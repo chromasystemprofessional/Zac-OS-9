@@ -1,5 +1,6 @@
 #include "finder.h"
 
+#include <QCoreApplication>
 #include <QDir>
 #include <QFile>
 #include <QProcess>
@@ -167,6 +168,8 @@ void Finder::command(const QString &name) {
 		showOriginal();
 	} else if (name.startsWith("label ")) {
 		setLabel(name.mid(6).toInt());
+	} else if (name == "classic") {
+		launchClassic();
 	} else if (name == "find") {
 		FindDialog::open();
 	} else if (name == "about") {
@@ -211,10 +214,36 @@ void Finder::openSelection() {
 				item->kind == PL_ICON_TRASH_EMPTY || item->kind == PL_ICON_TRASH_FULL) {
 			QDir().mkpath(item->path);
 			FolderWindow::open(item->path);
+		} else if (isMacDiskImage(item->path)) {
+			launchClassic({ item->path });
 		} else {
 			QProcess::startDetached("xdg-open", { item->path });
 		}
 	}
+}
+
+static QString classicLauncher() {
+	const QString local = QCoreApplication::applicationDirPath() + "/platinum-classic";
+	return QFileInfo(local).isExecutable() ? local : QStringLiteral("platinum-classic");
+}
+
+void Finder::launchClassic(const QStringList &disks) {
+	QStringList args;
+	for (const QString &d : disks) {
+		args << "--disk" << d;
+	}
+	QProcess check;
+	check.start(classicLauncher(), QStringList{ "--check" } + args);
+	if (!check.waitForFinished(15000) || check.exitStatus() != QProcess::NormalExit ||
+			check.exitCode() != 0) {
+		QString why = QString::fromUtf8(check.readAllStandardError()).trimmed();
+		if (why.isEmpty()) {
+			why = "Classic could not be started.";
+		}
+		Alert::ask(why, "OK", QString());
+		return;
+	}
+	QProcess::startDetached(classicLauncher(), args);
 }
 
 static bool isSpecial(const Item *item) {

@@ -26,6 +26,8 @@ const QString &Item::kindName() {
 	if (kindText.isEmpty()) {
 		if (isDir) {
 			kindText = "folder";
+		} else if (isMacDiskImage(path)) {
+			kindText = "Macintosh disk image";
 		} else if (kind == PL_ICON_APPLICATION) {
 			kindText = "application program";
 		} else {
@@ -64,6 +66,27 @@ pl_icon_kind iconKindFor(const QString &path) {
 		return PL_ICON_APPLICATION;
 	}
 	return PL_ICON_DOCUMENT;
+}
+
+bool isMacDiskImage(const QString &path) {
+	static const QStringList suffixes = {
+		"dsk", "img", "hfv", "hda", "toast", "iso", "cdr", "image",
+	};
+	QFileInfo info(path);
+	if (!info.isFile() || info.size() < 400 * 1024 ||
+			!suffixes.contains(info.suffix().toLower())) {
+		return false;
+	}
+	QFile f(path);
+	if (!f.open(QIODevice::ReadOnly)) {
+		return false;
+	}
+	const QByteArray head = f.read(1026);
+	if (head.size() < 1026) {
+		return false;
+	}
+	const QByteArray sig = head.mid(1024, 2);
+	return sig == "BD" || sig == "H+" || sig == "HX" || head.startsWith("ER");
 }
 
 int readLabel(const QString &path) {

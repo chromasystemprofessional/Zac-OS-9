@@ -61,6 +61,9 @@ public:
 	void putAway();
 	void showOriginal();
 	void setLabel(int label);
+	/* Start classic Mac OS (shell/classic/platinum-classic), with extra
+	 * disk images; explains in an alert when ROM or emulator is missing. */
+	void launchClassic(const QStringList &disks = {});
 
 	/* Spring-loaded folders: hovering a drag over a folder opens it; the
 	 * windows that sprang open close again when the drag ends. Each view

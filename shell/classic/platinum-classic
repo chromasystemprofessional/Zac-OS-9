@@ -1,0 +1,165 @@
+#!/bin/sh
+# platinum-classic: run classic Mac OS in an emulator window.
+#
+#   platinum-classic [--check] [--68k] [--disk IMAGE]...
+#
+# The user supplies Apple's files: ROMs and system disk images go in
+# ~/Classic (or $PLATINUM_CLASSIC_DIR), up to two folders deep. ROMs are
+# recognised by their checksum, disks by their HFS or
+# partition-map signature, so file names don't matter.
+#
+# PowerPC (SheepShaver, Mac OS 7.5.2 to 9.0.4) is the default; --68k uses
+# Basilisk II (System 7 to Mac OS 8.1). The home folder is shared with
+# the Mac as the "Unix" volume. --check only reports what would run;
+# problems go to stderr, one line, with exit status 2.
+set -eu
+
+classic_dir=${PLATINUM_CLASSIC_DIR:-$HOME/Classic}
+self_dir=$(cd "$(dirname "$0")" && pwd)
+check=false
+arch=ppc
+extra_disks=""
+
+while [ $# -gt 0 ]; do
+	case $1 in
+	--check) check=true ;;
+	--68k) arch=68k ;;
+	--disk) shift; extra_disks="$extra_disks
+$1" ;;
+	*) echo "usage: platinum-classic [--check] [--68k] [--disk IMAGE]..." >&2; exit 64 ;;
+	esac
+	shift
+done
+
+fail() {
+	echo "$1" >&2
+	exit 2
+}
+
+# ROM checksums (the first four bytes), best first. SheepShaver wants an
+# Old World PowerPC ROM; Basilisk II a 32-bit clean 68040 ROM.
+PPC_ROMS="9630c68b 96cd923d 960fc647 960e4be9 9feb69b3 9b7a3aad"
+M68K_ROMS="f1acad13 f1a6f343 420dbff3 3dc27823 ff7439ee 368cadfe 36b7fb6c"
+
+checksum() {
+	od -An -tx1 -N4 "$1" 2>/dev/null | tr -d ' \n'
+}
+
+candidates() {
+	find -H "$classic_dir" -maxdepth 3 -type f 2>/dev/null
+}
+
+find_rom() {
+	want=$1
+	list=$(candidates)
+	for sum in $want; do
+		echo "$list" | while IFS= read -r f; do
+			[ -n "$f" ] || continue
+			size=$(wc -c <"$f")
+			# 68k ROMs are 512K-1M; Old World PPC ROMs are 4M.
+			case $size in 524288|1048576|4194304) ;; *) continue ;; esac
+			if [ "$(checksum "$f")" = "$sum" ]; then
+				echo "$f"
+				break
+			fi
+		done | head -n 1 | grep . && return 0
+	done
+	# A New World "Mac OS ROM" file (from a Mac OS 9 CD) also suits SheepShaver.
+	if [ "$want" = "$PPC_ROMS" ]; then
+		echo "$list" | while IFS= read -r f; do
+			[ -n "$f" ] && head -c 12 "$f" 2>/dev/null | grep -q '<CHRP-BOOT>' && echo "$f"
+		done | head -n 1 | grep . && return 0
+	fi
+	return 1
+}
+
+# HFS ("BD"), HFS+ ("H+"/"HX") at 1024, or an Apple partition map ("ER").
+is_mac_disk() {
+	sig=$(dd if="$1" bs=1 skip=1024 count=2 2>/dev/null)
+	case $sig in BD|H+|HX) return 0 ;; esac
+	[ "$(dd if="$1" bs=1 count=2 2>/dev/null)" = "ER" ]
+}
+
+find_disks() {
+	candidates | while IFS= read -r f; do
+		[ -n "$f" ] || continue
+		[ "$(wc -c <"$f")" -ge 409600 ] || continue
+		# .dsk/.hfv are emulator hard disks: blank ones count too, so
+		# the Mac can initialise them.
+		case $f in *.dsk|*.hfv) echo "$f"; continue ;; esac
+		is_mac_disk "$f" && echo "$f"
+	done
+}
+
+emulator() {
+	for dir in ${PLATINUM_EMULATORS:-} "$self_dir/../emulators/bin" \
+			"$self_dir/../libexec/platinum"; do
+		[ -x "$dir/$1" ] && { echo "$(cd "$dir" && pwd)/$1"; return 0; }
+	done
+	command -v "$1"
+}
+
+[ -d "$classic_dir" ] || fail "Put Macintosh ROM files and system disk images in the folder \"$(basename "$classic_dir")\" in your home folder."
+
+if [ $arch = ppc ]; then
+	program=SheepShaver
+	rom=$(find_rom "$PPC_ROMS") || fail "No PowerPC Macintosh ROM was found in \"$(basename "$classic_dir")\". SheepShaver needs an Old World ROM (Power Mac 7200 to 9600) or a \"Mac OS ROM\" file."
+	ram=268435456
+else
+	program=BasiliskII
+	rom=$(find_rom "$M68K_ROMS") || fail "No 68040 Macintosh ROM was found in \"$(basename "$classic_dir")\". Basilisk II needs a Quadra or Centris ROM."
+	ram=67108864
+fi
+exe=$(emulator $program) || fail "$program isn't installed. Build it with emulation/build-emulators.sh."
+
+disks=$(printf '%s\n%s\n' "$extra_disks" "$(find_disks)" | grep . | awk '!seen[$0]++' || true)
+
+# Installing from a CD image needs a hard disk to install onto: make a
+# blank one (sparse, 2 GB), which the installer offers to initialise.
+is_cd() {
+	case $1 in *.iso|*.toast|*.cdr|*.ISO|*.TOAST|*.CDR) return 0 ;; esac
+	return 1
+}
+has_cd=false has_hd=false
+old_ifs=$IFS
+IFS='
+'
+for d in $disks; do
+	if is_cd "$d"; then has_cd=true; else has_hd=true; fi
+done
+IFS=$old_ifs
+blank="$classic_dir/Macintosh HD.dsk"
+if $has_cd && ! $has_hd; then
+	if $check; then
+		disks=$(printf '%s\n%s (blank, made at first start)\n' "$disks" "$blank")
+	else
+		truncate -s 2G "$blank"
+		disks=$(printf '%s\n%s\n' "$disks" "$blank")
+	fi
+fi
+
+if $check; then
+	echo "emulator: $exe"
+	echo "rom: $rom"
+	echo "$disks" | sed -n 's/^./disk: &/p'
+	[ -n "$disks" ] || echo "disks: none (the Mac will wait for a startup disk)"
+	exit 0
+fi
+
+set -- --rom "$rom" --ramsize $ram --screen win/800/600 --extfs "$HOME" --nogui true
+# CD images are read-only ("*" prefix); writable disks stay writable.
+old_ifs=$IFS
+IFS='
+'
+for d in $disks; do
+	if is_cd "$d"; then
+		set -- "$@" --disk "*$d"
+	else
+		set -- "$@" --disk "$d"
+	fi
+done
+IFS=$old_ifs
+
+# SDL's Wayland backend never shows a window here; Xwayland works.
+# TODO: find out why (frame callbacks? libdecor?).
+SDL_VIDEODRIVER=x11 exec "$exe" "$@"

@@ -141,6 +141,8 @@ void launch_fill_logo_menu(struct mb_menu *menu) {
 	/* Shown by the Finder. */
 	add_item(menu, "About This Computer…", true, ACT_ABOUT, NULL);
 	add_item(menu, NULL, false, ACT_NONE, NULL);
+	/* Classic Mac OS in an emulator; the Finder explains what's missing. */
+	add_item(menu, "Classic", true, ACT_FINDER, "classic");
 
 	struct entry entries[MAX_ITEMS];
 	int n = read_items_dir(entries, MAX_ITEMS - 4);

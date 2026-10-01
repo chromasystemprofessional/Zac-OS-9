@@ -69,11 +69,20 @@ scaling only, original behaviors and timings).
 - To measure: icon grid and label metrics, Get Info layout, alert margins,
   selected list row, expanded triangle.
 
-## Phase 4: Classic app emulation
-- Package SheepShaver (PowerPC, up to Mac OS 9.0.4) and Basilisk II (68k, up to 8.1).
-- Shared folder bridge between the Finder and the emulated Mac.
-- Double-clicking a classic app or document launches it through the emulator.
-- Setup assistant that checks the user-supplied ROM and system disk.
+## Phase 4: Classic app emulation (in progress)
+- Done:
+  - SheepShaver (PowerPC, up to Mac OS 9.0.4) and Basilisk II (68k, up to
+    8.1), built from source by `emulation/build-emulators.sh`.
+  - `platinum-classic`: picks ROMs by checksum and disk images by signature
+    from `~/Classic`, shares the home folder as the Mac's "Unix" volume,
+    and makes a blank disk for installing from a CD image.
+  - Logo menu > Classic; double-clicking a Mac disk image boots it; alerts
+    explain a missing ROM or emulator.
+- Next:
+  - Boot Mac OS 9 from the user's disk (waiting on a disk image).
+  - Double-clicking a classic app or document launches it in the emulator.
+  - SDL's Wayland backend under platinum-wm (Xwayland for now).
+  - Packaging the emulators (Phase 7).
 
 ## Phase 5: Control Panels and theming
 - Appearance, Date & Time, Sound, Monitors, Mouse, Keyboard: wired to

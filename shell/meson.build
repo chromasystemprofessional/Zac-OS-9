@@ -30,6 +30,11 @@ foreach xml : client_protocols
   )
 endforeach
 
+# The classic Mac OS launcher, next to the Finder that runs it.
+configure_file(input: 'classic/platinum-classic', output: 'platinum-classic', copy: true)
+install_data('classic/platinum-classic', install_dir: get_option('bindir'),
+  install_mode: 'rwxr-xr-x')
+
 executable('platinum-menubar',
   'menubar/main.c',
   'menubar/menus.c',
