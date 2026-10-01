@@ -17,7 +17,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/inotify.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
 #include <sys/timerfd.h>
 #include <time.h>
 #include <unistd.h>
@@ -544,7 +546,7 @@ static void pointer_pressed(void) {
 	enum side side;
 	int index;
 	bool on_title = title_at(g.px, g.py, &side, &index);
-	if (g.open_index < 0 && !on_title && g.py < MBAR_HEIGHT && g.model.n_right > 0 &&
+	if (g.open_index < 0 && !on_title && g.py < MBAR_HEIGHT && g.model.has_clock &&
 			mbar_title_at(g.model.right_titles, 1, (int)g.px) == 0) {
 		/* The clock: a click flips between time and date. */
 		menus_toggle_clock();
@@ -883,6 +885,21 @@ int main(void) {
 	g.blink_fd = timerfd_create(CLOCK_MONOTONIC, TFD_CLOEXEC | TFD_NONBLOCK);
 	arm_clock();
 
+	/* Watch the settings folder (the panels write desktop.conf there). */
+	int settings_fd = inotify_init1(IN_CLOEXEC | IN_NONBLOCK);
+	if (settings_fd >= 0) {
+		const char *config = getenv("XDG_CONFIG_HOME");
+		const char *home = getenv("HOME");
+		char dir[1024];
+		if (config && *config) {
+			snprintf(dir, sizeof(dir), "%s/platinum", config);
+		} else {
+			snprintf(dir, sizeof(dir), "%s/.config/platinum", home ? home : "");
+		}
+		mkdir(dir, 0755);
+		inotify_add_watch(settings_fd, dir, IN_CLOSE_WRITE | IN_MOVED_TO | IN_DELETE);
+	}
+
 	g.running = true;
 	while (g.running) {
 		while (wl_display_prepare_read(g.display) != 0) {
@@ -894,10 +911,11 @@ int main(void) {
 			{ .fd = g.clock_fd, .events = POLLIN },
 			{ .fd = g.blink_fd, .events = POLLIN },
 			{ .fd = finder_fd(), .events = POLLIN }, /* -1 is ignored */
+			{ .fd = settings_fd, .events = POLLIN },
 		};
 		/* The Finder may start after us, or restart: while we have no line
 		 * to it, look again every second. */
-		if (poll(fds, 4, finder_fd() < 0 ? 1000 : -1) < 0 && errno != EINTR) {
+		if (poll(fds, 5, finder_fd() < 0 ? 1000 : -1) < 0 && errno != EINTR) {
 			wl_display_cancel_read(g.display);
 			break;
 		}
@@ -921,6 +939,13 @@ int main(void) {
 		if ((fds[2].revents & POLLIN) &&
 				read(g.blink_fd, &expirations, sizeof(expirations)) > 0) {
 			blink_tick();
+		}
+		if (settings_fd >= 0 && (fds[4].revents & POLLIN)) {
+			/* desktop.conf changed: clock options, accent colour. */
+			char events[4096];
+			while (read(settings_fd, events, sizeof(events)) > 0) {
+			}
+			menubar_apps_changed();
 		}
 		if (fds[3].fd >= 0 && (fds[3].revents & (POLLIN | POLLHUP)) && finder_read()) {
 			menubar_apps_changed(); /* re-enable Finder menu items */

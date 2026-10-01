@@ -171,6 +171,7 @@ void launch_fill_logo_menu(struct mb_menu *menu) {
 	menu->items[menu->n - 1].submenu = panels;
 	const struct { const char *name, *program; } panel_list[] = {
 		{ "Appearance", "platinum-appearance" },
+		{ "Date & Time", "platinum-datetime" },
 	};
 	for (size_t i = 0; i < sizeof(panel_list) / sizeof(panel_list[0]); i++) {
 		char command[PATH_MAX + 64];

@@ -93,6 +93,7 @@ struct mb_bar {
 	int n_left;
 	struct mb_menu right[2];           /* clock (no menu), Application menu */
 	int n_right;
+	bool has_clock;                    /* right[0] is the clock */
 	struct mbar_title left_titles[MAX_TITLES], right_titles[2];
 };
 

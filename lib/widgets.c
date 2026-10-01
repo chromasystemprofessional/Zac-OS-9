@@ -75,6 +75,157 @@ void pl_button_paint(struct pl_canvas *c, int x, int y, int w,
 	}
 }
 
+/* ---- checkbox (figures 2-8, 6-1) ------------------------------------------ */
+
+/* Measured at 1:1 in figure 6-1 (checked) and 2-8 (unchecked). 'K' black,
+ * 'W' white, '.' leaves the background; digits/letters are greys. The
+ * check mark is anti-aliased into the box's face. */
+static const char *const check_off[12] = {
+	"KKKKKKKKKKKK", "KWWWWWWWWWdK", "KWdddddddd8K", "KWdddddddd8K",
+	"KWdddddddd8K", "KWdddddddd8K", "KWdddddddd8K", "KWdddddddd8K",
+	"KWdddddddd8K", "KWdddddddd8K", "Kd888888888K", "KKKKKKKKKKKK",
+};
+static const char *const check_on[12] = {
+	"KKKKKKKKKKKK..", "KWWWWWWWWWdKK.", "KWddddddddKK7a", "KWdddddddKKKa.",
+	"KWddddddKK5K..", "KWKKdddKK77K..", "KWdKKdKK7a8K..", "KWdaKKK7ad8K..",
+	"KWddaK7add8K..", "KWddd7addd8K..", "Kd888888888K..", "KKKKKKKKKKKK..",
+};
+
+static uint32_t grey_char(char ch) {
+	switch (ch) {
+	case 'K': return C_BLACK;
+	case 'W': return C_WHITE;
+	case '5': return GRAY(0x5);
+	case '7': return GRAY(0x7);
+	case '8': return GRAY(0x8);
+	case '9': return GRAY(0x9);
+	case 'a': return GRAY(0xA);
+	default: return GRAY(0xD);
+	}
+}
+
+void pl_checkbox_paint(struct pl_canvas *c, int x, int y, enum pl_check value,
+		bool pressed, bool enabled, const struct plat_text *label) {
+	const char *const *rows = value == PL_CHECK_ON ? check_on : check_off;
+	for (int j = 0; j < PL_CHECKBOX_SIZE; j++) {
+		for (int i = 0; rows[j][i]; i++) {
+			const char ch = rows[j][i];
+			if (ch == '.') {
+				continue;
+			}
+			/* The bevel: white top and left, #888 bottom and right. */
+			const bool bevel_hi = ch == 'W';
+			const bool bevel_lo = ch == '8' && (j == 10 || i == 10);
+			const bool face = ch == 'd';
+			uint32_t v = grey_char(ch);
+			if (pressed && enabled) {
+				/* Pressed: #555 highlight, #777 face, #999 shade (figure 2-8). */
+				v = bevel_hi ? GRAY(0x5) : face ? GRAY(0x7) : bevel_lo ? GRAY(0x9) : v;
+			} else if (!enabled) {
+				/* Disabled: a grey frame and mark on a flat face. */
+				v = ch == 'K' ? GRAY(0x8) : GRAY(0xD);
+			}
+			pl_put(c, x + i, y + j, v);
+		}
+	}
+	if (value == PL_CHECK_MIXED) {
+		/* A dash across the middle. */
+		const uint32_t v = enabled ? C_BLACK : GRAY(0x8);
+		pl_fill(c, x + 2, y + 5, x + 9, y + 6, v);
+	}
+	if (label && label->ink_l >= 0) {
+		pl_text(c, label, x + PL_CHECKBOX_LABEL_X, y + PL_CHECKBOX_BASELINE,
+			enabled ? C_BLACK : GRAY(0x8));
+	}
+}
+
+/* ---- little arrows (figures 2-20, 2-22) --------------------------------------- */
+
+static void arrow_box(struct pl_canvas *c, int x, int y, bool up, bool pressed, bool enabled) {
+	/* A 13 x 12 box sharing its top or bottom line with its partner. */
+	const int x1 = x + PL_ARROWS_W - 1, y1 = y + 11;
+	const uint32_t hi = pressed ? GRAY(0x5) : C_WHITE;
+	const uint32_t face = pressed ? GRAY(0x7) : GRAY(0xD);
+	const uint32_t lo = pressed ? GRAY(0x9) : GRAY(0xA);
+	pl_fill(c, x + 1, y + 1, x1 - 1, y1 - 1, face);
+	pl_hline(c, x + 1, x1 - 2, y + 1, hi);
+	pl_vline(c, x + 1, y + 1, y1 - 2, hi);
+	pl_put(c, x1 - 1, y + 1, face);
+	pl_vline(c, x1 - 1, y + 2, y1 - 1, lo);
+	pl_hline(c, x + 2, x1 - 1, y1 - 1, lo);
+	pl_put(c, x + 1, y1 - 1, face);
+	/* The triangle: 1, 3, 5, 7 px wide, centred on x + 6. */
+	const uint32_t ink = enabled ? C_BLACK : GRAY(0x8);
+	for (int r = 0; r < 4; r++) {
+		const int row = up ? y + 4 + r : y + 7 - r;
+		pl_hline(c, x + 6 - r, x + 6 + r, row, ink);
+	}
+}
+
+void pl_little_arrows_paint(struct pl_canvas *c, int x, int y, enum pl_arrows_part pressed,
+		bool enabled) {
+	const int x1 = x + PL_ARROWS_W - 1, y1 = y + PL_ARROWS_H - 1;
+	arrow_box(c, x, y, true, pressed == PL_ARROWS_UP, enabled);
+	arrow_box(c, x, y + 11, false, pressed == PL_ARROWS_DOWN, enabled);
+	/* Black lines around and between, the outer corners left out. */
+	const uint32_t line = enabled ? C_BLACK : GRAY(0x8);
+	pl_hline(c, x + 1, x1 - 1, y, line);
+	pl_hline(c, x + 1, x1 - 1, y1, line);
+	pl_hline(c, x, x1, y + 11, line);
+	pl_vline(c, x, y + 1, y1 - 1, line);
+	pl_vline(c, x1, y + 1, y1 - 1, line);
+}
+
+enum pl_arrows_part pl_little_arrows_hit(int x, int y, int px, int py) {
+	if (px < x || px >= x + PL_ARROWS_W || py < y || py >= y + PL_ARROWS_H) {
+		return PL_ARROWS_NONE;
+	}
+	return py < y + 11 ? PL_ARROWS_UP : PL_ARROWS_DOWN;
+}
+
+/* ---- clock control (figure 2-22) ----------------------------------------------- */
+
+void pl_clock_paint(struct pl_canvas *c, int x0, int y0, int field_w, bool focused,
+		enum pl_arrows_part pressed, bool enabled, struct pl_accent accent, uint32_t bg) {
+	const int fx1 = x0 + field_w - 1, y1 = y0 + PL_CLOCK_H - 1;
+	const int ax = PL_CLOCK_ARROWS_X(x0, field_w), ax1 = ax + PL_ARROWS_W - 1;
+	if (focused) {
+		/* Two rows of ring above, and down the sides; one row below the
+		 * arrows but two below the field. */
+		pl_fill(c, x0 - 2, y0 - 2, ax1 + 2, y1 + 1, accent.dark);
+		pl_hline(c, x0 - 2, fx1 + 1, y1 + 2, accent.dark);
+		pl_put(c, x0 - 2, y0 - 2, bg);
+		pl_put(c, ax1 + 2, y0 - 2, bg);
+		pl_put(c, x0 - 2, y1 + 2, bg);
+	}
+	const uint32_t line = enabled ? C_BLACK : GRAY(0x8);
+	pl_outline(c, x0, y0, fx1, y1, line);
+	pl_fill(c, x0 + 1, y0 + 1, fx1 - 1, y1 - 1, C_WHITE);
+	pl_little_arrows_paint(c, ax, y0, pressed, enabled);
+}
+
+/* ---- edit text frame and focus ring ------------------------------------------- */
+
+void pl_edit_frame_paint(struct pl_canvas *c, int x0, int y0, int x1, int y1) {
+	pl_hline(c, x0 - 1, x1, y0 - 1, GRAY(0x8));
+	pl_vline(c, x0 - 1, y0 - 1, y1, GRAY(0x8));
+	pl_hline(c, x0, x1 + 1, y1 + 1, C_WHITE);
+	pl_vline(c, x1 + 1, y0, y1 + 1, C_WHITE);
+	pl_outline(c, x0, y0, x1, y1, C_BLACK);
+	pl_fill(c, x0 + 1, y0 + 1, x1 - 1, y1 - 1, C_WHITE);
+}
+
+void pl_focus_ring_paint(struct pl_canvas *c, int x0, int y0, int x1, int y1,
+		struct pl_accent accent, uint32_t bg) {
+	for (int k = 1; k <= 2; k++) {
+		pl_outline(c, x0 - k, y0 - k, x1 + k, y1 + k, accent.dark);
+	}
+	pl_put(c, x0 - 2, y0 - 2, bg);
+	pl_put(c, x1 + 2, y0 - 2, bg);
+	pl_put(c, x0 - 2, y1 + 2, bg);
+	pl_put(c, x1 + 2, y1 + 2, bg);
+}
+
 /* ---- group box (figure 2-38) ------------------------------------------- */
 
 void pl_group_box_paint(struct pl_canvas *c, int x0, int y0, int x1, int y1,

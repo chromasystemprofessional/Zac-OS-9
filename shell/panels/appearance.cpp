@@ -31,53 +31,6 @@ static void setSetting(const char *key, const QString &value) {
 	pl_setting_set(key, value.isEmpty() ? nullptr : value.toUtf8().constData());
 }
 
-/* ---- list boxes ------------------------------------------------------------ */
-
-void PanelList::setItems(const QStringList &list) {
-	items = list;
-	texts.clear();
-	for (const QString &s : list) {
-		texts.push_back(std::make_unique<Text>(s, frame.width() - SB_WIDTH - 8, PL_FONT_SYSTEM));
-	}
-	state.n = static_cast<int>(texts.size());
-}
-
-pl_list PanelList::view() const {
-	pl_list v = state;
-	static thread_local std::vector<const plat_text *> rows;
-	rows.clear();
-	for (auto &t : texts) {
-		rows.push_back(t->t);
-	}
-	v.rows = rows.data();
-	return v;
-}
-
-void PanelList::scrollTo(int top) {
-	const int visible = pl_list_visible_rows(frame.top(), frame.bottom());
-	state.top = std::clamp(top, 0, std::max(0, state.n - visible));
-}
-
-void PanelList::ensureVisible(int row) {
-	const int visible = pl_list_visible_rows(frame.top(), frame.bottom());
-	if (row < state.top) {
-		scrollTo(row);
-	} else if (row >= state.top + visible) {
-		scrollTo(row - visible + 1);
-	}
-}
-
-void PanelList::select(int row, bool notify) {
-	if (row < 0 || row >= state.n) {
-		return;
-	}
-	state.selected = row;
-	ensureVisible(row);
-	if (notify && picked) {
-		picked(row);
-	}
-}
-
 /* ---- the panel ---------------------------------------------------------------- */
 
 AppearancePanel::AppearancePanel() {
@@ -190,10 +143,7 @@ std::vector<PanelList *> AppearancePanel::visibleLists() {
 }
 
 static void paintList(pl_canvas *c, PanelList &l, bool focused) {
-	pl_list v = l.view();
-	v.focused = focused;
-	pl_list_paint(c, l.frame.left(), l.frame.top(), l.frame.right(), l.frame.bottom(), &v,
-		pl_accent_current(), pl_highlight_current());
+	l.paint(c, focused);
 }
 
 /* A group box around `inner` (its items), with the HIG's margins. */
@@ -286,32 +236,11 @@ void AppearancePanel::mousePressEvent(QMouseEvent *e) {
 		return;
 	}
 	for (PanelList *l : visibleLists()) {
-		const QRect f = l->frame;
-		if (!f.contains(pos)) {
-			continue;
+		if (l->press(pos)) {
+			m_focus = l;
+			update();
+			return;
 		}
-		m_focus = l;
-		if (pos.x() >= f.right() - SB_WIDTH + 1) {
-			/* The scroll bar: arrows step a row, the track a page. */
-			pl_scrollbar sb = pl_list_scrollbar(f.top(), f.bottom(), &l->state);
-			const int visible = pl_list_visible_rows(f.top(), f.bottom());
-			switch (sb_hit(&sb, pos.y() - f.top())) {
-			case SB_DEC_ARROW: l->scrollTo(l->state.top - 1); break;
-			case SB_INC_ARROW: l->scrollTo(l->state.top + 1); break;
-			case SB_DEC_PAGE: l->scrollTo(l->state.top - visible); break;
-			case SB_INC_PAGE: l->scrollTo(l->state.top + visible); break;
-			default: break;
-			}
-		} else {
-			pl_list v = l->view();
-			const int row = pl_list_row_at(f.left(), f.top(), f.right(), f.bottom(), &v,
-				pos.x(), pos.y());
-			if (row >= 0) {
-				l->select(row, true);
-			}
-		}
-		update();
-		return;
 	}
 }
 
@@ -323,16 +252,12 @@ void AppearancePanel::keyPressEvent(QKeyEvent *e) {
 	if (!m_focus) {
 		return;
 	}
-	if (e->key() == Qt::Key_Up) {
-		m_focus->select(m_focus->state.selected - 1, true);
-	} else if (e->key() == Qt::Key_Down) {
-		m_focus->select(m_focus->state.selected + 1, true);
-	} else if (e->key() == Qt::Key_Tab) {
+	if (e->key() == Qt::Key_Tab) {
 		/* Tab moves the focus between the lists on this pane. */
 		auto lists = visibleLists();
 		auto it = std::find(lists.begin(), lists.end(), m_focus);
 		m_focus = (it == lists.end() || it + 1 == lists.end()) ? lists.front() : *(it + 1);
-	} else {
+	} else if (!m_focus->key(e->key(), e->text())) {
 		return;
 	}
 	update();

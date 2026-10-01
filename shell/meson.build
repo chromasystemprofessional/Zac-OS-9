@@ -83,11 +83,30 @@ executable('platinum-finder',
 )
 
 # Control panels.
+panelkit = static_library('panelkit', 'panels/panelkit.cpp',
+  include_directories: include_directories('finder'),
+  dependencies: [platinum_dep, qt6],
+  cpp_args: ['-std=c++17'],
+)
 executable('platinum-appearance',
   'panels/main.cpp',
   'panels/appearance.cpp',
+  link_with: panelkit,
   include_directories: include_directories('finder'), # pixels.h
   dependencies: [platinum_dep, qt6],
+  cpp_args: ['-std=c++17'],
+  install: true,
+)
+
+executable('platinum-datetime',
+  'panels/datetime_main.cpp',
+  'panels/datetime.cpp',
+  'finder/alert.cpp',
+  'finder/platinumshell.cpp',
+  finder_protocol,
+  link_with: panelkit,
+  include_directories: include_directories('finder'),
+  dependencies: [platinum_dep, qt6, wayland_client],
   cpp_args: ['-std=c++17'],
   install: true,
 )

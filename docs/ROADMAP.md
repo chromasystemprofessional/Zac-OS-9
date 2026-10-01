@@ -94,10 +94,16 @@ scaling only, original behaviors and timings).
     the logo menu's Control Panels submenu; changes apply at once.
   - Desktop entries in share/applications; platinum-wm puts its ../share
     on XDG_DATA_DIRS so the menu bar names our apps.
+  - Checkbox, little arrows, clock control and edit-text frame, matching
+    HIG figures 2-8, 6-1, 2-20 and 2-22 pixel for pixel.
+  - Date & Time control panel: date and time in clock controls, time
+    zone picker and network time (timedated, via timedatectl), and the
+    menu bar clock's options (hidden, 24-hour, day of the week), which
+    the menu bar follows live.
 - Next:
-  - Date & Time, Mouse, Keyboard, Monitors, Sound volume: wired to Linux
-    backends (systemd-timedated, PipeWire, wlr-output-management…).
-  - Pop-up menu buttons and checkboxes (for panels that need them).
+  - Mouse, Keyboard, Monitors, Sound volume: wired to Linux backends
+    (PipeWire, wlr-output-management...).
+  - Pop-up menu buttons (for panels that need them).
   - Platinum QStyle plugin and GTK3/4 theme, so third-party apps match.
 
 ## Phase 6: Original assets (in progress)

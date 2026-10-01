@@ -7,24 +7,7 @@
 #include <memory>
 #include <vector>
 
-#include "pixels.h"
-#include "widgets.h"
-
-/* A Platinum list box inside a panel: its rows, selection and scrolling. */
-struct PanelList {
-	QRect frame; /* the black frame */
-	QStringList items;
-	std::vector<std::unique_ptr<Text>> texts;
-	pl_list state{};
-	/* Called with the new row when the user picks one. */
-	std::function<void(int)> picked;
-
-	void setItems(const QStringList &items);
-	void select(int row, bool notify);
-	void scrollTo(int top);
-	void ensureVisible(int row);
-	pl_list view() const;
-};
+#include "panelkit.h"
 
 /*
  * The Appearance control panel, after Mac OS 8's (HIG figure 6-1): a tab

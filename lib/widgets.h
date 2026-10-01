@@ -94,6 +94,46 @@ void pl_tabs_paint(struct pl_canvas *c, int x0, int y0, int x1, int y1,
 /* The tab under (x, y), or -1. */
 int pl_tabs_hit(int x0, int y0, const struct plat_text *const *labels, int n, int x, int y);
 
+/* Checkbox (HIG figure 2-8, and the checked boxes of figure 6-1): a 12 px
+ * box whose check mark pokes 2 px out of its top right. The label's ink
+ * starts PL_CHECKBOX_LABEL_X from the box, baseline 9 rows below its top. */
+#define PL_CHECKBOX_SIZE 12
+#define PL_CHECKBOX_LABEL_X 17
+#define PL_CHECKBOX_BASELINE 9
+enum pl_check { PL_CHECK_OFF, PL_CHECK_ON, PL_CHECK_MIXED };
+void pl_checkbox_paint(struct pl_canvas *c, int x, int y, enum pl_check value,
+		bool pressed, bool enabled, const struct plat_text *label);
+
+/* Little arrows (HIG figures 2-20, 2-22): two stacked 13 x 12 buttons
+ * sharing a line, 13 x 23 in all, with clipped corners. */
+#define PL_ARROWS_W 13
+#define PL_ARROWS_H 23
+enum pl_arrows_part { PL_ARROWS_NONE, PL_ARROWS_UP, PL_ARROWS_DOWN };
+void pl_little_arrows_paint(struct pl_canvas *c, int x, int y, enum pl_arrows_part pressed,
+		bool enabled);
+enum pl_arrows_part pl_little_arrows_hit(int x, int y, int px, int py);
+
+/* Edit text frame (HIG figures 2-28, 3-30): a white field in a black
+ * frame (22 px tall as standard), #888 just outside its top and left,
+ * white outside its bottom and right. */
+#define PL_EDIT_H 22
+void pl_edit_frame_paint(struct pl_canvas *c, int x0, int y0, int x1, int y1);
+
+/* Clock control (HIG figure 2-22): a 23 px tall field (black frame,
+ * white inside) with little arrows 2 px to its right. When focused, the
+ * ring's colour fills behind both, as in the figure. The caller draws
+ * the date or time text and the highlighted part inside the field. */
+#define PL_CLOCK_H 23
+void pl_clock_paint(struct pl_canvas *c, int x0, int y0, int field_w, bool focused,
+		enum pl_arrows_part pressed, bool enabled, struct pl_accent accent, uint32_t bg);
+/* The little arrows' x for a clock control at x0 with this field width. */
+#define PL_CLOCK_ARROWS_X(x0, field_w) ((x0) + (field_w) + 2)
+
+/* The keyboard focus ring (figures 2-22, 2-25, 3-11): 2 px of the accent's
+ * dark shade around x0..x1, y0..y1, outer corners clipped to `bg`. */
+void pl_focus_ring_paint(struct pl_canvas *c, int x0, int y0, int x1, int y1,
+		struct pl_accent accent, uint32_t bg);
+
 /* Determinate progress indicator (HIG figures 2-45, 3-31): 12 px tall
  * between its black lines, `w` wide including them, with a one-pixel
  * bevel outside. `fraction` is 0..1. */

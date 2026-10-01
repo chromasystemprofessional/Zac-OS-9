@@ -186,6 +186,60 @@ static int run_tabs(const char *dir, int *ran) {
 	return fails > 0 ? fails : 0;
 }
 
+/* Draw into a canvas filled with `bg`, compare the given regions. */
+static int compare_drawing(const char *dir, const char *name, const char *fig, int fx, int fy,
+		int w, int h, uint32_t bg, void (*draw)(struct pl_canvas *),
+		const struct fig_rect *regions, int nr, int *ran) {
+	uint32_t *px = calloc((size_t)w * h, sizeof(*px));
+	struct pl_canvas c = { .px = px, .stride = w, .width = w, .height = h };
+	pl_fill(&c, 0, 0, w - 1, h - 1, bg);
+	draw(&c);
+	int fails = fig_compare(name, dir, fig, fx, fy, px, w, h, regions, nr);
+	free(px);
+	if (fails >= 0) {
+		*ran = 1;
+	}
+	return fails > 0 ? fails : 0;
+}
+
+static void draw_checked(struct pl_canvas *c) {
+	pl_checkbox_paint(c, 0, 0, PL_CHECK_ON, false, true, NULL);
+}
+
+static void draw_unchecked(struct pl_canvas *c) {
+	pl_checkbox_paint(c, 1, 0, PL_CHECK_OFF, false, true, NULL);
+}
+
+static void draw_arrows(struct pl_canvas *c) {
+	pl_little_arrows_paint(c, 1, 1, PL_ARROWS_NONE, true);
+}
+
+static void draw_clock(struct pl_canvas *c) {
+	/* Focus ring around the field and the arrows, then the field frame
+	 * (black, white inside), then the arrows. */
+	pl_clock_paint(c, 6, 6, 104, true, PL_ARROWS_NONE, true, PL_ACCENT_DEFAULT, GRAY(0xD));
+}
+
+static int run_small_controls(const char *dir, int *ran) {
+	int fails = 0;
+	const struct fig_rect box[] = { { 0, 0, 14, 12 } };
+	fails += compare_drawing(dir, "checkbox, checked (fig 6-1)", "img-111-136.png", 30, 87,
+		14, 12, GRAY(0xE), draw_checked, box, 1, ran);
+	const struct fig_rect off[] = { { 1, 0, 11, 12 } };
+	fails += compare_drawing(dir, "checkbox, unchecked (fig 2-8)", "img-028-024.png", 0, 0,
+		12, 12, GRAY(0xD), draw_unchecked, off, 1, ran);
+	const struct fig_rect arrows[] = { { 0, 0, 15, 25 } };
+	fails += compare_drawing(dir, "little arrows (fig 2-20)", "img-036-053.png", 0, 0,
+		15, 25, C_WHITE, draw_arrows, arrows, 1, ran);
+	/* The whole clock control but the date text and its highlight. */
+	const struct fig_rect clock[] = {
+		{ 0, 0, 133, 8 }, { 0, 0, 16, 35 }, { 0, 24, 133, 11 }, { 90, 0, 43, 35 },
+	};
+	fails += compare_drawing(dir, "clock control (fig 2-22)", "img-037-055.png",
+		0, 0, 133, 35, GRAY(0xD), draw_clock, clock, 4, ran);
+	return fails;
+}
+
 int main(int argc, char *argv[]) {
 	const char *dir = argc > 1 ? argv[1] : "tools/measure/figs";
 	int ran = 0;
@@ -196,5 +250,6 @@ int main(int argc, char *argv[]) {
 	fails += run_group_box(dir, &ran);
 	fails += run_list_box(dir, &ran);
 	fails += run_tabs(dir, &ran);
+	fails += run_small_controls(dir, &ran);
 	return fig_exit_status(fails, ran);
 }

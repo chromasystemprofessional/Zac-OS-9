@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Date & Time
+Comment=Date, time, time zone and the menu bar clock
+Exec=platinum-datetime
+Categories=Settings;DesktopSettings;
+OnlyShowIn=Platinum;

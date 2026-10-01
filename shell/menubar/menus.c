@@ -5,6 +5,7 @@
 
 #include "icons.h"
 #include "menubar.h"
+#include "settings.h"
 
 #define TEXT_UNLIMITED 100000
 
@@ -113,17 +114,37 @@ void menus_toggle_clock(void) {
 	clock_shows_date = !clock_shows_date;
 }
 
+static bool setting_on(const char *key) {
+	char v[16];
+	return pl_setting(key, v, sizeof(v)) && (strcmp(v, "1") == 0 || strcmp(v, "true") == 0);
+}
+
+/* The clock's options come from the Date & Time panel (desktop.conf). */
+static bool clock_shown(void) {
+	char v[16];
+	return !(pl_setting("clock", v, sizeof(v)) && strcmp(v, "off") == 0);
+}
+
 static void clock_text(char *buf, size_t size) {
 	time_t now = time(NULL);
 	struct tm tm;
+	tzset(); /* the time zone may have just changed */
 	localtime_r(&now, &tm);
 	if (clock_shows_date) {
 		strftime(buf, size, "%a, %b %-d, %Y", &tm);
 		return;
 	}
+	char day[16] = "";
+	if (setting_on("clock-weekday")) {
+		strftime(day, sizeof(day), "%a ", &tm);
+	}
+	if (setting_on("clock-24h")) {
+		snprintf(buf, size, "%s%d:%02d", day, tm.tm_hour, tm.tm_min);
+		return;
+	}
 	/* Mac OS 8 default: 12-hour clock, "9:41 AM". */
 	int hour = tm.tm_hour % 12 ? tm.tm_hour % 12 : 12;
-	snprintf(buf, size, "%d:%02d %s", hour, tm.tm_min, tm.tm_hour < 12 ? "AM" : "PM");
+	snprintf(buf, size, "%s%d:%02d %s", day, hour, tm.tm_min, tm.tm_hour < 12 ? "AM" : "PM");
 }
 
 static void render_menu_text(struct mb_menu *m) {
@@ -166,9 +187,12 @@ void menus_rebuild(struct mb_bar *bar, int screen_w) {
 	}
 
 	/* Right: clock, then the Application menu. */
-	char clock[32];
-	clock_text(clock, sizeof(clock));
-	new_menu(bar->right, &bar->n_right, clock);
+	bar->has_clock = clock_shown();
+	if (bar->has_clock) {
+		char clock[48];
+		clock_text(clock, sizeof(clock));
+		new_menu(bar->right, &bar->n_right, clock);
+	}
 
 	struct mb_menu *am = new_menu(bar->right, &bar->n_right, front ? front->name : "Finder");
 	if (front) {
