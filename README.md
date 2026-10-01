@@ -35,6 +35,12 @@ inside it or close the window.
 
 Add `-d` for debug logging: `.\run -d -s foot`.
 
+**If the window shows on the taskbar but draws nothing** (you see your desktop
+wallpaper through it), WSLg's display bridge has gone stale. This is common
+after sleep or monitor changes on multi-monitor setups. Run `wsl --shutdown` in
+PowerShell and launch again. `wsl --terminate Debian` is not enough, because it
+doesn't restart WSLg.
+
 Build only: `wsl -d Debian -- scripts/build.sh`
 
 Full-session testing (real login, boot) happens in a Debian VM; see `docs/ROADMAP.md`.
