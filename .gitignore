@@ -9,3 +9,7 @@ emulation/roms/
 emulation/disks/
 *.ROM
 *.rom
+
+# Downloaded reference material (Apple-copyrighted): measure locally, never commit.
+tools/measure/hig-os8.pdf
+tools/measure/figs/
