@@ -96,9 +96,12 @@ scaling only, original behaviors and timings).
     string lays out to the pixel), composed accented letters, synthesised
     italic for alias names, DejaVu fallback for anything else
     (docs/reference/platinum-fonts.md).
+  - Icon set: folder, document, application, hard disk, Trash (empty and
+    full) and caution, as 32x32 and 16x16 pixel art in
+    assets/icons/platinum-icons.picon (tools/icons/build_icons.py).
 - Next:
-  - Icon set (32x32 and 16x16 pixel art), desktop patterns, cursor theme,
-    alert sounds, startup screen.
+  - More icons (disk images, Classic, aliases' targets), desktop patterns,
+    cursor theme, alert sounds, startup screen.
   - An application font (Geneva 12 metrics) for app content.
 
 ## Phase 7: Packaging and distribution

@@ -6,8 +6,8 @@ extern "C" {
 #endif
 
 /*
- * Finder icons: original artwork drawn from simple shapes.
- * TODO(phase 6): replace with hand-drawn 32x32 and 16x16 pixel art.
+ * Finder icons: Platinum 2026's own 32x32 and 16x16 pixel art
+ * (assets/icons/platinum-icons.picon).
  */
 
 #include "draw.h"

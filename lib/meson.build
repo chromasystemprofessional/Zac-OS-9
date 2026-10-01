@@ -43,3 +43,7 @@ if python3.found()
   test('fonts-current', python3,
     args: [meson.project_source_root() / 'tools/fonts/build_fonts.py', '--check'])
 endif
+if python3.found()
+  test('icons-current', python3,
+    args: [meson.project_source_root() / 'tools/icons/build_icons.py', '--check'])
+endif
