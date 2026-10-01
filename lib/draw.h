@@ -18,13 +18,30 @@
 
 #define C_BLACK GRAY(0x0)
 #define C_WHITE GRAY(0xF)
-/* Appearance accent ("highlight") color. Highlights have a one-row bevel:
- * light top row, base body, dark bottom row (HIG figures 4-1, 4-2). */
+/* Appearance accent color: a ramp of shades (docs/reference/platinum-finder.md).
+ * Scroll thumbs use the light end; menu highlights the dark end (top row
+ * `dark`, body `shadow`, bottom row `deep`). */
 struct pl_accent {
-	uint32_t light, base, dark;
+	uint32_t corner;  /* scroll thumb top-left pixel */
+	uint32_t grip_hi; /* scroll grip highlight */
+	uint32_t light;   /* scroll thumb edges, grip ridges */
+	uint32_t body;    /* scroll thumb */
+	uint32_t dark;    /* thumb edges; menu highlight top row */
+	uint32_t shadow;  /* grip shadow; menu highlight body */
+	uint32_t deep;    /* menu highlight bottom row */
 };
+/* Lavender, the Mac OS 8 default (HIG figures 2-24, 4-1). */
 #define PL_ACCENT_DEFAULT ((struct pl_accent){ \
-	RGB(0x66, 0x66, 0xCC), RGB(0x33, 0x33, 0x99), RGB(0x00, 0x00, 0x88) })
+	.corner = RGB(0xEE, 0xEE, 0xEE), .grip_hi = RGB(0xEE, 0xEE, 0xEE), \
+	.light = RGB(0xCC, 0xCC, 0xFF), .body = RGB(0x99, 0x99, 0xFF), \
+	.dark = RGB(0x66, 0x66, 0xCC), .shadow = RGB(0x33, 0x33, 0x99), \
+	.deep = RGB(0x00, 0x00, 0x88) })
+/* Green (HIG figure 2-26). TODO: its menu-highlight bottom row is unknown. */
+#define PL_ACCENT_GREEN ((struct pl_accent){ \
+	.corner = RGB(0xFF, 0xFF, 0xFF), .grip_hi = RGB(0xCC, 0xFF, 0xCC), \
+	.light = RGB(0x66, 0xFF, 0x99), .body = RGB(0x33, 0xCC, 0x66), \
+	.dark = RGB(0x33, 0x99, 0x66), .shadow = RGB(0x00, 0x66, 0x33), \
+	.deep = RGB(0x00, 0x33, 0x00) })
 
 /* A rectangle of ARGB8888 pixels positioned in some local coordinate
  * space; drawing outside it is clipped. */

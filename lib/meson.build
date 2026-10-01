@@ -6,6 +6,7 @@ platinum_lib = static_library('platinum',
   'draw.c',
   'text.c',
   'menudraw.c',
+  'widgets.c',
   include_directories: platinum_inc,
   dependencies: [cairo],
 )
@@ -24,6 +25,11 @@ figcompare_dep = declare_dependency(
 )
 test('menudraw',
   executable('test-menudraw', 'tests/test_menudraw.c',
+    dependencies: [figcompare_dep]),
+  args: [figs_dir],
+)
+test('widgets',
+  executable('test-widgets', 'tests/test_widgets.c',
     dependencies: [figcompare_dep]),
   args: [figs_dir],
 )

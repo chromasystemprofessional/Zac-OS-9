@@ -112,9 +112,9 @@ void mbar_paint_titles(struct pl_canvas *c, const struct mbar_title *titles,
 		const struct mbar_title *t = &titles[i];
 		bool hi = i == highlighted;
 		if (hi) {
-			pl_hline(c, t->hi_l, t->hi_r, 0, accent.light);
-			pl_fill(c, t->hi_l, 1, t->hi_r, MBAR_HEIGHT - 3, accent.base);
-			pl_hline(c, t->hi_l, t->hi_r, MBAR_HEIGHT - 2, accent.dark);
+			pl_hline(c, t->hi_l, t->hi_r, 0, accent.dark);
+			pl_fill(c, t->hi_l, 1, t->hi_r, MBAR_HEIGHT - 3, accent.shadow);
+			pl_hline(c, t->hi_l, t->hi_r, MBAR_HEIGHT - 2, accent.deep);
 		}
 		if (t->icon) {
 			pl_image(c, t->ink_l, MBAR_ICON_Y, t->icon, MBAR_ICON_SIZE, MBAR_ICON_SIZE);
@@ -197,7 +197,7 @@ void menu_paint(struct pl_canvas *c, const struct menu_item *items, int n,
 		 * the title's accent fill with white text. */
 		bool sel = i == selected && it->enabled;
 		if (sel) {
-			pl_fill(c, 1, y, W - 2, y + MENU_ITEM_H - 1, accent.base);
+			pl_fill(c, 1, y, W - 2, y + MENU_ITEM_H - 1, accent.shadow);
 		}
 		uint32_t color = sel ? C_WHITE : it->enabled ? C_BLACK : C_888;
 		pl_text(c, it->label, MENU_TEXT_X, y + MENU_ITEM_BASELINE, color);
