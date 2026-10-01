@@ -26,6 +26,46 @@ QString Finder::socketPath() {
 	return runtime + "/platinum-finder." + display + ".sock";
 }
 
+/* Mac OS 8's default spring delay is "medium". TODO: measure. */
+static constexpr int SPRING_MS = 900;
+
+void Finder::springHover(const QString &folder) {
+	if (folder == m_springPath) {
+		return;
+	}
+	m_springPath = folder;
+	if (!m_springTimer) {
+		m_springTimer = new QTimer;
+		m_springTimer->setSingleShot(true);
+		QObject::connect(m_springTimer, &QTimer::timeout, [this] {
+			if (m_springPath.isEmpty()) {
+				return;
+			}
+			const bool wasOpen = FolderWindow::isOpen(m_springPath);
+			FolderWindow *w = FolderWindow::open(m_springPath);
+			if (!wasOpen) {
+				m_sprung.push_back(w);
+			}
+			m_springPath.clear();
+		});
+	}
+	if (folder.isEmpty()) {
+		m_springTimer->stop();
+	} else {
+		m_springTimer->start(SPRING_MS);
+	}
+}
+
+void Finder::dragEnded() {
+	springHover(QString());
+	for (auto &w : m_sprung) {
+		if (w) {
+			w->close();
+		}
+	}
+	m_sprung.clear();
+}
+
 void Finder::start(Desktop *desktop) {
 	m_desktop = desktop;
 	m_front = desktop;

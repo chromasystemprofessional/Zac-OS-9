@@ -293,6 +293,7 @@ void Desktop::mouseMoveEvent(QMouseEvent *e) {
 	m_renameTimer.stop();
 	m_dragStart = m_pressPos;
 	startItemDrag(this, items, origins, m_pressPos);
+	Finder::instance().dragEnded();
 }
 
 void Desktop::mouseReleaseEvent(QMouseEvent *) {
@@ -324,10 +325,13 @@ void Desktop::dragMoveEvent(QDragMoveEvent *e) {
 	}
 	update();
 	e->acceptProposedAction();
+	/* Folders and the disk spring open (the Trash too, on a Mac). */
+	Finder::instance().springHover(target ? target->path : QString());
 }
 
 void Desktop::dragLeaveEvent(QDragLeaveEvent *) {
 	clearDropTarget();
+	Finder::instance().springHover(QString());
 }
 
 void Desktop::dropEvent(QDropEvent *e) {
@@ -353,6 +357,7 @@ void Desktop::dropEvent(QDropEvent *e) {
 		return;
 	}
 	dropItems(e, target, folderPath());
+	Finder::instance().dragEnded();
 }
 
 void Desktop::keyPressEvent(QKeyEvent *e) {

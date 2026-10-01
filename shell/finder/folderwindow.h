@@ -22,6 +22,7 @@ public:
 
 	/* Opens (or brings back) the window for `path`. */
 	static FolderWindow *open(const QString &path);
+	static bool isOpen(const QString &path);
 	/* Reload every open window showing `folder` (or a folder expanded in it). */
 	static void reloadAll(const QString &folder);
 	~FolderWindow() override;

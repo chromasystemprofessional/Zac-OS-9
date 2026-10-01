@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QLocalServer>
+#include <QTimer>
 #include <QLocalSocket>
 #include <QPointer>
 #include <QString>
@@ -59,6 +60,12 @@ public:
 	void putAway();
 	void showOriginal();
 
+	/* Spring-loaded folders: hovering a drag over a folder opens it; the
+	 * windows that sprang open close again when the drag ends. Each view
+	 * calls springHover() from its drag handlers. */
+	void springHover(const QString &folderOrEmpty);
+	void dragEnded();
+
 	/* Re-read every view showing `folder`, and the Trash icon. */
 	void folderChanged(const QString &folder);
 	/* Selection or front view changed: tell the menu bar. */
@@ -69,6 +76,9 @@ private:
 	QString stateLine();
 
 	Desktop *m_desktop = nullptr;
+	QString m_springPath;
+	QTimer *m_springTimer = nullptr;
+	std::vector<QPointer<QWidget>> m_sprung;
 	FinderView *m_front = nullptr;
 	QLocalServer m_server;
 	std::vector<QPointer<QLocalSocket>> m_clients;

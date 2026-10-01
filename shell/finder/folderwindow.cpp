@@ -120,6 +120,10 @@ FolderWindow *FolderWindow::open(const QString &path) {
 	return w;
 }
 
+bool FolderWindow::isOpen(const QString &path) {
+	return openWindows().contains(QDir(path).absolutePath());
+}
+
 void FolderWindow::reloadAll(const QString &folder) {
 	const QString key = QDir(folder).absolutePath();
 	for (FolderWindow *w : openWindows()) {
@@ -780,6 +784,7 @@ void FolderWindow::mouseMoveEvent(QMouseEvent *e) {
 		m_dragStart = m_pressPos;
 		if (origins.size() == items.size()) {
 			startItemDrag(this, items, origins, m_pressPos);
+			Finder::instance().dragEnded();
 		}
 		return;
 	}
@@ -879,10 +884,13 @@ void FolderWindow::dragMoveEvent(QDragMoveEvent *e) {
 	forEachItem([&](Item *item) { item->dropTarget = item == target; });
 	update();
 	e->acceptProposedAction();
+	Finder::instance().springHover(target && target->kind == PL_ICON_FOLDER ? target->path
+		: QString());
 }
 
 void FolderWindow::dragLeaveEvent(QDragLeaveEvent *) {
 	clearDropTarget();
+	Finder::instance().springHover(QString());
 }
 
 void FolderWindow::dropEvent(QDropEvent *e) {
@@ -906,4 +914,5 @@ void FolderWindow::dropEvent(QDropEvent *e) {
 		return;
 	}
 	dropItems(e, target, m_path);
+	Finder::instance().dragEnded();
 }
