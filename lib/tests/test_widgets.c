@@ -220,6 +220,19 @@ static void draw_clock(struct pl_canvas *c) {
 	pl_clock_paint(c, 6, 6, 104, true, PL_ARROWS_NONE, true, PL_ACCENT_DEFAULT, GRAY(0xD));
 }
 
+static void draw_radio_off(struct pl_canvas *c) {
+	pl_radio_paint(c, 0, 0, false, false, true, NULL);
+}
+
+static void draw_radio_on(struct pl_canvas *c) {
+	pl_radio_paint(c, 0, 0, true, false, true, NULL);
+}
+
+static void draw_slider_thumb(struct pl_canvas *c) {
+	/* Thumb at the track's left end: its left column is 1 px in. */
+	pl_slider_paint(c, -1, 0, 120, 2, 0, true, PL_ACCENT_DEFAULT);
+}
+
 static int run_small_controls(const char *dir, int *ran) {
 	int fails = 0;
 	const struct fig_rect box[] = { { 0, 0, 14, 12 } };
@@ -237,6 +250,25 @@ static int run_small_controls(const char *dir, int *ran) {
 	};
 	fails += compare_drawing(dir, "clock control (fig 2-22)", "img-037-055.png",
 		0, 0, 133, 35, GRAY(0xD), draw_clock, clock, 4, ran);
+	/* Radio buttons in figure 2-4, whose greys are shifted. */
+	static const uint32_t radio_map[][2] = {
+		{ 0xE3E4E4, 0xDDDDDD }, { 0x565656, 0x555555 }, { 0x686868, 0x666666 },
+		{ 0xC7C7C7, 0xCCCCCC }, { 0xF1F1F1, 0xEEEEEE }, { 0x9A9A9A, 0x999999 },
+		{ 0xB8B8B8, 0xBBBBBB }, { 0x2D2D2D, 0x333333 }, { 0x8A8A8A, 0x888888 },
+		{ 0xA9A9A9, 0xAAAAAA },
+	};
+	fig_set_color_map(radio_map, (int)(sizeof(radio_map) / sizeof(radio_map[0])));
+	const struct fig_rect bead[] = { { 0, 0, 12, 12 } };
+	fails += compare_drawing(dir, "radio button, off (fig 2-4)", "img-024-012.png", 37, 100,
+		12, 12, GRAY(0xD), draw_radio_off, bead, 1, ran);
+	fails += compare_drawing(dir, "radio button, on (fig 2-4)", "img-024-012.png", 37, 122,
+		12, 12, GRAY(0xD), draw_radio_on, bead, 1, ran);
+	fig_set_color_map(NULL, 0);
+	/* The slider's thumb (figure 2-17), down to where the figure's ghost
+	 * thumb and pointer overlap it. */
+	const struct fig_rect thumb[] = { { 0, 0, 14, 1 }, { 0, 1, 15, 10 } };
+	fails += compare_drawing(dir, "slider thumb (fig 2-17)", "img-034-050.png", 21, 13,
+		15, 23, GRAY(0xD), draw_slider_thumb, thumb, 2, ran);
 	return fails;
 }
 

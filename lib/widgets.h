@@ -104,6 +104,25 @@ enum pl_check { PL_CHECK_OFF, PL_CHECK_ON, PL_CHECK_MIXED };
 void pl_checkbox_paint(struct pl_canvas *c, int x, int y, enum pl_check value,
 		bool pressed, bool enabled, const struct plat_text *label);
 
+/* Radio button (HIG figures 2-4, 2-5): a 12 px shaded bead, a dark dot
+ * when on. Labels sit as for checkboxes. */
+#define PL_RADIO_SIZE 12
+void pl_radio_paint(struct pl_canvas *c, int x, int y, bool on, bool pressed, bool enabled,
+		const struct plat_text *label);
+
+/* Horizontal slider (HIG figures 2-17, 2-18): a recessed track with
+ * rounded ends and a 15 px accent thumb pointing down at it, with tick
+ * marks below. (x, y) is the left end of the track at the thumb's top
+ * row; `w` the track's length. `value` is 0..steps-1. */
+#define PL_SLIDER_THUMB_W 15
+#define PL_SLIDER_H 23 /* thumb and ticks */
+void pl_slider_paint(struct pl_canvas *c, int x, int y, int w, int steps, int value,
+		bool enabled, struct pl_accent accent);
+/* The thumb's left x for a value. */
+int pl_slider_thumb_x(int x, int w, int steps, int value);
+/* The value nearest to pointer x (for clicks and drags). */
+int pl_slider_value_at(int x, int w, int steps, int px);
+
 /* Little arrows (HIG figures 2-20, 2-22): two stacked 13 x 12 buttons
  * sharing a line, 13 x 23 in all, with clipped corners. */
 #define PL_ARROWS_W 13

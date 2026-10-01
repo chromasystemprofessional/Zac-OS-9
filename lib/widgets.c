@@ -139,6 +139,179 @@ void pl_checkbox_paint(struct pl_canvas *c, int x, int y, enum pl_check value,
 	}
 }
 
+/* ---- radio buttons (figure 2-4) ----------------------------------------------- */
+
+/* Measured at 1:1 in figure 2-4 (whose greys are shifted; each mapped to
+ * the nearest Platinum grey). '.' is outside the bead; ' ' inside is the
+ * #DDD face. '3' '5' '6' '8' '9' 'A' 'B' 'C' 'E' are greys, 'K' black. */
+static const char *const radio_off[12] = {
+	"....5KK5....",
+	"..K6   C5K..",
+	".KC EWWW 9K.",
+	".6 EWWEE C5.",
+	"5 EWWEE  C95",
+	"K WWEE  CC9K",
+	"K WEE  CCB9K",
+	"5CWE  CCBB95",
+	".6   CCBB95.",
+	".K9CCCBB99K.",
+	"..K699995K..",
+	"....5KK5....",
+};
+static const char *const radio_on[12] = {
+	"....3KK3....",
+	"..3K56665K..",
+	".35688899AK.",
+	".K68KKKKAA5.",
+	"358KKKKKKAC5",
+	"K68KKKKKKCCK",
+	"K68KKKKKKC K",
+	"369KKKKKK W5",
+	".39AKKKK W5.",
+	".3AAACC WWK.",
+	"..35CC W5K..",
+	"....5KK5....",
+};
+
+static uint32_t radio_grey(char ch) {
+	switch (ch) {
+	case 'K': return C_BLACK;
+	case 'W': return C_WHITE;
+	case '3': return GRAY(0x3);
+	case '5': return GRAY(0x5);
+	case '6': return GRAY(0x6);
+	case '8': return GRAY(0x8);
+	case '9': return GRAY(0x9);
+	case 'A': return GRAY(0xA);
+	case 'B': return GRAY(0xB);
+	case 'C': return GRAY(0xC);
+	case 'E': return GRAY(0xE);
+	default: return GRAY(0xD);
+	}
+}
+
+void pl_radio_paint(struct pl_canvas *c, int x, int y, bool on, bool pressed, bool enabled,
+		const struct plat_text *label) {
+	const char *const *rows = on ? radio_on : radio_off;
+	for (int j = 0; j < PL_RADIO_SIZE; j++) {
+		for (int i = 0; i < PL_RADIO_SIZE && rows[j][i]; i++) {
+			const char ch = rows[j][i];
+			if (ch == '.') {
+				continue;
+			}
+			uint32_t v = radio_grey(ch);
+			if (pressed && enabled) {
+				/* Pressed: the bead darkens (TODO: measure figure 2-5). */
+				v = 0xFF000000u | ((v >> 1) & 0x7F7F7Fu) | 0x202020u;
+			} else if (!enabled) {
+				v = ch == 'K' || ch == '3' || ch == '5' || ch == '6' ? GRAY(0x8) : GRAY(0xD);
+			}
+			pl_put(c, x + i, y + j, v);
+		}
+	}
+	if (label && label->ink_l >= 0) {
+		pl_text(c, label, x + PL_CHECKBOX_LABEL_X, y + PL_CHECKBOX_BASELINE,
+			enabled ? C_BLACK : GRAY(0x8));
+	}
+}
+
+/* ---- slider (figures 2-17, 2-18) ----------------------------------------------- */
+
+/* The thumb, measured in figure 2-17: 'K' black, 'L' 'M' 'N' 'P' 'D'
+ * the accent's light, body, dark, shadow and deep shades. */
+static const char *const slider_thumb[17] = {
+	".KKKKKKKKKKKKK.",
+	"KLMMMMMMMMMMMNK",
+	"KMNNNNNNNNNNNPK",
+	"KMNNLNLNLNNNNPK",
+	"KMNNMDMDMDNNNPK",
+	"KMNNMDMDMDNNNPK",
+	"KMNNMDMDMDNNNPK",
+	"KMNNMDMDMDNNNPK",
+	"KMNNMDMDMDNNNPK",
+	"KMNNNDNDNDNNNPK",
+	"KMNNNDNDNDNNNPK",
+	".KPNNNNNNNNNPK.",
+	"..KPNNNNNNNPK..",
+	"...KPNNNNNPK...",
+	"....KPNNNPK....",
+	".....KPPPK.....",
+	"......KKK......",
+};
+
+int pl_slider_thumb_x(int x, int w, int steps, int value) {
+	const int span = w - 2 - PL_SLIDER_THUMB_W;
+	if (steps < 2) {
+		return x + 1;
+	}
+	return x + 1 + span * value / (steps - 1);
+}
+
+int pl_slider_value_at(int x, int w, int steps, int px) {
+	if (steps < 2) {
+		return 0;
+	}
+	const int span = w - 2 - PL_SLIDER_THUMB_W;
+	const int rel = px - (x + 1 + PL_SLIDER_THUMB_W / 2);
+	int v = (rel * (steps - 1) + span / 2) / (span > 0 ? span : 1);
+	return v < 0 ? 0 : v > steps - 1 ? steps - 1 : v;
+}
+
+void pl_slider_paint(struct pl_canvas *c, int x, int y, int w, int steps, int value,
+		bool enabled, struct pl_accent ac) {
+	/* The track, 3 rows below the thumb's top: a #AAA rim, #222 lines
+	 * with rounded ends around a #AAA groove, and a white rim below. */
+	const int L = x, R = x + w - 1, T = y + 3;
+	const uint32_t dark = enabled ? GRAY(0x2) : GRAY(0x8);
+	pl_hline(c, L + 1, R - 2, T, GRAY(0xA));
+	pl_hline(c, L, L + 2, T + 1, GRAY(0xA));
+	pl_hline(c, L + 3, R - 2, T + 1, dark);
+	pl_put(c, R - 1, T + 1, GRAY(0xA));
+	for (int r = 2; r <= 4; r++) {
+		pl_put(c, L, T + r, GRAY(0xA));
+		pl_hline(c, L + 1, L + 2, T + r, dark);
+		pl_hline(c, L + 3, R - 2, T + r, GRAY(0xA));
+		pl_put(c, R - 1, T + r, dark);
+		pl_put(c, R, T + r, C_WHITE);
+	}
+	pl_hline(c, L + 1, L + 2, T + 5, C_WHITE);
+	pl_hline(c, L + 3, R - 2, T + 5, dark);
+	pl_hline(c, R - 1, R, T + 5, C_WHITE);
+	pl_hline(c, L + 3, R - 1, T + 6, C_WHITE);
+	pl_hline(c, L + 3, R - 1, T + 7, C_WHITE);
+
+	/* Tick marks below, one per step (TODO: measure figure 2-18). */
+	for (int i = 0; i < steps; i++) {
+		const int tx = pl_slider_thumb_x(x, w, steps, i) + PL_SLIDER_THUMB_W / 2;
+		pl_vline(c, tx, y + 19, y + 22, enabled ? C_BLACK : GRAY(0x8));
+	}
+
+	const int tx = pl_slider_thumb_x(x, w, steps, value);
+	for (int j = 0; j < 17; j++) {
+		for (int i = 0; slider_thumb[j][i]; i++) {
+			const char ch = slider_thumb[j][i];
+			uint32_t v;
+			switch (ch) {
+			case 'K': v = enabled ? C_BLACK : GRAY(0x8); break;
+			case 'L': v = enabled ? ac.light : GRAY(0xE); break;
+			case 'M': v = enabled ? ac.body : GRAY(0xD); break;
+			case 'N': v = enabled ? ac.dark : GRAY(0xC); break;
+			case 'P': v = enabled ? ac.shadow : GRAY(0xA); break;
+			case 'D': {
+				/* The grip's grooves: the deep shade at 5/8 (#000055 for
+				 * Lavender, figure 2-17). */
+				const uint32_t d = ac.deep;
+				v = enabled ? 0xFF000000u | ((((d >> 16) & 0xFF) * 5 / 8) << 16) |
+					((((d >> 8) & 0xFF) * 5 / 8) << 8) | ((d & 0xFF) * 5 / 8) : GRAY(0x9);
+				break;
+			}
+			default: continue;
+			}
+			pl_put(c, tx + i, y + j, v);
+		}
+	}
+}
+
 /* ---- little arrows (figures 2-20, 2-22) --------------------------------------- */
 
 static void arrow_box(struct pl_canvas *c, int x, int y, bool up, bool pressed, bool enabled) {
