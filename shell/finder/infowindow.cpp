@@ -235,7 +235,9 @@ void AboutWindow::paintEvent(QPaintEvent *) {
 	}
 	Text title("Platinum 2026", 300, PL_FONT_SYSTEM);
 	pl_text(c, title.t, 80, 30, C_BLACK);
-	Text version("Version 0.3 — " + QSysInfo::kernelType() + " " +
+	QString kernel = QSysInfo::kernelType();
+	kernel[0] = kernel[0].toUpper(); /* "Linux" */
+	Text version("Version 0.3 — " + kernel + " " +
 		QSysInfo::kernelVersion().section('-', 0, 0), 260, PL_FONT_VIEWS);
 	pl_text(c, version.t, 80, 46, C_BLACK);
 	separator(c, 10, W - 11, 70);
