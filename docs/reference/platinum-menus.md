@@ -177,4 +177,6 @@ they're measured, these follow Mac OS 8.5 behaviour as observed:
 ## Trademark note
 
 The Apple menu's title is the Apple logo, which is Apple's trademark. Platinum
-2026 uses its own original icon in that position.
+2026 uses its own original icon in that position (`lib/logo.c`): a faceted
+four-pointed platinum sparkle with a lavender heart and a small twinkle. It
+deliberately avoids the rainbow-striped round shape of Apple's 1977–1998 logo.

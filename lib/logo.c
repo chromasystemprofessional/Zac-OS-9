@@ -1,8 +1,9 @@
 /*
- * The Platinum 2026 logo: an original 16x16 color mark for the far left of
- * the menu bar (where Mac OS put the Apple logo, which we can't use). A
- * disc in six rainbow bands, as a nod to the era's 6-color stripes. Its ink
- * spans 12 columns, the same as the slot measured in HIG figure 4-1.
+ * The Platinum 2026 logo: an original 16x16 mark for the far left of the
+ * menu bar (where Mac OS put the Apple logo, which we can't use). A
+ * faceted four-pointed platinum sparkle, lit from the top left, with a
+ * lavender heart (the default Platinum accent) and a small twinkle. Its
+ * ink spans 12 columns, the same as the slot measured in HIG figure 4-1.
  */
 #include <stddef.h>
 #include <stdint.h>
@@ -12,18 +13,18 @@
 
 static const char *const rows[PL_LOGO_SIZE] = {
 	"................",
-	"......gggg......",
-	"....gggggggg....",
-	"...yyyyyyyyyy...",
-	"..yyyyyyyyyyyy..",
-	"..oooooooooooo..",
-	"..oooooooooooo..",
-	"..rrrrrrrrrrrr..",
-	"..rrrrrrrrrrrr..",
-	"..pppppppppppp..",
-	"...pppppppppp...",
-	"....bbbbbbbb....",
-	"......bbbb......",
+	"............K...",
+	".......K...KWK..",
+	"......KWK...K...",
+	"......KWK.......",
+	".....KWWcK......",
+	"...KKWWMccKK....",
+	"..KWWWMLM999K...",
+	"...KKccM99KK....",
+	".....Kc99K......",
+	"......K9K.......",
+	"......K9K.......",
+	".......K........",
 	"................",
 	"................",
 	"................",
@@ -31,12 +32,12 @@ static const char *const rows[PL_LOGO_SIZE] = {
 
 static uint32_t color_of(char c) {
 	switch (c) {
-	case 'g': return RGB(0x00, 0xBB, 0x00);
-	case 'y': return RGB(0xFF, 0xCC, 0x33);
-	case 'o': return RGB(0xFF, 0x66, 0x00);
-	case 'r': return RGB(0xDD, 0x00, 0x00);
-	case 'p': return RGB(0x99, 0x33, 0x99);
-	case 'b': return RGB(0x00, 0x66, 0xCC);
+	case 'K': return C_BLACK;
+	case 'W': return C_WHITE;
+	case 'c': return GRAY(0xC);
+	case '9': return GRAY(0x9);
+	case 'L': return RGB(0xCC, 0xCC, 0xFF);
+	case 'M': return RGB(0x99, 0x99, 0xFF);
 	default: return 0; /* transparent */
 	}
 }
