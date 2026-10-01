@@ -1,4 +1,5 @@
 #include <dirent.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -25,6 +26,27 @@ void launch(const char *command) {
 		_exit(0);
 	}
 	waitpid(pid, NULL, 0);
+}
+
+/* A shell command running `program` from next to this binary (build tree
+ * or install), else from $PATH. */
+static void sibling_program(const char *program, char *out, size_t size) {
+	char exe[PATH_MAX];
+	ssize_t len = readlink("/proc/self/exe", exe, sizeof(exe) - 1);
+	if (len > 0) {
+		exe[len] = '\0';
+		char *slash = strrchr(exe, '/');
+		if (slash) {
+			*slash = '\0';
+			char path[PATH_MAX + 64];
+			snprintf(path, sizeof(path), "%s/%s", exe, program);
+			if (access(path, X_OK) == 0) {
+				snprintf(out, size, "exec '%s'", path);
+				return;
+			}
+		}
+	}
+	snprintf(out, size, "exec %s", program);
 }
 
 static bool in_path(const char *program) {
@@ -143,6 +165,18 @@ void launch_fill_logo_menu(struct mb_menu *menu) {
 	add_item(menu, NULL, false, ACT_NONE, NULL);
 	/* Classic Mac OS in an emulator; the Finder explains what's missing. */
 	add_item(menu, "Classic", true, ACT_FINDER, "classic");
+	/* Control Panels, as a hierarchical menu. */
+	add_item(menu, "Control Panels", true, ACT_NONE, NULL);
+	struct mb_menu *panels = calloc(1, sizeof(*panels));
+	menu->items[menu->n - 1].submenu = panels;
+	const struct { const char *name, *program; } panel_list[] = {
+		{ "Appearance", "platinum-appearance" },
+	};
+	for (size_t i = 0; i < sizeof(panel_list) / sizeof(panel_list[0]); i++) {
+		char command[PATH_MAX + 64];
+		sibling_program(panel_list[i].program, command, sizeof(command));
+		add_item(panels, panel_list[i].name, true, ACT_LAUNCH, command);
+	}
 
 	struct entry entries[MAX_ITEMS];
 	int n = read_items_dir(entries, MAX_ITEMS - 4);

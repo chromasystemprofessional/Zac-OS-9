@@ -78,7 +78,7 @@ void pl_button_paint(struct pl_canvas *c, int x, int y, int w,
 /* ---- group box (figure 2-38) ------------------------------------------- */
 
 void pl_group_box_paint(struct pl_canvas *c, int x0, int y0, int x1, int y1,
-		const struct plat_text *title) {
+		const struct plat_text *title, uint32_t bg) {
 	/* White first, one pixel down and right; the #888 line over it. */
 	pl_outline(c, x0 + 1, y0 + 1, x1 + 1, y1 + 1, C_WHITE);
 	pl_outline(c, x0, y0, x1, y1, GRAY(0x8));
@@ -89,8 +89,8 @@ void pl_group_box_paint(struct pl_canvas *c, int x0, int y0, int x1, int y1,
 	const int ink_w = title->ink_r - title->ink_l + 1;
 	/* Clear both lines behind the title, 4 px either side of its ink. */
 	for (int x = ink_x - 4; x <= ink_x + ink_w + 3; x++) {
-		pl_put(c, x, y0, GRAY(0xD));
-		pl_put(c, x, y0 + 1, GRAY(0xD));
+		pl_put(c, x, y0, bg);
+		pl_put(c, x, y0 + 1, bg);
 	}
 	pl_text(c, title, ink_x, y0, C_BLACK);
 }

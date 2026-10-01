@@ -84,10 +84,21 @@ scaling only, original behaviors and timings).
   - SDL's Wayland backend under platinum-wm (Xwayland for now).
   - Packaging the emulators (Phase 7).
 
-## Phase 5: Control Panels and theming
-- Appearance, Date & Time, Sound, Monitors, Mouse, Keyboard: wired to
-  Linux backends (systemd-timedated, PipeWire, wlr-output-management…).
-- Platinum QStyle plugin and GTK3/4 theme, so third-party apps match.
+## Phase 5: Control Panels and theming (in progress)
+- Done:
+  - Group box, list box and tab control, each matching its HIG figure
+    (2-38, 2-25, 2-30) pixel for pixel apart from label text.
+  - Accent colours as a live setting (Lavender and Ivy measured, six
+    derived), and a highlight colour.
+  - Appearance control panel (Color, Desktop, Sound tabs), opened from
+    the logo menu's Control Panels submenu; changes apply at once.
+  - Desktop entries in share/applications; platinum-wm puts its ../share
+    on XDG_DATA_DIRS so the menu bar names our apps.
+- Next:
+  - Date & Time, Mouse, Keyboard, Monitors, Sound volume: wired to Linux
+    backends (systemd-timedated, PipeWire, wlr-output-management…).
+  - Pop-up menu buttons and checkboxes (for panels that need them).
+  - Platinum QStyle plugin and GTK3/4 theme, so third-party apps match.
 
 ## Phase 6: Original assets (in progress)
 - Done:

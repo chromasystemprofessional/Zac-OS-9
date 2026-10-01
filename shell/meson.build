@@ -82,6 +82,16 @@ executable('platinum-finder',
   install: true,
 )
 
+# Control panels.
+executable('platinum-appearance',
+  'panels/main.cpp',
+  'panels/appearance.cpp',
+  include_directories: include_directories('finder'), # pixels.h
+  dependencies: [platinum_dep, qt6],
+  cpp_args: ['-std=c++17'],
+  install: true,
+)
+
 # vptr: scripted pointer (press/drag/release) for UI tests.
 vptr_protocol = []
 foreach kind : [['client-header', '@BASENAME@-client-protocol.h'], ['private-code', '@BASENAME@-protocol.c']]

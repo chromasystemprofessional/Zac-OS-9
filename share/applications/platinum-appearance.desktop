@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Appearance
+Comment=Accent colour, highlight colour, desktop pattern and alert sound
+Exec=platinum-appearance
+Categories=Settings;DesktopSettings;
+OnlyShowIn=Platinum;

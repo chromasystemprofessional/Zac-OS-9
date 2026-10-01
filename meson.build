@@ -15,3 +15,4 @@ add_project_arguments(
 subdir('lib')
 subdir('compositor')
 subdir('shell')
+subdir('share')

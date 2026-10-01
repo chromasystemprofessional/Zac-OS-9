@@ -84,7 +84,7 @@ static int run_group_box(const char *dir, int *ran) {
 	struct pl_canvas c = { .px = px, .stride = w, .width = w, .height = h };
 	pl_fill(&c, 0, 0, w - 1, h - 1, GRAY(0xD));
 	struct plat_text *title = text_render_font("Format", 1000, PL_FONT_SYSTEM);
-	pl_group_box_paint(&c, 5, 14, 165, 127, title);
+	pl_group_box_paint(&c, 5, 14, 165, 127, title, GRAY(0xD));
 	const struct fig_rect regions[] = {
 		{ 0, 0, 14, 132 },      /* left of the title, the left side */
 		{ 18 + 39 + 4 + 8, 0, 101, 20 }, /* right of the title (ours is wider), top right */

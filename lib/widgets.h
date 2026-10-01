@@ -53,10 +53,15 @@ void pl_bevel_button_paint(struct pl_canvas *c, int x, int y, int w, int h, bool
 /* Primary group box (HIG figures 2-37, 2-38): an engraved rectangle
  * (#888 with a white line below and right of it). A title sits on the
  * top line, its ink PL_GROUP_TITLE_X in, with 4 px of the line cleared
- * either side. Its baseline is the top line's row. */
+ * (to `bg`) either side. Its baseline is the top line's row.
+ * Layout (HIG figure 3-29): items 10 px from the sides and bottom and
+ * 12 px from the inside top; boxes 10 px apart side by side, 12 px
+ * apart one above the other. */
 #define PL_GROUP_TITLE_X 13
+#define PL_GROUP_MARGIN 10
+#define PL_GROUP_MARGIN_TOP 12
 void pl_group_box_paint(struct pl_canvas *c, int x0, int y0, int x1, int y1,
-		const struct plat_text *title);
+		const struct plat_text *title, uint32_t bg);
 
 /* List box (HIG figure 2-25): a black frame around white rows of 16 px
  * (system font, baseline at +11, ink 3 px in from the frame), the

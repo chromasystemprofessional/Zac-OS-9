@@ -67,6 +67,28 @@ static void spawn_component(const char *env_var, const char *program) {
 	spawn(cmd);
 }
 
+/* Our desktop entries (app names for the menu bar) live in ../share next
+ * to this binary: build/share in a build tree, /usr/share when installed.
+ * Put that first in XDG_DATA_DIRS for every client we start. */
+static void share_our_data(void) {
+	char exe[PATH_MAX];
+	ssize_t len = readlink("/proc/self/exe", exe, sizeof(exe) - 1);
+	if (len <= 0) {
+		return;
+	}
+	exe[len] = '\0';
+	char *slash = strrchr(exe, '/');
+	if (!slash) {
+		return;
+	}
+	*slash = '\0';
+	const char *old = getenv("XDG_DATA_DIRS");
+	char dirs[2 * PATH_MAX];
+	snprintf(dirs, sizeof(dirs), "%s/../share:%s", exe,
+		old && *old ? old : "/usr/local/share:/usr/share");
+	setenv("XDG_DATA_DIRS", dirs, 1);
+}
+
 static int parse_scale(const char *s) {
 	int scale = s ? atoi(s) : 1;
 	return scale >= 1 && scale <= 4 ? scale : 1;
@@ -180,6 +202,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	setenv("WAYLAND_DISPLAY", socket, true);
+	share_our_data();
 	startup_begin(&server);
 	spawn_component("PLATINUM_MENUBAR", "platinum-menubar");
 	spawn_component("PLATINUM_FINDER", "platinum-finder");
