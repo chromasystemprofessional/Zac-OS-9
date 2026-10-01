@@ -25,11 +25,26 @@ scaling only, original behaviors and timings).
   - Measured box pressed states and drag-outline pattern.
   - Real Charcoal-metric font (Phase 6).
 
-## Phase 2: Menu bar
-- Layer-shell menu bar client (Qt6): Apple menu, application menus, clock,
-  Application menu (top right).
-- Global menus via `com.canonical.dbusmenu` / KDE appmenu protocol.
-- Menu tracking, highlight, and blink timing measured against reference captures.
+## Phase 2: Menu bar (in progress)
+- ✅ Menu bar and menu painter measured from HIG figures 4-1, 4-2 and 4-3
+  (`docs/reference/platinum-menus.md`), pixel-tested.
+- ✅ `platinum-menubar`: a C layer-shell client using the shared painter
+  rather than Qt, so the drawing is pixel-exact.
+  - Platinum logo menu (original mark) fed from `Platinum Menu Items`.
+  - Front app's File and Edit menus; Finder menus when no app is in front.
+  - Clock and Application menu (hide, show, switch; switching brings all of
+    an app's windows forward).
+  - Press-drag-release and sticky-click tracking, item blink.
+- ✅ Compositor: layer-shell, foreign-toplevel, hidden windows, ⌘ = Super → Ctrl,
+  virtual pointer and keyboard (used for scripted UI tests with `wlrctl`).
+- Next:
+  - Edit menu commands (send ⌘X/C/V/A/Z to the app via a virtual keyboard).
+  - Global app menus via `com.canonical.dbusmenu` / KDE appmenu.
+  - ⌘-key equivalents for menu items.
+  - App icons in the Application menu.
+  - Clicking the clock shows the date.
+- To measure: selected-item look, blink count and timing, the other screen
+  corners, other accent-color triples.
 
 ## Phase 3: Finder
 - Desktop icons, spatial folder windows (each folder remembers its window
