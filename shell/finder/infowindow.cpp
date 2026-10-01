@@ -1,5 +1,6 @@
 #include "infowindow.h"
 
+#include <QApplication>
 #include <QDir>
 #include <QDirIterator>
 #include <QFile>
@@ -9,7 +10,9 @@
 #include <QLocale>
 #include <QMimeDatabase>
 #include <QPointer>
+#include <QMouseEvent>
 #include <QSysInfo>
+#include <sys/xattr.h>
 
 #include "items.h"
 #include "logo.h"
@@ -18,6 +21,8 @@ static constexpr uint32_t FACE = GRAY(0xD);
 static constexpr int LABEL_RIGHT = 74; /* right edge of "Kind:" etc. */
 static constexpr int VALUE_X = 82;
 static constexpr int ROW_H = 16;
+static constexpr int COMMENT_MAX = 200; /* Mac OS Finder comment limit */
+static const char *const COMMENT_ATTR = "user.xdg.comment";
 
 QString finderDate(const QDateTime &t) {
 	if (!t.isValid()) {
@@ -78,7 +83,7 @@ InfoWindow::InfoWindow(const QString &path, pl_icon_kind kind, const QString &na
 	: m_path(path), m_name(name), m_kind(kind) {
 	setAttribute(Qt::WA_DeleteOnClose);
 	setWindowTitle(name + " Info");
-	setFixedSize(300, 220);
+	setFixedSize(300, 280);
 
 	QFileInfo info(path);
 	if (kind == PL_ICON_DISK) {
@@ -93,6 +98,16 @@ InfoWindow::InfoWindow(const QString &path, pl_icon_kind kind, const QString &na
 		}
 	}
 	m_where = macPath(path == "/" ? "/" : info.absolutePath());
+
+	char buf[1024];
+	ssize_t n = getxattr(QFile::encodeName(path).constData(), COMMENT_ATTR, buf, sizeof(buf));
+	if (n > 0) {
+		m_comment = QString::fromUtf8(buf, static_cast<int>(n));
+	}
+	m_caretTimer.callOnTimeout([this] {
+		m_caretOn = !m_caretOn;
+		update();
+	});
 	m_created = finderDate(info.birthTime().isValid() ? info.birthTime() : info.metadataChangeTime());
 	m_modified = finderDate(info.lastModified());
 
@@ -157,20 +172,95 @@ void InfoWindow::paintEvent(QPaintEvent *) {
 	row(c, y += ROW_H, "Modified:", m_modified, W - VALUE_X - 10);
 	separator(c, 10, W - 11, y + 10);
 
-	/* Comments box (TODO: editable, stored as an extended attribute). */
+	/* Comments box: click to type. */
 	Text label("Comments:", 200, PL_FONT_SYSTEM);
 	pl_text(c, label.t, 12, y + 30, C_BLACK);
+	m_commentBox = QRect(QPoint(12, y + 36), QPoint(W - 13, H - 12));
 	pl_fill(c, 12, y + 36, W - 13, H - 12, C_WHITE);
-	pl_outline(c, 12, y + 36, W - 13, H - 12, GRAY(0x8));
+	pl_outline(c, 12, y + 36, W - 13, H - 12, m_editingComment ? C_BLACK : GRAY(0x8));
+
+	/* Wrap the comment to the box, word by word. */
+	const int textW = m_commentBox.width() - 8;
+	QStringList lines;
+	for (const QString &para : m_comment.split('\n')) {
+		QString line;
+		for (const QString &word : para.split(' ')) {
+			QString candidate = line.isEmpty() ? word : line + ' ' + word;
+			Text probe(candidate, 100000, PL_FONT_VIEWS);
+			if (!line.isEmpty() && probe.inkWidth() > textW) {
+				lines << line;
+				line = word;
+			} else {
+				line = candidate;
+			}
+		}
+		lines << line;
+	}
+	int baseline = m_commentBox.top() + 12, caretX = m_commentBox.left() + 4;
+	for (const QString &line : lines) {
+		if (baseline > m_commentBox.bottom() - 2) {
+			break;
+		}
+		Text t(line, textW, PL_FONT_VIEWS);
+		if (t.t && t.t->ink_l >= 0) {
+			pl_text(c, t.t, m_commentBox.left() + 4 + t.t->ink_l - 1, baseline, C_BLACK);
+		}
+		caretX = m_commentBox.left() + 4 + (t.t ? t.t->advance : 0);
+		baseline += 12;
+	}
+	if (m_editingComment && m_caretOn) {
+		pl_vline(c, caretX, baseline - 12 - 9, baseline - 12 + 1, C_BLACK);
+	}
 
 	QPainter p(this);
 	px.blit(p);
 }
 
+void InfoWindow::saveComment() {
+	const QByteArray name = QFile::encodeName(m_path);
+	const QByteArray value = m_comment.toUtf8();
+	if (value.isEmpty()) {
+		removexattr(name.constData(), COMMENT_ATTR);
+	} else {
+		setxattr(name.constData(), COMMENT_ATTR, value.constData(), value.size(), 0);
+	}
+}
+
+void InfoWindow::mousePressEvent(QMouseEvent *e) {
+	const bool inBox = m_commentBox.contains(e->position().toPoint());
+	if (inBox != m_editingComment) {
+		m_editingComment = inBox;
+		m_caretOn = true;
+		inBox ? m_caretTimer.start(QApplication::cursorFlashTime() / 2) : m_caretTimer.stop();
+		update();
+	}
+}
+
 void InfoWindow::keyPressEvent(QKeyEvent *e) {
 	if ((e->modifiers() & Qt::ControlModifier) && e->key() == Qt::Key_W) {
 		close();
+		return;
 	}
+	if (!m_editingComment) {
+		return;
+	}
+	if (e->key() == Qt::Key_Backspace) {
+		m_comment.chop(1);
+	} else if (e->key() == Qt::Key_Return || e->key() == Qt::Key_Enter) {
+		m_comment += '\n';
+	} else if (e->key() == Qt::Key_Escape) {
+		m_editingComment = false;
+		m_caretTimer.stop();
+	} else if (!e->text().isEmpty() && e->text().at(0).isPrint() &&
+			!(e->modifiers() & Qt::ControlModifier)) {
+		m_comment += e->text();
+	} else {
+		return;
+	}
+	m_comment = m_comment.left(COMMENT_MAX);
+	m_caretOn = true;
+	saveComment();
+	update();
 }
 
 /* ---- About This Computer -------------------------------------------------- */
