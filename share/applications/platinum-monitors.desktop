@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Monitors
+Comment=Screen resolution and pixel size
+Exec=platinum-controlpanel monitors
+Categories=Settings;HardwareSettings;
+OnlyShowIn=Platinum;

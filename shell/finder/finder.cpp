@@ -90,6 +90,14 @@ void Finder::start(Desktop *desktop) {
 	});
 }
 
+void Finder::replaceDesktop(Desktop *desktop) {
+	if (m_front == m_desktop) {
+		m_front = desktop;
+	}
+	m_desktop = desktop;
+	notifyState();
+}
+
 FinderView *Finder::front() {
 	return m_front ? m_front : m_desktop;
 }

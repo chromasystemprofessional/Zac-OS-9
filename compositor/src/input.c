@@ -119,6 +119,7 @@ static void new_keyboard(struct plat_server *server, struct wlr_input_device *de
 	struct plat_keyboard *kb = calloc(1, sizeof(*kb));
 	kb->server = server;
 	kb->wlr_keyboard = wlr_keyboard;
+	kb->is_virtual = virtual;
 
 	if (!virtual) {
 		struct xkb_context *ctx = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
@@ -127,7 +128,7 @@ static void new_keyboard(struct plat_server *server, struct wlr_input_device *de
 		wlr_keyboard_set_keymap(wlr_keyboard, keymap);
 		xkb_keymap_unref(keymap);
 		xkb_context_unref(ctx);
-		wlr_keyboard_set_repeat_info(wlr_keyboard, 25, 600);
+		wlr_keyboard_set_repeat_info(wlr_keyboard, prefs_repeat_rate(), prefs_repeat_delay());
 	}
 
 	kb->modifiers.notify = keyboard_modifiers;
@@ -344,7 +345,7 @@ static void frame_press(struct plat_server *server, struct plat_view *view,
 		bool in_title = server->cursor->y - view_frame_box(view).y < DECOR_TOP - 2 &&
 			view->frame->st.style == DECOR_STYLE_DOCUMENT;
 		bool dbl = in_title && server->last_click_view == view &&
-			time_msec - server->last_click_msec <= PLAT_DOUBLE_CLICK_MS;
+			time_msec - server->last_click_msec <= (uint32_t)server->double_click_ms;
 		if (dbl) {
 			/* Appearance option "double-click title bar to collapse". */
 			server->last_click_view = NULL;
@@ -389,8 +390,9 @@ static void process_cursor_motion(struct plat_server *server, uint32_t time) {
 static void cursor_motion(struct wl_listener *listener, void *data) {
 	struct plat_server *server = wl_container_of(listener, server, cursor_motion);
 	struct wlr_pointer_motion_event *event = data;
+	/* Mouse tracking speed (the Mouse control panel). */
 	wlr_cursor_move(server->cursor, &event->pointer->base,
-		event->delta_x, event->delta_y);
+		event->delta_x * server->pointer_speed, event->delta_y * server->pointer_speed);
 	process_cursor_motion(server, event->time_msec);
 }
 

@@ -17,6 +17,7 @@
 #include "folderwindow.h"
 #include "menudraw.h"
 #include "patterns.h"
+#include "settings.h"
 
 /* Desktop icon placement (not in the HIG; TODO: measure). */
 static constexpr int ICON_MARGIN_RIGHT = 24;
@@ -63,6 +64,7 @@ Desktop::Desktop() {
 	m_settingsWatcher.addPath(settingsDir());
 	QObject::connect(&m_settingsWatcher, &QFileSystemWatcher::directoryChanged, [this] {
 		loadPattern();
+		QApplication::setDoubleClickInterval(pl_double_click_ms());
 		/* Accent colour and highlight are read at paint time. */
 		for (QWidget *w : QApplication::topLevelWidgets()) {
 			w->update();

@@ -44,6 +44,8 @@ public:
 	static QString socketPath();
 
 	void start(Desktop *desktop);
+	/* A new desktop surface took over (the screen's size or scale changed). */
+	void replaceDesktop(Desktop *desktop);
 	void setFront(FinderView *view);
 	void viewClosed(FinderView *view);
 	FinderView *front();

@@ -100,10 +100,16 @@ scaling only, original behaviors and timings).
     zone picker and network time (timedated, via timedatectl), and the
     menu bar clock's options (hidden, 24-hour, day of the week), which
     the menu bar follows live.
+  - Radio buttons and the slider (HIG figures 2-4, 2-17), pixel for pixel.
+  - Mouse (tracking speed, double-click speed), Keyboard (key repeat rate
+    and delay), Sound (volume and mute through pactl, alert volume) and
+    Monitors (resolution, 1x/2x/3x pixel size) panels in
+    platinum-controlpanel. platinum-wm applies the mouse, keyboard and
+    screen settings live (compositor/src/prefs.c) and publishes the
+    screen's modes for the Monitors panel.
 - Next:
-  - Mouse, Keyboard, Monitors, Sound volume: wired to Linux backends
-    (PipeWire, wlr-output-management...).
   - Pop-up menu buttons (for panels that need them).
+  - Monitors on real hardware: several screens, arrangement.
   - Platinum QStyle plugin and GTK3/4 theme, so third-party apps match.
 
 ## Phase 6: Original assets (in progress)

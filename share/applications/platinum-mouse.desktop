@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Mouse
+Comment=Mouse tracking and double-click speed
+Exec=platinum-controlpanel mouse
+Categories=Settings;HardwareSettings;
+OnlyShowIn=Platinum;

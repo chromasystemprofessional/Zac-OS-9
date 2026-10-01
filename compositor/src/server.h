@@ -40,6 +40,10 @@ struct plat_server {
 	struct wlr_allocator *allocator;
 	struct wlr_compositor *compositor;
 	int output_scale; /* integer HiDPI scale applied to every output */
+	int default_scale; /* from -S / PLATINUM_SCALE, until a panel picks one */
+	/* Mouse and Keyboard panel settings (prefs.c). */
+	double pointer_speed;
+	int double_click_ms;
 
 	/* Scene layers, bottom to top:
 	 *   desktop, shell[BACKGROUND], shell[BOTTOM], view_layer,
@@ -215,10 +219,18 @@ struct plat_keyboard {
 	struct wl_list link;
 	struct plat_server *server;
 	struct wlr_keyboard *wlr_keyboard;
+	bool is_virtual; /* scripted keyboards repeat on their own terms */
 	struct wl_listener modifiers;
 	struct wl_listener key;
 	struct wl_listener destroy;
 };
+
+/* prefs.c: control panel settings the compositor applies */
+void prefs_init(struct plat_server *server);
+void prefs_apply(struct plat_server *server);
+void prefs_write_outputs(struct plat_server *server);
+int prefs_repeat_rate(void);
+int prefs_repeat_delay(void);
 
 /* output.c */
 void output_init(struct plat_server *server);

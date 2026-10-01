@@ -146,7 +146,9 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
-	server.compositor = wlr_compositor_create(server.display, 5, server.renderer);
+	/* Version 6: clients follow wl_surface.preferred_buffer_scale, which we
+	 * update when a panel changes the scale (prefs.c). */
+	server.compositor = wlr_compositor_create(server.display, 6, server.renderer);
 	wlr_subcompositor_create(server.display);
 	wlr_viewporter_create(server.display);
 	wlr_data_device_manager_create(server.display);
@@ -187,6 +189,7 @@ int main(int argc, char *argv[]) {
 	output_init(&server);
 	xdg_init(&server);
 	input_init(&server);
+	prefs_init(&server);
 	xwayland_init(&server);
 
 	const char *socket = wl_display_add_socket_auto(server.display);
@@ -202,6 +205,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	setenv("WAYLAND_DISPLAY", socket, true);
+	prefs_write_outputs(&server);
 	share_our_data();
 	startup_begin(&server);
 	spawn_component("PLATINUM_MENUBAR", "platinum-menubar");

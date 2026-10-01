@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Keyboard
+Comment=Key repeat rate and delay
+Exec=platinum-controlpanel keyboard
+Categories=Settings;HardwareSettings;
+OnlyShowIn=Platinum;

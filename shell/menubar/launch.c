@@ -169,13 +169,19 @@ void launch_fill_logo_menu(struct mb_menu *menu) {
 	add_item(menu, "Control Panels", true, ACT_NONE, NULL);
 	struct mb_menu *panels = calloc(1, sizeof(*panels));
 	menu->items[menu->n - 1].submenu = panels;
-	const struct { const char *name, *program; } panel_list[] = {
-		{ "Appearance", "platinum-appearance" },
-		{ "Date & Time", "platinum-datetime" },
+	/* Alphabetical, as in the Mac's Control Panels folder. */
+	const struct { const char *name, *program, *arg; } panel_list[] = {
+		{ "Appearance", "platinum-appearance", "" },
+		{ "Date & Time", "platinum-datetime", "" },
+		{ "Keyboard", "platinum-controlpanel", " keyboard" },
+		{ "Monitors", "platinum-controlpanel", " monitors" },
+		{ "Mouse", "platinum-controlpanel", " mouse" },
+		{ "Sound", "platinum-controlpanel", " sound" },
 	};
 	for (size_t i = 0; i < sizeof(panel_list) / sizeof(panel_list[0]); i++) {
 		char command[PATH_MAX + 64];
 		sibling_program(panel_list[i].program, command, sizeof(command));
+		strncat(command, panel_list[i].arg, sizeof(command) - strlen(command) - 1);
 		add_item(panels, panel_list[i].name, true, ACT_LAUNCH, command);
 	}
 

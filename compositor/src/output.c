@@ -23,6 +23,7 @@ static void output_request_state(struct wl_listener *listener, void *data) {
 	const struct wlr_output_event_request_state *event = data;
 	wlr_output_commit_state(output->wlr_output, event->state);
 	layers_arrange(output);
+	prefs_write_outputs(output->server);
 }
 
 static void output_destroy(struct wl_listener *listener, void *data) {
@@ -79,6 +80,8 @@ static void server_new_output(struct wl_listener *listener, void *data) {
 		wlr_scene_output_create(server->scene, wlr_output);
 	wlr_scene_output_layout_add_output(server->scene_layout, l_output, scene_output);
 	layers_arrange(output);
+	/* The Monitors panel's scale and resolution, if chosen. */
+	prefs_apply(server);
 }
 
 struct plat_output *output_at(struct plat_server *server, double lx, double ly) {

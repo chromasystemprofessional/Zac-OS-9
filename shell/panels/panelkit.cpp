@@ -205,6 +205,131 @@ bool PanelCheckbox::release(QPoint p) {
 	return true;
 }
 
+/* ---- sliders --------------------------------------------------------------- */
+
+void PanelSlider::setLabels(const QString &left, const QString &right) {
+	leftLabel = std::make_unique<Text>(left, 200, PL_FONT_VIEWS);
+	rightLabel = std::make_unique<Text>(right, 200, PL_FONT_VIEWS);
+}
+
+QRect PanelSlider::hitRect() const {
+	return QRect(pos.x(), pos.y(), width, PL_SLIDER_H);
+}
+
+void PanelSlider::paint(pl_canvas *c) const {
+	pl_slider_paint(c, pos.x(), pos.y(), width, steps, value, enabled, pl_accent_current());
+	const uint32_t ink = enabled ? C_BLACK : GRAY(0x8);
+	if (leftLabel) {
+		pl_text(c, leftLabel->t, pos.x() + 1, pos.y() + PL_SLIDER_H + 11, ink);
+	}
+	if (rightLabel) {
+		pl_text(c, rightLabel->t, pos.x() + width - 1 - rightLabel->inkWidth(),
+			pos.y() + PL_SLIDER_H + 11, ink);
+	}
+}
+
+void PanelSlider::set(int v) {
+	v = std::clamp(v, 0, steps - 1);
+	if (v != value) {
+		value = v;
+		if (changed) {
+			changed(value);
+		}
+	}
+}
+
+bool PanelSlider::press(QPoint p) {
+	if (!enabled || !hitRect().contains(p)) {
+		return false;
+	}
+	dragging = true;
+	set(pl_slider_value_at(pos.x(), width, steps, p.x()));
+	return true;
+}
+
+bool PanelSlider::move(QPoint p) {
+	if (!dragging) {
+		return false;
+	}
+	set(pl_slider_value_at(pos.x(), width, steps, p.x()));
+	return true;
+}
+
+bool PanelSlider::release(QPoint) {
+	if (!dragging) {
+		return false;
+	}
+	dragging = false;
+	return true;
+}
+
+bool PanelSlider::key(int key) {
+	if (!enabled || (key != Qt::Key_Left && key != Qt::Key_Right)) {
+		return false;
+	}
+	set(value + (key == Qt::Key_Right ? 1 : -1));
+	return true;
+}
+
+/* ---- radio buttons ------------------------------------------------------------ */
+
+void PanelRadios::add(const QString &text, QPoint pos) {
+	buttons.push_back({ pos, std::make_unique<Text>(text, 300, PL_FONT_SYSTEM) });
+}
+
+int PanelRadios::hit(QPoint p) const {
+	for (int i = 0; i < static_cast<int>(buttons.size()); i++) {
+		const Button &b = buttons[i];
+		const int w = PL_CHECKBOX_LABEL_X + (b.label ? b.label->inkWidth() : 0);
+		if (QRect(b.pos.x(), b.pos.y() - 2, w, PL_RADIO_SIZE + 4).contains(p)) {
+			return i;
+		}
+	}
+	return -1;
+}
+
+void PanelRadios::paint(pl_canvas *c) const {
+	for (int i = 0; i < static_cast<int>(buttons.size()); i++) {
+		const Button &b = buttons[i];
+		pl_radio_paint(c, b.pos.x(), b.pos.y(), i == selected, i == down && inside, enabled,
+			b.label ? b.label->t : nullptr);
+	}
+}
+
+bool PanelRadios::press(QPoint p) {
+	const int i = enabled ? hit(p) : -1;
+	if (i < 0) {
+		return false;
+	}
+	down = i;
+	inside = true;
+	return true;
+}
+
+bool PanelRadios::move(QPoint p) {
+	if (down < 0) {
+		return false;
+	}
+	inside = hit(p) == down;
+	return true;
+}
+
+bool PanelRadios::release(QPoint p) {
+	if (down < 0) {
+		return false;
+	}
+	const int i = hit(p) == down ? down : -1;
+	down = -1;
+	inside = false;
+	if (i >= 0 && i != selected) {
+		selected = i;
+		if (changed) {
+			changed(i);
+		}
+	}
+	return true;
+}
+
 void panelGroup(pl_canvas *c, int x0, int y0, int x1, int y1, const char *title, uint32_t bg) {
 	Text t(title, 400, PL_FONT_SYSTEM);
 	pl_group_box_paint(c, x0, y0, x1, y1, t.t, bg);

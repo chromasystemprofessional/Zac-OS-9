@@ -78,5 +78,52 @@ struct PanelCheckbox {
 	bool release(QPoint pos);
 };
 
+/* A horizontal slider with labels under its ends; dragging or clicking
+ * picks a step, and `changed` fires as the value changes. */
+struct PanelSlider {
+	QPoint pos; /* the track's left end, at the thumb's top */
+	int width = 200;
+	int steps = 7;
+	int value = 0;
+	bool enabled = true;
+	std::unique_ptr<Text> leftLabel, rightLabel;
+	std::function<void(int)> changed;
+	bool dragging = false;
+
+	void setLabels(const QString &left, const QString &right);
+	QRect hitRect() const;
+	void paint(pl_canvas *c) const;
+	bool press(QPoint p);
+	bool move(QPoint p);
+	bool release(QPoint p);
+	bool key(int key); /* left and right arrows */
+
+private:
+	void set(int v);
+};
+
+/* A set of radio buttons; one is on. */
+struct PanelRadios {
+	struct Button {
+		QPoint pos;
+		std::unique_ptr<Text> label;
+	};
+	std::vector<Button> buttons;
+	int selected = 0;
+	bool enabled = true;
+	std::function<void(int)> changed;
+	int down = -1;
+	bool inside = false;
+
+	void add(const QString &text, QPoint pos);
+	void paint(pl_canvas *c) const;
+	bool press(QPoint p);
+	bool move(QPoint p);
+	bool release(QPoint p);
+
+private:
+	int hit(QPoint p) const;
+};
+
 /* A titled group box drawn on `bg`. */
 void panelGroup(pl_canvas *c, int x0, int y0, int x1, int y1, const char *title, uint32_t bg);

@@ -239,6 +239,16 @@ void pl_sound_play(const char *name) {
 	if (access(path, R_OK) != 0) {
 		return;
 	}
+	/* The Sound panel's alert volume, 0..7 (7 = full). */
+	char v[8];
+	int level = pl_setting("alert-volume", v, sizeof(v)) ? atoi(v) : 7;
+	level = level < 0 ? 0 : level > 7 ? 7 : level;
+	if (level == 0) {
+		return;
+	}
+	char pw_volume[16], pa_volume[24];
+	snprintf(pw_volume, sizeof(pw_volume), "%.3f", level / 7.0);
+	snprintf(pa_volume, sizeof(pa_volume), "--volume=%d", 65536 * level / 7);
 	/* Detach fully (double fork) so the caller never waits or reaps. */
 	pid_t pid = fork();
 	if (pid < 0) {
@@ -252,14 +262,9 @@ void pl_sound_play(const char *name) {
 				dup2(null, 1);
 				dup2(null, 2);
 			}
-			const char *players[] = { "pw-play", "paplay", "aplay" };
-			for (size_t i = 0; i < sizeof(players) / sizeof(players[0]); i++) {
-				if (i == 2) {
-					execlp(players[i], players[i], "-q", path, (char *)NULL);
-				} else {
-					execlp(players[i], players[i], path, (char *)NULL);
-				}
-			}
+			execlp("pw-play", "pw-play", "--volume", pw_volume, path, (char *)NULL);
+			execlp("paplay", "paplay", pa_volume, path, (char *)NULL);
+			execlp("aplay", "aplay", "-q", path, (char *)NULL);
 			_exit(127);
 		}
 		_exit(0);
@@ -269,4 +274,10 @@ void pl_sound_play(const char *name) {
 
 void pl_beep(void) {
 	pl_sound_play(NULL);
+}
+
+int pl_double_click_ms(void) {
+	char v[16];
+	const int ms = pl_setting("double-click", v, sizeof(v)) ? atoi(v) : 0;
+	return ms >= 150 && ms <= 2000 ? ms : 533;
 }

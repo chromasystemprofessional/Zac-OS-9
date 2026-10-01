@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Sound
+Comment=Volume and alert volume
+Exec=platinum-controlpanel sound
+Categories=Settings;HardwareSettings;
+OnlyShowIn=Platinum;
