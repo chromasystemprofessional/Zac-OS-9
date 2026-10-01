@@ -73,8 +73,13 @@ static void labelBox(Item &item, int x, int y, int *l, int *t, int *r, int *b) {
 	*b = *t + LABEL_H - 1;
 }
 
+bool acceptsDrops(const Item &item) {
+	return item.kind == PL_ICON_FOLDER || item.kind == PL_ICON_DISK ||
+		item.kind == PL_ICON_TRASH_EMPTY || item.kind == PL_ICON_TRASH_FULL;
+}
+
 void paintIconItem(pl_canvas *c, Item &item, int x, int y, bool onDesktop) {
-	pl_icon_paint(c, x, y, item.kind, PL_ICON_LARGE, item.selected);
+	pl_icon_paint(c, x, y, item.kind, PL_ICON_LARGE, item.selected || item.dropTarget);
 	int l, t, r, b;
 	labelBox(item, x, y, &l, &t, &r, &b);
 	uint32_t ink = C_BLACK;

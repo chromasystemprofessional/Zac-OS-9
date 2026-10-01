@@ -55,7 +55,20 @@ executable('platinum-finder',
   'finder/folderwindow.cpp',
   'finder/items.cpp',
   'finder/finder.cpp',
+  'finder/fileops.cpp',
   dependencies: [platinum_dep, qt6, layershellqt],
   cpp_args: ['-std=c++17'],
   install: true,
 )
+
+# vptr: scripted pointer (press/drag/release) for UI tests.
+vptr_protocol = []
+foreach kind : [['client-header', '@BASENAME@-client-protocol.h'], ['private-code', '@BASENAME@-protocol.c']]
+  vptr_protocol += custom_target('vptr_' + kind[0].underscorify(),
+    input: meson.project_source_root() / 'protocols/wlr-virtual-pointer-unstable-v1.xml',
+    output: kind[1],
+    command: [wayland_scanner, kind[0], '@INPUT@', '@OUTPUT@'],
+  )
+endforeach
+executable('vptr', meson.project_source_root() / 'tools/vptr/vptr.c', vptr_protocol,
+  dependencies: [wayland_client])

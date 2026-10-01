@@ -1,13 +1,16 @@
 #include "desktop.h"
 
 #include <LayerShellQt/window.h>
+#include <QApplication>
 #include <QDir>
+#include <QDragEnterEvent>
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QSet>
 #include <QStandardPaths>
 #include <QWindow>
 
+#include "fileops.h"
 #include "folderwindow.h"
 #include "menudraw.h"
 
@@ -34,6 +37,7 @@ static constexpr uint32_t PATTERN_DOT = RGB(0x55, 0x55, 0xAA);
 
 Desktop::Desktop() {
 	setAttribute(Qt::WA_OpaquePaintEvent);
+	setAcceptDrops(true);
 	m_disk = std::make_unique<Item>();
 	m_disk->name = displayName("/");
 	m_disk->path = "/";
@@ -93,6 +97,7 @@ void Desktop::reload() {
 			selected.insert(item->name);
 		}
 	}
+	m_pressItem = nullptr;
 	m_files = listFolder(folderPath());
 	for (auto &item : m_files) {
 		item->selected = selected.contains(item->name);
@@ -176,21 +181,29 @@ void Desktop::selectByName(const QString &name) {
 	update();
 }
 
+std::vector<Item *> Desktop::allItems() {
+	std::vector<Item *> all = { m_disk.get(), m_trash.get() };
+	for (auto &item : m_files) {
+		all.push_back(item.get());
+	}
+	return all;
+}
+
 void Desktop::mousePressEvent(QMouseEvent *e) {
 	Item *hit = itemAt(e->position().toPoint());
 	const bool extend = e->modifiers() & Qt::ShiftModifier;
-	auto apply = [&](Item *item) {
-		if (!extend) {
+	for (Item *item : allItems()) {
+		if (extend) {
+			if (item == hit) {
+				item->selected = !item->selected;
+			}
+		} else if (!hit || !hit->selected) {
+			/* Pressing a selected icon keeps the selection, to drag them all. */
 			item->selected = item == hit;
-		} else if (item == hit) {
-			item->selected = !item->selected;
 		}
-	};
-	apply(m_disk.get());
-	apply(m_trash.get());
-	for (auto &item : m_files) {
-		apply(item.get());
 	}
+	m_pressItem = hit && hit->selected ? hit : nullptr;
+	m_pressPos = e->position().toPoint();
 	update();
 	/* Clicking the desktop brings the Finder forward. */
 	Finder::instance().setFront(this);
@@ -201,6 +214,67 @@ void Desktop::mouseDoubleClickEvent(QMouseEvent *e) {
 	if (itemAt(e->position().toPoint())) {
 		Finder::instance().openSelection();
 	}
+}
+
+void Desktop::mouseMoveEvent(QMouseEvent *e) {
+	if (!m_pressItem || !(e->buttons() & Qt::LeftButton) ||
+			(e->position().toPoint() - m_pressPos).manhattanLength() <
+				QApplication::startDragDistance()) {
+		return;
+	}
+	std::vector<Item *> items;
+	std::vector<QPoint> origins;
+	for (Item *item : selectedItems()) {
+		/* The disk and the Trash stay put. TODO: dragging the disk to the
+		 * Trash ejects it on a Mac. */
+		if (item != m_disk.get() && item != m_trash.get()) {
+			items.push_back(item);
+			origins.push_back(item->pos);
+		}
+	}
+	m_pressItem = nullptr;
+	startItemDrag(this, items, origins, m_pressPos);
+}
+
+void Desktop::mouseReleaseEvent(QMouseEvent *) {
+	m_pressItem = nullptr;
+}
+
+Item *Desktop::dropTargetAt(QPoint pos, const QStringList &dragged) {
+	Item *item = itemAt(pos);
+	return item && acceptsDrops(*item) && !dragged.contains(item->path) ? item : nullptr;
+}
+
+void Desktop::clearDropTarget() {
+	for (Item *item : allItems()) {
+		item->dropTarget = false;
+	}
+	update();
+}
+
+void Desktop::dragEnterEvent(QDragEnterEvent *e) {
+	if (e->mimeData()->hasUrls()) {
+		e->acceptProposedAction();
+	}
+}
+
+void Desktop::dragMoveEvent(QDragMoveEvent *e) {
+	Item *target = dropTargetAt(e->position().toPoint(), draggedPaths(e->mimeData()));
+	for (Item *item : allItems()) {
+		item->dropTarget = item == target;
+	}
+	update();
+	e->acceptProposedAction();
+}
+
+void Desktop::dragLeaveEvent(QDragLeaveEvent *) {
+	clearDropTarget();
+}
+
+void Desktop::dropEvent(QDropEvent *e) {
+	Item *target = dropTargetAt(e->position().toPoint(), draggedPaths(e->mimeData()));
+	clearDropTarget();
+	dropItems(e, target, folderPath());
 }
 
 void Desktop::keyPressEvent(QKeyEvent *e) {

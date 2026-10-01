@@ -33,11 +33,23 @@ protected:
 	void mousePressEvent(QMouseEvent *) override;
 	void mouseDoubleClickEvent(QMouseEvent *) override;
 	void keyPressEvent(QKeyEvent *) override;
+	void mouseMoveEvent(QMouseEvent *) override;
+	void mouseReleaseEvent(QMouseEvent *) override;
+	void dragEnterEvent(QDragEnterEvent *) override;
+	void dragMoveEvent(QDragMoveEvent *) override;
+	void dragLeaveEvent(QDragLeaveEvent *) override;
+	void dropEvent(QDropEvent *) override;
 
 private:
 	void placeIcons();
 	void updateTrashIcon();
 	Item *itemAt(QPoint pos);
+	Item *dropTargetAt(QPoint pos, const QStringList &dragged);
+	void clearDropTarget();
+	std::vector<Item *> allItems();
+
+	Item *m_pressItem = nullptr;
+	QPoint m_pressPos;
 
 	std::unique_ptr<Item> m_disk, m_trash;
 	std::vector<std::unique_ptr<Item>> m_files; /* ~/Desktop */

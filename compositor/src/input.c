@@ -337,6 +337,10 @@ static void frame_press(struct plat_server *server, struct plat_view *view,
 /* ---- pointer ----------------------------------------------------------- */
 
 static void process_cursor_motion(struct plat_server *server, uint32_t time) {
+	if (server->drag_icon) {
+		wlr_scene_node_set_position(&server->drag_icon->node,
+			(int)server->cursor->x, (int)server->cursor->y);
+	}
 	if (server->cursor_mode != PLAT_CURSOR_PASSTHROUGH) {
 		grab_motion(server);
 		return;
@@ -446,6 +450,38 @@ static void seat_request_set_selection(struct wl_listener *listener, void *data)
 	wlr_seat_set_selection(server->seat, event->source, event->serial);
 }
 
+/* ---- drag and drop ------------------------------------------------------ */
+
+static void seat_request_start_drag(struct wl_listener *listener, void *data) {
+	struct plat_server *server = wl_container_of(listener, server, request_start_drag);
+	struct wlr_seat_request_start_drag_event *event = data;
+	if (wlr_seat_validate_pointer_grab_serial(server->seat, event->origin, event->serial)) {
+		wlr_seat_start_pointer_drag(server->seat, event->drag, event->serial);
+	} else {
+		wlr_data_source_destroy(event->drag->source);
+	}
+}
+
+static void drag_destroy(struct wl_listener *listener, void *data) {
+	struct plat_server *server = wl_container_of(listener, server, drag_destroy);
+	/* The scene removes the icon's tree itself. */
+	server->drag_icon = NULL;
+	wl_list_remove(&server->drag_destroy.link);
+}
+
+static void seat_start_drag(struct wl_listener *listener, void *data) {
+	struct plat_server *server = wl_container_of(listener, server, start_drag);
+	struct wlr_drag *drag = data;
+	if (drag->icon) {
+		/* Above windows and menus, like the Mac's drag outlines. */
+		server->drag_icon = wlr_scene_drag_icon_create(server->overlay_layer, drag->icon);
+		wlr_scene_node_set_position(&server->drag_icon->node,
+			(int)server->cursor->x, (int)server->cursor->y);
+	}
+	server->drag_destroy.notify = drag_destroy;
+	wl_signal_add(&drag->events.destroy, &server->drag_destroy);
+}
+
 void input_init(struct plat_server *server) {
 	server->cursor = wlr_cursor_create();
 	wlr_cursor_attach_output_layout(server->cursor, server->output_layout);
@@ -484,4 +520,8 @@ void input_init(struct plat_server *server) {
 	server->request_set_selection.notify = seat_request_set_selection;
 	wl_signal_add(&server->seat->events.request_set_selection,
 		&server->request_set_selection);
+	server->request_start_drag.notify = seat_request_start_drag;
+	wl_signal_add(&server->seat->events.request_start_drag, &server->request_start_drag);
+	server->start_drag.notify = seat_start_drag;
+	wl_signal_add(&server->seat->events.start_drag, &server->start_drag);
 }

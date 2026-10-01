@@ -1,12 +1,16 @@
 #include "folderwindow.h"
 
+#include <QApplication>
 #include <QDir>
+#include <QDragEnterEvent>
 #include <QHash>
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QProcess>
 #include <QSet>
 #include <QStorageInfo>
+
+#include "fileops.h"
 
 /* Layout. The item-count header matches HIG figure 2-24; the icon grid
  * spacing is not in the HIG (TODO: measure). */
@@ -48,6 +52,7 @@ FolderWindow::FolderWindow(const QString &path) : m_path(path) {
 	setAttribute(Qt::WA_DeleteOnClose);
 	setAttribute(Qt::WA_OpaquePaintEvent);
 	setWindowTitle(displayName(path));
+	setAcceptDrops(true);
 	m_repeat.callOnTimeout([this] { scrollStep(); });
 	/* Other programs change folders too; follow them. */
 	m_watcher.addPath(path);
@@ -75,12 +80,18 @@ void FolderWindow::changeEvent(QEvent *e) {
 
 /* Re-read the folder, keeping the selection by name. */
 void FolderWindow::reload() {
+	if (!QDir(m_path).exists()) {
+		/* Trashed, deleted or moved away: its window goes with it. */
+		QTimer::singleShot(0, this, [this] { close(); });
+		return;
+	}
 	QSet<QString> selected;
 	for (auto &item : m_items) {
 		if (item->selected) {
 			selected.insert(item->name);
 		}
 	}
+	m_pressItem = nullptr;
 	m_items = listFolder(m_path);
 	for (auto &item : m_items) {
 		item->selected = selected.contains(item->name);
@@ -248,19 +259,40 @@ void FolderWindow::mousePressEvent(QMouseEvent *e) {
 	}
 	Item *hit = itemAt(pos);
 	const bool extend = e->modifiers() & Qt::ShiftModifier;
-	if (!extend) {
+	if (extend) {
+		if (hit) {
+			hit->selected = !hit->selected;
+		}
+	} else if (!hit || !hit->selected) {
+		/* Pressing a selected icon keeps the selection, to drag them all. */
 		for (auto &item : m_items) {
 			item->selected = item.get() == hit;
 		}
-	} else if (hit) {
-		hit->selected = !hit->selected;
 	}
+	m_pressItem = hit && hit->selected ? hit : nullptr;
+	m_pressPos = pos;
 	update();
 	Finder::instance().setFront(this);
 	Finder::instance().notifyState();
 }
 
+QPoint FolderWindow::toWindow(QPoint contentPos) const {
+	return QPoint(contentPos.x(), contentPos.y() - m_scroll + CONTENT_Y);
+}
+
 void FolderWindow::mouseMoveEvent(QMouseEvent *e) {
+	if (m_pressItem && (e->buttons() & Qt::LeftButton) &&
+			(e->position().toPoint() - m_pressPos).manhattanLength() >=
+				QApplication::startDragDistance()) {
+		std::vector<Item *> items = selectedItems();
+		std::vector<QPoint> origins;
+		for (Item *item : items) {
+			origins.push_back(toWindow(item->pos));
+		}
+		m_pressItem = nullptr;
+		startItemDrag(this, items, origins, m_pressPos);
+		return;
+	}
 	if (m_sbPart != SB_THUMB_PART) {
 		return;
 	}
@@ -275,6 +307,7 @@ void FolderWindow::mouseMoveEvent(QMouseEvent *e) {
 }
 
 void FolderWindow::mouseReleaseEvent(QMouseEvent *) {
+	m_pressItem = nullptr;
 	m_sbPart = SB_NONE;
 	m_repeat.stop();
 }
@@ -289,6 +322,43 @@ void FolderWindow::keyPressEvent(QKeyEvent *e) {
 	if (!finderShortcut(e)) {
 		QWidget::keyPressEvent(e);
 	}
+}
+
+Item *FolderWindow::dropTargetAt(QPoint pos, const QStringList &dragged) {
+	Item *item = itemAt(pos);
+	return item && acceptsDrops(*item) && !dragged.contains(item->path) ? item : nullptr;
+}
+
+void FolderWindow::clearDropTarget() {
+	for (auto &item : m_items) {
+		item->dropTarget = false;
+	}
+	update();
+}
+
+void FolderWindow::dragEnterEvent(QDragEnterEvent *e) {
+	if (e->mimeData()->hasUrls()) {
+		e->acceptProposedAction();
+	}
+}
+
+void FolderWindow::dragMoveEvent(QDragMoveEvent *e) {
+	Item *target = dropTargetAt(e->position().toPoint(), draggedPaths(e->mimeData()));
+	for (auto &item : m_items) {
+		item->dropTarget = item.get() == target;
+	}
+	update();
+	e->acceptProposedAction();
+}
+
+void FolderWindow::dragLeaveEvent(QDragLeaveEvent *) {
+	clearDropTarget();
+}
+
+void FolderWindow::dropEvent(QDropEvent *e) {
+	Item *target = dropTargetAt(e->position().toPoint(), draggedPaths(e->mimeData()));
+	clearDropTarget();
+	dropItems(e, target, m_path);
 }
 
 bool finderShortcut(QKeyEvent *e) {

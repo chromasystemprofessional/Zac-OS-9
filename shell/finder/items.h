@@ -14,6 +14,7 @@ struct Item {
 	pl_icon_kind kind = PL_ICON_DOCUMENT;
 	QPoint pos; /* icon top-left in its view's coordinates */
 	bool selected = false;
+	bool dropTarget = false; /* a drag is hovering over this folder */
 	std::unique_ptr<Text> label;
 
 	/* Label below the icon: views font, centred, truncated to fit. */
@@ -33,5 +34,7 @@ QString trashFilesPath();
 /* Paint an icon with its label; `onDesktop` labels get a white box when
  * unselected (desktop pattern behind them). TODO: measure label metrics. */
 void paintIconItem(pl_canvas *c, Item &item, int x, int y, bool onDesktop);
+/* Can items be dropped into this one (folder, disk, Trash)? */
+bool acceptsDrops(const Item &item);
 /* Hit area of an icon item at (x, y): the icon square or its label. */
 bool iconItemContains(Item &item, int x, int y, QPoint p);
