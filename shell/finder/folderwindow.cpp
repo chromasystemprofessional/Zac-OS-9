@@ -413,6 +413,7 @@ bool finderShortcut(QKeyEvent *e) {
 	case Qt::Key_O: f.openSelection(); return true;
 	case Qt::Key_W: f.closeWindow(); return true;
 	case Qt::Key_Backspace: f.moveSelectionToTrash(); return true;
+	case Qt::Key_I: f.getInfo(); return true;
 	default: return false;
 	}
 }

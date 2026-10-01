@@ -61,8 +61,8 @@ static void add_finder_menus(struct mb_menu *menus, int *n) {
 	add(m, "Move To Trash", KEY_DELETE_GLYPH, sel, ACT_FINDER, "move-to-trash");
 	add(m, "Close Window", 'W', up && fs->window, ACT_FINDER, "close-window");
 	sep(m);
-	/* TODO(phase 3): Get Info, Duplicate, Make Alias, Put Away, Find. */
-	add(m, "Get Info", 'I', false, ACT_NONE, NULL);
+	add(m, "Get Info", 'I', sel || (up && fs->window), ACT_FINDER, "get-info");
+	/* TODO(phase 3): Duplicate, Make Alias, Put Away, Find. */
 	add(m, "Duplicate", 'D', false, ACT_NONE, NULL);
 	add(m, "Make Alias", 'M', false, ACT_NONE, NULL);
 	add_edit_menu(menus, n, false);
@@ -250,6 +250,8 @@ void menus_perform(struct mb_item *item) {
 		finder_send(item->arg);
 		break;
 	case ACT_ABOUT:
+		finder_send("about");
+		break;
 	case ACT_NONE:
 		break;
 	}

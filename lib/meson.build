@@ -8,6 +8,7 @@ platinum_lib = static_library('platinum',
   'menudraw.c',
   'widgets.c',
   'icons.c',
+  'logo.c',
   include_directories: platinum_inc,
   dependencies: [cairo],
 )

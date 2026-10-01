@@ -138,8 +138,8 @@ static void add_item(struct mb_menu *menu, const char *label, bool enabled,
 }
 
 void launch_fill_logo_menu(struct mb_menu *menu) {
-	/* TODO(phase 3): "About This Computer" window, shown by the Finder. */
-	add_item(menu, "About Platinum 2026…", false, ACT_ABOUT, NULL);
+	/* Shown by the Finder. */
+	add_item(menu, "About This Computer…", true, ACT_ABOUT, NULL);
 	add_item(menu, NULL, false, ACT_NONE, NULL);
 
 	struct entry entries[MAX_ITEMS];

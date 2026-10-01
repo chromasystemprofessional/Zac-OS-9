@@ -10,6 +10,7 @@
 #include "alert.h"
 #include "desktop.h"
 #include "folderwindow.h"
+#include "infowindow.h"
 
 Finder &Finder::instance() {
 	static Finder finder;
@@ -96,6 +97,10 @@ void Finder::command(const QString &name) {
 		moveSelectionToTrash();
 	} else if (name == "empty-trash") {
 		emptyTrash();
+	} else if (name == "get-info") {
+		getInfo();
+	} else if (name == "about") {
+		AboutWindow::open();
 	}
 }
 
@@ -136,6 +141,18 @@ void Finder::openSelection() {
 	}
 }
 
+/* Info on each selected item, or on the front window's folder. */
+void Finder::getInfo() {
+	FinderView *v = front();
+	std::vector<Item *> items = v->selectedItems();
+	if (items.empty() && v != m_desktop) {
+		InfoWindow::open(v->folderPath(), PL_ICON_FOLDER, displayName(v->folderPath()));
+	}
+	for (Item *item : items) {
+		InfoWindow::open(item->path, item->kind, item->name);
+	}
+}
+
 void Finder::closeWindow() {
 	FinderView *v = front();
 	if (v && v != m_desktop) {
@@ -161,17 +178,6 @@ void Finder::moveSelectionToTrash() {
 		folderChanged(folder);
 	}
 	folderChanged(trashFilesPath());
-}
-
-/* "12K", "1.4 MB": Finder-style sizes. */
-static QString finderSize(qint64 bytes) {
-	if (bytes < 1024 * 1024) {
-		return QString::number(std::max<qint64>(1, (bytes + 1023) / 1024)) + "K";
-	}
-	if (bytes < 1024LL * 1024 * 1024) {
-		return QString::number(bytes / (1024.0 * 1024), 'f', 1) + " MB";
-	}
-	return QString::number(bytes / (1024.0 * 1024 * 1024), 'f', 1) + " GB";
 }
 
 void Finder::emptyTrash() {

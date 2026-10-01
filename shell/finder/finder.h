@@ -50,6 +50,7 @@ public:
 	void closeWindow();
 	void moveSelectionToTrash();
 	void emptyTrash();
+	void getInfo();
 
 	/* Re-read every view showing `folder`, and the Trash icon. */
 	void folderChanged(const QString &folder);

@@ -127,8 +127,8 @@ void keys_send_clear(void);       /* Clear = Delete */
 
 /* ---- the logo (logo.c) --------------------------------------------------- */
 
-/* MBAR_ICON_SIZE² ARGB pixels. */
-const uint32_t *logo_pixels(void);
+/* The logo comes from lib/logo.h. */
+#include "logo.h"
 
 /* ---- app-wide state (main.c) ---------------------------------------------- */
 

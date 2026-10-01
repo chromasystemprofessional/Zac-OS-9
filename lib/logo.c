@@ -7,9 +7,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "menubar.h"
+#include "draw.h"
+#include "logo.h"
 
-static const char *const rows[MBAR_ICON_SIZE] = {
+static const char *const rows[PL_LOGO_SIZE] = {
 	"................",
 	"......gggg......",
 	"....gggggggg....",
@@ -41,12 +42,12 @@ static uint32_t color_of(char c) {
 }
 
 const uint32_t *logo_pixels(void) {
-	static uint32_t px[MBAR_ICON_SIZE * MBAR_ICON_SIZE];
+	static uint32_t px[PL_LOGO_SIZE * PL_LOGO_SIZE];
 	static int built;
 	if (!built) {
-		for (int y = 0; y < MBAR_ICON_SIZE; y++) {
-			for (int x = 0; x < MBAR_ICON_SIZE; x++) {
-				px[y * MBAR_ICON_SIZE + x] = color_of(rows[y][x]);
+		for (int y = 0; y < PL_LOGO_SIZE; y++) {
+			for (int x = 0; x < PL_LOGO_SIZE; x++) {
+				px[y * PL_LOGO_SIZE + x] = color_of(rows[y][x]);
 			}
 		}
 		built = 1;
