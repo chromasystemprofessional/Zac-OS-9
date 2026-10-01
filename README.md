@@ -25,14 +25,15 @@ software.
 The source tree lives on the Windows drive. Everything builds and runs inside the
 `Debian` WSL distro, and WSLg shows the compositor as a normal window.
 
-```sh
-# from PowerShell, in the project folder:
-wsl -d Debian -- scripts/run-nested.sh
-```
+To run it, double-click **`run.cmd`** in the project folder, or type `.\run` in a
+VS Code / PowerShell terminal opened in this folder.
 
 This builds the code and opens `platinum-wm` with a terminal (`foot`) running
-inside it. To quit, press **Ctrl+Alt+Backspace** or close the window.
-Until title bars exist (Phase 1), move a window by holding **Alt** and dragging it.
+inside it. **The window often opens behind other windows.** Look for
+"wlroots - WL-1 (Debian)" on the taskbar. To quit, press **Ctrl+Alt+Backspace**
+inside it or close the window.
+
+Add `-d` for debug logging: `.\run -d -s foot`.
 
 Build only: `wsl -d Debian -- scripts/build.sh`
 

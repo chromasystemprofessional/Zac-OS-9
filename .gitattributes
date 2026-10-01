@@ -1,5 +1,6 @@
 # Built inside Linux (WSL / Debian): keep LF everywhere.
 * text=auto eol=lf
+*.cmd text eol=crlf
 *.png binary
 *.ttf binary
 *.otf binary

@@ -16,6 +16,7 @@ export WLR_RENDERER="${WLR_RENDERER:-pixman}"
 export WLR_WL_OUTPUTS=1
 
 if [ $# -eq 0 ]; then
-	set -- -s foot
+	# foot warns about every optional protocol we lack; keep the console quiet.
+	set -- -s 'foot 2>/dev/null'
 fi
 exec build/compositor/platinum-wm "$@"

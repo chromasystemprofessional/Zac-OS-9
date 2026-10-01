@@ -13,16 +13,20 @@
 #include "server.h"
 
 static void usage(const char *argv0) {
-	printf("Usage: %s [-s startup-command]\n", argv0);
+	printf("Usage: %s [-d] [-s startup-command]\n"
+		"  -d  verbose (debug) logging\n", argv0);
 }
 
 int main(int argc, char *argv[]) {
-	wlr_log_init(WLR_DEBUG, NULL);
+	enum wlr_log_importance log_level = WLR_ERROR;
 	char *startup_cmd = NULL;
 
 	int c;
-	while ((c = getopt(argc, argv, "s:h")) != -1) {
+	while ((c = getopt(argc, argv, "ds:h")) != -1) {
 		switch (c) {
+		case 'd':
+			log_level = WLR_DEBUG;
+			break;
 		case 's':
 			startup_cmd = optarg;
 			break;
@@ -35,6 +39,7 @@ int main(int argc, char *argv[]) {
 		usage(argv[0]);
 		return 0;
 	}
+	wlr_log_init(log_level, NULL);
 
 	struct plat_server server = {0};
 	server.display = wl_display_create();
@@ -108,7 +113,8 @@ int main(int argc, char *argv[]) {
 		_exit(127);
 	}
 
-	wlr_log(WLR_INFO, "platinum-wm running on WAYLAND_DISPLAY=%s", socket);
+	fprintf(stderr, "platinum-wm running (WAYLAND_DISPLAY=%s). "
+		"Quit with Ctrl+Alt+Backspace or by closing its window.\n", socket);
 	wl_display_run(server.display);
 
 	wl_display_destroy_clients(server.display);
