@@ -33,7 +33,10 @@ QString trashFilesPath();
 
 /* Paint an icon with its label; `onDesktop` labels get a white box when
  * unselected (desktop pattern behind them). TODO: measure label metrics. */
-void paintIconItem(pl_canvas *c, Item &item, int x, int y, bool onDesktop);
+void paintIconItem(pl_canvas *c, Item &item, int x, int y, bool onDesktop,
+		bool showLabel = true);
+/* Is `p` on the label of the icon at (x, y)? */
+bool iconLabelContains(Item &item, int x, int y, QPoint p);
 /* Can items be dropped into this one (folder, disk, Trash)? */
 bool acceptsDrops(const Item &item);
 /* Hit area of an icon item at (x, y): the icon square or its label. */

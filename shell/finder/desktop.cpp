@@ -38,6 +38,8 @@ static constexpr uint32_t PATTERN_DOT = RGB(0x55, 0x55, 0xAA);
 Desktop::Desktop() {
 	setAttribute(Qt::WA_OpaquePaintEvent);
 	setAcceptDrops(true);
+	m_renameTimer.setSingleShot(true);
+	m_renameTimer.callOnTimeout([this] { beginRename(m_renameItem); });
 	m_disk = std::make_unique<Item>();
 	m_disk->name = displayName("/");
 	m_disk->path = "/";
@@ -98,7 +100,11 @@ void Desktop::reload() {
 		}
 	}
 	m_pressItem = nullptr;
-	m_files = listFolder(folderPath());
+	auto fresh = listFolder(folderPath());
+	m_editor.retarget(fresh);
+	m_renameTimer.stop();
+	m_renameItem = nullptr;
+	m_files = std::move(fresh);
 	for (auto &item : m_files) {
 		item->selected = selected.contains(item->name);
 	}
@@ -137,7 +143,11 @@ void Desktop::paintEvent(QPaintEvent *) {
 	}
 	paintIconItem(c, *m_disk, m_disk->pos.x(), m_disk->pos.y(), true);
 	for (auto &item : m_files) {
-		paintIconItem(c, *item, item->pos.x(), item->pos.y(), true);
+		const bool editing = m_editor.editing(item.get());
+		paintIconItem(c, *item, item->pos.x(), item->pos.y(), true, !editing);
+		if (editing) {
+			m_editor.paint(c, item->pos.x(), item->pos.y());
+		}
 	}
 	paintIconItem(c, *m_trash, m_trash->pos.x(), m_trash->pos.y(), true);
 	QPainter p(this);
@@ -189,9 +199,32 @@ std::vector<Item *> Desktop::allItems() {
 	return all;
 }
 
+bool Desktop::renamable(const Item *item) const {
+	return item && item != m_disk.get() && item != m_trash.get();
+}
+
+void Desktop::beginRename(Item *item) {
+	if (renamable(item) && item->selected) {
+		m_editor.begin(item);
+	}
+}
+
 void Desktop::mousePressEvent(QMouseEvent *e) {
-	Item *hit = itemAt(e->position().toPoint());
+	const QPoint pos = e->position().toPoint();
+	if (Item *edited = m_editor.item()) {
+		if (m_editor.contains(edited->pos.x(), edited->pos.y(), pos)) {
+			return;
+		}
+		m_editor.commit();
+	}
+	Item *hit = itemAt(pos);
 	const bool extend = e->modifiers() & Qt::ShiftModifier;
+	m_renameTimer.stop();
+	if (renamable(hit) && hit->selected && !extend && selectedItems().size() == 1 &&
+			iconLabelContains(*hit, hit->pos.x(), hit->pos.y(), pos)) {
+		m_renameItem = hit;
+		m_renameTimer.start(QApplication::doubleClickInterval());
+	}
 	for (Item *item : allItems()) {
 		if (extend) {
 			if (item == hit) {
@@ -211,6 +244,7 @@ void Desktop::mousePressEvent(QMouseEvent *e) {
 }
 
 void Desktop::mouseDoubleClickEvent(QMouseEvent *e) {
+	m_renameTimer.stop();
 	if (itemAt(e->position().toPoint())) {
 		Finder::instance().openSelection();
 	}
@@ -233,6 +267,7 @@ void Desktop::mouseMoveEvent(QMouseEvent *e) {
 		}
 	}
 	m_pressItem = nullptr;
+	m_renameTimer.stop();
 	startItemDrag(this, items, origins, m_pressPos);
 }
 
@@ -278,6 +313,14 @@ void Desktop::dropEvent(QDropEvent *e) {
 }
 
 void Desktop::keyPressEvent(QKeyEvent *e) {
+	if (m_editor.key(e)) {
+		return;
+	}
+	if ((e->key() == Qt::Key_Return || e->key() == Qt::Key_Enter) &&
+			selectedItems().size() == 1) {
+		beginRename(selectedItems().front());
+		return;
+	}
 	if (!finderShortcut(e)) {
 		QWidget::keyPressEvent(e);
 	}

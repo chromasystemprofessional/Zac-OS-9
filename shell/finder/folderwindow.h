@@ -6,6 +6,7 @@
 
 #include "finder.h"
 #include "items.h"
+#include "labeleditor.h"
 #include "widgets.h"
 
 /*
@@ -66,6 +67,12 @@ private:
 	/* A press on an icon that may turn into a drag. */
 	Item *m_pressItem = nullptr;
 	QPoint m_pressPos;
+
+	/* Renaming: a click on a selected name, held still, opens the editor. */
+	LabelEditor m_editor{ [this] { update(); } };
+	QTimer m_renameTimer;
+	Item *m_renameItem = nullptr;
+	void beginRename(Item *item);
 
 	/* Scroll bar tracking. */
 	sb_part m_sbPart = SB_NONE;

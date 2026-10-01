@@ -78,8 +78,17 @@ bool acceptsDrops(const Item &item) {
 		item.kind == PL_ICON_TRASH_EMPTY || item.kind == PL_ICON_TRASH_FULL;
 }
 
-void paintIconItem(pl_canvas *c, Item &item, int x, int y, bool onDesktop) {
+bool iconLabelContains(Item &item, int x, int y, QPoint p) {
+	int l, t, r, b;
+	labelBox(item, x, y, &l, &t, &r, &b);
+	return QRect(QPoint(l, t), QPoint(r, b)).contains(p);
+}
+
+void paintIconItem(pl_canvas *c, Item &item, int x, int y, bool onDesktop, bool showLabel) {
 	pl_icon_paint(c, x, y, item.kind, PL_ICON_LARGE, item.selected || item.dropTarget);
+	if (!showLabel) {
+		return;
+	}
 	int l, t, r, b;
 	labelBox(item, x, y, &l, &t, &r, &b);
 	uint32_t ink = C_BLACK;

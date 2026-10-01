@@ -3,8 +3,11 @@
 #include <QFileSystemWatcher>
 #include <QWidget>
 
+#include <QTimer>
+
 #include "finder.h"
 #include "items.h"
+#include "labeleditor.h"
 
 /*
  * The desktop: a full-screen wlr-layer-shell surface beneath all windows,
@@ -50,6 +53,13 @@ private:
 
 	Item *m_pressItem = nullptr;
 	QPoint m_pressPos;
+
+	/* Renaming items from ~/Desktop (the disk and Trash keep their names). */
+	LabelEditor m_editor{ [this] { update(); } };
+	QTimer m_renameTimer;
+	Item *m_renameItem = nullptr;
+	bool renamable(const Item *item) const;
+	void beginRename(Item *item);
 
 	std::unique_ptr<Item> m_disk, m_trash;
 	std::vector<std::unique_ptr<Item>> m_files; /* ~/Desktop */

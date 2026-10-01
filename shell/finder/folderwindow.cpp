@@ -54,6 +54,8 @@ FolderWindow::FolderWindow(const QString &path) : m_path(path) {
 	setWindowTitle(displayName(path));
 	setAcceptDrops(true);
 	m_repeat.callOnTimeout([this] { scrollStep(); });
+	m_renameTimer.setSingleShot(true);
+	m_renameTimer.callOnTimeout([this] { beginRename(m_renameItem); });
 	/* Other programs change folders too; follow them. */
 	m_watcher.addPath(path);
 	QObject::connect(&m_watcher, &QFileSystemWatcher::directoryChanged,
@@ -92,7 +94,11 @@ void FolderWindow::reload() {
 		}
 	}
 	m_pressItem = nullptr;
-	m_items = listFolder(m_path);
+	auto fresh = listFolder(m_path);
+	m_editor.retarget(fresh);
+	m_renameTimer.stop();
+	m_renameItem = nullptr;
+	m_items = std::move(fresh);
 	for (auto &item : m_items) {
 		item->selected = selected.contains(item->name);
 	}
@@ -193,7 +199,11 @@ void FolderWindow::paintEvent(QPaintEvent *) {
 	pl_fill(&content, 0, m_scroll, viewW - 1, m_scroll + viewH - 1, C_WHITE);
 	for (auto &item : m_items) {
 		if (item->pos.y() + CELL_H >= m_scroll && item->pos.y() <= m_scroll + viewH) {
-			paintIconItem(&content, *item, item->pos.x(), item->pos.y(), false);
+			const bool editing = m_editor.editing(item.get());
+			paintIconItem(&content, *item, item->pos.x(), item->pos.y(), false, !editing);
+			if (editing) {
+				m_editor.paint(&content, item->pos.x(), item->pos.y());
+			}
 		}
 	}
 
@@ -257,8 +267,23 @@ void FolderWindow::mousePressEvent(QMouseEvent *e) {
 	if (pos.y() < CONTENT_Y || pos.x() >= barX) {
 		return;
 	}
+	const QPoint content(pos.x(), pos.y() - CONTENT_Y + m_scroll);
+	if (Item *edited = m_editor.item()) {
+		if (m_editor.contains(edited->pos.x(), edited->pos.y(), content)) {
+			return;
+		}
+		m_editor.commit();
+	}
 	Item *hit = itemAt(pos);
 	const bool extend = e->modifiers() & Qt::ShiftModifier;
+	/* A click on the name of the one selected icon starts a rename, unless
+	 * it turns into a double-click or a drag first. */
+	m_renameTimer.stop();
+	if (hit && hit->selected && !extend && selectedItems().size() == 1 &&
+			iconLabelContains(*hit, hit->pos.x(), hit->pos.y(), content)) {
+		m_renameItem = hit;
+		m_renameTimer.start(QApplication::doubleClickInterval());
+	}
 	if (extend) {
 		if (hit) {
 			hit->selected = !hit->selected;
@@ -290,6 +315,7 @@ void FolderWindow::mouseMoveEvent(QMouseEvent *e) {
 			origins.push_back(toWindow(item->pos));
 		}
 		m_pressItem = nullptr;
+		m_renameTimer.stop();
 		startItemDrag(this, items, origins, m_pressPos);
 		return;
 	}
@@ -313,12 +339,28 @@ void FolderWindow::mouseReleaseEvent(QMouseEvent *) {
 }
 
 void FolderWindow::mouseDoubleClickEvent(QMouseEvent *e) {
+	m_renameTimer.stop();
 	if (itemAt(e->position().toPoint())) {
 		Finder::instance().openSelection();
 	}
 }
 
+void FolderWindow::beginRename(Item *item) {
+	if (item && item->selected) {
+		m_editor.begin(item);
+	}
+}
+
 void FolderWindow::keyPressEvent(QKeyEvent *e) {
+	if (m_editor.key(e)) {
+		return;
+	}
+	/* Return on the one selected icon: rename it (the Finder's way). */
+	if ((e->key() == Qt::Key_Return || e->key() == Qt::Key_Enter) &&
+			selectedItems().size() == 1) {
+		beginRename(selectedItems().front());
+		return;
+	}
 	if (!finderShortcut(e)) {
 		QWidget::keyPressEvent(e);
 	}
