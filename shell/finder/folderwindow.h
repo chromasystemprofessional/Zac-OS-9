@@ -18,7 +18,7 @@
  */
 class FolderWindow : public QWidget, public FinderView {
 public:
-	enum class ViewMode { Icons, List };
+	enum class ViewMode { Icons, List, Buttons };
 
 	/* Opens (or brings back) the window for `path`. */
 	static FolderWindow *open(const QString &path);
@@ -75,6 +75,13 @@ private:
 	/* Icon view. */
 	void layoutIcons();
 	void paintIcons(pl_canvas *content);
+
+	/* Button view: each item a bevel button; a click opens it. */
+	void layoutButtons();
+	void paintButtons(pl_canvas *content);
+	Item *buttonAt(QPoint content, bool *onButton);
+	Item *m_buttonDown = nullptr;
+	bool m_buttonInside = false;
 
 	/* List view (HIG figure 2-24). */
 	struct Row {

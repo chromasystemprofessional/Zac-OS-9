@@ -21,6 +21,41 @@ static void paint_nine(struct pl_canvas *c, int x, int y, int w,
 	}
 }
 
+void pl_bevel_button_paint(struct pl_canvas *c, int x, int y, int w, int h, bool pressed) {
+	const int x1 = x + w - 1, y1 = y + h - 1;
+	if (!pressed) {
+		/* Raised: #888 / #444 outside, white / #999 inside, #CCC face. */
+		pl_fill(c, x + 2, y + 2, x1 - 2, y1 - 2, GRAY(0xC));
+		pl_hline(c, x, x1 - 1, y, GRAY(0x8));
+		pl_vline(c, x, y, y1 - 1, GRAY(0x8));
+		pl_hline(c, x + 1, x1, y1, GRAY(0x4));
+		pl_vline(c, x1, y + 1, y1, GRAY(0x4));
+		pl_put(c, x1, y, GRAY(0x7));
+		pl_put(c, x, y1, GRAY(0x7));
+		pl_hline(c, x + 1, x1 - 2, y + 1, C_WHITE);
+		pl_vline(c, x + 1, y + 1, y1 - 2, C_WHITE);
+		pl_hline(c, x + 2, x1 - 1, y1 - 1, GRAY(0x9));
+		pl_vline(c, x1 - 1, y + 2, y1 - 1, GRAY(0x9));
+		pl_put(c, x1 - 1, y + 1, GRAY(0xC));
+		pl_put(c, x + 1, y1 - 1, GRAY(0xC));
+		return;
+	}
+	/* Pressed: #222 / #666 outside, #555 / #AAA inside, #888 face. */
+	pl_fill(c, x + 2, y + 2, x1 - 2, y1 - 2, GRAY(0x8));
+	pl_hline(c, x, x1 - 1, y, GRAY(0x2));
+	pl_vline(c, x, y, y1 - 1, GRAY(0x2));
+	pl_hline(c, x + 1, x1, y1, GRAY(0x6));
+	pl_vline(c, x1, y + 1, y1, GRAY(0x6));
+	pl_put(c, x1, y, GRAY(0x5));
+	pl_put(c, x, y1, GRAY(0x5));
+	pl_hline(c, x + 1, x1 - 2, y + 1, GRAY(0x5));
+	pl_vline(c, x + 1, y + 1, y1 - 2, GRAY(0x5));
+	pl_hline(c, x + 2, x1 - 1, y1 - 1, GRAY(0xA));
+	pl_vline(c, x1 - 1, y + 2, y1 - 1, GRAY(0xA));
+	pl_put(c, x1 - 1, y + 1, GRAY(0x8));
+	pl_put(c, x + 1, y1 - 1, GRAY(0x8));
+}
+
 void pl_button_paint(struct pl_canvas *c, int x, int y, int w,
 		const struct plat_text *label, unsigned flags) {
 	const bool pressed = flags & PL_BUTTON_PRESSED;

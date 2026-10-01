@@ -113,7 +113,8 @@ QString Finder::stateLine() {
 	QDir trash(trashFilesPath());
 	bool full = trash.exists() && !trash.isEmpty();
 	auto *fw = dynamic_cast<FolderWindow *>(v);
-	int list = fw && fw->viewMode() == FolderWindow::ViewMode::List ? 1 : 0;
+	int list = !fw ? 0 : fw->viewMode() == FolderWindow::ViewMode::List ? 1
+		: fw->viewMode() == FolderWindow::ViewMode::Buttons ? 2 : 0;
 	return QStringLiteral("state selection=%1 window=%2 trash=%3 view=%4")
 		.arg(selection).arg(window ? 1 : 0).arg(full ? 1 : 0).arg(list);
 }
@@ -154,9 +155,10 @@ void Finder::command(const QString &name) {
 		showOriginal();
 	} else if (name == "about") {
 		AboutWindow::open();
-	} else if (name == "view-icons" || name == "view-list") {
+	} else if (name == "view-icons" || name == "view-list" || name == "view-buttons") {
 		if (auto *fw = dynamic_cast<FolderWindow *>(front())) {
 			fw->setViewMode(name == "view-list" ? FolderWindow::ViewMode::List
+				: name == "view-buttons" ? FolderWindow::ViewMode::Buttons
 				: FolderWindow::ViewMode::Icons);
 		}
 	}

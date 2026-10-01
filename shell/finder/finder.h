@@ -35,7 +35,7 @@ public:
  *   menu bar -> Finder:  "cmd <name>"   (new-folder, open, close-window,
  *                         move-to-trash, empty-trash, ...)
  *   Finder -> menu bar:  "state selection=<n> window=<0|1> trash=<0|1>
- *                         view=<0 icons|1 list>"
+ *                         view=<0 icons|1 list|2 buttons>"
  */
 class Finder {
 public:

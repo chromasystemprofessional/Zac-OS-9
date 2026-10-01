@@ -22,6 +22,11 @@ static constexpr int ICONS_TOP = HEADER_H + 1; /* below a black separator */
 static constexpr int CELL_W = 80, CELL_H = 64;
 static constexpr int MARGIN = 8;
 
+/* Button view (Mac OS 8): a grid of small-bevel buttons, names below.
+ * Not in the HIG; sizes are estimates. TODO: measure. */
+static constexpr int BUTTON = 48;           /* bevel button, square */
+static constexpr int BCELL_W = 84, BCELL_H = 80;
+
 /* List view, HIG figure 2-24: a 21 px column-header band, 19 px rows. */
 static constexpr int BAND_H = 21;
 static constexpr int LIST_TOP = HEADER_H + BAND_H;
@@ -135,7 +140,8 @@ void FolderWindow::reloadAll(const QString &folder) {
 
 FolderWindow::FolderWindow(const QString &path) : m_path(path) {
 	m_state = FolderState::load(path);
-	m_mode = m_state.viewMode == 1 ? ViewMode::List : ViewMode::Icons;
+	m_mode = m_state.viewMode == 1 ? ViewMode::List
+		: m_state.viewMode == 2 ? ViewMode::Buttons : ViewMode::Icons;
 	m_sortColumn = std::clamp(m_state.sortColumn, 0, N_COLUMNS - 1);
 	m_saveTimer.setSingleShot(true);
 	m_saveTimer.callOnTimeout([this] { m_state.save(m_path); });
@@ -181,7 +187,7 @@ void FolderWindow::setViewMode(ViewMode mode) {
 	if (mode == m_mode) {
 		return;
 	}
-	m_state.viewMode = mode == ViewMode::List ? 1 : 0;
+	m_state.viewMode = mode == ViewMode::List ? 1 : mode == ViewMode::Buttons ? 2 : 0;
 	saveStateSoon();
 	m_editor.cancel();
 	m_mode = mode;
@@ -218,6 +224,7 @@ void FolderWindow::reload() {
 		}
 	});
 	m_pressItem = nullptr;
+	m_buttonDown = nullptr;
 	auto fresh = listFolder(m_path);
 	m_editor.retarget(fresh);
 	m_renameTimer.stop();
@@ -299,6 +306,8 @@ void FolderWindow::scrollTo(int x, int y) {
 void FolderWindow::relayout() {
 	if (m_mode == ViewMode::Icons) {
 		layoutIcons();
+	} else if (m_mode == ViewMode::Buttons) {
+		layoutButtons();
 	} else {
 		buildRows();
 		m_contentHeight = static_cast<int>(m_rows.size()) * ROW_H;
@@ -418,6 +427,65 @@ void FolderWindow::paintIcons(pl_canvas *content) {
 			}
 		}
 	}
+}
+
+/* ---- button view --------------------------------------------------------------- */
+
+/* item->pos is the icon's top-left; its button surrounds it. */
+void FolderWindow::layoutButtons() {
+	const int cols = std::max(1, (viewWidth() - 2 * MARGIN) / BCELL_W);
+	int i = 0;
+	for (auto &item : m_items) {
+		item->pos = QPoint(MARGIN + (i % cols) * BCELL_W + (BCELL_W - PL_ICON_LARGE) / 2,
+			MARGIN + (i / cols) * BCELL_H + (BUTTON - PL_ICON_LARGE) / 2);
+		i++;
+	}
+	const int rows = (static_cast<int>(m_items.size()) + cols - 1) / cols;
+	m_contentHeight = 2 * MARGIN + rows * BCELL_H;
+	m_contentWidth = 0;
+}
+
+static QRect buttonRect(const Item *item) {
+	const int inset = (BUTTON - PL_ICON_LARGE) / 2;
+	return QRect(item->pos.x() - inset, item->pos.y() - inset, BUTTON, BUTTON);
+}
+
+void FolderWindow::paintButtons(pl_canvas *content) {
+	pl_fill(content, 0, m_scrollY, viewWidth() - 1, m_scrollY + viewHeight() - 1, C_WHITE);
+	for (auto &item : m_items) {
+		const QRect b = buttonRect(item.get());
+		const bool pressed = item.get() == m_buttonDown && m_buttonInside;
+		pl_bevel_button_paint(content, b.x(), b.y(), b.width(), b.height(), pressed);
+		const int shift = pressed ? 1 : 0;
+		pl_icon_paint(content, item->pos.x() + shift, item->pos.y() + shift, item->kind,
+			PL_ICON_LARGE, item->dropTarget);
+
+		const Text &label = item->labelText();
+		const int lx = b.center().x() - label.inkWidth() / 2, top = b.bottom() + 3;
+		uint32_t ink = C_BLACK;
+		if (item->selected) {
+			pl_fill(content, lx - 2, top, lx + label.inkWidth() + 1, top + 12, C_BLACK);
+			ink = C_WHITE;
+		}
+		pl_text(content, label.t, lx, top + 10, ink);
+	}
+}
+
+/* The button itself, or its name below it. */
+Item *FolderWindow::buttonAt(QPoint p, bool *onButton) {
+	for (auto &item : m_items) {
+		const QRect b = buttonRect(item.get());
+		if (b.contains(p)) {
+			*onButton = true;
+			return item.get();
+		}
+		const int w = item->labelText().inkWidth();
+		if (QRect(b.center().x() - w / 2 - 2, b.bottom() + 3, w + 4, 13).contains(p)) {
+			*onButton = false;
+			return item.get();
+		}
+	}
+	return nullptr;
 }
 
 /* ---- list view ----------------------------------------------------------------- */
@@ -612,6 +680,9 @@ void FolderWindow::paintEvent(QPaintEvent *) {
 	if (m_mode == ViewMode::Icons) {
 		pl_hline(c, 0, W - 1, HEADER_H, C_BLACK);
 		paintIcons(&content);
+	} else if (m_mode == ViewMode::Buttons) {
+		pl_hline(c, 0, W - 1, HEADER_H, C_BLACK);
+		paintButtons(&content);
 	} else {
 		pl_canvas band = { c->px + HEADER_H * c->stride, c->stride, m_scrollX, 0, W, BAND_H };
 		paintColumnHeaders(&band);
@@ -639,6 +710,10 @@ Item *FolderWindow::itemAt(QPoint pos, bool *onTriangle) {
 		return nullptr;
 	}
 	const QPoint p = toContent(pos);
+	if (m_mode == ViewMode::Buttons) {
+		bool onButton;
+		return buttonAt(p, &onButton);
+	}
 	if (m_mode == ViewMode::Icons) {
 		for (auto it = m_items.rbegin(); it != m_items.rend(); ++it) {
 			if (iconItemContains(**it, (*it)->pos.x(), (*it)->pos.y(), p)) {
@@ -729,6 +804,18 @@ void FolderWindow::mousePressEvent(QMouseEvent *e) {
 		}
 		m_editor.commit();
 	}
+	if (m_mode == ViewMode::Buttons) {
+		/* Buttons open on release, tracked like any push button. */
+		bool onButton = false;
+		Item *b = buttonAt(content, &onButton);
+		if (b && onButton) {
+			m_buttonDown = b;
+			m_buttonInside = true;
+			update();
+			Finder::instance().setFront(this);
+			return;
+		}
+	}
 	bool onTriangle = false;
 	Item *hit = itemAt(pos, &onTriangle);
 	if (onTriangle) {
@@ -761,6 +848,14 @@ void FolderWindow::mousePressEvent(QMouseEvent *e) {
 }
 
 void FolderWindow::mouseMoveEvent(QMouseEvent *e) {
+	if (m_buttonDown) {
+		const bool inside = buttonRect(m_buttonDown).contains(toContent(e->position().toPoint()));
+		if (inside != m_buttonInside) {
+			m_buttonInside = inside;
+			update();
+		}
+		return;
+	}
 	if (m_pressItem && (e->buttons() & Qt::LeftButton) &&
 			(e->position().toPoint() - m_pressPos).manhattanLength() >=
 				QApplication::startDragDistance()) {
@@ -807,6 +902,18 @@ void FolderWindow::mouseMoveEvent(QMouseEvent *e) {
 }
 
 void FolderWindow::mouseReleaseEvent(QMouseEvent *) {
+	if (Item *b = m_buttonDown) {
+		const bool open = m_buttonInside;
+		m_buttonDown = nullptr;
+		m_buttonInside = false;
+		update();
+		if (open) {
+			forEachItem([&](Item *item) { item->selected = item == b; });
+			Finder::instance().notifyState();
+			Finder::instance().openSelection();
+		}
+		return;
+	}
 	m_pressItem = nullptr;
 	m_sbPart = SB_NONE;
 	m_repeat.stop();

@@ -46,6 +46,10 @@ enum pl_button_flags {
 void pl_button_paint(struct pl_canvas *c, int x, int y, int w,
 		const struct plat_text *label, unsigned flags);
 
+/* Small-bevel button (HIG figures 2-12 to 2-14, de-stretched): a 2 px
+ * bevel, raised or pressed, any size. Used by the Finder's button view. */
+void pl_bevel_button_paint(struct pl_canvas *c, int x, int y, int w, int h, bool pressed);
+
 enum sb_part {
 	SB_NONE,
 	SB_DEC_ARROW, /* up / left */
