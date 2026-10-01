@@ -22,6 +22,9 @@
 
 /* Mac OS default double-click time is 32 ticks (~533 ms). */
 #define PLAT_DOUBLE_CLICK_MS 533
+/* assets/cursors, 16 px at 1x (Mac OS cursors are 16x16). */
+#define PLATINUM_CURSOR_THEME "Platinum"
+#define PLATINUM_CURSOR_SIZE 16
 
 enum plat_cursor_mode {
 	PLAT_CURSOR_PASSTHROUGH,

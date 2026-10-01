@@ -860,7 +860,11 @@ int main(void) {
 		keys_init(g.vkbd_mgr, g.seat);
 	}
 	toplevels_init(g.toplevel_mgr);
-	g.cursor_theme = wl_cursor_theme_load(NULL, 24 * g.scale, g.shm);
+	/* platinum-wm sets XCURSOR_THEME/SIZE to its Platinum theme. */
+	const char *cursor_size = getenv("XCURSOR_SIZE");
+	int cursor_px = cursor_size ? atoi(cursor_size) : 16;
+	g.cursor_theme = wl_cursor_theme_load(getenv("XCURSOR_THEME"),
+		(cursor_px > 0 ? cursor_px : 16) * g.scale, g.shm);
 	g.cursor_surface = wl_compositor_create_surface(g.compositor);
 
 	g.bar_surface = wl_compositor_create_surface(g.compositor);

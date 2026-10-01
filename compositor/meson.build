@@ -43,6 +43,20 @@ decor_dep = declare_dependency(
   dependencies: [platinum_dep],
 )
 
+# The Platinum cursor theme, built next to platinum-wm (build tree) and
+# installed with the icon themes.
+python3 = find_program('python3')
+custom_target('cursor-theme',
+  input: meson.project_source_root() / 'assets/cursors/platinum-cursors.pcur',
+  output: 'cursors.stamp',
+  command: [python3, meson.project_source_root() / 'tools/cursors/build_cursors.py',
+    '@INPUT@', meson.current_build_dir()],
+  depend_files: meson.project_source_root() / 'tools/cursors/build_cursors.py',
+  build_by_default: true,
+)
+install_subdir(meson.current_build_dir() / 'Platinum',
+  install_dir: get_option('datadir') / 'icons')
+
 executable('platinum-wm',
   'src/main.c',
   'src/output.c',

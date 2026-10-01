@@ -7,6 +7,7 @@
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QSet>
+#include <QSettings>
 #include <QStandardPaths>
 #include <QWindow>
 
@@ -15,6 +16,7 @@
 #include "fileops.h"
 #include "folderwindow.h"
 #include "menudraw.h"
+#include "patterns.h"
 
 /* Desktop icon placement (not in the HIG; TODO: measure). */
 static constexpr int ICON_MARGIN_RIGHT = 24;
@@ -22,20 +24,22 @@ static constexpr int ICON_MARGIN_TOP = 14;    /* below the menu bar */
 static constexpr int ICON_MARGIN_BOTTOM = 32;
 static constexpr int CELL_W = 80, CELL_H = 64;
 
-/* An original 8x8 desktop pattern: blue-violet with a sparse darker
- * weave. (Mac OS 8's own patterns are Apple's; this one is ours.) */
-static const char *const pattern[8] = {
-	"d.......",
-	"........",
-	"....d...",
-	"........",
-	"..d.....",
-	"........",
-	"......d.",
-	"........",
-};
-static constexpr uint32_t PATTERN_BASE = RGB(0x66, 0x66, 0xCC);
-static constexpr uint32_t PATTERN_DOT = RGB(0x55, 0x55, 0xAA);
+/* The desktop pattern is chosen by id in ~/.config/platinum/desktop.conf
+ * ("pattern=ocean-ripple"); the Appearance control panel will write it.
+ * Changes apply at once. */
+static QString settingsDir() {
+	return QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + "/platinum";
+}
+
+void Desktop::loadPattern() {
+	QSettings settings(settingsDir() + "/desktop.conf", QSettings::IniFormat);
+	const QByteArray id = settings.value("pattern").toString().toUtf8();
+	const int pattern = pl_pattern_find(id.isEmpty() ? nullptr : id.constData());
+	if (pattern != m_pattern) {
+		m_pattern = pattern;
+		update();
+	}
+}
 
 Desktop::Desktop() {
 	setAttribute(Qt::WA_OpaquePaintEvent);
@@ -54,6 +58,12 @@ Desktop::Desktop() {
 	m_trash->name = "Trash";
 	m_trash->path = trashFilesPath();
 	updateTrashIcon();
+
+	QDir().mkpath(settingsDir());
+	m_settingsWatcher.addPath(settingsDir());
+	QObject::connect(&m_settingsWatcher, &QFileSystemWatcher::directoryChanged,
+		[this] { loadPattern(); });
+	loadPattern();
 
 	QDir().mkpath(folderPath());
 	m_watcher.addPath(folderPath());
@@ -158,12 +168,7 @@ void Desktop::resizeEvent(QResizeEvent *) {
 void Desktop::paintEvent(QPaintEvent *) {
 	Pixels px(width(), height());
 	pl_canvas *c = &px.c;
-	for (int y = 0; y < height(); y++) {
-		const char *row = pattern[y % 8];
-		for (int x = 0; x < width(); x++) {
-			pl_put(c, x, y, row[x % 8] == 'd' ? PATTERN_DOT : PATTERN_BASE);
-		}
-	}
+	pl_pattern_fill(c, m_pattern, 0, 0, width() - 1, height() - 1);
 	paintIconItem(c, *m_disk, m_disk->pos.x(), m_disk->pos.y(), true);
 	for (auto &item : m_files) {
 		const bool editing = m_editor.editing(item.get());

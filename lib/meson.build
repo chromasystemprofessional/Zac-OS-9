@@ -9,6 +9,7 @@ platinum_lib = static_library('platinum',
   'widgets.c',
   'icons.c',
   'logo.c',
+  'patterns.c',
   include_directories: platinum_inc,
   dependencies: [cairo],
 )
@@ -46,4 +47,8 @@ endif
 if python3.found()
   test('icons-current', python3,
     args: [meson.project_source_root() / 'tools/icons/build_icons.py', '--check'])
+endif
+if python3.found()
+  test('patterns-current', python3,
+    args: [meson.project_source_root() / 'tools/patterns/make_patterns.py', '--check'])
 endif

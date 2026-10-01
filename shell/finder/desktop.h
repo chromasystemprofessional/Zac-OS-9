@@ -48,6 +48,10 @@ protected:
 private:
 	void placeIcons();
 	void updateTrashIcon();
+	void loadPattern();
+
+	int m_pattern = -1;
+	QFileSystemWatcher m_settingsWatcher;
 	Item *itemAt(QPoint pos);
 	Item *dropTargetAt(QPoint pos, const QStringList &dragged);
 	void clearDropTarget();

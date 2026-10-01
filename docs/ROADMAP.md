@@ -99,9 +99,16 @@ scaling only, original behaviors and timings).
   - Icon set: folder, document, application, hard disk, Trash (empty and
     full) and caution, as 32x32 and 16x16 pixel art in
     assets/icons/platinum-icons.picon (tools/icons/build_icons.py).
+  - Desktop patterns: ten original tiles (embossed 64x64 textures in a
+    small palette, and 8x8 classics) from tools/patterns/make_patterns.py;
+    chosen by `pattern=` in ~/.config/platinum/desktop.conf, applied live.
+  - Cursors: a "Platinum" Xcursor theme (arrow, I-beam, animated watch,
+    crosshair, hand, move/resize, not-allowed, copy/alias/help) from
+    assets/cursors, used by platinum-wm and every client it starts.
 - Next:
-  - More icons (disk images, Classic, aliases' targets), desktop patterns,
-    cursor theme, alert sounds, startup screen.
+  - More icons (disk images, Classic, a better application icon), alert
+    sounds, startup screen.
+  - Choosing the pattern from an Appearance control panel (Phase 5).
   - An application font (Geneva 12 metrics) for app content.
 
 ## Phase 7: Packaging and distribution
