@@ -34,17 +34,18 @@ static struct mb_menu *new_menu(struct mb_menu *menus, int *n, const char *title
 	return m;
 }
 
-/* Edit commands need keystrokes sent to the app after the menu closes.
- * TODO: virtual-keyboard support; until then they're shown disabled. */
-static void add_edit_menu(struct mb_menu *menus, int *n) {
+/* Edit commands are keystrokes sent to the front app once the menu has
+ * closed. We can't know what the app can undo or paste, so with an app in
+ * front they are all enabled. */
+static void add_edit_menu(struct mb_menu *menus, int *n, bool enabled) {
 	struct mb_menu *m = new_menu(menus, n, "Edit");
-	add(m, "Undo", 'Z', false, ACT_NONE, NULL);
+	add(m, "Undo", 'Z', enabled, ACT_EDIT_COMMAND, NULL);
 	sep(m);
-	add(m, "Cut", 'X', false, ACT_NONE, NULL);
-	add(m, "Copy", 'C', false, ACT_NONE, NULL);
-	add(m, "Paste", 'V', false, ACT_NONE, NULL);
-	add(m, "Clear", 0, false, ACT_NONE, NULL);
-	add(m, "Select All", 'A', false, ACT_NONE, NULL);
+	add(m, "Cut", 'X', enabled, ACT_EDIT_COMMAND, NULL);
+	add(m, "Copy", 'C', enabled, ACT_EDIT_COMMAND, NULL);
+	add(m, "Paste", 'V', enabled, ACT_EDIT_COMMAND, NULL);
+	add(m, "Clear", 0, enabled, ACT_EDIT_CLEAR, NULL);
+	add(m, "Select All", 'A', enabled, ACT_EDIT_COMMAND, NULL);
 }
 
 /* With no app in front the Finder owns the menu bar. The Finder itself
@@ -56,7 +57,7 @@ static void add_finder_menus(struct mb_menu *menus, int *n) {
 	add(m, "Close Window", 'W', false, ACT_NONE, NULL);
 	sep(m);
 	add(m, "Get Info", 'I', false, ACT_NONE, NULL);
-	add_edit_menu(menus, n);
+	add_edit_menu(menus, n, false);
 	m = new_menu(menus, n, "View");
 	add(m, "as Icons", 0, false, ACT_NONE, NULL);
 	add(m, "as Buttons", 0, false, ACT_NONE, NULL);
@@ -74,13 +75,23 @@ static void add_app_menus(struct mb_menu *menus, int *n, const char *app_id) {
 	add(m, "Close Window", 'W', true, ACT_CLOSE_WINDOW, app_id);
 	sep(m);
 	add(m, "Quit", 'Q', true, ACT_QUIT_APP, app_id);
-	add_edit_menu(menus, n);
+	add_edit_menu(menus, n, keys_available());
+}
+
+static bool clock_shows_date;
+
+void menus_toggle_clock(void) {
+	clock_shows_date = !clock_shows_date;
 }
 
 static void clock_text(char *buf, size_t size) {
 	time_t now = time(NULL);
 	struct tm tm;
 	localtime_r(&now, &tm);
+	if (clock_shows_date) {
+		strftime(buf, size, "%a, %b %-d, %Y", &tm);
+		return;
+	}
 	/* Mac OS 8 default: 12-hour clock, "9:41 AM". */
 	int hour = tm.tm_hour % 12 ? tm.tm_hour % 12 : 12;
 	snprintf(buf, size, "%d:%02d %s", hour, tm.tm_min, tm.tm_hour < 12 ? "AM" : "PM");
@@ -216,6 +227,12 @@ void menus_perform(struct mb_item *item) {
 		break;
 	case ACT_ACTIVATE_APP:
 		app_activate(item->arg, menubar_seat());
+		break;
+	case ACT_EDIT_COMMAND:
+		keys_send_command(item->key);
+		break;
+	case ACT_EDIT_CLEAR:
+		keys_send_clear();
 		break;
 	case ACT_ABOUT:
 	case ACT_NONE:

@@ -12,6 +12,7 @@
 
 struct zwlr_foreign_toplevel_handle_v1;
 struct zwlr_foreign_toplevel_manager_v1;
+struct zwp_virtual_keyboard_manager_v1;
 
 /* ---- running apps (toplevels.c) ----------------------------------------- */
 
@@ -56,6 +57,8 @@ enum action {
 	ACT_SHOW_ALL,
 	ACT_ACTIVATE_APP, /* arg: app id */
 	ACT_ABOUT,
+	ACT_EDIT_COMMAND, /* key: the ⌘ letter, sent to the front app */
+	ACT_EDIT_CLEAR,
 };
 
 struct mb_item {
@@ -85,6 +88,8 @@ struct mb_bar {
 };
 
 void menus_rebuild(struct mb_bar *bar, int screen_w);
+/* Clicking the clock flips it between the time and the date. */
+void menus_toggle_clock(void);
 void menus_free(struct mb_bar *bar);
 void menus_perform(struct mb_item *item);
 
@@ -92,8 +97,15 @@ void menus_perform(struct mb_item *item);
 
 void launch(const char *command);
 /* Fills the logo menu with "About", a separator and the launchable items
- * from ~/.config/platinum/Logo Menu Items (or built-in defaults). */
+ * from ~/.config/platinum/Platinum Menu Items (or built-in defaults). */
 void launch_fill_logo_menu(struct mb_menu *menu);
+
+/* ---- keystrokes for Edit commands (keys.c) -------------------------------- */
+
+void keys_init(struct zwp_virtual_keyboard_manager_v1 *mgr, struct wl_seat *seat);
+bool keys_available(void);
+void keys_send_command(char key); /* ⌘key, delivered as Ctrl+key */
+void keys_send_clear(void);       /* Clear = Delete */
 
 /* ---- the logo (logo.c) --------------------------------------------------- */
 

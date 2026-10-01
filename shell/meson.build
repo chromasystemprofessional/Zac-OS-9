@@ -1,5 +1,6 @@
 wayland_client = dependency('wayland-client')
 wayland_cursor = dependency('wayland-cursor')
+xkbcommon_client = dependency('xkbcommon')
 wayland_protos = dependency('wayland-protocols')
 wayland_scanner = find_program(
   dependency('wayland-scanner', native: true).get_variable('wayland_scanner'),
@@ -12,6 +13,7 @@ client_protocols = [
   wl_protocol_dir / 'stable/viewporter/viewporter.xml',
   meson.project_source_root() / 'protocols/wlr-layer-shell-unstable-v1.xml',
   meson.project_source_root() / 'protocols/wlr-foreign-toplevel-management-unstable-v1.xml',
+  meson.project_source_root() / 'protocols/virtual-keyboard-unstable-v1.xml',
 ]
 client_protocol_src = []
 foreach xml : client_protocols
@@ -34,7 +36,8 @@ executable('platinum-menubar',
   'menubar/toplevels.c',
   'menubar/launch.c',
   'menubar/logo.c',
+  'menubar/keys.c',
   client_protocol_src,
-  dependencies: [platinum_dep, wayland_client, wayland_cursor],
+  dependencies: [platinum_dep, wayland_client, wayland_cursor, xkbcommon_client],
   install: true,
 )

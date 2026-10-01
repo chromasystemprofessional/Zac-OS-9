@@ -24,6 +24,7 @@
 
 #include "menubar.h"
 #include "viewporter-client-protocol.h"
+#include "virtual-keyboard-unstable-v1-client-protocol.h"
 #include "wlr-foreign-toplevel-management-unstable-v1-client-protocol.h"
 #include "wlr-layer-shell-unstable-v1-client-protocol.h"
 
@@ -44,6 +45,7 @@ static struct {
 	struct zwlr_layer_shell_v1 *layer_shell;
 	struct zwlr_foreign_toplevel_manager_v1 *toplevel_mgr;
 	struct wp_viewporter *viewporter;
+	struct zwp_virtual_keyboard_manager_v1 *vkbd_mgr;
 	int scale;
 
 	struct wl_pointer *pointer;
@@ -376,6 +378,7 @@ static void choose(int index) {
 	struct mb_item *it = &open_menu_ptr()->items[index];
 	g.chosen = (struct mb_item){
 		.action = it->action,
+		.key = it->key,
 		.arg = it->arg ? strdup(it->arg) : NULL,
 	};
 	g.selected = index;
@@ -431,6 +434,13 @@ static void pointer_pressed(void) {
 	enum side side;
 	int index;
 	bool on_title = title_at(g.px, g.py, &side, &index);
+	if (g.open_index < 0 && !on_title && g.py < MBAR_HEIGHT && g.model.n_right > 0 &&
+			mbar_title_at(g.model.right_titles, 1, (int)g.px) == 0) {
+		/* The clock: a click flips between time and date. */
+		menus_toggle_clock();
+		rebuild();
+		return;
+	}
 	if (g.open_index < 0) {
 		if (on_title && (side == SIDE_LEFT ? g.model.left[index].n : g.model.right[index].n)) {
 			g.button_down = true;
@@ -684,6 +694,9 @@ static void registry_global(void *data, struct wl_registry *reg, uint32_t name,
 			&zwlr_foreign_toplevel_manager_v1_interface, 3);
 	} else if (strcmp(iface, wp_viewporter_interface.name) == 0) {
 		g.viewporter = wl_registry_bind(reg, name, &wp_viewporter_interface, 1);
+	} else if (strcmp(iface, zwp_virtual_keyboard_manager_v1_interface.name) == 0) {
+		g.vkbd_mgr = wl_registry_bind(reg, name,
+			&zwp_virtual_keyboard_manager_v1_interface, 1);
 	}
 }
 
@@ -723,6 +736,9 @@ int main(void) {
 	}
 	wl_display_roundtrip(g.display); /* output scale, seat caps */
 
+	if (g.vkbd_mgr) {
+		keys_init(g.vkbd_mgr, g.seat);
+	}
 	toplevels_init(g.toplevel_mgr);
 	g.cursor_theme = wl_cursor_theme_load(NULL, 24 * g.scale, g.shm);
 	g.cursor_surface = wl_compositor_create_surface(g.compositor);
