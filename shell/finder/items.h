@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QDateTime>
 #include <QPoint>
 #include <QString>
 #include <memory>
@@ -16,6 +17,13 @@ struct Item {
 	bool selected = false;
 	bool dropTarget = false; /* a drag is hovering over this folder */
 	std::unique_ptr<Text> label;
+
+	/* For list view. */
+	bool isDir = false;
+	qint64 size = 0;
+	QDateTime modified;
+	QString kindText; /* filled in lazily: "folder", "Plain text document", ... */
+	const QString &kindName();
 
 	/* Label below the icon: views font, centred, truncated to fit. */
 	const Text &labelText();

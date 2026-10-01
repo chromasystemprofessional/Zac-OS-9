@@ -109,7 +109,7 @@ void launch_fill_logo_menu(struct mb_menu *menu);
 
 struct finder_state {
 	bool connected;
-	int selection, window, trash;
+	int selection, window, trash, view;
 };
 
 bool finder_connect(void);

@@ -19,6 +19,20 @@ const Text &Item::labelText() {
 	return *label;
 }
 
+const QString &Item::kindName() {
+	if (kindText.isEmpty()) {
+		if (isDir) {
+			kindText = "folder";
+		} else if (kind == PL_ICON_APPLICATION) {
+			kindText = "application program";
+		} else {
+			static QMimeDatabase db;
+			kindText = db.mimeTypeForFile(path).comment();
+		}
+	}
+	return kindText;
+}
+
 QString trashFilesPath() {
 	return QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) +
 		"/Trash/files";
@@ -59,6 +73,9 @@ std::vector<std::unique_ptr<Item>> listFolder(const QString &path) {
 		item->name = info.fileName();
 		item->path = info.absoluteFilePath();
 		item->kind = iconKindFor(item->path);
+		item->isDir = info.isDir();
+		item->size = info.isDir() ? 0 : info.size();
+		item->modified = info.lastModified();
 		items.push_back(std::move(item));
 	}
 	return items;

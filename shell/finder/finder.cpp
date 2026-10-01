@@ -69,8 +69,10 @@ QString Finder::stateLine() {
 	bool window = v && v != m_desktop;
 	QDir trash(trashFilesPath());
 	bool full = trash.exists() && !trash.isEmpty();
-	return QStringLiteral("state selection=%1 window=%2 trash=%3")
-		.arg(selection).arg(window ? 1 : 0).arg(full ? 1 : 0);
+	auto *fw = dynamic_cast<FolderWindow *>(v);
+	int list = fw && fw->viewMode() == FolderWindow::ViewMode::List ? 1 : 0;
+	return QStringLiteral("state selection=%1 window=%2 trash=%3 view=%4")
+		.arg(selection).arg(window ? 1 : 0).arg(full ? 1 : 0).arg(list);
 }
 
 void Finder::notifyState() {
@@ -101,6 +103,11 @@ void Finder::command(const QString &name) {
 		getInfo();
 	} else if (name == "about") {
 		AboutWindow::open();
+	} else if (name == "view-icons" || name == "view-list") {
+		if (auto *fw = dynamic_cast<FolderWindow *>(front())) {
+			fw->setViewMode(name == "view-list" ? FolderWindow::ViewMode::List
+				: FolderWindow::ViewMode::Icons);
+		}
 	}
 }
 

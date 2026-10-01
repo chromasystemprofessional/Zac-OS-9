@@ -67,10 +67,13 @@ static void add_finder_menus(struct mb_menu *menus, int *n) {
 	add(m, "Make Alias", 'M', false, ACT_NONE, NULL);
 	add_edit_menu(menus, n, false);
 	m = new_menu(menus, n, "View");
-	struct mb_item *icons = add(m, "as Icons", 0, up, ACT_NONE, NULL);
-	icons->checked = true;
+	const bool win = up && fs->window;
+	struct mb_item *icons = add(m, "as Icons", 0, win, ACT_FINDER, "view-icons");
+	icons->checked = win && !fs->view;
+	/* TODO: button view. */
 	add(m, "as Buttons", 0, false, ACT_NONE, NULL);
-	add(m, "as List", 0, false, ACT_NONE, NULL);
+	struct mb_item *list = add(m, "as List", 0, win, ACT_FINDER, "view-list");
+	list->checked = win && fs->view;
 	m = new_menu(menus, n, "Special");
 	add(m, "Empty Trash…", 0, up && fs->trash, ACT_FINDER, "empty-trash");
 	sep(m);

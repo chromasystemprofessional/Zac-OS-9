@@ -31,7 +31,8 @@ public:
  * $XDG_RUNTIME_DIR/platinum-finder.$WAYLAND_DISPLAY.sock):
  *   menu bar -> Finder:  "cmd <name>"   (new-folder, open, close-window,
  *                         move-to-trash, empty-trash, ...)
- *   Finder -> menu bar:  "state selection=<n> window=<0|1> trash=<0|1>"
+ *   Finder -> menu bar:  "state selection=<n> window=<0|1> trash=<0|1>
+ *                         view=<0 icons|1 list>"
  */
 class Finder {
 public:
