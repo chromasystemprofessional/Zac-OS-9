@@ -2,7 +2,6 @@ wayland_server = dependency('wayland-server')
 wayland_protos = dependency('wayland-protocols')
 wlroots = dependency('wlroots-0.18')
 xkbcommon = dependency('xkbcommon')
-cairo = dependency('cairo')
 xcb_icccm = dependency('xcb-icccm').partial_dependency(compile_args: true, includes: true)
 libdrm = dependency('libdrm').partial_dependency(compile_args: true, includes: true)
 
@@ -25,11 +24,15 @@ foreach xml : protocols
   )
 endforeach
 
-# Pure drawing code, shared with the unit tests.
+# Pure frame-drawing code, shared with the unit tests.
 decor_lib = static_library('platinum-decor',
   'src/decor.c',
-  'src/text.c',
-  dependencies: [cairo],
+  dependencies: [platinum_dep],
+)
+decor_dep = declare_dependency(
+  link_with: decor_lib,
+  include_directories: include_directories('src'),
+  dependencies: [platinum_dep],
 )
 
 executable('platinum-wm',
@@ -43,17 +46,14 @@ executable('platinum-wm',
   'src/outline.c',
   'src/pixbuf.c',
   protocol_headers,
-  link_with: decor_lib,
-  dependencies: [wayland_server, wlroots, xkbcommon, cairo, libdrm, xcb_icccm],
+  dependencies: [decor_dep, wayland_server, wlroots, xkbcommon, libdrm, xcb_icccm],
   install: true,
 )
 
 test('decor',
   executable('test-decor',
     'tests/test_decor.c',
-    include_directories: include_directories('src'),
-    link_with: decor_lib,
-    dependencies: [cairo],
+    dependencies: [decor_dep],
   ),
   args: [meson.project_source_root() / 'tools/measure/figs'],
 )

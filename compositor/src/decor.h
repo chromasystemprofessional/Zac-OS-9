@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "draw.h"
 #include "text.h"
 
 /*
@@ -44,14 +45,9 @@ struct decor_state {
 	const struct plat_text *title;
 };
 
-/* A rectangle of ARGB8888 pixels positioned in frame-local coordinates. */
-struct decor_canvas {
-	uint32_t *px;
-	int stride; /* in pixels */
-	int x, y, width, height;
-};
-
-void decor_paint(struct decor_canvas *canvas, const struct decor_state *st);
+/* Paints the part of the frame that falls inside the canvas, which is
+ * positioned in frame-local coordinates. */
+void decor_paint(struct pl_canvas *canvas, const struct decor_state *st);
 enum decor_part decor_hit(const struct decor_state *st, int x, int y);
 
 /* Widest title ink that fits between the boxes, for text_render(). */

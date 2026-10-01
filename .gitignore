@@ -13,3 +13,4 @@ emulation/disks/
 # Downloaded reference material (Apple-copyrighted): measure locally, never commit.
 tools/measure/hig-os8.pdf
 tools/measure/figs/
+tools/measure/hig.txt

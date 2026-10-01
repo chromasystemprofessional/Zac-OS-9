@@ -65,7 +65,7 @@ static void render_part(struct plat_frame *frame, struct wlr_scene_buffer *node,
 	if (!buf) {
 		return;
 	}
-	struct decor_canvas canvas = {
+	struct pl_canvas canvas = {
 		.px = buf->data, .stride = w, .x = x, .y = y, .width = w, .height = h,
 	};
 	decor_paint(&canvas, &frame->st);

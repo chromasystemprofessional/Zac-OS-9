@@ -29,7 +29,7 @@ struct fixture {
 static const struct fixture fixtures[] = {
 	{
 		.name = "collapsed active (fig 5-6)",
-		.figure = "img-104-006.png", .fig_x = 0, .fig_y = 0,
+		.figure = "img-104-134.png", .fig_x = 0, .fig_y = 0,
 		.st = { .width = 231, .height = 22, .active = true, .collapsed = true,
 			.has_close = true, .has_zoom = true, .has_collapse = true },
 		.regions = {
@@ -41,7 +41,7 @@ static const struct fixture fixtures[] = {
 	},
 	{
 		.name = "active document window (fig 5-1)",
-		.figure = "img-100-000.png", .fig_x = 3, .fig_y = 2,
+		.figure = "img-100-128.png", .fig_x = 3, .fig_y = 2,
 		.st = { .width = 214, .height = 227, .active = true,
 			.has_close = true, .has_zoom = true, .has_collapse = true,
 			.has_grow = true },
@@ -60,7 +60,7 @@ static const struct fixture fixtures[] = {
 	},
 	{
 		.name = "inactive document window (fig 5-1)",
-		.figure = "img-100-000.png", .fig_x = 218, .fig_y = 3,
+		.figure = "img-100-128.png", .fig_x = 218, .fig_y = 3,
 		.st = { .width = 214, .height = 225, .active = false,
 			.has_close = true, .has_zoom = true, .has_collapse = true,
 			.has_grow = true },
@@ -94,7 +94,7 @@ static int run_fixture(const struct fixture *f, const char *dir) {
 	const int W = f->st.width + DECOR_SHADOW;
 	const int H = (f->st.collapsed ? DECOR_COLLAPSED_H : f->st.height) + DECOR_SHADOW;
 	uint32_t *px = calloc((size_t)W * H, sizeof(*px));
-	struct decor_canvas canvas = {
+	struct pl_canvas canvas = {
 		.px = px, .stride = W, .x = 0, .y = 0, .width = W, .height = H,
 	};
 	decor_paint(&canvas, &f->st);

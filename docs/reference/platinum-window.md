@@ -7,8 +7,8 @@ screen captures. Every value below was read pixel by pixel from them using
 
 | Figure | PDF page | Embedded image | Used for |
 |---|---|---|---|
-| 5-1 Active vs inactive window | 100 | 435×233 | frame, content well, resize box, inactive state |
-| 5-6 Collapsed window | 104 | 232×23 | title bar, boxes, stripes, title text, shadow |
+| 5-1 Active vs inactive window | 100 | `img-100-128` 435×233 | frame, content well, resize box, inactive state |
+| 5-6 Collapsed window | 104 | `img-104-134` 232×23 | title bar, boxes, stripes, title text, shadow |
 
 Apple's bitmaps are **not** stored in this repo. This document records measurements only.
 
@@ -180,6 +180,6 @@ When inactive, the cell is plain `#DDD` with `#555` top and left lines.
 
 ```sh
 # inside WSL, from tools/measure/
-./fetch.sh          # downloads the HIG PDF and extracts its chapter-5 images
-python3 grid.py img-104-006 0 0 60 23    # prints a pixel grid
+./fetch.sh          # downloads the HIG PDF, extracts every figure + text
+python3 grid.py img-104-134 0 0 60 23    # prints a pixel grid
 ```

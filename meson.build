@@ -12,4 +12,5 @@ add_project_arguments(
   language: 'c',
 )
 
+subdir('lib')
 subdir('compositor')

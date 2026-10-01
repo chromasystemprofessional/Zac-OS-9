@@ -1,9 +1,5 @@
 #include "decor.h"
 
-/* Mac 8-bit system palette grays are multiples of 0x111111. */
-#define GRAY(n) (0xFF000000u | (uint32_t)(n) * 0x111111u)
-
-#define C_BLACK GRAY(0x0)
 #define C_222 GRAY(0x2)
 #define C_555 GRAY(0x5)
 #define C_666 GRAY(0x6)
@@ -13,7 +9,6 @@
 #define C_AAA GRAY(0xA)
 #define C_CCC GRAY(0xC)
 #define C_DDD GRAY(0xD)
-#define C_WHITE GRAY(0xF)
 
 /* Title-bar boxes: 12x12 at y=4, 1 px emboss right and below. */
 #define BOX_Y 4
@@ -51,40 +46,6 @@ static const char *const grow_active[20] = {
 	"99999999999999999999",
 };
 
-static void put(struct decor_canvas *c, int x, int y, uint32_t color) {
-	if (x < c->x || y < c->y || x >= c->x + c->width || y >= c->y + c->height) {
-		return;
-	}
-	c->px[(y - c->y) * c->stride + (x - c->x)] = color;
-}
-
-static void hline(struct decor_canvas *c, int x0, int x1, int y, uint32_t color) {
-	for (int x = x0; x <= x1; x++) {
-		put(c, x, y, color);
-	}
-}
-
-static void vline(struct decor_canvas *c, int x, int y0, int y1, uint32_t color) {
-	for (int y = y0; y <= y1; y++) {
-		put(c, x, y, color);
-	}
-}
-
-static void fill(struct decor_canvas *c, int x0, int y0, int x1, int y1,
-		uint32_t color) {
-	for (int y = y0; y <= y1; y++) {
-		hline(c, x0, x1, y, color);
-	}
-}
-
-static void outline(struct decor_canvas *c, int x0, int y0, int x1, int y1,
-		uint32_t color) {
-	hline(c, x0, x1, y0, color);
-	hline(c, x0, x1, y1, color);
-	vline(c, x0, y0, y1, color);
-	vline(c, x1, y0, y1, color);
-}
-
 static int frame_height(const struct decor_state *st) {
 	return st->collapsed ? DECOR_COLLAPSED_H : st->height;
 }
@@ -108,11 +69,11 @@ void decor_box_origin(const struct decor_state *st, enum decor_part part,
 	}
 }
 
-static void paint_box(struct decor_canvas *c, int bx, int by,
+static void paint_box(struct pl_canvas *c, int bx, int by,
 		enum decor_part part, bool pressed) {
-	hline(c, bx, bx + 11, by, C_888);
-	vline(c, bx, by, by + 11, C_888);
-	outline(c, bx + 1, by + 1, bx + 11, by + 11, C_222);
+	pl_hline(c, bx, bx + 11, by, C_888);
+	pl_vline(c, bx, by, by + 11, C_888);
+	pl_outline(c, bx + 1, by + 1, bx + 11, by + 11, C_222);
 
 	/* 9x9 interior: bevel ring around a 7x7 diagonal gradient.
 	 * TODO: pressed state is not in the HIG figures; this inverted, darker
@@ -121,36 +82,36 @@ static void paint_box(struct decor_canvas *c, int bx, int by,
 	uint32_t hi = pressed ? C_555 : C_CCC;
 	uint32_t lo = pressed ? C_CCC : C_888;
 	int base = pressed ? 0x5 : 0x9;
-	put(c, ix, iy, pressed ? C_555 : C_WHITE);
-	hline(c, ix + 1, ix + 8, iy, hi);
-	vline(c, ix, iy + 1, iy + 8, hi);
-	hline(c, ix + 1, ix + 8, iy + 8, lo);
-	vline(c, ix + 8, iy + 1, iy + 7, lo);
+	pl_put(c, ix, iy, pressed ? C_555 : C_WHITE);
+	pl_hline(c, ix + 1, ix + 8, iy, hi);
+	pl_vline(c, ix, iy + 1, iy + 8, hi);
+	pl_hline(c, ix + 1, ix + 8, iy + 8, lo);
+	pl_vline(c, ix + 8, iy + 1, iy + 7, lo);
 	for (int j = 0; j < 7; j++) {
 		for (int i = 0; i < 7; i++) {
-			put(c, ix + 1 + i, iy + 1 + j, GRAY(base + (i + j) / 2));
+			pl_put(c, ix + 1 + i, iy + 1 + j, GRAY(base + (i + j) / 2));
 		}
 	}
 
-	vline(c, bx + 12, by + 1, by + 12, C_WHITE);
-	hline(c, bx + 1, bx + 12, by + 12, C_WHITE);
+	pl_vline(c, bx + 12, by + 1, by + 12, C_WHITE);
+	pl_hline(c, bx + 1, bx + 12, by + 12, C_WHITE);
 
 	if (part == DECOR_PART_ZOOM) {
-		vline(c, bx + 7, by + 2, by + 7, C_222);
-		hline(c, bx + 2, bx + 7, by + 7, C_222);
+		pl_vline(c, bx + 7, by + 2, by + 7, C_222);
+		pl_hline(c, bx + 2, bx + 7, by + 7, C_222);
 	} else if (part == DECOR_PART_COLLAPSE) {
-		hline(c, bx + 1, bx + 11, by + 5, C_222);
-		hline(c, bx + 1, bx + 11, by + 7, C_222);
+		pl_hline(c, bx + 1, bx + 11, by + 5, C_222);
+		pl_hline(c, bx + 1, bx + 11, by + 7, C_222);
 	}
 }
 
-static void paint_stripes(struct decor_canvas *c, int x0, int x1) {
+static void paint_stripes(struct pl_canvas *c, int x0, int x1) {
 	if (x1 - x0 < 1) {
 		return;
 	}
 	for (int k = 0; k < 6; k++) {
-		hline(c, x0, x1 - 1, BOX_Y + 2 * k, C_WHITE);
-		hline(c, x0 + 1, x1, BOX_Y + 2 * k + 1, C_777);
+		pl_hline(c, x0, x1 - 1, BOX_Y + 2 * k, C_WHITE);
+		pl_hline(c, x0 + 1, x1, BOX_Y + 2 * k + 1, C_777);
 	}
 }
 
@@ -174,7 +135,7 @@ int decor_title_max_width(const struct decor_state *st) {
 	return half > 0 ? 2 * half + 1 : 0;
 }
 
-static void paint_title(struct decor_canvas *c, const struct decor_state *st) {
+static void paint_title(struct pl_canvas *c, const struct decor_state *st) {
 	int x0, x1;
 	title_span(st, &x0, &x1);
 
@@ -189,16 +150,7 @@ static void paint_title(struct decor_canvas *c, const struct decor_state *st) {
 	int ink_w = t->ink_r - t->ink_l + 1;
 	int ink_l = (st->width - 1) / 2 - (ink_w - 1) / 2;
 	int ink_r = ink_l + ink_w - 1;
-	int ox = ink_l - t->ink_l;
-	int oy = TITLE_BASELINE - t->baseline;
-	uint32_t color = st->active ? C_BLACK : C_666;
-	for (int y = 0; y < t->height; y++) {
-		for (int x = 0; x < t->width; x++) {
-			if (t->mask[y * t->stride + x]) {
-				put(c, ox + x, oy + y, color);
-			}
-		}
-	}
+	pl_text(c, t, ink_l, TITLE_BASELINE, st->active ? C_BLACK : C_666);
 
 	if (st->active) {
 		paint_stripes(c, x0, ink_l - STRIPE_TEXT_GAP - 1);
@@ -206,26 +158,20 @@ static void paint_title(struct decor_canvas *c, const struct decor_state *st) {
 	}
 }
 
-static void paint_grow(struct decor_canvas *c, const struct decor_state *st) {
+static void paint_grow(struct pl_canvas *c, const struct decor_state *st) {
 	int gx = st->width - DECOR_GROW_INSET, gy = st->height - DECOR_GROW_INSET;
 	if (st->active) {
-		for (int j = 0; j < 20; j++) {
-			for (int i = 0; i < 20; i++) {
-				char ch = grow_active[j][i];
-				int v = ch <= '9' ? ch - '0' : ch - 'a' + 10;
-				put(c, gx + i, gy + j, GRAY(v));
-			}
-		}
+		pl_grays(c, gx, gy, grow_active, 20);
 		return;
 	}
 	/* Inactive: blank cell; the well lines stop at it. */
 	int x1 = st->width - DECOR_RIGHT, y1 = st->height - DECOR_BOTTOM;
-	fill(c, gx + 1, gy + 1, x1, y1, C_DDD);
-	hline(c, gx, x1, gy, C_555);
-	vline(c, gx, gy, y1, C_555);
+	pl_fill(c, gx + 1, gy + 1, x1, y1, C_DDD);
+	pl_hline(c, gx, x1, gy, C_555);
+	pl_vline(c, gx, gy, y1, C_555);
 }
 
-void decor_paint(struct decor_canvas *c, const struct decor_state *st) {
+void decor_paint(struct pl_canvas *c, const struct decor_state *st) {
 	const int W = st->width, H = frame_height(st);
 	const bool act = st->active;
 	const uint32_t border = act ? C_BLACK : C_555;
@@ -233,35 +179,35 @@ void decor_paint(struct decor_canvas *c, const struct decor_state *st) {
 
 	/* Frame fill, never touching the client area. */
 	if (st->collapsed) {
-		fill(c, 0, 0, W - 1, H - 1, face);
+		pl_fill(c, 0, 0, W - 1, H - 1, face);
 	} else {
-		fill(c, 0, 0, W - 1, DECOR_TOP - 1, face);
-		fill(c, 0, H - DECOR_BOTTOM, W - 1, H - 1, face);
-		fill(c, 0, DECOR_TOP, DECOR_LEFT - 1, H - DECOR_BOTTOM - 1, face);
-		fill(c, W - DECOR_RIGHT, DECOR_TOP, W - 1, H - DECOR_BOTTOM - 1, face);
+		pl_fill(c, 0, 0, W - 1, DECOR_TOP - 1, face);
+		pl_fill(c, 0, H - DECOR_BOTTOM, W - 1, H - 1, face);
+		pl_fill(c, 0, DECOR_TOP, DECOR_LEFT - 1, H - DECOR_BOTTOM - 1, face);
+		pl_fill(c, W - DECOR_RIGHT, DECOR_TOP, W - 1, H - DECOR_BOTTOM - 1, face);
 	}
 
-	outline(c, 0, 0, W - 1, H - 1, border);
+	pl_outline(c, 0, 0, W - 1, H - 1, border);
 	if (act) {
-		hline(c, 1, W - 3, 1, C_WHITE);
-		vline(c, 1, 1, H - 3, C_WHITE);
-		vline(c, W - 2, 2, H - 2, C_999);
-		hline(c, 2, W - 2, H - 2, C_999);
+		pl_hline(c, 1, W - 3, 1, C_WHITE);
+		pl_vline(c, 1, 1, H - 3, C_WHITE);
+		pl_vline(c, W - 2, 2, H - 2, C_999);
+		pl_hline(c, 2, W - 2, H - 2, C_999);
 	}
 
 	/* Drop shadow: 1 px, offset 2 px in from the corners. */
-	vline(c, W, 2, H, border);
-	hline(c, 2, W, H, border);
+	pl_vline(c, W, 2, H, border);
+	pl_hline(c, 2, W, H, border);
 
 	if (!st->collapsed) {
 		if (act) {
-			hline(c, 4, W - 6, 20, C_999);
-			vline(c, 4, 20, H - 6, C_999);
+			pl_hline(c, 4, W - 6, 20, C_999);
+			pl_vline(c, 4, 20, H - 6, C_999);
 		}
-		outline(c, 5, 21, W - 6, H - 6, border);
+		pl_outline(c, 5, 21, W - 6, H - 6, border);
 		if (act) {
-			vline(c, W - 5, 21, H - 5, C_WHITE);
-			hline(c, 4, W - 5, H - 5, C_WHITE);
+			pl_vline(c, W - 5, 21, H - 5, C_WHITE);
+			pl_hline(c, 4, W - 5, H - 5, C_WHITE);
 		}
 		if (st->has_grow) {
 			paint_grow(c, st);
