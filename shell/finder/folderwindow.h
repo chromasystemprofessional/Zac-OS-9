@@ -35,6 +35,7 @@ public:
 	void selectByName(const QString &name) override;
 	void reload() override;
 	QWidget *widget() override { return this; }
+	void itemRenamed(const QString &from, const QString &to) override;
 
 protected:
 	void paintEvent(QPaintEvent *) override;
@@ -106,6 +107,8 @@ private:
 	int m_sortColumn = 0; /* Name */
 	int m_scrollX = 0, m_scrollY = 0;
 	int m_contentHeight = 0;
+	int m_contentWidth = 0; /* icon view: rightmost placed icon */
+	QPoint m_dragStart;     /* where a drag of our own icons began */
 	QFileSystemWatcher m_watcher;
 
 	/* A press on an icon that may turn into a drag. */

@@ -6,6 +6,7 @@
 #include <QTimer>
 
 #include "finder.h"
+#include "folderstate.h"
 #include "items.h"
 #include "labeleditor.h"
 
@@ -29,6 +30,7 @@ public:
 	void selectByName(const QString &name) override;
 	void reload() override;
 	QWidget *widget() override { return this; }
+	void itemRenamed(const QString &from, const QString &to) override;
 
 protected:
 	void paintEvent(QPaintEvent *) override;
@@ -53,6 +55,10 @@ private:
 
 	Item *m_pressItem = nullptr;
 	QPoint m_pressPos;
+	QPoint m_dragStart;
+
+	/* Icons the user placed on the desktop, remembered (spatial). */
+	FolderState m_state;
 
 	/* Renaming items from ~/Desktop (the disk and Trash keep their names). */
 	LabelEditor m_editor{ [this] { update(); } };

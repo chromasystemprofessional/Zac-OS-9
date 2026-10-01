@@ -181,6 +181,9 @@ void LabelEditor::commit() {
 		return;
 	}
 	Finder &finder = Finder::instance();
+	if (FinderView *v = finder.front()) {
+		v->itemRenamed(item->name, name);
+	}
 	finder.folderChanged(folder);
 	if (FinderView *v = finder.front()) {
 		v->selectByName(name);

@@ -16,6 +16,9 @@ struct Item {
 	QPoint pos; /* icon top-left in its view's coordinates */
 	bool selected = false;
 	bool dropTarget = false; /* a drag is hovering over this folder */
+	/* Key for remembered positions; the name unless set (disk, Trash). */
+	QString stateKey;
+	const QString &key() const { return stateKey.isEmpty() ? name : stateKey; }
 	std::unique_ptr<Text> label;
 
 	/* For list view. */
@@ -45,6 +48,14 @@ void paintIconItem(pl_canvas *c, Item &item, int x, int y, bool onDesktop,
 		bool showLabel = true);
 /* Is `p` on the label of the icon at (x, y)? */
 bool iconLabelContains(Item &item, int x, int y, QPoint p);
+/* Icon view placement: items whose names are in `placed` go there; the
+ * rest take the first free grid slot (`slot(i)` gives slot i's icon
+ * position) so they never land on a placed icon. Cells are cellW x cellH. */
+#include <QHash>
+#include <functional>
+void placeIcons(const std::vector<Item *> &items, const QHash<QString, QPoint> &placed,
+		const std::function<QPoint(int)> &slot, int cellW, int cellH);
+
 /* Can items be dropped into this one (folder, disk, Trash)? */
 bool acceptsDrops(const Item &item);
 /* Hit area of an icon item at (x, y): the icon square or its label. */

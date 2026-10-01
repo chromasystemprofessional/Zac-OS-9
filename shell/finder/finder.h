@@ -21,6 +21,8 @@ public:
 	virtual void selectByName(const QString &name) = 0;
 	virtual void reload() = 0;
 	virtual QWidget *widget() = 0;
+	/* An item here was renamed: keep its remembered icon position. */
+	virtual void itemRenamed(const QString &, const QString &) {}
 };
 
 /*

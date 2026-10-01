@@ -274,7 +274,8 @@ int FolderWindow::listWidth() const {
 }
 
 int FolderWindow::scrollMaxX() const {
-	return m_mode == ViewMode::List ? std::max(0, listWidth() - viewWidth()) : 0;
+	const int content = m_mode == ViewMode::List ? listWidth() : m_contentWidth;
+	return std::max(0, content - viewWidth());
 }
 
 int FolderWindow::scrollMaxY() const {
@@ -371,17 +372,34 @@ void FolderWindow::scrollStep() {
 
 /* ---- icon view ----------------------------------------------------------------- */
 
+/* Placed icons stay put (spatial); the rest flow into free grid cells. */
 void FolderWindow::layoutIcons() {
-	int cols = std::max(1, (viewWidth() - 2 * MARGIN) / CELL_W);
-	int i = 0;
+	const int cols = std::max(1, (viewWidth() - 2 * MARGIN) / CELL_W);
+	std::vector<Item *> items;
 	for (auto &item : m_items) {
-		int col = i % cols, row = i / cols;
-		item->pos = QPoint(MARGIN + col * CELL_W + (CELL_W - PL_ICON_LARGE) / 2,
-			MARGIN + row * CELL_H);
-		i++;
+		items.push_back(item.get());
 	}
-	int rows = (static_cast<int>(m_items.size()) + cols - 1) / cols;
-	m_contentHeight = 2 * MARGIN + rows * CELL_H;
+	placeIcons(items, m_state.icons, [cols](int i) {
+		return QPoint(MARGIN + (i % cols) * CELL_W + (CELL_W - PL_ICON_LARGE) / 2,
+			MARGIN + (i / cols) * CELL_H);
+	}, CELL_W, CELL_H);
+	m_contentHeight = 0;
+	m_contentWidth = 0;
+	for (Item *item : items) {
+		m_contentHeight = std::max(m_contentHeight, item->pos.y() + CELL_H + MARGIN);
+		m_contentWidth = std::max(m_contentWidth,
+			item->pos.x() + PL_ICON_LARGE + (CELL_W - PL_ICON_LARGE) / 2 + MARGIN);
+	}
+}
+
+void FolderWindow::itemRenamed(const QString &from, const QString &to) {
+	auto it = m_state.icons.find(from);
+	if (it != m_state.icons.end()) {
+		QPoint pos = *it;
+		m_state.icons.erase(it);
+		m_state.icons.insert(to, pos);
+		saveStateSoon();
+	}
 }
 
 void FolderWindow::paintIcons(pl_canvas *content) {
@@ -759,6 +777,7 @@ void FolderWindow::mouseMoveEvent(QMouseEvent *e) {
 		}
 		m_pressItem = nullptr;
 		m_renameTimer.stop();
+		m_dragStart = m_pressPos;
 		if (origins.size() == items.size()) {
 			startItemDrag(this, items, origins, m_pressPos);
 		}
@@ -865,5 +884,22 @@ void FolderWindow::dragLeaveEvent(QDragLeaveEvent *) {
 void FolderWindow::dropEvent(QDropEvent *e) {
 	Item *target = dropTargetAt(e->position().toPoint(), draggedPaths(e->mimeData()));
 	clearDropTarget();
+	if (!target && e->source() == this && m_mode == ViewMode::Icons &&
+			!(e->modifiers() & Qt::AltModifier)) {
+		/* Icons dragged within their own window: they move there, and stay. */
+		const QPoint delta = e->position().toPoint() - m_dragStart;
+		for (Item *item : selectedItems()) {
+			QPoint p = item->pos + delta;
+			p.setX(std::max(0, p.x()));
+			p.setY(std::max(0, p.y()));
+			m_state.icons.insert(item->name, p);
+		}
+		saveStateSoon();
+		relayout();
+		update();
+		e->setDropAction(Qt::MoveAction);
+		e->accept();
+		return;
+	}
 	dropItems(e, target, m_path);
 }

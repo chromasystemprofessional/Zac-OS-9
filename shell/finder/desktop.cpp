@@ -10,6 +10,8 @@
 #include <QStandardPaths>
 #include <QWindow>
 
+#include <QHash>
+
 #include "fileops.h"
 #include "folderwindow.h"
 #include "menudraw.h"
@@ -40,12 +42,15 @@ Desktop::Desktop() {
 	setAcceptDrops(true);
 	m_renameTimer.setSingleShot(true);
 	m_renameTimer.callOnTimeout([this] { beginRename(m_renameItem); });
+	m_state = FolderState::load(folderPath());
 	m_disk = std::make_unique<Item>();
+	m_disk->stateKey = "::disk";
 	m_disk->name = displayName("/");
 	m_disk->path = "/";
 	m_disk->kind = PL_ICON_DISK;
 
 	m_trash = std::make_unique<Item>();
+	m_trash->stateKey = "::trash";
 	m_trash->name = "Trash";
 	m_trash->path = trashFilesPath();
 	updateTrashIcon();
@@ -114,17 +119,35 @@ void Desktop::reload() {
 
 /* The disk first at top right, Desktop items in columns below it (right
  * to left), the Trash at bottom right. */
+/* Placed icons stay where the user put them. Otherwise: the disk at top
+ * right, Desktop items in columns below it (right to left), the Trash at
+ * bottom right. */
 void Desktop::placeIcons() {
 	const int right = width() - ICON_MARGIN_RIGHT - PL_ICON_LARGE;
 	const int top = MBAR_HEIGHT + ICON_MARGIN_TOP;
-	m_disk->pos = QPoint(right, top);
-	m_trash->pos = QPoint(right, height() - ICON_MARGIN_BOTTOM - PL_ICON_LARGE - 16);
-	const int rows = std::max(1, (m_trash->pos.y() - top) / CELL_H - 1);
-	int i = 1; /* slot 0 is the disk */
+	const QPoint trashHome(right, height() - ICON_MARGIN_BOTTOM - PL_ICON_LARGE - 16);
+	const int rows = std::max(1, (trashHome.y() - top) / CELL_H - 1);
+
+	QHash<QString, QPoint> placed = m_state.icons;
+	if (!placed.contains(m_trash->key())) {
+		placed.insert(m_trash->key(), trashHome);
+	}
+	std::vector<Item *> items = { m_disk.get(), m_trash.get() };
 	for (auto &item : m_files) {
-		int col = i / rows, row = i % rows;
-		item->pos = QPoint(right - col * CELL_W, top + row * CELL_H);
-		i++;
+		items.push_back(item.get());
+	}
+	::placeIcons(items, placed, [=](int i) {
+		return QPoint(right - (i / rows) * CELL_W, top + (i % rows) * CELL_H);
+	}, CELL_W, CELL_H);
+}
+
+void Desktop::itemRenamed(const QString &from, const QString &to) {
+	auto it = m_state.icons.find(from);
+	if (it != m_state.icons.end()) {
+		QPoint pos = *it;
+		m_state.icons.erase(it);
+		m_state.icons.insert(to, pos);
+		m_state.save(folderPath());
 	}
 }
 
@@ -268,6 +291,7 @@ void Desktop::mouseMoveEvent(QMouseEvent *e) {
 	}
 	m_pressItem = nullptr;
 	m_renameTimer.stop();
+	m_dragStart = m_pressPos;
 	startItemDrag(this, items, origins, m_pressPos);
 }
 
@@ -309,6 +333,25 @@ void Desktop::dragLeaveEvent(QDragLeaveEvent *) {
 void Desktop::dropEvent(QDropEvent *e) {
 	Item *target = dropTargetAt(e->position().toPoint(), draggedPaths(e->mimeData()));
 	clearDropTarget();
+	if (!target && e->source() == this && !(e->modifiers() & Qt::AltModifier)) {
+		/* Icons dragged about the desktop: they move there, and stay. */
+		const QPoint delta = e->position().toPoint() - m_dragStart;
+		for (Item *item : selectedItems()) {
+			if (item == m_disk.get() || item == m_trash.get()) {
+				continue;
+			}
+			QPoint p = item->pos + delta;
+			p.setX(std::clamp(p.x(), 0, width() - PL_ICON_LARGE));
+			p.setY(std::clamp(p.y(), MBAR_HEIGHT, height() - PL_ICON_LARGE - 16));
+			m_state.icons.insert(item->key(), p);
+		}
+		m_state.save(folderPath());
+		placeIcons();
+		update();
+		e->setDropAction(Qt::MoveAction);
+		e->accept();
+		return;
+	}
 	dropItems(e, target, folderPath());
 }
 

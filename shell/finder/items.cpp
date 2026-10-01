@@ -90,6 +90,40 @@ static void labelBox(Item &item, int x, int y, int *l, int *t, int *r, int *b) {
 	*b = *t + LABEL_H - 1;
 }
 
+void placeIcons(const std::vector<Item *> &items, const QHash<QString, QPoint> &placed,
+		const std::function<QPoint(int)> &slot, int cellW, int cellH) {
+	auto footprint = [&](QPoint icon) {
+		return QRect(icon.x() - (cellW - PL_ICON_LARGE) / 2, icon.y(), cellW, cellH);
+	};
+	std::vector<QRect> taken;
+	std::vector<Item *> unplaced;
+	for (Item *item : items) {
+		auto it = placed.find(item->key());
+		if (it != placed.end()) {
+			item->pos = *it;
+			taken.push_back(footprint(item->pos));
+		} else {
+			unplaced.push_back(item);
+		}
+	}
+	int s = 0;
+	for (Item *item : unplaced) {
+		for (;; s++) {
+			const QRect cell = footprint(slot(s));
+			bool clash = false;
+			for (const QRect &r : taken) {
+				clash |= r.intersects(cell);
+			}
+			if (!clash) {
+				break;
+			}
+		}
+		item->pos = slot(s);
+		taken.push_back(footprint(item->pos));
+		s++;
+	}
+}
+
 bool acceptsDrops(const Item &item) {
 	return item.kind == PL_ICON_FOLDER || item.kind == PL_ICON_DISK ||
 		item.kind == PL_ICON_TRASH_EMPTY || item.kind == PL_ICON_TRASH_FULL;
