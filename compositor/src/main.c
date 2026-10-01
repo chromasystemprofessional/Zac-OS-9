@@ -13,19 +13,30 @@
 #include "server.h"
 
 static void usage(const char *argv0) {
-	printf("Usage: %s [-d] [-s startup-command]\n"
-		"  -d  verbose (debug) logging\n", argv0);
+	printf("Usage: %s [-d] [-S scale] [-s startup-command]\n"
+		"  -d  verbose (debug) logging\n"
+		"  -S  integer output scale, 1-4 (default: $PLATINUM_SCALE or 1)\n",
+		argv0);
+}
+
+static int parse_scale(const char *s) {
+	int scale = s ? atoi(s) : 1;
+	return scale >= 1 && scale <= 4 ? scale : 1;
 }
 
 int main(int argc, char *argv[]) {
 	enum wlr_log_importance log_level = WLR_ERROR;
 	char *startup_cmd = NULL;
+	int scale = parse_scale(getenv("PLATINUM_SCALE"));
 
 	int c;
-	while ((c = getopt(argc, argv, "ds:h")) != -1) {
+	while ((c = getopt(argc, argv, "dS:s:h")) != -1) {
 		switch (c) {
 		case 'd':
 			log_level = WLR_DEBUG;
+			break;
+		case 'S':
+			scale = parse_scale(optarg);
 			break;
 		case 's':
 			startup_cmd = optarg;
@@ -42,6 +53,7 @@ int main(int argc, char *argv[]) {
 	wlr_log_init(log_level, NULL);
 
 	struct plat_server server = {0};
+	server.output_scale = scale;
 	server.display = wl_display_create();
 
 	server.backend = wlr_backend_autocreate(
@@ -64,7 +76,7 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
-	wlr_compositor_create(server.display, 5, server.renderer);
+	server.compositor = wlr_compositor_create(server.display, 5, server.renderer);
 	wlr_subcompositor_create(server.display);
 	wlr_data_device_manager_create(server.display);
 	/* Lets `grim` capture screenshots for visual checks. */
@@ -83,6 +95,7 @@ int main(int argc, char *argv[]) {
 	};
 	server.desktop = wlr_scene_rect_create(&server.scene->tree, 16384, 16384, desk);
 	server.view_layer = wlr_scene_tree_create(&server.scene->tree);
+	server.unmanaged_layer = wlr_scene_tree_create(&server.scene->tree);
 	server.overlay_layer = wlr_scene_tree_create(&server.scene->tree);
 	outline_init(&server.outline, server.overlay_layer);
 
@@ -91,9 +104,11 @@ int main(int argc, char *argv[]) {
 		wlr_server_decoration_manager_create(server.display),
 		WLR_SERVER_DECORATION_MANAGER_MODE_SERVER);
 
+	wl_list_init(&server.views);
 	output_init(&server);
-	view_init(&server);
+	xdg_init(&server);
 	input_init(&server);
+	xwayland_init(&server);
 
 	const char *socket = wl_display_add_socket_auto(server.display);
 	if (!socket) {
@@ -118,6 +133,9 @@ int main(int argc, char *argv[]) {
 	wl_display_run(server.display);
 
 	wl_display_destroy_clients(server.display);
+	if (server.xwayland) {
+		wlr_xwayland_destroy(server.xwayland);
+	}
 	wlr_scene_node_destroy(&server.scene->tree.node);
 	wlr_xcursor_manager_destroy(server.cursor_mgr);
 	wlr_cursor_destroy(server.cursor);

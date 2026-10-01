@@ -7,7 +7,9 @@
 # Clients start 1.5 s apart (so they stagger like Finder windows); the shot
 # is taken DELAY seconds after the last one starts.
 set -eu
-cd "$(dirname "$0")/.."
+self=$(realpath "$0")
+cd "$(dirname "$self")/.."
+. scripts/x11-namespace.sh
 out=$(realpath -m "$1")
 delay=$2
 shift 2

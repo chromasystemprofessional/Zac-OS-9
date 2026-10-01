@@ -9,15 +9,21 @@ scaling only, original behaviors and timings).
 - `platinum-wm` skeleton: desktop fill, xdg-shell windows, keyboard and pointer
   input, nested run under WSLg.
 
-## Phase 1: Compositor / window chrome
-- Server-side decorations (xdg-decoration): Platinum title bar with stripes,
-  close / zoom / collapse boxes, grow box, active and inactive states.
-- Click-and-drag on the title bar with an outline drag (as in Mac OS 9, where
-  live window dragging was off by default).
-- WindowShade (collapse) by double-clicking the title bar.
-- Zoom (Mac OS has no maximize), window layering by application.
-- Xwayland support.
-- Integer output scaling (1×/2×/3×) with nearest-neighbour filtering.
+## Phase 1: Compositor / window chrome ✅
+- ✅ Server-side decorations (xdg-decoration, KDE server-decoration): Platinum
+  title bar with stripes, close / zoom / collapse boxes, resize box, active and
+  inactive states. Pixel-tested against the HIG figures.
+- ✅ Outline drag and outline resize (Mac OS 9 had no live dragging by default).
+- ✅ WindowShade collapse: collapse box, Option-click for all windows,
+  double-click on the title bar.
+- ✅ Zoom (Mac OS has no maximize).
+- ✅ Xwayland: X11 windows framed; menus and tooltips unframed.
+- ✅ Integer output scaling (`-S 2` / `PLATINUM_SCALE=2`) with nearest-neighbour
+  filtering for the frame.
+- Deferred:
+  - Window layering by application (needs app identity from Phase 2).
+  - Measured box pressed states and drag-outline pattern.
+  - Real Charcoal-metric font (Phase 6).
 
 ## Phase 2: Menu bar
 - Layer-shell menu bar client (Qt6): Apple menu, application menus, clock,

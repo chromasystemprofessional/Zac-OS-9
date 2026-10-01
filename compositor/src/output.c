@@ -46,8 +46,11 @@ static void server_new_output(struct wl_listener *listener, void *data) {
 	if (mode) {
 		wlr_output_state_set_mode(&state, mode);
 	}
+	/* Whole-number scales only: 1-bit-era pixel art must stay sharp. */
+	wlr_output_state_set_scale(&state, server->output_scale);
 	wlr_output_commit_state(wlr_output, &state);
 	wlr_output_state_finish(&state);
+	wlr_xcursor_manager_load(server->cursor_mgr, server->output_scale);
 
 	struct plat_output *output = calloc(1, sizeof(*output));
 	output->wlr_output = wlr_output;

@@ -3,6 +3,7 @@ wayland_protos = dependency('wayland-protocols')
 wlroots = dependency('wlroots-0.18')
 xkbcommon = dependency('xkbcommon')
 cairo = dependency('cairo')
+xcb_icccm = dependency('xcb-icccm').partial_dependency(compile_args: true, includes: true)
 libdrm = dependency('libdrm').partial_dependency(compile_args: true, includes: true)
 
 wayland_scanner = find_program(
@@ -36,12 +37,14 @@ executable('platinum-wm',
   'src/output.c',
   'src/input.c',
   'src/view.c',
+  'src/xdg.c',
+  'src/xwayland.c',
   'src/frame.c',
   'src/outline.c',
   'src/pixbuf.c',
   protocol_headers,
   link_with: decor_lib,
-  dependencies: [wayland_server, wlroots, xkbcommon, cairo, libdrm],
+  dependencies: [wayland_server, wlroots, xkbcommon, cairo, libdrm, xcb_icccm],
   install: true,
 )
 

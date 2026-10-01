@@ -7,7 +7,9 @@
 #
 # Quit: Ctrl+Alt+Backspace inside the window, or close the window.
 set -eu
-cd "$(dirname "$0")/.."
+self=$(realpath "$0")
+cd "$(dirname "$self")/.."
+. scripts/x11-namespace.sh
 scripts/build.sh
 
 # WSLg exposes no reliable GPU path for nested wlroots; software render is

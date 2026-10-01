@@ -33,7 +33,16 @@ inside it. **The window often opens behind other windows.** Look for
 "wlroots - WL-1 (Debian)" on the taskbar. To quit, press **Ctrl+Alt+Backspace**
 inside it or close the window.
 
-Add `-d` for debug logging: `.\run -d -s foot`.
+Options:
+- `-d` turns on debug logging.
+- `-S 2` scales everything 2× (crisp on 4K screens).
+- `-s CMD` runs CMD at startup.
+
+For example: `.\run -S 2 -s "foot & xterm"`.
+
+Both Wayland and X11 apps work. Under WSLg the run scripts give the compositor
+a private `/tmp/.X11-unix` (see `scripts/x11-namespace.sh`), because WSLg's copy
+is read-only.
 
 **If the window shows on the taskbar but draws nothing** (you see your desktop
 wallpaper through it), WSLg's display bridge has gone stale. This is common
