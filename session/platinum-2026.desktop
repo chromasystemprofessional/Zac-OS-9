@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=Platinum 2026
+Comment=A classic desktop: Platinum appearance, menu bar and Finder
+Exec=platinum-session
+TryExec=platinum-session
+Type=Application
+DesktopNames=Platinum

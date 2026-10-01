@@ -141,10 +141,28 @@ scaling only, original behaviors and timings).
     control panels (Phase 5).
   - An application font (Geneva 12 metrics) for app content.
 
-## Phase 7: Packaging and distribution
-- `.deb` packages and a `platinum-2026.desktop` Wayland session file.
-- Debian VM image for full-session testing (Hyper-V or QEMU).
-- Live and installable ISO built with `live-build`.
+## Phase 7: Packaging and distribution (in progress)
+See `docs/packaging.md`.
+- Done:
+  - `platinum-2026` and `platinum-emulators` (SheepShaver and Basilisk II
+    from a pinned macemu commit, with their source) `.deb` packages, built
+    from what git would commit (`scripts/build-debs.sh`).
+  - The login session: `platinum-session` and a `platinum-2026.desktop`
+    entry in `wayland-sessions`. Software rendering when there's no GPU, a
+    session log, and the environment shared with D-Bus and systemd.
+  - Ctrl+Alt+F1 to F12 switch consoles on a real screen.
+  - Live and installable ISO with live-build (`scripts/build-iso.sh`):
+    - greetd and tuigreet for login;
+    - the live user logs straight in;
+    - Debian's installer is on the boot menu;
+    - firmware for real hardware.
+  - QEMU virtual machine for full-session testing (`vm.cmd`,
+    `scripts/vm.sh`), and a headless boot test (`tests/vm/boot.sh`).
+- Next:
+  - A Platinum login window in place of tuigreet.
+  - A Platinum boot menu and splash screen.
+  - Manual pages.
+  - Testing on real hardware and in Hyper-V.
 
 ## Fidelity references
 `docs/reference/` will hold measurements (pixel coordinates, colors, timings)

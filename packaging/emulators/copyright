@@ -1,0 +1,21 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: macemu (SheepShaver, Basilisk II)
+Source: https://github.com/kanjitalk755/macemu/tree/@COMMIT@
+Comment: Built unmodified from commit @COMMIT@. The complete source
+ is distributed alongside this package as
+ platinum-emulators_@VERSION@.source.tar.gz, and is also available
+ from the URL above.
+ .
+ No Macintosh ROMs or system software are included.
+
+Files: *
+Copyright: 1997-2008 Christian Bauer, Marc Hellwig, Gwenole Beauchesne and the
+ Basilisk II and SheepShaver contributors
+License: GPL-2.0-or-later
+ This program is free software; you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation; either version 2 of the License, or
+ (at your option) any later version.
+ .
+ On Debian systems, the full text of the GNU General Public License
+ version 2 can be found in /usr/share/common-licenses/GPL-2.

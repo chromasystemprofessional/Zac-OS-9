@@ -18,7 +18,9 @@ software.
 | `emulation/` | SheepShaver / Basilisk II integration. *Phase 4* |
 | `assets/` | Original fonts, icons, desktop patterns, sounds. |
 | `docs/` | Roadmap, fidelity references, design notes. |
-| `scripts/` | Build and run helpers. |
+| `scripts/` | Build and run helpers; package, ISO and VM scripts. |
+| `session/` | The login session: `platinum-session` and its `wayland-sessions` entry. |
+| `debian/`, `packaging/`, `iso/` | Debian packaging, the emulator package, the live-build configuration. |
 
 ## Developing on Windows (WSL2 + WSLg)
 
@@ -52,7 +54,15 @@ doesn't restart WSLg.
 
 Build only: `wsl -d Debian -- scripts/build.sh`
 
-Full-session testing (real login, boot) happens in a Debian VM; see `docs/ROADMAP.md`.
+## Packages, ISO and VM
+
+- `scripts/build-debs.sh` builds the `.deb` packages.
+- `scripts/build-iso.sh` builds a live and install ISO that boots straight into
+  Platinum 2026.
+- **`vm.cmd`** runs that ISO in a QEMU virtual machine, with a real boot, login
+  and screen.
+
+See [docs/packaging.md](docs/packaging.md).
 
 ## License
 

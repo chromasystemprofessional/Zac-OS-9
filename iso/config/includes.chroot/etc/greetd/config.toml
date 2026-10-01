@@ -1,0 +1,9 @@
+# Platinum 2026 login (greetd). The greeter runs on VT 7 and starts
+# the Platinum 2026 session. On the live system, live-config adds an
+# [initial_session] below that logs the live user straight in once.
+[terminal]
+vt = 7
+
+[default_session]
+command = "tuigreet --time --remember --asterisks --greeting 'Welcome to Platinum 2026' --cmd platinum-session"
+user = "_greetd"

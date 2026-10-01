@@ -36,6 +36,7 @@ enum plat_cursor_mode {
 struct plat_server {
 	struct wl_display *display;
 	struct wlr_backend *backend;
+	struct wlr_session *session; /* on a real screen (DRM); NULL nested */
 	struct wlr_renderer *renderer;
 	struct wlr_allocator *allocator;
 	struct wlr_compositor *compositor;

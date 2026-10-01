@@ -1,0 +1,25 @@
+# Platinum 2026 (built by scripts/build-debs.sh, in config/packages.chroot)
+platinum-2026
+platinum-emulators
+
+# Login: greetd with a text greeter; live sessions log straight in
+greetd
+tuigreet
+
+# Session
+dbus-user-session
+xwayland
+qt6-wayland
+foot
+libgl1-mesa-dri
+pipewire-audio
+wireplumber
+pulseaudio-utils
+
+# System
+sudo
+user-setup
+locales
+console-setup
+keyboard-configuration
+network-manager

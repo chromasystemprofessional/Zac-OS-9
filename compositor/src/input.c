@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <wlr/backend/session.h>
 #include <wlr/types/wlr_data_device.h>
 #include <wlr/types/wlr_input_device.h>
 #include <wlr/types/wlr_keyboard.h>
@@ -61,6 +62,13 @@ static bool handle_keybinding(struct plat_server *server, uint32_t mods,
 	const uint32_t ctrl_alt = WLR_MODIFIER_CTRL | WLR_MODIFIER_ALT;
 	if ((mods & ctrl_alt) == ctrl_alt && sym == XKB_KEY_BackSpace) {
 		wl_display_terminate(server->display);
+		return true;
+	}
+	/* Ctrl+Alt+F1..F12 on a real screen: switch to another console. */
+	if (sym >= XKB_KEY_XF86Switch_VT_1 && sym <= XKB_KEY_XF86Switch_VT_12) {
+		if (server->session) {
+			wlr_session_change_vt(server->session, sym - XKB_KEY_XF86Switch_VT_1 + 1);
+		}
 		return true;
 	}
 	return false;

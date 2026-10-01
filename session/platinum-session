@@ -1,0 +1,45 @@
+#!/bin/sh
+# platinum-session: a Platinum 2026 desktop session. Login managers run
+# this from the "Platinum 2026" entry in /usr/share/wayland-sessions;
+# from a text console, just type platinum-session.
+#
+# Arguments go to platinum-wm. Its messages go to
+# ~/.local/state/platinum/session.log (the previous session's to
+# session.log.old).
+set -u
+
+export XDG_CURRENT_DESKTOP=Platinum
+export XDG_SESSION_DESKTOP=platinum
+export XDG_SESSION_TYPE=wayland
+export QT_QPA_PLATFORM="wayland;xcb"
+export GDK_BACKEND="wayland,x11"
+export MOZ_ENABLE_WAYLAND=1
+export _JAVA_AWT_WM_NONREPARENTING=1
+
+# No GPU render node (a basic virtual machine display, a plain
+# framebuffer): draw in software. Platinum is light enough for it.
+if [ -z "${WLR_RENDERER:-}" ] && ! ls /dev/dri/renderD* >/dev/null 2>&1; then
+	export WLR_RENDERER=pixman
+fi
+
+# Apps want a D-Bus session bus. A systemd login has one in the runtime
+# folder; elsewhere, start one for the session.
+if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
+	if [ -S "${XDG_RUNTIME_DIR:-/nonexistent}/bus" ]; then
+		export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"
+	elif command -v dbus-run-session >/dev/null; then
+		exec dbus-run-session -- "$0" "$@"
+	fi
+fi
+
+state="${XDG_STATE_HOME:-$HOME/.local/state}/platinum"
+mkdir -p "$state"
+[ -f "$state/session.log" ] && mv -f "$state/session.log" "$state/session.log.old"
+
+# Once the compositor is up, tell D-Bus and systemd where it is, so
+# apps they start (portals, notifications) can find the display.
+if [ $# -eq 0 ] && command -v dbus-update-activation-environment >/dev/null; then
+	set -- -s "dbus-update-activation-environment --systemd WAYLAND_DISPLAY DISPLAY \
+XDG_CURRENT_DESKTOP XDG_SESSION_TYPE QT_QPA_PLATFORM XCURSOR_THEME XCURSOR_PATH XCURSOR_SIZE"
+fi
+exec platinum-wm "$@" >"$state/session.log" 2>&1

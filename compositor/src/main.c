@@ -127,7 +127,7 @@ int main(int argc, char *argv[]) {
 	server.display = wl_display_create();
 
 	server.backend = wlr_backend_autocreate(
-			wl_display_get_event_loop(server.display), NULL);
+			wl_display_get_event_loop(server.display), &server.session);
 	if (!server.backend) {
 		wlr_log(WLR_ERROR, "failed to create wlr_backend");
 		return 1;
