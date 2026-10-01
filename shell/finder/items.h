@@ -25,6 +25,10 @@ struct Item {
 	int labelIndex = 0;
 	uint32_t labelColor() const { return pl_labels[labelIndex].color; }
 
+	/* An alias (a symbolic link): its name is shown in italics. */
+	bool isAlias = false;
+	pl_font nameFont() const { return isAlias ? PL_FONT_VIEWS_ITALIC : PL_FONT_VIEWS; }
+
 	/* For list view. */
 	bool isDir = false;
 	qint64 size = 0;

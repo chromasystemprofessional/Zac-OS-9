@@ -289,8 +289,8 @@ void Finder::setLabel(int label) {
 	}
 }
 
-/* An alias is a symbolic link named "<name> alias".
- * TODO: the Mac shows alias names in italics (needs an italic views font). */
+/* An alias is a symbolic link named "<name> alias"; its name shows in
+ * italics. */
 void Finder::makeAlias() {
 	FinderView *v = front();
 	QString lastName;

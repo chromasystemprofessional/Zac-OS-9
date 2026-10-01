@@ -64,8 +64,7 @@ scaling only, original behaviors and timings).
   - Find (File > Find…): names, whole disk, results as a Finder view.
   - Labels from File > Label (the menu bar's first hierarchical menu),
     stored in `user.platinum.label`; labelled icons are tinted.
-- Next:
-  - Alias names in italics (needs an italic views font).
+  - Alias names in italics.
 - To measure: icon grid and label metrics, Get Info layout, alert margins,
   selected list row, expanded triangle.
 
@@ -90,9 +89,17 @@ scaling only, original behaviors and timings).
   Linux backends (systemd-timedated, PipeWire, wlr-output-management…).
 - Platinum QStyle plugin and GTK3/4 theme, so third-party apps match.
 
-## Phase 6: Original assets
-- Bitmap system and application fonts (Chicago and Geneva style), drawn from scratch.
-- Icon set, desktop patterns, cursor theme, alert sounds, startup screen.
+## Phase 6: Original assets (in progress)
+- Done:
+  - Fonts: Platinum System 12 and Platinum Views 9, original bitmap fonts
+    with the measured Charcoal 12 / Geneva 9 metrics (every measured HIG
+    string lays out to the pixel), composed accented letters, synthesised
+    italic for alias names, DejaVu fallback for anything else
+    (docs/reference/platinum-fonts.md).
+- Next:
+  - Icon set (32x32 and 16x16 pixel art), desktop patterns, cursor theme,
+    alert sounds, startup screen.
+  - An application font (Geneva 12 metrics) for app content.
 
 ## Phase 7: Packaging and distribution
 - `.deb` packages and a `platinum-2026.desktop` Wayland session file.

@@ -30,8 +30,16 @@ test('menudraw',
     dependencies: [figcompare_dep]),
   args: [figs_dir],
 )
+test('text', executable('test-text', 'tests/test_text.c', dependencies: [platinum_dep]))
 test('widgets',
   executable('test-widgets', 'tests/test_widgets.c',
     dependencies: [figcompare_dep]),
   args: [figs_dir],
 )
+
+# The compiled font table must match the .pfont sources.
+python3 = find_program('python3', required: false)
+if python3.found()
+  test('fonts-current', python3,
+    args: [meson.project_source_root() / 'tools/fonts/build_fonts.py', '--check'])
+endif

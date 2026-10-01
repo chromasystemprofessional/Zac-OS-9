@@ -17,7 +17,7 @@ static constexpr int LABEL_BASELINE = 10;
 
 const Text &Item::labelText() {
 	if (!label) {
-		label = std::make_unique<Text>(name, LABEL_MAX_INK, PL_FONT_VIEWS);
+		label = std::make_unique<Text>(name, LABEL_MAX_INK, nameFont());
 	}
 	return *label;
 }
@@ -126,6 +126,7 @@ std::unique_ptr<Item> makeItem(const QFileInfo &info) {
 	item->path = info.absoluteFilePath();
 	item->kind = iconKindFor(item->path);
 	item->isDir = info.isDir();
+	item->isAlias = info.isSymLink();
 	item->size = info.isDir() ? 0 : info.size();
 	item->modified = info.lastModified();
 	item->labelIndex = readLabel(item->path);

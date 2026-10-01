@@ -633,7 +633,7 @@ void FolderWindow::paintList(pl_canvas *c) {
 			item->selected || item->dropTarget, item->labelColor());
 
 		const int nameW = COLUMNS[0].width - NAME_X - d - 6;
-		Text name(item->name, std::max(8, nameW), PL_FONT_VIEWS);
+		Text name(item->name, std::max(8, nameW), item->nameFont());
 		uint32_t ink = C_BLACK;
 		if (item->selected) {
 			pl_fill(c, NAME_X + d - 2, top + 2, NAME_X + d + name.inkWidth() + 1, top + 14, C_BLACK);

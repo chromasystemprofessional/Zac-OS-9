@@ -11,10 +11,8 @@ extern "C" {
 /*
  * A rendered single line of 1-bit text, stored as an 8-bit coverage mask
  * (every value is 0 or 255; no antialiasing, matching the 1990s screen).
- *
- * TODO(phase 6): the backend is a stand-in (cairo + a system TrueType font).
- * It will be replaced by our own bitmap fonts with the Mac OS 8 metrics;
- * this interface stays the same.
+ * Drawn with Platinum 2026's own bitmap fonts (assets/fonts), which have
+ * the Mac OS 8 metrics; characters they lack fall back to DejaVu Sans.
  */
 struct plat_text {
 	int width, height;
@@ -26,8 +24,9 @@ struct plat_text {
 };
 
 enum pl_font {
-	PL_FONT_SYSTEM, /* menus, window titles, buttons (Charcoal 12) */
-	PL_FONT_VIEWS,  /* Finder icon labels and lists (Geneva) */
+	PL_FONT_SYSTEM,       /* menus, window titles, buttons (Charcoal 12 metrics) */
+	PL_FONT_VIEWS,        /* Finder icon labels and lists (Geneva 9 metrics) */
+	PL_FONT_VIEWS_ITALIC, /* the same, slanted: alias names */
 };
 
 /* Renders utf8, truncating with an ellipsis so the ink is at most
