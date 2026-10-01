@@ -768,8 +768,9 @@ int main(void) {
 			{ .fd = wl_display_get_fd(g.display), .events = POLLIN },
 			{ .fd = g.clock_fd, .events = POLLIN },
 			{ .fd = g.blink_fd, .events = POLLIN },
+			{ .fd = finder_fd(), .events = POLLIN }, /* -1 is ignored */
 		};
-		if (poll(fds, 3, -1) < 0 && errno != EINTR) {
+		if (poll(fds, 4, -1) < 0 && errno != EINTR) {
 			wl_display_cancel_read(g.display);
 			break;
 		}
@@ -793,6 +794,9 @@ int main(void) {
 		if ((fds[2].revents & POLLIN) &&
 				read(g.blink_fd, &expirations, sizeof(expirations)) > 0) {
 			blink_tick();
+		}
+		if (fds[3].fd >= 0 && (fds[3].revents & (POLLIN | POLLHUP)) && finder_read()) {
+			menubar_apps_changed(); /* re-enable Finder menu items */
 		}
 	}
 	return 0;

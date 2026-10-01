@@ -6,6 +6,7 @@
 #include <QScreen>
 
 #include "desktop.h"
+#include "finder.h"
 
 int main(int argc, char *argv[]) {
 	/* platinum-wm draws every frame; Qt must not add its own. */
@@ -21,5 +22,6 @@ int main(int argc, char *argv[]) {
 	desktop.resize(QGuiApplication::primaryScreen()->size());
 	desktop.becomeLayerSurface();
 	desktop.show();
+	Finder::instance().start(&desktop);
 	return app.exec();
 }

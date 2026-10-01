@@ -48,22 +48,31 @@ static void add_edit_menu(struct mb_menu *menus, int *n, bool enabled) {
 	add(m, "Select All", 'A', enabled, ACT_EDIT_COMMAND, NULL);
 }
 
-/* With no app in front the Finder owns the menu bar. The Finder itself
- * arrives in Phase 3; its menus are shown but mostly disabled. */
+/* With the Finder (or nothing) in front, the Finder's menus. Commands go
+ * to platinum-finder; its reported state enables the items. */
 static void add_finder_menus(struct mb_menu *menus, int *n) {
+	finder_connect();
+	const struct finder_state *fs = finder_state();
+	const bool up = fs->connected, sel = up && fs->selection > 0;
+
 	struct mb_menu *m = new_menu(menus, n, "File");
-	add(m, "New Folder", 'N', false, ACT_NONE, NULL);
-	add(m, "Open", 'O', false, ACT_NONE, NULL);
-	add(m, "Close Window", 'W', false, ACT_NONE, NULL);
+	add(m, "New Folder", 'N', up, ACT_FINDER, "new-folder");
+	add(m, "Open", 'O', sel, ACT_FINDER, "open");
+	add(m, "Move To Trash", KEY_DELETE_GLYPH, sel, ACT_FINDER, "move-to-trash");
+	add(m, "Close Window", 'W', up && fs->window, ACT_FINDER, "close-window");
 	sep(m);
+	/* TODO(phase 3): Get Info, Duplicate, Make Alias, Put Away, Find. */
 	add(m, "Get Info", 'I', false, ACT_NONE, NULL);
+	add(m, "Duplicate", 'D', false, ACT_NONE, NULL);
+	add(m, "Make Alias", 'M', false, ACT_NONE, NULL);
 	add_edit_menu(menus, n, false);
 	m = new_menu(menus, n, "View");
-	add(m, "as Icons", 0, false, ACT_NONE, NULL);
+	struct mb_item *icons = add(m, "as Icons", 0, up, ACT_NONE, NULL);
+	icons->checked = true;
 	add(m, "as Buttons", 0, false, ACT_NONE, NULL);
 	add(m, "as List", 0, false, ACT_NONE, NULL);
 	m = new_menu(menus, n, "Special");
-	add(m, "Empty Trash…", 0, false, ACT_NONE, NULL);
+	add(m, "Empty Trash…", 0, up && fs->trash, ACT_FINDER, "empty-trash");
 	sep(m);
 	add(m, "Sleep", 0, false, ACT_NONE, NULL);
 	add(m, "Restart", 0, false, ACT_NONE, NULL);
@@ -106,7 +115,9 @@ static void render_menu_text(struct mb_menu *m) {
 		if (it->label) {
 			it->label_text = text_render(it->label, TEXT_UNLIMITED);
 		}
-		if (it->key) {
+		if (it->key == KEY_DELETE_GLYPH) {
+			it->key_text = text_render("⌫", TEXT_UNLIMITED);
+		} else if (it->key) {
 			char k[2] = { it->key, '\0' };
 			it->key_text = text_render(k, TEXT_UNLIMITED);
 		}
@@ -234,6 +245,9 @@ void menus_perform(struct mb_item *item) {
 		break;
 	case ACT_EDIT_CLEAR:
 		keys_send_clear();
+		break;
+	case ACT_FINDER:
+		finder_send(item->arg);
 		break;
 	case ACT_ABOUT:
 	case ACT_NONE:

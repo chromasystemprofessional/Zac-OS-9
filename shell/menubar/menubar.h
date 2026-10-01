@@ -60,7 +60,11 @@ enum action {
 	ACT_ABOUT,
 	ACT_EDIT_COMMAND, /* key: the ⌘ letter, sent to the front app */
 	ACT_EDIT_CLEAR,
+	ACT_FINDER,       /* arg: Finder command name */
 };
+
+/* ⌘⌫ (delete) as a menu shortcut. */
+#define KEY_DELETE_GLYPH '\b'
 
 struct mb_item {
 	char *label;  /* NULL = separator */
@@ -100,6 +104,19 @@ void launch(const char *command);
 /* Fills the logo menu with "About", a separator and the launchable items
  * from ~/.config/platinum/Platinum Menu Items (or built-in defaults). */
 void launch_fill_logo_menu(struct mb_menu *menu);
+
+/* ---- the Finder (finderlink.c) ------------------------------------------ */
+
+struct finder_state {
+	bool connected;
+	int selection, window, trash;
+};
+
+bool finder_connect(void);
+int finder_fd(void);          /* -1 when not connected */
+bool finder_read(void);       /* true if the state changed */
+const struct finder_state *finder_state(void);
+void finder_send(const char *command);
 
 /* ---- keystrokes for Edit commands (keys.c) -------------------------------- */
 

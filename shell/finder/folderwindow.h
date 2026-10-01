@@ -1,8 +1,10 @@
 #pragma once
 
+#include <QFileSystemWatcher>
 #include <QTimer>
 #include <QWidget>
 
+#include "finder.h"
 #include "items.h"
 #include "widgets.h"
 
@@ -10,13 +12,20 @@
  * A Finder window onto one folder, icon view. Windows are spatial: each
  * folder has exactly one window, reopened where it was.
  */
-class FolderWindow : public QWidget {
+class FolderWindow : public QWidget, public FinderView {
 public:
 	/* Opens (or brings back) the window for `path`. */
 	static FolderWindow *open(const QString &path);
+	/* Reload every open window showing `folder`. */
+	static void reloadAll(const QString &folder);
 	~FolderWindow() override;
 
-	const QString &path() const { return m_path; }
+	/* FinderView */
+	QString folderPath() const override { return m_path; }
+	std::vector<Item *> selectedItems() override;
+	void selectByName(const QString &name) override;
+	void reload() override;
+	QWidget *widget() override { return this; }
 
 protected:
 	void paintEvent(QPaintEvent *) override;
@@ -26,10 +35,12 @@ protected:
 	void mouseReleaseEvent(QMouseEvent *) override;
 	void mouseDoubleClickEvent(QMouseEvent *) override;
 	void wheelEvent(QWheelEvent *) override;
+	void keyPressEvent(QKeyEvent *) override;
+	void changeEvent(QEvent *) override;
+	void closeEvent(QCloseEvent *) override;
 
 private:
 	explicit FolderWindow(const QString &path);
-	void reload();
 	void layoutIcons();
 	int viewHeight() const;
 	int scrollMax() const;
@@ -37,16 +48,20 @@ private:
 	pl_scrollbar verticalBar() const;
 	QString headerText() const;
 	Item *itemAt(QPoint windowPos);
-	void openItem(Item *item);
 	void scrollStep();
 
 	QString m_path;
 	std::vector<std::unique_ptr<Item>> m_items;
 	int m_scroll = 0;
 	int m_contentHeight = 0;
+	QFileSystemWatcher m_watcher;
 
 	/* Scroll bar tracking. */
 	sb_part m_sbPart = SB_NONE;
 	int m_thumbGrab = 0; /* pointer offset within the thumb */
 	QTimer m_repeat;
 };
+
+/* ⌘-key equivalents shared by Finder windows and the desktop. Linux apps
+ * see ⌘ as Ctrl (platinum-wm translates it). Returns true if handled. */
+bool finderShortcut(QKeyEvent *e);

@@ -2,8 +2,10 @@
 
 #include <QDir>
 #include <QHash>
+#include <QKeyEvent>
 #include <QMouseEvent>
 #include <QProcess>
+#include <QSet>
 #include <QStorageInfo>
 
 /* Layout. The item-count header matches HIG figure 2-24; the icon grid
@@ -36,21 +38,71 @@ FolderWindow *FolderWindow::open(const QString &path) {
 	return w;
 }
 
+void FolderWindow::reloadAll(const QString &folder) {
+	if (FolderWindow *w = openWindows().value(QDir(folder).absolutePath())) {
+		w->reload();
+	}
+}
+
 FolderWindow::FolderWindow(const QString &path) : m_path(path) {
 	setAttribute(Qt::WA_DeleteOnClose);
 	setAttribute(Qt::WA_OpaquePaintEvent);
 	setWindowTitle(displayName(path));
 	m_repeat.callOnTimeout([this] { scrollStep(); });
+	/* Other programs change folders too; follow them. */
+	m_watcher.addPath(path);
+	QObject::connect(&m_watcher, &QFileSystemWatcher::directoryChanged,
+		[this](const QString &) { reload(); });
 	reload();
 }
 
 FolderWindow::~FolderWindow() {
 	openWindows().remove(m_path);
+	Finder::instance().viewClosed(this);
 }
 
+void FolderWindow::closeEvent(QCloseEvent *e) {
+	Finder::instance().viewClosed(this);
+	QWidget::closeEvent(e);
+}
+
+void FolderWindow::changeEvent(QEvent *e) {
+	if (e->type() == QEvent::ActivationChange && isActiveWindow()) {
+		Finder::instance().setFront(this);
+	}
+	QWidget::changeEvent(e);
+}
+
+/* Re-read the folder, keeping the selection by name. */
 void FolderWindow::reload() {
+	QSet<QString> selected;
+	for (auto &item : m_items) {
+		if (item->selected) {
+			selected.insert(item->name);
+		}
+	}
 	m_items = listFolder(m_path);
+	for (auto &item : m_items) {
+		item->selected = selected.contains(item->name);
+	}
 	layoutIcons();
+	update();
+}
+
+std::vector<Item *> FolderWindow::selectedItems() {
+	std::vector<Item *> out;
+	for (auto &item : m_items) {
+		if (item->selected) {
+			out.push_back(item.get());
+		}
+	}
+	return out;
+}
+
+void FolderWindow::selectByName(const QString &name) {
+	for (auto &item : m_items) {
+		item->selected = item->name == name;
+	}
 	update();
 }
 
@@ -204,6 +256,8 @@ void FolderWindow::mousePressEvent(QMouseEvent *e) {
 		hit->selected = !hit->selected;
 	}
 	update();
+	Finder::instance().setFront(this);
+	Finder::instance().notifyState();
 }
 
 void FolderWindow::mouseMoveEvent(QMouseEvent *e) {
@@ -226,19 +280,31 @@ void FolderWindow::mouseReleaseEvent(QMouseEvent *) {
 }
 
 void FolderWindow::mouseDoubleClickEvent(QMouseEvent *e) {
-	if (Item *item = itemAt(e->position().toPoint())) {
-		openItem(item);
+	if (itemAt(e->position().toPoint())) {
+		Finder::instance().openSelection();
+	}
+}
+
+void FolderWindow::keyPressEvent(QKeyEvent *e) {
+	if (!finderShortcut(e)) {
+		QWidget::keyPressEvent(e);
+	}
+}
+
+bool finderShortcut(QKeyEvent *e) {
+	if (!(e->modifiers() & Qt::ControlModifier)) {
+		return false;
+	}
+	Finder &f = Finder::instance();
+	switch (e->key()) {
+	case Qt::Key_N: f.newFolder(); return true;
+	case Qt::Key_O: f.openSelection(); return true;
+	case Qt::Key_W: f.closeWindow(); return true;
+	case Qt::Key_Backspace: f.moveSelectionToTrash(); return true;
+	default: return false;
 	}
 }
 
 void FolderWindow::wheelEvent(QWheelEvent *e) {
 	scrollTo(m_scroll - e->angleDelta().y() / 120 * ARROW_STEP * 3);
-}
-
-void FolderWindow::openItem(Item *item) {
-	if (item->kind == PL_ICON_FOLDER) {
-		FolderWindow::open(item->path);
-	} else {
-		QProcess::startDetached("xdg-open", { item->path });
-	}
 }

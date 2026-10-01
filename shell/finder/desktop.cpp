@@ -2,7 +2,10 @@
 
 #include <LayerShellQt/window.h>
 #include <QDir>
+#include <QKeyEvent>
 #include <QMouseEvent>
+#include <QSet>
+#include <QStandardPaths>
 #include <QWindow>
 
 #include "folderwindow.h"
@@ -12,6 +15,7 @@
 static constexpr int ICON_MARGIN_RIGHT = 24;
 static constexpr int ICON_MARGIN_TOP = 14;    /* below the menu bar */
 static constexpr int ICON_MARGIN_BOTTOM = 32;
+static constexpr int CELL_W = 80, CELL_H = 64;
 
 /* An original 8x8 desktop pattern: blue-violet with a sparse darker
  * weave. (Mac OS 8's own patterns are Apple's; this one is ours.) */
@@ -30,19 +34,27 @@ static constexpr uint32_t PATTERN_DOT = RGB(0x55, 0x55, 0xAA);
 
 Desktop::Desktop() {
 	setAttribute(Qt::WA_OpaquePaintEvent);
-	auto disk = std::make_unique<Item>();
-	disk->name = displayName("/");
-	disk->path = "/";
-	disk->kind = PL_ICON_DISK;
-	m_items.push_back(std::move(disk));
+	m_disk = std::make_unique<Item>();
+	m_disk->name = displayName("/");
+	m_disk->path = "/";
+	m_disk->kind = PL_ICON_DISK;
 
-	auto trash = std::make_unique<Item>();
-	trash->name = "Trash";
-	trash->path = trashFilesPath();
-	QDir trashDir(trash->path);
-	trash->kind = trashDir.exists() && !trashDir.isEmpty() ? PL_ICON_TRASH_FULL
-		: PL_ICON_TRASH_EMPTY;
-	m_items.push_back(std::move(trash));
+	m_trash = std::make_unique<Item>();
+	m_trash->name = "Trash";
+	m_trash->path = trashFilesPath();
+	updateTrashIcon();
+
+	QDir().mkpath(folderPath());
+	m_watcher.addPath(folderPath());
+	QDir().mkpath(trashFilesPath());
+	m_watcher.addPath(trashFilesPath());
+	QObject::connect(&m_watcher, &QFileSystemWatcher::directoryChanged,
+		[this](const QString &dir) { Finder::instance().folderChanged(dir); });
+	reload();
+}
+
+QString Desktop::folderPath() const {
+	return QStandardPaths::writableLocation(QStandardPaths::DesktopLocation);
 }
 
 void Desktop::becomeLayerSurface() {
@@ -58,10 +70,51 @@ void Desktop::becomeLayerSurface() {
 	}
 }
 
+void Desktop::updateTrashIcon() {
+	QDir trash(trashFilesPath());
+	m_trash->kind = trash.exists() && !trash.isEmpty() ? PL_ICON_TRASH_FULL
+		: PL_ICON_TRASH_EMPTY;
+}
+
+void Desktop::folderChanged(const QString &folder) {
+	if (QDir(folder) == QDir(trashFilesPath())) {
+		updateTrashIcon();
+		update();
+	}
+	if (QDir(folder) == QDir(folderPath())) {
+		reload();
+	}
+}
+
+void Desktop::reload() {
+	QSet<QString> selected;
+	for (auto &item : m_files) {
+		if (item->selected) {
+			selected.insert(item->name);
+		}
+	}
+	m_files = listFolder(folderPath());
+	for (auto &item : m_files) {
+		item->selected = selected.contains(item->name);
+	}
+	placeIcons();
+	update();
+}
+
+/* The disk first at top right, Desktop items in columns below it (right
+ * to left), the Trash at bottom right. */
 void Desktop::placeIcons() {
-	const int x = width() - ICON_MARGIN_RIGHT - PL_ICON_LARGE;
-	m_items[0]->pos = QPoint(x, MBAR_HEIGHT + ICON_MARGIN_TOP);
-	m_items[1]->pos = QPoint(x, height() - ICON_MARGIN_BOTTOM - PL_ICON_LARGE - 16);
+	const int right = width() - ICON_MARGIN_RIGHT - PL_ICON_LARGE;
+	const int top = MBAR_HEIGHT + ICON_MARGIN_TOP;
+	m_disk->pos = QPoint(right, top);
+	m_trash->pos = QPoint(right, height() - ICON_MARGIN_BOTTOM - PL_ICON_LARGE - 16);
+	const int rows = std::max(1, (m_trash->pos.y() - top) / CELL_H - 1);
+	int i = 1; /* slot 0 is the disk */
+	for (auto &item : m_files) {
+		int col = i / rows, row = i % rows;
+		item->pos = QPoint(right - col * CELL_W, top + row * CELL_H);
+		i++;
+	}
 }
 
 void Desktop::resizeEvent(QResizeEvent *) {
@@ -77,15 +130,22 @@ void Desktop::paintEvent(QPaintEvent *) {
 			pl_put(c, x, y, row[x % 8] == 'd' ? PATTERN_DOT : PATTERN_BASE);
 		}
 	}
-	for (auto &item : m_items) {
+	paintIconItem(c, *m_disk, m_disk->pos.x(), m_disk->pos.y(), true);
+	for (auto &item : m_files) {
 		paintIconItem(c, *item, item->pos.x(), item->pos.y(), true);
 	}
+	paintIconItem(c, *m_trash, m_trash->pos.x(), m_trash->pos.y(), true);
 	QPainter p(this);
 	px.blit(p);
 }
 
 Item *Desktop::itemAt(QPoint pos) {
-	for (auto it = m_items.rbegin(); it != m_items.rend(); ++it) {
+	for (Item *item : { m_trash.get(), m_disk.get() }) {
+		if (iconItemContains(*item, item->pos.x(), item->pos.y(), pos)) {
+			return item;
+		}
+	}
+	for (auto it = m_files.rbegin(); it != m_files.rend(); ++it) {
 		if (iconItemContains(**it, (*it)->pos.x(), (*it)->pos.y(), pos)) {
 			return it->get();
 		}
@@ -93,17 +153,58 @@ Item *Desktop::itemAt(QPoint pos) {
 	return nullptr;
 }
 
-void Desktop::mousePressEvent(QMouseEvent *e) {
-	Item *hit = itemAt(e->position().toPoint());
-	for (auto &item : m_items) {
-		item->selected = item.get() == hit;
+std::vector<Item *> Desktop::selectedItems() {
+	std::vector<Item *> out;
+	for (Item *item : { m_disk.get(), m_trash.get() }) {
+		if (item->selected) {
+			out.push_back(item);
+		}
+	}
+	for (auto &item : m_files) {
+		if (item->selected) {
+			out.push_back(item.get());
+		}
+	}
+	return out;
+}
+
+void Desktop::selectByName(const QString &name) {
+	m_disk->selected = m_trash->selected = false;
+	for (auto &item : m_files) {
+		item->selected = item->name == name;
 	}
 	update();
 }
 
+void Desktop::mousePressEvent(QMouseEvent *e) {
+	Item *hit = itemAt(e->position().toPoint());
+	const bool extend = e->modifiers() & Qt::ShiftModifier;
+	auto apply = [&](Item *item) {
+		if (!extend) {
+			item->selected = item == hit;
+		} else if (item == hit) {
+			item->selected = !item->selected;
+		}
+	};
+	apply(m_disk.get());
+	apply(m_trash.get());
+	for (auto &item : m_files) {
+		apply(item.get());
+	}
+	update();
+	/* Clicking the desktop brings the Finder forward. */
+	Finder::instance().setFront(this);
+	Finder::instance().notifyState();
+}
+
 void Desktop::mouseDoubleClickEvent(QMouseEvent *e) {
-	if (Item *item = itemAt(e->position().toPoint())) {
-		QDir().mkpath(item->path);
-		FolderWindow::open(item->path);
+	if (itemAt(e->position().toPoint())) {
+		Finder::instance().openSelection();
+	}
+}
+
+void Desktop::keyPressEvent(QKeyEvent *e) {
+	if (!finderShortcut(e)) {
+		QWidget::keyPressEvent(e);
 	}
 }
