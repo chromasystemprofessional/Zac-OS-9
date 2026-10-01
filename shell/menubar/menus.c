@@ -62,9 +62,12 @@ static void add_finder_menus(struct mb_menu *menus, int *n) {
 	add(m, "Close Window", 'W', up && fs->window, ACT_FINDER, "close-window");
 	sep(m);
 	add(m, "Get Info", 'I', sel || (up && fs->window), ACT_FINDER, "get-info");
-	/* TODO(phase 3): Duplicate, Make Alias, Put Away, Find. */
-	add(m, "Duplicate", 'D', false, ACT_NONE, NULL);
-	add(m, "Make Alias", 'M', false, ACT_NONE, NULL);
+	add(m, "Duplicate", 'D', sel, ACT_FINDER, "duplicate");
+	add(m, "Make Alias", 'M', sel, ACT_FINDER, "make-alias");
+	add(m, "Put Away", 'Y', sel, ACT_FINDER, "put-away");
+	sep(m);
+	/* TODO: Find. */
+	add(m, "Show Original", 'R', sel, ACT_FINDER, "show-original");
 	add_edit_menu(menus, n, false);
 	m = new_menu(menus, n, "View");
 	const bool win = up && fs->window;

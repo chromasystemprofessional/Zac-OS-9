@@ -6,6 +6,9 @@
 #include <QWidget>
 
 #include <QDirIterator>
+#include <QUrl>
+
+#include "fileops.h"
 
 #include "alert.h"
 #include "desktop.h"
@@ -101,6 +104,14 @@ void Finder::command(const QString &name) {
 		emptyTrash();
 	} else if (name == "get-info") {
 		getInfo();
+	} else if (name == "duplicate") {
+		duplicate();
+	} else if (name == "make-alias") {
+		makeAlias();
+	} else if (name == "put-away") {
+		putAway();
+	} else if (name == "show-original") {
+		showOriginal();
 	} else if (name == "about") {
 		AboutWindow::open();
 	} else if (name == "view-icons" || name == "view-list") {
@@ -145,6 +156,112 @@ void Finder::openSelection() {
 		} else {
 			QProcess::startDetached("xdg-open", { item->path });
 		}
+	}
+}
+
+static bool isSpecial(const Item *item) {
+	return item->kind == PL_ICON_DISK || item->kind == PL_ICON_TRASH_EMPTY ||
+		item->kind == PL_ICON_TRASH_FULL;
+}
+
+/* "Report copy" next to "Report" (Mac OS 8 naming). */
+void Finder::duplicate() {
+	FinderView *v = front();
+	QStringList paths;
+	for (Item *item : v->selectedItems()) {
+		if (!isSpecial(item)) {
+			paths << item->path;
+		}
+	}
+	if (paths.isEmpty()) {
+		return;
+	}
+	const QString folder = QFileInfo(paths.first()).absolutePath();
+	for (const QString &d : transferItems(paths, folder, true)) {
+		folderChanged(d);
+	}
+}
+
+/* An alias is a symbolic link named "<name> alias".
+ * TODO: the Mac shows alias names in italics (needs an italic views font). */
+void Finder::makeAlias() {
+	FinderView *v = front();
+	QString lastName;
+	QString folder;
+	for (Item *item : v->selectedItems()) {
+		if (item->kind == PL_ICON_TRASH_EMPTY || item->kind == PL_ICON_TRASH_FULL) {
+			continue;
+		}
+		QFileInfo info(item->path);
+		folder = item->kind == PL_ICON_DISK ? v->folderPath() : info.absolutePath();
+		QDir dir(folder);
+		QString name = (item->kind == PL_ICON_DISK ? item->name : info.fileName()) + " alias";
+		for (int i = 2; dir.exists(name); i++) {
+			name = info.fileName() + " alias " + QString::number(i);
+		}
+		if (QFile::link(item->path, dir.filePath(name))) {
+			lastName = name;
+		}
+	}
+	if (!lastName.isEmpty()) {
+		folderChanged(folder);
+		v->selectByName(lastName);
+		notifyState();
+	}
+}
+
+/* Put Away: Trash items go back where they came from (freedesktop
+ * trashinfo "Path="). */
+void Finder::putAway() {
+	const QString trash = trashFilesPath();
+	const QString info = QFileInfo(trash).absolutePath() + "/info";
+	QStringList changed;
+	for (Item *item : front()->selectedItems()) {
+		if (QFileInfo(item->path).absolutePath() != QDir(trash).absolutePath()) {
+			continue; /* only things in the Trash can be put away */
+		}
+		QFile f(info + "/" + item->name + ".trashinfo");
+		if (!f.open(QIODevice::ReadOnly)) {
+			continue;
+		}
+		QString original;
+		for (const QByteArray &line : f.readAll().split('\n')) {
+			if (line.startsWith("Path=")) {
+				original = QUrl::fromPercentEncoding(line.mid(5).trimmed());
+			}
+		}
+		f.close();
+		if (original.isEmpty() || QFileInfo::exists(original) ||
+				!QDir().mkpath(QFileInfo(original).absolutePath())) {
+			continue;
+		}
+		if (QDir().rename(item->path, original)) {
+			QFile::remove(f.fileName());
+			changed << QFileInfo(original).absolutePath();
+		}
+	}
+	changed.removeDuplicates();
+	for (const QString &d : changed) {
+		folderChanged(d);
+	}
+	folderChanged(trash);
+}
+
+/* Show Original: the folder holding an alias's target, with it selected. */
+void Finder::showOriginal() {
+	for (Item *item : front()->selectedItems()) {
+		QFileInfo info(item->path);
+		if (!info.isSymLink()) {
+			continue;
+		}
+		QFileInfo target(info.symLinkTarget());
+		if (!target.exists()) {
+			continue;
+		}
+		FolderWindow *w = FolderWindow::open(target.absolutePath());
+		w->selectByName(target.fileName());
+		notifyState();
+		return;
 	}
 }
 

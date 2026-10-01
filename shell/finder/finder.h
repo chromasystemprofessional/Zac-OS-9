@@ -54,6 +54,10 @@ public:
 	void moveSelectionToTrash();
 	void emptyTrash();
 	void getInfo();
+	void duplicate();
+	void makeAlias();
+	void putAway();
+	void showOriginal();
 
 	/* Re-read every view showing `folder`, and the Trash icon. */
 	void folderChanged(const QString &folder);
