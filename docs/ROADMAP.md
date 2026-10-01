@@ -78,8 +78,9 @@ scaling only, original behaviors and timings).
     and makes a blank disk for installing from a CD image.
   - Logo menu > Classic; double-clicking a Mac disk image boots it; alerts
     explain a missing ROM or emulator.
+  - Mac OS 9.0 installed from the user's CD image onto a blank disk and
+    booted from it; the home folder shows up as the "Unix" volume.
 - Next:
-  - Boot Mac OS 9 from the user's disk (waiting on a disk image).
   - Double-clicking a classic app or document launches it in the emulator.
   - SDL's Wayland backend under platinum-wm (Xwayland for now).
   - Packaging the emulators (Phase 7).

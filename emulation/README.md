@@ -43,7 +43,8 @@ If there is no hard-disk image there, the first start creates a blank one,
 "68k" or "ppc" are only attached to that emulator, and the same image in
 two folders is attached once. The Mac boots from the CD and offers to
 initialize the blank disk. Run the installer onto it. Afterwards, remove the
-CD image from the folder, or leave it there as a second disk.
+CD image from the folder, or leave it there: hard disks are attached first,
+so the Mac starts up from the installed system and only falls back to a CD.
 
 ## Inside the Mac
 

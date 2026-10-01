@@ -161,16 +161,16 @@ if $check; then
 fi
 
 set -- --rom "$rom" --ramsize $ram --screen win/800/600 --extfs "$HOME" --nogui true
-# CD images are read-only ("*" prefix); writable disks stay writable.
+# Hard disks first, so the Mac starts up from an installed system and
+# only falls back to a CD; CD images are read-only ("*" prefix).
 old_ifs=$IFS
 IFS='
 '
 for d in $disks; do
-	if is_cd "$d"; then
-		set -- "$@" --disk "*$d"
-	else
-		set -- "$@" --disk "$d"
-	fi
+	is_cd "$d" || set -- "$@" --disk "$d"
+done
+for d in $disks; do
+	! is_cd "$d" || set -- "$@" --disk "*$d"
 done
 IFS=$old_ifs
 
