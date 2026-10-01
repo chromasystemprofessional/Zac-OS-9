@@ -3,6 +3,7 @@
 #include <QKeyEvent>
 #include <QMouseEvent>
 
+#include "settings.h"
 #include "platinumshell.h"
 #include "widgets.h"
 
@@ -72,6 +73,7 @@ bool Alert::ask(const QString &message, const QString &ok, const QString &cancel
 
 void Alert::showEvent(QShowEvent *e) {
 	QDialog::showEvent(e);
+	pl_beep();
 	platinumSetFrameStyle(this, FrameStyle::MovableModal);
 }
 

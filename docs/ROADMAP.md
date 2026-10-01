@@ -105,10 +105,15 @@ scaling only, original behaviors and timings).
   - Cursors: a "Platinum" Xcursor theme (arrow, I-beam, animated watch,
     crosshair, hand, move/resize, not-allowed, copy/alias/help) from
     assets/cursors, used by platinum-wm and every client it starts.
+  - Alert sounds: six original synthesised sounds (assets/sounds, from
+    tools/sounds/make_sounds.py); alerts play the one named by
+    `alert-sound=` in desktop.conf (default "platinum").
+  - Startup screen: a Welcome box with the logo and the HIG progress bar
+    over the desktop pattern until the menu bar and desktop are up.
 - Next:
-  - More icons (disk images, Classic, a better application icon), alert
-    sounds, startup screen.
-  - Choosing the pattern from an Appearance control panel (Phase 5).
+  - More icons (disk images, Classic, a better application icon).
+  - Choosing the pattern and alert sound from the Appearance and Sound
+    control panels (Phase 5).
   - An application font (Geneva 12 metrics) for app content.
 
 ## Phase 7: Packaging and distribution

@@ -74,6 +74,85 @@ void pl_button_paint(struct pl_canvas *c, int x, int y, int w,
 }
 
 /*
+ * Progress bar, measured in HIG figure 2-45 (whose colours are slightly
+ * shifted; each maps to the nearest Platinum value). Rows are relative to
+ * the top black line (row 0); the inside is rows 1..10.
+ */
+void pl_progress_paint(struct pl_canvas *c, int x, int y, int w, double fraction,
+		struct pl_accent ac) {
+	const int x1 = x + w - 1, y1 = y + PL_PROGRESS_H - 1;
+	const int inner = w - 2;
+	int fill = (int)(fraction * inner + 0.5);
+	if (fill < 0) {
+		fill = 0;
+	}
+	if (fill > inner) {
+		fill = inner;
+	}
+
+	/* Bevel outside the black line: shade above and left, white below and right. */
+	pl_hline(c, x - 1, x1, y - 1, GRAY(0xB));
+	pl_vline(c, x - 1, y - 1, y1, GRAY(0xB));
+	pl_hline(c, x, x1 + 1, y1 + 1, C_WHITE);
+	pl_vline(c, x1 + 1, y, y1 + 1, C_WHITE);
+	pl_outline(c, x, y, x1, y1, C_BLACK);
+
+	/* The filled part: a lit cylinder, dark at the edges, a near-white
+	 * line along the middle; its first columns catch the light and its
+	 * last fall into shadow. */
+	const uint32_t profile[10] = {
+		ac.shadow, ac.dark, ac.body, ac.light, ac.grip_hi,
+		ac.light, ac.body, ac.dark, ac.shadow, ac.deep,
+	};
+	const uint32_t first[10] = {
+		ac.dark, ac.dark, ac.dark, ac.dark, ac.dark,
+		ac.dark, ac.dark, ac.dark, ac.dark, ac.shadow,
+	};
+	const uint32_t second[10] = {
+		ac.dark, ac.body, ac.light, ac.grip_hi, ac.grip_hi,
+		ac.grip_hi, ac.light, ac.body, ac.dark, ac.shadow,
+	};
+	for (int i = 0; i < fill; i++) {
+		const int cx = x + 1 + i;
+		for (int r = 0; r < 10; r++) {
+			uint32_t v = profile[r];
+			if (i == 0) {
+				v = first[r];
+			} else if (i == 1) {
+				v = second[r];
+			} else if (fill < inner && i == fill - 1) {
+				v = r == 0 ? ac.shadow : ac.deep;
+			} else if (fill < inner && i == fill - 2) {
+				v = r == 1 ? ac.dark : r == 9 ? ac.deep : ac.shadow;
+			}
+			pl_put(c, cx, y + 1 + r, v);
+		}
+	}
+	if (fill >= inner) {
+		return;
+	}
+	/* A black line ends the fill (unless empty), then the recessed well:
+	 * #666 and #999 along the left, #999 on top, #CCC inside, #DDD along
+	 * the bottom and right. */
+	int wx = x + 1 + fill;
+	if (fill > 0) {
+		pl_vline(c, wx, y + 1, y1 - 1, C_BLACK);
+		wx++;
+	}
+	if (wx > x1 - 1) {
+		return;
+	}
+	pl_fill(c, wx, y + 1, x1 - 1, y1 - 1, GRAY(0xC));
+	pl_hline(c, wx, x1 - 1, y + 1, GRAY(0x9));
+	pl_hline(c, wx, x1 - 1, y1 - 1, GRAY(0xD));
+	pl_vline(c, x1 - 1, y + 2, y1 - 1, GRAY(0xD));
+	pl_vline(c, wx, y + 1, y1 - 1, GRAY(0x6));
+	if (wx + 1 <= x1 - 1) {
+		pl_vline(c, wx + 1, y + 1, y1 - 1, GRAY(0x9));
+	}
+}
+
+/*
  * Scroll bars are described horizontally, as measured in HIG figure 2-24:
  * `a` runs along the bar (0 = leading border), `b` across it (0 = top
  * border, 1..14 interior, 15 = bottom border). Vertical bars transpose.

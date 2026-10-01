@@ -50,6 +50,13 @@ void pl_button_paint(struct pl_canvas *c, int x, int y, int w,
  * bevel, raised or pressed, any size. Used by the Finder's button view. */
 void pl_bevel_button_paint(struct pl_canvas *c, int x, int y, int w, int h, bool pressed);
 
+/* Determinate progress indicator (HIG figures 2-45, 3-31): 12 px tall
+ * between its black lines, `w` wide including them, with a one-pixel
+ * bevel outside. `fraction` is 0..1. */
+#define PL_PROGRESS_H 12
+void pl_progress_paint(struct pl_canvas *c, int x, int y, int w, double fraction,
+		struct pl_accent accent);
+
 enum sb_part {
 	SB_NONE,
 	SB_DEC_ARROW, /* up / left */

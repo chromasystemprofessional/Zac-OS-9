@@ -13,6 +13,7 @@
 #include <wlr/types/wlr_xdg_output_v1.h>
 #include <wlr/util/log.h>
 
+#include "startup.h"
 #include "server.h"
 
 static void usage(const char *argv0) {
@@ -179,6 +180,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	setenv("WAYLAND_DISPLAY", socket, true);
+	startup_begin(&server);
 	spawn_component("PLATINUM_MENUBAR", "platinum-menubar");
 	spawn_component("PLATINUM_FINDER", "platinum-finder");
 	if (startup_cmd) {

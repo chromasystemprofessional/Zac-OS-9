@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <wlr/types/wlr_output.h>
 
+#include "startup.h"
 #include "server.h"
 
 #define LAYER_SHELL_VERSION 4
@@ -74,6 +75,7 @@ static void unfocus(struct plat_layer_surface *ls) {
 static void handle_map(struct wl_listener *listener, void *data) {
 	struct plat_layer_surface *ls = wl_container_of(listener, ls, map);
 	ls->mapped = true;
+	startup_surface_mapped(ls->layer_surface->namespace);
 	arrange_for(ls);
 	if (ls->layer_surface->current.keyboard_interactive ==
 			ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_EXCLUSIVE) {

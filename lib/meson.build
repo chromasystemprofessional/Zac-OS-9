@@ -10,8 +10,22 @@ platinum_lib = static_library('platinum',
   'icons.c',
   'logo.c',
   'patterns.c',
+  'settings.c',
   include_directories: platinum_inc,
   dependencies: [cairo],
+  c_args: [
+    '-DPLATINUM_DATA_DIR="@0@"'.format(get_option('prefix') / get_option('datadir') / 'platinum'),
+    '-DPLATINUM_SOURCE_DIR="@0@"'.format(meson.project_source_root()),
+  ],
+)
+
+install_data(
+  files(
+    '../assets/sounds/platinum.wav', '../assets/sounds/glass.wav',
+    '../assets/sounds/droplet.wav', '../assets/sounds/pluck.wav',
+    '../assets/sounds/woodblock.wav', '../assets/sounds/chirp.wav',
+  ),
+  install_dir: get_option('datadir') / 'platinum' / 'sounds',
 )
 platinum_dep = declare_dependency(
   link_with: platinum_lib,
@@ -32,6 +46,7 @@ test('menudraw',
   args: [figs_dir],
 )
 test('text', executable('test-text', 'tests/test_text.c', dependencies: [platinum_dep]))
+test('settings', executable('test-settings', 'tests/test_settings.c', dependencies: [platinum_dep]))
 test('widgets',
   executable('test-widgets', 'tests/test_widgets.c',
     dependencies: [figcompare_dep]),

@@ -1,0 +1,35 @@
+#ifndef PLATINUM_SETTINGS_H
+#define PLATINUM_SETTINGS_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#include <stdbool.h>
+#include <stddef.h>
+
+/*
+ * Appearance settings shared by the shell: ~/.config/platinum/desktop.conf
+ * (QSettings INI, "[General]" section), e.g. "pattern=ocean-ripple",
+ * "alert-sound=glass". The Appearance and Sound control panels write it.
+ */
+
+/* Copies the value of `key` into out; false if it isn't set. */
+bool pl_setting(const char *key, char *out, size_t size);
+
+/* Where shared data (sounds/) lives: $PLATINUM_DATA, the installed data
+ * directory, or the source tree's assets/ when running from a build. */
+const char *pl_data_dir(void);
+
+/* Play a sound from sounds/NAME.wav without waiting for it. NULL plays
+ * the chosen alert sound ("alert-sound", default "platinum"). */
+void pl_sound_play(const char *name);
+
+/* The alert sound, for alerts and refused actions. */
+void pl_beep(void);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif
