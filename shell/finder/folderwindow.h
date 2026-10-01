@@ -7,6 +7,7 @@
 #include <map>
 
 #include "finder.h"
+#include "folderstate.h"
 #include "items.h"
 #include "labeleditor.h"
 #include "widgets.h"
@@ -93,6 +94,10 @@ private:
 	void clearDropTarget();
 
 	QString m_path;
+	/* Remembered between sessions; written shortly after each change. */
+	FolderState m_state;
+	QTimer m_saveTimer;
+	void saveStateSoon();
 	ViewMode m_mode = ViewMode::Icons;
 	std::vector<std::unique_ptr<Item>> m_items;
 	std::map<QString, std::vector<std::unique_ptr<Item>>> m_children;

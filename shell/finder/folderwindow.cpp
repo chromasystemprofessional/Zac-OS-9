@@ -11,6 +11,7 @@
 
 #include "fileops.h"
 #include "infowindow.h"
+#include "platinumshell.h"
 
 /* Item-count header: HIG figure 2-24. */
 static constexpr int HEADER_H = 21;       /* white row, #DDD, #AAA shade */
@@ -99,10 +100,19 @@ FolderWindow *FolderWindow::open(const QString &path) {
 		w->raise();
 		w->activateWindow();
 	} else {
+		/* Spatial: the window comes back with its old size, view and place. */
 		w = new FolderWindow(key);
 		openWindows().insert(key, w);
-		w->resize(420, 280);
+		w->resize(w->m_state.size);
 		w->show();
+		if (w->m_state.hasPosition) {
+			platinumSetWindowPosition(w, w->m_state.position);
+		}
+		platinumOnWindowPosition(w, [w](QPoint p) {
+			w->m_state.position = p;
+			w->m_state.hasPosition = true;
+			w->saveStateSoon();
+		});
 	}
 	/* A window the Finder opens is the front one (Qt only learns about
 	 * activation from keyboard focus, which menus briefly take away). */
@@ -120,6 +130,11 @@ void FolderWindow::reloadAll(const QString &folder) {
 }
 
 FolderWindow::FolderWindow(const QString &path) : m_path(path) {
+	m_state = FolderState::load(path);
+	m_mode = m_state.viewMode == 1 ? ViewMode::List : ViewMode::Icons;
+	m_sortColumn = std::clamp(m_state.sortColumn, 0, N_COLUMNS - 1);
+	m_saveTimer.setSingleShot(true);
+	m_saveTimer.callOnTimeout([this] { m_state.save(m_path); });
 	setAttribute(Qt::WA_DeleteOnClose);
 	setAttribute(Qt::WA_OpaquePaintEvent);
 	setWindowTitle(displayName(path));
@@ -135,6 +150,9 @@ FolderWindow::FolderWindow(const QString &path) : m_path(path) {
 }
 
 FolderWindow::~FolderWindow() {
+	if (m_saveTimer.isActive()) {
+		m_state.save(m_path);
+	}
 	openWindows().remove(m_path);
 	Finder::instance().viewClosed(this);
 }
@@ -151,10 +169,16 @@ void FolderWindow::changeEvent(QEvent *e) {
 	QWidget::changeEvent(e);
 }
 
+void FolderWindow::saveStateSoon() {
+	m_saveTimer.start(300);
+}
+
 void FolderWindow::setViewMode(ViewMode mode) {
 	if (mode == m_mode) {
 		return;
 	}
+	m_state.viewMode = mode == ViewMode::List ? 1 : 0;
+	saveStateSoon();
 	m_editor.cancel();
 	m_mode = mode;
 	m_scrollX = m_scrollY = 0;
@@ -279,6 +303,10 @@ void FolderWindow::relayout() {
 
 void FolderWindow::resizeEvent(QResizeEvent *) {
 	relayout();
+	if (isVisible()) {
+		m_state.size = size();
+		saveStateSoon();
+	}
 }
 
 QPoint FolderWindow::toContent(QPoint pos) const {
@@ -661,6 +689,8 @@ void FolderWindow::mousePressEvent(QMouseEvent *e) {
 		int col = columnAt(pos.x() + m_scrollX);
 		if (col >= 0 && col != m_sortColumn) {
 			m_sortColumn = col;
+			m_state.sortColumn = col;
+			saveStateSoon();
 			relayout();
 			update();
 		}

@@ -271,6 +271,10 @@ void xdg_init(struct plat_server *server);
 void platinum_shell_init(struct plat_server *server);
 /* The hinted decor_style for a surface, or -1. */
 int platinum_shell_style_for(struct wlr_surface *surface);
+/* A remembered position for a surface's window, if its program gave one. */
+bool platinum_shell_position_for(struct wlr_surface *surface, int *x, int *y);
+/* Tell the window's program (if it is one of ours) where it now is. */
+void platinum_shell_report_position(struct plat_view *view);
 
 /* xwayland.c */
 void xwayland_init(struct plat_server *server);

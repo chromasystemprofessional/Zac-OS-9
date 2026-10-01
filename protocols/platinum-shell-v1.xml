@@ -26,6 +26,28 @@
       <arg name="style" type="uint" enum="style"/>
     </request>
 
+    <request name="set_window_position">
+      <description summary="where a window should appear">
+        Spatial programs (the Finder) reopen windows where the user left
+        them. Applies when the toplevel maps; x and y are the frame's
+        top-left in layout coordinates, kept on screen by the compositor.
+      </description>
+      <arg name="surface" type="object" interface="wl_surface"/>
+      <arg name="x" type="int"/>
+      <arg name="y" type="int"/>
+    </request>
+
+    <event name="window_position">
+      <description summary="a window now sits here">
+        Sent to the surface's own client when its toplevel maps and
+        whenever it is moved or resized, with the frame's top-left in
+        layout coordinates.
+      </description>
+      <arg name="surface" type="object" interface="wl_surface"/>
+      <arg name="x" type="int"/>
+      <arg name="y" type="int"/>
+    </event>
+
     <request name="destroy" type="destructor"/>
   </interface>
 </protocol>

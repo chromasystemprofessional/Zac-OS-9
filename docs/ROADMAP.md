@@ -46,11 +46,24 @@ scaling only, original behaviors and timings).
 - To measure: selected-item look, blink count and timing, the other screen
   corners, other accent-color triples.
 
-## Phase 3: Finder
-- Desktop icons, spatial folder windows (each folder remembers its window
-  position and view), icon, button and list views.
-- Trash, Get Info, labels, spring-loaded folders, aliases (symlinks).
-- File type and creator mapping to MIME types.
+## Phase 3: Finder ✅ (core)
+- ✅ Scroll bars, push buttons, dialog frame, list view: measured from the
+  HIG (`docs/reference/platinum-finder.md`) and pixel-tested.
+- ✅ `platinum-finder` (Qt6 + LayerShellQt, all drawing through `lib/`):
+  - Desktop (layer surface): original pattern, disk, Trash, `~/Desktop` items.
+  - Spatial windows that remember position, size, view and sort
+    (`platinum-shell-v1` lets the compositor place them).
+  - Icon view and list view (sortable columns, disclosure triangles).
+  - Select, open, drag and drop (move, copy, Option-copy, to the Trash),
+    rename in place, New Folder, Move To Trash, Empty Trash (with alert),
+    Get Info, About This Computer.
+  - Finder menus driven over a socket from the menu bar; ⌘-keys.
+- Next:
+  - Free icon positions in icon view (drag to place; remembered).
+  - Button view; Duplicate, Make Alias (symlinks), Put Away, Find.
+  - Labels, spring-loaded folders, comments stored as extended attributes.
+- To measure: icon grid and label metrics, Get Info layout, alert margins,
+  selected list row, expanded triangle.
 
 ## Phase 4: Classic app emulation
 - Package SheepShaver (PowerPC, up to Mac OS 9.0.4) and Basilisk II (68k, up to 8.1).

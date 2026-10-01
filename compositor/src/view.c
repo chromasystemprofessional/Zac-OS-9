@@ -206,10 +206,12 @@ void view_move_to(struct plat_view *view, int x, int y) {
 	if (view->impl->moved) {
 		view->impl->moved(view);
 	}
+	platinum_shell_report_position(view);
 }
 
 void view_resize_frame(struct plat_view *view, struct wlr_box box) {
 	wlr_scene_node_set_position(&view->scene_tree->node, box.x, box.y);
+	platinum_shell_report_position(view);
 	struct decor_margins m = decor_margins(view->frame->st.style);
 	view->impl->set_size(view, box.width - m.left - m.right,
 		box.height - m.top - m.bottom);
@@ -332,17 +334,29 @@ void view_handle_map(struct plat_view *view) {
 	view->hidden = false;
 	wlr_scene_node_set_enabled(&view->scene_tree->node, true);
 	view_update_frame(view);
-	if (view->frame->st.style == DECOR_STYLE_MOVABLE_MODAL) {
+	struct plat_server *server = view->server;
+	struct wlr_box area = output_usable_area(server, server->cursor->x, server->cursor->y);
+	struct wlr_box frame = view_frame_box(view);
+	int hx, hy;
+	if (platinum_shell_position_for(view->impl->get_surface(view), &hx, &hy)) {
+		/* Spatial: back where its program remembers it, but always with
+		 * the title bar on screen and below the menu bar. */
+		if (!wlr_box_empty(&area)) {
+			hx = hx > area.x + area.width - 40 ? area.x + area.width - 40 : hx;
+			hx = hx + frame.width < area.x + 40 ? area.x + 40 - frame.width : hx;
+			hy = hy > area.y + area.height - 30 ? area.y + area.height - 30 : hy;
+			hy = hy < area.y ? area.y : hy;
+		}
+		view_move_to(view, hx, hy);
+	} else if (view->frame->st.style == DECOR_STYLE_MOVABLE_MODAL) {
 		/* Mac OS puts alerts and dialogs centred, a third of the way down. */
-		struct plat_server *server = view->server;
-		struct wlr_box area = output_usable_area(server, server->cursor->x, server->cursor->y);
-		struct wlr_box frame = view_frame_box(view);
 		view_move_to(view, area.x + (area.width - frame.width) / 2,
 			area.y + (area.height - frame.height) / 3);
 	}
 	wl_list_insert(&view->server->views, &view->link);
 	create_toplevel_handle(view);
 	view_focus(view);
+	platinum_shell_report_position(view);
 }
 
 void view_handle_unmap(struct plat_view *view) {
