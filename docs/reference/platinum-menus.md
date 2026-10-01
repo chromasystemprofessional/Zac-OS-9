@@ -139,6 +139,22 @@ white text. *TODO: verify.*
 .##...##.
 ```
 
+### Checkmark (figure 4-3)
+
+The checkmark is 9×8 with its ink at `x=4..12`, and its bottom row sits on the
+item's baseline. It uses the item's text color.
+
+```
+........#
+.......##
+......##.
+.....##..
+#...##...
+##.##....
+.###.....
+..#......
+```
+
 ## Not in the HIG
 
 The HIG shows no clock or Application menu, and no menu-tracking timings. Until

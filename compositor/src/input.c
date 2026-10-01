@@ -3,6 +3,8 @@
 #include <wlr/types/wlr_input_device.h>
 #include <wlr/types/wlr_keyboard.h>
 #include <wlr/types/wlr_pointer.h>
+#include <wlr/types/wlr_virtual_keyboard_v1.h>
+#include <wlr/types/wlr_virtual_pointer_v1.h>
 #include <wlr/util/edges.h>
 #include <xkbcommon/xkbcommon.h>
 
@@ -88,20 +90,24 @@ static void keyboard_destroy(struct wl_listener *listener, void *data) {
 	free(kb);
 }
 
-static void new_keyboard(struct plat_server *server, struct wlr_input_device *device) {
+/* Virtual keyboards bring their own keymap; physical ones get the default. */
+static void new_keyboard(struct plat_server *server, struct wlr_input_device *device,
+		bool virtual) {
 	struct wlr_keyboard *wlr_keyboard = wlr_keyboard_from_input_device(device);
 
 	struct plat_keyboard *kb = calloc(1, sizeof(*kb));
 	kb->server = server;
 	kb->wlr_keyboard = wlr_keyboard;
 
-	struct xkb_context *ctx = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
-	struct xkb_keymap *keymap =
-		xkb_keymap_new_from_names(ctx, NULL, XKB_KEYMAP_COMPILE_NO_FLAGS);
-	wlr_keyboard_set_keymap(wlr_keyboard, keymap);
-	xkb_keymap_unref(keymap);
-	xkb_context_unref(ctx);
-	wlr_keyboard_set_repeat_info(wlr_keyboard, 25, 600);
+	if (!virtual) {
+		struct xkb_context *ctx = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
+		struct xkb_keymap *keymap =
+			xkb_keymap_new_from_names(ctx, NULL, XKB_KEYMAP_COMPILE_NO_FLAGS);
+		wlr_keyboard_set_keymap(wlr_keyboard, keymap);
+		xkb_keymap_unref(keymap);
+		xkb_context_unref(ctx);
+		wlr_keyboard_set_repeat_info(wlr_keyboard, 25, 600);
+	}
 
 	kb->modifiers.notify = keyboard_modifiers;
 	wl_signal_add(&wlr_keyboard->events.modifiers, &kb->modifiers);
@@ -120,7 +126,7 @@ static void server_new_input(struct wl_listener *listener, void *data) {
 
 	switch (device->type) {
 	case WLR_INPUT_DEVICE_KEYBOARD:
-		new_keyboard(server, device);
+		new_keyboard(server, device, false);
 		break;
 	case WLR_INPUT_DEVICE_POINTER:
 		wlr_cursor_attach_input_device(server->cursor, device);
@@ -134,6 +140,20 @@ static void server_new_input(struct wl_listener *listener, void *data) {
 		caps |= WL_SEAT_CAPABILITY_KEYBOARD;
 	}
 	wlr_seat_set_capabilities(server->seat, caps);
+}
+
+static void new_virtual_pointer(struct wl_listener *listener, void *data) {
+	struct plat_server *server = wl_container_of(listener, server, new_virtual_pointer);
+	struct wlr_virtual_pointer_v1_new_pointer_event *event = data;
+	wlr_cursor_attach_input_device(server->cursor, &event->new_pointer->pointer.base);
+}
+
+static void new_virtual_keyboard(struct wl_listener *listener, void *data) {
+	struct plat_server *server = wl_container_of(listener, server, new_virtual_keyboard);
+	struct wlr_virtual_keyboard_v1 *vkbd = data;
+	new_keyboard(server, &vkbd->keyboard.base, true);
+	wlr_seat_set_capabilities(server->seat,
+		WL_SEAT_CAPABILITY_POINTER | WL_SEAT_CAPABILITY_KEYBOARD);
 }
 
 static bool option_held(struct plat_server *server) {
@@ -448,6 +468,15 @@ void input_init(struct plat_server *server) {
 	wl_list_init(&server->keyboards);
 	server->new_input.notify = server_new_input;
 	wl_signal_add(&server->backend->events.new_input, &server->new_input);
+
+	struct wlr_virtual_pointer_manager_v1 *vptr =
+		wlr_virtual_pointer_manager_v1_create(server->display);
+	server->new_virtual_pointer.notify = new_virtual_pointer;
+	wl_signal_add(&vptr->events.new_virtual_pointer, &server->new_virtual_pointer);
+	struct wlr_virtual_keyboard_manager_v1 *vkbd =
+		wlr_virtual_keyboard_manager_v1_create(server->display);
+	server->new_virtual_keyboard.notify = new_virtual_keyboard;
+	wl_signal_add(&vkbd->events.new_virtual_keyboard, &server->new_virtual_keyboard);
 
 	server->seat = wlr_seat_create(server->display, "seat0");
 	server->request_cursor.notify = seat_request_cursor;

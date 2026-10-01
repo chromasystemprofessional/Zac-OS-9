@@ -1,12 +1,15 @@
 #include <getopt.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <wlr/types/wlr_compositor.h>
 #include <wlr/types/wlr_data_device.h>
 #include <wlr/types/wlr_screencopy_v1.h>
 #include <wlr/types/wlr_server_decoration.h>
 #include <wlr/types/wlr_subcompositor.h>
+#include <wlr/types/wlr_viewporter.h>
 #include <wlr/types/wlr_xdg_output_v1.h>
 #include <wlr/util/log.h>
 
@@ -17,6 +20,47 @@ static void usage(const char *argv0) {
 		"  -d  verbose (debug) logging\n"
 		"  -S  integer output scale, 1-4 (default: $PLATINUM_SCALE or 1)\n",
 		argv0);
+}
+
+static void spawn(const char *command) {
+	if (fork() == 0) {
+		setsid();
+		execl("/bin/sh", "/bin/sh", "-c", command, (void *)NULL);
+		_exit(127);
+	}
+}
+
+/* Start the menu bar: $PLATINUM_MENUBAR, else next to our own binary
+ * (installed) or in the build tree's shell/ directory, else from $PATH. */
+static void spawn_menubar(void) {
+	const char *env = getenv("PLATINUM_MENUBAR");
+	if (env) {
+		if (*env) {
+			spawn(env);
+		}
+		return;
+	}
+	char exe[PATH_MAX];
+	ssize_t len = readlink("/proc/self/exe", exe, sizeof(exe) - 1);
+	if (len > 0) {
+		exe[len] = '\0';
+		char *slash = strrchr(exe, '/');
+		if (slash) {
+			*slash = '\0';
+			const char *candidates[] = { "%s/platinum-menubar", "%s/../shell/platinum-menubar" };
+			for (size_t i = 0; i < sizeof(candidates) / sizeof(candidates[0]); i++) {
+				char path[PATH_MAX + 64];
+				snprintf(path, sizeof(path), candidates[i], exe);
+				if (access(path, X_OK) == 0) {
+					char quoted[PATH_MAX + 80];
+					snprintf(quoted, sizeof(quoted), "exec '%s'", path);
+					spawn(quoted);
+					return;
+				}
+			}
+		}
+	}
+	spawn("exec platinum-menubar");
 }
 
 static int parse_scale(const char *s) {
@@ -78,6 +122,7 @@ int main(int argc, char *argv[]) {
 
 	server.compositor = wlr_compositor_create(server.display, 5, server.renderer);
 	wlr_subcompositor_create(server.display);
+	wlr_viewporter_create(server.display);
 	wlr_data_device_manager_create(server.display);
 	/* Lets `grim` capture screenshots for visual checks. */
 	wlr_screencopy_manager_v1_create(server.display);
@@ -130,9 +175,9 @@ int main(int argc, char *argv[]) {
 	}
 
 	setenv("WAYLAND_DISPLAY", socket, true);
-	if (startup_cmd && fork() == 0) {
-		execl("/bin/sh", "/bin/sh", "-c", startup_cmd, (void *)NULL);
-		_exit(127);
+	spawn_menubar();
+	if (startup_cmd) {
+		spawn(startup_cmd);
 	}
 
 	fprintf(stderr, "platinum-wm running (WAYLAND_DISPLAY=%s). "

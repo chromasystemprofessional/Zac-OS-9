@@ -31,6 +31,19 @@ static const char *const cmd_glyph[9] = {
 	".##...##.",
 };
 
+/* Checkmark, 9x8, HIG figure 4-3: x=4 in the menu, bottom row on the
+ * item's baseline. */
+static const char *const check_glyph[8] = {
+	"........#",
+	".......##",
+	"......##.",
+	".....##..",
+	"#...##...",
+	"##.##....",
+	".###.....",
+	"..#......",
+};
+
 static int ink_width(const struct plat_text *t) {
 	return t && t->ink_l >= 0 ? t->ink_r - t->ink_l + 1 : 0;
 }
@@ -147,10 +160,11 @@ void menu_measure(const struct menu_item *items, int n, int *width, int *height)
 	*height = h;
 }
 
-static void paint_cmd(struct pl_canvas *c, int x, int y, uint32_t color) {
-	for (int j = 0; j < 9; j++) {
-		for (int i = 0; i < 9; i++) {
-			if (cmd_glyph[j][i] == '#') {
+static void paint_glyph(struct pl_canvas *c, const char *const *rows, int nrows,
+		int x, int y, uint32_t color) {
+	for (int j = 0; j < nrows; j++) {
+		for (int i = 0; rows[j][i]; i++) {
+			if (rows[j][i] == '#') {
 				pl_put(c, x + i, y + j, color);
 			}
 		}
@@ -187,9 +201,12 @@ void menu_paint(struct pl_canvas *c, const struct menu_item *items, int n,
 		}
 		uint32_t color = sel ? C_WHITE : it->enabled ? C_BLACK : C_888;
 		pl_text(c, it->label, MENU_TEXT_X, y + MENU_ITEM_BASELINE, color);
+		if (it->checked) {
+			paint_glyph(c, check_glyph, 8, MENU_CHECK_X, y + MENU_ITEM_BASELINE - 7, color);
+		}
 		if (it->key) {
 			int cx = W - MENU_CMD_FROM_RIGHT;
-			paint_cmd(c, cx, y + MENU_ITEM_BASELINE - 8, color);
+			paint_glyph(c, cmd_glyph, 9, cx, y + MENU_ITEM_BASELINE - 8, color);
 			pl_text(c, it->key, cx + MENU_KEY_AFTER_CMD, y + MENU_ITEM_BASELINE, color);
 		}
 		y += MENU_ITEM_H;

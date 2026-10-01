@@ -23,10 +23,12 @@
 #define MENU_SEP_H 6
 #define MENU_ITEM_BASELINE 11
 #define MENU_TEXT_X 18
+#define MENU_CHECK_X 4         /* checkmark ink, HIG figure 4-3 */
 #define MENU_RIGHT_PAD 12      /* clear pixels between widest ink and border */
 #define MENU_CMD_FROM_RIGHT 28 /* the ⌘ glyph's ink starts at W - 28 */
 #define MENU_KEY_AFTER_CMD 11  /* key character ink starts 11 px after ⌘ */
 #define MENU_SHORTCUT_GAP 12   /* text ink to ⌘ (not in the HIG; assumed) */
+#define MENU_SHADOW 1          /* extra column and row painted for the shadow */
 
 struct mbar_title {
 	const struct plat_text *text; /* text title, or */

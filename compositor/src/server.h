@@ -81,6 +81,9 @@ struct plat_server {
 
 	struct wlr_seat *seat;
 	struct wl_listener new_input;
+	/* Synthetic input: test automation (wlrctl) and menu commands. */
+	struct wl_listener new_virtual_pointer;
+	struct wl_listener new_virtual_keyboard;
 	struct wl_listener request_cursor;
 	struct wl_listener request_set_selection;
 	struct wl_list keyboards;
