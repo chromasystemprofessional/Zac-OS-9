@@ -43,6 +43,9 @@ void input_keyboard_enter(struct plat_server *server, struct wlr_surface *surfac
 
 static void keyboard_modifiers(struct wl_listener *listener, void *data) {
 	struct plat_keyboard *kb = wl_container_of(listener, kb, modifiers);
+	if (!kb->wlr_keyboard->keymap) {
+		return;
+	}
 	wlr_seat_set_keyboard(kb->server->seat, kb->wlr_keyboard);
 	struct wlr_keyboard_modifiers mods = command_as_ctrl(&kb->wlr_keyboard->modifiers);
 	wlr_seat_keyboard_notify_modifiers(kb->server->seat, &mods);
@@ -84,10 +87,23 @@ static void keyboard_key(struct wl_listener *listener, void *data) {
 
 static void keyboard_destroy(struct wl_listener *listener, void *data) {
 	struct plat_keyboard *kb = wl_container_of(listener, kb, destroy);
+	struct plat_server *server = kb->server;
 	wl_list_remove(&kb->modifiers.link);
 	wl_list_remove(&kb->key.link);
 	wl_list_remove(&kb->destroy.link);
 	wl_list_remove(&kb->link);
+	/* A scripted keyboard going away hands the seat back to another
+	 * keyboard (with its keymap), so clients never sit without one. */
+	if (wlr_seat_get_keyboard(server->seat) == kb->wlr_keyboard) {
+		wlr_seat_set_keyboard(server->seat, NULL);
+		struct plat_keyboard *other;
+		wl_list_for_each(other, &server->keyboards, link) {
+			if (other->wlr_keyboard->keymap) {
+				wlr_seat_set_keyboard(server->seat, other->wlr_keyboard);
+				break;
+			}
+		}
+	}
 	free(kb);
 }
 
@@ -117,7 +133,11 @@ static void new_keyboard(struct plat_server *server, struct wlr_input_device *de
 	kb->destroy.notify = keyboard_destroy;
 	wl_signal_add(&device->events.destroy, &kb->destroy);
 
-	wlr_seat_set_keyboard(server->seat, wlr_keyboard);
+	/* A virtual keyboard has no keymap yet: it becomes the seat's keyboard
+	 * when it first sends a key. */
+	if (!virtual) {
+		wlr_seat_set_keyboard(server->seat, wlr_keyboard);
+	}
 	wl_list_insert(&server->keyboards, &kb->link);
 }
 

@@ -39,7 +39,9 @@ Apple's files are not part of Platinum 2026. You supply them yourself.
 
 Put the install CD image (for example `Mac OS 9.toast`) in `~/Classic`.
 If there is no hard-disk image there, the first start creates a blank one,
-`Macintosh HD.dsk` (2 GB, sparse). The Mac boots from the CD and offers to
+`Macintosh HD (PPC).dsk` (or `(68k)`; 2 GB, sparse). Disks whose names say
+"68k" or "ppc" are only attached to that emulator, and the same image in
+two folders is attached once. The Mac boots from the CD and offers to
 initialize the blank disk. Run the installer onto it. Afterwards, remove the
 CD image from the folder, or leave it there as a second disk.
 

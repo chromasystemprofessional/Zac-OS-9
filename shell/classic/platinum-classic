@@ -81,9 +81,18 @@ is_mac_disk() {
 }
 
 find_disks() {
+	seen=""
 	candidates | while IFS= read -r f; do
 		[ -n "$f" ] || continue
-		[ "$(wc -c <"$f")" -ge 409600 ] || continue
+		size=$(wc -c <"$f")
+		[ "$size" -ge 409600 ] || continue
+		# The same image in two folders is attached once.
+		id="$size:$(basename "$f")"
+		case $seen in *"|$id|"*) continue ;; esac
+		seen="$seen|$id|"
+		# Disks named for the other processor ("…(m68k).iso") stay out.
+		name=$(basename "$f" | tr 'A-Z' 'a-z')
+		case $arch:$name in ppc:*68k*|68k:*ppc*) continue ;; esac
 		# .dsk/.hfv are emulator hard disks: blank ones count too, so
 		# the Mac can initialise them.
 		case $f in *.dsk|*.hfv) echo "$f"; continue ;; esac
@@ -128,7 +137,12 @@ for d in $disks; do
 	if is_cd "$d"; then has_cd=true; else has_hd=true; fi
 done
 IFS=$old_ifs
-blank="$classic_dir/Macintosh HD.dsk"
+# Each processor gets its own: a 68k Mac can't start up from 9.
+if [ $arch = ppc ]; then
+	blank="$classic_dir/Macintosh HD (PPC).dsk"
+else
+	blank="$classic_dir/Macintosh HD (68k).dsk"
+fi
 if $has_cd && ! $has_hd; then
 	if $check; then
 		disks=$(printf '%s\n%s (blank, made at first start)\n' "$disks" "$blank")

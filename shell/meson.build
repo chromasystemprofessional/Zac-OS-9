@@ -92,4 +92,5 @@ foreach kind : [['client-header', '@BASENAME@-client-protocol.h'], ['private-cod
   )
 endforeach
 executable('vptr', meson.project_source_root() / 'tools/vptr/vptr.c', vptr_protocol,
-  dependencies: [wayland_client])
+  client_protocol_src,
+  dependencies: [wayland_client, xkbcommon_client])
