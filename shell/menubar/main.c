@@ -24,6 +24,7 @@
 #include <wayland-cursor.h>
 
 #include "menubar.h"
+#include "settings.h"
 #include "viewporter-client-protocol.h"
 #include "virtual-keyboard-unstable-v1-client-protocol.h"
 #include "wlr-foreign-toplevel-management-unstable-v1-client-protocol.h"
@@ -189,8 +190,8 @@ static void draw_bar(void) {
 	mbar_paint_background(&c, g.width);
 	int hl = g.open_side == SIDE_LEFT ? g.open_index : -1;
 	int hr = g.open_side == SIDE_RIGHT ? g.open_index : -1;
-	mbar_paint_titles(&c, g.model.left_titles, g.model.n_left, hl, PL_ACCENT_DEFAULT);
-	mbar_paint_titles(&c, g.model.right_titles, g.model.n_right, hr, PL_ACCENT_DEFAULT);
+	mbar_paint_titles(&c, g.model.left_titles, g.model.n_left, hl, pl_accent_current());
+	mbar_paint_titles(&c, g.model.right_titles, g.model.n_right, hr, pl_accent_current());
 	present(g.bar_surface, px, g.width, MBAR_HEIGHT);
 	free(px);
 }
@@ -242,7 +243,7 @@ static void draw_submenu(struct menu_item *parent_items, int parent_n) {
 	uint32_t *px = calloc((size_t)w * h, sizeof(*px));
 	struct pl_canvas c = { .px = px, .stride = w, .width = w, .height = h };
 	int sel = g.blinks_left > 0 && g.chosen_in_sub && !g.blink_on ? -1 : g.sub_selected;
-	menu_paint(&c, items, s->n, g.sub_w, g.sub_h, sel, PL_ACCENT_DEFAULT);
+	menu_paint(&c, items, s->n, g.sub_w, g.sub_h, sel, pl_accent_current());
 	wl_subsurface_set_position(g.sub_sub, g.sub_x, g.sub_y);
 	present(g.sub_surface, px, w, h);
 	free(px);
@@ -270,7 +271,7 @@ static void draw_menu(void) {
 	uint32_t *px = calloc((size_t)w * h, sizeof(*px));
 	struct pl_canvas c = { .px = px, .stride = w, .width = w, .height = h };
 	int sel = g.blinks_left > 0 && !g.chosen_in_sub && !g.blink_on ? -1 : g.selected;
-	menu_paint(&c, items, m->n, g.menu_w, g.menu_h, sel, PL_ACCENT_DEFAULT);
+	menu_paint(&c, items, m->n, g.menu_w, g.menu_h, sel, pl_accent_current());
 
 	wl_subsurface_set_position(g.menu_sub, g.menu_x, MBAR_HEIGHT - 1);
 	present(g.menu_surface, px, w, h);

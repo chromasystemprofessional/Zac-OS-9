@@ -61,8 +61,13 @@ Desktop::Desktop() {
 
 	QDir().mkpath(settingsDir());
 	m_settingsWatcher.addPath(settingsDir());
-	QObject::connect(&m_settingsWatcher, &QFileSystemWatcher::directoryChanged,
-		[this] { loadPattern(); });
+	QObject::connect(&m_settingsWatcher, &QFileSystemWatcher::directoryChanged, [this] {
+		loadPattern();
+		/* Accent colour and highlight are read at paint time. */
+		for (QWidget *w : QApplication::topLevelWidgets()) {
+			w->update();
+		}
+	});
 	loadPattern();
 
 	QDir().mkpath(folderPath());

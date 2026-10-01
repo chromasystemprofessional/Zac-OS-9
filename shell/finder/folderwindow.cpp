@@ -11,6 +11,7 @@
 
 #include "fileops.h"
 #include "infowindow.h"
+#include "settings.h"
 #include "platinumshell.h"
 
 /* Item-count header: HIG figure 2-24. */
@@ -692,9 +693,9 @@ void FolderWindow::paintEvent(QPaintEvent *) {
 	/* Scroll bars share their outer lines with the window frame. The
 	 * compositor draws the resize box in the corner. */
 	pl_scrollbar v = verticalBar();
-	pl_scrollbar_paint(c, W - SB_WIDTH + 1, top - 1, &v, PL_ACCENT_DEFAULT);
+	pl_scrollbar_paint(c, W - SB_WIDTH + 1, top - 1, &v, pl_accent_current());
 	pl_scrollbar h = horizontalBar();
-	pl_scrollbar_paint(c, -1, H - SB_WIDTH + 1, &h, PL_ACCENT_DEFAULT);
+	pl_scrollbar_paint(c, -1, H - SB_WIDTH + 1, &h, pl_accent_current());
 
 	QPainter p(this);
 	px.blit(p);

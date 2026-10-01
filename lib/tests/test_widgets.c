@@ -8,6 +8,7 @@
 #include <stdlib.h>
 
 #include "figcompare.h"
+#include "text.h"
 #include "widgets.h"
 
 /* Horizontal scroll bar along the bottom of each Finder window: from the
@@ -75,6 +76,116 @@ static int run_hit_tests(void) {
 	return fails;
 }
 
+/* A titled group box (figure 2-38): the engraved frame, everywhere but
+ * the title and the controls inside it. */
+static int run_group_box(const char *dir, int *ran) {
+	const int w = 170, h = 132;
+	uint32_t *px = calloc((size_t)w * h, sizeof(*px));
+	struct pl_canvas c = { .px = px, .stride = w, .width = w, .height = h };
+	pl_fill(&c, 0, 0, w - 1, h - 1, GRAY(0xD));
+	struct plat_text *title = text_render_font("Format", 1000, PL_FONT_SYSTEM);
+	pl_group_box_paint(&c, 5, 14, 165, 127, title);
+	const struct fig_rect regions[] = {
+		{ 0, 0, 14, 132 },      /* left of the title, the left side */
+		{ 18 + 39 + 4 + 8, 0, 101, 20 }, /* right of the title (ours is wider), top right */
+		{ 160, 0, 10, 132 },    /* the right side */
+		{ 0, 120, 170, 12 },    /* the bottom */
+	};
+	int fails = fig_compare("group box (fig 2-38)", dir, "img-048-073.png", 0, 0, px, w, h,
+		regions, 4);
+	text_destroy(title);
+	free(px);
+	if (fails >= 0) {
+		*ran = 1;
+	}
+	return fails > 0 ? fails : 0;
+}
+
+/* A focused list box (figure 2-25), first row selected with a yellow
+ * highlight as in the figure: ring, frame and highlight edges (not the
+ * text or the scroll bar, whose content length the figure doesn't say). */
+static int run_list_box(const char *dir, int *ran) {
+	const int w = 248, h = 107;
+	uint32_t *px = calloc((size_t)w * h, sizeof(*px));
+	struct pl_canvas c = { .px = px, .stride = w, .width = w, .height = h };
+	pl_fill(&c, 0, 0, w - 1, h - 1, GRAY(0xD));
+	const char *names[] = { "Cupertino, U.S.A.", "Dacca, Bangladesh", "Dakar, Senegal",
+		"Dallas, U.S.A.", "Damascus, Syria", "Dar es Salaam, Tanzania", "Darwin, Australia" };
+	struct plat_text *rows[7];
+	for (int i = 0; i < 7; i++) {
+		rows[i] = text_render_font(names[i], 1000, PL_FONT_SYSTEM);
+	}
+	struct pl_list list = { .rows = (const struct plat_text *const *)rows, .n = 7,
+		.selected = 0, .top = 0, .focused = true };
+	pl_list_paint(&c, 5, 5, 243, 102, &list, PL_ACCENT_DEFAULT, RGB(0xFF, 0xFF, 0x00));
+	const struct fig_rect regions[] = {
+		{ 0, 0, 248, 7 },     /* ring and top frame */
+		{ 0, 0, 8, 107 },     /* ring, frame, highlight's left edge */
+		{ 0, 101, 248, 6 },   /* bottom frame and ring */
+		{ 226, 0, 22, 6 },    /* where the scroll bar meets the frame */
+		{ 243, 0, 5, 107 },   /* right frame and ring */
+	};
+	int fails = fig_compare("list box (fig 2-25)", dir, "img-039-059.png", 0, 0, px, w, h,
+		regions, 5);
+	for (int i = 0; i < 7; i++) {
+		text_destroy(rows[i]);
+	}
+	free(px);
+	if (fails >= 0) {
+		*ran = 1;
+	}
+	return fails > 0 ? fails : 0;
+}
+
+/* The tab control of figure 2-30 ("Protocol" in front), everything but
+ * the label text. The figure's greys are shifted; map them. */
+static int run_tabs(const char *dir, int *ran) {
+	static const uint32_t map[][2] = {
+		{ 0xEFEFEF, 0xEEEEEE }, { 0xCECECE, 0xCCCCCC }, { 0xBDBDBD, 0xBBBBBB },
+		{ 0xADADAD, 0xAAAAAA }, { 0xDEDEDE, 0xDDDDDD }, { 0x9C9C9C, 0x999999 },
+		{ 0x8C8C8C, 0x888888 }, { 0x424242, 0x444444 }, { 0x313131, 0x333333 },
+		{ 0x212121, 0x222222 },
+	};
+	const int w = 303, h = 47;
+	uint32_t *px = calloc((size_t)w * h, sizeof(*px));
+	struct pl_canvas c = { .px = px, .stride = w, .width = w, .height = h };
+	pl_fill(&c, 0, 0, w - 1, h - 1, C_WHITE);
+	struct plat_text *labels[3] = {
+		text_render_font("Protocol", 1000, PL_FONT_SYSTEM),
+		text_render_font("Connection", 1000, PL_FONT_SYSTEM),
+		text_render_font("Dialing", 1000, PL_FONT_SYSTEM),
+	};
+	pl_tabs_paint(&c, 1, 1, 300, 44, (const struct plat_text *const *)labels, 3, 0);
+	/* Everything except the label rows inside each tab. */
+	struct fig_rect regions[8];
+	int nr = 0;
+	regions[nr++] = (struct fig_rect){ 0, 0, w, 7 };
+	regions[nr++] = (struct fig_rect){ 0, 20, w, h - 20 };
+	int prev = 0;
+	for (int i = 0; i < 3; i++) {
+		int ink = labels[i]->ink_r - labels[i]->ink_l + 1;
+		int tx0 = 1 + 4 + 11;
+		for (int k = 0; k < i; k++) {
+			tx0 += 15 + (labels[k]->ink_r - labels[k]->ink_l + 1) - 1 + 21;
+		}
+		regions[nr++] = (struct fig_rect){ prev, 7, tx0 + 6 - prev, 13 };
+		prev = tx0 + 7 + ink + 1;
+	}
+	regions[nr++] = (struct fig_rect){ prev, 7, w - prev, 13 };
+	fig_set_color_map(map, (int)(sizeof(map) / sizeof(map[0])));
+	int fails = fig_compare("tabs (fig 2-30)", dir, "img-043-065.png", 0, 0, px, w, h,
+		regions, nr);
+	fig_set_color_map(NULL, 0);
+	for (int i = 0; i < 3; i++) {
+		text_destroy(labels[i]);
+	}
+	free(px);
+	if (fails >= 0) {
+		*ran = 1;
+	}
+	return fails > 0 ? fails : 0;
+}
+
 int main(int argc, char *argv[]) {
 	const char *dir = argc > 1 ? argv[1] : "tools/measure/figs";
 	int ran = 0;
@@ -82,5 +193,8 @@ int main(int argc, char *argv[]) {
 	fails += run_hbar(dir, "horizontal scroll bar, left window (fig 2-24)", 5, &ran);
 	fails += run_button(dir, "standard push button (fig 3-2)", 0, 223, 161, &ran);
 	fails += run_button(dir, "default push button (fig 3-2)", PL_BUTTON_DEFAULT, 220, 125, &ran);
+	fails += run_group_box(dir, &ran);
+	fails += run_list_box(dir, &ran);
+	fails += run_tabs(dir, &ran);
 	return fig_exit_status(fails, ran);
 }

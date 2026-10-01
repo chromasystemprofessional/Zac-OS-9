@@ -8,6 +8,7 @@
 #include <QMouseEvent>
 #include <QWheelEvent>
 
+#include "settings.h"
 #include "infowindow.h"
 
 static constexpr uint32_t FACE = GRAY(0xD);
@@ -419,7 +420,7 @@ void FoundWindow::paintEvent(QPaintEvent *) {
 	}
 
 	pl_scrollbar v = bar();
-	pl_scrollbar_paint(c, W - SB_WIDTH + 1, top - 1, &v, PL_ACCENT_DEFAULT);
+	pl_scrollbar_paint(c, W - SB_WIDTH + 1, top - 1, &v, pl_accent_current());
 
 	QPainter p(this);
 	px.blit(p);

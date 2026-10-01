@@ -21,6 +21,11 @@ int fig_compare(const char *name, const char *dir, const char *figure,
 		int fig_x, int fig_y, const uint32_t *px, int w, int h,
 		const struct fig_rect *regions, int max_regions);
 
+/* Some figures were printed with slightly shifted colours (#EFEFEF for
+ * #EEEEEE...). Map figure colours before comparing: pairs of {figure,
+ * ours}; n = 0 turns the map off. */
+void fig_set_color_map(const uint32_t (*pairs)[2], int n);
+
 /* Exit status for a test binary: 0 pass, 1 fail, 77 skip (meson). */
 int fig_exit_status(int failures, int ran);
 

@@ -1,7 +1,25 @@
 #include <cairo.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "figcompare.h"
+
+static const uint32_t (*color_map)[2];
+static int color_map_n;
+
+void fig_set_color_map(const uint32_t (*pairs)[2], int n) {
+	color_map = pairs;
+	color_map_n = n;
+}
+
+static uint32_t mapped(uint32_t c) {
+	for (int i = 0; i < color_map_n; i++) {
+		if (color_map[i][0] == c) {
+			return color_map[i][1];
+		}
+	}
+	return c;
+}
 
 int fig_compare(const char *name, const char *dir, const char *figure,
 		int fig_x, int fig_y, const uint32_t *px, int w, int h,
@@ -31,10 +49,10 @@ int fig_compare(const char *name, const char *dir, const char *figure,
 				}
 				uint32_t ours = x >= 0 && y >= 0 && x < w && y < h ? px[y * w + x] : 0;
 				ours = ours >> 24 ? ours & 0xFFFFFFu : 0xFFFFFFu;
-				uint32_t want =
-					((const uint32_t *)(data + fy * fig_stride))[fx] & 0xFFFFFFu;
+				uint32_t want = mapped(
+					((const uint32_t *)(data + fy * fig_stride))[fx] & 0xFFFFFFu);
 				if (ours != want) {
-					if (failures < 10) {
+					if (failures < (getenv("FIG_VERBOSE") ? 1000 : 10)) {
 						fprintf(stderr, "  %s: (%d,%d) got #%06x want #%06x\n",
 							name, x, y, ours, want);
 					}

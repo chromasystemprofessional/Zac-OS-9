@@ -99,7 +99,7 @@ static void draw(int w, int h, double fraction) {
 	const int sw = st.status->ink_r - st.status->ink_l + 1;
 	pl_text(&c, st.status, bx + (BOX_W - sw) / 2, ly + lw + 42, C_BLACK);
 	pl_progress_paint(&c, bx + (BOX_W - BAR_W) / 2, y1 - 30, BAR_W, fraction,
-		PL_ACCENT_DEFAULT);
+		pl_accent_current());
 
 	wlr_scene_buffer_set_buffer(st.buffer, &buf->base);
 	wlr_buffer_drop(&buf->base);

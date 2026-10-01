@@ -1,3 +1,5 @@
+#include <string.h>
+
 #include "widgets.h"
 
 /* Push-button art: left columns, one stretchable column, right columns. */
@@ -71,6 +73,251 @@ void pl_button_paint(struct pl_canvas *c, int x, int y, int w,
 		/* Baseline 13 px below the top ("OK", HIG figure 3-2). */
 		pl_text(c, label, x + (w - ink_w) / 2, y + 13, color);
 	}
+}
+
+/* ---- group box (figure 2-38) ------------------------------------------- */
+
+void pl_group_box_paint(struct pl_canvas *c, int x0, int y0, int x1, int y1,
+		const struct plat_text *title) {
+	/* White first, one pixel down and right; the #888 line over it. */
+	pl_outline(c, x0 + 1, y0 + 1, x1 + 1, y1 + 1, C_WHITE);
+	pl_outline(c, x0, y0, x1, y1, GRAY(0x8));
+	if (!title || title->ink_l < 0) {
+		return;
+	}
+	const int ink_x = x0 + PL_GROUP_TITLE_X;
+	const int ink_w = title->ink_r - title->ink_l + 1;
+	/* Clear both lines behind the title, 4 px either side of its ink. */
+	for (int x = ink_x - 4; x <= ink_x + ink_w + 3; x++) {
+		pl_put(c, x, y0, GRAY(0xD));
+		pl_put(c, x, y0 + 1, GRAY(0xD));
+	}
+	pl_text(c, title, ink_x, y0, C_BLACK);
+}
+
+/* ---- list box (figure 2-25) --------------------------------------------- */
+
+int pl_list_visible_rows(int y0, int y1) {
+	return (y1 - y0 - 1) / PL_LIST_ROW_H;
+}
+
+struct pl_scrollbar pl_list_scrollbar(int y0, int y1, const struct pl_list *list) {
+	const int visible = pl_list_visible_rows(y0, y1);
+	struct pl_scrollbar sb = { .vertical = true, .length = y1 - y0 + 1,
+		.enabled = list->n > visible };
+	if (sb.enabled) {
+		sb.thumb = list->top * sb_thumb_range(sb.length) / (list->n - visible);
+	}
+	return sb;
+}
+
+void pl_list_paint(struct pl_canvas *c, int x0, int y0, int x1, int y1,
+		const struct pl_list *list, struct pl_accent accent, uint32_t highlight) {
+	const int sx = x1 - SB_WIDTH + 1; /* the scroll bar's left line */
+	if (list->focused) {
+		/* A 2 px ring outside the frame, its outer corners clipped. */
+		for (int k = 1; k <= 2; k++) {
+			pl_outline(c, x0 - k, y0 - k, x1 + k, y1 + k, accent.dark);
+		}
+		pl_put(c, x0 - 2, y0 - 2, GRAY(0xD));
+		pl_put(c, x1 + 2, y0 - 2, GRAY(0xD));
+		pl_put(c, x0 - 2, y1 + 2, GRAY(0xD));
+		pl_put(c, x1 + 2, y1 + 2, GRAY(0xD));
+	}
+	pl_outline(c, x0, y0, x1, y1, C_BLACK);
+	pl_fill(c, x0 + 1, y0 + 1, sx - 1, y1 - 1, C_WHITE);
+	const int visible = pl_list_visible_rows(y0, y1);
+	for (int r = 0; r < visible && list->top + r < list->n; r++) {
+		const int i = list->top + r, top = y0 + 1 + r * PL_LIST_ROW_H;
+		if (i == list->selected) {
+			pl_fill(c, x0 + 1, top, sx - 1, top + PL_LIST_ROW_H - 1, highlight);
+		}
+		pl_text(c, list->rows[i], x0 + 3, top + 11, C_BLACK);
+	}
+	struct pl_scrollbar sb = pl_list_scrollbar(y0, y1, list);
+	pl_scrollbar_paint(c, sx, y0, &sb, accent);
+}
+
+int pl_list_row_at(int x0, int y0, int x1, int y1, const struct pl_list *list, int x, int y) {
+	if (x <= x0 || x >= x1 - SB_WIDTH + 1 || y <= y0 || y >= y1) {
+		return -1;
+	}
+	const int i = list->top + (y - y0 - 1) / PL_LIST_ROW_H;
+	return i < list->n ? i : -1;
+}
+
+/* ---- tab control (figures 2-30, 2-33) ----------------------------------- */
+
+/*
+ * Each tab's slanted sides, row by row from its top line (row 0) to the
+ * row above the pane (row 20), as measured in figure 2-30. Left edges are
+ * offsets from the tab's bottom-left corner, right edges from its
+ * bottom-right; the strings run left to right in greys: '1' #222, 'K'
+ * black, 'A'..'E' #AAA..#EEE, '3' '4' '8' #333 #444 #888, 'W' white. The
+ * edges step out a pixel every three rows; step rows are softened. Tabs
+ * behind the front one are shaded a little differently.
+ */
+struct tab_edge {
+	int dx;
+	const char *px;
+};
+static const struct tab_edge front_left[PL_TAB_H] = {
+	{ 10, "1" }, { 8, "1KB" }, { 7, "1BC" }, { 6, "1BCW" }, { 6, "KCW" },
+	{ 5, "1BW" }, { 5, "KCW" }, { 5, "KCW" }, { 4, "1BW" }, { 4, "KCW" },
+	{ 4, "KCW" }, { 3, "1BW" }, { 3, "KCW" }, { 3, "KCW" }, { 2, "1BW" },
+	{ 2, "KCW" }, { 2, "KCW" }, { 1, "1BW" }, { 1, "KCW" }, { 1, "KCW" },
+	{ 0, "1BW" },
+};
+static const struct tab_edge back_left[PL_TAB_H] = {
+	{ 10, "1" }, { 8, "1KA" }, { 7, "1AC" }, { 6, "1ADW" }, { 6, "KCW" },
+	{ 5, "1AW" }, { 5, "KCW" }, { 5, "KCW" }, { 4, "1AW" }, { 4, "KCW" },
+	{ 4, "KCW" }, { 3, "1AW" }, { 3, "KCW" }, { 3, "KCW" }, { 2, "1AW" },
+	{ 2, "KCW" }, { 2, "KCW" }, { 1, "1AW" }, { 1, "KCW" }, { 1, "KCW" },
+	{ 0, "1AW" },
+};
+static const struct tab_edge front_right[PL_TAB_H] = {
+	{ -10, "" }, { -10, "BKK" }, { -9, "D8K" }, { -8, "B43" }, { -8, "D8K" },
+	{ -7, "B43" }, { -7, "D8K" }, { -7, "D8K" }, { -6, "B43" }, { -6, "D8K" },
+	{ -6, "D8K" }, { -5, "B43" }, { -5, "C8K" }, { -5, "D8K" }, { -4, "B43" },
+	{ -4, "C8K" }, { -4, "D8K" }, { -3, "B43" }, { -3, "D8K" }, { -3, "E8K" },
+	{ -2, "B4K" },
+};
+static const struct tab_edge back_right[PL_TAB_H] = {
+	{ -10, "" }, { -10, "AKK" }, { -9, "D8K" }, { -8, "B43" }, { -8, "C8K" },
+	{ -7, "B43" }, { -7, "C8K" }, { -7, "CAK" }, { -6, "B43" }, { -6, "C8K" },
+	{ -6, "CAK" }, { -5, "B43" }, { -5, "C8K" }, { -5, "CAK" }, { -4, "B43" },
+	{ -4, "C8K" }, { -4, "CAK" }, { -3, "B43" }, { -3, "C8K" }, { -3, "CAK" },
+	{ -2, "B4K" },
+};
+#define TAB_INSET 4     /* first tab's bottom-left from the pane's left */
+#define TAB_LABEL_PAD 7 /* top line's start to the label ink */
+#define TAB_LABEL_PAD_R 8 /* label ink to the top line's end */
+#define TAB_SPREAD 11   /* bottom-left to the top line's start */
+#define TAB_PITCH 21    /* top line end to the next tab's top line start */
+#define TAB_BASELINE 15
+
+/* The top line of tab i spans tx0..tx1; returns the bottom-left x. */
+static int tab_geometry(int x0, const struct plat_text *const *labels, int i,
+		int *tx0, int *tx1) {
+	int left = x0 + TAB_INSET + TAB_SPREAD;
+	for (int k = 0; k <= i; k++) {
+		const struct plat_text *t = labels[k];
+		const int ink = t && t->ink_l >= 0 ? t->ink_r - t->ink_l + 1 : 0;
+		*tx0 = left;
+		*tx1 = left + TAB_LABEL_PAD + ink + TAB_LABEL_PAD_R - 1;
+		left = *tx1 + TAB_PITCH;
+	}
+	return *tx0 - TAB_SPREAD;
+}
+
+static uint32_t tab_color(char ch) {
+	switch (ch) {
+	case '1': return GRAY(0x2);
+	case 'K': return C_BLACK;
+	case 'A': return GRAY(0xA);
+	case 'B': return GRAY(0xB);
+	case 'C': return GRAY(0xC);
+	case 'D': return GRAY(0xD);
+	case 'E': return GRAY(0xE);
+	case '8': return GRAY(0x8);
+	case '4': return GRAY(0x4);
+	case '3': return GRAY(0x3);
+	default: return C_WHITE;
+	}
+}
+
+static void paint_tab(struct pl_canvas *c, int x0, int y0,
+		const struct plat_text *const *labels, int i, bool front, bool last) {
+	int tx0, tx1;
+	const int bl = tab_geometry(x0, labels, i, &tx0, &tx1);
+	const int br = tx1 + 10;
+	const uint32_t fill = front ? GRAY(0xE) : GRAY(0xC);
+	const struct tab_edge *left = front ? front_left : back_left;
+	const struct tab_edge *right = front ? front_right : back_right;
+	for (int r = 0; r < PL_TAB_H; r++) {
+		const int y = y0 + r;
+		const int lx = bl + left[r].dx, rx = br + right[r].dx;
+		const int l_end = lx + (int)strlen(left[r].px);
+		/* Interior: the #CCC row under the top line, then a white row. */
+		const uint32_t inside = r == 1 ? GRAY(0xC) : r == 2 ? C_WHITE : fill;
+		if (r == 0) {
+			pl_hline(c, tx0, tx1, y, C_BLACK);
+		} else {
+			pl_hline(c, l_end, rx - 1, y, inside);
+		}
+		for (int k = 0; left[r].px[k]; k++) {
+			pl_put(c, lx + k, y, tab_color(left[r].px[k]));
+		}
+		for (int k = 0; right[r].px[k]; k++) {
+			pl_put(c, rx + k, y, tab_color(right[r].px[k]));
+		}
+		/* The rightmost tab behind catches a little more light at its
+		 * top-right corner (figure 2-30). */
+		if (!front && last && r >= 7 && r % 3 == 1) {
+			pl_put(c, lx + 2, y, GRAY(0xE)); /* before each step */
+		}
+		if (!front && last && r == 1) {
+			pl_put(c, rx - 1, y, GRAY(0xB));
+		} else if (!front && last && r == 2) {
+			pl_put(c, lx + 3, y, GRAY(0xE));
+			pl_put(c, rx - 1, y, GRAY(0xE));
+		}
+	}
+	pl_text(c, labels[i], tx0 + TAB_LABEL_PAD, y0 + TAB_BASELINE, C_BLACK);
+}
+
+void pl_tabs_paint(struct pl_canvas *c, int x0, int y0, int x1, int y1,
+		const struct plat_text *const *labels, int n, int selected) {
+	const int py = y0 + PL_TAB_H; /* the pane's top line */
+	/* The raised pane: black, an inner #CCC line, a white highlight, and
+	 * a #999 shade along the bottom and right. */
+	pl_fill(c, x0 + 1, py + 1, x1 - 1, y1 - 1, GRAY(0xE));
+	pl_outline(c, x0, py, x1, y1, C_BLACK);
+	pl_hline(c, x0 + 1, x1 - 1, py + 1, GRAY(0xC));
+	pl_vline(c, x0 + 1, py + 1, y1 - 1, GRAY(0xC));
+	pl_hline(c, x0 + 2, x1 - 3, py + 2, C_WHITE);
+	pl_vline(c, x0 + 2, py + 2, y1 - 3, C_WHITE);
+	pl_hline(c, x0 + 2, x1 - 1, y1 - 1, GRAY(0x9));
+	pl_vline(c, x1 - 1, py + 2, y1 - 1, GRAY(0x9));
+	pl_put(c, x1 - 1, py + 1, GRAY(0xD));
+	pl_put(c, x0 + 1, y1 - 1, GRAY(0xE));
+
+	for (int i = n - 1; i >= 0; i--) {
+		if (i != selected) {
+			paint_tab(c, x0, y0, labels, i, false, i == n - 1);
+		}
+	}
+	if (selected < 0 || selected >= n) {
+		return;
+	}
+	paint_tab(c, x0, y0, labels, selected, true, selected == n - 1);
+	/* The front tab opens into the pane: its sides continue through the
+	 * pane's top line and the pane's inner lines stop beneath it. */
+	int tx0, tx1;
+	const int bl = tab_geometry(x0, labels, selected, &tx0, &tx1), br = tx1 + 10;
+	pl_put(c, bl, py, C_BLACK);
+	pl_put(c, bl + 1, py, GRAY(0xC));
+	pl_put(c, bl + 2, py, C_WHITE);
+	pl_hline(c, bl + 3, br - 2, py, GRAY(0xE));
+	pl_put(c, br - 1, py, GRAY(0x8));
+	pl_put(c, br, py, C_BLACK);
+	pl_hline(c, bl + 2, br - 2, py + 1, GRAY(0xE));
+	pl_hline(c, bl + 1, br - 1, py + 2, GRAY(0xE));
+}
+
+int pl_tabs_hit(int x0, int y0, const struct plat_text *const *labels, int n, int x, int y) {
+	if (y < y0 || y >= y0 + PL_TAB_H) {
+		return -1;
+	}
+	for (int i = 0; i < n; i++) {
+		int tx0, tx1;
+		const int bl = tab_geometry(x0, labels, i, &tx0, &tx1);
+		const int r = y - y0;
+		if (x >= bl + front_left[r].dx && x <= tx1 + 10 + front_right[r].dx + 2) {
+			return i;
+		}
+	}
+	return -1;
 }
 
 /*
