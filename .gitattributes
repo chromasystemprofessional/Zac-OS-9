@@ -1,0 +1,7 @@
+# Built inside Linux (WSL / Debian): keep LF everywhere.
+* text=auto eol=lf
+*.png binary
+*.ttf binary
+*.otf binary
+*.wav binary
+*.aiff binary

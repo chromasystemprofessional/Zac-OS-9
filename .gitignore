@@ -1,0 +1,11 @@
+build/
+.cache/
+compile_commands.json
+*.o
+*.so
+
+# User-supplied Apple files: never commit.
+emulation/roms/
+emulation/disks/
+*.ROM
+*.rom
