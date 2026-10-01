@@ -110,8 +110,10 @@ scaling only, original behaviors and timings).
     `alert-sound=` in desktop.conf (default "platinum").
   - Startup screen: a Welcome box with the logo and the HIG progress bar
     over the desktop pattern until the menu bar and desktop are up.
+  - New logo (a platinum sparkle, clearly not Apple's), and icons for
+    applications (a Platinum window), Mac disk images and classic
+    applications (recognised from SheepShaver's .finf type 'APPL').
 - Next:
-  - More icons (disk images, Classic, a better application icon).
   - Choosing the pattern and alert sound from the Appearance and Sound
     control panels (Phase 5).
   - An application font (Geneva 12 metrics) for app content.

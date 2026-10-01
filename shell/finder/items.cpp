@@ -26,8 +26,10 @@ const QString &Item::kindName() {
 	if (kindText.isEmpty()) {
 		if (isDir) {
 			kindText = "folder";
-		} else if (isMacDiskImage(path)) {
+		} else if (kind == PL_ICON_DISK_IMAGE) {
 			kindText = "Macintosh disk image";
+		} else if (kind == PL_ICON_CLASSIC) {
+			kindText = "classic application";
 		} else if (kind == PL_ICON_APPLICATION) {
 			kindText = "application program";
 		} else {
@@ -53,10 +55,28 @@ QString displayName(const QString &path) {
 	return QFileInfo(path).fileName();
 }
 
+bool isClassicApplication(const QString &path) {
+	const QFileInfo info(path);
+	if (!info.isFile()) {
+		return false;
+	}
+	QFile finf(info.absolutePath() + "/.finf/" + info.fileName());
+	if (!finf.open(QIODevice::ReadOnly)) {
+		return false;
+	}
+	return finf.read(4) == "APPL"; /* FInfo.fdType comes first */
+}
+
 pl_icon_kind iconKindFor(const QString &path) {
 	QFileInfo info(path);
 	if (info.isDir()) {
 		return PL_ICON_FOLDER;
+	}
+	if (isMacDiskImage(path)) {
+		return PL_ICON_DISK_IMAGE;
+	}
+	if (isClassicApplication(path)) {
+		return PL_ICON_CLASSIC;
 	}
 	static QMimeDatabase db;
 	const QString mime = db.mimeTypeForFile(info).name();

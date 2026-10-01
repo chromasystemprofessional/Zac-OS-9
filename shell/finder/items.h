@@ -50,6 +50,10 @@ pl_icon_kind iconKindFor(const QString &path);
 /* A Macintosh disk or CD image (HFS, HFS+ or partitioned): opening one
  * starts it in Classic. */
 bool isMacDiskImage(const QString &path);
+/* A classic Mac OS application: a file copied in through the emulator's
+ * "Unix" volume, whose Finder info (in .finf/<name>, SheepShaver's ExtFS
+ * format) has type 'APPL'. Opening one starts Classic. */
+bool isClassicApplication(const QString &path);
 
 /* The extended attribute holding an item's label, as a decimal index. */
 inline constexpr const char *LABEL_ATTR = "user.platinum.label";

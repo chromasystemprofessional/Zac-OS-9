@@ -214,8 +214,11 @@ void Finder::openSelection() {
 				item->kind == PL_ICON_TRASH_EMPTY || item->kind == PL_ICON_TRASH_FULL) {
 			QDir().mkpath(item->path);
 			FolderWindow::open(item->path);
-		} else if (isMacDiskImage(item->path)) {
+		} else if (item->kind == PL_ICON_DISK_IMAGE) {
 			launchClassic({ item->path });
+		} else if (item->kind == PL_ICON_CLASSIC) {
+			/* TODO: open the application itself inside the Mac. */
+			launchClassic();
 		} else {
 			QProcess::startDetached("xdg-open", { item->path });
 		}

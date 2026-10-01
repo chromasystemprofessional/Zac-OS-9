@@ -13,7 +13,8 @@ ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", ".."))
 SRC = os.path.join(ROOT, "assets", "icons", "platinum-icons.picon")
 OUT = os.path.join(ROOT, "lib", "icons_data.h")
 # Icons lib/icons.c expects, in enum pl_icon_kind order.
-KINDS = ["folder", "document", "application", "disk", "trash-empty", "trash-full", "caution"]
+KINDS = ["folder", "document", "application", "disk", "trash-empty", "trash-full", "caution",
+         "disk-image", "classic"]
 
 
 def parse():

@@ -61,5 +61,7 @@ used. Add `--68k` for Basilisk II.
 
 - SDL's Wayland backend never shows a window under platinum-wm, so the
   emulators run through Xwayland.
-- Double-clicking a classic application in the "Unix" volume doesn't open
-  it inside the Mac yet.
+- Classic applications copied out through the "Unix" volume show in the
+  Finder with the Classic icon (their type, 'APPL', is in the `.finf/`
+  file SheepShaver keeps beside them). Double-clicking one starts Classic,
+  but doesn't open that application inside the Mac yet.
