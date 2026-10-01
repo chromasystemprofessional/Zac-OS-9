@@ -1,6 +1,10 @@
 #ifndef PLATINUM_DRAW_H
 #define PLATINUM_DRAW_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*
  * Pixel primitives shared by everything that draws Platinum chrome
  * (compositor frames, menu bar, menus). No antialiasing, no scaling:
@@ -67,5 +71,9 @@ void pl_grays(struct pl_canvas *c, int x, int y, const char *const *rows, int nr
 
 /* Draw an ARGB image (alpha 0 or 255) with the top-left at x,y. */
 void pl_image(struct pl_canvas *c, int x, int y, const uint32_t *px, int w, int h);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

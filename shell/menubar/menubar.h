@@ -8,6 +8,7 @@
 #include "text.h"
 
 #define MAX_ITEMS 48
+#define FINDER_APP_ID "platinum-finder"
 #define MAX_TITLES 12
 
 struct zwlr_foreign_toplevel_handle_v1;

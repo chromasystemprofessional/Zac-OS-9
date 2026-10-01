@@ -177,7 +177,8 @@ const char *app_display_name(const char *app_id) {
 			return cache[i].name;
 		}
 	}
-	char *name = lookup_desktop_name(app_id);
+	char *name = strcmp(app_id, FINDER_APP_ID) == 0 ? strdup("Finder")
+		: lookup_desktop_name(app_id);
 	if (!name) {
 		name = strdup(*app_id ? app_id : "Untitled");
 		name[0] = (char)toupper((unsigned char)name[0]);

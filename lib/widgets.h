@@ -1,6 +1,10 @@
 #ifndef PLATINUM_WIDGETS_H
 #define PLATINUM_WIDGETS_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*
  * Platinum controls drawn from docs/reference/platinum-finder.md.
  */
@@ -37,5 +41,9 @@ enum sb_part {
 };
 /* Part at bar-local offset `along` (0 = leading border). */
 enum sb_part sb_hit(const struct pl_scrollbar *sb, int along);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

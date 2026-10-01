@@ -41,3 +41,19 @@ executable('platinum-menubar',
   dependencies: [platinum_dep, wayland_client, wayland_cursor, xkbcommon_client],
   install: true,
 )
+
+# The Finder: Qt6 for windows, input and files; all drawing through lib/.
+add_languages('cpp', native: false)
+qt6 = dependency('qt6', modules: ['Core', 'Gui', 'Widgets'])
+layershellqt = dependency('LayerShellQt', method: 'cmake',
+  modules: ['LayerShellQt::Interface'])
+
+executable('platinum-finder',
+  'finder/main.cpp',
+  'finder/desktop.cpp',
+  'finder/folderwindow.cpp',
+  'finder/items.cpp',
+  dependencies: [platinum_dep, qt6, layershellqt],
+  cpp_args: ['-std=c++17'],
+  install: true,
+)

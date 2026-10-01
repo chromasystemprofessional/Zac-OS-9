@@ -119,15 +119,16 @@ void menus_rebuild(struct mb_bar *bar, int screen_w) {
 	struct app apps[MAX_ITEMS];
 	int n_apps = apps_collect(apps, MAX_ITEMS - 4);
 	const struct app *front = n_apps > 0 && apps[0].active ? &apps[0] : NULL;
+	const bool finder_front = !front || strcmp(front->app_id, FINDER_APP_ID) == 0;
 
 	/* Left: the Platinum logo menu, then the front app's menus. */
 	struct mb_menu *logo = new_menu(bar->left, &bar->n_left, NULL);
 	logo->icon = logo_pixels();
 	launch_fill_logo_menu(logo);
-	if (front) {
-		add_app_menus(bar->left, &bar->n_left, front->app_id);
-	} else {
+	if (finder_front) {
 		add_finder_menus(bar->left, &bar->n_left);
+	} else {
+		add_app_menus(bar->left, &bar->n_left, front->app_id);
 	}
 
 	/* Right: clock, then the Application menu. */

@@ -30,10 +30,11 @@ static void spawn(const char *command) {
 	}
 }
 
-/* Start the menu bar: $PLATINUM_MENUBAR, else next to our own binary
- * (installed) or in the build tree's shell/ directory, else from $PATH. */
-static void spawn_menubar(void) {
-	const char *env = getenv("PLATINUM_MENUBAR");
+/* Start a shell component (menu bar, Finder): $env_var if set (empty
+ * disables it), else next to our own binary (installed) or in the build
+ * tree's shell/ directory, else from $PATH. */
+static void spawn_component(const char *env_var, const char *program) {
+	const char *env = getenv(env_var);
 	if (env) {
 		if (*env) {
 			spawn(env);
@@ -47,10 +48,10 @@ static void spawn_menubar(void) {
 		char *slash = strrchr(exe, '/');
 		if (slash) {
 			*slash = '\0';
-			const char *candidates[] = { "%s/platinum-menubar", "%s/../shell/platinum-menubar" };
+			const char *candidates[] = { "%s/%s", "%s/../shell/%s" };
 			for (size_t i = 0; i < sizeof(candidates) / sizeof(candidates[0]); i++) {
 				char path[PATH_MAX + 64];
-				snprintf(path, sizeof(path), candidates[i], exe);
+				snprintf(path, sizeof(path), candidates[i], exe, program);
 				if (access(path, X_OK) == 0) {
 					char quoted[PATH_MAX + 80];
 					snprintf(quoted, sizeof(quoted), "exec '%s'", path);
@@ -60,7 +61,9 @@ static void spawn_menubar(void) {
 			}
 		}
 	}
-	spawn("exec platinum-menubar");
+	char cmd[256];
+	snprintf(cmd, sizeof(cmd), "exec %s", program);
+	spawn(cmd);
 }
 
 static int parse_scale(const char *s) {
@@ -175,7 +178,8 @@ int main(int argc, char *argv[]) {
 	}
 
 	setenv("WAYLAND_DISPLAY", socket, true);
-	spawn_menubar();
+	spawn_component("PLATINUM_MENUBAR", "platinum-menubar");
+	spawn_component("PLATINUM_FINDER", "platinum-finder");
 	if (startup_cmd) {
 		spawn(startup_cmd);
 	}

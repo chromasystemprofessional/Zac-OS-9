@@ -1,6 +1,10 @@
 #ifndef PLATINUM_MENUDRAW_H
 #define PLATINUM_MENUDRAW_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*
  * Platinum menu bar and pull-down menus, drawn from
  * docs/reference/platinum-menus.md. Pure drawing + layout; no I/O.
@@ -66,5 +70,9 @@ void menu_paint(struct pl_canvas *c, const struct menu_item *items, int n,
 		int width, int height, int selected, struct pl_accent accent);
 /* Item index at menu-local y, or -1 (separators and borders count as -1). */
 int menu_item_at(const struct menu_item *items, int n, int height, int y);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
