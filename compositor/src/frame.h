@@ -34,15 +34,19 @@ void frame_set_active(struct plat_frame *frame, bool active);
 void frame_set_collapsed(struct plat_frame *frame, bool collapsed);
 void frame_set_title(struct plat_frame *frame, const char *title);
 void frame_set_features(struct plat_frame *frame, bool zoom, bool grow);
+/* Document window or dialog; dialogs have no boxes and no resize box. */
+void frame_set_style(struct plat_frame *frame, enum decor_style style);
 void frame_set_pressed(struct plat_frame *frame, enum decor_part part);
 void frame_commit(struct plat_frame *frame);
 
 /* Width and height of the frame (excluding shadow) for given content size. */
-static inline int frame_outer_w(int content_w) {
-	return content_w + DECOR_LEFT + DECOR_RIGHT;
+static inline int frame_outer_w(const struct plat_frame *frame, int content_w) {
+	struct decor_margins m = decor_margins(frame->st.style);
+	return content_w + m.left + m.right;
 }
-static inline int frame_outer_h(int content_h) {
-	return content_h + DECOR_TOP + DECOR_BOTTOM;
+static inline int frame_outer_h(const struct plat_frame *frame, int content_h) {
+	struct decor_margins m = decor_margins(frame->st.style);
+	return content_h + m.top + m.bottom;
 }
 
 #endif

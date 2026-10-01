@@ -19,6 +19,7 @@
 #define BOX_STRIPE_GAP 4 /* clear pixels between a box's emboss and stripes */
 #define STRIPE_TEXT_GAP 4 /* clear pixels between stripes and title ink */
 #define TITLE_BASELINE 14
+#define NO_BOX_STRIPE_X 5
 #define TITLE_BAR_LAST_ROW 19
 
 /* Active resize box, 20x20 from (W-21, H-21) to (W-2, H-2), measured from
@@ -117,14 +118,25 @@ static void paint_stripes(struct pl_canvas *c, int x0, int x1) {
 
 /* Horizontal extent available to stripes and title, inclusive. */
 static void title_span(const struct decor_state *st, int *x0, int *x1) {
-	*x0 = st->has_close ? CLOSE_X + BOX_SIZE + 1 + BOX_STRIPE_GAP : CLOSE_X;
+	/* Without boxes the stripes run from x=5 to W-6 (HIG figure 3-2). */
+	*x0 = st->has_close ? CLOSE_X + BOX_SIZE + 1 + BOX_STRIPE_GAP : NO_BOX_STRIPE_X;
 	int right_box = st->width;
 	if (st->has_zoom) {
 		right_box = st->width - ZOOM_X_FROM_RIGHT;
 	} else if (st->has_collapse) {
 		right_box = st->width - COLLAPSE_X_FROM_RIGHT;
 	}
-	*x1 = right_box < st->width ? right_box - BOX_STRIPE_GAP - 1 : st->width - 1 - CLOSE_X;
+	*x1 = right_box < st->width ? right_box - BOX_STRIPE_GAP - 1
+		: st->width - 1 - NO_BOX_STRIPE_X;
+}
+
+struct decor_margins decor_margins(enum decor_style style) {
+	if (style == DECOR_STYLE_MOVABLE_MODAL) {
+		return (struct decor_margins){ .left = 3, .right = 3, .top = 24, .bottom = 3 };
+	}
+	return (struct decor_margins){
+		.left = DECOR_LEFT, .right = DECOR_RIGHT, .top = DECOR_TOP, .bottom = DECOR_BOTTOM,
+	};
 }
 
 int decor_title_max_width(const struct decor_state *st) {
@@ -171,7 +183,50 @@ static void paint_grow(struct pl_canvas *c, const struct decor_state *st) {
 	pl_vline(c, gx, gy, y1, C_555);
 }
 
+/* Movable modal dialog (HIG figure 3-2): a document-style title bar
+ * without boxes over a body edged by a 2 px bevel. Margins 3/3/24/3. */
+static void paint_modal(struct pl_canvas *c, const struct decor_state *st) {
+	const int W = st->width, H = st->height;
+	const bool act = st->active;
+	const uint32_t border = act ? C_BLACK : C_555;
+	const uint32_t face = act ? C_CCC : C_DDD;
+
+	/* Title bar: rows 0..21, as a collapsed document window's. */
+	pl_fill(c, 0, 0, W - 1, 21, face);
+	/* Body edges (the client paints the interior). */
+	pl_fill(c, 0, 22, 2, H - 1, C_DDD);
+	pl_fill(c, W - 3, 22, W - 1, H - 1, C_DDD);
+	pl_fill(c, 0, 22, W - 1, 23, C_DDD);
+	pl_fill(c, 0, H - 3, W - 1, H - 1, C_DDD);
+
+	pl_outline(c, 0, 0, W - 1, H - 1, border);
+	if (act) {
+		pl_hline(c, 1, W - 3, 1, C_WHITE);
+		pl_vline(c, 1, 1, 19, C_WHITE);
+		pl_vline(c, W - 2, 2, 20, C_999);
+		pl_hline(c, 2, W - 2, 20, C_999);
+	}
+	pl_hline(c, 0, W - 1, 21, border);
+
+	if (act) {
+		pl_hline(c, 2, W - 4, 23, C_WHITE);
+		pl_vline(c, 2, 23, H - 4, C_WHITE);
+		pl_vline(c, W - 3, 24, H - 3, C_999);
+		pl_hline(c, 3, W - 3, H - 3, C_999);
+		pl_vline(c, W - 2, 23, H - 2, C_555);
+		pl_hline(c, 2, W - 2, H - 2, C_555);
+	}
+
+	pl_vline(c, W, 2, H, border);
+	pl_hline(c, 2, W, H, border);
+	paint_title(c, st);
+}
+
 void decor_paint(struct pl_canvas *c, const struct decor_state *st) {
+	if (st->style == DECOR_STYLE_MOVABLE_MODAL) {
+		paint_modal(c, st);
+		return;
+	}
 	const int W = st->width, H = frame_height(st);
 	const bool act = st->active;
 	const uint32_t border = act ? C_BLACK : C_555;
@@ -240,6 +295,17 @@ enum decor_part decor_hit(const struct decor_state *st, int x, int y) {
 	const int W = st->width, H = frame_height(st);
 	if (x < 0 || y < 0 || x >= W || y >= H) {
 		return DECOR_PART_NONE;
+	}
+	if (st->style == DECOR_STYLE_MOVABLE_MODAL) {
+		/* Dialogs move by their title bar only. */
+		const struct decor_margins m = decor_margins(st->style);
+		if (y < 22) {
+			return DECOR_PART_DRAG;
+		}
+		if (x >= m.left && x < W - m.right && y >= m.top && y < H - m.bottom) {
+			return DECOR_PART_CLIENT;
+		}
+		return DECOR_PART_BORDER;
 	}
 	if (y <= TITLE_BAR_LAST_ROW && st->active) {
 		if (st->has_close && in_box(st, DECOR_PART_CLOSE, x, y)) {

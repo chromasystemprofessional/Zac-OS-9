@@ -123,6 +123,21 @@ static void application(struct pen *p) {
 	pl_put(&p->c, cx, cy + r, C_BLACK);
 }
 
+static void caution(struct pen *p) {
+	/* A warning triangle with an exclamation mark. */
+	int top = S(2), bottom = S(29);
+	for (int y = top; y <= bottom; y++) {
+		int half = (y - top) * S(14) / (bottom - top);
+		int l = S(16) - half - 1, r = S(16) + half;
+		pl_hline(&p->c, l, r, y, RGB(0xFF, 0xCC, 0x00));
+		pl_put(&p->c, l, y, C_BLACK);
+		pl_put(&p->c, r, y, C_BLACK);
+	}
+	pl_hline(&p->c, S(2) - 1, S(30), bottom, C_BLACK);
+	pl_fill(&p->c, S(15), S(10), S(16), S(21), C_BLACK);
+	pl_fill(&p->c, S(15), S(24), S(16), S(25), C_BLACK);
+}
+
 static uint32_t *build(enum pl_icon_kind kind, int size) {
 	uint32_t *px = calloc((size_t)size * size, sizeof(*px));
 	struct pen pen = {
@@ -137,6 +152,7 @@ static uint32_t *build(enum pl_icon_kind kind, int size) {
 	case PL_ICON_DISK: disk(p); break;
 	case PL_ICON_TRASH_EMPTY: trash(p, false); break;
 	case PL_ICON_TRASH_FULL: trash(p, true); break;
+	case PL_ICON_CAUTION: caution(p); break;
 	default: break;
 	}
 	return px;

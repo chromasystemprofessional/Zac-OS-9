@@ -8,19 +8,29 @@
 #include "text.h"
 
 /*
- * Platinum document-window frame, drawn pixel-for-pixel from
+ * Platinum window frames, drawn pixel-for-pixel from
  * docs/reference/platinum-window.md. All coordinates are frame-local:
  * (0,0) is the outer border's top-left, W x H excludes the drop shadow.
  *
  * This module is pure (no wlroots) so it can be unit-tested.
  */
 
-/* Decoration margins around the client surface. */
+enum decor_style {
+	DECOR_STYLE_DOCUMENT,      /* HIG figure 5-1 */
+	DECOR_STYLE_MOVABLE_MODAL, /* dialogs: title bar, no boxes (HIG fig 3-2) */
+};
+
+/* Document-window margins around the client surface. */
 #define DECOR_LEFT 6
 #define DECOR_RIGHT 6
 #define DECOR_TOP 22
 #define DECOR_BOTTOM 6
 #define DECOR_SHADOW 1
+
+struct decor_margins {
+	int left, right, top, bottom;
+};
+struct decor_margins decor_margins(enum decor_style style);
 /* Height of a collapsed (WindowShaded) frame, excluding shadow. */
 #define DECOR_COLLAPSED_H 22
 /* Resize-box cell: top-left corner relative to the frame's bottom-right. */
@@ -34,9 +44,11 @@ enum decor_part {
 	DECOR_PART_ZOOM,
 	DECOR_PART_COLLAPSE,
 	DECOR_PART_GROW,
+	DECOR_PART_BORDER,   /* a dialog's frame: clicks do nothing */
 };
 
 struct decor_state {
+	enum decor_style style;
 	int width, height; /* W x H */
 	bool active;
 	bool collapsed;

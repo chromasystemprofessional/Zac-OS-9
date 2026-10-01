@@ -160,6 +160,7 @@ int main(int argc, char *argv[]) {
 	wl_list_init(&server.views);
 	server.foreign_toplevel_mgr = wlr_foreign_toplevel_manager_v1_create(server.display);
 	layers_init(&server);
+	platinum_shell_init(&server);
 	output_init(&server);
 	xdg_init(&server);
 	input_init(&server);

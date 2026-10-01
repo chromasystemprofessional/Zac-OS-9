@@ -15,6 +15,7 @@ protocols = [
   wl_protocol_dir / 'stable/xdg-shell/xdg-shell.xml',
   wl_protocol_dir / 'unstable/xdg-decoration/xdg-decoration-unstable-v1.xml',
   meson.project_source_root() / 'protocols/wlr-layer-shell-unstable-v1.xml',
+  meson.project_source_root() / 'protocols/platinum-shell-v1.xml',
 ]
 protocol_headers = []
 foreach xml : protocols
@@ -24,6 +25,12 @@ foreach xml : protocols
     command: [wayland_scanner, 'server-header', '@INPUT@', '@OUTPUT@'],
   )
 endforeach
+# Our own protocol also needs its interface code on the server side.
+protocol_headers += custom_target('platinum_shell_v1_c',
+  input: meson.project_source_root() / 'protocols/platinum-shell-v1.xml',
+  output: '@BASENAME@-protocol.c',
+  command: [wayland_scanner, 'private-code', '@INPUT@', '@OUTPUT@'],
+)
 
 # Pure frame-drawing code, shared with the unit tests.
 decor_lib = static_library('platinum-decor',
@@ -44,6 +51,7 @@ executable('platinum-wm',
   'src/xdg.c',
   'src/xwayland.c',
   'src/layers.c',
+  'src/platinum_shell.c',
   'src/frame.c',
   'src/outline.c',
   'src/pixbuf.c',

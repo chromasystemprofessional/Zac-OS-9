@@ -59,6 +59,21 @@ static const struct fixture fixtures[] = {
 		},
 	},
 	{
+		.name = "movable modal dialog (fig 3-2)",
+		.figure = "img-059-088.png", .fig_x = 0, .fig_y = 0,
+		.st = { .style = DECOR_STYLE_MOVABLE_MODAL, .width = 301, .height = 200,
+			.active = true },
+		.regions = {
+			{ 0, 0, 302, 4 },        /* top border and highlight */
+			{ 0, 17, 302, 7 },       /* bottom of title bar, body top bevel */
+			{ 0, 0, 40, 24 },        /* title bar left end (stripes) */
+			{ 262, 0, 40, 24 },      /* title bar right end + shadow */
+			{ 0, 24, 3, 177 },       /* left bevel + shadow corner */
+			{ 298, 24, 4, 177 },     /* right bevel + shadow */
+			{ 0, 197, 302, 4 },      /* bottom bevel + shadow */
+		},
+	},
+	{
 		.name = "inactive document window (fig 5-1)",
 		.figure = "img-100-128.png", .fig_x = 218, .fig_y = 3,
 		.st = { .width = 214, .height = 225, .active = false,

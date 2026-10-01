@@ -104,12 +104,13 @@ void frame_commit(struct plat_frame *frame) {
 		return;
 	}
 
-	const int H = st->height, mid = H - DECOR_TOP - DECOR_BOTTOM;
-	render_part(frame, frame->top, 0, 0, W + S, DECOR_TOP);
-	render_part(frame, frame->bottom, 0, H - DECOR_BOTTOM, W + S, DECOR_BOTTOM + S);
-	render_part(frame, frame->left, 0, DECOR_TOP, DECOR_LEFT, mid);
-	render_part(frame, frame->right, W - DECOR_RIGHT, DECOR_TOP, DECOR_RIGHT + S, mid);
-	if (st->has_grow) {
+	const struct decor_margins m = decor_margins(st->style);
+	const int H = st->height, mid = H - m.top - m.bottom;
+	render_part(frame, frame->top, 0, 0, W + S, m.top);
+	render_part(frame, frame->bottom, 0, H - m.bottom, W + S, m.bottom + S);
+	render_part(frame, frame->left, 0, m.top, m.left, mid);
+	render_part(frame, frame->right, W - m.right, m.top, m.right + S, mid);
+	if (st->has_grow && st->style == DECOR_STYLE_DOCUMENT) {
 		/* Only the part over the client; the frame parts paint the rest. */
 		int g = DECOR_GROW_INSET - DECOR_RIGHT;
 		render_part(frame, frame->grow, W - DECOR_GROW_INSET,
@@ -120,7 +121,7 @@ void frame_commit(struct plat_frame *frame) {
 }
 
 void frame_set_size(struct plat_frame *frame, int content_w, int content_h) {
-	int w = frame_outer_w(content_w), h = frame_outer_h(content_h);
+	int w = frame_outer_w(frame, content_w), h = frame_outer_h(frame, content_h);
 	if (w != frame->st.width || h != frame->st.height) {
 		bool width_changed = w != frame->st.width;
 		frame->st.width = w;
@@ -159,12 +160,30 @@ void frame_set_title(struct plat_frame *frame, const char *title) {
 }
 
 void frame_set_features(struct plat_frame *frame, bool zoom, bool grow) {
+	if (frame->st.style != DECOR_STYLE_DOCUMENT) {
+		zoom = grow = false;
+	}
 	if (frame->st.has_zoom != zoom || frame->st.has_grow != grow) {
 		frame->st.has_zoom = zoom;
 		frame->st.has_grow = grow;
 		frame->title_max = -1;
 		frame->dirty = true;
 	}
+}
+
+void frame_set_style(struct plat_frame *frame, enum decor_style style) {
+	if (frame->st.style == style) {
+		return;
+	}
+	frame->st.style = style;
+	const bool doc = style == DECOR_STYLE_DOCUMENT;
+	frame->st.has_close = frame->st.has_collapse = doc;
+	if (!doc) {
+		frame->st.has_zoom = frame->st.has_grow = false;
+	}
+	frame->st.width = 0; /* margins changed: recompute on the next size */
+	frame->title_max = -1;
+	frame->dirty = true;
 }
 
 void frame_set_pressed(struct plat_frame *frame, enum decor_part part) {

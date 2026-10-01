@@ -7,6 +7,7 @@
 
 #include "desktop.h"
 #include "finder.h"
+#include "platinumshell.h"
 
 int main(int argc, char *argv[]) {
 	/* platinum-wm draws every frame; Qt must not add its own. */
@@ -17,6 +18,7 @@ int main(int argc, char *argv[]) {
 	QGuiApplication::setDesktopFileName("platinum-finder"); /* Wayland app_id */
 	QApplication::setDoubleClickInterval(533);              /* Mac OS default */
 	QApplication::setQuitOnLastWindowClosed(false);
+	platinumShellInit();
 
 	Desktop desktop;
 	desktop.resize(QGuiApplication::primaryScreen()->size());

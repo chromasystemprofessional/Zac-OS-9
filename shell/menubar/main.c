@@ -770,7 +770,9 @@ int main(void) {
 			{ .fd = g.blink_fd, .events = POLLIN },
 			{ .fd = finder_fd(), .events = POLLIN }, /* -1 is ignored */
 		};
-		if (poll(fds, 4, -1) < 0 && errno != EINTR) {
+		/* The Finder may start after us, or restart: while we have no line
+		 * to it, look again every second. */
+		if (poll(fds, 4, finder_fd() < 0 ? 1000 : -1) < 0 && errno != EINTR) {
 			wl_display_cancel_read(g.display);
 			break;
 		}
@@ -797,6 +799,8 @@ int main(void) {
 		}
 		if (fds[3].fd >= 0 && (fds[3].revents & (POLLIN | POLLHUP)) && finder_read()) {
 			menubar_apps_changed(); /* re-enable Finder menu items */
+		} else if (finder_fd() < 0 && finder_connect()) {
+			menubar_apps_changed(); /* state arrives shortly; rebuild then too */
 		}
 	}
 	return 0;

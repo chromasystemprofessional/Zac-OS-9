@@ -71,6 +71,10 @@ static void xw_get_size_limits(struct plat_view *view,
 	}
 }
 
+static bool xw_has_parent(struct plat_view *view) {
+	return view->xsurface->parent != NULL;
+}
+
 static const struct plat_view_impl xwayland_impl = {
 	.get_surface = xw_get_surface,
 	.get_geometry = xw_get_geometry,
@@ -79,6 +83,7 @@ static const struct plat_view_impl xwayland_impl = {
 	.moved = xw_moved,
 	.close = xw_close,
 	.get_size_limits = xw_get_size_limits,
+	.has_parent = xw_has_parent,
 };
 
 /* ---- managed windows --------------------------------------------------- */

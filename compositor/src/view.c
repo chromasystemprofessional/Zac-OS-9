@@ -38,8 +38,9 @@ struct wlr_box view_frame_box(struct plat_view *view) {
 }
 
 void view_content_pos(struct plat_view *view, int *x, int *y) {
-	*x = view->scene_tree->node.x + DECOR_LEFT;
-	*y = view->scene_tree->node.y + DECOR_TOP;
+	struct decor_margins m = decor_margins(view->frame->st.style);
+	*x = view->scene_tree->node.x + m.left;
+	*y = view->scene_tree->node.y + m.top;
 }
 
 static bool view_resizable(struct plat_view *view) {
@@ -52,17 +53,24 @@ static bool view_resizable(struct plat_view *view) {
 void view_min_frame_size(struct plat_view *view, int *w, int *h) {
 	int min_w, min_h, max_w, max_h;
 	view->impl->get_size_limits(view, &min_w, &min_h, &max_w, &max_h);
-	*w = frame_outer_w(min_w > VIEW_MIN_W ? min_w : VIEW_MIN_W);
-	*h = frame_outer_h(min_h > VIEW_MIN_H ? min_h : VIEW_MIN_H);
+	*w = frame_outer_w(view->frame, min_w > VIEW_MIN_W ? min_w : VIEW_MIN_W);
+	*h = frame_outer_h(view->frame, min_h > VIEW_MIN_H ? min_h : VIEW_MIN_H);
 }
 
 /* Sync the frame to the client's current geometry. */
 void view_update_frame(struct plat_view *view) {
 	struct wlr_box geo;
 	view->impl->get_geometry(view, &geo);
+	/* Our own programs say how to frame a window; otherwise fixed-size
+	 * windows with a parent are dialogs (HIG: movable modal). */
+	int hint = platinum_shell_style_for(view->impl->get_surface(view));
+	bool dialog = hint >= 0 ? hint == DECOR_STYLE_MOVABLE_MODAL
+		: !view_resizable(view) && view->impl->has_parent(view);
+	frame_set_style(view->frame, dialog ? DECOR_STYLE_MOVABLE_MODAL : DECOR_STYLE_DOCUMENT);
+	struct decor_margins m = decor_margins(view->frame->st.style);
 	if (view->surface_tree) {
 		wlr_scene_node_set_position(&view->surface_tree->node,
-			DECOR_LEFT - geo.x, DECOR_TOP - geo.y);
+			m.left - geo.x, m.top - geo.y);
 	}
 	bool resizable = view_resizable(view);
 	frame_set_features(view->frame, resizable, resizable);
@@ -202,8 +210,9 @@ void view_move_to(struct plat_view *view, int x, int y) {
 
 void view_resize_frame(struct plat_view *view, struct wlr_box box) {
 	wlr_scene_node_set_position(&view->scene_tree->node, box.x, box.y);
-	view->impl->set_size(view, box.width - DECOR_LEFT - DECOR_RIGHT,
-		box.height - DECOR_TOP - DECOR_BOTTOM);
+	struct decor_margins m = decor_margins(view->frame->st.style);
+	view->impl->set_size(view, box.width - m.left - m.right,
+		box.height - m.top - m.bottom);
 }
 
 void view_close(struct plat_view *view) {
@@ -323,6 +332,14 @@ void view_handle_map(struct plat_view *view) {
 	view->hidden = false;
 	wlr_scene_node_set_enabled(&view->scene_tree->node, true);
 	view_update_frame(view);
+	if (view->frame->st.style == DECOR_STYLE_MOVABLE_MODAL) {
+		/* Mac OS puts alerts and dialogs centred, a third of the way down. */
+		struct plat_server *server = view->server;
+		struct wlr_box area = output_usable_area(server, server->cursor->x, server->cursor->y);
+		struct wlr_box frame = view_frame_box(view);
+		view_move_to(view, area.x + (area.width - frame.width) / 2,
+			area.y + (area.height - frame.height) / 3);
+	}
 	wl_list_insert(&view->server->views, &view->link);
 	create_toplevel_handle(view);
 	view_focus(view);

@@ -8,6 +8,7 @@
 #include <wlr/util/edges.h>
 #include <xkbcommon/xkbcommon.h>
 
+#include "frame.h"
 #include "server.h"
 
 /* ---- keyboard ---------------------------------------------------------- */
@@ -315,7 +316,9 @@ static void frame_press(struct plat_server *server, struct plat_view *view,
 			WLR_EDGE_RIGHT | WLR_EDGE_BOTTOM, part);
 		break;
 	case DECOR_PART_DRAG: {
-		bool in_title = server->cursor->y - view_frame_box(view).y < DECOR_TOP - 2;
+		/* Title-bar double-click collapses document windows only. */
+		bool in_title = server->cursor->y - view_frame_box(view).y < DECOR_TOP - 2 &&
+			view->frame->st.style == DECOR_STYLE_DOCUMENT;
 		bool dbl = in_title && server->last_click_view == view &&
 			time_msec - server->last_click_msec <= PLAT_DOUBLE_CLICK_MS;
 		if (dbl) {

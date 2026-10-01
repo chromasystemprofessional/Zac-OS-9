@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<protocol name="platinum_shell_v1">
+  <copyright>
+    Copyright 2026 Platinum 2026 contributors. GPL-3.0-or-later.
+  </copyright>
+
+  <description summary="Platinum shell window hints">
+    Lets Platinum 2026's own programs (the Finder, control panels) tell
+    platinum-wm how to frame a window, e.g. as a movable modal dialog,
+    when the generic rule (fixed size with a parent window) can't apply.
+  </description>
+
+  <interface name="platinum_shell_v1" version="1">
+    <enum name="style">
+      <entry name="document" value="0" summary="standard document window"/>
+      <entry name="movable_modal" value="1"
+        summary="dialog: title bar without boxes, no resize box"/>
+    </enum>
+
+    <request name="set_window_style">
+      <description summary="choose the frame for a toplevel's surface">
+        Applies to the xdg_toplevel (or X11 window) whose surface this is,
+        now or once it maps. Lasts until the surface is destroyed.
+      </description>
+      <arg name="surface" type="object" interface="wl_surface"/>
+      <arg name="style" type="uint" enum="style"/>
+    </request>
+
+    <request name="destroy" type="destructor"/>
+  </interface>
+</protocol>

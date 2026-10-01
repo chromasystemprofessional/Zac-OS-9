@@ -138,6 +138,8 @@ struct plat_view_impl {
 	/* 0 means unconstrained. */
 	void (*get_size_limits)(struct plat_view *view,
 		int *min_w, int *min_h, int *max_w, int *max_h);
+	/* Has a parent window (dialogs, alerts). */
+	bool (*has_parent)(struct plat_view *view);
 };
 
 enum plat_view_type {
@@ -264,6 +266,11 @@ void view_min_frame_size(struct plat_view *view, int *w, int *h);
 
 /* xdg.c */
 void xdg_init(struct plat_server *server);
+
+/* platinum_shell.c: window style hints from Platinum's own programs */
+void platinum_shell_init(struct plat_server *server);
+/* The hinted decor_style for a surface, or -1. */
+int platinum_shell_style_for(struct wlr_surface *surface);
 
 /* xwayland.c */
 void xwayland_init(struct plat_server *server);

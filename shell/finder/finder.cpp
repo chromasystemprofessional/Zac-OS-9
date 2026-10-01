@@ -5,6 +5,9 @@
 #include <QProcess>
 #include <QWidget>
 
+#include <QDirIterator>
+
+#include "alert.h"
 #include "desktop.h"
 #include "folderwindow.h"
 
@@ -160,10 +163,40 @@ void Finder::moveSelectionToTrash() {
 	folderChanged(trashFilesPath());
 }
 
+/* "12K", "1.4 MB": Finder-style sizes. */
+static QString finderSize(qint64 bytes) {
+	if (bytes < 1024 * 1024) {
+		return QString::number(std::max<qint64>(1, (bytes + 1023) / 1024)) + "K";
+	}
+	if (bytes < 1024LL * 1024 * 1024) {
+		return QString::number(bytes / (1024.0 * 1024), 'f', 1) + " MB";
+	}
+	return QString::number(bytes / (1024.0 * 1024 * 1024), 'f', 1) + " GB";
+}
+
 void Finder::emptyTrash() {
-	/* TODO: the Mac asks first ("The Trash contains N items...") once
-	 * Platinum alerts and push buttons exist. */
 	const QString files = trashFilesPath();
+	int count = 0;
+	qint64 bytes = 0;
+	QDirIterator it(files, QDir::AllEntries | QDir::NoDotAndDotDot | QDir::Hidden |
+		QDir::System, QDirIterator::Subdirectories);
+	while (it.hasNext()) {
+		it.next();
+		count++;
+		bytes += it.fileInfo().isFile() ? it.fileInfo().size() : 0;
+	}
+	if (count == 0) {
+		return;
+	}
+	/* The Mac asks first. */
+	QString message = QStringLiteral(
+		"The Trash contains %1 %2, which %3 %4 of disk space. Are you sure you "
+		"want to permanently remove %5?")
+		.arg(count).arg(count == 1 ? "item" : "items").arg(count == 1 ? "uses" : "use")
+		.arg(finderSize(bytes)).arg(count == 1 ? "this item" : "these items");
+	if (!Alert::ask(message)) {
+		return;
+	}
 	QDir(files).removeRecursively();
 	QDir(QFileInfo(files).absolutePath() + "/info").removeRecursively();
 	QDir().mkpath(files);

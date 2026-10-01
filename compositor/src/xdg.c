@@ -57,6 +57,10 @@ static void xdg_get_size_limits(struct plat_view *view,
 	*max_h = s->max_height;
 }
 
+static bool xdg_has_parent(struct plat_view *view) {
+	return view->xdg_toplevel->parent != NULL;
+}
+
 static const struct plat_view_impl xdg_impl = {
 	.get_surface = xdg_get_surface,
 	.get_geometry = xdg_get_geometry,
@@ -64,6 +68,7 @@ static const struct plat_view_impl xdg_impl = {
 	.set_size = xdg_set_size,
 	.close = xdg_close,
 	.get_size_limits = xdg_get_size_limits,
+	.has_parent = xdg_has_parent,
 };
 
 /* ---- toplevel events --------------------------------------------------- */

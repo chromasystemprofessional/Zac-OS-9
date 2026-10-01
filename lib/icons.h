@@ -19,6 +19,7 @@ enum pl_icon_kind {
 	PL_ICON_DISK,
 	PL_ICON_TRASH_EMPTY,
 	PL_ICON_TRASH_FULL,
+	PL_ICON_CAUTION, /* alerts */
 	PL_ICON_COUNT,
 };
 
