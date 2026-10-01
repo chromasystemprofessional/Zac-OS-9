@@ -10,12 +10,22 @@
 #include <wlr/types/wlr_scene.h>
 #include <wlr/types/wlr_seat.h>
 #include <wlr/types/wlr_xcursor_manager.h>
+#include <wlr/types/wlr_xdg_decoration_v1.h>
 #include <wlr/types/wlr_xdg_shell.h>
+
+#include "decor.h"
+#include "outline.h"
+
+/* Height reserved for the Mac OS menu bar (Phase 2). */
+#define PLAT_MENUBAR_H 20
+/* Mac OS default double-click time is 32 ticks (~533 ms). */
+#define PLAT_DOUBLE_CLICK_MS 533
 
 enum plat_cursor_mode {
 	PLAT_CURSOR_PASSTHROUGH,
-	PLAT_CURSOR_MOVE,
-	PLAT_CURSOR_RESIZE,
+	PLAT_CURSOR_MOVE,      /* dragging a window outline */
+	PLAT_CURSOR_RESIZE,    /* dragging a resize outline */
+	PLAT_CURSOR_TRACK_BOX, /* holding a title-bar box down */
 };
 
 struct plat_server {
@@ -28,11 +38,16 @@ struct plat_server {
 	struct wlr_scene_output_layout *scene_layout;
 	struct wlr_scene_rect *desktop;
 	struct wlr_scene_tree *view_layer;
+	struct wlr_scene_tree *overlay_layer;
+	struct plat_outline outline;
 
 	struct wlr_xdg_shell *xdg_shell;
 	struct wl_listener new_xdg_toplevel;
 	struct wl_listener new_xdg_popup;
+	struct wlr_xdg_decoration_manager_v1 *xdg_decoration_mgr;
+	struct wl_listener new_xdg_decoration;
 	struct wl_list views; /* plat_view.link, front-most first */
+	struct plat_view *focused_view;
 
 	struct wlr_cursor *cursor;
 	struct wlr_xcursor_manager *cursor_mgr;
@@ -48,11 +63,18 @@ struct plat_server {
 	struct wl_listener request_set_selection;
 	struct wl_list keyboards;
 
+	/* Interactive grab state. */
 	enum plat_cursor_mode cursor_mode;
 	struct plat_view *grabbed_view;
-	double grab_x, grab_y;
-	struct wlr_box grab_geobox;
+	double grab_x, grab_y;       /* cursor position at grab start */
+	struct wlr_box grab_box;     /* frame box at grab start */
 	uint32_t resize_edges;
+	enum decor_part grab_part;
+	bool grab_moved;
+
+	/* Double-click detection on title bars. */
+	uint32_t last_click_msec;
+	struct plat_view *last_click_view;
 
 	struct wlr_output_layout *output_layout;
 	struct wl_list outputs;
@@ -72,7 +94,17 @@ struct plat_view {
 	struct wl_list link;
 	struct plat_server *server;
 	struct wlr_xdg_toplevel *xdg_toplevel;
+	/* Positioned at the frame's outer top-left; node.data = this view. */
 	struct wlr_scene_tree *scene_tree;
+	struct wlr_scene_tree *surface_tree;
+	struct plat_frame *frame;
+	struct wlr_xdg_toplevel_decoration_v1 *decoration;
+
+	bool mapped;
+	bool collapsed;
+	bool zoomed;
+	struct wlr_box unzoomed; /* frame box to restore from zoom */
+
 	struct wl_listener map;
 	struct wl_listener unmap;
 	struct wl_listener commit;
@@ -81,6 +113,7 @@ struct plat_view {
 	struct wl_listener request_resize;
 	struct wl_listener request_maximize;
 	struct wl_listener request_fullscreen;
+	struct wl_listener set_title;
 };
 
 struct plat_keyboard {
@@ -97,13 +130,22 @@ void output_init(struct plat_server *server);
 
 /* input.c */
 void input_init(struct plat_server *server);
+void input_begin_grab(struct plat_server *server, struct plat_view *view,
+		enum plat_cursor_mode mode, uint32_t edges, enum decor_part part);
 
 /* view.c */
 void view_init(struct plat_server *server);
-void view_focus(struct plat_view *view, struct wlr_surface *surface);
+void view_focus(struct plat_view *view);
 struct plat_view *view_at(struct plat_server *server, double lx, double ly,
 		struct wlr_surface **surface, double *sx, double *sy);
-void view_begin_interactive(struct plat_view *view,
-		enum plat_cursor_mode mode, uint32_t edges);
+enum decor_part view_part_at(struct plat_view *view, double lx, double ly);
+struct wlr_box view_frame_box(struct plat_view *view);
+void view_move_to(struct plat_view *view, int x, int y);
+void view_resize_frame(struct plat_view *view, struct wlr_box frame_box);
+void view_close(struct plat_view *view);
+void view_toggle_zoom(struct plat_view *view);
+void view_set_collapsed(struct plat_view *view, bool collapsed);
+void view_set_pressed(struct plat_view *view, enum decor_part part);
+void view_min_frame_size(struct plat_view *view, int *w, int *h);
 
 #endif

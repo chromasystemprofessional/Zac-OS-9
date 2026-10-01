@@ -4,7 +4,10 @@
 #include <unistd.h>
 #include <wlr/types/wlr_compositor.h>
 #include <wlr/types/wlr_data_device.h>
+#include <wlr/types/wlr_screencopy_v1.h>
+#include <wlr/types/wlr_server_decoration.h>
 #include <wlr/types/wlr_subcompositor.h>
+#include <wlr/types/wlr_xdg_output_v1.h>
 #include <wlr/util/log.h>
 
 #include "server.h"
@@ -59,8 +62,11 @@ int main(int argc, char *argv[]) {
 	wlr_compositor_create(server.display, 5, server.renderer);
 	wlr_subcompositor_create(server.display);
 	wlr_data_device_manager_create(server.display);
+	/* Lets `grim` capture screenshots for visual checks. */
+	wlr_screencopy_manager_v1_create(server.display);
 
 	server.output_layout = wlr_output_layout_create(server.display);
+	wlr_xdg_output_manager_v1_create(server.display, server.output_layout);
 	server.scene = wlr_scene_create();
 	server.scene_layout = wlr_scene_attach_output_layout(
 			server.scene, server.output_layout);
@@ -72,6 +78,13 @@ int main(int argc, char *argv[]) {
 	};
 	server.desktop = wlr_scene_rect_create(&server.scene->tree, 16384, 16384, desk);
 	server.view_layer = wlr_scene_tree_create(&server.scene->tree);
+	server.overlay_layer = wlr_scene_tree_create(&server.scene->tree);
+	outline_init(&server.outline, server.overlay_layer);
+
+	/* GTK3 asks for decorations through the older KDE protocol. */
+	wlr_server_decoration_manager_set_default_mode(
+		wlr_server_decoration_manager_create(server.display),
+		WLR_SERVER_DECORATION_MANAGER_MODE_SERVER);
 
 	output_init(&server);
 	view_init(&server);

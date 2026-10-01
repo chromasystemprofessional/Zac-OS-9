@@ -108,75 +108,200 @@ static void server_new_input(struct wl_listener *listener, void *data) {
 	wlr_seat_set_capabilities(server->seat, caps);
 }
 
+static bool option_held(struct plat_server *server) {
+	struct wlr_keyboard *kb = wlr_seat_get_keyboard(server->seat);
+	return kb && (wlr_keyboard_get_modifiers(kb) & WLR_MODIFIER_ALT);
+}
+
+/* ---- grabs: outline move/resize and title-bar box tracking --------------- */
+
+void input_begin_grab(struct plat_server *server, struct plat_view *view,
+		enum plat_cursor_mode mode, uint32_t edges, enum decor_part part) {
+	server->cursor_mode = mode;
+	server->grabbed_view = view;
+	server->grab_x = server->cursor->x;
+	server->grab_y = server->cursor->y;
+	server->grab_box = view_frame_box(view);
+	server->resize_edges = edges;
+	server->grab_part = part;
+	server->grab_moved = false;
+	wlr_seat_pointer_clear_focus(server->seat);
+	if (mode == PLAT_CURSOR_TRACK_BOX) {
+		view_set_pressed(view, part);
+	}
+}
+
+static void end_grab(struct plat_server *server) {
+	outline_hide(&server->outline);
+	server->cursor_mode = PLAT_CURSOR_PASSTHROUGH;
+	server->grabbed_view = NULL;
+	server->grab_part = DECOR_PART_NONE;
+}
+
+static struct wlr_box resize_box(struct plat_server *server) {
+	struct wlr_box b = server->grab_box;
+	int dx = (int)(server->cursor->x - server->grab_x);
+	int dy = (int)(server->cursor->y - server->grab_y);
+	int min_w, min_h;
+	view_min_frame_size(server->grabbed_view, &min_w, &min_h);
+
+	uint32_t e = server->resize_edges;
+	if (e & WLR_EDGE_RIGHT) {
+		b.width = server->grab_box.width + dx;
+	} else if (e & WLR_EDGE_LEFT) {
+		b.width = server->grab_box.width - dx;
+	}
+	if (e & WLR_EDGE_BOTTOM) {
+		b.height = server->grab_box.height + dy;
+	} else if (e & WLR_EDGE_TOP) {
+		b.height = server->grab_box.height - dy;
+	}
+	if (b.width < min_w) {
+		b.width = min_w;
+	}
+	if (b.height < min_h) {
+		b.height = min_h;
+	}
+	if (e & WLR_EDGE_LEFT) {
+		b.x = server->grab_box.x + server->grab_box.width - b.width;
+	}
+	if (e & WLR_EDGE_TOP) {
+		b.y = server->grab_box.y + server->grab_box.height - b.height;
+	}
+	return b;
+}
+
+static struct wlr_box move_box(struct plat_server *server) {
+	struct wlr_box b = server->grab_box;
+	b.x += (int)(server->cursor->x - server->grab_x);
+	b.y += (int)(server->cursor->y - server->grab_y);
+	/* Keep the title bar below the menu bar so it can't be lost. */
+	if (b.y < PLAT_MENUBAR_H) {
+		b.y = PLAT_MENUBAR_H;
+	}
+	return b;
+}
+
+static void grab_motion(struct plat_server *server) {
+	struct plat_view *view = server->grabbed_view;
+	switch (server->cursor_mode) {
+	case PLAT_CURSOR_MOVE:
+		server->grab_moved = true;
+		outline_show(&server->outline, move_box(server));
+		break;
+	case PLAT_CURSOR_RESIZE:
+		server->grab_moved = true;
+		outline_show(&server->outline, resize_box(server));
+		break;
+	case PLAT_CURSOR_TRACK_BOX: {
+		/* Mac controls track: highlighted only while the pointer is inside. */
+		enum decor_part part = view_part_at(view, server->cursor->x, server->cursor->y);
+		view_set_pressed(view, part == server->grab_part ? part : DECOR_PART_NONE);
+		break;
+	}
+	default:
+		break;
+	}
+}
+
+static void grab_release(struct plat_server *server) {
+	struct plat_view *view = server->grabbed_view;
+	switch (server->cursor_mode) {
+	case PLAT_CURSOR_MOVE:
+		if (server->grab_moved) {
+			struct wlr_box b = move_box(server);
+			view_move_to(view, b.x, b.y);
+		}
+		break;
+	case PLAT_CURSOR_RESIZE:
+		if (server->grab_moved) {
+			view->zoomed = false;
+			view_resize_frame(view, resize_box(server));
+		}
+		break;
+	case PLAT_CURSOR_TRACK_BOX: {
+		enum decor_part part = server->grab_part;
+		bool inside = view_part_at(view, server->cursor->x, server->cursor->y) == part;
+		view_set_pressed(view, DECOR_PART_NONE);
+		if (!inside) {
+			break;
+		}
+		if (part == DECOR_PART_CLOSE) {
+			view_close(view);
+		} else if (part == DECOR_PART_ZOOM) {
+			view_toggle_zoom(view);
+		} else if (part == DECOR_PART_COLLAPSE) {
+			bool collapse = !view->collapsed;
+			if (option_held(server)) {
+				/* HIG: Option-click collapses (or expands) every window. */
+				struct plat_view *v;
+				wl_list_for_each(v, &server->views, link) {
+					view_set_collapsed(v, collapse);
+				}
+			} else {
+				view_set_collapsed(view, collapse);
+			}
+		}
+		break;
+	}
+	default:
+		break;
+	}
+	end_grab(server);
+}
+
+/* Mouse-down on a window frame (anything but the client area). */
+static void frame_press(struct plat_server *server, struct plat_view *view,
+		enum decor_part part, uint32_t time_msec) {
+	view_focus(view);
+
+	switch (part) {
+	case DECOR_PART_CLOSE:
+	case DECOR_PART_ZOOM:
+	case DECOR_PART_COLLAPSE:
+		input_begin_grab(server, view, PLAT_CURSOR_TRACK_BOX, 0, part);
+		break;
+	case DECOR_PART_GROW:
+		input_begin_grab(server, view, PLAT_CURSOR_RESIZE,
+			WLR_EDGE_RIGHT | WLR_EDGE_BOTTOM, part);
+		break;
+	case DECOR_PART_DRAG: {
+		bool in_title = server->cursor->y - view_frame_box(view).y < DECOR_TOP - 2;
+		bool dbl = in_title && server->last_click_view == view &&
+			time_msec - server->last_click_msec <= PLAT_DOUBLE_CLICK_MS;
+		if (dbl) {
+			/* Appearance option "double-click title bar to collapse". */
+			server->last_click_view = NULL;
+			view_set_collapsed(view, !view->collapsed);
+			break;
+		}
+		server->last_click_view = in_title ? view : NULL;
+		server->last_click_msec = time_msec;
+		input_begin_grab(server, view, PLAT_CURSOR_MOVE, 0, part);
+		break;
+	}
+	default:
+		break;
+	}
+}
+
 /* ---- pointer ----------------------------------------------------------- */
 
-static void process_move(struct plat_server *server) {
-	struct plat_view *view = server->grabbed_view;
-	wlr_scene_node_set_position(&view->scene_tree->node,
-		server->cursor->x - server->grab_x,
-		server->cursor->y - server->grab_y);
-}
-
-static void process_resize(struct plat_server *server) {
-	struct plat_view *view = server->grabbed_view;
-	double border_x = server->cursor->x - server->grab_x;
-	double border_y = server->cursor->y - server->grab_y;
-	int left = server->grab_geobox.x;
-	int right = server->grab_geobox.x + server->grab_geobox.width;
-	int top = server->grab_geobox.y;
-	int bottom = server->grab_geobox.y + server->grab_geobox.height;
-
-	if (server->resize_edges & WLR_EDGE_TOP) {
-		top = border_y;
-		if (top >= bottom) {
-			top = bottom - 1;
-		}
-	} else if (server->resize_edges & WLR_EDGE_BOTTOM) {
-		bottom = border_y;
-		if (bottom <= top) {
-			bottom = top + 1;
-		}
-	}
-	if (server->resize_edges & WLR_EDGE_LEFT) {
-		left = border_x;
-		if (left >= right) {
-			left = right - 1;
-		}
-	} else if (server->resize_edges & WLR_EDGE_RIGHT) {
-		right = border_x;
-		if (right <= left) {
-			right = left + 1;
-		}
-	}
-
-	struct wlr_box geo;
-	wlr_xdg_surface_get_geometry(view->xdg_toplevel->base, &geo);
-	wlr_scene_node_set_position(&view->scene_tree->node,
-		left - geo.x, top - geo.y);
-	wlr_xdg_toplevel_set_size(view->xdg_toplevel, right - left, bottom - top);
-}
-
 static void process_cursor_motion(struct plat_server *server, uint32_t time) {
-	if (server->cursor_mode == PLAT_CURSOR_MOVE) {
-		process_move(server);
-		return;
-	}
-	if (server->cursor_mode == PLAT_CURSOR_RESIZE) {
-		process_resize(server);
+	if (server->cursor_mode != PLAT_CURSOR_PASSTHROUGH) {
+		grab_motion(server);
 		return;
 	}
 
 	double sx, sy;
 	struct wlr_surface *surface = NULL;
-	struct plat_view *view = view_at(server, server->cursor->x, server->cursor->y,
-		&surface, &sx, &sy);
-	if (!view) {
-		wlr_cursor_set_xcursor(server->cursor, server->cursor_mgr, "default");
-	}
+	view_at(server, server->cursor->x, server->cursor->y, &surface, &sx, &sy);
 	if (surface) {
 		wlr_seat_pointer_notify_enter(server->seat, surface, sx, sy);
 		wlr_seat_pointer_notify_motion(server->seat, time, sx, sy);
 	} else {
+		/* Desktop or window frame: the compositor owns the arrow. */
+		wlr_cursor_set_xcursor(server->cursor, server->cursor_mgr, "default");
 		wlr_seat_pointer_clear_focus(server->seat);
 	}
 }
@@ -201,22 +326,26 @@ static void cursor_button(struct wl_listener *listener, void *data) {
 	struct plat_server *server = wl_container_of(listener, server, cursor_button);
 	struct wlr_pointer_button_event *event = data;
 
-	if (event->state == WL_POINTER_BUTTON_STATE_RELEASED) {
-		server->cursor_mode = PLAT_CURSOR_PASSTHROUGH;
-		server->grabbed_view = NULL;
-	} else {
+	if (server->cursor_mode != PLAT_CURSOR_PASSTHROUGH) {
+		/* Grabs are compositor-owned; the client never saw the press. */
+		if (event->state == WL_POINTER_BUTTON_STATE_RELEASED) {
+			grab_release(server);
+		}
+		return;
+	}
+
+	if (event->state == WL_POINTER_BUTTON_STATE_PRESSED) {
 		double sx, sy;
 		struct wlr_surface *surface = NULL;
 		struct plat_view *view = view_at(server, server->cursor->x,
 			server->cursor->y, &surface, &sx, &sy);
-		view_focus(view, surface);
-
-		/* Temporary dev aid until Phase 1 draws title bars: Alt-drag moves. */
-		struct wlr_keyboard *kb = wlr_seat_get_keyboard(server->seat);
-		if (view && kb && (wlr_keyboard_get_modifiers(kb) & WLR_MODIFIER_ALT)) {
-			view_begin_interactive(view, PLAT_CURSOR_MOVE, 0);
+		if (view && !surface) {
+			enum decor_part part =
+				view_part_at(view, server->cursor->x, server->cursor->y);
+			frame_press(server, view, part, event->time_msec);
 			return;
 		}
+		view_focus(view);
 	}
 	wlr_seat_pointer_notify_button(server->seat, event->time_msec,
 		event->button, event->state);

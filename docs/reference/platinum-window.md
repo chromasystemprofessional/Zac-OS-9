@@ -53,6 +53,10 @@ drop shadow     x=W   y=2..H                 #000             #555
 everything else                              #CCC             #DDD
 ```
 
+Figure 5-1 shows `#777` and `#888` at `(0,H)` and `(1,H)`, where the shadow row
+begins. Figure 5-6 and every other shadow corner show plain background there, so
+those two pixels are treated as an artifact of the figure.
+
 Collapsed (WindowShade) window: only the title bar remains. Height is **22**
 (`y=0` border, `y=1..19` title bar, `y=20` shade row, `y=21` border), plus the
 shadow row, for 23 in total.
