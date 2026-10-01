@@ -38,11 +38,11 @@ scaling only, original behaviors and timings).
 - ✅ Compositor: layer-shell, foreign-toplevel, hidden windows, ⌘ = Super → Ctrl,
   virtual pointer and keyboard (used for scripted UI tests with `wlrctl`).
 - Next:
-  - Edit menu commands (send ⌘X/C/V/A/Z to the app via a virtual keyboard).
+  - ✅ Edit menu commands (keystrokes to the front app via a virtual keyboard).
   - Global app menus via `com.canonical.dbusmenu` / KDE appmenu.
   - ⌘-key equivalents for menu items.
   - App icons in the Application menu.
-  - Clicking the clock shows the date.
+  - ✅ Clicking the clock shows the date.
 - To measure: selected-item look, blink count and timing, the other screen
   corners, other accent-color triples.
 
