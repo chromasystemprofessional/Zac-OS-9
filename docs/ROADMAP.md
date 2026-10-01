@@ -58,10 +58,13 @@ scaling only, original behaviors and timings).
     rename in place, New Folder, Move To Trash, Empty Trash (with alert),
     Get Info, About This Computer.
   - Finder menus driven over a socket from the menu bar; ⌘-keys.
-- Next:
   - Free icon positions in icon view (drag to place; remembered).
-  - Button view; Duplicate, Make Alias (symlinks), Put Away, Find.
-  - Labels, spring-loaded folders, comments stored as extended attributes.
+  - Button view; Duplicate, Make Alias (symlinks), Put Away, Show Original.
+  - Spring-loaded folders; Get Info comments (`user.xdg.comment`).
+  - Labels from File > Label (the menu bar's first hierarchical menu),
+    stored in `user.platinum.label`; labelled icons are tinted.
+- Next:
+  - Find; alias names in italics (needs an italic views font).
 - To measure: icon grid and label metrics, Get Info layout, alert margins,
   selected list row, expanded triangle.
 

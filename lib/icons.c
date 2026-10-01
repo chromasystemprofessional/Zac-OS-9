@@ -170,14 +170,44 @@ const uint32_t *pl_icon(enum pl_icon_kind kind, int size) {
 	return cache[kind][s];
 }
 
+const struct pl_label pl_labels[PL_LABEL_COUNT] = {
+	{ "None", 0 },
+	{ "Essential", 0xFFFF6403 },
+	{ "Hot", 0xFFDD0806 },
+	{ "In Progress", 0xFFF20884 },
+	{ "Cool", 0xFF02ABEA },
+	{ "Personal", 0xFF0000D4 },
+	{ "Project 1", 0xFF1FB714 },
+	{ "Project 2", 0xFF562C05 },
+};
+
+/* Each channel scaled by the label's: white becomes the label color and
+ * black stays black. TODO: compare with a real Mac's labelled icons. */
+static uint32_t tint(uint32_t v, uint32_t label) {
+	uint32_t out = 0xFF000000u;
+	for (int shift = 0; shift < 24; shift += 8) {
+		uint32_t a = (v >> shift) & 0xFF, b = (label >> shift) & 0xFF;
+		out |= (a * b / 255) << shift;
+	}
+	return out;
+}
+
 void pl_icon_paint(struct pl_canvas *c, int x, int y, enum pl_icon_kind kind,
 		int size, bool selected) {
+	pl_icon_paint_label(c, x, y, kind, size, selected, 0);
+}
+
+void pl_icon_paint_label(struct pl_canvas *c, int x, int y, enum pl_icon_kind kind,
+		int size, bool selected, uint32_t label_color) {
 	const uint32_t *px = pl_icon(kind, size);
 	for (int j = 0; j < size; j++) {
 		for (int i = 0; i < size; i++) {
 			uint32_t v = px[j * size + i];
 			if (!(v >> 24)) {
 				continue;
+			}
+			if (label_color) {
+				v = tint(v, label_color);
 			}
 			if (selected) {
 				v = 0xFF000000u | ((v >> 1) & 0x7F7F7F);

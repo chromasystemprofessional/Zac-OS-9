@@ -8,7 +8,7 @@ Values were read pixel by pixel from the native-resolution figures using
 |---|---|---|---|
 | 4-1 Menu bar using platinum appearance | 91 | `img-091-125` 256×165 | menu bar, rounded screen corner, open Edit menu, disabled items, separators, ⌘ shortcuts |
 | 4-2 Help menu | 92 | `img-092-126` 129×84 | highlighted title at the far left, menu width rule, shortcut column |
-| 4-3 A contextual menu | 94 | `img-094-127` 244×191 | contextual menu, checkmarks, submenu arrow (not yet measured) |
+| 4-3 A contextual menu | 94 | `img-094-127` 244×191 | contextual menu, checkmarks, submenu arrow |
 
 Grays use the same notation as `platinum-window.md`: a hex digit `n` means `#nnnnnn`.
 
@@ -154,6 +154,12 @@ item's baseline. It uses the item's text color.
 .###.....
 ..#......
 ```
+
+### Submenu arrow (figure 4-3)
+
+The arrow is a solid triangle in the item's text color, 6 wide and 11 tall,
+with widths 1, 2, 3, 4, 5, 6, 5, 4, 3, 2, 1 from top to bottom. Its ink starts
+at `x = W-19` (on figure 4-3's "Label" item) and occupies item rows `+2..+12`.
 
 ## Not in the HIG
 

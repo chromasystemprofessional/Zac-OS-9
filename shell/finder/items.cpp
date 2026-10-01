@@ -4,7 +4,10 @@
 #include <QFileInfo>
 #include <QMimeDatabase>
 #include <QStandardPaths>
+#include <QFile>
 #include <algorithm>
+#include <cerrno>
+#include <sys/xattr.h>
 
 static constexpr int LABEL_MAX_INK = 110;
 static constexpr int LABEL_GAP = 2;      /* icon bottom to label box top */
@@ -63,6 +66,26 @@ pl_icon_kind iconKindFor(const QString &path) {
 	return PL_ICON_DOCUMENT;
 }
 
+int readLabel(const QString &path) {
+	char buf[8];
+	ssize_t n = lgetxattr(QFile::encodeName(path).constData(), LABEL_ATTR, buf, sizeof(buf) - 1);
+	if (n <= 0) {
+		return 0;
+	}
+	buf[n] = '\0';
+	int label = atoi(buf);
+	return label > 0 && label < PL_LABEL_COUNT ? label : 0;
+}
+
+bool writeLabel(const QString &path, int label) {
+	const QByteArray name = QFile::encodeName(path);
+	if (label <= 0) {
+		return lremovexattr(name.constData(), LABEL_ATTR) == 0 || errno == ENODATA;
+	}
+	const QByteArray value = QByteArray::number(label);
+	return lsetxattr(name.constData(), LABEL_ATTR, value.constData(), value.size(), 0) == 0;
+}
+
 std::vector<std::unique_ptr<Item>> listFolder(const QString &path) {
 	std::vector<std::unique_ptr<Item>> items;
 	QDir dir(path);
@@ -76,6 +99,7 @@ std::vector<std::unique_ptr<Item>> listFolder(const QString &path) {
 		item->isDir = info.isDir();
 		item->size = info.isDir() ? 0 : info.size();
 		item->modified = info.lastModified();
+		item->labelIndex = readLabel(item->path);
 		items.push_back(std::move(item));
 	}
 	return items;
@@ -136,7 +160,8 @@ bool iconLabelContains(Item &item, int x, int y, QPoint p) {
 }
 
 void paintIconItem(pl_canvas *c, Item &item, int x, int y, bool onDesktop, bool showLabel) {
-	pl_icon_paint(c, x, y, item.kind, PL_ICON_LARGE, item.selected || item.dropTarget);
+	pl_icon_paint_label(c, x, y, item.kind, PL_ICON_LARGE, item.selected || item.dropTarget,
+		item.labelColor());
 	if (!showLabel) {
 		return;
 	}

@@ -35,7 +35,8 @@ public:
  *   menu bar -> Finder:  "cmd <name>"   (new-folder, open, close-window,
  *                         move-to-trash, empty-trash, ...)
  *   Finder -> menu bar:  "state selection=<n> window=<0|1> trash=<0|1>
- *                         view=<0 icons|1 list|2 buttons>"
+ *                         view=<0 icons|1 list|2 buttons>
+ *                         label=<the selection's common label, or -1>"
  */
 class Finder {
 public:
@@ -59,6 +60,7 @@ public:
 	void makeAlias();
 	void putAway();
 	void showOriginal();
+	void setLabel(int label);
 
 	/* Spring-loaded folders: hovering a drag over a folder opens it; the
 	 * windows that sprang open close again when the drag ends. Each view

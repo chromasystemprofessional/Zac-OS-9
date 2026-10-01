@@ -147,10 +147,14 @@ void menu_measure(const struct menu_item *items, int n, int *width, int *height)
 		if (!items[i].label) {
 			continue;
 		}
-		int need = MENU_TEXT_X + ink_width(items[i].label) + MENU_RIGHT_PAD;
+		int text_r = MENU_TEXT_X + ink_width(items[i].label) +
+			(items[i].swatch ? MENU_SWATCH_ADVANCE : 0);
+		int need = text_r + MENU_RIGHT_PAD;
+		if (items[i].submenu) {
+			need = text_r + MENU_SHORTCUT_GAP + MENU_ARROW_FROM_RIGHT;
+		}
 		if (items[i].key) {
-			need = MENU_TEXT_X + ink_width(items[i].label) + MENU_SHORTCUT_GAP +
-				MENU_CMD_FROM_RIGHT;
+			need = text_r + MENU_SHORTCUT_GAP + MENU_CMD_FROM_RIGHT;
 		}
 		if (need > w) {
 			w = need;
@@ -200,9 +204,24 @@ void menu_paint(struct pl_canvas *c, const struct menu_item *items, int n,
 			pl_fill(c, 1, y, W - 2, y + MENU_ITEM_H - 1, accent.shadow);
 		}
 		uint32_t color = sel ? C_WHITE : it->enabled ? C_BLACK : C_888;
-		pl_text(c, it->label, MENU_TEXT_X, y + MENU_ITEM_BASELINE, color);
+		int tx = MENU_TEXT_X;
+		if (it->swatch) {
+			int sy = y + (MENU_ITEM_H - MENU_SWATCH) / 2;
+			pl_fill(c, tx, sy, tx + MENU_SWATCH - 1, sy + MENU_SWATCH - 1, it->swatch);
+			pl_outline(c, tx, sy, tx + MENU_SWATCH - 1, sy + MENU_SWATCH - 1, color);
+			tx += MENU_SWATCH_ADVANCE;
+		}
+		pl_text(c, it->label, tx, y + MENU_ITEM_BASELINE, color);
 		if (it->checked) {
 			paint_glyph(c, check_glyph, 8, MENU_CHECK_X, y + MENU_ITEM_BASELINE - 7, color);
+		}
+		if (it->submenu) {
+			/* The hierarchical-menu arrow: widths 1..6..1 (figure 4-3). */
+			for (int j = 0; j < 11; j++) {
+				int w = j < 6 ? j + 1 : 11 - j;
+				pl_hline(c, W - MENU_ARROW_FROM_RIGHT, W - MENU_ARROW_FROM_RIGHT + w - 1,
+					y + 2 + j, color);
+			}
 		}
 		if (it->key) {
 			int cx = W - MENU_CMD_FROM_RIGHT;
@@ -211,6 +230,14 @@ void menu_paint(struct pl_canvas *c, const struct menu_item *items, int n,
 		}
 		y += MENU_ITEM_H;
 	}
+}
+
+int menu_item_top(const struct menu_item *items, int n, int i) {
+	int top = 1;
+	for (int k = 0; k < i && k < n; k++) {
+		top += row_height(&items[k]);
+	}
+	return top;
 }
 
 int menu_item_at(const struct menu_item *items, int n, int height, int y) {

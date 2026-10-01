@@ -33,6 +33,10 @@ extern "C" {
 #define MENU_KEY_AFTER_CMD 11  /* key character ink starts 11 px after ⌘ */
 #define MENU_SHORTCUT_GAP 12   /* text ink to ⌘ (not in the HIG; assumed) */
 #define MENU_SHADOW 1          /* extra column and row painted for the shadow */
+#define MENU_ARROW_FROM_RIGHT 19 /* submenu arrow ink starts at W - 19 (fig 4-3) */
+/* Label-menu color swatch: not in the HIG figures; estimated. */
+#define MENU_SWATCH 10         /* square, outlined in the text color */
+#define MENU_SWATCH_ADVANCE 15 /* text moves right by this much */
 
 struct mbar_title {
 	const struct plat_text *text; /* text title, or */
@@ -60,6 +64,8 @@ struct menu_item {
 	const struct plat_text *key;   /* ⌘ shortcut character, or NULL */
 	bool enabled;
 	bool checked;
+	bool submenu; /* draws the hierarchical-menu arrow */
+	uint32_t swatch; /* ARGB color square before the text, or 0 */
 };
 
 void menu_measure(const struct menu_item *items, int n, int *width, int *height);
@@ -70,6 +76,8 @@ void menu_paint(struct pl_canvas *c, const struct menu_item *items, int n,
 		int width, int height, int selected, struct pl_accent accent);
 /* Item index at menu-local y, or -1 (separators and borders count as -1). */
 int menu_item_at(const struct menu_item *items, int n, int height, int y);
+/* Menu-local y of item i's top row. */
+int menu_item_top(const struct menu_item *items, int n, int i);
 
 #ifdef __cplusplus
 }

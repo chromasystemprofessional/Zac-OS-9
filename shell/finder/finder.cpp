@@ -115,8 +115,19 @@ QString Finder::stateLine() {
 	auto *fw = dynamic_cast<FolderWindow *>(v);
 	int list = !fw ? 0 : fw->viewMode() == FolderWindow::ViewMode::List ? 1
 		: fw->viewMode() == FolderWindow::ViewMode::Buttons ? 2 : 0;
-	return QStringLiteral("state selection=%1 window=%2 trash=%3 view=%4")
-		.arg(selection).arg(window ? 1 : 0).arg(full ? 1 : 0).arg(list);
+	int label = -1;
+	if (v) {
+		for (Item *item : v->selectedItems()) {
+			if (label == -1) {
+				label = item->labelIndex;
+			} else if (label != item->labelIndex) {
+				label = -1;
+				break;
+			}
+		}
+	}
+	return QStringLiteral("state selection=%1 window=%2 trash=%3 view=%4 label=%5")
+		.arg(selection).arg(window ? 1 : 0).arg(full ? 1 : 0).arg(list).arg(label);
 }
 
 void Finder::notifyState() {
@@ -153,6 +164,8 @@ void Finder::command(const QString &name) {
 		putAway();
 	} else if (name == "show-original") {
 		showOriginal();
+	} else if (name.startsWith("label ")) {
+		setLabel(name.mid(6).toInt());
 	} else if (name == "about") {
 		AboutWindow::open();
 	} else if (name == "view-icons" || name == "view-list" || name == "view-buttons") {
@@ -221,6 +234,26 @@ void Finder::duplicate() {
 	const QString folder = QFileInfo(paths.first()).absolutePath();
 	for (const QString &d : transferItems(paths, folder, true)) {
 		folderChanged(d);
+	}
+}
+
+/* Labels live in an extended attribute on the item itself (an alias's
+ * own, not its original's). The disk and Trash can't be labelled. */
+void Finder::setLabel(int label) {
+	if (label < 0 || label >= PL_LABEL_COUNT) {
+		return;
+	}
+	QSet<QString> folders;
+	for (Item *item : front()->selectedItems()) {
+		if (isSpecial(item)) {
+			continue;
+		}
+		if (writeLabel(item->path, label)) {
+			folders.insert(QFileInfo(item->path).absolutePath());
+		}
+	}
+	for (const QString &folder : folders) {
+		folderChanged(folder);
 	}
 }
 

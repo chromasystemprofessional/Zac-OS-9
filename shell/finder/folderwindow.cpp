@@ -457,8 +457,8 @@ void FolderWindow::paintButtons(pl_canvas *content) {
 		const bool pressed = item.get() == m_buttonDown && m_buttonInside;
 		pl_bevel_button_paint(content, b.x(), b.y(), b.width(), b.height(), pressed);
 		const int shift = pressed ? 1 : 0;
-		pl_icon_paint(content, item->pos.x() + shift, item->pos.y() + shift, item->kind,
-			PL_ICON_LARGE, item->dropTarget);
+		pl_icon_paint_label(content, item->pos.x() + shift, item->pos.y() + shift, item->kind,
+			PL_ICON_LARGE, item->dropTarget, item->labelColor());
 
 		const Text &label = item->labelText();
 		const int lx = b.center().x() - label.inkWidth() / 2, top = b.bottom() + 3;
@@ -629,8 +629,8 @@ void FolderWindow::paintList(pl_canvas *c) {
 		if (item->isDir) {
 			paintTriangle(c, TRI_X + d, top + 3, m_expanded.contains(item->path));
 		}
-		pl_icon_paint(c, ICON_X + d, top + 1, item->kind, PL_ICON_SMALL,
-			item->selected || item->dropTarget);
+		pl_icon_paint_label(c, ICON_X + d, top + 1, item->kind, PL_ICON_SMALL,
+			item->selected || item->dropTarget, item->labelColor());
 
 		const int nameW = COLUMNS[0].width - NAME_X - d - 6;
 		Text name(item->name, std::max(8, nameW), PL_FONT_VIEWS);

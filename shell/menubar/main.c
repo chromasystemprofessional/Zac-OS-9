@@ -7,7 +7,8 @@
  * the menu itself is a small subsurface of it, so redraws stay cheap.
  *
  * Tracking follows Mac OS 8: press a title and drag to an item; or click a
- * title and the menu stays open ("sticky") until the next click.
+ * title and the menu stays open ("sticky") until the next click. An item
+ * with a submenu opens it beside the menu, in a second subsurface.
  */
 #define _GNU_SOURCE
 #include <errno.h>
@@ -68,6 +69,10 @@ static struct {
 	struct wl_subsurface *menu_sub;
 	bool overlay_configured;
 	int menu_x, menu_w, menu_h;
+	int height; /* logical screen height, from the overlay */
+	struct wl_surface *sub_surface;
+	struct wl_subsurface *sub_sub;
+	int sub_x, sub_y, sub_w, sub_h; /* screen position of the border */
 
 	struct mb_bar model;
 	bool rebuild_pending;
@@ -76,14 +81,20 @@ static struct {
 	enum side open_side;
 	int open_index; /* -1 when closed */
 	int selected;   /* item index, or -1 */
+	int sub_parent; /* item whose submenu is open, or -1 */
+	int sub_selected;
 	bool button_down;
 	int blinks_left;
 	bool blink_on;
+	bool chosen_in_sub;
 	struct mb_item chosen; /* copy of the item being performed */
 
 	int clock_fd, blink_fd;
 	bool running;
-} g = { .scale = 1, .open_index = -1, .selected = -1, .clock_fd = -1, .blink_fd = -1 };
+} g = {
+	.scale = 1, .open_index = -1, .selected = -1, .sub_parent = -1, .sub_selected = -1,
+	.clock_fd = -1, .blink_fd = -1,
+};
 
 struct wl_seat *menubar_seat(void) {
 	return g.seat;
@@ -191,8 +202,50 @@ static void to_menu_items(const struct mb_menu *m, struct menu_item *out) {
 			.key = m->items[i].key_text,
 			.enabled = m->items[i].enabled,
 			.checked = m->items[i].checked,
+			.submenu = m->items[i].submenu != NULL,
+			.swatch = m->items[i].swatch,
 		};
 	}
+}
+
+static struct mb_menu *sub_menu_ptr(void) {
+	struct mb_menu *m = open_menu_ptr();
+	return m && g.sub_parent >= 0 ? m->items[g.sub_parent].submenu : NULL;
+}
+
+/* The submenu's first item lines up with its parent item, and the menu
+ * overlaps the parent's right border. TODO: the HIG shows no open
+ * submenu; the overlap is an estimate. */
+static void draw_submenu(struct menu_item *parent_items, int parent_n) {
+	struct mb_menu *s = sub_menu_ptr();
+	if (!s) {
+		wl_surface_attach(g.sub_surface, NULL, 0, 0);
+		wl_surface_commit(g.sub_surface);
+		return;
+	}
+	struct menu_item items[MAX_ITEMS];
+	to_menu_items(s, items);
+	menu_measure(items, s->n, &g.sub_w, &g.sub_h);
+	g.sub_x = g.menu_x + g.menu_w - 1;
+	if (g.sub_x + g.sub_w + MENU_SHADOW > g.width) {
+		g.sub_x = g.menu_x - g.sub_w + 1; /* no room: open to the left */
+	}
+	g.sub_y = MBAR_HEIGHT - 1 + menu_item_top(parent_items, parent_n, g.sub_parent) - 1;
+	if (g.height > 0 && g.sub_y + g.sub_h + MENU_SHADOW > g.height) {
+		g.sub_y = g.height - g.sub_h - MENU_SHADOW;
+	}
+	if (g.sub_y < MBAR_HEIGHT - 1) {
+		g.sub_y = MBAR_HEIGHT - 1;
+	}
+
+	int w = g.sub_w + MENU_SHADOW, h = g.sub_h + MENU_SHADOW;
+	uint32_t *px = calloc((size_t)w * h, sizeof(*px));
+	struct pl_canvas c = { .px = px, .stride = w, .width = w, .height = h };
+	int sel = g.blinks_left > 0 && g.chosen_in_sub && !g.blink_on ? -1 : g.sub_selected;
+	menu_paint(&c, items, s->n, g.sub_w, g.sub_h, sel, PL_ACCENT_DEFAULT);
+	wl_subsurface_set_position(g.sub_sub, g.sub_x, g.sub_y);
+	present(g.sub_surface, px, w, h);
+	free(px);
 }
 
 static void draw_menu(void) {
@@ -216,12 +269,13 @@ static void draw_menu(void) {
 	int w = g.menu_w + MENU_SHADOW, h = g.menu_h + MENU_SHADOW;
 	uint32_t *px = calloc((size_t)w * h, sizeof(*px));
 	struct pl_canvas c = { .px = px, .stride = w, .width = w, .height = h };
-	int sel = g.blinks_left > 0 && !g.blink_on ? -1 : g.selected;
+	int sel = g.blinks_left > 0 && !g.chosen_in_sub && !g.blink_on ? -1 : g.selected;
 	menu_paint(&c, items, m->n, g.menu_w, g.menu_h, sel, PL_ACCENT_DEFAULT);
 
 	wl_subsurface_set_position(g.menu_sub, g.menu_x, MBAR_HEIGHT - 1);
 	present(g.menu_surface, px, w, h);
 	free(px);
+	draw_submenu(items, m->n);
 	wl_surface_commit(g.overlay); /* applies the subsurface position */
 }
 
@@ -233,6 +287,7 @@ static void overlay_configure(void *data, struct zwlr_layer_surface_v1 *layer,
 	/* A single transparent pixel, stretched over the screen, catches input. */
 	static const uint32_t clear = 0;
 	wp_viewport_set_destination(g.overlay_viewport, (int)w, (int)h);
+	g.height = (int)h;
 	struct wl_buffer *buf = make_buffer(&clear, 1, 1);
 	wl_surface_set_buffer_scale(g.overlay, 1);
 	wl_surface_attach(g.overlay, buf, 0, 0);
@@ -273,6 +328,10 @@ static void create_overlay(void) {
 	/* Pointer events all go to the overlay, in screen coordinates. */
 	struct wl_region *none = wl_compositor_create_region(g.compositor);
 	wl_surface_set_input_region(g.menu_surface, none);
+	g.sub_surface = wl_compositor_create_surface(g.compositor);
+	g.sub_sub = wl_subcompositor_get_subsurface(g.subcompositor, g.sub_surface, g.overlay);
+	wl_subsurface_set_desync(g.sub_sub);
+	wl_surface_set_input_region(g.sub_surface, none);
 	wl_region_destroy(none);
 
 	g.overlay_configured = false;
@@ -283,6 +342,8 @@ static void destroy_overlay(void) {
 	if (!g.overlay) {
 		return;
 	}
+	wl_subsurface_destroy(g.sub_sub);
+	wl_surface_destroy(g.sub_surface);
 	wl_subsurface_destroy(g.menu_sub);
 	wl_surface_destroy(g.menu_surface);
 	zwlr_layer_surface_v1_destroy(g.overlay_layer);
@@ -332,6 +393,7 @@ static void open_menu(enum side side, int index) {
 	g.open_side = side;
 	g.open_index = index;
 	g.selected = -1;
+	g.sub_parent = g.sub_selected = -1;
 	create_overlay();
 	draw_bar();
 	draw_menu();
@@ -343,6 +405,7 @@ static void close_menu(void) {
 	}
 	g.open_index = -1;
 	g.selected = -1;
+	g.sub_parent = g.sub_selected = -1;
 	g.button_down = false;
 	destroy_overlay();
 	if (g.rebuild_pending) {
@@ -367,6 +430,26 @@ static int item_under_pointer(void) {
 	return i >= 0 && m->items[i].enabled ? i : -1;
 }
 
+static bool in_submenu(void) {
+	return g.sub_parent >= 0 && g.px >= g.sub_x && g.px < g.sub_x + g.sub_w &&
+		g.py >= g.sub_y && g.py < g.sub_y + g.sub_h;
+}
+
+static int sub_item_under_pointer(void) {
+	struct mb_menu *s = sub_menu_ptr();
+	if (!s || !in_submenu()) {
+		return -1;
+	}
+	int lx = (int)g.px - g.sub_x, ly = (int)g.py - g.sub_y;
+	if (lx < 1 || lx > g.sub_w - 2) {
+		return -1;
+	}
+	struct menu_item items[MAX_ITEMS];
+	to_menu_items(s, items);
+	int i = menu_item_at(items, s->n, g.sub_h, ly);
+	return i >= 0 && s->items[i].enabled ? i : -1;
+}
+
 static void arm_timer(int fd, long ms) {
 	struct itimerspec its = {
 		.it_value = { .tv_sec = ms / 1000, .tv_nsec = (ms % 1000) * 1000000L },
@@ -374,14 +457,20 @@ static void arm_timer(int fd, long ms) {
 	timerfd_settime(fd, 0, &its, NULL);
 }
 
-static void choose(int index) {
-	struct mb_item *it = &open_menu_ptr()->items[index];
+static void choose(int index, bool in_sub) {
+	struct mb_item *it = in_sub ? &sub_menu_ptr()->items[index]
+		: &open_menu_ptr()->items[index];
 	g.chosen = (struct mb_item){
 		.action = it->action,
 		.key = it->key,
 		.arg = it->arg ? strdup(it->arg) : NULL,
 	};
-	g.selected = index;
+	g.chosen_in_sub = in_sub;
+	if (in_sub) {
+		g.sub_selected = index;
+	} else {
+		g.selected = index;
+	}
 	g.blinks_left = BLINK_COUNT * 2;
 	g.blink_on = false;
 	draw_menu();
@@ -416,13 +505,33 @@ static void pointer_moved(void) {
 			open_menu(side, index);
 		} else if (g.selected != -1) {
 			g.selected = -1;
+			g.sub_parent = g.sub_selected = -1;
+			draw_menu();
+		}
+		return;
+	}
+	if (in_submenu()) {
+		int sel = sub_item_under_pointer();
+		if (sel != g.sub_selected) {
+			g.sub_selected = sel;
 			draw_menu();
 		}
 		return;
 	}
 	int sel = item_under_pointer();
+	if (sel < 0 && g.sub_parent >= 0) {
+		/* Off both menus: the submenu stays up, so a diagonal path from
+		 * its parent item does not lose it. */
+		if (g.sub_selected != -1) {
+			g.sub_selected = -1;
+			draw_menu();
+		}
+		return;
+	}
 	if (sel != g.selected) {
 		g.selected = sel;
+		g.sub_parent = sel >= 0 && open_menu_ptr()->items[sel].submenu ? sel : -1;
+		g.sub_selected = -1;
 		draw_menu();
 	}
 }
@@ -456,7 +565,7 @@ static void pointer_pressed(void) {
 			g.button_down = true;
 			open_menu(side, index);
 		}
-	} else if (item_under_pointer() >= 0) {
+	} else if (item_under_pointer() >= 0 || sub_item_under_pointer() >= 0) {
 		g.button_down = true;
 	} else {
 		close_menu();
@@ -469,9 +578,20 @@ static void pointer_released(void) {
 	if (g.open_index < 0 || g.blinks_left > 0 || !was_down) {
 		return;
 	}
+	int sub = sub_item_under_pointer();
+	if (sub >= 0) {
+		choose(sub, true);
+		return;
+	}
+	if (in_submenu()) {
+		return; /* a separator or disabled item: keep tracking */
+	}
 	int sel = item_under_pointer();
+	if (sel >= 0 && sel == g.sub_parent) {
+		return; /* released on a submenu's parent: it stays open */
+	}
 	if (sel >= 0) {
-		choose(sel);
+		choose(sel, false);
 		return;
 	}
 	enum side side;

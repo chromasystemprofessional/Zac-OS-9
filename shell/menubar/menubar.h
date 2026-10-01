@@ -66,12 +66,16 @@ enum action {
 /* ⌘⌫ (delete) as a menu shortcut. */
 #define KEY_DELETE_GLYPH '\b'
 
+struct mb_menu;
+
 struct mb_item {
 	char *label;  /* NULL = separator */
 	char key;     /* ⌘ shortcut, or 0 */
 	bool enabled, checked;
 	enum action action;
 	char *arg;
+	struct mb_menu *submenu; /* hierarchical menu (owned), or NULL */
+	uint32_t swatch;         /* label color square, or 0 */
 	struct plat_text *label_text, *key_text;
 };
 
@@ -110,6 +114,7 @@ void launch_fill_logo_menu(struct mb_menu *menu);
 struct finder_state {
 	bool connected;
 	int selection, window, trash, view;
+	int label; /* the selection's common label index, or -1 */
 };
 
 bool finder_connect(void);

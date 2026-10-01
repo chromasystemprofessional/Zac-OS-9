@@ -33,6 +33,20 @@ const uint32_t *pl_icon(enum pl_icon_kind kind, int size);
  * TODO: measure the exact selected transform. */
 void pl_icon_paint(struct pl_canvas *c, int x, int y, enum pl_icon_kind kind,
 		int size, bool selected);
+/* The same, tinted with a Finder label color (0 = no label). */
+void pl_icon_paint_label(struct pl_canvas *c, int x, int y, enum pl_icon_kind kind,
+		int size, bool selected, uint32_t label_color);
+
+/*
+ * Finder labels: index 0 is "None", 1..7 the Mac OS 8 defaults (Label
+ * control panel), colors from the standard 16-color system palette.
+ */
+#define PL_LABEL_COUNT 8
+struct pl_label {
+	const char *name;
+	uint32_t color; /* ARGB; 0 for None */
+};
+extern const struct pl_label pl_labels[PL_LABEL_COUNT];
 
 #ifdef __cplusplus
 }

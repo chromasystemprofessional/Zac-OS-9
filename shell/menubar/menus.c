@@ -3,6 +3,7 @@
 #include <string.h>
 #include <time.h>
 
+#include "icons.h"
 #include "menubar.h"
 
 #define TEXT_UNLIMITED 100000
@@ -62,6 +63,19 @@ static void add_finder_menus(struct mb_menu *menus, int *n) {
 	add(m, "Close Window", 'W', up && fs->window, ACT_FINDER, "close-window");
 	sep(m);
 	add(m, "Get Info", 'I', sel || (up && fs->window), ACT_FINDER, "get-info");
+	struct mb_item *label = add(m, "Label", 0, sel, ACT_NONE, NULL);
+	label->submenu = calloc(1, sizeof(*label->submenu));
+	for (int i = 0; i < PL_LABEL_COUNT; i++) {
+		char command[16];
+		snprintf(command, sizeof(command), "label %d", i);
+		struct mb_item *it = add(label->submenu, pl_labels[i].name, 0, sel,
+			ACT_FINDER, command);
+		it->swatch = pl_labels[i].color;
+		it->checked = sel && fs->label == i;
+		if (i == 0) {
+			sep(label->submenu);
+		}
+	}
 	add(m, "Duplicate", 'D', sel, ACT_FINDER, "duplicate");
 	add(m, "Make Alias", 'M', sel, ACT_FINDER, "make-alias");
 	add(m, "Put Away", 'Y', sel, ACT_FINDER, "put-away");
@@ -118,6 +132,9 @@ static void render_menu_text(struct mb_menu *m) {
 	}
 	for (int i = 0; i < m->n; i++) {
 		struct mb_item *it = &m->items[i];
+		if (it->submenu) {
+			render_menu_text(it->submenu);
+		}
 		if (it->label) {
 			it->label_text = text_render(it->label, TEXT_UNLIMITED);
 		}
@@ -197,6 +214,10 @@ static void free_menu(struct mb_menu *m) {
 	for (int i = 0; i < m->n; i++) {
 		free(m->items[i].label);
 		free(m->items[i].arg);
+		if (m->items[i].submenu) {
+			free_menu(m->items[i].submenu);
+			free(m->items[i].submenu);
+		}
 		text_destroy(m->items[i].label_text);
 		text_destroy(m->items[i].key_text);
 	}

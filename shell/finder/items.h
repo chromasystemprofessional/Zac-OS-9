@@ -21,6 +21,10 @@ struct Item {
 	const QString &key() const { return stateKey.isEmpty() ? name : stateKey; }
 	std::unique_ptr<Text> label;
 
+	/* Finder label, 0 (None) .. PL_LABEL_COUNT-1, kept in LABEL_ATTR. */
+	int labelIndex = 0;
+	uint32_t labelColor() const { return pl_labels[labelIndex].color; }
+
 	/* For list view. */
 	bool isDir = false;
 	qint64 size = 0;
@@ -37,6 +41,12 @@ struct Item {
 std::vector<std::unique_ptr<Item>> listFolder(const QString &path);
 
 pl_icon_kind iconKindFor(const QString &path);
+
+/* The extended attribute holding an item's label, as a decimal index. */
+inline constexpr const char *LABEL_ATTR = "user.platinum.label";
+int readLabel(const QString &path);
+/* Label 0 removes the attribute. Returns false if it can't be stored. */
+bool writeLabel(const QString &path, int label);
 
 /* "Hard Disk" for /, "Trash" for the trash, else the last path component. */
 QString displayName(const QString &path);
