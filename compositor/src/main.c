@@ -94,9 +94,14 @@ int main(int argc, char *argv[]) {
 		0x66 / 255.0f, 0x66 / 255.0f, 0xCC / 255.0f, 1.0f,
 	};
 	server.desktop = wlr_scene_rect_create(&server.scene->tree, 16384, 16384, desk);
-	server.view_layer = wlr_scene_tree_create(&server.scene->tree);
-	server.unmanaged_layer = wlr_scene_tree_create(&server.scene->tree);
-	server.overlay_layer = wlr_scene_tree_create(&server.scene->tree);
+	struct wlr_scene_tree *root = &server.scene->tree;
+	server.shell_layers[ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND] = wlr_scene_tree_create(root);
+	server.shell_layers[ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM] = wlr_scene_tree_create(root);
+	server.view_layer = wlr_scene_tree_create(root);
+	server.shell_layers[ZWLR_LAYER_SHELL_V1_LAYER_TOP] = wlr_scene_tree_create(root);
+	server.unmanaged_layer = wlr_scene_tree_create(root);
+	server.shell_layers[ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY] = wlr_scene_tree_create(root);
+	server.overlay_layer = wlr_scene_tree_create(root);
 	outline_init(&server.outline, server.overlay_layer);
 
 	/* GTK3 asks for decorations through the older KDE protocol. */
@@ -105,6 +110,8 @@ int main(int argc, char *argv[]) {
 		WLR_SERVER_DECORATION_MANAGER_MODE_SERVER);
 
 	wl_list_init(&server.views);
+	server.foreign_toplevel_mgr = wlr_foreign_toplevel_manager_v1_create(server.display);
+	layers_init(&server);
 	output_init(&server);
 	xdg_init(&server);
 	input_init(&server);

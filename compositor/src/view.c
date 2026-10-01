@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <string.h>
 
 #include "frame.h"
 #include "server.h"
@@ -72,13 +73,67 @@ void view_update_frame(struct plat_view *view) {
 void view_set_title(struct plat_view *view, const char *title) {
 	frame_set_title(view->frame, title);
 	frame_commit(view->frame);
+	if (view->toplevel_handle) {
+		wlr_foreign_toplevel_handle_v1_set_title(view->toplevel_handle, title ? title : "");
+	}
+}
+
+void view_set_app_id(struct plat_view *view, const char *app_id) {
+	free(view->app_id);
+	view->app_id = strdup(app_id ? app_id : "");
+	if (view->toplevel_handle) {
+		wlr_foreign_toplevel_handle_v1_set_app_id(view->toplevel_handle, view->app_id);
+	}
 }
 
 void view_place_new(struct plat_view *view) {
 	/* Stagger new windows down and to the right, like the Finder does. */
 	static int stagger;
 	int offset = 20 * (stagger++ % 10);
-	view_move_to(view, 40 + offset, PLAT_MENUBAR_H + 20 + offset);
+	struct plat_server *server = view->server;
+	struct wlr_box area = output_usable_area(server, server->cursor->x, server->cursor->y);
+	view_move_to(view, area.x + 40 + offset, area.y + 20 + offset);
+}
+
+struct plat_view *view_topmost(struct plat_server *server) {
+	struct plat_view *view;
+	wl_list_for_each(view, &server->views, link) {
+		if (view->mapped && !view->hidden) {
+			return view;
+		}
+	}
+	return NULL;
+}
+
+static void set_active(struct plat_view *view, bool active) {
+	view->impl->set_activated(view, active);
+	frame_set_active(view->frame, active);
+	frame_commit(view->frame);
+	if (view->toplevel_handle) {
+		wlr_foreign_toplevel_handle_v1_set_activated(view->toplevel_handle, active);
+	}
+}
+
+void view_set_hidden(struct plat_view *view, bool hidden) {
+	if (view->hidden == hidden) {
+		return;
+	}
+	struct plat_server *server = view->server;
+	view->hidden = hidden;
+	wlr_scene_node_set_enabled(&view->scene_tree->node, !hidden);
+	if (view->toplevel_handle) {
+		wlr_foreign_toplevel_handle_v1_set_minimized(view->toplevel_handle, hidden);
+	}
+	if (hidden && server->focused_view == view) {
+		set_active(view, false);
+		server->focused_view = NULL;
+		struct plat_view *next = view_topmost(server);
+		if (next) {
+			view_focus(next);
+		} else if (!server->focused_layer) {
+			wlr_seat_keyboard_clear_focus(server->seat);
+		}
+	}
 }
 
 void view_focus(struct plat_view *view) {
@@ -86,29 +141,24 @@ void view_focus(struct plat_view *view) {
 		return;
 	}
 	struct plat_server *server = view->server;
+	if (view->hidden) {
+		view_set_hidden(view, false);
+	}
 	wlr_scene_node_raise_to_top(&view->scene_tree->node);
 	wl_list_remove(&view->link);
 	wl_list_insert(&server->views, &view->link);
 
 	struct plat_view *prev = server->focused_view;
-	if (prev == view) {
-		return;
+	if (prev != view) {
+		if (prev) {
+			set_active(prev, false);
+		}
+		server->focused_view = view;
+		set_active(view, true);
 	}
-	if (prev) {
-		prev->impl->set_activated(prev, false);
-		frame_set_active(prev->frame, false);
-		frame_commit(prev->frame);
-	}
-	server->focused_view = view;
-	view->impl->set_activated(view, true);
-	frame_set_active(view->frame, true);
-	frame_commit(view->frame);
-
-	struct wlr_surface *surface = view->impl->get_surface(view);
-	struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(server->seat);
-	if (keyboard && surface) {
-		wlr_seat_keyboard_notify_enter(server->seat, surface, keyboard->keycodes,
-			keyboard->num_keycodes, &keyboard->modifiers);
+	/* While the menu bar tracks a menu it keeps the keyboard. */
+	if (!server->focused_layer) {
+		input_keyboard_enter(server, view->impl->get_surface(view));
 	}
 }
 
@@ -181,15 +231,20 @@ void view_toggle_zoom(struct plat_view *view) {
 	}
 
 	/* TODO: Mac OS zooms to the app's "standard state"; for Linux clients
-	 * we use the screen below the menu bar with a 3 px margin. */
+	 * we use the area below the menu bar with a 3 px margin. */
 	const int margin = 3;
+	struct wlr_box area = output_usable_area(server,
+		frame.x + frame.width / 2.0, frame.y + frame.height / 2.0);
+	if (!wlr_box_empty(&area)) {
+		screen = area;
+	}
 	view->unzoomed = frame;
 	view->zoomed = true;
 	view_resize_frame(view, (struct wlr_box){
 		.x = screen.x + margin,
-		.y = screen.y + PLAT_MENUBAR_H + margin,
+		.y = screen.y + margin,
 		.width = screen.width - 2 * margin - DECOR_SHADOW,
-		.height = screen.height - PLAT_MENUBAR_H - 2 * margin - DECOR_SHADOW,
+		.height = screen.height - 2 * margin - DECOR_SHADOW,
 	});
 }
 
@@ -211,16 +266,72 @@ void view_set_pressed(struct plat_view *view, enum decor_part part) {
 	frame_commit(view->frame);
 }
 
+static void handle_request_activate(struct wl_listener *listener, void *data) {
+	struct plat_view *view = wl_container_of(listener, view, handle_request_activate);
+	view_focus(view);
+}
+
+static void handle_request_minimize(struct wl_listener *listener, void *data) {
+	struct plat_view *view = wl_container_of(listener, view, handle_request_minimize);
+	struct wlr_foreign_toplevel_handle_v1_minimized_event *event = data;
+	view_set_hidden(view, event->minimized);
+}
+
+static void handle_request_close(struct wl_listener *listener, void *data) {
+	struct plat_view *view = wl_container_of(listener, view, handle_request_close);
+	view_close(view);
+}
+
+static void create_toplevel_handle(struct plat_view *view) {
+	struct plat_server *server = view->server;
+	struct wlr_foreign_toplevel_handle_v1 *h =
+		wlr_foreign_toplevel_handle_v1_create(server->foreign_toplevel_mgr);
+	if (!h) {
+		return;
+	}
+	view->toplevel_handle = h;
+	wlr_foreign_toplevel_handle_v1_set_title(h,
+		view->frame->title_str ? view->frame->title_str : "");
+	wlr_foreign_toplevel_handle_v1_set_app_id(h, view->app_id ? view->app_id : "");
+	struct wlr_box box = view_frame_box(view);
+	struct plat_output *output =
+		output_at(server, box.x + box.width / 2.0, box.y + box.height / 2.0);
+	if (output) {
+		wlr_foreign_toplevel_handle_v1_output_enter(h, output->wlr_output);
+	}
+	view->handle_request_activate.notify = handle_request_activate;
+	wl_signal_add(&h->events.request_activate, &view->handle_request_activate);
+	view->handle_request_minimize.notify = handle_request_minimize;
+	wl_signal_add(&h->events.request_minimize, &view->handle_request_minimize);
+	view->handle_request_close.notify = handle_request_close;
+	wl_signal_add(&h->events.request_close, &view->handle_request_close);
+}
+
+static void destroy_toplevel_handle(struct plat_view *view) {
+	if (!view->toplevel_handle) {
+		return;
+	}
+	wl_list_remove(&view->handle_request_activate.link);
+	wl_list_remove(&view->handle_request_minimize.link);
+	wl_list_remove(&view->handle_request_close.link);
+	wlr_foreign_toplevel_handle_v1_destroy(view->toplevel_handle);
+	view->toplevel_handle = NULL;
+}
+
 void view_handle_map(struct plat_view *view) {
 	view->mapped = true;
+	view->hidden = false;
+	wlr_scene_node_set_enabled(&view->scene_tree->node, true);
 	view_update_frame(view);
 	wl_list_insert(&view->server->views, &view->link);
+	create_toplevel_handle(view);
 	view_focus(view);
 }
 
 void view_handle_unmap(struct plat_view *view) {
 	struct plat_server *server = view->server;
 	view->mapped = false;
+	destroy_toplevel_handle(view);
 	if (view == server->grabbed_view) {
 		outline_hide(&server->outline);
 		server->cursor_mode = PLAT_CURSOR_PASSTHROUGH;
@@ -235,8 +346,8 @@ void view_handle_unmap(struct plat_view *view) {
 	/* Like the Mac, activate the next window in line. */
 	if (server->focused_view == view) {
 		server->focused_view = NULL;
-		if (!wl_list_empty(&server->views)) {
-			struct plat_view *next = wl_container_of(server->views.next, next, link);
+		struct plat_view *next = view_topmost(server);
+		if (next) {
 			view_focus(next);
 		}
 	}
@@ -248,6 +359,7 @@ void view_handle_destroy(struct plat_view *view) {
 	}
 	wl_list_remove(&view->link);
 	frame_destroy(view->frame);
+	free(view->app_id);
 	wlr_scene_node_destroy(&view->scene_tree->node);
 	free(view);
 }

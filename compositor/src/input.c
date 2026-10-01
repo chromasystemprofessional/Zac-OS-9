@@ -10,11 +10,39 @@
 
 /* ---- keyboard ---------------------------------------------------------- */
 
+/* The Windows/Super key is the Mac's ⌘ key. Linux apps expect Ctrl for
+ * the same shortcuts (⌘C = Ctrl+C), so clients see Super as Ctrl. */
+static struct wlr_keyboard_modifiers command_as_ctrl(
+		const struct wlr_keyboard_modifiers *in) {
+	struct wlr_keyboard_modifiers out = *in;
+	uint32_t *masks[] = { &out.depressed, &out.latched, &out.locked };
+	for (int i = 0; i < 3; i++) {
+		if (*masks[i] & WLR_MODIFIER_LOGO) {
+			*masks[i] = (*masks[i] & ~WLR_MODIFIER_LOGO) | WLR_MODIFIER_CTRL;
+		}
+	}
+	return out;
+}
+
+void input_keyboard_enter(struct plat_server *server, struct wlr_surface *surface) {
+	struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(server->seat);
+	if (!surface) {
+		return;
+	}
+	if (!keyboard) {
+		wlr_seat_keyboard_notify_enter(server->seat, surface, NULL, 0, NULL);
+		return;
+	}
+	struct wlr_keyboard_modifiers mods = command_as_ctrl(&keyboard->modifiers);
+	wlr_seat_keyboard_notify_enter(server->seat, surface, keyboard->keycodes,
+		keyboard->num_keycodes, &mods);
+}
+
 static void keyboard_modifiers(struct wl_listener *listener, void *data) {
 	struct plat_keyboard *kb = wl_container_of(listener, kb, modifiers);
 	wlr_seat_set_keyboard(kb->server->seat, kb->wlr_keyboard);
-	wlr_seat_keyboard_notify_modifiers(kb->server->seat,
-		&kb->wlr_keyboard->modifiers);
+	struct wlr_keyboard_modifiers mods = command_as_ctrl(&kb->wlr_keyboard->modifiers);
+	wlr_seat_keyboard_notify_modifiers(kb->server->seat, &mods);
 }
 
 /* Compositor-level shortcuts. Returns true if the key was consumed. */
@@ -176,8 +204,9 @@ static struct wlr_box move_box(struct plat_server *server) {
 	b.x += (int)(server->cursor->x - server->grab_x);
 	b.y += (int)(server->cursor->y - server->grab_y);
 	/* Keep the title bar below the menu bar so it can't be lost. */
-	if (b.y < PLAT_MENUBAR_H) {
-		b.y = PLAT_MENUBAR_H;
+	struct wlr_box area = output_usable_area(server, server->cursor->x, server->cursor->y);
+	if (!wlr_box_empty(&area) && b.y < area.y) {
+		b.y = area.y;
 	}
 	return b;
 }
@@ -339,13 +368,28 @@ static void cursor_button(struct wl_listener *listener, void *data) {
 		struct wlr_surface *surface = NULL;
 		struct plat_view *view = view_at(server, server->cursor->x,
 			server->cursor->y, &surface, &sx, &sy);
-		if (view && !surface) {
-			enum decor_part part =
-				view_part_at(view, server->cursor->x, server->cursor->y);
-			frame_press(server, view, part, event->time_msec);
-			return;
+		struct wlr_layer_surface_v1 *layer = surface ?
+			wlr_layer_surface_v1_try_from_wlr_surface(surface) : NULL;
+		if (layer) {
+			/* Shell surfaces (the menu bar) never activate windows. */
+			if (layer->current.keyboard_interactive !=
+					ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_NONE) {
+				layers_focus(layer->data);
+			}
+		} else {
+			struct plat_layer_surface *fl = server->focused_layer;
+			if (fl && fl->layer_surface->current.keyboard_interactive !=
+					ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_EXCLUSIVE) {
+				server->focused_layer = NULL;
+			}
+			if (view && !surface) {
+				enum decor_part part =
+					view_part_at(view, server->cursor->x, server->cursor->y);
+				frame_press(server, view, part, event->time_msec);
+				return;
+			}
+			view_focus(view);
 		}
-		view_focus(view);
 	}
 	wlr_seat_pointer_notify_button(server->seat, event->time_msec,
 		event->button, event->state);

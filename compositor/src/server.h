@@ -7,6 +7,8 @@
 #include <wlr/render/wlr_renderer.h>
 #include <wlr/types/wlr_compositor.h>
 #include <wlr/types/wlr_cursor.h>
+#include <wlr/types/wlr_foreign_toplevel_management_v1.h>
+#include <wlr/types/wlr_layer_shell_v1.h>
 #include <wlr/types/wlr_output_layout.h>
 #include <wlr/types/wlr_scene.h>
 #include <wlr/types/wlr_seat.h>
@@ -18,8 +20,6 @@
 #include "decor.h"
 #include "outline.h"
 
-/* Height reserved for the Mac OS menu bar (Phase 2). */
-#define PLAT_MENUBAR_H 20
 /* Mac OS default double-click time is 32 ticks (~533 ms). */
 #define PLAT_DOUBLE_CLICK_MS 533
 
@@ -38,14 +38,25 @@ struct plat_server {
 	struct wlr_compositor *compositor;
 	int output_scale; /* integer HiDPI scale applied to every output */
 
-	/* Scene layers, bottom to top. */
+	/* Scene layers, bottom to top:
+	 *   desktop, shell[BACKGROUND], shell[BOTTOM], view_layer,
+	 *   shell[TOP] (menu bar), unmanaged_layer, shell[OVERLAY], overlay_layer */
 	struct wlr_scene *scene;
 	struct wlr_scene_output_layout *scene_layout;
 	struct wlr_scene_rect *desktop;
+	struct wlr_scene_tree *shell_layers[4]; /* indexed by zwlr_layer_shell_v1_layer */
 	struct wlr_scene_tree *view_layer;
 	struct wlr_scene_tree *unmanaged_layer; /* X11 menus, tooltips */
-	struct wlr_scene_tree *overlay_layer;
+	struct wlr_scene_tree *overlay_layer;   /* drag outlines */
 	struct plat_outline outline;
+
+	struct wlr_layer_shell_v1 *layer_shell;
+	struct wl_listener new_layer_surface;
+	struct wl_list layer_surfaces; /* plat_layer_surface.link */
+	/* Layer surface holding keyboard focus (menus being tracked), or NULL. */
+	struct plat_layer_surface *focused_layer;
+
+	struct wlr_foreign_toplevel_manager_v1 *foreign_toplevel_mgr;
 
 	struct wlr_xdg_shell *xdg_shell;
 	struct wl_listener new_xdg_toplevel;
@@ -96,6 +107,9 @@ struct plat_output {
 	struct wl_list link;
 	struct plat_server *server;
 	struct wlr_output *wlr_output;
+	/* Layout-coordinate area left for windows after shell surfaces (the
+	 * menu bar) reserve their exclusive zones. */
+	struct wlr_box usable_area;
 	struct wl_listener frame;
 	struct wl_listener request_state;
 	struct wl_listener destroy;
@@ -140,7 +154,9 @@ struct plat_view {
 	struct plat_frame *frame;
 	struct wlr_xdg_toplevel_decoration_v1 *decoration;
 
+	char *app_id;
 	bool mapped;
+	bool hidden;    /* "Hide <app>" from the Application menu */
 	bool collapsed;
 	bool zoomed;
 	struct wlr_box unzoomed; /* frame box to restore from zoom */
@@ -154,11 +170,33 @@ struct plat_view {
 	struct wl_listener request_maximize;
 	struct wl_listener request_fullscreen;
 	struct wl_listener set_title;
+	struct wl_listener set_app_id;
+
+	/* Exposed to the menu bar via wlr-foreign-toplevel-management. */
+	struct wlr_foreign_toplevel_handle_v1 *toplevel_handle;
+	struct wl_listener handle_request_activate;
+	struct wl_listener handle_request_minimize;
+	struct wl_listener handle_request_close;
+
 	/* Xwayland only. */
 	struct wl_listener associate;
 	struct wl_listener dissociate;
 	struct wl_listener request_configure;
 	struct wl_listener request_activate;
+};
+
+struct plat_layer_surface {
+	struct wl_list link;
+	struct plat_server *server;
+	struct wlr_layer_surface_v1 *layer_surface;
+	struct wlr_scene_layer_surface_v1 *scene;
+	struct wlr_scene_tree *popup_tree;
+	struct wl_listener map;
+	struct wl_listener unmap;
+	struct wl_listener commit;
+	struct wl_listener new_popup;
+	struct wl_listener destroy;
+	bool mapped;
 };
 
 struct plat_keyboard {
@@ -172,11 +210,21 @@ struct plat_keyboard {
 
 /* output.c */
 void output_init(struct plat_server *server);
+struct plat_output *output_at(struct plat_server *server, double lx, double ly);
+/* Usable area of the output under (lx, ly), or of the first output. */
+struct wlr_box output_usable_area(struct plat_server *server, double lx, double ly);
+
+/* layers.c: wlr-layer-shell (menu bar and other shell surfaces) */
+void layers_init(struct plat_server *server);
+void layers_arrange(struct plat_output *output);
+void layers_focus(struct plat_layer_surface *layer);
 
 /* input.c */
 void input_init(struct plat_server *server);
 void input_begin_grab(struct plat_server *server, struct plat_view *view,
 		enum plat_cursor_mode mode, uint32_t edges, enum decor_part part);
+/* Give keyboard focus to a surface, with ⌘ (Super) reported as Ctrl. */
+void input_keyboard_enter(struct plat_server *server, struct wlr_surface *surface);
 
 /* view.c: window behaviour shared by every client type */
 void view_setup(struct plat_view *view, struct plat_server *server,
@@ -188,6 +236,10 @@ void view_handle_destroy(struct plat_view *view);
 void view_update_frame(struct plat_view *view);
 void view_place_new(struct plat_view *view);
 void view_set_title(struct plat_view *view, const char *title);
+void view_set_app_id(struct plat_view *view, const char *app_id);
+void view_set_hidden(struct plat_view *view, bool hidden);
+/* Frontmost visible window, or NULL. */
+struct plat_view *view_topmost(struct plat_server *server);
 
 void view_focus(struct plat_view *view);
 struct plat_view *view_at(struct plat_server *server, double lx, double ly,

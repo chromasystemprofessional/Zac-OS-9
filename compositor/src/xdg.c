@@ -71,6 +71,7 @@ static const struct plat_view_impl xdg_impl = {
 static void handle_map(struct wl_listener *listener, void *data) {
 	struct plat_view *view = wl_container_of(listener, view, map);
 	view_set_title(view, view->xdg_toplevel->title);
+	view_set_app_id(view, view->xdg_toplevel->app_id);
 	view_handle_map(view);
 }
 
@@ -100,6 +101,11 @@ static void handle_set_title(struct wl_listener *listener, void *data) {
 	view_set_title(view, view->xdg_toplevel->title);
 }
 
+static void handle_set_app_id(struct wl_listener *listener, void *data) {
+	struct plat_view *view = wl_container_of(listener, view, set_app_id);
+	view_set_app_id(view, view->xdg_toplevel->app_id);
+}
+
 static void handle_destroy(struct wl_listener *listener, void *data) {
 	struct plat_view *view = wl_container_of(listener, view, destroy);
 	wl_list_remove(&view->map.link);
@@ -111,6 +117,7 @@ static void handle_destroy(struct wl_listener *listener, void *data) {
 	wl_list_remove(&view->request_maximize.link);
 	wl_list_remove(&view->request_fullscreen.link);
 	wl_list_remove(&view->set_title.link);
+	wl_list_remove(&view->set_app_id.link);
 	view_handle_destroy(view);
 }
 
@@ -178,6 +185,8 @@ static void server_new_xdg_toplevel(struct wl_listener *listener, void *data) {
 	wl_signal_add(&xdg_toplevel->events.request_fullscreen, &view->request_fullscreen);
 	view->set_title.notify = handle_set_title;
 	wl_signal_add(&xdg_toplevel->events.set_title, &view->set_title);
+	view->set_app_id.notify = handle_set_app_id;
+	wl_signal_add(&xdg_toplevel->events.set_app_id, &view->set_app_id);
 }
 
 /* ---- popups ------------------------------------------------------------ */

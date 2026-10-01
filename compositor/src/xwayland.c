@@ -86,6 +86,7 @@ static const struct plat_view_impl xwayland_impl = {
 static void handle_map(struct wl_listener *listener, void *data) {
 	struct plat_view *view = wl_container_of(listener, view, map);
 	view_set_title(view, view->xsurface->title);
+	view_set_app_id(view, view->xsurface->class);
 	view_place_new(view);
 	view_handle_map(view);
 }
@@ -182,6 +183,12 @@ static void handle_set_title(struct wl_listener *listener, void *data) {
 	view_set_title(view, view->xsurface->title);
 }
 
+/* WM_CLASS is X11's closest thing to an app id. */
+static void handle_set_class(struct wl_listener *listener, void *data) {
+	struct plat_view *view = wl_container_of(listener, view, set_app_id);
+	view_set_app_id(view, view->xsurface->class);
+}
+
 static void handle_destroy(struct wl_listener *listener, void *data) {
 	struct plat_view *view = wl_container_of(listener, view, destroy);
 	wl_list_remove(&view->map.link);
@@ -196,6 +203,7 @@ static void handle_destroy(struct wl_listener *listener, void *data) {
 	wl_list_remove(&view->request_maximize.link);
 	wl_list_remove(&view->request_fullscreen.link);
 	wl_list_remove(&view->set_title.link);
+	wl_list_remove(&view->set_app_id.link);
 	wl_list_remove(&view->destroy.link);
 	view_handle_destroy(view);
 }
@@ -229,6 +237,8 @@ static void new_managed(struct plat_server *server, struct wlr_xwayland_surface 
 	wl_signal_add(&xsurface->events.request_fullscreen, &view->request_fullscreen);
 	view->set_title.notify = handle_set_title;
 	wl_signal_add(&xsurface->events.set_title, &view->set_title);
+	view->set_app_id.notify = handle_set_class;
+	wl_signal_add(&xsurface->events.set_class, &view->set_app_id);
 	view->destroy.notify = handle_destroy;
 	wl_signal_add(&xsurface->events.destroy, &view->destroy);
 }

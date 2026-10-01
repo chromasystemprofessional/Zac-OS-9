@@ -22,10 +22,18 @@ static void output_request_state(struct wl_listener *listener, void *data) {
 	struct plat_output *output = wl_container_of(listener, output, request_state);
 	const struct wlr_output_event_request_state *event = data;
 	wlr_output_commit_state(output->wlr_output, event->state);
+	layers_arrange(output);
 }
 
 static void output_destroy(struct wl_listener *listener, void *data) {
 	struct plat_output *output = wl_container_of(listener, output, destroy);
+	/* Shell surfaces live on one output; they must go with it. */
+	struct plat_layer_surface *ls, *tmp;
+	wl_list_for_each_safe(ls, tmp, &output->server->layer_surfaces, link) {
+		if (ls->layer_surface->output == output->wlr_output) {
+			wlr_layer_surface_v1_destroy(ls->layer_surface);
+		}
+	}
 	wl_list_remove(&output->frame.link);
 	wl_list_remove(&output->request_state.link);
 	wl_list_remove(&output->destroy.link);
@@ -70,6 +78,24 @@ static void server_new_output(struct wl_listener *listener, void *data) {
 	struct wlr_scene_output *scene_output =
 		wlr_scene_output_create(server->scene, wlr_output);
 	wlr_scene_output_layout_add_output(server->scene_layout, l_output, scene_output);
+	layers_arrange(output);
+}
+
+struct plat_output *output_at(struct plat_server *server, double lx, double ly) {
+	struct wlr_output *wlr_output =
+		wlr_output_layout_output_at(server->output_layout, lx, ly);
+	struct plat_output *output;
+	wl_list_for_each(output, &server->outputs, link) {
+		if (!wlr_output || output->wlr_output == wlr_output) {
+			return output;
+		}
+	}
+	return NULL;
+}
+
+struct wlr_box output_usable_area(struct plat_server *server, double lx, double ly) {
+	struct plat_output *output = output_at(server, lx, ly);
+	return output ? output->usable_area : (struct wlr_box){ 0 };
 }
 
 void output_init(struct plat_server *server) {

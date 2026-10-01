@@ -14,6 +14,7 @@ wl_protocol_dir = wayland_protos.get_variable('pkgdatadir')
 protocols = [
   wl_protocol_dir / 'stable/xdg-shell/xdg-shell.xml',
   wl_protocol_dir / 'unstable/xdg-decoration/xdg-decoration-unstable-v1.xml',
+  meson.project_source_root() / 'protocols/wlr-layer-shell-unstable-v1.xml',
 ]
 protocol_headers = []
 foreach xml : protocols
@@ -42,6 +43,7 @@ executable('platinum-wm',
   'src/view.c',
   'src/xdg.c',
   'src/xwayland.c',
+  'src/layers.c',
   'src/frame.c',
   'src/outline.c',
   'src/pixbuf.c',
