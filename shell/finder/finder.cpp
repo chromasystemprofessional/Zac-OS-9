@@ -12,6 +12,7 @@
 
 #include "alert.h"
 #include "desktop.h"
+#include "findwindow.h"
 #include "folderwindow.h"
 #include "infowindow.h"
 
@@ -166,6 +167,8 @@ void Finder::command(const QString &name) {
 		showOriginal();
 	} else if (name.startsWith("label ")) {
 		setLabel(name.mid(6).toInt());
+	} else if (name == "find") {
+		FindDialog::open();
 	} else if (name == "about") {
 		AboutWindow::open();
 	} else if (name == "view-icons" || name == "view-list" || name == "view-buttons") {
@@ -411,6 +414,7 @@ void Finder::emptyTrash() {
 void Finder::folderChanged(const QString &folder) {
 	const QString abs = QDir(folder).absolutePath();
 	FolderWindow::reloadAll(abs);
+	FoundWindow::reloadAll();
 	if (m_desktop) {
 		m_desktop->folderChanged(abs);
 	}

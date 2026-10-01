@@ -39,6 +39,8 @@ struct Item {
 /* Directory listing as Finder items, folders and files mixed, by name
  * (the Finder's default "by Name" arrangement). Hidden files are skipped. */
 std::vector<std::unique_ptr<Item>> listFolder(const QString &path);
+class QFileInfo;
+std::unique_ptr<Item> makeItem(const QFileInfo &info);
 
 pl_icon_kind iconKindFor(const QString &path);
 

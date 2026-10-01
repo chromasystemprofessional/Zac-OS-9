@@ -41,8 +41,7 @@ QString finderSize(qint64 bytes) {
 	return QString::number(bytes / (1024.0 * 1024 * 1024), 'f', 1) + " GB";
 }
 
-/* "Hard Disk:home:root:" as the Mac wrote paths. */
-static QString macPath(const QString &dir) {
+QString macPath(const QString &dir) {
 	QStringList parts = QDir::cleanPath(dir).split('/', Qt::SkipEmptyParts);
 	parts.prepend(displayName("/"));
 	return parts.join(':') + ':';

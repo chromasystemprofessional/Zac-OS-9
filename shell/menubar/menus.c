@@ -80,7 +80,7 @@ static void add_finder_menus(struct mb_menu *menus, int *n) {
 	add(m, "Make Alias", 'M', sel, ACT_FINDER, "make-alias");
 	add(m, "Put Away", 'Y', sel, ACT_FINDER, "put-away");
 	sep(m);
-	/* TODO: Find. */
+	add(m, "Find…", 'F', up, ACT_FINDER, "find");
 	add(m, "Show Original", 'R', sel, ACT_FINDER, "show-original");
 	add_edit_menu(menus, n, false);
 	m = new_menu(menus, n, "View");

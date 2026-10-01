@@ -61,10 +61,11 @@ scaling only, original behaviors and timings).
   - Free icon positions in icon view (drag to place; remembered).
   - Button view; Duplicate, Make Alias (symlinks), Put Away, Show Original.
   - Spring-loaded folders; Get Info comments (`user.xdg.comment`).
+  - Find (File > Find…): names, whole disk, results as a Finder view.
   - Labels from File > Label (the menu bar's first hierarchical menu),
     stored in `user.platinum.label`; labelled icons are tinted.
 - Next:
-  - Find; alias names in italics (needs an italic views font).
+  - Alias names in italics (needs an italic views font).
 - To measure: icon grid and label metrics, Get Info layout, alert margins,
   selected list row, expanded triangle.
 

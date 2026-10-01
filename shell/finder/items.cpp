@@ -92,17 +92,21 @@ std::vector<std::unique_ptr<Item>> listFolder(const QString &path) {
 	const auto entries = dir.entryInfoList(
 		QDir::AllEntries | QDir::NoDotAndDotDot | QDir::System, QDir::Name | QDir::IgnoreCase);
 	for (const QFileInfo &info : entries) {
-		auto item = std::make_unique<Item>();
-		item->name = info.fileName();
-		item->path = info.absoluteFilePath();
-		item->kind = iconKindFor(item->path);
-		item->isDir = info.isDir();
-		item->size = info.isDir() ? 0 : info.size();
-		item->modified = info.lastModified();
-		item->labelIndex = readLabel(item->path);
-		items.push_back(std::move(item));
+		items.push_back(makeItem(info));
 	}
 	return items;
+}
+
+std::unique_ptr<Item> makeItem(const QFileInfo &info) {
+	auto item = std::make_unique<Item>();
+	item->name = info.fileName();
+	item->path = info.absoluteFilePath();
+	item->kind = iconKindFor(item->path);
+	item->isDir = info.isDir();
+	item->size = info.isDir() ? 0 : info.size();
+	item->modified = info.lastModified();
+	item->labelIndex = readLabel(item->path);
+	return item;
 }
 
 static void labelBox(Item &item, int x, int y, int *l, int *t, int *r, int *b) {
