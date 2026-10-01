@@ -31,6 +31,21 @@ int sb_thumb_range(int length);
 void pl_scrollbar_paint(struct pl_canvas *c, int x, int y,
 		const struct pl_scrollbar *sb, struct pl_accent accent);
 
+/* Push buttons (HIG figures 2-3 and 3-2): 20 px tall. A default button
+ * also gets its 3 px ring drawn around the rectangle. */
+#define PL_BUTTON_H 20
+#define PL_BUTTON_RING 3
+#define PL_BUTTON_MIN_W 58 /* HIG: OK and Cancel are 58 x 20 */
+
+enum pl_button_flags {
+	PL_BUTTON_DEFAULT = 1 << 0,
+	PL_BUTTON_PRESSED = 1 << 1,
+	PL_BUTTON_DISABLED = 1 << 2, /* TODO: measure; text is dimmed only */
+};
+
+void pl_button_paint(struct pl_canvas *c, int x, int y, int w,
+		const struct plat_text *label, unsigned flags);
+
 enum sb_part {
 	SB_NONE,
 	SB_DEC_ARROW, /* up / left */

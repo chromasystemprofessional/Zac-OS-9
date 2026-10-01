@@ -1,5 +1,43 @@
 #include "widgets.h"
 
+/* Push-button art: left columns, one stretchable column, right columns. */
+struct nine_slice {
+	int left, right, height;
+	const char *rows[26];
+};
+#include "buttons_data.h"
+
+static void paint_nine(struct pl_canvas *c, int x, int y, int w,
+		const struct nine_slice *s) {
+	for (int j = 0; j < s->height; j++) {
+		const char *row = s->rows[j];
+		for (int i = 0; i < w; i++) {
+			int k = i < s->left ? i : i >= w - s->right ? s->left + 1 + (i - (w - s->right)) : s->left;
+			char ch = row[k];
+			if (ch != '.') {
+				pl_put(c, x + i, y + j, GRAY(ch <= '9' ? ch - '0' : ch - 'a' + 10));
+			}
+		}
+	}
+}
+
+void pl_button_paint(struct pl_canvas *c, int x, int y, int w,
+		const struct plat_text *label, unsigned flags) {
+	const bool pressed = flags & PL_BUTTON_PRESSED;
+	if (flags & PL_BUTTON_DEFAULT) {
+		paint_nine(c, x - PL_BUTTON_RING, y - PL_BUTTON_RING, w + 2 * PL_BUTTON_RING,
+			pressed ? &button_default_pressed : &button_default);
+	} else {
+		paint_nine(c, x, y, w, pressed ? &button_standard_pressed : &button_standard);
+	}
+	if (label && label->ink_l >= 0) {
+		int ink_w = label->ink_r - label->ink_l + 1;
+		uint32_t color = pressed ? C_WHITE : (flags & PL_BUTTON_DISABLED) ? GRAY(0x8) : C_BLACK;
+		/* Baseline 13 px below the top ("OK", HIG figure 3-2). */
+		pl_text(c, label, x + (w - ink_w) / 2, y + 13, color);
+	}
+}
+
 /*
  * Scroll bars are described horizontally, as measured in HIG figure 2-24:
  * `a` runs along the bar (0 = leading border), `b` across it (0 = top
