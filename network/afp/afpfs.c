@@ -106,6 +106,84 @@ static int locate(const char *path, uint32_t *dir, const char **name) {
 	return folder_id(parent, dir);
 }
 
+/* ---- open files ------------------------------------------------------------- */
+
+/* Our open forks, by fork number, with the path each is open on. The
+ * kernel closes a file (release) after close() returns, so a delete right
+ * after can find it still open, and classic Macs won't delete or replace
+ * an open file: then we close our forks on it ourselves and try again. */
+static struct {
+	char *path;
+	bool closed; /* closed early; release has nothing left to do */
+} forks[65536];
+
+static void track(uint16_t fork, const char *path) {
+	free(forks[fork].path);
+	forks[fork].path = strdup(path);
+	forks[fork].closed = false;
+}
+
+static bool under(const char *path, const char *top) {
+	const size_t n = strlen(top);
+	return strncmp(path, top, n) == 0 && (path[n] == 0 || path[n] == '/');
+}
+
+/* Closes our forks on `path` (or inside it); true if there were any. */
+static bool close_forks(const char *path) {
+	bool any = false;
+	for (int f = 0; f < 65536; f++) {
+		if (forks[f].path && !forks[f].closed && under(forks[f].path, path)) {
+			afp_close_fork(afp, (uint16_t)f);
+			forks[f].closed = true;
+			any = true;
+		}
+	}
+	return any;
+}
+
+/* After a move, open forks follow their files. */
+static void moved(const char *from, const char *to) {
+	for (int f = 0; f < 65536; f++) {
+		if (forks[f].path && under(forks[f].path, from)) {
+			char *p;
+			if (asprintf(&p, "%s%s", to, forks[f].path + strlen(from)) >= 0) {
+				free(forks[f].path);
+				forks[f].path = p;
+			}
+		}
+	}
+}
+
+/* Deletes and moves of open files are refused. If the file is open only
+ * through our own forks (the kernel sends release after close() has
+ * returned, and we handle one request at a time), close them and try
+ * again; if someone else has it open, it stays busy. */
+static bool still_busy(int r, const char *path, int *tries) {
+	return r == -EBUSY && ++*tries <= 1 && close_forks(path);
+}
+
+static int delete_item(uint32_t dir, const char *name, const char *path) {
+	int r, tries = 0;
+	do {
+		r = afp_delete(afp, dir, name);
+	} while (still_busy(r, path, &tries));
+	return r;
+}
+
+static int move_item(uint32_t from_dir, const char *from_name, const char *from,
+		uint32_t to_dir, const char *to_name) {
+	int r, tries = 0;
+	do {
+		r = afp_move(afp, from_dir, from_name, to_dir, to_name);
+	} while (still_busy(r, from, &tries));
+	return r;
+}
+
+static int fork_of(struct fuse_file_info *fi, uint16_t *fork) {
+	*fork = (uint16_t)fi->fh;
+	return forks[*fork].closed ? -EIO : 0;
+}
+
 /* ---- operations ------------------------------------------------------------- */
 
 static void fill_stat(const struct afp_entry *e, struct stat *st) {
@@ -199,11 +277,18 @@ static int fs_open(const char *path, struct fuse_file_info *fi) {
 	if ((r = afp_open_fork(afp, dir, name, write, &fork)) < 0) {
 		return r;
 	}
-	if (write && (fi->flags & O_TRUNC)) {
-		afp_set_fork_size(afp, fork, 0);
+	if (write && (fi->flags & O_TRUNC) && afp_set_fork_size(afp, fork, 0) == -EOPNOTSUPP) {
+		/* A server that can't set a file's length: start a new one instead. */
+		afp_close_fork(afp, fork);
+		r = delete_item(dir, name, path);
+		if (r < 0 || (r = afp_create_file(afp, dir, name)) < 0 ||
+				(r = afp_open_fork(afp, dir, name, true, &fork)) < 0) {
+			return r;
+		}
 	}
 	fi->fh = fork;
 	fi->direct_io = 0;
+	track(fork, path);
 	return 0;
 }
 
@@ -226,7 +311,9 @@ static int fs_read(const char *path, char *buf, size_t size, off_t offset,
 	if (offset >= 0xFFFFFFFFLL) {
 		return 0;
 	}
-	return (int)afp_read(afp, (uint16_t)fi->fh, (uint32_t)offset, buf, size);
+	uint16_t fork;
+	int r = fork_of(fi, &fork);
+	return r < 0 ? r : (int)afp_read(afp, fork, (uint32_t)offset, buf, size);
 }
 
 static int fs_write(const char *path, const char *buf, size_t size, off_t offset,
@@ -234,23 +321,58 @@ static int fs_write(const char *path, const char *buf, size_t size, off_t offset
 	if (offset + (off_t)size > 0xFFFFFFFFLL) {
 		return -EFBIG; /* AFP 2's files stop at 4 GB */
 	}
-	return (int)afp_write(afp, (uint16_t)fi->fh, (uint32_t)offset, buf, size);
+	uint16_t fork;
+	int r = fork_of(fi, &fork);
+	return r < 0 ? r : (int)afp_write(afp, fork, (uint32_t)offset, buf, size);
 }
 
 static int fs_release(const char *path, struct fuse_file_info *fi) {
-	return afp_close_fork(afp, (uint16_t)fi->fh);
+	const uint16_t fork = (uint16_t)fi->fh;
+	const bool closed = forks[fork].closed;
+	free(forks[fork].path);
+	forks[fork].path = NULL;
+	forks[fork].closed = false;
+	return closed ? 0 : afp_close_fork(afp, fork);
 }
 
 /* Flushing is a hint: Mac OS 9's server refuses FPFlushFork (writes
  * reach its disk anyway), so its answer doesn't matter. */
 static int fs_flush(const char *path, struct fuse_file_info *fi) {
-	afp_flush_fork(afp, (uint16_t)fi->fh);
+	if (!forks[(uint16_t)fi->fh].closed) {
+		afp_flush_fork(afp, (uint16_t)fi->fh);
+	}
 	return 0;
 }
 
 static int fs_fsync(const char *path, int datasync, struct fuse_file_info *fi) {
-	afp_flush_fork(afp, (uint16_t)fi->fh);
-	return 0;
+	return fs_flush(path, fi);
+}
+
+/* For servers that can't set a file's length: keep its first
+ * `size` bytes (zeros past the end), and write them to a new file in its
+ * place. Closes `fork`. */
+static int recreate(const char *path, uint32_t dir, const char *name, uint16_t fork, uint32_t size) {
+	if (size > 64u * 1024 * 1024) {
+		afp_close_fork(afp, fork);
+		return -EOPNOTSUPP;
+	}
+	char *keep = calloc(1, size ? size : 1);
+	if (!keep) {
+		afp_close_fork(afp, fork);
+		return -ENOMEM;
+	}
+	ssize_t got = size ? afp_read(afp, fork, 0, keep, size) : 0;
+	afp_close_fork(afp, fork);
+	int r = got < 0 ? (int)got : delete_item(dir, name, path);
+	if (r == 0 && (r = afp_create_file(afp, dir, name)) == 0 &&
+			(r = afp_open_fork(afp, dir, name, true, &fork)) == 0) {
+		if (size && afp_write(afp, fork, 0, keep, size) != (ssize_t)size) {
+			r = -EIO;
+		}
+		afp_close_fork(afp, fork);
+	}
+	free(keep);
+	return r;
 }
 
 static int fs_truncate(const char *path, off_t size, struct fuse_file_info *fi) {
@@ -258,7 +380,9 @@ static int fs_truncate(const char *path, off_t size, struct fuse_file_info *fi) 
 		return -EFBIG;
 	}
 	if (fi) {
-		return afp_set_fork_size(afp, (uint16_t)fi->fh, (uint32_t)size);
+		uint16_t fork;
+		int r = fork_of(fi, &fork);
+		return r < 0 ? r : afp_set_fork_size(afp, fork, (uint32_t)size);
 	}
 	uint32_t dir;
 	const char *name;
@@ -268,7 +392,11 @@ static int fs_truncate(const char *path, off_t size, struct fuse_file_info *fi) 
 		return r;
 	}
 	r = afp_set_fork_size(afp, fork, (uint32_t)size);
-	afp_close_fork(afp, fork);
+	if (r == -EOPNOTSUPP) {
+		r = recreate(path, dir, name, fork, (uint32_t)size);
+	} else {
+		afp_close_fork(afp, fork);
+	}
 	return r;
 }
 
@@ -287,18 +415,23 @@ static int fs_unlink(const char *path) {
 	uint32_t dir;
 	const char *name;
 	int r = locate(path, &dir, &name);
-	return r < 0 ? r : afp_delete(afp, dir, name);
+	if (r < 0) {
+		return r;
+	}
+	return delete_item(dir, name, path);
 }
 
 static int fs_rmdir(const char *path) {
 	uint32_t dir;
 	const char *name;
 	int r = locate(path, &dir, &name);
-	if (r < 0 || (r = afp_delete(afp, dir, name)) < 0) {
+	if (r < 0) {
 		return r;
 	}
-	forget(path);
-	return 0;
+	if ((r = delete_item(dir, name, path)) == 0) {
+		forget(path);
+	}
+	return r;
 }
 
 static int fs_rename(const char *from, const char *to, unsigned int flags) {
@@ -317,15 +450,16 @@ static int fs_rename(const char *from, const char *to, unsigned int flags) {
 		if (flags & RENAME_NOREPLACE) {
 			return -EEXIST;
 		}
-		if ((r = afp_delete(afp, to_dir, to_name)) < 0) {
+		if ((r = delete_item(to_dir, to_name, to)) < 0) {
 			return r;
 		}
 		forget(to);
 	}
-	if ((r = afp_move(afp, from_dir, from_name, to_dir, to_name)) < 0) {
+	if ((r = move_item(from_dir, from_name, from, to_dir, to_name)) < 0) {
 		return r;
 	}
 	forget(from);
+	moved(from, to);
 	return 0;
 }
 

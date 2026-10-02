@@ -143,6 +143,13 @@ int main(int argc, char **argv) {
 		afp_disconnect(&a);
 		return r == -EACCES ? 2 : 1;
 	}
+	/* The volume answers before it is handed to the system. */
+	struct afp_entry root;
+	if ((r = afp_stat(&a, AFP_ROOT_DIR, "", &root)) < 0) {
+		fprintf(stderr, "The volume “%s” isn’t answering.\n", volume);
+		afp_disconnect(&a);
+		return 1;
+	}
 	char source[300];
 	snprintf(source, sizeof(source), "afp://%s/%s", argv[i], volume);
 	return afpfs_run(&a, dir, source, foreground) == 0 ? 0 : 1;

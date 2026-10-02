@@ -95,6 +95,16 @@ write_afp_conf() {
 	uams="uams_dhx2.so uams_dhx.so"
 	[ "$cleartext" = yes ] && uams="$uams uams_clrtxt.so"
 	[ "$guests" = yes ] && uams="$uams uams_guest.so"
+	# Netatalk can't have a volume inside another: it keeps each folder's ID
+	# on the folder, and a shared folder's (its volume's root) would clash
+	# in the home volume around it. So home volumes hide the shared folders
+	# in them, which Macs mount as volumes of their own.
+	home_veto=/.*/
+	each_share | while IFS="$tab" read -r sname spath; do
+		case $spath in /home/*/*) printf '%s/' "$(basename "$spath")" ;; esac
+	done >/tmp/platinum-veto.$$
+	home_veto="$home_veto$(cat /tmp/platinum-veto.$$)"
+	rm -f /tmp/platinum-veto.$$
 	keep_original /etc/netatalk/afp.conf
 	cat >/etc/netatalk/afp.conf <<EOF
 ; Written by Platinum 2026's File Sharing control panel from $conf;
@@ -110,8 +120,8 @@ mac charset = MAC_ROMAN
 
 [Homes]
 basedir regex = /home
-; Unix's hidden files stay hidden from Macs too.
-veto files = /.*/
+; Unix's hidden files stay hidden from Macs too, and so do shared folders.
+veto files = $home_veto
 EOF
 	# Shared folders (Get Info > Sharing). What each person may do is up to
 	# the folders' Unix permissions; guests log in as "nobody".

@@ -2,12 +2,14 @@
 #include "dsi.h"
 
 #include <errno.h>
+#include <stdio.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/uio.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -38,18 +40,28 @@ static uint32_t get32(const uint8_t *p) {
 	return (uint32_t)p[0] << 24 | (uint32_t)p[1] << 16 | (uint32_t)p[2] << 8 | p[3];
 }
 
-static int write_all(int fd, const void *buf, size_t n) {
-	const uint8_t *p = buf;
+/* Sends the pieces as one message: in one go, so they leave in as few
+ * TCP segments as possible. Mac OS 9's server misreads a request whose
+ * header and parameters arrive in separate segments. */
+static int write_all(int fd, struct iovec *iov, int n) {
 	while (n > 0) {
-		ssize_t w = send(fd, p, n, MSG_NOSIGNAL);
+		struct msghdr msg = { .msg_iov = iov, .msg_iovlen = (size_t)n };
+		ssize_t w = sendmsg(fd, &msg, MSG_NOSIGNAL);
 		if (w < 0 && errno == EINTR) {
 			continue;
 		}
 		if (w <= 0) {
 			return -1;
 		}
-		p += w;
-		n -= (size_t)w;
+		while (n > 0 && (size_t)w >= iov->iov_len) {
+			w -= (ssize_t)iov->iov_len;
+			iov++;
+			n--;
+		}
+		if (n > 0) {
+			iov->iov_base = (uint8_t *)iov->iov_base + w;
+			iov->iov_len -= (size_t)w;
+		}
 	}
 	return 0;
 }
@@ -79,8 +91,12 @@ static int send_header(struct dsi *d, const struct header *h, const void *a, siz
 	put32(raw + 4, (uint32_t)h->code);
 	put32(raw + 8, h->length);
 	put32(raw + 12, 0);
-	if (write_all(d->fd, raw, sizeof(raw)) < 0 || (alen && write_all(d->fd, a, alen) < 0) ||
-			(blen && write_all(d->fd, b, blen) < 0)) {
+	struct iovec iov[3] = {
+		{ raw, sizeof(raw) },
+		{ (void *)a, alen },
+		{ (void *)b, blen },
+	};
+	if (write_all(d->fd, iov, blen ? 3 : alen ? 2 : 1) < 0) {
 		d->dead = 1;
 		return -1;
 	}
@@ -169,6 +185,10 @@ int dsi_request(struct dsi *d, enum dsi_command command, const void *req, size_t
 				free(body);
 				break;
 			}
+		}
+		if (getenv("PLATINUM_AFP_DEBUG")) {
+			fprintf(stderr, "dsi: got flags=%d cmd=%d id=%u code=%d len=%u (waiting for id %u)\n",
+				r.flags, r.command, r.id, r.code, r.length, h.id);
 		}
 		if (r.flags == 0) {
 			/* From the server: tickles need nothing; attentions (such as

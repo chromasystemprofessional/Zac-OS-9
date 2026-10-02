@@ -284,6 +284,7 @@ static int to_errno(int code) {
 	case AFP_CANT_RENAME:
 	case AFP_PARAM_ERR: return -EINVAL;
 	case AFP_CALL_NOT_SUPPORTED: return -ENOSYS;
+	case AFP_BITMAP_ERR: return -EOPNOTSUPP; /* a parameter this server can't set */
 	default: return -EIO;
 	}
 }
@@ -296,7 +297,15 @@ static int call(struct afp *a, const struct buf *b, uint8_t **out, size_t *outle
 		debug = getenv("PLATINUM_AFP_DEBUG") != NULL;
 	}
 	if (debug) {
-		fprintf(stderr, "afp: command %d (%zu bytes) -> %d\n", b->data[0], b->len, code);
+		fprintf(stderr, "afp: command %d (%zu bytes) -> %d  [", b->data[0], b->len, code);
+		for (size_t i = 0; i < b->len && i < 40; i++) {
+			fprintf(stderr, "%02x", b->data[i]);
+		}
+		fprintf(stderr, "] -> [");
+		for (size_t i = 0; out && *out && outlen && i < *outlen && i < 24; i++) {
+			fprintf(stderr, "%02x", (*out)[i]);
+		}
+		fprintf(stderr, "]\n");
 	}
 	return code;
 }
@@ -889,6 +898,9 @@ ssize_t afp_write(struct afp *a, uint16_t fork, uint32_t offset, const void *buf
 		put32(&b, (uint32_t)n);
 		int code = dsi_request(&a->dsi, DSI_WRITE, b.data, b.len, (const uint8_t *)buf + done, n,
 			NULL, NULL);
+		if (getenv("PLATINUM_AFP_DEBUG")) {
+			fprintf(stderr, "afp: write %zu bytes at %u -> %d\n", n, offset + (unsigned)done, code);
+		}
 		if (code != 0) {
 			return done ? (ssize_t)done : to_errno(code);
 		}
