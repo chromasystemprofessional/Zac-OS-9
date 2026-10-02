@@ -129,13 +129,23 @@ bool writeLabel(const QString &path, int label) {
 	return lsetxattr(name.constData(), LABEL_ATTR, value.constData(), value.size(), 0) == 0;
 }
 
+/* Folders a classic Mac makes on any file server it writes to, and hides
+ * there with its own invisible flag. */
+static bool macHousekeeping(const QString &name) {
+	static const QStringList names = { "Network Trash Folder", "TheVolumeSettingsFolder",
+		"TheFindByContentFolder", "Temporary Items", "Icon\r" };
+	return names.contains(name);
+}
+
 std::vector<std::unique_ptr<Item>> listFolder(const QString &path) {
 	std::vector<std::unique_ptr<Item>> items;
 	QDir dir(path);
 	const auto entries = dir.entryInfoList(
 		QDir::AllEntries | QDir::NoDotAndDotDot | QDir::System, QDir::Name | QDir::IgnoreCase);
 	for (const QFileInfo &info : entries) {
-		items.push_back(makeItem(info));
+		if (!macHousekeeping(info.fileName())) {
+			items.push_back(makeItem(info));
+		}
 	}
 	return items;
 }

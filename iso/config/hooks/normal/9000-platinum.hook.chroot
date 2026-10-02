@@ -6,5 +6,7 @@ systemctl enable greetd.service platinum-console-colors.service
 systemctl set-default graphical.target
 # greetd takes tty1 (the splash's console) instead of a text login.
 systemctl mask getty@tty1.service
+# File sharing starts off; the File Sharing control panel turns it on.
+systemctl disable netatalk.service smbd.service nmbd.service wsdd2.service 2>/dev/null || true
 # The splash theme and settings into the initramfs.
 update-initramfs -u

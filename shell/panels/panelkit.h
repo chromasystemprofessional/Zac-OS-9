@@ -225,3 +225,11 @@ private:
 	bool m_caretOn = true;
 	PanelEdit *m_pressedEdit = nullptr;
 };
+
+/* Text at a pen position, and a label right-aligned so its ink ends at
+ * `right`; both on `baseline`. */
+void panelText(pl_canvas *c, const QString &s, int x, int baseline, pl_font font = PL_FONT_SYSTEM,
+	uint32_t color = C_BLACK, int maxWidth = 1000);
+void panelLabel(pl_canvas *c, const QString &s, int right, int baseline, uint32_t color = C_BLACK);
+/* Greedy word wrap: the lines of `s` that fit in `width`. */
+QStringList panelWrap(const QString &s, int width, pl_font font);

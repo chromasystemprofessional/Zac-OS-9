@@ -969,3 +969,38 @@ bool PanelHost::hostKey(QKeyEvent *e) {
 	}
 	return false;
 }
+
+/* ---- text ---------------------------------------------------------------------- */
+
+void panelText(pl_canvas *c, const QString &s, int x, int baseline, pl_font font, uint32_t color,
+		int maxWidth) {
+	Text t(s, maxWidth, font);
+	if (t.t && t.t->ink_l >= 0) {
+		pl_text(c, t.t, x + t.t->ink_l - 1, baseline, color);
+	}
+}
+
+void panelLabel(pl_canvas *c, const QString &s, int right, int baseline, uint32_t color) {
+	Text t(s, 400, PL_FONT_SYSTEM);
+	if (t.t && t.t->ink_l >= 0) {
+		pl_text(c, t.t, right - t.inkWidth() + 1, baseline, color);
+	}
+}
+
+QStringList panelWrap(const QString &s, int width, pl_font font) {
+	QStringList lines;
+	QString line;
+	for (const QString &word : s.split(' ', Qt::SkipEmptyParts)) {
+		const QString candidate = line.isEmpty() ? word : line + ' ' + word;
+		if (!line.isEmpty() && Text(candidate, 100000, font).inkWidth() > width) {
+			lines << line;
+			line = word;
+		} else {
+			line = candidate;
+		}
+	}
+	if (!line.isEmpty()) {
+		lines << line;
+	}
+	return lines;
+}

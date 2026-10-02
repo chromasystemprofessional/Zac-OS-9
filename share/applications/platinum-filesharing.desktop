@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=File Sharing
+Comment=Share this computer's files with Macs (AFP) and Windows computers (SMB)
+Exec=platinum-filesharing
+Categories=Settings;Network;
+OnlyShowIn=Platinum;

@@ -29,5 +29,12 @@ network-manager
 linux-headers-amd64
 broadcom-sta-dkms
 
+# File sharing: Macs (AFP), Windows (SMB, and shown in Windows' Network)
+netatalk
+samba
+wsdd2
+avahi-daemon
+pkexec
+
 # The boot splash
 plymouth

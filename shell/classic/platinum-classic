@@ -161,6 +161,11 @@ if $check; then
 fi
 
 set -- --rom "$rom" --ramsize $ram --screen win/800/600 --extfs "$HOME" --nogui true
+# A network through the emulator's own NAT: the Mac gets an address by DHCP
+# and reaches this computer at 10.0.2.2 (its file sharing too, in the
+# Chooser or Network Browser). This computer reaches the Mac's file
+# sharing at localhost:5548.
+set -- "$@" --ether slirp --redir tcp:5548:548
 # Hard disks first, so the Mac starts up from an installed system and
 # only falls back to a CD; CD images are read-only ("*" prefix).
 old_ifs=$IFS

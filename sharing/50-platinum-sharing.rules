@@ -1,0 +1,9 @@
+// Administrators at the computer (in the sudo group, logged in on its
+// screen) may change file sharing settings without a password, as the
+// File Sharing control panel has no way to ask for one.
+polkit.addRule(function(action, subject) {
+	if (action.id == "org.platinum2026.sharing" &&
+			subject.local && subject.active && subject.isInGroup("sudo")) {
+		return polkit.Result.YES;
+	}
+});

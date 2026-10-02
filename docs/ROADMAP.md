@@ -120,7 +120,27 @@ scaling only, original behaviors and timings).
     address, connect automatically) and Info…. Tested against a stand-in
     nmcli (tests/ui/tcpip.sh) and real NetworkManager with a simulated
     WPA2 network in the VM (tests/vm/tcpip-wifi.py).
+  - File Sharing control panel (platinum-filesharing), after Mac OS 9's:
+    - Start/Stop: Network Identity, File Sharing for Macs (AFP through
+      Netatalk 4: Mac OS 8.5 to 9 over TCP/IP with DHX, older Macs with
+      clear-text passwords if allowed, macOS with DHX2 and Bonjour), and
+      Windows File Sharing (SMB through Samba, wsdd2 for Windows'
+      Network) where Mac OS 9 had Program Linking.
+    - Activity Monitor (connected users, Disconnect) and Users & Groups
+      (owner, guests).
+    - The owner's password is their login password; it is stored for
+      Samba once checked.
+    - Changes go through platinum-sharing-helper (pkexec; polkit lets
+      administrators at the computer use it without a password).
+    - Tested: Mac OS 9 in Classic connected with the Chooser, mounted the
+      owner's home and wrote to it; smbclient against Samba in the VM.
+  - Classic's emulated Mac has a network (SheepShaver's NAT): it reaches
+    this computer at 10.0.2.2.
 - Next:
+  - File sharing: sharing folders from Get Info (Sharing, with
+    Owner/User/Group/Everyone privileges); the Network Browser to connect
+    to other computers: Windows and macOS through gvfs, and classic Macs
+    (AFP 2.2, which nothing in Debian speaks) through our own client.
   - TCP/IP: 802.1X (enterprise) networks, VPNs, proxies; a Wi-Fi menu
     in the menu bar.
   - Monitors on real hardware: several screens, arrangement.

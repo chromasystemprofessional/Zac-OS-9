@@ -123,6 +123,18 @@ executable('platinum-tcpip',
   install: true,
 )
 
+executable('platinum-filesharing',
+  'panels/filesharing.cpp',
+  'finder/alert.cpp',
+  'finder/platinumshell.cpp',
+  finder_protocol,
+  link_with: panelkit,
+  include_directories: include_directories('finder'),
+  dependencies: [platinum_dep, qt6, wayland_client],
+  cpp_args: ['-std=c++17'],
+  install: true,
+)
+
 executable('platinum-controlpanel',
   'panels/controlpanel.cpp',
   link_with: panelkit,

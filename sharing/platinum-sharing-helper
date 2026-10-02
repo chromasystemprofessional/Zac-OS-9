@@ -1,0 +1,253 @@
+#!/bin/sh
+# platinum-sharing-helper: the privileged half of the File Sharing control
+# panel (platinum-filesharing). It runs as root through pkexec; polkit lets
+# administrators at the computer use it without a password
+# (org.platinum2026.sharing).
+#
+#   platinum-sharing-helper apply        settings on stdin, key=value lines:
+#                                        name, owner, afp, smb, guests,
+#                                        cleartext (yes/no for the last four)
+#   platinum-sharing-helper password     your password for Windows sharing on
+#                                        stdin (only for yourself)
+#   platinum-sharing-helper status [USER]
+#                                        who is connected: conn<TAB>kind<TAB>
+#                                        user<TAB>address<TAB>pid lines; and
+#                                        password<TAB>set if USER (you, by
+#                                        default) has a Windows sharing password
+#   platinum-sharing-helper disconnect PID
+#
+# The settings live in /etc/platinum/sharing.conf (readable by everyone);
+# /etc/netatalk/afp.conf (Macs, AFP) and /etc/samba/smb.conf (Windows, SMB)
+# are written from them. The files the packages installed are kept once as
+# *.platinum-orig.
+set -eu
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+conf=/etc/platinum/sharing.conf
+
+die() {
+	echo "$1" >&2
+	exit 1
+}
+
+[ "$(id -u)" = 0 ] || die "platinum-sharing-helper must run as root (through pkexec)."
+
+# The user who asked: pkexec says, sudo says, or root itself.
+caller() {
+	if [ -n "${PKEXEC_UID:-}" ]; then
+		getent passwd "$PKEXEC_UID" | cut -d: -f1
+	elif [ -n "${SUDO_USER:-}" ]; then
+		echo "$SUDO_USER"
+	else
+		echo root
+	fi
+}
+
+yesno() {
+	case $1 in yes | no) echo "$1" ;; *) die "Expected yes or no, not \"$1\"." ;; esac
+}
+
+# A computer name: printable, no characters that mean something in the
+# config files, at most 63 bytes (AFP's limit).
+check_name() {
+	n=$1
+	[ -n "$n" ] || die "The computer name is empty."
+	[ "$(printf %s "$n" | wc -c)" -le 63 ] || die "The computer name is longer than 63 bytes."
+	if printf %s "$n" | grep -q '[][;#=\\"[:cntrl:]]'; then
+		die "The computer name can't contain ; # [ ] = \\ \" or control characters."
+	fi
+	case $n in
+	" "* | *" ") die "The computer name can't start or end with a space." ;;
+	esac
+}
+
+check_owner() {
+	entry=$(getent passwd "$1") || die "There is no user \"$1\"."
+	uid=$(echo "$entry" | cut -d: -f3)
+	[ "$uid" -ge 1000 ] && [ "$uid" -lt 60000 ] || die "\"$1\" isn't a person's account."
+}
+
+# Up to 15 letters, digits and hyphens: the NetBIOS name Windows shows.
+netbios_name() {
+	printf %s "$1" | tr -c 'A-Za-z0-9-' '-' | tr -s '-' | sed 's/^-//; s/-$//' | cut -c1-15 |
+		tr '[:lower:]' '[:upper:]'
+}
+
+keep_original() {
+	[ -e "$1.platinum-orig" ] || { [ -e "$1" ] && cp -p "$1" "$1.platinum-orig"; } || true
+}
+
+write_afp_conf() {
+	uams="uams_dhx2.so uams_dhx.so"
+	[ "$cleartext" = yes ] && uams="$uams uams_clrtxt.so"
+	[ "$guests" = yes ] && uams="$uams uams_guest.so"
+	keep_original /etc/netatalk/afp.conf
+	cat >/etc/netatalk/afp.conf <<EOF
+; Written by Platinum 2026's File Sharing control panel from $conf;
+; changes made here are replaced the next time it saves. The original is
+; afp.conf.platinum-orig.
+
+[Global]
+server name = $name
+; DHX2: macOS. DHX: Mac OS 8.5 to 9. Clear text: older Macs, if allowed.
+uam list = $uams
+guest account = nobody
+mac charset = MAC_ROMAN
+
+[Homes]
+basedir regex = /home
+; Unix's hidden files stay hidden from Macs too.
+veto files = /.*/
+EOF
+}
+
+write_smb_conf() {
+	guest_map=Never
+	[ "$guests" = yes ] && guest_map="Bad User"
+	keep_original /etc/samba/smb.conf
+	cat >/etc/samba/smb.conf <<EOF
+# Written by Platinum 2026's File Sharing control panel from $conf;
+# changes made here are replaced the next time it saves. The original is
+# smb.conf.platinum-orig.
+
+[global]
+   netbios name = $(netbios_name "$name")
+   server string = $name
+   workgroup = WORKGROUP
+   server role = standalone server
+   security = user
+   passdb backend = tdbsam
+   map to guest = $guest_map
+   guest account = nobody
+   server min protocol = SMB2_02
+   vfs objects = fruit streams_xattr
+   fruit:metadata = stream
+   log file = /var/log/samba/log.%m
+   max log size = 1000
+   logging = file
+
+[homes]
+   comment = Home folder
+   browseable = no
+   read only = no
+   valid users = %S
+   create mask = 0644
+   directory mask = 0755
+EOF
+}
+
+services() { # services on|off UNIT...
+	state=$1
+	shift
+	for u in "$@"; do
+		systemctl list-unit-files "$u.service" >/dev/null 2>&1 || continue
+		if [ "$state" = on ]; then
+			systemctl enable --quiet "$u.service" 2>/dev/null || true
+			if ! systemctl restart "$u.service" 2>/dev/null; then
+				case $u in
+				# Only announce the computer on the network: sharing works without.
+				nmbd | wsdd2 | avahi-daemon) echo "warning: $u didn't start" >&2 ;;
+				*) die "$u didn't start; see: journalctl -u $u" ;;
+				esac
+			fi
+		else
+			systemctl disable --now --quiet "$u.service" 2>/dev/null || true
+		fi
+	done
+}
+
+apply() {
+	name="" owner="" afp=no smb=no guests=no cleartext=no
+	while IFS= read -r line; do
+		key=${line%%=*}
+		value=${line#*=}
+		case $key in
+		name) name=$value ;;
+		owner) owner=$value ;;
+		afp) afp=$(yesno "$value") ;;
+		smb) smb=$(yesno "$value") ;;
+		guests) guests=$(yesno "$value") ;;
+		cleartext) cleartext=$(yesno "$value") ;;
+		"") ;;
+		*) die "Unknown setting \"$key\"." ;;
+		esac
+	done
+	check_name "$name"
+	check_owner "$owner"
+
+	mkdir -p /etc/platinum
+	umask 022
+	cat >"$conf.new" <<EOF
+name=$name
+owner=$owner
+afp=$afp
+smb=$smb
+guests=$guests
+cleartext=$cleartext
+EOF
+	mv "$conf.new" "$conf"
+
+	if [ "$afp" = yes ]; then
+		write_afp_conf
+		services on avahi-daemon netatalk
+	else
+		services off netatalk
+	fi
+	if [ "$smb" = yes ]; then
+		write_smb_conf
+		services on smbd nmbd wsdd2
+	else
+		services off smbd nmbd wsdd2
+	fi
+}
+
+password() {
+	user=$(caller)
+	[ "$user" != root ] || die "Run this as the user whose password it is."
+	IFS= read -r pw || true
+	[ -n "$pw" ] || die "The password is empty."
+	printf '%s\n%s\n' "$pw" "$pw" | smbpasswd -s -a "$user" >/dev/null
+	smbpasswd -e "$user" >/dev/null
+}
+
+status() {
+	who=${1:-$(caller)}
+	if [ "$who" != "$(caller)" ] && [ "$(caller)" != root ]; then
+		die "Only root can ask about another user's password."
+	fi
+	if pdbedit -L 2>/dev/null | cut -d: -f1 | grep -qxF "$who"; then
+		printf 'password\tset\n'
+	fi
+	# AFP: each session is an afpd running as the user who logged in.
+	ss -Htnp state established '( sport = :548 )' 2>/dev/null | while read -r _ _ _ peer rest; do
+		pid=$(echo "$rest" | sed -n 's/.*pid=\([0-9]*\).*/\1/p')
+		[ -n "$pid" ] || continue
+		user=$(ps -o user= -p "$pid" 2>/dev/null | tr -d ' ')
+		[ "$user" = root ] && user="(logging in)"
+		# [::ffff:192.168.1.5]:51234 -> 192.168.1.5
+		addr=$(echo "${peer%:*}" | sed 's/^\[//; s/\]$//; s/^::ffff://')
+		printf 'conn\tafp\t%s\t%s\t%s\n' "$user" "$addr" "$pid"
+	done
+	# SMB: smbstatus's table of processes.
+	if command -v smbstatus >/dev/null && systemctl is-active -q smbd; then
+		smbstatus -b 2>/dev/null | awk '/^-+$/ { table = 1; next }
+			table && NF >= 4 && $1 ~ /^[0-9]+$/ { printf "conn\tsmb\t%s\t%s\t%s\n", $2, $4, $1 }'
+	fi
+}
+
+disconnect() {
+	pid=$1
+	case $pid in *[!0-9]* | "") die "Not a process number: $pid" ;; esac
+	comm=$(ps -o comm= -p "$pid" 2>/dev/null || true)
+	case $comm in
+	afpd | smbd) kill "$pid" ;;
+	*) die "Process $pid isn't a file sharing session." ;;
+	esac
+}
+
+case ${1:-} in
+apply) apply ;;
+password) password ;;
+status) status "${2:-}" ;;
+disconnect) disconnect "${2:-}" ;;
+*) die "usage: platinum-sharing-helper apply | password | status | disconnect PID" ;;
+esac

@@ -173,6 +173,7 @@ void launch_fill_logo_menu(struct mb_menu *menu) {
 	const struct { const char *name, *program, *arg; } panel_list[] = {
 		{ "Appearance", "platinum-appearance", "" },
 		{ "Date & Time", "platinum-datetime", "" },
+		{ "File Sharing", "platinum-filesharing", "" },
 		{ "Keyboard", "platinum-controlpanel", " keyboard" },
 		{ "Monitors", "platinum-controlpanel", " monitors" },
 		{ "Mouse", "platinum-controlpanel", " mouse" },

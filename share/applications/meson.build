@@ -1,7 +1,7 @@
 # Desktop entries: copied into build/share/applications (platinum-wm adds
 # its ../share to XDG_DATA_DIRS, which covers the build tree and an
 # install alike) and installed.
-entries = ['platinum-appearance.desktop', 'platinum-datetime.desktop',
+entries = ['platinum-appearance.desktop', 'platinum-datetime.desktop', 'platinum-filesharing.desktop',
   'platinum-keyboard.desktop', 'platinum-monitors.desktop', 'platinum-mouse.desktop',
   'platinum-sound.desktop', 'platinum-tcpip.desktop']
 foreach f : entries
