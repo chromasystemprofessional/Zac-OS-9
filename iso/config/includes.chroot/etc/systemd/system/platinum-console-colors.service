@@ -1,0 +1,13 @@
+# During boot the text consoles' palette is all white (vt.default_* on the
+# kernel command line), so no console text shows over the white screen.
+# Once the desktop is up, give the consoles their normal colours back.
+[Unit]
+Description=Normal colours for the text consoles
+After=greetd.service
+
+[Service]
+Type=simple
+ExecStart=/bin/sh -c 'sleep 20; exec /usr/bin/setvtrgb vga'
+
+[Install]
+WantedBy=graphical.target

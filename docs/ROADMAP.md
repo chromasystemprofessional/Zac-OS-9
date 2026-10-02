@@ -172,9 +172,15 @@ See `docs/packaging.md`.
     - firmware for real hardware.
   - QEMU virtual machine for full-session testing (`vm.cmd`,
     `scripts/vm.sh`), and a headless boot test (`tests/vm/boot.sh`).
+  - A silent start-up: white from GRUB (menu hidden; Esc shows it)
+    through the kernel and a white plymouth theme (the console palette is
+    white while booting), then platinum-wm's logo on white, the Welcome
+    screen and the desktop. No console text.
+  - `scripts/dev-boot.sh`: try system changes in a VM in minutes, on top of
+    the last ISO build's system, with a recorded timeline of the screen.
 - Next:
   - A Platinum login window in place of tuigreet.
-  - A Platinum boot menu and splash screen.
+  - A Platinum boot menu (shown on Esc).
   - Manual pages.
   - Testing on real hardware and in Hyper-V.
 

@@ -28,3 +28,6 @@ network-manager
 # laptops): the wl driver, built for the image's kernel
 linux-headers-amd64
 broadcom-sta-dkms
+
+# The boot splash
+plymouth

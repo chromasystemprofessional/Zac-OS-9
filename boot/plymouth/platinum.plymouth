@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=Platinum 2026
+Description=A white screen while the system starts
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/platinum
+ScriptFile=/usr/share/plymouth/themes/platinum/platinum.script

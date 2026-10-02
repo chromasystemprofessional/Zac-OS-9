@@ -61,6 +61,8 @@ Build only: `wsl -d Debian -- scripts/build.sh`
   Platinum 2026.
 - **`vm.cmd`** runs that ISO in a QEMU virtual machine, with a real boot, login
   and screen.
+- `scripts/dev-boot.sh` tries system and boot changes in a VM in a few minutes,
+  without building the ISO.
 
 See [docs/packaging.md](docs/packaging.md).
 

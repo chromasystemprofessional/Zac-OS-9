@@ -1,0 +1,21 @@
+# Platinum 2026 boot splash: a white screen, nothing more. The kernel's
+# console is white too while booting (vt.default_* in iso/kernel-params),
+# so going from the splash to platinum-wm is white to white; platinum-wm
+# then shows the logo on white, and the Welcome screen.
+
+Window.SetBackgroundTopColor(1, 1, 1);
+Window.SetBackgroundBottomColor(1, 1, 1);
+
+# A disk password, if one is needed: one plain line in the middle.
+fun display_password_callback(prompt, bullets) {
+  box.image = Image.Text(prompt + "  " + bullets, 0, 0, 0);
+  box.sprite = Sprite(box.image);
+  box.sprite.SetX(Window.GetX() + Math.Int((Window.GetWidth() - box.image.GetWidth()) / 2));
+  box.sprite.SetY(Window.GetY() + Math.Int(Window.GetHeight() / 2));
+}
+Plymouth.SetDisplayPasswordFunction(display_password_callback);
+
+fun display_normal_callback() {
+  box.sprite = NULL;
+}
+Plymouth.SetDisplayNormalFunction(display_normal_callback);

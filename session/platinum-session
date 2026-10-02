@@ -16,10 +16,19 @@ export GDK_BACKEND="wayland,x11"
 export MOZ_ENABLE_WAYLAND=1
 export _JAVA_AWT_WM_NONREPARENTING=1
 
-# No GPU render node (a basic virtual machine display, a plain
-# framebuffer): draw in software. Platinum is light enough for it.
-if [ -z "${WLR_RENDERER:-}" ] && ! ls /dev/dri/renderD* >/dev/null 2>&1; then
-	export WLR_RENDERER=pixman
+# No real GPU (a plain framebuffer, or a virtual machine's display, where
+# GL would be emulated on the CPU and shows stale frames): draw with
+# pixman. Platinum is light enough for it.
+if [ -z "${WLR_RENDERER:-}" ]; then
+	gpu=false
+	for node in /sys/class/drm/renderD*; do
+		[ -e "$node/device/driver" ] || continue
+		case $(basename "$(readlink -f "$node/device/driver")") in
+		virtio_gpu | virtio-pci | bochs* | qxl | cirrus* | vboxvideo | vmwgfx | simpledrm) ;;
+		*) gpu=true ;;
+		esac
+	done
+	$gpu || export WLR_RENDERER=pixman
 fi
 
 # Apps want a D-Bus session bus. A systemd login has one in the runtime

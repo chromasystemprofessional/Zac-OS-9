@@ -1,5 +1,7 @@
 /*
- * The startup screen: while the menu bar and the Finder start, a
+ * The startup screen, as a classic Mac started up: first the logo on
+ * white (the boot before it is all white too, see iso/kernel-params and
+ * boot/plymouth), then, while the menu bar and the Finder start, a
  * "Welcome" box over the desktop pattern, with the logo and a progress
  * bar, as Mac OS 8 showed while it loaded. It lifts once both shell
  * components have put up their surfaces (or after STARTUP_MAX_MS).
@@ -24,7 +26,10 @@
 #include "widgets.h"
 
 #define TICK_MS 40
-#define STARTUP_MAX_MS 6000
+#define LOGO_MS 1500 /* the logo on white, before the Welcome box */
+#define LOGO_SCALE 2
+#define WELCOME_MIN_MS 1500 /* the Welcome box shows at least this long */
+#define STARTUP_MAX_MS 6000 /* from the Welcome box */
 #define FILL_MS 2500 /* time to reach 90% while waiting */
 #define FINISH_MS 300 /* from "ready" to a full bar */
 #define HOLD_MS 250   /* the full bar stays up this long */
@@ -36,7 +41,7 @@ static struct {
 	struct plat_server *server;
 	struct wlr_scene_buffer *buffer;
 	struct wl_event_source *timer;
-	long start_ms, ready_ms;
+	long start_ms, welcome_ms, ready_ms;
 	bool menubar, desktop;
 	int pattern;
 	struct plat_text *title, *status;
@@ -55,7 +60,7 @@ static int chosen_pattern(void) {
 }
 
 static double progress(long t) {
-	double p = (double)(t - st.start_ms) / FILL_MS * 0.9;
+	double p = (double)(t - st.welcome_ms) / FILL_MS * 0.9;
 	if (p > 0.9) {
 		p = 0.9;
 	}
@@ -64,6 +69,30 @@ static double progress(long t) {
 		p = p + (1.0 - p) * (q > 1 ? 1 : q);
 	}
 	return p;
+}
+
+/* The logo at `scale`, top-left at (x, y). */
+static void paint_logo(struct pl_canvas *c, int x, int y, int scale) {
+	const int lw = PL_LOGO_SIZE * scale;
+	const uint32_t *logo = logo_pixels();
+	for (int ly = 0; ly < lw; ly++) {
+		for (int lx = 0; lx < lw; lx++) {
+			uint32_t v = logo[(ly / scale) * PL_LOGO_SIZE + lx / scale];
+			if (v >> 24) {
+				pl_put(c, x + lx, y + ly, v);
+			}
+		}
+	}
+}
+
+static void draw_logo(int w, int h) {
+	struct plat_pixbuf *buf = pixbuf_create(w, h);
+	struct pl_canvas c = { .px = buf->data, .stride = w, .width = w, .height = h };
+	pl_fill(&c, 0, 0, w - 1, h - 1, C_WHITE);
+	const int lw = PL_LOGO_SIZE * LOGO_SCALE;
+	paint_logo(&c, (w - lw) / 2, (h - lw) / 2, LOGO_SCALE);
+	wlr_scene_buffer_set_buffer(st.buffer, &buf->base);
+	wlr_buffer_drop(&buf->base);
 }
 
 static void draw(int w, int h, double fraction) {
@@ -84,16 +113,8 @@ static void draw(int w, int h, double fraction) {
 
 	/* The logo at 3x. */
 	const int scale = 3, lw = PL_LOGO_SIZE * scale;
-	const int lx = bx + (BOX_W - lw) / 2, ly = by + 18;
-	const uint32_t *logo = logo_pixels();
-	for (int y = 0; y < lw; y++) {
-		for (int x = 0; x < lw; x++) {
-			uint32_t v = logo[(y / scale) * PL_LOGO_SIZE + x / scale];
-			if (v >> 24) {
-				pl_put(&c, lx + x, ly + y, v);
-			}
-		}
-	}
+	const int ly = by + 18;
+	paint_logo(&c, bx + (BOX_W - lw) / 2, ly, scale);
 	const int tw = st.title->ink_r - st.title->ink_l + 1;
 	pl_text(&c, st.title, bx + (BOX_W - tw) / 2, ly + lw + 22, C_BLACK);
 	const int sw = st.status->ink_r - st.status->ink_l + 1;
@@ -115,7 +136,9 @@ static void finish(void) {
 
 static int tick(void *data) {
 	const long t = now_ms();
-	if (!st.ready_ms && ((st.menubar && st.desktop) || t - st.start_ms > STARTUP_MAX_MS)) {
+	const bool welcome = t >= st.welcome_ms;
+	if (welcome && !st.ready_ms && t - st.welcome_ms >= WELCOME_MIN_MS &&
+			((st.menubar && st.desktop) || t - st.welcome_ms > STARTUP_MAX_MS)) {
 		st.ready_ms = t;
 	}
 	if (st.ready_ms && t - st.ready_ms > FINISH_MS + HOLD_MS) {
@@ -126,7 +149,11 @@ static int tick(void *data) {
 	wlr_output_layout_get_box(st.server->output_layout, NULL, &box);
 	if (box.width > 0 && box.height > 0) {
 		wlr_scene_node_set_position(&st.buffer->node, box.x, box.y);
-		draw(box.width, box.height, progress(t));
+		if (welcome) {
+			draw(box.width, box.height, progress(t));
+		} else {
+			draw_logo(box.width, box.height);
+		}
 	}
 	wl_event_source_timer_update(st.timer, TICK_MS);
 	return 0;
@@ -139,6 +166,7 @@ void startup_begin(struct plat_server *server) {
 	}
 	st.server = server;
 	st.start_ms = now_ms();
+	st.welcome_ms = st.start_ms + LOGO_MS;
 	st.pattern = chosen_pattern();
 	st.title = text_render_font("Platinum 2026", 1000, PL_FONT_SYSTEM);
 	st.status = text_render_font("Starting Up\xe2\x80\xa6", 1000, PL_FONT_VIEWS);

@@ -39,7 +39,7 @@ sudo_ lb config \
 	--iso-publisher "Platinum 2026" \
 	--iso-volume "Platinum 2026" \
 	--image-name platinum-2026 \
-	--bootappend-live "boot=live components quiet splash hostname=platinum username=user" \
+	--bootappend-live "$(cat "$root/iso/kernel-params")" \
 	--memtest none
 
 sudo_ cp -r "$root/iso/config/." config/

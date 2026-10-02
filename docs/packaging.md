@@ -68,6 +68,24 @@ is no password, and `sudo` works without one.
 - Logging out (or Ctrl+Alt+Backspace) shows the login screen.
 - Add `noautologin` to the boot line to start at the login screen.
 
+**Starting up.** No text shows, as on a classic Mac:
+
+1. **White.** GRUB waits 3 seconds on a white screen without a menu, then
+   the system starts.
+   - Press **Esc** (or Shift) during that time for the boot menu, which has
+     the installer.
+2. **Still white.** The kernel and boot splash stay white too:
+   - Plymouth shows a white theme (`boot/plymouth`), which keeps its disk
+     password prompt.
+   - The kernel's console palette is all white while booting
+     (`iso/kernel-params`), so nothing written to it shows and no black
+     flashes up.
+   - `platinum-console-colors.service` restores normal colours 20 seconds
+     after the desktop starts, so Ctrl+Alt+F2 consoles work.
+3. **The logo on white,** then the Welcome screen, then the desktop. Both
+   screens come from platinum-wm (`compositor/src/startup.c`). greetd runs on
+   tty1, so going from the splash to the desktop is white to white.
+
 **Install.** The boot menu also offers Debian's installer:
 
 1. It copies the system to a disk and creates your user.
@@ -88,7 +106,8 @@ The live system runs from the USB stick and changes nothing on the Mac's disk.
    - Shut the Mac down and plug in the stick.
    - Press the power button and hold **Option (⌥)** until the startup disks
      appear. Choose **EFI Boot**.
-   - The boot menu starts the live system after 5 seconds.
+   - The screen stays white, then the logo appears. Press Esc while it's
+     white for the boot menu.
 3. **Use the desktop.** The desktop appears by itself within a minute or two.
    - A Retina screen shows it at 2× automatically, giving a 1280×800 or
      1440×900 desktop. Monitors ▸ Normal switches to 1×.
@@ -133,6 +152,54 @@ the DRM backend, consoles (Ctrl+Alt+F1 to F12) and sound.
 
 **Hyper-V.** Not tested yet. It should work in a Generation 2 VM with Secure
 Boot off, or set to "Microsoft UEFI Certificate Authority".
+
+## Trying changes without building the ISO
+
+```sh
+scripts/dev-boot.sh              # build packages, update, boot in a window
+scripts/dev-boot.sh --no-debs    # without rebuilding the packages
+scripts/dev-boot.sh --record     # no window: a timeline of the screen
+scripts/dev-boot.sh --retina     # a 2560 x 1600 screen
+scripts/dev-boot.sh --clean      # start over from the ISO build's system
+```
+
+**What it does.** It starts from the system the last ISO build made (its
+chroot in `/var/tmp/platinum-iso`) and puts this tree on top, in an overlay:
+
+- the packages, `iso/config` and its hook;
+- packages added to the package lists, installed with apt.
+
+Then it packs the result and boots it in QEMU with the kernel and initramfs
+given directly. This takes a few minutes, against about 35 for an ISO.
+
+**What it leaves out.** The boot menu (GRUB or ISOLINUX) needs a real ISO
+build.
+
+**Recording.** `--record` takes a screenshot every 0.2 seconds for the first
+90 seconds into `/tmp/devboot`, and prints a timeline:
+
+```
+  1.0 -   6.6 s  white
+  9.8 -  24.0 s  white
+ 24.2 -  25.6 s  logo
+ 25.8 -  26.2 s  other        (the Welcome screen)
+ 26.4 -  89.9 s  desktop
+```
+
+The first frame of each run is saved as `run-NN-KIND.png`.
+
+**VM-only screens.** Some of what you see in QEMU never appears on real
+hardware:
+
+- the virtual firmware's own text at the very start;
+- QEMU's "Display output is not active" while its virtual graphics card
+  starts.
+
+**Logging in.** A login runs on the VM's serial port (`user` / `live`):
+
+```sh
+python3 tests/vm/serial.py ~/.local/share/platinum-vm/serial.sock 'journalctl -b'
+```
 
 ## Tests
 

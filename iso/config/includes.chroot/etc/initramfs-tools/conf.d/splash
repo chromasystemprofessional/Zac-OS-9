@@ -1,0 +1,2 @@
+# Graphics drivers in the initramfs, so the boot splash shows from the start.
+FRAMEBUFFER=y
