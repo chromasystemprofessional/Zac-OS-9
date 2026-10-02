@@ -103,6 +103,17 @@ static void refresh_surface_scales(struct plat_server *server, int scale) {
 	wlr_scene_node_for_each_buffer(&server->scene->tree.node, prefer_scale, &scale);
 }
 
+/* A screen's scale until one is chosen: 2x when it is dense enough
+ * (180 dpi and up, such as a Retina laptop) that 1x pixels would be too
+ * small to use, so it shows a classic-sized desktop at double size. */
+static int automatic_scale(struct plat_server *server, struct wlr_output *o) {
+	if (server->scale_explicit || nested(o) || o->phys_width <= 0) {
+		return server->default_scale;
+	}
+	const double dpi = o->width * 25.4 / o->phys_width;
+	return dpi >= 180 ? 2 : 1;
+}
+
 /* Apply the chosen scale and resolution to one output. */
 static void apply_output(struct plat_server *server, struct plat_output *output) {
 	struct wlr_output *o = output->wlr_output;
@@ -110,7 +121,7 @@ static void apply_output(struct plat_server *server, struct plat_output *output)
 	wlr_output_state_init(&state);
 	bool changed = false;
 
-	const int scale = setting_int("scale", server->default_scale, 1, 3);
+	const int scale = setting_int("scale", automatic_scale(server, o), 1, 3);
 	if ((int)o->scale != scale) {
 		wlr_output_state_set_scale(&state, scale);
 		changed = true;

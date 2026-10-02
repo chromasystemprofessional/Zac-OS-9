@@ -76,6 +76,43 @@ is no password, and `sudo` works without one.
 Write the ISO to a USB stick with any image writer (it is a hybrid image), or
 boot it in a virtual machine.
 
+## Trying it on a Mac (2008 to 2015 Intel MacBooks and iMacs)
+
+The live system runs from the USB stick and changes nothing on the Mac's disk.
+
+1. **Make the USB stick on Windows.** You need a USB stick of 4 GB or more,
+   which will be erased. Use either of these:
+   - [balenaEtcher](https://etcher.balena.io/);
+   - [Rufus](https://rufus.ie/). When it asks, choose **Write in DD Image mode**.
+2. **Start the Mac from the stick.**
+   - Shut the Mac down and plug in the stick.
+   - Press the power button and hold **Option (⌥)** until the startup disks
+     appear. Choose **EFI Boot**.
+   - The boot menu starts the live system after 5 seconds.
+3. **Use the desktop.** The desktop appears by itself within a minute or two.
+   - A Retina screen shows it at 2× automatically, giving a 1280×800 or
+     1440×900 desktop. Monitors ▸ Normal switches to 1×.
+4. **Connect to Wi-Fi.**
+   - The Broadcom `wl` driver is included.
+   - Choose **Terminal** from the logo menu, type `nmtui`, and pick
+     **Activate a connection**.
+   - A Thunderbolt Ethernet adapter, or USB tethering from a phone, also works.
+
+**Keys.** ⌘ is the Command key. The F-keys need fn, for example
+Ctrl+Alt+fn+F2 for a text console. Ctrl+Alt+Backspace ends the session and
+shows the login screen.
+
+**Don't choose "Start installer"** unless you mean to install. It can erase
+the Mac's disk, including macOS.
+
+**If something goes wrong:**
+- Note your exact model (About This Mac ▸ Model Identifier, for example
+  `MacBookPro11,1`).
+- The session log is `~/.local/state/platinum/session.log`. Read it from
+  Terminal with `cat`, or copy it to another USB stick.
+- 15-inch models with NVIDIA graphics are the most likely to have display
+  trouble.
+
 ## Virtual machine
 
 ```sh

@@ -98,6 +98,7 @@ int main(int argc, char *argv[]) {
 	enum wlr_log_importance log_level = WLR_ERROR;
 	char *startup_cmd = NULL;
 	int scale = parse_scale(getenv("PLATINUM_SCALE"));
+	bool scale_explicit = getenv("PLATINUM_SCALE") != NULL;
 
 	int c;
 	while ((c = getopt(argc, argv, "dS:s:h")) != -1) {
@@ -107,6 +108,7 @@ int main(int argc, char *argv[]) {
 			break;
 		case 'S':
 			scale = parse_scale(optarg);
+			scale_explicit = true;
 			break;
 		case 's':
 			startup_cmd = optarg;
@@ -124,6 +126,7 @@ int main(int argc, char *argv[]) {
 
 	struct plat_server server = {0};
 	server.output_scale = scale;
+	server.scale_explicit = scale_explicit;
 	server.display = wl_display_create();
 
 	server.backend = wlr_backend_autocreate(

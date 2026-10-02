@@ -32,7 +32,7 @@ sudo_ lb clean >/dev/null 2>&1 || true
 sudo_ rm -rf config
 sudo_ lb config \
 	--distribution trixie \
-	--archive-areas "main contrib non-free-firmware" \
+	--archive-areas "main contrib non-free non-free-firmware" \
 	--firmware-chroot true \
 	--debian-installer live \
 	--iso-application "Platinum 2026" \

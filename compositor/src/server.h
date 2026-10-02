@@ -42,6 +42,7 @@ struct plat_server {
 	struct wlr_compositor *compositor;
 	int output_scale; /* integer HiDPI scale applied to every output */
 	int default_scale; /* from -S / PLATINUM_SCALE, until a panel picks one */
+	bool scale_explicit; /* -S or PLATINUM_SCALE given: no automatic 2x */
 	/* Mouse and Keyboard panel settings (prefs.c). */
 	double pointer_speed;
 	int double_click_ms;
