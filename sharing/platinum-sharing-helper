@@ -15,14 +15,29 @@
 #                                        password<TAB>set if USER (you, by
 #                                        default) has a Windows sharing password
 #   platinum-sharing-helper disconnect PID
+#   platinum-sharing-helper share FOLDER     share a folder of yours (Get Info's
+#   platinum-sharing-helper unshare FOLDER   "Share this item and its contents")
+#   platinum-sharing-helper privileges FOLDER OWNER GROUP MODE [all]
+#                                        Get Info's Owner, User/Group and
+#                                        Everyone privileges: the folder's Unix
+#                                        owner, group and permissions (octal,
+#                                        e.g. 755); "all" copies them to every
+#                                        folder and file inside
 #
-# The settings live in /etc/platinum/sharing.conf (readable by everyone);
-# /etc/netatalk/afp.conf (Macs, AFP) and /etc/samba/smb.conf (Windows, SMB)
-# are written from them. The files the packages installed are kept once as
-# *.platinum-orig.
+# The settings live in /etc/platinum/sharing.conf, and the shared folders in
+# /etc/platinum/shared-folders (NAME<TAB>PATH lines); both are readable by
+# everyone. /etc/netatalk/afp.conf (Macs, AFP) and /etc/samba/smb.conf
+# (Windows, SMB) are written from them. The files the packages installed are
+# kept once as *.platinum-orig.
+#
+# As on a Mac, privileges belong to the folder: Netatalk and Samba both go by
+# the Unix permissions of whoever connects. Only a folder's owner may share it
+# or change its privileges, and a shared folder can't be inside another.
 set -eu
 PATH=/usr/sbin:/usr/bin:/sbin:/bin
 conf=/etc/platinum/sharing.conf
+shares=/etc/platinum/shared-folders
+tab=$(printf '\t')
 
 die() {
 	echo "$1" >&2
@@ -98,6 +113,12 @@ basedir regex = /home
 ; Unix's hidden files stay hidden from Macs too.
 veto files = /.*/
 EOF
+	# Shared folders (Get Info > Sharing). What each person may do is up to
+	# the folders' Unix permissions; guests log in as "nobody".
+	each_share | while IFS="$tab" read -r sname spath; do
+		# (Netatalk lowercases section names; "volume name" keeps the case.)
+		printf '\n[%s]\nvolume name = %s\npath = %s\nveto files = /.*/\n' "$sname" "$sname" "$spath"
+	done >>/etc/netatalk/afp.conf
 }
 
 write_smb_conf() {
@@ -133,6 +154,22 @@ write_smb_conf() {
    create mask = 0644
    directory mask = 0755
 EOF
+	guest_ok=no
+	[ "$guests" = yes ] && guest_ok=yes
+	# Shared folders: new files and folders take their folder's permissions,
+	# as they took the enclosing folder's privileges on a Mac.
+	each_share | while IFS="$tab" read -r sname spath; do
+		printf '\n[%s]\n   path = %s\n   read only = no\n   guest ok = %s\n   inherit permissions = yes\n   hide dot files = yes\n' \
+			"$sname" "$spath" "$guest_ok"
+	done >>/etc/samba/smb.conf
+}
+
+# The shared folders that are still there.
+each_share() {
+	[ -f "$shares" ] || return 0
+	while IFS="$tab" read -r sname spath; do
+		[ -n "$sname" ] && [ -d "$spath" ] && printf '%s\t%s\n' "$sname" "$spath"
+	done <"$shares"
 }
 
 services() { # services on|off UNIT...
@@ -185,7 +222,28 @@ guests=$guests
 cleartext=$cleartext
 EOF
 	mv "$conf.new" "$conf"
+	configure
+}
 
+# The settings from sharing.conf (false if there are none yet).
+load_settings() {
+	[ -f "$conf" ] || return 1
+	name="" owner="" afp=no smb=no guests=no cleartext=no
+	while IFS= read -r line; do
+		value=${line#*=}
+		case ${line%%=*} in
+		name) name=$value ;;
+		owner) owner=$value ;;
+		afp) afp=$value ;;
+		smb) smb=$value ;;
+		guests) guests=$value ;;
+		cleartext) cleartext=$value ;;
+		esac
+	done <"$conf"
+}
+
+# Writes the servers' settings and starts or stops them.
+configure() {
 	if [ "$afp" = yes ]; then
 		write_afp_conf
 		services on avahi-daemon netatalk
@@ -198,6 +256,124 @@ EOF
 	else
 		services off smbd nmbd wsdd2
 	fi
+}
+
+# After the shared folders change: running servers take the new list
+# without dropping anyone (afpd and smbd reread their settings).
+reconfigure() {
+	load_settings || return 0
+	if [ "$afp" = yes ]; then
+		write_afp_conf
+		systemctl reload netatalk.service 2>/dev/null || systemctl try-restart netatalk.service || true
+	fi
+	if [ "$smb" = yes ]; then
+		write_smb_conf
+		smbcontrol smbd reload-config >/dev/null 2>&1 || true
+	fi
+}
+
+# A folder the caller owns, as its real path.
+own_folder() {
+	p=$(realpath -e -- "$1" 2>/dev/null) || die "There's no folder \"$1\"."
+	[ -d "$p" ] || die "\"$(basename "$p")\" isn't a folder."
+	[ "$p" != / ] || die "The whole disk can't be shared; share folders on it instead."
+	# The settings files are line by line, and these mean something in them.
+	if [ "$(printf %s "$p" | wc -l)" -ne 0 ] || printf %s "$p" | grep -q '[;#"\\[:cntrl:]]'; then
+		die "Folders with ; # \" \\ or control characters in their names can't be shared."
+	fi
+	who=$(caller)
+	if [ "$who" != root ] && [ "$(stat -c %U -- "$p")" != "$who" ]; then
+		die "Only the owner of \"$(basename "$p")\" can share it or change its privileges."
+	fi
+	echo "$p"
+}
+
+# Shortens to 27 characters, a classic Mac's limit for volume names.
+cut27() {
+	printf %s "$1" | LC_ALL=C.UTF-8 sed "s/^\(.\{${2:-27}\}\).*/\1/"
+}
+
+# A share name from a folder's: what Macs and Windows both accept, and not
+# one already in use.
+share_name() {
+	base=$(basename "$1" | LC_ALL=C.UTF-8 sed 's#[]:/*?"<>|=;,+%$[]#-#g; s/^[ .]*//; s/ *$//')
+	[ -n "$base" ] || base=Shared
+	case $(echo "$base" | tr '[:upper:]' '[:lower:]') in
+	global | homes | printers) base="$base Folder" ;;
+	esac
+	cand=$(cut27 "$base")
+	n=1
+	while :; do
+		lower=$(echo "$cand" | tr '[:upper:]' '[:lower:]')
+		taken=no
+		if [ -f "$shares" ] && cut -f1 "$shares" | tr '[:upper:]' '[:lower:]' | grep -qxF "$lower"; then
+			taken=yes
+		fi
+		# \\computer\name is that user's home folder.
+		getent passwd "$cand" >/dev/null && taken=yes
+		[ $taken = no ] && break
+		n=$((n + 1))
+		cand="$(cut27 "$base" $((27 - ${#n} - 1))) $n"
+	done
+	echo "$cand"
+}
+
+share() {
+	path=$(own_folder "$1")
+	if [ -f "$shares" ]; then
+		while IFS="$tab" read -r sname spath; do
+			[ "$spath" = "$path" ] && return 0
+			case $path/ in "$spath"/*) die "\"$(basename "$path")\" is inside the shared folder \"$sname\", so it is shared already." ;; esac
+			case $spath/ in "$path"/*) die "\"$(basename "$path")\" can't be shared because the folder \"$sname\" inside it is shared." ;; esac
+		done <"$shares"
+	fi
+	mkdir -p /etc/platinum
+	umask 022
+	printf '%s\t%s\n' "$(share_name "$path")" "$path" >>"$shares"
+	reconfigure
+}
+
+unshare() {
+	path=$(own_folder "$1")
+	[ -f "$shares" ] || return 0
+	umask 022
+	awk -F '\t' -v p="$path" '$2 != p' "$shares" >"$shares.new"
+	mv "$shares.new" "$shares"
+	reconfigure
+}
+
+privileges() {
+	path=$(own_folder "$1")
+	new_owner=$2 group=$3 mode=$4
+	# Given to someone else: only to a person.
+	[ "$new_owner" = "$(stat -c %U -- "$path")" ] || check_owner "$new_owner"
+	getent group "$group" >/dev/null || die "There is no group \"$group\"."
+	case $mode in [0-7][0-7][0-7]) ;; *) die "Not a permission: $mode" ;; esac
+	if [ "${5:-}" = all ]; then
+		# Folders get the privileges, and files too (Unix has no "the
+		# enclosing folder's"): without x, which only programs keep.
+		fmode=$(echo "$mode" | tr 1357 0246)
+		xmode=$(echo "$fmode" | tr 46 57)
+		find "$path" -xdev ! -type l -exec chown -h "$new_owner:$group" {} +
+		find "$path" -xdev -type d -exec chmod "$mode" {} +
+		find "$path" -xdev -type f ! -perm -u+x -exec chmod "$fmode" {} +
+		find "$path" -xdev -type f -perm -u+x -exec chmod "$xmode" {} +
+	fi
+	chown -h "$new_owner:$group" "$path"
+	chmod "$mode" "$path"
+	# Others reach the folder through the ones it's in: let them pass
+	# through (not look in) the caller's own, such as their home folder,
+	# which Debian makes private.
+	who=$(caller)
+	case $mode:$who in ?00:* | *:root) ;; *)
+		uid=$(id -u "$who")
+		dir=$(dirname "$path")
+		while [ "$dir" != / ]; do
+			[ "$(stat -c %u -- "$dir")" = "$uid" ] && chmod o+x "$dir"
+			dir=$(dirname "$dir")
+		done
+		;;
+	esac
 }
 
 password() {
@@ -249,5 +425,11 @@ apply) apply ;;
 password) password ;;
 status) status "${2:-}" ;;
 disconnect) disconnect "${2:-}" ;;
-*) die "usage: platinum-sharing-helper apply | password | status | disconnect PID" ;;
+share) share "${2:-}" ;;
+unshare) unshare "${2:-}" ;;
+privileges)
+	[ $# -ge 5 ] || die "usage: platinum-sharing-helper privileges FOLDER OWNER GROUP MODE [all]"
+	privileges "$2" "$3" "$4" "$5" "${6:-}"
+	;;
+*) die "usage: platinum-sharing-helper apply | password | status | disconnect PID | share FOLDER | unshare FOLDER | privileges FOLDER OWNER GROUP MODE [all]" ;;
 esac

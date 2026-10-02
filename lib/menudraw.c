@@ -148,7 +148,7 @@ void menu_measure(const struct menu_item *items, int n, int *width, int *height)
 			continue;
 		}
 		int text_r = MENU_TEXT_X + ink_width(items[i].label) +
-			(items[i].swatch ? MENU_SWATCH_ADVANCE : 0);
+			(items[i].swatch ? MENU_SWATCH_ADVANCE : 0) + items[i].indent;
 		int need = text_r + MENU_RIGHT_PAD;
 		if (items[i].submenu) {
 			need = text_r + MENU_SHORTCUT_GAP + MENU_ARROW_FROM_RIGHT;
@@ -207,7 +207,7 @@ void menu_paint(struct pl_canvas *c, const struct menu_item *items, int n,
 			pl_vline(c, W - 2, y + 1, y + MENU_ITEM_H - 1, accent.deep);
 		}
 		uint32_t color = sel ? C_WHITE : it->enabled ? C_BLACK : C_888;
-		int tx = MENU_TEXT_X;
+		int tx = MENU_TEXT_X + it->indent;
 		if (it->swatch) {
 			int sy = y + (MENU_ITEM_H - MENU_SWATCH) / 2;
 			pl_fill(c, tx, sy, tx + MENU_SWATCH - 1, sy + MENU_SWATCH - 1, it->swatch);

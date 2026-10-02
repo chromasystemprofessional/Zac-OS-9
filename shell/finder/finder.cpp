@@ -3,6 +3,7 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QProcess>
 #include <QWidget>
 
@@ -166,6 +167,13 @@ void Finder::command(const QString &name) {
 		emptyTrash();
 	} else if (name == "get-info") {
 		getInfo();
+	} else if (name == "get-info-sharing") {
+		getInfo(true);
+	} else if (name.startsWith("info /")) {
+		/* Get Info for a path (scripts and other apps). */
+		const QString path = QDir::cleanPath(name.mid(5));
+		InfoWindow::open(path, path == "/" ? PL_ICON_DISK
+			: QFileInfo(path).isDir() ? PL_ICON_FOLDER : PL_ICON_DOCUMENT, displayName(path));
 	} else if (name == "duplicate") {
 		duplicate();
 	} else if (name == "make-alias") {
@@ -383,15 +391,17 @@ void Finder::showOriginal() {
 	}
 }
 
-/* Info on each selected item, or on the front window's folder. */
-void Finder::getInfo() {
+/* Info on each selected item, or on the front window's folder; `sharing`
+ * shows Sharing rather than General Information. */
+void Finder::getInfo(bool sharing) {
 	FinderView *v = front();
 	std::vector<Item *> items = v->selectedItems();
+	const int view = sharing ? InfoWindow::Sharing : InfoWindow::General;
 	if (items.empty() && v != m_desktop) {
-		InfoWindow::open(v->folderPath(), PL_ICON_FOLDER, displayName(v->folderPath()));
+		InfoWindow::open(v->folderPath(), PL_ICON_FOLDER, displayName(v->folderPath()), view);
 	}
 	for (Item *item : items) {
-		InfoWindow::open(item->path, item->kind, item->name);
+		InfoWindow::open(item->path, item->kind, item->name, view);
 	}
 }
 

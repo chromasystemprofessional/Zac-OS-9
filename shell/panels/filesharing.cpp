@@ -33,6 +33,7 @@
 #include "panelkit.h"
 #include "platinumshell.h"
 #include "settings.h"
+#include "sharingclient.h"
 
 static constexpr int W = 470, H = 392;
 static constexpr int MARGIN = 10;
@@ -45,34 +46,6 @@ static constexpr int IN = 1 + PL_GROUP_MARGIN; /* box line to its items */
 static constexpr int LABEL_R = 150;             /* labels' ink ends here */
 static constexpr int FIELD_X = LABEL_R + 8;
 static constexpr int BOX_GAP = 20;              /* box to box, with the title */
-
-static QString helperPath() {
-	const QString env = qEnvironmentVariable("PLATINUM_SHARING_HELPER");
-	return env.isEmpty() ? QString("/usr/libexec/platinum/platinum-sharing-helper") : env;
-}
-
-/* The helper, as root: through pkexec, or directly if we are root. */
-static void helperCommand(QProcess *p, const QStringList &args) {
-	if (geteuid() == 0) {
-		p->start(helperPath(), args);
-	} else {
-		p->start("pkexec", QStringList{ helperPath() } + args);
-	}
-}
-
-static QString runHelper(const QStringList &args, const QByteArray &input, bool *ok,
-		QString *err = nullptr) {
-	QProcess p;
-	helperCommand(&p, args);
-	p.write(input);
-	p.closeWriteChannel();
-	p.waitForFinished(60000);
-	*ok = p.exitStatus() == QProcess::NormalExit && p.exitCode() == 0;
-	if (err) {
-		*err = QString::fromUtf8(p.readAllStandardError()).trimmed();
-	}
-	return QString::fromUtf8(p.readAllStandardOutput());
-}
 
 static bool serviceActive(const char *unit) {
 	QProcess p;
@@ -206,7 +179,7 @@ public:
 		m_disconnect.clicked = [this] { disconnectSelected(); };
 		refreshServers();
 		bool ok;
-		const QString status = runHelper({ "status", m_settings.owner }, QByteArray(), &ok);
+		const QString status = runSharingHelper({ "status", m_settings.owner }, QByteArray(), &ok);
 		m_hasWindowsPassword = ok && status.contains("password\tset");
 		showTab(0);
 		m_timer.callOnTimeout([this] {
@@ -409,22 +382,9 @@ private:
 			g->button.enabled = false;
 			repaint();
 		}
-		auto *p = new QProcess(this);
-		bool done = false, ok = false;
+		bool ok;
 		QString err;
-		connect(p, &QProcess::finished, this, [&](int code, QProcess::ExitStatus st) {
-			ok = st == QProcess::NormalExit && code == 0;
-			err = QString::fromUtf8(p->readAllStandardError()).trimmed();
-			done = true;
-		});
-		helperCommand(p, { "apply" });
-		p->write(conf);
-		p->closeWriteChannel();
-		/* Wait, keeping the window drawn (the servers take a moment). */
-		while (!done) {
-			QApplication::processEvents(QEventLoop::ExcludeUserInputEvents | QEventLoop::WaitForMoreEvents, 100);
-		}
-		p->deleteLater();
+		runSharingHelper({ "apply" }, conf, &ok, &err);
 		if (g) {
 			g->busy = false;
 			g->button.enabled = true;
@@ -454,7 +414,7 @@ private:
 		}
 		bool ok;
 		QString err;
-		runHelper({ "password" }, m_password.text.toUtf8() + '\n', &ok, &err);
+		runSharingHelper({ "password" }, m_password.text.toUtf8() + '\n', &ok, &err);
 		if (!ok) {
 			Alert::ask(QString("The password couldn’t be stored. %1").arg(err), "OK", "");
 			return false;
@@ -485,7 +445,7 @@ private:
 
 	void refreshActivity() {
 		bool ok;
-		const QString out = runHelper({ "status", m_settings.owner }, QByteArray(), &ok);
+		const QString out = runSharingHelper({ "status", m_settings.owner }, QByteArray(), &ok);
 		m_connections.clear();
 		QStringList rows;
 		for (const QString &line : out.split('\n', Qt::SkipEmptyParts)) {
@@ -506,6 +466,9 @@ private:
 		QStringList items;
 		if (m_settings.afp || m_settings.smb) {
 			items << "Home folders: each user’s own, with their password";
+			for (const SharedFolder &f : sharedFolders()) {
+				items << QString("“%1”: %2").arg(f.name, f.path);
+			}
 		} else {
 			items << "Nothing: file sharing is off.";
 		}
@@ -531,7 +494,7 @@ private:
 		}
 		bool ok;
 		QString err;
-		runHelper({ "disconnect", f[4] }, QByteArray(), &ok, &err);
+		runSharingHelper({ "disconnect", f[4] }, QByteArray(), &ok, &err);
 		if (!ok) {
 			Alert::ask(err, "OK", "");
 		}

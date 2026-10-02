@@ -66,6 +66,8 @@ struct menu_item {
 	bool checked;
 	bool submenu; /* draws the hierarchical-menu arrow */
 	uint32_t swatch; /* ARGB color square before the text, or 0 */
+	int indent;      /* text moves right this much (room for an icon the
+	                    caller paints), or 0 */
 };
 
 void menu_measure(const struct menu_item *items, int n, int *width, int *height);

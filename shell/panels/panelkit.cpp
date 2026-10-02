@@ -396,6 +396,7 @@ public:
 				mi.label = m_texts[i]->t;
 				mi.enabled = m_items[i].enabled;
 				mi.checked = static_cast<int>(i) == m_checked;
+				mi.indent = m_items[i].icon.isNull() ? 0 : PANEL_ICON_W;
 			}
 			m_menu.push_back(mi);
 		}
@@ -421,6 +422,11 @@ protected:
 		menu_paint(c, m_menu.data(), static_cast<int>(m_menu.size()), m_w, m_h, m_hover, accent);
 		for (int i = 0; i < static_cast<int>(m_items.size()); i++) {
 			const PopupItem &it = m_items[i];
+			if (!it.icon.isNull()) {
+				/* After the checkmark, centred in the row. */
+				panelIcon(c, it.icon, MENU_TEXT_X - 4 + (PANEL_ICON_W - it.icon.width()) / 2,
+					itemTop(i) + (MENU_ITEM_H - it.icon.height()) / 2);
+			}
 			if (it.separator || (it.signal < 0 && !it.lock)) {
 				continue;
 			}
@@ -524,7 +530,74 @@ private:
 
 } // namespace
 
+void panelIcon(pl_canvas *c, const QImage &icon, int x, int y) {
+	const QImage img = icon.convertToFormat(QImage::Format_ARGB32);
+	for (int j = 0; j < img.height(); j++) {
+		const QRgb *row = reinterpret_cast<const QRgb *>(img.constScanLine(j));
+		for (int i = 0; i < img.width(); i++) {
+			if (qAlpha(row[i]) > 127) {
+				pl_put(c, x + i, y + j, 0xFF000000u | (row[i] & 0xFFFFFFu));
+			}
+		}
+	}
+}
+
+/* The small button with only the double triangle, beside an icon well:
+ * a black frame with cut corners, lit inside its top and left, shaded
+ * inside its bottom and right. Measured from Mac OS 9's Get Info. */
+static void paintArrowsButton(pl_canvas *c, int x, int y, int w, int h, bool enabled) {
+	const int x1 = x + w - 1, y1 = y + h - 1;
+	pl_fill(c, x + 1, y + 1, x1 - 1, y1 - 1, GRAY(0xD));
+	pl_hline(c, x + 2, x1 - 2, y, C_BLACK);
+	pl_hline(c, x + 2, x1 - 2, y1, C_BLACK);
+	pl_vline(c, x, y + 2, y1 - 2, C_BLACK);
+	pl_vline(c, x1, y + 2, y1 - 2, C_BLACK);
+	pl_put(c, x + 1, y + 1, C_BLACK);
+	pl_put(c, x1 - 1, y + 1, C_BLACK);
+	pl_put(c, x + 1, y1 - 1, C_BLACK);
+	pl_put(c, x1 - 1, y1 - 1, C_BLACK);
+	pl_hline(c, x + 2, x1 - 3, y + 2, C_WHITE);
+	pl_vline(c, x + 2, y + 2, y1 - 3, C_WHITE);
+	pl_hline(c, x + 3, x1 - 2, y1 - 2, GRAY(0xA));
+	pl_vline(c, x1 - 2, y + 3, y1 - 2, GRAY(0xA));
+	pl_hline(c, x + 2, x1 - 2, y1 - 1, GRAY(0x5));
+	pl_vline(c, x1 - 1, y + 2, y1 - 2, GRAY(0x5));
+	const uint32_t ink = enabled ? C_BLACK : GRAY(0x8);
+	const int mid = x + (w - 1) / 2, cy = y + h / 2;
+	for (int i = 0; i < 4; i++) {
+		pl_hline(c, mid - i, mid + i, cy - 5 + i, ink);
+		pl_hline(c, mid - i, mid + i, cy + 4 - i, ink);
+	}
+}
+
 void PanelPopup::paint(pl_canvas *c) const {
+	if (iconWell) {
+		/* The well: etched in, shaded top and left, lit bottom and right. */
+		const int x = rect.x(), y = rect.y(), x1 = x + PANEL_WELL_W - 1, y1 = y + rect.height() - 1;
+		pl_hline(c, x, x1 - 1, y, GRAY(0x8));
+		pl_vline(c, x, y, y1 - 1, GRAY(0x8));
+		pl_hline(c, x + 1, x1, y1, C_WHITE);
+		pl_vline(c, x1, y + 1, y1, C_WHITE);
+		if (selected >= 0 && selected < static_cast<int>(items.size())) {
+			const QImage &icon = items[selected].icon;
+			QImage shown = icon;
+			if (!enabled) { /* dimmed: halfway to the face */
+				shown = icon.convertToFormat(QImage::Format_ARGB32);
+				for (int j = 0; j < shown.height(); j++) {
+					auto *row = reinterpret_cast<QRgb *>(shown.scanLine(j));
+					for (int i = 0; i < shown.width(); i++) {
+						row[i] = qRgba((qRed(row[i]) + 0xDD) / 2, (qGreen(row[i]) + 0xDD) / 2,
+							(qBlue(row[i]) + 0xDD) / 2, qAlpha(row[i]));
+					}
+				}
+			}
+			panelIcon(c, shown, x + (PANEL_WELL_W - icon.width()) / 2,
+				y + (rect.height() - icon.height()) / 2);
+		}
+		paintArrowsButton(c, rect.right() - PANEL_ARROWS_W + 1, y, PANEL_ARROWS_W, rect.height(),
+			enabled);
+		return;
+	}
 	const int baseline = rect.y() + PL_POPUP_BASELINE(rect.height());
 	const uint32_t ink = enabled ? C_BLACK : GRAY(0x8);
 	if (!label.isEmpty()) {
@@ -557,8 +630,10 @@ bool PanelPopup::press(QWidget *owner, QPoint pos) {
 			}
 			owner->update();
 		});
-	/* The current choice opens level with the button (figure 2-7). */
-	const QPoint at(rect.x(), rect.y() + 1 - menu->itemTop(sel));
+	/* The current choice opens level with the button (figure 2-7); beside
+	 * an icon well, from the small button. */
+	const int left = iconWell ? rect.right() - PANEL_ARROWS_W + 1 : rect.x();
+	const QPoint at(left, rect.y() + 1 - menu->itemTop(sel));
 	menu->move(owner->mapToGlobal(at));
 	menu->show();
 	return true;

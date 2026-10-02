@@ -6,6 +6,7 @@
  * with lib/widgets.
  */
 
+#include <QImage>
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QPoint>
@@ -133,14 +134,20 @@ private:
 void panelGroup(pl_canvas *c, int x0, int y0, int x1, int y1, const char *title, uint32_t bg);
 
 /* One choice in a pop-up menu. Wi-Fi networks also show signal bars
- * (0..4; -1 for none) and a padlock. */
+ * (0..4; -1 for none) and a padlock; Get Info's privileges an icon
+ * before the text. */
 struct PopupItem {
+	PopupItem(QString t = QString(), bool on = true, bool sep = false, int bars = -1, bool locked = false)
+		: text(std::move(t)), enabled(on), separator(sep), signal(bars), lock(locked) {}
+	PopupItem(const char *t, bool on = true) : PopupItem(QString(t), on) {}
 	QString text;
 	bool enabled = true;
 	bool separator = false;
 	int signal = -1;
 	bool lock = false;
+	QImage icon; /* at most PANEL_ICON_W x 16 */
 };
+constexpr int PANEL_ICON_W = 20;
 
 /* A pop-up menu button (HIG figures 2-6, 2-7, 3-25), with an optional
  * label to its left. Pressing it opens the menu with the current choice
@@ -152,6 +159,10 @@ struct PanelPopup {
 	std::vector<PopupItem> items;
 	int selected = 0;
 	bool enabled = true;
+	/* Instead of the button, the choice's icon in a recessed well and a
+	 * small button with the double triangle beside it (Get Info's
+	 * privileges). `rect` holds both: PANEL_WELL_W + 3 + PANEL_ARROWS_W. */
+	bool iconWell = false;
 	/* Called with the chosen item, even if it is already selected
 	 * (so commands such as "Other Network…" work). If the items change
 	 * while the menu is open, the choice is matched up by its text. */
@@ -161,6 +172,11 @@ struct PanelPopup {
 	/* Opens the menu over `owner` if pos is on the button. */
 	bool press(QWidget *owner, QPoint pos);
 };
+
+constexpr int PANEL_WELL_W = 36, PANEL_ARROWS_W = 22;
+
+/* An ARGB icon at (x, y), where it isn't transparent. */
+void panelIcon(pl_canvas *c, const QImage &icon, int x, int y);
 
 /* A Platinum edit text field (HIG figures 2-28, 3-30): one line, or
  * several (Return starts a new one). Click or drag to place the caret

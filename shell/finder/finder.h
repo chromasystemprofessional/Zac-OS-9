@@ -57,7 +57,7 @@ public:
 	void closeWindow();
 	void moveSelectionToTrash();
 	void emptyTrash();
-	void getInfo();
+	void getInfo(bool sharing = false);
 	void duplicate();
 	void makeAlias();
 	void putAway();

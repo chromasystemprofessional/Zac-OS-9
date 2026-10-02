@@ -25,6 +25,12 @@ struct Item {
 	int labelIndex = 0;
 	uint32_t labelColor() const { return pl_labels[labelIndex].color; }
 
+	/* A folder shared from Get Info: drawn on a network line. */
+	bool shared = false;
+	pl_icon_kind iconKind() const {
+		return shared && kind == PL_ICON_FOLDER ? PL_ICON_SHARED_FOLDER : kind;
+	}
+
 	/* An alias (a symbolic link): its name is shown in italics. */
 	bool isAlias = false;
 	pl_font nameFont() const { return isAlias ? PL_FONT_VIEWS_ITALIC : PL_FONT_VIEWS; }
@@ -47,6 +53,8 @@ class QFileInfo;
 std::unique_ptr<Item> makeItem(const QFileInfo &info);
 
 pl_icon_kind iconKindFor(const QString &path);
+/* Is this folder shared (Get Info > Sharing)? */
+bool isSharedFolder(const QString &path);
 /* A Macintosh disk or CD image (HFS, HFS+ or partitioned): opening one
  * starts it in Classic. */
 bool isMacDiskImage(const QString &path);

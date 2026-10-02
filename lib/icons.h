@@ -22,6 +22,7 @@ enum pl_icon_kind {
 	PL_ICON_CAUTION,    /* alerts */
 	PL_ICON_DISK_IMAGE, /* a Macintosh disk or CD image */
 	PL_ICON_CLASSIC,    /* a classic Mac OS application (runs in Classic) */
+	PL_ICON_SHARED_FOLDER, /* a folder shared from Get Info */
 	PL_ICON_COUNT,
 };
 

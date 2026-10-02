@@ -134,13 +134,23 @@ scaling only, original behaviors and timings).
       administrators at the computer use it without a password).
     - Tested: Mac OS 9 in Classic connected with the Chooser, mounted the
       owner's home and wrote to it; smbclient against Samba in the VM.
+  - Sharing folders, as in Mac OS 9: File > Get Info > Sharing… (or the
+    Show pop-up) with "Share this item and its contents" and the Owner,
+    User/Group and Everyone privileges (Read & Write, Read only, Write
+    only (Drop Box), None) as icon pop-ups, and Copy to enclosed folders.
+    The window is measured from Mac OS 9's own Get Info. Privileges are
+    the folder's Unix owner, group and permissions, so Netatalk and Samba
+    enforce them alike. Shared folders get their own icon; with file
+    sharing off, the Mac's alert offers the control panel. Tested: Mac OS 9
+    saw a folder shared this way as a volume, mounted it, and its Get Info
+    showed the same privileges; tests/sharing/afp-volumes.py lists volumes
+    as a guest.
   - Classic's emulated Mac has a network (SheepShaver's NAT): it reaches
     this computer at 10.0.2.2.
 - Next:
-  - File sharing: sharing folders from Get Info (Sharing, with
-    Owner/User/Group/Everyone privileges); the Network Browser to connect
-    to other computers: Windows and macOS through gvfs, and classic Macs
-    (AFP 2.2, which nothing in Debian speaks) through our own client.
+  - File sharing: the Network Browser to connect to other computers:
+    Windows and macOS through gvfs, and classic Macs (AFP 2.2, which
+    nothing in Debian speaks) through our own client.
   - TCP/IP: 802.1X (enterprise) networks, VPNs, proxies; a Wi-Fi menu
     in the menu bar.
   - Monitors on real hardware: several screens, arrangement.

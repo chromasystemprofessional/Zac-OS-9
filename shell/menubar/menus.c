@@ -63,7 +63,12 @@ static void add_finder_menus(struct mb_menu *menus, int *n) {
 	add(m, "Move To Trash", KEY_DELETE_GLYPH, sel, ACT_FINDER, "move-to-trash");
 	add(m, "Close Window", 'W', up && fs->window, ACT_FINDER, "close-window");
 	sep(m);
-	add(m, "Get Info", 'I', sel || (up && fs->window), ACT_FINDER, "get-info");
+	/* Mac OS 9: Get Info > General Information, Sharing… */
+	const bool info = sel || (up && fs->window);
+	struct mb_item *get_info = add(m, "Get Info", 0, info, ACT_NONE, NULL);
+	get_info->submenu = calloc(1, sizeof(*get_info->submenu));
+	add(get_info->submenu, "General Information", 'I', info, ACT_FINDER, "get-info");
+	add(get_info->submenu, "Sharing…", 0, info, ACT_FINDER, "get-info-sharing");
 	struct mb_item *label = add(m, "Label", 0, sel, ACT_NONE, NULL);
 	label->submenu = calloc(1, sizeof(*label->submenu));
 	for (int i = 0; i < PL_LABEL_COUNT; i++) {

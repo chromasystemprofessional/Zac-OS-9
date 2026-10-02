@@ -5,9 +5,12 @@
 #include <QMimeDatabase>
 #include <QStandardPaths>
 #include <QFile>
+#include <QSet>
 #include <algorithm>
 #include <cerrno>
 #include <sys/xattr.h>
+
+#include "sharingclient.h"
 
 static constexpr int LABEL_MAX_INK = 110;
 static constexpr int LABEL_GAP = 2;      /* icon bottom to label box top */
@@ -65,6 +68,21 @@ bool isClassicApplication(const QString &path) {
 		return false;
 	}
 	return finf.read(4) == "APPL"; /* FInfo.fdType comes first */
+}
+
+bool isSharedFolder(const QString &path) {
+	/* The list, read again when it changes. */
+	static QSet<QString> paths;
+	static QDateTime stamp;
+	const QFileInfo list(sharingConfFile("shared-folders"));
+	if (list.lastModified() != stamp) {
+		stamp = list.lastModified();
+		paths.clear();
+		for (const SharedFolder &f : sharedFolders()) {
+			paths.insert(f.path);
+		}
+	}
+	return !paths.isEmpty() && paths.contains(QFileInfo(path).canonicalFilePath());
 }
 
 pl_icon_kind iconKindFor(const QString &path) {
@@ -157,6 +175,7 @@ std::unique_ptr<Item> makeItem(const QFileInfo &info) {
 	item->kind = iconKindFor(item->path);
 	item->isDir = info.isDir();
 	item->isAlias = info.isSymLink();
+	item->shared = item->isDir && !item->isAlias && isSharedFolder(item->path);
 	item->size = info.isDir() ? 0 : info.size();
 	item->modified = info.lastModified();
 	item->labelIndex = readLabel(item->path);
@@ -218,7 +237,7 @@ bool iconLabelContains(Item &item, int x, int y, QPoint p) {
 }
 
 void paintIconItem(pl_canvas *c, Item &item, int x, int y, bool onDesktop, bool showLabel) {
-	pl_icon_paint_label(c, x, y, item.kind, PL_ICON_LARGE, item.selected || item.dropTarget,
+	pl_icon_paint_label(c, x, y, item.iconKind(), PL_ICON_LARGE, item.selected || item.dropTarget,
 		item.labelColor());
 	if (!showLabel) {
 		return;

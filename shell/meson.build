@@ -63,6 +63,13 @@ foreach kind : [['client-header', '@BASENAME@-client-protocol.h'], ['private-cod
   )
 endforeach
 
+# Control panels (the Finder's Get Info uses their controls too).
+panelkit = static_library('panelkit', 'panels/panelkit.cpp', 'panels/sharingclient.cpp',
+  include_directories: include_directories('finder'),
+  dependencies: [platinum_dep, qt6],
+  cpp_args: ['-std=c++17'],
+)
+
 executable('platinum-finder',
   'finder/main.cpp',
   'finder/alert.cpp',
@@ -77,17 +84,13 @@ executable('platinum-finder',
   'finder/infowindow.cpp',
   'finder/findwindow.cpp',
   'finder/folderstate.cpp',
+  link_with: panelkit,
+  include_directories: include_directories('finder', 'panels'),
   dependencies: [platinum_dep, qt6, layershellqt, wayland_client],
   cpp_args: ['-std=c++17'],
   install: true,
 )
 
-# Control panels.
-panelkit = static_library('panelkit', 'panels/panelkit.cpp',
-  include_directories: include_directories('finder'),
-  dependencies: [platinum_dep, qt6],
-  cpp_args: ['-std=c++17'],
-)
 executable('platinum-appearance',
   'panels/main.cpp',
   'panels/appearance.cpp',
