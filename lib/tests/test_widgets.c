@@ -233,6 +233,34 @@ static void draw_slider_thumb(struct pl_canvas *c) {
 	pl_slider_paint(c, -1, 0, 120, 2, 0, true, PL_ACCENT_DEFAULT);
 }
 
+static void draw_popup(struct pl_canvas *c) {
+	pl_popup_button_paint(c, 0, 0, 130, 19, NULL, true);
+}
+
+static void draw_popup_20(struct pl_canvas *c) {
+	pl_popup_button_paint(c, 0, 0, 89, PL_POPUP_H, NULL, true);
+}
+
+/* Pop-up menu buttons: figure 2-6 (19 tall) pixel for pixel but the
+ * text, and the frame, corners and arrows of figure 3-25's 20 px "Size"
+ * button, which is drawn in other shades. */
+static int run_popups(const char *dir, int *ran) {
+	int fails = 0;
+	const struct fig_rect fig26[] = {
+		{ 0, 0, 130, 3 }, { 0, 16, 130, 3 }, { 0, 0, 5, 19 }, { 101, 0, 29, 19 },
+	};
+	fails += compare_drawing(dir, "pop-up menu button (fig 2-6)", "img-026-022.png", 0, 0,
+		130, 19, C_WHITE, draw_popup, fig26, 4, ran);
+	const struct fig_rect fig325[] = {
+		{ 0, 0, 89, 3 }, { 0, 17, 89, 3 }, { 0, 0, 3, 20 }, { 66, 0, 23, 20 },
+	};
+	fig_set_black_only(1);
+	fails += compare_drawing(dir, "pop-up menu button, 20 px (fig 3-25)", "img-079-112.png",
+		69, 57, 89, PL_POPUP_H, GRAY(0xD), draw_popup_20, fig325, 4, ran);
+	fig_set_black_only(0);
+	return fails;
+}
+
 static int run_small_controls(const char *dir, int *ran) {
 	int fails = 0;
 	const struct fig_rect box[] = { { 0, 0, 14, 12 } };
@@ -283,5 +311,6 @@ int main(int argc, char *argv[]) {
 	fails += run_list_box(dir, &ran);
 	fails += run_tabs(dir, &ran);
 	fails += run_small_controls(dir, &ran);
+	fails += run_popups(dir, &ran);
 	return fig_exit_status(fails, ran);
 }

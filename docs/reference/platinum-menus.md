@@ -121,9 +121,17 @@ separator and Preferences give `2 + 16·8 + 6·2 = 142`.
 | Enabled | `#000` |
 | Disabled | `#888` (shortcut too) |
 
-Figures 4-1 and 4-2 don't show a highlighted (selected) item. We assume the
-title's style: a `#333399` fill across `x=1..W-2` over the item's 16 rows, with
-white text. *TODO: verify.*
+Figures 4-1 and 4-2 don't show a highlighted (selected) item, but figure 2-7
+(a pop-up menu button's open menu) does. Over the item's 16 rows:
+
+```
+fill        x=1..W-2              accent shadow (#333399 in Lavender)
+top row     y=top, x=1..W-3       accent dark   (#6666CC)
+left        x=1                   accent dark
+right       x=W-2, y=top+1..      accent deep   (#000088)
+```
+
+Text and the checkmark are white. Checked by the pop-up menu pixel test.
 
 ### ⌘ glyph (figure 4-1, disabled color)
 

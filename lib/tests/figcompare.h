@@ -26,6 +26,10 @@ int fig_compare(const char *name, const char *dir, const char *figure,
  * ours}; n = 0 turns the map off. */
 void fig_set_color_map(const uint32_t (*pairs)[2], int n);
 
+/* Compare only where the black (and near-black) pixels are, for figures
+ * drawn in other shades but with the same shapes. */
+void fig_set_black_only(int on);
+
 /* Exit status for a test binary: 0 pass, 1 fail, 77 skip (meson). */
 int fig_exit_status(int failures, int ran);
 

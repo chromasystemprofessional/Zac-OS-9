@@ -65,6 +65,9 @@ static void sleep_ms(int ms) {
 
 static struct wl_display *display;
 static struct zwp_virtual_keyboard_v1 *kbd;
+/* Our own copy of the keyboard's state: a virtual keyboard must send its
+ * modifiers itself (wlroots doesn't derive them from its keys). */
+static struct xkb_state *kbd_state;
 
 static struct zwp_virtual_keyboard_v1 *keyboard(void) {
 	if (kbd || !kbd_manager) {
@@ -83,6 +86,7 @@ static struct zwp_virtual_keyboard_v1 *keyboard(void) {
 	zwp_virtual_keyboard_v1_keymap(kbd, WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1, fd, size);
 	close(fd);
 	free(text);
+	kbd_state = xkb_state_new(map);
 	xkb_keymap_unref(map);
 	xkb_context_unref(ctx);
 	wl_display_roundtrip(display);
@@ -92,6 +96,12 @@ static struct zwp_virtual_keyboard_v1 *keyboard(void) {
 static void key_event(uint32_t code, bool down) {
 	zwp_virtual_keyboard_v1_key(keyboard(), now_ms(), code,
 		down ? WL_KEYBOARD_KEY_STATE_PRESSED : WL_KEYBOARD_KEY_STATE_RELEASED);
+	xkb_state_update_key(kbd_state, code + 8, down ? XKB_KEY_DOWN : XKB_KEY_UP);
+	zwp_virtual_keyboard_v1_modifiers(kbd,
+		xkb_state_serialize_mods(kbd_state, XKB_STATE_MODS_DEPRESSED),
+		xkb_state_serialize_mods(kbd_state, XKB_STATE_MODS_LATCHED),
+		xkb_state_serialize_mods(kbd_state, XKB_STATE_MODS_LOCKED),
+		xkb_state_serialize_layout(kbd_state, XKB_STATE_LAYOUT_EFFECTIVE));
 	wl_display_flush(display);
 	sleep_ms(20);
 }

@@ -160,6 +160,23 @@ void pl_focus_ring_paint(struct pl_canvas *c, int x0, int y0, int x1, int y1,
 void pl_progress_paint(struct pl_canvas *c, int x, int y, int w, double fraction,
 		struct pl_accent accent);
 
+/* Pop-up menu button (HIG figures 2-6, 3-25): a rounded black frame
+ * holding the current choice and, in a box at its right end, a double
+ * triangle. Standard height 20 (figure 3-25); figure 2-6 draws one 19
+ * tall. Everything but the top rows is laid out from the bottom.
+ * Buttons stack 6 px apart; a label sits to the left, right-aligned,
+ * its ink ending PL_POPUP_LABEL_GAP px before the frame, on the same
+ * baseline as the choice. */
+#define PL_POPUP_H 20
+#define PL_POPUP_SPACING 6
+#define PL_POPUP_LABEL_GAP 7
+#define PL_POPUP_TEXT_X 7     /* pen position of the choice */
+#define PL_POPUP_ARROWS_W 21  /* the arrow box, with its left divider */
+#define PL_POPUP_BASELINE(h) ((h) - 7)
+/* `label` may be NULL. Disabled: dimmed text and arrows (TODO: measure). */
+void pl_popup_button_paint(struct pl_canvas *c, int x, int y, int w, int h,
+		const struct plat_text *label, bool enabled);
+
 enum sb_part {
 	SB_NONE,
 	SB_DEC_ARROW, /* up / left */

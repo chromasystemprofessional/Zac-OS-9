@@ -6,6 +6,11 @@
 
 static const uint32_t (*color_map)[2];
 static int color_map_n;
+static int black_only;
+
+void fig_set_black_only(int on) {
+	black_only = on;
+}
 
 void fig_set_color_map(const uint32_t (*pairs)[2], int n) {
 	color_map = pairs;
@@ -51,6 +56,11 @@ int fig_compare(const char *name, const char *dir, const char *figure,
 				ours = ours >> 24 ? ours & 0xFFFFFFu : 0xFFFFFFu;
 				uint32_t want = mapped(
 					((const uint32_t *)(data + fy * fig_stride))[fx] & 0xFFFFFFu);
+				if (black_only) {
+					/* Near-black (#222 corner pixels) counts as black. */
+					ours = (ours & 0xFF) > 0x40 ? 0xFFFFFFu : 0;
+					want = (want & 0xFF) > 0x40 ? 0xFFFFFFu : 0;
+				}
 				if (ours != want) {
 					if (failures < (getenv("FIG_VERBOSE") ? 1000 : 10)) {
 						fprintf(stderr, "  %s: (%d,%d) got #%06x want #%06x\n",

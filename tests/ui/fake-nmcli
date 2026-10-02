@@ -1,0 +1,188 @@
+#!/usr/bin/env python3
+"""A stand-in for nmcli, for testing the TCP/IP panel without NetworkManager.
+
+It answers the queries platinum-tcpip makes from a JSON state file
+($FAKE_NMCLI_STATE, default /tmp/fake-nmcli.json, created on first use),
+applies changes to it, and logs every call with its standard input to
+$FAKE_NMCLI_LOG (default /tmp/fake-nmcli.log). Put its folder first on
+PATH under the name nmcli.
+
+The secured networks' password is "correct horse".
+"""
+import json
+import os
+import sys
+
+STATE = os.environ.get("FAKE_NMCLI_STATE", "/tmp/fake-nmcli.json")
+LOG = os.environ.get("FAKE_NMCLI_LOG", "/tmp/fake-nmcli.log")
+PASSWORD = "correct horse"
+
+INITIAL = {
+    "wifi": True,
+    "devices": [
+        {"name": "eth0", "type": "ethernet", "state": "connected", "conn": "u-eth"},
+        {"name": "wlan0", "type": "wifi", "state": "connected", "conn": "u-home"},
+    ],
+    "profiles": {
+        "u-eth": {"connection.id": "Wired connection 1", "type": "802-3-ethernet",
+                  "connection.interface-name": "", "connection.autoconnect": "yes",
+                  "ipv4.method": "auto", "ipv4.addresses": "", "ipv4.gateway": "",
+                  "ipv4.dns": "", "ipv4.dns-search": "", "ipv4.ignore-auto-dns": "no",
+                  "ipv6.method": "auto"},
+        "u-home": {"connection.id": "HomeNet", "type": "802-11-wireless",
+                   "connection.interface-name": "wlan0", "connection.autoconnect": "yes",
+                   "ipv4.method": "auto", "ipv4.addresses": "", "ipv4.gateway": "",
+                   "ipv4.dns": "", "ipv4.dns-search": "", "ipv4.ignore-auto-dns": "no",
+                   "ipv6.method": "auto", "802-11-wireless.cloned-mac-address": "preserve"},
+    },
+    "live": {
+        "eth0": {"GENERAL.HWADDR": "52:54:00:12:34:56", "IP4.ADDRESS": ["10.0.2.15/24"],
+                 "IP4.GATEWAY": "10.0.2.2", "IP4.DNS": ["10.0.2.3"],
+                 "IP6.ADDRESS": ["fec0::5054:ff:fe12:3456/64"],
+                 "CAPABILITIES.SPEED": "1000 Mb/s"},
+        "wlan0": {"GENERAL.HWADDR": "A4:5E:60:C1:22:9F", "IP4.ADDRESS": ["192.168.1.23/24"],
+                  "IP4.GATEWAY": "192.168.1.1", "IP4.DNS": ["192.168.1.1"],
+                  "IP6.ADDRESS": [], "CAPABILITIES.SPEED": "unknown"},
+    },
+    "networks": [
+        {"ssid": "HomeNet", "signal": 82, "security": "WPA2"},
+        {"ssid": "Cafe Wi-Fi", "signal": 55, "security": ""},
+        {"ssid": "Neighbor", "signal": 30, "security": "WPA2 WPA3"},
+        {"ssid": "Printer:Setup", "signal": 18, "security": "WPA2"},
+    ],
+}
+
+
+def esc(v):
+    return str(v).replace("\\", "\\\\").replace(":", "\\:")
+
+
+def load():
+    if not os.path.exists(STATE):
+        save(INITIAL)
+    with open(STATE) as f:
+        return json.load(f)
+
+
+def save(s):
+    with open(STATE, "w") as f:
+        json.dump(s, f, indent=1)
+
+
+def device(s, name):
+    return next(d for d in s["devices"] if d["name"] == name)
+
+
+def main(argv):
+    stdin = "" if sys.stdin.isatty() else sys.stdin.read()
+    with open(LOG, "a") as log:
+        log.write(json.dumps({"args": argv, "stdin": stdin}) + "\n")
+    s = load()
+    fields = None
+    args = []
+    i = 0
+    while i < len(argv):
+        a = argv[i]
+        if a == "-t" or a == "--ask":
+            pass
+        elif a == "-f":
+            i += 1
+            fields = argv[i].split(",")
+        else:
+            args.append(a)
+        i += 1
+
+    def out(*cols):
+        print(":".join(esc(c) for c in cols))
+
+    if args == ["general"]:
+        print("running")
+    elif args == ["device"]:
+        for d in s["devices"]:
+            conn = s["profiles"].get(d["conn"], {}).get("connection.id", "") if d["conn"] else ""
+            out(d["name"], d["type"], d["state"], conn)
+    elif args[:2] == ["connection", "show"] and len(args) == 3 and args[2] == "--active":
+        for d in s["devices"]:
+            if d["conn"]:
+                out(d["conn"], d["name"])
+    elif args == ["connection", "show"]:
+        for uuid, p in s["profiles"].items():
+            out(*[{"UUID": uuid, "NAME": p["connection.id"], "TYPE": p["type"]}[f] for f in fields])
+    elif args[:2] == ["connection", "show"]:
+        p = s["profiles"][args[2]]
+        for f in fields:
+            if f in p:
+                out(f, p[f])
+    elif args[:2] == ["device", "show"]:
+        d, live = device(s, args[2]), s["live"][args[2]]
+        state = "100 (connected)" if d["state"] == "connected" else "30 (disconnected)"
+        out("GENERAL.DEVICE", d["name"])
+        out("GENERAL.STATE", state)
+        out("GENERAL.HWADDR", live["GENERAL.HWADDR"])
+        if d["state"] == "connected":
+            for k in ("IP4.ADDRESS", "IP4.DNS", "IP6.ADDRESS"):
+                for n, v in enumerate(live[k], 1):
+                    out(f"{k}[{n}]", v)
+            out("IP4.GATEWAY", live["IP4.GATEWAY"])
+        out("CAPABILITIES.SPEED", live["CAPABILITIES.SPEED"])
+    elif args[:3] == ["device", "wifi", "list"]:
+        if s["wifi"]:
+            active = s["profiles"].get(device(s, "wlan0")["conn"], {}).get("connection.id")
+            for n in s["networks"]:
+                out("*" if n["ssid"] == active else "", n["ssid"], n["signal"], n["security"])
+    elif args == ["radio", "wifi"]:
+        print("enabled" if s["wifi"] else "disabled")
+    elif args[:2] == ["radio", "wifi"]:
+        s["wifi"] = args[2] == "on"
+        d = device(s, "wlan0")
+        d["state"], d["conn"] = ("disconnected", "") if not s["wifi"] else (d["state"], d["conn"])
+        save(s)
+    elif args[:2] == ["connection", "modify"]:
+        p = s["profiles"][args[2]]
+        for k, v in zip(args[3::2], args[4::2]):
+            p[k] = ",".join(v.split()) if k in ("ipv4.dns", "ipv4.dns-search") else v
+        save(s)
+    elif args[:2] == ["connection", "add"]:
+        opts = dict(zip(args[2::2], args[3::2]))
+        uuid = "u-" + opts["con-name"].replace(" ", "-")
+        if opts["type"] == "wifi":
+            p = dict(INITIAL["profiles"]["u-home"], **{"connection.id": opts["con-name"],
+                                                      "ssid": opts["ssid"], "psk": None})
+        else:
+            p = {"connection.id": opts["con-name"], "type": "802-3-ethernet",
+                 "connection.interface-name": opts["ifname"]}
+        p.update({k: v for k, v in opts.items() if "." in k})
+        s["profiles"][uuid] = p
+        save(s)
+    elif args[:2] == ["connection", "up"]:
+        key = args[3] if args[2] == "id" else args[2]
+        uuid = next((u for u, p in s["profiles"].items() if key in (u, p["connection.id"])), None)
+        if not uuid:
+            print(f"Error: unknown connection '{key}'.", file=sys.stderr)
+            return 10
+        p = s["profiles"][uuid]
+        if p["type"] == "802-11-wireless":
+            # A new profile's secret comes from passwd-file (stdin here).
+            if "wifi-sec.key-mgmt" in p and p.get("psk", "saved") is None:
+                given = {}
+                if "passwd-file" in args:
+                    for line in stdin.splitlines():
+                        k, _, v = line.partition(":")
+                        given[k] = v
+                if given.get("802-11-wireless-security.psk") != PASSWORD:
+                    print("Error: Connection activation failed: Secrets were required, "
+                          "but not provided.", file=sys.stderr)
+                    return 4
+                p["psk"] = PASSWORD
+            device(s, "wlan0").update(state="connected", conn=uuid)
+        save(s)
+    elif args[:3] == ["connection", "delete", "id"]:
+        s["profiles"] = {u: p for u, p in s["profiles"].items() if p["connection.id"] != args[3]}
+        save(s)
+    else:
+        print(f"Error: fake nmcli doesn't know {args}", file=sys.stderr)
+        return 2
+    return 0
+
+
+sys.exit(main(sys.argv[1:]))

@@ -6,9 +6,13 @@
  * with lib/widgets.
  */
 
+#include <QKeyEvent>
+#include <QMouseEvent>
 #include <QPoint>
 #include <QRect>
 #include <QStringList>
+#include <QTimer>
+#include <QWidget>
 #include <functional>
 #include <memory>
 #include <vector>
@@ -127,3 +131,97 @@ private:
 
 /* A titled group box drawn on `bg`. */
 void panelGroup(pl_canvas *c, int x0, int y0, int x1, int y1, const char *title, uint32_t bg);
+
+/* One choice in a pop-up menu. Wi-Fi networks also show signal bars
+ * (0..4; -1 for none) and a padlock. */
+struct PopupItem {
+	QString text;
+	bool enabled = true;
+	bool separator = false;
+	int signal = -1;
+	bool lock = false;
+};
+
+/* A pop-up menu button (HIG figures 2-6, 2-7, 3-25), with an optional
+ * label to its left. Pressing it opens the menu with the current choice
+ * level with the button; release on an item to choose it, or click and
+ * release quickly to leave the menu open (a "sticky" menu). */
+struct PanelPopup {
+	QRect rect; /* the button: PL_POPUP_H tall */
+	QString label;
+	std::vector<PopupItem> items;
+	int selected = 0;
+	bool enabled = true;
+	/* Called with the chosen item, even if it is already selected
+	 * (so commands such as "Other Network…" work). If the items change
+	 * while the menu is open, the choice is matched up by its text. */
+	std::function<void(int)> chosen;
+
+	void paint(pl_canvas *c) const;
+	/* Opens the menu over `owner` if pos is on the button. */
+	bool press(QWidget *owner, QPoint pos);
+};
+
+/* A Platinum edit text field (HIG figures 2-28, 3-30): one line, or
+ * several (Return starts a new one). Click or drag to place the caret
+ * and select; ⌘A, ⌘C, ⌘X and ⌘V work. */
+struct PanelEdit {
+	QRect rect; /* the black frame; PL_EDIT_H tall for one line */
+	QString text;
+	bool multiline = false;
+	bool password = false;
+	bool enabled = true;
+	/* Characters the field takes (all printable ones if unset). */
+	std::function<bool(QChar)> accepts;
+	std::function<void()> edited;
+
+	int caret = 0, anchor = 0;
+
+	void setText(const QString &t);
+	void selectAll();
+	void paint(pl_canvas *c, bool focused, bool caretOn) const;
+	bool press(QPoint p, bool extend);
+	bool move(QPoint p);
+	bool release(QPoint p);
+	/* Editing keys; false for keys the field doesn't use (Tab, Escape,
+	 * and Return in a one-line field). */
+	bool key(QKeyEvent *e);
+
+private:
+	bool m_dragging = false;
+	QString shown() const;
+	QStringList lines() const;
+	int indexAt(QPoint p) const;
+	QPoint caretPos(int index) const; /* left of the character, baseline */
+	void insert(const QString &s);
+	int m_scroll = 0; /* one-line fields: pixels scrolled left */
+	void keepCaretVisible();
+};
+
+/* Controls laid out in a window, and the plumbing they share: mouse
+ * tracking, keyboard focus (Tab between fields), the blinking caret, and
+ * the default button (Return) and cancel button (Escape, ⌘.). */
+class PanelHost {
+public:
+	std::vector<PanelButton *> buttons;
+	std::vector<PanelCheckbox *> checks;
+	std::vector<PanelRadios *> radios;
+	std::vector<PanelPopup *> popups;
+	std::vector<PanelEdit *> edits;
+	PanelEdit *focus = nullptr;
+	PanelButton *defaultButton = nullptr, *cancelButton = nullptr;
+
+	explicit PanelHost(QWidget *w);
+	void setFocus(PanelEdit *e);
+	void paintControls(pl_canvas *c, uint32_t bg) const;
+	bool hostPress(QMouseEvent *e);
+	bool hostMove(QMouseEvent *e);
+	bool hostRelease(QMouseEvent *e);
+	bool hostKey(QKeyEvent *e);
+
+private:
+	QWidget *m_widget;
+	std::unique_ptr<QTimer> m_caret;
+	bool m_caretOn = true;
+	PanelEdit *m_pressedEdit = nullptr;
+};

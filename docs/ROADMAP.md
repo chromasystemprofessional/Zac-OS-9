@@ -107,8 +107,22 @@ scaling only, original behaviors and timings).
     platinum-controlpanel. platinum-wm applies the mouse, keyboard and
     screen settings live (compositor/src/prefs.c) and publishes the
     screen's modes for the Monitors panel.
+  - Pop-up menu buttons and their menus (HIG figures 2-6, 2-7, 3-25),
+    pixel for pixel; the menu highlight measured from figure 2-7. Edit
+    text fields (one or more lines, selection, ⌘A/C/X/V) and the
+    Mac OS 9 "Save changes?" alert with Don't Save.
+  - TCP/IP control panel (platinum-tcpip), after Mac OS 9's, on
+    NetworkManager: Connect via, Configure (DHCP or manually), IP
+    address, subnet mask, router, name servers, search domains; saved on
+    closing, after asking. Modern additions: a Wi-Fi Network pop-up
+    (signal bars, padlocks, Other Network…, Wi-Fi on/off), joining with
+    a password (never on a command line), Options… (IPv6, private Wi-Fi
+    address, connect automatically) and Info…. Tested against a stand-in
+    nmcli (tests/ui/tcpip.sh) and real NetworkManager with a simulated
+    WPA2 network in the VM (tests/vm/tcpip-wifi.py).
 - Next:
-  - Pop-up menu buttons (for panels that need them).
+  - TCP/IP: 802.1X (enterprise) networks, VPNs, proxies; a Wi-Fi menu
+    in the menu bar.
   - Monitors on real hardware: several screens, arrangement.
   - Platinum QStyle plugin and GTK3/4 theme, so third-party apps match.
 

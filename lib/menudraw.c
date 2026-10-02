@@ -197,11 +197,14 @@ void menu_paint(struct pl_canvas *c, const struct menu_item *items, int n,
 			y += MENU_SEP_H;
 			continue;
 		}
-		/* TODO: the selected-item look isn't in the HIG figures; we assume
-		 * the title's accent fill with white text. */
+		/* The selected item (HIG figure 2-7): an accent bar lit along its
+		 * top and left, shaded down its right side; white text. */
 		bool sel = i == selected && it->enabled;
 		if (sel) {
 			pl_fill(c, 1, y, W - 2, y + MENU_ITEM_H - 1, accent.shadow);
+			pl_hline(c, 1, W - 3, y, accent.dark);
+			pl_vline(c, 1, y, y + MENU_ITEM_H - 1, accent.dark);
+			pl_vline(c, W - 2, y + 1, y + MENU_ITEM_H - 1, accent.deep);
 		}
 		uint32_t color = sel ? C_WHITE : it->enabled ? C_BLACK : C_888;
 		int tx = MENU_TEXT_X;

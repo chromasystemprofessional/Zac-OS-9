@@ -4,7 +4,9 @@
 #include "server.h"
 
 struct plat_popup {
+	struct plat_server *server;
 	struct wlr_xdg_popup *xdg_popup;
+	struct wlr_scene_tree *parent_tree;
 	struct wl_listener commit;
 	struct wl_listener destroy;
 };
@@ -199,6 +201,15 @@ static void server_new_xdg_toplevel(struct wl_listener *listener, void *data) {
 static void popup_commit(struct wl_listener *listener, void *data) {
 	struct plat_popup *popup = wl_container_of(listener, popup, commit);
 	if (popup->xdg_popup->base->initial_commit) {
+		/* Keep menus on the screen and off the menu bar, sliding or
+		 * flipping them as the client allows. */
+		int lx, ly;
+		if (wlr_scene_node_coords(&popup->parent_tree->node, &lx, &ly)) {
+			struct wlr_box box = output_usable_area(popup->server, lx, ly);
+			box.x -= lx;
+			box.y -= ly;
+			wlr_xdg_popup_unconstrain_from_box(popup->xdg_popup, &box);
+		}
 		wlr_xdg_surface_schedule_configure(popup->xdg_popup->base);
 	}
 }
@@ -214,12 +225,14 @@ static void server_new_xdg_popup(struct wl_listener *listener, void *data) {
 	struct wlr_xdg_popup *xdg_popup = data;
 
 	struct plat_popup *popup = calloc(1, sizeof(*popup));
+	popup->server = wl_container_of(listener, popup->server, new_xdg_popup);
 	popup->xdg_popup = xdg_popup;
 
 	struct wlr_xdg_surface *parent =
 		wlr_xdg_surface_try_from_wlr_surface(xdg_popup->parent);
 	assert(parent);
 	struct wlr_scene_tree *parent_tree = parent->data;
+	popup->parent_tree = parent_tree;
 	xdg_popup->base->data = wlr_scene_xdg_surface_create(parent_tree, xdg_popup->base);
 
 	popup->commit.notify = popup_commit;

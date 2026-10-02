@@ -910,3 +910,60 @@ enum sb_part sb_hit(const struct pl_scrollbar *sb, int along) {
 	}
 	return SB_THUMB_PART;
 }
+
+/*
+ * Pop-up menu button, measured in HIG figure 2-6 (130 x 19) and checked
+ * against figure 3-25's 20 px buttons. Columns count from the left edge
+ * (x) or the right edge (w-1); rows from the top or bottom (h-1).
+ */
+void pl_popup_button_paint(struct pl_canvas *c, int x, int y, int w, int h,
+		const struct plat_text *label, bool enabled) {
+	const int x1 = x + w - 1, y1 = y + h - 1;
+	const uint32_t ink = enabled ? C_BLACK : GRAY(0x8);
+
+	pl_fill(c, x + 1, y + 1, x1 - 1, y1 - 1, GRAY(0xD));
+	/* The frame: black, its corners cut, a 0x22 pixel either side of each. */
+	pl_hline(c, x + 3, x1 - 3, y, C_BLACK);
+	pl_hline(c, x + 3, x1 - 3, y1, C_BLACK);
+	pl_vline(c, x, y + 3, y1 - 3, C_BLACK);
+	pl_vline(c, x1, y + 3, y1 - 3, C_BLACK);
+	const int corners[4][2] = { { x, y }, { x1, y }, { x, y1 }, { x1, y1 } };
+	for (int i = 0; i < 4; i++) {
+		const int cx = corners[i][0], cy = corners[i][1];
+		const int dx = cx == x ? 1 : -1, dy = cy == y ? 1 : -1;
+		pl_put(c, cx + dx, cy + dy, C_BLACK);
+		pl_put(c, cx + 2 * dx, cy, GRAY(0x2));
+		pl_put(c, cx, cy + 2 * dy, GRAY(0x2));
+	}
+
+	/* The choice's part: lit top and left, 0xAA shadow bottom and right. */
+	const int div = x1 - PL_POPUP_ARROWS_W; /* its shadow column */
+	pl_hline(c, x + 2, div - 1, y + 1, C_WHITE);
+	pl_vline(c, x + 1, y + 2, y1 - 2, C_WHITE);
+	pl_hline(c, x + 2, div, y1 - 1, GRAY(0xA));
+	pl_vline(c, div, y + 2, y1 - 2, GRAY(0xA));
+
+	/* The arrow box: lit top and left, two shades of shadow. */
+	const int ax = div + 2; /* its lit column */
+	pl_put(c, div + 1, y1 - 1, GRAY(0xB));
+	pl_put(c, x1 - 2, y + 1, GRAY(0xB));
+	pl_hline(c, ax, x1 - 3, y + 2, C_WHITE);
+	pl_vline(c, ax, y + 2, y1 - 3, C_WHITE);
+	pl_vline(c, x1 - 2, y + 3, y1 - 3, GRAY(0xA));
+	pl_hline(c, ax + 1, x1 - 3, y1 - 2, GRAY(0xA));
+	pl_put(c, x1 - 1, y + 2, GRAY(0xA));
+	pl_vline(c, x1 - 1, y + 3, y1 - 2, GRAY(0x7));
+	pl_hline(c, ax, x1 - 2, y1 - 1, GRAY(0x7));
+	pl_hline(c, x1 - 2, x1 - 1, y1 - 2, GRAY(0x7));
+
+	/* The double triangle, 7 px wide at the middle, centred 11 px in. */
+	const int mid = x1 - 11;
+	for (int i = 0; i < 4; i++) {
+		pl_hline(c, mid - i, mid + i, y1 - 14 + i, ink);
+		pl_hline(c, mid - i, mid + i, y1 - 5 - i, ink);
+	}
+
+	if (label) {
+		pl_text(c, label, x + PL_POPUP_TEXT_X + label->ink_l - 1, y + PL_POPUP_BASELINE(h), ink);
+	}
+}

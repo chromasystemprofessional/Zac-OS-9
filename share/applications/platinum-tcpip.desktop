@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=TCP/IP
+Comment=Network interfaces, Wi-Fi, addresses and name servers
+Exec=platinum-tcpip
+Categories=Settings;HardwareSettings;
+OnlyShowIn=Platinum;

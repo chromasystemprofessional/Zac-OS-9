@@ -80,6 +80,37 @@ static int run_help_menu(const char *dir, int *ran) {
 	return fails > 0 ? fails : 0;
 }
 
+/* A pop-up menu button's open menu (figure 2-7): the chosen item
+ * highlighted and checked. Text and the pointer are excluded; the
+ * figure's background is #DDD, not the page's white. */
+static int run_popup_menu(const char *dir, int *ran) {
+	struct plat_text *t = text_render("x", 1000);
+	struct menu_item items[] = { ITEM(t, NULL, true), ITEM(t, NULL, true), ITEM(t, NULL, true) };
+	items[0].checked = true;
+	const int w = 129, h = 50;
+	uint32_t *px = calloc((size_t)(w + 1) * (h + 1), sizeof(*px));
+	struct pl_canvas c = { .px = px, .stride = w + 1, .width = w + 1, .height = h + 1 };
+	menu_paint(&c, items, 3, w, h, 0, PL_ACCENT_DEFAULT);
+	const struct fig_rect regions[] = {
+		{ 0, 0, 129, 1 },     /* top border */
+		{ 0, 1, 18, 47 },     /* left bevel, highlight edge, checkmark */
+		{ 106, 1, 12, 47 },   /* right of the text */
+		{ 118, 1, 11, 8 },    /* above the pointer */
+		{ 118, 29, 12, 19 },  /* below it */
+		{ 128, 2, 2, 14 },    /* right border and shadow above the pointer */
+		{ 128, 25, 2, 23 },   /* and below it */
+		{ 2, 48, 128, 3 },    /* bottom bevel, border, shadow */
+	};
+	int fails = fig_compare("pop-up menu (fig 2-7)", dir, "img-027-023.png", 0, 0,
+		px, w + 1, h + 1, regions, sizeof(regions) / sizeof(regions[0]));
+	free(px);
+	text_destroy(t);
+	if (fails >= 0) {
+		*ran = 1;
+	}
+	return fails > 0 ? fails : 0;
+}
+
 static int run_menu_bar(const char *dir, int *ran) {
 	const int W = 256;
 	uint32_t *px = calloc((size_t)W * MBAR_HEIGHT, sizeof(*px));
@@ -147,5 +178,6 @@ int main(int argc, char *argv[]) {
 	fails += run_menu_bar(dir, &ran);
 	fails += run_edit_menu(dir, &ran);
 	fails += run_help_menu(dir, &ran);
+	fails += run_popup_menu(dir, &ran);
 	return fig_exit_status(fails, ran);
 }

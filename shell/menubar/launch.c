@@ -177,6 +177,7 @@ void launch_fill_logo_menu(struct mb_menu *menu) {
 		{ "Monitors", "platinum-controlpanel", " monitors" },
 		{ "Mouse", "platinum-controlpanel", " mouse" },
 		{ "Sound", "platinum-controlpanel", " sound" },
+		{ "TCP/IP", "platinum-tcpip", "" },
 	};
 	for (size_t i = 0; i < sizeof(panel_list) / sizeof(panel_list[0]); i++) {
 		char command[PATH_MAX + 64];

@@ -35,7 +35,8 @@ static std::vector<std::unique_ptr<Text>> wrap(const QString &message, int width
 	return lines;
 }
 
-Alert::Alert(const QString &message, const QString &okLabel, const QString &cancelLabel) {
+Alert::Alert(const QString &message, const QString &okLabel, const QString &cancelLabel,
+		const QString &otherLabel) {
 	setWindowTitle(" "); /* stripes all the way across */
 	m_lines = wrap(message, TEXT_W);
 
@@ -45,21 +46,31 @@ Alert::Alert(const QString &message, const QString &okLabel, const QString &canc
 	const int H = contentBottom + 16 + PL_BUTTON_H + MARGIN;
 	setFixedSize(W, H);
 
-	auto addButton = [&](const QString &label, bool isDefault) {
+	auto addButton = [&](const QString &label, bool isDefault, int result) {
 		Button b;
+		b.result = result;
 		b.label = std::make_unique<Text>(label, 200, PL_FONT_SYSTEM);
 		int w = std::max(PL_BUTTON_MIN_W, b.label->inkWidth() + 2 * BUTTON_TEXT_PAD);
 		b.rect = QRect(0, H - MARGIN - PL_BUTTON_H, w, PL_BUTTON_H);
 		b.isDefault = isDefault;
 		m_buttons.push_back(std::move(b));
 	};
-	if (!cancelLabel.isEmpty()) {
-		addButton(cancelLabel, false);
+	if (!otherLabel.isEmpty()) {
+		addButton(otherLabel, false, Other);
 	}
-	addButton(okLabel, true);
-	/* Right-aligned, default button rightmost. */
+	if (!cancelLabel.isEmpty()) {
+		addButton(cancelLabel, false, Cancel);
+	}
+	addButton(okLabel, true, Ok);
+	/* Right-aligned, default button rightmost; a third button at the left. */
+	if (!otherLabel.isEmpty()) {
+		m_buttons.front().rect.moveLeft(TEXT_X);
+	}
 	int x = W - MARGIN;
 	for (auto it = m_buttons.rbegin(); it != m_buttons.rend(); ++it) {
+		if (it->result == Other) {
+			continue;
+		}
 		x -= it->rect.width();
 		it->rect.moveLeft(x);
 		x -= BUTTON_GAP;
@@ -69,6 +80,12 @@ Alert::Alert(const QString &message, const QString &okLabel, const QString &canc
 bool Alert::ask(const QString &message, const QString &ok, const QString &cancel) {
 	Alert alert(message, ok, cancel);
 	return alert.exec() == QDialog::Accepted;
+}
+
+Alert::Choice Alert::choose(const QString &message, const QString &ok, const QString &cancel,
+		const QString &other) {
+	Alert alert(message, ok, cancel, other);
+	return static_cast<Choice>(alert.exec());
 }
 
 void Alert::showEvent(QShowEvent *e) {
@@ -132,7 +149,7 @@ void Alert::mouseReleaseEvent(QMouseEvent *) {
 	m_inside = false;
 	update();
 	if (chosen >= 0) {
-		m_buttons[chosen].isDefault ? accept() : reject();
+		done(m_buttons[chosen].result);
 	}
 }
 
@@ -142,5 +159,8 @@ void Alert::keyPressEvent(QKeyEvent *e) {
 	} else if (e->key() == Qt::Key_Escape ||
 			(e->key() == Qt::Key_Period && (e->modifiers() & Qt::ControlModifier))) {
 		reject();
+	} else if (e->key() == Qt::Key_D && (e->modifiers() & Qt::ControlModifier) &&
+			m_buttons.front().result == Other) {
+		done(Other);
 	}
 }

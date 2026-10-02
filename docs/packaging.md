@@ -56,8 +56,8 @@ The configuration is in `iso/config/` and is copied over a fresh `lb config`.
 The live system includes:
 
 - **Login.** greetd with tuigreet (`iso/config/includes.chroot/etc/greetd`).
-- **Session.** Xwayland, foot, PipeWire and NetworkManager (`nmtui` in a
-  terminal).
+- **Session.** Xwayland, foot, PipeWire and NetworkManager (set up in the
+  TCP/IP control panel).
 - **Firmware.** Debian's `non-free-firmware`, so that real hardware works.
 
 **Live.** The ISO starts straight into Platinum 2026 as the user `user`. There
@@ -94,8 +94,8 @@ The live system runs from the USB stick and changes nothing on the Mac's disk.
      1440×900 desktop. Monitors ▸ Normal switches to 1×.
 4. **Connect to Wi-Fi.**
    - The Broadcom `wl` driver is included.
-   - Choose **Terminal** from the logo menu, type `nmtui`, and pick
-     **Activate a connection**.
+   - Open **Control Panels ▸ TCP/IP** from the logo menu, choose **Wi-Fi** in
+     Connect via, then your network in the **Network** pop-up.
    - A Thunderbolt Ethernet adapter, or USB tethering from a phone, also works.
 
 **Keys.** ⌘ is the Command key. The F-keys need fn, for example

@@ -14,11 +14,19 @@
  */
 class Alert : public QDialog {
 public:
-	Alert(const QString &message, const QString &okLabel, const QString &cancelLabel);
+	/* An optional third button (such as "Don't Save") sits at the left. */
+	Alert(const QString &message, const QString &okLabel, const QString &cancelLabel,
+		const QString &otherLabel = QString());
 
 	/* Shows the alert modally; true if the default button was chosen. */
 	static bool ask(const QString &message, const QString &ok = "OK",
 		const QString &cancel = "Cancel");
+
+	/* With a third button: Ok (the default), Cancel or Other. ⌘D also
+	 * chooses Other, as "Don't Save" did on the Mac. */
+	enum Choice { Cancel = 0, Ok = 1, Other = 2 };
+	static Choice choose(const QString &message, const QString &ok, const QString &cancel,
+		const QString &other);
 
 protected:
 	void paintEvent(QPaintEvent *) override;
@@ -33,6 +41,7 @@ private:
 		QRect rect;
 		std::unique_ptr<Text> label;
 		bool isDefault = false;
+		int result = 0;
 	};
 	int buttonAt(QPoint p) const;
 
