@@ -1,6 +1,6 @@
 # Project Status
 
-Updated: 2026-10-02
+Updated: 2026-10-03
 
 ## Completed
 
@@ -14,6 +14,10 @@ Updated: 2026-10-02
 | *(uncommitted)* | Virtual Macintosh filesystem for the Finder, with real application icons, package origin, and hide-not-uninstall — see below |
 | *(uncommitted)* | Software window (app catalog over apt) in the Apple menu — see below |
 | *(uncommitted)* | Network Browser: connect to AFP and SMB servers, mounted volumes on the desktop — see below |
+| `4e3ebe6` | ZacOS 9 rename (from Platinum 2026) |
+| `996b311` | Applications: empty on fresh install, flat launchers |
+| `634add8` | Finder: local disk volumes on the desktop (GVolumeMonitor) |
+| `8771336` | Windows app compatibility: `.exe`/`.msi` open via Wine |
 
 ## Current work
 
