@@ -261,6 +261,8 @@ void Finder::openSelection() {
 			FolderWindow::open(item->path);
 		} else if (item->kind == PL_ICON_DISK_IMAGE) {
 			launchClassic({ item->path });
+		} else if (item->kind == PL_ICON_WINDOWS) {
+			launchWindows(item->path);
 		} else if (item->kind == PL_ICON_CLASSIC) {
 			/* TODO: open the application itself inside the Mac. */
 			launchClassic();
@@ -273,6 +275,26 @@ void Finder::openSelection() {
 static QString classicLauncher() {
 	const QString local = QCoreApplication::applicationDirPath() + "/zacos9-classic";
 	return QFileInfo(local).isExecutable() ? local : QStringLiteral("zacos9-classic");
+}
+
+static QString wineLauncher() {
+	const QString local = QCoreApplication::applicationDirPath() + "/zacos9-wine";
+	return QFileInfo(local).isExecutable() ? local : QStringLiteral("zacos9-wine");
+}
+
+void Finder::launchWindows(const QString &exe) {
+	QProcess check;
+	check.start(wineLauncher(), QStringList{ "--check" });
+	if (!check.waitForFinished(10000) || check.exitStatus() != QProcess::NormalExit ||
+			check.exitCode() != 0) {
+		QString why = QString::fromUtf8(check.readAllStandardError()).trimmed();
+		if (why.isEmpty()) {
+			why = "Wine could not be started.";
+		}
+		Alert::ask(why, "OK", QString());
+		return;
+	}
+	QProcess::startDetached(wineLauncher(), QStringList{ exe });
 }
 
 void Finder::launchClassic(const QStringList &disks) {

@@ -502,6 +502,59 @@ icon classic 16
 ....KaaaaaaK....
 ....KKKKKKKK....
 
+; A Windows application (runs via Wine).
+icon windows 32
+................................
+................................
+................................
+................................
+................................
+..KKKKKKKKKKKKKKKKKKKKKKKKKKKK..
+..KPPPPPPPPPPPPPPPPPPPPPPPPPPK..
+..KPNNNNNNNNNNNNNNNNNNNNNNNNPK..
+..KPNNNNNNNNNNNNNNNNNNNNWWWWPK..
+..KPNNNNNNNNNNNNNNNNNNNNWWWWPK..
+..KPPPPPPPPPPPPPPPPPPPPPPPPPPK..
+..KWWWWWWWWWWWWWWWWWWWWWWWWWWK..
+..KccccccccccccccccccccccccccK..
+..KccccccccccccccccccccccccccK..
+..KWWWWWWWWWWWWWWWWWWWWWWWWWWK..
+..KWccccccccccccccccccccccccWK..
+..KWccccccccccccccccccccccccWK..
+..KWWWWWWWWWWWWWWWWWWWWWWWWWWK..
+..KWccccccccccccccccccccccccWK..
+..KWccccccccccccccccccccccccWK..
+..KWWWWWWWWWWWWWWWWWWWWWWWWWWK..
+..KWccccccccccccccccccccccccWK..
+..KWccccccccccccccccccccccccWK..
+..KWWWWWWWWWWWWWWWWWWWWWWWWWWK..
+..KWccccccccccccccccccccccccWK..
+..KWccccccccccccccccccccccccWK..
+..K99999999999999999999999999K..
+..KKKKKKKKKKKKKKKKKKKKKKKKKKKK..
+................................
+................................
+................................
+................................
+
+icon windows 16
+................
+................
+.KKKKKKKKKKKKKK.
+.KPPPPPPPPPPPPK.
+.KPNNNNNNNNWWWK.
+.KPPPPPPPPPPPPK.
+.KWWWWWWWWWWWWK.
+.KccccccccccccK.
+.KWWWWWWWWWWWWK.
+.KWccccccccccWK.
+.KWWWWWWWWWWWWK.
+.KWccccccccccWK.
+.KWWWWWWWWWWWWK.
+.KKKKKKKKKKKKKK.
+................
+................
+
 ; A shared folder (Get Info > Sharing): the folder on a network line.
 icon shared-folder 32
 ................................

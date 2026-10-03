@@ -14,7 +14,7 @@ SRC = os.path.join(ROOT, "assets", "icons", "platinum-icons.picon")
 OUT = os.path.join(ROOT, "lib", "icons_data.h")
 # Icons lib/icons.c expects, in enum pl_icon_kind order.
 KINDS = ["folder", "document", "application", "disk", "trash-empty", "trash-full", "caution",
-         "disk-image", "classic", "shared-folder", "system-folder", "control-panels"]
+         "disk-image", "classic", "windows", "shared-folder", "system-folder", "control-panels"]
 
 
 def parse():

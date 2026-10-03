@@ -35,6 +35,11 @@ configure_file(input: 'classic/zacos9-classic', output: 'zacos9-classic', copy: 
 install_data('classic/zacos9-classic', install_dir: get_option('bindir'),
   install_mode: 'rwxr-xr-x')
 
+# The Wine launcher for Windows applications, next to the Finder.
+configure_file(input: 'wine/zacos9-wine', output: 'zacos9-wine', copy: true)
+install_data('wine/zacos9-wine', install_dir: get_option('bindir'),
+  install_mode: 'rwxr-xr-x')
+
 executable('zacos9-menubar',
   'menubar/main.c',
   'menubar/menus.c',

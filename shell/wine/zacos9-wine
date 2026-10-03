@@ -1,0 +1,51 @@
+#!/bin/sh
+# zacos9-wine: run a Windows application via Wine.
+#
+#   zacos9-wine [--check] EXE
+#
+# --check verifies that Wine is installed and reports where it was found;
+# it exits 2 with an error on stderr when Wine is missing, and 0 otherwise.
+# Without --check, EXE is launched via wine or wine64 and this script exits
+# immediately (Wine runs the program in the background).
+set -eu
+
+check=false
+exe=""
+
+while [ $# -gt 0 ]; do
+	case $1 in
+	--check) check=true ;;
+	*) exe=$1 ;;
+	esac
+	shift
+done
+
+fail() {
+	echo "$1" >&2
+	exit 2
+}
+
+# Find wine or wine64 on PATH or in common install locations.
+find_wine() {
+	for candidate in wine64 wine; do
+		path=$(command -v "$candidate" 2>/dev/null) && { echo "$path"; return 0; }
+	done
+	for dir in /usr/bin /usr/local/bin /opt/wine-stable/bin /opt/wine-devel/bin; do
+		for candidate in wine64 wine; do
+			[ -x "$dir/$candidate" ] && { echo "$dir/$candidate"; return 0; }
+		done
+	done
+	return 1
+}
+
+wine_bin=$(find_wine) || fail "Wine is not installed. Install it with: sudo apt install wine"
+
+if $check; then
+	echo "wine: $wine_bin"
+	exit 0
+fi
+
+[ -n "$exe" ] || fail "usage: zacos9-wine [--check] EXE"
+[ -f "$exe" ] || fail "File not found: $exe"
+
+exec "$wine_bin" "$exe"

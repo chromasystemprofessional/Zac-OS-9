@@ -66,6 +66,8 @@ public:
 	/* Start classic Mac OS (shell/classic/zacos9-classic), with extra
 	 * disk images; explains in an alert when ROM or emulator is missing. */
 	void launchClassic(const QStringList &disks = {});
+	/* Run a Windows executable via Wine (shell/wine/zacos9-wine). */
+	void launchWindows(const QString &exe);
 
 	/* Spring-loaded folders: hovering a drag over a folder opens it; the
 	 * windows that sprang open close again when the drag ends. Each view

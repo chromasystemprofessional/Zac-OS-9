@@ -32,6 +32,8 @@ const QString &Item::kindName() {
 			kindText = "folder";
 		} else if (kind == PL_ICON_DISK_IMAGE) {
 			kindText = "Macintosh disk image";
+		} else if (kind == PL_ICON_WINDOWS) {
+			kindText = "Windows application";
 		} else if (kind == PL_ICON_CLASSIC) {
 			kindText = "classic application";
 		} else if (kind == PL_ICON_APPLICATION) {
@@ -62,6 +64,15 @@ QString displayName(const QString &path) {
 		return "Trash";
 	}
 	return QFileInfo(path).fileName();
+}
+
+bool isWindowsExecutable(const QString &path) {
+	const QFileInfo info(path);
+	if (!info.isFile()) {
+		return false;
+	}
+	const QString suffix = info.suffix().toLower();
+	return suffix == "exe" || suffix == "msi";
 }
 
 bool isClassicApplication(const QString &path) {
@@ -98,6 +109,9 @@ pl_icon_kind iconKindFor(const QString &path) {
 	}
 	if (isMacDiskImage(path)) {
 		return PL_ICON_DISK_IMAGE;
+	}
+	if (isWindowsExecutable(path)) {
+		return PL_ICON_WINDOWS;
 	}
 	if (isClassicApplication(path)) {
 		return PL_ICON_CLASSIC;
