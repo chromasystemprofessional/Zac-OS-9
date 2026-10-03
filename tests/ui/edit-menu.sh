@@ -1,10 +1,10 @@
 #!/bin/sh
 # UI test: Edit menu commands reach the front app.
 # Run inside WSL:  scripts/snapshot.sh /tmp/edit.png 9 "mousepad" "sh tests/ui/edit-menu.sh"
-# Expected result: Mousepad shows "Hello Platinum. Hello Platinum."
+# Expected result: Mousepad shows "Hello ZacOS 9. Hello ZacOS 9."
 # (typed text, then Select All, Copy, Paste, Paste via the menu bar).
 sleep 2
-wlrctl keyboard type "Hello Platinum. "
+wlrctl keyboard type "Hello ZacOS 9. "
 sleep 0.5
 pick() { # $1 = item y; pointer starts at the Edit title
 	wlrctl pointer click left; sleep 0.3

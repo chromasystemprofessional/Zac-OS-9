@@ -1,5 +1,5 @@
 /*
- * platinum-tcpip: the TCP/IP control panel, after Mac OS 9's, for
+ * zacos9-tcpip: the TCP/IP control panel, after Mac OS 9's, for
  * NetworkManager.
  *
  * "Connect via" picks a network interface; the Setup box says how it gets
@@ -1252,12 +1252,12 @@ private:
 };
 
 int main(int argc, char *argv[]) {
-	/* platinum-wm draws every frame; Qt must not add its own. */
+	/* zacos9-wm draws every frame; Qt must not add its own. */
 	qputenv("QT_WAYLAND_DISABLE_WINDOWDECORATION", "1");
 	QApplication app(argc, argv);
 	QApplication::setApplicationName("TCP/IP");
 	QApplication::setDoubleClickInterval(pl_double_click_ms());
-	QGuiApplication::setDesktopFileName("platinum-tcpip"); /* Wayland app_id */
+	QGuiApplication::setDesktopFileName("zacos9-tcpip"); /* Wayland app_id */
 	platinumShellInit();
 
 	TcpipPanel panel;

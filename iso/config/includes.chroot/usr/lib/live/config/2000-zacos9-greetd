@@ -2,7 +2,7 @@
 
 . /usr/lib/live/config.sh
 
-## Platinum 2026: log the live user straight into the Platinum 2026
+## ZacOS 9: log the live user straight into the ZacOS 9
 ## session at boot (greetd's initial_session, once per boot); logging
 ## out shows the greeter. Boot with "noautologin" to start at the
 ## greeter instead.
@@ -26,12 +26,12 @@ Cmdline ()
 Init ()
 {
 	if ! pkg_is_installed "greetd" || \
-	   component_was_executed "platinum-greetd"
+	   component_was_executed "zacos9-greetd"
 	then
 		exit 0
 	fi
 
-	echo -n " platinum-greetd"
+	echo -n " zacos9-greetd"
 }
 
 Config ()
@@ -41,13 +41,13 @@ Config ()
 		cat >> /etc/greetd/config.toml << EOF
 
 [initial_session]
-command = "platinum-session"
+command = "zacos9-session"
 user = "${LIVE_USERNAME}"
 EOF
 	fi
 
 	# Creating state file
-	touch /var/lib/live/config/platinum-greetd
+	touch /var/lib/live/config/zacos9-greetd
 }
 
 Cmdline

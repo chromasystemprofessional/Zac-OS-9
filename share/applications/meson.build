@@ -1,10 +1,10 @@
-# Desktop entries: copied into build/share/applications (platinum-wm adds
+# Desktop entries: copied into build/share/applications (zacos9-wm adds
 # its ../share to XDG_DATA_DIRS, which covers the build tree and an
 # install alike) and installed.
-entries = ['platinum-appearance.desktop', 'platinum-datetime.desktop', 'platinum-filesharing.desktop',
-  'platinum-keyboard.desktop', 'platinum-monitors.desktop', 'platinum-mouse.desktop',
-  'platinum-sound.desktop', 'platinum-tcpip.desktop', 'platinum-store.desktop',
-  'platinum-netbrowser.desktop']
+entries = ['zacos9-appearance.desktop', 'zacos9-datetime.desktop', 'zacos9-filesharing.desktop',
+  'zacos9-keyboard.desktop', 'zacos9-monitors.desktop', 'zacos9-mouse.desktop',
+  'zacos9-sound.desktop', 'zacos9-tcpip.desktop', 'zacos9-store.desktop',
+  'zacos9-netbrowser.desktop']
 foreach f : entries
   configure_file(input: f, output: f, copy: true)
 endforeach

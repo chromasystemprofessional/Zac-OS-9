@@ -7,7 +7,7 @@
 #include "panelkit.h"
 
 /*
- * platinum-netbrowser: the Network Browser, from the Apple menu. Lists
+ * zacos9-netbrowser: the Network Browser, from the Apple menu. Lists
  * what Bonjour and our own WS-Discovery probe find; "Connect to
  * Server…" for anything that doesn't announce itself. Not pixel-
  * measured (see docs/network.md).

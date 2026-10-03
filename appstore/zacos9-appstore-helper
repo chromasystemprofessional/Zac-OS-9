@@ -1,15 +1,15 @@
 #!/bin/sh
-# platinum-appstore-helper: the privileged half of the Software window
-# (platinum-store), reached from the Apple menu. It runs as root through
+# zacos9-appstore-helper: the privileged half of the Software window
+# (zacos9-store), reached from the Apple menu. It runs as root through
 # pkexec; polkit lets administrators at the computer use it without a
-# password, the same as platinum-sharing-helper, because this desktop
+# password, the same as zacos9-sharing-helper, because this desktop
 # runs no polkit authentication agent to prompt for one.
 #
-#   platinum-appstore-helper install PACKAGE...
-#   platinum-appstore-helper remove PACKAGE...
-#   platinum-appstore-helper installed PACKAGE...
+#   zacos9-appstore-helper install PACKAGE...
+#   zacos9-appstore-helper remove PACKAGE...
+#   zacos9-appstore-helper installed PACKAGE...
 #       prints "PACKAGE<TAB>yes" or "PACKAGE<TAB>no" for each, from dpkg's
-#       own record; needs no root (platinum-store also runs it directly)
+#       own record; needs no root (zacos9-store also runs it directly)
 #
 # Every PACKAGE must be a plain Debian package name (dpkg -S's own syntax:
 # letters, digits, '+', '-', '.', not starting with '-'); nothing else
@@ -57,15 +57,15 @@ installed)
 	;;
 install)
 	check_pkgs "$@"
-	[ "$(id -u)" = 0 ] || die "platinum-appstore-helper install must run as root (through pkexec)."
+	[ "$(id -u)" = 0 ] || die "zacos9-appstore-helper install must run as root (through pkexec)."
 	apt-get -y -o Dpkg::Options::="--force-confold" -o Dpkg::Progress-Fancy=0 install -- "$@"
 	;;
 remove)
 	check_pkgs "$@"
-	[ "$(id -u)" = 0 ] || die "platinum-appstore-helper remove must run as root (through pkexec)."
+	[ "$(id -u)" = 0 ] || die "zacos9-appstore-helper remove must run as root (through pkexec)."
 	apt-get -y -o Dpkg::Progress-Fancy=0 remove -- "$@"
 	;;
 *)
-	die "usage: platinum-appstore-helper install|remove|installed PACKAGE..."
+	die "usage: zacos9-appstore-helper install|remove|installed PACKAGE..."
 	;;
 esac

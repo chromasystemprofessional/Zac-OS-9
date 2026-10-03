@@ -1,4 +1,4 @@
-"""Exit 0 if a screenshot shows the Platinum menu bar, else 1.
+"""Exit 0 if a screenshot shows the ZacOS 9 menu bar, else 1.
 
 usage: desktop-up.py SHOT.png
 

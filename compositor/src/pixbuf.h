@@ -1,5 +1,5 @@
-#ifndef PLATINUM_PIXBUF_H
-#define PLATINUM_PIXBUF_H
+#ifndef ZACOS9_PIXBUF_H
+#define ZACOS9_PIXBUF_H
 
 #include <stdint.h>
 #include <wlr/interfaces/wlr_buffer.h>

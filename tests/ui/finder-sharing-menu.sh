@@ -10,9 +10,9 @@
 #   /tmp/sm3.png  after sharing it and closing the window, Kinds on the
 #                 desktop has the shared-folder icon
 V=build/shell/vptr
-# The Finder that platinum-wm starts finds the helper in the sources.
-PLATINUM_SHARING_HELPER="$PWD/sharing/platinum-sharing-helper"
-sh "$PLATINUM_SHARING_HELPER" unshare "$HOME/Desktop/Kinds" 2>/dev/null
+# The Finder that zacos9-wm starts finds the helper in the sources.
+ZACOS9_SHARING_HELPER="$PWD/sharing/zacos9-sharing-helper"
+sh "$ZACOS9_SHARING_HELPER" unshare "$HOME/Desktop/Kinds" 2>/dev/null
 
 click_in() { # x y in the front window's content
 	grim /tmp/sm-where.png
@@ -29,5 +29,5 @@ grim /tmp/sm2.png
 click_in 26 119                                 # Share this item and its contents
 $V cmd w wait 3000
 grim /tmp/sm3.png
-grep Kinds /etc/platinum/shared-folders
-sh "$PLATINUM_SHARING_HELPER" unshare "$HOME/Desktop/Kinds"
+grep Kinds /etc/zacos9/shared-folders
+sh "$ZACOS9_SHARING_HELPER" unshare "$HOME/Desktop/Kinds"

@@ -31,11 +31,11 @@ foreach xml : client_protocols
 endforeach
 
 # The classic Mac OS launcher, next to the Finder that runs it.
-configure_file(input: 'classic/platinum-classic', output: 'platinum-classic', copy: true)
-install_data('classic/platinum-classic', install_dir: get_option('bindir'),
+configure_file(input: 'classic/zacos9-classic', output: 'zacos9-classic', copy: true)
+install_data('classic/zacos9-classic', install_dir: get_option('bindir'),
   install_mode: 'rwxr-xr-x')
 
-executable('platinum-menubar',
+executable('zacos9-menubar',
   'menubar/main.c',
   'menubar/menus.c',
   'menubar/toplevels.c',
@@ -74,7 +74,7 @@ panelkit = static_library('panelkit', 'panels/panelkit.cpp', 'panels/sharingclie
   cpp_args: ['-std=c++17'],
 )
 
-executable('platinum-finder',
+executable('zacos9-finder',
   'finder/main.cpp',
   'finder/alert.cpp',
   'finder/platinumshell.cpp',
@@ -117,7 +117,7 @@ test('finder-vfs',
   timeout: 180,
 )
 
-executable('platinum-appearance',
+executable('zacos9-appearance',
   'panels/main.cpp',
   'panels/appearance.cpp',
   link_with: panelkit,
@@ -127,7 +127,7 @@ executable('platinum-appearance',
   install: true,
 )
 
-executable('platinum-datetime',
+executable('zacos9-datetime',
   'panels/datetime_main.cpp',
   'panels/datetime.cpp',
   'finder/alert.cpp',
@@ -140,7 +140,7 @@ executable('platinum-datetime',
   install: true,
 )
 
-executable('platinum-tcpip',
+executable('zacos9-tcpip',
   'panels/tcpip.cpp',
   'finder/alert.cpp',
   'finder/platinumshell.cpp',
@@ -152,7 +152,7 @@ executable('platinum-tcpip',
   install: true,
 )
 
-executable('platinum-filesharing',
+executable('zacos9-filesharing',
   'panels/filesharing.cpp',
   'finder/alert.cpp',
   'finder/platinumshell.cpp',
@@ -177,7 +177,7 @@ test('discovery',
   timeout: 60,
 )
 
-executable('platinum-netbrowser',
+executable('zacos9-netbrowser',
   'network/main.cpp',
   'network/netbrowser.cpp',
   'network/connectdialog.cpp',
@@ -197,7 +197,7 @@ executable('platinum-netbrowser',
   install: true,
 )
 
-executable('platinum-store',
+executable('zacos9-store',
   'store/main.cpp',
   'store/store.cpp',
   'store/storeclient.cpp',
@@ -227,7 +227,7 @@ test('store-client',
   timeout: 60,
 )
 
-executable('platinum-controlpanel',
+executable('zacos9-controlpanel',
   'panels/controlpanel.cpp',
   link_with: panelkit,
   include_directories: include_directories('finder'),

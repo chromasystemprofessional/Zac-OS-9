@@ -31,11 +31,11 @@ static void writeCatalog(const QString &path, const QByteArray &json) {
  * malformed package name before "install"/"remove" even look at who is
  * calling. */
 static QString helperScript() {
-	const QString env = qEnvironmentVariable("PLATINUM_APPSTORE_HELPER");
+	const QString env = qEnvironmentVariable("ZACOS9_APPSTORE_HELPER");
 	if (!env.isEmpty()) {
 		return env;
 	}
-	return QCoreApplication::applicationDirPath() + "/../../appstore/platinum-appstore-helper";
+	return QCoreApplication::applicationDirPath() + "/../../appstore/zacos9-appstore-helper";
 }
 
 static int runHelper(const QStringList &args, QString *out = nullptr) {
@@ -55,7 +55,7 @@ int main(int argc, char **argv) {
 	catalog.open();
 	const QString path = catalog.fileName();
 	catalog.close();
-	qputenv("PLATINUM_STORE_CATALOG", path.toUtf8());
+	qputenv("ZACOS9_STORE_CATALOG", path.toUtf8());
 
 	writeCatalog(path, R"JSON({
 		"version": 1,
@@ -102,10 +102,10 @@ int main(int argc, char **argv) {
 		"an unknown category is simply empty, not an error");
 
 	/* A missing or unreadable catalog: the window says so, it doesn't crash. */
-	qputenv("PLATINUM_STORE_CATALOG", "/nonexistent/path/catalog.json");
+	qputenv("ZACOS9_STORE_CATALOG", "/nonexistent/path/catalog.json");
 	check(storeCategories().isEmpty(), "a missing catalog file reads as empty categories");
 	check(storeItems().empty(), "and empty items");
-	qputenv("PLATINUM_STORE_CATALOG", path.toUtf8());
+	qputenv("ZACOS9_STORE_CATALOG", path.toUtf8());
 
 	/* ---- the helper's own validation, run directly, never through pkexec --- */
 	QString out;

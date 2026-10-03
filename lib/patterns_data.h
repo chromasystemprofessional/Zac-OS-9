@@ -523,7 +523,7 @@ static const char *const pattern_9_rows[] = {
 	"00000000",
 };
 static const struct pattern patterns[] = {
-	{ "platinum", "Platinum", 64, 64, pattern_0_palette, pattern_0_rows },
+	{ "pewter", "Pewter", 64, 64, pattern_0_palette, pattern_0_rows },
 	{ "ocean-ripple", "Ocean Ripple", 64, 64, pattern_1_palette, pattern_1_rows },
 	{ "slate", "Slate", 64, 64, pattern_2_palette, pattern_2_rows },
 	{ "sandstone", "Sandstone", 64, 64, pattern_3_palette, pattern_3_rows },

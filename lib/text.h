@@ -1,5 +1,5 @@
-#ifndef PLATINUM_TEXT_H
-#define PLATINUM_TEXT_H
+#ifndef ZACOS9_TEXT_H
+#define ZACOS9_TEXT_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -11,7 +11,7 @@ extern "C" {
 /*
  * A rendered single line of 1-bit text, stored as an 8-bit coverage mask
  * (every value is 0 or 255; no antialiasing, matching the 1990s screen).
- * Drawn with Platinum 2026's own bitmap fonts (assets/fonts), which have
+ * Drawn with ZacOS 9's own bitmap fonts (assets/fonts), which have
  * the Mac OS 8 metrics; characters they lack fall back to DejaVu Sans.
  */
 struct plat_text {

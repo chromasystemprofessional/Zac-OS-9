@@ -1,7 +1,7 @@
 #!/bin/sh
 # UI test: button view; clicking a button opens it.
 # Setup and run inside WSL:
-#   rm -rf ~/Desktop/* ~/.local/share/platinum/finder
+#   rm -rf ~/Desktop/* ~/.local/share/zacos9/finder
 #   mkdir -p ~/Desktop/Forms/External ~/Desktop/Forms/Internal
 #   scripts/snapshot.sh /tmp/bt.png 8 "sh tests/ui/finder-buttons.sh"
 # Expected:

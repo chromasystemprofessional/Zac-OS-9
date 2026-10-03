@@ -1,15 +1,15 @@
 #!/bin/sh
-# platinum-session: a Platinum 2026 desktop session. Login managers run
-# this from the "Platinum 2026" entry in /usr/share/wayland-sessions;
-# from a text console, just type platinum-session.
+# zacos9-session: a ZacOS 9 desktop session. Login managers run
+# this from the "ZacOS 9" entry in /usr/share/wayland-sessions;
+# from a text console, just type zacos9-session.
 #
-# Arguments go to platinum-wm. Its messages go to
-# ~/.local/state/platinum/session.log (the previous session's to
+# Arguments go to zacos9-wm. Its messages go to
+# ~/.local/state/zacos9/session.log (the previous session's to
 # session.log.old).
 set -u
 
-export XDG_CURRENT_DESKTOP=Platinum
-export XDG_SESSION_DESKTOP=platinum
+export XDG_CURRENT_DESKTOP=ZacOS9
+export XDG_SESSION_DESKTOP=zacos9
 export XDG_SESSION_TYPE=wayland
 export QT_QPA_PLATFORM="wayland;xcb"
 export GDK_BACKEND="wayland,x11"
@@ -18,7 +18,7 @@ export _JAVA_AWT_WM_NONREPARENTING=1
 
 # No real GPU (a plain framebuffer, or a virtual machine's display, where
 # GL would be emulated on the CPU and shows stale frames): draw with
-# pixman. Platinum is light enough for it.
+# pixman. ZacOS 9 is light enough for it.
 if [ -z "${WLR_RENDERER:-}" ]; then
 	gpu=false
 	for node in /sys/class/drm/renderD*; do
@@ -41,7 +41,7 @@ if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
 	fi
 fi
 
-state="${XDG_STATE_HOME:-$HOME/.local/state}/platinum"
+state="${XDG_STATE_HOME:-$HOME/.local/state}/zacos9"
 mkdir -p "$state"
 [ -f "$state/session.log" ] && mv -f "$state/session.log" "$state/session.log.old"
 
@@ -51,4 +51,4 @@ if [ $# -eq 0 ] && command -v dbus-update-activation-environment >/dev/null; the
 	set -- -s "dbus-update-activation-environment --systemd WAYLAND_DISPLAY DISPLAY \
 XDG_CURRENT_DESKTOP XDG_SESSION_TYPE QT_QPA_PLATFORM XCURSOR_THEME XCURSOR_PATH XCURSOR_SIZE"
 fi
-exec platinum-wm "$@" >"$state/session.log" 2>&1
+exec zacos9-wm "$@" >"$state/session.log" 2>&1

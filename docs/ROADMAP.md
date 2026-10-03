@@ -6,7 +6,7 @@ scaling only, original behaviors and timings).
 ## Phase 0: Environment ✅
 - WSL Debian 13 toolchain: wlroots 0.18, Qt 6.8, meson.
 - Repo layout, build and run scripts.
-- `platinum-wm` skeleton: desktop fill, xdg-shell windows, keyboard and pointer
+- `zacos9-wm` skeleton: desktop fill, xdg-shell windows, keyboard and pointer
   input, nested run under WSLg.
 
 ## Phase 1: Compositor / window chrome ✅
@@ -18,7 +18,7 @@ scaling only, original behaviors and timings).
   double-click on the title bar.
 - ✅ Zoom (Mac OS has no maximize).
 - ✅ Xwayland: X11 windows framed; menus and tooltips unframed.
-- ✅ Integer output scaling (`-S 2` / `PLATINUM_SCALE=2`) with nearest-neighbour
+- ✅ Integer output scaling (`-S 2` / `ZACOS9_SCALE=2`) with nearest-neighbour
   filtering for the frame.
 - Deferred:
   - Window layering by application (needs app identity from Phase 2).
@@ -27,10 +27,10 @@ scaling only, original behaviors and timings).
 
 ## Phase 2: Menu bar (in progress)
 - ✅ Menu bar and menu painter measured from HIG figures 4-1, 4-2 and 4-3
-  (`docs/reference/platinum-menus.md`), pixel-tested.
-- ✅ `platinum-menubar`: a C layer-shell client using the shared painter
+  (`docs/reference/zacos9-menus.md`), pixel-tested.
+- ✅ `zacos9-menubar`: a C layer-shell client using the shared painter
   rather than Qt, so the drawing is pixel-exact.
-  - Platinum logo menu (original mark) fed from `Platinum Menu Items`.
+  - the logo menu (original mark) fed from `ZacOS 9 Menu Items`.
   - Front app's File and Edit menus; Finder menus when no app is in front.
   - Clock and Application menu (hide, show, switch; switching brings all of
     an app's windows forward).
@@ -48,8 +48,8 @@ scaling only, original behaviors and timings).
 
 ## Phase 3: Finder ✅ (core)
 - ✅ Scroll bars, push buttons, dialog frame, list view: measured from the
-  HIG (`docs/reference/platinum-finder.md`) and pixel-tested.
-- ✅ `platinum-finder` (Qt6 + LayerShellQt, all drawing through `lib/`):
+  HIG (`docs/reference/zacos9-finder.md`) and pixel-tested.
+- ✅ `zacos9-finder` (Qt6 + LayerShellQt, all drawing through `lib/`):
   - Desktop (layer surface): original pattern, disk, Trash, `~/Desktop` items.
   - Spatial windows that remember position, size, view and sort
     (`platinum-shell-v1` lets the compositor place them).
@@ -63,7 +63,7 @@ scaling only, original behaviors and timings).
   - Spring-loaded folders; Get Info comments (`user.xdg.comment`).
   - Find (File > Find…): names, whole disk, results as a Finder view.
   - Labels from File > Label (the menu bar's first hierarchical menu),
-    stored in `user.platinum.label`; labelled icons are tinted.
+    stored in `user.zacos9.label`; labelled icons are tinted.
   - Alias names in italics.
 - To measure: icon grid and label metrics, Get Info layout, alert margins,
   selected list row, expanded triangle.
@@ -72,7 +72,7 @@ scaling only, original behaviors and timings).
 - Done:
   - SheepShaver (PowerPC, up to Mac OS 9.0.4) and Basilisk II (68k, up to
     8.1), built from source by `emulation/build-emulators.sh`.
-  - `platinum-classic`: picks ROMs by checksum and disk images by signature
+  - `zacos9-classic`: picks ROMs by checksum and disk images by signature
     from `~/Classic`, shares the home folder as the Mac's "Unix" volume,
     and makes a blank disk for installing from a CD image.
   - Logo menu > Classic; double-clicking a Mac disk image boots it; alerts
@@ -81,7 +81,7 @@ scaling only, original behaviors and timings).
     booted from it; the home folder shows up as the "Unix" volume.
 - Next:
   - Double-clicking a classic app or document launches it in the emulator.
-  - SDL's Wayland backend under platinum-wm (Xwayland for now).
+  - SDL's Wayland backend under zacos9-wm (Xwayland for now).
   - Packaging the emulators (Phase 7).
 
 ## Phase 5: Control Panels and theming (in progress)
@@ -92,7 +92,7 @@ scaling only, original behaviors and timings).
     derived), and a highlight colour.
   - Appearance control panel (Color, Desktop, Sound tabs), opened from
     the logo menu's Control Panels submenu; changes apply at once.
-  - Desktop entries in share/applications; platinum-wm puts its ../share
+  - Desktop entries in share/applications; zacos9-wm puts its ../share
     on XDG_DATA_DIRS so the menu bar names our apps.
   - Checkbox, little arrows, clock control and edit-text frame, matching
     HIG figures 2-8, 6-1, 2-20 and 2-22 pixel for pixel.
@@ -104,14 +104,14 @@ scaling only, original behaviors and timings).
   - Mouse (tracking speed, double-click speed), Keyboard (key repeat rate
     and delay), Sound (volume and mute through pactl, alert volume) and
     Monitors (resolution, 1x/2x/3x pixel size) panels in
-    platinum-controlpanel. platinum-wm applies the mouse, keyboard and
+    zacos9-controlpanel. zacos9-wm applies the mouse, keyboard and
     screen settings live (compositor/src/prefs.c) and publishes the
     screen's modes for the Monitors panel.
   - Pop-up menu buttons and their menus (HIG figures 2-6, 2-7, 3-25),
     pixel for pixel; the menu highlight measured from figure 2-7. Edit
     text fields (one or more lines, selection, ⌘A/C/X/V) and the
     Mac OS 9 "Save changes?" alert with Don't Save.
-  - TCP/IP control panel (platinum-tcpip), after Mac OS 9's, on
+  - TCP/IP control panel (zacos9-tcpip), after Mac OS 9's, on
     NetworkManager: Connect via, Configure (DHCP or manually), IP
     address, subnet mask, router, name servers, search domains; saved on
     closing, after asking. Modern additions: a Wi-Fi Network pop-up
@@ -120,7 +120,7 @@ scaling only, original behaviors and timings).
     address, connect automatically) and Info…. Tested against a stand-in
     nmcli (tests/ui/tcpip.sh) and real NetworkManager with a simulated
     WPA2 network in the VM (tests/vm/tcpip-wifi.py).
-  - File Sharing control panel (platinum-filesharing), after Mac OS 9's:
+  - File Sharing control panel (zacos9-filesharing), after Mac OS 9's:
     - Start/Stop: Network Identity, File Sharing for Macs (AFP through
       Netatalk 4: Mac OS 8.5 to 9 over TCP/IP with DHX, older Macs with
       clear-text passwords if allowed, macOS with DHX2 and Bonjour), and
@@ -130,7 +130,7 @@ scaling only, original behaviors and timings).
       (owner, guests).
     - The owner's password is their login password; it is stored for
       Samba once checked.
-    - Changes go through platinum-sharing-helper (pkexec; polkit lets
+    - Changes go through zacos9-sharing-helper (pkexec; polkit lets
       administrators at the computer use it without a password).
     - Tested: Mac OS 9 in Classic connected with the Chooser, mounted the
       owner's home and wrote to it; smbclient against Samba in the VM.
@@ -158,20 +158,20 @@ scaling only, original behaviors and timings).
 
 ## Phase 6: Original assets (in progress)
 - Done:
-  - Fonts: Platinum System 12 and Platinum Views 9, original bitmap fonts
+  - Fonts: ZacOS 9 System 12 and ZacOS 9 Views 9, original bitmap fonts
     with the measured Charcoal 12 / Geneva 9 metrics (every measured HIG
     string lays out to the pixel), composed accented letters, synthesised
     italic for alias names, DejaVu fallback for anything else
-    (docs/reference/platinum-fonts.md).
+    (docs/reference/zacos9-fonts.md).
   - Icon set: folder, document, application, hard disk, Trash (empty and
     full) and caution, as 32x32 and 16x16 pixel art in
     assets/icons/platinum-icons.picon (tools/icons/build_icons.py).
   - Desktop patterns: ten original tiles (embossed 64x64 textures in a
     small palette, and 8x8 classics) from tools/patterns/make_patterns.py;
-    chosen by `pattern=` in ~/.config/platinum/desktop.conf, applied live.
+    chosen by `pattern=` in ~/.config/zacos9/desktop.conf, applied live.
   - Cursors: a "Platinum" Xcursor theme (arrow, I-beam, animated watch,
     crosshair, hand, move/resize, not-allowed, copy/alias/help) from
-    assets/cursors, used by platinum-wm and every client it starts.
+    assets/cursors, used by zacos9-wm and every client it starts.
   - Alert sounds: six original synthesised sounds (assets/sounds, from
     tools/sounds/make_sounds.py); alerts play the one named by
     `alert-sound=` in desktop.conf (default "platinum").
@@ -188,10 +188,10 @@ scaling only, original behaviors and timings).
 ## Phase 7: Packaging and distribution (in progress)
 See `docs/packaging.md`.
 - Done:
-  - `platinum-2026` and `platinum-emulators` (SheepShaver and Basilisk II
+  - `zacos9` and `zacos9-emulators` (SheepShaver and Basilisk II
     from a pinned macemu commit, with their source) `.deb` packages, built
     from what git would commit (`scripts/build-debs.sh`).
-  - The login session: `platinum-session` and a `platinum-2026.desktop`
+  - The login session: `zacos9-session` and a `zacos9.desktop`
     entry in `wayland-sessions`. Software rendering when there's no GPU, a
     session log, and the environment shared with D-Bus and systemd.
   - Ctrl+Alt+F1 to F12 switch consoles on a real screen.
@@ -204,7 +204,7 @@ See `docs/packaging.md`.
     `scripts/vm.sh`), and a headless boot test (`tests/vm/boot.sh`).
   - A silent start-up: white from GRUB (menu hidden; Esc shows it)
     through the kernel and a white plymouth theme (the console palette is
-    white while booting), then platinum-wm's logo on white, the Welcome
+    white while booting), then zacos9-wm's logo on white, the Welcome
     screen and the desktop. No console text.
   - `scripts/dev-boot.sh`: try system changes in a VM in minutes, on top of
     the last ISO build's system, with a recorded timeline of the screen.

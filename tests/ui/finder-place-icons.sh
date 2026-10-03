@@ -1,7 +1,7 @@
 #!/bin/sh
 # UI test: icons stay where you drag them, across sessions.
 # Setup and run inside WSL (two sessions):
-#   rm -rf ~/Desktop/* ~/.local/share/platinum/finder; echo hi > ~/Desktop/Report.txt
+#   rm -rf ~/Desktop/* ~/.local/share/zacos9/finder; echo hi > ~/Desktop/Report.txt
 #   scripts/snapshot.sh /tmp/pl1.png 4 "sh tests/ui/finder-place-icons.sh 1"
 #   scripts/snapshot.sh /tmp/pl2.png 3 "sh tests/ui/finder-place-icons.sh 2"
 # Expected: Report.txt sits mid-screen (about 600,400) in both shots.

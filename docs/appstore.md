@@ -19,9 +19,9 @@ per item: **Install** or **Remove**, whichever applies.
 |---|---|---|
 | The window | `shell/store/store.{h,cpp}` | `StoreWindow`: two `PanelList`s (category, item) and a details pane, built entirely from existing HIG-measured widgets (`lib/widgets.h`) — nothing new was added to the pixel-art toolkit except the icon blend (below). |
 | The catalog | `shell/store/storeclient.{h,cpp}` | Reads the shipped catalog and talks to the helper. |
-| The data | `assets/store/catalog.json` | Shipped, read-only; installed to `$datadir/platinum/store/catalog.json`, found through `pl_data_dir()` (the same function the alert sounds use), so a build tree and an install both just work. |
-| The privileged half | `appstore/platinum-appstore-helper` | A root shell script behind pkexec; validates every package name before `apt-get` ever sees it. |
-| Authorization | `appstore/org.platinum2026.appstore.policy`, `appstore/50-platinum-appstore.rules` | Same pattern as `sharing/`: this desktop runs no polkit authentication agent, so a local administrator (the `sudo` group) is granted without a password rather than being asked for one nothing can show. |
+| The data | `assets/store/catalog.json` | Shipped, read-only; installed to `$datadir/zacos9/store/catalog.json`, found through `pl_data_dir()` (the same function the alert sounds use), so a build tree and an install both just work. |
+| The privileged half | `appstore/zacos9-appstore-helper` | A root shell script behind pkexec; validates every package name before `apt-get` ever sees it. |
+| Authorization | `appstore/org.zacos9.appstore.policy`, `appstore/50-zacos9-appstore.rules` | Same pattern as `sharing/`: this desktop runs no polkit authentication agent, so a local administrator (the `sudo` group) is granted without a password rather than being asked for one nothing can show. |
 
 Reused, not reinvented: `PanelList`, `PanelButton`, `panelText`,
 `panelWrap`, `panelGroup` (`shell/panels/panelkit.*`); `Alert::ask` for
@@ -72,7 +72,7 @@ same code, called a second time.
 
 ## Installing and removing
 
-`StoreWindow::act()` runs `platinum-appstore-helper install <packages>`
+`StoreWindow::act()` runs `zacos9-appstore-helper install <packages>`
 or `remove <packages>`, through pkexec (or directly, already root — the
 same `appstoreHelperCommand` pattern `sharingclient.cpp` established).
 It blocks the button's click handler but keeps the window's events
@@ -102,7 +102,7 @@ Every argument that reaches `apt-get` is validated in the helper itself
 starting with `-`, so an argument can't be read as an option), **before**
 the helper's root check, so the validation is defense in depth regardless
 of who calls it — the GUI is not the only thing trusted to get this
-right. `platinum-store`'s own package names come only from the shipped
+right. `zacos9-store`'s own package names come only from the shipped
 catalog, never from anything typed by the user (there is no text field
 anywhere in the window), so in practice nothing but a curated list of
 package names is ever possible, but the helper does not assume that: it

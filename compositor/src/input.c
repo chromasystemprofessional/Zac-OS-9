@@ -519,10 +519,10 @@ static void seat_start_drag(struct wl_listener *listener, void *data) {
 	wl_signal_add(&drag->events.destroy, &server->drag_destroy);
 }
 
-/* The Platinum cursor theme (assets/cursors) sits next to our binary in
+/* The ZacOS9 cursor theme (assets/cursors) sits next to our binary in
  * the build tree, or under share/icons when installed. Point Xcursor at
  * it for us and, through the environment, for every client we start. */
-static void use_platinum_cursors(void) {
+static void use_zacos9_cursors(void) {
 	char exe[PATH_MAX];
 	ssize_t len = readlink("/proc/self/exe", exe, sizeof(exe) - 1);
 	if (len > 0) {
@@ -538,17 +538,17 @@ static void use_platinum_cursors(void) {
 			setenv("XCURSOR_PATH", path, 1);
 		}
 	}
-	setenv("XCURSOR_THEME", PLATINUM_CURSOR_THEME, 1);
+	setenv("XCURSOR_THEME", ZACOS9_CURSOR_THEME, 1);
 	char size[8];
-	snprintf(size, sizeof(size), "%d", PLATINUM_CURSOR_SIZE);
+	snprintf(size, sizeof(size), "%d", ZACOS9_CURSOR_SIZE);
 	setenv("XCURSOR_SIZE", size, 1);
 }
 
 void input_init(struct plat_server *server) {
 	server->cursor = wlr_cursor_create();
 	wlr_cursor_attach_output_layout(server->cursor, server->output_layout);
-	use_platinum_cursors();
-	server->cursor_mgr = wlr_xcursor_manager_create(PLATINUM_CURSOR_THEME, PLATINUM_CURSOR_SIZE);
+	use_zacos9_cursors();
+	server->cursor_mgr = wlr_xcursor_manager_create(ZACOS9_CURSOR_THEME, ZACOS9_CURSOR_SIZE);
 	server->cursor_mode = PLAT_CURSOR_PASSTHROUGH;
 
 	server->cursor_motion.notify = cursor_motion;

@@ -2,6 +2,6 @@
 Type=Application
 Name=Software
 Comment=Install and remove applications
-Exec=platinum-store
+Exec=zacos9-store
 Categories=System;
-OnlyShowIn=Platinum;
+OnlyShowIn=ZacOS9;

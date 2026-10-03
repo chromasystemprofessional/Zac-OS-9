@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """A stand-in for nmcli, for testing the TCP/IP panel without NetworkManager.
 
-It answers the queries platinum-tcpip makes from a JSON state file
+It answers the queries zacos9-tcpip makes from a JSON state file
 ($FAKE_NMCLI_STATE, default /tmp/fake-nmcli.json, created on first use),
 applies changes to it, and logs every call with its standard input to
 $FAKE_NMCLI_LOG (default /tmp/fake-nmcli.log). Put its folder first on

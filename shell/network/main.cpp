@@ -1,5 +1,5 @@
 /*
- * platinum-netbrowser: the Network Browser, from the Apple menu.
+ * zacos9-netbrowser: the Network Browser, from the Apple menu.
  */
 #include <QApplication>
 
@@ -8,12 +8,12 @@
 #include "settings.h"
 
 int main(int argc, char *argv[]) {
-	/* platinum-wm draws every frame; Qt must not add its own. */
+	/* zacos9-wm draws every frame; Qt must not add its own. */
 	qputenv("QT_WAYLAND_DISABLE_WINDOWDECORATION", "1");
 	QApplication app(argc, argv);
 	QApplication::setApplicationName("Network Browser");
 	QApplication::setDoubleClickInterval(pl_double_click_ms());
-	QGuiApplication::setDesktopFileName("platinum-netbrowser"); /* Wayland app_id */
+	QGuiApplication::setDesktopFileName("zacos9-netbrowser"); /* Wayland app_id */
 	platinumShellInit(); /* dialogs are movable modals */
 
 	NetBrowserWindow window;

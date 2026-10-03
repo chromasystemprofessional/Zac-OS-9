@@ -25,7 +25,7 @@ struct fixture {
 	struct rect regions[8];
 };
 
-/* Measured in docs/reference/platinum-window.md. */
+/* Measured in docs/reference/zacos9-window.md. */
 static const struct fixture fixtures[] = {
 	{
 		.name = "collapsed active (fig 5-6)",

@@ -140,5 +140,5 @@ private:
 };
 
 /* ⌘-key equivalents shared by Finder windows and the desktop. Linux apps
- * see ⌘ as Ctrl (platinum-wm translates it). Returns true if handled. */
+ * see ⌘ as Ctrl (zacos9-wm translates it). Returns true if handled. */
 bool finderShortcut(QKeyEvent *e);

@@ -1,5 +1,5 @@
 /*
- * The Platinum 2026 logo: an original 16x16 mark for the far left of the
+ * The ZacOS 9 logo: an original 16x16 mark for the far left of the
  * menu bar (where Mac OS put the Apple logo, which we can't use). A
  * faceted four-pointed platinum sparkle, lit from the top left, with a
  * lavender heart (the default Platinum accent) and a small twinkle. Its

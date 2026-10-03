@@ -1,6 +1,6 @@
-# Platinum 2026 boot splash: a white screen, nothing more. The kernel's
+# ZacOS 9 boot splash: a white screen, nothing more. The kernel's
 # console is white too while booting (vt.default_* in iso/kernel-params),
-# so going from the splash to platinum-wm is white to white; platinum-wm
+# so going from the splash to zacos9-wm is white to white; zacos9-wm
 # then shows the logo on white, and the Welcome screen.
 
 Window.SetBackgroundTopColor(1, 1, 1);

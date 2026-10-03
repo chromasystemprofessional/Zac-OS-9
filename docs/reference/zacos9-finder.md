@@ -65,7 +65,7 @@ The figure 2-26 rows are listed below, with `y=0` and `y=18` being the black bor
 
 ## Finder window, list view (figure 2-24)
 
-These sit inside the standard window frame (`platinum-window.md`).
+These sit inside the standard window frame (`zacos9-window.md`).
 
 - **Item-count header** ("2 items, 494 MB available"):
   - Starts below the content well's top black line with a white row, then a

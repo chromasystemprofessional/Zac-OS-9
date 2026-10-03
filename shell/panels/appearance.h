@@ -13,7 +13,7 @@
  * The Appearance control panel, after Mac OS 8's (HIG figure 6-1): a tab
  * control with Color (accent and highlight colours), Desktop (patterns)
  * and Sound (alert sound). Choices apply at once and are kept in
- * ~/.config/platinum/desktop.conf, which the shell watches.
+ * ~/.config/zacos9/desktop.conf, which the shell watches.
  * TODO: the layout inside the panes is ours; the HIG shows only "Options".
  */
 class AppearancePanel : public QWidget {

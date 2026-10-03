@@ -186,7 +186,7 @@ int dsi_request(struct dsi *d, enum dsi_command command, const void *req, size_t
 				break;
 			}
 		}
-		if (getenv("PLATINUM_AFP_DEBUG")) {
+		if (getenv("ZACOS9_AFP_DEBUG")) {
 			fprintf(stderr, "dsi: got flags=%d cmd=%d id=%u code=%d len=%u (waiting for id %u)\n",
 				r.flags, r.command, r.id, r.code, r.length, h.id);
 		}

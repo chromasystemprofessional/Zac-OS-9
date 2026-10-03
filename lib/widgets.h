@@ -1,12 +1,12 @@
-#ifndef PLATINUM_WIDGETS_H
-#define PLATINUM_WIDGETS_H
+#ifndef ZACOS9_WIDGETS_H
+#define ZACOS9_WIDGETS_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /*
- * Platinum controls drawn from docs/reference/platinum-finder.md.
+ * Platinum controls drawn from docs/reference/zacos9-finder.md.
  */
 
 #include "draw.h"

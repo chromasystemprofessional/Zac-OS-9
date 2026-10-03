@@ -2,7 +2,7 @@
 
 /*
  * What the Software window needs: the shipped catalog, and running
- * platinum-appstore-helper (as root, through pkexec, for install and
+ * zacos9-appstore-helper (as root, through pkexec, for install and
  * remove; directly for installed, which needs no privilege).
  */
 
@@ -20,7 +20,7 @@ struct StoreItem {
 };
 
 /* The shipped catalog (pl_data_dir()/store/catalog.json, or
- * PLATINUM_STORE_CATALOG for tests): its categories in the order the
+ * ZACOS9_STORE_CATALOG for tests): its categories in the order the
  * file lists them, "Featured" first, and its items. Empty on any
  * problem reading or parsing it (the window says so rather than crash). */
 QStringList storeCategories();
@@ -31,7 +31,7 @@ std::vector<const StoreItem *> storeItemsIn(const QStringList &category,
 	const std::vector<StoreItem> &items);
 
 /* The helper, as root: through pkexec, or directly if we are root.
- * PLATINUM_APPSTORE_HELPER points at another one, for tests. */
+ * ZACOS9_APPSTORE_HELPER points at another one, for tests. */
 void appstoreHelperCommand(QProcess *p, const QStringList &args);
 
 /* Runs the helper to the end, keeping the windows drawn meanwhile (apt

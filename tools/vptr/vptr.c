@@ -10,7 +10,7 @@
  *   vptr type TEXT            type printable ASCII
  *   vptr key NAME             Return, BackSpace, Tab, Escape, Delete,
  *                             Up, Down, Left, Right, or one character
- *   vptr cmd C                ⌘C (the Super key, as platinum-wm maps it)
+ *   vptr cmd C                ⌘C (the Super key, as zacos9-wm maps it)
  *   vptr wait MS              pause
  * Commands chain: vptr home move 100 50 down move 40 0 up
  */

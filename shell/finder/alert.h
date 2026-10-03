@@ -6,7 +6,7 @@
 
 /*
  * A Platinum alert: caution icon, message, and a default button with an
- * optional cancel button, framed by platinum-wm as a movable modal dialog.
+ * optional cancel button, framed by zacos9-wm as a movable modal dialog.
  * Return chooses the default button; Escape or ⌘. cancels.
  *
  * Layout follows the HIG's spacing rules where it states them (buttons

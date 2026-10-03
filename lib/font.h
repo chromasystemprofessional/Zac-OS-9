@@ -1,5 +1,5 @@
-#ifndef PLATINUM_FONT_H
-#define PLATINUM_FONT_H
+#ifndef ZACOS9_FONT_H
+#define ZACOS9_FONT_H
 
 /*
  * Bitmap fonts compiled from assets/fonts/ (*.pfont) by

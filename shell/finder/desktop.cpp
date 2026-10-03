@@ -34,11 +34,11 @@ static constexpr int ICON_MARGIN_TOP = 14;    /* below the menu bar */
 static constexpr int ICON_MARGIN_BOTTOM = 32;
 static constexpr int CELL_W = 80, CELL_H = 64;
 
-/* The desktop pattern is chosen by id in ~/.config/platinum/desktop.conf
+/* The desktop pattern is chosen by id in ~/.config/zacos9/desktop.conf
  * ("pattern=ocean-ripple"); the Appearance control panel will write it.
  * Changes apply at once. */
 static QString settingsDir() {
-	return QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + "/platinum";
+	return QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + "/zacos9";
 }
 
 void Desktop::loadPattern() {
@@ -207,7 +207,7 @@ void Desktop::becomeLayerSurface() {
 			LayerShellQt::Window::AnchorLeft | LayerShellQt::Window::AnchorRight));
 		lw->setExclusiveZone(-1); /* full screen, under the menu bar too */
 		lw->setKeyboardInteractivity(LayerShellQt::Window::KeyboardInteractivityOnDemand);
-		lw->setScope("platinum-desktop");
+		lw->setScope("zacos9-desktop");
 	}
 }
 

@@ -19,7 +19,7 @@
  *                        folder's Unix owner, group and permissions, which
  *                        is what Netatalk and Samba go by. Changes are made
  *                        when the window closes, through
- *                        platinum-sharing-helper; Copy works at once.
+ *                        zacos9-sharing-helper; Copy works at once.
  * The window and the Sharing view are measured from Mac OS 9's Get Info
  * (running in Classic); General Information's rows are estimates.
  */

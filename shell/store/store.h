@@ -9,10 +9,10 @@
 #include "storeclient.h"
 
 /*
- * platinum-store: the Software window, reached from the Apple menu. A
+ * zacos9-store: the Software window, reached from the Apple menu. A
  * curated catalog on one side (Mac OS 9 never had one of these; styled
  * after its own list-and-details windows, such as the Software Installer
- * that shipped on its CDs), apt underneath through platinum-appstore-helper.
+ * that shipped on its CDs), apt underneath through zacos9-appstore-helper.
  */
 class StoreWindow : public QWidget {
 public:

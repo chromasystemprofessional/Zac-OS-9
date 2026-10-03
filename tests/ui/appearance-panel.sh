@@ -1,7 +1,7 @@
 #!/bin/sh
 # UI test: the Appearance control panel changes the look live.
 # Setup and run inside WSL:
-#   rm -f ~/.config/platinum/desktop.conf
+#   rm -f ~/.config/zacos9/desktop.conf
 #   scripts/snapshot.sh /tmp/ap.png 14 "sh tests/ui/appearance-panel.sh"
 # Expected:
 #   /tmp/ap1.png  Appearance, Color tab: Accent Color and Highlight Color
@@ -10,10 +10,10 @@
 #   /tmp/ap2.png  Ocean picked: the sample, the list's focus ring and the
 #                 File menu's highlight are all ocean blue
 #   /tmp/ap3.png  Desktop tab, Ocean Ripple picked: preview and desktop
-#   /tmp/ap4.png  Sound tab: the alert sounds, Platinum selected
+#   /tmp/ap4.png  Sound tab: the alert sounds, Chime selected
 # The window's content starts at (46, 42) on screen.
 V=build/shell/vptr
-build/shell/platinum-appearance &
+build/shell/zacos9-appearance &
 sleep 4
 grim /tmp/ap1.png
 $V home move 110 194 click wait 600                  # Accent: Ocean

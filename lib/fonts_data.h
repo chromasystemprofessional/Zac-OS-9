@@ -373,7 +373,7 @@ static const struct pl_glyph font_system_glyphs[] = {
 	{ 0x232B, -8, 12, 7, 1899 },
 };
 static const struct pl_bitmap_font font_system = {
-	"Platinum System", 16, 12,
+	"ZacOS 9 System", 16, 12,
 	font_system_glyphs, 208, font_system_rows,
 };
 
@@ -726,6 +726,6 @@ static const struct pl_glyph font_views_glyphs[] = {
 	{ 0x2026, 0, 6, 1, 1675 },
 };
 static const struct pl_bitmap_font font_views = {
-	"Platinum Views", 15, 11,
+	"ZacOS 9 Views", 15, 11,
 	font_views_glyphs, 204, font_views_rows,
 };

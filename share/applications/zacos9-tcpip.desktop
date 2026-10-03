@@ -2,6 +2,6 @@
 Type=Application
 Name=TCP/IP
 Comment=Network interfaces, Wi-Fi, addresses and name servers
-Exec=platinum-tcpip
+Exec=zacos9-tcpip
 Categories=Settings;HardwareSettings;
-OnlyShowIn=Platinum;
+OnlyShowIn=ZacOS9;

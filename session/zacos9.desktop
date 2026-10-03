@@ -1,7 +1,7 @@
 [Desktop Entry]
-Name=Platinum 2026
+Name=ZacOS 9
 Comment=A classic desktop: Platinum appearance, menu bar and Finder
-Exec=platinum-session
-TryExec=platinum-session
+Exec=zacos9-session
+TryExec=zacos9-session
 Type=Application
-DesktopNames=Platinum
+DesktopNames=ZacOS9

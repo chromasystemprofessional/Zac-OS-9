@@ -1,5 +1,5 @@
 #!/bin/sh
-# Run Platinum 2026 in a QEMU virtual machine: the whole system from
+# Run ZacOS 9 in a QEMU virtual machine: the whole system from
 # the ISO, on a (virtual) screen of its own rather than nested in a
 # window. Run inside WSL Debian or any Linux with QEMU; uses KVM when
 # /dev/kvm is there.
@@ -11,7 +11,7 @@
 #   scripts/vm.sh --headless    # no window (for tests)
 #
 # The disk and QEMU's monitor socket (for screendump, sendkey) are in
-# ~/.local/share/platinum-vm (in WSL, a Windows drive is too slow for a
+# ~/.local/share/zacos9-vm (in WSL, a Windows drive is too slow for a
 # disk and can't hold sockets); delete disk.qcow2 to start over. The mouse
 # is a tablet, so the pointer follows the host's without grabbing.
 set -eu
@@ -37,7 +37,7 @@ while [ $# -gt 0 ]; do
 	shift
 done
 
-vm=${PLATINUM_VM_DIR:-$HOME/.local/share/platinum-vm}
+vm=${ZACOS9_VM_DIR:-$HOME/.local/share/zacos9-vm}
 mkdir -p "$vm"
 disk=$vm/disk.qcow2
 set -- -machine q35 -m 4096 -smp 4 \
@@ -45,7 +45,7 @@ set -- -machine q35 -m 4096 -smp 4 \
 	-device qemu-xhci -device usb-tablet -device usb-kbd \
 	-nic user,model=virtio-net-pci \
 	-monitor unix:"$vm"/monitor.sock,server,nowait \
-	-name "Platinum 2026"
+	-name "ZacOS 9"
 [ -w /dev/kvm ] && set -- "$@" -enable-kvm -cpu host
 # Sound through the host's PulseAudio (WSLg has one), if there is one.
 if [ -n "${PULSE_SERVER:-}" ] || [ -S "${XDG_RUNTIME_DIR:-/nonexistent}/pulse/native" ]; then

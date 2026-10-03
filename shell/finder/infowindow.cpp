@@ -259,7 +259,7 @@ bool InfoWindow::showView(int view) {
 		if (Alert::ask("Folders cannot be shared until file sharing is turned on using the "
 				"File Sharing control panel. Do you want the control panel opened now?",
 				"OK", "Cancel")) {
-			QProcess::startDetached("platinum-filesharing", {});
+			QProcess::startDetached("zacos9-filesharing", {});
 		}
 		view = m_view;
 		m_show.selected = view;
@@ -727,7 +727,7 @@ void AboutWindow::paintEvent(QPaintEvent *) {
 			}
 		}
 	}
-	Text title("Platinum 2026", 300, PL_FONT_SYSTEM);
+	Text title("ZacOS 9", 300, PL_FONT_SYSTEM);
 	pl_text(c, title.t, 80, 30, C_BLACK);
 	QString kernel = QSysInfo::kernelType();
 	kernel[0] = kernel[0].toUpper(); /* "Linux" */

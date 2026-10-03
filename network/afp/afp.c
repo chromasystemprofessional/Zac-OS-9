@@ -291,10 +291,10 @@ static int to_errno(int code) {
 
 static int call(struct afp *a, const struct buf *b, uint8_t **out, size_t *outlen) {
 	int code = dsi_request(&a->dsi, DSI_COMMAND, b->data, b->len, NULL, 0, out, outlen);
-	/* PLATINUM_AFP_DEBUG=1: each command and its result on stderr. */
+	/* ZACOS9_AFP_DEBUG=1: each command and its result on stderr. */
 	static int debug = -1;
 	if (debug < 0) {
-		debug = getenv("PLATINUM_AFP_DEBUG") != NULL;
+		debug = getenv("ZACOS9_AFP_DEBUG") != NULL;
 	}
 	if (debug) {
 		fprintf(stderr, "afp: command %d (%zu bytes) -> %d  [", b->data[0], b->len, code);
@@ -898,7 +898,7 @@ ssize_t afp_write(struct afp *a, uint16_t fork, uint32_t offset, const void *buf
 		put32(&b, (uint32_t)n);
 		int code = dsi_request(&a->dsi, DSI_WRITE, b.data, b.len, (const uint8_t *)buf + done, n,
 			NULL, NULL);
-		if (getenv("PLATINUM_AFP_DEBUG")) {
+		if (getenv("ZACOS9_AFP_DEBUG")) {
 			fprintf(stderr, "afp: write %zu bytes at %u -> %d\n", n, offset + (unsigned)done, code);
 		}
 		if (code != 0) {

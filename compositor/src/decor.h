@@ -1,5 +1,5 @@
-#ifndef PLATINUM_DECOR_H
-#define PLATINUM_DECOR_H
+#ifndef ZACOS9_DECOR_H
+#define ZACOS9_DECOR_H
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -9,7 +9,7 @@
 
 /*
  * Platinum window frames, drawn pixel-for-pixel from
- * docs/reference/platinum-window.md. All coordinates are frame-local:
+ * docs/reference/zacos9-window.md. All coordinates are frame-local:
  * (0,0) is the outer border's top-left, W x H excludes the drop shadow.
  *
  * This module is pure (no wlroots) so it can be unit-tested.

@@ -9,7 +9,7 @@
 #include <unistd.h>
 
 /* QProcess::waitForFinished() was tried first here and, in this Wayland
- * session, deadlocked: platinum-afp completed its exchange with the
+ * session, deadlocked: zacos9-afp completed its exchange with the
  * server in full (confirmed from Netatalk's own log: login, then a
  * clean "AFP logout" a moment later) and exited, but waitForFinished()
  * never returned. The rest of this project already avoids
@@ -40,18 +40,18 @@ static bool waitForProcess(QProcess *p, int timeoutMs) {
 }
 
 static QString afpClientPath() {
-	const QString env = qEnvironmentVariable("PLATINUM_AFP_CLIENT");
+	const QString env = qEnvironmentVariable("ZACOS9_AFP_CLIENT");
 	if (!env.isEmpty()) {
 		return env;
 	}
 	const QString dir = QCoreApplication::applicationDirPath();
-	for (const QString &candidate : { dir + "/../libexec/platinum/platinum-afp",
-			dir + "/../network/platinum-afp" }) {
+	for (const QString &candidate : { dir + "/../libexec/zacos9/zacos9-afp",
+			dir + "/../network/zacos9-afp" }) {
 		if (QFileInfo(candidate).isExecutable()) {
 			return QFileInfo(candidate).canonicalFilePath();
 		}
 	}
-	return "platinum-afp"; /* installed: next to the other binaries, on $PATH */
+	return "zacos9-afp"; /* installed: next to the other binaries, on $PATH */
 }
 
 AfpServerInfo afpServerInfo(const QString &address) {
@@ -168,7 +168,7 @@ bool afpMount(const QString &address, const QString &volume, const QString &moun
 	if (cleartext) {
 		command += " --cleartext";
 	}
-	/* No "--" here: platinum-afp's own parser doesn't recognize it as an
+	/* No "--" here: zacos9-afp's own parser doesn't recognize it as an
 	 * end-of-options marker (tested live: it treats "--" as an unknown
 	 * flag of its own and refuses with its usage message), it simply
 	 * stops consuming "--something" flags once it reaches SERVER. */

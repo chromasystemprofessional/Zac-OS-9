@@ -1,4 +1,4 @@
-Source: platinum-2026
+Source: zacos9
 Section: x11
 Priority: optional
 Maintainer: adamjlawson-ctrl <adamjlawson@gmail.com>
@@ -24,7 +24,7 @@ Build-Depends: debhelper-compat (= 13),
 Standards-Version: 4.7.0
 Rules-Requires-Root: no
 
-Package: platinum-2026
+Package: zacos9
 Architecture: any
 Depends: ${shlibs:Depends},
          ${misc:Depends},
@@ -43,13 +43,13 @@ Recommends: xwayland,
             pulseaudio-utils,
             dbus-user-session,
             foot
-Suggests: platinum-emulators,
+Suggests: zacos9-emulators,
           greetd
 Description: classic Platinum desktop for Wayland
- Platinum 2026 is a desktop in the style of a late-1990s Platinum
+ ZacOS 9 is a desktop in the style of a late-1990s Platinum
  interface: a wlroots compositor that draws Platinum window frames,
  a menu bar, a spatial Finder and control panels, with original fonts,
  icons, cursors, desktop patterns and sounds.
  .
- It installs a "Platinum 2026" session for login managers, and the
- platinum-session command for starting it from a text console.
+ It installs a "ZacOS 9" session for login managers, and the
+ zacos9-session command for starting it from a text console.

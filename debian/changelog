@@ -1,6 +1,6 @@
-platinum-2026 (0.0.1) trixie; urgency=medium
+zacos9 (0.0.1) trixie; urgency=medium
 
   * First packaged build: compositor, menu bar, Finder, control panels,
-    Classic launcher, and the Platinum 2026 login session.
+    Classic launcher, and the ZacOS 9 login session.
 
  -- adamjlawson-ctrl <adamjlawson@gmail.com>  Thu, 01 Oct 2026 12:00:00 +0000

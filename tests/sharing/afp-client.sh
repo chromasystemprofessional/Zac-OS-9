@@ -1,5 +1,5 @@
 #!/bin/sh
-# Test platinum-afp against a real server: mount a volume and use it.
+# Test zacos9-afp against a real server: mount a volume and use it.
 #
 #   AFP_PASSWORD=... tests/sharing/afp-client.sh SERVER VOLUME [USER]
 #
@@ -10,7 +10,7 @@
 set -u
 server=$1 volume=$2 user=${3:-}
 cd "$(dirname "$0")/../.."
-afp=$PWD/build/network/platinum-afp
+afp=$PWD/build/network/zacos9-afp
 m=$(mktemp -d)
 t="$m/afp-test-$$"
 fail() {

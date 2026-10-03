@@ -11,7 +11,7 @@
 #include "settings.h"
 
 static QString catalogFile() {
-	const QString env = qEnvironmentVariable("PLATINUM_STORE_CATALOG");
+	const QString env = qEnvironmentVariable("ZACOS9_STORE_CATALOG");
 	if (!env.isEmpty()) {
 		return env;
 	}
@@ -67,20 +67,20 @@ std::vector<const StoreItem *> storeItemsIn(const QStringList &category,
 }
 
 static QString helperPath() {
-	const QString env = qEnvironmentVariable("PLATINUM_APPSTORE_HELPER");
+	const QString env = qEnvironmentVariable("ZACOS9_APPSTORE_HELPER");
 	if (!env.isEmpty()) {
 		return env;
 	}
-	/* Installed beside us (prefix/libexec/platinum), or, running from a
+	/* Installed beside us (prefix/libexec/zacos9), or, running from a
 	 * build tree (build/shell/...), the one in the sources. */
 	const QString dir = QCoreApplication::applicationDirPath();
-	for (const QString &candidate : { dir + "/../libexec/platinum/platinum-appstore-helper",
-			dir + "/../../appstore/platinum-appstore-helper" }) {
+	for (const QString &candidate : { dir + "/../libexec/zacos9/zacos9-appstore-helper",
+			dir + "/../../appstore/zacos9-appstore-helper" }) {
 		if (QFileInfo(candidate).isExecutable()) {
 			return QFileInfo(candidate).canonicalFilePath();
 		}
 	}
-	return "/usr/libexec/platinum/platinum-appstore-helper";
+	return "/usr/libexec/zacos9/zacos9-appstore-helper";
 }
 
 void appstoreHelperCommand(QProcess *p, const QStringList &args) {

@@ -2,6 +2,6 @@
 Type=Application
 Name=Network Browser
 Comment=Connect to other computers over the network
-Exec=platinum-netbrowser
+Exec=zacos9-netbrowser
 Categories=Network;
-OnlyShowIn=Platinum;
+OnlyShowIn=ZacOS9;

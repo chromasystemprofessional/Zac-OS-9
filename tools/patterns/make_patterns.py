@@ -1,4 +1,4 @@
-"""Generate Platinum 2026's desktop patterns (assets/patterns/*.png).
+"""Generate ZacOS 9's desktop patterns (assets/patterns/*.png).
 
 usage: make_patterns.py [--sheet OUT.png | --check]
 
@@ -137,7 +137,7 @@ def classic(rows, colors):
 
 
 PATTERNS = [
-    ("Platinum", lambda: textured(1, (0x66, 0x66, 0xCC), "crumple", 10, 0.45, 5.0)),
+    ("Pewter", lambda: textured(1, (0x66, 0x66, 0xCC), "crumple", 10, 0.45, 5.0)),
     ("Ocean Ripple", lambda: textured(2, (0x22, 0x99, 0xAA), "ripple", 10, 0.6, 3.0)),
     ("Slate", lambda: textured(3, (0x88, 0x88, 0x90), "stone", 12, 0.8, 4.0)),
     ("Sandstone", lambda: textured(4, (0xCC, 0xAA, 0x77), "crumple", 12, 0.5)),

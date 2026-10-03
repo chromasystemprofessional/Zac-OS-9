@@ -1,5 +1,5 @@
-#ifndef PLATINUM_FIGCOMPARE_H
-#define PLATINUM_FIGCOMPARE_H
+#ifndef ZACOS9_FIGCOMPARE_H
+#define ZACOS9_FIGCOMPARE_H
 
 /*
  * Compare our rendering against an Apple HIG figure, pixel by pixel, in

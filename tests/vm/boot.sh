@@ -1,5 +1,5 @@
 #!/bin/sh
-# VM test: the ISO boots, logs in by itself and reaches the Platinum
+# VM test: the ISO boots, logs in by itself and reaches the ZacOS 9
 # desktop. Run inside WSL Debian after scripts/build-iso.sh:
 #   sh tests/vm/boot.sh [--uefi]
 # Expected: "desktop up after N s"; /tmp/vm-desktop.png shows the menu
@@ -8,7 +8,7 @@
 set -eu
 self=$(realpath "$0")
 cd "$(dirname "$self")/../.."
-vm=${PLATINUM_VM_DIR:-$HOME/.local/share/platinum-vm}
+vm=${ZACOS9_VM_DIR:-$HOME/.local/share/zacos9-vm}
 mon() { python3 tests/vm/monitor.py "$vm/monitor.sock" "$@"; }
 
 rm -f "$vm/monitor.sock"

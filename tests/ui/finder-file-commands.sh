@@ -1,7 +1,7 @@
 #!/bin/sh
 # UI test: Duplicate, Make Alias, Move To Trash and Put Away (File menu).
 # Setup and run inside WSL:
-#   rm -rf ~/Desktop/* ~/.local/share/platinum/finder ~/.local/share/Trash/*/*
+#   rm -rf ~/Desktop/* ~/.local/share/zacos9/finder ~/.local/share/Trash/*/*
 #   echo hi > ~/Desktop/Report.txt
 #   scripts/snapshot.sh /tmp/fc.png 14 "sh tests/ui/finder-file-commands.sh"
 # Expected:

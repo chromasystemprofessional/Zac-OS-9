@@ -1,5 +1,5 @@
 /*
- * platinum-store: the Software window (an app catalog over apt), from
+ * zacos9-store: the Software window (an app catalog over apt), from
  * the Apple menu.
  */
 #include <QApplication>
@@ -8,11 +8,11 @@
 #include "store.h"
 
 int main(int argc, char *argv[]) {
-	/* platinum-wm draws every frame; Qt must not add its own. */
+	/* zacos9-wm draws every frame; Qt must not add its own. */
 	qputenv("QT_WAYLAND_DISABLE_WINDOWDECORATION", "1");
 	QApplication app(argc, argv);
 	QApplication::setApplicationName("Software");
-	QGuiApplication::setDesktopFileName("platinum-store"); /* Wayland app_id */
+	QGuiApplication::setDesktopFileName("zacos9-store"); /* Wayland app_id */
 	platinumShellInit(); /* the Remove confirmation is a movable modal alert */
 
 	StoreWindow window;

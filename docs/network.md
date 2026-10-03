@@ -15,7 +15,7 @@ the rest of the control panels already use, the same honest approach
 |---|---|---|
 | The window | `shell/network/netbrowser.{h,cpp}` | The server list, Connect to Server, and the whole login → volumes → mount sequence. |
 | Finding servers | `shell/network/discovery.{h,cpp}` | Bonjour (`avahi-browse`) and our own WS-Discovery probe. |
-| AFP | `shell/network/afpclient.{h,cpp}` | Wraps `platinum-afp info`/`volumes`/`mount`. |
+| AFP | `shell/network/afpclient.{h,cpp}` | Wraps `zacos9-afp info`/`volumes`/`mount`. |
 | SMB | `shell/network/smbclient.{h,cpp}` | Wraps `gio mount`. |
 | What's mounted | `shell/network/netvolumes.{h,cpp}` | Read from the filesystem itself (`findmnt`, gvfs's runtime directory) — no registry of our own to drift from reality. |
 | Dialogs | `connectdialog.*`, `logindialog.*`, `volumedialog.*` | Address, Guest/Registered User + Name/Password (+ Share for SMB), the AFP volume list. |
@@ -53,7 +53,7 @@ could not be confirmed the same way: `smbd` crashed on startup in the
 container this was built in (`core-dump`, `abrt`; not investigated
 further, as it is unrelated to this feature — see the AFP work in an
 earlier session for `smbd`'s general status), so
-`sharing/platinum-sharing-helper` still writes an explicit
+`sharing/zacos9-sharing-helper` still writes an explicit
 `_smb._tcp` avahi service file of its own when SMB sharing is on,
 kept rather than assumed redundant.
 
@@ -73,20 +73,20 @@ packet capture.
 
 ## AFP: login, volumes, mount
 
-All three map straight onto `platinum-afp`'s own commands (`info`,
+All three map straight onto `zacos9-afp`'s own commands (`info`,
 `volumes`, `mount`), already built with this GUI in mind — see its own
 usage comment in `network/afp/main.c`.
 
 The login dialog's **Guest / Registered User** choice, and whether to
 warn before sending a cleartext password, both come from `info` first:
 its `guest` line and its `uam` list (no secure UAM, only `Cleartxt
-Passwrd`, means the warning). A wrong password (`platinum-afp`'s own
+Passwrd`, means the warning). A wrong password (`zacos9-afp`'s own
 exit code 2, its documented convention for a refused login) re-shows the
 login dialog with the reason rather than failing outright.
 
 ### Two real bugs, found only by actually connecting
 
-- **`QProcess::waitForFinished()` deadlocked.** `platinum-afp volumes`
+- **`QProcess::waitForFinished()` deadlocked.** `zacos9-afp volumes`
   completed its exchange with the server in full — confirmed from
   Netatalk's own log: a clean login, then "AFP logout", a moment
   later — and exited, but `waitForFinished()` in the GUI process never
@@ -105,7 +105,7 @@ login dialog with the reason rather than failing outright.
   other on real hardware.
 - **The mount command's own `--` was rejected.** `afpMount` built its
   shell command with a `--` before the server address, the usual
-  end-of-options marker — except `platinum-afp`'s own argument parser
+  end-of-options marker — except `zacos9-afp`'s own argument parser
   (`network/afp/main.c`) doesn't recognize that convention: it reads
   `--` as an unrecognized flag of its own and refuses with its usage
   message. Removing it was enough; the parser already stops consuming
@@ -127,7 +127,7 @@ the design, and one more changed the error handling:
   up) test instance. Rather than ship something unverified, the login
   dialog for an SMB server asks for the share name directly, the way
   Windows' own "Map Network Drive" asks for `\\server\share` rather than
-  browsing. AFP keeps its volume list, because `platinum-afp volumes`
+  browsing. AFP keeps its volume list, because `zacos9-afp volumes`
   (backed by AFP's `FPGetSrvrParms`) was verified reliable.
 - **`gio mount`'s own exit code is 0 whether or not the mount actually
   worked** — tested live against a server refusing the connection
@@ -164,7 +164,7 @@ trade `FileSharingPanel` already makes polling who's connected, there
 every 5 s), exactly as if Put Away had done it, because as far as the
 Finder is concerned nothing is different.
 
-An AFP volume mounts at `~/.local/share/platinum/mounts/<name>` (the
+An AFP volume mounts at `~/.local/share/zacos9/mounts/<name>` (the
 directory's own name is the disk's name — no separate record of what's
 what), made unique with " (2)" if another live mount already has that
 name. Both verified live end to end: mounted (confirmed with `df`, a
@@ -188,7 +188,7 @@ test) and WS-Discovery `ComputerName` extraction, without needing a live
 network.
 
 `tests/sharing/afp-client.sh` (an earlier session) already covers
-`platinum-afp` itself. This session's verification of the GUI on top of
+`zacos9-afp` itself. This session's verification of the GUI on top of
 it was manual and end-to-end rather than automated — screenshots and
 `findmnt`/`dpkg`-style checks against this project's own test server,
 not a script committed to the repo. A `tests/ui/` script scripting the

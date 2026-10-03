@@ -17,7 +17,7 @@ static QString stateKeyPath(const QString &path) {
 static QSettings &store() {
 	static QSettings settings(
 		QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) +
-			"/platinum/finder/folders.ini",
+			"/zacos9/finder/folders.ini",
 		QSettings::IniFormat);
 	return settings;
 }

@@ -9,7 +9,7 @@
 
 #include "menubar.h"
 
-#define ITEMS_DIR "/.config/platinum/Platinum Menu Items"
+#define ITEMS_DIR "/.config/zacos9/ZacOS 9 Menu Items"
 
 /* Run a shell command fully detached from the menu bar. */
 void launch(const char *command) {
@@ -170,14 +170,14 @@ void launch_fill_logo_menu(struct mb_menu *menu) {
 	 * since it is its own application rather than a settings pane. */
 	{
 		char command[PATH_MAX + 64];
-		sibling_program("platinum-store", command, sizeof(command));
+		sibling_program("zacos9-store", command, sizeof(command));
 		add_item(menu, "Software", true, ACT_LAUNCH, command);
 	}
 	/* The Network Browser: connecting to other computers, as Mac OS 9's
 	 * own Apple Menu Item of the same name did. */
 	{
 		char command[PATH_MAX + 64];
-		sibling_program("platinum-netbrowser", command, sizeof(command));
+		sibling_program("zacos9-netbrowser", command, sizeof(command));
 		add_item(menu, "Network Browser", true, ACT_LAUNCH, command);
 	}
 	/* Control Panels, as a hierarchical menu. */
@@ -186,14 +186,14 @@ void launch_fill_logo_menu(struct mb_menu *menu) {
 	menu->items[menu->n - 1].submenu = panels;
 	/* Alphabetical, as in the Mac's Control Panels folder. */
 	const struct { const char *name, *program, *arg; } panel_list[] = {
-		{ "Appearance", "platinum-appearance", "" },
-		{ "Date & Time", "platinum-datetime", "" },
-		{ "File Sharing", "platinum-filesharing", "" },
-		{ "Keyboard", "platinum-controlpanel", " keyboard" },
-		{ "Monitors", "platinum-controlpanel", " monitors" },
-		{ "Mouse", "platinum-controlpanel", " mouse" },
-		{ "Sound", "platinum-controlpanel", " sound" },
-		{ "TCP/IP", "platinum-tcpip", "" },
+		{ "Appearance", "zacos9-appearance", "" },
+		{ "Date & Time", "zacos9-datetime", "" },
+		{ "File Sharing", "zacos9-filesharing", "" },
+		{ "Keyboard", "zacos9-controlpanel", " keyboard" },
+		{ "Monitors", "zacos9-controlpanel", " monitors" },
+		{ "Mouse", "zacos9-controlpanel", " mouse" },
+		{ "Sound", "zacos9-controlpanel", " sound" },
+		{ "TCP/IP", "zacos9-tcpip", "" },
 	};
 	for (size_t i = 0; i < sizeof(panel_list) / sizeof(panel_list[0]); i++) {
 		char command[PATH_MAX + 64];
@@ -205,7 +205,7 @@ void launch_fill_logo_menu(struct mb_menu *menu) {
 	struct entry entries[MAX_ITEMS];
 	int n = read_items_dir(entries, MAX_ITEMS - 4);
 	if (n == 0) {
-		/* No Platinum Menu Items folder yet: offer the terminals we have. */
+		/* No ZacOS 9 Menu Items folder yet: offer the terminals we have. */
 		const struct { const char *name, *program; } defaults[] = {
 			{ "Terminal", "foot" },
 			{ "XTerm", "xterm" },

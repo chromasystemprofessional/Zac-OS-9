@@ -6,23 +6,23 @@ WSL distro), from the project folder.
 ## Debian packages
 
 ```sh
-scripts/build-debs.sh               # build/packages/platinum-2026_*.deb
-scripts/build-debs.sh --emulators   # and platinum-emulators_*.deb
+scripts/build-debs.sh               # build/packages/zacos9_*.deb
+scripts/build-debs.sh --emulators   # and zacos9-emulators_*.deb
 ```
 
-- **platinum-2026** is the desktop:
-  - `platinum-wm`, the menu bar, the Finder, the control panels and `platinum-classic`;
+- **zacos9** is the desktop:
+  - `zacos9-wm`, the menu bar, the Finder, the control panels and `zacos9-classic`;
   - the fonts, icons, patterns, cursors and sounds;
-  - a **Platinum 2026** session in `/usr/share/wayland-sessions`.
+  - a **ZacOS 9** session in `/usr/share/wayland-sessions`.
 
   Login managers (GDM, SDDM, LightDM, greetd) list the session. From a text
-  console, run `platinum-session`. The session log is
-  `~/.local/state/platinum/session.log`.
-- **platinum-emulators** holds SheepShaver and Basilisk II, built from the pinned
+  console, run `zacos9-session`. The session log is
+  `~/.local/state/zacos9/session.log`.
+- **zacos9-emulators** holds SheepShaver and Basilisk II, built from the pinned
   macemu commit in `emulation/build-emulators.sh`. They are installed in
-  `/usr/libexec/platinum`, where `platinum-classic` looks for them.
+  `/usr/libexec/zacos9`, where `zacos9-classic` looks for them.
   - The emulators are GPL-2. Their source is written next to the package as
-    `platinum-emulators_*.source.tar.gz`, and must go wherever the package goes.
+    `zacos9-emulators_*.source.tar.gz`, and must go wherever the package goes.
   - No ROMs or Mac OS system software are included.
 
 The package is built from what `git add -A` would commit. That means the tracked
@@ -35,18 +35,18 @@ The package build runs the unit tests. Without the HIG figures
 To install the packages on a Debian 13 machine:
 
 ```sh
-sudo apt install ./platinum-2026_*.deb ./platinum-emulators_*.deb
+sudo apt install ./zacos9_*.deb ./zacos9-emulators_*.deb
 ```
 
 ## The ISO
 
 ```sh
-scripts/build-iso.sh                # build/iso/platinum-2026-VERSION-amd64.iso
+scripts/build-iso.sh                # build/iso/zacos9-VERSION-amd64.iso
 ```
 
 This builds the packages, then a Debian 13 live image with live-build:
 
-- **Work folder.** live-build runs in `/var/tmp/platinum-iso`, because it needs a
+- **Work folder.** live-build runs in `/var/tmp/zacos9-iso`, because it needs a
   Linux file system for its chroot.
 - **Requirements.** It needs sudo, a network connection and about 10 GB free.
 - **Time.** The first build downloads everything and takes 20 to 40 minutes.
@@ -60,10 +60,10 @@ The live system includes:
   TCP/IP control panel).
 - **Firmware.** Debian's `non-free-firmware`, so that real hardware works.
 
-**Live.** The ISO starts straight into Platinum 2026 as the user `user`. There
+**Live.** The ISO starts straight into ZacOS 9 as the user `user`. There
 is no password, and `sudo` works without one.
 
-- How it works: `iso/config/includes.chroot/usr/lib/live/config/2000-platinum-greetd`
+- How it works: `iso/config/includes.chroot/usr/lib/live/config/2000-zacos9-greetd`
   adds greetd's one-time `initial_session` at boot.
 - Logging out (or Ctrl+Alt+Backspace) shows the login screen.
 - Add `noautologin` to the boot line to start at the login screen.
@@ -80,16 +80,16 @@ is no password, and `sudo` works without one.
    - The kernel's console palette is all white while booting
      (`iso/kernel-params`), so nothing written to it shows and no black
      flashes up.
-   - `platinum-console-colors.service` restores normal colours 20 seconds
+   - `zacos9-console-colors.service` restores normal colours 20 seconds
      after the desktop starts, so Ctrl+Alt+F2 consoles work.
 3. **The logo on white,** then the Welcome screen, then the desktop. Both
-   screens come from platinum-wm (`compositor/src/startup.c`). greetd runs on
+   screens come from zacos9-wm (`compositor/src/startup.c`). greetd runs on
    tty1, so going from the splash to the desktop is white to white.
 
 **Install.** The boot menu also offers Debian's installer:
 
 1. It copies the system to a disk and creates your user.
-2. The installed system starts at the login screen, which runs Platinum 2026.
+2. The installed system starts at the login screen, which runs ZacOS 9.
 
 Write the ISO to a USB stick with any image writer (it is a hybrid image), or
 boot it in a virtual machine.
@@ -127,7 +127,7 @@ the Mac's disk, including macOS.
 **If something goes wrong:**
 - Note your exact model (About This Mac ▸ Model Identifier, for example
   `MacBookPro11,1`).
-- The session log is `~/.local/state/platinum/session.log`. Read it from
+- The session log is `~/.local/state/zacos9/session.log`. Read it from
   Terminal with `cat`, or copy it to another USB stick.
 - 15-inch models with NVIDIA graphics are the most likely to have display
   trouble.
@@ -148,7 +148,7 @@ window. Unlike `run.cmd`, this runs the whole system: booting, the login screen,
 the DRM backend, consoles (Ctrl+Alt+F1 to F12) and sound.
 
 **Files.** The disk and QEMU's monitor socket are in
-`~/.local/share/platinum-vm`. Delete `disk.qcow2` to start over.
+`~/.local/share/zacos9-vm`. Delete `disk.qcow2` to start over.
 
 **Hyper-V.** Not tested yet. It should work in a Generation 2 VM with Secure
 Boot off, or set to "Microsoft UEFI Certificate Authority".
@@ -164,7 +164,7 @@ scripts/dev-boot.sh --clean      # start over from the ISO build's system
 ```
 
 **What it does.** It starts from the system the last ISO build made (its
-chroot in `/var/tmp/platinum-iso`) and puts this tree on top, in an overlay:
+chroot in `/var/tmp/zacos9-iso`) and puts this tree on top, in an overlay:
 
 - the packages, `iso/config` and its hook;
 - packages added to the package lists, installed with apt.
@@ -198,7 +198,7 @@ hardware:
 **Logging in.** A login runs on the VM's serial port (`user` / `live`):
 
 ```sh
-python3 tests/vm/serial.py ~/.local/share/platinum-vm/serial.sock 'journalctl -b'
+python3 tests/vm/serial.py ~/.local/share/zacos9-vm/serial.sock 'journalctl -b'
 ```
 
 ## Tests
@@ -208,5 +208,5 @@ sh tests/vm/boot.sh [--uefi]   # boots the ISO headless; passes on the desktop
 ```
 
 The test reads QEMU's screen through its monitor (`screendump`). It passes once
-the Platinum menu bar is drawn (`tests/vm/desktop-up.py`). The result is
+the ZacOS 9 menu bar is drawn (`tests/vm/desktop-up.py`). The result is
 `/tmp/vm-desktop.png`.

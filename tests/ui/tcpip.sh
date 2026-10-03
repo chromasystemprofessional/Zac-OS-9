@@ -23,7 +23,7 @@ click_in() { # click_in X Y: at (X, Y) in the panel's content
 	$V home move $(($1 + $3)) $(($2 + $4)) click wait 800
 }
 sleep 2
-build/shell/platinum-tcpip & sleep 4
+build/shell/zacos9-tcpip & sleep 4
 grim /tmp/tcp-1.png
 click_in 300 24                 # Connect via (a quick click: the menu stays open)
 grim /tmp/tcp-2.png

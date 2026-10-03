@@ -1,5 +1,5 @@
-#ifndef PLATINUM_FRAME_H
-#define PLATINUM_FRAME_H
+#ifndef ZACOS9_FRAME_H
+#define ZACOS9_FRAME_H
 
 #include <wlr/types/wlr_scene.h>
 

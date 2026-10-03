@@ -7,7 +7,7 @@
  * components have put up their surfaces (or after STARTUP_MAX_MS).
  *
  * The box layout is ours; TODO: the HIG doesn't show the Mac OS 8 one.
- * PLATINUM_STARTUP=0 turns the screen off.
+ * ZACOS9_STARTUP=0 turns the screen off.
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -160,7 +160,7 @@ static int tick(void *data) {
 }
 
 void startup_begin(struct plat_server *server) {
-	const char *env = getenv("PLATINUM_STARTUP");
+	const char *env = getenv("ZACOS9_STARTUP");
 	if (env && strcmp(env, "0") == 0) {
 		return;
 	}
@@ -168,7 +168,7 @@ void startup_begin(struct plat_server *server) {
 	st.start_ms = now_ms();
 	st.welcome_ms = st.start_ms + LOGO_MS;
 	st.pattern = chosen_pattern();
-	st.title = text_render_font("Platinum 2026", 1000, PL_FONT_SYSTEM);
+	st.title = text_render_font("ZacOS 9", 1000, PL_FONT_SYSTEM);
 	st.status = text_render_font("Starting Up\xe2\x80\xa6", 1000, PL_FONT_VIEWS);
 	st.buffer = wlr_scene_buffer_create(server->overlay_layer, NULL);
 	st.timer = wl_event_loop_add_timer(wl_display_get_event_loop(server->display), tick, NULL);
@@ -179,9 +179,9 @@ void startup_surface_mapped(const char *layer_namespace) {
 	if (!st.buffer || !layer_namespace) {
 		return;
 	}
-	if (strcmp(layer_namespace, "platinum-menubar") == 0) {
+	if (strcmp(layer_namespace, "zacos9-menubar") == 0) {
 		st.menubar = true;
-	} else if (strcmp(layer_namespace, "platinum-desktop") == 0) {
+	} else if (strcmp(layer_namespace, "zacos9-desktop") == 0) {
 		st.desktop = true;
 	}
 }

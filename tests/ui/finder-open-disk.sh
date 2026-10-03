@@ -6,7 +6,7 @@
 # Run inside WSL:
 #   python3 - <<'PY'
 #   import json, os
-#   p = os.path.expanduser('~/.local/share/platinum/finder/vfs.json')
+#   p = os.path.expanduser('~/.local/share/zacos9/finder/vfs.json')
 #   r = json.load(open(p)); r['showUnixVolume'] = True
 #   json.dump(r, open(p, 'w'), indent=2)
 #   PY

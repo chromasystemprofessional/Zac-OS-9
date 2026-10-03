@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=ZacOS 9
+Description=A white screen while the system starts
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/zacos9
+ScriptFile=/usr/share/plymouth/themes/zacos9/zacos9.script

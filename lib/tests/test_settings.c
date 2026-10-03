@@ -18,12 +18,12 @@ static void check(bool ok, const char *what) {
 }
 
 int main(void) {
-	char dir[] = "/tmp/platinum-settings-XXXXXX";
+	char dir[] = "/tmp/zacos9-settings-XXXXXX";
 	if (!mkdtemp(dir)) {
 		return 1;
 	}
 	char sub[256], conf[300];
-	snprintf(sub, sizeof(sub), "%s/platinum", dir);
+	snprintf(sub, sizeof(sub), "%s/zacos9", dir);
 	mkdir(sub, 0700);
 	snprintf(conf, sizeof(conf), "%s/desktop.conf", sub);
 	FILE *f = fopen(conf, "w");

@@ -1,7 +1,7 @@
 #!/bin/sh
 # Try changes to the system and the way it boots in a VM, without building
 # the ISO. Takes the system from the last ISO build (its chroot in
-# /var/tmp/platinum-iso), puts this tree's packages, iso/config and its
+# /var/tmp/zacos9-iso), puts this tree's packages, iso/config and its
 # hooks on top (in an overlay, so the build's copy stays as it was), packs
 # it (a minute or two) and boots it in QEMU with the kernel and initramfs
 # given directly. The boot menu (GRUB, ISOLINUX) is the one part this
@@ -16,7 +16,7 @@
 #   scripts/dev-boot.sh --clean      # start over from the ISO build's system
 #
 # A login runs on the VM's serial port (user / live):
-#   python3 tests/vm/serial.py ~/.local/share/platinum-vm/serial.sock 'command'
+#   python3 tests/vm/serial.py ~/.local/share/zacos9-vm/serial.sock 'command'
 # Files iso/config no longer has stay in the overlay until --clean.
 set -eu
 self=$(realpath "$0")
@@ -24,9 +24,9 @@ cd "$(dirname "$self")/.."
 root=$(pwd)
 
 sudo_() { if [ "$(id -u)" = 0 ]; then "$@"; else sudo "$@"; fi; }
-base=${PLATINUM_ISO_WORK:-/var/tmp/platinum-iso}/chroot
-dev=/var/tmp/platinum-dev
-vm=${PLATINUM_VM_DIR:-$HOME/.local/share/platinum-vm}
+base=${ZACOS9_ISO_WORK:-/var/tmp/zacos9-iso}/chroot
+dev=/var/tmp/zacos9-dev
+vm=${ZACOS9_VM_DIR:-$HOME/.local/share/zacos9-vm}
 if [ ! -d "$base/usr" ]; then
 	echo "No ISO build to start from: run scripts/build-iso.sh once." >&2
 	exit 2
@@ -69,12 +69,12 @@ sudo_ cp -r "$root/iso/config/includes.chroot/." "$r/"
 (cd "$root/iso/config/includes.chroot" && find . -type f) | while IFS= read -r f; do
 	sudo_ chmod 644 "$r/$f"
 done
-sudo_ chmod 755 "$r/usr/lib/live/config/2000-platinum-greetd"
+sudo_ chmod 755 "$r/usr/lib/live/config/2000-zacos9-greetd"
 sudo_ mkdir -p "$r/tmp/dev-boot"
-sudo_ cp "$root"/build/packages/platinum-2026_*.deb "$root"/iso/config/hooks/normal/*.hook.chroot \
+sudo_ cp "$root"/build/packages/zacos9_*.deb "$root"/iso/config/hooks/normal/*.hook.chroot \
 	"$r/tmp/dev-boot/"
 packages=$(cat "$root"/iso/config/package-lists/*.list.chroot | sed 's/#.*//' |
-	grep -v '^platinum' | tr '\n' ' ')
+	grep -v '^zacos9' | tr '\n' ' ')
 
 # Name resolution for apt inside; the image's own resolv.conf (a symlink)
 # goes back afterwards.
@@ -118,7 +118,7 @@ sudo_ cp "$(ls "$r"/boot/initrd.img-* | tail -1)" "$dev/initrd.img"
 sudo_ mksquashfs "$r" "$dev/medium/live/filesystem.squashfs" -noappend -comp lz4 -quiet
 cleanup
 mounted=""
-sudo_ xorriso -as mkisofs -quiet -r -V "Platinum 2026" -o "$dev/medium.iso" "$dev/medium"
+sudo_ xorriso -as mkisofs -quiet -r -V "ZacOS 9" -o "$dev/medium.iso" "$dev/medium"
 
 # ---- boot it ----
 set -- -machine q35 -m 4096 -smp 4 -device "$gpu" \
@@ -126,7 +126,7 @@ set -- -machine q35 -m 4096 -smp 4 -device "$gpu" \
 	-nic user,model=virtio-net-pci -cdrom "$dev/medium.iso" \
 	-kernel "$dev/vmlinuz" -initrd "$dev/initrd.img" -append "$(cat "$root/iso/kernel-params")" \
 	-monitor "unix:$vm/monitor.sock,server,nowait" -serial "unix:$vm/serial.sock,server,nowait" \
-	-name "Platinum 2026 (dev boot)"
+	-name "ZacOS 9 (dev boot)"
 [ -w /dev/kvm ] && set -- "$@" -enable-kvm -cpu host
 if ! $record; then
 	exec qemu-system-x86_64 "$@" -display gtk,zoom-to-fit=off

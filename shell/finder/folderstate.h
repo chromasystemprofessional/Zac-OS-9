@@ -8,7 +8,7 @@
 /*
  * What the Finder remembers about each folder's window, as the Mac kept it
  * in the folder itself: where the window was, its size, how it was viewed.
- * Stored in ~/.local/share/platinum/finder/folders.ini, keyed by path.
+ * Stored in ~/.local/share/zacos9/finder/folders.ini, keyed by path.
  */
 struct FolderState {
 	bool known = false; /* ever opened before */

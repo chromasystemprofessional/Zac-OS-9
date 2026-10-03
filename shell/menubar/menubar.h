@@ -1,5 +1,5 @@
-#ifndef PLATINUM_MENUBAR_H
-#define PLATINUM_MENUBAR_H
+#ifndef ZACOS9_MENUBAR_H
+#define ZACOS9_MENUBAR_H
 
 #include <stdbool.h>
 #include <wayland-client.h>
@@ -8,7 +8,7 @@
 #include "text.h"
 
 #define MAX_ITEMS 48
-#define FINDER_APP_ID "platinum-finder"
+#define FINDER_APP_ID "zacos9-finder"
 #define MAX_TITLES 12
 
 struct zwlr_foreign_toplevel_handle_v1;
@@ -107,7 +107,7 @@ void menus_perform(struct mb_item *item);
 
 void launch(const char *command);
 /* Fills the logo menu with "About", a separator and the launchable items
- * from ~/.config/platinum/Platinum Menu Items (or built-in defaults). */
+ * from ~/.config/zacos9/ZacOS 9 Menu Items (or built-in defaults). */
 void launch_fill_logo_menu(struct mb_menu *menu);
 
 /* ---- the Finder (finderlink.c) ------------------------------------------ */

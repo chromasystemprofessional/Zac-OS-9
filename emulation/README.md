@@ -1,11 +1,11 @@
 # Classic Mac OS
 
-Platinum 2026 runs classic Mac OS in an emulator window:
+ZacOS 9 runs classic Mac OS in an emulator window:
 
 - SheepShaver (PowerPC) runs Mac OS 7.5.2 to 9.0.4. This is the default.
 - Basilisk II (68k) runs System 7 to Mac OS 8.1.
 
-Apple's files are not part of Platinum 2026. You supply them yourself.
+Apple's files are not part of ZacOS 9. You supply them yourself.
 
 ## Setting up
 
@@ -17,7 +17,7 @@ Apple's files are not part of Platinum 2026. You supply them yourself.
 
    The binaries go into `build/emulators/bin`.
 2. Put your files in a folder named `Classic` in your home folder, up to two
-   folders deep. Set `PLATINUM_CLASSIC_DIR` to use a different folder.
+   folders deep. Set `ZACOS9_CLASSIC_DIR` to use a different folder.
    - **ROMs.** The launcher identifies each ROM by its checksum, so file names
      don't matter. The best one available is used:
      - **PowerPC:** an Old World ROM from a Power Mac 7200, 7500, 8500 or
@@ -48,18 +48,18 @@ so the Mac starts up from the installed system and only falls back to a CD.
 
 ## Inside the Mac
 
-- The emulator window gets a Platinum frame from platinum-wm.
+- The emulator window gets a Platinum frame from zacos9-wm.
 - Your home folder appears on the Mac's desktop as the "Unix" volume. Copy
   files across through it.
 - RAM is 256 MB for SheepShaver and 64 MB for Basilisk II. The screen is an
   800×600 window.
 
-Run `platinum-classic --check` to see which emulator, ROM and disks would be
+Run `zacos9-classic --check` to see which emulator, ROM and disks would be
 used. Add `--68k` for Basilisk II.
 
 ## Known gaps
 
-- SDL's Wayland backend never shows a window under platinum-wm, so the
+- SDL's Wayland backend never shows a window under zacos9-wm, so the
   emulators run through Xwayland.
 - Classic applications copied out through the "Unix" volume show in the
   Finder with the Classic icon (their type, 'APPL', is in the `.finf/`

@@ -1,4 +1,4 @@
-"""Compile the Platinum bitmap fonts (assets/fonts/ (*.pfont)) into C.
+"""Compile the ZacOS 9 bitmap fonts (assets/fonts/ (*.pfont)) into C.
 
 usage: build_fonts.py [--specimen OUT.png | --check]
 

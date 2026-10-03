@@ -1,15 +1,15 @@
 /*
- * platinum-afp: connect to Apple file servers the way a classic Mac does
+ * zacos9-afp: connect to Apple file servers the way a classic Mac does
  * (AFP 2.1/2.2 over TCP/IP), for the Network Browser.
  *
- *   platinum-afp info SERVER
+ *   zacos9-afp info SERVER
  *       what the Chooser shows before logging in: tab-separated
  *       name / machine / version / uam lines, and "guest yes" if guests
  *       may connect
- *   platinum-afp volumes [--user NAME] [--cleartext] SERVER
+ *   zacos9-afp volumes [--user NAME] [--cleartext] SERVER
  *       logs in (the password is the first line on stdin) and lists the
  *       volumes, one per line ("<name>\tpassword" if one has its own)
- *   platinum-afp mount [--user NAME] [--cleartext] [--foreground] SERVER VOLUME DIR
+ *   zacos9-afp mount [--user NAME] [--cleartext] [--foreground] SERVER VOLUME DIR
  *       logs in and serves the volume at DIR (FUSE) until it is unmounted
  *       (fusermount3 -u DIR)
  *
@@ -28,9 +28,9 @@
 #include "afpfs.h"
 
 static void usage(void) {
-	fprintf(stderr, "usage: platinum-afp info SERVER\n"
-		"       platinum-afp volumes [--user NAME] [--cleartext] SERVER\n"
-		"       platinum-afp mount [--user NAME] [--cleartext] [--foreground] SERVER VOLUME DIR\n");
+	fprintf(stderr, "usage: zacos9-afp info SERVER\n"
+		"       zacos9-afp volumes [--user NAME] [--cleartext] SERVER\n"
+		"       zacos9-afp mount [--user NAME] [--cleartext] [--foreground] SERVER VOLUME DIR\n");
 	exit(64);
 }
 

@@ -7,7 +7,7 @@
 #   /tmp/cl1.png  the logo menu with "Classic" highlighted
 #   /tmp/cl.png   a "SheepShaver" window: the Mac's gray screen, with the
 #                 flashing "?" disk while there is no system disk
-# With PLATINUM_CLASSIC_DIR pointing at an empty folder, an alert explains
+# With ZACOS9_CLASSIC_DIR pointing at an empty folder, an alert explains
 # what's missing instead.
 sleep 3
 wlrctl pointer move -3000 -3000; wlrctl pointer move 22 9

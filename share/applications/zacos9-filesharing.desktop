@@ -2,6 +2,6 @@
 Type=Application
 Name=File Sharing
 Comment=Share this computer's files with Macs (AFP) and Windows computers (SMB)
-Exec=platinum-filesharing
+Exec=zacos9-filesharing
 Categories=Settings;Network;
-OnlyShowIn=Platinum;
+OnlyShowIn=ZacOS9;

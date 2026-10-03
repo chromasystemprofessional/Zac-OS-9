@@ -1,5 +1,5 @@
 #!/bin/sh
-# Start platinum-wm nested, run some clients, save a screenshot, and exit.
+# Start zacos9-wm nested, run some clients, save a screenshot, and exit.
 # Run inside WSL Debian. Needs grim.
 #
 #   scripts/snapshot.sh out.png 3 'foot -T One' 'foot -T Two'
@@ -23,4 +23,4 @@ startup="$startup sleep $delay; grim '$out'; kill \$PPID"
 
 export WLR_RENDERER="${WLR_RENDERER:-pixman}"
 export WLR_WL_OUTPUTS=1
-exec timeout 60 build/compositor/platinum-wm -s "$startup" >/tmp/platinum-snapshot.log 2>&1
+exec timeout 60 build/compositor/zacos9-wm -s "$startup" >/tmp/zacos9-snapshot.log 2>&1

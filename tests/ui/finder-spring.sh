@@ -1,7 +1,7 @@
 #!/bin/sh
 # UI test: spring-loaded folders.
 # Setup and run inside WSL:
-#   rm -rf ~/Desktop/* ~/.local/share/platinum/finder; mkdir ~/Desktop/Docs
+#   rm -rf ~/Desktop/* ~/.local/share/zacos9/finder; mkdir ~/Desktop/Docs
 #   echo hi > ~/Desktop/Report.txt
 #   scripts/snapshot.sh /tmp/spr.png 9 "sh tests/ui/finder-spring.sh"
 # Expected:

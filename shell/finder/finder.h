@@ -31,7 +31,7 @@ public:
  * behind its menus, and the channel to the menu bar.
  *
  * Menu bar protocol (newline-separated text over a Unix socket at
- * $XDG_RUNTIME_DIR/platinum-finder.$WAYLAND_DISPLAY.sock):
+ * $XDG_RUNTIME_DIR/zacos9-finder.$WAYLAND_DISPLAY.sock):
  *   menu bar -> Finder:  "cmd <name>"   (new-folder, open, close-window,
  *                         move-to-trash, empty-trash, ...)
  *   Finder -> menu bar:  "state selection=<n> window=<0|1> trash=<0|1>
@@ -63,7 +63,7 @@ public:
 	void putAway();
 	void showOriginal();
 	void setLabel(int label);
-	/* Start classic Mac OS (shell/classic/platinum-classic), with extra
+	/* Start classic Mac OS (shell/classic/zacos9-classic), with extra
 	 * disk images; explains in an alert when ROM or emulator is missing. */
 	void launchClassic(const QStringList &disks = {});
 

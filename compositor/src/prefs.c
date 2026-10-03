@@ -1,11 +1,11 @@
 /*
  * The control panels' settings that the compositor applies: mouse
  * tracking speed, double-click speed, key repeat, and the screen's size
- * and scale. They live in ~/.config/platinum/desktop.conf (lib/settings);
+ * and scale. They live in ~/.config/zacos9/desktop.conf (lib/settings);
  * we watch that folder and apply changes as they happen.
  *
  * For the Monitors panel we also publish each screen's state and modes
- * in $XDG_RUNTIME_DIR/platinum-outputs-$WAYLAND_DISPLAY:
+ * in $XDG_RUNTIME_DIR/zacos9-outputs-$WAYLAND_DISPLAY:
  *   output NAME WxH scale S nested 0|1
  *   mode WxH@mHz
  */
@@ -69,7 +69,7 @@ void prefs_write_outputs(struct plat_server *server) {
 		return;
 	}
 	char path[1024], tmp[1100];
-	snprintf(path, sizeof(path), "%s/platinum-outputs-%s", runtime, display);
+	snprintf(path, sizeof(path), "%s/zacos9-outputs-%s", runtime, display);
 	snprintf(tmp, sizeof(tmp), "%s.new", path);
 	FILE *f = fopen(tmp, "w");
 	if (!f) {
@@ -194,9 +194,9 @@ void prefs_init(struct plat_server *server) {
 	const char *home = getenv("HOME");
 	char dir[1024];
 	if (config && *config) {
-		snprintf(dir, sizeof(dir), "%s/platinum", config);
+		snprintf(dir, sizeof(dir), "%s/zacos9", config);
 	} else {
-		snprintf(dir, sizeof(dir), "%s/.config/platinum", home ? home : "");
+		snprintf(dir, sizeof(dir), "%s/.config/zacos9", home ? home : "");
 	}
 	mkdir(dir, 0755);
 	inotify_add_watch(fd, dir, IN_CLOSE_WRITE | IN_MOVED_TO | IN_DELETE);

@@ -1,8 +1,8 @@
 #!/bin/sh
-# Boot to the Platinum 2026 login (greetd) rather than a text console,
+# Boot to the ZacOS 9 login (greetd) rather than a text console,
 # silently: the boot splash, then the desktop.
 set -e
-systemctl enable greetd.service platinum-console-colors.service
+systemctl enable greetd.service zacos9-console-colors.service
 systemctl set-default graphical.target
 # greetd takes tty1 (the splash's console) instead of a text login.
 systemctl mask getty@tty1.service

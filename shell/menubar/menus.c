@@ -51,7 +51,7 @@ static void add_edit_menu(struct mb_menu *menus, int *n, bool enabled) {
 }
 
 /* With the Finder (or nothing) in front, the Finder's menus. Commands go
- * to platinum-finder; its reported state enables the items. */
+ * to zacos9-finder; its reported state enables the items. */
 static void add_finder_menus(struct mb_menu *menus, int *n) {
 	finder_connect();
 	const struct finder_state *fs = finder_state();
@@ -99,7 +99,7 @@ static void add_finder_menus(struct mb_menu *menus, int *n) {
 	list->checked = win && fs->view == 1;
 	m = new_menu(menus, n, "Special");
 	add(m, "Empty Trash…", 0, up && fs->trash, ACT_FINDER, "empty-trash");
-	/* Platinum's own: brings back applications hidden from Applications
+	/* ZacOS 9's own: brings back applications hidden from Applications
 	 * (Move To Trash on one hides it, rather than touching the package
 	 * it belongs to). No Mac OS 9 original had this, because there the
 	 * Trash really did hold the file. */
@@ -186,7 +186,7 @@ void menus_rebuild(struct mb_bar *bar, int screen_w) {
 	const struct app *front = n_apps > 0 && apps[0].active ? &apps[0] : NULL;
 	const bool finder_front = !front || strcmp(front->app_id, FINDER_APP_ID) == 0;
 
-	/* Left: the Platinum logo menu, then the front app's menus. */
+	/* Left: the logo menu, then the front app's menus. */
 	struct mb_menu *logo = new_menu(bar->left, &bar->n_left, NULL);
 	logo->icon = logo_pixels();
 	launch_fill_logo_menu(logo);

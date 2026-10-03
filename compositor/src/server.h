@@ -1,5 +1,5 @@
-#ifndef PLATINUM_SERVER_H
-#define PLATINUM_SERVER_H
+#ifndef ZACOS9_SERVER_H
+#define ZACOS9_SERVER_H
 
 #include <wayland-server-core.h>
 #include <wlr/backend.h>
@@ -23,8 +23,8 @@
 /* Mac OS default double-click time is 32 ticks (~533 ms). */
 #define PLAT_DOUBLE_CLICK_MS 533
 /* assets/cursors, 16 px at 1x (Mac OS cursors are 16x16). */
-#define PLATINUM_CURSOR_THEME "Platinum"
-#define PLATINUM_CURSOR_SIZE 16
+#define ZACOS9_CURSOR_THEME "ZacOS9"
+#define ZACOS9_CURSOR_SIZE 16
 
 enum plat_cursor_mode {
 	PLAT_CURSOR_PASSTHROUGH,
@@ -41,8 +41,8 @@ struct plat_server {
 	struct wlr_allocator *allocator;
 	struct wlr_compositor *compositor;
 	int output_scale; /* integer HiDPI scale applied to every output */
-	int default_scale; /* from -S / PLATINUM_SCALE, until a panel picks one */
-	bool scale_explicit; /* -S or PLATINUM_SCALE given: no automatic 2x */
+	int default_scale; /* from -S / ZACOS9_SCALE, until a panel picks one */
+	bool scale_explicit; /* -S or ZACOS9_SCALE given: no automatic 2x */
 	/* Mouse and Keyboard panel settings (prefs.c). */
 	double pointer_speed;
 	int double_click_ms;

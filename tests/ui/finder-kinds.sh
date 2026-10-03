@@ -1,7 +1,7 @@
 #!/bin/sh
 # UI test: every kind of Finder icon, in a window in list view.
 # Setup and run inside WSL:
-#   rm -rf ~/Desktop/* ~/.local/share/platinum/finder
+#   rm -rf ~/Desktop/* ~/.local/share/zacos9/finder
 #   d=~/Desktop/Kinds; mkdir -p "$d/Folder" "$d/.finf"
 #   echo hi > "$d/Notes.txt"; printf '[Desktop Entry]\nType=Application\nName=Tool\nExec=true\n' > "$d/Tool.desktop"
 #   python3 -c "open('$d/System.dsk','wb').write(bytes(1024)+b'BD'+bytes(500000))"

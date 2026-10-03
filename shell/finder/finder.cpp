@@ -28,7 +28,7 @@ Finder &Finder::instance() {
 QString Finder::socketPath() {
 	QString runtime = qEnvironmentVariable("XDG_RUNTIME_DIR", "/tmp");
 	QString display = qEnvironmentVariable("WAYLAND_DISPLAY", "wayland-0");
-	return runtime + "/platinum-finder." + display + ".sock";
+	return runtime + "/zacos9-finder." + display + ".sock";
 }
 
 /* Mac OS 8's default spring delay is "medium". TODO: measure. */
@@ -270,8 +270,8 @@ void Finder::openSelection() {
 }
 
 static QString classicLauncher() {
-	const QString local = QCoreApplication::applicationDirPath() + "/platinum-classic";
-	return QFileInfo(local).isExecutable() ? local : QStringLiteral("platinum-classic");
+	const QString local = QCoreApplication::applicationDirPath() + "/zacos9-classic";
+	return QFileInfo(local).isExecutable() ? local : QStringLiteral("zacos9-classic");
 }
 
 void Finder::launchClassic(const QStringList &disks) {

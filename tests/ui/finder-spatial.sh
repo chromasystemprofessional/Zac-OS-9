@@ -1,7 +1,7 @@
 #!/bin/sh
 # UI test: spatial windows remember place, size and view across sessions.
 # Setup and run inside WSL (two sessions):
-#   rm -rf ~/Desktop/* ~/.local/share/platinum/finder; mkdir -p ~/Desktop/Forms/Internal
+#   rm -rf ~/Desktop/* ~/.local/share/zacos9/finder; mkdir -p ~/Desktop/Forms/Internal
 #   scripts/snapshot.sh /tmp/sp1.png 9 "sh tests/ui/finder-spatial.sh 1"
 #   scripts/snapshot.sh /tmp/sp2.png 4 "sh tests/ui/finder-spatial.sh 2"
 # Expected: /tmp/sp1.png and /tmp/sp2.png both show the Forms window moved

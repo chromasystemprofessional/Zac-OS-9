@@ -94,7 +94,7 @@ int main(int argc, char **argv) {
 	setenv("XDG_DATA_DIRS", dataDirs.toUtf8().constData(), 1);
 	setenv("XDG_CONFIG_HOME", (root + "/config").toUtf8().constData(), 1);
 	setenv("HOME", root.toUtf8().constData(), 1);
-	setenv("XDG_CURRENT_DESKTOP", "Platinum", 1);
+	setenv("XDG_CURRENT_DESKTOP", "ZacOS9", 1);
 	QDir().mkpath(appsDir);
 	QDir().mkpath(homeAppsDir);
 
@@ -116,7 +116,7 @@ int main(int argc, char **argv) {
 	writeEntry(appsDir, "othershell.desktop",
 		entry("Only Elsewhere", "/bin/true", "OnlyShowIn=GNOME;\n"));
 	writeEntry(appsDir, "notus.desktop",
-		entry("Not Here", "/bin/true", "NotShowIn=Platinum;\n"));
+		entry("Not Here", "/bin/true", "NotShowIn=ZacOS9;\n"));
 	writeEntry(appsDir, "missingbin.desktop",
 		entry("Missing Binary", "/bin/true", "TryExec=/nonexistent/program\n"));
 	settle();
@@ -401,7 +401,7 @@ int main(int argc, char **argv) {
 	check(registry.value("nodes").toArray().size() >= 8, "it lists the mapping");
 	/* Show Utilities and rename the disk, as a user editing it would. */
 	QJsonObject volumeObj;
-	volumeObj.insert("name", "Platinum HD");
+	volumeObj.insert("name", "Work HD");
 	registry.insert("volume", volumeObj);
 	QJsonArray nodes = registry.value("nodes").toArray();
 	for (int i = 0; i < nodes.size(); i++) {
@@ -417,7 +417,7 @@ int main(int argc, char **argv) {
 		reg.close();
 	}
 	vfsRefresh();
-	check(vfsVolumeName() == "Platinum HD", "the disk can be renamed in the registry");
+	check(vfsVolumeName() == "Work HD", "the disk can be renamed in the registry");
 	volume = namesIn(vfsRoot());
 	check(volume.contains("Utilities"), "Utilities can be switched on in the registry");
 

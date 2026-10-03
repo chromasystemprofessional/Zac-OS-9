@@ -545,7 +545,7 @@ int afpfs_run(struct afp *session, const char *mountpoint, const char *source, b
 	snprintf(opts, sizeof(opts), "fsname=%s,subtype=afp", name);
 	char *args[8];
 	int argc = 0;
-	args[argc++] = "platinum-afp";
+	args[argc++] = "zacos9-afp";
 	args[argc++] = "-s";
 	args[argc++] = "-o";
 	args[argc++] = opts;

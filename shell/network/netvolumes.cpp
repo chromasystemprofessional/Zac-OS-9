@@ -10,7 +10,7 @@
 
 static QString mountsDir() {
 	return QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) +
-		"/platinum/mounts";
+		"/zacos9/mounts";
 }
 
 static std::vector<NetVolume> afpMounts() {

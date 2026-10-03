@@ -2,6 +2,6 @@
 Type=Application
 Name=Appearance
 Comment=Accent colour, highlight colour, desktop pattern and alert sound
-Exec=platinum-appearance
+Exec=zacos9-appearance
 Categories=Settings;DesktopSettings;
-OnlyShowIn=Platinum;
+OnlyShowIn=ZacOS9;

@@ -1,5 +1,5 @@
 /*
- * platinum-finder: the Finder. Owns the desktop (a layer-shell surface)
+ * zacos9-finder: the Finder. Owns the desktop (a layer-shell surface)
  * and the spatial folder windows. Like the Mac's, it never quits.
  */
 #include <QApplication>
@@ -12,12 +12,12 @@
 #include "settings.h"
 
 int main(int argc, char *argv[]) {
-	/* platinum-wm draws every frame; Qt must not add its own. */
+	/* zacos9-wm draws every frame; Qt must not add its own. */
 	qputenv("QT_WAYLAND_DISABLE_WINDOWDECORATION", "1");
 
 	QApplication app(argc, argv);
 	QApplication::setApplicationName("Finder");
-	QGuiApplication::setDesktopFileName("platinum-finder"); /* Wayland app_id */
+	QGuiApplication::setDesktopFileName("zacos9-finder"); /* Wayland app_id */
 	QApplication::setDoubleClickInterval(pl_double_click_ms()); /* the Mouse panel's */
 	QApplication::setQuitOnLastWindowClosed(false);
 	platinumShellInit();

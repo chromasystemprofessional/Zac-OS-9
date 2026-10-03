@@ -1,7 +1,7 @@
-; Platinum System 12: the menu, title and button font of Platinum 2026.
+; ZacOS 9 System 12: the menu, title and button font of ZacOS 9.
 ;
 ; An original design. Its metrics follow the Mac OS 8 system font as
-; measured in the HIG figures (docs/reference/platinum-fonts.md): cap
+; measured in the HIG figures (docs/reference/zacos9-fonts.md): cap
 ; height 9, x-height 7, 2 px vertical stems, 1 px horizontals, 2 px
 ; letter spacing, 4 px space. The letter shapes are drawn from scratch.
 ;
@@ -10,7 +10,7 @@
 ; baseline row) downwards; "#" is ink, "." is blank, and every row is
 ; ADVANCE wide. "mark NAME" defines an accent for composed letters.
 
-font Platinum System
+font ZacOS 9 System
 height 16
 baseline 12
 cap 9

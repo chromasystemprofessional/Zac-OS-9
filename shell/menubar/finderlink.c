@@ -21,7 +21,7 @@ static struct finder_state state;
 static void socket_path(char *out, size_t size) {
 	const char *runtime = getenv("XDG_RUNTIME_DIR");
 	const char *display = getenv("WAYLAND_DISPLAY");
-	snprintf(out, size, "%s/platinum-finder.%s.sock",
+	snprintf(out, size, "%s/zacos9-finder.%s.sock",
 		runtime ? runtime : "/tmp", display ? display : "wayland-0");
 }
 

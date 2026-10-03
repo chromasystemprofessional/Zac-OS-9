@@ -2,6 +2,6 @@
 Type=Application
 Name=Sound
 Comment=Volume and alert volume
-Exec=platinum-controlpanel sound
+Exec=zacos9-controlpanel sound
 Categories=Settings;HardwareSettings;
-OnlyShowIn=Platinum;
+OnlyShowIn=ZacOS9;

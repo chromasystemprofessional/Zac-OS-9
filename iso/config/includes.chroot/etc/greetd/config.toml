@@ -1,9 +1,9 @@
-# Platinum 2026 login (greetd). It runs on tty1, the boot splash's console,
-# and starts the Platinum 2026 session. On the live system, live-config
+# ZacOS 9 login (greetd). It runs on tty1, the boot splash's console,
+# and starts the ZacOS 9 session. On the live system, live-config
 # adds an [initial_session] below that logs the live user straight in once.
 [terminal]
 vt = 1
 
 [default_session]
-command = "tuigreet --time --remember --asterisks --greeting 'Welcome to Platinum 2026' --cmd platinum-session"
+command = "tuigreet --time --remember --asterisks --greeting 'Welcome to ZacOS 9' --cmd zacos9-session"
 user = "_greetd"

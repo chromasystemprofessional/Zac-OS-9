@@ -1,5 +1,5 @@
 /*
- * platinum-menubar: the Mac OS 8/9 menu bar for platinum-wm.
+ * zacos9-menubar: the Mac OS 8/9 menu bar for zacos9-wm.
  *
  * The bar is a wlr-layer-shell surface at the top of the screen with a
  * 20 px exclusive zone. While a menu is open, a transparent full-screen
@@ -125,7 +125,7 @@ static const struct wl_buffer_listener buffer_listener = { .release = buffer_rel
 static struct wl_buffer *make_buffer(const uint32_t *src, int w, int h) {
 	int s = g.scale, bw = w * s, bh = h * s;
 	size_t size = (size_t)bw * bh * 4;
-	int fd = memfd_create("platinum-menubar", MFD_CLOEXEC);
+	int fd = memfd_create("zacos9-menubar", MFD_CLOEXEC);
 	if (fd < 0 || ftruncate(fd, size) < 0) {
 		if (fd >= 0) {
 			close(fd);
@@ -316,7 +316,7 @@ static void create_overlay(void) {
 	g.overlay = wl_compositor_create_surface(g.compositor);
 	g.overlay_viewport = wp_viewporter_get_viewport(g.viewporter, g.overlay);
 	g.overlay_layer = zwlr_layer_shell_v1_get_layer_surface(g.layer_shell, g.overlay,
-		g.output, ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY, "platinum-menu");
+		g.output, ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY, "zacos9-menu");
 	zwlr_layer_surface_v1_set_anchor(g.overlay_layer,
 		ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP | ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM |
 		ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT | ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT);
@@ -845,7 +845,7 @@ static void arm_clock(void) {
 int main(void) {
 	g.display = wl_display_connect(NULL);
 	if (!g.display) {
-		fprintf(stderr, "platinum-menubar: cannot connect to Wayland\n");
+		fprintf(stderr, "zacos9-menubar: cannot connect to Wayland\n");
 		return 1;
 	}
 	struct wl_registry *reg = wl_display_get_registry(g.display);
@@ -853,8 +853,8 @@ int main(void) {
 	wl_display_roundtrip(g.display);
 	if (!g.compositor || !g.subcompositor || !g.shm || !g.layer_shell ||
 			!g.viewporter || !g.toplevel_mgr || !g.seat) {
-		fprintf(stderr, "platinum-menubar: compositor lacks required protocols "
-			"(needs platinum-wm)\n");
+		fprintf(stderr, "zacos9-menubar: compositor lacks required protocols "
+			"(needs zacos9-wm)\n");
 		return 1;
 	}
 	wl_display_roundtrip(g.display); /* output scale, seat caps */
@@ -863,7 +863,7 @@ int main(void) {
 		keys_init(g.vkbd_mgr, g.seat);
 	}
 	toplevels_init(g.toplevel_mgr);
-	/* platinum-wm sets XCURSOR_THEME/SIZE to its Platinum theme. */
+	/* zacos9-wm sets XCURSOR_THEME/SIZE to its own cursor theme. */
 	const char *cursor_size = getenv("XCURSOR_SIZE");
 	int cursor_px = cursor_size ? atoi(cursor_size) : 16;
 	g.cursor_theme = wl_cursor_theme_load(getenv("XCURSOR_THEME"),
@@ -872,7 +872,7 @@ int main(void) {
 
 	g.bar_surface = wl_compositor_create_surface(g.compositor);
 	g.bar_layer = zwlr_layer_shell_v1_get_layer_surface(g.layer_shell, g.bar_surface,
-		g.output, ZWLR_LAYER_SHELL_V1_LAYER_TOP, "platinum-menubar");
+		g.output, ZWLR_LAYER_SHELL_V1_LAYER_TOP, "zacos9-menubar");
 	zwlr_layer_surface_v1_set_anchor(g.bar_layer,
 		ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP | ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT |
 		ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT);
@@ -892,9 +892,9 @@ int main(void) {
 		const char *home = getenv("HOME");
 		char dir[1024];
 		if (config && *config) {
-			snprintf(dir, sizeof(dir), "%s/platinum", config);
+			snprintf(dir, sizeof(dir), "%s/zacos9", config);
 		} else {
-			snprintf(dir, sizeof(dir), "%s/.config/platinum", home ? home : "");
+			snprintf(dir, sizeof(dir), "%s/.config/zacos9", home ? home : "");
 		}
 		mkdir(dir, 0755);
 		inotify_add_watch(settings_fd, dir, IN_CLOSE_WRITE | IN_MOVED_TO | IN_DELETE);

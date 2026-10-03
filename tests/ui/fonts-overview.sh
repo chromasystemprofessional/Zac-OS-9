@@ -1,7 +1,7 @@
 #!/bin/sh
-# UI test: Platinum's own fonts across the desktop.
+# UI test: ZacOS 9's own fonts across the desktop.
 # Setup and run inside WSL:
-#   rm -rf ~/Desktop/* ~/.local/share/platinum/finder
+#   rm -rf ~/Desktop/* ~/.local/share/zacos9/finder
 #   mkdir -p ~/Desktop/Documents/Letters; echo hi > ~/Desktop/Documents/Report.txt
 #   ln -s ~/Desktop/Documents ~/Desktop/"Documents alias"
 #   scripts/snapshot.sh /tmp/fo.png 6 "sh tests/ui/fonts-overview.sh"

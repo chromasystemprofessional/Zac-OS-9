@@ -1,5 +1,5 @@
-#ifndef PLATINUM_SETTINGS_H
-#define PLATINUM_SETTINGS_H
+#ifndef ZACOS9_SETTINGS_H
+#define ZACOS9_SETTINGS_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -11,7 +11,7 @@ extern "C" {
 #include "draw.h"
 
 /*
- * Appearance settings shared by the shell: ~/.config/platinum/desktop.conf
+ * Appearance settings shared by the shell: ~/.config/zacos9/desktop.conf
  * (QSettings INI, "[General]" section), e.g. "pattern=ocean-ripple",
  * "alert-sound=glass". The Appearance and Sound control panels write it.
  */
@@ -35,7 +35,7 @@ struct pl_accent pl_accent_current(void);
  * the accent's light shade. */
 uint32_t pl_highlight_current(void);
 
-/* Where shared data (sounds/) lives: $PLATINUM_DATA, the installed data
+/* Where shared data (sounds/) lives: $ZACOS9_DATA, the installed data
  * directory, or the source tree's assets/ when running from a build. */
 const char *pl_data_dir(void);
 

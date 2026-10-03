@@ -1,4 +1,4 @@
-project('platinum-2026', 'c',
+project('zacos9', 'c',
   version: '0.0.1',
   license: 'GPL-3.0-or-later',
   meson_version: '>=1.0.0',

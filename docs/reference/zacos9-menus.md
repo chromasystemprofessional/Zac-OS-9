@@ -10,7 +10,7 @@ Values were read pixel by pixel from the native-resolution figures using
 | 4-2 Help menu | 92 | `img-092-126` 129×84 | highlighted title at the far left, menu width rule, shortcut column |
 | 4-3 A contextual menu | 94 | `img-094-127` 244×191 | contextual menu, checkmarks, submenu arrow |
 
-Grays use the same notation as `platinum-window.md`: a hex digit `n` means `#nnnnnn`.
+Grays use the same notation as `zacos9-window.md`: a hex digit `n` means `#nnnnnn`.
 
 ## Menu bar
 
@@ -184,7 +184,6 @@ they're measured, these follow Mac OS 8.5 behaviour as observed:
 
 ## Trademark note
 
-The Apple menu's title is the Apple logo, which is Apple's trademark. Platinum
-2026 uses its own original icon in that position (`lib/logo.c`): a faceted
+The Apple menu's title is the Apple logo, which is Apple's trademark. ZacOS 9 uses its own original icon in that position (`lib/logo.c`): a faceted
 four-pointed platinum sparkle with a lavender heart and a small twinkle. It
 deliberately avoids the rainbow-striped round shape of Apple's 1977–1998 logo.

@@ -33,7 +33,7 @@ static const char *DEFAULT_REGISTRY = R"JSON({
     { "id": "system-folder", "name": "System Folder", "kind": "folder",
       "icon": "system-folder", "order": 0 },
     { "id": "system-folder/appearance", "name": "Appearance", "kind": "backed",
-      "backing": "$XDG_DATA_HOME/platinum/appearance" },
+      "backing": "$XDG_DATA_HOME/zacos9/appearance" },
     { "id": "system-folder/control-panels", "name": "Control Panels",
       "kind": "panels", "icon": "control-panels" },
     { "id": "system-folder/extensions", "name": "Extensions", "kind": "folder" },
@@ -75,7 +75,7 @@ const char *SCHEME = "vfs:/";
 
 QString dataDir() {
 	return QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) +
-		"/platinum/finder";
+		"/zacos9/finder";
 }
 
 /* $HOME and the XDG directories, so a registry is portable between users. */
@@ -195,14 +195,14 @@ struct PanelDef {
 };
 /* Alphabetical, as the Mac's Control Panels folder was. */
 const PanelDef PANELS[] = {
-	{ "Appearance", "platinum-appearance", nullptr },
-	{ "Date & Time", "platinum-datetime", nullptr },
-	{ "File Sharing", "platinum-filesharing", nullptr },
-	{ "Keyboard", "platinum-controlpanel", "keyboard" },
-	{ "Monitors", "platinum-controlpanel", "monitors" },
-	{ "Mouse", "platinum-controlpanel", "mouse" },
-	{ "Sound", "platinum-controlpanel", "sound" },
-	{ "TCP/IP", "platinum-tcpip", nullptr },
+	{ "Appearance", "zacos9-appearance", nullptr },
+	{ "Date & Time", "zacos9-datetime", nullptr },
+	{ "File Sharing", "zacos9-filesharing", nullptr },
+	{ "Keyboard", "zacos9-controlpanel", "keyboard" },
+	{ "Monitors", "zacos9-controlpanel", "monitors" },
+	{ "Mouse", "zacos9-controlpanel", "mouse" },
+	{ "Sound", "zacos9-controlpanel", "sound" },
+	{ "TCP/IP", "zacos9-tcpip", nullptr },
 };
 
 bool matchesCategories(const AppEntry &app, const VNode &node) {

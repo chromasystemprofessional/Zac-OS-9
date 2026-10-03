@@ -14,9 +14,9 @@ static void config_path(char *out, size_t size) {
 	const char *config = getenv("XDG_CONFIG_HOME");
 	const char *home = getenv("HOME");
 	if (config && *config) {
-		snprintf(out, size, "%s/platinum/desktop.conf", config);
+		snprintf(out, size, "%s/zacos9/desktop.conf", config);
 	} else {
-		snprintf(out, size, "%s/.config/platinum/desktop.conf", home ? home : "");
+		snprintf(out, size, "%s/.config/zacos9/desktop.conf", home ? home : "");
 	}
 }
 
@@ -214,13 +214,13 @@ const char *pl_data_dir(void) {
 	if (dir[0]) {
 		return dir;
 	}
-	const char *env = getenv("PLATINUM_DATA");
+	const char *env = getenv("ZACOS9_DATA");
 	if (env && *env) {
 		snprintf(dir, sizeof(dir), "%s", env);
-	} else if (is_dir(PLATINUM_DATA_DIR "/sounds")) {
-		snprintf(dir, sizeof(dir), "%s", PLATINUM_DATA_DIR);
+	} else if (is_dir(ZACOS9_DATA_DIR "/sounds")) {
+		snprintf(dir, sizeof(dir), "%s", ZACOS9_DATA_DIR);
 	} else {
-		snprintf(dir, sizeof(dir), "%s/assets", PLATINUM_SOURCE_DIR);
+		snprintf(dir, sizeof(dir), "%s/assets", ZACOS9_SOURCE_DIR);
 	}
 	return dir;
 }

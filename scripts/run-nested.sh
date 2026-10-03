@@ -1,6 +1,6 @@
 #!/bin/sh
-# Build, then run platinum-wm as a window inside the current Wayland session
-# (WSLg on the Windows dev box). Extra args are passed to platinum-wm.
+# Build, then run zacos9-wm as a window inside the current Wayland session
+# (WSLg on the Windows dev box). Extra args are passed to zacos9-wm.
 #
 #   scripts/run-nested.sh                 # opens a terminal inside
 #   scripts/run-nested.sh -s 'xterm'      # custom startup command
@@ -21,4 +21,4 @@ if [ $# -eq 0 ]; then
 	# foot warns about every optional protocol we lack; keep the console quiet.
 	set -- -s 'foot 2>/dev/null'
 fi
-exec build/compositor/platinum-wm "$@"
+exec build/compositor/zacos9-wm "$@"

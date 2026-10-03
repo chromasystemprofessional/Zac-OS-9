@@ -1,7 +1,7 @@
 #!/bin/sh
 # UI test: Get Info comments are editable and stored in user.xdg.comment.
 # Setup and run inside WSL:
-#   rm -rf ~/Desktop/* ~/.local/share/platinum/finder; echo hi > ~/Desktop/Report.txt
+#   rm -rf ~/Desktop/* ~/.local/share/zacos9/finder; echo hi > ~/Desktop/Report.txt
 #   scripts/snapshot.sh /tmp/cm.png 8 "sh tests/ui/finder-comments.sh"
 #   python3 -c "import os; print(os.getxattr(os.path.expanduser('~/Desktop/Report.txt'), 'user.xdg.comment'))"
 # Expected: /tmp/cm1.png shows the comment typed in the Info window, and

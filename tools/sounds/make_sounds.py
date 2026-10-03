@@ -1,4 +1,4 @@
-"""Synthesise Platinum 2026's alert sounds (assets/sounds/*.wav).
+"""Synthesise ZacOS 9's alert sounds (assets/sounds/*.wav).
 
 usage: make_sounds.py
 

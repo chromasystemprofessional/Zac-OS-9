@@ -2,6 +2,6 @@
 Type=Application
 Name=Keyboard
 Comment=Key repeat rate and delay
-Exec=platinum-controlpanel keyboard
+Exec=zacos9-controlpanel keyboard
 Categories=Settings;HardwareSettings;
-OnlyShowIn=Platinum;
+OnlyShowIn=ZacOS9;

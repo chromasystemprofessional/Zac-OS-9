@@ -1,5 +1,5 @@
-#ifndef PLATINUM_DRAW_H
-#define PLATINUM_DRAW_H
+#ifndef ZACOS9_DRAW_H
+#define ZACOS9_DRAW_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -22,7 +22,7 @@ extern "C" {
 
 #define C_BLACK GRAY(0x0)
 #define C_WHITE GRAY(0xF)
-/* Appearance accent color: a ramp of shades (docs/reference/platinum-finder.md).
+/* Appearance accent color: a ramp of shades (docs/reference/zacos9-finder.md).
  * Scroll thumbs use the light end; menu highlights the dark end (top row
  * `dark`, body `shadow`, bottom row `deep`). */
 struct pl_accent {

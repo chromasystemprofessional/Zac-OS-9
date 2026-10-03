@@ -1,7 +1,7 @@
 #pragma once
 
 /*
- * The Network Browser's AFP half: platinum-afp (network/afp), run as
+ * The Network Browser's AFP half: zacos9-afp (network/afp), run as
  * three different commands for the dialog sequence it drives —
  * info (before logging in), volumes (after), mount (the volume chosen).
  */
@@ -22,7 +22,7 @@ struct AfpServerInfo {
 	QString error; /* set when !ok */
 };
 
-/* platinum-afp info: what the login dialog is built from (the server's
+/* zacos9-afp info: what the login dialog is built from (the server's
  * name, whether Guest is offered, whether a cleartext warning is
  * needed) — before anyone has typed anything. */
 AfpServerInfo afpServerInfo(const QString &address);
@@ -32,14 +32,14 @@ struct AfpVolume {
 	bool hasPassword = false; /* a separate, legacy AFP volume password; see docs */
 };
 
-/* platinum-afp volumes: logs in and lists what's on the server. Empty
+/* zacos9-afp volumes: logs in and lists what's on the server. Empty
  * with *ok false and *error set on any failure (including a wrong
  * password, which comes back as "wrong" below so the dialog can ask
  * again instead of just failing). */
 std::vector<AfpVolume> afpListVolumes(const QString &address, const QString &user,
 	const QString &password, bool cleartext, bool *ok, bool *wrongPassword, QString *error);
 
-/* platinum-afp mount: starts a fully detached background process (it
+/* zacos9-afp mount: starts a fully detached background process (it
  * runs for as long as the volume stays mounted — hours, potentially,
  * well past this window closing) at `mountPoint`, which is created if
  * missing. The password is piped to the child's own stdin before it

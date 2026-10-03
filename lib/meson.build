@@ -14,8 +14,8 @@ platinum_lib = static_library('platinum',
   include_directories: platinum_inc,
   dependencies: [cairo],
   c_args: [
-    '-DPLATINUM_DATA_DIR="@0@"'.format(get_option('prefix') / get_option('datadir') / 'platinum'),
-    '-DPLATINUM_SOURCE_DIR="@0@"'.format(meson.project_source_root()),
+    '-DZACOS9_DATA_DIR="@0@"'.format(get_option('prefix') / get_option('datadir') / 'zacos9'),
+    '-DZACOS9_SOURCE_DIR="@0@"'.format(meson.project_source_root()),
   ],
 )
 
@@ -25,11 +25,11 @@ install_data(
     '../assets/sounds/droplet.wav', '../assets/sounds/pluck.wav',
     '../assets/sounds/woodblock.wav', '../assets/sounds/chirp.wav',
   ),
-  install_dir: get_option('datadir') / 'platinum' / 'sounds',
+  install_dir: get_option('datadir') / 'zacos9' / 'sounds',
 )
 # The Software window's catalog (shell/store).
 install_data('../assets/store/catalog.json',
-  install_dir: get_option('datadir') / 'platinum' / 'store',
+  install_dir: get_option('datadir') / 'zacos9' / 'store',
 )
 platinum_dep = declare_dependency(
   link_with: platinum_lib,

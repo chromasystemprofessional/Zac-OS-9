@@ -25,7 +25,7 @@ void keys_init(struct zwp_virtual_keyboard_manager_v1 *mgr, struct wl_seat *seat
 	struct xkb_keymap *keymap = ctx ?
 		xkb_keymap_new_from_names(ctx, NULL, XKB_KEYMAP_COMPILE_NO_FLAGS) : NULL;
 	if (!keymap) {
-		fprintf(stderr, "platinum-menubar: no keymap; Edit commands disabled\n");
+		fprintf(stderr, "zacos9-menubar: no keymap; Edit commands disabled\n");
 		xkb_context_unref(ctx);
 		return;
 	}
@@ -33,7 +33,7 @@ void keys_init(struct zwp_virtual_keyboard_manager_v1 *mgr, struct wl_seat *seat
 
 	char *text = xkb_keymap_get_as_string(keymap, XKB_KEYMAP_FORMAT_TEXT_V1);
 	size_t size = strlen(text) + 1;
-	int fd = memfd_create("platinum-keymap", MFD_CLOEXEC);
+	int fd = memfd_create("zacos9-keymap", MFD_CLOEXEC);
 	if (fd >= 0 && ftruncate(fd, size) == 0) {
 		void *map = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 		if (map != MAP_FAILED) {

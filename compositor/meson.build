@@ -43,7 +43,7 @@ decor_dep = declare_dependency(
   dependencies: [platinum_dep],
 )
 
-# The Platinum cursor theme, built next to platinum-wm (build tree) and
+# The ZacOS9 cursor theme, built next to zacos9-wm (build tree) and
 # installed with the icon themes.
 python3 = find_program('python3')
 custom_target('cursor-theme',
@@ -54,10 +54,10 @@ custom_target('cursor-theme',
   depend_files: meson.project_source_root() / 'tools/cursors/build_cursors.py',
   build_by_default: true,
 )
-install_subdir(meson.current_build_dir() / 'Platinum',
+install_subdir(meson.current_build_dir() / 'ZacOS9',
   install_dir: get_option('datadir') / 'icons')
 
-executable('platinum-wm',
+executable('zacos9-wm',
   'src/main.c',
   'src/output.c',
   'src/input.c',

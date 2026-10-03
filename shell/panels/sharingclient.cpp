@@ -6,25 +6,25 @@
 #include <unistd.h>
 
 QString sharingConfFile(const QString &name) {
-	const QString env = qEnvironmentVariable("PLATINUM_SHARING_CONF");
-	return (env.isEmpty() ? QString("/etc/platinum") : env) + '/' + name;
+	const QString env = qEnvironmentVariable("ZACOS9_SHARING_CONF");
+	return (env.isEmpty() ? QString("/etc/zacos9") : env) + '/' + name;
 }
 
 static QString helperPath() {
-	const QString env = qEnvironmentVariable("PLATINUM_SHARING_HELPER");
+	const QString env = qEnvironmentVariable("ZACOS9_SHARING_HELPER");
 	if (!env.isEmpty()) {
 		return env;
 	}
-	/* Installed beside us (prefix/libexec/platinum), or, running from a
+	/* Installed beside us (prefix/libexec/zacos9), or, running from a
 	 * build tree (build/shell/...), the one in the sources. */
 	const QString dir = QCoreApplication::applicationDirPath();
-	for (const QString &candidate : { dir + "/../libexec/platinum/platinum-sharing-helper",
-			dir + "/../../sharing/platinum-sharing-helper" }) {
+	for (const QString &candidate : { dir + "/../libexec/zacos9/zacos9-sharing-helper",
+			dir + "/../../sharing/zacos9-sharing-helper" }) {
 		if (QFileInfo(candidate).isExecutable()) {
 			return QFileInfo(candidate).canonicalFilePath();
 		}
 	}
-	return "/usr/libexec/platinum/platinum-sharing-helper";
+	return "/usr/libexec/zacos9/zacos9-sharing-helper";
 }
 
 void sharingHelperCommand(QProcess *p, const QStringList &args) {

@@ -17,8 +17,8 @@ the Finder pays for it.
 ```
 Macintosh HD
 ├── System Folder
-│   ├── Appearance        → ~/.local/share/platinum/appearance
-│   ├── Control Panels      (generated: Platinum's control panels)
+│   ├── Appearance        → ~/.local/share/zacos9/appearance
+│   ├── Control Panels      (generated: ZacOS 9's control panels)
 │   ├── Extensions
 │   ├── Fonts             → ~/.local/share/fonts
 │   └── Preferences       → ~/.config
@@ -44,7 +44,7 @@ approximated:
   the one of that id in `/usr/share`, and only one of them shows.
 - `Hidden=true` and `NoDisplay=true` entries are left out.
 - `OnlyShowIn` / `NotShowIn` are checked against `$XDG_CURRENT_DESKTOP`,
-  which the session sets to `Platinum`.
+  which the session sets to `ZacOS9`.
 - An entry whose `TryExec` names a program that isn't installed is left
   out — and so, GIO's own rule, not ours, is one whose plain `Exec`
   names a program that can't be found at all, even with no `TryExec`.
@@ -103,7 +103,7 @@ entry dropped in by hand, with an executable dpkg doesn't know).
 
 ## The registry
 
-`~/.local/share/platinum/finder/vfs.json`, written with the default
+`~/.local/share/zacos9/finder/vfs.json`, written with the default
 mapping the first time the Finder runs, and yours to edit after that.
 
 ```json
@@ -145,7 +145,7 @@ scatter your desktop.
 
 ### Things you might want to change
 
-- **Rename the disk**: `"volume": { "name": "Platinum HD" }`.
+- **Rename the disk**: `"volume": { "name": "Work HD" }`.
 - **Point Documents elsewhere**: change that node's `backing`.
 - **Show Utilities**: set its `visible` to `true`. To keep the same
   application out of both, give `applications` the matching

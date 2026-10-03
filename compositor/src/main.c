@@ -19,7 +19,7 @@
 static void usage(const char *argv0) {
 	printf("Usage: %s [-d] [-S scale] [-s startup-command]\n"
 		"  -d  verbose (debug) logging\n"
-		"  -S  integer output scale, 1-4 (default: $PLATINUM_SCALE or 1)\n",
+		"  -S  integer output scale, 1-4 (default: $ZACOS9_SCALE or 1)\n",
 		argv0);
 }
 
@@ -97,8 +97,8 @@ static int parse_scale(const char *s) {
 int main(int argc, char *argv[]) {
 	enum wlr_log_importance log_level = WLR_ERROR;
 	char *startup_cmd = NULL;
-	int scale = parse_scale(getenv("PLATINUM_SCALE"));
-	bool scale_explicit = getenv("PLATINUM_SCALE") != NULL;
+	int scale = parse_scale(getenv("ZACOS9_SCALE"));
+	bool scale_explicit = getenv("ZACOS9_SCALE") != NULL;
 
 	int c;
 	while ((c = getopt(argc, argv, "dS:s:h")) != -1) {
@@ -211,13 +211,13 @@ int main(int argc, char *argv[]) {
 	prefs_write_outputs(&server);
 	share_our_data();
 	startup_begin(&server);
-	spawn_component("PLATINUM_MENUBAR", "platinum-menubar");
-	spawn_component("PLATINUM_FINDER", "platinum-finder");
+	spawn_component("ZACOS9_MENUBAR", "zacos9-menubar");
+	spawn_component("ZACOS9_FINDER", "zacos9-finder");
 	if (startup_cmd) {
 		spawn(startup_cmd);
 	}
 
-	fprintf(stderr, "platinum-wm running (WAYLAND_DISPLAY=%s). "
+	fprintf(stderr, "zacos9-wm running (WAYLAND_DISPLAY=%s). "
 		"Quit with Ctrl+Alt+Backspace or by closing its window.\n", socket);
 	wl_display_run(server.display);
 

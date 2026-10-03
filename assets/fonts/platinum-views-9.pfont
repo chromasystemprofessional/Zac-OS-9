@@ -1,14 +1,14 @@
-; Platinum Views 9: the Finder's icon-label and list font in Platinum 2026.
+; ZacOS 9 Views 9: the Finder's icon-label and list font in ZacOS 9.
 ;
 ; An original design. Its metrics follow the Mac OS 8 Finder's views font
-; as measured in HIG figure 2-24 (docs/reference/platinum-fonts.md): cap
+; as measured in HIG figure 2-24 (docs/reference/zacos9-fonts.md): cap
 ; height 8, x-height 6, 1 px strokes, 1 px after each letter, 3 px space.
 ; The letter shapes are drawn from scratch. The italic style (alias names)
 ; is synthesised from these glyphs, as QuickDraw did.
 ;
 ; Format: see platinum-system-12.pfont.
 
-font Platinum Views
+font ZacOS 9 Views
 height 15
 baseline 11
 cap 8

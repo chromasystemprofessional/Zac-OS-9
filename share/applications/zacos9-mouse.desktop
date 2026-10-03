@@ -2,6 +2,6 @@
 Type=Application
 Name=Mouse
 Comment=Mouse tracking and double-click speed
-Exec=platinum-controlpanel mouse
+Exec=zacos9-controlpanel mouse
 Categories=Settings;HardwareSettings;
-OnlyShowIn=Platinum;
+OnlyShowIn=ZacOS9;

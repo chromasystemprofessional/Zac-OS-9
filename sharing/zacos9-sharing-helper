@@ -1,42 +1,42 @@
 #!/bin/sh
-# platinum-sharing-helper: the privileged half of the File Sharing control
-# panel (platinum-filesharing). It runs as root through pkexec; polkit lets
+# zacos9-sharing-helper: the privileged half of the File Sharing control
+# panel (zacos9-filesharing). It runs as root through pkexec; polkit lets
 # administrators at the computer use it without a password
-# (org.platinum2026.sharing).
+# (org.zacos9.sharing).
 #
-#   platinum-sharing-helper apply        settings on stdin, key=value lines:
+#   zacos9-sharing-helper apply        settings on stdin, key=value lines:
 #                                        name, owner, afp, smb, guests,
 #                                        cleartext (yes/no for the last four)
-#   platinum-sharing-helper password     your password for Windows sharing on
+#   zacos9-sharing-helper password     your password for Windows sharing on
 #                                        stdin (only for yourself)
-#   platinum-sharing-helper status [USER]
+#   zacos9-sharing-helper status [USER]
 #                                        who is connected: conn<TAB>kind<TAB>
 #                                        user<TAB>address<TAB>pid lines; and
 #                                        password<TAB>set if USER (you, by
 #                                        default) has a Windows sharing password
-#   platinum-sharing-helper disconnect PID
-#   platinum-sharing-helper share FOLDER     share a folder of yours (Get Info's
-#   platinum-sharing-helper unshare FOLDER   "Share this item and its contents")
-#   platinum-sharing-helper privileges FOLDER OWNER GROUP MODE [all]
+#   zacos9-sharing-helper disconnect PID
+#   zacos9-sharing-helper share FOLDER     share a folder of yours (Get Info's
+#   zacos9-sharing-helper unshare FOLDER   "Share this item and its contents")
+#   zacos9-sharing-helper privileges FOLDER OWNER GROUP MODE [all]
 #                                        Get Info's Owner, User/Group and
 #                                        Everyone privileges: the folder's Unix
 #                                        owner, group and permissions (octal,
 #                                        e.g. 755); "all" copies them to every
 #                                        folder and file inside
 #
-# The settings live in /etc/platinum/sharing.conf, and the shared folders in
-# /etc/platinum/shared-folders (NAME<TAB>PATH lines); both are readable by
+# The settings live in /etc/zacos9/sharing.conf, and the shared folders in
+# /etc/zacos9/shared-folders (NAME<TAB>PATH lines); both are readable by
 # everyone. /etc/netatalk/afp.conf (Macs, AFP) and /etc/samba/smb.conf
 # (Windows, SMB) are written from them. The files the packages installed are
-# kept once as *.platinum-orig.
+# kept once as *.zacos9-orig.
 #
 # As on a Mac, privileges belong to the folder: Netatalk and Samba both go by
 # the Unix permissions of whoever connects. Only a folder's owner may share it
 # or change its privileges, and a shared folder can't be inside another.
 set -eu
 PATH=/usr/sbin:/usr/bin:/sbin:/bin
-conf=/etc/platinum/sharing.conf
-shares=/etc/platinum/shared-folders
+conf=/etc/zacos9/sharing.conf
+shares=/etc/zacos9/shared-folders
 tab=$(printf '\t')
 
 die() {
@@ -44,7 +44,7 @@ die() {
 	exit 1
 }
 
-[ "$(id -u)" = 0 ] || die "platinum-sharing-helper must run as root (through pkexec)."
+[ "$(id -u)" = 0 ] || die "zacos9-sharing-helper must run as root (through pkexec)."
 
 # The user who asked: pkexec says, sudo says, or root itself.
 caller() {
@@ -88,7 +88,7 @@ netbios_name() {
 }
 
 keep_original() {
-	[ -e "$1.platinum-orig" ] || { [ -e "$1" ] && cp -p "$1" "$1.platinum-orig"; } || true
+	[ -e "$1.zacos9-orig" ] || { [ -e "$1" ] && cp -p "$1" "$1.zacos9-orig"; } || true
 }
 
 write_afp_conf() {
@@ -102,14 +102,14 @@ write_afp_conf() {
 	home_veto=/.*/
 	each_share | while IFS="$tab" read -r sname spath; do
 		case $spath in /home/*/*) printf '%s/' "$(basename "$spath")" ;; esac
-	done >/tmp/platinum-veto.$$
-	home_veto="$home_veto$(cat /tmp/platinum-veto.$$)"
-	rm -f /tmp/platinum-veto.$$
+	done >/tmp/zacos9-veto.$$
+	home_veto="$home_veto$(cat /tmp/zacos9-veto.$$)"
+	rm -f /tmp/zacos9-veto.$$
 	keep_original /etc/netatalk/afp.conf
 	cat >/etc/netatalk/afp.conf <<EOF
-; Written by Platinum 2026's File Sharing control panel from $conf;
+; Written by ZacOS 9's File Sharing control panel from $conf;
 ; changes made here are replaced the next time it saves. The original is
-; afp.conf.platinum-orig.
+; afp.conf.zacos9-orig.
 
 [Global]
 server name = $name
@@ -136,9 +136,9 @@ write_smb_conf() {
 	[ "$guests" = yes ] && guest_map="Bad User"
 	keep_original /etc/samba/smb.conf
 	cat >/etc/samba/smb.conf <<EOF
-# Written by Platinum 2026's File Sharing control panel from $conf;
+# Written by ZacOS 9's File Sharing control panel from $conf;
 # changes made here are replaced the next time it saves. The original is
-# smb.conf.platinum-orig.
+# smb.conf.zacos9-orig.
 
 [global]
    netbios name = $(netbios_name "$name")
@@ -188,10 +188,10 @@ EOF
 write_avahi_services() {
 	mkdir -p /etc/avahi/services
 	if [ "$smb" = yes ]; then
-		cat >/etc/avahi/services/platinum-smb.service <<EOF
+		cat >/etc/avahi/services/zacos9-smb.service <<EOF
 <?xml version="1.0" standalone='no'?>
 <!DOCTYPE service-group SYSTEM "avahi-service.dtd">
-<!-- Written by Platinum 2026's File Sharing control panel. -->
+<!-- Written by ZacOS 9's File Sharing control panel. -->
 <service-group>
 	<name replace-wildcards="yes">%h</name>
 	<service>
@@ -201,7 +201,7 @@ write_avahi_services() {
 </service-group>
 EOF
 	else
-		rm -f /etc/avahi/services/platinum-smb.service
+		rm -f /etc/avahi/services/zacos9-smb.service
 	fi
 	systemctl reload avahi-daemon.service 2>/dev/null || true
 }
@@ -253,7 +253,7 @@ apply() {
 	check_name "$name"
 	check_owner "$owner"
 
-	mkdir -p /etc/platinum
+	mkdir -p /etc/zacos9
 	umask 022
 	cat >"$conf.new" <<EOF
 name=$name
@@ -370,7 +370,7 @@ share() {
 			case $spath/ in "$path"/*) die "\"$(basename "$path")\" can't be shared because the folder \"$sname\" inside it is shared." ;; esac
 		done <"$shares"
 	fi
-	mkdir -p /etc/platinum
+	mkdir -p /etc/zacos9
 	umask 022
 	printf '%s\t%s\n' "$(share_name "$path")" "$path" >>"$shares"
 	reconfigure
@@ -471,8 +471,8 @@ disconnect) disconnect "${2:-}" ;;
 share) share "${2:-}" ;;
 unshare) unshare "${2:-}" ;;
 privileges)
-	[ $# -ge 5 ] || die "usage: platinum-sharing-helper privileges FOLDER OWNER GROUP MODE [all]"
+	[ $# -ge 5 ] || die "usage: zacos9-sharing-helper privileges FOLDER OWNER GROUP MODE [all]"
 	privileges "$2" "$3" "$4" "$5" "${6:-}"
 	;;
-*) die "usage: platinum-sharing-helper apply | password | status | disconnect PID | share FOLDER | unshare FOLDER | privileges FOLDER OWNER GROUP MODE [all]" ;;
+*) die "usage: zacos9-sharing-helper apply | password | status | disconnect PID | share FOLDER | unshare FOLDER | privileges FOLDER OWNER GROUP MODE [all]" ;;
 esac

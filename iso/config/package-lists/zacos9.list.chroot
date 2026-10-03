@@ -1,6 +1,6 @@
-# Platinum 2026 (built by scripts/build-debs.sh, in config/packages.chroot)
-platinum-2026
-platinum-emulators
+# ZacOS 9 (built by scripts/build-debs.sh, in config/packages.chroot)
+zacos9
+zacos9-emulators
 
 # Login: greetd with a text greeter; live sessions log straight in
 greetd

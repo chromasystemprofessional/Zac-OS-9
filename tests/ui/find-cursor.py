@@ -1,4 +1,4 @@
-"""Print where the Platinum arrow cursor is in screenshots (grim -c).
+"""Print where the ZacOS9 arrow cursor is in screenshots (grim -c).
 
 usage: find-cursor.py SHOT.png...
 

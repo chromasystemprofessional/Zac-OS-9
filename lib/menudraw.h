@@ -1,5 +1,5 @@
-#ifndef PLATINUM_MENUDRAW_H
-#define PLATINUM_MENUDRAW_H
+#ifndef ZACOS9_MENUDRAW_H
+#define ZACOS9_MENUDRAW_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -7,7 +7,7 @@ extern "C" {
 
 /*
  * Platinum menu bar and pull-down menus, drawn from
- * docs/reference/platinum-menus.md. Pure drawing + layout; no I/O.
+ * docs/reference/zacos9-menus.md. Pure drawing + layout; no I/O.
  */
 
 #include "draw.h"

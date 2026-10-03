@@ -1,8 +1,8 @@
-"""Build the Platinum Xcursor theme from assets/cursors/platinum-cursors.pcur.
+"""Build the ZacOS9 Xcursor theme from assets/cursors/platinum-cursors.pcur.
 
 usage: build_cursors.py SOURCE OUTDIR [--sheet OUT.png]
 
-Writes OUTDIR/Platinum/index.theme and OUTDIR/Platinum/cursors/<name> for
+Writes OUTDIR/ZacOS9/index.theme and OUTDIR/ZacOS9/cursors/<name> for
 every cursor name and alias, each with 16 px (1x) and 32 px (2x,
 nearest-neighbour) images. The watch is animated: its hand turns in
 eight steps.
@@ -102,10 +102,10 @@ def main():
     if len(sys.argv) < 3:
         sys.exit(__doc__)
     cursors = parse(sys.argv[1])
-    theme = os.path.join(sys.argv[2], "Platinum")
+    theme = os.path.join(sys.argv[2], "ZacOS9")
     os.makedirs(os.path.join(theme, "cursors"), exist_ok=True)
     with open(os.path.join(theme, "index.theme"), "w") as f:
-        f.write("[Icon Theme]\nName=Platinum\nComment=Platinum 2026 cursors\n")
+        f.write("[Icon Theme]\nName=ZacOS9\nComment=ZacOS 9 cursors\n")
     rendered = []
     for c in cursors:
         rows = add_outline(c["rows"]) if c["outline"] else c["rows"]

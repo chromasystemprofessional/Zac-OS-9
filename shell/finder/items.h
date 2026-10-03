@@ -82,7 +82,7 @@ bool isMacDiskImage(const QString &path);
 bool isClassicApplication(const QString &path);
 
 /* The extended attribute holding an item's label, as a decimal index. */
-inline constexpr const char *LABEL_ATTR = "user.platinum.label";
+inline constexpr const char *LABEL_ATTR = "user.zacos9.label";
 int readLabel(const QString &path);
 /* Label 0 removes the attribute. Returns false if it can't be stored. */
 bool writeLabel(const QString &path, int label);

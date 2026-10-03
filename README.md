@@ -1,4 +1,4 @@
-# Platinum 2026
+# ZacOS 9
 
 A strict, pixel-faithful replica of the Mac OS 8/9 "Platinum" desktop, built as a
 desktop environment for Debian Linux, with built-in support for running classic
@@ -12,14 +12,14 @@ software.
 
 | Path | What |
 |---|---|
-| `compositor/` | `platinum-wm`: Wayland compositor (C, wlroots 0.18). Draws window frames and handles input. |
+| `compositor/` | `zacos9-wm`: Wayland compositor (C, wlroots 0.18). Draws window frames and handles input. |
 | `shell/` | Menu bar, Finder, Control Panels (Qt6). *Phase 2+* |
 | `style/` | Platinum QStyle plugin and GTK theme. *Phase 5* |
 | `emulation/` | SheepShaver / Basilisk II integration. *Phase 4* |
 | `assets/` | Original fonts, icons, desktop patterns, sounds. |
 | `docs/` | Roadmap, fidelity references, design notes. |
 | `scripts/` | Build and run helpers; package, ISO and VM scripts. |
-| `session/` | The login session: `platinum-session` and its `wayland-sessions` entry. |
+| `session/` | The login session: `zacos9-session` and its `wayland-sessions` entry. |
 | `debian/`, `packaging/`, `iso/` | Debian packaging, the emulator package, the live-build configuration. |
 
 ## Developing on Windows (WSL2 + WSLg)
@@ -30,7 +30,7 @@ The source tree lives on the Windows drive. Everything builds and runs inside th
 To run it, double-click **`run.cmd`** in the project folder, or type `.\run` in a
 VS Code / PowerShell terminal opened in this folder.
 
-This builds the code and opens `platinum-wm` with a terminal (`foot`) running
+This builds the code and opens `zacos9-wm` with a terminal (`foot`) running
 inside it. **The window often opens behind other windows.** Look for
 "wlroots - WL-1 (Debian)" on the taskbar. To quit, press **Ctrl+Alt+Backspace**
 inside it or close the window.
@@ -58,7 +58,7 @@ Build only: `wsl -d Debian -- scripts/build.sh`
 
 - `scripts/build-debs.sh` builds the `.deb` packages.
 - `scripts/build-iso.sh` builds a live and install ISO that boots straight into
-  Platinum 2026.
+  ZacOS 9.
 - **`vm.cmd`** runs that ISO in a QEMU virtual machine, with a real boot, login
   and screen.
 - `scripts/dev-boot.sh` tries system and boot changes in a VM in a few minutes,

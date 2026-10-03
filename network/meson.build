@@ -4,7 +4,7 @@ fuse3 = dependency('fuse3')
 gcrypt = dependency('libgcrypt')
 threads = dependency('threads')
 
-executable('platinum-afp',
+executable('zacos9-afp',
   'afp/main.c',
   'afp/afp.c',
   'afp/afpfs.c',

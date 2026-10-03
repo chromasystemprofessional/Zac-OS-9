@@ -1,10 +1,10 @@
 #!/bin/sh
-# platinum-classic: run classic Mac OS in an emulator window.
+# zacos9-classic: run classic Mac OS in an emulator window.
 #
-#   platinum-classic [--check] [--68k] [--disk IMAGE]...
+#   zacos9-classic [--check] [--68k] [--disk IMAGE]...
 #
 # The user supplies Apple's files: ROMs and system disk images go in
-# ~/Classic (or $PLATINUM_CLASSIC_DIR), up to two folders deep. ROMs are
+# ~/Classic (or $ZACOS9_CLASSIC_DIR), up to two folders deep. ROMs are
 # recognised by their checksum, disks by their HFS or
 # partition-map signature, so file names don't matter.
 #
@@ -14,7 +14,7 @@
 # problems go to stderr, one line, with exit status 2.
 set -eu
 
-classic_dir=${PLATINUM_CLASSIC_DIR:-$HOME/Classic}
+classic_dir=${ZACOS9_CLASSIC_DIR:-$HOME/Classic}
 self_dir=$(cd "$(dirname "$0")" && pwd)
 check=false
 arch=ppc
@@ -26,7 +26,7 @@ while [ $# -gt 0 ]; do
 	--68k) arch=68k ;;
 	--disk) shift; extra_disks="$extra_disks
 $1" ;;
-	*) echo "usage: platinum-classic [--check] [--68k] [--disk IMAGE]..." >&2; exit 64 ;;
+	*) echo "usage: zacos9-classic [--check] [--68k] [--disk IMAGE]..." >&2; exit 64 ;;
 	esac
 	shift
 done
@@ -101,8 +101,8 @@ find_disks() {
 }
 
 emulator() {
-	for dir in ${PLATINUM_EMULATORS:-} "$self_dir/../emulators/bin" \
-			"$self_dir/../libexec/platinum"; do
+	for dir in ${ZACOS9_EMULATORS:-} "$self_dir/../emulators/bin" \
+			"$self_dir/../libexec/zacos9"; do
 		[ -x "$dir/$1" ] && { echo "$(cd "$dir" && pwd)/$1"; return 0; }
 	done
 	command -v "$1"

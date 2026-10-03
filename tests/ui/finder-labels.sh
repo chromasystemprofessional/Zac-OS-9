@@ -1,9 +1,9 @@
 #!/bin/sh
-# UI test: File > Label submenu sets a Finder label (user.platinum.label).
+# UI test: File > Label submenu sets a Finder label (user.zacos9.label).
 # Setup and run inside WSL:
-#   rm -rf ~/Desktop/* ~/.local/share/platinum/finder; echo hi > ~/Desktop/Report.txt
+#   rm -rf ~/Desktop/* ~/.local/share/zacos9/finder; echo hi > ~/Desktop/Report.txt
 #   scripts/snapshot.sh /tmp/lb.png 9 "sh tests/ui/finder-labels.sh"
-#   python3 -c "import os; print(os.getxattr(os.path.expanduser('~/Desktop/Report.txt'), 'user.platinum.label'))"
+#   python3 -c "import os; print(os.getxattr(os.path.expanduser('~/Desktop/Report.txt'), 'user.zacos9.label'))"
 # Expected:
 #   /tmp/lb1.png  File menu open, "Label" highlighted, its submenu beside
 #                 it: None, separator, seven labels with color swatches

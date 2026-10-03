@@ -1,7 +1,7 @@
 #!/bin/sh
 # UI test: File > Find… searches the disk by name.
 # Setup and run inside WSL:
-#   rm -rf ~/Desktop/* ~/.local/share/platinum/finder; mkdir ~/Desktop/Docs
+#   rm -rf ~/Desktop/* ~/.local/share/zacos9/finder; mkdir ~/Desktop/Docs
 #   echo hi > "$HOME/Desktop/Docs/Quarterly Zebra.txt"; echo hi > ~/Desktop/zebra-notes.md
 #   scripts/snapshot.sh /tmp/fd.png 14 "sh tests/ui/finder-find.sh"
 # Expected:

@@ -21,7 +21,7 @@
  * is no flag for this, so this is the one sure way to hand it a
  * password that was never on a command line). Blocks until gio
  * finishes (gvfs mounts are quick; nothing here waits on a volume
- * staying mounted the way platinum-afp's FUSE process does). */
+ * staying mounted the way zacos9-afp's FUSE process does). */
 bool smbMount(const QString &server, const QString &share, const QString &user,
 	const QString &password, QString *error);
 

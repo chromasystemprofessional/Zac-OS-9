@@ -2,7 +2,7 @@
  * Font metrics: the ink width of text that appears in the HIG figures
  * must match the figures, so menus, titles and lists lay out exactly as
  * on Mac OS 8. Widths were measured with tools/measure/glyphs.py
- * (docs/reference/platinum-fonts.md). Needs no figures.
+ * (docs/reference/zacos9-fonts.md). Needs no figures.
  */
 #include <stdio.h>
 #include <string.h>

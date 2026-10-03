@@ -2,8 +2,8 @@
 <!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
  "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
 <policyconfig>
-  <vendor>Platinum 2026</vendor>
-  <action id="org.platinum2026.appstore">
+  <vendor>ZacOS 9</vendor>
+  <action id="org.zacos9.appstore">
     <description>Install or remove software</description>
     <message>Authentication is required to install or remove software</message>
     <defaults>
@@ -11,6 +11,6 @@
       <allow_inactive>auth_admin</allow_inactive>
       <allow_active>auth_admin_keep</allow_active>
     </defaults>
-    <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/platinum/platinum-appstore-helper</annotate>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/zacos9/zacos9-appstore-helper</annotate>
   </action>
 </policyconfig>

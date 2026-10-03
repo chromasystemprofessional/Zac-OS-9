@@ -1,4 +1,4 @@
-; Platinum 2026 cursors: original 16x16 pixel art in the Mac OS 8 manner
+; ZacOS 9 cursors: original 16x16 pixel art in the Mac OS 8 manner
 ; (black shapes with a white edge, so they show on any background).
 ;
 ; "cursor NAME HOTX HOTY [outline] [names...]" then 16 rows: "K" black,

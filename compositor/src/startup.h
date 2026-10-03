@@ -1,5 +1,5 @@
-#ifndef PLATINUM_STARTUP_H
-#define PLATINUM_STARTUP_H
+#ifndef ZACOS9_STARTUP_H
+#define ZACOS9_STARTUP_H
 
 #include <stdbool.h>
 

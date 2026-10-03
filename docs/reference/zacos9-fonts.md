@@ -1,6 +1,6 @@
 # Platinum fonts: measured reference
 
-Platinum 2026 draws all of its text with two original bitmap fonts:
+ZacOS 9 draws all of its text with two original bitmap fonts:
 
 - `assets/fonts/platinum-system-12.pfont` is for menus, window titles and buttons.
 - `assets/fonts/platinum-views-9.pfont` is for icon labels, list views and Get Info values.

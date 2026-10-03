@@ -9,7 +9,7 @@ Updated: 2026-10-02
 | `cd4f6ed` | Silent start-up: white screen, platinum sparkle logo, Welcome screen; `scripts/dev-boot.sh` |
 | `d1f5765` | File Sharing control panel (AFP + SMB toggle, shared folders list) |
 | `02cd5a4` | Get Info > Sharing view, pixel-matched to Mac OS 9's original |
-| `2349968` | `network/afp/platinum-afp`: AFP 2.x FUSE client skeleton |
+| `2349968` | `network/afp/zacos9-afp`: AFP 2.x FUSE client skeleton |
 | `3dbae73` | AFP client fully working: single-`sendmsg` fix, busy-delete retry, truncate fallback; `tests/sharing/afp-client.sh` passes on Mac OS 9 and Netatalk |
 | *(uncommitted)* | Virtual Macintosh filesystem for the Finder, with real application icons, package origin, and hide-not-uninstall — see below |
 | *(uncommitted)* | Software window (app catalog over apt) in the Apple menu — see below |
@@ -32,13 +32,13 @@ could and couldn't be verified live in this dev container.
 - `shell/network/` — `netbrowser.{h,cpp}` (the window), `discovery.{h,cpp}`
   (Bonjour via `avahi-browse`, Windows via a hand-written WS-Discovery
   probe — Debian ships no query tool, only `wsdd2`'s responder),
-  `afpclient.{h,cpp}` (wraps the already-built `platinum-afp
+  `afpclient.{h,cpp}` (wraps the already-built `zacos9-afp
   info`/`volumes`/`mount`), `smbclient.{h,cpp}` (wraps `gio mount`),
   `netvolumes.{h,cpp}` (what's mounted, read from `findmnt`/gvfs's own
   runtime directory — no registry to drift from reality), three dialogs
   (`connectdialog`, `logindialog`, `volumedialog`).
 - AFP mounts fully detached (double-fork + a pipe for the password,
-  `afpMount()`) at `~/.local/share/platinum/mounts/<volume name>`, so
+  `afpMount()`) at `~/.local/share/zacos9/mounts/<volume name>`, so
   they outlive the GUI the way a real Mac's mounted volumes did.
 - `shell/finder/desktop.cpp` polls what's mounted every 3 s and shows
   each as a disk icon (`Item::isNetworkVolume`); `Finder::putAway()`
@@ -51,7 +51,7 @@ could and couldn't be verified live in this dev container.
   Bonjour-compatibility library, under the configured server name).
   Samba's own avahi support couldn't be confirmed the same way (`smbd`
   crashes on start in this dev container — unrelated pre-existing
-  issue), so `sharing/platinum-sharing-helper` still writes an explicit
+  issue), so `sharing/zacos9-sharing-helper` still writes an explicit
   `_smb._tcp` avahi service file when SMB sharing is on.
 - `avahi-utils` and `gvfs-backends` added to `debian/control` Depends.
 - Deliberately no SMB share-list dialog: anonymously browsing a
@@ -95,8 +95,8 @@ shipped) rather than any real reference. See
   existing `PanelList`/`PanelButton`/`pl_progress_paint` widgets),
   `storeclient.{h,cpp}` (catalog loading, helper invocation).
 - `assets/store/catalog.json` — 20 curated apps across 6 categories plus
-  Featured; shipped read-only, installed to `$datadir/platinum/store/`.
-- `appstore/` — `platinum-appstore-helper` (root, through pkexec;
+  Featured; shipped read-only, installed to `$datadir/zacos9/store/`.
+- `appstore/` — `zacos9-appstore-helper` (root, through pkexec;
   validates every package name — Debian's own charset, never starting
   with `-` — *before* its root check, so the check runs regardless of
   caller) plus the matching polkit `.policy`/`.rules`, mirroring
@@ -132,7 +132,7 @@ Documents instead of Debian's Unix hierarchy. Nothing on disk is moved,
 renamed or hidden; no FUSE mount. See [docs/vfs.md](docs/vfs.md).
 
 - `shell/finder/vfs.{h,cpp}` — the node model and its JSON registry at
-  `~/.local/share/platinum/finder/vfs.json` (stable ids, display names,
+  `~/.local/share/zacos9/finder/vfs.json` (stable ids, display names,
   icons, backing paths, visibility, kinds, migration by `version`).
 - `shell/finder/appdb.{h,cpp}` — installed applications through GIO:
   XDG precedence, `Hidden`/`NoDisplay`/`OnlyShowIn`/`NotShowIn`/`TryExec`
@@ -175,7 +175,7 @@ All Applications bringing it back.
 - **`smbd` crashes on start in this dev container** (`core-dump`,
   signal ABRT, immediately after "ready to serve connections") — a
   pre-existing environment issue, not investigated (not this session's
-  AFP/discovery work, and not something `platinum-sharing-helper`'s
+  AFP/discovery work, and not something `zacos9-sharing-helper`'s
   config generation can cause). Blocks live verification of real SMB
   serving *and*, as a side effect, real SMB mounting (there was nothing
   reachable to mount from). Worth a real investigation before relying
@@ -199,7 +199,7 @@ All Applications bringing it back.
   left out" section. No "Check for Updates" either — `dpkg-query` says
   installed or not, not whether a newer version exists.
 - `debian/control` still needs `fuse3`, `libfuse3-dev`, `libgcrypt20-dev`
-  for `platinum-afp` (left alone: separate feature — it's the same
+  for `zacos9-afp` (left alone: separate feature — it's the same
   binary the Network Browser now drives, so this is worth picking up
   alongside it next).
 - ISO has not been rebuilt since the silent-boot commit; it is missing
@@ -228,7 +228,7 @@ All Applications bringing it back.
 
 1. **Investigate the `smbd` crash** in this dev container — blocks real
    verification of both SMB serving and SMB mounting.
-2. **`debian/control`** — add `platinum-afp`'s own dependencies
+2. **`debian/control`** — add `zacos9-afp`'s own dependencies
    (`fuse3`, `libfuse3-dev`, `libgcrypt20-dev`).
 3. **An SMB share-list dialog**, once a working SMB server is available
    to test anonymous root-browsing against reliably (see
@@ -253,6 +253,6 @@ See `CLAUDE.md` for the full map. Key paths:
 - Software window: `shell/store/`, helper in `appstore/`
 - Network Browser: `shell/network/`
 - AFP client: `network/afp/`
-- File sharing helper: `sharing/platinum-sharing-helper`
+- File sharing helper: `sharing/zacos9-sharing-helper`
 - Tests: `meson test` (unit), `tests/ui/*.sh` (screenshots),
   `tests/sharing/afp-client.sh`

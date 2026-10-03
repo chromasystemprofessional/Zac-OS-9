@@ -110,7 +110,11 @@ AppearancePanel::AppearancePanel() {
 	m_soundIds << "none";
 	QStringList soundNames;
 	for (const QString &id : m_soundIds) {
-		QString name = id;
+		/* The default alert sound's file is still platinum.wav (sound
+		 * assets, like the fonts and icons, keep their internal names);
+		 * shown as "Chime" rather than capitalizing that into the
+		 * product's old name. */
+		QString name = id == "platinum" ? "Chime" : id;
 		name[0] = name[0].toUpper();
 		soundNames << name;
 	}

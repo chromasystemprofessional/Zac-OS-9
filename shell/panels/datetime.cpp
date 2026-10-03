@@ -371,10 +371,10 @@ DateTimePanel::DateTimePanel() {
 
 /* Runs `timedatectl ARGS`; on failure, explains in an alert (unless quiet). */
 bool DateTimePanel::run(const QStringList &args, QString *out, bool quiet) {
-	/* PLATINUM_DATETIME_DRYRUN=1 (the UI tests) logs changes instead of
+	/* ZACOS9_DATETIME_DRYRUN=1 (the UI tests) logs changes instead of
 	 * making them. */
-	if (qEnvironmentVariableIsSet("PLATINUM_DATETIME_DRYRUN") && args.value(0).startsWith("set-")) {
-		fprintf(stderr, "platinum-datetime: would run: timedatectl %s\n",
+	if (qEnvironmentVariableIsSet("ZACOS9_DATETIME_DRYRUN") && args.value(0).startsWith("set-")) {
+		fprintf(stderr, "zacos9-datetime: would run: timedatectl %s\n",
 			args.join(' ').toUtf8().constData());
 		return true;
 	}

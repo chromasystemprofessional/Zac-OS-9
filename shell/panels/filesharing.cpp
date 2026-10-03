@@ -1,5 +1,5 @@
 /*
- * platinum-filesharing: the File Sharing control panel, after Mac OS 9's.
+ * zacos9-filesharing: the File Sharing control panel, after Mac OS 9's.
  *
  *   Start/Stop        Network Identity (owner, password, computer name),
  *                     File Sharing for Macs (AFP, through Netatalk: Mac OS
@@ -14,7 +14,7 @@
  * Password: Windows needs its own copy, which the panel stores (after
  * checking it with unix_chkpwd) when it is typed here. Everyone's home
  * folder is shared with them. Settings and the servers are changed by
- * platinum-sharing-helper, through pkexec. TODO: the layout is ours, from
+ * zacos9-sharing-helper, through pkexec. TODO: the layout is ours, from
  * HIG controls and the Mac OS 9 panel's arrangement.
  */
 #include <QApplication>
@@ -54,9 +54,9 @@ static bool serviceActive(const char *unit) {
 	return p.exitStatus() == QProcess::NormalExit && p.exitCode() == 0;
 }
 
-/* The owner: this account (PLATINUM_SHARING_OWNER for tests). */
+/* The owner: this account (ZACOS9_SHARING_OWNER for tests). */
 static QString ownerName() {
-	const QString env = qEnvironmentVariable("PLATINUM_SHARING_OWNER");
+	const QString env = qEnvironmentVariable("ZACOS9_SHARING_OWNER");
 	if (!env.isEmpty()) {
 		return env;
 	}
@@ -88,7 +88,7 @@ struct Settings {
 static Settings readSettings() {
 	Settings s;
 	s.owner = ownerName();
-	QFile f("/etc/platinum/sharing.conf");
+	QFile f("/etc/zacos9/sharing.conf");
 	if (f.open(QIODevice::ReadOnly)) {
 		for (const QByteArray &raw : f.readAll().split('\n')) {
 			const QString line = QString::fromUtf8(raw);
@@ -596,12 +596,12 @@ private:
 };
 
 int main(int argc, char *argv[]) {
-	/* platinum-wm draws every frame; Qt must not add its own. */
+	/* zacos9-wm draws every frame; Qt must not add its own. */
 	qputenv("QT_WAYLAND_DISABLE_WINDOWDECORATION", "1");
 	QApplication app(argc, argv);
 	QApplication::setApplicationName("File Sharing");
 	QApplication::setDoubleClickInterval(pl_double_click_ms());
-	QGuiApplication::setDesktopFileName("platinum-filesharing"); /* Wayland app_id */
+	QGuiApplication::setDesktopFileName("zacos9-filesharing"); /* Wayland app_id */
 	platinumShellInit();
 
 	FileSharingPanel panel;

@@ -15,7 +15,7 @@ struct DiscoveredServer {
 	enum Kind { AFP, SMB };
 	Kind kind = AFP;
 	QString name; /* a person-readable name: the announced one, or the address */
-	QString address; /* host or "host:port", ready for platinum-afp or smb:// */
+	QString address; /* host or "host:port", ready for zacos9-afp or smb:// */
 
 	bool operator==(const DiscoveredServer &o) const {
 		return kind == o.kind && address == o.address;

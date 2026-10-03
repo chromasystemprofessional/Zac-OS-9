@@ -1,4 +1,4 @@
-# CLAUDE.md — Platinum 2026
+# CLAUDE.md — ZacOS 9
 
 ## Architectural map
 
@@ -65,10 +65,10 @@ AFP_PASSWORD=macpass tests/sharing/afp-client.sh 127.0.0.1:5548 "Macintosh HD" "
 - Mac OS 9 AFP server: AFP 1.1–2.1, Cleartxt / Randnum / 2-Way Randnum auth.
 - Classic forwards Mac port 548 → localhost:5548 (`--redir tcp:5548::548`).
 - **Critical:** send each DSI message in a single `sendmsg()` with iovec. Mac OS 9's server misreads split messages.
-- Netatalk can't nest volumes: `[Homes]` must veto shared sub-folders (handled in `sharing/platinum-sharing-helper`).
-- Debug tracing: `PLATINUM_AFP_DEBUG=1 build/network/platinum-afp mount ...`
+- Netatalk can't nest volumes: `[Homes]` must veto shared sub-folders (handled in `sharing/zacos9-sharing-helper`).
+- Debug tracing: `ZACOS9_AFP_DEBUG=1 build/network/zacos9-afp mount ...`
 - **Never use `QProcess::waitForFinished()` in this codebase.** It deadlocked live in a Qt/Wayland GUI process even when the child process had already exited cleanly (confirmed from the server's own log). Use the `processEvents()`-loop pattern (`runSharingHelper`, `runAppstoreHelper`, `waitForProcess` in `shell/network/afpclient.cpp`) everywhere instead.
-- `platinum-afp`'s own argument parser doesn't recognize `--` as an end-of-options marker — it reads it as an unknown flag and refuses. Don't add one when building its command line.
+- `zacos9-afp`'s own argument parser doesn't recognize `--` as an end-of-options marker — it reads it as an unknown flag and refuses. Don't add one when building its command line.
 - `avahi-browse` takes at most one service type per invocation (two args = "Too many arguments", browses nothing); use `-a` and filter client-side. Also needs `-k` or it substitutes a friendly name for the type even with `-p`.
 - `gio mount`'s exit code is 0 whether or not the mount worked; go by stderr.
 

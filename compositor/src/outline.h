@@ -1,5 +1,5 @@
-#ifndef PLATINUM_OUTLINE_H
-#define PLATINUM_OUTLINE_H
+#ifndef ZACOS9_OUTLINE_H
+#define ZACOS9_OUTLINE_H
 
 #include <stdbool.h>
 #include <wlr/types/wlr_scene.h>

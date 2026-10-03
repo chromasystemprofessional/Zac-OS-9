@@ -1,12 +1,12 @@
-#ifndef PLATINUM_ICONS_H
-#define PLATINUM_ICONS_H
+#ifndef ZACOS9_ICONS_H
+#define ZACOS9_ICONS_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /*
- * Finder icons: Platinum 2026's own 32x32 and 16x16 pixel art
+ * Finder icons: ZacOS 9's own 32x32 and 16x16 pixel art
  * (assets/icons/platinum-icons.picon).
  */
 

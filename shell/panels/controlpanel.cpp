@@ -1,10 +1,10 @@
 /*
- * platinum-controlpanel: the Mouse, Keyboard, Sound and Monitors control
+ * zacos9-controlpanel: the Mouse, Keyboard, Sound and Monitors control
  * panels, one per run:
  *
- *   platinum-controlpanel mouse | keyboard | sound | monitors
+ *   zacos9-controlpanel mouse | keyboard | sound | monitors
  *
- * Each writes ~/.config/platinum/desktop.conf; platinum-wm applies the
+ * Each writes ~/.config/zacos9/desktop.conf; zacos9-wm applies the
  * mouse, keyboard and screen settings as they change (compositor/src/
  * prefs.c). System volume goes through PulseAudio/PipeWire (pactl).
  * TODO: the layouts are ours, built from HIG controls and spacing.
@@ -436,9 +436,9 @@ protected:
 	}
 
 private:
-	/* platinum-wm publishes the screens and their modes. */
+	/* zacos9-wm publishes the screens and their modes. */
 	void readOutputs() {
-		QFile f(qEnvironmentVariable("XDG_RUNTIME_DIR") + "/platinum-outputs-" +
+		QFile f(qEnvironmentVariable("XDG_RUNTIME_DIR") + "/zacos9-outputs-" +
 			qEnvironmentVariable("WAYLAND_DISPLAY"));
 		if (f.open(QIODevice::ReadOnly)) {
 			bool first = true;
@@ -486,13 +486,13 @@ private:
 /* ---- main --------------------------------------------------------------------------- */
 
 int main(int argc, char *argv[]) {
-	/* platinum-wm draws every frame; Qt must not add its own. */
+	/* zacos9-wm draws every frame; Qt must not add its own. */
 	qputenv("QT_WAYLAND_DISABLE_WINDOWDECORATION", "1");
 	const QString which = argc > 1 ? QString::fromUtf8(argv[1]) : QString("mouse");
 	QApplication app(argc, argv);
 	QApplication::setDoubleClickInterval(pl_double_click_ms());
-	/* Each panel is its own app to the menu bar (platinum-mouse...). */
-	QGuiApplication::setDesktopFileName("platinum-" + which);
+	/* Each panel is its own app to the menu bar (zacos9-mouse...). */
+	QGuiApplication::setDesktopFileName("zacos9-" + which);
 
 	std::unique_ptr<QWidget> panel;
 	if (which == "keyboard") {

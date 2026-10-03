@@ -34,7 +34,7 @@ enum class VKind {
 	Folder,     /* a curated folder; children come from the registry */
 	Backed,     /* stands for a real directory */
 	Apps,       /* generated: the installed applications */
-	Panels,     /* generated: Platinum's control panels */
+	Panels,     /* generated: ZacOS 9's control panels */
 	AppFolder,  /* generated: one application's folder */
 	Launcher,   /* generated: starts an application or a control panel */
 	Unix,       /* the real filesystem root, for inspecting Debian */
