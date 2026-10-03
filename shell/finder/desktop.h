@@ -88,6 +88,11 @@ private:
 	QTimer m_netVolumesTimer;
 	void refreshNetVolumes();
 
+	/* Block-device volumes mounted locally (USB, extra HDDs, optical
+	 * discs, SD cards). Updated via GVolumeMonitor signals. */
+	std::vector<std::unique_ptr<Item>> m_localVolumes;
+	void refreshLocalVolumes();
+
 	std::vector<std::unique_ptr<Item>> m_files; /* ~/Desktop */
 	QFileSystemWatcher m_watcher;
 };

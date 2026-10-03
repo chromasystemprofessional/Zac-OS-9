@@ -1,0 +1,163 @@
+/* Before anything of Qt's: Qt defines `signals` as a keyword macro, and
+ * GIO's D-Bus headers have a struct field of that name. */
+#include <gio/gio.h>
+
+#include "localvolumes.h"
+
+#include <QFileInfo>
+
+#include "netvolumes.h"
+
+/* Mount-point prefixes that are never user-browsable storage: kernel
+ * pseudo-filesystems, container overlays, snap loops, etc. */
+static bool isVirtualMountPath(const QString &path) {
+	/* /run, /sys, /proc, /dev: kernel/runtime paths. */
+	if (path.startsWith("/run") || path.startsWith("/sys") ||
+			path.startsWith("/proc") || path.startsWith("/dev")) {
+		return true;
+	}
+	/* Snap packages mount their squashfs images under /snap. */
+	if (path.startsWith("/snap/")) {
+		return true;
+	}
+	return false;
+}
+
+/* Is this mount point already covered by netVolumes()? */
+static bool isNetworkMount(const QString &path) {
+	for (const NetVolume &v : netVolumes()) {
+		if (v.path == path) {
+			return true;
+		}
+	}
+	return false;
+}
+
+std::vector<LocalVolume> localVolumes() {
+	std::vector<LocalVolume> out;
+
+	GVolumeMonitor *monitor = g_volume_monitor_get();
+	GList *mounts = g_volume_monitor_get_mounts(monitor);
+
+	for (GList *l = mounts; l; l = l->next) {
+		auto *mount = G_MOUNT(l->data);
+
+		/* Skip mounts without a real block-device volume backing (most
+		 * virtual filesystems have no GVolume). */
+		GVolume *vol = g_mount_get_volume(mount);
+		if (!vol) {
+			continue;
+		}
+
+		GFile *root = g_mount_get_root(mount);
+		char *rawPath = g_file_get_path(root);
+		g_object_unref(root);
+		if (!rawPath) {
+			g_object_unref(vol);
+			continue;
+		}
+		const QString path = QString::fromUtf8(rawPath);
+		g_free(rawPath);
+
+		/* Skip / (shown as the Unix disk via vfsUnixVolumeShown), known
+		 * virtual/kernel mount paths, and mounts already shown as
+		 * network volumes. */
+		if (path == "/" || isVirtualMountPath(path) || isNetworkMount(path)) {
+			g_object_unref(vol);
+			continue;
+		}
+
+		LocalVolume v;
+		v.path = path;
+		/* GMount's own name is already human-readable ("500 GB SSD",
+		 * the volume label, or the share name). Fall back to the
+		 * mount-point basename only when the name is empty. */
+		char *rawName = g_mount_get_name(mount);
+		v.name = rawName && *rawName ? QString::fromUtf8(rawName)
+			: QFileInfo(path).fileName();
+		g_free(rawName);
+		v.ejectable = g_mount_can_eject(mount) || g_volume_can_eject(vol);
+		g_object_unref(vol);
+		out.push_back(std::move(v));
+	}
+
+	g_list_free_full(mounts, g_object_unref);
+	g_object_unref(monitor);
+	return out;
+}
+
+/* ---- change notifications ----------------------------------------------- */
+
+static std::vector<std::function<void()>> g_cbs;
+static GVolumeMonitor *g_monitor = nullptr;
+
+static void dispatchChange(GVolumeMonitor *, gpointer, gpointer) {
+	for (auto &f : g_cbs) {
+		f();
+	}
+}
+
+void localVolumesOnChange(std::function<void()> f) {
+	g_cbs.push_back(std::move(f));
+	if (g_monitor) {
+		return;
+	}
+	g_monitor = g_volume_monitor_get();
+	/* The mount-added and mount-removed signals cover plug/unplug of USB
+	 * drives and mounting/unmounting any volume. The second parameter is
+	 * a GMount *; we ignore it and just re-query the full list. */
+	g_signal_connect(g_monitor, "mount-added",
+		G_CALLBACK(dispatchChange), nullptr);
+	g_signal_connect(g_monitor, "mount-removed",
+		G_CALLBACK(dispatchChange), nullptr);
+}
+
+/* ---- eject -------------------------------------------------------------- */
+
+static void onEjectDone(GObject *src, GAsyncResult *res, gpointer wasEject) {
+	GMount *mount = G_MOUNT(src);
+	GError *err = nullptr;
+	if (wasEject) {
+		g_mount_eject_with_operation_finish(mount, res, &err);
+	} else {
+		g_mount_unmount_with_operation_finish(mount, res, &err);
+	}
+	if (err) {
+		g_error_free(err);
+	}
+	/* GVolumeMonitor fires mount-removed on success, which triggers
+	 * the registered localVolumesOnChange callbacks automatically. */
+}
+
+bool localVolumeEject(const LocalVolume &v) {
+	GVolumeMonitor *monitor = g_volume_monitor_get();
+	GList *mounts = g_volume_monitor_get_mounts(monitor);
+	GMount *found = nullptr;
+	for (GList *l = mounts; l; l = l->next) {
+		auto *mount = G_MOUNT(l->data);
+		GFile *root = g_mount_get_root(mount);
+		char *path = g_file_get_path(root);
+		g_object_unref(root);
+		if (path && v.path == QString::fromUtf8(path)) {
+			found = G_MOUNT(g_object_ref(mount));
+		}
+		g_free(path);
+		if (found) {
+			break;
+		}
+	}
+	g_list_free_full(mounts, g_object_unref);
+	g_object_unref(monitor);
+	if (!found) {
+		return false;
+	}
+	if (v.ejectable && g_mount_can_eject(found)) {
+		g_mount_eject_with_operation(found, G_MOUNT_UNMOUNT_NONE, nullptr,
+			nullptr, onEjectDone, reinterpret_cast<gpointer>(1));
+	} else {
+		g_mount_unmount_with_operation(found, G_MOUNT_UNMOUNT_NONE, nullptr,
+			nullptr, onEjectDone, nullptr);
+	}
+	g_object_unref(found);
+	return true;
+}

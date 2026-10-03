@@ -18,6 +18,7 @@
 #include "fileops.h"
 #include "folderwindow.h"
 #include "menudraw.h"
+#include "localvolumes.h"
 #include "netvolumes.h"
 #include "patterns.h"
 #include "settings.h"
@@ -106,6 +107,9 @@ Desktop::Desktop() {
 	refreshNetVolumes();
 	m_netVolumesTimer.callOnTimeout([this] { refreshNetVolumes(); });
 	m_netVolumesTimer.start(NET_VOLUMES_POLL_MS);
+
+	refreshLocalVolumes();
+	localVolumesOnChange([this] { refreshLocalVolumes(); });
 }
 
 Desktop::~Desktop() {
@@ -170,10 +174,49 @@ void Desktop::refreshNetVolumes() {
 	update();
 }
 
+void Desktop::refreshLocalVolumes() {
+	const std::vector<LocalVolume> found = localVolumes();
+	/* Skip rebuild when nothing changed. */
+	if (found.size() == m_localVolumes.size()) {
+		bool same = true;
+		for (size_t i = 0; i < found.size() && same; i++) {
+			same = m_localVolumes[i]->path == found[i].path;
+		}
+		if (same) {
+			return;
+		}
+	}
+	QSet<QString> selected;
+	for (auto &item : m_localVolumes) {
+		if (item->selected) {
+			selected.insert(item->path);
+		}
+	}
+	std::vector<std::unique_ptr<Item>> fresh;
+	for (const LocalVolume &v : found) {
+		auto item = std::make_unique<Item>();
+		item->stateKey = "::local:" + v.path;
+		item->name = v.name;
+		item->path = v.path;
+		item->kind = PL_ICON_DISK;
+		item->isDir = true;
+		item->isLocalVolume = true;
+		item->ejectable = v.ejectable;
+		item->selected = selected.contains(v.path);
+		fresh.push_back(std::move(item));
+	}
+	m_localVolumes = std::move(fresh);
+	placeIcons();
+	update();
+}
+
 std::vector<Item *> Desktop::fixedItems() const {
 	std::vector<Item *> out = { m_disk.get() };
 	if (m_unix) {
 		out.push_back(m_unix.get());
+	}
+	for (auto &item : m_localVolumes) {
+		out.push_back(item.get());
 	}
 	for (auto &item : m_netVolumes) {
 		out.push_back(item.get());
@@ -185,6 +228,11 @@ std::vector<Item *> Desktop::fixedItems() const {
 bool Desktop::isFixed(const Item *item) const {
 	if (item == m_disk.get() || item == m_trash.get() || item == m_unix.get()) {
 		return true;
+	}
+	for (auto &v : m_localVolumes) {
+		if (v.get() == item) {
+			return true;
+		}
 	}
 	for (auto &v : m_netVolumes) {
 		if (v.get() == item) {

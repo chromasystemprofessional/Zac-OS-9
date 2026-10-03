@@ -11,6 +11,7 @@
 #include <QUrl>
 
 #include "fileops.h"
+#include "localvolumes.h"
 #include "netvolumes.h"
 #include "vfs.h"
 
@@ -379,6 +380,17 @@ void Finder::putAway() {
 	const QString info = QFileInfo(trash).absolutePath() + "/info";
 	QStringList changed;
 	for (Item *item : front()->selectedItems()) {
+		if (item->isLocalVolume) {
+			/* Fire async eject/unmount via GIO; GVolumeMonitor signals
+			 * mount-removed when done, refreshing the desktop. */
+			for (const LocalVolume &v : localVolumes()) {
+				if (v.path == item->path) {
+					localVolumeEject(v);
+					break;
+				}
+			}
+			continue;
+		}
 		if (item->isNetworkVolume) {
 			/* The same eject this gets from dragging it to the Trash
 			 * (fileops.cpp's dropItems): nothing here is a file of

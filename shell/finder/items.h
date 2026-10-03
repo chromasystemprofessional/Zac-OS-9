@@ -28,6 +28,11 @@ struct Item {
 	/* A folder shared from Get Info: drawn on a network line. */
 	bool shared = false;
 
+	/* A locally-mounted block-device volume (USB, extra HDD, optical
+	 * disc, SD card): Put Away ejects it via GIO when ejectable. */
+	bool isLocalVolume = false;
+	bool ejectable = false;
+
 	/* A mounted network volume (AFP or SMB) on the desktop: real files,
 	 * at a real path, but Put Away ejects it instead of trying to move
 	 * it anywhere — there is nothing on this computer to put away. Like
