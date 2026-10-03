@@ -1,21 +1,54 @@
-# ZacOS 9 boot splash: a white screen, nothing more. The kernel's
-# console is white too while booting (vt.default_* in iso/kernel-params),
-# so going from the splash to zacos9-wm is white to white; zacos9-wm
-# then shows the logo on white, and the Welcome screen.
+# ZacOS 9 boot splash: the logo on white, centred exactly where zacos9-wm
+# draws it next (compositor/src/startup.c), with a Platinum progress bar
+# below it. The kernel's console is white too (vt.default_* in
+# iso/kernel-params), so the whole boot stays white to white.
 
 Window.SetBackgroundTopColor(1, 1, 1);
 Window.SetBackgroundBottomColor(1, 1, 1);
 
-# A disk password, if one is needed: one plain line in the middle.
+cx = Window.GetX() + Math.Int(Window.GetWidth() / 2);
+cy = Window.GetY() + Math.Int(Window.GetHeight() / 2);
+
+logo.image = Image("logo.png");
+logo.sprite = Sprite(logo.image);
+logo.sprite.SetX(cx - Math.Int(logo.image.GetWidth() / 2));
+logo.sprite.SetY(cy - Math.Int(logo.image.GetHeight() / 2));
+
+box.image = Image("progress-box.png");
+box.sprite = Sprite(box.image);
+box.x = cx - Math.Int(box.image.GetWidth() / 2);
+box.y = cy + Math.Int(logo.image.GetHeight() / 2) + 40;
+box.sprite.SetPosition(box.x, box.y, 1);
+
+# The fill is one column of the bar's shading, stretched to the progress.
+fill.source = Image("progress-fill.png");
+fill.inner = box.image.GetWidth() - 4;
+fill.shown = 0;
+fill.sprite = Sprite();
+fill.sprite.SetPosition(box.x + 2, box.y + 2, 2);
+
+fun boot_progress_callback(duration, progress) {
+  w = Math.Int(progress * fill.inner);
+  if (w > fill.inner) {
+    w = fill.inner;
+  }
+  if (w > fill.shown) {
+    fill.sprite.SetImage(fill.source.Scale(w, fill.source.GetHeight()));
+    fill.shown = w;
+  }
+}
+Plymouth.SetBootProgressFunction(boot_progress_callback);
+
+# A disk password, if one is needed: one plain line under the bar.
 fun display_password_callback(prompt, bullets) {
-  box.image = Image.Text(prompt + "  " + bullets, 0, 0, 0);
-  box.sprite = Sprite(box.image);
-  box.sprite.SetX(Window.GetX() + Math.Int((Window.GetWidth() - box.image.GetWidth()) / 2));
-  box.sprite.SetY(Window.GetY() + Math.Int(Window.GetHeight() / 2));
+  pw.image = Image.Text(prompt + "  " + bullets, 0, 0, 0);
+  pw.sprite = Sprite(pw.image);
+  pw.sprite.SetX(cx - Math.Int(pw.image.GetWidth() / 2));
+  pw.sprite.SetY(box.y + 30);
 }
 Plymouth.SetDisplayPasswordFunction(display_password_callback);
 
 fun display_normal_callback() {
-  box.sprite = NULL;
+  pw.sprite = NULL;
 }
 Plymouth.SetDisplayNormalFunction(display_normal_callback);

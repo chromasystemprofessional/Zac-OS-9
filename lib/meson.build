@@ -9,6 +9,7 @@ platinum_lib = static_library('platinum',
   'widgets.c',
   'icons.c',
   'logo.c',
+  'welcome.c',
   'patterns.c',
   'settings.c',
   include_directories: platinum_inc,
@@ -51,6 +52,7 @@ test('menudraw',
 )
 test('text', executable('test-text', 'tests/test_text.c', dependencies: [platinum_dep]))
 test('draw', executable('test-draw', 'tests/test_draw.c', dependencies: [platinum_dep]))
+test('welcome', executable('test-welcome', 'tests/test_welcome.c', dependencies: [platinum_dep]))
 test('settings', executable('test-settings', 'tests/test_settings.c', dependencies: [platinum_dep]))
 test('widgets',
   executable('test-widgets', 'tests/test_widgets.c',

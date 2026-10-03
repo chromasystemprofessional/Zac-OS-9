@@ -1,0 +1,20 @@
+#!/bin/sh
+# /etc/grub.d/09_zacos9: GRUB's start-up screen on an installed ZacOS 9.
+#
+# The logo on white from the moment GRUB starts, where the boot splash
+# (boot/plymouth) and zacos9-wm go on showing it. The picture is made by
+# zacos9-install for this computer's screen (zacos9-bootlogo); without it
+# (an unusual install) GRUB keeps its usual look.
+#
+# Whatever GRUB prints on its own (its loading messages, and errors) is
+# white on the white screen, so nothing shows over the logo. The menu
+# (Shift or Esc held at start-up) keeps readable colours.
+[ -f /boot/grub/zacos9-logo.png ] || exit 0
+cat << 'EOF'
+insmod png
+background_color 255,255,255
+background_image -m stretch $prefix/zacos9-logo.png
+set color_normal=white/black
+set menu_color_normal=black/white
+set menu_color_highlight=white/blue
+EOF

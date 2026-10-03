@@ -68,23 +68,39 @@ is no password, and `sudo` works without one.
 - Logging out (or Ctrl+Alt+Backspace) shows the login screen.
 - Add `noautologin` to the boot line to start at the login screen.
 
-**Starting up.** No text shows, as on a classic Mac:
+**Starting up.** No text shows, as on a classic Mac, and the logo (where a
+classic Mac showed its start-up icon) is up as soon as the computer can draw it:
 
-1. **White.** GRUB waits 3 seconds on a white screen without a menu, then
-   the system starts.
+1. **GRUB: the logo on white,** from the moment GRUB starts. It waits 3
+   seconds on the live medium (none once installed) without a menu.
    - Press **Esc** (or Shift) during that time for the boot menu, which has
      the installer.
-2. **Still white.** The kernel and boot splash stay white too:
-   - Plymouth shows a white theme (`boot/plymouth`), which keeps its disk
-     password prompt.
-   - The kernel's console palette is all white while booting
-     (`iso/kernel-params`), so nothing written to it shows and no black
-     flashes up.
-   - `zacos9-console-colors.service` restores normal colours 20 seconds
-     after the desktop starts, so Ctrl+Alt+F2 consoles work.
-3. **The logo on white,** then the Welcome screen, then the desktop. Both
-   screens come from zacos9-wm (`compositor/src/startup.c`). greetd runs on
-   tty1, so going from the splash to the desktop is white to white.
+   - GRUB can only draw a background image at the screen's top left, so the
+     picture is the screen's own size with the logo placed in its middle
+     (`boot/zacos9-bootlogo`). The live medium fixes GRUB at 800x600 and
+     ships `iso/config/bootloaders/grub-pc/zacos9-boot.png` (and
+     `isolinux/splash.png`, 640x480, for BIOS); `zacos9-install` makes one
+     for the installed computer's own screen and sets GRUB to that mode
+     (`boot/09_zacos9` shows it; past 4K it is left out).
+   - GRUB's own messages and errors are white on the white screen, so none
+     show; the menu keeps readable colours. Regenerate the live pictures
+     with `tools/boot/make-boot-art.py`.
+2. **The boot splash: the same logo in the same place,** and a progress bar
+   under it (`boot/plymouth`, which keeps its disk password prompt). The
+   kernel's console palette is all white while booting (`iso/kernel-params`),
+   so nothing written to it shows and no black flashes up.
+   - `zacos9-console-colors.service` and `session/zacos9-greeter` restore
+     normal colours, so the login screen and Ctrl+Alt+F2 consoles read.
+3. **zacos9-wm: the logo on white** for half a second, then **the Welcome
+   box** - "Welcome to ZacOS 9", a picture of a modern computer
+   (`lib/welcome.c`) and a progress bar - over the desktop pattern, with the
+   extensions' icons marching in along the bottom of the screen as the bar
+   fills, then the desktop. Both screens come from `compositor/src/startup.c`.
+   greetd runs on tty1, so going from the splash to the desktop is white to
+   white.
+4. **Known gaps:** a second or so of plain white between GRUB and the
+   splash (the kernel's text console clears the screen when it starts) and
+   again before zacos9-wm draws, where the logo is gone for a moment.
 
 **Install.** The boot menu also offers Debian's installer:
 

@@ -1,0 +1,69 @@
+#!/usr/bin/env python3
+"""zacos9-bootlogo WIDTH HEIGHT OUT.png
+
+Writes a white WIDTH x HEIGHT PNG with the ZacOS 9 logo (64x64) in the
+middle: the screen GRUB shows from the moment it starts, until the boot
+splash (boot/plymouth) draws the same logo in the same place. GRUB can only
+draw a background image at the screen's top left, so the image is the
+screen's own size and the logo is placed in it here.
+
+Standard library only: the installer runs it on a live system with no
+imaging libraries. The logo itself is logo-64.rgb, 64x64 RGB already
+flattened onto white, next to this script or in /usr/share/zacos9/boot.
+"""
+import os
+import struct
+import sys
+import zlib
+
+LOGO = 64
+
+
+def find_logo():
+    here = os.path.dirname(os.path.abspath(__file__))
+    for d in (here, "/usr/share/zacos9/boot"):
+        p = os.path.join(d, "logo-64.rgb")
+        if os.path.exists(p):
+            return p
+    sys.exit("zacos9-bootlogo: logo-64.rgb not found")
+
+
+def chunk(kind, data):
+    body = kind + data
+    return struct.pack(">I", len(data)) + body + struct.pack(">I", zlib.crc32(body) & 0xFFFFFFFF)
+
+
+def write_png(path, width, height, logo):
+    x0, y0 = (width - LOGO) // 2, (height - LOGO) // 2
+    white = b"\x00" + b"\xff" * (3 * width)  # filter type 0, then the row
+    rows = []
+    for y in range(height):
+        if y0 <= y < y0 + LOGO:
+            row = logo[(y - y0) * LOGO * 3:(y - y0 + 1) * LOGO * 3]
+            rows.append(b"\x00" + b"\xff" * (3 * x0) + row + b"\xff" * (3 * (width - x0 - LOGO)))
+        else:
+            rows.append(white)
+    png = (b"\x89PNG\r\n\x1a\n"
+           + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
+           + chunk(b"IDAT", zlib.compress(b"".join(rows), 9))
+           + chunk(b"IEND", b""))
+    tmp = path + ".tmp"
+    with open(tmp, "wb") as f:
+        f.write(png)
+    os.replace(tmp, path)
+
+
+def main():
+    if len(sys.argv) != 4:
+        sys.exit(__doc__)
+    width, height = int(sys.argv[1]), int(sys.argv[2])
+    if not (LOGO <= width <= 8192 and LOGO <= height <= 8192):
+        sys.exit("zacos9-bootlogo: size out of range")
+    with open(find_logo(), "rb") as f:
+        logo = f.read()
+    if len(logo) != LOGO * LOGO * 3:
+        sys.exit("zacos9-bootlogo: logo-64.rgb is the wrong size")
+    write_png(sys.argv[3], width, height, logo)
+
+
+main()

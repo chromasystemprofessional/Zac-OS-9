@@ -1,12 +1,15 @@
 /*
  * The startup screen, as a classic Mac started up: first the logo on
  * white (the boot before it is all white too, see iso/kernel-params and
- * boot/plymouth), then, while the menu bar and the Finder start, a
- * "Welcome" box over the desktop pattern, with the logo and a progress
- * bar, as Mac OS 8 showed while it loaded. It lifts once both shell
- * components have put up their surfaces (or after STARTUP_MAX_MS).
+ * boot/plymouth, and GRUB shows the same logo in the same place before
+ * either), then, while the menu bar and the Finder start, the Welcome box
+ * over the desktop pattern: "Welcome to ZacOS 9", a picture of a computer
+ * (lib/welcome.c) and a progress bar, with the extensions' icons marching
+ * in along the bottom of the screen as it fills, as Mac OS 9 showed while
+ * it loaded. It lifts once both shell components have put up their
+ * surfaces (or after STARTUP_MAX_MS).
  *
- * The box layout is ours; TODO: the HIG doesn't show the Mac OS 8 one.
+ * The box layout is ours; TODO: the HIG doesn't show the Mac OS 9 one.
  * ZACOS9_STARTUP=0 turns the screen off.
  */
 #include <stdio.h>
@@ -24,17 +27,17 @@
 #include "settings.h"
 #include "startup.h"
 #include "text.h"
+#include "welcome.h"
 #include "widgets.h"
 
 #define TICK_MS 40
-#define LOGO_MS 1500 /* the logo on white, before the Welcome box */
-#define LOGO_SCALE 2
-/* Extension parade: icons march left-to-right during the logo phase. */
+#define LOGO_MS 500 /* the logo on white, before the Welcome box */
+/* The extensions' icons, along the bottom of the screen: one more each
+ * time the progress bar passes another seventh. */
 #define EXT_ICON_SIZE   32
-#define EXT_ICON_GAP    10  /* pixels between icons */
-#define EXT_ICON_BOTTOM 12  /* gap from screen bottom */
-#define EXT_FIRST_MS   300  /* first icon appears this many ms after start */
-#define EXT_STEP_MS    140  /* each subsequent icon appears this many ms later */
+#define EXT_ICON_GAP    8   /* pixels between icons */
+#define EXT_ICON_BOTTOM 12  /* gap from the screen's bottom */
+#define EXT_ICON_LEFT   16  /* gap from the screen's left */
 
 static const enum pl_icon_kind ext_icons[] = {
 	PL_ICON_EXT_OPENTRANSPORT,
@@ -50,9 +53,14 @@ static const enum pl_icon_kind ext_icons[] = {
 #define FILL_MS 2500 /* time to reach 90% while waiting */
 #define FINISH_MS 300 /* from "ready" to a full bar */
 #define HOLD_MS 250   /* the full bar stays up this long */
+/* The Welcome box: the title, the picture in a white well, the status
+ * line, the bar. */
 #define BOX_W 320
-#define BOX_H 168
+#define WELL_W 204
+#define WELL_H 156
+#define WELL_TOP 42
 #define BAR_W 220
+#define BOX_H (WELL_TOP + WELL_H + 26 + 10 + PL_PROGRESS_H + 24)
 
 static struct {
 	struct plat_server *server;
@@ -88,53 +96,41 @@ static double progress(long t) {
 	return p;
 }
 
-/* The logo at `scale`, top-left at (x, y). */
-static void paint_logo(struct pl_canvas *c, int x, int y, int scale) {
-	const int lw = PL_LOGO_SIZE * scale;
-	const uint32_t *logo = logo_pixels();
-	for (int ly = 0; ly < lw; ly++) {
-		for (int lx = 0; lx < lw; lx++) {
-			uint32_t v = logo[(ly / scale) * PL_LOGO_SIZE + lx / scale];
-			if (v >> 24) {
-				pl_put(c, x + lx, y + ly, v);
-			}
-		}
-	}
+/* The HQ logo (64×64), top-left at (x, y), blended with real alpha. */
+static void paint_logo(struct pl_canvas *c, int x, int y) {
+	pl_image_blend(c, x, y, logo_pixels_hq(), PL_LOGO_SIZE_HQ, PL_LOGO_SIZE_HQ, false);
 }
 
-static void draw_logo(int w, int h, long t) {
+static void draw_logo(int w, int h) {
 	struct plat_pixbuf *buf = pixbuf_create(w, h);
 	struct pl_canvas c = { .px = buf->data, .stride = w, .width = w, .height = h };
 	pl_fill(&c, 0, 0, w - 1, h - 1, C_WHITE);
-	const int lw = PL_LOGO_SIZE * LOGO_SCALE;
-	paint_logo(&c, (w - lw) / 2, (h - lw) / 2, LOGO_SCALE);
+	const int lw = PL_LOGO_SIZE_HQ;
+	paint_logo(&c, (w - lw) / 2, (h - lw) / 2);
 
-	/* Extension parade: icons appear one by one from left to right. */
-	long elapsed = t - st.start_ms;
-	int n_shown = 0;
-	if (elapsed >= EXT_FIRST_MS) {
-		n_shown = (int)((elapsed - EXT_FIRST_MS) / EXT_STEP_MS) + 1;
-		if (n_shown > N_EXT_ICONS) n_shown = N_EXT_ICONS;
+	wlr_scene_buffer_set_buffer(st.buffer, &buf->base);
+	wlr_buffer_drop(&buf->base);
+}
+
+/* The extensions' icons, left to right along the bottom. */
+static void paint_extensions(struct pl_canvas *c, int h, double fraction) {
+	int shown = (int)(fraction * (N_EXT_ICONS + 1));
+	if (shown > N_EXT_ICONS) {
+		shown = N_EXT_ICONS;
 	}
-	if (n_shown > 0) {
-		const int stride = EXT_ICON_SIZE + EXT_ICON_GAP;
-		const int total_w = N_EXT_ICONS * stride - EXT_ICON_GAP;
-		const int x0 = (w - total_w) / 2;
-		const int iy = h - EXT_ICON_SIZE - EXT_ICON_BOTTOM;
-		for (int i = 0; i < n_shown; i++) {
-			const uint32_t *px = pl_icon(ext_icons[i], EXT_ICON_SIZE);
-			const int ix = x0 + i * stride;
-			for (int py = 0; py < EXT_ICON_SIZE; py++) {
-				for (int ipx = 0; ipx < EXT_ICON_SIZE; ipx++) {
-					uint32_t v = px[py * EXT_ICON_SIZE + ipx];
-					if (v >> 24) pl_put(&c, ix + ipx, iy + py, v);
+	const int y = h - EXT_ICON_SIZE - EXT_ICON_BOTTOM;
+	for (int i = 0; i < shown; i++) {
+		const uint32_t *px = pl_icon(ext_icons[i], EXT_ICON_SIZE);
+		const int x = EXT_ICON_LEFT + i * (EXT_ICON_SIZE + EXT_ICON_GAP);
+		for (int py = 0; py < EXT_ICON_SIZE; py++) {
+			for (int ix = 0; ix < EXT_ICON_SIZE; ix++) {
+				const uint32_t v = px[py * EXT_ICON_SIZE + ix];
+				if (v >> 24) {
+					pl_put(c, x + ix, y + py, v);
 				}
 			}
 		}
 	}
-
-	wlr_scene_buffer_set_buffer(st.buffer, &buf->base);
-	wlr_buffer_drop(&buf->base);
 }
 
 static void draw(int w, int h, double fraction) {
@@ -153,16 +149,24 @@ static void draw(int w, int h, double fraction) {
 	pl_hline(&c, bx + 2, x1 - 1, y1 - 1, GRAY(0x9));
 	pl_vline(&c, x1 - 1, by + 2, y1 - 1, GRAY(0x9));
 
-	/* The logo at 3x. */
-	const int scale = 3, lw = PL_LOGO_SIZE * scale;
-	const int ly = by + 18;
-	paint_logo(&c, bx + (BOX_W - lw) / 2, ly, scale);
+	/* "Welcome to ZacOS 9". */
 	const int tw = st.title->ink_r - st.title->ink_l + 1;
-	pl_text(&c, st.title, bx + (BOX_W - tw) / 2, ly + lw + 22, C_BLACK);
+	pl_text(&c, st.title, bx + (BOX_W - tw) / 2, by + 28, C_BLACK);
+
+	/* The computer, in a white well. */
+	const int wx = bx + (BOX_W - WELL_W) / 2, wy = by + WELL_TOP;
+	pl_outline(&c, wx - 1, wy - 1, wx + WELL_W, wy + WELL_H, GRAY(0x6));
+	pl_fill(&c, wx, wy, wx + WELL_W - 1, wy + WELL_H - 1, C_WHITE);
+	pl_welcome_art(&c, wx + (WELL_W - PL_WELCOME_ART_W) / 2,
+		wy + (WELL_H - PL_WELCOME_ART_H) / 2, 1.0);
+
+	/* What it is doing, and how far it has got. */
 	const int sw = st.status->ink_r - st.status->ink_l + 1;
-	pl_text(&c, st.status, bx + (BOX_W - sw) / 2, ly + lw + 42, C_BLACK);
-	pl_progress_paint(&c, bx + (BOX_W - BAR_W) / 2, y1 - 30, BAR_W, fraction,
+	pl_text(&c, st.status, bx + (BOX_W - sw) / 2, wy + WELL_H + 24, C_BLACK);
+	pl_progress_paint(&c, bx + (BOX_W - BAR_W) / 2, wy + WELL_H + 34, BAR_W, fraction,
 		pl_accent_current());
+
+	paint_extensions(&c, h, fraction);
 
 	wlr_scene_buffer_set_buffer(st.buffer, &buf->base);
 	wlr_buffer_drop(&buf->base);
@@ -194,7 +198,7 @@ static int tick(void *data) {
 		if (welcome) {
 			draw(box.width, box.height, progress(t));
 		} else {
-			draw_logo(box.width, box.height, t);
+			draw_logo(box.width, box.height);
 		}
 	}
 	wl_event_source_timer_update(st.timer, TICK_MS);
@@ -210,7 +214,7 @@ void startup_begin(struct plat_server *server) {
 	st.start_ms = now_ms();
 	st.welcome_ms = st.start_ms + LOGO_MS;
 	st.pattern = chosen_pattern();
-	st.title = text_render_font("ZacOS 9", 1000, PL_FONT_SYSTEM);
+	st.title = text_render_font("Welcome to ZacOS 9", 1000, PL_FONT_SYSTEM);
 	st.status = text_render_font("Starting Up\xe2\x80\xa6", 1000, PL_FONT_VIEWS);
 	st.buffer = wlr_scene_buffer_create(server->overlay_layer, NULL);
 	st.timer = wl_event_loop_add_timer(wl_display_get_event_loop(server->display), tick, NULL);

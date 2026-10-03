@@ -47,8 +47,9 @@ def kind(path):
     menubar = all(full[x, 19] == (0, 0, 0) for x in range(0, w, 7))
     if menubar:
         return "desktop"
-    # The Welcome box: platinum grey in the middle of the screen.
-    if full[w // 2, h // 2] == (221, 221, 221):
+    # The Welcome box (picture in the middle, so look just inside its left
+    # edge): platinum grey, and the desktop pattern just outside it.
+    if full[w // 2 - 150, h // 2] == (221, 221, 221) and full[w // 2 - 170, h // 2] != (221, 221, 221):
         return "welcome"
     return "other"
 
