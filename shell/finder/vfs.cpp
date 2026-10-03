@@ -226,41 +226,20 @@ void addNode(const VNode &node) {
 	g_nodes.insert(node.id, node);
 }
 
-/* Each application becomes a folder holding its launcher, as a Macintosh
- * application lived in a folder of its own. Nothing is copied: the folder
- * and the launcher are entries in this model only. */
+/* Each application appears as a direct launcher in the parent folder.
+ * Nothing is copied: these are entries in this model only. */
 void generateApps(const VNode &parent) {
 	for (const AppEntry &app : appList()) {
 		if (!matchesCategories(app, parent)) {
 			continue;
 		}
-		VNode folder;
-		folder.id = parent.id + "/" + app.id;
-		folder.name = app.folderName;
-		folder.kind = VKind::AppFolder;
-		folder.icon = PL_ICON_FOLDER;
-		folder.appId = app.id;
-		addNode(folder);
-
 		VNode launcher;
-		launcher.id = folder.id + "/launch";
+		launcher.id = parent.id + "/" + app.id;
 		launcher.name = app.folderName;
 		launcher.kind = VKind::Launcher;
 		launcher.icon = PL_ICON_APPLICATION;
 		launcher.appId = app.id;
 		addNode(launcher);
-
-		for (const AppAction &action : app.actions) {
-			VNode item;
-			item.id = folder.id + "/action:" + action.id;
-			item.name = action.name;
-			item.kind = VKind::Launcher;
-			item.icon = PL_ICON_DOCUMENT;
-			item.appId = app.id;
-			item.actionId = action.id;
-			item.order = 1; /* after the application itself */
-			addNode(item);
-		}
 	}
 }
 
@@ -552,12 +531,14 @@ bool vfsCanDelete(const QString &path) {
 
 bool vfsIsAppFolder(const QString &path) {
 	const VNode *node = vfsNode(path);
-	return node && node->kind == VKind::AppFolder;
+	return node && node->kind == VKind::Launcher &&
+		!node->appId.isEmpty() && node->actionId.isEmpty();
 }
 
 bool vfsHideApplication(const QString &path) {
 	const VNode *node = vfsNode(path);
-	if (!node || node->kind != VKind::AppFolder) {
+	if (!node || node->kind != VKind::Launcher ||
+			node->appId.isEmpty() || !node->actionId.isEmpty()) {
 		return false;
 	}
 	setOverride(node->id, "hidden", true);

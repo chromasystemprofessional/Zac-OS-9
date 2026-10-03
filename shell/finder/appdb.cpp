@@ -238,6 +238,14 @@ void load() {
 		if (!g_app_info_should_show(info)) {
 			continue;
 		}
+		/* Only include apps that explicitly opt into this desktop with
+		 * OnlyShowIn=. An entry without it was not written for ZacOS 9
+		 * and would appear on every desktop. Applications is empty on a
+		 * fresh install and fills only as ZacOS9-native apps are added. */
+		if (!G_IS_DESKTOP_APP_INFO(info) ||
+				!g_desktop_app_info_has_key(G_DESKTOP_APP_INFO(info), "OnlyShowIn")) {
+			continue;
+		}
 		const QString id = fromUtf8(g_app_info_get_id(info));
 		const QString name = finderName(fromUtf8(g_app_info_get_name(info)));
 		if (id.isEmpty() || name.isEmpty()) {

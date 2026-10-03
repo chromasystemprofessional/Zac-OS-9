@@ -43,11 +43,12 @@ static void writeEntry(const QString &dir, const QString &file, const QString &b
 	}
 }
 
-/* An ordinary application entry. */
+/* An ordinary application entry. All test entries opt into this desktop
+ * explicitly; without OnlyShowIn=ZacOS9 they would be filtered out. */
 static QString entry(const QString &name, const QString &exec = "/bin/true",
 		const QString &extra = QString()) {
 	return "[Desktop Entry]\nType=Application\nName=" + name +
-		"\nExec=" + exec + "\n" + extra;
+		"\nExec=" + exec + "\nOnlyShowIn=ZacOS9;\n" + extra;
 }
 
 /* Give GIO's file monitors time to be served: it drops its cached list
@@ -109,14 +110,20 @@ int main(int argc, char **argv) {
 	writeEntry(appsDir, "simpletext.desktop", entry("SimpleText"));
 	writeEntry(appsDir, "calculator.desktop",
 		entry("Calculator", "/bin/true", "Categories=Utility;\n"));
-	/* Every way an entry asks not to be shown. */
-	writeEntry(appsDir, "hidden.desktop", entry("Hidden One", "/bin/true", "Hidden=true\n"));
+	/* Every way an entry asks not to be shown. These are written without
+	 * the entry() helper since they deliberately lack OnlyShowIn=ZacOS9. */
+	writeEntry(appsDir, "hidden.desktop",
+		"[Desktop Entry]\nType=Application\nName=Hidden One\n"
+		"Exec=/bin/true\nHidden=true\n");
 	writeEntry(appsDir, "nodisplay.desktop",
-		entry("NoDisplay One", "/bin/true", "NoDisplay=true\n"));
+		"[Desktop Entry]\nType=Application\nName=NoDisplay One\n"
+		"Exec=/bin/true\nNoDisplay=true\n");
 	writeEntry(appsDir, "othershell.desktop",
-		entry("Only Elsewhere", "/bin/true", "OnlyShowIn=GNOME;\n"));
+		"[Desktop Entry]\nType=Application\nName=Only Elsewhere\n"
+		"Exec=/bin/true\nOnlyShowIn=GNOME;\n");
 	writeEntry(appsDir, "notus.desktop",
-		entry("Not Here", "/bin/true", "NotShowIn=ZacOS9;\n"));
+		"[Desktop Entry]\nType=Application\nName=Not Here\n"
+		"Exec=/bin/true\nNotShowIn=ZacOS9;\n");
 	writeEntry(appsDir, "missingbin.desktop",
 		entry("Missing Binary", "/bin/true", "TryExec=/nonexistent/program\n"));
 	settle();
@@ -155,24 +162,16 @@ int main(int argc, char **argv) {
 	check(panels.contains("Appearance") && panels.contains("File Sharing") &&
 		panels.contains("TCP/IP"), "Control Panels lists the control panels");
 
-	/* ---- an application is a folder holding a launcher ---------------- */
-	QStringList inside = namesIn(appFolder("simpletext.desktop"));
-	check(inside == QStringList{ "SimpleText" },
-		"an application folder holds one launcher, named for the application");
-	const VNode *launcher = vfsNode(vfsPathFor("applications/simpletext.desktop/launch"));
+	/* ---- an application appears as a direct launcher in Applications --- */
+	const VNode *launcher = vfsNode(vfsPathFor("applications/simpletext.desktop"));
 	check(launcher && launcher->kind == VKind::Launcher &&
-		launcher->icon == PL_ICON_APPLICATION, "the launcher is an application item");
+		launcher->icon == PL_ICON_APPLICATION, "an application is a direct launcher");
 	check(launcher && launcher->appId == "simpletext.desktop",
 		"identity is the desktop file id, not the display name");
+	check(namesIn(appFolder("simpletext.desktop")).empty(),
+		"a launcher has no children of its own");
 
-	/* Desktop Actions appear beside the application. */
-	writeEntry(appsDir, "browser.desktop",
-		entry("Browser", "/bin/true",
-			"Actions=NewWindow;\n\n[Desktop Action NewWindow]\n"
-			"Name=New Window\nExec=/bin/true\n"));
-	settle();
-	check(namesIn(appFolder("browser.desktop")).contains("New Window"),
-		"a Desktop Action appears in the application's folder");
+	writeEntry(appsDir, "browser.desktop", entry("Browser", "/bin/true"));
 
 	/* ---- where an application came from --------------------------------- */
 	/* /bin/true is owned by coreutils on Debian; a real package lookup,
@@ -278,29 +277,24 @@ int main(int argc, char **argv) {
 
 	/* ---- what the Finder allows --------------------------------------- */
 	const QString appsPath = vfsPathFor("applications");
-	const QString launchPath = vfsPathFor("applications/browser.desktop/launch");
-	check(!vfsCanDelete(appFolder("browser.desktop")),
-		"an application folder can't be thrown away");
+	const QString appPath = appFolder("browser.desktop"); /* the launcher itself */
+	check(!vfsCanDelete(appPath), "an application can't be thrown away");
 	check(!vfsCanDelete(appsPath), "the Applications folder can't be thrown away");
 	check(!vfsCanDelete(vfsPathFor("system-folder")),
 		"the System Folder can't be thrown away");
 	check(!vfsAcceptsDrops(appsPath), "Applications takes no drops");
 	check(!vfsAcceptsDrops(vfsPathFor("system-folder")), "the System Folder takes no drops");
 	check(vfsAcceptsDrops(vfsPathFor("documents")), "Documents takes drops");
-	check(vfsCanRename(launchPath), "an application can be renamed");
-	check(!vfsCanRename(vfsPathFor("applications/browser.desktop/action:NewWindow")),
-		"a Desktop Action can't be renamed on its own");
+	check(vfsCanRename(appPath), "an application can be renamed");
 
 	/* ---- hiding an application (never uninstalling it) ----------------- */
-	check(vfsIsAppFolder(appFolder("browser.desktop")),
-		"an application's folder is recognized as one");
+	check(vfsIsAppFolder(appPath), "an application launcher is recognized as one");
 	check(!vfsIsAppFolder(appsPath), "the Applications folder itself is not");
-	check(!vfsIsAppFolder(launchPath), "neither is the launcher inside the folder");
-	check(vfsSetLabel(launchPath, 3), "give it a label, to check it isn't lost");
-	check(vfsHideApplication(appFolder("browser.desktop")), "an application can be hidden");
+	check(vfsSetLabel(appPath, 3), "give it a label, to check it isn't lost");
+	check(vfsHideApplication(appPath), "an application can be hidden");
 	apps = namesIn(vfsPathFor("applications"));
 	check(!apps.contains("Browser"), "a hidden application no longer appears");
-	check(vfsNode(appFolder("browser.desktop")) != nullptr,
+	check(vfsNode(appPath) != nullptr,
 		"but its node, and so its remembered label and position, still exist");
 	vfsRefresh();
 	apps = namesIn(vfsPathFor("applications"));
@@ -308,13 +302,11 @@ int main(int argc, char **argv) {
 	vfsShowAllHidden();
 	apps = namesIn(vfsPathFor("applications"));
 	check(apps.contains("Browser"), "Show All Applications brings it back");
-	check(vfsLabel(launchPath) == 3, "bringing it back did not also clear its label");
+	check(vfsLabel(appPath) == 3, "bringing it back did not also clear its label");
 	check(!vfsHideApplication(appsPath), "the Applications folder itself can't be hidden");
-	check(!vfsHideApplication(launchPath),
-		"hiding targets the folder, not the launcher inside it, directly");
 
 	/* ---- Get Info reads the real thing an item stands for -------------- */
-	check(vfsRealCounterpart(launchPath).endsWith("browser.desktop"),
+	check(vfsRealCounterpart(appPath).endsWith("browser.desktop"),
 		"Get Info on an application reads its desktop entry");
 	check(vfsRealCounterpart(vfsPathFor("documents")).startsWith(root),
 		"Get Info on Documents reads its real directory");
@@ -334,20 +326,20 @@ int main(int argc, char **argv) {
 		"a folder standing for a directory has no virtual children");
 
 	/* ---- renames and labels persist ----------------------------------- */
-	check(vfsRename(launchPath, "Web Browser"), "an application can be renamed");
-	check(vfsName(launchPath) == "Web Browser", "the new name is used");
-	check(vfsSetLabel(launchPath, 2), "a label can be set on it");
-	check(vfsLabel(launchPath) == 2, "and read back");
-	check(!vfsRename(launchPath, "   "), "an empty name is refused");
+	check(vfsRename(appPath, "Web Browser"), "an application can be renamed");
+	check(vfsName(appPath) == "Web Browser", "the new name is used");
+	check(vfsSetLabel(appPath, 2), "a label can be set on it");
+	check(vfsLabel(appPath) == 2, "and read back");
+	check(!vfsRename(appPath, "   "), "an empty name is refused");
 
 	/* A rename doesn't move the item: its id, and so its icon's place
 	 * and its window, stay as they were. */
-	check(vfsNode(launchPath) != nullptr, "the renamed item keeps its id");
+	check(vfsNode(appPath) != nullptr, "the renamed item keeps its id");
 
 	/* Reload from the registry file, as a fresh Finder would. */
 	vfsRefresh();
-	check(vfsName(launchPath) == "Web Browser", "the rename outlasts a reload");
-	check(vfsLabel(launchPath) == 2, "the label outlasts a reload");
+	check(vfsName(appPath) == "Web Browser", "the rename outlasts a reload");
+	check(vfsLabel(appPath) == 2, "the label outlasts a reload");
 	check(QFile::exists(vfsRegistryPath()), "the registry was written");
 	check(vfsRegistryPath().startsWith(root),
 		"the registry is in the user's own data directory");
@@ -365,19 +357,17 @@ int main(int argc, char **argv) {
 	settle();
 	apps = namesIn(vfsPathFor("applications"));
 	check(!apps.contains("Calculator"), "an uninstalled application goes away");
-	check(apps.contains("Browser") && apps.contains("SimpleText Override"),
+	check(apps.contains("Web Browser") && apps.contains("SimpleText Override"),
 		"and the others stay");
 	check(vfsNode(appFolder("calculator.desktop")) == nullptr,
-		"its folder goes with it");
-	/* Renaming the launcher renames the application, not the folder
-	 * around it, as on a Mac where they are separate things. */
-	check(vfsName(launchPath) == "Web Browser" && apps.contains("Browser"),
-		"renaming an application leaves its folder's name alone");
+		"its node goes with it");
+	check(vfsName(appPath) == "Web Browser" && apps.contains("Web Browser"),
+		"a rename persists across the uninstall of another application");
 
 	/* A rename kept for an application that has gone is harmless. */
 	QFile::remove(appsDir + "/browser.desktop");
 	settle();
-	check(vfsNode(launchPath) == nullptr, "a removed application's launcher goes too");
+	check(vfsNode(appPath) == nullptr, "a removed application's node goes too");
 	vfsRefresh();
 	check(true, "a rename left over for a removed application does no harm");
 
