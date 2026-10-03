@@ -8,5 +8,16 @@ systemctl set-default graphical.target
 systemctl mask getty@tty1.service
 # File sharing starts off; the File Sharing control panel turns it on.
 systemctl disable netatalk.service smbd.service nmbd.service wsdd2.service 2>/dev/null || true
+# Auto-launch the installer when booting from the live medium.
+# The autostart entry checks for /run/live (set by live-boot) so it only
+# fires on live sessions, not on the installed system.
+mkdir -p /etc/xdg/autostart
+cat > /etc/xdg/autostart/zacos9-installer.desktop << 'EOF'
+[Desktop Entry]
+Type=Application
+Name=ZacOS 9 Installer
+Exec=sh -c 'test -d /run/live && exec zacos9-installer'
+OnlyShowIn=ZacOS9;
+EOF
 # The splash theme and settings into the initramfs.
 update-initramfs -u

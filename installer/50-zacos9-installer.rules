@@ -1,0 +1,9 @@
+// The live session user may install ZacOS 9 without a password: there is
+// no polkit agent running on this desktop to prompt for one, and the
+// installer only runs when booted from the install medium.
+polkit.addRule(function(action, subject) {
+	if (action.id == "org.zacos9.installer" &&
+			subject.local && subject.active && subject.isInGroup("sudo")) {
+		return polkit.Result.YES;
+	}
+});

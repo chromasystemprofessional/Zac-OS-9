@@ -18,6 +18,7 @@ Updated: 2026-10-03
 | `996b311` | Applications: empty on fresh install, flat launchers |
 | `634add8` | Finder: local disk volumes on the desktop (GVolumeMonitor) |
 | `8771336` | Windows app compatibility: `.exe`/`.msi` open via Wine |
+| *(uncommitted)* | Mac OS 9-style installer: Welcome → Select Disk → Installing → Done, runs `zacos9-install` via polkit |
 
 ## Current work
 

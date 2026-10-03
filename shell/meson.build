@@ -242,6 +242,16 @@ executable('zacos9-controlpanel',
   install: true,
 )
 
+executable('zacos9-installer',
+  'installer/main.cpp',
+  'installer/installer.cpp',
+  link_with: panelkit,
+  include_directories: include_directories('finder', 'panels'),
+  dependencies: [platinum_dep, qt6],
+  cpp_args: ['-std=c++17'],
+  install: true,
+)
+
 # vptr: scripted pointer (press/drag/release) for UI tests.
 vptr_protocol = []
 foreach kind : [['client-header', '@BASENAME@-client-protocol.h'], ['private-code', '@BASENAME@-protocol.c']]
