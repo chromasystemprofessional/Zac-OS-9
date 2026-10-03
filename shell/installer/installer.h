@@ -20,9 +20,10 @@
  */
 
 struct DiskEntry {
-	QString device;   /* /dev/sda, /dev/nvme0n1, … */
+	QString device;   /* /dev/sda or /dev/sda2 */
 	QString size;     /* human-readable, e.g. "500G" */
-	QString model;    /* drive model, may be empty */
+	QString model;    /* drive model for disks; filesystem type for partitions */
+	bool isDisk;      /* true = whole disk (erase), false = single partition */
 	QString label() const;
 };
 
@@ -33,7 +34,9 @@ public:
 protected:
 	void paintEvent(QPaintEvent *) override;
 	void mousePressEvent(QMouseEvent *) override;
+	void mouseMoveEvent(QMouseEvent *) override;
 	void mouseReleaseEvent(QMouseEvent *) override;
+	void wheelEvent(QWheelEvent *) override;
 	void keyPressEvent(QKeyEvent *) override;
 
 private:
@@ -47,11 +50,14 @@ private:
 	std::vector<DiskEntry> m_disks;
 	PanelList m_diskList;
 	PanelButton m_install;
+	PanelEdit m_diskName; /* what the installed disk is called */
+	PanelHost m_host{ this }; /* the name field's caret, typing, Tab */
 
 	/* Installing screen */
 	QProcess *m_installProcess = nullptr;
 	double m_progress = 0.0;
 	QString m_status;
+	QString m_lastOutput; /* last non-protocol line from the helper, shown on failure */
 	int m_step = 0;
 
 	/* Done screen */

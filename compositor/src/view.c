@@ -164,8 +164,18 @@ void view_focus(struct plat_view *view) {
 		server->focused_view = view;
 		set_active(view, true);
 	}
-	/* While the menu bar tracks a menu it keeps the keyboard. */
-	if (!server->focused_layer) {
+	/* While the menu bar tracks a menu (an exclusive layer) it keeps the
+	 * keyboard. A shell surface that merely had it - the desktop, after a
+	 * click or a drag on it - gives it up to the window coming forward, as
+	 * a click in a window already makes it (input.c), so a window opened
+	 * then (an alert, say) gets its keys. */
+	struct plat_layer_surface *fl = server->focused_layer;
+	if (fl && fl->layer_surface->current.keyboard_interactive !=
+			ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_EXCLUSIVE) {
+		server->focused_layer = NULL;
+		fl = NULL;
+	}
+	if (!fl) {
 		input_keyboard_enter(server, view->impl->get_surface(view));
 	}
 }

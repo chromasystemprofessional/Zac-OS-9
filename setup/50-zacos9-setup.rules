@@ -1,0 +1,11 @@
+// The first-run account (made by zacos9-install, removed once setup is
+// done) may run the Setup Assistant's helper without a password: it is
+// the only account on a freshly installed computer, and there is no
+// polkit agent on this desktop to ask. The helper itself refuses to run
+// once the computer is set up.
+polkit.addRule(function(action, subject) {
+	if (action.id == "org.zacos9.setup" && subject.user == "zacos9-setup" &&
+			subject.local && subject.active) {
+		return polkit.Result.YES;
+	}
+});

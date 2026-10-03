@@ -1,0 +1,109 @@
+#!/bin/sh
+# zacos9-setup-helper: finish a freshly installed ZacOS 9 from the Setup
+# Assistant (shell/setup). Runs as root through pkexec, only for the
+# first-run account (50-zacos9-setup.rules), and only while
+# /var/lib/zacos9/setup-pending exists.
+#
+# Reads KEY=VALUE lines on stdin (so the password never appears in a
+# process list):
+#   fullname  username  password  computername  hostname  timezone  autologin (0/1)
+# Prints "error MESSAGE" and exits non-zero on a problem, else "done".
+# Then, moments later, restarts the login (into the new account, if it
+# logs in automatically) and removes the first-run account.
+set -eu
+
+FLAG=/var/lib/zacos9/setup-pending
+SETUP_USER=zacos9-setup
+GREETD=/etc/greetd/config.toml
+
+fail() { echo "error $*"; exit 1; }
+
+[ "$(id -u)" = 0 ] || fail "Must run as root"
+[ -e "$FLAG" ] || fail "This computer is already set up"
+
+fullname= username= password= computername= hostname= timezone= autologin=0
+while IFS= read -r line; do
+	value=${line#*=}
+	case $line in
+	fullname=*) fullname=$value ;;
+	username=*) username=$value ;;
+	password=*) password=$value ;;
+	computername=*) computername=$value ;;
+	hostname=*) hostname=$value ;;
+	timezone=*) timezone=$value ;;
+	autologin=*) autologin=$value ;;
+	esac
+done
+
+# ---------- validate everything before changing anything ----------
+printf '%s' "$username" | grep -Eqx '[a-z][a-z0-9_-]{0,31}' ||
+	fail "The short name must start with a letter and use only a-z, 0-9, - and _"
+[ "$username" != "$SETUP_USER" ] && [ "$username" != root ] ||
+	fail "That short name is reserved"
+! getent passwd "$username" >/dev/null || fail "There is already an account named $username"
+[ -n "$fullname" ] || fail "A name is needed"
+case $fullname in *:* | *,*) fail "The name can't contain : or ," ;; esac
+[ -n "$password" ] || fail "A password is needed"
+printf '%s' "$hostname" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?' ||
+	fail "Not a usable network name: $hostname"
+[ -n "$computername" ] || computername=$hostname
+case $timezone in
+'') ;;
+*..* | /* | *[!A-Za-z0-9_+/-]*) fail "Not a time zone: $timezone" ;;
+*) [ -f "/usr/share/zoneinfo/$timezone" ] || fail "Not a time zone: $timezone" ;;
+esac
+case $autologin in 0 | 1) ;; *) fail "autologin must be 0 or 1" ;; esac
+
+# ---------- the account: an administrator, like the live user was ----------
+groups=
+for g in sudo audio cdrom dip floppy video plugdev netdev scanner bluetooth users render input lpadmin; do
+	getent group "$g" >/dev/null && groups="${groups:+$groups,}$g"
+done
+useradd --create-home --shell /bin/bash --comment "$fullname" --groups "$groups" "$username" ||
+	fail "Could not create the account"
+printf '%s:%s\n' "$username" "$password" | chpasswd || fail "Could not set the password"
+
+# ---------- computer name ----------
+hostnamectl set-hostname "$hostname" 2>/dev/null || echo "$hostname" > /etc/hostname
+hostnamectl set-hostname --pretty "$computername" 2>/dev/null || true
+if grep -q '^127\.0\.1\.1' /etc/hosts; then
+	sed -i "s/^127\.0\.1\.1.*/127.0.1.1\t$hostname/" /etc/hosts
+else
+	printf '127.0.1.1\t%s\n' "$hostname" >> /etc/hosts
+fi
+
+# ---------- time zone ----------
+if [ -n "$timezone" ]; then
+	timedatectl set-timezone "$timezone" 2>/dev/null ||
+		ln -sf "/usr/share/zoneinfo/$timezone" /etc/localtime
+fi
+
+# ---------- login ----------
+# The new account is logged straight in now either way, as the Mac's
+# assistant went straight to the desktop. Without automatic login, that
+# entry comes out again once greetd has used it, so the next start-up
+# asks for the password.
+sed -i '/^\[initial_session\]/,$d' "$GREETD"
+printf '\n[initial_session]\ncommand = "zacos9-session"\nuser = "%s"\n' "$username" >> "$GREETD"
+if [ "$autologin" = 1 ]; then
+	forget_autologin=
+else
+	forget_autologin="sed -i '/^\\[initial_session\\]/,\$d' $GREETD"
+fi
+
+rm -f "$FLAG"
+echo "done"
+
+# Leave the Setup Assistant a moment to show it's finished, then restart
+# the login (ending this first-run session) and remove the first-run
+# account. greetd starts its initial_session only once per boot, which it
+# records in /run/greetd.run; without that file it logs the new account in.
+systemd-run --quiet --collect --on-active=3 --unit=zacos9-setup-finish /bin/sh -c "
+	rm -f /run/greetd.run
+	systemctl restart greetd
+	sleep 2
+	$forget_autologin
+	loginctl terminate-user $SETUP_USER 2>/dev/null
+	sleep 2
+	userdel --force --remove $SETUP_USER 2>/dev/null
+" >/dev/null 2>&1 || true

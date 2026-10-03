@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Installer
+Comment=Install ZacOS 9 on a hard disk
+Exec=zacos9-installer
+NoDisplay=true
+OnlyShowIn=ZacOS9;

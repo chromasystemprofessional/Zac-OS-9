@@ -38,3 +38,15 @@ pkexec
 
 # The boot splash
 plymouth
+
+# The installer's boot loader (zacos9-install): GRUB for both UEFI and
+# BIOS computers. The -bin packages hold the boot images without
+# claiming the live system's own boot, so both kinds can be installed.
+grub2-common
+grub-efi-amd64-bin
+grub-pc-bin
+efibootmgr
+
+# AppImages (installed by dropping them onto Applications) mount
+# themselves through FUSE 2.
+libfuse2t64

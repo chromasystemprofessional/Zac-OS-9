@@ -10,3 +10,10 @@ systemctl mask getty@tty1.service
 systemctl disable netatalk.service smbd.service nmbd.service wsdd2.service 2>/dev/null || true
 # The splash theme and settings into the initramfs.
 update-initramfs -u
+# The applications the system comes with (desktop file IDs: path under
+# applications/ with / as -). The Finder's Applications folder shows only
+# what is installed later (shell/finder/appdb.cpp).
+mkdir -p /usr/share/zacos9
+find /usr/share/applications /usr/local/share/applications -name '*.desktop' 2>/dev/null |
+	sed -e 's|^/usr/local/share/applications/||' -e 's|^/usr/share/applications/||' -e 's|/|-|g' |
+	sort -u > /usr/share/zacos9/base-applications

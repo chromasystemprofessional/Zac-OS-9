@@ -214,11 +214,14 @@ int main(int argc, char *argv[]) {
 	startup_begin(&server);
 	spawn_component("ZACOS9_MENUBAR", "zacos9-menubar");
 	spawn_component("ZACOS9_FINDER", "zacos9-finder");
-	/* On a live medium, open the installer automatically. */
+	/* On a live medium, open the installer automatically; on a freshly
+	 * installed system (zacos9-install leaves the flag), the Setup Assistant. */
 	{
 		struct stat st_live;
 		if (stat("/run/live", &st_live) == 0 && S_ISDIR(st_live.st_mode)) {
 			spawn("exec zacos9-installer");
+		} else if (access("/var/lib/zacos9/setup-pending", F_OK) == 0) {
+			spawn("exec zacos9-setup");
 		}
 	}
 	if (startup_cmd) {

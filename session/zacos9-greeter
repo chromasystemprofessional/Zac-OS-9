@@ -1,0 +1,8 @@
+#!/bin/sh
+# zacos9-greeter: the login screen greetd shows (/etc/greetd/config.toml).
+# The console palette is all white while starting up (vt.default_* in the
+# kernel arguments, so no text shows over the white boot); give it its
+# normal colours back first, or the login screen draws white on white.
+# setvtrgb works on the greeter's own console without root.
+setvtrgb vga 2>/dev/null
+exec tuigreet --time --remember --asterisks --greeting 'Welcome to ZacOS 9' --cmd zacos9-session

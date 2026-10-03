@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Setup Assistant
+Comment=Set up this computer after installing ZacOS 9
+Exec=zacos9-setup
+NoDisplay=true
+OnlyShowIn=ZacOS9;

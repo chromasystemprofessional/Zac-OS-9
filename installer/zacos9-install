@@ -1,13 +1,18 @@
 #!/bin/sh
-# zacos9-install: install ZacOS 9 from a live session to a hard disk.
+# zacos9-install: install ZacOS 9 from a live session to a hard disk or partition.
 #
-#   zacos9-install DEVICE
+#   zacos9-install DEVICE [NAME]
 #
-# DEVICE is a block device path such as /dev/sda or /dev/nvme0n1.
-# Must run as root (via pkexec). Progress is reported on stdout as
-# lines of the form:
+# NAME is what the installed disk is called in the Finder (default
+# Zacintosh HD); it is also the filesystem's label, cut to ext4's 16 bytes.
 #
-#   step N LABEL    — starting step N (of 6), with a short description
+# DEVICE may be a whole disk (/dev/sda) or an existing partition (/dev/sda2).
+# Whole disk: the disk is repartitioned (GPT + ESP + root) and erased.
+# Partition:  only the named partition is formatted (ext4); the existing
+#             EFI System Partition on the same disk is reused for grub.
+#
+# Must run as root (via pkexec). Progress is reported on stdout as:
+#   step N LABEL    — starting step N (of 6)
 #   done            — installation complete
 #   error MESSAGE   — fatal error
 #
@@ -19,13 +24,35 @@ TARGET=/mnt/zacos9-install-target
 
 # ---------- validate the device ----------
 device=$1
+disk_name=${2:-Zacintosh HD}
+case $disk_name in
+'' | *:* | */*)
+	echo "error The disk's name can't be empty or contain : or /"
+	exit 1
+	;;
+esac
+if [ "${#disk_name}" -gt 27 ] || printf '%s' "$disk_name" | grep -q '[[:cntrl:]]'; then
+	echo "error The disk's name must be 27 characters or fewer"
+	exit 1
+fi
+fs_label=$(printf '%s' "$disk_name" | head -c 16)
+# Whole disks first, then partitions (sdaN, sdaNN, nvme0n1pN, mmcblk0pN).
+# No comments inside the pattern list: a "\" continuation would swallow them.
 case $device in
-/dev/sd[a-z] | /dev/sd[a-z][a-z] | /dev/hd[a-z] | \
-/dev/vd[a-z] | /dev/xvd[a-z] | /dev/nvme[0-9]n[0-9] | \
-/dev/mmcblk[0-9])
+/dev/sd[a-z]            | /dev/sd[a-z][a-z]         | \
+/dev/hd[a-z]            | /dev/vd[a-z]               | \
+/dev/xvd[a-z]           | /dev/nvme[0-9]n[0-9]       | \
+/dev/mmcblk[0-9]        | \
+/dev/sd[a-z][0-9]       | /dev/sd[a-z][0-9][0-9]     | \
+/dev/sd[a-z][a-z][0-9]  | /dev/sd[a-z][a-z][0-9][0-9] | \
+/dev/hd[a-z][0-9]       | /dev/hd[a-z][0-9][0-9]     | \
+/dev/vd[a-z][0-9]       | /dev/vd[a-z][0-9][0-9]     | \
+/dev/xvd[a-z][0-9]      | /dev/xvd[a-z][0-9][0-9]    | \
+/dev/nvme[0-9]n[0-9]p[0-9]  | /dev/nvme[0-9]n[0-9]p[0-9][0-9] | \
+/dev/mmcblk[0-9]p[0-9]  | /dev/mmcblk[0-9]p[0-9][0-9])
 	;;
 *)
-	echo "error Not a recognised block device: $device" >&2
+	echo "error Not a recognised block device: $device"
 	exit 1
 	;;
 esac
@@ -34,44 +61,98 @@ if ! [ -b "$device" ]; then
 	exit 1
 fi
 
-# Determine partition suffix: nvme/mmcblk use pN, others use N.
-case $device in
-*nvme* | *mmcblk*) part_suffix=p ;;
-*) part_suffix= ;;
-esac
-efi_part="${device}${part_suffix}1"
-root_part="${device}${part_suffix}2"
-
+# Any command that fails ends the install; the installer window shows the
+# "error" line naming the step it was on (and the line before it).
+step_label=Setup
+reported=
+step() { step_label=$2; echo "step $1 $2"; }
+fail() { echo "error $*"; reported=1; exit 1; }
 cleanup() {
+	status=$?
 	umount -R "$TARGET" 2>/dev/null || true
 	rm -rf "$TARGET"
+	if [ "$status" != 0 ] && [ -z "$reported" ]; then
+		echo "error ${step_label%...} failed (exit $status)"
+	fi
 }
 trap cleanup EXIT
 
-# ---------- step 1: partition ----------
-echo "step 1 Partitioning disk..."
 rm -rf "$TARGET"
 mkdir -p "$TARGET"
-# Wipe any existing partition table so parted starts clean.
-wipefs -a "$device" >/dev/null 2>&1 || true
-parted -s "$device" mklabel gpt
-parted -s "$device" mkpart ESP fat32 1MiB 513MiB
-parted -s "$device" set 1 esp on
-parted -s "$device" mkpart primary ext4 513MiB 100%
-# Let the kernel re-read the new partition table.
-partprobe "$device" 2>/dev/null || true
-sleep 1
 
-# ---------- step 2: format ----------
-echo "step 2 Formatting partitions..."
-mkfs.fat -F 32 -n "EFI" "$efi_part" >/dev/null
-mkfs.ext4 -F -L "zacos9" "$root_part" >/dev/null 2>&1
+# How this computer starts up decides the boot loader.
+if [ -d /sys/firmware/efi ]; then uefi=true; else uefi=false; fi
+
+# ---------- detect partition vs whole disk ----------
+dev_type=$(lsblk -n -o TYPE "$device" 2>/dev/null | head -1 | tr -d ' ')
+
+if [ "$dev_type" = "part" ]; then
+
+	# ======== PARTITION-LEVEL INSTALL ========
+	# Only the named partition is erased; everything else is untouched.
+
+	step 1 "Checking disk layout..."
+	parent_name=$(lsblk -n -o PKNAME "$device" | head -1 | tr -d ' ')
+	[ -n "$parent_name" ] || fail "Could not find the disk that $device is on"
+	parent_disk="/dev/$parent_name"
+	grub_target="$parent_disk"
+
+	# The EFI System Partition on the same disk (GUID C12A7328-…), shared
+	# with whatever else starts from it. Only UEFI computers need one.
+	efi_part=$(lsblk -l -n -o NAME,PARTTYPE "$parent_disk" 2>/dev/null | awk '
+		tolower($2) == "c12a7328-f81f-11d2-ba4b-00a0c93ec93b" { print "/dev/" $1; exit }
+	')
+	if $uefi && [ -z "$efi_part" ]; then
+		fail "No EFI System Partition on $parent_disk. Choose the whole disk instead."
+	fi
+
+	step 2 "Formatting partition..."
+	mkfs.ext4 -F -L "$fs_label" "$device" >/dev/null 2>&1
+
+	root_part="$device"
+
+else
+
+	# ======== WHOLE-DISK INSTALL ========
+	# Repartition the disk (GPT): a 1 MiB BIOS boot partition (GRUB's
+	# home on a BIOS computer), the ESP (512 MiB, for UEFI), root (rest).
+	# Both boot partitions are made either way, so the disk can move.
+
+	grub_target="$device"
+
+	# Partition suffix: nvme/mmcblk use pN, others use N.
+	case $device in
+	*nvme* | *mmcblk*) part_suffix=p ;;
+	*) part_suffix= ;;
+	esac
+	efi_part="${device}${part_suffix}2"
+	root_part="${device}${part_suffix}3"
+
+	step 1 "Partitioning disk..."
+	wipefs -a "$device" >/dev/null 2>&1 || true
+	parted -s "$device" mklabel gpt
+	parted -s "$device" mkpart BIOS 1MiB 2MiB
+	parted -s "$device" set 1 bios_grub on
+	parted -s "$device" mkpart ESP fat32 2MiB 514MiB
+	parted -s "$device" set 2 esp on
+	parted -s "$device" mkpart ZacOS ext4 514MiB 100%
+	# Let the kernel re-read the new partition table.
+	partprobe "$device" 2>/dev/null || true
+	udevadm settle 2>/dev/null || sleep 1
+
+	step 2 "Formatting partitions..."
+	mkfs.fat -F 32 -n "EFI" "$efi_part" >/dev/null
+	mkfs.ext4 -F -L "$fs_label" "$root_part" >/dev/null 2>&1
+
+fi
 
 # ---------- step 3: copy system ----------
-echo "step 3 Copying system files..."
+step 3 "Copying system files..."
 mount "$root_part" "$TARGET"
-mkdir -p "$TARGET/boot/efi"
-mount "$efi_part" "$TARGET/boot/efi"
+if [ -n "$efi_part" ]; then
+	mkdir -p "$TARGET/boot/efi"
+	mount "$efi_part" "$TARGET/boot/efi"
+fi
 
 # If we are running from a live session the entire live root is at /;
 # rsync it to the target, skipping live-only and virtual paths.
@@ -91,9 +172,8 @@ mkdir -p "$TARGET/proc" "$TARGET/sys" "$TARGET/dev" "$TARGET/run" \
          "$TARGET/tmp" "$TARGET/media" "$TARGET/mnt"
 
 # ---------- step 4: configure for hard-disk boot ----------
-echo "step 4 Configuring system..."
+step 4 "Configuring system..."
 
-# Remove live-boot packages and config from the installed system.
 mount --bind /dev "$TARGET/dev"
 mount --bind /dev/pts "$TARGET/dev/pts"
 mount --bind /proc "$TARGET/proc"
@@ -112,31 +192,100 @@ chroot "$TARGET" update-initramfs -u >/dev/null 2>&1 || true
 
 # fstab from the real UUIDs of the new partitions.
 root_uuid=$(blkid -s UUID -o value "$root_part")
-efi_uuid=$(blkid  -s UUID -o value "$efi_part")
 cat > "$TARGET/etc/fstab" << FSTAB
 # /etc/fstab: static file system information — generated by zacos9-install.
 UUID=$root_uuid  /          ext4  defaults,errors=remount-ro  0  1
-UUID=$efi_uuid   /boot/efi  vfat  umask=0077                  0  1
 FSTAB
+if [ -n "$efi_part" ]; then
+	efi_uuid=$(blkid -s UUID -o value "$efi_part")
+	echo "UUID=$efi_uuid   /boot/efi  vfat  umask=0077                  0  1" >> "$TARGET/etc/fstab"
+fi
+
+# GRUB's settings (normally from the grub-pc/grub-efi-amd64 packages): no
+# menu, and this boot's quiet white-console arguments minus the live ones.
+kargs=$(tr ' ' '\n' < /proc/cmdline | grep -vE \
+	'^(BOOT_IMAGE=|initrd=|boot=|components$|hostname=|username=|user-default-groups=|console=|findiso=|live-media)' |
+	tr '\n' ' ' | sed 's/ *$//')
+# GRUB's start-up picture: the logo on white, from the moment GRUB starts, in
+# the middle of the screen as the boot splash will then keep it. GRUB can only
+# draw a background at the top left, so the picture is the screen's own size
+# (this session's, which is the panel's native one) and GRUB is asked for that
+# mode (/etc/grub.d/09_zacos9 shows the picture).
+screen=$(cat /sys/class/graphics/fb0/virtual_size 2>/dev/null || true)
+screen_w=${screen%,*}
+screen_h=${screen#*,}
+case "$screen_w$screen_h" in
+'' | *[!0-9]*) screen_w=1024; screen_h=768 ;;
+esac
+if [ "$screen_w" -lt 640 ] || [ "$screen_h" -lt 480 ]; then screen_w=1024; screen_h=768; fi
+# Past 4K, decoding a picture that size would strain GRUB's memory: it goes
+# without (09_zacos9 needs the file), and keeps its own choice of mode.
+grub_gfx="GRUB_GFXMODE=\"${screen_w}x${screen_h},auto\""
+mkdir -p "$TARGET/boot/grub"
+if [ $((screen_w * screen_h)) -le 9437184 ]; then
+	/usr/libexec/zacos9/zacos9-bootlogo "$screen_w" "$screen_h" "$TARGET/boot/grub/zacos9-logo.png" || true
+else
+	grub_gfx="GRUB_GFXMODE=auto"
+fi
+cat > "$TARGET/etc/default/grub" << GRUB
+# Generated by zacos9-install. Hold Shift (BIOS) or Esc (UEFI) at start-up for the menu.
+GRUB_DEFAULT=0
+GRUB_TIMEOUT=0
+GRUB_TIMEOUT_STYLE=hidden
+GRUB_DISTRIBUTOR="ZacOS 9"
+GRUB_CMDLINE_LINUX_DEFAULT="$kargs"
+GRUB_CMDLINE_LINUX=""
+$grub_gfx
+GRUB_GFXPAYLOAD_LINUX=keep
+GRUB
 
 # Hostname.
 echo "zacos9" > "$TARGET/etc/hostname"
 printf "127.0.0.1\tlocalhost\n127.0.1.1\tzacos9\n" > "$TARGET/etc/hosts"
 
+# First run: the live session's account, and its password-free admin
+# rights, stay behind. A locked account logs in by itself instead, once,
+# to run the Setup Assistant (shell/setup), which makes the real account
+# through zacos9-setup-helper and then removes this one.
+live_user=$(tr ' ' '\n' < /proc/cmdline | sed -n 's/^username=//p')
+chroot "$TARGET" userdel --force --remove "${live_user:-user}" 2>/dev/null || true
+rm -f "$TARGET/etc/sudoers.d/live" "$TARGET/usr/share/polkit-1/rules.d/sudo_on_live.rules"
+chroot "$TARGET" useradd --create-home --home-dir /var/lib/zacos9-setup --shell /bin/sh \
+	--comment "ZacOS 9 Setup" zacos9-setup
+chroot "$TARGET" passwd --lock zacos9-setup >/dev/null
+for g in video audio render input; do
+	if chroot "$TARGET" getent group "$g" >/dev/null; then
+		chroot "$TARGET" usermod -aG "$g" zacos9-setup
+	fi
+done
+greetd="$TARGET/etc/greetd/config.toml"
+sed -i '/^\[initial_session\]/,$d' "$greetd"
+printf '\n[initial_session]\ncommand = "zacos9-session"\nuser = "zacos9-setup"\n' >> "$greetd"
+mkdir -p "$TARGET/var/lib/zacos9"
+# The name chosen for the disk, for the Finder (shell/finder/vfs.cpp).
+mkdir -p "$TARGET/etc/zacos9"
+printf '%s\n' "$disk_name" > "$TARGET/etc/zacos9/disk-name"
+touch "$TARGET/var/lib/zacos9/setup-pending"
+
 # ---------- step 5: install boot loader ----------
-echo "step 5 Installing boot loader..."
-chroot "$TARGET" grub-install \
-	--target=x86_64-efi \
-	--efi-directory=/boot/efi \
-	--bootloader-id=ZacOS9 \
-	--recheck "$device" >/dev/null 2>&1 || \
-chroot "$TARGET" grub-install \
-	--target=i386-pc \
-	--recheck "$device" >/dev/null 2>&1
-chroot "$TARGET" update-grub >/dev/null 2>&1
+step 5 "Installing boot loader..."
+# Output goes to stderr, which the installer window shows if this fails.
+if $uefi; then
+	efi() { chroot "$TARGET" grub-install --target=x86_64-efi --efi-directory=/boot/efi "$@" >&2; }
+	# A boot entry in the firmware; some (Macs among them) won't take one.
+	efi --bootloader-id=ZacOS9 || efi --bootloader-id=ZacOS9 --no-nvram
+	# The fallback path every UEFI firmware starts on its own, which is what
+	# a Mac's startup picker finds. Left alone if another system put one there.
+	if [ ! -e "$TARGET/boot/efi/EFI/BOOT/BOOTX64.EFI" ]; then
+		efi --removable --no-nvram
+	fi
+else
+	chroot "$TARGET" grub-install --target=i386-pc "$grub_target" >&2
+fi
+chroot "$TARGET" update-grub >&2
 
 # ---------- step 6: clean up ----------
-echo "step 6 Finishing..."
+step 6 "Finishing..."
 sync
 umount -R "$TARGET"
 rm -rf "$TARGET"

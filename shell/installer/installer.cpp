@@ -6,13 +6,14 @@
 #include <QMouseEvent>
 #include <QPainter>
 #include <QProcess>
+#include <QWheelEvent>
 
 #include "logo.h"
 #include "panelkit.h"
 #include "pixels.h"
 #include "settings.h"
 
-static constexpr int W = 440, H = 290;
+static constexpr int W = 440, H = 310;
 static constexpr int MARGIN = 16;
 static constexpr int BTN_W = 80, BTN_H = 20;
 static constexpr int BTN_Y = H - MARGIN - BTN_H;
@@ -23,10 +24,14 @@ static constexpr int LINE_H = 14;           /* body text line height */
 /* ---- DiskEntry ------------------------------------------------------------ */
 
 QString DiskEntry::label() const {
-	if (model.isEmpty()) {
-		return device + "  " + size;
+	if (isDisk) {
+		if (model.isEmpty()) return device + "  " + size;
+		return model + "  " + size + "  (" + device + ")";
 	}
-	return model + "  " + size + "  (" + device + ")";
+	/* Partition: indent with a tree glyph so it reads as a child of the disk above. */
+	const QString name = device.section('/', -1);
+	const QString fs = model.isEmpty() ? QString() : "  " + model;
+	return "  \xe2\x94\x94 " + name + "  " + size + fs;
 }
 
 /* ---- construction -------------------------------------------------------- */
@@ -46,10 +51,27 @@ void InstallerWindow::showWelcome() {
 
 void InstallerWindow::showSelect() {
 	m_screen = Screen::Select;
+	/* Frame first: setItems() sizes each row's text to the frame width. */
+	m_diskList.frame = QRect(MARGIN, 68, W - 2 * MARGIN, 140);
 	enumerateDisks();
-	m_diskList.frame = QRect(MARGIN, 90, W - 2 * MARGIN, 130);
 	m_install = PanelButton("Install",
 		QRect(BTN_R - BTN_W, BTN_Y, BTN_W, BTN_H), true);
+	/* The name the installed disk goes by in the Finder (Mac OS allowed
+	 * 27 characters; ':' separated a Mac path's parts, '/' a Unix one's). */
+	m_diskName.rect = QRect(MARGIN + 82, 232, 220, PL_EDIT_H);
+	m_diskName.accepts = [](QChar ch) { return ch.isPrint() && ch != ':' && ch != '/'; };
+	m_diskName.edited = [this] {
+		if (m_diskName.text.size() > 27) {
+			m_diskName.setText(m_diskName.text.left(27));
+		}
+		update();
+	};
+	if (m_diskName.text.isEmpty()) {
+		m_diskName.setText(QStringLiteral("Zacintosh HD"));
+	}
+	m_host.edits = { &m_diskName };
+	m_host.setFocus(&m_diskName);
+	m_diskName.selectAll();
 	update();
 }
 
@@ -62,8 +84,18 @@ void InstallerWindow::showInstalling(const QString &device) {
 
 	static const QString helper = QStringLiteral("/usr/libexec/zacos9/zacos9-install");
 	m_installProcess = new QProcess(this);
-	m_installProcess->setProcessChannelMode(QProcess::MergedChannels);
-	connect(m_installProcess, &QProcess::readyRead, this, [this] {
+	/* Separate channels: the helper's protocol is on stdout; its tools'
+	 * chatter on stderr (where GRUB prints a bare "done" of its own) is
+	 * only kept to show beside a failure. */
+	connect(m_installProcess, &QProcess::readyReadStandardError, this, [this] {
+		for (const QByteArray &raw : m_installProcess->readAllStandardError().split('\n')) {
+			const QString line = QString::fromUtf8(raw).trimmed();
+			if (!line.isEmpty()) {
+				m_lastOutput = line;
+			}
+		}
+	});
+	connect(m_installProcess, &QProcess::readyReadStandardOutput, this, [this] {
 		while (m_installProcess->canReadLine()) {
 			const QString line = QString::fromUtf8(m_installProcess->readLine()).trimmed();
 			if (line.startsWith("step ")) {
@@ -79,6 +111,9 @@ void InstallerWindow::showInstalling(const QString &device) {
 				return;
 			} else if (line.startsWith("error ")) {
 				m_status = "Error: " + line.mid(6);
+				m_lastOutput.clear();
+			} else if (!line.isEmpty()) {
+				m_lastOutput = line;
 			}
 			update();
 		}
@@ -86,13 +121,16 @@ void InstallerWindow::showInstalling(const QString &device) {
 	connect(m_installProcess,
 		QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
 		this, [this](int code, QProcess::ExitStatus) {
-			if (m_screen == Screen::Installing && code != 0) {
-				m_status = "Installation failed (exit " + QString::number(code) + ").";
+			if (m_screen == Screen::Installing && code != 0 && !m_status.startsWith("Error: ")) {
+				m_status = "Installation failed (exit " + QString::number(code) + ")";
+				if (!m_lastOutput.isEmpty()) {
+					m_status += ": " + m_lastOutput;
+				}
 				m_progress = 0.0;
 				update();
 			}
 		});
-	m_installProcess->start("pkexec", { helper, device });
+	m_installProcess->start("pkexec", { helper, device, m_diskName.text.trimmed() });
 }
 
 void InstallerWindow::showDone() {
@@ -126,50 +164,49 @@ static bool waitSync(QProcess *p, int ms) {
 
 void InstallerWindow::enumerateDisks() {
 	m_disks.clear();
-	/* -e 7,11: exclude loop (7) and optical (11) devices */
+	/* -P: machine-readable pairs; -e 1,7,11: leave out RAM disks (1), loop
+	 * devices (7) and optical drives (11) */
 	QProcess p;
-	p.start("lsblk", { "-d", "-n", "-e", "7,11", "-o", "NAME,SIZE,MODEL" });
+	p.start("lsblk", { "-P", "-n", "-e", "1,7,11", "-o", "NAME,TYPE,SIZE,FSTYPE,MODEL" });
 	waitSync(&p, 5000);
 	for (const QByteArray &raw : p.readAllStandardOutput().split('\n')) {
-		const QString line = QString::fromUtf8(raw).simplified();
-		if (line.isEmpty()) {
-			continue;
+		const QString line = QString::fromUtf8(raw).trimmed();
+		if (line.isEmpty()) continue;
+		/* Parse  KEY="value" ... pairs */
+		QMap<QString, QString> kv;
+		int i = 0;
+		while (i < line.size()) {
+			int eq = line.indexOf('=', i);
+			if (eq < 0) break;
+			const QString key = line.mid(i, eq - i).trimmed();
+			i = eq + 1;
+			if (i >= line.size() || line[i] != '"') break;
+			++i;
+			int close = line.indexOf('"', i);
+			if (close < 0) break;
+			kv[key] = line.mid(i, close - i);
+			i = close + 2;
 		}
-		const QStringList parts = line.split(' ', Qt::SkipEmptyParts);
-		if (parts.isEmpty()) {
-			continue;
-		}
+		const QString type = kv.value("TYPE");
+		const QString name = kv.value("NAME");
+		if (name.isEmpty() || (type != "disk" && type != "part")) continue;
 		DiskEntry d;
-		d.device = "/dev/" + parts[0];
-		if (parts.size() > 1) {
-			d.size = parts[1];
-		}
-		if (parts.size() > 2) {
-			d.model = parts.mid(2).join(' ');
-		}
+		d.device = "/dev/" + name;
+		d.size   = kv.value("SIZE");
+		d.isDisk = (type == "disk");
+		d.model  = d.isDisk ? kv.value("MODEL") : kv.value("FSTYPE");
 		m_disks.push_back(d);
 	}
 	QStringList labels;
-	for (const DiskEntry &d : m_disks) {
-		labels << d.label();
-	}
+	for (const DiskEntry &d : m_disks) labels << d.label();
 	m_diskList.setItems(labels);
 }
 
 /* ---- painting ------------------------------------------------------------ */
 
-void InstallerWindow::paintLogo(pl_canvas *c, int cx, int cy, int size) {
-	const uint32_t *logo = logo_pixels();
-	const int scale = size / PL_LOGO_SIZE;
-	const int ox = cx - size / 2, oy = cy - size / 2;
-	for (int y = 0; y < PL_LOGO_SIZE * scale; y++) {
-		for (int x = 0; x < PL_LOGO_SIZE * scale; x++) {
-			uint32_t v = logo[(y / scale) * PL_LOGO_SIZE + x / scale];
-			if (v >> 24) {
-				pl_put(c, ox + x, oy + y, v);
-			}
-		}
-	}
+void InstallerWindow::paintLogo(pl_canvas *c, int cx, int cy, int /*size*/) {
+	const int s = PL_LOGO_SIZE_HQ;
+	pl_image_blend(c, cx - s / 2, cy - s / 2, logo_pixels_hq(), s, s, false);
 }
 
 /* Draw word-wrapped body text; returns the y of the next line. */
@@ -190,8 +227,8 @@ void InstallerWindow::paintWelcome(pl_canvas *c) {
 	pl_text(c, ttl.t, (W - ttl_w) / 2, 122, C_BLACK);
 
 	bodyText(c,
-		"This will install ZacOS 9 on a hard disk. "
-		"The selected disk will be completely erased. "
+		"This will install ZacOS 9 on a hard disk or partition. "
+		"All data on the selected destination will be erased. "
 		"Back up any files you want to keep before continuing.",
 		MARGIN, 148, W - 2 * MARGIN);
 
@@ -200,20 +237,36 @@ void InstallerWindow::paintWelcome(pl_canvas *c) {
 
 void InstallerWindow::paintSelect(pl_canvas *c) {
 	panelText(c, "Select a Destination", MARGIN, MARGIN + 13);
-
-	bodyText(c,
-		"Where would you like to install ZacOS 9? "
-		"All data on the selected disk will be erased.",
-		MARGIN, MARGIN + 13 + 18, W - 2 * MARGIN);
+	panelText(c, "Select a disk to erase, or a partition to install into.",
+		MARGIN, MARGIN + 13 + 18);
 
 	m_diskList.paint(c, true);
 
+	const int warn_y = m_diskList.frame.bottom() + 14;
+	panelLabel(c, "Disk name:", m_diskName.rect.left() - 8, m_diskName.rect.top() + 15);
+	m_host.paintControls(c, FACE);
 	if (m_disks.empty()) {
-		panelText(c, "No suitable disks were found.",
-			MARGIN, m_diskList.frame.bottom() + 14);
+		panelText(c, "No suitable disks were found.", MARGIN, warn_y);
+	} else {
+		const int sel = m_diskList.state.selected;
+		if (sel >= 0 && sel < static_cast<int>(m_disks.size())) {
+			const DiskEntry &d = m_disks[sel];
+			if (d.isDisk) {
+				/* ⚠ U+26A0 in UTF-8 */
+				panelText(c,
+					"\xe2\x9a\xa0 " + d.device + " will be completely erased.",
+					MARGIN, warn_y);
+			} else {
+				panelText(c,
+					d.device + " will be formatted. Other partitions are preserved.",
+					MARGIN, warn_y);
+			}
+		}
 	}
 
-	m_install.enabled = m_diskList.state.selected >= 0;
+	m_install.enabled = m_diskList.state.selected >= 0 &&
+		m_diskList.state.selected < static_cast<int>(m_disks.size()) &&
+		!m_diskName.text.trimmed().isEmpty();
 	m_install.paint(c);
 }
 
@@ -274,6 +327,7 @@ void InstallerWindow::mousePressEvent(QMouseEvent *e) {
 	case Screen::Select:
 		m_diskList.press(pos);
 		m_install.press(pos);
+		m_host.hostPress(e);
 		update();
 		break;
 	case Screen::Done:
@@ -285,8 +339,25 @@ void InstallerWindow::mousePressEvent(QMouseEvent *e) {
 	}
 }
 
+void InstallerWindow::mouseMoveEvent(QMouseEvent *e) {
+	if (m_screen == Screen::Select &&
+			(m_diskList.move(e->position().toPoint()) | m_host.hostMove(e))) {
+		update();
+	}
+}
+
+void InstallerWindow::wheelEvent(QWheelEvent *e) {
+	if (m_screen == Screen::Select &&
+			m_diskList.wheel(e->position().toPoint(), e->angleDelta().y())) {
+		update();
+	}
+}
+
 void InstallerWindow::mouseReleaseEvent(QMouseEvent *e) {
 	const QPoint pos = e->position().toPoint();
+	if (m_diskList.release() | (m_screen == Screen::Select && m_host.hostRelease(e))) {
+		update();
+	}
 	switch (m_screen) {
 	case Screen::Welcome:
 		if (m_continue.release(pos)) {
@@ -319,7 +390,9 @@ void InstallerWindow::keyPressEvent(QKeyEvent *e) {
 		return;
 	}
 	if (m_screen == Screen::Select) {
-		if (m_diskList.key(e->key(), e->text())) {
+		/* Up and Down choose a disk; everything else is the name field's. */
+		const bool listKey = e->key() == Qt::Key_Up || e->key() == Qt::Key_Down;
+		if (listKey ? m_diskList.key(e->key(), e->text()) : m_host.hostKey(e)) {
 			update();
 		}
 	}
