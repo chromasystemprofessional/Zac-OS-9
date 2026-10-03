@@ -1,5 +1,7 @@
 #include "infowindow.h"
 
+#include "vfs.h"
+
 #include <QApplication>
 #include <QDir>
 #include <QDirIterator>
@@ -52,7 +54,9 @@ QString finderSize(qint64 bytes) {
 
 QString macPath(const QString &dir) {
 	QStringList parts = QDir::cleanPath(dir).split('/', Qt::SkipEmptyParts);
-	parts.prepend(displayName("/"));
+	/* The startup disk the user sees, not the Unix root: their files are
+	 * on the disk the desktop shows them on. */
+	parts.prepend(vfsVolumeName());
 	return parts.join(':') + ':';
 }
 

@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Software
+Comment=Install and remove applications
+Exec=platinum-store
+Categories=System;
+OnlyShowIn=Platinum;

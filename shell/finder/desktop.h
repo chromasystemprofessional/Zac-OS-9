@@ -19,6 +19,7 @@
 class Desktop : public QWidget, public FinderView {
 public:
 	Desktop();
+	~Desktop() override;
 	/* Turn this widget into the layer surface; call before show(). */
 	void becomeLayerSurface();
 	/* Something changed in `folder`: refresh desktop items or the Trash. */
@@ -71,7 +72,22 @@ private:
 	bool renamable(const Item *item) const;
 	void beginRename(Item *item);
 
-	std::unique_ptr<Item> m_disk, m_trash;
+	/* The startup disk (the Macintosh view), the Trash, and Debian's own
+	 * filesystem when the registry asks for it. */
+	std::unique_ptr<Item> m_disk, m_trash, m_unix;
+	void buildUnixDisk();
+	std::vector<Item *> fixedItems() const;
+	bool isFixed(const Item *item) const;
+	int m_vfsToken = 0;
+
+	/* Volumes mounted from the Network Browser: polled (nothing watches
+	 * fusermount3 -u or gio mount -u run from a terminal, so there is
+	 * no event to wait for instead), not kept open across a rename —
+	 * there is nothing to rename, the name is the server's. */
+	std::vector<std::unique_ptr<Item>> m_netVolumes;
+	QTimer m_netVolumesTimer;
+	void refreshNetVolumes();
+
 	std::vector<std::unique_ptr<Item>> m_files; /* ~/Desktop */
 	QFileSystemWatcher m_watcher;
 };

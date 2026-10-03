@@ -11,6 +11,7 @@
 #include <sys/xattr.h>
 
 #include "sharingclient.h"
+#include "vfs.h"
 
 static constexpr int LABEL_MAX_INK = 110;
 static constexpr int LABEL_GAP = 2;      /* icon bottom to label box top */
@@ -49,8 +50,13 @@ QString trashFilesPath() {
 }
 
 QString displayName(const QString &path) {
+	if (vfsIsVirtual(path)) {
+		return vfsName(path);
+	}
 	if (path == "/") {
-		return "Hard Disk";
+		/* Debian's own filesystem; the startup disk is the Macintosh
+		 * view, which has a name of its own (see vfs.h). */
+		return "Unix";
 	}
 	if (QDir(path) == QDir(trashFilesPath())) {
 		return "Trash";
@@ -156,6 +162,9 @@ static bool macHousekeeping(const QString &name) {
 }
 
 std::vector<std::unique_ptr<Item>> listFolder(const QString &path) {
+	if (vfsIsVirtual(path)) {
+		return vfsList(path);
+	}
 	std::vector<std::unique_ptr<Item>> items;
 	QDir dir(path);
 	const auto entries = dir.entryInfoList(
@@ -226,6 +235,11 @@ void placeIcons(const std::vector<Item *> &items, const QHash<QString, QPoint> &
 }
 
 bool acceptsDrops(const Item &item) {
+	/* A curated folder has nowhere to put a file; only the ones standing
+	 * for a real directory take drops. */
+	if (item.isVirtual) {
+		return vfsAcceptsDrops(item.path);
+	}
 	return item.kind == PL_ICON_FOLDER || item.kind == PL_ICON_DISK ||
 		item.kind == PL_ICON_TRASH_EMPTY || item.kind == PL_ICON_TRASH_FULL;
 }
@@ -236,9 +250,20 @@ bool iconLabelContains(Item &item, int x, int y, QPoint p) {
 	return QRect(QPoint(l, t), QPoint(r, b)).contains(p);
 }
 
+void paintIcon(pl_canvas *c, Item &item, int x, int y, int size, bool highlight) {
+	const std::vector<uint32_t> &custom = size >= 32 ? item.customIcon32 : item.customIcon16;
+	if (!custom.empty()) {
+		/* A real application icon: real alpha, and no Finder-label tint
+		 * (it would fight the icon's own colors). */
+		pl_image_blend(c, x, y, custom.data(), size, size, highlight);
+	} else {
+		pl_icon_paint_label(c, x, y, item.iconKind(), size, highlight, item.labelColor());
+	}
+}
+
 void paintIconItem(pl_canvas *c, Item &item, int x, int y, bool onDesktop, bool showLabel) {
-	pl_icon_paint_label(c, x, y, item.iconKind(), PL_ICON_LARGE, item.selected || item.dropTarget,
-		item.labelColor());
+	const bool highlight = item.selected || item.dropTarget;
+	paintIcon(c, item, x, y, PL_ICON_LARGE, highlight);
 	if (!showLabel) {
 		return;
 	}

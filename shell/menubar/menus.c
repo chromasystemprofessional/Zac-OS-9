@@ -99,6 +99,11 @@ static void add_finder_menus(struct mb_menu *menus, int *n) {
 	list->checked = win && fs->view == 1;
 	m = new_menu(menus, n, "Special");
 	add(m, "Empty Trash…", 0, up && fs->trash, ACT_FINDER, "empty-trash");
+	/* Platinum's own: brings back applications hidden from Applications
+	 * (Move To Trash on one hides it, rather than touching the package
+	 * it belongs to). No Mac OS 9 original had this, because there the
+	 * Trash really did hold the file. */
+	add(m, "Show All Applications", 0, up, ACT_FINDER, "show-hidden-applications");
 	sep(m);
 	add(m, "Sleep", 0, false, ACT_NONE, NULL);
 	add(m, "Restart", 0, false, ACT_NONE, NULL);

@@ -23,6 +23,8 @@ enum pl_icon_kind {
 	PL_ICON_DISK_IMAGE, /* a Macintosh disk or CD image */
 	PL_ICON_CLASSIC,    /* a classic Mac OS application (runs in Classic) */
 	PL_ICON_SHARED_FOLDER, /* a folder shared from Get Info */
+	PL_ICON_SYSTEM_FOLDER, /* the System Folder, marked with the sparkle */
+	PL_ICON_CONTROL_PANELS, /* the Control Panels folder */
 	PL_ICON_COUNT,
 };
 

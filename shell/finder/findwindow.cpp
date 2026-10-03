@@ -390,8 +390,7 @@ void FoundWindow::paintEvent(QPaintEvent *) {
 		Item *item = m_items[r].get();
 		const int y = r * ROW_H;
 		pl_hline(&list, 0, viewW - 1, y + ROW_H - 1, GRAY(0xE));
-		pl_icon_paint_label(&list, ICON_X, y + 1, item->iconKind(), PL_ICON_SMALL, item->selected,
-			item->labelColor());
+		paintIcon(&list, *item, ICON_X, y + 1, PL_ICON_SMALL, item->selected);
 		Text name(item->name, NAME_W - NAME_X - 6, item->nameFont());
 		uint32_t ink = C_BLACK;
 		if (item->selected) {

@@ -11,6 +11,8 @@
 #include <QUrl>
 
 #include "fileops.h"
+#include "netvolumes.h"
+#include "vfs.h"
 
 #include "alert.h"
 #include "desktop.h"
@@ -186,6 +188,14 @@ void Finder::command(const QString &name) {
 		setLabel(name.mid(6).toInt());
 	} else if (name == "classic") {
 		launchClassic();
+	} else if (name == "refresh") {
+		/* The fallback when a desktop entry appears without the
+		 * application directories changing in a way we can see. */
+		vfsRefresh();
+	} else if (name == "show-unix-volume") {
+		vfsSetUnixVolumeShown(!vfsUnixVolumeShown());
+	} else if (name == "show-hidden-applications") {
+		vfsShowAllHidden();
 	} else if (name == "find") {
 		FindDialog::open();
 	} else if (name == "about") {
@@ -214,6 +224,11 @@ static QString uniqueName(const QDir &dir, const QString &base) {
 
 void Finder::newFolder() {
 	FinderView *v = front();
+	if (vfsIsVirtual(v->folderPath())) {
+		Alert::ask("New folders can't be made here. Documents, and the "
+			"folders inside it, hold your own files.", "OK", QString());
+		return;
+	}
 	QDir dir(v->folderPath());
 	dir.mkpath(".");
 	QString name = uniqueName(dir, "untitled folder");
@@ -226,6 +241,19 @@ void Finder::newFolder() {
 
 void Finder::openSelection() {
 	for (Item *item : front()->selectedItems()) {
+		if (item->isVirtual) {
+			const VNode *node = vfsNode(item->path);
+			if (node && node->kind == VKind::Launcher) {
+				if (!vfsLaunch(item->path)) {
+					Alert::ask(item->name + " could not be opened. Its "
+						"application may have been removed.", "OK", QString());
+				}
+				continue;
+			}
+			const QString real = vfsOpensAs(item->path);
+			FolderWindow::open(real.isEmpty() ? item->path : real);
+			continue;
+		}
 		if (item->kind == PL_ICON_FOLDER || item->kind == PL_ICON_DISK ||
 				item->kind == PL_ICON_TRASH_EMPTY || item->kind == PL_ICON_TRASH_FULL) {
 			QDir().mkpath(item->path);
@@ -266,8 +294,11 @@ void Finder::launchClassic(const QStringList &disks) {
 }
 
 static bool isSpecial(const Item *item) {
-	return item->kind == PL_ICON_DISK || item->kind == PL_ICON_TRASH_EMPTY ||
-		item->kind == PL_ICON_TRASH_FULL;
+	/* Virtual items stand for the Finder's own structure or for
+	 * applications dpkg owns: duplicating or aliasing them would mean
+	 * copying package files about, so the Finder leaves them alone. */
+	return item->isVirtual || item->kind == PL_ICON_DISK ||
+		item->kind == PL_ICON_TRASH_EMPTY || item->kind == PL_ICON_TRASH_FULL;
 }
 
 /* "Report copy" next to "Report" (Mac OS 8 naming). */
@@ -296,6 +327,11 @@ void Finder::setLabel(int label) {
 	}
 	QSet<QString> folders;
 	for (Item *item : front()->selectedItems()) {
+		if (item->isVirtual) {
+			/* Kept as metadata, so it survives package upgrades. */
+			vfsSetLabel(item->path, label);
+			continue;
+		}
 		if (isSpecial(item)) {
 			continue;
 		}
@@ -343,6 +379,18 @@ void Finder::putAway() {
 	const QString info = QFileInfo(trash).absolutePath() + "/info";
 	QStringList changed;
 	for (Item *item : front()->selectedItems()) {
+		if (item->isNetworkVolume) {
+			/* The same eject this gets from dragging it to the Trash
+			 * (fileops.cpp's dropItems): nothing here is a file of
+			 * ours to put anywhere. */
+			QString error;
+			for (const NetVolume &v : netVolumes()) {
+				if (v.path == item->path && !netVolumeEject(v, &error)) {
+					Alert::ask(error, "OK", QString());
+				}
+			}
+			continue;
+		}
 		if (QFileInfo(item->path).absolutePath() != QDir(trash).absolutePath()) {
 			continue; /* only things in the Trash can be put away */
 		}
@@ -401,6 +449,17 @@ void Finder::getInfo(bool sharing) {
 		InfoWindow::open(v->folderPath(), PL_ICON_FOLDER, displayName(v->folderPath()), view);
 	}
 	for (Item *item : items) {
+		if (item->isVirtual) {
+			/* Get Info reads a file. Show the one the item stands for:
+			 * a folder's real directory, or an application's desktop
+			 * entry. The curated folders stand for nothing on disk.
+			 * TODO: a Get Info of their own. */
+			const QString real = vfsRealCounterpart(item->path);
+			if (!real.isEmpty()) {
+				InfoWindow::open(real, item->kind, item->name, view);
+			}
+			continue;
+		}
 		InfoWindow::open(item->path, item->kind, item->name, view);
 	}
 }
@@ -416,8 +475,26 @@ void Finder::moveSelectionToTrash() {
 	FinderView *v = front();
 	QStringList changed;
 	for (Item *item : v->selectedItems()) {
-		/* The disk and the Trash itself can't go in the Trash. */
-		if (item->kind == PL_ICON_DISK || item->kind == PL_ICON_TRASH_EMPTY ||
+		/* An application's folder in Applications: there is no file to
+		 * move, and the package stays installed. Trashing it only hides
+		 * it from the Finder (vfsHideApplication refreshes any open
+		 * window itself, the same way a rename does); ask first, since
+		 * unlike an ordinary Trash this can't be undone by fishing the
+		 * item back out. */
+		if (item->isVirtual && vfsIsAppFolder(item->path)) {
+			if (Alert::ask(QStringLiteral("Remove “%1” from the Desktop? "
+					"The application itself will not be removed, and this can be "
+					"undone with Special > Show All Applications.").arg(item->name),
+					"Remove", "Cancel")) {
+				vfsHideApplication(item->path);
+			}
+			continue;
+		}
+		/* The disk and the Trash itself can't go in the Trash, and
+		 * neither can anything else in the Macintosh view: there is no
+		 * file to move. */
+		if (item->isVirtual || item->kind == PL_ICON_DISK ||
+				item->kind == PL_ICON_TRASH_EMPTY ||
 				item->kind == PL_ICON_TRASH_FULL) {
 			continue;
 		}

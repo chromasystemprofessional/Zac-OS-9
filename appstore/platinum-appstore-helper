@@ -1,0 +1,71 @@
+#!/bin/sh
+# platinum-appstore-helper: the privileged half of the Software window
+# (platinum-store), reached from the Apple menu. It runs as root through
+# pkexec; polkit lets administrators at the computer use it without a
+# password, the same as platinum-sharing-helper, because this desktop
+# runs no polkit authentication agent to prompt for one.
+#
+#   platinum-appstore-helper install PACKAGE...
+#   platinum-appstore-helper remove PACKAGE...
+#   platinum-appstore-helper installed PACKAGE...
+#       prints "PACKAGE<TAB>yes" or "PACKAGE<TAB>no" for each, from dpkg's
+#       own record; needs no root (platinum-store also runs it directly)
+#
+# Every PACKAGE must be a plain Debian package name (dpkg -S's own syntax:
+# letters, digits, '+', '-', '.', not starting with '-'); nothing else
+# reaches apt-get, so an argument can't smuggle in an option of its own.
+set -eu
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export DEBIAN_FRONTEND=noninteractive
+
+die() {
+	echo "$1" >&2
+	exit 1
+}
+
+valid_pkg() {
+	case "$1" in
+		'') return 1 ;;
+		-*) return 1 ;;
+	esac
+	case "$1" in
+		*[!a-zA-Z0-9.+-]*) return 1 ;;
+	esac
+	return 0
+}
+
+check_pkgs() {
+	[ "$#" -gt 0 ] || die "no package named."
+	for pkg in "$@"; do
+		valid_pkg "$pkg" || die "'$pkg' isn't a package name."
+	done
+}
+
+cmd=${1:-}
+[ "$#" -ge 1 ] && shift
+
+case "$cmd" in
+installed)
+	check_pkgs "$@"
+	for pkg in "$@"; do
+		status=$(dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null || true)
+		case "$status" in
+		"install ok installed") printf '%s\tyes\n' "$pkg" ;;
+		*) printf '%s\tno\n' "$pkg" ;;
+		esac
+	done
+	;;
+install)
+	check_pkgs "$@"
+	[ "$(id -u)" = 0 ] || die "platinum-appstore-helper install must run as root (through pkexec)."
+	apt-get -y -o Dpkg::Options::="--force-confold" -o Dpkg::Progress-Fancy=0 install -- "$@"
+	;;
+remove)
+	check_pkgs "$@"
+	[ "$(id -u)" = 0 ] || die "platinum-appstore-helper remove must run as root (through pkexec)."
+	apt-get -y -o Dpkg::Progress-Fancy=0 remove -- "$@"
+	;;
+*)
+	die "usage: platinum-appstore-helper install|remove|installed PACKAGE..."
+	;;
+esac

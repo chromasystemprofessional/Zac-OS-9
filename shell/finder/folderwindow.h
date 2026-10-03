@@ -118,6 +118,9 @@ private:
 	int m_contentWidth = 0; /* icon view: rightmost placed icon */
 	QPoint m_dragStart;     /* where a drag of our own icons began */
 	QFileSystemWatcher m_watcher;
+	/* Virtual folders have no directory to watch: they are reloaded when
+	 * the Macintosh view changes (see vfs.h). 0 when not subscribed. */
+	int m_vfsToken = 0;
 
 	/* A press on an icon that may turn into a drag. */
 	Item *m_pressItem = nullptr;

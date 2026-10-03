@@ -1,0 +1,10 @@
+// Administrators at the computer (in the sudo group, logged in on its
+// screen) may install or remove software without a password, as the
+// Software window has no way to ask for one (this desktop runs no
+// polkit authentication agent). Same reasoning as 50-platinum-sharing.rules.
+polkit.addRule(function(action, subject) {
+	if (action.id == "org.platinum2026.appstore" &&
+			subject.local && subject.active && subject.isInGroup("sudo")) {
+		return polkit.Result.YES;
+	}
+});

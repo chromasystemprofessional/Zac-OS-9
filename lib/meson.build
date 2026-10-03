@@ -27,6 +27,10 @@ install_data(
   ),
   install_dir: get_option('datadir') / 'platinum' / 'sounds',
 )
+# The Software window's catalog (shell/store).
+install_data('../assets/store/catalog.json',
+  install_dir: get_option('datadir') / 'platinum' / 'store',
+)
 platinum_dep = declare_dependency(
   link_with: platinum_lib,
   include_directories: platinum_inc,
@@ -46,6 +50,7 @@ test('menudraw',
   args: [figs_dir],
 )
 test('text', executable('test-text', 'tests/test_text.c', dependencies: [platinum_dep]))
+test('draw', executable('test-draw', 'tests/test_draw.c', dependencies: [platinum_dep]))
 test('settings', executable('test-settings', 'tests/test_settings.c', dependencies: [platinum_dep]))
 test('widgets',
   executable('test-widgets', 'tests/test_widgets.c',

@@ -11,6 +11,7 @@
 #include <QWidget>
 
 #include "finder.h"
+#include "vfs.h"
 
 static bool sameDisk(const QString &a, const QString &b) {
 	return QStorageInfo(a).device() == QStorageInfo(b).device();
@@ -117,6 +118,13 @@ void startItemDrag(QWidget *source, const std::vector<Item *> &items,
 	if (items.empty()) {
 		return;
 	}
+	/* Nothing in the Macintosh view is a file, so there is nothing to
+	 * hand to the drop: an application folder stands for a package. */
+	for (const Item *item : items) {
+		if (item->isVirtual) {
+			return;
+		}
+	}
 	QRect bounds;
 	for (const QPoint &o : itemOrigins) {
 		bounds = bounds.united(QRect(o, QSize(PL_ICON_LARGE, PL_ICON_LARGE)));
@@ -169,7 +177,16 @@ void dropItems(QDropEvent *e, const Item *target, const QString &folder) {
 		e->acceptProposedAction();
 		return;
 	}
-	const QString dest = target ? target->path : folder;
+	QString dest = target ? target->path : folder;
+	if (vfsIsVirtual(dest)) {
+		/* Documents and the other folders standing for real directories
+		 * take files; the curated ones have nowhere to put them. */
+		dest = vfsOpensAs(dest);
+		if (dest.isEmpty()) {
+			e->ignore();
+			return;
+		}
+	}
 	const bool option = e->modifiers() & Qt::AltModifier;
 	for (const QString &d : transferItems(paths, dest, option)) {
 		finder.folderChanged(d);

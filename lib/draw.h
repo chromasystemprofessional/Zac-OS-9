@@ -72,6 +72,12 @@ void pl_grays(struct pl_canvas *c, int x, int y, const char *const *rows, int nr
 /* Draw an ARGB image (alpha 0 or 255) with the top-left at x,y. */
 void pl_image(struct pl_canvas *c, int x, int y, const uint32_t *px, int w, int h);
 
+/* Draw an ARGB image with real (0-255) alpha, blended against what is
+ * already on the canvas: a resolved application icon, not 1990s pixel
+ * art. `selected` applies the same darkening pl_icon_paint_label does. */
+void pl_image_blend(struct pl_canvas *c, int x, int y, const uint32_t *px, int w, int h,
+		bool selected);
+
 #ifdef __cplusplus
 }
 #endif

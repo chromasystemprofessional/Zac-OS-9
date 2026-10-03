@@ -1,5 +1,7 @@
 #include "desktop.h"
 
+#include "vfs.h"
+
 #include <LayerShellQt/window.h>
 #include <QApplication>
 #include <QDir>
@@ -16,8 +18,15 @@
 #include "fileops.h"
 #include "folderwindow.h"
 #include "menudraw.h"
+#include "netvolumes.h"
 #include "patterns.h"
 #include "settings.h"
+
+/* How often the desktop checks what's mounted from the Network Browser:
+ * nothing posts an event when a terminal runs fusermount3 -u or gio
+ * mount -u by hand, so this is a poll, the same trade FileSharingPanel
+ * already makes for who's connected (there, every 5 s). */
+static constexpr int NET_VOLUMES_POLL_MS = 3000;
 
 /* Desktop icon placement (not in the HIG; TODO: measure). */
 static constexpr int ICON_MARGIN_RIGHT = 24;
@@ -48,11 +57,25 @@ Desktop::Desktop() {
 	m_renameTimer.setSingleShot(true);
 	m_renameTimer.callOnTimeout([this] { beginRename(m_renameItem); });
 	m_state = FolderState::load(folderPath());
+	/* The startup disk shows the Macintosh view of this computer: a
+	 * System Folder, Applications and Documents. Debian's own hierarchy
+	 * is untouched underneath, and appears as a second disk when the
+	 * registry asks for it (see vfs.h). */
 	m_disk = std::make_unique<Item>();
 	m_disk->stateKey = "::disk";
-	m_disk->name = displayName("/");
-	m_disk->path = "/";
+	m_disk->name = vfsVolumeName();
+	m_disk->path = vfsRoot();
 	m_disk->kind = PL_ICON_DISK;
+	m_disk->isVirtual = true;
+	m_disk->isDir = true;
+	buildUnixDisk();
+	m_vfsToken = vfsOnChange([this] {
+		m_disk->name = vfsVolumeName();
+		m_disk->label.reset();
+		buildUnixDisk();
+		placeIcons();
+		update();
+	});
 
 	m_trash = std::make_unique<Item>();
 	m_trash->stateKey = "::trash";
@@ -79,6 +102,96 @@ Desktop::Desktop() {
 	QObject::connect(&m_watcher, &QFileSystemWatcher::directoryChanged,
 		[this](const QString &dir) { Finder::instance().folderChanged(dir); });
 	reload();
+
+	refreshNetVolumes();
+	m_netVolumesTimer.callOnTimeout([this] { refreshNetVolumes(); });
+	m_netVolumesTimer.start(NET_VOLUMES_POLL_MS);
+}
+
+Desktop::~Desktop() {
+	if (m_vfsToken) {
+		vfsOffChange(m_vfsToken);
+	}
+}
+
+/* Debian's filesystem as a disk of its own, for looking at what the
+ * Macintosh view leaves out. Off unless the registry turns it on. */
+void Desktop::buildUnixDisk() {
+	const bool want = vfsUnixVolumeShown();
+	if (want == (m_unix != nullptr)) {
+		return;
+	}
+	if (!want) {
+		m_unix.reset();
+		return;
+	}
+	m_unix = std::make_unique<Item>();
+	m_unix->stateKey = "::unix";
+	m_unix->name = displayName("/");
+	m_unix->path = "/";
+	m_unix->kind = PL_ICON_DISK;
+	m_unix->isDir = true;
+}
+
+/* What's mounted from the Network Browser, as desktop disk icons. Skips
+ * rebuilding (and so repainting, and so flickering a selection) when
+ * nothing actually changed since the last poll. */
+void Desktop::refreshNetVolumes() {
+	const std::vector<NetVolume> found = netVolumes();
+	if (found.size() == m_netVolumes.size()) {
+		bool same = true;
+		for (size_t i = 0; i < found.size() && same; i++) {
+			same = m_netVolumes[i]->path == found[i].path;
+		}
+		if (same) {
+			return;
+		}
+	}
+	QSet<QString> selected;
+	for (auto &item : m_netVolumes) {
+		if (item->selected) {
+			selected.insert(item->path);
+		}
+	}
+	std::vector<std::unique_ptr<Item>> fresh;
+	for (const NetVolume &v : found) {
+		auto item = std::make_unique<Item>();
+		item->stateKey = "::net:" + v.path;
+		item->name = v.name;
+		item->path = v.path;
+		item->kind = PL_ICON_DISK;
+		item->isDir = true;
+		item->isNetworkVolume = true;
+		item->selected = selected.contains(v.path);
+		fresh.push_back(std::move(item));
+	}
+	m_netVolumes = std::move(fresh);
+	placeIcons();
+	update();
+}
+
+std::vector<Item *> Desktop::fixedItems() const {
+	std::vector<Item *> out = { m_disk.get() };
+	if (m_unix) {
+		out.push_back(m_unix.get());
+	}
+	for (auto &item : m_netVolumes) {
+		out.push_back(item.get());
+	}
+	out.push_back(m_trash.get());
+	return out;
+}
+
+bool Desktop::isFixed(const Item *item) const {
+	if (item == m_disk.get() || item == m_trash.get() || item == m_unix.get()) {
+		return true;
+	}
+	for (auto &v : m_netVolumes) {
+		if (v.get() == item) {
+			return true;
+		}
+	}
+	return false;
 }
 
 QString Desktop::folderPath() const {
@@ -149,7 +262,7 @@ void Desktop::placeIcons() {
 	if (!placed.contains(m_trash->key())) {
 		placed.insert(m_trash->key(), trashHome);
 	}
-	std::vector<Item *> items = { m_disk.get(), m_trash.get() };
+	std::vector<Item *> items = fixedItems();
 	for (auto &item : m_files) {
 		items.push_back(item.get());
 	}
@@ -177,6 +290,12 @@ void Desktop::paintEvent(QPaintEvent *) {
 	pl_canvas *c = &px.c;
 	pl_pattern_fill(c, m_pattern, 0, 0, width() - 1, height() - 1);
 	paintIconItem(c, *m_disk, m_disk->pos.x(), m_disk->pos.y(), true);
+	if (m_unix) {
+		paintIconItem(c, *m_unix, m_unix->pos.x(), m_unix->pos.y(), true);
+	}
+	for (auto &item : m_netVolumes) {
+		paintIconItem(c, *item, item->pos.x(), item->pos.y(), true);
+	}
 	for (auto &item : m_files) {
 		const bool editing = m_editor.editing(item.get());
 		paintIconItem(c, *item, item->pos.x(), item->pos.y(), true, !editing);
@@ -190,7 +309,7 @@ void Desktop::paintEvent(QPaintEvent *) {
 }
 
 Item *Desktop::itemAt(QPoint pos) {
-	for (Item *item : { m_trash.get(), m_disk.get() }) {
+	for (Item *item : fixedItems()) {
 		if (iconItemContains(*item, item->pos.x(), item->pos.y(), pos)) {
 			return item;
 		}
@@ -205,7 +324,7 @@ Item *Desktop::itemAt(QPoint pos) {
 
 std::vector<Item *> Desktop::selectedItems() {
 	std::vector<Item *> out;
-	for (Item *item : { m_disk.get(), m_trash.get() }) {
+	for (Item *item : fixedItems()) {
 		if (item->selected) {
 			out.push_back(item);
 		}
@@ -219,7 +338,9 @@ std::vector<Item *> Desktop::selectedItems() {
 }
 
 void Desktop::selectByName(const QString &name) {
-	m_disk->selected = m_trash->selected = false;
+	for (Item *item : fixedItems()) {
+		item->selected = false;
+	}
 	for (auto &item : m_files) {
 		item->selected = item->name == name;
 	}
@@ -227,7 +348,7 @@ void Desktop::selectByName(const QString &name) {
 }
 
 std::vector<Item *> Desktop::allItems() {
-	std::vector<Item *> all = { m_disk.get(), m_trash.get() };
+	std::vector<Item *> all = fixedItems();
 	for (auto &item : m_files) {
 		all.push_back(item.get());
 	}
@@ -235,7 +356,7 @@ std::vector<Item *> Desktop::allItems() {
 }
 
 bool Desktop::renamable(const Item *item) const {
-	return item && item != m_disk.get() && item != m_trash.get();
+	return item && !isFixed(item);
 }
 
 void Desktop::beginRename(Item *item) {
@@ -296,7 +417,7 @@ void Desktop::mouseMoveEvent(QMouseEvent *e) {
 	for (Item *item : selectedItems()) {
 		/* The disk and the Trash stay put. TODO: dragging the disk to the
 		 * Trash ejects it on a Mac. */
-		if (item != m_disk.get() && item != m_trash.get()) {
+		if (!isFixed(item)) {
 			items.push_back(item);
 			origins.push_back(item->pos);
 		}
@@ -353,7 +474,7 @@ void Desktop::dropEvent(QDropEvent *e) {
 		/* Icons dragged about the desktop: they move there, and stay. */
 		const QPoint delta = e->position().toPoint() - m_dragStart;
 		for (Item *item : selectedItems()) {
-			if (item == m_disk.get() || item == m_trash.get()) {
+			if (isFixed(item)) {
 				continue;
 			}
 			QPoint p = item->pos + delta;

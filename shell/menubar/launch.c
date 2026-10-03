@@ -165,6 +165,21 @@ void launch_fill_logo_menu(struct mb_menu *menu) {
 	add_item(menu, NULL, false, ACT_NONE, NULL);
 	/* Classic Mac OS in an emulator; the Finder explains what's missing. */
 	add_item(menu, "Classic", true, ACT_FINDER, "classic");
+	/* The Software window: an app catalog over apt. Mac OS 9 never had
+	 * one of these; it sits beside Classic, not inside Control Panels,
+	 * since it is its own application rather than a settings pane. */
+	{
+		char command[PATH_MAX + 64];
+		sibling_program("platinum-store", command, sizeof(command));
+		add_item(menu, "Software", true, ACT_LAUNCH, command);
+	}
+	/* The Network Browser: connecting to other computers, as Mac OS 9's
+	 * own Apple Menu Item of the same name did. */
+	{
+		char command[PATH_MAX + 64];
+		sibling_program("platinum-netbrowser", command, sizeof(command));
+		add_item(menu, "Network Browser", true, ACT_LAUNCH, command);
+	}
 	/* Control Panels, as a hierarchical menu. */
 	add_item(menu, "Control Panels", true, ACT_NONE, NULL);
 	struct mb_menu *panels = calloc(1, sizeof(*panels));

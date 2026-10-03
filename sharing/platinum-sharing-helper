@@ -174,6 +174,38 @@ EOF
 	done >>/etc/samba/smb.conf
 }
 
+# Announcing this computer's own SMB server over Bonjour, for the
+# Network Browser's list (and modern Macs' own "Connect to Server").
+# Netatalk needs nothing here: once avahi-daemon is running (configure()
+# below ensures that), it announces the AFP server itself, through
+# avahi's Bonjour-compatibility library, under the configured server
+# name — confirmed live, and a service file of our own here would only
+# have duplicated it, less helpfully (named after the hostname, not
+# "name=" from sharing.conf). Samba's own avahi support could not be
+# confirmed the same way (smbd would not start to test against in the
+# development container this was built in; see docs/network.md), so
+# this is kept rather than assumed redundant too.
+write_avahi_services() {
+	mkdir -p /etc/avahi/services
+	if [ "$smb" = yes ]; then
+		cat >/etc/avahi/services/platinum-smb.service <<EOF
+<?xml version="1.0" standalone='no'?>
+<!DOCTYPE service-group SYSTEM "avahi-service.dtd">
+<!-- Written by Platinum 2026's File Sharing control panel. -->
+<service-group>
+	<name replace-wildcards="yes">%h</name>
+	<service>
+		<type>_smb._tcp</type>
+		<port>445</port>
+	</service>
+</service-group>
+EOF
+	else
+		rm -f /etc/avahi/services/platinum-smb.service
+	fi
+	systemctl reload avahi-daemon.service 2>/dev/null || true
+}
+
 # The shared folders that are still there.
 each_share() {
 	[ -f "$shares" ] || return 0
@@ -262,10 +294,11 @@ configure() {
 	fi
 	if [ "$smb" = yes ]; then
 		write_smb_conf
-		services on smbd nmbd wsdd2
+		services on avahi-daemon smbd nmbd wsdd2
 	else
 		services off smbd nmbd wsdd2
 	fi
+	write_avahi_services
 }
 
 # After the shared folders change: running servers take the new list

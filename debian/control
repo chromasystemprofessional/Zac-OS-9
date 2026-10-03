@@ -19,7 +19,8 @@ Build-Depends: debhelper-compat (= 13),
                libcairo2-dev,
                qt6-base-dev,
                qt6-base-private-dev,
-               liblayershellqtinterface-dev
+               liblayershellqtinterface-dev,
+               libglib2.0-dev
 Standards-Version: 4.7.0
 Rules-Requires-Root: no
 
@@ -28,7 +29,10 @@ Architecture: any
 Depends: ${shlibs:Depends},
          ${misc:Depends},
          qt6-wayland,
-         fonts-dejavu-core
+         qt6-svg-plugins,
+         fonts-dejavu-core,
+         avahi-utils,
+         gvfs-backends
 Recommends: xwayland,
             netatalk,
             samba,

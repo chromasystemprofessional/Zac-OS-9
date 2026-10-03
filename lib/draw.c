@@ -70,3 +70,41 @@ void pl_image(struct pl_canvas *c, int x, int y, const uint32_t *px, int w, int 
 		}
 	}
 }
+
+void pl_image_blend(struct pl_canvas *c, int x, int y, const uint32_t *px, int w, int h,
+		bool selected) {
+	for (int j = 0; j < h; j++) {
+		int dy = y + j;
+		if (dy < c->y || dy >= c->y + c->height) {
+			continue;
+		}
+		for (int i = 0; i < w; i++) {
+			int dx = x + i;
+			if (dx < c->x || dx >= c->x + c->width) {
+				continue;
+			}
+			uint32_t p = px[j * w + i];
+			unsigned a = p >> 24;
+			if (!a) {
+				continue;
+			}
+			uint32_t *dst = &c->px[(dy - c->y) * c->stride + (dx - c->x)];
+			uint32_t out;
+			if (a == 255) {
+				out = p;
+			} else {
+				uint32_t bg = *dst;
+				unsigned br = (bg >> 16) & 0xFF, bgc = (bg >> 8) & 0xFF, bb = bg & 0xFF;
+				unsigned sr = (p >> 16) & 0xFF, sg = (p >> 8) & 0xFF, sb = p & 0xFF;
+				unsigned r = (sr * a + br * (255 - a)) / 255;
+				unsigned g = (sg * a + bgc * (255 - a)) / 255;
+				unsigned b = (sb * a + bb * (255 - a)) / 255;
+				out = 0xFF000000u | (r << 16) | (g << 8) | b;
+			}
+			if (selected) {
+				out = 0xFF000000u | ((out >> 1) & 0x7F7F7F);
+			}
+			*dst = out;
+		}
+	}
+}

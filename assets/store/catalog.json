@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "categories": ["Featured", "Internet", "Graphics", "Productivity", "Multimedia", "Games", "Utilities"],
+  "items": [
+    { "id": "firefox", "name": "Firefox", "category": "Internet", "featured": true,
+      "blurb": "Browse the web.", "packages": ["firefox-esr"] },
+    { "id": "thunderbird", "name": "Thunderbird", "category": "Internet",
+      "blurb": "Read and send email.", "packages": ["thunderbird"] },
+    { "id": "filezilla", "name": "FileZilla", "category": "Internet",
+      "blurb": "Transfer files by FTP and SFTP.", "packages": ["filezilla"] },
+    { "id": "transmission", "name": "Transmission", "category": "Internet",
+      "blurb": "Download files by BitTorrent.", "packages": ["transmission-gtk"] },
+
+    { "id": "gimp", "name": "GIMP", "category": "Graphics", "featured": true,
+      "blurb": "Edit and retouch photographs.", "packages": ["gimp"] },
+    { "id": "inkscape", "name": "Inkscape", "category": "Graphics",
+      "blurb": "Draw vector illustrations.", "packages": ["inkscape"] },
+    { "id": "krita", "name": "Krita", "category": "Graphics",
+      "blurb": "Paint and illustrate.", "packages": ["krita"] },
+    { "id": "shotwell", "name": "Shotwell", "category": "Graphics",
+      "blurb": "Organize and touch up your photographs.", "packages": ["shotwell"] },
+
+    { "id": "libreoffice", "name": "LibreOffice", "category": "Productivity", "featured": true,
+      "blurb": "Write, calculate and present.", "packages": ["libreoffice"] },
+    { "id": "gnucash", "name": "GnuCash", "category": "Productivity",
+      "blurb": "Keep track of your money.", "packages": ["gnucash"] },
+
+    { "id": "vlc", "name": "VLC", "category": "Multimedia", "featured": true,
+      "blurb": "Play almost any video or sound file.", "packages": ["vlc"] },
+    { "id": "audacity", "name": "Audacity", "category": "Multimedia",
+      "blurb": "Record and edit sound.", "packages": ["audacity"] },
+    { "id": "mpv", "name": "mpv", "category": "Multimedia",
+      "blurb": "A simple, fast movie player.", "packages": ["mpv"] },
+
+    { "id": "mines", "name": "Mines", "category": "Games",
+      "blurb": "Find the mines without digging one up.", "packages": ["gnome-mines"] },
+    { "id": "sudoku", "name": "Sudoku", "category": "Games",
+      "blurb": "Number puzzles, four difficulties.", "packages": ["gnome-sudoku"] },
+    { "id": "solitaire", "name": "Solitaire", "category": "Games",
+      "blurb": "A deck of card games.", "packages": ["aisleriot"] },
+    { "id": "quadrapassel", "name": "Quadrapassel", "category": "Games",
+      "blurb": "Falling blocks; don't let them reach the top.", "packages": ["quadrapassel"] },
+
+    { "id": "simplescan", "name": "Simple Scan", "category": "Utilities",
+      "blurb": "Scan documents and photographs.", "packages": ["simple-scan"] },
+    { "id": "archiveutility", "name": "Archive Utility", "category": "Utilities",
+      "blurb": "Open and make Zip and other archives.", "packages": ["xarchiver"] },
+    { "id": "calculator", "name": "Calculator", "category": "Utilities",
+      "blurb": "A desk calculator.", "packages": ["galculator"] }
+  ]
+}

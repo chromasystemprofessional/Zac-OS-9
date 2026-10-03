@@ -27,9 +27,27 @@ struct Item {
 
 	/* A folder shared from Get Info: drawn on a network line. */
 	bool shared = false;
+
+	/* A mounted network volume (AFP or SMB) on the desktop: real files,
+	 * at a real path, but Put Away ejects it instead of trying to move
+	 * it anywhere — there is nothing on this computer to put away. Like
+	 * the startup disk, it can't be dragged at all yet (desktop.cpp
+	 * excludes every "fixed" item from dragging; the Mac let you drag a
+	 * disk to the Trash to eject it, a gap that predates this and isn't
+	 * closed here either — see its TODO in Desktop::mouseMoveEvent).
+	 * See shell/network/netvolumes.h. */
+	bool isNetworkVolume = false;
 	pl_icon_kind iconKind() const {
 		return shared && kind == PL_ICON_FOLDER ? PL_ICON_SHARED_FOLDER : kind;
 	}
+
+	/* A virtual item: `path` names a node in the Macintosh view of this
+	 * computer ("vfs:/applications/..."), not a file. See vfs.h. */
+	bool isVirtual = false;
+	/* An application's own icon, resolved from the freedesktop icon
+	 * theme (straight-alpha ARGB, 32x32 and 16x16): drawn instead of the
+	 * compiled icon for `kind` when not empty. See appdb.h. */
+	std::vector<uint32_t> customIcon32, customIcon16;
 
 	/* An alias (a symbolic link): its name is shown in italics. */
 	bool isAlias = false;
@@ -69,7 +87,8 @@ int readLabel(const QString &path);
 /* Label 0 removes the attribute. Returns false if it can't be stored. */
 bool writeLabel(const QString &path, int label);
 
-/* "Hard Disk" for /, "Trash" for the trash, else the last path component. */
+/* The node's name for a virtual path, "Unix" for /, "Trash" for the
+ * trash, else the last path component. */
 QString displayName(const QString &path);
 QString trashFilesPath();
 
@@ -77,6 +96,10 @@ QString trashFilesPath();
  * unselected (desktop pattern behind them). TODO: measure label metrics. */
 void paintIconItem(pl_canvas *c, Item &item, int x, int y, bool onDesktop,
 		bool showLabel = true);
+/* The icon alone, at `size` (32 or 16): an application's own icon if one
+ * was resolved, else the compiled icon for its kind. Used by the list
+ * and Find windows, which draw the label text themselves. */
+void paintIcon(pl_canvas *c, Item &item, int x, int y, int size, bool highlight);
 /* Is `p` on the label of the icon at (x, y)? */
 bool iconLabelContains(Item &item, int x, int y, QPoint p);
 /* Icon view placement: items whose names are in `placed` go there; the

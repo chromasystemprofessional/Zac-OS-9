@@ -1,5 +1,7 @@
 #include "folderwindow.h"
 
+#include "vfs.h"
+
 #include <QApplication>
 #include <QDir>
 #include <QDragEnterEvent>
@@ -98,8 +100,25 @@ static QHash<QString, FolderWindow *> &openWindows() {
 	return windows;
 }
 
+/* A virtual path names a node by its stable id and is already absolute;
+ * QDir would read it as relative to the working directory. */
+static QString windowKey(const QString &path) {
+	return vfsIsVirtual(path) ? path : QDir(path).absolutePath();
+}
+
+/* Where a path's free space comes from: everything in the Macintosh view
+ * lives on the startup disk, which is the disk holding the home folder. */
+static QString spacePath(const QString &path) {
+	return vfsIsVirtual(path) ? QDir::homePath() : path;
+}
+
+/* Has this folder gone away? A virtual one goes when its node does. */
+static bool folderExists(const QString &path) {
+	return vfsIsVirtual(path) ? vfsNode(path) != nullptr : QDir(path).exists();
+}
+
 FolderWindow *FolderWindow::open(const QString &path) {
-	const QString key = QDir(path).absolutePath();
+	const QString key = windowKey(path);
 	FolderWindow *w = openWindows().value(key);
 	if (w) {
 		w->show();
@@ -131,7 +150,7 @@ bool FolderWindow::isOpen(const QString &path) {
 }
 
 void FolderWindow::reloadAll(const QString &folder) {
-	const QString key = QDir(folder).absolutePath();
+	const QString key = windowKey(folder);
 	for (FolderWindow *w : openWindows()) {
 		if (w->m_path == key || w->m_expanded.contains(key)) {
 			w->reload();
@@ -154,13 +173,21 @@ FolderWindow::FolderWindow(const QString &path) : m_path(path) {
 	m_renameTimer.setSingleShot(true);
 	m_renameTimer.callOnTimeout([this] { beginRename(m_renameItem); });
 	/* Other programs change folders too; follow them. */
-	m_watcher.addPath(path);
+	if (vfsIsVirtual(path)) {
+		/* Applications come and go as packages are installed. */
+		m_vfsToken = vfsOnChange([this] { reload(); });
+	} else {
+		m_watcher.addPath(path);
+	}
 	QObject::connect(&m_watcher, &QFileSystemWatcher::directoryChanged,
 		[this](const QString &) { reload(); });
 	reload();
 }
 
 FolderWindow::~FolderWindow() {
+	if (m_vfsToken) {
+		vfsOffChange(m_vfsToken);
+	}
 	if (m_saveTimer.isActive()) {
 		m_state.save(m_path);
 	}
@@ -213,7 +240,7 @@ template <typename F> void FolderWindow::forEachItem(F f) {
 
 /* Re-read the folder (and expanded subfolders), keeping the selection. */
 void FolderWindow::reload() {
-	if (!QDir(m_path).exists()) {
+	if (!folderExists(m_path)) {
 		/* Trashed, deleted or moved away: its window goes with it. */
 		QTimer::singleShot(0, this, [this] { close(); });
 		return;
@@ -234,7 +261,7 @@ void FolderWindow::reload() {
 
 	m_children.clear();
 	for (const QString &dir : QSet<QString>(m_expanded)) {
-		if (QDir(dir).exists()) {
+		if (folderExists(dir)) {
 			m_children[dir] = listFolder(dir);
 		} else {
 			m_expanded.remove(dir);
@@ -355,7 +382,7 @@ pl_scrollbar FolderWindow::horizontalBar() const {
 QString FolderWindow::headerText() const {
 	const int n = static_cast<int>(m_items.size());
 	QString items = n == 1 ? QStringLiteral("1 item") : QStringLiteral("%1 items").arg(n);
-	const qint64 free = QStorageInfo(m_path).bytesAvailable();
+	const qint64 free = QStorageInfo(spacePath(m_path)).bytesAvailable();
 	QString avail;
 	if (free >= 1024LL * 1024 * 1024) {
 		avail = QString::number(free / (1024.0 * 1024 * 1024), 'f', 1) + " GB";
@@ -541,11 +568,15 @@ void FolderWindow::toggleExpanded(Item *item) {
 	if (m_expanded.contains(path)) {
 		m_expanded.remove(path);
 		m_children.erase(path);
-		m_watcher.removePath(path);
+		if (!vfsIsVirtual(path)) {
+			m_watcher.removePath(path);
+		}
 	} else {
 		m_expanded.insert(path);
 		m_children[path] = listFolder(path);
-		m_watcher.addPath(path);
+		if (!vfsIsVirtual(path)) {
+			m_watcher.addPath(path);
+		}
 	}
 	relayout();
 	update();
@@ -630,8 +661,8 @@ void FolderWindow::paintList(pl_canvas *c) {
 		if (item->isDir) {
 			paintTriangle(c, TRI_X + d, top + 3, m_expanded.contains(item->path));
 		}
-		pl_icon_paint_label(c, ICON_X + d, top + 1, item->iconKind(), PL_ICON_SMALL,
-			item->selected || item->dropTarget, item->labelColor());
+		paintIcon(c, *item, ICON_X + d, top + 1, PL_ICON_SMALL,
+			item->selected || item->dropTarget);
 
 		const int nameW = COLUMNS[0].width - NAME_X - d - 6;
 		Text name(item->name, std::max(8, nameW), item->nameFont());

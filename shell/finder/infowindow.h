@@ -99,7 +99,7 @@ private:
 
 /* Mac-style time stamp: "Thu, Oct 1, 2026, 9:41 AM". */
 QString finderDate(const QDateTime &t);
-/* "Hard Disk:home:root:" as the Mac wrote paths. */
+/* "Macintosh HD:home:root:" as the Mac wrote paths. */
 QString macPath(const QString &dir);
 /* "12K", "1.4 MB", "2.3 GB" */
 QString finderSize(qint64 bytes);

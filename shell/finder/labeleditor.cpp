@@ -1,5 +1,7 @@
 #include "labeleditor.h"
 
+#include "vfs.h"
+
 #include <QApplication>
 #include <QDir>
 #include <QFileInfo>
@@ -166,6 +168,25 @@ void LabelEditor::commit() {
 	m_blink.stop();
 	m_repaint();
 	if (name.isEmpty() || name == item->name) {
+		return;
+	}
+	if (item->isVirtual) {
+		/* A virtual rename is metadata: the registry keeps it, and the
+		 * item's id (and so its icon's place) doesn't change. */
+		if (vfsNameTaken(item->path, name)) {
+			Alert::ask("That name is already taken. Please use a different name.",
+				"OK", "");
+			return;
+		}
+		if (!vfsRename(item->path, name)) {
+			Alert::ask(QStringLiteral("The item “%1” can't be renamed.")
+				.arg(item->name), "OK", "");
+			return;
+		}
+		if (FinderView *v = Finder::instance().front()) {
+			v->reload();
+			v->selectByName(name);
+		}
 		return;
 	}
 	const QFileInfo info(item->path);

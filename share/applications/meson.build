@@ -3,7 +3,8 @@
 # install alike) and installed.
 entries = ['platinum-appearance.desktop', 'platinum-datetime.desktop', 'platinum-filesharing.desktop',
   'platinum-keyboard.desktop', 'platinum-monitors.desktop', 'platinum-mouse.desktop',
-  'platinum-sound.desktop', 'platinum-tcpip.desktop']
+  'platinum-sound.desktop', 'platinum-tcpip.desktop', 'platinum-store.desktop',
+  'platinum-netbrowser.desktop']
 foreach f : entries
   configure_file(input: f, output: f, copy: true)
 endforeach

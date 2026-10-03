@@ -53,6 +53,10 @@ qt6 = dependency('qt6', modules: ['Core', 'Gui', 'Widgets', 'Network'],
   private_headers: true) # QPlatformNativeInterface: a window's wl_surface
 layershellqt = dependency('LayerShellQt', method: 'cmake',
   modules: ['LayerShellQt::Interface'])
+# GIO reads and launches XDG desktop entries for the Applications folder,
+# so the desktop entry specification is followed rather than approximated.
+gio = dependency('gio-2.0')
+gio_unix = dependency('gio-unix-2.0')
 
 finder_protocol = []
 foreach kind : [['client-header', '@BASENAME@-client-protocol.h'], ['private-code', '@BASENAME@-protocol.c']]
@@ -84,11 +88,33 @@ executable('platinum-finder',
   'finder/infowindow.cpp',
   'finder/findwindow.cpp',
   'finder/folderstate.cpp',
+  'finder/vfs.cpp',
+  'finder/appdb.cpp',
+  'network/netvolumes.cpp',
+  'network/smbclient.cpp',
   link_with: panelkit,
-  include_directories: include_directories('finder', 'panels'),
-  dependencies: [platinum_dep, qt6, layershellqt, wayland_client],
+  include_directories: include_directories('finder', 'panels', 'network'),
+  dependencies: [platinum_dep, qt6, layershellqt, wayland_client, gio, gio_unix],
   cpp_args: ['-std=c++17'],
   install: true,
+)
+
+# The Macintosh view of this computer: the curated hierarchy, and the
+# Applications folder built from XDG desktop entries. The test builds a
+# private XDG environment, so it reads only its own desktop entries.
+test('finder-vfs',
+  executable('test-finder-vfs',
+    'finder/tests/test_vfs.cpp',
+    'finder/vfs.cpp',
+    'finder/appdb.cpp',
+    'finder/items.cpp',
+    link_with: panelkit,
+    include_directories: include_directories('finder', 'panels'),
+    dependencies: [platinum_dep, qt6, gio, gio_unix],
+    cpp_args: ['-std=c++17'],
+  ),
+  env: ['QT_QPA_PLATFORM=offscreen'],
+  timeout: 180,
 )
 
 executable('platinum-appearance',
@@ -136,6 +162,69 @@ executable('platinum-filesharing',
   dependencies: [platinum_dep, qt6, wayland_client],
   cpp_args: ['-std=c++17'],
   install: true,
+)
+
+# Parsing avahi-browse and WS-Discovery replies, against recorded text
+# (see the test file for what could and couldn't be checked live).
+test('discovery',
+  executable('test-discovery',
+    'network/tests/test_discovery.cpp',
+    'network/discovery.cpp',
+    include_directories: include_directories('network'),
+    dependencies: [platinum_dep, qt6],
+    cpp_args: ['-std=c++17'],
+  ),
+  timeout: 60,
+)
+
+executable('platinum-netbrowser',
+  'network/main.cpp',
+  'network/netbrowser.cpp',
+  'network/connectdialog.cpp',
+  'network/logindialog.cpp',
+  'network/volumedialog.cpp',
+  'network/discovery.cpp',
+  'network/afpclient.cpp',
+  'network/smbclient.cpp',
+  'network/netvolumes.cpp',
+  'finder/alert.cpp',
+  'finder/platinumshell.cpp',
+  finder_protocol,
+  link_with: panelkit,
+  include_directories: include_directories('finder', 'panels', 'network'),
+  dependencies: [platinum_dep, qt6, wayland_client],
+  cpp_args: ['-std=c++17'],
+  install: true,
+)
+
+executable('platinum-store',
+  'store/main.cpp',
+  'store/store.cpp',
+  'store/storeclient.cpp',
+  'finder/alert.cpp',
+  'finder/platinumshell.cpp',
+  'finder/appdb.cpp',
+  finder_protocol,
+  link_with: panelkit,
+  include_directories: include_directories('finder', 'panels'),
+  dependencies: [platinum_dep, qt6, wayland_client, gio, gio_unix],
+  cpp_args: ['-std=c++17'],
+  install: true,
+)
+
+# The Software window's catalog: reading it, filtering, and the helper
+# script's own package-name validation, run directly (never through
+# pkexec, and never with a package name that could really install or
+# remove anything).
+test('store-client',
+  executable('test-store-client',
+    'store/tests/test_storeclient.cpp',
+    'store/storeclient.cpp',
+    include_directories: include_directories('finder', 'store'), # settings.h, storeclient.h
+    dependencies: [platinum_dep, qt6],
+    cpp_args: ['-std=c++17'],
+  ),
+  timeout: 60,
 )
 
 executable('platinum-controlpanel',

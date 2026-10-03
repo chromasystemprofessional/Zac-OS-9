@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Network Browser
+Comment=Connect to other computers over the network
+Exec=platinum-netbrowser
+Categories=Network;
+OnlyShowIn=Platinum;

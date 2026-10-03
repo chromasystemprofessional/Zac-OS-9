@@ -6,6 +6,14 @@
 #include <QStandardPaths>
 #include <QUrl>
 
+#include "vfs.h"
+
+/* Virtual paths are already absolute and name a node by its stable id;
+ * QDir would read them as relative to the working directory. */
+static QString stateKeyPath(const QString &path) {
+	return vfsIsVirtual(path) ? path : QDir(path).absolutePath();
+}
+
 static QSettings &store() {
 	static QSettings settings(
 		QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) +
@@ -16,7 +24,7 @@ static QSettings &store() {
 
 /* Paths contain '/', which QSettings treats as nesting: key by hash. */
 static QString group(const QString &path) {
-	return "f" + QCryptographicHash::hash(QDir(path).absolutePath().toUtf8(),
+	return "f" + QCryptographicHash::hash(stateKeyPath(path).toUtf8(),
 		QCryptographicHash::Sha1).toHex().left(16);
 }
 
@@ -46,7 +54,7 @@ FolderState FolderState::load(const QString &path) {
 void FolderState::save(const QString &path) const {
 	QSettings &st = store();
 	st.beginGroup(group(path));
-	st.setValue("path", QDir(path).absolutePath());
+	st.setValue("path", stateKeyPath(path));
 	if (hasPosition) {
 		st.setValue("x", position.x());
 		st.setValue("y", position.y());
