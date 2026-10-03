@@ -105,9 +105,9 @@ static void add_finder_menus(struct mb_menu *menus, int *n) {
 	 * Trash really did hold the file. */
 	add(m, "Show All Applications", 0, up, ACT_FINDER, "show-hidden-applications");
 	sep(m);
-	add(m, "Sleep", 0, false, ACT_NONE, NULL);
-	add(m, "Restart", 0, false, ACT_NONE, NULL);
-	add(m, "Shut Down", 0, false, ACT_NONE, NULL);
+	add(m, "Sleep",     0, true, ACT_LAUNCH, "systemctl suspend");
+	add(m, "Restart",   0, true, ACT_LAUNCH, "systemctl reboot");
+	add(m, "Shut Down", 0, true, ACT_LAUNCH, "systemctl poweroff");
 }
 
 static void add_app_menus(struct mb_menu *menus, int *n, const char *app_id) {
