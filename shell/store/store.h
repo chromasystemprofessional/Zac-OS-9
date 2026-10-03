@@ -34,6 +34,7 @@ private:
 	const StoreItem *currentItem() const;
 	void refreshInstalled();  /* re-checks the selected item only */
 	void act();               /* the detail button: install or remove */
+	void actStyle();          /* the second button: the preset on or off */
 	void paintDetail(pl_canvas *c, uint32_t bg) const;
 
 	std::vector<StoreItem> m_allItems;
@@ -41,7 +42,7 @@ private:
 	std::vector<const StoreItem *> m_shown; /* items in the chosen category */
 
 	PanelList m_categoryList, m_itemList;
-	PanelButton m_actionButton;
+	PanelButton m_actionButton, m_styleButton;
 	PanelHost m_host{ this };
 
 	/* The selected item's installed state, re-checked when it is chosen
@@ -50,6 +51,7 @@ private:
 	 * wasteful for something that only changes because of our own
 	 * actions or, rarely, someone else's in a terminal). */
 	bool m_installed = false;
+	bool m_styleOn = false; /* the selected item's preset is on */
 	bool m_busy = false;
 	QString m_status;
 

@@ -12,7 +12,9 @@
       "blurb": "Download files by BitTorrent.", "packages": ["transmission-gtk"] },
 
     { "id": "gimp", "name": "GIMP", "category": "Graphics", "featured": true,
-      "blurb": "Edit and retouch photographs.", "packages": ["gimp"] },
+      "blurb": "Edit and retouch photographs.", "packages": ["gimp"],
+      "style": { "id": "gimp-photoshop", "label": "Photoshop Layout", "reset": "Standard Layout",
+        "blurb": "Photoshop Layout arranges GIMP's tools, panels and shortcuts like Photoshop's (PhotoGIMP by Diolinux, GPL-3.0). Quit GIMP before switching; Standard Layout puts your own settings back." } },
     { "id": "inkscape", "name": "Inkscape", "category": "Graphics",
       "blurb": "Draw vector illustrations.", "packages": ["inkscape"] },
     { "id": "krita", "name": "Krita", "category": "Graphics",

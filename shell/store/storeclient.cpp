@@ -6,6 +6,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <functional>
 #include <unistd.h>
 
 #include "settings.h"
@@ -46,6 +47,14 @@ std::vector<StoreItem> storeItems() {
 		item.featured = o.value("featured").toBool(false);
 		for (const QJsonValue &p : o.value("packages").toArray()) {
 			item.packages << p.toString();
+		}
+		const QJsonObject style = o.value("style").toObject();
+		item.styleId = style.value("id").toString();
+		item.styleLabel = style.value("label").toString();
+		item.styleReset = style.value("reset").toString();
+		item.styleBlurb = style.value("blurb").toString();
+		if (item.styleLabel.isEmpty() || item.styleReset.isEmpty()) {
+			item.styleId.clear(); /* an incomplete preset is no preset */
 		}
 		if (!item.id.isEmpty() && !item.name.isEmpty() && !item.packages.isEmpty()) {
 			out.push_back(std::move(item));
@@ -91,7 +100,10 @@ void appstoreHelperCommand(QProcess *p, const QStringList &args) {
 	}
 }
 
-QString runAppstoreHelper(const QStringList &args, bool *ok, QString *err) {
+/* Starts a process through `start`, waits for it keeping the windows
+ * drawn (never QProcess::waitForFinished: see CLAUDE.md), and reports
+ * as runAppstoreHelper does. */
+static QString runWatched(const std::function<void(QProcess *)> &start, bool *ok, QString *err) {
 	QProcess p;
 	bool done = false;
 	QObject::connect(&p, &QProcess::finished, [&done] { done = true; });
@@ -100,7 +112,7 @@ QString runAppstoreHelper(const QStringList &args, bool *ok, QString *err) {
 			done = true;
 		}
 	});
-	appstoreHelperCommand(&p, args);
+	start(&p);
 	p.closeWriteChannel();
 	while (!done) {
 		QApplication::processEvents(QEventLoop::ExcludeUserInputEvents | QEventLoop::WaitForMoreEvents,
@@ -117,6 +129,35 @@ QString runAppstoreHelper(const QStringList &args, bool *ok, QString *err) {
 		}
 	}
 	return QString::fromUtf8(p.readAllStandardOutput());
+}
+
+QString runAppstoreHelper(const QStringList &args, bool *ok, QString *err) {
+	return runWatched([&](QProcess *p) { appstoreHelperCommand(p, args); }, ok, err);
+}
+
+static QString styleHelperPath() {
+	const QString env = qEnvironmentVariable("ZACOS9_APPSTYLE_HELPER");
+	if (!env.isEmpty()) {
+		return env;
+	}
+	const QString dir = QCoreApplication::applicationDirPath();
+	for (const QString &candidate : { dir + "/../libexec/zacos9/zacos9-appstyle",
+			dir + "/../../appstore/zacos9-appstyle" }) {
+		if (QFileInfo(candidate).isExecutable()) {
+			return QFileInfo(candidate).canonicalFilePath();
+		}
+	}
+	return "/usr/libexec/zacos9/zacos9-appstyle";
+}
+
+QString runStyleHelper(const QStringList &args, bool *ok, QString *err) {
+	return runWatched([&](QProcess *p) { p->start(styleHelperPath(), args); }, ok, err);
+}
+
+bool styleIsOn(const QString &styleId) {
+	bool ok = false;
+	const QString out = runStyleHelper({ "status", styleId }, &ok);
+	return ok && out.trimmed() == "on";
 }
 
 bool packagesInstalled(const QStringList &packages) {

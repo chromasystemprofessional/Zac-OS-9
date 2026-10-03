@@ -30,6 +30,8 @@ Depends: ${shlibs:Depends},
          ${misc:Depends},
          qt6-wayland,
          qt6-svg-plugins,
+         python3,
+         procps,
          fonts-dejavu-core,
          avahi-utils,
          gvfs-backends

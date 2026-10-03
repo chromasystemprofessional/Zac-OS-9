@@ -20,6 +20,7 @@ static constexpr int DETAIL_H = 150;
 static constexpr int LIST_BOTTOM = H - MARGIN - DETAIL_H - GAP;
 static constexpr int ICON_SIZE = 32;
 static constexpr int SWEEP_MS = 30; /* the busy sweep's frame interval */
+static constexpr int STYLE_BTN_W = 150; /* the preset button, beside Install/Remove */
 
 /* The real icon of an installed item, matched by the package dpkg says
  * it is (see appdb.h's AppEntry::origin): empty if it isn't installed,
@@ -53,6 +54,9 @@ StoreWindow::StoreWindow() {
 
 	m_actionButton = PanelButton("Install", QRect(W - MARGIN - 90, H - MARGIN - 20, 90, 20));
 	m_actionButton.clicked = [this] { act(); };
+	m_styleButton = PanelButton("Preset", QRect(W - MARGIN - 90 - 8 - STYLE_BTN_W, H - MARGIN - 20,
+		STYLE_BTN_W, 20));
+	m_styleButton.clicked = [this] { actStyle(); };
 	m_host.buttons = { &m_actionButton };
 
 	m_sweep.setInterval(SWEEP_MS);
@@ -113,6 +117,51 @@ void StoreWindow::refreshInstalled() {
 		m_actionButton.rect.width() - 8, PL_FONT_SYSTEM);
 	m_actionButton.enabled = true;
 	m_status.clear();
+
+	/* A look-and-feel preset, once the application is there to use it. */
+	const bool preset = m_installed && !item->styleId.isEmpty();
+	m_styleOn = preset && styleIsOn(item->styleId);
+	if (preset) {
+		m_styleButton.label = std::make_unique<Text>(m_styleOn ? item->styleReset : item->styleLabel,
+			m_styleButton.rect.width() - 8, PL_FONT_SYSTEM);
+		m_styleButton.enabled = true;
+		m_host.buttons = { &m_styleButton, &m_actionButton };
+	} else {
+		m_host.buttons = { &m_actionButton };
+	}
+}
+
+void StoreWindow::actStyle() {
+	const StoreItem *item = currentItem();
+	if (!item || m_busy || item->styleId.isEmpty()) {
+		return;
+	}
+	const QString id = item->id;
+	const QString styleId = item->styleId;
+	const bool turningOff = m_styleOn;
+	m_busy = true;
+	m_actionButton.enabled = false;
+	m_styleButton.enabled = false;
+	m_status = QString(turningOff ? "Switching to %1…" : "Switching to %1…")
+		.arg(turningOff ? item->styleReset : item->styleLabel);
+	m_sweepPos = 0;
+	m_sweep.start();
+	update();
+
+	bool ok = false;
+	QString err;
+	runStyleHelper({ turningOff ? "reset" : "apply", styleId }, &ok, &err);
+
+	m_sweep.stop();
+	m_busy = false;
+	if (currentItem() && currentItem()->id == id) {
+		refreshInstalled();
+	}
+	/* After the refresh, which clears the status line. */
+	if (!ok) {
+		m_status = err.isEmpty() ? "That didn't work." : err;
+	}
+	update();
 }
 
 void StoreWindow::act() {
@@ -132,6 +181,7 @@ void StoreWindow::act() {
 	const bool wasInstalled = m_installed;
 	m_busy = true;
 	m_actionButton.enabled = false;
+	m_styleButton.enabled = false;
 	m_status = (wasInstalled ? "Removing " : "Installing ") + name + "…";
 	m_sweepPos = 0;
 	m_sweep.start();
@@ -183,6 +233,13 @@ void StoreWindow::paintDetail(pl_canvas *c, uint32_t bg) const {
 		panelText(c, line, textX, y, PL_FONT_VIEWS, GRAY(0x5));
 		y += 12;
 	}
+	if (m_installed && !item->styleId.isEmpty()) {
+		y += 4;
+		for (const QString &line : panelWrap(item->styleBlurb, textW, PL_FONT_VIEWS)) {
+			panelText(c, line, textX, y, PL_FONT_VIEWS, GRAY(0x5));
+			y += 12;
+		}
+	}
 
 	const int barY = H - MARGIN - 20 - 8 - PL_PROGRESS_H;
 	if (m_busy) {
@@ -191,8 +248,11 @@ void StoreWindow::paintDetail(pl_canvas *c, uint32_t bg) const {
 	} else if (!m_status.isEmpty()) {
 		panelText(c, m_status, textX, barY + PL_PROGRESS_H - 1, PL_FONT_VIEWS, GRAY(0x5));
 	} else {
-		panelText(c, m_installed ? "Installed." : "Not installed.", textX, barY + PL_PROGRESS_H - 1,
-			PL_FONT_VIEWS, GRAY(0x5));
+		QString state = m_installed ? "Installed." : "Not installed.";
+		if (m_styleOn) {
+			state += " " + item->styleLabel + " is on.";
+		}
+		panelText(c, state, textX, barY + PL_PROGRESS_H - 1, PL_FONT_VIEWS, GRAY(0x5));
 	}
 	(void)bg;
 }

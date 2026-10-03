@@ -142,3 +142,27 @@ check is ever reached.
 installs and removes a small package (`galculator`) through the window,
 end to end, and was used to produce the screenshots this feature's
 review was based on.
+
+## Look-and-feel presets
+
+An item in `assets/store/catalog.json` may carry a `"style"` (`id`, `label`,
+`reset`, `blurb`). Once the application is installed, its detail pane gets a
+second button beside Remove that switches the preset on (`label`) and off
+(`reset`). It runs `zacos9-appstyle` (appstore/, Python 3, no privileges) as
+the user.
+
+- **GIMP › Photoshop Layout** is PhotoGIMP 3.1 by Diolinux (GPL-3.0): GIMP 3's
+  tool order, panels and shortcuts arranged like Photoshop's. The release zip
+  is fetched on first use, checked against a SHA-256 fixed in the helper, and
+  only its `.config/GIMP/3.0` settings are used. Left out: the splash screen,
+  icons and launcher (artwork whose license PhotoGIMP doesn't state), the
+  author's monitor resolution (`gimprc`) and every window position, size and
+  monitor (`sessionrc`, which holds windows for a two-monitor 2560-wide
+  desk).
+- Anything it replaces is kept in `~/.local/share/zacos9/styles/ID.backup`;
+  Standard Layout restores it exactly and removes what the preset added. A
+  failure part way through is rolled back. It refuses while the application
+  runs (GIMP rewrites its settings when it quits).
+- Updating it means changing the URL and SHA-256 in `STYLES`, after trying the
+  new release; `tests/store/test_appstyle.py` covers the mechanics with a made-up
+  preset.

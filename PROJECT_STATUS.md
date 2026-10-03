@@ -24,6 +24,21 @@ Updated: 2026-10-03
 
 ## Current work
 
+**Software window: look-and-feel presets (GIMP › Photoshop Layout)** (built and tested; not yet committed; not in an ISO yet).
+
+- A catalog item can carry a `"style"`; the detail pane then shows a second button (Photoshop Layout /
+  Standard Layout) once the app is installed, with a line saying what it does and "Photoshop Layout is
+  on." in the status. `appstore/zacos9-appstyle` (Python, runs as the user) does the work — see
+  `docs/appstore.md`. `debian/control` now Depends on `python3` and `procps`.
+- Checked first: Debian 13 has GIMP 3.0.4 (PhotoGIMP 3.1 needs 3.0+); PhotoGIMP is GPL-3.0; the
+  splash/icons/launcher artwork has no stated license, so they're not used.
+- Tested for real: in the Software window with GIMP installed — apply, GIMP launched with the layout
+  (single slim tool column, tool options and layers on the right), then Standard Layout restored an
+  existing settings file exactly. Found and fixed: the preset's `sessionrc` holds its author's
+  2560-wide, two-monitor window sizes and positions (GIMP opened off-screen); those are cut out.
+- 19 checks in `tests/store/test_appstyle.py` (meson test `appstyle`). Krita/Inkscape presets not done:
+  their built-in shortcut schemes still to be confirmed in the Debian versions (Krita 5.2.9, Inkscape 1.4).
+
 **Boot screens: logo from the first moment, a new Welcome screen** (built; checked in QEMU under BIOS and UEFI, live and installed; not yet committed; not in an ISO yet).
 
 - **GRUB shows the logo** (centred, on white) from the moment it starts, where there was a blank

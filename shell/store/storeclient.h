@@ -17,6 +17,10 @@ struct StoreItem {
 	QString id, name, category, blurb;
 	QStringList packages;
 	bool featured = false;
+	/* An optional look-and-feel preset for it (zacos9-appstyle): the
+	 * button's label to switch it on (`styleLabel`) and off (`styleReset`),
+	 * and what it does. Empty `styleId` means none. */
+	QString styleId, styleLabel, styleReset, styleBlurb;
 };
 
 /* The shipped catalog (pl_data_dir()/store/catalog.json, or
@@ -38,6 +42,12 @@ void appstoreHelperCommand(QProcess *p, const QStringList &args);
  * can take a while, and pkexec may be asking for a password). *ok says
  * whether it worked; *err gets its last line of complaint. */
 QString runAppstoreHelper(const QStringList &args, bool *ok, QString *err = nullptr);
+
+/* zacos9-appstyle, as the user (no privilege): "apply", "reset" or
+ * "status" for a preset. Keeps the windows drawn meanwhile, like
+ * runAppstoreHelper; *err gets its last line of complaint. */
+QString runStyleHelper(const QStringList &args, bool *ok, QString *err = nullptr);
+bool styleIsOn(const QString &styleId);
 
 /* Is every package in `packages` installed? Runs the helper's
  * "installed" command directly: no privilege is needed to ask, so it

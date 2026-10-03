@@ -1,0 +1,242 @@
+#!/usr/bin/env python3
+"""zacos9-appstyle: look-and-feel presets for installed applications, for the
+Software window (shell/store).
+
+    zacos9-appstyle status ID    prints "on" or "off"
+    zacos9-appstyle apply ID     turns the preset on
+    zacos9-appstyle reset ID     puts the application's own settings back
+
+A preset is a set of settings files for the application, fetched once from
+its publisher, checked against a SHA-256 fixed here, and copied into the
+user's own settings folder - never anywhere else. Whatever a preset replaces
+is kept in ~/.local/share/zacos9/styles/ID.backup, so reset puts it back
+exactly (or removes what the preset added). Runs as the user, no privileges.
+
+"gimp-photoshop": PhotoGIMP by Diolinux (GPL-3.0,
+https://github.com/Diolinux/PhotoGIMP): GIMP 3's tools, panels and keyboard
+shortcuts arranged like Photoshop's. Only its settings are used; its splash
+screen, icons and launcher (artwork whose license isn't stated) are left out,
+and so are the display resolution and window positions its author's files hard-code.
+"""
+import hashlib
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import urllib.request
+import zipfile
+
+HOME = os.path.expanduser("~")
+
+STYLES = {
+    "gimp-photoshop": {
+        "name": "Photoshop Layout",
+        "program": r"gimp(-3(\.[0-9]+)?)?",  # a running GIMP rewrites its settings on exit
+        "program_label": "GIMP",
+        "url": "https://github.com/Diolinux/PhotoGIMP/releases/download/3.1/PhotoGIMP-linux.zip",
+        "sha256": "bf0e1279870d40152beb3e702cf3e4e01a6892031a1ace5bc4a9b858894b584e",
+        "member_prefix": "PhotoGIMP-linux/.config/GIMP/3.0/",
+        "target": os.path.join(HOME, ".config", "GIMP", "3.0"),
+        "skip": ("splashes/",),
+        # The author's own monitors, not ours: GIMP works out the real one, and sizes
+        # and places its windows for it (their sessionrc holds windows for a 2560-wide
+        # screen, one of two). Expressions are cut out, not lines: they share a line
+        # with the brackets that close their window's entry.
+        "edits": {
+            "gimprc": [(re.compile(r"^\(monitor-[xy]resolution [^\n]*\n", re.M), "")],
+            "sessionrc": [(re.compile(r"[ \t]*\((?:position|size|monitor)(?:[ \t]+-?\d+)+\)"), "")],
+        },
+    },
+}
+
+
+class Failure(Exception):
+    pass
+
+
+def state_dir():
+    base = os.environ.get("XDG_DATA_HOME") or os.path.join(HOME, ".local", "share")
+    return os.path.join(base, "zacos9", "styles")
+
+
+def cache_dir():
+    base = os.environ.get("XDG_CACHE_HOME") or os.path.join(HOME, ".cache")
+    return os.path.join(base, "zacos9", "styles")
+
+
+def manifest_path(style_id):
+    return os.path.join(state_dir(), style_id + ".json")
+
+
+def backup_dir(style_id):
+    return os.path.join(state_dir(), style_id + ".backup")
+
+
+def is_on(style_id):
+    return os.path.exists(manifest_path(style_id))
+
+
+def running(style):
+    """Is the application running (as this user)?"""
+    try:
+        out = subprocess.run(["pgrep", "-u", str(os.getuid()), "-x", style["program"]],
+                             capture_output=True, text=True)
+    except FileNotFoundError:
+        return False
+    return out.returncode == 0
+
+
+def fetch(style):
+    """The preset's zip, from the cache or downloaded, checked either way."""
+    os.makedirs(cache_dir(), exist_ok=True)
+    path = os.path.join(cache_dir(), style["sha256"] + ".zip")
+
+    def good(p):
+        h = hashlib.sha256()
+        with open(p, "rb") as f:
+            for block in iter(lambda: f.read(1 << 20), b""):
+                h.update(block)
+        return h.hexdigest() == style["sha256"]
+
+    if os.path.exists(path) and good(path):
+        return path
+    fd, tmp = tempfile.mkstemp(dir=cache_dir(), suffix=".part")
+    os.close(fd)
+    try:
+        req = urllib.request.Request(style["url"], headers={"User-Agent": "zacos9-appstyle"})
+        with urllib.request.urlopen(req, timeout=60) as r, open(tmp, "wb") as out:
+            shutil.copyfileobj(r, out)
+        if not good(tmp):
+            raise Failure("What was downloaded isn't what ZacOS 9 expects, so nothing was changed.")
+        os.replace(tmp, path)
+        return path
+    except Failure:
+        raise
+    except Exception:
+        raise Failure("It couldn't be downloaded. Check your internet connection and try again.")
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+
+
+def members(style, zf):
+    """(zip member, path relative to the settings folder) to install."""
+    out = []
+    for info in zf.infolist():
+        name = info.filename
+        if info.is_dir() or not name.startswith(style["member_prefix"]):
+            continue
+        rel = name[len(style["member_prefix"]):]
+        parts = rel.split("/")
+        if not rel or rel.startswith("/") or ".." in parts or any(rel.startswith(s) for s in style["skip"]):
+            continue
+        out.append((info, rel))
+    return out
+
+
+def apply(style_id):
+    style = STYLES[style_id]
+    if is_on(style_id):
+        return
+    if running(style):
+        raise Failure("Quit %s first, then try again: it saves its settings when it quits, "
+                      "which would undo this." % style["program_label"])
+    zip_path = fetch(style)
+    target = style["target"]
+    backup = backup_dir(style_id)
+    written, replaced = [], []
+    try:
+        with zipfile.ZipFile(zip_path) as zf:
+            files = members(style, zf)
+            if not files:
+                raise Failure("The download has nothing for this version of %s." % style["program_label"])
+            for info, rel in files:
+                dest = os.path.join(target, rel)
+                if os.path.lexists(dest):
+                    keep = os.path.join(backup, rel)
+                    os.makedirs(os.path.dirname(keep), exist_ok=True)
+                    shutil.copy2(dest, keep, follow_symlinks=False)
+                    replaced.append(rel)
+                data = zf.read(info)
+                edits = style["edits"].get(rel)
+                if edits:
+                    text = data.decode("utf-8")
+                    for pattern, replacement in edits:
+                        text = pattern.sub(replacement, text)
+                    data = text.encode("utf-8")
+                os.makedirs(os.path.dirname(dest), exist_ok=True)
+                if os.path.islink(dest):
+                    os.unlink(dest)
+                with open(dest, "wb") as f:
+                    f.write(data)
+                written.append(rel)
+        os.makedirs(state_dir(), exist_ok=True)
+        tmp = manifest_path(style_id) + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump({"written": written, "replaced": replaced}, f)
+        os.replace(tmp, manifest_path(style_id))
+    except BaseException:
+        undo(style, written, replaced, backup)
+        shutil.rmtree(backup, ignore_errors=True)
+        raise
+
+
+def undo(style, written, replaced, backup):
+    target = style["target"]
+    for rel in written:
+        dest = os.path.join(target, rel)
+        if rel in replaced:
+            shutil.copy2(os.path.join(backup, rel), dest)
+        elif os.path.lexists(dest):
+            os.unlink(dest)
+    # Folders the preset made and nothing else has used.
+    for rel in sorted(written, key=len, reverse=True):
+        d = os.path.dirname(os.path.join(target, rel))
+        while d.startswith(target + os.sep):
+            try:
+                os.rmdir(d)
+            except OSError:
+                break
+            d = os.path.dirname(d)
+
+
+def reset(style_id):
+    style = STYLES[style_id]
+    if not is_on(style_id):
+        return
+    if running(style):
+        raise Failure("Quit %s first, then try again." % style["program_label"])
+    with open(manifest_path(style_id)) as f:
+        m = json.load(f)
+    undo(style, m["written"], m["replaced"], backup_dir(style_id))
+    os.unlink(manifest_path(style_id))
+    shutil.rmtree(backup_dir(style_id), ignore_errors=True)
+
+
+def main(argv):
+    if len(argv) != 3 or argv[1] not in ("status", "apply", "reset") or argv[2] not in STYLES:
+        print("usage: zacos9-appstyle status|apply|reset ID   (IDs: %s)" % ", ".join(sorted(STYLES)),
+              file=sys.stderr)
+        return 64
+    action, style_id = argv[1], argv[2]
+    try:
+        if action == "status":
+            print("on" if is_on(style_id) else "off")
+        elif action == "apply":
+            apply(style_id)
+        else:
+            reset(style_id)
+    except Failure as e:
+        print(str(e), file=sys.stderr)
+        return 1
+    except OSError as e:
+        print("Something went wrong with the settings files (%s)." % e.strerror, file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
