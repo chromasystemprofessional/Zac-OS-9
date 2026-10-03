@@ -173,6 +173,12 @@ void launch_fill_logo_menu(struct mb_menu *menu) {
 		sibling_program("zacos9-store", command, sizeof(command));
 		add_item(menu, "Software", true, ACT_LAUNCH, command);
 	}
+	/* Windows programs, installed through Wine. */
+	{
+		char command[PATH_MAX + 64];
+		sibling_program("zacos9-wininstall", command, sizeof(command));
+		add_item(menu, "Windows Installer", true, ACT_LAUNCH, command);
+	}
 	/* The Network Browser: connecting to other computers, as Mac OS 9's
 	 * own Apple Menu Item of the same name did. */
 	{

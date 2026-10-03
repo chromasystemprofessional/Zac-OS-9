@@ -7,6 +7,10 @@
 #
 #   zacos9-appstore-helper install PACKAGE...
 #   zacos9-appstore-helper remove PACKAGE...
+#   zacos9-appstore-helper install-deb FILE
+#       installs a downloaded .deb (and what it depends on), for the App
+#       Installer (zacos9-appinstall); apt's progress goes to stdout as
+#       APT::Status-Fd lines ("dlstatus:..." and "pmstatus:...")
 #   zacos9-appstore-helper installed PACKAGE...
 #       prints "PACKAGE<TAB>yes" or "PACKAGE<TAB>no" for each, from dpkg's
 #       own record; needs no root (zacos9-store also runs it directly)
@@ -60,12 +64,30 @@ install)
 	[ "$(id -u)" = 0 ] || die "zacos9-appstore-helper install must run as root (through pkexec)."
 	apt-get -y -o Dpkg::Options::="--force-confold" -o Dpkg::Progress-Fancy=0 install -- "$@"
 	;;
+install-deb)
+	[ "$#" -eq 1 ] || die "usage: zacos9-appstore-helper install-deb FILE"
+	case "$1" in
+	/*.deb) ;;
+	*) die "'$1' isn't the full path of a .deb file." ;;
+	esac
+	[ -f "$1" ] && [ ! -L "$1" ] || die "There is no file at $1."
+	[ "$(id -u)" = 0 ] || die "zacos9-appstore-helper install-deb must run as root (through pkexec)."
+	# A copy of our own: the file can't be swapped between here and dpkg,
+	# and apt's unprivileged download user can read it.
+	tmp=$(mktemp -d /tmp/zacos9-deb.XXXXXX)
+	trap 'rm -rf "$tmp"' EXIT
+	cp -- "$1" "$tmp/package.deb"
+	chmod 755 "$tmp"
+	chmod 644 "$tmp/package.deb"
+	dpkg-deb --info "$tmp/package.deb" >/dev/null 2>&1 || die "That file isn't a Debian package."
+	apt-get -y -o Dpkg::Options::="--force-confold" -o Dpkg::Progress-Fancy=0 		-o APT::Status-Fd=1 install "$tmp/package.deb"
+	;;
 remove)
 	check_pkgs "$@"
 	[ "$(id -u)" = 0 ] || die "zacos9-appstore-helper remove must run as root (through pkexec)."
 	apt-get -y -o Dpkg::Progress-Fancy=0 remove -- "$@"
 	;;
 *)
-	die "usage: zacos9-appstore-helper install|remove|installed PACKAGE..."
+	die "usage: zacos9-appstore-helper install|remove|installed PACKAGE... | install-deb FILE"
 	;;
 esac

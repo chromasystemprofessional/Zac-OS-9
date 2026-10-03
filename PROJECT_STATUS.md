@@ -18,9 +18,148 @@ Updated: 2026-10-03
 | `996b311` | Applications: empty on fresh install, flat launchers |
 | `634add8` | Finder: local disk volumes on the desktop (GVolumeMonitor) |
 | `8771336` | Windows app compatibility: `.exe`/`.msi` open via Wine |
-| *(uncommitted)* | Mac OS 9-style installer: Welcome → Select Disk → Installing → Done, runs `zacos9-install` via polkit |
+| *(uncommitted)* | Mac OS 9-style installer: Welcome → Select Disk → Installing → Done, runs `zacos9-install` via polkit; partition-level install (preserve FAT/HFS+ sibling partitions) |
+| *(uncommitted)* | New ZacOS 9 SVG logo at 16×16 (menu bar) and 64×64 HQ (startup, installer) with real alpha blending |
+| *(uncommitted)* | Installer fixed end to end: GRUB packages in the image, UEFI/BIOS detection, BIOS boot partition, fallback `EFI/BOOT/BOOTX64.EFI` for Macs, live user in `sudo` (polkit), failing step shown in the window. VM-tested (`build/test-install.py`): whole disk under BIOS and UEFI, and a partition beside a kept FAT partition under UEFI — each installed disk boots to the desktop. Boot splash now shows the logo and a progress bar. |
 
 ## Current work
+
+**Boot screens: logo from the first moment, a new Welcome screen** (built; checked in QEMU under BIOS and UEFI, live and installed; not yet committed; not in an ISO yet).
+
+- **GRUB shows the logo** (centred, on white) from the moment it starts, where there was a blank
+  white or black screen — live medium (`iso/config/bootloaders/grub-pc`: 800x600 picture
+  `zacos9-boot.png`; `isolinux/splash.png` + hidden countdown for BIOS) and installed
+  (`boot/09_zacos9`; `zacos9-install` runs `boot/zacos9-bootlogo` — stdlib-only Python writing a
+  white PNG the size of the current screen (fb0) with the logo in the middle — and sets
+  `GRUB_GFXMODE=WxH,auto`). GRUB can only draw backgrounds at the top left, hence a picture the
+  screen's size. GRUB's own text is hidden by `color_normal=white/black`. Past 4K it's skipped.
+  Debian's `00_header` hardcodes `background_image -m stretch`, which is fine for an exact-size picture.
+- **Welcome screen** (`compositor/src/startup.c`): "Welcome to ZacOS 9", a vector picture of a modern
+  computer (`lib/welcome.c`, cairo; display on a stand showing a ZacOS desktop, keyboard, mouse) in a
+  white well, status, progress bar; the extension icons now march in along the bottom of the screen
+  as the bar fills (they used to run during the logo phase). Logo-only phase 1500 → 500 ms.
+  `lib/tests/test_welcome.c`; `tests/vm/boot-frames.py` recognises the new box.
+- Tools: `tools/boot/make-boot-art.py` regenerates `boot/logo-64.rgb` and the two live pictures.
+  `build/bootlab/` (not committed): loop-mount the test disks, patch an ISO's boot files with xorriso
+  (no rebuild), record a boot frame by frame (`rec.sh`, `rec-iso.sh`, `analyze.py`).
+- **Not fixed — gaps of ~1 s of plain white** between GRUB and the splash, and before zacos9-wm
+  draws (the kernel's text console clears the screen to its all-white palette when it starts; and
+  plymouth quits before the wm's first frame). Tried `fbcon=map:9` (keeps the logo up through the
+  first gap) but it leaves a *black* gap after plymouth and unbinds the text consoles (the greeter
+  needs them) — would need a seamless hand-off (plymouth deactivate / quit --retain-splash around
+  wm start, fbcon bound after) that can't be validated on real hardware from here.
+
+**Disk name, aliases of applications, About logo** (built and tested; not yet committed; not in an ISO yet).
+
+- The startup disk: "Macintosh HD" (Apple's) replaced. Name = the user's rename, else the name
+  given at install (`/etc/zacos9/disk-name`), else "Zacintosh HD"; a registry still holding the
+  old default is treated as unnamed. The installer's Select screen has a "Disk name" field
+  (default Zacintosh HD, ≤ 27 chars, no `:` `/`), passed as `zacos9-install DEVICE NAME`, also
+  used as the ext4 label (16 bytes). The desktop's disk can now be renamed (it was "fixed").
+  VM-tested: installed as "Adam's Disk", label and file right, shown on the desktop after setup.
+- Make Alias on a Macintosh-view item (an application, or a folder standing for a real one) makes
+  the alias on the desktop (it silently failed before). An application's alias is a link to its
+  desktop file: shown with the app's icon, opening it launches the app (`appLaunchFile`).
+- About This Computer: the 64x64 logo (was the 16x16 scaled 3x).
+- Installer disk list leaves out RAM disks (`lsblk -e 1,7,11`).
+
+**Installing apps by dropping them onto Applications** (built and tested in a nested session; not yet committed; not in an ISO yet).
+
+- Files dropped on the Applications icon or into its window (`vfsIsApplications`; Applications
+  now accepts drops) are installed, not moved: `.exe`/`.msi` to the Windows Installer, the rest
+  to the new App Installer (`shell/appinstall/`), a Mac OS 9 copy-style window ("Items remaining
+  to be installed", progress bar, Stop).
+  - `.deb`: an alert names package, version and publisher (setup runs as root), then
+    `zacos9-appstore-helper install-deb FILE` (new: validates, copies the file, `apt-get install`
+    with `APT::Status-Fd` for real progress; dependencies fetched). Not stoppable once started.
+  - `.AppImage`: copied (chunked, with progress) into `~/.local/share/zacos9/apps`, made runnable;
+    name/icon from its own root files via `--appimage-extract`, following their symlinks into
+    `usr/share` (extracting a link alone left it dangling). `libfuse2t64` added to the ISO.
+  - `.tar.gz/.xz/.bz2/.zst`: unpacked there with progress; a desktop entry inside, else exactly
+    one program (or one named like the archive), else refused and removed.
+  - Anything else: "isn't an application to install" (shown by the App Installer).
+- The Finder now loads `Icon=` file paths (GFileIcon), so these apps show their own icons.
+- **Compositor focus bug fixed** (`view_focus`, view.c): after a click or drag on the desktop
+  (a layer surface with on-demand keyboard), newly opened windows were drawn active but typing
+  went to the desktop until clicked. Only an *exclusive* layer (a menu being tracked) keeps it now.
+- Tested: .deb (with a real dependency fetched), a real AppImage (appimagetool), an archive with
+  one program, one with two (refused), notes.txt (refused); drops on the icon and into the window;
+  the installed archive app launched from Applications.
+- Not done: removing such apps (Move To Trash still only hides; `X-ZacOS9-Installed` in their
+  entries records what to delete when that's added). Flatpak `.flatpakref` not handled.
+
+**Finder: moving icons in the Macintosh view, Clean Up, Arrange** (built and checked on screen; not yet committed).
+
+- Icons of virtual items (Macintosh HD's three folders, System Folder, Applications) used to refuse
+  to drag at all. They now drag within their own window and stay put (remembered per folder, as
+  for real folders), carrying `ICON_MOVE_MIME` rather than file URLs, so nothing else accepts them.
+  Dropped anywhere else, an application gets an alert: it stays in Applications; Move To Trash
+  removes one. Other virtual items: "part of this computer and can't be moved".
+- View > Clean Up (nearest free grid spot, topmost-leftmost first) and View > Arrange > by Name /
+  Date Modified / Date Created / Size / Kind / Label (`items.cpp` `arrangeIcons`/`sortIcons`), for
+  an icon-view window, or the desktop with no window in front (the Trash keeps its corner).
+- Checked in a nested session: Documents moved and still there in a new session; Clean Up snapped
+  it to the grid; Arrange by Name ordered the disk's folders; dragging an app out of Applications
+  showed the alert; desktop Clean Up / Arrange.
+
+**Windows Installer** (built and tested in a nested session, not yet committed; not in an ISO yet).
+
+- `shell/wininstall/`: drop a .exe/.msi on its window (from the Finder or a browser), or
+  double-click one in the Finder (`Finder::launchWindows` now opens it here — and no longer uses
+  `waitForFinished`). Install (first time: `wineboot --init` with a progress sweep), or Open
+  Without Installing (.exe only). Afterwards it names the programs added — the new desktop
+  entries Wine files under `~/.local/share/applications/wine/`, which Applications shows.
+  Apple menu > Windows Installer. Closing is refused while Wine is running the installer.
+- Wine in the ISO: `iso/config/hooks/normal/8000-zacos9-wine.hook.chroot` adds i386 and installs
+  `wine wine64 wine32:i386 fonts-wine` (Debian 13's wine64 has no WoW64 — `i386-windows` is
+  empty — so 32-bit installers need wine32). **Untested until the next ISO build.**
+- Tested with a real 32-bit NSIS installer (`build/wintest/`, made with `makensis`): dragged from
+  the Finder desktop onto the window, Install, Wine's first-run setup, the NSIS pages clicked
+  through; window then said "Installed: ZacTest Notes." (its uninstaller left out); the program
+  appeared in Applications with its icon and opened (Notepad with the installed file).
+- Adobe Creative Cloud: deliberately skipped (its installer and app don't run under Wine).
+- `shell/wine/zacos9-wine` is no longer used by the Finder (still installed).
+
+**Applications shows only what's been installed; list scrolling** (built and tested, not yet committed; not in an ISO yet).
+
+- Applications used to require `OnlyShowIn=ZacOS9`, which hid real programs (Firefox from
+  Software) and showed ZacOS 9's own control panels. Now: every launchable entry *except*
+  ZacOS 9's own (`zacos9-*`), the ones the image was built with (the ISO hook writes
+  `/usr/share/zacos9/base-applications`), and Wine's "Uninstall …" shortcuts. Windows programs
+  installed through Wine appear because Wine files their Start-menu shortcuts as desktop entries
+  in `~/.local/share/applications/wine/`. Without the list (an install from an older ISO, a dev
+  tree) everything not `zacos9-*` shows. `test-finder-vfs`: 5 new checks, 109 pass.
+- List boxes (`PanelList`): the scroll-bar thumb can be dragged, and the scroll wheel scrolls
+  (3 rows a notch). Wired into Setup, Installer, Date & Time, Software, Appearance, Network
+  Browser and the volume picker. Thumb drag checked on screen in Set Time Zone; the wheel isn't
+  (vptr has no axis events).
+
+**Setup Assistant** (first-run account setup, built and VM-tested, not yet committed; not in an ISO yet).
+After Mac OS 9's Mac OS Setup Assistant: one window, ◀ ▶ arrows, "Go Ahead" on the last page.
+Pages: Introduction, Name (+ short name), Password (+ "Log in automatically", on by default),
+Computer Name, Time Zone, Conclusion.
+
+- `shell/setup/` (the window), `setup/zacos9-setup-helper` (root through pkexec; polkit allows
+  only the `zacos9-setup` account, and the helper refuses once `/var/lib/zacos9/setup-pending`
+  is gone). Input on stdin, so the password is never in a process list.
+- `zacos9-install` now removes the live user, `/etc/sudoers.d/live` and live-config's
+  `sudo_on_live.rules` from the installed copy, makes the locked `zacos9-setup` account, logs it in
+  once via greetd's `initial_session`, and leaves the flag; `zacos9-wm` opens the assistant when the
+  flag is there.
+- Go Ahead: account (sudo + the live user's groups), password, hostname + pretty name, time zone,
+  then greetd restarts into the new account (`/run/greetd.run` removed first — greetd otherwise runs
+  `initial_session` only once per boot). Without automatic login, that one-time login is removed
+  again so the next start-up asks for the password.
+- `build/test-firstrun.py`: install in a VM, drive the assistant by keys, check the disk. Passed:
+  account/groups/hostname/greetd all as chosen, setup account and live user gone, and the session
+  hands over to the new account's desktop.
+- **Text login fixed:** it drew white on white — the boot's all-white console palette was only
+  reset by `zacos9-console-colors.service` 20 s after greetd started. greetd now runs
+  `session/zacos9-greeter`, which runs `setvtrgb vga` before `tuigreet` (`build/test-greeter.py`:
+  readable at once at boot with automatic login off; logging in by keys reaches the desktop).
+  A Platinum login window in place of tuigreet is still on the roadmap.
+- Seen once, not reproduced: `plymouth-quit.service` taking ~19 s (once timing out at 20 s),
+  which holds greetd back that long. Worth watching on real hardware.
 
 **Network Browser** (built, tested end to end against a real AFP server, not yet committed).
 

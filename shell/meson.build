@@ -252,6 +252,39 @@ executable('zacos9-installer',
   install: true,
 )
 
+executable('zacos9-appinstall',
+  'appinstall/main.cpp',
+  'appinstall/appinstall.cpp',
+  'finder/alert.cpp',
+  'finder/platinumshell.cpp',
+  finder_protocol,
+  link_with: panelkit,
+  include_directories: include_directories('finder', 'panels'),
+  dependencies: [platinum_dep, qt6, wayland_client],
+  cpp_args: ['-std=c++17'],
+  install: true,
+)
+
+executable('zacos9-wininstall',
+  'wininstall/main.cpp',
+  'wininstall/wininstall.cpp',
+  link_with: panelkit,
+  include_directories: include_directories('finder', 'panels'),
+  dependencies: [platinum_dep, qt6],
+  cpp_args: ['-std=c++17'],
+  install: true,
+)
+
+executable('zacos9-setup',
+  'setup/main.cpp',
+  'setup/setup.cpp',
+  link_with: panelkit,
+  include_directories: include_directories('finder', 'panels'),
+  dependencies: [platinum_dep, qt6],
+  cpp_args: ['-std=c++17'],
+  install: true,
+)
+
 # vptr: scripted pointer (press/drag/release) for UI tests.
 vptr_protocol = []
 foreach kind : [['client-header', '@BASENAME@-client-protocol.h'], ['private-code', '@BASENAME@-protocol.c']]

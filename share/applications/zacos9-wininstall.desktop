@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Windows Installer
+Comment=Install a Windows program through Wine
+Exec=zacos9-wininstall %f
+MimeType=application/x-ms-dos-executable;application/x-msdownload;application/x-msi;application/x-ms-installer;
+NoDisplay=true
+OnlyShowIn=ZacOS9;

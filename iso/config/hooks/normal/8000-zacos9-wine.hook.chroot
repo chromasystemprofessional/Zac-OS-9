@@ -1,0 +1,14 @@
+#!/bin/sh
+# Windows programs (the Windows Installer, shell/wininstall): Wine, with
+# 32-bit support. Debian 13's Wine runs 32-bit Windows programs - most
+# installers among them - only through wine32, an i386 package, so the
+# image needs the i386 architecture too. live-build has no option for a
+# second architecture; its hooks run while the package sources are still
+# set up, so this adds it here. Runs before 9000-zacos9 lists the image's
+# own applications, so Wine's entries count as the system's.
+set -e
+dpkg --add-architecture i386
+apt-get update
+DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+	wine wine64 wine32:i386 libwine:i386 fonts-wine
+apt-get clean

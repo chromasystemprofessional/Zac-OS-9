@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Installer
+Comment=Install applications dropped onto the Applications folder
+Exec=zacos9-appinstall %F
+NoDisplay=true
+OnlyShowIn=ZacOS9;
