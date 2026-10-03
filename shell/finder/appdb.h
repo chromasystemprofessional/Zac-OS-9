@@ -15,6 +15,8 @@
  * NoDisplay, OnlyShowIn/NotShowIn against $XDG_CURRENT_DESKTOP, TryExec,
  * Exec field codes, Path, Terminal and DBusActivatable. Flatpak and Snap
  * applications appear because they install desktop entries like any other.
+ * Left out: ZacOS 9's own entries ("zacos9-*"), those the system was built
+ * with (<data dir>/zacos9/base-applications), and Wine's "Uninstall …".
  *
  * An application's identity is its desktop file ID ("firefox.desktop",
  * "org.gnome.Nautilus.desktop"), never its display name: names are
@@ -75,3 +77,8 @@ void appOnChange(std::function<void()> f);
 /* Launch an application by desktop file ID, or one of its Desktop
  * Actions. Returns false if the entry has gone away or won't start. */
 bool appLaunch(const QString &id, const QString &actionId = QString());
+/* An alias of an application is a link to its desktop file: the entry for
+ * that file (resolving links), if it's one Applications shows; and
+ * launching from the file itself, which works for any entry. */
+const AppEntry *appByFile(const QString &desktopFile);
+bool appLaunchFile(const QString &desktopFile);

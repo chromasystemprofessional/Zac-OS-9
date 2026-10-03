@@ -7,6 +7,7 @@
 
 #include <QCoreApplication>
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QFileSystemWatcher>
 #include <QGuiApplication>
@@ -15,6 +16,7 @@
 #include <QImage>
 #include <QPixmap>
 #include <QProcess>
+#include <QSet>
 #include <QStandardPaths>
 #include <QTimer>
 #include <algorithm>
@@ -108,6 +110,18 @@ void resolveIcon(GAppInfo *info, AppEntry *entry) {
 		return;
 	}
 	ensureIconTheme();
+	/* Icon= a file path (AppImages and unpacked programs the App
+	 * Installer set up, for one): load the file itself. */
+	if (G_IS_FILE_ICON(icon)) {
+		char *path = g_file_get_path(g_file_icon_get_file(G_FILE_ICON(icon)));
+		const QIcon qicon(fromUtf8(path));
+		g_free(path);
+		if (!qicon.isNull()) {
+			entry->icon32 = toArgb(qicon.pixmap(32, 32), 32);
+			entry->icon16 = toArgb(qicon.pixmap(16, 16), 16);
+		}
+		return;
+	}
 	QStringList names;
 	if (G_IS_THEMED_ICON(icon)) {
 		const char *const *themed = g_themed_icon_get_names(G_THEMED_ICON(icon));
@@ -227,6 +241,31 @@ void disambiguate(std::vector<AppEntry> &apps) {
 	}
 }
 
+/* The desktop entries the system came with, listed when the ISO is built
+ * (iso/config/hooks/normal/9000-zacos9.hook.chroot) as
+ * <data dir>/zacos9/base-applications. Applications holds only what was
+ * installed since: from the Software window, apt, or a Windows installer
+ * run through Wine. */
+const QSet<QString> &baseApplications() {
+	static QSet<QString> ids;
+	static bool read = false;
+	if (!read) {
+		read = true;
+		for (const QString &path : QStandardPaths::locateAll(
+				QStandardPaths::GenericDataLocation, QStringLiteral("zacos9/base-applications"))) {
+			QFile f(path);
+			if (f.open(QIODevice::ReadOnly)) {
+				for (const QByteArray &line : f.readAll().split('\n')) {
+					if (!line.trimmed().isEmpty()) {
+						ids.insert(QString::fromUtf8(line.trimmed()));
+					}
+				}
+			}
+		}
+	}
+	return ids;
+}
+
 void load() {
 	g_apps.clear();
 	/* g_app_info_get_all() applies XDG data directory precedence and
@@ -238,17 +277,22 @@ void load() {
 		if (!g_app_info_should_show(info)) {
 			continue;
 		}
-		/* Only include apps that explicitly opt into this desktop with
-		 * OnlyShowIn=. An entry without it was not written for ZacOS 9
-		 * and would appear on every desktop. Applications is empty on a
-		 * fresh install and fills only as ZacOS9-native apps are added. */
-		if (!G_IS_DESKTOP_APP_INFO(info) ||
-				!g_desktop_app_info_has_key(G_DESKTOP_APP_INFO(info), "OnlyShowIn")) {
-			continue;
-		}
 		const QString id = fromUtf8(g_app_info_get_id(info));
 		const QString name = finderName(fromUtf8(g_app_info_get_name(info)));
 		if (id.isEmpty() || name.isEmpty()) {
+			continue;
+		}
+		/* Applications is empty on a fresh install: not ZacOS 9's own
+		 * pieces (the control panels and the Apple menu have those), and
+		 * not what the system came with. */
+		if (id.startsWith(QLatin1String("zacos9-")) || baseApplications().contains(id)) {
+			continue;
+		}
+		/* Wine files a Windows program's Start-menu shortcuts as desktop
+		 * entries (~/.local/share/applications/wine/Programs/..., ids
+		 * "wine-Programs-..."), uninstallers among them. */
+		if (id.startsWith(QLatin1String("wine-")) &&
+				name.startsWith(QLatin1String("Uninstall"), Qt::CaseInsensitive)) {
 			continue;
 		}
 		AppEntry entry;
@@ -353,6 +397,34 @@ void appOnChange(std::function<void()> f) {
 			w->addPath(dir);
 		}
 	}
+}
+
+const AppEntry *appByFile(const QString &desktopFile) {
+	const QString want = QFileInfo(desktopFile).canonicalFilePath();
+	if (want.isEmpty()) {
+		return nullptr;
+	}
+	for (const AppEntry &a : appList()) {
+		if (QFileInfo(a.file).canonicalFilePath() == want) {
+			return &a;
+		}
+	}
+	return nullptr;
+}
+
+bool appLaunchFile(const QString &desktopFile) {
+	const QString real = QFileInfo(desktopFile).canonicalFilePath();
+	GDesktopAppInfo *info = g_desktop_app_info_new_from_filename(real.toUtf8().constData());
+	if (!info) {
+		return false;
+	}
+	GError *error = nullptr;
+	const bool ok = g_app_info_launch(G_APP_INFO(info), nullptr, nullptr, &error);
+	if (error) {
+		g_error_free(error);
+	}
+	g_object_unref(info);
+	return ok;
 }
 
 bool appLaunch(const QString &id, const QString &actionId) {

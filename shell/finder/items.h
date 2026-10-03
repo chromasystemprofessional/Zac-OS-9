@@ -117,6 +117,18 @@ bool iconLabelContains(Item &item, int x, int y, QPoint p);
 void placeIcons(const std::vector<Item *> &items, const QHash<QString, QPoint> &placed,
 		const std::function<QPoint(int)> &slot, int cellW, int cellH);
 
+/* The View menu's Clean Up and Arrange (Mac OS 9). */
+enum class Arrange { CleanUp, Name, Modified, Created, Size, Kind, Label };
+/* Into Arrange's order: by name; newest first by date; largest first by
+ * size; by kind, then name; labelled before unlabelled, in label order. */
+void sortIcons(std::vector<Item *> &items, Arrange by);
+/* Sets each item's pos to a grid slot (slot(i), i < slotCount). Clean Up
+ * moves each icon to the nearest free slot, the topmost-leftmost first,
+ * keeping the arrangement roughly as it was; the others sort the icons
+ * and lay them out afresh from the first slot. */
+void arrangeIcons(std::vector<Item *> items, Arrange how,
+		const std::function<QPoint(int)> &slot, int slotCount);
+
 /* Can items be dropped into this one (folder, disk, Trash)? */
 bool acceptsDrops(const Item &item);
 /* Hit area of an icon item at (x, y): the icon square or its label. */

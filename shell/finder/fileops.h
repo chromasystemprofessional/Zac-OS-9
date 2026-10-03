@@ -22,6 +22,9 @@ QStringList transferItems(const QStringList &paths, const QString &destDir, bool
 /* Start dragging `items`, shown as dotted outlines (Mac OS 8 dragged
  * outlines, not pictures). `itemOrigins` are the items' icon positions in
  * `source` coordinates; `pointer` is where the drag began. */
+/* A drag of icons that only move about their own window (the Macintosh
+ * view's virtual items: no files to hand anywhere). */
+inline constexpr char ICON_MOVE_MIME[] = "application/x-zacos9-icon-move";
 void startItemDrag(QWidget *source, const std::vector<Item *> &items,
 		const std::vector<QPoint> &itemOrigins, QPoint pointer);
 

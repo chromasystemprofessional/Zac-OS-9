@@ -433,6 +433,34 @@ void FolderWindow::layoutIcons() {
 	}
 }
 
+/* Clean Up / Arrange: every icon gets a grid position, remembered like
+ * one the user dragged there. */
+void FolderWindow::arrange(Arrange how) {
+	if (m_mode != ViewMode::Icons || m_items.empty()) {
+		return;
+	}
+	const int cols = std::max(1, (viewWidth() - 2 * MARGIN) / CELL_W);
+	std::vector<Item *> items;
+	int lowest = 0;
+	for (auto &item : m_items) {
+		items.push_back(item.get());
+		lowest = std::max(lowest, item->pos.y());
+	}
+	/* Enough rows for every icon, and for Clean Up to reach the lowest one. */
+	const int rows = std::max(static_cast<int>(items.size()) / cols + 1, lowest / CELL_H + 1) + 1;
+	arrangeIcons(items, how, [cols](int i) {
+		return QPoint(MARGIN + (i % cols) * CELL_W + (CELL_W - PL_ICON_LARGE) / 2,
+			MARGIN + (i / cols) * CELL_H);
+	}, cols * rows);
+	m_state.icons.clear();
+	for (Item *item : items) {
+		m_state.icons.insert(item->key(), item->pos);
+	}
+	saveStateSoon();
+	relayout();
+	update();
+}
+
 void FolderWindow::itemRenamed(const QString &from, const QString &to) {
 	auto it = m_state.icons.find(from);
 	if (it != m_state.icons.end()) {
@@ -1013,12 +1041,19 @@ bool finderShortcut(QKeyEvent *e) {
 /* ---- drag and drop --------------------------------------------------------------- */
 
 void FolderWindow::dragEnterEvent(QDragEnterEvent *e) {
-	if (e->mimeData()->hasUrls()) {
+	/* Icons that can only move about their own window are taken back
+	 * there and nowhere else. */
+	if (e->mimeData()->hasUrls() ||
+			(e->mimeData()->hasFormat(ICON_MOVE_MIME) && e->source() == this)) {
 		e->acceptProposedAction();
 	}
 }
 
 void FolderWindow::dragMoveEvent(QDragMoveEvent *e) {
+	if (e->mimeData()->hasFormat(ICON_MOVE_MIME)) {
+		e->acceptProposedAction(); /* nothing to drop them into */
+		return;
+	}
 	Item *target = dropTargetAt(e->position().toPoint(), draggedPaths(e->mimeData()));
 	forEachItem([&](Item *item) { item->dropTarget = item == target; });
 	update();
@@ -1033,8 +1068,17 @@ void FolderWindow::dragLeaveEvent(QDragLeaveEvent *) {
 }
 
 void FolderWindow::dropEvent(QDropEvent *e) {
-	Item *target = dropTargetAt(e->position().toPoint(), draggedPaths(e->mimeData()));
+	const bool iconMove = e->mimeData()->hasFormat(ICON_MOVE_MIME);
+	Item *target = iconMove ? nullptr
+		: dropTargetAt(e->position().toPoint(), draggedPaths(e->mimeData()));
 	clearDropTarget();
+	if (iconMove && (e->source() != this || m_mode != ViewMode::Icons)) {
+		/* Back in its own list or button view: nothing moves, but it
+		 * isn't a drop elsewhere either. */
+		e->setDropAction(e->source() == this ? Qt::MoveAction : Qt::IgnoreAction);
+		e->setAccepted(e->source() == this);
+		return;
+	}
 	if (!target && e->source() == this && m_mode == ViewMode::Icons &&
 			!(e->modifiers() & Qt::AltModifier)) {
 		/* Icons dragged within their own window: they move there, and stay. */
@@ -1043,7 +1087,7 @@ void FolderWindow::dropEvent(QDropEvent *e) {
 			QPoint p = item->pos + delta;
 			p.setX(std::max(0, p.x()));
 			p.setY(std::max(0, p.y()));
-			m_state.icons.insert(item->name, p);
+			m_state.icons.insert(item->key(), p);
 		}
 		saveStateSoon();
 		relayout();

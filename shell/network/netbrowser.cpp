@@ -3,6 +3,7 @@
 #include <QApplication>
 #include <QKeyEvent>
 #include <QMouseEvent>
+#include <QWheelEvent>
 #include <QPainter>
 #include <QTimer>
 
@@ -155,12 +156,17 @@ void NetBrowserWindow::mousePressEvent(QMouseEvent *e) {
 	}
 }
 void NetBrowserWindow::mouseMoveEvent(QMouseEvent *e) {
-	if (m_host.hostMove(e)) {
+	if (m_list.move(e->position().toPoint()) || m_host.hostMove(e)) {
 		update();
 	}
 }
 void NetBrowserWindow::mouseReleaseEvent(QMouseEvent *e) {
-	if (m_host.hostRelease(e)) {
+	if (m_list.release() | m_host.hostRelease(e)) {
+		update();
+	}
+}
+void NetBrowserWindow::wheelEvent(QWheelEvent *e) {
+	if (m_list.wheel(e->position().toPoint(), e->angleDelta().y())) {
 		update();
 	}
 }

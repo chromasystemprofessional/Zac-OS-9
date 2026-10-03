@@ -1,6 +1,8 @@
 #include "fileops.h"
 
+#include <QCoreApplication>
 #include <QDir>
+#include <QProcess>
 #include <QDrag>
 #include <QDropEvent>
 #include <QFile>
@@ -9,7 +11,9 @@
 #include <QStorageInfo>
 #include <QUrl>
 #include <QWidget>
+#include <algorithm>
 
+#include "alert.h"
 #include "finder.h"
 #include "vfs.h"
 
@@ -119,12 +123,10 @@ void startItemDrag(QWidget *source, const std::vector<Item *> &items,
 		return;
 	}
 	/* Nothing in the Macintosh view is a file, so there is nothing to
-	 * hand to the drop: an application folder stands for a package. */
-	for (const Item *item : items) {
-		if (item->isVirtual) {
-			return;
-		}
-	}
+	 * hand to a drop: an application stands for a package. Such icons
+	 * can still be moved about their own window (ICON_MOVE_MIME). */
+	const bool anyVirtual = std::any_of(items.begin(), items.end(),
+		[](const Item *item) { return item->isVirtual; });
 	QRect bounds;
 	for (const QPoint &o : itemOrigins) {
 		bounds = bounds.united(QRect(o, QSize(PL_ICON_LARGE, PL_ICON_LARGE)));
@@ -141,17 +143,62 @@ void startItemDrag(QWidget *source, const std::vector<Item *> &items,
 	pixmap.setDevicePixelRatio(dpr);
 
 	auto *mime = new QMimeData;
-	QList<QUrl> urls;
-	for (Item *item : items) {
-		urls << QUrl::fromLocalFile(item->path);
+	if (anyVirtual) {
+		mime->setData(ICON_MOVE_MIME, QByteArray());
+	} else {
+		QList<QUrl> urls;
+		for (Item *item : items) {
+			urls << QUrl::fromLocalFile(item->path);
+		}
+		mime->setUrls(urls);
 	}
-	mime->setUrls(urls);
 
 	auto *drag = new QDrag(source);
 	drag->setMimeData(mime);
 	drag->setPixmap(pixmap);
 	drag->setHotSpot(pointer - bounds.topLeft());
-	drag->exec(Qt::MoveAction | Qt::CopyAction, Qt::MoveAction);
+	const Qt::DropAction done = drag->exec(
+		anyVirtual ? Qt::MoveAction : Qt::MoveAction | Qt::CopyAction, Qt::MoveAction);
+
+	/* Their own window always takes such a drag back; anywhere else
+	 * leaves it nowhere to go, so say why rather than do nothing. */
+	if (anyVirtual && done == Qt::IgnoreAction) {
+		const Item *first = *std::find_if(items.begin(), items.end(),
+			[](const Item *item) { return item->isVirtual; });
+		if (vfsIsAppFolder(first->path)) {
+			Alert::ask("“" + first->name + "” stays in the Applications folder. "
+				"To remove an application, select it and choose Move To Trash.", "OK", QString());
+		} else {
+			Alert::ask("“" + first->name + "” is part of this computer and can't be moved "
+				"out of its window.", "OK", QString());
+		}
+	}
+}
+
+/* A program installed next to the Finder (build tree), else on $PATH. */
+static QString sibling(const QString &program) {
+	const QString local = QCoreApplication::applicationDirPath() + "/" + program;
+	return QFileInfo(local).isExecutable() ? local : program;
+}
+
+/* Files dropped onto Applications: install them rather than move them.
+ * Windows ones go to the Windows Installer, the rest to the App Installer,
+ * which also says why it can't install any that aren't installers (an
+ * alert of the Finder's own, opened from a drag that began on the desktop,
+ * gets no input - see PROJECT_STATUS.md). */
+static void installIntoApplications(const QStringList &paths) {
+	QStringList rest;
+	for (const QString &p : paths) {
+		const QString name = QFileInfo(p).fileName().toLower();
+		if (name.endsWith(".exe") || name.endsWith(".msi")) {
+			QProcess::startDetached(sibling("zacos9-wininstall"), { p });
+		} else {
+			rest << p;
+		}
+	}
+	if (!rest.isEmpty()) {
+		QProcess::startDetached(sibling("zacos9-appinstall"), rest);
+	}
 }
 
 void dropItems(QDropEvent *e, const Item *target, const QString &folder) {
@@ -178,6 +225,13 @@ void dropItems(QDropEvent *e, const Item *target, const QString &folder) {
 		return;
 	}
 	QString dest = target ? target->path : folder;
+	if (vfsIsApplications(dest)) {
+		installIntoApplications(paths);
+		/* Copy: the install file stays where it was. */
+		e->setDropAction(Qt::CopyAction);
+		e->accept();
+		return;
+	}
 	if (vfsIsVirtual(dest)) {
 		/* Documents and the other folders standing for real directories
 		 * take files; the curated ones have nowhere to put them. */

@@ -24,6 +24,8 @@ public:
 	virtual QWidget *widget() = 0;
 	/* An item here was renamed: keep its remembered icon position. */
 	virtual void itemRenamed(const QString &, const QString &) {}
+	/* View > Clean Up and View > Arrange (icon views only). */
+	virtual void arrange(Arrange) {}
 };
 
 /*
@@ -66,7 +68,7 @@ public:
 	/* Start classic Mac OS (shell/classic/zacos9-classic), with extra
 	 * disk images; explains in an alert when ROM or emulator is missing. */
 	void launchClassic(const QStringList &disks = {});
-	/* Run a Windows executable via Wine (shell/wine/zacos9-wine). */
+	/* Open a .exe or .msi in the Windows Installer. */
 	void launchWindows(const QString &exe);
 
 	/* Spring-loaded folders: hovering a drag over a folder opens it; the

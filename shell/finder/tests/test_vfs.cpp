@@ -43,12 +43,11 @@ static void writeEntry(const QString &dir, const QString &file, const QString &b
 	}
 }
 
-/* An ordinary application entry. All test entries opt into this desktop
- * explicitly; without OnlyShowIn=ZacOS9 they would be filtered out. */
+/* An ordinary application entry, as most packages write one. */
 static QString entry(const QString &name, const QString &exec = "/bin/true",
 		const QString &extra = QString()) {
 	return "[Desktop Entry]\nType=Application\nName=" + name +
-		"\nExec=" + exec + "\nOnlyShowIn=ZacOS9;\n" + extra;
+		"\nExec=" + exec + "\n" + extra;
 }
 
 /* Give GIO's file monitors time to be served: it drops its cached list
@@ -110,8 +109,18 @@ int main(int argc, char **argv) {
 	writeEntry(appsDir, "simpletext.desktop", entry("SimpleText"));
 	writeEntry(appsDir, "calculator.desktop",
 		entry("Calculator", "/bin/true", "Categories=Utility;\n"));
-	/* Every way an entry asks not to be shown. These are written without
-	 * the entry() helper since they deliberately lack OnlyShowIn=ZacOS9. */
+	/* An entry written for this desktop only shows too. */
+	writeEntry(appsDir, "ours-only.desktop", entry("Only Ours", "/bin/true", "OnlyShowIn=ZacOS9;\n"));
+	/* What Applications leaves out: the system's own applications (listed
+	 * when the ISO is built), ZacOS 9's own pieces, Wine's uninstallers. */
+	writeEntry(dataDirs + "/zacos9", "base-applications", "builtin.desktop\nfoot.desktop\n");
+	writeEntry(appsDir, "builtin.desktop", entry("Came With The System"));
+	writeEntry(appsDir, "zacos9-somepanel.desktop", entry("A ZacOS Panel"));
+	writeEntry(homeAppsDir + "/wine/Programs/Notepad Plus", "Notepad Plus.desktop",
+		entry("Notepad Plus", "env WINEPREFIX=/nonexistent wine C:\\\\np.exe"));
+	writeEntry(homeAppsDir + "/wine/Programs/Notepad Plus", "Uninstall Notepad Plus.desktop",
+		entry("Uninstall Notepad Plus", "env WINEPREFIX=/nonexistent wine C:\\\\unins.exe"));
+	/* Every way an entry asks not to be shown. */
 	writeEntry(appsDir, "hidden.desktop",
 		"[Desktop Entry]\nType=Application\nName=Hidden One\n"
 		"Exec=/bin/true\nHidden=true\n");
@@ -136,6 +145,11 @@ int main(int argc, char **argv) {
 	check(!apps.contains("Only Elsewhere"), "OnlyShowIn for another desktop is not shown");
 	check(!apps.contains("Not Here"), "NotShowIn for this desktop is not shown");
 	check(!apps.contains("Missing Binary"), "a failing TryExec is not shown");
+	check(apps.contains("Only Ours"), "an entry for this desktop only is shown");
+	check(!apps.contains("Came With The System"), "an application the system came with is not shown");
+	check(!apps.contains("A ZacOS Panel"), "ZacOS 9's own entries are not shown");
+	check(apps.contains("Notepad Plus"), "a Windows program installed through Wine is shown");
+	check(!apps.contains("Uninstall Notepad Plus"), "its Wine uninstaller is not shown");
 
 	/* ---- the startup disk --------------------------------------------- */
 	QStringList volume = namesIn(vfsRoot());
@@ -282,7 +296,9 @@ int main(int argc, char **argv) {
 	check(!vfsCanDelete(appsPath), "the Applications folder can't be thrown away");
 	check(!vfsCanDelete(vfsPathFor("system-folder")),
 		"the System Folder can't be thrown away");
-	check(!vfsAcceptsDrops(appsPath), "Applications takes no drops");
+	check(vfsAcceptsDrops(appsPath), "Applications takes drops (it installs install files)");
+	check(vfsIsApplications(appsPath), "and is known as Applications");
+	check(!vfsIsApplications(vfsPathFor("documents")), "Documents isn't Applications");
 	check(!vfsAcceptsDrops(vfsPathFor("system-folder")), "the System Folder takes no drops");
 	check(vfsAcceptsDrops(vfsPathFor("documents")), "Documents takes drops");
 	check(vfsCanRename(appPath), "an application can be renamed");

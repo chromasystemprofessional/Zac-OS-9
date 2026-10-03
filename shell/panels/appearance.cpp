@@ -3,6 +3,7 @@
 #include <QDir>
 #include <QKeyEvent>
 #include <QMouseEvent>
+#include <QWheelEvent>
 
 #include "patterns.h"
 #include "settings.h"
@@ -244,6 +245,28 @@ void AppearancePanel::mousePressEvent(QMouseEvent *e) {
 			m_focus = l;
 			update();
 			return;
+		}
+	}
+}
+
+void AppearancePanel::mouseMoveEvent(QMouseEvent *e) {
+	for (PanelList *l : visibleLists()) {
+		if (l->move(e->position().toPoint())) {
+			update();
+		}
+	}
+}
+
+void AppearancePanel::mouseReleaseEvent(QMouseEvent *) {
+	for (PanelList *l : visibleLists()) {
+		l->release();
+	}
+}
+
+void AppearancePanel::wheelEvent(QWheelEvent *e) {
+	for (PanelList *l : visibleLists()) {
+		if (l->wheel(e->position().toPoint(), e->angleDelta().y())) {
+			update();
 		}
 	}
 }

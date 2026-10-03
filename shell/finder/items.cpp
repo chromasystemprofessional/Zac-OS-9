@@ -10,6 +10,7 @@
 #include <cerrno>
 #include <sys/xattr.h>
 
+#include "appdb.h"
 #include "sharingclient.h"
 #include "vfs.h"
 
@@ -202,6 +203,15 @@ std::unique_ptr<Item> makeItem(const QFileInfo &info) {
 	item->size = info.isDir() ? 0 : info.size();
 	item->modified = info.lastModified();
 	item->labelIndex = readLabel(item->path);
+	/* An application's alias: a link to its desktop file. It looks and
+	 * opens like the application. */
+	if (info.isSymLink() && info.symLinkTarget().endsWith(QLatin1String(".desktop"))) {
+		item->kind = PL_ICON_APPLICATION;
+		if (const AppEntry *app = appByFile(info.symLinkTarget())) {
+			item->customIcon32 = app->icon32;
+			item->customIcon16 = app->icon16;
+		}
+	}
 	return item;
 }
 
@@ -300,4 +310,91 @@ bool iconItemContains(Item &item, int x, int y, QPoint p) {
 	int l, t, r, b;
 	labelBox(item, x, y, &l, &t, &r, &b);
 	return QRect(QPoint(l, t), QPoint(r, b)).contains(p);
+}
+
+void sortIcons(std::vector<Item *> &items, Arrange by) {
+	const auto byName = [](Item *a, Item *b) {
+		return QString::localeAwareCompare(a->name, b->name) < 0;
+	};
+	/* Newest first; items without a date (virtual ones) after the rest. */
+	const auto newest = [&](const QDateTime &da, const QDateTime &db, Item *a, Item *b) {
+		if (da.isValid() != db.isValid()) {
+			return da.isValid();
+		}
+		return da != db ? da > db : byName(a, b);
+	};
+	switch (by) {
+	case Arrange::CleanUp:
+	case Arrange::Name:
+		std::stable_sort(items.begin(), items.end(), byName);
+		break;
+	case Arrange::Modified:
+		std::stable_sort(items.begin(), items.end(), [&](Item *a, Item *b) {
+			return newest(a->modified, b->modified, a, b);
+		});
+		break;
+	case Arrange::Created: {
+		QHash<Item *, QDateTime> born;
+		for (Item *item : items) {
+			born.insert(item, item->isVirtual ? QDateTime() : QFileInfo(item->path).birthTime());
+		}
+		std::stable_sort(items.begin(), items.end(), [&](Item *a, Item *b) {
+			return newest(born.value(a), born.value(b), a, b);
+		});
+		break;
+	}
+	case Arrange::Size:
+		std::stable_sort(items.begin(), items.end(), [&](Item *a, Item *b) {
+			return a->size != b->size ? a->size > b->size : byName(a, b);
+		});
+		break;
+	case Arrange::Kind:
+		std::stable_sort(items.begin(), items.end(), [&](Item *a, Item *b) {
+			const int c = QString::localeAwareCompare(a->kindName(), b->kindName());
+			return c != 0 ? c < 0 : byName(a, b);
+		});
+		break;
+	case Arrange::Label:
+		std::stable_sort(items.begin(), items.end(), [&](Item *a, Item *b) {
+			const int ra = a->labelIndex ? a->labelIndex : PL_LABEL_COUNT;
+			const int rb = b->labelIndex ? b->labelIndex : PL_LABEL_COUNT;
+			return ra != rb ? ra < rb : byName(a, b);
+		});
+		break;
+	}
+}
+
+void arrangeIcons(std::vector<Item *> items, Arrange how,
+		const std::function<QPoint(int)> &slot, int slotCount) {
+	if (how != Arrange::CleanUp) {
+		sortIcons(items, how);
+		for (int i = 0; i < static_cast<int>(items.size()) && i < slotCount; i++) {
+			items[static_cast<size_t>(i)]->pos = slot(i);
+		}
+		return;
+	}
+	std::stable_sort(items.begin(), items.end(), [](Item *a, Item *b) {
+		return a->pos.y() != b->pos.y() ? a->pos.y() < b->pos.y() : a->pos.x() < b->pos.x();
+	});
+	std::vector<bool> taken(static_cast<size_t>(std::max(0, slotCount)), false);
+	for (Item *item : items) {
+		int best = -1;
+		qint64 bestDist = 0;
+		for (int s = 0; s < slotCount; s++) {
+			if (taken[static_cast<size_t>(s)]) {
+				continue;
+			}
+			const QPoint d = slot(s) - item->pos;
+			const qint64 dist = qint64(d.x()) * d.x() + qint64(d.y()) * d.y();
+			if (best < 0 || dist < bestDist) {
+				best = s;
+				bestDist = dist;
+			}
+		}
+		if (best < 0) {
+			break;
+		}
+		taken[static_cast<size_t>(best)] = true;
+		item->pos = slot(best);
+	}
 }

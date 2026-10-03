@@ -2,6 +2,7 @@
 
 #include <QKeyEvent>
 #include <QMouseEvent>
+#include <QWheelEvent>
 #include <QPainter>
 
 #include "pixels.h"
@@ -81,12 +82,17 @@ void VolumeDialog::mousePressEvent(QMouseEvent *e) {
 	}
 }
 void VolumeDialog::mouseMoveEvent(QMouseEvent *e) {
-	if (m_host.hostMove(e)) {
+	if (m_list.move(e->position().toPoint()) || m_host.hostMove(e)) {
 		update();
 	}
 }
 void VolumeDialog::mouseReleaseEvent(QMouseEvent *e) {
-	if (m_host.hostRelease(e)) {
+	if (m_list.release() | m_host.hostRelease(e)) {
+		update();
+	}
+}
+void VolumeDialog::wheelEvent(QWheelEvent *e) {
+	if (m_list.wheel(e->position().toPoint(), e->angleDelta().y())) {
 		update();
 	}
 }

@@ -319,6 +319,54 @@ void Desktop::placeIcons() {
 	}, CELL_W, CELL_H);
 }
 
+/* Clean Up snaps the disks and files to the nearest free spot; Arrange
+ * leaves the disks where they are and lays the desktop's files out in
+ * order in the free spots, from the top right. The Trash keeps its
+ * corner either way, and the grid (as placeIcons') stops short of it. */
+void Desktop::arrange(Arrange how) {
+	const int right = width() - ICON_MARGIN_RIGHT - PL_ICON_LARGE;
+	const int top = MBAR_HEIGHT + ICON_MARGIN_TOP;
+	const int trashY = height() - ICON_MARGIN_BOTTOM - PL_ICON_LARGE - 16;
+	const int rows = std::max(1, (trashY - top) / CELL_H - 1);
+	const int cols = std::max(1, right / CELL_W + 1);
+	const auto slot = [=](int i) {
+		return QPoint(right - (i / rows) * CELL_W, top + (i % rows) * CELL_H);
+	};
+	std::vector<Item *> fixed = fixedItems();
+	std::vector<Item *> files;
+	for (auto &item : m_files) {
+		files.push_back(item.get());
+	}
+	if (how == Arrange::CleanUp) {
+		std::vector<Item *> all;
+		for (Item *item : fixed) {
+			if (item != m_trash.get()) {
+				all.push_back(item);
+			}
+		}
+		all.insert(all.end(), files.begin(), files.end());
+		arrangeIcons(all, how, slot, rows * cols);
+	} else {
+		sortIcons(files, how);
+		QHash<QString, QPoint> placed;
+		for (Item *item : fixed) {
+			placed.insert(item->key(), item->pos);
+		}
+		std::vector<Item *> all = fixed;
+		all.insert(all.end(), files.begin(), files.end());
+		::placeIcons(all, placed, slot, CELL_W, CELL_H);
+	}
+	m_state.icons.clear();
+	for (Item *item : fixedItems()) {
+		m_state.icons.insert(item->key(), item->pos);
+	}
+	for (Item *item : files) {
+		m_state.icons.insert(item->key(), item->pos);
+	}
+	m_state.save(folderPath());
+	update();
+}
+
 void Desktop::itemRenamed(const QString &from, const QString &to) {
 	auto it = m_state.icons.find(from);
 	if (it != m_state.icons.end()) {
@@ -404,7 +452,8 @@ std::vector<Item *> Desktop::allItems() {
 }
 
 bool Desktop::renamable(const Item *item) const {
-	return item && !isFixed(item);
+	/* The startup disk takes a name of the user's choosing, as on the Mac. */
+	return item && (item == m_disk.get() || !isFixed(item));
 }
 
 void Desktop::beginRename(Item *item) {

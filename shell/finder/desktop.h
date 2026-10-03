@@ -32,6 +32,7 @@ public:
 	void reload() override;
 	QWidget *widget() override { return this; }
 	void itemRenamed(const QString &from, const QString &to) override;
+	void arrange(Arrange how) override;
 
 protected:
 	void paintEvent(QPaintEvent *) override;

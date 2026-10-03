@@ -3,6 +3,7 @@
 #include <QCloseEvent>
 #include <QKeyEvent>
 #include <QMouseEvent>
+#include <QWheelEvent>
 #include <QPainter>
 
 #include "alert.h"
@@ -218,13 +219,22 @@ void StoreWindow::mousePressEvent(QMouseEvent *e) {
 }
 
 void StoreWindow::mouseMoveEvent(QMouseEvent *e) {
-	if (m_host.hostMove(e)) {
+	const QPoint pos = e->position().toPoint();
+	if (m_categoryList.move(pos) | m_itemList.move(pos) || m_host.hostMove(e)) {
 		update();
 	}
 }
 
 void StoreWindow::mouseReleaseEvent(QMouseEvent *e) {
-	if (m_host.hostRelease(e)) {
+	if (m_categoryList.release() | m_itemList.release() | m_host.hostRelease(e)) {
+		update();
+	}
+}
+
+void StoreWindow::wheelEvent(QWheelEvent *e) {
+	const QPoint pos = e->position().toPoint();
+	const int dy = e->angleDelta().y();
+	if (m_categoryList.wheel(pos, dy) || m_itemList.wheel(pos, dy)) {
 		update();
 	}
 }

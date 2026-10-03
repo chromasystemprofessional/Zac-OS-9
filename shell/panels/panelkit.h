@@ -36,14 +36,21 @@ struct PanelList {
 	void ensureVisible(int row);
 	pl_list view() const;
 	void paint(pl_canvas *c, bool focused) const;
-	/* A press inside the frame: picks a row or works the scroll bar. */
+	/* A press inside the frame: picks a row or works the scroll bar
+	 * (arrows, page, or a press on the thumb that move() then drags). */
 	bool press(QPoint pos);
+	bool move(QPoint pos);
+	bool release();
+	/* The scroll wheel over the list (QWheelEvent::angleDelta().y()). */
+	bool wheel(QPoint pos, int angleDeltaY);
 	/* Arrow keys and type-to-select; true if handled. */
 	bool key(int key, const QString &text);
 
 private:
 	QString m_typed;
 	qint64 m_typedAt = 0;
+	int m_thumbGrab = -1; /* dragging the thumb: where on it it was pressed */
+	int m_wheelRemainder = 0;
 };
 
 /* A push button that tracks the mouse and fires on release inside it. */

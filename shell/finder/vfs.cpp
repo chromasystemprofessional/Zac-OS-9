@@ -27,7 +27,7 @@ static constexpr int REGISTRY_VERSION = 1;
 
 static const char *DEFAULT_REGISTRY = R"JSON({
   "version": 1,
-  "volume": { "name": "Macintosh HD" },
+  "volume": {},
   "showUnixVolume": false,
   "nodes": [
     { "id": "system-folder", "name": "System Folder", "kind": "folder",
@@ -62,7 +62,7 @@ struct Override {
 
 QHash<QString, VNode> g_nodes;
 QHash<QString, Override> g_overrides;
-QString g_volumeName = "Macintosh HD";
+QString g_volumeName;
 bool g_showUnix = false;
 bool g_loaded = false;
 /* Keyed by token so a window can stop listening when it closes. */
@@ -271,8 +271,27 @@ void load() {
 		writeRegistryFile(root);
 	}
 
-	g_volumeName = root.value("volume").toObject().value("name")
-		.toString(QStringLiteral("Macintosh HD"));
+	/* The startup disk's name: the user's own, if they renamed it; else
+	 * the one it was given when ZacOS 9 was installed (zacos9-install
+	 * writes /etc/zacos9/disk-name); else Zacintosh HD. "Macintosh HD",
+	 * the default before, is Apple's, so a file still holding it (never
+	 * renamed) counts as not named. */
+	QJsonObject volumeObj = root.value("volume").toObject();
+	if (volumeObj.value("name").toString() == QLatin1String("Macintosh HD")) {
+		volumeObj.remove("name");
+		root.insert("volume", volumeObj);
+		writeRegistryFile(root);
+	}
+	g_volumeName = volumeObj.value("name").toString();
+	if (g_volumeName.isEmpty()) {
+		QFile named(QStringLiteral("/etc/zacos9/disk-name"));
+		if (named.open(QIODevice::ReadOnly)) {
+			g_volumeName = QString::fromUtf8(named.readLine()).trimmed();
+		}
+	}
+	if (g_volumeName.isEmpty()) {
+		g_volumeName = QStringLiteral("Zacintosh HD");
+	}
 	g_showUnix = root.value("showUnixVolume").toBool(false);
 
 	const QJsonObject overrides = root.value("overrides").toObject();
@@ -564,7 +583,13 @@ void vfsShowAllHidden() {
 
 bool vfsAcceptsDrops(const QString &path) {
 	const VNode *node = vfsNode(path);
-	return node && (node->kind == VKind::Backed || node->kind == VKind::Unix);
+	return node && (node->kind == VKind::Backed || node->kind == VKind::Unix ||
+		node->kind == VKind::Apps);
+}
+
+bool vfsIsApplications(const QString &path) {
+	const VNode *node = vfsNode(path);
+	return node && node->kind == VKind::Apps;
 }
 
 bool vfsRename(const QString &path, const QString &newName) {

@@ -6,6 +6,7 @@
 #include <QMouseEvent>
 #include <QProcess>
 #include <QTimeZone>
+#include <QWheelEvent>
 
 #include "alert.h"
 #include "platinumshell.h"
@@ -270,14 +271,20 @@ void TimeZoneDialog::mousePressEvent(QMouseEvent *e) {
 
 void TimeZoneDialog::mouseMoveEvent(QMouseEvent *e) {
 	const QPoint pos = e->position().toPoint();
-	if (m_ok.move(pos) || m_cancel.move(pos)) {
+	if (m_ok.move(pos) || m_cancel.move(pos) || m_list.move(pos)) {
 		update();
 	}
 }
 
 void TimeZoneDialog::mouseReleaseEvent(QMouseEvent *e) {
 	const QPoint pos = e->position().toPoint();
-	if (m_ok.release(pos) || m_cancel.release(pos)) {
+	if (m_list.release() | m_ok.release(pos) || m_cancel.release(pos)) {
+		update();
+	}
+}
+
+void TimeZoneDialog::wheelEvent(QWheelEvent *e) {
+	if (m_list.wheel(e->position().toPoint(), e->angleDelta().y())) {
 		update();
 	}
 }

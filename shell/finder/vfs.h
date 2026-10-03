@@ -109,8 +109,11 @@ bool vfsIsAppFolder(const QString &path);
 bool vfsHideApplication(const QString &path);
 /* Brings back every application hidden this way. */
 void vfsShowAllHidden();
-/* Can items be dropped into this virtual folder? Only a Backed one. */
+/* Can items be dropped into this virtual folder? A Backed one, and
+ * Applications (where a dropped install file is installed). */
 bool vfsAcceptsDrops(const QString &path);
+/* Is this the Applications folder? */
+bool vfsIsApplications(const QString &path);
 
 /* The real filesystem, shown as a second disk for inspecting Debian.
  * Off by default, so the Finder's ordinary views never show Unix. */

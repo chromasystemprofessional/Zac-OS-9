@@ -97,6 +97,18 @@ static void add_finder_menus(struct mb_menu *menus, int *n) {
 	buttons->checked = win && fs->view == 2;
 	struct mb_item *list = add(m, "as List", 0, win, ACT_FINDER, "view-list");
 	list->checked = win && fs->view == 1;
+	sep(m);
+	/* Mac OS 9: for an icon view, or the desktop when no window is in front. */
+	const bool iconView = up && (!fs->window || fs->view == 0);
+	add(m, "Clean Up", 0, iconView, ACT_FINDER, "clean-up");
+	struct mb_item *arrange = add(m, "Arrange", 0, iconView, ACT_NONE, NULL);
+	arrange->submenu = calloc(1, sizeof(*arrange->submenu));
+	add(arrange->submenu, "by Name", 0, iconView, ACT_FINDER, "arrange name");
+	add(arrange->submenu, "by Date Modified", 0, iconView, ACT_FINDER, "arrange modified");
+	add(arrange->submenu, "by Date Created", 0, iconView, ACT_FINDER, "arrange created");
+	add(arrange->submenu, "by Size", 0, iconView, ACT_FINDER, "arrange size");
+	add(arrange->submenu, "by Kind", 0, iconView, ACT_FINDER, "arrange kind");
+	add(arrange->submenu, "by Label", 0, iconView, ACT_FINDER, "arrange label");
 	m = new_menu(menus, n, "Special");
 	add(m, "Empty Trash…", 0, up && fs->trash, ACT_FINDER, "empty-trash");
 	/* ZacOS 9's own: brings back applications hidden from Applications

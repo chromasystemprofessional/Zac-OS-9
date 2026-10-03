@@ -768,16 +768,10 @@ void AboutWindow::paintEvent(QPaintEvent *) {
 	pl_canvas *c = &px.c;
 	pl_fill(c, 0, 0, W - 1, H - 1, FACE);
 
-	/* The logo, 3x, like the big Mac OS logo of the original. */
-	const uint32_t *logo = logo_pixels();
-	for (int y = 0; y < PL_LOGO_SIZE * 3; y++) {
-		for (int x = 0; x < PL_LOGO_SIZE * 3; x++) {
-			uint32_t v = logo[(y / 3) * PL_LOGO_SIZE + x / 3];
-			if (v >> 24) {
-				pl_put(c, 16 + x, 10 + y, v);
-			}
-		}
-	}
+	/* The logo, large, like the big Mac OS logo of the original: the
+	 * 64x64 drawing with its own soft edges, not the menu bar's 16x16
+	 * scaled up. */
+	pl_image_blend(c, 8, 4, logo_pixels_hq(), PL_LOGO_SIZE_HQ, PL_LOGO_SIZE_HQ, false);
 	Text title("ZacOS 9", 300, PL_FONT_SYSTEM);
 	pl_text(c, title.t, 80, 30, C_BLACK);
 	QString kernel = QSysInfo::kernelType();

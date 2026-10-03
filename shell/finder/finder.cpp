@@ -5,11 +5,13 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QProcess>
+#include <QStandardPaths>
 #include <QWidget>
 
 #include <QDirIterator>
 #include <QUrl>
 
+#include "appdb.h"
 #include "fileops.h"
 #include "localvolumes.h"
 #include "netvolumes.h"
@@ -201,6 +203,16 @@ void Finder::command(const QString &name) {
 		FindDialog::open();
 	} else if (name == "about") {
 		AboutWindow::open();
+	} else if (name == "clean-up" || name.startsWith("arrange ")) {
+		static const QHash<QString, Arrange> by = {
+			{ "clean-up", Arrange::CleanUp }, { "arrange name", Arrange::Name },
+			{ "arrange modified", Arrange::Modified }, { "arrange created", Arrange::Created },
+			{ "arrange size", Arrange::Size }, { "arrange kind", Arrange::Kind },
+			{ "arrange label", Arrange::Label },
+		};
+		if (by.contains(name)) {
+			front()->arrange(by.value(name));
+		}
 	} else if (name == "view-icons" || name == "view-list" || name == "view-buttons") {
 		if (auto *fw = dynamic_cast<FolderWindow *>(front())) {
 			fw->setViewMode(name == "view-list" ? FolderWindow::ViewMode::List
@@ -255,6 +267,14 @@ void Finder::openSelection() {
 			FolderWindow::open(real.isEmpty() ? item->path : real);
 			continue;
 		}
+		if (item->isAlias && QFileInfo(item->path).symLinkTarget().endsWith(".desktop")) {
+			/* An application's alias. */
+			if (!appLaunchFile(item->path)) {
+				Alert::ask("“" + item->name + "” could not be opened. Its "
+					"application may have been removed.", "OK", QString());
+			}
+			continue;
+		}
 		if (item->kind == PL_ICON_FOLDER || item->kind == PL_ICON_DISK ||
 				item->kind == PL_ICON_TRASH_EMPTY || item->kind == PL_ICON_TRASH_FULL) {
 			QDir().mkpath(item->path);
@@ -277,24 +297,12 @@ static QString classicLauncher() {
 	return QFileInfo(local).isExecutable() ? local : QStringLiteral("zacos9-classic");
 }
 
-static QString wineLauncher() {
-	const QString local = QCoreApplication::applicationDirPath() + "/zacos9-wine";
-	return QFileInfo(local).isExecutable() ? local : QStringLiteral("zacos9-wine");
-}
-
+/* Windows programs open in the Windows Installer (shell/wininstall), which
+ * installs them, or runs one that needs no installing. */
 void Finder::launchWindows(const QString &exe) {
-	QProcess check;
-	check.start(wineLauncher(), QStringList{ "--check" });
-	if (!check.waitForFinished(10000) || check.exitStatus() != QProcess::NormalExit ||
-			check.exitCode() != 0) {
-		QString why = QString::fromUtf8(check.readAllStandardError()).trimmed();
-		if (why.isEmpty()) {
-			why = "Wine could not be started.";
-		}
-		Alert::ask(why, "OK", QString());
-		return;
-	}
-	QProcess::startDetached(wineLauncher(), QStringList{ exe });
+	const QString local = QCoreApplication::applicationDirPath() + "/zacos9-wininstall";
+	QProcess::startDetached(QFileInfo(local).isExecutable() ? local : QStringLiteral("zacos9-wininstall"),
+		QStringList{ exe });
 }
 
 void Finder::launchClassic(const QStringList &disks) {
@@ -373,8 +381,41 @@ void Finder::makeAlias() {
 	FinderView *v = front();
 	QString lastName;
 	QString folder;
+	const QString desktopDir = QStandardPaths::writableLocation(QStandardPaths::DesktopLocation);
+	bool onDesktop = false;
 	for (Item *item : v->selectedItems()) {
 		if (item->kind == PL_ICON_TRASH_EMPTY || item->kind == PL_ICON_TRASH_FULL) {
+			continue;
+		}
+		if (item->isVirtual && item->kind != PL_ICON_DISK) {
+			/* Nothing can be put in the Macintosh view's own folders, so -
+			 * as the Mac did when it couldn't write an alias beside its
+			 * original - the alias goes on the desktop. An application's
+			 * links to its desktop file; a folder standing for a real one,
+			 * to that folder. */
+			const VNode *node = vfsNode(item->path);
+			QString target;
+			if (node && node->kind == VKind::Launcher && node->actionId.isEmpty()) {
+				if (const AppEntry *app = appById(node->appId)) {
+					target = app->file;
+				}
+			} else {
+				target = vfsOpensAs(item->path);
+			}
+			if (target.isEmpty()) {
+				Alert::ask("An alias of “" + item->name + "” can't be made.", "OK", QString());
+				continue;
+			}
+			QDir dir(desktopDir);
+			dir.mkpath(".");
+			QString name = item->name + " alias";
+			for (int i = 2; dir.exists(name); i++) {
+				name = item->name + " alias " + QString::number(i);
+			}
+			if (QFile::link(target, dir.filePath(name))) {
+				folderChanged(desktopDir);
+				onDesktop = true;
+			}
 			continue;
 		}
 		QFileInfo info(item->path);
@@ -391,6 +432,8 @@ void Finder::makeAlias() {
 	if (!lastName.isEmpty()) {
 		folderChanged(folder);
 		v->selectByName(lastName);
+		notifyState();
+	} else if (onDesktop) {
 		notifyState();
 	}
 }

@@ -78,6 +78,10 @@ bool PanelList::press(QPoint pos) {
 		case SB_INC_ARROW: scrollTo(state.top + 1); break;
 		case SB_DEC_PAGE: scrollTo(state.top - visible); break;
 		case SB_INC_PAGE: scrollTo(state.top + visible); break;
+		case SB_THUMB_PART:
+			/* Drag the thumb: remember where on it the press landed. */
+			m_thumbGrab = pos.y() - frame.top() - (SB_ARROW + 1 + sb.thumb);
+			break;
 		default: break;
 		}
 		return true;
@@ -88,6 +92,47 @@ bool PanelList::press(QPoint pos) {
 	if (row >= 0) {
 		select(row, true);
 	}
+	return true;
+}
+
+bool PanelList::move(QPoint pos) {
+	if (m_thumbGrab < 0) {
+		return false;
+	}
+	const pl_scrollbar sb = pl_list_scrollbar(frame.top(), frame.bottom(), &state);
+	const int range = sb_thumb_range(sb.length);
+	const int visible = pl_list_visible_rows(frame.top(), frame.bottom());
+	if (range <= 0 || state.n <= visible) {
+		return false;
+	}
+	const int thumb = std::clamp(pos.y() - frame.top() - (SB_ARROW + 1) - m_thumbGrab, 0, range);
+	const int top = (thumb * (state.n - visible) + range / 2) / range;
+	if (top == state.top) {
+		return false;
+	}
+	scrollTo(top);
+	return true;
+}
+
+bool PanelList::release() {
+	const bool was = m_thumbGrab >= 0;
+	m_thumbGrab = -1;
+	return was;
+}
+
+bool PanelList::wheel(QPoint pos, int angleDeltaY) {
+	if (!frame.contains(pos) || angleDeltaY == 0) {
+		return false;
+	}
+	/* Three rows a notch, as most systems scroll; smooth-scrolling
+	 * touchpads send smaller steps, which add up. */
+	m_wheelRemainder += angleDeltaY;
+	const int rows = m_wheelRemainder / 40;
+	m_wheelRemainder -= rows * 40;
+	if (rows == 0) {
+		return false;
+	}
+	scrollTo(state.top - rows);
 	return true;
 }
 

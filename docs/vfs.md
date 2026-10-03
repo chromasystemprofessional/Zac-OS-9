@@ -15,7 +15,7 @@ the Finder pays for it.
 ## What you see
 
 ```
-Macintosh HD
+Zacintosh HD
 ├── System Folder
 │   ├── Appearance        → ~/.local/share/zacos9/appearance
 │   ├── Control Panels      (generated: ZacOS 9's control panels)
@@ -106,10 +106,14 @@ entry dropped in by hand, with an executable dpkg doesn't know).
 `~/.local/share/zacos9/finder/vfs.json`, written with the default
 mapping the first time the Finder runs, and yours to edit after that.
 
+The startup disk's name: `volume.name` once the user renames it; until then
+the name it was installed with (`/etc/zacos9/disk-name`, written by
+`zacos9-install`), else "Zacintosh HD".
+
 ```json
 {
   "version": 1,
-  "volume": { "name": "Macintosh HD" },
+  "volume": {},
   "showUnixVolume": false,
   "nodes": [
     { "id": "system-folder", "name": "System Folder", "kind": "folder",
