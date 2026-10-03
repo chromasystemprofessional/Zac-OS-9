@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 #include <wlr/types/wlr_compositor.h>
 #include <wlr/types/wlr_data_device.h>
@@ -213,6 +214,13 @@ int main(int argc, char *argv[]) {
 	startup_begin(&server);
 	spawn_component("ZACOS9_MENUBAR", "zacos9-menubar");
 	spawn_component("ZACOS9_FINDER", "zacos9-finder");
+	/* On a live medium, open the installer automatically. */
+	{
+		struct stat st_live;
+		if (stat("/run/live", &st_live) == 0 && S_ISDIR(st_live.st_mode)) {
+			spawn("exec zacos9-installer");
+		}
+	}
 	if (startup_cmd) {
 		spawn(startup_cmd);
 	}
