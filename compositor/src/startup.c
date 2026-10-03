@@ -16,6 +16,7 @@
 #include <wlr/types/wlr_output_layout.h>
 
 #include "draw.h"
+#include "icons.h"
 #include "logo.h"
 #include "patterns.h"
 #include "pixbuf.h"
@@ -28,6 +29,22 @@
 #define TICK_MS 40
 #define LOGO_MS 1500 /* the logo on white, before the Welcome box */
 #define LOGO_SCALE 2
+/* Extension parade: icons march left-to-right during the logo phase. */
+#define EXT_ICON_SIZE   32
+#define EXT_ICON_GAP    10  /* pixels between icons */
+#define EXT_ICON_BOTTOM 12  /* gap from screen bottom */
+#define EXT_FIRST_MS   300  /* first icon appears this many ms after start */
+#define EXT_STEP_MS    140  /* each subsequent icon appears this many ms later */
+
+static const enum pl_icon_kind ext_icons[] = {
+	PL_ICON_EXT_OPENTRANSPORT,
+	PL_ICON_EXT_APPLETALK,
+	PL_ICON_SHARED_FOLDER,
+	PL_ICON_EXT_BLUETOOTH,
+	PL_ICON_EXT_AUDIO,
+	PL_ICON_EXT_PRINTMONITOR,
+};
+#define N_EXT_ICONS ((int)(sizeof(ext_icons) / sizeof(ext_icons[0])))
 #define WELCOME_MIN_MS 1500 /* the Welcome box shows at least this long */
 #define STARTUP_MAX_MS 6000 /* from the Welcome box */
 #define FILL_MS 2500 /* time to reach 90% while waiting */
@@ -85,12 +102,37 @@ static void paint_logo(struct pl_canvas *c, int x, int y, int scale) {
 	}
 }
 
-static void draw_logo(int w, int h) {
+static void draw_logo(int w, int h, long t) {
 	struct plat_pixbuf *buf = pixbuf_create(w, h);
 	struct pl_canvas c = { .px = buf->data, .stride = w, .width = w, .height = h };
 	pl_fill(&c, 0, 0, w - 1, h - 1, C_WHITE);
 	const int lw = PL_LOGO_SIZE * LOGO_SCALE;
 	paint_logo(&c, (w - lw) / 2, (h - lw) / 2, LOGO_SCALE);
+
+	/* Extension parade: icons appear one by one from left to right. */
+	long elapsed = t - st.start_ms;
+	int n_shown = 0;
+	if (elapsed >= EXT_FIRST_MS) {
+		n_shown = (int)((elapsed - EXT_FIRST_MS) / EXT_STEP_MS) + 1;
+		if (n_shown > N_EXT_ICONS) n_shown = N_EXT_ICONS;
+	}
+	if (n_shown > 0) {
+		const int stride = EXT_ICON_SIZE + EXT_ICON_GAP;
+		const int total_w = N_EXT_ICONS * stride - EXT_ICON_GAP;
+		const int x0 = (w - total_w) / 2;
+		const int iy = h - EXT_ICON_SIZE - EXT_ICON_BOTTOM;
+		for (int i = 0; i < n_shown; i++) {
+			const uint32_t *px = pl_icon(ext_icons[i], EXT_ICON_SIZE);
+			const int ix = x0 + i * stride;
+			for (int py = 0; py < EXT_ICON_SIZE; py++) {
+				for (int ipx = 0; ipx < EXT_ICON_SIZE; ipx++) {
+					uint32_t v = px[py * EXT_ICON_SIZE + ipx];
+					if (v >> 24) pl_put(&c, ix + ipx, iy + py, v);
+				}
+			}
+		}
+	}
+
 	wlr_scene_buffer_set_buffer(st.buffer, &buf->base);
 	wlr_buffer_drop(&buf->base);
 }
@@ -152,7 +194,7 @@ static int tick(void *data) {
 		if (welcome) {
 			draw(box.width, box.height, progress(t));
 		} else {
-			draw_logo(box.width, box.height);
+			draw_logo(box.width, box.height, t);
 		}
 	}
 	wl_event_source_timer_update(st.timer, TICK_MS);

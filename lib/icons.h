@@ -26,6 +26,12 @@ enum pl_icon_kind {
 	PL_ICON_SHARED_FOLDER, /* a folder shared from Get Info */
 	PL_ICON_SYSTEM_FOLDER, /* the System Folder, marked with the sparkle */
 	PL_ICON_CONTROL_PANELS, /* the Control Panels folder */
+	/* System extensions shown during the startup parade. */
+	PL_ICON_EXT_OPENTRANSPORT,
+	PL_ICON_EXT_APPLETALK,
+	PL_ICON_EXT_BLUETOOTH,
+	PL_ICON_EXT_AUDIO,
+	PL_ICON_EXT_PRINTMONITOR,
 	PL_ICON_COUNT,
 };
 
