@@ -682,6 +682,53 @@ void AboutWindow::open() {
 	aboutWindow()->raise();
 }
 
+static QString cpuName() {
+	QFile f("/proc/cpuinfo");
+	if (!f.open(QIODevice::ReadOnly)) { return {}; }
+	for (const QByteArray &raw : f.readAll().split('\n')) {
+		if (!raw.startsWith("model name")) { continue; }
+		QString s = QString::fromUtf8(raw.mid(raw.indexOf(':') + 1)).trimmed();
+		s.remove("(R)"); s.remove("(TM)");
+		while (s.contains("  ")) { s.replace("  ", " "); }
+		return s.trimmed();
+	}
+	return {};
+}
+
+static QString gpuName() {
+	/* NVIDIA: the nvidia driver exposes a "Model:" line per GPU. */
+	const QDir nvgpus("/proc/driver/nvidia/gpus");
+	if (nvgpus.exists()) {
+		for (const QString &gpu : nvgpus.entryList(QDir::Dirs | QDir::NoDotAndDotDot)) {
+			QFile info("/proc/driver/nvidia/gpus/" + gpu + "/information");
+			if (!info.open(QIODevice::ReadOnly)) { continue; }
+			for (const QByteArray &line : info.readAll().split('\n')) {
+				if (line.startsWith("Model:")) {
+					return QString::fromUtf8(line.mid(6)).trimmed();
+				}
+			}
+		}
+	}
+	/* Other drivers: probe DRM card nodes via sysfs uevent. */
+	static const QStringList virtualDrivers = {
+		"virtio_gpu", "virtio-pci", "bochs-drm", "qxl",
+		"cirrusfb", "simpledrm", "vboxvideo", "vmwgfx"
+	};
+	for (const char *card : {"card0", "card1"}) {
+		QFile ue(QStringLiteral("/sys/class/drm/") + card + "/device/uevent");
+		if (!ue.open(QIODevice::ReadOnly)) { continue; }
+		QString driver;
+		for (const QString &line : QString::fromUtf8(ue.readAll()).split('\n')) {
+			if (line.startsWith("DRIVER=")) { driver = line.mid(7); break; }
+		}
+		if (driver.isEmpty() || virtualDrivers.contains(driver)) { continue; }
+		if (driver == "i915" || driver == "xe") { return "Intel GPU"; }
+		if (driver == "amdgpu" || driver == "radeon") { return "AMD GPU"; }
+		return driver + " GPU";
+	}
+	return {};
+}
+
 static qint64 meminfoKB(const QString &key) {
 	QFile f("/proc/meminfo");
 	if (!f.open(QIODevice::ReadOnly)) {
@@ -702,13 +749,17 @@ static QString megabytes(qint64 kb) {
 AboutWindow::AboutWindow() {
 	setAttribute(Qt::WA_DeleteOnClose);
 	setWindowTitle("About This Computer");
-	setFixedSize(360, 170);
+	const QString cpu = cpuName();
+	const QString gpu = gpuName();
+	if (!cpu.isEmpty()) { m_lines << "Processor:\t" + cpu; }
+	if (!gpu.isEmpty()) { m_lines << "Graphics:\t" + gpu; }
 	const qint64 swap = meminfoKB("SwapTotal");
-	m_lines = {
-		"Built-in Memory:\t" + megabytes(meminfoKB("MemTotal")),
-		"Virtual Memory:\t" + (swap > 0 ? megabytes(swap) + " used on disk" : QStringLiteral("Off")),
-		"Largest Unused Block:\t" + megabytes(meminfoKB("MemAvailable")),
-	};
+	m_lines << "Built-in Memory:\t" + megabytes(meminfoKB("MemTotal"))
+	        << "Virtual Memory:\t" + (swap > 0 ? megabytes(swap) + " used on disk"
+	                                           : QStringLiteral("Off"))
+	        << "Largest Unused Block:\t" + megabytes(meminfoKB("MemAvailable"));
+	/* 94px to first line, 20px per line, 22px bottom margin. */
+	setFixedSize(360, 94 + m_lines.size() * 20 + 22);
 }
 
 void AboutWindow::paintEvent(QPaintEvent *) {
