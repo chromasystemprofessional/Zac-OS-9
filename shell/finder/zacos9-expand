@@ -1,0 +1,134 @@
+#!/usr/bin/python3
+"""zacos9-expand ARCHIVE: expand an archive in place, as StuffIt Expander did
+when an archive was double-clicked in the Finder.
+
+The contents go beside the archive: a single top-level file or folder as
+itself, several as a folder named after the archive ("Photos.zip" ->
+"Photos"). A name already taken gets a number ("Photos 2"); nothing is
+overwritten, and the archive is kept. Prints the path of what it made.
+
+.zip (stored, deflate, bzip2, lzma, zip64), .tar, .tar.gz/.tgz,
+.tar.bz2/.tbz2, .tar.xz/.txz. Entries that would land outside the folder
+(absolute paths, "..") are refused; macOS's __MACOSX/ and ._ files are
+left out; a zip's Unix permissions (executable bits) are kept.
+"""
+import os
+import shutil
+import sys
+import tarfile
+import tempfile
+import zipfile
+
+TAR_SUFFIXES = (".tar.gz", ".tgz", ".tar.bz2", ".tbz2", ".tar.xz", ".txz", ".tar")
+
+
+def fail(message):
+    print(message, file=sys.stderr)
+    sys.exit(1)
+
+
+def stem(name):
+    lower = name.lower()
+    for suffix in (".zip",) + TAR_SUFFIXES:
+        if lower.endswith(suffix):
+            return name[: -len(suffix)] or name
+    return name
+
+
+def mac_junk(path):
+    parts = path.replace("\\", "/").split("/")
+    return parts[0] == "__MACOSX" or parts[-1].startswith("._") or parts[-1] == ".DS_Store"
+
+
+def safe_target(root, member):
+    target = os.path.realpath(os.path.join(root, member))
+    if not (target == root or target.startswith(root + os.sep)):
+        fail(f"The archive holds an item that would go outside its folder ({member}).")
+    return target
+
+
+def expand_zip(archive, root):
+    with zipfile.ZipFile(archive) as z:
+        for info in z.infolist():
+            if mac_junk(info.filename):
+                continue
+            if info.flag_bits & 0x1:
+                fail("The archive is protected with a password.")
+            target = safe_target(root, info.filename)
+            if info.is_dir():
+                os.makedirs(target, exist_ok=True)
+                continue
+            os.makedirs(os.path.dirname(target), exist_ok=True)
+            with z.open(info) as src, open(target, "wb") as dst:
+                shutil.copyfileobj(src, dst, 1 << 20)
+            mode = (info.external_attr >> 16) & 0o777
+            if mode:
+                os.chmod(target, mode | 0o600)
+
+
+def expand_tar(archive, root):
+    with tarfile.open(archive) as t:
+        members = [m for m in t.getmembers() if not mac_junk(m.name)]
+        for m in members:
+            safe_target(root, m.name)
+        # "data": no devices, no links out of the folder, no setuid bits.
+        t.extractall(root, members=members, filter="data")
+
+
+def unique(path):
+    if not os.path.lexists(path):
+        return path
+    base, ext = path, ""
+    if not os.path.isdir(path):
+        base, ext = os.path.splitext(path)
+    n = 2
+    while os.path.lexists(f"{base} {n}{ext}"):
+        n += 1
+    return f"{base} {n}{ext}"
+
+
+def main():
+    if len(sys.argv) != 2:
+        fail("usage: zacos9-expand ARCHIVE")
+    archive = os.path.abspath(sys.argv[1])
+    if not os.path.isfile(archive):
+        fail(f"There is no file at {archive}.")
+    folder = os.path.dirname(archive)
+    lower = archive.lower()
+    # Expanded beside the archive first (same disk: the final move is a
+    # rename), so a failure part way leaves nothing half-made in view.
+    work = tempfile.mkdtemp(prefix=".expanding-", dir=folder)
+    try:
+        root = os.path.realpath(work)
+        try:
+            if lower.endswith(".zip"):
+                expand_zip(archive, root)
+            elif lower.endswith(TAR_SUFFIXES):
+                expand_tar(archive, root)
+            else:
+                fail("That isn't an archive ZacOS 9 can expand.")
+        except (zipfile.BadZipFile, tarfile.TarError, EOFError) as e:
+            fail(f"The archive is damaged or incomplete ({e}).")
+        except NotImplementedError as e:
+            fail(f"The archive uses a kind of compression that can't be read ({e}).")
+        except OSError as e:
+            fail(f"It couldn't be expanded: {e.strerror or e}.")
+        entries = os.listdir(root)
+        if not entries:
+            fail("The archive is empty.")
+        if len(entries) == 1:
+            source = os.path.join(root, entries[0])
+            result = unique(os.path.join(folder, entries[0]))
+        else:
+            source = root
+            result = unique(os.path.join(folder, stem(os.path.basename(archive))))
+        os.rename(source, result)
+        if source == root:
+            os.chmod(result, 0o755)
+        print(result)
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+if __name__ == "__main__":
+    main()

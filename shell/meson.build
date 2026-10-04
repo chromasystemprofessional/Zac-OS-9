@@ -30,6 +30,13 @@ foreach xml : client_protocols
   )
 endforeach
 
+# Expanding archives on a double-click (the Finder runs it from beside itself).
+configure_file(input: 'finder/zacos9-expand', output: 'zacos9-expand', copy: true)
+install_data('finder/zacos9-expand', install_dir: get_option('bindir'),
+  install_mode: 'rwxr-xr-x')
+test('expand', find_program('python3'),
+  args: [files('../tests/finder/test_expand.py'), files('finder/zacos9-expand')])
+
 # Screen Snapshot (Apple menu): drag out a rectangle; a picture on the
 # Desktop and the clipboard (slurp, grim, wl-copy).
 configure_file(input: 'snapshot/zacos9-snapshot', output: 'zacos9-snapshot', copy: true)

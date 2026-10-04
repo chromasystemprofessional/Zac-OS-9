@@ -261,6 +261,8 @@ void Finder::newFolder() {
 	}
 }
 
+static bool isExpandable(const QString &path);
+
 void Finder::openItem(Item *item) {
 	{
 		if (item->isVirtual) {
@@ -295,10 +297,56 @@ void Finder::openItem(Item *item) {
 		} else if (item->kind == PL_ICON_CLASSIC) {
 			/* TODO: open the application itself inside the Mac. */
 			launchClassic();
+		} else if (isExpandable(item->path)) {
+			expandArchive(item->path);
 		} else {
 			QProcess::startDetached("xdg-open", { item->path });
 		}
 	}
+}
+
+/* ---- archives ------------------------------------------------------------------------ */
+
+static bool isExpandable(const QString &path) {
+	const QString lower = path.toLower();
+	for (const char *s : { ".zip", ".tar", ".tgz", ".tar.gz", ".tbz2", ".tar.bz2", ".txz", ".tar.xz" }) {
+		if (lower.endsWith(QLatin1String(s))) {
+			return true;
+		}
+	}
+	return false;
+}
+
+void Finder::expandArchive(const QString &archive) {
+	/* Beside us: installed in the same bin directory, or the build tree's copy. */
+	const QString tool = QCoreApplication::applicationDirPath() + "/zacos9-expand";
+	auto *p = new QProcess;
+	QObject::connect(p, &QProcess::finished, [this, p, archive](int code, QProcess::ExitStatus status) {
+		p->deleteLater();
+		const QString out = QString::fromUtf8(p->readAllStandardOutput()).trimmed();
+		const QString why = QString::fromUtf8(p->readAllStandardError()).trimmed().section('\n', -1);
+		if (status != QProcess::NormalExit || code != 0 || out.isEmpty()) {
+			Alert::ask("“" + QFileInfo(archive).fileName() + "” couldn’t be expanded. " +
+				(why.isEmpty() ? QString("The expanding tool stopped.") : why), "OK", QString());
+			return;
+		}
+		const QFileInfo result(out);
+		const QString folder = result.absolutePath();
+		folderChanged(folder);
+		if (QDir(folder) == QDir(m_desktop->folderPath())) {
+			m_desktop->selectByName(result.fileName());
+		} else if (FolderWindow::isOpen(folder)) {
+			FolderWindow::open(folder)->selectByName(result.fileName());
+		}
+	});
+	QObject::connect(p, &QProcess::errorOccurred, [p, archive](QProcess::ProcessError e) {
+		if (e == QProcess::FailedToStart) {
+			p->deleteLater();
+			Alert::ask("“" + QFileInfo(archive).fileName() + "” couldn’t be expanded: zacos9-expand "
+				"isn't installed.", "OK", QString());
+		}
+	});
+	p->start(tool, { archive });
 }
 
 void Finder::openSelection() {

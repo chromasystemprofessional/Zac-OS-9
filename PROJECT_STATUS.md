@@ -26,6 +26,15 @@ Updated: 2026-10-03
 
 Resuming the work on other applications' look (themes, styles, global menus): see `docs/app-integration.md`.
 
+**Double-clicking an archive expands it in place** (built; checked in a nested session; 13 checks in `meson test expand`).
+
+- StuffIt Expander's way: a double-clicked .zip / .tar / .tar.gz / .tgz / .tar.bz2 / .tar.xz is expanded beside itself by
+  `zacos9-expand` (`shell/finder/`, Python's zipfile/tarfile: no new dependency). One top-level item lands as itself, several go in
+  a folder named after the archive; taken names get " 2"; the archive is kept; the result is selected. Entries escaping the folder
+  are refused, __MACOSX/._ files skipped, zip Unix modes kept, password-protected zips refused with a message.
+- Seen: Photos.zip on the desktop -> "Photos" selected beside it; Project.zip in a Downloads window -> "Project" selected.
+- Not done: a progress window for big archives (it works in the background; the result appears when done); .7z and .rar.
+
 **Other programs' "Show in Folder" opens the Finder** (built; checked in a nested session).
 
 - Reported on real hardware: Firefox's folder button after a download did nothing. Nothing on the session bus was
