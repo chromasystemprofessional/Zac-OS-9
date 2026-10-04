@@ -39,10 +39,14 @@ Updated: 2026-10-03
 - 19 checks in `tests/store/test_appstyle.py` (meson test `appstyle`). Krita/Inkscape presets not done:
   their built-in shortcut schemes still to be confirmed in the Debian versions (Krita 5.2.9, Inkscape 1.4).
 
-**Wi-Fi freeze on the iMac: still open.** The whole screen freezes (pointer too) after OK on the Wi-Fi password in TCP/IP; joining from
-Terminal (`nmcli device wifi connect ... --ask`) works, so it's how the panel joins or the panel window. Not reproduced here. Ruled out: xdg-activation
-(Qt dialogs don't use it; tested). Added anyway: activation only focuses mapped windows, and view_handle_map can't put a view in the list twice.
-Asked the user to run the panel's own nmcli sequence from Terminal, and to run zacos9-tcpip with its output to a file and send the logs.
+**iMac freezes (joining Wi-Fi, dropping an app on Applications): GPU lockups - fix built, not committed.**
+
+- The user's `journalctl -b -1 -k` from a frozen boot (iMac7,1, Radeon HD 2600, `radeon` driver): CP stalled status registers, "GPU reset
+  succeeded, trying to resume", then a ttm_bo_release warning - the GPU's 3D engine hung under zacos9-wm's GLES drawing and the screen never
+  came back. Not our panels; joining from Terminal only worked because nothing new was drawn.
+- `zacos9-session` now uses the pixman renderer when the GPU's driver is `radeon` (pre-GCN Radeons); amdgpu cards keep GL.
+  The xdg-activation guards added while hunting this (mapped-only focus, no double insert) stay.
+- Seen in the same log: Wi-Fi is Broadcom's proprietary `wl` module (taints the kernel, works).
 
 **Control panel changes ignored in a fresh account - the real cause of the Monitors revert** (fixed; reproduced and verified; not committed).
 

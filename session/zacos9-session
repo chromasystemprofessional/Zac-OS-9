@@ -31,12 +31,16 @@ export QT_STYLE_OVERRIDE=zacos9
 # No real GPU (a plain framebuffer, or a virtual machine's display, where
 # GL would be emulated on the CPU and shows stale frames): draw with
 # pixman. ZacOS 9 is light enough for it.
+# Nor on the older Radeons the radeon driver runs (HD 2000-6000, such as a
+# 2007 iMac's HD 2600): their 3D engine locks up under zacos9-wm's GL
+# drawing ("GPU lockup", "CP stalled", then a frozen screen), so they
+# only show what pixman draws. amdgpu's newer cards are unaffected.
 if [ -z "${WLR_RENDERER:-}" ]; then
 	gpu=false
 	for node in /sys/class/drm/renderD*; do
 		[ -e "$node/device/driver" ] || continue
 		case $(basename "$(readlink -f "$node/device/driver")") in
-		virtio_gpu | virtio-pci | bochs* | qxl | cirrus* | vboxvideo | vmwgfx | simpledrm) ;;
+		virtio_gpu | virtio-pci | bochs* | qxl | cirrus* | vboxvideo | vmwgfx | simpledrm | radeon) ;;
 		*) gpu=true ;;
 		esac
 	done
