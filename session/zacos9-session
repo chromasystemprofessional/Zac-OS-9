@@ -66,8 +66,18 @@ mkdir -p "$state"
 
 # Once the compositor is up, tell D-Bus and systemd where it is, so
 # apps they start (portals, notifications) can find the display.
-if [ $# -eq 0 ] && command -v dbus-update-activation-environment >/dev/null; then
-	set -- -s "dbus-update-activation-environment --systemd WAYLAND_DISPLAY DISPLAY \
+startup=
+if command -v dbus-update-activation-environment >/dev/null; then
+	startup="dbus-update-activation-environment --systemd WAYLAND_DISPLAY DISPLAY \
 XDG_CURRENT_DESKTOP XDG_SESSION_TYPE QT_QPA_PLATFORM GTK_CSD GTK_THEME QT_STYLE_OVERRIDE XCURSOR_THEME XCURSOR_PATH XCURSOR_SIZE"
+fi
+# Then the password prompt for programs that need an administrator
+# (polkit: balenaEtcher writing a disk, pkexec), as Mac OS asked for one.
+# ZacOS 9's own helpers don't ask (their polkit rules).
+if command -v lxqt-policykit-agent >/dev/null; then
+	startup="${startup:+$startup; }lxqt-policykit-agent"
+fi
+if [ $# -eq 0 ] && [ -n "$startup" ]; then
+	set -- -s "$startup"
 fi
 exec zacos9-wm "$@" >"$state/session.log" 2>&1

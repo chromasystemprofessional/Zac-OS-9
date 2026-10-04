@@ -113,7 +113,12 @@ int main(int argc, char **argv) {
 	writeEntry(appsDir, "ours-only.desktop", entry("Only Ours", "/bin/true", "OnlyShowIn=ZacOS9;\n"));
 	/* What Applications leaves out: the system's own applications (listed
 	 * when the ISO is built), ZacOS 9's own pieces, Wine's uninstallers. */
-	writeEntry(dataDirs + "/zacos9", "base-applications", "builtin.desktop\nfoot.desktop\n");
+	writeEntry(dataDirs + "/zacos9", "base-applications",
+		"builtin.desktop\nfoot.desktop\nflasher.desktop\n");
+	/* A utility ZacOS 9 ships (Applications > Utilities), though the
+	 * system came with it. */
+	writeEntry(appsDir, "flasher.desktop",
+		entry("Disk Flasher", "/bin/true", "Categories=Utility;X-ZacOS9-Utility;\n"));
 	writeEntry(appsDir, "builtin.desktop", entry("Came With The System"));
 	writeEntry(appsDir, "zacos9-somepanel.desktop", entry("A ZacOS Panel"));
 	writeEntry(homeAppsDir + "/wine/Programs/Notepad Plus", "Notepad Plus.desktop",
@@ -145,6 +150,12 @@ int main(int argc, char **argv) {
 	check(!apps.contains("Only Elsewhere"), "OnlyShowIn for another desktop is not shown");
 	check(!apps.contains("Not Here"), "NotShowIn for this desktop is not shown");
 	check(!apps.contains("Missing Binary"), "a failing TryExec is not shown");
+	check(apps.contains("Utilities"), "Applications holds a Utilities folder");
+	check(!apps.contains("Disk Flasher"), "a shipped utility is not loose in Applications");
+	check(namesIn(vfsPathFor("applications/utilities")).contains("Disk Flasher"),
+		"it is in Applications > Utilities, though the system came with it");
+	check(!namesIn(vfsPathFor("applications/utilities")).contains("Calculator"),
+		"an ordinary Utility-category application stays in Applications");
 	check(apps.contains("Only Ours"), "an entry for this desktop only is shown");
 	check(!apps.contains("Came With The System"), "an application the system came with is not shown");
 	check(!apps.contains("A ZacOS Panel"), "ZacOS 9's own entries are not shown");

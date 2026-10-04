@@ -139,7 +139,7 @@ if [ "${1:-}" = --update ]; then
 	[ -n "$installed" ] || fail "There is no ZacOS 9 on that disk to update"
 	debs=
 	for dir in /run/live/medium/zacos9 /lib/live/mount/medium/zacos9 /cdrom/zacos9; do
-		for f in "$dir"/zacos9_*.deb "$dir"/zacos9-emulators_*.deb; do
+		for f in "$dir"/zacos9_*.deb "$dir"/zacos9-emulators_*.deb "$dir"/balena-etcher_*.deb; do
 			[ -f "$f" ] && debs="$debs $f"
 		done
 		[ -n "$debs" ] && break

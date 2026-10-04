@@ -17,4 +17,5 @@ tools/measure/figs/
 tools/measure/hig.txt
 /core.*
 /uploads/
+/Uploads/
 __pycache__/

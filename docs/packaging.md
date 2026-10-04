@@ -41,6 +41,21 @@ sudo apt install ./zacos9_*.deb ./zacos9-emulators_*.deb
 To publish a release that installed systems pick up through Software
 Update, see `docs/updates.md` (`scripts/release.sh`).
 
+- **balena-etcher** is balenaEtcher 2.1.7, repackaged from balena's own Linux
+  build by `packaging/etcher/build-deb.sh`. It is preinstalled on the ISO and
+  shows in Applications → Utilities.
+  - The script downloads the official zip (or takes `ETCHER_ZIP=...`) and
+    checks it against the SHA-256 that GitHub publishes for it.
+  - It installs to `/usr/lib/balena-etcher`, the path Debian's AppArmor
+    profile expects. The package has the upstream name, so balena's own
+    `.deb` upgrades it cleanly.
+  - The icon (`packaging/etcher/balena-etcher.png`) is balena's
+    `assets/icon.png` at the v2.1.7 tag; the Linux zip has none.
+  - The licence is Apache-2.0.
+  - **Writing a disk needs an administrator's password.** Etcher asks
+    through `pkexec`, which the session's polkit agent (`lxqt-policykit`)
+    answers with a password dialog.
+
 ## The ISO
 
 ```sh

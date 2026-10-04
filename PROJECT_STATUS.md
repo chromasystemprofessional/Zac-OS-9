@@ -26,6 +26,19 @@ Updated: 2026-10-03
 
 Resuming the work on other applications' look (themes, styles, global menus): see `docs/app-integration.md`.
 
+**balenaEtcher preinstalled, in Applications > Utilities; a polkit password prompt** (package built and inspected; Utilities
+covered by `test-finder-vfs`; not yet installed or run - needs root and a new ISO).
+
+- `packaging/etcher/build-deb.sh` -> `balena-etcher_2.1.7_amd64.deb` from balena's Linux zip (SHA-256 pinned to GitHub's digest;
+  the user's ~/Downloads copy matched), in /usr/lib/balena-etcher (Debian's AppArmor profile path), setuid chrome-sandbox, icon
+  from balena's repo, desktop entry `Categories=Utility;X-ZacOS9-Utility;`. ISO installs it; installer Update carries it;
+  `zacos9` Recommends it.
+- Applications > Utilities (`applications/utilities`, registry v4; v3 registries gain it and Applications' exclusion on upgrade)
+  shows X-ZacOS9-Utility entries, even ones the system came with (`appdb.cpp` exempts them from base-applications).
+- Etcher writes disks as root through `pkexec /bin/bash -c ...`: no safe polkit rule can allow that without a password, so
+  `zacos9` now depends on `lxqt-policykit` and the session starts `lxqt-policykit-agent` (a Qt 6 password dialog, so Platinum).
+- Not done: Software Update only fetches the `zacos9` .deb, so existing systems get Etcher from a new ISO's Update or by hand.
+
 **Double-clicking an archive expands it in place** (built; checked in a nested session; 13 checks in `meson test expand`).
 
 - StuffIt Expander's way: a double-clicked .zip / .tar / .tar.gz / .tgz / .tar.bz2 / .tar.xz is expanded beside itself by

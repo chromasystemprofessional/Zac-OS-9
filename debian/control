@@ -38,8 +38,10 @@ Depends: ${shlibs:Depends},
          grim,
          slurp,
          wl-clipboard,
-         bluez
-Recommends: xwayland,
+         bluez,
+         lxqt-policykit
+Recommends: balena-etcher,
+            xwayland,
             netatalk,
             samba,
             wsdd2,

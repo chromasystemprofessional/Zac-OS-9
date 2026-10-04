@@ -24,10 +24,10 @@
  * doesn't have take their default, and nodes it doesn't know about are
  * added, while the user's own nodes and overrides are kept.
  */
-static constexpr int REGISTRY_VERSION = 3;
+static constexpr int REGISTRY_VERSION = 4;
 
 static const char *DEFAULT_REGISTRY = R"JSON({
-  "version": 3,
+  "version": 4,
   "volume": {},
   "showUnixVolume": false,
   "nodes": [
@@ -42,7 +42,10 @@ static const char *DEFAULT_REGISTRY = R"JSON({
       "backing": "$XDG_DATA_HOME/fonts" },
     { "id": "system-folder/preferences", "name": "Preferences", "kind": "backed",
       "backing": "$XDG_CONFIG_HOME" },
-    { "id": "applications", "name": "Applications", "kind": "apps", "order": 1 },
+    { "id": "applications", "name": "Applications", "kind": "apps", "order": 1,
+      "excludeCategories": ["X-ZacOS9-Utility"] },
+    { "id": "applications/utilities", "name": "Utilities", "kind": "apps", "order": -1,
+      "categories": ["X-ZacOS9-Utility"] },
     { "id": "home", "name": "Home", "kind": "backed",
       "backing": "$HOME", "order": 2 },
     { "id": "utilities", "name": "Utilities", "kind": "apps", "order": 4,
@@ -173,6 +176,19 @@ bool migrate(QJsonObject *root) {
 		if (n.value("id").toString() == QLatin1String("documents") &&
 				n.value("backing").toString() == QLatin1String("$XDG_DOCUMENTS_DIR")) {
 			nodes.removeAt(i);
+		}
+	}
+	/* Version 4: Applications > Utilities holds what ZacOS 9 ships as a
+	 * utility (balenaEtcher, ...), so Applications itself leaves them out. */
+	for (int i = 0; i < nodes.size(); i++) {
+		QJsonObject n = nodes.at(i).toObject();
+		if (n.value("id").toString() == QLatin1String("applications")) {
+			QJsonArray ex = n.value("excludeCategories").toArray();
+			if (!ex.contains(QJsonValue("X-ZacOS9-Utility"))) {
+				ex.append("X-ZacOS9-Utility");
+				n.insert("excludeCategories", ex);
+				nodes.replace(i, n);
+			}
 		}
 	}
 	QStringList have;

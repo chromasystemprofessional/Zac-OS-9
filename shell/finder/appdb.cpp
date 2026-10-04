@@ -285,8 +285,13 @@ void load() {
 		}
 		/* Applications is empty on a fresh install: not ZacOS 9's own
 		 * pieces (the control panels and the Apple menu have those), and
-		 * not what the system came with. */
-		if (id.startsWith(QLatin1String("zacos9-")) || baseApplications().contains(id)) {
+		 * not what the system came with - except the utilities ZacOS 9
+		 * ships for Applications > Utilities (balenaEtcher, ...). */
+		const bool shippedUtility = G_IS_DESKTOP_APP_INFO(info) &&
+			fromUtf8(g_desktop_app_info_get_categories(G_DESKTOP_APP_INFO(info)))
+				.split(';').contains(QLatin1String("X-ZacOS9-Utility"));
+		if (id.startsWith(QLatin1String("zacos9-")) ||
+				(baseApplications().contains(id) && !shippedUtility)) {
 			continue;
 		}
 		/* Wine files a Windows program's Start-menu shortcuts as desktop
