@@ -6,7 +6,8 @@ entries = ['zacos9-appearance.desktop', 'zacos9-datetime.desktop', 'zacos9-files
   'zacos9-sound.desktop', 'zacos9-tcpip.desktop', 'zacos9-store.desktop',
   'zacos9-netbrowser.desktop', 'zacos9-setup.desktop', 'zacos9-installer.desktop',
   'zacos9-wininstall.desktop', 'zacos9-appinstall.desktop', 'zacos9-update.desktop',
-  'zacos9-bluetooth.desktop']
+  'zacos9-bluetooth.desktop',
+  'zacos9-finder.desktop']
 foreach f : entries
   configure_file(input: f, output: f, copy: true)
 endforeach

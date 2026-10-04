@@ -26,6 +26,16 @@ Updated: 2026-10-03
 
 Resuming the work on other applications' look (themes, styles, global menus): see `docs/app-integration.md`.
 
+**Other programs' "Show in Folder" opens the Finder** (built; checked in a nested session).
+
+- Reported on real hardware: Firefox's folder button after a download did nothing. Nothing on the session bus was
+  `org.freedesktop.FileManager1`, and nothing was the default for `inode/directory`, so its fallback failed too.
+- The Finder now owns `org.freedesktop.FileManager1` (`shell/finder/filemanager1.cpp`): ShowFolders opens folder windows,
+  ShowItems opens the item's folder with it selected, ShowItemProperties adds Get Info. A hidden `zacos9-finder.desktop`
+  (`zacos9-finder --open URI...`, forwarded to the running Finder) is the default for folders through
+  `share/xdg/zacos9-mimeapps.list` (read via XDG_CONFIG_DIRS and XDG_CURRENT_DESKTOP=ZacOS9).
+- Seen: gdbus ShowItems on Downloads/report.pdf -> Downloads window, report.pdf selected; `gio open ~/Documents` -> its window.
+
 **Icon labels: cut in the middle, whole when selected** (built; seen in a nested session).
 
 - As Mac OS 8/9: in icon views and on the desktop a long name is cut in the middle to 72 px ("Mousep…rences", "Quarter… 3.txt")

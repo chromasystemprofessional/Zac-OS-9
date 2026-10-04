@@ -1,0 +1,4 @@
+# ZacOS 9's default applications (XDG_CONFIG_DIRS, as zacos9-session sets it;
+# a user's own ~/.config/mimeapps.list still wins).
+[Default Applications]
+inode/directory=zacos9-finder.desktop
