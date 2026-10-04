@@ -16,6 +16,18 @@ export GDK_BACKEND="wayland,x11"
 export MOZ_ENABLE_WAYLAND=1
 export _JAVA_AWT_WM_NONREPARENTING=1
 
+# Windows get ZacOS 9's frames, from the compositor, not the application's
+# own: GTK 3 draws its own title bar unless told otherwise, and Qt its own
+# frame if the compositor can't give it one. (GTK 4 and Electron apps that
+# draw their own title bars ignore these.)
+export GTK_CSD=0
+export QT_WAYLAND_DISABLE_WINDOWDECORATION=1
+# GTK 3 applications wear the Platinum theme (share/themes/ZacOS9).
+export GTK_THEME=ZacOS9
+# Qt applications get the Platinum controls from the zacos9 style plugin
+# (shell/qtstyle); a system without it falls back to Qt's own look.
+export QT_STYLE_OVERRIDE=zacos9
+
 # No real GPU (a plain framebuffer, or a virtual machine's display, where
 # GL would be emulated on the CPU and shows stale frames): draw with
 # pixman. ZacOS 9 is light enough for it.
@@ -49,6 +61,6 @@ mkdir -p "$state"
 # apps they start (portals, notifications) can find the display.
 if [ $# -eq 0 ] && command -v dbus-update-activation-environment >/dev/null; then
 	set -- -s "dbus-update-activation-environment --systemd WAYLAND_DISPLAY DISPLAY \
-XDG_CURRENT_DESKTOP XDG_SESSION_TYPE QT_QPA_PLATFORM XCURSOR_THEME XCURSOR_PATH XCURSOR_SIZE"
+XDG_CURRENT_DESKTOP XDG_SESSION_TYPE QT_QPA_PLATFORM GTK_CSD GTK_THEME QT_STYLE_OVERRIDE XCURSOR_THEME XCURSOR_PATH XCURSOR_SIZE"
 fi
 exec zacos9-wm "$@" >"$state/session.log" 2>&1

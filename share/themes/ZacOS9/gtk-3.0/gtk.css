@@ -1,0 +1,303 @@
+/* ZacOS9: the Platinum look for GTK 3 applications.
+ *
+ * Starts from GTK's own Adwaita (so every widget still works and keeps its
+ * icons) and restyles it: grey 3-D controls with black outlines, square
+ * corners, no shadows or animations, a flat grey menu bar, a lavender
+ * selection. The window's frame is the compositor's. Colours are those of
+ * the native ZacOS 9 programs (lib/draw.h: GRAY(0xD) is the control face);
+ * the lavender is the default accent - it doesn't follow the Appearance
+ * panel's choice yet. */
+@import url("resource:///org/gtk/libgtk/theme/Adwaita/gtk-contained.css");
+
+@define-color theme_bg_color #dddddd;
+@define-color theme_fg_color #000000;
+@define-color theme_base_color #ffffff;
+@define-color theme_text_color #000000;
+@define-color theme_selected_bg_color #9999cc;
+@define-color theme_selected_fg_color #000000;
+@define-color insensitive_fg_color #888888;
+@define-color borders #000000;
+@define-color unfocused_borders #666666;
+@define-color content_view_bg #ffffff;
+
+* {
+	border-radius: 0;
+	transition: none;
+	animation: none;
+	text-shadow: none;
+	-gtk-icon-shadow: none;
+	box-shadow: none;
+}
+
+/* Windows: grey; the frame is not ours to draw. */
+window, dialog, .background {
+	background-color: #dddddd;
+	color: #000000;
+}
+decoration, window decoration {
+	box-shadow: none;
+	margin: 0;
+	border: none;
+}
+window.csd, window.csd decoration {
+	border-radius: 0;
+	box-shadow: none;
+}
+
+/* Controls: raised grey, black outline. */
+button, button.flat:hover {
+	background-image: linear-gradient(to bottom, #eeeeee, #cccccc);
+	background-color: #dddddd;
+	color: #000000;
+	border: 1px solid #000000;
+	border-radius: 3px;
+	box-shadow: inset 1px 1px #ffffff, inset -1px -1px #888888;
+	padding: 3px 10px;
+	min-height: 16px;
+}
+button:hover {
+	background-image: linear-gradient(to bottom, #f4f4f4, #d4d4d4);
+}
+button:active, button:checked, button.toggle:checked {
+	background-image: none;
+	background-color: #999999;
+	box-shadow: inset 1px 1px #666666;
+	color: #000000;
+}
+button:disabled {
+	color: #888888;
+	background-image: none;
+	background-color: #dddddd;
+	border-color: #888888;
+	box-shadow: none;
+}
+button.flat, button.image-button.flat {
+	background-image: none;
+	background-color: transparent;
+	border-color: transparent;
+	box-shadow: none;
+}
+button.suggested-action, button.default {
+	border-width: 2px;
+}
+button.destructive-action {
+	color: #000000;
+}
+
+/* Text fields: white, sunk. */
+textview, textview text, .view, treeview.view {
+	background-color: #ffffff;
+	background-image: none;
+	color: #000000;
+}
+scrolledwindow > .frame, scrolledwindow {
+	border-color: #000000;
+}
+entry, spinbutton {
+	background-color: #ffffff;
+	background-image: none;
+	color: #000000;
+	border: 1px solid #000000;
+	box-shadow: inset 1px 1px #888888;
+}
+entry:focus, spinbutton:focus {
+	border-color: #000000;
+	box-shadow: inset 1px 1px #888888, 0 0 0 1px #9999cc;
+}
+entry:disabled, spinbutton:disabled {
+	background-color: #eeeeee;
+	color: #888888;
+}
+selection, *:selected, .view:selected, textview text selection,
+entry selection, row:selected, treeview.view:selected {
+	background-color: #9999cc;
+	color: #000000;
+}
+
+/* Menus: a flat grey bar; items turn lavender under the pointer. */
+menubar, .menubar {
+	background-color: #dddddd;
+	background-image: none;
+	color: #000000;
+	border-bottom: 1px solid #000000;
+	box-shadow: none;
+	padding: 0;
+}
+menubar > menuitem, .menubar > menuitem {
+	padding: 2px 10px;
+	border: none;
+}
+menubar > menuitem:hover, menuitem:hover, menu menuitem:hover, modelbutton:hover {
+	background-color: #9999cc;
+	background-image: none;
+	color: #000000;
+}
+menu, .menu, .popup, popover, popover.background {
+	background-color: #dddddd;
+	background-image: none;
+	color: #000000;
+	border: 1px solid #000000;
+	box-shadow: 2px 2px #888888;
+	padding: 2px 0;
+}
+menuitem {
+	padding: 3px 18px;
+	min-height: 16px;
+}
+menuitem:disabled, menuitem:disabled label {
+	color: #888888;
+}
+separator, menuitem separator {
+	background-color: #888888;
+	min-height: 1px;
+	min-width: 1px;
+}
+
+/* Toolbars and the status line. */
+toolbar, .toolbar, .inline-toolbar, statusbar, actionbar {
+	background-color: #dddddd;
+	background-image: none;
+	border-color: #888888;
+	box-shadow: none;
+}
+headerbar, .titlebar {
+	background-color: #dddddd;
+	background-image: none;
+	color: #000000;
+	border-bottom: 1px solid #000000;
+	box-shadow: none;
+}
+
+/* Scroll bars: a grey groove and a square, outlined thumb. */
+scrollbar {
+	background-color: #eeeeee;
+	background-image: none;
+	border: none;
+	border-left: 1px solid #888888;
+}
+scrollbar.horizontal {
+	border-left: none;
+	border-top: 1px solid #888888;
+}
+scrollbar slider {
+	background-image: linear-gradient(to right, #eeeeee, #bbbbcc);
+	background-color: #ccccdd;
+	border: 1px solid #000000;
+	min-width: 14px;
+	min-height: 14px;
+	margin: 0;
+	box-shadow: inset 1px 1px #ffffff;
+}
+scrollbar.horizontal slider {
+	background-image: linear-gradient(to bottom, #eeeeee, #bbbbcc);
+}
+scrollbar slider:hover, scrollbar slider:active {
+	background-color: #9999cc;
+}
+scrollbar trough {
+	background-color: #eeeeee;
+	border: none;
+}
+scrollbar.overlay-indicator:not(.dragging):not(.hovering) slider {
+	min-width: 14px;
+	min-height: 14px;
+	background-color: #ccccdd;
+}
+
+/* Tabs. */
+notebook > header {
+	background-color: #dddddd;
+	box-shadow: none;
+}
+notebook > header > tabs > tab {
+	background-image: linear-gradient(to bottom, #eeeeee, #cccccc);
+	border: 1px solid #000000;
+	padding: 3px 12px;
+	box-shadow: inset 1px 1px #ffffff;
+}
+notebook > header > tabs > tab:checked {
+	background-image: none;
+	background-color: #dddddd;
+}
+notebook > stack {
+	background-color: #dddddd;
+	border: 1px solid #000000;
+}
+
+/* Lists, frames, progress, tooltips. */
+frame > border, .frame {
+	border: 1px solid #000000;
+}
+treeview header button {
+	border-radius: 0;
+	background-image: linear-gradient(to bottom, #eeeeee, #cccccc);
+	padding: 2px 6px;
+}
+progressbar trough {
+	background-color: #ffffff;
+	border: 1px solid #000000;
+	min-height: 12px;
+}
+progressbar progress {
+	background-color: #6666cc;
+	background-image: none;
+	border: none;
+}
+scale trough {
+	background-color: #999999;
+	border: 1px solid #000000;
+}
+scale slider {
+	background-image: linear-gradient(to bottom, #eeeeee, #cccccc);
+	border: 1px solid #000000;
+}
+tooltip, tooltip.background {
+	background-color: #ffffcc;
+	color: #000000;
+	border: 1px solid #000000;
+}
+tooltip * {
+	color: #000000;
+}
+infobar, .info, .warning, .error, .question {
+	background-color: #dddddd;
+	background-image: none;
+	color: #000000;
+	border: 1px solid #000000;
+}
+
+/* Check boxes and radio buttons: square, outlined, black mark. */
+check, radio {
+	background-image: none;
+	background-color: #ffffff;
+	border: 1px solid #000000;
+	color: #000000;
+	box-shadow: inset 1px 1px #888888;
+	min-width: 14px;
+	min-height: 14px;
+}
+radio {
+	border-radius: 50%;
+}
+check:checked, check:indeterminate, radio:checked, radio:indeterminate {
+	background-image: none;
+	background-color: #ffffff;
+	color: #000000;
+}
+check:disabled, radio:disabled {
+	background-color: #dddddd;
+	border-color: #888888;
+	color: #888888;
+}
+
+/* The selected tab is the one with no line under it, not a blue one. */
+notebook > header.top > tabs > tab:checked,
+notebook > header.bottom > tabs > tab:checked,
+notebook > header.left > tabs > tab:checked,
+notebook > header.right > tabs > tab:checked {
+	box-shadow: none;
+	border-bottom-color: #dddddd;
+}
+notebook > header.top > tabs > tab:hover {
+	box-shadow: inset 1px 1px #ffffff;
+}

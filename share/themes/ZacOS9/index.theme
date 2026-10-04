@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=X-GNOME-Metatheme
+Name=ZacOS9
+Comment=Mac OS 9 Platinum look for GTK 3 applications
+Encoding=UTF-8
+
+[X-GNOME-Metatheme]
+GtkTheme=ZacOS9
+IconTheme=Adwaita

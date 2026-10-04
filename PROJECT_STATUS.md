@@ -39,6 +39,35 @@ Updated: 2026-10-03
 - 19 checks in `tests/store/test_appstyle.py` (meson test `appstyle`). Krita/Inkscape presets not done:
   their built-in shortcut schemes still to be confirmed in the Debian versions (Krita 5.2.9, Inkscape 1.4).
 
+**Qt style plugin** (built; seen on screen with a Qt 6 test program; not committed; not in an ISO yet).
+
+- `shell/qtstyle/`: a `QProxyStyle` over Fusion, installed to `<libdir>/qt6/plugins/styles/zacos9style.so`, selected for every Qt
+  program in the session by `QT_STYLE_OVERRIDE=zacos9`. Platinum palette; push buttons (incl. default ring), check boxes, radio
+  buttons, text field frames and scroll bars are drawn by `lib/widgets.c`, so they match the native programs pixel for pixel.
+  Scroll bar geometry (arrows at both ends, fixed thumb) is defined in `subControlRect` to match `lib/widgets.c`.
+- Seen: buttons, disabled button, check boxes, radios, line edit, a scrolling text view with the Platinum scroll bar. Thumb dragging and
+  the arrows were driven with the pointer and scroll the text; page clicks weren't tried. Menus, tabs, sliders, combo boxes, spin boxes are Fusion in the Platinum palette.
+- Qt 6 only (Debian 13's Qt 5 programs are not covered). Accent colour is read at start-up from the Appearance panel's setting.
+
+**GTK 3 Platinum theme; toolkit session defaults** (built; looked at on screen with Mousepad; not committed; not in an ISO yet).
+
+- `share/themes/ZacOS9/gtk-3.0/gtk.css` (installed to `/usr/share/themes`): Adwaita as the base, restyled - grey 3-D outlined
+  buttons, square corners, sunk white fields, flat grey menu bar and menus, lavender selection, Platinum-style scroll bars and tabs,
+  no shadows or animations. `zacos9-session` sets `GTK_THEME=ZacOS9`, `GTK_CSD=0`, `QT_WAYLAND_DISABLE_WINDOWDECORATION=1`.
+- Seen on screen in Mousepad (GTK 3): grey menu bar, an opened File menu (grey, lavender bar highlight), the Preferences dialog
+  (outlined buttons, tabs, square check boxes with a black mark, combo box). Not seen: scroll bars, GIMP/Inkscape
+  (GIMP keeps its own dark theme until Preferences > Theme is set to System). Lavender is fixed - the Appearance accent isn't followed yet.
+- Not done: Qt style, GTK 4/libadwaita (ignores themes), global menus (next).
+- Build tree: the theme is only installed, not copied into build/share; point XDG_DATA_DIRS at share/ to try it from a build.
+
+**Windows come forward when re-opened; double-click opens one item** (built; checked in a nested session; not committed).
+
+- Compositor: `xdg_activation_v1` (`compositor/src/xdg.c`) - a client asking for its window to be activated brings it to the
+  front with keyboard focus. Qt's `activateWindow()` (used by `FolderWindow::open` for an already-open folder) uses it, so
+  opening the startup disk while its window is buried raises it. If none is open, one opens as before.
+- Double-click opens only the item under the pointer (selecting just it), on the desktop and in folder windows, so two
+  icons selected by accident (shift-click, marquee) aren't both opened. File > Open still opens every selected item.
+
 **Documents replaced by Home; the user can add folders to the startup disk** (built; VFS test passes; not committed). Registry version 3 drops the untouched default Documents node (Home holds ~/Documents). File > New Folder in the disk's window makes a folder of the user's own (`vfsNewFolder`, registry node with `"user": true`, real directory in `~/.local/share/zacos9/finder/folders/`); renamable, takes files, Move To Trash deletes it only when empty.
 
 **Home folder on the startup disk; Wine programs without a menu entry** (built; VFS test passes; not tested with a real Wine install; not committed; not in an ISO yet).

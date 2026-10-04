@@ -188,6 +188,17 @@ static void handle_set_title(struct wl_listener *listener, void *data) {
 	view_set_title(view, view->xsurface->title);
 }
 
+/* The X server reports a resize when it has applied it, which can be after
+ * the client's last commit: the frame is fitted to the window's size here
+ * as well as on commits, or it would stay at the old one (until something
+ * else - folding the window, say - made it redraw). */
+static void handle_set_geometry(struct wl_listener *listener, void *data) {
+	struct plat_view *view = wl_container_of(listener, view, set_geometry);
+	if (view->mapped) {
+		view_update_frame(view);
+	}
+}
+
 /* WM_CLASS is X11's closest thing to an app id. */
 static void handle_set_class(struct wl_listener *listener, void *data) {
 	struct plat_view *view = wl_container_of(listener, view, set_app_id);
@@ -208,6 +219,7 @@ static void handle_destroy(struct wl_listener *listener, void *data) {
 	wl_list_remove(&view->request_maximize.link);
 	wl_list_remove(&view->request_fullscreen.link);
 	wl_list_remove(&view->set_title.link);
+	wl_list_remove(&view->set_geometry.link);
 	wl_list_remove(&view->set_app_id.link);
 	wl_list_remove(&view->destroy.link);
 	view_handle_destroy(view);
@@ -228,6 +240,8 @@ static void new_managed(struct plat_server *server, struct wlr_xwayland_surface 
 	wl_signal_add(&xsurface->events.associate, &view->associate);
 	view->dissociate.notify = handle_dissociate;
 	wl_signal_add(&xsurface->events.dissociate, &view->dissociate);
+	view->set_geometry.notify = handle_set_geometry;
+	wl_signal_add(&xsurface->events.set_geometry, &view->set_geometry);
 	view->request_configure.notify = handle_request_configure;
 	wl_signal_add(&xsurface->events.request_configure, &view->request_configure);
 	view->request_activate.notify = handle_request_activate;

@@ -71,6 +71,8 @@ struct plat_server {
 	struct wl_listener new_xdg_toplevel;
 	struct wl_listener new_xdg_popup;
 	struct wlr_xdg_decoration_manager_v1 *xdg_decoration_mgr;
+	struct wlr_xdg_activation_v1 *xdg_activation;
+	struct wl_listener request_activate;
 	struct wl_listener new_xdg_decoration;
 
 	struct wlr_xwayland *xwayland;
@@ -200,6 +202,7 @@ struct plat_view {
 	struct wl_listener associate;
 	struct wl_listener dissociate;
 	struct wl_listener request_configure;
+	struct wl_listener set_geometry;
 	struct wl_listener request_activate;
 };
 

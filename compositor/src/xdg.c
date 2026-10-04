@@ -1,6 +1,8 @@
 #include <assert.h>
 #include <stdlib.h>
 
+#include <wlr/types/wlr_xdg_activation_v1.h>
+
 #include "server.h"
 
 struct plat_popup {
@@ -277,12 +279,31 @@ static void server_new_xdg_decoration(struct wl_listener *listener, void *data) 
 	decoration_request_mode(&deco->request_mode, NULL);
 }
 
+/* A client asking for one of its windows to come forward (Qt's
+ * requestActivate, used by the Finder when a folder that is already open is
+ * opened again): bring it to the front and give it the keyboard. */
+static void handle_request_activate(struct wl_listener *listener, void *data) {
+	const struct wlr_xdg_activation_v1_request_activate_event *event = data;
+	struct wlr_xdg_surface *xdg = wlr_xdg_surface_try_from_wlr_surface(event->surface);
+	if (!xdg || xdg->role != WLR_XDG_SURFACE_ROLE_TOPLEVEL || !xdg->toplevel) {
+		return;
+	}
+	struct plat_view *view = view_from_toplevel(xdg->toplevel);
+	if (view) {
+		view_focus(view);
+	}
+}
+
 void xdg_init(struct plat_server *server) {
 	server->xdg_shell = wlr_xdg_shell_create(server->display, 3);
 	server->new_xdg_toplevel.notify = server_new_xdg_toplevel;
 	wl_signal_add(&server->xdg_shell->events.new_toplevel, &server->new_xdg_toplevel);
 	server->new_xdg_popup.notify = server_new_xdg_popup;
 	wl_signal_add(&server->xdg_shell->events.new_popup, &server->new_xdg_popup);
+
+	server->xdg_activation = wlr_xdg_activation_v1_create(server->display);
+	server->request_activate.notify = handle_request_activate;
+	wl_signal_add(&server->xdg_activation->events.request_activate, &server->request_activate);
 
 	server->xdg_decoration_mgr = wlr_xdg_decoration_manager_v1_create(server->display);
 	server->new_xdg_decoration.notify = server_new_xdg_decoration;

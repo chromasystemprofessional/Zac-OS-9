@@ -56,6 +56,9 @@ public:
 	void command(const QString &name);
 	void newFolder();
 	void openSelection();
+	/* Opens just this item, whatever else is selected: what a double-click
+	 * means, so two icons selected by accident aren't both opened. */
+	void openItem(Item *item);
 	void closeWindow();
 	void moveSelectionToTrash();
 	void emptyTrash();

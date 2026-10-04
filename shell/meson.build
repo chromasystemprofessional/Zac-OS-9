@@ -297,3 +297,18 @@ endforeach
 executable('vptr', meson.project_source_root() / 'tools/vptr/vptr.c', vptr_protocol,
   client_protocol_src,
   dependencies: [wayland_client, xkbcommon_client])
+
+# ZacOS 9 Qt style plugin: other Qt applications (Qt 6) drawn with the
+# Platinum controls. Selected with QT_STYLE_OVERRIDE=zacos9 (session/).
+qt6_mod = import('qt6')
+qtstyle_moc = qt6_mod.preprocess(moc_headers: 'qtstyle/zacos9style.h',
+  dependencies: qt6)
+shared_module('zacos9style',
+  'qtstyle/zacos9style.cpp', qtstyle_moc,
+  include_directories: include_directories('qtstyle'),
+  dependencies: [platinum_dep, qt6],
+  cpp_args: ['-std=c++17'],
+  name_prefix: '',
+  install: true,
+  install_dir: get_option('libdir') / 'qt6' / 'plugins' / 'styles',
+)

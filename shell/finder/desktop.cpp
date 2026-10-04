@@ -498,8 +498,13 @@ void Desktop::mousePressEvent(QMouseEvent *e) {
 
 void Desktop::mouseDoubleClickEvent(QMouseEvent *e) {
 	m_renameTimer.stop();
-	if (itemAt(e->position().toPoint())) {
-		Finder::instance().openSelection();
+	if (Item *hit = itemAt(e->position().toPoint())) {
+		for (Item *item : allItems()) {
+			item->selected = item == hit;
+		}
+		update();
+		Finder::instance().notifyState();
+		Finder::instance().openItem(hit);
 	}
 }
 

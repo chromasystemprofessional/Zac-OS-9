@@ -261,8 +261,8 @@ void Finder::newFolder() {
 	}
 }
 
-void Finder::openSelection() {
-	for (Item *item : front()->selectedItems()) {
+void Finder::openItem(Item *item) {
+	{
 		if (item->isVirtual) {
 			const VNode *node = vfsNode(item->path);
 			if (node && node->kind == VKind::Launcher) {
@@ -270,11 +270,11 @@ void Finder::openSelection() {
 					Alert::ask(item->name + " could not be opened. Its "
 						"application may have been removed.", "OK", QString());
 				}
-				continue;
+				return;
 			}
 			const QString real = vfsOpensAs(item->path);
 			FolderWindow::open(real.isEmpty() ? item->path : real);
-			continue;
+			return;
 		}
 		if (item->isAlias && QFileInfo(item->path).symLinkTarget().endsWith(".desktop")) {
 			/* An application's alias. */
@@ -282,7 +282,7 @@ void Finder::openSelection() {
 				Alert::ask("“" + item->name + "” could not be opened. Its "
 					"application may have been removed.", "OK", QString());
 			}
-			continue;
+			return;
 		}
 		if (item->kind == PL_ICON_FOLDER || item->kind == PL_ICON_DISK ||
 				item->kind == PL_ICON_TRASH_EMPTY || item->kind == PL_ICON_TRASH_FULL) {
@@ -298,6 +298,12 @@ void Finder::openSelection() {
 		} else {
 			QProcess::startDetached("xdg-open", { item->path });
 		}
+	}
+}
+
+void Finder::openSelection() {
+	for (Item *item : front()->selectedItems()) {
+		openItem(item);
 	}
 }
 

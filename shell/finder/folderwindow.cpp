@@ -982,8 +982,11 @@ void FolderWindow::mouseReleaseEvent(QMouseEvent *) {
 void FolderWindow::mouseDoubleClickEvent(QMouseEvent *e) {
 	m_renameTimer.stop();
 	bool onTriangle = false;
-	if (itemAt(e->position().toPoint(), &onTriangle) && !onTriangle) {
-		Finder::instance().openSelection();
+	if (Item *hit = itemAt(e->position().toPoint(), &onTriangle); hit && !onTriangle) {
+		forEachItem([&](Item *item) { item->selected = item == hit; });
+		update();
+		Finder::instance().notifyState();
+		Finder::instance().openItem(hit);
 	}
 }
 
