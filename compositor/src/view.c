@@ -363,6 +363,7 @@ void view_handle_map(struct plat_view *view) {
 		view_move_to(view, area.x + (area.width - frame.width) / 2,
 			area.y + (area.height - frame.height) / 3);
 	}
+	wl_list_remove(&view->link); /* never in the list twice */
 	wl_list_insert(&view->server->views, &view->link);
 	create_toplevel_handle(view);
 	view_focus(view);

@@ -289,7 +289,9 @@ static void handle_request_activate(struct wl_listener *listener, void *data) {
 		return;
 	}
 	struct plat_view *view = view_from_toplevel(xdg->toplevel);
-	if (view) {
+	/* Only a window on screen: focusing one that isn't mapped yet would put it
+	 * in the window list before view_handle_map does. */
+	if (view && view->mapped) {
 		view_focus(view);
 	}
 }

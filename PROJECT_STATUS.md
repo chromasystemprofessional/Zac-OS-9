@@ -39,6 +39,20 @@ Updated: 2026-10-03
 - 19 checks in `tests/store/test_appstyle.py` (meson test `appstyle`). Krita/Inkscape presets not done:
   their built-in shortcut schemes still to be confirmed in the Debian versions (Krita 5.2.9, Inkscape 1.4).
 
+**Wi-Fi freeze on the iMac: still open.** The whole screen freezes (pointer too) after OK on the Wi-Fi password in TCP/IP; joining from
+Terminal (`nmcli device wifi connect ... --ask`) works, so it's how the panel joins or the panel window. Not reproduced here. Ruled out: xdg-activation
+(Qt dialogs don't use it; tested). Added anyway: activation only focuses mapped windows, and view_handle_map can't put a view in the list twice.
+Asked the user to run the panel's own nmcli sequence from Terminal, and to run zacos9-tcpip with its output to a file and send the logs.
+
+**Control panel changes ignored in a fresh account - the real cause of the Monitors revert** (fixed; reproduced and verified; not committed).
+
+- zacos9-wm watches ~/.config/zacos9 for the panels' changes, but made it with a one-level mkdir(): in a new account (every live session, and
+  the first login after Setup) ~/.config doesn't exist yet when zacos9-wm starts, so the watch failed silently and no panel change applied
+  for that whole session (the Finder makes the folder a moment later, so the panels' writes did land in the file). Monitors then re-read the
+  unchanged layout and the display jumped back. Mouse, keyboard and resolution changes were equally ignored.
+- Now mkdir -p in prefs_init and in lib/settings (pl_setting_set), and a failed watch is logged. Reproduced with HOME=/tmp/fh (empty) and two
+  nested screens: before, desktop.conf held the new place but WL-2 stayed at 1280,0; after, WL-2 moved to -30,720.
+
 **Monitors Arrangement: grab offset bug** (found by reproducing; fixed; not committed).
 
 - Real-hardware report: arranging a display reverted and nothing was saved. Cause: on pressing a display that was already selected, the grab

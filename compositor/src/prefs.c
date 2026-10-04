@@ -283,6 +283,20 @@ static int settings_changed(int fd, uint32_t mask, void *data) {
 	return 0;
 }
 
+/* mkdir -p: a new account has no ~/.config yet, and mkdir() makes one level only. */
+static void make_dirs(const char *dir) {
+	char path[1024];
+	snprintf(path, sizeof(path), "%s", dir);
+	for (char *p = path + 1; *p; p++) {
+		if (*p == '/') {
+			*p = '\0';
+			mkdir(path, 0755);
+			*p = '/';
+		}
+	}
+	mkdir(path, 0755);
+}
+
 void prefs_init(struct plat_server *server) {
 	server->default_scale = server->output_scale;
 	server->pointer_speed = 1.0;
@@ -300,8 +314,13 @@ void prefs_init(struct plat_server *server) {
 	} else {
 		snprintf(dir, sizeof(dir), "%s/.config/zacos9", home ? home : "");
 	}
-	mkdir(dir, 0755);
-	inotify_add_watch(fd, dir, IN_CLOSE_WRITE | IN_MOVED_TO | IN_DELETE);
+	/* The control panels' changes are only seen if this folder can be watched,
+	 * and it must exist for that: a fresh account (the live session's, or one
+	 * the Setup Assistant just made) has no ~/.config when zacos9-wm starts. */
+	make_dirs(dir);
+	if (inotify_add_watch(fd, dir, IN_CLOSE_WRITE | IN_MOVED_TO | IN_DELETE) < 0) {
+		wlr_log_errno(WLR_ERROR, "can't watch %s: control panel changes won't apply", dir);
+	}
 	wl_event_loop_add_fd(wl_display_get_event_loop(server->display), fd, WL_EVENT_READABLE,
 		settings_changed, server);
 }

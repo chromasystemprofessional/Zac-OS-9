@@ -20,6 +20,20 @@ static void config_path(char *out, size_t size) {
 	}
 }
 
+/* mkdir -p: a new account has no ~/.config yet, and mkdir() makes one level only. */
+static void make_dirs(const char *dir) {
+	char path[1024];
+	snprintf(path, sizeof(path), "%s", dir);
+	for (char *p = path + 1; *p; p++) {
+		if (*p == '/') {
+			*p = '\0';
+			mkdir(path, 0755);
+			*p = '/';
+		}
+	}
+	mkdir(path, 0755);
+}
+
 static char *trim(char *s) {
 	while (isspace((unsigned char)*s)) {
 		s++;
@@ -123,7 +137,7 @@ bool pl_setting_set(const char *key, const char *value) {
 	char *slash = strrchr(path, '/');
 	if (slash) {
 		*slash = '\0';
-		mkdir(path, 0755);
+		make_dirs(path);
 		*slash = '/';
 	}
 	/* Write a new file and rename it over, so readers never see half. */
