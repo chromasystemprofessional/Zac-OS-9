@@ -237,8 +237,17 @@ static QString uniqueName(const QDir &dir, const QString &base) {
 
 void Finder::newFolder() {
 	FinderView *v = front();
+	if (v->folderPath() == vfsRoot()) {
+		/* The startup disk takes folders of the user's own. */
+		const QString path = vfsNewFolder();
+		if (!path.isEmpty()) {
+			v->selectByName(vfsName(path));
+			notifyState();
+		}
+		return;
+	}
 	if (vfsIsVirtual(v->folderPath())) {
-		Alert::ask("New folders can't be made here. Documents, and the "
+		Alert::ask("New folders can't be made here. Home, and the "
 			"folders inside it, hold your own files.", "OK", QString());
 		return;
 	}
@@ -564,6 +573,14 @@ void Finder::moveSelectionToTrash() {
 					"undone with Special > Show All Applications.").arg(item->name),
 					"Remove", "Cancel")) {
 				vfsHideApplication(item->path);
+			}
+			continue;
+		}
+		/* A folder the user made on the startup disk: gone if empty. */
+		if (item->isVirtual && vfsIsUserFolder(item->path)) {
+			if (!vfsDeleteUserFolder(item->path)) {
+				Alert::ask(QStringLiteral("“%1” isn't empty. Move what's inside it to the "
+					"Trash first.").arg(item->name), "OK", QString());
 			}
 			continue;
 		}

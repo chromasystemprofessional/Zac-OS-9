@@ -38,6 +38,7 @@ private:
 	QString m_message;      /* a problem, shown in red */
 	QStringList m_added;    /* names of the programs the installer added */
 	QSet<QString> m_before; /* Wine's desktop entries before installing */
+	QSet<QString> m_beforeDirs; /* program folders in the prefix before installing */
 	bool m_dropHover = false;
 
 	PanelButton m_install, m_openOnly, m_another, m_done;

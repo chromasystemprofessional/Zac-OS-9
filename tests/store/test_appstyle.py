@@ -150,5 +150,58 @@ except OSError:
 check(rolled and tree(target) == before and not appstyle.is_on("test"),
       "a failure part way through puts back what was already replaced")
 
+# A preset that is one setting in the application's preferences.xml (no download).
+keys = root + "/keys.xml"
+open(keys, "w").write("<keys/>")
+prefs = root + "/ink/preferences.xml"
+appstyle.STYLES["prefs"] = {
+    "name": "Prefs", "kind": "prefs", "program": r"zacos9-appstyle-test-never-running", "program_label": "Test App",
+    "prefs_file": prefs, "needs": keys,
+    "settings": [(("options", "kbshortcuts"), "shortcutfile", keys)],
+}
+
+
+def attr(path=prefs):
+    import xml.etree.ElementTree as ET
+    g = ET.parse(path).getroot()
+    for gid in ("options", "kbshortcuts"):
+        g = next((c for c in g.findall("group") if c.get("id") == gid), None)
+        if g is None:
+            return "no group"
+    return g.get("shortcutfile")
+
+
+# No preferences file yet (Inkscape never run): one is made, and reset removes the setting again.
+appstyle.apply("prefs")
+check(appstyle.is_on("prefs") and attr() == keys, "prefs preset: sets the option, even with no preferences file yet")
+appstyle.reset("prefs")
+check(not appstyle.is_on("prefs") and attr() in (None, "no group"), "and reset takes it out again")
+
+os.makedirs(root + "/ink", exist_ok=True)
+open(prefs, "w").write('<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n<inkscape version="1.4">\n'
+                       '  <group id="options">\n    <group id="kbshortcuts" shortcutfile="/old/set.xml" value="3"/>\n'
+                       '    <group id="other" size="5"/>\n  </group>\n  <group id="theme" dark="1"/>\n</inkscape>\n')
+appstyle.apply("prefs")
+text = open(prefs).read()
+check(attr() == keys and 'value="3"' in text and 'size="5"' in text and 'dark="1"' in text,
+      "prefs preset: changes just that one setting, the rest of the file is kept")
+open(prefs, "a").close()
+text_on = text.replace('size="5"', 'size="6"')  # the user changes something else while it's on
+open(prefs, "w").write(text_on)
+appstyle.reset("prefs")
+check(attr() == "/old/set.xml" and 'size="6"' in open(prefs).read(),
+      "reset puts back the previous value and keeps what was changed since")
+check(not os.path.exists(appstyle.state_dir() + "/prefs.prefs"), "and removes its saved copy")
+
+appstyle.STYLES["prefs"]["needs"] = root + "/nope.xml"
+msg = fails_with(appstyle.apply, "prefs")
+check(msg is not None and not appstyle.is_on("prefs") and attr() == "/old/set.xml",
+      "a version without the keyboard set is refused and changes nothing")
+appstyle.STYLES["prefs"]["needs"] = keys
+open(prefs, "w").write("<inkscape><broken")
+msg = fails_with(appstyle.apply, "prefs")
+check(msg is not None and open(prefs).read() == "<inkscape><broken" and not appstyle.is_on("prefs"),
+      "an unreadable preferences file is left alone")
+
 print("all passed" if not fails else "%d failed" % fails)
 sys.exit(1 if fails else 0)

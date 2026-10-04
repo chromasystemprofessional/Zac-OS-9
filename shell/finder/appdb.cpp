@@ -7,6 +7,7 @@
 
 #include <QCoreApplication>
 #include <QDir>
+#include <QDirIterator>
 #include <QFile>
 #include <QFileInfo>
 #include <QFileSystemWatcher>
@@ -338,6 +339,33 @@ QStringList applicationDirs() {
  * change is read a moment after it is noticed, not during it. */
 constexpr int SETTLE_MS = 400;
 
+/* Watch the application directories, and the folders Wine files Windows
+ * programs' shortcuts in (applications/wine/Programs/<program>/): a
+ * watcher sees only one level, so a shortcut made three folders down was
+ * noticed only when something else changed. Run again after each change,
+ * as new folders appear. */
+void watchDirs(QFileSystemWatcher *w) {
+	for (const QString &dir : applicationDirs()) {
+		QStringList want;
+		if (QDir(dir).exists()) {
+			want << dir;
+			QDirIterator it(dir + "/wine", QDir::Dirs | QDir::NoDotAndDotDot,
+				QDirIterator::Subdirectories);
+			if (QDir(dir + "/wine").exists()) {
+				want << dir + "/wine";
+			}
+			while (it.hasNext()) {
+				want << it.next();
+			}
+		}
+		for (const QString &d : want) {
+			if (!w->directories().contains(d)) {
+				w->addPath(d);
+			}
+		}
+	}
+}
+
 QFileSystemWatcher *watcher() {
 	static QFileSystemWatcher *w = nullptr;
 	if (!w) {
@@ -357,7 +385,10 @@ QFileSystemWatcher *watcher() {
 			}
 		});
 		QObject::connect(w, &QFileSystemWatcher::directoryChanged,
-			[settle](const QString &) { settle->start(); });
+			[w, settle](const QString &) {
+				watchDirs(w);
+				settle->start();
+			});
 	}
 	return w;
 }
@@ -392,11 +423,7 @@ void appRefresh() {
 void appOnChange(std::function<void()> f) {
 	g_callbacks.push_back(std::move(f));
 	QFileSystemWatcher *w = watcher();
-	for (const QString &dir : applicationDirs()) {
-		if (QDir(dir).exists() && !w->directories().contains(dir)) {
-			w->addPath(dir);
-		}
-	}
+	watchDirs(w);
 }
 
 const AppEntry *appByFile(const QString &desktopFile) {

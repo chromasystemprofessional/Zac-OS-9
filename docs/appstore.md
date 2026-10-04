@@ -159,6 +159,11 @@ the user.
   author's monitor resolution (`gimprc`) and every window position, size and
   monitor (`sessionrc`, which holds windows for a two-monitor 2560-wide
   desk).
+- **Inkscape › Illustrator Layout** downloads nothing: Inkscape 1.4 ships a keyboard set that
+  follows Illustrator's (`/usr/share/inkscape/keys/adobe-illustrator-cs2.xml`: V select, A node,
+  P pen, T text, M rectangle, L ellipse ...). The preset (`"kind": "prefs"`) sets
+  `/options/kbshortcuts/shortcutfile` in `~/.config/inkscape/preferences.xml` and nothing else;
+  Standard Layout puts that one setting back to what it was, keeping any other change made since.
 - Anything it replaces is kept in `~/.local/share/zacos9/styles/ID.backup`;
   Standard Layout restores it exactly and removes what the preset added. A
   failure part way through is rolled back. It refuses while the application

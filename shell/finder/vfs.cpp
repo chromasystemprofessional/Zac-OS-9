@@ -17,16 +17,17 @@
 /*
  * The default mapping. Written to the registry the first time the Finder
  * runs, then owned by the user: edit it to rename the disk, add folders,
- * point Documents somewhere else, or show Utilities.
+ * point Home somewhere else, or show Utilities.
+ * Folders the user makes on the startup disk are nodes with "user": true.
  *
  * Changing REGISTRY_VERSION migrates an older file: fields the old file
  * doesn't have take their default, and nodes it doesn't know about are
  * added, while the user's own nodes and overrides are kept.
  */
-static constexpr int REGISTRY_VERSION = 1;
+static constexpr int REGISTRY_VERSION = 3;
 
 static const char *DEFAULT_REGISTRY = R"JSON({
-  "version": 1,
+  "version": 3,
   "volume": {},
   "showUnixVolume": false,
   "nodes": [
@@ -42,9 +43,9 @@ static const char *DEFAULT_REGISTRY = R"JSON({
     { "id": "system-folder/preferences", "name": "Preferences", "kind": "backed",
       "backing": "$XDG_CONFIG_HOME" },
     { "id": "applications", "name": "Applications", "kind": "apps", "order": 1 },
-    { "id": "documents", "name": "Documents", "kind": "backed",
-      "backing": "$XDG_DOCUMENTS_DIR", "order": 2 },
-    { "id": "utilities", "name": "Utilities", "kind": "apps", "order": 3,
+    { "id": "home", "name": "Home", "kind": "backed",
+      "backing": "$HOME", "order": 2 },
+    { "id": "utilities", "name": "Utilities", "kind": "apps", "order": 4,
       "visible": false,
       "categories": ["Utility", "System", "Settings"] }
   ],
@@ -165,6 +166,15 @@ bool migrate(QJsonObject *root) {
 	}
 	const QJsonObject fresh = QJsonDocument::fromJson(DEFAULT_REGISTRY).object();
 	QJsonArray nodes = root->value("nodes").toArray();
+	/* Documents was the default before Home: Home holds it now. Only the
+	 * untouched default goes; one the user pointed elsewhere stays. */
+	for (int i = nodes.size() - 1; i >= 0; i--) {
+		const QJsonObject n = nodes.at(i).toObject();
+		if (n.value("id").toString() == QLatin1String("documents") &&
+				n.value("backing").toString() == QLatin1String("$XDG_DOCUMENTS_DIR")) {
+			nodes.removeAt(i);
+		}
+	}
 	QStringList have;
 	for (const QJsonValue &v : nodes) {
 		have << v.toObject().value("id").toString();
@@ -326,6 +336,7 @@ void load() {
 		node.backing = expand(o.value("backing").toString());
 		node.icon = iconFromName(o.value("icon").toString(), node.kind);
 		node.visible = o.value("visible").toBool(true);
+		node.user = o.value("user").toBool(false);
 		node.order = o.value("order").toInt();
 		node.categories = stringList(o.value("categories"));
 		node.excludeCategories = stringList(o.value("excludeCategories"));
@@ -539,6 +550,83 @@ bool vfsCanRename(const QString &path) {
 	/* A Desktop Action isn't a thing of its own; everything else the user
 	 * sees may carry a name of their choosing. */
 	return node->actionId.isEmpty();
+}
+
+/* The folder user-made nodes keep their contents in. */
+static QString userFoldersDir() {
+	return dataDir() + "/folders";
+}
+
+QString vfsNewFolder() {
+	ensureLoaded();
+	QStringList taken;
+	for (auto it = g_nodes.cbegin(); it != g_nodes.cend(); ++it) {
+		if (it->parentId().isEmpty() && !it->id.isEmpty()) {
+			taken << it->name.toLower();
+		}
+	}
+	QString name = "untitled folder";
+	for (int i = 2; taken.contains(name.toLower()); i++) {
+		name = "untitled folder " + QString::number(i);
+	}
+	int n = 1;
+	while (g_nodes.contains("folder-" + QString::number(n)) ||
+			QFileInfo::exists(userFoldersDir() + "/folder-" + QString::number(n))) {
+		n++;
+	}
+	const QString id = "folder-" + QString::number(n);
+	const QString backing = userFoldersDir() + "/" + id;
+	if (!QDir().mkpath(backing)) {
+		return QString();
+	}
+	QJsonObject root = readRegistryFile();
+	QJsonArray nodes = root.value("nodes").toArray();
+	QJsonObject node;
+	node.insert("id", id);
+	node.insert("name", name);
+	node.insert("kind", "backed");
+	node.insert("backing", backing);
+	node.insert("user", true);
+	node.insert("order", 10);
+	nodes.append(node);
+	root.insert("nodes", nodes);
+	writeRegistryFile(root);
+	load();
+	notifyChanged();
+	return vfsPathFor(id);
+}
+
+bool vfsIsUserFolder(const QString &path) {
+	const VNode *node = vfsNode(path);
+	return node && node->user;
+}
+
+bool vfsDeleteUserFolder(const QString &path) {
+	const VNode *node = vfsNode(path);
+	if (!node || !node->user) {
+		return false;
+	}
+	/* Only an empty one: a folder that holds files goes to the Trash by
+	 * emptying it first, so nothing is lost with a stray gesture. */
+	if (QDir(node->backing).exists() && !QDir().rmdir(node->backing)) {
+		return false;
+	}
+	const QString id = node->id;
+	QJsonObject root = readRegistryFile();
+	QJsonArray nodes = root.value("nodes").toArray();
+	for (int i = nodes.size() - 1; i >= 0; i--) {
+		if (nodes.at(i).toObject().value("id").toString() == id) {
+			nodes.removeAt(i);
+		}
+	}
+	root.insert("nodes", nodes);
+	QJsonObject overrides = root.value("overrides").toObject();
+	overrides.remove(id);
+	root.insert("overrides", overrides);
+	writeRegistryFile(root);
+	load();
+	notifyChanged();
+	return true;
 }
 
 bool vfsCanDelete(const QString &path) {

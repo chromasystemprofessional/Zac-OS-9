@@ -13,6 +13,7 @@
 #include <QMouseEvent>
 #include <QPainter>
 #include <QStandardPaths>
+#include <QSaveFile>
 #include <QUrl>
 #include <algorithm>
 
@@ -70,6 +71,75 @@ static QString entryName(const QString &path) {
 		}
 	}
 	return QString();
+}
+
+/* Where a Windows program's own folder goes in the prefix. */
+static QStringList programRoots() {
+	const QString c = winePrefix() + "/drive_c";
+	QStringList roots = { c + "/Program Files", c + "/Program Files (x86)" };
+	QDir users(c + "/users");
+	for (const QString &u : users.entryList(QDir::Dirs | QDir::NoDotAndDotDot)) {
+		roots << users.filePath(u) + "/AppData/Local/Programs";
+	}
+	return roots;
+}
+
+static QSet<QString> programDirs() {
+	QSet<QString> out;
+	for (const QString &root : programRoots()) {
+		for (const QFileInfo &fi : QDir(root).entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot)) {
+			out.insert(fi.absoluteFilePath());
+		}
+	}
+	return out;
+}
+
+/* Many installers leave no Start-menu shortcut Wine can turn into a desktop
+ * entry (portable programs, a missing "create shortcuts" step). For a program
+ * folder the installer added, make the entry ourselves from its main .exe:
+ * the one named like the folder, else the biggest that isn't an uninstaller
+ * or helper. Returns the program's name, or nothing. */
+static QString makeEntryFor(const QString &dir, const QString &wine) {
+	const QString folder = QFileInfo(dir).fileName();
+	QString best;
+	qint64 bestScore = -1;
+	QDirIterator it(dir, { "*.exe" }, QDir::Files, QDirIterator::Subdirectories);
+	while (it.hasNext()) {
+		const QFileInfo fi(it.next());
+		QString base = fi.completeBaseName().toLower();
+		if (base.contains("unins") || base.contains("uninst") || base.contains("setup") ||
+				base.contains("update") || base.contains("crash") || base.contains("helper")) {
+			continue;
+		}
+		const int depth = fi.absolutePath().mid(dir.size()).count('/');
+		qint64 score = fi.size() / 1024 - depth * 100000;
+		if (base.remove(' ').remove('+') == QString(folder).remove(' ').remove('+').toLower()) {
+			score += 1000000000;
+		}
+		if (score > bestScore) {
+			bestScore = score;
+			best = fi.absoluteFilePath();
+		}
+	}
+	if (best.isEmpty()) {
+		return QString();
+	}
+	const QString entries = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) +
+		"/applications/wine/Programs";
+	QDir().mkpath(entries);
+	QSaveFile f(entries + "/" + folder + ".desktop");
+	if (!f.open(QIODevice::WriteOnly)) {
+		return QString();
+	}
+	auto quote = [](QString s) {
+		s.replace('\\', "\\\\").replace('"', "\\\"").replace('$', "\\$").replace('`', "\\`");
+		return "\"" + s + "\"";
+	};
+	QString exec = "env " + quote("WINEPREFIX=" + winePrefix()) + " " + quote(wine) + " " + quote(best);
+	exec.replace('%', "%%");
+	f.write(("[Desktop Entry]\nType=Application\nName=" + folder + "\nExec=" + exec + "\nPath=" +
+		QFileInfo(best).absolutePath() + "\nStartupNotify=true\nCategories=Wine;\n").toUtf8());
+	return f.commit() ? folder : QString();
 }
 
 /* Text centred on x = W/2 at a baseline. */
@@ -185,6 +255,7 @@ void WinInstallWindow::install() {
 }
 
 void WinInstallWindow::runInstaller() {
+	m_beforeDirs = programDirs();
 	setState(State::Installing);
 	QStringList args;
 	if (QFileInfo(m_file).suffix().toLower() == "msi") {
@@ -222,6 +293,16 @@ void WinInstallWindow::finished(int exitCode) {
 		const QString name = entryName(path);
 		if (!name.isEmpty() && !name.startsWith("Uninstall", Qt::CaseInsensitive)) {
 			m_added << name;
+		}
+	}
+	if (m_added.isEmpty()) {
+		for (const QString &dir : programDirs()) {
+			if (!m_beforeDirs.contains(dir)) {
+				const QString name = makeEntryFor(dir, wineBinary());
+				if (!name.isEmpty()) {
+					m_added << name;
+				}
+			}
 		}
 	}
 	m_added.removeDuplicates();

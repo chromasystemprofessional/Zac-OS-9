@@ -39,6 +39,25 @@ Updated: 2026-10-03
 - 19 checks in `tests/store/test_appstyle.py` (meson test `appstyle`). Krita/Inkscape presets not done:
   their built-in shortcut schemes still to be confirmed in the Debian versions (Krita 5.2.9, Inkscape 1.4).
 
+**Documents replaced by Home; the user can add folders to the startup disk** (built; VFS test passes; not committed). Registry version 3 drops the untouched default Documents node (Home holds ~/Documents). File > New Folder in the disk's window makes a folder of the user's own (`vfsNewFolder`, registry node with `"user": true`, real directory in `~/.local/share/zacos9/finder/folders/`); renamable, takes files, Move To Trash deletes it only when empty.
+
+**Home folder on the startup disk; Wine programs without a menu entry** (built; VFS test passes; not tested with a real Wine install; not committed; not in an ISO yet).
+
+- The startup disk gains **Home** (-> `~`, so Downloads from Firefox and everything else is reachable). Registry
+  version 2: existing registries pick it up by migration.
+- Reported: a program installed through the Windows Installer (notepad .exe) didn't appear in Applications.
+  Cause not confirmed (installer probably filed no Start-menu entry). The installer now notes the program
+  folders in the prefix (`Program Files*`, `AppData/Local/Programs`) and, if it finds no new Wine entry but a
+  new folder, writes its own entry in `~/.local/share/applications/wine/Programs/` for the folder's main .exe.
+
+**Software window: Inkscape › Illustrator Layout** (built and tested; not yet committed; not in an ISO yet).
+
+- Same button as GIMP's. Inkscape 1.4 already ships `adobe-illustrator-cs2.xml`; the preset (new
+  `"kind": "prefs"` in `zacos9-appstyle`, no download) sets `/options/kbshortcuts/shortcutfile` in
+  `preferences.xml` and reset restores just that value. Verified with real Inkscape 1.4 (strace shows
+  it loading the Illustrator set after apply). 7 more checks in `tests/store/test_appstyle.py`.
+- Krita Photoshop preset still not done (Krita 5.2.9; scheme unconfirmed).
+
 **Boot screens: logo from the first moment, a new Welcome screen** (built; checked in QEMU under BIOS and UEFI, live and installed; not yet committed; not in an ISO yet).
 
 - **GRUB shows the logo** (centred, on white) from the moment it starts, where there was a blank

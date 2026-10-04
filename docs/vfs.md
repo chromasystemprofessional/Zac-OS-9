@@ -26,7 +26,9 @@ Zacintosh HD
 │   └── Mousepad
 │       ├── Mousepad        launches it
 │       └── Preferences     one of its Desktop Actions
-├── Documents             → ~/Documents
+├── Home                  → ~ (Documents, Downloads, Desktop, everything of the user's)
+├── (folders you make: File > New Folder in the disk's window; each is a real
+│    directory under ~/.local/share/zacos9/finder/folders; Trash removes an empty one)
 └── Utilities               (generated, off by default)
 ```
 

@@ -17,6 +17,11 @@ https://github.com/Diolinux/PhotoGIMP): GIMP 3's tools, panels and keyboard
 shortcuts arranged like Photoshop's. Only its settings are used; its splash
 screen, icons and launcher (artwork whose license isn't stated) are left out,
 and so are the display resolution and window positions its author's files hard-code.
+
+"inkscape-illustrator": Inkscape ships a keyboard set that follows Illustrator's
+(V select, A node, P pen, T text, M rectangle, L ellipse ...). Nothing is
+downloaded: the preset selects it in Inkscape's preferences.xml, changing just
+that one setting, and reset puts that one setting back as it was.
 """
 import hashlib
 import json
@@ -27,6 +32,7 @@ import subprocess
 import sys
 import tempfile
 import urllib.request
+import xml.etree.ElementTree as ET
 import zipfile
 
 HOME = os.path.expanduser("~")
@@ -49,6 +55,17 @@ STYLES = {
             "gimprc": [(re.compile(r"^\(monitor-[xy]resolution [^\n]*\n", re.M), "")],
             "sessionrc": [(re.compile(r"[ \t]*\((?:position|size|monitor)(?:[ \t]+-?\d+)+\)"), "")],
         },
+    },
+    "inkscape-illustrator": {
+        "name": "Illustrator Layout",
+        "kind": "prefs",
+        "program": r"inkscape",
+        "program_label": "Inkscape",
+        "prefs_file": os.path.join(HOME, ".config", "inkscape", "preferences.xml"),
+        "needs": "/usr/share/inkscape/keys/adobe-illustrator-cs2.xml",
+        # (path of group ids, attribute, value)
+        "settings": [(("options", "kbshortcuts"), "shortcutfile",
+                      "/usr/share/inkscape/keys/adobe-illustrator-cs2.xml")],
     },
 }
 
@@ -137,6 +154,65 @@ def members(style, zf):
     return out
 
 
+def prefs_group(root, path, create):
+    node = root
+    for gid in path:
+        for child in node.findall("group"):
+            if child.get("id") == gid:
+                node = child
+                break
+        else:
+            if not create:
+                return None
+            node = ET.SubElement(node, "group", {"id": gid})
+    return node
+
+
+def prefs_apply(style_id, style):
+    if not os.path.exists(style["needs"]):
+        raise Failure("This version of %s doesn't have that keyboard set." % style["program_label"])
+    path = style["prefs_file"]
+    if os.path.exists(path):
+        try:
+            tree = ET.parse(path)
+        except ET.ParseError:
+            raise Failure("%s's settings file couldn't be read, so nothing was changed." % style["program_label"])
+        root = tree.getroot()
+        shutil.copy2(path, os.path.join(state_dir(), style_id + ".prefs"))
+    else:
+        root = ET.Element("inkscape")
+        tree = ET.ElementTree(root)
+    old = []
+    for gpath, attr, value in style["settings"]:
+        node = prefs_group(root, gpath, True)
+        old.append({"path": list(gpath), "attr": attr, "old": node.get(attr)})
+        node.set(attr, value)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = path + ".tmp"
+    tree.write(tmp, encoding="UTF-8", xml_declaration=True)
+    os.replace(tmp, path)
+    return {"prefs": old}
+
+
+def prefs_undo(style, m):
+    path = style["prefs_file"]
+    if not os.path.exists(path):
+        return
+    tree = ET.parse(path)
+    root = tree.getroot()
+    for item in m["prefs"]:
+        node = prefs_group(root, item["path"], False)
+        if node is None:
+            continue
+        if item["old"] is None:
+            node.attrib.pop(item["attr"], None)
+        else:
+            node.set(item["attr"], item["old"])
+    tmp = path + ".tmp"
+    tree.write(tmp, encoding="UTF-8", xml_declaration=True)
+    os.replace(tmp, path)
+
+
 def apply(style_id):
     style = STYLES[style_id]
     if is_on(style_id):
@@ -144,6 +220,14 @@ def apply(style_id):
     if running(style):
         raise Failure("Quit %s first, then try again: it saves its settings when it quits, "
                       "which would undo this." % style["program_label"])
+    if style.get("kind") == "prefs":
+        os.makedirs(state_dir(), exist_ok=True)
+        m = prefs_apply(style_id, style)
+        tmp = manifest_path(style_id) + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(m, f)
+        os.replace(tmp, manifest_path(style_id))
+        return
     zip_path = fetch(style)
     target = style["target"]
     backup = backup_dir(style_id)
@@ -211,7 +295,13 @@ def reset(style_id):
         raise Failure("Quit %s first, then try again." % style["program_label"])
     with open(manifest_path(style_id)) as f:
         m = json.load(f)
-    undo(style, m["written"], m["replaced"], backup_dir(style_id))
+    if style.get("kind") == "prefs":
+        prefs_undo(style, m)
+        keep = os.path.join(state_dir(), style_id + ".prefs")
+        if os.path.exists(keep):
+            os.unlink(keep)
+    else:
+        undo(style, m["written"], m["replaced"], backup_dir(style_id))
     os.unlink(manifest_path(style_id))
     shutil.rmtree(backup_dir(style_id), ignore_errors=True)
 

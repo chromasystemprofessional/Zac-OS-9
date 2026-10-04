@@ -155,7 +155,8 @@ int main(int argc, char **argv) {
 	QStringList volume = namesIn(vfsRoot());
 	check(volume.contains("System Folder"), "the startup disk holds a System Folder");
 	check(volume.contains("Applications"), "the startup disk holds Applications");
-	check(volume.contains("Documents"), "the startup disk holds Documents");
+	check(!volume.contains("Documents"), "Documents is gone: Home holds it");
+	check(volume.contains("Home"), "the startup disk holds the user's Home folder");
 	check(!volume.contains("Utilities"), "Utilities is off until the registry asks for it");
 	check(volume.size() == 3, "and nothing else: no Unix directories");
 	for (const QString &unix_ : { "usr", "etc", "bin", "var", "lib", "proc", "sys", "home" }) {
@@ -298,9 +299,9 @@ int main(int argc, char **argv) {
 		"the System Folder can't be thrown away");
 	check(vfsAcceptsDrops(appsPath), "Applications takes drops (it installs install files)");
 	check(vfsIsApplications(appsPath), "and is known as Applications");
-	check(!vfsIsApplications(vfsPathFor("documents")), "Documents isn't Applications");
+	check(!vfsIsApplications(vfsPathFor("home")), "Home isn't Applications");
 	check(!vfsAcceptsDrops(vfsPathFor("system-folder")), "the System Folder takes no drops");
-	check(vfsAcceptsDrops(vfsPathFor("documents")), "Documents takes drops");
+	check(vfsAcceptsDrops(vfsPathFor("home")), "Home takes drops");
 	check(vfsCanRename(appPath), "an application can be renamed");
 
 	/* ---- hiding an application (never uninstalling it) ----------------- */
@@ -324,21 +325,21 @@ int main(int argc, char **argv) {
 	/* ---- Get Info reads the real thing an item stands for -------------- */
 	check(vfsRealCounterpart(appPath).endsWith("browser.desktop"),
 		"Get Info on an application reads its desktop entry");
-	check(vfsRealCounterpart(vfsPathFor("documents")).startsWith(root),
-		"Get Info on Documents reads its real directory");
+	check(vfsRealCounterpart(vfsPathFor("home")).startsWith(root),
+		"Get Info on Home reads its real directory");
 	check(vfsRealCounterpart(vfsPathFor("system-folder")).isEmpty(),
 		"a curated folder stands for nothing on disk");
 
 	/* ---- folders standing for real directories ------------------------ */
-	const QString documents = vfsOpensAs(vfsPathFor("documents"));
+	const QString documents = vfsOpensAs(vfsPathFor("home"));
 	check(!documents.isEmpty() && QDir(documents).exists(),
-		"Documents opens a real directory, made if it was missing");
+		"Home opens a real directory, made if it was missing");
 	check(documents.startsWith(root), "and it is inside the home folder, not a system one");
 	const QString prefs = vfsOpensAs(vfsPathFor("system-folder/preferences"));
 	check(prefs == root + "/config", "Preferences stands for the XDG config directory");
 	check(vfsOpensAs(vfsPathFor("system-folder")).isEmpty(),
 		"a curated folder opens as a virtual window, not a directory");
-	check(vfsList(vfsPathFor("documents")).empty(),
+	check(vfsList(vfsPathFor("home")).empty(),
 		"a folder standing for a directory has no virtual children");
 
 	/* ---- renames and labels persist ----------------------------------- */
@@ -456,12 +457,33 @@ int main(int argc, char **argv) {
 	volume = namesIn(vfsRoot());
 	check(volume.contains("My Folder"), "migration keeps a node the user added");
 	check(volume.contains("System Folder") && volume.contains("Applications") &&
-		volume.contains("Documents"), "and adds the ones this version expects");
+		volume.contains("Home"), "and adds the ones this version expects");
 	if (reg.open(QIODevice::ReadOnly)) {
 		check(QJsonDocument::fromJson(reg.readAll()).object().value("version").toInt() >= 1,
 			"and writes the new version back");
 		reg.close();
 	}
+
+	/* ---- folders of the user's own ------------------------------------- */
+	const QString userFolder = vfsNewFolder();
+	check(!userFolder.isEmpty() && vfsIsUserFolder(userFolder) && namesIn(vfsRoot()).contains("untitled folder"),
+		"New Folder on the startup disk makes a folder of the user's own");
+	const QString userFolder2 = vfsNewFolder();
+	check(namesIn(vfsRoot()).contains("untitled folder 2") && userFolder2 != userFolder, "the next one is told apart");
+	check(vfsAcceptsDrops(userFolder) && vfsOpensAs(userFolder).startsWith(root) && QDir(vfsOpensAs(userFolder)).exists(),
+		"it takes files, in a real directory inside the user's own");
+	check(vfsRename(userFolder, "Projects") && namesIn(vfsRoot()).contains("Projects"), "and can be renamed");
+	vfsRefresh();
+	check(namesIn(vfsRoot()).contains("Projects"), "and it outlasts a reload");
+	QFile keep(vfsOpensAs(userFolder) + "/a.txt");
+	keep.open(QIODevice::WriteOnly);
+	keep.close();
+	check(!vfsDeleteUserFolder(userFolder) && namesIn(vfsRoot()).contains("Projects"),
+		"a folder holding files isn't thrown away");
+	keep.remove();
+	check(vfsDeleteUserFolder(userFolder) && !namesIn(vfsRoot()).contains("Projects"), "an empty one is");
+	check(!vfsDeleteUserFolder(vfsPathFor("home")), "Home is not one of them");
+	vfsDeleteUserFolder(userFolder2);
 
 	/* ---- unprivileged -------------------------------------------------- */
 	check(!namesIn(vfsRoot()).isEmpty(), "browsing needs no privileges");
@@ -469,7 +491,7 @@ int main(int argc, char **argv) {
 	 * belongs to the user, so no ordinary action needs root and none can
 	 * reach into a system location. */
 	bool allInHome = true;
-	for (const QString &id : { "documents", "system-folder/preferences",
+	for (const QString &id : { "home", "system-folder/preferences",
 			"system-folder/fonts", "system-folder/appearance" }) {
 		const QString real = vfsOpensAs(vfsPathFor(id));
 		allInHome = allInHome && !real.isEmpty() && real.startsWith(root);

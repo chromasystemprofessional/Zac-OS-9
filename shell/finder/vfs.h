@@ -47,6 +47,7 @@ struct VNode {
 	QString backing; /* Backed: the real directory it stands for */
 	pl_icon_kind icon = PL_ICON_FOLDER;
 	bool visible = true;
+	bool user = false; /* made by the user on the startup disk */
 	int order = 0;   /* ties in the Finder's by-name order */
 	/* Apps: keep only these XDG categories (empty means all), then drop
 	 * anything in `excludeCategories`. */
@@ -83,6 +84,14 @@ bool vfsLaunch(const QString &path);
  * Backed node's directory, or an application's desktop entry. Empty for
  * the curated and generated folders, which stand for nothing on disk. */
 QString vfsRealCounterpart(const QString &path);
+
+/* Folders of the user's own on the startup disk (New Folder in its window).
+ * Each stands for a real directory, so it holds files like any folder.
+ * vfsNewFolder returns its path ("" on failure). A user folder is thrown
+ * away with vfsDeleteUserFolder, which refuses one that isn't empty. */
+QString vfsNewFolder();
+bool vfsIsUserFolder(const QString &path);
+bool vfsDeleteUserFolder(const QString &path);
 
 /* Renames and labels on virtual items are metadata: they are kept in the
  * registry, so they outlast package upgrades and reboots. Both return
