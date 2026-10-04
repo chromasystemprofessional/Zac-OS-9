@@ -19,6 +19,7 @@
 #include <QApplication>
 #include <QCloseEvent>
 #include <QDialog>
+#include <QElapsedTimer>
 #include <QHostAddress>
 #include <QKeyEvent>
 #include <QMap>
@@ -66,7 +67,25 @@ static bool run(const QStringList &args, QString *out = nullptr, QString *err = 
 		return false;
 	}
 	p.closeWriteChannel();
-	p.waitForFinished(ms);
+	/* Not QProcess::waitForFinished(): it deadlocked in this Qt/Wayland process
+	 * (see CLAUDE.md). Events are served while waiting, except the user's, so
+	 * the panel keeps drawing and nothing is clicked half way. */
+	bool done = false;
+	QObject::connect(&p, &QProcess::finished, [&done] { done = true; });
+	QElapsedTimer clock;
+	clock.start();
+	while (!done && p.state() != QProcess::NotRunning && clock.elapsed() < ms) {
+		QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents |
+			QEventLoop::WaitForMoreEvents, 100);
+	}
+	if (p.state() != QProcess::NotRunning) {
+		p.kill();
+		p.waitForFinished(1000);
+		if (err) {
+			*err = "nmcli didn't answer.";
+		}
+		return false;
+	}
 	if (out) {
 		*out = QString::fromUtf8(p.readAllStandardOutput());
 	}
@@ -991,6 +1010,9 @@ private:
 	/* Copies, not references: dialogs run the event loop, and the
 	 * periodic refresh replaces the lists meanwhile. */
 	void chooseNetwork(int i) {
+		if (i < 0 || i >= static_cast<int>(m_network.items.size())) {
+			return;
+		}
 		const QString text = m_network.items[i].text;
 		if (text == "Turn Wi-Fi On" || text == "Turn Wi-Fi Off") {
 			const bool on = text == "Turn Wi-Fi On";
@@ -1040,6 +1062,9 @@ private:
 	 * it from its standard input (passwd-file), and NetworkManager keeps
 	 * it with the profile. */
 	void join(const QString &ssid, const QString &password, const QString &mgmt, bool hidden) {
+		if (m_dev < 0 || m_dev >= m_devices.size()) {
+			return; /* the device went away while the dialog was open */
+		}
 		QStringList add = { "connection", "add", "type", "wifi", "ifname", m_devices[m_dev].name,
 			"con-name", ssid, "ssid", ssid };
 		if (!mgmt.isEmpty()) {
@@ -1122,10 +1147,15 @@ private:
 
 	/* Keep the shown state current; the user's unsaved edits stay. */
 	void refresh(bool rescan) {
-		if (!m_available || m_job) {
+		if (!m_available || m_job || m_refreshing) {
 			return;
 		}
-		const QString current = m_dev >= 0 ? m_devices[m_dev].name : QString();
+		m_refreshing = true;
+		struct Done {
+			bool &flag;
+			~Done() { flag = false; }
+		} done{ m_refreshing };
+		const QString current = m_dev >= 0 && m_dev < m_devices.size() ? m_devices[m_dev].name : QString();
 		refreshDevices();
 		m_dev = -1;
 		for (int i = 0; i < m_devices.size(); i++) {
@@ -1243,6 +1273,7 @@ private:
 	QString m_jobStatus;
 	QTimer m_refresh;
 	int m_ticks = 0;
+	bool m_refreshing = false;
 
 	PanelPopup m_via, m_network, m_configure;
 	PanelEdit m_ip, m_mask, m_router, m_dns, m_search;

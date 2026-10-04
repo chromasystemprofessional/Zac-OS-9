@@ -426,6 +426,10 @@ protected:
 			return;
 		}
 		m_dragNow = p;
+		if (m_drag == Drag::Display) {
+			m_dragPos = wantFor(p - m_dragGrab);
+			m_dragSnap = snapFor(m_dragPos);
+		}
 		update();
 	}
 
@@ -628,6 +632,12 @@ private:
 				}
 			}
 		}
+		if (m_drag == Drag::Display) {
+			/* Where it will land when let go. */
+			const QRect r = miniRect(m_displays[m_sel], m_dragSnap);
+			pl_outline(c, r.left(), r.top(), r.right(), r.bottom(), GRAY(0x5));
+			pl_outline(c, r.left() + 1, r.top() + 1, r.right() - 1, r.bottom() - 1, GRAY(0x8));
+		}
 		if (m_drag == Drag::Bar) {
 			paintBar(c, QRect(m_dragNow.x() - 14, m_dragNow.y() - 2, 28, 4));
 		}
@@ -650,7 +660,7 @@ private:
 		} else {
 			m_drag = Drag::Display;
 			m_dragGrab = p - miniRect(hit).topLeft();
-			m_dragPos = m_displays[hit].pos;
+			m_dragPos = m_dragSnap = m_displays[hit].pos;
 		}
 		if (hit != m_sel) {
 			m_sel = hit;
@@ -660,15 +670,19 @@ private:
 		return true;
 	}
 
-	/* Where the dragged screen lands: touching another screen, like Mac OS's
-	 * arrangement, at the nearest such place to where it was let go. */
-	void dropDisplay() {
+	/* Where a dragged screen's top left is in the layout, for where it is in the panel. */
+	QPoint wantFor(QPoint panelTopLeft) const {
 		const double f = factor();
 		const QRect w = world();
-		Screen &d = m_displays[m_sel];
-		const QPoint topLeft = m_dragNow - m_dragGrab;
-		const QPoint want(int((topLeft.x() - toPanel(QPoint(w.x(), w.y())).x()) / f) + w.x(),
-			int((topLeft.y() - toPanel(QPoint(w.x(), w.y())).y()) / f) + w.y());
+		const QPoint origin = toPanel(QPoint(w.x(), w.y()));
+		return QPoint(int((panelTopLeft.x() - origin.x()) / f) + w.x(),
+			int((panelTopLeft.y() - origin.y()) / f) + w.y());
+	}
+
+	/* Where the dragged screen lands: touching another screen, like Mac OS's
+	 * arrangement, at the nearest such place to where it is. */
+	QPoint snapFor(QPoint want) const {
+		const Screen &d = m_displays[m_sel];
 		const QSize sz = d.logical();
 		QPoint best = d.pos;
 		long bestDist = -1;
@@ -708,7 +722,11 @@ private:
 				consider(QPoint(xx, o.y() - sz.height()));
 			}
 		}
-		d.pos = best;
+		return best;
+	}
+
+	void dropDisplay() {
+		m_displays[m_sel].pos = snapFor(wantFor(m_dragNow - m_dragGrab));
 		saveArrangement();
 	}
 
@@ -814,7 +832,7 @@ private:
 	QByteArray m_title;
 	QRect m_area;
 	Drag m_drag = Drag::None;
-	QPoint m_dragNow, m_dragGrab, m_dragPos;
+	QPoint m_dragNow, m_dragGrab, m_dragPos, m_dragSnap;
 	std::unique_ptr<PanelCheckbox> m_mirror;
 	PanelList m_list;
 	PanelRadios m_scale;

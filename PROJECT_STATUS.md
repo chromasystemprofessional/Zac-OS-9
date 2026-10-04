@@ -39,6 +39,20 @@ Updated: 2026-10-03
 - 19 checks in `tests/store/test_appstyle.py` (meson test `appstyle`). Krita/Inkscape presets not done:
   their built-in shortcut schemes still to be confirmed in the Debian versions (Krita 5.2.9, Inkscape 1.4).
 
+**Monitors Arrangement: drag preview** (built; seen in a nested session; the reported spring-back was not reproduced; not committed).
+
+- Reported on real hardware: dragged displays spring back to where they were. In nested sessions saved layouts always stuck (side, below, raised,
+  different sizes - checked by writing desktop.conf directly). Likely cause: the dragged display did not move on screen and snapped to the *nearest*
+  touching place on release, so a short drag landed where it started. Now the display follows the pointer and an outline shows where it will land.
+- The compositor logs "display layout: the saved places overlap..." (session.log) if it ever discards a saved layout.
+
+**TCP/IP panel: hardening after a crash choosing a Wi-Fi network on the iMac** (built; panel starts; the Wi-Fi path itself is untested - no NetworkManager/Wi-Fi in the test setup; not committed).
+
+- Cause not found. Fixed what could plausibly do it: `nm::run` used `QProcess::waitForFinished()` (banned in CLAUDE.md - it deadlocks in this
+  Qt/Wayland process) on the GUI thread for every refresh, join and scan; it now serves events while waiting. The 4-second refresh can no longer
+  run inside itself, and join/choose guard a device or list that changed while a dialog was open.
+- Other `waitForFinished` calls remain elsewhere (controlpanel, datetime, filesharing, netvolumes, smbclient, discovery, appdb, finder) - not touched.
+
 **Installer lists whole drives only, by make and model** (built; seen on screen; not committed; not in an ISO yet).
 
 - `shell/installer`: the destination list shows only whole disks, each by its make and model (from `lsblk`) - no size, no device name,

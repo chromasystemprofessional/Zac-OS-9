@@ -30,6 +30,7 @@
 #include <wlr/types/wlr_output_layout.h>
 #include <wlr/types/wlr_scene.h>
 #include <wlr/types/wlr_compositor.h>
+#include <wlr/util/log.h>
 
 #include "server.h"
 #include "settings.h"
@@ -221,6 +222,9 @@ static void apply_layout(struct plat_server *server) {
 			}
 		}
 		if (!saved || overlap) {
+			if (saved) {
+				wlr_log(WLR_INFO, "display layout: the saved places overlap, placing the screens side by side");
+			}
 			/* Left to right, by the saved place where there is one. */
 			int order[16];
 			for (int i = 0; i < n; i++) {
