@@ -8,7 +8,7 @@
 | Finder (desktop + windows) | `shell/finder/` | C++ / Qt6 |
 | └ Macintosh view (startup disk, Applications) | `shell/finder/vfs.cpp`, `appdb.cpp` | C++ / GIO — see `docs/vfs.md` |
 | Menu bar (incl. Apple menu) | `shell/menubar/` | C++ / Qt6 |
-| Control panels | `shell/panels/` | C++ / Qt6 |
+| Control panels (Bluetooth: `bluetooth.cpp`, see `docs/bluetooth.md`) | `shell/panels/` | C++ / Qt6 |
 | Software window (app catalog over apt) | `shell/store/` | C++ / Qt6 — see `docs/appstore.md` |
 | Software Update (ZacOS releases from GitHub + Debian updates) | `shell/update/`, `scripts/release.sh` | C++ / Qt6 — see `docs/updates.md` |
 | Network Browser (connect to AFP/SMB servers) | `shell/network/` | C++ / Qt6 — see `docs/network.md` |

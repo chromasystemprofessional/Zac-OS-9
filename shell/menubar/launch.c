@@ -206,6 +206,7 @@ void launch_fill_logo_menu(struct mb_menu *menu) {
 	/* Alphabetical, as in the Mac's Control Panels folder. */
 	const struct { const char *name, *program, *arg; } panel_list[] = {
 		{ "Appearance", "zacos9-appearance", "" },
+		{ "Bluetooth", "zacos9-bluetooth", "" },
 		{ "Date & Time", "zacos9-datetime", "" },
 		{ "File Sharing", "zacos9-filesharing", "" },
 		{ "Keyboard", "zacos9-controlpanel", " keyboard" },

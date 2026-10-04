@@ -76,7 +76,7 @@ executable('zacos9-menubar',
 
 # The Finder: Qt6 for windows, input and files; all drawing through lib/.
 add_languages('cpp', native: false)
-qt6 = dependency('qt6', modules: ['Core', 'Gui', 'Widgets', 'Network'],
+qt6 = dependency('qt6', modules: ['Core', 'Gui', 'Widgets', 'Network', 'DBus'],
   private_headers: true) # QPlatformNativeInterface: a window's wl_surface
 layershellqt = dependency('LayerShellQt', method: 'cmake',
   modules: ['LayerShellQt::Interface'])
@@ -162,6 +162,19 @@ executable('zacos9-datetime',
 executable('zacos9-tcpip',
   'panels/tcpip.cpp',
   'finder/alert.cpp',
+  'finder/platinumshell.cpp',
+  finder_protocol,
+  link_with: panelkit,
+  include_directories: include_directories('finder'),
+  dependencies: [platinum_dep, qt6, wayland_client],
+  cpp_args: ['-std=c++17'],
+  install: true,
+)
+
+# Bluetooth: BlueZ over the system D-Bus; headsets and speakers become the
+# sound output (pactl).
+executable('zacos9-bluetooth',
+  'panels/bluetooth.cpp',
   'finder/platinumshell.cpp',
   finder_protocol,
   link_with: panelkit,

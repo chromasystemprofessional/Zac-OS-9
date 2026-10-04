@@ -26,6 +26,14 @@ Updated: 2026-10-03
 
 Resuming the work on other applications' look (themes, styles, global menus): see `docs/app-integration.md`.
 
+**Bluetooth control panel; headphones and speakers as the sound output** (built; window seen in a nested session; not tried with
+real devices yet - this machine has an adapter, but bluez wasn't installed).
+
+- `zacos9-bluetooth` (`shell/panels/bluetooth.cpp`), Apple menu > Control Panels > Bluetooth: Bluetooth On, the device list, Search,
+  Connect/Disconnect (pairs and trusts first if needed), Forget, Play Sound Here. BlueZ over the system D-Bus (QtDBus; a
+  NoInputNoOutput pairing agent while open); an audio device's PipeWire sink becomes the default output through pactl.
+  `debian/control` depends on bluez. See `docs/bluetooth.md`.
+
 **Screen Snapshot in the Apple menu** (built; checked in a nested session; not released yet).
 
 - `shell/snapshot/zacos9-snapshot`: drag a rectangle (slurp, Platinum-styled: black 1-px outline, screen lightly dimmed; Escape

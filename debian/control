@@ -37,7 +37,8 @@ Depends: ${shlibs:Depends},
          gvfs-backends,
          grim,
          slurp,
-         wl-clipboard
+         wl-clipboard,
+         bluez
 Recommends: xwayland,
             netatalk,
             samba,
