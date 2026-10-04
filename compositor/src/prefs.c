@@ -71,8 +71,12 @@ static bool nested(struct wlr_output *o) {
 }
 
 void prefs_write_outputs(struct plat_server *server) {
+	/* Named after our own socket, never $WAYLAND_DISPLAY: a nested zacos9-wm
+	 * starts its outputs while that still names the outer session, and
+	 * overwrote the outer session's file (its Finder then took a nested
+	 * screen for the main display and covered the real desktop). */
 	const char *runtime = getenv("XDG_RUNTIME_DIR");
-	const char *display = getenv("WAYLAND_DISPLAY");
+	const char *display = server->socket;
 	if (!runtime || !display) {
 		return;
 	}

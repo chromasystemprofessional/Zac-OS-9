@@ -203,6 +203,7 @@ int main(int argc, char *argv[]) {
 		wlr_backend_destroy(server.backend);
 		return 1;
 	}
+	server.socket = socket;
 
 	if (!wlr_backend_start(server.backend)) {
 		wlr_backend_destroy(server.backend);

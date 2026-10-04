@@ -26,6 +26,13 @@ Updated: 2026-10-03
 
 Resuming the work on other applications' look (themes, styles, global menus): see `docs/app-integration.md`.
 
+**Nested zacos9-wm overwrote the real session's screens file** (fixed; verified).
+
+- `prefs_write_outputs` named `$XDG_RUNTIME_DIR/zacos9-outputs-*` after `$WAYLAND_DISPLAY`, but runs as the outputs appear, before
+  zacos9-wm sets that to its own socket: a nested session wrote the outer session's file. The real Finder then read a nested screen
+  ("WL-2") as the main display, put its pattern-only `desktop-extra` layer over both real screens, and hid every desktop icon.
+  Now named after `server->socket`. Checked: a nested run leaves the real file byte-identical and writes `...-wayland-1`.
+
 **Clicking the desktop puts the Finder in front** (built; checked in a nested session).
 
 - As on the Mac: a click on the desktop (`zacos9-desktop`, or `desktop-extra` on other displays) brings the Finder's windows forward

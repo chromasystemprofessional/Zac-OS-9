@@ -35,6 +35,9 @@ enum plat_cursor_mode {
 
 struct plat_server {
 	struct wl_display *display;
+	/* Our own socket ("wayland-1"), once made. Not $WAYLAND_DISPLAY: nested,
+	 * that names the outer session until we replace it. */
+	const char *socket;
 	struct wlr_backend *backend;
 	struct wlr_session *session; /* on a real screen (DRM); NULL nested */
 	struct wlr_renderer *renderer;
