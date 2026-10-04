@@ -483,6 +483,12 @@ void FolderWindow::paintIcons(pl_canvas *content) {
 			}
 		}
 	}
+	/* Selected icons' whole names, over their neighbours. */
+	for (auto &item : m_items) {
+		if (item->selected && !m_editor.editing(item.get())) {
+			paintIconLabel(content, *item, item->pos.x(), item->pos.y(), false);
+		}
+	}
 }
 
 /* ---- button view --------------------------------------------------------------- */
@@ -516,7 +522,7 @@ void FolderWindow::paintButtons(pl_canvas *content) {
 		pl_icon_paint_label(content, item->pos.x() + shift, item->pos.y() + shift, item->iconKind(),
 			PL_ICON_LARGE, item->dropTarget, item->labelColor());
 
-		const Text &label = item->labelText();
+		const Text &label = item->shownLabel();
 		const int lx = b.center().x() - label.inkWidth() / 2, top = b.bottom() + 3;
 		uint32_t ink = C_BLACK;
 		if (item->selected) {
@@ -535,7 +541,7 @@ Item *FolderWindow::buttonAt(QPoint p, bool *onButton) {
 			*onButton = true;
 			return item.get();
 		}
-		const int w = item->labelText().inkWidth();
+		const int w = item->shownLabel().inkWidth();
 		if (QRect(b.center().x() - w / 2 - 2, b.bottom() + 3, w + 4, 13).contains(p)) {
 			*onButton = false;
 			return item.get();

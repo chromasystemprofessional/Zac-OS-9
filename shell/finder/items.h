@@ -19,7 +19,13 @@ struct Item {
 	/* Key for remembered positions; the name unless set (disk, Trash). */
 	QString stateKey;
 	const QString &key() const { return stateKey.isEmpty() ? name : stateKey; }
-	std::unique_ptr<Text> label;
+	/* The name as drawn: `label` cut in the middle to fit a grid cell,
+	 * `fullLabel` whole (shown while selected). Reset both on a rename. */
+	std::unique_ptr<Text> label, fullLabel;
+	void resetLabels() {
+		label.reset();
+		fullLabel.reset();
+	}
 
 	/* Finder label, 0 (None) .. PL_LABEL_COUNT-1, kept in LABEL_ATTR. */
 	int labelIndex = 0;
@@ -65,8 +71,12 @@ struct Item {
 	QString kindText; /* filled in lazily: "folder", "Plain text document", ... */
 	const QString &kindName();
 
-	/* Label below the icon: views font, centred, truncated to fit. */
+	/* Label below the icon, views font. As in Mac OS 8 and 9: a long name is
+	 * cut in the middle ("Mousepad…ferences") to fit its grid cell, and shown
+	 * whole while the icon is selected. */
 	const Text &labelText();
+	const Text &fullLabelText();
+	const Text &shownLabel() { return selected ? fullLabelText() : labelText(); }
 };
 
 /* Directory listing as Finder items, folders and files mixed, by name
@@ -109,6 +119,10 @@ void paintIconItem(pl_canvas *c, Item &item, int x, int y, bool onDesktop,
 void paintIcon(pl_canvas *c, Item &item, int x, int y, int size, bool highlight);
 /* Is `p` on the label of the icon at (x, y)? */
 bool iconLabelContains(Item &item, int x, int y, QPoint p);
+/* The label alone, again: called for the selected icons after everything
+ * else, so a whole name lies over its neighbours rather than under them.
+ * Kept inside the canvas. */
+void paintIconLabel(pl_canvas *c, Item &item, int x, int y, bool onDesktop);
 /* Icon view placement: items whose names are in `placed` go there; the
  * rest take the first free grid slot (`slot(i)` gives slot i's icon
  * position) so they never land on a placed icon. Cells are cellW x cellH. */

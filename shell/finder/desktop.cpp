@@ -72,7 +72,7 @@ Desktop::Desktop() {
 	buildUnixDisk();
 	m_vfsToken = vfsOnChange([this] {
 		m_disk->name = vfsVolumeName();
-		m_disk->label.reset();
+		m_disk->resetLabels();
 		buildUnixDisk();
 		placeIcons();
 		update();
@@ -404,6 +404,18 @@ void Desktop::paintEvent(QPaintEvent *) {
 		}
 	}
 	paintIconItem(c, *m_trash, m_trash->pos.x(), m_trash->pos.y(), true);
+	/* Selected icons' whole names, over their neighbours. */
+	std::vector<Item *> all = fixedItems();
+	for (auto &item : m_files) {
+		if (!m_editor.editing(item.get())) {
+			all.push_back(item.get());
+		}
+	}
+	for (Item *item : all) {
+		if (item->selected) {
+			paintIconLabel(c, *item, item->pos.x(), item->pos.y(), true);
+		}
+	}
 	QPainter p(this);
 	px.blit(p);
 }

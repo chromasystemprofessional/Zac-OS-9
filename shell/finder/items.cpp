@@ -14,17 +14,49 @@
 #include "sharingclient.h"
 #include "vfs.h"
 
-static constexpr int LABEL_MAX_INK = 110;
+static constexpr int LABEL_SHORT_INK = 72; /* inside an 80-px grid cell, with room between */
+static constexpr int LABEL_MAX_INK = 400;   /* a whole name (Mac OS allowed 31 characters) */
 static constexpr int LABEL_GAP = 2;      /* icon bottom to label box top */
 static constexpr int LABEL_PAD_X = 2;    /* label box padding beside the ink */
 static constexpr int LABEL_H = 13;       /* label box height */
 static constexpr int LABEL_BASELINE = 10;
 
+/* `name` cut in the middle with an ellipsis so its ink fits `maxInk`, as
+ * Mac OS 8 and 9 shortened long names in icon views: both the start and
+ * the end (often a number or an extension) stay readable. */
+static QString middleTruncated(const QString &name, int maxInk, pl_font font) {
+	const auto fits = [&](const QString &s) { return Text(s, 100000, font).inkWidth() <= maxInk; };
+	if (fits(name)) {
+		return name;
+	}
+	const auto cut = [&](int keep) {
+		return name.left((keep + 1) / 2) + QStringLiteral("…") + name.right(keep / 2);
+	};
+	int lo = 0, hi = static_cast<int>(name.size()) - 1;
+	while (lo < hi) { /* the most characters that still fit */
+		const int mid = (lo + hi + 1) / 2;
+		if (fits(cut(mid))) {
+			lo = mid;
+		} else {
+			hi = mid - 1;
+		}
+	}
+	return cut(lo);
+}
+
 const Text &Item::labelText() {
 	if (!label) {
-		label = std::make_unique<Text>(name, LABEL_MAX_INK, nameFont());
+		label = std::make_unique<Text>(middleTruncated(name, LABEL_SHORT_INK, nameFont()),
+			LABEL_SHORT_INK, nameFont());
 	}
 	return *label;
+}
+
+const Text &Item::fullLabelText() {
+	if (!fullLabel) {
+		fullLabel = std::make_unique<Text>(name, LABEL_MAX_INK, nameFont());
+	}
+	return *fullLabel;
 }
 
 const QString &Item::kindName() {
@@ -215,11 +247,18 @@ std::unique_ptr<Item> makeItem(const QFileInfo &info) {
 	return item;
 }
 
-static void labelBox(Item &item, int x, int y, int *l, int *t, int *r, int *b) {
-	int w = item.labelText().inkWidth();
+/* The label's box, centred under the icon; with `limitW`, moved sideways
+ * to stay within 0..limitW-1 (a whole name near a screen's edge). */
+static void labelBox(Item &item, int x, int y, int *l, int *t, int *r, int *b, int limitW = 0) {
+	int w = item.shownLabel().inkWidth();
 	int cx = x + PL_ICON_LARGE / 2;
 	*l = cx - w / 2 - LABEL_PAD_X;
 	*r = *l + w - 1 + 2 * LABEL_PAD_X;
+	if (limitW > 0) {
+		const int shift = *r > limitW - 1 ? limitW - 1 - *r : *l < 0 ? -*l : 0;
+		*l += shift;
+		*r += shift;
+	}
 	*t = y + PL_ICON_LARGE + LABEL_GAP;
 	*b = *t + LABEL_H - 1;
 }
@@ -288,11 +327,14 @@ void paintIcon(pl_canvas *c, Item &item, int x, int y, int size, bool highlight)
 void paintIconItem(pl_canvas *c, Item &item, int x, int y, bool onDesktop, bool showLabel) {
 	const bool highlight = item.selected || item.dropTarget;
 	paintIcon(c, item, x, y, PL_ICON_LARGE, highlight);
-	if (!showLabel) {
-		return;
+	if (showLabel) {
+		paintIconLabel(c, item, x, y, onDesktop);
 	}
+}
+
+void paintIconLabel(pl_canvas *c, Item &item, int x, int y, bool onDesktop) {
 	int l, t, r, b;
-	labelBox(item, x, y, &l, &t, &r, &b);
+	labelBox(item, x, y, &l, &t, &r, &b, c->width);
 	uint32_t ink = C_BLACK;
 	if (item.selected) {
 		pl_fill(c, l, t, r, b, C_BLACK);
@@ -300,7 +342,7 @@ void paintIconItem(pl_canvas *c, Item &item, int x, int y, bool onDesktop, bool 
 	} else if (onDesktop) {
 		pl_fill(c, l, t, r, b, C_WHITE);
 	}
-	pl_text(c, item.labelText().t, l + LABEL_PAD_X, t + LABEL_BASELINE, ink);
+	pl_text(c, item.shownLabel().t, l + LABEL_PAD_X, t + LABEL_BASELINE, ink);
 }
 
 bool iconItemContains(Item &item, int x, int y, QPoint p) {

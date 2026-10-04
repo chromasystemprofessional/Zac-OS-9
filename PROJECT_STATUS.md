@@ -26,6 +26,13 @@ Updated: 2026-10-03
 
 Resuming the work on other applications' look (themes, styles, global menus): see `docs/app-integration.md`.
 
+**Icon labels: cut in the middle, whole when selected** (built; seen in a nested session).
+
+- As Mac OS 8/9: in icon views and on the desktop a long name is cut in the middle to 72 px ("Mousep…rences", "Quarter… 3.txt")
+  so it fits its 80-px grid cell; a selected icon shows its whole name (up to 400 px), drawn after everything else so it lies over
+  its neighbours, and moved sideways to stay inside the screen or window. Button view shows the whole name when selected too.
+  `Item::labelText()` / `fullLabelText()` / `shownLabel()` in `shell/finder/items.cpp`; `paintIconLabel` for the second pass.
+
 **Every drive on the desktop at startup** (built; seen working on the real system with the build's Finder).
 
 - Reported on real hardware: other internal drives (NTFS "Archive and Projects", "GAMING SSD", a Windows partition) didn't appear on
@@ -553,8 +560,8 @@ All Applications bringing it back.
   alongside it next).
 - ISO has not been rebuilt since the silent-boot commit; it is missing
   file sharing, Get Info Sharing, the AFP client and the virtual filesystem.
-- Long icon labels overlap slightly in icon view (seen with "Mousepad
-  Preferences"); pre-existing `placeIcons` behaviour, not investigated.
+- ~~Long icon labels overlap in icon view~~ - fixed (2026-10-04): labels are cut in the middle to fit their grid cell, and shown
+  whole, over their neighbours, while selected (Mac OS 8/9's way).
 - Get Info on a *curated* folder (System Folder, Applications, an
   application's folder) opens nothing, because `InfoWindow` reads a file
   and those stand for none. Applications and `backed` folders do work —
