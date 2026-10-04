@@ -658,9 +658,11 @@ private:
 		if (m_displays[hit].main && barRect(hit).adjusted(0, -1, 0, 2).contains(p)) {
 			m_drag = Drag::Bar;
 		} else {
-			m_drag = Drag::Display;
-			m_dragGrab = p - miniRect(hit).topLeft();
+			/* Where it is now, not where the last drag left m_dragPos: the offset of
+			 * the grab inside it decides where it lands. */
+			m_dragGrab = p - miniRect(m_displays[hit], m_displays[hit].pos).topLeft();
 			m_dragPos = m_dragSnap = m_displays[hit].pos;
+			m_drag = Drag::Display;
 		}
 		if (hit != m_sel) {
 			m_sel = hit;

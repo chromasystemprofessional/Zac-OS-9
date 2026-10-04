@@ -39,6 +39,13 @@ Updated: 2026-10-03
 - 19 checks in `tests/store/test_appstyle.py` (meson test `appstyle`). Krita/Inkscape presets not done:
   their built-in shortcut schemes still to be confirmed in the Debian versions (Krita 5.2.9, Inkscape 1.4).
 
+**Monitors Arrangement: grab offset bug** (found by reproducing; fixed; not committed).
+
+- Real-hardware report: arranging a display reverted and nothing was saved. Cause: on pressing a display that was already selected, the grab
+  offset was measured against a stale position (`m_dragPos`, left by the previous drag or never set), so the drop snapped somewhere far off,
+  most often back to the start. The first display is selected from the start, so dragging it was always wrong unless it sat at the origin.
+- Test (two nested screens, display 1 at x=1280, panel on the main one): dragging display 1 below display 2 now saves and applies (x -30, y 720).
+
 **Monitors Arrangement: drag preview** (built; seen in a nested session; the reported spring-back was not reproduced; not committed).
 
 - Reported on real hardware: dragged displays spring back to where they were. In nested sessions saved layouts always stuck (side, below, raised,
