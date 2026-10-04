@@ -11,6 +11,7 @@
 | Control panels | `shell/panels/` | C++ / Qt6 |
 | Software window (app catalog over apt) | `shell/store/` | C++ / Qt6 — see `docs/appstore.md` |
 | Network Browser (connect to AFP/SMB servers) | `shell/network/` | C++ / Qt6 — see `docs/network.md` |
+| Platinum look for other apps (GTK 3 theme, Qt 6 style; global menus next) | `share/themes/ZacOS9/`, `shell/qtstyle/` | CSS / C++ — see `docs/app-integration.md` |
 | Classic (SheepShaver) launcher | `shell/classic/` | sh |
 | Session entry | `session/` | sh |
 | AFP 2.x FUSE client | `network/afp/` | C (libfuse3) |

@@ -24,6 +24,8 @@ Updated: 2026-10-03
 
 ## Current work
 
+Resuming the work on other applications' look (themes, styles, global menus): see `docs/app-integration.md`.
+
 **Software window: look-and-feel presets (GIMP › Photoshop Layout)** (built and tested; not yet committed; not in an ISO yet).
 
 - A catalog item can carry a `"style"`; the detail pane then shows a second button (Photoshop Layout /
