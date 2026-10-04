@@ -10,6 +10,7 @@
 | Menu bar (incl. Apple menu) | `shell/menubar/` | C++ / Qt6 |
 | Control panels | `shell/panels/` | C++ / Qt6 |
 | Software window (app catalog over apt) | `shell/store/` | C++ / Qt6 — see `docs/appstore.md` |
+| Software Update (ZacOS releases from GitHub + Debian updates) | `shell/update/`, `scripts/release.sh` | C++ / Qt6 — see `docs/updates.md` |
 | Network Browser (connect to AFP/SMB servers) | `shell/network/` | C++ / Qt6 — see `docs/network.md` |
 | Platinum look for other apps (GTK 3 theme, Qt 6 style; global menus next) | `share/themes/ZacOS9/`, `shell/qtstyle/` | CSS / C++ — see `docs/app-integration.md` |
 | Classic (SheepShaver) launcher | `shell/classic/` | sh |

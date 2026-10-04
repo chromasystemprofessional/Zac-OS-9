@@ -26,6 +26,15 @@ Updated: 2026-10-03
 
 Resuming the work on other applications' look (themes, styles, global menus): see `docs/app-integration.md`.
 
+**Software Update in the Apple menu** (built; window seen in a nested session; installing not tried yet - needs a published release).
+
+- `zacos9-update` (`shell/update/`): checks the newest GitHub release's `zacos9_*.deb` against the installed version and apt's pending
+  Debian updates, lists both, and with Update downloads, checks (digest, package name, version) and installs the .deb, then Debian's
+  updates, through `zacos9-appstore-helper` (new `refresh` and `upgrade` commands). Offers Restart after a ZacOS update.
+- `scripts/release.sh VERSION "notes"`: changelog entry, tag, build, push, `gh release create` with the .deb. See `docs/updates.md`.
+- Seen: "Updates are available" (a test release from a file) and "up to date" (the real repository, no releases yet).
+  19 checks in `meson test update-check`.
+
 **Global menus for Qt 6 programs** (built; tested in a nested session; not on the installed system yet).
 
 - A Qt 6 program's own menus show in the menu bar while its window is in front, and its in-window menu bar goes away.

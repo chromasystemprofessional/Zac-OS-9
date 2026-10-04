@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Software Update
+Comment=Install new versions of ZacOS 9 and Debian updates
+Exec=zacos9-update
+Categories=System;
+OnlyShowIn=ZacOS9;

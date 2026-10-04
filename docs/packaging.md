@@ -38,6 +38,9 @@ To install the packages on a Debian 13 machine:
 sudo apt install ./zacos9_*.deb ./zacos9-emulators_*.deb
 ```
 
+To publish a release that installed systems pick up through Software
+Update, see `docs/updates.md` (`scripts/release.sh`).
+
 ## The ISO
 
 ```sh

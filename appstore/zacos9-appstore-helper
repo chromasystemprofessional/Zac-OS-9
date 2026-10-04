@@ -11,6 +11,12 @@
 #       installs a downloaded .deb (and what it depends on), for the App
 #       Installer (zacos9-appinstall); apt's progress goes to stdout as
 #       APT::Status-Fd lines ("dlstatus:..." and "pmstatus:...")
+#   zacos9-appstore-helper refresh
+#       apt-get update, for Software Update (zacos9-update) to see what's new
+#   zacos9-appstore-helper upgrade
+#       installs every Debian update apt has (apt-get upgrade, adding new
+#       packages an update needs, e.g. a new kernel; never removing any),
+#       keeping changed configuration files; progress as for install-deb
 #   zacos9-appstore-helper installed PACKAGE...
 #       prints "PACKAGE<TAB>yes" or "PACKAGE<TAB>no" for each, from dpkg's
 #       own record; needs no root (zacos9-store also runs it directly)
@@ -82,12 +88,23 @@ install-deb)
 	dpkg-deb --info "$tmp/package.deb" >/dev/null 2>&1 || die "That file isn't a Debian package."
 	apt-get -y -o Dpkg::Options::="--force-confold" -o Dpkg::Progress-Fancy=0 		-o APT::Status-Fd=1 install "$tmp/package.deb"
 	;;
+refresh)
+	[ "$#" -eq 0 ] || die "usage: zacos9-appstore-helper refresh"
+	[ "$(id -u)" = 0 ] || die "zacos9-appstore-helper refresh must run as root (through pkexec)."
+	apt-get -q -o APT::Status-Fd=1 update
+	;;
+upgrade)
+	[ "$#" -eq 0 ] || die "usage: zacos9-appstore-helper upgrade"
+	[ "$(id -u)" = 0 ] || die "zacos9-appstore-helper upgrade must run as root (through pkexec)."
+	apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" \
+		-o Dpkg::Progress-Fancy=0 -o APT::Status-Fd=1 --with-new-pkgs upgrade
+	;;
 remove)
 	check_pkgs "$@"
 	[ "$(id -u)" = 0 ] || die "zacos9-appstore-helper remove must run as root (through pkexec)."
 	apt-get -y -o Dpkg::Progress-Fancy=0 remove -- "$@"
 	;;
 *)
-	die "usage: zacos9-appstore-helper install|remove|installed PACKAGE... | install-deb FILE"
+	die "usage: zacos9-appstore-helper install|remove|installed PACKAGE... | install-deb FILE | refresh | upgrade"
 	;;
 esac

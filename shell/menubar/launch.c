@@ -173,6 +173,12 @@ void launch_fill_logo_menu(struct mb_menu *menu) {
 		sibling_program("zacos9-store", command, sizeof(command));
 		add_item(menu, "Software", true, ACT_LAUNCH, command);
 	}
+	/* Software Update: new ZacOS 9 releases and Debian's own updates. */
+	{
+		char command[PATH_MAX + 64];
+		sibling_program("zacos9-update", command, sizeof(command));
+		add_item(menu, "Software Update", true, ACT_LAUNCH, command);
+	}
 	/* Windows programs, installed through Wine. */
 	{
 		char command[PATH_MAX + 64];

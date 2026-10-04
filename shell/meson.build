@@ -229,6 +229,19 @@ executable('zacos9-store',
 # script's own package-name validation, run directly (never through
 # pkexec, and never with a package name that could really install or
 # remove anything).
+# Software Update's checks: reading a GitHub release and apt's simulation,
+# and Debian version order (dpkg's own); no network, nothing installed.
+test('update-check',
+  executable('test-update-check',
+    'update/tests/test_updatecheck.cpp',
+    'update/updatecheck.cpp',
+    include_directories: include_directories('update'),
+    dependencies: [qt6],
+    cpp_args: ['-std=c++17'],
+  ),
+  timeout: 60,
+)
+
 test('store-client',
   executable('test-store-client',
     'store/tests/test_storeclient.cpp',
@@ -267,6 +280,22 @@ executable('zacos9-appinstall',
   finder_protocol,
   link_with: panelkit,
   include_directories: include_directories('finder', 'panels'),
+  dependencies: [platinum_dep, qt6, wayland_client],
+  cpp_args: ['-std=c++17'],
+  install: true,
+)
+
+# Software Update (Apple menu): ZacOS 9 releases from GitHub, Debian's
+# updates through apt; installs through zacos9-appstore-helper.
+executable('zacos9-update',
+  'update/main.cpp',
+  'update/update.cpp',
+  'update/updatecheck.cpp',
+  'store/storeclient.cpp',
+  'finder/platinumshell.cpp',
+  finder_protocol,
+  link_with: panelkit,
+  include_directories: include_directories('finder', 'panels', 'store'),
   dependencies: [platinum_dep, qt6, wayland_client],
   cpp_args: ['-std=c++17'],
   install: true,
