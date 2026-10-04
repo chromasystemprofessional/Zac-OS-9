@@ -26,7 +26,7 @@ Updated: 2026-10-03
 
 Resuming the work on other applications' look (themes, styles, global menus): see `docs/app-integration.md`.
 
-**Every drive on the desktop at startup** (built; checked up to polkit; mounting not yet seen for real - the new rule needs root).
+**Every drive on the desktop at startup** (built; seen working on the real system with the build's Finder).
 
 - Reported on real hardware: other internal drives (NTFS "Archive and Projects", "GAMING SSD", a Windows partition) didn't appear on
   the desktop: the Finder showed mounted volumes only, and nothing mounts internal drives (udisks: should_automount=0).
@@ -34,7 +34,9 @@ Resuming the work on other applications' look (themes, styles, global menus): se
   isn't mounted gets `g_volume_mount`; later ones too (volume-added). Each is tried once; failures are logged. GIO already hides
   EFI/recovery partitions. `share/polkit/50-zacos9-mount.rules` grants udisks2 filesystem-mount(-system) to local active sudo users
   (internal drives otherwise need a password, and nothing here can ask for one).
-- Seen in a nested session without the rule: all three volumes tried, each refused "Not authorized" (as expected), nothing mounted.
+- Seen for real once the rule was installed (Finder run from the build): all three mounted under /media/adam and on the desktop.
+- Also fixed: `Desktop::paintEvent` never drew `m_localVolumes` (since local volumes were added): they had places and could be
+  clicked, but were invisible.
 
 **Installer: Update an installed ZacOS 9 instead of erasing** (built; window flow checked in a nested session with a fake helper;
 `--detect`/`--update` not yet run for real - needs root, a new ISO and a disk with ZacOS 9, e.g. the iMac).

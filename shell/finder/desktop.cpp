@@ -390,6 +390,9 @@ void Desktop::paintEvent(QPaintEvent *) {
 	if (m_unix) {
 		paintIconItem(c, *m_unix, m_unix->pos.x(), m_unix->pos.y(), true);
 	}
+	for (auto &item : m_localVolumes) {
+		paintIconItem(c, *item, item->pos.x(), item->pos.y(), true);
+	}
 	for (auto &item : m_netVolumes) {
 		paintIconItem(c, *item, item->pos.x(), item->pos.y(), true);
 	}
