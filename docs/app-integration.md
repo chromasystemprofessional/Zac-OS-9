@@ -66,6 +66,39 @@ Steps:
      menu belongs to. Check whether Qt 6.8 sends that without KDE's
      integration plugin.
    - Write down which toolkits can be supported before building anything.
+
+   **Findings (2026-10-04, on the installed system: Debian 13, Qt 6.8.2,
+   GTK 3.24, appmenu-gtk3-module 25.04).** Tested with a stand-in
+   registrar (owns the name, logs `RegisterWindow`, then calls `GetLayout`)
+   and two small test windows with a File and an Edit menu.
+   - **Qt 6: works, on Wayland and X11, with nothing extra installed.** As
+     soon as the registrar name is owned, Qt registers `/MenuBar/N` and
+     **hides its own in-window menu bar** (`isNativeMenuBar()` is true), so
+     the menu bar must own the name only when it can show the menus.
+     `GetLayout` returned File and Edit. On Wayland the window id is
+     meaningless (`winId()` = 1, a counter); on X11 it is the real XID. So on
+     Wayland, menus are matched to windows by the **D-Bus sender's PID**
+     (`GetConnectionUnixProcessID`) against the front window's client PID.
+     Qt registers twice while a window opens (unregister, register a new
+     path); the first `GetLayout` timed out because the app was still busy
+     opening - fetch asynchronously and use the latest registration.
+   - **GTK 3 (`appmenu-gtk3-module`): not on Wayland without more work.** On
+     Wayland the module ignores the registrar and calls
+     `gdk_wayland_window_set_dbus_properties_libgtk_only`, i.e. GTK's
+     private `gtk_shell1` protocol (`gtk_surface1.set_dbus_properties`),
+     which zacos9-wm doesn't implement (it logged a GDK critical and did
+     nothing). The menus it exports there are `org.gtk.Menus` /
+     `org.gtk.Actions` (GMenuModel), not dbusmenu - a second format to read.
+     Under X11 it saw the registrar but never registered (not investigated).
+   - **GTK 4 / libadwaita, Electron**: no global menu support on Wayland;
+     they keep their own menus.
+   - **What the menu bar is missing:** it learns the front window's app id
+     from foreign-toplevel (`shell/menubar/toplevels.c`) but not its PID.
+     Proposed: `platinum_shell_v1` version 2 gets an event giving the front
+     window's client PID (`wl_client_get_credentials` in zacos9-wm).
+
+   **Decision:** build Qt 6 first (registrar + dbusmenu + PID from
+   zacos9-wm). GTK 3 (`gtk_shell1` + GMenuModel) is a separate, later step.
 2. **Menu bar side** (`shell/menubar/`, C): own the registrar, track the
    front window's app id / surface, fetch its dbusmenu layout, draw it with
    the existing menu drawing (`lib/menudraw.c`), forward clicks. If the
@@ -73,7 +106,7 @@ Steps:
    foreign-toplevel handles it already uses (`toplevels.c`) may be enough;
    a surface-to-menu mapping may need `org_kde_kwin_appmenu` in zacos9-wm.
 3. **Keep the Apple menu and the application menu** (right side) as they are.
-4. Test with Mousepad (GTK 3) and a Qt 6 program.
+4. Test with a Qt 6 program (GTK 3 after the separate GTK step).
 
 ## Gaps (known, not planned yet)
 
