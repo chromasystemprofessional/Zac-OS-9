@@ -122,6 +122,19 @@ static void set_active(struct plat_view *view, bool active) {
 	}
 }
 
+/* A click on the desktop, as on the Mac, puts the Finder in front: no
+ * window stays active, so the menu bar shows the Finder's menus. Windows
+ * stay where they are; clicking one makes it active again. */
+void view_clear_focus(struct plat_server *server) {
+	struct plat_view *view = server->focused_view;
+	if (!view) {
+		return;
+	}
+	set_active(view, false);
+	server->focused_view = NULL;
+	platinum_shell_focus_changed(server);
+}
+
 void view_set_hidden(struct plat_view *view, bool hidden) {
 	if (view->hidden == hidden) {
 		return;

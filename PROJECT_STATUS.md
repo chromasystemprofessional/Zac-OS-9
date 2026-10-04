@@ -26,6 +26,13 @@ Updated: 2026-10-03
 
 Resuming the work on other applications' look (themes, styles, global menus): see `docs/app-integration.md`.
 
+**Clicking the desktop puts the Finder in front** (built; checked in a nested session).
+
+- As on the Mac: a click on the desktop (`zacos9-desktop`, or `desktop-extra` on other displays) leaves no window active
+  (`view_clear_focus` in `compositor/src/view.c`), so the menu bar shows the Finder's menus (File, Edit, View, Special; "Finder" at
+  the right). Windows stay where they are; clicking one makes it active again. Seen: foot in front -> desktop click -> Finder's
+  menus, foot's frame inactive -> click on foot -> its menus back.
+
 **Software Update in the Apple menu** (built; window seen in a nested session; installing not tried yet - needs a published release).
 
 - `zacos9-update` (`shell/update/`): checks the newest GitHub release's `zacos9_*.deb` against the installed version and apt's pending

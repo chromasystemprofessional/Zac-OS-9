@@ -276,6 +276,8 @@ void view_set_hidden(struct plat_view *view, bool hidden);
 struct plat_view *view_topmost(struct plat_server *server);
 
 void view_focus(struct plat_view *view);
+/* No window active: the desktop (the Finder) is in front. */
+void view_clear_focus(struct plat_server *server);
 struct plat_view *view_at(struct plat_server *server, double lx, double ly,
 		struct wlr_surface **surface, double *sx, double *sy);
 enum decor_part view_part_at(struct plat_view *view, double lx, double ly);

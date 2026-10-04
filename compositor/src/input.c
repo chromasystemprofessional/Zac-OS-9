@@ -448,7 +448,13 @@ static void cursor_button(struct wl_listener *listener, void *data) {
 		struct wlr_layer_surface_v1 *layer = surface ?
 			wlr_layer_surface_v1_try_from_wlr_surface(surface) : NULL;
 		if (layer) {
-			/* Shell surfaces (the menu bar) never activate windows. */
+			/* Shell surfaces (the menu bar) never activate windows, but a
+			 * click on the desktop (the Finder's, on any display) puts the
+			 * Finder in front, its menus in the menu bar. */
+			if (layer->namespace && (strcmp(layer->namespace, "zacos9-desktop") == 0 ||
+					strcmp(layer->namespace, "desktop-extra") == 0)) {
+				view_clear_focus(server);
+			}
 			if (layer->current.keyboard_interactive !=
 					ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_NONE) {
 				layers_focus(layer->data);
