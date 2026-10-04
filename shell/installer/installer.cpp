@@ -29,6 +29,17 @@ QString DiskEntry::label() const {
 	return model.isEmpty() ? QStringLiteral("Hard Disk") : model;
 }
 
+/* zacos9-install, as root through pkexec; ZACOS9_INSTALL_HELPER runs
+ * another one directly instead, for trying the window out. */
+static void startHelper(QProcess *p, const QStringList &args) {
+	const QString test = qEnvironmentVariable("ZACOS9_INSTALL_HELPER");
+	if (!test.isEmpty()) {
+		p->start(test, args);
+	} else {
+		p->start("pkexec", QStringList{ QStringLiteral("/usr/libexec/zacos9/zacos9-install") } + args);
+	}
+}
+
 /* ---- construction -------------------------------------------------------- */
 
 InstallerWindow::InstallerWindow() {
@@ -47,13 +58,13 @@ void InstallerWindow::showWelcome() {
 void InstallerWindow::showSelect() {
 	m_screen = Screen::Select;
 	/* Frame first: setItems() sizes each row's text to the frame width. */
-	m_diskList.frame = QRect(MARGIN, 68, W - 2 * MARGIN, 140);
+	m_diskList.frame = QRect(MARGIN, 68, W - 2 * MARGIN, 110);
 	enumerateDisks();
-	m_install = PanelButton("Install",
-		QRect(BTN_R - BTN_W, BTN_Y, BTN_W, BTN_H), true);
+	m_diskList.picked = [this](int) { updateSelectButtons(); };
+	updateSelectButtons();
 	/* The name the installed disk goes by in the Finder (Mac OS allowed
 	 * 27 characters; ':' separated a Mac path's parts, '/' a Unix one's). */
-	m_diskName.rect = QRect(MARGIN + 82, 232, 220, PL_EDIT_H);
+	m_diskName.rect = QRect(MARGIN + 82, 236, 220, PL_EDIT_H);
 	m_diskName.accepts = [](QChar ch) { return ch.isPrint() && ch != ':' && ch != '/'; };
 	m_diskName.edited = [this] {
 		if (m_diskName.text.size() > 27) {
@@ -70,14 +81,30 @@ void InstallerWindow::showSelect() {
 	update();
 }
 
-void InstallerWindow::showInstalling(const QString &device) {
+const DiskEntry *InstallerWindow::selectedDisk() const {
+	const int sel = m_diskList.state.selected;
+	return sel >= 0 && sel < static_cast<int>(m_disks.size()) ? &m_disks[sel] : nullptr;
+}
+
+/* Install alone; or, for a disk with ZacOS 9 on it, Update (Reinstall at
+ * the same version) as the default button and Erase & Install beside it. */
+void InstallerWindow::updateSelectButtons() {
+	const DiskEntry *d = selectedDisk();
+	const bool has = d && !d->zacosPart.isEmpty();
+	m_install = PanelButton(!has ? "Install" : d->zacosCmp == 0 ? "Reinstall" : "Update",
+		QRect(BTN_R - BTN_W, BTN_Y, BTN_W, BTN_H), true);
+	m_erase = PanelButton("Erase & Install", QRect(BTN_R - BTN_W - 12 - 112, BTN_Y, 112, BTN_H));
+	update();
+}
+
+void InstallerWindow::showInstalling(const QStringList &args, bool updating) {
 	m_screen = Screen::Installing;
+	m_updating = updating;
 	m_progress = 0.0;
 	m_step = 0;
 	m_status = "Preparing...";
 	update();
 
-	static const QString helper = QStringLiteral("/usr/libexec/zacos9/zacos9-install");
 	m_installProcess = new QProcess(this);
 	/* Separate channels: the helper's protocol is on stdout; its tools'
 	 * chatter on stderr (where GRUB prints a bare "done" of its own) is
@@ -125,7 +152,7 @@ void InstallerWindow::showInstalling(const QString &device) {
 				update();
 			}
 		});
-	m_installProcess->start("pkexec", { helper, device, m_diskName.text.trimmed() });
+	startHelper(m_installProcess, args);
 }
 
 void InstallerWindow::showDone() {
@@ -214,6 +241,31 @@ void InstallerWindow::enumerateDisks() {
 		d.model  = kv.value("MODEL").trimmed();
 		m_disks.push_back(d);
 	}
+	/* ZacOS 9 already on a disk: the helper looks, read-only (it needs root
+	 * to open a disk). */
+	QProcess version;
+	version.start("dpkg-query", { "-W", "-f=${Version}", "zacos9" });
+	waitSync(&version, 3000);
+	m_liveVersion = QString::fromUtf8(version.readAllStandardOutput()).trimmed();
+	QProcess detect;
+	startHelper(&detect, { "--detect" });
+	waitSync(&detect, 30000);
+	for (const QByteArray &raw : detect.readAllStandardOutput().split('\n')) {
+		const QStringList f = QString::fromUtf8(raw).trimmed().split(' ');
+		if (f.size() < 5 || f[0] != "zacos9") continue;
+		for (DiskEntry &d : m_disks) {
+			if (d.device == f[1] && d.zacosPart.isEmpty()) {
+				d.zacosPart = f[2];
+				d.zacosVersion = f[3];
+				d.zacosName = f.mid(4).join(' ');
+				for (int cmp : { -1, 1 }) {
+					QProcess v;
+					v.start("dpkg", { "--compare-versions", d.zacosVersion, cmp < 0 ? "lt" : "gt", m_liveVersion });
+					if (waitSync(&v, 3000) && v.exitCode() == 0) d.zacosCmp = cmp;
+				}
+			}
+		}
+	}
 	/* Two drives of one make: tell them apart by number, nothing more. */
 	QMap<QString, int> total, seen;
 	for (const DiskEntry &d : m_disks) total[d.label()]++;
@@ -222,6 +274,9 @@ void InstallerWindow::enumerateDisks() {
 		QString label = d.label();
 		if (total[label] > 1) {
 			label += " (" + QString::number(++seen[d.label()]) + ")";
+		}
+		if (!d.zacosVersion.isEmpty()) {
+			label += "  \xe2\x80\x94  ZacOS 9 " + d.zacosVersion;
 		}
 		labels << label;
 	}
@@ -253,9 +308,9 @@ void InstallerWindow::paintWelcome(pl_canvas *c) {
 	pl_text(c, ttl.t, (W - ttl_w) / 2, 122, C_BLACK);
 
 	bodyText(c,
-		"This will install ZacOS 9 on a hard disk. "
-		"All data on the selected disk will be erased. "
-		"Back up any files you want to keep before continuing.",
+		"This will install ZacOS 9 on a hard disk, or update the ZacOS 9 "
+		"already on one, keeping its accounts, files and settings. "
+		"Installing on a new disk erases it: back up any files you want to keep.",
 		MARGIN, 148, W - 2 * MARGIN);
 
 	m_continue.paint(c);
@@ -274,23 +329,37 @@ void InstallerWindow::paintSelect(pl_canvas *c) {
 	if (m_disks.empty()) {
 		panelText(c, "No suitable disks were found.", MARGIN, warn_y);
 	} else {
-		const int sel = m_diskList.state.selected;
-		if (sel >= 0 && sel < static_cast<int>(m_disks.size())) {
+		const DiskEntry *d = selectedDisk();
+		if (d && !d->zacosPart.isEmpty()) {
+			const QString have = "This disk has ZacOS 9 " + d->zacosVersion + " (\xe2\x80\x9c" +
+				d->zacosName + "\xe2\x80\x9d). ";
+			bodyText(c, d->zacosCmp > 0
+				? have + "That is newer than this installer's " + m_liveVersion +
+				  "; Erase & Install would erase it and everything on the disk."
+				: have + (d->zacosCmp == 0 ? "Reinstall" : "Update") +
+				  " keeps its accounts, files and settings; Erase & Install erases everything on it.",
+				MARGIN, warn_y, W - 2 * MARGIN);
+		} else if (d) {
 			/* U+26A0 in UTF-8 */
 			panelText(c,
-				"\xe2\x9a\xa0 " + m_diskList.items.value(sel) + " will be completely erased.",
-				MARGIN, warn_y);
+				"\xe2\x9a\xa0 " + m_diskList.items.value(m_diskList.state.selected) +
+				" will be completely erased.", MARGIN, warn_y);
 		}
 	}
 
-	m_install.enabled = m_diskList.state.selected >= 0 &&
-		m_diskList.state.selected < static_cast<int>(m_disks.size()) &&
-		!m_diskName.text.trimmed().isEmpty();
+	const DiskEntry *d = selectedDisk();
+	const bool has = d && !d->zacosPart.isEmpty();
+	m_install.enabled = d && (has ? d->zacosCmp <= 0 : !m_diskName.text.trimmed().isEmpty());
 	m_install.paint(c);
+	if (has) {
+		m_erase.enabled = !m_diskName.text.trimmed().isEmpty();
+		m_erase.paint(c);
+	}
 }
 
 void InstallerWindow::paintInstalling(pl_canvas *c) {
-	panelText(c, "Installing ZacOS 9\xE2\x80\xA6", MARGIN, MARGIN + 13);
+	panelText(c, m_updating ? "Updating ZacOS 9\xE2\x80\xA6" : "Installing ZacOS 9\xE2\x80\xA6",
+		MARGIN, MARGIN + 13);
 
 	paintLogo(c, W / 2, 118, 48);
 
@@ -303,13 +372,15 @@ void InstallerWindow::paintInstalling(pl_canvas *c) {
 void InstallerWindow::paintDone(pl_canvas *c) {
 	paintLogo(c, W / 2, 88, 64);
 
-	Text ttl("Installation Complete", W, PL_FONT_SYSTEM);
+	Text ttl(m_updating ? "Update Complete" : "Installation Complete", W, PL_FONT_SYSTEM);
 	const int ttl_w = ttl.t->ink_l < 0 ? 0 : ttl.t->ink_r - ttl.t->ink_l + 1;
 	pl_text(c, ttl.t, (W - ttl_w) / 2, 146, C_BLACK);
 
-	bodyText(c,
-		"ZacOS 9 has been installed. Remove the installer disk "
-		"and click Restart to start your new system.",
+	bodyText(c, m_updating
+		? "ZacOS 9 has been updated; your accounts, files and settings are as they were. "
+		  "Remove the installer disk and click Restart."
+		: "ZacOS 9 has been installed. Remove the installer disk "
+		  "and click Restart to start your new system.",
 		MARGIN, 166, W - 2 * MARGIN);
 
 	m_restart.paint(c);
@@ -346,6 +417,9 @@ void InstallerWindow::mousePressEvent(QMouseEvent *e) {
 	case Screen::Select:
 		m_diskList.press(pos);
 		m_install.press(pos);
+		if (selectedDisk() && !selectedDisk()->zacosPart.isEmpty()) {
+			m_erase.press(pos);
+		}
 		m_host.hostPress(e);
 		update();
 		break;
@@ -384,10 +458,17 @@ void InstallerWindow::mouseReleaseEvent(QMouseEvent *e) {
 		}
 		break;
 	case Screen::Select:
-		if (m_install.release(pos)) {
-			const int sel = m_diskList.state.selected;
-			if (sel >= 0 && sel < static_cast<int>(m_disks.size())) {
-				showInstalling(m_disks[sel].device);
+		if (const DiskEntry *d = selectedDisk()) {
+			const bool has = !d->zacosPart.isEmpty();
+			const bool erase = has && m_erase.release(pos);
+			if (m_install.release(pos) && m_install.enabled) {
+				if (has) {
+					showInstalling({ "--update", d->zacosPart }, true);
+				} else {
+					showInstalling({ d->device, m_diskName.text.trimmed() }, false);
+				}
+			} else if (erase && m_erase.enabled) {
+				showInstalling({ d->device, m_diskName.text.trimmed() }, false);
 			}
 		}
 		break;

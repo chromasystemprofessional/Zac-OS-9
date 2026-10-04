@@ -14,7 +14,9 @@
  *
  * Screens (shown in order):
  *   Welcome  — logo, description, Continue button
- *   Select   — list of available disks, Install button
+ *   Select   — list of available disks, Install button; a disk that
+ *              already has ZacOS 9 offers Update (keeps its accounts,
+ *              files and settings) beside Erase & Install
  *   Install  — progress bar and status while zacos9-install runs
  *   Done     — completion message, Restart button
  */
@@ -24,6 +26,9 @@ struct DiskEntry {
 	QString size;     /* human-readable, e.g. "500G" (not shown) */
 	QString model;    /* the drive's make and model: its name in the list */
 	bool isDisk = true; /* the list holds whole disks only */
+	/* A ZacOS 9 already installed on it (zacos9-install --detect). */
+	QString zacosPart, zacosVersion, zacosName;
+	int zacosCmp = 0; /* its version against this installer's: -1, 0, 1 */
 	QString label() const;
 };
 
@@ -49,7 +54,9 @@ private:
 	/* Select screen */
 	std::vector<DiskEntry> m_disks;
 	PanelList m_diskList;
-	PanelButton m_install;
+	PanelButton m_install;  /* Install, or Update / Reinstall for a ZacOS 9 disk */
+	PanelButton m_erase;    /* Erase & Install, beside Update */
+	QString m_liveVersion;  /* this installer's ZacOS 9 */
 	PanelEdit m_diskName; /* what the installed disk is called */
 	PanelHost m_host{ this }; /* the name field's caret, typing, Tab */
 
@@ -59,13 +66,16 @@ private:
 	QString m_status;
 	QString m_lastOutput; /* last non-protocol line from the helper, shown on failure */
 	int m_step = 0;
+	bool m_updating = false; /* updating an installed system, not installing */
 
 	/* Done screen */
 	PanelButton m_restart;
 
 	void showWelcome();
 	void showSelect();
-	void showInstalling(const QString &device);
+	void showInstalling(const QStringList &args, bool updating);
+	void updateSelectButtons();
+	const DiskEntry *selectedDisk() const;
 	void showDone();
 
 	void enumerateDisks();

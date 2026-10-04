@@ -46,8 +46,13 @@ sudo_ cp -r "$root/iso/config/." config/
 sudo_ mkdir -p config/packages.chroot
 sudo_ cp "$root"/build/packages/zacos9_*.deb "$root"/build/packages/zacos9-emulators_*.deb \
 	config/packages.chroot/
+# The same packages on the medium itself (/zacos9/), for the installer's
+# Update: it installs them into a ZacOS 9 already on a disk.
+sudo_ mkdir -p config/includes.binary/zacos9
+sudo_ cp "$root"/build/packages/zacos9_*.deb "$root"/build/packages/zacos9-emulators_*.deb \
+	config/includes.binary/zacos9/
 # Copies from a Windows drive come out as mode 777: set real modes.
-sudo_ find config/includes.chroot config/package-lists config/packages.chroot \
+sudo_ find config/includes.chroot config/includes.binary config/package-lists config/packages.chroot \
 	config/bootloaders -type f \
 	-exec chmod 644 {} +
 sudo_ chmod 755 config/includes.chroot/usr/lib/live/config/2000-zacos9-greetd \

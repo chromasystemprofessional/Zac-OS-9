@@ -46,6 +46,39 @@ Settings for tests and forks:
 - `ZACOS9_UPDATE_URL` sets the whole release URL. A `file://` URL works for
   trying the window without the network.
 
+## Updating from the installer
+
+The installer on a ZacOS 9 ISO can also update a computer that already has
+ZacOS 9, for example one without a network connection, or an older system
+that predates Software Update.
+
+- **Choosing the disk.** When the installer lists disks, it runs
+  `zacos9-install --detect`. That mounts every ext4 partition read-only
+  (`ro,noload`, so not even the journal is replayed) and reads `zacos9`'s
+  version from dpkg.
+- **The buttons.** A disk with ZacOS 9 shows its version in the list.
+  Selecting it offers **Update** as the default button (**Reinstall** at the
+  same version), with **Erase & Install** beside it. Update isn't offered
+  when the disk has a newer version than the installer.
+- **What Update does.** `zacos9-install --update PARTITION`:
+  1. Mounts the system, plus its `/boot/efi` from its own fstab.
+  2. Lends it this session's name servers.
+  3. Runs `apt-get update`.
+  4. Installs the `.deb` files from the medium's `zacos9/` folder with apt
+     (`--force-confold`), which also brings in new dependencies.
+  5. Installs Debian's pending updates (`upgrade --with-new-pkgs`).
+  6. Runs `update-grub`.
+
+  Accounts, home folders, settings, the disk's name, the fstab and the boot
+  loader are left alone.
+- **Offline.** It still works without a network connection, unless the new
+  version needs packages the old system lacks. In that case it says to
+  connect and try again.
+- **The packages on the medium.** `scripts/build-iso.sh` copies the
+  packages into the ISO's `zacos9/` folder (`config/includes.binary`).
+- **Trying the window out.** `ZACOS9_INSTALL_HELPER=/path/to/script` runs
+  that script directly, in place of `pkexec zacos9-install`.
+
 ## Making a release
 
 ```sh

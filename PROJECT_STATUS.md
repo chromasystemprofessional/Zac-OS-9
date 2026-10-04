@@ -26,6 +26,17 @@ Updated: 2026-10-03
 
 Resuming the work on other applications' look (themes, styles, global menus): see `docs/app-integration.md`.
 
+**Installer: Update an installed ZacOS 9 instead of erasing** (built; window flow checked in a nested session with a fake helper;
+`--detect`/`--update` not yet run for real - needs root, a new ISO and a disk with ZacOS 9, e.g. the iMac).
+
+- `zacos9-install --detect` (read-only mounts) finds installed systems; the installer lists "— ZacOS 9 0.1.0" beside such a disk and
+  offers Update (default; Reinstall at the same version, none if the disk's is newer) beside Erase & Install.
+- `zacos9-install --update PARTITION`: apt installs the medium's `zacos9/*.deb` into the system (new dependencies from Debian, so
+  online if it has any), then Debian's updates, then update-grub; accounts, files, settings, fstab and boot loader kept.
+  `scripts/build-iso.sh` puts the packages on the medium. See `docs/updates.md`.
+- Fixed on the way: the script's cleanup did `rm -rf` on the mount point after `umount -R`, which would have deleted a disk's files
+  if an unmount ever failed; it is `rmdir` now (start, cleanup and end).
+
 **Bluetooth control panel; headphones and speakers as the sound output** (built; window seen in a nested session; not tried with
 real devices yet - this machine has an adapter, but bluez wasn't installed).
 

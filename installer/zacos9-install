@@ -1,7 +1,10 @@
 #!/bin/sh
-# zacos9-install: install ZacOS 9 from a live session to a hard disk or partition.
+# zacos9-install: install ZacOS 9 from a live session to a hard disk or
+# partition, or update a ZacOS 9 already installed on one.
 #
 #   zacos9-install DEVICE [NAME]
+#   zacos9-install --detect
+#   zacos9-install --update PARTITION
 #
 # NAME is what the installed disk is called in the Finder (default
 # Zacintosh HD); it is also the filesystem's label, cut to ext4's 16 bytes.
@@ -10,6 +13,15 @@
 # Whole disk: the disk is repartitioned (GPT + ESP + root) and erased.
 # Partition:  only the named partition is formatted (ext4); the existing
 #             EFI System Partition on the same disk is reused for grub.
+#
+# --detect looks (read-only) at every ext4 partition for an installed
+# ZacOS 9 and prints, for each:
+#   zacos9 DISK PARTITION VERSION NAME
+# --update installs this installer's ZacOS 9 packages (the zacos9/ folder
+# on the installer medium) into the system on PARTITION with apt, then
+# Debian's own updates. Accounts, files, settings, the disk's name and
+# the boot loader are kept. New dependencies come from Debian, so it
+# needs a network connection when the new version has any.
 #
 # Must run as root (via pkexec). Progress is reported on stdout as:
 #   step N LABEL    — starting step N (of 6)
@@ -22,7 +34,176 @@ set -eu
 
 TARGET=/mnt/zacos9-install-target
 
-# ---------- validate the device ----------
+# Whole disks first, then partitions (sdaN, sdaNN, nvme0n1pN, mmcblk0pN).
+# No comments inside the pattern list: a "\" continuation would swallow them.
+valid_device() {
+	case $1 in
+	/dev/sd[a-z]            | /dev/sd[a-z][a-z]         | \
+	/dev/hd[a-z]            | /dev/vd[a-z]               | \
+	/dev/xvd[a-z]           | /dev/nvme[0-9]n[0-9]       | \
+	/dev/mmcblk[0-9]        | \
+	/dev/sd[a-z][0-9]       | /dev/sd[a-z][0-9][0-9]     | \
+	/dev/sd[a-z][a-z][0-9]  | /dev/sd[a-z][a-z][0-9][0-9] | \
+	/dev/hd[a-z][0-9]       | /dev/hd[a-z][0-9][0-9]     | \
+	/dev/vd[a-z][0-9]       | /dev/vd[a-z][0-9][0-9]     | \
+	/dev/xvd[a-z][0-9]      | /dev/xvd[a-z][0-9][0-9]    | \
+	/dev/nvme[0-9]n[0-9]p[0-9]  | /dev/nvme[0-9]n[0-9]p[0-9][0-9] | \
+	/dev/mmcblk[0-9]p[0-9]  | /dev/mmcblk[0-9]p[0-9][0-9])
+		[ -b "$1" ]
+		;;
+	*)
+		return 1
+		;;
+	esac
+}
+
+# Any command that fails ends the install; the installer window shows the
+# "error" line naming the step it was on (and the line before it).
+step_label=Setup
+reported=
+resolv_saved=
+step() { step_label=$2; echo "step $1 $2"; }
+fail() { echo "error $*"; reported=1; exit 1; }
+# Never rm -r the mount point: if an unmount failed, that would delete the
+# disk's own files (for an update, the user's whole system). rmdir only
+# removes it empty.
+unmount_target() {
+	if [ -n "$resolv_saved" ]; then
+		rm -f "$TARGET/etc/resolv.conf"
+		mv "$TARGET/etc/resolv.conf.zacos9-update" "$TARGET/etc/resolv.conf" 2>/dev/null || true
+		resolv_saved=
+	fi
+	umount -R "$TARGET" 2>/dev/null || true
+	rmdir "$TARGET" 2>/dev/null || true
+}
+cleanup() {
+	status=$?
+	unmount_target
+	if [ "$status" != 0 ] && [ -z "$reported" ]; then
+		echo "error ${step_label%...} failed (exit $status)"
+	fi
+}
+
+# The drive the live system runs from: never a target, never looked at.
+live_disk() {
+	for where in /run/live/medium /lib/live/mount/medium /cdrom; do
+		src=$(findmnt -n -o SOURCE "$where" 2>/dev/null) || continue
+		pk=$(lsblk -n -o PKNAME "$src" 2>/dev/null | head -1 | tr -d ' ')
+		echo "${pk:-${src#/dev/}}"
+		return
+	done
+}
+
+# The installed zacos9 version in a system mounted at $1, or nothing.
+installed_version() {
+	awk '/^Package: zacos9$/ { p = 1; next } /^$/ { p = 0 }
+		p && /^Status: / && $4 != "installed" { p = 0 }
+		p && /^Version: / { print $2; exit }' "$1/var/lib/dpkg/status" 2>/dev/null
+}
+
+# ---------- --detect: installed systems, read-only ----------
+if [ "${1:-}" = --detect ]; then
+	look=/mnt/zacos9-detect
+	live=$(live_disk)
+	mkdir -p "$look"
+	lsblk -l -n -o NAME,TYPE,FSTYPE,PKNAME | while read -r name type fstype pkname; do
+		[ "$type" = part ] && [ "$fstype" = ext4 ] && [ -n "$pkname" ] || continue
+		[ "$pkname" != "$live" ] || continue
+		# noload: no journal replay, so nothing on the disk changes.
+		mount -o ro,noload "/dev/$name" "$look" 2>/dev/null || continue
+		version=$(installed_version "$look")
+		disk_name=$(head -n 1 "$look/etc/zacos9/disk-name" 2>/dev/null || true)
+		umount "$look"
+		if [ -n "$version" ]; then
+			echo "zacos9 /dev/$pkname /dev/$name $version ${disk_name:-Zacintosh HD}"
+		fi
+	done
+	rmdir "$look" 2>/dev/null || true
+	exit 0
+fi
+
+# ---------- --update: a newer ZacOS 9 into an installed system ----------
+if [ "${1:-}" = --update ]; then
+	part=${2:-}
+	valid_device "$part" && [ "$(lsblk -n -o TYPE "$part" 2>/dev/null | head -1 | tr -d ' ')" = part ] ||
+		{ echo "error Not a partition: $part"; exit 1; }
+	trap cleanup EXIT
+	umount -R "$TARGET" 2>/dev/null || true
+	rmdir "$TARGET" 2>/dev/null || true
+	mkdir -p "$TARGET"
+	[ -z "$(ls -A "$TARGET")" ] || fail "$TARGET isn't empty; restart and try again"
+
+	step 1 "Checking the installed system..."
+	mount "$part" "$TARGET" || fail "The disk couldn't be opened. Check it with Disk First Aid (fsck), then try again"
+	installed=$(installed_version "$TARGET")
+	[ -n "$installed" ] || fail "There is no ZacOS 9 on that disk to update"
+	debs=
+	for dir in /run/live/medium/zacos9 /lib/live/mount/medium/zacos9 /cdrom/zacos9; do
+		for f in "$dir"/zacos9_*.deb "$dir"/zacos9-emulators_*.deb; do
+			[ -f "$f" ] && debs="$debs $f"
+		done
+		[ -n "$debs" ] && break
+	done
+	[ -n "$debs" ] || fail "This installer disk doesn't carry the ZacOS 9 packages an update needs"
+	# The boot partition, as the installed system mounts it (kernel updates
+	# write there).
+	efi_dev=$(awk '$2 == "/boot/efi" { print $1 }' "$TARGET/etc/fstab" 2>/dev/null | head -1)
+	if [ -n "$efi_dev" ]; then
+		mount "$efi_dev" "$TARGET/boot/efi" 2>/dev/null || true
+	fi
+
+	step 2 "Preparing..."
+	mount --bind /dev "$TARGET/dev"
+	mount --bind /dev/pts "$TARGET/dev/pts"
+	mount --bind /proc "$TARGET/proc"
+	mount --bind /sys "$TARGET/sys"
+	mount --bind /sys/firmware/efi/efivars "$TARGET/sys/firmware/efi/efivars" 2>/dev/null || true
+	mount -t tmpfs tmpfs "$TARGET/run"
+	# This session's name servers, for apt, put back afterwards.
+	if [ -e "$TARGET/etc/resolv.conf" ] || [ -L "$TARGET/etc/resolv.conf" ]; then
+		mv "$TARGET/etc/resolv.conf" "$TARGET/etc/resolv.conf.zacos9-update"
+		resolv_saved=1
+	fi
+	cat /etc/resolv.conf >"$TARGET/etc/resolv.conf" 2>/dev/null || true
+	cache="$TARGET/var/cache/zacos9-update"
+	mkdir -p "$cache"
+	# shellcheck disable=SC2086 # a list of plain file paths
+	cp $debs "$cache/"
+	in_target() { chroot "$TARGET" env DEBIAN_FRONTEND=noninteractive "$@"; }
+	apt_opts="-y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold -o Dpkg::Progress-Fancy=0"
+
+	step 3 "Getting the latest software lists..."
+	online=true
+	in_target apt-get -q update >&2 || online=false
+
+	new_version=$(dpkg-deb -f "$(ls "$cache"/zacos9_*.deb | head -1)" Version)
+	step 4 "Installing ZacOS 9 $new_version..."
+	# shellcheck disable=SC2086
+	if ! in_target apt-get $apt_opts install /var/cache/zacos9-update/*.deb >&2; then
+		if $online; then
+			fail "ZacOS 9 $new_version couldn't be installed on the disk"
+		fi
+		fail "ZacOS 9 $new_version needs software from Debian, and this computer isn't on the internet. Connect it (TCP/IP control panel) and try again"
+	fi
+
+	step 5 "Updating Debian software..."
+	if $online; then
+		# shellcheck disable=SC2086
+		in_target apt-get $apt_opts --with-new-pkgs upgrade >&2 ||
+			fail "ZacOS 9 is updated, but Debian's updates couldn't be installed"
+	fi
+
+	step 6 "Finishing..."
+	in_target update-grub >&2 || true
+	rm -rf "$cache"
+	sync
+	unmount_target
+	trap - EXIT
+	echo "done"
+	exit 0
+fi
+
+# ---------- install: validate the device ----------
 device=$1
 disk_name=${2:-Zacintosh HD}
 case $disk_name in
@@ -36,49 +217,16 @@ if [ "${#disk_name}" -gt 27 ] || printf '%s' "$disk_name" | grep -q '[[:cntrl:]]
 	exit 1
 fi
 fs_label=$(printf '%s' "$disk_name" | head -c 16)
-# Whole disks first, then partitions (sdaN, sdaNN, nvme0n1pN, mmcblk0pN).
-# No comments inside the pattern list: a "\" continuation would swallow them.
-case $device in
-/dev/sd[a-z]            | /dev/sd[a-z][a-z]         | \
-/dev/hd[a-z]            | /dev/vd[a-z]               | \
-/dev/xvd[a-z]           | /dev/nvme[0-9]n[0-9]       | \
-/dev/mmcblk[0-9]        | \
-/dev/sd[a-z][0-9]       | /dev/sd[a-z][0-9][0-9]     | \
-/dev/sd[a-z][a-z][0-9]  | /dev/sd[a-z][a-z][0-9][0-9] | \
-/dev/hd[a-z][0-9]       | /dev/hd[a-z][0-9][0-9]     | \
-/dev/vd[a-z][0-9]       | /dev/vd[a-z][0-9][0-9]     | \
-/dev/xvd[a-z][0-9]      | /dev/xvd[a-z][0-9][0-9]    | \
-/dev/nvme[0-9]n[0-9]p[0-9]  | /dev/nvme[0-9]n[0-9]p[0-9][0-9] | \
-/dev/mmcblk[0-9]p[0-9]  | /dev/mmcblk[0-9]p[0-9][0-9])
-	;;
-*)
+if ! valid_device "$device"; then
 	echo "error Not a recognised block device: $device"
 	exit 1
-	;;
-esac
-if ! [ -b "$device" ]; then
-	echo "error Not a block device: $device"
-	exit 1
 fi
-
-# Any command that fails ends the install; the installer window shows the
-# "error" line naming the step it was on (and the line before it).
-step_label=Setup
-reported=
-step() { step_label=$2; echo "step $1 $2"; }
-fail() { echo "error $*"; reported=1; exit 1; }
-cleanup() {
-	status=$?
-	umount -R "$TARGET" 2>/dev/null || true
-	rm -rf "$TARGET"
-	if [ "$status" != 0 ] && [ -z "$reported" ]; then
-		echo "error ${step_label%...} failed (exit $status)"
-	fi
-}
 trap cleanup EXIT
 
-rm -rf "$TARGET"
+umount -R "$TARGET" 2>/dev/null || true
+rmdir "$TARGET" 2>/dev/null || true
 mkdir -p "$TARGET"
+[ -z "$(ls -A "$TARGET")" ] || fail "$TARGET isn't empty; restart and try again"
 
 # How this computer starts up decides the boot loader.
 if [ -d /sys/firmware/efi ]; then uefi=true; else uefi=false; fi
@@ -287,8 +435,7 @@ chroot "$TARGET" update-grub >&2
 # ---------- step 6: clean up ----------
 step 6 "Finishing..."
 sync
-umount -R "$TARGET"
-rm -rf "$TARGET"
+unmount_target
 trap - EXIT
 
 echo "done"
