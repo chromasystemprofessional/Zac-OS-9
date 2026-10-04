@@ -27,6 +27,15 @@ std::vector<LocalVolume> localVolumes();
  * than once; every callback is kept. */
 void localVolumesOnChange(std::function<void()> f);
 
+/* Mounts every drive volume that isn't mounted yet, as Mac OS 9 put every
+ * disk on the desktop at startup, and from then on each one that appears
+ * (a USB stick, a disc). Each volume is tried once: one that can't be
+ * mounted (a Windows partition left in use by Fast Startup, an encrypted
+ * one) is logged and left alone. Internal drives need polkit's
+ * filesystem-mount-system, which 50-zacos9-mount.rules grants to
+ * administrators at the computer. */
+void localVolumesMountAll();
+
 /* Ejects or unmounts `v` asynchronously. Returns false immediately if
  * no matching GMount can be found; the actual unmount happens on the
  * GLib event loop — GVolumeMonitor fires mount-removed when done,

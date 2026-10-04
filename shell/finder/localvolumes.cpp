@@ -5,6 +5,8 @@
 #include "localvolumes.h"
 
 #include <QFileInfo>
+#include <QSet>
+#include <cstdio>
 
 #include "netvolumes.h"
 
@@ -110,6 +112,66 @@ void localVolumesOnChange(std::function<void()> f) {
 		G_CALLBACK(dispatchChange), nullptr);
 	g_signal_connect(g_monitor, "mount-removed",
 		G_CALLBACK(dispatchChange), nullptr);
+}
+
+/* ---- mounting ----------------------------------------------------------- */
+
+static QSet<QString> g_tried; /* volumes already mounted once, by device */
+
+static QString volumeName(GVolume *v) {
+	char *raw = g_volume_get_name(v);
+	const QString name = QString::fromUtf8(raw ? raw : "");
+	g_free(raw);
+	return name;
+}
+
+static void onMounted(GObject *src, GAsyncResult *res, gpointer) {
+	GError *err = nullptr;
+	if (!g_volume_mount_finish(G_VOLUME(src), res, &err) && err) {
+		fprintf(stderr, "zacos9-finder: \"%s\" couldn't be mounted: %s\n",
+			qPrintable(volumeName(G_VOLUME(src))), err->message);
+		g_error_free(err);
+	}
+	/* Success: mount-added follows, and the desktop shows the disk. */
+}
+
+static void mountIfNeeded(GVolume *v) {
+	if (!g_volume_can_mount(v)) {
+		return;
+	}
+	if (GMount *m = g_volume_get_mount(v)) {
+		g_object_unref(m);
+		return;
+	}
+	char *dev = g_volume_get_identifier(v, G_VOLUME_IDENTIFIER_KIND_UNIX_DEVICE);
+	if (!dev) {
+		return; /* not a drive: a network share, a phone, ... */
+	}
+	const QString key = QString::fromUtf8(dev);
+	g_free(dev);
+	if (g_tried.contains(key)) {
+		return;
+	}
+	g_tried.insert(key);
+	g_volume_mount(v, G_MOUNT_MOUNT_NONE, nullptr, nullptr, onMounted, nullptr);
+}
+
+static void onVolumeAdded(GVolumeMonitor *, GVolume *v, gpointer) {
+	mountIfNeeded(v);
+}
+
+void localVolumesMountAll() {
+	static GVolumeMonitor *monitor = nullptr;
+	if (monitor) {
+		return;
+	}
+	monitor = g_volume_monitor_get();
+	GList *volumes = g_volume_monitor_get_volumes(monitor);
+	for (GList *l = volumes; l; l = l->next) {
+		mountIfNeeded(G_VOLUME(l->data));
+	}
+	g_list_free_full(volumes, g_object_unref);
+	g_signal_connect(monitor, "volume-added", G_CALLBACK(onVolumeAdded), nullptr);
 }
 
 /* ---- eject -------------------------------------------------------------- */

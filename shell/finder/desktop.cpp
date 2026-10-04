@@ -110,6 +110,7 @@ Desktop::Desktop() {
 
 	refreshLocalVolumes();
 	localVolumesOnChange([this] { refreshLocalVolumes(); });
+	localVolumesMountAll();
 }
 
 Desktop::~Desktop() {
