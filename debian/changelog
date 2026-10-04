@@ -1,3 +1,11 @@
+zacos9 (0.1.0) trixie; urgency=medium
+
+  * Software Update in the Apple menu; global menus for Qt 6 programs;
+    clicking the desktop brings the Finder forward; Cmd-C and Cmd-V copy
+    and paste in Terminal.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Sun, 04 Oct 2026 18:55:28 +0000
+
 zacos9 (0.0.1) trixie; urgency=medium
 
   * First packaged build: compositor, menu bar, Finder, control panels,
