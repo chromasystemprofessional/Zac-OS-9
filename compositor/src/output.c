@@ -1,9 +1,11 @@
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 #include <wlr/types/wlr_output.h>
 #include <wlr/util/log.h>
 
 #include "server.h"
+#include "settings.h"
 
 static void output_frame(struct wl_listener *listener, void *data) {
 	struct plat_output *output = wl_container_of(listener, output, frame);
@@ -28,18 +30,23 @@ static void output_request_state(struct wl_listener *listener, void *data) {
 
 static void output_destroy(struct wl_listener *listener, void *data) {
 	struct plat_output *output = wl_container_of(listener, output, destroy);
-	/* Shell surfaces live on one output; they must go with it. */
-	struct plat_layer_surface *ls, *tmp;
-	wl_list_for_each_safe(ls, tmp, &output->server->layer_surfaces, link) {
-		if (ls->layer_surface->output == output->wlr_output) {
-			wlr_layer_surface_v1_destroy(ls->layer_surface);
-		}
-	}
+	struct plat_server *server = output->server;
+	struct wlr_output *gone = output->wlr_output;
 	wl_list_remove(&output->frame.link);
 	wl_list_remove(&output->request_state.link);
 	wl_list_remove(&output->destroy.link);
 	wl_list_remove(&output->link);
 	free(output);
+	/* ZacOS 9's own shell (menu bar, desktop) moves to the display that is
+	 * main now; anyone else's shell surfaces live on one output and go
+	 * with it. */
+	layers_pin_to_main(server);
+	struct plat_layer_surface *ls, *tmp;
+	wl_list_for_each_safe(ls, tmp, &server->layer_surfaces, link) {
+		if (ls->layer_surface->output == gone) {
+			wlr_layer_surface_v1_destroy(ls->layer_surface);
+		}
+	}
 }
 
 static void server_new_output(struct wl_listener *listener, void *data) {
@@ -82,6 +89,20 @@ static void server_new_output(struct wl_listener *listener, void *data) {
 	layers_arrange(output);
 	/* The Monitors panel's scale and resolution, if chosen. */
 	prefs_apply(server);
+}
+
+struct plat_output *output_main(struct plat_server *server) {
+	char name[64];
+	struct plat_output *output, *first = NULL;
+	const bool chosen = pl_setting("main-display", name, sizeof(name));
+	/* The list has the newest output first: the first one connected is last. */
+	wl_list_for_each(output, &server->outputs, link) {
+		first = output;
+		if (chosen && strcmp(output->wlr_output->name, name) == 0) {
+			return output;
+		}
+	}
+	return first;
 }
 
 struct plat_output *output_at(struct plat_server *server, double lx, double ly) {

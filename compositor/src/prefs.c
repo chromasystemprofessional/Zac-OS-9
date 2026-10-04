@@ -6,10 +6,17 @@
  *
  * For the Monitors panel we also publish each screen's state and modes
  * in $XDG_RUNTIME_DIR/zacos9-outputs-$WAYLAND_DISPLAY:
- *   output NAME WxH scale S nested 0|1
+ *   output NAME WxH scale S nested 0|1 x X y Y main 0|1
  *   mode WxH@mHz
+ * and, once, "mirror 0|1". X and Y are the screen's place in the layout
+ * (logical pixels: the size divided by the scale).
+ *
+ * Several screens: "main-display=NAME" has the menu bar and desktop icons;
+ * "display.NAME.resolution=WxH" and "display.NAME.x|y=N" set a screen's
+ * size and place; "mirror=1" puts every screen at the same place.
  */
 #define _GNU_SOURCE
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -76,10 +83,14 @@ void prefs_write_outputs(struct plat_server *server) {
 		return;
 	}
 	struct plat_output *output;
-	wl_list_for_each(output, &server->outputs, link) {
+	struct plat_output *main = output_main(server);
+	fprintf(f, "mirror %d\n", setting_int("mirror", 0, 0, 1));
+	wl_list_for_each_reverse(output, &server->outputs, link) {
 		struct wlr_output *o = output->wlr_output;
-		fprintf(f, "output %s %dx%d scale %d nested %d\n", o->name, o->width, o->height,
-			(int)o->scale, nested(o) ? 1 : 0);
+		struct wlr_box box = { 0 };
+		wlr_output_layout_get_box(server->output_layout, o, &box);
+		fprintf(f, "output %s %dx%d scale %d nested %d x %d y %d main %d\n", o->name, o->width,
+			o->height, (int)o->scale, nested(o) ? 1 : 0, box.x, box.y, output == main ? 1 : 0);
 		struct wlr_output_mode *mode;
 		wl_list_for_each(mode, &o->modes, link) {
 			fprintf(f, "mode %dx%d@%d\n", mode->width, mode->height, mode->refresh);
@@ -126,9 +137,10 @@ static void apply_output(struct plat_server *server, struct plat_output *output)
 		wlr_output_state_set_scale(&state, scale);
 		changed = true;
 	}
-	char res[32];
+	char res[32], key[96];
 	int w, h;
-	if (pl_setting("resolution", res, sizeof(res)) && sscanf(res, "%dx%d", &w, &h) == 2 &&
+	snprintf(key, sizeof(key), "display.%s.resolution", o->name);
+	if ((pl_setting(key, res, sizeof(res)) || pl_setting("resolution", res, sizeof(res))) && sscanf(res, "%dx%d", &w, &h) == 2 &&
 			w >= 640 && h >= 480 && (w != o->width || h != o->height)) {
 		struct wlr_output_mode *mode, *best = NULL;
 		wl_list_for_each(mode, &o->modes, link) {
@@ -155,6 +167,91 @@ static void apply_output(struct plat_server *server, struct plat_output *output)
 	wlr_output_state_finish(&state);
 }
 
+static int display_pos(struct wlr_output *o, const char *axis, int fallback) {
+	char key[96];
+	snprintf(key, sizeof(key), "display.%s.%s", o->name, axis);
+	return setting_int(key, fallback, -100000, 100000);
+}
+
+static void logical_size(struct wlr_output *o, int *w, int *h) {
+	int ow, oh;
+	wlr_output_effective_resolution(o, &ow, &oh);
+	*w = ow;
+	*h = oh;
+}
+
+/* Where each screen sits: all at the origin when mirrored; else where the
+ * Monitors panel put them, if that is a layout without overlaps; else side
+ * by side, left to right, in the order they were connected. */
+static void apply_layout(struct plat_server *server) {
+	struct plat_output *output;
+	struct wlr_output *outs[16];
+	int n = 0;
+	wl_list_for_each_reverse(output, &server->outputs, link) {
+		if (n < 16) {
+			outs[n++] = output->wlr_output;
+		}
+	}
+	if (n == 0) {
+		return;
+	}
+	int xs[16], ys[16];
+	bool saved = true;
+	for (int i = 0; i < n; i++) {
+		xs[i] = display_pos(outs[i], "x", INT32_MIN);
+		ys[i] = display_pos(outs[i], "y", INT32_MIN);
+		saved = saved && xs[i] != INT32_MIN && ys[i] != INT32_MIN;
+	}
+	if (setting_int("mirror", 0, 0, 1)) {
+		for (int i = 0; i < n; i++) {
+			xs[i] = ys[i] = 0;
+		}
+	} else {
+		bool overlap = false;
+		for (int i = 0; saved && i < n; i++) {
+			int wi, hi;
+			logical_size(outs[i], &wi, &hi);
+			for (int j = i + 1; j < n; j++) {
+				int wj, hj;
+				logical_size(outs[j], &wj, &hj);
+				if (xs[i] < xs[j] + wj && xs[j] < xs[i] + wi &&
+						ys[i] < ys[j] + hj && ys[j] < ys[i] + hi) {
+					overlap = true;
+				}
+			}
+		}
+		if (!saved || overlap) {
+			/* Left to right, by the saved place where there is one. */
+			int order[16];
+			for (int i = 0; i < n; i++) {
+				order[i] = i;
+			}
+			for (int i = 1; i < n; i++) {
+				for (int j = i; j > 0 && saved && xs[order[j]] < xs[order[j - 1]]; j--) {
+					int t = order[j];
+					order[j] = order[j - 1];
+					order[j - 1] = t;
+				}
+			}
+			int x = 0;
+			for (int k = 0; k < n; k++) {
+				int w, h;
+				logical_size(outs[order[k]], &w, &h);
+				xs[order[k]] = x;
+				ys[order[k]] = 0;
+				x += w;
+			}
+		}
+	}
+	for (int i = 0; i < n; i++) {
+		wlr_output_layout_add(server->output_layout, outs[i], xs[i], ys[i]);
+	}
+	wl_list_for_each(output, &server->outputs, link) {
+		layers_arrange(output);
+	}
+	layers_pin_to_main(server);
+}
+
 void prefs_apply(struct plat_server *server) {
 	server->pointer_speed = tracking[setting_int("mouse-speed", TRACKING_DEFAULT, 0, 6)];
 	server->double_click_ms = setting_int("double-click", PLAT_DOUBLE_CLICK_MS, 150, 2000);
@@ -170,6 +267,7 @@ void prefs_apply(struct plat_server *server) {
 	wl_list_for_each(output, &server->outputs, link) {
 		apply_output(server, output);
 	}
+	apply_layout(server);
 	prefs_write_outputs(server);
 }
 

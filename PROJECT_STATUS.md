@@ -39,6 +39,27 @@ Updated: 2026-10-03
 - 19 checks in `tests/store/test_appstyle.py` (meson test `appstyle`). Krita/Inkscape presets not done:
   their built-in shortcut schemes still to be confirmed in the Debian versions (Krita 5.2.9, Inkscape 1.4).
 
+**Installer lists whole drives only, by make and model** (built; seen on screen; not committed; not in an ISO yet).
+
+- `shell/installer`: the destination list shows only whole disks, each by its make and model (from `lsblk`) - no size, no device name,
+  no partitions; drives that report no model are "Hard Disk"; two of one make are numbered (1), (2). The warning names the disk.
+  `zacos9-install` itself still accepts a partition on the command line; the window no longer offers one.
+- The drive ZacOS 9 is running from (the installer USB or disc, found through findmnt on /run/live/medium) is left out of the list.
+
+**Several displays; Monitors panel Arrangement** (built; tested with two nested screens, not on real monitors; not committed; not in an ISO yet).
+
+- Compositor (`prefs.c`, `output.c`, `layers.c`): per-display settings in desktop.conf - `main-display=NAME`, `display.NAME.resolution=WxH`,
+  `display.NAME.x|y=N` (layout position, logical pixels), `mirror=1`. Layout is applied from them (side by side if none or overlapping);
+  ZacOS 9's own layer surfaces (namespace `zacos9-*`: menu bar, its menus, desktop icons) are pinned to the main display and move with it
+  live, also when a screen is unplugged. The desktop colour rect now reaches negative coordinates. The screens file gains `x y main`, `mirror`.
+- Monitors panel: with more than one display, an Arrangement box (drag a display; it snaps to touch another; drag the menu bar strip to
+  another display to make it main), Mirror Displays, and the Resolution list for the selected display. One display looks as before.
+  Pixel size (scale) is still one setting for all displays.
+- Finder: `SecondaryDesktop` shows the desktop pattern on every non-main display.
+- Seen with WLR_WL_OUTPUTS=2: dragging display 2 below 1 saved x/y; dragging the strip made display 2 main (menu bar and icons moved, windows stayed);
+  mirror put both at 0,0; display.WL-2.resolution=1024x768 applied. Not tested: real monitors/hotplug, dragging windows between displays.
+- Not done: per-display pixel size, a different pattern per display, mirror with different resolutions (the smaller shows part).
+
 **Qt style plugin** (built; seen on screen with a Qt 6 test program; not committed; not in an ISO yet).
 
 - `shell/qtstyle/`: a `QProxyStyle` over Fusion, installed to `<libdir>/qt6/plugins/styles/zacos9style.so`, selected for every Qt

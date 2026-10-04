@@ -9,6 +9,7 @@
 #include "desktop.h"
 #include "finder.h"
 #include "platinumshell.h"
+#include "secondarydesktop.h"
 #include "settings.h"
 
 int main(int argc, char *argv[]) {
@@ -32,6 +33,8 @@ int main(int argc, char *argv[]) {
 	};
 	Desktop *desktop = makeDesktop();
 	Finder::instance().start(desktop);
+	/* More than one screen: the pattern on the others. */
+	SecondaryDesktop::keepInStep();
 	/* The Monitors panel can change the screen's size or scale. Qt keeps
 	 * a widget's backing store at the scale it started with, so the
 	 * desktop is replaced by a fresh one drawn at the new scale. */

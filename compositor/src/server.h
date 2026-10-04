@@ -239,6 +239,9 @@ int prefs_repeat_delay(void);
 
 /* output.c */
 void output_init(struct plat_server *server);
+/* The main display: the one with the menu bar and the desktop icons (the
+ * Monitors panel's choice, else the first). NULL with no output at all. */
+struct plat_output *output_main(struct plat_server *server);
 struct plat_output *output_at(struct plat_server *server, double lx, double ly);
 /* Usable area of the output under (lx, ly), or of the first output. */
 struct wlr_box output_usable_area(struct plat_server *server, double lx, double ly);
@@ -247,6 +250,8 @@ struct wlr_box output_usable_area(struct plat_server *server, double lx, double 
 void layers_init(struct plat_server *server);
 void layers_arrange(struct plat_output *output);
 void layers_focus(struct plat_layer_surface *layer);
+/* Move ZacOS 9's own shell surfaces (menu bar, desktop) to the main display. */
+void layers_pin_to_main(struct plat_server *server);
 
 /* input.c */
 void input_init(struct plat_server *server);

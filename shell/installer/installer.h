@@ -21,9 +21,9 @@
 
 struct DiskEntry {
 	QString device;   /* /dev/sda or /dev/sda2 */
-	QString size;     /* human-readable, e.g. "500G" */
-	QString model;    /* drive model for disks; filesystem type for partitions */
-	bool isDisk;      /* true = whole disk (erase), false = single partition */
+	QString size;     /* human-readable, e.g. "500G" (not shown) */
+	QString model;    /* the drive's make and model: its name in the list */
+	bool isDisk = true; /* the list holds whole disks only */
 	QString label() const;
 };
 

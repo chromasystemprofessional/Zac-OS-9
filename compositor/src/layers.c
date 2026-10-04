@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <string.h>
 #include <wlr/types/wlr_output.h>
 
 #include "startup.h"
@@ -35,6 +36,30 @@ void layers_arrange(struct plat_output *output) {
 		}
 	}
 	output->usable_area = usable;
+}
+
+/* ZacOS 9's own shell surfaces (menu bar, its menus, desktop) live on the
+ * main display, as the menu bar does on a Mac with several screens. */
+static bool is_ours(const struct wlr_layer_surface_v1 *s) {
+	return s->namespace && strncmp(s->namespace, "zacos9-", 7) == 0;
+}
+
+void layers_pin_to_main(struct plat_server *server) {
+	struct plat_output *main = output_main(server);
+	if (!main) {
+		return;
+	}
+	struct plat_layer_surface *ls;
+	wl_list_for_each(ls, &server->layer_surfaces, link) {
+		struct wlr_layer_surface_v1 *s = ls->layer_surface;
+		if (is_ours(s) && s->output != main->wlr_output) {
+			s->output = main->wlr_output;
+		}
+	}
+	struct plat_output *output;
+	wl_list_for_each(output, &server->outputs, link) {
+		layers_arrange(output);
+	}
 }
 
 static void arrange_for(struct plat_layer_surface *ls) {
@@ -149,9 +174,9 @@ static void server_new_layer_surface(struct wl_listener *listener, void *data) {
 	struct plat_server *server = wl_container_of(listener, server, new_layer_surface);
 	struct wlr_layer_surface_v1 *s = data;
 
-	if (!s->output) {
-		struct plat_output *output =
-			output_at(server, server->cursor->x, server->cursor->y);
+	if (is_ours(s) || !s->output) {
+		struct plat_output *output = is_ours(s) ? output_main(server)
+			: output_at(server, server->cursor->x, server->cursor->y);
 		if (!output) {
 			wlr_layer_surface_v1_destroy(s);
 			return;

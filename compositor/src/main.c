@@ -171,6 +171,8 @@ int main(int argc, char *argv[]) {
 		0x66 / 255.0f, 0x66 / 255.0f, 0xCC / 255.0f, 1.0f,
 	};
 	server.desktop = wlr_scene_rect_create(&server.scene->tree, 16384, 16384, desk);
+	/* Screens may sit left of or above the first one: centre the rect on the origin. */
+	wlr_scene_node_set_position(&server.desktop->node, -8192, -8192);
 	struct wlr_scene_tree *root = &server.scene->tree;
 	server.shell_layers[ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND] = wlr_scene_tree_create(root);
 	server.shell_layers[ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM] = wlr_scene_tree_create(root);

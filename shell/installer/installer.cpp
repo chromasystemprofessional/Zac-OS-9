@@ -24,14 +24,9 @@ static constexpr int LINE_H = 14;           /* body text line height */
 /* ---- DiskEntry ------------------------------------------------------------ */
 
 QString DiskEntry::label() const {
-	if (isDisk) {
-		if (model.isEmpty()) return device + "  " + size;
-		return model + "  " + size + "  (" + device + ")";
-	}
-	/* Partition: indent with a tree glyph so it reads as a child of the disk above. */
-	const QString name = device.section('/', -1);
-	const QString fs = model.isEmpty() ? QString() : "  " + model;
-	return "  \xe2\x94\x94 " + name + "  " + size + fs;
+	/* Only the drive's make and model, as the Mac OS installer names a disk: no
+	 * size, no device name. A drive that reports none is just a disk. */
+	return model.isEmpty() ? QStringLiteral("Hard Disk") : model;
 }
 
 /* ---- construction -------------------------------------------------------- */
@@ -162,8 +157,29 @@ static bool waitSync(QProcess *p, int ms) {
 	return true;
 }
 
+/* The drive ZacOS 9 is running from (the installer USB stick or disc), by name
+ * ("sdb"), or nothing: it is not somewhere to install to. */
+static QString liveMediumDisk() {
+	for (const char *where : { "/run/live/medium", "/lib/live/mount/medium", "/cdrom" }) {
+		QProcess find;
+		find.start("findmnt", { "-n", "-o", "SOURCE", where });
+		if (!waitSync(&find, 3000)) continue;
+		const QString source = QString::fromUtf8(find.readAllStandardOutput()).trimmed();
+		if (!source.startsWith("/dev/")) continue;
+		QProcess parent;
+		parent.start("lsblk", { "-n", "-o", "PKNAME", source });
+		if (!waitSync(&parent, 3000)) continue;
+		const QString name = QString::fromUtf8(parent.readAllStandardOutput()).split('\n').value(0).trimmed();
+		/* A partition names its disk; a whole disk (a disc, or an image written
+		 * straight to a stick) is its own. */
+		return name.isEmpty() ? source.section('/', -1) : name;
+	}
+	return QString();
+}
+
 void InstallerWindow::enumerateDisks() {
 	m_disks.clear();
+	const QString live = liveMediumDisk();
 	/* -P: machine-readable pairs; -e 1,7,11: leave out RAM disks (1), loop
 	 * devices (7) and optical drives (11) */
 	QProcess p;
@@ -189,16 +205,26 @@ void InstallerWindow::enumerateDisks() {
 		}
 		const QString type = kv.value("TYPE");
 		const QString name = kv.value("NAME");
-		if (name.isEmpty() || (type != "disk" && type != "part")) continue;
+		/* Whole drives only: partitions are not offered. */
+		if (name.isEmpty() || type != "disk" || name == live) continue;
 		DiskEntry d;
 		d.device = "/dev/" + name;
 		d.size   = kv.value("SIZE");
-		d.isDisk = (type == "disk");
-		d.model  = d.isDisk ? kv.value("MODEL") : kv.value("FSTYPE");
+		d.isDisk = true;
+		d.model  = kv.value("MODEL").trimmed();
 		m_disks.push_back(d);
 	}
+	/* Two drives of one make: tell them apart by number, nothing more. */
+	QMap<QString, int> total, seen;
+	for (const DiskEntry &d : m_disks) total[d.label()]++;
 	QStringList labels;
-	for (const DiskEntry &d : m_disks) labels << d.label();
+	for (const DiskEntry &d : m_disks) {
+		QString label = d.label();
+		if (total[label] > 1) {
+			label += " (" + QString::number(++seen[d.label()]) + ")";
+		}
+		labels << label;
+	}
 	m_diskList.setItems(labels);
 }
 
@@ -227,8 +253,8 @@ void InstallerWindow::paintWelcome(pl_canvas *c) {
 	pl_text(c, ttl.t, (W - ttl_w) / 2, 122, C_BLACK);
 
 	bodyText(c,
-		"This will install ZacOS 9 on a hard disk or partition. "
-		"All data on the selected destination will be erased. "
+		"This will install ZacOS 9 on a hard disk. "
+		"All data on the selected disk will be erased. "
 		"Back up any files you want to keep before continuing.",
 		MARGIN, 148, W - 2 * MARGIN);
 
@@ -237,7 +263,7 @@ void InstallerWindow::paintWelcome(pl_canvas *c) {
 
 void InstallerWindow::paintSelect(pl_canvas *c) {
 	panelText(c, "Select a Destination", MARGIN, MARGIN + 13);
-	panelText(c, "Select a disk to erase, or a partition to install into.",
+	panelText(c, "Select the disk to install ZacOS 9 on.",
 		MARGIN, MARGIN + 13 + 18);
 
 	m_diskList.paint(c, true);
@@ -250,17 +276,10 @@ void InstallerWindow::paintSelect(pl_canvas *c) {
 	} else {
 		const int sel = m_diskList.state.selected;
 		if (sel >= 0 && sel < static_cast<int>(m_disks.size())) {
-			const DiskEntry &d = m_disks[sel];
-			if (d.isDisk) {
-				/* ⚠ U+26A0 in UTF-8 */
-				panelText(c,
-					"\xe2\x9a\xa0 " + d.device + " will be completely erased.",
-					MARGIN, warn_y);
-			} else {
-				panelText(c,
-					d.device + " will be formatted. Other partitions are preserved.",
-					MARGIN, warn_y);
-			}
+			/* U+26A0 in UTF-8 */
+			panelText(c,
+				"\xe2\x9a\xa0 " + m_diskList.items.value(sel) + " will be completely erased.",
+				MARGIN, warn_y);
 		}
 	}
 
