@@ -1,3 +1,9 @@
+zacos9 (0.1.1) trixie; urgency=medium
+
+  * Screen Snapshot in the Apple menu.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Sun, 04 Oct 2026 19:05:14 +0000
+
 zacos9 (0.1.0) trixie; urgency=medium
 
   * Software Update in the Apple menu; global menus for Qt 6 programs;
