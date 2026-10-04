@@ -122,16 +122,33 @@ static void set_active(struct plat_view *view, bool active) {
 	}
 }
 
-/* A click on the desktop, as on the Mac, puts the Finder in front: no
- * window stays active, so the menu bar shows the Finder's menus. Windows
- * stay where they are; clicking one makes it active again. */
+/* A click on the desktop, as on the Mac, puts the Finder in front: its
+ * windows come forward above every other program's, in their own order
+ * (and back from Hide Finder), and no window stays active, so the menu
+ * bar shows the Finder's menus for the desktop. Clicking a window makes
+ * it active again. */
 void view_clear_focus(struct plat_server *server) {
-	struct plat_view *view = server->focused_view;
-	if (!view) {
-		return;
+	/* server->views is front first: raising the Finder's from the back
+	 * forward keeps their order. */
+	struct plat_view *finder[64];
+	int n = 0;
+	struct plat_view *view;
+	wl_list_for_each(view, &server->views, link) {
+		if (n < (int)(sizeof(finder) / sizeof(finder[0])) && view->mapped &&
+				view->app_id && strcmp(view->app_id, "zacos9-finder") == 0) {
+			finder[n++] = view;
+		}
 	}
-	set_active(view, false);
-	server->focused_view = NULL;
+	for (int i = n - 1; i >= 0; i--) {
+		view_set_hidden(finder[i], false);
+		wlr_scene_node_raise_to_top(&finder[i]->scene_tree->node);
+		wl_list_remove(&finder[i]->link);
+		wl_list_insert(&server->views, &finder[i]->link);
+	}
+	if (server->focused_view) {
+		set_active(server->focused_view, false);
+		server->focused_view = NULL;
+	}
 	platinum_shell_focus_changed(server);
 }
 

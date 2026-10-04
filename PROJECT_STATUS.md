@@ -28,10 +28,11 @@ Resuming the work on other applications' look (themes, styles, global menus): se
 
 **Clicking the desktop puts the Finder in front** (built; checked in a nested session).
 
-- As on the Mac: a click on the desktop (`zacos9-desktop`, or `desktop-extra` on other displays) leaves no window active
+- As on the Mac: a click on the desktop (`zacos9-desktop`, or `desktop-extra` on other displays) brings the Finder's windows forward
+  above every other program's, in their own order (and back from Hide Finder), and leaves no window active
   (`view_clear_focus` in `compositor/src/view.c`), so the menu bar shows the Finder's menus (File, Edit, View, Special; "Finder" at
-  the right). Windows stay where they are; clicking one makes it active again. Seen: foot in front -> desktop click -> Finder's
-  menus, foot's frame inactive -> click on foot -> its menus back.
+  the right). Clicking a window makes it active again. Seen in a nested session: foot in front of a Finder window -> desktop click ->
+  the Finder window comes above foot, Finder's menus, foot's frame inactive; foot alone -> desktop click -> Finder's menus.
 
 **Software Update in the Apple menu** (built; window seen in a nested session; installing not tried yet - needs a published release).
 
