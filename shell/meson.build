@@ -40,6 +40,20 @@ configure_file(input: 'wine/zacos9-wine', output: 'zacos9-wine', copy: true)
 install_data('wine/zacos9-wine', install_dir: get_option('bindir'),
   install_mode: 'rwxr-xr-x')
 
+# GDBus: the menu bar's global menus (registrar, dbusmenu); GIO for the
+# Finder's desktop entries too.
+gio = dependency('gio-2.0')
+
+# platinum-shell-v1: the menu bar (front window's pid) and the Finder.
+finder_protocol = []
+foreach kind : [['client-header', '@BASENAME@-client-protocol.h'], ['private-code', '@BASENAME@-protocol.c']]
+  finder_protocol += custom_target('finder_platinum_shell_' + kind[0].underscorify(),
+    input: meson.project_source_root() / 'protocols/platinum-shell-v1.xml',
+    output: kind[1],
+    command: [wayland_scanner, kind[0], '@INPUT@', '@OUTPUT@'],
+  )
+endforeach
+
 executable('zacos9-menubar',
   'menubar/main.c',
   'menubar/menus.c',
@@ -47,8 +61,10 @@ executable('zacos9-menubar',
   'menubar/launch.c',
   'menubar/keys.c',
   'menubar/finderlink.c',
+  'menubar/appmenu.c',
   client_protocol_src,
-  dependencies: [platinum_dep, wayland_client, wayland_cursor, xkbcommon_client],
+  finder_protocol,
+  dependencies: [platinum_dep, wayland_client, wayland_cursor, xkbcommon_client, gio],
   install: true,
 )
 
@@ -60,17 +76,7 @@ layershellqt = dependency('LayerShellQt', method: 'cmake',
   modules: ['LayerShellQt::Interface'])
 # GIO reads and launches XDG desktop entries for the Applications folder,
 # so the desktop entry specification is followed rather than approximated.
-gio = dependency('gio-2.0')
 gio_unix = dependency('gio-unix-2.0')
-
-finder_protocol = []
-foreach kind : [['client-header', '@BASENAME@-client-protocol.h'], ['private-code', '@BASENAME@-protocol.c']]
-  finder_protocol += custom_target('finder_platinum_shell_' + kind[0].underscorify(),
-    input: meson.project_source_root() / 'protocols/platinum-shell-v1.xml',
-    output: kind[1],
-    command: [wayland_scanner, kind[0], '@INPUT@', '@OUTPUT@'],
-  )
-endforeach
 
 # Control panels (the Finder's Get Info uses their controls too).
 panelkit = static_library('panelkit', 'panels/panelkit.cpp', 'panels/sharingclient.cpp',

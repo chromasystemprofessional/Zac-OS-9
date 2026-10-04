@@ -25,6 +25,11 @@ static struct mb_item *add(struct mb_menu *m, const char *label, char key,
 	return it;
 }
 
+struct mb_item *menus_add_item(struct mb_menu *m, const char *label, char key,
+		bool enabled, enum action action, const char *arg) {
+	return add(m, label, key, enabled, action, arg);
+}
+
 static void sep(struct mb_menu *m) {
 	add(m, NULL, 0, false, ACT_NONE, NULL);
 }
@@ -122,6 +127,10 @@ static void add_finder_menus(struct mb_menu *menus, int *n) {
 	add(m, "Shut Down", 0, true, ACT_LAUNCH, "systemctl poweroff");
 }
 
+struct mb_menu *menus_new_menu(struct mb_menu *menus, int *n, const char *title) {
+	return new_menu(menus, n, title);
+}
+
 static void add_app_menus(struct mb_menu *menus, int *n, const char *app_id) {
 	struct mb_menu *m = new_menu(menus, n, "File");
 	add(m, "Close Window", 'W', true, ACT_CLOSE_WINDOW, app_id);
@@ -204,7 +213,8 @@ void menus_rebuild(struct mb_bar *bar, int screen_w) {
 	launch_fill_logo_menu(logo);
 	if (finder_front) {
 		add_finder_menus(bar->left, &bar->n_left);
-	} else {
+	} else if (!appmenu_add_menus(bar->left, &bar->n_left, MAX_TITLES)) {
+		/* A program that gave us its own menus (appmenu.c) shows those. */
 		add_app_menus(bar->left, &bar->n_left, front->app_id);
 	}
 
@@ -321,6 +331,9 @@ void menus_perform(struct mb_item *item) {
 		break;
 	case ACT_FINDER:
 		finder_send(item->arg);
+		break;
+	case ACT_DBUSMENU:
+		appmenu_perform(item->arg);
 		break;
 	case ACT_ABOUT:
 		finder_send("about");

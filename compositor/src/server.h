@@ -300,6 +300,8 @@ int platinum_shell_style_for(struct wlr_surface *surface);
 bool platinum_shell_position_for(struct wlr_surface *surface, int *x, int *y);
 /* Tell the window's program (if it is one of ours) where it now is. */
 void platinum_shell_report_position(struct plat_view *view);
+/* The front window changed: tell the menu bar whose it is. */
+void platinum_shell_focus_changed(struct plat_server *server);
 
 /* xwayland.c */
 void xwayland_init(struct plat_server *server);

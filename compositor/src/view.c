@@ -141,6 +141,7 @@ void view_set_hidden(struct plat_view *view, bool hidden) {
 		} else if (!server->focused_layer) {
 			wlr_seat_keyboard_clear_focus(server->seat);
 		}
+		platinum_shell_focus_changed(server);
 	}
 }
 
@@ -163,6 +164,7 @@ void view_focus(struct plat_view *view) {
 		}
 		server->focused_view = view;
 		set_active(view, true);
+		platinum_shell_focus_changed(server);
 	}
 	/* While the menu bar tracks a menu (an exclusive layer) it keeps the
 	 * keyboard. A shell surface that merely had it - the desktop, after a
@@ -392,6 +394,7 @@ void view_handle_unmap(struct plat_view *view) {
 		if (next) {
 			view_focus(next);
 		}
+		platinum_shell_focus_changed(server);
 	}
 }
 

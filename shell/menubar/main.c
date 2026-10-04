@@ -26,6 +26,7 @@
 #include <wayland-cursor.h>
 
 #include "menubar.h"
+#include "platinum-shell-v1-client-protocol.h"
 #include "settings.h"
 #include "viewporter-client-protocol.h"
 #include "virtual-keyboard-unstable-v1-client-protocol.h"
@@ -50,6 +51,7 @@ static struct {
 	struct zwlr_foreign_toplevel_manager_v1 *toplevel_mgr;
 	struct wp_viewporter *viewporter;
 	struct zwp_virtual_keyboard_manager_v1 *vkbd_mgr;
+	struct platinum_shell_v1 *platinum_shell; /* version 2: the front window's pid */
 	int scale;
 
 	struct wl_pointer *pointer;
@@ -794,6 +796,21 @@ static const struct zwlr_layer_surface_v1_listener bar_listener = {
 	.closed = bar_closed,
 };
 
+/* ---- the front window's process (global menus) ---------------------------- */
+
+static void shell_window_position(void *data, struct platinum_shell_v1 *shell,
+		struct wl_surface *surface, int32_t x, int32_t y) {
+}
+
+static void shell_active_client(void *data, struct platinum_shell_v1 *shell, uint32_t pid) {
+	appmenu_set_active_pid(pid);
+}
+
+static const struct platinum_shell_v1_listener shell_listener = {
+	.window_position = shell_window_position,
+	.active_client = shell_active_client,
+};
+
 /* ---- globals ------------------------------------------------------------- */
 
 static void registry_global(void *data, struct wl_registry *reg, uint32_t name,
@@ -820,6 +837,9 @@ static void registry_global(void *data, struct wl_registry *reg, uint32_t name,
 	} else if (strcmp(iface, zwp_virtual_keyboard_manager_v1_interface.name) == 0) {
 		g.vkbd_mgr = wl_registry_bind(reg, name,
 			&zwp_virtual_keyboard_manager_v1_interface, 1);
+	} else if (strcmp(iface, platinum_shell_v1_interface.name) == 0 && version >= 2) {
+		g.platinum_shell = wl_registry_bind(reg, name, &platinum_shell_v1_interface, 2);
+		platinum_shell_v1_add_listener(g.platinum_shell, &shell_listener, NULL);
 	}
 }
 
@@ -863,6 +883,9 @@ int main(void) {
 		keys_init(g.vkbd_mgr, g.seat);
 	}
 	toplevels_init(g.toplevel_mgr);
+	if (g.platinum_shell) {
+		appmenu_init();
+	}
 	/* zacos9-wm sets XCURSOR_THEME/SIZE to its own cursor theme. */
 	const char *cursor_size = getenv("XCURSOR_SIZE");
 	int cursor_px = cursor_size ? atoi(cursor_size) : 16;
@@ -906,7 +929,7 @@ int main(void) {
 			wl_display_dispatch_pending(g.display);
 		}
 		wl_display_flush(g.display);
-		struct pollfd fds[] = {
+		struct pollfd fds[5 + 16] = {
 			{ .fd = wl_display_get_fd(g.display), .events = POLLIN },
 			{ .fd = g.clock_fd, .events = POLLIN },
 			{ .fd = g.blink_fd, .events = POLLIN },
@@ -915,7 +938,9 @@ int main(void) {
 		};
 		/* The Finder may start after us, or restart: while we have no line
 		 * to it, look again every second. */
-		if (poll(fds, 5, finder_fd() < 0 ? 1000 : -1) < 0 && errno != EINTR) {
+		int timeout = finder_fd() < 0 ? 1000 : -1;
+		int n_glib = appmenu_poll_prepare(fds + 5, 16, &timeout);
+		if (poll(fds, 5 + n_glib, timeout) < 0 && errno != EINTR) {
 			wl_display_cancel_read(g.display);
 			break;
 		}
@@ -952,6 +977,7 @@ int main(void) {
 		} else if (finder_fd() < 0 && finder_connect()) {
 			menubar_apps_changed(); /* state arrives shortly; rebuild then too */
 		}
+		appmenu_poll_dispatch(fds + 5); /* D-Bus: other programs' menus */
 	}
 	return 0;
 }

@@ -61,6 +61,7 @@ enum action {
 	ACT_EDIT_COMMAND, /* key: the ⌘ letter, sent to the front app */
 	ACT_EDIT_CLEAR,
 	ACT_FINDER,       /* arg: Finder command name */
+	ACT_DBUSMENU,     /* arg: "sender path id" of another program's menu item */
 };
 
 /* ⌘⌫ (delete) as a menu shortcut. */
@@ -102,6 +103,26 @@ void menus_rebuild(struct mb_bar *bar, int screen_w);
 void menus_toggle_clock(void);
 void menus_free(struct mb_bar *bar);
 void menus_perform(struct mb_item *item);
+/* Building blocks for menus filled elsewhere (appmenu.c). */
+struct mb_menu *menus_new_menu(struct mb_menu *menus, int *n, const char *title);
+struct mb_item *menus_add_item(struct mb_menu *m, const char *label, char key,
+	bool enabled, enum action action, const char *arg);
+
+/* ---- other programs' menus (appmenu.c) ------------------------------------ */
+
+struct pollfd;
+
+/* Owns com.canonical.AppMenu.Registrar; call only when zacos9-wm reports
+ * the front window's process (see appmenu_set_active_pid). */
+void appmenu_init(void);
+void appmenu_set_active_pid(uint32_t pid);
+/* Appends the front program's own menus; false if it has none. */
+bool appmenu_add_menus(struct mb_menu *menus, int *n, int max);
+void appmenu_perform(const char *arg);
+/* GLib's main context in our poll() loop: fills up to max pollfds and
+ * may shorten the timeout; dispatch gets the same fds back after poll(). */
+int appmenu_poll_prepare(struct pollfd *fds, int max, int *timeout);
+void appmenu_poll_dispatch(const struct pollfd *fds);
 
 /* ---- apple-menu-equivalent items and launching (launch.c) ---------------- */
 

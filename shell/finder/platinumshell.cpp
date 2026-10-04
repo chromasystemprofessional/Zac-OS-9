@@ -32,7 +32,8 @@ static void handle_window_position(void *, platinum_shell_v1 *, wl_surface *surf
 	}
 }
 
-static const platinum_shell_v1_listener shell_listener = { handle_window_position };
+/* Version 1 is bound: active_client (the menu bar's) never arrives. */
+static const platinum_shell_v1_listener shell_listener = { handle_window_position, nullptr };
 
 static void global(void *, wl_registry *reg, uint32_t name, const char *iface, uint32_t) {
 	if (std::strcmp(iface, platinum_shell_v1_interface.name) == 0) {

@@ -10,7 +10,7 @@
     when the generic rule (fixed size with a parent window) can't apply.
   </description>
 
-  <interface name="platinum_shell_v1" version="1">
+  <interface name="platinum_shell_v1" version="2">
     <enum name="style">
       <entry name="document" value="0" summary="standard document window"/>
       <entry name="movable_modal" value="1"
@@ -49,5 +49,15 @@
     </event>
 
     <request name="destroy" type="destructor"/>
+
+    <event name="active_client" since="2">
+      <description summary="the front window's process">
+        Sent on bind and whenever the window with keyboard focus changes,
+        with the process id of the program that owns it (an X11 window's own
+        process, not Xwayland's), or 0 when no window is in front. The menu
+        bar uses it to show that program's own menus (global menus).
+      </description>
+      <arg name="pid" type="uint"/>
+    </event>
   </interface>
 </protocol>

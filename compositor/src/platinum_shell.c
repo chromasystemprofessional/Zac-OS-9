@@ -4,6 +4,7 @@
  */
 #include <stdlib.h>
 #include <wlr/types/wlr_compositor.h>
+#include <wlr/xwayland.h>
 
 #include "platinum-shell-v1-protocol.h"
 #include "server.h"
@@ -129,6 +130,41 @@ static void handle_set_window_position(struct wl_client *client, struct wl_resou
 	}
 }
 
+/* The process behind the front window, for the menu bar's global menus. */
+static uint32_t active_pid;
+
+static uint32_t view_pid(struct plat_view *view) {
+	if (view->type == PLAT_VIEW_XWAYLAND) {
+		return view->xsurface->pid > 0 ? (uint32_t)view->xsurface->pid : 0;
+	}
+	struct wlr_surface *surface = view->impl->get_surface(view);
+	if (!surface || !surface->resource) {
+		return 0;
+	}
+	pid_t pid = 0;
+	wl_client_get_credentials(wl_resource_get_client(surface->resource), &pid, NULL, NULL);
+	return pid > 0 ? (uint32_t)pid : 0;
+}
+
+static void send_active(struct wl_resource *resource) {
+	if (wl_resource_get_version(resource) >= PLATINUM_SHELL_V1_ACTIVE_CLIENT_SINCE_VERSION) {
+		platinum_shell_v1_send_active_client(resource, active_pid);
+	}
+}
+
+void platinum_shell_focus_changed(struct plat_server *server) {
+	struct plat_view *view = server->focused_view;
+	uint32_t pid = view ? view_pid(view) : 0;
+	if (pid == active_pid) {
+		return;
+	}
+	active_pid = pid;
+	struct wl_resource *r;
+	wl_resource_for_each(r, &resources) {
+		send_active(r);
+	}
+}
+
 static void handle_destroy(struct wl_client *client, struct wl_resource *resource) {
 	wl_resource_destroy(resource);
 }
@@ -152,11 +188,12 @@ static void bind_shell(struct wl_client *client, void *data, uint32_t version, u
 	}
 	wl_resource_set_implementation(resource, &shell_impl, NULL, resource_destroy);
 	wl_list_insert(&resources, wl_resource_get_link(resource));
+	send_active(resource);
 }
 
 void platinum_shell_init(struct plat_server *server) {
 	the_server = server;
 	wl_list_init(&hints);
 	wl_list_init(&resources);
-	wl_global_create(server->display, &platinum_shell_v1_interface, 1, NULL, bind_shell);
+	wl_global_create(server->display, &platinum_shell_v1_interface, 2, NULL, bind_shell);
 }

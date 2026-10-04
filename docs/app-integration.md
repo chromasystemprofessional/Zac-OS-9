@@ -13,7 +13,7 @@ works for it:
 |---|---|---|---|
 | Window frame | zacos9-wm (server-side decorations) | session asks toolkits not to draw their own | done |
 | Controls (buttons, fields, scroll bars) | the toolkit | a Platinum theme/style per toolkit | GTK 3, Qt 6 done |
-| Menus | the application, inside its window | global menu: the app's menus in our menu bar | not started |
+| Menus | the application, inside its window | global menu: the app's menus in our menu bar | Qt 6 done; GTK 3 not started |
 | Everything | Electron, GTK 4 / libadwaita | nothing reliable | known gap |
 
 ## Done
@@ -107,6 +107,31 @@ Steps:
    a surface-to-menu mapping may need `org_kde_kwin_appmenu` in zacos9-wm.
 3. **Keep the Apple menu and the application menu** (right side) as they are.
 4. Test with a Qt 6 program (GTK 3 after the separate GTK step).
+
+## Global menus, Qt 6: built (step 2)
+
+- `shell/menubar/appmenu.c` owns `com.canonical.AppMenu.Registrar` (only
+  when zacos9-wm offers `platinum_shell_v1` version 2), keeps each
+  program's latest registration, fetches `GetLayout` asynchronously and
+  again on `LayoutUpdated` / `ItemsPropertiesUpdated`, drops a program's
+  menus when it leaves the bus, and sends `Event(id, "clicked")` for a
+  chosen item. GLib's main context runs inside the menu bar's `poll()`.
+- zacos9-wm sends the front window's client pid
+  (`platinum_shell_v1.active_client`, new in version 2; for an X11 window
+  its own pid, not Xwayland's). `menus_rebuild` shows the front program's
+  menus after the logo menu instead of the generic File/Edit; programs
+  without them keep the generic ones.
+- Shown: labels (mnemonics stripped), separators, disabled items, check
+  and radio state, ⌘ shortcuts for Control+letter, one level of submenu
+  (deeper ones are shown disabled). Not done: icons, `AboutToShow` (menus
+  a program fills only when opened stay as they were exported), the Quit
+  item Mac programs have (a Qt program's File menu has its own or none).
+- Tested in a nested session (`dbus-run-session`, a Qt 6 test window): its
+  File and Edit menus appear in our bar and its own menu bar disappears;
+  File > Open ran the program's action; Edit > More opens its submenu;
+  after it quits the Finder's menus come back; foot keeps the generic
+  menus. Debug: `ZACOS9_APPMENU_DEBUG=1` logs registrations and the
+  front pid. Not yet tried with a real Qt program or on the installed system.
 
 ## Gaps (known, not planned yet)
 

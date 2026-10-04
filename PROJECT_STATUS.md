@@ -26,6 +26,12 @@ Updated: 2026-10-03
 
 Resuming the work on other applications' look (themes, styles, global menus): see `docs/app-integration.md`.
 
+**Global menus for Qt 6 programs** (built; tested in a nested session; not on the installed system yet).
+
+- A Qt 6 program's own menus show in the menu bar while its window is in front, and its in-window menu bar goes away.
+  `shell/menubar/appmenu.c` (registrar + dbusmenu over GDBus); zacos9-wm reports the front window's pid
+  (`platinum_shell_v1` version 2). Details, what's shown and what isn't: `docs/app-integration.md`.
+
 **Terminal: ⌘C/⌘V copy and paste** (built, installed as a .deb and confirmed working on the real system 2026-10-04).
 
 - Reported on real hardware: copy/paste doesn't work in Terminal. zacos9-wm turned ⌘ into Ctrl for every client, so in foot ⌘C was an
