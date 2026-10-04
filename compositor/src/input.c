@@ -18,11 +18,25 @@
 
 /* ---- keyboard ---------------------------------------------------------- */
 
+/* Clients that take ⌘ (Super) shortcuts themselves: in a terminal Ctrl+C
+ * interrupts, so ⌘C must stay ⌘ to copy (foot.ini binds it). */
+static bool keeps_command_key(struct plat_server *server, struct wlr_surface *surface) {
+	struct plat_view *view = server->focused_view;
+	if (!surface || server->focused_layer || !view || !view->app_id ||
+			view->impl->get_surface(view) != surface) {
+		return false;
+	}
+	return strcmp(view->app_id, "foot") == 0 || strcmp(view->app_id, "footclient") == 0;
+}
+
 /* The Windows/Super key is the Mac's ⌘ key. Linux apps expect Ctrl for
  * the same shortcuts (⌘C = Ctrl+C), so clients see Super as Ctrl. */
-static struct wlr_keyboard_modifiers command_as_ctrl(
-		const struct wlr_keyboard_modifiers *in) {
+static struct wlr_keyboard_modifiers command_as_ctrl(struct plat_server *server,
+		struct wlr_surface *surface, const struct wlr_keyboard_modifiers *in) {
 	struct wlr_keyboard_modifiers out = *in;
+	if (keeps_command_key(server, surface)) {
+		return out;
+	}
 	uint32_t *masks[] = { &out.depressed, &out.latched, &out.locked };
 	for (int i = 0; i < 3; i++) {
 		if (*masks[i] & WLR_MODIFIER_LOGO) {
@@ -41,7 +55,8 @@ void input_keyboard_enter(struct plat_server *server, struct wlr_surface *surfac
 		wlr_seat_keyboard_notify_enter(server->seat, surface, NULL, 0, NULL);
 		return;
 	}
-	struct wlr_keyboard_modifiers mods = command_as_ctrl(&keyboard->modifiers);
+	struct wlr_keyboard_modifiers mods =
+		command_as_ctrl(server, surface, &keyboard->modifiers);
 	wlr_seat_keyboard_notify_enter(server->seat, surface, keyboard->keycodes,
 		keyboard->num_keycodes, &mods);
 }
@@ -52,7 +67,8 @@ static void keyboard_modifiers(struct wl_listener *listener, void *data) {
 		return;
 	}
 	wlr_seat_set_keyboard(kb->server->seat, kb->wlr_keyboard);
-	struct wlr_keyboard_modifiers mods = command_as_ctrl(&kb->wlr_keyboard->modifiers);
+	struct wlr_keyboard_modifiers mods = command_as_ctrl(kb->server,
+		kb->server->seat->keyboard_state.focused_surface, &kb->wlr_keyboard->modifiers);
 	wlr_seat_keyboard_notify_modifiers(kb->server->seat, &mods);
 }
 

@@ -27,6 +27,9 @@ export GTK_THEME=ZacOS9
 # Qt applications get the Platinum controls from the zacos9 style plugin
 # (shell/qtstyle); a system without it falls back to Qt's own look.
 export QT_STYLE_OVERRIDE=zacos9
+# ZacOS 9's defaults for other programs (share/xdg: Terminal's ⌘C/⌘V),
+# ahead of the system's; a user's own ~/.config files still win.
+export XDG_CONFIG_DIRS="/usr/share/zacos9/xdg:${XDG_CONFIG_DIRS:-/etc/xdg}"
 
 # No real GPU (a plain framebuffer, or a virtual machine's display, where
 # GL would be emulated on the CPU and shows stale frames): draw with

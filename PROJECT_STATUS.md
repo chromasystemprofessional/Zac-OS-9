@@ -26,6 +26,17 @@ Updated: 2026-10-03
 
 Resuming the work on other applications' look (themes, styles, global menus): see `docs/app-integration.md`.
 
+**Terminal: ⌘C/⌘V copy and paste** (built, installed as a .deb and confirmed working on the real system 2026-10-04).
+
+- Reported on real hardware: copy/paste doesn't work in Terminal. zacos9-wm turned ⌘ into Ctrl for every client, so in foot ⌘C was an
+  interrupt and ⌘V an unbound Ctrl+V (foot's own keys are Ctrl+Shift+C/V).
+- zacos9-wm now leaves ⌘ as Super (Mod4) when foot has the keyboard (`keeps_command_key` in `compositor/src/input.c`); other apps unchanged.
+  The menu bar's Edit commands now send ⌘ rather than Ctrl, so zacos9-wm makes the same choice for them.
+- `share/xdg/foot/foot.ini` (installed to /usr/share/zacos9/xdg, put first in XDG_CONFIG_DIRS by zacos9-session) binds Mod4+c/v to copy
+  and paste. Checked: foot 1.21 reads it from there (`foot --check-config`); ~/.config/foot/foot.ini still overrides it.
+- Confirmed by the user after logging in to the installed build: ⌘C/⌘V copy and paste in Terminal.
+- Seen in the log, not done: zacos9-wm has no primary selection (middle-click paste), which foot warns about.
+
 **Software window: look-and-feel presets (GIMP › Photoshop Layout)** (built and tested; not yet committed; not in an ISO yet).
 
 - A catalog item can carry a `"style"`; the detail pane then shows a second button (Photoshop Layout /

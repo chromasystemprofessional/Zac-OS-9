@@ -1,7 +1,8 @@
 /*
- * Edit-menu commands are delivered to the front app as keystrokes (⌘X is
- * Ctrl+X to a Linux app) through a virtual keyboard. By the time they are
- * sent, the menu overlay is gone and the app has keyboard focus again;
+ * Edit-menu commands are delivered to the front app as ⌘ keystrokes through
+ * a virtual keyboard: zacos9-wm makes ⌘X Ctrl+X for a Linux app, but leaves
+ * it ⌘X for a terminal, where Ctrl+X means something else. By the time they
+ * are sent, the menu overlay is gone and the app has keyboard focus again;
  * requests on one connection are handled in order.
  */
 #define _GNU_SOURCE
@@ -18,7 +19,7 @@
 #include "virtual-keyboard-unstable-v1-client-protocol.h"
 
 static struct zwp_virtual_keyboard_v1 *vkbd;
-static uint32_t ctrl_mask;
+static uint32_t command_mask;
 
 void keys_init(struct zwp_virtual_keyboard_manager_v1 *mgr, struct wl_seat *seat) {
 	struct xkb_context *ctx = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
@@ -29,7 +30,7 @@ void keys_init(struct zwp_virtual_keyboard_manager_v1 *mgr, struct wl_seat *seat
 		xkb_context_unref(ctx);
 		return;
 	}
-	ctrl_mask = 1u << xkb_keymap_mod_get_index(keymap, XKB_MOD_NAME_CTRL);
+	command_mask = 1u << xkb_keymap_mod_get_index(keymap, XKB_MOD_NAME_LOGO);
 
 	char *text = xkb_keymap_get_as_string(keymap, XKB_KEYMAP_FORMAT_TEXT_V1);
 	size_t size = strlen(text) + 1;
@@ -84,7 +85,7 @@ static void tap(uint32_t keycode, uint32_t mods) {
 void keys_send_command(char key) {
 	uint32_t code = keycode_for(key);
 	if (vkbd && code) {
-		tap(code, ctrl_mask);
+		tap(code, command_mask);
 	}
 }
 
