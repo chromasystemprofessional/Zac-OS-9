@@ -179,6 +179,13 @@ void launch_fill_logo_menu(struct mb_menu *menu) {
 		sibling_program("zacos9-update", command, sizeof(command));
 		add_item(menu, "Software Update", true, ACT_LAUNCH, command);
 	}
+	/* Screen Snapshot: drag out part of the screen; it goes on the Desktop
+	 * as "Picture N.png" and on the clipboard. */
+	{
+		char command[PATH_MAX + 64];
+		sibling_program("zacos9-snapshot", command, sizeof(command));
+		add_item(menu, "Screen Snapshot", true, ACT_LAUNCH, command);
+	}
 	/* Windows programs, installed through Wine. */
 	{
 		char command[PATH_MAX + 64];

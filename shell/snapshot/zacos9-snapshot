@@ -1,0 +1,34 @@
+#!/bin/sh
+# zacos9-snapshot: Screen Snapshot, from the Apple menu. Drag a rectangle
+# (Escape or a right click cancels); the picture is saved on the Desktop as
+# "Picture 1.png", "Picture 2.png", ... (as Mac OS 9 named its own) and is
+# put on the clipboard too, ready to paste.
+#
+# slurp draws the selection, grim takes the picture (zacos9-wm's
+# screencopy), wl-copy sets the clipboard (zacos9-wm's data-control).
+set -u
+
+for tool in slurp grim wl-copy; do
+	command -v "$tool" >/dev/null || {
+		echo "zacos9-snapshot: $tool isn't installed (packages grim, slurp, wl-clipboard)." >&2
+		exit 1
+	}
+done
+
+# Platinum: a black 1-pixel outline, the screen lightly dimmed outside it.
+geometry=$(slurp -d -w 1 -c '#000000ff' -b '#00000030' -s '#00000000' -F "DejaVu Sans") || exit 0
+[ -n "$geometry" ] || exit 0
+
+desktop=$(xdg-user-dir DESKTOP 2>/dev/null)
+[ -n "$desktop" ] && [ "$desktop" != "$HOME" ] || desktop=$HOME/Desktop
+mkdir -p "$desktop"
+n=1
+while [ -e "$desktop/Picture $n.png" ]; do
+	n=$((n + 1))
+done
+file="$desktop/Picture $n.png"
+
+# Let slurp's overlay go before the picture is taken.
+sleep 0.2
+grim -g "$geometry" "$file" || exit 1
+wl-copy --type image/png <"$file"

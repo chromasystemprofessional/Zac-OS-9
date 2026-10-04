@@ -26,6 +26,14 @@ Updated: 2026-10-03
 
 Resuming the work on other applications' look (themes, styles, global menus): see `docs/app-integration.md`.
 
+**Screen Snapshot in the Apple menu** (built; checked in a nested session; not released yet).
+
+- `shell/snapshot/zacos9-snapshot`: drag a rectangle (slurp, Platinum-styled: black 1-px outline, screen lightly dimmed; Escape
+  cancels); grim saves it on the Desktop as "Picture N.png" (Mac OS 9's naming) and wl-copy puts it on the clipboard.
+- zacos9-wm now offers `wlr-data-control` so wl-copy sets the clipboard without a window of its own. `debian/control` depends on
+  grim, slurp, wl-clipboard.
+- Seen: Apple menu > Screen Snapshot, a 300x200 drag -> "Picture 1.png" (300x200, no overlay in it) and `image/png` on the clipboard.
+
 **Nested zacos9-wm overwrote the real session's screens file** (fixed; verified).
 
 - `prefs_write_outputs` named `$XDG_RUNTIME_DIR/zacos9-outputs-*` after `$WAYLAND_DISPLAY`, but runs as the outputs appear, before

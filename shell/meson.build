@@ -30,6 +30,12 @@ foreach xml : client_protocols
   )
 endforeach
 
+# Screen Snapshot (Apple menu): drag out a rectangle; a picture on the
+# Desktop and the clipboard (slurp, grim, wl-copy).
+configure_file(input: 'snapshot/zacos9-snapshot', output: 'zacos9-snapshot', copy: true)
+install_data('snapshot/zacos9-snapshot', install_dir: get_option('bindir'),
+  install_mode: 'rwxr-xr-x')
+
 # The classic Mac OS launcher, next to the Finder that runs it.
 configure_file(input: 'classic/zacos9-classic', output: 'zacos9-classic', copy: true)
 install_data('classic/zacos9-classic', install_dir: get_option('bindir'),

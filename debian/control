@@ -34,7 +34,10 @@ Depends: ${shlibs:Depends},
          procps,
          fonts-dejavu-core,
          avahi-utils,
-         gvfs-backends
+         gvfs-backends,
+         grim,
+         slurp,
+         wl-clipboard
 Recommends: xwayland,
             netatalk,
             samba,

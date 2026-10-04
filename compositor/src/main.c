@@ -6,6 +6,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <wlr/types/wlr_compositor.h>
+#include <wlr/types/wlr_data_control_v1.h>
 #include <wlr/types/wlr_data_device.h>
 #include <wlr/types/wlr_screencopy_v1.h>
 #include <wlr/types/wlr_server_decoration.h>
@@ -156,6 +157,9 @@ int main(int argc, char *argv[]) {
 	wlr_subcompositor_create(server.display);
 	wlr_viewporter_create(server.display);
 	wlr_data_device_manager_create(server.display);
+	/* wl-copy and wl-paste (Screen Snapshot puts its picture on the
+	 * clipboard) set and read the clipboard without a window of their own. */
+	wlr_data_control_manager_v1_create(server.display);
 	/* Lets `grim` capture screenshots for visual checks. */
 	wlr_screencopy_manager_v1_create(server.display);
 
