@@ -14,3 +14,6 @@ install_data('logo-64.rgb',
   install_dir: get_option('datadir') / 'zacos9' / 'boot')
 install_data('09_zacos9',
   install_dir: get_option('sysconfdir') / 'grub.d', install_mode: 'rwxr-xr-x')
+
+test('boot-splash-displays', find_program('python3'),
+  args: [files('tests/test_splash.py'), files('plymouth/zacos9.script')])

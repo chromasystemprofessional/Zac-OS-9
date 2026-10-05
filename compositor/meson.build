@@ -83,3 +83,12 @@ test('decor',
   ),
   args: [meson.project_source_root() / 'tools/measure/figs'],
 )
+
+test('startup-displays',
+  executable('test-startup',
+    'tests/test_startup.c', 'src/startup.c', 'src/pixbuf.c',
+    include_directories: include_directories('src'),
+    dependencies: [platinum_dep, wayland_server, wlroots],
+  ),
+  env: ['ZACOS9_STARTUP=1'],
+)

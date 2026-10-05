@@ -131,6 +131,8 @@ struct plat_output {
 	/* Layout-coordinate area left for windows after shell surfaces (the
 	 * menu bar) reserve their exclusive zones. */
 	struct wlr_box usable_area;
+	struct wlr_scene_buffer *startup_buffer;
+	struct wl_listener startup_buffer_destroy;
 	struct wl_listener frame;
 	struct wl_listener request_state;
 	struct wl_listener destroy;

@@ -109,6 +109,10 @@ classic Mac showed its start-up icon) is up as soon as the computer can draw it:
    so nothing written to it shows and no black flashes up.
    - `zacos9-console-colors.service` and `session/zacos9-greeter` restore
      normal colours, so the login screen and Ctrl+Alt+F2 consoles read.
+   - Each monitor gets its own centered logo, progress bar and password
+     prompt, even at different resolutions. Viewports are kept separate so
+     one monitor's artwork cannot overlap another's. Theme updates activate
+     Debian's `update-initramfs` trigger to refresh the installed boot image.
 3. **zacos9-wm: the logo on white** for half a second, then **the Welcome
    box** - "Welcome to ZacOS 9", a picture of a modern computer
    (`lib/welcome.c`) and a progress bar - over the desktop pattern, with the
@@ -116,9 +120,21 @@ classic Mac showed its start-up icon) is up as soon as the computer can draw it:
    fills, then the desktop. Both screens come from `compositor/src/startup.c`.
    greetd runs on tty1, so going from the splash to the desktop is white to
    white.
+   - With multiple monitors, each gets a complete logo and Welcome box,
+     centered within that output's logical resolution. This applies to
+     extended and mirrored layouts, including different pixel scales.
+     It does not change the saved desktop arrangement.
 4. **Known gaps:** a second or so of plain white between GRUB and the
    splash (the kernel's text console clears the screen when it starts) and
    again before zacos9-wm draws, where the logo is gone for a moment.
+   The earlier GRUB screen still depends on the firmware's display support;
+   it cannot independently draw a background for each connected monitor.
+
+**Multi-monitor startup tests.** `meson test -C build startup-displays
+boot-splash-displays` checks unequal resolutions, mirrored/offset layouts,
+HiDPI, hot-plug and startup completion. The Plymouth test uses its installed
+script interpreter with isolated display/sprite mocks and skips when that
+plugin is not installed. It does not change the active desktop or boot image.
 
 **Install.** The boot menu also offers Debian's installer:
 

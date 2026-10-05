@@ -64,7 +64,7 @@ static const enum pl_icon_kind ext_icons[] = {
 
 static struct {
 	struct plat_server *server;
-	struct wlr_scene_buffer *buffer;
+	bool active;
 	struct wl_event_source *timer;
 	long start_ms, welcome_ms, ready_ms;
 	bool menubar, desktop;
@@ -101,14 +101,14 @@ static void paint_logo(struct pl_canvas *c, int x, int y) {
 	pl_image_blend(c, x, y, logo_pixels_hq(), PL_LOGO_SIZE_HQ, PL_LOGO_SIZE_HQ, false);
 }
 
-static void draw_logo(int w, int h) {
+static void draw_logo(struct wlr_scene_buffer *buffer, int w, int h) {
 	struct plat_pixbuf *buf = pixbuf_create(w, h);
 	struct pl_canvas c = { .px = buf->data, .stride = w, .width = w, .height = h };
 	pl_fill(&c, 0, 0, w - 1, h - 1, C_WHITE);
 	const int lw = PL_LOGO_SIZE_HQ;
 	paint_logo(&c, (w - lw) / 2, (h - lw) / 2);
 
-	wlr_scene_buffer_set_buffer(st.buffer, &buf->base);
+	wlr_scene_buffer_set_buffer(buffer, &buf->base);
 	wlr_buffer_drop(&buf->base);
 }
 
@@ -133,7 +133,7 @@ static void paint_extensions(struct pl_canvas *c, int h, double fraction) {
 	}
 }
 
-static void draw(int w, int h, double fraction) {
+static void draw(struct wlr_scene_buffer *buffer, int w, int h, double fraction) {
 	struct plat_pixbuf *buf = pixbuf_create(w, h);
 	struct pl_canvas c = { .px = buf->data, .stride = w, .width = w, .height = h };
 	pl_pattern_fill(&c, st.pattern, 0, 0, w - 1, h - 1);
@@ -168,16 +168,37 @@ static void draw(int w, int h, double fraction) {
 
 	paint_extensions(&c, h, fraction);
 
-	wlr_scene_buffer_set_buffer(st.buffer, &buf->base);
+	wlr_scene_buffer_set_buffer(buffer, &buf->base);
 	wlr_buffer_drop(&buf->base);
 }
 
 static void finish(void) {
 	wl_event_source_remove(st.timer);
-	wlr_scene_node_destroy(&st.buffer->node);
+	struct plat_output *output;
+	wl_list_for_each(output, &st.server->outputs, link) {
+		startup_output_destroy(output);
+	}
 	text_destroy(st.title);
 	text_destroy(st.status);
-	st.buffer = NULL;
+	st.active = false;
+}
+
+void startup_output_frame(struct plat_output *output, bool visible) {
+	if (output->startup_buffer) {
+		wlr_scene_node_set_enabled(&output->startup_buffer->node, visible);
+	}
+}
+
+void startup_output_destroy(struct plat_output *output) {
+	if (output->startup_buffer) {
+		wlr_scene_node_destroy(&output->startup_buffer->node);
+	}
+}
+
+static void buffer_destroyed(struct wl_listener *listener, void *data) {
+	struct plat_output *output = wl_container_of(listener, output, startup_buffer_destroy);
+	wl_list_remove(&output->startup_buffer_destroy.link);
+	output->startup_buffer = NULL;
 }
 
 static int tick(void *data) {
@@ -191,15 +212,29 @@ static int tick(void *data) {
 		finish();
 		return 0;
 	}
-	struct wlr_box box;
-	wlr_output_layout_get_box(st.server->output_layout, NULL, &box);
-	if (box.width > 0 && box.height > 0) {
-		wlr_scene_node_set_position(&st.buffer->node, box.x, box.y);
-		if (welcome) {
-			draw(box.width, box.height, progress(t));
-		} else {
-			draw_logo(box.width, box.height);
+	struct plat_output *output;
+	wl_list_for_each(output, &st.server->outputs, link) {
+		struct wlr_box box;
+		wlr_output_layout_get_box(st.server->output_layout, output->wlr_output, &box);
+		if (box.width <= 0 || box.height <= 0) {
+			startup_output_destroy(output);
+			continue;
 		}
+		if (!output->startup_buffer) {
+			output->startup_buffer = wlr_scene_buffer_create(st.server->overlay_layer, NULL);
+			output->startup_buffer_destroy.notify = buffer_destroyed;
+			wl_signal_add(&output->startup_buffer->node.events.destroy,
+				&output->startup_buffer_destroy);
+			wlr_scene_node_set_enabled(&output->startup_buffer->node, false);
+		}
+		struct wlr_scene_buffer *buffer = output->startup_buffer;
+		wlr_scene_node_set_position(&buffer->node, box.x, box.y);
+		if (welcome) {
+			draw(buffer, box.width, box.height, progress(t));
+		} else {
+			draw_logo(buffer, box.width, box.height);
+		}
+		wlr_output_schedule_frame(output->wlr_output);
 	}
 	wl_event_source_timer_update(st.timer, TICK_MS);
 	return 0;
@@ -211,18 +246,18 @@ void startup_begin(struct plat_server *server) {
 		return;
 	}
 	st.server = server;
+	st.active = true;
 	st.start_ms = now_ms();
 	st.welcome_ms = st.start_ms + LOGO_MS;
 	st.pattern = chosen_pattern();
 	st.title = text_render_font("Welcome to ZacOS 9", 1000, PL_FONT_SYSTEM);
 	st.status = text_render_font("Starting Up\xe2\x80\xa6", 1000, PL_FONT_VIEWS);
-	st.buffer = wlr_scene_buffer_create(server->overlay_layer, NULL);
 	st.timer = wl_event_loop_add_timer(wl_display_get_event_loop(server->display), tick, NULL);
 	wl_event_source_timer_update(st.timer, 1);
 }
 
 void startup_surface_mapped(const char *layer_namespace) {
-	if (!st.buffer || !layer_namespace) {
+	if (!st.active || !layer_namespace) {
 		return;
 	}
 	if (strcmp(layer_namespace, "zacos9-menubar") == 0) {
@@ -233,5 +268,5 @@ void startup_surface_mapped(const char *layer_namespace) {
 }
 
 bool startup_active(void) {
-	return st.buffer != NULL;
+	return st.active;
 }

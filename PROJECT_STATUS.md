@@ -24,6 +24,18 @@ Updated: 2026-10-05
 
 ## Current work
 
+**Multi-monitor boot/startup artwork** (0.1.4): Plymouth renders a separate
+centered logo, progress bar and password prompt in each display viewport.
+The compositor no longer stretches one startup buffer across the combined
+desktop: each output has its own centered logo/Welcome box, visible only during
+that output's frame commit, including overlapping mirrored layouts. Hot-plug,
+different resolutions, negative layout positions and HiDPI are covered by
+`startup-displays`; `boot-splash-displays` executes the theme in Plymouth's real
+interpreter with display mocks. Actual isolated dual-headless compositor frames
+were captured and checked for centered logos. Packages activate Debian's
+`update-initramfs` trigger so theme upgrades reach the next boot. GRUB's earlier
+display behavior remains firmware-dependent. No live dual-monitor reboot tested.
+
 **Sound output selection** (0.1.3): the Sound control panel has a Platinum
 output menu for built-in speakers, available HDMI/DisplayPort monitor outputs,
 headphones and other audio-server outputs, including Bluetooth. Names include

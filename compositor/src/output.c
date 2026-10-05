@@ -6,13 +6,16 @@
 
 #include "server.h"
 #include "settings.h"
+#include "startup.h"
 
 static void output_frame(struct wl_listener *listener, void *data) {
 	struct plat_output *output = wl_container_of(listener, output, frame);
 	struct wlr_scene_output *scene_output = wlr_scene_get_scene_output(
 			output->server->scene, output->wlr_output);
 
+	startup_output_frame(output, true);
 	wlr_scene_output_commit(scene_output, NULL);
+	startup_output_frame(output, false);
 
 	struct timespec now;
 	clock_gettime(CLOCK_MONOTONIC, &now);
@@ -32,6 +35,7 @@ static void output_destroy(struct wl_listener *listener, void *data) {
 	struct plat_output *output = wl_container_of(listener, output, destroy);
 	struct plat_server *server = output->server;
 	struct wlr_output *gone = output->wlr_output;
+	startup_output_destroy(output);
 	wl_list_remove(&output->frame.link);
 	wl_list_remove(&output->request_state.link);
 	wl_list_remove(&output->destroy.link);
