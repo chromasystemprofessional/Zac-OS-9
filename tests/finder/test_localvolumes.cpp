@@ -127,7 +127,11 @@ int main(int argc, char **argv) {
 	assert(volume->attempts == 2);
 	g_signal_emit_by_name(monitor, "volume-removed", volume);
 	volume->fail = false;
+	localVolumeInhibitMount("/dev/sdz", true);
 	g_signal_emit_by_name(monitor, "volume-added", volume);
+	localVolumeMountDevice("/dev/sdz");
+	assert(volume->attempts == 2);
+	localVolumeInhibitMount("/dev/sdz", false);
 	assert(waitFor([] { return volume->mounted; }));
 	assert(volume->attempts == 3);
 	return 0;

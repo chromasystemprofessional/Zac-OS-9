@@ -1,3 +1,14 @@
+zacos9 (0.1.13) trixie; urgency=medium
+
+  * Add Special > Erase Disk for selected eligible USB disks. Require
+    explicit whole-disk confirmation and administrator authorization,
+    then safely unmount and format as Untitled (FAT32).
+  * Preserve system and unsafe-storage protections, revalidate disk
+    identity, and inhibit automount while erasing. Add mocked safety,
+    menu-state and controller regression tests.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Mon, 05 Oct 2026 19:17:04 -0400
+
 zacos9 (0.1.12) trixie; urgency=medium
 
   * Fix USB hot-plug discovery: service GIO events alongside Qt, mount

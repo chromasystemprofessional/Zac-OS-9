@@ -1,8 +1,12 @@
 #!/usr/bin/python3
-"""List USB disks, or initialize DEVICE EXPECTED_ID as MBR/FAT32.
+"""List USB disks, or initialize/erase DEVICE EXPECTED_ID as MBR/FAT32.
 
-Listing is unprivileged. Initialize must run through pkexec's installed
-org.zacos9.disks action. Eject/power-off belongs to UDisks2, not this helper.
+list eligibility remains restricted to unmounted disks. list-erasable uses the
+same JSON schema but permits ordinary mounts strictly below /media/ and /run/media/.
+erase requires frontend confirmation and administrator authentication through
+the existing pkexec action. It unmounts only pinned, revalidated user volumes;
+busy, bind, nested, system and changed mounts abort without formatting.
+Eject/power-off belongs to UDisks2, not this helper.
 """
 
 import contextlib
@@ -13,6 +17,7 @@ import os
 from pathlib import Path
 import re
 import stat
+import struct
 import subprocess
 import sys
 import time
@@ -22,6 +27,8 @@ LSBLK = "/usr/bin/lsblk"
 BLKID = "/usr/sbin/blkid"
 SFDISK = "/usr/sbin/sfdisk"
 MKFS = "/usr/sbin/mkfs.fat"
+UMOUNT = "/usr/bin/umount"
+BLKGETDISKSEQ = 0x80081280
 MIN_SIZE = 64 * 1024 * 1024
 MAX_SIZE = 2 * 1024**4
 DEVICE = re.compile(r"/dev/(?:sd[a-z]+|nvme[0-9]+n[0-9]+|mmcblk[0-9]+)\Z")
@@ -192,7 +199,58 @@ def device_info(item):
     return token
 
 
-def assess(state, item):
+def mount_table():
+    """Retain every mount, including bind aliases absent from lsblk."""
+    mounts = []
+    for line in read_text("/proc/self/mountinfo").splitlines():
+        fields = line.split()
+        if (len(fields) < 10 or "-" not in fields[6:]
+                or not fields[0].isdigit() or not fields[1].isdigit()
+                or not re.fullmatch(r"[0-9]+:[0-9]+", fields[2])):
+            raise Failure("Cannot determine mounted storage")
+        if len(fields) - fields.index("-", 6) != 4:
+            raise Failure("Cannot determine mounted storage")
+        decode = lambda value: re.sub(
+            r"\\([0-7]{3})", lambda m: chr(int(m.group(1), 8)), value,
+        )
+        root, target = decode(fields[3]), decode(fields[4])
+        if not root.startswith("/") or not target.startswith("/"):
+            raise Failure("Cannot determine mounted storage")
+        mounts.append((fields[0], fields[1], fields[2], root, target, line))
+    if len({mount[0] for mount in mounts}) != len(mounts):
+        raise Failure("Cannot determine mounted storage")
+    return mounts
+
+
+def user_mounts(state, item):
+    family = connected(state[1], item["maj:min"])
+    mounts = mount_table()
+    selected = [mount for mount in mounts if mount[2] in family]
+    if {mount[2] for mount in selected} != family & state[2]:
+        raise Failure("Mounted topology changed or cannot be identified")
+    seen = set()
+    for mount in selected:
+        _, _, devno, root, target, _ = mount
+        if (root != "/" or devno in seen
+                or not target.startswith(("/media/", "/run/media/"))
+                or os.path.normpath(target) != target
+                or os.path.realpath(target) != target):
+            raise Failure("System, bind or non-user storage mounts cannot be erased")
+        seen.add(devno)
+        node = state[0].get(devno)
+        if node is None or set(filter(None, node.get("mountpoints") or [])) != {target}:
+            raise Failure("Mounted topology changed or cannot be identified")
+        # Even a foreign filesystem mounted below a user volume makes
+        # unmounting it unsafe. Mount IDs also catch path/namespace aliases.
+        if any(other != mount and (
+            other[1] == mount[0] or other[4] == target
+            or other[4].startswith(target + "/")
+        ) for other in mounts):
+            raise Failure("Nested or overmounted storage cannot be erased")
+    return sorted(selected)
+
+
+def assess(state, item, allow_user_mounts=False):
     nodes, graph, mounted, swap = state
     if item.get("type") != "disk":
         raise Failure("Only whole physical disks can be initialized")
@@ -207,7 +265,7 @@ def assess(state, item):
     if size > MAX_SIZE or sector != 512 or size // sector > 0xFFFFFFFF:
         raise Failure("MBR/FAT32 requires a 512-byte-sector disk smaller than 2 TiB")
     family = connected(graph, item["maj:min"])
-    if family & mounted:
+    if family & mounted and not allow_user_mounts:
         raise Failure("Disk or related storage is mounted (including system storage)")
     if family & swap:
         raise Failure("Disk or related storage is active swap")
@@ -219,23 +277,35 @@ def assess(state, item):
             raise Failure("Disk is used by encrypted, LVM, RAID or mapped storage")
         if forbidden_signature(node.get("fstype")):
             raise Failure("Encrypted, LVM, RAID or swap signatures cannot be erased")
+        if allow_user_mounts:
+            if devno != item["maj:min"] and (
+                node.get("type") != "part"
+                or graph.get(devno) != {item["maj:min"]}
+            ):
+                raise Failure("Disk has related backing storage; cannot erase")
+            if node.get("ro") or read_text(
+                Path(f"/sys/dev/block/{devno}") / "ro",
+            ).strip() != "0":
+                raise Failure("Related storage is read-only")
+    if allow_user_mounts:
+        user_mounts(state, item)
     return identity
 
 
-def select(state, device, expected):
+def select(state, device, expected, allow_user_mounts=False):
     if not DEVICE.fullmatch(device):
         raise Failure("Specify a canonical whole disk device")
     matches = [item for item in state[0].values() if item["name"] == device]
     if len(matches) != 1:
         raise Failure("Disk disappeared or changed; list disks again")
     item = matches[0]
-    identity = assess(state, item)
+    identity = assess(state, item, allow_user_mounts)
     if identity != expected:
         raise Failure("Disk identity changed (possibly unplugged/replugged); list disks again")
     return item
 
 
-def listing():
+def listing(allow_user_mounts=False):
     state = snapshot()
     disks = []
     for item in state[0].values():
@@ -254,7 +324,7 @@ def listing():
         }
         try:
             entry["identity"] = device_info(item)
-            assess(state, item)
+            assess(state, item, allow_user_mounts)
             # Ordinary desktop users usually cannot read raw block devices.
             # Use lsblk/udev metadata then; root initialization always probes.
             family = connected(state[1], item["maj:min"])
@@ -306,10 +376,10 @@ def probe(state, item):
             node["fstype"] = fields["TYPE"]
 
 
-def fresh(device, expected):
+def fresh(device, expected, allow_user_mounts=False):
     try:
         state = snapshot()
-        return state, select(state, device, expected)
+        return state, select(state, device, expected, allow_user_mounts)
     except OSError as error:
         raise Failure("Cannot revalidate disk; it may have disappeared or changed. "
                       f"List disks again: {error}") from error
@@ -326,9 +396,100 @@ def initialize(device, expected):
     # This cooperates with udev's shared probe lock and other initializers.
     with opened(device, item["maj:min"], locked=True):
         partition_number = initialize_locked(device, expected)
+    initialized(device, partition_number)
+
+
+def initialized(device, partition_number):
     run(["/usr/bin/udevadm", "trigger", "--action=change", "--settle",
          f"/sys/dev/block/{partition_number}"])
     print(json.dumps({"version": 1, "device": device, "initialized": True}))
+
+
+def check_pinned(fd, devno, sequence):
+    info = os.fstat(fd)
+    number = f"{os.major(info.st_rdev)}:{os.minor(info.st_rdev)}"
+    if (not stat.S_ISBLK(info.st_mode) or number != devno
+            or struct.unpack("=Q", fcntl.ioctl(
+                fd, BLKGETDISKSEQ, bytes(8),
+            ))[0] != sequence):
+        raise Failure("Pinned disk identity changed; list disks again")
+
+
+@contextlib.contextmanager
+def opened_mount(mount):
+    # Verify both the backing device and mount ID. Close this descriptor
+    # before umount: even O_PATH references can make a normal unmount busy.
+    fd = os.open(mount[4], os.O_PATH | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    try:
+        info = os.fstat(fd)
+        number = f"{os.major(info.st_dev)}:{os.minor(info.st_dev)}"
+        fields = dict(line.split(":", 1) for line in read_text(
+            f"/proc/self/fdinfo/{fd}",
+        ).splitlines() if ":" in line)
+        if number != mount[2] or fields.get("mnt_id", "").strip() != mount[0]:
+            raise Failure("Mount identity changed; list disks again")
+        yield fd
+    finally:
+        os.close(fd)
+
+
+def erase_topology(state, item):
+    family = connected(state[1], item["maj:min"])
+    return sorted(
+        (number, state[0][number]["name"], state[0][number]["type"],
+         state[0][number].get("size"), state[0][number].get("ro"),
+         tuple(sorted(state[1].get(number, ()))))
+        for number in family
+    )
+
+
+def erase(device, expected):
+    if os.geteuid() != 0:
+        raise Failure("Erasing requires administrator authentication via pkexec")
+    if not re.fullmatch(r"[0-9a-f]{64}", expected):
+        raise Failure("Invalid disk identity; list disks again")
+    state, item = fresh(device, expected, allow_user_mounts=True)
+    probe(state, item)
+    topology = erase_topology(state, item)
+    remaining = user_mounts(state, item)
+    sequence = int(read_text(
+        Path(f"/sys/dev/block/{item['maj:min']}") / "diskseq",
+    ).strip())
+
+    def revalidate(disk_fd):
+        current, disk = fresh(device, expected, allow_user_mounts=True)
+        check_pinned(disk_fd, disk["maj:min"], sequence)
+        if (erase_topology(current, disk) != topology
+                or user_mounts(current, disk) != remaining):
+            raise Failure("Mounted disk topology changed; list disks again")
+        return current, disk
+
+    with opened(device, item["maj:min"], locked=True) as disk_fd:
+        revalidate(disk_fd)
+        while remaining:
+            mount = remaining[0]
+            current, disk = revalidate(disk_fd)
+            child = current[0][mount[2]]
+            if os.path.realpath(child["name"]) != child["name"]:
+                raise Failure("Mounted block device changed; list disks again")
+            with opened(child["name"], mount[2]) as child_fd:
+                current, disk = revalidate(disk_fd)
+                check_pinned(child_fd, mount[2], sequence)
+                probe(current, disk)
+                with opened_mount(mount):
+                    revalidate(disk_fd)
+                revalidate(disk_fd)
+                check_pinned(child_fd, mount[2], sequence)
+                run([UMOUNT, "--no-canonicalize", "--internal-only", "--",
+                     mount[4]])
+            remaining = remaining[1:]
+            revalidate(disk_fd)
+        # The strict, existing initializer still requires every related
+        # device to be unmounted and claims the disk exclusively before writes.
+        fresh(device, expected)
+        check_pinned(disk_fd, item["maj:min"], sequence)
+        partition_number = initialize_locked(device, expected)
+    initialized(device, partition_number)
 
 
 def initialize_locked(device, expected):
@@ -401,10 +562,15 @@ def main(args=None):
     try:
         if args == ["list"]:
             print(json.dumps(listing()))
+        elif args == ["list-erasable"]:
+            print(json.dumps(listing(allow_user_mounts=True)))
         elif len(args) == 3 and args[0] == "initialize":
             initialize(args[1], args[2])
+        elif len(args) == 3 and args[0] == "erase":
+            erase(args[1], args[2])
         else:
-            raise Failure("Usage: zacos9-disk-helper list | initialize DEVICE EXPECTED_ID")
+            raise Failure("Usage: zacos9-disk-helper list | list-erasable | "
+                          "initialize DEVICE EXPECTED_ID | erase DEVICE EXPECTED_ID")
         return 0
     except (Failure, OSError, ValueError, KeyError, subprocess.SubprocessError) as error:
         print(f"zacos9-disk-helper: {error}", file=sys.stderr)

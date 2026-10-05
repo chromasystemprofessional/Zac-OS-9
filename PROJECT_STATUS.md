@@ -24,6 +24,20 @@ Updated: 2026-10-05
 
 ## Current work
 
+**Special > Erase Disk** (0.1.13): Select one safe mounted USB disk icon
+to enable Erase Disk. A default-Cancel confirmation identifies the physical disk
+and warns that every partition will be erased. Administrator authorization,
+identity revalidation and non-forced unmounting precede the existing verified
+FAT32/MBR formatter. Finder inhibits automount during the operation, then
+remounts Untitled. Internal/system, encrypted, read-only and unsafe mount
+topologies remain excluded; automatic unreadable-disk initialization still
+rejects mounted disks. Hardware-free menu, controller and hot-plug regression
+tests cover gating, cancellation, replacement and automount inhibition. No
+physical disk was erased; interactive hardware verification is pending.
+Finder and menu bar build successfully. All five focused suites pass, including
+66 mock-only helper tests and invalid-success/authorization-error controller
+checks. The menu-state parser remains compatible with older Finder messages.
+
 **USB hot-plug discovery fixes** (0.1.12): Finder now services GLib/GIO
 events with a bounded Qt timer, handles volume-changed when an inserted drive
 becomes mountable after volume-added, and registers listeners before startup

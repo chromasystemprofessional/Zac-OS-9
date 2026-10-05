@@ -40,7 +40,8 @@ public:
  *                         move-to-trash, empty-trash, ...)
  *   Finder -> menu bar:  "state selection=<n> window=<0|1> trash=<0|1>
  *                         view=<0 icons|1 list|2 buttons>
- *                         label=<the selection's common label, or -1>"
+ *                         label=<the selection's common label, or -1>
+ *                         erase=<0|1 selected mounted USB disk>"
  */
 class Finder {
 public:

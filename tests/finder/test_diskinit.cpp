@@ -70,7 +70,7 @@ int main(int argc, char **argv) {
 	const QString log = root.path() + "/operations";
 	qputenv("DISK_TEST_CATALOG", fixture.toUtf8());
 	qputenv("DISK_TEST_LOG", log.toUtf8());
-	write(helper, "#!/bin/sh\nif [ \"$1\" = list ]; then cat \"$DISK_TEST_CATALOG\"; "
+	write(helper, "#!/bin/sh\nif [ \"$1\" = list ] || [ \"$1\" = list-erasable ]; then cat \"$DISK_TEST_CATALOG\"; "
 		"else printf '%s\\n' \"$*\" >> \"$DISK_TEST_LOG\"; "
 		"printf '{\"version\":1,\"device\":\"/dev/sdz\",\"initialized\":true}\\n'; fi\n", true);
 	write(authorizer, "#!/bin/sh\nexec \"$@\"\n", true);
@@ -119,6 +119,7 @@ int main(int argc, char **argv) {
 				QThread::msleep(10);
 			}
 			assert(prompts == 0 && read(log).isEmpty());
+			assert(controller.canEraseDevice("/dev/sdz1") == eligible);
 			return;
 		}
 		assert(waitFor([&] { return prompts == 1; }));
@@ -147,8 +148,65 @@ int main(int argc, char **argv) {
 	exercise(DiskInitialization::Ignore, false, false, false, true, false);
 	exercise(DiskInitialization::Ignore, false, false, true, false, false);
 	exercise(DiskInitialization::Initialize, true, false, true, false, true);
+	auto manualErase = [&](bool confirm, bool changed, bool eligible, const QString &device) {
+		QFile::remove(log);
+		QJsonObject current = disk;
+		current["eligible"] = eligible;
+		current["unreadable"] = false;
+		write(fixture, catalog(current));
+		int confirmations = 0, errors = 0, initialized = 0;
+		int inhibited = 0, resumed = 0;
+		DiskInitialization::Interface ui;
+		ui.choose = [](const InitializationDisk &) {
+			assert(!"Manual erase must not use the insertion prompt");
+			return DiskInitialization::Ignore;
+		};
+		ui.confirm = [&](const InitializationDisk &selected) {
+			++confirmations;
+			assert(selected.device == "/dev/sdz");
+			assert(selected.name.startsWith("Untitled on "));
+			if (changed) {
+				current["identity"] = "replacement-device";
+				write(fixture, catalog(current));
+			}
+			return confirm;
+		};
+		ui.error = [&](const QString &) { ++errors; };
+		ui.busy = [](bool) {};
+		ui.initialized = [&](const QString &) { ++initialized; };
+		ui.inhibitMount = [&](const QString &wholeDisk, bool active) {
+			assert(wholeDisk == "/dev/sdz");
+			active ? ++inhibited : ++resumed;
+		};
+		DiskInitialization controller(ui, helper, authorizer, helper);
+		controller.eraseDevice(device, "Untitled");
+		const bool match = device == "/dev/sdz" || device == "/dev/sdz1";
+		if (!eligible || !match) {
+			assert(waitFor([&] { return errors == 1; }));
+			assert(confirmations == 0 && read(log).isEmpty());
+		} else if (!confirm) {
+			assert(waitFor([&] { return confirmations == 1; }));
+			assert(read(log).isEmpty());
+		} else if (changed || invalidSuccess) {
+			assert(waitFor([&] { return errors == 1; }));
+			assert(read(log).isEmpty());
+		} else {
+			assert(waitFor([&] { return initialized == 1; }));
+			assert(read(log) == "erase /dev/sdz original-device\n");
+		}
+		const bool operated = eligible && match && confirm && !changed;
+		assert(inhibited == (operated ? 1 : 0) && resumed == inhibited);
+	};
+	manualErase(true, false, true, "/dev/sdz1");
+	manualErase(false, false, true, "/dev/sdz1");
+	manualErase(true, true, true, "/dev/sdz1");
+	manualErase(true, false, false, "/dev/sdz1");
+	manualErase(true, false, true, "/dev/internal");
 	write(authorizer, "#!/bin/sh\nprintf '{}\\n'\n", true);
 	invalidSuccess = true;
 	exercise(DiskInitialization::Initialize, true, false, true, true, false);
+	manualErase(true, false, true, "/dev/sdz1");
+	write(authorizer, "#!/bin/sh\necho 'Authorization denied' >&2\nexit 1\n", true);
+	manualErase(true, false, true, "/dev/sdz1");
 	return 0;
 }

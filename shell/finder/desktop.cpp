@@ -214,6 +214,7 @@ void Desktop::refreshLocalVolumes() {
 	m_localVolumes = std::move(fresh);
 	placeIcons();
 	update();
+	Finder::instance().notifyState();
 }
 
 std::vector<Item *> Desktop::fixedItems() const {

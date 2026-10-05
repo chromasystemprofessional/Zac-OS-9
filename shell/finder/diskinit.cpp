@@ -86,6 +86,42 @@ void DiskInitialization::mountFailed(const QString &device) {
 	QTimer::singleShot(500, this, &DiskInitialization::scan);
 }
 
+void DiskInitialization::eraseDevice(const QString &device, const QString &volumeName) {
+	if (m_scanning || m_presenting || m_operating) {
+		report("A disk check or operation is already in progress. Please try again.");
+		return;
+	}
+	m_operating = true;
+	run(m_helper, { "list-erasable" }, 15000,
+		[this, device, volumeName](const QByteArray &out, const QString &failure) {
+			QString error = failure;
+			std::vector<InitializationDisk> disks;
+			if (error.isEmpty()) {
+				parseInitializationDisks(out, &disks, &error);
+			}
+			for (InitializationDisk disk : disks) {
+				if (disk.device != device && !disk.children.contains(device)) {
+					continue;
+				}
+				if (!disk.eligible) {
+					break;
+				}
+				disk.name = volumeName.left(80) + " on " + disk.name;
+				m_presenting = true;
+				const bool confirmed = m_interface.confirm(disk);
+				m_presenting = false;
+				if (confirmed) {
+					revalidate(disk, Erase);
+				} else {
+					m_operating = false;
+				}
+				return;
+			}
+			m_operating = false;
+			report(error.isEmpty() ? "This disk cannot be erased. Select a writable USB disk that is not system, encrypted, or otherwise protected storage." : error);
+		});
+}
+
 void DiskInitialization::report(const QString &message) {
 	qWarning().noquote() << "zacos9-finder:" << message;
 	m_interface.error(message);
@@ -132,21 +168,51 @@ void DiskInitialization::scan() {
 	}
 	m_scanning = true;
 	run(m_helper, { "list" }, 15000, [this](const QByteArray &out, const QString &failure) {
-		m_scanning = false;
 		QString error = failure;
 		std::vector<InitializationDisk> disks;
 		if (error.isEmpty()) {
 			parseInitializationDisks(out, &disks, &error);
 		}
 		if (!error.isEmpty()) {
-			if (error != m_lastScanError) {
+			m_scanning = false;
+			if (error != m_lastEraseError) {
 				qWarning().noquote() << "zacos9-finder: Could not check inserted USB disks:" << error;
 			}
 			m_lastScanError = error;
 			return;
 		}
 		m_lastScanError.clear();
-		acceptDisks(disks);
+		run(m_helper, { "list-erasable" }, 15000,
+			[this, disks](const QByteArray &catalog, const QString &failure) {
+				m_scanning = false;
+				QString error = failure;
+				std::vector<InitializationDisk> candidates;
+				if (error.isEmpty()) {
+					parseInitializationDisks(catalog, &candidates, &error);
+				}
+				QSet<QString> available;
+				if (!error.isEmpty()) {
+					if (error != m_lastScanError) {
+						qWarning().noquote() << "zacos9-finder: Could not check erasable USB disks:" << error;
+					}
+					m_lastEraseError = error;
+				} else {
+					m_lastEraseError.clear();
+					for (const auto &disk : candidates) {
+						if (disk.eligible) {
+							available.insert(disk.device);
+							for (const QString &child : disk.children) {
+								available.insert(child);
+							}
+						}
+					}
+				}
+				if (available != m_erasable) {
+					m_erasable = available;
+					m_interface.availabilityChanged();
+				}
+				acceptDisks(disks);
+			});
 	});
 }
 
@@ -185,7 +251,7 @@ void DiskInitialization::acceptDisks(const std::vector<InitializationDisk> &disk
 
 void DiskInitialization::revalidate(const InitializationDisk &disk, Choice choice) {
 	m_operating = true;
-	run(m_helper, { "list" }, 15000,
+	run(m_helper, { choice == Erase ? "list-erasable" : "list" }, 15000,
 		[this, disk, choice](const QByteArray &out, const QString &failure) {
 			QString error = failure;
 			std::vector<InitializationDisk> disks;
@@ -204,17 +270,24 @@ void DiskInitialization::revalidate(const InitializationDisk &disk, Choice choic
 }
 
 void DiskInitialization::operate(const InitializationDisk &disk, Choice choice) {
+	if (choice == Erase) {
+		m_interface.inhibitMount(disk.device, true);
+	}
 	m_interface.busy(true);
-	const QString program = choice == Initialize ? m_authorizer : m_ejector;
-	const QStringList args = choice == Initialize
-		? QStringList{ m_helper, "initialize", disk.device, disk.identity }
+	const bool format = choice == Initialize || choice == Erase;
+	const QString program = format ? m_authorizer : m_ejector;
+	const QStringList args = format
+		? QStringList{ m_helper, choice == Erase ? "erase" : "initialize", disk.device, disk.identity }
 		: QStringList{ "power-off", "--block-device", disk.device };
 	run(program, args, 300000,
 		[this, choice, disk](const QByteArray &out, const QString &failure) {
+			if (choice == Erase) {
+				m_interface.inhibitMount(disk.device, false);
+			}
 			m_interface.busy(false);
 			m_operating = false;
 			QString error = failure;
-			if (error.isEmpty() && choice == Initialize) {
+			if (error.isEmpty() && (choice == Initialize || choice == Erase)) {
 				const QJsonDocument response = QJsonDocument::fromJson(out);
 				const QJsonObject object = response.object();
 				if (!response.isObject() || object.value("version").toInt() != 1 ||
@@ -225,7 +298,7 @@ void DiskInitialization::operate(const InitializationDisk &disk, Choice choice) 
 			}
 			if (!error.isEmpty()) {
 				report(error);
-			} else if (choice == Initialize) {
+			} else if (choice == Initialize || choice == Erase) {
 				m_failed.clear();
 				m_interface.initialized(disk.device);
 			}
@@ -233,6 +306,8 @@ void DiskInitialization::operate(const InitializationDisk &disk, Choice choice) 
 }
 
 namespace {
+DiskInitialization *diskController = nullptr;
+
 class DiskBusy : public QDialog {
 public:
 	DiskBusy() {
@@ -262,7 +337,7 @@ void DiskBusy::closeEvent(QCloseEvent *event) {
 	event->ignore();
 }
 
-void diskInitializationStart() {
+void diskInitializationStart(std::function<void()> availabilityChanged) {
 	auto *busy = new DiskBusy;
 	busy->setParent(nullptr);
 	DiskInitialization::Interface interface;
@@ -277,7 +352,8 @@ void diskInitializationStart() {
 	};
 	interface.confirm = [](const InitializationDisk &disk) {
 		return Alert::choose("Erase ALL files and partitions on " + disk.name.left(80) +
-			" (" + disk.device + ")? This cannot be undone. The disk will become Untitled (FAT32).",
+			" (" + QString::number(disk.size / 1000000000.0, 'f', 1) + " GB, " +
+			disk.device + ")? This cannot be undone. Every volume on this USB disk will be erased, not just the selected volume. The disk will become Untitled (FAT32). Close files on it before continuing.",
 			"Cancel", QString(), "Erase") == Alert::Other;
 	};
 	interface.error = [](const QString &error) { Alert::ask(error, "OK", QString()); };
@@ -288,9 +364,26 @@ void diskInitializationStart() {
 		Alert::ask("The disk has been initialized as Untitled (FAT32). It will appear on the desktop when mounted.",
 			"OK", QString());
 	};
+	interface.availabilityChanged = std::move(availabilityChanged);
+	interface.inhibitMount = localVolumeInhibitMount;
 	auto *controller = new DiskInitialization(std::move(interface),
 		ZACOS9_DISK_HELPER, "pkexec", "udisksctl", qApp);
+	diskController = controller;
 	localVolumesOnMountFailed([controller](const QString &device) { controller->mountFailed(device); });
 	controller->start();
 	QObject::connect(qApp, &QCoreApplication::aboutToQuit, busy, &QObject::deleteLater);
+}
+
+bool diskCanEraseVolume(const QString &mountPath) {
+	return diskController && diskController->canEraseDevice(localVolumeUsbDevice(mountPath));
+}
+
+void diskEraseVolume(const QString &mountPath, const QString &volumeName) {
+	const QString device = localVolumeUsbDevice(mountPath);
+	if (device.isEmpty() || !diskController) {
+		Alert::ask("Select a mounted USB disk to erase. Internal and system disks cannot be erased here.",
+			"OK", QString());
+		return;
+	}
+	diskController->eraseDevice(device, volumeName);
 }

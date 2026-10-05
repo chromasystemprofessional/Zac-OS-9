@@ -17,6 +17,7 @@
 #include "appdb.h"
 #include "fileops.h"
 #include "localvolumes.h"
+#include "diskinit.h"
 #include "netvolumes.h"
 #include "vfs.h"
 
@@ -145,8 +146,11 @@ QString Finder::stateLine() {
 			}
 		}
 	}
-	return QStringLiteral("state selection=%1 window=%2 trash=%3 view=%4 label=%5")
-		.arg(selection).arg(window ? 1 : 0).arg(full ? 1 : 0).arg(list).arg(label);
+	const auto items = v ? v->selectedItems() : std::vector<Item *>{};
+	const bool erase = items.size() == 1 && items[0]->isLocalVolume &&
+		diskCanEraseVolume(items[0]->path);
+	return QStringLiteral("state selection=%1 window=%2 trash=%3 view=%4 label=%5 erase=%6")
+		.arg(selection).arg(window ? 1 : 0).arg(full ? 1 : 0).arg(list).arg(label).arg(erase ? 1 : 0);
 }
 
 void Finder::notifyState() {
@@ -173,6 +177,13 @@ void Finder::command(const QString &name) {
 		moveSelectionToTrash();
 	} else if (name == "empty-trash") {
 		emptyTrash();
+	} else if (name == "erase-disk") {
+		const auto items = front() ? front()->selectedItems() : std::vector<Item *>{};
+		if (items.size() != 1 || !items[0]->isLocalVolume) {
+			Alert::ask("Select one USB disk on the desktop to erase.", "OK", QString());
+		} else {
+			diskEraseVolume(items[0]->path, items[0]->name);
+		}
 	} else if (name == "get-info") {
 		getInfo();
 	} else if (name == "get-info-sharing") {

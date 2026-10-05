@@ -140,6 +140,7 @@ struct finder_state {
 	bool connected;
 	int selection, window, trash, view;
 	int label; /* the selection's common label index, or -1 */
+	int erase; /* exactly one mounted USB disk is selected */
 };
 
 bool finder_connect(void);

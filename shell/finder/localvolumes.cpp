@@ -40,6 +40,46 @@ static bool isNetworkMount(const QString &path) {
 	return false;
 }
 
+QString localVolumeUsbDevice(const QString &mountPath) {
+	QString device;
+	GVolumeMonitor *monitor = g_volume_monitor_get();
+	GList *mounts = g_volume_monitor_get_mounts(monitor);
+	for (GList *item = mounts; item; item = item->next) {
+		auto *mount = G_MOUNT(item->data);
+		GFile *root = g_mount_get_root(mount);
+		char *path = g_file_get_path(root);
+		g_object_unref(root);
+		const bool matches = path && mountPath == QString::fromUtf8(path);
+		g_free(path);
+		if (!matches) {
+			continue;
+		}
+		GVolume *volume = g_mount_get_volume(mount);
+		if (!volume) {
+			break;
+		}
+		char *rawDevice = g_volume_get_identifier(volume, G_VOLUME_IDENTIFIER_KIND_UNIX_DEVICE);
+		const QString candidate = QString::fromUtf8(rawDevice ? rawDevice : "");
+		g_free(rawDevice);
+		g_object_unref(volume);
+		if (!candidate.startsWith("/dev/") || candidate.contains("/../")) {
+			break;
+		}
+		QString sysPath = QFileInfo("/sys/class/block/" + QFileInfo(candidate).fileName()).canonicalFilePath();
+		while (!sysPath.isEmpty() && sysPath != "/") {
+			if (QFileInfo(sysPath + "/subsystem").canonicalFilePath() == "/sys/bus/usb") {
+				device = candidate;
+				break;
+			}
+			sysPath = QFileInfo(sysPath).absolutePath();
+		}
+		break;
+	}
+	g_list_free_full(mounts, g_object_unref);
+	g_object_unref(monitor);
+	return device;
+}
+
 std::vector<LocalVolume> localVolumes() {
 	std::vector<LocalVolume> out;
 
@@ -123,7 +163,27 @@ void localVolumesOnChange(std::function<void()> f) {
 
 static QSet<QString> g_tried; /* volumes already mounted once, by device */
 static QSet<QString> g_mounting;
+static QSet<QString> g_erasing;
 static std::vector<std::function<void(const QString &)>> g_mountFailed;
+
+static bool belongsToDevice(const QString &path, const QString &device) {
+	const QString suffix = path.mid(device.size());
+	const QString number = suffix.startsWith('p') ? suffix.mid(1) : suffix;
+	bool partition = path.startsWith(device) && !number.isEmpty();
+	for (QChar c : number) {
+		partition = partition && c.isDigit();
+	}
+	return path == device || partition;
+}
+
+void localVolumeInhibitMount(const QString &device, bool inhibit) {
+	if (inhibit) {
+		g_erasing.insert(device);
+	} else {
+		g_erasing.remove(device);
+		localVolumeMountDevice(device);
+	}
+}
 
 void localVolumesOnMountFailed(std::function<void(const QString &)> f) {
 	g_mountFailed.push_back(std::move(f));
@@ -178,6 +238,11 @@ static void mountIfNeeded(GVolume *v) {
 	}
 	const QString key = QString::fromUtf8(dev);
 	g_free(dev);
+	for (const QString &device : g_erasing) {
+		if (belongsToDevice(key, device)) {
+			return;
+		}
+	}
 	if (g_tried.contains(key) || g_mounting.contains(key)) {
 		return;
 	}
@@ -206,15 +271,7 @@ void localVolumeMountDevice(const QString &device) {
 		char *raw = g_volume_get_identifier(volume, G_VOLUME_IDENTIFIER_KIND_UNIX_DEVICE);
 		const QString path = QString::fromUtf8(raw ? raw : "");
 		g_free(raw);
-		/* Partition names append digits, or p plus digits for NVMe/MMC. */
-		const QString suffix = path.mid(device.size());
-		bool partition = path.startsWith(device) && !suffix.isEmpty();
-		const QString number = suffix.startsWith('p') ? suffix.mid(1) : suffix;
-		for (QChar c : number) {
-			partition = partition && c.isDigit();
-		}
-		partition = partition && !number.isEmpty();
-		if (path == device || partition) {
+		if (belongsToDevice(path, device)) {
 			g_tried.remove(path);
 			mountIfNeeded(volume);
 		}

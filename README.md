@@ -148,7 +148,7 @@ is kept. 7z support uses `python3-libarchive-c`; StuffIt (`.sit`) support uses
 Unsafe StuffIt paths, links, and special entries are rejected before extraction.
 Password-protected archives are reported as unsupported rather than prompting.
 
-### Unreadable USB disks
+### USB disk initialization and erasing
 
 Sniffer automatically mounts newly inserted volumes once GIO reports them
 ready and displays mounted disks, including those under `/run/media`. A disk
@@ -162,9 +162,19 @@ including every partition, then creates an MBR partition table with one
 **FAT32** volume named **Untitled**. Cancel is the default on the erase
 confirmation; administrator authentication is required.
 
+To reformat a readable USB disk, select its disk icon on the desktop and choose
+**Special > Erase Disk…**. This erases the **whole physical USB disk**, including
+other partitions, and creates the same **Untitled (FAT32)** volume. Back up
+everything first and close files on every volume on that disk. Cancel is the
+default; administrator authorization is required. The helper unmounts the disk's
+volumes without force and stops if they are busy or the disk's identity changes.
+Finder pauses automatic mounting for that disk during erasing and remounts it
+afterward. Only safe USB disks mounted beneath `/media` or `/run/media` are
+eligible; internal, system, encrypted and read-only disks are excluded.
+
 Never initialize a disk containing files you need to recover. This is not a
-repair tool. Mounted, system, encrypted, read-only and other unsafe disks are
-excluded. Hardware that Linux cannot detect cannot be initialized this way.
+repair tool. Automatic initialization excludes mounted disks. Hardware that
+Linux cannot detect cannot be initialized this way.
 FAT32 limits individual files to less than 4 GiB; the formatter only accepts
 disk sizes compatible with its FAT32/MBR layout.
 

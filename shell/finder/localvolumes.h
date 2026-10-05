@@ -22,6 +22,9 @@ struct LocalVolume {
 
 bool localVolumePathShown(const QString &path);
 
+/* Selected mounted volume's block device, only when backed by physical USB. */
+QString localVolumeUsbDevice(const QString &mountPath);
+
 /* Every real storage volume mounted right now, except / and network mounts. */
 std::vector<LocalVolume> localVolumes();
 
@@ -46,6 +49,7 @@ void localVolumesOnMountFailed(std::function<void(const QString &)> f);
 
 /* Retry mounting the newly initialized disk, without retrying other volumes. */
 void localVolumeMountDevice(const QString &device);
+void localVolumeInhibitMount(const QString &device, bool inhibit);
 
 /* Ejects or unmounts `v` asynchronously. Returns false immediately if
  * no matching GMount can be found; the actual unmount happens on the

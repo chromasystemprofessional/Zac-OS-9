@@ -57,6 +57,12 @@ install_data('wine/zacos9-wine', install_dir: get_option('bindir'),
 # Finder's desktop entries too.
 gio = dependency('gio-2.0')
 
+test('erase-disk-menu',
+  executable('test-erase-menu', 'menubar/test_erase_menu.c',
+    dependencies: [platinum_dep, wayland_client],
+    c_args: ['-ffunction-sections', '-fdata-sections'],
+    link_args: ['-Wl,--gc-sections']))
+
 # platinum-shell-v1: the menu bar (front window's pid) and the Finder.
 finder_protocol = []
 foreach kind : [['client-header', '@BASENAME@-client-protocol.h'], ['private-code', '@BASENAME@-protocol.c']]

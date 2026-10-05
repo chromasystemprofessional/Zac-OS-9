@@ -21,18 +21,22 @@ bool parseInitializationDisks(const QByteArray &data,
 
 class DiskInitialization : public QObject {
 public:
-	enum Choice { Ignore, Eject, Initialize };
+	enum Choice { Ignore, Eject, Initialize, Erase };
 	struct Interface {
 		std::function<Choice(const InitializationDisk &)> choose;
 		std::function<bool(const InitializationDisk &)> confirm;
 		std::function<void(const QString &)> error;
 		std::function<void(bool)> busy;
 		std::function<void(const QString &)> initialized;
+		std::function<void()> availabilityChanged = [] {};
+		std::function<void(const QString &, bool)> inhibitMount = [](const QString &, bool) {};
 	};
 	DiskInitialization(Interface interface, QString helper, QString authorizer,
 		QString ejector, QObject *parent = nullptr);
 	void start();
 	void mountFailed(const QString &device);
+	void eraseDevice(const QString &device, const QString &volumeName);
+	bool canEraseDevice(const QString &device) const { return m_erasable.contains(device); }
 
 private:
 	void scan();
@@ -45,9 +49,11 @@ private:
 	Interface m_interface;
 	QString m_helper, m_authorizer, m_ejector;
 	QTimer m_scanTimer;
-	QSet<QString> m_seen, m_failed;
+	QSet<QString> m_seen, m_failed, m_erasable;
 	bool m_scanning = false, m_operating = false, m_presenting = false;
-	QString m_lastScanError;
+	QString m_lastScanError, m_lastEraseError;
 };
 
-void diskInitializationStart();
+void diskInitializationStart(std::function<void()> availabilityChanged);
+void diskEraseVolume(const QString &mountPath, const QString &volumeName);
+bool diskCanEraseVolume(const QString &mountPath);

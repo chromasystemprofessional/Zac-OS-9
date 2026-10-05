@@ -39,7 +39,7 @@ int main(int argc, char *argv[]) {
 	QApplication::setDoubleClickInterval(pl_double_click_ms()); /* the Mouse panel's */
 	QApplication::setQuitOnLastWindowClosed(false);
 	platinumShellInit();
-	diskInitializationStart();
+	diskInitializationStart([] { Finder::instance().notifyState(); });
 
 	QScreen *screen = QGuiApplication::primaryScreen();
 	const auto makeDesktop = [screen] {

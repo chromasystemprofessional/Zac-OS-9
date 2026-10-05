@@ -60,6 +60,12 @@ def result(stdout="", code=0, stderr=""):
     return SimpleNamespace(stdout=stdout, returncode=code, stderr=stderr)
 
 
+def mount(devno="8:17", target="/media/user/USB", root="/", identifier="20",
+          parent="1"):
+    return (identifier, parent, devno, root, target,
+            f"{identifier} {parent} {devno} {root} {target} rw - vfat /dev/sdb1 rw")
+
+
 class SafetyTests(unittest.TestCase):
     def setUp(self):
         self.info = patch.object(helper, "device_info", return_value=TOKEN).start()
@@ -194,6 +200,95 @@ class SafetyTests(unittest.TestCase):
             disk(tran="sata"), part(),
         )):
             self.assertEqual(helper.listing(), {"version": 1, "disks": []})
+
+    def manual_state(self, targets=("/media/user/USB",), **changes):
+        return state(disk(), part(mountpoints=list(targets), fstype="vfat", **changes),
+                     mounted=["8:17"])
+
+    def test_manual_listing_same_schema_but_mounted_user_volume_eligible(self):
+        for target in ("/media/user/USB", "/run/media/user/USB", "/media/USB space"):
+            with patch.object(helper, "snapshot", return_value=self.manual_state((target,))), \
+                    patch.object(helper, "mount_table", return_value=[mount(target=target)]), \
+                    patch.object(helper.os.path, "realpath", side_effect=lambda path: path):
+                automatic = helper.listing()["disks"][0]
+                manual = helper.listing(allow_user_mounts=True)["disks"][0]
+                self.assertEqual(manual.keys(), automatic.keys())
+                self.assertEqual(manual["identity"], TOKEN)
+                self.assertEqual(manual["children"], ["/dev/sdb1"])
+                self.assertTrue(manual["eligible"])
+                self.assertFalse(manual["unreadable"])
+                self.assertFalse(automatic["eligible"])
+
+    def test_manual_rejects_all_system_nonuser_and_noncanonical_mounts(self):
+        for target in ("/", "/boot", "/boot/efi", "/home", "/var", "/mnt/usb",
+                       "/media", "/run/media", "/media-other/usb", "/run/media2/usb",
+                       "/media/user/../usb", "/media/user/usb/"):
+            with self.subTest(target=target), \
+                    patch.object(helper, "mount_table", return_value=[mount(target=target)]):
+                with self.assertRaises(helper.Failure):
+                    helper.select(self.manual_state((target,)), "/dev/sdb", TOKEN, True)
+
+    def test_manual_rejects_bind_alias_even_when_user_alias_appears_first(self):
+        for target in ("/", "/boot", "/home", "/media/user/alias"):
+            mounts = [mount(), mount(target=target, identifier="21")]
+            with patch.object(helper, "mount_table", return_value=mounts):
+                with self.assertRaisesRegex(helper.Failure, "System|bind|topology"):
+                    helper.select(self.manual_state(("/media/user/USB", target)),
+                                  "/dev/sdb", TOKEN, True)
+        with patch.object(helper, "mount_table", return_value=[mount(root="/folder")]):
+            with self.assertRaisesRegex(helper.Failure, "bind"):
+                helper.select(self.manual_state(), "/dev/sdb", TOKEN, True)
+
+    def test_manual_rejects_nested_foreign_mounts_and_overmounts(self):
+        for other in (mount(devno="8:1", target="/media/user/USB/child",
+                            identifier="21", parent="20"),
+                      mount(devno="8:1", target="/elsewhere", identifier="21", parent="20"),
+                      mount(devno="8:1", identifier="21")):
+            with patch.object(helper, "mount_table", return_value=[mount(), other]):
+                with self.assertRaisesRegex(helper.Failure, "Nested|overmounted"):
+                    helper.select(self.manual_state(), "/dev/sdb", TOKEN, True)
+
+    def test_manual_rejects_unknown_or_inconsistent_mount_metadata(self):
+        for mounts, targets in [([], ["/media/user/USB"]), ([mount()], []),
+                                ([mount()], ["/media/user/other"])]:
+            with patch.object(helper, "mount_table", return_value=mounts):
+                with self.assertRaisesRegex(helper.Failure, "topology"):
+                    helper.select(self.manual_state(targets), "/dev/sdb", TOKEN, True)
+        with patch.object(helper, "mount_table", return_value=[mount()]), \
+                patch.object(helper.os.path, "realpath", return_value="/elsewhere"):
+            with self.assertRaises(helper.Failure):
+                helper.select(self.manual_state(), "/dev/sdb", TOKEN, True)
+
+    def test_manual_retains_all_storage_protections(self):
+        unsafe = [
+            state(disk(ro=True)), state(disk(size=helper.MIN_SIZE - 1)),
+            state(disk(size=helper.MAX_SIZE)), state(disk(**{"log-sec": 4096})),
+            state(disk(), part(ro=True)),
+            state(disk(), part(), swap=["8:17"]),
+            state(extra_edges=[("8:16", "253:0")]),
+            state(disk(), disk(name="/dev/sdc", **{"maj:min": "8:32"}),
+                  extra_edges=[("8:16", "8:32")]),
+        ]
+        for fs in ("crypto_LUKS", "BitLocker", "LVM2_member", "linux_raid_member",
+                   "swap", "zfs_member", "bcache"):
+            unsafe.append(state(disk(), part(fstype=fs)))
+        for kind in ("crypt", "lvm", "raid1", "dm", "loop"):
+            unsafe.append(state(disk(), part(type=kind)))
+        with patch.object(helper, "mount_table", return_value=[]):
+            for system in unsafe:
+                with self.subTest(system=system), self.assertRaises(helper.Failure):
+                    helper.select(system, "/dev/sdb", TOKEN, True)
+            self.info.side_effect = helper.Failure("Only physical USB disks")
+            with self.assertRaisesRegex(helper.Failure, "USB"):
+                helper.select(state(disk(tran="sata")), "/dev/sdb", TOKEN, True)
+
+    def test_manual_unmounted_candidate_and_changed_identity(self):
+        with patch.object(helper, "mount_table", return_value=[]):
+            self.assertEqual(helper.select(state(), "/dev/sdb", TOKEN, True)["name"],
+                             "/dev/sdb")
+            self.info.return_value = "b" * 64
+            with self.assertRaisesRegex(helper.Failure, "identity changed"):
+                helper.select(state(), "/dev/sdb", TOKEN, True)
 
 
 class IdentityTests(unittest.TestCase):
@@ -570,7 +665,291 @@ class InitializeTests(unittest.TestCase):
             self.invoke()
 
 
+class EraseTests(unittest.TestCase):
+    opened = InitializeTests.opened
+    destructive = InitializeTests.destructive
+
+    def setUp(self):
+        self.mounts = [mount()]
+        self.mount_open = False
+        InitializeTests.setUp(self)
+        patch.object(helper, "mount_table", side_effect=lambda: list(self.mounts)).start()
+        self.pin = patch.object(helper, "check_pinned").start()
+        patch.object(helper, "opened_mount", side_effect=self.opened_mount).start()
+
+    def snapshot(self):
+        targets = [entry[4] for entry in self.mounts]
+        return state(disk(), part(fstype="vfat", mountpoints=targets),
+                     mounted=["8:17"] if targets else [])
+
+    @contextlib.contextmanager
+    def opened_mount(self, entry):
+        self.mount_open = True
+        try:
+            yield 43
+        finally:
+            self.mount_open = False
+
+    def command(self, argv, **kwargs):
+        if argv[0] == helper.UMOUNT:
+            self.assertFalse(self.mount_open, "mount descriptor would make umount busy")
+            self.mounts = self.mounts[1:]
+        return InitializeTests.command(self, argv, **kwargs)
+
+    def invoke(self, expected=TOKEN):
+        with contextlib.redirect_stdout(io.StringIO()) as output:
+            helper.erase("/dev/sdb", expected)
+        return json.loads(output.getvalue())
+
+    def test_erase_unmounts_before_existing_initializer_and_reports_same_success(self):
+        self.assertEqual(self.invoke(),
+                         {"version": 1, "device": "/dev/sdb", "initialized": True})
+        commands = [argv for argv, _ in self.commands]
+        unmount = [helper.UMOUNT, "--no-canonicalize", "--internal-only",
+                   "--", "/media/user/USB"]
+        self.assertIn(unmount, commands)
+        self.assertLess(commands.index(unmount),
+                        next(i for i, argv in enumerate(commands) if argv[0] == helper.SFDISK))
+        self.assertEqual(next(kwargs for argv, kwargs in self.commands if argv == unmount),
+                         {})
+        self.assertEqual(self.destructive()[1],
+                         [helper.MKFS, "-F", "32", "-n", "Untitled", "/proc/self/fd/42"])
+        self.mock_open.assert_any_call("/dev/sdb", "8:16", locked=True)
+        self.mock_open.assert_any_call("/dev/sdb1", "8:17")
+        self.pin.assert_any_call(42, "8:16", 0)
+        self.pin.assert_any_call(42, "8:17", 0)
+
+    def test_erase_unmounted_disk_does_not_unmount(self):
+        self.mounts.clear()
+        self.assertTrue(self.invoke()["initialized"])
+        self.assertFalse(any(argv[0] == helper.UMOUNT for argv, _ in self.commands))
+
+    def test_erase_whole_disk_filesystem(self):
+        self.mounts = [mount(devno="8:16")]
+        def snapshot():
+            if not self.partitioned:
+                return state(disk(fstype="vfat",
+                                  mountpoints=[entry[4] for entry in self.mounts]),
+                             mounted=["8:16"] if self.mounts else [])
+            return state(disk(), part())
+        self.mock_snapshot.side_effect = snapshot
+        self.assertTrue(self.invoke()["initialized"])
+        self.assertTrue(self.formatted)
+
+    def test_erase_two_mounted_partitions(self):
+        self.mounts.append(mount(devno="8:18", target="/run/media/user/Second",
+                                 identifier="21"))
+        def snapshot():
+            if self.partitioned:
+                return state(disk(), part())
+            items = [disk()]
+            for devno in ("8:17", "8:18"):
+                targets = [entry[4] for entry in self.mounts if entry[2] == devno]
+                items.append(part(name="/dev/sdb1" if devno == "8:17" else "/dev/sdb2",
+                                  mountpoints=targets, **{"maj:min": devno}))
+            return state(*items, mounted=[entry[2] for entry in self.mounts],
+                         extra_edges=[("8:16", "8:18")])
+        self.mock_snapshot.side_effect = snapshot
+        self.assertTrue(self.invoke()["initialized"])
+        self.assertEqual(sum(argv[0] == helper.UMOUNT for argv, _ in self.commands), 2)
+
+    def test_erase_root_and_valid_token_required_before_any_commands(self):
+        for uid, token in ((1000, TOKEN), (0, "bad"), (0, "b" * 64)):
+            with patch.object(helper.os, "geteuid", return_value=uid):
+                with self.assertRaises(helper.Failure):
+                    self.invoke(token)
+            self.assertEqual(self.commands, [])
+
+    def test_busy_unmount_aborts_without_partitioning_or_formatting(self):
+        original = self.command
+        def command(argv, **kwargs):
+            if argv[0] == helper.UMOUNT:
+                raise helper.Failure("umount failed: target is busy")
+            return original(argv, **kwargs)
+        self.mock_run.side_effect = command
+        with self.assertRaisesRegex(helper.Failure, "busy"):
+            self.invoke()
+        self.assertEqual(self.destructive(), [])
+
+    def test_failed_pinned_mount_open_never_unmounts_or_formats(self):
+        with patch.object(helper, "opened_mount", side_effect=helper.Failure(
+            "Mount identity changed",
+        )):
+            with self.assertRaisesRegex(helper.Failure, "Mount identity"):
+                self.invoke()
+        self.assertFalse(any(argv[0] == helper.UMOUNT for argv, _ in self.commands))
+        self.assertEqual(self.destructive(), [])
+
+    def test_successful_unmount_status_without_mount_removal_aborts(self):
+        self.mock_run.side_effect = lambda argv, **kwargs: InitializeTests.command(
+            self, argv, **kwargs,
+        )
+        with self.assertRaisesRegex(helper.Failure, "topology"):
+            self.invoke()
+        self.assertEqual(self.destructive(), [])
+
+    def test_replug_at_each_pre_unmount_validation_aborts_before_unmount(self):
+        for change_at in range(1, 7):
+            self.commands.clear()
+            identities = iter([TOKEN] * (change_at - 1) + ["b" * 64] * 30)
+            with patch.object(helper, "device_info", side_effect=lambda item: next(identities)):
+                with self.assertRaisesRegex(helper.Failure, "identity changed"):
+                    self.invoke()
+            self.assertFalse(any(argv[0] == helper.UMOUNT for argv, _ in self.commands))
+            self.assertEqual(self.destructive(), [])
+
+    def test_replug_after_unmount_never_formats(self):
+        original = self.command
+        def command(argv, **kwargs):
+            value = original(argv, **kwargs)
+            if argv[0] == helper.UMOUNT:
+                helper.device_info.return_value = "b" * 64
+            return value
+        self.mock_run.side_effect = command
+        with self.assertRaisesRegex(helper.Failure, "identity changed"):
+            self.invoke()
+        self.assertEqual(self.destructive(), [])
+
+    def test_changed_pinned_disk_or_partition_never_unmounts(self):
+        for changed in ("8:16", "8:17"):
+            self.commands.clear()
+            def check(fd, devno, sequence):
+                if devno == changed:
+                    raise helper.Failure("Pinned disk identity changed")
+            self.pin.side_effect = check
+            with self.assertRaisesRegex(helper.Failure, "Pinned"):
+                self.invoke()
+            self.assertFalse(any(argv[0] == helper.UMOUNT for argv, _ in self.commands))
+            self.assertEqual(self.destructive(), [])
+
+    def test_mount_identity_or_target_changes_before_unmount_abort(self):
+        for changed in (mount(identifier="22"), mount(target="/media/user/Other"),
+                        mount(root="/subdir"), mount(target="/home")):
+            self.commands.clear()
+            self.mounts = [mount()]
+            count = 0
+            def mounts():
+                nonlocal count
+                count += 1
+                if count >= 4:
+                    self.mounts = [changed]
+                return list(self.mounts)
+            with patch.object(helper, "mount_table", side_effect=mounts):
+                with self.assertRaises(helper.Failure):
+                    self.invoke()
+            self.assertFalse(any(argv[0] == helper.UMOUNT for argv, _ in self.commands))
+            self.assertEqual(self.destructive(), [])
+
+    def test_new_mount_or_child_after_unmount_aborts(self):
+        for add_mount in (True, False):
+            self.commands.clear()
+            self.mounts = [mount()]
+            original = self.command
+            def command(argv, **kwargs):
+                value = original(argv, **kwargs)
+                if argv[0] == helper.UMOUNT:
+                    if add_mount:
+                        self.mounts = [mount(target="/media/user/New", identifier="22")]
+                    else:
+                        self.mock_snapshot.side_effect = lambda: state(
+                            disk(), part(), part(name="/dev/sdb2", **{"maj:min": "8:18"}),
+                            extra_edges=[("8:16", "8:18")],
+                        )
+                return value
+            self.mock_run.side_effect = command
+            with self.assertRaisesRegex(helper.Failure, "topology"):
+                self.invoke()
+            self.assertEqual(self.destructive(), [])
+
+    def test_probe_forbidden_signature_before_unmount_never_unmounts(self):
+        self.mock_run.side_effect = lambda argv, **kwargs: result("TYPE=crypto_LUKS\n")
+        with self.assertRaisesRegex(helper.Failure, "signatures"):
+            self.invoke()
+        self.assertEqual(self.destructive(), [])
+        self.assertEqual(self.mounts, [mount()])
+
+    def test_probe_failure_and_new_signature_at_final_unmount_check_abort(self):
+        for fail_probe in (True, False):
+            self.commands.clear()
+            count = 0
+            def command(argv, **kwargs):
+                nonlocal count
+                if argv[0] == helper.BLKID:
+                    count += 1
+                    if count >= 3:
+                        if fail_probe:
+                            raise helper.Failure("blkid failed")
+                        return result("TYPE=BitLocker\n")
+                return self.command(argv, **kwargs)
+            self.mock_run.side_effect = command
+            with self.assertRaisesRegex(helper.Failure, "blkid|signatures"):
+                self.invoke()
+            self.assertFalse(any(argv[0] == helper.UMOUNT for argv, _ in self.commands))
+            self.assertEqual(self.destructive(), [])
+
+
 class RunnerTests(unittest.TestCase):
+    def test_mountinfo_decodes_escapes_retains_aliases_and_rejects_malformed_input(self):
+        text = ("1 0 8:17 / /media/user/USB\\040disk rw - vfat /dev/sdb1 rw\n"
+                "2 0 8:17 / /home rw - vfat /dev/sdb1 rw\n")
+        with patch.object(helper, "read_text", return_value=text):
+            mounts = helper.mount_table()
+        self.assertEqual(mounts[0][4], "/media/user/USB disk")
+        self.assertEqual(mounts[1][4], "/home")
+        for text in ("bad", "1 0 8:17 / /media/USB rw\n",
+                     "1 0 bad / /media/USB rw - vfat /dev/sdb1 rw\n",
+                     "1 0 8:17 / relative rw - vfat /dev/sdb1 rw\n",
+                     mount()[5] + "\n" + mount()[5]):
+            with patch.object(helper, "read_text", return_value=text):
+                with self.assertRaises(helper.Failure):
+                    helper.mount_table()
+
+    def test_pinned_fd_disk_sequence_and_device_number_must_match(self):
+        info = SimpleNamespace(st_mode=stat.S_IFBLK, st_rdev=os.makedev(8, 16))
+        with patch.object(helper.os, "fstat", return_value=info), \
+                patch.object(helper.fcntl, "ioctl", return_value=helper.struct.pack("=Q", 10)) \
+                as ioctl:
+            helper.check_pinned(4, "8:16", 10)
+            ioctl.assert_called_with(4, helper.BLKGETDISKSEQ, bytes(8))
+            for number, sequence in (("8:32", 10), ("8:16", 11)):
+                with self.assertRaises(helper.Failure):
+                    helper.check_pinned(4, number, sequence)
+            info.st_mode = stat.S_IFREG
+            with self.assertRaises(helper.Failure):
+                helper.check_pinned(4, "8:16", 10)
+
+    def test_opened_mount_pins_original_mount_id_and_backing_device(self):
+        info = SimpleNamespace(st_dev=os.makedev(8, 17))
+        with patch.object(helper.os, "open", return_value=4) as opened, \
+                patch.object(helper.os, "fstat", return_value=info), \
+                patch.object(helper.os, "close") as closed, \
+                patch.object(helper, "read_text", return_value="mnt_id:\t20\n") as read:
+            with helper.opened_mount(mount()) as fd:
+                self.assertEqual(fd, 4)
+            read.assert_called_once_with("/proc/self/fdinfo/4")
+            flags = opened.call_args.args[1]
+            self.assertTrue(flags & os.O_PATH)
+            self.assertTrue(flags & os.O_NOFOLLOW)
+            closed.assert_called_once_with(4)
+            for entry in (mount(identifier="21"), mount(devno="8:18")):
+                with self.assertRaisesRegex(helper.Failure, "Mount identity"):
+                    with helper.opened_mount(entry):
+                        self.fail("must not accept replacement mount")
+
+    def test_manual_cli_contract_and_exact_arguments(self):
+        with patch.object(helper, "listing", return_value={"version": 1, "disks": []}) \
+                as listing, contextlib.redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(helper.main(["list-erasable"]), 0)
+            listing.assert_called_once_with(allow_user_mounts=True)
+            self.assertEqual(json.loads(output.getvalue()), {"version": 1, "disks": []})
+        with patch.object(helper, "erase") as erase:
+            self.assertEqual(helper.main(["erase", "/dev/sdb", TOKEN]), 0)
+            erase.assert_called_once_with("/dev/sdb", TOKEN)
+        for args in (["erase"], ["erase", "/dev/sdb"],
+                     ["erase", "/dev/sdb", TOKEN, "extra"], ["list-erasable", "extra"]):
+            with contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(helper.main(args), 1)
+
     def test_policy_is_specific_to_installed_helper_and_requires_admin(self):
         directory = Path(helper_path).parent
         policy = ET.parse(directory / "org.zacos9.disks.policy.in").getroot()

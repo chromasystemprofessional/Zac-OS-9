@@ -122,6 +122,7 @@ static void add_finder_menus(struct mb_menu *menus, int *n) {
 	add(arrange->submenu, "by Label", 0, iconView, ACT_FINDER, "arrange label");
 	m = new_menu(menus, n, "Special");
 	add(m, "Empty Trash…", 0, up && fs->trash, ACT_FINDER, "empty-trash");
+	add(m, "Erase Disk…", 0, up && fs->erase && fs->selection == 1, ACT_FINDER, "erase-disk");
 	/* ZacOS 9's own: brings back applications hidden from Applications
 	 * (Move To Trash on one hides it, rather than touching the package
 	 * it belongs to). No Mac OS 9 original had this, because there the
