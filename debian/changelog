@@ -1,3 +1,11 @@
+zacos9 (0.1.9) trixie; urgency=medium
+
+  * Add Fetch Software and New Tricks to the Apple menu. Expand the
+    software catalog with optional sources, add appearance presets and
+    sound themes, and improve Finder archive and file handling.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Mon, 05 Oct 2026 15:34:16 -0400
+
 zacos9 (0.1.8) trixie; urgency=medium
 
   * Fix badly stuttering HDMI and DisplayPort sound on computers with Intel
