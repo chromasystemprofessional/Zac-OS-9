@@ -1,0 +1,46 @@
+#!/bin/sh
+# zacos9-hda-load: loads snd_hda_intel, the HD Audio driver, on modprobe's
+# behalf (zacos9-hda.conf), with the position fix Haswell's HDMI audio needs.
+#
+# The HDMI/DisplayPort audio controller in Intel's Haswell graphics
+# (8086:0a0c, 0c0c, 0d0c) reports its playback position from a position
+# buffer that runs ahead of the sound actually sent: in bursts the pointer
+# leaps thousands of frames, the kernel logs "Unstable LPIB", PipeWire sees
+# an underrun and restarts the stream, and HDMI sound stutters badly while
+# analog sound (another controller) plays cleanly. Linux already reads the
+# link position (LPIB) instead on Broadwell's HDMI controller for the same
+# reason; position_fix=1 does that here, for those controllers only.
+#
+# snd_hda_intel's options are per controller, in the order the driver finds
+# them: PCI order among HD Audio controllers. A position_fix set by the user
+# (modprobe.d or the kernel command line) wins, and so does any failure here:
+# the driver is always loaded.
+#
+# ZACOS9_SYSFS and ZACOS9_MODPROBE are for tests.
+
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+sysfs=${ZACOS9_SYSFS:-/sys}
+modprobe=${ZACOS9_MODPROBE:-/sbin/modprobe}
+
+fix=
+if ! "$modprobe" -c 2>/dev/null |
+	grep -Eq '^options snd[_-]hda[_-]intel( .*)? position_fix='; then
+	values= wanted=
+	for dev in "$sysfs"/bus/pci/devices/*; do
+		case $(cat "$dev/class" 2>/dev/null) in
+		0x0403*) ;;		# an HD Audio controller
+		*) continue ;;
+		esac
+		case $(cat "$dev/vendor" 2>/dev/null):$(cat "$dev/device" 2>/dev/null) in
+		0x8086:0x0a0c|0x8086:0x0c0c|0x8086:0x0d0c)
+			values=$values${values:+,}1
+			wanted=$values ;;
+		*)
+			values=$values${values:+,}-1 ;;
+		esac
+	done
+	# Up to the last controller that needs it; the rest keep the default.
+	[ -n "$wanted" ] && fix=position_fix=$wanted
+fi
+
+exec "$modprobe" --ignore-install snd_hda_intel "$@" $fix

@@ -24,6 +24,18 @@ Updated: 2026-10-05
 
 ## Current work
 
+**HDMI audio on Haswell Macs** (0.1.8): HDMI/DisplayPort sound stuttered
+on the iMac14,1 while analog played cleanly. The Haswell HDMI controller's
+position buffer runs ahead of the sound sent: its pointer leapt 500-2,400
+frames in 1-2 ms and overtook PipeWire about 14 times a second ("Unstable
+LPIB" in the kernel log). PipeWire buffering and interrupt scheduling still
+underran. A modprobe hook (`hardware/zacos9-hda-load`) loads `snd_hda_intel`
+with `position_fix=1` (LPIB) for Haswell HDMI controllers only, as upstream
+already does for Broadwell. `zacos9-gpe-guard.timer` masks ACPI GPEs firing
+over 1,000/s on Macs: GPE 0x06, the graphics SCI, fired ~24,000/s from boot
+and kept `irq/9-acpi` on most of a CPU. `hardware-quirks` covers both against
+a fake /sys. Confirmed on the iMac: HDMI playback is clean after a restart.
+
 **Sniffer multiple selection** (0.1.7): desktop, icon and list views
 support Mac OS-style dotted selection rectangles, Shift-click and Shift-drag
 toggling, and Edit > Select All / Command-A. List rectangles start in blank

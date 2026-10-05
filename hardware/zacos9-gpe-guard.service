@@ -1,0 +1,8 @@
+# Masks ACPI events that fire nonstop on some Macs (zacos9-gpe-guard).
+[Unit]
+Description=Stop ACPI interrupt storms on Macs
+ConditionPathIsDirectory=/sys/firmware/acpi/interrupts
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/zacos9/zacos9-gpe-guard

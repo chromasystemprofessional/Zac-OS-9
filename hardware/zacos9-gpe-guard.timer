@@ -1,0 +1,11 @@
+# Soon after start-up, then every few minutes: a storm can start later,
+# when a display is plugged in.
+[Unit]
+Description=Check for ACPI interrupt storms on Macs
+
+[Timer]
+OnBootSec=15s
+OnUnitActiveSec=5min
+
+[Install]
+WantedBy=timers.target

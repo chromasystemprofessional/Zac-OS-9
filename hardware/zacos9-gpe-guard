@@ -1,0 +1,51 @@
+#!/bin/sh
+# zacos9-gpe-guard: stops ACPI interrupt storms on Macs.
+#
+# Some Macs' firmware leaves an ACPI general-purpose event (GPE) firing
+# nonstop under Linux: on the iMac14,1, GPE 0x06 (the graphics SCI) fires
+# about 24,000 times a second from start-up. The kernel's ACPI interrupt
+# thread then keeps most of a CPU busy at real-time priority, above
+# PipeWire's audio thread. This masks any GPE firing more than $limit times
+# a second, the run-time form of the acpi_mask_gpe= kernel option, and says
+# so in the journal. zacos9-gpe-guard.timer runs it after start-up and every
+# few minutes, for storms that start later (a display plugged in).
+#
+# Apple hardware only: elsewhere a busy GPE may be the embedded controller's,
+# which the kernel looks after itself.
+#
+# ZACOS9_SYSFS and ZACOS9_GPE_SLEEP are for tests.
+
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+sysfs=${ZACOS9_SYSFS:-/sys}
+dir=$sysfs/firmware/acpi/interrupts
+limit=1000	# a second
+seconds=2
+
+case $(cat "$sysfs/class/dmi/id/sys_vendor" 2>/dev/null) in
+Apple*) ;;
+*) exit 0 ;;
+esac
+[ -d "$dir" ] || exit 0
+
+counts() {
+	for f in "$dir"/gpe[0-9A-Fa-f][0-9A-Fa-f]; do
+		[ -r "$f" ] && printf '%s %s\n' "${f##*/}" "$(cat "$f")"
+	done
+}
+
+before=$(counts)
+${ZACOS9_GPE_SLEEP:-sleep} "$seconds"
+counts | while read -r gpe count state; do
+	case " $state " in
+	*" masked "*) continue ;;	# already
+	esac
+	old=$(printf '%s\n' "$before" | awk -v g="$gpe" '$1 == g { print $2 }')
+	[ -n "$old" ] || continue
+	rate=$(( (count - old) / seconds ))
+	[ "$rate" -gt "$limit" ] || continue
+	if echo mask > "$dir/$gpe"; then
+		echo "GPE 0x${gpe#gpe} fired $rate times a second; masked it."
+	else
+		echo "GPE 0x${gpe#gpe} fired $rate times a second; could not mask it." >&2
+	fi
+done

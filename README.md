@@ -20,6 +20,7 @@ software.
 | `docs/` | Roadmap, fidelity references, design notes. |
 | `scripts/` | Build and run helpers; package, ISO and VM scripts. |
 | `session/` | The login session: `zacos9-session` and its `wayland-sessions` entry. |
+| `hardware/` | Hardware quirks: Haswell HDMI audio, ACPI interrupt storms on Macs. |
 | `debian/`, `packaging/`, `iso/` | Debian packaging, the emulator package, the live-build configuration. |
 
 ## Developing on Windows (WSL2 + WSLg)
@@ -81,6 +82,10 @@ Audio-server errors are shown in the panel rather than silently ignored.
 Adjusting Volume previews the selected alert sound once the change succeeds:
 on release when dragging, or after a keyboard adjustment. The preview respects
 Mute, Alert Volume and the "None" alert-sound choice.
+
+On computers with Intel Haswell graphics, such as the iMac14,1, HDMI and
+DisplayPort sound needs a driver setting that ZacOS 9 applies by itself; it
+takes effect after a restart. See [Hardware quirks](docs/hardware.md).
 
 ## Fullscreen applications
 

@@ -15,6 +15,7 @@
 | Platinum look for other apps (GTK 3 theme, Qt 6 style; global menus next) | `share/themes/ZacOS9/`, `shell/qtstyle/` | CSS / C++ — see `docs/app-integration.md` |
 | Classic (SheepShaver) launcher | `shell/classic/` | sh |
 | Session entry | `session/` | sh |
+| Hardware quirks (Haswell HDMI audio, Mac ACPI interrupt storms) | `hardware/` | sh + modprobe.d + systemd — see `docs/hardware.md` |
 | AFP 2.x FUSE client | `network/afp/` | C (libfuse3) |
 | File sharing helper + polkit | `sharing/` | sh + policy XML |
 | Software helper + polkit | `appstore/` | sh + policy XML |
