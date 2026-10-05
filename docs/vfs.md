@@ -18,10 +18,12 @@ the Finder pays for it.
 Zacintosh HD
 ├── System Folder
 │   ├── Appearance        → ~/.local/share/zacos9/appearance
+│   │   └── Desktop Patterns → custom user-created tiles and classic Mac pattern files
 │   ├── Control Panels      (generated: ZacOS 9's control panels)
 │   ├── Extensions
 │   ├── Fonts             → ~/.local/share/fonts
-│   └── Preferences       → ~/.config
+│   ├── Preferences       → ~/.config
+│   └── Wallpaper         → ~/.local/share/zacos9/wallpaper
 ├── Applications            (generated: the installed applications)
 │   └── Mousepad
 │       ├── Mousepad        launches it
@@ -38,6 +40,13 @@ A folder with an arrow stands for a real directory. Opening one opens
 that directory, and from there everything is an ordinary file: the
 virtual layer is only as deep as the curated part. The directory is
 created the first time it is opened if it isn't there yet.
+
+Desktop Patterns is created automatically by the desktop and Appearance panel.
+Registry versions 5 and 6 add Desktop Patterns and the separate Wallpaper
+backed nodes to existing registries without removing user changes. See
+[custom desktop patterns](../README.md#custom-desktop-patterns) and
+[desktop wallpaper](../README.md#desktop-wallpaper) for supported formats,
+placement choices and import limits.
 
 ## How applications are found
 

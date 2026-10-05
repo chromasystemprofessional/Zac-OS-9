@@ -1,4 +1,5 @@
 #include "finder.h"
+#include "platinumshell.h"
 
 #include <QCoreApplication>
 #include <QDir>
@@ -7,6 +8,7 @@
 #include <QProcess>
 #include <QStandardPaths>
 #include <QWidget>
+#include <QTimer>
 
 #include <QDirIterator>
 #include <QUrl>
@@ -300,7 +302,9 @@ void Finder::openItem(Item *item) {
 		} else if (isExpandable(item->path)) {
 			expandArchive(item->path);
 		} else {
-			QProcess::startDetached("xdg-open", { item->path });
+			if (!appOpenFile(item->path)) {
+				Alert::ask(item->name + " could not be opened.", "OK", QString());
+			}
 		}
 	}
 }
@@ -309,7 +313,7 @@ void Finder::openItem(Item *item) {
 
 static bool isExpandable(const QString &path) {
 	const QString lower = path.toLower();
-	for (const char *s : { ".zip", ".tar", ".tgz", ".tar.gz", ".tbz2", ".tar.bz2", ".txz", ".tar.xz" }) {
+	for (const char *s : { ".zip", ".7z", ".tar", ".tgz", ".tar.gz", ".tbz2", ".tar.bz2", ".txz", ".tar.xz" }) {
 		if (lower.endsWith(QLatin1String(s))) {
 			return true;
 		}
@@ -364,8 +368,11 @@ static QString classicLauncher() {
  * installs them, or runs one that needs no installing. */
 void Finder::launchWindows(const QString &exe) {
 	const QString local = QCoreApplication::applicationDirPath() + "/zacos9-wininstall";
-	QProcess::startDetached(QFileInfo(local).isExecutable() ? local : QStringLiteral("zacos9-wininstall"),
-		QStringList{ exe });
+	if (!platinumStartApplication(
+			QFileInfo(local).isExecutable() ? local : QStringLiteral("zacos9-wininstall"),
+			QStringList{ exe })) {
+		Alert::ask("The Windows Installer could not be opened.", "OK", QString());
+	}
 }
 
 void Finder::launchClassic(const QStringList &disks) {
@@ -373,18 +380,39 @@ void Finder::launchClassic(const QStringList &disks) {
 	for (const QString &d : disks) {
 		args << "--disk" << d;
 	}
-	QProcess check;
-	check.start(classicLauncher(), QStringList{ "--check" } + args);
-	if (!check.waitForFinished(15000) || check.exitStatus() != QProcess::NormalExit ||
-			check.exitCode() != 0) {
-		QString why = QString::fromUtf8(check.readAllStandardError()).trimmed();
-		if (why.isEmpty()) {
-			why = "Classic could not be started.";
+	const uint32_t cookie = platinumBeginLaunch();
+	auto *check = new QProcess(QCoreApplication::instance());
+	auto *timeout = new QTimer(check);
+	timeout->setSingleShot(true);
+	QObject::connect(timeout, &QTimer::timeout, check, [check] {
+		check->setProperty("launchTimedOut", true);
+		check->kill();
+	});
+	QObject::connect(check, &QProcess::errorOccurred, check, [check, cookie](QProcess::ProcessError error) {
+		if (error == QProcess::FailedToStart) {
+			platinumCancelLaunch(cookie);
+			Alert::ask("Classic could not be started: " + check->errorString(), "OK", QString());
+			check->deleteLater();
 		}
-		Alert::ask(why, "OK", QString());
-		return;
-	}
-	QProcess::startDetached(classicLauncher(), args);
+	});
+	QObject::connect(check, &QProcess::finished, check,
+		[check, timeout, args, cookie](int code, QProcess::ExitStatus status) {
+			timeout->stop();
+			platinumCancelLaunch(cookie);
+			if (status != QProcess::NormalExit || code != 0) {
+				QString why = QString::fromUtf8(check->readAllStandardError()).trimmed();
+				if (why.isEmpty()) {
+					why = check->property("launchTimedOut").toBool()
+						? "Classic's startup check timed out." : "Classic could not be started.";
+				}
+				Alert::ask(why, "OK", QString());
+			} else if (!platinumStartApplication(classicLauncher(), args)) {
+				Alert::ask("Classic could not be started.", "OK", QString());
+			}
+			check->deleteLater();
+		});
+	check->start(classicLauncher(), QStringList{ "--check" } + args);
+	timeout->start(15000);
 }
 
 static bool isSpecial(const Item *item) {

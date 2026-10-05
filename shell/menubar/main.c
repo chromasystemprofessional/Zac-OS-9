@@ -51,7 +51,7 @@ static struct {
 	struct zwlr_foreign_toplevel_manager_v1 *toplevel_mgr;
 	struct wp_viewporter *viewporter;
 	struct zwp_virtual_keyboard_manager_v1 *vkbd_mgr;
-	struct platinum_shell_v1 *platinum_shell; /* version 2: the front window's pid */
+	struct platinum_shell_v1 *platinum_shell;
 	int scale;
 
 	struct wl_pointer *pointer;
@@ -811,6 +811,40 @@ static const struct platinum_shell_v1_listener shell_listener = {
 	.active_client = shell_active_client,
 };
 
+static void flush_launch_feedback(void) {
+	if (wl_display_flush(g.display) < 0 && errno != EAGAIN) {
+		fprintf(stderr, "Could not send launch feedback: %s\n", strerror(errno));
+	}
+}
+
+uint32_t launch_feedback_begin(void) {
+	if (!g.platinum_shell ||
+			wl_proxy_get_version((struct wl_proxy *)g.platinum_shell) < 3) {
+		return 0;
+	}
+	static uint32_t cookie;
+	if (++cookie == 0) {
+		++cookie;
+	}
+	platinum_shell_v1_begin_launch(g.platinum_shell, cookie, 0, "");
+	flush_launch_feedback();
+	return cookie;
+}
+
+void launch_feedback_update(uint32_t cookie, uint32_t pid) {
+	if (cookie) {
+		platinum_shell_v1_update_launch(g.platinum_shell, cookie, pid);
+		flush_launch_feedback();
+	}
+}
+
+void launch_feedback_cancel(uint32_t cookie) {
+	if (cookie) {
+		platinum_shell_v1_cancel_launch(g.platinum_shell, cookie);
+		flush_launch_feedback();
+	}
+}
+
 /* ---- globals ------------------------------------------------------------- */
 
 static void registry_global(void *data, struct wl_registry *reg, uint32_t name,
@@ -838,7 +872,8 @@ static void registry_global(void *data, struct wl_registry *reg, uint32_t name,
 		g.vkbd_mgr = wl_registry_bind(reg, name,
 			&zwp_virtual_keyboard_manager_v1_interface, 1);
 	} else if (strcmp(iface, platinum_shell_v1_interface.name) == 0 && version >= 2) {
-		g.platinum_shell = wl_registry_bind(reg, name, &platinum_shell_v1_interface, 2);
+		g.platinum_shell = wl_registry_bind(reg, name, &platinum_shell_v1_interface,
+			version < 3 ? version : 3);
 		platinum_shell_v1_add_listener(g.platinum_shell, &shell_listener, NULL);
 	}
 }

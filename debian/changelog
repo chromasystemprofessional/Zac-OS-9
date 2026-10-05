@@ -1,3 +1,17 @@
+zacos9 (0.1.6) trixie; urgency=medium
+
+  * Show an original animated dog cursor during application launches and
+    standard busy states, with readiness tracking and timeout recovery.
+  * Extract 7z archives in place when double-clicked in Sniffer.
+  * Add user-created desktop patterns from image files and classic Mac
+    resource forks, MacBinary, AppleDouble, BinHex and PICT containers.
+  * Add a separate Wallpaper folder and Appearance tab with Fit, Fill,
+    Stretch and Center placement independently on each monitor.
+  * Package archive and image decoding dependencies and add focused
+    cursor, launch, extraction, background import and rendering tests.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Mon, 05 Oct 2026 04:40:46 -0400
+
 zacos9 (0.1.5) trixie; urgency=medium
 
   * Rename user-visible Finder branding to Sniffer while preserving

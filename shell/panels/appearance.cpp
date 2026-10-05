@@ -6,6 +6,7 @@
 #include <QWheelEvent>
 
 #include "patterns.h"
+#include "custompatterns.h"
 #include "settings.h"
 
 /* The window, its tab control, and the layout inside a pane following
@@ -37,7 +38,7 @@ static void setSetting(const char *key, const QString &value) {
 AppearancePanel::AppearancePanel() {
 	setWindowTitle("Appearance");
 	setFixedSize(W, H);
-	for (const char *label : { "Color", "Desktop", "Sound" }) {
+	for (const char *label : { "Color", "Desktop", "Wallpaper", "Sound" }) {
 		m_tabLabels.push_back(std::make_unique<Text>(label, 200, PL_FONT_SYSTEM));
 	}
 
@@ -86,14 +87,33 @@ AppearancePanel::AppearancePanel() {
 	/* Desktop pattern. */
 	m_patterns.frame = QRect(QPoint(BOX_L + ITEM_INSET, ITEM_TOP),
 		QPoint(BOX_L + ITEM_INSET + 170, ITEM_TOP + 8 * PL_LIST_ROW_H + 1));
-	QStringList patterns;
-	for (int i = 0; i < pl_pattern_count(); i++) {
-		patterns << pl_pattern_name(i);
-	}
-	m_patterns.setItems(patterns);
-	m_patterns.select(pl_pattern_find(setting("pattern").toUtf8().constData()), false);
+	loadPatterns();
+	watchDesktopPatterns(this, [this] { loadPatterns(); update(); });
 	m_patterns.picked = [this](int i) {
-		setSetting("pattern", i == 0 ? QString() : QString(pl_pattern_id(i)));
+		setSetting("pattern", i == 0 ? QString() : desktopPatternId(i));
+		setSetting("background", "pattern");
+		update();
+	};
+
+	m_wallpapers.frame = QRect(QPoint(BOX_L + ITEM_INSET, ITEM_TOP),
+		QPoint(BOX_L + ITEM_INSET + 170, ITEM_TOP + 6 * PL_LIST_ROW_H + 1));
+	loadWallpapers();
+	watchDesktopWallpaper(this, [this] { loadWallpapers(); update(); });
+	m_wallpapers.picked = [this](int i) {
+		if (i < desktopWallpaperCount()) {
+			setSetting("wallpaper", desktopWallpaperId(i));
+			setSetting("background", "wallpaper");
+			update();
+		}
+	};
+	m_placement.rect = QRect(BOX_L + 80, m_wallpapers.frame.bottom() + 16, 100, PL_POPUP_H);
+	m_placement.label = "Placement:";
+	m_placement.items = { "Fit", "Fill", "Stretch", "Center" };
+	const QStringList modes{"fit", "fill", "stretch", "center"};
+	m_placement.selected = std::max<int>(0, modes.indexOf(setting("wallpaper-mode")));
+	m_placement.chosen = [this, modes](int i) {
+		m_placement.selected = i;
+		setSetting("wallpaper-mode", modes[i]);
 		update();
 	};
 
@@ -133,8 +153,35 @@ AppearancePanel::AppearancePanel() {
 	m_focus = &m_accents;
 }
 
+void AppearancePanel::loadPatterns() {
+	QStringList names;
+	for (int i = 0; i < desktopPatternCount(); ++i) {
+		names << desktopPatternName(i);
+	}
+	m_patterns.setItems(names);
+	m_patterns.select(desktopPatternFind(setting("pattern")), false);
+	setToolTip("Patterns: " + desktopPatternsFolder() + "\n" +
+		desktopPatternErrors().join('\n') + "\nWallpaper: " + desktopWallpaperFolder() +
+		"\n" + desktopWallpaperErrors().join('\n'));
+}
+
+void AppearancePanel::loadWallpapers() {
+	QStringList names;
+	for (int i = 0; i < desktopWallpaperCount(); ++i) {
+		names << desktopWallpaperName(i);
+	}
+	if (names.isEmpty()) {
+		names << "No wallpapers";
+	}
+	m_wallpapers.setItems(names);
+	m_wallpapers.select(std::max(0, desktopWallpaperFind(setting("wallpaper"))), false);
+	setToolTip("Patterns: " + desktopPatternsFolder() + "\n" +
+		desktopPatternErrors().join('\n') + "\nWallpaper: " + desktopWallpaperFolder() +
+		"\n" + desktopWallpaperErrors().join('\n'));
+}
+
 void AppearancePanel::showTab(int tab) {
-	m_tab = std::clamp(tab, 0, 2);
+	m_tab = std::clamp(tab, 0, 3);
 	m_focus = visibleLists().front();
 	update();
 }
@@ -143,6 +190,7 @@ std::vector<PanelList *> AppearancePanel::visibleLists() {
 	switch (m_tab) {
 	case 0: return { &m_accents, &m_highlights };
 	case 1: return { &m_patterns };
+	case 2: return { &m_wallpapers };
 	default: return { &m_sounds };
 	}
 }
@@ -188,10 +236,41 @@ void AppearancePanel::paintDesktopTab(pl_canvas *c) {
 	pl_vline(c, px0 - 1, py0 - 1, py0 + size, GRAY(0x8));
 	pl_hline(c, px0, px0 + size, py0 + size, C_WHITE);
 	pl_vline(c, px0 + size, py0, py0 + size, C_WHITE);
-	pl_pattern_fill(c, std::max(0, m_patterns.state.selected), px0, py0, px0 + size - 1,
+	desktopPatternFill(c, std::max(0, m_patterns.state.selected), px0, py0, px0 + size - 1,
 		py0 + size - 1);
 	Text name(m_patterns.items.value(m_patterns.state.selected), size, PL_FONT_VIEWS);
 	pl_text(c, name.t, px0 + (size - name.inkWidth()) / 2, py0 + size + 16, C_BLACK);
+	const QStringList errors = desktopPatternErrors();
+	Text hint(errors.isEmpty() ? (setting("background") == "wallpaper"
+		? "Wallpaper active; select a pattern to switch."
+		: "Add tiles to Desktop Patterns")
+		: QString("Import error: ") + errors.first(), BOX_R - BOX_L - 8, PL_FONT_VIEWS);
+	pl_text(c, hint.t, BOX_L + 4, m_patterns.frame.bottom() + 20, C_BLACK);
+}
+
+void AppearancePanel::paintWallpaperTab(pl_canvas *c) {
+	groupAround(c, m_patterns.frame, "Wallpaper", BOX_R);
+	paintList(c, m_wallpapers, m_focus == &m_wallpapers);
+	const int size = 112;
+	const int x = m_wallpapers.frame.right() + 24, y = ITEM_TOP + 1;
+	pl_hline(c, x - 1, x + size, y - 1, GRAY(8));
+	pl_vline(c, x - 1, y - 1, y + size, GRAY(8));
+	pl_hline(c, x, x + size, y + size, C_WHITE);
+	pl_vline(c, x + size, y, y + size, C_WHITE);
+	const QStringList modes{"fit", "fill", "stretch", "center"};
+	desktopWallpaperFill(c, m_wallpapers.state.selected, modes[m_placement.selected],
+		x, y, x + size - 1, y + size - 1);
+	m_placement.paint(c);
+	const QStringList errors = desktopWallpaperErrors();
+	const bool active = setting("background") == "wallpaper";
+	Text hint(!errors.isEmpty() ? "Import error: " + errors.first() :
+		desktopWallpaperCount() == 0 ? "Add photos to System Folder > Wallpaper." :
+		active && desktopWallpaperFind(setting("wallpaper")) < 0
+			? "Selected wallpaper is missing; select a photo." :
+		active ? "Wallpaper active; choose a pattern to switch."
+		       : "Select a photo to use wallpaper.",
+		BOX_R - BOX_L - 8, PL_FONT_VIEWS);
+	pl_text(c, hint.t, BOX_L + 4, m_patterns.frame.bottom() + 20, C_BLACK);
 }
 
 void AppearancePanel::paintSoundTab(pl_canvas *c) {
@@ -220,6 +299,7 @@ void AppearancePanel::paintEvent(QPaintEvent *) {
 	switch (m_tab) {
 	case 0: paintColorTab(c); break;
 	case 1: paintDesktopTab(c); break;
+	case 2: paintWallpaperTab(c); break;
 	default: paintSoundTab(c); break;
 	}
 	QPainter p(this);
@@ -238,6 +318,9 @@ void AppearancePanel::mousePressEvent(QMouseEvent *e) {
 		m_tab = tab;
 		m_focus = visibleLists().front();
 		update();
+		return;
+	}
+	if (m_tab == 2 && m_placement.press(this, pos)) {
 		return;
 	}
 	for (PanelList *l : visibleLists()) {

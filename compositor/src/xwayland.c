@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include <xcb/xcb_icccm.h>
 #include <wlr/util/log.h>
 
@@ -379,6 +380,28 @@ static void server_new_xwayland_surface(struct wl_listener *listener, void *data
 static void xwayland_ready(struct wl_listener *listener, void *data) {
 	struct plat_server *server = wl_container_of(listener, server, xwayland_ready);
 	wlr_xwayland_set_seat(server->xwayland, server->seat);
+
+	/* libxcb-cursor reads X resources, not XCURSOR_THEME (Qt's X11 backend). */
+	xcb_connection_t *connection = xcb_connect(server->xwayland->display_name, NULL);
+	if (xcb_connection_has_error(connection)) {
+		wlr_log(WLR_ERROR, "Could not set the Xwayland cursor theme");
+		xcb_disconnect(connection);
+	} else {
+		xcb_screen_t *screen = xcb_setup_roots_iterator(xcb_get_setup(connection)).data;
+		char resources[128];
+		int length = snprintf(resources, sizeof(resources),
+			"Xcursor.theme: %s\nXcursor.size: %d\n", ZACOS9_CURSOR_THEME, ZACOS9_CURSOR_SIZE);
+		xcb_void_cookie_t cookie = xcb_change_property_checked(connection,
+			XCB_PROP_MODE_REPLACE, screen->root, XCB_ATOM_RESOURCE_MANAGER,
+			XCB_ATOM_STRING, 8, length, resources);
+		xcb_generic_error_t *error = xcb_request_check(connection, cookie);
+		if (error) {
+			wlr_log(WLR_ERROR, "Could not set Xwayland cursor resources (X11 error %u)",
+				error->error_code);
+			free(error);
+		}
+		xcb_disconnect(connection);
+	}
 
 	/* Root-window cursor for X clients that don't set their own. */
 	struct wlr_xcursor *xcursor =

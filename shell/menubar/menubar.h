@@ -127,6 +127,9 @@ void appmenu_poll_dispatch(const struct pollfd *fds);
 /* ---- apple-menu-equivalent items and launching (launch.c) ---------------- */
 
 void launch(const char *command);
+uint32_t launch_feedback_begin(void);
+void launch_feedback_update(uint32_t cookie, uint32_t pid);
+void launch_feedback_cancel(uint32_t cookie);
 /* Fills the logo menu with "About", a separator and the launchable items
  * from ~/.config/zacos9/ZacOS 9 Menu Items (or built-in defaults). */
 void launch_fill_logo_menu(struct mb_menu *menu);

@@ -24,6 +24,50 @@ Updated: 2026-10-05
 
 ## Current work
 
+**Desktop wallpaper mode** (0.1.6): a separate System Folder > Wallpaper
+folder and Appearance Wallpaper tab allow user photos and classic PICT pictures.
+Choosing a pattern or photo switches background mode while retaining both
+selections. Fit, Fill, Stretch and Center render independently on each monitor.
+An asynchronous photo catalog shares the existing importer, with photo-sized
+limits and cached per-monitor renderings invalidated on file replacement.
+Focused tests cover placement extents, central cropping versus stretching,
+landscape/portrait monitor geometry, selection persistence, mode switching,
+replacement cache invalidation and classic PICT imports. Installation on the
+physical desktop is pending.
+
+**User-created desktop patterns** (0.1.6): System Folder > Appearance >
+Desktop Patterns maps to the user's XDG data directory. The Appearance Desktop
+tab, main desktop and secondary monitors share an asynchronous pattern catalog
+that discovers additions, replacements and removals every two seconds.
+Normal image tiles and classic Mac ppat/PAT/PAT#/ppt#/PICT resources are read
+from raw forks, MacBinary, AppleDouble and checksum-validated BinHex; standalone
+PICT uses the packaged ImageMagick converter. Original files are unchanged,
+selection IDs are stable, built-in patterns remain available, and errors are
+shown in the panel tooltip and logged. Unsupported pattern packing/layouts
+are explicitly rejected. Synthetic tests contain only original artwork.
+Focused tests pass for format decoding, palette/direct pixels, BinHex checksums,
+file discovery/replacement/removal, stable selection persistence and an exact
+112x112 custom-tile preview. The writable System Folder path and existing
+zip/7z/tar extraction tests pass. Physical desktop installation is pending.
+
+**Animated dog busy pointer** (0.1.6): original monochrome cursor artwork
+wags its tail and backflips for standard wait/progress requests, including
+Wayland cursor-shape requests and themed Wayland/Xwayland cursors. Sniffer's
+desktop entries, built-in launchers, document opening and application menu
+send launch feedback through platinum-shell-v1 version 3. Matching app IDs,
+launch PIDs or their descendants end feedback when a window maps/activates;
+failure, launcher disconnection and a 15-second timeout prevent stuck feedback.
+The normal client cursor is preserved during launch feedback, and pointer input
+continues normally. Document launches use the registered GIO handler so its
+identity is tracked instead of an already-exited xdg-open wrapper. Classic's
+pre-launch check is asynchronous so it does not freeze pointer feedback.
+Xwayland also publishes cursor X resources for Qt's XCB theme lookup.
+Custom application-drawn busy cursors cannot be identified.
+Focused cursor artwork, launch lifecycle and isolated Wayland/Xwayland pixel
+checks pass, including complete animation cycles, wait/progress aliases,
+normal/text cursor restoration and the exact 15-second timeout. The affected
+desktop components build successfully; physical desktop validation is pending.
+
 **Sniffer naming** (0.1.5): user-visible Finder branding is now Sniffer,
 including the application menu and Hide command, Qt application name, folder
 desktop entry, login-session description and Windows installer guidance.
@@ -88,12 +132,20 @@ covered by `test-finder-vfs`; not yet installed or run - needs root and a new IS
 
 **Double-clicking an archive expands it in place** (built; checked in a nested session; 13 checks in `meson test expand`).
 
-- StuffIt Expander's way: a double-clicked .zip / .tar / .tar.gz / .tgz / .tar.bz2 / .tar.xz is expanded beside itself by
-  `zacos9-expand` (`shell/finder/`, Python's zipfile/tarfile: no new dependency). One top-level item lands as itself, several go in
+- StuffIt Expander's way: a double-clicked .zip / .7z / .tar / .tar.gz / .tgz / .tar.bz2 / .tar.xz is expanded beside itself by
+  `zacos9-expand` (`shell/finder/`, Python's zipfile/tarfile and python3-libarchive-c for 7z). One top-level item lands as itself, several go in
   a folder named after the archive; taken names get " 2"; the archive is kept; the result is selected. Entries escaping the folder
   are refused, __MACOSX/._ files skipped, zip Unix modes kept, password-protected zips refused with a message.
 - Seen: Photos.zip on the desktop -> "Photos" selected beside it; Project.zip in a Downloads window -> "Project" selected.
-- Not done: a progress window for big archives (it works in the background; the result appears when done); .7z and .rar.
+- 7z support (0.1.6) follows the same naming, collision avoidance,
+  original-archive retention and partial-extraction cleanup. Links, special
+  entries and unsafe paths are refused; encrypted or damaged archives show an
+  error. Debian installs the libarchive Python reader as a runtime dependency.
+  Focused extraction tests cover real 7z contents, executable permissions,
+  single/multiple roots, repeated extraction, uppercase extensions, metadata
+  filtering, traversal, links, empty/corrupt archives and encryption, alongside
+  the existing zip/tar behavior.
+- Not done: a progress window for big archives (it works in the background; the result appears when done); .rar.
 
 **Other programs' "Show in Folder" opens the Finder** (built; checked in a nested session).
 

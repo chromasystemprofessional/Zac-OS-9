@@ -300,6 +300,25 @@ int main(int argc, char **argv) {
 	}
 	check(QFile::exists(stamp), "launching ran the program named by Exec");
 	check(!appLaunch("not-installed.desktop"), "launching an entry that isn't there fails");
+	writeEntry(appsDir, "broken-launch.desktop",
+		entry("Broken Launch", "/nonexistent/zacos9-launch-test"));
+	check(!appLaunch("broken-launch.desktop"), "a failed process launch is reported");
+	const QString document = root + "/document.txt";
+	const QString documentStamp = root + "/document-launched";
+	writeEntry(root, "document.txt", "launch feedback test\n");
+	writeEntry(appsDir, "document-handler.desktop",
+		entry("Document Handler", "/usr/bin/touch " + documentStamp + " %f",
+			"MimeType=text/plain;\n"));
+	writeEntry(root + "/config", "mimeapps.list",
+		"[Default Applications]\ntext/plain=document-handler.desktop;\n");
+	settle();
+	check(appOpenFile(document), "a document opens with its registered application");
+	waited.restart();
+	while (!QFile::exists(documentStamp) && waited.elapsed() < 5000) {
+		usleep(20000);
+	}
+	check(QFile::exists(documentStamp), "document opening launches the default handler");
+	check(!appOpenFile(root + "/missing-document"), "a missing document reports an error");
 
 	/* ---- what the Finder allows --------------------------------------- */
 	const QString appsPath = vfsPathFor("applications");
@@ -347,6 +366,12 @@ int main(int argc, char **argv) {
 		"Home opens a real directory, made if it was missing");
 	check(documents.startsWith(root), "and it is inside the home folder, not a system one");
 	const QString prefs = vfsOpensAs(vfsPathFor("system-folder/preferences"));
+	const QString desktopPatterns = vfsOpensAs(vfsPathFor("system-folder/appearance/desktop-patterns"));
+	check(desktopPatterns == dataHome + "/zacos9/appearance/Desktop Patterns" &&
+		QDir(desktopPatterns).exists(), "System Folder exposes a writable custom desktop patterns folder");
+	const QString wallpaper = vfsOpensAs(vfsPathFor("system-folder/wallpaper"));
+	check(wallpaper == dataHome + "/zacos9/wallpaper" && QDir(wallpaper).exists(),
+		"System Folder exposes a separate writable Wallpaper folder");
 	check(prefs == root + "/config", "Preferences stands for the XDG config directory");
 	check(vfsOpensAs(vfsPathFor("system-folder")).isEmpty(),
 		"a curated folder opens as a virtual window, not a directory");

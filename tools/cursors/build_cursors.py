@@ -4,8 +4,7 @@ usage: build_cursors.py SOURCE OUTDIR [--sheet OUT.png]
 
 Writes OUTDIR/ZacOS9/index.theme and OUTDIR/ZacOS9/cursors/<name> for
 every cursor name and alias, each with 16 px (1x) and 32 px (2x,
-nearest-neighbour) images. The watch is animated: its hand turns in
-eight steps.
+nearest-neighbour) images. The busy dog wags its tail and backflips.
 """
 import math
 import os
@@ -13,7 +12,7 @@ import struct
 import sys
 
 COLORS = {"K": 0xFF000000, "W": 0xFFFFFFFF, ".": 0}
-WATCH_FRAMES, WATCH_MS = 8, 100
+WATCH_MS = 80
 
 
 def parse(path):
@@ -55,19 +54,28 @@ def add_outline(rows):
 
 
 def watch_frames(rows, hot):
-    """The face with its hand at eight angles (12 o'clock first)."""
+    """Wag, then rotate backwards through one airborne somersault."""
     frames = []
-    cx, cy = hot
-    for i in range(WATCH_FRAMES):
+    tails = [((2, 7), (1, 6)), ((2, 8), (1, 8)),
+             ((2, 9), (1, 10)), ((2, 8), (1, 8))]
+    for i in range(12):
         f = [r[:] for r in rows]
-        a = i * 2 * math.pi / WATCH_FRAMES
-        for t in range(4):
-            x = round(cx + 0.5 + math.sin(a) * t)
-            y = round(cy + 0.5 - math.cos(a) * t)
-            if f[y][x] == "W":
-                f[y][x] = "K"
-        f[cy][cx] = "K"
-        frames.append(f)
+        for x, y in tails[i % len(tails)]:
+            f[y][x] = "K"
+        frames.append(add_outline(f))
+    for i in range(12):
+        angle = -i * 2 * math.pi / 12
+        # Inverse mapping keeps the small pixel-art silhouette connected.
+        f = [["."] * 16 for _ in range(16)]
+        lift = 3 * math.sin(math.pi * i / 11)
+        for y in range(16):
+            for x in range(16):
+                dx, dy = x - 7.5, y - (8.5 - lift)
+                sx = round(7.5 + math.cos(angle) * dx + math.sin(angle) * dy)
+                sy = round(8.5 - math.sin(angle) * dx + math.cos(angle) * dy)
+                if 0 <= sx < 16 and 0 <= sy < 16:
+                    f[y][x] = rows[sy][sx]
+        frames.append(add_outline(f))
     return frames
 
 
@@ -108,10 +116,10 @@ def main():
         f.write("[Icon Theme]\nName=ZacOS9\nComment=ZacOS 9 cursors\n")
     rendered = []
     for c in cursors:
-        rows = add_outline(c["rows"]) if c["outline"] else c["rows"]
         if c["name"] == "watch":
-            frames, delay = watch_frames(rows, c["hot"]), WATCH_MS
+            frames, delay = watch_frames(c["rows"], c["hot"]), WATCH_MS
         else:
+            rows = add_outline(c["rows"]) if c["outline"] else c["rows"]
             frames, delay = [rows], 0
         data = xcursor(frames, c["hot"], delay)
         for name in [c["name"]] + c["aliases"]:

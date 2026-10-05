@@ -203,6 +203,7 @@ void view_focus(struct plat_view *view) {
 		return;
 	}
 	struct plat_server *server = view->server;
+	platinum_shell_launch_ready(view);
 	if (view->hidden) {
 		view_set_hidden(view, false);
 	}

@@ -81,6 +81,14 @@ executable('zacos9-menubar',
   install: true,
 )
 
+test('menu-launch-feedback',
+  executable('test-menu-launch',
+    'menubar/test_launch.c', 'menubar/launch.c',
+    dependencies: [platinum_dep, wayland_client, gio],
+  ),
+  timeout: 10,
+)
+
 # The Finder: Qt6 for windows, input and files; all drawing through lib/.
 add_languages('cpp', native: false)
 qt6 = dependency('qt6', modules: ['Core', 'Gui', 'Widgets', 'Network', 'DBus'],
@@ -93,9 +101,28 @@ gio_unix = dependency('gio-unix-2.0')
 
 # Control panels (the Finder's Get Info uses their controls too).
 panelkit = static_library('panelkit', 'panels/panelkit.cpp', 'panels/sharingclient.cpp',
+  'panels/custompatterns.cpp',
   include_directories: include_directories('finder'),
   dependencies: [platinum_dep, qt6],
   cpp_args: ['-std=c++17'],
+)
+
+configure_file(input: 'panels/zacos9-patterns', output: 'zacos9-patterns', copy: true)
+install_data('panels/zacos9-patterns', install_dir: get_option('bindir'),
+  install_mode: 'rwxr-xr-x')
+test('custom-patterns', find_program('python3'),
+  args: [files('../tests/panels/test_patterns.py'), files('panels/zacos9-patterns')],
+  timeout: 60,
+)
+test('custom-pattern-catalog',
+  executable('test-custompatterns', '../tests/panels/test_custompatterns.cpp', 'panels/appearance.cpp',
+    link_with: panelkit,
+    include_directories: include_directories('panels', 'finder'),
+    dependencies: [platinum_dep, qt6],
+    cpp_args: ['-std=c++17'],
+  ),
+  env: ['QT_QPA_PLATFORM=offscreen'],
+  timeout: 30,
 )
 
 executable('zacos9-finder',
@@ -134,10 +161,12 @@ test('finder-vfs',
     'finder/tests/test_vfs.cpp',
     'finder/vfs.cpp',
     'finder/appdb.cpp',
+    'finder/platinumshell.cpp',
+    finder_protocol,
     'finder/items.cpp',
     link_with: panelkit,
     include_directories: include_directories('finder', 'panels'),
-    dependencies: [platinum_dep, qt6, gio, gio_unix],
+    dependencies: [platinum_dep, qt6, gio, gio_unix, wayland_client],
     cpp_args: ['-std=c++17'],
   ),
   env: ['QT_QPA_PLATFORM=offscreen'],
@@ -344,9 +373,11 @@ executable('zacos9-update',
 executable('zacos9-wininstall',
   'wininstall/main.cpp',
   'wininstall/wininstall.cpp',
+  'finder/platinumshell.cpp',
+  finder_protocol,
   link_with: panelkit,
   include_directories: include_directories('finder', 'panels'),
-  dependencies: [platinum_dep, qt6],
+  dependencies: [platinum_dep, qt6, wayland_client],
   cpp_args: ['-std=c++17'],
   install: true,
 )
@@ -382,9 +413,23 @@ foreach kind : [['client-header', '@BASENAME@-client-protocol.h'], ['private-cod
     command: [wayland_scanner, kind[0], '@INPUT@', '@OUTPUT@'],
   )
 endforeach
-executable('vptr', meson.project_source_root() / 'tools/vptr/vptr.c', vptr_protocol,
+vptr_exe = executable('vptr', meson.project_source_root() / 'tools/vptr/vptr.c', vptr_protocol,
   client_protocol_src,
   dependencies: [wayland_client, xkbcommon_client])
+
+busy_client = executable('test-busy-client',
+  '../compositor/tests/busy_client.cpp', 'finder/platinumshell.cpp', finder_protocol,
+  include_directories: include_directories('finder'),
+  dependencies: [qt6, wayland_client],
+  cpp_args: ['-std=c++17'],
+)
+test('busy-cursor-protocols', find_program('python3'),
+  args: [files('../compositor/tests/test_busy_cursor.py'), compositor_exe, busy_client, vptr_exe,
+    meson.project_source_root() / 'tools/cursors/build_cursors.py',
+    meson.project_source_root() / 'assets/cursors/platinum-cursors.pcur'],
+  depends: [compositor_exe, cursor_theme],
+  timeout: 45,
+)
 
 # ZacOS 9 Qt style plugin: other Qt applications (Qt 6) drawn with the
 # Platinum controls. Selected with QT_STYLE_OVERRIDE=zacos9 (session/).

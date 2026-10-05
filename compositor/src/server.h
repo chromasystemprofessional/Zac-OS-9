@@ -93,6 +93,16 @@ struct plat_server {
 	struct wl_listener cursor_button;
 	struct wl_listener cursor_axis;
 	struct wl_listener cursor_frame;
+	struct wl_list pending_launches;
+	struct wl_event_source *launch_timer;
+	bool launch_cursor_shown;
+	struct wlr_surface *client_cursor_surface;
+	struct wl_listener client_cursor_destroy;
+	struct wl_listener cursor_client_destroy;
+	struct wlr_seat_client *cursor_client;
+	const char *client_cursor_name;
+	int cursor_hotspot_x, cursor_hotspot_y;
+	struct wl_listener request_cursor_shape;
 
 	struct wlr_seat *seat;
 	struct wl_listener new_input;
@@ -266,6 +276,7 @@ void layers_pin_to_main(struct plat_server *server);
 
 /* input.c */
 void input_init(struct plat_server *server);
+void input_refresh_cursor(struct plat_server *server);
 void input_begin_grab(struct plat_server *server, struct plat_view *view,
 		enum plat_cursor_mode mode, uint32_t edges, enum decor_part part);
 /* Give keyboard focus to a surface, with ⌘ (Super) reported as Ctrl. */
@@ -317,6 +328,7 @@ bool platinum_shell_position_for(struct wlr_surface *surface, int *x, int *y);
 void platinum_shell_report_position(struct plat_view *view);
 /* The front window changed: tell the menu bar whose it is. */
 void platinum_shell_focus_changed(struct plat_server *server);
+void platinum_shell_launch_ready(struct plat_view *view);
 
 /* xwayland.c */
 void xwayland_init(struct plat_server *server);

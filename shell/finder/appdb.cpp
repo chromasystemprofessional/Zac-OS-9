@@ -4,9 +4,11 @@
 #include <gio/gio.h>
 
 #include "appdb.h"
+#include "platinumshell.h"
 
 #include <QCoreApplication>
 #include <QDir>
+#include <QDebug>
 #include <QDirIterator>
 #include <QFile>
 #include <QFileInfo>
@@ -444,17 +446,53 @@ const AppEntry *appByFile(const QString &desktopFile) {
 	return nullptr;
 }
 
+static GAppLaunchContext *launchContext(GAppInfo *info, uint32_t &cookie) {
+	const char *wmClass = G_IS_DESKTOP_APP_INFO(info)
+		? g_desktop_app_info_get_startup_wm_class(G_DESKTOP_APP_INFO(info)) : nullptr;
+	cookie = platinumBeginLaunch(fromUtf8(wmClass ? wmClass :
+		g_app_info_get_id(info)));
+	GAppLaunchContext *context = g_app_launch_context_new();
+	g_signal_connect(context, "launched", G_CALLBACK(+[](GAppLaunchContext *,
+			GAppInfo *, GVariant *data, gpointer user) {
+		gint32 pid = 0;
+		if (g_variant_lookup(data, "pid", "i", &pid) && pid > 0) {
+			platinumUpdateLaunch(GPOINTER_TO_UINT(user), static_cast<uint32_t>(pid));
+		}
+	}), GUINT_TO_POINTER(cookie));
+	return context;
+}
+
+static bool launchInfo(GAppInfo *info, GList *files, const QString &actionId = {}) {
+	uint32_t cookie;
+	GAppLaunchContext *context = launchContext(info, cookie);
+	bool ok = true;
+	if (actionId.isEmpty()) {
+		GError *error = nullptr;
+		ok = g_app_info_launch(info, files, context, &error);
+		if (!ok) {
+			platinumCancelLaunch(cookie);
+			qWarning() << "Could not launch" << fromUtf8(g_app_info_get_name(info)) << ":" <<
+				(error ? error->message : "unknown launch error");
+		}
+		if (error) {
+			g_error_free(error);
+		}
+	} else {
+		/* Desktop Actions have no failure report of their own. */
+		g_desktop_app_info_launch_action(G_DESKTOP_APP_INFO(info),
+			actionId.toUtf8().constData(), context);
+	}
+	g_object_unref(context);
+	return ok;
+}
+
 bool appLaunchFile(const QString &desktopFile) {
 	const QString real = QFileInfo(desktopFile).canonicalFilePath();
 	GDesktopAppInfo *info = g_desktop_app_info_new_from_filename(real.toUtf8().constData());
 	if (!info) {
 		return false;
 	}
-	GError *error = nullptr;
-	const bool ok = g_app_info_launch(G_APP_INFO(info), nullptr, nullptr, &error);
-	if (error) {
-		g_error_free(error);
-	}
+	const bool ok = launchInfo(G_APP_INFO(info), nullptr);
 	g_object_unref(info);
 	return ok;
 }
@@ -466,17 +504,27 @@ bool appLaunch(const QString &id, const QString &actionId) {
 	if (!info) {
 		return false;
 	}
-	bool ok = true;
-	if (actionId.isEmpty()) {
-		GError *error = nullptr;
-		ok = g_app_info_launch(G_APP_INFO(info), nullptr, nullptr, &error);
+	const bool ok = launchInfo(G_APP_INFO(info), nullptr, actionId);
+	g_object_unref(info);
+	return ok;
+}
+
+bool appOpenFile(const QString &path) {
+	GFile *file = g_file_new_for_path(path.toUtf8().constData());
+	GError *error = nullptr;
+	GAppInfo *info = g_file_query_default_handler(file, nullptr, &error);
+	if (!info) {
+		qWarning() << "Could not find an application for" << path << ":" <<
+			(error ? error->message : "no default application");
 		if (error) {
 			g_error_free(error);
 		}
-	} else {
-		/* Desktop Actions have no failure report of their own. */
-		g_desktop_app_info_launch_action(info, actionId.toUtf8().constData(), nullptr);
+		g_object_unref(file);
+		return false;
 	}
+	GList files = { file, nullptr, nullptr };
+	const bool ok = launchInfo(info, &files);
 	g_object_unref(info);
+	g_object_unref(file);
 	return ok;
 }

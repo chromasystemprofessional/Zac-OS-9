@@ -1,4 +1,5 @@
 #include "vfs.h"
+#include "platinumshell.h"
 
 #include <QCoreApplication>
 #include <QDir>
@@ -24,10 +25,10 @@
  * doesn't have take their default, and nodes it doesn't know about are
  * added, while the user's own nodes and overrides are kept.
  */
-static constexpr int REGISTRY_VERSION = 4;
+static constexpr int REGISTRY_VERSION = 6;
 
 static const char *DEFAULT_REGISTRY = R"JSON({
-  "version": 4,
+  "version": 6,
   "volume": {},
   "showUnixVolume": false,
   "nodes": [
@@ -35,6 +36,10 @@ static const char *DEFAULT_REGISTRY = R"JSON({
       "icon": "system-folder", "order": 0 },
     { "id": "system-folder/appearance", "name": "Appearance", "kind": "backed",
       "backing": "$XDG_DATA_HOME/zacos9/appearance" },
+    { "id": "system-folder/appearance/desktop-patterns", "name": "Desktop Patterns",
+      "kind": "backed", "backing": "$XDG_DATA_HOME/zacos9/appearance/Desktop Patterns" },
+    { "id": "system-folder/wallpaper", "name": "Wallpaper", "kind": "backed",
+      "backing": "$XDG_DATA_HOME/zacos9/wallpaper" },
     { "id": "system-folder/control-panels", "name": "Control Panels",
       "kind": "panels", "icon": "control-panels" },
     { "id": "system-folder/extensions", "name": "Extensions", "kind": "folder" },
@@ -536,7 +541,7 @@ bool vfsLaunch(const QString &path) {
 		return appLaunch(node->appId, node->actionId);
 	}
 	if (!node->program.isEmpty()) {
-		return QProcess::startDetached(siblingProgram(node->program), node->args);
+		return platinumStartApplication(siblingProgram(node->program), node->args);
 	}
 	return false;
 }

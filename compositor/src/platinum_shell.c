@@ -7,6 +7,7 @@
 #include <wlr/xwayland.h>
 
 #include "platinum-shell-v1-protocol.h"
+#include "launch.h"
 #include "server.h"
 
 struct surface_hint {
@@ -146,6 +147,37 @@ static uint32_t view_pid(struct plat_view *view) {
 	return pid > 0 ? (uint32_t)pid : 0;
 }
 
+void platinum_shell_launch_ready(struct plat_view *view) {
+	launch_ready(view->server, view_pid(view), view->app_id);
+}
+
+static void handle_begin_launch(struct wl_client *client, struct wl_resource *resource,
+		uint32_t cookie, uint32_t pid, const char *app_id) {
+	if (!launch_begin(the_server, resource, cookie, pid, app_id)) {
+		wl_client_post_implementation_error(client, "Cannot track application launch");
+		return;
+	}
+}
+
+static void handle_update_launch(struct wl_client *client, struct wl_resource *resource,
+		uint32_t cookie, uint32_t pid) {
+	launch_update(the_server, resource, cookie, pid);
+	/* The launched client may have mapped before the PID update arrived. */
+	if (pid) {
+		struct plat_view *view;
+		wl_list_for_each(view, &the_server->views, link) {
+			if (view->mapped) {
+				platinum_shell_launch_ready(view);
+			}
+		}
+	}
+}
+
+static void handle_cancel_launch(struct wl_client *client, struct wl_resource *resource,
+		uint32_t cookie) {
+	launch_cancel(the_server, resource, cookie);
+}
+
 static void send_active(struct wl_resource *resource) {
 	if (wl_resource_get_version(resource) >= PLATINUM_SHELL_V1_ACTIVE_CLIENT_SINCE_VERSION) {
 		platinum_shell_v1_send_active_client(resource, active_pid);
@@ -173,9 +205,13 @@ static const struct platinum_shell_v1_interface shell_impl = {
 	.set_window_style = handle_set_window_style,
 	.set_window_position = handle_set_window_position,
 	.destroy = handle_destroy,
+	.begin_launch = handle_begin_launch,
+	.update_launch = handle_update_launch,
+	.cancel_launch = handle_cancel_launch,
 };
 
 static void resource_destroy(struct wl_resource *resource) {
+	launch_cancel_owner(the_server, resource);
 	wl_list_remove(wl_resource_get_link(resource));
 }
 
@@ -195,5 +231,5 @@ void platinum_shell_init(struct plat_server *server) {
 	the_server = server;
 	wl_list_init(&hints);
 	wl_list_init(&resources);
-	wl_global_create(server->display, &platinum_shell_v1_interface, 2, NULL, bind_shell);
+	wl_global_create(server->display, &platinum_shell_v1_interface, 3, NULL, bind_shell);
 }

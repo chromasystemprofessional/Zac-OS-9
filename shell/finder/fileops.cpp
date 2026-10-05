@@ -1,4 +1,5 @@
 #include "fileops.h"
+#include "platinumshell.h"
 
 #include <QCoreApplication>
 #include <QDir>
@@ -191,13 +192,13 @@ static void installIntoApplications(const QStringList &paths) {
 	for (const QString &p : paths) {
 		const QString name = QFileInfo(p).fileName().toLower();
 		if (name.endsWith(".exe") || name.endsWith(".msi")) {
-			QProcess::startDetached(sibling("zacos9-wininstall"), { p });
+			platinumStartApplication(sibling("zacos9-wininstall"), { p });
 		} else {
 			rest << p;
 		}
 	}
 	if (!rest.isEmpty()) {
-		QProcess::startDetached(sibling("zacos9-appinstall"), rest);
+		platinumStartApplication(sibling("zacos9-appinstall"), rest);
 	}
 }
 

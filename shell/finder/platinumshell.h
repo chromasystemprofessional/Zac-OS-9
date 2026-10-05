@@ -1,7 +1,9 @@
 #pragma once
 
 #include <QPoint>
+#include <QStringList>
 #include <functional>
+#include <cstdint>
 
 class QWidget;
 
@@ -20,3 +22,8 @@ void platinumSetFrameStyle(QWidget *window, FrameStyle style);
 void platinumSetWindowPosition(QWidget *window, QPoint frameTopLeft);
 /* Be told where the window is whenever it maps or the user moves it. */
 void platinumOnWindowPosition(QWidget *window, std::function<void(QPoint)> callback);
+uint32_t platinumBeginLaunch(const QString &appId = {});
+void platinumUpdateLaunch(uint32_t cookie, uint32_t pid);
+void platinumCancelLaunch(uint32_t cookie);
+bool platinumStartApplication(const QString &program, const QStringList &args,
+	const QString &directory = {});

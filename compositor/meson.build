@@ -3,6 +3,7 @@ wayland_protos = dependency('wayland-protocols')
 wlroots = dependency('wlroots-0.18')
 xkbcommon = dependency('xkbcommon')
 xcb_icccm = dependency('xcb-icccm').partial_dependency(compile_args: true, includes: true)
+xcb = dependency('xcb')
 libdrm = dependency('libdrm').partial_dependency(compile_args: true, includes: true)
 
 wayland_scanner = find_program(
@@ -14,6 +15,7 @@ wl_protocol_dir = wayland_protos.get_variable('pkgdatadir')
 protocols = [
   wl_protocol_dir / 'stable/xdg-shell/xdg-shell.xml',
   wl_protocol_dir / 'unstable/xdg-decoration/xdg-decoration-unstable-v1.xml',
+  wl_protocol_dir / 'staging/cursor-shape/cursor-shape-v1.xml',
   meson.project_source_root() / 'protocols/wlr-layer-shell-unstable-v1.xml',
   meson.project_source_root() / 'protocols/platinum-shell-v1.xml',
 ]
@@ -46,7 +48,7 @@ decor_dep = declare_dependency(
 # The ZacOS9 cursor theme, built next to zacos9-wm (build tree) and
 # installed with the icon themes.
 python3 = find_program('python3')
-custom_target('cursor-theme',
+cursor_theme = custom_target('cursor-theme',
   input: meson.project_source_root() / 'assets/cursors/platinum-cursors.pcur',
   output: 'cursors.stamp',
   command: [python3, meson.project_source_root() / 'tools/cursors/build_cursors.py',
@@ -61,6 +63,7 @@ compositor_exe = executable('zacos9-wm',
   'src/main.c',
   'src/output.c',
   'src/input.c',
+  'src/launch.c',
   'src/startup.c',
   'src/prefs.c',
   'src/view.c',
@@ -72,7 +75,8 @@ compositor_exe = executable('zacos9-wm',
   'src/outline.c',
   'src/pixbuf.c',
   protocol_headers,
-  dependencies: [decor_dep, wayland_server, wlroots, xkbcommon, libdrm, xcb_icccm],
+  dependencies: [decor_dep, wayland_server, wlroots, xkbcommon, libdrm, xcb_icccm, xcb],
+  link_depends: cursor_theme,
   install: true,
 )
 
@@ -91,4 +95,18 @@ test('startup-displays',
     dependencies: [platinum_dep, wayland_server, wlroots],
   ),
   env: ['ZACOS9_STARTUP=1'],
+)
+
+test('cursor-theme', python3,
+  args: [files('tests/test_cursors.py'),
+    meson.project_source_root() / 'tools/cursors/build_cursors.py',
+    meson.project_source_root() / 'assets/cursors/platinum-cursors.pcur'],
+)
+test('launch-feedback',
+  executable('test-launch',
+    'tests/test_launch.c', 'src/launch.c',
+    include_directories: include_directories('src'),
+    dependencies: [platinum_dep, wayland_server, wlroots],
+  ),
+  timeout: 20,
 )

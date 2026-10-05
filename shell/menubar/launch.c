@@ -4,28 +4,36 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
-#include <sys/wait.h>
 #include <unistd.h>
+#include <glib.h>
 
 #include "menubar.h"
 
 #define ITEMS_DIR "/.config/zacos9/ZacOS 9 Menu Items"
 
+static void detach_session(void *data) {
+	if (setsid() < 0) {
+		const char message[] = "Could not detach application launch session\n";
+		ssize_t written = write(STDERR_FILENO, message, sizeof(message) - 1);
+		(void)written;
+		_exit(127);
+	}
+}
+
 /* Run a shell command fully detached from the menu bar. */
 void launch(const char *command) {
-	pid_t pid = fork();
-	if (pid < 0) {
+	uint32_t cookie = launch_feedback_begin();
+	char *argv[] = { "/bin/sh", "-c", (char *)command, NULL };
+	GPid pid;
+	GError *error = NULL;
+	if (!g_spawn_async(NULL, argv, NULL, G_SPAWN_DEFAULT, detach_session, NULL, &pid, &error)) {
+		launch_feedback_cancel(cookie);
+		fprintf(stderr, "Could not launch %s: %s\n", command, error->message);
+		g_error_free(error);
 		return;
 	}
-	if (pid == 0) {
-		setsid();
-		if (fork() == 0) {
-			execl("/bin/sh", "/bin/sh", "-c", command, (char *)NULL);
-			_exit(127);
-		}
-		_exit(0);
-	}
-	waitpid(pid, NULL, 0);
+	launch_feedback_update(cookie, pid);
+	g_spawn_close_pid(pid);
 }
 
 /* A shell command running `program` from next to this binary (build tree

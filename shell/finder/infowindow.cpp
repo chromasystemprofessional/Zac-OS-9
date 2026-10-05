@@ -1,4 +1,5 @@
 #include "infowindow.h"
+#include "platinumshell.h"
 
 #include "vfs.h"
 
@@ -259,7 +260,7 @@ bool InfoWindow::showView(int view) {
 		if (Alert::ask("Folders cannot be shared until file sharing is turned on using the "
 				"File Sharing control panel. Do you want the control panel opened now?",
 				"OK", "Cancel")) {
-			QProcess::startDetached("zacos9-filesharing", {});
+			platinumStartApplication("zacos9-filesharing", {});
 		}
 		view = m_view;
 		m_show.selected = view;

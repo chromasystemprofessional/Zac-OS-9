@@ -82,3 +82,5 @@ bool appLaunch(const QString &id, const QString &actionId = QString());
  * launching from the file itself, which works for any entry. */
 const AppEntry *appByFile(const QString &desktopFile);
 bool appLaunchFile(const QString &desktopFile);
+/* Open a document with its registered application and launch feedback. */
+bool appOpenFile(const QString &path);

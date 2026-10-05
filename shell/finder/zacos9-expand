@@ -7,7 +7,7 @@ itself, several as a folder named after the archive ("Photos.zip" ->
 "Photos"). A name already taken gets a number ("Photos 2"); nothing is
 overwritten, and the archive is kept. Prints the path of what it made.
 
-.zip (stored, deflate, bzip2, lzma, zip64), .tar, .tar.gz/.tgz,
+.zip (stored, deflate, bzip2, lzma, zip64), .7z, .tar, .tar.gz/.tgz,
 .tar.bz2/.tbz2, .tar.xz/.txz. Entries that would land outside the folder
 (absolute paths, "..") are refused; macOS's __MACOSX/ and ._ files are
 left out; a zip's Unix permissions (executable bits) are kept.
@@ -29,7 +29,7 @@ def fail(message):
 
 def stem(name):
     lower = name.lower()
-    for suffix in (".zip",) + TAR_SUFFIXES:
+    for suffix in (".zip", ".7z") + TAR_SUFFIXES:
         if lower.endswith(suffix):
             return name[: -len(suffix)] or name
     return name
@@ -75,6 +75,42 @@ def expand_tar(archive, root):
         t.extractall(root, members=members, filter="data")
 
 
+def expand_7z(archive, root):
+    try:
+        import libarchive
+        from libarchive.exception import ArchiveError
+    except ImportError:
+        fail("7z support isn't installed. Install python3-libarchive-c.")
+    try:
+        with libarchive.file_reader(archive, format_name="7zip") as entries:
+            for entry in entries:
+                name = entry.pathname
+                if mac_junk(name):
+                    continue
+                # Reject links entirely: extraction must never follow an
+                # archive-provided symlink while writing a later entry.
+                if not (entry.isfile or entry.isdir) or entry.issym or entry.islnk:
+                    fail(f"The 7z archive holds an unsupported link or special item ({name}).")
+                normalized = name.replace("\\", "/")
+                if normalized.startswith("/") or ".." in normalized.split("/") or (
+                        len(normalized) >= 2 and normalized[1] == ":"):
+                    fail(f"The archive holds an item that would go outside its folder ({name}).")
+                target = safe_target(root, normalized)
+                if entry.isdir:
+                    os.makedirs(target, exist_ok=True)
+                    continue
+                os.makedirs(os.path.dirname(target), exist_ok=True)
+                with open(target, "wb") as dst:
+                    for block in entry.get_blocks():
+                        dst.write(block)
+                mode = entry.mode & 0o777
+                if mode:
+                    os.chmod(target, mode | 0o600)
+    except ArchiveError as e:
+        fail(f"The 7z archive couldn't be expanded. It may be damaged, "
+             f"password-protected, or use unsupported compression ({e}).")
+
+
 def unique(path):
     if not os.path.lexists(path):
         return path
@@ -103,6 +139,8 @@ def main():
         try:
             if lower.endswith(".zip"):
                 expand_zip(archive, root)
+            elif lower.endswith(".7z"):
+                expand_7z(archive, root)
             elif lower.endswith(TAR_SUFFIXES):
                 expand_tar(archive, root)
             else:

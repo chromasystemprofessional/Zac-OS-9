@@ -1,7 +1,7 @@
 /*
  * zacos9-appearance: the Appearance control panel.
  *
- *   zacos9-appearance [color | desktop | sound]
+ *   zacos9-appearance [color | desktop | wallpaper | sound]
  *
  * The argument picks the tab it opens on.
  */
@@ -18,7 +18,7 @@ int main(int argc, char *argv[]) {
 
 	AppearancePanel panel;
 	const QString tab = argc > 1 ? QString::fromUtf8(argv[1]) : QString();
-	panel.showTab(tab == "desktop" ? 1 : tab == "sound" ? 2 : 0);
+	panel.showTab(tab == "desktop" ? 1 : tab == "wallpaper" ? 2 : tab == "sound" ? 3 : 0);
 	panel.show();
 	return app.exec();
 }

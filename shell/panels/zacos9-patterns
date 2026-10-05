@@ -1,0 +1,328 @@
+#!/usr/bin/python3
+"""Read user-created image tiles and classic Mac pattern containers as JSON."""
+import base64
+import binascii
+import io
+import hashlib
+import json
+import os
+from pathlib import Path
+import shutil
+import struct
+import subprocess
+import sys
+import tempfile
+import warnings
+
+from PIL import Image
+
+MAX_FILE = 16 * 1024 * 1024
+MAX_PIXELS = 1024 * 1024
+MAX_CATALOG_PIXELS = 16 * MAX_PIXELS
+MAX_ENTRIES = 512
+WALLPAPER = False
+Image.MAX_IMAGE_PIXELS = MAX_PIXELS
+warnings.simplefilter("error", Image.DecompressionBombWarning)
+
+
+def take(data, offset, length):
+    if offset < 0 or length < 0 or offset + length > len(data):
+        raise ValueError("truncated or invalid file offsets")
+    return data[offset:offset + length]
+
+
+def unpack(fmt, data, offset=0):
+    return struct.unpack(fmt, take(data, offset, struct.calcsize(fmt)))
+
+
+def dimensions(width, height):
+    if width <= 0 or height <= 0 or width * height > MAX_PIXELS:
+        raise ValueError("tile must have positive dimensions and at most 1,048,576 pixels")
+
+
+def mono(data):
+    return Image.frombytes("1", (8, 8), take(data, 0, 8)).convert("RGB").point(lambda v: 255 - v)
+
+
+def ppat(data):
+    kind, pixmap, pixels = unpack(">HII", data)
+    if kind == 0:
+        return mono(take(data, 20, 8))
+    if kind not in (1, 3):
+        raise ValueError(f"unsupported ppat type {kind}")
+    header = pixmap + 4  # Stored PixMap includes the unused baseAddr.
+    row_bytes = unpack(">H", data, header)[0] & 0x3fff
+    top, left, bottom, right = unpack(">hhhh", data, header + 2)
+    width, height = right - left, bottom - top
+    dimensions(width, height)
+    pack = unpack(">H", data, header + 12)[0]
+    pixel_type, depth, components, component_bits = unpack(">HHHH", data, header + 26)
+    if pack not in (0, 1):
+        raise ValueError("packed ppat pixel data is not supported")
+    if row_bytes < (width * depth + 7) // 8:
+        raise ValueError("ppat row size is too small")
+    raw = take(data, pixels, row_bytes * height)
+    palette = {}
+    if pixel_type == 0 and depth in (1, 2, 4, 8):
+        table = unpack(">I", data, header + 38)[0]
+        flags, last = unpack(">Hh", data, table + 4)
+        if not 0 <= last < 256:
+            raise ValueError("invalid ppat color table")
+        for i in range(last + 1):
+            index, r, g, b = unpack(">HHHH", data, table + 8 + 8 * i)
+            palette[i if flags & 0x8000 else index] = (r >> 8, g >> 8, b >> 8)
+    elif not (pixel_type == 16 and ((depth == 16 and components == 3 and component_bits == 5)
+                                  or (depth == 32 and components == 3 and component_bits == 8))):
+        raise ValueError("unsupported ppat pixel layout")
+    result = Image.new("RGB", (width, height))
+    values = []
+    for y in range(height):
+        row = raw[y * row_bytes:(y + 1) * row_bytes]
+        for x in range(width):
+            if palette:
+                bit = x * depth
+                index = (row[bit // 8] >> (8 - depth - bit % 8)) & ((1 << depth) - 1)
+                if index not in palette:
+                    raise ValueError("ppat refers to a missing palette color")
+                values.append(palette[index])
+            elif depth == 16:
+                v = unpack(">H", row, x * 2)[0]
+                values.append(tuple(((v >> shift) & 31) * 255 // 31 for shift in (10, 5, 0)))
+            else:
+                values.append(tuple(row[x * 4 + 1:x * 4 + 4]))
+    result.putdata(values)
+    return result
+
+
+def pict(data, resource=False):
+    decoder = shutil.which("magick") or shutil.which("convert")
+    if not decoder:
+        raise ValueError("PICT support requires the imagemagick package")
+    with tempfile.TemporaryDirectory(prefix="zacos9-pict-") as directory:
+        source = Path(directory) / "tile.pict"
+        source.write_bytes(b"\0" * 512 + data if resource else data)
+        result = subprocess.run(
+            [decoder, "-limit", "memory", "64MiB", "-limit", "map", "64MiB",
+             "-limit", "disk", "0", "-limit", "width", "4096", "-limit", "height", "4096",
+             "PICT:" + str(source) + "[0]", "PNG:-"],
+            capture_output=True, timeout=10)
+        if result.returncode:
+            raise ValueError("PICT conversion failed: " +
+                             result.stderr.decode("utf-8", "replace").strip()[:300])
+        with Image.open(io.BytesIO(result.stdout)) as image:
+            dimensions(*image.size)
+            return image.convert("RGBA")
+
+
+def resources(data, pictures_only=False):
+    start, map_start, length, map_length = unpack(">IIII", data)
+    body = take(data, start, length)
+    resource_map = take(data, map_start, map_length)
+    types, names = unpack(">HH", resource_map, 24)
+    count = unpack(">H", resource_map, types)[0] + 1
+    if count > 4096:
+        raise ValueError("too many resource types")
+    found = []
+    for i in range(count):
+        kind, last, refs = unpack(">4sHH", resource_map, types + 2 + i * 8)
+        if kind not in (b"ppat", b"PAT ", b"PAT#", b"PICT", b"ppt#"):
+            continue
+        if pictures_only and kind != b"PICT":
+            continue
+        for j in range(last + 1):
+            ref = types + refs + j * 12
+            number, name_offset = unpack(">hh", resource_map, ref)
+            flags = take(resource_map, ref + 4, 1)[0]
+            if flags & 1:
+                raise ValueError("compressed resources are not supported")
+            offset = int.from_bytes(take(resource_map, ref + 5, 3), "big")
+            size = unpack(">I", body, offset)[0]
+            payload = take(body, offset + 4, size)
+            name = ""
+            if name_offset != -1:
+                pos = names + name_offset
+                name = take(resource_map, pos + 1, take(resource_map, pos, 1)[0]).decode("mac_roman")
+            label = name or f"{kind.decode('ascii').strip()} {number}"
+            identity = f"{kind.hex()}:{number}"
+            if kind == b"ppat":
+                found.append((identity, label, ppat(payload)))
+            elif kind == b"PAT ":
+                found.append((identity, label, mono(payload)))
+            elif kind == b"PICT":
+                found.append((identity, label, pict(payload, resource=True)))
+            elif kind == b"PAT#":
+                total = unpack(">H", payload)[0]
+                if total + len(found) > 256:
+                    raise ValueError("a file may contain at most 256 patterns")
+                for k in range(total):
+                    found.append((f"{identity}:{k}", f"{label} {k + 1}",
+                                  mono(take(payload, 2 + k * 8, 8))))
+            else:
+                total = unpack(">H", payload)[0]
+                if total + len(found) > 256:
+                    raise ValueError("a file may contain at most 256 patterns")
+                for k in range(total):
+                    offset = unpack(">I", payload, 2 + k * 4)[0]
+                    found.append((f"{identity}:{k}", f"{label} {k + 1}", ppat(payload[offset:])))
+            if len(found) > 256:
+                raise ValueError("a file may contain at most 256 patterns")
+    return found
+
+
+def binhex(data):
+    alphabet = b'!"#$%&\'()*+,-012345689@ABCDEFGHIJKLMNPQRSTUVXYZ[`abcdefhijklmpqr'
+    first = data.find(b":")
+    last = data.find(b":", first + 1)
+    if first < 0 or last < 0:
+        raise ValueError("missing BinHex delimiters")
+    encoded = b"".join(data[first + 1:last].split())
+    packed = bytearray()
+    value = bits = 0
+    for ch in encoded:
+        if ch not in alphabet:
+            raise ValueError("invalid BinHex character")
+        value = (value << 6) | alphabet.index(ch)
+        bits += 6
+        if bits >= 8:
+            bits -= 8
+            packed.append((value >> bits) & 255)
+            value &= (1 << bits) - 1
+    decoded = bytearray()
+    pos = 0
+    while pos < len(packed):
+        ch = packed[pos]
+        pos += 1
+        if ch == 0x90:
+            count = take(packed, pos, 1)[0]
+            pos += 1
+            if count == 0:
+                decoded.append(ch)
+            elif not decoded:
+                raise ValueError("invalid BinHex run")
+            else:
+                decoded.extend(bytes([decoded[-1]]) * (count - 1))
+        else:
+            decoded.append(ch)
+        if len(decoded) > MAX_FILE:
+            raise ValueError("BinHex expansion is too large")
+    header_end = take(decoded, 0, 1)[0] + 20
+
+    def checked(offset, size):
+        block = take(decoded, offset, size)
+        crc = unpack(">H", decoded, offset + size)[0]
+        if binascii.crc_hqx(block, 0) != crc:
+            raise ValueError("BinHex checksum mismatch")
+        return block
+
+    header = checked(0, header_end)
+    data_size, resource_size = unpack(">II", header, header_end - 8)
+    fork = checked(header_end + 2, data_size)
+    resource = checked(header_end + 4 + data_size, resource_size)
+    return fork, resource
+
+
+def containers(data, suffix):
+    if suffix == ".hqx":
+        return binhex(data)
+    if data[:4] in (b"\0\x05\x16\x07", b"\0\x05\x16\0"):
+        count = unpack(">H", data, 24)[0]
+        forks = {}
+        for i in range(count):
+            kind, offset, size = unpack(">III", data, 26 + 12 * i)
+            forks[kind] = take(data, offset, size)
+        return forks.get(1, b""), forks.get(2, b"")
+    if (len(data) >= 128 and data[0] == 0 and 1 <= data[1] <= 63
+            and b"\0" not in data[2:2 + data[1]] and data[74] == 0 and data[82] == 0):
+        data_size, resource_size = unpack(">II", data, 83)
+        if data_size or resource_size:
+            secondary = unpack(">H", data, 120)[0]
+            start = 128 + ((secondary + 127) // 128) * 128
+            return (take(data, start, data_size),
+                    take(data, start + ((data_size + 127) // 128) * 128, resource_size)
+                    if resource_size else b"")
+    return data, b""
+
+
+def read_file(path):
+    if path.stat().st_size > MAX_FILE:
+        raise ValueError("file exceeds the 16 MiB import limit")
+    data = path.read_bytes()
+    suffix = path.suffix.lower()
+    if suffix in (".png", ".jpg", ".jpeg", ".bmp", ".gif", ".tif", ".tiff"):
+        with Image.open(io.BytesIO(data)) as image:
+            dimensions(*image.size)
+            return [("image", path.stem, image.convert("RGBA"))]
+    if WALLPAPER and suffix in (".ppat", ".pat"):
+        raise ValueError("pattern tiles belong in Appearance/Desktop Patterns")
+    fork, resource = containers(data, suffix)
+    if resource:
+        result = resources(resource, pictures_only=WALLPAPER)
+        if result:
+            return result
+    picture_header = len(fork) >= 524 and fork[522:524] in (b"\x11\x01", b"\0\x11")
+    raw_picture = len(fork) >= 12 and fork[10:12] in (b"\x11\x01", b"\0\x11")
+    if suffix in (".pict", ".pct", ".pic") or picture_header or raw_picture:
+        return [("pict", path.stem, pict(fork, resource=raw_picture and not picture_header))]
+    if suffix == ".ppat":
+        return [("ppat", path.stem, ppat(fork))]
+    if suffix == ".pat":
+        return [("pat", path.stem, mono(fork))]
+    result = resources(fork, pictures_only=WALLPAPER)
+    if not result:
+        raise ValueError("no supported pattern or picture resources found")
+    return result
+
+
+def scan(folder):
+    entries, errors = [], []
+    total_pixels = 0
+    if not folder.exists():
+        return {"entries": [], "errors": [f"Patterns folder is missing: {folder}"]}
+    paths = sorted(folder.iterdir(), key=lambda p: p.name.casefold())
+    sidecars = {p.name[2:] for p in paths if p.name.startswith("._") and p.is_file()}
+    for path in paths:
+        if not path.is_file() or path.name == ".DS_Store" or (
+                path.name.startswith(".") and not path.name.startswith("._")):
+            continue
+        if path.name in sidecars and path.stat().st_size == 0:
+            continue  # The useful content is in its AppleDouble sidecar.
+        try:
+            for identity, label, image in read_file(path):
+                dimensions(*image.size)
+                total_pixels += image.width * image.height
+                if len(entries) >= MAX_ENTRIES or total_pixels > MAX_CATALOG_PIXELS:
+                    errors.append(f"Catalog exceeds {MAX_ENTRIES} images or "
+                                  f"{MAX_CATALOG_PIXELS // (1024 * 1024)} megapixels.")
+                    return {"entries": entries, "errors": errors}
+                # Desktop tiles are opaque; transparency is composited on white.
+                background = Image.new("RGBA", image.size, "white")
+                background.alpha_composite(image.convert("RGBA"))
+                out = io.BytesIO()
+                background.convert("RGB").save(out, format="PNG")
+                source = path.name[2:] if path.name.startswith("._") else path.name
+                key = hashlib.sha256(source.encode("utf-8")).hexdigest()
+                prefix = "wallpaper" if WALLPAPER else "user"
+                entries.append({"id": f"{prefix}:{key}:{identity}", "name": f"{source} - {label}",
+                                "png": base64.b64encode(out.getvalue()).decode("ascii")})
+        except (ValueError, OSError, struct.error, subprocess.TimeoutExpired,
+                Image.DecompressionBombError, Image.DecompressionBombWarning) as error:
+            errors.append(f"{path.name}: {error}")
+    return {"entries": entries, "errors": errors}
+
+
+if __name__ == "__main__":
+    args = sys.argv[1:]
+    if args and args[0] == "--wallpaper":
+        WALLPAPER = True
+        MAX_FILE = 64 * 1024 * 1024
+        MAX_PIXELS = 32 * 1024 * 1024
+        MAX_CATALOG_PIXELS = 64 * 1024 * 1024
+        MAX_ENTRIES = 128
+        Image.MAX_IMAGE_PIXELS = MAX_PIXELS
+        args = args[1:]
+    if len(args) != 1:
+        sys.exit("usage: zacos9-patterns [--wallpaper] FOLDER")
+    try:
+        print(json.dumps(scan(Path(args[0])), ensure_ascii=True))
+    except OSError as error:
+        sys.exit(f"Could not read patterns folder: {error}")

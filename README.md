@@ -92,12 +92,77 @@ restores its previous window size, position and zoom state. Other monitors keep
 their desktop layout; resolution changes and monitor removal update fullscreen
 placement.
 
+## Busy pointer
+
+An original animated dog wags its tail and does backflips while applications
+launched from Sniffer or the application menu are starting. The normal pointer
+returns when the matching application opens or activates a window. Launch
+failures and launcher disconnection cancel feedback; applications that never
+show a window time out after 15 seconds. The pointer remains usable throughout.
+
+Applications requesting the standard wait/progress cursor also use the dog,
+on Wayland and Xwayland, through the ZacOS9 cursor theme. Apps drawing their own
+custom cursors or not reporting busy state cannot be detected automatically.
+Other cursor shapes, including text selection and resizing, are unchanged.
+
 ## Sniffer
 
 **Sniffer** is ZacOS 9's desktop and spatial file browser (formerly Finder).
 The application menu, folder-opening entry and user-facing messages use Sniffer.
 Internal names such as `zacos9-finder`, its application ID, D-Bus interfaces and
 `shell/finder/` remain unchanged for compatibility.
+
+Double-click `.zip`, `.7z`, or supported tar archives to extract them beside the
+archive. A single top-level item keeps its name; multiple items go into a folder
+named after the archive. Existing items are never overwritten, and the archive
+is kept. 7z support uses `python3-libarchive-c` (installed with ZacOS 9);
+password-protected archives are reported as unsupported rather than prompting.
+
+## Custom desktop patterns
+
+Place your own or freely licensed tiles in **System Folder > Appearance >
+Desktop Patterns**, then choose them in **Control Panels > Appearance > Desktop**.
+The real folder is `$XDG_DATA_HOME/zacos9/appearance/Desktop Patterns`
+(normally `~/.local/share/zacos9/appearance/Desktop Patterns`). Files added,
+replaced or removed there are discovered automatically, without restarting.
+The preview and every monitor use the same tiled image.
+
+Supported inputs include PNG, JPEG, BMP, GIF and TIFF; raw `.ppat`/`.pat`;
+classic Mac resource-fork files containing `ppat`, `PAT `, `PAT#`, `ppt#` or
+`PICT` resources; MacBinary `.bin`; BinHex `.hqx`; and AppleDouble `._` sidecars
+(keep the sidecar beside its original file). Standalone PICT pictures are also
+supported through ImageMagick. BinHex checksums and resource offsets are
+validated; unsupported packed pattern layouts or PICT drawing operations
+produce an import error rather than an incorrect pattern.
+
+Original files are not modified. Import errors appear in the Desktop tab
+(hover for full details) and session log. A removed selected tile falls back
+to the built-in default, retaining its selection ID if the file returns.
+Limits are 16 MiB per source, 1 megapixel per tile, and 512 tiles/16 megapixels
+per catalog. No Apple artwork is included.
+
+## Desktop wallpaper
+
+Place photos or user-created PICT desktop pictures in **System Folder >
+Wallpaper** (`$XDG_DATA_HOME/zacos9/wallpaper`, normally
+`~/.local/share/zacos9/wallpaper`). Open **Control Panels > Appearance >
+Wallpaper**, select a picture, and choose its placement:
+
+- **Fit**: show the whole photo, preserving proportions with dark margins.
+- **Fill**: cover the monitor, preserving proportions and cropping centrally.
+- **Stretch**: fill the monitor without preserving proportions.
+- **Center**: retain the picture's original size, with margins or clipping.
+
+Selecting a wallpaper activates photo mode; selecting a pattern on the Desktop
+tab switches back to tiled-pattern mode. Both selections and placement are
+remembered. Each monitor renders the picture independently at its own size,
+rather than spanning a combined desktop. Added or replaced files are refreshed
+automatically; removed selections fall back to the built-in default.
+
+PNG, JPEG, BMP, GIF, TIFF, standalone PICT and PICT resources in classic Mac
+containers are supported. Pattern resources belong in Desktop Patterns instead.
+Wallpaper limits are 64 MiB per source, 32 megapixels per picture and 128
+pictures/64 megapixels per catalog. Sources are not modified.
 
 ## License
 

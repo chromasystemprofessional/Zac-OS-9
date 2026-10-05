@@ -20,6 +20,7 @@
 #include "icons.h"
 #include "pixels.h"
 #include "settings.h"
+#include "platinumshell.h"
 
 static constexpr int W = 460, H = 320;
 static constexpr int MARGIN = 16;
@@ -320,7 +321,11 @@ void WinInstallWindow::openWithoutInstalling() {
 		update();
 		return;
 	}
-	QProcess::startDetached(wine, { m_file }, QFileInfo(m_file).absolutePath());
+	if (!platinumStartApplication(wine, { m_file }, QFileInfo(m_file).absolutePath())) {
+		m_message = "The Windows program could not be started.";
+		update();
+		return;
+	}
 	close();
 }
 

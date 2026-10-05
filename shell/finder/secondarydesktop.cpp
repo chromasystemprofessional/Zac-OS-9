@@ -14,6 +14,7 @@
 #include <memory>
 
 #include "patterns.h"
+#include "custompatterns.h"
 #include "pixels.h"
 
 namespace {
@@ -49,6 +50,8 @@ std::map<QScreen *, std::unique_ptr<SecondaryDesktop>> &desktops() {
 } // namespace
 
 SecondaryDesktop::SecondaryDesktop(QScreen *screen) : m_screen(screen) {
+	watchDesktopPatterns(this, [this] { loadPattern(); update(); });
+	watchDesktopWallpaper(this, [this] { update(); });
 	setAttribute(Qt::WA_OpaquePaintEvent);
 	setFocusPolicy(Qt::NoFocus);
 	loadPattern();
@@ -71,12 +74,12 @@ SecondaryDesktop::SecondaryDesktop(QScreen *screen) : m_screen(screen) {
 void SecondaryDesktop::loadPattern() {
 	QSettings settings(settingsDir() + "/desktop.conf", QSettings::IniFormat);
 	const QByteArray id = settings.value("pattern").toString().toUtf8();
-	m_pattern = pl_pattern_find(id.isEmpty() ? nullptr : id.constData());
+	m_pattern = desktopPatternFind(QString::fromUtf8(id));
 }
 
 void SecondaryDesktop::paintEvent(QPaintEvent *) {
 	Pixels px(width(), height());
-	pl_pattern_fill(&px.c, m_pattern, 0, 0, width() - 1, height() - 1);
+	desktopBackgroundFill(&px.c, width(), height());
 	QPainter p(this);
 	px.blit(p);
 }

@@ -5,15 +5,18 @@
 #include <unistd.h>
 #include <wlr/backend/session.h>
 #include <wlr/types/wlr_data_device.h>
+#include <wlr/types/wlr_cursor_shape_v1.h>
 #include <wlr/types/wlr_input_device.h>
 #include <wlr/types/wlr_keyboard.h>
 #include <wlr/types/wlr_pointer.h>
 #include <wlr/types/wlr_virtual_keyboard_v1.h>
 #include <wlr/types/wlr_virtual_pointer_v1.h>
 #include <wlr/util/edges.h>
+#include <wlr/util/log.h>
 #include <xkbcommon/xkbcommon.h>
 
 #include "frame.h"
+#include "launch.h"
 #include "server.h"
 
 /* ---- keyboard ---------------------------------------------------------- */
@@ -227,6 +230,7 @@ void input_begin_grab(struct plat_server *server, struct plat_view *view,
 	server->grab_part = part;
 	server->grab_moved = false;
 	wlr_seat_pointer_clear_focus(server->seat);
+	input_refresh_cursor(server);
 	if (mode == PLAT_CURSOR_TRACK_BOX) {
 		view_set_pressed(view, part);
 	}
@@ -237,6 +241,7 @@ static void end_grab(struct plat_server *server) {
 	server->cursor_mode = PLAT_CURSOR_PASSTHROUGH;
 	server->grabbed_view = NULL;
 	server->grab_part = DECOR_PART_NONE;
+	input_refresh_cursor(server);
 }
 
 static struct wlr_box resize_box(struct plat_server *server) {
@@ -391,6 +396,31 @@ static void frame_press(struct plat_server *server, struct plat_view *view,
 
 /* ---- pointer ----------------------------------------------------------- */
 
+void input_refresh_cursor(struct plat_server *server) {
+	bool busy = launch_pending(server) &&
+		server->cursor_mode == PLAT_CURSOR_PASSTHROUGH && !server->drag_icon;
+	if (busy) {
+		if (!server->launch_cursor_shown) {
+			wlr_cursor_set_xcursor(server->cursor, server->cursor_mgr, "watch");
+		}
+		server->launch_cursor_shown = true;
+		return;
+	}
+	server->launch_cursor_shown = false;
+	if (server->cursor_client &&
+			server->cursor_client == server->seat->pointer_state.focused_client) {
+		if (server->client_cursor_name) {
+			wlr_cursor_set_xcursor(server->cursor, server->cursor_mgr,
+				server->client_cursor_name);
+		} else {
+			wlr_cursor_set_surface(server->cursor, server->client_cursor_surface,
+				server->cursor_hotspot_x, server->cursor_hotspot_y);
+		}
+	} else {
+		wlr_cursor_set_xcursor(server->cursor, server->cursor_mgr, "default");
+	}
+}
+
 static void process_cursor_motion(struct plat_server *server, uint32_t time) {
 	if (server->drag_icon) {
 		wlr_scene_node_set_position(&server->drag_icon->node,
@@ -409,9 +439,9 @@ static void process_cursor_motion(struct plat_server *server, uint32_t time) {
 		wlr_seat_pointer_notify_motion(server->seat, time, sx, sy);
 	} else {
 		/* Desktop or window frame: the compositor owns the arrow. */
-		wlr_cursor_set_xcursor(server->cursor, server->cursor_mgr, "default");
 		wlr_seat_pointer_clear_focus(server->seat);
 	}
+	input_refresh_cursor(server);
 }
 
 static void cursor_motion(struct wl_listener *listener, void *data) {
@@ -496,13 +526,70 @@ static void cursor_frame(struct wl_listener *listener, void *data) {
 
 /* ---- seat requests ----------------------------------------------------- */
 
+static void client_cursor_destroy(struct wl_listener *listener, void *data) {
+	struct plat_server *server = wl_container_of(listener, server, client_cursor_destroy);
+	wl_list_remove(&server->client_cursor_destroy.link);
+	server->client_cursor_surface = NULL;
+	input_refresh_cursor(server);
+}
+
+static void clear_client_cursor(struct plat_server *server) {
+	if (server->client_cursor_surface) {
+		wl_list_remove(&server->client_cursor_destroy.link);
+		server->client_cursor_surface = NULL;
+	}
+}
+
+static void cursor_client_destroy(struct wl_listener *listener, void *data) {
+	struct plat_server *server = wl_container_of(listener, server, cursor_client_destroy);
+	wl_list_remove(&server->cursor_client_destroy.link);
+	clear_client_cursor(server);
+	server->cursor_client = NULL;
+	server->client_cursor_name = NULL;
+	input_refresh_cursor(server);
+}
+
+static void remember_cursor_client(struct plat_server *server, struct wlr_seat_client *client) {
+	if (server->cursor_client == client) {
+		return;
+	}
+	if (server->cursor_client) {
+		wl_list_remove(&server->cursor_client_destroy.link);
+	}
+	server->cursor_client = client;
+	server->cursor_client_destroy.notify = cursor_client_destroy;
+	wl_signal_add(&client->events.destroy, &server->cursor_client_destroy);
+}
+
 static void seat_request_cursor(struct wl_listener *listener, void *data) {
 	struct plat_server *server = wl_container_of(listener, server, request_cursor);
 	struct wlr_seat_pointer_request_set_cursor_event *event = data;
 	if (server->seat->pointer_state.focused_client == event->seat_client) {
-		wlr_cursor_set_surface(server->cursor, event->surface,
-			event->hotspot_x, event->hotspot_y);
+		clear_client_cursor(server);
+		remember_cursor_client(server, event->seat_client);
+		server->client_cursor_name = NULL;
+		server->client_cursor_surface = event->surface;
+		server->cursor_hotspot_x = event->hotspot_x;
+		server->cursor_hotspot_y = event->hotspot_y;
+		if (event->surface) {
+			server->client_cursor_destroy.notify = client_cursor_destroy;
+			wl_signal_add(&event->surface->events.destroy, &server->client_cursor_destroy);
+		}
+		input_refresh_cursor(server);
 	}
+}
+
+static void seat_request_cursor_shape(struct wl_listener *listener, void *data) {
+	struct plat_server *server = wl_container_of(listener, server, request_cursor_shape);
+	struct wlr_cursor_shape_manager_v1_request_set_shape_event *event = data;
+	if (event->device_type != WLR_CURSOR_SHAPE_MANAGER_V1_DEVICE_TYPE_POINTER ||
+			server->seat->pointer_state.focused_client != event->seat_client) {
+		return;
+	}
+	clear_client_cursor(server);
+	remember_cursor_client(server, event->seat_client);
+	server->client_cursor_name = wlr_cursor_shape_v1_name(event->shape);
+	input_refresh_cursor(server);
 }
 
 static void seat_request_set_selection(struct wl_listener *listener, void *data) {
@@ -529,6 +616,7 @@ static void drag_destroy(struct wl_listener *listener, void *data) {
 	/* The scene removes the icon's tree itself. */
 	server->drag_icon = NULL;
 	wl_list_remove(&server->drag_destroy.link);
+	input_refresh_cursor(server);
 }
 
 static void seat_start_drag(struct wl_listener *listener, void *data) {
@@ -542,6 +630,7 @@ static void seat_start_drag(struct wl_listener *listener, void *data) {
 	}
 	server->drag_destroy.notify = drag_destroy;
 	wl_signal_add(&drag->events.destroy, &server->drag_destroy);
+	input_refresh_cursor(server);
 }
 
 /* The ZacOS9 cursor theme (assets/cursors) sits next to our binary in
@@ -575,6 +664,15 @@ void input_init(struct plat_server *server) {
 	use_zacos9_cursors();
 	server->cursor_mgr = wlr_xcursor_manager_create(ZACOS9_CURSOR_THEME, ZACOS9_CURSOR_SIZE);
 	server->cursor_mode = PLAT_CURSOR_PASSTHROUGH;
+	launch_init(server);
+	struct wlr_cursor_shape_manager_v1 *shapes =
+		wlr_cursor_shape_manager_v1_create(server->display, 1);
+	if (!shapes) {
+		wlr_log(WLR_ERROR, "Could not create cursor-shape manager");
+		exit(EXIT_FAILURE);
+	}
+	server->request_cursor_shape.notify = seat_request_cursor_shape;
+	wl_signal_add(&shapes->events.request_set_shape, &server->request_cursor_shape);
 
 	server->cursor_motion.notify = cursor_motion;
 	wl_signal_add(&server->cursor->events.motion, &server->cursor_motion);

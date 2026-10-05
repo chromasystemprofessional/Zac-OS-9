@@ -3,11 +3,15 @@
 #include <QGuiApplication>
 #include <QHash>
 #include <QPointer>
+#include <QProcess>
+#include <QDebug>
 #include <QWidget>
 #include <QWindow>
 #include <QtGui/qguiapplication_platform.h>
 #include <qpa/qplatformnativeinterface.h>
 #include <cstring>
+#include <cerrno>
+#include <algorithm>
 #include <wayland-client.h>
 
 #include "platinum-shell-v1-client-protocol.h"
@@ -32,13 +36,18 @@ static void handle_window_position(void *, platinum_shell_v1 *, wl_surface *surf
 	}
 }
 
-/* Version 1 is bound: active_client (the menu bar's) never arrives. */
-static const platinum_shell_v1_listener shell_listener = { handle_window_position, nullptr };
+static void handle_active_client(void *, platinum_shell_v1 *, uint32_t) {
+}
+static const platinum_shell_v1_listener shell_listener = {
+	handle_window_position, handle_active_client
+};
 
-static void global(void *, wl_registry *reg, uint32_t name, const char *iface, uint32_t) {
+static void global(void *, wl_registry *reg, uint32_t name, const char *iface, uint32_t version) {
 	if (std::strcmp(iface, platinum_shell_v1_interface.name) == 0) {
 		shell = static_cast<platinum_shell_v1 *>(
-			wl_registry_bind(reg, name, &platinum_shell_v1_interface, 1));
+			wl_registry_bind(reg, name, &platinum_shell_v1_interface,
+				std::min(version, 3u)));
+		platinum_shell_v1_add_listener(shell, &shell_listener, nullptr);
 	}
 }
 
@@ -48,6 +57,11 @@ static void global_remove(void *, wl_registry *, uint32_t) {
 static const wl_registry_listener registry_listener = { global, global_remove };
 
 void platinumShellInit() {
+	static bool initialized = false;
+	if (initialized) {
+		return;
+	}
+	initialized = true;
 	auto *wayland = qGuiApp->nativeInterface<QNativeInterface::QWaylandApplication>();
 	if (!wayland) {
 		return;
@@ -63,12 +77,58 @@ void platinumShellInit() {
 	wl_registry_add_listener(registry, &registry_listener, nullptr);
 	wl_display_roundtrip_queue(display, queue);
 	wl_registry_destroy(registry);
-	wl_event_queue_destroy(queue);
 	if (shell) {
 		/* ...then let Qt's main-thread dispatch deliver its events. */
 		wl_proxy_set_queue(reinterpret_cast<wl_proxy *>(shell), nullptr);
-		platinum_shell_v1_add_listener(shell, &shell_listener, nullptr);
 	}
+	wl_event_queue_destroy(queue);
+}
+
+static void flushLaunch() {
+	if (wl_display_flush(display) < 0 && errno != EAGAIN) {
+		qWarning() << "Could not send application launch feedback:" << strerror(errno);
+	}
+}
+
+uint32_t platinumBeginLaunch(const QString &appId) {
+	platinumShellInit();
+	if (!shell || wl_proxy_get_version(reinterpret_cast<wl_proxy *>(shell)) < 3) {
+		return 0; /* Other compositors and older ZacOS releases remain supported. */
+	}
+	static uint32_t nextCookie = 0;
+	if (++nextCookie == 0) {
+		++nextCookie;
+	}
+	platinum_shell_v1_begin_launch(shell, nextCookie, 0, appId.toUtf8().constData());
+	flushLaunch();
+	return nextCookie;
+}
+
+void platinumUpdateLaunch(uint32_t cookie, uint32_t pid) {
+	if (cookie) {
+		platinum_shell_v1_update_launch(shell, cookie, pid);
+		flushLaunch();
+	}
+}
+
+void platinumCancelLaunch(uint32_t cookie) {
+	if (cookie) {
+		platinum_shell_v1_cancel_launch(shell, cookie);
+		flushLaunch();
+	}
+}
+
+bool platinumStartApplication(const QString &program, const QStringList &args,
+		const QString &directory) {
+	const uint32_t cookie = platinumBeginLaunch();
+	qint64 pid = 0;
+	if (!QProcess::startDetached(program, args, directory, &pid)) {
+		platinumCancelLaunch(cookie);
+		qWarning() << "Could not launch application:" << program;
+		return false;
+	}
+	platinumUpdateLaunch(cookie, static_cast<uint32_t>(pid));
+	return true;
 }
 
 static wl_surface *surfaceOf(QWidget *window) {

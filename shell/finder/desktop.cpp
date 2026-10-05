@@ -21,6 +21,7 @@
 #include "localvolumes.h"
 #include "netvolumes.h"
 #include "patterns.h"
+#include "custompatterns.h"
 #include "settings.h"
 
 /* How often the desktop checks what's mounted from the Network Browser:
@@ -45,14 +46,16 @@ static QString settingsDir() {
 void Desktop::loadPattern() {
 	QSettings settings(settingsDir() + "/desktop.conf", QSettings::IniFormat);
 	const QByteArray id = settings.value("pattern").toString().toUtf8();
-	const int pattern = pl_pattern_find(id.isEmpty() ? nullptr : id.constData());
+	const int pattern = desktopPatternFind(QString::fromUtf8(id));
 	if (pattern != m_pattern) {
 		m_pattern = pattern;
-		update();
 	}
+	update();
 }
 
 Desktop::Desktop() {
+	watchDesktopPatterns(this, [this] { loadPattern(); update(); });
+	watchDesktopWallpaper(this, [this] { update(); });
 	setAttribute(Qt::WA_OpaquePaintEvent);
 	setAcceptDrops(true);
 	m_renameTimer.setSingleShot(true);
@@ -385,7 +388,7 @@ void Desktop::resizeEvent(QResizeEvent *) {
 void Desktop::paintEvent(QPaintEvent *) {
 	Pixels px(width(), height());
 	pl_canvas *c = &px.c;
-	pl_pattern_fill(c, m_pattern, 0, 0, width() - 1, height() - 1);
+	desktopBackgroundFill(c, width(), height());
 	paintIconItem(c, *m_disk, m_disk->pos.x(), m_disk->pos.y(), true);
 	if (m_unix) {
 		paintIconItem(c, *m_unix, m_unix->pos.x(), m_unix->pos.y(), true);
