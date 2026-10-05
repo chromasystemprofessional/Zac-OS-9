@@ -24,7 +24,7 @@ Updated: 2026-10-05
 
 ## Current work
 
-**Sound output selection** (uncommitted): the Sound control panel has a Platinum
+**Sound output selection** (0.1.3): the Sound control panel has a Platinum
 output menu for built-in speakers, available HDMI/DisplayPort monitor outputs,
 headphones and other audio-server outputs, including Bluetooth. Names include
 the monitor name when provided. Selection sets the default sink/port and moves
