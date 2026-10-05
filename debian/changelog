@@ -1,3 +1,12 @@
+zacos9 (0.1.2) trixie; urgency=medium
+
+  * Bluetooth control panel; installer can update an existing ZacOS 9;
+    every drive on the desktop; long icon names cut in the middle; Show in
+    Folder; zip files expand on double-click; balenaEtcher in Applications
+    > Utilities.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Sun, 04 Oct 2026 20:06:05 -0400
+
 zacos9 (0.1.1) trixie; urgency=medium
 
   * Screen Snapshot in the Apple menu.
