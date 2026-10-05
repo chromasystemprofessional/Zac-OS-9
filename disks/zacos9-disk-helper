@@ -1,0 +1,415 @@
+#!/usr/bin/python3
+"""List USB disks, or initialize DEVICE EXPECTED_ID as MBR/FAT32.
+
+Listing is unprivileged. Initialize must run through pkexec's installed
+org.zacos9.disks action. Eject/power-off belongs to UDisks2, not this helper.
+"""
+
+import contextlib
+import fcntl
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import stat
+import subprocess
+import sys
+import time
+
+
+LSBLK = "/usr/bin/lsblk"
+BLKID = "/usr/sbin/blkid"
+SFDISK = "/usr/sbin/sfdisk"
+MKFS = "/usr/sbin/mkfs.fat"
+MIN_SIZE = 64 * 1024 * 1024
+MAX_SIZE = 2 * 1024**4
+DEVICE = re.compile(r"/dev/(?:sd[a-z]+|nvme[0-9]+n[0-9]+|mmcblk[0-9]+)\Z")
+KNOWN_FILESYSTEMS = {
+    "vfat", "exfat", "ntfs", "ntfs3", "ext2", "ext3", "ext4", "btrfs",
+    "xfs", "f2fs", "hfs", "hfsplus", "udf", "iso9660", "jfs", "reiserfs",
+    "nilfs2", "ufs", "zfs_member", "bcachefs",
+}
+
+
+class Failure(Exception):
+    pass
+
+
+def run(argv, *, input=None, pass_fds=(), allowed=(0,)):
+    result = subprocess.run(
+        argv, input=input, text=True, capture_output=True, check=False,
+        pass_fds=pass_fds, timeout=120,
+        env={"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "LC_ALL": "C"},
+    )
+    if result.returncode not in allowed:
+        raise Failure(f"{Path(argv[0]).name} failed: {result.stderr.strip()}")
+    return result
+
+
+def read_text(path):
+    return Path(path).read_text(encoding="utf-8")
+
+
+def forbidden_signature(value):
+    value = (value or "").lower()
+    return any(word in value for word in
+               ("crypto", "luks", "bitlocker", "lvm", "raid", "swap",
+                "zfs_member", "bcache", "drbd", "mpath"))
+
+
+def snapshot():
+    """Merge lsblk's tree with kernel partition/holder/slave topology."""
+    data = json.loads(run([
+        LSBLK, "--json", "--bytes", "--paths", "--tree", "--output",
+        "NAME,KNAME,TYPE,SIZE,RO,TRAN,RM,MODEL,SERIAL,WWN,MAJ:MIN,FSTYPE,MOUNTPOINTS,LOG-SEC",
+    ]).stdout)
+    nodes, graph = {}, {}
+
+    def edge(a, b):
+        graph.setdefault(a, set()).add(b)
+        graph.setdefault(b, set()).add(a)
+
+    def visit(item, parent=None):
+        devno = item["maj:min"]
+        if not re.fullmatch(r"[0-9]+:[0-9]+", devno):
+            raise Failure("Invalid block topology")
+        nodes[devno] = item
+        graph.setdefault(devno, set())
+        if parent is not None:
+            edge(parent, devno)
+        for child in item.get("children", []):
+            visit(child, devno)
+
+    for item in data["blockdevices"]:
+        visit(item)
+
+    # Walk beyond lsblk's tree: a mounted mapped/LVM/RAID device can depend
+    # on several disks, and mountpoint-only checks on partitions miss it.
+    pending, seen = list(nodes), set()
+    while pending:
+        devno = pending.pop()
+        if devno in seen:
+            continue
+        seen.add(devno)
+        root = Path(f"/sys/dev/block/{devno}").resolve(strict=True)
+        if read_text(root / "dev").strip() != devno:
+            raise Failure("Block topology changed; list disks again")
+        neighbors = []
+        for kind in ("holders", "slaves"):
+            directory = root / kind
+            if directory.exists():
+                neighbors.extend(directory.iterdir())
+        backing_file = root / "loop" / "backing_file"
+        if backing_file.exists():
+            # Loop backing devices/files do not appear in holders/slaves.
+            filename = read_text(backing_file).strip()
+            if filename:
+                info = os.stat(filename)
+                number = info.st_rdev if stat.S_ISBLK(info.st_mode) else info.st_dev
+                other = f"{os.major(number)}:{os.minor(number)}"
+                if other in nodes:
+                    edge(devno, other)
+        if (root / "partition").exists():
+            neighbors.append(root.parent)
+        for child in root.iterdir():
+            if (child / "partition").exists():
+                neighbors.append(child)
+        for neighbor in neighbors:
+            other = read_text(neighbor / "dev").strip()
+            if not re.fullmatch(r"[0-9]+:[0-9]+", other):
+                raise Failure("Invalid kernel block topology")
+            edge(devno, other)
+            pending.append(other)
+
+    mounted = set()
+    for line in read_text("/proc/self/mountinfo").splitlines():
+        fields = line.split()
+        if len(fields) < 6:
+            raise Failure("Cannot determine mounted storage")
+        mounted.add(fields[2])
+    for devno, item in nodes.items():
+        if any(item.get("mountpoints") or []):
+            mounted.add(devno)
+
+    swap = set()
+    lines = read_text("/proc/swaps").splitlines()
+    if not lines or not lines[0].startswith("Filename"):
+        raise Failure("Cannot determine active swap")
+    for line in lines[1:]:
+        filename = re.sub(r"\\([0-7]{3})",
+                          lambda m: chr(int(m.group(1), 8)), line.split()[0])
+        info = os.stat(filename)
+        number = info.st_rdev if stat.S_ISBLK(info.st_mode) else info.st_dev
+        swap.add(f"{os.major(number)}:{os.minor(number)}")
+    return nodes, graph, mounted, swap
+
+
+def connected(graph, devno):
+    found, pending = set(), [devno]
+    while pending:
+        item = pending.pop()
+        if item not in found:
+            found.add(item)
+            pending.extend(graph.get(item, ()))
+    return found
+
+
+def device_info(item):
+    device = item["name"]
+    if not DEVICE.fullmatch(device) or os.path.realpath(device) != device:
+        raise Failure("Not a canonical physical whole disk")
+    info = os.stat(device, follow_symlinks=False)
+    number = f"{os.major(info.st_rdev)}:{os.minor(info.st_rdev)}"
+    if not stat.S_ISBLK(info.st_mode) or number != item["maj:min"]:
+        raise Failure("Disk device changed; list disks again")
+    root = Path(f"/sys/dev/block/{number}").resolve(strict=True)
+    if (root / "partition").exists():
+        raise Failure("Partitions cannot be initialized")
+    if root.name != Path(device).name:
+        raise Failure("Disk sysfs identity does not match")
+    if item.get("tran") != "usb" or not any(
+        (ancestor / "subsystem").resolve().name == "usb"
+        for ancestor in (root, *root.parents)
+    ):
+        raise Failure("Only physical USB disks can be initialized")
+    diskseq = read_text(root / "diskseq").strip()
+    if not diskseq.isdigit():
+        raise Failure("Cannot identify this disk insertion")
+    size = int(item["size"])
+    sector = int(item["log-sec"])
+    # Compare kernel capacity rather than trusting only cached udev metadata.
+    if int(read_text(root / "size")) * 512 != size:
+        raise Failure("Disk size changed; list disks again")
+    identity = {
+        "device": device, "devno": number, "sysfs": str(root),
+        "serial": item.get("serial") or "", "wwn": item.get("wwn") or "",
+        "size": size, "sector": sector, "diskseq": diskseq,
+    }
+    token = hashlib.sha256(json.dumps(
+        identity, sort_keys=True, separators=(",", ":"),
+    ).encode()).hexdigest()
+    return token
+
+
+def assess(state, item):
+    nodes, graph, mounted, swap = state
+    if item.get("type") != "disk":
+        raise Failure("Only whole physical disks can be initialized")
+    identity = device_info(item)
+    if item.get("ro") or read_text(
+        Path(f"/sys/dev/block/{item['maj:min']}") / "ro",
+    ).strip() != "0":
+        raise Failure("Disk is read-only")
+    size, sector = int(item["size"]), int(item["log-sec"])
+    if size < MIN_SIZE:
+        raise Failure("Disk is too small for FAT32 (minimum 64 MiB)")
+    if size > MAX_SIZE or sector != 512 or size // sector > 0xFFFFFFFF:
+        raise Failure("MBR/FAT32 requires a 512-byte-sector disk smaller than 2 TiB")
+    family = connected(graph, item["maj:min"])
+    if family & mounted:
+        raise Failure("Disk or related storage is mounted (including system storage)")
+    if family & swap:
+        raise Failure("Disk or related storage is active swap")
+    for devno in family:
+        node = nodes.get(devno)
+        if node is None:
+            raise Failure("Cannot identify related block storage")
+        if node.get("type") not in ("disk", "part"):
+            raise Failure("Disk is used by encrypted, LVM, RAID or mapped storage")
+        if forbidden_signature(node.get("fstype")):
+            raise Failure("Encrypted, LVM, RAID or swap signatures cannot be erased")
+    return identity
+
+
+def select(state, device, expected):
+    if not DEVICE.fullmatch(device):
+        raise Failure("Specify a canonical whole disk device")
+    matches = [item for item in state[0].values() if item["name"] == device]
+    if len(matches) != 1:
+        raise Failure("Disk disappeared or changed; list disks again")
+    item = matches[0]
+    identity = assess(state, item)
+    if identity != expected:
+        raise Failure("Disk identity changed (possibly unplugged/replugged); list disks again")
+    return item
+
+
+def listing():
+    state = snapshot()
+    disks = []
+    for item in state[0].values():
+        if item.get("type") != "disk" or item.get("tran") != "usb":
+            continue
+        entry = {
+            "device": item["name"],
+            "name": (item.get("model") or "").strip() or Path(item["name"]).name,
+            "size": int(item["size"] or 0), "identity": "",
+            "unreadable": False, "eligible": False, "reason": "",
+            "children": sorted(
+                state[0][number]["name"]
+                for number in connected(state[1], item["maj:min"])
+                if number in state[0] and state[0][number].get("type") == "part"
+            ),
+        }
+        try:
+            entry["identity"] = device_info(item)
+            assess(state, item)
+            # Ordinary desktop users usually cannot read raw block devices.
+            # Use lsblk/udev metadata then; root initialization always probes.
+            family = connected(state[1], item["maj:min"])
+            if all(os.access(state[0][number]["name"], os.R_OK) for number in family):
+                probe(state, item)
+            entry["eligible"] = True
+            filesystems = [state[0][devno].get("fstype") for devno in family]
+            entry["unreadable"] = not any(
+                value in KNOWN_FILESYSTEMS for value in filesystems
+            )
+        except (Failure, OSError, ValueError) as error:
+            entry["reason"] = str(error)
+        disks.append(entry)
+    return {"version": 1, "disks": sorted(disks, key=lambda item: item["device"])}
+
+
+@contextlib.contextmanager
+def opened(device, devno, exclusive=False, locked=False):
+    flags = os.O_RDWR | os.O_CLOEXEC | os.O_NOFOLLOW
+    if exclusive:
+        flags |= os.O_EXCL
+    fd = os.open(device, flags)
+    try:
+        info = os.fstat(fd)
+        number = f"{os.major(info.st_rdev)}:{os.minor(info.st_rdev)}"
+        if not stat.S_ISBLK(info.st_mode) or number != devno:
+            raise Failure("Disk device changed before opening")
+        if locked:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except OSError as error:
+                raise Failure("Disk is busy with another storage operation") from error
+        yield fd
+    finally:
+        os.close(fd)
+
+
+def probe(state, item):
+    for devno in connected(state[1], item["maj:min"]):
+        node = state[0][devno]
+        result = run([BLKID, "--probe", "--output", "export", node["name"]],
+                     allowed=(0, 2))
+        fields = dict(line.split("=", 1) for line in result.stdout.splitlines()
+                      if "=" in line)
+        if (forbidden_signature(fields.get("TYPE"))
+                or fields.get("USAGE") in ("crypto", "raid", "other")):
+            raise Failure("Encrypted, LVM, RAID or swap signatures cannot be erased")
+        if fields.get("TYPE"):
+            node["fstype"] = fields["TYPE"]
+
+
+def fresh(device, expected):
+    try:
+        state = snapshot()
+        return state, select(state, device, expected)
+    except OSError as error:
+        raise Failure("Cannot revalidate disk; it may have disappeared or changed. "
+                      f"List disks again: {error}") from error
+
+
+def initialize(device, expected):
+    if os.geteuid() != 0:
+        raise Failure("Initialization requires administrator authentication via pkexec")
+    if not re.fullmatch(r"[0-9a-f]{64}", expected):
+        raise Failure("Invalid disk identity; list disks again")
+    state, item = fresh(device, expected)
+    probe(state, item)
+    # Hold the disk's advisory lock across both commands, not just sfdisk.
+    # This cooperates with udev's shared probe lock and other initializers.
+    with opened(device, item["maj:min"], locked=True):
+        partition_number = initialize_locked(device, expected)
+    run(["/usr/bin/udevadm", "trigger", "--action=change", "--settle",
+         f"/sys/dev/block/{partition_number}"])
+    print(json.dumps({"version": 1, "device": device, "initialized": True}))
+
+
+def initialize_locked(device, expected):
+    state, item = fresh(device, expected)
+    # O_EXCL prevents mounted storage from being claimed during partitioning.
+    # Commands use inherited descriptors so device-node replacement cannot
+    # redirect a destructive operation to a different disk.
+    with opened(device, item["maj:min"], exclusive=True) as disk_fd:
+        state, item = fresh(device, expected)
+        probe(state, item)
+        fresh(device, expected)
+        run([SFDISK, "--lock=no", "--wipe", "always",
+             "--wipe-partitions", "always", f"/proc/self/fd/{disk_fd}"],
+            input="label: dos\nunit: sectors\n\nstart=2048, type=c\n",
+            pass_fds=(disk_fd,))
+        table = json.loads(run(
+            [SFDISK, "--json", f"/proc/self/fd/{disk_fd}"],
+            pass_fds=(disk_fd,),
+        ).stdout)["partitiontable"]
+        partitions = table.get("partitions", [])
+        if (table.get("label") != "dos" or table.get("sectorsize") != 512
+                or len(partitions) != 1 or partitions[0].get("start") != 2048
+                or partitions[0].get("type") not in ("c", "0c")
+                or partitions[0].get("size", 0) < (MIN_SIZE // 512 - 2048)):
+            raise Failure("Unexpected partition table; disk was NOT formatted")
+    # Do not wait for udev while holding its probe lock; devtmpfs and the
+    # kernel topology already expose the new partition. Trigger after unlock.
+    deadline = time.monotonic() + 10
+    while True:
+        state, item = fresh(device, expected)
+        children = [
+            state[0][number] for number in state[1].get(item["maj:min"], ())
+            if state[0][number].get("type") == "part"
+        ]
+        if len(children) == 1:
+            partition = children[0]
+            break
+        if time.monotonic() >= deadline:
+            raise Failure("Partition did not appear; disk was NOT formatted")
+        time.sleep(0.1)
+    part_device = partition["name"]
+    if (os.path.realpath(part_device) != part_device
+            or not re.fullmatch(re.escape(device) + r"(?:p)?1", part_device)
+            or int(partition["size"]) != partitions[0]["size"] * 512):
+        raise Failure("Unexpected partition device; disk was NOT formatted")
+    with opened(part_device, partition["maj:min"]) as part_fd:
+        state, item = fresh(device, expected)
+        current = state[0].get(partition["maj:min"])
+        if current is None or current["name"] != part_device:
+            raise Failure("Partition identity changed; disk was NOT formatted")
+        probe(state, item)
+        fresh(device, expected)
+        # mkfs.fat itself opens exclusively, refusing a partition mounted
+        # between the final safety check and its open.
+        run([MKFS, "-F", "32", "-n", "Untitled", f"/proc/self/fd/{part_fd}"],
+            pass_fds=(part_fd,))
+        os.fsync(part_fd)
+        result = run([BLKID, "--probe", "--output", "export",
+                      f"/proc/self/fd/{part_fd}"], pass_fds=(part_fd,))
+        fields = dict(line.split("=", 1) for line in result.stdout.splitlines()
+                      if "=" in line)
+        if (fields.get("TYPE") != "vfat" or fields.get("VERSION") != "FAT32"
+                or fields.get("LABEL") != "Untitled"):
+            raise Failure("Could not verify the new FAT32 volume")
+    return partition["maj:min"]
+
+
+def main(args=None):
+    args = sys.argv[1:] if args is None else args
+    try:
+        if args == ["list"]:
+            print(json.dumps(listing()))
+        elif len(args) == 3 and args[0] == "initialize":
+            initialize(args[1], args[2])
+        else:
+            raise Failure("Usage: zacos9-disk-helper list | initialize DEVICE EXPECTED_ID")
+        return 0
+    except (Failure, OSError, ValueError, KeyError, subprocess.SubprocessError) as error:
+        print(f"zacos9-disk-helper: {error}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

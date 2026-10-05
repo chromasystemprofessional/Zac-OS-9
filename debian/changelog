@@ -1,3 +1,13 @@
+zacos9 (0.1.11) trixie; urgency=medium
+
+  * Offer Eject, Ignore and Initialize when eligible unreadable USB disks
+    are inserted. Require explicit whole-disk erase confirmation and
+    administrator authorization before creating an Untitled FAT32 volume.
+  * Protect mounted, system, encrypted and other unsafe storage; recheck
+    device identity before initialization and install the required tools.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Mon, 05 Oct 2026 17:53:43 -0400
+
 zacos9 (0.1.10) trixie; urgency=medium
 
   * Add distinct window collapse and expand sounds, controlled repeating

@@ -24,6 +24,21 @@ Updated: 2026-10-05
 
 ## Current work
 
+**Unreadable USB disk initialization** (0.1.11): Sniffer checks inserted
+USB storage and mount failures and offers a Platinum Eject/Ignore/Initialize
+alert. Initialization requires a second explicit whole-disk erase confirmation
+with Cancel as default, followed by administrator authorization. A constrained
+helper creates one FAT32 partition labeled Untitled, rejecting unsafe storage
+and verifying device identity again before destructive commands. Mounted,
+system, encrypted and read-only devices are not initialization candidates.
+Physical USB and formatting validation are pending; no real disk is erased
+during automated tests.
+Finder builds successfully. The 40 mocked helper tests, offscreen dialog
+controller tests and Finder selection regression suite pass. Helper tests cover
+mounted/system-device topology, swap, protected signatures, identity changes,
+exclusive opens and verified FAT32 command sequencing. Read-only discovery was
+checked; physical USB formatting verification remains pending.
+
 **HDMI audio on Haswell Macs** (0.1.8): HDMI/DisplayPort sound stuttered
 on the iMac14,1 while analog played cleanly. The Haswell HDMI controller's
 position buffer runs ahead of the sound sent: its pointer leapt 500-2,400

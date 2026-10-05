@@ -31,10 +31,17 @@ void localVolumesOnChange(std::function<void()> f);
  * disk on the desktop at startup, and from then on each one that appears
  * (a USB stick, a disc). Each volume is tried once: one that can't be
  * mounted (a Windows partition left in use by Fast Startup, an encrypted
- * one) is logged and left alone. Internal drives need polkit's
+ * one) is logged and reported to the disk-initialization controller, which
+ * independently excludes unsafe and non-USB storage. Internal drives need polkit's
  * filesystem-mount-system, which 50-zacos9-mount.rules grants to
  * administrators at the computer. */
 void localVolumesMountAll();
+
+/* Failed block-device mounts, excluding cancellation and authorization errors. */
+void localVolumesOnMountFailed(std::function<void(const QString &)> f);
+
+/* Retry mounting the newly initialized disk, without retrying other volumes. */
+void localVolumeMountDevice(const QString &device);
 
 /* Ejects or unmounts `v` asynchronously. Returns false immediately if
  * no matching GMount can be found; the actual unmount happens on the

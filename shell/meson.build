@@ -162,13 +162,15 @@ executable('zacos9-finder',
   'finder/vfs.cpp',
   'finder/appdb.cpp',
   'finder/localvolumes.cpp',
+  'finder/diskinit.cpp',
   'finder/filemanager1.cpp',
   'network/netvolumes.cpp',
   'network/smbclient.cpp',
   link_with: panelkit,
   include_directories: include_directories('finder', 'panels', 'network'),
   dependencies: [platinum_dep, qt6, layershellqt, wayland_client, gio, gio_unix],
-  cpp_args: ['-std=c++17'],
+  cpp_args: ['-std=c++17', '-DZACOS9_DISK_HELPER="@0@"'.format(
+    get_option('prefix') / get_option('libexecdir') / 'zacos9' / 'zacos9-disk-helper')],
   install: true,
 )
 
@@ -193,6 +195,7 @@ finder_selection_sources = [
   'finder/vfs.cpp',
   'finder/appdb.cpp',
   'finder/localvolumes.cpp',
+  'finder/diskinit.cpp',
   'finder/filemanager1.cpp',
   'network/netvolumes.cpp',
   'network/smbclient.cpp',
@@ -222,6 +225,18 @@ test('finder-vfs',
   ),
   env: ['QT_QPA_PLATFORM=offscreen'],
   timeout: 180,
+)
+
+test('disk-initialization-ui',
+  executable('test-diskinit', '../tests/finder/test_diskinit.cpp',
+    'finder/diskinit.cpp', 'finder/localvolumes.cpp',
+    'finder/alert.cpp', 'finder/platinumshell.cpp', finder_protocol,
+    dependencies: [platinum_dep, qt6, gio, wayland_client],
+    include_directories: include_directories('finder', 'network'),
+    cpp_args: ['-std=c++17'],
+  ),
+  env: ['QT_QPA_PLATFORM=offscreen'],
+  timeout: 60,
 )
 
 executable('zacos9-appearance',

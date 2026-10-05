@@ -117,6 +117,12 @@ void localVolumesOnChange(std::function<void()> f) {
 /* ---- mounting ----------------------------------------------------------- */
 
 static QSet<QString> g_tried; /* volumes already mounted once, by device */
+static QSet<QString> g_mounting;
+static std::vector<std::function<void(const QString &)>> g_mountFailed;
+
+void localVolumesOnMountFailed(std::function<void(const QString &)> f) {
+	g_mountFailed.push_back(std::move(f));
+}
 
 static QString volumeName(GVolume *v) {
 	char *raw = g_volume_get_name(v);
@@ -126,10 +132,25 @@ static QString volumeName(GVolume *v) {
 }
 
 static void onMounted(GObject *src, GAsyncResult *res, gpointer) {
+	char *rawDevice = g_volume_get_identifier(G_VOLUME(src), G_VOLUME_IDENTIFIER_KIND_UNIX_DEVICE);
+	const QString mountedDevice = QString::fromUtf8(rawDevice ? rawDevice : "");
+	g_free(rawDevice);
+	g_mounting.remove(mountedDevice);
 	GError *err = nullptr;
 	if (!g_volume_mount_finish(G_VOLUME(src), res, &err) && err) {
 		fprintf(stderr, "zacos9-finder: \"%s\" couldn't be mounted: %s\n",
 			qPrintable(volumeName(G_VOLUME(src))), err->message);
+		if (!g_error_matches(err, G_IO_ERROR, G_IO_ERROR_CANCELLED) &&
+				!g_error_matches(err, G_IO_ERROR, G_IO_ERROR_PERMISSION_DENIED) &&
+				!g_error_matches(err, G_IO_ERROR, G_IO_ERROR_FAILED_HANDLED)) {
+			char *device = g_volume_get_identifier(G_VOLUME(src), G_VOLUME_IDENTIFIER_KIND_UNIX_DEVICE);
+			if (device) {
+				for (auto &callback : g_mountFailed) {
+					callback(QString::fromUtf8(device));
+				}
+				g_free(device);
+			}
+		}
 		g_error_free(err);
 	}
 	/* Success: mount-added follows, and the desktop shows the disk. */
@@ -149,15 +170,49 @@ static void mountIfNeeded(GVolume *v) {
 	}
 	const QString key = QString::fromUtf8(dev);
 	g_free(dev);
-	if (g_tried.contains(key)) {
+	if (g_tried.contains(key) || g_mounting.contains(key)) {
 		return;
 	}
 	g_tried.insert(key);
+	g_mounting.insert(key);
 	g_volume_mount(v, G_MOUNT_MOUNT_NONE, nullptr, nullptr, onMounted, nullptr);
 }
 
 static void onVolumeAdded(GVolumeMonitor *, GVolume *v, gpointer) {
 	mountIfNeeded(v);
+}
+
+static void onVolumeRemoved(GVolumeMonitor *, GVolume *v, gpointer) {
+	char *device = g_volume_get_identifier(v, G_VOLUME_IDENTIFIER_KIND_UNIX_DEVICE);
+	if (device) {
+		g_tried.remove(QString::fromUtf8(device));
+		g_free(device);
+	}
+}
+
+void localVolumeMountDevice(const QString &device) {
+	GVolumeMonitor *monitor = g_volume_monitor_get();
+	GList *volumes = g_volume_monitor_get_volumes(monitor);
+	for (GList *item = volumes; item; item = item->next) {
+		auto *volume = G_VOLUME(item->data);
+		char *raw = g_volume_get_identifier(volume, G_VOLUME_IDENTIFIER_KIND_UNIX_DEVICE);
+		const QString path = QString::fromUtf8(raw ? raw : "");
+		g_free(raw);
+		/* Partition names append digits, or p plus digits for NVMe/MMC. */
+		const QString suffix = path.mid(device.size());
+		bool partition = path.startsWith(device) && !suffix.isEmpty();
+		const QString number = suffix.startsWith('p') ? suffix.mid(1) : suffix;
+		for (QChar c : number) {
+			partition = partition && c.isDigit();
+		}
+		partition = partition && !number.isEmpty();
+		if (path == device || partition) {
+			g_tried.remove(path);
+			mountIfNeeded(volume);
+		}
+	}
+	g_list_free_full(volumes, g_object_unref);
+	g_object_unref(monitor);
 }
 
 void localVolumesMountAll() {
@@ -172,6 +227,7 @@ void localVolumesMountAll() {
 	}
 	g_list_free_full(volumes, g_object_unref);
 	g_signal_connect(monitor, "volume-added", G_CALLBACK(onVolumeAdded), nullptr);
+	g_signal_connect(monitor, "volume-removed", G_CALLBACK(onVolumeRemoved), nullptr);
 }
 
 /* ---- eject -------------------------------------------------------------- */

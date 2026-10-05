@@ -148,6 +148,21 @@ is kept. 7z support uses `python3-libarchive-c`; StuffIt (`.sit`) support uses
 Unsafe StuffIt paths, links, and special entries are rejected before extraction.
 Password-protected archives are reported as unsupported rather than prompting.
 
+### Unreadable USB disks
+
+When an unformatted USB disk is detected, or an eligible USB disk cannot be
+mounted, Sniffer offers **Eject**, **Ignore**, and **Initialize** in a
+classic-style alert. Initialize asks again before erasing the **entire disk**,
+including every partition, then creates an MBR partition table with one
+**FAT32** volume named **Untitled**. Cancel is the default on the erase
+confirmation; administrator authentication is required.
+
+Never initialize a disk containing files you need to recover. This is not a
+repair tool. Mounted, system, encrypted, read-only and other unsafe disks are
+excluded. Hardware that Linux cannot detect cannot be initialized this way.
+FAT32 limits individual files to less than 4 GiB; the formatter only accepts
+disk sizes compatible with its FAT32/MBR layout.
+
 ## Custom desktop patterns
 
 Appearance also supports saved appearance presets and interface sound sets.
