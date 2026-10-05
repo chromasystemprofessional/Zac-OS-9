@@ -168,25 +168,23 @@ static void add_item(struct mb_menu *menu, const char *label, bool enabled,
 }
 
 void launch_fill_logo_menu(struct mb_menu *menu) {
-	/* Shown by the Finder. */
+	/* About and software tools are the top group in the Apple menu. */
 	add_item(menu, "About This Computer…", true, ACT_ABOUT, NULL);
-	add_item(menu, NULL, false, ACT_NONE, NULL);
-	/* Classic Mac OS in an emulator; the Finder explains what's missing. */
-	add_item(menu, "Classic", true, ACT_FINDER, "classic");
-	/* The Software window: an app catalog over apt. Mac OS 9 never had
-	 * one of these; it sits beside Classic, not inside Control Panels,
-	 * since it is its own application rather than a settings pane. */
+	/* The app catalog over apt. */
 	{
 		char command[PATH_MAX + 64];
 		sibling_program("zacos9-store", command, sizeof(command));
-		add_item(menu, "Software", true, ACT_LAUNCH, command);
+		add_item(menu, "Fetch Software", true, ACT_LAUNCH, command);
 	}
-	/* Software Update: new ZacOS 9 releases and Debian's own updates. */
+	/* New ZacOS 9 releases and Debian's own updates. */
 	{
 		char command[PATH_MAX + 64];
 		sibling_program("zacos9-update", command, sizeof(command));
-		add_item(menu, "Software Update", true, ACT_LAUNCH, command);
+		add_item(menu, "New Tricks", true, ACT_LAUNCH, command);
 	}
+	add_item(menu, NULL, false, ACT_NONE, NULL);
+	/* Classic Mac OS in an emulator; the Finder explains what's missing. */
+	add_item(menu, "Classic", true, ACT_FINDER, "classic");
 	/* Screen Snapshot: drag out part of the screen; it goes on the Desktop
 	 * as "Picture N.png" and on the clipboard. */
 	{

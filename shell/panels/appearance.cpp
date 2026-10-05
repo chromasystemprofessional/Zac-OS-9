@@ -7,11 +7,12 @@
 
 #include "patterns.h"
 #include "custompatterns.h"
+#include "customthemes.h"
 #include "settings.h"
 
 /* The window, its tab control, and the layout inside a pane following
  * the HIG's group box measurements (figure 3-29). */
-static constexpr int W = 380, H = 262;
+static constexpr int W = 580, H = 300;
 static constexpr int MARGIN = 10;
 static constexpr int TABS_Y = 10;
 static constexpr uint32_t FACE = GRAY(0xD);
@@ -30,7 +31,13 @@ static QString setting(const char *key) {
 }
 
 static void setSetting(const char *key, const QString &value) {
-	pl_setting_set(key, value.isEmpty() ? nullptr : value.toUtf8().constData());
+	if (!pl_setting_set(key, value.isEmpty() ? nullptr : value.toUtf8().constData())) {
+		qWarning() << "Could not save appearance preference:" << key;
+		return;
+	}
+	if (!pl_setting_set("appearance-theme", nullptr)) {
+		qWarning() << "Could not clear the changed appearance preset selection.";
+	}
 }
 
 /* ---- the panel ---------------------------------------------------------------- */
@@ -38,7 +45,7 @@ static void setSetting(const char *key, const QString &value) {
 AppearancePanel::AppearancePanel() {
 	setWindowTitle("Appearance");
 	setFixedSize(W, H);
-	for (const char *label : { "Color", "Desktop", "Wallpaper", "Sound" }) {
+	for (const char *label : { "Color", "Desktop", "Wallpaper", "Sound", "Themes", "Sound Sets" }) {
 		m_tabLabels.push_back(std::make_unique<Text>(label, 200, PL_FONT_SYSTEM));
 	}
 
@@ -150,7 +157,84 @@ AppearancePanel::AppearancePanel() {
 		update();
 	};
 
+	m_themes.frame = m_soundThemes.frame = m_sounds.frame;
+	m_previewTheme = PanelButton("Preview", QRect(m_soundThemes.frame.right() + 20, ITEM_TOP + 20, 90, 20));
+	m_previewTheme.clicked = [this] { previewSoundTheme(m_soundThemes.state.selected); };
+	m_interfaceVolume.pos = QPoint(m_soundThemes.frame.right() + 20, ITEM_TOP + 78);
+	m_interfaceVolume.width = 170;
+	m_interfaceVolume.steps = 8;
+	const QString volume = setting("interface-volume");
+	m_interfaceVolume.value = volume.isEmpty() ? 5 : std::clamp(volume.toInt(), 0, 7);
+	m_interfaceVolume.setLabels("Off", "Loud");
+	m_interfaceVolume.changed = [this](int value) {
+		if (!pl_setting_set("interface-volume", QByteArray::number(value).constData())) {
+			m_themeError = "Could not save interface sound volume.";
+		}
+		update();
+	};
+	m_themeName.rect = QRect(m_themes.frame.right() + 20, ITEM_TOP + 48, 170, PL_EDIT_H);
+	m_themeName.setText("My Theme");
+	m_saveTheme = PanelButton("Save Current", QRect(m_themes.frame.right() + 20, ITEM_TOP + 82, 130, 20));
+	m_saveTheme.clicked = [this] {
+		m_themeError.clear();
+		saveAppearanceTheme(m_themeName.text, &m_themeError);
+		update();
+	};
+	m_themes.picked = [this](int i) {
+		m_themeError.clear();
+		if (applyAppearanceTheme(i, &m_themeError)) {
+			m_accents.select(pl_accent_find(setting("accent").toUtf8().constData()), false);
+			const QString highlight = setting("highlight").toUpper();
+			int selected = 0;
+			for (size_t n = 1; n < m_highlightColors.size(); ++n) {
+				if (QString::asprintf("%06X", m_highlightColors[n] & 0xFFFFFF) == highlight) {
+					selected = static_cast<int>(n);
+				}
+			}
+			m_highlights.select(selected, false);
+			const QString alert = setting("alert-sound");
+			m_sounds.select(std::max<int>(0, m_soundIds.indexOf(alert.isEmpty() ? "platinum" : alert)), false);
+			const QStringList modes{ "fit", "fill", "stretch", "center" };
+			m_placement.selected = std::max<int>(0, modes.indexOf(setting("wallpaper-mode")));
+			loadPatterns();
+			loadWallpapers();
+			loadThemes();
+		}
+		update();
+	};
+	m_soundThemes.picked = [this](int i) {
+		m_themeError.clear();
+		applySoundTheme(i, &m_themeError);
+		update();
+	};
+	loadThemes();
+	watchCustomThemes(this, [this] { loadThemes(); update(); });
 	m_focus = &m_accents;
+}
+
+void AppearancePanel::loadThemes() {
+	QStringList names;
+	int selected = 0;
+	for (int i = 0; i < soundThemeCount(); ++i) {
+		names << soundThemeName(i);
+		if (soundThemeId(i) == setting("sound-theme")) {
+			selected = i;
+		}
+	}
+	m_soundThemes.setItems(names);
+	m_soundThemes.select(selected, false);
+	names.clear();
+	selected = -1;
+	for (int i = 0; i < appearanceThemeCount(); ++i) {
+		names << appearanceThemeName(i);
+		if (appearanceThemeId(i) == setting("appearance-theme")) {
+			selected = i;
+		}
+	}
+	m_themes.setItems(names);
+	m_themes.select(selected, false);
+	setToolTip("Appearance Themes: " + appearanceThemesFolder() +
+		"\nSound Themes: " + soundThemesFolder() + "\n" + customThemeErrors().join('\n'));
 }
 
 void AppearancePanel::loadPatterns() {
@@ -181,7 +265,16 @@ void AppearancePanel::loadWallpapers() {
 }
 
 void AppearancePanel::showTab(int tab) {
-	m_tab = std::clamp(tab, 0, 3);
+	m_tab = std::clamp(tab, 0, 5);
+	m_host.buttons = m_tab == 4 ? std::vector<PanelButton *>{ &m_saveTheme }
+		: m_tab == 5 ? std::vector<PanelButton *>{ &m_previewTheme } : std::vector<PanelButton *>{};
+	m_host.edits = m_tab == 4 ? std::vector<PanelEdit *>{ &m_themeName } : std::vector<PanelEdit *>{};
+	if (m_tab != 4) {
+		m_host.setFocus(nullptr);
+	}
+	if (m_tab == 4 || m_tab == 5) {
+		loadThemes();
+	}
 	m_focus = visibleLists().front();
 	update();
 }
@@ -191,7 +284,9 @@ std::vector<PanelList *> AppearancePanel::visibleLists() {
 	case 0: return { &m_accents, &m_highlights };
 	case 1: return { &m_patterns };
 	case 2: return { &m_wallpapers };
-	default: return { &m_sounds };
+	case 3: return { &m_sounds };
+	case 4: return { &m_themes };
+	default: return { &m_soundThemes };
 	}
 }
 
@@ -264,7 +359,7 @@ void AppearancePanel::paintWallpaperTab(pl_canvas *c) {
 	const QStringList errors = desktopWallpaperErrors();
 	const bool active = setting("background") == "wallpaper";
 	Text hint(!errors.isEmpty() ? "Import error: " + errors.first() :
-		desktopWallpaperCount() == 0 ? "Add photos to System Folder > Wallpaper." :
+		desktopWallpaperCount() == 0 ? "Add photos to Appearance > Wallpaper." :
 		active && desktopWallpaperFind(setting("wallpaper")) < 0
 			? "Selected wallpaper is missing; select a photo." :
 		active ? "Wallpaper active; choose a pattern to switch."
@@ -286,6 +381,31 @@ void AppearancePanel::paintSoundTab(pl_canvas *c) {
 	}
 }
 
+void AppearancePanel::paintThemesTab(pl_canvas *c) {
+	groupAround(c, m_themes.frame, "Appearance Theme", BOX_R);
+	paintList(c, m_themes, m_focus == &m_themes);
+	const int x = m_themes.frame.right() + 20;
+	panelText(c, "Save the current colors,", x, ITEM_TOP + 12, PL_FONT_VIEWS);
+	panelText(c, "background and sound set.", x, ITEM_TOP + 26, PL_FONT_VIEWS);
+	m_host.paintControls(c, PANE);
+	const QStringList errors = customThemeErrors();
+	panelText(c, !m_themeError.isEmpty() ? m_themeError : !errors.isEmpty() ? errors.first()
+		: "Custom presets: Appearance > Themes", BOX_L + 4, H - 24, PL_FONT_VIEWS, C_BLACK, BOX_R - BOX_L);
+}
+
+void AppearancePanel::paintSoundThemesTab(pl_canvas *c) {
+	groupAround(c, m_soundThemes.frame, "Sound Set", BOX_R);
+	paintList(c, m_soundThemes, m_focus == &m_soundThemes);
+	const int x = m_soundThemes.frame.right() + 20;
+	panelText(c, "Interface sounds", x, ITEM_TOP + 12, PL_FONT_SYSTEM);
+	panelText(c, "Interface Volume:", x, ITEM_TOP + 68, PL_FONT_VIEWS);
+	m_interfaceVolume.paint(c);
+	m_host.paintControls(c, PANE);
+	const QStringList errors = customThemeErrors();
+	panelText(c, !m_themeError.isEmpty() ? m_themeError : !errors.isEmpty() ? errors.first()
+		: "Add sets to Appearance > Sound Themes", BOX_L + 4, H - 24, PL_FONT_VIEWS, C_BLACK, BOX_R - BOX_L);
+}
+
 void AppearancePanel::paintEvent(QPaintEvent *) {
 	Pixels px(W, H);
 	pl_canvas *c = &px.c;
@@ -300,7 +420,9 @@ void AppearancePanel::paintEvent(QPaintEvent *) {
 	case 0: paintColorTab(c); break;
 	case 1: paintDesktopTab(c); break;
 	case 2: paintWallpaperTab(c); break;
-	default: paintSoundTab(c); break;
+	case 3: paintSoundTab(c); break;
+	case 4: paintThemesTab(c); break;
+	default: paintSoundThemesTab(c); break;
 	}
 	QPainter p(this);
 	px.blit(p);
@@ -315,12 +437,17 @@ void AppearancePanel::mousePressEvent(QMouseEvent *e) {
 	const int tab = pl_tabs_hit(MARGIN, TABS_Y, labels.data(), static_cast<int>(labels.size()),
 		pos.x(), pos.y());
 	if (tab >= 0 && tab != m_tab) {
-		m_tab = tab;
-		m_focus = visibleLists().front();
-		update();
+		showTab(tab);
 		return;
 	}
 	if (m_tab == 2 && m_placement.press(this, pos)) {
+		return;
+	}
+	if (m_tab == 5 && m_interfaceVolume.press(pos)) {
+		update();
+		return;
+	}
+	if ((m_tab == 4 || m_tab == 5) && m_host.hostPress(e)) {
 		return;
 	}
 	for (PanelList *l : visibleLists()) {
@@ -333,6 +460,12 @@ void AppearancePanel::mousePressEvent(QMouseEvent *e) {
 }
 
 void AppearancePanel::mouseMoveEvent(QMouseEvent *e) {
+	if (m_tab == 5 && m_interfaceVolume.move(e->position().toPoint())) {
+		update();
+	}
+	if (m_tab == 4 || m_tab == 5) {
+		m_host.hostMove(e);
+	}
 	for (PanelList *l : visibleLists()) {
 		if (l->move(e->position().toPoint())) {
 			update();
@@ -340,7 +473,13 @@ void AppearancePanel::mouseMoveEvent(QMouseEvent *e) {
 	}
 }
 
-void AppearancePanel::mouseReleaseEvent(QMouseEvent *) {
+void AppearancePanel::mouseReleaseEvent(QMouseEvent *e) {
+	if (m_tab == 5) {
+		m_interfaceVolume.release(e->position().toPoint());
+	}
+	if (m_tab == 4 || m_tab == 5) {
+		m_host.hostRelease(e);
+	}
 	for (PanelList *l : visibleLists()) {
 		l->release();
 	}
@@ -357,6 +496,10 @@ void AppearancePanel::wheelEvent(QWheelEvent *e) {
 void AppearancePanel::keyPressEvent(QKeyEvent *e) {
 	if ((e->modifiers() & Qt::ControlModifier) && e->key() == Qt::Key_W) {
 		close();
+		return;
+	}
+	if ((m_tab == 4 || m_tab == 5) && m_host.hostKey(e)) {
+		update();
 		return;
 	}
 	if (!m_focus) {

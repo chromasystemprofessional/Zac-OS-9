@@ -45,6 +45,9 @@ void pl_sound_play(const char *name);
 
 /* The alert sound, for alerts and refused actions. */
 void pl_beep(void);
+/* Interface events use the selected sound theme, independently of alerts. */
+void pl_sound_event(const char *event);
+void pl_sound_preview(const char *path, int level);
 
 /* Double-click time in ms (the Mouse panel's "double-click"; Mac OS's
  * default 533). */

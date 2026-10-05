@@ -18,12 +18,14 @@ the Finder pays for it.
 Zacintosh HD
 ├── System Folder
 │   ├── Appearance        → ~/.local/share/zacos9/appearance
-│   │   └── Desktop Patterns → custom user-created tiles and classic Mac pattern files
+│   │   ├── Desktop Patterns → custom user-created tiles and classic Mac pattern files
+│   │   ├── Wallpaper     → ~/.local/share/zacos9/appearance/Wallpaper
+│   │   ├── Themes        → compatible appearance preset JSON files
+│   │   └── Sound Themes  → custom WAV themes and classic resource-fork sound sets
 │   ├── Control Panels      (generated: ZacOS 9's control panels)
 │   ├── Extensions
 │   ├── Fonts             → ~/.local/share/fonts
 │   ├── Preferences       → ~/.config
-│   └── Wallpaper         → ~/.local/share/zacos9/wallpaper
 ├── Applications            (generated: the installed applications)
 │   └── Mousepad
 │       ├── Mousepad        launches it
@@ -43,7 +45,12 @@ created the first time it is opened if it isn't there yet.
 
 Desktop Patterns is created automatically by the desktop and Appearance panel.
 Registry versions 5 and 6 add Desktop Patterns and the separate Wallpaper
-backed nodes to existing registries without removing user changes. See
+backed nodes to existing registries without removing user changes. Version 7
+moves Wallpaper under Appearance, retaining node overrides and existing files.
+If the old folder cannot be moved (including an existing destination), the
+catalog retains the old folder and logs the conflict rather than overwriting files.
+Version 8 adds Themes and Sound Themes under Appearance.
+See
 [custom desktop patterns](../README.md#custom-desktop-patterns) and
 [desktop wallpaper](../README.md#desktop-wallpaper) for supported formats,
 placement choices and import limits.

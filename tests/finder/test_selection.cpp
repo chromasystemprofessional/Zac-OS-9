@@ -221,6 +221,19 @@ int main(int argc, char **argv) {
 		"one drop moves every selected item into another folder");
 	delete mime;
 
+	const QString classic = folder + "/Classic Sound";
+	const QString fork = folder + "/._Classic Sound";
+	touch(classic);
+	touch(fork);
+	check(!transferItems({ classic }, folder, true).isEmpty() &&
+		QFile::exists(folder + "/Classic Sound copy") &&
+		QFile::exists(folder + "/._Classic Sound copy"),
+		"Option-copy preserves a classic file's hidden resource fork under its new name");
+	check(!transferItems({ classic }, target, false).isEmpty() &&
+		QFile::exists(target + "/Classic Sound") && QFile::exists(target + "/._Classic Sound") &&
+		!QFile::exists(classic) && !QFile::exists(fork),
+		"moving a classic sound file also moves its resource-fork companion");
+
 	w->close();
 	settle();
 	return fails ? 1 : 0;

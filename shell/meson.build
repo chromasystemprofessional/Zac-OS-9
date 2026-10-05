@@ -102,12 +102,31 @@ gio_unix = dependency('gio-unix-2.0')
 # Control panels (the Finder's Get Info uses their controls too).
 panelkit = static_library('panelkit', 'panels/panelkit.cpp', 'panels/sharingclient.cpp',
   'panels/custompatterns.cpp',
+  'panels/customthemes.cpp',
   include_directories: include_directories('finder'),
   dependencies: [platinum_dep, qt6],
   cpp_args: ['-std=c++17'],
 )
 
 configure_file(input: 'panels/zacos9-patterns', output: 'zacos9-patterns', copy: true)
+configure_file(input: 'panels/zacos9-soundthemes', output: 'zacos9-soundthemes', copy: true)
+install_data('panels/zacos9-soundthemes', install_dir: get_option('bindir'),
+  install_mode: 'rwxr-xr-x')
+test('sound-themes', find_program('python3'),
+  args: [files('../tests/panels/test_soundthemes.py'), files('panels/zacos9-soundthemes')],
+  timeout: 60,
+)
+test('custom-themes',
+  executable('test-customthemes', '../tests/panels/test_customthemes.cpp', 'panels/appearance.cpp',
+    link_with: panelkit,
+    include_directories: include_directories('panels', 'finder'),
+    dependencies: [platinum_dep, qt6],
+    cpp_args: ['-std=c++17'],
+  ),
+  args: [meson.project_source_root() / 'assets/sounds/woodblock.wav'],
+  env: ['QT_QPA_PLATFORM=offscreen'],
+  timeout: 60,
+)
 install_data('panels/zacos9-patterns', install_dir: get_option('bindir'),
   install_mode: 'rwxr-xr-x')
 test('custom-patterns', find_program('python3'),
@@ -311,6 +330,21 @@ executable('zacos9-store',
   dependencies: [platinum_dep, qt6, wayland_client, gio, gio_unix],
   cpp_args: ['-std=c++17'],
   install: true,
+)
+
+test('store-browser',
+  executable('test-store-browser',
+    '../tests/store/test_browser.cpp',
+    'store/store.cpp', 'store/storeclient.cpp',
+    'finder/alert.cpp', 'finder/platinumshell.cpp', 'finder/appdb.cpp',
+    finder_protocol,
+    link_with: panelkit,
+    include_directories: include_directories('finder', 'panels', 'store'),
+    dependencies: [platinum_dep, qt6, wayland_client, gio, gio_unix],
+    cpp_args: ['-std=c++17'],
+  ),
+  env: ['QT_QPA_PLATFORM=offscreen'],
+  timeout: 60,
 )
 
 # The Software window's catalog: reading it, filtering, and the helper

@@ -110,6 +110,20 @@ on Wayland and Xwayland, through the ZacOS9 cursor theme. Apps drawing their own
 custom cursors or not reporting busy state cannot be detected automatically.
 Other cursor shapes, including text selection and resizing, are unchanged.
 
+## Software sources
+
+Software opens with the small curated **Featured** selection. Choose
+**All Applications** to browse Debian desktop apps and use **Search** to filter
+the current category. Refresh Debian metadata through Software Update after
+installing this feature; discovery uses repository AppStream data, not every
+APT package.
+
+For more apps, open **Additional Sources > Enable Flathub** and confirm.
+The optional **Flathub** category then offers user-scoped Flatpak apps,
+separate from Debian packages. Disabling Flathub keeps installed apps and data.
+No additional repository is enabled automatically.
+See [Software](docs/appstore.md) for details.
+
 ## Sniffer
 
 **Sniffer** is ZacOS 9's desktop and spatial file browser (formerly Finder).
@@ -125,13 +139,21 @@ whose icon or name it crosses and scrolls when dragged past the window edge.
 Drag any selected item to move the whole selection into another folder; hold
 Option while dropping to copy instead.
 
-Double-click `.zip`, `.7z`, or supported tar archives to extract them beside the
+Double-click `.zip`, `.7z`, `.sit`, or supported tar archives to extract them beside the
 archive. A single top-level item keeps its name; multiple items go into a folder
 named after the archive. Existing items are never overwritten, and the archive
-is kept. 7z support uses `python3-libarchive-c` (installed with ZacOS 9);
-password-protected archives are reported as unsupported rather than prompting.
+is kept. 7z support uses `python3-libarchive-c`; StuffIt (`.sit`) support uses
+`unar` and `lsar` (installed with ZacOS 9) and preserves resource forks as hidden
+`._` AppleDouble sidecars without recursively expanding nested archives.
+Unsafe StuffIt paths, links, and special entries are rejected before extraction.
+Password-protected archives are reported as unsupported rather than prompting.
 
 ## Custom desktop patterns
+
+Appearance also supports saved appearance presets and interface sound sets.
+Use its **Themes** and **Sound Sets** tabs, with custom files under
+**System Folder > Appearance > Themes** or **Sound Themes**.
+See [Themes and sound sets](docs/themes.md) for formats and compatibility limits.
 
 Place your own or freely licensed tiles in **System Folder > Appearance >
 Desktop Patterns**, then choose them in **Control Panels > Appearance > Desktop**.
@@ -157,8 +179,10 @@ per catalog. No Apple artwork is included.
 ## Desktop wallpaper
 
 Place photos or user-created PICT desktop pictures in **System Folder >
-Wallpaper** (`$XDG_DATA_HOME/zacos9/wallpaper`, normally
-`~/.local/share/zacos9/wallpaper`). Open **Control Panels > Appearance >
+Appearance > Wallpaper** (`$XDG_DATA_HOME/zacos9/appearance/Wallpaper`, normally
+`~/.local/share/zacos9/appearance/Wallpaper`). Existing wallpaper folders from
+older versions are moved here automatically without changing selection IDs.
+Open **Control Panels > Appearance >
 Wallpaper**, select a picture, and choose its placement:
 
 - **Fit**: show the whole photo, preserving proportions with dark margins.

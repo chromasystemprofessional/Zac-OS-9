@@ -1,4 +1,5 @@
 #include "desktop.h"
+#include "customthemes.h"
 
 #include "vfs.h"
 
@@ -56,6 +57,7 @@ void Desktop::loadPattern() {
 Desktop::Desktop() {
 	watchDesktopPatterns(this, [this] { loadPattern(); update(); });
 	watchDesktopWallpaper(this, [this] { update(); });
+	watchCustomThemes(this, [this] { update(); });
 	setAttribute(Qt::WA_OpaquePaintEvent);
 	setAcceptDrops(true);
 	m_renameTimer.setSingleShot(true);

@@ -233,7 +233,19 @@ void watchDesktopPatterns(QObject *owner, std::function<void()> changed) {
 }
 
 QString desktopWallpaperFolder() {
-	return QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + "/zacos9/wallpaper";
+	const QString base = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + "/zacos9";
+	const QString folder = base + "/appearance/Wallpaper";
+	const QString legacy = base + "/wallpaper";
+	if (QDir(legacy).exists()) {
+		if (!QFileInfo::exists(folder) && QDir().mkpath(base + "/appearance") &&
+				QDir().rename(legacy, folder)) {
+			return folder;
+		}
+		qWarning().noquote() << "Could not move the old Wallpaper folder into Appearance."
+			<< "Existing wallpapers remain in" << legacy << "; destination:" << folder;
+		return legacy;
+	}
+	return folder;
 }
 
 int desktopWallpaperCount() {

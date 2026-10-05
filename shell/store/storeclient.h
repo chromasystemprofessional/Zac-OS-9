@@ -17,6 +17,7 @@ struct StoreItem {
 	QString id, name, category, blurb;
 	QStringList packages;
 	bool featured = false;
+	QString source = "debian";
 	/* An optional look-and-feel preset for it (zacos9-appstyle): the
 	 * button's label to switch it on (`styleLabel`) and off (`styleReset`),
 	 * and what it does. Empty `styleId` means none. */
@@ -52,4 +53,10 @@ bool styleIsOn(const QString &styleId);
 /* Is every package in `packages` installed? Runs the helper's
  * "installed" command directly: no privilege is needed to ask, so it
  * is never run through pkexec. */
-bool packagesInstalled(const QStringList &packages);
+bool packagesInstalled(const QStringList &packages, bool *ok = nullptr, QString *err = nullptr);
+QString runFlatpak(const QStringList &args, bool *ok, QString *err = nullptr);
+bool flathubEnabled(bool *ok, QString *err);
+bool flatpakInstalled(const QString &id, bool *ok, QString *err);
+QString softwareCatalogHelper();
+bool parseSoftwareCatalog(const QByteArray &json, const QString &source,
+	std::vector<StoreItem> *items, QString *error);

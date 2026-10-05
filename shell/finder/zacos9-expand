@@ -7,19 +7,30 @@ itself, several as a folder named after the archive ("Photos.zip" ->
 "Photos"). A name already taken gets a number ("Photos 2"); nothing is
 overwritten, and the archive is kept. Prints the path of what it made.
 
-.zip (stored, deflate, bzip2, lzma, zip64), .7z, .tar, .tar.gz/.tgz,
+.zip (stored, deflate, bzip2, lzma, zip64), .7z, .sit, .tar, .tar.gz/.tgz,
 .tar.bz2/.tbz2, .tar.xz/.txz. Entries that would land outside the folder
 (absolute paths, "..") are refused; macOS's __MACOSX/ and ._ files are
-left out; a zip's Unix permissions (executable bits) are kept.
+left out except in StuffIt archives, whose resource forks are kept as
+hidden AppleDouble sidecars; a zip's Unix permissions (executable bits) are kept.
 """
+import json
 import os
+import resource
 import shutil
+import stat
+import struct
+import subprocess
 import sys
 import tarfile
 import tempfile
 import zipfile
 
 TAR_SUFFIXES = (".tar.gz", ".tgz", ".tar.bz2", ".tbz2", ".tar.xz", ".txz", ".tar")
+SIT_MAX_ENTRIES = 10000
+SIT_MAX_FILE = 1 << 30
+SIT_MAX_TOTAL = 2 << 30
+SIT_LIST_LIMIT = 16 << 20
+SIT_TIMEOUT = 120
 
 
 def fail(message):
@@ -29,7 +40,7 @@ def fail(message):
 
 def stem(name):
     lower = name.lower()
-    for suffix in (".zip", ".7z") + TAR_SUFFIXES:
+    for suffix in (".zip", ".7z", ".sit") + TAR_SUFFIXES:
         if lower.endswith(suffix):
             return name[: -len(suffix)] or name
     return name
@@ -111,6 +122,154 @@ def expand_7z(archive, root):
              f"password-protected, or use unsupported compression ({e}).")
 
 
+def sit_process(args, output, file_limit):
+    def limits():
+        resource.setrlimit(resource.RLIMIT_FSIZE, (file_limit, file_limit))
+        resource.setrlimit(resource.RLIMIT_CPU, (SIT_TIMEOUT, SIT_TIMEOUT))
+        resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+
+    try:
+        result = subprocess.run(args, stdin=subprocess.DEVNULL, stdout=output,
+                                stderr=subprocess.DEVNULL, timeout=SIT_TIMEOUT,
+                                preexec_fn=limits)
+    except FileNotFoundError:
+        fail("StuffIt support isn't installed. Install unar (including lsar).")
+    except subprocess.TimeoutExpired:
+        fail("The StuffIt archive took too long to expand.")
+    if result.returncode:
+        fail("The StuffIt archive couldn't be expanded. It may be damaged, "
+             "password-protected, or use unsupported compression.")
+
+
+def sit_path(root, name):
+    # Treat both separator conventions as paths even on Unix. Do not let
+    # the decoder silently sanitize an unsafe name before we see it.
+    if not isinstance(name, str) or not name or "\0" in name:
+        fail("The StuffIt archive has an invalid item name.")
+    normalized = name.replace("\\", "/")
+    if (normalized.startswith("/") or ".." in normalized.split("/")
+            or any(len(part) >= 2 and part[0].isascii() and part[0].isalpha()
+                   and part[1] == ":" for part in normalized.split("/"))
+            or not normalized.strip("/.")):
+        fail(f"The archive holds an item that would go outside its folder ({name}).")
+    return safe_target(root, normalized)
+
+
+def sit_metadata(item):
+    if not isinstance(item, dict):
+        fail("The StuffIt archive has an invalid listing.")
+    if item.get("XADIsEncrypted"):
+        fail("The archive is protected with a password.")
+    unsafe = ("XADIsLink", "XADIsHardLink", "XADIsSymbolicLink",
+              "XADLinkDestination", "XADIsCharacterDevice", "XADIsBlockDevice",
+              "XADIsFIFO", "XADIsSocket", "XADIsDevice", "XADIsSpecialFile")
+    mode = item.get("XADPosixPermissions", item.get("XADPOSIXPermissions", 0))
+    if (not isinstance(mode, int) or mode < 0
+            or stat.S_IFMT(mode) not in (0, stat.S_IFREG, stat.S_IFDIR)
+            or any(item.get(key) for key in unsafe)
+            or any(key in item for key in ("XADDeviceMajor", "XADDeviceMinor"))):
+        fail("The StuffIt archive holds an unsupported link or special item.")
+    if item.get("XADIsCorrupted") or item.get("XADError"):
+        fail("The StuffIt archive is damaged or incomplete.")
+
+
+def expand_sit(archive, root):
+    listing = os.path.join(root, ".listing.json")
+    with open(listing, "wb") as output:
+        sit_process(["lsar", "-j", "-nr", "-p", "", archive], output, SIT_LIST_LIMIT)
+    try:
+        with open(listing, encoding="utf-8") as source:
+            data = json.load(source)
+    except (ValueError, UnicodeError):
+        fail("The StuffIt archive has an invalid listing.")
+    finally:
+        os.unlink(listing)
+    if (not isinstance(data, dict) or data.get("lsarFormatVersion") != 2
+            or data.get("lsarFormatName") not in ("StuffIt", "StuffIt 5")
+            or data.get("lsarError")):
+        fail("That isn't a readable StuffIt archive.")
+    sit_metadata(data.get("lsarProperties", {}))
+    entries = data.get("lsarContents")
+    if not isinstance(entries, list) or len(entries) > SIT_MAX_ENTRIES:
+        fail("The StuffIt archive has too many items or an invalid listing.")
+    total = 0
+    for entry in entries:
+        sit_metadata(entry)
+        sit_path(root, entry.get("XADFileName"))
+        size = entry.get("XADFileSize", 0 if entry.get("XADIsDirectory") else None)
+        if not isinstance(size, int) or size < 0 or size > SIT_MAX_FILE:
+            fail("The StuffIt archive has an invalid or oversized item.")
+        total += size
+        if total > SIT_MAX_TOTAL:
+            fail("The StuffIt archive is too large to expand.")
+    if not entries:
+        fail("The archive is empty.")
+    sit_process(["unar", "-q", "-f", "-D", "-nr", "-k", "hidden",
+                 "-p", "", "-o", root, archive], subprocess.DEVNULL, SIT_MAX_FILE)
+    total = count = 0
+    sidecars = []
+
+    def walk_error(error):
+        raise error
+
+    for folder, dirs, files in os.walk(root, followlinks=False, onerror=walk_error):
+        for name in dirs + files:
+            path = os.path.join(folder, name)
+            info = os.lstat(path)
+            if (not (stat.S_ISDIR(info.st_mode) or stat.S_ISREG(info.st_mode))
+                    or (stat.S_ISREG(info.st_mode) and info.st_nlink != 1)):
+                fail("The StuffIt decoder produced an unsupported link or special item.")
+            safe_target(root, os.path.relpath(path, root))
+            os.chmod(path, stat.S_IMODE(info.st_mode) & 0o777)
+            count += 1
+            total += info.st_size if stat.S_ISREG(info.st_mode) else 0
+            if count > SIT_MAX_ENTRIES * 3 or total > SIT_MAX_TOTAL + SIT_LIST_LIMIT:
+                fail("The StuffIt decoder produced too many or oversized items.")
+            if stat.S_ISREG(info.st_mode) and name.startswith("._"):
+                sidecars.append(path)
+    sit_companions(root, sidecars)
+
+
+def sit_companions(root, sidecars):
+    targets = []
+    for path in sidecars:
+        with open(path, "rb") as source:
+            header = source.read(26)
+            if header[:4] != b"\x00\x05\x16\x07":
+                continue
+            if len(header) != 26 or header[4:8] != b"\x00\x02\x00\x00":
+                fail("The StuffIt decoder produced an invalid AppleDouble sidecar.")
+            count = struct.unpack_from(">H", header, 24)[0]
+            size = os.fstat(source.fileno()).st_size
+            if count > 1024 or 26 + 12 * count > size:
+                fail("The StuffIt decoder produced an invalid AppleDouble sidecar.")
+            table = source.read(12 * count)
+            has_resource = False
+            for index in range(count):
+                kind, offset, length = struct.unpack_from(">III", table, 12 * index)
+                if offset < 26 + 12 * count or offset + length > size:
+                    fail("The StuffIt decoder produced an invalid AppleDouble sidecar.")
+                has_resource |= kind == 2
+        if not has_resource:
+            continue
+        name = os.path.basename(path)[2:]
+        if name in ("", ".", ".."):
+            fail("The StuffIt decoder produced an unsafe AppleDouble target.")
+        target = os.path.join(os.path.dirname(path), name)
+        sit_path(root, os.path.relpath(target, root))
+        if os.path.lexists(target):
+            info = os.lstat(target)
+            if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+                fail("The StuffIt decoder produced an unsupported AppleDouble target.")
+        else:
+            targets.append(target)
+    # unar omits empty data forks. Restore visible files only after every
+    # extracted item and sidecar target has passed verification.
+    for target in targets:
+        descriptor = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        os.close(descriptor)
+
+
 def unique(path):
     if not os.path.lexists(path):
         return path
@@ -141,6 +300,8 @@ def main():
                 expand_zip(archive, root)
             elif lower.endswith(".7z"):
                 expand_7z(archive, root)
+            elif lower.endswith(".sit"):
+                expand_sit(archive, root)
             elif lower.endswith(TAR_SUFFIXES):
                 expand_tar(archive, root)
             else:

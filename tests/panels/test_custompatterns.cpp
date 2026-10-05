@@ -34,6 +34,15 @@ int main(int argc, char **argv) {
 	qputenv("XDG_DATA_HOME", root.path().toUtf8());
 	qputenv("XDG_CONFIG_HOME", (root.path() + "/config").toUtf8());
 	QApplication app(argc, argv);
+	const QString legacyPhotos = root.path() + "/zacos9/wallpaper";
+	assert(QDir().mkpath(legacyPhotos));
+	QImage legacyPhoto(2, 2, QImage::Format_RGB32);
+	legacyPhoto.fill(qRgb(12, 34, 56));
+	assert(legacyPhoto.save(legacyPhotos + "/Existing.png"));
+	const QString photos = desktopWallpaperFolder();
+	assert(QFile::exists(photos + "/Existing.png"));
+	assert(!QDir(legacyPhotos).exists());
+	assert(QFile::remove(photos + "/Existing.png"));
 	const QString folder = desktopPatternsFolder();
 	assert(folder == root.path() + "/zacos9/appearance/Desktop Patterns");
 	QObject owner;
@@ -110,11 +119,10 @@ int main(int argc, char **argv) {
 	assert(QFile::remove(invalid.fileName()));
 	assert(waitFor([] { return desktopPatternErrors().isEmpty(); }));
 	// Wallpaper is a separate catalog and mode, not a tile repeated on screen.
-	const QString photos = desktopWallpaperFolder();
 	QObject photoOwner;
 	watchDesktopWallpaper(&photoOwner, [&] { changed++; });
 	assert(QDir(photos).exists());
-	assert(photos == root.path() + "/zacos9/wallpaper");
+	assert(photos == root.path() + "/zacos9/appearance/Wallpaper");
 	QImage photo(4, 2, QImage::Format_RGB32);
 	photo.fill(qRgb(17, 91, 163));
 	const QString photoPath = photos + "/Photo.png";

@@ -1,0 +1,415 @@
+#!/usr/bin/python3
+"""Catalog user sound sets; cache PCM copies without modifying source files.
+
+Folder themes use theme.json: {"version":1,"name":"Name","events":{event:"file.wav"}}.
+Classic sets may also be inside one grouping folder without theme.json.
+Cached, content-addressed WAV files remain valid across later catalog scans.
+Only discrete, documented Appearance Manager events are imported, not skins,
+drag loops, random sound sequences, compressed sound, or executable resources.
+"""
+import hashlib
+import importlib.machinery
+import importlib.util
+import io
+import json
+import os
+from pathlib import Path
+import stat
+import struct
+import sys
+import wave
+
+MAX_SOURCE = 32 * 1024 * 1024
+MAX_WAV = 2 * 1024 * 1024
+MAX_SECONDS = 10
+MAX_THEMES = 64
+MAX_OUTPUT = 64 * 1024 * 1024
+MAX_SCAN_ENTRIES = 1024
+EVENTS = frozenset(("button-click", "checkbox-toggle", "menu-open", "menu-command",
+                    "window-open", "window-close", "trash-move", "trash-empty"))
+# Public Carbon HIToolbox Appearance.h kThemeSound* FourCCs. There is no
+# documented move-to-trash equivalent; fdrp is a generic Finder drop, not trash.
+CLASSIC_EVENTS = {b"btnp": "button-click", b"chkp": "checkbox-toggle",
+                  b"mnuo": "menu-open", b"mnus": "menu-command",
+                  b"wopn": "window-open", b"wcls": "window-close",
+                  b"ftrs": "trash-empty"}
+_patterns = None
+
+
+def take(data, offset, size):
+    if offset < 0 or size < 0 or offset + size > len(data):
+        raise ValueError("truncated or invalid offsets")
+    return data[offset:offset + size]
+
+
+def unpack(fmt, data, offset=0):
+    return struct.unpack(fmt, take(data, offset, struct.calcsize(fmt)))
+
+
+def containers(data, suffix):
+    global _patterns
+    if _patterns is None:
+        loader = importlib.machinery.SourceFileLoader(
+            "soundtheme_containers", str(Path(__file__).with_name("zacos9-patterns")))
+        spec = importlib.util.spec_from_loader(loader.name, loader)
+        _patterns = importlib.util.module_from_spec(spec)
+        loader.exec_module(_patterns)
+    return _patterns.containers(data, suffix)
+
+
+def resource_records(data):
+    start, map_start, size, map_size = unpack(">IIII", data)
+    body, mapping = take(data, start, size), take(data, map_start, map_size)
+    types, names = unpack(">HH", mapping, 24)
+    last = unpack(">H", mapping, types)[0]
+    if last == 65535:
+        return {}
+    if last >= 512:
+        raise ValueError("too many resource types")
+    result, count = {}, 0
+    for i in range(last + 1):
+        kind, refs_last, refs = unpack(">4sHH", mapping, types + 2 + 8 * i)
+        if refs_last == 65535:
+            continue
+        count += refs_last + 1
+        if count > 4096:
+            raise ValueError("too many resources")
+        if kind not in (b"snd ", b"sdid", b"snd#"):
+            continue
+        for j in range(refs_last + 1):
+            ref = take(mapping, types + refs + j * 12, 12)
+            number, name_offset = unpack(">hh", ref)
+            if ref[4] & 1:
+                raise ValueError("compressed resource maps are unsupported")
+            offset = int.from_bytes(ref[5:8], "big")
+            length = unpack(">I", body, offset)[0]
+            payload = take(body, offset + 4, length)
+            if name_offset != -1:
+                if name_offset < 0:
+                    raise ValueError("invalid resource name offset")
+                pos = names + name_offset
+                take(mapping, pos + 1, take(mapping, pos, 1)[0])
+            if (kind, number) in result:
+                raise ValueError("duplicate resource ID")
+            result[kind, number] = payload
+    return result
+
+
+def classic_mapping(records):
+    """sdid identifies a sound; snd# supplies default IDs when sdid is absent.
+
+    Verified against user-provided sound sets: sdid is a MacRoman
+    FourCC#label[#category#description] string, with the same ID as its snd.
+    Older sets sometimes store only a filename: those have no event identity.
+    snd# v1 has a 16-bit count and 44-byte records: FourCC at 0, and the
+    first signed 32-bit sound-resource reference at 10. Later slots are
+    interactive variants, not a list of additional discrete events.
+    """
+    identities, candidates, defaults = {}, {}, {}
+    for (kind, number), payload in records.items():
+        if kind != b"sdid":
+            continue
+        fields = payload.split(b"#")
+        if len(fields) < 2 or len(fields[0]) != 4:
+            continue
+        identities[number] = fields[0]
+        if fields[0] in CLASSIC_EVENTS:
+            event = CLASSIC_EVENTS[fields[0]]
+            candidates.setdefault(event, set()).add(number)
+    for (kind, _), payload in records.items():
+        if kind != b"snd#":
+            continue
+        version, count = unpack(">HH", payload)
+        if version != 1 or count > 512 or len(payload) != 4 + count * 44:
+            raise ValueError("unsupported snd# metadata structure")
+        for i in range(count):
+            record = take(payload, 4 + i * 44, 44)
+            code = record[:4]
+            number = unpack(">i", record, 10)[0]
+            if code not in CLASSIC_EVENTS or number == 0:
+                continue
+            # A user-set sdid may deliberately identify a different event.
+            if number in identities and identities[number] != code:
+                continue
+            event = CLASSIC_EVENTS[code]
+            if event in defaults and defaults[event] != number:
+                raise ValueError("ambiguous snd# event mapping")
+            defaults[event] = number
+    selected = {}
+    for event in candidates.keys() | defaults.keys():
+        choices = candidates.get(event, set())
+        default = defaults.get(event)
+        if default is not None and (not choices or default in choices):
+            number = default
+        elif len(choices) == 1:
+            number = next(iter(choices))
+        else:
+            continue  # No authoritative choice: an ambiguous event stays silent.
+        if (b"snd ", number) in records:
+            selected[event] = number
+    return selected
+
+
+def pcm_wav(channels, width, rate, frames, samples):
+    if channels not in (1, 2) or width not in (1, 2) or not 8000 <= rate <= 96000:
+        raise ValueError("only mono/stereo 8/16-bit PCM at 8–96 kHz is supported")
+    if not 0 < frames <= rate * MAX_SECONDS:
+        raise ValueError("sound must be nonempty and at most 10 seconds")
+    if len(samples) != frames * channels * width or len(samples) + 44 > MAX_WAV:
+        raise ValueError("invalid or oversized PCM sample data")
+    out = io.BytesIO()
+    with wave.open(out, "wb") as writer:
+        writer.setnchannels(channels)
+        writer.setsampwidth(width)
+        writer.setframerate(rate)
+        writer.writeframes(samples)
+    return out.getvalue()
+
+
+def decode_sound(data):
+    version = unpack(">H", data)[0]
+    if version == 1:
+        count = unpack(">H", data, 2)[0]
+        if count != 1 or unpack(">H", data, 4)[0] != 5:
+            raise ValueError("unsupported sound synthesizer")
+        offset = 10
+    elif version == 2:
+        take(data, 0, 4)
+        offset = 4
+    else:
+        raise ValueError("unsupported snd format")
+    count = unpack(">H", data, offset)[0]
+    if count != 1:
+        raise ValueError("sound command sequences are unsupported")
+    command, _, header = unpack(">HHI", data, offset + 2)
+    if command not in (0x8050, 0x8051):
+        raise ValueError("unsupported sound command or external sample pointer")
+    if header < offset + 10:
+        raise ValueError("invalid sample header offset")
+    pointer, length, fixed_rate = unpack(">III", data, header)
+    if pointer:
+        raise ValueError("external sample pointers are unsupported")
+    rate = (fixed_rate + 32768) >> 16
+    encoding = take(data, header + 20, 1)[0]
+    if encoding == 0:
+        channels, width, frames, start = 1, 1, length, header + 22
+    elif encoding == 255:
+        channels = length
+        frames = unpack(">I", data, header + 22)[0]
+        bits = unpack(">H", data, header + 48)[0]
+        if bits not in (8, 16):
+            raise ValueError("unsupported extended PCM sample size")
+        width, start = bits // 8, header + 64
+    elif encoding == 254:
+        raise ValueError("compressed snd samples are unsupported")
+    else:
+        raise ValueError("unsupported sound header encoding")
+    size = frames * channels * width
+    if size > MAX_WAV:
+        raise ValueError("PCM output exceeds 2 MiB")
+    samples = take(data, start, size)
+    if width == 2:
+        swapped = bytearray(samples)
+        swapped[::2], swapped[1::2] = samples[1::2], samples[::2]
+        samples = bytes(swapped)
+    return pcm_wav(channels, width, rate, frames, samples)
+
+
+def decode_wav(data):
+    if len(data) > MAX_WAV or data[:4] != b"RIFF" or take(data, 8, 4) != b"WAVE":
+        raise ValueError("expected bounded PCM WAV")
+    if unpack("<I", data, 4)[0] + 8 != len(data):
+        raise ValueError("invalid WAV container size")
+    try:
+        with wave.open(io.BytesIO(data), "rb") as reader:
+            if reader.getcomptype() != "NONE":
+                raise ValueError("compressed WAV is unsupported")
+            channels, width, rate, frames = (reader.getnchannels(), reader.getsampwidth(),
+                                            reader.getframerate(), reader.getnframes())
+            if frames * channels * width > MAX_WAV or frames > rate * MAX_SECONDS:
+                raise ValueError("WAV exceeds output or duration limit")
+            return pcm_wav(channels, width, rate, frames, reader.readframes(frames))
+    except (wave.Error, EOFError) as error:
+        raise ValueError(f"unsupported or invalid PCM WAV: {error}") from error
+
+
+def no_symlinks(path):
+    for part in (path, *path.parents):
+        if part.is_symlink():
+            raise ValueError("symlinks are not allowed")
+
+
+def read_bounded(path, limit=MAX_SOURCE):
+    no_symlinks(path)
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    with os.fdopen(fd, "rb") as reader:
+        info = os.fstat(reader.fileno())
+        if not stat.S_ISREG(info.st_mode):
+            raise ValueError("expected regular file")
+        if info.st_size > limit:
+            raise ValueError(f"source exceeds {limit} byte limit")
+        data = reader.read(limit + 1)
+        if len(data) > limit:
+            raise ValueError("source grew beyond import limit")
+        return data
+
+
+def folder_theme(folder):
+    raw = read_bounded(folder / "theme.json", 65536)
+    theme = json.loads(raw)
+    if not isinstance(theme, dict) or type(theme.get("version")) is not int or theme["version"] != 1:
+        raise ValueError("theme.json must have version 1")
+    name, events = theme.get("name"), theme.get("events")
+    if not isinstance(name, str) or not name.strip() or len(name) > 128:
+        raise ValueError("theme name must contain 1–128 characters")
+    if not isinstance(events, dict) or not events or set(events) - EVENTS:
+        raise ValueError("theme events must contain only supported event names")
+    output, total = {}, len(raw)
+    for event, relative in events.items():
+        if not isinstance(relative, str) or not relative or "\\" in relative:
+            raise ValueError("event paths must be relative WAV paths")
+        path = Path(relative)
+        if path.is_absolute() or any(p in ("", ".", "..") for p in relative.split("/")):
+            raise ValueError("unsafe event path")
+        if path.suffix.lower() != ".wav":
+            raise ValueError("event paths must name WAV files")
+        data = read_bounded(folder / path, MAX_WAV)
+        total += len(data)
+        if total > MAX_SOURCE:
+            raise ValueError("theme exceeds 32 MiB source limit")
+        output[event] = decode_wav(data)
+    return name.strip(), output
+
+
+def prepare_cache(folder):
+    no_symlinks(folder)
+    folder.mkdir(mode=0o700, parents=True, exist_ok=True)
+    info = folder.stat()
+    if not folder.is_dir() or info.st_uid != os.getuid():
+        raise ValueError("sound theme cache must be an owned directory")
+    # Qt may have already created this dedicated cache with its default mode.
+    folder.chmod(0o700)
+    return folder
+
+
+def cache_wav(root, data):
+    target = root / (hashlib.sha256(data).hexdigest() + ".wav")
+    no_symlinks(target)
+    try:
+        fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    except FileExistsError:
+        if read_bounded(target, MAX_WAV) != data:
+            raise ValueError("cached PCM file was modified")
+    else:
+        try:
+            with os.fdopen(fd, "wb") as output:
+                output.write(data)
+        except OSError:
+            target.unlink()
+            raise
+    return str(target)
+
+
+def catalog_paths(source, errors):
+    """Accept one grouping-directory level, never recursively traverse trees."""
+    paths = []
+    count = 0
+
+    def entries(folder):
+        nonlocal count
+        found = []
+        for path in folder.iterdir():
+            count += 1
+            if count > MAX_SCAN_ENTRIES:
+                raise ValueError("catalog scan exceeds 1024 filesystem entries")
+            found.append(path)
+        found.sort(key=lambda p: p.name.casefold())
+        sidecars = {p.name[2:] for p in found if p.name.startswith("._")}
+        return [p for p in found if not (
+            (p.name.startswith(".") and not p.name.startswith("._")) or
+            p.name in sidecars)]
+
+    try:
+        top = entries(source)
+        for path in top:
+            try:
+                no_symlinks(path)
+                manifest = path / "theme.json"
+                if path.is_dir() and not os.path.lexists(manifest):
+                    for child in entries(path):
+                        try:
+                            no_symlinks(child)
+                            if child.is_dir():
+                                raise ValueError(
+                                    "nested directories beyond one level are unsupported")
+                            paths.append(child)
+                        except (OSError, ValueError) as error:
+                            errors.append(f"{child.relative_to(source)}: {error}")
+                else:
+                    paths.append(path)
+            except OSError as error:
+                errors.append(f"{path.relative_to(source)}: {error}")
+            except ValueError as error:
+                if count > MAX_SCAN_ENTRIES:
+                    raise
+                errors.append(f"{path.relative_to(source)}: {error}")
+    except (OSError, ValueError) as error:
+        errors.append(str(error))
+    return paths
+
+
+def scan(source, cache):
+    result = {"themes": [], "errors": []}
+    source, cache = Path(os.path.abspath(source)), Path(os.path.abspath(cache))
+    try:
+        no_symlinks(source)
+        if not source.is_dir():
+            raise ValueError("source folder is missing")
+        if cache == source or source in cache.parents:
+            raise ValueError("cache must be outside the source folder")
+        root = prepare_cache(cache)
+        paths = catalog_paths(source, result["errors"])
+    except (OSError, ValueError) as error:
+        result["errors"].append(str(error))
+        return result
+    total = 0
+    for path in paths:
+        relative = path.relative_to(source)
+        leaf = path.name[2:] if path.name.startswith("._") else path.name
+        identity = str(relative.with_name(leaf))
+        try:
+            no_symlinks(path)
+            if path.is_dir():
+                name, events = folder_theme(path)
+            else:
+                data = read_bounded(path)
+                fork, resource = containers(data, path.suffix.lower())
+                records = resource_records(resource or fork)
+                mapping = classic_mapping(records)
+                events = {}
+                for event, number in mapping.items():
+                    try:
+                        events[event] = decode_sound(records[b"snd ", number])
+                    except ValueError as error:
+                        result["errors"].append(f"{identity}/{event}: {error}")
+                name = leaf
+                if not events:
+                    raise ValueError("no supported discrete PCM sound events")
+            size = sum(map(len, events.values()))
+            if len(result["themes"]) >= MAX_THEMES or total + size > MAX_OUTPUT:
+                result["errors"].append("catalog exceeds 64 themes or 64 MiB PCM output")
+                break
+            cached = {event: cache_wav(root, data) for event, data in events.items()}
+            total += size
+            result["themes"].append({
+                "id": "user:" + hashlib.sha256(identity.encode("utf-8")).hexdigest()[:32],
+                "name": name, "events": cached})
+        except (OSError, ValueError, struct.error) as error:
+            result["errors"].append(f"{identity}: {error}")
+    return result
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 3:
+        sys.exit("usage: zacos9-soundthemes SOURCE_DIR CACHE_DIR")
+    print(json.dumps(scan(sys.argv[1], sys.argv[2]), ensure_ascii=True))

@@ -130,6 +130,7 @@ FolderWindow *FolderWindow::open(const QString &path) {
 		openWindows().insert(key, w);
 		w->resize(w->m_state.size);
 		w->show();
+		pl_sound_event("window-open");
 		if (w->m_state.hasPosition) {
 			platinumSetWindowPosition(w, w->m_state.position);
 		}
@@ -198,6 +199,7 @@ FolderWindow::~FolderWindow() {
 }
 
 void FolderWindow::closeEvent(QCloseEvent *e) {
+	pl_sound_event("window-close");
 	Finder::instance().viewClosed(this);
 	QWidget::closeEvent(e);
 }

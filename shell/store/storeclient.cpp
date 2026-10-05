@@ -6,6 +6,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QRegularExpression>
 #include <functional>
 #include <unistd.h>
 
@@ -160,17 +161,32 @@ bool styleIsOn(const QString &styleId) {
 	return ok && out.trimmed() == "on";
 }
 
-bool packagesInstalled(const QStringList &packages) {
+bool packagesInstalled(const QStringList &packages, bool *success, QString *err) {
 	if (packages.isEmpty()) {
+		if (success) {
+			*success = false;
+		}
+		if (err) {
+			*err = "No package was selected.";
+		}
+		qWarning() << "No package was selected.";
 		return false;
 	}
-	QProcess p;
-	p.start(helperPath(), QStringList{ "installed" } + packages);
-	p.closeWriteChannel();
-	if (!p.waitForFinished(5000) || p.exitStatus() != QProcess::NormalExit || p.exitCode() != 0) {
+	bool ok = false;
+	QString error;
+	const QString out = runWatched([&](QProcess *p) {
+		p->start(helperPath(), QStringList{ "installed" } + packages);
+	}, &ok, &error);
+	if (success) {
+		*success = ok;
+	}
+	if (err) {
+		*err = error;
+	}
+	if (!ok) {
+		qWarning().noquote() << error;
 		return false;
 	}
-	const QString out = QString::fromUtf8(p.readAllStandardOutput());
 	int found = 0;
 	for (const QString &line : out.split('\n', Qt::SkipEmptyParts)) {
 		if (line.endsWith("\tyes")) {
@@ -178,4 +194,83 @@ bool packagesInstalled(const QStringList &packages) {
 		}
 	}
 	return found == packages.size();
+}
+
+QString runFlatpak(const QStringList &args, bool *ok, QString *err) {
+	return runWatched([&](QProcess *p) { p->start("flatpak", QStringList{ "--user" } + args); }, ok, err);
+}
+
+bool flathubEnabled(bool *ok, QString *err) {
+	const QString output = runFlatpak({ "remote-list", "--show-disabled", "--columns=name,url,options" }, ok, err);
+	for (const QString &line : output.split('\n', Qt::SkipEmptyParts)) {
+		const QStringList fields = line.split('\t');
+		if (fields.first() == "flathub") {
+			if (fields.size() != 3 || (fields[1] != "https://dl.flathub.org/repo/" &&
+					fields[1] != "https://dl.flathub.org/repo")) {
+				*ok = false;
+				*err = "The existing flathub remote is not the official Flathub source.";
+				return false;
+			}
+			return !fields[2].split(',').contains("disabled");
+		}
+	}
+	return false;
+}
+
+bool flatpakInstalled(const QString &id, bool *ok, QString *err) {
+	const QString output = runFlatpak({ "list", "--app", "--columns=application" }, ok, err);
+	return *ok && output.split('\n', Qt::SkipEmptyParts).contains(id);
+}
+
+QString softwareCatalogHelper() {
+	const QString override = qEnvironmentVariable("ZACOS9_SOFTWARE_CATALOG_HELPER");
+	if (!override.isEmpty()) {
+		return override;
+	}
+	const QString dir = QCoreApplication::applicationDirPath();
+	for (const QString &path : { dir + "/../libexec/zacos9/zacos9-software-catalog",
+			dir + "/../../appstore/zacos9-software-catalog" }) {
+		if (QFileInfo(path).isExecutable()) {
+			return path;
+		}
+	}
+	return "/usr/libexec/zacos9/zacos9-software-catalog";
+}
+
+bool parseSoftwareCatalog(const QByteArray &json, const QString &source,
+		std::vector<StoreItem> *items, QString *error) {
+	QJsonParseError parseError;
+	const QJsonDocument doc = QJsonDocument::fromJson(json, &parseError);
+	if (!doc.isObject() || !doc.object().value("items").isArray()) {
+		*error = "Invalid software catalog: " + parseError.errorString();
+		return false;
+	}
+	const QRegularExpression package("\\A[a-z0-9][a-z0-9+.-]+\\z");
+	const QRegularExpression appId("\\A[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+){2,}\\z");
+	std::vector<StoreItem> next;
+	for (const QJsonValue &value : doc.object().value("items").toArray()) {
+		const QJsonObject obj = value.toObject();
+		StoreItem item;
+		item.source = source;
+		item.id = obj.value("id").toString();
+		item.name = obj.value("name").toString();
+		item.blurb = obj.value("blurb").toString();
+		for (const QJsonValue &p : obj.value("packages").toArray()) {
+			const QString name = p.toString();
+			if (!(source == "flathub" ? appId : package).match(name).hasMatch()) {
+				*error = "Invalid application identifier in software catalog.";
+				return false;
+			}
+			item.packages << name;
+		}
+		if (item.id.isEmpty() || item.name.isEmpty() || item.packages.isEmpty() ||
+				obj.value("source").toString() != source ||
+				(source == "flathub" && item.packages.size() != 1)) {
+			*error = "Incomplete application in software catalog.";
+			return false;
+		}
+		next.push_back(std::move(item));
+	}
+	*items = std::move(next);
+	return true;
 }

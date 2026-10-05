@@ -8,10 +8,28 @@ icon, a blurb, a status line and one button. Under that, it is apt.
 
 ## What it's for
 
-A short, curated catalog of real, well-known applications — not a
-front end to the whole of Debian's archive, which would need search,
-dependency trees, and a great deal more chrome to be usable. One button
-per item: **Install** or **Remove**, whichever applies.
+A short, curated catalog remains the default. **All Applications** expands
+it with desktop applications described by the configured Debian repositories'
+AppStream metadata. Search filters names, descriptions and package identifiers.
+**Flathub** is a separate, optional catalog; **Additional Sources** enables or
+disables the official Flathub remote for the current user after confirmation.
+One button per item: **Install** or **Remove**, whichever applies.
+
+Debian discovery needs the packaged `appstream`, `python3-gi` and
+`gir1.2-appstream-1.0` dependencies. Refresh Debian package metadata through
+Software Update (or `sudo apt update`) after installing them, so APT downloads
+DEP-11 metadata and refreshes the AppStream cache. Repositories that do not
+publish AppStream desktop-app metadata will not contribute applications.
+This is not a list of every library or command-line package.
+
+Flathub uses `flatpak --user`, never a system-wide remote. Enabling contacts
+the official HTTPS repository and downloads metadata; installing may download
+large runtimes. Disabling keeps installed apps and their data but disables
+that remote's browsing and updates. No remote is added by default, and arbitrary
+third-party APT sources are not supported. Existing remotes named `flathub`
+with a different URL are rejected rather than silently replaced.
+Software Update still manages ZacOS releases and Debian updates; Flatpak
+updates can be applied separately with `flatpak --user update`.
 
 ## Architecture
 
@@ -20,6 +38,7 @@ per item: **Install** or **Remove**, whichever applies.
 | The window | `shell/store/store.{h,cpp}` | `StoreWindow`: two `PanelList`s (category, item) and a details pane, built entirely from existing HIG-measured widgets (`lib/widgets.h`) — nothing new was added to the pixel-art toolkit except the icon blend (below). |
 | The catalog | `shell/store/storeclient.{h,cpp}` | Reads the shipped catalog and talks to the helper. |
 | The data | `assets/store/catalog.json` | Shipped, read-only; installed to `$datadir/zacos9/store/catalog.json`, found through `pl_data_dir()` (the same function the alert sounds use), so a build tree and an install both just work. |
+| Discovery | `appstore/zacos9-software-catalog` | Unprivileged JSON helper: distro AppStream desktop applications or the enabled user Flathub remote. Asynchronous GUI loading has a two-minute timeout and explicit error status. |
 | The privileged half | `appstore/zacos9-appstore-helper` | A root shell script behind pkexec; validates every package name before `apt-get` ever sees it. |
 | Authorization | `appstore/org.zacos9.appstore.policy`, `appstore/50-zacos9-appstore.rules` | Same pattern as `sharing/`: this desktop runs no polkit authentication agent, so a local administrator (the `sudo` group) is granted without a password rather than being asked for one nothing can show. |
 
@@ -34,6 +53,12 @@ New: `pl_image_blend` (`lib/draw.{h,c}`) — the one genuinely new drawing
 primitive, real alpha compositing for an icon that isn't 1990s pixel art,
 first added for the Finder's own Applications folder and reused here
 unchanged.
+
+Discovered results are validated before merging; a failed refresh leaves the
+previous catalog intact and reports the failure. Curated Debian packages are
+deduplicated from the expanded results. Debian and Flathub entries remain
+distinct even when their displayed names match, with their source shown in
+the detail status. Search applies to the current category, including Featured.
 
 ## The catalog
 
@@ -95,6 +120,11 @@ item is selected and right after an install or remove finishes — never
 polled continuously: nothing but this window's own actions, or someone
 at a terminal, changes it in the meantime.
 
+Flathub install/remove/status commands run as the user, without pkexec.
+Uninstall leaves application data intact. Flatpak-exported launcher directories
+are included in the session's `XDG_DATA_DIRS`, making installed apps available
+to Sniffer and the application menu after the updated session starts.
+
 ## Security
 
 Every argument that reaches `apt-get` is validated in the helper itself
@@ -102,11 +132,11 @@ Every argument that reaches `apt-get` is validated in the helper itself
 starting with `-`, so an argument can't be read as an option), **before**
 the helper's root check, so the validation is defense in depth regardless
 of who calls it — the GUI is not the only thing trusted to get this
-right. `zacos9-store`'s own package names come only from the shipped
-catalog, never from anything typed by the user (there is no text field
-anywhere in the window), so in practice nothing but a curated list of
-package names is ever possible, but the helper does not assume that: it
-checks for itself. `DEBIAN_FRONTEND=noninteractive` keeps apt from ever
+right. `zacos9-store`'s package names come from the shipped catalog or validated
+AppStream metadata, never directly from the search field. Flatpak identifiers
+are validated separately and commands receive argument arrays, not shell strings.
+The privileged helper still checks Debian arguments independently.
+`DEBIAN_FRONTEND=noninteractive` keeps apt from ever
 blocking on a question with no one positioned to answer it.
 
 `installed` needs no privilege (reading dpkg's own status is not a
@@ -114,8 +144,8 @@ privileged operation) and is never run through pkexec.
 
 ## What was deliberately left out
 
-- **Search.** The catalog is small and categorized; a search field would
-  be more UI than the catalog currently justifies.
+- **Arbitrary third-party APT sources.** The optional external source is
+  Flathub, keeping it separate from system packages.
 - **A progress percentage.** See above.
 - **Batch install** (checkboxes, "Install all checked" — closer to how
   the Mac OS 9 CD's own Software Installer actually worked). One item,
@@ -142,6 +172,13 @@ check is ever reached.
 installs and removes a small package (`galculator`) through the window,
 end to end, and was used to produce the screenshots this feature's
 review was based on.
+
+`software-catalog` exercises metadata filtering, schema, remote URL validation,
+disabled remotes, subprocess failures and timeouts using isolated mocks.
+`store-browser` exercises the offscreen window, keeping Featured as default,
+expanded results, search, source confirmation, Flathub install/remove routing
+and visible errors. It uses private mock commands, never real installs or
+repository mutations.
 
 ## Look-and-feel presets
 

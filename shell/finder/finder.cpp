@@ -1,5 +1,6 @@
 #include "finder.h"
 #include "platinumshell.h"
+#include "settings.h"
 
 #include <QCoreApplication>
 #include <QDir>
@@ -317,7 +318,7 @@ void Finder::openItem(Item *item) {
 
 static bool isExpandable(const QString &path) {
 	const QString lower = path.toLower();
-	for (const char *s : { ".zip", ".7z", ".tar", ".tgz", ".tar.gz", ".tbz2", ".tar.bz2", ".txz", ".tar.xz" }) {
+	for (const char *s : { ".zip", ".7z", ".sit", ".tar", ".tgz", ".tar.gz", ".tbz2", ".tar.bz2", ".txz", ".tar.xz" }) {
 		if (lower.endsWith(QLatin1String(s))) {
 			return true;
 		}
@@ -686,6 +687,9 @@ void Finder::moveSelectionToTrash() {
 	for (const QString &folder : changed) {
 		folderChanged(folder);
 	}
+	if (!changed.isEmpty()) {
+		pl_sound_event("trash-move");
+	}
 	folderChanged(trashFilesPath());
 }
 
@@ -712,9 +716,14 @@ void Finder::emptyTrash() {
 	if (!Alert::ask(message)) {
 		return;
 	}
-	QDir(files).removeRecursively();
-	QDir(QFileInfo(files).absolutePath() + "/info").removeRecursively();
+	if (!QDir(files).removeRecursively() ||
+			!QDir(QFileInfo(files).absolutePath() + "/info").removeRecursively()) {
+		Alert::ask("The Trash could not be completely emptied.", "OK", QString());
+		folderChanged(files);
+		return;
+	}
 	QDir().mkpath(files);
+	pl_sound_event("trash-empty");
 	folderChanged(files);
 }
 

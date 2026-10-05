@@ -30,6 +30,7 @@ export QT_STYLE_OVERRIDE=zacos9
 # ZacOS 9's defaults for other programs (share/xdg: Terminal's ⌘C/⌘V),
 # ahead of the system's; a user's own ~/.config files still win.
 export XDG_CONFIG_DIRS="/usr/share/zacos9/xdg:${XDG_CONFIG_DIRS:-/etc/xdg}"
+export XDG_DATA_DIRS="${XDG_DATA_HOME:-$HOME/.local/share}/flatpak/exports/share:/var/lib/flatpak/exports/share:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
 
 # No real GPU (a plain framebuffer, or a virtual machine's display, where
 # GL would be emulated on the CPU and shows stale frames): draw with
@@ -69,7 +70,7 @@ mkdir -p "$state"
 startup=
 if command -v dbus-update-activation-environment >/dev/null; then
 	startup="dbus-update-activation-environment --systemd WAYLAND_DISPLAY DISPLAY \
-XDG_CURRENT_DESKTOP XDG_SESSION_TYPE QT_QPA_PLATFORM GTK_CSD GTK_THEME QT_STYLE_OVERRIDE XCURSOR_THEME XCURSOR_PATH XCURSOR_SIZE"
+XDG_CURRENT_DESKTOP XDG_SESSION_TYPE XDG_DATA_DIRS QT_QPA_PLATFORM GTK_CSD GTK_THEME QT_STYLE_OVERRIDE XCURSOR_THEME XCURSOR_PATH XCURSOR_SIZE"
 fi
 # Then the password prompt for programs that need an administrator
 # (polkit: balenaEtcher writing a disk, pkexec), as Mac OS asked for one.

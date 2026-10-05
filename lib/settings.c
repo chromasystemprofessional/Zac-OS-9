@@ -6,7 +6,9 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <sys/file.h>
 #include <unistd.h>
+#include <time.h>
 
 #include "settings.h"
 
@@ -239,23 +241,11 @@ const char *pl_data_dir(void) {
 	return dir;
 }
 
-void pl_sound_play(const char *name) {
-	char chosen[64] = "platinum";
-	if (!name) {
-		pl_setting("alert-sound", chosen, sizeof(chosen));
-		name = chosen;
-	}
-	if (strcmp(name, "none") == 0 || strchr(name, '/')) {
-		return;
-	}
-	char path[1200];
-	snprintf(path, sizeof(path), "%s/sounds/%s.wav", pl_data_dir(), name);
+static void play_sound(const char *path, int level, bool interface_sound) {
 	if (access(path, R_OK) != 0) {
+		fprintf(stderr, "Sound file cannot be read: %s\n", path);
 		return;
 	}
-	/* The Sound panel's alert volume, 0..7 (7 = full). */
-	char v[8];
-	int level = pl_setting("alert-volume", v, sizeof(v)) ? atoi(v) : 7;
 	level = level < 0 ? 0 : level > 7 ? 7 : level;
 	if (level == 0) {
 		return;
@@ -266,24 +256,118 @@ void pl_sound_play(const char *name) {
 	/* Detach fully (double fork) so the caller never waits or reaps. */
 	pid_t pid = fork();
 	if (pid < 0) {
+		perror("Could not start sound playback");
 		return;
 	}
 	if (pid == 0) {
 		if (fork() == 0) {
 			setsid();
+			if (interface_sound) {
+				char lock_path[1200];
+				const char *runtime = getenv("XDG_RUNTIME_DIR");
+				const char *cache_dir = getenv("XDG_CACHE_HOME");
+				const char *home = getenv("HOME");
+				if (runtime && *runtime) {
+					snprintf(lock_path, sizeof(lock_path), "%s/zacos9-interface-sound.lock", runtime);
+				} else if (cache_dir && *cache_dir) {
+					snprintf(lock_path, sizeof(lock_path), "%s/zacos9/sounds/player.lock", cache_dir);
+				} else {
+					snprintf(lock_path, sizeof(lock_path), "%s/.cache/zacos9/sounds/player.lock", home ? home : "");
+				}
+				int lock = open(lock_path, O_CREAT | O_RDWR | O_NOFOLLOW, 0600);
+				if (lock < 0) {
+					perror("Could not lock interface sound playback");
+					_exit(1);
+				}
+				if (flock(lock, LOCK_EX | LOCK_NB) != 0) {
+					_exit(0); /* Keep a previous interface event from overlapping. */
+				}
+			}
 			int null = open("/dev/null", O_WRONLY);
 			if (null >= 0) {
 				dup2(null, 1);
-				dup2(null, 2);
 			}
 			execlp("pw-play", "pw-play", "--volume", pw_volume, path, (char *)NULL);
 			execlp("paplay", "paplay", pa_volume, path, (char *)NULL);
 			execlp("aplay", "aplay", "-q", path, (char *)NULL);
+			perror("No sound playback command could be started");
 			_exit(127);
 		}
 		_exit(0);
 	}
 	waitpid(pid, NULL, 0);
+}
+
+void pl_sound_preview(const char *path, int level) {
+	play_sound(path, level, false);
+}
+
+void pl_sound_play(const char *name) {
+	char chosen[64] = "platinum";
+	if (!name) {
+		pl_setting("alert-sound", chosen, sizeof(chosen));
+		name = chosen;
+	}
+	if (strcmp(name, "none") == 0 || strchr(name, '/')) {
+		return;
+	}
+	char path[1200], v[8];
+	snprintf(path, sizeof(path), "%s/sounds/%s.wav", pl_data_dir(), name);
+	pl_sound_preview(path, pl_setting("alert-volume", v, sizeof(v)) ? atoi(v) : 7);
+}
+
+void pl_sound_event(const char *event) {
+	static const char *const events[] = { "button-click", "checkbox-toggle", "menu-open",
+		"menu-command", "window-open", "window-close", "trash-move", "trash-empty" };
+	int index = -1;
+	for (int i = 0; i < 8; i++) {
+		if (strcmp(event, events[i]) == 0) {
+			index = i;
+			break;
+		}
+	}
+	if (index < 0) {
+		fprintf(stderr, "Unknown interface sound event: %s\n", event);
+		return;
+	}
+	char theme[128], value[128], key[64], path[1200];
+	if (!pl_setting("sound-theme", theme, sizeof(theme)) || strcmp(theme, "none") == 0) {
+		return;
+	}
+	char volume[8];
+	const int level = pl_setting("interface-volume", volume, sizeof(volume)) ? atoi(volume) : 5;
+	if (level <= 0) {
+		return;
+	}
+	struct timespec now;
+	clock_gettime(CLOCK_MONOTONIC, &now);
+	static struct timespec last;
+	if ((now.tv_sec - last.tv_sec) * 1000000000LL + now.tv_nsec - last.tv_nsec < 60000000LL) {
+		return;
+	}
+	last = now;
+	if (strcmp(theme, "original") == 0) {
+		static const char *const sounds[] = { "woodblock", "pluck", "droplet", "woodblock",
+			"chirp", "pluck", "droplet", "woodblock" };
+		snprintf(path, sizeof(path), "%s/sounds/%s.wav", pl_data_dir(), sounds[index]);
+	} else {
+		snprintf(key, sizeof(key), "sound.%s", event);
+		if (!pl_setting(key, value, sizeof(value))) {
+			return; /* A theme need not supply every event. */
+		}
+		if (strchr(value, '/') || strchr(value, '\\') || strstr(value, "..")) {
+			fprintf(stderr, "Invalid cached interface sound filename\n");
+			return;
+		}
+		const char *cache_dir = getenv("XDG_CACHE_HOME");
+		if (cache_dir && *cache_dir) {
+			snprintf(path, sizeof(path), "%s/zacos9/sounds/%s", cache_dir, value);
+		} else {
+			const char *home = getenv("HOME");
+			snprintf(path, sizeof(path), "%s/.cache/zacos9/sounds/%s", home ? home : "", value);
+		}
+	}
+	play_sound(path, level, true);
 }
 
 void pl_beep(void) {

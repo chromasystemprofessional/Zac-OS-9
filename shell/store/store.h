@@ -36,6 +36,11 @@ private:
 	void act();               /* the detail button: install or remove */
 	void actStyle();          /* the second button: the preset on or off */
 	void paintDetail(pl_canvas *c, uint32_t bg) const;
+	void filterItems();
+	void loadSource(const QString &source);
+	void configureSource();
+	void finishCatalog();
+	bool sourcesPage() const;
 
 	std::vector<StoreItem> m_allItems;
 	QStringList m_categories;
@@ -43,7 +48,16 @@ private:
 
 	PanelList m_categoryList, m_itemList;
 	PanelButton m_actionButton, m_styleButton;
+	PanelButton m_sourceButton, m_refreshButton;
+	PanelEdit m_search;
 	PanelHost m_host{ this };
+	QProcess m_catalog;
+	QTimer m_catalogTimeout;
+	QString m_loadingSource;
+	bool m_catalogTimedOut = false;
+	bool m_debianLoaded = false;
+	bool m_flathubLoaded = false;
+	bool m_flathubEnabled = false;
 
 	/* The selected item's installed state, re-checked when it is chosen
 	 * and after an install/remove finishes; not polled continuously

@@ -204,6 +204,7 @@ bool PanelButton::release(QPoint pos) {
 	const bool fire = rect.contains(pos);
 	down = inside = false;
 	if (fire && clicked) {
+		pl_sound_event("button-click");
 		clicked();
 	}
 	return true;
@@ -248,6 +249,7 @@ bool PanelCheckbox::release(QPoint p) {
 	down = inside = false;
 	if (fire) {
 		on = !on;
+		pl_sound_event("checkbox-toggle");
 		if (toggled) {
 			toggled(on);
 		}
@@ -661,6 +663,7 @@ bool PanelPopup::press(QWidget *owner, QPoint pos) {
 		return false;
 	}
 	const int sel = std::clamp(selected, 0, static_cast<int>(items.size()) - 1);
+	pl_sound_event("menu-open");
 	auto *menu = new PopupMenu(owner, items, sel, rect.width() - 1,
 		[this, owner, shown = items](int i) {
 			/* The items may have been refreshed while the menu was open:
@@ -668,6 +671,7 @@ bool PanelPopup::press(QWidget *owner, QPoint pos) {
 			for (int j = 0; j < static_cast<int>(items.size()); j++) {
 				if (!items[j].separator && items[j].text == shown[i].text) {
 					if (chosen) {
+						pl_sound_event("menu-command");
 						chosen(j);
 					}
 					break;

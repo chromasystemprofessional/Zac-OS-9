@@ -20,7 +20,8 @@
 class AppearancePanel : public QWidget {
 public:
 	AppearancePanel();
-	/* 0 Color, 1 Desktop patterns, 2 Wallpaper, 3 Sound. */
+	/* 0 Color, 1 Desktop patterns, 2 Wallpaper, 3 Alert Sound,
+	 * 4 Appearance Themes, 5 Sound Sets. */
 	void showTab(int tab);
 
 protected:
@@ -39,10 +40,18 @@ private:
 	void loadPatterns();
 	void loadWallpapers();
 	void paintWallpaperTab(pl_canvas *c);
+	void loadThemes();
+	void paintThemesTab(pl_canvas *c);
+	void paintSoundThemesTab(pl_canvas *c);
 
 	int m_tab = 0;
 	std::vector<std::unique_ptr<Text>> m_tabLabels;
-	PanelList m_accents, m_highlights, m_patterns, m_wallpapers, m_sounds;
+	PanelList m_accents, m_highlights, m_patterns, m_wallpapers, m_sounds, m_themes, m_soundThemes;
+	PanelButton m_previewTheme, m_saveTheme;
+	PanelEdit m_themeName;
+	PanelSlider m_interfaceVolume;
+	PanelHost m_host{ this };
+	QString m_themeError;
 	PanelPopup m_placement;
 	PanelList *m_focus = nullptr;
 	QStringList m_soundIds;

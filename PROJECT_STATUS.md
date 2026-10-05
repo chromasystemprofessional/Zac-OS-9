@@ -12,7 +12,7 @@ Updated: 2026-10-05
 | `2349968` | `network/afp/zacos9-afp`: AFP 2.x FUSE client skeleton |
 | `3dbae73` | AFP client fully working: single-`sendmsg` fix, busy-delete retry, truncate fallback; `tests/sharing/afp-client.sh` passes on Mac OS 9 and Netatalk |
 | *(uncommitted)* | Virtual Macintosh filesystem for the Finder, with real application icons, package origin, and hide-not-uninstall — see below |
-| *(uncommitted)* | Software window (app catalog over apt) in the Apple menu — see below |
+| *(uncommitted)* | Fetch Software (app catalog over apt) and New Tricks (software updates) in the Apple menu — see below |
 | *(uncommitted)* | Network Browser: connect to AFP and SMB servers, mounted volumes on the desktop — see below |
 | `4e3ebe6` | ZacOS 9 rename (from Platinum 2026) |
 | `996b311` | Applications: empty on fresh install, flat launchers |
@@ -36,6 +36,44 @@ over 1,000/s on Macs: GPE 0x06, the graphics SCI, fired ~24,000/s from boot
 and kept `irq/9-acpi` on most of a CPU. `hardware-quirks` covers both against
 a fake /sys. Confirmed on the iMac: HDMI playback is clean after a restart.
 
+**Appearance presets and sound themes** (uncommitted): Appearance adds Themes
+and Sound Sets tabs with saved preset combinations, None/original/custom sound
+sets, preview and independent interface volume. Registry version 8 adds Themes
+and Sound Themes under Appearance. Interface events are wired into ZacOS
+buttons/checkboxes, menus, Sniffer windows and successful Trash operations.
+Classic PCM sound resources and WAV manifests import without modifying sources;
+full classic window/control skins are intentionally unsupported for this phase.
+The local compatibility archive is excluded from commits/package builds.
+Full build and nine focused suites pass. The local sample archive validates
+496 entries and 374 resource forks; all 75 sound-set metadata maps were checked,
+with 399 supported PCM events decoded in private verification. Unsupported
+compressed samples and command sequences are reported. UI rendering and
+playback volume/overlap are covered by offscreen tests. Not installed/published.
+StuffIt extraction creates visible companions for resource-only files; Sniffer
+preserves their AppleDouble forks during individual moves and copies. The sound
+catalog also accepts a copied Sounds folder with one level of classic sets.
+
+**Expanded optional Software catalogs** (uncommitted): Featured stays the
+default; searchable All Applications uses Debian AppStream desktop metadata,
+and optional Flathub is enabled explicitly for the current user through
+Additional Sources. Flatpak app installs/removals are user-scoped, and disabling
+the source retains apps/data. Metadata discovery is asynchronous with timeout
+and explicit errors; arbitrary APT sources are excluded. Session data paths
+include Flatpak exports for Sniffer/menu launchers. Mocked catalog and offscreen
+browser tests exercise discovery, filtering, confirmation and command routing;
+no sources or applications have been added to the running system.
+The full build and five focused suites pass, including the pending wallpaper
+folder migration. Not installed or published yet.
+
+**Wallpaper folder placement** (uncommitted): Wallpaper now lives inside
+System Folder > Appearance, backed by `zacos9/appearance/Wallpaper`.
+Registry version 7 reparents the old node and preserves overrides; existing
+wallpaper storage is moved without changing image IDs. Failed moves are logged
+and retain the old storage rather than losing or overwriting user files.
+Sniffer and Appearance build successfully; the catalog, VFS and selection
+test suites pass, including legacy file moves and registry override preservation.
+Not yet installed or published.
+
 **Sniffer multiple selection** (0.1.7): desktop, icon and list views
 support Mac OS-style dotted selection rectangles, Shift-click and Shift-drag
 toggling, and Edit > Select All / Command-A. List rectangles start in blank
@@ -46,7 +84,7 @@ toggling, Select All, autoscroll and a three-file drop into another folder.
 Desktop rectangle code shares the tested hit-area/painting helpers; physical
 desktop validation is pending.
 
-**Desktop wallpaper mode** (0.1.6): a separate System Folder > Wallpaper
+**Desktop wallpaper mode** (0.1.6): a separate System Folder > Appearance > Wallpaper
 folder and Appearance Wallpaper tab allow user photos and classic PICT pictures.
 Choosing a pattern or photo switches background mode while retaining both
 selections. Fit, Fill, Stretch and Center render independently on each monitor.
@@ -240,7 +278,7 @@ real devices yet - this machine has an adapter, but bluez wasn't installed).
   the right). Clicking a window makes it active again. Seen in a nested session: foot in front of a Finder window -> desktop click ->
   the Finder window comes above foot, Finder's menus, foot's frame inactive; foot alone -> desktop click -> Finder's menus.
 
-**Software Update in the Apple menu** (built; window seen in a nested session; installing not tried yet - needs a published release).
+**New Tricks in the Apple menu** (built; window seen in a nested session; installing not tried yet - needs a published release).
 
 - `zacos9-update` (`shell/update/`): checks the newest GitHub release's `zacos9_*.deb` against the installed version and apt's pending
   Debian updates, lists both, and with Update downloads, checks (digest, package name, version) and installs the .deb, then Debian's

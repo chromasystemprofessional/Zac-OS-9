@@ -19,3 +19,6 @@ tools/measure/hig.txt
 /uploads/
 /Uploads/
 __pycache__/
+
+# Local compatibility archive: never package third-party theme assets.
+/tests/fixtures/themes/Appearance_Themes.sit

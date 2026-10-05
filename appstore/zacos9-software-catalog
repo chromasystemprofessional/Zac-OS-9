@@ -1,0 +1,142 @@
+#!/usr/bin/python3
+"""Read local Debian AppStream or the user's Flathub catalog as {"items": [...]}.
+
+Usage: zacos9-software-catalog debian|flathub
+This helper never adds remotes, refreshes metadata, or installs software.
+"""
+
+import json
+import re
+import subprocess
+import sys
+
+
+TIMEOUT = 60
+PACKAGE_NAME = re.compile(r"[a-z0-9][a-z0-9+.-]+\Z")
+APPLICATION_ID = re.compile(
+    r"(?:[A-Za-z_][A-Za-z0-9_]*\.){2,}[A-Za-z_][A-Za-z0-9_-]*\Z"
+)
+
+
+class Failure(Exception):
+    pass
+
+
+def debian_catalog():
+    try:
+        import gi
+        gi.require_version("AppStream", "1.0")
+        from gi.repository import AppStream
+    except (ImportError, ValueError) as error:
+        raise Failure(
+            "Debian discovery requires python3-gi, gir1.2-appstream-1.0 "
+            "and appstream."
+        ) from error
+
+    try:
+        pool = AppStream.Pool.new()
+        # Only the distribution catalog, not Flatpak or unowned desktop files.
+        pool.set_flags(AppStream.PoolFlags.LOAD_OS_CATALOG)
+        if not pool.load(None):
+            raise Failure("Unable to load the Debian AppStream catalog.")
+        components = pool.get_components().as_array()
+        items = {}
+        for component in components:
+            if component.get_kind() != AppStream.ComponentKind.DESKTOP_APP:
+                continue
+            packages = sorted({
+                package for package in (component.get_pkgnames() or [])
+                if PACKAGE_NAME.fullmatch(package)
+            })
+            identifier = component.get_id()
+            if not packages or not identifier:
+                continue
+            items.setdefault(identifier, {
+                "id": identifier,
+                "name": component.get_name() or identifier,
+                "blurb": component.get_summary() or "",
+                "packages": packages,
+                "source": "debian",
+            })
+        return sorted(items.values(), key=lambda item: item["id"])
+    except Failure:
+        raise
+    except Exception as error:
+        raise Failure(f"Unable to read the Debian AppStream catalog: {error}") from error
+
+
+def run_flatpak(arguments):
+    try:
+        result = subprocess.run(
+            ["flatpak", "--user", *arguments],
+            capture_output=True, text=True, check=False, timeout=TIMEOUT,
+        )
+    except subprocess.TimeoutExpired as error:
+        raise Failure(f"Flathub discovery timed out after {TIMEOUT} seconds.") from error
+    except (OSError, UnicodeError) as error:
+        raise Failure(f"Unable to run Flatpak: {error}") from error
+    if result.returncode:
+        detail = result.stderr.strip() or f"exit status {result.returncode}"
+        raise Failure(f"Unable to read the user's Flathub catalog: {detail}")
+    return result.stdout
+
+
+def flathub_catalog():
+    remotes = run_flatpak(["remote-list", "--show-disabled", "--columns=name,url,options"])
+    matches = []
+    for line in remotes.splitlines():
+        if not line.strip():
+            continue
+        columns = line.split("\t")
+        if len(columns) != 3:
+            raise Failure("Flatpak returned an invalid remote row (expected three columns).")
+        if columns[0] == "flathub":
+            matches.append(columns)
+    if len(matches) != 1:
+        raise Failure("An enabled official Flathub remote must exist in the user installation.")
+    _, url, options = matches[0]
+    if url not in ("https://dl.flathub.org/repo", "https://dl.flathub.org/repo/"):
+        raise Failure("The user's Flathub remote does not use https://dl.flathub.org/repo/.")
+    if "disabled" in {option.strip() for option in options.split(",")}:
+        raise Failure("The user's Flathub remote is disabled.")
+
+    output = run_flatpak([
+        "remote-ls", "--app", "--columns=application,name,description", "flathub",
+    ])
+
+    items = {}
+    for line in output.splitlines():
+        if not line.strip():
+            continue
+        columns = line.split("\t", 2)
+        if len(columns) != 3:
+            raise Failure("Flatpak returned an invalid catalog row (expected three columns).")
+        identifier, name, blurb = columns
+        if len(identifier) > 255 or not APPLICATION_ID.fullmatch(identifier):
+            continue
+        items.setdefault(identifier, {
+            "id": identifier,
+            "name": name or identifier,
+            "blurb": blurb,
+            "packages": [identifier],
+            "source": "flathub",
+        })
+    return sorted(items.values(), key=lambda item: item["id"])
+
+
+def main(argv=None):
+    args = sys.argv[1:] if argv is None else argv
+    if len(args) != 1 or args[0] not in ("debian", "flathub"):
+        print("Usage: zacos9-software-catalog debian|flathub", file=sys.stderr)
+        return 2
+    try:
+        items = debian_catalog() if args[0] == "debian" else flathub_catalog()
+    except Failure as error:
+        print(f"zacos9-software-catalog: {error}", file=sys.stderr)
+        return 1
+    print(json.dumps({"items": items}, ensure_ascii=False))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

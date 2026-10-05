@@ -1,5 +1,6 @@
 #include "vfs.h"
 #include "platinumshell.h"
+#include "custompatterns.h"
 
 #include <QCoreApplication>
 #include <QDir>
@@ -25,10 +26,10 @@
  * doesn't have take their default, and nodes it doesn't know about are
  * added, while the user's own nodes and overrides are kept.
  */
-static constexpr int REGISTRY_VERSION = 6;
+static constexpr int REGISTRY_VERSION = 8;
 
 static const char *DEFAULT_REGISTRY = R"JSON({
-  "version": 6,
+  "version": 8,
   "volume": {},
   "showUnixVolume": false,
   "nodes": [
@@ -38,8 +39,12 @@ static const char *DEFAULT_REGISTRY = R"JSON({
       "backing": "$XDG_DATA_HOME/zacos9/appearance" },
     { "id": "system-folder/appearance/desktop-patterns", "name": "Desktop Patterns",
       "kind": "backed", "backing": "$XDG_DATA_HOME/zacos9/appearance/Desktop Patterns" },
-    { "id": "system-folder/wallpaper", "name": "Wallpaper", "kind": "backed",
-      "backing": "$XDG_DATA_HOME/zacos9/wallpaper" },
+    { "id": "system-folder/appearance/wallpaper", "name": "Wallpaper", "kind": "backed",
+      "backing": "$XDG_DATA_HOME/zacos9/appearance/Wallpaper" },
+    { "id": "system-folder/appearance/themes", "name": "Themes", "kind": "backed",
+      "backing": "$XDG_DATA_HOME/zacos9/appearance/Themes" },
+    { "id": "system-folder/appearance/sound-themes", "name": "Sound Themes", "kind": "backed",
+      "backing": "$XDG_DATA_HOME/zacos9/appearance/Sound Themes" },
     { "id": "system-folder/control-panels", "name": "Control Panels",
       "kind": "panels", "icon": "control-panels" },
     { "id": "system-folder/extensions", "name": "Extensions", "kind": "folder" },
@@ -174,6 +179,16 @@ bool migrate(QJsonObject *root) {
 	}
 	const QJsonObject fresh = QJsonDocument::fromJson(DEFAULT_REGISTRY).object();
 	QJsonArray nodes = root->value("nodes").toArray();
+	for (int i = 0; i < nodes.size(); i++) {
+		QJsonObject n = nodes.at(i).toObject();
+		if (n.value("id").toString() == QLatin1String("system-folder/wallpaper")) {
+			n.insert("id", "system-folder/appearance/wallpaper");
+			if (n.value("backing").toString() == QLatin1String("$XDG_DATA_HOME/zacos9/wallpaper")) {
+				n.insert("backing", desktopWallpaperFolder());
+			}
+			nodes.replace(i, n);
+		}
+	}
 	/* Documents was the default before Home: Home holds it now. Only the
 	 * untouched default goes; one the user pointed elsewhere stays. */
 	for (int i = nodes.size() - 1; i >= 0; i--) {

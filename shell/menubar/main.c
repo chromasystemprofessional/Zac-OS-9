@@ -395,6 +395,7 @@ static bool title_at(double x, double y, enum side *side, int *index) {
 }
 
 static void open_menu(enum side side, int index) {
+	pl_sound_event("menu-open");
 	g.open_side = side;
 	g.open_index = index;
 	g.selected = -1;
@@ -494,6 +495,7 @@ static void blink_tick(void) {
 		return;
 	}
 	close_menu();
+	pl_sound_event("menu-command");
 	menus_perform(&g.chosen);
 	free(g.chosen.arg);
 	g.chosen.arg = NULL;

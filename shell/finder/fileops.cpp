@@ -1,5 +1,6 @@
 #include "fileops.h"
 #include "platinumshell.h"
+#include "settings.h"
 
 #include <QCoreApplication>
 #include <QDir>
@@ -78,7 +79,27 @@ QStringList transferItems(const QStringList &paths, const QString &destDir, bool
 			continue;
 		}
 		const QString target = dest.filePath(name);
+		const QString resource = info.absolutePath() + "/._" + info.fileName();
+		const QString resourceTarget = dest.filePath("._" + name);
+		const bool resourceFork = info.isFile() && !info.isSymLink() &&
+			!info.fileName().startsWith("._") && QFileInfo::exists(resource);
+		if (resourceFork && (QFileInfo(resource).isSymLink() || !QFileInfo(resource).isFile() ||
+				QFileInfo::exists(resourceTarget))) {
+			Alert::ask("The resource fork for “" + info.fileName() +
+				"” cannot be transferred safely; the file has not been moved.", "OK", QString());
+			continue;
+		}
 		bool ok = copy ? copyRecursively(srcAbs, target) : QDir().rename(srcAbs, target);
+		if (ok && resourceFork) {
+			ok = copy ? QFile::copy(resource, resourceTarget) : QDir().rename(resource, resourceTarget);
+			if (!ok) {
+				const bool restored = copy ? QFile::remove(target) : QDir().rename(target, srcAbs);
+				Alert::ask(restored
+					? "The resource fork could not be transferred. The original file is unchanged."
+					: "The resource fork could not be transferred, and the file could not be restored. "
+					  "Check both the source and destination folders.", "OK", QString());
+			}
+		}
 		if (ok) {
 			changed << destAbs;
 			if (!copy) {
@@ -218,6 +239,9 @@ void dropItems(QDropEvent *e, const Item *target, const QString &folder) {
 			}
 		}
 		changed.removeDuplicates();
+		if (!changed.isEmpty()) {
+			pl_sound_event("trash-move");
+		}
 		for (const QString &d : changed) {
 			finder.folderChanged(d);
 		}

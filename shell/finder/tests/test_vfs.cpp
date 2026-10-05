@@ -369,9 +369,17 @@ int main(int argc, char **argv) {
 	const QString desktopPatterns = vfsOpensAs(vfsPathFor("system-folder/appearance/desktop-patterns"));
 	check(desktopPatterns == dataHome + "/zacos9/appearance/Desktop Patterns" &&
 		QDir(desktopPatterns).exists(), "System Folder exposes a writable custom desktop patterns folder");
-	const QString wallpaper = vfsOpensAs(vfsPathFor("system-folder/wallpaper"));
-	check(wallpaper == dataHome + "/zacos9/wallpaper" && QDir(wallpaper).exists(),
-		"System Folder exposes a separate writable Wallpaper folder");
+	const QString wallpaper = vfsOpensAs(vfsPathFor("system-folder/appearance/wallpaper"));
+	check(wallpaper == dataHome + "/zacos9/appearance/Wallpaper" && QDir(wallpaper).exists(),
+		"Appearance contains a writable Wallpaper folder");
+	check(!namesIn(vfsPathFor("system-folder")).contains("Wallpaper"),
+		"Wallpaper is not directly inside System Folder");
+	check(vfsOpensAs(vfsPathFor("system-folder/appearance/themes")) ==
+		dataHome + "/zacos9/appearance/Themes",
+		"Appearance contains a custom preset Themes folder");
+	check(vfsOpensAs(vfsPathFor("system-folder/appearance/sound-themes")) ==
+		dataHome + "/zacos9/appearance/Sound Themes",
+		"Appearance contains a custom Sound Themes folder");
 	check(prefs == root + "/config", "Preferences stands for the XDG config directory");
 	check(vfsOpensAs(vfsPathFor("system-folder")).isEmpty(),
 		"a curated folder opens as a virtual window, not a directory");
@@ -499,6 +507,26 @@ int main(int argc, char **argv) {
 			"and writes the new version back");
 		reg.close();
 	}
+
+	/* Version 6's Wallpaper node moves without losing user overrides. */
+	old.insert("version", 6);
+	QJsonObject oldWallpaper;
+	oldWallpaper.insert("id", "system-folder/wallpaper");
+	oldWallpaper.insert("name", "My Wallpapers");
+	oldWallpaper.insert("kind", "backed");
+	oldWallpaper.insert("backing", root + "/custom-wallpapers");
+	oldNodes.append(oldWallpaper);
+	old.insert("nodes", oldNodes);
+	if (reg.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+		reg.write(QJsonDocument(old).toJson());
+		reg.close();
+	}
+	vfsRefresh();
+	check(vfsName(vfsPathFor("system-folder/appearance/wallpaper")) == "My Wallpapers" &&
+		vfsOpensAs(vfsPathFor("system-folder/appearance/wallpaper")) == root + "/custom-wallpapers",
+		"Wallpaper migration preserves the user's name and backing override");
+	check(!namesIn(vfsPathFor("system-folder")).contains("My Wallpapers"),
+		"the migrated Wallpaper node no longer appears directly under System Folder");
 
 	/* ---- folders of the user's own ------------------------------------- */
 	const QString userFolder = vfsNewFolder();
