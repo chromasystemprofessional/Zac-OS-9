@@ -42,6 +42,12 @@ Trash operations emit discrete events; third-party application controls are
 not intercepted. Closely spaced events are rate-limited.
 Only one interface event plays at a time, preventing long custom sounds from
 overlapping. Explicit previews and alerts remain independent.
+Window collapse and expansion have distinct events, including title-bar
+double-click and the collapse button. Window movement starts a repeating
+`window-drag` sample on the first actual movement, not merely a title-bar click.
+Releasing the grab stops it and optionally plays `window-drag-end`; Escape,
+window closure, fullscreen transitions and session shutdown cancel it without
+an end sound. These compositor events also work for other applications' windows.
 
 Place user-created or freely licensed sets in **System Folder > Appearance >
 Sound Themes**, normally `~/.local/share/zacos9/appearance/Sound Themes`.
@@ -59,6 +65,10 @@ files:
     "menu-command": "choose.wav",
     "window-open": "window.wav",
     "window-close": "close.wav",
+    "window-collapse": "collapse.wav",
+    "window-expand": "expand.wav",
+    "window-drag": "drag.wav",
+    "window-drag-end": "drop.wav",
     "trash-move": "trash.wav",
     "trash-empty": "empty.wav"
   }
@@ -86,9 +96,13 @@ data files so they can be selected normally in Sniffer.
 
 Classic discrete events supported are button press (`btnp`), checkbox press
 (`chkp`), menu open (`mnuo`), menu selection (`mnus`), window open (`wopn`),
-window close (`wcls`) and Trash flush (`ftrs`). Classic drag-loop sounds,
-random/command sequences and compressed samples are not supported. There is
-no verified classic mapping for `trash-move`; WAV themes can supply it explicitly.
+window close (`wcls`), collapse (`wcol`), expansion (`wexp`) and Trash flush
+(`ftrs`). Window movement (`wmov`) imports a PCM sample for repeating playback
+throughout the grab. These identifiers follow the public Carbon HIToolbox
+Appearance Manager interface. Playback repeats the complete decoded sample;
+classic interactive variants, embedded loop regions, random/command sequences
+and compressed samples are not supported. There is no verified classic mapping
+for `trash-move` or `window-drag-end`; WAV themes can supply these explicitly.
 The importer accepts up to 64 custom sets with a 64 MiB decoded-audio budget;
 individual samples are limited to ten seconds and 2 MiB. Limit violations are
 reported explicitly.

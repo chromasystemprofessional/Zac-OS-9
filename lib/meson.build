@@ -1,5 +1,6 @@
 # Pure drawing code shared by the compositor, the shell and the tests.
 cairo = dependency('cairo')
+threads = dependency('threads')
 
 platinum_inc = include_directories('.')
 platinum_lib = static_library('platinum',
@@ -13,7 +14,7 @@ platinum_lib = static_library('platinum',
   'patterns.c',
   'settings.c',
   include_directories: platinum_inc,
-  dependencies: [cairo],
+  dependencies: [cairo, threads],
   c_args: [
     '-DZACOS9_DATA_DIR="@0@"'.format(get_option('prefix') / get_option('datadir') / 'zacos9'),
     '-DZACOS9_SOURCE_DIR="@0@"'.format(meson.project_source_root()),
@@ -35,7 +36,7 @@ install_data('../assets/store/catalog.json',
 platinum_dep = declare_dependency(
   link_with: platinum_lib,
   include_directories: platinum_inc,
-  dependencies: [cairo],
+  dependencies: [cairo, threads],
 )
 
 # Pixel tests against the Apple HIG figures (tools/measure/fetch.sh).
@@ -63,6 +64,12 @@ test('widgets',
 # The compiled font table must match the .pfont sources.
 python3 = find_program('python3', required: false)
 if python3.found()
+  sound_driver = executable('test-sound-driver', 'tests/sound_driver.c',
+    dependencies: [platinum_dep])
+  test('sound-playback', python3,
+    args: [files('tests/test_sound.py'), sound_driver,
+      meson.project_source_root() / 'assets'],
+    timeout: 60)
   test('fonts-current', python3,
     args: [meson.project_source_root() / 'tools/fonts/build_fonts.py', '--check'])
 endif

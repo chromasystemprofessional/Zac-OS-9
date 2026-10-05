@@ -51,7 +51,9 @@ int main(int argc, char **argv) {
 	assert(QDir().mkpath(custom));
 	assert(QFile::copy(QString::fromUtf8(argv[1]), custom + "/click.wav"));
 	write(custom + "/theme.json", R"JSON({"version":1,"name":"Original Test",
-		"events":{"button-click":"click.wav","checkbox-toggle":"click.wav"}})JSON");
+		"events":{"button-click":"click.wav","checkbox-toggle":"click.wav",
+		"window-collapse":"click.wav","window-expand":"click.wav",
+		"window-drag":"click.wav","window-drag-end":"click.wav"}})JSON");
 	assert(waitFor([] { return soundThemeCount() == 3; }));
 	assert(changes > 0);
 	assert(soundThemeName(2) == "Original Test");
@@ -70,6 +72,10 @@ int main(int argc, char **argv) {
 	const QString id = soundThemeId(2);
 	assert(preference("sound-theme") == id);
 	assert(!preference("sound.button-click").isEmpty());
+	for (const char *key : { "sound.window-collapse", "sound.window-expand",
+			"sound.window-drag", "sound.window-drag-end" }) {
+		assert(!preference(key).isEmpty());
+	}
 	assert(preference("sound.window-open").isEmpty());
 	write(root.path() + "/pw-play", "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$TEST_LOG\"\nsleep 0.4\n");
 	QFile player(root.path() + "/pw-play");
@@ -97,6 +103,7 @@ int main(int argc, char **argv) {
 	assert(applySoundTheme(0, &error));
 	pl_sound_event("button-click");
 	assert(preference("sound.button-click").isEmpty());
+	assert(preference("sound.window-drag").isEmpty());
 	QThread::msleep(100);
 	assert(!QFile::exists(root.path() + "/played"));
 	assert(applySoundTheme(2, &error));

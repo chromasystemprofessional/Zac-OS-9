@@ -19,6 +19,7 @@
 
 #include "decor.h"
 #include "outline.h"
+#include "window_sounds.h"
 
 /* Mac OS default double-click time is 32 ticks (~533 ms). */
 #define PLAT_DOUBLE_CLICK_MS 533
@@ -125,6 +126,7 @@ struct plat_server {
 	uint32_t resize_edges;
 	enum decor_part grab_part;
 	bool grab_moved;
+	struct window_sound_state window_sound;
 
 	/* Double-click detection on title bars. */
 	uint32_t last_click_msec;
@@ -279,6 +281,7 @@ void input_init(struct plat_server *server);
 void input_refresh_cursor(struct plat_server *server);
 void input_begin_grab(struct plat_server *server, struct plat_view *view,
 		enum plat_cursor_mode mode, uint32_t edges, enum decor_part part);
+void input_cancel_grab(struct plat_server *server);
 /* Give keyboard focus to a surface, with ⌘ (Super) reported as Ctrl. */
 void input_keyboard_enter(struct plat_server *server, struct wlr_surface *surface);
 

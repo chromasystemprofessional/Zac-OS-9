@@ -240,6 +240,7 @@ int main(int argc, char *argv[]) {
 		"Quit with Ctrl+Alt+Backspace or by closing its window.\n", socket);
 	wl_display_run(server.display);
 
+	input_cancel_grab(&server);
 	wl_display_destroy_clients(server.display);
 	if (server.xwayland) {
 		wlr_xwayland_destroy(server.xwayland);

@@ -23,7 +23,8 @@
 
 namespace {
 const QStringList events{ "button-click", "checkbox-toggle", "menu-open", "menu-command",
-	"window-open", "window-close", "trash-move", "trash-empty" };
+	"window-open", "window-close", "trash-move", "trash-empty",
+	"window-collapse", "window-expand", "window-drag", "window-drag-end" };
 struct Theme {
 	QString id, name;
 	QMap<QString, QString> values;

@@ -1,12 +1,17 @@
 #define _GNU_SOURCE
 #include <ctype.h>
 #include <fcntl.h>
+#include <errno.h>
+#include <poll.h>
+#include <pthread.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <sys/file.h>
+#include <sys/syscall.h>
 #include <unistd.h>
 #include <time.h>
 
@@ -241,7 +246,51 @@ const char *pl_data_dir(void) {
 	return dir;
 }
 
-static void play_sound(const char *path, int level, bool interface_sound) {
+static int interface_lock(void) {
+	char path[1200];
+	const char *runtime = getenv("XDG_RUNTIME_DIR");
+	const char *cache_dir = getenv("XDG_CACHE_HOME");
+	const char *home = getenv("HOME");
+	if (runtime && *runtime) {
+		snprintf(path, sizeof(path), "%s/zacos9-interface-sound.lock", runtime);
+	} else if (cache_dir && *cache_dir) {
+		snprintf(path, sizeof(path), "%s/zacos9/sounds/player.lock", cache_dir);
+	} else {
+		snprintf(path, sizeof(path), "%s/.cache/zacos9/sounds/player.lock", home ? home : "");
+	}
+	int fd = open(path, O_CREAT | O_RDWR | O_NOFOLLOW, 0600);
+	if (fd < 0) {
+		perror("Could not open interface sound lock");
+	}
+	if (fd >= 0 && flock(fd, LOCK_EX | LOCK_NB) != 0) {
+		if (errno != EWOULDBLOCK && errno != EAGAIN) {
+			perror("Could not lock interface sound playback");
+		}
+		close(fd);
+		return -1;
+	}
+	return fd;
+}
+
+static void sound_backend(const char *path, int level) {
+	char pw_volume[16], pa_volume[24];
+	snprintf(pw_volume, sizeof(pw_volume), "%.3f", level / 7.0);
+	snprintf(pa_volume, sizeof(pa_volume), "--volume=%d", 65536 * level / 7);
+	int null = open("/dev/null", O_WRONLY);
+	if (null >= 0) {
+		dup2(null, STDOUT_FILENO);
+		close(null);
+	}
+	execlp("pw-play", "pw-play", "--volume", pw_volume, path, (char *)NULL);
+	execlp("paplay", "paplay", pa_volume, path, (char *)NULL);
+	execlp("aplay", "aplay", "-q", path, (char *)NULL);
+	perror("No sound playback command could be started");
+	_exit(127);
+}
+
+static int loop_stop_fd = -1;
+
+static void play_sound(const char *path, int level, bool interface_sound, int lock_retry_ms) {
 	if (access(path, R_OK) != 0) {
 		fprintf(stderr, "Sound file cannot be read: %s\n", path);
 		return;
@@ -250,9 +299,6 @@ static void play_sound(const char *path, int level, bool interface_sound) {
 	if (level == 0) {
 		return;
 	}
-	char pw_volume[16], pa_volume[24];
-	snprintf(pw_volume, sizeof(pw_volume), "%.3f", level / 7.0);
-	snprintf(pa_volume, sizeof(pa_volume), "--volume=%d", 65536 * level / 7);
 	/* Detach fully (double fork) so the caller never waits or reaps. */
 	pid_t pid = fork();
 	if (pid < 0) {
@@ -260,38 +306,28 @@ static void play_sound(const char *path, int level, bool interface_sound) {
 		return;
 	}
 	if (pid == 0) {
+		/* Detached one-shots must not extend the caller's loop lifetime, even
+		 * while an end event waits for its interface lock before exec. */
+		if (loop_stop_fd >= 0) {
+			close(loop_stop_fd);
+		}
 		if (fork() == 0) {
 			setsid();
 			if (interface_sound) {
-				char lock_path[1200];
-				const char *runtime = getenv("XDG_RUNTIME_DIR");
-				const char *cache_dir = getenv("XDG_CACHE_HOME");
-				const char *home = getenv("HOME");
-				if (runtime && *runtime) {
-					snprintf(lock_path, sizeof(lock_path), "%s/zacos9-interface-sound.lock", runtime);
-				} else if (cache_dir && *cache_dir) {
-					snprintf(lock_path, sizeof(lock_path), "%s/zacos9/sounds/player.lock", cache_dir);
-				} else {
-					snprintf(lock_path, sizeof(lock_path), "%s/.cache/zacos9/sounds/player.lock", home ? home : "");
+				int lock = interface_lock();
+				/* A release event can arrive before the stopped loop has killed
+				 * its backend. Retry only in this detached playback process. */
+				while (lock < 0 && lock_retry_ms > 0) {
+					struct timespec delay = { .tv_nsec = 10000000 };
+					nanosleep(&delay, NULL);
+					lock_retry_ms -= 10;
+					lock = interface_lock();
 				}
-				int lock = open(lock_path, O_CREAT | O_RDWR | O_NOFOLLOW, 0600);
 				if (lock < 0) {
-					perror("Could not lock interface sound playback");
-					_exit(1);
-				}
-				if (flock(lock, LOCK_EX | LOCK_NB) != 0) {
 					_exit(0); /* Keep a previous interface event from overlapping. */
 				}
 			}
-			int null = open("/dev/null", O_WRONLY);
-			if (null >= 0) {
-				dup2(null, 1);
-			}
-			execlp("pw-play", "pw-play", "--volume", pw_volume, path, (char *)NULL);
-			execlp("paplay", "paplay", pa_volume, path, (char *)NULL);
-			execlp("aplay", "aplay", "-q", path, (char *)NULL);
-			perror("No sound playback command could be started");
-			_exit(127);
+			sound_backend(path, level);
 		}
 		_exit(0);
 	}
@@ -299,7 +335,7 @@ static void play_sound(const char *path, int level, bool interface_sound) {
 }
 
 void pl_sound_preview(const char *path, int level) {
-	play_sound(path, level, false);
+	play_sound(path, level, false, 0);
 }
 
 void pl_sound_play(const char *name) {
@@ -316,58 +352,241 @@ void pl_sound_play(const char *name) {
 	pl_sound_preview(path, pl_setting("alert-volume", v, sizeof(v)) ? atoi(v) : 7);
 }
 
-void pl_sound_event(const char *event) {
+static bool event_sound(const char *event, char *path, size_t size, int *level) {
 	static const char *const events[] = { "button-click", "checkbox-toggle", "menu-open",
-		"menu-command", "window-open", "window-close", "trash-move", "trash-empty" };
+		"menu-command", "window-open", "window-close", "trash-move", "trash-empty",
+		"window-collapse", "window-expand", "window-drag", "window-drag-end" };
 	int index = -1;
-	for (int i = 0; i < 8; i++) {
+	for (size_t i = 0; event && i < sizeof(events) / sizeof(events[0]); i++) {
 		if (strcmp(event, events[i]) == 0) {
 			index = i;
 			break;
 		}
 	}
 	if (index < 0) {
-		fprintf(stderr, "Unknown interface sound event: %s\n", event);
-		return;
+		fprintf(stderr, "Unknown interface sound event: %s\n", event ? event : "(null)");
+		return false;
 	}
-	char theme[128], value[128], key[64], path[1200];
+	char theme[128], value[128], key[64];
 	if (!pl_setting("sound-theme", theme, sizeof(theme)) || strcmp(theme, "none") == 0) {
-		return;
+		return false;
 	}
 	char volume[8];
-	const int level = pl_setting("interface-volume", volume, sizeof(volume)) ? atoi(volume) : 5;
-	if (level <= 0) {
+	*level = pl_setting("interface-volume", volume, sizeof(volume)) ? atoi(volume) : 5;
+	if (*level <= 0) {
+		return false;
+	}
+	if (*level > 7) {
+		*level = 7;
+	}
+	if (strcmp(theme, "original") == 0) {
+		static const char *const sounds[] = { "woodblock", "pluck", "droplet", "woodblock",
+			"chirp", "pluck", "droplet", "woodblock", "pluck", "chirp", "droplet", "woodblock" };
+		snprintf(path, size, "%s/sounds/%s.wav", pl_data_dir(), sounds[index]);
+	} else {
+		snprintf(key, sizeof(key), "sound.%s", event);
+		if (!pl_setting(key, value, sizeof(value))) {
+			return false; /* A theme need not supply every event. */
+		}
+		if (strchr(value, '/') || strchr(value, '\\') || strstr(value, "..")) {
+			fprintf(stderr, "Invalid cached interface sound filename\n");
+			return false;
+		}
+		const char *cache_dir = getenv("XDG_CACHE_HOME");
+		if (cache_dir && *cache_dir) {
+			snprintf(path, size, "%s/zacos9/sounds/%s", cache_dir, value);
+		} else {
+			const char *home = getenv("HOME");
+			snprintf(path, size, "%s/.cache/zacos9/sounds/%s", home ? home : "", value);
+		}
+	}
+	return access(path, R_OK) == 0;
+}
+
+void pl_sound_event(const char *event) {
+	char path[1200];
+	int level;
+	if (!event_sound(event, path, sizeof(path), &level)) {
 		return;
 	}
 	struct timespec now;
 	clock_gettime(CLOCK_MONOTONIC, &now);
 	static struct timespec last;
-	if ((now.tv_sec - last.tv_sec) * 1000000000LL + now.tv_nsec - last.tv_nsec < 60000000LL) {
+	bool drag_end = strcmp(event, "window-drag-end") == 0;
+	if (!drag_end && (now.tv_sec - last.tv_sec) * 1000000000LL + now.tv_nsec - last.tv_nsec < 60000000LL) {
 		return;
 	}
 	last = now;
-	if (strcmp(theme, "original") == 0) {
-		static const char *const sounds[] = { "woodblock", "pluck", "droplet", "woodblock",
-			"chirp", "pluck", "droplet", "woodblock" };
-		snprintf(path, sizeof(path), "%s/sounds/%s.wav", pl_data_dir(), sounds[index]);
-	} else {
-		snprintf(key, sizeof(key), "sound.%s", event);
-		if (!pl_setting(key, value, sizeof(value))) {
-			return; /* A theme need not supply every event. */
-		}
-		if (strchr(value, '/') || strchr(value, '\\') || strstr(value, "..")) {
-			fprintf(stderr, "Invalid cached interface sound filename\n");
-			return;
-		}
-		const char *cache_dir = getenv("XDG_CACHE_HOME");
-		if (cache_dir && *cache_dir) {
-			snprintf(path, sizeof(path), "%s/zacos9/sounds/%s", cache_dir, value);
-		} else {
-			const char *home = getenv("HOME");
-			snprintf(path, sizeof(path), "%s/.cache/zacos9/sounds/%s", home ? home : "", value);
+	play_sound(path, level, true, drag_end ? 300 : 0);
+}
+
+void pl_sound_loop_stop(void) {
+	if (loop_stop_fd >= 0) {
+		close(loop_stop_fd); /* EOF also stops playback when the caller exits. */
+		loop_stop_fd = -1;
+	}
+}
+
+/* Inspect without reaping: the owned PID/group cannot be reused until cleanup. */
+static bool backend_finished(pid_t pid, bool *failed) {
+	siginfo_t info = {0};
+	if (waitid(P_PID, pid, &info, WEXITED | WNOHANG | WNOWAIT) != 0) {
+		perror("Could not inspect sound playback process");
+		*failed = true;
+		return true;
+	}
+	*failed = info.si_pid && (info.si_code != CLD_EXITED || info.si_status != 0);
+	return info.si_pid != 0;
+}
+
+static void stop_backend(pid_t pid) {
+	/* These disposable players have no state to save. Kill immediately so
+	 * release/mute cannot leave an audible tail or a backend holding the lock. */
+	kill(-pid, SIGKILL);
+	while (waitpid(pid, NULL, 0) < 0 && errno == EINTR) {}
+}
+
+static void loop_supervisor(int fd, const char *event) {
+	/* Do not inherit the compositor's SIGCHLD reaper or unrelated pipe writers. */
+	struct sigaction action = { .sa_handler = SIG_DFL };
+	sigemptyset(&action.sa_mask);
+	sigaction(SIGCHLD, &action, NULL);
+	sigset_t empty;
+	sigemptyset(&empty);
+	sigprocmask(SIG_SETMASK, &empty, NULL);
+	setsid();
+	if (fd != 3) {
+		dup2(fd, 3);
+		close(fd);
+	}
+	/* ZacOS is Linux; close_range avoids keeping GUI connections alive. */
+	if (syscall(SYS_close_range, 4u, ~0u, 0u) != 0) {
+		long max = sysconf(_SC_OPEN_MAX);
+		for (int i = 4; i < max; i++) {
+			close(i);
 		}
 	}
-	play_sound(path, level, true);
+	fcntl(3, F_SETFD, FD_CLOEXEC);
+	struct pollfd control = { .fd = 3, .events = POLLIN };
+	pid_t backend = 0;
+	int lock = -1, playing_level = 0;
+	char playing_path[1200] = "";
+	for (;;) {
+		int ready = poll(&control, 1, 40);
+		if (ready > 0 || (ready < 0 && errno != EINTR)) {
+			break;
+		}
+		char path[1200];
+		int level = 0;
+		bool enabled = event_sound(event, path, sizeof(path), &level);
+		bool failed = false;
+		bool finished = backend && backend_finished(backend, &failed);
+		if (failed) {
+			fprintf(stderr, "Window drag sound playback failed; stopping the loop\n");
+			break;
+		}
+		if (backend && (!enabled || level != playing_level ||
+				strcmp(path, playing_path) != 0 || finished)) {
+			stop_backend(backend);
+			backend = 0;
+			close(lock);
+			lock = -1;
+			/* Yield the interface lock between samples, even for very short WAVs. */
+			continue;
+		}
+		if (!backend && enabled && (lock = interface_lock()) >= 0) {
+			backend = fork();
+			if (backend == 0) {
+				close(3);
+				setpgid(0, 0);
+				sound_backend(path, level);
+			}
+			if (backend < 0) {
+				perror("Could not start window drag sound backend");
+				backend = 0;
+				close(lock);
+				lock = -1;
+				break;
+			} else {
+				setpgid(backend, backend);
+				playing_level = level;
+				snprintf(playing_path, sizeof(playing_path), "%s", path);
+			}
+		}
+	}
+	if (backend) {
+		stop_backend(backend);
+	}
+	if (lock >= 0) {
+		close(lock);
+	}
+	_exit(0);
+}
+
+static void *reap_loop(void *arg) {
+	int fd = (int)(intptr_t)arg;
+	pid_t pid;
+	ssize_t count;
+	do {
+		count = read(fd, &pid, sizeof(pid));
+	} while (count < 0 && errno == EINTR);
+	close(fd);
+	if (count == sizeof(pid)) {
+		while (waitpid(pid, NULL, 0) < 0 && errno == EINTR) {}
+	}
+	return NULL;
+}
+
+void pl_sound_loop_start(const char *event) {
+	pl_sound_loop_stop();
+	char path[1200];
+	int level;
+	if (!event_sound(event, path, sizeof(path), &level)) {
+		return;
+	}
+	int control[2];
+	if (pipe2(control, O_CLOEXEC) != 0) {
+		perror("Could not create sound loop control pipe");
+		return;
+	}
+	int reaper[2];
+	if (pipe2(reaper, O_CLOEXEC) != 0) {
+		perror("Could not create sound loop reaper pipe");
+		close(control[0]);
+		close(control[1]);
+		return;
+	}
+	/* Reserve the reaper before creating a child, so thread exhaustion cannot
+	 * leave a zombie in callers without their own SIGCHLD handler. */
+	pthread_t thread;
+	int error = pthread_create(&thread, NULL, reap_loop, (void *)(intptr_t)reaper[0]);
+	if (error != 0) {
+		fprintf(stderr, "Could not create sound loop reaper: %s\n", strerror(error));
+		close(reaper[0]);
+		close(reaper[1]);
+		close(control[0]);
+		close(control[1]);
+		return;
+	}
+	pthread_detach(thread);
+	pid_t pid = fork();
+	if (pid == 0) {
+		close(control[1]);
+		loop_supervisor(control[0], event);
+	}
+	close(control[0]);
+	if (pid < 0) {
+		perror("Could not start window drag sound loop");
+		close(reaper[1]);
+		close(control[1]);
+		return;
+	}
+	loop_stop_fd = control[1];
+	ssize_t count;
+	do {
+		count = write(reaper[1], &pid, sizeof(pid));
+	} while (count < 0 && errno == EINTR);
+	close(reaper[1]);
 }
 
 void pl_beep(void) {

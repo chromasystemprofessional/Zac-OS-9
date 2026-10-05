@@ -199,6 +199,24 @@ class SoundTests(unittest.TestCase):
         records[b"snd#", 1000] = snd_list([(b"btnp", 2)])
         self.assertEqual(sounds.classic_mapping(records), {"button-click": 2})
 
+    def test_classic_window_actions_and_drag_pcm(self):
+        entries = [(b"wcol", 10), (b"wexp", 11), (b"wmov", 12)]
+        records = {(b"snd ", number): snd() for _, number in entries}
+        records[b"snd#", 1000] = snd_list(entries)
+        expected = {"window-collapse": 10, "window-expand": 11, "window-drag": 12}
+        self.assertEqual(sounds.classic_mapping(records), expected)
+        self.assertNotIn("window-drag-end", sounds.CLASSIC_EVENTS.values())
+        items = [(b"snd ", number, snd()) for _, number in entries]
+        items += [(b"sdid", number, code + b"#Original#wind#Window action")
+                  for code, number in entries]
+        (self.source / "Window actions").write_bytes(resource_file(items))
+        result = sounds.scan(self.source, self.cache)
+        self.assertEqual(result["errors"], [])
+        self.assertEqual(set(result["themes"][0]["events"]), set(expected))
+        for path in result["themes"][0]["events"].values():
+            with wave.open(path) as reader:
+                self.assertEqual(reader.readframes(3), b"\0\x80\xff")
+
     def test_containers_and_silent_missing_events(self):
         resource = resource_file([(b"snd ", 42, snd()),
                                   (b"sdid", 42, b"chkp#Original#ui#Checkbox press")])

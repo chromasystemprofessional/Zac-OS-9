@@ -78,6 +78,10 @@ static void keyboard_modifiers(struct wl_listener *listener, void *data) {
 /* Compositor-level shortcuts. Returns true if the key was consumed. */
 static bool handle_keybinding(struct plat_server *server, uint32_t mods,
 		xkb_keysym_t sym) {
+	if (sym == XKB_KEY_Escape && server->grabbed_view) {
+		input_cancel_grab(server);
+		return true;
+	}
 	const uint32_t ctrl_alt = WLR_MODIFIER_CTRL | WLR_MODIFIER_ALT;
 	if ((mods & ctrl_alt) == ctrl_alt && sym == XKB_KEY_BackSpace) {
 		wl_display_terminate(server->display);
@@ -86,6 +90,7 @@ static bool handle_keybinding(struct plat_server *server, uint32_t mods,
 	/* Ctrl+Alt+F1..F12 on a real screen: switch to another console. */
 	if (sym >= XKB_KEY_XF86Switch_VT_1 && sym <= XKB_KEY_XF86Switch_VT_12) {
 		if (server->session) {
+			input_cancel_grab(server);
 			wlr_session_change_vt(server->session, sym - XKB_KEY_XF86Switch_VT_1 + 1);
 		}
 		return true;
@@ -221,6 +226,9 @@ void input_begin_grab(struct plat_server *server, struct plat_view *view,
 	if (view->fullscreen) {
 		return;
 	}
+	if (server->grabbed_view) {
+		input_cancel_grab(server);
+	}
 	server->cursor_mode = mode;
 	server->grabbed_view = view;
 	server->grab_x = server->cursor->x;
@@ -242,6 +250,14 @@ static void end_grab(struct plat_server *server) {
 	server->grabbed_view = NULL;
 	server->grab_part = DECOR_PART_NONE;
 	input_refresh_cursor(server);
+}
+
+void input_cancel_grab(struct plat_server *server) {
+	window_sound_finish(&server->window_sound, false);
+	if (server->grabbed_view && server->cursor_mode == PLAT_CURSOR_TRACK_BOX) {
+		view_set_pressed(server->grabbed_view, DECOR_PART_NONE);
+	}
+	end_grab(server);
 }
 
 static struct wlr_box resize_box(struct plat_server *server) {
@@ -292,10 +308,15 @@ static struct wlr_box move_box(struct plat_server *server) {
 static void grab_motion(struct plat_server *server) {
 	struct plat_view *view = server->grabbed_view;
 	switch (server->cursor_mode) {
-	case PLAT_CURSOR_MOVE:
-		server->grab_moved = true;
-		outline_show(&server->outline, move_box(server));
+	case PLAT_CURSOR_MOVE: {
+		struct wlr_box box = move_box(server);
+		if (box.x != server->grab_box.x || box.y != server->grab_box.y) {
+			server->grab_moved = true;
+			window_sound_move(&server->window_sound);
+		}
+		outline_show(&server->outline, box);
 		break;
+	}
 	case PLAT_CURSOR_RESIZE:
 		server->grab_moved = true;
 		outline_show(&server->outline, resize_box(server));
@@ -319,6 +340,7 @@ static void grab_release(struct plat_server *server) {
 			struct wlr_box b = move_box(server);
 			view_move_to(view, b.x, b.y);
 		}
+		window_sound_finish(&server->window_sound, server->grab_moved);
 		break;
 	case PLAT_CURSOR_RESIZE:
 		if (server->grab_moved) {

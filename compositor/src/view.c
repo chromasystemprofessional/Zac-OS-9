@@ -180,6 +180,9 @@ void view_set_hidden(struct plat_view *view, bool hidden) {
 		return;
 	}
 	struct plat_server *server = view->server;
+	if (hidden && server->grabbed_view == view) {
+		input_cancel_grab(server);
+	}
 	view->hidden = hidden;
 	wlr_scene_node_set_enabled(&view->scene_tree->node, !hidden);
 	if (view->toplevel_handle) {
@@ -308,6 +311,9 @@ void view_set_fullscreen(struct plat_view *view, bool fullscreen, struct wlr_out
 		if (wlr_box_empty(&box)) {
 			return;
 		}
+		if (server->grabbed_view == view) {
+			input_cancel_grab(server);
+		}
 		if (!view->fullscreen) {
 			view_set_collapsed(view, false);
 			view->unfullscreen = view_frame_box(view);
@@ -411,7 +417,7 @@ void view_set_collapsed(struct plat_view *view, bool collapsed) {
 	}
 	frame_set_collapsed(view->frame, collapsed);
 	frame_commit(view->frame);
-	/* TODO(phase 6): collapse/expand sounds (HIG: on by default). */
+	window_sound_collapse(collapsed);
 }
 
 void view_set_pressed(struct plat_view *view, enum decor_part part) {
@@ -522,9 +528,7 @@ void view_handle_unmap(struct plat_view *view) {
 	view->mapped = false;
 	destroy_toplevel_handle(view);
 	if (view == server->grabbed_view) {
-		outline_hide(&server->outline);
-		server->cursor_mode = PLAT_CURSOR_PASSTHROUGH;
-		server->grabbed_view = NULL;
+		input_cancel_grab(server);
 	}
 	if (view == server->last_click_view) {
 		server->last_click_view = NULL;

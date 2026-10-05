@@ -53,6 +53,18 @@ StuffIt extraction creates visible companions for resource-only files; Sniffer
 preserves their AppleDouble forks during individual moves and copies. The sound
 catalog also accepts a copied Sounds folder with one level of classic sets.
 
+**Window interaction sounds** (0.1.10): sound sets now accept
+window-collapse, window-expand, window-drag and optional window-drag-end.
+The compositor emits collapse/expand on actual state changes and starts
+repeating drag playback only after movement. Release stops playback; Escape,
+window unmap, fullscreen transitions and session shutdown cancel it. Classic
+PCM events wcol, wexp and wmov are imported; drag repeats the complete sample,
+not classic interactive variants or embedded loop regions. No Apple audio is
+bundled. The release also requires the StuffIt decoder at runtime.
+Compositor and Appearance builds pass; focused state-machine, mock playback,
+classic importer, offscreen theme-selection and settings suites pass. Physical
+audio and interactive desktop verification are still pending.
+
 **Expanded optional Software catalogs** (uncommitted): Featured stays the
 default; searchable All Applications uses Debian AppStream desktop metadata,
 and optional Flathub is enabled explicitly for the current user through
@@ -192,11 +204,16 @@ covered by `test-finder-vfs`; not yet installed or run - needs root and a new IS
 
 **Double-clicking an archive expands it in place** (built; checked in a nested session; 13 checks in `meson test expand`).
 
-- StuffIt Expander's way: a double-clicked .zip / .7z / .tar / .tar.gz / .tgz / .tar.bz2 / .tar.xz is expanded beside itself by
+- StuffIt Expander's way: a double-clicked .zip / .7z / .sit / .tar / .tar.gz / .tgz / .tar.bz2 / .tar.xz is expanded beside itself by
   `zacos9-expand` (`shell/finder/`, Python's zipfile/tarfile and python3-libarchive-c for 7z). One top-level item lands as itself, several go in
   a folder named after the archive; taken names get " 2"; the archive is kept; the result is selected. Entries escaping the folder
   are refused, __MACOSX/._ files skipped, zip Unix modes kept, password-protected zips refused with a message.
 - Seen: Photos.zip on the desktop -> "Photos" selected beside it; Project.zip in a Downloads window -> "Project" selected.
+- StuffIt runtime packaging fix (0.1.10): `unar` is now a mandatory
+  runtime dependency, not just a build dependency, so installed systems receive
+  both `unar` and `lsar` for `.sit` double-click extraction. Resource forks are
+  preserved as AppleDouble companions; existing extraction tests use generated
+  StuffIt files to cover in-place output, uppercase extensions and collisions.
 - 7z support (0.1.6) follows the same naming, collision avoidance,
   original-archive retention and partial-extraction cleanup. Links, special
   entries and unsafe paths are refused; encrypted or damaged archives show an

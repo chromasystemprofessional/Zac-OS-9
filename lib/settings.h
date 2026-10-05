@@ -45,8 +45,19 @@ void pl_sound_play(const char *name);
 
 /* The alert sound, for alerts and refused actions. */
 void pl_beep(void);
-/* Interface events use the selected sound theme, independently of alerts. */
+/* Interface events use the selected sound theme, independently of alerts.
+ * window-drag-end bypasses the event throttle and retries a busy interface
+ * lock for up to 300 ms in the detached player, allowing stop then end without
+ * waiting in the GUI. Other interface events skip a busy lock immediately. */
 void pl_sound_event(const char *event);
+/* Start repeating an interface event (normally "window-drag"), replacing the
+ * caller's previous loop. Unset/none/muted/missing events start no playback.
+ * An active loop rechecks theme, sample and volume every ~40 ms, pausing while
+ * disabled. Each sample shares the interface-event lock; contention retries.
+ * Stop is idempotent and never waits for playback. Call on release/cancel/unmap;
+ * caller exit/exec also stops the loop. These APIs are for the GUI thread. */
+void pl_sound_loop_start(const char *event);
+void pl_sound_loop_stop(void);
 void pl_sound_preview(const char *path, int level);
 
 /* Double-click time in ms (the Mouse panel's "double-click"; Mac OS's

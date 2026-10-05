@@ -1,3 +1,13 @@
+zacos9 (0.1.10) trixie; urgency=medium
+
+  * Add distinct window collapse and expand sounds, controlled repeating
+    window-drag playback, and an optional drag-end sound. Import classic
+    PCM window action samples and stop playback on release or cancellation.
+  * Require unar at runtime so StuffIt .sit archives can expand beside
+    themselves when double-clicked in Sniffer.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Mon, 05 Oct 2026 17:18:26 -0400
+
 zacos9 (0.1.9) trixie; urgency=medium
 
   * Add Fetch Software and New Tricks to the Apple menu. Expand the

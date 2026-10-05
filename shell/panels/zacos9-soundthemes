@@ -4,8 +4,8 @@
 Folder themes use theme.json: {"version":1,"name":"Name","events":{event:"file.wav"}}.
 Classic sets may also be inside one grouping folder without theme.json.
 Cached, content-addressed WAV files remain valid across later catalog scans.
-Only discrete, documented Appearance Manager events are imported, not skins,
-drag loops, random sound sequences, compressed sound, or executable resources.
+Documented Appearance Manager events and PCM window-drag samples are imported,
+not skins, random sound sequences, compressed sound, or executable resources.
 """
 import hashlib
 import importlib.machinery
@@ -26,12 +26,15 @@ MAX_THEMES = 64
 MAX_OUTPUT = 64 * 1024 * 1024
 MAX_SCAN_ENTRIES = 1024
 EVENTS = frozenset(("button-click", "checkbox-toggle", "menu-open", "menu-command",
-                    "window-open", "window-close", "trash-move", "trash-empty"))
+                    "window-open", "window-close", "trash-move", "trash-empty",
+                    "window-collapse", "window-expand", "window-drag", "window-drag-end"))
 # Public Carbon HIToolbox Appearance.h kThemeSound* FourCCs. There is no
 # documented move-to-trash equivalent; fdrp is a generic Finder drop, not trash.
 CLASSIC_EVENTS = {b"btnp": "button-click", b"chkp": "checkbox-toggle",
                   b"mnuo": "menu-open", b"mnus": "menu-command",
                   b"wopn": "window-open", b"wcls": "window-close",
+                  b"wcol": "window-collapse", b"wexp": "window-expand",
+                  b"wmov": "window-drag",
                   b"ftrs": "trash-empty"}
 _patterns = None
 
