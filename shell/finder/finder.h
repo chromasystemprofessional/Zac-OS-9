@@ -26,6 +26,8 @@ public:
 	virtual void itemRenamed(const QString &, const QString &) {}
 	/* View > Clean Up and View > Arrange (icon views only). */
 	virtual void arrange(Arrange) {}
+	/* Edit > Select All: every item shown in the view. */
+	virtual void selectAll() {}
 };
 
 /*

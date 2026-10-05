@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QFileSystemWatcher>
+#include <QSet>
 #include <QWidget>
 
 #include <QTimer>
@@ -33,6 +34,7 @@ public:
 	QWidget *widget() override { return this; }
 	void itemRenamed(const QString &from, const QString &to) override;
 	void arrange(Arrange how) override;
+	void selectAll() override;
 
 protected:
 	void paintEvent(QPaintEvent *) override;
@@ -62,6 +64,13 @@ private:
 	Item *m_pressItem = nullptr;
 	QPoint m_pressPos;
 	QPoint m_dragStart;
+
+	/* Selection rectangle; with Shift it toggles from its first selection. */
+	bool m_marquee = false;
+	bool m_marqueeExtend = false;
+	QPoint m_marqueeStart, m_marqueeEnd;
+	QSet<QString> m_marqueeBase; /* paths: volume polling can replace items */
+	void updateMarquee(QPoint pos);
 
 	/* Icons the user placed on the desktop, remembered (spatial). */
 	FolderState m_state;

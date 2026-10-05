@@ -24,6 +24,16 @@ Updated: 2026-10-05
 
 ## Current work
 
+**Sniffer multiple selection** (0.1.7): desktop, icon and list views
+support Mac OS-style dotted selection rectangles, Shift-click and Shift-drag
+toggling, and Edit > Select All / Command-A. List rectangles start in blank
+columns, select rows by icon/name and autoscroll at window edges. Existing
+multi-item drags move or Option-copy the whole selection. `finder-selection`
+uses real offscreen mouse/key events to cover icon and list rectangles,
+toggling, Select All, autoscroll and a three-file drop into another folder.
+Desktop rectangle code shares the tested hit-area/painting helpers; physical
+desktop validation is pending.
+
 **Desktop wallpaper mode** (0.1.6): a separate System Folder > Wallpaper
 folder and Appearance Wallpaper tab allow user photos and classic PICT pictures.
 Choosing a pattern or photo switches background mode while retaining both

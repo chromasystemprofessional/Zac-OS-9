@@ -354,6 +354,32 @@ bool iconItemContains(Item &item, int x, int y, QPoint p) {
 	return QRect(QPoint(l, t), QPoint(r, b)).contains(p);
 }
 
+QRect iconItemRect(Item &item, int x, int y) {
+	int l, t, r, b;
+	labelBox(item, x, y, &l, &t, &r, &b);
+	return QRect(x, y, PL_ICON_LARGE, PL_ICON_LARGE).united(QRect(QPoint(l, t), QPoint(r, b)));
+}
+
+void paintMarquee(pl_canvas *c, const QRect &r) {
+	const QRect visible = r.intersected(QRect(c->x, c->y, c->width, c->height));
+	if (visible.isEmpty()) {
+		return;
+	}
+	auto dot = [&](int x, int y) {
+		if (((x + y) & 1) == 0) {
+			pl_put(c, x, y, GRAY(0x5));
+		}
+	};
+	for (int x = visible.left(); x <= visible.right(); x++) {
+		dot(x, r.top());
+		dot(x, r.bottom());
+	}
+	for (int y = visible.top(); y <= visible.bottom(); y++) {
+		dot(r.left(), y);
+		dot(r.right(), y);
+	}
+}
+
 void sortIcons(std::vector<Item *> &items, Arrange by) {
 	const auto byName = [](Item *a, Item *b) {
 		return QString::localeAwareCompare(a->name, b->name) < 0;

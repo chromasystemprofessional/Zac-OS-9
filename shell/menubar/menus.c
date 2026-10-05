@@ -93,7 +93,13 @@ static void add_finder_menus(struct mb_menu *menus, int *n) {
 	sep(m);
 	add(m, "Find…", 'F', up, ACT_FINDER, "find");
 	add(m, "Show Original", 'R', sel, ACT_FINDER, "show-original");
+	/* Sniffer has no undoable edits or clipboard yet; it can select. */
 	add_edit_menu(menus, n, false);
+	struct mb_menu *edit = &menus[*n - 1];
+	struct mb_item *select_all = &edit->items[edit->n - 1];
+	select_all->enabled = up;
+	select_all->action = ACT_FINDER;
+	select_all->arg = strdup("select-all");
 	m = new_menu(menus, n, "View");
 	const bool win = up && fs->window;
 	struct mb_item *icons = add(m, "as Icons", 0, win, ACT_FINDER, "view-icons");

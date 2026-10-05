@@ -38,6 +38,7 @@ public:
 	QWidget *widget() override { return this; }
 	void itemRenamed(const QString &from, const QString &to) override;
 	void arrange(Arrange how) override;
+	void selectAll() override;
 
 protected:
 	void paintEvent(QPaintEvent *) override;
@@ -126,6 +127,19 @@ private:
 	/* A press on an icon that may turn into a drag. */
 	Item *m_pressItem = nullptr;
 	QPoint m_pressPos;
+
+	/* Selection rectangle, in content coordinates. With Shift, the
+	 * items it covers toggle from the selection it started with. */
+	bool m_marquee = false;
+	bool m_marqueeExtend = false;
+	QPoint m_marqueeStart, m_marqueeEnd, m_marqueePointer;
+	QSet<Item *> m_marqueeBase;
+	QTimer m_marqueeScroll;
+	std::vector<Item *> visibleItems();
+	QRect selectionRect(Item *item);
+	bool listSelectableAt(QPoint windowPos, Item *item);
+	void updateMarquee(QPoint windowPos);
+	void endMarquee();
 
 	/* Renaming (icon view): a click on a selected name, held still. */
 	LabelEditor m_editor{ [this] { update(); } };

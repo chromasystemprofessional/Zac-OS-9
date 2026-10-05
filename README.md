@@ -112,6 +112,14 @@ The application menu, folder-opening entry and user-facing messages use Sniffer.
 Internal names such as `zacos9-finder`, its application ID, D-Bus interfaces and
 `shell/finder/` remain unchanged for compatibility.
 
+Select multiple items as in Mac OS: drag a dotted selection rectangle from blank
+space on the desktop or in an icon/list window, Shift-click to add or remove an
+item, Shift-drag to toggle the items covered, or choose **Edit > Select All**
+(Command-A). In list view, start a rectangle in a blank column; it selects rows
+whose icon or name it crosses and scrolls when dragged past the window edge.
+Drag any selected item to move the whole selection into another folder; hold
+Option while dropping to copy instead.
+
 Double-click `.zip`, `.7z`, or supported tar archives to extract them beside the
 archive. A single top-level item keeps its name; multiple items go into a folder
 named after the archive. Existing items are never overwritten, and the archive

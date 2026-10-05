@@ -172,6 +172,8 @@ FolderWindow::FolderWindow(const QString &path) : m_path(path) {
 	m_repeat.callOnTimeout([this] { scrollStep(); });
 	m_renameTimer.setSingleShot(true);
 	m_renameTimer.callOnTimeout([this] { beginRename(m_renameItem); });
+	m_marqueeScroll.setInterval(REPEAT_MS);
+	m_marqueeScroll.callOnTimeout([this] { updateMarquee(m_marqueePointer); });
 	/* Other programs change folders too; follow them. */
 	if (vfsIsVirtual(path)) {
 		/* Applications come and go as packages are installed. */
@@ -253,6 +255,9 @@ void FolderWindow::reload() {
 	});
 	m_pressItem = nullptr;
 	m_buttonDown = nullptr;
+	m_marquee = false;
+	m_marqueeBase.clear();
+	m_marqueeScroll.stop();
 	auto fresh = listFolder(m_path);
 	m_editor.retarget(fresh);
 	m_renameTimer.stop();
@@ -287,6 +292,98 @@ void FolderWindow::selectByName(const QString &name) {
 	for (auto &item : m_items) {
 		item->selected = item->name == name;
 	}
+	update();
+}
+
+/* What the current view shows: list rows include expanded contents. */
+std::vector<Item *> FolderWindow::visibleItems() {
+	std::vector<Item *> items;
+	if (m_mode == ViewMode::List) {
+		for (const Row &row : m_rows) {
+			items.push_back(row.item);
+		}
+	} else {
+		for (auto &item : m_items) {
+			items.push_back(item.get());
+		}
+	}
+	return items;
+}
+
+void FolderWindow::selectAll() {
+	m_editor.commit();
+	forEachItem([](Item *item) { item->selected = false; });
+	for (Item *item : visibleItems()) {
+		item->selected = true;
+	}
+	update();
+	Finder::instance().notifyState();
+}
+
+/* An item's icon and name, in content coordinates. */
+QRect FolderWindow::selectionRect(Item *item) {
+	if (m_mode == ViewMode::Icons) {
+		return iconItemRect(*item, item->pos.x(), item->pos.y());
+	}
+	for (size_t r = 0; r < m_rows.size(); r++) {
+		if (m_rows[r].item != item) {
+			continue;
+		}
+		const int d = m_rows[r].depth * INDENT, top = static_cast<int>(r) * ROW_H;
+		const int nameW = COLUMNS[0].width - NAME_X - d - 6;
+		Text name(item->name, std::max(8, nameW), item->nameFont());
+		return QRect(QPoint(ICON_X + d, top + 1),
+			QPoint(NAME_X + d + name.inkWidth() + 1, top + 16));
+	}
+	return {};
+}
+
+/* List view, like the Finder's: a row's icon and name select it; its
+ * blank columns start a selection rectangle instead. */
+bool FolderWindow::listSelectableAt(QPoint windowPos, Item *item) {
+	return m_mode != ViewMode::List || !item ||
+		selectionRect(item).contains(toContent(windowPos));
+}
+
+void FolderWindow::updateMarquee(QPoint windowPos) {
+	if (!m_marquee) {
+		return;
+	}
+	m_marqueePointer = windowPos;
+	const int top = contentTop(), bottom = top + viewHeight() - 1, right = viewWidth() - 1;
+	int dx = windowPos.x() < 0 ? windowPos.x() : windowPos.x() > right ? windowPos.x() - right : 0;
+	int dy = windowPos.y() < top ? windowPos.y() - top
+		: windowPos.y() > bottom ? windowPos.y() - bottom : 0;
+	dx = std::clamp(dx, -ARROW_STEP, ARROW_STEP);
+	dy = std::clamp(dy, -ARROW_STEP, ARROW_STEP);
+	if (dx || dy) {
+		scrollTo(m_scrollX + dx, m_scrollY + dy);
+		if (!m_marqueeScroll.isActive()) {
+			m_marqueeScroll.start();
+		}
+	} else {
+		m_marqueeScroll.stop();
+	}
+	const QPoint clamped(std::clamp(windowPos.x(), 0, right), std::clamp(windowPos.y(), top, bottom));
+	m_marqueeEnd = toContent(clamped);
+	const QRect area = QRect(m_marqueeStart, m_marqueeEnd).normalized();
+	forEachItem([](Item *item) { item->selected = false; });
+	for (Item *item : m_marqueeBase) {
+		item->selected = true;
+	}
+	for (Item *item : visibleItems()) {
+		if (selectionRect(item).intersects(area)) {
+			item->selected = m_marqueeExtend ? !m_marqueeBase.contains(item) : true;
+		}
+	}
+	update();
+	Finder::instance().notifyState();
+}
+
+void FolderWindow::endMarquee() {
+	m_marquee = false;
+	m_marqueeBase.clear();
+	m_marqueeScroll.stop();
 	update();
 }
 
@@ -754,6 +851,9 @@ void FolderWindow::paintEvent(QPaintEvent *) {
 		paintColumnHeaders(&band);
 		paintList(&content);
 	}
+	if (m_marquee) {
+		paintMarquee(&content, QRect(m_marqueeStart, m_marqueeEnd).normalized());
+	}
 
 	/* Scroll bars share their outer lines with the window frame. The
 	 * compositor draws the resize box in the corner. */
@@ -888,6 +988,9 @@ void FolderWindow::mousePressEvent(QMouseEvent *e) {
 		toggleExpanded(hit);
 		return;
 	}
+	if (!listSelectableAt(pos, hit)) {
+		hit = nullptr;
+	}
 	const bool extend = e->modifiers() & Qt::ShiftModifier;
 	/* Icon view: a click on the name of the one selected icon starts a
 	 * rename, unless it turns into a double-click or a drag first. */
@@ -908,6 +1011,18 @@ void FolderWindow::mousePressEvent(QMouseEvent *e) {
 	}
 	m_pressItem = hit && hit->selected ? hit : nullptr;
 	m_pressPos = pos;
+	if (!hit && m_mode != ViewMode::Buttons) {
+		m_marquee = true;
+		m_marqueeExtend = extend;
+		m_marqueeBase.clear();
+		for (Item *item : visibleItems()) {
+			if (item->selected) {
+				m_marqueeBase.insert(item);
+			}
+		}
+		m_marqueeStart = m_marqueeEnd = content;
+		m_marqueePointer = pos;
+	}
 	update();
 	Finder::instance().setFront(this);
 	Finder::instance().notifyState();
@@ -920,6 +1035,10 @@ void FolderWindow::mouseMoveEvent(QMouseEvent *e) {
 			m_buttonInside = inside;
 			update();
 		}
+		return;
+	}
+	if (m_marquee && (e->buttons() & Qt::LeftButton)) {
+		updateMarquee(e->position().toPoint());
 		return;
 	}
 	if (m_pressItem && (e->buttons() & Qt::LeftButton) &&
@@ -981,6 +1100,9 @@ void FolderWindow::mouseReleaseEvent(QMouseEvent *) {
 		return;
 	}
 	m_pressItem = nullptr;
+	if (m_marquee) {
+		endMarquee();
+	}
 	m_sbPart = SB_NONE;
 	m_repeat.stop();
 }
@@ -988,7 +1110,8 @@ void FolderWindow::mouseReleaseEvent(QMouseEvent *) {
 void FolderWindow::mouseDoubleClickEvent(QMouseEvent *e) {
 	m_renameTimer.stop();
 	bool onTriangle = false;
-	if (Item *hit = itemAt(e->position().toPoint(), &onTriangle); hit && !onTriangle) {
+	if (Item *hit = itemAt(e->position().toPoint(), &onTriangle);
+			hit && !onTriangle && listSelectableAt(e->position().toPoint(), hit)) {
 		forEachItem([&](Item *item) { item->selected = item == hit; });
 		update();
 		Finder::instance().notifyState();
@@ -1035,6 +1158,7 @@ bool finderShortcut(QKeyEvent *e) {
 	Finder &f = Finder::instance();
 	switch (e->key()) {
 	case Qt::Key_N: f.newFolder(); return true;
+	case Qt::Key_A: f.command("select-all"); return true;
 	case Qt::Key_O: f.openSelection(); return true;
 	case Qt::Key_W: f.closeWindow(); return true;
 	case Qt::Key_Backspace: f.moveSelectionToTrash(); return true;

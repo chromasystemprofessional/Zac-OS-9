@@ -419,6 +419,9 @@ void Desktop::paintEvent(QPaintEvent *) {
 			paintIconLabel(c, *item, item->pos.x(), item->pos.y(), true);
 		}
 	}
+	if (m_marquee) {
+		paintMarquee(c, QRect(m_marqueeStart, m_marqueeEnd).normalized());
+	}
 	QPainter p(this);
 	px.blit(p);
 }
@@ -509,6 +512,17 @@ void Desktop::mousePressEvent(QMouseEvent *e) {
 	}
 	m_pressItem = hit && hit->selected ? hit : nullptr;
 	m_pressPos = e->position().toPoint();
+	if (!hit && e->button() == Qt::LeftButton) {
+		m_marquee = true;
+		m_marqueeExtend = extend;
+		m_marqueeBase.clear();
+		for (Item *item : allItems()) {
+			if (item->selected) {
+				m_marqueeBase.insert(item->path);
+			}
+		}
+		m_marqueeStart = m_marqueeEnd = pos;
+	}
 	update();
 	/* Clicking the desktop brings the Finder forward. */
 	Finder::instance().setFront(this);
@@ -527,7 +541,32 @@ void Desktop::mouseDoubleClickEvent(QMouseEvent *e) {
 	}
 }
 
+void Desktop::selectAll() {
+	m_editor.commit();
+	for (Item *item : allItems()) {
+		item->selected = true;
+	}
+	update();
+	Finder::instance().notifyState();
+}
+
+void Desktop::updateMarquee(QPoint pos) {
+	m_marqueeEnd = QPoint(std::clamp(pos.x(), 0, width() - 1), std::clamp(pos.y(), 0, height() - 1));
+	const QRect area = QRect(m_marqueeStart, m_marqueeEnd).normalized();
+	for (Item *item : allItems()) {
+		const bool base = m_marqueeBase.contains(item->path);
+		item->selected = iconItemRect(*item, item->pos.x(), item->pos.y()).intersects(area)
+			? (!m_marqueeExtend || !base) : base;
+	}
+	update();
+	Finder::instance().notifyState();
+}
+
 void Desktop::mouseMoveEvent(QMouseEvent *e) {
+	if (m_marquee && (e->buttons() & Qt::LeftButton)) {
+		updateMarquee(e->position().toPoint());
+		return;
+	}
 	if (!m_pressItem || !(e->buttons() & Qt::LeftButton) ||
 			(e->position().toPoint() - m_pressPos).manhattanLength() <
 				QApplication::startDragDistance()) {
@@ -552,6 +591,11 @@ void Desktop::mouseMoveEvent(QMouseEvent *e) {
 
 void Desktop::mouseReleaseEvent(QMouseEvent *) {
 	m_pressItem = nullptr;
+	if (m_marquee) {
+		m_marquee = false;
+		m_marqueeBase.clear();
+		update();
+	}
 }
 
 Item *Desktop::dropTargetAt(QPoint pos, const QStringList &dragged) {

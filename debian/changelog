@@ -1,3 +1,13 @@
+zacos9 (0.1.7) trixie; urgency=medium
+
+  * Add Mac OS-style multiple selection in Sniffer: dotted selection
+    rectangles on the desktop and in icon/list windows, Shift-click and
+    Shift-drag toggling, and Edit > Select All with Command-A.
+  * Autoscroll list-window selection rectangles and add an offscreen test
+    for selection gestures and moving several items with one drop.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Mon, 05 Oct 2026 05:02:12 -0400
+
 zacos9 (0.1.6) trixie; urgency=medium
 
   * Show an original animated dog cursor during application launches and

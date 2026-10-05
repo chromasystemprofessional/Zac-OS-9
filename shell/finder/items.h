@@ -2,6 +2,7 @@
 
 #include <QDateTime>
 #include <QPoint>
+#include <QRect>
 #include <QString>
 #include <memory>
 #include <vector>
@@ -147,3 +148,7 @@ void arrangeIcons(std::vector<Item *> items, Arrange how,
 bool acceptsDrops(const Item &item);
 /* Hit area of an icon item at (x, y): the icon square or its label. */
 bool iconItemContains(Item &item, int x, int y, QPoint p);
+/* The icon square and label together, for a selection rectangle. */
+QRect iconItemRect(Item &item, int x, int y);
+/* The Finder's dotted gray selection rectangle. */
+void paintMarquee(pl_canvas *c, const QRect &r);

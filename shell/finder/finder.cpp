@@ -181,6 +181,10 @@ void Finder::command(const QString &name) {
 		const QString path = QDir::cleanPath(name.mid(5));
 		InfoWindow::open(path, path == "/" ? PL_ICON_DISK
 			: QFileInfo(path).isDir() ? PL_ICON_FOLDER : PL_ICON_DOCUMENT, displayName(path));
+	} else if (name == "select-all") {
+		if (FinderView *v = front()) {
+			v->selectAll();
+		}
 	} else if (name == "duplicate") {
 		duplicate();
 	} else if (name == "make-alias") {
