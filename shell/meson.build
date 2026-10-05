@@ -239,6 +239,17 @@ test('disk-initialization-ui',
   timeout: 60,
 )
 
+test('local-volume-hotplug',
+  executable('test-localvolumes', '../tests/finder/test_localvolumes.cpp',
+    'finder/localvolumes.cpp',
+    dependencies: [qt6, gio],
+    include_directories: include_directories('finder', 'network'),
+    cpp_args: ['-std=c++17'],
+  ),
+  env: ['QT_NO_GLIB=1'],
+  timeout: 10,
+)
+
 executable('zacos9-appearance',
   'panels/main.cpp',
   'panels/appearance.cpp',

@@ -24,6 +24,17 @@ Updated: 2026-10-05
 
 ## Current work
 
+**USB hot-plug discovery fixes** (0.1.12): Finder now services GLib/GIO
+events with a bounded Qt timer, handles volume-changed when an inserted drive
+becomes mountable after volume-added, and registers listeners before startup
+enumeration. Mounted storage under /run/media is visible rather than filtered
+as runtime storage. Disk-initialization failure reporting starts before desktop
+automount, and completed mount requests refresh disk icons. Hardware-free
+hot-plug tests pass with Qt GLib integration disabled, covering late readiness,
+reinsertion, failure reporting and path filtering. Finder builds and disk-dialog
+and selection regression tests pass. Physical hot-plug verification remains
+pending on the installed update.
+
 **Unreadable USB disk initialization** (0.1.11): Sniffer checks inserted
 USB storage and mount failures and offers a Platinum Eject/Ignore/Initialize
 alert. Initialization requires a second explicit whole-disk erase confirmation

@@ -6,23 +6,28 @@
 
 #include <QFileInfo>
 #include <QSet>
+#include <QCoreApplication>
+#include <QTimer>
 #include <cstdio>
 
 #include "netvolumes.h"
 
 /* Mount-point prefixes that are never user-browsable storage: kernel
  * pseudo-filesystems, container overlays, snap loops, etc. */
-static bool isVirtualMountPath(const QString &path) {
+bool localVolumePathShown(const QString &path) {
+	if (path == "/") {
+		return false;
+	}
+	if (path.startsWith("/run/media/")) {
+		return true;
+	}
 	/* /run, /sys, /proc, /dev: kernel/runtime paths. */
-	if (path.startsWith("/run") || path.startsWith("/sys") ||
-			path.startsWith("/proc") || path.startsWith("/dev")) {
-		return true;
+	for (const char *prefix : { "/run", "/sys", "/proc", "/dev", "/snap" }) {
+		if (path == QLatin1String(prefix) || path.startsWith(QString::fromLatin1(prefix) + '/')) {
+			return false;
+		}
 	}
-	/* Snap packages mount their squashfs images under /snap. */
-	if (path.startsWith("/snap/")) {
-		return true;
-	}
-	return false;
+	return true;
 }
 
 /* Is this mount point already covered by netVolumes()? */
@@ -64,7 +69,7 @@ std::vector<LocalVolume> localVolumes() {
 		/* Skip / (shown as the Unix disk via vfsUnixVolumeShown), known
 		 * virtual/kernel mount paths, and mounts already shown as
 		 * network volumes. */
-		if (path == "/" || isVirtualMountPath(path) || isNetworkMount(path)) {
+		if (!localVolumePathShown(path) || isNetworkMount(path)) {
 			g_object_unref(vol);
 			continue;
 		}
@@ -153,6 +158,9 @@ static void onMounted(GObject *src, GAsyncResult *res, gpointer) {
 		}
 		g_error_free(err);
 	}
+	for (auto &callback : g_cbs) {
+		callback();
+	}
 	/* Success: mount-added follows, and the desktop shows the disk. */
 }
 
@@ -220,14 +228,23 @@ void localVolumesMountAll() {
 	if (monitor) {
 		return;
 	}
+	/* Qt's Wayland dispatcher need not service GLib's default context.
+	 * Bound each pass so a busy GIO source cannot monopolize the GUI. */
+	auto *events = new QTimer(QCoreApplication::instance());
+	events->setInterval(25);
+	QObject::connect(events, &QTimer::timeout, [] {
+		for (int i = 0; i < 32 && g_main_context_iteration(nullptr, FALSE); ++i) {}
+	});
+	events->start();
 	monitor = g_volume_monitor_get();
+	g_signal_connect(monitor, "volume-added", G_CALLBACK(onVolumeAdded), nullptr);
+	g_signal_connect(monitor, "volume-changed", G_CALLBACK(onVolumeAdded), nullptr);
+	g_signal_connect(monitor, "volume-removed", G_CALLBACK(onVolumeRemoved), nullptr);
 	GList *volumes = g_volume_monitor_get_volumes(monitor);
 	for (GList *l = volumes; l; l = l->next) {
 		mountIfNeeded(G_VOLUME(l->data));
 	}
 	g_list_free_full(volumes, g_object_unref);
-	g_signal_connect(monitor, "volume-added", G_CALLBACK(onVolumeAdded), nullptr);
-	g_signal_connect(monitor, "volume-removed", G_CALLBACK(onVolumeRemoved), nullptr);
 }
 
 /* ---- eject -------------------------------------------------------------- */

@@ -39,6 +39,7 @@ int main(int argc, char *argv[]) {
 	QApplication::setDoubleClickInterval(pl_double_click_ms()); /* the Mouse panel's */
 	QApplication::setQuitOnLastWindowClosed(false);
 	platinumShellInit();
+	diskInitializationStart();
 
 	QScreen *screen = QGuiApplication::primaryScreen();
 	const auto makeDesktop = [screen] {
@@ -50,7 +51,6 @@ int main(int argc, char *argv[]) {
 	};
 	Desktop *desktop = makeDesktop();
 	Finder::instance().start(desktop);
-	diskInitializationStart();
 	/* Other programs' "Show in Folder" (Firefox's downloads, ...). */
 	fileManager1Start();
 	/* More than one screen: the pattern on the others. */

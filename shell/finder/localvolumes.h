@@ -20,6 +20,8 @@ struct LocalVolume {
 	bool ejectable;    /* can be ejected (USB, optical, SD) */
 };
 
+bool localVolumePathShown(const QString &path);
+
 /* Every real storage volume mounted right now, except / and network mounts. */
 std::vector<LocalVolume> localVolumes();
 
@@ -29,7 +31,9 @@ void localVolumesOnChange(std::function<void()> f);
 
 /* Mounts every drive volume that isn't mounted yet, as Mac OS 9 put every
  * disk on the desktop at startup, and from then on each one that appears
- * (a USB stick, a disc). Each volume is tried once: one that can't be
+ * (a USB stick, a disc), including volumes that become mountable after their
+ * initial insertion notification. GIO callbacks are serviced alongside Qt.
+ * Each volume is tried once per insertion: one that can't be
  * mounted (a Windows partition left in use by Fast Startup, an encrypted
  * one) is logged and reported to the disk-initialization controller, which
  * independently excludes unsafe and non-USB storage. Internal drives need polkit's

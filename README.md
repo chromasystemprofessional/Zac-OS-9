@@ -150,6 +150,11 @@ Password-protected archives are reported as unsupported rather than prompting.
 
 ### Unreadable USB disks
 
+Sniffer automatically mounts newly inserted volumes once GIO reports them
+ready and displays mounted disks, including those under `/run/media`. A disk
+that Linux detects but cannot mount may need filesystem support or repair;
+discovery alone does not make unsupported formats readable.
+
 When an unformatted USB disk is detected, or an eligible USB disk cannot be
 mounted, Sniffer offers **Eject**, **Ignore**, and **Initialize** in a
 classic-style alert. Initialize asks again before erasing the **entire disk**,

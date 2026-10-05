@@ -1,3 +1,13 @@
+zacos9 (0.1.12) trixie; urgency=medium
+
+  * Fix USB hot-plug discovery: service GIO events alongside Qt, mount
+    volumes that become ready after insertion, and listen before startup
+    enumeration. Show mounted disks under /run/media.
+  * Register unreadable-disk reporting before automount and refresh disk
+    icons after mount completion. Add hardware-free hot-plug regression tests.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Mon, 05 Oct 2026 18:39:53 -0400
+
 zacos9 (0.1.11) trixie; urgency=medium
 
   * Offer Eject, Ignore and Initialize when eligible unreadable USB disks
