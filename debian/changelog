@@ -1,3 +1,12 @@
+zacos9 (0.1.8) trixie; urgency=medium
+
+  * Fix badly stuttering HDMI and DisplayPort sound on computers with Intel
+    Haswell graphics, such as the iMac14,1: the audio driver now reads the
+    HDMI controller's link position. On Macs, mask ACPI events that fire
+    nonstop and kept a CPU busy. Restart after updating.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Mon, 05 Oct 2026 15:08:22 -0400
+
 zacos9 (0.1.7) trixie; urgency=medium
 
   * Add Mac OS-style multiple selection in Sniffer: dotted selection
