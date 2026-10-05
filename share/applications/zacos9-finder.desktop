@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
-Name=Finder
-Comment=Opens folders in the Finder
+Name=Sniffer
+Comment=Opens folders in Sniffer
 Exec=zacos9-finder --open %U
 MimeType=inode/directory;
 NoDisplay=true

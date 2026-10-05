@@ -24,6 +24,31 @@ Updated: 2026-10-05
 
 ## Current work
 
+**Sniffer naming** (0.1.5): user-visible Finder branding is now Sniffer,
+including the application menu and Hide command, Qt application name, folder
+desktop entry, login-session description and Windows installer guidance.
+Executable names, application IDs, D-Bus interfaces and source paths remain
+unchanged for compatibility.
+
+**Application fullscreen** (0.1.5): the compositor now honors native
+Wayland, Xwayland and foreign-toplevel fullscreen requests instead of ignoring
+them. Fullscreen removes Platinum decorations, fills one output including the
+menu-bar area, and restores the previous frame position/size and zoom state on
+exit. Active fullscreen windows sit above the menu bar; focusing a regular
+window returns fullscreen content to the normal view layer. Output changes
+refresh fullscreen geometry and disconnected outputs fall back to a remaining
+display. `fullscreen-protocols` exercises fullscreen enter/exit with actual Qt
+Wayland and Xwayland clients in an isolated dual-output headless compositor.
+Captured native Wayland frames confirm content fills every pixel of the selected
+1280x720 output and restores its exact previous rendered position and size.
+Firefox/YouTube on the physical desktop has not yet been retested after restart.
+
+**Volume sound feedback** (0.1.5): successful system-volume adjustments
+preview the selected alert sound via `pl_beep()`, once on drag release or after
+a keyboard change. Playback waits for the audio-server command to succeed;
+failed commands do not produce success feedback. Existing mute, alert-volume
+and None-sound behavior is retained.
+
 **Multi-monitor boot/startup artwork** (0.1.4): Plymouth renders a separate
 centered logo, progress bar and password prompt in each display viewport.
 The compositor no longer stretches one startup buffer across the combined

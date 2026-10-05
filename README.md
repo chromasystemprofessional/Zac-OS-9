@@ -13,7 +13,7 @@ software.
 | Path | What |
 |---|---|
 | `compositor/` | `zacos9-wm`: Wayland compositor (C, wlroots 0.18). Draws window frames and handles input. |
-| `shell/` | Menu bar, Finder, Control Panels (Qt6). *Phase 2+* |
+| `shell/` | Menu bar, Sniffer, Control Panels (Qt6). *Phase 2+* |
 | `style/` | Platinum QStyle plugin and GTK theme. *Phase 5* |
 | `emulation/` | SheepShaver / Basilisk II integration. *Phase 4* |
 | `assets/` | Original fonts, icons, desktop patterns, sounds. |
@@ -78,6 +78,26 @@ it. Volume and Mute control that output; Alert Volume remains a separate setting
 The panel refreshes every two seconds, including when a monitor is connected or
 removed, and follows the audio server's fallback output after disconnection.
 Audio-server errors are shown in the panel rather than silently ignored.
+Adjusting Volume previews the selected alert sound once the change succeeds:
+on release when dragging, or after a keyboard adjustment. The preview respects
+Mute, Alert Volume and the "None" alert-sound choice.
+
+## Fullscreen applications
+
+Native Wayland and Xwayland applications can request true fullscreen, including
+Firefox's fullscreen button, F11 and a video player's fullscreen shortcut.
+The window's frame is hidden and its content fills the selected monitor,
+covering the menu bar while the fullscreen window is active. Leaving fullscreen
+restores its previous window size, position and zoom state. Other monitors keep
+their desktop layout; resolution changes and monitor removal update fullscreen
+placement.
+
+## Sniffer
+
+**Sniffer** is ZacOS 9's desktop and spatial file browser (formerly Finder).
+The application menu, folder-opening entry and user-facing messages use Sniffer.
+Internal names such as `zacos9-finder`, its application ID, D-Bus interfaces and
+`shell/finder/` remain unchanged for compatibility.
 
 ## License
 

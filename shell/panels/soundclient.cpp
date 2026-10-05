@@ -266,10 +266,13 @@ void SoundClient::setVolume(const QString &sink, int percent) {
 		report("No valid sound output or volume was selected.");
 		return;
 	}
+	const unsigned generation = ++m_volumeGeneration;
 	run({ "set-sink-volume", sink, QString::number(percent) + "%" },
-		[this](const QByteArray &, const QString &error) {
+		[this, generation](const QByteArray &, const QString &error) {
 			if (!error.isEmpty()) {
 				report(error);
+			} else if (generation == m_volumeGeneration && volumeApplied) {
+				volumeApplied();
 			}
 			refresh();
 		});

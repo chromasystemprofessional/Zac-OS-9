@@ -28,6 +28,11 @@ void view_attach_surface_tree(struct plat_view *view, struct wlr_scene_tree *tre
 }
 
 struct wlr_box view_frame_box(struct plat_view *view) {
+	if (view->fullscreen && view->fullscreen_output) {
+		struct wlr_box box;
+		wlr_output_layout_get_box(view->server->output_layout, view->fullscreen_output, &box);
+		return box;
+	}
 	const struct decor_state *st = &view->frame->st;
 	return (struct wlr_box){
 		.x = view->scene_tree->node.x,
@@ -38,7 +43,8 @@ struct wlr_box view_frame_box(struct plat_view *view) {
 }
 
 void view_content_pos(struct plat_view *view, int *x, int *y) {
-	struct decor_margins m = decor_margins(view->frame->st.style);
+	struct decor_margins m = view->fullscreen ? (struct decor_margins){0}
+		: decor_margins(view->frame->st.style);
 	*x = view->scene_tree->node.x + m.left;
 	*y = view->scene_tree->node.y + m.top;
 }
@@ -61,6 +67,15 @@ void view_min_frame_size(struct plat_view *view, int *w, int *h) {
 void view_update_frame(struct plat_view *view) {
 	struct wlr_box geo;
 	view->impl->get_geometry(view, &geo);
+	if (view->fullscreen) {
+		wlr_scene_node_set_enabled(&view->frame->tree->node, false);
+		wlr_scene_node_set_enabled(&view->frame->grow->node, false);
+		if (view->surface_tree) {
+			wlr_scene_node_set_position(&view->surface_tree->node, -geo.x, -geo.y);
+		}
+		return;
+	}
+	wlr_scene_node_set_enabled(&view->frame->tree->node, true);
 	/* Our own programs say how to frame a window; otherwise fixed-size
 	 * windows with a parent are dialogs (HIG: movable modal). */
 	int hint = platinum_shell_style_for(view->impl->get_surface(view));
@@ -80,7 +95,9 @@ void view_update_frame(struct plat_view *view) {
 
 void view_set_title(struct plat_view *view, const char *title) {
 	frame_set_title(view->frame, title);
-	frame_commit(view->frame);
+	if (!view->fullscreen) {
+		frame_commit(view->frame);
+	}
 	if (view->toplevel_handle) {
 		wlr_foreign_toplevel_handle_v1_set_title(view->toplevel_handle, title ? title : "");
 	}
@@ -114,9 +131,15 @@ struct plat_view *view_topmost(struct plat_server *server) {
 }
 
 static void set_active(struct plat_view *view, bool active) {
+	if (view->fullscreen) {
+		wlr_scene_node_reparent(&view->scene_tree->node,
+			active ? view->server->fullscreen_layer : view->server->view_layer);
+	}
 	view->impl->set_activated(view, active);
 	frame_set_active(view->frame, active);
-	frame_commit(view->frame);
+	if (!view->fullscreen) {
+		frame_commit(view->frame);
+	}
 	if (view->toplevel_handle) {
 		wlr_foreign_toplevel_handle_v1_set_activated(view->toplevel_handle, active);
 	}
@@ -239,6 +262,9 @@ struct plat_view *view_at(struct plat_server *server, double lx, double ly,
 }
 
 enum decor_part view_part_at(struct plat_view *view, double lx, double ly) {
+	if (view->fullscreen) {
+		return DECOR_PART_CLIENT;
+	}
 	return decor_hit(&view->frame->st,
 		(int)lx - view->scene_tree->node.x, (int)ly - view->scene_tree->node.y);
 }
@@ -259,11 +285,81 @@ void view_resize_frame(struct plat_view *view, struct wlr_box box) {
 		box.height - m.top - m.bottom);
 }
 
+void view_set_fullscreen(struct plat_view *view, bool fullscreen, struct wlr_output *requested) {
+	struct plat_server *server = view->server;
+	if (fullscreen) {
+		struct plat_output *output, *chosen = NULL;
+		wl_list_for_each(output, &server->outputs, link) {
+			if (output->wlr_output == requested) {
+				chosen = output;
+				break;
+			}
+		}
+		if (!chosen) {
+			struct wlr_box frame = view_frame_box(view);
+			chosen = output_at(server, frame.x + frame.width / 2.0, frame.y + frame.height / 2.0);
+		}
+		if (!chosen) {
+			return;
+		}
+		struct wlr_box box;
+		wlr_output_layout_get_box(server->output_layout, chosen->wlr_output, &box);
+		if (wlr_box_empty(&box)) {
+			return;
+		}
+		if (!view->fullscreen) {
+			view_set_collapsed(view, false);
+			view->unfullscreen = view_frame_box(view);
+			if (view->unfullscreen.width <= 0 || view->unfullscreen.height <= 0) {
+				view->unfullscreen.width = frame_outer_w(view->frame, 640);
+				view->unfullscreen.height = frame_outer_h(view->frame, 400);
+			}
+		}
+		view->fullscreen = true;
+		view->fullscreen_output = chosen->wlr_output;
+		view->impl->set_fullscreen(view, true);
+		wlr_scene_node_set_position(&view->scene_tree->node, box.x, box.y);
+		view->impl->set_size(view, box.width, box.height);
+		wlr_scene_node_reparent(&view->scene_tree->node,
+			server->focused_view == view ? server->fullscreen_layer : server->view_layer);
+	} else {
+		if (!view->fullscreen) {
+			view->impl->set_fullscreen(view, false);
+			return;
+		}
+		view->fullscreen = false;
+		view->fullscreen_output = NULL;
+		view->impl->set_fullscreen(view, false);
+		wlr_scene_node_reparent(&view->scene_tree->node, server->view_layer);
+		if (server->focused_view == view) {
+			wlr_scene_node_raise_to_top(&view->scene_tree->node);
+		}
+		view_resize_frame(view, view->unfullscreen);
+		view->frame->dirty = true;
+	}
+	view_update_frame(view);
+	if (view->toplevel_handle) {
+		wlr_foreign_toplevel_handle_v1_set_fullscreen(view->toplevel_handle, fullscreen);
+	}
+}
+
+void view_refresh_fullscreen(struct plat_server *server) {
+	struct plat_view *view;
+	wl_list_for_each(view, &server->views, link) {
+		if (view->fullscreen) {
+			view_set_fullscreen(view, true, view->fullscreen_output);
+		}
+	}
+}
+
 void view_close(struct plat_view *view) {
 	view->impl->close(view);
 }
 
 void view_toggle_zoom(struct plat_view *view) {
+	if (view->fullscreen) {
+		return;
+	}
 	if (view->collapsed) {
 		view_set_collapsed(view, false);
 	}
@@ -302,6 +398,9 @@ void view_toggle_zoom(struct plat_view *view) {
 }
 
 void view_set_collapsed(struct plat_view *view, bool collapsed) {
+	if (view->fullscreen) {
+		return;
+	}
 	if (view->collapsed == collapsed) {
 		return;
 	}
@@ -335,6 +434,12 @@ static void handle_request_close(struct wl_listener *listener, void *data) {
 	view_close(view);
 }
 
+static void handle_request_fullscreen(struct wl_listener *listener, void *data) {
+	struct plat_view *view = wl_container_of(listener, view, handle_request_fullscreen);
+	struct wlr_foreign_toplevel_handle_v1_fullscreen_event *event = data;
+	view_set_fullscreen(view, event->fullscreen, event->output);
+}
+
 static void create_toplevel_handle(struct plat_view *view) {
 	struct plat_server *server = view->server;
 	struct wlr_foreign_toplevel_handle_v1 *h =
@@ -346,6 +451,7 @@ static void create_toplevel_handle(struct plat_view *view) {
 	wlr_foreign_toplevel_handle_v1_set_title(h,
 		view->frame->title_str ? view->frame->title_str : "");
 	wlr_foreign_toplevel_handle_v1_set_app_id(h, view->app_id ? view->app_id : "");
+	wlr_foreign_toplevel_handle_v1_set_fullscreen(h, view->fullscreen);
 	struct wlr_box box = view_frame_box(view);
 	struct plat_output *output =
 		output_at(server, box.x + box.width / 2.0, box.y + box.height / 2.0);
@@ -358,6 +464,8 @@ static void create_toplevel_handle(struct plat_view *view) {
 	wl_signal_add(&h->events.request_minimize, &view->handle_request_minimize);
 	view->handle_request_close.notify = handle_request_close;
 	wl_signal_add(&h->events.request_close, &view->handle_request_close);
+	view->handle_request_fullscreen.notify = handle_request_fullscreen;
+	wl_signal_add(&h->events.request_fullscreen, &view->handle_request_fullscreen);
 }
 
 static void destroy_toplevel_handle(struct plat_view *view) {
@@ -367,6 +475,7 @@ static void destroy_toplevel_handle(struct plat_view *view) {
 	wl_list_remove(&view->handle_request_activate.link);
 	wl_list_remove(&view->handle_request_minimize.link);
 	wl_list_remove(&view->handle_request_close.link);
+	wl_list_remove(&view->handle_request_fullscreen.link);
 	wlr_foreign_toplevel_handle_v1_destroy(view->toplevel_handle);
 	view->toplevel_handle = NULL;
 }
@@ -380,7 +489,9 @@ void view_handle_map(struct plat_view *view) {
 	struct wlr_box area = output_usable_area(server, server->cursor->x, server->cursor->y);
 	struct wlr_box frame = view_frame_box(view);
 	int hx, hy;
-	if (platinum_shell_position_for(view->impl->get_surface(view), &hx, &hy)) {
+	if (view->fullscreen) {
+		view_set_fullscreen(view, true, view->fullscreen_output);
+	} else if (platinum_shell_position_for(view->impl->get_surface(view), &hx, &hy)) {
 		/* Spatial: back where its program remembers it, but always with
 		 * the title bar on screen and below the menu bar. */
 		if (!wlr_box_empty(&area)) {
@@ -404,6 +515,9 @@ void view_handle_map(struct plat_view *view) {
 
 void view_handle_unmap(struct plat_view *view) {
 	struct plat_server *server = view->server;
+	if (view->fullscreen) {
+		view_set_fullscreen(view, false, NULL);
+	}
 	view->mapped = false;
 	destroy_toplevel_handle(view);
 	if (view == server->grabbed_view) {

@@ -45,6 +45,10 @@ static void xw_set_size(struct plat_view *view, int width, int height) {
 	wlr_xwayland_surface_configure(view->xsurface, x, y, width, height);
 }
 
+static void xw_set_fullscreen(struct plat_view *view, bool fullscreen) {
+	wlr_xwayland_surface_set_fullscreen(view->xsurface, fullscreen);
+}
+
 /* X11 clients position their own popups from their window position. */
 static void xw_moved(struct plat_view *view) {
 	xw_set_size(view, view->xsurface->width, view->xsurface->height);
@@ -80,6 +84,7 @@ static const struct plat_view_impl xwayland_impl = {
 	.get_geometry = xw_get_geometry,
 	.set_activated = xw_set_activated,
 	.set_size = xw_set_size,
+	.set_fullscreen = xw_set_fullscreen,
 	.moved = xw_moved,
 	.close = xw_close,
 	.get_size_limits = xw_get_size_limits,
@@ -94,6 +99,9 @@ static void handle_map(struct wl_listener *listener, void *data) {
 	view_set_app_id(view, view->xsurface->class);
 	view_place_new(view);
 	view_handle_map(view);
+	if (view->xsurface->fullscreen) {
+		view_set_fullscreen(view, true, NULL);
+	}
 }
 
 static void handle_unmap(struct wl_listener *listener, void *data) {
@@ -145,6 +153,11 @@ static void handle_request_configure(struct wl_listener *listener, void *data) {
 			event->x, event->y, event->width, event->height);
 		return;
 	}
+	if (view->fullscreen) {
+		struct wlr_box box = view_frame_box(view);
+		xw_set_size(view, box.width, box.height);
+		return;
+	}
 	/* Windows stay where the user put them; only the size is negotiable. */
 	xw_set_size(view, event->width, event->height);
 }
@@ -180,7 +193,10 @@ static void handle_request_maximize(struct wl_listener *listener, void *data) {
 }
 
 static void handle_request_fullscreen(struct wl_listener *listener, void *data) {
-	/* Not supported yet; the window keeps its frame. */
+	struct plat_view *view = wl_container_of(listener, view, request_fullscreen);
+	if (view->mapped) {
+		view_set_fullscreen(view, view->xsurface->fullscreen, NULL);
+	}
 }
 
 static void handle_set_title(struct wl_listener *listener, void *data) {

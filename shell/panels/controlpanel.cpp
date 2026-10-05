@@ -334,7 +334,15 @@ public:
 		m_volume.enabled = false;
 		m_volume.changed = [this](int v) {
 			m_error.clear();
+			m_volumeFeedbackReady = false;
 			m_sound.setVolume(m_currentSink, v * 100 / 7);
+		};
+		m_sound.volumeApplied = [this] {
+			if (m_volume.dragging) {
+				m_volumeFeedbackReady = true;
+			} else {
+				pl_beep();
+			}
 		};
 		m_mute = PanelCheckbox("Mute", QPoint(M + IN, g1 + SLIDER_GROUP_H + 2));
 		m_mute.enabled = false;
@@ -369,10 +377,11 @@ protected:
 	}
 
 	void mouseReleaseEvent(QMouseEvent *e) override {
-		/* Let go of the alert volume and you hear it. */
 		const bool alert = m_alert.dragging;
+		const bool volume = m_volume.dragging && m_volumeFeedbackReady;
 		ControlPanel::mouseReleaseEvent(e);
-		if (alert) {
+		m_volumeFeedbackReady = false;
+		if (alert || volume) {
 			pl_beep();
 		}
 	}
@@ -423,6 +432,7 @@ private:
 	QTimer m_refresh;
 	PanelPopup m_output;
 	QString m_currentSink, m_error;
+	bool m_volumeFeedbackReady = false;
 	PanelSlider m_volume, m_alert;
 	PanelCheckbox m_mute;
 };

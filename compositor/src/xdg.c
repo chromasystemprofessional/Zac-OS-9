@@ -48,6 +48,10 @@ static void xdg_set_size(struct plat_view *view, int width, int height) {
 	wlr_xdg_toplevel_set_size(view->xdg_toplevel, width, height);
 }
 
+static void xdg_set_fullscreen(struct plat_view *view, bool fullscreen) {
+	wlr_xdg_toplevel_set_fullscreen(view->xdg_toplevel, fullscreen);
+}
+
 static void xdg_close(struct plat_view *view) {
 	wlr_xdg_toplevel_send_close(view->xdg_toplevel);
 }
@@ -70,6 +74,7 @@ static const struct plat_view_impl xdg_impl = {
 	.get_geometry = xdg_get_geometry,
 	.set_activated = xdg_set_activated,
 	.set_size = xdg_set_size,
+	.set_fullscreen = xdg_set_fullscreen,
 	.close = xdg_close,
 	.get_size_limits = xdg_get_size_limits,
 	.has_parent = xdg_has_parent,
@@ -94,6 +99,9 @@ static void handle_commit(struct wl_listener *listener, void *data) {
 	if (view->xdg_toplevel->base->initial_commit) {
 		/* Let the client pick its own size, as classic Mac apps do. */
 		wlr_xdg_toplevel_set_size(view->xdg_toplevel, 0, 0);
+		if (view->xdg_toplevel->requested.fullscreen) {
+			view_set_fullscreen(view, true, view->xdg_toplevel->requested.fullscreen_output);
+		}
 		if (view->decoration) {
 			wlr_xdg_toplevel_decoration_v1_set_mode(view->decoration,
 				WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE);
@@ -158,7 +166,8 @@ static void handle_request_maximize(struct wl_listener *listener, void *data) {
 static void handle_request_fullscreen(struct wl_listener *listener, void *data) {
 	struct plat_view *view = wl_container_of(listener, view, request_fullscreen);
 	if (view->xdg_toplevel->base->initialized) {
-		wlr_xdg_surface_schedule_configure(view->xdg_toplevel->base);
+		view_set_fullscreen(view, view->xdg_toplevel->requested.fullscreen,
+			view->xdg_toplevel->requested.fullscreen_output);
 	}
 }
 

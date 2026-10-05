@@ -22,6 +22,7 @@ public:
 	bool switching = false;
 	std::function<void()> changed;
 	std::function<void(const QString &)> failed;
+	std::function<void()> volumeApplied;
 
 	void refresh();
 	void selectOutput(const SoundOutput &output);
@@ -32,6 +33,7 @@ private:
 	using Done = std::function<void(const QByteArray &, const QString &)>;
 	bool m_refreshing = false;
 	unsigned m_generation = 0;
+	unsigned m_volumeGeneration = 0;
 	void run(const QStringList &args, Done done);
 	void report(const QString &error);
 	void finishSwitch(const QString &error);

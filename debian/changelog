@@ -1,3 +1,14 @@
+zacos9 (0.1.5) trixie; urgency=medium
+
+  * Rename user-visible Finder branding to Sniffer while preserving
+    executable names and application identifiers for compatibility.
+  * Honor Wayland and Xwayland fullscreen requests, fill the selected
+    monitor without decorations, and restore window geometry on exit.
+  * Preview the selected alert sound after successful volume adjustments.
+  * Add fullscreen protocol tests and sound feedback regression coverage.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Mon, 05 Oct 2026 03:44:34 -0400
+
 zacos9 (0.1.4) trixie; urgency=medium
 
   * Center complete boot and startup artwork independently on each monitor,

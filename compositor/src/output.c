@@ -28,6 +28,7 @@ static void output_request_state(struct wl_listener *listener, void *data) {
 	const struct wlr_output_event_request_state *event = data;
 	wlr_output_commit_state(output->wlr_output, event->state);
 	layers_arrange(output);
+	view_refresh_fullscreen(output->server);
 	prefs_write_outputs(output->server);
 }
 
@@ -41,6 +42,17 @@ static void output_destroy(struct wl_listener *listener, void *data) {
 	wl_list_remove(&output->destroy.link);
 	wl_list_remove(&output->link);
 	free(output);
+	struct plat_view *view;
+	wl_list_for_each(view, &server->views, link) {
+		if (view->fullscreen_output == gone) {
+			view->fullscreen_output = NULL;
+			if (wl_list_empty(&server->outputs)) {
+				view_set_fullscreen(view, false, NULL);
+			} else {
+				view_set_fullscreen(view, true, NULL);
+			}
+		}
+	}
 	/* ZacOS 9's own shell (menu bar, desktop) moves to the display that is
 	 * main now; anyone else's shell surfaces live on one output and go
 	 * with it. */

@@ -367,7 +367,7 @@ void WinInstallWindow::paintEvent(QPaintEvent *) {
 		}
 	};
 	switch (m_state) {
-	case State::Empty: para("Or open one from the Finder."); break;
+	case State::Empty: para("Or open one from Sniffer."); break;
 	case State::Ready:
 		para("Click Install to run it. Its own windows will guide you through.");
 		break;

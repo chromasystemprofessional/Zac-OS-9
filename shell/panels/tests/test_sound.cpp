@@ -99,7 +99,9 @@ int main(int argc, char **argv) {
 	check(save(path, state), "write sound server fixture state");
 	SoundClient client;
 	int updates = 0;
+	int volumeFeedback = 0;
 	client.changed = [&] { updates++; };
+	client.volumeApplied = [&] { volumeFeedback++; };
 	client.failed = [&](const QString &message) { error = message; };
 	error.clear();
 	client.refresh();
@@ -127,6 +129,16 @@ int main(int argc, char **argv) {
 	client.setVolume("monitor", 71);
 	check(until([&] { return updates > 0; }) && client.outputs[1].volume == 71,
 		"set volume on selected monitor");
+	check(volumeFeedback == 1, "offer sound feedback after successful volume adjustment");
+	error.clear();
+	qputenv("SOUND_TEST_FAIL", "set-sink-volume");
+	client.setVolume("monitor", 50);
+	check(until([&] { return !error.isEmpty(); }) && volumeFeedback == 1,
+		"failed volume adjustments do not offer success feedback");
+	updates = 0;
+	check(until([&] { return updates > 0; }), "refresh actual volume after failed adjustment");
+	qunsetenv("SOUND_TEST_FAIL");
+	error.clear();
 	updates = 0;
 	client.setMuted("monitor", false);
 	check(until([&] { return updates > 0; }) && !client.outputs[1].muted,

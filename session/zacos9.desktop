@@ -1,6 +1,6 @@
 [Desktop Entry]
 Name=ZacOS 9
-Comment=A classic desktop: Platinum appearance, menu bar and Finder
+Comment=A classic desktop: Platinum appearance, menu bar and Sniffer
 Exec=zacos9-session
 TryExec=zacos9-session
 Type=Application

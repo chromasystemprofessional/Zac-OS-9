@@ -215,6 +215,9 @@ static bool option_held(struct plat_server *server) {
 
 void input_begin_grab(struct plat_server *server, struct plat_view *view,
 		enum plat_cursor_mode mode, uint32_t edges, enum decor_part part) {
+	if (view->fullscreen) {
+		return;
+	}
 	server->cursor_mode = mode;
 	server->grabbed_view = view;
 	server->grab_x = server->cursor->x;

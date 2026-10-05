@@ -182,6 +182,7 @@ int main(int argc, char *argv[]) {
 	server.shell_layers[ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM] = wlr_scene_tree_create(root);
 	server.view_layer = wlr_scene_tree_create(root);
 	server.shell_layers[ZWLR_LAYER_SHELL_V1_LAYER_TOP] = wlr_scene_tree_create(root);
+	server.fullscreen_layer = wlr_scene_tree_create(root);
 	server.unmanaged_layer = wlr_scene_tree_create(root);
 	server.shell_layers[ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY] = wlr_scene_tree_create(root);
 	server.overlay_layer = wlr_scene_tree_create(root);

@@ -57,7 +57,7 @@ custom_target('cursor-theme',
 install_subdir(meson.current_build_dir() / 'ZacOS9',
   install_dir: get_option('datadir') / 'icons')
 
-executable('zacos9-wm',
+compositor_exe = executable('zacos9-wm',
   'src/main.c',
   'src/output.c',
   'src/input.c',

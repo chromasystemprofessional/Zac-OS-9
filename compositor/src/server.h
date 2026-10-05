@@ -59,6 +59,7 @@ struct plat_server {
 	struct wlr_scene_tree *shell_layers[4]; /* indexed by zwlr_layer_shell_v1_layer */
 	struct wlr_scene_tree *view_layer;
 	struct wlr_scene_tree *unmanaged_layer; /* X11 menus, tooltips */
+	struct wlr_scene_tree *fullscreen_layer;
 	struct wlr_scene_tree *overlay_layer;   /* drag outlines */
 	struct plat_outline outline;
 
@@ -148,6 +149,7 @@ struct plat_view_impl {
 	void (*set_activated)(struct plat_view *view, bool activated);
 	/* Ask the client for a new content size. */
 	void (*set_size)(struct plat_view *view, int width, int height);
+	void (*set_fullscreen)(struct plat_view *view, bool fullscreen);
 	/* The frame moved (X11 clients must be told their new position). */
 	void (*moved)(struct plat_view *view);
 	void (*close)(struct plat_view *view);
@@ -184,6 +186,9 @@ struct plat_view {
 	bool hidden;    /* "Hide <app>" from the Application menu */
 	bool collapsed;
 	bool zoomed;
+	bool fullscreen;
+	struct wlr_output *fullscreen_output;
+	struct wlr_box unfullscreen;
 	struct wlr_box unzoomed; /* frame box to restore from zoom */
 
 	struct wl_listener map;
@@ -202,6 +207,7 @@ struct plat_view {
 	struct wl_listener handle_request_activate;
 	struct wl_listener handle_request_minimize;
 	struct wl_listener handle_request_close;
+	struct wl_listener handle_request_fullscreen;
 
 	/* Xwayland only. */
 	struct wl_listener associate;
@@ -292,6 +298,8 @@ void view_move_to(struct plat_view *view, int x, int y);
 void view_resize_frame(struct plat_view *view, struct wlr_box frame_box);
 void view_close(struct plat_view *view);
 void view_toggle_zoom(struct plat_view *view);
+void view_set_fullscreen(struct plat_view *view, bool fullscreen, struct wlr_output *output);
+void view_refresh_fullscreen(struct plat_server *server);
 void view_set_collapsed(struct plat_view *view, bool collapsed);
 void view_set_pressed(struct plat_view *view, enum decor_part part);
 void view_min_frame_size(struct plat_view *view, int *w, int *h);

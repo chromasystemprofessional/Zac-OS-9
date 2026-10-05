@@ -24,7 +24,7 @@ int main(int argc, char *argv[]) {
 		if (fileManager1ShowFolders(uris)) {
 			return 0;
 		}
-		fprintf(stderr, "zacos9-finder: the Finder isn't running to open %s\n",
+		fprintf(stderr, "zacos9-finder: Sniffer isn't running to open %s\n",
 			qPrintable(uris.join(' ')));
 		return 1;
 	}
@@ -33,7 +33,7 @@ int main(int argc, char *argv[]) {
 	qputenv("QT_WAYLAND_DISABLE_WINDOWDECORATION", "1");
 
 	QApplication app(argc, argv);
-	QApplication::setApplicationName("Finder");
+	QApplication::setApplicationName("Sniffer");
 	QGuiApplication::setDesktopFileName("zacos9-finder"); /* Wayland app_id */
 	QApplication::setDoubleClickInterval(pl_double_click_ms()); /* the Mouse panel's */
 	QApplication::setQuitOnLastWindowClosed(false);

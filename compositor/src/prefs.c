@@ -276,6 +276,7 @@ void prefs_apply(struct plat_server *server) {
 		apply_output(server, output);
 	}
 	apply_layout(server);
+	view_refresh_fullscreen(server);
 	prefs_write_outputs(server);
 }
 

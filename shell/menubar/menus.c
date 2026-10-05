@@ -226,20 +226,20 @@ void menus_rebuild(struct mb_bar *bar, int screen_w) {
 		new_menu(bar->right, &bar->n_right, clock);
 	}
 
-	struct mb_menu *am = new_menu(bar->right, &bar->n_right, front ? front->name : "Finder");
+	struct mb_menu *am = new_menu(bar->right, &bar->n_right, front ? front->name : "Sniffer");
 	if (front) {
 		char label[256];
 		snprintf(label, sizeof(label), "Hide %s", front->name);
 		add(am, label, 0, true, ACT_HIDE_APP, front->app_id);
 	} else {
-		add(am, "Hide Finder", 0, false, ACT_NONE, NULL);
+		add(am, "Hide Sniffer", 0, false, ACT_NONE, NULL);
 	}
 	add(am, "Hide Others", 0, n_apps > 1 || (n_apps == 1 && !front), ACT_HIDE_OTHERS,
 		front ? front->app_id : "");
 	add(am, "Show All", 0, n_apps > 0, ACT_SHOW_ALL, NULL);
 	sep(am);
 	if (n_apps == 0) {
-		struct mb_item *it = add(am, "Finder", 0, true, ACT_NONE, NULL);
+		struct mb_item *it = add(am, "Sniffer", 0, true, ACT_NONE, NULL);
 		it->checked = true;
 	}
 	for (int i = 0; i < n_apps; i++) {
