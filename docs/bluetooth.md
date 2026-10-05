@@ -45,6 +45,9 @@ It is in Apple menu → Control Panels.
   If an older device asks anyway, it is given `0000`.
 - **Sound.** The output goes through `pactl`, as in the Sound panel. When a
   device disconnects, PipeWire goes back to the previous output by itself.
+  **Control Panels > Sound > Sound Output** also lists Bluetooth outputs,
+  alongside built-in speakers and connected monitor outputs. Choosing an
+  output there moves current playback as well as changing the default.
 - **Package.** `debian/control` depends on `bluez`. PipeWire's Bluetooth
   plugin (`libspa-0.2-bluetooth`) comes with Debian's PipeWire.
 
@@ -55,5 +58,3 @@ It is in Apple menu → Control Panels.
 - **Paired devices with the panel closed.** They reconnect by themselves when
   they are trusted, but if one asks to pair again, nothing answers.
 - **Device icons.** The list shows text only.
-- **Sound panel.** It doesn't list outputs yet. The Bluetooth panel is where
-  to choose a Bluetooth output.

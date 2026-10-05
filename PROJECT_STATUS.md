@@ -1,6 +1,6 @@
 # Project Status
 
-Updated: 2026-10-03
+Updated: 2026-10-05
 
 ## Completed
 
@@ -23,6 +23,16 @@ Updated: 2026-10-03
 | *(uncommitted)* | Installer fixed end to end: GRUB packages in the image, UEFI/BIOS detection, BIOS boot partition, fallback `EFI/BOOT/BOOTX64.EFI` for Macs, live user in `sudo` (polkit), failing step shown in the window. VM-tested (`build/test-install.py`): whole disk under BIOS and UEFI, and a partition beside a kept FAT partition under UEFI — each installed disk boots to the desktop. Boot splash now shows the logo and a progress bar. |
 
 ## Current work
+
+**Sound output selection** (uncommitted): the Sound control panel has a Platinum
+output menu for built-in speakers, available HDMI/DisplayPort monitor outputs,
+headphones and other audio-server outputs, including Bluetooth. Names include
+the monitor name when provided. Selection sets the default sink/port and moves
+existing playback streams; volume and mute track the active output. Asynchronous
+`pactl` calls have timeouts and visible errors; the output list refreshes every two
+seconds for hot-plug and server fallback. Focused `sound-output` tests cover
+discovery, routing, ports, volume/mute, disconnect/reconnect and error paths.
+Read-only live discovery confirmed built-in speakers and the connected SONY TV.
 
 Resuming the work on other applications' look (themes, styles, global menus): see `docs/app-integration.md`.
 

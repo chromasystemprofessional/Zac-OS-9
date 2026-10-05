@@ -282,11 +282,24 @@ test('store-client',
 
 executable('zacos9-controlpanel',
   'panels/controlpanel.cpp',
+  'panels/soundclient.cpp',
   link_with: panelkit,
   include_directories: include_directories('finder'),
   dependencies: [platinum_dep, qt6],
   cpp_args: ['-std=c++17'],
   install: true,
+)
+
+test('sound-output',
+  executable('test-sound-output',
+    'panels/tests/test_sound.cpp',
+    'panels/soundclient.cpp',
+    include_directories: include_directories('panels'),
+    dependencies: qt6,
+    cpp_args: ['-std=c++17'],
+  ),
+  args: files('panels/tests/pactl-fixture.py'),
+  timeout: 60,
 )
 
 executable('zacos9-installer',

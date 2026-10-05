@@ -20,6 +20,7 @@
 
 #include "panelkit.h"
 #include "settings.h"
+#include "soundclient.h"
 
 static constexpr uint32_t FACE = GRAY(0xD);
 static constexpr int W = 360;
@@ -309,49 +310,37 @@ private:
 /* ---- Sound ---------------------------------------------------------------------- */
 
 /* The system volume through PulseAudio or PipeWire's pulse server. */
-static bool pactl(const QStringList &args, QString *out = nullptr) {
-	QProcess p;
-	p.start("pactl", args);
-	if (!p.waitForFinished(3000) || p.exitStatus() != QProcess::NormalExit || p.exitCode() != 0) {
-		return false;
-	}
-	if (out) {
-		*out = QString::fromUtf8(p.readAllStandardOutput());
-	}
-	return true;
-}
-
 class SoundPanel : public ControlPanel {
 public:
-	SoundPanel() : ControlPanel("Sound", 236) {
-		const int g1 = 26, g2 = g1 + SLIDER_GROUP_H + 12 + 16 + 20;
-		m_groups = { { g1, g1 + SLIDER_GROUP_H + 20, "Volume" },
+	SoundPanel() : ControlPanel("Sound", 336), m_sound(this) {
+		const int g0 = 26, g1 = 102, g2 = g1 + SLIDER_GROUP_H + 12 + 16 + 20;
+		m_groups = { { g0, 78, "Sound Output" },
+			{ g1, g1 + SLIDER_GROUP_H + 20, "Volume" },
 			{ g2, g2 + SLIDER_GROUP_H, "Alert Volume" } };
+		m_output.rect = QRect(M + IN, g0 + 1 + PL_GROUP_MARGIN_TOP,
+			W - 2 * M - 2 * IN - 2, PL_POPUP_H);
+		m_output.items = { PopupItem("Reading sound outputs...", false) };
+		m_output.enabled = false;
+		m_output.chosen = [this](int row) {
+			if (row < 0 || row >= m_sound.outputs.size()) {
+				return;
+			}
+			m_error.clear();
+			m_sound.selectOutput(m_sound.outputs[row]);
+		};
 
 		/* Volume in eight steps, 0..7, as on the Mac. */
-		QString out;
-		m_available = pactl({ "get-sink-volume", "@DEFAULT_SINK@" }, &out);
-		int percent = 100;
-		const int at = out.indexOf('%');
-		if (at > 0) {
-			int start = at;
-			while (start > 0 && out[start - 1].isDigit()) {
-				start--;
-			}
-			percent = out.mid(start, at - start).toInt();
-		}
-		placeSlider(m_volume, g1, 8, (percent * 7 + 50) / 100, "Quiet", "Loud");
-		m_volume.enabled = m_available;
-		m_volume.changed = [](int v) {
-			pactl({ "set-sink-volume", "@DEFAULT_SINK@", QString("%1%").arg(v * 100 / 7) });
+		placeSlider(m_volume, g1, 8, 0, "Quiet", "Loud");
+		m_volume.enabled = false;
+		m_volume.changed = [this](int v) {
+			m_error.clear();
+			m_sound.setVolume(m_currentSink, v * 100 / 7);
 		};
 		m_mute = PanelCheckbox("Mute", QPoint(M + IN, g1 + SLIDER_GROUP_H + 2));
-		QString muted;
-		pactl({ "get-sink-mute", "@DEFAULT_SINK@" }, &muted);
-		m_mute.on = muted.contains("yes");
-		m_mute.enabled = m_available;
-		m_mute.toggled = [](bool on) {
-			pactl({ "set-sink-mute", "@DEFAULT_SINK@", on ? "1" : "0" });
+		m_mute.enabled = false;
+		m_mute.toggled = [this](bool on) {
+			m_error.clear();
+			m_sound.setMuted(m_currentSink, on);
 		};
 		m_checks.push_back(&m_mute);
 
@@ -359,12 +348,26 @@ public:
 		m_alert.changed = [](int v) {
 			setInt("alert-volume", v);
 		};
-		if (!m_available) {
-			m_notes = { "The volume can't be set: no sound server (pactl) here." };
-		}
+		m_sound.changed = [this] { syncOutputs(); };
+		m_sound.failed = [this](const QString &error) {
+			m_error = error;
+			syncOutputs();
+		};
+		m_refresh.callOnTimeout([this] { m_sound.refresh(); });
+		m_refresh.start(2000);
+		m_sound.refresh();
 	}
 
 protected:
+	void paintExtra(pl_canvas *c) override {
+		m_output.paint(c);
+	}
+
+	bool pressExtra(QPoint p, bool) override {
+		m_focus = nullptr;
+		return m_output.press(this, p);
+	}
+
 	void mouseReleaseEvent(QMouseEvent *e) override {
 		/* Let go of the alert volume and you hear it. */
 		const bool alert = m_alert.dragging;
@@ -375,7 +378,51 @@ protected:
 	}
 
 private:
-	bool m_available = false;
+	void syncOutputs() {
+		m_output.items.clear();
+		int selected = -1;
+		for (int i = 0; i < m_sound.outputs.size(); i++) {
+			const SoundOutput &output = m_sound.outputs[i];
+			m_output.items.emplace_back(output.label);
+			if (output.current) {
+				selected = i;
+			}
+		}
+		if (m_output.items.empty()) {
+			m_output.items.emplace_back("No sound outputs available", false);
+		} else if (selected < 0) {
+			m_output.items.emplace_back("Choose a sound output", false);
+		}
+		m_output.selected = selected < 0 ? static_cast<int>(m_output.items.size()) - 1 : selected;
+		m_output.enabled = !m_sound.switching && !m_sound.outputs.isEmpty();
+		m_volume.enabled = m_mute.enabled = !m_sound.switching && selected >= 0;
+		m_currentSink.clear();
+		if (selected >= 0) {
+			const SoundOutput &output = m_sound.outputs[selected];
+			m_currentSink = output.sink;
+			if (!m_volume.dragging) {
+				m_volume.value = (output.volume * 7 + 50) / 100;
+			}
+			if (!m_mute.down) {
+				m_mute.on = output.muted;
+			}
+		}
+		const QString note = !m_error.isEmpty() ? m_error
+			: m_sound.switching ? "Changing sound output..."
+			: m_sound.outputs.isEmpty() ? "No sound outputs are available."
+			: "Choose built-in speakers, a monitor or another output.";
+		m_notes.clear();
+		const QStringList lines = panelWrap(note, W - 2 * M, PL_FONT_VIEWS);
+		for (const QString &line : lines.mid(0, 3)) {
+			m_notes.push_back(line);
+		}
+		update();
+	}
+
+	SoundClient m_sound;
+	QTimer m_refresh;
+	PanelPopup m_output;
+	QString m_currentSink, m_error;
 	PanelSlider m_volume, m_alert;
 	PanelCheckbox m_mute;
 };

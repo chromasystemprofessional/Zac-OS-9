@@ -66,6 +66,19 @@ Build only: `wsl -d Debian -- scripts/build.sh`
 
 See [docs/packaging.md](docs/packaging.md).
 
+## Sound output
+
+Open **Apple menu > Control Panels > Sound**, then use **Sound Output** to
+choose built-in speakers, a connected HDMI/DisplayPort monitor, headphones,
+or another output exposed by PulseAudio/PipeWire. Monitor names are shown when
+the audio server provides them. Disconnected ports are omitted.
+
+The choice changes the system's default output and moves existing playback to
+it. Volume and Mute control that output; Alert Volume remains a separate setting.
+The panel refreshes every two seconds, including when a monitor is connected or
+removed, and follows the audio server's fallback output after disconnection.
+Audio-server errors are shown in the panel rather than silently ignored.
+
 ## License
 
 GPL-3.0-or-later.
