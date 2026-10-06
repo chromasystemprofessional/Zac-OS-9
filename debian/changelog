@@ -1,3 +1,17 @@
+zacos9 (0.1.27) trixie; urgency=medium
+
+  * Keep Applications focused on user-installed apps: automatically
+    installed Debian dependencies no longer appear there. Settings, system
+    tools and file managers such as qps, PCManFM, desktop/screen-saver
+    settings and Print Settings now appear in System Folder > Utilities,
+    alongside shipped tools such as balenaEtcher. Existing folder
+    customizations and launcher names/labels are migrated, and apt
+    installation-mark changes refresh automatically. System tools and
+    dependencies are protected from Finder Trash uninstall. No packages are
+    removed. Restart after updating to use the new Finder.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Tue, 06 Oct 2026 19:57:51 -0400
+
 zacos9 (0.1.26) trixie; urgency=medium
 
   * Finder now automatically discovers newly installed Flatpak
