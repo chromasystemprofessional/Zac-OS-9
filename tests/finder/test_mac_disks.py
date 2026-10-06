@@ -10,6 +10,8 @@ import stat
 import struct
 import sys
 import tempfile
+import shutil
+import subprocess
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
@@ -183,17 +185,23 @@ class ImageTests(unittest.TestCase):
         image.write_bytes(bytes(4096))
         loop = "/org/freedesktop/UDisks2/block_devices/loop0"
         records = {loop + "p1": {"org.freedesktop.UDisks2.Block": {
-            "IdType": "hfsplus", "Device": list(b"/dev/loop0p1\0")}}}
-        result = {"path": "/run/media/zacos9-mac/1001/7-1", "device": "/dev/loop0p1"}
+            "IdType": "apfs", "Device": list(b"/dev/loop0p1\0")}}}
+        result = {"path": "/run/media/zacos9-mac/1001/7-1", "device": "/dev/loop0p1",
+                  "paths": ["/run/media/zacos9-mac/1001/7-1/1",
+                            "/run/media/zacos9-mac/1001/7-1/2"]}
         with patch.dict(os.environ, {"XDG_CACHE_HOME": str(self.root / "cache")}), \
                 patch.object(images, "loop_setup", return_value=loop), \
                 patch.object(images, "managed_objects", return_value=records), \
                 patch.object(images, "run", return_value=json.dumps(result)) as run, \
                 patch.object(images, "block_call") as call, \
-                patch.object(images.os.path, "ismount", return_value=False):
+                patch.object(images.os.path, "ismount", return_value=False) as ismount:
             info = images.mount(image)
-            self.assertEqual(info["paths"], [result["path"]])
+            self.assertEqual(info["paths"], result["paths"])
             run.assert_called_once_with(["pkexec", images.HELPER, "mount", "/dev/loop0p1"])
+            ismount.return_value = True
+            images.release_image("/dev/loop0p1")
+            call.assert_not_called()
+            ismount.return_value = False
             images.release_image("/dev/loop0p1")
             call.assert_called_once_with("Delete", loop, "Loop", "(a{sv})", ({},))
             self.assertEqual(list((self.root / "cache/zacos9/mac-images").iterdir()), [])
@@ -280,7 +288,9 @@ class PrivilegedTests(unittest.TestCase):
                         patch.object(helper.os, "close"), \
                         patch.object(helper, "mount_root", root), \
                         patch.object(helper, "root_directory"), \
-                        patch.object(helper.os.path, "ismount", side_effect=[False, True]), \
+                        patch.object(helper, "mount_apfs",
+                                     return_value=[str(Path(directory) / "8-17")]) as apfs, \
+                        patch.object(helper.os.path, "ismount", return_value=True), \
                         patch.object(helper, "run", side_effect=run):
                     if kind == "ext4":
                         with self.assertRaisesRegex(ValueError, "Not an HFS"):
@@ -292,14 +302,102 @@ class PrivilegedTests(unittest.TestCase):
                     flags = opened.call_args.args[1]
                     self.assertEqual(flags & os.O_ACCMODE, os.O_RDONLY)
                     self.assertTrue(flags & os.O_NOFOLLOW)
+                    if kind == "apfs":
+                        apfs.assert_called_once_with("/proc/self/fd/3", Path(directory) / "8-17", 3)
+                        self.assertEqual(len(calls), 1)
+                        self.assertEqual(json.loads((Path(directory) / "8-17.json").read_text()), result)
+                        continue
                     args, descriptors = calls[1]
                     self.assertIn("/proc/self/fd/3", args)
                     self.assertEqual(descriptors, (3,))
                     options = args[args.index("-X" if kind == "apfs" else "-o") + 1].split(",")
                     self.assertTrue({"ro", "nodev", "nosuid", "noexec"} <= set(options))
-                    if kind == "apfs":
-                        self.assertEqual(args[1:3], ["-f", "all"])
                     self.assertEqual(json.loads((Path(directory) / "8-17.json").read_text()), result)
+
+    def test_apfs_uses_numeric_indexes_for_every_volume(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory)
+            with patch.object(helper, "apfs_volume_count", return_value=3), \
+                    patch.object(helper, "root_directory"), \
+                    patch.object(helper, "run") as run, \
+                    patch.object(helper.os.path, "ismount", return_value=True):
+                self.assertEqual(helper.mount_apfs("/proc/self/fd/3", target, 3),
+                                 [str(target / str(i)) for i in (1, 2, 3)])
+                self.assertEqual([call.args[0][1:3] for call in run.call_args_list],
+                                 [["-f", "1"], ["-f", "2"], ["-f", "3"]])
+                for call in run.call_args_list:
+                    self.assertEqual(call.args[1], (3,))
+                    self.assertIn("ro,nodev,nosuid,noexec,allow_other", call.args[0])
+
+    def test_apfs_failure_rolls_back_prior_volumes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory)
+            with patch.object(helper, "apfs_volume_count", return_value=2), \
+                    patch.object(helper, "root_directory", side_effect=lambda path: path.mkdir()), \
+                    patch.object(helper, "run", side_effect=[
+                        "", ValueError("volume 2 unreadable"), ""]) as run, \
+                    patch.object(helper.os.path, "ismount", return_value=True):
+                with self.assertRaisesRegex(ValueError, "volume 2 unreadable"):
+                    helper.mount_apfs("/proc/self/fd/3", target, 3)
+                self.assertEqual(run.call_args_list[-1].args[0],
+                                 ["/usr/bin/umount", "--", str(target / "1")])
+                self.assertEqual(list(target.iterdir()), [])
+
+    def test_apfs_container_reader_reports_invalid_source(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "invalid.img"
+            source.write_bytes(bytes(4096))
+            try:
+                helper.ctypes.CDLL("libfsapfs.so.1")
+            except OSError:
+                self.skipTest("libfsapfs1 is not installed")
+            with self.assertRaisesRegex(ValueError, "APFS container"):
+                helper.apfs_volume_count(str(source))
+
+    def test_apfs_eject_unmounts_container_children(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            target = root / "8-17"
+            target.mkdir()
+            paths = [str(target / str(i)) for i in (1, 2)]
+            for path in paths:
+                Path(path).mkdir()
+            record = root / "8-17.json"
+            record.write_text(json.dumps({"path": str(target), "device": "/dev/sdb1",
+                                          "paths": paths}))
+
+            @contextlib.contextmanager
+            def mount_root(uid):
+                yield root
+
+            with patch.object(helper.os, "open", return_value=3), \
+                    patch.object(helper.os, "fstat", return_value=SimpleNamespace(
+                        st_mode=stat.S_IFBLK, st_rdev=os.makedev(8, 17))), \
+                    patch.object(helper.os, "close"), \
+                    patch.object(helper, "mount_root", mount_root), \
+                    patch.object(helper.os.path, "ismount", return_value=True), \
+                    patch.object(helper, "run") as run:
+                helper.mount_device("unmount", "/dev/sdb1", 1001)
+                self.assertEqual([call.args[0] for call in run.call_args_list],
+                                 [["/usr/bin/umount", "--", path] for path in reversed(paths)])
+                self.assertFalse(record.exists())
+                self.assertFalse(target.exists())
+
+    def test_installed_apfs_reader_accepts_numeric_selection(self):
+        reader = shutil.which("fsapfsmount")
+        if not reader:
+            self.skipTest("libfsapfs-utils is not installed")
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "invalid-apfs.img"
+            source.write_bytes(bytes(4096))
+            target = Path(directory) / "mount"
+            target.mkdir()
+            result = subprocess.run([reader, "-f", "1", str(source), str(target)],
+                                    capture_output=True, text=True, timeout=10, check=False)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertNotIn("unsupported character value", result.stderr.lower())
+            self.assertNotIn("invalid volume index", result.stderr.lower())
+            self.assertIn("Unable to open source", result.stderr)
 
 
 if __name__ == "__main__":

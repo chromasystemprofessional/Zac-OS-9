@@ -24,6 +24,10 @@ Supported containers:
 
 All supported Mac partitions in an image are mounted, not just the first one.
 APFS containers expose their available volumes inside the container folder.
+The reader is invoked once per volume with a numeric, one-based index: its
+advertised `-f all` option is not implemented by the Debian reader. Failed
+container mounts roll back the volumes already mounted; eject unmounts every
+child before releasing the image's loop device.
 Reopening an already mounted image reuses its mounts.
 
 Converted images live temporarily in `$XDG_CACHE_HOME/zacos9/mac-images`

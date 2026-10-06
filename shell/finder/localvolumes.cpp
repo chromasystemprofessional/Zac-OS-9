@@ -157,7 +157,14 @@ std::vector<LocalVolume> localVolumes() {
 		}
 		const QJsonObject info = QJsonDocument::fromJson(record.readAll()).object();
 		const QString path = info.value("path").toString();
-		if (path != records.filePath(name.chopped(5)) || !mounted.contains(path)) {
+		bool active = mounted.contains(path);
+		for (const QJsonValue &value : info.value("paths").toArray()) {
+			const QString child = value.toString();
+			if (QFileInfo(child).absolutePath() == path && mounted.contains(child)) {
+				active = true;
+			}
+		}
+		if (path != records.filePath(name.chopped(5)) || !active) {
 			continue;
 		}
 		bool shown = false;

@@ -270,7 +270,8 @@ def mount(source):
             block = interfaces.get("org.freedesktop.UDisks2.Block", {})
             if block.get("IdType") in MAC_TYPES:
                 mounted.append(json.loads(run(["pkexec", HELPER, "mount", device_name(block)])))
-                info["paths"] = [item["path"] for item in mounted]
+                info["paths"] = [path for item in mounted
+                                 for path in item.get("paths", [item["path"]])]
                 info["devices"] = [item["device"] for item in mounted]
                 (directory / "mount.json").write_text(json.dumps(info))
         if not mounted:

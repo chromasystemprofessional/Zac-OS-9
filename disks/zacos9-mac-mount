@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 """Privileged, read-only mounting of HFS, HFS+ and APFS block devices."""
 import contextlib
+import ctypes
 import fcntl
 import json
 import os
@@ -15,6 +16,78 @@ ROOT = Path("/run/media/zacos9-mac")
 DEVICE = re.compile(r"/dev/(?:sd[a-z]+[0-9]*|nvme[0-9]+n[0-9]+(?:p[0-9]+)?|"
                     r"mmcblk[0-9]+(?:p[0-9]+)?|loop[0-9]+(?:p[0-9]+)?|sr[0-9]+)\Z")
 FILESYSTEMS = {"hfs", "hfsplus", "apfs"}
+
+
+def apfs_volume_count(source):
+    library = ctypes.CDLL("libfsapfs.so.1")
+    pointer = ctypes.c_void_p
+    pointer_ref = ctypes.POINTER(pointer)
+    signatures = {
+        "container_initialize": ([pointer_ref, pointer_ref], ctypes.c_int),
+        "container_open": ([pointer, ctypes.c_char_p, ctypes.c_int, pointer_ref], ctypes.c_int),
+        "container_get_number_of_volumes": (
+            [pointer, ctypes.POINTER(ctypes.c_int), pointer_ref], ctypes.c_int),
+        "container_close": ([pointer, pointer_ref], ctypes.c_int),
+        "container_free": ([pointer_ref, pointer_ref], ctypes.c_int),
+        "error_sprint": ([pointer, ctypes.c_char_p, ctypes.c_size_t], ctypes.c_int),
+        "error_free": ([pointer_ref], None),
+    }
+    for name, (arguments, result) in signatures.items():
+        function = getattr(library, "libfsapfs_" + name)
+        function.argtypes, function.restype = arguments, result
+    container, error = pointer(), pointer()
+    opened = False
+
+    def check(result, expected=1):
+        if result != expected:
+            message = ctypes.create_string_buffer(4096)
+            library.libfsapfs_error_sprint(error, message, len(message))
+            library.libfsapfs_error_free(ctypes.byref(error))
+            raise ValueError("APFS container: " + message.value.decode("utf-8", errors="replace"))
+
+    try:
+        check(library.libfsapfs_container_initialize(ctypes.byref(container), ctypes.byref(error)))
+        check(library.libfsapfs_container_open(container, os.fsencode(source), 1, ctypes.byref(error)))
+        opened = True
+        count = ctypes.c_int()
+        check(library.libfsapfs_container_get_number_of_volumes(
+            container, ctypes.byref(count), ctypes.byref(error)))
+        if not 1 <= count.value <= 100:
+            raise ValueError("APFS container has no volumes or exceeds the reader's 100-volume limit")
+        return count.value
+    finally:
+        if container:
+            try:
+                if opened:
+                    check(library.libfsapfs_container_close(container, ctypes.byref(error)), 0)
+            finally:
+                check(library.libfsapfs_container_free(ctypes.byref(container), ctypes.byref(error)))
+
+
+def mount_apfs(source, target, fd):
+    count = apfs_volume_count(source)
+    mounted = []
+    directories = []
+    try:
+        for index in range(1, count + 1):
+            volume = target / str(index)
+            root_directory(volume)
+            directories.append(volume)
+            run(["/usr/bin/fsapfsmount", "-f", str(index), "-X",
+                 "ro,nodev,nosuid,noexec,allow_other", source, str(volume)], (fd,))
+            if not os.path.ismount(volume):
+                raise ValueError(f"APFS volume {index}: the reader exited without mounting")
+            mounted.append(volume)
+        return [str(volume) for volume in mounted]
+    except (OSError, ValueError, subprocess.TimeoutExpired) as error:
+        for volume in reversed(mounted):
+            try:
+                run(["/usr/bin/umount", "--", str(volume)])
+            except (OSError, ValueError, subprocess.TimeoutExpired) as failure:
+                raise ValueError(f"{error}; APFS rollback failed: {failure}") from error
+        for volume in reversed(directories):
+            volume.rmdir()
+        raise
 
 
 def run(args, pass_fds=()):
@@ -64,15 +137,27 @@ def mount_device(operation, device, uid):
         name = f"{os.major(info.st_rdev)}-{os.minor(info.st_rdev)}"
         with mount_root(uid) as directory:
             target = directory / name
+            record = directory / (name + ".json")
+            existing = json.loads(record.read_text()) if record.exists() else None
+            paths = existing.get("paths", [str(target)]) if existing else [str(target)]
+            if any(Path(path) != target and Path(path).parent != target for path in paths):
+                raise ValueError("Invalid Mac mount record")
             if operation == "unmount":
-                if not os.path.ismount(target):
+                active = [path for path in paths if os.path.ismount(path)]
+                if not active:
                     raise ValueError("This Mac volume is not mounted")
-                run(["/usr/bin/umount", "--", str(target)])
+                for path in reversed(active):
+                    run(["/usr/bin/umount", "--", path])
+                for path in paths:
+                    if Path(path) != target:
+                        Path(path).rmdir()
                 target.rmdir()
-                (directory / (name + ".json")).unlink()
+                record.unlink()
                 return {"path": str(target), "device": device}
-            if os.path.ismount(target):
-                return {"path": str(target), "device": device}
+            if existing and all(os.path.ismount(path) for path in paths):
+                return existing
+            if existing and any(os.path.ismount(path) for path in paths):
+                raise ValueError("This APFS container is partly mounted; eject it before mounting again")
             root_directory(target)
             source = f"/proc/self/fd/{fd}"
             filesystem = run(["/usr/sbin/blkid", "-p", "-s", "TYPE", "-o", "value",
@@ -80,23 +165,21 @@ def mount_device(operation, device, uid):
             if filesystem not in FILESYSTEMS:
                 raise ValueError("Not an HFS, HFS+ or APFS volume")
             if filesystem == "apfs":
-                # libfsapfs provides read-only FUSE access, with each APFS volume
-                # below the container root. No passwords are put in argv.
-                run(["/usr/bin/fsapfsmount", "-f", "all", "-X",
-                     "ro,nodev,nosuid,noexec,allow_other", source, str(target)], (fd,))
+                paths = mount_apfs(source, target, fd)
             else:
                 run(["/usr/bin/mount", "-t", filesystem, "-o", "ro,nodev,nosuid,noexec",
                      source, str(target)], (fd,))
-            if not os.path.ismount(target):
+            if not all(os.path.ismount(path) for path in paths):
                 raise ValueError("The mount tool exited without mounting the volume")
-            record = directory / (name + ".json")
+            result = {"device": device, "path": str(target), "paths": paths}
             try:
-                record.write_text(json.dumps({"device": device, "path": str(target)}))
+                record.write_text(json.dumps(result))
                 record.chmod(0o644)
             except OSError:
-                run(["/usr/bin/umount", "--", str(target)])
+                for path in reversed(paths):
+                    run(["/usr/bin/umount", "--", path])
                 raise
-            return {"path": str(target), "device": device}
+            return result
     finally:
         os.close(fd)
 

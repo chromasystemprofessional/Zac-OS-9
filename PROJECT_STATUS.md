@@ -24,6 +24,17 @@ Updated: 2026-10-06
 
 ## Current work
 
+**APFS boot mount correction** (0.1.21): the 0.1.20 helper passed `-f all`
+to fsapfsmount, whose numeric-only parser rejects it despite advertising the
+option. Multi-volume APFS containers then failed with an invalid volume index.
+The helper now enumerates containers through libfsapfs and mounts each volume
+by its one-based number. Desktop discovery recognizes the child mounts, eject
+unmounts all children, image cleanup tracks those actual mountpoints, and failed
+mounts roll back prior volumes. Regression tests cover numeric selection,
+multi-volume mount/eject and rollback, including the installed reader's parser.
+Finder builds and all four focused suites pass (22 Mac-disk tests). Actual
+APFS mounting on the reported drive still requires verification after installation.
+
 **Read-only Mac disk mounting** (0.1.20): physical HFS/HFS+/APFS volumes
 and Mac disk images mount through a constrained block-device helper, with
 polkit authentication, read-only source descriptors and ro/nodev/nosuid/noexec
