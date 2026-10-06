@@ -1,3 +1,13 @@
+zacos9 (0.1.18) trixie; urgency=medium
+
+  * App windows now open nearly full-screen, leaving the desktop icons
+    visible around them. Classic: installing or updating ZacOS 9 gives
+    SheepShaver the low-memory permission Old World ROMs need, so Classic
+    starts without a manual setcap step (requires the zacos9-emulators
+    package).
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Tue, 06 Oct 2026 13:33:20 -0400
+
 zacos9 (0.1.17) trixie; urgency=medium
 
   * Fix Wayland app content overlapping the classic window frame by
