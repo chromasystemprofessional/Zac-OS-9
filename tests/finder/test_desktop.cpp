@@ -35,6 +35,7 @@ static int failures;
 std::vector<LocalVolume> localVolumes() { return {}; }
 QString localVolumeUsbDevice(const QString &) { return {}; }
 void localVolumesOnChange(std::function<void()>) {}
+void localVolumesOnError(std::function<void(const QString &)>) {}
 void localVolumesMountAll() {}
 void localVolumesOnMountFailed(std::function<void(const QString &)>) {}
 void localVolumeMountDevice(const QString &) {}
