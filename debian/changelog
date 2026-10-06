@@ -1,3 +1,12 @@
+zacos9 (0.1.17) trixie; urgency=medium
+
+  * Fix Wayland app content overlapping the classic window frame by
+    removing the double-applied window-geometry offset.
+  * Test document and dialog content insets, nonzero geometry offsets,
+    and fullscreen restoration; document the correct frame placement.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Tue, 06 Oct 2026 12:49:29 -0400
+
 zacos9 (0.1.16) trixie; urgency=medium
 
   * Keep Platinum dialog windows above applications and show status while

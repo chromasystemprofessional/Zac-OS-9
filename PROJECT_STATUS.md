@@ -61,6 +61,12 @@ completed-item retention, move status, keyboard Stop, recursive alias copies,
 read-error rollback including read-only copied directories, and existing
 Desktop/resource-fork behavior. Movable-modal windows now occupy a compositor
 layer above ordinary app windows, keeping their Platinum frames visible.
+Content-inset correction (0.1.17): xdg scene trees already compensate for
+window-geometry offsets; the compositor no longer subtracts them a second time.
+App content now starts below the classic title bar at the existing frame margins,
+including movable-modal dialogs and transitions out of fullscreen.
+The compositor builds; content-inset and fullscreen-protocol regression tests
+pass. Live verification in the installed session is still pending.
 Installed-session drag/dialog interaction
 still needs interactive verification after updating the Finder. Sniffer
 builds successfully; all three focused selection, Desktop and VFS suites

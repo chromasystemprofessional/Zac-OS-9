@@ -72,11 +72,14 @@ void view_min_frame_size(struct plat_view *view, int *w, int *h) {
 void view_update_frame(struct plat_view *view) {
 	struct wlr_box geo;
 	view->impl->get_geometry(view, &geo);
+	/* xdg scene trees already have their origin at the window geometry. */
+	int offset_x = view->type == PLAT_VIEW_XDG ? 0 : geo.x;
+	int offset_y = view->type == PLAT_VIEW_XDG ? 0 : geo.y;
 	if (view->fullscreen) {
 		wlr_scene_node_set_enabled(&view->frame->tree->node, false);
 		wlr_scene_node_set_enabled(&view->frame->grow->node, false);
 		if (view->surface_tree) {
-			wlr_scene_node_set_position(&view->surface_tree->node, -geo.x, -geo.y);
+			wlr_scene_node_set_position(&view->surface_tree->node, -offset_x, -offset_y);
 		}
 		return;
 	}
@@ -94,7 +97,7 @@ void view_update_frame(struct plat_view *view) {
 	struct decor_margins m = decor_margins(view->frame->st.style);
 	if (view->surface_tree) {
 		wlr_scene_node_set_position(&view->surface_tree->node,
-			m.left - geo.x, m.top - geo.y);
+			m.left - offset_x, m.top - offset_y);
 	}
 	bool resizable = view_resizable(view);
 	frame_set_features(view->frame, resizable, resizable);

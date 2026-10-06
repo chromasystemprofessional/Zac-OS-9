@@ -34,6 +34,11 @@ Apple's bitmaps are **not** stored in this repo. This document records measureme
 
 Decoration margins around the client surface: **left 6, right 6, top 22, bottom 6.**
 
+Wayland xdg scene trees already place their origin at the window geometry's
+top-left. Position that tree directly at the decoration margins; subtracting
+the geometry offset again pulls content into the frame. Fullscreen uses a
+zero inset. Movable-modal dialogs use margins **3/3/24/3** instead.
+
 ```
 row/col                       active                         inactive
 outer border    x=0, x=W-1, y=0, y=H-1       #000             #555
