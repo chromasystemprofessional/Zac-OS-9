@@ -2,10 +2,13 @@
 """Read local Debian AppStream or the user's Flathub catalog as {"items": [...]}.
 
 Usage: zacos9-software-catalog debian|flathub
-This helper never adds remotes, refreshes metadata, or installs software.
+This helper never adds remotes or installs software. Flathub discovery refreshes
+only the enabled remote's AppStream metadata, not installed applications.
 """
 
 import json
+import os
+from pathlib import Path
 import re
 import subprocess
 import sys
@@ -20,6 +23,83 @@ APPLICATION_ID = re.compile(
 
 class Failure(Exception):
     pass
+
+
+def main_category(categories):
+    categories = set(categories)
+    for source, target in (
+        ("Game", "Games"), ("Graphics", "Graphics"),
+        ("AudioVideo", "Multimedia"), ("Audio", "Multimedia"),
+        ("Video", "Multimedia"), ("Network", "Internet"),
+        ("Office", "Productivity"), ("Education", "Productivity"),
+        ("Science", "Productivity"),
+    ):
+        if source in categories:
+            return target
+    return "Utilities"
+
+
+def flathub_metadata():
+    run_flatpak(["update", "--appstream", "--noninteractive", "flathub"])
+    root = Path(os.environ.get("FLATPAK_USER_DIR") or
+                str(Path(os.environ.get("XDG_DATA_HOME") or
+                         str(Path.home() / ".local/share")) / "flatpak"))
+    catalogs = sorted((root / "appstream/flathub").glob("*/active/appstream.xml*"))
+    if not catalogs:
+        raise Failure("Flathub AppStream metadata is missing after refresh.")
+    try:
+        import gi
+        gi.require_version("AppStream", "1.0")
+        from gi.repository import AppStream, Gio, GLib
+    except (ImportError, ValueError) as error:
+        raise Failure(
+            "Flathub discovery requires python3-gi and gir1.2-appstream-1.0."
+        ) from error
+    try:
+        items = {}
+        # Prefer the uncompressed file when Flatpak supplies both versions.
+        directories = sorted({path.parent for path in catalogs})
+        for directory in directories:
+            path = directory / "appstream.xml"
+            if not path.is_file():
+                path = directory / "appstream.xml.gz"
+            metadata = AppStream.Metadata.new()
+            metadata.set_format_style(AppStream.FormatStyle.CATALOG)
+            if not metadata.parse_file(Gio.File.new_for_path(str(path)), AppStream.FormatKind.XML):
+                raise Failure(f"Unable to parse Flathub AppStream metadata: {path}")
+            for component in metadata.get_components().as_array():
+                if component.get_kind() != AppStream.ComponentKind.DESKTOP_APP:
+                    continue
+                identifier = component.get_id()
+                if not identifier:
+                    continue
+                icon_path = ""
+                for icon in sorted(component.get_icons(), key=lambda icon: icon.get_width(),
+                                   reverse=True):
+                    name = icon.get_name()
+                    if icon.get_kind() != AppStream.IconKind.CACHED or not name:
+                        continue
+                    if Path(name).name != name or name in (".", ".."):
+                        continue
+                    scale = icon.get_scale()
+                    size = f"{icon.get_width()}x{icon.get_height()}"
+                    if scale > 1:
+                        size += f"@{scale}"
+                    candidate = directory / "icons" / size / name
+                    if candidate.is_file() and candidate.resolve().is_relative_to(directory.resolve()):
+                        icon_path = str(candidate.resolve())
+                        break
+                items.setdefault(identifier, {
+                    "name": component.get_name() or identifier,
+                    "blurb": component.get_summary() or "",
+                    "category": main_category(component.get_categories() or []),
+                    "icon": icon_path,
+                })
+        return items
+    except Failure:
+        raise
+    except (GLib.Error, ValueError, OSError, RuntimeError) as error:
+        raise Failure(f"Unable to read Flathub AppStream metadata: {error}") from error
 
 
 def debian_catalog():
@@ -125,6 +205,14 @@ def flathub_catalog():
             "packages": [identifier],
             "source": "flathub",
         })
+    if items:
+        metadata = flathub_metadata()
+        for identifier, item in items.items():
+            details = metadata.get(identifier) or metadata.get(identifier + ".desktop")
+            if details:
+                item.update(details)
+            else:
+                item["category"] = "Utilities"
     return sorted(items.values(), key=lambda item: item["id"])
 
 

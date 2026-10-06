@@ -3,8 +3,13 @@
 Sniffer mounts recognized **HFS, HFS+ (including HFSX) and APFS** volumes
 read-only. Physical disks are discovered at startup and when connected;
 double-click a disk image to mount it and open its contents. Mounted volumes
-appear as desktop disk icons. Mounting and ejecting may require administrator
-authentication.
+appear as desktop disk icons. Active local administrators (members of the
+`sudo` group) can mount and eject read-only Mac disks without entering a
+password, including at startup after reboot. This uses the same polkit mount
+rule as ordinary local disks; no administrator password is saved or cached.
+Other users, remote sessions, and inactive sessions retain the action's
+administrator-authentication requirement. This does not unlock encrypted
+volumes or save network-share passwords.
 
 Read-only mounting is intentional: neither the filesystem driver nor an
 image's loop device is allowed to write to the source. Mounts also disable
@@ -85,3 +90,6 @@ setup, pinned read-only block descriptors, mount restrictions, partition
 discovery, rollback and eject cleanup without touching physical disks.
 Finder's image recognition is covered by `finder-vfs`; existing hotplug and
 disk-initialization tests cover the surrounding behavior.
+`mount-authorization` executes the JavaScript rule with mocked action IDs and
+subjects, checking local/active/admin combinations and ensuring unrelated,
+encrypted-unlock, and other-user actions are not granted.

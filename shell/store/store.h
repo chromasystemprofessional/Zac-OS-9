@@ -40,6 +40,7 @@ private:
 	void loadSource(const QString &source);
 	void configureSource();
 	void finishCatalog();
+	void includeFlathub(bool on);
 	bool sourcesPage() const;
 
 	std::vector<StoreItem> m_allItems;
@@ -50,6 +51,7 @@ private:
 	PanelButton m_actionButton, m_styleButton;
 	PanelButton m_sourceButton, m_refreshButton;
 	PanelEdit m_search;
+	PanelCheckbox m_includeFlathub;
 	PanelHost m_host{ this };
 	QProcess m_catalog;
 	QTimer m_catalogTimeout;
@@ -58,6 +60,7 @@ private:
 	bool m_debianLoaded = false;
 	bool m_flathubLoaded = false;
 	bool m_flathubEnabled = false;
+	std::vector<uint32_t> m_catalogIcon;
 
 	/* The selected item's installed state, re-checked when it is chosen
 	 * and after an install/remove finishes; not polled continuously

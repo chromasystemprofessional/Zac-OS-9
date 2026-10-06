@@ -2,6 +2,7 @@
 #include <QDir>
 #include <QElapsedTimer>
 #include <QFile>
+#include <QImage>
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QProcess>
@@ -59,13 +60,16 @@ int main(int argc, char **argv) {
 	qputenv("PATH", (root.path() + ":/usr/bin:/bin").toUtf8());
 	QApplication app(argc, argv);
 	const QString catalog = root.path() + "/catalog.json";
-	writeFile(catalog, R"JSON({"categories":["Featured","Internet"],
+	writeFile(catalog, R"JSON({"categories":["Featured","Internet","Graphics"],
 		"items":[{"id":"curated","name":"Curated Browser","category":"Internet",
 		"blurb":"Web browser","packages":["browser"],"featured":true}]})JSON");
 	qputenv("ZACOS9_STORE_CATALOG", catalog.toUtf8());
 	const QString apt = root.path() + "/apt-helper";
 	writeFile(apt, "#!/bin/sh\nprintf '%s\\tno\\n' \"$2\"\n", true);
 	qputenv("ZACOS9_APPSTORE_HELPER", apt.toUtf8());
+	QImage icon(64, 64, QImage::Format_ARGB32);
+	icon.fill(0xff12ab34);
+	assert(icon.save(root.path() + "/paint.png"));
 	const QString discovery = root.path() + "/discovery";
 	writeFile(discovery, R"PY(#!/usr/bin/python3
 import json, os, sys
@@ -76,7 +80,9 @@ elif sys.argv[1] == "debian":
         "blurb":"Edit photos","packages":["editor"],"source":"debian"}]}))
 else:
     print(json.dumps({"items":[{"id":"org.example.Paint","name":"Flatpak Paint",
-        "blurb":"Draw pictures","packages":["org.example.Paint"],"source":"flathub"}]}))
+        "blurb":"Draw pictures","category":"Graphics",
+        "icon":os.environ["TEST_STATE"] + "/paint.png",
+        "packages":["org.example.Paint"],"source":"flathub"}]}))
 )PY", true);
 	qputenv("ZACOS9_SOFTWARE_CATALOG_HELPER", discovery.toUtf8());
 	writeFile(root.path() + "/flatpak", R"PY(#!/usr/bin/python3
@@ -127,10 +133,17 @@ else:
 		"source":"debian","packages":["--remove"]}]})JSON", "debian", &parsed, &error));
 	assert(!parseSoftwareCatalog(R"JSON({"items":[{"id":"bad","name":"Bad",
 		"source":"flathub","packages":["org.example.Paint;bad"]}]})JSON", "flathub", &parsed, &error));
+	assert(!parseSoftwareCatalog(R"JSON({"items":[{"id":"bad","name":"Bad",
+		"source":"flathub","category":"Arbitrary","packages":["org.example.Paint"]}]})JSON",
+		"flathub", &parsed, &error));
+	assert(!parseSoftwareCatalog(R"JSON({"items":[{"id":"bad","name":"Bad",
+		"source":"flathub","icon":"relative.png","packages":["org.example.Paint"]}]})JSON",
+		"flathub", &parsed, &error));
 
 	StoreWindow window;
 	window.show();
 	assert(window.currentItem()->name == "Curated Browser");
+	assert(window.m_includeFlathub.on);
 	auto select = [&](const QString &name) {
 		window.m_categoryList.select(window.m_categories.indexOf(name), true);
 	};
@@ -177,6 +190,70 @@ else:
 	select("Flathub");
 	assert(waitFor([&] { return !window.m_busy; }));
 	assert(window.m_shown.size() == 1 && window.currentItem()->source == "flathub");
+	assert(window.currentItem()->blurb == "Draw pictures");
+	assert(window.m_catalogIcon.size() == 32 * 32);
+	assert(window.m_catalogIcon.front() == 0xff12ab34);
+	select("Graphics");
+	assert(window.m_shown.size() == 1 && window.currentItem()->name == "Flatpak Paint");
+	select("All Applications");
+	assert(window.m_shown.size() == 3);
+	auto toggle = [&] {
+		const QPoint pos = window.m_includeFlathub.hitRect().center();
+		QMouseEvent down(QEvent::MouseButtonPress, pos, window.mapToGlobal(pos),
+			Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+		QMouseEvent up(QEvent::MouseButtonRelease, pos, window.mapToGlobal(pos),
+			Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+		QApplication::sendEvent(&window, &down);
+		QApplication::sendEvent(&window, &up);
+	};
+	toggle();
+	assert(!window.m_includeFlathub.on && window.m_shown.size() == 2);
+	assert(QFile::exists(root.path() + "/enabled"));
+	{
+		StoreWindow reopened;
+		assert(!reopened.m_includeFlathub.on && !reopened.m_busy);
+		reopened.m_categoryList.select(reopened.m_categories.indexOf("Graphics"), true);
+		assert(reopened.m_shown.empty());
+	}
+	select("Graphics");
+	assert(window.m_shown.empty());
+	toggle();
+	assert(window.m_includeFlathub.on && window.m_shown.size() == 1);
+	{
+		StoreWindow reopened;
+		assert(reopened.m_includeFlathub.on);
+		assert(waitFor([&] { return !reopened.m_busy; }));
+		assert(reopened.m_flathubLoaded);
+		reopened.m_categoryList.select(reopened.m_categories.indexOf("Graphics"), true);
+		assert(reopened.m_shown.size() == 1 && reopened.m_catalogIcon.size() == 32 * 32);
+		reopened.m_categoryList.select(reopened.m_categories.indexOf("All Applications"), true);
+		assert(waitFor([&] { return !reopened.m_busy; }));
+		assert(reopened.m_shown.size() == 3);
+		reopened.m_categoryList.select(reopened.m_categories.indexOf("Additional Sources"), true);
+		reopened.m_refreshButton.clicked();
+		assert(waitFor([&] { return !reopened.m_busy; }));
+		assert(reopened.m_flathubLoaded && reopened.m_debianLoaded);
+		reopened.m_categoryList.select(reopened.m_categories.indexOf("Graphics"), true);
+		assert(reopened.m_shown.size() == 1);
+	}
+	window.m_search.setText("pictures");
+	window.m_search.edited();
+	assert(window.m_shown.size() == 1);
+	window.m_search.setText("no match");
+	window.m_search.edited();
+	assert(window.m_shown.empty());
+	window.m_search.setText("");
+	window.m_search.edited();
+	window.loadSource("flathub");
+	assert(waitFor([&] { return !window.m_busy; }));
+	assert(window.m_shown.size() == 1);
+	qputenv("TEST_BAD", "1");
+	window.loadSource("flathub");
+	assert(waitFor([&] { return !window.m_busy; }));
+	assert(window.m_status.contains("Invalid software catalog"));
+	assert(window.m_shown.size() == 1 && window.m_catalogIcon.size() == 32 * 32);
+	qunsetenv("TEST_BAD");
+	select("Flathub");
 	qputenv("TEST_INSTALL_FAIL", "1");
 	window.act();
 	assert(window.m_status == "Mock installation failed" && !window.m_installed);

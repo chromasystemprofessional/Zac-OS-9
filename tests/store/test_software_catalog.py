@@ -5,9 +5,11 @@ import importlib.machinery
 import importlib.util
 import io
 import json
+import gzip
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 from types import ModuleType, SimpleNamespace
 import unittest
 from unittest.mock import Mock, call, patch
@@ -31,6 +33,11 @@ def component(identifier="org.example.Editor", kind="desktop", packages=None,
 
 
 class CatalogTests(unittest.TestCase):
+    def setUp(self):
+        metadata = patch.object(catalog, "flathub_metadata", return_value={})
+        self.metadata = metadata.start()
+        self.addCleanup(metadata.stop)
+
     def flatpak_results(self, result):
         return [
             SimpleNamespace(returncode=0, stderr="", stdout=(
@@ -139,6 +146,7 @@ class CatalogTests(unittest.TestCase):
         self.assertEqual(items[0], {
             "id": "org.example.Editor", "name": "Éditeur", "blurb": "Edit documents",
             "packages": ["org.example.Editor"], "source": "flathub",
+            "category": "Utilities",
         })
         self.assertEqual(len(items), 2)
 
@@ -191,6 +199,35 @@ class CatalogTests(unittest.TestCase):
         self.assertEqual(len(items), 1)
         self.assertEqual(items[0]["name"], "Editor")
         self.assertEqual(items[0]["blurb"], "")
+
+    def test_flathub_enriched_metadata_and_desktop_suffix(self):
+        self.metadata.return_value = {
+            "org.example.Editor.desktop": {
+                "name": "Photo Editor", "blurb": "Retouch photographs",
+                "category": "Graphics", "icon": "/cache/editor.png",
+            },
+        }
+        result = SimpleNamespace(returncode=0, stderr="",
+                                 stdout="org.example.Editor\tEditor\n")
+        with patch.object(catalog.subprocess, "run",
+                          side_effect=self.flatpak_results(result)):
+            item = catalog.flathub_catalog()[0]
+        self.assertEqual(item["name"], "Photo Editor")
+        self.assertEqual(item["blurb"], "Retouch photographs")
+        self.assertEqual(item["category"], "Graphics")
+        self.assertEqual(item["icon"], "/cache/editor.png")
+        self.assertEqual(item["packages"], ["org.example.Editor"])
+
+    def test_flathub_metadata_failure_is_reported(self):
+        self.metadata.side_effect = catalog.Failure("metadata download failed")
+        result = SimpleNamespace(returncode=0, stderr="",
+                                 stdout="org.example.Editor\tEditor\n")
+        with patch.object(catalog.subprocess, "run",
+                          side_effect=self.flatpak_results(result)):
+            status, stdout, stderr = self.invoke(["flathub"])
+        self.assertEqual(status, 1)
+        self.assertEqual(stdout, "")
+        self.assertIn("metadata download failed", stderr)
 
     def test_flathub_malformed_rows_fail_without_partial_json(self):
         result = SimpleNamespace(
@@ -289,6 +326,84 @@ class CatalogTests(unittest.TestCase):
             self.assertIn("debian|flathub", stderr)
             debian.assert_not_called()
             flathub.assert_not_called()
+
+
+class MetadataTests(unittest.TestCase):
+    def setUp(self):
+        self.root = tempfile.TemporaryDirectory()
+        self.addCleanup(self.root.cleanup)
+        self.directory = Path(self.root.name) / "appstream/flathub/x86_64/active"
+        self.directory.mkdir(parents=True)
+        environment = patch.dict(catalog.os.environ, {"FLATPAK_USER_DIR": self.root.name})
+        environment.start()
+        self.addCleanup(environment.stop)
+        run = patch.object(catalog, "run_flatpak", return_value="")
+        self.run = run.start()
+        self.addCleanup(run.stop)
+
+    def fixture(self, icon="org.example.Editor.png"):
+        return f"""<?xml version="1.0"?>
+<components version="0.16" origin="flathub">
+  <component type="desktop-application">
+    <id>org.example.Editor</id><name>Photo Editor</name>
+    <summary>Retouch photographs</summary>
+    <categories><category>Graphics</category><category>Utility</category></categories>
+    <icon type="cached" width="128" height="128">{icon}</icon>
+    <icon type="cached" width="64" height="64">small.png</icon>
+  </component>
+  <component type="runtime"><id>org.example.Runtime</id></component>
+</components>"""
+
+    def test_cached_metadata_and_icons(self):
+        (self.directory / "appstream.xml").write_text(self.fixture())
+        icons = self.directory / "icons/128x128"
+        icons.mkdir(parents=True)
+        (icons / "org.example.Editor.png").write_bytes(b"fixture")
+        items = catalog.flathub_metadata()
+        self.run.assert_called_once_with(
+            ["update", "--appstream", "--noninteractive", "flathub"])
+        self.assertEqual(items, {"org.example.Editor": {
+            "name": "Photo Editor", "blurb": "Retouch photographs",
+            "category": "Graphics", "icon": str(icons / "org.example.Editor.png"),
+        }})
+
+    def test_compressed_metadata_and_smaller_icon(self):
+        (self.directory / "appstream.xml.gz").write_bytes(gzip.compress(self.fixture().encode()))
+        icons = self.directory / "icons/64x64"
+        icons.mkdir(parents=True)
+        (icons / "small.png").write_bytes(b"fixture")
+        item = catalog.flathub_metadata()["org.example.Editor"]
+        self.assertEqual(item["icon"], str(icons / "small.png"))
+
+    def test_missing_and_malformed_metadata(self):
+        with self.assertRaisesRegex(catalog.Failure, "metadata is missing"):
+            catalog.flathub_metadata()
+        (self.directory / "appstream.xml").write_text("<broken")
+        with self.assertRaisesRegex(catalog.Failure, "Flathub AppStream metadata"):
+            catalog.flathub_metadata()
+
+    def test_icons_cannot_escape_cache(self):
+        for name in ("../outside.png", "/tmp/outside.png", "escape.png"):
+            with self.subTest(name=name):
+                (self.directory / "appstream.xml").write_text(self.fixture(name))
+                icons = self.directory / "icons/128x128"
+                icons.mkdir(parents=True, exist_ok=True)
+                outside = Path(self.root.name) / "outside.png"
+                outside.write_bytes(b"fixture")
+                if name == "escape.png":
+                    (icons / name).symlink_to(outside)
+                self.assertEqual(catalog.flathub_metadata()["org.example.Editor"]["icon"], "")
+
+    def test_main_categories(self):
+        for category, expected in {
+            "Network": "Internet", "Graphics": "Graphics", "Office": "Productivity",
+            "AudioVideo": "Multimedia", "Audio": "Multimedia", "Video": "Multimedia",
+            "Game": "Games", "Utility": "Utilities", "Development": "Utilities",
+            "Education": "Productivity", "Science": "Productivity",
+        }.items():
+            self.assertEqual(catalog.main_category([category]), expected)
+        self.assertEqual(catalog.main_category([]), "Utilities")
+        self.assertEqual(catalog.main_category(["Utility", "Graphics"]), "Graphics")
 
 
 if __name__ == "__main__":

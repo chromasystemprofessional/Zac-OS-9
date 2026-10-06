@@ -1,11 +1,11 @@
 // Administrators at the computer (in the sudo group, logged in on its
-// screen) may mount its internal drives without a password: the Finder
-// puts every disk on the desktop at startup, as Mac OS 9 did, and this
-// desktop runs no polkit authentication agent to ask for one. Same
-// reasoning as 50-zacos9-appstore.rules. Removable media need no rule.
+// screen) may mount internal drives and read-only Mac disks without a
+// password, including after reboot. No administrator password is stored.
+// Other users and sessions retain the actions' authentication defaults.
 polkit.addRule(function(action, subject) {
 	if ((action.id == "org.freedesktop.udisks2.filesystem-mount-system" ||
-			action.id == "org.freedesktop.udisks2.filesystem-mount") &&
+			action.id == "org.freedesktop.udisks2.filesystem-mount" ||
+			action.id == "org.zacos9.disks.mac-mount") &&
 			subject.local && subject.active && subject.isInGroup("sudo")) {
 		return polkit.Result.YES;
 	}

@@ -5,6 +5,7 @@
 #include <QMouseEvent>
 #include <QWheelEvent>
 #include <QPainter>
+#include <QImageReader>
 #include <algorithm>
 
 #include "alert.h"
@@ -47,12 +48,18 @@ StoreWindow::StoreWindow() {
 	m_categories = storeCategories();
 	m_allItems = storeItems();
 	m_categories << "All Applications" << "Flathub" << "Additional Sources";
-	m_categoryList.frame = QRect(MARGIN, 42, CAT_W, LIST_BOTTOM - 42);
+	m_categoryList.frame = QRect(MARGIN, 64, CAT_W, LIST_BOTTOM - 64);
 	m_itemList.frame =
-		QRect(MARGIN + CAT_W + GAP, 42, W - MARGIN - (MARGIN + CAT_W + GAP), LIST_BOTTOM - 42);
+		QRect(MARGIN + CAT_W + GAP, 64, W - MARGIN - (MARGIN + CAT_W + GAP), LIST_BOTTOM - 64);
 	m_search.rect = QRect(70, MARGIN, W - 80 - MARGIN, PL_EDIT_H);
 	m_search.edited = [this] { if (!m_busy) { filterItems(); } };
 	m_host.edits = { &m_search };
+	m_includeFlathub = PanelCheckbox("Include Flathub applications", QPoint(MARGIN, 38));
+	char include[16];
+	m_includeFlathub.on = !pl_setting("store-include-flathub", include, sizeof(include)) ||
+		QString::fromUtf8(include) == "1";
+	m_includeFlathub.toggled = [this](bool on) { includeFlathub(on); };
+	m_host.checks = { &m_includeFlathub };
 	m_categoryList.setItems(m_categories);
 	m_categoryList.picked = [this](int row) { selectCategory(row); };
 	m_itemList.picked = [this](int row) { selectItem(row); };
@@ -62,9 +69,9 @@ StoreWindow::StoreWindow() {
 	m_styleButton = PanelButton("Preset", QRect(W - MARGIN - 90 - 8 - STYLE_BTN_W, H - MARGIN - 20,
 		STYLE_BTN_W, 20));
 	m_styleButton.clicked = [this] { actStyle(); };
-	m_sourceButton = PanelButton("Enable Flathub", QRect(MARGIN + CAT_W + GAP, 132, 155, 20));
+	m_sourceButton = PanelButton("Enable Flathub", QRect(MARGIN + CAT_W + GAP, 152, 155, 20));
 	m_sourceButton.clicked = [this] { configureSource(); };
-	m_refreshButton = PanelButton("Refresh", QRect(W - MARGIN - 90, 132, 90, 20));
+	m_refreshButton = PanelButton("Refresh", QRect(W - MARGIN - 90, 152, 90, 20));
 	m_refreshButton.clicked = [this] {
 		bool ok;
 		QString error;
@@ -119,15 +126,16 @@ void StoreWindow::selectCategory(int row) {
 	m_status.clear();
 	m_host.buttons = sourcesPage() ? std::vector<PanelButton *>{ &m_sourceButton, &m_refreshButton }
 		: std::vector<PanelButton *>{ &m_actionButton };
-	if (sourcesPage() || m_categories[row] == "Flathub") {
+	if (sourcesPage() || m_categories[row] == "Flathub" || m_includeFlathub.on) {
 		bool ok;
 		QString error;
 		m_flathubEnabled = flathubEnabled(&ok, &error);
 		m_sourceButton.label = std::make_unique<Text>(
 			m_flathubEnabled ? "Disable Flathub" : "Enable Flathub", 147, PL_FONT_SYSTEM);
 		if (!ok) {
-			m_status = error;
 			filterItems();
+			m_status = error;
+			update();
 			return;
 		}
 	}
@@ -140,8 +148,21 @@ void StoreWindow::selectCategory(int row) {
 		} else if (!m_flathubLoaded) {
 			loadSource("flathub");
 		}
+	} else if (!sourcesPage() && m_includeFlathub.on && m_flathubEnabled && !m_flathubLoaded) {
+		loadSource("flathub");
 	}
 	update();
+}
+
+void StoreWindow::includeFlathub(bool on) {
+	if (!pl_setting_set("store-include-flathub", on ? "1" : "0")) {
+		m_includeFlathub.on = !on;
+		m_status = "Unable to save the Flathub browsing preference.";
+		qWarning().noquote() << m_status;
+		update();
+		return;
+	}
+	selectCategory(m_categoryList.state.selected);
 }
 
 bool StoreWindow::sourcesPage() const {
@@ -154,9 +175,11 @@ void StoreWindow::filterItems() {
 	const QString category = m_categories.value(m_categoryList.state.selected);
 	const QString query = m_search.text.trimmed();
 	for (const StoreItem &item : m_allItems) {
-		const bool inCategory = category == "All Applications" ? item.source == "debian"
+		const bool visibleSource = item.source != "flathub" ||
+			(m_flathubEnabled && (m_includeFlathub.on || category == "Flathub"));
+		const bool inCategory = visibleSource && (category == "All Applications" ? true
 			: category == "Flathub" ? item.source == "flathub" && m_flathubEnabled
-			: category == "Featured" ? item.featured : item.category == category;
+			: category == "Featured" ? item.featured : item.category == category);
 		if (inCategory && (query.isEmpty() || item.name.contains(query, Qt::CaseInsensitive) ||
 				item.blurb.contains(query, Qt::CaseInsensitive) ||
 				item.packages.join(' ').contains(query, Qt::CaseInsensitive))) {
@@ -184,6 +207,7 @@ void StoreWindow::loadSource(const QString &source) {
 	m_loadingSource = source;
 	m_busy = true;
 	m_search.enabled = false;
+	m_includeFlathub.enabled = false;
 	m_sourceButton.enabled = m_refreshButton.enabled = m_actionButton.enabled = false;
 	m_catalogTimedOut = false;
 	m_status = "Loading " + (source == "debian" ? QString("Debian applications") : QString("Flathub")) + "...";
@@ -198,6 +222,7 @@ void StoreWindow::finishCatalog() {
 	m_sweep.stop();
 	m_busy = false;
 	m_search.enabled = true;
+	m_includeFlathub.enabled = true;
 	m_sourceButton.enabled = m_refreshButton.enabled = true;
 	QString error;
 	std::vector<StoreItem> discovered;
@@ -214,7 +239,8 @@ void StoreWindow::finishCatalog() {
 		m_shown.clear();
 		m_allItems.erase(std::remove_if(m_allItems.begin(), m_allItems.end(),
 			[this](const StoreItem &item) {
-				return item.category.isEmpty() && item.source == m_loadingSource;
+				return item.source == m_loadingSource &&
+					(item.source == "flathub" || item.category.isEmpty());
 			}), m_allItems.end());
 		for (StoreItem &item : discovered) {
 			const bool duplicate = std::any_of(m_allItems.begin(), m_allItems.end(),
@@ -237,6 +263,10 @@ void StoreWindow::finishCatalog() {
 		qWarning().noquote() << error;
 	} else if (discovered.empty()) {
 		m_status = "No desktop applications found. Refresh package metadata in Software Update.";
+	}
+	if (error.isEmpty() && m_loadingSource == "debian" && m_flathubEnabled &&
+			!m_flathubLoaded && (m_includeFlathub.on || sourcesPage())) {
+		loadSource("flathub");
 	}
 	update();
 }
@@ -289,6 +319,7 @@ void StoreWindow::selectItem(int row) {
 }
 
 void StoreWindow::refreshInstalled() {
+	m_catalogIcon.clear();
 	const StoreItem *item = currentItem();
 	if (!item) {
 		return;
@@ -316,6 +347,25 @@ void StoreWindow::refreshInstalled() {
 		m_actionButton.rect.width() - 8, PL_FONT_SYSTEM);
 	m_actionButton.enabled = true;
 	m_status.clear();
+	if (!item->iconPath.isEmpty()) {
+		QImageReader reader(item->iconPath);
+		const QSize size = reader.size();
+		if (size.isValid() && size.width() <= 1024 && size.height() <= 1024) {
+			const QImage image = reader.read().scaled(ICON_SIZE, ICON_SIZE,
+				Qt::IgnoreAspectRatio, Qt::SmoothTransformation).convertToFormat(QImage::Format_ARGB32);
+			if (!image.isNull()) {
+				m_catalogIcon.reserve(ICON_SIZE * ICON_SIZE);
+				for (int y = 0; y < ICON_SIZE; ++y) {
+					for (int x = 0; x < ICON_SIZE; ++x) {
+						m_catalogIcon.push_back(image.pixel(x, y));
+					}
+				}
+			}
+		}
+		if (m_catalogIcon.empty()) {
+			qWarning().noquote() << "Unable to read application icon:" << item->iconPath;
+		}
+	}
 
 	/* A look-and-feel preset, once the application is there to use it. */
 	const bool preset = m_installed && !item->styleId.isEmpty();
@@ -424,7 +474,10 @@ void StoreWindow::paintDetail(pl_canvas *c, uint32_t bg) const {
 		}
 		return;
 	}
-	const std::vector<uint32_t> icon = m_installed ? installedIcon(*item) : std::vector<uint32_t>{};
+	std::vector<uint32_t> icon = m_installed ? installedIcon(*item) : std::vector<uint32_t>{};
+	if (icon.empty()) {
+		icon = m_catalogIcon;
+	}
 	if (!icon.empty()) {
 		pl_image_blend(c, MARGIN, inside, icon.data(), ICON_SIZE, ICON_SIZE, false);
 	} else {
@@ -434,19 +487,25 @@ void StoreWindow::paintDetail(pl_canvas *c, uint32_t bg) const {
 	const int textW = W - MARGIN - 90 - 10 - textX;
 	panelText(c, item->name, textX, inside + 11, PL_FONT_SYSTEM, C_BLACK, textW);
 	int y = inside + 11 + 16;
+	const int barY = H - MARGIN - 20 - 8 - PL_PROGRESS_H;
 	for (const QString &line : panelWrap(item->blurb, textW, PL_FONT_VIEWS)) {
+		if (y > barY - 8) {
+			break;
+		}
 		panelText(c, line, textX, y, PL_FONT_VIEWS, GRAY(0x5));
 		y += 12;
 	}
 	if (m_installed && !item->styleId.isEmpty()) {
 		y += 4;
 		for (const QString &line : panelWrap(item->styleBlurb, textW, PL_FONT_VIEWS)) {
+			if (y > barY - 8) {
+				break;
+			}
 			panelText(c, line, textX, y, PL_FONT_VIEWS, GRAY(0x5));
 			y += 12;
 		}
 	}
 
-	const int barY = H - MARGIN - 20 - 8 - PL_PROGRESS_H;
 	if (m_busy) {
 		pl_progress_paint(c, textX, barY, W - MARGIN - 90 - 10 - textX, m_sweepPos,
 			pl_accent_current());
@@ -471,11 +530,11 @@ void StoreWindow::paintEvent(QPaintEvent *) {
 	m_categoryList.paint(c, !m_busy);
 	if (sourcesPage()) {
 		const int x = MARGIN + CAT_W + GAP;
-		panelText(c, "Debian applications", x, 58, PL_FONT_SYSTEM, C_BLACK);
-		panelText(c, "Uses your configured APT repositories.", x, 76, PL_FONT_VIEWS, C_BLACK);
-		panelText(c, "Flathub (optional, for this account)", x, 102, PL_FONT_SYSTEM, C_BLACK);
+		panelText(c, "Debian applications", x, 78, PL_FONT_SYSTEM, C_BLACK);
+		panelText(c, "Uses your configured APT repositories.", x, 94, PL_FONT_VIEWS, C_BLACK);
+		panelText(c, "Flathub (optional, for this account)", x, 122, PL_FONT_SYSTEM, C_BLACK);
 		panelText(c, m_flathubEnabled ? "Enabled." : "Disabled. No source is added until you enable it.",
-			x, 120, PL_FONT_VIEWS, C_BLACK, W - x - MARGIN);
+			x, 140, PL_FONT_VIEWS, C_BLACK, W - x - MARGIN);
 		if (!m_status.isEmpty()) {
 			int y = 185;
 			for (const QString &line : panelWrap(m_status, W - x - MARGIN, PL_FONT_VIEWS)) {

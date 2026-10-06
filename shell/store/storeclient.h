@@ -18,6 +18,7 @@ struct StoreItem {
 	QStringList packages;
 	bool featured = false;
 	QString source = "debian";
+	QString iconPath;
 	/* An optional look-and-feel preset for it (zacos9-appstyle): the
 	 * button's label to switch it on (`styleLabel`) and off (`styleReset`),
 	 * and what it does. Empty `styleId` means none. */

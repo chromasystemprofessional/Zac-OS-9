@@ -255,6 +255,18 @@ bool parseSoftwareCatalog(const QByteArray &json, const QString &source,
 		item.id = obj.value("id").toString();
 		item.name = obj.value("name").toString();
 		item.blurb = obj.value("blurb").toString();
+		item.category = obj.value("category").toString();
+		item.iconPath = obj.value("icon").toString();
+		const QStringList categories = { "Internet", "Graphics", "Productivity",
+			"Multimedia", "Games", "Utilities" };
+		if (!item.category.isEmpty() && !categories.contains(item.category)) {
+			*error = "Invalid category in software catalog.";
+			return false;
+		}
+		if (!item.iconPath.isEmpty() && !QFileInfo(item.iconPath).isAbsolute()) {
+			*error = "Invalid icon path in software catalog.";
+			return false;
+		}
 		for (const QJsonValue &p : obj.value("packages").toArray()) {
 			const QString name = p.toString();
 			if (!(source == "flathub" ? appId : package).match(name).hasMatch()) {

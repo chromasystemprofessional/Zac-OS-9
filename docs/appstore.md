@@ -11,8 +11,13 @@ icon, a blurb, a status line and one button. Under that, it is apt.
 A short, curated catalog remains the default. **All Applications** expands
 it with desktop applications described by the configured Debian repositories'
 AppStream metadata. Search filters names, descriptions and package identifiers.
-**Flathub** is a separate, optional catalog; **Additional Sources** enables or
-disables the official Flathub remote for the current user after confirmation.
+**Include Flathub applications** adds Flathub apps to the main categories and
+All Applications. The checkbox defaults to checked, remembers your choice, and
+only includes apps when the official user remote is enabled. Unchecking hides
+them from combined browsing without disabling the remote, changing updates, or
+removing apps. **Flathub** also remains available as a source-only view.
+**Additional Sources** enables or disables the official Flathub remote for the
+current user after confirmation.
 One button per item: **Install** or **Remove**, whichever applies.
 
 Debian discovery needs the packaged `appstream`, `python3-gi` and
@@ -31,6 +36,14 @@ with a different URL are rejected rather than silently replaced.
 Remote validation accepts Flatpak's omitted empty options column as well as
 an explicit empty column; neither form changes the official URL requirement.
 Catalog rows may likewise omit an empty trailing application description.
+Discovery refreshes only Flathub's AppStream metadata (not installed apps), then
+reads localized names, summaries, desktop categories, and cached icons from the
+user installation. Network/Graphics/Office/AudioVideo/Game metadata maps into
+Internet/Graphics/Productivity/Multimedia/Games; Education and Science map into
+Productivity, with other or missing categories in Utilities. Apps without
+published summaries or cached icons retain the listing summary or generic icon.
+Metadata failures are reported rather than replacing the catalog with partial
+results.
 Software Update still manages ZacOS releases and Debian updates; Flatpak
 updates can be applied separately with `flatpak --user update`.
 
@@ -86,8 +99,8 @@ the detail status. Search applies to the current category, including Featured.
   shown broken (`storeItems()` filters it silently; see
   `shell/store/tests/test_storeclient.cpp`).
 
-No icon is given in the catalog. Before installing, there is nothing on
-disk to resolve one from, and the project doesn't ship third-party
+No icon is given in the shipped Debian catalog. Before installing those
+apps, there is nothing on disk to resolve one from, and the project doesn't ship third-party
 logos (the same reasoning that keeps this out of `assets/`: no Apple
 assets, and by the same logic, no Firefox fox or GIMP wilber either) —
 the generic application icon is shown instead. Once installed, the real
@@ -96,7 +109,12 @@ against `appList()`'s `AppEntry::origin` (`"dpkg:<package>"`, from the
 Finder's own package-origin lookup — see `docs/vfs.md`) and uses its
 resolved icon, the same `QIcon::fromTheme` pipeline the Finder's
 Applications folder uses. Nothing is duplicated to get this: it is the
-same code, called a second time.
+same code, called a second time. Flathub apps can show their cached AppStream
+icons before installation; these are downloaded by Flatpak from the enabled
+official remote, not bundled in ZacOS. Installed launcher icons take precedence,
+with the metadata icon used if the launcher has none. Missing icons use the
+generic application icon. The catalog JSON carries optional `category` and
+absolute `icon` fields for discovered metadata, validated before merging.
 
 ## Installing and removing
 

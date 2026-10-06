@@ -24,6 +24,34 @@ Updated: 2026-10-06
 
 ## Current work
 
+**Persistent local-administrator Mac mount authorization** (0.1.25):
+the existing polkit mount rule now includes the constrained read-only Mac
+mount/eject helper. Active local members of `sudo` no longer receive an
+administrator-password prompt each time a permanently connected Mac drive
+is mounted after reboot. No password is stored; non-admin, remote and
+inactive sessions still use the policy's authentication defaults. Disk erase,
+encrypted unlock and other-user mount actions are not granted by this rule.
+The JavaScript authorization regression passes all 64 action/session/group
+combinations; all three focused authorization and disk-helper suites pass.
+The rule is installed through the existing package path; reboot behavior on
+the connected physical drive still needs confirmation after installing it.
+
+**Flathub metadata and combined category browsing** (0.1.25): Software
+reads the enabled user remote's AppStream metadata for application names,
+summaries, cached icons and categories, instead of relying on the sparse
+remote listing. Flathub applications join the main categories and All
+Applications through a remembered "Include Flathub applications" checkbox,
+checked by default; hiding them does not disable the remote or remove apps.
+The dedicated Flathub view remains available. Refresh replaces categorized
+results without duplicates and preserves the prior catalog on errors.
+Runtime dependencies now explicitly include Flatpak and AppStream bindings.
+Software builds and all three focused Store/catalog suites pass, including
+26 Python catalog tests and offscreen checkbox persistence, automatic loading,
+category/search filtering, pre-install icons and refresh/error regressions.
+The real official remote yields 3,371 applications across all six main
+categories, with 3,356 summaries and 3,296 cached icons; missing published
+metadata uses the existing fallbacks.
+
 **Flathub remote validation correction** (0.1.24): Flatpak 1.16 omits
 the trailing options column when empty. The Store incorrectly treated the
 official two-column remote row as an unofficial source, and the catalog
