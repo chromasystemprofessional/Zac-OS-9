@@ -97,14 +97,21 @@ data files so they can be selected normally in Sniffer.
 Classic discrete events supported are button press (`btnp`), checkbox press
 (`chkp`), menu open (`mnuo`), menu selection (`mnus`), window open (`wopn`),
 window close (`wcls`), collapse (`wcol`), expansion (`wexp`) and Trash flush
-(`ftrs`). Window movement (`wmov`) imports a PCM sample for repeating playback
-throughout the grab. These identifiers follow the public Carbon HIToolbox
-Appearance Manager interface. Playback repeats the complete decoded sample;
-classic interactive variants, embedded loop regions, random/command sequences
-and compressed samples are not supported. There is no verified classic mapping
-for `trash-move` or `window-drag-end`; WAV themes can supply these explicitly.
-The importer accepts up to 64 custom sets with a 64 MiB decoded-audio budget;
-individual samples are limited to ten seconds and 2 MiB. Limit violations are
+(`ftrs`). Window movement (`wmov`) imports the record's drag slot as
+`window-drag`, which repeats throughout the grab, and its release slot as
+`window-drag-end`. Classic sets keep these in the second and fourth `snd#`
+slots (the first is normally empty) and often share them with other drag
+records, so a shared sound label does not block them. These identifiers follow
+the public Carbon HIToolbox Appearance Manager interface. Playback repeats the
+complete decoded sample; the idle-drag variant, embedded loop regions and
+random sound sequences are not supported.
+
+Samples may be 8- or 16-bit PCM, μ-law, IMA 4:1 or `twos`, at 1–96 kHz. MACE
+is not decoded and is reported. Leading null sound commands are skipped, and
+an empty sound resource silences its event without an error. There is no
+verified classic mapping for `trash-move`; WAV themes can supply it explicitly.
+The importer accepts up to 256 custom sets with a 256 MiB decoded-audio budget;
+individual samples are limited to 30 seconds and 8 MiB. Limit violations are
 reported explicitly.
 
 ## Tests

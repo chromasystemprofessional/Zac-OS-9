@@ -56,13 +56,28 @@ def snd(samples=b"\0\x80\xff", extended=False, channels=1, version=1):
 
 
 def snd_list(entries):
+    """entries: (code, id) for slot 0, or (code, (slot0, slot1, slot2, slot3))."""
     result = bytearray(struct.pack(">HH", 1, len(entries)))
     for code, number in entries:
+        slots = number if isinstance(number, tuple) else (number, 0, 0, 0)
         entry = bytearray(44)
         entry[:4] = code
-        struct.pack_into(">HHHi", entry, 4, 2, 5, 0, number)
+        struct.pack_into(">HHH", entry, 4, 2, 5, 0)
+        for index, value in enumerate(slots):
+            struct.pack_into(">ii", entry, 10 + index * 8, value, 0)
         result.extend(entry)
     return bytes(result)
+
+
+def cmp_snd(fmt, samples, frames, compression=-1, bits=16, channels=1, rate=22050):
+    header = bytearray(64)
+    struct.pack_into(">III", header, 0, 0, channels, rate << 16)
+    header[20] = 254
+    struct.pack_into(">I", header, 22, frames)
+    header[40:44] = fmt
+    struct.pack_into(">hhhH", header, 56, compression, 0, 0, bits)
+    prefix = struct.pack(">HHHIH", 1, 1, 5, 128, 1)
+    return prefix + struct.pack(">HHI", 0x8051, 0, len(prefix) + 8) + header + samples
 
 
 def appledouble(resource):
@@ -161,7 +176,7 @@ class SoundTests(unittest.TestCase):
                 sounds.decode_sound(bytes(data))
         for mutate in (
                 lambda d: struct.pack_into(">H", d, 0, 3),
-                lambda d: struct.pack_into(">H", d, 10, 2),
+                lambda d: struct.pack_into(">H", d, 10, 0),
                 lambda d: struct.pack_into(">H", d, 12, 0x51),
                 lambda d: struct.pack_into(">I", d, 20, 1),
                 lambda d: struct.pack_into(">I", d, 24, 0xffffffff)):
@@ -171,6 +186,45 @@ class SoundTests(unittest.TestCase):
                 sounds.decode_sound(bytes(data))
         with self.assertRaises(ValueError):
             sounds.decode_sound(snd()[:-1])
+
+    def test_compressed_sound_formats(self):
+        def frames(data):
+            with wave.open(io.BytesIO(sounds.decode_sound(data))) as reader:
+                return (reader.getnchannels(), reader.getsampwidth(),
+                        reader.readframes(reader.getnframes()))
+        self.assertEqual(frames(cmp_snd(b"ulaw", b"\xff\x7f\x80\x00", 4)),
+                         (1, 2, struct.pack("<4h", 0, 0, 32124, -32124)))
+        self.assertEqual(frames(cmp_snd(b"twos", b"\x12\x34\xff\xfe", 2)),
+                         (1, 2, b"\x34\x12\xfe\xff"))
+        self.assertEqual(frames(cmp_snd(b"twos", b"\x00\x7f\x80", 3, bits=8)),
+                         (1, 1, b"\x80\xff\x00"))
+        self.assertEqual(frames(cmp_snd(bytes(4), b"\x00\x80\xff", 3, 0, 8)),
+                         (1, 1, b"\x00\x80\xff"))
+        silent = struct.pack(">H", 0) + bytes(32)
+        rising = struct.pack(">H", 0) + bytes([0x77]) * 32
+        channels, width, data = frames(cmp_snd(b"ima4", silent + rising, 1, channels=2))
+        self.assertEqual((channels, width, len(data)), (2, 2, 64 * 2 * 2))
+        samples = struct.unpack("<128h", data)
+        left, right = samples[0::2], samples[1::2]
+        self.assertEqual(left, (0,) * 64)
+        self.assertEqual(list(right), sorted(right))
+        self.assertGreater(right[-1], 1000)
+        with self.assertRaisesRegex(ValueError, "MACE"):
+            sounds.decode_sound(cmp_snd(bytes(4), bytes(4), 2, 3, 8))
+        with self.assertRaises(ValueError):
+            sounds.decode_sound(cmp_snd(b"ima4", silent, 2))
+        with self.assertRaises(sounds.EmptySound):
+            sounds.decode_sound(b"")
+        rate = cmp_snd(b"twos", b"\0\0", 1, rate=2476)
+        self.assertEqual(wave.open(io.BytesIO(sounds.decode_sound(rate))).getframerate(), 2476)
+
+    def test_leading_null_commands(self):
+        data = bytearray(snd())
+        prefix = struct.pack(">HHHIH", 1, 1, 5, 128, 2) + bytes(8)
+        command = struct.pack(">HHI", 0x8051, 0, len(prefix) + 8)
+        result = sounds.decode_sound(prefix + command + bytes(data[20:]))
+        with wave.open(io.BytesIO(result)) as reader:
+            self.assertEqual(reader.readframes(3), b"\0\x80\xff")
 
     def test_sdid_and_sound_list_not_resource_id_guessing(self):
         records = {(b"snd ", 42): snd(),
@@ -199,13 +253,25 @@ class SoundTests(unittest.TestCase):
         records[b"snd#", 1000] = snd_list([(b"btnp", 2)])
         self.assertEqual(sounds.classic_mapping(records), {"button-click": 2})
 
+    def test_drag_slots_and_shared_drag_ids(self):
+        # Real sets: wmov keeps slot 0 empty, drag in slot 1, idle in 2, release in 3,
+        # and share those IDs with other drag codes whose sdid labels win.
+        records = {(b"snd ", 504): snd(), (b"snd ", 505): snd(), (b"snd ", 506): snd(),
+                   (b"sdid", 504): b"imov#Drag#drag#Icon move",
+                   (b"sdid", 506): b"drag#Drop#drag#Drag release",
+                   (b"snd#", 1000): snd_list([(b"imov", (0, 504, 505, 506)),
+                                              (b"wmov", (0, 504, 505, 506))])}
+        self.assertEqual(sounds.classic_mapping(records),
+                         {"window-drag": 504, "window-drag-end": 506})
+        records[b"snd#", 1000] = snd_list([(b"wmov", (0, 504, 0, 0))])
+        self.assertEqual(sounds.classic_mapping(records), {"window-drag": 504})
+
     def test_classic_window_actions_and_drag_pcm(self):
         entries = [(b"wcol", 10), (b"wexp", 11), (b"wmov", 12)]
         records = {(b"snd ", number): snd() for _, number in entries}
         records[b"snd#", 1000] = snd_list(entries)
         expected = {"window-collapse": 10, "window-expand": 11, "window-drag": 12}
         self.assertEqual(sounds.classic_mapping(records), expected)
-        self.assertNotIn("window-drag-end", sounds.CLASSIC_EVENTS.values())
         items = [(b"snd ", number, snd()) for _, number in entries]
         items += [(b"sdid", number, code + b"#Original#wind#Window action")
                   for code, number in entries]
@@ -234,6 +300,7 @@ class SoundTests(unittest.TestCase):
     def test_per_event_compression_error_keeps_pcm(self):
         compressed = bytearray(snd())
         compressed[40] = 254
+        compressed[25] = 1
         resource = resource_file([(b"snd ", 1, snd()), (b"snd ", 2, bytes(compressed)),
                                   (b"sdid", 1, b"btnp#One#ui#Press"),
                                   (b"sdid", 2, b"chkp#Two#ui#Press")])
@@ -309,7 +376,7 @@ class SoundTests(unittest.TestCase):
             self.assertEqual(sounds.scan(self.source, self.cache)["themes"], [])
 
     def test_wav_and_source_limits(self):
-        for data in (b"not WAV", wav_data(b"\0" * 22050 * 11), wav_data(rate=4000),
+        for data in (b"not WAV", wav_data(b"\0" * 22050 * 31), wav_data(rate=500),
                      wav_data(width=3), wav_data(channels=3), wav_data()[:-1]):
             with self.assertRaises(ValueError):
                 sounds.decode_wav(data)
@@ -375,7 +442,8 @@ class SoundTests(unittest.TestCase):
         self.assertEqual(records[b"sdid", 515], b"mnuo#Menu1#menu#Menu open")
         self.assertEqual(sounds.classic_mapping(records), {
             "button-click": 304, "menu-open": 515, "menu-command": 518,
-            "window-open": 548, "window-close": 550, "trash-empty": 290})
+            "window-open": 548, "window-close": 550, "trash-empty": 290,
+            "window-drag": 504})
         payload = records[b"snd#", 1000]
         self.assertEqual(struct.unpack_from(">HH", payload), (1, 116))
         self.assertEqual(len(payload), 4 + 116 * 44)
@@ -387,7 +455,10 @@ class SoundTests(unittest.TestCase):
         self.assertNotIn("window-open", sounds.classic_mapping(clinton))
         platinum = sounds.resource_records(sounds.containers(
             (REAL_SOUNDS / "._Platinum Sounds").read_bytes(), "")[1])
-        self.assertEqual(sounds.classic_mapping(platinum)["checkbox-toggle"], 330)
+        mapping = sounds.classic_mapping(platinum)
+        self.assertEqual(mapping["checkbox-toggle"], 330)
+        self.assertIn("window-drag", mapping)
+        self.assertIn("window-drag-end", mapping)
         count = 0
         for path in REAL_SOUNDS.glob("._*"):
             records = sounds.resource_records(sounds.containers(path.read_bytes(), "")[1])

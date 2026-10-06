@@ -4,8 +4,9 @@
 Folder themes use theme.json: {"version":1,"name":"Name","events":{event:"file.wav"}}.
 Classic sets may also be inside one grouping folder without theme.json.
 Cached, content-addressed WAV files remain valid across later catalog scans.
-Documented Appearance Manager events and PCM window-drag samples are imported,
-not skins, random sound sequences, compressed sound, or executable resources.
+Documented Appearance Manager events, including window drag and release, are
+imported from PCM, mu-law, IMA4 and 'twos' samples; skins, random sound
+sequences, MACE audio and executable resources are not.
 """
 import hashlib
 import importlib.machinery
@@ -20,10 +21,11 @@ import sys
 import wave
 
 MAX_SOURCE = 32 * 1024 * 1024
-MAX_WAV = 2 * 1024 * 1024
-MAX_SECONDS = 10
-MAX_THEMES = 64
-MAX_OUTPUT = 64 * 1024 * 1024
+MAX_WAV = 8 * 1024 * 1024
+MAX_SECONDS = 30
+MIN_RATE, MAX_RATE = 1000, 96000
+MAX_THEMES = 256
+MAX_OUTPUT = 256 * 1024 * 1024
 MAX_SCAN_ENTRIES = 1024
 EVENTS = frozenset(("button-click", "checkbox-toggle", "menu-open", "menu-command",
                     "window-open", "window-close", "trash-move", "trash-empty",
@@ -36,6 +38,12 @@ CLASSIC_EVENTS = {b"btnp": "button-click", b"chkp": "checkbox-toggle",
                   b"wcol": "window-collapse", b"wexp": "window-expand",
                   b"wmov": "window-drag",
                   b"ftrs": "trash-empty"}
+# Drag sounds (kThemeDragSound*) keep their phases in later snd# slots:
+# slot 1 plays while dragging, slot 2 while held still, slot 3 on release.
+# Slot 0 is normally empty; older or hand-made sets may put the drag there.
+DRAG_CODE = b"wmov"
+DRAG_SLOT, DRAG_RELEASE_SLOT = 1, 3
+SLOT_OFFSET, SLOT_SIZE = 10, 8
 _patterns = None
 
 
@@ -104,9 +112,12 @@ def classic_mapping(records):
     Verified against user-provided sound sets: sdid is a MacRoman
     FourCC#label[#category#description] string, with the same ID as its snd.
     Older sets sometimes store only a filename: those have no event identity.
-    snd# v1 has a 16-bit count and 44-byte records: FourCC at 0, and the
-    first signed 32-bit sound-resource reference at 10. Later slots are
-    interactive variants, not a list of additional discrete events.
+    snd# v1 has a 16-bit count and 44-byte records: FourCC at 0, then four
+    8-byte slots from offset 10, each starting with a signed 32-bit
+    sound-resource reference. Discrete events use slot 0; later slots are
+    interactive variants. Window drags use the drag and release slots
+    (see DRAG_SLOT), which sets often share between several drag codes, so
+    an sdid naming another drag code does not veto them.
     """
     identities, candidates, defaults = {}, {}, {}
     for (kind, number), payload in records.items():
@@ -128,7 +139,20 @@ def classic_mapping(records):
         for i in range(count):
             record = take(payload, 4 + i * 44, 44)
             code = record[:4]
-            number = unpack(">i", record, 10)[0]
+
+            def slot(index):
+                return unpack(">i", record, SLOT_OFFSET + index * SLOT_SIZE)[0]
+
+            if code == DRAG_CODE:
+                for event, number in (("window-drag", slot(DRAG_SLOT) or slot(0)),
+                                      ("window-drag-end", slot(DRAG_RELEASE_SLOT))):
+                    if number == 0:
+                        continue
+                    if event in defaults and defaults[event] != number:
+                        raise ValueError("ambiguous snd# event mapping")
+                    defaults[event] = number
+                continue
+            number = slot(0)
             if code not in CLASSIC_EVENTS or number == 0:
                 continue
             # A user-set sdid may deliberately identify a different event.
@@ -154,10 +178,10 @@ def classic_mapping(records):
 
 
 def pcm_wav(channels, width, rate, frames, samples):
-    if channels not in (1, 2) or width not in (1, 2) or not 8000 <= rate <= 96000:
-        raise ValueError("only mono/stereo 8/16-bit PCM at 8–96 kHz is supported")
+    if channels not in (1, 2) or width not in (1, 2) or not MIN_RATE <= rate <= MAX_RATE:
+        raise ValueError("only mono/stereo 8/16-bit PCM at 1–96 kHz is supported")
     if not 0 < frames <= rate * MAX_SECONDS:
-        raise ValueError("sound must be nonempty and at most 10 seconds")
+        raise ValueError(f"sound must be nonempty and at most {MAX_SECONDS} seconds")
     if len(samples) != frames * channels * width or len(samples) + 44 > MAX_WAV:
         raise ValueError("invalid or oversized PCM sample data")
     out = io.BytesIO()
@@ -169,22 +193,116 @@ def pcm_wav(channels, width, rate, frames, samples):
     return out.getvalue()
 
 
+class EmptySound(ValueError):
+    """A deliberately empty snd resource: the set silences that event."""
+
+
+def _ulaw_table():
+    table = []
+    for byte in range(256):
+        value = ~byte & 0xFF
+        magnitude = (((value & 0x0F) << 3) + 0x84) << ((value & 0x70) >> 4)
+        table.append(0x84 - magnitude if value & 0x80 else magnitude - 0x84)
+    return table
+
+
+ULAW = _ulaw_table()
+IMA_INDEX = (-1, -1, -1, -1, 2, 4, 6, 8, -1, -1, -1, -1, 2, 4, 6, 8)
+IMA_STEP = (7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 19, 21, 23, 25, 28, 31, 34,
+            37, 41, 45, 50, 55, 60, 66, 73, 80, 88, 97, 107, 118, 130, 143, 157,
+            173, 190, 209, 230, 253, 279, 307, 337, 371, 408, 449, 494, 544, 598,
+            658, 724, 796, 876, 963, 1060, 1166, 1282, 1411, 1552, 1707, 1878,
+            2066, 2272, 2499, 2749, 3024, 3327, 3660, 4026, 4428, 4871, 5358,
+            5894, 6484, 7132, 7845, 8630, 9493, 10442, 11487, 12635, 13899,
+            15289, 16818, 18500, 20350, 22385, 24623, 27086, 29794, 32767)
+
+
+def ima4_packet(packet):
+    """Decode one 34-byte Apple IMA4 packet into 64 signed samples."""
+    header = struct.unpack(">H", packet[:2])[0]
+    predictor = header & 0xFF80
+    if predictor >= 0x8000:
+        predictor -= 0x10000
+    index = min(header & 0x7F, 88)
+    out = []
+    for byte in packet[2:34]:
+        for nibble in (byte & 0x0F, byte >> 4):
+            step = IMA_STEP[index]
+            diff = step >> 3
+            if nibble & 4:
+                diff += step
+            if nibble & 2:
+                diff += step >> 1
+            if nibble & 1:
+                diff += step >> 2
+            predictor += -diff if nibble & 8 else diff
+            predictor = max(-32768, min(32767, predictor))
+            index = max(0, min(88, index + IMA_INDEX[nibble]))
+            out.append(predictor)
+    return out
+
+
+def compressed_samples(data, header, channels):
+    """Return (width, frames, little-endian/unsigned PCM) for a CmpSoundHeader."""
+    packets = unpack(">I", data, header + 22)[0]
+    fmt = take(data, header + 40, 4)
+    compression, _, _, bits = unpack(">hhhH", data, header + 56)
+    start = header + 64
+    if fmt == b"ulaw":
+        raw = take(data, start, packets * channels)
+        return 2, packets, struct.pack(f"<{len(raw)}h", *(ULAW[b] for b in raw))
+    if fmt == b"ima4":
+        size = packets * channels * 34
+        if packets * 64 > MAX_RATE * MAX_SECONDS:
+            raise ValueError("IMA4 sound is too long")
+        raw = take(data, start, size)
+        decoded = [ima4_packet(raw[i:i + 34]) for i in range(0, size, 34)]
+        samples = []
+        for p in range(packets):
+            group = decoded[p * channels:(p + 1) * channels]
+            for i in range(64):
+                samples.extend(ch[i] for ch in group)
+        return 2, packets * 64, struct.pack(f"<{len(samples)}h", *samples)
+    if fmt in (b"twos", b"sowt", b"raw ", b"\0\0\0\0") and compression in (0, -1):
+        if fmt == b"\0\0\0\0" and compression != 0:
+            raise ValueError("unsupported compressed snd format")
+        if bits not in (8, 16):
+            raise ValueError("unsupported compressed sample size")
+        width = bits // 8
+        raw = take(data, start, packets * channels * width)
+        if width == 1:
+            if fmt == b"twos":
+                raw = bytes((b + 128) & 0xFF for b in raw)
+            return 1, packets, raw
+        if fmt != b"sowt":
+            swapped = bytearray(raw)
+            swapped[::2], swapped[1::2] = raw[1::2], raw[::2]
+            raw = bytes(swapped)
+        return 2, packets, raw
+    raise ValueError("unsupported compressed snd format (MACE or other codec)")
+
+
 def decode_sound(data):
+    if not data:
+        raise EmptySound()
     version = unpack(">H", data)[0]
     if version == 1:
         count = unpack(">H", data, 2)[0]
-        if count != 1 or unpack(">H", data, 4)[0] != 5:
+        if count > 1 or (count == 1 and unpack(">H", data, 4)[0] != 5):
             raise ValueError("unsupported sound synthesizer")
-        offset = 10
+        offset = 4 + 6 * count
     elif version == 2:
         take(data, 0, 4)
         offset = 4
     else:
         raise ValueError("unsupported snd format")
     count = unpack(">H", data, offset)[0]
-    if count != 1:
-        raise ValueError("sound command sequences are unsupported")
-    command, _, header = unpack(">HHI", data, offset + 2)
+    for i in range(count):
+        command, _, header = unpack(">HHI", data, offset + 2 + 8 * i)
+        if command != 0:
+            break
+    else:
+        raise ValueError("sound has no sample command")
     if command not in (0x8050, 0x8051):
         raise ValueError("unsupported sound command or external sample pointer")
     if header < offset + 10:
@@ -195,26 +313,31 @@ def decode_sound(data):
     rate = (fixed_rate + 32768) >> 16
     encoding = take(data, header + 20, 1)[0]
     if encoding == 0:
-        channels, width, frames, start = 1, 1, length, header + 22
+        channels, width, frames = 1, 1, length
+        samples = take(data, header + 22, frames)
     elif encoding == 255:
         channels = length
         frames = unpack(">I", data, header + 22)[0]
         bits = unpack(">H", data, header + 48)[0]
         if bits not in (8, 16):
             raise ValueError("unsupported extended PCM sample size")
-        width, start = bits // 8, header + 64
+        width = bits // 8
+        if frames * channels * width > MAX_WAV:
+            raise ValueError("PCM output exceeds the size limit")
+        samples = take(data, header + 64, frames * channels * width)
+        if width == 2:
+            swapped = bytearray(samples)
+            swapped[::2], swapped[1::2] = samples[1::2], samples[::2]
+            samples = bytes(swapped)
     elif encoding == 254:
-        raise ValueError("compressed snd samples are unsupported")
+        channels = length
+        if channels not in (1, 2):
+            raise ValueError("only mono/stereo compressed sound is supported")
+        width, frames, samples = compressed_samples(data, header, channels)
     else:
         raise ValueError("unsupported sound header encoding")
-    size = frames * channels * width
-    if size > MAX_WAV:
-        raise ValueError("PCM output exceeds 2 MiB")
-    samples = take(data, start, size)
-    if width == 2:
-        swapped = bytearray(samples)
-        swapped[::2], swapped[1::2] = samples[1::2], samples[::2]
-        samples = bytes(swapped)
+    if len(samples) > MAX_WAV:
+        raise ValueError("PCM output exceeds the size limit")
     return pcm_wav(channels, width, rate, frames, samples)
 
 
@@ -393,14 +516,16 @@ def scan(source, cache):
                 for event, number in mapping.items():
                     try:
                         events[event] = decode_sound(records[b"snd ", number])
-                    except ValueError as error:
+                    except EmptySound:
+                        pass
+                    except (ValueError, struct.error) as error:
                         result["errors"].append(f"{identity}/{event}: {error}")
                 name = leaf
                 if not events:
-                    raise ValueError("no supported discrete PCM sound events")
+                    raise ValueError("no supported sound events")
             size = sum(map(len, events.values()))
             if len(result["themes"]) >= MAX_THEMES or total + size > MAX_OUTPUT:
-                result["errors"].append("catalog exceeds 64 themes or 64 MiB PCM output")
+                result["errors"].append(f"catalog exceeds {MAX_THEMES} themes or {MAX_OUTPUT >> 20} MiB PCM output")
                 break
             cached = {event: cache_wav(root, data) for event, data in events.items()}
             total += size

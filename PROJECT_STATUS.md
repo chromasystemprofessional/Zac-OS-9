@@ -24,6 +24,15 @@ Updated: 2026-10-06
 
 ## Current work
 
+**Classic sound set import** (uncommitted): `wmov` drag and release sounds
+now come from the `snd#` slots classic sets actually use (slot 1 and slot 3),
+and are not rejected when they share IDs with other drag codes. That is why
+window dragging was silent. μ-law, IMA4, `twos` and uncompressed CmpSoundHeader
+samples decode; leading null commands and low (1 kHz+) rates are accepted;
+empty resources are silent instead of errors. Limits are raised to 256 sets,
+30 s and 8 MiB per sample. All 75 local sets import with no errors (49 with a
+drag sound, 18 with a release sound). Only MACE is still unsupported.
+
 **GTK 3 global menus** (0.1.15): Added GTK's version-one Wayland menu
 metadata protocol and per-focused-surface menu paths over platinum-shell v4,
 preserving earlier clients and distinguishing windows of the same process.
