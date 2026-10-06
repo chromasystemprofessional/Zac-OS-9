@@ -49,7 +49,7 @@ Version: $version
 Architecture: $arch
 Maintainer: adamjlawson-ctrl <adamjlawson@gmail.com>
 Installed-Size: $(du -ks "$pkg/usr" | cut -f1)
-Depends: $deps
+Depends: $deps, libcap2-bin
 Enhances: zacos9
 Section: otherosfs
 Priority: optional
@@ -62,6 +62,19 @@ Description: classic Macintosh emulators for ZacOS 9
  No Macintosh ROMs or system software are included: you supply your
  own in ~/Classic.
 EOF
+
+# An Old World ROM needs SheepShaver to map low memory (see zacos9's postinst).
+cat >"$pkg/DEBIAN/postinst" <<'EOF'
+#!/bin/sh
+set -e
+if [ "$1" = configure ] &&
+		! setcap cap_sys_rawio=ep /usr/libexec/zacos9/SheepShaver 2>/dev/null; then
+	echo "zacos9-emulators: could not give SheepShaver the low-memory permission;" \
+		"Classic may not start with an Old World ROM." >&2
+fi
+exit 0
+EOF
+chmod 755 "$pkg/DEBIAN/postinst"
 
 dpkg-deb --root-owner-group --build "$pkg" "$out/${name}_${version}_$arch.deb"
 git -C "$src" archive --prefix="macemu-$commit/" -o "$out/${name}_${version}.source.tar.gz" "$commit"

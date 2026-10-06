@@ -58,6 +58,7 @@ Depends: ${shlibs:Depends},
          slurp,
          wl-clipboard,
          bluez,
+         libcap2-bin,
          lxqt-policykit
 Recommends: balena-etcher,
             xwayland,

@@ -1,0 +1,28 @@
+#!/bin/sh
+# Classic: an Old World ROM needs SheepShaver to map the Mac's low-memory
+# globals at address 0, which Linux refuses without CAP_SYS_RAWIO
+# ("Cannot map Low Memory Globals: Operation not permitted"). Grant that
+# one capability to the packaged emulator alone, rather than lowering
+# vm.mmap_min_addr for the whole system. Re-run by the file trigger when
+# zacos9-emulators replaces the binary.
+set -e
+
+sheepshaver=/usr/libexec/zacos9/SheepShaver
+
+grant_rawio() {
+	[ -f "$sheepshaver" ] || return 0
+	if ! setcap cap_sys_rawio=ep "$sheepshaver" 2>/dev/null; then
+		echo "zacos9: could not give SheepShaver the low-memory permission;" \
+			"Classic may not start with an Old World ROM." >&2
+	fi
+}
+
+case "$1" in
+	configure|triggered)
+		grant_rawio
+		;;
+esac
+
+#DEBHELPER#
+
+exit 0

@@ -67,6 +67,12 @@ App content now starts below the classic title bar at the existing frame margins
 including movable-modal dialogs and transitions out of fullscreen.
 The compositor builds; content-inset and fullscreen-protocol regression tests
 pass. Live verification in the installed session is still pending.
+Default window size: new main windows from other programs (xdg-shell and
+XWayland) open nearly full-screen, inset 96 px from each side and 32 px from
+the menu bar and screen bottom so desktop icons stay visible. Finder windows,
+dialogs, fixed-size windows and fullscreen requests are unchanged. The
+`default-window-size` test covers this, and the full Meson suite passes;
+live-session verification is pending.
 Installed-session drag/dialog interaction
 still needs interactive verification after updating the Finder. Sniffer
 builds successfully; all three focused selection, Desktop and VFS suites
@@ -83,6 +89,11 @@ the Mac OS desktop or installer appears. This is a local capability change,
 not an automatic package permission grant; replacement of the binary during
 an emulator upgrade may remove it. The permission's risks and removal are
 documented in `emulation/README.md`.
+Packaged (next release): `zacos9`'s postinst grants the same capability to
+`/usr/libexec/zacos9/SheepShaver` on install and upgrade (Software Update
+carries it). A dpkg file trigger reapplies it when `zacos9-emulators`
+replaces the binary, and the emulator package's own postinst grants it too.
+Both packages depend on `libcap2-bin`. A setcap failure only warns.
 
 **Real Desktop and save locations** (0.1.15): Finder continues to show
 the real XDG Desktop directory while retaining startup/mounted disks and

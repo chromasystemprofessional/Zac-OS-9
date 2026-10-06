@@ -61,19 +61,21 @@ used. Add `--68k` for Basilisk II.
 
 - **Linux low-memory protection:** an Old World ROM can fail before the
   window appears with `Cannot map Low Memory Globals: Operation not permitted`.
-  On a trusted, administrator-installed emulator, an administrator can allow
-  only SheepShaver to make this mapping:
+  The `zacos9` and `zacos9-emulators` packages therefore give only the
+  packaged SheepShaver this permission when they're installed or upgraded.
+  A dpkg file trigger in `zacos9` grants it again whenever an emulator
+  upgrade replaces the binary. To apply or check it by hand:
 
   ```sh
   sudo setcap cap_sys_rawio=ep /usr/libexec/zacos9/SheepShaver
-  getcap /usr/libexec/zacos9/SheepShaver
+  /usr/sbin/getcap /usr/libexec/zacos9/SheepShaver
   ```
 
   This is a sensitive capability: use only trusted emulator binaries, ROMs
   and disk images. Do not run the whole emulator as root or globally disable
-  `vm.mmap_min_addr`. The permission persists across restarts but may need to
-  be reapplied when an emulator package upgrade replaces the binary. Remove
-  it with `sudo setcap -r /usr/libexec/zacos9/SheepShaver` if no longer needed.
+  `vm.mmap_min_addr`. To withdraw it, run
+  `sudo setcap -r /usr/libexec/zacos9/SheepShaver`; the next upgrade of
+  either package grants it again.
   Some emulator startup errors return exit status zero; `--check` verifies
   file discovery, not successful emulation.
 - SDL's Wayland backend never shows a window under zacos9-wm, so the
