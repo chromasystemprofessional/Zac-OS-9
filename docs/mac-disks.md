@@ -28,6 +28,12 @@ The reader is invoked once per volume with a numeric, one-based index: its
 advertised `-f all` option is not implemented by the Debian reader. Failed
 container mounts roll back the volumes already mounted; eject unmounts every
 child before releasing the image's loop device.
+Mount detection uses the kernel mount table, since some APFS FUSE roots
+cannot be stat'ed even when mounted. Rollback also checks the volume whose
+reader failed, so a mount created before an error is not left behind. If
+cleanup cannot unmount a busy volume, its original error is retained and a
+recovery disk icon allows another eject attempt. Eject can also recover
+unrecorded child mounts left by earlier versions.
 Reopening an already mounted image reuses its mounts.
 
 Converted images live temporarily in `$XDG_CACHE_HOME/zacos9/mac-images`

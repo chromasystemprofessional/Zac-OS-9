@@ -18,6 +18,38 @@ DEVICE = re.compile(r"/dev/(?:sd[a-z]+[0-9]*|nvme[0-9]+n[0-9]+(?:p[0-9]+)?|"
 FILESYSTEMS = {"hfs", "hfsplus", "apfs"}
 
 
+def mounted_paths():
+    paths = set()
+    for line in Path("/proc/self/mountinfo").read_text().splitlines():
+        fields = line.split()
+        if len(fields) < 10 or "-" not in fields:
+            raise ValueError("Cannot determine mounted filesystems")
+        paths.add(re.sub(r"\\([0-7]{3})", lambda match: chr(int(match.group(1), 8)), fields[4]))
+    return paths
+
+
+def container_mounts(target):
+    paths = []
+    for value in mounted_paths():
+        path = Path(value)
+        if path == target:
+            paths.append(value)
+        elif path.is_relative_to(target):
+            if path.parent != target or not re.fullmatch(r"[1-9][0-9]*", path.name):
+                raise ValueError("Unexpected nested mount in Mac container: " + value)
+            paths.append(value)
+    return sorted(paths)
+
+
+def recovery_record(record, target, device, active):
+    try:
+        record.write_text(json.dumps({"path": str(target), "device": device,
+                                     "paths": active, "recovery": True}))
+        record.chmod(0o644)
+    except OSError as error:
+        raise ValueError(f"Leftover Mac mounts at {target}; could not record them for eject: {error}") from error
+
+
 def apfs_volume_count(source):
     library = ctypes.CDLL("libfsapfs.so.1")
     pointer = ctypes.c_void_p
@@ -66,7 +98,6 @@ def apfs_volume_count(source):
 
 def mount_apfs(source, target, fd):
     count = apfs_volume_count(source)
-    mounted = []
     directories = []
     try:
         for index in range(1, count + 1):
@@ -75,18 +106,26 @@ def mount_apfs(source, target, fd):
             directories.append(volume)
             run(["/usr/bin/fsapfsmount", "-f", str(index), "-X",
                  "ro,nodev,nosuid,noexec,allow_other", source, str(volume)], (fd,))
-            if not os.path.ismount(volume):
+            if str(volume) not in mounted_paths():
                 raise ValueError(f"APFS volume {index}: the reader exited without mounting")
-            mounted.append(volume)
-        return [str(volume) for volume in mounted]
+        return [str(volume) for volume in directories]
     except (OSError, ValueError, subprocess.TimeoutExpired) as error:
-        for volume in reversed(mounted):
-            try:
-                run(["/usr/bin/umount", "--", str(volume)])
-            except (OSError, ValueError, subprocess.TimeoutExpired) as failure:
-                raise ValueError(f"{error}; APFS rollback failed: {failure}") from error
+        failures = []
+        # A reader can create its FUSE mount and then fail. Inspect every
+        # attempted path, not just the commands that returned successfully.
         for volume in reversed(directories):
-            volume.rmdir()
+            try:
+                if str(volume) in mounted_paths():
+                    run(["/usr/bin/umount", "--", str(volume)])
+            except (OSError, ValueError, subprocess.TimeoutExpired) as failure:
+                failures.append(str(failure))
+        if failures:
+            raise ValueError(f"{error}; APFS rollback failed: {'; '.join(failures)}") from error
+        for volume in reversed(directories):
+            try:
+                volume.rmdir()
+            except OSError as failure:
+                raise ValueError(f"{error}; APFS directory cleanup failed: {failure}") from error
         raise
 
 
@@ -142,22 +181,27 @@ def mount_device(operation, device, uid):
             paths = existing.get("paths", [str(target)]) if existing else [str(target)]
             if any(Path(path) != target and Path(path).parent != target for path in paths):
                 raise ValueError("Invalid Mac mount record")
+            active = container_mounts(target)
             if operation == "unmount":
-                active = [path for path in paths if os.path.ismount(path)]
                 if not active:
                     raise ValueError("This Mac volume is not mounted")
                 for path in reversed(active):
                     run(["/usr/bin/umount", "--", path])
-                for path in paths:
-                    if Path(path) != target:
-                        Path(path).rmdir()
+                if container_mounts(target):
+                    raise ValueError("The Mac container is still mounted after eject")
+                for child in target.iterdir():
+                    if child.is_symlink() or not re.fullmatch(r"[1-9][0-9]*", child.name):
+                        raise ValueError("Unexpected entry in Mac container: " + str(child))
+                    root_directory(child)
+                    child.rmdir()
                 target.rmdir()
-                record.unlink()
+                record.unlink(missing_ok=True)
                 return {"path": str(target), "device": device}
-            if existing and all(os.path.ismount(path) for path in paths):
+            if existing and not existing.get("recovery") and paths and set(paths) == set(active):
                 return existing
-            if existing and any(os.path.ismount(path) for path in paths):
-                raise ValueError("This APFS container is partly mounted; eject it before mounting again")
+            if active:
+                recovery_record(record, target, device, active)
+                raise ValueError("This Mac container has leftover mounts; eject it before mounting again")
             root_directory(target)
             source = f"/proc/self/fd/{fd}"
             filesystem = run(["/usr/sbin/blkid", "-p", "-s", "TYPE", "-o", "value",
@@ -165,11 +209,21 @@ def mount_device(operation, device, uid):
             if filesystem not in FILESYSTEMS:
                 raise ValueError("Not an HFS, HFS+ or APFS volume")
             if filesystem == "apfs":
-                paths = mount_apfs(source, target, fd)
+                try:
+                    paths = mount_apfs(source, target, fd)
+                except (OSError, ValueError, subprocess.TimeoutExpired) as error:
+                    active = container_mounts(target)
+                    if active:
+                        try:
+                            recovery_record(record, target, device, active)
+                        except ValueError as failure:
+                            raise ValueError(f"{error}; {failure}") from error
+                    raise
             else:
+                paths = [str(target)]
                 run(["/usr/bin/mount", "-t", filesystem, "-o", "ro,nodev,nosuid,noexec",
                      source, str(target)], (fd,))
-            if not all(os.path.ismount(path) for path in paths):
+            if not set(paths) <= mounted_paths():
                 raise ValueError("The mount tool exited without mounting the volume")
             result = {"device": device, "path": str(target), "paths": paths}
             try:

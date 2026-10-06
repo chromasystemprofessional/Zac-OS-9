@@ -194,14 +194,14 @@ class ImageTests(unittest.TestCase):
                 patch.object(images, "managed_objects", return_value=records), \
                 patch.object(images, "run", return_value=json.dumps(result)) as run, \
                 patch.object(images, "block_call") as call, \
-                patch.object(images.os.path, "ismount", return_value=False) as ismount:
+                patch.object(images, "mounted_paths", return_value=set()) as mounts:
             info = images.mount(image)
             self.assertEqual(info["paths"], result["paths"])
             run.assert_called_once_with(["pkexec", images.HELPER, "mount", "/dev/loop0p1"])
-            ismount.return_value = True
+            mounts.return_value = set(result["paths"])
             images.release_image("/dev/loop0p1")
             call.assert_not_called()
-            ismount.return_value = False
+            mounts.return_value = set()
             images.release_image("/dev/loop0p1")
             call.assert_called_once_with("Delete", loop, "Loop", "(a{sv})", ({},))
             self.assertEqual(list((self.root / "cache/zacos9/mac-images").iterdir()), [])
@@ -231,6 +231,20 @@ class ImageTests(unittest.TestCase):
 
 
 class PrivilegedTests(unittest.TestCase):
+    def test_mount_table_detects_mounts_even_when_stat_cannot(self):
+        table = (
+            "50 1 0:50 / /run/media/zacos9-mac/1001/8-18/4 ro - fuse /dev/fuse ro\n"
+            "51 1 0:51 / /media/A\\040Disk ro - hfs /dev/sdz ro\n")
+        for module in (helper, images):
+            with self.subTest(module=module.__name__), \
+                    patch.object(Path, "read_text", return_value=table), \
+                    patch.object(os.path, "ismount", return_value=False):
+                self.assertEqual(module.mounted_paths(),
+                                 {"/run/media/zacos9-mac/1001/8-18/4", "/media/A Disk"})
+        with patch.object(Path, "read_text", return_value=table):
+            self.assertEqual(helper.container_mounts(Path("/run/media/zacos9-mac/1001/8-18")),
+                             ["/run/media/zacos9-mac/1001/8-18/4"])
+
     def test_reject_paths_before_opening(self):
         for device in ("/etc/passwd", "/dev/../etc/passwd", "/dev/mapper/root", "/dev/sdb;id"):
             with self.subTest(device=device), patch.object(helper.os, "open") as opened:
@@ -290,7 +304,9 @@ class PrivilegedTests(unittest.TestCase):
                         patch.object(helper, "root_directory"), \
                         patch.object(helper, "mount_apfs",
                                      return_value=[str(Path(directory) / "8-17")]) as apfs, \
-                        patch.object(helper.os.path, "ismount", return_value=True), \
+                        patch.object(helper, "container_mounts", return_value=[]), \
+                        patch.object(helper, "mounted_paths",
+                                     return_value={str(Path(directory) / "8-17")}), \
                         patch.object(helper, "run", side_effect=run):
                     if kind == "ext4":
                         with self.assertRaisesRegex(ValueError, "Not an HFS"):
@@ -320,7 +336,8 @@ class PrivilegedTests(unittest.TestCase):
             with patch.object(helper, "apfs_volume_count", return_value=3), \
                     patch.object(helper, "root_directory"), \
                     patch.object(helper, "run") as run, \
-                    patch.object(helper.os.path, "ismount", return_value=True):
+                    patch.object(helper, "mounted_paths",
+                                 return_value={str(target / str(i)) for i in (1, 2, 3)}):
                 self.assertEqual(helper.mount_apfs("/proc/self/fd/3", target, 3),
                                  [str(target / str(i)) for i in (1, 2, 3)])
                 self.assertEqual([call.args[0][1:3] for call in run.call_args_list],
@@ -336,12 +353,40 @@ class PrivilegedTests(unittest.TestCase):
                     patch.object(helper, "root_directory", side_effect=lambda path: path.mkdir()), \
                     patch.object(helper, "run", side_effect=[
                         "", ValueError("volume 2 unreadable"), ""]) as run, \
-                    patch.object(helper.os.path, "ismount", return_value=True):
+                    patch.object(helper, "mounted_paths", return_value={str(target / "1")}):
                 with self.assertRaisesRegex(ValueError, "volume 2 unreadable"):
                     helper.mount_apfs("/proc/self/fd/3", target, 3)
                 self.assertEqual(run.call_args_list[-1].args[0],
                                  ["/usr/bin/umount", "--", str(target / "1")])
                 self.assertEqual(list(target.iterdir()), [])
+
+    def test_apfs_reader_failure_after_mount_rolls_back_current_volume(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory)
+            with patch.object(helper, "apfs_volume_count", return_value=2), \
+                    patch.object(helper, "root_directory", side_effect=lambda path: path.mkdir()), \
+                    patch.object(helper, "run", side_effect=[
+                        "", ValueError("reader failed after mounting"), "", ""]) as run, \
+                    patch.object(helper, "mounted_paths",
+                                 return_value={str(target / "1"), str(target / "2")}):
+                with self.assertRaisesRegex(ValueError, "^reader failed after mounting$"):
+                    helper.mount_apfs("/proc/self/fd/3", target, 3)
+                self.assertEqual([call.args[0] for call in run.call_args_list[-2:]],
+                                 [["/usr/bin/umount", "--", str(target / str(i))]
+                                  for i in (2, 1)])
+                self.assertEqual(list(target.iterdir()), [])
+
+    def test_apfs_rollback_failure_preserves_original_error_and_mount_directory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory)
+            with patch.object(helper, "apfs_volume_count", return_value=1), \
+                    patch.object(helper, "root_directory", side_effect=lambda path: path.mkdir()), \
+                    patch.object(helper, "run", side_effect=[
+                        ValueError("reader error"), ValueError("busy unmount")]), \
+                    patch.object(helper, "mounted_paths", return_value={str(target / "1")}):
+                with self.assertRaisesRegex(ValueError, "reader error; APFS rollback failed: busy unmount"):
+                    helper.mount_apfs("/proc/self/fd/3", target, 3)
+                self.assertTrue((target / "1").is_dir())
 
     def test_apfs_container_reader_reports_invalid_source(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -355,16 +400,16 @@ class PrivilegedTests(unittest.TestCase):
                 helper.apfs_volume_count(str(source))
 
     def test_apfs_eject_unmounts_container_children(self):
+        self.check_apfs_eject(recorded=True)
+
+    def test_apfs_eject_recovers_mounts_without_record(self):
+        self.check_apfs_eject(recorded=False)
+
+    def test_orphan_mount_is_recorded_for_eject_not_reused_as_success(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             target = root / "8-17"
-            target.mkdir()
-            paths = [str(target / str(i)) for i in (1, 2)]
-            for path in paths:
-                Path(path).mkdir()
-            record = root / "8-17.json"
-            record.write_text(json.dumps({"path": str(target), "device": "/dev/sdb1",
-                                          "paths": paths}))
+            active = [str(target / "4")]
 
             @contextlib.contextmanager
             def mount_root(uid):
@@ -375,7 +420,39 @@ class PrivilegedTests(unittest.TestCase):
                         st_mode=stat.S_IFBLK, st_rdev=os.makedev(8, 17))), \
                     patch.object(helper.os, "close"), \
                     patch.object(helper, "mount_root", mount_root), \
-                    patch.object(helper.os.path, "ismount", return_value=True), \
+                    patch.object(helper, "container_mounts", return_value=active):
+                for attempt in range(2):
+                    with self.subTest(attempt=attempt), \
+                            self.assertRaisesRegex(ValueError, "leftover mounts"):
+                        helper.mount_device("mount", "/dev/sdb1", 1001)
+                record = json.loads((root / "8-17.json").read_text())
+                self.assertEqual(record["paths"], active)
+                self.assertTrue(record["recovery"])
+
+    def check_apfs_eject(self, recorded):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            target = root / "8-17"
+            target.mkdir()
+            paths = [str(target / str(i)) for i in (1, 2)]
+            for path in paths:
+                Path(path).mkdir()
+            record = root / "8-17.json"
+            if recorded:
+                record.write_text(json.dumps({"path": str(target), "device": "/dev/sdb1",
+                                              "paths": paths}))
+
+            @contextlib.contextmanager
+            def mount_root(uid):
+                yield root
+
+            with patch.object(helper.os, "open", return_value=3), \
+                    patch.object(helper.os, "fstat", return_value=SimpleNamespace(
+                        st_mode=stat.S_IFBLK, st_rdev=os.makedev(8, 17))), \
+                    patch.object(helper.os, "close"), \
+                    patch.object(helper, "mount_root", mount_root), \
+                    patch.object(helper, "container_mounts", side_effect=[paths, []]), \
+                    patch.object(helper, "root_directory"), \
                     patch.object(helper, "run") as run:
                 helper.mount_device("unmount", "/dev/sdb1", 1001)
                 self.assertEqual([call.args[0] for call in run.call_args_list],

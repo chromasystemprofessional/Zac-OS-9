@@ -20,6 +20,16 @@ MAC_TYPES = {"hfs", "hfsplus", "apfs"}
 MAX_IMAGE = 2 * 1024**4
 
 
+def mounted_paths():
+    paths = set()
+    for line in Path("/proc/self/mountinfo").read_text().splitlines():
+        fields = line.split()
+        if len(fields) < 10 or "-" not in fields:
+            raise ValueError("Cannot determine mounted filesystems")
+        paths.add(re.sub(r"\\([0-7]{3})", lambda match: chr(int(match.group(1), 8)), fields[4]))
+    return paths
+
+
 def run(args):
     result = subprocess.run(args, capture_output=True, text=True, timeout=600, check=False)
     if result.returncode:
@@ -234,7 +244,7 @@ def release_image(device):
         info = json.loads(record.read_text())
         if device not in info["devices"]:
             continue
-        if any(os.path.ismount(path) for path in info["paths"]):
+        if set(info["paths"]) & mounted_paths():
             return
         block_call("Delete", info["loop"], "Loop", "(a{sv})", ({},))
         shutil.rmtree(record.parent)
@@ -252,8 +262,8 @@ def mount(source):
     cache.mkdir(parents=True, exist_ok=True, mode=0o700)
     for record in cache.glob("mount-*/mount.json"):
         info = json.loads(record.read_text())
-        if info.get("source") == str(source.resolve()) and all(
-                os.path.ismount(path) for path in info["paths"]):
+        if (info.get("source") == str(source.resolve()) and info["paths"]
+                and set(info["paths"]) <= mounted_paths()):
             return info
     directory = Path(tempfile.mkdtemp(prefix="mount-", dir=cache))
     loop = None

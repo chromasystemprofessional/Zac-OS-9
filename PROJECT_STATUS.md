@@ -24,6 +24,18 @@ Updated: 2026-10-06
 
 ## Current work
 
+**APFS busy-directory correction** (0.1.22): the reported volume 4 is
+present in the kernel mount table but `os.path.ismount()` returns false.
+The 0.1.21 helper treated it as unmounted and tried removing its directory,
+masking the mount failure with EBUSY. Mount detection and image-cache checks
+now use `/proc/self/mountinfo`. Rollback checks every attempted volume,
+including the failed reader's mount, and preserves the original error if
+cleanup fails. Eject discovers orphan child mounts even without a record;
+leftover mounts receive recovery records so Sniffer can offer eject.
+Verified the detection fix against the actual stranded volume 4 without
+modifying it. All four focused suites pass, including 27 Mac-disk tests;
+mounting and browsing the affected volume still need verification after install.
+
 **APFS boot mount correction** (0.1.21): the 0.1.20 helper passed `-f all`
 to fsapfsmount, whose numeric-only parser rejects it despite advertising the
 option. Multi-volume APFS containers then failed with an invalid volume index.
