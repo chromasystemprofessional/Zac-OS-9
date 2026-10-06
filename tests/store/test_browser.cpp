@@ -95,7 +95,10 @@ if command == "remote-list":
         mode = os.getenv("TEST_REMOTE_MODE", "")
         url = "https://wrong.example/repo/" if mode == "untrusted" else "https://dl.flathub.org/repo/"
         options = "disabled" if mode == "disabled" else ""
-        print(f"flathub\t{url}\t{options}")
+        if mode == "omitted-options":
+            print(f"flathub\t{url}")
+        else:
+            print(f"flathub\t{url}\t{options}")
 elif command == "remote-add":
     enabled.touch()
 elif command == "remote-modify":
@@ -164,6 +167,8 @@ else:
 	window.configureSource();
 	assert(window.m_flathubEnabled && QFile::exists(root.path() + "/enabled"));
 	bool remoteOk;
+	qputenv("TEST_REMOTE_MODE", "omitted-options");
+	assert(flathubEnabled(&remoteOk, &error) && remoteOk);
 	qputenv("TEST_REMOTE_MODE", "disabled");
 	assert(!flathubEnabled(&remoteOk, &error) && remoteOk);
 	qputenv("TEST_REMOTE_MODE", "untrusted");

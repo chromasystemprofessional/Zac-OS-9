@@ -205,13 +205,13 @@ bool flathubEnabled(bool *ok, QString *err) {
 	for (const QString &line : output.split('\n', Qt::SkipEmptyParts)) {
 		const QStringList fields = line.split('\t');
 		if (fields.first() == "flathub") {
-			if (fields.size() != 3 || (fields[1] != "https://dl.flathub.org/repo/" &&
+			if ((fields.size() != 2 && fields.size() != 3) || (fields[1] != "https://dl.flathub.org/repo/" &&
 					fields[1] != "https://dl.flathub.org/repo")) {
 				*ok = false;
 				*err = "The existing flathub remote is not the official Flathub source.";
 				return false;
 			}
-			return !fields[2].split(',').contains("disabled");
+			return !fields.value(2).split(',').contains("disabled");
 		}
 	}
 	return false;

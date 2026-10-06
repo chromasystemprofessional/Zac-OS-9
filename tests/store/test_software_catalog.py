@@ -182,6 +182,16 @@ class CatalogTests(unittest.TestCase):
                           side_effect=self.flatpak_results(result)):
             self.assertEqual(catalog.flathub_catalog(), [])
 
+    def test_flathub_description_column_may_be_omitted(self):
+        result = SimpleNamespace(returncode=0, stderr="",
+                                 stdout="org.example.Editor\tEditor\n")
+        with patch.object(catalog.subprocess, "run",
+                          side_effect=self.flatpak_results(result)):
+            items = catalog.flathub_catalog()
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["name"], "Editor")
+        self.assertEqual(items[0]["blurb"], "")
+
     def test_flathub_malformed_rows_fail_without_partial_json(self):
         result = SimpleNamespace(
             returncode=0, stderr="", stdout="org.example.Good\tGood\tWorks\nbad row\n",
@@ -211,7 +221,10 @@ class CatalogTests(unittest.TestCase):
             ("flathub\thttps://dl.flathub.org/repo//\t\n", "does not use"),
             ("flathub\thttps://dl.flathub.org/repo/\tdisabled\n", "disabled"),
             ("flathub\thttps://dl.flathub.org/repo/\tno-gpg-verify,disabled\n", "disabled"),
-            ("flathub\tbad row\n", "invalid remote row"),
+            ("flathub\tbad row\n", "does not use"),
+            ("flathub\n", "invalid remote row"),
+            ("flathub\thttps://evil.example/repo/\n", "does not use"),
+            ("flathub\thttps://dl.flathub.org/repo/\t\tunexpected\n", "invalid remote row"),
             ("flathub\thttps://dl.flathub.org/repo/\t\n" * 2, "must exist"),
         ]:
             with self.subTest(output=output):
@@ -233,6 +246,16 @@ class CatalogTests(unittest.TestCase):
         ]
         with patch.object(catalog.subprocess, "run", side_effect=results):
             self.assertEqual(catalog.flathub_catalog(), [])
+
+    def test_flathub_empty_options_column_may_be_omitted(self):
+        for url in ("https://dl.flathub.org/repo/", "https://dl.flathub.org/repo"):
+            with self.subTest(url=url):
+                results = [
+                    SimpleNamespace(returncode=0, stderr="", stdout=f"flathub\t{url}\n"),
+                    SimpleNamespace(returncode=0, stderr="", stdout=""),
+                ]
+                with patch.object(catalog.subprocess, "run", side_effect=results):
+                    self.assertEqual(catalog.flathub_catalog(), [])
 
     def test_flathub_listing_failures_after_validation(self):
         for result in (

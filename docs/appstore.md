@@ -28,6 +28,9 @@ large runtimes. Disabling keeps installed apps and their data but disables
 that remote's browsing and updates. No remote is added by default, and arbitrary
 third-party APT sources are not supported. Existing remotes named `flathub`
 with a different URL are rejected rather than silently replaced.
+Remote validation accepts Flatpak's omitted empty options column as well as
+an explicit empty column; neither form changes the official URL requirement.
+Catalog rows may likewise omit an empty trailing application description.
 Software Update still manages ZacOS releases and Debian updates; Flatpak
 updates can be applied separately with `flatpak --user update`.
 

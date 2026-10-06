@@ -24,6 +24,18 @@ Updated: 2026-10-06
 
 ## Current work
 
+**Flathub remote validation correction** (0.1.24): Flatpak 1.16 omits
+the trailing options column when empty. The Store incorrectly treated the
+official two-column remote row as an unofficial source, and the catalog
+helper rejected it as malformed. Both parsers now accept an omitted empty
+options column while retaining exact official URL checks and disabled-remote
+handling. Regression tests cover both output forms and reject malformed
+rows and unofficial URLs.
+Real Flathub catalog rows also omit empty descriptions; those now load with
+an empty blurb rather than aborting the entire catalog.
+Software builds and all three focused Store/catalog suites pass. The actual
+configured official user remote loads 3,371 application entries successfully.
+
 **Relevant APFS volumes and real disk names** (0.1.23): enumerate stored
 APFS names through libfsapfs, exclude standard helper names (Preboot, Recovery,
 VM, Update, xART, iSCPreboot, Hardware and Diagnostics), and mount remaining
