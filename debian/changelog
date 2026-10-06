@@ -1,3 +1,13 @@
+zacos9 (0.1.24) trixie; urgency=medium
+
+  * Fix Flathub being incorrectly rejected as an unofficial source when
+    Flatpak omits the empty remote-options column. Flathub browsing also
+    accepts application entries with omitted empty descriptions, allowing
+    the complete catalog to load. Official URL checks and disabled-remote
+    handling remain in place; no existing remote is replaced.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Tue, 06 Oct 2026 16:24:50 -0400
+
 zacos9 (0.1.23) trixie; urgency=medium
 
   * APFS mounting now skips standard helper volumes such as Preboot,
