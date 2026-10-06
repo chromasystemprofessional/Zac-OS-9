@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-"""List USB disks, or initialize/erase DEVICE EXPECTED_ID as MBR/FAT32.
+"""List USB disks, or initialize/erase DEVICE EXPECTED_ID [LABEL] as MBR/FAT32.
 
 list eligibility remains restricted to unmounted disks. list-erasable uses the
 same JSON schema but permits ordinary mounts strictly below /media/ and /run/media/.
@@ -29,6 +29,7 @@ SFDISK = "/usr/sbin/sfdisk"
 MKFS = "/usr/sbin/mkfs.fat"
 UMOUNT = "/usr/bin/umount"
 BLKGETDISKSEQ = 0x80081280
+BLKRRPART = 0x125F
 MIN_SIZE = 64 * 1024 * 1024
 MAX_SIZE = 2 * 1024**4
 DEVICE = re.compile(r"/dev/(?:sd[a-z]+|nvme[0-9]+n[0-9]+|mmcblk[0-9]+)\Z")
@@ -385,7 +386,17 @@ def fresh(device, expected, allow_user_mounts=False):
                       f"List disks again: {error}") from error
 
 
-def initialize(device, expected):
+def validate_label(label):
+    if (not re.fullmatch(r"[A-Za-z0-9 _-]{1,11}", label)
+            or label != label.strip() or label.upper() == "NO NAME"):
+        raise Failure("Disk name must be 1-11 ASCII letters, numbers, spaces, "
+                      "hyphens or underscores, with no surrounding spaces; "
+                      "NO NAME is reserved")
+    return label
+
+
+def initialize(device, expected, label="Untitled"):
+    validate_label(label)
     if os.geteuid() != 0:
         raise Failure("Initialization requires administrator authentication via pkexec")
     if not re.fullmatch(r"[0-9a-f]{64}", expected):
@@ -395,7 +406,7 @@ def initialize(device, expected):
     # Hold the disk's advisory lock across both commands, not just sfdisk.
     # This cooperates with udev's shared probe lock and other initializers.
     with opened(device, item["maj:min"], locked=True):
-        partition_number = initialize_locked(device, expected)
+        partition_number = initialize_locked(device, expected, label)
     initialized(device, partition_number)
 
 
@@ -443,7 +454,8 @@ def erase_topology(state, item):
     )
 
 
-def erase(device, expected):
+def erase(device, expected, label="Untitled"):
+    validate_label(label)
     if os.geteuid() != 0:
         raise Failure("Erasing requires administrator authentication via pkexec")
     if not re.fullmatch(r"[0-9a-f]{64}", expected):
@@ -488,11 +500,11 @@ def erase(device, expected):
         # device to be unmounted and claims the disk exclusively before writes.
         fresh(device, expected)
         check_pinned(disk_fd, item["maj:min"], sequence)
-        partition_number = initialize_locked(device, expected)
+        partition_number = initialize_locked(device, expected, label)
     initialized(device, partition_number)
 
 
-def initialize_locked(device, expected):
+def initialize_locked(device, expected, label):
     state, item = fresh(device, expected)
     # O_EXCL prevents mounted storage from being claimed during partitioning.
     # Commands use inherited descriptors so device-node replacement cannot
@@ -501,7 +513,9 @@ def initialize_locked(device, expected):
         state, item = fresh(device, expected)
         probe(state, item)
         fresh(device, expected)
-        run([SFDISK, "--lock=no", "--wipe", "always",
+        # Our exclusive claim makes sfdisk's second claim look busy. Keep
+        # ownership and perform the kernel reread ourselves on this descriptor.
+        run([SFDISK, "--lock=no", "--no-reread", "--no-tell-kernel", "--wipe", "always",
              "--wipe-partitions", "always", f"/proc/self/fd/{disk_fd}"],
             input="label: dos\nunit: sectors\n\nstart=2048, type=c\n",
             pass_fds=(disk_fd,))
@@ -515,6 +529,14 @@ def initialize_locked(device, expected):
                 or partitions[0].get("type") not in ("c", "0c")
                 or partitions[0].get("size", 0) < (MIN_SIZE // 512 - 2048)):
             raise Failure("Unexpected partition table; disk was NOT formatted")
+        os.fsync(disk_fd)
+        fresh(device, expected)
+        try:
+            fcntl.ioctl(disk_fd, BLKRRPART)
+        except OSError as error:
+            raise Failure("The partition table was written, but the kernel "
+                          "could not refresh it. The disk was NOT formatted. "
+                          f"Close programs using it and reconnect it: {error}") from error
     # Do not wait for udev while holding its probe lock; devtmpfs and the
     # kernel topology already expose the new partition. Trigger after unlock.
     deadline = time.monotonic() + 10
@@ -544,15 +566,15 @@ def initialize_locked(device, expected):
         fresh(device, expected)
         # mkfs.fat itself opens exclusively, refusing a partition mounted
         # between the final safety check and its open.
-        run([MKFS, "-F", "32", "-n", "Untitled", f"/proc/self/fd/{part_fd}"],
+        run([MKFS, "-F", "32", "-n", label, f"/proc/self/fd/{part_fd}"],
             pass_fds=(part_fd,))
         os.fsync(part_fd)
-        result = run([BLKID, "--probe", "--output", "export",
+        result = run([BLKID, "--probe", "--no-encoding", "--output", "export",
                       f"/proc/self/fd/{part_fd}"], pass_fds=(part_fd,))
         fields = dict(line.split("=", 1) for line in result.stdout.splitlines()
                       if "=" in line)
         if (fields.get("TYPE") != "vfat" or fields.get("VERSION") != "FAT32"
-                or fields.get("LABEL") != "Untitled"):
+                or fields.get("LABEL") != label):
             raise Failure("Could not verify the new FAT32 volume")
     return partition["maj:min"]
 
@@ -564,13 +586,14 @@ def main(args=None):
             print(json.dumps(listing()))
         elif args == ["list-erasable"]:
             print(json.dumps(listing(allow_user_mounts=True)))
-        elif len(args) == 3 and args[0] == "initialize":
-            initialize(args[1], args[2])
-        elif len(args) == 3 and args[0] == "erase":
-            erase(args[1], args[2])
+        elif len(args) in (3, 4) and args[0] == "initialize":
+            initialize(*args[1:])
+        elif len(args) in (3, 4) and args[0] == "erase":
+            erase(*args[1:])
         else:
             raise Failure("Usage: zacos9-disk-helper list | list-erasable | "
-                          "initialize DEVICE EXPECTED_ID | erase DEVICE EXPECTED_ID")
+                          "initialize DEVICE EXPECTED_ID [LABEL] | "
+                          "erase DEVICE EXPECTED_ID [LABEL]")
         return 0
     except (Failure, OSError, ValueError, KeyError, subprocess.SubprocessError) as error:
         print(f"zacos9-disk-helper: {error}", file=sys.stderr)

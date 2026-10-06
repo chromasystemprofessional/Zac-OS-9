@@ -1,6 +1,6 @@
 # Project Status
 
-Updated: 2026-10-05
+Updated: 2026-10-06
 
 ## Completed
 
@@ -23,6 +23,24 @@ Updated: 2026-10-05
 | *(uncommitted)* | Installer fixed end to end: GRUB packages in the image, UEFI/BIOS detection, BIOS boot partition, fallback `EFI/BOOT/BOOTX64.EFI` for Macs, live user in `sudo` (polkit), failing step shown in the window. VM-tested (`build/test-install.py`): whole disk under BIOS and UEFI, and a partition beside a kept FAT partition under UEFI — each installed disk boots to the desktop. Boot splash now shows the logo and a progress bar. |
 
 ## Current work
+
+**USB erase safety-lock fix and disk names** (0.1.14): The helper's own
+exclusive disk claim prevented sfdisk from taking another exclusive claim,
+producing an erroneous "disk is currently in use" failure on unmounted disks.
+sfdisk now leaves the preflight claim and kernel refresh to the helper: the
+helper retains its exclusive descriptor, verifies the written table, fsyncs
+and performs BLKRRPART through that same descriptor. No force option is used;
+refresh failure stops before mkfs and reports that the partition table changed.
+Both Erase Disk and unreadable-disk Initialize request a FAT32 label before
+confirmation, defaulting to Untitled. Cancel causes no unmount or erase. Names
+are validated by both GUI and privileged helper and passed to mkfs as one
+argument. Raw blkid verification preserves spaces instead of comparing escaped
+export labels. Physical disk/privileged-loop verification remains pending.
+Finder and menu bar build, and all five focused suites pass. The helper suite
+has 71 tests, including actual mkfs/blkid round-trips on disposable regular-file
+images (no physical storage), exclusive-descriptor refresh and busy-refresh
+failure tests. Offscreen dialog tests cover editing, invalid names and Cancel;
+controller tests cover label propagation and cancellation in both entry points.
 
 **Special > Erase Disk** (0.1.13): Select one safe mounted USB disk icon
 to enable Erase Disk. A default-Cancel confirmation identifies the physical disk

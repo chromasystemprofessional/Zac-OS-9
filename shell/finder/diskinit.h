@@ -6,10 +6,11 @@
 #include <QStringList>
 #include <QTimer>
 #include <functional>
+#include <optional>
 #include <vector>
 
 struct InitializationDisk {
-	QString device, identity, name;
+	QString device, identity, name, label = "Untitled";
 	quint64 size = 0;
 	QStringList children;
 	bool unreadable = false;
@@ -18,6 +19,8 @@ struct InitializationDisk {
 
 bool parseInitializationDisks(const QByteArray &data,
 	std::vector<InitializationDisk> *disks, QString *error);
+bool validDiskLabel(const QString &label);
+std::optional<QString> diskLabelPrompt(const InitializationDisk &disk);
 
 class DiskInitialization : public QObject {
 public:
@@ -30,6 +33,8 @@ public:
 		std::function<void(const QString &)> initialized;
 		std::function<void()> availabilityChanged = [] {};
 		std::function<void(const QString &, bool)> inhibitMount = [](const QString &, bool) {};
+		std::function<std::optional<QString>(const InitializationDisk &)> label =
+			[](const InitializationDisk &disk) { return std::optional<QString>(disk.label); };
 	};
 	DiskInitialization(Interface interface, QString helper, QString authorizer,
 		QString ejector, QObject *parent = nullptr);
@@ -41,6 +46,7 @@ public:
 private:
 	void scan();
 	void acceptDisks(const std::vector<InitializationDisk> &disks);
+	bool confirmFormat(InitializationDisk &disk);
 	void revalidate(const InitializationDisk &disk, Choice choice);
 	void operate(const InitializationDisk &disk, Choice choice);
 	void report(const QString &message);

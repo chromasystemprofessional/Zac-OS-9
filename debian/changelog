@@ -1,3 +1,14 @@
+zacos9 (0.1.14) trixie; urgency=medium
+
+  * Fix USB erasing reporting the disk in use because of the helper's
+    own exclusive claim. Refresh kernel partitions through the owned
+    descriptor and abort before formatting on refresh failure.
+  * Ask for a validated FAT32 disk name before erase or initialization
+    confirmation. Preserve spaces during label verification and add
+    disposable-image and offscreen naming regression tests.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Tue, 06 Oct 2026 00:32:31 -0400
+
 zacos9 (0.1.13) trixie; urgency=medium
 
   * Add Special > Erase Disk for selected eligible USB disks. Require

@@ -3,8 +3,10 @@
 #include <QFile>
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QKeyEvent>
 #include <QTemporaryDir>
 #include <QThread>
+#include <QWidget>
 #include <cassert>
 
 #include "diskinit.h"
@@ -64,6 +66,35 @@ int main(int argc, char **argv) {
 	bad["eligible"] = false;
 	bad["size"] = 0;
 	assert(parseInitializationDisks(catalog(bad), &parsed, &error));
+	for (const QString &label : { QString("My USB"), QString("12345678901"),
+			QString("Untitled"), QString("A_-") }) {
+		assert(validDiskLabel(label));
+	}
+	for (const QString &label : { QString(), QString("123456789012"), QString(" name"),
+			QString("name "), QString("a/b"), QString("a.b"), QString("NO NAME"),
+			QString::fromUtf8("\xc3\xa9") }) {
+		assert(!validDiskLabel(label));
+	}
+	auto prompt = [&](const QString &text, bool valid) {
+		QTimer::singleShot(30, [&] {
+			auto *dialog = QApplication::activeModalWidget();
+			assert(dialog);
+			QKeyEvent input(QEvent::KeyPress, Qt::Key_unknown, Qt::NoModifier, text);
+			QApplication::sendEvent(dialog, &input);
+			QKeyEvent enter(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier);
+			QApplication::sendEvent(dialog, &enter);
+			if (!valid) {
+				assert(dialog->isVisible());
+				QKeyEvent cancel(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier);
+				QApplication::sendEvent(dialog, &cancel);
+			}
+		});
+		const auto chosen = diskLabelPrompt(InitializationDisk{});
+		assert(valid ? chosen && *chosen == text : !chosen);
+	};
+	prompt("My USB", true);
+	prompt("123456789012", false);
+	prompt("a/b", false);
 	const QString fixture = root.path() + "/catalog";
 	const QString helper = root.path() + "/helper";
 	const QString authorizer = root.path() + "/authorize";
@@ -76,7 +107,8 @@ int main(int argc, char **argv) {
 	write(authorizer, "#!/bin/sh\nexec \"$@\"\n", true);
 	bool invalidSuccess = false;
 	auto exercise = [&](DiskInitialization::Choice choice, bool confirm,
-			bool changed, bool eligible, bool unreadable, bool failedMount) {
+			bool changed, bool eligible, bool unreadable, bool failedMount,
+			std::optional<QString> label = QString("Untitled")) {
 		QFile::remove(log);
 		QJsonObject current = disk;
 		current["eligible"] = eligible;
@@ -89,8 +121,10 @@ int main(int argc, char **argv) {
 			++prompts;
 			return choice;
 		};
-		ui.confirm = [&](const InitializationDisk &) {
+		ui.label = [&](const InitializationDisk &) { return label; };
+		ui.confirm = [&](const InitializationDisk &selected) {
 			++confirmations;
+			assert(label && selected.label == *label);
 			if (changed) {
 				QJsonObject replacement = current;
 				replacement["identity"] = "replacement-device";
@@ -123,14 +157,14 @@ int main(int argc, char **argv) {
 			return;
 		}
 		assert(waitFor([&] { return prompts == 1; }));
-		if (choice == DiskInitialization::Initialize && confirm) {
+		if (choice == DiskInitialization::Initialize && confirm && label) {
 			assert(waitFor([&] { return initialized + errors == 1; }));
 			assert(!busy);
 			if (changed || invalidSuccess) {
 				assert(errors == 1 && read(log).isEmpty());
 			} else {
 				assert(initialized == 1 && read(log) ==
-					"initialize /dev/sdz original-device\n");
+					"initialize /dev/sdz original-device " + label->toUtf8() + "\n");
 			}
 		} else if (choice == DiskInitialization::Eject) {
 			assert(waitFor([&] { return !read(log).isEmpty(); }));
@@ -138,7 +172,7 @@ int main(int argc, char **argv) {
 		} else {
 			assert(read(log).isEmpty());
 		}
-		assert(confirmations == (choice == DiskInitialization::Initialize ? 1 : 0));
+		assert(confirmations == (choice == DiskInitialization::Initialize && label ? 1 : 0));
 	};
 	exercise(DiskInitialization::Ignore, false, false, true, true, false);
 	exercise(DiskInitialization::Initialize, false, false, true, true, false);
@@ -148,7 +182,10 @@ int main(int argc, char **argv) {
 	exercise(DiskInitialization::Ignore, false, false, false, true, false);
 	exercise(DiskInitialization::Ignore, false, false, true, false, false);
 	exercise(DiskInitialization::Initialize, true, false, true, false, true);
-	auto manualErase = [&](bool confirm, bool changed, bool eligible, const QString &device) {
+	exercise(DiskInitialization::Initialize, true, false, true, true, false, QString("My USB"));
+	exercise(DiskInitialization::Initialize, true, false, true, true, false, std::nullopt);
+	auto manualErase = [&](bool confirm, bool changed, bool eligible, const QString &device,
+			std::optional<QString> label = QString("Untitled")) {
 		QFile::remove(log);
 		QJsonObject current = disk;
 		current["eligible"] = eligible;
@@ -156,6 +193,7 @@ int main(int argc, char **argv) {
 		write(fixture, catalog(current));
 		int confirmations = 0, errors = 0, initialized = 0;
 		int inhibited = 0, resumed = 0;
+		int labelPrompts = 0;
 		DiskInitialization::Interface ui;
 		ui.choose = [](const InitializationDisk &) {
 			assert(!"Manual erase must not use the insertion prompt");
@@ -165,11 +203,16 @@ int main(int argc, char **argv) {
 			++confirmations;
 			assert(selected.device == "/dev/sdz");
 			assert(selected.name.startsWith("Untitled on "));
+			assert(label && selected.label == *label);
 			if (changed) {
 				current["identity"] = "replacement-device";
 				write(fixture, catalog(current));
 			}
 			return confirm;
+		};
+		ui.label = [&](const InitializationDisk &) {
+			++labelPrompts;
+			return label;
 		};
 		ui.error = [&](const QString &) { ++errors; };
 		ui.busy = [](bool) {};
@@ -184,6 +227,13 @@ int main(int argc, char **argv) {
 		if (!eligible || !match) {
 			assert(waitFor([&] { return errors == 1; }));
 			assert(confirmations == 0 && read(log).isEmpty());
+			assert(labelPrompts == 0);
+		} else if (!label) {
+			assert(waitFor([&] { return labelPrompts == 1; }));
+			assert(confirmations == 0 && read(log).isEmpty());
+		} else if (!validDiskLabel(*label)) {
+			assert(waitFor([&] { return errors == 1; }));
+			assert(confirmations == 0 && read(log).isEmpty());
 		} else if (!confirm) {
 			assert(waitFor([&] { return confirmations == 1; }));
 			assert(read(log).isEmpty());
@@ -192,9 +242,10 @@ int main(int argc, char **argv) {
 			assert(read(log).isEmpty());
 		} else {
 			assert(waitFor([&] { return initialized == 1; }));
-			assert(read(log) == "erase /dev/sdz original-device\n");
+			assert(read(log) == "erase /dev/sdz original-device " + label->toUtf8() + "\n");
 		}
-		const bool operated = eligible && match && confirm && !changed;
+		const bool operated = eligible && match && confirm && !changed &&
+			label && validDiskLabel(*label);
 		assert(inhibited == (operated ? 1 : 0) && resumed == inhibited);
 	};
 	manualErase(true, false, true, "/dev/sdz1");
@@ -202,6 +253,9 @@ int main(int argc, char **argv) {
 	manualErase(true, true, true, "/dev/sdz1");
 	manualErase(true, false, false, "/dev/sdz1");
 	manualErase(true, false, true, "/dev/internal");
+	manualErase(true, false, true, "/dev/sdz1", QString("My USB"));
+	manualErase(true, false, true, "/dev/sdz1", std::nullopt);
+	manualErase(true, false, true, "/dev/sdz1", QString("invalid/"));
 	write(authorizer, "#!/bin/sh\nprintf '{}\\n'\n", true);
 	invalidSuccess = true;
 	exercise(DiskInitialization::Initialize, true, false, true, true, false);

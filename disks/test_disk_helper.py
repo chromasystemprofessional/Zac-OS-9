@@ -1,4 +1,7 @@
-"""Mock-only disk safety tests; no real disk commands or filesystem writes."""
+"""Mocked disk safety plus label probes on disposable regular-file images.
+
+No physical storage is unmounted, partitioned or formatted.
+"""
 
 import contextlib
 import copy
@@ -10,6 +13,7 @@ import os
 from pathlib import Path
 import stat
 import sys
+import tempfile
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
@@ -467,6 +471,8 @@ class InitializeTests(unittest.TestCase):
         patch.object(helper, "read_text", return_value="0").start()
         patch.object(helper.os, "geteuid", return_value=0).start()
         patch.object(helper.os, "fsync").start()
+        self.exclusive_open = False
+        self.mock_ioctl = patch.object(helper.fcntl, "ioctl", side_effect=self.ioctl).start()
         patch.object(helper.os.path, "realpath", side_effect=lambda path: path).start()
         self.mock_run = patch.object(helper, "run", side_effect=self.command).start()
         self.mock_open = patch.object(helper, "opened", side_effect=self.opened).start()
@@ -477,7 +483,17 @@ class InitializeTests(unittest.TestCase):
 
     @contextlib.contextmanager
     def opened(self, device, devno, exclusive=False, locked=False):
-        yield 41 if exclusive else 42
+        if exclusive:
+            self.exclusive_open = True
+        try:
+            yield 41 if exclusive else 42
+        finally:
+            if exclusive:
+                self.exclusive_open = False
+
+    def ioctl(self, fd, request):
+        self.assertEqual((fd, request), (41, helper.BLKRRPART))
+        self.assertTrue(self.exclusive_open, "kernel refresh must use our exclusive claim")
 
     def command(self, argv, **kwargs):
         self.commands.append((argv, kwargs))
@@ -488,8 +504,14 @@ class InitializeTests(unittest.TestCase):
                         {"start": 2048, "size": 8 * 1024**3 // 512 - 2048, "type": "c"},
                     ],
                 }}))
+            self.assertTrue(self.exclusive_open)
+            self.assertIn("--no-reread", argv,
+                          "sfdisk must not try to acquire our exclusive claim again")
+            self.assertIn("--no-tell-kernel", argv,
+                          "kernel refresh must use the already-exclusive descriptor")
             self.partitioned = True
         if argv[0] == helper.MKFS:
+            self.assertTrue(self.mock_ioctl.called, "refresh kernel partitions before mkfs")
             self.formatted = True
         if argv[0] == helper.BLKID and self.formatted:
             return result("TYPE=vfat\nVERSION=FAT32\nLABEL=Untitled\n")
@@ -518,8 +540,41 @@ class InitializeTests(unittest.TestCase):
         self.assertEqual(partition_call["input"],
                          "label: dos\nunit: sectors\n\nstart=2048, type=c\n")
         self.assertEqual(partition_call["pass_fds"], (41,))
+        self.assertIn("--no-reread", destructive[0])
+        self.assertIn("--no-tell-kernel", destructive[0])
+        self.assertNotIn("--force", destructive[0])
+        self.mock_ioctl.assert_called_once_with(41, helper.BLKRRPART)
         self.mock_open.assert_any_call("/dev/sdb", "8:16", exclusive=True)
         self.mock_open.assert_any_call("/dev/sdb1", "8:17")
+
+    def test_kernel_reread_failure_never_formats_or_reports_success(self):
+        self.mock_ioctl.side_effect = OSError("Device or resource busy")
+        with self.assertRaisesRegex(helper.Failure, "kernel.*NOT formatted"):
+            self.invoke()
+        self.assertTrue(self.partitioned)
+        self.assertFalse(self.formatted)
+
+    def test_custom_label_reaches_mkfs_and_verification(self):
+        original = self.command
+        def command(argv, **kwargs):
+            value = original(argv, **kwargs)
+            if argv[0] == helper.BLKID and self.formatted:
+                return result("TYPE=vfat\nVERSION=FAT32\nLABEL=My USB\n")
+            return value
+        self.mock_run.side_effect = command
+        with contextlib.redirect_stdout(io.StringIO()):
+            helper.initialize("/dev/sdb", TOKEN, "My USB")
+        self.assertIn([helper.MKFS, "-F", "32", "-n", "My USB", "/proc/self/fd/42"],
+                      self.destructive())
+
+    def test_invalid_labels_fail_before_any_storage_commands(self):
+        for label in ("", "abcdefghijkl", " name", "name ", "é", "disk/one",
+                      "bad\nname", "NO NAME", "no name", "a.b", "a*b", "a\x00b"):
+            with self.subTest(label=label), self.assertRaises(helper.Failure):
+                helper.initialize("/dev/sdb", TOKEN, label)
+            with self.subTest(label=label), self.assertRaises(helper.Failure):
+                helper.erase("/dev/sdb", TOKEN, label)
+        self.assertEqual(self.commands, [])
 
     def test_not_root_invalid_identity_or_mounted_never_write(self):
         for root, token, system in [(1000, TOKEN, state()), (0, "bad", state()),
@@ -667,6 +722,10 @@ class InitializeTests(unittest.TestCase):
 
 class EraseTests(unittest.TestCase):
     opened = InitializeTests.opened
+    ioctl = InitializeTests.ioctl
+    test_kernel_reread_failure_never_formats_or_reports_success = (
+        InitializeTests.test_kernel_reread_failure_never_formats_or_reports_success
+    )
     destructive = InitializeTests.destructive
 
     def setUp(self):
@@ -945,8 +1004,14 @@ class RunnerTests(unittest.TestCase):
         with patch.object(helper, "erase") as erase:
             self.assertEqual(helper.main(["erase", "/dev/sdb", TOKEN]), 0)
             erase.assert_called_once_with("/dev/sdb", TOKEN)
+        with patch.object(helper, "erase") as erase:
+            self.assertEqual(helper.main(["erase", "/dev/sdb", TOKEN, "My USB"]), 0)
+            erase.assert_called_once_with("/dev/sdb", TOKEN, "My USB")
+        with patch.object(helper, "initialize") as initialize:
+            self.assertEqual(helper.main(["initialize", "/dev/sdb", TOKEN, "My USB"]), 0)
+            initialize.assert_called_once_with("/dev/sdb", TOKEN, "My USB")
         for args in (["erase"], ["erase", "/dev/sdb"],
-                     ["erase", "/dev/sdb", TOKEN, "extra"], ["list-erasable", "extra"]):
+                     ["erase", "/dev/sdb", TOKEN, "name", "extra"], ["list-erasable", "extra"]):
             with contextlib.redirect_stderr(io.StringIO()):
                 self.assertEqual(helper.main(args), 1)
 
@@ -1016,6 +1081,30 @@ class RunnerTests(unittest.TestCase):
                 contextlib.redirect_stdout(io.StringIO()) as output:
             self.assertEqual(helper.main(["list"]), 0)
         self.assertEqual(json.loads(output.getvalue()), {"version": 1, "disks": []})
+
+
+class LabelImageTests(unittest.TestCase):
+    @unittest.skipUnless(Path(helper.MKFS).is_file() and Path(helper.BLKID).is_file(),
+                         "mkfs.fat and blkid are required for image label probes")
+    def test_actual_fat32_labels_with_pinned_regular_file(self):
+        for label in ("Untitled", "My USB", "12345678901"):
+            with self.subTest(label=label), tempfile.TemporaryFile(
+                prefix="zacos9-label-test-",
+            ) as image:
+                image.truncate(helper.MIN_SIZE)
+                fd = image.fileno()
+                device = f"/proc/self/fd/{fd}"
+                helper.run([helper.MKFS, "-F", "32", "-n", label, device],
+                           pass_fds=(fd,))
+                result = helper.run(
+                    [helper.BLKID, "--probe", "--no-encoding", "--output",
+                     "export", device], pass_fds=(fd,),
+                )
+                fields = dict(line.split("=", 1) for line in result.stdout.splitlines()
+                              if "=" in line)
+                self.assertEqual(fields.get("TYPE"), "vfat")
+                self.assertEqual(fields.get("VERSION"), "FAT32")
+                self.assertEqual(fields.get("LABEL"), label)
 
 
 if __name__ == "__main__":

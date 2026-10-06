@@ -159,18 +159,25 @@ When an unformatted USB disk is detected, or an eligible USB disk cannot be
 mounted, Sniffer offers **Eject**, **Ignore**, and **Initialize** in a
 classic-style alert. Initialize asks again before erasing the **entire disk**,
 including every partition, then creates an MBR partition table with one
-**FAT32** volume named **Untitled**. Cancel is the default on the erase
-confirmation; administrator authentication is required.
+**FAT32** volume with the name you enter (default **Untitled**). Cancel is the
+default on the erase confirmation; administrator authentication is required.
 
 To reformat a readable USB disk, select its disk icon on the desktop and choose
 **Special > Erase Disk…**. This erases the **whole physical USB disk**, including
-other partitions, and creates the same **Untitled (FAT32)** volume. Back up
+other partitions, and creates a named **FAT32** volume. Back up
 everything first and close files on every volume on that disk. Cancel is the
 default; administrator authorization is required. The helper unmounts the disk's
 volumes without force and stops if they are busy or the disk's identity changes.
+Before confirmation, a name dialog accepts 1-11 ASCII letters, numbers, spaces,
+hyphens or underscores. Names cannot start or end with spaces; `NO NAME` is
+reserved by FAT. Cancelling this dialog does not unmount or erase anything.
 Finder pauses automatic mounting for that disk during erasing and remounts it
 afterward. Only safe USB disks mounted beneath `/media` or `/run/media` are
 eligible; internal, system, encrypted and read-only disks are excluded.
+The helper owns the disk exclusively while writing its partition table and
+refreshes the kernel's partition view through that same descriptor. It does
+not force through a busy disk. A refresh failure stops before formatting;
+the error explicitly warns if the partition table has already been changed.
 
 Never initialize a disk containing files you need to recover. This is not a
 repair tool. Automatic initialization excludes mounted disks. Hardware that

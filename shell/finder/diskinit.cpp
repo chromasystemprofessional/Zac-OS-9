@@ -11,11 +11,20 @@
 #include <QRegularExpression>
 #include <QDebug>
 #include <QCloseEvent>
+#include <QKeyEvent>
+#include <QMouseEvent>
 
 #include "alert.h"
 #include "localvolumes.h"
 #include "pixels.h"
 #include "platinumshell.h"
+#include "panelkit.h"
+
+bool validDiskLabel(const QString &label) {
+	static const QRegularExpression pattern("\\A[A-Za-z0-9 _-]{1,11}\\z");
+	return pattern.match(label).hasMatch() && label == label.trimmed() &&
+		label.toUpper() != "NO NAME";
+}
 
 #ifndef ZACOS9_DISK_HELPER
 #define ZACOS9_DISK_HELPER "/usr/libexec/zacos9/zacos9-disk-helper"
@@ -108,7 +117,7 @@ void DiskInitialization::eraseDevice(const QString &device, const QString &volum
 				}
 				disk.name = volumeName.left(80) + " on " + disk.name;
 				m_presenting = true;
-				const bool confirmed = m_interface.confirm(disk);
+				const bool confirmed = confirmFormat(disk);
 				m_presenting = false;
 				if (confirmed) {
 					revalidate(disk, Erase);
@@ -125,6 +134,19 @@ void DiskInitialization::eraseDevice(const QString &device, const QString &volum
 void DiskInitialization::report(const QString &message) {
 	qWarning().noquote() << "zacos9-finder:" << message;
 	m_interface.error(message);
+}
+
+bool DiskInitialization::confirmFormat(InitializationDisk &disk) {
+	const auto label = m_interface.label(disk);
+	if (!label) {
+		return false;
+	}
+	if (!validDiskLabel(*label)) {
+		report("Invalid disk name. Use 1-11 ASCII letters, numbers, spaces, hyphens or underscores, without surrounding spaces. NO NAME is reserved.");
+		return false;
+	}
+	disk.label = *label;
+	return m_interface.confirm(disk);
 }
 
 void DiskInitialization::run(const QString &program, const QStringList &args, int timeout,
@@ -229,7 +251,7 @@ void DiskInitialization::acceptDisks(const std::vector<InitializationDisk> &disk
 	}
 	m_seen.intersect(present);
 	m_failed.intersect(devices);
-	for (const InitializationDisk &disk : disks) {
+	for (InitializationDisk disk : disks) {
 		bool failed = m_failed.contains(disk.device);
 		for (const QString &child : disk.children) {
 			failed = failed || m_failed.contains(child);
@@ -240,7 +262,7 @@ void DiskInitialization::acceptDisks(const std::vector<InitializationDisk> &disk
 		m_seen.insert(disk.identity);
 		m_presenting = true;
 		const Choice choice = m_interface.choose(disk);
-		bool confirmed = choice != Initialize || m_interface.confirm(disk);
+		bool confirmed = choice != Initialize || confirmFormat(disk);
 		m_presenting = false;
 		if (choice != Ignore && confirmed) {
 			revalidate(disk, choice);
@@ -277,7 +299,7 @@ void DiskInitialization::operate(const InitializationDisk &disk, Choice choice) 
 	const bool format = choice == Initialize || choice == Erase;
 	const QString program = format ? m_authorizer : m_ejector;
 	const QStringList args = format
-		? QStringList{ m_helper, choice == Erase ? "erase" : "initialize", disk.device, disk.identity }
+		? QStringList{ m_helper, choice == Erase ? "erase" : "initialize", disk.device, disk.identity, disk.label }
 		: QStringList{ "power-off", "--block-device", disk.device };
 	run(program, args, 300000,
 		[this, choice, disk](const QByteArray &out, const QString &failure) {
@@ -308,6 +330,67 @@ void DiskInitialization::operate(const InitializationDisk &disk, Choice choice) 
 namespace {
 DiskInitialization *diskController = nullptr;
 
+class DiskLabelDialog : public QDialog {
+public:
+	explicit DiskLabelDialog(const InitializationDisk &disk) {
+		setWindowTitle("Name the Disk");
+		setFixedSize(420, 178);
+		m_name.rect = QRect(90, 49, 305, PL_EDIT_H);
+		m_name.setText(disk.label);
+		m_name.selectAll();
+		m_cancel = PanelButton("Cancel", QRect(225, 140, 80, PL_BUTTON_H));
+		m_continue = PanelButton("Continue", QRect(317, 140, 80, PL_BUTTON_H), true);
+		m_cancel.clicked = [this] { reject(); };
+		m_continue.clicked = [this] {
+			if (validDiskLabel(m_name.text)) {
+				accept();
+			}
+		};
+		m_name.edited = [this] {
+			m_continue.enabled = validDiskLabel(m_name.text);
+			update();
+		};
+		m_host.buttons = { &m_cancel, &m_continue };
+		m_host.edits = { &m_name };
+		m_host.defaultButton = &m_continue;
+		m_host.cancelButton = &m_cancel;
+		m_host.setFocus(&m_name);
+	}
+	QString label() const { return m_name.text; }
+protected:
+	void showEvent(QShowEvent *event) override {
+		QDialog::showEvent(event);
+		platinumSetFrameStyle(this, FrameStyle::MovableModal);
+	}
+	void paintEvent(QPaintEvent *) override {
+		Pixels px(width(), height());
+		pl_fill(&px.c, 0, 0, width() - 1, height() - 1, GRAY(0xD));
+		panelText(&px.c, "Enter a name for the new FAT32 disk:", 16, 28);
+		panelLabel(&px.c, "Name:", 82, 64);
+		panelText(&px.c, "1-11 ASCII letters, numbers, spaces, - or _.", 16, 95, PL_FONT_VIEWS);
+		panelText(&px.c, "No surrounding spaces. NO NAME is reserved.", 16, 111, PL_FONT_VIEWS);
+		if (!validDiskLabel(m_name.text)) {
+			panelText(&px.c, "Please enter a valid disk name.", 16, 127, PL_FONT_VIEWS, RGB(0x99, 0, 0));
+		}
+		m_host.paintControls(&px.c, GRAY(0xD));
+		QPainter painter(this);
+		px.blit(painter);
+	}
+	void mousePressEvent(QMouseEvent *event) override { m_host.hostPress(event); update(); }
+	void mouseMoveEvent(QMouseEvent *event) override { m_host.hostMove(event); update(); }
+	void mouseReleaseEvent(QMouseEvent *event) override { m_host.hostRelease(event); update(); }
+	void keyPressEvent(QKeyEvent *event) override {
+		if (!m_host.hostKey(event)) {
+			QDialog::keyPressEvent(event);
+		}
+		update();
+	}
+private:
+	PanelEdit m_name;
+	PanelButton m_cancel, m_continue;
+	PanelHost m_host{ this };
+};
+
 class DiskBusy : public QDialog {
 public:
 	DiskBusy() {
@@ -337,6 +420,11 @@ void DiskBusy::closeEvent(QCloseEvent *event) {
 	event->ignore();
 }
 
+std::optional<QString> diskLabelPrompt(const InitializationDisk &disk) {
+	DiskLabelDialog dialog(disk);
+	return dialog.exec() == QDialog::Accepted ? std::optional<QString>(dialog.label()) : std::nullopt;
+}
+
 void diskInitializationStart(std::function<void()> availabilityChanged) {
 	auto *busy = new DiskBusy;
 	busy->setParent(nullptr);
@@ -353,7 +441,7 @@ void diskInitializationStart(std::function<void()> availabilityChanged) {
 	interface.confirm = [](const InitializationDisk &disk) {
 		return Alert::choose("Erase ALL files and partitions on " + disk.name.left(80) +
 			" (" + QString::number(disk.size / 1000000000.0, 'f', 1) + " GB, " +
-			disk.device + ")? This cannot be undone. Every volume on this USB disk will be erased, not just the selected volume. The disk will become Untitled (FAT32). Close files on it before continuing.",
+			disk.device + ")? This cannot be undone. Every volume on this USB disk will be erased, not just the selected volume. The disk will become " + disk.label + " (FAT32). Close files on it before continuing.",
 			"Cancel", QString(), "Erase") == Alert::Other;
 	};
 	interface.error = [](const QString &error) { Alert::ask(error, "OK", QString()); };
@@ -361,11 +449,12 @@ void diskInitializationStart(std::function<void()> availabilityChanged) {
 	interface.initialized = [](const QString &device) {
 		localVolumeMountDevice(device);
 		QTimer::singleShot(1500, qApp, [device] { localVolumeMountDevice(device); });
-		Alert::ask("The disk has been initialized as Untitled (FAT32). It will appear on the desktop when mounted.",
+		Alert::ask("The disk has been initialized as FAT32 with the name you entered. It will appear on the desktop when mounted.",
 			"OK", QString());
 	};
 	interface.availabilityChanged = std::move(availabilityChanged);
 	interface.inhibitMount = localVolumeInhibitMount;
+	interface.label = diskLabelPrompt;
 	auto *controller = new DiskInitialization(std::move(interface),
 		ZACOS9_DISK_HELPER, "pkexec", "udisksctl", qApp);
 	diskController = controller;
