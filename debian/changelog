@@ -1,3 +1,14 @@
+zacos9 (0.1.22) trixie; urgency=medium
+
+  * Fix the APFS device-or-resource-busy mount error in 0.1.21. Mount
+    detection now uses the kernel mount table instead of stat-based checks
+    that miss some APFS FUSE mounts. Includes complete rollback,
+    original-error reporting, leftover-mount recovery through eject, and
+    safe image-cache cleanup. Mounting remains read-only; browsing the
+    affected APFS volume still requires hardware verification.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Tue, 06 Oct 2026 15:31:58 -0400
+
 zacos9 (0.1.21) trixie; urgency=medium
 
   * Fix the APFS mount error shown at startup in 0.1.20. APFS volumes are
