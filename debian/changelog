@@ -1,3 +1,11 @@
+zacos9 (0.1.19) trixie; urgency=medium
+
+  * Sound sets now play window-drag and drag-release sounds from classic
+    Mac OS sound sets, decode compressed (mu-law, IMA4, twos) samples,
+    accept low-rate sounds, and import up to 256 sets.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Tue, 06 Oct 2026 13:57:09 -0400
+
 zacos9 (0.1.18) trixie; urgency=medium
 
   * App windows now open nearly full-screen, leaving the desktop icons
