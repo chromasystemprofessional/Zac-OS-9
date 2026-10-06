@@ -1,6 +1,7 @@
 #include "labeleditor.h"
 
 #include "vfs.h"
+#include "apptrash.h"
 
 #include <QApplication>
 #include <QDir>
@@ -24,6 +25,9 @@ LabelEditor::LabelEditor(std::function<void()> repaint) : m_repaint(std::move(re
 }
 
 void LabelEditor::begin(Item *item) {
+	if (appTrashMarker(item->path)) {
+		return;
+	}
 	m_item = item;
 	m_text = item->name;
 	m_anchor = 0;

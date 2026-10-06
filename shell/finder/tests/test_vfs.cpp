@@ -14,12 +14,14 @@
 #include <QElapsedTimer>
 #include <QFile>
 #include <QGuiApplication>
+#include <QImage>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QTextStream>
+#include <functional>
 
 #include <glib.h>
 
@@ -78,6 +80,17 @@ static QString appFolder(const QString &desktopId) {
 	return vfsPathFor("applications/" + desktopId);
 }
 
+static bool waitFor(const std::function<bool()> &condition) {
+	QElapsedTimer timer;
+	timer.start();
+	while (!condition() && timer.elapsed() < 3000) {
+		g_main_context_iteration(nullptr, FALSE);
+		QCoreApplication::processEvents();
+		usleep(2000);
+	}
+	return condition();
+}
+
 int main(int argc, char **argv) {
 	QTemporaryDir tmp;
 	if (!tmp.isValid()) {
@@ -88,10 +101,11 @@ int main(int argc, char **argv) {
 	 * real desktop's is read or written. Set before Qt or GIO look. */
 	const QString dataHome = root + "/data";
 	const QString dataDirs = root + "/system";
+	const QString flatpakData = dataHome + "/flatpak/exports/share";
 	appsDir = dataDirs + "/applications";
 	homeAppsDir = dataHome + "/applications";
 	setenv("XDG_DATA_HOME", dataHome.toUtf8().constData(), 1);
-	setenv("XDG_DATA_DIRS", dataDirs.toUtf8().constData(), 1);
+	setenv("XDG_DATA_DIRS", (flatpakData + ":" + dataDirs).toUtf8().constData(), 1);
 	setenv("XDG_CONFIG_HOME", (root + "/config").toUtf8().constData(), 1);
 	setenv("HOME", root.toUtf8().constData(), 1);
 	setenv("XDG_CURRENT_DESKTOP", "ZacOS9", 1);
@@ -161,6 +175,52 @@ int main(int argc, char **argv) {
 	check(!apps.contains("A ZacOS Panel"), "ZacOS 9's own entries are not shown");
 	check(apps.contains("Notepad Plus"), "a Windows program installed through Wine is shown");
 	check(!apps.contains("Uninstall Notepad Plus"), "its Wine uninstaller is not shown");
+
+	/* First Flatpak install creates the export directories after startup. */
+	int appChanges = 0;
+	appOnChange([&] { ++appChanges; });
+	int folderChanges = 0;
+	const int flatpakWatch = vfsOnChange([&] { ++folderChanges; });
+	const QString flatpakApps = flatpakData + "/applications";
+	const QString chaskiId = "com.a_chacon.chaski.desktop";
+	const QString exported = dataHome + "/flatpak/app/chaski/export/share/applications";
+	QDir().mkpath(flatpakData + "/icons/hicolor/64x64/apps");
+	writeEntry(flatpakData + "/icons/hicolor", "index.theme",
+		"[Icon Theme]\nName=Hicolor\nDirectories=64x64/apps\n"
+		"[64x64/apps]\nSize=64\nType=Fixed\nContext=Applications\n");
+	QImage flatpakIcon(64, 64, QImage::Format_ARGB32);
+	flatpakIcon.fill(0xff123456);
+	check(flatpakIcon.save(flatpakData + "/icons/hicolor/64x64/apps/com.a_chacon.chaski.png"),
+		"the first Flatpak export supplies an application icon");
+	writeEntry(exported, chaskiId, entry("Chaski", "/bin/true",
+		"Categories=Network;News;\nIcon=com.a_chacon.chaski\nX-Flatpak=com.a_chacon.chaski\n"));
+	QDir().mkpath(flatpakApps);
+	check(QFile::link(exported + "/" + chaskiId, flatpakApps + "/" + chaskiId),
+		"the Flatpak fixture exports a symlinked launcher");
+	check(waitFor([&] { return appChanges > 0 && folderChanges > 0 && appById(chaskiId); }),
+		"first Flatpak install is discovered automatically without manual refresh");
+	if (const AppEntry *chaski = appById(chaskiId)) {
+		check(chaski->name == "Chaski" && chaski->origin == "flatpak:com.a_chacon.chaski",
+			"the newly exported app keeps its name and Flatpak identity");
+		check(!chaski->icon32.empty(), "icons from a newly created Flatpak export tree resolve");
+	}
+	check(namesIn(vfsPathFor("applications")).contains("Chaski"),
+		"the newly exported app appears in Applications");
+	const int changesBeforeRemoval = appChanges;
+	check(QFile::remove(flatpakApps + "/" + chaskiId), "the fixture removes the exported launcher");
+	check(waitFor([&] { return appChanges > changesBeforeRemoval && !appById(chaskiId); }),
+		"removing a Flatpak launcher refreshes Applications automatically");
+	check(QDir().rmdir(flatpakApps), "the fixture removes its empty export applications directory");
+	QDir().mkpath(flatpakApps);
+	check(QFile::link(exported + "/" + chaskiId, flatpakApps + "/" + chaskiId),
+		"the fixture recreates the export applications directory and launcher");
+	check(waitFor([&] { return appById(chaskiId) &&
+		namesIn(vfsPathFor("applications")).contains("Chaski"); }),
+		"a replaced Flatpak export directory is watched again");
+	QFile::remove(flatpakApps + "/" + chaskiId);
+	check(waitFor([&] { return !appById(chaskiId); }),
+		"removal after directory replacement is noticed");
+	vfsOffChange(flatpakWatch);
 
 	/* ---- the startup disk --------------------------------------------- */
 	QStringList volume = namesIn(vfsRoot());

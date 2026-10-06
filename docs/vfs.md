@@ -263,6 +263,12 @@ files and because GIO drops its own cached list only once its file
 monitors have been served. `Finder` also takes a `refresh` command for
 when something appears without the directories changing in a way the
 watcher sees.
+Missing launcher directories are monitored through their nearest existing
+ancestor, so the first Flatpak installation can create its export tree after
+Finder starts and still appear automatically. GIO application-list change
+notifications also trigger the same settled refresh. Newly created icon-theme
+directories are added when the application list reloads. No launcher copies or
+login restart are needed; XDG precedence and hidden-entry rules still apply.
 
 ## What the Finder will and won't do
 
@@ -273,14 +279,13 @@ watcher sees.
 | Rename | yes, kept in the registry | yes, kept in the registry | ordinary rename |
 | Label | yes, kept in the registry | yes, kept in the registry | extended attribute |
 | Move, copy, duplicate, alias | no | no | ordinary |
-| Throw away | no | an application's folder: hides it (next section) | ordinary |
+| Throw away | no | queues a supported application for uninstall (next section) | ordinary |
 | Take a drop | no | no | yes |
 | New folder inside | no | no | yes |
 
-Nothing a package owns can be moved, renamed on disk, or really thrown
-away from the Finder, so no Finder gesture can damage an installed
-package. Browsing and every one of these actions is unprivileged: the
-only directories this hierarchy writes into are the user's own.
+Package-owned launchers are never moved or deleted directly. Debian uninstall
+uses the existing privileged software helper; other browsing and metadata
+actions write only into the user's own directories.
 
 A Desktop Action can't be renamed on its own, because it isn't a thing of
 its own: it belongs to the application's desktop entry.
@@ -290,22 +295,35 @@ application's desktop entry, or a `backed` folder's real directory. The
 curated folders stand for nothing on disk and have no Get Info window
 yet.
 
-## Hiding an application (never uninstalling it)
+## Uninstalling applications through Trash
 
-Move To Trash on an application's folder in Applications doesn't move
-anything — there is no file — and it never touches the package. It asks
-for confirmation first (unlike an ordinary Trash, there is no fishing the
-item back out of it), then sets `hidden` in that folder's own override,
-exactly the mechanism a rename already uses. The application comes right
-back, with every other override (a rename, a label) intact, as soon as
-that one key is gone: from **Special > Show All Applications**, which
-clears `hidden` from every override, or by deleting the key from the
-registry by hand.
+**Move To Trash**, or dragging an application from Applications/Utilities onto
+Trash or into its window, queues it for uninstall. It remains installed but
+disappears from Applications, with its name and icon displayed in Trash.
+Queue records persist in the user's Trash across logins. No package-owned
+launcher is moved, and application aliases remain ordinary links: trashing an
+alias does not queue or uninstall its original.
 
-The node itself, and everything generated under it, is never destroyed:
-hiding only keeps it out of its parent's listing (`vfsList` filters on
-`visible`), so nothing is lost if the application is reinstalled before
-anyone brings it back on purpose.
+**Put Away**, or dragging a queued app back to Applications, cancels removal
+and restores its launcher. **Empty Trash** asks for confirmation listing queued
+app names and install sources, then shows progress while uninstalling them.
+Debian uses the existing software helper's `remove` operation, not `purge`;
+user Flatpak uses `flatpak --user uninstall` without `--delete-data`. Personal
+data is retained. A Debian package can own several applications or have
+dependents, so removal may remove those as well. System-wide Flatpak apps and
+unsupported/unowned apps are not queued; Finder reports how to remove them
+instead.
+
+Failed uninstalls leave their records in Trash for retry or Put Away, and stop
+emptying before ordinary files are deleted. Completed removals are not undone
+if a later app fails. A changed install source or invalid queue record blocks
+uninstall with an explicit error. Queued entries cannot be renamed or copied
+as ordinary files. New app queue entries created during emptying require a
+new confirmation.
+
+**Special > Show All Applications** still restores legacy hidden overrides
+from earlier versions, but does not cancel the uninstall queue. Renames and
+labels remain intact when an app is put away or later reinstalled.
 
 ## Looking at Debian
 
@@ -341,5 +359,9 @@ is exercised for real, not skipped.
 `pl_image_blend` uses to draw a resolved icon's real alpha, separately
 from the icon set's plain on/off transparency.
 
+`finder-desktop` tests menu and drag-to-Trash queueing, persisted records,
+Put Away, cancellation, failed-removal retries, both uninstall command routes,
+and personal-data preservation with isolated commands (no real uninstall).
 `tests/ui/finder-startup-disk.sh` and `tests/ui/finder-hide-application.sh`
-are the matching look at the screen.
+are the matching look at the screen; the latter queues and restores an app
+without emptying Trash.

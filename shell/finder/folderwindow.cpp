@@ -1178,7 +1178,9 @@ bool finderShortcut(QKeyEvent *e) {
 void FolderWindow::dragEnterEvent(QDragEnterEvent *e) {
 	/* Icons that can only move about their own window are taken back
 	 * there and nowhere else. */
-	if (e->mimeData()->hasUrls() || (e->mimeData()->hasFormat(ALIAS_ITEMS_MIME) &&
+	if ((e->mimeData()->hasFormat(APPLICATION_ITEMS_MIME) &&
+			QDir(m_path) == QDir(trashFilesPath())) ||
+			e->mimeData()->hasUrls() || (e->mimeData()->hasFormat(ALIAS_ITEMS_MIME) &&
 			!vfsIsVirtual(m_path)) ||
 			(e->mimeData()->hasFormat(ICON_MOVE_MIME) && e->source() == this)) {
 		e->acceptProposedAction();

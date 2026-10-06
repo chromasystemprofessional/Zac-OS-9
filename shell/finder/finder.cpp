@@ -16,6 +16,9 @@
 #include <QUrl>
 
 #include "appdb.h"
+#include "apptrash.h"
+#include "../store/storeclient.h"
+#include <QScopedValueRollback>
 #include "fileops.h"
 #include "localvolumes.h"
 #include "diskinit.h"
@@ -292,6 +295,11 @@ void Finder::newFolder() {
 static bool isExpandable(const QString &path);
 
 void Finder::openItem(Item *item) {
+	if (appTrashMarker(item->path)) {
+		Alert::ask("This application is queued for uninstall when Trash is emptied. "
+			"Choose Put Away to cancel removal and return it to Applications.", "OK", QString());
+		return;
+	}
 	{
 		if (item->isVirtual) {
 			const VNode *node = vfsNode(item->path);
@@ -586,6 +594,7 @@ void Finder::putAway() {
 	const QString trash = trashFilesPath();
 	const QString info = QFileInfo(trash).absolutePath() + "/info";
 	QStringList changed;
+	bool restoredApplication = false;
 	for (Item *item : front()->selectedItems()) {
 		if (item->isLocalVolume) {
 			/* Fire async eject/unmount via GIO; GVolumeMonitor signals
@@ -613,6 +622,14 @@ void Finder::putAway() {
 		if (QFileInfo(item->path).absolutePath() != QDir(trash).absolutePath()) {
 			continue; /* only things in the Trash can be put away */
 		}
+		if (appTrashMarker(item->path)) {
+			QString error;
+			if (!appTrashRestore(item->path, &error)) {
+				Alert::ask(error, "OK", QString());
+			}
+			restoredApplication = true;
+			continue;
+		}
 		QFile f(info + "/" + item->name + ".trashinfo");
 		if (!f.open(QIODevice::ReadOnly)) {
 			continue;
@@ -634,6 +651,9 @@ void Finder::putAway() {
 		}
 	}
 	changed.removeDuplicates();
+	if (restoredApplication) {
+		vfsRefresh();
+	}
 	for (const QString &d : changed) {
 		folderChanged(d);
 	}
@@ -693,40 +713,42 @@ void Finder::closeWindow() {
 void Finder::moveSelectionToTrash() {
 	FinderView *v = front();
 	QStringList changed;
+	QStringList paths;
 	for (Item *item : v->selectedItems()) {
-		/* An application's folder in Applications: there is no file to
-		 * move, and the package stays installed. Trashing it only hides
-		 * it from the Finder (vfsHideApplication refreshes any open
-		 * window itself, the same way a rename does); ask first, since
-		 * unlike an ordinary Trash this can't be undone by fishing the
-		 * item back out. */
-		if (item->isVirtual && vfsIsAppFolder(item->path)) {
-			if (Alert::ask(QStringLiteral("Remove “%1” from the Desktop? "
-					"The application itself will not be removed, and this can be "
-					"undone with Special > Show All Applications.").arg(item->name),
-					"Remove", "Cancel")) {
-				vfsHideApplication(item->path);
+		if (item->kind != PL_ICON_DISK && item->kind != PL_ICON_TRASH_EMPTY &&
+				item->kind != PL_ICON_TRASH_FULL) {
+			paths << item->path;
+		}
+	}
+	for (const QString &path : paths) {
+		if (vfsIsAppFolder(path)) {
+			const QString id = vfsNode(path)->appId;
+			QString error;
+			if (appTrashQueue(id, &error)) {
+				changed << trashFilesPath();
+				vfsRefresh();
+			} else {
+				Alert::ask(error, "OK", QString());
 			}
 			continue;
 		}
 		/* A folder the user made on the startup disk: gone if empty. */
-		if (item->isVirtual && vfsIsUserFolder(item->path)) {
-			if (!vfsDeleteUserFolder(item->path)) {
+		if (vfsIsUserFolder(path)) {
+			if (!vfsDeleteUserFolder(path)) {
 				Alert::ask(QStringLiteral("“%1” isn't empty. Move what's inside it to the "
-					"Trash first.").arg(item->name), "OK", QString());
+					"Trash first.").arg(displayName(path)), "OK", QString());
 			}
 			continue;
 		}
 		/* The disk and the Trash itself can't go in the Trash, and
 		 * neither can anything else in the Macintosh view: there is no
 		 * file to move. */
-		if (item->isVirtual || item->kind == PL_ICON_DISK ||
-				item->kind == PL_ICON_TRASH_EMPTY ||
-				item->kind == PL_ICON_TRASH_FULL) {
+		if (vfsIsVirtual(path) || path == trashFilesPath() ||
+				QDir(path).isRoot()) {
 			continue;
 		}
-		if (QFile::moveToTrash(item->path)) {
-			changed << QFileInfo(item->path).absolutePath();
+		if (QFile::moveToTrash(path)) {
+			changed << QFileInfo(path).absolutePath();
 		}
 	}
 	changed.removeDuplicates();
@@ -740,7 +762,18 @@ void Finder::moveSelectionToTrash() {
 }
 
 void Finder::emptyTrash() {
+	static bool emptying = false;
+	if (emptying) {
+		return;
+	}
+	QScopedValueRollback<bool> guard(emptying, true);
 	const QString files = trashFilesPath();
+	QString queueError;
+	const auto applications = appTrashEntries(&queueError);
+	if (!queueError.isEmpty()) {
+		Alert::ask(queueError, "OK", QString());
+		return;
+	}
 	int count = 0;
 	qint64 bytes = 0;
 	QDirIterator it(files, QDir::AllEntries | QDir::NoDotAndDotDot | QDir::Hidden |
@@ -759,7 +792,80 @@ void Finder::emptyTrash() {
 		"want to permanently remove %5?")
 		.arg(count).arg(count == 1 ? "item" : "items").arg(count == 1 ? "uses" : "use")
 		.arg(finderSize(bytes)).arg(count == 1 ? "this item" : "these items");
+	if (!applications.empty()) {
+		QStringList names;
+		for (const auto &entry : applications) {
+			names << entry.name + " (" + entry.origin + ")";
+		}
+		message += "\n\nThis will uninstall: " + names.join(", ") +
+			". Personal application data is kept. Debian removal may also remove dependent packages.";
+	}
 	if (!Alert::ask(message)) {
+		return;
+	}
+	if (!applications.empty()) {
+		QProgressDialog progress("Uninstalling applications...", QString(), 0, 0);
+		progress.setWindowTitle("Uninstalling Applications");
+		progress.setWindowModality(Qt::ApplicationModal);
+		progress.setMinimumDuration(0);
+		progress.setCancelButton(nullptr);
+		progress.show();
+		platinumSetFrameStyle(&progress, FrameStyle::MovableModal);
+		quint64 completed = 0;
+		for (const auto &entry : applications) {
+			progress.setLabelText(QString("Uninstalling %1 (%2 of %3). Personal data is kept.")
+				.arg(entry.name).arg(completed + 1).arg(applications.size()));
+			QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+			appRefresh();
+			const AppEntry *app = appById(entry.id);
+			bool ok = true;
+			QString error;
+			if (app && app->origin != entry.origin) {
+				ok = false;
+				error = "The application's install source has changed: " + entry.name;
+			} else {
+				const QString source = entry.origin.section(':', 0, 0);
+				const QString id = entry.origin.section(':', 1);
+				bool installed = source == "flatpak" ? flatpakInstalled(id, &ok, &error)
+					: packagesInstalled({ id }, &ok, &error);
+				if (ok && installed) {
+					if (source == "flatpak") {
+						runFlatpak({ "uninstall", "--noninteractive", "--", id }, &ok, &error);
+					} else {
+						runAppstoreHelper({ "remove", id }, &ok, &error);
+					}
+					if (ok) {
+						installed = source == "flatpak" ? flatpakInstalled(id, &ok, &error)
+							: packagesInstalled({ id }, &ok, &error);
+						if (ok && installed) {
+							ok = false;
+							error = "The uninstall command finished, but the application is still installed: " +
+								entry.name;
+						}
+					}
+				}
+			}
+			if (ok) {
+				ok = appTrashRemove(entry.path, &error);
+			}
+			if (!ok) {
+				progress.hide();
+				qWarning().noquote() << error;
+				Alert::ask(error + "\nThe application remains queued in Trash; Put Away cancels removal.",
+					"OK", QString());
+				vfsRefresh();
+				folderChanged(files);
+				return;
+			}
+			++completed;
+			vfsRefresh();
+		}
+		progress.hide();
+	}
+	if (!appTrashEntries(&queueError).empty() || !queueError.isEmpty()) {
+		Alert::ask(queueError.isEmpty() ? "New applications were queued while emptying Trash. "
+			"Empty Trash again to confirm their removal." : queueError, "OK", QString());
+		folderChanged(files);
 		return;
 	}
 	if (!QDir(files).removeRecursively() ||

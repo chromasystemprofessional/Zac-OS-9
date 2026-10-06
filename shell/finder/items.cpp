@@ -11,6 +11,7 @@
 #include <sys/xattr.h>
 
 #include "appdb.h"
+#include "apptrash.h"
 #include "sharingclient.h"
 #include "vfs.h"
 
@@ -244,6 +245,20 @@ std::unique_ptr<Item> makeItem(const QFileInfo &info) {
 	item->size = info.isDir() ? 0 : info.size();
 	item->modified = info.lastModified();
 	item->labelIndex = readLabel(item->path);
+	if (appTrashMarker(item->path)) {
+		TrashedApplication entry;
+		QString error;
+		if (appTrashRead(item->path, &entry, &error)) {
+			item->name = entry.name;
+			item->kind = PL_ICON_APPLICATION;
+			if (const AppEntry *app = appById(entry.id)) {
+				item->customIcon32 = app->icon32;
+				item->customIcon16 = app->icon16;
+			}
+		} else {
+			qWarning().noquote() << error;
+		}
+	}
 	/* An application's alias: a link to its desktop file. It looks and
 	 * opens like the application. */
 	if (info.isSymLink() && info.symLinkTarget().endsWith(QLatin1String(".desktop"))) {

@@ -28,6 +28,8 @@
 #include "alert.h"
 #include "finder.h"
 #include "vfs.h"
+#include "apptrash.h"
+#include "appdb.h"
 #include "transferdialog.h"
 
 static bool sameDisk(const QString &a, const QString &b) {
@@ -252,6 +254,11 @@ QStringList transferItems(const QStringList &paths, const QString &destDir, bool
 		return {};
 	}
 	for (const QString &src : paths) {
+		if (appTrashMarker(src)) {
+			Alert::ask("Queued applications cannot be copied or moved as files. "
+				"Use Put Away or drag back to Applications to cancel removal.", "OK", QString());
+			return {};
+		}
 		QFileInfo info(src);
 		const QString srcAbs = info.absoluteFilePath();
 		/* A folder can't go inside itself. */
@@ -422,6 +429,18 @@ QMimeData *itemDragMime(const std::vector<Item *> &items) {
 	auto *mime = new QMimeData;
 	if (anyVirtual) {
 		mime->setData(ICON_MOVE_MIME, QByteArray());
+		QJsonArray applications;
+		for (const Item *item : items) {
+			if (!item->isVirtual || !vfsIsAppFolder(item->path)) {
+				applications = {};
+				break;
+			}
+			applications.append(vfsNode(item->path)->appId);
+		}
+		if (!applications.isEmpty()) {
+			mime->setData(APPLICATION_ITEMS_MIME,
+				QJsonDocument(applications).toJson(QJsonDocument::Compact));
+		}
 		QJsonArray aliases;
 		for (const Item *item : items) {
 			const VNode *node = item->isVirtual ? vfsNode(item->path) : nullptr;
@@ -520,6 +539,46 @@ static void installIntoApplications(const QStringList &paths) {
 }
 
 void dropItems(QDropEvent *e, const Item *target, const QString &folder) {
+	const bool toTrash = (target &&
+		(target->kind == PL_ICON_TRASH_EMPTY || target->kind == PL_ICON_TRASH_FULL)) ||
+		(!target && QDir(folder) == QDir(trashFilesPath()));
+	if (toTrash && e->mimeData()->hasFormat(APPLICATION_ITEMS_MIME)) {
+		const auto document = QJsonDocument::fromJson(e->mimeData()->data(APPLICATION_ITEMS_MIME));
+		if (!document.isArray() || document.array().isEmpty() || document.array().size() > 256) {
+			Alert::ask("The dragged application information is invalid.", "OK", QString());
+			e->ignore();
+			return;
+		}
+		QStringList ids;
+		for (const auto &value : document.array()) {
+			if (!value.isString() || !appById(value.toString())) {
+				Alert::ask("The dragged application is no longer available.", "OK", QString());
+				e->ignore();
+				return;
+			}
+			ids << value.toString();
+		}
+		// Release the drag grab before any error alert is opened.
+		QTimer::singleShot(0, QCoreApplication::instance(), [ids] {
+			bool queued = false;
+			for (const QString &id : ids) {
+				QString error;
+				if (appTrashQueue(id, &error)) {
+					queued = true;
+				} else {
+					Alert::ask(error, "OK", QString());
+				}
+			}
+			vfsRefresh();
+			Finder::instance().folderChanged(trashFilesPath());
+			if (queued) {
+				pl_sound_event("trash-move");
+			}
+		});
+		e->setDropAction(Qt::MoveAction);
+		e->accept();
+		return;
+	}
 	const bool aliasDrag = e->mimeData()->hasFormat(ALIAS_ITEMS_MIME);
 	const bool link = aliasDrag || e->proposedAction() == Qt::LinkAction ||
 		(e->modifiers() & (Qt::ControlModifier | Qt::AltModifier)) ==
@@ -584,8 +643,6 @@ void dropItems(QDropEvent *e, const Item *target, const QString &folder) {
 		return;
 	}
 	Finder &finder = Finder::instance();
-	const bool toTrash = target &&
-		(target->kind == PL_ICON_TRASH_EMPTY || target->kind == PL_ICON_TRASH_FULL);
 	if (toTrash) {
 		QStringList changed;
 		for (const QString &p : paths) {
@@ -606,7 +663,25 @@ void dropItems(QDropEvent *e, const Item *target, const QString &folder) {
 	}
 	QString dest = target ? target->path : folder;
 	if (vfsIsApplications(dest)) {
-		installIntoApplications(paths);
+		QStringList installers;
+		bool restored = false;
+		for (const QString &path : paths) {
+			if (appTrashMarker(path)) {
+				QString error;
+				if (appTrashRestore(path, &error)) {
+					restored = true;
+				} else {
+					Alert::ask(error, "OK", QString());
+				}
+			} else {
+				installers << path;
+			}
+		}
+		if (restored) {
+			vfsRefresh();
+			finder.folderChanged(trashFilesPath());
+		}
+		installIntoApplications(installers);
 		/* Copy: the install file stays where it was. */
 		e->setDropAction(Qt::CopyAction);
 		e->accept();

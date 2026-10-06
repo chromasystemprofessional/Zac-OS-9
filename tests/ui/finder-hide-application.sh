@@ -1,12 +1,12 @@
 #!/bin/sh
-# UI test: hiding an application from the Desktop (never uninstalling it).
+# UI test: queue an application in Trash and restore it (never uninstall it).
 # Run inside WSL:
 #   scripts/snapshot.sh /tmp/hide.png 14 "sh tests/ui/finder-hide-application.sh"
 # Expected:
-#   hide1.png  the confirmation alert, naming the application, offering
-#              "Remove" and "Cancel" (never "Delete" or "Uninstall")
-#   hide2.png  Applications with that application's folder gone
-#   hide3.png  Applications with it back, after Special > Show All Applications
+#   hide1.png  Applications with the queued application's launcher gone
+#   hide2.png  Trash holding the queued application
+#   hide3.png  Applications after Put Away cancels removal
+# Use an otherwise empty Trash in the disposable UI-test session.
 V=build/shell/vptr
 choose() { # $1 = menu title x, $2 = item y
 	wlrctl pointer move -3000 -3000
@@ -24,9 +24,17 @@ $V home move 353 130 click                         # select (not open) an app fo
 sleep 1
 choose 50 60                                        # File > Move To Trash
 grim /tmp/hide1.png
-$V key Return                                       # the alert's default button, "Remove"
+build/shell/zacos9-finder --open "file://${XDG_DATA_HOME:-$HOME/.local/share}/Trash/files"
 sleep 1
 grim /tmp/hide2.png
-choose 190 44                                       # Special > Show All Applications
+python3 - <<'PY'
+import os, socket
+path = (os.environ.get("XDG_RUNTIME_DIR", "/tmp") + "/zacos9-finder." +
+        os.environ.get("WAYLAND_DISPLAY", "wayland-0") + ".sock")
+with socket.socket(socket.AF_UNIX) as client:
+    client.connect(path)
+    client.recv(4096)
+    client.sendall(b"cmd select-all\ncmd put-away\ncmd close-window\n")
+PY
 sleep 1
 grim /tmp/hide3.png

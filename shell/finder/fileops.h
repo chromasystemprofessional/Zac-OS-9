@@ -29,6 +29,7 @@ QString createAlias(const QString &target, const QString &destDir, const QString
  * view's virtual items: no files to hand anywhere). */
 inline constexpr char ICON_MOVE_MIME[] = "application/x-zacos9-icon-move";
 inline constexpr char ALIAS_ITEMS_MIME[] = "application/x-zacos9-alias-items";
+inline constexpr char APPLICATION_ITEMS_MIME[] = "application/x-zacos9-application-items";
 /* Caller owns the file URLs or private virtual-item alias payload. */
 QMimeData *itemDragMime(const std::vector<Item *> &items);
 void startItemDrag(QWidget *source, const std::vector<Item *> &items,

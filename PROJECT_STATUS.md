@@ -24,6 +24,30 @@ Updated: 2026-10-06
 
 ## Current work
 
+**Trash queues application uninstall** (0.1.26): moving a supported
+Debian or user Flatpak application to Trash via the menu or a drag creates
+a persisted uninstall record and hides its launcher, without uninstalling
+yet. Put Away or dragging back to Applications cancels removal. Empty Trash
+confirms app names/sources and shows progress, then uses the existing
+software helper or user Flatpak uninstall, retaining personal data. Failures
+keep pending entries for retry/restoration and do not delete ordinary Trash
+contents. Unsupported or system-wide Flatpak apps report an explicit error.
+Application aliases remain ordinary links and never uninstall their targets.
+Finder builds and focused Finder/Store tests pass with mocked uninstall
+commands; tests cover separate-process queue persistence, confirmation
+cancellation, failed and no-op uninstalls, personal-data preservation and
+ordinary Trash retention on errors. No real application was uninstalled.
+
+**First-install Flatpak launcher discovery** (0.1.26): Finder now watches
+the existing ancestors of missing application directories and reacts to GIO
+application-list changes. A first Flatpak installation (such as Chaski) can
+create its export directory after login and appear in Applications without a
+manual refresh or reboot. Reloading also picks up newly created icon-theme
+directories. Tests cover symlinked exports, automatic folder refresh,
+Flatpak identity, icons, removal and export-directory replacement.
+The automatic discovery regression and Store browser suite pass; a normal
+refresh was requested in the live Finder for the already installed Chaski.
+
 **Persistent local-administrator Mac mount authorization** (0.1.25):
 the existing polkit mount rule now includes the constrained read-only Mac
 mount/eject helper. Active local members of `sudo` no longer receive an

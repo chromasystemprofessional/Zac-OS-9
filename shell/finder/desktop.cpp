@@ -621,7 +621,8 @@ void Desktop::clearDropTarget() {
 }
 
 void Desktop::dragEnterEvent(QDragEnterEvent *e) {
-	if (e->mimeData()->hasUrls() || e->mimeData()->hasFormat(ALIAS_ITEMS_MIME)) {
+	if (e->mimeData()->hasUrls() || e->mimeData()->hasFormat(ALIAS_ITEMS_MIME) ||
+			e->mimeData()->hasFormat(APPLICATION_ITEMS_MIME)) {
 		e->acceptProposedAction();
 	}
 }

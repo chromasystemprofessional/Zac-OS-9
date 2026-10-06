@@ -123,10 +123,7 @@ static void add_finder_menus(struct mb_menu *menus, int *n) {
 	m = new_menu(menus, n, "Special");
 	add(m, "Empty Trash…", 0, up && fs->trash, ACT_FINDER, "empty-trash");
 	add(m, "Erase Disk…", 0, up && fs->erase && fs->selection == 1, ACT_FINDER, "erase-disk");
-	/* ZacOS 9's own: brings back applications hidden from Applications
-	 * (Move To Trash on one hides it, rather than touching the package
-	 * it belongs to). No Mac OS 9 original had this, because there the
-	 * Trash really did hold the file. */
+	/* Restore legacy hidden overrides, not applications queued in Trash. */
 	add(m, "Show All Applications", 0, up, ACT_FINDER, "show-hidden-applications");
 	sep(m);
 	add(m, "Sleep",     0, true, ACT_LAUNCH, "systemctl suspend");

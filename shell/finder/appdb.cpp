@@ -60,11 +60,6 @@ void readActions(GDesktopAppInfo *desktop, AppEntry *entry) {
  * spec's always-present fallback theme, and almost every icon not in a
  * desktop's own theme is installed there directly. */
 void ensureIconTheme() {
-	static bool done = false;
-	if (done) {
-		return;
-	}
-	done = true;
 	QStringList search = QIcon::themeSearchPaths();
 	for (const QString &base :
 			QStandardPaths::standardLocations(QStandardPaths::GenericDataLocation)) {
@@ -112,7 +107,6 @@ void resolveIcon(GAppInfo *info, AppEntry *entry) {
 	if (!icon) {
 		return;
 	}
-	ensureIconTheme();
 	/* Icon= a file path (AppImages and unpacked programs the App
 	 * Installer set up, for one): load the file itself. */
 	if (G_IS_FILE_ICON(icon)) {
@@ -271,6 +265,9 @@ const QSet<QString> &baseApplications() {
 
 void load() {
 	g_apps.clear();
+	if (qobject_cast<QGuiApplication *>(QCoreApplication::instance())) {
+		ensureIconTheme();
+	}
 	/* g_app_info_get_all() applies XDG data directory precedence and
 	 * drops entries that are Hidden or whose TryExec is missing. */
 	GList *all = g_app_info_get_all();
@@ -349,11 +346,21 @@ constexpr int SETTLE_MS = 400;
 /* Watch the application directories, and the folders Wine files Windows
  * programs' shortcuts in (applications/wine/Programs/<program>/): a
  * watcher sees only one level, so a shortcut made three folders down was
- * noticed only when something else changed. Run again after each change,
- * as new folders appear. */
+ * noticed only when something else changed. Watch an existing ancestor too:
+ * the first Flatpak installation can create the entire export tree. Run
+ * again after each change, as new folders appear. */
 void watchDirs(QFileSystemWatcher *w) {
 	for (const QString &dir : applicationDirs()) {
 		QStringList want;
+		QString parent = QFileInfo(dir).absolutePath();
+		while (!QDir(parent).exists()) {
+			const QString next = QFileInfo(parent).absolutePath();
+			if (next == parent) {
+				break;
+			}
+			parent = next;
+		}
+		want << parent;
 		if (QDir(dir).exists()) {
 			want << dir;
 			QDirIterator it(dir + "/wine", QDir::Dirs | QDir::NoDotAndDotDot,
@@ -366,8 +373,8 @@ void watchDirs(QFileSystemWatcher *w) {
 			}
 		}
 		for (const QString &d : want) {
-			if (!w->directories().contains(d)) {
-				w->addPath(d);
+			if (!w->directories().contains(d) && !w->addPath(d)) {
+				qWarning().noquote() << "Unable to watch application directory:" << d;
 			}
 		}
 	}
@@ -377,15 +384,11 @@ QFileSystemWatcher *watcher() {
 	static QFileSystemWatcher *w = nullptr;
 	if (!w) {
 		w = new QFileSystemWatcher;
-		/* Asking for the monitor is what makes GIO watch the
-		 * application directories, so its list expires with ours. */
-		static GAppInfoMonitor *monitor = g_app_info_monitor_get();
-		(void)monitor;
 		auto *settle = new QTimer;
 		settle->setSingleShot(true);
 		settle->setInterval(SETTLE_MS);
 		QObject::connect(settle, &QTimer::timeout, [] {
-			load();
+			appRefresh();
 			const auto callbacks = g_callbacks;
 			for (const auto &f : callbacks) {
 				f();
@@ -396,6 +399,12 @@ QFileSystemWatcher *watcher() {
 				watchDirs(w);
 				settle->start();
 			});
+		static GAppInfoMonitor *monitor = g_app_info_monitor_get();
+		g_signal_connect(monitor, "changed", G_CALLBACK(+[](GAppInfoMonitor *, gpointer data) {
+			auto *timer = static_cast<QTimer *>(data);
+			watchDirs(watcher());
+			timer->start();
+		}), settle);
 	}
 	return w;
 }

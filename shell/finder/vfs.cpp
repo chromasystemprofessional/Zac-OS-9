@@ -15,6 +15,7 @@
 #include <algorithm>
 
 #include "appdb.h"
+#include "apptrash.h"
 
 /*
  * The default mapping. Written to the registry the first time the Finder
@@ -275,8 +276,15 @@ void addNode(const VNode &node) {
 /* Each application appears as a direct launcher in the parent folder.
  * Nothing is copied: these are entries in this model only. */
 void generateApps(const VNode &parent) {
+	QString error;
+	const auto queued = appTrashEntries(&error);
+	if (!error.isEmpty()) {
+		qWarning().noquote() << error;
+	}
 	for (const AppEntry &app : appList()) {
-		if (!matchesCategories(app, parent)) {
+		if (!matchesCategories(app, parent) ||
+				std::any_of(queued.begin(), queued.end(),
+					[&app](const TrashedApplication &entry) { return entry.id == app.id; })) {
 			continue;
 		}
 		VNode launcher;
