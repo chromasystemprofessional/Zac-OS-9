@@ -1,3 +1,17 @@
+zacos9 (0.1.23) trixie; urgency=medium
+
+  * APFS mounting now skips standard helper volumes such as Preboot,
+    Recovery, VM and Update. Normal data/system volumes appear in Sniffer
+    using their stored disk names, such as Chromasystem SSD, and open
+    directly instead of showing numbered container folders. Separate system
+    and Data volumes remain visible. Mounts stay read-only. Helper
+    filtering uses exact standard names because the Debian reader does not
+    expose volume roles; custom-renamed helper volumes cannot be identified
+    automatically. Install and reboot to apply the change to existing
+    mounts.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Tue, 06 Oct 2026 15:52:05 -0400
+
 zacos9 (0.1.22) trixie; urgency=medium
 
   * Fix the APFS device-or-resource-busy mount error in 0.1.21. Mount
