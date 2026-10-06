@@ -1,3 +1,14 @@
+zacos9 (0.1.26) trixie; urgency=medium
+
+  * Finder now automatically discovers newly installed Flatpak
+    applications, including first-install export directories and icons.
+    Moving supported Debian or user Flatpak applications to Trash queues
+    uninstall; Put Away cancels removal, and Empty Trash confirms and
+    uninstalls while preserving personal data. Failed removals remain
+    queued for retry.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Tue, 06 Oct 2026 18:03:52 -0400
+
 zacos9 (0.1.25) trixie; urgency=medium
 
   * Flathub applications now appear in the main Software categories with
