@@ -206,6 +206,12 @@ isolated sessions. Verification of YouTube playback on the affected system
 remains necessary; this is a replacement capture path, not a proven diagnosis
 of the server's earlier `403` responses.
 
+## Mac disks and disk images
+
+Sniffer mounts HFS/HFS+ and supported APFS volumes read-only, including Mac
+disk images opened with a double-click. See [Mac disks](docs/mac-disks.md)
+for supported containers, eject behavior, authentication and limitations.
+
 ## Custom desktop patterns
 
 Appearance also supports saved appearance presets and interface sound sets.

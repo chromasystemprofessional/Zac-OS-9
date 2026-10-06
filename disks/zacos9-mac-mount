@@ -1,0 +1,118 @@
+#!/usr/bin/python3
+"""Privileged, read-only mounting of HFS, HFS+ and APFS block devices."""
+import contextlib
+import fcntl
+import json
+import os
+from pathlib import Path
+import pwd
+import re
+import stat
+import subprocess
+import sys
+
+ROOT = Path("/run/media/zacos9-mac")
+DEVICE = re.compile(r"/dev/(?:sd[a-z]+[0-9]*|nvme[0-9]+n[0-9]+(?:p[0-9]+)?|"
+                    r"mmcblk[0-9]+(?:p[0-9]+)?|loop[0-9]+(?:p[0-9]+)?|sr[0-9]+)\Z")
+FILESYSTEMS = {"hfs", "hfsplus", "apfs"}
+
+
+def run(args, pass_fds=()):
+    result = subprocess.run(args, capture_output=True, text=True, timeout=120,
+                            pass_fds=pass_fds, check=False,
+                            env={"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "LC_ALL": "C"})
+    if result.returncode:
+        raise ValueError(f"{Path(args[0]).name}: {result.stderr.strip() or result.stdout.strip()}")
+    return result.stdout.strip()
+
+
+def root_directory(path):
+    try:
+        path.mkdir(mode=0o755)
+    except FileExistsError:
+        pass
+    info = path.lstat()
+    if not stat.S_ISDIR(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o022:
+        raise ValueError("Unsafe mount directory: " + str(path))
+
+
+@contextlib.contextmanager
+def mount_root(uid):
+    for path in (Path("/run"), Path("/run/media"), ROOT, ROOT / str(uid)):
+        root_directory(path)
+    run(["/usr/bin/setfacl", "--set",
+         f"u::rwx,u:{uid}:r-x,g::---,m::r-x,o::---", str(ROOT / str(uid))])
+    fd = os.open(ROOT / ".lock", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+    try:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode) or info.st_uid or info.st_mode & 0o077:
+            raise ValueError("Unsafe mount lock")
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        yield ROOT / str(uid)
+    finally:
+        os.close(fd)
+
+
+def mount_device(operation, device, uid):
+    if not DEVICE.fullmatch(device):
+        raise ValueError("Specify a canonical Mac block device, not an arbitrary path")
+    fd = os.open(device, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    try:
+        info = os.fstat(fd)
+        if not stat.S_ISBLK(info.st_mode):
+            raise ValueError("Not a block device")
+        name = f"{os.major(info.st_rdev)}-{os.minor(info.st_rdev)}"
+        with mount_root(uid) as directory:
+            target = directory / name
+            if operation == "unmount":
+                if not os.path.ismount(target):
+                    raise ValueError("This Mac volume is not mounted")
+                run(["/usr/bin/umount", "--", str(target)])
+                target.rmdir()
+                (directory / (name + ".json")).unlink()
+                return {"path": str(target), "device": device}
+            if os.path.ismount(target):
+                return {"path": str(target), "device": device}
+            root_directory(target)
+            source = f"/proc/self/fd/{fd}"
+            filesystem = run(["/usr/sbin/blkid", "-p", "-s", "TYPE", "-o", "value",
+                              source], (fd,))
+            if filesystem not in FILESYSTEMS:
+                raise ValueError("Not an HFS, HFS+ or APFS volume")
+            if filesystem == "apfs":
+                # libfsapfs provides read-only FUSE access, with each APFS volume
+                # below the container root. No passwords are put in argv.
+                run(["/usr/bin/fsapfsmount", "-f", "all", "-X",
+                     "ro,nodev,nosuid,noexec,allow_other", source, str(target)], (fd,))
+            else:
+                run(["/usr/bin/mount", "-t", filesystem, "-o", "ro,nodev,nosuid,noexec",
+                     source, str(target)], (fd,))
+            if not os.path.ismount(target):
+                raise ValueError("The mount tool exited without mounting the volume")
+            record = directory / (name + ".json")
+            try:
+                record.write_text(json.dumps({"device": device, "path": str(target)}))
+                record.chmod(0o644)
+            except OSError:
+                run(["/usr/bin/umount", "--", str(target)])
+                raise
+            return {"path": str(target), "device": device}
+    finally:
+        os.close(fd)
+
+
+def main():
+    if os.geteuid() != 0 or not os.environ.get("PKEXEC_UID", "").isdigit():
+        raise ValueError("Run this helper through pkexec")
+    uid = int(os.environ["PKEXEC_UID"])
+    pwd.getpwuid(uid)
+    if uid == 0 or len(sys.argv) != 3 or sys.argv[1] not in ("mount", "unmount"):
+        raise ValueError("Usage: pkexec zacos9-mac-mount mount|unmount DEVICE")
+    print(json.dumps(mount_device(sys.argv[1], sys.argv[2], uid)))
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except (ValueError, OSError, KeyError, subprocess.TimeoutExpired) as error:
+        sys.exit("Mac disk: " + str(error))

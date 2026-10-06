@@ -209,7 +209,13 @@ void Finder::command(const QString &name) {
 	} else if (name.startsWith("label ")) {
 		setLabel(name.mid(6).toInt());
 	} else if (name == "classic") {
-		launchClassic();
+		QStringList disks;
+		for (Item *item : front()->selectedItems()) {
+			if (item->kind == PL_ICON_DISK_IMAGE && !item->isDir) {
+				disks << item->path;
+			}
+		}
+		launchClassic(disks);
 	} else if (name == "refresh") {
 		/* The fallback when a desktop entry appears without the
 		 * application directories changing in a way we can see. */
@@ -318,7 +324,7 @@ void Finder::openItem(Item *item) {
 			QDir().mkpath(item->path);
 			FolderWindow::open(item->path);
 		} else if (item->kind == PL_ICON_DISK_IMAGE) {
-			launchClassic({ item->path });
+			mountMacImage(item->path);
 		} else if (item->kind == PL_ICON_WINDOWS) {
 			launchWindows(item->path);
 		} else if (item->kind == PL_ICON_CLASSIC) {
@@ -332,6 +338,26 @@ void Finder::openItem(Item *item) {
 			}
 		}
 	}
+}
+
+void Finder::mountMacImage(const QString &image) {
+	auto *progress = new QProgressDialog("Mounting " + QFileInfo(image).fileName() + " read-only...",
+		QString(), 0, 0);
+	progress->setWindowTitle("Mounting Disk");
+	progress->setCancelButton(nullptr);
+	progress->setWindowModality(Qt::ApplicationModal);
+	progress->setMinimumDuration(0);
+	progress->show();
+	platinumSetFrameStyle(progress, FrameStyle::MovableModal);
+	localVolumeMountMacImage(image, [progress](const QString &path, const QString &error) {
+		progress->hide();
+		progress->deleteLater();
+		if (!error.isEmpty()) {
+			Alert::ask("The disk image could not be mounted. " + error, "OK", QString());
+		} else {
+			FolderWindow::open(path);
+		}
+	});
 }
 
 /* ---- archives ------------------------------------------------------------------------ */

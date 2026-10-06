@@ -549,6 +549,33 @@ int main(int argc, char **argv) {
 	check(!vfsDeleteUserFolder(vfsPathFor("home")), "Home is not one of them");
 	vfsDeleteUserFolder(userFolder2);
 
+	/* ---- Mac disk image recognition ----------------------------------- */
+	for (const QString &suffix : QStringList{ "dmg", "sparseimage" }) {
+		QFile image(root + "/disk." + suffix);
+		image.open(QIODevice::WriteOnly);
+		image.write("image");
+		image.close();
+		check(isMacDiskImage(image.fileName()) && iconKindFor(image.fileName()) == PL_ICON_DISK_IMAGE,
+			"Mac container images have a mountable disk-image icon");
+	}
+	const QString bundle = root + "/disk.sparsebundle";
+	QDir().mkpath(bundle);
+	QFile bundleInfo(bundle + "/Info.plist");
+	bundleInfo.open(QIODevice::WriteOnly);
+	bundleInfo.write("plist");
+	bundleInfo.close();
+	check(isMacDiskImage(bundle) && iconKindFor(bundle) == PL_ICON_DISK_IMAGE,
+		"a sparse bundle is a disk image, not an ordinary folder");
+	for (const QByteArray &signature : { QByteArray("NXSB"), QByteArray("EFI PART") }) {
+		QByteArray data(400 * 1024, '\0');
+		data.replace(signature == "NXSB" ? 32 : 512, signature.size(), signature);
+		QFile image(root + "/disk.img");
+		image.open(QIODevice::WriteOnly);
+		image.write(data);
+		image.close();
+		check(isMacDiskImage(image.fileName()), "APFS and GPT raw images are recognized");
+	}
+
 	/* ---- unprivileged -------------------------------------------------- */
 	check(!namesIn(vfsRoot()).isEmpty(), "browsing needs no privileges");
 	/* Every directory the Finder may write into through this hierarchy

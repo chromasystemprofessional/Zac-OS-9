@@ -1,0 +1,321 @@
+#!/usr/bin/python3
+"""Prepare Mac images and mount volumes read-only; never modify the source."""
+import json
+import contextlib
+import ctypes
+import os
+from pathlib import Path
+import plistlib
+import re
+import shutil
+import stat
+import struct
+import subprocess
+import sys
+import tempfile
+
+installed_helper = Path(__file__).resolve().parent.parent / "libexec/zacos9/zacos9-mac-mount"
+HELPER = str(installed_helper) if installed_helper.is_file() else "/usr/libexec/zacos9/zacos9-mac-mount"
+MAC_TYPES = {"hfs", "hfsplus", "apfs"}
+MAX_IMAGE = 2 * 1024**4
+
+
+def run(args):
+    result = subprocess.run(args, capture_output=True, text=True, timeout=600, check=False)
+    if result.returncode:
+        raise ValueError(f"{Path(args[0]).name}: {result.stderr.strip() or result.stdout.strip()}")
+    return result.stdout.strip()
+
+
+def block_call(method, path, interface, signature, values):
+    from gi.repository import Gio, GLib
+    bus = Gio.bus_get_sync(Gio.BusType.SYSTEM, None)
+    return bus.call_sync("org.freedesktop.UDisks2", path,
+                         "org.freedesktop.UDisks2." + interface, method,
+                         GLib.Variant(signature, values), None,
+                         Gio.DBusCallFlags.NONE, 120000, None).unpack()
+
+
+def loop_setup(path):
+    from gi.repository import Gio, GLib
+    fd = os.open(path, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW)
+    try:
+        if not stat.S_ISREG(os.fstat(fd).st_mode):
+            raise ValueError("The image must be a regular file")
+        descriptors = Gio.UnixFDList.new()
+        handle = descriptors.append(fd)
+        bus = Gio.bus_get_sync(Gio.BusType.SYSTEM, None)
+        result, _ = bus.call_with_unix_fd_list_sync(
+            "org.freedesktop.UDisks2", "/org/freedesktop/UDisks2/Manager",
+            "org.freedesktop.UDisks2.Manager", "LoopSetup",
+            GLib.Variant("(ha{sv})", (handle, {"read-only": GLib.Variant("b", True)})),
+            None, Gio.DBusCallFlags.NONE, 120000, descriptors, None)
+        return result.unpack()[0]
+    finally:
+        os.close(fd)
+
+
+def managed_objects():
+    from gi.repository import Gio, GLib
+    bus = Gio.bus_get_sync(Gio.BusType.SYSTEM, None)
+    return bus.call_sync(
+        "org.freedesktop.UDisks2", "/org/freedesktop/UDisks2",
+        "org.freedesktop.DBus.ObjectManager", "GetManagedObjects", None, None,
+        Gio.DBusCallFlags.NONE, 30000, None).unpack()[0]
+
+
+def device_name(properties):
+    return bytes(properties["Device"]).rstrip(b"\0").decode("utf-8")
+
+
+def copy_range(source, output, size):
+    remaining = size
+    while remaining:
+        data = source.read(min(1024 * 1024, remaining))
+        if not data:
+            raise ValueError("Truncated disk image")
+        output.write(data)
+        remaining -= len(data)
+
+
+def sparsebundle(source, destination):
+    metadata = source / "Info.plist"
+    if metadata.is_symlink() or metadata.stat().st_size > 1024 * 1024:
+        raise ValueError("Invalid sparse bundle metadata")
+    with metadata.open("rb") as stream:
+        info = plistlib.load(stream)
+    size, band_size = info.get("size"), info.get("band-size")
+    if (type(size) is not int or type(band_size) is not int or
+            not 0 < size <= MAX_IMAGE or not 0 < band_size <= 1024**3):
+        raise ValueError("Invalid sparse bundle size or band size")
+    bands = source / "bands"
+    if bands.is_symlink() or not bands.is_dir():
+        raise ValueError("Invalid sparse bundle bands")
+    with destination.open("wb") as output:
+        output.truncate(size)
+        seen = set()
+        for band in bands.iterdir():
+            if not re.fullmatch(r"[0-9a-fA-F]+", band.name):
+                raise ValueError("Invalid sparse bundle band name")
+            offset = int(band.name, 16) * band_size
+            if (band.is_symlink() or not band.is_file() or offset >= size or
+                    offset in seen or
+                    band.stat().st_size > min(band_size, size - offset)):
+                raise ValueError("Invalid sparse bundle band")
+            seen.add(offset)
+            output.seek(offset)
+            with band.open("rb") as stream:
+                copy_range(stream, output, band.stat().st_size)
+
+
+@contextlib.contextmanager
+def modi_image(source):
+    library = ctypes.CDLL("libmodi.so.1")
+    pointer = ctypes.c_void_p
+    pointer_ref = ctypes.POINTER(pointer)
+    signatures = {
+        "handle_initialize": ([pointer_ref, pointer_ref], ctypes.c_int),
+        "handle_open": ([pointer, ctypes.c_char_p, ctypes.c_int, pointer_ref], ctypes.c_int),
+        "handle_close": ([pointer, pointer_ref], ctypes.c_int),
+        "handle_get_media_size": ([pointer, ctypes.POINTER(ctypes.c_uint64), pointer_ref], ctypes.c_int),
+        "handle_read_buffer_at_offset": ([pointer, pointer, ctypes.c_size_t, ctypes.c_int64, pointer_ref],
+                                         ctypes.c_ssize_t),
+        "handle_free": ([pointer_ref, pointer_ref], ctypes.c_int),
+        "error_sprint": ([pointer, ctypes.c_char_p, ctypes.c_size_t], ctypes.c_int),
+        "error_free": ([pointer_ref], None),
+    }
+    for name, (arguments, result) in signatures.items():
+        function = getattr(library, "libmodi_" + name)
+        function.argtypes, function.restype = arguments, result
+    handle, error = pointer(), pointer()
+    opened = False
+
+    def check(result, expected=1):
+        if result != expected:
+            message = ctypes.create_string_buffer(4096)
+            library.libmodi_error_sprint(error, message, len(message))
+            library.libmodi_error_free(ctypes.byref(error))
+            raise ValueError("Sparse image: " + message.value.decode("utf-8", errors="replace"))
+
+    def read(offset, size):
+        buffer = ctypes.create_string_buffer(size)
+        check(library.libmodi_handle_read_buffer_at_offset(
+            handle, buffer, size, offset, ctypes.byref(error)), size)
+        return buffer.raw
+
+    try:
+        check(library.libmodi_handle_initialize(ctypes.byref(handle), ctypes.byref(error)))
+        check(library.libmodi_handle_open(handle, os.fsencode(source), 1, ctypes.byref(error)))
+        opened = True
+        size = ctypes.c_uint64()
+        check(library.libmodi_handle_get_media_size(handle, ctypes.byref(size), ctypes.byref(error)))
+        yield size.value, read
+    finally:
+        if handle:
+            try:
+                if opened:
+                    check(library.libmodi_handle_close(handle, ctypes.byref(error)), 0)
+            finally:
+                check(library.libmodi_handle_free(ctypes.byref(handle), ctypes.byref(error)))
+
+
+def sparseimage(source, destination):
+    with modi_image(source) as (size, read):
+        if not 0 < size <= MAX_IMAGE:
+            raise ValueError("Invalid or oversized sparse image")
+        with destination.open("wb") as output:
+            offset = 0
+            while offset < size:
+                data = read(offset, min(1024 * 1024, size - offset))
+                if data.strip(b"\0"):
+                    if shutil.disk_usage(destination.parent).free < len(data) + 256 * 1024**2:
+                        raise ValueError("Not enough free space to prepare the sparse image")
+                    output.write(data)
+                else:
+                    output.seek(len(data), os.SEEK_CUR)
+                offset += len(data)
+            output.truncate(size)
+
+
+def prepare_image(source, directory):
+    suffix = source.suffix.lower()
+    target = directory / "image.raw"
+    if source.is_dir():
+        if suffix != ".sparsebundle":
+            raise ValueError("Not a sparse bundle")
+        sparsebundle(source, target)
+        return target
+    if not source.is_file() or not 0 < source.stat().st_size <= MAX_IMAGE:
+        raise ValueError("Invalid or oversized disk image")
+    with source.open("rb") as stream:
+        head = stream.read(84)
+        stream.seek(max(0, source.stat().st_size - 512))
+        trailer = stream.read(512)
+        if trailer[:4] == b"koly":
+            size = struct.unpack_from(">Q", trailer, 492)[0] * 512
+            if not 0 < size <= MAX_IMAGE:
+                raise ValueError("Invalid or oversized DMG")
+            if shutil.disk_usage(directory).free < size + 256 * 1024**2:
+                raise ValueError("Not enough free space to expand the DMG")
+            run(["dmg2img", str(source), str(target)])
+            return target
+        if head[:4] == b"sprs":
+            sparseimage(source, target)
+            return target
+        # Disk Copy 4.2: 84-byte header, data followed by optional tag bytes.
+        if len(head) == 84 and head[82:84] == b"\x01\x00" and head[0] <= 63:
+            size, tags = struct.unpack_from(">II", head, 64)
+            if size == 0 or 84 + size + tags != source.stat().st_size:
+                raise ValueError("Invalid Disk Copy image")
+            stream.seek(84)
+            with target.open("wb") as output:
+                copy_range(stream, output, size)
+            return target
+    return source
+
+
+def scan():
+    result = []
+    for path, interfaces in managed_objects().items():
+        block = interfaces.get("org.freedesktop.UDisks2.Block", {})
+        filesystem = interfaces.get("org.freedesktop.UDisks2.Filesystem", {})
+        if (block.get("IdType") in MAC_TYPES and not block.get("HintIgnore")
+                and not filesystem.get("MountPoints")):
+            # Mounted helper volumes are suppressed by the Finder's device set.
+            result.append(device_name(block))
+    return result
+
+
+def release_image(device):
+    cache = Path(os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache"))) / "zacos9/mac-images"
+    if not cache.exists():
+        return
+    for record in cache.glob("mount-*/mount.json"):
+        info = json.loads(record.read_text())
+        if device not in info["devices"]:
+            continue
+        if any(os.path.ismount(path) for path in info["paths"]):
+            return
+        block_call("Delete", info["loop"], "Loop", "(a{sv})", ({},))
+        shutil.rmtree(record.parent)
+        return
+
+
+def remove_cache(directory):
+    shutil.rmtree(directory)
+
+
+def mount(source):
+    if str(source).startswith("/dev/"):
+        return json.loads(run(["pkexec", HELPER, "mount", str(source)]))
+    cache = Path(os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache"))) / "zacos9/mac-images"
+    cache.mkdir(parents=True, exist_ok=True, mode=0o700)
+    for record in cache.glob("mount-*/mount.json"):
+        info = json.loads(record.read_text())
+        if info.get("source") == str(source.resolve()) and all(
+                os.path.ismount(path) for path in info["paths"]):
+            return info
+    directory = Path(tempfile.mkdtemp(prefix="mount-", dir=cache))
+    loop = None
+    mounted = []
+    try:
+        prepared = prepare_image(source, directory)
+        loop = loop_setup(prepared)
+        info = {"paths": [], "loop": loop, "source": str(source.resolve()), "devices": []}
+        (directory / "mount.json").write_text(json.dumps(info))
+        # UDisks' LoopSetup waits for udev and its partition objects.
+        for path, interfaces in managed_objects().items():
+            if path != loop and not path.startswith(loop + "p"):
+                continue
+            block = interfaces.get("org.freedesktop.UDisks2.Block", {})
+            if block.get("IdType") in MAC_TYPES:
+                mounted.append(json.loads(run(["pkexec", HELPER, "mount", device_name(block)])))
+                info["paths"] = [item["path"] for item in mounted]
+                info["devices"] = [item["device"] for item in mounted]
+                (directory / "mount.json").write_text(json.dumps(info))
+        if not mounted:
+            raise ValueError("No supported Mac filesystem found. Encrypted/CoreStorage, MFS "
+                             "and non-Mac images cannot be mounted by this tool")
+        return info
+    except Exception as error:
+        # Roll back each completed mount before removing its image backing file.
+        # Errors are re-raised; failed cleanup retains the backing file.
+        failures = []
+        for item in reversed(mounted):
+            try:
+                run(["pkexec", HELPER, "unmount", item["device"]])
+            except (ValueError, OSError, subprocess.TimeoutExpired) as failure:
+                failures.append(str(failure))
+        if not failures:
+            try:
+                if loop:
+                    block_call("Delete", loop, "Loop", "(a{sv})", ({},))
+                remove_cache(directory)
+            except Exception as failure:
+                raise ValueError(f"{error}; cleanup failed: {failure}") from error
+        else:
+            raise ValueError(f"{error}; cleanup failed: {'; '.join(failures)}") from error
+        raise
+
+
+def main():
+    if len(sys.argv) == 2 and sys.argv[1] == "scan":
+        print(json.dumps(scan()))
+    elif len(sys.argv) == 3 and sys.argv[1] in ("mount", "unmount"):
+        source = Path(sys.argv[2]).absolute()
+        if sys.argv[1] == "unmount":
+            result = run(["pkexec", HELPER, "unmount", str(source)])
+            release_image(str(source))
+            print(result)
+        else:
+            print(json.dumps(mount(source)))
+    else:
+        raise ValueError("Usage: zacos9-mac-disks scan|mount SOURCE|unmount DEVICE")
+
+
+if __name__ == "__main__":
+    from gi.repository import GLib
+    try:
+        main()
+    except (ValueError, OSError, GLib.Error, subprocess.TimeoutExpired) as error:
+        sys.exit("Mac disk: " + str(error))

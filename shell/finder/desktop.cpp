@@ -9,6 +9,7 @@
 #include <QDragEnterEvent>
 #include <QKeyEvent>
 #include <QMouseEvent>
+#include <QPointer>
 #include <QSet>
 #include <QSettings>
 #include <QStandardPaths>
@@ -17,6 +18,7 @@
 #include <QHash>
 
 #include "fileops.h"
+#include "alert.h"
 #include "folderwindow.h"
 #include "menudraw.h"
 #include "localvolumes.h"
@@ -114,7 +116,12 @@ Desktop::Desktop() {
 	m_netVolumesTimer.start(NET_VOLUMES_POLL_MS);
 
 	refreshLocalVolumes();
-	localVolumesOnChange([this] { refreshLocalVolumes(); });
+	localVolumesOnChange([owner = QPointer<Desktop>(this)] {
+		if (owner) {
+			owner->refreshLocalVolumes();
+		}
+	});
+	localVolumesOnError([](const QString &error) { Alert::ask(error, "OK", QString()); });
 	localVolumesMountAll();
 }
 

@@ -61,10 +61,10 @@ const Text &Item::fullLabelText() {
 
 const QString &Item::kindName() {
 	if (kindText.isEmpty()) {
-		if (isDir) {
-			kindText = "folder";
-		} else if (kind == PL_ICON_DISK_IMAGE) {
+		if (kind == PL_ICON_DISK_IMAGE) {
 			kindText = "Macintosh disk image";
+		} else if (isDir) {
+			kindText = "folder";
 		} else if (kind == PL_ICON_WINDOWS) {
 			kindText = "Windows application";
 		} else if (kind == PL_ICON_CLASSIC) {
@@ -137,11 +137,11 @@ bool isSharedFolder(const QString &path) {
 
 pl_icon_kind iconKindFor(const QString &path) {
 	QFileInfo info(path);
-	if (info.isDir()) {
-		return PL_ICON_FOLDER;
-	}
 	if (isMacDiskImage(path)) {
 		return PL_ICON_DISK_IMAGE;
+	}
+	if (info.isDir()) {
+		return PL_ICON_FOLDER;
 	}
 	if (isWindowsExecutable(path)) {
 		return PL_ICON_WINDOWS;
@@ -164,6 +164,13 @@ bool isMacDiskImage(const QString &path) {
 		"dsk", "img", "hfv", "hda", "toast", "iso", "cdr", "image",
 	};
 	QFileInfo info(path);
+	if (info.isDir() && info.suffix().compare("sparsebundle", Qt::CaseInsensitive) == 0) {
+		return QFileInfo(path + "/Info.plist").isFile();
+	}
+	if (info.isFile() && (info.suffix().compare("dmg", Qt::CaseInsensitive) == 0 ||
+			info.suffix().compare("sparseimage", Qt::CaseInsensitive) == 0)) {
+		return true;
+	}
 	if (!info.isFile() || info.size() < 400 * 1024 ||
 			!suffixes.contains(info.suffix().toLower())) {
 		return false;
@@ -177,7 +184,9 @@ bool isMacDiskImage(const QString &path) {
 		return false;
 	}
 	const QByteArray sig = head.mid(1024, 2);
-	return sig == "BD" || sig == "H+" || sig == "HX" || head.startsWith("ER");
+	return sig == "BD" || sig == "H+" || sig == "HX" || head.startsWith("ER") ||
+		head.mid(32, 4) == "NXSB" || head.mid(512, 8) == "EFI PART" ||
+		(head.mid(82, 2) == QByteArray("\x01\x00", 2) && static_cast<unsigned char>(head[0]) <= 63);
 }
 
 int readLabel(const QString &path) {

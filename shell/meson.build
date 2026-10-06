@@ -37,6 +37,13 @@ install_data('finder/zacos9-expand', install_dir: get_option('bindir'),
 test('expand', find_program('python3'),
   args: [files('../tests/finder/test_expand.py'), files('finder/zacos9-expand')])
 
+configure_file(input: 'finder/zacos9-mac-disks', output: 'zacos9-mac-disks', copy: true)
+install_data('finder/zacos9-mac-disks', install_dir: get_option('bindir'),
+  install_mode: 'rwxr-xr-x')
+test('mac-disks', find_program('python3'),
+  args: [files('../tests/finder/test_mac_disks.py'), files('finder/zacos9-mac-disks'),
+    files('../disks/zacos9-mac-mount')])
+
 # Screen Snapshot (Apple menu): drag out a rectangle; a picture on the
 # Desktop and the clipboard (slurp, native committed-frame capture, wl-copy).
 configure_file(input: 'snapshot/zacos9-snapshot', output: 'zacos9-snapshot', copy: true)

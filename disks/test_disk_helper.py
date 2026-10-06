@@ -118,7 +118,8 @@ class SafetyTests(unittest.TestCase):
 
     def test_encrypted_lvm_raid_swap_and_other_storage_signatures(self):
         for fs in ("crypto_LUKS", "BitLocker", "LVM2_member", "linux_raid_member",
-                   "isw_raid_member", "swap", "zfs_member", "bcache"):
+                   "isw_raid_member", "swap", "zfs_member", "bcache",
+                   "apfs", "cs_fvault2"):
             for on_part in (False, True):
                 with self.subTest(fs=fs, on_part=on_part):
                     items = (disk(), part(fstype=fs)) if on_part else (disk(fstype=fs),)

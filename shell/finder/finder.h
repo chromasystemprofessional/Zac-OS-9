@@ -79,6 +79,7 @@ public:
 	/* A supported archive expanded beside itself (zacos9-expand), with a
 	 * status dialog; what came out is then selected. */
 	void expandArchive(const QString &archive);
+	void mountMacImage(const QString &image);
 
 	/* Spring-loaded folders: hovering a drag over a folder opens it; the
 	 * windows that sprang open close again when the drag ends. Each view

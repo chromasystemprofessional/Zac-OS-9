@@ -8,6 +8,14 @@
 #include <QSet>
 #include <QCoreApplication>
 #include <QTimer>
+#include <QDir>
+#include <QFile>
+#include <QJsonDocument>
+#include <QJsonArray>
+#include <QJsonObject>
+#include <QProcess>
+#include <QDebug>
+#include <unistd.h>
 #include <cstdio>
 
 #include "netvolumes.h"
@@ -130,12 +138,47 @@ std::vector<LocalVolume> localVolumes() {
 
 	g_list_free_full(mounts, g_object_unref);
 	g_object_unref(monitor);
+	QFile table("/proc/self/mountinfo");
+	QSet<QString> mounted;
+	if (table.open(QIODevice::ReadOnly)) {
+		for (const QByteArray &line : table.readAll().split('\n')) {
+			const QList<QByteArray> fields = line.split(' ');
+			if (fields.size() > 5) {
+				mounted.insert(QString::fromUtf8(fields[4]));
+			}
+		}
+	}
+	const QDir records("/run/media/zacos9-mac/" + QString::number(getuid()));
+	for (const QString &name : records.entryList({ "*.json" }, QDir::Files | QDir::NoSymLinks)) {
+		QFile record(records.filePath(name));
+		if (!record.open(QIODevice::ReadOnly)) {
+			qWarning() << "Could not read Mac mount record:" << record.fileName();
+			continue;
+		}
+		const QJsonObject info = QJsonDocument::fromJson(record.readAll()).object();
+		const QString path = info.value("path").toString();
+		if (path != records.filePath(name.chopped(5)) || !mounted.contains(path)) {
+			continue;
+		}
+		bool shown = false;
+		for (LocalVolume &volume : out) {
+			if (volume.path == path) {
+				volume.macDevice = info.value("device").toString();
+				shown = true;
+			}
+		}
+		if (!shown) {
+			const QString device = info.value("device").toString();
+			out.push_back({ "Mac Disk (" + QFileInfo(device).fileName() + ")", path, true, device });
+		}
+	}
 	return out;
 }
 
 /* ---- change notifications ----------------------------------------------- */
 
 static std::vector<std::function<void()>> g_cbs;
+static std::vector<std::function<void(const QString &)>> g_errors;
 static GVolumeMonitor *g_monitor = nullptr;
 
 static void dispatchChange(GVolumeMonitor *, gpointer, gpointer) {
@@ -149,6 +192,7 @@ void localVolumesOnChange(std::function<void()> f) {
 	if (g_monitor) {
 		return;
 	}
+
 	g_monitor = g_volume_monitor_get();
 	/* The mount-added and mount-removed signals cover plug/unplug of USB
 	 * drives and mounting/unmounting any volume. The second parameter is
@@ -159,12 +203,109 @@ void localVolumesOnChange(std::function<void()> f) {
 		G_CALLBACK(dispatchChange), nullptr);
 }
 
+void localVolumesOnError(std::function<void(const QString &)> f) {
+	g_errors.push_back(std::move(f));
+}
+
+static void reportMacError(const QString &error) {
+	qWarning().noquote() << "zacos9-finder:" << error;
+	for (auto &callback : g_errors) {
+		callback(error);
+	}
+}
+
 /* ---- mounting ----------------------------------------------------------- */
 
 static QSet<QString> g_tried; /* volumes already mounted once, by device */
 static QSet<QString> g_mounting;
 static QSet<QString> g_erasing;
 static std::vector<std::function<void(const QString &)>> g_mountFailed;
+static bool belongsToDevice(const QString &path, const QString &device);
+
+static void macTool(const QStringList &arguments,
+		std::function<void(const QByteArray &, const QString &)> completed) {
+	auto *process = new QProcess(QCoreApplication::instance());
+	const QString local = QCoreApplication::applicationDirPath() + "/zacos9-mac-disks";
+	QObject::connect(process, &QProcess::errorOccurred, process,
+		[process, completed](QProcess::ProcessError error) {
+			if (error == QProcess::FailedToStart) {
+				completed({}, "The Mac disk helper could not start: " + process->errorString());
+				process->deleteLater();
+			}
+		});
+	QObject::connect(process, &QProcess::finished, process,
+		[process, completed](int code, QProcess::ExitStatus status) {
+			const QString error = QString::fromUtf8(process->readAllStandardError()).trimmed();
+			completed(process->readAllStandardOutput(),
+				status == QProcess::NormalExit && code == 0 ? QString()
+					: error.isEmpty() ? "The Mac disk helper stopped." : error);
+			process->deleteLater();
+		});
+	process->start(QFileInfo(local).isExecutable() ? local : QStringLiteral("zacos9-mac-disks"), arguments);
+}
+
+void localVolumeMountMacImage(const QString &path,
+		std::function<void(const QString &, const QString &)> completed) {
+	macTool({ "mount", path }, [completed](const QByteArray &out, const QString &failure) {
+		QString error = failure;
+		QString mountedPath;
+		if (error.isEmpty()) {
+			const QJsonObject result = QJsonDocument::fromJson(out).object();
+			mountedPath = result.value("path").toString();
+			if (mountedPath.isEmpty()) {
+				const QJsonArray paths = result.value("paths").toArray();
+				if (!paths.isEmpty()) {
+					mountedPath = paths[0].toString();
+				}
+			}
+			if (!mountedPath.startsWith("/run/media/zacos9-mac/") || !QFileInfo(mountedPath).isDir()) {
+				error = "The Mac disk helper returned an invalid mount point.";
+				mountedPath.clear();
+			}
+		}
+		for (auto &callback : g_cbs) {
+			callback();
+		}
+		completed(mountedPath, error);
+	});
+}
+
+static void mountMacDevice(const QString &device) {
+	if (g_tried.contains(device) || g_mounting.contains(device) || g_erasing.contains(device)) {
+		return;
+	}
+	for (const QString &erasing : g_erasing) {
+		if (belongsToDevice(device, erasing)) {
+			return;
+		}
+	}
+	g_tried.insert(device);
+	g_mounting.insert(device);
+	localVolumeMountMacImage(device, [device](const QString &, const QString &error) {
+		g_mounting.remove(device);
+		if (!error.isEmpty()) {
+			reportMacError(device + " could not be mounted read-only. " + error);
+		}
+	});
+}
+
+static bool macFilesystem(const QString &device) {
+	QFile number("/sys/class/block/" + QFileInfo(device).fileName() + "/dev");
+	if (!number.open(QIODevice::ReadOnly)) {
+		return false;
+	}
+	QFile properties("/run/udev/data/b" + QString::fromUtf8(number.readAll()).trimmed());
+	if (!properties.open(QIODevice::ReadOnly)) {
+		return false;
+	}
+	const QByteArray data = properties.readAll();
+	for (const char *type : { "hfs", "hfsplus", "apfs" }) {
+		if (data.split('\n').contains(QByteArray("E:ID_FS_TYPE=") + type)) {
+			return true;
+		}
+	}
+	return false;
+}
 
 static bool belongsToDevice(const QString &path, const QString &device) {
 	const QString suffix = path.mid(device.size());
@@ -225,9 +366,6 @@ static void onMounted(GObject *src, GAsyncResult *res, gpointer) {
 }
 
 static void mountIfNeeded(GVolume *v) {
-	if (!g_volume_can_mount(v)) {
-		return;
-	}
 	if (GMount *m = g_volume_get_mount(v)) {
 		g_object_unref(m);
 		return;
@@ -242,6 +380,16 @@ static void mountIfNeeded(GVolume *v) {
 		if (belongsToDevice(key, device)) {
 			return;
 		}
+	}
+	if (macFilesystem(key)) {
+		// Image loops are mounted by their owning image operation.
+		if (!key.startsWith("/dev/loop")) {
+			mountMacDevice(key);
+		}
+		return;
+	}
+	if (!g_volume_can_mount(v)) {
+		return;
 	}
 	if (g_tried.contains(key) || g_mounting.contains(key)) {
 		return;
@@ -302,6 +450,45 @@ void localVolumesMountAll() {
 		mountIfNeeded(G_VOLUME(l->data));
 	}
 	g_list_free_full(volumes, g_object_unref);
+	auto *macPoll = new QTimer(QCoreApplication::instance());
+	macPoll->setInterval(3000);
+	QObject::connect(macPoll, &QTimer::timeout, macPoll, [macPoll] {
+		if (macPoll->property("busy").toBool()) {
+			return;
+		}
+		macPoll->setProperty("busy", true);
+		macTool({ "scan" }, [macPoll](const QByteArray &out, const QString &error) {
+			macPoll->setProperty("busy", false);
+			if (!error.isEmpty()) {
+				qWarning().noquote() << "Mac disk discovery:" << error;
+				macPoll->stop();
+				return;
+			}
+			const QJsonDocument document = QJsonDocument::fromJson(out);
+			if (!document.isArray()) {
+				qWarning() << "Invalid Mac disk discovery response";
+				macPoll->stop();
+				return;
+			}
+			QSet<QString> present;
+			for (const QJsonValue &value : document.array()) {
+				const QString device = value.toString();
+				if (device.startsWith("/dev/") && !device.startsWith("/dev/loop")) {
+					present.insert(device);
+					mountMacDevice(device);
+				}
+			}
+			const QSet<QString> previous = macPoll->property("devices").value<QSet<QString>>();
+			for (const QString &device : previous - present) {
+				g_tried.remove(device);
+			}
+			macPoll->setProperty("devices", QVariant::fromValue(present));
+			for (auto &callback : g_cbs) {
+				callback();
+			}
+		});
+	});
+	macPoll->start();
 }
 
 /* ---- eject -------------------------------------------------------------- */
@@ -322,6 +509,17 @@ static void onEjectDone(GObject *src, GAsyncResult *res, gpointer wasEject) {
 }
 
 bool localVolumeEject(const LocalVolume &v) {
+	if (!v.macDevice.isEmpty()) {
+		macTool({ "unmount", v.macDevice }, [](const QByteArray &, const QString &error) {
+			if (!error.isEmpty()) {
+				reportMacError("The Mac disk could not be ejected. " + error);
+			}
+			for (auto &callback : g_cbs) {
+				callback();
+			}
+		});
+		return true;
+	}
 	GVolumeMonitor *monitor = g_volume_monitor_get();
 	GList *mounts = g_volume_monitor_get_mounts(monitor);
 	GMount *found = nullptr;

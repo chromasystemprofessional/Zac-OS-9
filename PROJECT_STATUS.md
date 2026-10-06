@@ -24,6 +24,21 @@ Updated: 2026-10-06
 
 ## Current work
 
+**Read-only Mac disk mounting** (0.1.20): physical HFS/HFS+/APFS volumes
+and Mac disk images mount through a constrained block-device helper, with
+polkit authentication, read-only source descriptors and ro/nodev/nosuid/noexec
+mounts. Sniffer image double-click mounts instead of launching Classic;
+the Classic menu still opens selected raw images. Raw APM/GPT, Disk Copy 4.2,
+UDIF DMG, sparseimage and sparsebundle containers are supported. Desktop
+icons include APFS FUSE mounts; eject removes image loops and converted
+cache files after their final partition is unmounted. Errors remain visible,
+and APFS is excluded from the erase/initialization helper. See
+[Mac disks](docs/mac-disks.md) for backend limitations. Privileged mounting
+on real hardware remains to be verified; no physical disks were modified
+during automated tests. Finder builds; six focused Meson suites pass, including
+17 Mac-mount helper tests. A synthetic sparse image was also read with Debian's
+actual libmodi backend, verifying the converted data and untouched source.
+
 **Classic sound set import** (uncommitted): `wmov` drag and release sounds
 now come from the `snd#` slots classic sets actually use (slot 1 and slot 3),
 and are not rejected when they share IDs with other drag codes. That is why

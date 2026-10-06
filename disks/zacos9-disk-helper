@@ -36,7 +36,7 @@ DEVICE = re.compile(r"/dev/(?:sd[a-z]+|nvme[0-9]+n[0-9]+|mmcblk[0-9]+)\Z")
 KNOWN_FILESYSTEMS = {
     "vfat", "exfat", "ntfs", "ntfs3", "ext2", "ext3", "ext4", "btrfs",
     "xfs", "f2fs", "hfs", "hfsplus", "udf", "iso9660", "jfs", "reiserfs",
-    "nilfs2", "ufs", "zfs_member", "bcachefs",
+    "nilfs2", "ufs", "zfs_member", "bcachefs", "apfs",
 }
 
 
@@ -62,7 +62,7 @@ def read_text(path):
 def forbidden_signature(value):
     value = (value or "").lower()
     return any(word in value for word in
-               ("crypto", "luks", "bitlocker", "lvm", "raid", "swap",
+               ("crypto", "luks", "bitlocker", "lvm", "raid", "swap", "apfs", "cs_fvault",
                 "zfs_member", "bcache", "drbd", "mpath"))
 
 
