@@ -15,8 +15,9 @@
  * NoDisplay, OnlyShowIn/NotShowIn against $XDG_CURRENT_DESKTOP, TryExec,
  * Exec field codes, Path, Terminal and DBusActivatable. Flatpak and Snap
  * applications appear because they install desktop entries like any other.
- * Left out: ZacOS 9's own entries ("zacos9-*"), those the system was built
- * with (<data dir>/zacos9/base-applications), and Wine's "Uninstall …".
+ * Left out: ZacOS 9's own entries ("zacos9-*") and Wine's "Uninstall …".
+ * System tools remain discoverable but belong in System Folder. Applications
+ * excludes the installation baseline and automatically installed Debian apps.
  *
  * An application's identity is its desktop file ID ("firefox.desktop",
  * "org.gnome.Nautilus.desktop"), never its display name: names are
@@ -39,6 +40,8 @@ struct AppEntry {
 	QString file;       /* the desktop file's path, shown in Get Info */
 	QString commandLine;/* Exec=, shown in Get Info; never run as shell text */
 	QStringList categories; /* Categories=, split on ';' */
+	bool systemUtility = false;
+	bool userInstalled = true;
 	bool terminal = false;
 	std::vector<AppAction> actions;
 

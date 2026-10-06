@@ -7,8 +7,10 @@
 #include "platinumshell.h"
 
 #include <QCoreApplication>
+#include <QDateTime>
 #include <QDir>
 #include <QDebug>
+#include <QElapsedTimer>
 #include <QDirIterator>
 #include <QFile>
 #include <QFileInfo>
@@ -22,6 +24,7 @@
 #include <QSet>
 #include <QStandardPaths>
 #include <QTimer>
+#include <QThread>
 #include <algorithm>
 #include <cstring>
 
@@ -29,6 +32,7 @@ namespace {
 
 std::vector<AppEntry> g_apps;
 bool g_loaded = false;
+bool g_loading = false;
 std::vector<std::function<void()>> g_callbacks;
 
 QString fromUtf8(const char *s) {
@@ -141,8 +145,7 @@ void resolveIcon(GAppInfo *info, AppEntry *entry) {
 
 /* ---- where an application came from --------------------------------- */
 
-/* dpkg -S and dpkg-query, cached by resolved executable path: run once
- * per path for the life of the process, not on every reload. */
+/* Cache package ownership until dpkg's database changes. */
 struct PackageInfo {
 	QString name, version;
 };
@@ -150,6 +153,29 @@ struct PackageInfo {
 QHash<QString, PackageInfo> &packageCache() {
 	static QHash<QString, PackageInfo> cache;
 	return cache;
+}
+
+bool finishPackageQuery(QProcess &process) {
+	QElapsedTimer timer;
+	timer.start();
+	while (process.state() != QProcess::NotRunning && timer.elapsed() < 3000) {
+		QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+		QThread::msleep(1);
+	}
+	if (process.state() != QProcess::NotRunning) {
+		qWarning() << "Package query timed out:" << process.program() << process.arguments();
+		process.kill();
+		while (process.state() != QProcess::NotRunning) {
+			QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+			QThread::msleep(1);
+		}
+		return false;
+	}
+	if (process.error() == QProcess::FailedToStart || process.exitStatus() != QProcess::NormalExit) {
+		qWarning() << "Package query failed:" << process.errorString();
+		return false;
+	}
+	return true;
 }
 
 PackageInfo lookupPackage(const QString &exePath) {
@@ -161,22 +187,79 @@ PackageInfo lookupPackage(const QString &exePath) {
 	PackageInfo info;
 	QProcess owner;
 	owner.start("dpkg", { "-S", exePath });
-	if (owner.waitForFinished(3000) && owner.exitCode() == 0) {
+	if (finishPackageQuery(owner) && owner.exitCode() == 0) {
 		const QString out = QString::fromUtf8(owner.readAllStandardOutput());
-		const int colon = out.indexOf(':');
+		const int colon = out.indexOf(": ");
 		if (colon > 0) {
 			info.name = out.left(colon).trimmed();
 		}
+	} else if (owner.exitCode() != 1) {
+		qWarning().noquote() << "Could not query application package ownership:"
+			<< exePath << owner.readAllStandardError();
 	}
 	if (!info.name.isEmpty()) {
 		QProcess version;
 		version.start("dpkg-query", { "-W", "-f=${Version}", info.name });
-		if (version.waitForFinished(3000) && version.exitCode() == 0) {
+		if (finishPackageQuery(version) && version.exitCode() == 0) {
 			info.version = QString::fromUtf8(version.readAllStandardOutput()).trimmed();
+		} else {
+			qWarning() << "Could not read application package version:" << info.name;
 		}
 	}
 	cache.insert(exePath, info);
 	return info;
+}
+
+QString aptStatePath() {
+	const QByteArray path = qgetenv("ZACOS9_APT_STATE");
+	return path.isEmpty() ? QStringLiteral("/var/lib/apt/extended_states") : QString::fromUtf8(path);
+}
+
+QSet<QString> automaticPackages() {
+	QSet<QString> packages;
+	QFile file(aptStatePath());
+	if (!file.open(QIODevice::ReadOnly)) {
+		if (file.exists()) {
+			qWarning().noquote() << "Could not read automatic package marks:" << file.errorString();
+		}
+		return packages;
+	}
+	QString package, architecture;
+	bool automatic = false;
+	const auto record = [&] {
+		if (automatic && !package.isEmpty()) {
+			packages.insert(package + ":" + architecture);
+		}
+		package.clear();
+		architecture.clear();
+		automatic = false;
+	};
+	while (!file.atEnd()) {
+		const QString line = QString::fromUtf8(file.readLine()).trimmed();
+		if (line.isEmpty()) {
+			record();
+		} else if (line.startsWith("Package: ")) {
+			package = line.mid(9);
+		} else if (line.startsWith("Architecture: ")) {
+			architecture = line.mid(14);
+		} else if (line == "Auto-Installed: 1") {
+			automatic = true;
+		}
+	}
+	record();
+	return packages;
+}
+
+bool isAutomaticPackage(const PackageInfo &package, const QSet<QString> &automatic) {
+	if (package.name.contains(':')) {
+		return automatic.contains(package.name) || automatic.contains(package.name.section(':', 0, 0) + ":");
+	}
+	for (const QString &name : automatic) {
+		if (name.startsWith(package.name + ":")) {
+			return true;
+		}
+	}
+	return false;
 }
 
 /* The application's origin, for Get Info: never guessed, and never
@@ -189,6 +272,12 @@ void resolveOrigin(GDesktopAppInfo *desktop, AppEntry *entry) {
 	if (flatpakId) {
 		entry->origin = "flatpak:" + fromUtf8(flatpakId);
 		g_free(flatpakId);
+		return;
+	}
+	const PackageInfo owner = lookupPackage(entry->file);
+	if (!owner.name.isEmpty()) {
+		entry->origin = "dpkg:" + owner.name.section(':', 0, 0);
+		entry->version = owner.version;
 		return;
 	}
 	/* Owned by the GAppInfo itself: not g_free'd. */
@@ -213,7 +302,7 @@ void resolveOrigin(GDesktopAppInfo *desktop, AppEntry *entry) {
 	}
 	const PackageInfo pkg = lookupPackage(exePath);
 	if (!pkg.name.isEmpty()) {
-		entry->origin = "dpkg:" + pkg.name;
+		entry->origin = "dpkg:" + pkg.name.section(':', 0, 0);
 		entry->version = pkg.version;
 	}
 }
@@ -222,11 +311,16 @@ void resolveOrigin(GDesktopAppInfo *desktop, AppEntry *entry) {
  * application folder has a name of its own. */
 void disambiguate(std::vector<AppEntry> &apps) {
 	QHash<QString, int> count;
+	const auto key = [](const AppEntry &app) {
+		return (app.systemUtility ? "system:" : "applications:") + app.name.toCaseFolded();
+	};
 	for (const AppEntry &a : apps) {
-		count[a.name.toCaseFolded()]++;
+		if (a.systemUtility || a.userInstalled) {
+			count[key(a)]++;
+		}
 	}
 	for (AppEntry &a : apps) {
-		if (count.value(a.name.toCaseFolded()) > 1) {
+		if ((a.systemUtility || a.userInstalled) && count.value(key(a)) > 1) {
 			QString stem = a.id;
 			if (stem.endsWith(".desktop")) {
 				stem.chop(8);
@@ -264,7 +358,20 @@ const QSet<QString> &baseApplications() {
 }
 
 void load() {
+	if (g_loading) {
+		return;
+	}
+	g_loading = true;
 	g_apps.clear();
+	static qint64 packageTime = -1, packageSize = -1;
+	const QFileInfo status(QStringLiteral("/var/lib/dpkg/status"));
+	const qint64 time = status.lastModified().toMSecsSinceEpoch();
+	if (time != packageTime || status.size() != packageSize) {
+		packageCache().clear();
+		packageTime = time;
+		packageSize = status.size();
+	}
+	const QSet<QString> automatic = automaticPackages();
 	if (qobject_cast<QGuiApplication *>(QCoreApplication::instance())) {
 		ensureIconTheme();
 	}
@@ -282,15 +389,7 @@ void load() {
 		if (id.isEmpty() || name.isEmpty()) {
 			continue;
 		}
-		/* Applications is empty on a fresh install: not ZacOS 9's own
-		 * pieces (the control panels and the Apple menu have those), and
-		 * not what the system came with - except the utilities ZacOS 9
-		 * ships for Applications > Utilities (balenaEtcher, ...). */
-		const bool shippedUtility = G_IS_DESKTOP_APP_INFO(info) &&
-			fromUtf8(g_desktop_app_info_get_categories(G_DESKTOP_APP_INFO(info)))
-				.split(';').contains(QLatin1String("X-ZacOS9-Utility"));
-		if (id.startsWith(QLatin1String("zacos9-")) ||
-				(baseApplications().contains(id) && !shippedUtility)) {
+		if (id.startsWith(QLatin1String("zacos9-"))) {
 			continue;
 		}
 		/* Wine files a Windows program's Start-menu shortcuts as desktop
@@ -311,6 +410,22 @@ void load() {
 			entry.terminal = g_desktop_app_info_get_boolean(desktop, "Terminal");
 			const QString cats = fromUtf8(g_desktop_app_info_get_categories(desktop));
 			entry.categories = cats.split(';', Qt::SkipEmptyParts);
+			for (const QString category : { "System", "Settings", "FileManager", "X-ZacOS9-Utility" }) {
+				entry.systemUtility |= entry.categories.contains(category, Qt::CaseInsensitive);
+			}
+			entry.userInstalled = !baseApplications().contains(id);
+			const QString local = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation);
+			const bool userEntry = QFileInfo(entry.file).absoluteFilePath().startsWith(local + "/");
+			char *flatpak = g_desktop_app_info_get_string(desktop, "X-Flatpak");
+			if (userEntry || flatpak) {
+				entry.userInstalled = true;
+			} else {
+				const PackageInfo package = lookupPackage(entry.file);
+				if (!package.name.isEmpty() && isAutomaticPackage(package, automatic)) {
+					entry.userInstalled = false;
+				}
+			}
+			g_free(flatpak);
 			readActions(desktop, &entry);
 			resolveOrigin(desktop, &entry);
 		}
@@ -325,6 +440,7 @@ void load() {
 	});
 	disambiguate(g_apps);
 	g_loaded = true;
+	g_loading = false;
 }
 
 /* Every directory desktop entries can come from, in XDG order. */
@@ -350,6 +466,14 @@ constexpr int SETTLE_MS = 400;
  * the first Flatpak installation can create the entire export tree. Run
  * again after each change, as new folders appear. */
 void watchDirs(QFileSystemWatcher *w) {
+	const QString marks = aptStatePath();
+	if (QFile::exists(marks) && !w->files().contains(marks) && !w->addPath(marks)) {
+		qWarning().noquote() << "Unable to watch automatic package marks:" << marks;
+	}
+	const QString marksDir = QFileInfo(marks).absolutePath();
+	if (QDir(marksDir).exists() && !w->directories().contains(marksDir) && !w->addPath(marksDir)) {
+		qWarning().noquote() << "Unable to watch package marks directory:" << marksDir;
+	}
 	for (const QString &dir : applicationDirs()) {
 		QStringList want;
 		QString parent = QFileInfo(dir).absolutePath();
@@ -387,7 +511,11 @@ QFileSystemWatcher *watcher() {
 		auto *settle = new QTimer;
 		settle->setSingleShot(true);
 		settle->setInterval(SETTLE_MS);
-		QObject::connect(settle, &QTimer::timeout, [] {
+		QObject::connect(settle, &QTimer::timeout, [settle] {
+			if (g_loading) {
+				settle->start();
+				return;
+			}
 			appRefresh();
 			const auto callbacks = g_callbacks;
 			for (const auto &f : callbacks) {
@@ -396,6 +524,11 @@ QFileSystemWatcher *watcher() {
 		});
 		QObject::connect(w, &QFileSystemWatcher::directoryChanged,
 			[w, settle](const QString &) {
+				watchDirs(w);
+				settle->start();
+			});
+		QObject::connect(w, &QFileSystemWatcher::fileChanged,
+			[settle](const QString &) {
 				watchDirs(w);
 				settle->start();
 			});

@@ -79,12 +79,12 @@ Zacintosh HD
 │   ├── Extensions
 │   ├── Fonts             → ~/.local/share/fonts
 │   ├── Preferences       → ~/.config
-├── Applications            (generated: the installed applications)
+│   └── Utilities           (generated: settings, file managers and system tools,
+│                            including shipped tools such as balenaEtcher)
+├── Applications            (generated: user-installed applications)
 │   └── Mousepad
 │       ├── Mousepad        launches it
 │       └── Preferences     one of its Desktop Actions
-│   └── Utilities           (generated: entries with Categories=X-ZacOS9-Utility,
-│                            the utilities ZacOS 9 ships - balenaEtcher)
 ├── Home                  → ~ (Documents, Downloads, Desktop, everything of the user's)
 ├── (folders you make: File > New Folder in the disk's window; each is a real
 │    directory under ~/.local/share/zacos9/finder/folders; Trash removes an empty one)
@@ -103,6 +103,8 @@ moves Wallpaper under Appearance, retaining node overrides and existing files.
 If the old folder cannot be moved (including an existing destination), the
 catalog retains the old folder and logs the conflict rather than overwriting files.
 Version 8 adds Themes and Sound Themes under Appearance.
+Version 9 moves the shipped Utilities folder into System Folder and preserves
+its custom name and the renamed titles/labels of system launchers.
 See
 [custom desktop patterns](../README.md#custom-desktop-patterns) and
 [desktop wallpaper](../README.md#desktop-wallpaper) for supported formats,
@@ -131,7 +133,8 @@ approximated:
 Flatpak and Snap applications appear with the rest, because they install
 desktop entries like everything else. A package with several desktop
 entries gets a folder for each: one package is not assumed to be one
-application, and nothing maps back to dpkg.
+application. Debian desktop-file ownership determines installation status
+and uninstall identity, not how many application entries a package supplies.
 
 An application's identity is its **desktop file ID** (`mousepad.desktop`,
 `org.gnome.Nautilus.desktop`), never its display name. Names are
@@ -141,6 +144,31 @@ two entries do share a name, each is told apart by its id — "Files
 
 Nothing is copied. An application's folder and the launcher in it are
 entries in this model; the package's files stay where dpkg put them.
+
+### User applications versus system utilities
+
+Applications excludes the desktop-entry baseline recorded on the installation
+image and Debian packages marked `Auto-Installed: 1` in
+`/var/lib/apt/extended_states`. Package ownership is checked against the desktop
+file itself, not the executable that may merely wrap or launch another app.
+Explicitly installed Debian apps, user-local launchers, Wine shortcuts and
+Flatpak exports remain eligible. Changes to apt's automatic/manual marks
+refresh the view without requiring a new launcher file or a login restart.
+
+Entries with `System`, `Settings`, `FileManager` or `X-ZacOS9-Utility`
+categories appear only in **System Folder > Utilities**, even when explicitly
+installed, present on the original image or installed as dependencies. This
+includes qps, PCManFM, desktop/screen-saver settings, print settings and shipped
+tools such as balenaEtcher. The ordinary `Utility` category alone does not move
+an application: calculators and other user utilities stay in Applications.
+ZacOS's own control panels remain in Control Panels.
+
+This uses installation metadata, not a historical record of user intent:
+`apt-mark manual` makes a non-baseline application eligible, while packages
+marked manual by another installer are indistinguishable from explicit user
+installs. A dependency can provide several launchers; the filter applies to
+its package, not to a translated application name. No packages are removed,
+and system tools remain launchable from their new virtual folder.
 
 ### Icon
 
@@ -161,8 +189,8 @@ it isn't the application itself.
 ### Where it came from
 
 For Get Info, once there is one (see "What the Finder will and won't
-do" below): the owning package, found from the application's own
-executable (`dpkg -S` on its canonical path, resolving the symlinks a
+do" below): the package owning the desktop file, or, for an unowned launcher,
+the application's own executable (`dpkg -S` on its canonical path, resolving the symlinks a
 merged-`/usr` system has — `dpkg`'s file database has `/usr/bin/x`, not
 the `/bin/x` most `Exec=` lines actually name), then its version
 (`dpkg-query`). Looked up once per executable path and kept for the life
@@ -297,7 +325,7 @@ yet.
 
 ## Uninstalling applications through Trash
 
-**Move To Trash**, or dragging an application from Applications/Utilities onto
+**Move To Trash**, or dragging an application from Applications onto
 Trash or into its window, queues it for uninstall. It remains installed but
 disappears from Applications, with its name and icon displayed in Trash.
 Queue records persist in the user's Trash across logins. No package-owned
@@ -313,6 +341,9 @@ data is retained. A Debian package can own several applications or have
 dependents, so removal may remove those as well. System-wide Flatpak apps and
 unsupported/unowned apps are not queued; Finder reports how to remove them
 instead.
+System utilities and automatically installed dependencies cannot be queued
+for uninstall through Finder. System Folder > Utilities also does not accept
+application-installation drops.
 
 Failed uninstalls leave their records in Trash for retry or Put Away, and stop
 emptying before ordinary files are deleted. Completed removals are not undone

@@ -820,7 +820,11 @@ void Finder::emptyTrash() {
 			const AppEntry *app = appById(entry.id);
 			bool ok = true;
 			QString error;
-			if (app && app->origin != entry.origin) {
+			if (app && (app->systemUtility || !app->userInstalled)) {
+				ok = false;
+				error = "This application is now a system utility or an automatically installed "
+					"dependency and cannot be uninstalled through Finder: " + entry.name;
+			} else if (app && app->origin != entry.origin) {
 				ok = false;
 				error = "The application's install source has changed: " + entry.name;
 			} else {

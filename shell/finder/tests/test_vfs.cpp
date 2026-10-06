@@ -26,6 +26,7 @@
 #include <glib.h>
 
 #include "appdb.h"
+#include "apptrash.h"
 #include "vfs.h"
 
 static int fails;
@@ -111,6 +112,28 @@ int main(int argc, char **argv) {
 	setenv("XDG_CURRENT_DESKTOP", "ZacOS9", 1);
 	QDir().mkpath(appsDir);
 	QDir().mkpath(homeAppsDir);
+	const QString aptState = root + "/apt/extended_states";
+	setenv("ZACOS9_APT_STATE", aptState.toUtf8().constData(), 1);
+	writeEntry(root + "/apt", "extended_states",
+		"Package: finder-auto-demo\nArchitecture: amd64\nAuto-Installed: 1\n\n");
+	writeEntry(root + "/bin", "dpkg",
+		"#!/bin/sh\n"
+		"case \"$2\" in\n"
+		"*/automatic.desktop) printf 'finder-auto-demo:amd64: %s\\n' \"$2\" ;;\n"
+		"*/manual.desktop|*/qps.desktop) printf 'finder-manual-demo: %s\\n' \"$2\" ;;\n"
+		"*) exec /usr/bin/dpkg \"$@\" ;;\n"
+		"esac\n");
+	writeEntry(root + "/bin", "dpkg-query",
+		"#!/bin/sh\n"
+		"case \"$3\" in\n"
+		"finder-auto-demo:amd64|finder-manual-demo) printf '1.0\\n' ;;\n"
+		"*) exec /usr/bin/dpkg-query \"$@\" ;;\n"
+		"esac\n");
+	for (const QString name : { "dpkg", "dpkg-query" }) {
+		QFile::setPermissions(root + "/bin/" + name,
+			QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
+	}
+	setenv("PATH", (root + "/bin:" + QString::fromLocal8Bit(qgetenv("PATH"))).toUtf8().constData(), 1);
 
 	/* A QGuiApplication (not just QCoreApplication), offscreen: so icon
 	 * resolution (QIcon::fromTheme, which needs a QPA platform to
@@ -128,12 +151,24 @@ int main(int argc, char **argv) {
 	/* What Applications leaves out: the system's own applications (listed
 	 * when the ISO is built), ZacOS 9's own pieces, Wine's uninstallers. */
 	writeEntry(dataDirs + "/zacos9", "base-applications",
-		"builtin.desktop\nfoot.desktop\nflasher.desktop\n");
-	/* A utility ZacOS 9 ships (Applications > Utilities), though the
+		"builtin.desktop\nfoot.desktop\nflasher.desktop\nxscreensaver-settings.desktop\n");
+	/* A utility ZacOS 9 ships (System Folder > Utilities), though the
 	 * system came with it. */
 	writeEntry(appsDir, "flasher.desktop",
 		entry("Disk Flasher", "/bin/true", "Categories=Utility;X-ZacOS9-Utility;\n"));
 	writeEntry(appsDir, "builtin.desktop", entry("Came With The System"));
+	writeEntry(appsDir, "automatic.desktop", entry("Automatic Dependency"));
+	writeEntry(appsDir, "manual.desktop", entry("Explicitly Installed"));
+	writeEntry(appsDir, "system-twin.desktop",
+		entry("SimpleText", "/bin/true", "Categories=System;\n"));
+	for (const auto &utility : std::vector<std::pair<QString, QString>>{
+			{ "qps", "System" }, { "pcmanfm-qt", "FileManager;Utility;Core;Qt" },
+			{ "pcmanfm-qt-desktop-pref", "Settings;Qt;DesktopSettings" },
+			{ "xscreensaver-settings", "Settings;DesktopSettings;Security" },
+			{ "system-config-printer", "Settings;System;Printing" } }) {
+		writeEntry(appsDir, utility.first + ".desktop",
+			entry(utility.first, "/bin/true", "Categories=" + utility.second + ";\n"));
+	}
 	writeEntry(appsDir, "zacos9-somepanel.desktop", entry("A ZacOS Panel"));
 	writeEntry(homeAppsDir + "/wine/Programs/Notepad Plus", "Notepad Plus.desktop",
 		entry("Notepad Plus", "env WINEPREFIX=/nonexistent wine C:\\\\np.exe"));
@@ -158,23 +193,57 @@ int main(int argc, char **argv) {
 
 	QStringList apps = namesIn(vfsPathFor("applications"));
 	check(apps.contains("SimpleText"), "an installed application appears in Applications");
+	check(namesIn(vfsPathFor("system-folder/utilities")).contains("SimpleText"),
+		"the same name in a different destination does not rename either app");
 	check(apps.contains("Calculator"), "a second application appears too");
 	check(!apps.contains("Hidden One"), "Hidden=true is not shown");
 	check(!apps.contains("NoDisplay One"), "NoDisplay=true is not shown");
 	check(!apps.contains("Only Elsewhere"), "OnlyShowIn for another desktop is not shown");
 	check(!apps.contains("Not Here"), "NotShowIn for this desktop is not shown");
 	check(!apps.contains("Missing Binary"), "a failing TryExec is not shown");
-	check(apps.contains("Utilities"), "Applications holds a Utilities folder");
+	check(!apps.contains("Utilities"), "shipped Utilities is no longer inside Applications");
 	check(!apps.contains("Disk Flasher"), "a shipped utility is not loose in Applications");
-	check(namesIn(vfsPathFor("applications/utilities")).contains("Disk Flasher"),
-		"it is in Applications > Utilities, though the system came with it");
-	check(!namesIn(vfsPathFor("applications/utilities")).contains("Calculator"),
+	check(namesIn(vfsPathFor("system-folder/utilities")).contains("Disk Flasher"),
+		"shipped tools are accessible in System Folder > Utilities");
+	check(!namesIn(vfsPathFor("system-folder/utilities")).contains("Calculator"),
 		"an ordinary Utility-category application stays in Applications");
+	check(!apps.contains("Automatic Dependency") && apps.contains("Explicitly Installed"),
+		"automatic Debian dependencies stay out, explicit Debian installs stay in Applications");
+	check(appById("automatic.desktop") &&
+		appById("automatic.desktop")->origin == "dpkg:finder-auto-demo",
+		"architecture-qualified desktop ownership keeps a supported package uninstall identity");
+	for (const QString name : { "qps", "pcmanfm-qt", "pcmanfm-qt-desktop-pref",
+			"xscreensaver-settings", "system-config-printer" }) {
+		check(!apps.contains(name) && namesIn(vfsPathFor("system-folder/utilities")).contains(name),
+			"system utility is routed away from Applications: " + name);
+	}
+	QString trashError;
+	check(!appTrashQueue("qps.desktop", &trashError) && !trashError.isEmpty(),
+		"system tools cannot be queued for uninstall");
+	check(!appTrashQueue("automatic.desktop", &trashError) && !trashError.isEmpty(),
+		"automatic dependencies cannot be queued for uninstall");
+	check(!vfsAcceptsDrops(vfsPathFor("system-folder/utilities")) &&
+		!vfsIsApplications(vfsPathFor("system-folder/utilities")),
+		"system Utilities is not an app installation drop target");
 	check(apps.contains("Only Ours"), "an entry for this desktop only is shown");
 	check(!apps.contains("Came With The System"), "an application the system came with is not shown");
 	check(!apps.contains("A ZacOS Panel"), "ZacOS 9's own entries are not shown");
 	check(apps.contains("Notepad Plus"), "a Windows program installed through Wine is shown");
 	check(!apps.contains("Uninstall Notepad Plus"), "its Wine uninstaller is not shown");
+	const int markWatch = vfsOnChange([] {});
+	writeEntry(root + "/apt", "extended_states",
+		"Package: finder-auto-demo\nArchitecture: amd64\nAuto-Installed: 0\n");
+	check(waitFor([&] { return namesIn(vfsPathFor("applications")).contains("Automatic Dependency"); }),
+		"marking a dependency manual updates Applications without rewriting its launcher");
+	writeEntry(root + "/apt", "extended_states",
+		"Package: finder-auto-demo\nArchitecture: amd64\nAuto-Installed: 1\n\n");
+	check(waitFor([&] { return !namesIn(vfsPathFor("applications")).contains("Automatic Dependency"); }),
+		"marking an app automatic removes it from Applications");
+	vfsOffChange(markWatch);
+	writeEntry(homeAppsDir, "automatic.desktop", entry("User Dependency Override"));
+	settle();
+	check(namesIn(vfsPathFor("applications")).contains("User Dependency Override"),
+		"user-local launchers are kept even when overriding an automatic package");
 
 	/* First Flatpak install creates the export directories after startup. */
 	int appChanges = 0;
@@ -541,6 +610,35 @@ int main(int argc, char **argv) {
 	QStringList utilities = namesIn(vfsPathFor("utilities"));
 	check(utilities.contains("Wrench"), "a Utility-category application is in Utilities");
 	check(!utilities.contains("Game"), "one in another category is not");
+
+	/* Version 8 moves shipped utilities and their overrides into System Folder. */
+	registry.insert("version", 8);
+	nodes = registry.value("nodes").toArray();
+	for (int i = 0; i < nodes.size(); ++i) {
+		QJsonObject node = nodes[i].toObject();
+		if (node.value("id").toString() == "system-folder/utilities") {
+			node.insert("id", "applications/utilities");
+			node.insert("name", "My Tools");
+			node.insert("categories", QJsonArray{ "X-ZacOS9-Utility" });
+			nodes[i] = node;
+		}
+	}
+	registry.insert("nodes", nodes);
+	QJsonObject oldOverrides = registry.value("overrides").toObject();
+	oldOverrides.insert("applications/qps.desktop",
+		QJsonObject{ { "name", "Process Viewer" }, { "label", 4 } });
+	registry.insert("overrides", oldOverrides);
+	if (reg.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+		reg.write(QJsonDocument(registry).toJson());
+		reg.close();
+	}
+	vfsRefresh();
+	check(vfsName(vfsPathFor("system-folder/utilities")) == "My Tools" &&
+		!namesIn(vfsPathFor("applications")).contains("My Tools"),
+		"version 9 moves the Utilities node while preserving a custom folder name");
+	check(vfsName(vfsPathFor("system-folder/utilities/qps.desktop")) == "Process Viewer" &&
+		vfsLabel(vfsPathFor("system-folder/utilities/qps.desktop")) == 4,
+		"migrated system launchers retain their renamed title and label");
 
 	/* ---- migration ----------------------------------------------------- */
 	/* An older registry keeps the user's own nodes and gains ours. */

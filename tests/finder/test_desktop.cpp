@@ -381,6 +381,19 @@ esac
 			alert->accept();
 		}
 	});
+	fixture(apps + "/com.example.TrashTest.desktop",
+		"[Desktop Entry]\nType=Application\nName=Trash Test\nExec=/bin/true\n"
+		"X-Flatpak=com.example.TrashTest\nCategories=Settings;\n");
+	vfsRefresh();
+	confirmations.start();
+	Finder::instance().emptyTrash();
+	confirmations.stop();
+	check(appTrashEntries(&error).size() == 1 && QFile::exists(home.path() + "/installed"),
+		"an already queued app that becomes a system tool is not uninstalled");
+	fixture(apps + "/com.example.TrashTest.desktop",
+		"[Desktop Entry]\nType=Application\nName=Trash Test\nExec=/bin/true\n"
+		"X-Flatpak=com.example.TrashTest\n");
+	vfsRefresh();
 	fixture(home.path() + "/fail", "fail");
 	confirmations.start();
 	Finder::instance().emptyTrash();

@@ -27,10 +27,10 @@
  * doesn't have take their default, and nodes it doesn't know about are
  * added, while the user's own nodes and overrides are kept.
  */
-static constexpr int REGISTRY_VERSION = 8;
+static constexpr int REGISTRY_VERSION = 9;
 
 static const char *DEFAULT_REGISTRY = R"JSON({
-  "version": 8,
+  "version": 9,
   "volume": {},
   "showUnixVolume": false,
   "nodes": [
@@ -53,10 +53,9 @@ static const char *DEFAULT_REGISTRY = R"JSON({
       "backing": "$XDG_DATA_HOME/fonts" },
     { "id": "system-folder/preferences", "name": "Preferences", "kind": "backed",
       "backing": "$XDG_CONFIG_HOME" },
+    { "id": "system-folder/utilities", "name": "Utilities", "kind": "apps" },
     { "id": "applications", "name": "Applications", "kind": "apps", "order": 1,
       "excludeCategories": ["X-ZacOS9-Utility"] },
-    { "id": "applications/utilities", "name": "Utilities", "kind": "apps", "order": -1,
-      "categories": ["X-ZacOS9-Utility"] },
     { "id": "home", "name": "Home", "kind": "backed",
       "backing": "$HOME", "order": 2 },
     { "id": "utilities", "name": "Utilities", "kind": "apps", "order": 4,
@@ -182,6 +181,13 @@ bool migrate(QJsonObject *root) {
 	QJsonArray nodes = root->value("nodes").toArray();
 	for (int i = 0; i < nodes.size(); i++) {
 		QJsonObject n = nodes.at(i).toObject();
+		if (n.value("id").toString() == QLatin1String("applications/utilities")) {
+			n.insert("id", "system-folder/utilities");
+			if (n.value("categories").toArray() == QJsonArray{ "X-ZacOS9-Utility" }) {
+				n.remove("categories");
+			}
+			nodes.replace(i, n);
+		}
 		if (n.value("id").toString() == QLatin1String("system-folder/wallpaper")) {
 			n.insert("id", "system-folder/appearance/wallpaper");
 			if (n.value("backing").toString() == QLatin1String("$XDG_DATA_HOME/zacos9/wallpaper")) {
@@ -222,6 +228,23 @@ bool migrate(QJsonObject *root) {
 		}
 	}
 	root->insert("nodes", nodes);
+	QJsonObject overrides = root->value("overrides").toObject();
+	const QStringList keys = overrides.keys();
+	for (const QString &key : keys) {
+		QString destination;
+		if (key == "applications/utilities") {
+			destination = "system-folder/utilities";
+		} else if (key.startsWith("applications/")) {
+			const AppEntry *app = appById(key.section('/', -1));
+			if (app && app->systemUtility) {
+				destination = "system-folder/utilities/" + app->id;
+			}
+		}
+		if (!destination.isEmpty() && !overrides.contains(destination)) {
+			overrides.insert(destination, overrides.take(key));
+		}
+	}
+	root->insert("overrides", overrides);
 	if (!root->contains("volume")) {
 		root->insert("volume", fresh.value("volume"));
 	}
@@ -282,7 +305,9 @@ void generateApps(const VNode &parent) {
 		qWarning().noquote() << error;
 	}
 	for (const AppEntry &app : appList()) {
-		if (!matchesCategories(app, parent) ||
+		const bool systemFolder = parent.id.startsWith("system-folder/");
+		if ((systemFolder ? !app.systemUtility : (app.systemUtility || !app.userInstalled)) ||
+				!matchesCategories(app, parent) ||
 				std::any_of(queued.begin(), queued.end(),
 					[&app](const TrashedApplication &entry) { return entry.id == app.id; })) {
 			continue;
@@ -716,12 +741,12 @@ void vfsShowAllHidden() {
 bool vfsAcceptsDrops(const QString &path) {
 	const VNode *node = vfsNode(path);
 	return node && (node->kind == VKind::Backed || node->kind == VKind::Unix ||
-		node->kind == VKind::Apps);
+		(node->kind == VKind::Apps && !node->id.startsWith("system-folder/")));
 }
 
 bool vfsIsApplications(const QString &path) {
 	const VNode *node = vfsNode(path);
-	return node && node->kind == VKind::Apps;
+	return node && node->kind == VKind::Apps && !node->id.startsWith("system-folder/");
 }
 
 bool vfsRename(const QString &path, const QString &newName) {

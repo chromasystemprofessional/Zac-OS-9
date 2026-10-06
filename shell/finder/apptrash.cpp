@@ -58,6 +58,11 @@ std::vector<TrashedApplication> appTrashEntries(QString *error) {
 bool appTrashQueue(const QString &id, QString *error) {
 	error->clear();
 	const AppEntry *app = appById(id);
+	if (app && (app->systemUtility || !app->userInstalled)) {
+		*error = "System utilities and automatically installed applications cannot be "
+			"uninstalled through Finder. Use the system package administrator tools.";
+		return false;
+	}
 	if (!app || (!app->origin.startsWith("dpkg:") && !app->origin.startsWith("flatpak:"))) {
 		*error = "This application has no supported Debian or Flatpak uninstall source. "
 			"Remove it using its own installer; it has not been moved to Trash.";

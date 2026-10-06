@@ -24,6 +24,27 @@ Updated: 2026-10-06
 
 ## Current work
 
+**User applications separated from system utilities** (0.1.27): Finder
+now excludes automatically installed Debian dependencies as well as the
+installation-image baseline from Applications. Settings, system tools,
+file managers and shipped utilities are shown in System Folder > Utilities,
+including qps, PCManFM, desktop/screen-saver settings, Print Settings and
+balenaEtcher, even when explicitly installed. Ordinary user utilities,
+manually installed Debian applications, user-local launchers, Wine apps and
+Flatpak exports remain eligible for Applications. Apt mark changes refresh
+the view; desktop-file ownership supplies package identity, with cached
+queries invalidated when dpkg's database changes. Registry version 9 moves
+the shipped Utilities folder and system-launcher rename/label overrides
+without removing user nodes. System tools and automatic dependencies cannot
+be queued or removed through Finder's application Trash path, including an
+already queued app subsequently reclassified as a system tool. No packages
+are removed. The production Finder builds, and focused Finder routing,
+desktop and selection suites pass;
+installed systems receive the change through Software Update. Apt marks on
+this machine confirm all four named utility packages are automatic, but
+installation metadata cannot reconstruct user intent if another installer
+marked a package manual.
+
 **Trash queues application uninstall** (0.1.26): moving a supported
 Debian or user Flatpak application to Trash via the menu or a drag creates
 a persisted uninstall record and hides its launcher, without uninstalling
@@ -293,6 +314,22 @@ sink a clip joining or being killed left the device's trigger time and
 hw_params unchanged. The sound pattern alone does not reproduce the hang;
 a live test with YouTube, real window drags and interface sounds on, under
 a read-only hardware-position monitor, is next.
+
+**Recurring HDMI stall after updating to 0.1.26** (2026-10-06): the
+installed Haswell position fix was active and the ACPI storming GPE was
+masked, but HDMI's ALSA hardware and application pointers stopped advancing
+while Brave and a short imported button-click player remained active.
+Terminating that stuck player did not restore hardware progress. Apt history
+shows the update installed only ZacOS 9, not an audio-server, browser or kernel
+update; this does not establish what triggered the stall. After an authorized
+reboot, the user confirmed YouTube video and HDMI/TV sound worked again.
+Three bounded original chirps and twelve bounded copies of the previously
+stuck button-click sample completed successfully, the latter alongside Brave
+playback with advancing hardware pointers. Reopening Software Update, checking
+for updates and moving its window also left playback working, confirmed by
+the user. HDMI selection and interface-sound settings were unchanged. No
+preventative fix is established; the recurring stall and unbounded detached
+sound-player lifetime remain unresolved.
 
 **USB erase safety-lock fix and disk names** (0.1.14): The helper's own
 exclusive disk claim prevented sfdisk from taking another exclusive claim,
