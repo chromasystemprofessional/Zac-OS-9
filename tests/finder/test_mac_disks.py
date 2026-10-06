@@ -303,7 +303,8 @@ class PrivilegedTests(unittest.TestCase):
                         patch.object(helper, "mount_root", root), \
                         patch.object(helper, "root_directory"), \
                         patch.object(helper, "mount_apfs",
-                                     return_value=[str(Path(directory) / "8-17")]) as apfs, \
+                                     return_value=[{"name": "Chromasystem SSD",
+                                                    "path": str(Path(directory) / "8-17")}]) as apfs, \
                         patch.object(helper, "container_mounts", return_value=[]), \
                         patch.object(helper, "mounted_paths",
                                      return_value={str(Path(directory) / "8-17")}), \
@@ -333,23 +334,107 @@ class PrivilegedTests(unittest.TestCase):
     def test_apfs_uses_numeric_indexes_for_every_volume(self):
         with tempfile.TemporaryDirectory() as directory:
             target = Path(directory)
-            with patch.object(helper, "apfs_volume_count", return_value=3), \
+            volumes = [{"index": i, "name": f"Disk {i}"} for i in (1, 2, 3)]
+            with patch.object(helper, "apfs_volumes", return_value=volumes), \
                     patch.object(helper, "root_directory"), \
                     patch.object(helper, "run") as run, \
                     patch.object(helper, "mounted_paths",
                                  return_value={str(target / str(i)) for i in (1, 2, 3)}):
                 self.assertEqual(helper.mount_apfs("/proc/self/fd/3", target, 3),
-                                 [str(target / str(i)) for i in (1, 2, 3)])
+                                 [{"name": f"Disk {i}", "path": str(target / str(i))}
+                                  for i in (1, 2, 3)])
                 self.assertEqual([call.args[0][1:3] for call in run.call_args_list],
                                  [["-f", "1"], ["-f", "2"], ["-f", "3"]])
                 for call in run.call_args_list:
                     self.assertEqual(call.args[1], (3,))
                     self.assertIn("ro,nodev,nosuid,noexec,allow_other", call.args[0])
 
+    def test_apfs_helper_volumes_are_not_mounted_and_names_preserved(self):
+        names = ["Preboot", "Recovery", "VM", "Chromasystem SSD", "Update",
+                 "Chromasystem SSD - Data", "iSCPreboot", "xART", "Hardware"]
+        volumes = [{"index": i, "name": name} for i, name in enumerate(names, 1)]
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory)
+            with patch.object(helper, "apfs_volumes", return_value=volumes), \
+                    patch.object(helper, "root_directory"), \
+                    patch.object(helper, "mounted_paths",
+                                 return_value={str(target / "4"), str(target / "6")}), \
+                    patch.object(helper, "run") as run:
+                result = helper.mount_apfs("/proc/self/fd/3", target, 3)
+                self.assertEqual(result, [
+                    {"name": "Chromasystem SSD", "path": str(target / "4")},
+                    {"name": "Chromasystem SSD - Data", "path": str(target / "6")}])
+                self.assertEqual([call.args[0][1:3] for call in run.call_args_list],
+                                 [["-f", "4"], ["-f", "6"]])
+
+    def test_apfs_filter_uses_exact_names_not_substrings(self):
+        names = [" recovery ", "PREBOOT", "VM", "Update", "Recovery Documents",
+                 "VM Projects", "Update Archive", "Personal SSD"]
+        volumes = [{"index": i, "name": name} for i, name in enumerate(names, 1)]
+        self.assertEqual([volume["name"] for volume in helper.user_apfs_volumes(volumes)],
+                         names[4:])
+        with self.assertRaisesRegex(ValueError, "no normal"):
+            helper.user_apfs_volumes(volumes[:4])
+
+    def test_apfs_library_reads_each_stored_name_and_frees_handles(self):
+        names = [b"Preboot", b"Chromasystem SSD", b"Chromasystem SSD - Data"]
+        freed = []
+        indexes = []
+
+        def initialize(container, error):
+            container._obj.value = 100
+            return 1
+
+        def get_count(container, count, error):
+            count._obj.value = len(names)
+            return 1
+
+        def get_volume(container, index, volume, error):
+            indexes.append(index)
+            volume._obj.value = index + 1
+            return 1
+
+        def get_name_size(volume, size, error):
+            size._obj.value = len(names[volume.value - 1]) + 1
+            return 1
+
+        def get_name(volume, buffer, size, error):
+            buffer.value = names[volume.value - 1]
+            return 1
+
+        def free_volume(volume, error):
+            freed.append(volume._obj.value)
+            volume._obj.value = None
+            return 1
+
+        def free_container(container, error):
+            freed.append(container._obj.value)
+            container._obj.value = None
+            return 1
+
+        library = SimpleNamespace(
+            libfsapfs_container_initialize=initialize,
+            libfsapfs_container_open=lambda *args: 1,
+            libfsapfs_container_get_number_of_volumes=get_count,
+            libfsapfs_container_get_volume_by_index=get_volume,
+            libfsapfs_volume_get_utf8_name_size=get_name_size,
+            libfsapfs_volume_get_utf8_name=get_name,
+            libfsapfs_volume_free=free_volume,
+            libfsapfs_container_close=lambda *args: 0,
+            libfsapfs_container_free=free_container,
+            libfsapfs_error_sprint=lambda *args: 1,
+            libfsapfs_error_free=lambda *args: None)
+        with patch.object(helper.ctypes, "CDLL", return_value=library):
+            self.assertEqual(helper.apfs_volumes("/proc/self/fd/3"), [
+                {"index": i, "name": name.decode()} for i, name in enumerate(names, 1)])
+        self.assertEqual(indexes, [0, 1, 2])
+        self.assertEqual(freed, [1, 2, 3, 100])
+
     def test_apfs_failure_rolls_back_prior_volumes(self):
         with tempfile.TemporaryDirectory() as directory:
             target = Path(directory)
-            with patch.object(helper, "apfs_volume_count", return_value=2), \
+            with patch.object(helper, "apfs_volumes",
+                              return_value=[{"index": i, "name": f"Disk {i}"} for i in (1, 2)]), \
                     patch.object(helper, "root_directory", side_effect=lambda path: path.mkdir()), \
                     patch.object(helper, "run", side_effect=[
                         "", ValueError("volume 2 unreadable"), ""]) as run, \
@@ -363,7 +448,8 @@ class PrivilegedTests(unittest.TestCase):
     def test_apfs_reader_failure_after_mount_rolls_back_current_volume(self):
         with tempfile.TemporaryDirectory() as directory:
             target = Path(directory)
-            with patch.object(helper, "apfs_volume_count", return_value=2), \
+            with patch.object(helper, "apfs_volumes",
+                              return_value=[{"index": i, "name": f"Disk {i}"} for i in (1, 2)]), \
                     patch.object(helper, "root_directory", side_effect=lambda path: path.mkdir()), \
                     patch.object(helper, "run", side_effect=[
                         "", ValueError("reader failed after mounting"), "", ""]) as run, \
@@ -379,7 +465,7 @@ class PrivilegedTests(unittest.TestCase):
     def test_apfs_rollback_failure_preserves_original_error_and_mount_directory(self):
         with tempfile.TemporaryDirectory() as directory:
             target = Path(directory)
-            with patch.object(helper, "apfs_volume_count", return_value=1), \
+            with patch.object(helper, "apfs_volumes", return_value=[{"index": 1, "name": "Disk"}]), \
                     patch.object(helper, "root_directory", side_effect=lambda path: path.mkdir()), \
                     patch.object(helper, "run", side_effect=[
                         ValueError("reader error"), ValueError("busy unmount")]), \
@@ -397,7 +483,7 @@ class PrivilegedTests(unittest.TestCase):
             except OSError:
                 self.skipTest("libfsapfs1 is not installed")
             with self.assertRaisesRegex(ValueError, "APFS container"):
-                helper.apfs_volume_count(str(source))
+                helper.apfs_volumes(str(source))
 
     def test_apfs_eject_unmounts_container_children(self):
         self.check_apfs_eject(recorded=True)

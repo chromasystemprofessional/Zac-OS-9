@@ -24,6 +24,18 @@ Updated: 2026-10-06
 
 ## Current work
 
+**Relevant APFS volumes and real disk names** (0.1.23): enumerate stored
+APFS names through libfsapfs, exclude standard helper names (Preboot, Recovery,
+VM, Update, xART, iSCPreboot, Hardware and Diagnostics), and mount remaining
+data/system volumes with their original numeric indexes. Finder shows each
+normal volume by its stored name, such as Chromasystem SSD, and opens its
+contents directly; eject still unmounts the complete container. Filtering is
+exact-name based because the Debian reader lacks a public role API; renamed
+helper volumes cannot be identified automatically. Finder builds; 30 Mac-disk
+tests pass, including filtering, name enumeration and rollback regressions.
+All four focused Meson suites pass; the hotplug suite also checks the exact
+desktop names, browse paths and eject identity for a system/data volume pair.
+
 **APFS busy-directory correction** (0.1.22): the reported volume 4 is
 present in the kernel mount table but `os.path.ismount()` returns false.
 The 0.1.21 helper treated it as unmounted and tried removing its directory,

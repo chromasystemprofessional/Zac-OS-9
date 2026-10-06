@@ -88,6 +88,22 @@ QString localVolumeUsbDevice(const QString &mountPath) {
 	return device;
 }
 
+std::vector<LocalVolume> localVolumeMacNames(const QByteArray &record,
+		const QString &container, const QSet<QString> &mounted) {
+	const QJsonObject info = QJsonDocument::fromJson(record).object();
+	std::vector<LocalVolume> volumes;
+	for (const QJsonValue &value : info.value("volumes").toArray()) {
+		const QJsonObject named = value.toObject();
+		const QString path = named.value("path").toString();
+		const QString label = named.value("name").toString();
+		if (QFileInfo(path).absolutePath() != container || !mounted.contains(path) || label.isEmpty()) {
+			continue;
+		}
+		volumes.push_back({ label, path, true, info.value("device").toString() });
+	}
+	return volumes;
+}
+
 std::vector<LocalVolume> localVolumes() {
 	std::vector<LocalVolume> out;
 
@@ -155,7 +171,8 @@ std::vector<LocalVolume> localVolumes() {
 			qWarning() << "Could not read Mac mount record:" << record.fileName();
 			continue;
 		}
-		const QJsonObject info = QJsonDocument::fromJson(record.readAll()).object();
+		const QByteArray data = record.readAll();
+		const QJsonObject info = QJsonDocument::fromJson(data).object();
 		const QString path = info.value("path").toString();
 		bool active = mounted.contains(path);
 		for (const QJsonValue &value : info.value("paths").toArray()) {
@@ -165,6 +182,23 @@ std::vector<LocalVolume> localVolumes() {
 			}
 		}
 		if (path != records.filePath(name.chopped(5)) || !active) {
+			continue;
+		}
+		const QJsonArray namedVolumes = info.value("volumes").toArray();
+		if (!namedVolumes.isEmpty()) {
+			for (const LocalVolume &named : localVolumeMacNames(data, path, mounted)) {
+				bool shown = false;
+				for (LocalVolume &volume : out) {
+					if (volume.path == named.path) {
+						volume.name = named.name;
+						volume.macDevice = named.macDevice;
+						shown = true;
+					}
+				}
+				if (!shown) {
+					out.push_back(named);
+				}
+			}
 			continue;
 		}
 		bool shown = false;
@@ -259,7 +293,7 @@ void localVolumeMountMacImage(const QString &path,
 		if (error.isEmpty()) {
 			const QJsonObject result = QJsonDocument::fromJson(out).object();
 			mountedPath = result.value("path").toString();
-			if (mountedPath.isEmpty()) {
+			if (mountedPath.isEmpty() || !result.value("volumes").toArray().isEmpty()) {
 				const QJsonArray paths = result.value("paths").toArray();
 				if (!paths.isEmpty()) {
 					mountedPath = paths[0].toString();

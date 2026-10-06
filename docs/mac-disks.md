@@ -22,8 +22,20 @@ Supported containers:
 - `.sparseimage` files, read through `libmodi` and copied to a sparse raw file.
 - `.sparsebundle` directories, reconstructed from their band files.
 
-All supported Mac partitions in an image are mounted, not just the first one.
-APFS containers expose their available volumes inside the container folder.
+Supported Mac partitions in an image are mounted, not just the first one.
+For APFS, only normal data/system volumes are mounted. Finder shows each as
+a desktop disk using its stored name (for example, **Chromasystem SSD**),
+and opens the first normal volume directly instead of a numbered container.
+Selecting either volume of a system/data pair and ejecting unmounts the whole
+container.
+
+The Debian reader exposes names but not APFS volume roles through its public
+API. Helper volumes are therefore excluded by their exact standard names,
+ignoring case and surrounding whitespace: Preboot, Recovery, VM, Update,
+xART, iSCPreboot, Hardware and Diagnostics. A volume named "Recovery Documents"
+or "VM Projects" is not excluded. Custom-renamed helper volumes cannot be
+identified automatically by this reader.
+
 The reader is invoked once per volume with a numeric, one-based index: its
 advertised `-f all` option is not implemented by the Debian reader. Failed
 container mounts roll back the volumes already mounted; eject unmounts every
@@ -35,6 +47,8 @@ cleanup cannot unmount a busy volume, its original error is retained and a
 recovery disk icon allows another eject attempt. Eject can also recover
 unrecorded child mounts left by earlier versions.
 Reopening an already mounted image reuses its mounts.
+Eject and remount existing containers, or restart the session after reboot,
+to apply filtering and names to mounts created by an older version.
 
 Converted images live temporarily in `$XDG_CACHE_HOME/zacos9/mac-images`
 (normally `~/.cache/zacos9/mac-images`). They can require substantial free

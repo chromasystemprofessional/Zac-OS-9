@@ -10,6 +10,8 @@
  */
 
 #include <QString>
+#include <QByteArray>
+#include <QSet>
 #include <functional>
 #include <vector>
 
@@ -27,6 +29,8 @@ QString localVolumeUsbDevice(const QString &mountPath);
 
 /* Every real storage volume mounted right now, except / and network mounts. */
 std::vector<LocalVolume> localVolumes();
+std::vector<LocalVolume> localVolumeMacNames(const QByteArray &record,
+	const QString &container, const QSet<QString> &mounted);
 
 /* Call `f` whenever a volume is mounted or unmounted. Safe to call more
  * than once; every callback is kept. */

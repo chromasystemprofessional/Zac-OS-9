@@ -88,6 +88,18 @@ static bool waitFor(const std::function<bool()> &ready) {
 int main(int argc, char **argv) {
 	qputenv("QT_NO_GLIB", "1");
 	QCoreApplication app(argc, argv);
+	const QString container = "/run/media/zacos9-mac/1001/8-18";
+	const QByteArray record = R"({"device":"/dev/sdb2","volumes":[
+		{"name":"Chromasystem SSD","path":"/run/media/zacos9-mac/1001/8-18/4"},
+		{"name":"Chromasystem SSD - Data","path":"/run/media/zacos9-mac/1001/8-18/6"},
+		{"name":"Unmounted","path":"/run/media/zacos9-mac/1001/8-18/9"},
+		{"name":"Foreign","path":"/media/foreign"}]})";
+	const auto named = localVolumeMacNames(record, container,
+		{ container + "/4", container + "/6", "/media/foreign" });
+	assert(named.size() == 2);
+	assert(named[0].name == "Chromasystem SSD" && named[0].path == container + "/4");
+	assert(named[1].name == "Chromasystem SSD - Data" && named[1].path == container + "/6");
+	assert(named[0].macDevice == "/dev/sdb2" && named[0].ejectable);
 	assert(localVolumePathShown("/run/media/adam/Untitled"));
 	assert(localVolumePathShown("/media/adam/Untitled"));
 	assert(localVolumePathShown("/runner/files"));

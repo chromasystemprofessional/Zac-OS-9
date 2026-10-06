@@ -16,6 +16,16 @@ ROOT = Path("/run/media/zacos9-mac")
 DEVICE = re.compile(r"/dev/(?:sd[a-z]+[0-9]*|nvme[0-9]+n[0-9]+(?:p[0-9]+)?|"
                     r"mmcblk[0-9]+(?:p[0-9]+)?|loop[0-9]+(?:p[0-9]+)?|sr[0-9]+)\Z")
 FILESYSTEMS = {"hfs", "hfsplus", "apfs"}
+APFS_HELPER_NAMES = {"preboot", "recovery", "vm", "update", "xart", "iscpreboot",
+                     "hardware", "diagnostics"}
+
+
+def user_apfs_volumes(volumes):
+    selected = [volume for volume in volumes
+                if volume["name"].strip().casefold() not in APFS_HELPER_NAMES]
+    if not selected:
+        raise ValueError("The APFS container has no normal data/system volumes to mount")
+    return selected
 
 
 def mounted_paths():
@@ -50,7 +60,7 @@ def recovery_record(record, target, device, active):
         raise ValueError(f"Leftover Mac mounts at {target}; could not record them for eject: {error}") from error
 
 
-def apfs_volume_count(source):
+def apfs_volumes(source):
     library = ctypes.CDLL("libfsapfs.so.1")
     pointer = ctypes.c_void_p
     pointer_ref = ctypes.POINTER(pointer)
@@ -59,6 +69,13 @@ def apfs_volume_count(source):
         "container_open": ([pointer, ctypes.c_char_p, ctypes.c_int, pointer_ref], ctypes.c_int),
         "container_get_number_of_volumes": (
             [pointer, ctypes.POINTER(ctypes.c_int), pointer_ref], ctypes.c_int),
+        "container_get_volume_by_index": (
+            [pointer, ctypes.c_int, pointer_ref, pointer_ref], ctypes.c_int),
+        "volume_get_utf8_name_size": (
+            [pointer, ctypes.POINTER(ctypes.c_size_t), pointer_ref], ctypes.c_int),
+        "volume_get_utf8_name": (
+            [pointer, pointer, ctypes.c_size_t, pointer_ref], ctypes.c_int),
+        "volume_free": ([pointer_ref, pointer_ref], ctypes.c_int),
         "container_close": ([pointer, pointer_ref], ctypes.c_int),
         "container_free": ([pointer_ref, pointer_ref], ctypes.c_int),
         "error_sprint": ([pointer, ctypes.c_char_p, ctypes.c_size_t], ctypes.c_int),
@@ -86,7 +103,27 @@ def apfs_volume_count(source):
             container, ctypes.byref(count), ctypes.byref(error)))
         if not 1 <= count.value <= 100:
             raise ValueError("APFS container has no volumes or exceeds the reader's 100-volume limit")
-        return count.value
+        volumes = []
+        for index in range(count.value):
+            volume = pointer()
+            try:
+                check(library.libfsapfs_container_get_volume_by_index(
+                    container, index, ctypes.byref(volume), ctypes.byref(error)))
+                size = ctypes.c_size_t()
+                check(library.libfsapfs_volume_get_utf8_name_size(
+                    volume, ctypes.byref(size), ctypes.byref(error)))
+                if not 1 <= size.value <= 4096:
+                    raise ValueError(f"APFS volume {index + 1} has an invalid name size")
+                name = ctypes.create_string_buffer(size.value)
+                check(library.libfsapfs_volume_get_utf8_name(
+                    volume, name, size.value, ctypes.byref(error)))
+                decoded = name.value.decode("utf-8")
+                volumes.append({"index": index + 1,
+                                "name": decoded or f"APFS Volume {index + 1}"})
+            finally:
+                if volume:
+                    check(library.libfsapfs_volume_free(ctypes.byref(volume), ctypes.byref(error)))
+        return volumes
     finally:
         if container:
             try:
@@ -97,10 +134,11 @@ def apfs_volume_count(source):
 
 
 def mount_apfs(source, target, fd):
-    count = apfs_volume_count(source)
+    volumes = user_apfs_volumes(apfs_volumes(source))
     directories = []
     try:
-        for index in range(1, count + 1):
+        for entry in volumes:
+            index = entry["index"]
             volume = target / str(index)
             root_directory(volume)
             directories.append(volume)
@@ -108,7 +146,8 @@ def mount_apfs(source, target, fd):
                  "ro,nodev,nosuid,noexec,allow_other", source, str(volume)], (fd,))
             if str(volume) not in mounted_paths():
                 raise ValueError(f"APFS volume {index}: the reader exited without mounting")
-        return [str(volume) for volume in directories]
+        return [{"name": entry["name"], "path": str(target / str(entry["index"]))}
+                for entry in volumes]
     except (OSError, ValueError, subprocess.TimeoutExpired) as error:
         failures = []
         # A reader can create its FUSE mount and then fail. Inspect every
@@ -210,7 +249,8 @@ def mount_device(operation, device, uid):
                 raise ValueError("Not an HFS, HFS+ or APFS volume")
             if filesystem == "apfs":
                 try:
-                    paths = mount_apfs(source, target, fd)
+                    volumes = mount_apfs(source, target, fd)
+                    paths = [volume["path"] for volume in volumes]
                 except (OSError, ValueError, subprocess.TimeoutExpired) as error:
                     active = container_mounts(target)
                     if active:
@@ -226,6 +266,8 @@ def mount_device(operation, device, uid):
             if not set(paths) <= mounted_paths():
                 raise ValueError("The mount tool exited without mounting the volume")
             result = {"device": device, "path": str(target), "paths": paths}
+            if filesystem == "apfs":
+                result["volumes"] = volumes
             try:
                 record.write_text(json.dumps(result))
                 record.chmod(0o644)
