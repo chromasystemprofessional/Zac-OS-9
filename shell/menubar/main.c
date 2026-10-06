@@ -808,9 +808,16 @@ static void shell_active_client(void *data, struct platinum_shell_v1 *shell, uin
 	appmenu_set_active_pid(pid);
 }
 
+static void shell_active_gtk_menu(void *data, struct platinum_shell_v1 *shell,
+		const char *bus_name, const char *app_menu_path, const char *menubar_path,
+		const char *window_path, const char *application_path) {
+	appmenu_set_active_gtk(bus_name, app_menu_path, menubar_path, window_path, application_path);
+}
+
 static const struct platinum_shell_v1_listener shell_listener = {
 	.window_position = shell_window_position,
 	.active_client = shell_active_client,
+	.active_gtk_menu = shell_active_gtk_menu,
 };
 
 static void flush_launch_feedback(void) {
@@ -875,7 +882,7 @@ static void registry_global(void *data, struct wl_registry *reg, uint32_t name,
 			&zwp_virtual_keyboard_manager_v1_interface, 1);
 	} else if (strcmp(iface, platinum_shell_v1_interface.name) == 0 && version >= 2) {
 		g.platinum_shell = wl_registry_bind(reg, name, &platinum_shell_v1_interface,
-			version < 3 ? version : 3);
+			version < 4 ? version : 4);
 		platinum_shell_v1_add_listener(g.platinum_shell, &shell_listener, NULL);
 	}
 }

@@ -4,31 +4,40 @@
 # "Picture 1.png", "Picture 2.png", ... (as Mac OS 9 named its own) and is
 # put on the clipboard too, ready to paste.
 #
-# slurp draws the selection, grim takes the picture (zacos9-wm's
-# screencopy), wl-copy sets the clipboard (zacos9-wm's data-control).
+# Uses native committed-frame capture, not wlroots screencopy.
 set -u
 
-for tool in slurp grim wl-copy; do
+capture=$(dirname "$(readlink -f "$0")")/zacos9-capture
+if [ ! -x "$capture" ]; then
+	echo "zacos9-snapshot: the native capture helper is missing; reinstall ZacOS." >&2
+	exit 1
+fi
+for tool in slurp wl-copy; do
 	command -v "$tool" >/dev/null || {
-		echo "zacos9-snapshot: $tool isn't installed (packages grim, slurp, wl-clipboard)." >&2
+		echo "zacos9-snapshot: $tool isn't installed." >&2
 		exit 1
 	}
 done
 
-# Platinum: a black 1-pixel outline, the screen lightly dimmed outside it.
-geometry=$(slurp -d -w 1 -c '#000000ff' -b '#00000030' -s '#00000000' -F "DejaVu Sans") || exit 0
-[ -n "$geometry" ] || exit 0
-
+geometry=$(slurp -d -w 1 -c '#000000ff' -b '#00000030' -s '#00000000' -F "DejaVu Sans")
+status=$?
+case $status in
+	0) [ -n "$geometry" ] || exit 0 ;;
+	1) exit 0 ;; # slurp uses status 1 for a cancelled selection.
+	*) echo "zacos9-snapshot: region selection failed ($status)." >&2; exit "$status" ;;
+esac
 desktop=$(xdg-user-dir DESKTOP 2>/dev/null)
 [ -n "$desktop" ] && [ "$desktop" != "$HOME" ] || desktop=$HOME/Desktop
-mkdir -p "$desktop"
+mkdir -p "$desktop" || exit 1
 n=1
 while [ -e "$desktop/Picture $n.png" ]; do
 	n=$((n + 1))
 done
 file="$desktop/Picture $n.png"
 
-# Let slurp's overlay go before the picture is taken.
 sleep 0.2
-grim -g "$geometry" "$file" || exit 1
-wl-copy --type image/png <"$file"
+"$capture" --geometry "$geometry" "$file" || exit 1
+if ! wl-copy --type image/png <"$file"; then
+	echo "zacos9-snapshot: the picture was saved, but clipboard copying failed: $file" >&2
+	exit 1
+fi

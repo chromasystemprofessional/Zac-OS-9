@@ -5,3 +5,5 @@
 install_data('zacos9-mimeapps.list', install_dir: get_option('datadir') / 'zacos9' / 'xdg')
 install_data('foot/foot.ini',
   install_dir: get_option('datadir') / 'zacos9' / 'xdg' / 'foot')
+install_data('xdg-desktop-portal/zacos9-portals.conf',
+  install_dir: get_option('datadir') / 'zacos9' / 'xdg' / 'xdg-desktop-portal')

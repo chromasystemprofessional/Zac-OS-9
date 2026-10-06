@@ -182,12 +182,21 @@ static void send_active(struct wl_resource *resource) {
 	if (wl_resource_get_version(resource) >= PLATINUM_SHELL_V1_ACTIVE_CLIENT_SINCE_VERSION) {
 		platinum_shell_v1_send_active_client(resource, active_pid);
 	}
+	gtk_shell_send_active(resource, the_server);
+}
+
+void platinum_shell_gtk_changed(struct plat_server *server) {
+	struct wl_resource *resource;
+	wl_resource_for_each(resource, &resources) {
+		gtk_shell_send_active(resource, server);
+	}
 }
 
 void platinum_shell_focus_changed(struct plat_server *server) {
 	struct plat_view *view = server->focused_view;
 	uint32_t pid = view ? view_pid(view) : 0;
 	if (pid == active_pid) {
+		platinum_shell_gtk_changed(server);
 		return;
 	}
 	active_pid = pid;
@@ -231,5 +240,5 @@ void platinum_shell_init(struct plat_server *server) {
 	the_server = server;
 	wl_list_init(&hints);
 	wl_list_init(&resources);
-	wl_global_create(server->display, &platinum_shell_v1_interface, 3, NULL, bind_shell);
+	wl_global_create(server->display, &platinum_shell_v1_interface, 4, NULL, bind_shell);
 }

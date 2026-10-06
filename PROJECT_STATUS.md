@@ -24,6 +24,108 @@ Updated: 2026-10-06
 
 ## Current work
 
+**GTK 3 global menus** (0.1.15): Added GTK's version-one Wayland menu
+metadata protocol and per-focused-surface menu paths over platinum-shell v4,
+preserving earlier clients and distinguishing windows of the same process.
+The menu bar imports GTK GMenuModel/GActionGroup exports, live enabled and
+checked/radio states, sections/submenus and action targets; asynchronous owner
+PID verification rejects spoofed/stale exports and owner loss restores fallback.
+Native GTK exports work directly. A realization-safe ZacOS GTK module reuses
+Debian's appmenu parser for legacy GtkWindow menu bars: the stock module's
+25.04 legacy Wayland export fails before realization and sends the wrong
+action path. Session/dependency wiring installs and enables the corrected
+module; legacy local menus reappear when the menu service disappears.
+Isolated headless tests verify real Galculator File/Edit/Help global titles,
+legacy/native GTK action clicks, same-process window focus/close, local-menu
+fallback and real Qt registration/action compatibility. Backend tests cover
+updates, toggles/radios, invalid paths, owner loss and PID mismatch. This is
+released together in 0.1.15; the compositor/session need a coordinated
+update and logout/login. GTK forced to X11 and custom/non-exported menus remain
+outside this implementation.
+The compositor, menu bar, Finder and GTK module build successfully. All
+eight focused GTK, Qt-action, launch-feedback, Finder and native-snapshot
+regression suites pass with no skips or failures.
+
+**Sniffer copy/move status dialogs** (0.1.15): File transfers and
+Duplicate now show a Platinum movable-modal dialog with current filename,
+destination, progress bar, percentage and Stop. A worker thread counts and
+copies folder contents in bounded chunks while the GUI remains responsive.
+Stop/Escape/Command-period keep completed items, remove the current incomplete
+copy and preserve originals; same-disk rename moves stop between items.
+Aliases (including relative and dangling links) and resource-fork companions
+are preserved. Explicit errors cover conflicts, read/write failures and
+failed cleanup. Finder-originated drops release the drag grab before showing
+the modal controls, and stopped/failed external drops are not reported as
+completed moves. Tests cover copy interruption during actual file I/O,
+completed-item retention, move status, keyboard Stop, recursive alias copies,
+read-error rollback including read-only copied directories, and existing
+Desktop/resource-fork behavior. Installed-session drag/dialog interaction
+still needs interactive verification after updating the Finder. Sniffer
+builds successfully; all three focused selection, Desktop and VFS suites
+pass, including pixel checks of the Platinum dialog and progress fill.
+
+**Classic startup on installed hardware**: The user's Power Mac 7300–9600
+Old World ROM, Mac OS 9.0 CD image and 2 GB hard-disk image were recognized,
+but installed SheepShaver exited before opening a window with
+`Cannot map Low Memory Globals: Operation not permitted`. With explicit
+administrator authorization, `cap_sys_rawio=ep` was applied only to the
+root-owned installed SheepShaver binary. Global `vm.mmap_min_addr` remains
+65536. Relaunch created an 800×600 emulator window, and the user confirmed
+the Mac OS desktop or installer appears. This is a local capability change,
+not an automatic package permission grant; replacement of the binary during
+an emulator upgrade may remove it. The permission's risks and removal are
+documented in `emulation/README.md`.
+
+**Real Desktop and save locations** (0.1.15): Finder continues to show
+the real XDG Desktop directory while retaining startup/mounted disks and
+Trash. Login registers a missing XDG Desktop mapping and GTK bookmark without
+replacing existing paths, files or bookmarks; the Qt style appends Desktop to
+save-dialog places and portal file choosers prefer GTK. Virtual application
+and backed-folder drags make real Desktop aliases without moving originals;
+Command-Option-drag makes aliases of ordinary files/folders. Alias copies
+preserve links, unavailable originals give an alert, and transfers resolve
+destination aliases before checking for recursive folder copies. Offscreen
+tests cover external saves/watcher updates, New Folder, actual application
+and backed-folder drag payloads, alias opening/copying/trashing, and saving
+through a Desktop folder alias in a real Qt file chooser. Registration tests
+cover custom paths, existing bookmarks, repeated login, invalid paths and
+symlinked configuration files. Finder and the Qt style build; all five focused
+Desktop, GTK, selection and VFS suites pass. A real GTK chooser also verifies
+the Desktop sidebar and saving through its folder alias. Installed-session
+portal routing still requires verification after updating the package and
+logging in again.
+
+**Native Screen Snapshot replacement** (0.1.15): Following a repeatable
+report of YouTube playback failing after `grim` captures, Snapshot now uses a
+native private Wayland interface to read the last committed display buffer.
+Unlike screencopy, it does not change output-render or software-cursor locks.
+The compositor retains one current displayed buffer per output, releases it
+on replacement/reconfiguration/removal, and copies requested images into sealed
+memory files. The native client validates dimensions, imposes a 32-megapixel
+limit, combines monitor images at the selected scale, crops and atomically
+saves PNGs. Rectangle selection, Desktop naming and clipboard behavior remain.
+There is no automatic grim or unverified GNOME fallback. Old compositors give a
+restart/update alert. Tests verify unchanged output locks and buffer lifetime,
+repeated multi-display readback while animations continue on pixman and GLES,
+image colors/crops, malformed geometry, save/clipboard failures and cancellation.
+HiDPI captures retain pixel resolution, and all eight output rotation/mirror
+transforms are covered by exact pixel assertions. The compositor and native
+client build successfully; all seven focused snapshot, startup, launch, window
+sound and Finder selection suites pass.
+The affected Firefox/YouTube reproduction still needs installed-system testing;
+the replacement does not establish the root cause of the earlier HTTP 403s.
+
+**Original window-sound live check**: ZacOS Original is available in installed
+0.1.14 and already maps drag, release, collapse and expansion events. Enabling
+the per-user sound set exposed stalled playback on the developer machine's
+HDMI sink: bounded pw-play/paplay previews do not finish, while an original
+chirp plays successfully on analog without changing the HDMI default. Resetting
+the HDMI sink and restarting user audio services did not recover it; the
+existing Haswell position_fix=1 is active. Window-sound, playback and settings
+regression suites pass. HDMI recovery and a reproduction after installing the
+native screenshot replacement still require testing; no new sound-event
+implementation or global sound-default change was needed.
+
 **USB erase safety-lock fix and disk names** (0.1.14): The helper's own
 exclusive disk claim prevented sfdisk from taking another exclusive claim,
 producing an erroneous "disk is currently in use" failure on unmounted disks.

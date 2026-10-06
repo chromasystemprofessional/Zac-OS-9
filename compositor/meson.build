@@ -18,6 +18,8 @@ protocols = [
   wl_protocol_dir / 'staging/cursor-shape/cursor-shape-v1.xml',
   meson.project_source_root() / 'protocols/wlr-layer-shell-unstable-v1.xml',
   meson.project_source_root() / 'protocols/platinum-shell-v1.xml',
+  meson.project_source_root() / 'protocols/zacos-snapshot-v1.xml',
+  meson.project_source_root() / 'protocols/gtk-shell.xml',
 ]
 protocol_headers = []
 foreach xml : protocols
@@ -30,6 +32,16 @@ endforeach
 # Our own protocol also needs its interface code on the server side.
 protocol_headers += custom_target('platinum_shell_v1_c',
   input: meson.project_source_root() / 'protocols/platinum-shell-v1.xml',
+  output: '@BASENAME@-protocol.c',
+  command: [wayland_scanner, 'private-code', '@INPUT@', '@OUTPUT@'],
+)
+protocol_headers += custom_target('zacos_snapshot_v1_c',
+  input: meson.project_source_root() / 'protocols/zacos-snapshot-v1.xml',
+  output: '@BASENAME@-protocol.c',
+  command: [wayland_scanner, 'private-code', '@INPUT@', '@OUTPUT@'],
+)
+protocol_headers += custom_target('gtk_shell_c',
+  input: meson.project_source_root() / 'protocols/gtk-shell.xml',
   output: '@BASENAME@-protocol.c',
   command: [wayland_scanner, 'private-code', '@INPUT@', '@OUTPUT@'],
 )
@@ -62,6 +74,7 @@ install_subdir(meson.current_build_dir() / 'ZacOS9',
 compositor_exe = executable('zacos9-wm',
   'src/main.c',
   'src/output.c',
+  'src/snapshot.c',
   'src/input.c',
   'src/window_sounds.c',
   'src/launch.c',
@@ -72,6 +85,7 @@ compositor_exe = executable('zacos9-wm',
   'src/xwayland.c',
   'src/layers.c',
   'src/platinum_shell.c',
+  'src/gtk_shell.c',
   'src/frame.c',
   'src/outline.c',
   'src/pixbuf.c',
@@ -116,5 +130,15 @@ test('window-sounds',
   executable('test-window-sounds',
     'tests/test_window_sounds.c', 'src/window_sounds.c',
     include_directories: include_directories('src', '../lib'),
+  ),
+)
+
+test('snapshot-output-state',
+  executable('test-snapshot-state', 'tests/test_snapshot.c', 'src/pixbuf.c',
+    protocol_headers,
+    include_directories: include_directories('src'),
+    dependencies: [decor_dep, wayland_server, wlroots, libdrm],
+    link_args: ['-Wl,--wrap=wlr_output_from_resource',
+      '-Wl,--wrap=wlr_output_layout_get_box'],
   ),
 )

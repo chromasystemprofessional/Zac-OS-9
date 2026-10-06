@@ -61,7 +61,7 @@ enum action {
 	ACT_EDIT_COMMAND, /* key: the ⌘ letter, sent to the front app */
 	ACT_EDIT_CLEAR,
 	ACT_FINDER,       /* arg: Finder command name */
-	ACT_DBUSMENU,     /* arg: "sender path id" of another program's menu item */
+	ACT_DBUSMENU,     /* arg: dbusmenu "sender path id" or opaque GTK route */
 };
 
 /* ⌘⌫ (delete) as a menu shortcut. */
@@ -112,10 +112,17 @@ struct mb_item *menus_add_item(struct mb_menu *m, const char *label, char key,
 
 struct pollfd;
 
-/* Owns com.canonical.AppMenu.Registrar; call only when zacos9-wm reports
- * the front window's process (see appmenu_set_active_pid). */
+/* Owns com.canonical.AppMenu.Registrar and prepares GTK menu integration.
+ * Focus metadata is supplied with the setters below after initialization. */
 void appmenu_init(void);
 void appmenu_set_active_pid(uint32_t pid);
+/* GTK exports of the focused surface: bus_name must be a unique name and
+ * paths must be object paths. The bus owner is asynchronously checked
+ * against active_pid before accepting exports. Empty bus/menu paths clear
+ * GTK selection; unavailable exports fall back to the registrar. Strings
+ * are copied and may be supplied before appmenu_init(). */
+void appmenu_set_active_gtk(const char *bus_name, const char *app_menu_path,
+	const char *menubar_path, const char *window_path, const char *application_path);
 /* Appends the front program's own menus; false if it has none. */
 bool appmenu_add_menus(struct mb_menu *menus, int *n, int max);
 void appmenu_perform(const char *arg);

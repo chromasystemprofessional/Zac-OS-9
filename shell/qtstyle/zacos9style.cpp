@@ -1,6 +1,10 @@
 #include "zacos9style.h"
 
 #include <QAbstractScrollArea>
+#include <QFileDialog>
+#include <QEvent>
+#include <QStandardPaths>
+#include <QUrl>
 #include <QImage>
 #include <QPainter>
 #include <QStyleFactory>
@@ -87,6 +91,33 @@ void Zacos9Style::polish(QPalette &p) {
 	for (QPalette::ColorRole role : { QPalette::WindowText, QPalette::ButtonText, QPalette::Text }) {
 		p.setColor(QPalette::Disabled, role, dim);
 	}
+}
+
+void Zacos9Style::polish(QWidget *widget) {
+	QProxyStyle::polish(widget);
+	if (qobject_cast<QFileDialog *>(widget)) {
+		widget->installEventFilter(this);
+	}
+}
+
+void Zacos9Style::unpolish(QWidget *widget) {
+	widget->removeEventFilter(this);
+	QProxyStyle::unpolish(widget);
+}
+
+bool Zacos9Style::eventFilter(QObject *object, QEvent *event) {
+	if (event->type() == QEvent::Show) {
+		if (auto *dialog = qobject_cast<QFileDialog *>(object)) {
+			auto places = dialog->sidebarUrls();
+			const QUrl desktop = QUrl::fromLocalFile(
+				QStandardPaths::writableLocation(QStandardPaths::DesktopLocation));
+			if (!places.contains(desktop)) {
+				places.append(desktop);
+				dialog->setSidebarUrls(places);
+			}
+		}
+	}
+	return QProxyStyle::eventFilter(object, event);
 }
 
 int Zacos9Style::pixelMetric(PixelMetric metric, const QStyleOption *option,

@@ -27,7 +27,11 @@ Build-Depends: debhelper-compat (= 13),
                qt6-base-dev,
                qt6-base-private-dev,
                liblayershellqtinterface-dev,
-               libglib2.0-dev
+               libglib2.0-dev,
+               libgtk-3-dev,
+               libappmenu-gtk3-parser-dev,
+               python3-gi,
+               gir1.2-gtk-3.0
 Standards-Version: 4.7.0
 Rules-Requires-Root: no
 

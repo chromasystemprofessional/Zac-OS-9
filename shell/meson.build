@@ -38,7 +38,7 @@ test('expand', find_program('python3'),
   args: [files('../tests/finder/test_expand.py'), files('finder/zacos9-expand')])
 
 # Screen Snapshot (Apple menu): drag out a rectangle; a picture on the
-# Desktop and the clipboard (slurp, grim, wl-copy).
+# Desktop and the clipboard (slurp, native committed-frame capture, wl-copy).
 configure_file(input: 'snapshot/zacos9-snapshot', output: 'zacos9-snapshot', copy: true)
 install_data('snapshot/zacos9-snapshot', install_dir: get_option('bindir'),
   install_mode: 'rwxr-xr-x')
@@ -99,6 +99,37 @@ test('menu-launch-feedback',
 add_languages('cpp', native: false)
 qt6 = dependency('qt6', modules: ['Core', 'Gui', 'Widgets', 'Network', 'DBus'],
   private_headers: true) # QPlatformNativeInterface: a window's wl_surface
+snapshot_protocol = []
+foreach kind : [['client-header', '@BASENAME@-client-protocol.h'], ['private-code', '@BASENAME@-protocol.c']]
+  snapshot_protocol += custom_target('zacos_snapshot_client_' + kind[0].underscorify(),
+    input: meson.project_source_root() / 'protocols/zacos-snapshot-v1.xml',
+    output: kind[1],
+    command: [wayland_scanner, kind[0], '@INPUT@', '@OUTPUT@'],
+  )
+endforeach
+capture_exe = executable('zacos9-capture', 'snapshot/capture.cpp',
+  'finder/alert.cpp', 'finder/platinumshell.cpp', finder_protocol, snapshot_protocol,
+  dependencies: [platinum_dep, qt6, wayland_client],
+  include_directories: include_directories('finder'),
+  cpp_args: ['-std=c++17'],
+  install: true,
+)
+test('snapshot-image',
+  executable('test-snapshot-image', '../tests/finder/test_snapshot_image.cpp',
+    'finder/alert.cpp', 'finder/platinumshell.cpp', finder_protocol, snapshot_protocol,
+    dependencies: [platinum_dep, qt6, wayland_client],
+    include_directories: include_directories('finder'),
+    cpp_args: ['-std=c++17']),
+  env: ['QT_QPA_PLATFORM=offscreen'],
+)
+snapshot_animation = executable('test-snapshot-animation',
+  '../tests/finder/snapshot_animation.cpp',
+  dependencies: [qt6], cpp_args: ['-std=c++17'])
+test('native-snapshot', find_program('python3'),
+  args: [files('../tests/finder/test_snapshot.py'), compositor_exe, capture_exe,
+    files('snapshot/zacos9-snapshot'), snapshot_animation],
+  timeout: 60,
+)
 layershellqt = dependency('LayerShellQt', method: 'cmake',
   modules: ['LayerShellQt::Interface'])
 # GIO reads and launches XDG desktop entries for the Applications folder,
@@ -161,6 +192,7 @@ executable('zacos9-finder',
   'finder/items.cpp',
   'finder/finder.cpp',
   'finder/fileops.cpp',
+  'finder/transferdialog.cpp',
   'finder/labeleditor.cpp',
   'finder/infowindow.cpp',
   'finder/findwindow.cpp',
@@ -183,8 +215,7 @@ executable('zacos9-finder',
 # The Macintosh view of this computer: the curated hierarchy, and the
 # Applications folder built from XDG desktop entries. The test builds a
 # private XDG environment, so it reads only its own desktop entries.
-finder_selection_sources = [
-  '../tests/finder/test_selection.cpp',
+finder_test_sources = [
   'finder/alert.cpp',
   'finder/platinumshell.cpp',
   finder_protocol,
@@ -194,20 +225,21 @@ finder_selection_sources = [
   'finder/items.cpp',
   'finder/finder.cpp',
   'finder/fileops.cpp',
+  'finder/transferdialog.cpp',
   'finder/labeleditor.cpp',
   'finder/infowindow.cpp',
   'finder/findwindow.cpp',
   'finder/folderstate.cpp',
   'finder/vfs.cpp',
   'finder/appdb.cpp',
-  'finder/localvolumes.cpp',
   'finder/diskinit.cpp',
   'finder/filemanager1.cpp',
   'network/netvolumes.cpp',
   'network/smbclient.cpp',
 ]
 test('finder-selection',
-  executable('test-finder-selection', finder_selection_sources,
+  executable('test-finder-selection', '../tests/finder/test_selection.cpp', finder_test_sources,
+    'finder/localvolumes.cpp',
     link_with: panelkit,
     include_directories: include_directories('finder', 'panels', 'network'),
     dependencies: [platinum_dep, qt6, layershellqt, wayland_client, gio, gio_unix],
@@ -543,4 +575,44 @@ shared_module('zacos9style',
   name_prefix: '',
   install: true,
   install_dir: get_option('libdir') / 'qt6' / 'plugins' / 'styles',
+)
+gtk_menu_observer = executable('gtk-menu-observer',
+  '../tests/finder/gtk_menu_observer.c', finder_protocol, 'menubar/appmenu.c',
+  include_directories: include_directories('menubar'),
+  dependencies: [platinum_dep, wayland_client, gio],
+)
+test('gtk-appmenu', find_program('dbus-run-session'),
+  args: [executable('test-appmenu-gtk', 'menubar/test_appmenu_gtk.c',
+    dependencies: [platinum_dep, wayland_client, gio])],
+  env: ['G_DEBUG=fatal-warnings'], timeout: 15)
+gtk3 = dependency('gtk+-3.0')
+gtk_parser = dependency('appmenu-gtk3-parser')
+gtk_appmenu_module = shared_module('zacos9-appmenu',
+  'gtkmenu/module.c',
+  dependencies: [gtk3, gtk_parser],
+  install: true,
+  install_dir: get_option('libdir') / 'gtk-3.0' / 'modules',
+)
+qt_menu_fixture = executable('qt-menu-fixture', '../tests/finder/qt_menu_fixture.cpp',
+  dependencies: qt6)
+test('gtk-menu-protocol', find_program('dbus-run-session'),
+  args: ['--', find_program('python3').full_path(),
+    files('../tests/finder/test_gtk_menu_protocol.py'),
+    compositor_exe.full_path(), gtk_menu_observer.full_path(),
+    files('../tests/finder/gtk_menu_fixture.py'), gtk_appmenu_module.full_path(),
+    qt_menu_fixture.full_path()],
+  depends: [compositor_exe, gtk_menu_observer, gtk_appmenu_module, qt_menu_fixture],
+  timeout: 45,
+)
+test('finder-desktop',
+  executable('test-finder-desktop',
+    '../tests/finder/test_desktop.cpp', finder_test_sources,
+    'qtstyle/zacos9style.cpp', qtstyle_moc,
+    link_with: panelkit,
+    include_directories: include_directories('finder', 'panels', 'network', 'qtstyle'),
+    dependencies: [platinum_dep, qt6, layershellqt, wayland_client, gio, gio_unix],
+    cpp_args: ['-std=c++17'],
+  ),
+  env: ['QT_QPA_PLATFORM=offscreen'],
+  timeout: 60,
 )

@@ -1,0 +1,70 @@
+#!/usr/bin/python3
+"""Register the real Desktop for XDG and GTK file choosers without moving files."""
+
+import fcntl
+import os
+from pathlib import Path
+import shlex
+import sys
+import tempfile
+
+
+def write_atomic(path, text):
+    if path.is_symlink():
+        path = path.resolve(strict=True)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporary = tempfile.mkstemp(prefix=path.name + ".", dir=path.parent)
+    try:
+        if path.exists():
+            os.fchmod(fd, path.stat().st_mode & 0o777)
+        with os.fdopen(fd, "w", encoding="utf-8") as stream:
+            stream.write(text)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+def register():
+    home = Path.home()
+    config = Path(os.environ.get("XDG_CONFIG_HOME") or home / ".config")
+    directory = config / "zacos9"
+    directory.mkdir(parents=True, exist_ok=True)
+    with (directory / "desktop-places.lock").open("a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        user_dirs = config / "user-dirs.dirs"
+        original = user_dirs.read_text(encoding="utf-8") if user_dirs.exists() else ""
+        desktop = None
+        for line in original.splitlines():
+            if line.strip().startswith("XDG_DESKTOP_DIR="):
+                values = shlex.split(line.strip().partition("=")[2], comments=True)
+                if len(values) != 1:
+                    raise ValueError("Invalid XDG_DESKTOP_DIR; correct user-dirs.dirs first")
+                value = values[0].replace("${HOME}", str(home)).replace("$HOME", str(home))
+                desktop = Path(value)
+                if not desktop.is_absolute() or "$" in value or "\n" in value:
+                    raise ValueError("XDG_DESKTOP_DIR must be an absolute path or use $HOME")
+        missing = desktop is None
+        if missing:
+            desktop = home / "Desktop"
+        desktop.mkdir(parents=True, exist_ok=True)
+        if missing:
+            separator = "" if not original or original.endswith("\n") else "\n"
+            write_atomic(user_dirs, original + separator + 'XDG_DESKTOP_DIR="$HOME/Desktop"\n')
+        bookmarks = config / "gtk-3.0" / "bookmarks"
+        existing = bookmarks.read_text(encoding="utf-8") if bookmarks.exists() else ""
+        uri = desktop.as_uri()
+        if not any(line.split(" ", 1)[0] == uri for line in existing.splitlines()):
+            separator = "" if not existing or existing.endswith("\n") else "\n"
+            write_atomic(bookmarks, existing + separator + uri + " Desktop\n")
+        print(desktop)
+
+
+if __name__ == "__main__":
+    try:
+        register()
+    except (OSError, ValueError) as error:
+        print(f"zacos9-desktop-places: {error}", file=sys.stderr)
+        sys.exit(1)

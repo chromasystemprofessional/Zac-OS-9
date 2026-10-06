@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<protocol name="zacos_snapshot_v1">
+  <copyright>Copyright 2026 ZacOS contributors. GPL-3.0-or-later.</copyright>
+  <interface name="zacos_snapshot_manager_v1" version="1">
+    <description summary="read the last committed display frame">
+      Copies a displayed buffer without changing output render or cursor locks.
+      Available to local Wayland clients, like the screencopy interface.
+      Images exclude hardware cursors and are limited to 32 megapixels.
+    </description>
+    <request name="capture">
+      <arg name="frame" type="new_id" interface="zacos_snapshot_frame_v1"/>
+      <arg name="output" type="object" interface="wl_output"/>
+    </request>
+    <request name="destroy" type="destructor"/>
+  </interface>
+  <interface name="zacos_snapshot_frame_v1" version="1">
+    <request name="destroy" type="destructor"/>
+    <event name="image">
+      <description summary="read-only ARGB8888 image and logical display box">
+        FD contains stride * height bytes, native-endian ARGB8888. Transform
+        is wl_output.transform and must be applied to get displayed orientation.
+        The image is sealed against modification. Close the FD after reading.
+        Exactly one image or failed event is sent.
+      </description>
+      <arg name="fd" type="fd"/>
+      <arg name="width" type="uint"/>
+      <arg name="height" type="uint"/>
+      <arg name="stride" type="uint"/>
+      <arg name="transform" type="uint"/>
+      <arg name="x" type="int"/>
+      <arg name="y" type="int"/>
+      <arg name="logical_width" type="uint"/>
+      <arg name="logical_height" type="uint"/>
+    </event>
+    <event name="failed">
+      <arg name="message" type="string"/>
+    </event>
+  </interface>
+</protocol>

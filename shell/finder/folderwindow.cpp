@@ -1178,14 +1178,16 @@ bool finderShortcut(QKeyEvent *e) {
 void FolderWindow::dragEnterEvent(QDragEnterEvent *e) {
 	/* Icons that can only move about their own window are taken back
 	 * there and nowhere else. */
-	if (e->mimeData()->hasUrls() ||
+	if (e->mimeData()->hasUrls() || (e->mimeData()->hasFormat(ALIAS_ITEMS_MIME) &&
+			!vfsIsVirtual(m_path)) ||
 			(e->mimeData()->hasFormat(ICON_MOVE_MIME) && e->source() == this)) {
 		e->acceptProposedAction();
 	}
 }
 
 void FolderWindow::dragMoveEvent(QDragMoveEvent *e) {
-	if (e->mimeData()->hasFormat(ICON_MOVE_MIME)) {
+	if (e->mimeData()->hasFormat(ICON_MOVE_MIME) &&
+			(e->source() == this || !e->mimeData()->hasFormat(ALIAS_ITEMS_MIME))) {
 		e->acceptProposedAction(); /* nothing to drop them into */
 		return;
 	}
@@ -1207,6 +1209,12 @@ void FolderWindow::dropEvent(QDropEvent *e) {
 	Item *target = iconMove ? nullptr
 		: dropTargetAt(e->position().toPoint(), draggedPaths(e->mimeData()));
 	clearDropTarget();
+	if (iconMove && e->source() != this && e->mimeData()->hasFormat(ALIAS_ITEMS_MIME) &&
+			!vfsIsVirtual(m_path)) {
+		dropItems(e, dropTargetAt(e->position().toPoint(), {}), m_path);
+		Finder::instance().dragEnded();
+		return;
+	}
 	if (iconMove && (e->source() != this || m_mode != ViewMode::Icons)) {
 		/* Back in its own list or button view: nothing moves, but it
 		 * isn't a drop elsewhere either. */

@@ -276,6 +276,9 @@ void Finder::newFolder() {
 		folderChanged(dir.absolutePath());
 		v->selectByName(name);
 		notifyState();
+	} else {
+		Alert::ask("The folder could not be created in " + dir.absolutePath() +
+			". Check folder permissions.", "OK", QString());
 	}
 }
 
@@ -290,6 +293,11 @@ void Finder::openItem(Item *item) {
 					Alert::ask(item->name + " could not be opened. Its "
 						"application may have been removed.", "OK", QString());
 				}
+				return;
+			}
+			if (item->isAlias && !QFileInfo(item->path).exists()) {
+				Alert::ask("The original for “" + item->name +
+					"” is unavailable. Reconnect its disk or recreate the alias.", "OK", QString());
 				return;
 			}
 			const QString real = vfsOpensAs(item->path);
@@ -494,32 +502,21 @@ void Finder::makeAlias() {
 		if (item->kind == PL_ICON_TRASH_EMPTY || item->kind == PL_ICON_TRASH_FULL) {
 			continue;
 		}
-		if (item->isVirtual && item->kind != PL_ICON_DISK) {
+		if (item->isVirtual) {
 			/* Nothing can be put in the Macintosh view's own folders, so -
 			 * as the Mac did when it couldn't write an alias beside its
 			 * original - the alias goes on the desktop. An application's
 			 * links to its desktop file; a folder standing for a real one,
 			 * to that folder. */
 			const VNode *node = vfsNode(item->path);
-			QString target;
-			if (node && node->kind == VKind::Launcher && node->actionId.isEmpty()) {
-				if (const AppEntry *app = appById(node->appId)) {
-					target = app->file;
-				}
-			} else {
-				target = vfsOpensAs(item->path);
-			}
+			const QString target = node && node->actionId.isEmpty()
+				? vfsRealCounterpart(item->path) : QString();
 			if (target.isEmpty()) {
 				Alert::ask("An alias of “" + item->name + "” can't be made.", "OK", QString());
 				continue;
 			}
-			QDir dir(desktopDir);
-			dir.mkpath(".");
-			QString name = item->name + " alias";
-			for (int i = 2; dir.exists(name); i++) {
-				name = item->name + " alias " + QString::number(i);
-			}
-			if (QFile::link(target, dir.filePath(name))) {
+			QDir().mkpath(desktopDir);
+			if (!createAlias(target, desktopDir, item->name).isEmpty()) {
 				folderChanged(desktopDir);
 				onDesktop = true;
 			}
@@ -527,12 +524,9 @@ void Finder::makeAlias() {
 		}
 		QFileInfo info(item->path);
 		folder = item->kind == PL_ICON_DISK ? v->folderPath() : info.absolutePath();
-		QDir dir(folder);
-		QString name = (item->kind == PL_ICON_DISK ? item->name : info.fileName()) + " alias";
-		for (int i = 2; dir.exists(name); i++) {
-			name = info.fileName() + " alias " + QString::number(i);
-		}
-		if (QFile::link(item->path, dir.filePath(name))) {
+		const QString name = createAlias(item->path, folder,
+			item->kind == PL_ICON_DISK ? item->name : info.fileName());
+		if (!name.isEmpty()) {
 			lastName = name;
 		}
 	}

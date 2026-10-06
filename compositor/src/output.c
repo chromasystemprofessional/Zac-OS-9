@@ -7,6 +7,19 @@
 #include "server.h"
 #include "settings.h"
 #include "startup.h"
+#include "snapshot.h"
+
+static void output_snapshot_commit(struct wl_listener *listener, void *data) {
+	struct plat_output *output = wl_container_of(listener, output, snapshot_commit);
+	const struct wlr_output_event_commit *event = data;
+	if (event->state->committed & (WLR_OUTPUT_STATE_MODE | WLR_OUTPUT_STATE_ENABLED |
+			WLR_OUTPUT_STATE_TRANSFORM | WLR_OUTPUT_STATE_SCALE)) {
+		snapshot_output_finish(output);
+	}
+	if (event->state->committed & WLR_OUTPUT_STATE_BUFFER) {
+		snapshot_output_commit(output, event->state->buffer);
+	}
+}
 
 static void output_frame(struct wl_listener *listener, void *data) {
 	struct plat_output *output = wl_container_of(listener, output, frame);
@@ -37,6 +50,8 @@ static void output_destroy(struct wl_listener *listener, void *data) {
 	struct plat_server *server = output->server;
 	struct wlr_output *gone = output->wlr_output;
 	startup_output_destroy(output);
+	snapshot_output_finish(output);
+	wl_list_remove(&output->snapshot_commit.link);
 	wl_list_remove(&output->frame.link);
 	wl_list_remove(&output->request_state.link);
 	wl_list_remove(&output->destroy.link);
@@ -90,6 +105,8 @@ static void server_new_output(struct wl_listener *listener, void *data) {
 
 	output->frame.notify = output_frame;
 	wl_signal_add(&wlr_output->events.frame, &output->frame);
+	output->snapshot_commit.notify = output_snapshot_commit;
+	wl_signal_add(&wlr_output->events.commit, &output->snapshot_commit);
 	output->request_state.notify = output_request_state;
 	wl_signal_add(&wlr_output->events.request_state, &output->request_state);
 	output->destroy.notify = output_destroy;

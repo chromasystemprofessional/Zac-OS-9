@@ -9,6 +9,9 @@
  * (platinum_shell_v1.active_client), D-Bus tells us the caller's. A
  * process with several windows shows its latest registered menu.
  *
+ * GTK menus instead come from the focused surface's GMenu/GAction export
+ * metadata. Their current owner takes priority over registrar menus.
+ *
  * Layouts are fetched asynchronously and kept, so menus_rebuild never
  * waits on another program. GLib's main context runs inside the menu
  * bar's own poll() loop (appmenu_poll_prepare/dispatch).
@@ -57,6 +60,256 @@ static GPtrArray *regs; /* struct reg *, oldest first */
 static guint32 active_pid;
 static GMainContext *ctx;
 static bool debug; /* ZACOS9_APPMENU_DEBUG=1: log registrations and focus */
+
+/* GTK metadata belongs to the focused surface. Bind proxies to the unique
+ * owner, so a restarted service cannot receive an old menu's clicks. */
+static struct {
+	char *name, *owner, *paths[4]; /* application, window, menubar, app menu */
+	guint watch, refresh;
+	guint64 generation;
+	guint32 verified_pid;
+	bool checking_owner;
+	GMenuModel *app_menu, *menubar;
+	GActionGroup *groups[4];
+	GPtrArray *models;
+} gtk;
+
+static void gtk_schedule_refresh(void);
+
+static void gtk_items_changed(GMenuModel *model, gint position, gint removed,
+		gint added, gpointer data) {
+	gtk_schedule_refresh();
+}
+
+static void gtk_action_changed(GActionGroup *group, const char *name, gpointer data) {
+	gtk_schedule_refresh();
+}
+
+static void gtk_enabled_changed(GActionGroup *group, const char *name,
+		gboolean enabled, gpointer data) {
+	gtk_schedule_refresh();
+}
+
+static void gtk_state_changed(GActionGroup *group, const char *name,
+		GVariant *state, gpointer data) {
+	gtk_schedule_refresh();
+}
+
+static void gtk_models_clear(void) {
+	if (!gtk.models) {
+		return;
+	}
+	for (guint i = 0; i < gtk.models->len; i++) {
+		g_signal_handlers_disconnect_by_func(g_ptr_array_index(gtk.models, i),
+			gtk_items_changed, NULL);
+	}
+	g_ptr_array_set_size(gtk.models, 0);
+}
+
+static void gtk_watch_model(GMenuModel *model, int depth) {
+	if (!model || depth > 16 || gtk.models->len >= 256) {
+		return;
+	}
+	for (guint i = 0; i < gtk.models->len; i++) {
+		if (g_ptr_array_index(gtk.models, i) == model) {
+			return;
+		}
+	}
+	g_ptr_array_add(gtk.models, g_object_ref(model));
+	g_signal_connect(model, "items-changed", G_CALLBACK(gtk_items_changed), NULL);
+	int count = g_menu_model_get_n_items(model);
+	for (int i = 0; i < count; i++) {
+		GMenuLinkIter *links = g_menu_model_iterate_item_links(model, i);
+		GMenuModel *child;
+		while (g_menu_link_iter_get_next(links, NULL, &child)) {
+			gtk_watch_model(child, depth + 1);
+			g_object_unref(child);
+		}
+		g_object_unref(links);
+	}
+}
+
+static gboolean gtk_refresh(gpointer data) {
+	gtk.refresh = 0;
+	/* Keep old proxies alive while rediscovering links: dropping the last
+	 * reference first would restart lazy subscriptions on every refresh. */
+	GPtrArray *old = gtk.models;
+	for (guint i = 0; i < old->len; i++) {
+		g_signal_handlers_disconnect_by_func(g_ptr_array_index(old, i),
+			gtk_items_changed, NULL);
+	}
+	gtk.models = g_ptr_array_new_with_free_func(g_object_unref);
+	gtk_watch_model(gtk.app_menu, 0);
+	gtk_watch_model(gtk.menubar, 0);
+	g_ptr_array_unref(old);
+	menubar_apps_changed();
+	return G_SOURCE_REMOVE;
+}
+
+static void gtk_schedule_refresh(void) {
+	if (!gtk.refresh) {
+		gtk.refresh = g_idle_add(gtk_refresh, NULL);
+	}
+}
+
+static void gtk_exports_clear(void) {
+	gtk.generation++;
+	gtk.verified_pid = 0;
+	gtk.checking_owner = false;
+	g_clear_pointer(&gtk.owner, g_free);
+	if (gtk.refresh) {
+		g_source_remove(gtk.refresh);
+		gtk.refresh = 0;
+	}
+	gtk_models_clear();
+	g_clear_object(&gtk.app_menu);
+	g_clear_object(&gtk.menubar);
+	for (guint i = 0; i < G_N_ELEMENTS(gtk.groups); i++) {
+		if (gtk.groups[i]) {
+			g_signal_handlers_disconnect_by_data(gtk.groups[i], &gtk);
+			g_clear_object(&gtk.groups[i]);
+		}
+	}
+}
+
+struct gtk_owner_check {
+	guint64 generation;
+	guint32 pid;
+	char *owner;
+};
+
+static void gtk_owner_checked(GObject *source, GAsyncResult *result, gpointer data) {
+	struct gtk_owner_check *check = data;
+	GError *error = NULL;
+	GVariant *reply = g_dbus_connection_call_finish(G_DBUS_CONNECTION(source), result, &error);
+	guint32 pid = 0;
+	if (reply) {
+		g_variant_get(reply, "(u)", &pid);
+		g_variant_unref(reply);
+	}
+	bool current = check->generation == gtk.generation && check->pid == active_pid;
+	if (current) {
+		gtk.checking_owner = false;
+	}
+	if (current && error) {
+		fprintf(stderr, "zacos9-menubar: GTK owner %s: %s\n", check->owner, error->message);
+	}
+	if (!current || !pid || pid != active_pid) {
+		if (current && pid && debug) {
+			fprintf(stderr, "appmenu: reject GTK owner %s pid %u (front %u)\n",
+				check->owner, pid, active_pid);
+		}
+		g_clear_error(&error);
+		g_free(check->owner);
+		g_free(check);
+		return;
+	}
+	g_clear_error(&error);
+	GDBusConnection *connection = G_DBUS_CONNECTION(source);
+	const char *owner = check->owner;
+	gtk.owner = g_strdup(owner);
+	gtk.verified_pid = pid;
+	if (*gtk.paths[3]) {
+		gtk.app_menu = G_MENU_MODEL(g_dbus_menu_model_get(connection, owner, gtk.paths[3]));
+	}
+	if (*gtk.paths[2]) {
+		gtk.menubar = G_MENU_MODEL(g_dbus_menu_model_get(connection, owner, gtk.paths[2]));
+	}
+	for (guint i = 0; i < G_N_ELEMENTS(gtk.groups); i++) {
+		if (!*gtk.paths[i]) {
+			continue;
+		}
+		gtk.groups[i] = G_ACTION_GROUP(g_dbus_action_group_get(connection, owner, gtk.paths[i]));
+		g_signal_connect(gtk.groups[i], "action-added", G_CALLBACK(gtk_action_changed), &gtk);
+		g_signal_connect(gtk.groups[i], "action-removed", G_CALLBACK(gtk_action_changed), &gtk);
+		g_signal_connect(gtk.groups[i], "action-enabled-changed",
+			G_CALLBACK(gtk_enabled_changed), &gtk);
+		g_signal_connect(gtk.groups[i], "action-state-changed",
+			G_CALLBACK(gtk_state_changed), &gtk);
+		/* Listing starts the asynchronous DescribeAll subscription. */
+		char **actions = g_action_group_list_actions(gtk.groups[i]);
+		g_strfreev(actions);
+	}
+	gtk_schedule_refresh();
+	g_free(check->owner);
+	g_free(check);
+}
+
+static void gtk_owner_appeared(GDBusConnection *connection, const char *name,
+		const char *owner, gpointer data) {
+	gtk_exports_clear();
+	menubar_apps_changed();
+	if (!active_pid) {
+		return;
+	}
+	struct gtk_owner_check *check = g_new0(struct gtk_owner_check, 1);
+	check->generation = gtk.generation;
+	check->pid = active_pid;
+	check->owner = g_strdup(owner);
+	gtk.checking_owner = true;
+	g_dbus_connection_call(connection, "org.freedesktop.DBus", "/org/freedesktop/DBus",
+		"org.freedesktop.DBus", "GetConnectionUnixProcessID", g_variant_new("(s)", owner),
+		G_VARIANT_TYPE("(u)"), G_DBUS_CALL_FLAGS_NONE, 1000, NULL, gtk_owner_checked, check);
+}
+
+static void gtk_owner_vanished(GDBusConnection *connection, const char *name,
+		gpointer data) {
+	gtk_exports_clear();
+	menubar_apps_changed();
+}
+
+static void gtk_start_watch(void) {
+	if (bus && gtk.name && *gtk.name && !gtk.watch) {
+		gtk.watch = g_bus_watch_name_on_connection(bus, gtk.name, G_BUS_NAME_WATCHER_FLAGS_NONE,
+			gtk_owner_appeared, gtk_owner_vanished, NULL, NULL);
+	}
+}
+
+void appmenu_set_active_gtk(const char *bus_name, const char *app_menu_path,
+		const char *menubar_path, const char *window_path, const char *application_path) {
+	const char *name = bus_name ? bus_name : "";
+	const char *paths[] = { application_path, window_path, menubar_path, app_menu_path };
+	bool valid = *name && g_dbus_is_unique_name(name);
+	for (guint i = 0; i < G_N_ELEMENTS(paths); i++) {
+		if (!paths[i]) {
+			paths[i] = "";
+		}
+		if (*paths[i] && !g_variant_is_object_path(paths[i])) {
+			valid = false;
+		}
+	}
+	valid = valid && (*paths[2] || *paths[3]);
+	if (!valid) {
+		name = "";
+		for (guint i = 0; i < G_N_ELEMENTS(paths); i++) {
+			paths[i] = "";
+		}
+	}
+	bool same = g_strcmp0(name, gtk.name) == 0;
+	for (guint i = 0; i < G_N_ELEMENTS(paths); i++) {
+		same &= g_strcmp0(paths[i], gtk.paths[i]) == 0;
+	}
+	if (same) {
+		gtk_start_watch();
+		return;
+	}
+	if (gtk.watch) {
+		g_bus_unwatch_name(gtk.watch);
+		gtk.watch = 0;
+	}
+	gtk_exports_clear();
+	g_free(gtk.name);
+	gtk.name = g_strdup(name);
+	for (guint i = 0; i < G_N_ELEMENTS(paths); i++) {
+		g_free(gtk.paths[i]);
+		gtk.paths[i] = g_strdup(paths[i]);
+	}
+	if (!gtk.models) {
+		gtk.models = g_ptr_array_new_with_free_func(g_object_unref);
+	}
+	gtk_start_watch();
+	menubar_apps_changed();
+}
 
 static void reg_free(gpointer data) {
 	struct reg *r = data;
@@ -280,6 +533,7 @@ void appmenu_init(void) {
 	 * it comes last, once we can show their menus. */
 	g_bus_own_name_on_connection(bus, REGISTRAR_NAME, G_BUS_NAME_OWNER_FLAGS_NONE,
 		NULL, NULL, NULL, NULL);
+	gtk_start_watch(); /* Focus metadata can arrive in the initial Wayland roundtrip. */
 }
 
 void appmenu_set_active_pid(uint32_t pid) {
@@ -287,6 +541,14 @@ void appmenu_set_active_pid(uint32_t pid) {
 		return;
 	}
 	active_pid = pid;
+	/* Changing processes invalidates both verified exports and in-flight
+	 * owner checks; watch again in case metadata arrived before the pid. */
+	if (gtk.watch) {
+		g_bus_unwatch_name(gtk.watch);
+		gtk.watch = 0;
+	}
+	gtk_exports_clear();
+	gtk_start_watch();
 	if (debug) {
 		fprintf(stderr, "appmenu: front pid %u\n", pid);
 	}
@@ -388,7 +650,195 @@ static void fill_menu(struct mb_menu *menu, GVariant *children, const struct reg
 	}
 }
 
+/* Native GTK exports use app./win.; unity-gtk-module uses unity. and
+ * exports its action group alongside its menu. Some exporters retain the
+ * prefix in the action group, others export the unqualified action name. */
+static GActionGroup *gtk_resolve_action(const char *qualified, const char **action,
+		int *index) {
+	if (!qualified) {
+		return NULL;
+	}
+	const char *dot = strchr(qualified, '.');
+	if (!dot || !dot[1]) {
+		return NULL;
+	}
+	int preferred;
+	bool unity = false;
+	if (g_str_has_prefix(qualified, "app.")) {
+		preferred = 0;
+	} else if (g_str_has_prefix(qualified, "win.")) {
+		preferred = 1;
+	} else if (g_str_has_prefix(qualified, "unity.")) {
+		/* appmenu-gtk3-module exports at the focused window's path. */
+		preferred = 1;
+		unity = true;
+	} else {
+		return NULL;
+	}
+	for (int attempt = 0; attempt < 5; attempt++) {
+		int i = attempt == 0 ? preferred : attempt - 1;
+		/* app and win must never resolve to another window/application. */
+		if (attempt && !unity) {
+			break;
+		}
+		if (!gtk.groups[i]) {
+			continue;
+		}
+		if (g_action_group_has_action(gtk.groups[i], dot + 1)) {
+			*action = dot + 1;
+		} else if (g_action_group_has_action(gtk.groups[i], qualified)) {
+			*action = qualified;
+		} else {
+			continue;
+		}
+		*index = i;
+		return gtk.groups[i];
+	}
+	return NULL;
+}
+
+static char gtk_shortcut(GMenuModel *model, int item) {
+	char *accel = NULL;
+	if (!g_menu_model_get_item_attribute(model, item, "accel", "s", &accel)) {
+		g_menu_model_get_item_attribute(model, item, "x-gtk-accel", "s", &accel);
+	}
+	char key = 0;
+	if (accel) {
+		const char *letter = strchr(accel, '>');
+		if (letter && letter[1] && !letter[2] &&
+				(g_ascii_strncasecmp(accel, "<Primary>", 9) == 0 ||
+				 g_ascii_strncasecmp(accel, "<Control>", 9) == 0 ||
+				 g_ascii_strncasecmp(accel, "<Ctrl>", 6) == 0) &&
+				g_ascii_isalnum(letter[1])) {
+			key = g_ascii_toupper(letter[1]);
+		}
+	}
+	g_free(accel);
+	return key;
+}
+
+static void gtk_fill_menu(struct mb_menu *menu, GMenuModel *model, int depth,
+		int submenu_depth) {
+	if (depth > 16) {
+		return;
+	}
+	int count = g_menu_model_get_n_items(model);
+	for (int i = 0; i < count && menu->n < MAX_ITEMS; i++) {
+		GMenuModel *section = g_menu_model_get_item_link(model, i, G_MENU_LINK_SECTION);
+		if (section) {
+			int before = menu->n;
+			if (before && menu->items[before - 1].label) {
+				menus_add_item(menu, NULL, 0, false, ACT_NONE, NULL);
+			}
+			int start = menu->n;
+			gtk_fill_menu(menu, section, depth + 1, submenu_depth);
+			if (menu->n == start) {
+				menu->n = before; /* don't add separators for empty sections */
+			}
+			g_object_unref(section);
+			continue;
+		}
+		char *raw = NULL, *qualified = NULL, *hidden = NULL;
+		g_menu_model_get_item_attribute(model, i, G_MENU_ATTRIBUTE_LABEL, "s", &raw);
+		g_menu_model_get_item_attribute(model, i, G_MENU_ATTRIBUTE_ACTION, "s", &qualified);
+		g_menu_model_get_item_attribute(model, i, "hidden-when", "s", &hidden);
+		GVariant *target = g_menu_model_get_item_attribute_value(model, i,
+			G_MENU_ATTRIBUTE_TARGET, NULL);
+		const char *action = NULL;
+		int group_index = 0;
+		GActionGroup *group = gtk_resolve_action(qualified, &action, &group_index);
+		bool enabled = group && g_action_group_get_action_enabled(group, action);
+		const GVariantType *parameter = group ?
+			g_action_group_get_action_parameter_type(group, action) : NULL;
+		bool valid = group && (parameter ? target && g_variant_is_of_type(target, parameter) :
+			target == NULL);
+		enabled &= valid;
+		GMenuModel *sub = g_menu_model_get_item_link(model, i, G_MENU_LINK_SUBMENU);
+		bool visible = !(g_strcmp0(hidden, "action-missing") == 0 && !group) &&
+			!(g_strcmp0(hidden, "action-disabled") == 0 && !enabled) &&
+			!(g_strcmp0(hidden, "action-invalid") == 0 && !valid);
+		if (visible && raw) {
+			char label[256];
+			strip_mnemonic(raw, label, sizeof(label));
+			char *arg = NULL;
+			if (group && !sub) {
+				GVariant *route = g_variant_ref_sink(g_variant_new("(tss@av)",
+					gtk.generation, gtk.paths[group_index], action,
+					g_variant_new_array(G_VARIANT_TYPE_VARIANT,
+						target ? (GVariant *[]){ g_variant_new_variant(target) } : NULL,
+						target ? 1 : 0)));
+				char *text = g_variant_print(route, TRUE);
+				arg = g_strconcat("gtk:", text, NULL);
+				g_free(text);
+				g_variant_unref(route);
+			}
+			struct mb_item *it = menus_add_item(menu, label, gtk_shortcut(model, i),
+				sub && !qualified ? true : enabled, sub ? ACT_NONE : ACT_DBUSMENU, arg);
+			g_free(arg);
+			if (it) {
+				GVariant *state = group ? g_action_group_get_action_state(group, action) : NULL;
+				it->checked = state && (target ? g_variant_equal(state, target) :
+					g_variant_is_of_type(state, G_VARIANT_TYPE_BOOLEAN) &&
+					g_variant_get_boolean(state));
+				g_clear_pointer(&state, g_variant_unref);
+				if (sub && submenu_depth == 0) {
+					it->submenu = g_new0(struct mb_menu, 1);
+					gtk_fill_menu(it->submenu, sub, depth + 1, submenu_depth + 1);
+				} else if (sub) {
+					it->enabled = false;
+				}
+			}
+		}
+		g_clear_object(&sub);
+		g_clear_pointer(&target, g_variant_unref);
+		g_free(raw);
+		g_free(qualified);
+		g_free(hidden);
+	}
+}
+
+static void gtk_add_top(struct mb_menu *menus, int *n, int max,
+		GMenuModel *model, int depth) {
+	if (!model || depth > 16) {
+		return;
+	}
+	int count = g_menu_model_get_n_items(model);
+	for (int i = 0; i < count && *n < max; i++) {
+		GMenuModel *section = g_menu_model_get_item_link(model, i, G_MENU_LINK_SECTION);
+		if (section) {
+			gtk_add_top(menus, n, max, section, depth + 1);
+			g_object_unref(section);
+			continue;
+		}
+		GMenuModel *sub = g_menu_model_get_item_link(model, i, G_MENU_LINK_SUBMENU);
+		char *raw = NULL;
+		g_menu_model_get_item_attribute(model, i, G_MENU_ATTRIBUTE_LABEL, "s", &raw);
+		if (sub && raw) {
+			char title[256];
+			strip_mnemonic(raw, title, sizeof(title));
+			gtk_fill_menu(menus_new_menu(menus, n, title), sub, 0, 0);
+		}
+		g_free(raw);
+		g_clear_object(&sub);
+	}
+}
+
+static bool gtk_add_menus(struct mb_menu *menus, int *n, int max) {
+	if (!gtk.owner || !active_pid || gtk.verified_pid != active_pid) {
+		return false;
+	}
+	int before = *n;
+	if (gtk.app_menu && g_menu_model_get_n_items(gtk.app_menu) > 0 && *n < max) {
+		gtk_fill_menu(menus_new_menu(menus, n, "Application"), gtk.app_menu, 0, 0);
+	}
+	gtk_add_top(menus, n, max, gtk.menubar, 0);
+	return *n > before;
+}
+
 bool appmenu_add_menus(struct mb_menu *menus, int *n, int max) {
+	if (gtk_add_menus(menus, n, max)) {
+		return true;
+	}
 	struct reg *r = active_reg();
 	if (!r || !r->layout) {
 		return false;
@@ -419,7 +869,65 @@ bool appmenu_add_menus(struct mb_menu *menus, int *n, int max) {
 
 /* ---- choosing an item ---------------------------------------------------------- */
 
+static void gtk_activated(GObject *source, GAsyncResult *result, gpointer data) {
+	GError *error = NULL;
+	GVariant *reply = g_dbus_connection_call_finish(G_DBUS_CONNECTION(source), result, &error);
+	if (!reply) {
+		fprintf(stderr, "zacos9-menubar: GTK action %s: %s\n", (char *)data, error->message);
+		g_clear_error(&error);
+	} else {
+		g_variant_unref(reply);
+	}
+	g_free(data);
+}
+
+static void gtk_perform(const char *text) {
+	GError *error = NULL;
+	GVariant *route = g_variant_parse(G_VARIANT_TYPE("(tssav)"), text, NULL, NULL, &error);
+	if (!route) {
+		fprintf(stderr, "zacos9-menubar: invalid GTK action: %s\n", error->message);
+		g_clear_error(&error);
+		return;
+	}
+	guint64 generation;
+	const char *path, *action;
+	GVariant *targets;
+	g_variant_get(route, "(t&s&s@av)", &generation, &path, &action, &targets);
+	GActionGroup *group = NULL;
+	for (guint i = 0; i < G_N_ELEMENTS(gtk.groups); i++) {
+		if (gtk.groups[i] && g_strcmp0(gtk.paths[i], path) == 0) {
+			group = gtk.groups[i];
+			break;
+		}
+	}
+	if (generation == gtk.generation && gtk.owner && gtk.verified_pid == active_pid && group &&
+			g_action_group_has_action(group, action) &&
+			g_action_group_get_action_enabled(group, action)) {
+		const GVariantType *parameter = g_action_group_get_action_parameter_type(group, action);
+		GVariant *target = g_variant_n_children(targets) == 1 ?
+			g_variant_get_child_value(targets, 0) : NULL;
+		GVariant *value = target ? g_variant_get_variant(target) : NULL;
+		bool valid = parameter ? value && g_variant_is_of_type(value, parameter) :
+			g_variant_n_children(targets) == 0;
+		if (valid) {
+			g_dbus_connection_call(bus, gtk.owner, path, "org.gtk.Actions", "Activate",
+				g_variant_new("(s@av@a{sv})", action, g_variant_ref(targets),
+					g_variant_new_array(G_VARIANT_TYPE("{sv}"), NULL, 0)),
+				G_VARIANT_TYPE_UNIT, G_DBUS_CALL_FLAGS_NONE, 5000, NULL,
+				gtk_activated, g_strdup(action));
+		}
+		g_clear_pointer(&value, g_variant_unref);
+		g_clear_pointer(&target, g_variant_unref);
+	}
+	g_variant_unref(targets);
+	g_variant_unref(route);
+}
+
 void appmenu_perform(const char *arg) {
+	if (bus && arg && g_str_has_prefix(arg, "gtk:")) {
+		gtk_perform(arg + 4);
+		return;
+	}
 	char sender[256], path[256];
 	int id;
 	if (!bus || !arg || sscanf(arg, "%255s %255s %d", sender, path, &id) != 3) {

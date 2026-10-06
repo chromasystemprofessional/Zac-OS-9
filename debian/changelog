@@ -1,3 +1,18 @@
+zacos9 (0.1.15) trixie; urgency=medium
+
+  * Add GTK 3 Wayland global menus, including Galculator, with per-window
+    focus matching, live action states and a realization-safe GTK module.
+  * Register the real Desktop in GTK and Qt save dialogs; support Desktop
+    application and folder aliases while preserving originals and disk icons.
+  * Show responsive Platinum copy/move progress dialogs with Stop and safe
+    cleanup of incomplete copies, preserving aliases and resource forks.
+  * Replace grim-based Screen Snapshot with native committed-frame capture,
+    validated image buffers and atomic PNG saves without screencopy locks.
+  * Document the administrator-authorized local Classic mapping fix and
+    add focused menu, Desktop, transfer and screenshot regression tests.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Tue, 06 Oct 2026 03:30:44 -0400
+
 zacos9 (0.1.14) trixie; urgency=medium
 
   * Fix USB erasing reporting the disk in use because of the helper's

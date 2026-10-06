@@ -10,7 +10,7 @@
     when the generic rule (fixed size with a parent window) can't apply.
   </description>
 
-  <interface name="platinum_shell_v1" version="3">
+  <interface name="platinum_shell_v1" version="4">
     <enum name="style">
       <entry name="document" value="0" summary="standard document window"/>
       <entry name="movable_modal" value="1"
@@ -84,5 +84,17 @@
       </description>
       <arg name="cookie" type="uint"/>
     </request>
+    <event name="active_gtk_menu" since="4">
+      <description summary="GTK menu exports of the focused surface">
+        Sent on bind, focus changes and menu-property changes. Empty strings
+        clear the current GTK menu. Window paths distinguish windows owned
+        by the same process. The bus name is the client's unique D-Bus name.
+      </description>
+      <arg name="bus_name" type="string"/>
+      <arg name="app_menu_path" type="string"/>
+      <arg name="menubar_path" type="string"/>
+      <arg name="window_path" type="string"/>
+      <arg name="application_path" type="string"/>
+    </event>
   </interface>
 </protocol>

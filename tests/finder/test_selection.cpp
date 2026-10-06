@@ -21,12 +21,15 @@
 #include <QWidget>
 #include <algorithm>
 #include <map>
+#include <unistd.h>
 
 #include "fileops.h"
 #include "finder.h"
 #include "items.h"
 #include "labeleditor.h"
 #include "widgets.h"
+#include "transferdialog.h"
+#include "alert.h"
 
 #define private public
 #define protected public
@@ -233,6 +236,146 @@ int main(int argc, char **argv) {
 		QFile::exists(target + "/Classic Sound") && QFile::exists(target + "/._Classic Sound") &&
 		!QFile::exists(classic) && !QFile::exists(fork),
 		"moving a classic sound file also moves its resource-fork companion");
+
+	const QString transferSource = home.path() + "/Transfer Source";
+	const QString transferTarget = home.path() + "/Transfer Target";
+	QDir().mkdir(transferSource);
+	QDir().mkdir(transferTarget);
+	touch(transferSource + "/Completed");
+	QFile large(transferSource + "/Large");
+	check(large.open(QIODevice::WriteOnly) && large.resize(256 * 1024 * 1024),
+		"create disposable large file for stoppable copy");
+	large.close();
+	bool visible = false, stopped = false, responsive = false;
+	QTimer stop;
+	stop.setInterval(1);
+	QObject::connect(&stop, &QTimer::timeout, [&] {
+		for (QWidget *widget : QApplication::topLevelWidgets()) {
+			if (auto *progress = dynamic_cast<TransferDialog *>(widget); progress && progress->isVisible()) {
+				visible = true;
+				responsive = true;
+				if (QFileInfo(transferTarget + "/Large").size() > 1024 * 1024) {
+					progress->reject();
+					stopped = true;
+					stop.stop();
+				}
+			}
+		}
+	});
+	stop.start();
+	bool finished = true;
+	const auto cancelled = transferItems({transferSource + "/Completed", transferSource + "/Large"},
+		transferTarget, true, &finished);
+	stop.stop();
+	check(visible && responsive && stopped, "copy dialog remains responsive and Stop interrupts file I/O");
+	check(!finished, "stopped batch does not report complete success to drag source");
+	check(cancelled.contains(transferTarget) && QFile::exists(transferTarget + "/Completed") &&
+		!QFile::exists(transferTarget + "/Large"), "Stop retains completed copy and removes incomplete file");
+	check(QFile::exists(transferSource + "/Completed") &&
+		QFileInfo(transferSource + "/Large").size() == 256 * 1024 * 1024,
+		"stopped copy preserves all originals");
+	touch(transferSource + "/Move me");
+	bool moveVisible = false;
+	QTimer moveObserver;
+	moveObserver.setInterval(0);
+	QObject::connect(&moveObserver, &QTimer::timeout, [&] {
+		for (QWidget *widget : QApplication::topLevelWidgets()) {
+			if (auto *progress = dynamic_cast<TransferDialog *>(widget); progress && progress->isVisible()) {
+				moveVisible = true;
+			}
+		}
+	});
+	moveObserver.start();
+	check(!transferItems({transferSource + "/Move me"}, transferTarget, false).isEmpty() &&
+		QFile::exists(transferTarget + "/Move me") && !QFile::exists(transferSource + "/Move me"),
+		"move progress preserves same-disk rename behavior");
+	moveObserver.stop();
+	check(moveVisible, "same-disk moves also show a status dialog");
+	std::atomic_bool buttonStopped{false};
+	TransferDialog buttons(buttonStopped);
+	buttons.setProgress("Copying", "Report", transferTarget, 256, 1024, false);
+	buttons.show();
+	settle();
+	check(buttons.currentFile() == "Report" && buttons.completed() == 256 && buttons.total() == 1024,
+		"progress dialog receives exact filename and byte-work fraction");
+	const QImage quarter = buttons.grab().toImage();
+	buttons.setProgress("Copying", "Report", transferTarget, 768, 1024, false);
+	const QImage threeQuarters = buttons.grab().toImage();
+	check(quarter.pixel(20, 75) == 0xFF000000u && quarter.pixel(5, 5) == 0xFFDDDDDDu &&
+		quarter.pixel(220, 80) != threeQuarters.pixel(220, 80),
+		"Platinum grey dialog paints a bordered progress bar reflecting 25% versus 75%");
+	QKeyEvent escape(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier);
+	QApplication::sendEvent(&buttons, &escape);
+	check(buttonStopped.load() && buttons.isVisible(), "Escape requests Stop without closing before rollback");
+	buttons.done(QDialog::Accepted);
+	std::atomic_bool clickStopped{false};
+	TransferDialog clickDialog(clickStopped);
+	clickDialog.show();
+	settle();
+	mouse(&clickDialog, QEvent::MouseButtonPress, QPoint(375, 145), Qt::LeftButton);
+	mouse(&clickDialog, QEvent::MouseButtonRelease, QPoint(375, 145), Qt::NoButton);
+	check(clickStopped.load() && clickDialog.isVisible(), "mouse Stop requests cancellation without abandoning worker");
+	clickDialog.done(QDialog::Accepted);
+	touch(transferSource + "/Keep on Stop");
+	QMimeData stoppedMime;
+	stoppedMime.setUrls({QUrl::fromLocalFile(transferSource + "/Keep on Stop")});
+	QDropEvent stoppedDrop(QPointF(1, 1), Qt::MoveAction | Qt::CopyAction, &stoppedMime,
+		Qt::LeftButton, Qt::AltModifier);
+	QTimer::singleShot(0, [] {
+		for (QWidget *widget : QApplication::topLevelWidgets()) {
+			if (auto *progress = dynamic_cast<TransferDialog *>(widget); progress && progress->isVisible()) {
+				progress->reject();
+			}
+		}
+	});
+	dropItems(&stoppedDrop, nullptr, transferTarget);
+	check(!stoppedDrop.isAccepted() && QFile::exists(transferSource + "/Keep on Stop"),
+		"stopped drop never asks external drag source to delete uncopied originals");
+	const QString tree = transferSource + "/Folder";
+	QDir().mkpath(tree + "/Nested");
+	touch(tree + "/Nested/Data");
+	check(symlink("Nested", QFile::encodeName(tree + "/Relative alias").constData()) == 0 &&
+		symlink("Missing", QFile::encodeName(tree + "/Missing alias").constData()) == 0,
+		"create relative and dangling aliases inside test folder");
+	check(!transferItems({tree}, transferTarget, true).isEmpty() &&
+		QFile::exists(transferTarget + "/Folder/Nested/Data") &&
+		QFileInfo(transferTarget + "/Folder/Relative alias").isSymLink() &&
+		QFileInfo(transferTarget + "/Folder/Missing alias").isSymLink(),
+		"recursive copy preserves real files and both folder and dangling aliases");
+	QByteArray link(64, '\0');
+	const auto linkLength = readlink(QFile::encodeName(transferTarget + "/Folder/Relative alias").constData(),
+		link.data(), link.size());
+	check(linkLength == 6 && link.left(linkLength) == "Nested",
+		"recursive copy keeps relative alias target relative to copied folder");
+	const QString broken = transferSource + "/Cannot copy";
+	QDir().mkpath(broken + "/A completed folder");
+	touch(broken + "/A completed folder/Data");
+	touch(broken + "/Z unreadable");
+	QFile::setPermissions(broken + "/A completed folder",
+		QFileDevice::ReadOwner | QFileDevice::ExeOwner);
+	QFile::setPermissions(broken + "/Z unreadable", {});
+	int errorAlerts = 0;
+	QTimer dismissErrors;
+	dismissErrors.setInterval(1);
+	QObject::connect(&dismissErrors, &QTimer::timeout, [&] {
+		for (QWidget *widget : QApplication::topLevelWidgets()) {
+			if (auto *alert = dynamic_cast<Alert *>(widget); alert && alert->isVisible()) {
+				errorAlerts++;
+				alert->accept();
+			}
+		}
+	});
+	dismissErrors.start();
+	bool errorFinished = true;
+	const auto failed = transferItems({broken}, transferTarget, true, &errorFinished);
+	dismissErrors.stop();
+	check(!errorFinished && failed.isEmpty() && errorAlerts > 0 &&
+		!QFile::exists(transferTarget + "/Cannot copy") &&
+		QFile::exists(broken + "/A completed folder/Data"),
+		"read failure reports error and rolls back partial tree including read-only copied folders");
+	QFile::setPermissions(broken + "/A completed folder",
+		QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner);
+	QFile::setPermissions(broken + "/Z unreadable", QFileDevice::ReadOwner | QFileDevice::WriteOwner);
 
 	w->close();
 	settle();

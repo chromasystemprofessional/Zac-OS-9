@@ -185,6 +185,27 @@ Linux cannot detect cannot be initialized this way.
 FAT32 limits individual files to less than 4 GiB; the formatter only accepts
 disk sizes compatible with its FAT32/MBR layout.
 
+### Screen Snapshot
+
+**Apple menu > Screen Snapshot** lets you drag a rectangle, saves it as
+**Picture 1.png**, **Picture 2.png**, etc. on the Desktop, and copies the PNG
+to the clipboard. Escape or a right click cancels selection.
+
+Capture uses ZacOS's native committed-frame reader instead of `grim` and the
+wlroots screencopy path, following a report of YouTube streams becoming stuck
+after screencopy captures. It reads the already-displayed image without changing
+the compositor's output-render or software-cursor locks. Multiple displays and
+HiDPI are supported; hardware cursors are excluded. Captures are limited to
+32 megapixels, with explicit errors for unavailable frames or save failures.
+
+Both the capture helper and compositor must be updated: **restart after
+installation**. On an older compositor, capture reports that a restart/update
+is needed; it does not silently fall back to the reported problematic path.
+Native capture is tested with animated software and GPU-rendered output in
+isolated sessions. Verification of YouTube playback on the affected system
+remains necessary; this is a replacement capture path, not a proven diagnosis
+of the server's earlier `403` responses.
+
 ## Custom desktop patterns
 
 Appearance also supports saved appearance presets and interface sound sets.

@@ -12,6 +12,59 @@ application list it draws on is in
 mounted: nothing outside the Finder needs this view, so nothing outside
 the Finder pays for it.
 
+## Desktop files and aliases
+
+The Desktop is **not** part of the virtual Macintosh hierarchy. It displays
+the real XDG Desktop directory (`~/Desktop` by default), alongside the startup
+disk, mounted disks and Trash icons. Files saved there by other applications
+appear automatically; New Folder, renaming, copying and moving work on the
+same files.
+
+File > Make Alias creates a filesystem symbolic link. Drag an application
+or a backed folder from the Macintosh view to Desktop to create an alias
+without moving its package or original directory. For ordinary files and
+folders, Command-Option-drag creates an alias; Option-drag copies. Aliases can
+also be moved between real folders and Desktop. Copying an alias preserves
+the link, and moving it to Trash does not delete the original.
+
+Folder aliases open as folders and accept file drops. In a standard application
+save dialog, choose Desktop and open a folder or folder alias to save inside
+it. Saves through an alias go into its target directory. An alias does not
+track a target that is renamed/moved, unlike a classic Mac alias record; a
+disconnected or deleted original must be reconnected or the alias recreated.
+Finder reports unavailable originals rather than creating empty replacement
+folders.
+
+At login, `zacos9-desktop-places` registers Desktop with XDG user directories
+and GTK bookmarks. Existing Desktop paths, user files, configuration entries
+and bookmark labels are preserved. Qt dialogs using the ZacOS style add the
+same Desktop location without replacing their other places; portal file
+choosers use the GTK backend. Registration errors are reported without
+preventing login. Applications with their own custom file pickers may still
+need navigation through Home to Desktop.
+
+## File-transfer status
+
+Copying, moving, Option-drag copying and File > Duplicate use a movable
+Platinum status dialog showing the current filename, destination, progress
+bar and percentage. Folder copies include their contents and hidden files;
+aliases remain links and classic resource-fork companions travel with their
+files. Preparing/counting and copying run off the GUI thread so the dialog
+continues to respond.
+
+Choose **Stop**, press Escape or Command-period to stop a batch. Completed
+items stay in the destination. The current incomplete copy is removed, and
+its original is not deleted. Same-disk moves are renames: an individual
+rename finishes atomically, then Stop prevents further items from moving.
+Cross-disk drags retain their copy semantics. Closing the progress window
+also requests Stop and waits for cleanup rather than abandoning the worker.
+Unreadable files, name conflicts and cleanup failures produce explicit
+alerts; existing destination items are never overwritten.
+
+Finder-originated drops release their drag grab before the progress dialog
+opens so its Stop button can receive input. External drops are not reported
+as successfully completed if a transfer is stopped or fails.
+
 ## What you see
 
 ```

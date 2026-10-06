@@ -39,7 +39,7 @@ static void handle_window_position(void *, platinum_shell_v1 *, wl_surface *surf
 static void handle_active_client(void *, platinum_shell_v1 *, uint32_t) {
 }
 static const platinum_shell_v1_listener shell_listener = {
-	handle_window_position, handle_active_client
+	handle_window_position, handle_active_client, nullptr
 };
 
 static void global(void *, wl_registry *reg, uint32_t name, const char *iface, uint32_t version) {

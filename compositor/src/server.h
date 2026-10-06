@@ -147,6 +147,8 @@ struct plat_output {
 	struct wlr_scene_buffer *startup_buffer;
 	struct wl_listener startup_buffer_destroy;
 	struct wl_listener frame;
+	struct wl_listener snapshot_commit;
+	struct wlr_buffer *snapshot_buffer;
 	struct wl_listener request_state;
 	struct wl_listener destroy;
 };
@@ -332,6 +334,9 @@ void platinum_shell_report_position(struct plat_view *view);
 /* The front window changed: tell the menu bar whose it is. */
 void platinum_shell_focus_changed(struct plat_server *server);
 void platinum_shell_launch_ready(struct plat_view *view);
+void gtk_shell_init(struct plat_server *server);
+void gtk_shell_send_active(struct wl_resource *resource, struct plat_server *server);
+void platinum_shell_gtk_changed(struct plat_server *server);
 
 /* xwayland.c */
 void xwayland_init(struct plat_server *server);

@@ -13,11 +13,19 @@ works for it:
 |---|---|---|---|
 | Window frame | zacos9-wm (server-side decorations) | session asks toolkits not to draw their own | done |
 | Controls (buttons, fields, scroll bars) | the toolkit | a Platinum theme/style per toolkit | GTK 3, Qt 6 done |
-| Menus | the application, inside its window | global menu: the app's menus in our menu bar | Qt 6 done; GTK 3 not started |
+| Menus | the application, inside its window | global menu: the app's menus in our menu bar | Qt 6 and GTK 3 Wayland implemented |
 | Everything | Electron, GTK 4 / libadwaita | nothing reliable | known gap |
 
 ## Done
 
+- **Shared Desktop save location**: session startup registers the real XDG
+  Desktop directory and a GTK Desktop bookmark without replacing existing
+  user settings. The ZacOS Qt style adds Desktop to ordinary `QFileDialog`
+  sidebars, preserving other places. Portal file choosers prefer the GTK
+  backend in the ZacOS session. Folder aliases are filesystem links, so
+  ordinary choosers can open them and save into their targets. See
+  [Desktop files and aliases](vfs.md#desktop-files-and-aliases). Application-
+  specific custom pickers are not rewritten.
 - **Session defaults** (`session/zacos9-session`): `GTK_CSD=0`,
   `QT_WAYLAND_DISABLE_WINDOWDECORATION=1`, `GTK_THEME=ZacOS9`,
   `QT_STYLE_OVERRIDE=zacos9`. GTK 3 already took our frames before this;
@@ -41,7 +49,7 @@ works for it:
   VS Code's resize glitch (the frame kept the old size after an outline
   resize). Unconfirmed by the user.
 
-## Next: global menus (the biggest visible difference left)
+## Global-menu implementation history
 
 Goal: an application's menus (File, Edit, ...) appear in ZacOS 9's menu bar
 when its window is in front, and its in-window menu bar disappears, as on a
@@ -99,6 +107,8 @@ Steps:
 
    **Decision:** build Qt 6 first (registrar + dbusmenu + PID from
    zacos9-wm). GTK 3 (`gtk_shell1` + GMenuModel) is a separate, later step.
+   That GTK step is now implemented below; these findings describe the
+   original investigation, not the current implementation status.
 2. **Menu bar side** (`shell/menubar/`, C): own the registrar, track the
    front window's app id / surface, fetch its dbusmenu layout, draw it with
    the existing menu drawing (`lib/menudraw.c`), forward clicks. If the
@@ -132,6 +142,46 @@ Steps:
   after it quits the Finder's menus come back; foot keeps the generic
   menus. Debug: `ZACOS9_APPMENU_DEBUG=1` logs registrations and the
   front pid. Not yet tried with a real Qt program or on the installed system.
+
+## Global menus, GTK 3 Wayland: implemented (0.1.15)
+
+- The compositor implements the version-one `gtk_shell1`/`gtk_surface1`
+  menu-property protocol. `platinum_shell_v1` version 4 sends the focused
+  surface's unique D-Bus name and menu/action paths to the menu bar. This
+  distinguishes windows in one process; version 2/3 clients remain compatible.
+- The menu bar imports `GDBusMenuModel` and `GDBusActionGroup` exports,
+  subscribes to menu/action updates, and renders sections, submenus,
+  enabled state, check/radio state and action targets. It forwards `app.`,
+  `win.` and legacy `unity.` actions. The bus owner's PID is checked
+  asynchronously against the focused process before importing exports;
+  stale clicks and unavailable owners do not activate another window's actions.
+- Native GTK application menus use GTK's built-in exports. Legacy
+  `GtkWindow`/`GtkMenuBar` applications, including Galculator, use the small
+  `shell/gtkmenu/module.c` module and Debian's `libappmenu-gtk3-parser`.
+  The stock appmenu module attempts to publish legacy Wayland metadata before
+  the window is realized; this fails on the tested version 25.04. ZacOS's
+  module instead exports after realization and publishes the correct action
+  path. It reuses the maintained parser rather than implementing a second
+  menu-widget parser.
+- The session loads `GTK_MODULES=zacos9-appmenu` while preserving other
+  user modules, and propagates its settings to D-Bus-activated applications.
+  Legacy in-window menus hide only while the registrar is available, and
+  reappear if it exits. On unsupported desktops the module leaves them alone.
+- Tests run under a private D-Bus session and headless compositor. They
+  verify actual Galculator File/Edit/Help titles in the global-menu backend,
+  activate real legacy and native GTK actions through that backend, switch
+  between two GTK windows in one process, restore menus on close, and verify
+  in-window menu fallback. A real Qt fixture verifies existing registration
+  and action forwarding. Backend tests cover live updates, checked/radio
+  actions, owner disappearance, PID mismatches, invalid paths and stale
+  activations.
+
+The new compositor, menu bar, GTK module and session environment must be
+installed together; log out/in and restart applications after updating.
+GTK applications explicitly forced to X11, custom non-exported menus and
+Electron are not covered by this GTK Wayland path. Mixed applications using
+legacy widgets inside `GtkApplicationWindow` should use native menu models;
+the module does not override GTK application-window exports.
 
 ## Gaps (known, not planned yet)
 
