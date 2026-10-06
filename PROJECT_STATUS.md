@@ -59,7 +59,9 @@ the modal controls, and stopped/failed external drops are not reported as
 completed moves. Tests cover copy interruption during actual file I/O,
 completed-item retention, move status, keyboard Stop, recursive alias copies,
 read-error rollback including read-only copied directories, and existing
-Desktop/resource-fork behavior. Installed-session drag/dialog interaction
+Desktop/resource-fork behavior. Movable-modal windows now occupy a compositor
+layer above ordinary app windows, keeping their Platinum frames visible.
+Installed-session drag/dialog interaction
 still needs interactive verification after updating the Finder. Sniffer
 builds successfully; all three focused selection, Desktop and VFS suites
 pass, including pixel checks of the Platinum dialog and progress fill.
@@ -122,9 +124,35 @@ HDMI sink: bounded pw-play/paplay previews do not finish, while an original
 chirp plays successfully on analog without changing the HDMI default. Resetting
 the HDMI sink and restarting user audio services did not recover it; the
 existing Haswell position_fix=1 is active. Window-sound, playback and settings
-regression suites pass. HDMI recovery and a reproduction after installing the
-native screenshot replacement still require testing; no new sound-event
-implementation or global sound-default change was needed.
+regression suites pass. On installed 0.1.15, YouTube resumed after moving its
+stream to analog while HDMI hardware pointers remained frozen. A local HDMI-only
+48 kHz/1024-frame period/8192-frame headroom/no-suspend rule still froze when a
+second stream joined. Adding interrupt scheduling and a fixed 1024-frame quantum
+passed a sustained-stream plus twelve-short-sounds test, but failed the subsequent
+live window-sound test: TV audio was silent, hardware progress stopped, and a
+woodblock player remained stuck. The unsuccessful local rule was removed and
+user audio services restarted; interface sounds remain temporarily disabled at
+the user's request, with volume 5 preserved. No HDMI fix is established or
+shipped; recovery, audible concurrent playback, and a bounded sound-player
+lifetime remain unresolved.
+Later checks in that boot, with interface sounds off, saw PipeWire HDMI
+streams freeze within seconds of starting, and unbinding and rebinding the
+HDMI controller did not recover it; a reboot did. The kernel log's only
+audio event was "IRQ timing workaround is activated for card #0" during the
+interrupt-scheduled testing, with no i915 FIFO underrun, flip timeout or
+codec timeout. Two test tools from that session were unsound and their
+results are void: a raw ALSA client wrote 16-bit samples, and a probe
+misparsed the padded keys in `/proc/asound/.../status`. After the reboot,
+16-bit streams opened directly on the HDMI device stall every time while
+32-bit streams play; PipeWire always drives the HDMI sink in S32LE, so this
+quirk is not reached in normal use. On healthy HDMI, five minutes of the
+drag loop's pattern (clips respawned, SIGKILLed on release, end sounds)
+beside a sustained stream, and 57 drag bursts waking an idle sink, nine from
+a runtime-suspended controller, all played without a stall. On the analog
+sink a clip joining or being killed left the device's trigger time and
+hw_params unchanged. The sound pattern alone does not reproduce the hang;
+a live test with YouTube, real window drags and interface sounds on, under
+a read-only hardware-position monitor, is next.
 
 **USB erase safety-lock fix and disk names** (0.1.14): The helper's own
 exclusive disk claim prevented sfdisk from taking another exclusive claim,
@@ -366,7 +394,8 @@ covered by `test-finder-vfs`; not yet installed or run - needs root and a new IS
 
 - StuffIt Expander's way: a double-clicked .zip / .7z / .sit / .tar / .tar.gz / .tgz / .tar.bz2 / .tar.xz is expanded beside itself by
   `zacos9-expand` (`shell/finder/`, Python's zipfile/tarfile and python3-libarchive-c for 7z). One top-level item lands as itself, several go in
-  a folder named after the archive; taken names get " 2"; the archive is kept; the result is selected. Entries escaping the folder
+  a folder named after the archive; taken names get " 2"; the archive is kept; the result is selected. A shared status dialog appears while
+  any supported archive is expanding. Entries escaping the folder
   are refused, __MACOSX/._ files skipped, zip Unix modes kept, password-protected zips refused with a message.
 - Seen: Photos.zip on the desktop -> "Photos" selected beside it; Project.zip in a Downloads window -> "Project" selected.
 - StuffIt runtime packaging fix (0.1.10): `unar` is now a mandatory

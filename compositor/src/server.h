@@ -53,7 +53,8 @@ struct plat_server {
 
 	/* Scene layers, bottom to top:
 	 *   desktop, shell[BACKGROUND], shell[BOTTOM], view_layer,
-	 *   shell[TOP] (menu bar), unmanaged_layer, shell[OVERLAY], overlay_layer */
+	 *   shell[TOP] (menu bar), fullscreen_layer, dialog_layer, unmanaged_layer,
+	 *   shell[OVERLAY], overlay_layer */
 	struct wlr_scene *scene;
 	struct wlr_scene_output_layout *scene_layout;
 	struct wlr_scene_rect *desktop;
@@ -61,6 +62,7 @@ struct plat_server {
 	struct wlr_scene_tree *view_layer;
 	struct wlr_scene_tree *unmanaged_layer; /* X11 menus, tooltips */
 	struct wlr_scene_tree *fullscreen_layer;
+	struct wlr_scene_tree *dialog_layer; /* movable-modal windows above app windows */
 	struct wlr_scene_tree *overlay_layer;   /* drag outlines */
 	struct plat_outline outline;
 

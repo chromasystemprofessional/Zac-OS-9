@@ -76,8 +76,8 @@ public:
 	void launchClassic(const QStringList &disks = {});
 	/* Open a .exe or .msi in the Windows Installer. */
 	void launchWindows(const QString &exe);
-	/* A .zip or .tar.* expanded beside itself (zacos9-expand), as StuffIt
-	 * Expander did on a double-click; what came out is then selected. */
+	/* A supported archive expanded beside itself (zacos9-expand), with a
+	 * status dialog; what came out is then selected. */
 	void expandArchive(const QString &archive);
 
 	/* Spring-loaded folders: hovering a drag over a folder opens it; the

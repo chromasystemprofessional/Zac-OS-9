@@ -6,6 +6,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QProgressDialog>
 #include <QProcess>
 #include <QStandardPaths>
 #include <QWidget>
@@ -348,8 +349,20 @@ static bool isExpandable(const QString &path) {
 void Finder::expandArchive(const QString &archive) {
 	/* Beside us: installed in the same bin directory, or the build tree's copy. */
 	const QString tool = QCoreApplication::applicationDirPath() + "/zacos9-expand";
+	auto *progress = new QProgressDialog("Expanding “" + QFileInfo(archive).fileName() + "”…",
+		QString(), 0, 0);
+	progress->setWindowTitle("Expanding");
+	progress->setCancelButton(nullptr);
+	progress->setWindowModality(Qt::ApplicationModal);
+	progress->setMinimumDuration(0);
+	progress->setAutoClose(false);
+	progress->setAutoReset(false);
+	progress->show();
+	platinumSetFrameStyle(progress, FrameStyle::MovableModal);
 	auto *p = new QProcess;
-	QObject::connect(p, &QProcess::finished, [this, p, archive](int code, QProcess::ExitStatus status) {
+	QObject::connect(p, &QProcess::finished, [this, p, progress, archive](int code, QProcess::ExitStatus status) {
+		progress->hide();
+		progress->deleteLater();
 		p->deleteLater();
 		const QString out = QString::fromUtf8(p->readAllStandardOutput()).trimmed();
 		const QString why = QString::fromUtf8(p->readAllStandardError()).trimmed().section('\n', -1);
@@ -367,8 +380,10 @@ void Finder::expandArchive(const QString &archive) {
 			FolderWindow::open(folder)->selectByName(result.fileName());
 		}
 	});
-	QObject::connect(p, &QProcess::errorOccurred, [p, archive](QProcess::ProcessError e) {
+	QObject::connect(p, &QProcess::errorOccurred, [p, progress, archive](QProcess::ProcessError e) {
 		if (e == QProcess::FailedToStart) {
+			progress->hide();
+			progress->deleteLater();
 			p->deleteLater();
 			Alert::ask("“" + QFileInfo(archive).fileName() + "” couldn’t be expanded: zacos9-expand "
 				"isn't installed.", "OK", QString());

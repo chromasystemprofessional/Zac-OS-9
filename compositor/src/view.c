@@ -56,6 +56,11 @@ static bool view_resizable(struct plat_view *view) {
 	return !fixed;
 }
 
+static struct wlr_scene_tree *view_window_layer(struct plat_view *view) {
+	return view->frame->st.style == DECOR_STYLE_MOVABLE_MODAL
+		? view->server->dialog_layer : view->server->view_layer;
+}
+
 void view_min_frame_size(struct plat_view *view, int *w, int *h) {
 	int min_w, min_h, max_w, max_h;
 	view->impl->get_size_limits(view, &min_w, &min_h, &max_w, &max_h);
@@ -82,6 +87,10 @@ void view_update_frame(struct plat_view *view) {
 	bool dialog = hint >= 0 ? hint == DECOR_STYLE_MOVABLE_MODAL
 		: !view_resizable(view) && view->impl->has_parent(view);
 	frame_set_style(view->frame, dialog ? DECOR_STYLE_MOVABLE_MODAL : DECOR_STYLE_DOCUMENT);
+	struct wlr_scene_tree *layer = view_window_layer(view);
+	if (view->scene_tree->node.parent != layer) {
+		wlr_scene_node_reparent(&view->scene_tree->node, layer);
+	}
 	struct decor_margins m = decor_margins(view->frame->st.style);
 	if (view->surface_tree) {
 		wlr_scene_node_set_position(&view->surface_tree->node,
@@ -133,7 +142,7 @@ struct plat_view *view_topmost(struct plat_server *server) {
 static void set_active(struct plat_view *view, bool active) {
 	if (view->fullscreen) {
 		wlr_scene_node_reparent(&view->scene_tree->node,
-			active ? view->server->fullscreen_layer : view->server->view_layer);
+			active ? view->server->fullscreen_layer : view_window_layer(view));
 	}
 	view->impl->set_activated(view, active);
 	frame_set_active(view->frame, active);
@@ -337,7 +346,7 @@ void view_set_fullscreen(struct plat_view *view, bool fullscreen, struct wlr_out
 		view->fullscreen = false;
 		view->fullscreen_output = NULL;
 		view->impl->set_fullscreen(view, false);
-		wlr_scene_node_reparent(&view->scene_tree->node, server->view_layer);
+		wlr_scene_node_reparent(&view->scene_tree->node, view_window_layer(view));
 		if (server->focused_view == view) {
 			wlr_scene_node_raise_to_top(&view->scene_tree->node);
 		}
