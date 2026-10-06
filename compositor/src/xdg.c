@@ -97,8 +97,16 @@ static void handle_unmap(struct wl_listener *listener, void *data) {
 static void handle_commit(struct wl_listener *listener, void *data) {
 	struct plat_view *view = wl_container_of(listener, view, commit);
 	if (view->xdg_toplevel->base->initial_commit) {
-		/* Let the client pick its own size, as classic Mac apps do. */
-		wlr_xdg_toplevel_set_size(view->xdg_toplevel, 0, 0);
+		struct wlr_box frame;
+		int width, height;
+		if (!view->xdg_toplevel->requested.fullscreen &&
+				view_default_frame(view, view->xdg_toplevel->app_id, &frame, &width, &height)) {
+			view_move_to(view, frame.x, frame.y);
+			wlr_xdg_toplevel_set_size(view->xdg_toplevel, width, height);
+		} else {
+			/* Let the client pick its own size, as classic Mac apps do. */
+			wlr_xdg_toplevel_set_size(view->xdg_toplevel, 0, 0);
+		}
 		if (view->xdg_toplevel->requested.fullscreen) {
 			view_set_fullscreen(view, true, view->xdg_toplevel->requested.fullscreen_output);
 		}

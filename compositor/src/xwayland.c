@@ -99,6 +99,13 @@ static void handle_map(struct wl_listener *listener, void *data) {
 	view_set_title(view, view->xsurface->title);
 	view_set_app_id(view, view->xsurface->class);
 	view_place_new(view);
+	struct wlr_box frame;
+	int width, height;
+	if (!view->xsurface->fullscreen && !view->xsurface->modal &&
+			view_default_frame(view, view->xsurface->class, &frame, &width, &height)) {
+		view_move_to(view, frame.x, frame.y);
+		xw_set_size(view, width, height);
+	}
 	view_handle_map(view);
 	if (view->xsurface->fullscreen) {
 		view_set_fullscreen(view, true, NULL);

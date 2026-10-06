@@ -19,6 +19,8 @@ if not shutil.which("grim") or not shutil.which("Xwayland"):
     sys.exit(77)
 
 compositor, client, pointer, builder, source = map(lambda arg: Path(arg).resolve(), sys.argv[1:6])
+# Inside the probe window, which opens near full-screen past the desktop strip.
+AT = 300
 spec = importlib.util.spec_from_file_location("cursors", builder)
 cursors = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(cursors)
@@ -80,7 +82,7 @@ with tempfile.TemporaryDirectory(prefix="zacos9-busy-cursor-") as directory:
                            capture_output=True, timeout=5)
 
             def move():
-                subprocess.run([pointer, "home", "move", "100", "100"], env=env,
+                subprocess.run([pointer, "home", "move", str(AT), str(AT)], env=env,
                                check=True, capture_output=True, timeout=5)
 
             def shot():
@@ -94,7 +96,7 @@ with tempfile.TemporaryDirectory(prefix="zacos9-busy-cursor-") as directory:
                     for x, ch in enumerate(row):
                         if ch != ".":
                             value = 0 if ch == "K" else 255
-                            if image.getpixel((100 - hot[0] + x, 100 - hot[1] + y)) != (value,) * 3:
+                            if image.getpixel((AT - hot[0] + x, AT - hot[1] + y)) != (value,) * 3:
                                 return False
                 return True
 
@@ -106,13 +108,13 @@ with tempfile.TemporaryDirectory(prefix="zacos9-busy-cursor-") as directory:
                     found = [i for i, frame in enumerate(dog_frames)
                              if matches(image, frame, dog["hot"])]
                     if not found:
-                        print("Unexpected pointer pixels around (100,100):", file=sys.stderr)
-                        for y in range(80, 120):
+                        print(f"Unexpected pointer pixels around ({AT},{AT}):", file=sys.stderr)
+                        for y in range(AT - 20, AT + 20):
                             print("".join({(0, 0, 0): "K", (255, 255, 255): "W",
                                            (0, 255, 0): "."}.get(image.getpixel((x, y)), "?")
-                                          for x in range(80, 120)), file=sys.stderr)
+                                          for x in range(AT - 20, AT + 20)), file=sys.stderr)
                         raise AssertionError("Busy pointer does not match the original dog artwork")
-                    seen.add(image.crop((93, 93, 109, 109)).tobytes())
+                    seen.add(image.crop((AT - 7, AT - 7, AT + 9, AT + 9)).tobytes())
                     seen_frames.update(found)
                     time.sleep(0.08)
                 assert len(seen) > 1, "Dog pointer is not animating"

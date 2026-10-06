@@ -298,6 +298,11 @@ void view_handle_unmap(struct plat_view *view);
 void view_handle_destroy(struct plat_view *view);
 void view_update_frame(struct plat_view *view);
 void view_place_new(struct plat_view *view);
+/* The near-full-screen frame a new window opens in, inside a usable area. */
+struct wlr_box view_default_frame_in(struct wlr_box area);
+/* Whether a new window takes that default; if so its frame and content size. */
+bool view_default_frame(struct plat_view *view, const char *app_id,
+		struct wlr_box *frame, int *content_w, int *content_h);
 void view_set_title(struct plat_view *view, const char *title);
 void view_set_app_id(struct plat_view *view, const char *app_id);
 void view_set_hidden(struct plat_view *view, bool hidden);

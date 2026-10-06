@@ -8,6 +8,11 @@
 #define VIEW_MIN_W 100
 #define VIEW_MIN_H 50
 
+/* Desktop left showing around a new window: the right strip clears the
+ * desktop's icon column (an 80 px cell 24 px in from the edge). */
+#define VIEW_DEFAULT_MARGIN_X 96
+#define VIEW_DEFAULT_MARGIN_Y 32
+
 void view_setup(struct plat_view *view, struct plat_server *server,
 		enum plat_view_type type, const struct plat_view_impl *impl) {
 	view->server = server;
@@ -130,6 +135,59 @@ void view_place_new(struct plat_view *view) {
 	struct plat_server *server = view->server;
 	struct wlr_box area = output_usable_area(server, server->cursor->x, server->cursor->y);
 	view_move_to(view, area.x + 40 + offset, area.y + 20 + offset);
+}
+
+struct wlr_box view_default_frame_in(struct wlr_box area) {
+	int mx = VIEW_DEFAULT_MARGIN_X, my = VIEW_DEFAULT_MARGIN_Y;
+	/* Small screens: keep the strips proportionate rather than squash the window. */
+	if (area.width < 4 * mx) {
+		mx = area.width / 8;
+	}
+	if (area.height < 4 * my) {
+		my = area.height / 8;
+	}
+	return (struct wlr_box){
+		.x = area.x + mx,
+		.y = area.y + my,
+		.width = area.width - 2 * mx - DECOR_SHADOW,
+		.height = area.height - 2 * my - DECOR_SHADOW,
+	};
+}
+
+/* Other programs' main windows open almost full-screen, leaving a strip of
+ * desktop on every side so the disk icons stay in view. The Finder sizes
+ * its own windows, and dialogs and fixed-size windows keep theirs. */
+bool view_default_frame(struct plat_view *view, const char *app_id,
+		struct wlr_box *frame, int *content_w, int *content_h) {
+	struct wlr_surface *surface = view->impl->get_surface(view);
+	int hx, hy;
+	if (view->fullscreen || view->impl->has_parent(view) || !view_resizable(view) ||
+			(app_id && strcmp(app_id, "zacos9-finder") == 0) ||
+			platinum_shell_style_for(surface) >= 0 ||
+			platinum_shell_position_for(surface, &hx, &hy)) {
+		return false;
+	}
+	struct plat_server *server = view->server;
+	struct wlr_box area = output_usable_area(server, server->cursor->x, server->cursor->y);
+	if (wlr_box_empty(&area)) {
+		return false;
+	}
+	struct wlr_box box = view_default_frame_in(area);
+	struct decor_margins m = decor_margins(DECOR_STYLE_DOCUMENT);
+	int w = box.width - m.left - m.right;
+	int h = box.height - m.top - m.bottom;
+	int min_w, min_h, max_w, max_h;
+	view->impl->get_size_limits(view, &min_w, &min_h, &max_w, &max_h);
+	w = max_w > 0 && w > max_w ? max_w : w;
+	h = max_h > 0 && h > max_h ? max_h : h;
+	w = w < min_w ? min_w : w;
+	h = h < min_h ? min_h : h;
+	w = w < VIEW_MIN_W ? VIEW_MIN_W : w;
+	h = h < VIEW_MIN_H ? VIEW_MIN_H : h;
+	*frame = box;
+	*content_w = w;
+	*content_h = h;
+	return true;
 }
 
 struct plat_view *view_topmost(struct plat_server *server) {
