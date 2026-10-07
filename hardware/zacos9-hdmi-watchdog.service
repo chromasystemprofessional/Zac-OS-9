@@ -1,0 +1,13 @@
+# Restarts Haswell HDMI audio when its playback position freezes
+# (zacos9-hdmi-watchdog). Exits at once on other computers.
+[Unit]
+Description=Restart frozen HDMI audio on Haswell graphics
+After=pipewire-pulse.service
+
+[Service]
+ExecStart=/usr/libexec/zacos9/zacos9-hdmi-watchdog
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

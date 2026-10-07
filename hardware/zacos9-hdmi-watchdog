@@ -1,0 +1,96 @@
+#!/bin/sh
+# zacos9-hdmi-watchdog: restarts Haswell HDMI audio when it freezes.
+#
+# Now and then the HDMI/DisplayPort audio controller in Intel's Haswell
+# graphics (8086:0a0c, 0c0c, 0d0c) stops moving its playback position in
+# the middle of a stream: the PCM stays RUNNING, PipeWire keeps the sink
+# RUNNING, and the TV goes silent. Nothing recovers it while the stream is
+# open, and a stuck stream (a short interface sound, say) can keep it open
+# even after the user picks another output. Closing and reopening the device
+# does recover it, so when a running HDMI PCM's hardware pointer hasn't
+# moved for a few seconds, this suspends and resumes its PipeWire sink.
+#
+# Runs as a user service (zacos9-hdmi-watchdog.service) and exits at once on
+# computers without that controller. ZACOS9_SYSFS, ZACOS9_PROCFS,
+# ZACOS9_PACTL, ZACOS9_SLEEP and ZACOS9_WATCHDOG_ROUNDS are for tests.
+
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+sysfs=${ZACOS9_SYSFS:-/sys}
+procfs=${ZACOS9_PROCFS:-/proc}
+pactl=${ZACOS9_PACTL:-pactl}
+sleep=${ZACOS9_SLEEP:-sleep}
+rounds=${ZACOS9_WATCHDOG_ROUNDS:-0}	# 0: forever
+stall=3		# seconds without progress before a restart
+
+# The ALSA cards on Haswell HDMI controllers, as "card PCI-address" lines.
+cards=
+for card in "$sysfs"/class/sound/card[0-9]*; do
+	dev=$(readlink -f "$card/device" 2>/dev/null) || continue
+	case $(cat "$dev/vendor" 2>/dev/null):$(cat "$dev/device" 2>/dev/null) in
+	0x8086:0x0a0c|0x8086:0x0c0c|0x8086:0x0d0c)
+		cards="$cards${card##*/} ${dev##*/}
+" ;;
+	esac
+done
+[ -n "$cards" ] || exit 0
+
+# A running playback PCM's position: "trigger_time hw_ptr", or nothing.
+position() {
+	awk -F': *' '
+		$1 == "state" && $2 != "RUNNING" { exit }
+		$1 == "trigger_time" { t = $2 }
+		$1 ~ /^hw_ptr/ { h = $2 }
+		END { if (h != "") print t, h }' "$1" 2>/dev/null
+}
+
+# PipeWire's sinks for a PCI address: alsa_output.pci-0000_00_03.0.hdmi-…
+sinks() {
+	id=$(printf '%s' "$1" | tr : _)
+	"$pactl" list short sinks 2>/dev/null |
+		awk -v p="alsa_output.pci-$id." 'index($2, p) == 1 { print $2 }'
+}
+
+restart() {
+	for sink in $(sinks "$2"); do
+		echo "HDMI audio on $1 stopped for ${stall}s; restarting $sink."
+		"$pactl" suspend-sink "$sink" 1
+		"$sleep" 1
+		"$pactl" suspend-sink "$sink" 0
+	done
+}
+
+state=$(mktemp -d "${TMPDIR:-/tmp}/zacos9-hdmi-watchdog.XXXXXX") || exit 1
+trap 'rm -rf "$state"' EXIT
+trap 'exit 0' INT TERM
+
+round=0
+while [ "$rounds" -eq 0 ] || [ "$round" -lt "$rounds" ]; do
+	round=$((round + 1))
+	printf '%s' "$cards" | while read -r card pci; do
+		restarted=
+		for status in "$procfs"/asound/"$card"/pcm*p/sub*/status; do
+			key=$(printf '%s' "${status#"$procfs"/asound/}" | tr / _)
+			# One field: the trigger time and the hardware pointer.
+			now=$(position "$status" | tr ' ' @)
+			if [ -z "$now" ]; then
+				rm -f "$state/$key"
+				continue
+			fi
+			then= count=0
+			[ -f "$state/$key" ] && read -r then count <"$state/$key"
+			if [ "$now" = "$then" ]; then
+				count=$((count + 1))
+			else
+				count=0
+			fi
+			if [ "$count" -ge "$stall" ] && [ -z "$restarted" ]; then
+				restart "$card" "$pci"
+				restarted=1
+				count=0
+			fi
+			echo "$now $count" >"$state/$key"
+		done
+	done
+	"$sleep" 1
+done
+exit 0

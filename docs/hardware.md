@@ -48,6 +48,56 @@ iMac14,1 it's `position_fix=1` (the HDMI controller is first).
 cat /sys/module/snd_hda_intel/parameters/position_fix   # 1,-1,-1,…
 ```
 
+## Haswell HDMI audio: freezes mid-stream
+
+**Symptom.** HDMI sound stops in the middle of a video and doesn't come
+back. Picking the built-in speakers brings sound back there at once, but
+picking HDMI again stays silent; until now only a restart fixed it.
+
+**What's happening.** The same Haswell HDMI controller stops moving its
+playback position while the stream is still running. Seen on the iMac14,1
+on 2026-10-07, under a once-a-second monitor of
+`/proc/asound/card0/pcm3p/sub0/status`:
+
+- The state stays `RUNNING` and PipeWire's sink stays `RUNNING`, but
+  `hw_ptr` freezes (`avail_max: 0`); the TV is silent.
+- The TV's audio information (ELD), the HDMI connector and the controller's
+  power state all stay good, and HDA power saving was off. That rules out
+  the TV, the cable and runtime suspend.
+- It happened twice, 90 seconds apart, while Firefox was playing YouTube
+  (48 kHz).
+- Switching outputs doesn't help, because something else keeps the frozen
+  device open: an interface sound's `pw-play`, for example, that never
+  finishes.
+- Closing and reopening the device does help (`pactl suspend-sink … 1`,
+  then `0`). The position moves again and the TV plays, with no restart.
+- No kernel message comes with a freeze, and the freezes come in bursts
+  (often 40–80 seconds apart, then none for up to 40 minutes).
+- Not the IOMMU: with the controller's IOMMU group switched to `identity`
+  (untranslated), it ran 20 minutes clean and then froze again.
+
+The cause isn't known yet; this is a recovery, not a fix.
+
+**Recovery.** `zacos9-hdmi-watchdog.service`, a user service in
+`/usr/lib/systemd/user` (enabled for every user), runs `zacos9-hdmi-watchdog`.
+
+- Each second it reads the status of every playback PCM on a Haswell HDMI
+  controller.
+- If a running PCM's `hw_ptr` hasn't moved for 3 seconds (same trigger
+  time, so the same stream), it suspends and resumes that controller's
+  PipeWire sinks (`alsa_output.pci-0000_00_03.0.*`).
+- That gives about 4 seconds of silence instead of silence until a restart.
+- Each restart is noted in the journal, for example
+  `HDMI audio on card0 stopped for 3s; restarting alsa_output.pci-0000_00_03.0.hdmi-stereo.`
+- On computers without that controller it exits at once.
+
+**Check** after restarting:
+
+```sh
+systemctl --user status zacos9-hdmi-watchdog
+journalctl --user -u zacos9-hdmi-watchdog
+```
+
 ## ACPI interrupt storms on Macs
 
 **Symptom.** A kernel thread, `irq/9-acpi`, uses most of a CPU all the time,
@@ -81,5 +131,5 @@ grep -H . /sys/firmware/acpi/interrupts/gpe*    # "masked" on the storming one
 
 ## Tests
 
-`meson test -C build hardware-quirks` runs both scripts against a fake
-`/sys` (`tests/hardware/test_quirks.py`).
+`meson test -C build hardware-quirks` runs all three scripts against a fake
+`/sys` and `/proc` (`tests/hardware/test_quirks.py`).

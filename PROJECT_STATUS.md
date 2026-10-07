@@ -1,6 +1,6 @@
 # Project Status
 
-Updated: 2026-10-06
+Updated: 2026-10-07
 
 ## Completed
 
@@ -347,8 +347,30 @@ stuck button-click sample completed successfully, the latter alongside Brave
 playback with advancing hardware pointers. Reopening Software Update, checking
 for updates and moving its window also left playback working, confirmed by
 the user. HDMI selection and interface-sound settings were unchanged. No
-preventative fix is established; the recurring stall and unbounded detached
-sound-player lifetime remain unresolved.
+preventative fix was established in that boot; the recurring stall and
+unbounded detached sound-player lifetime remained unresolved.
+
+**HDMI freeze recovery without a restart** (unreleased, 2026-10-07): a
+once-a-second monitor caught two HDMI freezes on the iMac14,1 during
+Firefox/YouTube, 90 seconds apart. Each time, PCM state and sink stayed
+RUNNING with `hw_ptr` frozen, while the TV's ELD, the connector and the
+controller's runtime power stayed good. HDA power saving had been turned
+off at run time (`power_save=0`, `power/control=on`), so runtime suspend is
+ruled out; the power-saving modprobe change tried earlier that day was
+dropped unshipped. Suspending and resuming the HDMI sink (`pactl
+suspend-sink`) restored TV sound both times, confirmed by the user, with
+no reboot. Switching outputs failed because a stuck interface-sound
+`pw-play` kept the frozen device open. New `zacos9-hdmi-watchdog` user
+service: on Haswell HDMI controllers only, it restarts the controller's
+PipeWire sinks after 3 s without hardware progress; it caught and recovered
+the second freeze live. `hardware-quirks` covers it (17 tests). Ruled out
+since: the IOMMU. Kernel logs (exported by the user) had no audio or
+graphics errors at the freezes. With the HDMI controller's IOMMU group
+switched live from `DMA-FQ` to `identity` at 15:09 (`position_fix=1` kept),
+it ran 20 minutes clean and then froze again at 15:28:56; the watchdog
+recovered it. An `identity` change briefly added to `zacos9-hda-load` was
+reverted unshipped. The root cause of the freeze is still unknown, and so
+is the unbounded detached sound-player lifetime.
 
 **USB erase safety-lock fix and disk names** (0.1.14): The helper's own
 exclusive disk claim prevented sfdisk from taking another exclusive claim,
