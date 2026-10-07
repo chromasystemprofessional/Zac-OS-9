@@ -200,6 +200,16 @@ combinations; all three focused authorization and disk-helper suites pass.
 The rule is installed through the existing package path; reboot behavior on
 the connected physical drive still needs confirmation after installing it.
 
+**Extensions Manager: friendly names, icons and a curated list**
+(unreleased, 2026-10-07): instead of 145 raw kernel module names, Extensions
+Manager and System Folder > Extensions now show about 45 curated entries
+(only the ones loaded on this computer), for example "HDMI Sound", "Bluetooth",
+"Keyboard & Mouse", "Linux Disks (ext4)". Each entry has a new Platinum icon
+(11 new icons: puzzle piece, display, Ethernet, Wi-Fi, USB, keyboard, camera,
+power, sensor, padlock, chip), a description and the modules it covers.
+Helper libraries are hidden; **Show All** lists every module with an icon.
+The window stays read-only. `extension-catalog` test added; full suite passes.
+
 **Software no longer stuck loading Flathub** (0.1.31, 2026-10-07): opening
 Software sat on the Featured page with the busy sweep running on every
 machine. The Flathub AppStream download takes about 80 seconds here, but the

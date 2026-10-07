@@ -456,7 +456,7 @@ void pl_list_paint(struct pl_canvas *c, int x0, int y0, int x1, int y1,
 		if (i == list->selected) {
 			pl_fill(c, x0 + 1, top, sx - 1, top + PL_LIST_ROW_H - 1, highlight);
 		}
-		pl_text(c, list->rows[i], x0 + 3, top + 11, C_BLACK);
+		pl_text(c, list->rows[i], x0 + 3 + list->indent, top + 11, C_BLACK);
 	}
 	struct pl_scrollbar sb = pl_list_scrollbar(y0, y1, list);
 	pl_scrollbar_paint(c, sx, y0, &sb, accent);

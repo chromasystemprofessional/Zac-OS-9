@@ -4,6 +4,8 @@
 #include <QStringList>
 #include <vector>
 
+#include "icons.h"
+
 enum class ResourceType {
 	FilesystemAlias,
 	Collection,
@@ -19,6 +21,8 @@ struct SystemResource {
 	QString description;
 	QStringList metadata;
 	bool directory = false;
+	/* The Finder icon; a directory always shows as a folder. */
+	pl_icon_kind icon = PL_ICON_DOCUMENT;
 };
 
 struct ResourceDetails {

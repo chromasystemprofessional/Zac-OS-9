@@ -344,8 +344,14 @@ Current providers:
   directories; command text is not exposed.
 - **Application Support**: allowlisted user/system support roots as read-only
   aliases.
-- **Device Drivers** and **Extensions**: loaded kernel module inventory and
-  startup-module metadata, informational only.
+- **Device Drivers**: every loaded kernel module, with startup-module metadata,
+  informational only.
+- **Extensions**: a curated view of the same modules
+  (`shell/finder/extensioncatalog.cpp`). Each entry gives a friendly name, an
+  icon and a one-line description, and groups the modules behind it (for
+  example "HDMI Sound" covers `snd_hda_codec_hdmi`). Only entries with a loaded
+  module appear. Helper libraries and plumbing modules are left out on purpose;
+  they still show up under Device Drivers.
 - **Network**: current interface status and addresses, informational only.
 - **System Logs**: protected informational notice only; raw log content is not
   exposed here.
@@ -356,8 +362,10 @@ Built-in launchers:
 
 - **System Information**: read-only summary of ZacOS version, distro, kernel,
   CPU, memory, storage, network, audio, loaded drivers and uptime.
-- **Extensions Manager**: read-only list of discovered extension/driver
-  components with status/startup metadata.
+- **Extensions Manager**: read-only list of the curated Extensions, with
+  icons, a description and status/startup/module details for the selection.
+  **Show All** switches to every loaded kernel module by technical name.
+  Nothing here loads or unloads modules.
 
 ## What the Finder will and won't do
 

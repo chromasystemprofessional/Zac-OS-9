@@ -13,6 +13,7 @@
 #include <unistd.h>
 
 #include "appdb.h"
+#include "extensioncatalog.h"
 
 namespace {
 
@@ -191,6 +192,17 @@ QStringList startupEnabledNames() {
 
 QStringList loadedModuleLines() {
 	return splitLines(boundedText("/proc/modules", 2 * 1024 * 1024));
+}
+
+QStringList loadedModuleNames() {
+	QStringList names;
+	for (const QString &line : loadedModuleLines()) {
+		const QString name = line.section(' ', 0, 0).trimmed();
+		if (!name.isEmpty()) {
+			names << name;
+		}
+	}
+	return names;
 }
 
 QStringList moduleStartupNames() {
@@ -377,14 +389,27 @@ std::vector<SystemResource> resourceChildren(const QString &provider, const QStr
 		return out;
 	}
 
-	if (provider == "device-drivers" || provider == "extensions") {
+	if (provider == "extensions") {
+		for (const ExtensionEntry &entry : curatedExtensions(loadedModuleNames(),
+				moduleStartupNames())) {
+			add(entry.key, entry.name, ResourceType::Information, "system extension",
+				entry.description,
+				{ "Status: on",
+					"Starts: " + QString(entry.startup ? "at every startup (modules-load.d)" :
+						"automatically when its hardware is found"),
+					"Kernel modules: " + entry.modules.join(", ") });
+			out.back().icon = entry.icon;
+		}
+		if (out.empty()) {
+			add("none", "No extensions found", ResourceType::Information,
+				"information", "The kernel did not report any familiar extensions.");
+		}
+		return out;
+	}
+
+	if (provider == "device-drivers") {
 		const QStringList startup = moduleStartupNames();
-		for (const QString &line : loadedModuleLines()) {
-			const QStringList fields = line.split(QRegularExpression("\\s+"), Qt::SkipEmptyParts);
-			if (fields.isEmpty()) {
-				continue;
-			}
-			const QString module = fields.at(0);
+		for (const QString &module : loadedModuleNames()) {
 			QString displayName = module;
 			displayName.replace('_', ' ');
 			const QString description = moduleDescription(module);
@@ -395,8 +420,9 @@ std::vector<SystemResource> resourceChildren(const QString &provider, const QStr
 				{ "Status: loaded",
 					"Startup: " + QString(configured ? "configured in modules-load.d" :
 						"not configured in modules-load.d"),
-					"Component: /sys/module/" + fields.at(0),
+					"Component: /sys/module/" + module,
 					"Access: informational only; driver controls are not provided." });
+			out.back().icon = extensionModuleIcon(module);
 		}
 		if (out.empty()) {
 			add("none", "No loaded drivers found", ResourceType::Information,
@@ -516,9 +542,18 @@ ResourceDetails resourceDetails(const QString &provider, const QString &key) {
 		details.access = "Restricted; no logs are opened or copied.";
 		return details;
 	}
-	if (provider == "device-drivers" || provider == "extensions") {
-		details.name = key.isEmpty() ? (provider == "extensions" ?
-			"Extensions" : "Device Drivers") : safeDisplayName(key);
+	if (provider == "extensions") {
+		const ExtensionEntry entry = extensionEntry(key);
+		details.name = key.isEmpty() ? QStringLiteral("Extensions") :
+			entry.key.isEmpty() ? safeDisplayName(key) : entry.name;
+		details.kind = key.isEmpty() ? "virtual collection" : "system extension";
+		details.description = entry.key.isEmpty() ?
+			"Familiar system extensions; open Extensions Manager and choose Show All "
+			"for every loaded kernel module." : entry.description;
+		return details;
+	}
+	if (provider == "device-drivers") {
+		details.name = key.isEmpty() ? QStringLiteral("Device Drivers") : safeDisplayName(key);
 		details.kind = key.isEmpty() ? "virtual collection" : "loaded kernel module";
 		details.description = "Current kernel module status; no load/unload controls.";
 		return details;

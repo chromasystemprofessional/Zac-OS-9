@@ -26,11 +26,14 @@ struct PanelList {
 	QRect frame; /* the black frame */
 	QStringList items;
 	std::vector<std::unique_ptr<Text>> texts;
+	std::vector<int> icons;
 	pl_list state{};
 	/* Called with the new row when the user picks one. */
 	std::function<void(int)> picked;
 
-	void setItems(const QStringList &items);
+	/* Icons, if given, are one pl_icon_kind per row, drawn small before
+	 * each row's text. */
+	void setItems(const QStringList &items, const std::vector<int> &icons = {});
 	void select(int row, bool notify);
 	void scrollTo(int top);
 	void ensureVisible(int row);

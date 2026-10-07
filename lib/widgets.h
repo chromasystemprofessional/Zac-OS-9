@@ -74,6 +74,7 @@ struct pl_list {
 	int selected; /* -1 for none */
 	int top;      /* first visible row */
 	bool focused;
+	int indent;   /* pixels before each row's text, e.g. for an icon */
 };
 /* x0..x1, y0..y1 is the black frame. */
 void pl_list_paint(struct pl_canvas *c, int x0, int y0, int x1, int y1,

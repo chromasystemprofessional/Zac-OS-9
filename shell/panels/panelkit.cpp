@@ -7,16 +7,20 @@
 #include <QPainter>
 #include <algorithm>
 
+#include "icons.h"
 #include "menudraw.h"
 #include "settings.h"
 
 /* ---- list boxes ------------------------------------------------------------ */
 
-void PanelList::setItems(const QStringList &list) {
+void PanelList::setItems(const QStringList &list, const std::vector<int> &rowIcons) {
 	items = list;
+	icons = rowIcons.size() == static_cast<size_t>(list.size()) ? rowIcons : std::vector<int>{};
+	state.indent = icons.empty() ? 0 : PL_ICON_SMALL + 4;
 	texts.clear();
 	for (const QString &s : list) {
-		texts.push_back(std::make_unique<Text>(s, frame.width() - SB_WIDTH - 8, PL_FONT_SYSTEM));
+		texts.push_back(std::make_unique<Text>(s, frame.width() - SB_WIDTH - 8 - state.indent,
+			PL_FONT_SYSTEM));
 	}
 	state.n = static_cast<int>(texts.size());
 	state.top = std::min(state.top, std::max(0, state.n - 1));
@@ -38,6 +42,12 @@ void PanelList::paint(pl_canvas *c, bool focused) const {
 	v.focused = focused;
 	pl_list_paint(c, frame.left(), frame.top(), frame.right(), frame.bottom(), &v,
 		pl_accent_current(), pl_highlight_current());
+	const int visible = pl_list_visible_rows(frame.top(), frame.bottom());
+	for (int r = 0; r < visible && !icons.empty() && v.top + r < v.n; r++) {
+		const int i = v.top + r;
+		pl_icon_paint(c, frame.left() + 2, frame.top() + 1 + r * PL_LIST_ROW_H,
+			static_cast<pl_icon_kind>(icons[static_cast<size_t>(i)]), PL_ICON_SMALL, false);
+	}
 }
 
 void PanelList::scrollTo(int top) {

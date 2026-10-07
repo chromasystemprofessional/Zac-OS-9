@@ -603,7 +603,7 @@ static void refreshResourceChildren(const VNode &parent) {
 		child.id = parent.id + '/' + resourceIdComponent(resource.key);
 		child.name = resource.name;
 		child.kind = VKind::Resource;
-		child.icon = resource.directory ? PL_ICON_FOLDER : PL_ICON_DOCUMENT;
+		child.icon = resource.directory ? PL_ICON_FOLDER : resource.icon;
 		child.resourceProvider = parent.resourceProvider;
 		child.resourceKey = resource.key;
 		child.resourceDirectory = resource.directory;
