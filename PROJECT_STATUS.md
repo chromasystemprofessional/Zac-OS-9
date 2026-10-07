@@ -201,7 +201,7 @@ The rule is installed through the existing package path; reboot behavior on
 the connected physical drive still needs confirmation after installing it.
 
 **Real extension parade at startup, with Welcome on the boot splash**
-(unreleased, 2026-10-07): the icons along the bottom of the startup screen
+(0.1.32, 2026-10-07): the icons along the bottom of the startup screen
 used to be six fixed pictures shown on a timer after logging in. Now they
 are the curated extensions (`lib/extensions.c`, shared with Extensions
 Manager) appearing as their kernel modules actually load.
@@ -220,7 +220,7 @@ Manager) appearing as their kernel modules actually load.
   mode as it starts, and only a real boot shows that.
 
 **Extensions Manager: friendly names, icons and a curated list**
-(unreleased, 2026-10-07): instead of 145 raw kernel module names, Extensions
+(0.1.32, 2026-10-07): instead of 145 raw kernel module names, Extensions
 Manager and System Folder > Extensions now show about 45 curated entries
 (only the ones loaded on this computer), for example "HDMI Sound", "Bluetooth",
 "Keyboard & Mouse", "Linux Disks (ext4)". Each entry has a new Platinum icon
@@ -1014,7 +1014,7 @@ real devices yet - this machine has an adapter, but bluez wasn't installed).
   first gap) but it leaves a *black* gap after plymouth and unbinds the text consoles (the greeter
   needs them) — would need a seamless hand-off (plymouth deactivate / quit --retain-splash around
   wm start, fbcon bound after) that can't be validated on real hardware from here.
-  *Update (unreleased):* the second gap now has that hand-off (`docs/boot.md`), pending a real boot.
+  *Update (0.1.32):* the second gap now has that hand-off (`docs/boot.md`), pending a real boot.
 
 **Disk name, aliases of applications, About logo** (built and tested; not yet committed; not in an ISO yet).
 
