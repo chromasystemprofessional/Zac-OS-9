@@ -76,7 +76,16 @@ Zacintosh HD
 │   │   ├── Themes        → compatible appearance preset JSON files
 │   │   └── Sound Themes  → custom WAV themes and classic resource-fork sound sets
 │   ├── Control Panels      (generated: ZacOS 9's control panels)
-│   ├── Extensions
+│   ├── Extensions         (generated, read-only driver/module status)
+│   ├── Sounds             (generated, read-only aliases to user/system sounds)
+│   ├── Startup Items      (generated, read-only enabled autostart entries)
+│   ├── Application Support (generated, read-only aliases to support resources)
+│   ├── Device Drivers     (generated, read-only loaded kernel modules)
+│   ├── Network            (generated, read-only interface status)
+│   ├── System Logs        (generated, protected informational view only)
+│   ├── Software Components (generated, read-only installed app/package metadata)
+│   ├── System Information (generated launcher, read-only status window)
+│   ├── Extensions Manager (generated launcher, read-only status window)
 │   ├── Fonts             → ~/.local/share/fonts
 │   ├── Preferences       → ~/.config
 │   └── Utilities           (generated: settings, file managers and system tools,
@@ -104,7 +113,11 @@ If the old folder cannot be moved (including an existing destination), the
 catalog retains the old folder and logs the conflict rather than overwriting files.
 Version 8 adds Themes and Sound Themes under Appearance.
 Version 9 moves the shipped Utilities folder into System Folder and preserves
-its custom name and the renamed titles/labels of system launchers.
+its custom name and the renamed titles/labels of system launchers. Version 10
+adds read-only System Folder resource providers (Sounds, Startup Items,
+Application Support, Device Drivers, Network, System Logs, Software Components
+and Extensions) and built-in launchers for System Information and Extensions
+Manager.
 See
 [custom desktop patterns](../README.md#custom-desktop-patterns) and
 [desktop wallpaper](../README.md#desktop-wallpaper) for supported formats,
@@ -235,8 +248,10 @@ A node's fields:
 |---|---|
 | `id` | Stable and unique. `/` separates it from its parent, so `system-folder/fonts` sits in `system-folder`. |
 | `name` | What the Finder shows. |
-| `kind` | `folder` (curated), `backed` (stands for a real directory), `apps`, `panels`, `unix`. |
+| `kind` | `folder` (curated), `backed` (real directory), `apps`, `panels`, `resource`, `launcher`, `unix`. |
 | `backing` | For `backed`. `$HOME`, `$XDG_CONFIG_HOME`, `$XDG_DATA_HOME` and `$XDG_DOCUMENTS_DIR` are expanded. |
+| `provider` | For `resource`: fixed provider id (`sounds`, `startup-items`, …), never a command or arbitrary path. |
+| `action` | For built-in `launcher` rows: trusted internal actions (`system-information`, `extensions-manager`) only. |
 | `icon` | `folder`, `system-folder`, `control-panels`, `disk`, `application`, `document`. |
 | `visible` | `false` hides it without deleting it. |
 | `order` | Where it sits among its siblings before the user moves it; ties go by name. |
@@ -297,6 +312,48 @@ Finder starts and still appear automatically. GIO application-list change
 notifications also trigger the same settled refresh. Newly created icon-theme
 directories are added when the application list reloads. No launcher copies or
 login restart are needed; XDG precedence and hidden-entry rules still apply.
+
+System Folder resource providers are lazily enumerated when opened. They do not
+recursively scan `/proc`, `/sys` or `/usr/lib` during ordinary navigation.
+Provider identities are allowlisted in code; registry rows can select only known
+providers and fixed built-in actions.
+
+## Read-only resource providers
+
+Resource providers are virtual collections and informational entries, not copies
+of system files. They support three kinds of entries:
+
+- **Filesystem alias**: read-only alias to an allowlisted real source.
+- **Virtual collection**: generated grouping with no single source path.
+- **Information item**: metadata/status with no openable file source.
+
+For safety, provider aliases are canonical-path checked against allowlisted
+roots, reject broken/out-of-root/looping symlinks, and never expand into
+write-enabled virtual folders. Operations such as rename, label, drop and trash
+are disabled for provider items.
+
+Current providers:
+
+- **Sounds**: user and system sound roots (`$XDG_DATA_HOME/sounds`,
+  `/usr/share/sounds`) as read-only aliases.
+- **Startup Items**: enabled autostart desktop entries from supported startup
+  directories; command text is not exposed.
+- **Application Support**: allowlisted user/system support roots as read-only
+  aliases.
+- **Device Drivers** and **Extensions**: loaded kernel module inventory and
+  startup-module metadata, informational only.
+- **Network**: current interface status and addresses, informational only.
+- **System Logs**: protected informational notice only; raw log content is not
+  exposed here.
+- **Software Components**: installed application/component metadata from desktop
+  entries and package ownership.
+
+Built-in launchers:
+
+- **System Information**: read-only summary of ZacOS version, distro, kernel,
+  CPU, memory, storage, network, audio, loaded drivers and uptime.
+- **Extensions Manager**: read-only list of discovered extension/driver
+  components with status/startup metadata.
 
 ## What the Finder will and won't do
 

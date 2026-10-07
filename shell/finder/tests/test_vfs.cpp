@@ -27,6 +27,7 @@
 
 #include "appdb.h"
 #include "apptrash.h"
+#include "resources.h"
 #include "vfs.h"
 
 static int fails;
@@ -81,6 +82,15 @@ static QString appFolder(const QString &desktopId) {
 	return vfsPathFor("applications/" + desktopId);
 }
 
+static QString pathNamed(const QString &path, const QString &name) {
+	for (const auto &item : vfsList(path)) {
+		if (item->name == name) {
+			return item->path;
+		}
+	}
+	return {};
+}
+
 static bool waitFor(const std::function<bool()> &condition) {
 	QElapsedTimer timer;
 	timer.start();
@@ -110,8 +120,35 @@ int main(int argc, char **argv) {
 	setenv("XDG_CONFIG_HOME", (root + "/config").toUtf8().constData(), 1);
 	setenv("HOME", root.toUtf8().constData(), 1);
 	setenv("XDG_CURRENT_DESKTOP", "ZacOS9", 1);
+	const QString resourceRoot = root + "/resource-fixtures";
+	setenv("ZACOS9_RESOURCE_TEST_ROOT", resourceRoot.toUtf8().constData(), 1);
 	QDir().mkpath(appsDir);
 	QDir().mkpath(homeAppsDir);
+	QDir().mkpath(resourceRoot + "/sounds/user/pack");
+	QDir().mkpath(resourceRoot + "/sounds/system");
+	QDir().mkpath(resourceRoot + "/support/user/appearance");
+	QDir().mkpath(resourceRoot + "/support/system");
+	QDir().mkpath(resourceRoot + "/startup/user");
+	QDir().mkpath(resourceRoot + "/startup/system");
+	QDir().mkpath(resourceRoot + "/dpkg");
+	QDir().rmdir(resourceRoot + "/support/system");
+	QFile::link("/etc", resourceRoot + "/support/system");
+	writeEntry(resourceRoot + "/sounds/user/pack", "chime.wav", "sound data");
+	writeEntry(resourceRoot + "/support/user/appearance", "theme.txt", "theme data");
+	writeEntry(resourceRoot + "/startup/user", "enabled.desktop",
+		"[Desktop Entry]\nName=Fixture Startup\nExec=secret-command\n");
+	writeEntry(resourceRoot + "/startup/user", "disabled.desktop",
+		"[Desktop Entry]\nName=Disabled Fixture\nExec=secret-command\nHidden=true\n");
+	writeEntry(resourceRoot + "/dpkg", "status",
+		"Package: other\nVersion: 1.0\n\nPackage: zacos9\nVersion: 0.1.27-fixture\n"
+		"Status: install ok installed\n\n");
+	QFile::link(resourceRoot + "/sounds/user/pack/chime.wav",
+		resourceRoot + "/sounds/user/alias.wav");
+	QFile::link("/etc/passwd", resourceRoot + "/sounds/user/escape");
+	QFile::link(resourceRoot + "/sounds/user/missing",
+		resourceRoot + "/sounds/user/broken");
+	QFile::link(resourceRoot + "/sounds/user", resourceRoot + "/sounds/user/loop");
+	QFile::link("/etc", resourceRoot + "/support/user/appearance/escape");
 	const QString aptState = root + "/apt/extended_states";
 	setenv("ZACOS9_APT_STATE", aptState.toUtf8().constData(), 1);
 	writeEntry(root + "/apt", "extended_states",
@@ -192,6 +229,115 @@ int main(int argc, char **argv) {
 	settle();
 
 	QStringList apps = namesIn(vfsPathFor("applications"));
+	const QString systemFolder = vfsPathFor("system-folder");
+	const QStringList systemNames = namesIn(systemFolder);
+	for (const QString name : { "Sounds", "Startup Items", "Application Support",
+			"Device Drivers", "Network", "System Logs", "Software Components",
+			"Extensions", "System Information", "Extensions Manager" }) {
+		check(systemNames.contains(name), "System Folder contains " + name);
+	}
+	check(pathNamed(vfsPathFor("system-folder/utilities"), "System Information") != QString() &&
+		pathNamed(vfsPathFor("system-folder/utilities"), "Extensions Manager") != QString(),
+		"the trusted System Information and Extensions Manager launchers are also in Utilities");
+	const QString sounds = vfsPathFor("system-folder/sounds");
+	const QString userSounds = pathNamed(sounds, "User");
+	check(!userSounds.isEmpty() && !pathNamed(sounds, "Computer").isEmpty(),
+		"sound roots are discovered at runtime as virtual collections");
+	const QString pack = pathNamed(userSounds, "pack");
+	const QString sound = pathNamed(pack, "chime.wav");
+	check(!pack.isEmpty() && !sound.isEmpty(),
+		"allowlisted sound descendants retain virtual identities");
+	check(pathNamed(userSounds, "alias.wav") != QString(),
+		"a symlink resolving inside an allowlisted source remains browsable");
+	check(pathNamed(userSounds, "escape").isEmpty() &&
+		pathNamed(userSounds, "broken").isEmpty() &&
+		pathNamed(userSounds, "loop").isEmpty(),
+		"broken, looping and out-of-root symlinks are not exposed");
+	const QString support = vfsPathFor("system-folder/application-support");
+	const QString userSupport = pathNamed(support, "User");
+	check(!userSupport.isEmpty() && pathNamed(support, "Computer").isEmpty() &&
+		pathNamed(pathNamed(userSupport, "appearance"), "escape").isEmpty(),
+		"support aliases reject symlinks that escape the allowlisted root");
+	QString soundSource;
+	QString directResourceSource;
+	const bool directResourceOpen = resourceOpenPath("sounds", "user:pack/chime.wav",
+		&directResourceSource);
+	check(vfsResourceOpenPath(sound, &soundSource) &&
+		soundSource == resourceRoot + "/sounds/user/pack/chime.wav",
+		"an alias opens only after canonical-root validation (" + soundSource + ", " +
+			(vfsNode(sound) ? vfsNode(sound)->resourceProvider + ":" +
+				vfsNode(sound)->resourceKey + ":" +
+				QString::number(vfsNode(sound)->resourceDirectory) : QStringLiteral("no node")) +
+			", direct=" + QString::number(directResourceOpen) + ':' + directResourceSource +
+			", root=" + resourceTestFixtureRoot() + ")");
+	check(vfsRealCounterpart(sound).isEmpty() && vfsOpensAs(pack).isEmpty(),
+		"resource aliases cannot escape to unrestricted filesystem navigation");
+	check(!vfsCanRename(pack) && !vfsCanRename(sound) && !vfsCanDelete(pack) &&
+		!vfsAcceptsDrops(pack) && !vfsSetLabel(sound, 2) &&
+		!vfsRename(sound, "renamed.wav") && !vfsIsAppFolder(sound),
+		"read-only resource capabilities reject rename, delete, labels, drops and app-trash handling");
+	QStringList resourceInfo;
+	QString resourceKind, resourceLocation, resourceSource, resourceAccess;
+	const bool soundDetails = vfsResourceDetails(sound, &resourceInfo, &resourceKind,
+		&resourceLocation, &resourceSource, &resourceAccess);
+	check(soundDetails && resourceKind.contains("file", Qt::CaseInsensitive) &&
+		resourceSource == soundSource &&
+		resourceAccess.contains("read-only", Qt::CaseInsensitive) &&
+		resourceLocation.contains("Sounds"),
+		"resource Get Info reports its kind, location, source and effective access (" +
+			resourceKind + ", " + resourceLocation + ", " + resourceSource + ", " +
+			resourceAccess + ")");
+	const QString startupItems = vfsPathFor("system-folder/startup-items");
+	const QString startupEntry = pathNamed(startupItems, "Fixture Startup");
+	check(!startupEntry.isEmpty() &&
+		pathNamed(startupItems, "Disabled Fixture").isEmpty(),
+		"startup discovery includes enabled entries and excludes disabled entries");
+	vfsResourceDetails(startupEntry, &resourceInfo, &resourceKind, &resourceLocation,
+		&resourceSource, &resourceAccess);
+	check(resourceInfo.join('\n').contains("enabled at login") &&
+		!resourceInfo.join('\n').contains("secret-command"),
+		"startup metadata never reveals or executes desktop-entry command text");
+	const QString logs = vfsPathFor("system-folder/system-logs");
+	check(pathNamed(logs, "Protected system logs") != QString(),
+		"System Logs presents a protected-information explanation, not log contents");
+	check(vfsNode(vfsPathFor("system-folder/sounds/../../etc")) == nullptr &&
+		!vfsResourceOpenPath(vfsPathFor("system-folder/sounds/../../etc"), &soundSource) &&
+		resourceChildren("untrusted-provider").empty(),
+		"provider/path traversal attempts fail closed");
+	const QStringList systemInfo = systemInformation();
+	check(systemInfo.join('\n').contains("0.1.27-fixture") &&
+		systemInfo.join('\n').contains("Distribution:") &&
+		systemInfo.join('\n').contains("Kernel:") &&
+		systemInfo.join('\n').contains("Processor:") &&
+		systemInfo.join('\n').contains("Memory:") &&
+		systemInfo.join('\n').contains("Storage devices:") &&
+		systemInfo.join('\n').contains("Network:") &&
+		systemInfo.join('\n').contains("Audio:") &&
+		systemInfo.join('\n').contains("Loaded hardware drivers:") &&
+		systemInfo.join('\n').contains("Uptime:"),
+		"System Information reports installed version and the required hardware/system fields");
+	check(!extensionInformation().isEmpty(),
+		"Extensions discovery reports loaded drivers or an explicit unavailable state");
+	check(vfsLaunch(vfsPathFor("system-folder/system-information")) &&
+		vfsLaunch(vfsPathFor("system-folder/extensions-manager")),
+		"the only built-in launch actions are the two trusted provider windows");
+	check(!vfsLaunch(vfsPathFor("system-folder/fonts")),
+		"resource folders do not become launchable commands");
+	QDir(resourceRoot + "/sounds/system").removeRecursively();
+	check(pathNamed(sounds, "Computer").isEmpty(),
+		"a source removed after startup disappears during lazy rediscovery");
+	QDir(resourceRoot + "/sounds/user").removeRecursively();
+	check(pathNamed(sounds, "No sound folders found") != QString(),
+		"missing sound directories yield a safe informational entry");
+	QDir().mkpath(resourceRoot + "/sounds/user/pack");
+	writeEntry(resourceRoot + "/sounds/user/pack", "chime.wav", "sound data");
+	QFile::link(resourceRoot + "/sounds/user/pack/chime.wav",
+		resourceRoot + "/sounds/user/alias.wav");
+	QFile::link("/etc/passwd", resourceRoot + "/sounds/user/escape");
+	QFile::link(resourceRoot + "/sounds/user/missing",
+		resourceRoot + "/sounds/user/broken");
+	QFile::link(resourceRoot + "/sounds/user", resourceRoot + "/sounds/user/loop");
+
 	check(apps.contains("SimpleText"), "an installed application appears in Applications");
 	check(namesIn(vfsPathFor("system-folder/utilities")).contains("SimpleText"),
 		"the same name in a different destination does not rename either app");
@@ -299,7 +445,7 @@ int main(int argc, char **argv) {
 	check(volume.contains("Home"), "the startup disk holds the user's Home folder");
 	check(!volume.contains("Utilities"), "Utilities is off until the registry asks for it");
 	check(volume.size() == 3, "and nothing else: no Unix directories");
-	for (const QString &unix_ : { "usr", "etc", "bin", "var", "lib", "proc", "sys", "home" }) {
+	for (const QString unix_ : { "usr", "etc", "bin", "var", "lib", "proc", "sys", "home" }) {
 		check(!volume.contains(unix_), "the startup disk does not show /" + unix_);
 	}
 
@@ -740,7 +886,7 @@ int main(int argc, char **argv) {
 	 * belongs to the user, so no ordinary action needs root and none can
 	 * reach into a system location. */
 	bool allInHome = true;
-	for (const QString &id : { "home", "system-folder/preferences",
+	for (const QString id : { "home", "system-folder/preferences",
 			"system-folder/fonts", "system-folder/appearance" }) {
 		const QString real = vfsOpensAs(vfsPathFor(id));
 		allInHome = allInHome && !real.isEmpty() && real.startsWith(root);

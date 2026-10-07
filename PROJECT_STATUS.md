@@ -24,6 +24,25 @@ Updated: 2026-10-06
 
 ## Current work
 
+**System Folder resource providers and read-only system views** (0.1.28):
+Finder's virtual registry now includes resource-provider nodes under System
+Folder (Sounds, Startup Items, Application Support, Device Drivers, Network,
+System Logs, Software Components and Extensions) plus trusted launchers for
+System Information and Extensions Manager. Providers are allowlisted by id and
+lazy-loaded; no provider accepts arbitrary registry paths or commands. Alias
+providers canonical-check source paths against allowed roots and suppress
+broken, looping and out-of-root links. Resource entries remain virtual: they
+cannot be renamed, labeled, dropped into, trashed or treated as uninstallable
+applications. Protected logs stay informational only. Get Info now supports
+virtual resource details (kind, location, source and access) for curated items
+without a single filesystem counterpart. System Information reports installed
+ZacOS version, distro, kernel, CPU, memory, storage, network, audio, loaded
+drivers and uptime. Extensions Manager is intentionally read-only in this
+phase, showing status/startup metadata without load/unload toggles.
+Focused Finder VFS, desktop and selection suites pass in an isolated build;
+one transient `finder-selection` timing failure was resolved by immediate
+re-run in the same build directory.
+
 **User applications separated from system utilities** (0.1.27): Finder
 now excludes automatically installed Debian dependencies as well as the
 installation-image baseline from Applications. Settings, system tools,

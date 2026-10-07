@@ -28,6 +28,7 @@
 #include "items.h"
 #include "logo.h"
 #include "sharingclient.h"
+#include "resourcewindows.h"
 
 static constexpr uint32_t FACE = GRAY(0xD);
 static constexpr int LABEL_RIGHT = 74; /* right edge of "Kind:" etc. */
@@ -172,10 +173,34 @@ void InfoWindow::open(const QString &path, pl_icon_kind kind, const QString &nam
 	w->raise();
 }
 
-InfoWindow::InfoWindow(const QString &path, pl_icon_kind kind, const QString &name)
-	: m_path(path), m_name(name), m_kind(kind) {
+void InfoWindow::openVirtual(const QString &path, pl_icon_kind kind, const QString &name,
+		const ResourceDetails &details) {
+	InfoWindow *w = infoWindows().value(path);
+	if (!w) {
+		w = new InfoWindow(path, kind, name, &details);
+		infoWindows().insert(path, w);
+	}
+	w->show();
+	w->raise();
+}
+
+InfoWindow::InfoWindow(const QString &path, pl_icon_kind kind, const QString &name,
+		const ResourceDetails *details)
+	: m_path(path), m_name(name), m_kind(kind),
+	  m_isResourceInfo(details != nullptr) {
 	setAttribute(Qt::WA_DeleteOnClose);
 	setWindowTitle(name + " Info");
+	if (details) {
+		m_resourceDetails = *details;
+		m_kindText = details->kind;
+		m_where = details->location;
+		m_size = "--";
+		m_show.rect = QRect(SHOW_X, SHOW_Y, SHOW_W, PL_POPUP_H);
+		m_show.items = { PopupItem{ "General Information" }, PopupItem{ "Sharing", false } };
+		m_show.chosen = [this](int i) { showView(i); };
+		showView(0);
+		return;
+	}
 
 	QFileInfo info(path);
 	if (kind == PL_ICON_DISK) {
@@ -324,6 +349,30 @@ static void infoRow(pl_canvas *c, int baseline, const QString &label, const QStr
 }
 
 void InfoWindow::paintGeneral(pl_canvas *c) {
+	if (m_isResourceInfo) {
+		infoRow(c, 92, "Kind:", m_resourceDetails.kind);
+		infoRow(c, 92 + ROW_H, "Where:", m_resourceDetails.location);
+		infoRow(c, 92 + ROW_H * 2, "Source:", m_resourceDetails.sources.isEmpty()
+			? QStringLiteral("No single file source") : m_resourceDetails.sources);
+		infoRow(c, 92 + ROW_H * 3, "Access:", m_resourceDetails.access);
+		int y = 92 + ROW_H * 4 + 8;
+		QStringList lines;
+		if (!m_resourceDetails.description.isEmpty()) {
+			lines << "Description: " + m_resourceDetails.description;
+		}
+		lines << m_resourceDetails.metadata;
+		for (const QString &detail : lines) {
+			for (const QString &line : panelWrap(detail, BOX_X1 - VALUE_X2 - 8,
+					PL_FONT_VIEWS)) {
+				if (y > BOX_Y1 - 8) {
+					return;
+				}
+				panelText(c, line, VALUE_X2, y, PL_FONT_VIEWS);
+				y += 13;
+			}
+		}
+		return;
+	}
 	int y = 92;
 	infoRow(c, y, "Kind:", m_kindText);
 	infoRow(c, y += ROW_H, "Size:", m_size);
@@ -676,11 +725,7 @@ static QPointer<AboutWindow> &aboutWindow() {
 }
 
 void AboutWindow::open() {
-	if (!aboutWindow()) {
-		aboutWindow() = new AboutWindow;
-	}
-	aboutWindow()->show();
-	aboutWindow()->raise();
+	openSystemInformation();
 }
 
 static QString cpuName() {

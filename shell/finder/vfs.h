@@ -38,6 +38,7 @@ enum class VKind {
 	AppFolder,  /* generated: one application's folder */
 	Launcher,   /* generated: starts an application or a control panel */
 	Unix,       /* the real filesystem root, for inspecting Debian */
+	Resource,   /* lazily generated, provider-backed read-only information */
 };
 
 struct VNode {
@@ -56,6 +57,12 @@ struct VNode {
 	 * if this is one; or a program of ours to run, with its arguments. */
 	QString appId, actionId, program;
 	QStringList args;
+	/* Resource: a fixed provider id and provider-generated item key.
+	 * These are never source paths or commands from the registry. */
+	QString resourceProvider, resourceKey;
+	bool resourceDirectory = false;
+	QStringList resourceMetadata;
+	QString builtinAction;
 
 	QString parentId() const {
 		const int slash = id.lastIndexOf('/');
@@ -84,6 +91,13 @@ bool vfsLaunch(const QString &path);
  * Backed node's directory, or an application's desktop entry. Empty for
  * the curated and generated folders, which stand for nothing on disk. */
 QString vfsRealCounterpart(const QString &path);
+/* Safe resource access: only generated aliases from the fixed providers
+ * may return a source path. Metadata-only resources have no counterpart. */
+bool vfsResourceOpenPath(const QString &path, QString *sourcePath);
+bool vfsResourceDetails(const QString &path, QStringList *details,
+		QString *kind = nullptr, QString *location = nullptr,
+		QString *source = nullptr, QString *access = nullptr);
+QString vfsBuiltinAction(const QString &path);
 
 /* Folders of the user's own on the startup disk (New Folder in its window).
  * Each stands for a real directory, so it holds files like any folder.

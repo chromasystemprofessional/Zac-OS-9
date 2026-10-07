@@ -11,11 +11,13 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QProcess>
+#include <QSet>
 #include <QStandardPaths>
 #include <algorithm>
 
 #include "appdb.h"
 #include "apptrash.h"
+#include "resources.h"
 
 /*
  * The default mapping. Written to the registry the first time the Finder
@@ -27,10 +29,10 @@
  * doesn't have take their default, and nodes it doesn't know about are
  * added, while the user's own nodes and overrides are kept.
  */
-static constexpr int REGISTRY_VERSION = 9;
+static constexpr int REGISTRY_VERSION = 10;
 
 static const char *DEFAULT_REGISTRY = R"JSON({
-  "version": 9,
+  "version": 10,
   "volume": {},
   "showUnixVolume": false,
   "nodes": [
@@ -48,7 +50,26 @@ static const char *DEFAULT_REGISTRY = R"JSON({
       "backing": "$XDG_DATA_HOME/zacos9/appearance/Sound Themes" },
     { "id": "system-folder/control-panels", "name": "Control Panels",
       "kind": "panels", "icon": "control-panels" },
-    { "id": "system-folder/extensions", "name": "Extensions", "kind": "folder" },
+    { "id": "system-folder/extensions", "name": "Extensions", "kind": "resource",
+      "provider": "extensions" },
+    { "id": "system-folder/sounds", "name": "Sounds", "kind": "resource",
+      "provider": "sounds" },
+    { "id": "system-folder/startup-items", "name": "Startup Items", "kind": "resource",
+      "provider": "startup-items" },
+    { "id": "system-folder/application-support", "name": "Application Support", "kind": "resource",
+      "provider": "application-support" },
+    { "id": "system-folder/device-drivers", "name": "Device Drivers", "kind": "resource",
+      "provider": "device-drivers" },
+    { "id": "system-folder/network", "name": "Network", "kind": "resource",
+      "provider": "network" },
+    { "id": "system-folder/system-logs", "name": "System Logs", "kind": "resource",
+      "provider": "system-logs" },
+    { "id": "system-folder/software-components", "name": "Software Components",
+      "kind": "resource", "provider": "software-components" },
+    { "id": "system-folder/system-information", "name": "System Information",
+      "kind": "launcher", "action": "system-information" },
+    { "id": "system-folder/extensions-manager", "name": "Extensions Manager",
+      "kind": "launcher", "action": "extensions-manager" },
     { "id": "system-folder/fonts", "name": "Fonts", "kind": "backed",
       "backing": "$XDG_DATA_HOME/fonts" },
     { "id": "system-folder/preferences", "name": "Preferences", "kind": "backed",
@@ -121,6 +142,12 @@ VKind kindFromName(const QString &name) {
 	if (name == "unix") {
 		return VKind::Unix;
 	}
+	if (name == "resource") {
+		return VKind::Resource;
+	}
+	if (name == "launcher") {
+		return VKind::Launcher;
+	}
 	return VKind::Folder;
 }
 
@@ -181,6 +208,12 @@ bool migrate(QJsonObject *root) {
 	QJsonArray nodes = root->value("nodes").toArray();
 	for (int i = 0; i < nodes.size(); i++) {
 		QJsonObject n = nodes.at(i).toObject();
+		if (n.value("id").toString() == QLatin1String("system-folder/extensions")) {
+			n.insert("kind", "resource");
+			n.insert("provider", "extensions");
+			n.remove("backing");
+			nodes.replace(i, n);
+		}
 		if (n.value("id").toString() == QLatin1String("applications/utilities")) {
 			n.insert("id", "system-folder/utilities");
 			if (n.value("categories").toArray() == QJsonArray{ "X-ZacOS9-Utility" }) {
@@ -338,6 +371,20 @@ void generatePanels(const VNode &parent) {
 	}
 }
 
+void generateResourceLaunchers(const VNode &parent) {
+	for (const auto &entry : std::vector<std::pair<QString, QString>>{
+			{ "System Information", "system-information" },
+			{ "Extensions Manager", "extensions-manager" } }) {
+		VNode node;
+		node.id = parent.id + "/" + entry.second;
+		node.name = entry.first;
+		node.kind = VKind::Launcher;
+		node.icon = PL_ICON_APPLICATION;
+		node.builtinAction = entry.second;
+		addNode(node);
+	}
+}
+
 /* ---- loading ------------------------------------------------------------ */
 
 void load() {
@@ -409,6 +456,17 @@ void load() {
 		node.order = o.value("order").toInt();
 		node.categories = stringList(o.value("categories"));
 		node.excludeCategories = stringList(o.value("excludeCategories"));
+		node.resourceProvider = o.value("provider").toString();
+		if (node.kind == VKind::Resource && !resourceProviderKnown(node.resourceProvider)) {
+			continue;
+		}
+		node.resourceDirectory = node.kind == VKind::Resource;
+		node.builtinAction = o.value("action").toString();
+		if (node.kind == VKind::Launcher && !node.builtinAction.isEmpty() &&
+				node.builtinAction != "system-information" &&
+				node.builtinAction != "extensions-manager") {
+			node.builtinAction.clear();
+		}
 		addNode(node);
 		if (node.kind == VKind::Apps || node.kind == VKind::Panels) {
 			generators.push_back(node);
@@ -419,10 +477,16 @@ void load() {
 	for (const VNode &node : generators) {
 		if (node.kind == VKind::Apps) {
 			generateApps(node);
+			if (node.id == "system-folder/utilities") {
+				generateResourceLaunchers(node);
+			}
 		} else {
 			generatePanels(node);
 		}
 	}
+	VNode systemFolder;
+	systemFolder.id = "system-folder";
+	generateResourceLaunchers(systemFolder);
 
 	/* Renames and labels are applied last: they override everything. */
 	for (auto it = g_overrides.begin(); it != g_overrides.end(); ++it) {
@@ -505,6 +569,50 @@ QString vfsVolumeName() {
 	return g_volumeName;
 }
 
+static QString resourceIdComponent(const QString &key) {
+	return QString::fromLatin1(key.toUtf8().toBase64(
+		QByteArray::Base64UrlEncoding | QByteArray::OmitTrailingEquals));
+}
+
+static void refreshResourceChildren(const VNode &parent) {
+	const auto resources = resourceChildren(parent.resourceProvider, parent.resourceKey);
+	QSet<QString> keep;
+	for (const SystemResource &resource : resources) {
+		keep.insert(parent.id + '/' + resourceIdComponent(resource.key));
+	}
+	QStringList stale;
+	for (auto it = g_nodes.cbegin(); it != g_nodes.cend(); ++it) {
+		if (it->parentId() == parent.id && it->resourceProvider == parent.resourceProvider &&
+				!keep.contains(it->id)) {
+			stale << it->id;
+		}
+	}
+	for (const QString &id : stale) {
+		const QString prefix = id + '/';
+		for (auto it = g_nodes.begin(); it != g_nodes.end();) {
+			if (it->id == id || (it->id.startsWith(prefix) &&
+					it->resourceProvider == parent.resourceProvider)) {
+				it = g_nodes.erase(it);
+			} else {
+				++it;
+			}
+		}
+	}
+	for (const SystemResource &resource : resources) {
+		VNode child;
+		child.id = parent.id + '/' + resourceIdComponent(resource.key);
+		child.name = resource.name;
+		child.kind = VKind::Resource;
+		child.icon = resource.directory ? PL_ICON_FOLDER : PL_ICON_DOCUMENT;
+		child.resourceProvider = parent.resourceProvider;
+		child.resourceKey = resource.key;
+		child.resourceDirectory = resource.directory;
+		child.resourceMetadata = resource.metadata;
+		child.backing = resource.source;
+		addNode(child);
+	}
+}
+
 /* ---- listing ------------------------------------------------------------ */
 
 std::vector<std::unique_ptr<Item>> vfsList(const QString &path) {
@@ -514,10 +622,16 @@ std::vector<std::unique_ptr<Item>> vfsList(const QString &path) {
 		return items;
 	}
 	/* A Backed node is a real directory; its contents are real files. */
-	if (parent->kind == VKind::Backed || parent->kind == VKind::Unix) {
+	if (parent->kind == VKind::Backed || parent->kind == VKind::Unix ||
+			(parent->kind == VKind::Resource && !parent->resourceDirectory &&
+				!parent->resourceKey.isEmpty())) {
 		return items;
 	}
 	const QString parentId = parent->id;
+	const VNode parentCopy = *parent;
+	if (parentCopy.kind == VKind::Resource) {
+		refreshResourceChildren(parentCopy);
+	}
 	std::vector<const VNode *> children;
 	for (auto it = g_nodes.cbegin(); it != g_nodes.cend(); ++it) {
 		if (it->parentId() == parentId && it->visible && !it->id.isEmpty()) {
@@ -538,13 +652,19 @@ std::vector<std::unique_ptr<Item>> vfsList(const QString &path) {
 		 * where the user put it. */
 		item->stateKey = node->id;
 		item->isVirtual = true;
-		item->kind = node->kind == VKind::Backed ? PL_ICON_FOLDER : node->icon;
-		item->isDir = node->kind != VKind::Launcher;
+		item->kind = node->kind == VKind::Backed ||
+			(node->kind == VKind::Resource && node->resourceDirectory) ?
+			PL_ICON_FOLDER : node->icon;
+		item->isDir = node->kind != VKind::Launcher &&
+			(node->kind != VKind::Resource || node->resourceDirectory);
 		item->labelIndex = vfsLabel(item->path);
 		if (node->kind == VKind::Launcher) {
 			item->kindText = node->actionId.isEmpty()
 				? QStringLiteral("application program")
 				: QStringLiteral("application command");
+		} else if (node->kind == VKind::Resource) {
+			item->kindText = node->resourceDirectory ?
+				QStringLiteral("read-only folder") : QStringLiteral("system information");
 		} else {
 			item->kindText = QStringLiteral("folder");
 		}
@@ -585,6 +705,10 @@ bool vfsLaunch(const QString &path) {
 	if (!node || node->kind != VKind::Launcher) {
 		return false;
 	}
+	if (node->builtinAction == "system-information" ||
+			node->builtinAction == "extensions-manager") {
+		return true;
+	}
 	if (!node->appId.isEmpty()) {
 		return appLaunch(node->appId, node->actionId);
 	}
@@ -609,6 +733,119 @@ QString vfsRealCounterpart(const QString &path) {
 	return QString();
 }
 
+bool vfsResourceOpenPath(const QString &path, QString *sourcePath) {
+	const VNode *node = vfsNode(path);
+	return node && node->kind == VKind::Resource && !node->resourceDirectory &&
+		resourceOpenPath(node->resourceProvider, node->resourceKey, sourcePath);
+}
+
+bool vfsResourceDetails(const QString &path, QStringList *details, QString *kind,
+		QString *location, QString *source, QString *access) {
+	const VNode *node = vfsNode(path);
+	if (!node) {
+		return false;
+	}
+	ResourceDetails info;
+	if (node->kind == VKind::Resource) {
+		info = resourceDetails(node->resourceProvider, node->resourceKey);
+		QString parentKey;
+		if (const VNode *parent = vfsNode(vfsPathFor(node->parentId()))) {
+			parentKey = parent->resourceKey;
+		}
+		for (const SystemResource &child :
+				resourceChildren(node->resourceProvider, parentKey)) {
+			if (child.key == node->resourceKey) {
+				info.name = child.name;
+				info.kind = child.kind;
+				info.description = child.description;
+				info.metadata = child.metadata;
+				if (!child.source.isEmpty()) {
+					info.sources = child.source;
+				}
+				if (child.type == ResourceType::Information) {
+					info.access = "Informational only; no source files are changed.";
+				}
+				break;
+			}
+		}
+	} else {
+		info.name = node->name;
+		info.kind = node->kind == VKind::Launcher ? "application launcher" :
+			node->kind == VKind::Apps ? "virtual application collection" :
+			node->kind == VKind::Panels ? "virtual control-panel collection" :
+			node->kind == VKind::Volume ? "startup disk" :
+			node->kind == VKind::Backed ? "folder" : "curated folder";
+		if (node->kind == VKind::Volume) {
+			info.location = "Desktop";
+		} else {
+			QStringList parents;
+			QString parentId = node->parentId();
+			while (!parentId.isEmpty()) {
+				parents.prepend(vfsName(vfsPathFor(parentId)));
+				parentId = parentId.section('/', 0, -2);
+			}
+			info.location = g_volumeName + (parents.isEmpty() ? QString() :
+				':' + parents.join(':'));
+		}
+		info.sources = vfsRealCounterpart(path);
+		if (node->kind == VKind::Launcher && !node->appId.isEmpty()) {
+			if (const AppEntry *app = appById(node->appId)) {
+				info.description = app->comment;
+				info.version = app->version;
+				info.ownership = app->origin;
+			}
+			info.access = "Application is not modified by Finder Get Info.";
+			info.kind = "application program";
+		} else if (node->kind == VKind::Backed) {
+			const QFileInfo backing(node->backing);
+			info.access = backing.isWritable() ?
+				"Ordinary filesystem permissions apply; writes are allowed by the source folder." :
+				"Read-only under the current user's ordinary filesystem permissions.";
+			info.description = "A real folder shown in the Macintosh view.";
+		} else {
+			info.access = "Virtual Finder metadata only; this item has no single file source.";
+			info.description = "Curated Macintosh-view item.";
+		}
+	}
+	if (details) {
+		*details = info.metadata;
+		if (!info.description.isEmpty()) {
+			details->prepend("Description: " + info.description);
+		}
+		if (!info.version.isEmpty()) {
+			details->append("Version: " + info.version);
+		}
+		if (!info.ownership.isEmpty()) {
+			details->append("Package ownership: " + info.ownership);
+		}
+		if (!info.status.isEmpty()) {
+			details->append("Status: " + info.status);
+		}
+		if (!info.startup.isEmpty()) {
+			details->append("Startup: " + info.startup);
+		}
+		details->append("Access: " + info.access);
+	}
+	if (kind) {
+		*kind = info.kind;
+	}
+	if (location) {
+		*location = info.location;
+	}
+	if (source) {
+		*source = info.sources;
+	}
+	if (access) {
+		*access = info.access;
+	}
+	return true;
+}
+
+QString vfsBuiltinAction(const QString &path) {
+	const VNode *node = vfsNode(path);
+	return node ? node->builtinAction : QString();
+}
+
 /* ---- metadata ----------------------------------------------------------- */
 
 bool vfsCanRename(const QString &path) {
@@ -618,7 +855,8 @@ bool vfsCanRename(const QString &path) {
 	}
 	/* A Desktop Action isn't a thing of its own; everything else the user
 	 * sees may carry a name of their choosing. */
-	return node->actionId.isEmpty();
+	return node->actionId.isEmpty() && node->builtinAction.isEmpty() &&
+		node->kind != VKind::Resource;
 }
 
 /* The folder user-made nodes keep their contents in. */
@@ -797,7 +1035,7 @@ int vfsLabel(const QString &path) {
 
 bool vfsSetLabel(const QString &path, int label) {
 	const VNode *node = vfsNode(path);
-	if (!node) {
+	if (!node || node->kind == VKind::Resource || !node->builtinAction.isEmpty()) {
 		return false;
 	}
 	setOverride(node->id, "label", label);

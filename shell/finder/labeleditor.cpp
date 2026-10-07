@@ -28,6 +28,11 @@ void LabelEditor::begin(Item *item) {
 	if (appTrashMarker(item->path)) {
 		return;
 	}
+	if (item->isVirtual && !vfsCanRename(item->path)) {
+		Alert::ask("This system resource is read-only and can't be renamed or labelled.",
+			"OK", QString());
+		return;
+	}
 	m_item = item;
 	m_text = item->name;
 	m_anchor = 0;

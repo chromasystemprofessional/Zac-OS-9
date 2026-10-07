@@ -30,6 +30,7 @@
 #include "findwindow.h"
 #include "folderwindow.h"
 #include "infowindow.h"
+#include "resourcewindows.h"
 
 Finder &Finder::instance() {
 	static Finder finder;
@@ -304,10 +305,39 @@ void Finder::openItem(Item *item) {
 		if (item->isVirtual) {
 			const VNode *node = vfsNode(item->path);
 			if (node && node->kind == VKind::Launcher) {
-				if (!vfsLaunch(item->path)) {
+				const QString action = vfsBuiltinAction(item->path);
+				if (action == "system-information") {
+					openSystemInformation();
+				} else if (action == "extensions-manager") {
+					openExtensionsManager();
+				} else if (!vfsLaunch(item->path)) {
 					Alert::ask(item->name + " could not be opened. Its "
 						"application may have been removed.", "OK", QString());
 				}
+				return;
+			}
+			if (node && node->kind == VKind::Resource) {
+				if (node->resourceDirectory) {
+					FolderWindow::open(item->path);
+					return;
+				}
+				QString source;
+				if (vfsResourceOpenPath(item->path, &source)) {
+					if (!appOpenFile(source)) {
+						Alert::ask(item->name + " could not be opened.", "OK", QString());
+					}
+					return;
+				}
+				QStringList metadata;
+				QString kind, location, sources, access;
+				vfsResourceDetails(item->path, &metadata, &kind, &location, &sources, &access);
+				ResourceDetails details;
+				details.kind = kind;
+				details.location = location;
+				details.sources = sources;
+				details.access = access;
+				details.metadata = metadata;
+				InfoWindow::openVirtual(item->path, item->kind, item->name, details);
 				return;
 			}
 			if (item->isAlias && !QFileInfo(item->path).exists()) {
@@ -524,7 +554,10 @@ void Finder::setLabel(int label) {
 	for (Item *item : front()->selectedItems()) {
 		if (item->isVirtual) {
 			/* Kept as metadata, so it survives package upgrades. */
-			vfsSetLabel(item->path, label);
+			if (!vfsSetLabel(item->path, label)) {
+				Alert::ask("Labels aren't available for this read-only system resource.",
+					"OK", QString());
+			}
 			continue;
 		}
 		if (isSpecial(item)) {
@@ -685,7 +718,18 @@ void Finder::getInfo(bool sharing) {
 	std::vector<Item *> items = v->selectedItems();
 	const int view = sharing ? InfoWindow::Sharing : InfoWindow::General;
 	if (items.empty() && v != m_desktop) {
-		InfoWindow::open(v->folderPath(), PL_ICON_FOLDER, displayName(v->folderPath()), view);
+		if (vfsIsVirtual(v->folderPath())) {
+			const QString path = v->folderPath();
+			QStringList metadata;
+			ResourceDetails details;
+			vfsResourceDetails(path, &metadata, &details.kind, &details.location,
+				&details.sources, &details.access);
+			details.name = vfsName(path);
+			details.metadata = metadata;
+			InfoWindow::openVirtual(path, PL_ICON_FOLDER, details.name, details);
+		} else {
+			InfoWindow::open(v->folderPath(), PL_ICON_FOLDER, displayName(v->folderPath()), view);
+		}
 	}
 	for (Item *item : items) {
 		if (item->isVirtual) {
@@ -694,8 +738,18 @@ void Finder::getInfo(bool sharing) {
 			 * entry. The curated folders stand for nothing on disk.
 			 * TODO: a Get Info of their own. */
 			const QString real = vfsRealCounterpart(item->path);
-			if (!real.isEmpty()) {
+			const VNode *node = vfsNode(item->path);
+			if (!real.isEmpty() && !(node && node->kind == VKind::Launcher &&
+					!node->appId.isEmpty())) {
 				InfoWindow::open(real, item->kind, item->name, view);
+			} else {
+				QStringList metadata;
+				ResourceDetails details;
+				vfsResourceDetails(item->path, &metadata, &details.kind, &details.location,
+					&details.sources, &details.access);
+				details.name = item->name;
+				details.metadata = metadata;
+				InfoWindow::openVirtual(item->path, item->kind, item->name, details);
 			}
 			continue;
 		}

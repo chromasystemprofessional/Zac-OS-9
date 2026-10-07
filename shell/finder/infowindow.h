@@ -8,6 +8,7 @@
 
 #include "panelkit.h"
 #include "pixels.h"
+#include "resources.h"
 
 /*
  * "<name> Info": what Get Info shows for a file, folder or disk, chosen
@@ -29,6 +30,8 @@ public:
 	/* One Info window per item; brings back an open one, showing `view`
 	 * (if the item has it). */
 	static void open(const QString &path, pl_icon_kind kind, const QString &name, int view = General);
+	static void openVirtual(const QString &path, pl_icon_kind kind, const QString &name,
+		const ResourceDetails &details);
 	~InfoWindow() override;
 
 protected:
@@ -40,7 +43,8 @@ protected:
 	void closeEvent(QCloseEvent *) override;
 
 private:
-	InfoWindow(const QString &path, pl_icon_kind kind, const QString &name);
+	InfoWindow(const QString &path, pl_icon_kind kind, const QString &name,
+		const ResourceDetails *details = nullptr);
 	void saveComment();
 	bool showView(int view);
 	void paintHeader(pl_canvas *c);
@@ -80,6 +84,8 @@ private:
 	QString m_path, m_name;
 	pl_icon_kind m_kind;
 	QString m_kindText, m_where, m_created, m_modified, m_size;
+	ResourceDetails m_resourceDetails;
+	bool m_isResourceInfo = false;
 	QThread *m_sizer = nullptr;
 };
 
