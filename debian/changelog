@@ -1,3 +1,11 @@
+zacos9 (0.1.29) trixie; urgency=medium
+
+  * Recover HDMI audio on Haswell Macs (iMac14,1) when it freezes
+    mid-stream: a background watchdog restarts the HDMI output within a few
+    seconds instead of needing a restart or a switch to built-in audio.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Wed, 07 Oct 2026 16:33:06 -0400
+
 zacos9 (0.1.28) trixie; urgency=medium
 
   * Expand System Folder with read-only Sounds, Startup Items, Application
