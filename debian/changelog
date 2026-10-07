@@ -1,3 +1,14 @@
+zacos9 (0.1.28) trixie; urgency=medium
+
+  * Expand System Folder with read-only Sounds, Startup Items, Application
+    Support, Device Drivers, Network, Software Components and Extensions
+    views, plus protected System Logs information. Add System Information
+    and a read-only Extensions Manager, resource-aware Get Info, and
+    allowlisted alias browsing. Applications continues to show
+    user-installed apps rather than system utilities.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Tue, 06 Oct 2026 21:36:54 -0400
+
 zacos9 (0.1.27) trixie; urgency=medium
 
   * Keep Applications focused on user-installed apps: automatically
