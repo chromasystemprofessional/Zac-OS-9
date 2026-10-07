@@ -26,6 +26,10 @@ without moving its package or original directory. For ordinary files and
 folders, Command-Option-drag creates an alias; Option-drag copies. Aliases can
 also be moved between real folders and Desktop. Copying an alias preserves
 the link, and moving it to Trash does not delete the original.
+Aliases inherit the resolved original's icon, including application icons in
+both icon and list views, while retaining their own name and italic alias label.
+Alias chains use the final target's icon; missing or looping targets show a
+generic document icon.
 
 Folder aliases open as folders and accept file drops. In a standard application
 save dialog, choose Desktop and open a folder or folder alias to save inside

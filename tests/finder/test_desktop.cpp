@@ -5,6 +5,7 @@
 #include <QFile>
 #include <QFileDialog>
 #include <QFileSystemWatcher>
+#include <QImage>
 #include <QLineEdit>
 #include <QMimeData>
 #include <QProcess>
@@ -107,9 +108,14 @@ int main(int argc, char **argv) {
 	userDirs.write("XDG_DESKTOP_DIR=\"$HOME/Work Desktop\"\n");
 	userDirs.close();
 	QDir().mkpath(home.path() + "/data/applications");
+	QImage appIcon(32, 32, QImage::Format_ARGB32);
+	appIcon.fill(0xff336699);
+	const QString appIconPath = home.path() + "/desktop-test.png";
+	check(appIcon.save(appIconPath), "create isolated application icon");
 	QFile launcher(home.path() + "/data/applications/desktop-test.desktop");
 	check(launcher.open(QIODevice::WriteOnly), "create isolated application launcher");
-	launcher.write("[Desktop Entry]\nType=Application\nName=Desktop Test\nExec=true\n");
+	launcher.write(("[Desktop Entry]\nType=Application\nName=Desktop Test\nExec=true\nIcon=" +
+		appIconPath + "\n").toUtf8());
 	launcher.close();
 	QApplication app(argc, argv);
 	app.setStyle(new Zacos9Style);
@@ -138,6 +144,41 @@ int main(int argc, char **argv) {
 	auto alias = makeItem(QFileInfo(path + "/External folder alias"));
 	check(alias->isAlias && alias->isDir && alias->kind == PL_ICON_FOLDER,
 		"folder aliases keep folder navigation and alias appearance");
+	for (const QString &name : { QStringLiteral("Windows.exe"),
+			QStringLiteral("Installer.msi"), QStringLiteral("Disk.dmg"),
+			QStringLiteral("Document.txt"), QStringLiteral("Classic app") }) {
+		const QString original = path + "/" + name;
+		check(write(original), "create alias icon target");
+		if (name == "Classic app") {
+			QDir().mkpath(path + "/.finf");
+			QFile finderInfo(path + "/.finf/" + name);
+			check(finderInfo.open(QIODevice::WriteOnly) && finderInfo.write("APPL") == 4,
+				"create classic application Finder metadata");
+		}
+		const QString aliasName = createAlias(original, path, name);
+		auto originalItem = makeItem(QFileInfo(original));
+		auto linkedItem = makeItem(QFileInfo(path + "/" + aliasName));
+		check(!aliasName.isEmpty() && linkedItem->isAlias &&
+			linkedItem->name == aliasName && linkedItem->path != original &&
+			linkedItem->nameFont() == PL_FONT_VIEWS_ITALIC &&
+			linkedItem->iconKind() == originalItem->iconKind() &&
+			iconKindFor(linkedItem->path) == iconKindFor(original),
+			"alias inherits target icon without losing alias identity or italic label");
+		const QString chainedName = createAlias(linkedItem->path, path, aliasName);
+		check(!chainedName.isEmpty() &&
+			makeItem(QFileInfo(path + "/" + chainedName))->iconKind() == originalItem->iconKind(),
+			"alias chains inherit the final target icon");
+	}
+	qputenv("ZACOS9_SHARING_CONF", (home.path() + "/config").toUtf8());
+	QFile sharedFolders(home.path() + "/config/shared-folders");
+	check(sharedFolders.open(QIODevice::WriteOnly) &&
+		sharedFolders.write(("External folder\t" + path + "/External folder\n").toUtf8()) > 0,
+		"create isolated shared-folder configuration");
+	sharedFolders.close();
+	check(makeItem(QFileInfo(alias->path))->iconKind() == PL_ICON_SHARED_FOLDER &&
+		makeItem(QFileInfo(alias->path))->iconKind() ==
+			makeItem(QFileInfo(path + "/External folder"))->iconKind(),
+		"shared-folder alias inherits the original shared-folder icon");
 	Finder::instance().openItem(alias.get());
 	check(FolderWindow::isOpen(alias->path), "opening folder alias opens its real contents");
 	const auto copied = transferItems({alias->path}, path, true);
@@ -191,9 +232,21 @@ int main(int argc, char **argv) {
 				appMime.get(), Qt::LeftButton, Qt::NoModifier);
 			desktop.dropEvent(&appDrop);
 			const QString shortcut = path + "/" + item->name + " alias";
+			auto shortcutItem = makeItem(QFileInfo(shortcut));
 			appAlias = appDrop.isAccepted() && QFileInfo(shortcut).symLinkTarget() == launcher.fileName()
-				&& makeItem(QFileInfo(shortcut))->kind == PL_ICON_APPLICATION &&
+				&& shortcutItem->kind == PL_ICON_APPLICATION &&
 				QFileInfo::exists(launcher.fileName());
+			check(!item->customIcon32.empty() && !item->customIcon16.empty() &&
+				shortcutItem->customIcon32 == item->customIcon32 &&
+				shortcutItem->customIcon16 == item->customIcon16,
+				"application alias inherits original large and small custom icons");
+			const QString chainedName = createAlias(shortcut, path, "Application chain");
+			auto chained = makeItem(QFileInfo(path + "/" + chainedName));
+			check(!chainedName.isEmpty() && chained->isAlias &&
+				chained->kind == PL_ICON_APPLICATION &&
+				chained->customIcon32 == item->customIcon32 &&
+				chained->customIcon16 == item->customIcon16,
+				"application alias chain inherits final target custom icons");
 		}
 	}
 	check(appAlias, "dragging actual Applications entry creates a launchable alias without moving launcher");
@@ -218,6 +271,13 @@ int main(int argc, char **argv) {
 	check(createAlias(path + "/External folder", path, "External file") == "External file alias 3",
 		"alias naming also avoids dangling links");
 	auto unavailable = makeItem(QFileInfo(path + "/External file alias 2"));
+	check(unavailable->isAlias && unavailable->kind == PL_ICON_DOCUMENT,
+		"unavailable alias retains alias identity with a generic icon");
+	check(QFile::link(path + "/Loop alias", path + "/Loop alias"),
+		"create looping alias fixture");
+	auto loop = makeItem(QFileInfo(path + "/Loop alias"));
+	check(loop->isAlias && loop->kind == PL_ICON_DOCUMENT,
+		"looping alias resolves safely to a generic icon");
 	closeAlert();
 	Finder::instance().openItem(unavailable.get());
 	check(!QFileInfo::exists(path + "/missing") && !FolderWindow::isOpen(unavailable->path),

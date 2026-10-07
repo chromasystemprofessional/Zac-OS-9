@@ -138,16 +138,24 @@ bool isSharedFolder(const QString &path) {
 
 pl_icon_kind iconKindFor(const QString &path) {
 	QFileInfo info(path);
-	if (isMacDiskImage(path)) {
+	if (info.isSymLink()) {
+		const QString target = info.canonicalFilePath();
+		if (target.isEmpty() || QFileInfo(target).isSymLink()) {
+			return PL_ICON_DOCUMENT;
+		}
+		info.setFile(target);
+	}
+	const QString iconPath = info.absoluteFilePath();
+	if (isMacDiskImage(iconPath)) {
 		return PL_ICON_DISK_IMAGE;
 	}
 	if (info.isDir()) {
 		return PL_ICON_FOLDER;
 	}
-	if (isWindowsExecutable(path)) {
+	if (isWindowsExecutable(iconPath)) {
 		return PL_ICON_WINDOWS;
 	}
-	if (isClassicApplication(path)) {
+	if (isClassicApplication(iconPath)) {
 		return PL_ICON_CLASSIC;
 	}
 	static QMimeDatabase db;
@@ -241,7 +249,7 @@ std::unique_ptr<Item> makeItem(const QFileInfo &info) {
 	item->kind = iconKindFor(item->path);
 	item->isDir = info.isDir();
 	item->isAlias = info.isSymLink();
-	item->shared = item->isDir && !item->isAlias && isSharedFolder(item->path);
+	item->shared = item->isDir && isSharedFolder(item->path);
 	item->size = info.isDir() ? 0 : info.size();
 	item->modified = info.lastModified();
 	item->labelIndex = readLabel(item->path);
@@ -261,9 +269,10 @@ std::unique_ptr<Item> makeItem(const QFileInfo &info) {
 	}
 	/* An application's alias: a link to its desktop file. It looks and
 	 * opens like the application. */
-	if (info.isSymLink() && info.symLinkTarget().endsWith(QLatin1String(".desktop"))) {
+	const QString target = item->isAlias ? info.canonicalFilePath() : QString();
+	if (target.endsWith(QLatin1String(".desktop"))) {
 		item->kind = PL_ICON_APPLICATION;
-		if (const AppEntry *app = appByFile(info.symLinkTarget())) {
+		if (const AppEntry *app = appByFile(target)) {
 			item->customIcon32 = app->icon32;
 			item->customIcon16 = app->icon16;
 		}
