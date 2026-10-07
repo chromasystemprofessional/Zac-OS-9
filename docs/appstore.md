@@ -44,6 +44,16 @@ Productivity, with other or missing categories in Utilities. Apps without
 published summaries or cached icons retain the listing summary or generic icon.
 Metadata failures are reported rather than replacing the catalog with partial
 results.
+
+Flathub's AppStream download is large (about 80 seconds on a slow
+connection), so the helper never kills it. The refresh runs as a detached
+`flatpak update --appstream` that finishes even when the helper or the window
+stops waiting. When a cached catalog already exists, it is read immediately
+and refreshed in the background for the next visit. The first download is
+waited on for 60 seconds; after that, Software says the catalog is still
+downloading instead of starting over. Icon paths go through Flatpak's
+`active` link, so a later refresh doesn't break them. The Featured page is
+the curated catalog only and never waits on Flathub.
 Software Update still manages ZacOS releases and Debian updates; Flatpak
 updates can be applied separately with `flatpak --user update`.
 

@@ -148,7 +148,9 @@ void StoreWindow::selectCategory(int row) {
 		} else if (!m_flathubLoaded) {
 			loadSource("flathub");
 		}
-	} else if (!sourcesPage() && m_includeFlathub.on && m_flathubEnabled && !m_flathubLoaded) {
+	} else if (!sourcesPage() && m_categories[row] != "Featured" && m_includeFlathub.on &&
+			m_flathubEnabled && !m_flathubLoaded) {
+		/* Featured is the curated catalog only, so it never waits on Flathub. */
 		loadSource("flathub");
 	}
 	update();

@@ -200,6 +200,16 @@ combinations; all three focused authorization and disk-helper suites pass.
 The rule is installed through the existing package path; reboot behavior on
 the connected physical drive still needs confirmation after installing it.
 
+**Software no longer stuck loading Flathub** (0.1.31, 2026-10-07): opening
+Software sat on the Featured page with the busy sweep running on every
+machine. The Flathub AppStream download takes about 80 seconds here, but the
+catalog helper killed it at 60, so it never finished and every visit started
+over. The refresh now runs detached and always completes; a cached catalog
+is read at once (about 9 s for 3,376 apps) and refreshed in the background;
+a first download that is still running reports "still downloading". Featured,
+which only shows curated Debian apps, no longer loads Flathub at all.
+Catalog (31) and store-browser tests pass.
+
 **Flathub metadata and combined category browsing** (0.1.25): Software
 reads the enabled user remote's AppStream metadata for application names,
 summaries, cached icons and categories, instead of relying on the sparse

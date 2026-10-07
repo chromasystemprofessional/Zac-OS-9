@@ -328,6 +328,41 @@ class CatalogTests(unittest.TestCase):
             flathub.assert_not_called()
 
 
+class RefreshTests(unittest.TestCase):
+    COMMAND = ["flatpak", "--user", "update", "--appstream", "--noninteractive", "flathub"]
+
+    def popen(self, wait=None, stderr=b""):
+        def start(command, **options):
+            options["stderr"].write(stderr)
+            return SimpleNamespace(wait=wait or Mock(return_value=0), kill=Mock())
+        return patch.object(catalog.subprocess, "Popen", side_effect=start)
+
+    def test_detached_and_not_waited_for(self):
+        process_wait = Mock()
+        with self.popen(process_wait) as popen:
+            catalog.refresh_appstream(wait=False)
+        self.assertEqual(popen.call_args.args[0], self.COMMAND)
+        self.assertTrue(popen.call_args.kwargs["start_new_session"])
+        process_wait.assert_not_called()
+
+    def test_slow_first_download_keeps_running(self):
+        process_wait = Mock(side_effect=subprocess.TimeoutExpired("flatpak", 60))
+        with self.popen(process_wait), \
+                self.assertRaisesRegex(catalog.Failure, "still downloading"):
+            catalog.refresh_appstream(wait=True)
+        process_wait.assert_called_once_with(timeout=60)
+
+    def test_failure_reports_flatpak_error(self):
+        with self.popen(Mock(return_value=1), b"Network unreachable\n"), \
+                self.assertRaisesRegex(catalog.Failure, "Network unreachable"):
+            catalog.refresh_appstream(wait=True)
+
+    def test_missing_flatpak(self):
+        with patch.object(catalog.subprocess, "Popen", side_effect=OSError("no flatpak")), \
+                self.assertRaisesRegex(catalog.Failure, "Unable to run Flatpak"):
+            catalog.refresh_appstream(wait=True)
+
+
 class MetadataTests(unittest.TestCase):
     def setUp(self):
         self.root = tempfile.TemporaryDirectory()
@@ -337,9 +372,9 @@ class MetadataTests(unittest.TestCase):
         environment = patch.dict(catalog.os.environ, {"FLATPAK_USER_DIR": self.root.name})
         environment.start()
         self.addCleanup(environment.stop)
-        run = patch.object(catalog, "run_flatpak", return_value="")
-        self.run = run.start()
-        self.addCleanup(run.stop)
+        refresh = patch.object(catalog, "refresh_appstream")
+        self.refresh = refresh.start()
+        self.addCleanup(refresh.stop)
 
     def fixture(self, icon="org.example.Editor.png"):
         return f"""<?xml version="1.0"?>
@@ -360,8 +395,8 @@ class MetadataTests(unittest.TestCase):
         icons.mkdir(parents=True)
         (icons / "org.example.Editor.png").write_bytes(b"fixture")
         items = catalog.flathub_metadata()
-        self.run.assert_called_once_with(
-            ["update", "--appstream", "--noninteractive", "flathub"])
+        # A cached catalog is read at once; the refresh is left running.
+        self.refresh.assert_called_once_with(wait=False)
         self.assertEqual(items, {"org.example.Editor": {
             "name": "Photo Editor", "blurb": "Retouch photographs",
             "category": "Graphics", "icon": str(icons / "org.example.Editor.png"),
@@ -378,6 +413,7 @@ class MetadataTests(unittest.TestCase):
     def test_missing_and_malformed_metadata(self):
         with self.assertRaisesRegex(catalog.Failure, "metadata is missing"):
             catalog.flathub_metadata()
+        self.refresh.assert_called_once_with(wait=True)
         (self.directory / "appstream.xml").write_text("<broken")
         with self.assertRaisesRegex(catalog.Failure, "Flathub AppStream metadata"):
             catalog.flathub_metadata()
@@ -393,6 +429,12 @@ class MetadataTests(unittest.TestCase):
                 if name == "escape.png":
                     (icons / name).symlink_to(outside)
                 self.assertEqual(catalog.flathub_metadata()["org.example.Editor"]["icon"], "")
+
+    def test_first_download_waits_then_reads(self):
+        self.refresh.side_effect = lambda wait: (
+            self.directory / "appstream.xml").write_text(self.fixture())
+        self.assertIn("org.example.Editor", catalog.flathub_metadata())
+        self.refresh.assert_called_once_with(wait=True)
 
     def test_main_categories(self):
         for category, expected in {

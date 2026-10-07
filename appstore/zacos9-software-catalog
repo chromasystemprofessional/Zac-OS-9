@@ -12,6 +12,7 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import tempfile
 
 
 TIMEOUT = 60
@@ -39,14 +40,57 @@ def main_category(categories):
     return "Utilities"
 
 
+def refresh_appstream(wait):
+    """Refresh Flathub's AppStream metadata in a detached Flatpak process.
+
+    The first download can take minutes on a slow connection. Killing it on a
+    deadline meant it never finished, so every later attempt started over; the
+    detached process keeps going after this helper (or the window) stops waiting.
+    """
+    errors = tempfile.TemporaryFile()
+    try:
+        process = subprocess.Popen(
+            ["flatpak", "--user", "update", "--appstream", "--noninteractive", "flathub"],
+            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=errors,
+            start_new_session=True,
+        )
+    except OSError as error:
+        errors.close()
+        raise Failure(f"Unable to run Flatpak: {error}") from error
+    if not wait:
+        errors.close()
+        return
+    try:
+        status = process.wait(timeout=TIMEOUT)
+    except subprocess.TimeoutExpired as error:
+        errors.close()
+        raise Failure(
+            "The Flathub catalog is still downloading. Try again in a few minutes."
+        ) from error
+    if status:
+        errors.seek(0)
+        detail = errors.read().decode(errors="replace").strip() or f"exit status {status}"
+        errors.close()
+        raise Failure(f"Unable to refresh the Flathub catalog: {detail}")
+    errors.close()
+
+
 def flathub_metadata():
-    run_flatpak(["update", "--appstream", "--noninteractive", "flathub"])
     root = Path(os.environ.get("FLATPAK_USER_DIR") or
                 str(Path(os.environ.get("XDG_DATA_HOME") or
                          str(Path.home() / ".local/share")) / "flatpak"))
-    catalogs = sorted((root / "appstream/flathub").glob("*/active/appstream.xml*"))
+
+    def cached():
+        return sorted((root / "appstream/flathub").glob("*/active/appstream.xml*"))
+
+    catalogs = cached()
+    # With a cache, read it now and refresh afterwards, for the next visit.
+    refresh_later = bool(catalogs)
     if not catalogs:
-        raise Failure("Flathub AppStream metadata is missing after refresh.")
+        refresh_appstream(wait=True)
+        catalogs = cached()
+        if not catalogs:
+            raise Failure("Flathub AppStream metadata is missing after refresh.")
     try:
         import gi
         gi.require_version("AppStream", "1.0")
@@ -87,7 +131,8 @@ def flathub_metadata():
                         size += f"@{scale}"
                     candidate = directory / "icons" / size / name
                     if candidate.is_file() and candidate.resolve().is_relative_to(directory.resolve()):
-                        icon_path = str(candidate.resolve())
+                        # Through "active", so it survives the refresh pruning this checkout.
+                        icon_path = str(candidate)
                         break
                 items.setdefault(identifier, {
                     "name": component.get_name() or identifier,
@@ -95,11 +140,13 @@ def flathub_metadata():
                     "category": main_category(component.get_categories() or []),
                     "icon": icon_path,
                 })
-        return items
     except Failure:
         raise
     except (GLib.Error, ValueError, OSError, RuntimeError) as error:
         raise Failure(f"Unable to read Flathub AppStream metadata: {error}") from error
+    if refresh_later:
+        refresh_appstream(wait=False)
+    return items
 
 
 def debian_catalog():

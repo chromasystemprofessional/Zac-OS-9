@@ -222,9 +222,11 @@ else:
 	{
 		StoreWindow reopened;
 		assert(reopened.m_includeFlathub.on);
+		/* Featured is curated: opening the window never waits on Flathub. */
+		assert(!reopened.m_busy && !reopened.m_flathubLoaded);
+		reopened.m_categoryList.select(reopened.m_categories.indexOf("Graphics"), true);
 		assert(waitFor([&] { return !reopened.m_busy; }));
 		assert(reopened.m_flathubLoaded);
-		reopened.m_categoryList.select(reopened.m_categories.indexOf("Graphics"), true);
 		assert(reopened.m_shown.size() == 1 && reopened.m_catalogIcon.size() == 32 * 32);
 		reopened.m_categoryList.select(reopened.m_categories.indexOf("All Applications"), true);
 		assert(waitFor([&] { return !reopened.m_busy; }));
