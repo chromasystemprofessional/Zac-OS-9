@@ -1,3 +1,17 @@
+zacos9 (0.1.32) trixie; urgency=medium
+
+  * Extensions Manager and System Folder > Extensions now show curated,
+    friendly extension names, descriptions and Platinum icons, with Show
+    All available for every loaded driver. The startup splash displays
+    Welcome to ZacOS 9 while extension icons appear as their drivers load,
+    then hands the screen to the desktop with safe login and timeout
+    fallbacks. Includes all previous HDMI audio and Software loading fixes.
+    Reboot after installing to restart Finder and use the new boot splash.
+    The splash handoff is tested in software; hardware-specific flashing
+    still needs confirmation.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Wed, 07 Oct 2026 19:04:57 -0400
+
 zacos9 (0.1.31) trixie; urgency=medium
 
   * Software no longer gets stuck loading on its first page. The Flathub
