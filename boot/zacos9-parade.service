@@ -1,0 +1,16 @@
+# The startup screen's extension parade, live: each extension's icon as its
+# kernel module loads (boot/zacos9-parade.c). Starts before udev loads the
+# drivers; ends on its own a couple of minutes later.
+[Unit]
+Description=Show extensions on the startup screen as they load
+DefaultDependencies=no
+ConditionKernelCommandLine=splash
+Before=systemd-udev-trigger.service sysinit.target shutdown.target
+Conflicts=shutdown.target
+
+[Service]
+Type=simple
+ExecStart=/usr/libexec/zacos9/zacos9-parade
+
+[Install]
+WantedBy=sysinit.target

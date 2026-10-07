@@ -1,5 +1,7 @@
 #include <assert.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 #include <time.h>
 #include <wlr/backend/headless.h>
 #include <wlr/render/allocator.h>
@@ -137,6 +139,63 @@ int main(void) {
 	dispatch_for(loop, 2100);
 	assert(!startup_active() && !a.startup_buffer && !c.startup_buffer);
 	puts("ok: startup completes and removes every output's overlay");
+
+	/* Taking over from the boot splash: the Welcome box at once, the bar
+	 * from where the splash left it, and the boot's own parade, live. */
+	char dir[] = "/tmp/zacos9-startup-XXXXXX", handoff[64], parade[64];
+	assert(mkdtemp(dir));
+	snprintf(handoff, sizeof(handoff), "%s/handoff", dir);
+	snprintf(parade, sizeof(parade), "%s/parade", dir);
+	struct timespec boot;
+	clock_gettime(CLOCK_BOOTTIME, &boot);
+	FILE *f = fopen(handoff, "w");
+	fprintf(f, "%.2f\n", boot.tv_sec + boot.tv_nsec / 1e9 - 1);
+	fclose(f);
+	f = fopen(parade, "w");
+	fputs("intel-graphics\nbuilt-in-sound\n", f);
+	fclose(f);
+	setenv("ZACOS9_HANDOFF_FILE", handoff, 1);
+	setenv("ZACOS9_PARADE_FILE", parade, 1);
+	setenv("ZACOS9_PROC_MODULES", "/nonexistent", 1);
+	startup_begin(&server);
+	dispatch_for(loop, 30);
+	struct plat_pixbuf *p = buffer(&a, 1280, 800, 0, 0);
+	centered_welcome(p);
+	const int bx = (1280 - 320) / 2 + 51, by = (800 - 270) / 2 + 233 + 5;
+	const uint32_t empty = p->data[by * 1280 + bx + 217];
+	assert(p->data[by * 1280 + bx] != empty && p->data[by * 1280 + bx + 160] != empty);
+	puts("ok: after the splash, the Welcome box is up at once, its bar three-quarters full");
+
+	/* Icon slots: 0 and 1 drawn, 2 not yet; then the next to load appears. */
+	uint32_t slot2[32 * 32];
+	const int sy = 800 - 44;
+	for (int y = 0; y < 32; y++) {
+		for (int x = 0; x < 32; x++) {
+			slot2[y * 32 + x] = p->data[(sy + y) * 1280 + 96 + x];
+		}
+	}
+	f = fopen(parade, "a");
+	fputs("bluetooth\n", f);
+	fclose(f);
+	dispatch_for(loop, 60);
+	p = buffer(&a, 1280, 800, 0, 0);
+	int changed = 0;
+	for (int y = 0; y < 32; y++) {
+		for (int x = 0; x < 32; x++) {
+			changed += slot2[y * 32 + x] != p->data[(sy + y) * 1280 + 96 + x];
+		}
+	}
+	assert(changed > 50);
+	puts("ok: extensions join the parade as the boot records them");
+
+	startup_surface_mapped("zacos9-menubar");
+	startup_surface_mapped("zacos9-desktop");
+	dispatch_for(loop, 1300);
+	assert(!startup_active());
+	unlink(handoff);
+	unlink(parade);
+	rmdir(dir);
+	puts("ok: after the splash, startup ends soon after the shell is up");
 	wlr_scene_node_destroy(&server.scene->tree.node);
 	wlr_output_layout_destroy(server.output_layout);
 	wlr_backend_destroy(server.backend);

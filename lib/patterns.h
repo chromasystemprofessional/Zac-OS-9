@@ -19,6 +19,8 @@ const char *pl_pattern_name(int index); /* "Ocean Ripple" */
 int pl_pattern_find(const char *id);
 /* Tile the pattern over canvas pixels x0..x1, y0..y1 (inclusive),
  * aligned to the canvas origin so neighbouring fills line up. */
+/* One tile's size; the pattern repeats from (0, 0). */
+void pl_pattern_size(int index, int *w, int *h);
 void pl_pattern_fill(struct pl_canvas *c, int index, int x0, int y0, int x1, int y1);
 
 #ifdef __cplusplus

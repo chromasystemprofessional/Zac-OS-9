@@ -1,0 +1,12 @@
+# Started by "zacos9-boot-handoff quit" (plymouth-quit.service): ends the
+# boot splash once the desktop or the login screen has the display.
+[Unit]
+Description=Hand the startup screen over to the desktop
+DefaultDependencies=no
+Conflicts=shutdown.target
+Before=shutdown.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/zacos9/zacos9-boot-handoff watch
+TimeoutStartSec=60

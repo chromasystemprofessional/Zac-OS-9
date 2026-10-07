@@ -3,6 +3,7 @@
 #include <stdint.h>
 
 #include "welcome.h"
+#include "widgets.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -247,4 +248,70 @@ void pl_welcome_art(struct pl_canvas *c, int x, int y, double scale) {
 	cairo_destroy(cr);
 	cairo_surface_flush(surface);
 	cairo_surface_destroy(surface);
+}
+
+void pl_welcome_box_origin(int w, int h, int *x, int *y) {
+	*x = (w - PL_WELCOME_BOX_W) / 2;
+	*y = (h - PL_WELCOME_BOX_H) / 2;
+}
+
+void pl_welcome_bar_origin(int bx, int by, int *x, int *y) {
+	*x = bx + (PL_WELCOME_BOX_W - PL_WELCOME_BAR_W) / 2;
+	*y = by + PL_WELCOME_WELL_TOP + PL_WELCOME_WELL_H + 34;
+}
+
+void pl_welcome_box_paint(struct pl_canvas *c, int bx, int by, const struct plat_text *title,
+		const struct plat_text *status, double fraction, struct pl_accent accent) {
+	const int x1 = bx + PL_WELCOME_BOX_W - 1, y1 = by + PL_WELCOME_BOX_H - 1;
+	pl_fill(c, bx + 2, by + 2, x1 + 2, y1 + 2, GRAY(0x2));
+	pl_fill(c, bx, by, x1, y1, GRAY(0xD));
+	pl_outline(c, bx, by, x1, y1, C_BLACK);
+	pl_hline(c, bx + 1, x1 - 1, by + 1, C_WHITE);
+	pl_vline(c, bx + 1, by + 1, y1 - 1, C_WHITE);
+	pl_hline(c, bx + 2, x1 - 1, y1 - 1, GRAY(0x9));
+	pl_vline(c, x1 - 1, by + 2, y1 - 1, GRAY(0x9));
+
+	const int tw = title->ink_r - title->ink_l + 1;
+	pl_text(c, title, bx + (PL_WELCOME_BOX_W - tw) / 2, by + 28, C_BLACK);
+
+	/* The computer, in a white well. */
+	const int wx = bx + (PL_WELCOME_BOX_W - PL_WELCOME_WELL_W) / 2;
+	const int wy = by + PL_WELCOME_WELL_TOP;
+	pl_outline(c, wx - 1, wy - 1, wx + PL_WELCOME_WELL_W, wy + PL_WELCOME_WELL_H, GRAY(0x6));
+	pl_fill(c, wx, wy, wx + PL_WELCOME_WELL_W - 1, wy + PL_WELCOME_WELL_H - 1, C_WHITE);
+	pl_welcome_art(c, wx + (PL_WELCOME_WELL_W - PL_WELCOME_ART_W) / 2,
+		wy + (PL_WELCOME_WELL_H - PL_WELCOME_ART_H) / 2, 1.0);
+
+	/* What it is doing, and how far it has got. */
+	const int sw = status->ink_r - status->ink_l + 1;
+	pl_text(c, status, bx + (PL_WELCOME_BOX_W - sw) / 2, wy + PL_WELCOME_WELL_H + 24, C_BLACK);
+	int barx, bary;
+	pl_welcome_bar_origin(bx, by, &barx, &bary);
+	pl_progress_paint(c, barx, bary, PL_WELCOME_BAR_W, fraction, accent);
+}
+
+void pl_parade_slot(int w, int h, int i, int *x, int *y) {
+	const int step = PL_PARADE_ICON + PL_PARADE_GAP;
+	int per_row = (w - 2 * PL_PARADE_LEFT + PL_PARADE_GAP) / step;
+	if (per_row < 1) {
+		per_row = 1;
+	}
+	*x = PL_PARADE_LEFT + (i % per_row) * step;
+	*y = h - PL_PARADE_ICON - PL_PARADE_BOTTOM - (i / per_row) * step;
+}
+
+void pl_parade_paint(struct pl_canvas *c, int w, int h, const enum pl_icon_kind *icons, int n) {
+	for (int i = 0; i < n; i++) {
+		int x, y;
+		pl_parade_slot(w, h, i, &x, &y);
+		const uint32_t *px = pl_icon(icons[i], PL_PARADE_ICON);
+		for (int py = 0; py < PL_PARADE_ICON; py++) {
+			for (int ix = 0; ix < PL_PARADE_ICON; ix++) {
+				const uint32_t v = px[py * PL_PARADE_ICON + ix];
+				if (v >> 24) {
+					pl_put(c, x + ix, y + py, v);
+				}
+			}
+		}
+	}
 }

@@ -4,21 +4,31 @@
  * boot/plymouth, and GRUB shows the same logo in the same place before
  * either), then, while the menu bar and the Finder start, the Welcome box
  * over the desktop pattern: "Welcome to ZacOS 9", a picture of a computer
- * (lib/welcome.c) and a progress bar, with the extensions' icons marching
- * in along the bottom of the screen as it fills, as Mac OS 9 showed while
- * it loaded. It lifts once both shell components have put up their
- * surfaces (or after STARTUP_MAX_MS).
+ * (lib/welcome.c) and a progress bar, with the extensions' icons along the
+ * bottom of the screen, as Mac OS 9 showed while it loaded. It lifts once
+ * both shell components have put up their surfaces (or after
+ * STARTUP_MAX_MS).
+ *
+ * At boot the splash has shown all this already: boot/zacos9-parade adds
+ * each extension's icon as its kernel module loads, both to the splash and
+ * to /run/zacos9/parade, and boot/zacos9-boot-handoff keeps the splash's
+ * last frame up until this takes over (it writes /run/zacos9/handoff).
+ * Then this skips the logo, carries on the bar from where the splash left
+ * it, and keeps adding icons as more lines arrive. Without that record (a
+ * later login) the loaded extensions march in as the bar fills.
  *
  * The box layout is ours; TODO: the HIG doesn't show the Mac OS 9 one.
  * ZACOS9_STARTUP=0 turns the screen off.
  */
 #include <stdio.h>
+#include <sys/stat.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <wlr/types/wlr_output_layout.h>
 
 #include "draw.h"
+#include "extensions.h"
 #include "icons.h"
 #include "logo.h"
 #include "patterns.h"
@@ -32,42 +42,28 @@
 
 #define TICK_MS 40
 #define LOGO_MS 500 /* the logo on white, before the Welcome box */
-/* The extensions' icons, along the bottom of the screen: one more each
- * time the progress bar passes another seventh. */
-#define EXT_ICON_SIZE   32
-#define EXT_ICON_GAP    8   /* pixels between icons */
-#define EXT_ICON_BOTTOM 12  /* gap from the screen's bottom */
-#define EXT_ICON_LEFT   16  /* gap from the screen's left */
-
-static const enum pl_icon_kind ext_icons[] = {
-	PL_ICON_EXT_OPENTRANSPORT,
-	PL_ICON_EXT_APPLETALK,
-	PL_ICON_SHARED_FOLDER,
-	PL_ICON_EXT_BLUETOOTH,
-	PL_ICON_EXT_AUDIO,
-	PL_ICON_EXT_PRINTMONITOR,
-};
-#define N_EXT_ICONS ((int)(sizeof(ext_icons) / sizeof(ext_icons[0])))
+#define MAX_PARADE 64
+#define HANDOFF_FRESH_S 60 /* a handoff record older than this is a past boot's */
+/* The splash fills this much of the bar; it is the same in zacos9.script. */
+#define SPLASH_BAR_SHARE 0.75
 #define WELCOME_MIN_MS 1500 /* the Welcome box shows at least this long */
+#define HANDOFF_MIN_MS 500   /* ... or this, when the splash showed it already */
 #define STARTUP_MAX_MS 6000 /* from the Welcome box */
 #define FILL_MS 2500 /* time to reach 90% while waiting */
 #define FINISH_MS 300 /* from "ready" to a full bar */
 #define HOLD_MS 250   /* the full bar stays up this long */
-/* The Welcome box: the title, the picture in a white well, the status
- * line, the bar. */
-#define BOX_W 320
-#define WELL_W 204
-#define WELL_H 156
-#define WELL_TOP 42
-#define BAR_W 220
-#define BOX_H (WELL_TOP + WELL_H + 26 + 10 + PL_PROGRESS_H + 24)
-
 static struct {
 	struct plat_server *server;
 	bool active;
 	struct wl_event_source *timer;
 	long start_ms, welcome_ms, ready_ms;
 	bool menubar, desktop;
+	bool handoff; /* taking over from the boot splash */
+	bool live;    /* the parade comes from the boot's record, as it grows */
+	enum pl_icon_kind parade[MAX_PARADE];
+	const char *parade_keys[MAX_PARADE];
+	int n_parade;
+	off_t parade_size;
 	int pattern;
 	struct plat_text *title, *status;
 } st;
@@ -84,8 +80,89 @@ static int chosen_pattern(void) {
 	return pl_pattern_find(pl_setting("pattern", id, sizeof(id)) ? id : NULL);
 }
 
+static const char *path_or(const char *env, const char *fallback) {
+	const char *v = getenv(env);
+	return v && *v ? v : fallback;
+}
+
+static void add_parade(const struct pl_extension *e) {
+	if (!e || st.n_parade >= MAX_PARADE) {
+		return;
+	}
+	for (int i = 0; i < st.n_parade; i++) {
+		if (st.parade_keys[i] == e->key) {
+			return;
+		}
+	}
+	st.parade_keys[st.n_parade] = e->key;
+	st.parade[st.n_parade++] = e->icon;
+}
+
+/* The boot's record, one extension key a line, in the order they loaded. */
+static bool read_parade_record(void) {
+	const char *path = path_or("ZACOS9_PARADE_FILE", "/run/zacos9/parade");
+	struct stat sb;
+	if (stat(path, &sb) != 0) {
+		return false;
+	}
+	if (sb.st_size == st.parade_size) {
+		return true;
+	}
+	FILE *f = fopen(path, "r");
+	if (!f) {
+		return false;
+	}
+	st.parade_size = sb.st_size;
+	char line[128];
+	while (fgets(line, sizeof(line), f)) {
+		line[strcspn(line, "\n")] = 0;
+		add_parade(pl_extension_find(line));
+	}
+	fclose(f);
+	return true;
+}
+
+/* Without a record: the extensions loaded now, oldest first (the kernel
+ * lists the newest first). */
+static void read_loaded_modules(void) {
+	FILE *f = fopen(path_or("ZACOS9_PROC_MODULES", "/proc/modules"), "r");
+	if (!f) {
+		return;
+	}
+	const struct pl_extension *found[512];
+	int n = 0;
+	char line[512];
+	while (n < 512 && fgets(line, sizeof(line), f)) {
+		line[strcspn(line, " \n")] = 0;
+		const struct pl_extension *e = pl_extension_for_module(line);
+		if (e) {
+			found[n++] = e;
+		}
+	}
+	fclose(f);
+	while (n > 0) {
+		add_parade(found[--n]);
+	}
+}
+
+/* Whether the splash handed over to us just now, this boot. */
+static bool handed_off(void) {
+	FILE *f = fopen(path_or("ZACOS9_HANDOFF_FILE", "/run/zacos9/handoff"), "r");
+	if (!f) {
+		return false;
+	}
+	double at = -1;
+	const bool ok = fscanf(f, "%lf", &at) == 1;
+	fclose(f);
+	struct timespec ts;
+	clock_gettime(CLOCK_BOOTTIME, &ts);
+	const double now = ts.tv_sec + ts.tv_nsec / 1e9;
+	return ok && at >= 0 && now - at >= 0 && now - at < HANDOFF_FRESH_S;
+}
+
 static double progress(long t) {
-	double p = (double)(t - st.welcome_ms) / FILL_MS * 0.9;
+	const double from = st.handoff ? SPLASH_BAR_SHARE : 0;
+	double p = from + (double)(t - st.welcome_ms) / FILL_MS * (0.9 - from);
 	if (p > 0.9) {
 		p = 0.9;
 	}
@@ -112,61 +189,24 @@ static void draw_logo(struct wlr_scene_buffer *buffer, int w, int h) {
 	wlr_buffer_drop(&buf->base);
 }
 
-/* The extensions' icons, left to right along the bottom. */
-static void paint_extensions(struct pl_canvas *c, int h, double fraction) {
-	int shown = (int)(fraction * (N_EXT_ICONS + 1));
-	if (shown > N_EXT_ICONS) {
-		shown = N_EXT_ICONS;
-	}
-	const int y = h - EXT_ICON_SIZE - EXT_ICON_BOTTOM;
-	for (int i = 0; i < shown; i++) {
-		const uint32_t *px = pl_icon(ext_icons[i], EXT_ICON_SIZE);
-		const int x = EXT_ICON_LEFT + i * (EXT_ICON_SIZE + EXT_ICON_GAP);
-		for (int py = 0; py < EXT_ICON_SIZE; py++) {
-			for (int ix = 0; ix < EXT_ICON_SIZE; ix++) {
-				const uint32_t v = px[py * EXT_ICON_SIZE + ix];
-				if (v >> 24) {
-					pl_put(c, x + ix, y + py, v);
-				}
-			}
-		}
-	}
-}
-
 static void draw(struct wlr_scene_buffer *buffer, int w, int h, double fraction) {
 	struct plat_pixbuf *buf = pixbuf_create(w, h);
 	struct pl_canvas c = { .px = buf->data, .stride = w, .width = w, .height = h };
 	pl_pattern_fill(&c, st.pattern, 0, 0, w - 1, h - 1);
+	int bx, by;
+	pl_welcome_box_origin(w, h, &bx, &by);
+	pl_welcome_box_paint(&c, bx, by, st.title, st.status, fraction, pl_accent_current());
 
-	/* A raised Platinum box with a one-pixel shadow. */
-	const int bx = (w - BOX_W) / 2, by = (h - BOX_H) / 2;
-	const int x1 = bx + BOX_W - 1, y1 = by + BOX_H - 1;
-	pl_fill(&c, bx + 2, by + 2, x1 + 2, y1 + 2, GRAY(0x2));
-	pl_fill(&c, bx, by, x1, y1, GRAY(0xD));
-	pl_outline(&c, bx, by, x1, y1, C_BLACK);
-	pl_hline(&c, bx + 1, x1 - 1, by + 1, C_WHITE);
-	pl_vline(&c, bx + 1, by + 1, y1 - 1, C_WHITE);
-	pl_hline(&c, bx + 2, x1 - 1, y1 - 1, GRAY(0x9));
-	pl_vline(&c, x1 - 1, by + 2, y1 - 1, GRAY(0x9));
-
-	/* "Welcome to ZacOS 9". */
-	const int tw = st.title->ink_r - st.title->ink_l + 1;
-	pl_text(&c, st.title, bx + (BOX_W - tw) / 2, by + 28, C_BLACK);
-
-	/* The computer, in a white well. */
-	const int wx = bx + (BOX_W - WELL_W) / 2, wy = by + WELL_TOP;
-	pl_outline(&c, wx - 1, wy - 1, wx + WELL_W, wy + WELL_H, GRAY(0x6));
-	pl_fill(&c, wx, wy, wx + WELL_W - 1, wy + WELL_H - 1, C_WHITE);
-	pl_welcome_art(&c, wx + (WELL_W - PL_WELCOME_ART_W) / 2,
-		wy + (WELL_H - PL_WELCOME_ART_H) / 2, 1.0);
-
-	/* What it is doing, and how far it has got. */
-	const int sw = st.status->ink_r - st.status->ink_l + 1;
-	pl_text(&c, st.status, bx + (BOX_W - sw) / 2, wy + WELL_H + 24, C_BLACK);
-	pl_progress_paint(&c, bx + (BOX_W - BAR_W) / 2, wy + WELL_H + 34, BAR_W, fraction,
-		pl_accent_current());
-
-	paint_extensions(&c, h, fraction);
+	/* Live from the boot's record, or one more each time the bar passes
+	 * another step. */
+	int shown = st.n_parade;
+	if (!st.live) {
+		shown = (int)(fraction * (st.n_parade + 1));
+		if (shown > st.n_parade) {
+			shown = st.n_parade;
+		}
+	}
+	pl_parade_paint(&c, w, h, st.parade, shown);
 
 	wlr_scene_buffer_set_buffer(buffer, &buf->base);
 	wlr_buffer_drop(&buf->base);
@@ -204,7 +244,11 @@ static void buffer_destroyed(struct wl_listener *listener, void *data) {
 static int tick(void *data) {
 	const long t = now_ms();
 	const bool welcome = t >= st.welcome_ms;
-	if (welcome && !st.ready_ms && t - st.welcome_ms >= WELCOME_MIN_MS &&
+	if (st.live) {
+		read_parade_record();
+	}
+	const long min_ms = st.handoff ? HANDOFF_MIN_MS : WELCOME_MIN_MS;
+	if (welcome && !st.ready_ms && t - st.welcome_ms >= min_ms &&
 			((st.menubar && st.desktop) || t - st.welcome_ms > STARTUP_MAX_MS)) {
 		st.ready_ms = t;
 	}
@@ -248,7 +292,16 @@ void startup_begin(struct plat_server *server) {
 	st.server = server;
 	st.active = true;
 	st.start_ms = now_ms();
-	st.welcome_ms = st.start_ms + LOGO_MS;
+	st.ready_ms = 0;
+	st.menubar = st.desktop = false;
+	st.handoff = handed_off();
+	st.welcome_ms = st.start_ms + (st.handoff ? 0 : LOGO_MS);
+	st.n_parade = 0;
+	st.parade_size = -1;
+	st.live = st.handoff && read_parade_record();
+	if (!st.live) {
+		read_loaded_modules();
+	}
 	st.pattern = chosen_pattern();
 	st.title = text_render_font("Welcome to ZacOS 9", 1000, PL_FONT_SYSTEM);
 	st.status = text_render_font("Starting Up\xe2\x80\xa6", 1000, PL_FONT_VIEWS);

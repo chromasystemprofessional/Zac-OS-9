@@ -44,6 +44,14 @@ int pl_pattern_find(const char *id) {
 	return 0;
 }
 
+void pl_pattern_size(int index, int *w, int *h) {
+	if (index < 0 || index >= N_PATTERNS) {
+		index = 0;
+	}
+	*w = patterns[index].width;
+	*h = patterns[index].height;
+}
+
 void pl_pattern_fill(struct pl_canvas *c, int index, int x0, int y0, int x1, int y1) {
 	if (index < 0 || index >= N_PATTERNS) {
 		index = 0;

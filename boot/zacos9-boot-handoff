@@ -1,0 +1,86 @@
+#!/bin/sh
+# zacos9-boot-handoff: carries the startup screen from the boot splash
+# (Plymouth) over to the desktop's own (compositor/src/startup.c) without
+# the screen going blank between them.
+#
+#   quit   in place of plymouth-quit.service's "plymouth quit": the splash
+#          stops drawing but leaves its last frame up, a note in
+#          /run/zacos9/handoff tells the compositor to carry on from it,
+#          and "watch" runs in the background to finish the job.
+#   wait   in place of plymouth-quit-wait's "plymouth --wait", which would
+#          otherwise hold back the login (greetd) until the splash is gone.
+#   watch  quits the splash for good: keeping its frame once the desktop has
+#          the display, or clearing it for the text login screen, or after
+#          WATCH_SECONDS whatever happened, so it never hides a login.
+set -u
+
+plymouth=${ZACOS9_HANDOFF_PLYMOUTH:-/usr/bin/plymouth}
+systemctl=${ZACOS9_HANDOFF_SYSTEMCTL:-systemctl}
+proc=${ZACOS9_HANDOFF_PROC:-/proc}
+marker=${ZACOS9_HANDOFF_FILE:-/run/zacos9/handoff}
+watch_seconds=${ZACOS9_HANDOFF_SECONDS:-30}
+settle=${ZACOS9_HANDOFF_SETTLE:-0.5}
+
+# Is any process other than the splash holding the display? Prints its name.
+display_taken() {
+	for p in "$proc"/[0-9]*; do
+		read -r comm <"$p/comm" 2>/dev/null || continue
+		case $comm in plymouthd) continue ;; esac
+		for fd in "$p"/fd/*; do
+			case $(readlink "$fd" 2>/dev/null) in
+			/dev/dri/card*) echo "$comm"; return 0 ;;
+			esac
+		done
+	done
+	return 1
+}
+
+# Is a text login on the console?
+text_login() {
+	for p in "$proc"/[0-9]*; do
+		read -r comm <"$p/comm" 2>/dev/null || continue
+		case $comm in tuigreet|agreety|zacos9-greeter) return 0 ;; esac
+	done
+	return 1
+}
+
+case ${1:-} in
+quit)
+	"$plymouth" --ping 2>/dev/null || exit 0
+	if ! "$plymouth" deactivate; then
+		exec "$plymouth" quit
+	fi
+	mkdir -p "${marker%/*}"
+	# The time since boot, CLOCK_BOOTTIME, as the compositor reads it.
+	read -r up _ <"${ZACOS9_HANDOFF_UPTIME:-/proc/uptime}"
+	echo "$up" >"$marker"
+	if ! "$systemctl" start --no-block zacos9-boot-handoff.service; then
+		rm -f "$marker"
+		exec "$plymouth" quit
+	fi
+	;;
+wait)
+	[ -e "$marker" ] && exit 0
+	exec "$plymouth" --wait
+	;;
+watch)
+	end=$(($(date +%s) + watch_seconds))
+	while [ "$(date +%s)" -lt "$end" ]; do
+		"$plymouth" --ping 2>/dev/null || exit 0
+		if text_login; then
+			exec "$plymouth" quit
+		fi
+		if display_taken >/dev/null; then
+			# Give it time to put its first frame up over the splash's.
+			sleep "$settle"
+			exec "$plymouth" quit --retain-splash
+		fi
+		sleep 0.1
+	done
+	exec "$plymouth" quit
+	;;
+*)
+	echo "usage: zacos9-boot-handoff quit|wait|watch" >&2
+	exit 2
+	;;
+esac

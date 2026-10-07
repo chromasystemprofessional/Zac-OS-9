@@ -200,6 +200,25 @@ combinations; all three focused authorization and disk-helper suites pass.
 The rule is installed through the existing package path; reboot behavior on
 the connected physical drive still needs confirmation after installing it.
 
+**Real extension parade at startup, with Welcome on the boot splash**
+(unreleased, 2026-10-07): the icons along the bottom of the startup screen
+used to be six fixed pictures shown on a timer after logging in. Now they
+are the curated extensions (`lib/extensions.c`, shared with Extensions
+Manager) appearing as their kernel modules actually load.
+- The boot splash shows "Welcome to ZacOS 9" half a second in, drawn from
+  the compositor's own code at build time (`boot/make-splash.c`). It
+  matches pixel for pixel; bar fills 4–218 were checked against
+  `lib/welcome.c`.
+- `zacos9-parade` sends each icon to the splash as its module loads.
+- The splash hands over to the compositor without the white gap
+  (`zacos9-boot-handoff`: deactivate, then `quit --retain-splash` once the
+  wm has the display). There are fallbacks so the text login is never hidden.
+- See `docs/boot.md`. Tests added: `boot-parade`, `boot-handoff`,
+  `boot-splash-welcome`, and a handoff phase in `startup-displays`.
+- Still to confirm on real hardware after a reboot: that the handover
+  shows no white flash on i915. greetd may switch the console to text
+  mode as it starts, and only a real boot shows that.
+
 **Extensions Manager: friendly names, icons and a curated list**
 (unreleased, 2026-10-07): instead of 145 raw kernel module names, Extensions
 Manager and System Folder > Extensions now show about 45 curated entries
@@ -995,6 +1014,7 @@ real devices yet - this machine has an adapter, but bluez wasn't installed).
   first gap) but it leaves a *black* gap after plymouth and unbinds the text consoles (the greeter
   needs them) — would need a seamless hand-off (plymouth deactivate / quit --retain-splash around
   wm start, fbcon bound after) that can't be validated on real hardware from here.
+  *Update (unreleased):* the second gap now has that hand-off (`docs/boot.md`), pending a real boot.
 
 **Disk name, aliases of applications, About logo** (built and tested; not yet committed; not in an ISO yet).
 
