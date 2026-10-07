@@ -1,3 +1,11 @@
+zacos9 (0.1.31) trixie; urgency=medium
+
+  * Software no longer gets stuck loading on its first page. The Flathub
+    catalog download now always finishes in the background, and the
+    Featured page no longer waits for it.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Wed, 07 Oct 2026 17:16:20 -0400
+
 zacos9 (0.1.30) trixie; urgency=medium
 
   * Aliases in the Finder now show their original's icon (including
