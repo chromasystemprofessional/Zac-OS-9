@@ -7,6 +7,14 @@ ZacOS 9 runs classic Mac OS in an emulator window:
 
 Apple's files are not part of ZacOS 9. You supply them yourself.
 
+For the proposed independent-window integration, see the
+[seamless Classic windows plan](../docs/classic-seamless.md). It targets true
+per-window rendering with a permanent full-desktop fallback; it is not
+implemented yet.
+An original guest test application and host pixel verifier are available in
+the [rendering feasibility spike](seamless/README.md); this does not enable
+seamless mode.
+
 ## Setting up
 
 1. Build the emulators once:

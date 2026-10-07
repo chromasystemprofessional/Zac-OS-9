@@ -24,6 +24,106 @@ Updated: 2026-10-07
 
 ## Current work
 
+**Classic monochrome graphics coverage** (unreleased, gate not passed):
+expanded native capture to preserve monochrome pen/text/color-value state and
+explicit application clipping, with `DrawText`, frames/lines, masked/scaled
+`CopyBits`, backing-store self-copy and `ScrollRect` hooks. Replay and original
+compound-call guards prevent nested double capture; helper scratch regions stay
+in the helper heap, and the caller's port/zone are restored. The hook-free
+fixture's opt-in graphics mode exercises styles, XOR/OR modes, spacing, pen
+patterns, clipping, images and alternating scroll directions. Version-2 exports
+require independent guest references and full meaningful-pixel comparison.
+Actual graphics trials match both hidden/visible buffers at frames 36, 52 and
+67, including 356x220 resize; a frame-82 original-pattern regression also passes.
+Diagnostics confirm every added hook ran. Color-window testing explicitly
+refuses capture without overwriting old evidence; color/PixMap/GWorld capture
+is the next prerequisite, not implemented. Capture restarts after rejection,
+closed-window invalidation and all-eight-vector restoration tested. Fourteen
+host tests and strict builds of all three guest apps pass. Copied guest shut
+down through Finder; original disk checksum is unchanged.
+See [graphics experiment](emulation/seamless/README.md#monochrome-drawing-state-text-images-and-scrolling).
+
+**Classic native execution-context capture** (unreleased, gate not passed):
+the helper now resolves PowerPC InterfaceLib transition vectors through CFM
+and reversibly hooks `PaintRect`, `EraseRect` and `DisposeWindow`, chaining
+saved native entry/TOC pairs. This reaches the separate, hook-free fixture's
+process context without modifying its binary, window procedures or clipping
+regions. Native observation counted 75,873 fixture calls; its process-context
+Window Manager list is accessible there. Helper-owned independent buffers
+match both references exactly at frames 54 and 69 with either window fully
+hidden, after resizing A to 356x220, and after advancing to frame 84 with B in
+front. Screen crops still fail the hidden-window controls. Window close
+invalidates captures; exports refuse a closed pair. App exit/relaunch produces
+fresh exact frame-13 captures. Callback lifetime remains tied to the running
+helper; it refuses unsafe unloading if another patch changes the vector chain.
+No startup extension or emulator patch was necessary for this bounded result.
+Ten host verifier tests pass, including independent frame/dimension/reference
+checks. General text/color/blit capture and production recovery remain unproven.
+The final guarded helper passes a fresh frame-29 trial. All six native trials
+pass independent-reference CLI checks; screen negative controls fail as expected.
+Native vectors restored, guest apps exited normally and copied guest shut down
+through Finder; original disk checksum remains unchanged.
+See [native capture experiment](emulation/seamless/README.md#native-powerpc-execution-context-and-capture).
+
+**Classic separate-app/helper trial** (earlier result, Toolbox-only path blocked):
+split the original drawing fixture into a separate `ZcDF` application with no
+capture hooks and added a `ZcSH` diagnostic helper. Shared surface/export code
+preserves the first in-process probe. Strict PowerPC builds pass for all three
+apps. In the copied guest, Process Manager enumeration sees both apps, but the
+helper's Window Manager list contains zero fixture windows. A reversible
+rectangle-trap observer sees helper calls but zero fixture rectangles while
+the separate fixture advances from frame 180 to 200 and changes front window.
+Frame-200 references remain exact; the hidden screen crop fails all 61,440
+pixels. Removed unexercised external replay code rather than claiming capture
+success. The subsequent native CFM-vector experiment above establishes target
+execution context without a startup extension. Precise Toolbox trap scoping
+remains unresolved; no production integration.
+Verified observer teardown, normal app exits and Finder shutdown of the copied
+guest; original disk checksum is unchanged. Nine host verifier tests pass.
+See [separate-app experiment](emulation/seamless/README.md#separate-applicationhelper-experiment).
+
+**Seamless Classic rendering spike** (unreleased, gate not passed): inspected
+the pinned macemu revision in a separate temporary checkout. SDL presents one
+guest framebuffer; Native QuickDraw acceleration hooks and native thunks are
+candidate integration points, not independent per-window backing stores.
+Added an original PowerPC two-window QuickDraw probe with overlapping animated
+patterns, cooperative offscreen reference buffers, rectangle-hook candidate
+buffers, screen-crop exports,
+resize and cancelled-close controls. Cross-compilation with the open-source
+Retro68/Multiversal toolchain passes strict warnings and generates resources,
+MacBinary and an application-only HFS disk. Added an exact-pixel host verifier
+and nine focused tests for stale/corrupt/cropped frames and limits, wired into
+Meson as `classic-window-probe`. Actual trials in a disposable copy of the
+user's Classic setup passed exact-pixel reference and rectangle-hook capture
+checks with either window fully obscured, after advancing the frame and after
+resizing to 356x220. Hidden screen crops fail completely (61,440 wrong pixels
+at 320x192); partial-overlap cropping also fails. Cancelling Quit preserves
+both windows, and closing one preserves the other's exact pixels. The copied
+guest was shut down through Finder; the original disk's SHA-256 is unchanged.
+This proves only controlled black/white rectangle interception
+before visibility clipping, not general rendering. No production emulator or
+launcher changes, original guest disk writes or Apple SDK redistribution.
+Unmodified app hook installation, cross-process discovery, other drawing
+operations and the feasibility gate remain unverified. Exact guest OS version
+is not yet confirmed. See [spike instructions](emulation/seamless/README.md).
+
+**Seamless Classic windows plan** (milestone 0 started): agreed target is independent
+SheepShaver application windows with a permanent full-desktop fallback, not
+screen cropping. [Implementation plan](docs/classic-seamless.md) starts with
+a rendering feasibility gate for obscured windows, then covers a guest helper,
+versioned bridge, direct launching, host windows, dialogs/recovery, menus,
+clipboard and compatibility packaging. No seamless implementation or schedule
+is claimed; general guest rendering still needs proof.
+
+**Alias icon inheritance** (0.1.30): Finder resolves symbolic links before
+choosing their icon, so aliases retain the original's file-type icon and
+application aliases (including chains) use its custom 32- and 16-pixel icons.
+Shared-folder aliases inherit the shared-folder icon. Alias names, paths and
+italic labels remain independent; broken or looping links use a generic icon.
+Focused desktop and selection tests pass, including custom application icons,
+file-type icons, alias chains, shared folders and unavailable targets; the
+production Finder target builds successfully.
+
 **System Folder resource providers and read-only system views** (0.1.28):
 Finder's virtual registry now includes resource-provider nodes under System
 Folder (Sounds, Startup Items, Application Support, Device Drivers, Network,
@@ -350,7 +450,7 @@ the user. HDMI selection and interface-sound settings were unchanged. No
 preventative fix was established in that boot; the recurring stall and
 unbounded detached sound-player lifetime remained unresolved.
 
-**HDMI freeze recovery without a restart** (unreleased, 2026-10-07): a
+**HDMI freeze recovery without a restart** (0.1.29, 2026-10-07): a
 once-a-second monitor caught two HDMI freezes on the iMac14,1 during
 Firefox/YouTube, 90 seconds apart. Each time, PCM state and sink stayed
 RUNNING with `hw_ptr` frozen, while the TV's ELD, the connector and the
