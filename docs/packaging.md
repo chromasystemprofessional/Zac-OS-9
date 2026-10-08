@@ -18,6 +18,7 @@ scripts/build-debs.sh --emulators   # and zacos9-emulators_*.deb
   Login managers (GDM, SDDM, LightDM, greetd) list the session. From a text
   console, run `zacos9-session`. The session log is
   `~/.local/state/zacos9/session.log`.
+
 - **zacos9-emulators** holds SheepShaver and Basilisk II, built from the pinned
   macemu commit in `emulation/build-emulators.sh`. They are installed in
   `/usr/libexec/zacos9`, where `zacos9-classic` looks for them.
@@ -55,6 +56,28 @@ Update, see `docs/updates.md` (`scripts/release.sh`).
   - **Writing a disk needs an administrator's password.** Etcher asks
     through `pkexec`, which the session's polkit agent (`lxqt-policykit`)
     answers with a password dialog.
+
+### Password login and application keyrings
+
+Automatic login supplies no account password to GNOME Keyring, so encrypted
+keyrings used by applications such as ChatGPT can remain locked. To retain
+encryption and unlock at login, use password login: remove greetd's
+`[initial_session]` block from `/etc/greetd/config.toml` (keep
+`[default_session]`) and ensure `libpam-gnome-keyring` is installed with
+`auth optional pam_gnome_keyring.so` and
+`session optional pam_gnome_keyring.so auto_start` in `/etc/pam.d/greetd`.
+This takes effect at the next login; do not restart greetd from a working
+desktop merely to apply it.
+
+PAM unlocks the **Login** keyring using the account password. A separately
+created **Default Keyring** is not automatically the Login keyring. Preserve
+it: after password login, unlock it in the system prompt and, when offered,
+enable automatically unlocking it when logging in (its unlock password is
+then protected by the Login keyring). If the Login keyring password differs
+from the account password, change it through a keyring manager such as
+Passwords and Keys, not by storing passwords in session scripts. Do not
+delete keyring files, remove their password, or use app flags that bypass
+encrypted password storage as a workaround.
 
 ## The ISO
 

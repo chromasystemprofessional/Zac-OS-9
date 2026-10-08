@@ -31,9 +31,13 @@ both icon and list views, while retaining their own name and italic alias label.
 Alias chains use the final target's icon; missing or looping targets show a
 generic document icon.
 
-Folder aliases open as folders and accept file drops. In a standard application
-save dialog, choose Desktop and open a folder or folder alias to save inside
-it. Saves through an alias go into its target directory. An alias does not
+Folder aliases open as folders and accept file drops. The standard application
+file chooser lists Desktop folder aliases alongside disks, using their Desktop
+names. Choose an alias to open files, select its target folder or save inside
+it, including folders on mounted AFP and Windows/SMB servers. They can also be
+opened through Home/Desktop in the chooser's Macintosh view. Saves through an
+alias go into its target directory; applications receive real target paths.
+Unavailable or replaced originals report an error instead of opening Home.
 Aliases stay ordinary symbolic links, so existing ones keep working. Beside
 each alias, `<folder>/.alias/<name>` (hidden) records the original's device,
 inode, name and parent folder (`shell/finder/alias.cpp`). Open and Show

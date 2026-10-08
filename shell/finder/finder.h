@@ -41,7 +41,9 @@ public:
  *   Finder -> menu bar:  "state selection=<n> window=<0|1> trash=<0|1>
  *                         view=<0 icons|1 list|2 buttons>
  *                         label=<the selection's common label, or -1>
- *                         erase=<0|1 selected mounted USB disk>"
+ *                         erase=<0|1 selected mounted USB disk>
+ *                         network=<0|1 selected network disk>
+ *                         unmount=<0|1 selected local mounted disk>"
  */
 class Finder {
 public:
@@ -69,6 +71,7 @@ public:
 	void duplicate();
 	void makeAlias();
 	void putAway();
+	void unmountSelection(bool network);
 	void showOriginal();
 	void setLabel(int label);
 	/* Start classic Mac OS (shell/classic/zacos9-classic), with extra
@@ -95,6 +98,7 @@ public:
 private:
 	Finder() = default;
 	QString stateLine();
+	void ejectVolume(QString path, QString name, bool network);
 
 	Desktop *m_desktop = nullptr;
 	QString m_springPath;

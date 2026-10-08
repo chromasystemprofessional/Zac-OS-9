@@ -17,9 +17,9 @@ the rest of the control panels already use, the same honest approach
 | Finding servers | `shell/network/discovery.{h,cpp}` | Bonjour (`avahi-browse`) and our own WS-Discovery probe. |
 | AFP | `shell/network/afpclient.{h,cpp}` | Wraps `zacos9-afp info`/`volumes`/`mount`. |
 | SMB | `shell/network/smbclient.{h,cpp}` | Wraps `gio mount`. |
-| What's mounted | `shell/network/netvolumes.{h,cpp}` | Read from the filesystem itself (`findmnt`, gvfs's runtime directory) — no registry of our own to drift from reality. |
+| What's mounted | `shell/network/netvolumes.{h,cpp}` | Read from the filesystem itself (`/proc/self/mountinfo`, gvfs's runtime directory) — no registry of our own to drift from reality or blocking `findmnt` child process. |
 | Dialogs | `connectdialog.*`, `logindialog.*`, `volumedialog.*` | Address, Guest/Registered User + Name/Password (+ Share for SMB), the AFP volume list. |
-| Desktop integration | `shell/finder/desktop.{h,cpp}` | Mounted volumes as disk icons, polled every 3 s (nothing posts an event for `fusermount3 -u` run from a terminal). |
+| Desktop integration | `shell/finder/desktop.{h,cpp}` | Mounted volumes as disk icons, polled every 3 s for ordinary mount changes; AFP connection loss notifies Finder immediately. |
 | Ejecting | `shell/finder/finder.cpp` (`putAway`) | ⌘Y ejects a network volume instead of trying to move a file. |
 
 ## Discovery
@@ -73,9 +73,54 @@ packet capture.
 
 ## AFP: login, volumes, mount
 
+Select one network disk on the desktop and choose **Special → Disconnect
+Network Drive** to disconnect AFP or SMB. For a mounted local disk, including
+USB storage, choose **Special → Unmount Disk** before unplugging it. Each item
+is enabled only for the appropriate single selected disk; startup disk and
+ordinary folders cannot be unmounted. Existing Put Away remains available.
+Successful network disconnects remove the desktop icon immediately and do
+not show an unexpected-disconnection warning. Failed disconnects and local
+unmount errors are reported without pretending the operation succeeded.
+Installed live on 2026-10-08; Finder and the menu bar were restarted with user
+approval. Offscreen tests cover menu enablement, USB helper routing, successful
+SMB disconnect, and a refused SMB unmount that misleadingly exits zero.
+
 All three map straight onto `zacos9-afp`'s own commands (`info`,
 `volumes`, `mount`), already built with this GUI in mind — see its own
 usage comment in `network/afp/main.c`.
+
+### Connection loss
+
+The AFP daemon monitors idle sockets as well as active requests. TCP EOF/reset,
+a DSI session-close, or AFP session-closed/server-going-down errors terminate
+the failed FUSE session and unmount it. After unmounting, the daemon sends
+`afp-disconnected <hex-encoded mount path>` over the existing per-display
+Finder socket. Finder immediately removes that disk icon and opens a Platinum
+**Server Disconnected** dialog identifying the disk, suggesting reconnection,
+and warning that unsaved changes may have been lost. This does not wait for
+the Desktop's three-second volume poll. Normal Put Away/eject remains silent;
+ordinary file errors, including permissions, missing files and file-level I/O
+errors, do not disconnect the whole volume.
+
+Explicit disconnects are detected promptly, including while idle. Silent
+network outages cannot be detected instantaneously: TCP keepalive and
+unacknowledged-data timeouts are configured to detect a lost peer in roughly
+20 seconds. A connected server that stops replying to AFP requests still has
+the existing 90-second receive timeout. The daemon logs failures to configure
+monitoring or deliver the Finder notification. No automatic reconnect or
+replacement mount is attempted.
+
+Installed live on 2026-10-08 and restarted Finder with user approval.
+Existing AFP mounts keep their running client, so eject and remount once to
+activate the new disconnect handling for those disks.
+
+`meson test -C build afp-disconnect finder-desktop` tests real FUSE mounts
+against an isolated local mock AFP server (no live shares or credentials):
+idle EOF/reset/session-close, active-request failure, AFP terminal session
+errors, background daemon teardown and silent normal eject. It also checks
+that ordinary file errors preserve the mount and that Finder's real socket
+removes only the failed disk before showing the dialog. The FUSE test skips
+explicitly when mounts are not permitted.
 
 The login dialog's **Guest / Registered User** choice, and whether to
 warn before sending a cleartext password, both come from `info` first:

@@ -6,9 +6,13 @@
 #include <fcntl.h>
 #include <fuse.h>
 #include <limits.h>
+#include <signal.h>
+#include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
+#include <sys/un.h>
 #include <unistd.h>
 
 /*
@@ -19,6 +23,71 @@
  */
 
 static struct afp *afp;
+static atomic_bool disconnected;
+
+static void connection_lost(void *data) {
+	atomic_store(&disconnected, true);
+	fprintf(stderr, "zacos9-afp: the server disconnected; unmounting its volume.\n");
+	/* libfuse's installed handler stops its loop, then fuse_main unmounts. */
+	if (kill(getpid(), SIGTERM) < 0) {
+		perror("zacos9-afp: could not stop the disconnected mount");
+	}
+}
+
+static void notify_disconnected(const char *mountpoint) {
+	const char *runtime = getenv("XDG_RUNTIME_DIR");
+	const char *display = getenv("WAYLAND_DISPLAY");
+	if (!runtime || !*runtime) {
+		fprintf(stderr, "zacos9-afp: cannot notify Finder without XDG_RUNTIME_DIR.\n");
+		return;
+	}
+	struct sockaddr_un address = { .sun_family = AF_UNIX };
+	int n = snprintf(address.sun_path, sizeof(address.sun_path), "%s/zacos9-finder.%s.sock",
+		runtime, display && *display ? display : "wayland-0");
+	if (n < 0 || (size_t)n >= sizeof(address.sun_path)) {
+		fprintf(stderr, "zacos9-afp: Finder's socket path is too long.\n");
+		return;
+	}
+	int fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
+	if (fd < 0) {
+		perror("zacos9-afp: Finder notification socket");
+		return;
+	}
+	if (connect(fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
+		perror("zacos9-afp: could not notify Finder of disconnection");
+		close(fd);
+		return;
+	}
+	char message[2 * PATH_MAX + 32];
+	const char prefix[] = "afp-disconnected ";
+	size_t len = strlen(mountpoint), offset = sizeof(prefix) - 1;
+	if (len >= PATH_MAX) {
+		fprintf(stderr, "zacos9-afp: disconnected mount path is too long.\n");
+		close(fd);
+		return;
+	}
+	memcpy(message, prefix, offset);
+	const char hex[] = "0123456789abcdef";
+	for (size_t i = 0; i < len; i++) {
+		const unsigned char byte = (unsigned char)mountpoint[i];
+		message[offset++] = hex[byte >> 4];
+		message[offset++] = hex[byte & 15];
+	}
+	message[offset++] = '\n';
+	size_t sent = 0;
+	while (sent < offset) {
+		ssize_t written = send(fd, message + sent, offset - sent, MSG_NOSIGNAL);
+		if (written < 0 && errno == EINTR) {
+			continue;
+		}
+		if (written <= 0) {
+			perror("zacos9-afp: could not send disconnection notification");
+			break;
+		}
+		sent += (size_t)written;
+	}
+	close(fd);
+}
 
 /* ---- folder IDs ------------------------------------------------------------- */
 
@@ -500,6 +569,7 @@ static int fs_statfs(const char *path, struct statvfs *st) {
 
 static void *fs_init(struct fuse_conn_info *conn, struct fuse_config *cfg) {
 	/* After any fork into the background: keep the session alive. */
+	afp->dsi.disconnected = connection_lost;
 	dsi_start_tickles(&afp->dsi);
 	cfg->use_ino = 0;
 	cfg->nullpath_ok = 0;
@@ -507,6 +577,9 @@ static void *fs_init(struct fuse_conn_info *conn, struct fuse_config *cfg) {
 }
 
 static void fs_destroy(void *data) {
+	pthread_mutex_lock(&afp->dsi.lock);
+	afp->dsi.disconnected = NULL;
+	pthread_mutex_unlock(&afp->dsi.lock);
 	afp_disconnect(afp);
 }
 
@@ -535,6 +608,12 @@ static const struct fuse_operations ops = {
 
 int afpfs_run(struct afp *session, const char *mountpoint, const char *source, bool foreground) {
 	afp = session;
+	char absolute[PATH_MAX];
+	if (!realpath(mountpoint, absolute)) {
+		perror("zacos9-afp: could not resolve mount point");
+		afp_disconnect(afp);
+		return -1;
+	}
 	/* fsname is how mount lists it: afp://server/volume (a comma would
 	 * end the option). */
 	char name[256], opts[300];
@@ -554,5 +633,10 @@ int afpfs_run(struct afp *session, const char *mountpoint, const char *source, b
 	}
 	args[argc++] = (char *)mountpoint;
 	args[argc] = NULL;
-	return fuse_main(argc, args, &ops, NULL);
+	int result = fuse_main(argc, args, &ops, NULL);
+	if (atomic_load(&disconnected)) {
+		notify_disconnected(absolute);
+		return -1;
+	}
+	return result;
 }

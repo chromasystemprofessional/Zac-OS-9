@@ -95,16 +95,39 @@ void Finder::start(Desktop *desktop) {
 	QObject::connect(&m_server, &QLocalServer::newConnection, [this] {
 		while (QLocalSocket *s = m_server.nextPendingConnection()) {
 			m_clients.push_back(s);
-			QObject::connect(s, &QLocalSocket::readyRead, [this, s] {
+			const auto receive = [this, s] {
 				while (s->canReadLine()) {
 					QString line = QString::fromUtf8(s->readLine()).trimmed();
 					if (line.startsWith("cmd ")) {
 						command(line.mid(4));
+					} else if (line.startsWith("afp-disconnected ")) {
+						const QByteArray encoded = line.mid(17).toLatin1();
+						const QByteArray bytes = QByteArray::fromHex(encoded);
+						const QString path = QFile::decodeName(bytes);
+						if (encoded.isEmpty() || bytes.toHex() != encoded ||
+								bytes.contains('\0') || !QDir::isAbsolutePath(path)) {
+							qWarning() << "Invalid AFP disconnection notification";
+							continue;
+						}
+						if (m_desktop) {
+							m_desktop->networkDisconnected(path);
+						}
+						const QString message = QStringLiteral(
+							"The server disk \"%1\" has been disconnected. "
+							"Connect to the server again to use it. "
+							"Unsaved changes may have been lost.").arg(QFileInfo(path).fileName());
+						auto *alert = new Alert(message, "OK", QString());
+						alert->setAttribute(Qt::WA_DeleteOnClose);
+						alert->setWindowTitle("Server Disconnected");
+						alert->setAccessibleDescription(message);
+						alert->open();
 					}
 				}
-			});
+			};
+			QObject::connect(s, &QLocalSocket::readyRead, receive);
 			QObject::connect(s, &QLocalSocket::disconnected, s, &QObject::deleteLater);
 			s->write((stateLine() + "\n").toUtf8());
+			receive();
 		}
 	});
 }
@@ -158,8 +181,11 @@ QString Finder::stateLine() {
 	const auto items = v ? v->selectedItems() : std::vector<Item *>{};
 	const bool erase = items.size() == 1 && items[0]->isLocalVolume &&
 		diskCanEraseVolume(items[0]->path);
-	return QStringLiteral("state selection=%1 window=%2 trash=%3 view=%4 label=%5 erase=%6")
-		.arg(selection).arg(window ? 1 : 0).arg(full ? 1 : 0).arg(list).arg(label).arg(erase ? 1 : 0);
+	const bool network = items.size() == 1 && items[0]->isNetworkVolume;
+	const bool unmount = items.size() == 1 && items[0]->isLocalVolume;
+	return QStringLiteral("state selection=%1 window=%2 trash=%3 view=%4 label=%5 erase=%6 network=%7 unmount=%8")
+		.arg(selection).arg(window ? 1 : 0).arg(full ? 1 : 0).arg(list).arg(label).arg(erase ? 1 : 0)
+		.arg(network ? 1 : 0).arg(unmount ? 1 : 0);
 }
 
 void Finder::notifyState() {
@@ -212,6 +238,10 @@ void Finder::command(const QString &name) {
 		makeAlias();
 	} else if (name == "put-away") {
 		putAway();
+	} else if (name == "disconnect-network") {
+		unmountSelection(true);
+	} else if (name == "unmount-disk") {
+		unmountSelection(false);
 	} else if (name == "show-original") {
 		showOriginal();
 	} else if (name.startsWith("label ")) {
@@ -636,6 +666,43 @@ void Finder::makeAlias() {
 	}
 }
 
+void Finder::ejectVolume(QString path, QString name, bool network) {
+	if (!network) {
+		for (const LocalVolume &volume : localVolumes()) {
+			if (volume.path == path) {
+				if (!localVolumeEject(volume)) {
+					Alert::ask("The disk \"" + name + "\" could not be unmounted. "
+						"It may no longer be mounted.", "OK", QString());
+				}
+				return;
+			}
+		}
+	} else {
+		for (const NetVolume &volume : netVolumes()) {
+			if (volume.path == path) {
+				QString error;
+				if (!netVolumeEject(volume, &error)) {
+					Alert::ask(error, "OK", QString());
+				} else if (m_desktop) {
+					m_desktop->networkDisconnected(path);
+				}
+				return;
+			}
+		}
+	}
+	Alert::ask("The disk \"" + name + "\" is no longer mounted.", "OK", QString());
+}
+
+void Finder::unmountSelection(bool network) {
+	const auto items = front() ? front()->selectedItems() : std::vector<Item *>{};
+	if (items.size() != 1 || (network ? !items[0]->isNetworkVolume : !items[0]->isLocalVolume)) {
+		Alert::ask(network ? "Select one network disk on the desktop to disconnect." :
+			"Select one mounted disk on the desktop to unmount.", "OK", QString());
+		return;
+	}
+	ejectVolume(items[0]->path, items[0]->name, network);
+}
+
 /* Put Away: Trash items go back where they came from (freedesktop
  * trashinfo "Path="). */
 void Finder::putAway() {
@@ -643,42 +710,31 @@ void Finder::putAway() {
 	const QString info = QFileInfo(trash).absolutePath() + "/info";
 	QStringList changed;
 	bool restoredApplication = false;
-	for (Item *item : front()->selectedItems()) {
-		if (item->isLocalVolume) {
-			/* Fire async eject/unmount via GIO; GVolumeMonitor signals
-			 * mount-removed when done, refreshing the desktop. */
-			for (const LocalVolume &v : localVolumes()) {
-				if (v.path == item->path) {
-					localVolumeEject(v);
-					break;
-				}
-			}
+	struct Selected {
+		QString path, name;
+		bool local, network;
+	};
+	QList<Selected> selected;
+	for (const Item *item : front()->selectedItems()) {
+		selected.append({ item->path, item->name, item->isLocalVolume, item->isNetworkVolume });
+	}
+	for (const auto &item : selected) {
+		if (item.local || item.network) {
+			ejectVolume(item.path, item.name, item.network);
 			continue;
 		}
-		if (item->isNetworkVolume) {
-			/* The same eject this gets from dragging it to the Trash
-			 * (fileops.cpp's dropItems): nothing here is a file of
-			 * ours to put anywhere. */
-			QString error;
-			for (const NetVolume &v : netVolumes()) {
-				if (v.path == item->path && !netVolumeEject(v, &error)) {
-					Alert::ask(error, "OK", QString());
-				}
-			}
-			continue;
-		}
-		if (QFileInfo(item->path).absolutePath() != QDir(trash).absolutePath()) {
+		if (QFileInfo(item.path).absolutePath() != QDir(trash).absolutePath()) {
 			continue; /* only things in the Trash can be put away */
 		}
-		if (appTrashMarker(item->path)) {
+		if (appTrashMarker(item.path)) {
 			QString error;
-			if (!appTrashRestore(item->path, &error)) {
+			if (!appTrashRestore(item.path, &error)) {
 				Alert::ask(error, "OK", QString());
 			}
 			restoredApplication = true;
 			continue;
 		}
-		QFile f(info + "/" + item->name + ".trashinfo");
+		QFile f(info + "/" + item.name + ".trashinfo");
 		if (!f.open(QIODevice::ReadOnly)) {
 			continue;
 		}
@@ -693,7 +749,7 @@ void Finder::putAway() {
 				!QDir().mkpath(QFileInfo(original).absolutePath())) {
 			continue;
 		}
-		if (QDir().rename(item->path, original)) {
+		if (QDir().rename(item.path, original)) {
 			QFile::remove(f.fileName());
 			changed << QFileInfo(original).absolutePath();
 		}

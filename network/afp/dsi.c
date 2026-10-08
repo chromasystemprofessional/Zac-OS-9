@@ -6,6 +6,7 @@
 #include <netdb.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
+#include <poll.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
@@ -23,6 +24,21 @@ struct header {
 	int32_t code; /* error code (replies) or write offset (DSIWrite) */
 	uint32_t length;
 };
+
+static void failed(struct dsi *d) {
+	if (!d->dead) {
+		d->dead = 1;
+		if (d->disconnected) {
+			d->disconnected(d->disconnected_data);
+		}
+	}
+}
+
+void dsi_fail(struct dsi *d) {
+	pthread_mutex_lock(&d->lock);
+	failed(d);
+	pthread_mutex_unlock(&d->lock);
+}
 
 static void put16(uint8_t *p, uint16_t v) {
 	p[0] = v >> 8;
@@ -82,6 +98,30 @@ static int read_all(int fd, void *buf, size_t n) {
 	return 0;
 }
 
+static int receive_message(struct dsi *d, struct header *h, uint8_t **body) {
+	uint8_t raw[DSI_HEADER];
+	*body = NULL;
+	if (read_all(d->fd, raw, sizeof(raw)) < 0) {
+		return -1;
+	}
+	*h = (struct header) {
+		.flags = raw[0], .command = raw[1],
+		.id = (uint16_t)(raw[2] << 8 | raw[3]),
+		.code = (int32_t)get32(raw + 4), .length = get32(raw + 8),
+	};
+	if (h->length) {
+		if (h->length > 64u * 1024 * 1024 || !(*body = malloc(h->length))) {
+			return -1;
+		}
+		if (read_all(d->fd, *body, h->length) < 0) {
+			free(*body);
+			*body = NULL;
+			return -1;
+		}
+	}
+	return 0;
+}
+
 static int send_header(struct dsi *d, const struct header *h, const void *a, size_t alen,
 		const void *b, size_t blen) {
 	uint8_t raw[DSI_HEADER];
@@ -97,7 +137,7 @@ static int send_header(struct dsi *d, const struct header *h, const void *a, siz
 		{ (void *)b, blen },
 	};
 	if (write_all(d->fd, iov, blen ? 3 : alen ? 2 : 1) < 0) {
-		d->dead = 1;
+		failed(d);
 		return -1;
 	}
 	return 0;
@@ -130,6 +170,13 @@ int dsi_connect(struct dsi *d, const char *host, const char *port) {
 			int one = 1;
 			setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one));
 			setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &one, sizeof(one));
+			int idle = 5, interval = 5, probes = 3, timeout = 20000;
+			if (setsockopt(fd, IPPROTO_TCP, TCP_KEEPIDLE, &idle, sizeof(idle)) < 0 ||
+					setsockopt(fd, IPPROTO_TCP, TCP_KEEPINTVL, &interval, sizeof(interval)) < 0 ||
+					setsockopt(fd, IPPROTO_TCP, TCP_KEEPCNT, &probes, sizeof(probes)) < 0 ||
+					setsockopt(fd, IPPROTO_TCP, TCP_USER_TIMEOUT, &timeout, sizeof(timeout)) < 0) {
+				perror("zacos9-afp: could not configure connection-loss timeout");
+			}
 			d->fd = fd;
 			break;
 		}
@@ -165,26 +212,10 @@ int dsi_request(struct dsi *d, enum dsi_command command, const void *req, size_t
 		return DSI_ERR_IO;
 	}
 	for (;;) {
-		uint8_t raw[DSI_HEADER];
-		if (read_all(d->fd, raw, sizeof(raw)) < 0) {
+		struct header r;
+		uint8_t *body;
+		if (receive_message(d, &r, &body) < 0) {
 			break;
-		}
-		struct header r = {
-			.flags = raw[0],
-			.command = raw[1],
-			.id = (uint16_t)(raw[2] << 8 | raw[3]),
-			.code = (int32_t)get32(raw + 4),
-			.length = get32(raw + 8),
-		};
-		uint8_t *body = NULL;
-		if (r.length) {
-			if (r.length > 64u * 1024 * 1024 || !(body = malloc(r.length))) {
-				break;
-			}
-			if (read_all(d->fd, body, r.length) < 0) {
-				free(body);
-				break;
-			}
 		}
 		if (getenv("ZACOS9_AFP_DEBUG")) {
 			fprintf(stderr, "dsi: got flags=%d cmd=%d id=%u code=%d len=%u (waiting for id %u)\n",
@@ -195,7 +226,10 @@ int dsi_request(struct dsi *d, enum dsi_command command, const void *req, size_t
 			 * "shutting down") are acknowledged; a close ends us. */
 			if (r.command == DSI_ATTENTION) {
 				struct header ack = { .flags = 1, .command = DSI_ATTENTION, .id = r.id };
-				send_header(d, &ack, NULL, 0, NULL, 0);
+				if (send_header(d, &ack, NULL, 0, NULL, 0) < 0) {
+					free(body);
+					break;
+				}
 			} else if (r.command == DSI_CLOSE_SESSION) {
 				free(body);
 				break;
@@ -218,7 +252,7 @@ int dsi_request(struct dsi *d, enum dsi_command command, const void *req, size_t
 		pthread_mutex_unlock(&d->lock);
 		return r.code;
 	}
-	d->dead = 1;
+	failed(d);
 	pthread_mutex_unlock(&d->lock);
 	return DSI_ERR_IO;
 }
@@ -247,25 +281,72 @@ int dsi_open_session(struct dsi *d) {
 
 static void *tickle(void *arg) {
 	struct dsi *d = arg;
+	time_t next = time(NULL) + TICKLE_SECONDS;
 	for (;;) {
-		struct timespec ts = { .tv_sec = TICKLE_SECONDS };
-		while (nanosleep(&ts, &ts) < 0 && errno == EINTR) {
+		pthread_mutex_lock(&d->lock);
+		if (d->dead) {
+			pthread_mutex_unlock(&d->lock);
+			return NULL;
+		}
+		const int fd = d->fd;
+		pthread_mutex_unlock(&d->lock);
+		struct pollfd ready = { .fd = fd, .events = POLLIN };
+		int result = poll(&ready, 1, 1000);
+		if (result < 0 && errno == EINTR) {
+			continue;
 		}
 		pthread_mutex_lock(&d->lock);
 		if (d->dead) {
 			pthread_mutex_unlock(&d->lock);
 			return NULL;
 		}
-		struct header h = { .command = DSI_TICKLE, .id = d->next_id++ };
-		send_header(d, &h, NULL, 0, NULL, 0);
+		if (result < 0 || (ready.revents & (POLLERR | POLLHUP | POLLNVAL))) {
+			failed(d);
+		} else if (ready.revents & POLLIN) {
+			/* Requests own the lock through their reply, and may consume
+			 * readiness before we get it. Only idle server messages remain. */
+			int readable = poll(&ready, 1, 0);
+			struct header incoming;
+			uint8_t *body;
+			if (readable < 0) {
+				failed(d);
+			} else if (readable > 0 && (ready.revents & POLLIN)) {
+				if (receive_message(d, &incoming, &body) < 0) {
+					failed(d);
+				} else {
+					free(body);
+					if (incoming.flags == 0 && incoming.command == DSI_CLOSE_SESSION) {
+						failed(d);
+					} else if (incoming.flags == 0 && incoming.command == DSI_ATTENTION) {
+						struct header ack = { .flags = 1, .command = DSI_ATTENTION,
+							.id = incoming.id };
+						send_header(d, &ack, NULL, 0, NULL, 0);
+					}
+				}
+			}
+		}
+		if (!d->dead && time(NULL) >= next) {
+			struct header h = { .command = DSI_TICKLE, .id = d->next_id++ };
+			send_header(d, &h, NULL, 0, NULL, 0);
+			next = time(NULL) + TICKLE_SECONDS;
+		}
+		const int dead = d->dead;
 		pthread_mutex_unlock(&d->lock);
+		if (dead) {
+			return NULL;
+		}
 	}
 }
 
 void dsi_start_tickles(struct dsi *d) {
-	if (!d->tickling && pthread_create(&d->tickler, NULL, tickle, d) == 0) {
-		pthread_detach(d->tickler);
-		d->tickling = 1;
+	if (!d->tickling) {
+		int result = pthread_create(&d->tickler, NULL, tickle, d);
+		if (result != 0) {
+			fprintf(stderr, "zacos9-afp: could not monitor the connection: %s\n", strerror(result));
+			dsi_fail(d);
+		} else {
+			d->tickling = 1;
+		}
 	}
 }
 
@@ -274,6 +355,7 @@ void dsi_close(struct dsi *d) {
 		return;
 	}
 	pthread_mutex_lock(&d->lock);
+	d->disconnected = NULL;
 	if (!d->dead) {
 		struct header h = { .command = DSI_CLOSE_SESSION, .id = d->next_id++ };
 		send_header(d, &h, NULL, 0, NULL, 0);
@@ -282,4 +364,8 @@ void dsi_close(struct dsi *d) {
 	close(d->fd);
 	d->fd = -1;
 	pthread_mutex_unlock(&d->lock);
+	if (d->tickling) {
+		pthread_join(d->tickler, NULL);
+		d->tickling = 0;
+	}
 }

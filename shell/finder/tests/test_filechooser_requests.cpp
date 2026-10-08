@@ -1,4 +1,5 @@
 #include "filechooserportal.h"
+#include "alias.h"
 
 #include <QLabel>
 #include <QApplication>
@@ -17,6 +18,7 @@
 #include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QTimer>
+#include <QToolButton>
 #include <QUrl>
 #include <cstdio>
 #include <functional>
@@ -33,7 +35,8 @@ static void check(bool condition, const char *message) {
 }
 
 static QDBusMessage choose(const QDBusConnection &client, const QString &method,
-		const QVariantMap &options, const std::function<void(QDialog *, const QString &)> &action) {
+		const QVariantMap &options, const std::function<void(QDialog *, const QString &)> &action,
+		const QString &location = {}) {
 	const QString handle = QStringLiteral("/org/freedesktop/portal/desktop/request/test/r%1")
 		.arg(++serial);
 	QDBusMessage call = QDBusMessage::createMethodCall(service,
@@ -51,10 +54,18 @@ static QDBusMessage choose(const QDBusConnection &client, const QString &method,
 	QObject::connect(&interact, &QTimer::timeout, [&]() {
 		if (!acted) {
 			if (auto *dialog = qobject_cast<QDialog *>(QApplication::activeModalWidget())) {
-				if (options.contains("current_folder") && !choseDrive &&
+				if ((options.contains("current_folder") || !location.isEmpty()) && !choseDrive &&
 						!qobject_cast<QFileDialog *>(dialog)) {
-					check(dialog->findChild<QListWidget *>(),
+					auto *list = dialog->findChild<QListWidget *>();
+					check(list,
 						"app-suggested Home does not bypass the Desktop drives screen");
+					if (list && !location.isEmpty()) {
+						const auto items = list->findItems(location, Qt::MatchExactly);
+						check(items.size() == 1, "the requested desktop folder alias is listed");
+						if (!items.isEmpty()) {
+							list->setCurrentItem(items.front());
+						}
+					}
 					choseDrive = true;
 					dialog->accept();
 					return;
@@ -254,6 +265,123 @@ int main(int argc, char **argv) {
 			QUrl::fromLocalFile(QDir(drive).filePath("test (1).txt")).toString(QUrl::FullyEncoded),
 			QUrl::fromLocalFile(QDir(drive).filePath("test (2).txt")).toString(QUrl::FullyEncoded) },
 		"SaveFiles decodes aay names, asks for a folder, and avoids collisions");
+
+	QTemporaryDir server;
+	const QString serverRoot = QFileInfo(server.path()).canonicalFilePath();
+	const QString desktop = QStandardPaths::writableLocation(QStandardPaths::DesktopLocation);
+	check(QDir().mkpath(desktop), "create the Desktop for alias requests");
+	for (const QString &name : { QStringLiteral("AFP Projects"), QStringLiteral("Windows Shared") }) {
+		const QString target = serverRoot + "/" + name;
+		check(QDir().mkpath(target) && QFile::link(target, desktop + "/" + name),
+			"create desktop aliases to folders outside Home");
+		QFile document(target + "/document.txt");
+		check(document.open(QIODevice::WriteOnly), "create a server document");
+		document.write("server");
+		document.close();
+		for (const QString &method : { QStringLiteral("OpenFile"), QStringLiteral("SaveFile"),
+				QStringLiteral("SaveFiles") }) {
+			QVariantMap aliasOptions;
+			if (method == "SaveFile") {
+				aliasOptions.insert("current_name", "saved.txt");
+			} else if (method == "SaveFiles") {
+				aliasOptions.insert("files", QVariant::fromValue(names));
+			}
+			results = successfulResults(choose(client, method, aliasOptions,
+				[&](QDialog *dialog, const QString &) {
+					auto *picker = qobject_cast<QFileDialog *>(dialog);
+					check(picker && picker->directory().absolutePath() == target,
+						"choosing an alias starts directly in its resolved folder");
+					if (!picker) {
+						dialog->reject();
+						return;
+					}
+					auto *up = picker->findChild<QToolButton *>("toParentButton");
+					check(up && !up->isEnabled(), "an alias target has no Unix-parent navigation");
+					if (method == "OpenFile") {
+						if (auto *edit = picker->findChild<QLineEdit *>("fileNameEdit")) {
+							edit->setText(base + "/test.txt");
+							QMetaObject::invokeMethod(picker, "accept");
+							check(picker->isVisible() && picker->directory().absolutePath() == target,
+								"an alias location still refuses selections outside its target");
+							edit->setText("document.txt");
+						}
+					}
+					auto *select = new QTimer(picker);
+					QObject::connect(select, &QTimer::timeout, picker, [picker, method]() {
+						if (method != "SaveFiles") {
+							if (auto *edit = picker->findChild<QLineEdit *>("fileNameEdit")) {
+								edit->setText(method == "OpenFile" ? "document.txt" : "saved.txt");
+							}
+						}
+						QMetaObject::invokeMethod(picker, "accept");
+					});
+					select->start(20);
+				}, name));
+			QStringList expected;
+			const QStringList selected = method == "SaveFiles" ? QStringList{ "test.txt", "test (1).txt" } :
+				QStringList{ method == "OpenFile" ? "document.txt" : "saved.txt" };
+			for (const QString &fileName : selected) {
+				expected << QUrl::fromLocalFile(target + "/" + fileName).toString(QUrl::FullyEncoded);
+			}
+			check(results.value("uris").toStringList() == expected,
+				"open and both save methods return real external-folder URIs");
+		}
+		QVariantMap folderOptions;
+		folderOptions.insert("directory", true);
+		results = successfulResults(choose(client, "OpenFile", folderOptions,
+			[&](QDialog *dialog, const QString &) { QMetaObject::invokeMethod(dialog, "accept"); }, name));
+		check(results.value("uris").toStringList() ==
+			QStringList{ QUrl::fromLocalFile(target).toString(QUrl::FullyEncoded) },
+			"folder selection can return the alias target itself");
+	}
+	check(QFile::link(serverRoot + "/Disconnected", desktop + "/Offline Server"),
+		"create an unavailable server alias");
+	const QDBusMessage unavailable = choose(client, "OpenFile", {},
+		[&](QDialog *dialog, const QString &) {
+			auto *list = dialog->findChild<QListWidget *>();
+			const auto items = list ? list->findItems("Offline Server", Qt::MatchExactly) :
+				QList<QListWidgetItem *>{};
+			check(items.size() == 1, "an unavailable server remains on the location screen");
+			if (!items.isEmpty()) {
+				list->setCurrentItem(items.front());
+				QMetaObject::invokeMethod(dialog, "accept");
+				check(dialog->isVisible(), "an unavailable alias does not fall back to Home");
+				bool error = false;
+				for (const QLabel *label : dialog->findChildren<QLabel *>()) {
+					error |= label->text().contains("Reconnect");
+				}
+				check(error, "unavailable aliases report a visible reconnection error");
+			}
+			dialog->reject();
+		});
+	check(unavailable.arguments().value(0).toUInt() == 1,
+		"cancelling an unavailable alias returns cancellation");
+	check(QDir().mkpath(serverRoot + "/Replaced") &&
+		QFile::link(serverRoot + "/Replaced", desktop + "/Replaced Folder") &&
+		aliasRecord(desktop + "/Replaced Folder", serverRoot + "/Replaced") &&
+		QDir().mkpath(serverRoot + "/Away/a/b/c/d") &&
+		QDir().rename(serverRoot + "/Replaced", serverRoot + "/Away/a/b/c/d/Original") &&
+		QDir().mkpath(serverRoot + "/Replaced"),
+		"create an alias with a replaced original outside the reconnection search area");
+	const QDBusMessage replaced = choose(client, "OpenFile", {},
+		[&](QDialog *dialog, const QString &) {
+			auto *list = dialog->findChild<QListWidget *>();
+			const auto items = list ? list->findItems("Replaced Folder", Qt::MatchExactly) :
+				QList<QListWidgetItem *>{};
+			check(items.size() == 1, "a replaced folder alias stays listed");
+			if (!items.isEmpty()) {
+				list->setCurrentItem(items.front());
+				QMetaObject::invokeMethod(dialog, "accept");
+				check(dialog->isVisible(), "a replaced folder is not silently accepted");
+				bool error = false;
+				for (const QLabel *label : dialog->findChildren<QLabel *>()) {
+					error |= label->text().contains("replaced");
+				}
+				check(error, "the chooser reports a replaced original explicitly");
+			}
+			dialog->reject();
+		});
+	check(replaced.arguments().value(0).toUInt() == 1, "a replaced alias request can be cancelled");
 
 	for (int i = 0; i < 2; ++i) {
 		const QDBusMessage cancelled = choose(client, "OpenFile", {},

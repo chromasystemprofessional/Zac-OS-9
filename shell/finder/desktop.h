@@ -25,6 +25,7 @@ public:
 	void becomeLayerSurface();
 	/* Something changed in `folder`: refresh desktop items or the Trash. */
 	void folderChanged(const QString &folder);
+	void networkDisconnected(const QString &path);
 
 	/* FinderView */
 	QString folderPath() const override;

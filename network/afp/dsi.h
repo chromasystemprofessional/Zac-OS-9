@@ -4,8 +4,8 @@
  * DSI, the Data Stream Interface: AFP over TCP (Inside AppleTalk's AFP
  * over TCP chapter). Each request has a 16-byte header and a reply with
  * the same request ID. The server also sends tickles (ignored), and
- * attentions (acknowledged); a thread tickles the server every 30 s so an
- * idle session isn't dropped.
+ * attentions (acknowledged); a thread monitors idle messages and tickles
+ * the server every 30 s so an idle session isn't dropped.
  */
 
 #include <pthread.h>
@@ -32,6 +32,8 @@ struct dsi {
 	pthread_t tickler;
 	int tickling;
 	int dead;
+	void (*disconnected)(void *);
+	void *disconnected_data;
 	/* The most the server takes in one request (DSIOpenSession's reply). */
 	uint32_t server_quantum;
 };
@@ -48,5 +50,7 @@ int dsi_request(struct dsi *d, enum dsi_command command, const void *req, size_t
 	const void *data, size_t datalen, uint8_t **out, size_t *outlen);
 /* Starts the tickle thread (after any fork). */
 void dsi_start_tickles(struct dsi *d);
+/* Marks a terminal session failure, notifying once (under the DSI lock). */
+void dsi_fail(struct dsi *d);
 /* DSICloseSession and close. */
 void dsi_close(struct dsi *d);

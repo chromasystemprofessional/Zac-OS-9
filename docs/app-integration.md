@@ -20,7 +20,7 @@ works for it:
 
 - **Standard application file chooser**: the session selects the ZacOS
   `FileChooser` portal for GTK and Qt standard dialogs. Its first screen lists
-  Zacintosh HD and mounted data volumes, without a
+  Zacintosh HD, mounted data volumes and Desktop folder aliases, without a
   places sidebar; the subsequent file browser also has no sidebar. The
   Zacintosh HD shows the Finder's Macintosh view, not the Unix root: System
   Folder, Applications, Home and the user's own top-level folders. The backend
@@ -35,14 +35,32 @@ works for it:
   time), so the backend warms up at start and the session starts the backend at
   login. Requests arriving during the scan wait for it; closing one cancels it
   immediately. Every request starts
-  at the drive list, ignoring app-suggested Home/current folders. The browser
-  stays within the selected drive: Unix ancestors are not offered, and typed
-  paths or symlinks outside the drive cannot be selected. Cancel and reopen to
-  choose another drive. This is a navigation restriction, not an application
-  sandbox. App-specific custom pickers are not rewritten.
+  at the location list, ignoring app-suggested Home/current folders. Desktop
+  folder aliases appear under their Desktop names with italic labels and
+  Platinum folder icons. They may point to any directory, including mounted
+  AFP or Windows/SMB shares and their subfolders; document aliases are omitted.
+  Choosing one opens its resolved folder, and open, folder and save requests
+  return real target paths. Desktop folder aliases can also be followed from
+  Home/Desktop inside Zacintosh HD. Missing or changed aliases report an error
+  rather than falling back to Home; repair them using Finder's Fix Alias.
+  This refinement was installed in the live session on 2026-10-08 and is
+  included in 0.1.38. The restarted backend responds on D-Bus;
+  the user confirmed the live AFP disk works after remounting. Live SMB
+  selection still needs confirmation.
+  The browser stays within the selected drive or alias target: Unix ancestors
+  are not offered, and typed paths or symlinks outside that location cannot be
+  selected. Cancel and reopen to choose another location. This is a navigation
+  restriction, not an application sandbox. App-specific custom pickers are not rewritten.
   Read-only drives remain available for opening files. Mac/APFS drives are
   discovered from active mount records with their Desktop names, even when
-  GIO or Qt storage enumeration omits their FUSE mounts. An unavailable drive
+  GIO or Qt storage enumeration omits their FUSE mounts. AFP and kernel SMB
+  disks are also discovered from active mount records, preserving spaces in
+  their names and listing them even when an I/O error prevents Qt from
+  recognizing them as ready. GVFS Windows shares use their local GVFS paths
+  and share names, since GIO normally reports their roots as SMB URLs.
+  The correction was installed live on 2026-10-08; the live location screen
+  was visually verified to include the mounted AFP disk `adam's home`.
+  An unavailable drive
   reports an error instead of falling back to Home. Drive icons are rendered by
   the same Platinum painter as the Finder Desktop: the 32-pixel disk icon,
   nearest-neighbour scaled for HiDPI, with the Desktop's USB badge on USB

@@ -4,6 +4,10 @@
 #include <QProcess>
 #include <QStandardPaths>
 #include <QUrl>
+#include <QCoreApplication>
+#include <QElapsedTimer>
+#include <QEventLoop>
+#include <QThread>
 
 /* server/share, percent-escaped the way a URL needs (a share name with
  * a space in it is common enough on real networks to get right). */
@@ -22,9 +26,19 @@ static bool runGio(const QStringList &args, const QByteArray &stdin_, QString *e
 		p.write(stdin_);
 	}
 	p.closeWriteChannel();
-	if (!p.waitForFinished(20000)) {
+	QElapsedTimer timer;
+	timer.start();
+	while (p.state() != QProcess::NotRunning && timer.elapsed() < 20000) {
+		QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents, 10);
+		QThread::msleep(1);
+	}
+	if (p.state() != QProcess::NotRunning) {
 		p.kill();
 		*error = "That took too long.";
+		return false;
+	}
+	if (p.error() == QProcess::FailedToStart || p.exitStatus() != QProcess::NormalExit) {
+		*error = p.errorString();
 		return false;
 	}
 	const QString err = QString::fromUtf8(p.readAllStandardError()).trimmed();
@@ -32,6 +46,10 @@ static bool runGio(const QStringList &args, const QByteArray &stdin_, QString *e
 		/* "gio: smb://host/share/: Failed to mount Windows share: ..." */
 		const int colon = err.indexOf(": ", err.indexOf("://"));
 		*error = colon > 0 ? err.mid(colon + 2) : err;
+		return false;
+	}
+	if (p.exitCode() != 0) {
+		*error = "The network operation failed (exit code " + QString::number(p.exitCode()) + ").";
 		return false;
 	}
 	return true;

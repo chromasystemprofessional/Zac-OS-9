@@ -39,7 +39,9 @@
 
 static int failures;
 
-std::vector<LocalVolume> localVolumes() { return {}; }
+static std::vector<LocalVolume> fixtureVolumes;
+static QString ejectedFixture;
+std::vector<LocalVolume> localVolumes() { return fixtureVolumes; }
 QString localVolumeUsbDevice(const QString &) { return {}; }
 void localVolumesOnChange(std::function<void()>) {}
 void localVolumesOnError(std::function<void(const QString &)>) {}
@@ -51,7 +53,10 @@ void localVolumesMountAll() {}
 void localVolumesOnMountFailed(std::function<void(const QString &)>) {}
 void localVolumeMountDevice(const QString &) {}
 void localVolumeInhibitMount(const QString &, bool) {}
-bool localVolumeEject(const LocalVolume &) { return false; }
+bool localVolumeEject(const LocalVolume &volume) {
+	ejectedFixture = volume.path;
+	return true;
+}
 bool localVolumePathShown(const QString &) { return false; }
 
 static void check(bool ok, const char *message) {
@@ -184,6 +189,138 @@ int main(int argc, char **argv) {
 	desktop.resize(1024, 768);
 	desktop.show();
 	Finder::instance().start(&desktop);
+	const size_t connectedDiskCount = desktop.m_netVolumes.size();
+	for (const QString &command : { QStringLiteral("disconnect-network"), QStringLiteral("unmount-disk") }) {
+		desktop.selectByName(QString());
+		bool explained = false;
+		QTimer::singleShot(0, [&] {
+			if (auto *alert = qobject_cast<QDialog *>(QApplication::activeModalWidget())) {
+				explained = true;
+				alert->reject();
+			}
+		});
+		Finder::instance().command(command);
+		check(explained, "disk commands refuse an invalid selection with an explicit dialog");
+	}
+	auto disconnectedDisk = std::make_unique<Item>();
+	disconnectedDisk->name = "adam's home";
+	disconnectedDisk->path = home.path() + "/network/adam's home";
+	disconnectedDisk->kind = PL_ICON_DISK;
+	disconnectedDisk->isDir = true;
+	disconnectedDisk->isNetworkVolume = true;
+	const QString disconnectedPath = disconnectedDisk->path;
+	desktop.m_pressItem = disconnectedDisk.get();
+	desktop.m_netVolumes.push_back(std::move(disconnectedDisk));
+	desktop.selectByName(QString());
+	desktop.m_netVolumes.back()->selected = true;
+	QLocalSocket stateClient;
+	stateClient.connectToServer(Finder::socketPath());
+	check(waitFor([&] { return stateClient.canReadLine(); }),
+		"menu bar can read selected network-disk state");
+	const QByteArray networkState = stateClient.readLine();
+	check(networkState.contains("network=1 unmount=0"),
+		"network disk enables only the dedicated disconnect command");
+	stateClient.disconnectFromServer();
+	QLocalSocket client;
+	client.connectToServer(Finder::socketPath());
+	check(waitFor([&] { return client.state() == QLocalSocket::ConnectedState; }),
+		"AFP daemon can connect to Finder's existing notification socket");
+	client.write("afp-disconnected " + QFile::encodeName(disconnectedPath).toHex() + "\n");
+	client.disconnectFromServer();
+	QWidget *disconnectedAlert = nullptr;
+	check(waitFor([&] {
+		for (QWidget *window : QApplication::topLevelWidgets()) {
+			if (window->windowTitle() == "Server Disconnected" && window->isVisible()) {
+				disconnectedAlert = window;
+				return true;
+			}
+		}
+		return false;
+	}), "a real AFP disconnect notification displays a dialog immediately");
+	check(desktop.m_netVolumes.size() == connectedDiskCount && desktop.m_pressItem == nullptr &&
+		std::none_of(desktop.m_netVolumes.begin(), desktop.m_netVolumes.end(),
+			[&](const auto &item) { return item->path == disconnectedPath; }),
+		"disconnected disk icon and stale press pointer are removed before the dialog");
+	if (disconnectedAlert) {
+		check(disconnectedAlert->accessibleDescription().contains("adam's home") &&
+			disconnectedAlert->accessibleDescription().contains("has been disconnected"),
+			"the disconnect dialog identifies the server disk and explains what happened");
+		disconnectedAlert->close();
+	}
+	settle();
+	const QString usbPath = home.path() + "/USB Disk";
+	fixtureVolumes.push_back({ "USB Disk", usbPath, true, {} });
+	desktop.refreshLocalVolumes();
+	desktop.selectByName(QString());
+	desktop.m_localVolumes.back()->selected = true;
+	QLocalSocket usbStateClient;
+	usbStateClient.connectToServer(Finder::socketPath());
+	check(waitFor([&] { return usbStateClient.canReadLine(); }), "menu bar receives USB disk state");
+	check(usbStateClient.readLine().contains("network=0 unmount=1"),
+		"local USB disk enables Unmount Disk, not Disconnect Network Drive");
+	Finder::instance().command("unmount-disk");
+	check(ejectedFixture == usbPath, "Unmount Disk routes the selected USB disk to the local eject helper");
+	usbStateClient.disconnectFromServer();
+	fixtureVolumes.clear();
+	desktop.refreshLocalVolumes();
+	const QString windowsShare = home.path() + "/gvfs/smb-share:server=test,share=Menu Test";
+	const QString tools = home.path() + "/menu-tools";
+	check(QDir().mkpath(windowsShare) && QDir().mkpath(tools), "create isolated SMB command fixture");
+	QFile gioMock(tools + "/gio");
+	check(gioMock.open(QIODevice::WriteOnly), "create mock SMB unmount command");
+	gioMock.write("#!/bin/sh\n[ \"$1\" = mount ] && [ \"$2\" = -u ] && "
+		"[ \"$3\" = 'smb://test/Menu%20Test' ] || exit 9\n"
+		"rmdir \"$XDG_RUNTIME_DIR/gvfs/smb-share:server=test,share=Menu Test\"\n");
+	gioMock.close();
+	check(QFile::setPermissions(gioMock.fileName(), QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner),
+		"make mock SMB command executable");
+	const QByteArray oldPath = qgetenv("PATH");
+	qputenv("PATH", tools.toUtf8() + ":" + oldPath);
+	desktop.refreshNetVolumes();
+	desktop.selectByName(QString());
+	for (auto &item : desktop.m_netVolumes) {
+		item->selected = item->path == windowsShare;
+	}
+	Finder::instance().command("disconnect-network");
+	check(!QFileInfo::exists(windowsShare) &&
+		std::none_of(desktop.m_netVolumes.begin(), desktop.m_netVolumes.end(),
+			[&](const auto &item) { return item->path == windowsShare; }),
+		"Disconnect Network Drive runs SMB unmount and immediately removes only that disk");
+	bool warned = false;
+	for (QWidget *window : QApplication::topLevelWidgets()) {
+		warned |= window->windowTitle() == "Server Disconnected" && window->isVisible();
+	}
+	check(!warned, "intentional network disconnect does not show an unexpected-disconnection dialog");
+	check(QDir().mkpath(windowsShare) && gioMock.open(QIODevice::WriteOnly | QIODevice::Truncate),
+		"create a refused SMB unmount fixture");
+	gioMock.write("#!/bin/sh\nprintf 'gio: smb://test/Menu%%20Test/: The share is busy\\n' >&2\nexit 0\n");
+	gioMock.close();
+	desktop.refreshNetVolumes();
+	desktop.selectByName(QString());
+	for (auto &item : desktop.m_netVolumes) {
+		item->selected = item->path == windowsShare;
+	}
+	bool failureExplained = false;
+	QTimer::singleShot(0, [&] {
+		auto *closeAlert = new QTimer(&desktop);
+		QObject::connect(closeAlert, &QTimer::timeout, closeAlert, [&, closeAlert] {
+			if (auto *alert = qobject_cast<QDialog *>(QApplication::activeModalWidget())) {
+				failureExplained = true;
+				alert->reject();
+				closeAlert->stop();
+				closeAlert->deleteLater();
+			}
+		});
+		closeAlert->start(10);
+	});
+	Finder::instance().command("disconnect-network");
+	check(failureExplained && QFileInfo::exists(windowsShare) &&
+		std::any_of(desktop.m_netVolumes.begin(), desktop.m_netVolumes.end(),
+			[&](const auto &item) { return item->path == windowsShare; }),
+		"failed SMB unmount reports an error and retains its disk even when gio exits zero");
+	check(QDir().rmdir(windowsShare), "remove mock SMB mount fixture");
+	desktop.refreshNetVolumes();
+	qputenv("PATH", oldPath);
 	Finder::instance().command("about");
 	QWidget *aboutWindow = nullptr;
 	for (QWidget *window : QApplication::topLevelWidgets()) {

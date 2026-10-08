@@ -1,6 +1,6 @@
 # Project Status
 
-Updated: 2026-10-07
+Updated: 2026-10-08
 
 ## Completed
 
@@ -23,6 +23,85 @@ Updated: 2026-10-07
 | *(uncommitted)* | Installer fixed end to end: GRUB packages in the image, UEFI/BIOS detection, BIOS boot partition, fallback `EFI/BOOT/BOOTX64.EFI` for Macs, live user in `sudo` (polkit), failing step shown in the window. VM-tested (`build/test-install.py`): whole disk under BIOS and UEFI, and a partition beside a kept FAT partition under UEFI — each installed disk boots to the desktop. Boot splash now shows the logo and a progress bar. |
 
 ## Current work
+
+**Explicit disk disconnect/unmount menus and password login** (0.1.38):
+Finder's Special menu now has Disconnect Network Drive
+(AFP/SMB) and Unmount Disk (local disks, including USB), enabled only for the
+appropriate single selected mounted disk. Startup disk and ordinary folders
+are excluded. Existing Put Away is preserved through the same eject helpers.
+Successful network disconnect removes the icon immediately without an
+unexpected-disconnection warning; failures are reported, including GIO local
+unmount errors. AFP/SMB command waits service Qt events instead of blocking
+with `waitForFinished`.
+All five focused suites pass (`erase-disk-menu`, `finder-desktop`,
+`afp-disconnect`, `filechooser-locations`, `filechooser-requests`), covering
+menu gating, USB helper routing, successful SMB disconnect without warning,
+and a refused SMB unmount whose exit code is zero. Installed tested Finder,
+menu bar, Network Browser and chooser with administrator authorization and
+restarted Finder/menu bar with user approval on 2026-10-08. Both services are
+active; the live Finder sends the new `network`/`unmount` fields, and the
+chooser responds on D-Bus. Included in the 0.1.38 release. Full pre-release
+suite: 63 passed, 3 skipped, no failures (66 tests).
+
+The user chose password login to retain encrypted application credentials.
+Removed only greetd's automatic `initial_session` from the live machine's
+`/etc/greetd/config.toml`, preserving a backup at
+`/etc/greetd/config.toml.before-password-login`; normal login and PAM keyring
+hooks were already present. The account has a password, and the greeter is
+available. Did not restart greetd or read/change stored secrets. This applies
+at the next login. The existing Default Keyring is separate from Login:
+after password login it may need a one-time unlock with automatic unlock
+enabled in its native prompt. End-to-end password-login/keyring unlocking
+remains to be confirmed by the user. This machine-specific login preference
+is not forced on other installations. See [packaging](docs/packaging.md).
+
+**AFP disconnected disks** (0.1.38): confirmed the user
+remounted `adam's home` successfully. AFP transport/session failure now ends
+the failed FUSE mount rather than leaving an I/O-error disk behind. Idle
+sockets are monitored, with TCP keepalive/user timeouts for silent outages.
+After unmounting, the AFP daemon notifies Finder through its existing socket;
+the desktop icon is removed immediately and a Platinum Server Disconnected
+dialog names the disk and warns about unsaved changes. Normal eject and
+ordinary file errors remain silent. All five focused suites pass; eight real
+FUSE lifecycle scenarios unmounted within 0.00-1.02 seconds in a measured run,
+including background daemon teardown. Finder socket tests verify the icon is
+removed before its dialog appears and unrelated disks remain.
+Installed the tested AFP client, Finder, Network Browser and chooser with
+administrator authorization on 2026-10-08. Restarted Finder with user approval
+and reloaded the chooser; both live endpoints respond, and installed binaries
+match the builds. Kept the working AFP mount untouched: it retains the old
+daemon until the next eject/remount. Included in the 0.1.38 release.
+See [network](docs/network.md).
+
+**Desktop folder aliases in the application chooser** (0.1.38; installed live): the
+location screen lists Desktop folder aliases alongside disks, with their own
+names, italic labels and Platinum folder icons. Targets may be any directory,
+including mounted AFP or Windows/SMB folders outside Home. Open, folder
+selection, SaveFile and SaveFiles return real target paths. Aliases can also
+be followed from Home/Desktop in the Macintosh view. Missing or replaced
+originals report errors instead of falling back to Home. Installed the tested
+backend at `/usr/bin/zacos9-file-portal` with administrator authorization on
+2026-10-08 and restarted only the chooser backend. Its new live process owns
+the portal D-Bus service and responds to introspection; the installed binary's
+SHA-256 matches the tested build. The user confirmed the AFP disk works after
+remounting. Included in the 0.1.38 release. Focused tests pass:
+`filechooser-locations`, `filechooser-requests`, `filechooser-lifecycle`,
+`finder-desktop` and `alias`. Regressions use external-folder fixtures for
+AFP/SMB paths and cover chained aliases, renamed originals, unavailable and
+replaced targets, outside-location rejection and all four chooser operations.
+Follow-up: the live AFP disk `adam's home` was absent because its mount
+returned an Input/output error and Qt omitted it as not ready. The chooser
+now discovers AFP and kernel SMB disks from active mount records and GVFS
+Windows shares from their local paths, so an unavailable disk remains listed
+and reports an access error. The real Desktop directory also contains a
+`Home alias` pointing to `/home/adam`; it is not the AFP disk. After explicit
+user approval, moved that alias and its identity record to Trash, preserving
+the real Home folder. New chooser requests no longer list that alias.
+Installed the correction with administrator authorization and restarted only
+the chooser backend. Visually verified the actual live chooser lists
+`adam's home` as a disk alongside the local disks (before trashing `Home alias`). All five
+focused suites still pass. The user subsequently remounted the AFP disk and
+confirmed it works; the disconnected-mount lifecycle fix is described above.
 
 **Startup Items by drag and drop** (unreleased): dropping an application
 into System Folder ▸ Startup Items (on the folder or into its window) makes

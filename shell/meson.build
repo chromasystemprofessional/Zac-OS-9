@@ -167,6 +167,7 @@ panelkit = static_library('panelkit', 'panels/panelkit.cpp', 'panels/sharingclie
 # The chooser shows the startup disk through the Finder's Macintosh view.
 file_chooser_sources = [
   'finder/filechooserportal.cpp',
+  'finder/alias.cpp',
   'finder/localvolumes.cpp', 'network/netvolumes.cpp', 'network/smbclient.cpp',
   'finder/vfs.cpp', 'finder/resources.cpp', 'finder/autostart.cpp',
   'finder/extensioncatalog.cpp', 'finder/appdb.cpp', 'finder/apptrash.cpp',

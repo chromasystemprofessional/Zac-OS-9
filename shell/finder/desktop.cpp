@@ -28,6 +28,7 @@
 #include "patterns.h"
 #include "custompatterns.h"
 #include "settings.h"
+#include <algorithm>
 
 /* How often the desktop checks what's mounted from the Network Browser:
  * nothing posts an event when a terminal runs fusermount3 -u or gio
@@ -186,9 +187,21 @@ void Desktop::refreshNetVolumes() {
 		item->selected = selected.contains(v.path);
 		fresh.push_back(std::move(item));
 	}
+	m_pressItem = nullptr;
+	clearDropTarget();
 	m_netVolumes = std::move(fresh);
 	placeIcons();
 	update();
+}
+
+void Desktop::networkDisconnected(const QString &path) {
+	m_pressItem = nullptr;
+	clearDropTarget();
+	m_netVolumes.erase(std::remove_if(m_netVolumes.begin(), m_netVolumes.end(),
+		[&path](const auto &item) { return item->path == path; }), m_netVolumes.end());
+	placeIcons();
+	update();
+	Finder::instance().notifyState();
 }
 
 void Desktop::refreshLocalVolumes() {

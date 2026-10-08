@@ -543,6 +543,8 @@ static void onEjectDone(GObject *src, GAsyncResult *res, gpointer wasEject) {
 		g_mount_unmount_with_operation_finish(mount, res, &err);
 	}
 	if (err) {
+		reportMacError(QStringLiteral("The disk could not be unmounted. ") +
+			QString::fromUtf8(err->message));
 		g_error_free(err);
 	}
 	/* GVolumeMonitor fires mount-removed on success, which triggers

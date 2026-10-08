@@ -1,10 +1,16 @@
 #include "netvolumes.h"
 
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QProcess>
 #include <QRegularExpression>
 #include <QStandardPaths>
+#include <QDebug>
+#include <QCoreApplication>
+#include <QElapsedTimer>
+#include <QEventLoop>
+#include <QThread>
 
 #include "smbclient.h"
 
@@ -15,20 +21,33 @@ static QString mountsDir() {
 
 static std::vector<NetVolume> afpMounts() {
 	std::vector<NetVolume> out;
-	QProcess p;
-	p.start("findmnt", { "-t", "fuse.afp", "-n", "-o", "TARGET" });
-	if (!p.waitForFinished(3000)) {
+	QFile mounts("/proc/self/mountinfo");
+	if (!mounts.open(QIODevice::ReadOnly)) {
+		qWarning() << "Could not read network mount table:" << mounts.errorString();
 		return out;
 	}
-	for (const QString &path : QString::fromUtf8(p.readAllStandardOutput())
-			.split('\n', Qt::SkipEmptyParts)) {
+	for (const QByteArray &line : mounts.readAll().split('\n')) {
+		const QList<QByteArray> fields = line.split(' ');
+		const int separator = fields.indexOf("-");
+		if (separator < 6 || separator + 1 >= fields.size() ||
+				fields.at(separator + 1) != "fuse.afp") {
+			continue;
+		}
 		NetVolume v;
 		v.kind = NetVolume::AFP;
-		v.path = path.trimmed();
+		v.path = netVolumeMountInfoPath(fields.at(4));
 		v.share = v.name = QFileInfo(v.path).fileName();
 		out.push_back(v);
 	}
 	return out;
+}
+
+QString netVolumeMountInfoPath(QByteArray path) {
+	path.replace("\\040", " ");
+	path.replace("\\011", "\t");
+	path.replace("\\012", "\n");
+	path.replace("\\134", "\\");
+	return QFile::decodeName(path);
 }
 
 static std::vector<NetVolume> smbMounts() {
@@ -86,11 +105,23 @@ bool netVolumeEject(const NetVolume &v, QString *error) {
 	if (v.kind == NetVolume::AFP) {
 		QProcess p;
 		p.start("fusermount3", { "-u", v.path });
-		if (!p.waitForFinished(10000) || p.exitStatus() != QProcess::NormalExit ||
+		QElapsedTimer timer;
+		timer.start();
+		while (p.state() != QProcess::NotRunning && timer.elapsed() < 10000) {
+			QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents, 10);
+			QThread::msleep(1);
+		}
+		const bool timedOut = p.state() != QProcess::NotRunning;
+		if (timedOut) {
+			p.kill();
+		}
+		if (timedOut || p.error() == QProcess::FailedToStart || p.exitStatus() != QProcess::NormalExit ||
 				p.exitCode() != 0) {
 			*error = QString::fromUtf8(p.readAllStandardError()).trimmed();
 			if (error->isEmpty()) {
-				*error = "The volume couldn’t be put away; something may still be using it.";
+				*error = timedOut ? QStringLiteral("Disconnecting the server disk took too long.") :
+					p.error() == QProcess::FailedToStart ? p.errorString() :
+					QStringLiteral("The volume couldn’t be put away; something may still be using it.");
 			}
 			return false;
 		}

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QImage>
+#include <QByteArray>
 #include <QList>
 #include <QString>
 #include <QStringList>
@@ -15,9 +16,13 @@ struct FileChooserLocation {
 	 * folders and links. These are the real folders/files behind its links,
 	 * the only places that can be chosen. Empty for an ordinary drive. */
 	QStringList realRoots;
+	bool folderAlias = false;
+	QString error = {};
 };
 
 QList<FileChooserLocation> fileChooserLocations();
+QList<FileChooserLocation> fileChooserNetworkLocations(
+	const QByteArray &mountInfo, const QString &runtime);
 void prepareFileChooserDialog(QFileDialog &dialog);
 bool registerFileChooserPortal();
 /* The Finder desktop's disk icon, at 32x32 1x pixels. */

@@ -1,7 +1,9 @@
 #include <gio/gio.h>
 
 #include "filechooserportal.h"
+#include "alias.h"
 #include "localvolumes.h"
+#include "netvolumes.h"
 #include "vfs.h"
 #include "pixels.h"
 
@@ -20,6 +22,7 @@
 #include <QListWidget>
 #include <QMimeDatabase>
 #include <QPushButton>
+#include <QRegularExpression>
 #include <QSet>
 #include <QStorageInfo>
 #include <QStandardPaths>
@@ -97,7 +100,7 @@ public:
 		connect(this, &QFileDialog::directoryEntered, this, [this](const QString &path) {
 			if (!fileChooserPathWithinDisk(path, m_root, m_realRoots, true)) {
 				setDirectory(m_root);
-				m_error->setText("Choose a location on this drive. Cancel to choose another drive.");
+				m_error->setText("Choose a folder inside this location. Cancel to choose another location.");
 			}
 			updateLocation();
 		});
@@ -110,7 +113,7 @@ protected:
 			if (!fileChooserPathWithinDisk(path, m_root, m_realRoots, false)) {
 				m_error->setText(fileChooserPathWithinDisk(path, m_root, m_realRoots, true) ?
 					QStringLiteral("Choose an item inside a folder such as Home.") :
-					QStringLiteral("This item is outside the selected drive. Choose an item on this drive."));
+					QStringLiteral("This item is outside the selected location. Choose an item inside it."));
 				/* A stale selection would keep rejecting later valid choices. */
 				for (QAbstractItemView *view : findChildren<QAbstractItemView *>()) {
 					if (view->selectionModel()) {
@@ -208,11 +211,19 @@ QImage fileChooserDriveIcon(bool usb, bool selected) {
 namespace {
 
 /* Pixel art is scaled whole-number with nearest-neighbour, as on the desktop. */
-QIcon driveIcon(bool usb) {
+QIcon driveIcon(bool usb, bool folderAlias) {
 	QIcon icon;
 	for (int scale = 1; scale <= 3; scale++) {
 		for (bool selected : { false, true }) {
-			const QImage image = fileChooserDriveIcon(usb, selected);
+			QImage image;
+			if (folderAlias) {
+				Pixels folder(PL_ICON_LARGE, PL_ICON_LARGE);
+				pl_icon_paint_label(&folder.c, 0, 0, PL_ICON_FOLDER, PL_ICON_LARGE,
+					selected, pl_labels[0].color);
+				image = folder.img;
+			} else {
+				image = fileChooserDriveIcon(usb, selected);
+			}
 			icon.addPixmap(QPixmap::fromImage(image.scaled(image.size() * scale,
 				Qt::IgnoreAspectRatio, Qt::FastTransformation)),
 				selected ? QIcon::Selected : QIcon::Normal);
@@ -228,7 +239,7 @@ public:
 		setModal(true);
 		resize(520, 350);
 		auto *layout = new QVBoxLayout(this);
-		auto *heading = new QLabel("Choose a disk", this);
+		auto *heading = new QLabel("Choose a disk or desktop folder alias", this);
 		layout->addWidget(heading);
 		m_error = new QLabel(this);
 		m_error->setWordWrap(true);
@@ -243,8 +254,13 @@ public:
 		m_locations->setSpacing(8);
 		m_drives = fileChooserLocations();
 		for (int i = 0; i < m_drives.size(); i++) {
-			auto *item = new QListWidgetItem(driveIcon(m_drives[i].usb), m_drives[i].name,
-				m_locations);
+			auto *item = new QListWidgetItem(
+				driveIcon(m_drives[i].usb, m_drives[i].folderAlias), m_drives[i].name, m_locations);
+			if (m_drives[i].folderAlias) {
+				QFont font = item->font();
+				font.setItalic(true);
+				item->setFont(font);
+			}
 			item->setData(Qt::UserRole, i);
 		}
 		m_locations->setCurrentRow(0);
@@ -270,12 +286,28 @@ public:
 
 protected:
 	void accept() override {
-		const QFileInfo root(selectedDrive().path);
+		FileChooserLocation location = selectedDrive();
+		if (location.folderAlias) {
+			const AliasResolution resolved = aliasResolve(location.path);
+			if (!resolved.error.isEmpty() ||
+					(resolved.state != AliasState::Ok && resolved.state != AliasState::Reconnected)) {
+				QString problem = aliasProblemText(resolved.state);
+				if (problem.isEmpty()) {
+					problem = "This desktop item is no longer an alias.";
+				}
+				m_error->setText(resolved.error.isEmpty() ? problem +
+					" Reconnect the server or use Finder's Fix Alias." : resolved.error);
+				return;
+			}
+			location.path = QFileInfo(resolved.target).canonicalFilePath();
+		}
+		const QFileInfo root(location.path);
 		if (!root.isDir() || !root.isReadable() || root.canonicalFilePath().isEmpty() ||
-				root.canonicalFilePath() == "/") {
-			m_error->setText("This drive is not accessible. Reconnect it or choose another drive.");
+				(!location.folderAlias && root.canonicalFilePath() == "/")) {
+			m_error->setText("This location is not accessible. Reconnect it or choose another location.");
 			return;
 		}
+		m_drives[m_locations->currentItem()->data(Qt::UserRole).toInt()] = location;
 		QDialog::accept();
 	}
 
@@ -611,7 +643,7 @@ static bool under(const QString &path, const QString &root) {
 
 bool fileChooserPathWithinDrive(const QString &path, const QString &root) {
 	const QString canonicalRoot = QFileInfo(root).canonicalFilePath();
-	if (canonicalRoot.isEmpty() || canonicalRoot == "/") {
+	if (canonicalRoot.isEmpty()) {
 		return false;
 	}
 	return under(canonicalTarget(path), canonicalRoot);
@@ -632,7 +664,7 @@ bool fileChooserPathWithinDisk(const QString &path, const QString &root,
 		return browsing;
 	}
 	return std::any_of(realRoots.begin(), realRoots.end(),
-		[&target](const QString &real) { return real != "/" && under(target, real); });
+		[&target](const QString &real) { return under(target, real); });
 }
 
 QString fileChooserRealPath(const QString &path) {
@@ -726,6 +758,43 @@ void prepareFileChooserDialog(QFileDialog &dialog) {
 	}
 }
 
+QList<FileChooserLocation> fileChooserNetworkLocations(
+		const QByteArray &mountInfo, const QString &runtime) {
+	QList<FileChooserLocation> locations;
+	QSet<QString> seen;
+	for (const QByteArray &line : mountInfo.split('\n')) {
+		const QList<QByteArray> fields = line.split(' ');
+		const int separator = fields.indexOf("-");
+		if (separator < 6 || separator + 2 >= fields.size()) {
+			continue;
+		}
+		const QByteArray type = fields.at(separator + 1);
+		if (type != "fuse.afp" && type != "cifs" && type != "smb3") {
+			continue;
+		}
+		const QString path = netVolumeMountInfoPath(fields.at(4));
+		if (path.isEmpty() || path == "/" || seen.contains(path)) {
+			continue;
+		}
+		seen.insert(path);
+		locations << FileChooserLocation{ QFileInfo(path).fileName(), path, false, {} };
+	}
+	/* GIO roots for SMB are URLs; their local paths live under GVFS. */
+	if (!runtime.isEmpty()) {
+		static const QRegularExpression shareName("^smb-share:server=([^,]+),share=([^,]+)");
+		for (const QFileInfo &entry : QDir(runtime + "/gvfs").entryInfoList(
+				QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
+			const auto match = shareName.match(entry.fileName());
+			if (match.hasMatch() && !seen.contains(entry.absoluteFilePath())) {
+				seen.insert(entry.absoluteFilePath());
+				locations << FileChooserLocation{
+					match.captured(2), entry.absoluteFilePath(), false, {} };
+			}
+		}
+	}
+	return locations;
+}
+
 QList<FileChooserLocation> fileChooserLocations() {
 	QString runtime = QStandardPaths::writableLocation(QStandardPaths::RuntimeLocation);
 	if (runtime.isEmpty()) {
@@ -766,20 +835,23 @@ QList<FileChooserLocation> fileChooserLocations() {
 		locations << FileChooserLocation{ name, path, false, {} };
 	}
 	QSet<QString> mounted;
+	QByteArray mountInfo;
 	QFile mountTable("/proc/self/mountinfo");
 	if (!mountTable.open(QIODevice::ReadOnly)) {
 		qWarning() << "Could not read chooser mount table:" << mountTable.errorString();
 	} else {
-		for (const QByteArray &line : mountTable.readAll().split('\n')) {
+		mountInfo = mountTable.readAll();
+		for (const QByteArray &line : mountInfo.split('\n')) {
 			const QList<QByteArray> fields = line.split(' ');
 			if (fields.size() > 5) {
-				QByteArray path = fields.at(4);
-				path.replace("\\040", " ");
-				path.replace("\\011", "\t");
-				path.replace("\\012", "\n");
-				path.replace("\\134", "\\");
-				mounted.insert(QFile::decodeName(path));
+				mounted.insert(netVolumeMountInfoPath(fields.at(4)));
 			}
+		}
+	}
+	for (const FileChooserLocation &network : fileChooserNetworkLocations(mountInfo, runtime)) {
+		if (!seen.contains(network.path)) {
+			seen.insert(network.path);
+			locations << network;
 		}
 	}
 	const QDir records("/run/media/zacos9-mac/" + QString::number(getuid()));
@@ -823,6 +895,31 @@ QList<FileChooserLocation> fileChooserLocations() {
 	for (int i = 1; i < locations.size(); i++) {
 		locations[i].usb = !localVolumeUsbDevice(locations[i].path).isEmpty();
 	}
+	const QDir desktop(QStandardPaths::writableLocation(QStandardPaths::DesktopLocation));
+	for (const QFileInfo &entry : desktop.entryInfoList(
+			QDir::AllEntries | QDir::System | QDir::NoDotAndDotDot, QDir::Name | QDir::IgnoreCase)) {
+		if (!entry.isSymLink()) {
+			continue;
+		}
+		const AliasResolution resolved = aliasResolve(entry.absoluteFilePath());
+		if (!resolved.target.isEmpty() && !QFileInfo(resolved.target).isDir()) {
+			continue;
+		}
+		FileChooserLocation alias;
+		alias.name = entry.fileName();
+		alias.path = entry.absoluteFilePath();
+		alias.folderAlias = true;
+		alias.error = resolved.error;
+		if (alias.error.isEmpty() && resolved.state != AliasState::Ok &&
+				resolved.state != AliasState::Reconnected) {
+			alias.error = aliasProblemText(resolved.state);
+		}
+		if (alias.error.isEmpty()) {
+			locations[0].realRoots << QFileInfo(resolved.target).canonicalFilePath();
+		}
+		locations << alias;
+	}
+	locations[0].realRoots.removeDuplicates();
 	return locations;
 }
 
