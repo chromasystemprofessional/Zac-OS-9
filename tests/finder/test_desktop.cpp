@@ -141,6 +141,18 @@ int main(int argc, char **argv) {
 	}
 	check(usbBadgeDiffers && diskRemainsVisible,
 		"USB volume icon overlays a USB badge on the drive without replacing it");
+	Pixels smallUsb(PL_ICON_SMALL, PL_ICON_SMALL);
+	Pixels expectedSmallUsb(PL_ICON_SMALL, PL_ICON_SMALL);
+	Pixels usbBadge(PL_ICON_SMALL, PL_ICON_SMALL);
+	paintIcon(&smallUsb.c, usbDisk, 0, 0, PL_ICON_SMALL, false);
+	pl_icon_paint(&expectedSmallUsb.c, 0, 0, PL_ICON_DISK, PL_ICON_SMALL, false);
+	pl_icon_paint(&usbBadge.c, 0, 0, PL_ICON_EXT_USB, PL_ICON_SMALL, false);
+	const QImage smallBadge = usbBadge.img.scaled(8, 8,
+		Qt::IgnoreAspectRatio, Qt::FastTransformation);
+	pl_image(&expectedSmallUsb.c, 8, 8,
+		reinterpret_cast<const uint32_t *>(smallBadge.constBits()), 8, 8);
+	check(smallUsb.img == expectedSmallUsb.img,
+		"small USB drive icon uses the complete scaled USB badge");
 	app.setStyle(new Zacos9Style);
 
 	Desktop desktop;

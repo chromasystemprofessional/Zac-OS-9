@@ -356,8 +356,13 @@ void paintIcon(pl_canvas *c, Item &item, int x, int y, int size, bool highlight)
 		pl_icon_paint_label(c, x, y, item.iconKind(), size, highlight, item.labelColor());
 		if (item.isUsbVolume && item.kind == PL_ICON_DISK) {
 			const int badgeSize = size >= 32 ? 16 : 8;
-			pl_icon_paint_label(c, x + size - badgeSize, y + size - badgeSize,
-				PL_ICON_EXT_USB, badgeSize, highlight, item.labelColor());
+			Pixels badge(PL_ICON_SMALL, PL_ICON_SMALL);
+			pl_icon_paint_label(&badge.c, 0, 0, PL_ICON_EXT_USB,
+				PL_ICON_SMALL, highlight, item.labelColor());
+			const QImage scaled = badge.img.scaled(badgeSize, badgeSize,
+				Qt::IgnoreAspectRatio, Qt::FastTransformation);
+			pl_image(c, x + size - badgeSize, y + size - badgeSize,
+				reinterpret_cast<const uint32_t *>(scaled.constBits()), badgeSize, badgeSize);
 		}
 	}
 }
