@@ -137,6 +137,28 @@ static gboolean scan_windows(gpointer data) {
 	GList *windows = gtk_window_list_toplevels();
 	for (GList *item = windows; item; item = item->next) {
 		if (gtk_widget_get_realized(item->data)) {
+			GtkWidget *widget = item->data;
+			if (GTK_IS_FILE_CHOOSER(widget)) {
+				GtkFileChooser *chooser = GTK_FILE_CHOOSER(widget);
+				if (gtk_file_chooser_get_action(chooser) == GTK_FILE_CHOOSER_ACTION_SAVE) {
+					char *current = gtk_file_chooser_get_current_folder(chooser);
+					char *home = g_strdup(g_get_home_dir());
+					char *working = g_get_current_dir();
+					const gboolean use_desktop = !current ||
+						g_strcmp0(current, home) == 0 || g_strcmp0(current, working) == 0;
+					g_free(current);
+					g_free(home);
+					g_free(working);
+					if (use_desktop) {
+						const char *desktop =
+							g_get_user_special_dir(G_USER_DIRECTORY_DESKTOP);
+						if (desktop && !gtk_file_chooser_set_current_folder(chooser, desktop)) {
+							g_warning("ZacOS could not set the GTK save dialog to Desktop: %s",
+								desktop);
+						}
+					}
+				}
+			}
 			export_window(item->data);
 		}
 	}

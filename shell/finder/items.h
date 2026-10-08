@@ -39,6 +39,7 @@ struct Item {
 	 * disc, SD card): Put Away ejects it via GIO when ejectable. */
 	bool isLocalVolume = false;
 	bool ejectable = false;
+	bool isUsbVolume = false;
 
 	/* A mounted network volume (AFP or SMB) on the desktop: real files,
 	 * at a real path, but Put Away ejects it instead of trying to move

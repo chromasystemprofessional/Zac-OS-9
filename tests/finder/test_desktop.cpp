@@ -118,6 +118,29 @@ int main(int argc, char **argv) {
 		appIconPath + "\n").toUtf8());
 	launcher.close();
 	QApplication app(argc, argv);
+	Item regularDisk;
+	regularDisk.kind = PL_ICON_DISK;
+	Item usbDisk;
+	usbDisk.kind = PL_ICON_DISK;
+	usbDisk.isUsbVolume = true;
+	Pixels regularDiskPixels(PL_ICON_LARGE, PL_ICON_LARGE);
+	Pixels usbDiskPixels(PL_ICON_LARGE, PL_ICON_LARGE);
+	paintIcon(&regularDiskPixels.c, regularDisk, 0, 0, PL_ICON_LARGE, false);
+	paintIcon(&usbDiskPixels.c, usbDisk, 0, 0, PL_ICON_LARGE, false);
+	bool usbBadgeDiffers = false;
+	bool diskRemainsVisible = false;
+	for (int y = 0; y < PL_ICON_LARGE; y++) {
+		for (int x = 0; x < PL_ICON_LARGE; x++) {
+			const bool same = regularDiskPixels.img.pixel(x, y) == usbDiskPixels.img.pixel(x, y);
+			if (x >= PL_ICON_LARGE / 2 && y >= PL_ICON_LARGE / 2) {
+				usbBadgeDiffers |= !same;
+			} else {
+				diskRemainsVisible |= same;
+			}
+		}
+	}
+	check(usbBadgeDiffers && diskRemainsVisible,
+		"USB volume icon overlays a USB badge on the drive without replacing it");
 	app.setStyle(new Zacos9Style);
 
 	Desktop desktop;
@@ -190,12 +213,18 @@ int main(int argc, char **argv) {
 	QFileDialog dialog(nullptr, "Save");
 	dialog.setOption(QFileDialog::DontUseNativeDialog);
 	dialog.setAcceptMode(QFileDialog::AcceptSave);
+	const QString privateDisk = home.path() + "/data/zacos9/Zacintosh HD";
+	QDir().mkpath(privateDisk + "/System Folder");
 	dialog.setSidebarUrls({QUrl::fromLocalFile(home.path())});
 	dialog.show();
 	settle();
 	check(dialog.sidebarUrls().contains(QUrl::fromLocalFile(path)) &&
-		dialog.sidebarUrls().contains(QUrl::fromLocalFile(home.path())),
-		"Qt save dialog adds Desktop without replacing existing places");
+		dialog.sidebarUrls().contains(QUrl::fromLocalFile(privateDisk)) &&
+		dialog.sidebarUrls().contains(QUrl::fromLocalFile(home.path())) &&
+		dialog.sidebarUrls().contains(QUrl::fromLocalFile("/")),
+		"Qt save dialog adds Desktop, Zacintosh HD and mounted disks without replacing places");
+	check(QDir::cleanPath(dialog.directory().absolutePath()) == QDir::cleanPath(path),
+		"Qt save dialog defaults to the XDG Desktop");
 	dialog.setDirectory(path);
 	check(dialog.directory().absolutePath() == path, "save chooser navigates to Desktop");
 	dialog.setDirectory(alias->path);
@@ -209,6 +238,17 @@ int main(int argc, char **argv) {
 		QFile::exists(path + "/External folder/From application"),
 		"application save chooser follows Desktop folder alias to its target");
 	dialog.hide();
+	QFileDialog explicitDialog(nullptr, "Explicit save location");
+	explicitDialog.setOption(QFileDialog::DontUseNativeDialog);
+	explicitDialog.setAcceptMode(QFileDialog::AcceptSave);
+	const QString explicitFolder = path + "/External folder";
+	explicitDialog.setDirectory(explicitFolder);
+	explicitDialog.show();
+	settle();
+	check(QDir::cleanPath(explicitDialog.directory().absolutePath()) ==
+		QDir::cleanPath(explicitFolder),
+		"Qt save dialog preserves an application-selected non-default directory");
+	explicitDialog.hide();
 
 	const QString backed = vfsNewFolder();
 	auto virtualItem = makeItem(QFileInfo(path + "/External folder"));

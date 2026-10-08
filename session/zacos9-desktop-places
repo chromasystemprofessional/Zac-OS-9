@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-"""Register the real Desktop for XDG and GTK file choosers without moving files."""
+"""Register ZacOS save locations without moving or exposing system files."""
 
 import fcntl
 import os
@@ -29,9 +29,11 @@ def write_atomic(path, text):
 
 def register():
     home = Path.home()
+    data = Path(os.environ.get("XDG_DATA_HOME") or home / ".local/share")
     config = Path(os.environ.get("XDG_CONFIG_HOME") or home / ".config")
     directory = config / "zacos9"
     directory.mkdir(parents=True, exist_ok=True)
+    private_disk = data / "zacos9" / "Zacintosh HD"
     with (directory / "desktop-places.lock").open("a") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         user_dirs = config / "user-dirs.dirs"
@@ -50,15 +52,29 @@ def register():
         if missing:
             desktop = home / "Desktop"
         desktop.mkdir(parents=True, exist_ok=True)
+        if private_disk.is_symlink():
+            raise ValueError(
+                f"Refusing to use a symlink as the Zacintosh HD workspace: {private_disk}")
+        private_disk.mkdir(parents=True, exist_ok=True)
+        private_disk.chmod(0o700)
+        for name in ("System Folder", "Applications"):
+            (private_disk / name).mkdir(exist_ok=True)
         if missing:
             separator = "" if not original or original.endswith("\n") else "\n"
             write_atomic(user_dirs, original + separator + 'XDG_DESKTOP_DIR="$HOME/Desktop"\n')
         bookmarks = config / "gtk-3.0" / "bookmarks"
         existing = bookmarks.read_text(encoding="utf-8") if bookmarks.exists() else ""
-        uri = desktop.as_uri()
-        if not any(line.split(" ", 1)[0] == uri for line in existing.splitlines()):
-            separator = "" if not existing or existing.endswith("\n") else "\n"
-            write_atomic(bookmarks, existing + separator + uri + " Desktop\n")
+        lines = existing.splitlines()
+        updated = existing
+        for path, label in ((desktop, "Desktop"), (private_disk, "Zacintosh HD")):
+            uri = path.as_uri()
+            if not any(line.split(" ", 1)[0] == uri for line in lines):
+                separator = "" if not updated or updated.endswith("\n") else "\n"
+                entry = uri + " " + label
+                updated += separator + entry + "\n"
+                lines.append(entry)
+        if updated != existing:
+            write_atomic(bookmarks, updated)
         print(desktop)
 
 

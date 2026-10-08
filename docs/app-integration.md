@@ -18,14 +18,15 @@ works for it:
 
 ## Done
 
-- **Shared Desktop save location**: session startup registers the real XDG
-  Desktop directory and a GTK Desktop bookmark without replacing existing
-  user settings. The ZacOS Qt style adds Desktop to ordinary `QFileDialog`
-  sidebars, preserving other places. Portal file choosers prefer the GTK
-  backend in the ZacOS session. Folder aliases are filesystem links, so
-  ordinary choosers can open them and save into their targets. See
-  [Desktop files and aliases](vfs.md#desktop-files-and-aliases). Application-
-  specific custom pickers are not rewritten.
+- **Desktop-first save location**: standard GTK 3 and Qt 6 save dialogs
+  default to Desktop when the application did not choose a save directory.
+  Both expose a private per-user Zacintosh HD workspace; Qt adds mounted
+  filesystems and GTK/portal choosers expose GIO mounts. The workspace has
+  document-only `System Folder` and `Applications` directories, separated
+  from the actual system and installed application files. Explicit app
+  directories outside the generic Home/current-directory default remain
+  respected. App-specific custom pickers are not rewritten. See
+  [Desktop files and aliases](vfs.md#desktop-files-and-aliases).
 - **Session defaults** (`session/zacos9-session`): `GTK_CSD=0`,
   `QT_WAYLAND_DISABLE_WINDOWDECORATION=1`, `GTK_THEME=ZacOS9`,
   `QT_STYLE_OVERRIDE=zacos9`. GTK 3 already took our frames before this;

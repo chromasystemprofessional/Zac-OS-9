@@ -1,8 +1,10 @@
 #include "zacos9style.h"
 
 #include <QAbstractScrollArea>
+#include <QDir>
 #include <QFileDialog>
 #include <QEvent>
+#include <QStorageInfo>
 #include <QStandardPaths>
 #include <QUrl>
 #include <QImage>
@@ -109,11 +111,41 @@ bool Zacos9Style::eventFilter(QObject *object, QEvent *event) {
 	if (event->type() == QEvent::Show) {
 		if (auto *dialog = qobject_cast<QFileDialog *>(object)) {
 			auto places = dialog->sidebarUrls();
-			const QUrl desktop = QUrl::fromLocalFile(
-				QStandardPaths::writableLocation(QStandardPaths::DesktopLocation));
-			if (!places.contains(desktop)) {
-				places.append(desktop);
-				dialog->setSidebarUrls(places);
+			auto addPlace = [&places](const QString &path) {
+				if (path.isEmpty()) {
+					return;
+				}
+				const QUrl url = QUrl::fromLocalFile(path);
+				if (!places.contains(url)) {
+					places.append(url);
+				}
+			};
+			const QString desktopPath = QStandardPaths::writableLocation(
+				QStandardPaths::DesktopLocation);
+			addPlace(desktopPath);
+			addPlace(QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) +
+				"/zacos9/Zacintosh HD");
+			for (const QStorageInfo &volume : QStorageInfo::mountedVolumes()) {
+				const QString path = volume.rootPath();
+				if (!volume.isValid() || !volume.isReady() ||
+						path == "/proc" || path.startsWith("/proc/") ||
+						path == "/sys" || path.startsWith("/sys/") ||
+						path == "/dev" || path.startsWith("/dev/") ||
+						path == "/run" || path.startsWith("/run/") ||
+						path == "/snap" || path.startsWith("/snap/")) {
+					continue;
+				}
+				addPlace(path);
+			}
+			dialog->setSidebarUrls(places);
+			if (dialog->acceptMode() == QFileDialog::AcceptSave) {
+				const QString current = dialog->directory().absolutePath();
+				const QString home = QDir::homePath();
+				const QString working = QDir::currentPath();
+				if (current.isEmpty() || QDir::cleanPath(current) == QDir::cleanPath(home) ||
+						QDir::cleanPath(current) == QDir::cleanPath(working)) {
+					dialog->setDirectory(desktopPath);
+				}
 			}
 		}
 	}

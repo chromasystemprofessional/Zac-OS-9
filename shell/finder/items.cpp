@@ -354,6 +354,11 @@ void paintIcon(pl_canvas *c, Item &item, int x, int y, int size, bool highlight)
 		pl_image_blend(c, x, y, custom.data(), size, size, highlight);
 	} else {
 		pl_icon_paint_label(c, x, y, item.iconKind(), size, highlight, item.labelColor());
+		if (item.isUsbVolume && item.kind == PL_ICON_DISK) {
+			const int badgeSize = size >= 32 ? 16 : 8;
+			pl_icon_paint_label(c, x + size - badgeSize, y + size - badgeSize,
+				PL_ICON_EXT_USB, badgeSize, highlight, item.labelColor());
+		}
 	}
 }
 

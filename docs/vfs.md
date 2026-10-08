@@ -40,12 +40,21 @@ Finder reports unavailable originals rather than creating empty replacement
 folders.
 
 At login, `zacos9-desktop-places` registers Desktop with XDG user directories
-and GTK bookmarks. Existing Desktop paths, user files, configuration entries
-and bookmark labels are preserved. Qt dialogs using the ZacOS style add the
-same Desktop location without replacing their other places; portal file
-choosers use the GTK backend. Registration errors are reported without
-preventing login. Applications with their own custom file pickers may still
-need navigation through Home to Desktop.
+and GTK bookmarks, and creates a private **Zacintosh HD** workspace at
+`$XDG_DATA_HOME/zacos9/Zacintosh HD` (normally
+`~/.local/share/zacos9/Zacintosh HD`). Its `System Folder` and `Applications`
+directories are user-owned document storage, not aliases to the real system
+or installed applications; files saved there cannot replace or change them.
+The GTK and Qt 6 standard save dialogs prefer Desktop when they otherwise
+would open at Home/current working directory; application-selected locations
+elsewhere remain unchanged. Their places include Desktop and the private
+Zacintosh HD workspace; Qt also adds currently mounted filesystems, while
+GTK's places list includes GIO-mounted local/network disks. GTK portal-backed
+choosers use the GTK backend and the registered places. The Finder's
+mounted-drive icons remain real mounted drives; its virtual Zacintosh HD view
+described above is distinct from this private save workspace. Ordinary mount
+paths keep their normal filesystem permissions. Applications with custom
+file pickers are outside this integration.
 
 ## File-transfer status
 

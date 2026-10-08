@@ -397,22 +397,28 @@ carries it). A dpkg file trigger reapplies it when `zacos9-emulators`
 replaces the binary, and the emulator package's own postinst grants it too.
 Both packages depend on `libcap2-bin`. A setcap failure only warns.
 
-**Real Desktop and save locations** (0.1.15): Finder continues to show
+**Desktop-first save locations** (0.1.15): Finder continues to show
 the real XDG Desktop directory while retaining startup/mounted disks and
-Trash. Login registers a missing XDG Desktop mapping and GTK bookmark without
-replacing existing paths, files or bookmarks; the Qt style appends Desktop to
-save-dialog places and portal file choosers prefer GTK. Virtual application
-and backed-folder drags make real Desktop aliases without moving originals;
-Command-Option-drag makes aliases of ordinary files/folders. Alias copies
-preserve links, unavailable originals give an alert, and transfers resolve
-destination aliases before checking for recursive folder copies. Offscreen
-tests cover external saves/watcher updates, New Folder, actual application
-and backed-folder drag payloads, alias opening/copying/trashing, and saving
-through a Desktop folder alias in a real Qt file chooser. Registration tests
-cover custom paths, existing bookmarks, repeated login, invalid paths and
-symlinked configuration files. Finder and the Qt style build; all five focused
-Desktop, GTK, selection and VFS suites pass. A real GTK chooser also verifies
-the Desktop sidebar and saving through its folder alias. Installed-session
+Trash; locally mounted USB volumes use the USB icon overlaid on the drive
+icon. Login registers Desktop and a private, per-user Zacintosh HD document
+workspace without replacing existing paths or bookmarks. The workspace's
+System Folder and Applications are ordinary private document directories,
+not the real system/application paths. Standard GTK and Qt save dialogs
+prefer Desktop instead of their generic Home/current-directory default; Qt
+adds mounted filesystems to its sidebar, and GTK/portal places include the
+private workspace and GIO mounts. Virtual application and backed-folder drags make
+private workspace and GIO mounts. Virtual application and backed-folder drags
+make real Desktop aliases without moving originals; Command-Option-drag makes
+aliases of ordinary files/folders. Alias copies preserve links, unavailable
+originals give an alert, and transfers resolve destination aliases before
+checking for recursive folder copies. Offscreen tests cover external saves/
+watcher updates, New Folder, actual application and backed-folder drag
+payloads, alias opening/copying/trashing, and saving through a Desktop folder
+alias in a real Qt file chooser. Registration tests cover custom paths,
+existing bookmarks, repeated login, invalid paths and symlinked configuration
+files. Finder and the Qt style build; all focused Desktop, GTK, selection and
+VFS suites pass. A real GTK chooser verifies Desktop and Zacintosh HD places
+and private workspace saves. Installed-session
 portal routing still requires verification after updating the package and
 logging in again.
 

@@ -626,6 +626,13 @@ gtk_appmenu_module = shared_module('zacos9-appmenu',
   install: true,
   install_dir: get_option('libdir') / 'gtk-3.0' / 'modules',
 )
+test('gtk-save-places', find_program('dbus-run-session'),
+  args: ['--', find_program('python3').full_path(),
+    files('../tests/finder/test_desktop_gtk.py'),
+    files('../session/zacos9-desktop-places'), gtk_appmenu_module.full_path()],
+  depends: [gtk_appmenu_module],
+  timeout: 30,
+)
 qt_menu_fixture = executable('qt-menu-fixture', '../tests/finder/qt_menu_fixture.cpp',
   dependencies: qt6)
 test('gtk-menu-protocol', find_program('dbus-run-session'),

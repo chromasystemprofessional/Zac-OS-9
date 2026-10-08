@@ -215,6 +215,7 @@ void Desktop::refreshLocalVolumes() {
 		item->isDir = true;
 		item->isLocalVolume = true;
 		item->ejectable = v.ejectable;
+		item->isUsbVolume = !localVolumeUsbDevice(v.path).isEmpty();
 		item->selected = selected.contains(v.path);
 		fresh.push_back(std::move(item));
 	}

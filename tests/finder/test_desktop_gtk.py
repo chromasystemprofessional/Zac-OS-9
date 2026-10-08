@@ -8,6 +8,9 @@ import tempfile
 import time
 
 helper = Path(sys.argv[1]).resolve()
+if len(sys.argv) > 2:
+    os.environ["GTK_MODULES"] = str(Path(sys.argv[2]).resolve())
+    os.environ["ZACOS9_EXPECT_DESKTOP_DEFAULT"] = "1"
 
 try:
     import gi
@@ -33,6 +36,7 @@ with tempfile.TemporaryDirectory(prefix="zacos9-desktop-gtk-") as temporary:
     alias = desktop / "Save Folder alias"
     alias.symlink_to(target, target_is_directory=True)
     chooser = Gtk.FileChooserDialog(title="Desktop save test", action=Gtk.FileChooserAction.SAVE)
+    chooser.show()
 
     def settle():
         until = time.monotonic() + 0.5
@@ -54,6 +58,22 @@ with tempfile.TemporaryDirectory(prefix="zacos9-desktop-gtk-") as temporary:
         assert any(isinstance(widget, Gtk.Label) and widget.get_text() == "Desktop"
                    for sidebar in sidebars for widget in descendants(sidebar)), \
             "Desktop is missing from the real GTK chooser sidebar"
+        assert any(isinstance(widget, Gtk.Label) and widget.get_text() == "Zacintosh HD"
+                   for sidebar in sidebars for widget in descendants(sidebar)), \
+            "Zacintosh HD is missing from the real GTK chooser sidebar"
+        if os.environ.get("ZACOS9_EXPECT_DESKTOP_DEFAULT") == "1":
+            assert Path(chooser.get_current_folder()).resolve() == desktop.resolve(), \
+                "GTK save dialog did not default to Desktop"
+        private_system_folder = home / "data/zacos9/Zacintosh HD/System Folder"
+        assert private_system_folder.is_dir()
+        assert chooser.set_current_folder(str(private_system_folder)), \
+            "Cannot navigate to the private Zacintosh HD System Folder"
+        settle()
+        chooser.set_current_name("Private document")
+        selected = chooser.get_filename()
+        assert selected, "GTK chooser did not return a private Zacintosh HD save path"
+        Path(selected).write_text("private", encoding="utf-8")
+        assert (private_system_folder / "Private document").read_text() == "private"
         assert chooser.set_current_folder(str(desktop)), "Cannot navigate to Desktop"
         settle()
         assert Path(chooser.get_current_folder()).resolve() == desktop.resolve()
@@ -64,7 +84,15 @@ with tempfile.TemporaryDirectory(prefix="zacos9-desktop-gtk-") as temporary:
         assert selected, "GTK chooser did not return a save path"
         Path(selected).write_text("Saved through a Desktop alias", encoding="utf-8")
         assert (target / "Saved by GTK").read_text() == "Saved through a Desktop alias"
-        print("OK: GTK sidebar includes Desktop and save through folder alias reaches original")
+        explicit = Gtk.FileChooserDialog(title="Explicit GTK save location",
+                                         action=Gtk.FileChooserAction.SAVE)
+        assert explicit.set_current_folder(str(target))
+        explicit.show()
+        settle()
+        assert Path(explicit.get_current_folder()).resolve() == target.resolve(), \
+            "GTK integration overrode an explicit application save location"
+        explicit.destroy()
+        print("OK: GTK Desktop default, Zacintosh HD place, private saves and explicit folders")
     finally:
         chooser.destroy()
         settle()
