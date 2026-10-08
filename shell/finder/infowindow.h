@@ -84,12 +84,14 @@ private:
 	QString m_path, m_name;
 	pl_icon_kind m_kind;
 	QString m_kindText, m_where, m_created, m_modified, m_size, m_original;
+	QString m_available;
 	ResourceDetails m_resourceDetails;
 	bool m_isResourceInfo = false;
+	bool m_isVolumeInfo = false;
 	QThread *m_sizer = nullptr;
 };
 
-/* About This Computer: the logo, version, system and memory. */
+/* About This Computer: a readable, compact overview of this computer. */
 class AboutWindow : public QWidget {
 public:
 	static void open();
@@ -100,6 +102,7 @@ protected:
 
 private:
 	AboutWindow();
+	QString m_version;
 	QStringList m_lines;
 };
 

@@ -15,9 +15,9 @@
 #include <QMimeDatabase>
 #include <QPointer>
 #include <QProcess>
+#include <QStorageInfo>
 #include <QMouseEvent>
 #include <QCloseEvent>
-#include <QSysInfo>
 #include <grp.h>
 #include <pwd.h>
 #include <sys/stat.h>
@@ -28,8 +28,8 @@
 #include "finder.h"
 #include "items.h"
 #include "logo.h"
+#include "resources.h"
 #include "sharingclient.h"
-#include "resourcewindows.h"
 
 static constexpr uint32_t FACE = GRAY(0xD);
 static constexpr int LABEL_RIGHT = 74; /* right edge of "Kind:" etc. */
@@ -196,6 +196,23 @@ InfoWindow::InfoWindow(const QString &path, pl_icon_kind kind, const QString &na
 		m_kindText = details->kind;
 		m_where = details->location;
 		m_size = "--";
+		m_isVolumeInfo = kind == PL_ICON_DISK && path == vfsRoot();
+		if (m_isVolumeInfo) {
+			m_kindText = "startup disk";
+			m_where = "Desktop";
+			m_resourceDetails.kind = m_kindText;
+			m_resourceDetails.location = m_where;
+			QStorageInfo storage(QDir::homePath());
+			storage.refresh();
+			if (storage.isValid() && storage.isReady()) {
+				m_size = storage.bytesTotal() > 0 ? finderSize(storage.bytesTotal()) :
+					QStringLiteral("Not reported");
+				m_available = storage.bytesAvailable() >= 0 ?
+					finderSize(storage.bytesAvailable()) : QStringLiteral("Not reported");
+			} else {
+				m_size = m_available = "Not reported";
+			}
+		}
 		m_show.rect = QRect(SHOW_X, SHOW_Y, SHOW_W, PL_POPUP_H);
 		m_show.items = { PopupItem{ "General Information" }, PopupItem{ "Sharing", false } };
 		m_show.chosen = [this](int i) { showView(i); };
@@ -361,6 +378,22 @@ void InfoWindow::paintGeneral(pl_canvas *c) {
 	if (m_isResourceInfo) {
 		infoRow(c, 92, "Kind:", m_resourceDetails.kind);
 		infoRow(c, 92 + ROW_H, "Where:", m_resourceDetails.location);
+		if (m_isVolumeInfo) {
+			infoRow(c, 92 + ROW_H * 2, "Size:", m_size);
+			infoRow(c, 92 + ROW_H * 3, "Available:", m_available);
+			int y = 92 + ROW_H * 4 + 8;
+			for (const QString &detail : m_resourceDetails.metadata) {
+				for (const QString &line : panelWrap(detail, BOX_X1 - VALUE_X2 - 8,
+						PL_FONT_VIEWS)) {
+					if (y > BOX_Y1 - 8) {
+						return;
+					}
+					panelText(c, line, VALUE_X2, y, PL_FONT_VIEWS);
+					y += 13;
+				}
+			}
+			return;
+		}
 		infoRow(c, 92 + ROW_H * 2, "Source:", m_resourceDetails.sources.isEmpty()
 			? QStringLiteral("None (virtual; no physical equivalent)") : m_resourceDetails.sources);
 		infoRow(c, 92 + ROW_H * 3, "Access:", m_resourceDetails.access);
@@ -737,7 +770,11 @@ static QPointer<AboutWindow> &aboutWindow() {
 }
 
 void AboutWindow::open() {
-	openSystemInformation();
+	if (!aboutWindow()) {
+		aboutWindow() = new AboutWindow;
+	}
+	aboutWindow()->show();
+	aboutWindow()->raise();
 }
 
 static QString cpuName() {
@@ -800,8 +837,12 @@ static qint64 meminfoKB(const QString &key) {
 	return 0;
 }
 
-static QString megabytes(qint64 kb) {
-	return QLocale(QLocale::English).toString(kb / 1024) + " MB";
+static QString memorySize(qint64 kb) {
+	if (kb <= 0) {
+		return "Not reported";
+	}
+	const double gb = kb / (1024.0 * 1024.0);
+	return QLocale(QLocale::English).toString(gb, 'f', 1) + " GB";
 }
 
 AboutWindow::AboutWindow() {
@@ -809,15 +850,17 @@ AboutWindow::AboutWindow() {
 	setWindowTitle("About This Computer");
 	const QString cpu = cpuName();
 	const QString gpu = gpuName();
-	if (!cpu.isEmpty()) { m_lines << "Processor:\t" + cpu; }
-	if (!gpu.isEmpty()) { m_lines << "Graphics:\t" + gpu; }
+	const QString version = systemInformation().value(0).section(": ", 1);
+	m_version = version.isEmpty() || version.startsWith("not reported", Qt::CaseInsensitive) ?
+		"System version not reported" : "Version " + version;
+	m_lines << "Processor:\t" + (cpu.isEmpty() ? QStringLiteral("Not reported") : cpu)
+		<< "Graphics:\t" + (gpu.isEmpty() ? QStringLiteral("Not reported") : gpu);
 	const qint64 swap = meminfoKB("SwapTotal");
-	m_lines << "Built-in Memory:\t" + megabytes(meminfoKB("MemTotal"))
-	        << "Virtual Memory:\t" + (swap > 0 ? megabytes(swap) + " used on disk"
-	                                           : QStringLiteral("Off"))
-	        << "Largest Unused Block:\t" + megabytes(meminfoKB("MemAvailable"));
-	/* 94px to first line, 20px per line, 22px bottom margin. */
-	setFixedSize(360, 94 + m_lines.size() * 20 + 22);
+	m_lines << "Memory:\t" + memorySize(meminfoKB("MemTotal"))
+		<< "Virtual Memory:\t" + (swap > 0 ?
+			memorySize(swap) + " allocated on disk" : QStringLiteral("None configured"))
+		<< "Available Memory:\t" + memorySize(meminfoKB("MemAvailable"));
+	setFixedSize(620, 120 + m_lines.size() * 28 + 18);
 }
 
 void AboutWindow::paintEvent(QPaintEvent *) {
@@ -826,28 +869,27 @@ void AboutWindow::paintEvent(QPaintEvent *) {
 	pl_canvas *c = &px.c;
 	pl_fill(c, 0, 0, W - 1, H - 1, FACE);
 
-	/* The logo, large, like the big Mac OS logo of the original: the
-	 * 64x64 drawing with its own soft edges, not the menu bar's 16x16
-	 * scaled up. */
-	pl_image_blend(c, 8, 4, logo_pixels_hq(), PL_LOGO_SIZE_HQ, PL_LOGO_SIZE_HQ, false);
-	Text title("ZacOS 9", 300, PL_FONT_SYSTEM);
-	pl_text(c, title.t, 80, 30, C_BLACK);
-	QString kernel = QSysInfo::kernelType();
-	kernel[0] = kernel[0].toUpper(); /* "Linux" */
-	Text version("Version 0.3 — " + kernel + " " +
-		QSysInfo::kernelVersion().section('-', 0, 0), 260, PL_FONT_VIEWS);
-	pl_text(c, version.t, 80, 46, C_BLACK);
-	separator(c, 10, W - 11, 70);
+	pl_image_blend(c, 22, 10, logo_pixels_hq(), PL_LOGO_SIZE_HQ, PL_LOGO_SIZE_HQ, false);
+	Text title("ZacOS 9", 450, PL_FONT_SYSTEM);
+	pl_text(c, title.t, 104, 34, C_BLACK);
+	Text release(m_version, 450, PL_FONT_VIEWS);
+	pl_text(c, release.t, 104, 55, GRAY(0x4));
+	separator(c, 14, W - 15, 82);
 
-	int y = 94;
+	const int panelTop = 98;
+	pl_fill(c, 19, panelTop, W - 20, H - 17, C_WHITE);
+	pl_hline(c, 19, W - 20, panelTop, GRAY(0x8));
+	pl_vline(c, 19, panelTop, H - 17, GRAY(0x8));
+	pl_hline(c, 20, W - 21, H - 17, C_WHITE);
+	pl_vline(c, W - 20, panelTop, H - 18, C_WHITE);
+	int y = 119;
 	for (const QString &line : m_lines) {
-		Text label(line.section('\t', 0, 0), 200, PL_FONT_SYSTEM);
-		pl_text(c, label.t, 180 - label.inkWidth(), y, C_BLACK);
-		Text value(line.section('\t', 1), 160, PL_FONT_VIEWS);
+		Text label(line.section('\t', 0, 0), 148, PL_FONT_SYSTEM);
+		pl_text(c, label.t, 36, y, GRAY(0x3));
+		Text value(line.section('\t', 1), W - 220, PL_FONT_VIEWS);
 		pl_text(c, value.t, 190, y, C_BLACK);
-		y += 20;
+		y += 28;
 	}
-	/* TODO: Mac OS 8 also charted each running program's memory. */
 	QPainter p(this);
 	px.blit(p);
 }

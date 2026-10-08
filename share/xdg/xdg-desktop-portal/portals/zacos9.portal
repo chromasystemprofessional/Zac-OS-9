@@ -1,0 +1,4 @@
+[portal]
+DBusName=org.freedesktop.impl.portal.desktop.zacos9
+Interfaces=org.freedesktop.impl.portal.FileChooser
+UseIn=ZacOS9;

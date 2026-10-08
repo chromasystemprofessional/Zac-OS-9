@@ -44,6 +44,41 @@ window.csd, window.csd decoration {
 	box-shadow: none;
 }
 
+/* Application prompts: a standard raised title area, compact action row,
+ * and the same default/destructive button treatment as the rest of ZacOS. */
+dialog, .dialog, .message-dialog {
+	background-color: #dddddd;
+	color: #000000;
+	border: 1px solid #000000;
+}
+.message-dialog .dialog-vbox {
+	padding: 12px;
+}
+.message-dialog .dialog-action-area {
+	padding: 6px 10px;
+	border-top: 1px solid #888888;
+	background-color: #dddddd;
+}
+.message-dialog .dialog-action-area button {
+	min-width: 72px;
+}
+.message-dialog .dialog-action-area button.suggested-action,
+.message-dialog .dialog-action-area button.default {
+	border-width: 2px;
+}
+.message-dialog .dialog-action-area button.destructive-action {
+	background-image: linear-gradient(to bottom, #eeeeee, #cccccc);
+	color: #000000;
+}
+.message-dialog label.title {
+	font-weight: bold;
+	color: #000000;
+}
+.message-dialog .secondary-label,
+.message-dialog label.dim-label {
+	color: #444444;
+}
+
 /* Controls: raised grey, black outline. */
 button, button.flat:hover {
 	background-image: linear-gradient(to bottom, #eeeeee, #cccccc);

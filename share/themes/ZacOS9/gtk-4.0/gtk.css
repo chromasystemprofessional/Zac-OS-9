@@ -1,0 +1,117 @@
+/* ZacOS Platinum styling for GTK 4 applications that honor GTK themes.
+ * Libadwaita applications intentionally use their own appearance. */
+
+@define-color window_bg_color #dddddd;
+@define-color window_fg_color #000000;
+@define-color view_bg_color #ffffff;
+@define-color view_fg_color #000000;
+@define-color headerbar_bg_color #dddddd;
+@define-color headerbar_fg_color #000000;
+@define-color card_bg_color #dddddd;
+@define-color card_fg_color #000000;
+@define-color popover_bg_color #dddddd;
+@define-color popover_fg_color #000000;
+@define-color dialog_bg_color #dddddd;
+@define-color dialog_fg_color #000000;
+@define-color accent_bg_color #9999cc;
+@define-color accent_fg_color #000000;
+@define-color accent_color #6666cc;
+@define-color borders #000000;
+
+window,
+dialog,
+popover,
+menu,
+tooltip {
+	background-color: #dddddd;
+	color: #000000;
+}
+
+headerbar,
+toolbar,
+actionbar,
+statuspage,
+messagedialog {
+	background-color: #dddddd;
+	color: #000000;
+}
+
+messagedialog {
+	border: 1px solid #000000;
+}
+
+messagedialog .response-area {
+	padding: 6px 10px;
+	border-top: 1px solid #888888;
+}
+
+button {
+	color: #000000;
+	background-color: #dddddd;
+	border: 1px solid #000000;
+	border-radius: 3px;
+	box-shadow: inset 1px 1px #ffffff, inset -1px -1px #888888;
+}
+
+button:hover {
+	background-color: #eeeeee;
+}
+
+button:active,
+button:checked {
+	background-color: #999999;
+	box-shadow: inset 1px 1px #666666;
+}
+
+button:disabled {
+	color: #888888;
+}
+
+button.suggested-action,
+button.default {
+	border: 2px solid #000000;
+}
+
+entry,
+textview text,
+listview,
+gridview,
+columnview,
+treeview {
+	color: #000000;
+	background-color: #ffffff;
+	border: 1px solid #000000;
+}
+
+selection,
+*:selected {
+	color: #000000;
+	background-color: #9999cc;
+}
+
+checkbutton check,
+radiobutton radio {
+	color: #000000;
+	background-color: #ffffff;
+	border: 1px solid #000000;
+}
+
+progressbar trough,
+scale trough {
+	background-color: #ffffff;
+	border: 1px solid #000000;
+}
+
+progressbar progress,
+scale highlight {
+	background-color: #6666cc;
+}
+
+scrollbar trough {
+	background-color: #eeeeee;
+}
+
+scrollbar slider {
+	background-color: #ccccdd;
+	border: 1px solid #000000;
+}

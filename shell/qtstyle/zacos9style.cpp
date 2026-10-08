@@ -110,6 +110,9 @@ void Zacos9Style::unpolish(QWidget *widget) {
 bool Zacos9Style::eventFilter(QObject *object, QEvent *event) {
 	if (event->type() == QEvent::Show) {
 		if (auto *dialog = qobject_cast<QFileDialog *>(object)) {
+			if (dialog->property("zacos9-file-portal-dialog").toBool()) {
+				return QProxyStyle::eventFilter(object, event);
+			}
 			auto places = dialog->sidebarUrls();
 			auto addPlace = [&places](const QString &path) {
 				if (path.isEmpty()) {

@@ -8,6 +8,7 @@
 #include <QImage>
 #include <QLineEdit>
 #include <QMimeData>
+#include <QMessageBox>
 #include <QProcess>
 #include <QStandardPaths>
 #include <QTemporaryDir>
@@ -21,6 +22,7 @@
 #include "fileops.h"
 #include "finder.h"
 #include "folderstate.h"
+#include "infowindow.h"
 #include "items.h"
 #include "labeleditor.h"
 #include "localvolumes.h"
@@ -163,11 +165,28 @@ int main(int argc, char **argv) {
 	check(smallUsb.img == expectedSmallUsb.img,
 		"small USB drive icon uses the complete scaled USB badge");
 	app.setStyle(new Zacos9Style);
+	QMessageBox prompt;
+	check(prompt.palette().color(QPalette::Window) == QColor(0xDD, 0xDD, 0xDD) &&
+		prompt.palette().color(QPalette::WindowText) == QColor(Qt::black),
+		"Qt application prompts inherit the ZacOS Platinum palette");
 
 	Desktop desktop;
 	desktop.resize(1024, 768);
 	desktop.show();
 	Finder::instance().start(&desktop);
+	Finder::instance().command("about");
+	QWidget *aboutWindow = nullptr;
+	for (QWidget *window : QApplication::topLevelWidgets()) {
+		if (window->windowTitle() == "About This Computer" && window->isVisible()) {
+			aboutWindow = window;
+			break;
+		}
+	}
+	check(aboutWindow && aboutWindow->width() >= 600 && aboutWindow->height() >= 250,
+		"About This Computer opens its own readable, spacious summary instead of System Information");
+	if (aboutWindow) {
+		aboutWindow->close();
+	}
 	settle();
 	const QString path = desktop.folderPath();
 	check(path == home.path() + "/Work Desktop", "Finder uses the configured real Desktop");

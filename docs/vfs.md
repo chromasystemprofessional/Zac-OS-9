@@ -422,6 +422,9 @@ Built-in launchers:
 Items in the Macintosh view are either **virtual** (the System Folder, Control
 Panels, Applications and the generated resource folders: Get Info says "virtual;
 no physical equivalent") or **backed** by a real folder (Source shows the path).
+The virtual Zacintosh HD itself is the exception: its Get Info shows total
+filesystem capacity and space available to the user on the filesystem holding
+Home, without exposing Source or Access rows.
 The virtual System Folder is not the writable `Zacintosh HD` workspace that save
 dialogs use; Get Info says so and suggests Home or Documents. Show Original on an
 alias resolves it like Open does (reconnecting or offering Fix Alias…). Mounted
@@ -457,8 +460,8 @@ its own: it belongs to the application's desktop entry.
 
 Get Info reads a file, so it shows the one the item stands for: an
 application's desktop entry, or a `backed` folder's real directory. The
-curated folders stand for nothing on disk and have no Get Info window
-yet.
+curated folders stand for nothing on disk; the startup disk Get Info is a
+capacity/available-space summary of its backing filesystem.
 
 ## Uninstalling applications through Trash
 

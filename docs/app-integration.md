@@ -12,38 +12,47 @@ works for it:
 | Layer | Who draws it | How we cover it | State |
 |---|---|---|---|
 | Window frame | zacos9-wm (server-side decorations) | session asks toolkits not to draw their own | done |
-| Controls (buttons, fields, scroll bars) | the toolkit | a Platinum theme/style per toolkit | GTK 3, Qt 6 done |
+| Controls and standard prompts | the toolkit | a Platinum theme/style per toolkit | GTK 3 and Qt 6; GTK 4 stylesheet added, unverified |
 | Menus | the application, inside its window | global menu: the app's menus in our menu bar | Qt 6 and GTK 3 Wayland implemented |
-| Everything | Electron, GTK 4 / libadwaita | nothing reliable | known gap |
+| App-owned UI | Electron, libadwaita, custom-drawn dialogs | no reliable override | known gap |
 
 ## Done
 
-- **Desktop-first save location**: standard GTK 3 and Qt 6 save dialogs
-  default to Desktop when the application did not choose a save directory.
-  Both expose a private per-user Zacintosh HD workspace; Qt adds mounted
-  filesystems and GTK/portal choosers expose GIO mounts. The workspace has
-  document-only `System Folder` and `Applications` directories, separated
-  from the actual system and installed application files. Explicit app
-  directories outside the generic Home/current-directory default remain
-  respected. App-specific custom pickers are not rewritten. See
-  [Desktop files and aliases](vfs.md#desktop-files-and-aliases).
+- **Standard application file chooser**: the session selects the ZacOS
+  `FileChooser` portal for GTK and Qt standard dialogs. Its first screen lists
+  the private Zacintosh HD workspace and mounted data volumes, without a
+  places sidebar; the subsequent file browser also has no sidebar. The
+  workspace has document-only `System Folder` and `Applications` directories,
+  separated from system files and installed applications. App-provided initial
+  folders remain respected, and app-specific custom pickers are not rewritten.
+  The portal backend is built and has a location-list regression test; visual
+  behavior in a logged-in GTK/Qt desktop still requires live-session testing.
+  See [Desktop files and aliases](vfs.md#desktop-files-and-aliases).
 - **Session defaults** (`session/zacos9-session`): `GTK_CSD=0`,
   `QT_WAYLAND_DISABLE_WINDOWDECORATION=1`, `GTK_THEME=ZacOS9`,
-  `QT_STYLE_OVERRIDE=zacos9`. GTK 3 already took our frames before this;
-  it is a safeguard.
+  `QT_STYLE_OVERRIDE=zacos9`, and GTK/Qt portal selection. GTK 3 already took
+  our frames before this; it is a safeguard.
 - **GTK 3 theme** `share/themes/ZacOS9/gtk-3.0/gtk.css`, installed to
   `/usr/share/themes`. Adwaita imported as the base, then restyled: grey
   outlined buttons, square corners, sunk white fields, flat grey menu bar and
-  menus, lavender selection, Platinum tabs, check boxes and scroll bars, no
-  shadows or animations. Checked on screen with Mousepad (menu bar, File
-  menu, Preferences dialog). Not checked: GIMP/Inkscape dialogs.
+  menus, lavender selection, Platinum tabs, check boxes and scroll bars, and
+  compact Platinum message dialogs with emphasized default actions. Checked
+  on screen with Mousepad (menu bar, File menu, Preferences dialog); other
+  applications' prompts have not been visually exercised.
   To try it from a build tree: `XDG_DATA_DIRS=$PWD/share:/usr/share`.
+- **GTK 4 theme** `share/themes/ZacOS9/gtk-4.0/gtk.css` supplies the same
+  palette, controls, and prompt treatment to GTK 4 applications which honor
+  GTK themes. GTK 4 is not installed in the current build environment, so
+  this stylesheet has not been runtime-validated. Libadwaita and applications
+  that draw their own dialogs can ignore GTK themes.
 - **Qt 6 style** `shell/qtstyle/` -> `<libdir>/qt6/plugins/styles/zacos9style.so`.
   A `QProxyStyle` over Fusion with a Platinum palette; push buttons (and the
   default ring), check boxes, radio buttons, text-field frames and scroll bars
   are drawn by `lib/widgets.c`, so they match our own programs pixel for pixel.
-  Scroll bar geometry is in `subControlRect` (arrows at both ends, fixed
-  17-px thumb). Checked with `build/qtdemo.cpp` (thumb drag and arrows work).
+  Standard Qt dialogs and message prompts inherit the same palette and
+  controls. Scroll bar geometry is in `subControlRect` (arrows at both ends,
+  fixed 17-px thumb). Checked with `build/qtdemo.cpp` (thumb drag and arrows
+  work); prompts are covered by an offscreen palette regression check.
   To try it from a build tree: copy `build/shell/zacos9style.so` into
   `<dir>/styles/` and set `QT_PLUGIN_PATH=<dir> QT_STYLE_OVERRIDE=zacos9`.
 - **X11 frame re-fit** (`compositor/src/xwayland.c`, `set_geometry`): for

@@ -155,6 +155,25 @@ executable('zacos9-autostart',
   install: true,
 )
 
+executable('zacos9-file-portal',
+  'finder/filechooserportal_main.cpp',
+  'finder/filechooserportal.cpp',
+  dependencies: [qt6],
+  cpp_args: ['-std=c++17'],
+  install: true,
+)
+
+test('filechooser-locations',
+  executable('test-filechooser-portal',
+    'finder/tests/test_filechooser_portal.cpp',
+    'finder/filechooserportal.cpp',
+    include_directories: include_directories('finder'),
+    dependencies: [qt6],
+    cpp_args: ['-std=c++17'],
+  ),
+  env: ['QT_QPA_PLATFORM=offscreen'],
+)
+
 # Control panels (the Finder's Get Info uses their controls too).
 panelkit = static_library('panelkit', 'panels/panelkit.cpp', 'panels/sharingclient.cpp',
   'panels/custompatterns.cpp',
@@ -671,6 +690,11 @@ test('gtk-save-places', find_program('dbus-run-session'),
     files('../session/zacos9-desktop-places'), gtk_appmenu_module.full_path()],
   depends: [gtk_appmenu_module],
   timeout: 30,
+)
+test('gtk-theme-css',
+  executable('test-gtk-theme', '../tests/finder/test_gtk_theme.c',
+    dependencies: [gtk3]),
+  args: [meson.project_source_root() / 'share/themes/ZacOS9/gtk-3.0/gtk.css'],
 )
 qt_menu_fixture = executable('qt-menu-fixture', '../tests/finder/qt_menu_fixture.cpp',
   dependencies: qt6)

@@ -24,6 +24,9 @@ export GTK_CSD=0
 export QT_WAYLAND_DISABLE_WINDOWDECORATION=1
 # GTK 3 applications wear the Platinum theme (share/themes/ZacOS9).
 export GTK_THEME=ZacOS9
+# Standard application file dialogs use the ZacOS file chooser portal.
+export GTK_USE_PORTAL=1
+export QT_USE_PORTAL=1
 case ":${GTK_MODULES:-}:" in
 	*:zacos9-appmenu:*) ;;
 	*) export GTK_MODULES="${GTK_MODULES:+$GTK_MODULES:}zacos9-appmenu" ;;
@@ -79,7 +82,8 @@ mkdir -p "$state"
 startup=
 if command -v dbus-update-activation-environment >/dev/null; then
 	startup="dbus-update-activation-environment --systemd WAYLAND_DISPLAY DISPLAY \
-XDG_CURRENT_DESKTOP XDG_SESSION_TYPE XDG_CONFIG_DIRS XDG_DATA_DIRS QT_QPA_PLATFORM GTK_CSD GTK_THEME GTK_MODULES UBUNTU_MENUPROXY QT_STYLE_OVERRIDE XCURSOR_THEME XCURSOR_PATH XCURSOR_SIZE"
+XDG_CURRENT_DESKTOP XDG_SESSION_TYPE XDG_CONFIG_DIRS XDG_DATA_DIRS QT_QPA_PLATFORM QT_USE_PORTAL \
+GTK_USE_PORTAL GTK_CSD GTK_THEME GTK_MODULES UBUNTU_MENUPROXY QT_STYLE_OVERRIDE XCURSOR_THEME XCURSOR_PATH XCURSOR_SIZE"
 fi
 # The compositor runs its startup command after starting the Wayland backend,
 # setting WAYLAND_DISPLAY, and launching the desktop surfaces. Import the

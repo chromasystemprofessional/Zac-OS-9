@@ -24,6 +24,25 @@ Updated: 2026-10-07
 
 ## Current work
 
+**About This Computer, startup-disk Get Info, and application file chooser**
+(unreleased): About This Computer now presents installed version, processor,
+graphics, and memory in human-readable form. Zacintosh HD Get Info reports the
+home filesystem's capacity and free space without Source or Access rows. A
+ZacOS FileChooser portal backend presents the private Zacintosh HD workspace
+and mounted volumes with no places sidebar, and the session selects it for
+standard GTK/Qt dialogs. The backend builds; its location/dialog tests,
+Finder desktop/VFS tests, and D-Bus interface introspection pass. GTK/Qt portal
+activation and visual behavior have not been exercised in a live desktop.
+Details: [application integration](docs/app-integration.md) and
+[Finder VFS](docs/vfs.md).
+
+**Third-party application dialogs** (unreleased): GTK 3 message prompts now
+have explicit Platinum dialog/action-area styling; Qt 6 prompts inherit the
+ZacOS palette and controls and have a palette regression assertion. Added a
+GTK 4 stylesheet for applications that honor toolkit themes; GTK 4 and
+libadwaita behavior is not verified in this build environment. GTK 3 theme
+parsing is checked by `gtk-theme-css`.
+
 **Classic monochrome graphics coverage** (unreleased, gate not passed):
 expanded native capture to preserve monochrome pen/text/color-value state and
 explicit application clipping, with `DrawText`, frames/lines, masked/scaled
@@ -1267,6 +1286,14 @@ current user-unit policy; source watchers are debounced and bounded. Verificatio
 passed with `meson compile -C build` and the `autostart`, `alias`, `userservices`,
 `finder-vfs`, `finder-desktop` and `finder-selection` suites. These automated
 checks do not constitute a live login or interactive desktop verification.
+
+The Apple-menu **About This Computer** view is separate from the technical
+System Information window. It uses the installed ZacOS version, readable
+processor/graphics labels and gigabyte memory summaries in a dedicated
+classic-styled layout.
+
+Get Info on the virtual Zacintosh HD now reports total capacity and available
+space on the filesystem backing Home; its Source and Access rows are omitted.
 
 - `shell/finder/vfs.{h,cpp}` — the node model and its JSON registry at
   `~/.local/share/zacos9/finder/vfs.json` (stable ids, display names,
