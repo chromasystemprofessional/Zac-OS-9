@@ -1,3 +1,13 @@
+zacos9 (0.1.34) trixie; urgency=medium
+
+  * Startup Items follow the FreeDesktop autostart rules. Aliases reconnect
+    when their original is renamed or moved, with Fix Alias and loop
+    detection. Extensions Manager gains Login Items and Background Services
+    views with safe, user-level controls. Get Info explains virtual versus
+    physical items.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Wed, 07 Oct 2026 23:09:13 -0400
+
 zacos9 (0.1.33) trixie; urgency=medium
 
   * Desktop-first saving with an isolated per-user Zacintosh HD workspace;
