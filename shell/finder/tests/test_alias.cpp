@@ -37,6 +37,21 @@ int main(int argc, char **argv) {
 	check(aliasRecord(alias, r + "/docs/report.txt"), "record identity");
 	check(aliasResolve(alias).state == AliasState::Ok, "intact alias resolves");
 
+	/* A physical alias is opened through its resolved target, not as a link
+	 * or as the empty folder its broken path would otherwise create. */
+	QDir().mkpath(r + "/physical folder");
+	const QString folderAlias = r + "/aliases/folder alias";
+	QFile::link(r + "/physical folder", folderAlias);
+	check(aliasRecord(folderAlias, r + "/physical folder") &&
+		QFileInfo(aliasResolve(folderAlias).target).isDir(),
+		"physical folder aliases resolve and classify as the target folder");
+	touch(r + "/docs/example.desktop", "[Desktop Entry]\nType=Application\n");
+	const QString applicationAlias = r + "/aliases/application alias";
+	QFile::link(r + "/docs/example.desktop", applicationAlias);
+	check(aliasRecord(applicationAlias, r + "/docs/example.desktop") &&
+		aliasResolve(applicationAlias).target.endsWith(".desktop"),
+		"physical application aliases resolve to the desktop entry for application launch");
+
 	QFile::rename(r + "/docs/report.txt", r + "/docs/renamed.txt");
 	AliasResolution res = aliasResolve(alias);
 	check(res.state == AliasState::Reconnected && res.target == r + "/docs/renamed.txt",
@@ -57,6 +72,26 @@ int main(int argc, char **argv) {
 	QFile::rename(r + "/docs/sub/moved.txt", r + "/docs/again.txt");
 	check(aliasResolve(r + "/aliases/other").state == AliasState::Reconnected,
 		"record follows a moved alias");
+
+	/* A second alias remembers the original identity through its first alias. */
+	QFile::link(r + "/aliases/other", r + "/aliases/chain");
+	check(aliasRecord(r + "/aliases/chain", r + "/aliases/other"),
+		"chained alias records its ultimate target identity");
+	QFile::rename(r + "/docs/again.txt", r + "/docs/chained-move.txt");
+	res = aliasResolve(r + "/aliases/chain");
+	check(res.state == AliasState::Reconnected && res.target == r + "/docs/chained-move.txt",
+		"alias chains reconnect by the underlying target identity");
+	QDir().mkpath(r + "/elsewhere/a/b/c");
+	QFile::rename(r + "/docs/chained-move.txt", r + "/elsewhere/first-move.txt");
+	res = aliasResolve(r + "/aliases/chain");
+	check(res.state == AliasState::Reconnected && res.target == r + "/elsewhere/first-move.txt",
+		"reconnection updates the search origin for later moves");
+	QFile::rename(r + "/elsewhere/first-move.txt", r + "/elsewhere/a/b/c/deep-move.txt");
+	res = aliasResolve(r + "/aliases/chain");
+	check(res.state == AliasState::Reconnected &&
+		res.target == r + "/elsewhere/a/b/c/deep-move.txt",
+		"updated target identity finds subsequent moves within the bounded search");
+	QFile::rename(r + "/elsewhere/a/b/c/deep-move.txt", r + "/docs/again.txt");
 
 	/* Deleted: broken, never recreated. */
 	QFile::remove(r + "/docs/again.txt");
@@ -94,6 +129,8 @@ int main(int argc, char **argv) {
 	check(aliasResolve(r + "/aliases/self").state == AliasState::Loop, "self link detected");
 	check(!aliasReconnect(r + "/aliases/lost", r + "/aliases/lost"), "alias cannot point to itself");
 	check(!aliasReconnect(r + "/aliases/lost", r + "/aliases/a"), "alias cannot point into a loop");
+	check(!aliasMoveRecord(r + "/aliases/other", "/proc/zacos9-alias-test", true),
+		"record preservation failure is reported to the caller");
 
 	return failures ? 1 : 0;
 }

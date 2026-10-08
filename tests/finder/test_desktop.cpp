@@ -69,6 +69,15 @@ static void settle() {
 	}
 }
 
+static bool waitFor(const std::function<bool()> &condition, int timeoutMs = 3000) {
+	QElapsedTimer timer;
+	timer.start();
+	while (!condition() && timer.elapsed() < timeoutMs) {
+		QApplication::processEvents(QEventLoop::AllEvents, 10);
+	}
+	return condition();
+}
+
 static bool hasFile(Desktop &desktop, const QString &name) {
 	for (const auto &item : desktop.m_files) {
 		if (item->name == name) {
@@ -215,7 +224,8 @@ int main(int argc, char **argv) {
 			makeItem(QFileInfo(path + "/External folder"))->iconKind(),
 		"shared-folder alias inherits the original shared-folder icon");
 	Finder::instance().openItem(alias.get());
-	check(FolderWindow::isOpen(alias->path), "opening folder alias opens its real contents");
+	check(waitFor([&] { return FolderWindow::isOpen(path + "/External folder"); }),
+		"opening folder alias opens its real contents");
 	const auto copied = transferItems({alias->path}, path, true);
 	check(!copied.isEmpty() && QFileInfo(alias->path + " copy").isSymLink(),
 		"Option-copy preserves a folder alias rather than copying its target");
@@ -330,9 +340,23 @@ int main(int argc, char **argv) {
 	auto loop = makeItem(QFileInfo(path + "/Loop alias"));
 	check(loop->isAlias && loop->kind == PL_ICON_DOCUMENT,
 		"looping alias resolves safely to a generic icon");
-	closeAlert();
+	bool missingAliasPrompt = false;
+	QTimer dismissMissingAlias;
+	dismissMissingAlias.setInterval(10);
+	QObject::connect(&dismissMissingAlias, &QTimer::timeout, [&] {
+		if (auto *alert = dynamic_cast<Alert *>(QApplication::activeModalWidget())) {
+			missingAliasPrompt = true;
+			alert->reject();
+		}
+	});
+	dismissMissingAlias.start();
 	Finder::instance().openItem(unavailable.get());
-	check(!QFileInfo::exists(path + "/missing") && !FolderWindow::isOpen(unavailable->path),
+	const bool dismissed = waitFor([&] {
+		return missingAliasPrompt && !QApplication::activeModalWidget();
+	});
+	dismissMissingAlias.stop();
+	check(dismissed && !QFileInfo::exists(path + "/missing") &&
+		!FolderWindow::isOpen(unavailable->path),
 		"opening missing alias reports failure without creating a replacement target");
 	closeAlert();
 	QDropEvent unsupportedLink(QPointF(10, 400), Qt::MoveAction, &fileMime, Qt::LeftButton,

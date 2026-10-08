@@ -6,7 +6,6 @@
 #include <QSaveFile>
 #include <QSet>
 #include <QStandardPaths>
-#include <QTextStream>
 #include <QDirIterator>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -36,11 +35,12 @@ bool statOf(const QString &path, struct stat *st, bool follow) {
 Identity identityOf(const QString &path) {
 	Identity id;
 	struct stat st;
-	if (statOf(path, &st, false)) {
+	const QString intended = QFileInfo(path).canonicalFilePath();
+	if (!intended.isEmpty() && statOf(intended, &st, true)) {
 		id.dev = st.st_dev;
 		id.ino = st.st_ino;
-		id.name = QFileInfo(path).fileName();
-		id.parent = QFileInfo(path).absolutePath();
+		id.name = QFileInfo(intended).fileName();
+		id.parent = QFileInfo(intended).absolutePath();
 		id.valid = true;
 	}
 	return id;
@@ -70,14 +70,17 @@ Identity readRecord(const QString &aliasPath) {
 }
 
 bool writeRecord(const QString &aliasPath, const Identity &id) {
-	QDir().mkpath(QFileInfo(recordPath(aliasPath)).absolutePath());
+	if (!QDir().mkpath(QFileInfo(recordPath(aliasPath)).absolutePath())) {
+		return false;
+	}
 	QSaveFile f(recordPath(aliasPath));
 	if (!f.open(QIODevice::WriteOnly)) {
 		return false;
 	}
-	QTextStream(&f) << "dev=" << id.dev << "\nino=" << id.ino << "\nname=" << id.name
-		<< "\nparent=" << id.parent << "\n";
-	return f.commit();
+	const QByteArray data = "dev=" + QByteArray::number(id.dev) + "\nino=" +
+		QByteArray::number(id.ino) + "\nname=" + id.name.toUtf8() + "\nparent=" +
+		id.parent.toUtf8() + "\n";
+	return f.write(data) == data.size() && f.commit();
 }
 
 bool sameIdentity(const QString &path, const Identity &id) {
@@ -121,20 +124,20 @@ QString search(const Identity &id, const QString &aliasPath) {
 	struct Level { QString dir; int depth; };
 	QList<Level> queue;
 	for (const QString &r : roots) {
-		if (!r.isEmpty() && !queued.contains(r) && QFileInfo(r).isDir()) {
+		struct stat st;
+		if (!r.isEmpty() && !queued.contains(r) && statOf(r, &st, false) &&
+				S_ISDIR(st.st_mode) && quint64(st.st_dev) == id.dev) {
 			queued << r;
 			queue.append({ r, 0 });
 		}
 	}
 	for (int i = 0; i < queue.size() && visited < kMaxVisited; i++) {
 		const Level level = queue.at(i);
-		const QStringList names = QDir(level.dir).entryList(QDir::AllEntries | QDir::NoDotAndDotDot |
+		QDirIterator entries(level.dir, QDir::AllEntries | QDir::NoDotAndDotDot |
 			QDir::System | QDir::Hidden);
-		for (const QString &name : names) {
-			if (++visited > kMaxVisited) {
-				break;
-			}
-			const QString path = level.dir + "/" + name;
+		while (entries.hasNext() && visited < kMaxVisited) {
+			const QString path = entries.next();
+			++visited;
 			struct stat st;
 			if (!statOf(path, &st, false)) {
 				continue;
@@ -143,7 +146,7 @@ QString search(const Identity &id, const QString &aliasPath) {
 				return path;
 			}
 			if (S_ISDIR(st.st_mode) && quint64(st.st_dev) == id.dev && level.depth < kMaxDepth &&
-					name != ".alias" && !queued.contains(path)) {
+					QFileInfo(path).fileName() != ".alias" && !queued.contains(path)) {
 				queued << path;
 				queue.append({ path, level.depth + 1 });
 			}
@@ -189,11 +192,23 @@ AliasResolution aliasResolve(const QString &aliasPath, bool reconnect) {
 	if (chained == AliasState::Ok) {
 		if (!id.valid) {
 			/* A plain symbolic link: adopt it so it can reconnect later. */
-			aliasRecord(aliasPath, final);
+			if (!aliasRecord(aliasPath, final)) {
+				out.error = "The alias identity record could not be saved.";
+			}
 		} else if (!sameIdentity(final, id)) {
 			const QString moved = reconnect ? search(id, aliasPath) : QString();
 			if (!moved.isEmpty()) {
-				out.state = repoint(aliasPath, moved) ? AliasState::Reconnected : AliasState::Missing;
+				if (!aliasRecord(aliasPath, moved)) {
+					out.state = AliasState::Missing;
+					out.error = "The original was found, but its alias identity record could not be updated.";
+					return out;
+				}
+				if (!repoint(aliasPath, moved)) {
+					out.state = AliasState::Missing;
+					out.error = "The original was found, but the alias link could not be repaired.";
+					return out;
+				}
+				out.state = AliasState::Reconnected;
 				out.target = moved;
 				return out;
 			}
@@ -208,9 +223,15 @@ AliasResolution aliasResolve(const QString &aliasPath, bool reconnect) {
 	out.state = AliasState::Missing;
 	if (id.valid && reconnect) {
 		const QString found = search(id, aliasPath);
-		if (!found.isEmpty() && repoint(aliasPath, found)) {
-			out.state = AliasState::Reconnected;
-			out.target = found;
+		if (!found.isEmpty()) {
+			if (!aliasRecord(aliasPath, found)) {
+				out.error = "The original was found, but its alias identity record could not be updated.";
+			} else if (!repoint(aliasPath, found)) {
+				out.error = "The original was found, but the alias link could not be repaired.";
+			} else {
+				out.state = AliasState::Reconnected;
+				out.target = found;
+			}
 		}
 	}
 	return out;
@@ -237,26 +258,48 @@ bool aliasReconnect(const QString &aliasPath, const QString &newTarget, QString 
 			(target.isSymLink() && final == QFileInfo(aliasPath).absoluteFilePath())) {
 		return fail("An alias cannot point to itself.");
 	}
+	const QString oldTarget = QFileInfo(aliasPath).symLinkTarget();
 	if (!repoint(aliasPath, absolute)) {
 		return fail("The alias could not be updated. Check folder permissions.");
 	}
-	return aliasRecord(aliasPath, absolute) ? true : fail("The alias record could not be saved.");
+	if (!aliasRecord(aliasPath, absolute)) {
+		repoint(aliasPath, oldTarget);
+		return fail("The alias record could not be saved. The previous target was restored.");
+	}
+	return true;
 }
 
-void aliasMoveRecord(const QString &from, const QString &to, bool copy) {
+bool aliasMoveRecord(const QString &from, const QString &to, bool copy) {
 	const QString src = recordPath(from);
 	if (!QFileInfo(src).isFile()) {
-		return;
+		return true;
 	}
-	QDir().mkpath(QFileInfo(recordPath(to)).absolutePath());
-	QFile::remove(recordPath(to));
-	if (copy ? QFile::copy(src, recordPath(to)) : QFile::rename(src, recordPath(to))) {
-		return;
+	const QString dest = recordPath(to);
+	if (src == dest) {
+		return true;
 	}
+	if (!QDir().mkpath(QFileInfo(dest).absolutePath())) {
+		return false;
+	}
+	QFile input(src);
+	if (!input.open(QIODevice::ReadOnly) || input.size() > 8192) {
+		return false;
+	}
+	const QByteArray contents = input.readAll();
+	if (input.error() != QFileDevice::NoError) {
+		return false;
+	}
+	QSaveFile output(dest);
+	if (!output.open(QIODevice::WriteOnly) || output.write(contents) != contents.size() ||
+			!output.commit()) {
+		return false;
+	}
+	return copy || QFile::remove(src);
 }
 
-void aliasRemoveRecord(const QString &aliasPath) {
-	QFile::remove(recordPath(aliasPath));
+bool aliasRemoveRecord(const QString &aliasPath) {
+	const QString path = recordPath(aliasPath);
+	return !QFileInfo::exists(path) || QFile::remove(path);
 }
 
 QString aliasProblemText(AliasState state) {

@@ -507,8 +507,8 @@ ResourceDetails resourceDetails(const QString &provider, const QString &key) {
 	if (provider == "startup-items") {
 		details.name = "Startup Items";
 		details.kind = key.isEmpty() ? "virtual collection" : "informational startup item";
-		details.description = "Autostart status only; command text and launch controls are "
-			"not exposed.";
+		details.description = "Runs enabled entries at login; command text and launch controls "
+			"are not exposed here.";
 		return details;
 	}
 	if (provider == "system-logs") {

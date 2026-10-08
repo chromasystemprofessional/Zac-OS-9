@@ -4,6 +4,7 @@
 
 #include <QCoreApplication>
 #include <QDir>
+#include <QDirIterator>
 #include <QFile>
 #include <QFileInfo>
 #include <QFileSystemWatcher>
@@ -106,6 +107,7 @@ bool g_loaded = false;
 /* Keyed by token so a window can stop listening when it closes. */
 QHash<int, std::function<void()>> g_callbacks;
 int g_nextToken = 1;
+bool g_refreshing = false;
 
 const char *SCHEME = "vfs:/";
 
@@ -1073,9 +1075,14 @@ QString vfsRegistryPath() {
 }
 
 void vfsRefresh() {
+	if (g_refreshing) {
+		return;
+	}
+	g_refreshing = true;
 	appRefresh();
 	load();
 	notifyChanged();
+	g_refreshing = false;
 }
 
 /* Resource folders that change outside Finder (autostart entries, the
@@ -1087,15 +1094,34 @@ static void watchResourceSources() {
 	static QTimer *settle = nullptr;
 	auto arm = [] {
 		const QString config = QStandardPaths::writableLocation(QStandardPaths::ConfigLocation);
-		QStringList dirs = { config + "/autostart", config + "/systemd/user" };
-		dirs += autostartDefaultContext().systemDirs;
-		for (const QString &dir : dirs) {
-			QString existing = dir;
-			while (!QDir(existing).exists() && existing.contains('/') && existing != "/") {
+		const AutostartContext autostart = autostartDefaultContext();
+		QList<QPair<QString, QStringList>> sources = {
+			{ config + "/autostart", { "*.desktop" } },
+			{ config + "/systemd/user", { "*.service" } },
+		};
+		for (const QString &dir : autostart.systemDirs) {
+			sources << qMakePair(dir, QStringList{ "*.desktop" });
+		}
+		int fileCount = watcher->files().size();
+		for (const auto &source : sources) {
+			QString existing = source.first;
+			while (!QDir(existing).exists() && existing != "/" && !existing.isEmpty()) {
 				existing = QFileInfo(existing).absolutePath();
 			}
-			if (!watcher->directories().contains(existing)) {
+			if (!existing.isEmpty() && watcher->directories().size() < 64 &&
+					!watcher->directories().contains(existing)) {
 				watcher->addPath(existing);
+			}
+			if (existing != source.first || !QDir(source.first).exists()) {
+				continue;
+			}
+			QDirIterator it(source.first, source.second, QDir::Files | QDir::Readable,
+				QDirIterator::NoIteratorFlags);
+			while (it.hasNext() && fileCount < 512) {
+				const QString path = it.next();
+				if (!watcher->files().contains(path) && watcher->addPath(path)) {
+					++fileCount;
+				}
 			}
 		}
 	};
@@ -1104,12 +1130,15 @@ static void watchResourceSources() {
 		settle = new QTimer;
 		settle->setSingleShot(true);
 		settle->setInterval(500);
-		QObject::connect(settle, &QTimer::timeout, [arm] {
+		QTimer *debounce = settle;
+		QObject::connect(debounce, &QTimer::timeout, [arm] {
 			arm();
 			notifyChanged();
 		});
 		QObject::connect(watcher, &QFileSystemWatcher::directoryChanged,
-			[settle](const QString &) { settle->start(); });
+			[debounce](const QString &) { debounce->start(); });
+		QObject::connect(watcher, &QFileSystemWatcher::fileChanged,
+			[debounce](const QString &) { debounce->start(); });
 	}
 	arm();
 }

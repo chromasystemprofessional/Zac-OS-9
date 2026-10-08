@@ -147,6 +147,14 @@ layershellqt = dependency('LayerShellQt', method: 'cmake',
 # so the desktop entry specification is followed rather than approximated.
 gio_unix = dependency('gio-unix-2.0')
 
+executable('zacos9-autostart',
+  'finder/autostart_main.cpp',
+  'finder/autostart.cpp',
+  dependencies: [qt6, gio, gio_unix],
+  cpp_args: ['-std=c++17'],
+  install: true,
+)
+
 # Control panels (the Finder's Get Info uses their controls too).
 panelkit = static_library('panelkit', 'panels/panelkit.cpp', 'panels/sharingclient.cpp',
   'panels/custompatterns.cpp',
@@ -299,7 +307,7 @@ test('finder-vfs',
 test('autostart',
   executable('test-autostart', 'finder/tests/test_autostart.cpp', 'finder/autostart.cpp',
     include_directories: include_directories('finder'),
-    dependencies: [qt6, gio],
+    dependencies: [qt6, gio, gio_unix],
     cpp_args: ['-std=c++17'],
   ),
 )

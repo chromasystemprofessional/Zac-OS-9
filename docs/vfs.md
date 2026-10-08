@@ -158,8 +158,9 @@ approximated:
 - `OnlyShowIn` / `NotShowIn` are checked against `$XDG_CURRENT_DESKTOP`,
   which the session sets to `ZacOS9`.
 - An entry whose `TryExec` names a program that isn't installed is left
-  out — and so, GIO's own rule, not ours, is one whose plain `Exec`
-  names a program that can't be found at all, even with no `TryExec`.
+  out. `Exec` is parsed by GIO, but its executable is not preflighted when
+  `TryExec` is absent; a valid entry can therefore fail when launched if its
+  application is unavailable.
 - `Exec` field codes, `Path`, `Terminal` and `DBusActivatable` are
   honoured at launch, by GIO. **`Exec` is never handed to a shell.**
 - Desktop Actions appear beside the application in its folder.
@@ -362,11 +363,13 @@ Current providers:
   `/usr/share/sounds`) as read-only aliases.
 - **Startup Items**: enabled autostart desktop entries, resolved per the
   FreeDesktop Autostart spec (`shell/finder/autostart.cpp`, GKeyFile): the user
-  directory overrides `XDG_CONFIG_DIRS` entries by file name, `Hidden=true` and
+  directory overrides `XDG_CONFIG_DIRS` entries by desktop-file ID,
+  `Hidden=true` and
   `X-GNOME-Autostart-enabled=false` disable, `OnlyShowIn`/`NotShowIn` are checked
-  against `XDG_CURRENT_DESKTOP`, `TryExec`/`Exec` must resolve to an
-  executable, localized `Name` is used, and entries starting the same command
-  appear once. Command text is not exposed.
+  against `XDG_CURRENT_DESKTOP`, `TryExec` must resolve to an executable, and
+  GIO parses and launches `Exec` according to the desktop-entry specification.
+  Distinct IDs remain distinct even when their commands match. Command text is
+  not exposed.
 - **Application Support**: allowlisted user/system support roots as read-only
   aliases.
 - **Device Drivers**: every loaded kernel module, with startup-module metadata,
@@ -396,14 +399,23 @@ Built-in launchers:
   "takes effect at your next login"; **Turn On/Off** writes an override into
   `~/.config/autostart` only (a system entry is never edited), and is offered only
   for entries that are on or disabled, not for missing programs or other
-  desktops. **Background Services** lists `systemctl --user` services; only
+  desktops. At session startup, `zacos9-session` adds `zacos9-autostart` to the
+  compositor's post-start command, after the Wayland display is available and
+  the desktop surfaces have launched. The helper resolves effective entries,
+  then launches them through GIO once per session and reports launch errors to
+  the session log. A minimal user override containing only `Hidden=true` is removed
+  when re-enabled, restoring the lower-priority entry. **Background Services**
+  lists `systemctl --user` services; only
   user-owned/user-manager units that are `enabled` or `disabled` can be changed
   (Start/Stop now, or start at login). Essential session services (D-Bus,
   audio, `zacos9*`, portals, GNOME/Plasma services, …), static, generated and
   template units are read-only. Turning something off or stopping a service asks
-  first. Only the user manager is contacted: no root, no polkit, no system
-  services. Lists refresh when the autostart or `~/.config/systemd/user`
-  folders change (debounced); a service's running state is read on demand.
+  first. Before each change, the current unit list and full safety policy are
+  checked again. Only the user manager is contacted: no root, no polkit, no
+  system services. Queries and actions run off the UI thread; listing errors
+  are shown separately from an empty list. Lists refresh when the autostart or
+  `~/.config/systemd/user` folders change (debounced), and service state is
+  polled while the manager is open so external changes appear.
 
 ## Virtual versus physical
 
@@ -415,8 +427,13 @@ dialogs use; Get Info says so and suggests Home or Documents. Show Original on a
 alias resolves it like Open does (reconnecting or offering Fix Alias…). Mounted
 volumes are real drives; no filesystem paths change. Sniffer re-lists lazily and
 watches (debounced) the application folders, mounted volumes, autostart folders
-and the user's unit folder; alias targets are not watched and are re-checked when
-the alias is opened.
+and the user's unit folder. Resource watchers also observe existing desktop-entry
+files for in-place edits and atomic replacements, and watch the nearest existing
+ancestor when a source folder has not yet been created. Directory and file
+watches are bounded and rearmed after changes; alias targets are not watched and
+are re-checked asynchronously when the alias is opened. The session startup
+helper is wired into the compositor's startup hook; automated tests exercise
+discovery, launch, and duplicate suppression, but a live login was not exercised.
 
 ## What the Finder will and won't do
 

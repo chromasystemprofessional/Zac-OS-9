@@ -21,6 +21,7 @@
 #include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QTextStream>
+#include <QSaveFile>
 #include <functional>
 
 #include <glib.h>
@@ -136,9 +137,9 @@ int main(int argc, char **argv) {
 	writeEntry(resourceRoot + "/sounds/user/pack", "chime.wav", "sound data");
 	writeEntry(resourceRoot + "/support/user/appearance", "theme.txt", "theme data");
 	writeEntry(resourceRoot + "/startup/user", "enabled.desktop",
-		"[Desktop Entry]\nName=Fixture Startup\nExec=sh -c secret-command\n");
+		"[Desktop Entry]\nType=Application\nName=Fixture Startup\nExec=sh -c secret-command\n");
 	writeEntry(resourceRoot + "/startup/user", "disabled.desktop",
-		"[Desktop Entry]\nName=Disabled Fixture\nExec=sh -c secret-command\nHidden=true\n");
+		"[Desktop Entry]\nType=Application\nName=Disabled Fixture\nExec=sh -c secret-command\nHidden=true\n");
 	writeEntry(resourceRoot + "/dpkg", "status",
 		"Package: other\nVersion: 1.0\n\nPackage: zacos9\nVersion: 0.1.27-fixture\n"
 		"Status: install ok installed\n\n");
@@ -895,6 +896,51 @@ int main(int argc, char **argv) {
 	check(vfsOpensAs(vfsPathFor("applications")).isEmpty() &&
 		vfsOpensAs(vfsPathFor("system-folder/control-panels")).isEmpty(),
 		"the generated folders are not backed by any directory to write to");
+
+	/* Source monitoring starts at existing ancestors, then re-arms both
+	 * directory and file watches after creation, edits, replacement, and
+	 * directory recreation. */
+	int changes = 0;
+	const int watchToken = vfsOnChange([&] { ++changes; });
+	const QString autostart = root + "/config/autostart";
+	const QString desktopFile = autostart + "/watch.desktop";
+	int previous = changes;
+	QDir().mkpath(autostart);
+	writeEntry(autostart, "watch.desktop", entry("Watch Created"));
+	check(waitFor([&] { return changes > previous; }),
+		"an initially absent autostart directory is detected when created");
+	previous = changes;
+	writeEntry(autostart, "watch.desktop", entry("Watch Edited"));
+	check(waitFor([&] { return changes > previous; }),
+		"in-place desktop-file edits notify resource watchers");
+	previous = changes;
+	QSaveFile replacement(desktopFile);
+	check(replacement.open(QIODevice::WriteOnly) &&
+		replacement.write(entry("Watch Replaced").toUtf8()) > 0 && replacement.commit(),
+		"desktop-file atomic replacement succeeds");
+	check(waitFor([&] { return changes > previous; }),
+		"atomic desktop-file replacement notifies and rearms the watcher");
+	previous = changes;
+	check(QDir(autostart).removeRecursively(), "watched source directory is removed");
+	check(waitFor([&] { return changes > previous; }),
+		"directory removal notifies the watcher");
+	previous = changes;
+	QDir().mkpath(autostart);
+	writeEntry(autostart, "watch.desktop", entry("Watch Recreated"));
+	check(waitFor([&] { return changes > previous; }),
+		"recreated source directories are detected after watcher rearming");
+	vfsOffChange(watchToken);
+
+	bool nestedRefresh = false;
+	const int refreshToken = vfsOnChange([&] {
+		if (!nestedRefresh) {
+			nestedRefresh = true;
+			vfsRefresh();
+		}
+	});
+	vfsRefresh();
+	check(nestedRefresh, "reentrant refresh requests are suppressed safely");
+	vfsOffChange(refreshToken);
 
 	QTextStream(stdout) << (fails ? QString("%1 failed\n").arg(fails)
 		: QStringLiteral("all passed\n"));

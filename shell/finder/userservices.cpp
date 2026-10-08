@@ -1,10 +1,15 @@
 #include "userservices.h"
 
 #include <QCoreApplication>
+#include <QDir>
 #include <QElapsedTimer>
+#include <QMetaObject>
+#include <QPointer>
 #include <QProcess>
 #include <QRegularExpression>
 #include <QStandardPaths>
+#include <QThread>
+#include <QEventLoop>
 #include <algorithm>
 
 namespace {
@@ -26,20 +31,31 @@ bool runSystemctl(const QStringList &args, QString *out, QString *err, int timeo
 		return false;
 	}
 	QProcess p;
-	bool done = false;
-	QObject::connect(&p, &QProcess::finished, [&done] { done = true; });
-	QObject::connect(&p, &QProcess::errorOccurred, [&done](QProcess::ProcessError e) {
-		done = done || e == QProcess::FailedToStart;
-	});
 	p.start(exe, QStringList{ "--user", "--no-pager", "--no-ask-password" } + args);
 	QElapsedTimer clock;
 	clock.start();
-	while (!done && clock.elapsed() < timeoutMs) {
+	while (p.state() == QProcess::Starting && clock.elapsed() < 3000) {
 		QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents |
 			QEventLoop::WaitForMoreEvents, 100);
 	}
-	if (!done) {
+	if (p.state() == QProcess::NotRunning && p.error() == QProcess::FailedToStart) {
+		if (err) {
+			*err = "systemctl --user could not be started: " + p.errorString();
+		}
+		return false;
+	}
+	clock.restart();
+	while (p.state() != QProcess::NotRunning && clock.elapsed() < timeoutMs) {
+		QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents |
+			QEventLoop::WaitForMoreEvents, 100);
+	}
+	if (p.state() != QProcess::NotRunning) {
 		p.kill();
+		clock.restart();
+		while (p.state() != QProcess::NotRunning && clock.elapsed() < 1000) {
+			QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents |
+				QEventLoop::WaitForMoreEvents, 100);
+		}
 		if (err) {
 			*err = "systemd did not answer.";
 		}
@@ -73,8 +89,9 @@ bool userServiceUnitSafe(const QString &unit, QString *reason) {
 	if (!valid.match(unit).hasMatch()) {
 		return no("Not a plain user service");
 	}
+	const QString normalized = unit.toLower();
 	for (const char *prefix : kEssentialPrefixes) {
-		if (unit.startsWith(QLatin1String(prefix))) {
+		if (normalized.startsWith(QLatin1String(prefix))) {
 			return no("Essential to the session");
 		}
 	}
@@ -116,7 +133,12 @@ QList<UserService> parseUserServices(const QString &unitFiles, const QString &sh
 			s.manageable = false;
 			s.reason = "Started by the system rather than by the user";
 		}
-		if (s.manageable && fragment.isEmpty()) {
+		const QString normalizedFragment = QDir::cleanPath(fragment);
+		const bool generated = normalizedFragment.startsWith("/run/systemd/generator") ||
+			normalizedFragment.startsWith("/run/systemd/transient") ||
+			normalizedFragment.contains("/systemd/generator.") ||
+			normalizedFragment.contains("/systemd/transient/");
+		if (s.manageable && (fragment.isEmpty() || generated)) {
 			s.manageable = false;
 			s.reason = "Generated or transient";
 		}
@@ -128,10 +150,12 @@ QList<UserService> parseUserServices(const QString &unitFiles, const QString &sh
 	return out;
 }
 
-QList<UserService> userServices() {
+UserServiceQuery userServices() {
+	UserServiceQuery result;
 	QString files;
-	if (!runSystemctl({ "list-unit-files", "--type=service", "--no-legend", "--plain" }, &files, nullptr)) {
-		return {};
+	if (!runSystemctl({ "list-unit-files", "--type=service", "--no-legend", "--plain" },
+			&files, &result.error)) {
+		return result;
 	}
 	QStringList units;
 	for (const QString &line : files.split('\n', Qt::SkipEmptyParts)) {
@@ -140,12 +164,18 @@ QList<UserService> userServices() {
 			units << unit;
 		}
 	}
-	QString show;
-	if (units.isEmpty() || !runSystemctl(QStringList{ "show", "-p", "Id,Description,ActiveState,"
-			"UnitFileState,FragmentPath" } + units, &show, nullptr, 15000)) {
-		return {};
+	if (units.isEmpty()) {
+		result.success = true;
+		return result;
 	}
-	return parseUserServices(files, show);
+	QString show;
+	if (!runSystemctl(QStringList{ "show", "-p", "Id,Description,ActiveState,"
+			"UnitFileState,FragmentPath" } + units, &show, &result.error, 15000)) {
+		return result;
+	}
+	result.services = parseUserServices(files, show);
+	result.success = true;
+	return result;
 }
 
 bool userServiceAct(const QString &unit, UserServiceAction action, QString *error) {
@@ -153,6 +183,23 @@ bool userServiceAct(const QString &unit, UserServiceAction action, QString *erro
 	if (!userServiceUnitSafe(unit, &reason)) {
 		if (error) {
 			*error = reason + ".";
+		}
+		return false;
+	}
+	const UserServiceQuery current = userServices();
+	if (!current.success) {
+		if (error) {
+			*error = current.error;
+		}
+		return false;
+	}
+	const auto it = std::find_if(current.services.cbegin(), current.services.cend(),
+		[&unit](const UserService &service) { return service.unit == unit; });
+	if (it == current.services.cend() || !it->manageable) {
+		if (error) {
+			*error = it == current.services.cend() ?
+				"The service is no longer listed as a manageable user service." :
+				(it->reason + ".");
 		}
 		return false;
 	}
@@ -164,4 +211,42 @@ bool userServiceAct(const QString &unit, UserServiceAction action, QString *erro
 	case UserServiceAction::Stop: verb = "stop"; break;
 	}
 	return runSystemctl({ verb, "--", unit }, nullptr, error);
+}
+
+void userServicesAsync(QObject *receiver, std::function<void(UserServiceQuery)> done) {
+	QPointer<QObject> guard(receiver);
+	auto *thread = QThread::create([guard, done = std::move(done)]() mutable {
+		UserServiceQuery result = userServices();
+		if (!guard) {
+			return;
+		}
+		QMetaObject::invokeMethod(guard.data(),
+			[guard, done = std::move(done), result = std::move(result)]() mutable {
+				if (guard) {
+					done(std::move(result));
+				}
+			}, Qt::QueuedConnection);
+	});
+	QObject::connect(thread, &QThread::finished, thread, &QObject::deleteLater);
+	thread->start();
+}
+
+void userServiceActAsync(QObject *receiver, const QString &unit, UserServiceAction action,
+		std::function<void(bool, const QString &)> done) {
+	QPointer<QObject> guard(receiver);
+	auto *thread = QThread::create([guard, unit, action, done = std::move(done)]() mutable {
+		QString error;
+		const bool success = userServiceAct(unit, action, &error);
+		if (!guard) {
+			return;
+		}
+		QMetaObject::invokeMethod(guard.data(),
+			[guard, done = std::move(done), success, error]() mutable {
+				if (guard) {
+					done(success, error);
+				}
+			}, Qt::QueuedConnection);
+	});
+	QObject::connect(thread, &QThread::finished, thread, &QObject::deleteLater);
+	thread->start();
 }

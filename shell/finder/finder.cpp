@@ -8,7 +8,9 @@
 #include <QFileInfo>
 #include <QProgressDialog>
 #include <QProcess>
+#include <QMetaObject>
 #include <QStandardPaths>
+#include <QThread>
 #include <QWidget>
 #include <QTimer>
 
@@ -296,9 +298,32 @@ void Finder::newFolder() {
 }
 
 static bool isExpandable(const QString &path);
-static QFileInfo resolveAliasForUser(const QString &aliasPath);
+static void resolveAliasForUser(const QString &aliasPath,
+		std::function<void(const QFileInfo &)> done);
 
 void Finder::openItem(Item *item) {
+	if (!item->isVirtual && item->isAlias) {
+		const QString aliasPath = item->path;
+		const QString name = item->name;
+		resolveAliasForUser(aliasPath, [name](const QFileInfo &target) {
+			if (target.filePath().isEmpty()) {
+				return;
+			}
+			const QString path = target.absoluteFilePath();
+			if (path.endsWith(QLatin1String(".desktop"))) {
+				if (!appLaunchFile(path)) {
+					Alert::ask("“" + name + "” could not be opened. Its application may have been removed.",
+						"OK", QString());
+				}
+				return;
+			}
+			auto resolved = makeItem(QFileInfo(path));
+			if (resolved) {
+				Finder::instance().openItem(resolved.get());
+			}
+		});
+		return;
+	}
 	if (appTrashMarker(item->path)) {
 		Alert::ask("This application is queued for uninstall when Trash is emptied. "
 			"Choose Put Away to cancel removal and return it to Applications.", "OK", QString());
@@ -343,19 +368,8 @@ void Finder::openItem(Item *item) {
 				InfoWindow::openVirtual(item->path, item->kind, item->name, details);
 				return;
 			}
-			if (item->isAlias && resolveAliasForUser(item->path).filePath().isEmpty()) {
-				return;
-			}
 			const QString real = vfsOpensAs(item->path);
 			FolderWindow::open(real.isEmpty() ? item->path : real);
-			return;
-		}
-		if (item->isAlias && QFileInfo(item->path).symLinkTarget().endsWith(".desktop")) {
-			/* An application's alias. */
-			if (!appLaunchFile(item->path)) {
-				Alert::ask("“" + item->name + "” could not be opened. Its "
-					"application may have been removed.", "OK", QString());
-			}
 			return;
 		}
 		if (item->kind == PL_ICON_FOLDER || item->kind == PL_ICON_DISK ||
@@ -696,49 +710,74 @@ void Finder::putAway() {
 
 /* Resolves an alias, reconnecting by identity; on failure explains and offers
  * to choose a new original. An empty result means nothing to open. */
-static QFileInfo resolveAliasForUser(const QString &aliasPath) {
-	AliasResolution r = aliasResolve(aliasPath);
+static QFileInfo resolveAliasChoice(const QString &aliasPath, const AliasResolution &r) {
 	const QString name = QFileInfo(aliasPath).fileName();
+	if (!r.error.isEmpty()) {
+		Alert::ask(r.error, "OK", QString());
+	}
 	if (r.state == AliasState::Ok || r.state == AliasState::Reconnected) {
 		return QFileInfo(r.target);
 	}
 	if (r.state == AliasState::Changed) {
 		if (Alert::ask("The original for “" + name + "” has been replaced by a different item. "
 				"Use the new item?", "Use New Item", "Cancel")) {
-			aliasReconnect(aliasPath, r.target);
-			return QFileInfo(r.target);
-		}
-		return QFileInfo();
-	}
-	if (Alert::ask(aliasProblemText(r.state) + " Choose a new original for “" + name + "”?",
-			"Fix Alias…", "Cancel")) {
-		const QString chosen = QFileDialog::getOpenFileName(nullptr, "Fix Alias",
-			QFileInfo(aliasPath).absolutePath());
-		QString error;
-		if (!chosen.isEmpty()) {
-			if (aliasReconnect(aliasPath, chosen, &error)) {
-				return QFileInfo(chosen);
+			QString error;
+			if (aliasReconnect(aliasPath, r.target, &error)) {
+				return QFileInfo(r.target);
 			}
 			Alert::ask(error, "OK", QString());
 		}
+		return QFileInfo();
+	}
+	const Alert::Choice choice = Alert::choose(aliasProblemText(r.state) +
+		" Choose a new original for “" + name + "”?", "Choose File…", "Cancel", "Choose Folder…");
+	if (choice == Alert::Cancel) {
+		return QFileInfo();
+	}
+	const QString chosen = choice == Alert::Other ?
+		QFileDialog::getExistingDirectory(nullptr, "Fix Alias", QFileInfo(aliasPath).absolutePath()) :
+		QFileDialog::getOpenFileName(nullptr, "Fix Alias", QFileInfo(aliasPath).absolutePath());
+	QString error;
+	if (!chosen.isEmpty()) {
+		if (aliasReconnect(aliasPath, chosen, &error)) {
+			return QFileInfo(chosen);
+		}
+		Alert::ask(error, "OK", QString());
 	}
 	return QFileInfo();
+}
+
+static void resolveAliasForUser(const QString &aliasPath,
+		std::function<void(const QFileInfo &)> done) {
+	auto *worker = QThread::create([aliasPath, done = std::move(done)]() mutable {
+		const AliasResolution result = aliasResolve(aliasPath);
+		QCoreApplication *app = QCoreApplication::instance();
+		if (!app) {
+			return;
+		}
+		QMetaObject::invokeMethod(app, [aliasPath, result, done = std::move(done)]() mutable {
+			done(resolveAliasChoice(aliasPath, result));
+		}, Qt::QueuedConnection);
+	});
+	QObject::connect(worker, &QThread::finished, worker, &QObject::deleteLater);
+	worker->start();
 }
 
 /* Show Original: the folder holding an alias's target, with it selected. */
 void Finder::showOriginal() {
 	for (Item *item : front()->selectedItems()) {
-		QFileInfo info(item->path);
-		if (!info.isSymLink()) {
+		if (!item->isAlias) {
 			continue;
 		}
-		const QFileInfo target = resolveAliasForUser(item->path);
-		if (target.filePath().isEmpty()) {
-			continue;
-		}
-		FolderWindow *w = FolderWindow::open(target.absolutePath());
-		w->selectByName(target.fileName());
-		notifyState();
+		const QString path = item->path;
+		resolveAliasForUser(path, [](const QFileInfo &target) {
+			if (target.filePath().isEmpty()) {
+				return;
+			}
+			FolderWindow *w = FolderWindow::open(target.absolutePath());
+			w->selectByName(target.fileName());
+			Finder::instance().notifyState();
+		});
 		return;
 	}
 }

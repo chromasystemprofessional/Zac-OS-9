@@ -29,11 +29,14 @@ struct AutostartContext {
 };
 
 AutostartContext autostartDefaultContext();
-/* Every effective entry (enabled or not), sorted by name, one per ID and
- * with enabled entries running the same command collapsed to the first. */
+/* Every effective entry (enabled or not), sorted by name, one per desktop-file
+ * ID. Distinct IDs are preserved even when they run the same command. */
 std::vector<AutostartEntry> autostartEntries(const AutostartContext &context);
 std::vector<AutostartEntry> autostartEntries();
 /* Enable or disable by ID through a user-directory override. The system
  * file is never touched. */
 bool autostartSetEnabled(const AutostartContext &context, const QString &id, bool enabled,
 	QString *error = nullptr);
+/* Launch the effective entries once for this login session. */
+bool autostartRunSession(QString *error = nullptr);
+bool autostartRunSession(const AutostartContext &context, QString *error = nullptr);

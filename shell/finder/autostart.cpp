@@ -1,3 +1,5 @@
+#include <gio/gdesktopappinfo.h>
+
 #include "autostart.h"
 
 #include <QDir>
@@ -5,9 +7,15 @@
 #include <QSaveFile>
 #include <QSet>
 #include <QStandardPaths>
+#include <QCryptographicHash>
+#include <QDir>
+#include <QFile>
 #include <glib.h>
 #include <algorithm>
 #include <memory>
+#include <sys/file.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 namespace {
 
@@ -65,26 +73,6 @@ struct KeyFile {
 	}
 };
 
-/* First word of Exec, honoring quotes; "env VAR=x cmd" looks through env. */
-QString execProgram(const QString &exec) {
-	QStringList words;
-	gint argc = 0;
-	gchar **argv = nullptr;
-	if (g_shell_parse_argv(exec.toUtf8().constData(), &argc, &argv, nullptr)) {
-		for (int i = 0; i < argc; i++) {
-			words << QString::fromUtf8(argv[i]);
-		}
-		g_strfreev(argv);
-	}
-	if (!words.isEmpty() && QFileInfo(words.first()).fileName() == "env") {
-		words.removeFirst();
-		while (!words.isEmpty() && (words.first().contains('=') || words.first().startsWith('-'))) {
-			words.removeFirst();
-		}
-	}
-	return words.value(0);
-}
-
 bool executableAvailable(const QString &program) {
 	if (program.isEmpty()) {
 		return false;
@@ -96,8 +84,19 @@ bool executableAvailable(const QString &program) {
 	return !QStandardPaths::findExecutable(program).isEmpty();
 }
 
-QString disabledReason(const KeyFile &file, const QStringList &desktops) {
-	if (file.has("Type") && file.str("Type") != "Application") {
+QString execProgram(const QString &exec) {
+	gint argc = 0;
+	gchar **argv = nullptr;
+	if (!g_shell_parse_argv(exec.toUtf8().constData(), &argc, &argv, nullptr)) {
+		return {};
+	}
+	const QString program = argc > 0 ? QString::fromUtf8(argv[0]) : QString();
+	g_strfreev(argv);
+	return program;
+}
+
+QString disabledReason(const QString &path, const KeyFile &file, const QStringList &desktops) {
+	if (!file.has("Type") || file.str("Type") != "Application") {
 		return "Not an application";
 	}
 	if (file.boolean("Hidden")) {
@@ -125,7 +124,16 @@ QString disabledReason(const KeyFile &file, const QStringList &desktops) {
 	if (!tryExec.isEmpty() && !executableAvailable(tryExec)) {
 		return "Program not found";
 	}
-	if (!executableAvailable(execProgram(file.str("Exec")))) {
+	GDesktopAppInfo *app = g_desktop_app_info_new_from_filename(QFile::encodeName(path).constData());
+	if (!app) {
+		return "Invalid desktop entry";
+	}
+	const bool dbusActivatable = g_desktop_app_info_get_boolean(app, "DBusActivatable");
+	const QString executable = execProgram(file.str("Exec"));
+	const bool available = dbusActivatable ||
+		executableAvailable(executable);
+	g_object_unref(app);
+	if (!available) {
 		return "Program not found";
 	}
 	return {};
@@ -136,7 +144,10 @@ QString disabledReason(const KeyFile &file, const QStringList &desktops) {
 AutostartContext autostartDefaultContext() {
 	AutostartContext c;
 	c.userDir = QStandardPaths::writableLocation(QStandardPaths::ConfigLocation) + "/autostart";
-	const QString xdg = qEnvironmentVariable("XDG_CONFIG_DIRS", "/etc/xdg");
+	QString xdg = qEnvironmentVariable("XDG_CONFIG_DIRS");
+	if (xdg.isEmpty()) {
+		xdg = "/etc/xdg";
+	}
 	for (const QString &d : xdg.split(':', Qt::SkipEmptyParts)) {
 		c.systemDirs << d + "/autostart";
 	}
@@ -179,19 +190,9 @@ std::vector<AutostartEntry> autostartEntries(const AutostartContext &context) {
 			}
 			e.description = file.localized("Comment", context.locale).trimmed();
 			e.command = file.str("Exec");
-			e.reason = disabledReason(file, context.desktops);
+			e.reason = disabledReason(path, file, context.desktops);
 			e.enabled = e.reason.isEmpty();
 			out.push_back(e);
-		}
-	}
-	/* Different IDs starting the same command would start it twice. */
-	QSet<QString> commands;
-	for (AutostartEntry &e : out) {
-		if (e.enabled && !commands.contains(e.command.simplified())) {
-			commands << e.command.simplified();
-		} else if (e.enabled) {
-			e.enabled = false;
-			e.reason = "Duplicate";
 		}
 	}
 	std::sort(out.begin(), out.end(), [](const AutostartEntry &a, const AutostartEntry &b) {
@@ -216,7 +217,8 @@ bool autostartSetEnabled(const AutostartContext &context, const QString &id, boo
 		return fail("Invalid startup item.");
 	}
 	QString source = context.userDir + "/" + id;
-	if (!QFileInfo(source).isFile()) {
+	const bool userOverride = QFileInfo(source).isFile();
+	if (!userOverride) {
 		source.clear();
 		for (const QString &dir : context.systemDirs) {
 			if (QFileInfo(dir + "/" + id).isFile()) {
@@ -230,6 +232,23 @@ bool autostartSetEnabled(const AutostartContext &context, const QString &id, boo
 		return fail("The startup item could not be read.");
 	}
 	if (enabled) {
+		if (userOverride && file.boolean("Hidden")) {
+			gsize n = 0;
+			gchar **keys = g_key_file_get_keys(file.kf, "Desktop Entry", &n, nullptr);
+			const bool hiddenOnly = n == 1 && keys && g_str_equal(keys[0], "Hidden");
+			g_strfreev(keys);
+			if (hiddenOnly) {
+				const bool lowerPriorityExists = std::any_of(context.systemDirs.cbegin(),
+					context.systemDirs.cend(), [&](const QString &dir) {
+						return QFileInfo(dir + "/" + id).isFile();
+					});
+				if (!lowerPriorityExists) {
+					return fail("There is no lower-priority startup entry to restore.");
+				}
+				return QFile::remove(context.userDir + "/" + id) ? true :
+					fail("The disabled override could not be removed.");
+			}
+		}
 		g_key_file_remove_key(file.kf, "Desktop Entry", "Hidden", nullptr);
 		g_key_file_remove_key(file.kf, "Desktop Entry", "X-GNOME-Autostart-enabled", nullptr);
 	} else {
@@ -243,4 +262,80 @@ bool autostartSetEnabled(const AutostartContext &context, const QString &id, boo
 		out.write(data, qint64(length)) == qint64(length) && out.commit();
 	g_free(data);
 	return ok ? true : fail("The startup item could not be saved.");
+}
+
+bool autostartRunSession(QString *error) {
+	return autostartRunSession(autostartDefaultContext(), error);
+}
+
+bool autostartRunSession(const AutostartContext &context, QString *error) {
+	auto fail = [&](const QString &why) {
+		if (error) {
+			*error = why;
+		}
+		return false;
+	};
+	QString identity = qEnvironmentVariable("XDG_SESSION_ID");
+	if (identity.isEmpty()) {
+		identity = qEnvironmentVariable("WAYLAND_DISPLAY", "wayland-0");
+	}
+	const QByteArray key = QCryptographicHash::hash(identity.toUtf8(),
+		QCryptographicHash::Sha256).toHex().left(24);
+	QString runtime = qEnvironmentVariable("XDG_RUNTIME_DIR");
+	if (runtime.isEmpty()) {
+		runtime = QStandardPaths::writableLocation(QStandardPaths::RuntimeLocation);
+	}
+	if (runtime.isEmpty()) {
+		runtime = QStandardPaths::writableLocation(QStandardPaths::StateLocation) + "/zacos9";
+	}
+	if (!QDir().mkpath(runtime)) {
+		return fail("The session runtime directory could not be created.");
+	}
+	const QString base = runtime + "/zacos9-autostart-" + QString::fromLatin1(key);
+	const int lock = ::open(QFile::encodeName(base + ".lock").constData(),
+		O_CREAT | O_RDWR | O_CLOEXEC, 0600);
+	if (lock < 0) {
+		return fail("The session startup lock could not be opened.");
+	}
+	if (flock(lock, LOCK_EX | LOCK_NB) != 0) {
+		::close(lock);
+		return true;
+	}
+	if (QFileInfo::exists(base + ".started")) {
+		::close(lock);
+		return true;
+	}
+	QStringList errors;
+	for (const AutostartEntry &entry : autostartEntries(context)) {
+		if (!entry.enabled) {
+			continue;
+		}
+		GDesktopAppInfo *app = g_desktop_app_info_new_from_filename(
+			QFile::encodeName(entry.path).constData());
+		GAppLaunchContext *context = g_app_launch_context_new();
+		GError *launchError = nullptr;
+		const bool launched = app && g_app_info_launch(G_APP_INFO(app), nullptr, context,
+			&launchError);
+		if (!launched) {
+			errors << entry.id + ": " + (launchError ?
+				QString::fromUtf8(launchError->message) : "invalid desktop entry");
+		}
+		if (launchError) {
+			g_error_free(launchError);
+		}
+		g_object_unref(context);
+		if (app) {
+			g_object_unref(app);
+		}
+	}
+	QSaveFile started(base + ".started");
+	if (!started.open(QIODevice::WriteOnly) || started.write("started\n") != 8 ||
+			!started.commit()) {
+		errors << "The session startup marker could not be written.";
+	}
+	::close(lock);
+	if (!errors.isEmpty()) {
+		return fail(errors.join('\n'));
+	}
+	return true;
 }

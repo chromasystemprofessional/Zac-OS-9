@@ -211,7 +211,10 @@ void LabelEditor::commit() {
 			"OK", "");
 		return;
 	}
-	aliasMoveRecord(item->path, dir.filePath(name), false);
+	if (!aliasMoveRecord(item->path, dir.filePath(name), false)) {
+		Alert::ask(QStringLiteral("“%1” was renamed, but its alias identity record could not be "
+			"preserved.").arg(name), "OK", "");
+	}
 	Finder &finder = Finder::instance();
 	if (FinderView *v = finder.front()) {
 		v->itemRenamed(item->name, name);

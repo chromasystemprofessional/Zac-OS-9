@@ -8,6 +8,7 @@
 #include <algorithm>
 
 #include <QDir>
+#include <QDirIterator>
 #include <QFileSystemWatcher>
 #include <QStandardPaths>
 #include <QTimer>
@@ -234,9 +235,21 @@ private:
 	}
 
 	void loadServices() {
+		if (!m_serviceResultValid) {
+			m_explanation = m_serviceQuerying ? "Checking your account's background services…"
+				: "Background service status is not available.";
+			if (!m_serviceQuerying) {
+				requestServiceRefresh();
+			}
+			return;
+		}
+		if (!m_serviceResult.error.isEmpty()) {
+			m_explanation = "Background services could not be listed: " + m_serviceResult.error;
+			return;
+		}
 		m_explanation = "Background services of your own account. Essential services are "
 			"shown but can't be changed here.";
-		for (const UserService &u : userServices()) {
+		for (const UserService &u : m_serviceResult.services) {
 			SystemResource r;
 			r.key = u.unit;
 			r.name = u.unit.chopped(8);
@@ -268,11 +281,11 @@ private:
 		const int row = m_list.state.selected;
 		const bool valid = row >= 0 && row < int(m_state.size());
 		const RowState st = valid ? m_state[size_t(row)] : RowState();
-		m_toggle.enabled = st.canToggle;
+		m_toggle.enabled = st.canToggle && !m_serviceActionPending;
 		m_toggle.label = std::make_unique<Text>(category() == Services ?
 			(st.on ? "Don't Start at Login" : "Start at Login") :
 			(st.on ? "Turn Off" : "Turn On"), 142, PL_FONT_SYSTEM);
-		m_run.enabled = st.canRun;
+		m_run.enabled = st.canRun && !m_serviceActionPending;
 		m_run.label = std::make_unique<Text>(st.running ? "Stop Now" : "Start Now", 150,
 			PL_FONT_SYSTEM);
 		update();
@@ -295,8 +308,18 @@ private:
 		if (category() == LoginItems) {
 			ok = autostartSetEnabled(autostartDefaultContext(), key, turnOn, &error);
 		} else {
-			ok = userServiceAct(key, turnOn ? UserServiceAction::EnableAtLogin :
-				UserServiceAction::DisableAtLogin, &error);
+			m_serviceActionPending = true;
+			updateButtons();
+			userServiceActAsync(this, key, turnOn ? UserServiceAction::EnableAtLogin :
+				UserServiceAction::DisableAtLogin, [this](bool success, const QString &message) {
+				m_serviceActionPending = false;
+				m_serviceResultValid = false;
+				if (!success) {
+					Alert::ask(message, "OK", QString());
+				}
+				loadCategory();
+			});
+			return;
 		}
 		if (!ok) {
 			Alert::ask(error, "OK", QString());
@@ -315,12 +338,18 @@ private:
 				"working until it is started again.", "Stop", "Cancel")) {
 			return;
 		}
-		QString error;
-		if (!userServiceAct(m_resources[size_t(row)].key,
-				stop ? UserServiceAction::Stop : UserServiceAction::Start, &error)) {
-			Alert::ask(error, "OK", QString());
-		}
-		loadCategory();
+		m_serviceActionPending = true;
+		updateButtons();
+		userServiceActAsync(this, m_resources[size_t(row)].key,
+			stop ? UserServiceAction::Stop : UserServiceAction::Start,
+			[this](bool success, const QString &error) {
+				m_serviceActionPending = false;
+				m_serviceResultValid = false;
+				if (!success) {
+					Alert::ask(error, "OK", QString());
+				}
+				loadCategory();
+			});
 	}
 
 	/* Event-driven refresh: autostart folders and the user's unit folder. */
@@ -330,6 +359,9 @@ private:
 		m_reload.callOnTimeout([this] {
 			rewatch();
 			if (category() != Extensions) {
+				if (category() == Services) {
+					m_serviceResultValid = false;
+				}
 				loadCategory();
 			}
 		});
@@ -337,20 +369,70 @@ private:
 			qOverload<>(&QTimer::start));
 		connect(&m_watcher, &QFileSystemWatcher::fileChanged, &m_reload,
 			qOverload<>(&QTimer::start));
+		m_servicePoll.setInterval(5000);
+		connect(&m_servicePoll, &QTimer::timeout, this, [this] {
+			if (category() == Services) {
+				m_serviceResultValid = false;
+				requestServiceRefresh();
+			}
+		});
+		m_servicePoll.start();
 		rewatch();
 	}
 
 	void rewatch() {
 		const QString config = QStandardPaths::writableLocation(QStandardPaths::ConfigLocation);
-		QStringList dirs = { config + "/autostart", config + "/systemd/user" };
-		for (const QString &d : autostartDefaultContext().systemDirs) {
-			dirs << d;
+		const AutostartContext autostart = autostartDefaultContext();
+		QList<QPair<QString, QStringList>> sources = {
+			{ config + "/autostart", { "*.desktop" } },
+			{ config + "/systemd/user", { "*.service" } },
+		};
+		for (const QString &d : autostart.systemDirs) {
+			sources << qMakePair(d, QStringList{ "*.desktop" });
 		}
-		for (const QString &d : dirs) {
-			if (QDir(d).exists() && !m_watcher.directories().contains(d)) {
-				m_watcher.addPath(d);
+		int fileCount = m_watcher.files().size();
+		for (const auto &source : sources) {
+			QString existing = source.first;
+			while (!QDir(existing).exists() && existing != "/" && !existing.isEmpty()) {
+				existing = QFileInfo(existing).absolutePath();
+			}
+			if (!existing.isEmpty() && m_watcher.directories().size() < 64 &&
+					!m_watcher.directories().contains(existing)) {
+				m_watcher.addPath(existing);
+			}
+			if (existing != source.first || !QDir(source.first).exists()) {
+				continue;
+			}
+			QDirIterator it(source.first, source.second, QDir::Files | QDir::Readable,
+				QDirIterator::NoIteratorFlags);
+			while (it.hasNext() && fileCount < 512) {
+				const QString path = it.next();
+				if (!m_watcher.files().contains(path) && m_watcher.addPath(path)) {
+					++fileCount;
+				}
 			}
 		}
+	}
+
+	void requestServiceRefresh() {
+		if (m_serviceQuerying) {
+			m_serviceRefreshPending = true;
+			return;
+		}
+		m_serviceQuerying = true;
+		userServicesAsync(this, [this](UserServiceQuery result) {
+			m_serviceQuerying = false;
+			m_serviceResult = std::move(result);
+			m_serviceResultValid = true;
+			if (category() == Services) {
+				loadCategory();
+			}
+			if (m_serviceRefreshPending) {
+				m_serviceRefreshPending = false;
+				m_serviceResultValid = false;
+				requestServiceRefresh();
+			}
+		});
 	}
 
 	void paintDetails(pl_canvas *c) const {
@@ -391,6 +473,12 @@ private:
 	std::vector<RowState> m_state;
 	QFileSystemWatcher m_watcher;
 	QTimer m_reload;
+	QTimer m_servicePoll;
+	UserServiceQuery m_serviceResult;
+	bool m_serviceResultValid = false;
+	bool m_serviceQuerying = false;
+	bool m_serviceRefreshPending = false;
+	bool m_serviceActionPending = false;
 	QString m_title, m_explanation;
 	QStringList m_rows;
 	PanelList m_list;

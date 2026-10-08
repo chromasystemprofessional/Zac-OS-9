@@ -81,13 +81,15 @@ if command -v dbus-update-activation-environment >/dev/null; then
 	startup="dbus-update-activation-environment --systemd WAYLAND_DISPLAY DISPLAY \
 XDG_CURRENT_DESKTOP XDG_SESSION_TYPE XDG_CONFIG_DIRS XDG_DATA_DIRS QT_QPA_PLATFORM GTK_CSD GTK_THEME GTK_MODULES UBUNTU_MENUPROXY QT_STYLE_OVERRIDE XCURSOR_THEME XCURSOR_PATH XCURSOR_SIZE"
 fi
+# The compositor runs its startup command after starting the Wayland backend,
+# setting WAYLAND_DISPLAY, and launching the desktop surfaces. Import the
+# session environment first, then process the effective FreeDesktop entries.
+startup="${startup:+$startup; }zacos9-autostart"
 # Then the password prompt for programs that need an administrator
 # (polkit: balenaEtcher writing a disk, pkexec), as Mac OS asked for one.
 # ZacOS 9's own helpers don't ask (their polkit rules).
 if command -v lxqt-policykit-agent >/dev/null; then
 	startup="${startup:+$startup; }lxqt-policykit-agent"
 fi
-if [ $# -eq 0 ] && [ -n "$startup" ]; then
-	set -- -s "$startup"
-fi
+set -- "$@" -s "$startup"
 exec zacos9-wm "$@" >"$state/session.log" 2>&1

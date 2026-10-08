@@ -1259,6 +1259,15 @@ The Finder shows a startup disk holding System Folder, Applications and
 Documents instead of Debian's Unix hierarchy. Nothing on disk is moved,
 renamed or hidden; no FUSE mount. See [docs/vfs.md](docs/vfs.md).
 
+The Startup Items, persistent alias, Extensions Manager and refresh refinement
+pass is implemented and focused-tested. Login startup launches effective XDG
+autostart entries through the compositor's post-display hook; alias resolution
+and service queries run asynchronously; service mutations revalidate the
+current user-unit policy; source watchers are debounced and bounded. Verification
+passed with `meson compile -C build` and the `autostart`, `alias`, `userservices`,
+`finder-vfs`, `finder-desktop` and `finder-selection` suites. These automated
+checks do not constitute a live login or interactive desktop verification.
+
 - `shell/finder/vfs.{h,cpp}` — the node model and its JSON registry at
   `~/.local/share/zacos9/finder/vfs.json` (stable ids, display names,
   icons, backing paths, visibility, kinds, migration by `version`).

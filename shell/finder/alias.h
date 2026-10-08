@@ -21,6 +21,7 @@ enum class AliasState {
 struct AliasResolution {
 	AliasState state = AliasState::NotAlias;
 	QString target; /* Ok/Reconnected/Changed: the item to use */
+	QString error;  /* a repair or identity-record write that could not complete */
 };
 
 /* Records the identity of `target` for the link at `aliasPath`. */
@@ -31,7 +32,7 @@ AliasResolution aliasResolve(const QString &aliasPath, bool reconnect = true);
  * Refuses a missing item or one that would make a loop. */
 bool aliasReconnect(const QString &aliasPath, const QString &newTarget, QString *error = nullptr);
 /* Keeps records with their links across move, copy, rename and removal. */
-void aliasMoveRecord(const QString &from, const QString &to, bool copy);
-void aliasRemoveRecord(const QString &aliasPath);
+bool aliasMoveRecord(const QString &from, const QString &to, bool copy);
+bool aliasRemoveRecord(const QString &aliasPath);
 /* A sentence for the user describing a failed state. */
 QString aliasProblemText(AliasState state);

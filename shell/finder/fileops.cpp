@@ -214,7 +214,12 @@ QString createAlias(const QString &target, const QString &destDir, const QString
 			"OK", QString());
 		return {};
 	}
-	aliasRecord(destination.filePath(candidate), original.absoluteFilePath());
+	if (!aliasRecord(destination.filePath(candidate), original.absoluteFilePath())) {
+		QFile::remove(destination.filePath(candidate));
+		Alert::ask("The alias was not created because its identity record could not be saved.",
+			"OK", QString());
+		return {};
+	}
 	return candidate;
 }
 
@@ -354,7 +359,10 @@ QStringList transferItems(const QStringList &paths, const QString &destDir, bool
 			bool ok = task.copy ? copyRecursively(task.src, task.target, state) :
 				QDir().rename(task.src, task.target);
 			if (ok) {
-				aliasMoveRecord(task.src, task.target, task.copy);
+				if (!aliasMoveRecord(task.src, task.target, task.copy)) {
+					state.errors << "The item was transferred, but its alias identity record could "
+						"not be preserved: " + task.target;
+				}
 			}
 			if (ok && task.resourceFork) {
 				ok = task.copy ? copyRecursively(task.resource, task.resourceTarget, state) :
