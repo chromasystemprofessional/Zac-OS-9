@@ -43,17 +43,10 @@ active; the live Finder sends the new `network`/`unmount` fields, and the
 chooser responds on D-Bus. Included in the 0.1.38 release. Full pre-release
 suite: 63 passed, 3 skipped, no failures (66 tests).
 
-The user chose password login to retain encrypted application credentials.
-Removed only greetd's automatic `initial_session` from the live machine's
-`/etc/greetd/config.toml`, preserving a backup at
-`/etc/greetd/config.toml.before-password-login`; normal login and PAM keyring
-hooks were already present. The account has a password, and the greeter is
-available. Did not restart greetd or read/change stored secrets. This applies
-at the next login. The existing Default Keyring is separate from Login:
-after password login it may need a one-time unlock with automatic unlock
-enabled in its native prompt. End-to-end password-login/keyring unlocking
-remains to be confirmed by the user. This machine-specific login preference
-is not forced on other installations. See [packaging](docs/packaging.md).
+Automatic login remains the intended live-desktop behavior. Applications
+should request credentials through their normal sign-in flow at launch rather
+than through a separate desktop-startup password prompt. See
+[packaging](docs/packaging.md).
 
 **AFP disconnected disks** (0.1.38): confirmed the user
 remounted `adam's home` successfully. AFP transport/session failure now ends
