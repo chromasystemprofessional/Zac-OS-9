@@ -67,6 +67,68 @@ described above is distinct from this private save workspace. Ordinary mount
 paths keep their normal filesystem permissions. Applications with custom
 file pickers are outside this integration.
 
+## Picture previews
+
+Picture files show their picture instead of the document icon: on the
+Desktop, in icon and list views, in Find results and in Get Info. Any file
+whose type is `image/*` and which Qt can read (PNG, JPEG, GIF, BMP, WebP,
+SVG and the other installed image formats) qualifies; aliases show their
+original's picture. The preview is fitted into the icon square without being
+enlarged, framed in black on white, and follows a camera photo's recorded
+orientation. Files larger than 256 MB and unreadable pictures keep the
+document icon.
+
+Previews are decoded on two worker threads (`shell/finder/thumbnails.cpp`),
+never while painting: the document icon shows until the preview is ready,
+then the window repaints. The 128-pixel previews are stored in the shared
+[freedesktop thumbnail cache](https://specifications.freedesktop.org/thumbnail-spec/latest/)
+(`$XDG_CACHE_HOME/thumbnails/normal`, private to the user) with the
+picture's URI and modification time, so GTK software reuses them and an
+edited picture gets a new preview. A separate in-memory cache holds the
+icons for the most recent 2,000 pictures. Unlike Mac OS 9's preview icons,
+nothing is written to the picture file itself.
+
+## Document names and icons
+
+File names are shown without their extension: "Read Me.txt" appears as
+"Read Me", "Backup.tar.gz" as "Backup". Only a suffix the shared-mime-info
+database knows is hidden, so "Notes.v2", "Makefile" and dot-files keep their
+whole names, and folders are always shown whole. The hidden name is used for
+icon labels, list and Find rows, Get Info and alerts; the real file name is
+still what positions, selection, aliases and the Trash remember. Renaming
+edits the visible name and keeps the hidden extension ("Read Me" → "Notes"
+renames `Read Me.txt` to `Notes.txt`); typing a known extension yourself
+("Notes.md") uses it instead.
+
+A document's icon is a blank Platinum page bearing the icon of the
+application that opens it, as Mac OS drew an application's documents.
+Picture previews take precedence. A type with no application, or whose
+application has no icon, keeps the plain document icon. Aliases show their
+original's.
+
+There is no association table of ZacOS 9's own (`shell/finder/fileassoc.cpp`).
+A file's type is its MIME type (`QMimeDatabase`). The application for it is
+the [freedesktop default](https://specifications.freedesktop.org/mime-apps-spec/latest/)
+that GIO resolves from the `mimeapps.list` files (the user's, then
+`zacos9-mimeapps.list` and the system's) and the desktop entries'
+`MimeType=` keys. Opening a document asks GIO for the same default, so the
+icon always shows what opens it.
+
+The **File Exchange** control panel (`zacos9-fileexchange`, in Control Panels
+and the Apple menu) lists every kind of document an installed application
+can open, with its extensions and the application that opens it now. Change…
+offers every application that can open it and writes the choice through GIO
+to the user's `$XDG_CONFIG_HOME/mimeapps.list`. The candidates include
+applications that list the type in their own `MimeType=` but aren't in
+`mimeinfo.cache` yet.
+
+The Finder caches each type's default and document icon. It drops the cache
+and repaints when any association file changes: an edit in place, an atomic
+replacement, or a list created where there was none (it watches the
+directories and the files, re-arms after each change, and waits 250 ms for
+things to settle). It does the same when applications are installed or
+removed.
+
 ## File-transfer status
 
 Copying, moving, Option-drag copying and File > Duplicate use a movable
@@ -102,7 +164,7 @@ Zacintosh HD
 │   ├── Control Panels      (generated: ZacOS 9's control panels)
 │   ├── Extensions         (generated, read-only driver/module status)
 │   ├── Sounds             (generated, read-only aliases to user/system sounds)
-│   ├── Startup Items      (generated, read-only enabled autostart entries)
+│   ├── Startup Items      (generated: enabled autostart entries; drop apps in, drag to Trash)
 │   ├── Application Support (generated, read-only aliases to support resources)
 │   ├── Device Drivers     (generated, read-only loaded kernel modules)
 │   ├── Network            (generated, read-only interface status)
@@ -369,7 +431,31 @@ Current providers:
   against `XDG_CURRENT_DESKTOP`, `TryExec` must resolve to an executable, and
   GIO parses and launches `Exec` according to the desktop-entry specification.
   Distinct IDs remain distinct even when their commands match. Command text is
-  not exposed.
+  not exposed. Each item is keyed by its desktop-file ID and shows the
+  application's icon when that ID is an installed application.
+
+  Startup Items is the one provider folder that takes drops
+  (`autostartAddApplication`, `autostartRemove`):
+  - Dropping an application on the folder or into its window makes it open
+    at login. The application can come from Applications, an alias to one,
+    or a `.desktop` file.
+    - If an entry with that ID is disabled, it is turned back on.
+    - Otherwise the application's own desktop entry is copied to
+      `$XDG_CONFIG_HOME/autostart/<id>`. The copy drops `Hidden`,
+      `X-GNOME-Autostart-enabled`, `OnlyShowIn` and `NotShowIn`, since the user
+      asked for it here, and gains `X-ZacOS9-Startup-Item=true`.
+    - The copy is checked before anything is written.
+    - A missing program or a non-application is refused with an alert, and
+      the dropped item never moves.
+  - Dragging items to the Trash, or Move To Trash, stops them opening at login.
+    Startup items drag as their IDs, never as paths. Dropping one anywhere
+    else does nothing.
+    - An entry only the user has is moved to the Trash. Put Away, or dragging
+      it back into Startup Items, restores it; dragging it back also removes
+      it from the Trash.
+    - An entry from a system directory gets a `Hidden=true` user override;
+      the system file is never touched.
+  - The folder refreshes through the existing autostart-directory watcher.
 - **Application Support**: allowlisted user/system support roots as read-only
   aliases.
 - **Device Drivers**: every loaded kernel module, with startup-module metadata,
@@ -514,6 +600,18 @@ ordinary views never show the Unix hierarchy. The Finder also takes a
 - Renaming to a name a sibling already has is refused, as in the Finder.
 
 ## Tests
+
+`finder-fileassoc` covers hidden extensions (compound, unknown and dot-file
+names, folders), renames keeping or replacing the extension, MIME types of
+files and aliases, the default application and its candidates, the composed
+document icon and its fallback, setting a default (written to
+`mimeapps.list`, refused for an application that isn't installed), and
+noticing another program's atomic replacement, edit in place and a new
+desktop-specific list. It runs in a private XDG tree.
+
+`finder-thumbnails` covers picture previews: cache format and reuse,
+regeneration after an edit, orientation, framing, unreadable files, aliases,
+window repaints and the Finder icon painter.
 
 `shell/finder/tests/test_vfs.cpp` (`meson test finder-vfs`) builds a
 private XDG environment in a temporary directory and checks discovery,

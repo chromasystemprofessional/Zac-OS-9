@@ -214,6 +214,7 @@ void launch_fill_logo_menu(struct mb_menu *menu) {
 		{ "Appearance", "zacos9-appearance", "" },
 		{ "Bluetooth", "zacos9-bluetooth", "" },
 		{ "Date & Time", "zacos9-datetime", "" },
+		{ "File Exchange", "zacos9-fileexchange", "" },
 		{ "File Sharing", "zacos9-filesharing", "" },
 		{ "Keyboard", "zacos9-controlpanel", " keyboard" },
 		{ "Monitors", "zacos9-controlpanel", " monitors" },

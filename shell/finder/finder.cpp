@@ -304,7 +304,7 @@ static void resolveAliasForUser(const QString &aliasPath,
 void Finder::openItem(Item *item) {
 	if (!item->isVirtual && item->isAlias) {
 		const QString aliasPath = item->path;
-		const QString name = item->name;
+		const QString name = item->visibleName();
 		resolveAliasForUser(aliasPath, [name](const QFileInfo &target) {
 			if (target.filePath().isEmpty()) {
 				return;
@@ -339,7 +339,7 @@ void Finder::openItem(Item *item) {
 				} else if (action == "extensions-manager") {
 					openExtensionsManager();
 				} else if (!vfsLaunch(item->path)) {
-					Alert::ask(item->name + " could not be opened. Its "
+					Alert::ask(item->visibleName() + " could not be opened. Its "
 						"application may have been removed.", "OK", QString());
 				}
 				return;
@@ -352,7 +352,7 @@ void Finder::openItem(Item *item) {
 				QString source;
 				if (vfsResourceOpenPath(item->path, &source)) {
 					if (!appOpenFile(source)) {
-						Alert::ask(item->name + " could not be opened.", "OK", QString());
+						Alert::ask(item->visibleName() + " could not be opened.", "OK", QString());
 					}
 					return;
 				}
@@ -387,7 +387,7 @@ void Finder::openItem(Item *item) {
 			expandArchive(item->path);
 		} else {
 			if (!appOpenFile(item->path)) {
-				Alert::ask(item->name + " could not be opened.", "OK", QString());
+				Alert::ask(item->visibleName() + " could not be opened.", "OK", QString());
 			}
 		}
 	}
@@ -609,7 +609,7 @@ void Finder::makeAlias() {
 			const QString target = node && node->actionId.isEmpty()
 				? vfsRealCounterpart(item->path) : QString();
 			if (target.isEmpty()) {
-				Alert::ask("An alias of “" + item->name + "” can't be made.", "OK", QString());
+				Alert::ask("An alias of “" + item->visibleName() + "” can't be made.", "OK", QString());
 				continue;
 			}
 			QDir().mkpath(desktopDir);
@@ -812,7 +812,7 @@ void Finder::getInfo(bool sharing) {
 			const VNode *node = vfsNode(item->path);
 			if (!real.isEmpty() && !(node && node->kind == VKind::Launcher &&
 					!node->appId.isEmpty())) {
-				InfoWindow::open(real, item->kind, item->name, view);
+				InfoWindow::open(real, item->kind, item->visibleName(), view);
 			} else {
 				QStringList metadata;
 				ResourceDetails details;
@@ -824,7 +824,7 @@ void Finder::getInfo(bool sharing) {
 			}
 			continue;
 		}
-		InfoWindow::open(item->path, item->kind, item->name, view);
+		InfoWindow::open(item->path, item->kind, item->visibleName(), view);
 	}
 }
 
@@ -845,7 +845,13 @@ void Finder::moveSelectionToTrash() {
 			paths << item->path;
 		}
 	}
+	QStringList startupIds;
 	for (const QString &path : paths) {
+		const QString startupId = vfsStartupItemId(path);
+		if (!startupId.isEmpty()) {
+			startupIds << startupId;
+			continue;
+		}
 		if (vfsIsAppFolder(path)) {
 			const QString id = vfsNode(path)->appId;
 			QString error;
@@ -875,6 +881,9 @@ void Finder::moveSelectionToTrash() {
 		if (QFile::moveToTrash(path)) {
 			changed << QFileInfo(path).absolutePath();
 		}
+	}
+	if (!startupIds.isEmpty()) {
+		removeFromStartupItems(startupIds);
 	}
 	changed.removeDuplicates();
 	for (const QString &folder : changed) {

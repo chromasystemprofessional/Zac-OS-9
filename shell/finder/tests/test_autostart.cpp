@@ -120,6 +120,62 @@ int main(int argc, char **argv) {
 		"a Hidden-only override without a lower-priority entry is preserved and reports why");
 	check(!autostartSetEnabled(c, "../x.desktop", true, &error), "path-like IDs are refused");
 
+	/* Startup Items: drag an application in, drag it to the Trash. */
+	/* Qt picks the home Trash only for files on $HOME's disk. */
+	qputenv("HOME", tmp.path().toUtf8());
+	qputenv("XDG_DATA_HOME", (tmp.path() + "/data").toUtf8());
+	QDir().mkpath(tmp.path() + "/data"); /* Qt makes only Trash itself */
+	const QString apps = tmp.path() + "/apps";
+	write(apps, "editor.desktop", "[Desktop Entry]\nType=Application\nName=Editor\n"
+		"Exec=sh -c \"echo two  spaces\" %U\nOnlyShowIn=GNOME;\nIcon=editor\n");
+	write(apps, "masked.desktop", head("masked") + "Name=Masked App\n");
+	write(apps, "gone.desktop", "[Desktop Entry]\nType=Application\nName=Gone\nExec=/nonexistent/prog\n");
+	write(apps, "link.desktop", "[Desktop Entry]\nType=Link\nName=Web\nURL=https://example.com\n");
+	check(autostartAddApplication(c, "editor.desktop", apps + "/editor.desktop", &error),
+		"an application dropped into Startup Items is added");
+	const auto addedEntries = autostartEntries(c);
+	const AutostartEntry *added = find(addedEntries, "editor.desktop");
+	check(added && added->enabled && added->userEntry && added->path == user + "/editor.desktop",
+		"the added application is an enabled user autostart entry, even if its menu entry "
+		"was for another desktop");
+	QFile addedFile(user + "/editor.desktop");
+	addedFile.open(QIODevice::ReadOnly);
+	const QByteArray addedText = addedFile.readAll();
+	check(addedText.contains("X-ZacOS9-Startup-Item=true") && !addedText.contains("OnlyShowIn") &&
+		addedText.contains("Icon=editor") && added && added->command.contains("\"echo two  spaces\""),
+		"the entry copies the application's own command and icon unchanged");
+	addedFile.close();
+	check(autostartAddApplication(c, "editor.desktop", apps + "/editor.desktop", &error),
+		"dropping an application that is already a startup item is harmless");
+	check(autostartAddApplication(c, "masked.desktop", apps + "/masked.desktop", &error) &&
+		find(autostartEntries(c), "masked.desktop")->enabled,
+		"an application whose system entry the user disabled is turned back on");
+	check(!autostartAddApplication(c, "gone.desktop", apps + "/gone.desktop", &error) &&
+		!QFileInfo::exists(user + "/gone.desktop") && error.contains("could not be found"),
+		"an application whose program is missing is refused, and nothing is written");
+	check(!autostartAddApplication(c, "link.desktop", apps + "/link.desktop", &error) &&
+		!QFileInfo::exists(user + "/link.desktop"), "only applications can be startup items");
+	check(!autostartAddApplication(c, "../editor.desktop", apps + "/editor.desktop", &error),
+		"path-like IDs are refused when adding");
+
+	bool trashed = false;
+	check(autostartRemove(c, "editor.desktop", &trashed, &error) && trashed &&
+		!QFileInfo::exists(user + "/editor.desktop") &&
+		QFileInfo::exists(tmp.path() + "/data/Trash/files/editor.desktop") &&
+		!find(autostartEntries(c), "editor.desktop"),
+		"the Trash takes a startup item the user added, so it can be dragged back");
+	check(autostartAddApplication(c, "editor.desktop",
+		tmp.path() + "/data/Trash/files/editor.desktop", &error) &&
+		find(autostartEntries(c), "editor.desktop")->enabled,
+		"dragging it back out of the Trash adds it again");
+	check(autostartRemove(c, "zac.desktop", &trashed, &error) && !trashed &&
+		!find(autostartEntries(c), "zac.desktop")->enabled &&
+		QFileInfo::exists(sys + "/zac.desktop"),
+		"a system startup item is masked with a user override; the system file stays");
+	check(!autostartRemove(c, "nothing.desktop", &trashed, &error) && !error.isEmpty(),
+		"removing an item that is gone reports why");
+	check(!autostartRemove(c, "../zac.desktop", &trashed, &error), "path-like IDs are refused");
+
 	const QString bin = tmp.path() + "/record-start";
 	const QString marker = tmp.path() + "/launches";
 	write(tmp.path(), "record-start",

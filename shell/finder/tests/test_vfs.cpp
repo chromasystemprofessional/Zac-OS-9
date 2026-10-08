@@ -295,9 +295,16 @@ int main(int argc, char **argv) {
 		"startup discovery includes enabled entries and excludes disabled entries");
 	vfsResourceDetails(startupEntry, &resourceInfo, &resourceKind, &resourceLocation,
 		&resourceSource, &resourceAccess);
-	check(resourceInfo.join('\n').contains("enabled at login") &&
+	check(resourceInfo.join('\n').contains("opens at login") &&
 		!resourceInfo.join('\n').contains("secret-command"),
 		"startup metadata never reveals or executes desktop-entry command text");
+	check(vfsIsStartupItems(startupItems) && vfsAcceptsDrops(startupItems) &&
+		vfsStartupItemsPath() == startupItems && !vfsIsStartupItems(startupEntry),
+		"Startup Items is a drop target for applications");
+	check(vfsStartupItemId(startupEntry) == "enabled.desktop" &&
+		vfsStartupItemId(startupItems).isEmpty() &&
+		vfsStartupItemId(vfsPathFor("system-folder/sounds")).isEmpty(),
+		"each startup item names its desktop-file ID, so the Trash removes exactly that entry");
 	const QString logs = vfsPathFor("system-folder/system-logs");
 	check(pathNamed(logs, "Protected system logs") != QString(),
 		"System Logs presents a protected-information explanation, not log contents");

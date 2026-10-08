@@ -305,6 +305,7 @@ struct PanelDef {
 const PanelDef PANELS[] = {
 	{ "Appearance", "zacos9-appearance", nullptr },
 	{ "Date & Time", "zacos9-datetime", nullptr },
+	{ "File Exchange", "zacos9-fileexchange", nullptr },
 	{ "File Sharing", "zacos9-filesharing", nullptr },
 	{ "Keyboard", "zacos9-controlpanel", "keyboard" },
 	{ "Monitors", "zacos9-controlpanel", "monitors" },
@@ -667,6 +668,9 @@ std::vector<std::unique_ptr<Item>> vfsList(const QString &path) {
 			item->kindText = node->actionId.isEmpty()
 				? QStringLiteral("application program")
 				: QStringLiteral("application command");
+		} else if (node->kind == VKind::Resource && node->resourceProvider == "startup-items") {
+			item->kindText = node->resourceKey.isEmpty() ?
+				QStringLiteral("folder") : QStringLiteral("startup item");
 		} else if (node->kind == VKind::Resource) {
 			item->kindText = node->resourceDirectory ?
 				QStringLiteral("read-only folder") : QStringLiteral("system information");
@@ -677,6 +681,14 @@ std::vector<std::unique_ptr<Item>> vfsList(const QString &path) {
 			/* The application itself, not one of its Desktop Actions:
 			 * show its own icon when one was resolved. */
 			if (const AppEntry *app = appById(node->appId)) {
+				item->customIcon32 = app->icon32;
+				item->customIcon16 = app->icon16;
+			}
+		}
+		if (node->kind == VKind::Resource && node->resourceProvider == "startup-items" &&
+				!node->resourceKey.isEmpty()) {
+			/* A startup item looks like the application it opens. */
+			if (const AppEntry *app = appById(node->resourceKey)) {
 				item->customIcon32 = app->icon32;
 				item->customIcon16 = app->icon16;
 			}
@@ -989,7 +1001,30 @@ void vfsShowAllHidden() {
 bool vfsAcceptsDrops(const QString &path) {
 	const VNode *node = vfsNode(path);
 	return node && (node->kind == VKind::Backed || node->kind == VKind::Unix ||
-		(node->kind == VKind::Apps && !node->id.startsWith("system-folder/")));
+		(node->kind == VKind::Apps && !node->id.startsWith("system-folder/")) ||
+		vfsIsStartupItems(path));
+}
+
+bool vfsIsStartupItems(const QString &path) {
+	const VNode *node = vfsNode(path);
+	return node && node->kind == VKind::Resource && node->resourceProvider == "startup-items" &&
+		node->resourceKey.isEmpty();
+}
+
+QString vfsStartupItemId(const QString &path) {
+	const VNode *node = vfsNode(path);
+	return node && node->kind == VKind::Resource && node->resourceProvider == "startup-items" &&
+		!node->resourceKey.isEmpty() ? node->resourceKey : QString();
+}
+
+QString vfsStartupItemsPath() {
+	for (const VNode &node : g_nodes) {
+		if (node.kind == VKind::Resource && node.resourceProvider == "startup-items" &&
+				node.resourceKey.isEmpty()) {
+			return vfsPathFor(node.id);
+		}
+	}
+	return QString();
 }
 
 bool vfsIsApplications(const QString &path) {

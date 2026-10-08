@@ -13,6 +13,14 @@
 struct Item {
 	QString name;
 	QString path;
+	/* The name as shown, when it isn't `name`: a file's without its
+	 * extension (fileassoc.h's hiddenExtension). `name` stays the real
+	 * one, the key for positions, selection and renames. */
+	QString shownName;
+	const QString &visibleName() const { return shownName.isEmpty() ? name : shownName; }
+	/* The file's MIME type, looked up when first painted. */
+	QString mimeType;
+	bool mimeResolved = false;
 	pl_icon_kind kind = PL_ICON_DOCUMENT;
 	QPoint pos; /* icon top-left in its view's coordinates */
 	bool selected = false;
@@ -61,6 +69,9 @@ struct Item {
 	 * theme (straight-alpha ARGB, 32x32 and 16x16): drawn instead of the
 	 * compiled icon for `kind` when not empty. See appdb.h. */
 	std::vector<uint32_t> customIcon32, customIcon16;
+	/* A picture file's preview has been put in customIcon (or it has
+	 * none): stop asking. See thumbnails.h. */
+	bool thumbnailResolved = false;
 
 	/* An alias (a symbolic link): its name is shown in italics. */
 	bool isAlias = false;
@@ -116,9 +127,16 @@ QString trashFilesPath();
 void paintIconItem(pl_canvas *c, Item &item, int x, int y, bool onDesktop,
 		bool showLabel = true);
 /* The icon alone, at `size` (32 or 16): an application's own icon if one
- * was resolved, else the compiled icon for its kind. Used by the list
+ * was resolved, a picture file's preview once it is ready, a document
+ * bearing the icon of the application that opens it, else the compiled
+ * icon for its kind. Used by the list
  * and Find windows, which draw the label text themselves. */
 void paintIcon(pl_canvas *c, Item &item, int x, int y, int size, bool highlight);
+/* A document of `mimeType`: a blank page bearing the icon of the
+ * application that opens it, at `size` (32 or 16), straight-alpha ARGB.
+ * Null when no application with an icon opens it (the plain document icon
+ * is drawn). Cached until the associations change. */
+const std::vector<uint32_t> *documentIcon(const QString &mimeType, int size);
 /* Is `p` on the label of the icon at (x, y)? */
 bool iconLabelContains(Item &item, int x, int y, QPoint p);
 /* The label alone, again: called for the selected icons after everything

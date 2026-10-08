@@ -16,6 +16,7 @@
 #include <QTimer>
 #include <QUrl>
 
+#include "filechooserportal.h"
 #include "alert.h"
 #include "appdb.h"
 #include "apptrash.h"
@@ -152,6 +153,15 @@ int main(int argc, char **argv) {
 	}
 	check(usbBadgeDiffers && diskRemainsVisible,
 		"USB volume icon overlays a USB badge on the drive without replacing it");
+	for (bool selected : { false, true }) {
+		Pixels desktopDisk(PL_ICON_LARGE, PL_ICON_LARGE);
+		Pixels desktopUsb(PL_ICON_LARGE, PL_ICON_LARGE);
+		paintIcon(&desktopDisk.c, regularDisk, 0, 0, PL_ICON_LARGE, selected);
+		paintIcon(&desktopUsb.c, usbDisk, 0, 0, PL_ICON_LARGE, selected);
+		check(fileChooserDriveIcon(false, selected) == desktopDisk.img &&
+			fileChooserDriveIcon(true, selected) == desktopUsb.img,
+			"file chooser drive icons match the Finder desktop's drive icons");
+	}
 	Pixels smallUsb(PL_ICON_SMALL, PL_ICON_SMALL);
 	Pixels expectedSmallUsb(PL_ICON_SMALL, PL_ICON_SMALL);
 	Pixels usbBadge(PL_ICON_SMALL, PL_ICON_SMALL);
@@ -331,6 +341,79 @@ int main(int argc, char **argv) {
 		}
 	}
 	check(appAlias, "dragging actual Applications entry creates a launchable alias without moving launcher");
+
+	/* Startup Items: drag an application in, then drag it to the Trash. */
+	const QString startupFolder = vfsStartupItemsPath();
+	const QString autostartFile = home.path() + "/config/autostart/desktop-test.desktop";
+	bool startupAdded = false;
+	for (auto &item : vfsList(vfsRoot() + "applications")) {
+		if (vfsRealCounterpart(item->path) == launcher.fileName()) {
+			std::unique_ptr<QMimeData> appMime(itemDragMime({item.get()}));
+			QDropEvent startupDrop(QPointF(10, 10), Qt::MoveAction | Qt::LinkAction,
+				appMime.get(), Qt::LeftButton, Qt::NoModifier);
+			dropItems(&startupDrop, nullptr, startupFolder);
+			startupAdded = startupDrop.isAccepted() && startupDrop.dropAction() == Qt::LinkAction &&
+				waitFor([&] { return QFileInfo::exists(autostartFile); }) &&
+				QFileInfo::exists(launcher.fileName());
+		}
+	}
+	check(startupAdded, "an application dropped into Startup Items is set to open at login "
+		"and stays in Applications");
+	std::unique_ptr<Item> startupItem;
+	for (auto &item : vfsList(startupFolder)) {
+		if (vfsStartupItemId(item->path) == "desktop-test.desktop") {
+			startupItem = std::move(item);
+		}
+	}
+	check(startupItem && startupItem->name == "Desktop Test" && !startupItem->customIcon32.empty(),
+		"the new startup item shows under the application's name and icon");
+	if (startupItem) {
+		std::unique_ptr<QMimeData> startupMime(itemDragMime({startupItem.get()}));
+		check(startupMime->hasFormat(STARTUP_ITEMS_MIME) && !startupMime->hasUrls(),
+			"a startup item drags as its desktop-file ID, never as a file path");
+		QDropEvent elsewhere(QPointF(10, 10), Qt::MoveAction | Qt::LinkAction, startupMime.get(),
+			Qt::LeftButton, Qt::NoModifier);
+		dropItems(&elsewhere, nullptr, path);
+		check(!elsewhere.isAccepted() && QFileInfo::exists(autostartFile),
+			"a startup item dropped anywhere but the Trash stays a startup item");
+		QDropEvent intoTrash(QPointF(10, 10), Qt::MoveAction | Qt::LinkAction, startupMime.get(),
+			Qt::LeftButton, Qt::NoModifier);
+		dropItems(&intoTrash, nullptr, trashFilesPath());
+		check(intoTrash.isAccepted() &&
+			waitFor([&] { return !QFileInfo::exists(autostartFile); }) &&
+			QFileInfo::exists(trashFilesPath() + "/desktop-test.desktop"),
+			"dragging a startup item to the Trash stops it opening at login");
+		QMimeData back;
+		back.setUrls({ QUrl::fromLocalFile(trashFilesPath() + "/desktop-test.desktop") });
+		QDropEvent backDrop(QPointF(10, 10), Qt::MoveAction | Qt::CopyAction | Qt::LinkAction,
+			&back, Qt::LeftButton, Qt::NoModifier);
+		dropItems(&backDrop, nullptr, startupFolder);
+		check(backDrop.isAccepted() && waitFor([&] { return QFileInfo::exists(autostartFile); }) &&
+			waitFor([&] { return !QFileInfo::exists(trashFilesPath() + "/desktop-test.desktop"); }),
+			"dragging it back out of the Trash makes it a startup item again");
+		QFile::remove(autostartFile);
+		vfsRefresh();
+	}
+	QMimeData notApp;
+	notApp.setUrls({ QUrl::fromLocalFile(path + "/External file") });
+	QDropEvent notAppDrop(QPointF(10, 10), Qt::MoveAction | Qt::CopyAction | Qt::LinkAction,
+		&notApp, Qt::LeftButton, Qt::NoModifier);
+	bool notAppAlert = false;
+	QTimer dismissNotApp;
+	dismissNotApp.setInterval(10);
+	QObject::connect(&dismissNotApp, &QTimer::timeout, [&] {
+		if (auto *alert = dynamic_cast<Alert *>(QApplication::activeModalWidget())) {
+			notAppAlert = true;
+			alert->reject();
+		}
+	});
+	dismissNotApp.start();
+	dropItems(&notAppDrop, nullptr, startupFolder);
+	waitFor([&] { return notAppAlert && !QApplication::activeModalWidget(); });
+	dismissNotApp.stop();
+	check(notAppAlert && QFileInfo::exists(path + "/External file") &&
+		!QDir(home.path() + "/config/autostart").entryList({ "*.desktop" }).contains("External file"),
+		"a document dropped into Startup Items is refused with an explanation and is not moved");
 	std::unique_ptr<QMimeData> fixedMime(itemDragMime({desktop.m_disk.get()}));
 	check(fixedMime->hasFormat(ICON_MOVE_MIME) && !fixedMime->hasFormat(ALIAS_ITEMS_MIME),
 		"startup disk stays fixed; synthetic system nodes never become filesystem links");

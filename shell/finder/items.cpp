@@ -2,17 +2,21 @@
 
 #include <QDir>
 #include <QFileInfo>
+#include <QImage>
 #include <QMimeDatabase>
 #include <QStandardPaths>
 #include <QFile>
 #include <QSet>
 #include <algorithm>
 #include <cerrno>
+#include <cstring>
 #include <sys/xattr.h>
 
 #include "appdb.h"
+#include "fileassoc.h"
 #include "apptrash.h"
 #include "sharingclient.h"
+#include "thumbnails.h"
 #include "vfs.h"
 
 static constexpr int LABEL_SHORT_INK = 72; /* inside an 80-px grid cell, with room between */
@@ -47,7 +51,7 @@ static QString middleTruncated(const QString &name, int maxInk, pl_font font) {
 
 const Text &Item::labelText() {
 	if (!label) {
-		label = std::make_unique<Text>(middleTruncated(name, LABEL_SHORT_INK, nameFont()),
+		label = std::make_unique<Text>(middleTruncated(visibleName(), LABEL_SHORT_INK, nameFont()),
 			LABEL_SHORT_INK, nameFont());
 	}
 	return *label;
@@ -55,7 +59,7 @@ const Text &Item::labelText() {
 
 const Text &Item::fullLabelText() {
 	if (!fullLabel) {
-		fullLabel = std::make_unique<Text>(name, LABEL_MAX_INK, nameFont());
+		fullLabel = std::make_unique<Text>(visibleName(), LABEL_MAX_INK, nameFont());
 	}
 	return *fullLabel;
 }
@@ -253,7 +257,14 @@ std::unique_ptr<Item> makeItem(const QFileInfo &info) {
 	item->size = info.isDir() ? 0 : info.size();
 	item->modified = info.lastModified();
 	item->labelIndex = readLabel(item->path);
+	if (!item->isDir) {
+		const QString shown = nameWithoutExtension(item->name);
+		if (shown != item->name) {
+			item->shownName = shown;
+		}
+	}
 	if (appTrashMarker(item->path)) {
+		item->shownName.clear();
 		TrashedApplication entry;
 		QString error;
 		if (appTrashRead(item->path, &entry, &error)) {
@@ -346,12 +357,113 @@ bool iconLabelContains(Item &item, int x, int y, QPoint p) {
 	return QRect(QPoint(l, t), QPoint(r, b)).contains(p);
 }
 
+namespace {
+
+/* `pixels` (straight-alpha ARGB, from x from) scaled to `to` square. */
+std::vector<uint32_t> scaledArgb(const std::vector<uint32_t> &pixels, int from, int to) {
+	if (from == to) {
+		return pixels;
+	}
+	const QImage src(reinterpret_cast<const uchar *>(pixels.data()), from, from,
+		from * 4, QImage::Format_ARGB32);
+	const QImage img = src.scaled(to, to, Qt::IgnoreAspectRatio, Qt::SmoothTransformation)
+		.convertToFormat(QImage::Format_ARGB32);
+	std::vector<uint32_t> out(static_cast<size_t>(to) * to);
+	for (int y = 0; y < to; y++) {
+		memcpy(out.data() + static_cast<size_t>(y) * to, img.constScanLine(y),
+			static_cast<size_t>(to) * sizeof(uint32_t));
+	}
+	return out;
+}
+
+/* The Platinum document page with its text lines wiped, and the
+ * application's icon laid on it (16 px on the large page, 8 on the
+ * small), as the Mac drew an application's documents. */
+std::vector<uint32_t> composeDocument(const std::vector<uint32_t> &appIcon16, int size) {
+	Pixels page(size, size);
+	pl_icon_paint(&page.c, 0, 0, PL_ICON_DOCUMENT, size, false);
+	const bool large = size >= 32;
+	/* Inside the page's frame, below its folded corner. */
+	if (large) {
+		pl_fill(&page.c, 7, 8, 24, 29, C_WHITE);
+	} else {
+		pl_fill(&page.c, 4, 5, 11, 13, C_WHITE);
+	}
+	const int glyph = large ? 16 : 8;
+	const std::vector<uint32_t> icon = scaledArgb(appIcon16, 16, glyph);
+	pl_image_blend(&page.c, large ? 8 : 4, large ? 12 : 5, icon.data(), glyph, glyph, false);
+	std::vector<uint32_t> out(static_cast<size_t>(size) * size);
+	for (int y = 0; y < size; y++) {
+		memcpy(out.data() + static_cast<size_t>(y) * size, page.img.constScanLine(y),
+			static_cast<size_t>(size) * sizeof(uint32_t));
+	}
+	return out;
+}
+
+} // namespace
+
+const std::vector<uint32_t> *documentIcon(const QString &mimeType, int size) {
+	struct Icons {
+		std::vector<uint32_t> large, small;
+	};
+	static QHash<QString, Icons> cache;
+	static unsigned generation = 0;
+	static bool watchingApps = false;
+	if (!watchingApps) {
+		watchingApps = true;
+		/* A newly installed (or removed) application can change the
+		 * default for any type, and brings its icon. */
+		appOnChange([] { fileAssocInvalidate(); });
+	}
+	if (generation != fileAssocGeneration()) {
+		generation = fileAssocGeneration();
+		cache.clear();
+	}
+	if (mimeType.isEmpty()) {
+		return nullptr;
+	}
+	auto it = cache.find(mimeType);
+	if (it == cache.end()) {
+		Icons icons;
+		const QString id = defaultAppFor(mimeType);
+		std::vector<uint32_t> glyph;
+		if (!id.isEmpty()) {
+			const AppEntry *app = appById(id);
+			glyph = app && !app->icon16.empty() ? app->icon16 : appIconPixels(id, 16);
+		}
+		if (glyph.size() == 16 * 16) {
+			icons.large = composeDocument(glyph, PL_ICON_LARGE);
+			icons.small = composeDocument(glyph, PL_ICON_SMALL);
+		}
+		it = cache.insert(mimeType, icons);
+	}
+	const std::vector<uint32_t> &icon = size >= 32 ? it->large : it->small;
+	return icon.empty() ? nullptr : &icon;
+}
+
 void paintIcon(pl_canvas *c, Item &item, int x, int y, int size, bool highlight) {
-	const std::vector<uint32_t> &custom = size >= 32 ? item.customIcon32 : item.customIcon16;
-	if (!custom.empty()) {
+	if (!item.thumbnailResolved) {
+		if (item.isVirtual || item.isDir || item.kind != PL_ICON_DOCUMENT ||
+				!item.customIcon32.empty() ||
+				thumbnailFor(item.path, &item.customIcon32, &item.customIcon16) !=
+					ThumbnailState::Pending) {
+			item.thumbnailResolved = true;
+		}
+	}
+	const std::vector<uint32_t> *custom = size >= 32 ? &item.customIcon32 : &item.customIcon16;
+	if (custom->empty() && !item.isVirtual && !item.isDir && item.kind == PL_ICON_DOCUMENT) {
+		if (!item.mimeResolved) {
+			item.mimeType = fileMimeType(item.path);
+			item.mimeResolved = true;
+		}
+		if (const std::vector<uint32_t> *doc = documentIcon(item.mimeType, size)) {
+			custom = doc;
+		}
+	}
+	if (!custom->empty()) {
 		/* A real application icon: real alpha, and no Finder-label tint
 		 * (it would fight the icon's own colors). */
-		pl_image_blend(c, x, y, custom.data(), size, size, highlight);
+		pl_image_blend(c, x, y, custom->data(), size, size, highlight);
 	} else {
 		pl_icon_paint_label(c, x, y, item.iconKind(), size, highlight, item.labelColor());
 		if (item.isUsbVolume && item.kind == PL_ICON_DISK) {

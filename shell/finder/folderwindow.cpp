@@ -1,4 +1,6 @@
 #include "folderwindow.h"
+#include "thumbnails.h"
+#include "fileassoc.h"
 
 #include "vfs.h"
 
@@ -160,6 +162,8 @@ void FolderWindow::reloadAll(const QString &folder) {
 }
 
 FolderWindow::FolderWindow(const QString &path) : m_path(path) {
+	watchThumbnails(this);
+	watchFileAssociations(this);
 	m_state = FolderState::load(path);
 	m_mode = m_state.viewMode == 1 ? ViewMode::List
 		: m_state.viewMode == 2 ? ViewMode::Buttons : ViewMode::Icons;
@@ -333,7 +337,7 @@ QRect FolderWindow::selectionRect(Item *item) {
 		}
 		const int d = m_rows[r].depth * INDENT, top = static_cast<int>(r) * ROW_H;
 		const int nameW = COLUMNS[0].width - NAME_X - d - 6;
-		Text name(item->name, std::max(8, nameW), item->nameFont());
+		Text name(item->visibleName(), std::max(8, nameW), item->nameFont());
 		return QRect(QPoint(ICON_X + d, top + 1),
 			QPoint(NAME_X + d + name.inkWidth() + 1, top + 16));
 	}
@@ -798,7 +802,7 @@ void FolderWindow::paintList(pl_canvas *c) {
 			item->selected || item->dropTarget);
 
 		const int nameW = COLUMNS[0].width - NAME_X - d - 6;
-		Text name(item->name, std::max(8, nameW), item->nameFont());
+		Text name(item->visibleName(), std::max(8, nameW), item->nameFont());
 		uint32_t ink = C_BLACK;
 		if (item->selected) {
 			pl_fill(c, NAME_X + d - 2, top + 2, NAME_X + d + name.inkWidth() + 1, top + 14, C_BLACK);
@@ -1178,13 +1182,27 @@ bool finderShortcut(QKeyEvent *e) {
 void FolderWindow::dragEnterEvent(QDragEnterEvent *e) {
 	/* Icons that can only move about their own window are taken back
 	 * there and nowhere else. */
-	if ((e->mimeData()->hasFormat(APPLICATION_ITEMS_MIME) &&
+	const QMimeData *mime = e->mimeData();
+	if (((mime->hasFormat(APPLICATION_ITEMS_MIME) || mime->hasFormat(STARTUP_ITEMS_MIME)) &&
 			QDir(m_path) == QDir(trashFilesPath())) ||
+			/* Applications dragged to Startup Items, or to its folder. */
+			(e->source() != this && acceptsStartupDrops() &&
+				(mime->hasFormat(APPLICATION_ITEMS_MIME) || mime->hasFormat(ALIAS_ITEMS_MIME))) ||
 			e->mimeData()->hasUrls() || (e->mimeData()->hasFormat(ALIAS_ITEMS_MIME) &&
 			!vfsIsVirtual(m_path)) ||
 			(e->mimeData()->hasFormat(ICON_MOVE_MIME) && e->source() == this)) {
 		e->acceptProposedAction();
 	}
+}
+
+/* Startup Items itself, or a window showing its folder. */
+bool FolderWindow::acceptsStartupDrops() {
+	if (vfsIsStartupItems(m_path)) {
+		return true;
+	}
+	bool found = false;
+	forEachItem([&](Item *item) { found = found || vfsIsStartupItems(item->path); });
+	return found;
 }
 
 void FolderWindow::dragMoveEvent(QDragMoveEvent *e) {
@@ -1194,6 +1212,10 @@ void FolderWindow::dragMoveEvent(QDragMoveEvent *e) {
 		return;
 	}
 	Item *target = dropTargetAt(e->position().toPoint(), draggedPaths(e->mimeData()));
+	if (target && vfsIsVirtual(m_path) && e->mimeData()->hasFormat(ICON_MOVE_MIME) &&
+			!vfsIsStartupItems(target->path)) {
+		target = nullptr; /* only Startup Items takes these here */
+	}
 	forEachItem([&](Item *item) { item->dropTarget = item == target; });
 	update();
 	e->acceptProposedAction();
@@ -1211,6 +1233,14 @@ void FolderWindow::dropEvent(QDropEvent *e) {
 	Item *target = iconMove ? nullptr
 		: dropTargetAt(e->position().toPoint(), draggedPaths(e->mimeData()));
 	clearDropTarget();
+	if (e->source() != this && !e->mimeData()->hasFormat(STARTUP_ITEMS_MIME)) {
+		Item *on = dropTargetAt(e->position().toPoint(), {});
+		if (vfsIsStartupItems(on ? on->path : m_path)) {
+			dropItems(e, on, m_path);
+			Finder::instance().dragEnded();
+			return;
+		}
+	}
 	if (iconMove && e->source() != this && e->mimeData()->hasFormat(ALIAS_ITEMS_MIME) &&
 			!vfsIsVirtual(m_path)) {
 		dropItems(e, dropTargetAt(e->position().toPoint(), {}), m_path);

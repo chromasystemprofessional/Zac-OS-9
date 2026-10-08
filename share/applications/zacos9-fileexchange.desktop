@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=File Exchange
+Comment=Choose the application that opens each kind of document
+Exec=zacos9-fileexchange
+Categories=Settings;DesktopSettings;
+OnlyShowIn=ZacOS9;

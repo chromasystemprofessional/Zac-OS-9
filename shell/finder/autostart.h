@@ -37,6 +37,18 @@ std::vector<AutostartEntry> autostartEntries();
  * file is never touched. */
 bool autostartSetEnabled(const AutostartContext &context, const QString &id, bool enabled,
 	QString *error = nullptr);
+/* Startup Items: make the application whose desktop entry is `desktopFile`
+ * (desktop-file ID `id`) open at login. A disabled entry of that ID is
+ * re-enabled; otherwise the application's entry is copied into the user's
+ * autostart directory, without the menu-only desktop filters, since the
+ * user asked for it here. Already enabled is success. */
+bool autostartAddApplication(const AutostartContext &context, const QString &id,
+	const QString &desktopFile, QString *error = nullptr);
+/* Stop `id` opening at login. An entry only the user has is moved to the
+ * Trash (so it can be dragged back); one from a system directory is masked
+ * with a Hidden=true user override. `trashed` says which happened. */
+bool autostartRemove(const AutostartContext &context, const QString &id,
+	bool *trashed = nullptr, QString *error = nullptr);
 /* Launch the effective entries once for this login session. */
 bool autostartRunSession(QString *error = nullptr);
 bool autostartRunSession(const AutostartContext &context, QString *error = nullptr);

@@ -103,6 +103,7 @@ private:
 	Item *itemAt(QPoint windowPos, bool *onTriangle = nullptr);
 	Item *dropTargetAt(QPoint windowPos, const QStringList &dragged);
 	void clearDropTarget();
+	bool acceptsStartupDrops();
 
 	QString m_path;
 	/* Remembered between sessions; written shortly after each change. */

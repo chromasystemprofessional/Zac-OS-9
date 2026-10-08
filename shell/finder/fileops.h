@@ -30,6 +30,8 @@ QString createAlias(const QString &target, const QString &destDir, const QString
 inline constexpr char ICON_MOVE_MIME[] = "application/x-zacos9-icon-move";
 inline constexpr char ALIAS_ITEMS_MIME[] = "application/x-zacos9-alias-items";
 inline constexpr char APPLICATION_ITEMS_MIME[] = "application/x-zacos9-application-items";
+/* Startup Items being dragged out: a JSON array of desktop-file IDs. */
+inline constexpr char STARTUP_ITEMS_MIME[] = "application/x-zacos9-startup-items";
 /* Caller owns the file URLs or private virtual-item alias payload. */
 QMimeData *itemDragMime(const std::vector<Item *> &items);
 void startItemDrag(QWidget *source, const std::vector<Item *> &items,
@@ -41,3 +43,6 @@ QStringList draggedPaths(const QMimeData *mime);
 /* Drop onto `target` (a folder, the disk or the Trash item) or, with
  * target == nullptr, into `folder`. Notifies the Finder of changes. */
 void dropItems(QDropEvent *e, const Item *target, const QString &folder);
+/* Stop these Startup Items (desktop-file IDs) opening at login: the
+ * Trash gesture on them, by drag or Move To Trash. */
+void removeFromStartupItems(const QStringList &ids);

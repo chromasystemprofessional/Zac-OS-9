@@ -1,4 +1,6 @@
 #include "infowindow.h"
+#include "thumbnails.h"
+#include "fileassoc.h"
 #include "alias.h"
 #include "platinumshell.h"
 
@@ -190,6 +192,8 @@ InfoWindow::InfoWindow(const QString &path, pl_icon_kind kind, const QString &na
 	: m_path(path), m_name(name), m_kind(kind),
 	  m_isResourceInfo(details != nullptr) {
 	setAttribute(Qt::WA_DeleteOnClose);
+	watchThumbnails(this);
+	watchFileAssociations(this);
 	setWindowTitle(name + " Info");
 	if (details) {
 		m_resourceDetails = *details;
@@ -358,9 +362,21 @@ void InfoWindow::paintEvent(QPaintEvent *) {
  * titles. */
 void InfoWindow::paintHeader(pl_canvas *c) {
 	pl_outline(c, ICON_BOX_X, ICON_BOX_Y, ICON_BOX_X + 37, ICON_BOX_Y + 37, C_BLACK);
-	pl_icon_paint(c, ICON_BOX_X + 3, ICON_BOX_Y + 3,
-		m_kind == PL_ICON_FOLDER && !m_sharedAs.isEmpty() ? PL_ICON_SHARED_FOLDER : m_kind,
-		PL_ICON_LARGE, false);
+	std::vector<uint32_t> preview, small;
+	const std::vector<uint32_t> *document = nullptr;
+	if (m_kind == PL_ICON_DOCUMENT && !m_isResourceInfo &&
+			thumbnailFor(m_path, &preview, &small) == ThumbnailState::Ready) {
+		pl_image_blend(c, ICON_BOX_X + 3, ICON_BOX_Y + 3, preview.data(),
+			PL_ICON_LARGE, PL_ICON_LARGE, false);
+	} else if (m_kind == PL_ICON_DOCUMENT && !m_isResourceInfo &&
+			(document = documentIcon(fileMimeType(m_path), PL_ICON_LARGE))) {
+		pl_image_blend(c, ICON_BOX_X + 3, ICON_BOX_Y + 3, document->data(),
+			PL_ICON_LARGE, PL_ICON_LARGE, false);
+	} else {
+		pl_icon_paint(c, ICON_BOX_X + 3, ICON_BOX_Y + 3,
+			m_kind == PL_ICON_FOLDER && !m_sharedAs.isEmpty() ? PL_ICON_SHARED_FOLDER : m_kind,
+			PL_ICON_LARGE, false);
+	}
 	panelText(c, m_name, NAME_X, NAME_BASELINE, PL_FONT_SYSTEM, C_BLACK, INFO_W - NAME_X - 10);
 	pl_group_box_paint(c, BOX_X0, BOX_Y0, BOX_X1, BOX_Y1, nullptr, FACE);
 	/* The pop-up and its label stand in the box's top line. */

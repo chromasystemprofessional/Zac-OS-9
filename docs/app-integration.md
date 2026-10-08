@@ -20,13 +20,46 @@ works for it:
 
 - **Standard application file chooser**: the session selects the ZacOS
   `FileChooser` portal for GTK and Qt standard dialogs. Its first screen lists
-  the private Zacintosh HD workspace and mounted data volumes, without a
+  Zacintosh HD and mounted data volumes, without a
   places sidebar; the subsequent file browser also has no sidebar. The
-  workspace has document-only `System Folder` and `Applications` directories,
-  separated from system files and installed applications. App-provided initial
-  folders remain respected, and app-specific custom pickers are not rewritten.
-  The portal backend is built and has a location-list regression test; visual
-  behavior in a logged-in GTK/Qt desktop still requires live-session testing.
+  Zacintosh HD shows the Finder's Macintosh view, not the Unix root: System
+  Folder, Applications, Home and the user's own top-level folders. The backend
+  builds this as a read-only tree under `$XDG_RUNTIME_DIR/zacos9-file-chooser`
+  for each request. Real folders behind the view (Home, Appearance, Fonts,
+  Preferences, user folders) are links to those folders, and each installed
+  application appears by name as a link to its `.desktop` launcher. Generated
+  listings (Control Panels, Extensions, Unix) are omitted. Items can only be
+  chosen or saved inside the real folders; the view's own folders are browse
+  only. Applications receive real paths, never the chooser's links. Building
+  the view requires the Finder's application scan (about 5 seconds the first
+  time), so the backend warms up at start and the session starts the backend at
+  login. Requests arriving during the scan wait for it; closing one cancels it
+  immediately. Every request starts
+  at the drive list, ignoring app-suggested Home/current folders. The browser
+  stays within the selected drive: Unix ancestors are not offered, and typed
+  paths or symlinks outside the drive cannot be selected. Cancel and reopen to
+  choose another drive. This is a navigation restriction, not an application
+  sandbox. App-specific custom pickers are not rewritten.
+  Read-only drives remain available for opening files. Mac/APFS drives are
+  discovered from active mount records with their Desktop names, even when
+  GIO or Qt storage enumeration omits their FUSE mounts. An unavailable drive
+  reports an error instead of falling back to Home. Drive icons are rendered by
+  the same Platinum painter as the Finder Desktop: the 32-pixel disk icon,
+  nearest-neighbour scaled for HiDPI, with the Desktop's USB badge on USB
+  volumes. A rejected outside item is cleared from the selection so a later
+  valid choice is accepted. The Macintosh view and the login warm-up have
+  offscreen regressions but have not yet been confirmed in the live session.
+  The 0.1.36 backend incorrectly rejected real D-Bus option dictionaries,
+  including VS Code's requests. The correction decodes those dictionaries and
+  nested arrays, supports request cancellation, and keeps the backend alive
+  between dialogs. Regression tests exercise real D-Bus file/folder/save
+  requests, multi-file save names, cancellation, and repeated backend use.
+  Automated tests use an offscreen Qt display; they do not establish visual
+  behavior across all GTK/Qt/Electron applications.
+  After installing the correction, the user confirmed live VS Code file/folder
+  selection works, Home files are accessible through Zacintosh HD, and both
+  mounted ChromaSystem Professional drives appear. Other applications and
+  saving to read-only drives have not been live-tested.
   See [Desktop files and aliases](vfs.md#desktop-files-and-aliases).
 - **Session defaults** (`session/zacos9-session`): `GTK_CSD=0`,
   `QT_WAYLAND_DISABLE_WINDOWDECORATION=1`, `GTK_THEME=ZacOS9`,

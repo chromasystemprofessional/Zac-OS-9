@@ -132,9 +132,15 @@ bool vfsIsAppFolder(const QString &path);
 bool vfsHideApplication(const QString &path);
 /* Brings back every application hidden this way. */
 void vfsShowAllHidden();
-/* Can items be dropped into this virtual folder? A Backed one, and
- * Applications (where a dropped install file is installed). */
+/* Can items be dropped into this virtual folder? A Backed one,
+ * Applications (where a dropped install file is installed) and Startup
+ * Items (where a dropped application is set to open at login). */
 bool vfsAcceptsDrops(const QString &path);
+/* Startup Items: the folder itself, the desktop-file ID one of its items
+ * stands for ("" for anything else), and where the folder is. */
+bool vfsIsStartupItems(const QString &path);
+QString vfsStartupItemId(const QString &path);
+QString vfsStartupItemsPath();
 /* Is this the Applications folder? */
 bool vfsIsApplications(const QString &path);
 

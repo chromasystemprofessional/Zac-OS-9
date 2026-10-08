@@ -1,4 +1,6 @@
 #include "desktop.h"
+#include "thumbnails.h"
+#include "fileassoc.h"
 #include "customthemes.h"
 
 #include "vfs.h"
@@ -57,6 +59,8 @@ void Desktop::loadPattern() {
 }
 
 Desktop::Desktop() {
+	watchThumbnails(this);
+	watchFileAssociations(this);
 	watchDesktopPatterns(this, [this] { loadPattern(); update(); });
 	watchDesktopWallpaper(this, [this] { update(); });
 	watchCustomThemes(this, [this] { update(); });
@@ -623,7 +627,8 @@ void Desktop::clearDropTarget() {
 
 void Desktop::dragEnterEvent(QDragEnterEvent *e) {
 	if (e->mimeData()->hasUrls() || e->mimeData()->hasFormat(ALIAS_ITEMS_MIME) ||
-			e->mimeData()->hasFormat(APPLICATION_ITEMS_MIME)) {
+			e->mimeData()->hasFormat(APPLICATION_ITEMS_MIME) ||
+			e->mimeData()->hasFormat(STARTUP_ITEMS_MIME)) {
 		e->acceptProposedAction();
 	}
 }

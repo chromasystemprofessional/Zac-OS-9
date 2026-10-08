@@ -89,6 +89,13 @@ fi
 # setting WAYLAND_DISPLAY, and launching the desktop surfaces. Import the
 # session environment first, then process the effective FreeDesktop entries.
 startup="${startup:+$startup; }zacos9-autostart"
+# Start the file chooser now: its first scan of the Finder's applications
+# takes a few seconds, which the first Open/Save dialog shouldn't wait for.
+if command -v dbus-send >/dev/null; then
+	startup="${startup:+$startup; }{ dbus-send --session --type=method_call \
+--dest=org.freedesktop.impl.portal.desktop.zacos9 /org/freedesktop/portal/desktop \
+org.freedesktop.DBus.Peer.Ping >/dev/null 2>&1 & }"
+fi
 # Then the password prompt for programs that need an administrator
 # (polkit: balenaEtcher writing a disk, pkexec), as Mac OS asked for one.
 # ZacOS 9's own helpers don't ask (their polkit rules).

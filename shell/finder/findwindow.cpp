@@ -1,4 +1,6 @@
 #include "findwindow.h"
+#include "thumbnails.h"
+#include "fileassoc.h"
 
 #include <QApplication>
 #include <QDir>
@@ -191,6 +193,8 @@ void FoundWindow::reloadAll() {
 }
 
 FoundWindow::FoundWindow(const QString &text) : m_text(text) {
+	watchThumbnails(this);
+	watchFileAssociations(this);
 	setAttribute(Qt::WA_DeleteOnClose);
 	resize(560, 320);
 	setMinimumSize(300, 160);
@@ -391,7 +395,7 @@ void FoundWindow::paintEvent(QPaintEvent *) {
 		const int y = r * ROW_H;
 		pl_hline(&list, 0, viewW - 1, y + ROW_H - 1, GRAY(0xE));
 		paintIcon(&list, *item, ICON_X, y + 1, PL_ICON_SMALL, item->selected);
-		Text name(item->name, NAME_W - NAME_X - 6, item->nameFont());
+		Text name(item->visibleName(), NAME_W - NAME_X - 6, item->nameFont());
 		uint32_t ink = C_BLACK;
 		if (item->selected) {
 			pl_fill(&list, NAME_X - 2, y + 2, NAME_X + name.inkWidth() + 1, y + 14, C_BLACK);

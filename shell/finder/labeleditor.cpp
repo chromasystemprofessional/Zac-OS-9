@@ -1,5 +1,6 @@
 #include "labeleditor.h"
 #include "alias.h"
+#include "fileassoc.h"
 
 #include "vfs.h"
 #include "apptrash.h"
@@ -35,7 +36,7 @@ void LabelEditor::begin(Item *item) {
 		return;
 	}
 	m_item = item;
-	m_text = item->name;
+	m_text = item->visibleName();
 	m_anchor = 0;
 	m_cursor = m_text.size(); /* the whole name selected */
 	m_caretOn = true;
@@ -168,12 +169,23 @@ void LabelEditor::cancel() {
 	m_repaint();
 }
 
+QString renamedFileName(const QString &oldName, const QString &shownName, const QString &typed) {
+	if (typed.isEmpty() || shownName.isEmpty()) {
+		return typed;
+	}
+	/* Typed with an extension of its own: the user means that one. */
+	if (!hiddenExtension(typed).isEmpty()) {
+		return typed;
+	}
+	return typed + hiddenExtension(oldName);
+}
+
 void LabelEditor::commit() {
 	Item *item = m_item;
 	if (!item) {
 		return;
 	}
-	const QString name = m_text.trimmed();
+	const QString name = renamedFileName(item->name, item->shownName, m_text.trimmed());
 	m_item = nullptr;
 	m_blink.stop();
 	m_repaint();
@@ -190,7 +202,7 @@ void LabelEditor::commit() {
 		}
 		if (!vfsRename(item->path, name)) {
 			Alert::ask(QStringLiteral("The item “%1” can't be renamed.")
-				.arg(item->name), "OK", "");
+				.arg(item->visibleName()), "OK", "");
 			return;
 		}
 		if (FinderView *v = Finder::instance().front()) {
@@ -207,13 +219,13 @@ void LabelEditor::commit() {
 	}
 	const QString folder = dir.absolutePath();
 	if (!QDir().rename(item->path, dir.filePath(name))) {
-		Alert::ask(QStringLiteral("The item “%1” could not be renamed.").arg(item->name),
+		Alert::ask(QStringLiteral("The item “%1” could not be renamed.").arg(item->visibleName()),
 			"OK", "");
 		return;
 	}
 	if (!aliasMoveRecord(item->path, dir.filePath(name), false)) {
 		Alert::ask(QStringLiteral("“%1” was renamed, but its alias identity record could not be "
-			"preserved.").arg(name), "OK", "");
+			"preserved.").arg(nameWithoutExtension(name)), "OK", "");
 	}
 	Finder &finder = Finder::instance();
 	if (FinderView *v = finder.front()) {

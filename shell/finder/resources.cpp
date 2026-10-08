@@ -149,7 +149,7 @@ QString safeDisplayName(const QString &name) {
 		QStringLiteral("Unavailable item") : name;
 }
 
-QStringList startupEnabledNames() {
+AutostartContext startupContext() {
 	AutostartContext context = autostartDefaultContext();
 #ifdef ZACOS9_RESOURCE_TESTING
 	if (!fixtureRoot().isEmpty()) {
@@ -157,14 +157,17 @@ QStringList startupEnabledNames() {
 		context.systemDirs = { fixtureRoot() + "/startup/system" };
 	}
 #endif
-	QStringList names;
-	for (const AutostartEntry &entry : autostartEntries(context)) {
+	return context;
+}
+
+std::vector<AutostartEntry> startupEnabledEntries() {
+	std::vector<AutostartEntry> enabled;
+	for (const AutostartEntry &entry : autostartEntries(startupContext())) {
 		if (entry.enabled) {
-			names << entry.name;
+			enabled.push_back(entry);
 		}
 	}
-	names.removeDuplicates();
-	return names;
+	return enabled;
 }
 
 QStringList loadedModuleLines() {
@@ -352,16 +355,15 @@ std::vector<SystemResource> resourceChildren(const QString &provider, const QStr
 	}
 
 	if (provider == "startup-items") {
-		for (const QString &name : startupEnabledNames()) {
-			add("startup-" + QString::number(out.size()), name, ResourceType::Information,
-				"startup item", "An enabled desktop startup entry. Its command is not exposed "
-					"or run by Finder.",
-				{ "Status: enabled at login", "Access: informational only" });
-		}
-		if (out.empty()) {
-			add("none", "No enabled startup items found", ResourceType::Information,
-				"information", "No enabled entries were found in the supported autostart "
-					"directories.");
+		/* Keyed by desktop-file ID, so dragging one to the Trash names
+		 * exactly the entry it stands for. */
+		for (const AutostartEntry &entry : startupEnabledEntries()) {
+			add(entry.id, safeDisplayName(entry.name), ResourceType::Information,
+				"startup item", "Opens when you log in. To stop it opening, drag it to the "
+					"Trash; to add an application, drag it into Startup Items.",
+				{ "Status: opens at login",
+					QString("Added by: ") + (entry.userEntry ? "you" : "the system") });
+			out.back().icon = PL_ICON_APPLICATION;
 		}
 		return out;
 	}
@@ -506,9 +508,11 @@ ResourceDetails resourceDetails(const QString &provider, const QString &key) {
 	}
 	if (provider == "startup-items") {
 		details.name = "Startup Items";
-		details.kind = key.isEmpty() ? "virtual collection" : "informational startup item";
-		details.description = "Runs enabled entries at login; command text and launch controls "
-			"are not exposed here.";
+		details.kind = key.isEmpty() ? "folder" : "startup item";
+		details.description = key.isEmpty() ?
+			"Applications in this folder open when you log in. Drag an application here to "
+				"add it; drag an item to the Trash to remove it." :
+			"Opens when you log in. Drag it to the Trash to stop it opening.";
 		return details;
 	}
 	if (provider == "system-logs") {

@@ -31,6 +31,8 @@
 #include "vfs.h"
 #include "apptrash.h"
 #include "appdb.h"
+#include "autostart.h"
+#include "fileassoc.h"
 #include "transferdialog.h"
 
 static bool sameDisk(const QString &a, const QString &b) {
@@ -450,6 +452,18 @@ QMimeData *itemDragMime(const std::vector<Item *> &items) {
 			}
 			applications.append(vfsNode(item->path)->appId);
 		}
+		QJsonArray startup;
+		for (const Item *item : items) {
+			const QString id = item->isVirtual ? vfsStartupItemId(item->path) : QString();
+			if (id.isEmpty()) {
+				startup = {};
+				break;
+			}
+			startup.append(id);
+		}
+		if (!startup.isEmpty()) {
+			mime->setData(STARTUP_ITEMS_MIME, QJsonDocument(startup).toJson(QJsonDocument::Compact));
+		}
 		if (!applications.isEmpty()) {
 			mime->setData(APPLICATION_ITEMS_MIME,
 				QJsonDocument(applications).toJson(QJsonDocument::Compact));
@@ -518,6 +532,9 @@ void startItemDrag(QWidget *source, const std::vector<Item *> &items,
 		if (vfsIsAppFolder(first->path)) {
 			Alert::ask("“" + first->name + "” stays in the Applications folder. "
 				"To remove an application, select it and choose Move To Trash.", "OK", QString());
+		} else if (!vfsStartupItemId(first->path).isEmpty()) {
+			Alert::ask("To stop “" + first->name + "” opening at login, drag it to the Trash.",
+				"OK", QString());
 		} else {
 			Alert::ask("“" + first->name + "” is part of this computer and can't be moved "
 				"out of its window.", "OK", QString());
@@ -551,10 +568,143 @@ static void installIntoApplications(const QStringList &paths) {
 	}
 }
 
+/* Startup Items: the desktop entry each dropped item stands for. An
+ * application from Applications, an alias to one, or a .desktop file. */
+static QList<QPair<QString, QString>> droppedStartupApps(const QMimeData *mime,
+		QStringList *rejected) {
+	QList<QPair<QString, QString>> apps;
+	auto addFile = [&](QString path, const QString &name) {
+		const AliasResolution alias = aliasResolve(path);
+		if (alias.state == AliasState::Ok || alias.state == AliasState::Reconnected) {
+			path = alias.target;
+		} else if (alias.state != AliasState::NotAlias) {
+			*rejected << name;
+			return;
+		}
+		if (const AppEntry *app = appByFile(QFileInfo(path).absoluteFilePath())) {
+			apps << qMakePair(app->id, app->file);
+		} else if (path.endsWith(".desktop") && QFileInfo(path).isFile()) {
+			apps << qMakePair(QFileInfo(path).fileName(), path);
+		} else {
+			*rejected << name;
+		}
+	};
+	if (mime->hasFormat(APPLICATION_ITEMS_MIME)) {
+		const auto document = QJsonDocument::fromJson(mime->data(APPLICATION_ITEMS_MIME));
+		for (const auto &value : document.array()) {
+			const AppEntry *app = appById(value.toString());
+			if (app) {
+				apps << qMakePair(app->id, app->file);
+			} else {
+				*rejected << value.toString();
+			}
+		}
+	} else if (mime->hasFormat(ALIAS_ITEMS_MIME)) {
+		const auto document = QJsonDocument::fromJson(mime->data(ALIAS_ITEMS_MIME));
+		for (const auto &value : document.array()) {
+			const auto item = value.toObject();
+			addFile(item["target"].toString(), item["name"].toString());
+		}
+	} else {
+		for (const QString &path : draggedPaths(mime)) {
+			addFile(path, nameWithoutExtension(QFileInfo(path).fileName()));
+		}
+	}
+	return apps.size() > 256 ? decltype(apps){} : apps;
+}
+
+static void dropIntoStartupItems(QDropEvent *e) {
+	QStringList rejected;
+	const auto apps = droppedStartupApps(e->mimeData(), &rejected);
+	if (apps.isEmpty() && rejected.isEmpty()) {
+		e->ignore();
+		return;
+	}
+	// Release the drag grab before any alert is opened.
+	QTimer::singleShot(0, QCoreApplication::instance(), [apps, rejected] {
+		const QString trash = QDir(trashFilesPath()).absolutePath();
+		bool trashChanged = false;
+		for (const auto &app : apps) {
+			QString error;
+			if (!autostartAddApplication(autostartDefaultContext(), app.first, app.second, &error)) {
+				Alert::ask(error, "OK", QString());
+			} else if (QFileInfo(app.second).absolutePath() == trash) {
+				/* A startup item dragged back out of the Trash moves, as on the Mac. */
+				const QString name = QFileInfo(app.second).fileName();
+				if (QFile::remove(app.second)) {
+					QFile::remove(QFileInfo(trash).absolutePath() + "/info/" + name + ".trashinfo");
+					trashChanged = true;
+				}
+			}
+		}
+		if (trashChanged) {
+			Finder::instance().folderChanged(trashFilesPath());
+		}
+		if (!rejected.isEmpty()) {
+			Alert::ask("“" + rejected.first() + "” isn't an application. Only applications "
+				"can be startup items.", "OK", QString());
+		}
+		vfsRefresh();
+	});
+	/* Link: the application stays where it was. */
+	e->setDropAction(Qt::LinkAction);
+	e->accept();
+}
+
+static void removeStartupItems(QDropEvent *e) {
+	const auto document = QJsonDocument::fromJson(e->mimeData()->data(STARTUP_ITEMS_MIME));
+	if (!document.isArray() || document.array().isEmpty() || document.array().size() > 256) {
+		e->ignore();
+		return;
+	}
+	QStringList ids;
+	for (const auto &value : document.array()) {
+		ids << value.toString();
+	}
+	QTimer::singleShot(0, QCoreApplication::instance(), [ids] {
+		removeFromStartupItems(ids);
+	});
+	e->setDropAction(Qt::MoveAction);
+	e->accept();
+}
+
+void removeFromStartupItems(const QStringList &ids) {
+	bool removed = false;
+	for (const QString &id : ids) {
+		QString error;
+		if (autostartRemove(autostartDefaultContext(), id, nullptr, &error)) {
+			removed = true;
+		} else {
+			Alert::ask(error, "OK", QString());
+		}
+	}
+	vfsRefresh();
+	Finder::instance().folderChanged(trashFilesPath());
+	if (removed) {
+		pl_sound_event("trash-move");
+	}
+}
+
 void dropItems(QDropEvent *e, const Item *target, const QString &folder) {
 	const bool toTrash = (target &&
 		(target->kind == PL_ICON_TRASH_EMPTY || target->kind == PL_ICON_TRASH_FULL)) ||
 		(!target && QDir(folder) == QDir(trashFilesPath()));
+	if (vfsIsStartupItems(target ? target->path : folder)) {
+		if (e->mimeData()->hasFormat(STARTUP_ITEMS_MIME)) {
+			e->ignore(); /* already there */
+			return;
+		}
+		dropIntoStartupItems(e);
+		return;
+	}
+	if (e->mimeData()->hasFormat(STARTUP_ITEMS_MIME)) {
+		if (toTrash) {
+			removeStartupItems(e);
+		} else {
+			e->ignore();
+		}
+		return;
+	}
 	if (toTrash && e->mimeData()->hasFormat(APPLICATION_ITEMS_MIME)) {
 		const auto document = QJsonDocument::fromJson(e->mimeData()->data(APPLICATION_ITEMS_MIME));
 		if (!document.isArray() || document.array().isEmpty() || document.array().size() > 256) {

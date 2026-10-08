@@ -24,8 +24,82 @@ Updated: 2026-10-07
 
 ## Current work
 
+**Startup Items by drag and drop** (unreleased): dropping an application
+into System Folder ▸ Startup Items (on the folder or into its window) makes
+it open at login. Dragging a startup item to the Trash, or Move To Trash,
+stops it. User-added entries go into the Trash and can be put away or
+dragged back; system entries are masked with a `Hidden=true` override.
+Items show their application's icon. Covered by `autostart` (add, re-enable,
+refuse missing programs and non-applications, trash, restore, system mask)
+and `finder-desktop`: an Applications drag into Startup Items, a drag to the
+Trash, the drag back, and a refused document. Full suite: 62 ok, 3 display
+skips. Not yet tried by hand in the live session.
+
+**File associations** (unreleased): file names are shown without their
+extension, and rename keeps the hidden one. Documents show the icon of the
+application that opens them on a Platinum page. The new **File Exchange**
+control panel picks the application for each type through GIO and the user's
+`mimeapps.list`, the same default Open uses. `finder-fileassoc` covers this
+(41 checks), and the full suite passes (62 ok, 3 display skips). Seen in a
+nested session with a private HOME: hidden extensions, PDF and CSV documents
+bearing their apps' icons, a photo preview, and the panel showing types and
+their default apps. Change… and the Open With dialog have not been clicked
+through, and nothing has been installed or seen in the live session yet.
+
+**Picture previews** (unreleased): picture files show a framed preview of
+their picture instead of the document icon on the Desktop, in icon and list
+views, Find results and Get Info. Previews are decoded off the UI thread and
+stored in the freedesktop thumbnail cache (validated against GdkPixbuf: URI,
+modification time, file name hash, chunk CRCs). `finder-thumbnails` covers the
+cache, edits, orientation, framing, failures, aliases, repaints and painting;
+the Finder, chooser and VFS suites still pass. Not yet installed or seen live.
+
+**VS Code chooser failure** (unreleased fix for 0.1.36): the installed-session
+log confirmed `Backend call failed: Malformed FileChooser request`. The backend
+now decodes the actual D-Bus `a{sv}` dictionary and reads nested arrays rather
+than attempting to write them. Requests are dispatched with delayed replies,
+expose `Request.Close`, reject overlapping requests explicitly, and no longer
+terminate the backend when its last dialog closes. Multi-file save now asks
+for its destination instead of accepting the suggested directory without
+confirmation. Offscreen wire-level tests cover files, folders, SaveFile,
+SaveFiles, both cancellation screens, and repeated use of the actual backend
+process. Live VS Code selection has not yet been verified.
+
+The corrected backend was installed with administrator approval; the user
+confirmed VS Code's chooser opens and selects again. Follow-up refinement
+always begins at Desktop drive icons, ignores application-suggested Home/Unix
+paths, and restricts the file browser to the selected drive, including typed
+paths and escaping symlinks. The user confirmed the initial restriction was too
+narrow: Zacintosh HD now exposes Home files without Unix ancestors. The drive
+list includes GIO data mounts, AFP, and active Mac/APFS mount records with
+Desktop names; read-only disks are not excluded. Inaccessible disks report an
+error rather than falling back. Offscreen regressions exercise drive-first
+selection and confinement. Installed with administrator approval and restarted
+only the chooser backend; the user confirmed in live VS Code that Home files
+and both ChromaSystem Professional drives are available.
+
+Chooser drive icons now use the Finder Desktop's Platinum disk icon, including
+its USB badge, instead of Qt's generic drive icon; a pixel-exact regression
+compares them with Desktop `paintIcon` output. Rejecting an outside item (such
+as typed `/`) now clears the stale selection, which previously blocked a later
+valid choice. Installed with administrator approval; the user confirmed the
+icons match the Desktop.
+
+Zacintosh HD in the chooser now shows the Finder's Macintosh view (System
+Folder, Applications, Home, user folders) instead of raw Home: a per-request
+read-only tree of real folders and links built from the Finder VFS, with each
+application linked to its `.desktop` launcher and generated listings omitted.
+Only items inside the linked real folders can be chosen; applications get real
+paths. The Finder's ~5-second first application scan runs as a backend
+warm-up, which the session triggers at login; requests wait for it, and a
+request closed meanwhile is cancelled at once (previously it stayed pending
+until the scan finished). Regressions cover the tree, browse-versus-choose
+rules, link escapes, real-path results, save refusal in the view's own folders,
+cancellation during warm-up and of a displayed chooser, and isolation from the
+live session's chooser tree. Not yet installed or confirmed live.
+
 **About This Computer, startup-disk Get Info, and application file chooser**
-(unreleased): About This Computer now presents installed version, processor,
+(0.1.36): About This Computer now presents installed version, processor,
 graphics, and memory in human-readable form. Zacintosh HD Get Info reports the
 home filesystem's capacity and free space without Source or Access rows. A
 ZacOS FileChooser portal backend presents the private Zacintosh HD workspace
@@ -36,7 +110,7 @@ activation and visual behavior have not been exercised in a live desktop.
 Details: [application integration](docs/app-integration.md) and
 [Finder VFS](docs/vfs.md).
 
-**Third-party application dialogs** (unreleased): GTK 3 message prompts now
+**Third-party application dialogs** (0.1.36): GTK 3 message prompts now
 have explicit Platinum dialog/action-area styling; Qt 6 prompts inherit the
 ZacOS palette and controls and have a palette regression assertion. Added a
 GTK 4 stylesheet for applications that honor toolkit themes; GTK 4 and

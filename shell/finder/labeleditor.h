@@ -8,6 +8,10 @@
 
 class QKeyEvent;
 
+/* The file name a rename to `typed` gives: an item whose extension is
+ * hidden (`shownName` set) keeps it, unless `typed` names one itself. */
+QString renamedFileName(const QString &oldName, const QString &shownName, const QString &typed);
+
 /*
  * Editing an icon's name in place. The label becomes a white box with a
  * black outline; the selection uses the text highlight colour and a

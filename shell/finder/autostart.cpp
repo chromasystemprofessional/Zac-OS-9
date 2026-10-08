@@ -7,6 +7,7 @@
 #include <QSaveFile>
 #include <QSet>
 #include <QStandardPaths>
+#include <QTemporaryDir>
 #include <QCryptographicHash>
 #include <QDir>
 #include <QFile>
@@ -262,6 +263,121 @@ bool autostartSetEnabled(const AutostartContext &context, const QString &id, boo
 		out.write(data, qint64(length)) == qint64(length) && out.commit();
 	g_free(data);
 	return ok ? true : fail("The startup item could not be saved.");
+}
+
+static const AutostartEntry *entryWithId(const std::vector<AutostartEntry> &entries,
+		const QString &id) {
+	const auto it = std::find_if(entries.cbegin(), entries.cend(),
+		[&](const AutostartEntry &e) { return e.id == id; });
+	return it == entries.cend() ? nullptr : &*it;
+}
+
+bool autostartAddApplication(const AutostartContext &context, const QString &id,
+		const QString &desktopFile, QString *error) {
+	auto fail = [&](const QString &why) {
+		if (error) {
+			*error = why;
+		}
+		return false;
+	};
+	if (id.isEmpty() || id.contains('/') || id.startsWith('.') || !id.endsWith(".desktop")) {
+		return fail("Only applications can be startup items.");
+	}
+	KeyFile app;
+	if (!app.load(desktopFile) || app.str("Type") != "Application" || app.boolean("Hidden")) {
+		return fail("Only applications can be startup items.");
+	}
+	const QString name = app.localized("Name", context.locale).trimmed().isEmpty() ?
+		QFileInfo(id).completeBaseName() : app.localized("Name", context.locale).trimmed();
+	if (!app.boolean("DBusActivatable") && !executableAvailable(execProgram(app.str("Exec")))) {
+		return fail("“" + name + "” can't open at login: its program could not be found.");
+	}
+
+	auto entries = autostartEntries(context);
+	const AutostartEntry *current = entryWithId(entries, id);
+	if (current && current->enabled) {
+		return true;
+	}
+	/* A disabled entry of the same ID (the user's Hidden override of a
+	 * system one, or X-GNOME-Autostart-enabled=false): turn it back on. */
+	if (current && (current->reason == "Disabled") &&
+			autostartSetEnabled(context, id, true, nullptr)) {
+		entries = autostartEntries(context);
+		current = entryWithId(entries, id);
+		if (current && current->enabled) {
+			return true;
+		}
+	}
+
+	g_key_file_remove_key(app.kf, "Desktop Entry", "Hidden", nullptr);
+	g_key_file_remove_key(app.kf, "Desktop Entry", "X-GNOME-Autostart-enabled", nullptr);
+	g_key_file_remove_key(app.kf, "Desktop Entry", "OnlyShowIn", nullptr);
+	g_key_file_remove_key(app.kf, "Desktop Entry", "NotShowIn", nullptr);
+	g_key_file_set_boolean(app.kf, "Desktop Entry", "X-ZacOS9-Startup-Item", true);
+	gsize length = 0;
+	gchar *data = g_key_file_to_data(app.kf, &length, nullptr);
+	const QByteArray bytes(data, qsizetype(length));
+	g_free(data);
+
+	/* Check the result before it can replace anything. */
+	QTemporaryDir scratch;
+	const QString candidate = scratch.path() + "/" + id;
+	{
+		QFile f(candidate);
+		if (!scratch.isValid() || !f.open(QIODevice::WriteOnly) || f.write(bytes) != bytes.size()) {
+			return fail("“" + name + "” could not be added to Startup Items.");
+		}
+	}
+	KeyFile check;
+	const QString reason = check.load(candidate) ?
+		disabledReason(candidate, check, context.desktops) : QStringLiteral("Invalid desktop entry");
+	if (!reason.isEmpty()) {
+		return fail("“" + name + "” can't open at login: " +
+			(reason == "Program not found" ? "its program could not be found." :
+				"its desktop entry is not valid."));
+	}
+	if (!QDir().mkpath(context.userDir)) {
+		return fail("The autostart folder could not be created.");
+	}
+	QSaveFile out(context.userDir + "/" + id);
+	if (!out.open(QIODevice::WriteOnly) || out.write(bytes) != bytes.size() || !out.commit()) {
+		return fail("“" + name + "” could not be added to Startup Items.");
+	}
+	return true;
+}
+
+bool autostartRemove(const AutostartContext &context, const QString &id, bool *trashed,
+		QString *error) {
+	auto fail = [&](const QString &why) {
+		if (error) {
+			*error = why;
+		}
+		return false;
+	};
+	if (trashed) {
+		*trashed = false;
+	}
+	if (id.isEmpty() || id.contains('/') || id.startsWith('.') || !id.endsWith(".desktop")) {
+		return fail("Invalid startup item.");
+	}
+	const bool systemEntry = std::any_of(context.systemDirs.cbegin(), context.systemDirs.cend(),
+		[&](const QString &dir) { return QFileInfo(dir + "/" + id).isFile(); });
+	if (systemEntry) {
+		return autostartSetEnabled(context, id, false, error);
+	}
+	const QString user = context.userDir + "/" + id;
+	if (!QFileInfo(user).isFile()) {
+		return fail("The startup item is no longer there.");
+	}
+	if (QFile::moveToTrash(user)) {
+		if (trashed) {
+			*trashed = true;
+		}
+		return true;
+	}
+	/* No Trash on that disk: removing the user's own entry is the same
+	 * outcome, and nothing outside the autostart folder is touched. */
+	return QFile::remove(user) ? true : fail("The startup item could not be removed.");
 }
 
 bool autostartRunSession(QString *error) {
