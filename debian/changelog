@@ -1,3 +1,17 @@
+zacos9 (0.1.38) trixie; urgency=medium
+
+  * Application file choosers now list Desktop folder aliases and mounted
+    AFP and Windows/SMB disks, with real-path file and folder selection and
+    saving. Failed AFP connections automatically unmount and show a Server
+    Disconnected dialog instead of leaving stale desktop disks. Special
+    menu adds Disconnect Network Drive and Unmount Disk for mounted local
+    and USB storage, with explicit error reporting. Includes
+    encrypted-keyring password-login guidance without changing other users'
+    login settings. Full pre-release tests: 63 passed, 3 skipped, no
+    failures.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Thu, 08 Oct 2026 06:27:37 -0400
+
 zacos9 (0.1.37) trixie; urgency=medium
 
   * File names are shown without their extensions, and documents carry the
