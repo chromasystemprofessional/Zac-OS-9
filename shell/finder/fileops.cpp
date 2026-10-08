@@ -1,4 +1,5 @@
 #include "fileops.h"
+#include "alias.h"
 #include "platinumshell.h"
 #include "settings.h"
 
@@ -213,6 +214,7 @@ QString createAlias(const QString &target, const QString &destDir, const QString
 			"OK", QString());
 		return {};
 	}
+	aliasRecord(destination.filePath(candidate), original.absoluteFilePath());
 	return candidate;
 }
 
@@ -351,6 +353,9 @@ QStringList transferItems(const QStringList &paths, const QString &destDir, bool
 			state.current(task.src, task.copy ? "Copying" : "Moving");
 			bool ok = task.copy ? copyRecursively(task.src, task.target, state) :
 				QDir().rename(task.src, task.target);
+			if (ok) {
+				aliasMoveRecord(task.src, task.target, task.copy);
+			}
 			if (ok && task.resourceFork) {
 				ok = task.copy ? copyRecursively(task.resource, task.resourceTarget, state) :
 					QDir().rename(task.resource, task.resourceTarget);

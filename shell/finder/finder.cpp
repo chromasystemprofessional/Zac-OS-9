@@ -20,6 +20,8 @@
 #include "../store/storeclient.h"
 #include <QScopedValueRollback>
 #include "fileops.h"
+#include "alias.h"
+#include <QFileDialog>
 #include "localvolumes.h"
 #include "diskinit.h"
 #include "netvolumes.h"
@@ -294,6 +296,7 @@ void Finder::newFolder() {
 }
 
 static bool isExpandable(const QString &path);
+static QFileInfo resolveAliasForUser(const QString &aliasPath);
 
 void Finder::openItem(Item *item) {
 	if (appTrashMarker(item->path)) {
@@ -340,9 +343,7 @@ void Finder::openItem(Item *item) {
 				InfoWindow::openVirtual(item->path, item->kind, item->name, details);
 				return;
 			}
-			if (item->isAlias && !QFileInfo(item->path).exists()) {
-				Alert::ask("The original for “" + item->name +
-					"” is unavailable. Reconnect its disk or recreate the alias.", "OK", QString());
+			if (item->isAlias && resolveAliasForUser(item->path).filePath().isEmpty()) {
 				return;
 			}
 			const QString real = vfsOpensAs(item->path);
@@ -693,6 +694,37 @@ void Finder::putAway() {
 	folderChanged(trash);
 }
 
+/* Resolves an alias, reconnecting by identity; on failure explains and offers
+ * to choose a new original. An empty result means nothing to open. */
+static QFileInfo resolveAliasForUser(const QString &aliasPath) {
+	AliasResolution r = aliasResolve(aliasPath);
+	const QString name = QFileInfo(aliasPath).fileName();
+	if (r.state == AliasState::Ok || r.state == AliasState::Reconnected) {
+		return QFileInfo(r.target);
+	}
+	if (r.state == AliasState::Changed) {
+		if (Alert::ask("The original for “" + name + "” has been replaced by a different item. "
+				"Use the new item?", "Use New Item", "Cancel")) {
+			aliasReconnect(aliasPath, r.target);
+			return QFileInfo(r.target);
+		}
+		return QFileInfo();
+	}
+	if (Alert::ask(aliasProblemText(r.state) + " Choose a new original for “" + name + "”?",
+			"Fix Alias…", "Cancel")) {
+		const QString chosen = QFileDialog::getOpenFileName(nullptr, "Fix Alias",
+			QFileInfo(aliasPath).absolutePath());
+		QString error;
+		if (!chosen.isEmpty()) {
+			if (aliasReconnect(aliasPath, chosen, &error)) {
+				return QFileInfo(chosen);
+			}
+			Alert::ask(error, "OK", QString());
+		}
+	}
+	return QFileInfo();
+}
+
 /* Show Original: the folder holding an alias's target, with it selected. */
 void Finder::showOriginal() {
 	for (Item *item : front()->selectedItems()) {
@@ -700,8 +732,8 @@ void Finder::showOriginal() {
 		if (!info.isSymLink()) {
 			continue;
 		}
-		QFileInfo target(info.symLinkTarget());
-		if (!target.exists()) {
+		const QFileInfo target = resolveAliasForUser(item->path);
+		if (target.filePath().isEmpty()) {
 			continue;
 		}
 		FolderWindow *w = FolderWindow::open(target.absolutePath());

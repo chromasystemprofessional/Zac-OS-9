@@ -1,4 +1,5 @@
 #include "infowindow.h"
+#include "alias.h"
 #include "platinumshell.h"
 
 #include "vfs.h"
@@ -215,6 +216,14 @@ InfoWindow::InfoWindow(const QString &path, pl_icon_kind kind, const QString &na
 		}
 	}
 	m_where = macPath(path == "/" ? "/" : info.absolutePath());
+	if (info.isSymLink()) {
+		m_kindText = "alias";
+		const AliasResolution r = aliasResolve(path, false);
+		m_original = r.state == AliasState::Ok ? r.target :
+			r.state == AliasState::Changed ? r.target + " (replaced)" :
+			r.state == AliasState::Loop ? QStringLiteral("(alias loop)") :
+			QStringLiteral("(missing)");
+	}
 
 	/* Show: folders can be shared; files, aliases and disks can't. */
 	const bool folder = info.isDir() && !info.isSymLink() && kind != PL_ICON_DISK;
@@ -353,7 +362,7 @@ void InfoWindow::paintGeneral(pl_canvas *c) {
 		infoRow(c, 92, "Kind:", m_resourceDetails.kind);
 		infoRow(c, 92 + ROW_H, "Where:", m_resourceDetails.location);
 		infoRow(c, 92 + ROW_H * 2, "Source:", m_resourceDetails.sources.isEmpty()
-			? QStringLiteral("No single file source") : m_resourceDetails.sources);
+			? QStringLiteral("None (virtual; no physical equivalent)") : m_resourceDetails.sources);
 		infoRow(c, 92 + ROW_H * 3, "Access:", m_resourceDetails.access);
 		int y = 92 + ROW_H * 4 + 8;
 		QStringList lines;
@@ -379,6 +388,9 @@ void InfoWindow::paintGeneral(pl_canvas *c) {
 	infoRow(c, y += ROW_H + 8, "Where:", m_where);
 	infoRow(c, y += ROW_H + 8, "Created:", m_created);
 	infoRow(c, y += ROW_H, "Modified:", m_modified);
+	if (!m_original.isEmpty()) {
+		infoRow(c, y += ROW_H, "Original:", m_original);
+	}
 	y += 12;
 
 	/* Comments box: click to type. */

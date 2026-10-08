@@ -1,4 +1,5 @@
 #include "resources.h"
+#include "autostart.h"
 
 #include <QCoreApplication>
 #include <QDir>
@@ -149,44 +150,20 @@ QString safeDisplayName(const QString &name) {
 }
 
 QStringList startupEnabledNames() {
-	QStringList dirs = {
-		QStandardPaths::writableLocation(QStandardPaths::ConfigLocation) + "/autostart",
-		"/etc/xdg/autostart",
-	};
+	AutostartContext context = autostartDefaultContext();
 #ifdef ZACOS9_RESOURCE_TESTING
 	if (!fixtureRoot().isEmpty()) {
-		dirs = { fixtureRoot() + "/startup/user", fixtureRoot() + "/startup/system" };
+		context.userDir = fixtureRoot() + "/startup/user";
+		context.systemDirs = { fixtureRoot() + "/startup/system" };
 	}
 #endif
 	QStringList names;
-	for (const QString &dir : dirs) {
-		QDir folder(dir);
-		for (const QFileInfo &info : folder.entryInfoList({ "*.desktop" },
-				QDir::Files | QDir::Readable, QDir::Name)) {
-			const QString contents = boundedText(info.absoluteFilePath(), 64 * 1024);
-			if (contents.isEmpty()) {
-				continue;
-			}
-			const QStringList lines = splitLines(contents);
-			QString name = info.completeBaseName();
-			bool hidden = false;
-			bool enabled = true;
-			for (const QString &line : lines) {
-				if (line.startsWith("Name=")) {
-					name = line.mid(5).trimmed();
-				} else if (line == "Hidden=true") {
-					hidden = true;
-				} else if (line == "X-GNOME-Autostart-enabled=false") {
-					enabled = false;
-				}
-			}
-			if (!hidden && enabled) {
-				names << name;
-			}
+	for (const AutostartEntry &entry : autostartEntries(context)) {
+		if (entry.enabled) {
+			names << entry.name;
 		}
 	}
 	names.removeDuplicates();
-	names.sort(Qt::CaseInsensitive);
 	return names;
 }
 

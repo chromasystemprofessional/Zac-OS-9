@@ -83,7 +83,7 @@ private:
 
 	QString m_path, m_name;
 	pl_icon_kind m_kind;
-	QString m_kindText, m_where, m_created, m_modified, m_size;
+	QString m_kindText, m_where, m_created, m_modified, m_size, m_original;
 	ResourceDetails m_resourceDetails;
 	bool m_isResourceInfo = false;
 	QThread *m_sizer = nullptr;

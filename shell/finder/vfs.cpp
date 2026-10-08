@@ -6,6 +6,8 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QFileSystemWatcher>
+#include <QTimer>
 #include <QHash>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -17,6 +19,7 @@
 
 #include "appdb.h"
 #include "apptrash.h"
+#include "autostart.h"
 #include "resources.h"
 
 /*
@@ -804,7 +807,12 @@ bool vfsResourceDetails(const QString &path, QStringList *details, QString *kind
 			info.description = "A real folder shown in the Macintosh view.";
 		} else {
 			info.access = "Virtual Finder metadata only; this item has no single file source.";
-			info.description = "Curated Macintosh-view item.";
+			info.description = "A virtual item with no physical equivalent on disk; Finder "
+				"builds it from several places.";
+			if (node->id == "system-folder") {
+				info.description += " It is not the writable Zacintosh HD workspace that "
+					"save dialogs use; to keep a file, save it in Home or Documents.";
+			}
 		}
 	}
 	if (details) {
@@ -1070,6 +1078,42 @@ void vfsRefresh() {
 	notifyChanged();
 }
 
+/* Resource folders that change outside Finder (autostart entries, the
+ * user's systemd units): watched without recursion, each through its
+ * nearest existing ancestor so a folder created later is noticed. Events
+ * are debounced; Finder re-lists lazily, so nothing is rescanned here. */
+static void watchResourceSources() {
+	static QFileSystemWatcher *watcher = nullptr;
+	static QTimer *settle = nullptr;
+	auto arm = [] {
+		const QString config = QStandardPaths::writableLocation(QStandardPaths::ConfigLocation);
+		QStringList dirs = { config + "/autostart", config + "/systemd/user" };
+		dirs += autostartDefaultContext().systemDirs;
+		for (const QString &dir : dirs) {
+			QString existing = dir;
+			while (!QDir(existing).exists() && existing.contains('/') && existing != "/") {
+				existing = QFileInfo(existing).absolutePath();
+			}
+			if (!watcher->directories().contains(existing)) {
+				watcher->addPath(existing);
+			}
+		}
+	};
+	if (!watcher) {
+		watcher = new QFileSystemWatcher;
+		settle = new QTimer;
+		settle->setSingleShot(true);
+		settle->setInterval(500);
+		QObject::connect(settle, &QTimer::timeout, [arm] {
+			arm();
+			notifyChanged();
+		});
+		QObject::connect(watcher, &QFileSystemWatcher::directoryChanged,
+			[settle](const QString &) { settle->start(); });
+	}
+	arm();
+}
+
 int vfsOnChange(std::function<void()> f) {
 	const int token = g_nextToken++;
 	g_callbacks.insert(token, std::move(f));
@@ -1081,6 +1125,7 @@ int vfsOnChange(std::function<void()> f) {
 			load();
 			notifyChanged();
 		});
+		watchResourceSources();
 	}
 	return token;
 }

@@ -136,9 +136,9 @@ int main(int argc, char **argv) {
 	writeEntry(resourceRoot + "/sounds/user/pack", "chime.wav", "sound data");
 	writeEntry(resourceRoot + "/support/user/appearance", "theme.txt", "theme data");
 	writeEntry(resourceRoot + "/startup/user", "enabled.desktop",
-		"[Desktop Entry]\nName=Fixture Startup\nExec=secret-command\n");
+		"[Desktop Entry]\nName=Fixture Startup\nExec=sh -c secret-command\n");
 	writeEntry(resourceRoot + "/startup/user", "disabled.desktop",
-		"[Desktop Entry]\nName=Disabled Fixture\nExec=secret-command\nHidden=true\n");
+		"[Desktop Entry]\nName=Disabled Fixture\nExec=sh -c secret-command\nHidden=true\n");
 	writeEntry(resourceRoot + "/dpkg", "status",
 		"Package: other\nVersion: 1.0\n\nPackage: zacos9\nVersion: 0.1.27-fixture\n"
 		"Status: install ok installed\n\n");

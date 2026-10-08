@@ -219,6 +219,17 @@ Manager) appearing as their kernel modules actually load.
   shows no white flash on i915. greetd may switch the console to text
   mode as it starts, and only a real boot shows that.
 
+**Sniffer/System Folder refinements** (unreleased): Startup Items now follow the
+FreeDesktop autostart spec (`autostart.cpp`); aliases keep an inode record and
+reconnect when targets are renamed/moved, with Fix Alias… and loop detection
+(`alias.cpp`); Extensions Manager gains Login Items and Background Services
+views with confirmed, user-level-only Turn On/Off and Start/Stop
+(`userservices.cpp`); Get Info explains virtual vs. physical items and shows an
+alias's original; virtual folders refresh when autostart/user-unit folders
+change. Tests: `autostart`, `alias`, `userservices`, `finder-vfs`. Not done:
+watching alias targets, live service state events, UI-level tests of the new
+Extensions views, cross-disk alias reconnection.
+
 **Extensions Manager: friendly names, icons and a curated list**
 (0.1.32, 2026-10-07): instead of 145 raw kernel module names, Extensions
 Manager and System Folder > Extensions now show about 45 curated entries

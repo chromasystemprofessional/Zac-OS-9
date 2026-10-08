@@ -1,4 +1,5 @@
 #include "labeleditor.h"
+#include "alias.h"
 
 #include "vfs.h"
 #include "apptrash.h"
@@ -210,6 +211,7 @@ void LabelEditor::commit() {
 			"OK", "");
 		return;
 	}
+	aliasMoveRecord(item->path, dir.filePath(name), false);
 	Finder &finder = Finder::instance();
 	if (FinderView *v = finder.front()) {
 		v->itemRenamed(item->name, name);

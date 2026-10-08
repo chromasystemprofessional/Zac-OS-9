@@ -34,10 +34,21 @@ generic document icon.
 Folder aliases open as folders and accept file drops. In a standard application
 save dialog, choose Desktop and open a folder or folder alias to save inside
 it. Saves through an alias go into its target directory. An alias does not
-track a target that is renamed/moved, unlike a classic Mac alias record; a
-disconnected or deleted original must be reconnected or the alias recreated.
-Finder reports unavailable originals rather than creating empty replacement
-folders.
+Aliases stay ordinary symbolic links, so existing ones keep working. Beside
+each alias, `<folder>/.alias/<name>` (hidden) records the original's device,
+inode, name and parent folder (`shell/finder/alias.cpp`). Open and Show
+Original resolve through it: if the link no longer resolves, Finder looks for
+the same inode in a few nearby folders (the original's folder and its parent,
+the alias's folder, Desktop, Trash; same disk, depth 3, at most 4000 entries,
+no symlinks followed, no index) and repairs the link atomically. If the path
+now holds a different item ("replaced"), or nothing is found, Finder says so
+and offers **Fix Alias…** to choose a new original; it never substitutes or
+creates one. Loops (including self-links) are detected and refused. Plain
+symlinks gain a record on first use. Records follow an alias through
+move/copy/rename, but an alias moved outside Finder loses its record and
+behaves like a plain symlink. Get Info shows the alias's original and state.
+Target permissions are never changed. Reconnection works only on the same disk;
+a target moved to another disk or beyond the search area needs Fix Alias….
 
 At login, `zacos9-desktop-places` registers Desktop with XDG user directories
 and GTK bookmarks, and creates a private **Zacintosh HD** workspace at
@@ -349,8 +360,13 @@ Current providers:
 
 - **Sounds**: user and system sound roots (`$XDG_DATA_HOME/sounds`,
   `/usr/share/sounds`) as read-only aliases.
-- **Startup Items**: enabled autostart desktop entries from supported startup
-  directories; command text is not exposed.
+- **Startup Items**: enabled autostart desktop entries, resolved per the
+  FreeDesktop Autostart spec (`shell/finder/autostart.cpp`, GKeyFile): the user
+  directory overrides `XDG_CONFIG_DIRS` entries by file name, `Hidden=true` and
+  `X-GNOME-Autostart-enabled=false` disable, `OnlyShowIn`/`NotShowIn` are checked
+  against `XDG_CURRENT_DESKTOP`, `TryExec`/`Exec` must resolve to an
+  executable, localized `Name` is used, and entries starting the same command
+  appear once. Command text is not exposed.
 - **Application Support**: allowlisted user/system support roots as read-only
   aliases.
 - **Device Drivers**: every loaded kernel module, with startup-module metadata,
@@ -375,6 +391,32 @@ Built-in launchers:
   icons, a description and status/startup/module details for the selection.
   **Show All** switches to every loaded kernel module by technical name.
   Nothing here loads or unloads modules.
+  Two more views sit beside Extensions in the same window:
+  **Login Items** lists the autostart entries (on and off) with their source and
+  "takes effect at your next login"; **Turn On/Off** writes an override into
+  `~/.config/autostart` only (a system entry is never edited), and is offered only
+  for entries that are on or disabled, not for missing programs or other
+  desktops. **Background Services** lists `systemctl --user` services; only
+  user-owned/user-manager units that are `enabled` or `disabled` can be changed
+  (Start/Stop now, or start at login). Essential session services (D-Bus,
+  audio, `zacos9*`, portals, GNOME/Plasma services, …), static, generated and
+  template units are read-only. Turning something off or stopping a service asks
+  first. Only the user manager is contacted: no root, no polkit, no system
+  services. Lists refresh when the autostart or `~/.config/systemd/user`
+  folders change (debounced); a service's running state is read on demand.
+
+## Virtual versus physical
+
+Items in the Macintosh view are either **virtual** (the System Folder, Control
+Panels, Applications and the generated resource folders: Get Info says "virtual;
+no physical equivalent") or **backed** by a real folder (Source shows the path).
+The virtual System Folder is not the writable `Zacintosh HD` workspace that save
+dialogs use; Get Info says so and suggests Home or Documents. Show Original on an
+alias resolves it like Open does (reconnecting or offering Fix Alias…). Mounted
+volumes are real drives; no filesystem paths change. Sniffer re-lists lazily and
+watches (debounced) the application folders, mounted volumes, autostart folders
+and the user's unit folder; alias targets are not watched and are re-checked when
+the alias is opened.
 
 ## What the Finder will and won't do
 
