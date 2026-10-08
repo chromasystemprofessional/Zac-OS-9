@@ -1,3 +1,16 @@
+zacos9 (0.1.37) trixie; urgency=medium
+
+  * File names are shown without their extensions, and documents carry the
+    icon of the application that opens them. The new File Exchange control
+    panel chooses which application opens each kind of document. Picture
+    files show previews of their pictures. The file chooser in applications
+    now shows Zacintosh HD and your mounted drives, like the Mac's, with
+    matching drive icons and Platinum-styled dialogs. Drag an application
+    into System Folder > Startup Items to open it at login, and drag a
+    startup item to the Trash to stop it.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Thu, 08 Oct 2026 05:08:38 -0400
+
 zacos9 (0.1.36) trixie; urgency=medium
 
   * Added the ZacOS file chooser for standard application dialogs, clearer
