@@ -1,3 +1,12 @@
+zacos9 (0.1.39) trixie; urgency=medium
+
+  * Automatic login is restored: applications that need a password ask for
+    it in their own sign-in window when they open, instead of a password
+    prompt during startup. No stored passwords or keyrings are changed.
+    Full pre-release tests: 63 passed, 3 skipped, no failures.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Thu, 08 Oct 2026 15:45:28 -0400
+
 zacos9 (0.1.38) trixie; urgency=medium
 
   * Application file choosers now list Desktop folder aliases and mounted
