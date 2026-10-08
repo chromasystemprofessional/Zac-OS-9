@@ -1,3 +1,11 @@
+zacos9 (0.1.36) trixie; urgency=medium
+
+  * Added the ZacOS file chooser for standard application dialogs, clearer
+    startup-disk and About This Computer information, and improved Platinum
+    styling for GTK and Qt dialogs.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Thu, 08 Oct 2026 02:15:00 -0400
+
 zacos9 (0.1.35) trixie; urgency=medium
 
   * Startup Items now launch after login; Finder aliases reconnect safely;
