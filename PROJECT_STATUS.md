@@ -43,10 +43,19 @@ active; the live Finder sends the new `network`/`unmount` fields, and the
 chooser responds on D-Bus. Included in the 0.1.38 release. Full pre-release
 suite: 63 passed, 3 skipped, no failures (66 tests).
 
-Automatic login remains the intended live-desktop behavior. Applications
-should request credentials through their normal sign-in flow at launch rather
-than through a separate desktop-startup password prompt. See
-[packaging](docs/packaging.md).
+**Automatic login retained** (0.1.39): the earlier desktop-startup password
+prompt was undone at the user's request. The live machine's
+`/etc/greetd/config.toml` was restored byte-for-byte from its backup, so
+`[initial_session]` logs the user straight in again; the guidance in
+[packaging](docs/packaging.md) now says applications request credentials
+through their own normal sign-in flow at launch instead. No keyring files or
+stored secrets were read or changed, and no other installation's login
+settings are affected. Full pre-release suite: 63 passed, 3 skipped, no
+failures (66 tests). Note that this suite must be run serially
+(`meson test -C build --num-processes 1`) on a machine with a live desktop
+session: in parallel, `filechooser-lifecycle`, `native-snapshot`,
+`finder-selection` and `filechooser-locations` fail or time out on contention
+for gvfs, the compositor and dpkg, not on any code defect.
 
 **AFP disconnected disks** (0.1.38): confirmed the user
 remounted `adam's home` successfully. AFP transport/session failure now ends
