@@ -24,9 +24,8 @@ export GTK_CSD=0
 export QT_WAYLAND_DISABLE_WINDOWDECORATION=1
 # GTK 3 applications wear the Platinum theme (share/themes/ZacOS9).
 export GTK_THEME=ZacOS9
-# Standard application file dialogs use the ZacOS file chooser portal.
-export GTK_USE_PORTAL=1
-export QT_USE_PORTAL=1
+# Leave toolkit file dialogs on their native implementations by default.
+# Explicit portal callers use the system GTK file chooser backend.
 case ":${GTK_MODULES:-}:" in
 	*:zacos9-appmenu:*) ;;
 	*) export GTK_MODULES="${GTK_MODULES:+$GTK_MODULES:}zacos9-appmenu" ;;

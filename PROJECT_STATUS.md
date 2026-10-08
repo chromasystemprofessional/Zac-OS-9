@@ -29,9 +29,10 @@ Updated: 2026-10-07
 graphics, and memory in human-readable form. Zacintosh HD Get Info reports the
 home filesystem's capacity and free space without Source or Access rows. A
 ZacOS FileChooser portal backend presents the private Zacintosh HD workspace
-and mounted volumes with no places sidebar, and the session selects it for
-standard GTK/Qt dialogs. The backend builds; its location/dialog tests,
-Finder desktop/VFS tests, and D-Bus interface introspection pass. GTK/Qt portal
+and mounted volumes with no places sidebar. It is not selected by default:
+GTK/Qt keep their working toolkit dialogs, while explicit portal file chooser
+requests use the GTK backend. The ZacOS backend builds; its location/dialog
+tests, Finder desktop/VFS tests, and D-Bus interface introspection pass, but
 activation and visual behavior have not been exercised in a live desktop.
 Details: [application integration](docs/app-integration.md) and
 [Finder VFS](docs/vfs.md).

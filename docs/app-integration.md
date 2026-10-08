@@ -18,20 +18,17 @@ works for it:
 
 ## Done
 
-- **Standard application file chooser**: the session selects the ZacOS
-  `FileChooser` portal for GTK and Qt standard dialogs. Its first screen lists
-  the private Zacintosh HD workspace and mounted data volumes, without a
-  places sidebar; the subsequent file browser also has no sidebar. The
-  workspace has document-only `System Folder` and `Applications` directories,
-  separated from system files and installed applications. App-provided initial
-  folders remain respected, and app-specific custom pickers are not rewritten.
-  The portal backend is built and has a location-list regression test; visual
-  behavior in a logged-in GTK/Qt desktop still requires live-session testing.
-  See [Desktop files and aliases](vfs.md#desktop-files-and-aliases).
+- **Standard application file chooser**: GTK and Qt use their own file dialogs
+  by default so applications retain a working chooser even when desktop-portal
+  activation is unavailable. Explicit portal `FileChooser` requests use the
+  GTK portal backend. The ZacOS portal backend remains installed but is not
+  selected by default; its activation and live-session behavior need validation
+  before it can safely replace the working toolkit dialogs. See
+  [Desktop files and aliases](vfs.md#desktop-files-and-aliases).
 - **Session defaults** (`session/zacos9-session`): `GTK_CSD=0`,
   `QT_WAYLAND_DISABLE_WINDOWDECORATION=1`, `GTK_THEME=ZacOS9`,
-  `QT_STYLE_OVERRIDE=zacos9`, and GTK/Qt portal selection. GTK 3 already took
-  our frames before this; it is a safeguard.
+  `QT_STYLE_OVERRIDE=zacos9`. GTK 3 already took our frames before this; it is
+  a safeguard.
 - **GTK 3 theme** `share/themes/ZacOS9/gtk-3.0/gtk.css`, installed to
   `/usr/share/themes`. Adwaita imported as the base, then restyled: grey
   outlined buttons, square corners, sunk white fields, flat grey menu bar and
