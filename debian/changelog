@@ -1,3 +1,10 @@
+zacos9 (0.1.33) trixie; urgency=medium
+
+  * Desktop-first saving with an isolated per-user Zacintosh HD workspace;
+    mounted-disk places and USB drive badges.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Wed, 07 Oct 2026 20:00:28 -0400
+
 zacos9 (0.1.32) trixie; urgency=medium
 
   * Extensions Manager and System Folder > Extensions now show curated,
