@@ -1,3 +1,15 @@
+zacos9 (0.1.41) trixie; urgency=medium
+
+  * The Collar now matches the original layout open and closed, moves
+    between the screen bottom and the menu bar with Command-drag, and adds
+    Sound Set, per-display Resolution and Brightness, KDE Connect and
+    Keychain modules, plus a Collar control panel and a Command-F8 hot key.
+    The Keychain module unlocks locked keychains so apps such as ChatGPT
+    can open. New Picture Viewer opens image files fitted to the screen
+    with zoom in and out.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Fri, 09 Oct 2026 10:04:41 -0400
+
 zacos9 (0.1.40) trixie; urgency=medium
 
   * Combined release: restores automatic desktop login, with applications
