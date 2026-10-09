@@ -6,10 +6,7 @@
 #include <QDBusMetaType>
 #include <QDBusVariant>
 #include <QDBusVirtualObject>
-#include <QDir>
 #include <QElapsedTimer>
-#include <QFile>
-#include <QTemporaryDir>
 #include <QTextStream>
 #include <QThread>
 
@@ -29,14 +26,9 @@ static bool until(const std::function<bool()> &done) {
 	return done();
 }
 
-static bool write(const QString &path, const QByteArray &data) {
-	QFile file(path);
-	return file.open(QIODevice::WriteOnly) && file.write(data) == data.size();
-}
-
 class Services : public QDBusVirtualObject {
 public:
-	QString brightnessPath, rejection, capability = "yes";
+	QString rejection, capability = "yes";
 	bool wifi = true, bluetooth = false, battery = true, adapter = true, malformed = false;
 	double percentage = 64.0;
 	uint batteryState = 2;
@@ -66,9 +58,6 @@ public:
 			bus.send(message.createReply(QVariantList{ QVariant::fromValue(objects) }));
 		} else if (message.member() == "CanSuspend") {
 			bus.send(message.createReply(QVariantList{ capability }));
-		} else if (message.member() == "GetSessionByPID") {
-			check(args.size() == 1 && args[0].toUInt() > 0, "look up our login session by process ID");
-			bus.send(message.createReply(QVariantList{ QVariant::fromValue(QDBusObjectPath("/org/freedesktop/login1/session/test")) }));
 		} else if (!rejection.isEmpty()) {
 			bus.send(message.createErrorReply("org.freedesktop.DBus.Error.AccessDenied", rejection));
 		} else if (message.member() == "Set") {
@@ -81,12 +70,6 @@ public:
 			} else if (lastProperty == "Powered") {
 				bluetooth = lastValue.toBool();
 			}
-			bus.send(message.createReply());
-		} else if (message.member() == "SetBrightness") {
-			check(message.path() == "/org/freedesktop/login1/session/test", "use the caller's login session for brightness");
-			check(args.size() == 3 && args[0] == "backlight" && args[1] == "display0",
-				"route brightness to the backlight subsystem and selected device");
-			check(write(brightnessPath, QByteArray::number(args.value(2).toUInt())), "fixture applies brightness");
 			bus.send(message.createReply());
 		} else if (message.member() == "Suspend") {
 			++sleeps;
@@ -111,14 +94,7 @@ int main(int argc, char **argv) {
 			"org.freedesktop.UPower", "org.freedesktop.login1" }) {
 		check(bus.registerService(service), "own test service " + service);
 	}
-	QTemporaryDir dir;
-	check(dir.isValid(), "create isolated backlight fixture");
-	const QString display = dir.path() + "/display0";
-	check(QDir().mkpath(display), "create backlight device");
-	check(write(display + "/max_brightness", "200\n") && write(display + "/brightness", "100\n"),
-		"seed brightness range");
-	services.brightnessPath = display + "/brightness";
-	SystemControls client(nullptr, dir.path());
+	SystemControls client;
 	QString error;
 	int changes = 0;
 	client.changed = [&] { ++changes; };
@@ -129,7 +105,6 @@ int main(int argc, char **argv) {
 	check(changes == 1 && client.state.networkAvailable && client.state.wifi && client.state.networkState == 70,
 		"read connected network and Wi-Fi status");
 	check(client.state.adapter == "/org/bluez/hci0" && !client.state.bluetooth, "discover the BlueZ adapter");
-	check(client.state.brightness == 50 && client.state.maxBrightness == 200, "read and scale the backlight");
 	check(client.state.batteryPresent && client.state.batteryPercent == 64 && client.state.batteryState == 2,
 		"read real battery percentage and discharge state");
 	check(client.state.canSuspend == "yes", "read sleep capability");
@@ -143,12 +118,6 @@ int main(int argc, char **argv) {
 	check(until([&] { return !client.updating(); }) && client.state.bluetooth &&
 		services.lastPath == "/org/bluez/hci0" && services.lastProperty == "Powered",
 		"power Bluetooth through BlueZ and verify status");
-	client.setBrightness(75);
-	check(until([&] { return !client.updating(); }) && client.state.brightness == 75,
-		"set 75 percent using logind, not a direct sysfs write");
-	client.setBrightness(0);
-	check(until([&] { return !client.updating(); }) && client.state.brightness == 1,
-		"retain at least one hardware brightness step");
 	client.suspend();
 	check(until([&] { return !client.updating(); }) && services.sleeps == 1, "request sleep on the fake bus only");
 
@@ -188,14 +157,6 @@ int main(int argc, char **argv) {
 	client.refresh();
 	check(until([&] { return !client.updating(); }) && !client.state.batteryPresent &&
 		!client.state.powerError.isEmpty(), "reject an invalid battery state");
-	check(write(display + "/brightness", "oops"), "simulate unreadable backlight data");
-	client.readBrightness();
-	check(client.state.brightness == -1 && client.state.backlight.isEmpty() &&
-		!client.state.brightnessError.isEmpty(), "clear invalid backlight state explicitly");
-	SystemControls noBacklight(nullptr, dir.path() + "/missing");
-	noBacklight.readBrightness();
-	check(noBacklight.state.brightness == -1 && !noBacklight.state.brightnessError.isEmpty(),
-		"report unavailable brightness on external monitors");
 	bus.unregisterService("org.freedesktop.NetworkManager");
 	client.refresh();
 	check(until([&] { return !client.updating(); }) && !client.state.networkAvailable &&

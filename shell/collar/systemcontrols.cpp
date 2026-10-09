@@ -8,11 +8,8 @@
 #include <QDBusPendingCallWatcher>
 #include <QDBusVariant>
 #include <QDebug>
-#include <QDir>
-#include <QFile>
 #include <algorithm>
 #include <cmath>
-#include <unistd.h>
 
 static const QString NM = QStringLiteral("org.freedesktop.NetworkManager");
 static const QString NM_PATH = QStringLiteral("/org/freedesktop/NetworkManager");
@@ -22,8 +19,7 @@ static const QString LOGIN = QStringLiteral("org.freedesktop.login1");
 static const QString LOGIN_PATH = QStringLiteral("/org/freedesktop/login1");
 static const QString MANAGER = QStringLiteral("org.freedesktop.login1.Manager");
 
-SystemControls::SystemControls(QObject *parent, const QString &backlightRoot)
-	: QObject(parent), m_backlightRoot(backlightRoot) {
+SystemControls::SystemControls(QObject *parent) : QObject(parent) {
 	qDBusRegisterMetaType<CollarInterfaces>();
 	qDBusRegisterMetaType<CollarObjects>();
 }
@@ -66,7 +62,6 @@ void SystemControls::refresh() {
 	}
 	m_refreshing = true;
 	m_pending = 4;
-	readBrightness();
 	properties(NM, NM_PATH, NM, [this](const QVariantMap &p, const QString &error) {
 		QString problem = error;
 		bool ok = false;
@@ -156,42 +151,6 @@ void SystemControls::refresh() {
 		});
 }
 
-static bool readNumber(const QString &path, int &number) {
-	QFile file(path);
-	if (!file.open(QIODevice::ReadOnly)) {
-		return false;
-	}
-	bool ok = false;
-	number = QString::fromUtf8(file.readAll()).trimmed().toInt(&ok);
-	return ok;
-}
-
-void SystemControls::readBrightness() {
-	state.backlight.clear();
-	state.brightness = -1;
-	state.maxBrightness = 0;
-	QString problem = "No adjustable display backlight is available.";
-	const QDir dir(m_backlightRoot);
-	for (const QString &name : dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
-		int maximum = 0, value = 0;
-		const QString path = dir.filePath(name);
-		if (!readNumber(path + "/max_brightness", maximum) || maximum <= 0 ||
-				!readNumber(path + "/brightness", value) || value < 0 || value > maximum) {
-			problem = "Couldn't read display backlight " + name + ".";
-			continue;
-		}
-		state.backlight = name;
-		state.maxBrightness = maximum;
-		state.brightness = qRound(100.0 * value / maximum);
-		problem.clear();
-		break;
-	}
-	if (problem != state.brightnessError && !problem.isEmpty()) {
-		qWarning().noquote() << "The Collar:" << problem;
-	}
-	state.brightnessError = problem;
-}
-
 bool SystemControls::beginAction() {
 	if (busy || m_refreshing) {
 		const QString error = "The Collar is refreshing or applying a setting. Please try again.";
@@ -243,31 +202,6 @@ void SystemControls::setBluetooth(bool on) {
 	call(BLUEZ, state.adapter, "org.freedesktop.DBus.Properties", "Set",
 		{ ADAPTER, "Powered", QVariant::fromValue(QDBusVariant(on)) },
 		[this](const QVariantList &, const QString &error) { finishAction(error); });
-}
-
-void SystemControls::setBrightness(int percent) {
-	if (!beginAction()) {
-		return;
-	}
-	readBrightness();
-	if (percent < 0 || percent > 100 || state.backlight.isEmpty()) {
-		finishAction("No valid display backlight or brightness was selected. " + state.brightnessError);
-		return;
-	}
-	const QString device = state.backlight;
-	const uint value = static_cast<uint>(std::max(1, qRound(state.maxBrightness * (percent / 100.0))));
-	call(LOGIN, LOGIN_PATH, MANAGER, "GetSessionByPID",
-		{ QVariant::fromValue(static_cast<uint>(getpid())) },
-		[this, device, value](const QVariantList &args, const QString &error) {
-			const QString path = qdbus_cast<QDBusObjectPath>(args.value(0)).path();
-			if (!error.isEmpty() || path.isEmpty()) {
-				finishAction("Couldn't find the active login session. " + error);
-				return;
-			}
-			call(LOGIN, path, "org.freedesktop.login1.Session", "SetBrightness",
-				{ "backlight", device, QVariant::fromValue(value) },
-				[this](const QVariantList &, const QString &error) { finishAction(error); });
-		});
 }
 
 void SystemControls::suspend() {

@@ -18,6 +18,13 @@ works for it:
 
 ## Done
 
+- **Picture Viewer** (`shell/picture/`, `zacos9-picture`): images
+  double-clicked in the Finder open here; `share/xdg/zacos9-mimeapps.list`
+  makes it the default for image types. A user's own `~/.config/mimeapps.list`
+  still wins. It opens a picture fitted to the screen (never enlarged), sizes
+  its window to the picture (zacos9-wm exempts it from the near-full-screen
+  default frame), and zooms in fixed steps from 1/16 to 16× with the bar's
+  − / + buttons, ⌘+ / ⌘−, ⌘0, ⌘9 or ⌘-scroll. Drag to pan.
 - **Standard application file chooser**: the session selects the ZacOS
   `FileChooser` portal for GTK and Qt standard dialogs. Its first screen lists
   Zacintosh HD, mounted data volumes and Desktop folder aliases, without a

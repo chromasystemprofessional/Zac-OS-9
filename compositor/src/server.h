@@ -3,6 +3,7 @@
 
 #include <wayland-server-core.h>
 #include <wlr/backend.h>
+#include <xkbcommon/xkbcommon.h>
 #include <wlr/render/allocator.h>
 #include <wlr/render/wlr_renderer.h>
 #include <wlr/types/wlr_compositor.h>
@@ -263,6 +264,10 @@ void prefs_apply(struct plat_server *server);
 void prefs_write_outputs(struct plat_server *server);
 int prefs_repeat_rate(void);
 int prefs_repeat_delay(void);
+bool prefs_collar_hotkey(uint32_t mods, xkb_keysym_t sym);
+
+/* main.c: start a shell component (zacos9-menubar...) with extra arguments. */
+void spawn_component(const char *env_var, const char *program, const char *args);
 
 /* output.c */
 void output_init(struct plat_server *server);

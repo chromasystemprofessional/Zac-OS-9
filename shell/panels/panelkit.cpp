@@ -6,6 +6,7 @@
 #include <QElapsedTimer>
 #include <QPainter>
 #include <algorithm>
+#include <climits>
 
 #include "icons.h"
 #include "menudraw.h"
@@ -436,7 +437,7 @@ void paintLock(pl_canvas *c, int x, int baseline, uint32_t color) {
 class PopupMenu : public QWidget {
 public:
 	PopupMenu(QWidget *owner, const std::vector<PopupItem> &items, int selected, int minWidth,
-			std::function<void(int)> done, std::function<void()> closed = {})
+			std::function<void(int)> done, std::function<void()> closed = {}, pl_font font = PL_FONT_SYSTEM)
 		: QWidget(owner, Qt::Popup | Qt::FramelessWindowHint), m_items(items),
 		  m_hover(selected), m_checked(selected), m_done(std::move(done)), m_closed(std::move(closed)) {
 		setAttribute(Qt::WA_TranslucentBackground);
@@ -444,7 +445,7 @@ public:
 		setMouseTracking(true);
 		bool extras = false;
 		for (const PopupItem &it : m_items) {
-			m_texts.push_back(std::make_unique<Text>(it.text, 400, PL_FONT_SYSTEM));
+			m_texts.push_back(std::make_unique<Text>(it.text, 400, font));
 			extras |= it.signal >= 0 || it.lock;
 		}
 		for (size_t i = 0; i < m_items.size(); i++) {
@@ -597,13 +598,19 @@ private:
 
 void panelMenuAbove(QWidget *owner, const std::vector<PopupItem> &items, int checked,
 		const QRect &anchor, std::function<void(int)> chosen, std::function<void()> closed) {
+	panelMenuNear(owner, items, checked, anchor, INT_MAX, PL_FONT_SYSTEM, std::move(chosen), std::move(closed));
+}
+
+void panelMenuNear(QWidget *owner, const std::vector<PopupItem> &items, int checked,
+		const QRect &anchor, int roomAbove, pl_font font, std::function<void(int)> chosen, std::function<void()> closed) {
 	if (items.empty()) {
 		qWarning("Cannot open an empty panel menu.");
 		return;
 	}
 	pl_sound_event("menu-open");
-	auto *menu = new PopupMenu(owner, items, checked, anchor.width(), std::move(chosen), std::move(closed));
-	menu->move(owner->mapToGlobal(QPoint(anchor.left(), anchor.top() - menu->height())));
+	auto *menu = new PopupMenu(owner, items, checked, anchor.width(), std::move(chosen), std::move(closed), font);
+	const int top = menu->height() <= roomAbove ? anchor.top() - menu->height() : anchor.bottom() + 1;
+	menu->move(owner->mapToGlobal(QPoint(anchor.left(), top)));
 	menu->show();
 }
 

@@ -24,6 +24,67 @@ Updated: 2026-10-09
 
 ## Current work
 
+**The Collar correction** (uncommitted, after 0.1.40): the frame is mirrored
+to match the user's open and closed reference screenshots. The close box and
+recessed scroll arrows are on the left, 30-pixel module cells start at x=29,
+and the 18-pixel grip is on the right. The open width is `60 + 31 × modules`.
+Closed, only the 18-pixel grip remains.
+The strip sits flush in the bottom-left corner. Command-drag moves it between
+the screen bottom and the menu bar; Escape cancels the move.
+New modules:
+- A Sound Set switcher. Collar sounds follow the current set.
+- Per-display Resolution and Brightness modules. Built-in panels use the
+  backlight through logind; external monitors use DDC/CI through `ddcutil`,
+  which is now recommended and in the live image.
+Every menu is headed by its device label, for example "Display 2: NAME".
+Over-long sound-set and resolution lists are trimmed around the checked entry,
+with a "More..." item that opens the matching control panel.
+Pixel diffs against the references match apart from the reference Mac's
+rounded screen corner.
+New `collar-displays` suite. The Collar, sound and theme suites pass.
+DDC/CI is not yet verified on real monitors. Not released or installed.
+
+**KDE Connect in The Collar and the Collar control panel** (uncommitted):
+- When KDE Connect is installed, each paired, reachable device gets a Phone
+  module. It offers battery and signal, browse, clipboard, ring, send files,
+  SMS, ping, remote commands, pairing requests and settings, all over the
+  daemon's D-Bus API.
+- New `zacos9-collarpanel`, laid out from the Control Strip panel:
+  - Show/Hide: show, hide, or a hot key, with a key recorder;
+  - Font Settings for the module menus.
+- `zacos9-wm` matches the hot key (default ⌘F8) and runs
+  `zacos9-collar --toggle`.
+- The Collar's artwork moved to `collarart.cpp`, so the panel can draw its
+  preview.
+- New suites: `collar-kdeconnect`, `collar-panel` and `collar-hotkey`.
+  `collar-native` now presses ⌘F8 in a real compositor.
+- Not tested against a real phone. Not released or installed.
+
+**Keychain module in The Collar** (uncommitted): ChatGPT, an Electron app,
+wasn't opening because it waits on gnome-keyring's "Unlock Keyring" prompt.
+With automatic login, `pam_gnome_keyring` never receives the password, so the
+keychains start locked; that design is deliberate. The new Keychain module,
+modelled on Mac OS 9's Keychain Strip, talks to the Secret Service over D-Bus:
+- lists the keychains and checks the default (choosing one sets the default);
+- Unlock... shows the keyring's own password prompt;
+- Lock and Lock All Keychains;
+- Keychain Access... (Seahorse), when installed.
+The padlock icon opens when the default keychain is unlocked. New
+`collar-keychain` suite with a fake Secret Service; checked against the live
+gnome-keyring (lists Login and Default Keyring). Not released or installed.
+
+**Picture Viewer** (`zacos9-picture`, uncommitted): the default application
+for image files (PNG, JPEG, GIF, BMP, WebP, TIFF, SVG, ICO, ICNS, TGA,
+PNM, XBM, XPM) through `zacos9-mimeapps.list`, replacing ImageMagick's
+`display`. A plain Qt window in the Platinum style with File and View menus in
+the global menu bar. Pictures larger than the screen open fitted to it; smaller
+ones open at actual size, and the window wraps the picture. The bottom bar has
+zoom − / + buttons, the zoom percentage and the pixel dimensions. ⌘+ / ⌘−,
+⌘0 (Actual Size), ⌘9 (Fit to Screen), ⌘-scroll zooms at the pointer, and
+dragging pans. zacos9-wm lets it size its own window, as it does the Finder.
+New `picture-viewer` offscreen suite; checked in a headless zacos9-wm. Needs
+`qt6-image-formats-plugins` (added to Depends). Not released or installed.
+
 **The Collar: screenshot-matched desktop control strip** (0.1.40; published, not installed
 on the live desktop): original pixel artwork and Platinum menus, five modern
 modules (volume/output, network/Wi-Fi, Bluetooth, backlight brightness, and

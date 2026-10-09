@@ -32,6 +32,7 @@
 #include <wlr/types/wlr_compositor.h>
 #include <wlr/util/log.h>
 
+#include "hotkey.h"
 #include "server.h"
 #include "settings.h"
 
@@ -328,4 +329,16 @@ void prefs_init(struct plat_server *server) {
 	}
 	wl_event_loop_add_fd(wl_display_get_event_loop(server->display), fd, WL_EVENT_READABLE,
 		settings_changed, server);
+}
+
+/* The Collar panel's hot key, if it chose "Hot key to show/hide". */
+bool prefs_collar_hotkey(uint32_t mods, xkb_keysym_t sym) {
+	char v[128];
+	if (!pl_setting("collar-visibility", v, sizeof(v)) || strcmp(v, "hotkey") != 0) {
+		return false;
+	}
+	if (!pl_setting("collar-hotkey", v, sizeof(v)) || !*v) {
+		strcpy(v, HOTKEY_DEFAULT);
+	}
+	return hotkey_matches(v, mods, sym);
 }

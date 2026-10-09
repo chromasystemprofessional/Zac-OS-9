@@ -9,7 +9,7 @@
  *   vptr down | up | click    left button
  *   vptr type TEXT            type printable ASCII
  *   vptr key NAME             Return, BackSpace, Tab, Escape, Delete,
- *                             Up, Down, Left, Right, or one character
+ *                             Up, Down, Left, Right, F1..F12, or one character
  *   vptr cmd C                ⌘C (the Super key, as zacos9-wm maps it)
  *   vptr wait MS              pause
  * Commands chain: vptr home move 100 50 down move 40 0 up
@@ -162,6 +162,17 @@ static bool named_key(const char *name, uint32_t *code, bool *shift) {
 	for (size_t i = 0; i < sizeof(keys) / sizeof(keys[0]); i++) {
 		if (strcmp(name, keys[i].name) == 0) {
 			*code = keys[i].code;
+			*shift = false;
+			return true;
+		}
+	}
+	static const uint32_t fkeys[] = { KEY_F1, KEY_F2, KEY_F3, KEY_F4, KEY_F5, KEY_F6,
+		KEY_F7, KEY_F8, KEY_F9, KEY_F10, KEY_F11, KEY_F12 };
+	if (name[0] == 'F' && name[1]) {
+		char *end;
+		const long n = strtol(name + 1, &end, 10);
+		if (!*end && n >= 1 && n <= 12) {
+			*code = fkeys[n - 1];
 			*shift = false;
 			return true;
 		}

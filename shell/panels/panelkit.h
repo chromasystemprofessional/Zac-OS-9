@@ -188,6 +188,10 @@ constexpr int PANEL_WELL_W = 36, PANEL_ARROWS_W = 22;
 /* A command menu above a compact control, using the same Platinum painter. */
 void panelMenuAbove(QWidget *owner, const std::vector<PopupItem> &items, int checked,
 	const QRect &anchor, std::function<void(int)> chosen, std::function<void()> closed = {});
+/* Above the anchor if the menu fits in `roomAbove` pixels, otherwise below it. */
+void panelMenuNear(QWidget *owner, const std::vector<PopupItem> &items, int checked,
+	const QRect &anchor, int roomAbove, pl_font font, std::function<void(int)> chosen,
+	std::function<void()> closed = {});
 
 /* An ARGB icon at (x, y), where it isn't transparent. */
 void panelIcon(pl_canvas *c, const QImage &icon, int x, int y);

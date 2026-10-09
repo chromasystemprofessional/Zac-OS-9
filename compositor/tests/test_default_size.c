@@ -91,6 +91,7 @@ int main(void) {
 	/* Left alone: the Finder, our programs' hinted windows, dialogs,
 	 * fixed-size windows and fullscreen windows. */
 	assert(!view_default_frame(&view, "zacos9-finder", &frame, &w, &h));
+	assert(!view_default_frame(&view, "zacos9-picture", &frame, &w, &h));
 	style = DECOR_STYLE_DOCUMENT;
 	assert(!view_default_frame(&view, "app", &frame, &w, &h));
 	style = -1;

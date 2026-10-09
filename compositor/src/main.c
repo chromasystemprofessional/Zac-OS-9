@@ -36,12 +36,16 @@ static void spawn(const char *command) {
 
 /* Start a shell component (menu bar, Finder): $env_var if set (empty
  * disables it), else next to our own binary (installed) or in the build
- * tree's shell/ directory, else from $PATH. */
-static void spawn_component(const char *env_var, const char *program) {
-	const char *env = getenv(env_var);
+ * tree's shell/ directory, else from $PATH. `args` (may be empty) are
+ * appended to its command line as they are. A NULL env_var always runs
+ * our own program. */
+void spawn_component(const char *env_var, const char *program, const char *args) {
+	const char *env = env_var ? getenv(env_var) : NULL;
 	if (env) {
 		if (*env) {
-			spawn(env);
+			char cmd[PATH_MAX + 256];
+			snprintf(cmd, sizeof(cmd), "%s%s", env, args);
+			spawn(cmd);
 		}
 		return;
 	}
@@ -58,7 +62,7 @@ static void spawn_component(const char *env_var, const char *program) {
 				snprintf(path, sizeof(path), candidates[i], exe, program);
 				if (access(path, X_OK) == 0) {
 					char quoted[PATH_MAX + 80];
-					snprintf(quoted, sizeof(quoted), "exec '%s'", path);
+					snprintf(quoted, sizeof(quoted), "exec '%s'%s", path, args);
 					spawn(quoted);
 					return;
 				}
@@ -66,7 +70,7 @@ static void spawn_component(const char *env_var, const char *program) {
 		}
 	}
 	char cmd[256];
-	snprintf(cmd, sizeof(cmd), "exec %s", program);
+	snprintf(cmd, sizeof(cmd), "exec %s%s", program, args);
 	spawn(cmd);
 }
 
@@ -224,9 +228,9 @@ int main(int argc, char *argv[]) {
 	prefs_write_outputs(&server);
 	share_our_data();
 	startup_begin(&server);
-	spawn_component("ZACOS9_MENUBAR", "zacos9-menubar");
-	spawn_component("ZACOS9_FINDER", "zacos9-finder");
-	spawn_component("ZACOS9_COLLAR", "zacos9-collar");
+	spawn_component("ZACOS9_MENUBAR", "zacos9-menubar", "");
+	spawn_component("ZACOS9_FINDER", "zacos9-finder", "");
+	spawn_component("ZACOS9_COLLAR", "zacos9-collar", "");
 	/* On a live medium, open the installer automatically; on a freshly
 	 * installed system (zacos9-install leaves the flag), the Setup Assistant. */
 	{

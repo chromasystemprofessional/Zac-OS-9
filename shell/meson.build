@@ -445,6 +445,19 @@ executable('zacos9-appearance',
   install: true,
 )
 
+executable('zacos9-collarpanel',
+  'panels/collarpanel_main.cpp',
+  'panels/collarpanel.cpp',
+  'collar/collarart.cpp',
+  'finder/platinumshell.cpp',
+  finder_protocol,
+  link_with: panelkit,
+  include_directories: include_directories('finder', 'collar'),
+  dependencies: [platinum_dep, qt6, wayland_client],
+  cpp_args: ['-std=c++17'],
+  install: true,
+)
+
 executable('zacos9-datetime',
   'panels/datetime_main.cpp',
   'panels/datetime.cpp',
@@ -544,6 +557,27 @@ executable('zacos9-netbrowser',
   install: true,
 )
 
+executable('zacos9-picture',
+  'picture/main.cpp',
+  'picture/picturewindow.cpp',
+  'finder/alert.cpp',
+  'finder/platinumshell.cpp',
+  finder_protocol,
+  link_with: panelkit,
+  include_directories: include_directories('finder', 'panels', 'picture'),
+  dependencies: [platinum_dep, qt6, wayland_client],
+  cpp_args: ['-std=c++17'],
+  install: true,
+)
+picture_test = executable('test-picture', 'picture/tests/test_picture.cpp',
+  'picture/picturewindow.cpp', 'finder/alert.cpp', 'finder/platinumshell.cpp', finder_protocol,
+  link_with: panelkit,
+  include_directories: include_directories('finder', 'panels', 'picture'),
+  dependencies: [platinum_dep, qt6, wayland_client],
+  cpp_args: ['-std=c++17'],
+)
+test('picture-viewer', picture_test, env: ['QT_QPA_PLATFORM=offscreen'], timeout: 30)
+
 executable('zacos9-store',
   'store/main.cpp',
   'store/store.cpp',
@@ -613,8 +647,8 @@ executable('zacos9-controlpanel',
 )
 
 collar_sources = [
-  'collar/collar.cpp', 'collar/systemcontrols.cpp',
-  'panels/soundclient.cpp', 'finder/alert.cpp', 'finder/platinumshell.cpp',
+  'collar/collar.cpp', 'collar/collarart.cpp', 'collar/systemcontrols.cpp',
+  'collar/displaycontrols.cpp', 'collar/kdeconnect.cpp', 'collar/keychain.cpp', 'panels/soundclient.cpp', 'finder/alert.cpp', 'finder/platinumshell.cpp',
   finder_protocol,
 ]
 collar_exe = executable('zacos9-collar', 'collar/main.cpp', collar_sources,
@@ -631,7 +665,30 @@ collar_ui_test = executable('test-collar', 'collar/tests/test_collar.cpp', colla
   dependencies: [platinum_dep, qt6, layershellqt, wayland_client],
   cpp_args: ['-std=c++17'],
 )
-test('collar-ui', collar_ui_test, env: ['QT_QPA_PLATFORM=offscreen'], timeout: 30)
+test('collar-ui', collar_ui_test,
+  env: ['QT_QPA_PLATFORM=offscreen', 'ZACOS9_KDECONNECT_SERVICE=org.zacos9.test.NoKdeConnect',
+    'ZACOS9_SECRETS_SERVICE=org.zacos9.test.NoSecrets'], timeout: 30)
+collar_kdeconnect_test = executable('test-collar-kdeconnect', 'collar/tests/test_kdeconnect.cpp',
+  collar_sources,
+  link_with: panelkit,
+  include_directories: include_directories('collar', 'finder', 'panels'),
+  dependencies: [platinum_dep, qt6, layershellqt, wayland_client],
+  cpp_args: ['-std=c++17'],
+)
+test('collar-kdeconnect', find_program('dbus-run-session'),
+  args: ['--', collar_kdeconnect_test],
+  env: ['QT_QPA_PLATFORM=offscreen', 'ZACOS9_SECRETS_SERVICE=org.zacos9.test.NoSecrets'], timeout: 60,
+)
+collar_keychain_test = executable('test-collar-keychain', 'collar/tests/test_keychain.cpp',
+  collar_sources,
+  link_with: panelkit,
+  include_directories: include_directories('collar', 'finder', 'panels'),
+  dependencies: [platinum_dep, qt6, layershellqt, wayland_client],
+  cpp_args: ['-std=c++17'],
+)
+test('collar-keychain', find_program('dbus-run-session'),
+  args: ['--', collar_keychain_test], env: ['QT_QPA_PLATFORM=offscreen'], timeout: 60,
+)
 collar_controls_test = executable('test-collar-controls',
   'collar/tests/test_controls.cpp', 'collar/systemcontrols.cpp',
   include_directories: include_directories('collar'),
@@ -639,6 +696,29 @@ collar_controls_test = executable('test-collar-controls',
 )
 test('collar-controls', find_program('dbus-run-session'),
   args: ['--', collar_controls_test], timeout: 30,
+)
+collar_displays_test = executable('test-collar-displays',
+  'collar/tests/test_displays.cpp', 'collar/displaycontrols.cpp',
+  include_directories: include_directories('collar'),
+  dependencies: [platinum_dep, qt6], cpp_args: ['-std=c++17'],
+)
+test('collar-displays', find_program('dbus-run-session'),
+  args: ['--', collar_displays_test, files('collar/tests/fake-ddcutil.sh')], timeout: 30,
+)
+
+test('collar-panel',
+  executable('test-collar-panel',
+    'panels/tests/test_collarpanel.cpp',
+    'panels/collarpanel.cpp',
+    'collar/collarart.cpp',
+    'finder/platinumshell.cpp',
+    finder_protocol,
+    link_with: panelkit,
+    include_directories: include_directories('finder', 'collar', 'panels'),
+    dependencies: [platinum_dep, qt6, wayland_client],
+    cpp_args: ['-std=c++17'],
+  ),
+  env: ['QT_QPA_PLATFORM=offscreen'], timeout: 30,
 )
 
 test('sound-output',

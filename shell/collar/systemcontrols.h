@@ -16,8 +16,6 @@ struct CollarState {
 	QString networkError = "Reading network status...";
 	QString adapter, bluetoothError = "Reading Bluetooth status...";
 	bool bluetooth = false;
-	QString backlight, brightnessError = "Reading backlight status...";
-	int brightness = -1, maxBrightness = 0;
 	bool batteryPresent = false;
 	double batteryPercent = 0;
 	uint batteryState = 0;
@@ -27,8 +25,7 @@ struct CollarState {
 
 class SystemControls : public QObject {
 public:
-	explicit SystemControls(QObject *parent = nullptr,
-		const QString &backlightRoot = "/sys/class/backlight");
+	explicit SystemControls(QObject *parent = nullptr);
 	CollarState state;
 	bool busy = false;
 	std::function<void()> changed;
@@ -37,14 +34,11 @@ public:
 	void refresh();
 	void setWifi(bool on);
 	void setBluetooth(bool on);
-	void setBrightness(int percent);
 	void suspend();
-	void readBrightness();
 	bool updating() const { return busy || m_refreshing; }
 
 private:
 	using Done = std::function<void(const QVariantList &, const QString &)>;
-	QString m_backlightRoot;
 	bool m_refreshing = false;
 	int m_pending = 0;
 	void call(const QString &service, const QString &path, const QString &interface,

@@ -213,6 +213,7 @@ void launch_fill_logo_menu(struct mb_menu *menu) {
 	const struct { const char *name, *program, *arg; } panel_list[] = {
 		{ "Appearance", "zacos9-appearance", "" },
 		{ "Bluetooth", "zacos9-bluetooth", "" },
+		{ "Collar", "zacos9-collarpanel", "" },
 		{ "Date & Time", "zacos9-datetime", "" },
 		{ "File Exchange", "zacos9-fileexchange", "" },
 		{ "File Sharing", "zacos9-filesharing", "" },

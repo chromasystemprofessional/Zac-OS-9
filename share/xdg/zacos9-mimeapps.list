@@ -2,3 +2,24 @@
 # a user's own ~/.config/mimeapps.list still wins).
 [Default Applications]
 inode/directory=zacos9-finder.desktop
+# Pictures open in Picture Viewer.
+image/png=zacos9-picture.desktop
+image/jpeg=zacos9-picture.desktop
+image/gif=zacos9-picture.desktop
+image/bmp=zacos9-picture.desktop
+image/x-bmp=zacos9-picture.desktop
+image/webp=zacos9-picture.desktop
+image/tiff=zacos9-picture.desktop
+image/svg+xml=zacos9-picture.desktop
+image/svg+xml-compressed=zacos9-picture.desktop
+image/x-icon=zacos9-picture.desktop
+image/vnd.microsoft.icon=zacos9-picture.desktop
+image/x-icns=zacos9-picture.desktop
+image/x-tga=zacos9-picture.desktop
+image/x-portable-bitmap=zacos9-picture.desktop
+image/x-portable-graymap=zacos9-picture.desktop
+image/x-portable-pixmap=zacos9-picture.desktop
+image/x-portable-anymap=zacos9-picture.desktop
+image/x-xbitmap=zacos9-picture.desktop
+image/x-xpixmap=zacos9-picture.desktop
+image/vnd.wap.wbmp=zacos9-picture.desktop

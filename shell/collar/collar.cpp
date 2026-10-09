@@ -2,41 +2,65 @@
 
 #include <LayerShellQt/Window>
 #include <QApplication>
-#include <QDir>
 #include <QFile>
+#include <QFileDialog>
+#include <QFileSystemWatcher>
+#include <QDir>
+#include <QUrl>
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QPainter>
-#include <QScreen>
 #include <QRegion>
+#include <QScreen>
 #include <QStandardPaths>
 #include <QTimer>
 #include <QWindow>
 #include <algorithm>
+#include <climits>
 #include <cmath>
+#include <cstring>
 
 #include "alert.h"
+#include "customthemes.h"
+#include "menudraw.h"
 #include "panelkit.h"
 #include "pixels.h"
 #include "platinumshell.h"
 #include "settings.h"
 
-static QString configPath() {
-	return QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + "/zacos9/collar.conf";
+using namespace collarart;
+
+static QString configDir() {
+	return QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + "/zacos9";
 }
 
+static QString configPath() {
+	return configDir() + "/collar.conf";
+}
+
+static QString kdeConnectProgram(const QString &name) {
+	return QStandardPaths::findExecutable(name);
+}
+
+/* ---- Behaviour -------------------------------------------------------------------- */
+
 Collar::Collar(bool monitor)
-	: m_sound(this), m_controls(this), m_settings(configPath(), QSettings::IniFormat) {
+	: m_sound(this), m_controls(this), m_displays(this), m_kdeConnect(this),
+	  m_settings(configPath(), QSettings::IniFormat) {
 	setWindowTitle("The Collar");
 	setAccessibleName("The Collar");
-	setAccessibleDescription("Quick volume, network, Bluetooth, brightness and power controls.");
+	setAccessibleDescription("Quick sound, network, Bluetooth, phone, display and power controls.");
 	setAttribute(Qt::WA_TranslucentBackground);
 	setWindowFlags(Qt::FramelessWindowHint | Qt::Tool);
 	setFocusPolicy(Qt::StrongFocus);
 	setMouseTracking(true);
 	m_collapsed = m_settings.value("collapsed", false).toBool();
-	m_visible = std::clamp(m_settings.value("visible", ModuleCount).toInt(), 1, int(ModuleCount));
-	m_bottom = std::max(0, m_settings.value("bottom", 4).toInt());
+	m_wanted = std::max(0, m_settings.value("modules", 0).toInt());
+	m_bottom = std::max(0, m_settings.value("offset", 0).toInt());
+	m_hidden = m_settings.value("hidden", false).toBool();
+	m_visibility = visibilitySetting();
+	m_displays.refresh(false);
+	rebuildModules();
 	winId();
 	if (auto *layer = LayerShellQt::Window::get(windowHandle())) {
 		layer->setScope("zacos9-collar");
@@ -63,24 +87,97 @@ Collar::Collar(bool monitor)
 	m_sound.commandFailed = [](const QString &error) { Alert::ask(error, "OK", {}); };
 	m_controls.changed = [this] { update(); };
 	m_controls.failed = [](const QString &error) { Alert::ask(error, "OK", {}); };
+	m_displays.changed = [this] { rebuildModules(); };
+	m_displays.failed = [](const QString &error) { Alert::ask(error, "OK", {}); };
+	m_kdeConnect.changed = [this] { rebuildModules(); };
+	m_kdeConnect.failed = [](const QString &error) { Alert::ask(error, "OK", {}); };
+	m_keychains.changed = [this] { rebuildModules(); };
+	m_keychains.failed = [](const QString &error) { Alert::ask(error, "OK", {}); };
+	// The Collar control panel writes desktop.conf; follow it as it changes.
+	QDir().mkpath(configDir());
+	auto *settingsWatcher = new QFileSystemWatcher(this);
+	settingsWatcher->addPath(configDir());
+	connect(settingsWatcher, &QFileSystemWatcher::directoryChanged, this, [this] {
+		if (m_applied) {
+			applySettings();
+		}
+		update();
+	});
+	watchCustomThemes(this, [this] { update(); });
 	if (monitor) {
 		auto *timer = new QTimer(this);
-		connect(timer, &QTimer::timeout, this, [this] { m_sound.refresh(); m_controls.refresh(); });
+		connect(timer, &QTimer::timeout, this, [this] {
+			m_sound.refresh();
+			m_controls.refresh();
+			m_displays.refresh();
+			m_kdeConnect.refresh();
+			m_keychains.refresh();
+		});
 		timer->start(5000);
 		m_sound.refresh();
 		m_controls.refresh();
+		m_displays.refresh();
+		m_kdeConnect.refresh();
+		m_keychains.refresh();
 	}
 }
 
-QRect Collar::moduleRect(int module) const {
-	if (m_collapsed || module < m_first || module >= m_first + m_visible) {
+void Collar::rebuildModules() {
+	QList<Module> modules = { { Volume, {} }, { SoundSet, {} }, { Network, {} }, { Bluetooth, {} } };
+	// KDE Connect, when installed: a module per phone or tablet in reach, else one to pair a device.
+	for (const PhoneDevice &phone : m_kdeConnect.devices) {
+		modules.append(Module{ Phone, phone.id });
+	}
+	if (m_kdeConnect.installed && m_kdeConnect.devices.isEmpty()) {
+		modules.append(Module{ Phone, QString() });
+	}
+	// The keyring daemon's keychains, as Mac OS 9's Keychain Strip showed them.
+	if (m_keychains.available) {
+		modules.append(Module{ Keychain, QString() });
+	}
+	for (const CollarDisplay &d : m_displays.displays) {
+		modules.append(Module{ Resolution, d.name });
+		modules.append(Module{ Brightness, d.name });
+	}
+	if (m_displays.displays.isEmpty()) {
+		modules.append(Module{ Resolution, QString() });
+		modules.append(Module{ Brightness, QString() });
+	}
+	modules.append(Module{ Power, QString() });
+	if (modules != m_modules) {
+		m_modules = modules;
+		m_focus = std::clamp(m_focus, 0, int(m_modules.size()) - 1);
+		m_first = std::clamp(m_first, 0, int(m_modules.size()) - visibleModules());
+		if (windowHandle()) {
+			applyGeometry();
+		}
+	}
+	update();
+}
+
+int Collar::visibleModules() const {
+	const int count = m_modules.size();
+	return m_wanted > 0 ? std::min(m_wanted, count) : count;
+}
+
+int Collar::moduleIndex(Kind kind, const QString &device) const {
+	for (int i = 0; i < m_modules.size(); ++i) {
+		if (m_modules[i].kind == kind && (device.isEmpty() || m_modules[i].device == device)) {
+			return i;
+		}
+	}
+	return -1;
+}
+
+QRect Collar::moduleRect(int index) const {
+	if (m_collapsed || index < m_first || index >= m_first + visibleModules()) {
 		return {};
 	}
-	return QRect(Cap + Scroll + (module - m_first) * Cell, 0, Cell, Height);
+	return QRect(FirstModule + (index - m_first) * (Cell + 1), 0, Cell, Height);
 }
 
 int Collar::moduleAt(QPoint point) const {
-	for (int i = m_first; i < m_first + m_visible; ++i) {
+	for (int i = m_first; i < m_first + visibleModules(); ++i) {
 		if (moduleRect(i).contains(point)) {
 			return i;
 		}
@@ -88,16 +185,40 @@ int Collar::moduleAt(QPoint point) const {
 	return -1;
 }
 
+Collar::Part Collar::partAt(QPoint point) const {
+	if (!mask().contains(point)) {
+		return None;
+	}
+	if (m_collapsed) {
+		return GripPart;
+	}
+	const int right = FirstModule + visibleModules() * (Cell + 1);
+	if (point.x() <= Close + 1) {
+		return CloseBox;
+	} else if (point.x() < FirstModule) {
+		return LeftArrow;
+	} else if (moduleAt(point) >= 0) {
+		return ModulePart;
+	} else if (point.x() >= right && point.x() < right + Arrow) {
+		return RightArrow;
+	} else if (point.x() >= width() - Grip) {
+		return GripPart;
+	}
+	return None;
+}
+
 void Collar::applyGeometry() {
 	QScreen *screen = windowHandle()->screen();
 	if (screen) {
-		m_bottom = std::clamp(m_bottom, 0, std::max(0, screen->size().height() - Height - 22));
+		m_bottom = std::clamp(m_bottom, 0, std::max(0, screen->size().height() - Height - MenuBar));
 	}
-	setFixedSize(m_collapsed ? Cap : Cap + Scroll * 2 + Cell * m_visible + Tab, Height);
+	const int width = m_collapsed ? Closed : openWidth(visibleModules());
+	setFixedSize(width, Height);
 	QRegion shape;
+	const int grip = width - Grip;
+	shape += QRect(0, 0, grip, Height);
 	for (int y = 0; y < Height; ++y) {
-		const int left = y < 8 ? 8 - y : y > 15 ? y - 15 : 0;
-		shape += QRect(left, y, width() - left, 1);
+		shape += QRect(grip, y, int(strlen(GripArt[y])), 1);
 	}
 	setMask(shape);
 	if (auto *layer = LayerShellQt::Window::get(windowHandle())) {
@@ -110,8 +231,9 @@ void Collar::applyGeometry() {
 
 void Collar::save() {
 	m_settings.setValue("collapsed", m_collapsed);
-	m_settings.setValue("visible", m_visible);
-	m_settings.setValue("bottom", m_bottom);
+	m_settings.setValue("modules", m_wanted);
+	m_settings.setValue("offset", m_bottom);
+	m_settings.setValue("hidden", m_hidden);
 	m_settings.sync();
 	if (m_settings.status() != QSettings::NoError) {
 		qWarning("The Collar couldn't save its position and size.");
@@ -120,198 +242,137 @@ void Collar::save() {
 }
 
 void Collar::setCollapsed(bool collapsed) {
+	if (collapsed != m_collapsed) {
+		pl_sound_event(collapsed ? "window-collapse" : "window-expand");
+	}
 	m_collapsed = collapsed;
 	applyGeometry();
 	save();
 }
 
 void Collar::setVisibleModules(int count) {
-	m_visible = std::clamp(count, 1, int(ModuleCount));
-	m_first = std::min(m_first, int(ModuleCount) - m_visible);
+	const int total = m_modules.size();
+	count = std::clamp(count, 1, total);
+	m_wanted = count >= total ? 0 : count;
+	m_first = std::clamp(m_first, 0, total - visibleModules());
 	applyGeometry();
 	save();
 }
 
-static constexpr uint32_t CollarFace = RGB(0xC0, 0xC0, 0xC0);
-static constexpr uint32_t CollarShadow = RGB(0x80, 0x80, 0x80);
-
-static void menuArrow(pl_canvas *c, int x, int y) {
-	for (int i = 0; i < 4; ++i) {
-		pl_vline(c, x + i, y + i, y + 8 - i, C_BLACK);
+bool Collar::active(int index) const {
+	const Module &m = m_modules[index];
+	const auto &s = m_controls.state;
+	const CollarDisplay *d = m_displays.display(m.device);
+	switch (m.kind) {
+	case Volume: return !m_sound.outputs.isEmpty();
+	case SoundSet: return true;
+	case Network: return s.networkAvailable && s.wifi;
+	case Bluetooth: return !s.adapter.isEmpty() && s.bluetooth;
+	case Resolution: return d;
+	case Brightness: return d && d->brightness >= 0;
+	case Power: return s.powerError.isEmpty();
+	case Phone: return m_kdeConnect.device(m.device) || !m_kdeConnect.requests.isEmpty();
+	case Keychain: return !m_keychains.keychains.isEmpty();
 	}
-}
-
-static void scrollArrow(pl_canvas *c, int x, bool right, bool enabled) {
-	const uint32_t ink = enabled ? C_BLACK : CollarShadow;
-	static const char *const rows[] = {
-		"....#...", "...##...", "..#.#...", ".#..####", "#......#",
-		".#..####", "..#.#...", "...##...", "....#...",
-	};
-	for (int row = 0; row < 9; ++row) {
-		for (int column = 0; column < 8; ++column) {
-			if (rows[row][column] == '#') {
-				pl_put(c, x + (right ? 7 - column : column), 8 + row, ink);
-			}
-		}
-	}
-	pl_hline(c, x + 1, x + 6, 12, C_WHITE);
-}
-
-static void cellFrame(pl_canvas *c, int x, int width, bool inset) {
-	const int end = x + width - 1;
-	pl_fill(c, x, 0, end, Collar::Height - 1, CollarFace);
-	pl_outline(c, x, 0, end, Collar::Height - 1, C_BLACK);
-	pl_hline(c, x + 1, end - 1, 1, inset ? CollarShadow : C_WHITE);
-	pl_vline(c, x + 1, 1, Collar::Height - 2, inset ? CollarShadow : C_WHITE);
-	pl_hline(c, x + 2, end - 2, 2, inset ? CollarFace : GRAY(0xD));
-	pl_vline(c, x + 2, 2, Collar::Height - 3, inset ? CollarFace : GRAY(0xD));
-	pl_hline(c, x + 2, end - 2, Collar::Height - 3, inset ? CollarFace : GRAY(0x9));
-	pl_vline(c, end - 2, 2, Collar::Height - 3, inset ? CollarFace : GRAY(0x9));
-	pl_hline(c, x + 1, end - 1, Collar::Height - 2, inset ? C_WHITE : CollarShadow);
-	pl_vline(c, end - 1, 1, Collar::Height - 2, inset ? C_WHITE : CollarShadow);
-}
-
-static void grip(pl_canvas *c, bool collapsed) {
-	for (int y = 0; y < Collar::Height; ++y) {
-		const int left = y < 8 ? 8 - y : y > 15 ? y - 15 : 0;
-		pl_hline(c, left, Collar::Cap - 1, y, CollarFace);
-		pl_put(c, left, y, C_BLACK);
-		pl_put(c, Collar::Cap - 1, y, C_BLACK);
-		if (y == 0 || y == Collar::Height - 1) {
-			pl_hline(c, left, Collar::Cap - 1, y, C_BLACK);
-		} else if (y < 16) {
-			pl_put(c, left + 1, y, C_WHITE);
-		} else {
-			pl_put(c, left + 1, y, CollarShadow);
-		}
-	}
-	pl_hline(c, 8, Collar::Cap - 2, 1, C_WHITE);
-	pl_hline(c, 8, Collar::Cap - 2, Collar::Height - 2, CollarShadow);
-	pl_vline(c, Collar::Cap - 2, 2, Collar::Height - 3, CollarShadow);
-	for (int row = 0; row < 5; ++row) {
-		const int y = 4 + row * 3;
-		const int x = row % 2 ? 12 : 9;
-		pl_put(c, x, y, C_WHITE);
-		pl_put(c, x + 1, y + 1, CollarShadow);
-	}
-	pl_vline(c, 6, 7, 16, C_BLACK);
-	pl_vline(c, 5, 8, 15, C_WHITE);
-	pl_vline(c, 2, 9, 14, C_BLACK);
-	pl_put(c, 3, 8, C_BLACK);
-	pl_put(c, 4, 7, C_BLACK);
-	pl_put(c, 3, 15, C_BLACK);
-	pl_put(c, 4, 16, C_BLACK);
-	if (collapsed) {
-		menuArrow(c, 9, 8);
-	}
-}
-
-static void icon(pl_canvas *c, int module, int x, int y, bool on) {
-	const uint32_t ink = on ? C_BLACK : CollarShadow;
-	const uint32_t blue = on ? RGB(0x66, 0x66, 0xCC) : GRAY(0xA);
-	const uint32_t light = on ? RGB(0xCC, 0xCC, 0xFF) : GRAY(0xD);
-	const uint32_t gold = on ? RGB(0xEE, 0xBB, 0x33) : GRAY(0xB);
-	const uint32_t lineInk = module == Collar::Bluetooth ? (on ? C_WHITE : GRAY(0xD)) : ink;
-	auto line = [=](int x0, int y0, int x1, int y1) {
-		const int dx = std::abs(x1 - x0), dy = std::abs(y1 - y0);
-		const int n = std::max(dx, dy);
-		for (int i = 0; i <= n; ++i) {
-			pl_put(c, x + x0 + (n ? qRound((x1 - x0) * double(i) / n) : 0),
-				y + y0 + (n ? qRound((y1 - y0) * double(i) / n) : 0), lineInk);
-		}
-	};
-	if (module == Collar::Volume) {
-		for (int row = 0; row < 13; ++row) {
-			const int edge = row < 6 ? 8 - row : row > 8 ? row - 6 : 2;
-			pl_hline(c, x + edge, x + 8, y + 2 + row, blue);
-		}
-		pl_vline(c, x + 7, y + 3, y + 13, light);
-		pl_fill(c, x + 2, y + 7, x + 3, y + 9, light);
-		pl_outline(c, x + 1, y + 6, x + 4, y + 10, ink);
-		line(4, 6, 8, 2); line(8, 2, 8, 14); line(8, 14, 4, 10);
-		line(11, 5, 13, 7); line(13, 7, 13, 9); line(13, 9, 11, 11);
-		line(14, 2, 16, 5); line(16, 5, 16, 11); line(16, 11, 14, 14);
-	} else if (module == Collar::Network) {
-		pl_fill(c, x + 1, y + 2, x + 5, y + 5, light);
-		pl_fill(c, x + 11, y + 2, x + 15, y + 5, light);
-		pl_outline(c, x, y + 1, x + 6, y + 6, ink);
-		pl_outline(c, x + 10, y + 1, x + 16, y + 6, ink);
-		line(3, 6, 3, 11); line(13, 6, 13, 11); line(1, 11, 15, 11);
-		line(8, 11, 8, 15); line(5, 15, 11, 15);
-	} else if (module == Collar::Bluetooth) {
-		pl_fill(c, x + 1, y, x + 14, y + 16, blue);
-		pl_outline(c, x + 1, y, x + 14, y + 16, ink);
-		pl_vline(c, x + 2, y + 1, y + 15, light);
-		line(7, 1, 7, 15); line(7, 1, 12, 5); line(12, 5, 3, 13);
-		line(3, 3, 12, 11); line(12, 11, 7, 15);
-	} else if (module == Collar::Brightness) {
-		pl_outline(c, x + 5, y + 5, x + 11, y + 11, ink);
-		pl_fill(c, x + 6, y + 6, x + 10, y + 10, gold);
-		pl_hline(c, x + 6, x + 9, y + 6, C_WHITE);
-		line(8, 0, 8, 2); line(8, 14, 8, 16); line(0, 8, 2, 8); line(14, 8, 16, 8);
-		line(2, 2, 3, 3); line(13, 13, 14, 14); line(2, 14, 3, 13); line(13, 3, 14, 2);
-	} else {
-		pl_outline(c, x, y + 4, x + 14, y + 12, ink);
-		pl_fill(c, x + 15, y + 6, x + 16, y + 10, ink);
-		pl_fill(c, x + 2, y + 6, x + 11, y + 10, on ? RGB(0x66, 0x99, 0x55) : GRAY(0xA));
-		pl_hline(c, x + 2, x + 11, y + 6, on ? RGB(0xBB, 0xDD, 0x99) : GRAY(0xD));
-	}
+	return false;
 }
 
 void Collar::paintEvent(QPaintEvent *) {
 	Pixels px(width(), Height);
 	auto *c = &px.c;
-	grip(c, m_collapsed);
-	if (!m_collapsed) {
-		cellFrame(c, Cap, Scroll, true);
-		scrollArrow(c, Cap + 3, false, m_first > 0);
-		const auto &s = m_controls.state;
-		for (int i = m_first; i < m_first + m_visible; ++i) {
+	if (m_collapsed) {
+		for (int y = 0; y < Height; ++y) {
+			art(c, 0, y, GripArt[y]);
+		}
+	} else {
+		const int visible = visibleModules();
+		const int right = FirstModule + visible * (Cell + 1);
+		pl_hline(c, 0, right + Arrow, 0, C_BLACK);
+		pl_hline(c, 0, right + Arrow, Height - 1, C_BLACK);
+		for (int y = 0; y < Height; ++y) {
+			art(c, 0, y, CloseBoxArt[y]);
+		}
+		scrollButton(c, Close + 2, false, m_first > 0);
+		pl_vline(c, FirstModule - 1, 0, Height - 1, C_BLACK);
+		for (int i = m_first; i < m_first + visible; ++i) {
 			const QRect r = moduleRect(i);
-			const bool active = i == Volume ? !m_sound.outputs.isEmpty() :
-				i == Network ? s.networkAvailable : i == Bluetooth ? !s.adapter.isEmpty() :
-				i == Brightness ? !s.backlight.isEmpty() : s.powerError.isEmpty();
-			cellFrame(c, r.left(), Cell, m_pressed == i);
-			icon(c, i, r.left() + 4, 3, active);
-			menuArrow(c, r.left() + 24, 8);
-			if ((i == Bluetooth && !s.bluetooth) || (i == Network && !s.wifi)) {
-				pl_hline(c, r.left() + 4, r.left() + 20, 20, CollarShadow);
-			}
-			if (i == Volume) {
+			const Module &m = m_modules[i];
+			const bool on = active(i);
+			cell(c, r.left(), Cell, m_pressed == i);
+			pl_vline(c, r.right() + 1, 0, Height - 1, C_BLACK);
+			const PhoneDevice *phone = m.kind == Phone ? m_kdeConnect.device(m.device) : nullptr;
+			const KeychainInfo *keychain = m.kind == Keychain ? m_keychains.defaultKeychain() : nullptr;
+			icon(c, m.kind, r.left() + 2, 4, on, phone ? phone->charge : keychain ? !keychain->locked : -1);
+			menuArrow(c, r.left() + 22);
+			if (m.kind == Volume) {
 				for (const SoundOutput &output : m_sound.outputs) {
 					if (output.current && output.muted) {
-						pl_hline(c, r.left() + 4, r.left() + 20, 20, C_BLACK);
+						const QRect waves(r.left() + 12, 6, 5, 13);
+						pl_fill(c, waves.left(), waves.top(), waves.right(), waves.bottom(), Face);
+						for (int k = 0; k < 5; ++k) {
+							pl_put(c, waves.left() + k, 10 + k, C_BLACK);
+							pl_put(c, waves.right() - k, 10 + k, C_BLACK);
+						}
 					}
 				}
 			}
-			if (i == Power && s.batteryPresent) {
+			if (m.kind == Power && m_controls.state.batteryPresent) {
+				const auto &s = m_controls.state;
 				const int fill = qRound(10 * s.batteryPercent / 100);
-				pl_fill(c, r.left() + 6, 9, r.left() + 15, 13, CollarFace);
+				pl_fill(c, r.left() + 4, 10, r.left() + 13, 13, Face);
 				if (fill) {
-					pl_fill(c, r.left() + 6, 9, r.left() + 5 + fill, 13,
+					pl_fill(c, r.left() + 4, 10, r.left() + 3 + fill, 13,
 						s.batteryPercent < 15 ? RGB(0xAA, 0x22, 0x22) : RGB(0x66, 0x99, 0x55));
 				}
 			}
 			if (hasFocus() && m_focus == i) {
-				for (int x = r.left() + 3; x < r.right() - 2; x += 2) {
-					pl_put(c, x, Height - 5, C_BLACK);
+				for (int x = r.left() + 2; x < r.left() + 20; x += 2) {
+					pl_put(c, x, Height - 4, C_BLACK);
 				}
 			}
 		}
-		const int end = Cap + Scroll + Cell * m_visible;
-		cellFrame(c, end, Scroll, true);
-		scrollArrow(c, end + 3, true, m_first + m_visible < ModuleCount);
-		cellFrame(c, end + Scroll, Tab, false);
-		pl_outline(c, end + Scroll + 3, 8, end + Scroll + 10, 15, C_WHITE);
-		pl_outline(c, end + Scroll + 4, 9, end + Scroll + 9, 14, CollarShadow);
+		scrollButton(c, right, true, m_first + visible < m_modules.size());
+		for (int y = 0; y < Height; ++y) {
+			art(c, width() - Grip, y, GripArt[y]);
+		}
 	}
 	QPainter painter(this);
 	px.blit(painter);
 }
 
-QString Collar::description(int module) const {
+QString Collar::menuLabel(int index) const {
+	const Module &m = m_modules.value(index, { Volume, {} });
+	switch (m.kind) {
+	case Volume: return "Sound";
+	case SoundSet: return "Sound Set";
+	case Network: return "Network";
+	case Bluetooth: return "Bluetooth";
+	case Resolution:
+	case Brightness: return m.device.isEmpty() ? QString("Display") : m_displays.label(m.device);
+	case Power: return "Power";
+	case Phone:
+		if (const PhoneDevice *phone = m_kdeConnect.device(m.device)) {
+			return phone->name;
+		}
+		return "KDE Connect";
+	case Keychain: return "Keychain";
+	}
+	return "The Collar";
+}
+
+static QString currentSoundSet() {
+	char id[256];
+	return pl_setting("sound-theme", id, sizeof(id)) && *id ? QString::fromUtf8(id) : QString("none");
+}
+
+QString Collar::description(int index) const {
+	if (index < 0 || index >= m_modules.size()) {
+		return "The Collar";
+	}
+	const Module &m = m_modules[index];
 	const auto &s = m_controls.state;
-	switch (module) {
+	const CollarDisplay *d = m_displays.display(m.device);
+	switch (m.kind) {
 	case Volume:
 		for (const auto &o : m_sound.outputs) {
 			if (o.current) {
@@ -319,6 +380,13 @@ QString Collar::description(int module) const {
 			}
 		}
 		return m_soundError.isEmpty() ? "No sound output available" : m_soundError;
+	case SoundSet:
+		for (int i = 0; i < soundThemeCount(); ++i) {
+			if (soundThemeId(i) == currentSoundSet()) {
+				return "Sound set: " + soundThemeName(i);
+			}
+		}
+		return "Sound set: None";
 	case Network:
 		if (!s.networkAvailable) {
 			return s.networkError;
@@ -335,16 +403,40 @@ QString Collar::description(int module) const {
 		}
 	case Bluetooth:
 		return s.adapter.isEmpty() ? s.bluetoothError : s.bluetooth ? "Bluetooth on" : "Bluetooth off";
+	case Resolution:
+		return d ? QString("%1: %2 × %3").arg(menuLabel(index)).arg(d->size.width()).arg(d->size.height())
+			: QString("No display information is available.");
 	case Brightness:
-		return s.brightness < 0 ? s.brightnessError : QString("Brightness: %1%").arg(s.brightness);
+		if (!d) {
+			return "No display information is available.";
+		}
+		return menuLabel(index) + ": " +
+			(d->brightness < 0 ? d->brightnessError : QString("Brightness %1%").arg(d->brightness));
 	case Power:
 		if (!s.powerError.isEmpty()) {
 			return s.powerError;
 		}
 		return s.batteryPresent ? QString("Battery: %1%").arg(qRound(s.batteryPercent)) : "AC power (no battery)";
-	default:
-		return "The Collar";
+	case Phone: {
+		const PhoneDevice *phone = m_kdeConnect.device(m.device);
+		if (!m_kdeConnect.requests.isEmpty() && !phone) {
+			return QString("KDE Connect: %1 wants to pair").arg(m_kdeConnect.requests.first().name);
+		}
+		if (!phone) {
+			return "KDE Connect: no devices connected";
+		}
+		if (phone->charge < 0) {
+			return phone->name + ": connected";
+		}
+		return QString("%1: battery %2%%3").arg(phone->name).arg(phone->charge).arg(phone->charging ? " (charging)" : "");
 	}
+	case Keychain:
+		if (const KeychainInfo *k = m_keychains.defaultKeychain()) {
+			return QString("Keychain “%1” is %2").arg(k->name, k->locked ? "locked" : "unlocked");
+		}
+		return m_keychains.keychains.isEmpty() ? "No keychains" : "No default keychain";
+	}
+	return "The Collar";
 }
 
 void Collar::launch(const QString &program, const QStringList &args) {
@@ -354,26 +446,200 @@ void Collar::launch(const QString &program, const QStringList &args) {
 	}
 }
 
-void Collar::openModule(int module) {
-	if (moduleRect(module).isEmpty()) {
-		m_first = std::clamp(module - m_visible + 1, 0, int(ModuleCount) - m_visible);
-		applyGeometry();
+Collar::Visibility Collar::visibilitySetting() {
+	char value[16];
+	if (pl_setting("collar-visibility", value, sizeof(value))) {
+		if (!strcmp(value, "hide")) {
+			return Hide;
+		}
+		if (!strcmp(value, "hotkey")) {
+			return HotKey;
+		}
 	}
-	m_pressed = module;
-	update();
-	std::vector<PopupItem> items;
-	std::vector<std::function<void()>> actions;
-	int checked = -1;
+	return Show;
+}
+
+pl_font Collar::menuFont() {
+	char value[16];
+	return pl_setting("collar-menu-font", value, sizeof(value)) && !strcmp(value, "views") ? PL_FONT_VIEWS
+		: PL_FONT_SYSTEM;
+}
+
+void Collar::applySettings() {
+	m_applied = true;
+	m_visibility = visibilitySetting();
+	const bool shown = m_visibility == Show || (m_visibility == HotKey && !m_hidden);
+	if (shown == isVisible()) {
+		return;
+	}
+	if (!shown) {
+		if (QWidget *menu = QApplication::activePopupWidget()) {
+			menu->close();
+		}
+		hide();
+		return;
+	}
+	show();
+	applyGeometry();
+}
+
+void Collar::toggle() {
+	/* The hot key can beat the file watcher to a just-changed setting. */
+	m_visibility = visibilitySetting();
+	if (m_visibility != HotKey) {
+		return;
+	}
+	m_hidden = !m_hidden;
+	pl_sound_event(m_hidden ? "window-collapse" : "window-expand");
+	save();
+	applySettings();
+}
+
+void Collar::addPhoneItems(const QString &id, std::vector<PopupItem> &items,
+		std::vector<std::function<void()>> &actions) {
 	auto add = [&](const QString &label, bool enabled, std::function<void()> action = {}) {
 		items.emplace_back(label, enabled);
 		actions.push_back(std::move(action));
 	};
 	auto separator = [&] { items.emplace_back(QString(), false, true); actions.emplace_back(); };
+	if (const PhoneDevice *phone = m_kdeConnect.device(id)) {
+		const PhoneDevice d = *phone;
+		if (d.charge >= 0) {
+			add(QString("Battery: %1%%2").arg(d.charge).arg(d.charging ? " (charging)" : ""), false);
+		}
+		if (d.signal >= 0) {
+			add(QString("Signal: %1 of 4 bars%2").arg(d.signal).arg(d.network.isEmpty() ? QString() : " (" + d.network + ")"),
+				false);
+		}
+		if (d.charge >= 0 || d.signal >= 0) {
+			separator();
+		}
+		if (d.has("sftp")) {
+			add("Browse Device", true, [this, id] { m_kdeConnect.browse(id); });
+		}
+		if (d.has("clipboard")) {
+			add("Send Clipboard", true, [this, id] { m_kdeConnect.sendClipboard(id); });
+		}
+		if (d.has("findmyphone")) {
+			add("Ring Device", true, [this, id] { m_kdeConnect.ring(id); });
+		}
+		if (d.has("share")) {
+			add("Send Files...", true, [this, id, name = d.name] {
+				const QList<QUrl> urls = QFileDialog::getOpenFileUrls(nullptr, "Send Files to " + name);
+				QStringList list;
+				for (const QUrl &url : urls) {
+					list << url.toString();
+				}
+				if (!list.isEmpty()) {
+					m_kdeConnect.shareFiles(id, list);
+				}
+			});
+		}
+		const QString sms = kdeConnectProgram("kdeconnect-sms");
+		if (d.has("sms") && !sms.isEmpty()) {
+			add("SMS Messages...", true, [this, sms, id] { launch(sms, { "--device", id }); });
+		}
+		if (d.has("ping")) {
+			add("Send Ping", true, [this, id] { m_kdeConnect.ping(id); });
+		}
+		if (d.has("remotecommands")) {
+			separator();
+			add("Run Command", false);
+			for (const auto &[key, name] : d.commands) {
+				add("  " + name, true, [this, id, key = key] { m_kdeConnect.runCommand(id, key); });
+			}
+			add("Add Commands...", true, [this, id] { m_kdeConnect.editCommands(id); });
+		}
+	} else {
+		add("No devices connected", false);
+	}
+	if (!m_kdeConnect.requests.isEmpty()) {
+		separator();
+		for (const PhoneDevice &request : m_kdeConnect.requests) {
+			const QString requestId = request.id;
+			add(request.name + " wants to pair", false);
+			add("Pair with " + request.name, true, [this, requestId] { m_kdeConnect.acceptPairing(requestId); });
+			add("Reject " + request.name, true, [this, requestId] { m_kdeConnect.rejectPairing(requestId); });
+		}
+	}
+	separator();
+	QString settings = kdeConnectProgram("kdeconnect-settings");
+	if (settings.isEmpty()) {
+		settings = kdeConnectProgram("kdeconnect-app");
+	}
+	add("KDE Connect Settings...", !settings.isEmpty(), [this, settings] { launch(settings); });
+}
+
+void Collar::addKeychainItems(std::vector<PopupItem> &items, std::vector<std::function<void()>> &actions,
+		int &checked) {
+	auto add = [&](const QString &label, bool enabled, std::function<void()> action = {}) {
+		items.emplace_back(label, enabled);
+		actions.push_back(std::move(action));
+	};
+	auto separator = [&] { items.emplace_back(QString(), false, true); actions.emplace_back(); };
+	if (m_keychains.keychains.isEmpty()) {
+		add("No keychains", false);
+	}
+	// Picking a keychain makes it the default, where apps keep new passwords.
+	for (const KeychainInfo &k : m_keychains.keychains) {
+		const QString path = k.path;
+		if (path == m_keychains.defaultPath) {
+			checked = static_cast<int>(items.size());
+		}
+		add(k.locked ? k.name + " (locked)" : k.name, true,
+			[this, path] { m_keychains.setDefault(path); });
+	}
+	if (!m_keychains.keychains.isEmpty()) {
+		separator();
+		for (const KeychainInfo &k : m_keychains.keychains) {
+			const QString path = k.path;
+			if (k.locked) {
+				add(QString("Unlock “%1”...").arg(k.name), true, [this, path] { m_keychains.unlock(path); });
+			} else {
+				add(QString("Lock “%1”").arg(k.name), true, [this, path] { m_keychains.lock(path); });
+			}
+		}
+		const bool anyUnlocked = std::any_of(m_keychains.keychains.cbegin(), m_keychains.keychains.cend(),
+			[](const KeychainInfo &k) { return !k.locked; });
+		add("Lock All Keychains", anyUnlocked, [this] { m_keychains.lockAll(); });
+	}
+	const QString access = QStandardPaths::findExecutable("seahorse");
+	if (!access.isEmpty()) {
+		separator();
+		add("Keychain Access...", true, [this, access] { launch(access); });
+	}
+}
+
+void Collar::openModule(int index) {
+	if (index < 0 || index >= m_modules.size()) {
+		return;
+	}
+	if (moduleRect(index).isEmpty()) {
+		m_first = std::clamp(index - visibleModules() + 1, 0, int(m_modules.size()) - visibleModules());
+		applyGeometry();
+	}
+	m_pressed = index;
+	update();
+	const Module module = m_modules[index];
+	std::vector<PopupItem> items;
+	std::vector<std::function<void()>> actions;
+	int checked = -1;
+	// A long list (sound sets, display modes) is trimmed to fit the screen, with "More..." after it.
+	int listStart = -1, listEnd = -1;
+	QString more;
+	std::function<void()> moreAction;
+	auto add = [&](const QString &label, bool enabled, std::function<void()> action = {}) {
+		items.emplace_back(label, enabled);
+		actions.push_back(std::move(action));
+	};
+	auto separator = [&] { items.emplace_back(QString(), false, true); actions.emplace_back(); };
+	// Modules can repeat (one per display), so every menu names its device first.
+	add(menuLabel(index), false);
+	separator();
 	const auto s = m_controls.state;
 	const bool enabled = !m_controls.updating();
-	if (module == Volume) {
-		add("Open Sound Control Panel", true, [this] { launch("zacos9-controlpanel", { "sound" }); });
-		separator();
+	const CollarDisplay *display = m_displays.display(module.device);
+	if (module.kind == Volume) {
 		auto it = std::find_if(m_sound.outputs.cbegin(), m_sound.outputs.cend(),
 			[](const SoundOutput &output) { return output.current; });
 		if (it != m_sound.outputs.cend()) {
@@ -396,34 +662,81 @@ void Collar::openModule(int module) {
 					[this, target] { m_sound.selectOutput(target); });
 			}
 		} else {
-			add(description(Volume), false);
+			add(description(index), false);
 		}
-	} else if (module == Network) {
-		add("Open TCP/IP Control Panel", true, [this] { launch("zacos9-tcpip"); });
 		separator();
-		add(description(Network), false);
+		add("Open Sound Control Panel", true, [this] { launch("zacos9-controlpanel", { "sound" }); });
+	} else if (module.kind == SoundSet) {
+		const QString current = currentSoundSet();
+		listStart = static_cast<int>(items.size());
+		for (int i = 0; i < soundThemeCount(); ++i) {
+			if (soundThemeId(i) == current) {
+				checked = static_cast<int>(items.size());
+			}
+			add(soundThemeName(i), true, [this, i] {
+				QString error;
+				if (!applySoundTheme(i, &error)) {
+					Alert::ask(error, "OK", {});
+				}
+				update();
+			});
+		}
+		listEnd = static_cast<int>(items.size());
+		more = "More Sound Sets...";
+		moreAction = [this] { launch("zacos9-appearance", { "sound" }); };
+		separator();
+		add("Open Appearance Control Panel", true, moreAction);
+	} else if (module.kind == Network) {
+		add(description(index), false);
 		add(s.wifi ? "Turn Wi-Fi Off" : "Turn Wi-Fi On", enabled && s.networkAvailable,
 			[this, s] { m_controls.setWifi(!s.wifi); });
 		add("Network Browser...", true, [this] { launch("zacos9-netbrowser"); });
-	} else if (module == Bluetooth) {
-		add("Open Bluetooth Control Panel", true, [this] { launch("zacos9-bluetooth"); });
 		separator();
-		add(description(Bluetooth), false);
+		add("Open TCP/IP Control Panel", true, [this] { launch("zacos9-tcpip"); });
+	} else if (module.kind == Bluetooth) {
+		add(description(index), false);
 		add(s.bluetooth ? "Turn Bluetooth Off" : "Turn Bluetooth On", enabled && !s.adapter.isEmpty(),
 			[this, s] { m_controls.setBluetooth(!s.bluetooth); });
-	} else if (module == Brightness) {
-		add("Open Monitors Control Panel", true, [this] { launch("zacos9-controlpanel", { "monitors" }); });
 		separator();
-		add(description(Brightness), false);
+		add("Open Bluetooth Control Panel", true, [this] { launch("zacos9-bluetooth"); });
+	} else if (module.kind == Resolution) {
+		if (display) {
+			const QString name = display->name;
+			listStart = static_cast<int>(items.size());
+			for (const QSize &size : display->modes) {
+				if (size == display->size) {
+					checked = static_cast<int>(items.size());
+				}
+				add(QString("%1 × %2").arg(size.width()).arg(size.height()), true, [this, name, size] {
+					QString error;
+					if (!m_displays.setResolution(name, size, &error)) {
+						Alert::ask(error, "OK", {});
+					}
+				});
+			}
+			listEnd = static_cast<int>(items.size());
+			more = "More Resolutions...";
+			moreAction = [this] { launch("zacos9-controlpanel", { "monitors" }); };
+		} else {
+			add(description(index), false);
+		}
+		separator();
+		add("Open Monitors Control Panel", true, [this] { launch("zacos9-controlpanel", { "monitors" }); });
+	} else if (module.kind == Brightness) {
+		const bool ready = display && display->brightness >= 0 && !m_displays.busy(display->name);
+		add(display && display->brightness >= 0 ? QString("Brightness: %1%").arg(display->brightness)
+			: display ? display->brightnessError : description(index), false);
+		const QString name = module.device;
 		for (int percent : { 10, 25, 50, 75, 100 }) {
-			if (s.brightness == percent) {
+			if (display && std::abs(display->brightness - percent) <= 6) {
 				checked = static_cast<int>(items.size());
 			}
-			add(QString("%1%").arg(percent), enabled && !s.backlight.isEmpty(),
-				[this, percent] { m_controls.setBrightness(percent); });
+			add(QString("%1%").arg(percent), ready, [this, name, percent] { m_displays.setBrightness(name, percent); });
 		}
-	} else if (module == Power) {
-		add(description(Power), false);
+		separator();
+		add("Open Monitors Control Panel", true, [this] { launch("zacos9-controlpanel", { "monitors" }); });
+	} else if (module.kind == Power) {
+		add(description(index), false);
 		if (s.batteryPresent) {
 			const QStringList states = { "Battery status unknown", "Charging", "On battery", "Battery empty",
 				"Fully charged", "Waiting to charge", "Waiting to discharge" };
@@ -438,11 +751,46 @@ void Collar::openModule(int module) {
 				m_controls.suspend();
 			}
 		});
+	} else if (module.kind == Phone) {
+		addPhoneItems(module.device, items, actions);
+	} else if (module.kind == Keychain) {
+		addKeychainItems(items, actions, checked);
 	}
-	panelMenuAbove(this, items, checked, moduleRect(module), [actions](int index) {
-		if (index >= 0 && index < static_cast<int>(actions.size()) && actions[index]) {
+	int room = INT_MAX, below = 0;
+	if (QScreen *screen = windowHandle()->screen()) {
+		room = screen->size().height() - m_bottom - Height - MenuBar;
+		below = m_bottom;
+	}
+	auto menuHeight = [&] {
+		int h = 2 + MENU_SHADOW;
+		for (const PopupItem &item : items) {
+			h += item.separator ? MENU_SEP_H : MENU_ITEM_H;
+		}
+		return h;
+	};
+	const int fit = std::max(room, below);
+	if (listEnd > listStart && listStart >= 0 && menuHeight() > fit) {
+		const int count = listEnd - listStart;
+		const int keep = std::clamp((fit - (menuHeight() - count * MENU_ITEM_H) - MENU_ITEM_H) / MENU_ITEM_H, 1, count);
+		const int focus = checked >= listStart && checked < listEnd ? checked - listStart : 0;
+		const int first = std::clamp(focus - keep / 2, 0, count - keep);
+		const auto trim = [&](auto &list) {
+			list.erase(list.begin() + listStart + first + keep, list.begin() + listEnd);
+			list.erase(list.begin() + listStart, list.begin() + listStart + first);
+		};
+		trim(items);
+		trim(actions);
+		if (checked >= listStart) {
+			checked = checked < listEnd ? checked - first : -1;
+		}
+		items.insert(items.begin() + listStart + keep, PopupItem(more));
+		actions.insert(actions.begin() + listStart + keep, moreAction);
+	}
+	panelMenuNear(this, items, checked, moduleRect(index), room, menuFont(), [actions](int chosen) {
+		if (chosen >= 0 && chosen < static_cast<int>(actions.size()) && actions[chosen]) {
+			// After the action, so choosing a sound set is heard in the new set.
+			actions[chosen]();
 			pl_sound_event("menu-command");
-			actions[index]();
 		}
 	}, [this] { m_pressed = -1; update(); });
 }
@@ -454,86 +802,136 @@ void Collar::mousePressEvent(QMouseEvent *event) {
 	m_start = event->globalPosition().toPoint();
 	m_pressPoint = event->position().toPoint();
 	m_startBottom = m_bottom;
-	m_startVisible = m_visible;
+	m_startVisible = visibleModules();
 	m_dragged = false;
-	m_moving = event->modifiers().testFlag(Qt::AltModifier);
-	m_resizing = !m_moving && !m_collapsed && event->position().x() >= width() - Tab;
-	if (m_moving || m_resizing) {
-		setCursor(m_moving ? Qt::ClosedHandCursor : Qt::SizeHorCursor);
+	m_part = partAt(m_pressPoint);
+	// ⌘ arrives as Control: the compositor maps the Command (logo) key for Qt clients.
+	m_moving = m_part != None && (event->modifiers() & (Qt::ControlModifier | Qt::MetaModifier));
+	if (m_moving) {
+		setCursor(Qt::SizeVerCursor);
 		return;
 	}
-	const QPoint point = event->position().toPoint();
-	m_pressed = moduleAt(point);
-	update();
-	if (m_pressed >= 0) {
+	m_resizing = m_part == GripPart && !m_collapsed;
+	if (m_resizing) {
+		setCursor(Qt::SizeHorCursor);
+		return;
+	}
+	if (m_part == ModulePart) {
+		m_pressed = moduleAt(m_pressPoint);
 		m_focus = m_pressed;
 		openModule(m_pressed);
 	}
 }
 
+void Collar::stopMoving(bool cancel) {
+	if (!m_moving) {
+		return;
+	}
+	m_moving = false;
+	m_part = None;
+	unsetCursor();
+	if (m_dragSound) {
+		m_dragSound = false;
+		pl_sound_loop_stop();
+		pl_sound_event("window-drag-end");
+	}
+	if (cancel) {
+		m_bottom = m_startBottom;
+		applyGeometry();
+	} else if (m_dragged) {
+		save();
+	}
+}
+
 void Collar::mouseMoveEvent(QMouseEvent *event) {
 	const QPoint delta = event->globalPosition().toPoint() - m_start;
-	if (m_moving || m_resizing) {
-		m_dragged |= delta.manhattanLength() >= QApplication::startDragDistance();
-		if (m_moving && m_dragged) {
-			m_bottom = m_startBottom - delta.y();
-			applyGeometry();
-		} else if (m_resizing && m_dragged) {
-			m_visible = std::clamp(m_startVisible + qRound(delta.x() / double(Cell)), 1, int(ModuleCount));
-			m_first = std::min(m_first, int(ModuleCount) - m_visible);
+	if (m_moving) {
+		if (!m_dragged && std::abs(delta.y()) >= QApplication::startDragDistance()) {
+			m_dragged = true;
+			m_dragSound = true;
+			pl_sound_loop_start("window-drag");
+		}
+		if (m_dragged) {
+			m_bottom = std::max(0, m_startBottom - delta.y());
 			applyGeometry();
 		}
 		return;
 	}
-	const int module = moduleAt(event->position().toPoint());
-	setToolTip(module >= 0 ? description(module) : "The Collar: click the tab to fold; Alt-drag to move.");
+	if (m_resizing) {
+		m_dragged |= std::abs(delta.x()) >= QApplication::startDragDistance();
+		if (m_dragged) {
+			setVisibleModules(m_startVisible + qRound(delta.x() / double(Cell + 1)));
+		}
+		return;
+	}
+	const QPoint point = event->position().toPoint();
+	const Part part = partAt(point);
+	setToolTip(part == ModulePart ? description(moduleAt(point))
+		: part == GripPart ? (m_collapsed ? "Click to open The Collar. ⌘-drag to move it up or down."
+			: "Click to close The Collar; drag to show more or fewer modules. ⌘-drag to move it.")
+		: part == CloseBox ? "Close The Collar"
+		: QString());
 }
 
 void Collar::mouseReleaseEvent(QMouseEvent *event) {
 	if (event->button() != Qt::LeftButton) {
 		return;
 	}
-	if (m_moving || m_resizing) {
-		const bool fold = m_resizing && !m_dragged;
-		m_moving = m_resizing = false;
+	if (m_moving) {
+		stopMoving(false);
+		return;
+	}
+	if (m_resizing) {
+		m_resizing = false;
 		unsetCursor();
-		if (fold) {
+		if (!m_dragged) {
 			setCollapsed(true);
-		} else {
-			save();
 		}
 		return;
 	}
 	if (m_pressed >= 0 && QApplication::activePopupWidget()) {
 		return;
 	}
-	const QPoint point = event->position().toPoint();
+	const Part pressed = m_part;
+	m_part = None;
 	m_pressed = -1;
 	update();
-	if (!rect().contains(point)) {
+	if (pressed == None || partAt(event->position().toPoint()) != pressed) {
 		return;
 	}
-	if ((m_collapsed || point.x() < Cap) && (m_collapsed || m_pressPoint.x() < Cap)) {
-		setCollapsed(!m_collapsed);
-	} else if (point.x() >= Cap && point.x() < Cap + Scroll &&
-			m_pressPoint.x() >= Cap && m_pressPoint.x() < Cap + Scroll) {
-		m_first = std::max(0, m_first - 1);
+	if (pressed == GripPart && m_collapsed) {
+		setCollapsed(false);
+	} else if (pressed == CloseBox) {
+		setCollapsed(true);
+	} else if (pressed == LeftArrow && m_first > 0) {
+		--m_first;
 		update();
-	} else if (point.x() >= width() - Tab - Scroll && m_pressPoint.x() >= width() - Tab - Scroll) {
-		m_first = std::min(int(ModuleCount) - m_visible, m_first + 1);
+	} else if (pressed == RightArrow && m_first + visibleModules() < m_modules.size()) {
+		++m_first;
 		update();
 	}
 }
 
+void Collar::hideEvent(QHideEvent *event) {
+	stopMoving(true);
+	QWidget::hideEvent(event);
+}
+
 void Collar::keyPressEvent(QKeyEvent *event) {
 	if (event->key() == Qt::Key_Escape) {
-		setCollapsed(true);
+		if (m_moving) {
+			stopMoving(true);
+		} else {
+			setCollapsed(true);
+		}
 	} else if (event->key() == Qt::Key_Left || event->key() == Qt::Key_Right) {
 		if (m_collapsed) {
 			setCollapsed(false);
 		}
-		m_focus = std::clamp(m_focus + (event->key() == Qt::Key_Right ? 1 : -1), 0, int(ModuleCount) - 1);
-		m_first = std::clamp(m_first, std::max(0, m_focus - m_visible + 1), std::min(m_focus, int(ModuleCount) - m_visible));
+		const int count = m_modules.size();
+		m_focus = std::clamp(m_focus + (event->key() == Qt::Key_Right ? 1 : -1), 0, count - 1);
+		m_first = std::clamp(m_first, std::max(0, m_focus - visibleModules() + 1),
+			std::min(m_focus, count - visibleModules()));
 		update();
 	} else if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter || event->key() == Qt::Key_Space) {
 		if (m_collapsed) {

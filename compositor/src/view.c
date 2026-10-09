@@ -155,14 +155,15 @@ struct wlr_box view_default_frame_in(struct wlr_box area) {
 }
 
 /* Other programs' main windows open almost full-screen, leaving a strip of
- * desktop on every side so the disk icons stay in view. The Finder sizes
- * its own windows, and dialogs and fixed-size windows keep theirs. */
+ * desktop on every side so the disk icons stay in view. The Finder and
+ * Picture Viewer (fitted to its picture) size their own windows, and dialogs
+ * and fixed-size windows keep theirs. */
 bool view_default_frame(struct plat_view *view, const char *app_id,
 		struct wlr_box *frame, int *content_w, int *content_h) {
 	struct wlr_surface *surface = view->impl->get_surface(view);
 	int hx, hy;
 	if (view->fullscreen || view->impl->has_parent(view) || !view_resizable(view) ||
-			(app_id && strcmp(app_id, "zacos9-finder") == 0) ||
+			(app_id && (strcmp(app_id, "zacos9-finder") == 0 || strcmp(app_id, "zacos9-picture") == 0)) ||
 			platinum_shell_style_for(surface) >= 0 ||
 			platinum_shell_position_for(surface, &hx, &hy)) {
 		return false;

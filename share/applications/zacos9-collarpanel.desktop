@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Collar
+Comment=Show or hide the Collar, its hot key and its menu font
+Exec=zacos9-collarpanel
+Categories=Settings;DesktopSettings;
+OnlyShowIn=ZacOS9;
