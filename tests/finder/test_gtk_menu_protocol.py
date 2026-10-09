@@ -31,6 +31,7 @@ with tempfile.TemporaryDirectory(prefix="zacos9-gtk-menus-") as temporary:
         "WAYLAND_DISPLAY": "wayland-0", "GDK_BACKEND": "wayland",
         "WLR_BACKENDS": "headless", "WLR_RENDERER": "pixman", "WLR_HEADLESS_OUTPUTS": "1",
         "ZACOS9_FINDER": "", "ZACOS9_MENUBAR": "", "ZACOS9_STARTUP": "0",
+        "ZACOS9_COLLAR": "",
         "GTK_MODULES": module, "UBUNTU_MENUPROXY": "1",
         "GSETTINGS_BACKEND": "memory",
         "GIO_USE_VFS": "local",

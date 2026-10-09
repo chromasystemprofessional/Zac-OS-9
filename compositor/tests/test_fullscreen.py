@@ -11,6 +11,7 @@ with tempfile.TemporaryDirectory(prefix="zacos9-fullscreen-") as directory:
     env = dict(os.environ, XDG_RUNTIME_DIR=directory, XDG_CONFIG_HOME=directory,
                WLR_BACKENDS="headless", WLR_RENDERER="pixman", WLR_HEADLESS_OUTPUTS="2",
                ZACOS9_STARTUP="0", ZACOS9_MENUBAR="", ZACOS9_FINDER="",
+               ZACOS9_COLLAR="",
                QT_QPA_PLATFORM="wayland", QT_STYLE_OVERRIDE="", QT_WAYLAND_DISABLE_WINDOWDECORATION="1")
     env.pop("WAYLAND_DISPLAY", None)
     # The compositor provides its private Xwayland display to the X11 probe.

@@ -22,6 +22,7 @@ public:
 	bool switching = false;
 	std::function<void()> changed;
 	std::function<void(const QString &)> failed;
+	std::function<void(const QString &)> commandFailed;
 	std::function<void()> volumeApplied;
 
 	void refresh();
@@ -35,7 +36,7 @@ private:
 	unsigned m_generation = 0;
 	unsigned m_volumeGeneration = 0;
 	void run(const QStringList &args, Done done);
-	void report(const QString &error);
+	void report(const QString &error, bool command = false);
 	void finishSwitch(const QString &error);
 	void movePlayback(const QString &sink, QStringList inputs);
 	void makeDefault(const QString &sink);

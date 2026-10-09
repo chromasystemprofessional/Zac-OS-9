@@ -329,6 +329,8 @@ void view_min_frame_size(struct plat_view *view, int *w, int *h);
 
 /* xdg.c */
 void xdg_init(struct plat_server *server);
+void xdg_attach_popup(struct plat_server *server, struct wlr_xdg_popup *popup,
+	struct wlr_scene_tree *parent_tree);
 
 /* platinum_shell.c: window style hints from Platinum's own programs */
 void platinum_shell_init(struct plat_server *server);

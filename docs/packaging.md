@@ -11,7 +11,8 @@ scripts/build-debs.sh --emulators   # and zacos9-emulators_*.deb
 ```
 
 - **zacos9** is the desktop:
-  - `zacos9-wm`, the menu bar, the Finder, the control panels and `zacos9-classic`;
+  - `zacos9-wm`, the menu bar, the Finder, [The Collar](collar.md),
+    the control panels and `zacos9-classic`;
   - the fonts, icons, patterns, cursors and sounds;
   - a **ZacOS 9** session in `/usr/share/wayland-sessions`.
 
@@ -30,7 +31,9 @@ The package is built from what `git add -A` would commit. That means the tracked
 files plus any new ones, minus everything `.gitignore` excludes. Build output
 and the Apple files in `macos/` and `uploads/` can never get into a package.
 
-The package build runs the unit tests. Without the HIG figures
+The package build runs the unit tests serially: desktop integration tests
+share gvfs, compositor and package-manager resources and must not contend
+with one another. Compilation remains parallel. Without the HIG figures
 (`tools/measure/figs`), the pixel tests are skipped.
 
 To install the packages on a Debian 13 machine:
@@ -82,7 +85,7 @@ The live system includes:
 
 - **Login.** greetd with tuigreet (`iso/config/includes.chroot/etc/greetd`).
 - **Session.** Xwayland, foot, PipeWire and NetworkManager (set up in the
-  TCP/IP control panel).
+  TCP/IP control panel), and UPower for The Collar's battery status.
 - **Firmware.** Debian's `non-free-firmware`, so that real hardware works.
 
 **Live.** The ISO starts straight into ZacOS 9 as the user `user`. There

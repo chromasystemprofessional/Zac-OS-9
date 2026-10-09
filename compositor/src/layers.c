@@ -145,7 +145,7 @@ static void handle_commit(struct wl_listener *listener, void *data) {
 static void handle_new_popup(struct wl_listener *listener, void *data) {
 	struct plat_layer_surface *ls = wl_container_of(listener, ls, new_popup);
 	struct wlr_xdg_popup *popup = data;
-	popup->base->data = wlr_scene_xdg_surface_create(ls->popup_tree, popup->base);
+	xdg_attach_popup(ls->server, popup, ls->popup_tree);
 }
 
 static void handle_destroy(struct wl_listener *listener, void *data) {

@@ -185,6 +185,10 @@ struct PanelPopup {
 
 constexpr int PANEL_WELL_W = 36, PANEL_ARROWS_W = 22;
 
+/* A command menu above a compact control, using the same Platinum painter. */
+void panelMenuAbove(QWidget *owner, const std::vector<PopupItem> &items, int checked,
+	const QRect &anchor, std::function<void(int)> chosen, std::function<void()> closed = {});
+
 /* An ARGB icon at (x, y), where it isn't transparent. */
 void panelIcon(pl_canvas *c, const QImage &icon, int x, int y);
 

@@ -436,9 +436,9 @@ void paintLock(pl_canvas *c, int x, int baseline, uint32_t color) {
 class PopupMenu : public QWidget {
 public:
 	PopupMenu(QWidget *owner, const std::vector<PopupItem> &items, int selected, int minWidth,
-			std::function<void(int)> done)
+			std::function<void(int)> done, std::function<void()> closed = {})
 		: QWidget(owner, Qt::Popup | Qt::FramelessWindowHint), m_items(items),
-		  m_hover(selected), m_checked(selected), m_done(std::move(done)) {
+		  m_hover(selected), m_checked(selected), m_done(std::move(done)), m_closed(std::move(closed)) {
 		setAttribute(Qt::WA_TranslucentBackground);
 		setAttribute(Qt::WA_DeleteOnClose);
 		setMouseTracking(true);
@@ -472,6 +472,13 @@ public:
 	}
 
 protected:
+	void closeEvent(QCloseEvent *event) override {
+		if (m_closed) {
+			m_closed();
+		}
+		QWidget::closeEvent(event);
+	}
+
 	void paintEvent(QPaintEvent *) override {
 		Pixels px(width(), height());
 		pl_canvas *c = &px.c;
@@ -541,7 +548,7 @@ protected:
 				}
 			}
 		} else if (e->key() == Qt::Key_Return || e->key() == Qt::Key_Enter) {
-			if (m_hover >= 0) {
+			if (m_hover >= 0 && m_items[m_hover].enabled && !m_items[m_hover].separator) {
 				choose(m_hover);
 			}
 		} else if (e->key() == Qt::Key_Escape ||
@@ -583,9 +590,22 @@ private:
 	bool m_sticky = false;
 	QElapsedTimer m_opened;
 	std::function<void(int)> m_done;
+	std::function<void()> m_closed;
 };
 
 } // namespace
+
+void panelMenuAbove(QWidget *owner, const std::vector<PopupItem> &items, int checked,
+		const QRect &anchor, std::function<void(int)> chosen, std::function<void()> closed) {
+	if (items.empty()) {
+		qWarning("Cannot open an empty panel menu.");
+		return;
+	}
+	pl_sound_event("menu-open");
+	auto *menu = new PopupMenu(owner, items, checked, anchor.width(), std::move(chosen), std::move(closed));
+	menu->move(owner->mapToGlobal(QPoint(anchor.left(), anchor.top() - menu->height())));
+	menu->show();
+}
 
 void panelIcon(pl_canvas *c, const QImage &icon, int x, int y) {
 	const QImage img = icon.convertToFormat(QImage::Format_ARGB32);

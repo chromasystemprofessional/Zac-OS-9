@@ -240,17 +240,11 @@ static void popup_destroy(struct wl_listener *listener, void *data) {
 	free(popup);
 }
 
-static void server_new_xdg_popup(struct wl_listener *listener, void *data) {
-	struct wlr_xdg_popup *xdg_popup = data;
-
+void xdg_attach_popup(struct plat_server *server, struct wlr_xdg_popup *xdg_popup,
+		struct wlr_scene_tree *parent_tree) {
 	struct plat_popup *popup = calloc(1, sizeof(*popup));
-	popup->server = wl_container_of(listener, popup->server, new_xdg_popup);
+	popup->server = server;
 	popup->xdg_popup = xdg_popup;
-
-	struct wlr_xdg_surface *parent =
-		wlr_xdg_surface_try_from_wlr_surface(xdg_popup->parent);
-	assert(parent);
-	struct wlr_scene_tree *parent_tree = parent->data;
 	popup->parent_tree = parent_tree;
 	xdg_popup->base->data = wlr_scene_xdg_surface_create(parent_tree, xdg_popup->base);
 
@@ -258,6 +252,20 @@ static void server_new_xdg_popup(struct wl_listener *listener, void *data) {
 	wl_signal_add(&xdg_popup->base->surface->events.commit, &popup->commit);
 	popup->destroy.notify = popup_destroy;
 	wl_signal_add(&xdg_popup->events.destroy, &popup->destroy);
+}
+
+static void server_new_xdg_popup(struct wl_listener *listener, void *data) {
+	struct wlr_xdg_popup *xdg_popup = data;
+	/* Layer-shell popups start without an xdg parent; layers.c attaches
+	 * them when the client sends layer_surface.get_popup. */
+	if (!xdg_popup->parent) {
+		return;
+	}
+	struct plat_server *server = wl_container_of(listener, server, new_xdg_popup);
+	struct wlr_xdg_surface *parent =
+		wlr_xdg_surface_try_from_wlr_surface(xdg_popup->parent);
+	assert(parent);
+	xdg_attach_popup(server, xdg_popup, parent->data);
 }
 
 /* ---- xdg-decoration: always server-side --------------------------------- */

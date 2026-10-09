@@ -226,6 +226,7 @@ int main(int argc, char *argv[]) {
 	startup_begin(&server);
 	spawn_component("ZACOS9_MENUBAR", "zacos9-menubar");
 	spawn_component("ZACOS9_FINDER", "zacos9-finder");
+	spawn_component("ZACOS9_COLLAR", "zacos9-collar");
 	/* On a live medium, open the installer automatically; on a freshly
 	 * installed system (zacos9-install leaves the flag), the Setup Assistant. */
 	{

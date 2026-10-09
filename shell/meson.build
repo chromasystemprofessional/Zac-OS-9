@@ -612,6 +612,35 @@ executable('zacos9-controlpanel',
   install: true,
 )
 
+collar_sources = [
+  'collar/collar.cpp', 'collar/systemcontrols.cpp',
+  'panels/soundclient.cpp', 'finder/alert.cpp', 'finder/platinumshell.cpp',
+  finder_protocol,
+]
+collar_exe = executable('zacos9-collar', 'collar/main.cpp', collar_sources,
+  link_with: panelkit,
+  include_directories: include_directories('collar', 'finder', 'panels'),
+  dependencies: [platinum_dep, qt6, layershellqt, wayland_client],
+  cpp_args: ['-std=c++17'],
+  install: true,
+)
+
+collar_ui_test = executable('test-collar', 'collar/tests/test_collar.cpp', collar_sources,
+  link_with: panelkit,
+  include_directories: include_directories('collar', 'finder', 'panels'),
+  dependencies: [platinum_dep, qt6, layershellqt, wayland_client],
+  cpp_args: ['-std=c++17'],
+)
+test('collar-ui', collar_ui_test, env: ['QT_QPA_PLATFORM=offscreen'], timeout: 30)
+collar_controls_test = executable('test-collar-controls',
+  'collar/tests/test_controls.cpp', 'collar/systemcontrols.cpp',
+  include_directories: include_directories('collar'),
+  dependencies: [qt6], cpp_args: ['-std=c++17'],
+)
+test('collar-controls', find_program('dbus-run-session'),
+  args: ['--', collar_controls_test], timeout: 30,
+)
+
 test('sound-output',
   executable('test-sound-output',
     'panels/tests/test_sound.cpp',
@@ -709,6 +738,12 @@ endforeach
 vptr_exe = executable('vptr', meson.project_source_root() / 'tools/vptr/vptr.c', vptr_protocol,
   client_protocol_src,
   dependencies: [wayland_client, xkbcommon_client])
+
+test('collar-native', find_program('dbus-run-session'),
+  args: ['--', find_program('python3').full_path(), files('collar/tests/test_native.py'),
+    compositor_exe, collar_exe, capture_exe, vptr_exe],
+  timeout: 90,
+)
 
 busy_client = executable('test-busy-client',
   '../compositor/tests/busy_client.cpp', 'finder/platinumshell.cpp', finder_protocol,

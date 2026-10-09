@@ -56,6 +56,7 @@ with tempfile.TemporaryDirectory(prefix="zacos9-busy-cursor-") as directory:
     env = dict(os.environ, XDG_RUNTIME_DIR=directory, XDG_CONFIG_HOME=directory,
                WLR_BACKENDS="headless", WLR_RENDERER="pixman", WLR_HEADLESS_OUTPUTS="1",
                ZACOS9_STARTUP="0", ZACOS9_MENUBAR="", ZACOS9_FINDER="",
+               ZACOS9_COLLAR="",
                QT_QPA_PLATFORM="wayland", QT_STYLE_OVERRIDE="",
                QT_WAYLAND_DISABLE_WINDOWDECORATION="1", XCURSOR_THEME="ZacOS9",
                XCURSOR_SIZE="16", XCURSOR_PATH=str(compositor.parent),

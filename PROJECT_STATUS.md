@@ -1,6 +1,6 @@
 # Project Status
 
-Updated: 2026-10-08
+Updated: 2026-10-09
 
 ## Completed
 
@@ -23,6 +23,39 @@ Updated: 2026-10-08
 | *(uncommitted)* | Installer fixed end to end: GRUB packages in the image, UEFI/BIOS detection, BIOS boot partition, fallback `EFI/BOOT/BOOTX64.EFI` for Macs, live user in `sudo` (polkit), failing step shown in the window. VM-tested (`build/test-install.py`): whole disk under BIOS and UEFI, and a partition beside a kept FAT partition under UEFI — each installed disk boots to the desktop. Boot splash now shows the logo and a progress bar. |
 
 ## Current work
+
+**The Collar: screenshot-matched desktop control strip** (0.1.40; not installed
+on the live desktop): original pixel artwork and Platinum menus, five modern
+modules (volume/output, network/Wi-Fi, Bluetooth, backlight brightness, and
+battery/sleep). The 24-pixel-high strip folds to a 17-pixel angled grip, resizes and
+scrolls its modules, supports Alt-drag along the left edge and keyboard
+navigation, and remembers its folded state, size and position. The compositor
+starts it alongside Finder and the menu bar; `ZACOS9_COLLAR=''` disables it.
+Services are asynchronous, missing hardware is disabled explicitly, and
+failed user commands show alerts rather than success-shaped fallbacks.
+Native testing exposed a compositor crash on parentless xdg popups awaiting
+layer-shell attachment; those now use the shared popup configuration and
+constraint lifecycle after attaching. Normal window popup behavior is
+preserved. Focused UI/backend/audio tests and native 1x/2x committed-pixel
+checks pass, including real pointer/keyboard popup opening and dismissal.
+The native scenario also passes with an address-sanitized compositor.
+Final focused regression run: 11 suites passed, including startup/launch
+feedback, ordinary fullscreen/window behavior, cursor behavior, GTK menus,
+snapshots and sound outputs alongside The Collar's tests.
+Full pre-release run: 65 passed, 3 skipped, and one native-snapshot suite
+failed on frame-readiness checks; two isolated reruns of that suite passed.
+Debian package tests now run serially while compilation stays parallel.
+Release 0.1.40 combines The Collar with the automatic-login restoration from
+0.1.39, without a separate 0.1.39 publication.
+The user's 2026-10-09 screenshot now guides the frame: a 17-pixel angled
+grip, 14-pixel hollow-arrow scroll buttons, 32-pixel beveled module cells
+with distinct menu triangles, a square 14-pixel end tab and a neutral
+`#C0C0C0` face. Five modern modules yield a 219-by-24-pixel expanded strip.
+Open control-panel commands lead the menus; open modules reverse their
+bevels until dismissal. Original colored ZacOS icons replace the reference's
+legacy artwork. The enlarged/compressed image supports those proportions,
+not a byte-identical claim for its colors, fonts or original icons. See
+[The Collar](docs/collar.md).
 
 **Explicit disk disconnect/unmount menus and password login** (0.1.38):
 Finder's Special menu now has Disconnect Network Drive

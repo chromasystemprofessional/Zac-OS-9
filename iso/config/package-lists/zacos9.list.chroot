@@ -23,6 +23,7 @@ locales
 console-setup
 keyboard-configuration
 network-manager
+upower
 
 # Broadcom Wi-Fi (MacBooks from about 2008 to 2015, many Dell and HP
 # laptops): the wl driver, built for the image's kernel

@@ -100,9 +100,11 @@ int main(int argc, char **argv) {
 	SoundClient client;
 	int updates = 0;
 	int volumeFeedback = 0;
+	int commandFailures = 0;
 	client.changed = [&] { updates++; };
 	client.volumeApplied = [&] { volumeFeedback++; };
 	client.failed = [&](const QString &message) { error = message; };
+	client.commandFailed = [&](const QString &) { commandFailures++; };
 	error.clear();
 	client.refresh();
 	check(until([&] { return updates > 0; }) && error.isEmpty() && client.outputs.size() == 3,
@@ -177,6 +179,7 @@ int main(int argc, char **argv) {
 	client.selectOutput(client.outputs[2]);
 	check(until([&] { return !error.isEmpty(); }) && !client.switching
 		&& error.contains("simulated sound server failure"), "report rejected output changes");
+	check(commandFailures == 2, "report user-command failures separately from background polling");
 	// Finish the automatic refresh before changing the fixture's failure mode.
 	updates = 0;
 	check(until([&] { return updates > 0; }), "refresh actual output after rejected change");
@@ -186,6 +189,7 @@ int main(int argc, char **argv) {
 	client.selectOutput(client.outputs[2]);
 	check(until([&] { return !error.isEmpty(); }) && error.contains("default output changed"),
 		"report partial failure instead of claiming current playback moved");
+	check(commandFailures == 3, "partial output changes also notify the command owner");
 	updates = 0;
 	check(until([&] { return updates > 0; }), "refresh actual default after partial failure");
 	qunsetenv("SOUND_TEST_FAIL");
@@ -200,6 +204,7 @@ int main(int argc, char **argv) {
 	client.refresh();
 	check(until([&] { return !error.isEmpty(); }) && error.contains("start pactl"),
 		"report missing pactl explicitly");
+	check(commandFailures == 3, "background failures don't open repeated command alerts");
 	qputenv("PATH", oldPath);
 	qunsetenv("SOUND_TEST_STATE");
 	return fails ? 1 : 0;

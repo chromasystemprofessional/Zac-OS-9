@@ -64,6 +64,7 @@ class NativeCaptureTests(unittest.TestCase):
             "WLR_HEADLESS_OUTPUTS": "2",
             "ZACOS9_FINDER": "",
             "ZACOS9_MENUBAR": "",
+            "ZACOS9_COLLAR": "",
             "ZACOS9_STARTUP": "0",
             "QT_QPA_PLATFORM": "offscreen",
         }

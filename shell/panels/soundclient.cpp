@@ -123,10 +123,13 @@ void SoundClient::run(const QStringList &args, Done done) {
 	timeout->start(3000);
 }
 
-void SoundClient::report(const QString &error) {
+void SoundClient::report(const QString &error, bool command) {
 	qWarning().noquote() << error;
 	if (failed) {
 		failed(error);
+	}
+	if (command && commandFailed) {
+		commandFailed(error);
 	}
 }
 
@@ -179,7 +182,7 @@ void SoundClient::refresh() {
 void SoundClient::finishSwitch(const QString &error) {
 	switching = false;
 	if (!error.isEmpty()) {
-		report(error);
+		report(error, true);
 	}
 	if (changed) {
 		changed();
@@ -235,11 +238,11 @@ void SoundClient::makeDefault(const QString &sink) {
 
 void SoundClient::selectOutput(const SoundOutput &output) {
 	if (switching) {
-		report("An output change is already in progress.");
+		report("An output change is already in progress.", true);
 		return;
 	}
 	if (output.sink.isEmpty()) {
-		report("No sound output was selected.");
+		report("No sound output was selected.", true);
 		return;
 	}
 	switching = true;
@@ -263,14 +266,14 @@ void SoundClient::selectOutput(const SoundOutput &output) {
 
 void SoundClient::setVolume(const QString &sink, int percent) {
 	if (sink.isEmpty() || percent < 0 || percent > 100) {
-		report("No valid sound output or volume was selected.");
+		report("No valid sound output or volume was selected.", true);
 		return;
 	}
 	const unsigned generation = ++m_volumeGeneration;
 	run({ "set-sink-volume", sink, QString::number(percent) + "%" },
 		[this, generation](const QByteArray &, const QString &error) {
 			if (!error.isEmpty()) {
-				report(error);
+				report(error, true);
 			} else if (generation == m_volumeGeneration && volumeApplied) {
 				volumeApplied();
 			}
@@ -280,13 +283,13 @@ void SoundClient::setVolume(const QString &sink, int percent) {
 
 void SoundClient::setMuted(const QString &sink, bool muted) {
 	if (sink.isEmpty()) {
-		report("No sound output was selected.");
+		report("No sound output was selected.", true);
 		return;
 	}
 	run({ "set-sink-mute", sink, muted ? "1" : "0" },
 		[this](const QByteArray &, const QString &error) {
 			if (!error.isEmpty()) {
-				report(error);
+				report(error, true);
 			}
 			refresh();
 		});
