@@ -24,7 +24,7 @@ Updated: 2026-10-09
 
 ## Current work
 
-**The Collar: screenshot-matched desktop control strip** (0.1.40; not installed
+**The Collar: screenshot-matched desktop control strip** (0.1.40; published, not installed
 on the live desktop): original pixel artwork and Platinum menus, five modern
 modules (volume/output, network/Wi-Fi, Bluetooth, backlight brightness, and
 battery/sleep). The 24-pixel-high strip folds to a 17-pixel angled grip, resizes and
@@ -47,6 +47,13 @@ failed on frame-readiness checks; two isolated reruns of that suite passed.
 Debian package tests now run serially while compilation stays parallel.
 Release 0.1.40 combines The Collar with the automatic-login restoration from
 0.1.39, without a separate 0.1.39 publication.
+The clean release package build passed all 66 runnable suites, with 3 skipped,
+no failures and no timeouts (69 total), including native-snapshot and all
+three Collar suites. Published
+[ZacOS 9 0.1.40](https://github.com/chromasystemprofessional/Zac-OS-9/releases/tag/v0.1.40)
+with the amd64 Debian package; its uploaded SHA-256 matches the local package,
+which contains `zacos9-collar` and depends on UPower. No live installation,
+desktop restart or ISO rebuild was performed.
 The user's 2026-10-09 screenshot now guides the frame: a 17-pixel angled
 grip, 14-pixel hollow-arrow scroll buttons, 32-pixel beveled module cells
 with distinct menu triangles, a square 14-pixel end tab and a neutral
