@@ -1,3 +1,16 @@
+zacos9 (0.1.40) trixie; urgency=medium
+
+  * Combined release: restores automatic desktop login, with applications
+    using their own sign-in flows, and introduces The Collar, a
+    screenshot-matched 24-pixel desktop control strip with original ZacOS
+    artwork. The Collar provides volume and output selection, Wi-Fi/network
+    status, Bluetooth power, brightness, battery status and confirmed
+    sleep, with folding, resizing, scrolling and saved placement. Fixes
+    layer-shell popup attachment and keeps Debian package tests serial
+    while compiling in parallel.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Fri, 09 Oct 2026 07:34:26 -0400
+
 zacos9 (0.1.39) trixie; urgency=medium
 
   * Automatic login is restored: applications that need a password ask for
