@@ -24,7 +24,7 @@ Updated: 2026-10-09
 
 ## Current work
 
-**Alias replacement warning fix** (prepared for 0.1.42): unchanged Desktop aliases
+**Alias replacement warning fix** (0.1.42; published, not installed): unchanged Desktop aliases
 were reporting replaced originals because Linux device numbers changed while
 their target inodes stayed the same. Alias records now include the filesystem
 ID, so identity checks and bounded reconnection survive device renumbering.
@@ -32,10 +32,11 @@ Legacy records migrate on use when the inode and recorded canonical path still
 match. Genuine replacements still require confirmation. Finder and the file
 portal build; the alias and three file-chooser suites pass. Copies of all 11
 live Desktop alias records resolve twice without warnings or errors (six had
-stale device numbers on ext4); the live aliases were not changed. Not installed
-or released. The 0.1.42 amd64 Debian package builds with 72 tests passing,
-three skipped and none failing. GitHub publication is blocked by an invalid
-release token.
+stale device numbers on ext4); the live aliases were not changed. The 0.1.42
+amd64 Debian package builds with 72 tests passing, three skipped and none
+failing. Published on GitHub and verified as the latest release, with the
+uploaded package's SHA-256 matching the tested artifact. Software Update
+will offer it; restart after installation to use the new Finder.
 
 **The Collar correction** (uncommitted, after 0.1.40): the frame is mirrored
 to match the user's open and closed reference screenshots. The close box and
