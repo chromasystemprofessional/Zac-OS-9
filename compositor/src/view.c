@@ -326,6 +326,10 @@ struct plat_view *view_at(struct plat_server *server, double lx, double ly,
 		wlr_scene_surface_try_from_buffer(scene_buffer);
 	if (scene_surface) {
 		*surface = scene_surface->surface;
+		/* A HiDPI X11 window is shown at 1/scale (xwayland.c). */
+		int scale = xwayland_surface_scale(*surface);
+		*sx *= scale;
+		*sy *= scale;
 	}
 
 	/* Walk up to the view's tree; frame buffers and surfaces both lead there. */

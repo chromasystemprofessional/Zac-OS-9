@@ -150,7 +150,7 @@ gio_unix = dependency('gio-unix-2.0')
 executable('zacos9-autostart',
   'finder/autostart_main.cpp',
   'finder/autostart.cpp',
-  dependencies: [qt6, gio, gio_unix],
+  dependencies: [qt6, gio, gio_unix, platinum_dep],
   cpp_args: ['-std=c++17'],
   install: true,
 )
@@ -381,7 +381,7 @@ test('finder-vfs',
 test('autostart',
   executable('test-autostart', 'finder/tests/test_autostart.cpp', 'finder/autostart.cpp',
     include_directories: include_directories('finder'),
-    dependencies: [qt6, gio, gio_unix],
+    dependencies: [qt6, gio, gio_unix, platinum_dep],
     cpp_args: ['-std=c++17'],
   ),
 )

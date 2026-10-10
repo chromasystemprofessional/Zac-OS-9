@@ -53,6 +53,8 @@ struct reg {
 	char *sender, *path;
 	GVariant *layout; /* (ia{sv}av), the root item; NULL until fetched */
 	bool fetching, dirty;
+	GHashTable *asked; /* item ids sent AboutToShow */
+	int asking;        /* AboutToShow replies still to come */
 };
 
 static GDBusConnection *bus;
@@ -318,6 +320,9 @@ static void reg_free(gpointer data) {
 	if (r->layout) {
 		g_variant_unref(r->layout);
 	}
+	if (r->asked) {
+		g_hash_table_destroy(r->asked);
+	}
 	g_free(r);
 }
 
@@ -358,6 +363,47 @@ static bool reg_is_live(struct reg *r) {
 
 static void fetch_layout(struct reg *r);
 
+/* Some programs (Electron) fill a submenu only when told it is about to
+ * open, and export it empty until then. Ask once for each empty submenu we
+ * can show - the menus and their submenus - then fetch the layout again. */
+static void about_to_show_done(GObject *source, GAsyncResult *res, gpointer data) {
+	struct reg *r = data;
+	GVariant *reply = g_dbus_connection_call_finish(G_DBUS_CONNECTION(source), res, NULL);
+	if (reply) {
+		g_variant_unref(reply);
+	}
+	if (reg_is_live(r) && --r->asking == 0) {
+		fetch_layout(r);
+	}
+}
+
+static void ask_empty_submenus(struct reg *r, GVariant *item, int depth) {
+	gint32 id;
+	GVariant *props, *children;
+	g_variant_get(item, "(i@a{sv}@av)", &id, &props, &children);
+	const char *display = NULL;
+	bool submenu = g_variant_lookup(props, "children-display", "&s", &display) &&
+		strcmp(display, "submenu") == 0;
+	gsize count = g_variant_n_children(children);
+	if (depth >= 1 && submenu && count == 0 &&
+			!g_hash_table_contains(r->asked, GINT_TO_POINTER(id))) {
+		g_hash_table_add(r->asked, GINT_TO_POINTER(id));
+		r->asking++;
+		g_dbus_connection_call(bus, r->sender, r->path, DBUSMENU_IFACE, "AboutToShow",
+			g_variant_new("(i)", id), NULL, G_DBUS_CALL_FLAGS_NONE, 2000, NULL,
+			about_to_show_done, r);
+	}
+	for (gsize i = 0; depth < 2 && i < count; i++) {
+		GVariant *child = g_variant_get_child_value(children, i);
+		GVariant *inner = g_variant_get_variant(child);
+		ask_empty_submenus(r, inner, depth + 1);
+		g_variant_unref(inner);
+		g_variant_unref(child);
+	}
+	g_variant_unref(props);
+	g_variant_unref(children);
+}
+
 static void layout_fetched(GObject *source, GAsyncResult *res, gpointer data) {
 	struct reg *r = data;
 	GError *err = NULL;
@@ -382,6 +428,10 @@ static void layout_fetched(GObject *source, GAsyncResult *res, gpointer data) {
 		if (debug) {
 			fprintf(stderr, "appmenu: layout of %s%s\n", r->sender, r->path);
 		}
+		if (!r->asked) {
+			r->asked = g_hash_table_new(NULL, NULL);
+		}
+		ask_empty_submenus(r, r->layout, 0);
 	}
 	if (r->dirty) {
 		fetch_layout(r);

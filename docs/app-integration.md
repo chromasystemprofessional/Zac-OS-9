@@ -13,7 +13,7 @@ works for it:
 |---|---|---|---|
 | Window frame | zacos9-wm (server-side decorations) | session asks toolkits not to draw their own | done |
 | Controls and standard prompts | the toolkit | a Platinum theme/style per toolkit | GTK 3 and Qt 6; GTK 4 stylesheet added, unverified |
-| Menus | the application, inside its window | global menu: the app's menus in our menu bar | Qt 6 and GTK 3 Wayland implemented |
+| Menus | the application, inside its window | global menu: the app's menus in our menu bar | Qt 6, GTK 3 Wayland and Electron (under X11) implemented |
 | App-owned UI | Electron, libadwaita, custom-drawn dialogs | no reliable override | known gap |
 
 ## Done
@@ -201,8 +201,9 @@ Steps:
   without them keep the generic ones.
 - Shown: labels (mnemonics stripped), separators, disabled items, check
   and radio state, ⌘ shortcuts for Control+letter, one level of submenu
-  (deeper ones are shown disabled). Not done: icons, `AboutToShow` (menus
-  a program fills only when opened stay as they were exported), the Quit
+  (deeper ones are shown disabled). `AboutToShow` is sent once for each
+  empty menu and submenu, then the layout is fetched again: Electron exports
+  them empty and fills them only then. Not done: icons, the Quit
   item Mac programs have (a Qt program's File menu has its own or none).
 - Tested in a nested session (`dbus-run-session`, a Qt 6 test window): its
   File and Edit menus appear in our bar and its own menu bar disappears;
@@ -251,11 +252,67 @@ Electron are not covered by this GTK Wayland path. Mixed applications using
 legacy widgets inside `GtkApplicationWindow` should use native menu models;
 the module does not override GTK application-window exports.
 
+## Global menus, Electron (VS Code, ...): implemented
+
+Electron exports its menus (`com.canonical.AppMenu.Registrar` plus
+dbusmenu, through `libdbusmenu-glib.so.4`, which it loads at run time) only
+when it runs **under X11**. On Wayland it never does, on any desktop. So:
+
+- **Electron apps start under X11.** `lib/electron.c` recognises an Electron
+  app (`resources/app.asar` or `resources/app/` beside the binary, or one
+  folder up from a launcher script in `bin/`) and adds
+  `--ozone-platform=x11 --force-device-scale-factor=N` after the program,
+  N being the screen's scale from zacos9-wm's outputs file. The Finder
+  (`appdb.cpp`), Login Items (`autostart.cpp`, both through
+  `finder/electronlaunch.h`) and the Apple menu (`menubar/launch.c`) do
+  this. Started from a terminal, an Electron app picks Wayland as before.
+- **The package depends on `libdbusmenu-glib4`**; without it Electron
+  silently keeps its menus.
+- **HiDPI X11 windows are sharp** (`compositor/src/xwayland.c`). An X11
+  window whose program was started with `--force-device-scale-factor`
+  equal to the screen's scale (read from `/proc/PID/cmdline`) gets a scale
+  of its own: its X11 positions and sizes are in pixels, its buffer is shown
+  at 1/scale, and pointer positions are multiplied back. Other X11 windows
+  (Classic, Wine, xterm) have scale 1 and are enlarged as before. Override-
+  redirect menus follow their program (`_NET_WM_PID`, else the front window).
+- **Xwayland sees outputs in pixels** (`compositor/src/xwayland_output.c`):
+  its own `zxdg_output_manager_v1`, hidden from every other client, while
+  wlroots' manager is hidden from Xwayland. Without it the X11 root stays at
+  the layout's size and Xwayland would keep the pointer out of the right and
+  bottom of a scaled window.
+- **Not every "Electron" app has the exporter.** The ChatGPT desktop app
+  (`/usr/lib/chatgpt`, checked 2026-10-10) reports Electron 42 but runs on
+  OpenAI's own runtime ("owl", Chromium 155) without Electron's Linux
+  global-menu code (no `libdbusmenu-glib` loader, no
+  `ELECTRON_FORCE_WINDOW_MENU_BAR`): it sets an application menu but never
+  registers it, and its main window draws its menus in HTML. Nothing to
+  read on our side short of scraping the window over AT-SPI.
+- **The app must use a native menu bar.** VS Code does only with
+  `"window.titleBarStyle": "native"` (its default custom title bar draws
+  menus in HTML and never exports them). With the native title bar it has
+  no in-window menu bar: Electron hides it once the registrar is there.
+
+Tested (2026-10-10): VS Code 1.141.0 (Electron 43) under X11 on the live session
+exported File ... Help and the menu bar showed them. In a nested zacos9-wm at
+2x, VS Code opened at its normal size and sharp, a click landed on the icon
+under the pointer, and the pointer stayed its normal size; xmessage (1x) looked
+as before. Installed live, the menu titles appeared but the menus were empty
+until the menu bar sent `AboutToShow` (above); with that, in a nested session,
+File > New Text File opened a new editor. Not yet tried with another Electron
+app.
+
+Known costs: on every commit wlroots resizes a scene buffer to its surface
+and xwayland.c resizes it back, so a scaled X11 window is fully redrawn each
+frame (no partial damage). Changing the screen's scale needs the Electron app
+restarted (its scale factor is fixed at launch). If an Electron app runs under
+X11 without the scale argument it draws at 1x and is enlarged (blurry), as
+before.
+
 ## Gaps (known, not planned yet)
 
 - **GTK 4 / libadwaita** ignore themes and draw their own title bars.
-- **Electron** (VS Code, ...) draws everything itself; only its frame and
-  fonts can be influenced.
+- **Electron** (VS Code, ...) draws everything itself; only its frame,
+  fonts and (under X11) its menus can be influenced.
 - **Qt 5 programs**: the style plugin is Qt 6 only (Debian 13 still has some
   Qt 5 applications). The same source should build against Qt 5.
 - **GIMP** keeps its own dark theme until Preferences > Theme is "System";

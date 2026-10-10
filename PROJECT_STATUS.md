@@ -572,6 +572,29 @@ removed. Tests updated: `lib/tests/test_welcome.c`, `compositor/tests/test_start
 `boot/tests/test_splash.py`, `tests/vm/boot-frames.py`. Still to do: a full
 meson build (needs the -dev packages) and a look on real hardware.
 
+**Global menus for Electron apps, sharp X11 on HiDPI** (uncommitted): VS Code
+and other Electron apps put their menus in the menu bar. Electron exports
+menus only under X11 and needs `libdbusmenu-glib4` (now a package
+dependency), so the Finder, Login Items and the Apple menu start Electron
+apps with `--ozone-platform=x11 --force-device-scale-factor=N`
+(`lib/electron.c`). zacos9-wm shows such X11 windows at full resolution: a
+per-window X11 scale in `xwayland.c`, and Xwayland gets outputs in pixels
+from its own xdg-output manager (`xwayland_output.c`); other X11 windows are
+unchanged. VS Code also needs `"window.titleBarStyle": "native"`. Checked:
+live VS Code under X11 exported its menus to the running menu bar; nested 2x
+session: VS Code sharp at normal size, clicks and pointer correct, xmessage
+unchanged; `electron`, `autostart`, launch-feedback, `gtk-appmenu`,
+`appstyle` and `startup-displays` tests pass. Installed live with
+`scripts/install-live.sh`: VS Code's menu titles appeared but the menus were
+empty - Electron fills a submenu only on dbusmenu `AboutToShow`, which the
+menu bar now sends once per empty menu and submenu (`appmenu.c`), then
+refetches. Nested check: File lists VS Code's items and New Text File opens
+Untitled-1. Installed live; VS Code exports its full menus there. The
+ChatGPT desktop app can't be covered (its runtime has no global-menu
+exporter; see docs/app-integration.md). Seen once, not fixed: a new
+X11 window took focus but stayed behind the window in front.
+See docs/app-integration.md.
+
 **GRUB picture follows upgrades** (uncommitted): installed systems kept
 the old ZacOS logo in GRUB (the first white screen) after upgrading to
 Happy Zac, because `zacos9-install` draws `/boot/grub/zacos9-logo.png` only

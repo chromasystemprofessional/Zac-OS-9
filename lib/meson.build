@@ -14,6 +14,7 @@ platinum_lib = static_library('platinum',
   'extensions.c',
   'patterns.c',
   'settings.c',
+  'electron.c',
   include_directories: platinum_inc,
   dependencies: [cairo, threads],
   c_args: [
@@ -56,6 +57,7 @@ test('text', executable('test-text', 'tests/test_text.c', dependencies: [platinu
 test('draw', executable('test-draw', 'tests/test_draw.c', dependencies: [platinum_dep]))
 test('welcome', executable('test-welcome', 'tests/test_welcome.c', dependencies: [platinum_dep]))
 test('settings', executable('test-settings', 'tests/test_settings.c', dependencies: [platinum_dep]))
+test('electron', executable('test-electron', 'tests/test_electron.c', dependencies: [platinum_dep]))
 test('widgets',
   executable('test-widgets', 'tests/test_widgets.c',
     dependencies: [figcompare_dep]),

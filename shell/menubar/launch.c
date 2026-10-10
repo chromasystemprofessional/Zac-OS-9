@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <glib.h>
 
+#include "electron.h"
 #include "menubar.h"
 
 #define ITEMS_DIR "/.config/zacos9/ZacOS 9 Menu Items"
@@ -20,8 +21,13 @@ static void detach_session(void *data) {
 	}
 }
 
-/* Run a shell command fully detached from the menu bar. */
+/* Run a shell command fully detached from the menu bar. Electron apps
+ * start under X11, where they give us their menus (lib/electron.h). */
 void launch(const char *command) {
+	char *electron = pl_electron_command(command);
+	if (electron) {
+		command = electron;
+	}
 	uint32_t cookie = launch_feedback_begin();
 	char *argv[] = { "/bin/sh", "-c", (char *)command, NULL };
 	GPid pid;
@@ -30,10 +36,12 @@ void launch(const char *command) {
 		launch_feedback_cancel(cookie);
 		fprintf(stderr, "Could not launch %s: %s\n", command, error->message);
 		g_error_free(error);
+		free(electron);
 		return;
 	}
 	launch_feedback_update(cookie, pid);
 	g_spawn_close_pid(pid);
+	free(electron);
 }
 
 /* A shell command running `program` from next to this binary (build tree

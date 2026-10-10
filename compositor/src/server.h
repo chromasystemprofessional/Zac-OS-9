@@ -84,6 +84,9 @@ struct plat_server {
 	struct wl_listener new_xdg_decoration;
 
 	struct wlr_xwayland *xwayland;
+	struct wl_global *xwayland_xdg_output;
+	struct wl_list xwayland_xdg_outputs; /* zxdg_output_v1 resources */
+	struct wl_listener xwayland_layout_change;
 	struct wl_listener xwayland_ready;
 	struct wl_listener new_xwayland_surface;
 
@@ -227,6 +230,7 @@ struct plat_view {
 	struct wl_listener handle_request_fullscreen;
 
 	/* Xwayland only. */
+	int x11_scale; /* X11 pixels per layout unit (xwayland.c) */
 	struct wl_listener associate;
 	struct wl_listener dissociate;
 	struct wl_listener request_configure;
@@ -354,5 +358,9 @@ void platinum_shell_gtk_changed(struct plat_server *server);
 
 /* xwayland.c */
 void xwayland_init(struct plat_server *server);
+/* X11 pixels per layout unit for an X11 surface; 1 for any other. */
+int xwayland_surface_scale(struct wlr_surface *surface);
+/* xwayland_output.c: outputs as Xwayland sees them, in pixels. */
+void xwayland_output_init(struct plat_server *server);
 
 #endif

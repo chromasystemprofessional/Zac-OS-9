@@ -210,6 +210,7 @@ int main(int argc, char *argv[]) {
 	input_init(&server);
 	prefs_init(&server);
 	xwayland_init(&server);
+	xwayland_output_init(&server);
 
 	const char *socket = wl_display_add_socket_auto(server.display);
 	if (!socket) {

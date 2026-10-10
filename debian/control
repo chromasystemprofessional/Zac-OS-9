@@ -75,7 +75,8 @@ Depends: ${shlibs:Depends},
          pipewire,
          wireplumber,
          xdg-desktop-portal,
-         xdg-desktop-portal-wlr
+         xdg-desktop-portal-wlr,
+         libdbusmenu-glib4
 Recommends: balena-etcher,
             xwayland,
             netatalk,

@@ -4,6 +4,7 @@
 #include <gio/gio.h>
 
 #include "appdb.h"
+#include "electronlaunch.h"
 #include "platinumshell.h"
 
 #include <QCoreApplication>
@@ -607,10 +608,11 @@ static GAppLaunchContext *launchContext(GAppInfo *info, uint32_t &cookie) {
 static bool launchInfo(GAppInfo *info, GList *files, const QString &actionId = {}) {
 	uint32_t cookie;
 	GAppLaunchContext *context = launchContext(info, cookie);
+	GAppInfo *run = electronLaunchInfo(info);
 	bool ok = true;
 	if (actionId.isEmpty()) {
 		GError *error = nullptr;
-		ok = g_app_info_launch(info, files, context, &error);
+		ok = g_app_info_launch(run, files, context, &error);
 		if (!ok) {
 			platinumCancelLaunch(cookie);
 			qWarning() << "Could not launch" << fromUtf8(g_app_info_get_name(info)) << ":" <<
@@ -621,9 +623,10 @@ static bool launchInfo(GAppInfo *info, GList *files, const QString &actionId = {
 		}
 	} else {
 		/* Desktop Actions have no failure report of their own. */
-		g_desktop_app_info_launch_action(G_DESKTOP_APP_INFO(info),
+		g_desktop_app_info_launch_action(G_DESKTOP_APP_INFO(run),
 			actionId.toUtf8().constData(), context);
 	}
+	g_object_unref(run);
 	g_object_unref(context);
 	return ok;
 }

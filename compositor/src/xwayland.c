@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <xcb/xcb_icccm.h>
 #include <wlr/util/log.h>
 
@@ -15,10 +16,90 @@ struct plat_unmanaged {
 	struct wl_listener dissociate;
 	struct wl_listener map;
 	struct wl_listener unmap;
+	struct wl_listener commit;
 	struct wl_listener set_geometry;
 	struct wl_listener request_configure;
 	struct wl_listener destroy;
+	int scale;
 };
+
+/* ---- HiDPI --------------------------------------------------------------
+ * Most X11 programs draw at 1x, and are shown enlarged on a HiDPI screen. A
+ * program that draws at the screen's scale itself - an Electron app the
+ * desktop starts with --force-device-scale-factor (lib/electron.c) - would
+ * be enlarged again, so its windows get a scale of their own: their X11
+ * positions and sizes are in pixels, their buffers are shown at 1/scale,
+ * and pointer positions are scaled back. X11's root is in pixels for this
+ * (xwayland_output.c), so 1x windows sit in its top-left part unchanged. */
+
+static int cmdline_scale(pid_t pid) {
+	char path[64];
+	snprintf(path, sizeof(path), "/proc/%d/cmdline", (int)pid);
+	FILE *f = fopen(path, "r");
+	if (!f) {
+		return 1;
+	}
+	char args[8192];
+	size_t n = fread(args, 1, sizeof(args) - 1, f);
+	fclose(f);
+	/* Arguments are NUL-separated, or space-separated once a program
+	 * (Chromium) has rewritten its process title. */
+	for (size_t i = 0; i < n; i++) {
+		if (args[i] == '\0') {
+			args[i] = ' ';
+		}
+	}
+	args[n] = '\0';
+	static const char flag[] = " --force-device-scale-factor=";
+	const char *arg = strstr(args, flag);
+	return arg ? (int)(atof(arg + sizeof(flag) - 1) + 0.5) : 1;
+}
+
+static int client_scale(struct plat_server *server, struct wlr_xwayland_surface *xsurface) {
+	if (server->output_scale <= 1) {
+		return 1;
+	}
+	if (xsurface->pid > 0) {
+		return cmdline_scale(xsurface->pid) == server->output_scale ? server->output_scale : 1;
+	}
+	/* A menu without _NET_WM_PID belongs to the program in front. */
+	struct plat_view *front = server->focused_view;
+	return front && front->type == PLAT_VIEW_XWAYLAND ? front->x11_scale : 1;
+}
+
+static int to_logical(int v, int scale) {
+	return v >= 0 ? (v + scale - 1) / scale : v / scale;
+}
+
+static void scale_buffer(struct wlr_scene_buffer *buffer, int sx, int sy, void *data) {
+	int scale = *(int *)data;
+	struct wlr_scene_surface *scene_surface = wlr_scene_surface_try_from_buffer(buffer);
+	if (scene_surface && buffer->buffer) {
+		struct wlr_surface *surface = scene_surface->surface;
+		wlr_scene_buffer_set_dest_size(buffer, to_logical(surface->current.width, scale),
+			to_logical(surface->current.height, scale));
+	}
+}
+
+/* The scene sizes a buffer as its surface on every commit: after it has (our
+ * commit listeners come after the scene's), size it down again. */
+static void scale_tree(struct wlr_scene_tree *tree, int scale) {
+	if (tree && scale > 1) {
+		wlr_scene_node_for_each_buffer(&tree->node, scale_buffer, &scale);
+	}
+}
+
+int xwayland_surface_scale(struct wlr_surface *surface) {
+	struct wlr_xwayland_surface *xsurface =
+		surface ? wlr_xwayland_surface_try_from_wlr_surface(surface) : NULL;
+	if (!xsurface || !xsurface->data) {
+		return 1;
+	}
+	if (xsurface->override_redirect) {
+		return ((struct plat_unmanaged *)xsurface->data)->scale;
+	}
+	return ((struct plat_view *)xsurface->data)->x11_scale;
+}
 
 /* ---- plat_view_impl ---------------------------------------------------- */
 
@@ -28,8 +109,8 @@ static struct wlr_surface *xw_get_surface(struct plat_view *view) {
 
 static void xw_get_geometry(struct plat_view *view, struct wlr_box *geo) {
 	*geo = (struct wlr_box){
-		.width = view->xsurface->width,
-		.height = view->xsurface->height,
+		.width = to_logical(view->xsurface->width, view->x11_scale),
+		.height = to_logical(view->xsurface->height, view->x11_scale),
 	};
 }
 
@@ -43,7 +124,8 @@ static void xw_set_activated(struct plat_view *view, bool activated) {
 static void xw_set_size(struct plat_view *view, int width, int height) {
 	int x, y;
 	view_content_pos(view, &x, &y);
-	wlr_xwayland_surface_configure(view->xsurface, x, y, width, height);
+	int s = view->x11_scale;
+	wlr_xwayland_surface_configure(view->xsurface, x * s, y * s, width * s, height * s);
 }
 
 static void xw_set_fullscreen(struct plat_view *view, bool fullscreen) {
@@ -52,7 +134,9 @@ static void xw_set_fullscreen(struct plat_view *view, bool fullscreen) {
 
 /* X11 clients position their own popups from their window position. */
 static void xw_moved(struct plat_view *view) {
-	xw_set_size(view, view->xsurface->width, view->xsurface->height);
+	struct wlr_box geo;
+	xw_get_geometry(view, &geo);
+	xw_set_size(view, geo.width, geo.height);
 }
 
 static void xw_close(struct plat_view *view) {
@@ -66,13 +150,14 @@ static void xw_get_size_limits(struct plat_view *view,
 	if (!hints) {
 		return;
 	}
+	int s = view->x11_scale;
 	if (hints->flags & XCB_ICCCM_SIZE_HINT_P_MIN_SIZE) {
-		*min_w = hints->min_width;
-		*min_h = hints->min_height;
+		*min_w = to_logical(hints->min_width, s);
+		*min_h = to_logical(hints->min_height, s);
 	}
 	if (hints->flags & XCB_ICCCM_SIZE_HINT_P_MAX_SIZE) {
-		*max_w = hints->max_width;
-		*max_h = hints->max_height;
+		*max_w = hints->max_width / s;
+		*max_h = hints->max_height / s;
 	}
 }
 
@@ -96,6 +181,10 @@ static const struct plat_view_impl xwayland_impl = {
 
 static void handle_map(struct wl_listener *listener, void *data) {
 	struct plat_view *view = wl_container_of(listener, view, map);
+	view->x11_scale = client_scale(view->server, view->xsurface);
+	wlr_log(WLR_DEBUG, "X11 window pid %d: scale %d", (int)view->xsurface->pid,
+		view->x11_scale);
+	scale_tree(view->surface_tree, view->x11_scale);
 	view_set_title(view, view->xsurface->title);
 	view_set_app_id(view, view->xsurface->class);
 	view_place_new(view);
@@ -119,6 +208,7 @@ static void handle_unmap(struct wl_listener *listener, void *data) {
 
 static void handle_commit(struct wl_listener *listener, void *data) {
 	struct plat_view *view = wl_container_of(listener, view, commit);
+	scale_tree(view->surface_tree, view->x11_scale);
 	if (view->mapped) {
 		view_update_frame(view);
 	}
@@ -167,7 +257,8 @@ static void handle_request_configure(struct wl_listener *listener, void *data) {
 		return;
 	}
 	/* Windows stay where the user put them; only the size is negotiable. */
-	xw_set_size(view, event->width, event->height);
+	xw_set_size(view, to_logical(event->width, view->x11_scale),
+		to_logical(event->height, view->x11_scale));
 }
 
 static void handle_request_activate(struct wl_listener *listener, void *data) {
@@ -252,6 +343,7 @@ static void handle_destroy(struct wl_listener *listener, void *data) {
 static void new_managed(struct plat_server *server, struct wlr_xwayland_surface *xsurface) {
 	struct plat_view *view = calloc(1, sizeof(*view));
 	view->xsurface = xsurface;
+	view->x11_scale = 1;
 	view_setup(view, server, PLAT_VIEW_XWAYLAND, &xwayland_impl);
 	xsurface->data = view;
 
@@ -290,7 +382,10 @@ static void new_managed(struct plat_server *server, struct wlr_xwayland_surface 
 
 static void um_map(struct wl_listener *listener, void *data) {
 	struct plat_unmanaged *um = wl_container_of(listener, um, map);
-	wlr_scene_node_set_position(&um->tree->node, um->xsurface->x, um->xsurface->y);
+	um->scale = client_scale(um->server, um->xsurface);
+	scale_tree(um->tree, um->scale);
+	wlr_scene_node_set_position(&um->tree->node, um->xsurface->x / um->scale,
+		um->xsurface->y / um->scale);
 	wlr_scene_node_set_enabled(&um->tree->node, true);
 	wlr_scene_node_raise_to_top(&um->tree->node);
 }
@@ -303,8 +398,14 @@ static void um_unmap(struct wl_listener *listener, void *data) {
 static void um_set_geometry(struct wl_listener *listener, void *data) {
 	struct plat_unmanaged *um = wl_container_of(listener, um, set_geometry);
 	if (um->tree) {
-		wlr_scene_node_set_position(&um->tree->node, um->xsurface->x, um->xsurface->y);
+		wlr_scene_node_set_position(&um->tree->node, um->xsurface->x / um->scale,
+			um->xsurface->y / um->scale);
 	}
+}
+
+static void um_commit(struct wl_listener *listener, void *data) {
+	struct plat_unmanaged *um = wl_container_of(listener, um, commit);
+	scale_tree(um->tree, um->scale);
 }
 
 static void um_request_configure(struct wl_listener *listener, void *data) {
@@ -323,14 +424,18 @@ static void um_associate(struct wl_listener *listener, void *data) {
 	wl_signal_add(&surface->events.map, &um->map);
 	um->unmap.notify = um_unmap;
 	wl_signal_add(&surface->events.unmap, &um->unmap);
+	um->commit.notify = um_commit;
+	wl_signal_add(&surface->events.commit, &um->commit);
 }
 
 static void um_dissociate(struct wl_listener *listener, void *data) {
 	struct plat_unmanaged *um = wl_container_of(listener, um, dissociate);
 	wl_list_remove(&um->map.link);
 	wl_list_remove(&um->unmap.link);
+	wl_list_remove(&um->commit.link);
 	wl_list_init(&um->map.link);
 	wl_list_init(&um->unmap.link);
+	wl_list_init(&um->commit.link);
 	if (um->tree) {
 		wlr_scene_node_destroy(&um->tree->node);
 		um->tree = NULL;
@@ -341,6 +446,7 @@ static void um_destroy(struct wl_listener *listener, void *data) {
 	struct plat_unmanaged *um = wl_container_of(listener, um, destroy);
 	wl_list_remove(&um->map.link);
 	wl_list_remove(&um->unmap.link);
+	wl_list_remove(&um->commit.link);
 	wl_list_remove(&um->associate.link);
 	wl_list_remove(&um->dissociate.link);
 	wl_list_remove(&um->set_geometry.link);
@@ -349,6 +455,7 @@ static void um_destroy(struct wl_listener *listener, void *data) {
 	if (um->tree) {
 		wlr_scene_node_destroy(&um->tree->node);
 	}
+	um->xsurface->data = NULL;
 	free(um);
 }
 
@@ -356,8 +463,11 @@ static void new_unmanaged(struct plat_server *server, struct wlr_xwayland_surfac
 	struct plat_unmanaged *um = calloc(1, sizeof(*um));
 	um->server = server;
 	um->xsurface = xsurface;
+	um->scale = 1;
+	xsurface->data = um;
 	wl_list_init(&um->map.link);
 	wl_list_init(&um->unmap.link);
+	wl_list_init(&um->commit.link);
 
 	um->associate.notify = um_associate;
 	wl_signal_add(&xsurface->events.associate, &um->associate);

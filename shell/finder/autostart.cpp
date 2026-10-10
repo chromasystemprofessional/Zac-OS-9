@@ -1,6 +1,7 @@
 #include <gio/gdesktopappinfo.h>
 
 #include "autostart.h"
+#include "electronlaunch.h"
 
 #include <QDir>
 #include <QFileInfo>
@@ -430,8 +431,11 @@ bool autostartRunSession(const AutostartContext &context, QString *error) {
 			QFile::encodeName(entry.path).constData());
 		GAppLaunchContext *context = g_app_launch_context_new();
 		GError *launchError = nullptr;
-		const bool launched = app && g_app_info_launch(G_APP_INFO(app), nullptr, context,
-			&launchError);
+		GAppInfo *run = app ? electronLaunchInfo(G_APP_INFO(app)) : nullptr;
+		const bool launched = run && g_app_info_launch(run, nullptr, context, &launchError);
+		if (run) {
+			g_object_unref(run);
+		}
 		if (!launched) {
 			errors << entry.id + ": " + (launchError ?
 				QString::fromUtf8(launchError->message) : "invalid desktop entry");

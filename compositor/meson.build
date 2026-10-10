@@ -16,6 +16,7 @@ protocols = [
   wl_protocol_dir / 'stable/xdg-shell/xdg-shell.xml',
   wl_protocol_dir / 'unstable/xdg-decoration/xdg-decoration-unstable-v1.xml',
   wl_protocol_dir / 'staging/cursor-shape/cursor-shape-v1.xml',
+  wl_protocol_dir / 'unstable/xdg-output/xdg-output-unstable-v1.xml',
   meson.project_source_root() / 'protocols/wlr-layer-shell-unstable-v1.xml',
   meson.project_source_root() / 'protocols/platinum-shell-v1.xml',
   meson.project_source_root() / 'protocols/zacos-snapshot-v1.xml',
@@ -37,6 +38,12 @@ protocol_headers += custom_target('platinum_shell_v1_c',
 )
 protocol_headers += custom_target('zacos_snapshot_v1_c',
   input: meson.project_source_root() / 'protocols/zacos-snapshot-v1.xml',
+  output: '@BASENAME@-protocol.c',
+  command: [wayland_scanner, 'private-code', '@INPUT@', '@OUTPUT@'],
+)
+# Xwayland's own xdg-output manager (xwayland_output.c).
+protocol_headers += custom_target('xdg_output_c',
+  input: wl_protocol_dir / 'unstable/xdg-output/xdg-output-unstable-v1.xml',
   output: '@BASENAME@-protocol.c',
   command: [wayland_scanner, 'private-code', '@INPUT@', '@OUTPUT@'],
 )
@@ -84,6 +91,7 @@ compositor_exe = executable('zacos9-wm',
   'src/view.c',
   'src/xdg.c',
   'src/xwayland.c',
+  'src/xwayland_output.c',
   'src/layers.c',
   'src/platinum_shell.c',
   'src/gtk_shell.c',
