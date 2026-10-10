@@ -126,6 +126,16 @@ test('launch-feedback',
   ),
   timeout: 20,
 )
+test('virtual-pointer-output',
+  executable('test-virtual-pointer',
+    'tests/test_virtual_pointer.c',
+    protocol_headers,
+    include_directories: include_directories('src'),
+    dependencies: [decor_dep, wayland_server, wlroots, xkbcommon],
+    c_args: ['-ffunction-sections', '-fdata-sections'],
+    link_args: ['-Wl,--gc-sections'],
+  ),
+)
 
 test('window-sounds',
   executable('test-window-sounds',

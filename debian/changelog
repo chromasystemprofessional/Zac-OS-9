@@ -1,3 +1,14 @@
+zacos9 (0.1.44) trixie; urgency=medium
+
+  * Add opt-in current-desktop RDP sharing through xrdp and WayVNC, with
+    TLS, PAM account access, private backend transport and on-demand
+    lifecycle commands. Remote-desktop engines remain optional installs.
+  * Honor virtual-pointer output mapping for correct remote mouse
+    coordinates on multi-monitor desktops. Document setup, local tests
+    and remaining second-computer validation.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Fri, 09 Oct 2026 23:32:15 -0400
+
 zacos9 (0.1.43) trixie; urgency=medium
 
   * Add initial RustDesk Wayland integration: require the PipeWire capture

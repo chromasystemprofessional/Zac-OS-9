@@ -1,0 +1,223 @@
+#!/usr/bin/python3
+"""Exercise the live RDP bridge with a disposable account and isolated client."""
+
+import io
+import json
+import os
+from pathlib import Path
+import pwd
+import secrets
+import subprocess
+import sys
+import tempfile
+import time
+
+from PIL import Image, ImageChops
+
+
+MARKER = """
+import gi
+gi.require_version("Gtk", "3.0")
+from gi.repository import Gtk, Gdk
+import pathlib, sys
+report = pathlib.Path(sys.argv[1])
+window = Gtk.Window(title="ZacOS RDP validation")
+window.set_default_size(360, 220)
+box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+area = Gtk.DrawingArea()
+area.set_size_request(360, 120)
+def draw(widget, cr):
+    cr.set_source_rgb(20/255, 204/255, 64/255)
+    cr.rectangle(0, 0, 180, 120)
+    cr.fill()
+    cr.set_source_rgb(212/255, 31/255, 194/255)
+    cr.rectangle(180, 0, 180, 120)
+    cr.fill()
+area.connect("draw", draw)
+area.add_events(Gdk.EventMask.BUTTON_PRESS_MASK)
+def click(widget, event):
+    with report.open("a") as stream:
+        stream.write("pointer\\n")
+area.connect("button-press-event", click)
+entry = Gtk.Entry()
+def changed(widget):
+    with report.open("a") as stream:
+        stream.write("keyboard:" + widget.get_text() + "\\n")
+entry.connect("changed", changed)
+box.pack_start(area, False, False, 0)
+box.pack_start(entry, False, False, 0)
+box.pack_start(Gtk.Label(label="Temporary local RDP video/input test"), True, True, 0)
+window.add(box)
+window.connect("destroy", Gtk.main_quit)
+window.show_all()
+entry.grab_focus()
+Gtk.main()
+"""
+
+
+def run(*args, **kwargs):
+    return subprocess.run(args, check=True, **kwargs)
+
+
+def color_bounds(image, color):
+    difference = ImageChops.difference(image, Image.new("RGB", image.size, color))
+    channels = difference.split()
+    difference = ImageChops.lighter(ImageChops.lighter(channels[0], channels[1]), channels[2])
+    return difference.point(lambda value: 255 if value == 0 else 0).getbbox()
+
+
+def main():
+    if os.geteuid() != 0 or len(sys.argv) != 3:
+        raise ValueError("Run through zacos9-screen-sharing test.")
+    user = pwd.getpwuid(int(sys.argv[1]))
+    for binary in ("Xvfb", "xfreerdp3", "xwd", "convert", "xdotool", "wayvncctl"):
+        if subprocess.run(("which", binary), stdout=subprocess.DEVNULL).returncode:
+            raise ValueError(f"Install the missing test dependency: {binary}")
+    name = "zrdptest" + secrets.token_hex(3)
+    password = secrets.token_urlsafe(24)
+    group = f"zacos9-rdp-{user.pw_uid}"
+    children = []
+    account_created = False
+    with tempfile.TemporaryDirectory(prefix="zacos9-rdp-test-") as directory:
+        directory = Path(directory)
+        directory.chmod(0o711)
+        reports = directory / "reports"
+        reports.mkdir(mode=0o700)
+        os.chown(reports, user.pw_uid, user.pw_gid)
+        try:
+            run("useradd", "--system", "--no-create-home", "--shell", "/usr/sbin/nologin", name)
+            account_created = True
+            run("chpasswd", input=f"{name}:{password}\n", text=True)
+            fingerprint = subprocess.check_output((
+                "openssl", "x509", "-in", "/etc/zacos9/rdp/cert.pem",
+                "-noout", "-fingerprint", "-sha256"), text=True).strip().split("=")[1]
+            environment = {
+                "PATH": "/usr/bin:/bin", "DISPLAY": ":93", "HOME": user.pw_dir,
+                "USER": user.pw_name, "LOGNAME": user.pw_name,
+                "XDG_RUNTIME_DIR": f"/run/user/{user.pw_uid}",
+                "DBUS_SESSION_BUS_ADDRESS": f"unix:path=/run/user/{user.pw_uid}/bus",
+                "XDG_CACHE_HOME": f"{user.pw_dir}/.cache",
+            }
+            child_options = dict(user=user.pw_uid, group=user.pw_gid, extra_groups=[])
+            outputs = json.loads(run("wayvncctl", "-j", "-S",
+                f"/run/user/{user.pw_uid}/zacos9-rdp/control.sock", "output-list",
+                capture_output=True, text=True, **child_options).stdout)
+            captured = [output for output in outputs if output["captured"]]
+            if len(captured) != 1:
+                raise RuntimeError("Expected one captured WayVNC output.")
+            width, height = captured[0]["width"], captured[0]["height"]
+            xvfb = subprocess.Popen((
+                "/usr/bin/Xvfb", ":93", "-screen", "0", f"{width+256}x{height+256}x24",
+                "-nolisten", "tcp"),
+                **child_options)
+            children.append(xvfb)
+            time.sleep(1)
+            if xvfb.poll() is not None:
+                raise RuntimeError("The isolated client display could not start.")
+            client_args = (
+                "/usr/bin/xfreerdp3", "/v:127.0.0.1", f"/u:{name}", "/from-stdin:force",
+                f"/cert:fingerprint:sha256:{fingerprint}", "/sec:tls",
+                f"/size:{width}x{height}", "/bpp:32", "/log-level:DEBUG", "-clipboard",
+                "/title:ZacOS RDP validation")
+
+            def rejected_login(secret, reason):
+                auth_log = Path("/run/zacos9-rdp/auth.log")
+                offset = auth_log.stat().st_size
+                result = subprocess.run(client_args, input=secret + "\n", text=True,
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                    timeout=15, env=environment, **child_options)
+                with auth_log.open() as stream:
+                    stream.seek(offset)
+                    messages = stream.read()
+                if result.returncode == 0 or f"status for {name} : not logged in" not in messages:
+                    raise RuntimeError(f"RDP did not reject {reason}.")
+                print(f"PASS: RDP rejected {reason}.")
+
+            rejected_login(password, "an account outside the sharing group")
+            run("gpasswd", "-a", name, group, stdout=subprocess.DEVNULL)
+            rejected_login(secrets.token_urlsafe(24), "an incorrect account password")
+            marker_environment = dict(environment)
+            marker_environment["DISPLAY"] = ":0"
+            marker_environment["WAYLAND_DISPLAY"] = sys.argv[2]
+            marker_environment["GDK_BACKEND"] = "wayland"
+            report = reports / "input.txt"
+            marker = subprocess.Popen((
+                "/usr/bin/python3", "-c", MARKER, str(report)),
+                env=marker_environment, **child_options)
+            children.append(marker)
+            log_path = directory / "client.log"
+            with log_path.open("w") as log:
+                connection = subprocess.Popen(client_args,
+                    stdin=subprocess.PIPE, stdout=log, stderr=log,
+                    env=environment, **child_options)
+                children.append(connection)
+                connection.stdin.write((password + "\n").encode())
+                connection.stdin.close()
+                deadline = time.monotonic() + 20
+                green = purple = None
+                while time.monotonic() < deadline:
+                    if connection.poll() is not None:
+                        print(log_path.read_text()[-6000:], file=sys.stderr)
+                        print(Path("/run/zacos9-rdp/auth.log").read_text()[-3000:], file=sys.stderr)
+                        print(Path("/run/zacos9-rdp/transport/xrdp.log").read_text()[-3000:], file=sys.stderr)
+                        run("journalctl", "--no-pager", "-u", "zacos9-rdp-bridge", "-n", "12")
+                        raise RuntimeError(f"RDP client exited: {connection.returncode}")
+                    windows = subprocess.run((
+                        "xdotool", "search", "--name", "ZacOS RDP validation"),
+                        env=environment, capture_output=True, text=True, **child_options)
+                    if windows.returncode == 0:
+                        window = windows.stdout.splitlines()[0]
+                        xwd = run("xwd", "-silent", "-id", window,
+                                  env=environment, capture_output=True, **child_options).stdout
+                        ppm = run("convert", "xwd:-", "ppm:-", input=xwd,
+                                  capture_output=True, **child_options).stdout
+                        image = Image.open(io.BytesIO(ppm)).convert("RGB")
+                        green = color_bounds(image, (20, 204, 64))
+                        purple = color_bounds(image, (212, 31, 194))
+                        if green and purple:
+                            break
+                    time.sleep(0.5)
+                if not (green and purple):
+                    live_png = run("grim", "-", env=marker_environment,
+                                   capture_output=True, **child_options).stdout
+                    live = Image.open(io.BytesIO(live_png)).convert("RGB")
+                    print(f"Local pattern bounds: {color_bounds(live, (20, 204, 64))}, "
+                          f"{color_bounds(live, (212, 31, 194))}", file=sys.stderr)
+                    print(f"Remote image size: {image.size}; pattern bounds: {green}, {purple}",
+                          file=sys.stderr)
+                    print(log_path.read_text()[-6000:], file=sys.stderr)
+                    print(Path("/run/zacos9-rdp/auth.log").read_text()[-3000:], file=sys.stderr)
+                    print(Path("/run/zacos9-rdp/transport/xrdp.log").read_text()[-3000:], file=sys.stderr)
+                    run("journalctl", "--no-pager", "-u", "zacos9-rdp-bridge", "-n", "12")
+                    raise RuntimeError("The RDP client did not decode the live test pattern.")
+                print("PASS: certificate-pinned TLS and PAM login delivered real desktop video.")
+                x = (green[0] + green[2]) // 2
+                y = (green[1] + green[3]) // 2
+                run("xdotool", "windowfocus", window, "mousemove", "--window", window,
+                    str(x), str(y), "click", "1", env=environment, **child_options)
+                run("xdotool", "type", "--clearmodifiers", "rdpverified",
+                    env=environment, **child_options)
+                time.sleep(2)
+                events = ""
+                if report.exists():
+                    with os.fdopen(os.open(report, os.O_RDONLY | os.O_NOFOLLOW)) as stream:
+                        events = stream.read()
+                if "pointer\n" not in events or "keyboard:rdpverified\n" not in events:
+                    raise RuntimeError(f"Remote input did not reach the test window: {events!r}")
+                print("PASS: RDP mouse click and keyboard text reached the Wayland test window.")
+        finally:
+            for child in reversed(children):
+                if child.poll() is None:
+                    child.terminate()
+                try:
+                    child.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    child.kill()
+                    child.wait()
+            if account_created:
+                run("userdel", name)
+            print("Temporary account, test window, client and screen buffers removed.")
+
+
+if __name__ == "__main__":
+    main()

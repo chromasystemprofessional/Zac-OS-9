@@ -1,0 +1,61 @@
+#!/bin/sh
+set -eu
+
+helper=/usr/libexec/zacos9/zacos9-rdp-helper
+unit=zacos9-rdp-capture
+
+case "${1:-}" in
+start)
+    [ "$#" = 2 ] || { echo "Usage: zacos9-screen-sharing start LAN_IPV4" >&2; exit 1; }
+    : "${XDG_RUNTIME_DIR:?Run from the logged-in ZacOS desktop}"
+    : "${WAYLAND_DISPLAY:?Run from the logged-in ZacOS desktop}"
+    command -v wayvnc >/dev/null
+    if ! systemctl --user is-active --quiet "$unit"; then
+        systemd-run --user --collect --unit="$unit" \
+            --setenv=WAYLAND_DISPLAY="$WAYLAND_DISPLAY" \
+            --setenv=XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" \
+            --property=UMask=0077 \
+            --property=RuntimeDirectory=zacos9-rdp \
+            --property=RuntimeDirectoryMode=0700 \
+            /usr/bin/wayvnc -C /dev/null -R -u -S "$XDG_RUNTIME_DIR/zacos9-rdp/control.sock" \
+            "$XDG_RUNTIME_DIR/zacos9-rdp/vnc.sock"
+    fi
+    for attempt in 1 2 3 4 5; do
+        [ ! -S "$XDG_RUNTIME_DIR/zacos9-rdp/vnc.sock" ] || break
+        sleep 1
+    done
+    if ! pkexec --disable-internal-agent "$helper" start "$2"; then
+        systemctl --user stop "$unit"
+        exit 1
+    fi
+    ;;
+stop)
+    load=$(systemctl --user show "$unit" --property=LoadState --value)
+    if [ "$load" != not-found ]; then
+        systemctl --user stop "$unit"
+    fi
+    for attempt in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+        state=$(systemctl show zacos9-rdp-listener.service --property=ActiveState --value)
+        case "$state" in
+        inactive|failed)
+            echo "RDP sharing stopped."
+            exit 0
+            ;;
+        esac
+        sleep 1
+    done
+    echo "The RDP listener did not stop; ask an administrator to stop zacos9-rdp-listener.service." >&2
+    exit 1
+    ;;
+status)
+    systemctl --no-pager status zacos9-rdp-listener.service
+    systemctl --user --no-pager status "$unit"
+    ;;
+test)
+    pkexec --disable-internal-agent "$helper" test "${WAYLAND_DISPLAY:?Run from the ZacOS desktop}"
+    ;;
+*)
+    echo "Usage: zacos9-screen-sharing start LAN_IPV4 | stop | status | test" >&2
+    exit 1
+    ;;
+esac

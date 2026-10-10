@@ -210,6 +210,10 @@ static void new_virtual_pointer(struct wl_listener *listener, void *data) {
 	struct plat_server *server = wl_container_of(listener, server, new_virtual_pointer);
 	struct wlr_virtual_pointer_v1_new_pointer_event *event = data;
 	wlr_cursor_attach_input_device(server->cursor, &event->new_pointer->pointer.base);
+	if (event->suggested_output) {
+		wlr_cursor_map_input_to_output(server->cursor,
+			&event->new_pointer->pointer.base, event->suggested_output);
+	}
 }
 
 static void new_virtual_keyboard(struct wl_listener *listener, void *data) {

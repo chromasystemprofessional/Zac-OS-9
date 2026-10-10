@@ -1,0 +1,330 @@
+#!/usr/bin/python3
+"""Administrator-authorized, opt-in RDP bridge for one logged-in desktop."""
+
+import ipaddress
+import os
+from pathlib import Path
+import pwd
+import signal
+import socket
+import subprocess
+import sys
+import time
+
+
+CONFIG = Path("/etc/zacos9/rdp")
+RUNTIME = Path("/run/zacos9-rdp")
+TRANSPORT = RUNTIME / "transport"
+UNITS = Path("/run/systemd/system")
+SERVICES = ("zacos9-rdp-listener", "zacos9-rdp-bridge", "zacos9-rdp-auth")
+HELPER = "/usr/libexec/zacos9/zacos9-rdp-helper"
+
+
+def run(*args, **kwargs):
+    return subprocess.run(args, check=True, **kwargs)
+
+
+def validate_address(value):
+    address = ipaddress.IPv4Address(value)
+    private = any(address in network for network in (
+        ipaddress.IPv4Network("10.0.0.0/8"),
+        ipaddress.IPv4Network("172.16.0.0/12"),
+        ipaddress.IPv4Network("192.168.0.0/16"),
+        ipaddress.IPv4Network("127.0.0.0/8")))
+    if not private:
+        raise ValueError("Use a private LAN or loopback IPv4 address.")
+    if address.is_unspecified or address.is_multicast or address.is_link_local:
+        raise ValueError("Use a specific LAN or loopback IPv4 address.")
+    with socket.socket() as probe:
+        probe.bind((str(address), 0))
+    return str(address)
+
+
+def caller():
+    uid = int(os.environ.get("PKEXEC_UID", os.getuid()))
+    if uid < 1000 or uid >= 60000:
+        raise ValueError("Run this helper through pkexec from the logged-in desktop.")
+    account = pwd.getpwuid(uid)
+    return account
+
+
+def write(path, text, mode=0o640):
+    path.write_text(text, encoding="ascii")
+    path.chmod(mode)
+
+
+def xrdp_config():
+    return f"""[Globals]
+ini_version=1
+fork=true
+port=unix://.{TRANSPORT}/rdp.sock
+security_layer=tls
+crypt_level=high
+certificate={CONFIG}/cert.pem
+key_file={CONFIG}/key.pem
+ssl_protocols=TLSv1.2,TLSv1.3
+autorun=ZacOS
+allow_channels=false
+allow_multimon=false
+bitmap_cache=true
+bitmap_compression=true
+bulk_compression=true
+max_bpp=32
+use_fastpath=both
+require_credentials=true
+
+[Logging]
+LogFile={TRANSPORT}/xrdp.log
+LogLevel=INFO
+EnableSyslog=true
+
+[ZacOS]
+name=Current ZacOS desktop
+lib=libvnc.so
+ip=127.0.0.1
+port=5900
+username=ask
+password=ask
+pamusername=same
+pampassword=same
+"""
+
+
+def auth_config(group):
+    return f"""[Globals]
+ListenPort=sesman.socket
+
+[Security]
+AllowRootLogin=false
+MaxLoginRetry=3
+TerminalServerUsers={group}
+AlwaysGroupCheck=true
+AllowAlternateShell=false
+
+[Sessions]
+MaxSessions=1
+
+[Logging]
+LogFile={RUNTIME}/auth.log
+LogLevel=INFO
+EnableSyslog=true
+"""
+
+
+def service_units(uid, address):
+    capture = f"/run/user/{uid}/zacos9-rdp/vnc.sock"
+    return {
+        "zacos9-rdp-auth": f"""[Unit]
+Description=ZacOS RDP account authentication
+BindsTo=user@{uid}.service
+BindsTo=zacos9-rdp-bridge.service
+After=user@{uid}.service
+
+[Service]
+ExecStart=/usr/sbin/xrdp-sesman --nodaemon --config {CONFIG}/sesman.ini
+""",
+        "zacos9-rdp-bridge": f"""[Unit]
+Description=ZacOS private RDP to Wayland bridge
+Requires=zacos9-rdp-auth.service
+After=zacos9-rdp-auth.service
+BindsTo=user@{uid}.service
+
+[Service]
+Type=notify
+NotifyAccess=main
+PrivateNetwork=true
+UMask=0077
+ExecStart={HELPER} serve {capture}
+TimeoutStartSec=20
+TimeoutStopSec=10
+""",
+        "zacos9-rdp-listener": f"""[Unit]
+Description=ZacOS TLS RDP listener
+BindsTo=zacos9-rdp-bridge.service
+After=zacos9-rdp-bridge.service
+
+[Service]
+User=xrdp
+Group=xrdp
+NoNewPrivileges=true
+ExecStart=/usr/bin/socat TCP4-LISTEN:3389,bind={address},reuseaddr,fork UNIX-CONNECT:{TRANSPORT}/rdp.sock
+""",
+    }
+
+
+def stop():
+    for name in SERVICES:
+        unit = f"{name}.service"
+        state = run("systemctl", "show", "--property=LoadState", "--value",
+                    unit, capture_output=True, text=True).stdout.strip()
+        if state != "not-found":
+            run("systemctl", "stop", unit)
+
+
+def start(address):
+    account = caller()
+    address = validate_address(address)
+    capture = Path(f"/run/user/{account.pw_uid}/zacos9-rdp/vnc.sock")
+    if not capture.is_socket() or capture.stat().st_uid != account.pw_uid:
+        raise ValueError("The logged-in user's private WayVNC socket is not running.")
+    if capture.parent.stat().st_mode & 0o077:
+        raise ValueError("The WayVNC socket directory must be private (mode 0700).")
+    for binary in ("/usr/sbin/xrdp", "/usr/sbin/xrdp-sesman",
+                   "/usr/bin/socat", "/usr/bin/openssl"):
+        if not Path(binary).is_file():
+            raise ValueError(f"Install the missing dependency: {binary}")
+    stop()
+    if Path("/run/xrdp/sockdir/sesman.socket").exists():
+        raise ValueError("Another xrdp session manager is running. Stop it first.")
+    group = f"zacos9-rdp-{account.pw_uid}"
+    result = subprocess.run(("getent", "group", group), stdout=subprocess.DEVNULL)
+    if result.returncode == 2:
+        run("groupadd", "--system", group)
+    elif result.returncode != 0:
+        raise RuntimeError("Unable to inspect the RDP access group.")
+    run("gpasswd", "-M", account.pw_name, group, stdout=subprocess.DEVNULL)
+    xrdp = pwd.getpwnam("xrdp")
+    CONFIG.mkdir(parents=True, exist_ok=True)
+    CONFIG.chmod(0o750)
+    os.chown(CONFIG, 0, xrdp.pw_gid)
+    RUNTIME.mkdir(mode=0o750, exist_ok=True)
+    os.chown(RUNTIME, 0, xrdp.pw_gid)
+    RUNTIME.chmod(0o750)
+    auth_log = RUNTIME / "auth.log"
+    if auth_log.is_symlink() or (auth_log.exists() and auth_log.stat().st_uid != 0):
+        raise ValueError("The authentication log must be a root-owned regular file.")
+    if not auth_log.exists():
+        write(auth_log, "", 0o600)
+    TRANSPORT.mkdir(mode=0o750, exist_ok=True)
+    os.chown(TRANSPORT, xrdp.pw_uid, xrdp.pw_gid)
+    TRANSPORT.chmod(0o750)
+    (TRANSPORT / "rdp.sock").unlink(missing_ok=True)
+    write(CONFIG / "xrdp.ini", xrdp_config())
+    write(CONFIG / "sesman.ini", auth_config(group))
+    if not (CONFIG / "key.pem").exists():
+        run("openssl", "req", "-x509", "-newkey", "rsa:3072", "-nodes",
+            "-keyout", str(CONFIG / "key.pem"), "-out", str(CONFIG / "cert.pem"),
+            "-days", "365", "-subj", "/CN=ZacOS Remote Desktop",
+            "-addext", f"subjectAltName=IP:{address},IP:127.0.0.1",
+            stdout=subprocess.DEVNULL)
+    else:
+        checks = (
+            ("-checkip", address),
+            ("-checkend", "86400"),
+        )
+        renew = False
+        for option, value in checks:
+            result = subprocess.run((
+                "openssl", "x509", "-in", str(CONFIG / "cert.pem"), "-noout",
+                option, value), capture_output=True, text=True)
+            if result.returncode not in (0, 1) or result.stderr:
+                raise RuntimeError(f"Unable to validate the RDP certificate: {result.stderr}")
+            renew |= result.returncode == 1
+        if renew:
+            run("openssl", "req", "-new", "-x509", "-key", str(CONFIG / "key.pem"),
+                "-out", str(CONFIG / "cert.pem"), "-days", "365",
+                "-subj", "/CN=ZacOS Remote Desktop",
+                "-addext", f"subjectAltName=IP:{address},IP:127.0.0.1",
+                stdout=subprocess.DEVNULL)
+            print("RDP certificate renewed; verify the fingerprint shown below.")
+    for filename in ("xrdp.ini", "sesman.ini", "key.pem", "cert.pem"):
+        os.chown(CONFIG / filename, 0, xrdp.pw_gid)
+        (CONFIG / filename).chmod(0o640)
+    for name, text in service_units(account.pw_uid, address).items():
+        write(UNITS / f"{name}.service", text, 0o644)
+    run("systemctl", "daemon-reload")
+    try:
+        run("systemctl", "start", "zacos9-rdp-listener.service")
+    except subprocess.CalledProcessError:
+        stop()
+        raise
+    print(f"RDP sharing enabled at {address}:3389 for {account.pw_name}.")
+    run("openssl", "x509", "-in", str(CONFIG / "cert.pem"),
+        "-noout", "-fingerprint", "-sha256")
+
+
+def serve(capture):
+    if os.stat("/proc/self/ns/net").st_ino == os.stat("/proc/1/ns/net").st_ino:
+        raise ValueError("The RFB backend requires a private network namespace.")
+    if not capture.is_socket():
+        raise ValueError("WayVNC is not running.")
+    stopping = False
+
+    def request_stop(signum, frame):
+        nonlocal stopping
+        stopping = True
+
+    signal.signal(signal.SIGTERM, request_stop)
+    signal.signal(signal.SIGINT, request_stop)
+    children = []
+    try:
+        account = pwd.getpwuid(capture.stat().st_uid)
+        if capture != Path(f"/run/user/{account.pw_uid}/zacos9-rdp/vnc.sock"):
+            raise ValueError("Unexpected desktop capture socket.")
+        children.append(subprocess.Popen((
+            "/usr/libexec/zacos9/zacos9-rdp-rfb", str(capture)),
+            user=account.pw_uid, group=account.pw_gid, extra_groups=[]))
+        environment = dict(os.environ)
+        notify = environment.pop("NOTIFY_SOCKET")
+        xrdp = pwd.getpwnam("xrdp")
+        children.append(subprocess.Popen((
+            "/usr/sbin/xrdp", "--nodaemon", "--config", str(CONFIG / "xrdp.ini")),
+            env=environment, user=xrdp.pw_uid, group=xrdp.pw_gid,
+            extra_groups=[]))
+        deadline = time.monotonic() + 15
+        while not (TRANSPORT / "rdp.sock").is_socket():
+            if any(child.poll() is not None for child in children):
+                raise RuntimeError("The private bridge failed during startup.")
+            if time.monotonic() >= deadline:
+                raise RuntimeError("The private RDP socket did not become ready.")
+            time.sleep(0.1)
+        with socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM) as notifier:
+            notifier.connect("\0" + notify[1:] if notify.startswith("@") else notify)
+            notifier.sendall(b"READY=1")
+        while not stopping:
+            if not capture.is_socket():
+                print("Desktop capture stopped; closing RDP sharing.", flush=True)
+                return
+            if any(child.poll() is not None for child in children):
+                raise RuntimeError("A private bridge process exited unexpectedly.")
+            time.sleep(0.5)
+    finally:
+        for child in children:
+            if child.poll() is None:
+                child.terminate()
+        for child in children:
+            try:
+                child.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                child.kill()
+                child.wait()
+
+
+def main():
+    if os.geteuid() != 0:
+        raise ValueError("Administrator authorization through pkexec is required.")
+    if len(sys.argv) == 3 and sys.argv[1] == "start":
+        start(sys.argv[2])
+    elif len(sys.argv) == 2 and sys.argv[1] == "stop":
+        caller()
+        stop()
+    elif len(sys.argv) == 3 and sys.argv[1] == "test":
+        account = caller()
+        config = (UNITS / "zacos9-rdp-listener.service").read_text()
+        if "bind=127.0.0.1," not in config:
+            raise ValueError("Start sharing on 127.0.0.1 before running the local test.")
+        run("/usr/libexec/zacos9/zacos9-rdp-test", str(account.pw_uid), sys.argv[2])
+    elif len(sys.argv) == 3 and sys.argv[1] == "serve":
+        if os.environ.get("PKEXEC_UID") or not os.environ.get("NOTIFY_SOCKET"):
+            raise ValueError("The private bridge must be started by systemd.")
+        serve(Path(sys.argv[2]))
+    else:
+        raise ValueError("Usage: zacos9-rdp-helper start LAN_IPV4 | stop | test")
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except (ValueError, KeyError, OSError, RuntimeError, subprocess.CalledProcessError) as error:
+        print(f"RDP sharing failed: {error}", file=sys.stderr)
+        sys.exit(1)

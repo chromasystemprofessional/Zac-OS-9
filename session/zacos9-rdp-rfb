@@ -1,0 +1,104 @@
+#!/usr/bin/python3
+"""Adapt xrdp's RFB 3.3 handshake to WayVNC's RFB 3.8 on private transports."""
+
+import select
+import socket
+import socketserver
+import struct
+import sys
+
+
+MAX_BUFFER = 1024 * 1024
+
+
+def read_exact(connection, size):
+    data = bytearray()
+    while len(data) < size:
+        part = connection.recv(size - len(data))
+        if not part:
+            raise EOFError("Backend closed during RFB negotiation.")
+        data.extend(part)
+    return bytes(data)
+
+
+def handshake(frontend, backend):
+    if read_exact(backend, 12) != b"RFB 003.008\n":
+        raise ValueError("Expected the private WayVNC RFB 3.8 backend.")
+    frontend.sendall(b"RFB 003.003\n")
+    version = read_exact(frontend, 12)
+    if version != b"RFB 003.003\n":
+        raise ValueError(f"Expected xrdp's RFB 3.3 client, received {version!r}.")
+    backend.sendall(b"RFB 003.008\n")
+    count = read_exact(backend, 1)[0]
+    if count == 0 or 1 not in read_exact(backend, count):
+        raise ValueError("Private WayVNC socket has incompatible authentication.")
+    backend.sendall(b"\x01")
+    if read_exact(backend, 4) != bytes(4):
+        raise ValueError("Private WayVNC handshake was rejected.")
+    frontend.sendall(struct.pack(">I", 1))
+
+
+def relay(frontend, backend):
+    peers = (frontend, backend)
+    buffers = {peer: bytearray() for peer in peers}
+    other = {frontend: backend, backend: frontend}
+    closed = set()
+    write_closed = set()
+    for peer in peers:
+        peer.setblocking(False)
+    while True:
+        readers = [peer for peer in peers
+                   if peer not in closed and len(buffers[other[peer]]) < MAX_BUFFER]
+        writers = [peer for peer in peers if buffers[peer]]
+        readable, writable, _ = select.select(readers, writers, [])
+        for peer in readable:
+            try:
+                data = peer.recv(min(65536, MAX_BUFFER - len(buffers[other[peer]])))
+            except BlockingIOError:
+                continue
+            if not data:
+                closed.add(peer)
+            else:
+                buffers[other[peer]].extend(data)
+        for peer in writable:
+            try:
+                sent = peer.send(buffers[peer])
+            except BlockingIOError:
+                continue
+            if sent == 0:
+                raise EOFError("Private RFB transport closed.")
+            del buffers[peer][:sent]
+        for peer in closed:
+            destination = other[peer]
+            if not buffers[destination] and destination not in write_closed:
+                destination.shutdown(socket.SHUT_WR)
+                write_closed.add(destination)
+        if len(closed) == 2 and not any(buffers.values()):
+            return
+
+
+class Handler(socketserver.BaseRequestHandler):
+    def handle(self):
+        try:
+            self.request.settimeout(10)
+            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as backend:
+                backend.settimeout(10)
+                backend.connect(self.server.capture)
+                handshake(self.request, backend)
+                relay(self.request, backend)
+        except (OSError, ValueError, EOFError) as error:
+            print(f"RDP private RFB bridge failed: {error}", file=sys.stderr, flush=True)
+
+
+class Server(socketserver.ThreadingTCPServer):
+    address_family = socket.AF_INET6
+    allow_reuse_address = True
+    daemon_threads = True
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        sys.exit("Usage: zacos9-rdp-rfb PRIVATE_WAYVNC_SOCKET")
+    with Server(("::1", 5900), Handler) as server:
+        server.capture = sys.argv[1]
+        server.serve_forever()

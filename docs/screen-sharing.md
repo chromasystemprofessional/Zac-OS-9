@@ -1,5 +1,13 @@
 # Screen Sharing with RustDesk
 
+Incoming RustDesk sharing produced a black screen on the initial live system.
+The current direction is [RDP](rdp.md), with an opt-in current-desktop bridge.
+Local RDP video and keyboard work; the multi-monitor pointer fix needs a
+desktop restart before full live input testing.
+[Sunshine and Moonlight](sunshine-moonlight.md) describes the earlier streaming
+alternative, whose host is now stopped. The notes below describe the
+earlier experimental RustDesk integration, not verified working hosting.
+
 ZacOS uses the existing [RustDesk](https://rustdesk.com/) application for
 cross-platform remote desktop, rather than maintaining a remote-desktop engine.
 Install the native Debian package on ZacOS and RustDesk on the other computer
