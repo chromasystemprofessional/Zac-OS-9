@@ -151,6 +151,14 @@ with tempfile.TemporaryDirectory(prefix="zacos9-gtk-menus-") as temporary:
             native_properties = metadata(native)
             native_model, native_labels = loaded(native_properties, "Native")
             activate_rendered("Native")
+            mixed = subprocess.Popen([sys.executable, fixture, "--app-window"], env=env,
+                                     stdout=subprocess.PIPE, stderr=log, text=True)
+            processes.append(mixed)
+            threading.Thread(target=responses, args=(mixed,), daemon=True).start()
+            mixed_properties = metadata(mixed)
+            loaded(mixed_properties, "AppWindow")
+            activate_rendered("AppWindow")
+            print("OK: an application window's own menu bar widget is exported (GIMP 3)")
             print("OK: legacy and native GTK menus export working actions; focus distinguishes same-process windows")
             if shutil.which("galculator"):
                 calculator = subprocess.Popen(["galculator"], env=env, stdout=log, stderr=log)

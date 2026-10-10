@@ -572,6 +572,16 @@ removed. Tests updated: `lib/tests/test_welcome.c`, `compositor/tests/test_start
 `boot/tests/test_splash.py`, `tests/vm/boot-frames.py`. Still to do: a full
 meson build (needs the -dev packages) and a look on real hardware.
 
+**GIMP 3's menus in the menu bar** (uncommitted): GIMP's image window is a
+`GtkApplicationWindow` with its own menu bar widget, which the GTK module
+skipped (it left all application windows to GTK, which exports nothing
+without a menu model). The module now exports such windows, giving its
+properties right after GTK's realize handler (GDK sends them once, at first
+show) and opening the bus synchronously if needed (`shell/gtkmenu/module.c`).
+`gtk-menu-protocol` has a GIMP-shaped fixture (`--app-window`); nested check
+with GIMP 3.0.4: menus shown, own bar hidden, File > New... works. Installed
+live with `scripts/install-live.sh`; the user confirmed GIMP's menus work.
+
 **Global menus for Electron apps, sharp X11 on HiDPI** (uncommitted): VS Code
 and other Electron apps put their menus in the menu bar. Electron exports
 menus only under X11 and needs `libdbusmenu-glib4` (now a package

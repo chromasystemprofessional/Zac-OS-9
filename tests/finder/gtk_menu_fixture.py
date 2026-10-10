@@ -41,7 +41,26 @@ def command(stream, condition):
     return True
 
 
-if "--native" in sys.argv:
+if "--app-window" in sys.argv:
+    # GIMP 3's shape: an application window with a menu bar widget of its
+    # own and no menu model for GTK to export.
+    app = Gtk.Application(application_id="org.zacos9.AppWindowMenuTest")
+    def activate(application):
+        win = Gtk.ApplicationWindow(application=application, title="AppWindow")
+        win.set_default_size(320, 180)
+        bar = Gtk.MenuBar()
+        title = Gtk.MenuItem.new_with_mnemonic("_Image")
+        menu = Gtk.Menu()
+        action = Gtk.MenuItem.new_with_mnemonic("_AppWindow")
+        action.connect("activate", lambda item: print("ACTIVATED AppWindow", flush=True))
+        menu.append(action)
+        title.set_submenu(menu)
+        bar.append(title)
+        win.add(bar)
+        win.show_all()
+    app.connect("activate", activate)
+    app.run([sys.argv[0]])
+elif "--native" in sys.argv:
     app = Gtk.Application(application_id="org.zacos9.NativeMenuTest")
     def activate(application):
         action = Gio.SimpleAction.new("test", None)

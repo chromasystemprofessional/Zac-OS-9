@@ -63,6 +63,17 @@ static gboolean global_menus(GtkWidget *window) {
 	return supported;
 }
 
+/* GTK exports an application window's menus itself when the application
+ * gives it a menu model to show. An application window with a menu bar
+ * widget of its own instead (GIMP 3's image windows) is ours to export. */
+static gboolean gtk_exports_menus(GtkWindow *window) {
+	if (!GTK_IS_APPLICATION_WINDOW(window)) {
+		return FALSE;
+	}
+	GtkApplication *app = gtk_window_get_application(window);
+	return app && (gtk_application_get_menubar(app) || gtk_application_get_app_menu(app));
+}
+
 static void connect_bars(struct export *export, GPtrArray *bars) {
 	for (guint i = 0; i < bars->len; i++) {
 		GtkWidget *bar = g_ptr_array_index(bars, i);
@@ -76,11 +87,13 @@ static void connect_bars(struct export *export, GPtrArray *bars) {
 	}
 }
 
-static void export_window(GtkWindow *window) {
+/* allow_empty: export even before the window has a menu bar widget (it
+ * fills in later), for windows whose properties must be set now. */
+static void export_window(GtkWindow *window, gboolean allow_empty) {
 	GtkWidget *widget = GTK_WIDGET(window);
 	GdkWindow *gdk_window = gtk_widget_get_window(widget);
 	if (!connection || !gdk_window || !GDK_IS_WAYLAND_WINDOW(gdk_window) ||
-			!global_menus(widget) || GTK_IS_APPLICATION_WINDOW(window) ||
+			!global_menus(widget) || gtk_exports_menus(window) ||
 			gtk_window_get_window_type(window) != GTK_WINDOW_TOPLEVEL) {
 		return;
 	}
@@ -88,7 +101,7 @@ static void export_window(GtkWindow *window) {
 	if (!export) {
 		GPtrArray *bars = g_ptr_array_new();
 		collect_bars(widget, bars);
-		if (!bars->len) {
+		if (!bars->len && !allow_empty) {
 			g_ptr_array_unref(bars);
 			return;
 		}
@@ -159,7 +172,7 @@ static gboolean scan_windows(gpointer data) {
 					}
 				}
 			}
-			export_window(item->data);
+			export_window(item->data, FALSE);
 		}
 	}
 	g_list_free(windows);
@@ -180,6 +193,28 @@ static gboolean mapped(GSignalInvocationHint *hint, guint n, const GValue *value
 	return TRUE;
 }
 
+/* GDK sends a window's menu properties once, when it is first shown, with
+ * the values last given; later ones are ignored. For an application window
+ * GTK gives its own on realize (no menu bar, if the application has no menu
+ * model), so ours must follow straight after that, before the window shows. */
+static void app_window_realized(GtkWidget *widget, gpointer data) {
+	/* An application can get this far before the bus we asked for arrives. */
+	if (!connection) {
+		connection = g_bus_get_sync(G_BUS_TYPE_SESSION, NULL, NULL);
+	}
+	export_window(GTK_WINDOW(widget), TRUE);
+}
+
+static gboolean window_added(GSignalInvocationHint *hint, guint n, const GValue *values,
+		gpointer data) {
+	GtkWindow *window = g_value_get_object(&values[1]);
+	if (GTK_IS_APPLICATION_WINDOW(window) && !gtk_exports_menus(window) &&
+			!gtk_widget_get_realized(GTK_WIDGET(window))) {
+		g_signal_connect_after(window, "realize", G_CALLBACK(app_window_realized), NULL);
+	}
+	return TRUE;
+}
+
 static void appeared(GDBusConnection *bus, const char *name, const char *owner, gpointer data) {
 	registrar = TRUE;
 	queue_scan();
@@ -192,7 +227,12 @@ static void vanished(GDBusConnection *bus, const char *name, gpointer data) {
 
 static void bus_ready(GObject *object, GAsyncResult *result, gpointer data) {
 	GError *error = NULL;
-	connection = g_bus_get_finish(result, &error);
+	GDBusConnection *bus = g_bus_get_finish(result, &error);
+	if (connection && bus) {
+		g_object_unref(bus); /* the same connection, got early (app_window_realized) */
+	} else {
+		connection = bus;
+	}
 	if (!connection) {
 		g_warning("ZacOS GTK global menus have no session bus: %s", error->message);
 		g_error_free(error);
@@ -207,5 +247,8 @@ G_MODULE_EXPORT void gtk_module_init(gint *argc, gchar ***argv) {
 	export_key = g_quark_from_static_string("zacos9-gtk-menu-export");
 	g_type_class_ref(GTK_TYPE_WIDGET);
 	g_signal_add_emission_hook(g_signal_lookup("map", GTK_TYPE_WIDGET), 0, mapped, NULL, NULL);
+	g_type_class_ref(GTK_TYPE_APPLICATION);
+	g_signal_add_emission_hook(g_signal_lookup("window-added", GTK_TYPE_APPLICATION), 0,
+		window_added, NULL, NULL);
 	g_bus_get(G_BUS_TYPE_SESSION, NULL, bus_ready, NULL);
 }

@@ -248,9 +248,19 @@ Steps:
 The new compositor, menu bar, GTK module and session environment must be
 installed together; log out/in and restart applications after updating.
 GTK applications explicitly forced to X11, custom non-exported menus and
-Electron are not covered by this GTK Wayland path. Mixed applications using
-legacy widgets inside `GtkApplicationWindow` should use native menu models;
-the module does not override GTK application-window exports.
+Electron are not covered by this GTK Wayland path.
+
+An application window (`GtkApplicationWindow`) with a menu bar widget of its
+own and no menu model for GTK - GIMP 3's image window - is exported by the
+module like a plain window. GDK sends a window's menu properties once, when
+it is first shown, with the last values given, and GTK gives its own (no
+menu bar) when the window is realized; so the module connects after that
+realize handler (from `GtkApplication::window-added`) and gives ours in
+time, opening the session bus synchronously if it isn't open yet. Windows
+whose application has a menu model keep GTK's own export. Checked in a
+nested session with GIMP 3.0.4: its File ... Help menus in the menu bar, its
+own menu bar hidden, File > New... opened the New Image dialog. Installed
+live on 2026-10-10, the user confirmed GIMP's menus work.
 
 ## Global menus, Electron (VS Code, ...): implemented
 
