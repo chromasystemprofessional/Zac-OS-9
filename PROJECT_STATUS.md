@@ -24,7 +24,7 @@ Updated: 2026-10-09
 
 ## Current work
 
-**RustDesk screen sharing** (initial integration, prepared for 0.1.43): integrate the official
+**RustDesk screen sharing** (initial integration, published in 0.1.43): integrate the official
 native application rather than writing a remote-desktop engine. ScreenCast
 routes to the wlroots portal while FileChooser stays on Finder. PipeWire,
 WirePlumber and the portal backend are required runtime dependencies.
@@ -37,6 +37,10 @@ exports a stream and an authorized PipeWire socket. Frame-consumption testing
 did not succeed; no second-computer session has verified video or remote input.
 Pixman screencopy format negotiation failed in the isolated probe. Hosting is
 not yet certified; see `docs/screen-sharing.md` for setup and limitations.
+The amd64 Debian package passed 73 tests with four skipped and none failing;
+the isolated session test passed separately in the live development environment.
+GitHub's latest release is v0.1.43 and the uploaded package digest matches the
+tested artifact. RustDesk remains a separate install, not bundled by this update.
 
 **Alias replacement warning fix** (0.1.42; published, not installed): unchanged Desktop aliases
 were reporting replaced originals because Linux device numbers changed while
