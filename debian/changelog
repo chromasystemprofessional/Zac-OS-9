@@ -1,3 +1,12 @@
+zacos9 (0.1.46) trixie; urgency=medium
+
+  * Menus of more applications in the menu bar: VS Code and other Electron
+    apps (started under X11, now sharp on HiDPI screens) and GIMP 3. GRUB's
+    start-up picture follows upgrades, so installed systems show Happy Zac
+    from the first moment.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Sat, 10 Oct 2026 19:46:35 -0400
+
 zacos9 (0.1.45) trixie; urgency=medium
 
   * New startup screens: Happy Zac is the boot logo, and the Welcome box is
