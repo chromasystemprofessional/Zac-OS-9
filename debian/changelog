@@ -1,3 +1,13 @@
+zacos9 (0.1.43) trixie; urgency=medium
+
+  * Add initial RustDesk Wayland integration: require the PipeWire capture
+    stack and route ScreenCast to the wlroots portal, preserving Finder's
+    file chooser. RustDesk remains an optional native package. Document
+    attended setup and experimental hosting limitations; video delivery
+    and remote input are not yet verified between computers.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Fri, 09 Oct 2026 21:49:57 -0400
+
 zacos9 (0.1.42) trixie; urgency=medium
 
   * Fix false alias replacement warnings after disks are remounted or

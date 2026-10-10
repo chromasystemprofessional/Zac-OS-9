@@ -24,6 +24,20 @@ Updated: 2026-10-09
 
 ## Current work
 
+**RustDesk screen sharing** (initial integration, prepared for 0.1.43): integrate the official
+native application rather than writing a remote-desktop engine. ScreenCast
+routes to the wlroots portal while FileChooser stays on Finder. PipeWire,
+WirePlumber and the portal backend are required runtime dependencies.
+Attended sharing and native service input are documented; no permanent
+password, relay server or relaxed device permissions are configured.
+RustDesk 1.5.0 is installed and open on the live desktop; its service runs.
+A user portal preference enables monitor capture now without replacing Finder.
+Five focused suites pass, including a private GLES2 ScreenCast session that
+exports a stream and an authorized PipeWire socket. Frame-consumption testing
+did not succeed; no second-computer session has verified video or remote input.
+Pixman screencopy format negotiation failed in the isolated probe. Hosting is
+not yet certified; see `docs/screen-sharing.md` for setup and limitations.
+
 **Alias replacement warning fix** (0.1.42; published, not installed): unchanged Desktop aliases
 were reporting replaced originals because Linux device numbers changed while
 their target inodes stayed the same. Alias records now include the filesystem

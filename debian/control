@@ -71,7 +71,11 @@ Depends: ${shlibs:Depends},
          wl-clipboard,
          bluez,
          libcap2-bin,
-         lxqt-policykit
+         lxqt-policykit,
+         pipewire,
+         wireplumber,
+         xdg-desktop-portal,
+         xdg-desktop-portal-wlr
 Recommends: balena-etcher,
             xwayland,
             netatalk,
