@@ -39,8 +39,13 @@ opened through Home/Desktop in the chooser's Macintosh view. Saves through an
 alias go into its target directory; applications receive real target paths.
 Unavailable or replaced originals report an error instead of opening Home.
 Aliases stay ordinary symbolic links, so existing ones keep working. Beside
-each alias, `<folder>/.alias/<name>` (hidden) records the original's device,
-inode, name and parent folder (`shell/finder/alias.cpp`). Open and Show
+each alias, `<folder>/.alias/<name>` (hidden) records the original's filesystem
+ID, device, inode, name and parent folder (`shell/finder/alias.cpp`). The
+filesystem ID, rather than Linux's transient device number, identifies the
+disk across reboots and remounts. Older records gain it on use; a changed
+device number alone is accepted only when the inode and recorded canonical
+path still match. Filesystems without an ID retain device-number matching.
+Open and Show
 Original resolve through it: if the link no longer resolves, Finder looks for
 the same inode in a few nearby folders (the original's folder and its parent,
 the alias's folder, Desktop, Trash; same disk, depth 3, at most 4000 entries,

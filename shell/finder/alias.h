@@ -5,7 +5,7 @@
 /* Persistent Macintosh-style aliases. An alias stays an ordinary symbolic
  * link (so existing links keep working); next to it, hidden in
  * "<folder>/.alias/<name>", is a small record of the target's identity
- * (device, inode, name, parent folder). When the link's path stops
+ * (filesystem ID, device, inode, name, parent folder). When the link's path stops
  * resolving, the identity lets Finder find a renamed or moved target by
  * looking only in a few nearby folders on the same disk. Nothing is ever
  * created to stand in for a missing target. */

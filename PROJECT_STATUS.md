@@ -24,6 +24,17 @@ Updated: 2026-10-09
 
 ## Current work
 
+**Alias replacement warning fix** (prepared for 0.1.42): unchanged Desktop aliases
+were reporting replaced originals because Linux device numbers changed while
+their target inodes stayed the same. Alias records now include the filesystem
+ID, so identity checks and bounded reconnection survive device renumbering.
+Legacy records migrate on use when the inode and recorded canonical path still
+match. Genuine replacements still require confirmation. Finder and the file
+portal build; the alias and three file-chooser suites pass. Copies of all 11
+live Desktop alias records resolve twice without warnings or errors (six had
+stale device numbers on ext4); the live aliases were not changed. Not installed
+or released. GitHub publication is blocked by an invalid release token.
+
 **The Collar correction** (uncommitted, after 0.1.40): the frame is mirrored
 to match the user's open and closed reference screenshots. The close box and
 recessed scroll arrows are on the left, 30-pixel module cells start at x=29,

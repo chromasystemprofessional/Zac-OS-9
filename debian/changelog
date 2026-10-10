@@ -1,3 +1,11 @@
+zacos9 (0.1.42) trixie; urgency=medium
+
+  * Fix false alias replacement warnings after disks are remounted or
+    device numbers change. Track filesystem identity and migrate unchanged
+    legacy aliases automatically, while still confirming genuine replacements.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Fri, 09 Oct 2026 20:49:05 -0400
+
 zacos9 (0.1.41) trixie; urgency=medium
 
   * The Collar now matches the original layout open and closed, moves

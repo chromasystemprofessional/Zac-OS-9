@@ -24,6 +24,40 @@ static void touch(const QString &path, const char *text = "data") {
 	f.write(text);
 }
 
+static bool recordField(const QString &alias, const QByteArray &key, const QByteArray &value) {
+	const QFileInfo info(alias);
+	QFile file(info.absolutePath() + "/.alias/" + info.fileName());
+	if (!file.open(QIODevice::ReadOnly)) {
+		return false;
+	}
+	QList<QByteArray> lines = file.readAll().split('\n');
+	file.close();
+	bool found = false;
+	for (QByteArray &line : lines) {
+		if (line.startsWith(key + "=")) {
+			line = key + "=" + value;
+			found = true;
+		}
+	}
+	if (!found) {
+		lines.append(key + "=" + value);
+	}
+	if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+		return false;
+	}
+	const QByteArray data = lines.join('\n');
+	return file.write(data) == data.size();
+}
+
+static QByteArray recordContents(const QString &alias) {
+	const QFileInfo info(alias);
+	QFile file(info.absolutePath() + "/.alias/" + info.fileName());
+	if (!file.open(QIODevice::ReadOnly)) {
+		return {};
+	}
+	return file.readAll();
+}
+
 int main(int argc, char **argv) {
 	QCoreApplication app(argc, argv);
 	QTemporaryDir tmp;
@@ -36,6 +70,40 @@ int main(int argc, char **argv) {
 	QFile::link(r + "/docs/report.txt", alias);
 	check(aliasRecord(alias, r + "/docs/report.txt"), "record identity");
 	check(aliasResolve(alias).state == AliasState::Ok, "intact alias resolves");
+
+	/* Device numbers change across mounts; filesystem IDs and inodes do not. */
+	check(!recordContents(alias).contains("filesystem=\n"),
+		"test filesystem supplies a persistent identity");
+	check(recordField(alias, "dev", "18446744073709551615"), "simulate device renumbering");
+	check(aliasResolve(alias, false).state == AliasState::Ok &&
+		aliasResolve(alias).state == AliasState::Ok,
+		"device renumbering does not report an intact alias as replaced");
+	QFile::rename(r + "/docs/report.txt", r + "/docs/remounted.txt");
+	AliasResolution remounted = aliasResolve(alias);
+	check(remounted.state == AliasState::Reconnected &&
+		remounted.target == r + "/docs/remounted.txt",
+		"renamed targets reconnect after device renumbering");
+	check(QFile::rename(r + "/docs/remounted.txt", r + "/docs/report.txt") &&
+		aliasResolve(alias).state == AliasState::Reconnected,
+		"restore target after remount regression");
+
+	check(recordField(alias, "filesystem", "") &&
+		recordField(alias, "dev", "18446744073709551615"), "simulate legacy record after remount");
+	check(aliasResolve(alias, false).state == AliasState::Ok &&
+		!recordContents(alias).contains("filesystem=\n") &&
+		aliasResolve(alias).state == AliasState::Ok,
+		"legacy record migrates on use without a replacement warning");
+	check(recordField(alias, "filesystem", "") &&
+		recordField(alias, "dev", "18446744073709551615") &&
+		recordField(alias, "name", "another.txt"), "simulate unrelated legacy identity");
+	check(aliasResolve(alias, false).state == AliasState::Changed,
+		"legacy migration requires the recorded canonical path as well as inode");
+	check(aliasRecord(alias, r + "/docs/report.txt") &&
+		recordField(alias, "filesystem", "different-filesystem"),
+		"simulate another filesystem with the same device and inode");
+	check(aliasResolve(alias).state == AliasState::Changed,
+		"a different filesystem is not mistaken for the original");
+	check(aliasRecord(alias, r + "/docs/report.txt"), "restore identity after regressions");
 
 	/* A physical alias is opened through its resolved target, not as a link
 	 * or as the empty folder its broken path would otherwise create. */
@@ -105,6 +173,16 @@ int main(int argc, char **argv) {
 	check(QFileInfo(r + "/aliases/other").symLinkTarget() == r + "/docs/again.txt", "link not rewritten silently");
 	check(aliasReconnect(r + "/aliases/other", r + "/docs/again.txt") &&
 		aliasResolve(r + "/aliases/other").state == AliasState::Ok, "user confirms the new item");
+
+	check(recordField(r + "/aliases/other", "filesystem", "") &&
+		recordField(r + "/aliases/other", "dev", "18446744073709551615") &&
+		recordField(r + "/aliases/other", "ino", "18446744073709551615"),
+		"simulate a replaced original with a legacy record after remount");
+	check(aliasResolve(r + "/aliases/other").state == AliasState::Changed &&
+		recordContents(r + "/aliases/other").contains("filesystem=\n"),
+		"legacy migration never adopts a replacement inode");
+	check(aliasReconnect(r + "/aliases/other", r + "/docs/again.txt"),
+		"restore confirmed replacement identity");
 
 	/* User-assisted reconnect of a lost alias. */
 	QFile::link(r + "/docs/gone", r + "/aliases/lost");

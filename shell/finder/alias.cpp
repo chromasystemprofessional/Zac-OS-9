@@ -8,12 +8,14 @@
 #include <QStandardPaths>
 #include <QDirIterator>
 #include <sys/stat.h>
+#include <sys/vfs.h>
 #include <unistd.h>
 
 namespace {
 
 struct Identity {
 	quint64 dev = 0, ino = 0;
+	QByteArray filesystem;
 	QString name, parent;
 	bool valid = false;
 };
@@ -32,6 +34,22 @@ bool statOf(const QString &path, struct stat *st, bool follow) {
 		: lstat(QFile::encodeName(path).constData(), st)) == 0;
 }
 
+QByteArray filesystemOf(const QString &path) {
+	struct statfs st;
+	if (statfs(QFile::encodeName(path).constData(), &st) != 0 ||
+			(st.f_fsid.__val[0] == 0 && st.f_fsid.__val[1] == 0)) {
+		return {};
+	}
+	return QByteArray::number(quint64(st.f_type), 16) + ":" +
+		QByteArray::number(quint32(st.f_fsid.__val[0]), 16) + ":" +
+		QByteArray::number(quint32(st.f_fsid.__val[1]), 16);
+}
+
+bool sameFilesystem(const QString &path, const struct stat &st, const Identity &id) {
+	return id.filesystem.isEmpty() ? quint64(st.st_dev) == id.dev :
+		filesystemOf(path) == id.filesystem;
+}
+
 Identity identityOf(const QString &path) {
 	Identity id;
 	struct stat st;
@@ -39,6 +57,7 @@ Identity identityOf(const QString &path) {
 	if (!intended.isEmpty() && statOf(intended, &st, true)) {
 		id.dev = st.st_dev;
 		id.ino = st.st_ino;
+		id.filesystem = filesystemOf(intended);
 		id.name = QFileInfo(intended).fileName();
 		id.parent = QFileInfo(intended).absolutePath();
 		id.valid = true;
@@ -59,6 +78,8 @@ Identity readRecord(const QString &aliasPath) {
 			id.dev = value.toULongLong();
 		} else if (key == "ino") {
 			id.ino = value.toULongLong();
+		} else if (key == "filesystem") {
+			id.filesystem = value;
 		} else if (key == "name") {
 			id.name = QString::fromUtf8(value);
 		} else if (key == "parent") {
@@ -79,13 +100,22 @@ bool writeRecord(const QString &aliasPath, const Identity &id) {
 	}
 	const QByteArray data = "dev=" + QByteArray::number(id.dev) + "\nino=" +
 		QByteArray::number(id.ino) + "\nname=" + id.name.toUtf8() + "\nparent=" +
-		id.parent.toUtf8() + "\n";
+		id.parent.toUtf8() + "\nfilesystem=" + id.filesystem + "\n";
 	return f.write(data) == data.size() && f.commit();
 }
 
 bool sameIdentity(const QString &path, const Identity &id) {
 	struct stat st;
-	return statOf(path, &st, true) && quint64(st.st_dev) == id.dev && quint64(st.st_ino) == id.ino;
+	if (!statOf(path, &st, true) || quint64(st.st_ino) != id.ino) {
+		return false;
+	}
+	if (sameFilesystem(path, st, id)) {
+		return true;
+	}
+	/* Old records have only a transient device number. Migrate only an
+	 * unchanged inode at the recorded canonical path, never a nearby match. */
+	return id.filesystem.isEmpty() &&
+		QFileInfo(path).canonicalFilePath() == QDir(id.parent).filePath(id.name);
 }
 
 /* Follows the link chain by hand: Loop on a repeat or too many hops,
@@ -121,14 +151,14 @@ QString search(const Identity &id, const QString &aliasPath) {
 		QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + "/Trash/files" };
 	QSet<QString> queued;
 	int visited = 0;
-	struct Level { QString dir; int depth; };
+	struct Level { QString dir; int depth; quint64 dev; };
 	QList<Level> queue;
 	for (const QString &r : roots) {
 		struct stat st;
 		if (!r.isEmpty() && !queued.contains(r) && statOf(r, &st, false) &&
-				S_ISDIR(st.st_mode) && quint64(st.st_dev) == id.dev) {
+				S_ISDIR(st.st_mode) && sameFilesystem(r, st, id)) {
 			queued << r;
-			queue.append({ r, 0 });
+			queue.append({ r, 0, quint64(st.st_dev) });
 		}
 	}
 	for (int i = 0; i < queue.size() && visited < kMaxVisited; i++) {
@@ -142,13 +172,13 @@ QString search(const Identity &id, const QString &aliasPath) {
 			if (!statOf(path, &st, false)) {
 				continue;
 			}
-			if (quint64(st.st_dev) == id.dev && quint64(st.st_ino) == id.ino) {
+			if (quint64(st.st_dev) == level.dev && quint64(st.st_ino) == id.ino) {
 				return path;
 			}
-			if (S_ISDIR(st.st_mode) && quint64(st.st_dev) == id.dev && level.depth < kMaxDepth &&
+			if (S_ISDIR(st.st_mode) && quint64(st.st_dev) == level.dev && level.depth < kMaxDepth &&
 					QFileInfo(path).fileName() != ".alias" && !queued.contains(path)) {
 				queued << path;
-				queue.append({ path, level.depth + 1 });
+				queue.append({ path, level.depth + 1, level.dev });
 			}
 		}
 	}
@@ -215,6 +245,10 @@ AliasResolution aliasResolve(const QString &aliasPath, bool reconnect) {
 			out.state = AliasState::Changed;
 			out.target = final;
 			return out;
+		} else if (id.filesystem.isEmpty()) {
+			if (!aliasRecord(aliasPath, final)) {
+				out.error = "The alias identity record could not be saved.";
+			}
 		}
 		out.state = AliasState::Ok;
 		out.target = final;
