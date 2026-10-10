@@ -33,7 +33,9 @@ match. Genuine replacements still require confirmation. Finder and the file
 portal build; the alias and three file-chooser suites pass. Copies of all 11
 live Desktop alias records resolve twice without warnings or errors (six had
 stale device numbers on ext4); the live aliases were not changed. Not installed
-or released. GitHub publication is blocked by an invalid release token.
+or released. The 0.1.42 amd64 Debian package builds with 72 tests passing,
+three skipped and none failing. GitHub publication is blocked by an invalid
+release token.
 
 **The Collar correction** (uncommitted, after 0.1.40): the frame is mirrored
 to match the user's open and closed reference screenshots. The close box and
