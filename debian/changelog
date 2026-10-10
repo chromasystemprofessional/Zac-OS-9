@@ -1,3 +1,11 @@
+zacos9 (0.1.45) trixie; urgency=medium
+
+  * New startup screens: Happy Zac is the boot logo, and the Welcome box is
+    now a 1984 Macintosh-style 'Welcome to Zacintosh.' box with the ZacOS
+    logo.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Sat, 10 Oct 2026 01:47:42 -0400
+
 zacos9 (0.1.44) trixie; urgency=medium
 
   * Add opt-in current-desktop RDP sharing through xrdp and WayVNC, with
