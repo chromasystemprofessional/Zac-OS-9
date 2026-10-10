@@ -37,6 +37,9 @@ scripts/build.sh
 # Quick VM boot for interactive testing (no ISO rebuild):
 scripts/dev-boot.sh
 
+# Build the package and install it on this computer (one sudo prompt; then log out/in):
+scripts/install-live.sh            # --no-build installs build/packages as is
+
 # AFP client test (against Netatalk on localhost):
 AFP_PASSWORD=Sesame-42 tests/sharing/afp-client.sh 127.0.0.1 "platest's home" platest
 
