@@ -17,8 +17,22 @@ grant_rawio() {
 	fi
 }
 
+# GRUB's start-up picture (/etc/grub.d/09_zacos9) is drawn once by
+# zacos9-install for the screen's size; draw it again at that size so an
+# upgrade's new boot art shows from the first moment, not only from the
+# splash on. Same file name, so GRUB's config needs no update.
+redraw_grub_logo() {
+	[ -f /boot/grub/zacos9-logo.png ] || return 0
+	/usr/libexec/zacos9/zacos9-bootlogo --redraw /boot/grub/zacos9-logo.png ||
+		echo "zacos9: could not redraw the start-up picture." >&2
+}
+
 case "$1" in
-	configure|triggered)
+	configure)
+		grant_rawio
+		redraw_grub_logo
+		;;
+	triggered)
 		grant_rawio
 		;;
 esac

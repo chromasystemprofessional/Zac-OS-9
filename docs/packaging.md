@@ -109,7 +109,9 @@ classic Mac showed its start-up icon) is up as soon as the computer can draw it:
      ships `iso/config/bootloaders/grub-pc/zacos9-boot.png` (and
      `isolinux/splash.png`, 640x480, for BIOS); `zacos9-install` makes one
      for the installed computer's own screen and sets GRUB to that mode
-     (`boot/09_zacos9` shows it; past 4K it is left out).
+     (`boot/09_zacos9` shows it; past 4K it is left out). The package's
+     postinst redraws that picture at its size on every upgrade
+     (`zacos9-bootlogo --redraw`), so new boot art reaches GRUB too.
    - GRUB's own messages and errors are white on the white screen, so none
      show; the menu keeps readable colours. Regenerate the live pictures
      with `tools/boot/make-boot-art.py`.

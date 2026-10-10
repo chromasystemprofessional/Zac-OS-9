@@ -572,6 +572,14 @@ removed. Tests updated: `lib/tests/test_welcome.c`, `compositor/tests/test_start
 `boot/tests/test_splash.py`, `tests/vm/boot-frames.py`. Still to do: a full
 meson build (needs the -dev packages) and a look on real hardware.
 
+**GRUB picture follows upgrades** (uncommitted): installed systems kept
+the old ZacOS logo in GRUB (the first white screen) after upgrading to
+Happy Zac, because `zacos9-install` draws `/boot/grub/zacos9-logo.png` only
+once. `debian/zacos9.postinst` now runs `zacos9-bootlogo --redraw` on it
+(same size, same file name, so no `update-grub`). Checked: an 0.1.44-era
+800x600 picture redraws identical to a fresh one; a non-PNG is refused.
+Still to check: an upgrade on a real installed machine.
+
 **Real extension parade at startup, with Welcome on the boot splash**
 (0.1.32, 2026-10-07): the icons along the bottom of the startup screen
 used to be six fixed pictures shown on a timer after logging in. Now they

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """zacos9-bootlogo WIDTH HEIGHT OUT.png
+zacos9-bootlogo --redraw OUT.png
 
 Writes a white WIDTH x HEIGHT PNG with Happy Zac in the middle: the screen
 GRUB shows from the moment it starts, until the boot splash (boot/plymouth)
@@ -14,6 +15,11 @@ next to this script or in /usr/share/zacos9/boot.
 
 Standard library only: the installer runs it on a live system with no
 imaging libraries, so it reads the (8-bit RGB or RGBA) PNG itself.
+
+--redraw draws OUT.png again at the size it already is, with the art now
+installed: the package's postinst runs it on /boot/grub/zacos9-logo.png,
+which zacos9-install makes only once, so an upgrade changes GRUB's picture
+too.
 """
 import os
 import struct
@@ -119,16 +125,24 @@ def write_png(path, width, height, art):
 
 
 def main():
-    if len(sys.argv) != 4:
+    if len(sys.argv) == 3 and sys.argv[1] == "--redraw":
+        with open(sys.argv[2], "rb") as f:
+            head = f.read(24)
+        if head[:8] != b"\x89PNG\r\n\x1a\n" or head[12:16] != b"IHDR":
+            sys.exit(f"zacos9-bootlogo: {sys.argv[2]} is not a PNG")
+        width, height = struct.unpack(">II", head[16:24])
+        out = sys.argv[2]
+    elif len(sys.argv) == 4:
+        width, height, out = int(sys.argv[1]), int(sys.argv[2]), sys.argv[3]
+    else:
         sys.exit(__doc__)
-    width, height = int(sys.argv[1]), int(sys.argv[2])
     if not (ICON <= width <= 8192 and ICON <= height <= 8192):
         sys.exit("zacos9-bootlogo: size out of range")
     n = scale_for(width, height)
     art = read_png(find_art(f"happy-zac-{n}x.png"))
     if art[0] != ICON * n or art[1] != ICON * n:
         sys.exit("zacos9-bootlogo: happy-zac is the wrong size")
-    write_png(sys.argv[3], width, height, art)
+    write_png(out, width, height, art)
 
 
 main()
