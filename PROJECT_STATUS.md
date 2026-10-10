@@ -24,7 +24,7 @@ Updated: 2026-10-09
 
 ## Current work
 
-**RDP remote desktop** (0.1.44 release preparation): Remmina 1.4.39 and its
+**RDP remote desktop** (0.1.44 published): Remmina 1.4.39 and its
 RDP plugin are installed and the client opens; FreeRDP 3.15.0 is available.
 The xrdp/WayVNC bridge is implemented; installed native development package
 `0.1.43+rdptest2` replaces the initial local test add-on and persists the compositor fix.
@@ -47,6 +47,11 @@ the full live self-test or a second-computer session can be certified.
 Eleven RDP configuration/transport regressions pass. The native amd64 package
 passed 75 tests with four skipped and none failing. Clipboard, audio, drive redirection
 and automatic resizing are deliberately disabled. See `docs/rdp.md`.
+The 0.1.44 release package also passed 75 tests with four skipped and none
+failing. GitHub's latest release is v0.1.44; downloading its amd64 Debian
+asset produced an exact byte match with the tested package (SHA-256
+`2cd74c89cf60e9b27507a77b295ce37542dd0da4199796733c6698d78561b435`).
+The release is not automatically installed; restart the desktop after updating.
 Sunshine is stopped and its user-service autostart disabled; credentials and
 the separate RustDesk installation are retained.
 
