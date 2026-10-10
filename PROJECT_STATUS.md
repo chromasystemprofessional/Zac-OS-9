@@ -6,6 +6,7 @@ Updated: 2026-10-09
 
 | Commit | Feature |
 |---|---|
+| *(uncommitted)* | Silent start-up: the platinum sparkle logo is replaced by Happy Zac, and the Welcome box is now "Welcome to Zacintosh." with the ZacOS logo in a box like the 1984 Macintosh's (no progress bar) — see below |
 | `cd4f6ed` | Silent start-up: white screen, platinum sparkle logo, Welcome screen; `scripts/dev-boot.sh` |
 | `d1f5765` | File Sharing control panel (AFP + SMB toggle, shared folders list) |
 | `02cd5a4` | Get Info > Sharing view, pixel-matched to Mac OS 9's original |
@@ -555,6 +556,21 @@ The JavaScript authorization regression passes all 64 action/session/group
 combinations; all three focused authorization and disk-helper suites pass.
 The rule is installed through the existing package path; reboot behavior on
 the connected physical drive still needs confirmation after installing it.
+
+**Happy Zac and "Welcome to Zacintosh."** (uncommitted): the boot logo in
+GRUB, the splash and the compositor is now Happy Zac
+(`assets/boot/happy-zac.png`). The Welcome box copies the 1984 Macintosh's
+welcome box (measured from a screenshot kept out of the repo): white box,
+1 px black line, 2 px solid shadow, the ZacOS logo (`assets/boot/zacos-logo.png`)
+at its left and "Welcome to Zacintosh." centred. The picture and progress
+bar inside the box are gone. Everything uses one whole-number scale of the
+1984 512x342 screen (`pl_welcome_scale`, 1–6; 3x at 1080p), so GRUB, the
+splash and the desktop line up. Per-scale art: `assets/boot/*-Nx.png`
+(from `tools/boot/make-boot-art.py`) and the splash's `welcome-Nx.png` (from
+`boot/make-splash.c`). `boot/logo-64.rgb` and `boot/plymouth/logo.png` are
+removed. Tests updated: `lib/tests/test_welcome.c`, `compositor/tests/test_startup.c`,
+`boot/tests/test_splash.py`, `tests/vm/boot-frames.py`. Still to do: a full
+meson build (needs the -dev packages) and a look on real hardware.
 
 **Real extension parade at startup, with Welcome on the boot splash**
 (0.1.32, 2026-10-07): the icons along the bottom of the startup screen
@@ -1378,7 +1394,7 @@ real devices yet - this machine has an adapter, but bluez wasn't installed).
   white well, status, progress bar; the extension icons now march in along the bottom of the screen
   as the bar fills (they used to run during the logo phase). Logo-only phase 1500 → 500 ms.
   `lib/tests/test_welcome.c`; `tests/vm/boot-frames.py` recognises the new box.
-- Tools: `tools/boot/make-boot-art.py` regenerates `boot/logo-64.rgb` and the two live pictures.
+- Tools: `tools/boot/make-boot-art.py` regenerates the boot art in `assets/boot/` and the two live pictures.
   `build/bootlab/` (not committed): loop-mount the test disks, patch an ISO's boot files with xorriso
   (no rebuild), record a boot frame by frame (`rec.sh`, `rec-iso.sh`, `analyze.py`).
 - **Not fixed — gaps of ~1 s of plain white** between GRUB and the splash, and before zacos9-wm

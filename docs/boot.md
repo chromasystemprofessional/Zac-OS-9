@@ -2,15 +2,35 @@
 
 What the screen shows from power-on to the desktop, and which part draws it.
 
-1. **GRUB** (`boot/09_zacos9`, `boot/zacos9-bootlogo`): white, the logo.
-2. **Boot splash** (Plymouth theme `boot/plymouth/`): the logo on white for
-   half a second, then the **Welcome to ZacOS 9** box over the desktop
+1. **GRUB** (`boot/09_zacos9`, `boot/zacos9-bootlogo`): white, Happy Zac.
+2. **Boot splash** (Plymouth theme `boot/plymouth/`): Happy Zac on white for
+   half a second, then the **Welcome to Zacintosh.** box over the desktop
    pattern. Extensions join the row along the bottom of the screen as
    their kernel modules load.
 3. **Desktop** (`compositor/src/startup.c`): the same Welcome box, carried
    on until the menu bar and Finder are up.
 
-On shutdown the splash shows the logo and a progress bar instead.
+On shutdown the splash shows Happy Zac and a progress bar instead.
+
+## The pictures
+
+The boot art lives in `assets/boot/`: `happy-zac.png` (the boot logo) and
+`zacos-logo.png` (the logo in the Welcome box), as 512 px masters plus
+copies at 32, 64 ... 192 px (`happy-zac-Nx.png`, `zacos-logo-Nx.png`).
+`tools/boot/make-boot-art.py` makes those copies and the live medium's
+GRUB/isolinux pictures; run it after changing a master. They install to
+`/usr/share/zacos9/boot`.
+
+The Welcome box copies the 1984 Macintosh's welcome box, measured on its
+512x342 screen: a 448x126 box at (32, 64) with a 1 px line and a 2 px solid
+shadow, the 32 px logo at (24, 25) inside it and the title centred on
+x = 236 with its baseline on row 42 (`lib/welcome.h`). There is no progress
+bar or status line. On a real display everything is scaled by the largest
+whole number that fits a 512x342 screen into it (1 to 6;
+`pl_welcome_scale`), with that screen centred: 1920x1080 is 3x, so a
+1344x378 box and a 96 px logo, and Happy Zac is 96 px in the middle. GRUB,
+the splash and the compositor all use this rule, so nothing moves between
+them.
 
 ## The extension parade
 
@@ -26,18 +46,17 @@ minutes. Each time a module of a new extension loads, it:
 Modules that were already loaded in the initramfs (graphics, disks) appear
 first, together. After the handover, the compositor re-reads
 `/run/zacos9/parade` as it grows. Started without that record (no splash,
-or after a log out), it shows what `/proc/modules` lists, marching in as
-the bar fills.
+or after a log out), it shows what `/proc/modules` lists, marching in
+while the Welcome box is up.
 
 ## Splash art from the compositor's code
 
 `boot/make-splash.c` runs at build time. It draws the splash's pictures with
-the same `lib/welcome.c` code the compositor uses: `welcome.png`, `bar-fill.png`,
-`bar-end.png`, `pattern.png` and `parade.png`. The script places them where
-`pl_welcome_box_origin`, `pl_welcome_bar_origin` and `pl_parade_slot` would.
-The splash fills the bar to three quarters; the compositor starts from
-there. Changing the box's layout in `lib/welcome.h` means changing the
-constants at the top of `zacos9.script` too. `boot-splash-welcome` checks
+the same `lib/welcome.c` code the compositor uses: `welcome-Nx.png` (the box
+and its shadow at each scale), `pattern.png` and `parade.png`. The script
+places them where `pl_welcome_box_origin` and `pl_parade_slot` would.
+Changing the box's layout in `lib/welcome.h` means changing the constants
+at the top of `zacos9.script` too. `boot-splash-welcome` checks
 the positions in Plymouth's own interpreter.
 
 The splash always uses the default pattern and accent colour; it can't
@@ -57,8 +76,7 @@ repaints the screen (all white) until the compositor draws. Instead:
 - `plymouth-quit-wait.service` returns at once once handed over (`wait`),
   so greetd and the autologin start.
 - The compositor sees a handoff less than 60 s old. It skips the logo,
-  draws the Welcome box straight away with the bar at three quarters, and
-  uses the boot's parade record.
+  draws the Welcome box straight away, and uses the boot's parade record.
 - The watcher (`watch`) ends the splash for good:
   - with `plymouth quit --retain-splash` half a second after another
     process opens `/dev/dri/card*`;

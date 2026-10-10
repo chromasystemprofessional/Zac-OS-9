@@ -1,15 +1,14 @@
-# The boot splash. At boot: the logo on white, as GRUB showed it, then the
-# Welcome screen - the box over the desktop pattern, drawn ahead of time by
+# The boot splash. At boot: Happy Zac on white, as GRUB showed it, then the
+# Welcome to Zacintosh box over the desktop pattern - drawn ahead of time by
 # the compositor's own code (boot/make-splash.c) - with each extension's
 # icon added along the bottom as its kernel module loads (boot/zacos9-parade
 # sends "zacos9-ext:INDEX"). The compositor's own Welcome screen takes over
 # from this frame (compositor/src/startup.c, boot/zacos9-boot-handoff), so
-# the positions here are the same as there. Shutting down: the logo and a
-# bar. Every display gets its own complete, centred copy.
+# the positions here are the same as there (lib/welcome.h). Shutting down:
+# Happy Zac and a bar. Every display gets its own complete, centred copy.
 Window.SetBackgroundTopColor(1, 1, 1);
 Window.SetBackgroundBottomColor(1, 1, 1);
 
-logo_image = Image("logo.png");
 box_image = Image("progress-box.png");
 fill_source = Image("progress-fill.png");
 fill_inner = box_image.GetWidth() - 4;
@@ -18,18 +17,24 @@ password_image = NULL;
 screens = [];
 screen_count = 0;
 
-# The Welcome screen (lib/welcome.h).
-welcome_image = Image("welcome.png");
-bar_fill_image = Image("bar-fill.png");
-bar_end_image = Image("bar-end.png");
+# The startup screen: the 1984 Macintosh's 512x342 screen, scaled by a whole
+# number for each display (lib/welcome.h), with pictures for each scale.
+SCREEN_W = 512;
+SCREEN_H = 342;
+MAX_SCALE = 6;
+BOX_X = 32;
+BOX_Y = 64;
+BOX_H = 126;
+SHADOW = 2;
+ICON_SIZE = 32;
+happy_images = [];
+welcome_images = [];
+for (n = 1; n <= MAX_SCALE; n++) {
+  happy_images[n] = Image("happy-zac-" + n + "x.png");
+  welcome_images[n] = Image("welcome-" + n + "x.png");
+}
 pattern_image = Image("pattern.png");
 parade_sheet = Image("parade.png");
-WELCOME_W = 320;
-WELCOME_H = 270;
-BAR_X = 51;           # the bar's inside, from the box's corner
-BAR_Y = 233;
-BAR_INNER = 218;
-BAR_SHARE = 0.75;     # of the bar, for the splash; the compositor fills the rest
 LOGO_SECONDS = 0.5;
 ICON = 32;
 ICON_STEP = 40;
@@ -38,9 +43,19 @@ ICON_BOTTOM = 12;
 
 boot = Plymouth.GetMode() == "boot";
 welcome = 0;
-welcome_fill = 0;
 parade = [];
 parade_count = 0;
+
+fun scale_for(width, height) {
+  sc = Math.Int(width / SCREEN_W);
+  if (Math.Int(height / SCREEN_H) < sc)
+    sc = Math.Int(height / SCREEN_H);
+  if (sc > MAX_SCALE)
+    sc = MAX_SCALE;
+  if (sc < 1)
+    sc = 1;
+  return sc;
+}
 
 fun parade_slot(width, height, i) {
   per_row = Math.Int((width - 2 * ICON_LEFT + ICON_STEP - ICON) / ICON_STEP);
@@ -68,16 +83,14 @@ fun refresh_callback() {
     Window.SetX(i, x);
     Window.SetY(i, 0);
     if (screens[i] == NULL) {
-      screens[i].logo = Sprite(logo_image);
+      screens[i].logo = Sprite();
       screens[i].box = Sprite(box_image);
       screens[i].fill = Sprite();
       screens[i].password = Sprite();
       screens[i].shown = -1;
       screens[i].pattern = Sprite();
-      screens[i].welcome = Sprite(welcome_image);
-      screens[i].bar = Sprite();
-      screens[i].bar_end = Sprite(bar_end_image);
-      screens[i].bar_shown = -1;
+      screens[i].welcome = Sprite();
+      screens[i].scale = -1;
       screens[i].icons = [];
       screens[i].icon_count = 0;
       screens[i].pattern_w = -1;
@@ -85,13 +98,20 @@ fun refresh_callback() {
     }
     s = screens[i];
     cx = x + Math.Int(width / 2);
-    cy = Math.Int(height / 2);
+    sc = scale_for(width, height);
+    if (s.scale != sc) {
+      s.logo.SetImage(happy_images[sc]);
+      s.welcome.SetImage(welcome_images[sc]);
+      s.scale = sc;
+    }
 
-    # The logo, and when shutting down a bar under it.
+    # Happy Zac, and when shutting down a bar under it.
+    size = ICON_SIZE * sc;
+    logo_x = x + Math.Int((width - size) / 2);
+    logo_y = Math.Int((height - size) / 2);
     box_x = cx - Math.Int(box_image.GetWidth() / 2);
-    box_y = cy + Math.Int(logo_image.GetHeight() / 2) + 40;
-    s.logo.SetPosition(cx - Math.Int(logo_image.GetWidth() / 2),
-                       cy - Math.Int(logo_image.GetHeight() / 2), 0);
+    box_y = logo_y + size + 40;
+    s.logo.SetPosition(logo_x, logo_y, 0);
     s.box.SetPosition(box_x, box_y, 1);
     s.fill.SetPosition(box_x + 2, box_y + 2, 2);
     if (s.shown != progress_width) {
@@ -110,22 +130,9 @@ fun refresh_callback() {
       s.pattern_h = height;
     }
     s.pattern.SetPosition(x, 0, 10);
-    wx = x + Math.Int((width - WELCOME_W) / 2);
-    wy = Math.Int((height - WELCOME_H) / 2);
+    wx = x + Math.Int((width - SCREEN_W * sc) / 2) + BOX_X * sc;
+    wy = Math.Int((height - SCREEN_H * sc) / 2) + BOX_Y * sc;
     s.welcome.SetPosition(wx, wy, 11);
-    if (s.bar_shown != welcome_fill) {
-      if (welcome_fill > 0)
-        s.bar.SetImage(bar_fill_image.Crop(0, 0, welcome_fill, bar_fill_image.GetHeight()));
-      # The fill's end and the shadow after it, short of the bar's right end.
-      end_w = BAR_INNER + 2 - welcome_fill;
-      if (end_w > bar_end_image.GetWidth())
-        end_w = bar_end_image.GetWidth();
-      if (end_w > 0)
-        s.bar_end.SetImage(bar_end_image.Crop(0, 0, end_w, bar_end_image.GetHeight()));
-      s.bar_shown = welcome_fill;
-    }
-    s.bar.SetPosition(wx + BAR_X, wy + BAR_Y, 12);
-    s.bar_end.SetPosition(wx + BAR_X + welcome_fill - 2, wy + BAR_Y, 13);
     for (j = s.icon_count; j < parade_count; j++)
       s.icons[j] = Sprite(parade[j]);
     s.icon_count = parade_count;
@@ -136,14 +143,12 @@ fun refresh_callback() {
     }
     show(s.pattern, welcome);
     show(s.welcome, welcome);
-    show(s.bar, welcome && welcome_fill > 0);
-    show(s.bar_end, welcome && welcome_fill >= 3 && welcome_fill < BAR_INNER);
 
     s.password.SetImage(password_image);
     if (password_image != NULL) {
       if (welcome)
         s.password.SetPosition(cx - Math.Int(password_image.GetWidth() / 2),
-                               wy + WELCOME_H + 16, 20);
+                               wy + (BOX_H + SHADOW) * sc + 16, 20);
       else
         s.password.SetPosition(cx - Math.Int(password_image.GetWidth() / 2), box_y + 30, 20);
     }
@@ -164,14 +169,6 @@ fun boot_progress_callback(duration, progress) {
     w = fill_inner;
   if (w > progress_width)
     progress_width = w;
-  w = Math.Int(progress * BAR_SHARE * BAR_INNER + 0.5);
-  if (w > BAR_INNER)
-    w = BAR_INNER;
-  # Narrower, a bar's first columns are drawn differently from these images.
-  if (w < 4)
-    w = 0;
-  if (w > welcome_fill)
-    welcome_fill = w;
   if (boot && duration >= LOGO_SECONDS)
     welcome = 1;
 }

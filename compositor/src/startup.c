@@ -1,23 +1,21 @@
 /*
- * The startup screen, as a classic Mac started up: first the logo on
- * white (the boot before it is all white too, see iso/kernel-params and
- * boot/plymouth, and GRUB shows the same logo in the same place before
- * either), then, while the menu bar and the Finder start, the Welcome box
- * over the desktop pattern: "Welcome to ZacOS 9", a picture of a computer
- * (lib/welcome.c) and a progress bar, with the extensions' icons along the
- * bottom of the screen, as Mac OS 9 showed while it loaded. It lifts once
- * both shell components have put up their surfaces (or after
- * STARTUP_MAX_MS).
+ * The startup screen, as the Macintosh of 1984 started up: first Happy Zac
+ * on white (the boot before it is all white too, see iso/kernel-params and
+ * boot/plymouth, and GRUB shows Happy Zac in the same place before either),
+ * then, while the menu bar and the Finder start, the "Welcome to
+ * Zacintosh." box with the ZacOS logo over the desktop pattern
+ * (lib/welcome.c), with the extensions' icons along the bottom of the
+ * screen, as Mac OS 9 showed while it loaded. It lifts once both shell
+ * components have put up their surfaces (or after STARTUP_MAX_MS).
  *
  * At boot the splash has shown all this already: boot/zacos9-parade adds
  * each extension's icon as its kernel module loads, both to the splash and
  * to /run/zacos9/parade, and boot/zacos9-boot-handoff keeps the splash's
  * last frame up until this takes over (it writes /run/zacos9/handoff).
- * Then this skips the logo, carries on the bar from where the splash left
- * it, and keeps adding icons as more lines arrive. Without that record (a
- * later login) the loaded extensions march in as the bar fills.
+ * Then this skips Happy Zac and keeps adding icons as more lines arrive.
+ * Without that record (a later login) the loaded extensions march in one
+ * by one.
  *
- * The box layout is ours; TODO: the HIG doesn't show the Mac OS 9 one.
  * ZACOS9_STARTUP=0 turns the screen off.
  */
 #include <stdio.h>
@@ -30,7 +28,6 @@
 #include "draw.h"
 #include "extensions.h"
 #include "icons.h"
-#include "logo.h"
 #include "patterns.h"
 #include "pixbuf.h"
 #include "server.h"
@@ -41,17 +38,15 @@
 #include "widgets.h"
 
 #define TICK_MS 40
-#define LOGO_MS 500 /* the logo on white, before the Welcome box */
+#define LOGO_MS 500 /* Happy Zac on white, before the Welcome box */
 #define MAX_PARADE 64
 #define HANDOFF_FRESH_S 60 /* a handoff record older than this is a past boot's */
-/* The splash fills this much of the bar; it is the same in zacos9.script. */
-#define SPLASH_BAR_SHARE 0.75
 #define WELCOME_MIN_MS 1500 /* the Welcome box shows at least this long */
 #define HANDOFF_MIN_MS 500   /* ... or this, when the splash showed it already */
 #define STARTUP_MAX_MS 6000 /* from the Welcome box */
-#define FILL_MS 2500 /* time to reach 90% while waiting */
-#define FINISH_MS 300 /* from "ready" to a full bar */
-#define HOLD_MS 250   /* the full bar stays up this long */
+#define FILL_MS 2500 /* time to reach 90% of the march-in while waiting */
+#define FINISH_MS 300 /* from "ready" to the last icon */
+#define HOLD_MS 250   /* the finished screen stays up this long */
 static struct {
 	struct plat_server *server;
 	bool active;
@@ -65,7 +60,7 @@ static struct {
 	int n_parade;
 	off_t parade_size;
 	int pattern;
-	struct plat_text *title, *status;
+	struct plat_text *title;
 } st;
 
 static long now_ms(void) {
@@ -160,9 +155,9 @@ static bool handed_off(void) {
 	return ok && at >= 0 && now - at >= 0 && now - at < HANDOFF_FRESH_S;
 }
 
+/* How far the extensions have marched in, from 0 to 1. */
 static double progress(long t) {
-	const double from = st.handoff ? SPLASH_BAR_SHARE : 0;
-	double p = from + (double)(t - st.welcome_ms) / FILL_MS * (0.9 - from);
+	double p = (double)(t - st.welcome_ms) / FILL_MS * 0.9;
 	if (p > 0.9) {
 		p = 0.9;
 	}
@@ -173,17 +168,10 @@ static double progress(long t) {
 	return p;
 }
 
-/* The HQ logo (64×64), top-left at (x, y), blended with real alpha. */
-static void paint_logo(struct pl_canvas *c, int x, int y) {
-	pl_image_blend(c, x, y, logo_pixels_hq(), PL_LOGO_SIZE_HQ, PL_LOGO_SIZE_HQ, false);
-}
-
 static void draw_logo(struct wlr_scene_buffer *buffer, int w, int h) {
 	struct plat_pixbuf *buf = pixbuf_create(w, h);
 	struct pl_canvas c = { .px = buf->data, .stride = w, .width = w, .height = h };
-	pl_fill(&c, 0, 0, w - 1, h - 1, C_WHITE);
-	const int lw = PL_LOGO_SIZE_HQ;
-	paint_logo(&c, (w - lw) / 2, (h - lw) / 2);
+	pl_happy_zac_paint(&c, w, h);
 
 	wlr_scene_buffer_set_buffer(buffer, &buf->base);
 	wlr_buffer_drop(&buf->base);
@@ -195,10 +183,9 @@ static void draw(struct wlr_scene_buffer *buffer, int w, int h, double fraction)
 	pl_pattern_fill(&c, st.pattern, 0, 0, w - 1, h - 1);
 	int bx, by;
 	pl_welcome_box_origin(w, h, &bx, &by);
-	pl_welcome_box_paint(&c, bx, by, st.title, st.status, fraction, pl_accent_current());
+	pl_welcome_box_paint(&c, bx, by, pl_welcome_scale(w, h), st.title);
 
-	/* Live from the boot's record, or one more each time the bar passes
-	 * another step. */
+	/* Live from the boot's record, or one more at each step of the march. */
 	int shown = st.n_parade;
 	if (!st.live) {
 		shown = (int)(fraction * (st.n_parade + 1));
@@ -219,7 +206,6 @@ static void finish(void) {
 		startup_output_destroy(output);
 	}
 	text_destroy(st.title);
-	text_destroy(st.status);
 	st.active = false;
 }
 
@@ -303,8 +289,7 @@ void startup_begin(struct plat_server *server) {
 		read_loaded_modules();
 	}
 	st.pattern = chosen_pattern();
-	st.title = text_render_font("Welcome to ZacOS 9", 1000, PL_FONT_SYSTEM);
-	st.status = text_render_font("Starting Up\xe2\x80\xa6", 1000, PL_FONT_VIEWS);
+	st.title = text_render_font(PL_WELCOME_TITLE, 1000, PL_FONT_SYSTEM);
 	st.timer = wl_event_loop_add_timer(wl_display_get_event_loop(server->display), tick, NULL);
 	wl_event_source_timer_update(st.timer, 1);
 }

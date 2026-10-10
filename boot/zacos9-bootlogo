@@ -1,31 +1,95 @@
 #!/usr/bin/env python3
 """zacos9-bootlogo WIDTH HEIGHT OUT.png
 
-Writes a white WIDTH x HEIGHT PNG with the ZacOS 9 logo (64x64) in the
-middle: the screen GRUB shows from the moment it starts, until the boot
-splash (boot/plymouth) draws the same logo in the same place. GRUB can only
-draw a background image at the screen's top left, so the image is the
-screen's own size and the logo is placed in it here.
+Writes a white WIDTH x HEIGHT PNG with Happy Zac in the middle: the screen
+GRUB shows from the moment it starts, until the boot splash (boot/plymouth)
+draws the same picture in the same place. GRUB can only draw a background
+image at the screen's top left, so the image is the screen's own size and
+the picture is placed in it here.
+
+Happy Zac is 32 x N pixels square, N the startup screen's scale for this
+screen (lib/welcome.h: the 1984 Macintosh's 512x342 screen, scaled by a
+whole N from 1 to 6). It is read from happy-zac-Nx.png in $ZACOS9_BOOT_ART,
+next to this script or in /usr/share/zacos9/boot.
 
 Standard library only: the installer runs it on a live system with no
-imaging libraries. The logo itself is logo-64.rgb, 64x64 RGB already
-flattened onto white, next to this script or in /usr/share/zacos9/boot.
+imaging libraries, so it reads the (8-bit RGB or RGBA) PNG itself.
 """
 import os
 import struct
 import sys
 import zlib
 
-LOGO = 64
+ICON, SCREEN_W, SCREEN_H, MAX_SCALE = 32, 512, 342, 6
 
 
-def find_logo():
+def scale_for(width, height):
+    return max(1, min(width // SCREEN_W, height // SCREEN_H, MAX_SCALE))
+
+
+def find_art(name):
     here = os.path.dirname(os.path.abspath(__file__))
-    for d in (here, "/usr/share/zacos9/boot"):
-        p = os.path.join(d, "logo-64.rgb")
-        if os.path.exists(p):
-            return p
-    sys.exit("zacos9-bootlogo: logo-64.rgb not found")
+    for d in (os.environ.get("ZACOS9_BOOT_ART"), here, "/usr/share/zacos9/boot"):
+        if d and os.path.exists(os.path.join(d, name)):
+            return os.path.join(d, name)
+    sys.exit(f"zacos9-bootlogo: {name} not found")
+
+
+def read_png(path):
+    """Returns (width, height, rows of RGB bytes flattened onto white)."""
+    with open(path, "rb") as f:
+        data = f.read()
+    if data[:8] != b"\x89PNG\r\n\x1a\n":
+        sys.exit(f"zacos9-bootlogo: {path} is not a PNG")
+    pos, idat, header = 8, [], None
+    while pos < len(data):
+        (length,) = struct.unpack(">I", data[pos:pos + 4])
+        kind, body = data[pos + 4:pos + 8], data[pos + 8:pos + 8 + length]
+        pos += 12 + length
+        if kind == b"IHDR":
+            header = struct.unpack(">IIBBBBB", body)
+        elif kind == b"IDAT":
+            idat.append(body)
+        elif kind == b"IEND":
+            break
+    if not header:
+        sys.exit(f"zacos9-bootlogo: {path} has no header")
+    width, height, depth, colour, _, _, interlace = header
+    if depth != 8 or colour not in (2, 6) or interlace:
+        sys.exit(f"zacos9-bootlogo: {path} is not 8-bit RGB(A)")
+    bpp = 4 if colour == 6 else 3
+    raw = zlib.decompress(b"".join(idat))
+    stride = width * bpp
+    prev = bytearray(stride)
+    rows = []
+    for y in range(height):
+        kind = raw[y * (stride + 1)]
+        line = bytearray(raw[y * (stride + 1) + 1:(y + 1) * (stride + 1)])
+        for i in range(stride):
+            a = line[i - bpp] if i >= bpp else 0
+            b = prev[i]
+            c = prev[i - bpp] if i >= bpp else 0
+            if kind == 1:
+                line[i] = (line[i] + a) & 0xFF
+            elif kind == 2:
+                line[i] = (line[i] + b) & 0xFF
+            elif kind == 3:
+                line[i] = (line[i] + (a + b) // 2) & 0xFF
+            elif kind == 4:
+                pa, pb, pc = abs(b - c), abs(a - c), abs(a + b - 2 * c)
+                pred = a if pa <= pb and pa <= pc else (b if pb <= pc else c)
+                line[i] = (line[i] + pred) & 0xFF
+        prev = line
+        if bpp == 3:
+            rows.append(bytes(line))
+            continue
+        out = bytearray(width * 3)
+        for x in range(width):
+            alpha = line[x * 4 + 3]
+            for k in range(3):
+                out[x * 3 + k] = (line[x * 4 + k] * alpha + 255 * (255 - alpha) + 127) // 255
+        rows.append(bytes(out))
+    return width, height, rows
 
 
 def chunk(kind, data):
@@ -33,14 +97,15 @@ def chunk(kind, data):
     return struct.pack(">I", len(data)) + body + struct.pack(">I", zlib.crc32(body) & 0xFFFFFFFF)
 
 
-def write_png(path, width, height, logo):
-    x0, y0 = (width - LOGO) // 2, (height - LOGO) // 2
+def write_png(path, width, height, art):
+    size, _, art_rows = art
+    x0, y0 = (width - size) // 2, (height - size) // 2
     white = b"\x00" + b"\xff" * (3 * width)  # filter type 0, then the row
     rows = []
     for y in range(height):
-        if y0 <= y < y0 + LOGO:
-            row = logo[(y - y0) * LOGO * 3:(y - y0 + 1) * LOGO * 3]
-            rows.append(b"\x00" + b"\xff" * (3 * x0) + row + b"\xff" * (3 * (width - x0 - LOGO)))
+        if y0 <= y < y0 + size:
+            rows.append(b"\x00" + b"\xff" * (3 * x0) + art_rows[y - y0]
+                        + b"\xff" * (3 * (width - x0 - size)))
         else:
             rows.append(white)
     png = (b"\x89PNG\r\n\x1a\n"
@@ -57,13 +122,13 @@ def main():
     if len(sys.argv) != 4:
         sys.exit(__doc__)
     width, height = int(sys.argv[1]), int(sys.argv[2])
-    if not (LOGO <= width <= 8192 and LOGO <= height <= 8192):
+    if not (ICON <= width <= 8192 and ICON <= height <= 8192):
         sys.exit("zacos9-bootlogo: size out of range")
-    with open(find_logo(), "rb") as f:
-        logo = f.read()
-    if len(logo) != LOGO * LOGO * 3:
-        sys.exit("zacos9-bootlogo: logo-64.rgb is the wrong size")
-    write_png(sys.argv[3], width, height, logo)
+    n = scale_for(width, height)
+    art = read_png(find_art(f"happy-zac-{n}x.png"))
+    if art[0] != ICON * n or art[1] != ICON * n:
+        sys.exit("zacos9-bootlogo: happy-zac is the wrong size")
+    write_png(sys.argv[3], width, height, art)
 
 
 main()

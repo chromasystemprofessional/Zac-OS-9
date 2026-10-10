@@ -18,6 +18,7 @@ tools/measure/hig.txt
 /core.*
 /uploads/
 /Uploads/
+/upload assets/
 __pycache__/
 
 # Local compatibility archive: never package third-party theme assets.

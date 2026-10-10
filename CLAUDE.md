@@ -60,7 +60,7 @@ AFP_PASSWORD=macpass tests/sharing/afp-client.sh 127.0.0.1:5548 "Macintosh HD" "
 ## Key constraints
 
 - **No Apple assets.** No Happy Mac, no startup chime, no Apple fonts or icons.
-- **Platinum sparkle logo** is the boot logo (original asset, not the Apple logo).
+- **Happy Zac** (`assets/boot/happy-zac.png`) is the boot logo; the Welcome box shows `assets/boot/zacos-logo.png` (original assets, not the Apple logo). The 1984 Macintosh screenshot in `upload assets/` is a layout reference only: never ship or commit it.
 - `macos/` and `uploads/` are for measurement reference only; nothing from them ships.
 - Marks must not infringe Apple trademarks.
 

@@ -47,9 +47,13 @@ def kind(path):
     menubar = all(full[x, 19] == (0, 0, 0) for x in range(0, w, 7))
     if menubar:
         return "desktop"
-    # The Welcome box (picture in the middle, so look just inside its left
-    # edge): platinum grey, and the desktop pattern just outside it.
-    if full[w // 2 - 150, h // 2] == (221, 221, 221) and full[w // 2 - 170, h // 2] != (221, 221, 221):
+    # The Welcome box (lib/welcome.h): where the 1984 box sits on a 512x342
+    # screen scaled up and centred - black line, white inside, black shadow.
+    s = max(1, min(w // 512, h // 342, 6))
+    bx, by = (w - 512 * s) // 2 + 32 * s, (h - 342 * s) // 2 + 64 * s
+    if w >= 512 and h >= 342 and full[bx + 400 * s, by] == (0, 0, 0) and \
+            full[bx + 400 * s, by + 100 * s] == (255, 255, 255) and \
+            full[bx + 448 * s, by + 126 * s] == (0, 0, 0):
         return "welcome"
     return "other"
 

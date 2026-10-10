@@ -74,9 +74,12 @@ Image |= fun(file) {
   image.width = 64; image.height = 64;
   if (file == "progress-box.png") { image.width = BOX_WIDTH; image.height = BOX_HEIGHT; }
   if (file == "progress-fill.png") { image.width = 1; image.height = BOX_HEIGHT - 4; }
-  if (file == "welcome.png") { image.width = 322; image.height = 272; }
-  if (file == "bar-fill.png") { image.width = 218; image.height = 10; }
-  if (file == "bar-end.png") { image.width = 5; image.height = 10; }
+  for (mock_n = 1; mock_n <= 6; mock_n++) {
+    if (file == "happy-zac-" + mock_n + "x.png") { image.width = 32 * mock_n; image.height = 32 * mock_n; }
+    if (file == "welcome-" + mock_n + "x.png") {
+      image.width = 450 * mock_n; image.height = 128 * mock_n; image.scale = mock_n;
+    }
+  }
   if (file == "parade.png") { image.width = 32 * 44; image.height = 32; }
   return image;
 };
@@ -118,8 +121,10 @@ try:
           failures += welcome != 1 || parade_count != 1;
           failures += screens[0].logo.opacity != 0 || screens[1].welcome.opacity != 1;
           failures += screens[0].pattern.image.width != 1280 || screens[1].pattern.image.height != 1080;
-          failures += screens[0].welcome.x != 480 || screens[0].welcome.y != 265;
-          failures += screens[1].welcome.x != 1280 + 800 || screens[1].welcome.y != 405;
+          # 1280x800 is the 1984 screen twice over, 1920x1080 three times.
+          failures += screens[0].welcome.image.scale != 2 || screens[1].welcome.image.scale != 3;
+          failures += screens[0].welcome.x != 192 || screens[0].welcome.y != 186;
+          failures += screens[1].welcome.x != 1280 + 288 || screens[1].welcome.y != 219;
           failures += screens[0].icons[0].image.crop_x != 96;
           failures += screens[0].icons[0].x != 16 || screens[0].icons[0].y != 800 - 44;
           failures += screens[1].icons[0].x != 1280 + 16 || screens[1].icons[0].y != 1080 - 44;
@@ -135,31 +140,22 @@ try:
           failures += screens[1].icons[31].x != 1280 + 16 + 31 * 40;
         """, "bad statuses are ignored and the parade wraps into rows")
         check("""
-          welcome_fill = 0; Plymouth.progress(5, 0.015); Plymouth.refresh();
-          failures += welcome_fill != 0 || screens[0].bar.opacity != 0;
-          Plymouth.progress(5, 0.5); Plymouth.refresh();
-          fill = Math.Int(0.5 * 0.75 * 218 + 0.5);
-          failures += screens[0].bar.image.width != fill || screens[0].bar.opacity != 1;
-          failures += screens[0].bar.x != 480 + 51 || screens[0].bar.y != 265 + 233;
-          failures += screens[0].bar_end.x != 480 + 51 + fill - 2 || screens[0].bar_end.opacity != 1;
-          failures += screens[0].bar_end.image.width != 5;
-          Plymouth.progress(5, 1.4); Plymouth.refresh();
-          failures += screens[0].bar.image.width != 218 || screens[0].bar_end.opacity != 0;
-          welcome_fill = 0; Plymouth.progress(5, 0.997); Plymouth.refresh();
-          failures += welcome_fill != 163 || screens[0].bar_end.image.width != 5;
-          welcome_fill = 0; Plymouth.progress(5, 216 / 163.5); Plymouth.refresh();
-          failures += screens[0].bar_end.image.width != 4;
           Plymouth.password("Unlock", "***");
-          failures += screens[0].password.y != 265 + 270 + 16 || screens[0].password.opacity == 0;
+          failures += screens[0].password.y != 186 + 128 * 2 + 16 || screens[0].password.opacity == 0;
           Plymouth.normal();
-        """, "the Welcome bar fills to three quarters, the prompt goes under the box")
+          widths = [400]; heights = [300]; Plymouth.refresh();
+          failures += screens[0].welcome.image.scale != 1 || screens[0].logo.image.width != 32;
+          widths = [7680]; heights = [4320]; Plymouth.refresh();
+          failures += screens[0].welcome.image.scale != 6;
+        """, "the prompt goes under the box, and tiny and huge displays get the nearest scale")
         sys.exit(0)
     check("""
       failures += screen_count != 2;
       failures += viewport_x[0] != 0 || viewport_x[1] != 1280;
       failures += screens[0].logo.x != 608 || screens[0].logo.y != 368;
-      failures += screens[1].logo.x != 2208 || screens[1].logo.y != 508;
-    """, "independently center splash on unequal displays without sprite overlap")
+      failures += screens[1].logo.x != 2192 || screens[1].logo.y != 492;
+      failures += screens[0].logo.image.width != 64 || screens[1].logo.image.width != 96;
+    """, "independently center Happy Zac, scaled, on unequal displays without sprite overlap")
     check("""
       Plymouth.progress(1, 0.5); Plymouth.refresh();
       failures += screens[0].fill.image.GetWidth() != Math.Int(fill_inner * 0.5);

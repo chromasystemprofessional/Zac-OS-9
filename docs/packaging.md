@@ -99,7 +99,7 @@ is no password, and `sudo` works without one.
 **Starting up.** No text shows, as on a classic Mac, and the logo (where a
 classic Mac showed its start-up icon) is up as soon as the computer can draw it:
 
-1. **GRUB: the logo on white,** from the moment GRUB starts. It waits 3
+1. **GRUB: Happy Zac on white,** from the moment GRUB starts. It waits 3
    seconds on the live medium (none once installed) without a menu.
    - Press **Esc** (or Shift) during that time for the boot menu, which has
      the installer.
@@ -113,21 +113,22 @@ classic Mac showed its start-up icon) is up as soon as the computer can draw it:
    - GRUB's own messages and errors are white on the white screen, so none
      show; the menu keeps readable colours. Regenerate the live pictures
      with `tools/boot/make-boot-art.py`.
-2. **The boot splash: the same logo in the same place,** and a progress bar
-   under it (`boot/plymouth`, which keeps its disk password prompt). The
+2. **The boot splash: the same Happy Zac in the same place,** then the
+   Welcome box (`boot/plymouth`, which keeps its disk password prompt; a
+   progress bar under Happy Zac only on shutdown). The
    kernel's console palette is all white while booting (`iso/kernel-params`),
    so nothing written to it shows and no black flashes up.
    - `zacos9-console-colors.service` and `session/zacos9-greeter` restore
      normal colours, so the login screen and Ctrl+Alt+F2 consoles read.
-   - Each monitor gets its own centered logo, progress bar and password
+   - Each monitor gets its own centered logo, Welcome box and password
      prompt, even at different resolutions. Viewports are kept separate so
      one monitor's artwork cannot overlap another's. Theme updates activate
      Debian's `update-initramfs` trigger to refresh the installed boot image.
-3. **zacos9-wm: the logo on white** for half a second, then **the Welcome
-   box** - "Welcome to ZacOS 9", a picture of a modern computer
-   (`lib/welcome.c`) and a progress bar - over the desktop pattern, with the
-   extensions' icons marching in along the bottom of the screen as the bar
-   fills, then the desktop. Both screens come from `compositor/src/startup.c`.
+3. **zacos9-wm: Happy Zac on white** for half a second, then **the Welcome
+   box** - "Welcome to Zacintosh." and the ZacOS logo in a box shaped like
+   the 1984 Macintosh's (`lib/welcome.c`, see `docs/boot.md`) - over the
+   desktop pattern, with the extensions' icons marching in along the bottom
+   of the screen, then the desktop. Both screens come from `compositor/src/startup.c`.
    greetd runs on tty1, so going from the splash to the desktop is white to
    white.
    - With multiple monitors, each gets a complete logo and Welcome box,

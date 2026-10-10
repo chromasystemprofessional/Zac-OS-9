@@ -4,13 +4,11 @@
  * splash's Welcome screen and the compositor's match pixel for pixel when
  * one hands over to the other.
  *
- *   make-splash DIR   writes into DIR:
- *     welcome.png   the Welcome box, its bar empty, with its shadow
- *     bar-fill.png  the bar's inside, full (the splash crops it)
- *     bar-end.png   the end of a part-full bar: its last two columns, the
- *                   black line and the well's two shadow columns, laid over
- *                   at fill - 2 (cropped short of the bar's right end)
- *     pattern.png   one tile of the default desktop pattern
+ *   make-splash DIR [ART]   writes into DIR, with the pictures from ART
+ *                           (assets/boot) in the box:
+ *     welcome-Nx.png  the Welcome to Zacintosh box with its shadow, at
+ *                     scale N (lib/welcome.h), for N = 1..PL_WELCOME_MAX_SCALE
+ *     pattern.png     one tile of the default desktop pattern
  *     parade.png    every extension's icon in a row, in lib/extensions.c's
  *                   order; boot/zacos9-parade names them by that index
  */
@@ -24,7 +22,6 @@
 #include "patterns.h"
 #include "text.h"
 #include "welcome.h"
-#include "widgets.h"
 
 static uint32_t *canvas(struct pl_canvas *c, int w, int h, uint32_t fill) {
 	uint32_t *px = malloc(sizeof(uint32_t) * w * h);
@@ -61,32 +58,34 @@ static void save(const char *dir, const char *name, const struct pl_canvas *c, i
 }
 
 int main(int argc, char **argv) {
-	if (argc != 2) {
-		fprintf(stderr, "usage: make-splash DIR\n");
+	if (argc != 2 && argc != 3) {
+		fprintf(stderr, "usage: make-splash DIR [ART]\n");
 		return 2;
 	}
 	const char *dir = argv[1];
+	if (argc == 3) {
+		setenv("ZACOS9_BOOT_ART", argv[2], 1);
+	}
 	struct pl_canvas c;
-	const struct pl_accent accent = PL_ACCENT_DEFAULT;
+	uint32_t *px;
 
 	/* The box, on nothing, so the splash's pattern shows around it. */
-	const int bw = PL_WELCOME_BOX_W + 2, bh = PL_WELCOME_BOX_H + 2;
-	uint32_t *px = canvas(&c, bw, bh, 0);
-	struct plat_text *title = text_render_font("Welcome to ZacOS 9", 1000, PL_FONT_SYSTEM);
-	struct plat_text *status = text_render_font("Starting Up\xe2\x80\xa6", 1000, PL_FONT_VIEWS);
-	pl_welcome_box_paint(&c, 0, 0, title, status, 0, accent);
-	save(dir, "welcome.png", &c, 0, 0, bw, bh);
-	free(px);
-
-	/* The bar, full and part full, alone. */
-	const int barw = PL_WELCOME_BAR_W, inner = barw - 2;
-	px = canvas(&c, barw + 2, PL_PROGRESS_H + 2, 0);
-	pl_progress_paint(&c, 1, 1, barw, 1.0, accent);
-	save(dir, "bar-fill.png", &c, 2, 2, inner, PL_PROGRESS_H - 2);
-	const int fill = inner / 2;
-	pl_progress_paint(&c, 1, 1, barw, (double)fill / inner, accent);
-	save(dir, "bar-end.png", &c, 2 + fill - 2, 2, 5, PL_PROGRESS_H - 2);
-	free(px);
+	struct plat_text *title = text_render_font(PL_WELCOME_TITLE, 1000, PL_FONT_SYSTEM);
+	for (int s = 1; s <= PL_WELCOME_MAX_SCALE; s++) {
+		if (!pl_boot_art(PL_ART_LOGO, s)) {
+			fprintf(stderr, "make-splash: no zacos-logo-%dx.png\n", s);
+			return 1;
+		}
+		const int bw = (PL_WELCOME_BOX_W + PL_WELCOME_SHADOW) * s;
+		const int bh = (PL_WELCOME_BOX_H + PL_WELCOME_SHADOW) * s;
+		px = canvas(&c, bw, bh, 0);
+		pl_welcome_box_paint(&c, 0, 0, s, title);
+		char name[32];
+		snprintf(name, sizeof(name), "welcome-%dx.png", s);
+		save(dir, name, &c, 0, 0, bw, bh);
+		free(px);
+	}
+	text_destroy(title);
 
 	int pw, ph;
 	pl_pattern_size(0, &pw, &ph);
