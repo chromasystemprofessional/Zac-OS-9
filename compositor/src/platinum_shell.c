@@ -134,7 +134,7 @@ static void handle_set_window_position(struct wl_client *client, struct wl_resou
 /* The process behind the front window, for the menu bar's global menus. */
 static uint32_t active_pid;
 
-static uint32_t view_pid(struct plat_view *view) {
+uint32_t view_pid(struct plat_view *view) {
 	if (view->type == PLAT_VIEW_XWAYLAND) {
 		return view->xsurface->pid > 0 ? (uint32_t)view->xsurface->pid : 0;
 	}
@@ -210,6 +210,15 @@ static void handle_destroy(struct wl_client *client, struct wl_resource *resourc
 	wl_resource_destroy(resource);
 }
 
+static void handle_keep_awake(struct wl_client *client, struct wl_resource *resource,
+		uint32_t id, uint32_t pid, const char *app_id, uint32_t what) {
+	idle_keep_awake(the_server, client, id, pid, app_id, what);
+}
+
+static void handle_user_activity(struct wl_client *client, struct wl_resource *resource) {
+	idle_input(the_server, IDLE_INPUT_MOTION);
+}
+
 static const struct platinum_shell_v1_interface shell_impl = {
 	.set_window_style = handle_set_window_style,
 	.set_window_position = handle_set_window_position,
@@ -217,6 +226,8 @@ static const struct platinum_shell_v1_interface shell_impl = {
 	.begin_launch = handle_begin_launch,
 	.update_launch = handle_update_launch,
 	.cancel_launch = handle_cancel_launch,
+	.keep_awake = handle_keep_awake,
+	.user_activity = handle_user_activity,
 };
 
 static void resource_destroy(struct wl_resource *resource) {
@@ -240,5 +251,5 @@ void platinum_shell_init(struct plat_server *server) {
 	the_server = server;
 	wl_list_init(&hints);
 	wl_list_init(&resources);
-	wl_global_create(server->display, &platinum_shell_v1_interface, 4, NULL, bind_shell);
+	wl_global_create(server->display, &platinum_shell_v1_interface, 5, NULL, bind_shell);
 }

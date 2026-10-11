@@ -102,6 +102,7 @@ static void handle_map(struct wl_listener *listener, void *data) {
 	ls->mapped = true;
 	startup_surface_mapped(ls->layer_surface->namespace);
 	arrange_for(ls);
+	idle_show_savers(ls->server); /* a screen saver mapping just as its screen woke */
 	if (ls->layer_surface->current.keyboard_interactive ==
 			ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_EXCLUSIVE) {
 		layers_focus(ls);

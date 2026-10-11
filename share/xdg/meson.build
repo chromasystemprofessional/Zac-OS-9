@@ -15,6 +15,7 @@ install_data('foot/foot.ini',
 install_data('xdg-desktop-portal/zacos9-portals.conf',
   install_dir: get_option('datadir') / 'zacos9' / 'xdg' / 'xdg-desktop-portal')
 install_data('xdg-desktop-portal/portals/zacos9.portal',
+  'xdg-desktop-portal/portals/zacos9-inhibit.portal',
   install_dir: get_option('datadir') / 'xdg-desktop-portal' / 'portals')
 portal_service = configuration_data()
 portal_service.set('BINDIR', get_option('prefix') / get_option('bindir'))

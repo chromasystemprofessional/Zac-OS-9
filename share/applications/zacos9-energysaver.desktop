@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Energy Saver
+Comment=When the display and the system go to sleep
+Exec=zacos9-controlpanel energysaver
+Categories=Settings;HardwareSettings;
+OnlyShowIn=ZacOS9;

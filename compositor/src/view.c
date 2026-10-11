@@ -270,6 +270,9 @@ void view_set_hidden(struct plat_view *view, bool hidden) {
 		}
 		platinum_shell_focus_changed(server);
 	}
+	if (view->fullscreen) {
+		idle_update(server); /* hidden, it no longer keeps its screen awake */
+	}
 }
 
 void view_focus(struct plat_view *view) {
@@ -423,6 +426,7 @@ void view_set_fullscreen(struct plat_view *view, bool fullscreen, struct wlr_out
 	if (view->toplevel_handle) {
 		wlr_foreign_toplevel_handle_v1_set_fullscreen(view->toplevel_handle, fullscreen);
 	}
+	idle_update(server); /* a full-screen window keeps its screen awake */
 }
 
 void view_refresh_fullscreen(struct plat_server *server) {

@@ -223,11 +223,13 @@ void launch_fill_logo_menu(struct mb_menu *menu) {
 		{ "Bluetooth", "zacos9-bluetooth", "" },
 		{ "Collar", "zacos9-collarpanel", "" },
 		{ "Date & Time", "zacos9-datetime", "" },
+		{ "Energy Saver", "zacos9-controlpanel", " energysaver" },
 		{ "File Exchange", "zacos9-fileexchange", "" },
 		{ "File Sharing", "zacos9-filesharing", "" },
 		{ "Keyboard", "zacos9-controlpanel", " keyboard" },
 		{ "Monitors", "zacos9-controlpanel", " monitors" },
 		{ "Mouse", "zacos9-controlpanel", " mouse" },
+		{ "Screen Saver", "zacos9-controlpanel", " screensaver" },
 		{ "Sound", "zacos9-controlpanel", " sound" },
 		{ "TCP/IP", "zacos9-tcpip", "" },
 	};

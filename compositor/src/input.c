@@ -109,6 +109,17 @@ static void keyboard_key(struct wl_listener *listener, void *data) {
 	struct plat_server *server = kb->server;
 	struct wlr_keyboard_key_event *event = data;
 
+	/* A key that only woke a dark screen goes no further, nor its release. */
+	if (event->state == WL_KEYBOARD_KEY_STATE_PRESSED) {
+		if (idle_input(server, IDLE_INPUT_KEY)) {
+			server->idle_swallowed_key = event->keycode + 1;
+			return;
+		}
+	} else if (server->idle_swallowed_key == event->keycode + 1) {
+		server->idle_swallowed_key = 0;
+		return;
+	}
+
 	uint32_t keycode = event->keycode + 8;
 	const xkb_keysym_t *syms;
 	int nsyms = xkb_state_key_get_syms(kb->wlr_keyboard->xkb_state, keycode, &syms);
@@ -482,6 +493,7 @@ static void cursor_motion(struct wl_listener *listener, void *data) {
 	/* Mouse tracking speed (the Mouse control panel). */
 	wlr_cursor_move(server->cursor, &event->pointer->base,
 		event->delta_x * server->pointer_speed, event->delta_y * server->pointer_speed);
+	idle_input(server, IDLE_INPUT_MOTION);
 	process_cursor_motion(server, event->time_msec);
 }
 
@@ -490,12 +502,24 @@ static void cursor_motion_absolute(struct wl_listener *listener, void *data) {
 		wl_container_of(listener, server, cursor_motion_absolute);
 	struct wlr_pointer_motion_absolute_event *event = data;
 	wlr_cursor_warp_absolute(server->cursor, &event->pointer->base, event->x, event->y);
+	idle_input(server, IDLE_INPUT_MOTION);
 	process_cursor_motion(server, event->time_msec);
 }
 
 static void cursor_button(struct wl_listener *listener, void *data) {
 	struct plat_server *server = wl_container_of(listener, server, cursor_button);
 	struct wlr_pointer_button_event *event = data;
+
+	/* A click that only woke a dark screen goes no further, nor its release. */
+	if (event->state == WL_POINTER_BUTTON_STATE_PRESSED) {
+		if (idle_input(server, IDLE_INPUT_BUTTON)) {
+			server->idle_swallowed_button = event->button;
+			return;
+		}
+	} else if (server->idle_swallowed_button == event->button) {
+		server->idle_swallowed_button = 0;
+		return;
+	}
 
 	if (server->cursor_mode != PLAT_CURSOR_PASSTHROUGH) {
 		/* Grabs are compositor-owned; the client never saw the press. */
@@ -546,6 +570,7 @@ static void cursor_button(struct wl_listener *listener, void *data) {
 static void cursor_axis(struct wl_listener *listener, void *data) {
 	struct plat_server *server = wl_container_of(listener, server, cursor_axis);
 	struct wlr_pointer_axis_event *event = data;
+	idle_input(server, IDLE_INPUT_MOTION);
 	wlr_seat_pointer_notify_axis(server->seat, event->time_msec,
 		event->orientation, event->delta, event->delta_discrete,
 		event->source, event->relative_direction);

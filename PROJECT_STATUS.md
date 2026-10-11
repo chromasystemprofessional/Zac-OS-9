@@ -6,7 +6,8 @@ Updated: 2026-10-11
 
 | Commit | Feature |
 |---|---|
-| *(uncommitted)* | Regression fixes after 0.1.50: VS Code settings are read as JSONC before adding the native title bar (no insertion inside a comment, no truncation past 1 MiB, unreadable files never overwritten); AFP volumes mount at `mounts/SERVER/ID/NAME` and an existing mount is reused only if it is the volume asked for — see `docs/app-integration.md`, `docs/network.md` |
+| *(uncommitted)* | Energy Saver: display sleep and system sleep in `zacos9-wm` (per screen: a full-screen window or a video's idle inhibitor keeps its screen awake while the others sleep; the system sleeps only when none is kept awake), the Energy Saver control panel; the screen saver (`zacos9-screensaver`: Desktop Patterns, Starfield, Bouncing Logo, Blank Screen, per screen, ahead of display sleep) and its Screen Saver panel with a live preview; `zacos9-inhibit` answers `org.freedesktop.ScreenSaver` and the portal's Inhibit, keeping the asking app's screens awake — see `docs/energy-saver.md` |
+| `82b77c3` | Regression fixes after 0.1.50 (released in 0.1.51): VS Code settings are read as JSONC before adding the native title bar (no insertion inside a comment, no truncation past 1 MiB, unreadable files never overwritten); AFP volumes mount at `mounts/SERVER/ID/NAME` and an existing mount is reused only if it is the volume asked for — see `docs/app-integration.md`, `docs/network.md` |
 | *(uncommitted)* | Silent start-up: the platinum sparkle logo is replaced by Happy Zac, and the Welcome box is now "Welcome to Zacintosh." with the ZacOS logo in a box like the 1984 Macintosh's (no progress bar) — see below |
 | `cd4f6ed` | Silent start-up: white screen, platinum sparkle logo, Welcome screen; `scripts/dev-boot.sh` |
 | `d1f5765` | File Sharing control panel (AFP + SMB toggle, shared folders list) |

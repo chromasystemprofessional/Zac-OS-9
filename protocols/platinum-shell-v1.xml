@@ -10,7 +10,7 @@
     when the generic rule (fixed size with a parent window) can't apply.
   </description>
 
-  <interface name="platinum_shell_v1" version="4">
+  <interface name="platinum_shell_v1" version="5">
     <enum name="style">
       <entry name="document" value="0" summary="standard document window"/>
       <entry name="movable_modal" value="1"
@@ -96,5 +96,38 @@
       <arg name="window_path" type="string"/>
       <arg name="application_path" type="string"/>
     </event>
+
+    <enum name="keep_awake_what" bitfield="true" since="5">
+      <entry name="screens" value="1" summary="the screens showing the app"/>
+      <entry name="system" value="2" summary="the system: no system sleep"/>
+    </enum>
+    <request name="keep_awake" since="5">
+      <description summary="an app asked to stay awake">
+        For ZacOS 9's D-Bus idle service (org.freedesktop.ScreenSaver, the
+        portal's Inhibit): an app asked that the screen, or the system,
+        stay awake. The screens showing that app's windows (found by its
+        process, or a parent of it, or by app id) stay awake while the
+        others may sleep; when no window of it is found, every screen
+        stays awake. The system doesn't sleep while any request exists.
+        Destroying the object ends the request, as does disconnecting.
+      </description>
+      <arg name="id" type="new_id" interface="platinum_keep_awake_v1"/>
+      <arg name="pid" type="uint" summary="the asking process, 0 if unknown"/>
+      <arg name="app_id" type="string" summary="its app id, empty if unknown"/>
+      <arg name="what" type="uint" enum="keep_awake_what"/>
+    </request>
+    <request name="user_activity" since="5">
+      <description summary="as if there had been input">
+        Wakes every screen and restarts the idle timers
+        (org.freedesktop.ScreenSaver's SimulateUserActivity).
+      </description>
+    </request>
+  </interface>
+
+  <interface name="platinum_keep_awake_v1" version="1">
+    <description summary="a request to stay awake">
+      Made by platinum_shell_v1.keep_awake; lasts until destroyed.
+    </description>
+    <request name="destroy" type="destructor"/>
   </interface>
 </protocol>

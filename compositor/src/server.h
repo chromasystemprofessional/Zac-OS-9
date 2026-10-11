@@ -1,6 +1,7 @@
 #ifndef ZACOS9_SERVER_H
 #define ZACOS9_SERVER_H
 
+#include <sys/types.h>
 #include <wayland-server-core.h>
 #include <wlr/backend.h>
 #include <xkbcommon/xkbcommon.h>
@@ -141,6 +142,19 @@ struct plat_server {
 	struct wlr_output_layout *output_layout;
 	struct wl_list outputs;
 	struct wl_listener new_output;
+
+	/* idle.c: screen saver, display and system sleep. */
+	struct wlr_idle_inhibit_manager_v1 *idle_inhibit;
+	struct wl_listener new_idle_inhibitor;
+	struct wlr_idle_notifier_v1 *idle_notifier;
+	struct wl_event_source *idle_timer;
+	long idle_last_input; /* ms, CLOCK_MONOTONIC */
+	long idle_slept_at;   /* when the system last went to sleep */
+	int idle_reported;    /* screens in the state file */
+	pid_t idle_saver_pid; /* zacos9-screensaver, while it runs */
+	struct wl_list keep_awake; /* idle.c keep_awake.link: apps' D-Bus requests */
+	/* A press that only woke a dark screen; its release is swallowed too. */
+	uint32_t idle_swallowed_button, idle_swallowed_key;
 };
 
 struct plat_output {
@@ -157,6 +171,7 @@ struct plat_output {
 	struct wlr_buffer *snapshot_buffer;
 	struct wl_listener request_state;
 	struct wl_listener destroy;
+	int idle_state; /* enum idle_state (idle_policy.h) */
 };
 
 struct plat_view;
@@ -270,8 +285,10 @@ int prefs_repeat_rate(void);
 int prefs_repeat_delay(void);
 bool prefs_collar_hotkey(uint32_t mods, xkb_keysym_t sym);
 
+/* main.c: run a shell command, in its own session; its pid, or -1. */
+pid_t spawn(const char *command);
 /* main.c: start a shell component (zacos9-menubar...) with extra arguments. */
-void spawn_component(const char *env_var, const char *program, const char *args);
+pid_t spawn_component(const char *env_var, const char *program, const char *args);
 
 /* output.c */
 void output_init(struct plat_server *server);
@@ -281,6 +298,21 @@ struct plat_output *output_main(struct plat_server *server);
 struct plat_output *output_at(struct plat_server *server, double lx, double ly);
 /* Usable area of the output under (lx, ly), or of the first output. */
 struct wlr_box output_usable_area(struct plat_server *server, double lx, double ly);
+
+/* idle.c: screen saver, display and system sleep */
+enum idle_input { IDLE_INPUT_MOTION, IDLE_INPUT_BUTTON, IDLE_INPUT_KEY };
+void idle_init(struct plat_server *server);
+/* Input happened (or a screen arrived): every screen wakes. True if this
+ * press only woke a dark screen and should reach no one. */
+bool idle_input(struct plat_server *server, enum idle_input kind);
+/* Something that keeps a screen awake changed (a window went full screen,
+ * a screen went away, the settings): look again. */
+void idle_update(struct plat_server *server);
+/* zacos9-screensaver's surfaces show only on screens in its turn. */
+void idle_show_savers(struct plat_server *server);
+/* platinum_shell_v1.keep_awake: an app asked over D-Bus to stay awake. */
+void idle_keep_awake(struct plat_server *server, struct wl_client *client, uint32_t id,
+	uint32_t pid, const char *app_id, uint32_t what);
 
 /* layers.c: wlr-layer-shell (menu bar and other shell surfaces) */
 void layers_init(struct plat_server *server);
@@ -352,6 +384,8 @@ void platinum_shell_report_position(struct plat_view *view);
 /* The front window changed: tell the menu bar whose it is. */
 void platinum_shell_focus_changed(struct plat_server *server);
 void platinum_shell_launch_ready(struct plat_view *view);
+/* The process behind a window (X11: its _NET_WM_PID), or 0. */
+uint32_t view_pid(struct plat_view *view);
 void gtk_shell_init(struct plat_server *server);
 void gtk_shell_send_active(struct wl_resource *resource, struct plat_server *server);
 void platinum_shell_gtk_changed(struct plat_server *server);

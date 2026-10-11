@@ -57,6 +57,7 @@ static void output_destroy(struct wl_listener *listener, void *data) {
 	wl_list_remove(&output->destroy.link);
 	wl_list_remove(&output->link);
 	free(output);
+	idle_update(server);
 	struct plat_view *view;
 	wl_list_for_each(view, &server->views, link) {
 		if (view->fullscreen_output == gone) {
@@ -122,6 +123,8 @@ static void server_new_output(struct wl_listener *listener, void *data) {
 	layers_arrange(output);
 	/* The Monitors panel's scale and resolution, if chosen. */
 	prefs_apply(server);
+	/* A screen plugged in wakes the others, as input would. */
+	idle_input(server, IDLE_INPUT_MOTION);
 }
 
 struct plat_output *output_main(struct plat_server *server) {

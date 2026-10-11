@@ -26,12 +26,14 @@ static void usage(const char *argv0) {
 		argv0);
 }
 
-static void spawn(const char *command) {
-	if (fork() == 0) {
+pid_t spawn(const char *command) {
+	const pid_t pid = fork();
+	if (pid == 0) {
 		setsid();
 		execl("/bin/sh", "/bin/sh", "-c", command, (void *)NULL);
 		_exit(127);
 	}
+	return pid;
 }
 
 /* Start a shell component (menu bar, Finder): $env_var if set (empty
@@ -39,15 +41,15 @@ static void spawn(const char *command) {
  * tree's shell/ directory, else from $PATH. `args` (may be empty) are
  * appended to its command line as they are. A NULL env_var always runs
  * our own program. */
-void spawn_component(const char *env_var, const char *program, const char *args) {
+pid_t spawn_component(const char *env_var, const char *program, const char *args) {
 	const char *env = env_var ? getenv(env_var) : NULL;
 	if (env) {
 		if (*env) {
 			char cmd[PATH_MAX + 256];
 			snprintf(cmd, sizeof(cmd), "%s%s", env, args);
-			spawn(cmd);
+			return spawn(cmd);
 		}
-		return;
+		return -1;
 	}
 	char exe[PATH_MAX];
 	ssize_t len = readlink("/proc/self/exe", exe, sizeof(exe) - 1);
@@ -63,15 +65,14 @@ void spawn_component(const char *env_var, const char *program, const char *args)
 				if (access(path, X_OK) == 0) {
 					char quoted[PATH_MAX + 80];
 					snprintf(quoted, sizeof(quoted), "exec '%s'%s", path, args);
-					spawn(quoted);
-					return;
+					return spawn(quoted);
 				}
 			}
 		}
 	}
 	char cmd[256];
 	snprintf(cmd, sizeof(cmd), "exec %s%s", program, args);
-	spawn(cmd);
+	return spawn(cmd);
 }
 
 /* Our desktop entries (app names for the menu bar) live in ../share next
@@ -209,6 +210,7 @@ int main(int argc, char *argv[]) {
 	xdg_init(&server);
 	input_init(&server);
 	prefs_init(&server);
+	idle_init(&server);
 	xwayland_init(&server);
 	xwayland_output_init(&server);
 
@@ -232,6 +234,11 @@ int main(int argc, char *argv[]) {
 	spawn_component("ZACOS9_MENUBAR", "zacos9-menubar", "");
 	spawn_component("ZACOS9_FINDER", "zacos9-finder", "");
 	spawn_component("ZACOS9_COLLAR", "zacos9-collar", "");
+	/* Keeping screens awake for apps that ask over D-Bus: in a real session
+	 * only, or a nested or test one would take the host's bus names. */
+	if (server.session || getenv("ZACOS9_INHIBIT")) {
+		spawn_component("ZACOS9_INHIBIT", "zacos9-inhibit", "");
+	}
 	/* On a live medium, open the installer automatically; on a freshly
 	 * installed system (zacos9-install leaves the flag), the Setup Assistant. */
 	{

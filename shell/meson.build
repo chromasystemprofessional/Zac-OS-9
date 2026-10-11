@@ -98,6 +98,22 @@ executable('zacos9-menubar',
   install: true,
 )
 
+# The screen saver (docs/energy-saver.md).
+saver_exe = executable('zacos9-screensaver',
+  'screensaver/screensaver.c',
+  client_protocol_src,
+  dependencies: [platinum_dep, wayland_client],
+  install: true,
+)
+
+# Keeping screens awake for apps that ask over D-Bus (docs/energy-saver.md).
+inhibit_exe = executable('zacos9-inhibit',
+  'inhibit/inhibit.c',
+  finder_protocol,
+  dependencies: [wayland_client, gio],
+  install: true,
+)
+
 test('menu-launch-feedback',
   executable('test-menu-launch',
     'menubar/test_launch.c', 'menubar/launch.c',
@@ -830,6 +846,22 @@ endforeach
 vptr_exe = executable('vptr', meson.project_source_root() / 'tools/vptr/vptr.c', vptr_protocol,
   client_protocol_src,
   dependencies: [wayland_client, xkbcommon_client])
+
+# Screen saver, display and system sleep (compositor/src/idle.c).
+idle_client = executable('test-idle-client',
+  '../compositor/tests/idle_client.cpp',
+  dependencies: qt6,
+  cpp_args: ['-std=c++17'],
+)
+test('idle-sleep', find_program('python3'),
+  args: [files('../compositor/tests/test_idle.py'), compositor_exe, idle_client, vptr_exe],
+  timeout: 60,
+)
+test('idle-inhibit', find_program('dbus-run-session'),
+  args: ['--', find_program('python3').full_path(), files('../compositor/tests/test_inhibit.py'),
+    compositor_exe, idle_client, inhibit_exe],
+  timeout: 60,
+)
 
 test('collar-native', find_program('dbus-run-session'),
   args: ['--', find_program('python3').full_path(), files('collar/tests/test_native.py'),

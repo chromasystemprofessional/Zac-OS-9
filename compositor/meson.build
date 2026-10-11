@@ -87,6 +87,8 @@ compositor_exe = executable('zacos9-wm',
   'src/launch.c',
   'src/startup.c',
   'src/prefs.c',
+  'src/idle.c',
+  'src/idle_policy.c',
   'src/hotkey.c',
   'src/view.c',
   'src/xdg.c',
@@ -181,6 +183,13 @@ test('snapshot-output-state',
     dependencies: [decor_dep, wayland_server, wlroots, libdrm],
     link_args: ['-Wl,--wrap=wlr_output_from_resource',
       '-Wl,--wrap=wlr_output_layout_get_box'],
+  ),
+)
+
+test('idle-policy',
+  executable('test-idle-policy',
+    'tests/test_idle_policy.c', 'src/idle_policy.c',
+    include_directories: include_directories('src'),
   ),
 )
 

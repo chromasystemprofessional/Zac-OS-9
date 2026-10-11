@@ -305,11 +305,13 @@ struct PanelDef {
 const PanelDef PANELS[] = {
 	{ "Appearance", "zacos9-appearance", nullptr },
 	{ "Date & Time", "zacos9-datetime", nullptr },
+	{ "Energy Saver", "zacos9-controlpanel", "energysaver" },
 	{ "File Exchange", "zacos9-fileexchange", nullptr },
 	{ "File Sharing", "zacos9-filesharing", nullptr },
 	{ "Keyboard", "zacos9-controlpanel", "keyboard" },
 	{ "Monitors", "zacos9-controlpanel", "monitors" },
 	{ "Mouse", "zacos9-controlpanel", "mouse" },
+	{ "Screen Saver", "zacos9-controlpanel", "screensaver" },
 	{ "Sound", "zacos9-controlpanel", "sound" },
 	{ "TCP/IP", "zacos9-tcpip", nullptr },
 };
