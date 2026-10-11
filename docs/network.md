@@ -209,10 +209,21 @@ trade `FileSharingPanel` already makes polling who's connected, there
 every 5 s), exactly as if Put Away had done it, because as far as the
 Finder is concerned nothing is different.
 
-An AFP volume mounts at `~/.local/share/zacos9/mounts/<name>` (the
-directory's own name is the disk's name — no separate record of what's
-what), made unique with " (2)" if another live mount already has that
-name. Both verified live end to end: mounted (confirmed with `df`, a
+An AFP volume mounts at `~/.local/share/zacos9/mounts/<server>/<name>`
+(the directory's own name is the disk's name — no separate record of
+what's what). The name is the shared folder's, as on Mac OS 9: never
+numbered, and two servers' volumes of the same name sit side by side on
+the desktop. Netatalk's default home volume name, "NAME's home", is shown
+as the folder NAME when you logged in as NAME (`afpVolumeDisplayName`);
+ZacOS's own File Sharing names home volumes after the folder anyway
+(`home name = $u`). The same volume always gets the same place, so it
+comes back where its icon was. Before mounting, empty folders left by
+earlier connections (a logout or a dropped server skips the cleanup that
+follows an unmount) are removed, a dead mount in the way is lazily
+unmounted, and a volume that's already mounted isn't mounted again.
+(Until 0.1.47 the folder was `mounts/<name>`, numbered " (2)", " (3)" ...
+whenever a leftover folder had the name, so reconnecting piled them up.)
+Mounting and ejecting were verified live end to end: mounted (confirmed with `df`, a
 real write), appeared on the desktop as a disk icon within the next
 poll, ejected with ⌘Y (confirmed gone from both the desktop and
 `findmnt`).

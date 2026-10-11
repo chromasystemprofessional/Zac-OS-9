@@ -116,8 +116,10 @@ void NetBrowserWindow::connectTo(const QString &address, DiscoveredServer::Kind 
 			const QString volume = VolumeDialog::ask(this, info.name, volumes);
 			if (!volume.isEmpty()) {
 				QString mountError;
-				if (!afpMount(address, volume, afpMountPointFor(volume),
-						login.guest ? QString() : login.user,
+				bool mounted = false;
+				const QString user = login.guest ? QString() : login.user;
+				const QString mountPoint = afpMountPointFor(address, volume, user, &mounted);
+				if (!mounted && !afpMount(address, volume, mountPoint, user,
 						login.guest ? QString() : login.password, cleartext, &mountError)) {
 					Alert::ask(mountError, "OK", QString());
 				}

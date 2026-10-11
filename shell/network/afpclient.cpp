@@ -178,8 +178,10 @@ bool afpMount(const QString &address, const QString &volume, const QString &moun
 	 * returns and there is nothing left to clean up but the directory
 	 * itself. A directory that failed to mount (so still has something
 	 * in it, or was never ours) is left alone: rmdir only removes an
-	 * empty one. */
-	command += "; rmdir " + shellQuote(mountPoint) + " 2>/dev/null";
+	 * empty one; so is the server's folder around it, once its last
+	 * volume has gone (netvolumes.cpp). */
+	command += "; rmdir " + shellQuote(mountPoint) + " " +
+		shellQuote(QFileInfo(mountPoint).path()) + " 2>/dev/null";
 
 	int pipefd[2];
 	if (pipe(pipefd) != 0) {

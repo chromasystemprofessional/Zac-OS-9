@@ -537,6 +537,18 @@ test('discovery',
   timeout: 60,
 )
 
+# AFP volume names and mount points (network/netvolumes.cpp).
+test('netvolumes',
+  executable('test-netvolumes',
+    'network/tests/test_netvolumes.cpp',
+    'network/netvolumes.cpp',
+    'network/smbclient.cpp',
+    include_directories: include_directories('network'),
+    dependencies: [qt6],
+    cpp_args: ['-std=c++17'],
+  ),
+)
+
 executable('zacos9-netbrowser',
   'network/main.cpp',
   'network/netbrowser.cpp',

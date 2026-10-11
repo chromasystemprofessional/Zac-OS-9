@@ -572,6 +572,18 @@ removed. Tests updated: `lib/tests/test_welcome.c`, `compositor/tests/test_start
 `boot/tests/test_splash.py`, `tests/vm/boot-frames.py`. Still to do: a full
 meson build (needs the -dev packages) and a look on real hardware.
 
+**Network disk names: the shared folder's, never numbered** (uncommitted):
+reconnecting an AFP server piled up "adam's home (2)", "(3)", "(4)" -
+leftover empty mount folders (a logout skips the unmount cleanup) made each
+new mount take the next number. AFP volumes now mount at
+`mounts/<server>/<name>`, always the same place; leftovers are removed and a
+dead mount lazily unmounted first; an already-mounted volume isn't mounted
+again (`netvolumes.cpp`, `netbrowser.cpp`). The name is the folder's, as on
+Mac OS 9 (duplicates side by side): Netatalk's "NAME's home" shows as NAME
+when logged in as NAME, and our File Sharing sets `home name = $u`.
+`netvolumes` test added; `afp-disconnect` and `discovery` pass. Not yet
+tried live against a server.
+
 **Apple menu names and icon** (uncommitted): the catalog (Software window) is now
 **New Tricks** and Software Update is **Fetch Updates** (`menubar/launch.c`);
 the windows keep their names. The Apple-menu icon is now a 16x16 close-up of Happy Zac's head
