@@ -1,3 +1,11 @@
+zacos9 (0.1.49) trixie; urgency=medium
+
+  * The Network Browser lists servers that announce themselves over IPv6
+    only, so computers no longer drop out of the list after connecting, and
+    names like "Adam’s Computer" show correctly.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Sat, 10 Oct 2026 21:47:39 -0400
+
 zacos9 (0.1.48) trixie; urgency=medium
 
   * Network disks are named after the shared folder, as on Mac OS 9 (your
