@@ -572,6 +572,15 @@ removed. Tests updated: `lib/tests/test_welcome.c`, `compositor/tests/test_start
 `boot/tests/test_splash.py`, `tests/vm/boot-frames.py`. Still to do: a full
 meson build (needs the -dev packages) and a look on real hardware.
 
+**VS Code's native title bar set automatically** (uncommitted): other ZacOS
+computers running VS Code didn't get its global menu: the setting
+`"window.titleBarStyle": "native"` had only been set by hand on this one.
+The Electron launch path (`pl_electron_command`) now adds it to VS Code's
+(and VSCodium's, Code - OSS's, Cursor's) settings.json when no title bar
+style has been chosen there; a chosen one is kept (`lib/electron.c`).
+`electron` test extended; checked against this computer's VS Code (already
+set: untouched) and ChatGPT (not VS Code: ignored).
+
 **Network Browser: servers announced over IPv6 alone, UTF-8 names**
 (uncommitted): two ZacOS computers dropped out of the list after a first
 connection: their avahi announced AFP over IPv6 only for a while, and

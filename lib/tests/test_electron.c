@@ -100,6 +100,51 @@ int main(void) {
 		"other commands are left alone");
 	free(none);
 
+	/* VS Code: its settings get the native title bar, unless already chosen. */
+	char code[512], settings[600], want_path[600];
+	snprintf(path, sizeof(path), "%s/Code", root);
+	mkdir(path, 0755);
+	snprintf(path, sizeof(path), "%s/Code/resources", root);
+	mkdir(path, 0755);
+	snprintf(path, sizeof(path), "%s/Code/resources/app", root);
+	mkdir(path, 0755);
+	snprintf(path, sizeof(path), "%s/Code/resources/app/package.json", root);
+	touch(path, false);
+	snprintf(path, sizeof(path), "%s/Code/resources/app/product.json", root);
+	f = fopen(path, "w");
+	fputs("{\n  \"nameShort\": \"Code\",\n  \"dataFolderName\": \".vscode\"\n}\n", f);
+	fclose(f);
+	snprintf(code, sizeof(code), "%s/Code/code", root);
+	touch(code, true);
+	setenv("XDG_CONFIG_HOME", root, 1);
+	snprintf(want_path, sizeof(want_path), "%s/Code/User/settings.json", root);
+	check(pl_code_settings_path(code, settings, sizeof(settings)) && strcmp(settings, want_path) == 0,
+		"VS Code's settings are found from its product.json");
+	check(!pl_code_settings_path(app, settings, sizeof(settings)), "other Electron apps have none");
+	char *launched = pl_electron_command(code);
+	free(launched);
+	f = fopen(want_path, "r");
+	char text[512] = "";
+	if (f) {
+		text[fread(text, 1, sizeof(text) - 1, f)] = '\0';
+		fclose(f);
+	}
+	check(strstr(text, "\"window.titleBarStyle\": \"native\"") != NULL,
+		"starting VS Code makes its settings with the native title bar");
+	f = fopen(want_path, "w");
+	fputs("// mine\n{\n    \"editor.fontSize\": 14\n}\n", f);
+	fclose(f);
+	check(pl_code_use_native_title_bar(want_path), "added to existing settings");
+	f = fopen(want_path, "r");
+	text[fread(text, 1, sizeof(text) - 1, f)] = '\0';
+	fclose(f);
+	check(strcmp(text, "// mine\n{\n    \"window.titleBarStyle\": \"native\",\n    \"editor.fontSize\": 14\n}\n") == 0,
+		"after the brace, keeping comments and other settings");
+	f = fopen(want_path, "w");
+	fputs("{ \"window.titleBarStyle\": \"custom\" }\n", f);
+	fclose(f);
+	check(!pl_code_use_native_title_bar(want_path), "a title bar style chosen already is kept");
+
 	setenv("PATH", saved_path, 1);
 	free(saved_path);
 	char cleanup[600];

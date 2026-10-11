@@ -299,7 +299,13 @@ when it runs **under X11**. On Wayland it never does, on any desktop. So:
   read on our side short of scraping the window over AT-SPI.
 - **The app must use a native menu bar.** VS Code does only with
   `"window.titleBarStyle": "native"` (its default custom title bar draws
-  menus in HTML and never exports them). With the native title bar it has
+  menus in HTML and never exports them). So when a ZacOS launcher starts
+  VS Code or a relative (VSCodium, Code - OSS, Cursor: an Electron app with
+  a `product.json` naming its settings folder, `nameShort`), it adds that
+  setting to `~/.config/<nameShort>/User/settings.json`, unless the person
+  chose a title bar style there already, either way
+  (`pl_code_use_native_title_bar`). Each account gets it on its first
+  launch from the Finder or the Apple menu after updating. With the native title bar it has
   no in-window menu bar: Electron hides it once the registrar is there.
 
 Tested (2026-10-10): VS Code 1.141.0 (Electron 43) under X11 on the live session
