@@ -26,6 +26,44 @@ static void touch(const char *path, bool executable) {
 	chmod(path, executable ? 0755 : 0644);
 }
 
+static void write_text(const char *path, const char *text) {
+	FILE *f = fopen(path, "w");
+	fputs(text, f);
+	fclose(f);
+}
+
+/* The whole file (to be freed), NULL if unreadable. */
+static char *slurp(const char *path, size_t *len) {
+	FILE *f = fopen(path, "rb");
+	if (!f) {
+		return NULL;
+	}
+	fseek(f, 0, SEEK_END);
+	long n = ftell(f);
+	rewind(f);
+	char *text = malloc(n + 1);
+	text[fread(text, 1, n, f)] = '\0';
+	fclose(f);
+	if (len) {
+		*len = (size_t)n;
+	}
+	return text;
+}
+
+/* Settings `before` get the native title bar (or are left alone, if `after`
+ * is NULL), giving exactly `after`. */
+static bool settings_become(const char *path, const char *before, const char *after) {
+	write_text(path, before);
+	const bool wrote = pl_code_use_native_title_bar(path);
+	char *got = slurp(path, NULL);
+	const bool ok = got && wrote == (after != NULL) && strcmp(got, after ? after : before) == 0;
+	if (!ok) {
+		printf("      got (%s): %s\n", wrote ? "wrote" : "left", got ? got : "(unreadable)");
+	}
+	free(got);
+	return ok;
+}
+
 static bool command_is(const char *command, const char *want) {
 	char *got = pl_electron_command(command);
 	bool ok = got && strcmp(got, want) == 0;
@@ -144,6 +182,78 @@ int main(void) {
 	fputs("{ \"window.titleBarStyle\": \"custom\" }\n", f);
 	fclose(f);
 	check(!pl_code_use_native_title_bar(want_path), "a title bar style chosen already is kept");
+
+
+	/* Settings are JSON with comments: a brace in a comment or a string is
+	 * not the object's, and a style mentioned only in a comment isn't chosen. */
+	check(settings_become(want_path, "// example { here\n{\n  \"editor.fontSize\": 14\n}\n",
+		"// example { here\n{\n    \"window.titleBarStyle\": \"native\",\n  \"editor.fontSize\": 14\n}\n"),
+		"a brace in a comment before the object isn't its opening brace");
+	check(settings_become(want_path,
+		"/* { \"window.titleBarStyle\": \"custom\" } */\n{\n  // \"window.titleBarStyle\": \"custom\",\n  \"a\": \"{\\\"\"\n}\n",
+		"/* { \"window.titleBarStyle\": \"custom\" } */\n{\n    \"window.titleBarStyle\": \"native\",\n  // \"window.titleBarStyle\": \"custom\",\n  \"a\": \"{\\\"\"\n}\n"),
+		"one in a block comment, a commented-out style or a string doesn't count");
+	check(settings_become(want_path,
+		"// {\n{ /* c */ \"window.titleBarStyle\" /* x */ : \"custom\", }\n", NULL),
+		"a chosen style is kept, whatever comments are around it");
+	check(settings_become(want_path, "\xEF\xBB\xBF{}", "\xEF\xBB\xBF{\n    \"window.titleBarStyle\": \"native\"}"),
+		"an empty object (after a byte order mark) gets no stray comma");
+	check(settings_become(want_path, "{ \"a\": 1\n", NULL) &&
+		settings_become(want_path, "// just a note\n", NULL) &&
+		settings_become(want_path, "{ \"a\": \"unterminated }\n", NULL) &&
+		settings_become(want_path, "{ /* unterminated }\n", NULL) &&
+		settings_become(want_path, "{ \"a\": 1 }\n{ \"b\": 2 }\n", NULL),
+		"anything that isn't one whole object is left alone");
+
+	/* Big settings are rewritten whole, never cut off at a buffer's size. */
+	const size_t big = 3 << 20;
+	char *large = malloc(big + 64);
+	strcpy(large, "{\n  \"big\": \"");
+	size_t at = strlen(large);
+	memset(large + at, 'x', big);
+	strcpy(large + at + big, "\",\n  \"tail\": true\n}\n");
+	write_text(want_path, large);
+	size_t len = 0;
+	check(pl_code_use_native_title_bar(want_path), "added to settings over a megabyte");
+	char *grown = slurp(want_path, &len);
+	static const char added[] = "\n    \"window.titleBarStyle\": \"native\",";
+	check(grown && len == strlen(large) + strlen(added) &&
+		strcmp(grown + len - strlen("\"tail\": true\n}\n"), "\"tail\": true\n}\n") == 0,
+		"keeping every byte of them");
+	free(grown);
+	free(large);
+
+	/* Its permissions stay, a symlink stays a symlink, and a file it can't
+	 * read is never replaced. */
+	write_text(want_path, "{}\n");
+	chmod(want_path, 0600);
+	struct stat st;
+	check(pl_code_use_native_title_bar(want_path) && stat(want_path, &st) == 0 &&
+		(st.st_mode & 0777) == 0600, "a private settings file stays private");
+	char real[600], link[600];
+	snprintf(real, sizeof(real), "%s/dotfiles-settings.json", root);
+	snprintf(link, sizeof(link), "%s/Code/User/linked.json", root);
+	write_text(real, "{ \"a\": 1 }\n");
+	symlink(real, link);
+	char *through = NULL;
+	check(pl_code_use_native_title_bar(link) && lstat(link, &st) == 0 && S_ISLNK(st.st_mode) &&
+		(through = slurp(real, NULL)) && strstr(through, "\"window.titleBarStyle\": \"native\""),
+		"a symlinked settings file is changed through the link");
+	free(through);
+	snprintf(link, sizeof(link), "%s/Code/User/dangling.json", root);
+	snprintf(real, sizeof(real), "%s/nowhere.json", root);
+	symlink(real, link);
+	check(!pl_code_use_native_title_bar(link) && access(real, F_OK) != 0,
+		"a symlink to nothing is left alone");
+	if (geteuid() != 0) {
+		write_text(want_path, "{ \"secret\": 1 }\n");
+		chmod(want_path, 0);
+		check(!pl_code_use_native_title_bar(want_path), "an unreadable settings file is left alone");
+		chmod(want_path, 0600);
+		char *kept = slurp(want_path, NULL);
+		check(kept && strcmp(kept, "{ \"secret\": 1 }\n") == 0, "and not overwritten");
+		free(kept);
+	}
 
 	setenv("PATH", saved_path, 1);
 	free(saved_path);

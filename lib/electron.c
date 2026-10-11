@@ -1,6 +1,7 @@
 #define _DEFAULT_SOURCE
 #include "electron.h"
 
+#include <errno.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -88,16 +89,42 @@ static bool json_string(const char *text, const char *key, char *out, size_t siz
 	return true;
 }
 
-static char *read_file(const char *path) {
+/* The whole of a file, NUL-terminated (its length in *len); NULL with errno
+ * set if it can't be read, or is too big to be a settings file. */
+static char *read_file(const char *path, size_t *len) {
 	FILE *f = fopen(path, "rb");
 	if (!f) {
 		return NULL;
 	}
-	char *text = malloc(1 << 20);
-	size_t n = text ? fread(text, 1, (1 << 20) - 1, f) : 0;
+	enum { LIMIT = 64 << 20 };
+	size_t size = 0, cap = 64 << 10;
+	char *text = malloc(cap);
+	while (text) {
+		size += fread(text + size, 1, cap - 1 - size, f);
+		if (size < cap - 1) {
+			break;
+		}
+		char *bigger = cap < LIMIT ? realloc(text, cap * 2) : NULL;
+		if (!bigger) {
+			free(text);
+			text = NULL;
+			errno = EFBIG;
+			break;
+		}
+		text = bigger;
+		cap *= 2;
+	}
+	if (text && ferror(f)) {
+		free(text);
+		text = NULL;
+		errno = EIO;
+	}
 	fclose(f);
 	if (text) {
-		text[n] = '\0';
+		text[size] = '\0';
+		if (len) {
+			*len = size;
+		}
 	}
 	return text;
 }
@@ -108,7 +135,7 @@ bool pl_code_settings_path(const char *program, char *out, size_t size) {
 		return false;
 	}
 	snprintf(path, sizeof(path), "%s/resources/app/product.json", root);
-	char *product = read_file(path);
+	char *product = read_file(path, NULL);
 	/* VS Code and its relatives (VSCodium, Code - OSS, Cursor) keep their
 	 * settings under ~/.config/<nameShort>; other Electron apps have no
 	 * product.json, or no nameShort, and are left alone. */
@@ -138,38 +165,129 @@ static void make_parents(char *path) {
 	}
 }
 
+/* Past whitespace and JSONC comments from p; NULL in an unterminated comment. */
+static const char *skip_blank(const char *p, const char *end) {
+	while (p < end) {
+		if (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n') {
+			p++;
+		} else if (end - p >= 2 && p[0] == '/' && p[1] == '/') {
+			while (p < end && *p != '\n') {
+				p++;
+			}
+		} else if (end - p >= 2 && p[0] == '/' && p[1] == '*') {
+			const char *close = NULL;
+			for (const char *q = p + 2; q + 1 < end && !close; q++) {
+				close = q[0] == '*' && q[1] == '/' ? q : NULL;
+			}
+			if (!close) {
+				return NULL;
+			}
+			p = close + 2;
+		} else {
+			break;
+		}
+	}
+	return p;
+}
+
+/* Where a settings file's top-level object opens, read the way VS Code reads
+ * it (JSON with comments and trailing commas): NULL unless the file is one
+ * object with only whitespace and comments around it. *chosen is set if the
+ * object has a "window.titleBarStyle" of its own; *empty if it has nothing. */
+static const char *settings_object(const char *text, size_t len, bool *chosen, bool *empty) {
+	static const char key[] = "window.titleBarStyle";
+	const char *end = text + len;
+	const char *p = text;
+	if (len >= 3 && memcmp(p, "\xEF\xBB\xBF", 3) == 0) {
+		p += 3;
+	}
+	p = skip_blank(p, end);
+	if (!p || p == end || *p != '{') {
+		return NULL;
+	}
+	const char *open = p++;
+	const char *first = skip_blank(p, end);
+	*empty = first && first < end && *first == '}';
+	*chosen = false;
+	int depth = 1;
+	while (depth > 0) {
+		if (!(p = skip_blank(p, end)) || p == end) {
+			return NULL;
+		}
+		if (*p == '"') {
+			const char *s = ++p;
+			while (p < end && *p != '"') {
+				p += *p == '\\' && p + 1 < end ? 2 : 1;
+			}
+			if (p >= end) {
+				return NULL;
+			}
+			const char *after = skip_blank(p + 1, end);
+			*chosen |= depth == 1 && after && after < end && *after == ':' &&
+				(size_t)(p - s) == sizeof(key) - 1 && memcmp(s, key, sizeof(key) - 1) == 0;
+		} else if (*p == '{' || *p == '[') {
+			depth++;
+		} else if (*p == '}' || *p == ']') {
+			depth--;
+		}
+		p++;
+	}
+	p = skip_blank(p, end);
+	return p == end ? open : NULL;
+}
+
 bool pl_code_use_native_title_bar(const char *settings) {
-	char *text = read_file(settings);
-	if (text && strstr(text, "\"window.titleBarStyle\"")) {
-		free(text); /* chosen already, whichever way: theirs to keep */
-		return false;
-	}
 	static const char setting[] = "\"window.titleBarStyle\": \"native\"";
-	const char *brace = text ? strchr(text, '{') : NULL;
+	/* Write through a symlink (settings kept with dotfiles) to its file. */
+	char target[PATH_MAX];
+	if (!realpath(settings, target)) {
+		if (errno != ENOENT || snprintf(target, sizeof(target), "%s", settings) >= (int)sizeof(target)) {
+			return false;
+		}
+		struct stat st;
+		if (lstat(settings, &st) == 0) {
+			return false; /* a symlink to nothing: not ours to replace */
+		}
+	}
+	size_t len = 0;
+	char *text = read_file(target, &len);
+	if (!text && errno != ENOENT) {
+		return false; /* there but unreadable: never write over it */
+	}
 	bool blank = !text || text[strspn(text, " \t\r\n")] == '\0';
-	if (!brace && !blank) {
-		free(text); /* not a settings file we understand: leave it */
+	bool chosen = false, empty = false;
+	const char *brace = blank ? NULL : settings_object(text, len, &chosen, &empty);
+	if (!blank && (!brace || chosen)) {
+		/* Chosen already, whichever way (theirs to keep), or not a settings
+		 * file this understands: leave it as it is. */
+		free(text);
 		return false;
 	}
+	struct stat st;
+	const bool existed = text && stat(target, &st) == 0;
 	char tmp[PATH_MAX + 8];
-	snprintf(tmp, sizeof(tmp), "%s.zacos9", settings);
+	snprintf(tmp, sizeof(tmp), "%s.zacos9", target);
 	make_parents(tmp);
 	FILE *f = fopen(tmp, "w");
 	if (!f) {
 		free(text);
 		return false;
 	}
+	if (existed) {
+		fchmod(fileno(f), st.st_mode & 07777);
+	}
 	if (brace) {
-		/* VS Code reads settings as JSON with comments and trailing commas,
-		 * so a line after the opening brace is always valid. */
+		/* A member straight after the object's opening brace; VS Code
+		 * accepts the trailing comma, but an empty object gets none. */
 		fwrite(text, 1, brace + 1 - text, f);
-		fprintf(f, "\n    %s,", setting);
-		fputs(brace + 1, f);
+		fprintf(f, empty ? "\n    %s" : "\n    %s,", setting);
+		fwrite(brace + 1, 1, len - (brace + 1 - text), f);
 	} else {
 		fprintf(f, "{\n    %s\n}\n", setting);
 	}
 	free(text);
-	bool ok = fclose(f) == 0 && rename(tmp, settings) == 0;
+	bool ok = !ferror(f);
+	ok = fclose(f) == 0 && ok && rename(tmp, target) == 0;
 	if (!ok) {
 		unlink(tmp);
 	}

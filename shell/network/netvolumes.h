@@ -32,16 +32,37 @@ QString netVolumeMountInfoPath(QByteArray path);
  * "NAME's home" by default; logged in as NAME, that is the folder NAME. */
 QString afpVolumeDisplayName(const QString &volume, const QString &user);
 
-/* Where an AFP volume is mounted: DIR/SERVER/NAME (NAME from
- * afpVolumeDisplayName), so the same volume always gets the same place and
- * volumes of the same name on two servers never collide. */
-QString afpMountPointIn(const QString &dir, const QString &server, const QString &name);
+/* Where an AFP volume is mounted: DIR/SERVER/ID/NAME. NAME (from
+ * afpVolumeDisplayName) is the disk's name on the desktop. ID comes from the
+ * exact server and volume names, so volumes whose names make the same folder
+ * name ("a/b" and "a-b"; "adam's home", shown as "adam", beside a volume
+ * "adam") never share a place, while the same volume always gets the same
+ * one, and volumes of the same name on two servers never collide. */
+QString afpMountPointIn(const QString &dir, const QString &server, const QString &volume,
+	const QString &name);
+
+/* The server and volume an AFP mount's source names: "afp://SERVER/VOLUME",
+ * as zacos9-afp gives it (SERVER may carry a port; VOLUME is raw text, not a
+ * URL path). */
+bool afpMountSource(const QString &source, QString *server, QString *volume);
+
+/* Whether a mounted AFP volume is SERVER's VOLUME, as nearly as its source
+ * can say (zacos9-afp writes a comma there as "_", and stops at 255 bytes). */
+bool afpMountIs(const NetVolume &v, const QString &server, const QString &volume);
+
+/* Which of the mounts `live` SERVER's VOLUME is already mounted as: the one
+ * at `path`, or at `legacy` (where 0.1.50 and before put it), that really is
+ * that volume; -1 if none. *taken is set if something else is mounted at
+ * `path` - never to be reused, or mounted over. */
+int afpMountAmong(const std::vector<NetVolume> &live, const QString &path, const QString &legacy,
+	const QString &server, const QString &volume, bool *taken);
 
 /* The mount point for a volume, under this account's own data directory.
  * Empty folders left by earlier connections (a logout or a dropped server
- * skips the cleanup) are removed, and a dead mount still in the way is
- * unmounted. *mounted is set if the volume is already mounted there.
- * Creates nothing; `afpMount` does that. */
+ * skips the cleanup) are removed, and a dead mount of the volume still in
+ * the way is unmounted. *mounted is set if the volume is already mounted
+ * (the path returned is where). Empty if a different volume is mounted in
+ * its place. Creates nothing; `afpMount` does that. */
 QString afpMountPointFor(const QString &server, const QString &volume, const QString &user,
 	bool *mounted);
 

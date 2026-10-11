@@ -218,9 +218,12 @@ trade `FileSharingPanel` already makes polling who's connected, there
 every 5 s), exactly as if Put Away had done it, because as far as the
 Finder is concerned nothing is different.
 
-An AFP volume mounts at `~/.local/share/zacos9/mounts/<server>/<name>`
+An AFP volume mounts at `~/.local/share/zacos9/mounts/<server>/<id>/<name>`
 (the directory's own name is the disk's name — no separate record of
-what's what). The name is the shared folder's, as on Mac OS 9: never
+what's what). `<id>` is 16 hex digits of a SHA-256 of the exact server
+(lowercased) and volume names, so volumes whose names make the same
+folder name — "a/b" and "a-b", or a home volume shown as "adam" beside a
+volume called "adam" — never share a mount point (`afpMountPointIn`). The name is the shared folder's, as on Mac OS 9: never
 numbered, and two servers' volumes of the same name sit side by side on
 the desktop. Netatalk's default home volume name, "NAME's home", is shown
 as the folder NAME when you logged in as NAME (`afpVolumeDisplayName`);
@@ -229,7 +232,17 @@ ZacOS's own File Sharing names home volumes after the folder anyway
 comes back where its icon was. Before mounting, empty folders left by
 earlier connections (a logout or a dropped server skips the cleanup that
 follows an unmount) are removed, a dead mount in the way is lazily
-unmounted, and a volume that's already mounted isn't mounted again.
+unmounted, and a volume that's already mounted isn't mounted again —
+but only if the mount really is that volume: its source,
+`afp://SERVER/VOLUME` as `zacos9-afp` writes it (parsed as plain text,
+not a URL, so a port, `#` or `?` survives), must match
+(`afpMountIs`/`afpMountAmong`). A volume still mounted where 0.1.48–0.1.50
+put it (`mounts/<server>/<name>`) is found there; a different volume
+mounted in a volume's place is neither reused nor mounted over — the
+Network Browser says so instead. The cleanup removes empty folders down
+to `<server>/<id>/<name>`, and never looks inside a mount, or another
+filesystem mounted there. (Upgrading from 0.1.50, a volume's desktop icon
+loses its remembered position once, as its mount point moves.)
 (Until 0.1.47 the folder was `mounts/<name>`, numbered " (2)", " (3)" ...
 whenever a leftover folder had the name, so reconnecting piled them up.)
 Mounting and ejecting were verified live end to end: mounted (confirmed with `df`, a

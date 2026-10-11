@@ -304,7 +304,13 @@ when it runs **under X11**. On Wayland it never does, on any desktop. So:
   a `product.json` naming its settings folder, `nameShort`), it adds that
   setting to `~/.config/<nameShort>/User/settings.json`, unless the person
   chose a title bar style there already, either way
-  (`pl_code_use_native_title_bar`). Each account gets it on its first
+  (`pl_code_use_native_title_bar`). The file is read the way VS Code reads
+  it, as JSON with comments: the setting goes straight after the
+  top-level object's opening brace (not a brace in a comment or string),
+  and a style only mentioned in a comment doesn't count as chosen. A file
+  that isn't one whole object, can't be read, or is a symlink to nothing is
+  left untouched; otherwise it is rewritten whole (any size), keeping its
+  permissions, and through a symlink to its real file. Each account gets it on its first
   launch from the Finder or the Apple menu after updating. With the native title bar it has
   no in-window menu bar: Electron hides it once the registrar is there.
 

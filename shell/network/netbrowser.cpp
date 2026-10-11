@@ -119,7 +119,10 @@ void NetBrowserWindow::connectTo(const QString &address, DiscoveredServer::Kind 
 				bool mounted = false;
 				const QString user = login.guest ? QString() : login.user;
 				const QString mountPoint = afpMountPointFor(address, volume, user, &mounted);
-				if (!mounted && !afpMount(address, volume, mountPoint, user,
+				if (mountPoint.isEmpty()) {
+					Alert::ask(QStringLiteral("“%1” can’t be connected: a different disk is "
+						"already connected in its place.").arg(volume), "OK", QString());
+				} else if (!mounted && !afpMount(address, volume, mountPoint, user,
 						login.guest ? QString() : login.password, cleartext, &mountError)) {
 					Alert::ask(mountError, "OK", QString());
 				}

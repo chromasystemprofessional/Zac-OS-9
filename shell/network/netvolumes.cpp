@@ -8,10 +8,10 @@
 #include <QStandardPaths>
 #include <QDebug>
 #include <QCoreApplication>
+#include <QCryptographicHash>
 #include <QElapsedTimer>
 #include <QEventLoop>
 #include <QThread>
-#include <QUrl>
 
 #include <cerrno>
 #include <sys/stat.h>
@@ -42,11 +42,8 @@ static std::vector<NetVolume> afpMounts() {
 		v.path = netVolumeMountInfoPath(fields.at(4));
 		v.name = QFileInfo(v.path).fileName();
 		/* The source, "afp://SERVER/VOLUME", names what was mounted. */
-		const QUrl source(separator + 2 < fields.size() ?
-			netVolumeMountInfoPath(fields.at(separator + 2)) : QString());
-		v.server = source.host();
-		v.share = source.path().mid(1);
-		if (v.share.isEmpty()) {
+		if (separator + 2 >= fields.size() ||
+				!afpMountSource(netVolumeMountInfoPath(fields.at(separator + 2)), &v.server, &v.share)) {
 			v.share = v.name;
 		}
 		out.push_back(v);
@@ -108,8 +105,58 @@ QString afpVolumeDisplayName(const QString &volume, const QString &user) {
 	return volume;
 }
 
-QString afpMountPointIn(const QString &dir, const QString &server, const QString &name) {
+bool afpMountSource(const QString &source, QString *server, QString *volume) {
+	static const QString scheme = QStringLiteral("afp://");
+	const int slash = source.indexOf('/', scheme.size());
+	if (!source.startsWith(scheme, Qt::CaseInsensitive) || slash <= scheme.size() ||
+			slash + 1 >= source.size()) {
+		return false;
+	}
+	*server = source.mid(scheme.size(), slash - scheme.size());
+	*volume = source.mid(slash + 1);
+	return true;
+}
+
+bool afpMountIs(const NetVolume &v, const QString &server, const QString &volume) {
+	/* What zacos9-afp would have named this volume's mount (afpfs.c). */
+	QByteArray source = QFile::encodeName("afp://" + server + "/" + volume);
+	source.replace(',', '_');
+	QString wantServer, wantVolume;
+	return v.kind == NetVolume::AFP &&
+		afpMountSource(QFile::decodeName(source.left(255)), &wantServer, &wantVolume) &&
+		v.server.compare(wantServer, Qt::CaseInsensitive) == 0 && v.share == wantVolume;
+}
+
+QString afpMountPointIn(const QString &dir, const QString &server, const QString &volume,
+		const QString &name) {
+	const QString host = server.toLower(); /* host names are case-insensitive */
+	const QByteArray id = QCryptographicHash::hash(host.toUtf8() + '\0' + volume.toUtf8(),
+		QCryptographicHash::Sha256).toHex().left(16);
+	return dir + "/" + pathSafe(host, "Server") + "/" + QString::fromLatin1(id) + "/" +
+		pathSafe(name, "Untitled");
+}
+
+/* Where 0.1.48 to 0.1.50 mounted a volume: DIR/SERVER/NAME. */
+static QString legacyMountPoint(const QString &dir, const QString &server, const QString &name) {
 	return dir + "/" + pathSafe(server, "Server") + "/" + pathSafe(name, "Untitled");
+}
+
+int afpMountAmong(const std::vector<NetVolume> &live, const QString &path, const QString &legacy,
+		const QString &server, const QString &volume, bool *taken) {
+	*taken = false;
+	int found = -1;
+	for (size_t i = 0; i < live.size(); i++) {
+		const NetVolume &v = live[i];
+		if (v.kind != NetVolume::AFP || (v.path != path && v.path != legacy)) {
+			continue;
+		}
+		if (!afpMountIs(v, server, volume)) {
+			*taken |= v.path == path;
+		} else if (found < 0 || v.path == path) {
+			found = int(i);
+		}
+	}
+	return found;
 }
 
 /* Runs a short command to the end without blocking the GUI (never
@@ -130,21 +177,27 @@ static bool runBriefly(const QString &program, const QStringList &args) {
 	return p.exitStatus() == QProcess::NormalExit && p.exitCode() == 0;
 }
 
-/* Empty folders in DIR (and one level down) that nothing is mounted on.
- * rmdir removes only an empty folder, and fails on a mount point. */
-static void removeLeftovers(const QString &dir, const std::vector<NetVolume> &live) {
-	for (const QFileInfo &entry : QDir(dir).entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot)) {
+/* Empty folders under DIR, down to where volumes mount (SERVER/ID/NAME),
+ * that nothing is mounted on or in. rmdir removes only an empty folder, and
+ * fails on a mount point; nothing else mounted here is looked inside. */
+static void removeLeftovers(const QString &dir, const std::vector<NetVolume> &live, int depth = 3) {
+	struct stat top;
+	if (depth == 0 || stat(QFile::encodeName(dir).constData(), &top) != 0) {
+		return;
+	}
+	for (const QFileInfo &entry : QDir(dir).entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot |
+			QDir::NoSymLinks | QDir::Hidden)) {
 		const QString path = entry.absoluteFilePath();
 		bool mounted = false;
 		for (const NetVolume &v : live) {
 			mounted |= v.path == path || v.path.startsWith(path + "/");
 		}
-		if (mounted) {
+		struct stat st;
+		if (mounted || lstat(QFile::encodeName(path).constData(), &st) != 0 ||
+				!S_ISDIR(st.st_mode) || st.st_dev != top.st_dev) {
 			continue;
 		}
-		for (const QFileInfo &inner : QDir(path).entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot)) {
-			QDir().rmdir(inner.absoluteFilePath());
-		}
+		removeLeftovers(path, live, depth - 1);
 		QDir().rmdir(path);
 	}
 }
@@ -152,19 +205,26 @@ static void removeLeftovers(const QString &dir, const std::vector<NetVolume> &li
 QString afpMountPointFor(const QString &server, const QString &volume, const QString &user,
 		bool *mounted) {
 	*mounted = false;
-	const QString path = afpMountPointIn(mountsDir(), server, afpVolumeDisplayName(volume, user));
-	for (const NetVolume &v : afpMounts()) {
-		if (v.path != path) {
-			continue;
-		}
+	const QString name = afpVolumeDisplayName(volume, user);
+	const QString path = afpMountPointIn(mountsDir(), server, volume, name);
+	const std::vector<NetVolume> live = afpMounts();
+	bool taken = false;
+	const int found = afpMountAmong(live, path, legacyMountPoint(mountsDir(), server, name),
+		server, volume, &taken);
+	if (taken) {
+		qWarning() << "A different volume is mounted at" << path;
+		return QString();
+	}
+	if (found >= 0) {
+		const QString at = live[found].path;
 		struct stat st;
-		if (stat(QFile::encodeName(path).constData(), &st) == 0) {
+		if (stat(QFile::encodeName(at).constData(), &st) == 0) {
 			*mounted = true; /* already there: nothing to do */
-			return path;
+			return at;
 		}
 		/* Its server went away ("Transport endpoint is not connected"). */
 		if (errno == ENOTCONN || errno == EIO) {
-			runBriefly("fusermount3", { "-u", "-z", path });
+			runBriefly("fusermount3", { "-u", "-z", at });
 		}
 	}
 	removeLeftovers(mountsDir(), afpMounts());
