@@ -1,3 +1,13 @@
+zacos9 (0.1.51) trixie; urgency=medium
+
+  * VS Code's settings stay intact when ZacOS turns on its native title
+    bar: comments, large settings files and files it can't read are now
+    handled safely. Network disks whose names make the same folder name
+    (such as a/b and a-b) no longer share a place, and a disk that's
+    already connected is reused only if it really is the one asked for.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Sun, 11 Oct 2026 16:27:45 -0400
+
 zacos9 (0.1.50) trixie; urgency=medium
 
   * VS Code's menus reach the menu bar on every ZacOS computer: starting VS
