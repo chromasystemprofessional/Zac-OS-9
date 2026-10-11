@@ -43,6 +43,15 @@ this project's own Netatalk test server:
 - The same server, announced on more than one interface, is one
   computer, not two: `discoverServers()` dedupes by name after merging
   Bonjour and WS-Discovery, not just by address.
+- A server can be announced over **IPv6 alone** for a while, even with
+  an IPv4 address (seen live on 2026-10-10: two ZacOS computers' AFP
+  records came over IPv6 only, then IPv4 again, and the Network Browser
+  missed them meanwhile, as it took IPv4 records only). Such a server is
+  now listed by its `.local` host name, which the system resolves
+  (`mdns4_minimal`); a server with an IPv4 record is still listed by that
+  address, once (`parseAvahiBrowse`).
+- Names are UTF-8, escaped a byte at a time (`Adam\226\128\153s` is
+  "Adam’s"): they're decoded as UTF-8, not one character per byte.
 
 Netatalk needs nothing from this project to be found: once
 `avahi-daemon` is running (the File Sharing control panel's helper

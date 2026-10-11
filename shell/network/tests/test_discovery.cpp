@@ -47,9 +47,8 @@ int main() {
 	check(!parseAvahiBrowseLine(friendlyLine, &s),
 		"a line with the friendly type name (no -k) is not mistaken for AFP");
 
-	/* A non-default port is kept; IPv6 is skipped (IPv4 alone is
-	 * enough to connect, and showing both would list every server
-	 * twice). */
+	/* A non-default port is kept. An IPv6 resolution gives the host
+	 * name; parseAvahiBrowse keeps it only for a server with no IPv4. */
 	const QString smbLine = "=;eth0;IPv4;OFFICE;_smb._tcp;local;"
 		"office.local;10.0.0.5;1445;";
 	check(parseAvahiBrowseLine(smbLine, &s), "a resolved SMB line parses");
@@ -57,7 +56,29 @@ int main() {
 	check(s.address == "10.0.0.5:1445", "a non-default port is kept in the address");
 	const QString v6Line = "=;eth0;IPv6;OFFICE;_smb._tcp;local;"
 		"office.local;fe80::1;445;";
-	check(!parseAvahiBrowseLine(v6Line, &s), "an IPv6 resolution is skipped (IPv4 covers it)");
+	check(parseAvahiBrowseLine(v6Line, &s) && s.address == "office.local" && s.byHostName,
+		"an IPv6 resolution gives the server's host name");
+
+	/* Seen live (2026-10-10): two ZacOS computers announced their AFP
+	 * service over IPv6 alone for a while, though their .local names
+	 * resolved over IPv4, and the Network Browser didn't list them. */
+	const QString both =
+		"=;wlp3s0;IPv4;MacBook\\032Pro;_afpovertcp._tcp;local;macbook-pro.local;192.168.2.43;548\n"
+		"=;wlp3s0;IPv6;MacBook\\032Pro;_afpovertcp._tcp;local;macbook-pro.local;fd28::1;548\n"
+		"=;wlp3s0;IPv6;ChromaSystem\\032Pro\\032Server;_afpovertcp._tcp;local;adams-zacos-9.local;fd28::2;548\n";
+	const std::vector<DiscoveredServer> servers = parseAvahiBrowse(both);
+	check(servers.size() == 2, "each server once");
+	bool mac = false, chroma = false;
+	for (const DiscoveredServer &d : servers) {
+		mac |= d.name == "MacBook Pro" && d.address == "192.168.2.43";
+		chroma |= d.name == "ChromaSystem Pro Server" && d.address == "adams-zacos-9.local";
+	}
+	const QString curly = "=;wlp3s0;IPv4;Adam\\226\\128\\153s\\032Computer;_afpovertcp._tcp;local;"
+		"adams-zacos-10.local;192.168.2.111;548;";
+	check(parseAvahiBrowseLine(curly, &s) && s.name == QString::fromUtf8("Adam\u2019s Computer"),
+		"a name's UTF-8 escapes are read as UTF-8 (Adam’s, not Adamâs)");
+	check(mac, "a server with IPv4 by its IPv4 address");
+	check(chroma, "a server announced over IPv6 alone by its host name");
 
 	const QString otherType = "=;eth0;IPv4;Printer;_ipp._tcp;local;p.local;10.0.0.9;631;";
 	check(!parseAvahiBrowseLine(otherType, &s), "an unrelated service type is ignored");

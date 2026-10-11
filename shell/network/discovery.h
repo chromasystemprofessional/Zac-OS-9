@@ -16,6 +16,7 @@ struct DiscoveredServer {
 	Kind kind = AFP;
 	QString name; /* a person-readable name: the announced one, or the address */
 	QString address; /* host or "host:port", ready for zacos9-afp or smb:// */
+	bool byHostName = false; /* announced over IPv6 alone: address is its .local name */
 
 	bool operator==(const DiscoveredServer &o) const {
 		return kind == o.kind && address == o.address;
@@ -41,6 +42,10 @@ std::vector<DiscoveredServer> wsDiscoveryServers(int timeoutMs = 3000);
  * testing: the escaping and field order are what a real build depends
  * on actually matching avahi's own output. */
 bool parseAvahiBrowseLine(const QString &line, DiscoveredServer *out);
+/* Every server in avahi-browse's parseable output: by its IPv4 address,
+ * or - announced over IPv6 alone, which a server's avahi can do for a
+ * while even when it has an IPv4 address - by its .local host name. */
+std::vector<DiscoveredServer> parseAvahiBrowse(const QString &text);
 
 /* Pulls ComputerName (if present) and the sender's own name out of a
  * WS-Discovery ProbeMatch body; exposed for testing against a recorded

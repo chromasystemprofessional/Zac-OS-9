@@ -8,31 +8,34 @@
 #include <QUdpSocket>
 #include <QUuid>
 #include <algorithm>
+#include <cctype>
 
 /* Avahi escapes any byte that isn't a plain label character as a
  * three-decimal-digit "\DDD" (its value), and a literal backslash or
- * dot as "\\" / "\.". */
+ * dot as "\\" / "\.". The bytes are UTF-8: "Adam’s" comes as
+ * "Adam\226\128\153s", one escape per byte of the apostrophe. */
 static QString unescapeAvahi(const QString &s) {
-	QString out;
-	out.reserve(s.size());
-	for (int i = 0; i < s.size(); i++) {
-		if (s[i] != '\\' || i + 1 >= s.size()) {
-			out += s[i];
+	const QByteArray in = s.toUtf8();
+	QByteArray out;
+	out.reserve(in.size());
+	for (int i = 0; i < in.size(); i++) {
+		if (in[i] != '\\' || i + 1 >= in.size()) {
+			out += in[i];
 			continue;
 		}
-		const QChar next = s[i + 1];
+		const char next = in[i + 1];
 		if (next == '\\' || next == '.') {
 			out += next;
 			i++;
-		} else if (next.isDigit() && i + 3 < s.size() &&
-				s[i + 2].isDigit() && s[i + 3].isDigit()) {
-			out += QChar(s.mid(i + 1, 3).toInt());
+		} else if (isdigit((unsigned char)next) && i + 3 < in.size() &&
+				isdigit((unsigned char)in[i + 2]) && isdigit((unsigned char)in[i + 3])) {
+			out += static_cast<char>(in.mid(i + 1, 3).toInt());
 			i += 3;
 		} else {
-			out += s[i];
+			out += in[i];
 		}
 	}
-	return out;
+	return QString::fromUtf8(out);
 }
 
 bool parseAvahiBrowseLine(const QString &line, DiscoveredServer *out) {
@@ -44,9 +47,14 @@ bool parseAvahiBrowseLine(const QString &line, DiscoveredServer *out) {
 	if (f.size() < 9) {
 		return false;
 	}
-	const QString &proto = f[2], &type = f[4], &address = f[7], &port = f[8];
-	if (proto != "IPv4" || address.isEmpty()) {
-		return false; /* one of each per family; IPv4 alone is enough to connect */
+	const QString &proto = f[2], &type = f[4], &host = f[6], &port = f[8];
+	/* IPv4: its address. IPv6: its host name, which the system resolves
+	 * (mdns4_minimal) - a bare IPv6 address would need brackets, and a
+	 * link-local one its interface too. parseAvahiBrowse prefers IPv4. */
+	const bool v4 = proto == "IPv4";
+	const QString address = v4 ? f[7] : host;
+	if ((!v4 && proto != "IPv6") || address.isEmpty()) {
+		return false;
 	}
 	if (type == "_afpovertcp._tcp") {
 		out->kind = DiscoveredServer::AFP;
@@ -56,6 +64,7 @@ bool parseAvahiBrowseLine(const QString &line, DiscoveredServer *out) {
 		return false;
 	}
 	out->name = unescapeAvahi(f[3]);
+	out->byHostName = !v4;
 	const QString defaultPort = out->kind == DiscoveredServer::AFP ? "548" : "445";
 	out->address = port == defaultPort ? address : address + ":" + port;
 	return true;
@@ -82,10 +91,24 @@ std::vector<DiscoveredServer> bonjourServers(int timeoutMs) {
 		p.kill();
 		p.waitForFinished(1000);
 	}
-	const QString text = QString::fromUtf8(p.readAllStandardOutput());
+	return parseAvahiBrowse(QString::fromUtf8(p.readAllStandardOutput()));
+}
+
+std::vector<DiscoveredServer> parseAvahiBrowse(const QString &text) {
+	std::vector<DiscoveredServer> found;
+	QSet<QString> withIPv4;
 	for (const QString &line : text.split('\n', Qt::SkipEmptyParts)) {
 		DiscoveredServer s;
 		if (parseAvahiBrowseLine(line, &s)) {
+			found.push_back(s);
+			if (!s.byHostName) {
+				withIPv4.insert(QString::number(s.kind) + "/" + s.name);
+			}
+		}
+	}
+	std::vector<DiscoveredServer> out;
+	for (const DiscoveredServer &s : found) {
+		if (!s.byHostName || !withIPv4.contains(QString::number(s.kind) + "/" + s.name)) {
 			out.push_back(s);
 		}
 	}

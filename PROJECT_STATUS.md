@@ -572,6 +572,15 @@ removed. Tests updated: `lib/tests/test_welcome.c`, `compositor/tests/test_start
 `boot/tests/test_splash.py`, `tests/vm/boot-frames.py`. Still to do: a full
 meson build (needs the -dev packages) and a look on real hardware.
 
+**Network Browser: servers announced over IPv6 alone, UTF-8 names**
+(uncommitted): two ZacOS computers dropped out of the list after a first
+connection: their avahi announced AFP over IPv6 only for a while, and
+`discovery.cpp` kept IPv4 records only. Such servers are now listed by their
+`.local` host name (IPv4 still preferred, no duplicates;
+`parseAvahiBrowse`). Names with escaped UTF-8 ("Adam’s Computer") were
+decoded a byte at a time ("Adamâs"); now as UTF-8. `discovery` test
+extended; checked against this network's live avahi output.
+
 **Network disk names: the shared folder's, never numbered** (uncommitted):
 reconnecting an AFP server piled up "adam's home (2)", "(3)", "(4)" -
 leftover empty mount folders (a logout skips the unmount cleanup) made each
