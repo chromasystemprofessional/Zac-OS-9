@@ -1,3 +1,10 @@
+zacos9 (0.1.47) trixie; urgency=medium
+
+  * Apple menu: the Software catalog is now New Tricks and Software Update
+    is Fetch Updates, and the Apple-menu icon is a close-up of Happy Zac.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Sat, 10 Oct 2026 20:30:19 -0400
+
 zacos9 (0.1.46) trixie; urgency=medium
 
   * Menus of more applications in the menu bar: VS Code and other Electron
