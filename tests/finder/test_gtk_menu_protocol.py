@@ -97,7 +97,9 @@ with tempfile.TemporaryDirectory(prefix="zacos9-gtk-menus-") as temporary:
                     for kind in ("section", "submenu"):
                         child = model.get_item_link(index, kind)
                         if child:
-                            retained = models.setdefault((hash(model), index, kind), child)
+                            # Keyed by the model itself, which keeps it alive: a hash()
+                            # (its address) can be reused by the next app's model.
+                            retained = models.setdefault((model, index, kind), child)
                             result.extend(labels(retained))
                 return result
 
