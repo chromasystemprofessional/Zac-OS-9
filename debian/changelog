@@ -1,3 +1,12 @@
+zacos9 (0.1.50) trixie; urgency=medium
+
+  * VS Code's menus reach the menu bar on every ZacOS computer: starting VS
+    Code (or VSCodium, Code - OSS, Cursor) from the Finder or the Apple
+    menu turns on its native title bar, unless a title bar style was chosen
+    already.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Sat, 10 Oct 2026 23:00:30 -0400
+
 zacos9 (0.1.49) trixie; urgency=medium
 
   * The Network Browser lists servers that announce themselves over IPv6
