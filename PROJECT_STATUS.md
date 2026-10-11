@@ -572,6 +572,13 @@ removed. Tests updated: `lib/tests/test_welcome.c`, `compositor/tests/test_start
 `boot/tests/test_splash.py`, `tests/vm/boot-frames.py`. Still to do: a full
 meson build (needs the -dev packages) and a look on real hardware.
 
+**Apple menu names and icon** (uncommitted): the catalog (Software window) is now
+**New Tricks** and Software Update is **Fetch Updates** (`menubar/launch.c`);
+the windows keep their names. The Apple-menu icon is now a 16x16 close-up of Happy Zac's head
+(`logo16_data` in `lib/logo.c`, from `tools/menubar/make-menu-logo.py`); the
+64x64 ZacOS logo used by Get Info, setup and the installer is unchanged.
+Seen in a nested session.
+
 **GIMP 3's menus in the menu bar** (uncommitted): GIMP's image window is a
 `GtkApplicationWindow` with its own menu bar widget, which the GTK module
 skipped (it left all application windows to GTK, which exports nothing

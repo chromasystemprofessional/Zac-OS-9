@@ -1,6 +1,6 @@
 # Software Update
 
-**Software Update** in the Apple menu (`zacos9-update`, `shell/update/`) keeps
+**Software Update** (Apple menu > **Fetch Updates**; `zacos9-update`, `shell/update/`) keeps
 an installed ZacOS 9 current. It covers two things in one window:
 
 - **New ZacOS 9 releases.** These are GitHub releases of

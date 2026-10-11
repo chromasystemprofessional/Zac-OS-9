@@ -182,13 +182,13 @@ void launch_fill_logo_menu(struct mb_menu *menu) {
 	{
 		char command[PATH_MAX + 64];
 		sibling_program("zacos9-store", command, sizeof(command));
-		add_item(menu, "Fetch Software", true, ACT_LAUNCH, command);
+		add_item(menu, "New Tricks", true, ACT_LAUNCH, command);
 	}
 	/* New ZacOS 9 releases and Debian's own updates. */
 	{
 		char command[PATH_MAX + 64];
 		sibling_program("zacos9-update", command, sizeof(command));
-		add_item(menu, "New Tricks", true, ACT_LAUNCH, command);
+		add_item(menu, "Fetch Updates", true, ACT_LAUNCH, command);
 	}
 	add_item(menu, NULL, false, ACT_NONE, NULL);
 	/* Classic Mac OS in an emulator; the Finder explains what's missing. */

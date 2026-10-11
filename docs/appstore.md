@@ -5,6 +5,7 @@ It borrows instead from the Mac's own list-and-details convention (the
 Finder's own windows, Get Info, the Installer VISE packages shipped on
 Mac OS 9 CDs): a category list, an item list, and a details pane with an
 icon, a blurb, a status line and one button. Under that, it is apt.
+It opens from Apple menu > **New Tricks**.
 
 ## What it's for
 
