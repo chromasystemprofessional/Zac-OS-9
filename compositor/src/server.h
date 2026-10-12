@@ -66,6 +66,8 @@ struct plat_server {
 	struct wlr_scene_tree *fullscreen_layer;
 	struct wlr_scene_tree *dialog_layer; /* movable-modal windows above app windows */
 	struct wlr_scene_tree *overlay_layer;   /* drag outlines */
+	struct wlr_scene_tree *lock_layer;  /* lock.c: the lock, over black */
+	struct wlr_scene_tree *saver_layer; /* zacos9-screensaver, even over the lock */
 	struct plat_outline outline;
 
 	struct wlr_layer_shell_v1 *layer_shell;
@@ -152,7 +154,20 @@ struct plat_server {
 	long idle_slept_at;   /* when the system last went to sleep */
 	int idle_reported;    /* screens in the state file */
 	pid_t idle_saver_pid; /* zacos9-screensaver, while it runs */
+	bool idle_refocus_pending; /* the pointer looked at again shortly */
 	struct wl_list keep_awake; /* idle.c keep_awake.link: apps' D-Bus requests */
+	bool suspend_after_lock; /* system sleep waits for the lock */
+
+	/* lock.c: ext-session-lock-v1. */
+	struct wlr_session_lock_manager_v1 *lock_mgr;
+	struct wl_listener lock_new;
+	struct wlr_session_lock_v1 *lock; /* the lock client's, while it lives */
+	struct wl_listener lock_new_surface, lock_unlock, lock_destroy;
+	bool locked; /* stays true if the lock client dies without unlocking */
+	struct wl_list lock_surfaces; /* lock.c lock_surface.link */
+	struct wl_list lock_waiters;  /* wl_callbacks for platinum_shell_v1.lock */
+	struct wl_event_source *lock_restart;
+	pid_t lock_pid;
 	/* A press that only woke a dark screen; its release is swallowed too. */
 	uint32_t idle_swallowed_button, idle_swallowed_key;
 };
@@ -314,6 +329,25 @@ void idle_show_savers(struct plat_server *server);
 void idle_keep_awake(struct plat_server *server, struct wl_client *client, uint32_t id,
 	uint32_t pid, const char *app_id, uint32_t what);
 
+/* lock.c: locking the screens (ext-session-lock-v1) */
+void lock_init(struct plat_server *server);
+bool lock_active(struct plat_server *server);
+/* "Ask for my password to wake" is on. */
+bool lock_required(void);
+/* Start zacos9-lock, unless locked already. */
+void lock_start(struct plat_server *server);
+/* platinum_shell_v1.lock: the callback is done once locked (at once if
+ * not to be: `always`, or else only when a password is required). */
+void lock_request(struct plat_server *server, struct wl_client *client, uint32_t id, bool always);
+/* Whether a surface is one of the lock's; which one is under a point. */
+bool lock_owns(struct plat_server *server, struct wlr_surface *surface);
+struct wlr_surface *lock_surface_at(struct plat_server *server, double lx, double ly,
+	double *sx, double *sy);
+/* The keyboard to the lock (the one on the screen under the pointer). */
+void lock_focus(struct plat_server *server);
+/* idle.c: the lock came or went (the state file says). */
+void idle_lock_changed(struct plat_server *server);
+
 /* layers.c: wlr-layer-shell (menu bar and other shell surfaces) */
 void layers_init(struct plat_server *server);
 void layers_arrange(struct plat_output *output);
@@ -327,6 +361,9 @@ void input_refresh_cursor(struct plat_server *server);
 void input_begin_grab(struct plat_server *server, struct plat_view *view,
 		enum plat_cursor_mode mode, uint32_t edges, enum decor_part part);
 void input_cancel_grab(struct plat_server *server);
+/* What's under the pointer changed with no motion (a screen saver or the
+ * lock came or went): its focus and image again. */
+void input_pointer_refocus(struct plat_server *server);
 /* Give keyboard focus to a surface, with ⌘ (Super) reported as Ctrl. */
 void input_keyboard_enter(struct plat_server *server, struct wlr_surface *surface);
 

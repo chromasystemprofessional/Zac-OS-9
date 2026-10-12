@@ -219,6 +219,11 @@ static void handle_user_activity(struct wl_client *client, struct wl_resource *r
 	idle_input(the_server, IDLE_INPUT_MOTION);
 }
 
+static void handle_lock(struct wl_client *client, struct wl_resource *resource, uint32_t callback,
+		uint32_t always) {
+	lock_request(the_server, client, callback, always != 0);
+}
+
 static const struct platinum_shell_v1_interface shell_impl = {
 	.set_window_style = handle_set_window_style,
 	.set_window_position = handle_set_window_position,
@@ -228,6 +233,7 @@ static const struct platinum_shell_v1_interface shell_impl = {
 	.cancel_launch = handle_cancel_launch,
 	.keep_awake = handle_keep_awake,
 	.user_activity = handle_user_activity,
+	.lock = handle_lock,
 };
 
 static void resource_destroy(struct wl_resource *resource) {
@@ -251,5 +257,5 @@ void platinum_shell_init(struct plat_server *server) {
 	the_server = server;
 	wl_list_init(&hints);
 	wl_list_init(&resources);
-	wl_global_create(server->display, &platinum_shell_v1_interface, 5, NULL, bind_shell);
+	wl_global_create(server->display, &platinum_shell_v1_interface, 6, NULL, bind_shell);
 }

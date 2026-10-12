@@ -62,6 +62,16 @@ void layers_pin_to_main(struct plat_server *server) {
 	}
 }
 
+/* The scene tree for a layer surface: its layer's, but the screen saver
+ * plays above everything, the lock included. */
+static struct wlr_scene_tree *tree_for(struct plat_server *server, struct wlr_layer_surface_v1 *s,
+		enum zwlr_layer_shell_v1_layer layer) {
+	if (s->namespace && strcmp(s->namespace, "screensaver") == 0) {
+		return server->saver_layer;
+	}
+	return server->shell_layers[layer];
+}
+
 static void arrange_for(struct plat_layer_surface *ls) {
 	struct wlr_output *wlr_output = ls->layer_surface->output;
 	struct plat_output *output;
@@ -123,7 +133,7 @@ static void handle_commit(struct wl_listener *listener, void *data) {
 		return;
 	}
 	/* Layer changes move the surface between scene trees. */
-	struct wlr_scene_tree *want = ls->server->shell_layers[s->current.layer];
+	struct wlr_scene_tree *want = tree_for(ls->server, s, s->current.layer);
 	if (ls->scene->tree->node.parent != want) {
 		wlr_scene_node_reparent(&ls->scene->tree->node, want);
 	}
@@ -188,8 +198,7 @@ static void server_new_layer_surface(struct wl_listener *listener, void *data) {
 	struct plat_layer_surface *ls = calloc(1, sizeof(*ls));
 	ls->server = server;
 	ls->layer_surface = s;
-	ls->scene = wlr_scene_layer_surface_v1_create(
-		server->shell_layers[s->pending.layer], s);
+	ls->scene = wlr_scene_layer_surface_v1_create(tree_for(server, s, s->pending.layer), s);
 	ls->popup_tree = wlr_scene_tree_create(server->shell_layers[ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY]);
 	s->data = ls;
 	wl_list_insert(&server->layer_surfaces, &ls->link);

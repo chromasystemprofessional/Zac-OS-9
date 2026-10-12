@@ -10,6 +10,12 @@
  *     "zacos9-inhibit" (share/xdg/xdg-desktop-portal/): Inhibit, with its
  *     Request's Close
  *
+ * It locks the screens too (platinum_shell_v1.lock, compositor/src/lock.c):
+ * for ScreenSaver's Lock and logind's Lock (loginctl lock-session), and,
+ * holding a logind "delay" inhibitor, before the system sleeps (idle,
+ * Special > Sleep, the lid), letting it sleep once they are locked - when
+ * "Ask for my password to wake" is on.
+ *
  * Each request becomes a platinum_shell_v1.keep_awake in zacos9-wm
  * (compositor/src/idle.c), with the asking process (its D-Bus connection's
  * PID) or app id, so the screens showing that app stay awake while the
@@ -18,10 +24,13 @@
  * See docs/energy-saver.md.
  */
 #include <gio/gio.h>
+#include <gio/gunixfdlist.h>
 #include <glib-unix.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <wayland-client.h>
 
 #include "platinum-shell-v1-client-protocol.h"
@@ -60,6 +69,9 @@ static const char request_xml[] =
 
 static struct wl_display *display;
 static struct platinum_shell_v1 *shell;
+static uint32_t shell_version;
+static GDBusConnection *system_bus;
+static int sleep_delay = -1; /* logind's delay inhibitor, while held */
 static GDBusNodeInfo *screensaver_info, *portal_info, *request_info;
 static GHashTable *requests; /* cookie -> struct request */
 static guint32 last_cookie;
@@ -111,6 +123,104 @@ static gboolean screen_saver_active(void) {
 		return FALSE;
 	}
 	return strstr(text, " saver\n") || strstr(text, " asleep\n");
+}
+
+/* ---- locking ------------------------------------------------------------------ */
+
+/* Once locked: answer the D-Bus call waiting, or let logind sleep. */
+static void locked_done(void *data, struct wl_callback *callback, uint32_t unused) {
+	if (callback) {
+		wl_callback_destroy(callback);
+	}
+	if (data) {
+		g_dbus_method_invocation_return_value(data, NULL);
+	} else if (sleep_delay >= 0) {
+		close(sleep_delay);
+		sleep_delay = -1;
+	}
+}
+
+static const struct wl_callback_listener locked_listener = { locked_done };
+
+/* `always`: logind's or an app's request; else only with a password asked
+ * (before sleep). `invocation` (may be NULL) is answered once locked; with
+ * none, logind's delay is let go. */
+static void lock_screens(bool always, GDBusMethodInvocation *invocation) {
+	if (shell_version < PLATINUM_SHELL_V1_LOCK_SINCE_VERSION) {
+		locked_done(invocation, NULL, 0);
+		return;
+	}
+	struct wl_callback *callback = platinum_shell_v1_lock(shell, always ? 1 : 0);
+	wl_callback_add_listener(callback, &locked_listener, invocation);
+	wl_display_flush(display);
+}
+
+static void take_sleep_delay(void);
+
+static void got_sleep_delay(GObject *source, GAsyncResult *result, gpointer data) {
+	g_autoptr(GUnixFDList) fds = NULL;
+	g_autoptr(GError) error = NULL;
+	g_autoptr(GVariant) reply = g_dbus_connection_call_with_unix_fd_list_finish(G_DBUS_CONNECTION(source),
+		&fds, result, &error);
+	if (!reply || !fds) {
+		g_printerr("zacos9-inhibit: no sleep delay from logind: %s\n", error ? error->message : "?");
+		return;
+	}
+	gint32 index;
+	g_variant_get(reply, "(h)", &index);
+	sleep_delay = g_unix_fd_list_get(fds, index, NULL);
+}
+
+static void take_sleep_delay(void) {
+	if (!system_bus || sleep_delay >= 0) {
+		return;
+	}
+	g_dbus_connection_call_with_unix_fd_list(system_bus, "org.freedesktop.login1",
+		"/org/freedesktop/login1", "org.freedesktop.login1.Manager", "Inhibit",
+		g_variant_new("(ssss)", "sleep", "ZacOS 9", "Locks the screens first", "delay"),
+		G_VARIANT_TYPE("(h)"), G_DBUS_CALL_FLAGS_NONE, -1, NULL, NULL, got_sleep_delay, NULL);
+}
+
+static void prepare_for_sleep(GDBusConnection *bus, const char *sender, const char *path,
+		const char *iface, const char *signal, GVariant *args, gpointer data) {
+	gboolean start;
+	g_variant_get(args, "(b)", &start);
+	if (start) {
+		lock_screens(false, NULL); /* lets logind go once locked */
+	} else {
+		take_sleep_delay(); /* woken: ready for the next time */
+	}
+}
+
+static void session_lock(GDBusConnection *bus, const char *sender, const char *path,
+		const char *iface, const char *signal, GVariant *args, gpointer data) {
+	lock_screens(true, NULL);
+}
+
+static void got_session(GObject *source, GAsyncResult *result, gpointer data) {
+	g_autoptr(GVariant) reply = g_dbus_connection_call_finish(G_DBUS_CONNECTION(source), result, NULL);
+	if (!reply) {
+		return; /* not in a logind session */
+	}
+	const char *session;
+	g_variant_get(reply, "(&o)", &session);
+	g_dbus_connection_signal_subscribe(system_bus, "org.freedesktop.login1",
+		"org.freedesktop.login1.Session", "Lock", session, NULL, G_DBUS_SIGNAL_FLAGS_NONE,
+		session_lock, NULL, NULL);
+}
+
+static void got_system_bus(GObject *source, GAsyncResult *result, gpointer data) {
+	system_bus = g_bus_get_finish(result, NULL);
+	if (!system_bus) {
+		return; /* no logind to hear from */
+	}
+	g_dbus_connection_signal_subscribe(system_bus, "org.freedesktop.login1",
+		"org.freedesktop.login1.Manager", "PrepareForSleep", "/org/freedesktop/login1", NULL,
+		G_DBUS_SIGNAL_FLAGS_NONE, prepare_for_sleep, NULL, NULL);
+	g_dbus_connection_call(system_bus, "org.freedesktop.login1", "/org/freedesktop/login1",
+		"org.freedesktop.login1.Manager", "GetSessionByPID", g_variant_new("(u)", (guint32)getpid()),
+		G_VARIANT_TYPE("(o)"), G_DBUS_CALL_FLAGS_NONE, -1, NULL, got_session, NULL);
+	take_sleep_delay();
 }
 
 /* ---- org.freedesktop.ScreenSaver --------------------------------------------- */
@@ -166,8 +276,10 @@ static void screensaver_call(GDBusConnection *bus, const char *sender, const cha
 		g_dbus_method_invocation_return_value(invocation, g_variant_new("(b)", FALSE));
 	} else if (strcmp(method, "GetActiveTime") == 0 || strcmp(method, "GetSessionIdleTime") == 0) {
 		g_dbus_method_invocation_return_value(invocation, g_variant_new("(u)", 0));
+	} else if (strcmp(method, "Lock") == 0) {
+		lock_screens(true, invocation);
 	} else {
-		g_dbus_method_invocation_return_value(invocation, NULL); /* Lock: no lock yet */
+		g_dbus_method_invocation_return_value(invocation, NULL);
 	}
 }
 
@@ -263,8 +375,9 @@ static void global(void *data, struct wl_registry *registry, uint32_t name,
 		const char *iface, uint32_t version) {
 	if (strcmp(iface, platinum_shell_v1_interface.name) == 0 &&
 			version >= PLATINUM_SHELL_V1_KEEP_AWAKE_SINCE_VERSION) {
-		shell = wl_registry_bind(registry, name, &platinum_shell_v1_interface,
-			PLATINUM_SHELL_V1_KEEP_AWAKE_SINCE_VERSION);
+		shell_version = version < PLATINUM_SHELL_V1_LOCK_SINCE_VERSION ? version :
+			PLATINUM_SHELL_V1_LOCK_SINCE_VERSION;
+		shell = wl_registry_bind(registry, name, &platinum_shell_v1_interface, shell_version);
 	}
 }
 
@@ -305,6 +418,7 @@ int main(void) {
 		bus_acquired, NULL, name_lost, NULL, NULL);
 	g_bus_own_name(G_BUS_TYPE_SESSION, PORTAL_NAME, G_BUS_NAME_OWNER_FLAGS_NONE,
 		NULL, NULL, name_lost, NULL, NULL);
+	g_bus_get(G_BUS_TYPE_SYSTEM, NULL, got_system_bus, NULL);
 	g_main_loop_run(loop);
 	return 0;
 }

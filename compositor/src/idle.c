@@ -24,9 +24,14 @@
  * keep_awake: the screens showing that app's windows stay awake (every
  * screen, if none is found), and the system doesn't sleep.
  *
+ * With "Ask for my password to wake" (require-password=1), the screens
+ * lock (lock.c) once every screen has gone to the screen saver or to
+ * sleep, and system sleep waits until they are locked.
+ *
  * Each screen's state is published for the screen saver and tests in
  * $XDG_RUNTIME_DIR/zacos9-idle-$WAYLAND_DISPLAY:
  *   output NAME awake|saver|asleep
+ *   locked 0|1
  * $ZACOS9_IDLE_MINUTE_MS makes a "minute" shorter, for tests.
  */
 #define _GNU_SOURCE
@@ -222,8 +227,15 @@ static void write_states(struct plat_server *server) {
 	wl_list_for_each_reverse(output, &server->outputs, link) {
 		fprintf(f, "output %s %s\n", output->wlr_output->name, names[output->idle_state]);
 	}
+	fprintf(f, "locked %d\n", server->locked ? 1 : 0);
 	fclose(f);
 	rename(tmp, path);
+}
+
+static void refocus_pointer(void *data) {
+	struct plat_server *server = data;
+	server->idle_refocus_pending = false;
+	input_pointer_refocus(server);
 }
 
 /* zacos9-screensaver's surfaces show only on screens in its turn: hidden
@@ -242,6 +254,12 @@ void idle_show_savers(struct plat_server *server) {
 				output->idle_state == IDLE_SAVER;
 		}
 		wlr_scene_node_set_enabled(&ls->scene->tree->node, shown);
+	}
+	/* No arrow left over a screen saver that came up under a still mouse:
+	 * looked at once this commit is done, when the scene has its buffer. */
+	if (!server->idle_refocus_pending) {
+		server->idle_refocus_pending = true;
+		wl_event_loop_add_idle(wl_display_get_event_loop(server->display), refocus_pointer, server);
 	}
 }
 
@@ -288,6 +306,14 @@ void idle_update(struct plat_server *server) {
 			next = n;
 		}
 	}
+	/* Every screen dark (none kept awake): lock, if a password is asked. */
+	bool all_dark = !wl_list_empty(&server->outputs);
+	wl_list_for_each(output, &server->outputs, link) {
+		all_dark &= output->idle_state != IDLE_AWAKE;
+	}
+	if (all_dark && !server->locked && lock_required()) {
+		lock_start(server);
+	}
 	/* The system's own clock restarts when it wakes from sleep. */
 	const long since = now - (server->idle_slept_at > server->idle_last_input ?
 		server->idle_slept_at : server->idle_last_input);
@@ -295,7 +321,13 @@ void idle_update(struct plat_server *server) {
 	const bool system_kept = any_kept || !wl_list_empty(&server->keep_awake);
 	if (idle_system_due(&t, since, system_kept)) {
 		server->idle_slept_at = now;
-		suspend(server);
+		if (lock_required() && !server->locked) {
+			/* Never asleep unlocked: it sleeps once the lock is in place. */
+			server->suspend_after_lock = true;
+			lock_start(server);
+		} else {
+			suspend(server);
+		}
 	} else {
 		const long n = idle_system_next(&t, since, system_kept);
 		if (n >= 0 && (next < 0 || n < next)) {
@@ -320,6 +352,18 @@ void idle_update(struct plat_server *server) {
 	if (saver_due && server->idle_saver_pid <= 0) {
 		server->idle_saver_pid = spawn_component("ZACOS9_SCREENSAVER", "zacos9-screensaver", "");
 	}
+}
+
+void idle_lock_changed(struct plat_server *server) {
+	if (server->locked && server->suspend_after_lock) {
+		server->suspend_after_lock = false;
+		suspend(server);
+	}
+	if (!server->locked) {
+		server->suspend_after_lock = false;
+	}
+	server->idle_reported = -1; /* rewrite the state file */
+	idle_update(server);
 }
 
 bool idle_input(struct plat_server *server, enum idle_input kind) {

@@ -98,6 +98,27 @@ executable('zacos9-menubar',
   install: true,
 )
 
+# The lock screen (docs/energy-saver.md): ext-session-lock-v1, PAM.
+lock_protocol = []
+foreach kind : [['client-header', '@BASENAME@-client-protocol.h'], ['private-code', '@BASENAME@-protocol.c']]
+  lock_protocol += custom_target('lock_' + kind[0].underscorify(),
+    input: wl_protocol_dir / 'staging/ext-session-lock/ext-session-lock-v1.xml',
+    output: kind[1],
+    command: [wayland_scanner, kind[0], '@INPUT@', '@OUTPUT@'],
+  )
+endforeach
+# libpam directly: Debian's pam.pc also needs libaudit's, for nothing here.
+pam = meson.get_compiler('c').find_library('pam', has_headers: ['security/pam_appl.h'])
+executable('zacos9-lock', 'lock/lock.c', lock_protocol,
+  dependencies: [platinum_dep, wayland_client, xkbcommon_client, pam],
+  install: true,
+)
+# The same, taking "sesame" instead of asking PAM: compositor/tests/test_lock.py.
+test_lock_exe = executable('test-lock', 'lock/lock.c', lock_protocol,
+  c_args: ['-DZACOS9_LOCK_TEST'],
+  dependencies: [platinum_dep, wayland_client, xkbcommon_client],
+)
+
 # The screen saver (docs/energy-saver.md).
 saver_exe = executable('zacos9-screensaver',
   'screensaver/screensaver.c',
@@ -856,6 +877,11 @@ idle_client = executable('test-idle-client',
 test('idle-sleep', find_program('python3'),
   args: [files('../compositor/tests/test_idle.py'), compositor_exe, idle_client, vptr_exe],
   timeout: 60,
+)
+test('idle-lock', find_program('dbus-run-session'),
+  args: ['--', find_program('python3').full_path(), files('../compositor/tests/test_lock.py'),
+    compositor_exe, idle_client, test_lock_exe, inhibit_exe, vptr_exe],
+  timeout: 90,
 )
 test('idle-inhibit', find_program('dbus-run-session'),
   args: ['--', find_program('python3').full_path(), files('../compositor/tests/test_inhibit.py'),

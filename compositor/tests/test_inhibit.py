@@ -59,6 +59,8 @@ with tempfile.TemporaryDirectory(prefix="zacos9-inhibit-") as directory:
                WLR_BACKENDS="headless", WLR_RENDERER="pixman", WLR_HEADLESS_OUTPUTS="2",
                ZACOS9_STARTUP="0", ZACOS9_MENUBAR="", ZACOS9_FINDER="", ZACOS9_COLLAR="",
                ZACOS9_INHIBIT=helper, ZACOS9_IDLE_MINUTE_MS=str(MINUTE),
+               # Never the real logind: no sleep inhibitor on this machine.
+               DBUS_SYSTEM_BUS_ADDRESS="unix:path=/nonexistent",
                ZACOS9_SUSPEND_COMMAND=f"echo slept >>'{slept}'",
                QT_QPA_PLATFORM="wayland", QT_STYLE_OVERRIDE="",
                QT_WAYLAND_DISABLE_WINDOWDECORATION="1")

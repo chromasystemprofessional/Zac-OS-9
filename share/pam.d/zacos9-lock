@@ -1,0 +1,2 @@
+# ZacOS 9 lock screen (zacos9-lock): your own password wakes the screens.
+@include common-auth

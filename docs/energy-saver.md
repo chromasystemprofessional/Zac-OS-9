@@ -23,6 +23,7 @@ panels' settings.
 | `screensaver-after` | 5 | the screen saver starts |
 | `display-sleep` | 10 | the display goes dark |
 | `system-sleep` | 0 (never) | `systemctl suspend` |
+| `require-password` | unset (off) | `1`: the screens lock, and only your password wakes them |
 
 The Energy Saver sliders stop at 1, 2, 3, 5, 10, 15, 20, 30, 45, 60, 90
 and 120 minutes, and Never; the Screen Saver's at 1 to 60 minutes (None is
@@ -72,6 +73,43 @@ so the screen saver itself never takes input.
   suspends. Nested (`dev-boot.sh` in a window) or headless, the states are
   only reported, never the host's own screens or sleep.
 
+## Asking for a password to wake
+
+**Ask for my password to wake**, a checkbox in the Screen Saver panel
+(`require-password=1`), is off unless you turn it on. With it on, the
+session locks (`compositor/src/lock.c`, with `ext-session-lock-v1`):
+
+- once **every** screen shows the screen saver or has gone to sleep — not
+  while a full-screen window (or an app's request) keeps a screen awake:
+  someone is watching;
+- **before the system sleeps**: idle system sleep waits until the lock is
+  in place, and `zacos9-inhibit` holds a logind "delay" inhibitor, so
+  Special > Sleep and closing a laptop's lid lock first too;
+- and, with or without the checkbox, when asked: `loginctl lock-session`
+  (logind's Lock signal) or an app calling the ScreenSaver's `Lock`.
+
+The lock is `zacos9-lock` (`shell/lock/lock.c`): every screen shows the
+desktop pattern, and the main screen a Platinum dialog asking for the
+password of the person logged in, checked through PAM — the
+`zacos9-lock` service (`/etc/pam.d/zacos9-lock`, `@include common-auth`,
+installed with ZacOS), or `login` if that file is missing, so a missing
+file never locks anyone out. The check runs in a child process (PAM
+pauses after a wrong password); the password is kept out of swap and core
+dumps, and wiped once checked.
+
+While locked, the compositor shows nothing but the lock, over black — no
+window, desktop, menu bar or drag icon — and the screen saver, which goes
+on playing above the lock on screens in its turn, so the screens lock
+quietly beneath it and the dialog appears when they wake. Only the lock
+gets the keyboard and the pointer; no keyboard shortcut works but
+Ctrl+Alt+F*n* (a text console). If `zacos9-lock` dies without unlocking,
+the screens stay locked and blank and it is started again a second later.
+Unlocked, the keyboard goes back where it was.
+
+`require-password` is checked again whenever the screens go idle, so
+turning it off takes effect at once (a lock already in place stays until
+unlocked).
+
 ## Apps that ask over D-Bus
 
 Most video in a browser running under X11 (Chromium, Electron, so VS Code
@@ -82,8 +120,8 @@ Wayland protocol. `zacos9-inhibit` (`shell/inhibit/inhibit.c`, started by
 - **`org.freedesktop.ScreenSaver`**, at `/org/freedesktop/ScreenSaver` and
   `/ScreenSaver`: `Inhibit` / `UnInhibit`, `SimulateUserActivity` (wakes
   every screen), `GetActive` (true while any screen shows the screen saver
-  or is asleep); `SetActive`, `GetActiveTime`, `GetSessionIdleTime` and
-  `Lock` are accepted and do nothing yet.
+  or is asleep), `Lock` (locks, answering once locked); `SetActive`,
+  `GetActiveTime` and `GetSessionIdleTime` are accepted and do nothing yet.
 - **The portal's Inhibit**, as the backend `zacos9-inhibit`
   (`share/xdg/xdg-desktop-portal/`): the idle flag keeps screens and the
   system awake, the suspend flag the system only, until the portal closes
@@ -124,7 +162,9 @@ States are `awake`, `saver` and `asleep`. `$ZACOS9_IDLE_MINUTE_MS` makes a
 `systemctl suspend` (and allows it without a real session; empty disables
 it). `compositor/tests/test_idle.py` uses both: two headless screens with
 400 ms minutes; `test_inhibit.py` does the same for the D-Bus requests,
-under `dbus-run-session`.
+under `dbus-run-session`, and `test_lock.py` for the lock, with
+`test-lock` (the same program built with `-DZACOS9_LOCK_TEST`, taking
+"sesame" instead of asking PAM; nothing like it is in `zacos9-lock`).
 
 ## Not yet
 
@@ -132,4 +172,6 @@ under `dbus-run-session`.
   saver extension (`XScreenSaverSuspend`) or `xset s` go unheard: Xwayland
   keeps those to itself.
 - **More screen savers**, and perhaps xscreensaver's hacks as extra ones.
-- **Requiring a password to wake** (`ext-session-lock-v1`).
+- **Virtual keyboards** (`zwp_virtual_keyboard`, used by `vptr` and
+  on-screen keyboards) can type into the lock like any keyboard: any
+  program in the session could guess passwords at PAM's pace.

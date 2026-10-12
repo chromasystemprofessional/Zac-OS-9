@@ -1,6 +1,7 @@
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 #include <string.h>
 #include <unistd.h>
 #include <wlr/backend/session.h>
@@ -17,6 +18,7 @@
 
 #include "frame.h"
 #include "launch.h"
+#include "idle_policy.h"
 #include "server.h"
 
 /* ---- keyboard ---------------------------------------------------------- */
@@ -51,8 +53,8 @@ static struct wlr_keyboard_modifiers command_as_ctrl(struct plat_server *server,
 
 void input_keyboard_enter(struct plat_server *server, struct wlr_surface *surface) {
 	struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(server->seat);
-	if (!surface) {
-		return;
+	if (!surface || (lock_active(server) && !lock_owns(server, surface))) {
+		return; /* locked: the keyboard is the lock's alone */
 	}
 	if (!keyboard) {
 		wlr_seat_keyboard_notify_enter(server->seat, surface, NULL, 0, NULL);
@@ -75,6 +77,18 @@ static void keyboard_modifiers(struct wl_listener *listener, void *data) {
 	wlr_seat_keyboard_notify_modifiers(kb->server->seat, &mods);
 }
 
+/* Ctrl+Alt+F1..F12 on a real screen: switch to another console. */
+static bool handle_vt_switch(struct plat_server *server, xkb_keysym_t sym) {
+	if (sym < XKB_KEY_XF86Switch_VT_1 || sym > XKB_KEY_XF86Switch_VT_12) {
+		return false;
+	}
+	if (server->session) {
+		input_cancel_grab(server);
+		wlr_session_change_vt(server->session, sym - XKB_KEY_XF86Switch_VT_1 + 1);
+	}
+	return true;
+}
+
 /* Compositor-level shortcuts. Returns true if the key was consumed. */
 static bool handle_keybinding(struct plat_server *server, uint32_t mods,
 		xkb_keysym_t sym) {
@@ -87,12 +101,7 @@ static bool handle_keybinding(struct plat_server *server, uint32_t mods,
 		wl_display_terminate(server->display);
 		return true;
 	}
-	/* Ctrl+Alt+F1..F12 on a real screen: switch to another console. */
-	if (sym >= XKB_KEY_XF86Switch_VT_1 && sym <= XKB_KEY_XF86Switch_VT_12) {
-		if (server->session) {
-			input_cancel_grab(server);
-			wlr_session_change_vt(server->session, sym - XKB_KEY_XF86Switch_VT_1 + 1);
-		}
+	if (handle_vt_switch(server, sym)) {
 		return true;
 	}
 	/* The Collar panel's hot key shows or hides the Collar (if one runs:
@@ -127,8 +136,10 @@ static void keyboard_key(struct wl_listener *listener, void *data) {
 
 	bool handled = false;
 	if (event->state == WL_KEYBOARD_KEY_STATE_PRESSED) {
+		/* Locked, no shortcuts but for a text console. */
 		for (int i = 0; i < nsyms && !handled; i++) {
-			handled = handle_keybinding(server, mods, syms[i]);
+			handled = lock_active(server) ? handle_vt_switch(server, syms[i]) :
+				handle_keybinding(server, mods, syms[i]);
 		}
 	}
 	if (!handled) {
@@ -464,6 +475,17 @@ void input_refresh_cursor(struct plat_server *server) {
 	}
 }
 
+/* No pointer over a screen saver (locked or not, with or without the
+ * saver's own say); the usual one elsewhere. */
+static void refresh_cursor_or_hide(struct plat_server *server) {
+	struct plat_output *under = output_at(server, server->cursor->x, server->cursor->y);
+	if (under && under->idle_state == IDLE_SAVER) {
+		wlr_cursor_unset_image(server->cursor);
+	} else {
+		input_refresh_cursor(server);
+	}
+}
+
 static void process_cursor_motion(struct plat_server *server, uint32_t time) {
 	if (server->drag_icon) {
 		wlr_scene_node_set_position(&server->drag_icon->node,
@@ -476,6 +498,18 @@ static void process_cursor_motion(struct plat_server *server, uint32_t time) {
 
 	double sx, sy;
 	struct wlr_surface *surface = NULL;
+	if (lock_active(server)) {
+		/* Locked: only the lock's surfaces get the pointer. */
+		surface = lock_surface_at(server, server->cursor->x, server->cursor->y, &sx, &sy);
+		if (surface) {
+			wlr_seat_pointer_notify_enter(server->seat, surface, sx, sy);
+			wlr_seat_pointer_notify_motion(server->seat, time, sx, sy);
+		} else {
+			wlr_seat_pointer_clear_focus(server->seat);
+		}
+		refresh_cursor_or_hide(server);
+		return;
+	}
 	view_at(server, server->cursor->x, server->cursor->y, &surface, &sx, &sy);
 	if (surface) {
 		wlr_seat_pointer_notify_enter(server->seat, surface, sx, sy);
@@ -484,7 +518,13 @@ static void process_cursor_motion(struct plat_server *server, uint32_t time) {
 		/* Desktop or window frame: the compositor owns the arrow. */
 		wlr_seat_pointer_clear_focus(server->seat);
 	}
-	input_refresh_cursor(server);
+	refresh_cursor_or_hide(server);
+}
+
+void input_pointer_refocus(struct plat_server *server) {
+	struct timespec now;
+	clock_gettime(CLOCK_MONOTONIC, &now);
+	process_cursor_motion(server, (uint32_t)(now.tv_sec * 1000 + now.tv_nsec / 1000000));
 }
 
 static void cursor_motion(struct wl_listener *listener, void *data) {
@@ -518,6 +558,20 @@ static void cursor_button(struct wl_listener *listener, void *data) {
 		}
 	} else if (server->idle_swallowed_button == event->button) {
 		server->idle_swallowed_button = 0;
+		return;
+	}
+
+	if (lock_active(server)) {
+		/* Locked: a click goes to the lock under the pointer, nowhere else. */
+		if (event->state == WL_POINTER_BUTTON_STATE_PRESSED) {
+			double sx, sy;
+			struct wlr_surface *surface =
+				lock_surface_at(server, server->cursor->x, server->cursor->y, &sx, &sy);
+			if (surface) {
+				input_keyboard_enter(server, surface);
+			}
+		}
+		wlr_seat_pointer_notify_button(server->seat, event->time_msec, event->button, event->state);
 		return;
 	}
 

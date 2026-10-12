@@ -193,6 +193,8 @@ int main(int argc, char *argv[]) {
 	server.unmanaged_layer = wlr_scene_tree_create(root);
 	server.shell_layers[ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY] = wlr_scene_tree_create(root);
 	server.overlay_layer = wlr_scene_tree_create(root);
+	server.lock_layer = wlr_scene_tree_create(root);
+	server.saver_layer = wlr_scene_tree_create(root);
 	outline_init(&server.outline, server.overlay_layer);
 
 	/* GTK3 asks for decorations through the older KDE protocol. */
@@ -210,6 +212,7 @@ int main(int argc, char *argv[]) {
 	xdg_init(&server);
 	input_init(&server);
 	prefs_init(&server);
+	lock_init(&server);
 	idle_init(&server);
 	xwayland_init(&server);
 	xwayland_output_init(&server);

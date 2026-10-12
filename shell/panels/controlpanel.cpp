@@ -972,7 +972,7 @@ static constexpr int SAVER_STEPS = sizeof(SAVER_MINUTES) / sizeof(SAVER_MINUTES[
  * starts zacos9-screensaver then (compositor/src/idle.c, lib/savers.c). */
 class ScreenSaverPanel : public ControlPanel {
 public:
-	ScreenSaverPanel() : ControlPanel("Screen Saver", 252) {
+	ScreenSaverPanel() : ControlPanel("Screen Saver", 278) {
 		const int g1 = 26, rows = pl_saver_count() + 1;
 		const int g1h = 1 + PL_GROUP_MARGIN_TOP + 20 * rows - 8 + PL_GROUP_MARGIN;
 		const int g2 = g1 + g1h + 12;
@@ -1003,6 +1003,14 @@ public:
 		placeSlider(m_after, g2, SAVER_STEPS, step, "1 min", "1 hour");
 		m_after.changed = [](int v) { setInt("screensaver-after", SAVER_MINUTES[v]); };
 		m_after.enabled = m_which.selected != 0;
+		/* Locks once every screen shows it or sleeps, and before the system
+		 * sleeps (compositor/src/lock.c, shell/lock/). */
+		m_password = std::make_unique<PanelCheckbox>(QStringLiteral("Ask for my password to wake"),
+			QPoint(M + 2, g2 + SLIDER_GROUP_H + 12));
+		char v[8];
+		m_password->on = pl_setting("require-password", v, sizeof(v)) && strcmp(v, "1") == 0;
+		m_password->toggled = [](bool on) { pl_setting_set("require-password", on ? "1" : nullptr); };
+		m_checks.push_back(m_password.get());
 		m_notes = { "It shows until the display sleeps (Energy Saver).",
 			"A window filling a screen keeps it away from that one." };
 		restartPreview();
@@ -1043,6 +1051,7 @@ private:
 
 	PanelRadios m_which;
 	PanelSlider m_after;
+	std::unique_ptr<PanelCheckbox> m_password;
 	QRect m_preview;
 	pl_saver *m_saver = nullptr;
 	QElapsedTimer m_clock;

@@ -10,7 +10,7 @@
     when the generic rule (fixed size with a parent window) can't apply.
   </description>
 
-  <interface name="platinum_shell_v1" version="5">
+  <interface name="platinum_shell_v1" version="6">
     <enum name="style">
       <entry name="document" value="0" summary="standard document window"/>
       <entry name="movable_modal" value="1"
@@ -121,6 +121,18 @@
         Wakes every screen and restarts the idle timers
         (org.freedesktop.ScreenSaver's SimulateUserActivity).
       </description>
+    </request>
+    <request name="lock" since="6">
+      <description summary="lock the screens">
+        For ZacOS 9's D-Bus idle service: logind asked the session to lock
+        (always set), or the system is about to sleep (always unset: lock
+        only if "Ask for my password to wake" is on), or an app asked
+        org.freedesktop.ScreenSaver to Lock (always set). The callback is
+        done once the screens are locked, or at once if they are already,
+        or aren't to be.
+      </description>
+      <arg name="callback" type="new_id" interface="wl_callback"/>
+      <arg name="always" type="uint" summary="1 to lock even without a password asked"/>
     </request>
   </interface>
 

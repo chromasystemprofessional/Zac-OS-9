@@ -1,11 +1,14 @@
-/* For test_idle.py and test_inhibit.py:
+/* For test_idle.py, test_inhibit.py and test_lock.py:
  *   idle_client             a window filling the last screen until killed;
  *                           prints "fullscreen SCREEN" once it does
  *   idle_client --dbus      an ordinary window that asks
  *                           org.freedesktop.ScreenSaver to stay awake, as a
  *                           browser playing video does; prints "inhibited
- *                           COOKIE" once the window shows */
+ *                           COOKIE" once the window shows
+ *   idle_client --keys      an ordinary window that prints "shown", then
+ *                           "key TEXT" for every key it gets */
 #include <QApplication>
+#include <QKeyEvent>
 #include <QDBusInterface>
 #include <QDBusReply>
 #include <QScreen>
@@ -15,14 +18,33 @@
 #include <cstdio>
 #include <cstring>
 
+/* Says which keys reach it. */
+class KeyWindow : public QWidget {
+protected:
+	void keyPressEvent(QKeyEvent *e) override {
+		std::printf("key %s\n", qPrintable(e->text()));
+		std::fflush(stdout);
+	}
+};
+
 int main(int argc, char **argv) {
 	QApplication app(argc, argv);
 	const bool dbus = argc > 1 && std::strcmp(argv[1], "--dbus") == 0;
-	QWidget window;
+	const bool keys = argc > 1 && std::strcmp(argv[1], "--keys") == 0;
+	KeyWindow window;
 	window.setWindowTitle("Idle test film");
+	window.setAttribute(Qt::WA_StyledBackground, true); /* a subclass, so the style sheet paints */
 	window.setStyleSheet("background-color: #00aa00;");
 	window.resize(320, 200);
 	window.show();
+	if (keys) {
+		QTimer::singleShot(500, &window, [&] {
+			window.activateWindow();
+			std::printf("shown\n");
+			std::fflush(stdout);
+		});
+		return app.exec();
+	}
 	if (dbus) {
 		QTimer::singleShot(500, &window, [&] {
 			QDBusInterface saver("org.freedesktop.ScreenSaver", "/org/freedesktop/ScreenSaver",
