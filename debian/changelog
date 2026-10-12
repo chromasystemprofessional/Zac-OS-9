@@ -1,3 +1,15 @@
+zacos9 (0.1.52) trixie; urgency=medium
+
+  * Energy Saver and Screen Saver: after 5 minutes without use each screen
+    shows a screen saver (Desktop Patterns, Starfield, Bouncing Logo or
+    Blank Screen), and after 10 it goes dark; set them in the new Energy
+    Saver and Screen Saver control panels. A window filling a screen, or a
+    video asking to stay awake, keeps that screen awake while the others
+    sleep. Optionally, Ask for my password to wake locks the screens when
+    they go idle and before the computer sleeps.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Sun, 11 Oct 2026 20:26:10 -0400
+
 zacos9 (0.1.51) trixie; urgency=medium
 
   * VS Code's settings stay intact when ZacOS turns on its native title
