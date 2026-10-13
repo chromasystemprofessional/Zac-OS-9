@@ -276,7 +276,7 @@ A zram/swap switch in a Memory panel is a possible P3.
 | Keyboard navigation (type-select, arrows, ⌘-↑, ⌘-D desktop, ⌘-N new folder) | ✅? | Verify against p. 127. |
 | Shortcuts, **Favorites** and **Recent** pop-ups (Navigation Services) | ◐ | Favorite folders are offered as locations (0.1.54); Recent still to do. P3 S |
 | Drag a folder onto the dialog to jump there | ✗? | Verify. P3 S |
-| General Controls ▸ Documents: default save folder | ✗ | See 3.10. |
+| General Controls ▸ Documents: default save folder | ✅ | Folder set by the application (the list of disks, as before), last folder used in the program, or Documents; the latter two open straight in the folder, with Other Locations… |
 
 ### 3.9 Moving data (ch. 9)
 
@@ -306,7 +306,7 @@ A zram/swap switch in a Memory panel is a possible P3.
 | File Translator | ✅ | |
 | File Sharing | ✅ | |
 | **Retriever** (folder pairs) | ✗ | rsync two-way with newest-wins and a warning. P3 M |
-| **General Controls**: show desktop in background, Toy Box at startup, shut-down warning, insertion-point and menu blinking, Documents folder for Open/Save | ✗ | **P1 M.** Menu blink exists as a default; the panel doesn't. |
+| **General Controls**: show desktop in background, Toy Box at startup, shut-down warning, insertion-point and menu blinking, Documents folder for Open/Save | ◐ | `zacos9-controlpanel general`. Show Desktop, Menu Blinking, Insertion Point Blinking and Documents done. Launcher at startup waits for the Toy Box (2.6); Shut Down Warning (fsck covers it) and Folder Protection (already dead in Mac OS 9) left out. |
 | **Internet** (email, web, default apps, downloads folder) | ✗ | Map to `xdg-mime`/`mimeapps.list`: default browser and mail, Downloads folder. P2 S |
 | **Keyboard**: repeat rate/delay | ✅ | |
 | Keyboard ▸ **layouts** and the keyboard menu (flag at the right of the menu bar, ⌘-Space to switch) | ✗ | P1 M. xkb layouts in `compositor/src/prefs.c`. |
@@ -476,7 +476,7 @@ updates `PROJECT_STATUS.md` and the relevant `docs/` page.
 | 1.5 ✅ | **Folder-path menu** on ⌘-click of a Sniffer window's title, ⌘-↑ / Option-⌘-↑ | compositor → Sniffer via `platinum-shell-v1` (new event: title clicked with modifiers), Sniffer menu | M | Headless: ⌘-click title shows the path; choosing opens the parent |
 | 1.6 ✅ | **Favorites**: File ▸ Add To Favorites, Zac menu Favorites, Favorites in Open/Save | `shell/finder/`, `shell/menubar/launch.c`, file-chooser portal | S | Unit: alias written; menu lists it |
 | 1.7 ✅ | **Recent Applications / Documents / Servers** in the Zac menu, with counts from a new Zac Menu Options panel | menu bar (launch record), `recently-used.xbel`, Neighbourhood, `shell/panels/` | M | Unit: list ordering and limits |
-| 1.8 | **General Controls** panel: show desktop in background, menu blinking, insertion-point blink rate, Documents folder for Open/Save, Toy Box at startup | `shell/panels/controlpanel.cpp`, menu bar, file-chooser portal, Qt/GTK cursor blink settings | M | Unit per setting; visual check |
+| 1.8 ✅ | **General Controls** panel: show desktop in background, menu blinking, insertion-point blink rate, Documents folder for Open/Save, Toy Box at startup | `shell/panels/controlpanel.cpp`, menu bar, file-chooser portal, Qt/GTK cursor blink settings | M | Unit per setting; visual check |
 | 1.9 | **Keyboard layouts** and the keyboard menu (flag/abbreviation at the menu bar's right, ⌘-Space to switch) | Keyboard panel, `compositor/src/prefs.c` (xkb), menu bar | M | Headless: switch layout, typed key changes |
 | 1.10 | **Sniffer Preferences** (General, Views, Labels) and **View Options** (icon size, snap to grid, Keep Arranged, list columns, relative dates, folder sizes, Set to Standard Views) | `shell/finder/` | M | Unit: settings persist per window; screenshots |
 
