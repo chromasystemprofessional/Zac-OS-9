@@ -1,3 +1,9 @@
+zacos9 (0.1.53) trixie; urgency=medium
+
+  * Update project status and assets
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Mon, 12 Oct 2026 23:44:06 -0400
+
 zacos9 (0.1.52) trixie; urgency=medium
 
   * Energy Saver and Screen Saver: after 5 minutes without use each screen
