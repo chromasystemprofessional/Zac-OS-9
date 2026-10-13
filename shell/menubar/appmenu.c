@@ -981,6 +981,9 @@ void appmenu_perform(const char *arg) {
 	char sender[256], path[256];
 	int id;
 	if (!bus || !arg || sscanf(arg, "%255s %255s %d", sender, path, &id) != 3) {
+		if (debug) {
+			fprintf(stderr, "appmenu: invalid arg %s\n", arg ? arg : "NULL");
+		}
 		return;
 	}
 	g_dbus_connection_call(bus, sender, path, DBUSMENU_IFACE, "Event",
