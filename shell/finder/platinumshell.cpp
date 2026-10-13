@@ -51,7 +51,7 @@ static void global(void *, wl_registry *reg, uint32_t name, const char *iface, u
 	if (std::strcmp(iface, platinum_shell_v1_interface.name) == 0) {
 		shell = static_cast<platinum_shell_v1 *>(
 			wl_registry_bind(reg, name, &platinum_shell_v1_interface,
-				std::min(version, 7u)));
+				std::min(version, 9u)));
 		platinum_shell_v1_add_listener(shell, &shell_listener, nullptr);
 	}
 }
@@ -143,6 +143,19 @@ static wl_surface *surfaceOf(QWidget *window) {
 	auto *native = QGuiApplication::platformNativeInterface();
 	return static_cast<wl_surface *>(
 		native->nativeResourceForWindow("surface", window->windowHandle()));
+}
+
+void platinumSetStandardSize(QWidget *window, QSize size) {
+	if (!shell || wl_proxy_get_version(reinterpret_cast<wl_proxy *>(shell)) < 9) {
+		return;
+	}
+	wl_surface *surface = surfaceOf(window);
+	if (surface) {
+		platinum_shell_v1_set_standard_size(shell, surface,
+			static_cast<uint32_t>(std::max(0, size.width())),
+			static_cast<uint32_t>(std::max(0, size.height())));
+		wl_display_flush(display);
+	}
 }
 
 void platinumSetFrameStyle(QWidget *window, FrameStyle style) {

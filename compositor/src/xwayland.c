@@ -287,7 +287,7 @@ static void handle_request_resize(struct wl_listener *listener, void *data) {
 static void handle_request_maximize(struct wl_listener *listener, void *data) {
 	struct plat_view *view = wl_container_of(listener, view, request_maximize);
 	if (view->mapped) {
-		view_toggle_zoom(view);
+		view_toggle_zoom(view, true); /* maximize: the whole screen */
 	}
 }
 

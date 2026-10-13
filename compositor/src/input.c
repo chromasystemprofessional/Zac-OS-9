@@ -259,6 +259,16 @@ static bool option_held(struct plat_server *server) {
 	return kb && (wlr_keyboard_get_modifiers(kb) & WLR_MODIFIER_ALT);
 }
 
+static bool command_held(struct plat_server *server) {
+	struct wlr_keyboard *kb = wlr_seat_get_keyboard(server->seat);
+	return kb && (wlr_keyboard_get_modifiers(kb) & WLR_MODIFIER_LOGO);
+}
+
+/* Option-click on a box acts on every window of the same program. */
+static bool same_app(const struct plat_view *a, const struct plat_view *b) {
+	return a == b || (a->app_id && b->app_id && *a->app_id && strcmp(a->app_id, b->app_id) == 0);
+}
+
 /* ---- grabs: outline move/resize and title-bar box tracking --------------- */
 
 void input_begin_grab(struct plat_server *server, struct plat_view *view,
@@ -395,17 +405,31 @@ static void grab_release(struct plat_server *server) {
 		if (!inside) {
 			break;
 		}
+		const bool option = option_held(server);
+		struct plat_view *v, *tmp;
 		if (part == DECOR_PART_CLOSE) {
-			view_close(view);
+			/* Option-click closes all of the program's windows. */
+			if (option) {
+				wl_list_for_each_safe(v, tmp, &server->views, link) {
+					if (v->mapped && same_app(v, view)) {
+						view_close(v);
+					}
+				}
+			} else {
+				view_close(view);
+			}
 		} else if (part == DECOR_PART_ZOOM) {
-			view_toggle_zoom(view);
+			/* Option-click fills the screen, whatever the program's size. */
+			view_toggle_zoom(view, option);
 		} else if (part == DECOR_PART_COLLAPSE) {
 			bool collapse = !view->collapsed;
-			if (option_held(server)) {
-				/* HIG: Option-click collapses (or expands) every window. */
-				struct plat_view *v;
+			if (option) {
+				/* Option-click collapses (or expands) all of the program's
+				 * windows (Mac OS 9: "all windows in the current program"). */
 				wl_list_for_each(v, &server->views, link) {
-					view_set_collapsed(v, collapse);
+					if (v->mapped && same_app(v, view)) {
+						view_set_collapsed(v, collapse);
+					}
 				}
 			} else {
 				view_set_collapsed(view, collapse);
@@ -422,7 +446,11 @@ static void grab_release(struct plat_server *server) {
 /* Mouse-down on a window frame (anything but the client area). */
 static void frame_press(struct plat_server *server, struct plat_view *view,
 		enum decor_part part, uint32_t time_msec) {
-	view_focus(view);
+	/* ⌘-drag a window behind by its title bar or edge: it moves (or, with
+	 * a double-click, collapses) where it is, staying behind. */
+	if (!(part == DECOR_PART_DRAG && command_held(server) && view != server->focused_view)) {
+		view_focus(view);
+	}
 
 	switch (part) {
 	case DECOR_PART_CLOSE:

@@ -21,6 +21,7 @@ struct surface_hint {
 	bool has_position;
 	int x, y;
 	bool reported;       /* last reported position, to avoid repeats */
+	int standard_w, standard_h; /* the zoom box's content size; 0: none */
 	int rx, ry;
 	struct wl_listener surface_destroy;
 };
@@ -71,6 +72,16 @@ bool platinum_shell_position_for(struct wlr_surface *surface, int *x, int *y) {
 	}
 	*x = h->x;
 	*y = h->y;
+	return true;
+}
+
+bool platinum_shell_standard_size_for(struct wlr_surface *surface, int *w, int *h) {
+	struct surface_hint *h_ = find_hint(surface);
+	if (!h_ || h_->standard_w <= 0 || h_->standard_h <= 0) {
+		return false;
+	}
+	*w = h_->standard_w;
+	*h = h_->standard_h;
 	return true;
 }
 
@@ -254,6 +265,13 @@ static void handle_force_quit(struct wl_client *client, struct wl_resource *reso
 	}
 }
 
+static void handle_set_standard_size(struct wl_client *client, struct wl_resource *resource,
+		struct wl_resource *surface_resource, uint32_t width, uint32_t height) {
+	struct surface_hint *h = get_hint(wlr_surface_from_resource(surface_resource));
+	h->standard_w = width > 16384 ? 16384 : (int)width;
+	h->standard_h = height > 16384 ? 16384 : (int)height;
+}
+
 static void handle_activate_app(struct wl_client *client, struct wl_resource *resource,
 		const char *app_id) {
 	if (app_id && *app_id) {
@@ -284,6 +302,7 @@ static const struct platinum_shell_v1_interface shell_impl = {
 	.lock = handle_lock,
 	.force_quit = handle_force_quit,
 	.activate_app = handle_activate_app,
+	.set_standard_size = handle_set_standard_size,
 };
 
 static void resource_destroy(struct wl_resource *resource) {
@@ -307,5 +326,5 @@ void platinum_shell_init(struct plat_server *server) {
 	the_server = server;
 	wl_list_init(&hints);
 	wl_list_init(&resources);
-	wl_global_create(server->display, &platinum_shell_v1_interface, 8, NULL, bind_shell);
+	wl_global_create(server->display, &platinum_shell_v1_interface, 9, NULL, bind_shell);
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QPoint>
+#include <QSize>
 #include <QStringList>
 #include <functional>
 #include <cstdint>
@@ -17,6 +18,9 @@ enum class FrameStyle {
 void platinumShellInit();
 /* Ask for a frame style; call after the window is shown. */
 void platinumSetFrameStyle(QWidget *window, FrameStyle style);
+/* The content size the zoom box gives the window ("just big enough"); the
+ * window must be shown. An empty size: the zoom box fills the screen. */
+void platinumSetStandardSize(QWidget *window, QSize size);
 /* Ask for the window to appear at `frameTopLeft` (layout coordinates);
  * call right after show(), before the window first draws. */
 void platinumSetWindowPosition(QWidget *window, QPoint frameTopLeft);

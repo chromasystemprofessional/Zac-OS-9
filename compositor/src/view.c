@@ -489,7 +489,7 @@ void view_close(struct plat_view *view) {
 	view->impl->close(view);
 }
 
-void view_toggle_zoom(struct plat_view *view) {
+void view_toggle_zoom(struct plat_view *view, bool fill) {
 	if (view->fullscreen) {
 		return;
 	}
@@ -520,14 +520,37 @@ void view_toggle_zoom(struct plat_view *view) {
 	if (!wlr_box_empty(&area)) {
 		screen = area;
 	}
-	view->unzoomed = frame;
-	view->zoomed = true;
-	view_resize_frame(view, (struct wlr_box){
+	struct wlr_box zoomed = {
 		.x = screen.x + margin,
 		.y = screen.y + margin,
 		.width = screen.width - 2 * margin - DECOR_SHADOW,
 		.height = screen.height - 2 * margin - DECOR_SHADOW,
-	});
+	};
+	int sw, sh;
+	struct wlr_surface *surface = view->impl->get_surface(view);
+	if (!fill && surface && platinum_shell_standard_size_for(surface, &sw, &sh)) {
+		/* "Just big enough": the standard size where the window is, moved
+		 * only as far as it takes to stay on screen. */
+		struct decor_margins m = decor_margins(view->frame->st.style);
+		struct wlr_box want = {
+			.x = frame.x, .y = frame.y,
+			.width = sw + m.left + m.right, .height = sh + m.top + m.bottom,
+		};
+		want.width = want.width < zoomed.width ? want.width : zoomed.width;
+		want.height = want.height < zoomed.height ? want.height : zoomed.height;
+		if (want.x + want.width > zoomed.x + zoomed.width) {
+			want.x = zoomed.x + zoomed.width - want.width;
+		}
+		if (want.y + want.height > zoomed.y + zoomed.height) {
+			want.y = zoomed.y + zoomed.height - want.height;
+		}
+		want.x = want.x < zoomed.x ? zoomed.x : want.x;
+		want.y = want.y < zoomed.y ? zoomed.y : want.y;
+		zoomed = want;
+	}
+	view->unzoomed = frame;
+	view->zoomed = true;
+	view_resize_frame(view, zoomed);
 }
 
 void view_set_collapsed(struct plat_view *view, bool collapsed) {

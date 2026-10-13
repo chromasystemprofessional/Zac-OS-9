@@ -136,6 +136,7 @@ FolderWindow *FolderWindow::open(const QString &path) {
 		if (w->m_state.hasPosition) {
 			platinumSetWindowPosition(w, w->m_state.position);
 		}
+		w->updateStandardSize();
 		platinumOnWindowPosition(w, [w](QPoint p) {
 			w->m_state.position = p;
 			w->m_state.hasPosition = true;
@@ -444,6 +445,28 @@ void FolderWindow::relayout() {
 		m_contentHeight = static_cast<int>(m_rows.size()) * ROW_H;
 	}
 	scrollTo(m_scrollX, m_scrollY);
+	updateStandardSize();
+}
+
+void FolderWindow::updateStandardSize() {
+	if (!isVisible()) {
+		return; /* no surface yet: open() sends it once shown */
+	}
+	int w = m_contentWidth;
+	if (m_mode == ViewMode::List) {
+		w = listWidth();
+	} else if (m_mode == ViewMode::Buttons) {
+		const int cols = std::max(1, (viewWidth() - 2 * MARGIN) / BCELL_W);
+		const int used = std::min(cols, std::max(1, static_cast<int>(m_items.size())));
+		w = 2 * MARGIN + used * BCELL_W;
+	}
+	/* Scroll bars stay; an empty folder still gets a usable window. */
+	const QSize size(std::max(w, 200) + SB_WIDTH - 1,
+		std::max(contentTop() + m_contentHeight, contentTop() + 2 * ROW_H) + SB_WIDTH - 1);
+	if (size != m_standardSize) {
+		m_standardSize = size;
+		platinumSetStandardSize(this, size);
+	}
 }
 
 void FolderWindow::resizeEvent(QResizeEvent *) {

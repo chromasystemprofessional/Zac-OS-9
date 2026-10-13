@@ -145,15 +145,15 @@ Section 3 lists every feature; section 5 is the plan.
 | Feature | Book | Status | Notes |
 |---|---|---|---|
 | Close box, ⌘-W | p. 9 | ✅ | |
-| Option-click close box / Option-⌘-W closes all of the app's windows | p. 10 | ✗ | Compositor: close every toplevel with the same app id. P1 S |
+| Option-click close box / Option-⌘-W closes all of the app's windows | p. 10 | ◐ | Option-click ✅ (0.1.54); Option-⌘-W still to do. P2 S |
 | Title-bar stripes show the active window; drag to move | p. 10 | ✅ | |
 | ⌘-click title → folder-hierarchy menu; Option-⌘-click closes the inner window too | p. 11 | ✗ | Sniffer windows only (the Sniffer knows the path); compositor forwards ⌘-click on the title of a Sniffer window. P1 M |
 | ⌘-↑ opens the enclosing folder; Option-⌘-↑ also closes this one | p. 12 | ✗ | Sniffer key handling. P1 S |
-| ⌘-drag an inactive window without bringing it forward | p. 12 | ✗ | Compositor grab without focus. P2 S |
+| ⌘-drag an inactive window without bringing it forward | p. 12 | ✅ | Title bar or edge (0.1.54). |
 | Double-click title to collapse (Appearance option) | p. 12 | ✅ | Option toggle in Appearance: see 3.10 |
-| ⌘-double-click an inactive title to collapse it in place | p. 12 | ✗ | P3 S |
-| Zoom box: fit contents; Option-click zoom fills the screen | p. 12 | ◐ | Zoom works; Option-zoom to full screen missing. P2 S |
-| Collapse box; Option-click collapses all of the app's windows | p. 13 | ◐ | Collapse works; Option variant missing. P2 S |
+| ⌘-double-click an inactive title to collapse it in place | p. 12 | ✅ | Falls out of ⌘-drag (0.1.54). |
+| Zoom box: fit contents; Option-click zoom fills the screen | p. 12 | ✅ | Sniffer windows zoom to fit their icons or list (`platinum_shell_v1.set_standard_size`, v9); Option-click fills the screen; other programs' zoom fills it (0.1.54). |
+| Collapse box; Option-click collapses all of the app's windows | p. 13 | ✅ | Only the program's own windows now (it was every window) (0.1.54). |
 | Scroll bars; arrows together or at both ends (Appearance) | p. 13 | ◐ | Arrows-together only; option missing. P3 S |
 | ⌘-drag inside a Sniffer window scrolls in any direction (grabber hand) | p. 14 | ✗ | P3 S |
 | Drag window edges to move the window | p. 14 | ✅? | Verify. |
@@ -472,7 +472,7 @@ updates `PROJECT_STATUS.md` and the relevant `docs/` page.
 | 1.1 ✅ | **⌘-Tab / ⇧⌘-Tab** app cycling, and Option-click desktop or Option-choose an app to hide the one you leave | `compositor/src/hotkey.c`, `shell/menubar/toplevels.c` | S | Headless: three clients, ⌘-Tab order and focus; hidden state after Option-switch |
 | 1.2 ✅ | **Sniffer contextual menus** for icons, window backgrounds, the desktop, the Trash and disks; Control-click and right-click | `shell/finder/` (popup surface), `lib/menudraw` | M | Headless screenshot of each menu; each command reaches `Finder::command` |
 | 1.3 ✅ | **Special ▸ Eject (⌘E)** and **Log Out (⇧⌘Q)**, with "quit your programs first" | `shell/menubar/menus.c`, `session/` | S | VM: Log Out returns to the login window |
-| 1.4 | **Window tricks**: Option-click close/collapse for all of an app's windows, ⌘-drag a background window, Option-zoom fills the screen | `compositor/src/input.c`, `view.c`, `frame.c` | S | Headless compositor tests (`compositor/tests/`) |
+| 1.4 ✅ | **Window tricks**: Option-click close/collapse for all of an app's windows, ⌘-drag a background window, Option-zoom fills the screen | `compositor/src/input.c`, `view.c`, `frame.c` | S | Headless compositor tests (`compositor/tests/`) |
 | 1.5 | **Folder-path menu** on ⌘-click of a Sniffer window's title, ⌘-↑ / Option-⌘-↑ | compositor → Sniffer via `platinum-shell-v1` (new event: title clicked with modifiers), Sniffer menu | M | Headless: ⌘-click title shows the path; choosing opens the parent |
 | 1.6 | **Favorites**: File ▸ Add To Favorites, Zac menu Favorites, Favorites in Open/Save | `shell/finder/`, `shell/menubar/launch.c`, file-chooser portal | S | Unit: alias written; menu lists it |
 | 1.7 | **Recent Applications / Documents / Servers** in the Zac menu, with counts from a new Zac Menu Options panel | menu bar (launch record), `recently-used.xbel`, Neighbourhood, `shell/panels/` | M | Unit: list ordering and limits |

@@ -61,6 +61,10 @@ private:
 
 	/* Layout and scrolling, shared by both views. */
 	void relayout();
+	/* Tell zacos9-wm the size the zoom box gives us: just big enough for
+	 * the icons (or the list), as the Mac's Finder did. */
+	void updateStandardSize();
+	QSize m_standardSize;
 	int contentTop() const;   /* first window row of the scrolling area */
 	int viewWidth() const;
 	int viewHeight() const;

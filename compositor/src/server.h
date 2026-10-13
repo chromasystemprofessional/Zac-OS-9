@@ -401,7 +401,9 @@ void view_content_pos(struct plat_view *view, int *x, int *y);
 void view_move_to(struct plat_view *view, int x, int y);
 void view_resize_frame(struct plat_view *view, struct wlr_box frame_box);
 void view_close(struct plat_view *view);
-void view_toggle_zoom(struct plat_view *view);
+/* The zoom box: to the program's standard size (kept on screen), or with
+ * `fill` (Option-click, a client's maximize) the whole screen; again, back. */
+void view_toggle_zoom(struct plat_view *view, bool fill);
 void view_set_fullscreen(struct plat_view *view, bool fullscreen, struct wlr_output *output);
 void view_refresh_fullscreen(struct plat_server *server);
 void view_set_collapsed(struct plat_view *view, bool collapsed);
@@ -419,6 +421,8 @@ void platinum_shell_init(struct plat_server *server);
 int platinum_shell_style_for(struct wlr_surface *surface);
 /* A remembered position for a surface's window, if its program gave one. */
 bool platinum_shell_position_for(struct wlr_surface *surface, int *x, int *y);
+/* The content size the zoom box gives this window, if its program said. */
+bool platinum_shell_standard_size_for(struct wlr_surface *surface, int *w, int *h);
 /* Tell the window's program (if it is one of ours) where it now is. */
 void platinum_shell_report_position(struct plat_view *view);
 /* The front window changed: tell the menu bar whose it is. */

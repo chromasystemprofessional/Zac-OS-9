@@ -165,7 +165,7 @@ static void handle_request_maximize(struct wl_listener *listener, void *data) {
 		return;
 	}
 	if (view->mapped && view->xdg_toplevel->requested.maximized != view->zoomed) {
-		view_toggle_zoom(view);
+		view_toggle_zoom(view, true); /* maximize: the whole screen */
 	} else {
 		wlr_xdg_surface_schedule_configure(view->xdg_toplevel->base);
 	}
