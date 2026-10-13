@@ -1,11 +1,13 @@
 # Project Status
 
-Updated: 2026-10-12
+Updated: 2026-10-13
 
 ## Completed
 
 | Commit | Feature |
 |---|---|
+| `f988700` | Force Quit in the Apple menu: a submenu of the open applications (front-most first, not the Finder); choosing one has the Finder ask "Force “App” to quit? Any unsaved changes in it will be lost." and then send `platinum_shell_v1.force_quit` (protocol v7), on which `zacos9-wm` SIGKILLs every process behind that app id's windows (never itself). Checked in a headless session (foot killed, another foot outside it untouched) and in the VM (the Finder's command from the menu item: the alert, Return, the Installer gone, the Finder still running); the submenu itself not clicked through (the VM's pointer didn't reach the session) |
+| `84dd640` | Platinum login window: `session/zacos9-greeter` runs `zacos9-login` (`shell/greeter/`: pick a name, password, Log In; Restart, Shut Down) in a bare `zacos9-wm` (`ZACOS9_LOGIN_WINDOW`: no menu bar, Finder, collar, start-up screen, installer or Setup Assistant); it speaks greetd's IPC (`greeter/greetd.cpp`, PAM stays in greetd), remembers the last user, and falls back to tuigreet if the window can't run. `greetd-client` test passes; drawn in a headless zacos9-wm. In the VM (`scripts/dev-boot.sh`), under the real greetd after logging the live session out: a wrong password shows "Sorry, that password isn't right.", the right one starts the desktop as that user and the greeter's processes are gone. Restart and Shut Down not tried (the VM's pointer didn't reach the session) |
 | *(uncommitted)* | Apple-menu icon is now Happy Zac's head drawn on its own (`assets/menubar/happy-zac-mini.png`), whole and on transparency instead of a square crop of the start-up picture, 20×15 so it fills the bar's height with a 1 px margin (`MBAR_ICON_W/H` in `lib/menudraw.h`; alpha-blended now): `tools/menubar/make-menu-logo.py` regenerates `logo16_data` in `lib/logo.c` |
 | *(uncommitted)* | Busy pointer is now a rainbow dog bone (`assets/cursors/dog-bone.svg`) spinning clockwise instead of the tail-wagging/backflipping dog: `tools/cursors/build_cursors.py` draws the SVG antialiased at 16 and 32 px (24 frames, 60 ms, hot spot at the centre); `cursor-theme` and `busy-cursor-protocols` tests pass |
 | *(uncommitted)* | "Ask for my password to wake" (Screen Saver panel, off by default): `zacos9-lock` (ext-session-lock-v1, PAM) locks once every screen is idle, before any system sleep (logind delay inhibitor) and on `loginctl lock-session` / ScreenSaver.Lock; the screen saver plays above the lock — see `docs/energy-saver.md` |
