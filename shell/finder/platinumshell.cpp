@@ -2,6 +2,7 @@
 
 #include <QGuiApplication>
 #include <QHash>
+#include <QList>
 #include <QPointer>
 #include <QProcess>
 #include <QDebug>
@@ -36,7 +37,19 @@ static void handle_window_position(void *, platinum_shell_v1 *, wl_surface *surf
 	}
 }
 
-static void handle_active_client(void *, platinum_shell_v1 *, uint32_t) {
+static uint32_t activeClient;
+static QList<QPair<QPointer<QObject>, std::function<void()>>> &activeWatches() {
+	static QList<QPair<QPointer<QObject>, std::function<void()>>> watches;
+	return watches;
+}
+static void handle_active_client(void *, platinum_shell_v1 *, uint32_t pid) {
+	activeClient = pid;
+	const auto watches = activeWatches();
+	for (const auto &watch : watches) {
+		if (watch.first) {
+			watch.second();
+		}
+	}
 }
 static void handle_active_gtk_menu(void *, platinum_shell_v1 *, const char *, const char *,
 		const char *, const char *, const char *) {
@@ -168,6 +181,14 @@ void platinumSetStandardSize(QWidget *window, QSize size) {
 			static_cast<uint32_t>(std::max(0, size.height())));
 		wl_display_flush(display);
 	}
+}
+
+uint32_t platinumActiveClient() {
+	return activeClient;
+}
+
+void platinumOnActiveClient(QObject *owner, std::function<void()> changed) {
+	activeWatches().append({ owner, std::move(changed) });
 }
 
 void platinumOnTitleMenu(QWidget *window, std::function<void(bool)> callback) {

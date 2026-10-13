@@ -51,6 +51,7 @@ protected:
 	void dropEvent(QDropEvent *) override;
 
 private:
+	bool iconsShown() const;
 	void placeIcons();
 	void updateTrashIcon();
 	void loadPattern();

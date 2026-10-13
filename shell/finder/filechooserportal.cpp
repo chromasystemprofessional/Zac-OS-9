@@ -7,6 +7,7 @@
 #include "netvolumes.h"
 #include "vfs.h"
 #include "pixels.h"
+#include "settings.h"
 
 #include <QDialog>
 #include <QAbstractItemView>
@@ -45,6 +46,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <cstring>
 #include <unistd.h>
 #include <algorithm>
 #include <functional>
@@ -81,7 +83,13 @@ bool hiddenSystemMount(const QString &path) {
 
 class DriveFileDialog : public QFileDialog {
 public:
-	DriveFileDialog(QWidget *parent, const QString &title, const FileChooserLocation &drive)
+	/* What exec() returns for Other Locations... */
+	static constexpr int OtherLocations = 2;
+
+	/* `otherLocations`: it opened straight in a folder (General Controls'
+	 * Documents), so it offers the list of disks, too. */
+	DriveFileDialog(QWidget *parent, const QString &title, const FileChooserLocation &drive,
+			bool otherLocations = false)
 		: QFileDialog(parent, title, drive.path), m_root(QFileInfo(drive.path).canonicalFilePath()),
 		  m_realRoots(drive.realRoots) {
 		prepareFileChooserDialog(*this);
@@ -93,6 +101,13 @@ public:
 		m_error->setWordWrap(true);
 		layout()->addWidget(m_location);
 		layout()->addWidget(m_error);
+		if (otherLocations) {
+			auto *other = new QPushButton("Other Locations...", this);
+			other->setObjectName("otherLocationsButton");
+			other->setAutoDefault(false);
+			layout()->addWidget(other);
+			connect(other, &QPushButton::clicked, this, [this] { done(OtherLocations); });
+		}
 		for (const char *name : { "backButton", "forwardButton" }) {
 			if (auto *button = findChild<QToolButton *>(name)) {
 				button->hide();
@@ -343,49 +358,79 @@ static QStringList decodeFiles(const QVariant &value) {
 
 class PortalFileDialog {
 public:
-	static QStringList openFiles(QWidget *parent, const QString &title,
+	static QStringList openFiles(QWidget *parent, const QString &title, const QString &appId,
 			const QVariantMap &options, ChooserRequest &request) {
 		const bool directory = options.value("directory").toBool();
 		const bool multiple = options.value("multiple").toBool();
-		const FileChooserLocation start = chooseLocation(parent, title, request);
-		if (start.path.isEmpty()) {
-			return {};
-		}
-
-		DriveFileDialog dialog(parent, title.isEmpty() ? "Open" : title, start);
-		dialog.setAcceptMode(QFileDialog::AcceptOpen);
-		dialog.setFileMode(directory ? QFileDialog::Directory :
-			(multiple ? QFileDialog::ExistingFiles : QFileDialog::ExistingFile));
-		dialog.setOption(QFileDialog::ShowDirsOnly, directory);
-		applyFilters(dialog, options);
-		const QString acceptLabel = options.value("accept_label").toString();
-		dialog.setLabelText(QFileDialog::Accept,
-			acceptLabel.isEmpty() ? "Open" : acceptLabel);
-		return request.run(dialog) == QDialog::Accepted ? dialog.chosenFiles() : QStringList{};
+		return run(parent, title, appId, request, [&](DriveFileDialog &dialog) {
+			dialog.setWindowTitle(title.isEmpty() ? "Open" : title);
+			dialog.setAcceptMode(QFileDialog::AcceptOpen);
+			dialog.setFileMode(directory ? QFileDialog::Directory :
+				(multiple ? QFileDialog::ExistingFiles : QFileDialog::ExistingFile));
+			dialog.setOption(QFileDialog::ShowDirsOnly, directory);
+			applyFilters(dialog, options);
+			const QString acceptLabel = options.value("accept_label").toString();
+			dialog.setLabelText(QFileDialog::Accept,
+				acceptLabel.isEmpty() ? "Open" : acceptLabel);
+		});
 	}
 
-	static QString saveFile(QWidget *parent, const QString &title, const QVariantMap &options,
-			ChooserRequest &request) {
-		const FileChooserLocation start = chooseLocation(parent, title, request);
-		if (start.path.isEmpty()) {
-			return {};
-		}
-		DriveFileDialog dialog(parent, title.isEmpty() ? "Save" : title, start);
-		dialog.setAcceptMode(QFileDialog::AcceptSave);
-		dialog.setFileMode(QFileDialog::AnyFile);
-		const QString currentName = options.value("current_name").toString();
-		if (!currentName.isEmpty() && currentName != "." && currentName != ".." &&
-				QFileInfo(currentName).fileName() == currentName) {
-			dialog.selectFile(currentName);
-		}
-		applyFilters(dialog, options);
-		dialog.setLabelText(QFileDialog::Accept,
-			options.value("accept_label").toString().isEmpty() ? "Save" :
-			options.value("accept_label").toString());
-		return request.run(dialog) == QDialog::Accepted ? dialog.chosenFiles().value(0) : QString();
+	static QString saveFile(QWidget *parent, const QString &title, const QString &appId,
+			const QVariantMap &options, ChooserRequest &request) {
+		return run(parent, title, appId, request, [&](DriveFileDialog &dialog) {
+			dialog.setWindowTitle(title.isEmpty() ? "Save" : title);
+			dialog.setAcceptMode(QFileDialog::AcceptSave);
+			dialog.setFileMode(QFileDialog::AnyFile);
+			const QString currentName = options.value("current_name").toString();
+			if (!currentName.isEmpty() && currentName != "." && currentName != ".." &&
+					QFileInfo(currentName).fileName() == currentName) {
+				dialog.selectFile(currentName);
+			}
+			applyFilters(dialog, options);
+			dialog.setLabelText(QFileDialog::Accept,
+				options.value("accept_label").toString().isEmpty() ? "Save" :
+				options.value("accept_label").toString());
+		}).value(0);
 	}
 
 private:
+	/* The dialog opens in General Controls' Documents choice when there
+	 * is one, or else on the disk chosen from the list; Other Locations...
+	 * goes back to the list. */
+	static QStringList run(QWidget *parent, const QString &title, const QString &appId,
+			ChooserRequest &request, const std::function<void(DriveFileDialog &)> &setUp) {
+		QString folder;
+		FileChooserLocation start;
+		const QString startFolder = fileChooserStartFolder(appId);
+		if (!startFolder.isEmpty()) {
+			start = fileChooserLocationFor(fileChooserLocations(), startFolder, &folder);
+		}
+		for (;;) {
+			if (start.path.isEmpty()) {
+				folder.clear();
+				start = chooseLocation(parent, title, request);
+				if (start.path.isEmpty()) {
+					return {};
+				}
+			}
+			DriveFileDialog dialog(parent, title, start, !folder.isEmpty());
+			setUp(dialog);
+			if (!folder.isEmpty()) {
+				dialog.setDirectory(folder);
+			}
+			const int result = request.run(dialog);
+			if (result == DriveFileDialog::OtherLocations && !request.cancelled) {
+				start = {};
+				continue;
+			}
+			if (result != QDialog::Accepted) {
+				return {};
+			}
+			fileChooserRememberFolder(appId, fileChooserRealPath(dialog.directory().absolutePath()));
+			return dialog.chosenFiles();
+		}
+	}
+
 	static FileChooserLocation chooseLocation(QWidget *parent, const QString &title,
 			ChooserRequest &request) {
 		LocationDialog locations(title);
@@ -541,12 +586,13 @@ private:
 			const QVariantMap &options, ChooserRequest &request) {
 		const QString method = message.member();
 		const QVariantList args = message.arguments();
+		const QString appId = args.at(1).toString();
 		const QString title = args.at(3).toString();
 		QStringList paths;
 		if (method == "OpenFile") {
-			paths = PortalFileDialog::openFiles(nullptr, title, options, request);
+			paths = PortalFileDialog::openFiles(nullptr, title, appId, options, request);
 		} else if (method == "SaveFile") {
-			const QString path = PortalFileDialog::saveFile(nullptr, title, options, request);
+			const QString path = PortalFileDialog::saveFile(nullptr, title, appId, options, request);
 			if (!path.isEmpty()) {
 				paths << path;
 			}
@@ -579,7 +625,7 @@ private:
 			folderOptions.insert("directory", true);
 			folderOptions.insert("multiple", false);
 			const QString folder = PortalFileDialog::openFiles(
-				nullptr, title, folderOptions, request).value(0);
+				nullptr, title, appId, folderOptions, request).value(0);
 			if (!folder.isEmpty()) {
 				QSet<QString> allocatedNames;
 				for (const QString &name : names) {
@@ -671,6 +717,115 @@ bool fileChooserPathWithinDisk(const QString &path, const QString &root,
 QString fileChooserRealPath(const QString &path) {
 	const QString target = canonicalTarget(path);
 	return target.isEmpty() ? QDir::cleanPath(QFileInfo(path).absoluteFilePath()) : target;
+}
+
+static QString lastFoldersPath() {
+	QString state = qEnvironmentVariable("XDG_STATE_HOME");
+	if (state.isEmpty()) {
+		state = QDir::homePath() + "/.local/state";
+	}
+	return state + "/zacos9/open-save-folders";
+}
+
+/* "app id<TAB>folder" lines, newest first. */
+static QStringList lastFolders() {
+	QFile f(lastFoldersPath());
+	return f.open(QIODevice::ReadOnly) ?
+		QString::fromUtf8(f.readAll()).split('\n', Qt::SkipEmptyParts) : QStringList();
+}
+
+QString fileChooserStartFolder(const QString &appId) {
+	char mode[32];
+	if (!pl_setting("documents-folder", mode, sizeof(mode))) {
+		return {};
+	}
+	if (strcmp(mode, "documents") == 0) {
+		const QString documents = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
+		return QDir().mkpath(documents) ? documents : QString();
+	}
+	if (strcmp(mode, "last") == 0) {
+		for (const QString &line : lastFolders()) {
+			const int tab = line.indexOf('\t');
+			if (tab >= 0 && line.left(tab) == appId) {
+				const QString folder = line.mid(tab + 1);
+				return QFileInfo(folder).isDir() ? folder : QString();
+			}
+		}
+	}
+	return {};
+}
+
+void fileChooserRememberFolder(const QString &appId, const QString &folder) {
+	if (appId.contains('\t') || appId.contains('\n') || folder.contains('\n') ||
+			!QFileInfo(folder).isDir()) {
+		return;
+	}
+	QStringList lines{ appId + '\t' + folder };
+	for (const QString &line : lastFolders()) {
+		if (!line.startsWith(appId + '\t') && lines.size() < 100) {
+			lines << line;
+		}
+	}
+	const QString path = lastFoldersPath();
+	QDir().mkpath(QFileInfo(path).absolutePath());
+	QFile f(path);
+	if (f.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+		f.write((lines.join('\n') + '\n').toUtf8());
+	}
+}
+
+/* The startup disk's link that reaches deepest toward `real`. */
+static void findLink(const QString &dir, const QString &real, int depth, QString *best,
+		qsizetype *bestLength) {
+	if (depth > 8) {
+		return;
+	}
+	for (const QFileInfo &entry : QDir(dir).entryInfoList(
+			QDir::AllEntries | QDir::Hidden | QDir::System | QDir::NoDotAndDotDot)) {
+		if (entry.isSymLink()) {
+			const QString target = entry.canonicalFilePath();
+			if (under(real, target) && target.size() > *bestLength) {
+				*bestLength = target.size();
+				*best = QDir::cleanPath(QDir(entry.absoluteFilePath()).filePath(
+					QDir(target).relativeFilePath(real)));
+			}
+		} else if (entry.isDir()) {
+			findLink(entry.absoluteFilePath(), real, depth + 1, best, bestLength);
+		}
+	}
+}
+
+FileChooserLocation fileChooserLocationFor(const QList<FileChooserLocation> &locations,
+		const QString &folder, QString *browse) {
+	const QString real = QFileInfo(folder).canonicalFilePath();
+	if (real.isEmpty()) {
+		return {};
+	}
+	/* A disk of its own first (the deepest), then the startup disk's links. */
+	const FileChooserLocation *found = nullptr;
+	for (const FileChooserLocation &location : locations) {
+		if (!location.folderAlias && location.realRoots.isEmpty() &&
+				fileChooserPathWithinDrive(real, location.path) &&
+				(!found || location.path.size() > found->path.size())) {
+			found = &location;
+		}
+	}
+	if (found) {
+		*browse = real;
+		return *found;
+	}
+	for (const FileChooserLocation &location : locations) {
+		if (!location.realRoots.isEmpty()) {
+			QString path;
+			qsizetype length = 0;
+			findLink(location.path, real, 0, &path, &length);
+			if (!path.isEmpty()) {
+				*browse = path;
+				return location;
+			}
+		}
+	}
+	return {};
 }
 
 /* Removes a chooser tree without following its links into real folders. */

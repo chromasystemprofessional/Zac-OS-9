@@ -169,7 +169,9 @@ struct plat_server {
 	struct wl_event_source *lock_restart;
 	pid_t lock_pid;
 	/* A press that only woke a dark screen; its release is swallowed too. */
-	uint32_t idle_swallowed_button, idle_swallowed_key;
+	/* A press that went nowhere (it woke the screen, or hit a hidden
+	 * desktop): its release goes nowhere either. */
+	uint32_t swallowed_button, idle_swallowed_key;
 };
 
 struct plat_output {
@@ -299,6 +301,8 @@ void prefs_write_outputs(struct plat_server *server);
 int prefs_repeat_rate(void);
 int prefs_repeat_delay(void);
 bool prefs_collar_hotkey(uint32_t mods, xkb_keysym_t sym);
+/* General Controls' "Show Desktop when in background" ("show-desktop"). */
+bool prefs_show_desktop(void);
 
 /* main.c: run a shell command, in its own session; its pid, or -1. */
 pid_t spawn(const char *command);
@@ -387,6 +391,8 @@ void view_set_hidden(struct plat_view *view, bool hidden);
 /* Every window of `app_id` forward (front one active), or hidden. */
 void view_activate_app(struct plat_server *server, const char *app_id);
 void view_hide_app(struct plat_server *server, const char *app_id);
+/* False while General Controls hides the desktop behind another program. */
+bool view_desktop_shown(struct plat_server *server);
 /* Frontmost visible window, or NULL. */
 struct plat_view *view_topmost(struct plat_server *server);
 

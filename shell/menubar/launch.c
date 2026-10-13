@@ -293,6 +293,7 @@ void launch_fill_logo_menu(struct mb_menu *menu, const struct app *apps, int n_a
 		{ "Date & Time", "zacos9-datetime", "" },
 		{ "File Sharing", "zacos9-filesharing", "" },
 		{ "File Translator", "zacos9-fileexchange", "" },
+		{ "General Controls", "zacos9-controlpanel", " general" },
 		{ "Keyboard", "zacos9-controlpanel", " keyboard" },
 		{ "Monitors", "zacos9-controlpanel", " monitors" },
 		{ "Mouse", "zacos9-controlpanel", " mouse" },

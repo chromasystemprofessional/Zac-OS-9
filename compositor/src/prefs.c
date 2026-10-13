@@ -62,6 +62,11 @@ int prefs_repeat_rate(void) {
 	return delay ? rate : 0;
 }
 
+bool prefs_show_desktop(void) {
+	char v[16];
+	return !pl_setting("show-desktop", v, sizeof(v)) || strcmp(v, "false") != 0;
+}
+
 int prefs_repeat_delay(void) {
 	const int delay = repeat_delays[setting_int("key-delay", DELAY_DEFAULT, 0, 5)];
 	return delay ? delay : 600;

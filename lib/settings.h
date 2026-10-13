@@ -64,6 +64,13 @@ void pl_sound_preview(const char *path, int level);
  * default 533). */
 int pl_double_click_ms(void);
 
+/* General Controls. How many times a chosen menu item blinks before it
+ * acts, 0..3 ("menu-blink"; 1 by default). */
+int pl_menu_blinks(void);
+/* The insertion point's blink cycle in ms, on and off ("caret-blink":
+ * slow 1600, medium 1066, fast 534; Mac OS's 32-tick default is medium). */
+int pl_caret_blink_ms(void);
+
 #ifdef __cplusplus
 }
 #endif

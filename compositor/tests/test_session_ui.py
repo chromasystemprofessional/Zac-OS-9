@@ -2,7 +2,9 @@
 zacos9-wm: ⌘-Tab and Option-click on the desktop (compositor/src/input.c,
 view.c, the menu bar's app_switch_target); a contextual menu on the desktop
 (the Sniffer asks, the menu bar opens it at the pointer); then Special > Log
-Out (shell/menubar/logout.c).
+Out (shell/menubar/logout.c). Between them, General Controls' "Show Desktop
+when in background", off: the desktop's icons go while a program is in
+front, and a click there goes nowhere.
 
 usage: test_session_ui.py ZACOS9-WM MENUBAR FINDER IDLE-CLIENT VPTR
 """
@@ -135,6 +137,30 @@ with tempfile.TemporaryDirectory(prefix="zacos9-switch-") as directory:
             vp("home", "move", "70", "458", "click", "wait", "1500")
             wait_for("New Folder from the contextual menu", lambda: (desktop / "untitled folder").is_dir())
             print("ok: a contextual menu on the desktop opens at the pointer; New Folder works")
+
+            # Show Desktop when in background, off (the Sniffer and zacos9-wm
+            # read it as it changes): with Bravo in front, the startup disk's
+            # icon (top right) goes, and a click on the desktop does nothing.
+            if have_grim:
+                def corner():
+                    path = root / "corner.ppm"
+                    subprocess.run(["grim", "-g", "1180,20 100x70", "-t", "ppm", str(path)],
+                                   env=env, check=True, timeout=10)
+                    return path.read_bytes()
+                # (the Sniffer is in front, after New Folder)
+                assert switch("z") == "alpha" and switch("c") == "bravo"
+                shown = corner()
+                conf = root / "config" / "zacos9" / "desktop.conf"
+                text = conf.read_text() if conf.exists() else "[General]\n"
+                conf.parent.mkdir(parents=True, exist_ok=True)
+                conf.write_text(text.replace("[General]\n", "[General]\nshow-desktop=false\n", 1))
+                wait_for("the desktop's icons to go", lambda: corner() != shown)
+                vp("home", "move", "40", "450", "click", "wait", "400")
+                assert typed("a") == "bravo", "a click on the hidden desktop leaves Bravo in front"
+                assert switch("b") is None, "⌘-Tab brings the Sniffer back"
+                wait_for("the desktop's icons back", lambda: corner() == shown)
+                conf.write_text(text)
+                print("ok: Show Desktop when in background, off, hides the desktop behind programs")
 
             # Special > Log Out: the Sniffer asks; Return says Log Out; the
             # programs are asked to quit, and once they have, the session ends.

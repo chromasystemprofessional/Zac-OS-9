@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=General Controls
+Comment=Desktop, menu blinking, the insertion point and where Open and Save start
+Exec=zacos9-controlpanel general
+Categories=Settings;DesktopSettings;
+OnlyShowIn=ZacOS9;

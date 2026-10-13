@@ -598,3 +598,18 @@ int pl_double_click_ms(void) {
 	const int ms = pl_setting("double-click", v, sizeof(v)) ? atoi(v) : 0;
 	return ms >= 150 && ms <= 2000 ? ms : 533;
 }
+
+int pl_menu_blinks(void) {
+	char v[16];
+	if (!pl_setting("menu-blink", v, sizeof(v))) {
+		return 1;
+	}
+	const int n = atoi(v);
+	return n < 0 ? 0 : n > 3 ? 3 : n;
+}
+
+int pl_caret_blink_ms(void) {
+	char v[16];
+	const int ms = pl_setting("caret-blink", v, sizeof(v)) ? atoi(v) : 0;
+	return ms >= 200 && ms <= 4000 ? ms : 1066;
+}

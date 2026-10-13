@@ -1,5 +1,6 @@
 #include "filechooserportal.h"
 #include "alias.h"
+#include "settings.h"
 
 #include <QLabel>
 #include <QApplication>
@@ -15,6 +16,7 @@
 #include <QFileInfo>
 #include <QListWidget>
 #include <QLineEdit>
+#include <QPushButton>
 #include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QTimer>
@@ -403,5 +405,57 @@ int main(int argc, char **argv) {
 	check(cancelled.type() == QDBusMessage::ReplyMessage &&
 		cancelled.arguments().value(0).toUInt() == 1,
 		"Request.Close also cancels the file browser without hanging the caller");
+
+	/* General Controls' Documents folder: Open starts there, with no list
+	 * of disks first, and Other Locations... goes back to the list. */
+	pl_setting_set("documents-folder", "documents");
+	const QString documents = base + "/Documents";
+	QDir().mkpath(documents);
+	QFile letter(documents + "/letter.txt");
+	check(letter.open(QIODevice::WriteOnly), "create a document in Documents");
+	letter.close();
+	results = successfulResults(choose(client, "OpenFile", {},
+		[&](QDialog *dialog, const QString &) {
+			auto *picker = qobject_cast<QFileDialog *>(dialog);
+			check(picker && QFileInfo(picker->directory().absolutePath()).canonicalFilePath() == documents,
+				"with Documents folder chosen, Open starts in it");
+			check(picker && picker->findChild<QPushButton *>("otherLocationsButton"),
+				"and offers the other locations");
+			if (!picker) {
+				dialog->reject();
+				return;
+			}
+			auto *select = new QTimer(picker);
+			QObject::connect(select, &QTimer::timeout, picker, [picker]() {
+				if (auto *name = picker->findChild<QLineEdit *>("fileNameEdit")) {
+					name->setText("letter.txt");
+				}
+				QMetaObject::invokeMethod(picker, "accept");
+			});
+			select->start(20);
+		}));
+	check(results.value("uris").toStringList() ==
+		QStringList{ QUrl::fromLocalFile(documents + "/letter.txt").toString(QUrl::FullyEncoded) },
+		"a document opened from Documents is its real file");
+	bool listed = false;
+	const QDBusMessage other = choose(client, "SaveFile", {},
+		[&](QDialog *dialog, const QString &) {
+			auto *button = dialog->findChild<QPushButton *>("otherLocationsButton");
+			check(button, "Save offers the other locations too");
+			auto *wait = new QTimer(&app);
+			QObject::connect(wait, &QTimer::timeout, [&listed, wait]() {
+				auto *list = qobject_cast<QDialog *>(QApplication::activeModalWidget());
+				if (list && !qobject_cast<QFileDialog *>(list) && list->findChild<QListWidget *>()) {
+					listed = true;
+					wait->deleteLater();
+					list->reject();
+				}
+			});
+			wait->start(20);
+			button ? button->click() : dialog->reject();
+		});
+	check(listed, "Other Locations... shows the list of disks");
+	check(other.arguments().value(0).toUInt() == 1, "and cancelling it cancels the request");
+	pl_setting_set("documents-folder", nullptr);
 	return failures ? 1 : 0;
 }

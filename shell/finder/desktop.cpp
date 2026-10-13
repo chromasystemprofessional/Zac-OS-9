@@ -27,6 +27,7 @@
 #include "netvolumes.h"
 #include "patterns.h"
 #include "custompatterns.h"
+#include "platinumshell.h"
 #include "settings.h"
 #include <algorithm>
 
@@ -64,6 +65,7 @@ Desktop::Desktop() {
 	watchFileAssociations(this);
 	watchDesktopPatterns(this, [this] { loadPattern(); update(); });
 	watchDesktopWallpaper(this, [this] { update(); });
+	platinumOnActiveClient(this, [this] { update(); });
 	watchCustomThemes(this, [this] { update(); });
 	setAttribute(Qt::WA_OpaquePaintEvent);
 	setAcceptDrops(true);
@@ -101,6 +103,7 @@ Desktop::Desktop() {
 	QObject::connect(&m_settingsWatcher, &QFileSystemWatcher::directoryChanged, [this] {
 		loadPattern();
 		QApplication::setDoubleClickInterval(pl_double_click_ms());
+		QApplication::setCursorFlashTime(pl_caret_blink_ms());
 		/* Accent colour and highlight are read at paint time. */
 		for (QWidget *w : QApplication::topLevelWidgets()) {
 			w->update();
@@ -413,10 +416,25 @@ void Desktop::resizeEvent(QResizeEvent *) {
 	placeIcons();
 }
 
+/* General Controls' "Show Desktop when in background", off: while another
+ * program is in front, only the pattern shows (zacos9-wm hides the
+ * Sniffer's windows, and clicks here go nowhere). */
+bool Desktop::iconsShown() const {
+	char v[16];
+	const uint32_t front = platinumActiveClient();
+	return !(pl_setting("show-desktop", v, sizeof(v)) && strcmp(v, "false") == 0) || front == 0 ||
+		front == static_cast<uint32_t>(QCoreApplication::applicationPid());
+}
+
 void Desktop::paintEvent(QPaintEvent *) {
 	Pixels px(width(), height());
 	pl_canvas *c = &px.c;
 	desktopBackgroundFill(c, width(), height());
+	if (!iconsShown()) {
+		QPainter p(this);
+		px.blit(p);
+		return;
+	}
 	paintIconItem(c, *m_disk, m_disk->pos.x(), m_disk->pos.y(), true);
 	if (m_unix) {
 		paintIconItem(c, *m_unix, m_unix->pos.x(), m_unix->pos.y(), true);
@@ -651,9 +669,9 @@ void Desktop::clearDropTarget() {
 }
 
 void Desktop::dragEnterEvent(QDragEnterEvent *e) {
-	if (e->mimeData()->hasUrls() || e->mimeData()->hasFormat(ALIAS_ITEMS_MIME) ||
+	if (iconsShown() && (e->mimeData()->hasUrls() || e->mimeData()->hasFormat(ALIAS_ITEMS_MIME) ||
 			e->mimeData()->hasFormat(APPLICATION_ITEMS_MIME) ||
-			e->mimeData()->hasFormat(STARTUP_ITEMS_MIME)) {
+			e->mimeData()->hasFormat(STARTUP_ITEMS_MIME))) {
 		e->acceptProposedAction();
 	}
 }

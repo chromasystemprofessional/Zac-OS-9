@@ -1,6 +1,7 @@
 #include "zacos9style.h"
 
 #include <QAbstractScrollArea>
+#include <QApplication>
 #include <QDir>
 #include <QFileDialog>
 #include <QEvent>
@@ -12,6 +13,7 @@
 #include <QStyleFactory>
 #include <QStyleOption>
 #include <algorithm>
+#include <cstring>
 
 extern "C" {
 #include "settings.h"
@@ -69,6 +71,12 @@ SbGeom sbGeom(int length) {
 } // namespace
 
 Zacos9Style::Zacos9Style() : QProxyStyle(QStyleFactory::create(QStringLiteral("Fusion"))) {
+}
+
+/* General Controls' insertion point blink rate. */
+void Zacos9Style::polish(QApplication *app) {
+	QProxyStyle::polish(app);
+	QApplication::setCursorFlashTime(pl_caret_blink_ms());
 }
 
 void Zacos9Style::polish(QPalette &p) {
@@ -141,13 +149,21 @@ bool Zacos9Style::eventFilter(QObject *object, QEvent *event) {
 				addPlace(path);
 			}
 			dialog->setSidebarUrls(places);
-			if (dialog->acceptMode() == QFileDialog::AcceptSave) {
+			/* A dialog the program left at home or where it started opens
+			 * where General Controls says: the Documents folder, or for a
+			 * Save, the desktop. */
+			char where[32];
+			const bool documents = pl_setting("documents-folder", where, sizeof(where)) &&
+				strcmp(where, "documents") == 0;
+			if (documents || dialog->acceptMode() == QFileDialog::AcceptSave) {
 				const QString current = dialog->directory().absolutePath();
 				const QString home = QDir::homePath();
 				const QString working = QDir::currentPath();
 				if (current.isEmpty() || QDir::cleanPath(current) == QDir::cleanPath(home) ||
 						QDir::cleanPath(current) == QDir::cleanPath(working)) {
-					dialog->setDirectory(desktopPath);
+					const QString folder = QStandardPaths::writableLocation(
+						QStandardPaths::DocumentsLocation);
+					dialog->setDirectory(documents && QDir().mkpath(folder) ? folder : desktopPath);
 				}
 			}
 		}

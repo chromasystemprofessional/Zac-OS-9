@@ -35,7 +35,6 @@
 
 /* Chosen items blink before the menu closes (General Controls default).
  * TODO: verify count and timing on a real Mac. */
-#define BLINK_COUNT 1
 #define BLINK_MS 60
 
 /* SIDE_CONTEXT: a contextual menu at the pointer, not from a title. */
@@ -494,6 +493,8 @@ static void arm_timer(int fd, long ms) {
 	timerfd_settime(fd, 0, &its, NULL);
 }
 
+static void blink_tick(void);
+
 static void choose(int index, bool in_sub) {
 	struct mb_item *it = in_sub ? &sub_menu_ptr()->items[index]
 		: &open_menu_ptr()->items[index];
@@ -508,8 +509,14 @@ static void choose(int index, bool in_sub) {
 	} else {
 		g.selected = index;
 	}
-	g.blinks_left = BLINK_COUNT * 2;
+	/* General Controls' Menu Blinking: Off acts at once. */
+	g.blinks_left = pl_menu_blinks() * 2;
 	g.blink_on = false;
+	if (g.blinks_left == 0) {
+		g.blinks_left = 1;
+		blink_tick();
+		return;
+	}
 	draw_menu();
 	arm_timer(g.blink_fd, BLINK_MS);
 }

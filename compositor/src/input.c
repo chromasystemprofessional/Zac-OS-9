@@ -601,11 +601,11 @@ static void cursor_button(struct wl_listener *listener, void *data) {
 	/* A click that only woke a dark screen goes no further, nor its release. */
 	if (event->state == WL_POINTER_BUTTON_STATE_PRESSED) {
 		if (idle_input(server, IDLE_INPUT_BUTTON)) {
-			server->idle_swallowed_button = event->button;
+			server->swallowed_button = event->button;
 			return;
 		}
-	} else if (server->idle_swallowed_button == event->button) {
-		server->idle_swallowed_button = 0;
+	} else if (server->swallowed_button == event->button) {
+		server->swallowed_button = 0;
 		return;
 	}
 
@@ -642,8 +642,16 @@ static void cursor_button(struct wl_listener *listener, void *data) {
 			/* Shell surfaces (the menu bar) never activate windows, but a
 			 * click on the desktop (the Finder's, on any display) puts the
 			 * Finder in front, its menus in the menu bar. */
-			if (layer->namespace && (strcmp(layer->namespace, "zacos9-desktop") == 0 ||
-					strcmp(layer->namespace, "desktop-extra") == 0)) {
+			const bool desktop = layer->namespace &&
+				(strcmp(layer->namespace, "zacos9-desktop") == 0 ||
+				strcmp(layer->namespace, "desktop-extra") == 0);
+			if (desktop && !view_desktop_shown(server)) {
+				/* General Controls hid the desktop behind this program:
+				 * there is nothing there to click. */
+				server->swallowed_button = event->button;
+				return;
+			}
+			if (desktop) {
 				/* Option-click: the program you leave hides, too. */
 				struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(server->seat);
 				struct plat_view *left = server->focused_view;

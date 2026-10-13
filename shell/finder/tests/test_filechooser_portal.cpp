@@ -1,6 +1,7 @@
 #include "filechooserportal.h"
 #include "items.h"
 #include "alias.h"
+#include "settings.h"
 
 #include <QApplication>
 #include <QDir>
@@ -187,5 +188,30 @@ int main(int argc, char **argv) {
 		foundSmb |= location.path == gvfsShare && location.name == "Team Files";
 	}
 	check(foundSmb, "the actual chooser includes GVFS shares omitted by GIO local-path enumeration");
+
+	/* General Controls' Documents. */
+	check(fileChooserStartFolder("org.example.Writer").isEmpty(),
+		"by default (folder set by the application) dialogs start from the list of disks");
+	pl_setting_set("documents-folder", "documents");
+	const QString documents = fileChooserStartFolder("org.example.Writer");
+	check(documents == base + "/Documents" && QFileInfo(documents).isDir(),
+		"Documents folder: dialogs start there, and it is made if missing");
+	QString browse;
+	const FileChooserLocation startup = fileChooserLocationFor(refreshed, documents, &browse);
+	check(!startup.realRoots.isEmpty() && browse.startsWith(startup.path + "/") &&
+		QFileInfo(browse).canonicalFilePath() == documents,
+		"a folder in Home opens on the startup disk, through its links");
+	check(fileChooserLocationFor(refreshed, "/proc", &browse).path.isEmpty(),
+		"a folder no location reaches has none");
+	pl_setting_set("documents-folder", "last");
+	check(fileChooserStartFolder("org.example.Writer").isEmpty(), "nothing used yet: the list of disks");
+	fileChooserRememberFolder("org.example.Writer", serverRoot + "/AFP/Projects");
+	fileChooserRememberFolder("org.example.Paint", base);
+	fileChooserRememberFolder("org.example.Paint", base + "/gone");
+	check(fileChooserStartFolder("org.example.Writer") == serverRoot + "/AFP/Projects" &&
+		fileChooserStartFolder("org.example.Paint") == base &&
+		fileChooserStartFolder("org.example.Other").isEmpty(),
+		"Last folder used: each program starts where it last was");
+	pl_setting_set("documents-folder", nullptr);
 	return failures ? 1 : 0;
 }

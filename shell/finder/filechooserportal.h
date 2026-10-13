@@ -32,6 +32,19 @@ bool fileChooserPathWithinDrive(const QString &path, const QString &root);
 bool fileChooserPathWithinDisk(const QString &path, const QString &root,
 	const QStringList &realRoots, bool browsing);
 QString fileChooserRealPath(const QString &path);
+/* General Controls' Documents: the folder an Open or Save dialog for
+ * `appId` starts in ("last": the one last used in that program; "documents":
+ * the Documents folder, made if missing), or empty to start from the list
+ * of disks, as for "Folder set by the application" (programs' own
+ * suggestions never skip it). */
+QString fileChooserStartFolder(const QString &appId);
+/* The folder last used in `appId`'s dialog, for "last". */
+void fileChooserRememberFolder(const QString &appId, const QString &folder);
+/* The location among `locations` holding the real folder `folder`, and in
+ * *browse the path to it there (on the startup disk, through its links);
+ * an empty location if none does. */
+FileChooserLocation fileChooserLocationFor(const QList<FileChooserLocation> &locations,
+	const QString &folder, QString *browse);
 /* Loads the Finder's Macintosh view ahead of the first request. */
 void fileChooserWarmUp();
 /* Rebuilds the startup disk's chooser tree under `parent` (replacing it). */

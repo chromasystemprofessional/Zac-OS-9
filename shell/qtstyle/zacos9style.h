@@ -14,6 +14,7 @@ class Zacos9Style : public QProxyStyle {
 public:
 	Zacos9Style();
 
+	void polish(QApplication *app) override;
 	void polish(QPalette &palette) override;
 	void polish(QWidget *widget) override;
 	void unpolish(QWidget *widget) override;

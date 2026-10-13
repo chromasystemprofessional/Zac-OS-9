@@ -246,6 +246,28 @@ void view_clear_focus(struct plat_server *server) {
 	platinum_shell_focus_changed(server);
 }
 
+static bool is_finder(struct plat_view *view) {
+	return view->app_id && strcmp(view->app_id, "zacos9-finder") == 0;
+}
+
+/* General Controls' "Show Desktop when in background", off: while another
+ * program is in front the Sniffer is hidden, windows and all (and it hides
+ * its desktop icons), so a stray click can't bring it forward. It comes
+ * back with Command-Tab, the Application menu, or when nothing else is
+ * left open. */
+bool view_desktop_shown(struct plat_server *server) {
+	return prefs_show_desktop() || !server->focused_view || is_finder(server->focused_view);
+}
+
+/* Nothing left in front: as on the Mac, the Sniffer comes forward. */
+static void focus_none(struct plat_server *server) {
+	if (!prefs_show_desktop()) {
+		view_clear_focus(server);
+	} else {
+		platinum_shell_focus_changed(server);
+	}
+}
+
 void view_set_hidden(struct plat_view *view, bool hidden) {
 	if (view->hidden == hidden) {
 		return;
@@ -265,10 +287,13 @@ void view_set_hidden(struct plat_view *view, bool hidden) {
 		struct plat_view *next = view_topmost(server);
 		if (next) {
 			view_focus(next);
-		} else if (!server->focused_layer) {
-			wlr_seat_keyboard_clear_focus(server->seat);
+			platinum_shell_focus_changed(server);
+		} else {
+			if (!server->focused_layer) {
+				wlr_seat_keyboard_clear_focus(server->seat);
+			}
+			focus_none(server);
 		}
-		platinum_shell_focus_changed(server);
 	}
 	if (view->fullscreen) {
 		idle_update(server); /* hidden, it no longer keeps its screen awake */
@@ -342,6 +367,9 @@ void view_focus(struct plat_view *view) {
 		}
 		server->focused_view = view;
 		set_active(view, true);
+		if (!is_finder(view) && !prefs_show_desktop()) {
+			view_hide_app(server, "zacos9-finder");
+		}
 		platinum_shell_focus_changed(server);
 	}
 	/* While the menu bar tracks a menu (an exclusive layer) it keeps the
@@ -691,8 +719,10 @@ void view_handle_unmap(struct plat_view *view) {
 		struct plat_view *next = view_topmost(server);
 		if (next) {
 			view_focus(next);
+			platinum_shell_focus_changed(server);
+		} else {
+			focus_none(server);
 		}
-		platinum_shell_focus_changed(server);
 	}
 }
 

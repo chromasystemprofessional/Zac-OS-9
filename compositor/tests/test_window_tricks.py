@@ -1,7 +1,9 @@
 """Window tricks from Mac OS 9 (compositor/src/input.c): Option-click on the
 close box closes all of the program's windows, on the collapse box collapses
 only the program's; ⌘-dragging a window behind moves it without bringing it
-forward.
+forward. General Controls' "Show Desktop when in background", off: the
+Sniffer's windows hide while another program is in front, and come back
+when nothing else is left.
 
 usage: test_window_tricks.py ZACOS9-WM IDLE-CLIENT VPTR
 """
@@ -122,6 +124,25 @@ with tempfile.TemporaryDirectory(prefix="zacos9-tricks-") as directory:
             click((CLOSE[0], CLOSE[1] + dy), "option")
             wait_for("Bravo to quit", lambda: b.poll() is not None)
             print("ok: Option-click on the close box closes all of the program's windows")
+
+            # Show Desktop when in background, off (read as it changes). A
+            # stand-in Sniffer window, then another program's over it, moved
+            # down: the Sniffer's isn't there to click.
+            (root / "zacos9").mkdir(exist_ok=True)
+            (root / "zacos9" / "desktop.conf").write_text("[General]\nshow-desktop=false\n")
+            sniffer, sniffer_keys = window("zacos9-finder")
+            alone = green()
+            b, b_keys = window("bravo")
+            vp("home", "move", *map(str, TITLE), "down", "move", "0", "250", "up", "wait", "500")
+            click(TITLE)
+            vp("type", "q")
+            wait_for("Bravo to keep the keyboard", lambda: "key q" in b_keys)
+            assert "key q" not in sniffer_keys, "the Sniffer's window hid behind Bravo"
+            # Bravo quits: nothing else is open, so the Sniffer's comes back.
+            click((CLOSE[0], CLOSE[1] + dy))
+            wait_for("Bravo to quit", lambda: b.poll() is not None)
+            wait_for("the Sniffer's window back", lambda: green() >= alone * 0.95)
+            print("ok: with the desktop hidden in the background, the Sniffer's windows hide too")
         finally:
             for p in reversed(processes):
                 p.terminate()

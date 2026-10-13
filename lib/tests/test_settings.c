@@ -37,6 +37,16 @@ int main(void) {
 	check(pl_setting("alert-sound", v, sizeof(v)) && strcmp(v, "glass") == 0, "alert-sound=glass");
 	check(!pl_setting("missing", v, sizeof(v)), "an unset key reads as unset");
 
+	/* General Controls. */
+	check(pl_menu_blinks() == 1 && pl_caret_blink_ms() == 1066,
+		"menus blink once and the insertion point at medium by default");
+	pl_setting_set("menu-blink", "0");
+	pl_setting_set("caret-blink", "534");
+	check(pl_menu_blinks() == 0 && pl_caret_blink_ms() == 534, "Menu Blinking Off; a fast insertion point");
+	pl_setting_set("menu-blink", "9");
+	pl_setting_set("caret-blink", "5");
+	check(pl_menu_blinks() == 3 && pl_caret_blink_ms() == 1066, "out-of-range values are kept in bounds");
+
 	char wav[1200];
 	snprintf(wav, sizeof(wav), "%s/sounds/platinum.wav", pl_data_dir());
 	check(access(wav, R_OK) == 0, "the default alert sound is found");

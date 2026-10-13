@@ -6,6 +6,7 @@
 #include <functional>
 #include <cstdint>
 
+class QObject;
 class QWidget;
 
 /* Window frame styles zacos9-wm can draw (platinum-shell-v1). */
@@ -25,6 +26,10 @@ void platinumSetStandardSize(QWidget *window, QSize size);
  * `callback`, the button still down, instead of moving the window. Call
  * once the window is shown. */
 void platinumOnTitleMenu(QWidget *window, std::function<void(bool option)> callback);
+/* The process whose window is in front (0: none, the desktop's), and a
+ * callback for when it changes. */
+uint32_t platinumActiveClient();
+void platinumOnActiveClient(QObject *owner, std::function<void()> changed);
 /* Ask for the window to appear at `frameTopLeft` (layout coordinates);
  * call right after show(), before the window first draws. */
 void platinumSetWindowPosition(QWidget *window, QPoint frameTopLeft);
