@@ -167,26 +167,26 @@ Section 3 lists every feature; section 5 is the plan.
 | Feature | Book | Status | Notes |
 |---|---|---|---|
 | Icon, list, button views per window, remembered | p. 17 | ✅ | |
-| **Small-icon view** (names beside icons) | p. 18 | ✗ | View Options. P2 S |
+| **Small-icon view** (names beside icons) | p. 18 | ✅ | View Options ▸ Icon Size; buttons too. |
 | Clean Up; ⌘-drag snaps one icon to the grid | p. 18 | ◐ | Clean Up ✅; ⌘-drag snap missing. P3 S |
 | Arrange by name/date/size/kind/label | p. 19 | ✅ | |
-| **Always snap to grid**, **Keep Arranged** (view options) | p. 18–20 | ✗ | P2 M (with View Options) |
-| Grid spacing Tight / Wide (Preferences) | p. 18 | ✗ | Sniffer Preferences. P3 S |
+| **Always snap to grid**, **Keep Arranged** (view options) | p. 18–20 | ✅ | Windows and the desktop; Arrange changes the order kept. |
+| Grid spacing Tight / Wide (Preferences) | p. 18 | ✅ | Windows, buttons and the desktop. |
 | List view: column headings sort; reverse-sort pyramid | p. 16, 23 | ✅? | Verify the pyramid button. |
-| Columns: Date Modified, Date Created, Size, Kind, Label, Comments, Version — chosen per window | p. 20–22 | ◐ | Check which exist; choosing columns needs View Options. P2 M |
+| Columns: Date Modified, Date Created, Size, Kind, Label, Comments, Version — chosen per window | p. 20–22 | ✅ | Comments are Get Info's (`user.xdg.comment`); Version is an application's package version, "n/a" otherwise. List icons standard, small or tiny (12 px generic shapes). |
 | Drag column headers to reorder; drag dividers to resize; dates/sizes shorten as the column narrows | p. 22 | ✗? | Verify. P2 M |
 | Reset Column Positions | p. 415 | ✗ | P3 S |
-| Use relative dates ("Today", "Yesterday"); Calculate folder sizes | p. 24 | ✗ | P2 S |
+| Use relative dates ("Today", "Yesterday"); Calculate folder sizes | p. 24 | ✅ | Folder sizes are added up on another thread and filled in as they finish. |
 | Disclosure triangles; ⌘-→/⌘-← open/close them | p. 23 | ◐ | Triangles ✅; keys to verify. |
 | Button view; drag a button by its name | p. 23 | ✅ | |
-| **View Options** dialog (per view); Set to Standard Views | p. 24, 415 | ✗ | P1 M |
+| **View Options** dialog (per view); Set to Standard Views | p. 24, 415 | ✅ | New folders inherit their parent window's view, else the standard views. |
 | **Pop-up windows**: as Pop-up Window, tabs along the bottom of the screen, spring open on drag | p. 27 | ✗ | Layer-shell tabs from the Sniffer. Iconic Mac OS 8/9 feature. P2 L |
 | Select by typing, Tab/Shift-Tab alphabetically, arrows, Shift-click, drag-select | p. 33 | ✅? | Verify Tab order. |
 | Rename by clicking the name; Undo while editing | p. 31 | ✅ | |
 | Option-drag copies; ⌘-Option-drag makes an alias | p. 34–37 | ✅ | |
 | Paste a picture over the icon in Get Info for a custom icon | p. 32 | ✗ | Write `metadata::custom-icon` (gio) or a `.directory`. P3 M |
-| Labels: seven, applied from File ▸ Label; names and colours editable in Preferences | p. 40 | ◐ | Applying ✅; editing names/colours needs Preferences. P2 S |
-| Spring-loaded folders; delay slider; Space opens at once | p. 35 | ◐ | Folders ✅; delay setting and Space to verify. P3 S |
+| Labels: seven, applied from File ▸ Label; names and colours editable in Preferences | p. 40 | ✅ | Colours from the 16-colour system palette rather than a full colour picker. |
+| Spring-loaded folders; delay slider; Space opens at once | p. 35 | ◐ | On/off and delay in Preferences ✅; Space-to-open still to do. P3 S |
 | **Toy Box** (buttons in categories, pages; Option-drag between pages) | p. 43 | ✗ | A Sniffer window on `Toy Box Items` in button view gets most of the way. P2 M |
 | Trash: Empty Trash…, warn-before-emptying option (the ellipsis disappears), locked items need Option | p. 46 | ◐ | Empty with warning ✅; option to turn the warning off, locked items to verify. P3 S |
 | Put Away takes items out of the Trash back to where they were | p. 412 | ✅? | Verify for files from the Trash. |
@@ -206,10 +206,10 @@ Section 3 lists every feature; section 5 is the plan.
 | File ▸ **Page Setup…**, **Print Window/Print Desktop…** | ✗ | Render the window with the existing painter to PDF, then print. P3 M |
 | Edit ▸ Undo, Cut, Copy, Paste, Clear, Select All | ◐ | Edit menu sends keys to apps ✅; in the Sniffer: copying icons copies their names (p. 414), to verify. |
 | Edit ▸ **Show Clipboard** | ✗ | A Sniffer window showing the clipboard's text or picture. P2 S |
-| Edit ▸ **Preferences…** (General: Puppy Mode, spring-loaded, grid; Views: standard views; Labels) | ✗ | P1 M |
+| Edit ▸ **Preferences…** (General: Puppy Mode, spring-loaded, grid; Views: standard views; Labels) | ◐ | All but Puppy Mode (Simple Finder), which waits for account kinds (P3). |
 | View ▸ as Icons/Buttons/List, Clean Up, Arrange | ✅ | |
 | View ▸ **as Window / as Pop-up Window** | ✗ | See 3.2. P2 L |
-| View ▸ **Sort List** (in list view), **Reset Column Positions**, **View Options…** | ✗ | P2 |
+| View ▸ **Sort List** (in list view), **Reset Column Positions**, **View Options…** | ◐ | Sort List and View Options… ✅; Reset Column Positions waits for movable columns. |
 | Special ▸ Empty Trash…, Erase Disk…, Sleep, Restart, Shut Down | ✅ | Erase Disk: format choices (Mac OS Extended, DOS/FAT, exFAT) to verify. |
 | Special ▸ **Eject** (⌘E) | ✅ | Every selected disk, local or network; replaces Disconnect Network Drive and Unmount Disk (0.1.54). |
 | Special ▸ **Log Out** (⇧⌘Q) | ✅ | Asks, quits the programs (each may offer to save), then ends the session; a program still open after 30 s cancels it (0.1.54). The menu doesn't show ⇧⌘Q yet (the painter has no ⇧ glyph). |
@@ -221,7 +221,7 @@ Section 3 lists every feature; section 5 is the plan.
 |---|---|---|
 | Control-click (and right-click) on icons, window backgrounds, the desktop, the Trash, disks | ✅ | The Sniffer asks; the menu bar opens it at the pointer (press-drag-release, or click for a sticky menu), as its own menus (0.1.54). ⌘-click opens one too (⌘ reaches apps as Control). |
 | Icon menu: Open, Get Info, Label, Duplicate, Make Alias, Add To Favorites, Move To Trash, Print | ◐ | Open, Move To Trash, Get Info, Label ▸, Duplicate, Make Alias ✅; disks add Eject and Erase Disk…, the Trash Empty Trash…. Add To Favorites and Print wait for those features. |
-| Window/desktop menu: New Folder, View as …, Clean Up, Arrange, Sort List, View Options, Change Desktop Background | ◐ | New Folder, View ▸, Clean Up, Arrange ▸, Get Info, Close Window; the desktop's Change Desktop Background… ✅. Sort List and View Options wait for those features. |
+| Window/desktop menu: New Folder, View as …, Clean Up, Arrange, Sort List, View Options, Change Desktop Background | ◐ | New Folder, View ▸, Clean Up, Arrange ▸, Get Info, Close Window; the desktop's Change Desktop Background… ✅. Sort List (list view) and View Options… ✅ too. |
 | Find Similar Items, Index Selection | ✗ | Need content search (3.13). P3 |
 | Attach a Folder Trick | ✗ | Needs folder tricks (3.12). P3 |
 | Summarize Text to Clipboard | — | Out of scope (or an LLM-free extractive summary later). |
@@ -478,7 +478,7 @@ updates `PROJECT_STATUS.md` and the relevant `docs/` page.
 | 1.7 ✅ | **Recent Applications / Documents / Servers** in the Zac menu, with counts from a new Zac Menu Options panel | menu bar (launch record), `recently-used.xbel`, Neighbourhood, `shell/panels/` | M | Unit: list ordering and limits |
 | 1.8 ✅ | **General Controls** panel: show desktop in background, menu blinking, insertion-point blink rate, Documents folder for Open/Save, Toy Box at startup | `shell/panels/controlpanel.cpp`, menu bar, file-chooser portal, Qt/GTK cursor blink settings | M | Unit per setting; visual check |
 | 1.9 ✅ | **Keyboard layouts** and the keyboard menu (flag/abbreviation at the menu bar's right, ⌘-Space to switch) | Keyboard panel, `compositor/src/prefs.c` (xkb), menu bar | M | Headless: switch layout, typed key changes |
-| 1.10 | **Sniffer Preferences** (General, Views, Labels) and **View Options** (icon size, snap to grid, Keep Arranged, list columns, relative dates, folder sizes, Set to Standard Views) | `shell/finder/` | M | Unit: settings persist per window; screenshots |
+| 1.10 ✅ | **Sniffer Preferences** (General, Views, Labels) and **View Options** (icon size, snap to grid, Keep Arranged, list columns, relative dates, folder sizes, Set to Standard Views) | `shell/finder/` | M | Unit: settings persist per window; screenshots |
 
 ### Milestone 2 — The rest of the classic desktop (P2)
 
