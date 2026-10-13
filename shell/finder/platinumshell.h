@@ -25,5 +25,8 @@ void platinumOnWindowPosition(QWidget *window, std::function<void(QPoint)> callb
 uint32_t platinumBeginLaunch(const QString &appId = {});
 void platinumUpdateLaunch(uint32_t cookie, uint32_t pid);
 void platinumCancelLaunch(uint32_t cookie);
+/* Kill the processes behind an app's windows (the Apple menu's Force
+ * Quit); false if the compositor can't. */
+bool platinumForceQuit(const QString &appId);
 bool platinumStartApplication(const QString &program, const QStringList &args,
 	const QString &directory = {});

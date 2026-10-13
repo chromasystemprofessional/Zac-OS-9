@@ -10,7 +10,7 @@
     when the generic rule (fixed size with a parent window) can't apply.
   </description>
 
-  <interface name="platinum_shell_v1" version="6">
+  <interface name="platinum_shell_v1" version="7">
     <enum name="style">
       <entry name="document" value="0" summary="standard document window"/>
       <entry name="movable_modal" value="1"
@@ -133,6 +133,14 @@
       </description>
       <arg name="callback" type="new_id" interface="wl_callback"/>
       <arg name="always" type="uint" summary="1 to lock even without a password asked"/>
+    </request>
+    <request name="force_quit" since="7">
+      <description summary="end an application that won't quit">
+        For the Apple menu's Force Quit, once the user has confirmed it: every
+        process owning a window with this app id is killed (SIGKILL), as
+        Mac OS's Force Quit did. Unsaved work in it is lost.
+      </description>
+      <arg name="app_id" type="string"/>
     </request>
   </interface>
 

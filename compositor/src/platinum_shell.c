@@ -2,8 +2,12 @@
  * platinum-shell-v1: window hints from Platinum's own programs (frame
  * style, remembered position) and window-position reports back to them.
  */
+#include <signal.h>
 #include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 #include <wlr/types/wlr_compositor.h>
+#include <wlr/util/log.h>
 #include <wlr/xwayland.h>
 
 #include "platinum-shell-v1-protocol.h"
@@ -224,6 +228,32 @@ static void handle_lock(struct wl_client *client, struct wl_resource *resource, 
 	lock_request(the_server, client, callback, always != 0);
 }
 
+static void handle_force_quit(struct wl_client *client, struct wl_resource *resource,
+		const char *app_id) {
+	if (!app_id || !*app_id) {
+		return;
+	}
+	/* Each process once, however many windows it has; never ourselves. */
+	uint32_t killed[64];
+	size_t n = 0;
+	struct plat_view *view;
+	wl_list_for_each(view, &the_server->views, link) {
+		if (!view->app_id || strcmp(view->app_id, app_id) != 0) {
+			continue;
+		}
+		const uint32_t pid = view_pid(view);
+		bool seen = pid <= 1 || pid == (uint32_t)getpid();
+		for (size_t i = 0; i < n && !seen; i++) {
+			seen = killed[i] == pid;
+		}
+		if (!seen && n < sizeof(killed) / sizeof(killed[0])) {
+			wlr_log(WLR_INFO, "force quit: %s (process %u)", app_id, pid);
+			kill((pid_t)pid, SIGKILL);
+			killed[n++] = pid;
+		}
+	}
+}
+
 static const struct platinum_shell_v1_interface shell_impl = {
 	.set_window_style = handle_set_window_style,
 	.set_window_position = handle_set_window_position,
@@ -234,6 +264,7 @@ static const struct platinum_shell_v1_interface shell_impl = {
 	.keep_awake = handle_keep_awake,
 	.user_activity = handle_user_activity,
 	.lock = handle_lock,
+	.force_quit = handle_force_quit,
 };
 
 static void resource_destroy(struct wl_resource *resource) {
@@ -257,5 +288,5 @@ void platinum_shell_init(struct plat_server *server) {
 	the_server = server;
 	wl_list_init(&hints);
 	wl_list_init(&resources);
-	wl_global_create(server->display, &platinum_shell_v1_interface, 6, NULL, bind_shell);
+	wl_global_create(server->display, &platinum_shell_v1_interface, 7, NULL, bind_shell);
 }

@@ -139,7 +139,8 @@ void launch_feedback_update(uint32_t cookie, uint32_t pid);
 void launch_feedback_cancel(uint32_t cookie);
 /* Fills the logo menu with "About", a separator and the launchable items
  * from ~/.config/zacos9/ZacOS 9 Menu Items (or built-in defaults). */
-void launch_fill_logo_menu(struct mb_menu *menu);
+/* `apps` (front-most first) fill its Force Quit submenu. */
+void launch_fill_logo_menu(struct mb_menu *menu, const struct app *apps, int n_apps);
 
 /* ---- the Finder (finderlink.c) ------------------------------------------ */
 

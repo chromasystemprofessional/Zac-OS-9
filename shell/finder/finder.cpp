@@ -202,7 +202,19 @@ void Finder::notifyState() {
 }
 
 void Finder::command(const QString &name) {
-	if (name == "new-folder") {
+	if (name.startsWith("force-quit ")) {
+		/* "force-quit APP-ID NAME", from the Apple menu: Mac OS's own
+		 * question first, as the menu bar can't ask it. */
+		const QString rest = name.mid(11);
+		const QString appId = rest.section(' ', 0, 0);
+		const QString app = rest.section(' ', 1).trimmed();
+		if (!appId.isEmpty() && Alert::ask("Force “" + (app.isEmpty() ? appId : app) +
+				"” to quit? Any unsaved changes in it will be lost.", "Force Quit")) {
+			if (!platinumForceQuit(appId)) {
+				Alert::ask("“" + app + "” couldn't be forced to quit.", "OK", QString());
+			}
+		}
+	} else if (name == "new-folder") {
 		newFolder();
 	} else if (name == "open") {
 		openSelection();

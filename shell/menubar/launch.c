@@ -175,7 +175,7 @@ static void add_item(struct mb_menu *menu, const char *label, bool enabled,
 	};
 }
 
-void launch_fill_logo_menu(struct mb_menu *menu) {
+void launch_fill_logo_menu(struct mb_menu *menu, const struct app *apps, int n_apps) {
 	/* About and software tools are the top group in the Apple menu. */
 	add_item(menu, "About This Computer…", true, ACT_ABOUT, NULL);
 	/* The app catalog over apt. */
@@ -189,6 +189,21 @@ void launch_fill_logo_menu(struct mb_menu *menu) {
 		char command[PATH_MAX + 64];
 		sibling_program("zacos9-update", command, sizeof(command));
 		add_item(menu, "Fetch Updates", true, ACT_LAUNCH, command);
+	}
+	/* Force Quit: the open applications, front-most first; the Finder
+	 * asks first, then has zacos9-wm end the one chosen. */
+	{
+		struct mb_menu *quit = calloc(1, sizeof(*quit));
+		for (int i = 0; i < n_apps; i++) {
+			if (!*apps[i].app_id || strcmp(apps[i].app_id, FINDER_APP_ID) == 0) {
+				continue;
+			}
+			char arg[512];
+			snprintf(arg, sizeof(arg), "force-quit %s %s", apps[i].app_id, apps[i].name);
+			add_item(quit, apps[i].name, true, ACT_FINDER, arg);
+		}
+		add_item(menu, "Force Quit", quit->n > 0, ACT_NONE, NULL);
+		menu->items[menu->n - 1].submenu = quit;
 	}
 	add_item(menu, NULL, false, ACT_NONE, NULL);
 	/* Classic Mac OS in an emulator; the Finder explains what's missing. */

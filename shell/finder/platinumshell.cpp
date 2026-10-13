@@ -38,15 +38,18 @@ static void handle_window_position(void *, platinum_shell_v1 *, wl_surface *surf
 
 static void handle_active_client(void *, platinum_shell_v1 *, uint32_t) {
 }
+static void handle_active_gtk_menu(void *, platinum_shell_v1 *, const char *, const char *,
+		const char *, const char *, const char *) {
+}
 static const platinum_shell_v1_listener shell_listener = {
-	handle_window_position, handle_active_client, nullptr
+	handle_window_position, handle_active_client, handle_active_gtk_menu
 };
 
 static void global(void *, wl_registry *reg, uint32_t name, const char *iface, uint32_t version) {
 	if (std::strcmp(iface, platinum_shell_v1_interface.name) == 0) {
 		shell = static_cast<platinum_shell_v1 *>(
 			wl_registry_bind(reg, name, &platinum_shell_v1_interface,
-				std::min(version, 3u)));
+				std::min(version, 7u)));
 		platinum_shell_v1_add_listener(shell, &shell_listener, nullptr);
 	}
 }
@@ -162,4 +165,13 @@ void platinumOnWindowPosition(QWidget *window, std::function<void(QPoint)> callb
 		/* Surfaces are reused after a window goes; forget it then. */
 		QObject::connect(window, &QObject::destroyed, [surface] { watches().remove(surface); });
 	}
+}
+
+bool platinumForceQuit(const QString &appId) {
+	if (!shell || wl_proxy_get_version(reinterpret_cast<wl_proxy *>(shell)) < 7) {
+		return false;
+	}
+	platinum_shell_v1_force_quit(shell, appId.toUtf8().constData());
+	wl_display_flush(display);
+	return true;
 }
