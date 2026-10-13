@@ -104,6 +104,14 @@ static bool handle_keybinding(struct plat_server *server, uint32_t mods,
 	if (handle_vt_switch(server, sym)) {
 		return true;
 	}
+	/* ⌘-Tab and ⇧⌘-Tab switch programs (Mac OS 9: alphabetically). */
+	if (sym == XKB_KEY_Tab || sym == XKB_KEY_ISO_Left_Tab) {
+		const uint32_t others = WLR_MODIFIER_CTRL | WLR_MODIFIER_ALT;
+		if ((mods & WLR_MODIFIER_LOGO) && !(mods & others)) {
+			platinum_shell_switch_app(server, (mods & WLR_MODIFIER_SHIFT) ? -1 : 1);
+			return true;
+		}
+	}
 	/* The Collar panel's hot key shows or hides the Collar (if one runs:
 	 * --toggle just asks it over D-Bus). */
 	if (prefs_collar_hotkey(mods, sym)) {
@@ -596,6 +604,13 @@ static void cursor_button(struct wl_listener *listener, void *data) {
 			 * Finder in front, its menus in the menu bar. */
 			if (layer->namespace && (strcmp(layer->namespace, "zacos9-desktop") == 0 ||
 					strcmp(layer->namespace, "desktop-extra") == 0)) {
+				/* Option-click: the program you leave hides, too. */
+				struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(server->seat);
+				struct plat_view *left = server->focused_view;
+				if (keyboard && (wlr_keyboard_get_modifiers(keyboard) & WLR_MODIFIER_ALT) &&
+						left && left->app_id && strcmp(left->app_id, "zacos9-finder") != 0) {
+					view_hide_app(server, left->app_id);
+				}
 				view_clear_focus(server);
 			}
 			if (layer->current.keyboard_interactive !=

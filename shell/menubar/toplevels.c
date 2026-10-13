@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 
 #include "menubar.h"
 #include "wlr-foreign-toplevel-management-unstable-v1-client-protocol.h"
@@ -297,4 +298,39 @@ void app_quit(const char *app_id) {
 			zwlr_foreign_toplevel_handle_v1_close(t->handle);
 		}
 	}
+}
+
+static int by_app_name(const void *a, const void *b) {
+	const struct app *x = a, *y = b;
+	const int c = strcasecmp(x->name, y->name);
+	return c ? c : strcmp(x->app_id, y->app_id);
+}
+
+const char *app_switch_pick(struct app *apps, int n, int step) {
+	const char *front = FINDER_APP_ID;
+	bool have_finder = false;
+	for (int i = 0; i < n; i++) {
+		if (apps[i].active) {
+			front = apps[i].app_id;
+		}
+		have_finder |= strcmp(apps[i].app_id, FINDER_APP_ID) == 0;
+	}
+	if (!have_finder) {
+		/* The Sniffer runs even with no windows: the desktop is its. */
+		apps[n++] = (struct app){ .app_id = FINDER_APP_ID, .name = "Sniffer" };
+	}
+	qsort(apps, n, sizeof(apps[0]), by_app_name);
+	int at = 0;
+	for (int i = 0; i < n; i++) {
+		if (strcmp(apps[i].app_id, front) == 0) {
+			at = i;
+		}
+	}
+	return apps[((at + step) % n + n) % n].app_id;
+}
+
+const char *app_switch_target(int step) {
+	static struct app apps[MAX_ITEMS];
+	const int n = apps_collect(apps, MAX_ITEMS - 1);
+	return app_switch_pick(apps, n, step);
 }

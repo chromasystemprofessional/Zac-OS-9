@@ -384,6 +384,9 @@ bool view_default_frame(struct plat_view *view, const char *app_id,
 void view_set_title(struct plat_view *view, const char *title);
 void view_set_app_id(struct plat_view *view, const char *app_id);
 void view_set_hidden(struct plat_view *view, bool hidden);
+/* Every window of `app_id` forward (front one active), or hidden. */
+void view_activate_app(struct plat_server *server, const char *app_id);
+void view_hide_app(struct plat_server *server, const char *app_id);
 /* Frontmost visible window, or NULL. */
 struct plat_view *view_topmost(struct plat_server *server);
 
@@ -420,6 +423,8 @@ bool platinum_shell_position_for(struct wlr_surface *surface, int *x, int *y);
 void platinum_shell_report_position(struct plat_view *view);
 /* The front window changed: tell the menu bar whose it is. */
 void platinum_shell_focus_changed(struct plat_server *server);
+/* ⌘-Tab (1) or ⇧⌘-Tab (-1): ask the menu bar to switch programs. */
+void platinum_shell_switch_app(struct plat_server *server, int step);
 void platinum_shell_launch_ready(struct plat_view *view);
 /* The process behind a window (X11: its _NET_WM_PID), or 0. */
 uint32_t view_pid(struct plat_view *view);

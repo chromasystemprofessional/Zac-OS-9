@@ -84,7 +84,7 @@ foreach kind : [['client-header', '@BASENAME@-client-protocol.h'], ['private-cod
   )
 endforeach
 
-executable('zacos9-menubar',
+menubar_exe = executable('zacos9-menubar',
   'menubar/main.c',
   'menubar/menus.c',
   'menubar/toplevels.c',
@@ -96,6 +96,15 @@ executable('zacos9-menubar',
   finder_protocol,
   dependencies: [platinum_dep, wayland_client, wayland_cursor, xkbcommon_client, gio],
   install: true,
+)
+
+# ⌘-Tab's choice of program (menubar/toplevels.c).
+test('menu-app-switch',
+  executable('test-app-switch',
+    'menubar/test_app_switch.c', 'menubar/toplevels.c', client_protocol_src,
+    dependencies: [platinum_dep, wayland_client],
+  ),
+  timeout: 10,
 )
 
 # The lock screen (docs/energy-saver.md): ext-session-lock-v1, PAM.
@@ -289,7 +298,7 @@ test('custom-pattern-catalog',
   timeout: 30,
 )
 
-executable('zacos9-finder',
+finder_exe = executable('zacos9-finder',
   'finder/main.cpp',
   'finder/alert.cpp',
   'finder/platinumshell.cpp',
@@ -908,6 +917,12 @@ test('idle-sleep', find_program('python3'),
 test('idle-lock', find_program('dbus-run-session'),
   args: ['--', find_program('python3').full_path(), files('../compositor/tests/test_lock.py'),
     compositor_exe, idle_client, test_lock_exe, inhibit_exe, vptr_exe],
+  timeout: 90,
+)
+# ⌘-Tab and Option-click on the desktop, with the real menu bar and Sniffer.
+test('app-switch', find_program('dbus-run-session'),
+  args: ['--', find_program('python3').full_path(), files('../compositor/tests/test_app_switch.py'),
+    compositor_exe, menubar_exe, finder_exe, idle_client, vptr_exe],
   timeout: 90,
 )
 test('idle-inhibit', find_program('dbus-run-session'),

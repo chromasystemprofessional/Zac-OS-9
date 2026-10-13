@@ -275,6 +275,53 @@ void view_set_hidden(struct plat_view *view, bool hidden) {
 	}
 }
 
+void view_activate_app(struct plat_server *server, const char *app_id) {
+	/* server->views is front first: raising from the back forward keeps
+	 * the app's own order, and its front window ends up active. */
+	struct plat_view *mine[64];
+	int n = 0;
+	struct plat_view *view;
+	wl_list_for_each(view, &server->views, link) {
+		if (n < (int)(sizeof(mine) / sizeof(mine[0])) && view->mapped &&
+				view->app_id && strcmp(view->app_id, app_id) == 0) {
+			mine[n++] = view;
+		}
+	}
+	if (n == 0) {
+		if (strcmp(app_id, "zacos9-finder") == 0) {
+			/* As a click on the desktop: its keys go to the desktop. */
+			view_clear_focus(server);
+			struct plat_layer_surface *ls, *desktop = NULL;
+			wl_list_for_each(ls, &server->layer_surfaces, link) {
+				const char *ns = ls->layer_surface->namespace;
+				if (!desktop && ls->mapped && ns && strcmp(ns, "zacos9-desktop") == 0 &&
+						ls->layer_surface->current.keyboard_interactive !=
+						ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_NONE) {
+					desktop = ls;
+				}
+			}
+			if (desktop) {
+				layers_focus(desktop);
+			} else if (!server->focused_layer) {
+				wlr_seat_keyboard_clear_focus(server->seat);
+			}
+		}
+		return;
+	}
+	for (int i = n - 1; i >= 0; i--) {
+		view_focus(mine[i]);
+	}
+}
+
+void view_hide_app(struct plat_server *server, const char *app_id) {
+	struct plat_view *view, *tmp;
+	wl_list_for_each_safe(view, tmp, &server->views, link) {
+		if (view->mapped && view->app_id && strcmp(view->app_id, app_id) == 0) {
+			view_set_hidden(view, true);
+		}
+	}
+}
+
 void view_focus(struct plat_view *view) {
 	if (!view) {
 		return;

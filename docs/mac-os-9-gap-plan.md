@@ -253,8 +253,8 @@ Section 3 lists every feature; section 5 is the plan.
 |---|---|---|
 | Application menu at the right: lists apps, Hide, Hide Others, Show All, current app's name | ✅ | |
 | Ribbed handle to show/hide the app name in the menu bar | ✗ | P3 S |
-| **⌘-Tab / ⇧⌘-Tab** cycles programs | ✗ | **P1 S.** Compositor hotkey; cycles app ids alphabetically, as Mac OS 9 did. |
-| **Option-click the desktop / Option-choose an app** hides the one you leave | ✗ | P2 S |
+| **⌘-Tab / ⇧⌘-Tab** cycles programs | ✅ | By name, the Sniffer among them; hidden programs come back (0.1.54). |
+| **Option-click the desktop / Option-choose an app** hides the one you leave | ◐ | Desktop ✅ (0.1.54); Option-choosing from the Application menu still to do. P3 S |
 | **Pack palette** (tear off the Application menu; vertical/horizontal, small/large icons, names on/off; drop documents on tiles to open them) | ✗ | P2 M. A layer-shell palette from the menu bar. |
 | **F-keys launch** programs/documents/folders (Keyboard panel ▸ Function Keys); pressing again brings it forward | ✗ | P2 M |
 | ⌘-period cancels a launch | — | |
@@ -469,7 +469,7 @@ updates `PROJECT_STATUS.md` and the relevant `docs/` page.
 
 | # | Work package | Components | Effort | Tests |
 |---|---|---|---|---|
-| 1.1 | **⌘-Tab / ⇧⌘-Tab** app cycling, and Option-click desktop or Option-choose an app to hide the one you leave | `compositor/src/hotkey.c`, `shell/menubar/toplevels.c` | S | Headless: three clients, ⌘-Tab order and focus; hidden state after Option-switch |
+| 1.1 ✅ | **⌘-Tab / ⇧⌘-Tab** app cycling, and Option-click desktop or Option-choose an app to hide the one you leave | `compositor/src/hotkey.c`, `shell/menubar/toplevels.c` | S | Headless: three clients, ⌘-Tab order and focus; hidden state after Option-switch |
 | 1.2 | **Sniffer contextual menus** for icons, window backgrounds, the desktop, the Trash and disks; Control-click and right-click | `shell/finder/` (popup surface), `lib/menudraw` | M | Headless screenshot of each menu; each command reaches `Finder::command` |
 | 1.3 | **Special ▸ Eject (⌘E)** and **Log Out (⇧⌘Q)**, with "quit your programs first" | `shell/menubar/menus.c`, `session/` | S | VM: Log Out returns to the login window |
 | 1.4 | **Window tricks**: Option-click close/collapse for all of an app's windows, ⌘-drag a background window, Option-zoom fills the screen | `compositor/src/input.c`, `view.c`, `frame.c` | S | Headless compositor tests (`compositor/tests/`) |

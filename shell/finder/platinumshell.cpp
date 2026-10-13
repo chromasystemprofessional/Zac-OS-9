@@ -41,8 +41,10 @@ static void handle_active_client(void *, platinum_shell_v1 *, uint32_t) {
 static void handle_active_gtk_menu(void *, platinum_shell_v1 *, const char *, const char *,
 		const char *, const char *, const char *) {
 }
+static void handle_switch_app(void *, platinum_shell_v1 *, int32_t) {
+}
 static const platinum_shell_v1_listener shell_listener = {
-	handle_window_position, handle_active_client, handle_active_gtk_menu
+	handle_window_position, handle_active_client, handle_active_gtk_menu, handle_switch_app
 };
 
 static void global(void *, wl_registry *reg, uint32_t name, const char *iface, uint32_t version) {

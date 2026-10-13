@@ -6,7 +6,8 @@
  *                           browser playing video does; prints "inhibited
  *                           COOKIE" once the window shows
  *   idle_client --keys      an ordinary window that prints "shown", then
- *                           "key TEXT" for every key it gets */
+ *                           "key TEXT" for every key it gets
+ *   ... --app-id ID         with that Wayland app id (test_app_switch.py) */
 #include <QApplication>
 #include <QKeyEvent>
 #include <QDBusInterface>
@@ -29,6 +30,11 @@ protected:
 
 int main(int argc, char **argv) {
 	QApplication app(argc, argv);
+	for (int i = 1; i + 1 < argc; i++) {
+		if (std::strcmp(argv[i], "--app-id") == 0) {
+			QGuiApplication::setDesktopFileName(argv[i + 1]);
+		}
+	}
 	const bool dbus = argc > 1 && std::strcmp(argv[1], "--dbus") == 0;
 	const bool keys = argc > 1 && std::strcmp(argv[1], "--keys") == 0;
 	KeyWindow window;

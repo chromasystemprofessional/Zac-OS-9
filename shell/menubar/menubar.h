@@ -45,6 +45,11 @@ void app_activate(const char *app_id, struct wl_seat *seat);
 void app_set_hidden(const char *app_id, bool hidden);
 void app_close_front_window(const char *app_id);
 void app_quit(const char *app_id);
+/* ⌘-Tab: the program `step` (1 or -1) after the front one, alphabetically
+ * by name, the Sniffer always among them. Valid until the next call. */
+const char *app_switch_target(int step);
+/* The same choice on a given list (front first, as apps_collect gives). */
+const char *app_switch_pick(struct app *apps, int n, int step);
 
 /* ---- menus (menus.c) ----------------------------------------------------- */
 

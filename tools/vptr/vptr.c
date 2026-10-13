@@ -11,6 +11,7 @@
  *   vptr key NAME             Return, BackSpace, Tab, Escape, Delete,
  *                             Up, Down, Left, Right, F1..F12, or one character
  *   vptr cmd C                ⌘C (the Super key, as zacos9-wm maps it)
+ *   vptr hold MOD | release MOD   keep option, shift, control or command down
  *   vptr wait MS              pause
  * Commands chain: vptr home move 100 50 down move 40 0 up
  */
@@ -250,6 +251,18 @@ int main(int argc, char *argv[]) {
 			if (cmd[0] == 'c') {
 				key_event(KEY_LEFTMETA, false);
 			}
+		} else if ((strcmp(cmd, "hold") == 0 || strcmp(cmd, "release") == 0) && i + 1 < argc &&
+				keyboard()) {
+			const char *mod = argv[++i];
+			const uint32_t code = strcmp(mod, "option") == 0 ? KEY_LEFTALT
+				: strcmp(mod, "shift") == 0 ? KEY_LEFTSHIFT
+				: strcmp(mod, "control") == 0 ? KEY_LEFTCTRL
+				: strcmp(mod, "command") == 0 ? KEY_LEFTMETA : 0;
+			if (!code) {
+				fprintf(stderr, "vptr: unknown modifier '%s'\n", mod);
+				return 2;
+			}
+			key_event(code, cmd[0] == 'h');
 		} else if (strcmp(cmd, "wait") == 0 && i + 1 < argc) {
 			wl_display_flush(display);
 			sleep_ms(atoi(argv[++i]));

@@ -10,7 +10,7 @@
     when the generic rule (fixed size with a parent window) can't apply.
   </description>
 
-  <interface name="platinum_shell_v1" version="7">
+  <interface name="platinum_shell_v1" version="8">
     <enum name="style">
       <entry name="document" value="0" summary="standard document window"/>
       <entry name="movable_modal" value="1"
@@ -139,6 +139,23 @@
         For the Apple menu's Force Quit, once the user has confirmed it: every
         process owning a window with this app id is killed (SIGKILL), as
         Mac OS's Force Quit did. Unsaved work in it is lost.
+      </description>
+      <arg name="app_id" type="string"/>
+    </request>
+    <event name="switch_app" since="8">
+      <description summary="⌘-Tab: switch programs">
+        Sent to the menu bar when ⌘-Tab (step 1) or ⇧⌘-Tab (step -1) is
+        pressed. The menu bar knows the programs' names, so it picks the
+        next one, alphabetically as Mac OS 9 did, and answers with
+        activate_app.
+      </description>
+      <arg name="step" type="int"/>
+    </event>
+    <request name="activate_app" since="8">
+      <description summary="bring a program to the front">
+        Every window of this app id comes forward, in its own order, and
+        out of hiding; its front window becomes active. For the Finder with
+        no windows, as a click on the desktop does: no window is active.
       </description>
       <arg name="app_id" type="string"/>
     </request>

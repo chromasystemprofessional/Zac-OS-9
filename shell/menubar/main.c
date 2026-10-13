@@ -814,10 +814,16 @@ static void shell_active_gtk_menu(void *data, struct platinum_shell_v1 *shell,
 	appmenu_set_active_gtk(bus_name, app_menu_path, menubar_path, window_path, application_path);
 }
 
+/* ⌘-Tab, caught by zacos9-wm: we know the names, so we choose. */
+static void shell_switch_app(void *data, struct platinum_shell_v1 *shell, int32_t step) {
+	platinum_shell_v1_activate_app(shell, app_switch_target(step < 0 ? -1 : 1));
+}
+
 static const struct platinum_shell_v1_listener shell_listener = {
 	.window_position = shell_window_position,
 	.active_client = shell_active_client,
 	.active_gtk_menu = shell_active_gtk_menu,
+	.switch_app = shell_switch_app,
 };
 
 static void flush_launch_feedback(void) {
@@ -882,7 +888,7 @@ static void registry_global(void *data, struct wl_registry *reg, uint32_t name,
 			&zwp_virtual_keyboard_manager_v1_interface, 1);
 	} else if (strcmp(iface, platinum_shell_v1_interface.name) == 0 && version >= 2) {
 		g.platinum_shell = wl_registry_bind(reg, name, &platinum_shell_v1_interface,
-			version < 4 ? version : 4);
+			version < 8 ? version : 8);
 		platinum_shell_v1_add_listener(g.platinum_shell, &shell_listener, NULL);
 	}
 }
