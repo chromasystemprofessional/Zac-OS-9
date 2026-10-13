@@ -53,7 +53,9 @@ fi
 
 # ---- the system: the ISO build's, with this tree on top ----
 r=$dev/root
-sudo_ mkdir -p "$dev/upper" "$dev/work" "$r" "$dev/medium/live" "$vm"
+sudo_ mkdir -p "$dev/upper" "$dev/work" "$r" "$dev/medium/live"
+# Ours, not root's: QEMU makes its monitor and serial sockets in it, as us.
+mkdir -p "$vm"
 mounted=""
 cleanup() {
 	for m in $mounted; do
@@ -140,7 +142,9 @@ qemu=$!
 trap 'kill $qemu 2>/dev/null || true' EXIT
 while [ ! -S "$vm/monitor.sock" ]; do sleep 0.1; done
 python3 "$root/tests/vm/record.py" "$vm/monitor.sock" /tmp/devboot 90 0.2
-python3 "$root/tests/vm/boot-frames.py" /tmp/devboot
+# A timeline that can't be read is no reason to stop the VM.
+python3 "$root/tests/vm/boot-frames.py" /tmp/devboot ||
+	echo "dev-boot.sh: couldn't sum up the recording in /tmp/devboot." >&2
 if $keep; then
 	echo "The VM keeps running (serial: $vm/serial.sock)."
 	wait $qemu

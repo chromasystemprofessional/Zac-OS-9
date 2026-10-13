@@ -14,7 +14,9 @@ import sys
 from PIL import Image
 
 d = sys.argv[1]
-times = dict(line.split() for line in open(os.path.join(d, "times.txt")))
+# Whole "N SECONDS" lines only: a recording cut short ends mid-line.
+times = dict(f for f in (line.split() for line in open(os.path.join(d, "times.txt")))
+             if len(f) == 2)
 frames = sorted(f for f in os.listdir(d) if f.startswith("frame-"))
 here = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, here)
