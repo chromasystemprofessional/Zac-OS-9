@@ -197,7 +197,8 @@ struct TransferTask {
 	quint64 units = 0;
 };
 
-QString createAlias(const QString &target, const QString &destDir, const QString &name) {
+QString createAlias(const QString &target, const QString &destDir, const QString &name,
+		const QString &suffix) {
 	const QFileInfo original(target);
 	if (!original.exists() || name.isEmpty() || name.contains('/') || name == "." || name == ".." ||
 			!QFileInfo(destDir).isDir()) {
@@ -206,10 +207,10 @@ QString createAlias(const QString &target, const QString &destDir, const QString
 		return {};
 	}
 	QDir destination(destDir);
-	QString candidate = name + " alias";
+	QString candidate = name + suffix;
 	for (int i = 2; QFileInfo(destination.filePath(candidate)).exists() ||
 			QFileInfo(destination.filePath(candidate)).isSymLink(); i++) {
-		candidate = name + " alias " + QString::number(i);
+		candidate = name + suffix + " " + QString::number(i);
 	}
 	if (!QFile::link(original.absoluteFilePath(), destination.filePath(candidate))) {
 		Alert::ask("The alias could not be created in " + destDir + ". Check folder permissions.",

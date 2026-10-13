@@ -116,9 +116,12 @@ void finder_send(const char *command) {
 	if (!finder_connect()) {
 		return;
 	}
-	char line[128];
-	int n = snprintf(line, sizeof(line), "cmd %s\n", command);
+	/* Paths (open-path) can be long: the line is as long as it needs. */
+	const size_t size = strlen(command) + 6;
+	char *line = malloc(size);
+	const int n = snprintf(line, size, "cmd %s\n", command);
 	if (write(fd, line, (size_t)n) < 0) {
 		disconnect();
 	}
+	free(line);
 }

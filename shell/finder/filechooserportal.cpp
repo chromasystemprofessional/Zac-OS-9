@@ -1,6 +1,7 @@
 #include <gio/gio.h>
 
 #include "filechooserportal.h"
+#include "items.h"
 #include "alias.h"
 #include "localvolumes.h"
 #include "netvolumes.h"
@@ -895,29 +896,42 @@ QList<FileChooserLocation> fileChooserLocations() {
 	for (int i = 1; i < locations.size(); i++) {
 		locations[i].usb = !localVolumeUsbDevice(locations[i].path).isEmpty();
 	}
-	const QDir desktop(QStandardPaths::writableLocation(QStandardPaths::DesktopLocation));
-	for (const QFileInfo &entry : desktop.entryInfoList(
-			QDir::AllEntries | QDir::System | QDir::NoDotAndDotDot, QDir::Name | QDir::IgnoreCase)) {
-		if (!entry.isSymLink()) {
-			continue;
+	/* Folder aliases on the desktop, then in Favorites (File > Add To
+	 * Favorites: Mac OS 9's Open and Save dialogs listed them too). */
+	QSet<QString> aliasTargets;
+	const QString favorites = favoritesPath();
+	for (const QString &aliasFolder : { QStandardPaths::writableLocation(QStandardPaths::DesktopLocation),
+			favorites }) {
+		for (const QFileInfo &entry : QDir(aliasFolder).entryInfoList(
+				QDir::AllEntries | QDir::System | QDir::NoDotAndDotDot, QDir::Name | QDir::IgnoreCase)) {
+			if (!entry.isSymLink()) {
+				continue;
+			}
+			const AliasResolution resolved = aliasResolve(entry.absoluteFilePath());
+			if (!resolved.target.isEmpty() && !QFileInfo(resolved.target).isDir()) {
+				continue;
+			}
+			if (aliasFolder == favorites) {
+				if (!resolved.target.isEmpty() && aliasTargets.contains(resolved.target)) {
+					continue; /* a Favorite already listed from the desktop */
+				}
+			} else {
+				aliasTargets.insert(resolved.target);
+			}
+			FileChooserLocation alias;
+			alias.name = entry.fileName();
+			alias.path = entry.absoluteFilePath();
+			alias.folderAlias = true;
+			alias.error = resolved.error;
+			if (alias.error.isEmpty() && resolved.state != AliasState::Ok &&
+					resolved.state != AliasState::Reconnected) {
+				alias.error = aliasProblemText(resolved.state);
+			}
+			if (alias.error.isEmpty()) {
+				locations[0].realRoots << QFileInfo(resolved.target).canonicalFilePath();
+			}
+			locations << alias;
 		}
-		const AliasResolution resolved = aliasResolve(entry.absoluteFilePath());
-		if (!resolved.target.isEmpty() && !QFileInfo(resolved.target).isDir()) {
-			continue;
-		}
-		FileChooserLocation alias;
-		alias.name = entry.fileName();
-		alias.path = entry.absoluteFilePath();
-		alias.folderAlias = true;
-		alias.error = resolved.error;
-		if (alias.error.isEmpty() && resolved.state != AliasState::Ok &&
-				resolved.state != AliasState::Reconnected) {
-			alias.error = aliasProblemText(resolved.state);
-		}
-		if (alias.error.isEmpty()) {
-			locations[0].realRoots << QFileInfo(resolved.target).canonicalFilePath();
-		}
-		locations << alias;
 	}
 	locations[0].realRoots.removeDuplicates();
 	return locations;

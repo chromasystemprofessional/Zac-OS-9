@@ -89,6 +89,11 @@ QString trashFilesPath() {
 		"/Trash/files";
 }
 
+QString favoritesPath() {
+	return QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) +
+		"/zacos9/Favorites";
+}
+
 QString displayName(const QString &path) {
 	if (vfsIsVirtual(path)) {
 		return vfsName(path);

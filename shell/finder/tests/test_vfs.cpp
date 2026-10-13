@@ -235,7 +235,7 @@ int main(int argc, char **argv) {
 	const QStringList systemNames = namesIn(systemFolder);
 	for (const QString name : { "Sounds", "Startup Items", "Application Support",
 			"Device Drivers", "Network", "System Logs", "Software Components",
-			"Extensions", "System Information", "Tricks Manager" }) {
+			"Extensions", "System Information", "Tricks Manager", "Favorites" }) {
 		check(systemNames.contains(name), "System Folder contains " + name);
 	}
 	check(pathNamed(vfsPathFor("system-folder/utilities"), "System Information") != QString() &&

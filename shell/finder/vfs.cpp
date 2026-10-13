@@ -33,7 +33,7 @@
  * doesn't have take their default, and nodes it doesn't know about are
  * added, while the user's own nodes and overrides are kept.
  */
-static constexpr int REGISTRY_VERSION = 10;
+static constexpr int REGISTRY_VERSION = 11;
 
 static const char *DEFAULT_REGISTRY = R"JSON({
   "version": 10,
@@ -76,6 +76,8 @@ static const char *DEFAULT_REGISTRY = R"JSON({
       "kind": "launcher", "action": "extensions-manager" },
     { "id": "system-folder/fonts", "name": "Fonts", "kind": "backed",
       "backing": "$XDG_DATA_HOME/fonts" },
+    { "id": "system-folder/favorites", "name": "Favorites", "kind": "backed",
+      "backing": "$XDG_CONFIG_HOME/zacos9/Favorites" },
     { "id": "system-folder/preferences", "name": "Preferences", "kind": "backed",
       "backing": "$XDG_CONFIG_HOME" },
     { "id": "system-folder/utilities", "name": "Utilities", "kind": "apps" },

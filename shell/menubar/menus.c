@@ -108,6 +108,7 @@ static void add_finder_menus(struct mb_menu *menus, int *n) {
 	add_label_submenu(m, sel, fs->label);
 	add(m, "Duplicate", 'D', sel, ACT_FINDER, "duplicate");
 	add(m, "Make Alias", 'M', sel, ACT_FINDER, "make-alias");
+	add(m, "Add To Favorites", 0, sel, ACT_FINDER, "add-to-favorites");
 	add(m, "Put Away", 'Y', sel, ACT_FINDER, "put-away");
 	sep(m);
 	add(m, "Find…", 'F', up, ACT_FINDER, "find");
@@ -382,10 +383,15 @@ void menus_context(struct mb_menu *m, const char *kind) {
 		add_label_submenu(m, true, fs->label);
 		add(m, "Duplicate", 0, true, ACT_FINDER, "duplicate");
 		add(m, "Make Alias", 0, true, ACT_FINDER, "make-alias");
+		add(m, "Add To Favorites", 0, true, ACT_FINDER, "add-to-favorites");
 	} else if (strcmp(kind, "disk") == 0 && sel) {
 		add(m, "Open", 0, true, ACT_FINDER, "open");
 		add(m, "Get Info", 0, true, ACT_FINDER, "get-info");
 		add_label_submenu(m, true, fs->label);
+		if (fs->network || fs->unmount) {
+			/* A real disk; the startup disk is the Macintosh view. */
+			add(m, "Add To Favorites", 0, true, ACT_FINDER, "add-to-favorites");
+		}
 		if (fs->network || fs->unmount || (fs->erase && fs->selection == 1)) {
 			sep(m);
 		}

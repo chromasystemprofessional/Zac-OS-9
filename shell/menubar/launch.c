@@ -175,6 +175,49 @@ static void add_item(struct mb_menu *menu, const char *label, bool enabled,
 	};
 }
 
+/* $XDG_CONFIG_HOME/zacos9/NAME (the Sniffer's QStandardPaths agrees). */
+static void config_path(const char *name, char *out, size_t size) {
+	const char *config = getenv("XDG_CONFIG_HOME");
+	if (config && *config) {
+		snprintf(out, size, "%s/zacos9/%s", config, name);
+	} else {
+		snprintf(out, size, "%s/.config/zacos9/%s", getenv("HOME") ? getenv("HOME") : "", name);
+	}
+}
+
+static int by_label(const void *a, const void *b) {
+	return strcasecmp(*(char *const *)a, *(char *const *)b);
+}
+
+/* Favorites: the aliases in the Favorites folder, by name; the Sniffer
+ * opens the one chosen. Dimmed when there are none. */
+static void add_favorites(struct mb_menu *menu) {
+	char dir_path[PATH_MAX];
+	config_path("Favorites", dir_path, sizeof(dir_path));
+	char *names[MAX_ITEMS];
+	int n = 0;
+	DIR *dir = opendir(dir_path);
+	if (dir) {
+		struct dirent *de;
+		while ((de = readdir(dir)) && n < MAX_ITEMS) {
+			if (de->d_name[0] != '.') {
+				names[n++] = strdup(de->d_name);
+			}
+		}
+		closedir(dir);
+	}
+	qsort(names, n, sizeof(names[0]), by_label);
+	add_item(menu, "Favorites", n > 0, ACT_NONE, NULL);
+	struct mb_menu *favorites = calloc(1, sizeof(*favorites));
+	menu->items[menu->n - 1].submenu = favorites;
+	for (int i = 0; i < n; i++) {
+		char arg[PATH_MAX + 300];
+		snprintf(arg, sizeof(arg), "open-path %s/%s", dir_path, names[i]);
+		add_item(favorites, names[i], true, ACT_FINDER, arg);
+		free(names[i]);
+	}
+}
+
 void launch_fill_logo_menu(struct mb_menu *menu, const struct app *apps, int n_apps) {
 	/* About and software tools are the top group in the Apple menu. */
 	add_item(menu, "About This Computer…", true, ACT_ABOUT, NULL);
@@ -254,6 +297,7 @@ void launch_fill_logo_menu(struct mb_menu *menu, const struct app *apps, int n_a
 		strncat(command, panel_list[i].arg, sizeof(command) - strlen(command) - 1);
 		add_item(panels, panel_list[i].name, true, ACT_LAUNCH, command);
 	}
+	add_favorites(menu);
 
 	struct entry entries[MAX_ITEMS];
 	int n = read_items_dir(entries, MAX_ITEMS - 4);

@@ -94,6 +94,11 @@ public:
 	/* A folder's window, the Macintosh view's folders through their real
 	 * counterparts where they have one. */
 	void openFolder(const QString &path);
+	/* File > Add To Favorites: an alias of each selected item in Favorites. */
+	void addToFavorites();
+	/* Open a file, folder, disk or alias by path, as a double-click does
+	 * (the Zac menu's Favorites and Recent Documents). */
+	void openPath(const QString &path);
 	/* Special > Eject (⌘E): every selected disk, local or network. */
 	void ejectSelection();
 	/* Special > Log Out (⇧⌘Q): asks, then has the menu bar quit the

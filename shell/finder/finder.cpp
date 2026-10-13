@@ -219,6 +219,10 @@ void Finder::command(const QString &name) {
 				Alert::ask("“" + app + "” couldn't be forced to quit.", "OK", QString());
 			}
 		}
+	} else if (name == "add-to-favorites") {
+		addToFavorites();
+	} else if (name.startsWith("open-path ")) {
+		openPath(name.mid(10));
 	} else if (name.startsWith("path-menu ")) {
 		/* The folder-path menu's choice; the first is the window's own. */
 		const int i = name.mid(10).toInt();
@@ -775,6 +779,47 @@ void Finder::openEnclosing(bool closeThis) {
 	openFolder(parent);
 	if (closeThis && was) {
 		was->close();
+	}
+}
+
+void Finder::addToFavorites() {
+	FinderView *v = front();
+	if (!v) {
+		return;
+	}
+	const QString favorites = favoritesPath();
+	QDir().mkpath(favorites);
+	for (Item *item : v->selectedItems()) {
+		if (item->kind == PL_ICON_TRASH_EMPTY || item->kind == PL_ICON_TRASH_FULL) {
+			continue;
+		}
+		/* The Macintosh view's folders and applications through what they
+		 * stand for; an alias, through its original. */
+		QString target = item->path;
+		if (item->isVirtual) {
+			const VNode *node = vfsNode(item->path);
+			target = node && node->actionId.isEmpty() ? vfsRealCounterpart(item->path) : QString();
+		} else if (item->isAlias) {
+			target = QFileInfo(item->path).symLinkTarget();
+		}
+		if (target.isEmpty()) {
+			Alert::ask("“" + item->visibleName() + "” can't be added to Favorites.", "OK", QString());
+			continue;
+		}
+		createAlias(target, favorites, item->visibleName(), QString());
+	}
+	folderChanged(favorites);
+}
+
+void Finder::openPath(const QString &path) {
+	const QFileInfo info(path);
+	if (!info.exists() && !info.isSymLink()) {
+		Alert::ask("“" + info.fileName() + "” could not be found.", "OK", QString());
+		return;
+	}
+	auto item = makeItem(info);
+	if (item) {
+		openItem(item.get());
 	}
 }
 

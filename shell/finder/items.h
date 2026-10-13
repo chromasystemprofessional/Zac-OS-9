@@ -121,6 +121,9 @@ bool writeLabel(const QString &path, int label);
  * trash, else the last path component. */
 QString displayName(const QString &path);
 QString trashFilesPath();
+/* Favorites (File > Add To Favorites): aliases, listed in the Zac menu and
+ * the Open and Save dialogs. */
+QString favoritesPath();
 
 /* Paint an icon with its label; `onDesktop` labels get a white box when
  * unselected (desktop pattern behind them). TODO: measure label metrics. */

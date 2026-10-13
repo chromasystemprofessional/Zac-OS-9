@@ -1,4 +1,5 @@
 #include "filechooserportal.h"
+#include "items.h"
 #include "alias.h"
 
 #include <QApplication>
@@ -56,6 +57,12 @@ int main(int argc, char **argv) {
 		"create a recorded alias whose original was renamed");
 	check(QFile::link(desktop + "/Loop alias", desktop + "/Loop alias"),
 		"create a looping alias");
+	/* Favorites: a folder of its own, and one the desktop already has. */
+	const QString favorites = favoritesPath();
+	check(QDir().mkpath(favorites) && QDir().mkpath(serverRoot + "/Fav") &&
+		QFile::link(serverRoot + "/Fav", favorites + "/Fav Folder") &&
+		QFile::link(serverRoot + "/SMB/Shared", favorites + "/Shared Again"),
+		"create Favorites folder aliases");
 	QElapsedTimer timer;
 	timer.start();
 	const QList<FileChooserLocation> locations = fileChooserLocations();
@@ -96,15 +103,16 @@ int main(int argc, char **argv) {
 	for (const FileChooserLocation &location : locations) {
 		if (location.folderAlias) {
 			aliases.insert(location.name);
-			check(location.path == desktop + "/" + location.name,
-				"folder locations retain their desktop alias name and path");
+			check(location.path == desktop + "/" + location.name ||
+					location.path == favorites + "/" + location.name,
+				"folder locations retain their alias's name and path");
 			check(location.error.isEmpty() ==
 				(location.name != "Offline Server" && location.name != "Loop alias"),
 				"unavailable and looping aliases have an explicit error");
 		}
 	}
 	check(aliases == QSet<QString>{ "AFP Projects", "Windows Shared", "Second Projects",
-			"Offline Server", "Moved Folder", "Loop alias" },
+			"Offline Server", "Moved Folder", "Loop alias", "Fav Folder" },
 		"all desktop folder aliases appear, including duplicate targets and offline servers, but not documents");
 	check(QFileInfo(desktop + "/Moved Folder").canonicalFilePath() == serverRoot + "/After",
 		"the chooser reuses Finder's identity-based reconnection for renamed originals");

@@ -20,7 +20,9 @@ class QDropEvent;
  * never overwrite existing items. */
 QStringList transferItems(const QStringList &paths, const QString &destDir, bool forceCopy,
 	bool *finished = nullptr);
-QString createAlias(const QString &target, const QString &destDir, const QString &name);
+/* `suffix` follows the name (Make Alias: " alias"; Favorites: none). */
+QString createAlias(const QString &target, const QString &destDir, const QString &name,
+	const QString &suffix = QStringLiteral(" alias"));
 
 /* Start dragging `items`, shown as dotted outlines (Mac OS 8 dragged
  * outlines, not pictures). `itemOrigins` are the items' icon positions in

@@ -200,7 +200,7 @@ Section 3 lists every feature; section 5 is the plan.
 | File ▸ New Folder, Open, Move To Trash, Close Window, Get Info, Label, Duplicate, Make Alias, Put Away, Find…, Show Original | ✅ | |
 | File ▸ **Print** (⌘P) — prints the selected documents through their apps | ✗ | `lp` for PDFs/images/text; else open the app with its print action. P2 M |
 | File ▸ Get Info ▸ General Information / Sharing / Memory submenu | ◐ | General and Sharing ✅; Memory — (out of scope) |
-| File ▸ **Add To Favorites** | ✗ | Writes an alias into `Favorites`; feeds the Zac menu and Open/Save. P1 S |
+| File ▸ **Add To Favorites** | ✅ | Aliases in `~/.config/zacos9/Favorites` (System Folder ▸ Favorites); also on icons' and disks' contextual menus (0.1.54). |
 | File ▸ **Encrypt** | ✗ | See 3.2. P3 |
 | File ▸ **Search Internet…** (⌘H) | ✗ | Opens the search window on its Internet channel. P3 S |
 | File ▸ **Page Setup…**, **Print Window/Print Desktop…** | ✗ | Render the window with the existing painter to PDF, then print. P3 M |
@@ -235,7 +235,7 @@ Section 3 lists every feature; section 5 is the plan.
 | About This Computer (memory bars per app) | ✅ | Memory per app is shown? Verify. |
 | Items from a folder; aliases; folders sprout submenus | ◐ | Items ✅; folder submenus to verify. P2 S |
 | **Recent Applications / Recent Documents / Recent Servers** | ✗ | **P1 M.** Record launches (the menu bar knows them), documents from `recently-used.xbel`, servers from the Neighbourhood. |
-| **Favorites** submenu (and Add To Favorites) | ✗ | **P1 S.** |
+| **Favorites** submenu (and Add To Favorites) | ✅ | (0.1.54) |
 | **Zac Menu Options** panel: submenus on/off, how many recent items | ✗ | P2 S |
 | Control Panels submenu | ✅ | |
 | Printer Picker | ✗ | See 3.15. |
@@ -274,7 +274,7 @@ A zram/swap switch in a Memory panel is a possible P3.
 |---|---|---|
 | Open/Save through the ZacOS file-chooser portal | ✅ | `shell/finder/filechooserportal.cpp` |
 | Keyboard navigation (type-select, arrows, ⌘-↑, ⌘-D desktop, ⌘-N new folder) | ✅? | Verify against p. 127. |
-| Shortcuts, **Favorites** and **Recent** pop-ups (Navigation Services) | ◐ | Needs Favorites/Recent (3.5). P2 S |
+| Shortcuts, **Favorites** and **Recent** pop-ups (Navigation Services) | ◐ | Favorite folders are offered as locations (0.1.54); Recent still to do. P3 S |
 | Drag a folder onto the dialog to jump there | ✗? | Verify. P3 S |
 | General Controls ▸ Documents: default save folder | ✗ | See 3.10. |
 
@@ -474,7 +474,7 @@ updates `PROJECT_STATUS.md` and the relevant `docs/` page.
 | 1.3 ✅ | **Special ▸ Eject (⌘E)** and **Log Out (⇧⌘Q)**, with "quit your programs first" | `shell/menubar/menus.c`, `session/` | S | VM: Log Out returns to the login window |
 | 1.4 ✅ | **Window tricks**: Option-click close/collapse for all of an app's windows, ⌘-drag a background window, Option-zoom fills the screen | `compositor/src/input.c`, `view.c`, `frame.c` | S | Headless compositor tests (`compositor/tests/`) |
 | 1.5 ✅ | **Folder-path menu** on ⌘-click of a Sniffer window's title, ⌘-↑ / Option-⌘-↑ | compositor → Sniffer via `platinum-shell-v1` (new event: title clicked with modifiers), Sniffer menu | M | Headless: ⌘-click title shows the path; choosing opens the parent |
-| 1.6 | **Favorites**: File ▸ Add To Favorites, Zac menu Favorites, Favorites in Open/Save | `shell/finder/`, `shell/menubar/launch.c`, file-chooser portal | S | Unit: alias written; menu lists it |
+| 1.6 ✅ | **Favorites**: File ▸ Add To Favorites, Zac menu Favorites, Favorites in Open/Save | `shell/finder/`, `shell/menubar/launch.c`, file-chooser portal | S | Unit: alias written; menu lists it |
 | 1.7 | **Recent Applications / Documents / Servers** in the Zac menu, with counts from a new Zac Menu Options panel | menu bar (launch record), `recently-used.xbel`, Neighbourhood, `shell/panels/` | M | Unit: list ordering and limits |
 | 1.8 | **General Controls** panel: show desktop in background, menu blinking, insertion-point blink rate, Documents folder for Open/Save, Toy Box at startup | `shell/panels/controlpanel.cpp`, menu bar, file-chooser portal, Qt/GTK cursor blink settings | M | Unit per setting; visual check |
 | 1.9 | **Keyboard layouts** and the keyboard menu (flag/abbreviation at the menu bar's right, ⌘-Space to switch) | Keyboard panel, `compositor/src/prefs.c` (xkb), menu bar | M | Headless: switch layout, typed key changes |

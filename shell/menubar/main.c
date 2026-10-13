@@ -597,6 +597,12 @@ static void pointer_pressed(void) {
 		return;
 	}
 	if (g.open_index < 0) {
+		if (on_title) {
+			/* Fresh contents each time a menu opens: Favorites and the
+			 * recent items change while the menus sit closed. */
+			rebuild();
+			on_title = title_at(g.px, g.py, &side, &index);
+		}
 		if (on_title && (side == SIDE_LEFT ? g.model.left[index].n : g.model.right[index].n)) {
 			g.button_down = true;
 			open_menu(side, index);

@@ -85,10 +85,10 @@ int main(void) {
 	/* Contextual menus: only what can be done now, by what was clicked. */
 	char got[512];
 	context_labels("state selection=1 window=1 trash=0 view=0 label=0", "icon", got, sizeof(got));
-	assert(strcmp(got, "Open|Move To Trash|-|Get Info|Label|Duplicate|Make Alias|") == 0);
+	assert(strcmp(got, "Open|Move To Trash|-|Get Info|Label|Duplicate|Make Alias|Add To Favorites|") == 0);
 	context_labels("state selection=1 window=0 trash=0 view=0 label=0 erase=1 network=0 unmount=1",
 		"disk", got, sizeof(got));
-	assert(strcmp(got, "Open|Get Info|Label|-|Eject|Erase Disk…|") == 0);
+	assert(strcmp(got, "Open|Get Info|Label|Add To Favorites|-|Eject|Erase Disk…|") == 0);
 	context_labels("state selection=1 window=0 trash=0 view=0 label=0", "disk", got, sizeof(got));
 	assert(strcmp(got, "Open|Get Info|Label|") == 0); /* the startup disk */
 	context_labels("state selection=1 window=0 trash=1", "trash", got, sizeof(got));
