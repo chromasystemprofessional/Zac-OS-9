@@ -9,6 +9,7 @@ extern "C" {
 #include <stddef.h>
 
 #include "draw.h"
+#include "icons.h"
 
 /*
  * Appearance settings shared by the shell: ~/.config/zacos9/desktop.conf
@@ -63,6 +64,16 @@ void pl_sound_preview(const char *path, int level);
 /* Double-click time in ms (the Mouse panel's "double-click"; Mac OS's
  * default 533). */
 int pl_double_click_ms(void);
+
+/* Finder labels as the user named and coloured them (the Sniffer's
+ * Preferences > Labels: desktop.conf "label-names", seven names separated
+ * by '|', and "label-colors", seven RRGGBB), else pl_labels. Index 0 is
+ * None, always. */
+const char *pl_label_name(int index);
+uint32_t pl_label_color(int index);
+/* The labels' choices: Mac OS's standard 16 colours, ARGB. */
+#define PL_PALETTE16_COUNT 16
+extern const uint32_t pl_palette16[PL_PALETTE16_COUNT];
 
 /* General Controls. How many times a chosen menu item blinks before it
  * acts, 0..3 ("menu-blink"; 1 by default). */

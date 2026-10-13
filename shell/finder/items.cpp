@@ -312,10 +312,29 @@ static void labelBox(Item &item, int x, int y, int *l, int *t, int *r, int *b, i
 	*b = *t + LABEL_H - 1;
 }
 
+int nearestFreeSlot(QPoint p, const std::function<QPoint(int)> &slot, int slotCount,
+		const QSet<int> &taken) {
+	int best = -1;
+	qint64 bestDist = 0;
+	for (int s = 0; s < slotCount; s++) {
+		if (taken.contains(s)) {
+			continue;
+		}
+		const QPoint d = slot(s) - p;
+		const qint64 dist = qint64(d.x()) * d.x() + qint64(d.y()) * d.y();
+		if (best < 0 || dist < bestDist) {
+			best = s;
+			bestDist = dist;
+		}
+	}
+	return best;
+}
+
 void placeIcons(const std::vector<Item *> &items, const QHash<QString, QPoint> &placed,
-		const std::function<QPoint(int)> &slot, int cellW, int cellH) {
+		const std::function<QPoint(int)> &slot, int cellW, int cellH, int iconInset) {
+	const int inset = iconInset >= 0 ? iconInset : (cellW - PL_ICON_LARGE) / 2;
 	auto footprint = [&](QPoint icon) {
-		return QRect(icon.x() - (cellW - PL_ICON_LARGE) / 2, icon.y(), cellW, cellH);
+		return QRect(icon.x() - inset, icon.y(), cellW, cellH);
 	};
 	std::vector<QRect> taken;
 	std::vector<Item *> unplaced;

@@ -41,7 +41,13 @@ static constexpr int NET_VOLUMES_POLL_MS = 3000;
 static constexpr int ICON_MARGIN_RIGHT = 24;
 static constexpr int ICON_MARGIN_TOP = 14;    /* below the menu bar */
 static constexpr int ICON_MARGIN_BOTTOM = 32;
-static constexpr int CELL_W = 80, CELL_H = 64;
+/* The icon grid: Preferences' Wide (as it always was) or Tight. */
+static int cellW() {
+	return tightGrid() ? 64 : 80;
+}
+static int cellH() {
+	return tightGrid() ? 56 : 64;
+}
 
 /* The desktop pattern is chosen by id in ~/.config/zacos9/desktop.conf
  * ("pattern=ocean-ripple"); the Appearance control panel will write it.
@@ -104,6 +110,9 @@ Desktop::Desktop() {
 		loadPattern();
 		QApplication::setDoubleClickInterval(pl_double_click_ms());
 		QApplication::setCursorFlashTime(pl_caret_blink_ms());
+		/* Preferences: the grid's spacing, the labels. */
+		placeIcons();
+		FolderWindow::preferencesChanged();
 		/* Accent colour and highlight are read at paint time. */
 		for (QWidget *w : QApplication::topLevelWidgets()) {
 			w->update();
@@ -335,38 +344,62 @@ void Desktop::reload() {
 /* Placed icons stay where the user put them. Otherwise: the disk at top
  * right, Desktop items in columns below it (right to left), the Trash at
  * bottom right. */
-void Desktop::placeIcons() {
+/* The grid: columns from the right, rows stopping short of the Trash. */
+std::function<QPoint(int)> Desktop::gridSlot(int *slotCount) const {
 	const int right = width() - ICON_MARGIN_RIGHT - PL_ICON_LARGE;
 	const int top = MBAR_HEIGHT + ICON_MARGIN_TOP;
-	const QPoint trashHome(right, height() - ICON_MARGIN_BOTTOM - PL_ICON_LARGE - 16);
-	const int rows = std::max(1, (trashHome.y() - top) / CELL_H - 1);
+	const int trashY = height() - ICON_MARGIN_BOTTOM - PL_ICON_LARGE - 16;
+	const int w = cellW(), h = cellH();
+	const int rows = std::max(1, (trashY - top) / h - 1);
+	if (slotCount) {
+		*slotCount = rows * std::max(1, right / w + 1);
+	}
+	return [=](int i) { return QPoint(right - (i / rows) * w, top + (i % rows) * h); };
+}
 
+void Desktop::placeIcons() {
+	const int right = width() - ICON_MARGIN_RIGHT - PL_ICON_LARGE;
+	const QPoint trashHome(right, height() - ICON_MARGIN_BOTTOM - PL_ICON_LARGE - 16);
 	QHash<QString, QPoint> placed = m_state.icons;
 	if (!placed.contains(m_trash->key())) {
 		placed.insert(m_trash->key(), trashHome);
 	}
 	std::vector<Item *> items = fixedItems();
+	std::vector<Item *> files;
 	for (auto &item : m_files) {
-		items.push_back(item.get());
+		files.push_back(item.get());
 	}
-	::placeIcons(items, placed, [=](int i) {
-		return QPoint(right - (i / rows) * CELL_W, top + (i % rows) * CELL_H);
-	}, CELL_W, CELL_H);
+	/* Kept arranged (View Options): the disks and Trash stay put, the
+	 * files go in order into the free spots. */
+	const IconViewOptions &o = m_state.options.icons;
+	if (o.arrangement == IconArrangement::KeepArranged) {
+		sortIcons(files, o.keepBy);
+		for (Item *item : files) {
+			placed.remove(item->key());
+		}
+	}
+	items.insert(items.end(), files.begin(), files.end());
+	::placeIcons(items, placed, gridSlot(nullptr), cellW(), cellH());
 }
 
 /* Clean Up snaps the disks and files to the nearest free spot; Arrange
  * leaves the disks where they are and lays the desktop's files out in
  * order in the free spots, from the top right. The Trash keeps its
- * corner either way, and the grid (as placeIcons') stops short of it. */
+ * corner either way, and the grid (as placeIcons') stops short of it.
+ * Kept arranged, Arrange changes the order kept. */
 void Desktop::arrange(Arrange how) {
-	const int right = width() - ICON_MARGIN_RIGHT - PL_ICON_LARGE;
-	const int top = MBAR_HEIGHT + ICON_MARGIN_TOP;
-	const int trashY = height() - ICON_MARGIN_BOTTOM - PL_ICON_LARGE - 16;
-	const int rows = std::max(1, (trashY - top) / CELL_H - 1);
-	const int cols = std::max(1, right / CELL_W + 1);
-	const auto slot = [=](int i) {
-		return QPoint(right - (i / rows) * CELL_W, top + (i % rows) * CELL_H);
-	};
+	IconViewOptions &o = m_state.options.icons;
+	if (o.arrangement == IconArrangement::KeepArranged) {
+		if (how != Arrange::CleanUp) {
+			o.keepBy = how;
+			m_state.save(folderPath());
+			placeIcons();
+			update();
+		}
+		return;
+	}
+	int count = 0;
+	const auto slot = gridSlot(&count);
 	std::vector<Item *> fixed = fixedItems();
 	std::vector<Item *> files;
 	for (auto &item : m_files) {
@@ -380,7 +413,7 @@ void Desktop::arrange(Arrange how) {
 			}
 		}
 		all.insert(all.end(), files.begin(), files.end());
-		arrangeIcons(all, how, slot, rows * cols);
+		arrangeIcons(all, how, slot, count);
 	} else {
 		sortIcons(files, how);
 		QHash<QString, QPoint> placed;
@@ -389,7 +422,7 @@ void Desktop::arrange(Arrange how) {
 		}
 		std::vector<Item *> all = fixed;
 		all.insert(all.end(), files.begin(), files.end());
-		::placeIcons(all, placed, slot, CELL_W, CELL_H);
+		::placeIcons(all, placed, slot, cellW(), cellH());
 	}
 	m_state.icons.clear();
 	for (Item *item : fixedItems()) {
@@ -399,6 +432,18 @@ void Desktop::arrange(Arrange how) {
 		m_state.icons.insert(item->key(), item->pos);
 	}
 	m_state.save(folderPath());
+	update();
+}
+
+void Desktop::setViewOptions(const ViewOptions &options) {
+	const bool snapNow = options.icons.arrangement == IconArrangement::SnapToGrid &&
+		m_state.options.icons.arrangement != IconArrangement::SnapToGrid;
+	m_state.options = options;
+	m_state.save(folderPath());
+	if (snapNow) {
+		arrange(Arrange::CleanUp);
+	}
+	placeIcons();
 	update();
 }
 
@@ -706,16 +751,45 @@ void Desktop::dropEvent(QDropEvent *e) {
 		return;
 	}
 	if (!target && e->source() == this && !(e->modifiers() & Qt::AltModifier)) {
-		/* Icons dragged about the desktop: they move there, and stay. */
+		/* Icons dragged about the desktop: they move there, and stay (on
+		 * the grid, if it snaps; kept arranged, they go back in line). */
+		const IconArrangement arrangement = m_state.options.icons.arrangement;
 		const QPoint delta = e->position().toPoint() - m_dragStart;
+		std::vector<Item *> moved;
 		for (Item *item : selectedItems()) {
-			if (isFixed(item)) {
+			if (isFixed(item) || arrangement == IconArrangement::KeepArranged) {
 				continue;
 			}
 			QPoint p = item->pos + delta;
 			p.setX(std::clamp(p.x(), 0, width() - PL_ICON_LARGE));
 			p.setY(std::clamp(p.y(), MBAR_HEIGHT, height() - PL_ICON_LARGE - 16));
+			item->pos = p;
+			moved.push_back(item);
 			m_state.icons.insert(item->key(), p);
+		}
+		if (arrangement == IconArrangement::SnapToGrid && !moved.empty()) {
+			int count = 0;
+			const auto slot = gridSlot(&count);
+			QSet<int> taken;
+			for (Item *item : allItems()) {
+				if (std::find(moved.begin(), moved.end(), item) != moved.end()) {
+					continue;
+				}
+				for (int s = 0; s < count; s++) {
+					if (slot(s) == item->pos) {
+						taken.insert(s);
+						break;
+					}
+				}
+			}
+			for (Item *item : moved) {
+				const int s = nearestFreeSlot(item->pos, slot, count, taken);
+				if (s >= 0) {
+					taken.insert(s);
+					item->pos = slot(s);
+					m_state.icons.insert(item->key(), item->pos);
+				}
+			}
 		}
 		m_state.save(folderPath());
 		placeIcons();

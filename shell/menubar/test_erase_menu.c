@@ -96,12 +96,41 @@ int main(void) {
 	context_labels("state selection=1 window=0 trash=0", "trash", got, sizeof(got));
 	assert(strcmp(got, "Open|") == 0);
 	context_labels("state selection=0 window=1 trash=0 view=0", "window", got, sizeof(got));
-	assert(strcmp(got, "New Folder|-|View|Clean Up|Arrange|-|Get Info|Close Window|") == 0);
+	assert(strcmp(got, "New Folder|-|View|Clean Up|Arrange|View Options…|-|Get Info|Close Window|") == 0);
 	context_labels("state selection=0 window=1 trash=0 view=1", "window", got, sizeof(got));
-	assert(strcmp(got, "New Folder|-|View|-|Get Info|Close Window|") == 0); /* list view */
+	assert(strcmp(got, "New Folder|-|View|Sort List|View Options…|-|Get Info|Close Window|") == 0);
 	context_labels("state selection=0 window=0 trash=0 view=0", "desktop", got, sizeof(got));
-	assert(strcmp(got, "New Folder|-|Clean Up|Arrange|-|Change Desktop Background…|") == 0);
+	assert(strcmp(got, "New Folder|-|Clean Up|Arrange|View Options…|-|Change Desktop Background…|") == 0);
 	assert(!parse_line("context desktop") && strcmp(context_kind, "desktop") == 0);
+
+	/* View > Sort List: the list's columns shown (Name, Date Modified =1,
+	 * Size =2, Label =5), the sorted one checked; Edit > Preferences…. */
+	parse_line("state selection=0 window=1 trash=0 view=1 label=-1 erase=0 network=0 unmount=0 "
+		"sort=5 columns=39");
+	struct mb_bar views = {0};
+	add_finder_menus(views.left, &views.n_left);
+	const struct mb_item *sortList = NULL, *viewOptions = NULL, *prefs = NULL;
+	for (int m = 0; m < views.n_left; m++) {
+		for (int i = 0; i < views.left[m].n; i++) {
+			const struct mb_item *it = &views.left[m].items[i];
+			if (it->label && strcmp(it->label, "Sort List") == 0) {
+				sortList = it;
+			} else if (it->arg && strcmp(it->arg, "view-options") == 0) {
+				viewOptions = it;
+			} else if (it->arg && strcmp(it->arg, "preferences") == 0) {
+				prefs = it;
+			}
+		}
+	}
+	assert(sortList && sortList->enabled && sortList->submenu->n == 4);
+	assert(strcmp(sortList->submenu->items[0].label, "by Name") == 0 &&
+		strcmp(sortList->submenu->items[1].label, "by Date Modified") == 0 &&
+		strcmp(sortList->submenu->items[2].label, "by Size") == 0 &&
+		strcmp(sortList->submenu->items[3].arg, "sort label") == 0 &&
+		sortList->submenu->items[3].checked && !sortList->submenu->items[0].checked);
+	assert(viewOptions && viewOptions->enabled && strcmp(viewOptions->label, "View Options…") == 0);
+	assert(prefs && prefs->enabled && strcmp(prefs->label, "Preferences…") == 0);
+	menus_free(&views);
 
 	/* The folder-path menu: the names, each choosing its place in the list. */
 	assert(!parse_line("pathmenu Extensions\tSystem Folder\tZacintosh HD") &&

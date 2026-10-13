@@ -1,4 +1,5 @@
 #include "folderwindow.h"
+#include "tinyicons.h"
 #include "thumbnails.h"
 #include "fileassoc.h"
 
@@ -11,6 +12,8 @@
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QStorageInfo>
+#include <QDirIterator>
+#include <QThreadPool>
 #include <algorithm>
 
 #include "fileops.h"
@@ -22,33 +25,26 @@
 static constexpr int HEADER_H = 21;       /* white row, #DDD, #AAA shade */
 static constexpr int HEADER_BASELINE = 13;
 
-/* Icon view. The grid is not in the HIG (TODO: measure). */
+/* Icon view. The grid is not in the HIG (TODO: measure). Preferences'
+ * grid spacing makes it Wide (as it always was) or Tight; small icons
+ * (View Options) sit in short, wide cells with their names beside them. */
 static constexpr int ICONS_TOP = HEADER_H + 1; /* below a black separator */
-static constexpr int CELL_W = 80, CELL_H = 64;
 static constexpr int MARGIN = 8;
+static constexpr int SMALL_LABEL_X = PL_ICON_SMALL + 4; /* small icon's name */
 
 /* Button view (Mac OS 8): a grid of small-bevel buttons, names below.
- * Not in the HIG; sizes are estimates. TODO: measure. */
-static constexpr int BUTTON = 48;           /* bevel button, square */
-static constexpr int BCELL_W = 84, BCELL_H = 80;
+ * Not in the HIG; sizes are estimates. TODO: measure. Small buttons
+ * (View Options) hold small icons. */
+static constexpr int BUTTON = 48, SMALL_BUTTON = 26; /* bevel button, square */
 
-/* List view, HIG figure 2-24: a 21 px column-header band, 19 px rows. */
+/* List view, HIG figure 2-24: a 21 px column-header band, 19 px rows
+ * (small icons; standard ones need taller rows, tiny ones fewer). */
 static constexpr int BAND_H = 21;
 static constexpr int LIST_TOP = HEADER_H + BAND_H;
-static constexpr int ROW_H = 19;          /* 18 px row + white separator */
-static constexpr int ROW_BASELINE = 11;
-static constexpr int TRI_X = 12, ICON_X = 28, NAME_X = 50;
+static constexpr int TRI_X = 12;
 static constexpr int INDENT = 20;         /* per expanded level (TODO: measure) */
 static constexpr int COL_TEXT_X = 6;      /* text inset in non-name columns */
 
-struct Column {
-	const char *title;
-	int width;
-};
-static const Column COLUMNS[] = {
-	{ "Name", 220 }, { "Date Modified", 170 }, { "Size", 64 }, { "Kind", 140 },
-};
-static constexpr int N_COLUMNS = sizeof(COLUMNS) / sizeof(COLUMNS[0]);
 
 static constexpr int ARROW_STEP = 16;
 static constexpr int REPEAT_FIRST_MS = 300, REPEAT_MS = 50;
@@ -169,7 +165,9 @@ FolderWindow::FolderWindow(const QString &path) : m_path(path) {
 	m_state = FolderState::load(path);
 	m_mode = m_state.viewMode == 1 ? ViewMode::List
 		: m_state.viewMode == 2 ? ViewMode::Buttons : ViewMode::Icons;
-	m_sortColumn = std::clamp(m_state.sortColumn, 0, N_COLUMNS - 1);
+	m_sortColumn = m_state.options.list.columns & columnBit(m_state.sortColumn) ?
+		m_state.sortColumn : COL_NAME;
+	m_editor.setBeside(smallIcons());
 	m_saveTimer.setSingleShot(true);
 	m_saveTimer.callOnTimeout([this] { m_state.save(m_path); });
 	setAttribute(Qt::WA_DeleteOnClose);
@@ -194,6 +192,9 @@ FolderWindow::FolderWindow(const QString &path) : m_path(path) {
 }
 
 FolderWindow::~FolderWindow() {
+	if (m_sizingCancel) {
+		*m_sizingCancel = true;
+	}
 	if (m_vfsToken) {
 		vfsOffChange(m_vfsToken);
 	}
@@ -235,6 +236,61 @@ void FolderWindow::setViewMode(ViewMode mode) {
 	Finder::instance().notifyState();
 }
 
+void FolderWindow::setViewOptions(const ViewOptions &options) {
+	if (options == m_state.options) {
+		return;
+	}
+	m_editor.cancel();
+	/* Icons placed for one size don't fit the other's grid: they flow
+	 * again. */
+	if (options.icons.size != m_state.options.icons.size) {
+		m_state.icons.clear();
+	}
+	const bool snapNow = options.icons.arrangement == IconArrangement::SnapToGrid &&
+		m_state.options.icons.arrangement != IconArrangement::SnapToGrid;
+	m_state.options = options;
+	if (!(options.list.columns & columnBit(m_sortColumn))) {
+		m_sortColumn = m_state.sortColumn = COL_NAME;
+	}
+	m_editor.setBeside(smallIcons());
+	saveStateSoon();
+	relayout();
+	if (snapNow && m_mode == ViewMode::Icons) {
+		arrange(Arrange::CleanUp); /* onto the grid, now */
+	}
+	update();
+	Finder::instance().notifyState();
+}
+
+void FolderWindow::sortBy(int column) {
+	if (column < 0 || column >= COL_COUNT || column == m_sortColumn ||
+			!(m_state.options.list.columns & columnBit(column))) {
+		return;
+	}
+	m_sortColumn = m_state.sortColumn = column;
+	saveStateSoon();
+	relayout();
+	update();
+	Finder::instance().notifyState();
+}
+
+std::vector<int> FolderWindow::columns() const {
+	std::vector<int> shown;
+	for (int c : COLUMN_ORDER) {
+		if (c == COL_NAME || (m_state.options.list.columns & columnBit(c))) {
+			shown.push_back(c);
+		}
+	}
+	return shown;
+}
+
+void FolderWindow::preferencesChanged() {
+	for (FolderWindow *w : openWindows()) {
+		w->relayout();
+		w->update();
+	}
+}
+
 /* ---- items ------------------------------------------------------------------ */
 
 template <typename F> void FolderWindow::forEachItem(F f) {
@@ -268,6 +324,13 @@ void FolderWindow::reload() {
 	m_marqueeScroll.stop();
 	auto fresh = listFolder(m_path);
 	m_editor.retarget(fresh);
+	/* Contents may have changed anywhere below: sizes are added up again. */
+	if (m_sizingCancel) {
+		*m_sizingCancel = true;
+		m_sizingCancel.reset();
+	}
+	m_folderSizes.clear();
+	m_sizing.clear();
 	m_renameTimer.stop();
 	m_renameItem = nullptr;
 	m_items = std::move(fresh);
@@ -331,17 +394,19 @@ void FolderWindow::selectAll() {
 /* An item's icon and name, in content coordinates. */
 QRect FolderWindow::selectionRect(Item *item) {
 	if (m_mode == ViewMode::Icons) {
-		return iconItemRect(*item, item->pos.x(), item->pos.y());
+		return itemRect(*item);
 	}
+	const ListMetrics m = metrics();
 	for (size_t r = 0; r < m_rows.size(); r++) {
 		if (m_rows[r].item != item) {
 			continue;
 		}
-		const int d = m_rows[r].depth * INDENT, top = static_cast<int>(r) * ROW_H;
-		const int nameW = COLUMNS[0].width - NAME_X - d - 6;
+		const int d = m_rows[r].depth * INDENT, top = static_cast<int>(r) * m.rowH;
+		const int nameW = columnInfo(COL_NAME).width - m.nameX - d - 6;
 		Text name(item->visibleName(), std::max(8, nameW), item->nameFont());
-		return QRect(QPoint(ICON_X + d, top + 1),
-			QPoint(NAME_X + d + name.inkWidth() + 1, top + 16));
+		return QRect(QPoint(m.iconX + d, top + m.iconY),
+			QPoint(m.nameX + d + name.inkWidth() + 1,
+				std::max(top + m.iconY + m.icon - 1, top + m.baseline + 3)));
 	}
 	return {};
 }
@@ -411,8 +476,8 @@ int FolderWindow::viewHeight() const {
 
 int FolderWindow::listWidth() const {
 	int w = 0;
-	for (const Column &col : COLUMNS) {
-		w += col.width;
+	for (int c : columns()) {
+		w += columnInfo(c).width;
 	}
 	return w;
 }
@@ -443,7 +508,8 @@ void FolderWindow::relayout() {
 		layoutButtons();
 	} else {
 		buildRows();
-		m_contentHeight = static_cast<int>(m_rows.size()) * ROW_H;
+		m_contentHeight = static_cast<int>(m_rows.size()) * metrics().rowH;
+		calculateFolderSizes();
 	}
 	scrollTo(m_scrollX, m_scrollY);
 	updateStandardSize();
@@ -457,13 +523,14 @@ void FolderWindow::updateStandardSize() {
 	if (m_mode == ViewMode::List) {
 		w = listWidth();
 	} else if (m_mode == ViewMode::Buttons) {
-		const int cols = std::max(1, (viewWidth() - 2 * MARGIN) / BCELL_W);
+		const int cellW = buttonCell().width();
+		const int cols = std::max(1, (viewWidth() - 2 * MARGIN) / cellW);
 		const int used = std::min(cols, std::max(1, static_cast<int>(m_items.size())));
-		w = 2 * MARGIN + used * BCELL_W;
+		w = 2 * MARGIN + used * cellW;
 	}
 	/* Scroll bars stay; an empty folder still gets a usable window. */
 	const QSize size(std::max(w, 200) + SB_WIDTH - 1,
-		std::max(contentTop() + m_contentHeight, contentTop() + 2 * ROW_H) + SB_WIDTH - 1);
+		std::max(contentTop() + m_contentHeight, contentTop() + 38) + SB_WIDTH - 1);
 	if (size != m_standardSize) {
 		m_standardSize = size;
 		platinumSetStandardSize(this, size);
@@ -540,33 +607,74 @@ void FolderWindow::scrollStep() {
 
 /* ---- icon view ----------------------------------------------------------------- */
 
-/* Placed icons stay put (spatial); the rest flow into free grid cells. */
+FolderWindow::IconGrid FolderWindow::iconGrid() const {
+	const bool tight = tightGrid();
+	if (smallIcons()) {
+		return tight ? IconGrid{ 104, 20, 0 } : IconGrid{ 128, 24, 0 };
+	}
+	return tight ? IconGrid{ 64, 56, (64 - PL_ICON_LARGE) / 2 } :
+		IconGrid{ 80, 64, (80 - PL_ICON_LARGE) / 2 };
+}
+
+bool FolderWindow::smallIcons() const {
+	return m_state.options.icons.size == IconSize::Small;
+}
+
+int FolderWindow::iconColumns() const {
+	return std::max(1, (viewWidth() - 2 * MARGIN) / iconGrid().cellW);
+}
+
+QPoint FolderWindow::iconSlot(int i) const {
+	const IconGrid g = iconGrid();
+	const int cols = iconColumns();
+	return QPoint(MARGIN + (i % cols) * g.cellW + g.inset, MARGIN + (i / cols) * g.cellH);
+}
+
+/* Placed icons stay put (spatial); the rest flow into free grid cells.
+ * Keep Arranged puts them all in order instead. */
 void FolderWindow::layoutIcons() {
-	const int cols = std::max(1, (viewWidth() - 2 * MARGIN) / CELL_W);
+	const IconGrid g = iconGrid();
 	std::vector<Item *> items;
 	for (auto &item : m_items) {
 		items.push_back(item.get());
 	}
-	placeIcons(items, m_state.icons, [cols](int i) {
-		return QPoint(MARGIN + (i % cols) * CELL_W + (CELL_W - PL_ICON_LARGE) / 2,
-			MARGIN + (i / cols) * CELL_H);
-	}, CELL_W, CELL_H);
+	const auto slot = [this](int i) { return iconSlot(i); };
+	const IconViewOptions &o = m_state.options.icons;
+	if (o.arrangement == IconArrangement::KeepArranged) {
+		sortIcons(items, o.keepBy);
+		for (size_t i = 0; i < items.size(); i++) {
+			items[i]->pos = slot(static_cast<int>(i));
+		}
+	} else {
+		placeIcons(items, m_state.icons, slot, g.cellW, g.cellH, g.inset);
+	}
 	m_contentHeight = 0;
 	m_contentWidth = 0;
 	for (Item *item : items) {
-		m_contentHeight = std::max(m_contentHeight, item->pos.y() + CELL_H + MARGIN);
-		m_contentWidth = std::max(m_contentWidth,
-			item->pos.x() + PL_ICON_LARGE + (CELL_W - PL_ICON_LARGE) / 2 + MARGIN);
+		m_contentHeight = std::max(m_contentHeight, item->pos.y() + g.cellH + MARGIN);
+		m_contentWidth = std::max(m_contentWidth, item->pos.x() - g.inset + g.cellW + MARGIN);
 	}
 }
 
 /* Clean Up / Arrange: every icon gets a grid position, remembered like
- * one the user dragged there. */
+ * one the user dragged there. Kept arranged, Arrange changes the order
+ * kept. */
 void FolderWindow::arrange(Arrange how) {
 	if (m_mode != ViewMode::Icons || m_items.empty()) {
 		return;
 	}
-	const int cols = std::max(1, (viewWidth() - 2 * MARGIN) / CELL_W);
+	IconViewOptions &o = m_state.options.icons;
+	if (o.arrangement == IconArrangement::KeepArranged) {
+		if (how != Arrange::CleanUp && how != o.keepBy) {
+			o.keepBy = how;
+			saveStateSoon();
+			relayout();
+			update();
+		}
+		return;
+	}
+	const IconGrid g = iconGrid();
+	const int cols = iconColumns();
 	std::vector<Item *> items;
 	int lowest = 0;
 	for (auto &item : m_items) {
@@ -574,11 +682,8 @@ void FolderWindow::arrange(Arrange how) {
 		lowest = std::max(lowest, item->pos.y());
 	}
 	/* Enough rows for every icon, and for Clean Up to reach the lowest one. */
-	const int rows = std::max(static_cast<int>(items.size()) / cols + 1, lowest / CELL_H + 1) + 1;
-	arrangeIcons(items, how, [cols](int i) {
-		return QPoint(MARGIN + (i % cols) * CELL_W + (CELL_W - PL_ICON_LARGE) / 2,
-			MARGIN + (i / cols) * CELL_H);
-	}, cols * rows);
+	const int rows = std::max(static_cast<int>(items.size()) / cols + 1, lowest / g.cellH + 1) + 1;
+	arrangeIcons(items, how, [this](int i) { return iconSlot(i); }, cols * rows);
 	m_state.icons.clear();
 	for (Item *item : items) {
 		m_state.icons.insert(item->key(), item->pos);
@@ -586,6 +691,90 @@ void FolderWindow::arrange(Arrange how) {
 	saveStateSoon();
 	relayout();
 	update();
+}
+
+void FolderWindow::snapToGrid(const std::vector<Item *> &moved) {
+	const IconGrid g = iconGrid();
+	const int cols = iconColumns();
+	int lowest = 0;
+	for (auto &item : m_items) {
+		lowest = std::max(lowest, item->pos.y());
+	}
+	const int count = cols * (lowest / g.cellH + static_cast<int>(m_items.size()) + 2);
+	/* Slots the icons left alone sit on. */
+	QSet<int> taken;
+	for (auto &item : m_items) {
+		if (std::find(moved.begin(), moved.end(), item.get()) != moved.end()) {
+			continue;
+		}
+		const int col = (item->pos.x() - MARGIN - g.inset) / g.cellW;
+		const int row = (item->pos.y() - MARGIN) / g.cellH;
+		const int s = row * cols + col;
+		if (col >= 0 && col < cols && row >= 0 && iconSlot(s) == item->pos) {
+			taken.insert(s);
+		}
+	}
+	for (Item *item : moved) {
+		const int s = nearestFreeSlot(item->pos, [this](int i) { return iconSlot(i); }, count, taken);
+		if (s >= 0) {
+			taken.insert(s);
+			item->pos = iconSlot(s);
+			m_state.icons.insert(item->key(), item->pos);
+		}
+	}
+}
+
+QRect FolderWindow::smallLabelBox(Item &item) {
+	const int maxW = item.selected ? 1000 : iconGrid().cellW - SMALL_LABEL_X - 4;
+	Text t(item.visibleName(), std::max(8, maxW), item.nameFont());
+	return QRect(item.pos.x() + SMALL_LABEL_X - 2, item.pos.y() + 1, t.inkWidth() + 4, 14);
+}
+
+QRect FolderWindow::itemRect(Item &item) {
+	if (smallIcons()) {
+		return QRect(item.pos, QSize(PL_ICON_SMALL, PL_ICON_SMALL)).united(smallLabelBox(item));
+	}
+	return iconItemRect(item, item.pos.x(), item.pos.y());
+}
+
+bool FolderWindow::itemHit(Item &item, QPoint p) {
+	if (smallIcons()) {
+		return QRect(item.pos, QSize(PL_ICON_SMALL, PL_ICON_SMALL)).contains(p) ||
+			smallLabelBox(item).contains(p);
+	}
+	return iconItemContains(item, item.pos.x(), item.pos.y(), p);
+}
+
+bool FolderWindow::labelHit(Item &item, QPoint p) {
+	return smallIcons() ? smallLabelBox(item).contains(p) :
+		iconLabelContains(item, item.pos.x(), item.pos.y(), p);
+}
+
+void FolderWindow::paintItem(pl_canvas *c, Item &item, bool showLabel) {
+	if (!smallIcons()) {
+		paintIconItem(c, item, item.pos.x(), item.pos.y(), false, showLabel);
+		return;
+	}
+	paintIcon(c, item, item.pos.x(), item.pos.y(), PL_ICON_SMALL, item.selected || item.dropTarget);
+	if (showLabel) {
+		paintItemLabel(c, item);
+	}
+}
+
+void FolderWindow::paintItemLabel(pl_canvas *c, Item &item) {
+	if (!smallIcons()) {
+		paintIconLabel(c, item, item.pos.x(), item.pos.y(), false);
+		return;
+	}
+	const QRect box = smallLabelBox(item);
+	const int maxW = item.selected ? 1000 : iconGrid().cellW - SMALL_LABEL_X - 4;
+	Text t(item.visibleName(), std::max(8, maxW), item.nameFont());
+	uint32_t ink = C_BLACK;
+	if (item.selected) {
+		pl_fill(c, box.left(), box.top(), box.right(), box.bottom() - 1, C_BLACK);
+		ink = C_WHITE;
+	}
+	pl_text(c, t.t, box.left() + 2, box.top() + 10, ink);
 }
 
 void FolderWindow::itemRenamed(const QString &from, const QString &to) {
@@ -599,12 +788,12 @@ void FolderWindow::itemRenamed(const QString &from, const QString &to) {
 }
 
 void FolderWindow::paintIcons(pl_canvas *content) {
-	const int viewH = viewHeight();
+	const int viewH = viewHeight(), cellH = iconGrid().cellH;
 	pl_fill(content, 0, m_scrollY, viewWidth() - 1, m_scrollY + viewH - 1, C_WHITE);
 	for (auto &item : m_items) {
-		if (item->pos.y() + CELL_H >= m_scrollY && item->pos.y() <= m_scrollY + viewH) {
+		if (item->pos.y() + cellH >= m_scrollY && item->pos.y() <= m_scrollY + viewH) {
 			const bool editing = m_editor.editing(item.get());
-			paintIconItem(content, *item, item->pos.x(), item->pos.y(), false, !editing);
+			paintItem(content, *item, !editing);
 			if (editing) {
 				m_editor.paint(content, item->pos.x(), item->pos.y());
 			}
@@ -613,30 +802,55 @@ void FolderWindow::paintIcons(pl_canvas *content) {
 	/* Selected icons' whole names, over their neighbours. */
 	for (auto &item : m_items) {
 		if (item->selected && !m_editor.editing(item.get())) {
-			paintIconLabel(content, *item, item->pos.x(), item->pos.y(), false);
+			paintItemLabel(content, *item);
 		}
 	}
 }
 
 /* ---- button view --------------------------------------------------------------- */
 
-/* item->pos is the icon's top-left; its button surrounds it. */
+int FolderWindow::buttonSide() const {
+	return m_state.options.buttons.size == IconSize::Small ? SMALL_BUTTON : BUTTON;
+}
+
+QSize FolderWindow::buttonCell() const {
+	const bool tight = tightGrid();
+	if (m_state.options.buttons.size == IconSize::Small) {
+		return tight ? QSize(64, 42) : QSize(72, 46);
+	}
+	return tight ? QSize(76, 74) : QSize(84, 80);
+}
+
+static int buttonIcon(int side) {
+	return side == BUTTON ? PL_ICON_LARGE : PL_ICON_SMALL;
+}
+
+/* item->pos is the icon's top-left; its button surrounds it. The buttons
+ * are kept in order (View Options' "Keep arranged", by Name unless set). */
 void FolderWindow::layoutButtons() {
-	const int cols = std::max(1, (viewWidth() - 2 * MARGIN) / BCELL_W);
-	int i = 0;
+	const QSize cell = buttonCell();
+	const int side = buttonSide(), icon = buttonIcon(side);
+	const int cols = std::max(1, (viewWidth() - 2 * MARGIN) / cell.width());
+	std::vector<Item *> items;
 	for (auto &item : m_items) {
-		item->pos = QPoint(MARGIN + (i % cols) * BCELL_W + (BCELL_W - PL_ICON_LARGE) / 2,
-			MARGIN + (i / cols) * BCELL_H + (BUTTON - PL_ICON_LARGE) / 2);
+		items.push_back(item.get());
+	}
+	sortIcons(items, m_state.options.buttons.keepBy);
+	int i = 0;
+	for (Item *item : items) {
+		item->pos = QPoint(MARGIN + (i % cols) * cell.width() + (cell.width() - icon) / 2,
+			MARGIN + (i / cols) * cell.height() + (side - icon) / 2);
 		i++;
 	}
 	const int rows = (static_cast<int>(m_items.size()) + cols - 1) / cols;
-	m_contentHeight = 2 * MARGIN + rows * BCELL_H;
+	m_contentHeight = 2 * MARGIN + rows * cell.height();
 	m_contentWidth = 0;
 }
 
-static QRect buttonRect(const Item *item) {
-	const int inset = (BUTTON - PL_ICON_LARGE) / 2;
-	return QRect(item->pos.x() - inset, item->pos.y() - inset, BUTTON, BUTTON);
+QRect FolderWindow::buttonRect(const Item *item) const {
+	const int side = buttonSide();
+	const int inset = (side - buttonIcon(side)) / 2;
+	return QRect(item->pos.x() - inset, item->pos.y() - inset, side, side);
 }
 
 void FolderWindow::paintButtons(pl_canvas *content) {
@@ -647,7 +861,7 @@ void FolderWindow::paintButtons(pl_canvas *content) {
 		pl_bevel_button_paint(content, b.x(), b.y(), b.width(), b.height(), pressed);
 		const int shift = pressed ? 1 : 0;
 		pl_icon_paint_label(content, item->pos.x() + shift, item->pos.y() + shift, item->iconKind(),
-			PL_ICON_LARGE, item->dropTarget, item->labelColor());
+			buttonIcon(buttonSide()), item->dropTarget, item->labelColor());
 
 		const Text &label = item->shownLabel();
 		const int lx = b.center().x() - label.inkWidth() / 2, top = b.bottom() + 3;
@@ -679,33 +893,87 @@ Item *FolderWindow::buttonAt(QPoint p, bool *onButton) {
 
 /* ---- list view ----------------------------------------------------------------- */
 
-void FolderWindow::sortItems(std::vector<std::unique_ptr<Item>> &items) const {
-	auto byName = [](const std::unique_ptr<Item> &a, const std::unique_ptr<Item> &b) {
-		return a->name.compare(b->name, Qt::CaseInsensitive) < 0;
-	};
-	switch (m_sortColumn) {
-	case 1: /* newest first */
-		std::stable_sort(items.begin(), items.end(), [](auto &a, auto &b) {
-			return a->modified > b->modified;
-		});
-		break;
-	case 2: /* largest first; folders last */
-		std::stable_sort(items.begin(), items.end(), [](auto &a, auto &b) {
-			if (a->isDir != b->isDir) {
-				return !a->isDir;
-			}
-			return a->size > b->size;
-		});
-		break;
-	case 3:
-		std::stable_sort(items.begin(), items.end(), [](auto &a, auto &b) {
-			return a->kindName().compare(b->kindName(), Qt::CaseInsensitive) < 0;
-		});
-		break;
-	default:
-		std::stable_sort(items.begin(), items.end(), byName);
-		break;
+FolderWindow::ListMetrics FolderWindow::metrics() const {
+	switch (m_state.options.list.size) {
+	case IconSize::Standard: return { 36, PL_ICON_LARGE, 28, 2, 66, 22 };
+	case IconSize::Tiny: return { 17, TINY_ICON, 30, 2, 46, 12 };
+	default: return { 19, PL_ICON_SMALL, 28, 1, 50, 11 };
 	}
+}
+
+void FolderWindow::sortItems(std::vector<std::unique_ptr<Item>> &items) const {
+	std::vector<Item *> order;
+	for (auto &item : items) {
+		order.push_back(item.get());
+	}
+	sortByColumn(order, m_sortColumn);
+	QHash<Item *, int> rank;
+	for (size_t i = 0; i < order.size(); i++) {
+		rank.insert(order[i], static_cast<int>(i));
+	}
+	std::sort(items.begin(), items.end(), [&](const auto &a, const auto &b) {
+		return rank.value(a.get()) < rank.value(b.get());
+	});
+}
+
+/* Calculate folder sizes: each folder in the list added up on another
+ * thread (it can take a while), filled in as it finishes. */
+void FolderWindow::calculateFolderSizes() {
+	if (m_mode != ViewMode::List || !m_state.options.list.folderSizes) {
+		return;
+	}
+	if (!m_sizingCancel) {
+		m_sizingCancel = std::make_shared<std::atomic<bool>>(false);
+	}
+	auto cancel = m_sizingCancel;
+	FolderWindow *self = this;
+	forEachItem([&](Item *item) {
+		if (!item->isDir || item->isVirtual || item->isAlias || item->folderSize >= 0) {
+			return;
+		}
+		const auto known = m_folderSizes.constFind(item->path);
+		if (known != m_folderSizes.constEnd()) {
+			item->folderSize = *known;
+			return;
+		}
+		if (m_sizing.contains(item->path)) {
+			return;
+		}
+		m_sizing.insert(item->path);
+		const QString path = item->path;
+		QThreadPool::globalInstance()->start([self, cancel, path] {
+			qint64 total = 0;
+			/* Not into linked folders: an alias isn't its original's size. */
+			QDirIterator it(path, QDir::AllEntries | QDir::Hidden | QDir::System |
+				QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
+			while (it.hasNext() && !*cancel) {
+				it.next();
+				const QFileInfo info = it.fileInfo();
+				if (info.isFile() && !info.isSymLink()) {
+					total += info.size();
+				}
+			}
+			QMetaObject::invokeMethod(qApp, [self, cancel, path, total] {
+				if (!*cancel) { /* else the window reloaded or went */
+					self->folderSized(path, total);
+				}
+			}, Qt::QueuedConnection);
+		});
+	});
+}
+
+void FolderWindow::folderSized(const QString &path, qint64 bytes) {
+	m_sizing.remove(path);
+	m_folderSizes.insert(path, bytes);
+	forEachItem([&](Item *item) {
+		if (item->path == path) {
+			item->folderSize = bytes;
+		}
+	});
+	if (m_sortColumn == COL_SIZE) {
+		relayout();
+	}
+	update();
 }
 
 void FolderWindow::buildRows() {
@@ -745,11 +1013,22 @@ void FolderWindow::toggleExpanded(Item *item) {
 
 int FolderWindow::columnAt(int contentX) const {
 	int x = 0;
-	for (int i = 0; i < N_COLUMNS; i++) {
-		if (contentX < x + COLUMNS[i].width) {
-			return i;
+	for (int c : columns()) {
+		if (contentX < x + columnInfo(c).width) {
+			return c;
 		}
-		x += COLUMNS[i].width;
+		x += columnInfo(c).width;
+	}
+	return -1;
+}
+
+int FolderWindow::columnX(int column) const {
+	int x = 0;
+	for (int c : columns()) {
+		if (c == column) {
+			return x;
+		}
+		x += columnInfo(c).width;
 	}
 	return -1;
 }
@@ -786,10 +1065,10 @@ void FolderWindow::paintColumnHeaders(pl_canvas *b) {
 		}
 	};
 	int x = 0;
-	for (int i = 0; i < N_COLUMNS; i++) {
-		const int x1 = x + COLUMNS[i].width - 1;
-		paintColumn(x, x1, i == m_sortColumn, COLUMNS[i].title,
-			x + (i == 0 ? NAME_X : COL_TEXT_X));
+	for (int c : columns()) {
+		const int x1 = x + columnInfo(c).width - 1;
+		paintColumn(x, x1, c == m_sortColumn, columnInfo(c).title,
+			x + (c == COL_NAME ? metrics().nameX : COL_TEXT_X));
 		x = x1 + 1;
 	}
 	const int end = b->x + b->width - 1;
@@ -801,49 +1080,56 @@ void FolderWindow::paintColumnHeaders(pl_canvas *b) {
 void FolderWindow::paintList(pl_canvas *c) {
 	const int viewH = viewHeight(), right = m_scrollX + viewWidth() - 1;
 	const int y0 = m_scrollY, y1 = m_scrollY + viewH - 1;
+	const ListMetrics m = metrics();
+	const std::vector<int> shown = columns();
+	const QDateTime now = QDateTime::currentDateTime();
 
 	/* Column backgrounds: the sorted column a shade darker. */
 	int x = 0;
-	for (int i = 0; i < N_COLUMNS; i++) {
-		pl_fill(c, x, y0, x + COLUMNS[i].width - 1, y1,
-			i == m_sortColumn ? GRAY(0xD) : GRAY(0xE));
-		x += COLUMNS[i].width;
+	for (int col : shown) {
+		pl_fill(c, x, y0, x + columnInfo(col).width - 1, y1,
+			col == m_sortColumn ? GRAY(0xD) : GRAY(0xE));
+		x += columnInfo(col).width;
 	}
 	pl_fill(c, x, y0, std::max(x, right), y1, GRAY(0xE));
 
-	const int first = std::max(0, m_scrollY / ROW_H);
-	const int last = std::min<int>(m_rows.size() - 1, (m_scrollY + viewH) / ROW_H);
+	const int first = std::max(0, m_scrollY / m.rowH);
+	const int last = std::min<int>(m_rows.size() - 1, (m_scrollY + viewH) / m.rowH);
 	for (int r = first; r <= last; r++) {
 		const Row &row = m_rows[r];
 		Item *item = row.item;
-		const int top = r * ROW_H, d = row.depth * INDENT;
-		pl_hline(c, 0, std::max(listWidth(), right), top + ROW_H - 1, C_WHITE);
+		const int top = r * m.rowH, d = row.depth * INDENT;
+		pl_hline(c, 0, std::max(listWidth(), right), top + m.rowH - 1, C_WHITE);
 
 		if (item->isDir) {
-			paintTriangle(c, TRI_X + d, top + 3, m_expanded.contains(item->path));
+			paintTriangle(c, TRI_X + d, top + (m.rowH - 13) / 2, m_expanded.contains(item->path));
 		}
-		paintIcon(c, *item, ICON_X + d, top + 1, PL_ICON_SMALL,
-			item->selected || item->dropTarget);
+		const bool highlight = item->selected || item->dropTarget;
+		if (m.icon == TINY_ICON) {
+			paintTinyIcon(c, *item, m.iconX + d, top + m.iconY, highlight);
+		} else {
+			paintIcon(c, *item, m.iconX + d, top + m.iconY, m.icon, highlight);
+		}
 
-		const int nameW = COLUMNS[0].width - NAME_X - d - 6;
+		const int nameW = columnInfo(COL_NAME).width - m.nameX - d - 6;
 		Text name(item->visibleName(), std::max(8, nameW), item->nameFont());
 		uint32_t ink = C_BLACK;
 		if (item->selected) {
-			pl_fill(c, NAME_X + d - 2, top + 2, NAME_X + d + name.inkWidth() + 1, top + 14, C_BLACK);
+			pl_fill(c, m.nameX + d - 2, top + m.baseline - 9, m.nameX + d + name.inkWidth() + 1,
+				top + m.baseline + 3, C_BLACK);
 			ink = C_WHITE;
 		}
-		pl_text(c, name.t, NAME_X + d, top + ROW_BASELINE, ink);
+		pl_text(c, name.t, m.nameX + d, top + m.baseline, ink);
 
-		const QString cells[] = {
-			finderDate(item->modified),
-			item->isDir ? QStringLiteral("--") : finderSize(item->size),
-			item->kindName(),
-		};
-		int cx = COLUMNS[0].width;
-		for (int i = 1; i < N_COLUMNS; i++) {
-			Text t(cells[i - 1], COLUMNS[i].width - 2 * COL_TEXT_X, PL_FONT_VIEWS);
-			pl_text(c, t.t, cx + COL_TEXT_X, top + ROW_BASELINE, C_BLACK);
-			cx += COLUMNS[i].width;
+		int cx = 0;
+		for (int col : shown) {
+			const int w = columnInfo(col).width;
+			if (col != COL_NAME) {
+				Text t(columnText(*item, col, m_state.options.list, now), w - 2 * COL_TEXT_X,
+					PL_FONT_VIEWS);
+				pl_text(c, t.t, cx + COL_TEXT_X, top + m.baseline, C_BLACK);
+			}
+			cx += w;
 		}
 	}
 }
@@ -912,13 +1198,13 @@ Item *FolderWindow::itemAt(QPoint pos, bool *onTriangle) {
 	}
 	if (m_mode == ViewMode::Icons) {
 		for (auto it = m_items.rbegin(); it != m_items.rend(); ++it) {
-			if (iconItemContains(**it, (*it)->pos.x(), (*it)->pos.y(), p)) {
+			if (itemHit(**it, p)) {
 				return it->get();
 			}
 		}
 		return nullptr;
 	}
-	const int r = p.y() / ROW_H;
+	const int r = p.y() / metrics().rowH;
 	if (p.y() < 0 || r >= static_cast<int>(m_rows.size()) || p.x() >= listWidth()) {
 		return nullptr;
 	}
@@ -1000,14 +1286,7 @@ void FolderWindow::mousePressEvent(QMouseEvent *e) {
 
 	/* List view: clicking a column header sorts by it. */
 	if (m_mode == ViewMode::List && pos.y() >= HEADER_H && pos.y() < LIST_TOP) {
-		int col = columnAt(pos.x() + m_scrollX);
-		if (col >= 0 && col != m_sortColumn) {
-			m_sortColumn = col;
-			m_state.sortColumn = col;
-			saveStateSoon();
-			relayout();
-			update();
-		}
+		sortBy(columnAt(pos.x() + m_scrollX));
 		return;
 	}
 	if (pos.y() < contentTop() || pos.x() >= barX) {
@@ -1048,7 +1327,7 @@ void FolderWindow::mousePressEvent(QMouseEvent *e) {
 	m_renameTimer.stop();
 	if (m_mode == ViewMode::Icons && hit && hit->selected && !extend &&
 			selectedItems().size() == 1 &&
-			iconLabelContains(*hit, hit->pos.x(), hit->pos.y(), content)) {
+			labelHit(*hit, content)) {
 		m_renameItem = hit;
 		m_renameTimer.start(QApplication::doubleClickInterval());
 	}
@@ -1102,11 +1381,13 @@ void FolderWindow::mouseMoveEvent(QMouseEvent *e) {
 				origins.push_back(toWindow(item->pos));
 				continue;
 			}
-			/* List rows: centre a large outline on the small icon. */
+			/* List rows: centre a large outline on the row's icon. */
+			const ListMetrics m = metrics();
 			for (size_t r = 0; r < m_rows.size(); r++) {
 				if (m_rows[r].item == item) {
-					QPoint icon(ICON_X + m_rows[r].depth * INDENT, static_cast<int>(r) * ROW_H + 1);
-					origins.push_back(toWindow(icon) - QPoint(8, 8));
+					QPoint icon(m.iconX + m_rows[r].depth * INDENT, static_cast<int>(r) * m.rowH + m.iconY);
+					const int off = (PL_ICON_LARGE - m.icon) / 2;
+					origins.push_back(toWindow(icon) - QPoint(off, off));
 				}
 			}
 		}
@@ -1310,13 +1591,23 @@ void FolderWindow::dropEvent(QDropEvent *e) {
 	}
 	if (!target && e->source() == this && m_mode == ViewMode::Icons &&
 			!(e->modifiers() & Qt::AltModifier)) {
-		/* Icons dragged within their own window: they move there, and stay. */
+		/* Icons dragged within their own window: they move there, and stay
+		 * (on the grid, if it snaps; kept arranged, they go back in line). */
+		const IconArrangement arrangement = m_state.options.icons.arrangement;
 		const QPoint delta = e->position().toPoint() - m_dragStart;
-		for (Item *item : selectedItems()) {
+		const std::vector<Item *> moved = selectedItems();
+		for (Item *item : moved) {
+			if (arrangement == IconArrangement::KeepArranged) {
+				break;
+			}
 			QPoint p = item->pos + delta;
 			p.setX(std::max(0, p.x()));
 			p.setY(std::max(0, p.y()));
+			item->pos = p;
 			m_state.icons.insert(item->key(), p);
+		}
+		if (arrangement == IconArrangement::SnapToGrid) {
+			snapToGrid(moved);
 		}
 		saveStateSoon();
 		relayout();

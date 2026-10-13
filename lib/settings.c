@@ -53,7 +53,7 @@ static char *trim(char *s) {
 }
 
 /* The file's lines, cached until its modification time changes. */
-#define MAX_LINES 64
+#define MAX_LINES 160
 static struct {
 	struct timespec mtime;
 	off_t size;
@@ -612,4 +612,71 @@ int pl_caret_blink_ms(void) {
 	char v[16];
 	const int ms = pl_setting("caret-blink", v, sizeof(v)) ? atoi(v) : 0;
 	return ms >= 200 && ms <= 4000 ? ms : 1066;
+}
+
+/* ---- labels ----------------------------------------------------------------- */
+
+const uint32_t pl_palette16[PL_PALETTE16_COUNT] = {
+	0xFFFFFFFF, 0xFFFCF305, 0xFFFF6403, 0xFFDD0806, 0xFFF20884, 0xFF4600A5,
+	0xFF0000D4, 0xFF02ABEA, 0xFF1FB714, 0xFF006411, 0xFF562C05, 0xFF90713A,
+	0xFFC0C0C0, 0xFF808080, 0xFF404040, 0xFF000000,
+};
+
+static struct {
+	char names_raw[256], colors_raw[256];
+	char names[PL_LABEL_COUNT][64];
+	uint32_t colors[PL_LABEL_COUNT];
+	bool ready;
+} labels;
+
+/* Re-parsed only when the settings' values change. */
+static void labels_load(void) {
+	char names[256] = "", colors[256] = "";
+	pl_setting("label-names", names, sizeof(names));
+	pl_setting("label-colors", colors, sizeof(colors));
+	if (labels.ready && strcmp(names, labels.names_raw) == 0 &&
+			strcmp(colors, labels.colors_raw) == 0) {
+		return;
+	}
+	labels.ready = true;
+	snprintf(labels.names_raw, sizeof(labels.names_raw), "%s", names);
+	snprintf(labels.colors_raw, sizeof(labels.colors_raw), "%s", colors);
+	const char *n = names, *c = colors;
+	for (int i = 0; i < PL_LABEL_COUNT; i++) {
+		snprintf(labels.names[i], sizeof(labels.names[0]), "%s", pl_labels[i].name);
+		labels.colors[i] = pl_labels[i].color;
+		if (i == 0) {
+			continue;
+		}
+		const size_t nl = strcspn(n, "|");
+		if (*n && nl > 0) {
+			snprintf(labels.names[i], sizeof(labels.names[0]), "%.*s", (int)nl, n);
+		}
+		n += nl + (n[nl] == '|');
+		const size_t cl = strcspn(c, ",");
+		char *end;
+		char hex[16];
+		snprintf(hex, sizeof(hex), "%.*s", (int)(cl < 15 ? cl : 15), c);
+		const unsigned long rgb = strtoul(hex, &end, 16);
+		if (cl == 6 && *end == '\0') {
+			labels.colors[i] = 0xFF000000u | (uint32_t)rgb;
+		}
+		c += cl + (c[cl] == ',');
+	}
+}
+
+const char *pl_label_name(int index) {
+	if (index < 0 || index >= PL_LABEL_COUNT) {
+		index = 0;
+	}
+	labels_load();
+	return labels.names[index];
+}
+
+uint32_t pl_label_color(int index) {
+	if (index <= 0 || index >= PL_LABEL_COUNT) {
+		return 0;
+	}
+	labels_load();
+	return labels.colors[index];
 }

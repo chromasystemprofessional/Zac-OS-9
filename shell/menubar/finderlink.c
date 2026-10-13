@@ -74,9 +74,9 @@ static bool parse_line(const char *line) {
 		return false;
 	}
 	struct finder_state s = { .connected = true, .label = -1 };
-	if (sscanf(line, "state selection=%d window=%d trash=%d view=%d label=%d erase=%d network=%d unmount=%d",
+	if (sscanf(line, "state selection=%d window=%d trash=%d view=%d label=%d erase=%d network=%d unmount=%d sort=%d columns=%u",
 			&s.selection, &s.window, &s.trash, &s.view, &s.label, &s.erase,
-			&s.network, &s.unmount) < 3) {
+			&s.network, &s.unmount, &s.sort, &s.columns) < 3) {
 		return false;
 	}
 	bool changed = memcmp(&s, &state, sizeof(s)) != 0;

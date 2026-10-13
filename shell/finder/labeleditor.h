@@ -37,6 +37,10 @@ public:
 	void commit();
 	void cancel();
 
+	/* Small icons (View Options): the name sits beside the 16 px icon,
+	 * not under it. */
+	void setBeside(bool beside) { m_beside = beside; }
+
 	/* Paint the edit box for the item whose icon is at (x, y). */
 	void paint(pl_canvas *c, int x, int y) const;
 	/* Is `p` inside the edit box of the icon at (x, y)? */
@@ -52,5 +56,8 @@ private:
 	QString m_text;
 	int m_cursor = 0, m_anchor = 0;
 	bool m_caretOn = true;
+	bool m_beside = false;
 	QTimer m_blink;
+	/* The pen and the box's top for the icon at (x, y). */
+	void origin(int x, int y, int width, int *pen, int *top) const;
 };

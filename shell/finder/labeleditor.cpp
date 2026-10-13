@@ -238,10 +238,20 @@ void LabelEditor::commit() {
 }
 
 /* The box is centred under the icon and sized to the text being typed. */
+void LabelEditor::origin(int x, int y, int width, int *pen, int *top) const {
+	if (m_beside) {
+		*pen = x + PL_ICON_SMALL + 4;
+		*top = y + 1;
+	} else {
+		*pen = x + PL_ICON_LARGE / 2 - width / 2;
+		*top = y + PL_ICON_LARGE + LABEL_GAP;
+	}
+}
+
 void LabelEditor::paint(pl_canvas *c, int x, int y) const {
 	const int width = advanceTo(m_text.size());
-	const int pen = x + PL_ICON_LARGE / 2 - width / 2;
-	const int top = y + PL_ICON_LARGE + LABEL_GAP;
+	int pen, top;
+	origin(x, y, width, &pen, &top);
 	pl_fill(c, pen - BOX_PAD - 1, top, pen + width + BOX_PAD, top + BOX_H - 1, C_WHITE);
 	pl_outline(c, pen - BOX_PAD - 1, top, pen + width + BOX_PAD, top + BOX_H - 1, C_BLACK);
 
@@ -262,8 +272,8 @@ void LabelEditor::paint(pl_canvas *c, int x, int y) const {
 
 bool LabelEditor::contains(int x, int y, QPoint p) const {
 	const int width = advanceTo(m_text.size());
-	const int pen = x + PL_ICON_LARGE / 2 - width / 2;
-	const int top = y + PL_ICON_LARGE + LABEL_GAP;
+	int pen, top;
+	origin(x, y, width, &pen, &top);
 	return QRect(QPoint(pen - BOX_PAD - 1, top), QPoint(pen + width + BOX_PAD, top + BOX_H - 1))
 		.contains(p);
 }

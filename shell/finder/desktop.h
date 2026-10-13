@@ -36,6 +36,9 @@ public:
 	void itemRenamed(const QString &from, const QString &to) override;
 	void arrange(Arrange how) override;
 	void selectAll() override;
+	/* View Options: the desktop's icon arrangement. */
+	const ViewOptions &viewOptions() const { return m_state.options; }
+	void setViewOptions(const ViewOptions &options);
 
 protected:
 	void paintEvent(QPaintEvent *) override;
@@ -53,6 +56,7 @@ protected:
 private:
 	bool iconsShown() const;
 	void placeIcons();
+	std::function<QPoint(int)> gridSlot(int *slotCount) const;
 	void updateTrashIcon();
 	void loadPattern();
 

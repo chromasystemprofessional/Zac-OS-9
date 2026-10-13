@@ -4,12 +4,15 @@
 #include <QSet>
 #include <QTimer>
 #include <QWidget>
+#include <atomic>
 #include <map>
+#include <memory>
 
 #include "finder.h"
 #include "folderstate.h"
 #include "items.h"
 #include "labeleditor.h"
+#include "viewoptions.h"
 #include "widgets.h"
 
 /*
@@ -29,6 +32,18 @@ public:
 
 	void setViewMode(ViewMode mode);
 	ViewMode viewMode() const { return m_mode; }
+
+	/* View Options (viewoptions.h): this window's, for each of its views. */
+	const ViewOptions &viewOptions() const { return m_state.options; }
+	void setViewOptions(const ViewOptions &options);
+	/* View > Sort List and the column headers: a ListColumn shown. */
+	void sortBy(int column);
+	int sortColumn() const { return m_sortColumn; }
+	/* The list's columns, left to right (Name first). */
+	std::vector<int> columns() const;
+	/* Preferences changed (grid spacing, labels, standard views): every
+	 * window lays itself out again. */
+	static void preferencesChanged();
 
 	/* FinderView */
 	QString folderPath() const override { return m_path; }
@@ -78,11 +93,30 @@ private:
 	QPoint toWindow(QPoint contentPos) const;
 	void scrollStep();
 
-	/* Icon view. */
+	/* Icon view, standard or small icons, on a Wide or Tight grid. */
+	struct IconGrid {
+		int cellW, cellH, inset; /* inset: the icon's left within its cell */
+	};
+	IconGrid iconGrid() const;
+	int iconColumns() const;
+	QPoint iconSlot(int i) const;
+	bool smallIcons() const;
 	void layoutIcons();
 	void paintIcons(pl_canvas *content);
+	/* An icon item at item->pos: its icon and name, as either size draws them. */
+	QRect itemRect(Item &item);
+	bool itemHit(Item &item, QPoint content);
+	bool labelHit(Item &item, QPoint content);
+	void paintItem(pl_canvas *c, Item &item, bool showLabel);
+	void paintItemLabel(pl_canvas *c, Item &item);
+	QRect smallLabelBox(Item &item);
+	/* Always snap to grid: the moved icons go to the nearest free slots. */
+	void snapToGrid(const std::vector<Item *> &moved);
 
 	/* Button view: each item a bevel button; a click opens it. */
+	int buttonSide() const;
+	QSize buttonCell() const;
+	QRect buttonRect(const Item *item) const;
 	void layoutButtons();
 	void paintButtons(pl_canvas *content);
 	Item *buttonAt(QPoint content, bool *onButton);
@@ -94,6 +128,11 @@ private:
 		Item *item;
 		int depth;
 	};
+	struct ListMetrics {
+		int rowH, icon, iconX, iconY, nameX, baseline;
+	};
+	ListMetrics metrics() const;
+	int columnX(int column) const;
 	void buildRows();
 	void paintColumnHeaders(pl_canvas *band);
 	void paintList(pl_canvas *content);
@@ -119,7 +158,14 @@ private:
 	std::map<QString, std::vector<std::unique_ptr<Item>>> m_children;
 	QSet<QString> m_expanded;
 	std::vector<Row> m_rows;
-	int m_sortColumn = 0; /* Name */
+	int m_sortColumn = 0; /* a ListColumn; Name */
+	/* Calculate folder sizes: folders' contents added up off the main
+	 * thread, kept until the window reloads. */
+	void calculateFolderSizes();
+	void folderSized(const QString &path, qint64 bytes);
+	QHash<QString, qint64> m_folderSizes;
+	QSet<QString> m_sizing;
+	std::shared_ptr<std::atomic<bool>> m_sizingCancel;
 	int m_scrollX = 0, m_scrollY = 0;
 	int m_contentHeight = 0;
 	int m_contentWidth = 0; /* icon view: rightmost placed icon */

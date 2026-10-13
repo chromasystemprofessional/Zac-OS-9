@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "pixels.h"
+#include "settings.h"
 
 /* Something the Finder shows as an icon: a file, folder, disk or the Trash. */
 struct Item {
@@ -38,7 +39,7 @@ struct Item {
 
 	/* Finder label, 0 (None) .. PL_LABEL_COUNT-1, kept in LABEL_ATTR. */
 	int labelIndex = 0;
-	uint32_t labelColor() const { return pl_labels[labelIndex].color; }
+	uint32_t labelColor() const { return pl_label_color(labelIndex); }
 
 	/* A folder shared from Get Info: drawn on a network line. */
 	bool shared = false;
@@ -83,6 +84,13 @@ struct Item {
 	QDateTime modified;
 	QString kindText; /* filled in lazily: "folder", "Plain text document", ... */
 	const QString &kindName();
+	/* View Options' other columns, looked up when first needed
+	 * (viewoptions.cpp). */
+	QDateTime created;
+	QString comment, version;
+	bool createdResolved = false, commentResolved = false, versionResolved = false;
+	/* A folder's contents added up (Calculate folder sizes); -1 until then. */
+	qint64 folderSize = -1;
 
 	/* Label below the icon, views font. As in Mac OS 8 and 9: a long name is
 	 * cut in the middle ("Mousepad…ferences") to fit its grid cell, and shown
@@ -150,9 +158,14 @@ void paintIconLabel(pl_canvas *c, Item &item, int x, int y, bool onDesktop);
  * rest take the first free grid slot (`slot(i)` gives slot i's icon
  * position) so they never land on a placed icon. Cells are cellW x cellH. */
 #include <QHash>
+#include <QSet>
 #include <functional>
 void placeIcons(const std::vector<Item *> &items, const QHash<QString, QPoint> &placed,
-		const std::function<QPoint(int)> &slot, int cellW, int cellH);
+		const std::function<QPoint(int)> &slot, int cellW, int cellH, int iconInset = -1);
+/* Always snap to grid (View Options): the free slot nearest `p` (slots
+ * 0..slotCount-1, as placeIcons'), not one in `taken`. */
+int nearestFreeSlot(QPoint p, const std::function<QPoint(int)> &slot, int slotCount,
+		const QSet<int> &taken);
 
 /* The View menu's Clean Up and Arrange (Mac OS 9). */
 enum class Arrange { CleanUp, Name, Modified, Created, Size, Kind, Label };

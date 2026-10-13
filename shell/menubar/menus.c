@@ -64,9 +64,9 @@ static void add_label_submenu(struct mb_menu *m, bool enabled, int current) {
 	for (int i = 0; i < PL_LABEL_COUNT; i++) {
 		char command[16];
 		snprintf(command, sizeof(command), "label %d", i);
-		struct mb_item *it = add(label->submenu, pl_labels[i].name, 0, enabled,
+		struct mb_item *it = add(label->submenu, pl_label_name(i), 0, enabled,
 			ACT_FINDER, command);
-		it->swatch = pl_labels[i].color;
+		it->swatch = pl_label_color(i);
 		it->checked = enabled && current == i;
 		if (i == 0) {
 			sep(label->submenu);
@@ -84,6 +84,27 @@ static void add_arrange_submenu(struct mb_menu *m, bool enabled) {
 	add(arrange->submenu, "by Size", 0, enabled, ACT_FINDER, "arrange size");
 	add(arrange->submenu, "by Kind", 0, enabled, ACT_FINDER, "arrange kind");
 	add(arrange->submenu, "by Label", 0, enabled, ACT_FINDER, "arrange label");
+}
+
+/* View > Sort List: the list's columns shown, left to right (the
+ * Sniffer's viewoptions.h ids), the one sorted by checked. */
+static void add_sort_submenu(struct mb_menu *m, bool enabled, const struct finder_state *fs) {
+	static const struct { int id; const char *name, *key; } columns[] = {
+		{ 0, "by Name", "name" }, { 1, "by Date Modified", "modified" },
+		{ 4, "by Date Created", "created" }, { 2, "by Size", "size" }, { 3, "by Kind", "kind" },
+		{ 5, "by Label", "label" }, { 6, "by Comments", "comments" }, { 7, "by Version", "version" },
+	};
+	struct mb_item *sort = add(m, "Sort List", 0, enabled, ACT_NONE, NULL);
+	sort->submenu = calloc(1, sizeof(*sort->submenu));
+	for (size_t i = 0; i < sizeof(columns) / sizeof(columns[0]); i++) {
+		if (columns[i].id != 0 && !(fs->columns & (1u << columns[i].id))) {
+			continue;
+		}
+		char command[32];
+		snprintf(command, sizeof(command), "sort %s", columns[i].key);
+		struct mb_item *it = add(sort->submenu, columns[i].name, 0, enabled, ACT_FINDER, command);
+		it->checked = enabled && fs->sort == columns[i].id;
+	}
 }
 
 /* With the Finder (or nothing) in front, the Finder's menus. Commands go
@@ -120,6 +141,8 @@ static void add_finder_menus(struct mb_menu *menus, int *n) {
 	select_all->enabled = up;
 	select_all->action = ACT_FINDER;
 	select_all->arg = strdup("select-all");
+	sep(edit);
+	add(edit, "Preferences…", 0, up, ACT_FINDER, "preferences");
 	m = new_menu(menus, n, "View");
 	const bool win = up && fs->window;
 	struct mb_item *icons = add(m, "as Icons", 0, win, ACT_FINDER, "view-icons");
@@ -133,6 +156,9 @@ static void add_finder_menus(struct mb_menu *menus, int *n) {
 	const bool iconView = up && (!fs->window || fs->view == 0);
 	add(m, "Clean Up", 0, iconView, ACT_FINDER, "clean-up");
 	add_arrange_submenu(m, iconView);
+	add_sort_submenu(m, win && fs->view == 1, fs);
+	sep(m);
+	add(m, "View Options…", 0, up, ACT_FINDER, "view-options");
 	m = new_menu(menus, n, "Special");
 	add(m, "Empty Trash…", 0, up && fs->trash, ACT_FINDER, "empty-trash");
 	add(m, "Eject", 'E', up && (fs->network || fs->unmount), ACT_FINDER, "eject");
@@ -422,7 +448,10 @@ void menus_context(struct mb_menu *m, const char *kind) {
 		if (fs->view == 0) {
 			add(m, "Clean Up", 0, true, ACT_FINDER, "clean-up");
 			add_arrange_submenu(m, true);
+		} else if (fs->view == 1) {
+			add_sort_submenu(m, true, fs);
 		}
+		add(m, "View Options…", 0, true, ACT_FINDER, "view-options");
 		sep(m);
 		add(m, "Get Info", 0, true, ACT_FINDER, "get-info");
 		add(m, "Close Window", 0, true, ACT_FINDER, "close-window");
@@ -431,6 +460,7 @@ void menus_context(struct mb_menu *m, const char *kind) {
 		sep(m);
 		add(m, "Clean Up", 0, true, ACT_FINDER, "clean-up");
 		add_arrange_submenu(m, true);
+		add(m, "View Options…", 0, true, ACT_FINDER, "view-options");
 		sep(m);
 		char command[PATH_MAX + 64];
 		sibling_program("zacos9-appearance", command, sizeof(command));

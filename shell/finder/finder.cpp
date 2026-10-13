@@ -35,6 +35,7 @@
 #include "findwindow.h"
 #include "folderpath.h"
 #include "folderwindow.h"
+#include "viewoptionsdialog.h"
 #include "infowindow.h"
 #include "resourcewindows.h"
 
@@ -49,11 +50,10 @@ QString Finder::socketPath() {
 	return runtime + "/zacos9-finder." + display + ".sock";
 }
 
-/* Mac OS 8's default spring delay is "medium". TODO: measure. */
-static constexpr int SPRING_MS = 900;
-
+/* Spring-loaded folders: on or off, and the delay (Mac OS 8's default
+ * "medium", 900 ms; TODO: measure), from Preferences > General. */
 void Finder::springHover(const QString &folder) {
-	if (folder == m_springPath) {
+	if (folder == m_springPath || (!folder.isEmpty() && !springLoadedFolders())) {
 		return;
 	}
 	m_springPath = folder;
@@ -75,7 +75,7 @@ void Finder::springHover(const QString &folder) {
 	if (folder.isEmpty()) {
 		m_springTimer->stop();
 	} else {
-		m_springTimer->start(SPRING_MS);
+		m_springTimer->start(springDelayMs());
 	}
 }
 
@@ -188,9 +188,17 @@ QString Finder::stateLine() {
 		[](const Item *i) { return i->isNetworkVolume; });
 	const bool unmount = std::any_of(items.begin(), items.end(),
 		[](const Item *i) { return i->isLocalVolume; });
-	return QStringLiteral("state selection=%1 window=%2 trash=%3 view=%4 label=%5 erase=%6 network=%7 unmount=%8")
+	/* View > Sort List: the list's sort column and the columns shown. */
+	const int sort = fw ? fw->sortColumn() : 0;
+	unsigned columns = 0;
+	if (fw) {
+		for (int c : fw->columns()) {
+			columns |= columnBit(c);
+		}
+	}
+	return QStringLiteral("state selection=%1 window=%2 trash=%3 view=%4 label=%5 erase=%6 network=%7 unmount=%8 sort=%9 columns=%10")
 		.arg(selection).arg(window ? 1 : 0).arg(full ? 1 : 0).arg(list).arg(label).arg(erase ? 1 : 0)
-		.arg(network ? 1 : 0).arg(unmount ? 1 : 0);
+		.arg(network ? 1 : 0).arg(unmount ? 1 : 0).arg(sort).arg(columns);
 }
 
 void Finder::notifyState() {
@@ -312,6 +320,25 @@ void Finder::command(const QString &name) {
 		};
 		if (by.contains(name)) {
 			front()->arrange(by.value(name));
+		}
+	} else if (name == "view-options") {
+		/* Its dialog runs its own event loop: not inside the socket's
+		 * read loop, whose socket may go away meanwhile. */
+		QPointer<QWidget> view = front() ? front()->widget() : nullptr;
+		QTimer::singleShot(0, [this, view] {
+			if (view && front() && front()->widget() == view) {
+				showViewOptions(front());
+			}
+		});
+	} else if (name == "preferences") {
+		showPreferences();
+	} else if (name.startsWith("sort ")) {
+		if (auto *fw = dynamic_cast<FolderWindow *>(front())) {
+			for (int c = 0; c < COL_COUNT; c++) {
+				if (name.mid(5) == QLatin1String(columnInfo(c).key)) {
+					fw->sortBy(c);
+				}
+			}
 		}
 	} else if (name == "view-icons" || name == "view-list" || name == "view-buttons") {
 		if (auto *fw = dynamic_cast<FolderWindow *>(front())) {

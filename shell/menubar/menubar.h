@@ -159,6 +159,8 @@ struct finder_state {
 	int label; /* the selection's common label index, or -1 */
 	int erase; /* exactly one mounted USB disk is selected */
 	int network, unmount; /* selected network/local mounted disk */
+	int sort;             /* the front list's sort column (viewoptions.h) */
+	unsigned columns;     /* and its columns shown, as bits */
 };
 
 bool finder_connect(void);

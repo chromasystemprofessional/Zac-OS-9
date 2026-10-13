@@ -37,6 +37,18 @@ int main(void) {
 	check(pl_setting("alert-sound", v, sizeof(v)) && strcmp(v, "glass") == 0, "alert-sound=glass");
 	check(!pl_setting("missing", v, sizeof(v)), "an unset key reads as unset");
 
+	/* Labels: the defaults, then the user's (Sniffer Preferences). */
+	check(strcmp(pl_label_name(1), "Essential") == 0 && pl_label_color(2) == 0xFFDD0806 &&
+		pl_label_color(0) == 0, "labels default to Mac OS's");
+	pl_setting_set("label-names", "Urgent||Later");
+	pl_setting_set("label-colors", "000000,nope,4600A5");
+	check(strcmp(pl_label_name(1), "Urgent") == 0 && strcmp(pl_label_name(2), "Hot") == 0 &&
+		strcmp(pl_label_name(3), "Later") == 0 && strcmp(pl_label_name(4), "Cool") == 0,
+		"renamed labels; an empty name keeps the default");
+	check(pl_label_color(1) == 0xFF000000 && pl_label_color(2) == 0xFFDD0806 &&
+		pl_label_color(3) == 0xFF4600A5 && pl_label_color(7) == 0xFF562C05,
+		"recoloured labels; a bad colour keeps the default");
+
 	/* General Controls. */
 	check(pl_menu_blinks() == 1 && pl_caret_blink_ms() == 1066,
 		"menus blink once and the insertion point at medium by default");
