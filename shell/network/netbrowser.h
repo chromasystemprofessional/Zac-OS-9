@@ -15,6 +15,9 @@
 class NetBrowserWindow : public QWidget {
 public:
 	NetBrowserWindow();
+	/* Log in to a server and mount what's chosen (also the Zac menu's
+	 * Recent Servers: zacos9-netbrowser --connect afp|smb ADDRESS). */
+	void connectTo(const QString &address, DiscoveredServer::Kind kind);
 
 protected:
 	void paintEvent(QPaintEvent *) override;
@@ -28,7 +31,6 @@ protected:
 private:
 	void scan();
 	void connectToServer();
-	void connectTo(const QString &address, DiscoveredServer::Kind kind);
 
 	std::vector<DiscoveredServer> m_found;
 	PanelList m_list;

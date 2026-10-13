@@ -1,5 +1,11 @@
 #include "netbrowser.h"
 
+#include <QDir>
+
+#include <QFile>
+
+#include <QStandardPaths>
+
 #include <QApplication>
 #include <QKeyEvent>
 #include <QMouseEvent>
@@ -75,6 +81,32 @@ void NetBrowserWindow::connectToServer() {
 	}
 }
 
+/* Connected: first in the Zac menu's Recent Servers ("kind\taddress\tname"
+ * lines, newest first, in $XDG_STATE_HOME/zacos9/recent-servers). */
+static void rememberServer(DiscoveredServer::Kind kind, const QString &address, const QString &name) {
+	const QString dir = QStandardPaths::writableLocation(QStandardPaths::GenericStateLocation) + "/zacos9";
+	QDir().mkpath(dir);
+	QFile file(dir + "/recent-servers");
+	QStringList lines;
+	if (file.open(QIODevice::ReadOnly)) {
+		lines = QString::fromUtf8(file.readAll()).split('\n', Qt::SkipEmptyParts);
+		file.close();
+	}
+	const QString kindName = kind == DiscoveredServer::SMB ? "smb" : "afp";
+	QString clean = name;
+	clean.replace('\t', ' ').replace('\n', ' ');
+	lines.removeIf([&](const QString &line) {
+		return line.section('\t', 0, 1) == kindName + "\t" + address;
+	});
+	lines.prepend(kindName + "\t" + address + "\t" + (clean.isEmpty() ? address : clean));
+	while (lines.size() > 50) {
+		lines.removeLast();
+	}
+	if (file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+		file.write((lines.join('\n') + "\n").toUtf8());
+	}
+}
+
 void NetBrowserWindow::connectTo(const QString &address, DiscoveredServer::Kind kind) {
 	if (kind == DiscoveredServer::SMB) {
 		const LoginDialog::Result login = LoginDialog::ask(this, address, true, true);
@@ -86,6 +118,8 @@ void NetBrowserWindow::connectTo(const QString &address, DiscoveredServer::Kind 
 				login.guest ? QString() : login.password, &error)) {
 			Alert::ask(error.isEmpty() ? "The share could not be mounted." : error, "OK",
 				QString());
+		} else {
+			rememberServer(kind, address, address);
 		}
 		return;
 	}
@@ -125,6 +159,8 @@ void NetBrowserWindow::connectTo(const QString &address, DiscoveredServer::Kind 
 				} else if (!mounted && !afpMount(address, volume, mountPoint, user,
 						login.guest ? QString() : login.password, cleartext, &mountError)) {
 					Alert::ask(mountError, "OK", QString());
+				} else {
+					rememberServer(kind, address, info.name);
 				}
 			}
 			return;

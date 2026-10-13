@@ -654,6 +654,37 @@ bool appLaunch(const QString &id, const QString &actionId) {
 	return ok;
 }
 
+/* Opened from the Finder: on the freedesktop recently-used list (the Zac
+ * menu's Recent Documents), under the application that opened it, as
+ * GTK programs record their own. */
+static void rememberRecentDocument(GFile *file, GAppInfo *info) {
+	char *xbel = g_build_filename(g_get_user_data_dir(), "recently-used.xbel", nullptr);
+	GBookmarkFile *bookmarks = g_bookmark_file_new();
+	g_bookmark_file_load_from_file(bookmarks, xbel, nullptr); /* none yet is fine */
+	char *uri = g_file_get_uri(file);
+	char *path = g_file_get_path(file);
+	char *type = path ? g_content_type_guess(path, nullptr, 0, nullptr) : nullptr;
+	char *mime = type ? g_content_type_get_mime_type(type) : nullptr;
+	if (mime) {
+		g_bookmark_file_set_mime_type(bookmarks, uri, mime);
+	}
+	const char *program = g_app_info_get_executable(info);
+	char *exec = g_strdup_printf("%s %%u", program ? program : "xdg-open");
+	g_bookmark_file_add_application(bookmarks, uri, g_app_info_get_name(info), exec);
+	GError *error = nullptr;
+	if (!g_bookmark_file_to_file(bookmarks, xbel, &error)) {
+		qWarning() << "Could not add to recent documents:" << (error ? error->message : "");
+		g_clear_error(&error);
+	}
+	g_free(exec);
+	g_free(mime);
+	g_free(type);
+	g_free(path);
+	g_free(uri);
+	g_bookmark_file_free(bookmarks);
+	g_free(xbel);
+}
+
 bool appOpenFile(const QString &path) {
 	GFile *file = g_file_new_for_path(path.toUtf8().constData());
 	GError *error = nullptr;
@@ -669,6 +700,9 @@ bool appOpenFile(const QString &path) {
 	}
 	GList files = { file, nullptr, nullptr };
 	const bool ok = launchInfo(info, &files);
+	if (ok) {
+		rememberRecentDocument(file, info);
+	}
 	g_object_unref(info);
 	g_object_unref(file);
 	return ok;

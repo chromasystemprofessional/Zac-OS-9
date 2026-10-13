@@ -9,6 +9,9 @@
 /* toplevels.c tells the menu bar when windows come and go. */
 void menubar_apps_changed(void) {
 }
+void recent_app_seen(const char *app_id) {
+	(void)app_id;
+}
 
 static const char *pick(struct app *list, int n, int step) {
 	struct app copy[MAX_ITEMS];

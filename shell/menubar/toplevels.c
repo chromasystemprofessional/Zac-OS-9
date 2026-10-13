@@ -58,8 +58,9 @@ static void handle_done(void *data, struct zwlr_foreign_toplevel_handle_v1 *h) {
 	if (t->p_title) {
 		replace(&t->title, t->p_title);
 	}
-	if (t->p_app_id) {
+	if (t->p_app_id && (!t->app_id || strcmp(t->app_id, t->p_app_id) != 0)) {
 		replace(&t->app_id, t->p_app_id);
+		recent_app_seen(t->app_id); /* Recent Applications */
 	}
 	if (t->p_activated && !t->activated) {
 		t->last_active = ++activation_counter;
@@ -140,7 +141,12 @@ static char *desktop_name(const char *path) {
 	return name;
 }
 
-static char *lookup_desktop_name(const char *app_id) {
+/* The desktop file naming an app id (as is, or in lower case), searched
+ * like the menu bar's names; NULL if none. */
+char *app_desktop_file(const char *app_id) {
+	if (!app_id || !*app_id) {
+		return NULL;
+	}
 	const char *home = getenv("HOME");
 	const char *data_dirs = getenv("XDG_DATA_DIRS");
 	char dirs[2048];
@@ -161,11 +167,19 @@ static char *lookup_desktop_name(const char *app_id) {
 			snprintf(path, sizeof(path), "%s/applications/%s.desktop", dir, candidates[c]);
 			char *name = desktop_name(path);
 			if (name) {
-				return name;
+				free(name);
+				return strdup(path);
 			}
 		}
 	}
 	return NULL;
+}
+
+static char *lookup_desktop_name(const char *app_id) {
+	char *path = app_desktop_file(app_id);
+	char *name = path ? desktop_name(path) : NULL;
+	free(path);
+	return name;
 }
 
 const char *app_display_name(const char *app_id) {

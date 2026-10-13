@@ -93,10 +93,19 @@ menubar_exe = executable('zacos9-menubar',
   'menubar/finderlink.c',
   'menubar/appmenu.c',
   'menubar/logout.c',
+  'menubar/recent.c',
   client_protocol_src,
   finder_protocol,
   dependencies: [platinum_dep, wayland_client, wayland_cursor, xkbcommon_client, gio],
   install: true,
+)
+
+# The Zac menu's recent items (menubar/recent.c).
+test('menu-recent',
+  executable('test-recent', 'menubar/test_recent.c', 'menubar/recent.c',
+    dependencies: [platinum_dep, gio],
+  ),
+  timeout: 10,
 )
 
 # ⌘-Tab's choice of program (menubar/toplevels.c).

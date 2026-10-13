@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Zac Menu Options
+Comment=How many recent applications, documents and servers the Zac menu lists
+Exec=zacos9-controlpanel zacmenu
+Categories=Settings;DesktopSettings;
+OnlyShowIn=ZacOS9;

@@ -2,6 +2,7 @@
  * zacos9-netbrowser: the Network Browser, from the Apple menu.
  */
 #include <QApplication>
+#include <QTimer>
 
 #include "netbrowser.h"
 #include "platinumshell.h"
@@ -18,5 +19,12 @@ int main(int argc, char *argv[]) {
 
 	NetBrowserWindow window;
 	window.show();
+	/* --connect afp|smb ADDRESS: the Zac menu's Recent Servers. */
+	if (argc == 4 && QString(argv[1]) == "--connect") {
+		const DiscoveredServer::Kind kind = QString(argv[2]) == "smb"
+			? DiscoveredServer::SMB : DiscoveredServer::AFP;
+		const QString address = QString::fromUtf8(argv[3]);
+		QTimer::singleShot(0, &window, [&window, address, kind] { window.connectTo(address, kind); });
+	}
 	return app.exec();
 }

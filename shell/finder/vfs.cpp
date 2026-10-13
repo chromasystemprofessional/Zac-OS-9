@@ -316,6 +316,7 @@ const PanelDef PANELS[] = {
 	{ "Screen Saver", "zacos9-controlpanel", "screensaver" },
 	{ "Sound", "zacos9-controlpanel", "sound" },
 	{ "TCP/IP", "zacos9-tcpip", nullptr },
+	{ "Zac Menu Options", "zacos9-controlpanel", "zacmenu" },
 };
 
 bool matchesCategories(const AppEntry &app, const VNode &node) {

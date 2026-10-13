@@ -177,6 +177,20 @@ void menus_path(struct mb_menu *m, const char *names);
 void menubar_context_menu(const char *kind);
 void menubar_path_menu(const char *names);
 
+/* The desktop file for an app id, or NULL (toplevels.c); free it. */
+char *app_desktop_file(const char *app_id);
+/* A desktop file's Name and Exec (without field codes), or false (launch.c). */
+bool launch_read_desktop(const char *path, char **name, char **exec);
+
+/* ---- Recent items (recent.c) ----------------------------------------------- */
+
+/* A program's window appeared: it goes to the front of Recent Applications. */
+void recent_app_seen(const char *app_id);
+/* The Zac menu's Recent Applications, Recent Documents and Recent Servers,
+ * as many as Zac Menu Options says (desktop.conf recent-*, 10 by default;
+ * 0 leaves one out). */
+void recent_fill_menu(struct mb_menu *menu);
+
 /* ---- Log Out (logout.c) --------------------------------------------------- */
 
 /* The Sniffer asked, and the user said Log Out: quit the programs. */

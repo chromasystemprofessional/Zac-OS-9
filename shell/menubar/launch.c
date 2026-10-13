@@ -129,6 +129,16 @@ static bool read_desktop(const char *path, struct entry *e) {
 	return true;
 }
 
+bool launch_read_desktop(const char *path, char **name, char **exec) {
+	struct entry e;
+	if (!read_desktop(path, &e)) {
+		return false;
+	}
+	*name = e.name;
+	*exec = e.exec;
+	return true;
+}
+
 static int by_name(const void *a, const void *b) {
 	return strcasecmp(((const struct entry *)a)->name, ((const struct entry *)b)->name);
 }
@@ -290,6 +300,7 @@ void launch_fill_logo_menu(struct mb_menu *menu, const struct app *apps, int n_a
 		{ "Screen Saver", "zacos9-controlpanel", " screensaver" },
 		{ "Sound", "zacos9-controlpanel", " sound" },
 		{ "TCP/IP", "zacos9-tcpip", "" },
+		{ "Zac Menu Options", "zacos9-controlpanel", " zacmenu" },
 	};
 	for (size_t i = 0; i < sizeof(panel_list) / sizeof(panel_list[0]); i++) {
 		char command[PATH_MAX + 64];
@@ -298,6 +309,7 @@ void launch_fill_logo_menu(struct mb_menu *menu, const struct app *apps, int n_a
 		add_item(panels, panel_list[i].name, true, ACT_LAUNCH, command);
 	}
 	add_favorites(menu);
+	recent_fill_menu(menu);
 
 	struct entry entries[MAX_ITEMS];
 	int n = read_items_dir(entries, MAX_ITEMS - 4);

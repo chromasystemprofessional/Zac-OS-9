@@ -22,6 +22,11 @@ void launch_feedback_cancel(uint32_t cookie) {
 	assert(!"Unexpected launch failure");
 }
 
+/* The Zac menu's recent items live in recent.c, not tested here. */
+void recent_fill_menu(struct mb_menu *menu) {
+	(void)menu;
+}
+
 int main(int argc, char **argv) {
 	if (argc == 3 && strcmp(argv[1], "--child") == 0) {
 		FILE *file = fopen(argv[2], "w");
