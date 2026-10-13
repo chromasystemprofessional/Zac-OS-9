@@ -234,9 +234,9 @@ Section 3 lists every feature; section 5 is the plan.
 |---|---|---|
 | About This Computer (memory bars per app) | ✅ | Memory per app is shown? Verify. |
 | Items from a folder; aliases; folders sprout submenus | ◐ | Items ✅; folder submenus to verify. P2 S |
-| **Recent Applications / Recent Documents / Recent Servers** | ✗ | **P1 M.** Record launches (the menu bar knows them), documents from `recently-used.xbel`, servers from the Neighbourhood. |
+| **Recent Applications / Recent Documents / Recent Servers** | ✅ | Programs whose windows appeared; `recently-used.xbel` (the Sniffer adds what it opens); servers Neighbourhood connected to, reconnected with `--connect` (0.1.54). |
 | **Favorites** submenu (and Add To Favorites) | ✅ | (0.1.54) |
-| **Zac Menu Options** panel: submenus on/off, how many recent items | ✗ | P2 S |
+| **Zac Menu Options** panel: submenus on/off, how many recent items | ◐ | How many of each ✅ (0.1.54); submenus are always on. |
 | Control Panels submenu | ✅ | |
 | Printer Picker | ✗ | See 3.15. |
 | Calculator, Key Tags, Notepad, Stash, Dog Ears, Bark Recorder, Jigsaw Puzzle, Plotter | ✗ | See 3.18. |
@@ -295,7 +295,7 @@ A zram/swap switch in a Memory panel is a possible P3.
 | **Appearance**: Themes, Color (accent, highlight), Desktop (patterns, pictures), Sound (sound sets) | ✅ | Desktop picture placement — Tile / Center / Scale / Position Automatically — to verify. |
 | Appearance ▸ **Fonts** (Large System Font, Small System Font, Views font and size, Smooth all fonts) | ✗ | P2 M — the bitmap fonts are fixed; offer the Views size and smoothing for apps (GTK/Qt settings). |
 | Appearance ▸ **Options** (smart scrolling, double-click title to collapse) | ◐ | Collapse option exists? Verify; scroll-arrow placement missing. P3 S |
-| **Zac Menu Options** | ✗ | P2 S |
+| **Zac Menu Options** | ◐ | Recent counts ✅ (0.1.54); submenus always on. |
 | AppleTalk | — | |
 | ColorSync | — | colord is out of scope for now. |
 | **The Collar** panel (show/hide, hot key, font) | ✅ | The Collar panel. |
@@ -475,7 +475,7 @@ updates `PROJECT_STATUS.md` and the relevant `docs/` page.
 | 1.4 ✅ | **Window tricks**: Option-click close/collapse for all of an app's windows, ⌘-drag a background window, Option-zoom fills the screen | `compositor/src/input.c`, `view.c`, `frame.c` | S | Headless compositor tests (`compositor/tests/`) |
 | 1.5 ✅ | **Folder-path menu** on ⌘-click of a Sniffer window's title, ⌘-↑ / Option-⌘-↑ | compositor → Sniffer via `platinum-shell-v1` (new event: title clicked with modifiers), Sniffer menu | M | Headless: ⌘-click title shows the path; choosing opens the parent |
 | 1.6 ✅ | **Favorites**: File ▸ Add To Favorites, Zac menu Favorites, Favorites in Open/Save | `shell/finder/`, `shell/menubar/launch.c`, file-chooser portal | S | Unit: alias written; menu lists it |
-| 1.7 | **Recent Applications / Documents / Servers** in the Zac menu, with counts from a new Zac Menu Options panel | menu bar (launch record), `recently-used.xbel`, Neighbourhood, `shell/panels/` | M | Unit: list ordering and limits |
+| 1.7 ✅ | **Recent Applications / Documents / Servers** in the Zac menu, with counts from a new Zac Menu Options panel | menu bar (launch record), `recently-used.xbel`, Neighbourhood, `shell/panels/` | M | Unit: list ordering and limits |
 | 1.8 | **General Controls** panel: show desktop in background, menu blinking, insertion-point blink rate, Documents folder for Open/Save, Toy Box at startup | `shell/panels/controlpanel.cpp`, menu bar, file-chooser portal, Qt/GTK cursor blink settings | M | Unit per setting; visual check |
 | 1.9 | **Keyboard layouts** and the keyboard menu (flag/abbreviation at the menu bar's right, ⌘-Space to switch) | Keyboard panel, `compositor/src/prefs.c` (xkb), menu bar | M | Headless: switch layout, typed key changes |
 | 1.10 | **Sniffer Preferences** (General, Views, Labels) and **View Options** (icon size, snap to grid, Keep Arranged, list columns, relative dates, folder sizes, Set to Standard Views) | `shell/finder/` | M | Unit: settings persist per window; screenshots |
