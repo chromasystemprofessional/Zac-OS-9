@@ -7,8 +7,9 @@ extern "C" {
 
 #include <stdint.h>
 
-/* Menu-bar logo: 16×16 ARGB, exactly MBAR_ICON_SIZE. */
-#define PL_LOGO_SIZE 16
+/* Menu-bar logo: 20×15 ARGB with alpha, exactly MBAR_ICON_W × MBAR_ICON_H. */
+#define PL_LOGO_W 20
+#define PL_LOGO_H 15
 const uint32_t *logo_pixels(void);
 
 /* High-quality logo: 64×64 ARGB with full per-pixel alpha, for startup/installer. */

@@ -54,6 +54,8 @@ without the highlight column.*
   ink at File 43–63, Edit 79–?, View 117–146, Special 162–205 and Help 221–246.
 - Apple menu icon: color icon with ink at `x=17..28`, rows 2–16. The first text
   title's ink starts at `x=43`.
+  ZacOS 9 draws Happy Zac's head 20×15 at `x=13..32`, rows 2–16, centred on
+  that icon cell (`MBAR_ICON_*` in `lib/menudraw.h`).
 - Highlighted (open) title: a box from `ink_l - 10` to `ink_r + 10`, with white text.
   Figure 4-1 has Edit at 69–111; figure 4-2 has Help at 4–49. The box has a
   one-row bevel and no side edges:

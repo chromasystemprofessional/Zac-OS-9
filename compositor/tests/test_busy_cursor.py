@@ -25,8 +25,8 @@ spec = importlib.util.spec_from_file_location("cursors", builder)
 cursors = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(cursors)
 definitions = {c["name"]: c for c in cursors.parse(source)}
-dog = definitions["watch"]
-dog_frames = cursors.watch_frames(dog["rows"], dog["hot"])
+bone = definitions["watch"]
+bone_frames = cursors.images(bone)[0][1]
 
 
 def expect_line(process, expected):
@@ -92,40 +92,39 @@ with tempfile.TemporaryDirectory(prefix="zacos9-busy-cursor-") as directory:
                                capture_output=True, timeout=5)
                 return Image.open(path).convert("RGB")
 
-            def matches(image, rows, hot):
-                for y, row in enumerate(rows):
-                    for x, ch in enumerate(row):
-                        if ch != ".":
-                            value = 0 if ch == "K" else 255
-                            if image.getpixel((AT - hot[0] + x, AT - hot[1] + y)) != (value,) * 3:
-                                return False
+            def matches(image, pixels, hot):
+                # Only opaque pixels: antialiased edges blend with the window.
+                for i, p in enumerate(pixels):
+                    if p >> 24 == 255:
+                        rgb = (p >> 16 & 255, p >> 8 & 255, p & 255)
+                        if image.getpixel((AT - hot[0] + i % 16, AT - hot[1] + i // 16)) != rgb:
+                            return False
                 return True
 
-            def animated_dog():
+            def spinning_bone():
                 seen = set()
                 seen_frames = set()
                 for _ in range(24):
                     image = shot()
-                    found = [i for i, frame in enumerate(dog_frames)
-                             if matches(image, frame, dog["hot"])]
+                    found = [i for i, frame in enumerate(bone_frames)
+                             if matches(image, frame, bone["hot"])]
                     if not found:
                         print(f"Unexpected pointer pixels around ({AT},{AT}):", file=sys.stderr)
                         for y in range(AT - 20, AT + 20):
                             print("".join({(0, 0, 0): "K", (255, 255, 255): "W",
                                            (0, 255, 0): "."}.get(image.getpixel((x, y)), "?")
                                           for x in range(AT - 20, AT + 20)), file=sys.stderr)
-                        raise AssertionError("Busy pointer does not match the original dog artwork")
-                    seen.add(image.crop((AT - 7, AT - 7, AT + 9, AT + 9)).tobytes())
+                        raise AssertionError("Busy pointer does not match the dog bone artwork")
+                    seen.add(image.crop((AT - 8, AT - 8, AT + 8, AT + 8)).tobytes())
                     seen_frames.update(found)
                     time.sleep(0.08)
-                assert len(seen) > 1, "Dog pointer is not animating"
-                assert any(i > 12 for i in seen_frames), "Dog never performs a backflip"
+                assert len(seen) > 1, "Dog bone pointer is not animating"
+                assert len(seen_frames) > 4, "Dog bone pointer is not spinning"
 
             def normal_cursor(name):
                 definition = definitions[name]
-                rows = (cursors.add_outline(definition["rows"]) if definition["outline"]
-                        else definition["rows"])
-                assert matches(shot(), rows, definition["hot"]), f"{name} cursor was not restored"
+                frames, _ = cursors.images(definition)
+                assert matches(shot(), frames[1][0], definition["hot"]), f"{name} cursor was not restored"
 
             for platform in ("wayland", "xcb"):
                 probe_env = dict(env, QT_QPA_PLATFORM=platform)
@@ -136,7 +135,7 @@ with tempfile.TemporaryDirectory(prefix="zacos9-busy-cursor-") as directory:
                     move()
                     if platform == "wayland":
                         command(probe, "begin")
-                        animated_dog()
+                        spinning_bone()
                         command(probe, "cancel")
                         normal_cursor("default")
                         command(probe, "begin")
@@ -149,15 +148,15 @@ with tempfile.TemporaryDirectory(prefix="zacos9-busy-cursor-") as directory:
                         command(probe, "show")
                         move()
                     command(probe, "wait")
-                    animated_dog()
+                    spinning_bone()
                     command(probe, "progress")
-                    animated_dog()
+                    spinning_bone()
                     command(probe, "text")
                     normal_cursor("text")
                     if platform == "wayland":
                         command(probe, "other")
                         move()
-                        animated_dog()
+                        spinning_bone()
                         command(probe, "cancel")
                         normal_cursor("text")
                     command(probe, "arrow")
@@ -165,7 +164,7 @@ with tempfile.TemporaryDirectory(prefix="zacos9-busy-cursor-") as directory:
                     command(probe, "quit")
                     assert probe.wait(timeout=5) == 0
                     probe = None
-                print(f"ok: {platform} dog animation and normal cursor restoration")
+                print(f"ok: {platform} dog bone animation and normal cursor restoration")
 
             # A launcher crash/disconnect must also release its outstanding feedback.
             with (root / "disconnect.log").open("w") as errors:
@@ -174,7 +173,7 @@ with tempfile.TemporaryDirectory(prefix="zacos9-busy-cursor-") as directory:
                 expect_line(probe, "ready")
                 move()
                 command(probe, "begin")
-                animated_dog()
+                spinning_bone()
                 stop(probe)
                 probe = None
                 time.sleep(0.12)

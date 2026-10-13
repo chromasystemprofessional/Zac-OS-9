@@ -1,11 +1,13 @@
 # Project Status
 
-Updated: 2026-10-11
+Updated: 2026-10-12
 
 ## Completed
 
 | Commit | Feature |
 |---|---|
+| *(uncommitted)* | Apple-menu icon is now Happy Zac's head drawn on its own (`assets/menubar/happy-zac-mini.png`), whole and on transparency instead of a square crop of the start-up picture, 20×15 so it fills the bar's height with a 1 px margin (`MBAR_ICON_W/H` in `lib/menudraw.h`; alpha-blended now): `tools/menubar/make-menu-logo.py` regenerates `logo16_data` in `lib/logo.c` |
+| *(uncommitted)* | Busy pointer is now a rainbow dog bone (`assets/cursors/dog-bone.svg`) spinning clockwise instead of the tail-wagging/backflipping dog: `tools/cursors/build_cursors.py` draws the SVG antialiased at 16 and 32 px (24 frames, 60 ms, hot spot at the centre); `cursor-theme` and `busy-cursor-protocols` tests pass |
 | *(uncommitted)* | "Ask for my password to wake" (Screen Saver panel, off by default): `zacos9-lock` (ext-session-lock-v1, PAM) locks once every screen is idle, before any system sleep (logind delay inhibitor) and on `loginctl lock-session` / ScreenSaver.Lock; the screen saver plays above the lock — see `docs/energy-saver.md` |
 | `39d1eaa` | Energy Saver: display sleep and system sleep in `zacos9-wm` (per screen: a full-screen window or a video's idle inhibitor keeps its screen awake while the others sleep; the system sleeps only when none is kept awake), the Energy Saver control panel; the screen saver (`zacos9-screensaver`: Desktop Patterns, Starfield, Bouncing Logo, Blank Screen, per screen, ahead of display sleep) and its Screen Saver panel with a live preview; `zacos9-inhibit` answers `org.freedesktop.ScreenSaver` and the portal's Inhibit, keeping the asking app's screens awake — see `docs/energy-saver.md` |
 | `82b77c3` | Regression fixes after 0.1.50 (released in 0.1.51): VS Code settings are read as JSONC before adding the native title bar (no insertion inside a comment, no truncation past 1 MiB, unreadable files never overwritten); AFP volumes mount at `mounts/SERVER/ID/NAME` and an existing mount is reused only if it is the volume asked for — see `docs/app-integration.md`, `docs/network.md` |

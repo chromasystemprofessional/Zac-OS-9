@@ -218,6 +218,8 @@ void menus_rebuild(struct mb_bar *bar, int screen_w) {
 
 	/* Left: the logo menu, then the front app's menus. */
 	struct mb_menu *logo = new_menu(bar->left, &bar->n_left, NULL);
+	_Static_assert(PL_LOGO_W == MBAR_ICON_W && PL_LOGO_H == MBAR_ICON_H,
+		"the logo fills the menu bar's icon slot");
 	logo->icon = logo_pixels();
 	launch_fill_logo_menu(logo);
 	if (finder_front) {

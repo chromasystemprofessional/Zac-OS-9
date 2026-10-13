@@ -18,9 +18,10 @@ extern "C" {
 #define MBAR_TITLE_GAP 15      /* clear pixels between adjacent titles' ink */
 #define MBAR_HILITE_PAD 10     /* highlight extends this far past the ink */
 #define MBAR_FIRST_TEXT_X 43   /* ink of the first text title */
-#define MBAR_ICON_X 15         /* left-hand icon title cell (estimate) */
-#define MBAR_ICON_Y 2
-#define MBAR_ICON_SIZE 16
+#define MBAR_ICON_X 13         /* left-hand icon title cell (estimate) */
+#define MBAR_ICON_Y 2          /* 1 px clear of the bar's top and bottom shading */
+#define MBAR_ICON_W 20         /* the logo: Happy Zac's head is wider than tall */
+#define MBAR_ICON_H 15
 
 /* Pull-down menus (HIG figures 4-1, 4-2). */
 #define MENU_ITEM_H 16
@@ -40,7 +41,7 @@ extern "C" {
 
 struct mbar_title {
 	const struct plat_text *text; /* text title, or */
-	const uint32_t *icon;         /* MBAR_ICON_SIZE² ARGB icon title */
+	const uint32_t *icon;         /* MBAR_ICON_W × MBAR_ICON_H ARGB icon title */
 	bool dimmed;
 	/* Filled in by mbar_layout_*: */
 	int ink_l, ink_r; /* text ink, or the icon cell */

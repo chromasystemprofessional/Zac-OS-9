@@ -99,13 +99,13 @@ placement.
 
 ## Busy pointer
 
-An original animated dog wags its tail and does backflips while applications
-launched from Sniffer or the application menu are starting. The normal pointer
+An original rainbow dog bone (`assets/cursors/dog-bone.svg`) spins clockwise
+while applications launched from Sniffer or the application menu are starting. The normal pointer
 returns when the matching application opens or activates a window. Launch
 failures and launcher disconnection cancel feedback; applications that never
 show a window time out after 15 seconds. The pointer remains usable throughout.
 
-Applications requesting the standard wait/progress cursor also use the dog,
+Applications requesting the standard wait/progress cursor also use the bone,
 on Wayland and Xwayland, through the ZacOS9 cursor theme. Apps drawing their own
 custom cursors or not reporting busy state cannot be detected automatically.
 Other cursor shapes, including text selection and resizing, are unchanged.

@@ -51,7 +51,7 @@ static int ink_width(const struct plat_text *t) {
 /* ---- menu bar ---------------------------------------------------------- */
 
 static void set_extent(struct mbar_title *t, int ink_l) {
-	int w = t->icon ? MBAR_ICON_SIZE : ink_width(t->text);
+	int w = t->icon ? MBAR_ICON_W : ink_width(t->text);
 	t->ink_l = ink_l;
 	t->ink_r = ink_l + (w > 0 ? w : 1) - 1;
 	t->hi_l = t->ink_l - MBAR_HILITE_PAD;
@@ -76,7 +76,7 @@ void mbar_layout_right(struct mbar_title *titles, int n, int screen_w) {
 	/* Mirror of the left icon slot (estimate; not in the HIG). */
 	int right = screen_w - MBAR_ICON_X - 1;
 	for (int i = n - 1; i >= 0; i--) {
-		int w = titles[i].icon ? MBAR_ICON_SIZE : ink_width(titles[i].text);
+		int w = titles[i].icon ? MBAR_ICON_W : ink_width(titles[i].text);
 		set_extent(&titles[i], right - (w > 0 ? w : 1) + 1);
 		right = titles[i].ink_l - 1 - MBAR_TITLE_GAP;
 	}
@@ -117,7 +117,8 @@ void mbar_paint_titles(struct pl_canvas *c, const struct mbar_title *titles,
 			pl_hline(c, t->hi_l, t->hi_r, MBAR_HEIGHT - 2, accent.deep);
 		}
 		if (t->icon) {
-			pl_image(c, t->ink_l, MBAR_ICON_Y, t->icon, MBAR_ICON_SIZE, MBAR_ICON_SIZE);
+			/* Blended: the logo's edge is soft. */
+			pl_image_blend(c, t->ink_l, MBAR_ICON_Y, t->icon, MBAR_ICON_W, MBAR_ICON_H, false);
 		} else {
 			uint32_t color = hi ? C_WHITE : t->dimmed ? C_888 : C_BLACK;
 			pl_text(c, t->text, t->ink_l, MBAR_BASELINE, color);

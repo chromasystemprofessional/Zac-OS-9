@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="64" viewBox="0 0 128 64" role="img" aria-labelledby="title">
+  <title id="title">Dog bone with two rounded humps on each end</title>
+  <defs>
+    <linearGradient id="rainbow" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#FF3333"/>
+      <stop offset="17%" stop-color="#FF9500"/>
+      <stop offset="33%" stop-color="#FFE600"/>
+      <stop offset="50%" stop-color="#35CD55"/>
+      <stop offset="67%" stop-color="#2196FF"/>
+      <stop offset="83%" stop-color="#5544DD"/>
+      <stop offset="100%" stop-color="#AD35D9"/>
+    </linearGradient>
+  </defs>
+  <path d="M34 22 C29 22 27 18 27 14 C27 7 22 3 16 4 C7 5 4 14 9 21 L17 32 L9 43 C4 50 7 59 16 60 C22 61 27 57 27 50 C27 46 29 42 34 42 L94 42 C99 42 101 46 101 50 C101 57 106 61 112 60 C121 59 124 50 119 43 L111 32 L119 21 C124 14 121 5 112 4 C106 3 101 7 101 14 C101 18 99 22 94 22 Z" fill="url(#rainbow)" stroke="#5A4632" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

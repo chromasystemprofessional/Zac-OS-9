@@ -11,32 +11,47 @@ spec = importlib.util.spec_from_file_location("cursors", builder)
 cursors = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(cursors)
 definitions = cursors.parse(source)
-dog = next(c for c in definitions if c["name"] == "watch")
-frames = cursors.watch_frames(dog["rows"], dog["hot"])
-assert len(frames) == 24
-assert len({tuple(map(tuple, frame)) for frame in frames[:12]}) == 3
-assert len({tuple(map(tuple, frame)) for frame in frames[12:]}) >= 10
-assert frames[0] != frames[12]
-assert all(any("K" in row for row in frame) for frame in frames)
+bone = next(c for c in definitions if c["name"] == "watch")
+assert bone["spin"] and bone["hot"] == (8, 8)
+frames, delay = cursors.images(bone)
+assert delay == 60 and all(len(frames[s]) == 24 for s in (1, 2))
+for scale, sequence in frames.items():
+    assert len(set(map(tuple, sequence))) == 24
+    for frame in sequence:
+        assert any(p >> 24 == 255 for p in frame), "Bone frame has no opaque pixels"
+        assert len({p & 0xFFFFFF for p in frame if p >> 24 == 255}) > 8, "Bone lost its rainbow"
+
+
+def red_side(frame, size):
+    """Mean offset from the centre of the bone's red (gradient start) pixels."""
+    red = [(i % size - size / 2, i // size - size / 2) for i, p in enumerate(frame)
+           if p >> 24 == 255 and (p >> 16 & 255) > 200 and (p & 255) < 90 and (p >> 8 & 255) < 120]
+    return sum(x for x, _ in red) / len(red), sum(y for _, y in red) / len(red)
+
+
+# Red starts on the left; clockwise on screen (y down) carries it to the top, then right.
+x, y = red_side(frames[2][0], 32)
+assert x < -6 and abs(y) < 3
+x, y = red_side(frames[2][6], 32)
+assert y < -6 and abs(x) < 3
+x, y = red_side(frames[2][12], 32)
+assert x > 6 and abs(y) < 3
 with tempfile.TemporaryDirectory(prefix="zacos9-cursors-") as directory:
     subprocess.run([sys.executable, builder, source, directory], check=True)
     theme = Path(directory) / "ZacOS9" / "cursors"
     data = (theme / "watch").read_bytes()
     magic, header, version, count = struct.unpack_from("<4sIII", data)
     assert (magic, header, version, count) == (b"Xcur", 16, 0x10000, 48)
-    for name in dog["aliases"]:
+    for name in bone["aliases"]:
         assert (theme / name).read_bytes() == data, name
     for i in range(count):
         kind, nominal, offset = struct.unpack_from("<III", data, 16 + 12 * i)
         image = struct.unpack_from("<9I", data, offset)
         scale = 1 if i < 24 else 2
         assert image == (36, kind, nominal, 1, 16 * scale, 16 * scale,
-                         7 * scale, 7 * scale, 80)
+                         8 * scale, 8 * scale, 60)
         pixels = struct.unpack_from(f"<{256 * scale * scale}I", data, offset + 36)
-        expected = frames[i % 24]
-        for y in range(16 * scale):
-            for x in range(16 * scale):
-                assert pixels[y * 16 * scale + x] == cursors.COLORS[expected[y // scale][x // scale]]
+        assert list(pixels) == frames[scale][i % 24]
     arrow = (theme / "default").read_bytes()
     assert struct.unpack_from("<I", arrow, 12)[0] == 2, "Normal pointer must remain static"
-print("ok: original tail-wag/backflip animation, aliases, hotspots, timing and HiDPI pixels")
+print("ok: dog bone spins clockwise; aliases, hotspots, timing and HiDPI pixels")
