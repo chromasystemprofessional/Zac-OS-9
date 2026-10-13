@@ -925,11 +925,31 @@ static void shell_switch_app(void *data, struct platinum_shell_v1 *shell, int32_
 	platinum_shell_v1_activate_app(shell, app_switch_target(step < 0 ? -1 : 1));
 }
 
+/* (Only the Sniffer's windows ask for it.) */
+static void shell_title_menu(void *data, struct platinum_shell_v1 *shell,
+		struct wl_surface *surface, uint32_t option) {
+}
+
+static void shell_keyboard_layouts(void *data, struct platinum_shell_v1 *shell,
+		const char *layouts, uint32_t current) {
+	kbmenu_set(layouts, current);
+	menubar_apps_changed();
+}
+
+void menubar_set_keyboard_layout(int index) {
+	if (g.platinum_shell && wl_proxy_get_version((struct wl_proxy *)g.platinum_shell) >=
+			PLATINUM_SHELL_V1_SET_KEYBOARD_LAYOUT_SINCE_VERSION) {
+		platinum_shell_v1_set_keyboard_layout(g.platinum_shell, (uint32_t)index);
+	}
+}
+
 static const struct platinum_shell_v1_listener shell_listener = {
 	.window_position = shell_window_position,
 	.active_client = shell_active_client,
 	.active_gtk_menu = shell_active_gtk_menu,
 	.switch_app = shell_switch_app,
+	.title_menu = shell_title_menu,
+	.keyboard_layouts = shell_keyboard_layouts,
 };
 
 static void flush_launch_feedback(void) {
@@ -994,7 +1014,7 @@ static void registry_global(void *data, struct wl_registry *reg, uint32_t name,
 			&zwp_virtual_keyboard_manager_v1_interface, 1);
 	} else if (strcmp(iface, platinum_shell_v1_interface.name) == 0 && version >= 2) {
 		g.platinum_shell = wl_registry_bind(reg, name, &platinum_shell_v1_interface,
-			version < 8 ? version : 8);
+			version < 11 ? version : 11);
 		platinum_shell_v1_add_listener(g.platinum_shell, &shell_listener, NULL);
 	}
 }

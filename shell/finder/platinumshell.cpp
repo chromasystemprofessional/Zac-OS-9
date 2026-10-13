@@ -67,9 +67,11 @@ static void handle_title_menu(void *, platinum_shell_v1 *, wl_surface *surface, 
 		it.value()(option != 0);
 	}
 }
+static void handle_keyboard_layouts(void *, platinum_shell_v1 *, const char *, uint32_t) {
+}
 static const platinum_shell_v1_listener shell_listener = {
 	handle_window_position, handle_active_client, handle_active_gtk_menu, handle_switch_app,
-	handle_title_menu
+	handle_title_menu, handle_keyboard_layouts
 };
 
 static void global(void *, wl_registry *reg, uint32_t name, const char *iface, uint32_t version) {

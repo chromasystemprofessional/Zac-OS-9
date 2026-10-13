@@ -313,6 +313,37 @@ void platinum_shell_switch_app(struct plat_server *server, int step) {
 	}
 }
 
+static void send_layouts(struct wl_resource *resource, struct plat_server *server) {
+	if (wl_resource_get_version(resource) < PLATINUM_SHELL_V1_KEYBOARD_LAYOUTS_SINCE_VERSION ||
+			!server->kb_keymap) {
+		return;
+	}
+	char list[2048] = "";
+	const xkb_layout_index_t n = xkb_keymap_num_layouts(server->kb_keymap);
+	for (xkb_layout_index_t i = 0; i < n; i++) {
+		const char *name = xkb_keymap_layout_get_name(server->kb_keymap, i);
+		char line[256];
+		snprintf(line, sizeof(line), "%s\t%s\n",
+			(int)n == server->kb_layouts.n ? server->kb_layouts.codes[i] : "", name ? name : "");
+		if (strlen(list) + strlen(line) < sizeof(list)) {
+			strcat(list, line);
+		}
+	}
+	platinum_shell_v1_send_keyboard_layouts(resource, list, (uint32_t)server->kb_current);
+}
+
+void platinum_shell_layouts_changed(struct plat_server *server) {
+	struct wl_resource *resource;
+	wl_resource_for_each(resource, &resources) {
+		send_layouts(resource, server);
+	}
+}
+
+static void handle_set_keyboard_layout(struct wl_client *client, struct wl_resource *resource,
+		uint32_t index) {
+	input_set_layout(the_server, (int)index);
+}
+
 static const struct platinum_shell_v1_interface shell_impl = {
 	.set_window_style = handle_set_window_style,
 	.set_window_position = handle_set_window_position,
@@ -327,6 +358,7 @@ static const struct platinum_shell_v1_interface shell_impl = {
 	.activate_app = handle_activate_app,
 	.set_standard_size = handle_set_standard_size,
 	.enable_title_menu = handle_enable_title_menu,
+	.set_keyboard_layout = handle_set_keyboard_layout,
 };
 
 static void resource_destroy(struct wl_resource *resource) {
@@ -344,11 +376,12 @@ static void bind_shell(struct wl_client *client, void *data, uint32_t version, u
 	wl_resource_set_implementation(resource, &shell_impl, NULL, resource_destroy);
 	wl_list_insert(&resources, wl_resource_get_link(resource));
 	send_active(resource);
+	send_layouts(resource, the_server);
 }
 
 void platinum_shell_init(struct plat_server *server) {
 	the_server = server;
 	wl_list_init(&hints);
 	wl_list_init(&resources);
-	wl_global_create(server->display, &platinum_shell_v1_interface, 10, NULL, bind_shell);
+	wl_global_create(server->display, &platinum_shell_v1_interface, 11, NULL, bind_shell);
 }

@@ -62,6 +62,12 @@ int prefs_repeat_rate(void) {
 	return delay ? rate : 0;
 }
 
+/* The Keyboard panel's "Use Command-Option-Space": ⌘-Space is often taken. */
+bool prefs_layout_switch_option(void) {
+	char v[16];
+	return pl_setting("keyboard-switch", v, sizeof(v)) && strcmp(v, "option") == 0;
+}
+
 bool prefs_show_desktop(void) {
 	char v[16];
 	return !pl_setting("show-desktop", v, sizeof(v)) || strcmp(v, "false") != 0;
@@ -270,6 +276,7 @@ void prefs_apply(struct plat_server *server) {
 	server->pointer_speed = tracking[setting_int("mouse-speed", TRACKING_DEFAULT, 0, 6)];
 	server->double_click_ms = setting_int("double-click", PLAT_DOUBLE_CLICK_MS, 150, 2000);
 
+	input_apply_layouts(server);
 	struct plat_keyboard *kb;
 	wl_list_for_each(kb, &server->keyboards, link) {
 		if (!kb->is_virtual) {

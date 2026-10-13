@@ -94,6 +94,7 @@ menubar_exe = executable('zacos9-menubar',
   'menubar/appmenu.c',
   'menubar/logout.c',
   'menubar/recent.c',
+  'menubar/kbmenu.c',
   client_protocol_src,
   finder_protocol,
   dependencies: [platinum_dep, wayland_client, wayland_cursor, xkbcommon_client, gio],
@@ -104,6 +105,14 @@ menubar_exe = executable('zacos9-menubar',
 test('menu-recent',
   executable('test-recent', 'menubar/test_recent.c', 'menubar/recent.c',
     dependencies: [platinum_dep, gio],
+  ),
+  timeout: 10,
+)
+
+# The keyboard menu (menubar/kbmenu.c).
+test('menu-keyboard',
+  executable('test-kbmenu', 'menubar/test_kbmenu.c', 'menubar/kbmenu.c',
+    dependencies: [platinum_dep, wayland_client],
   ),
   timeout: 10,
 )
@@ -732,12 +741,17 @@ test('store-client',
   timeout: 60,
 )
 
+# The Keyboard panel's layouts, read as zacos9-wm reads them.
+xkb_layouts_sources = ['panels/xkblayouts.cpp', '../compositor/src/kblayout.c']
+xkb_layouts_include = include_directories('../compositor/src')
+
 executable('zacos9-controlpanel',
   'panels/controlpanel.cpp',
   'panels/soundclient.cpp',
+  xkb_layouts_sources,
   link_with: panelkit,
-  include_directories: include_directories('finder'),
-  dependencies: [platinum_dep, qt6],
+  include_directories: [include_directories('finder'), xkb_layouts_include],
+  dependencies: [platinum_dep, qt6, xkbcommon_client],
   cpp_args: ['-std=c++17'],
   install: true,
 )
@@ -815,6 +829,15 @@ test('collar-panel',
     cpp_args: ['-std=c++17'],
   ),
   env: ['QT_QPA_PLATFORM=offscreen'], timeout: 30,
+)
+
+test('keyboard-layout-list',
+  executable('test-xkblayouts',
+    'panels/tests/test_xkblayouts.cpp', xkb_layouts_sources,
+    include_directories: [include_directories('panels'), xkb_layouts_include],
+    dependencies: [platinum_dep, qt6, xkbcommon_client],
+    cpp_args: ['-std=c++17'],
+  ),
 )
 
 test('sound-output',
@@ -936,6 +959,11 @@ test('session-ui', find_program('dbus-run-session'),
   args: ['--', find_program('python3').full_path(), files('../compositor/tests/test_session_ui.py'),
     compositor_exe, menubar_exe, finder_exe, idle_client, vptr_exe],
   timeout: 90,
+)
+# Keyboard layouts: ⌘-Space and the keyboard menu (input.c, kbmenu.c).
+test('keyboard-layout-switch', find_program('python3'),
+  args: [files('../compositor/tests/test_keyboard_layouts.py'), compositor_exe, menubar_exe, vptr_exe],
+  timeout: 60,
 )
 # Option-click on the close and collapse boxes, ⌘-drag behind (input.c).
 test('window-tricks', find_program('python3'),

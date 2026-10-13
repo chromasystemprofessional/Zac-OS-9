@@ -5,6 +5,7 @@
 #include <wayland-server-core.h>
 #include <wlr/backend.h>
 #include <xkbcommon/xkbcommon.h>
+#include "kblayout.h"
 #include <wlr/render/allocator.h>
 #include <wlr/render/wlr_renderer.h>
 #include <wlr/types/wlr_compositor.h>
@@ -126,6 +127,11 @@ struct plat_server {
 	struct wl_listener drag_destroy;
 	struct wlr_scene_tree *drag_icon; /* follows the pointer during a drag */
 	struct wl_list keyboards;
+	/* Keyboard layouts (input.c, kblayout.c): one keymap for every
+	 * physical keyboard, a group each, and the group in use. */
+	struct kb_layouts kb_layouts;
+	struct xkb_keymap *kb_keymap;
+	int kb_current;
 
 	/* Interactive grab state. */
 	enum plat_cursor_mode cursor_mode;
@@ -303,6 +309,7 @@ int prefs_repeat_delay(void);
 bool prefs_collar_hotkey(uint32_t mods, xkb_keysym_t sym);
 /* General Controls' "Show Desktop when in background" ("show-desktop"). */
 bool prefs_show_desktop(void);
+bool prefs_layout_switch_option(void);
 
 /* main.c: run a shell command, in its own session; its pid, or -1. */
 pid_t spawn(const char *command);
@@ -370,6 +377,10 @@ void input_cancel_grab(struct plat_server *server);
 void input_pointer_refocus(struct plat_server *server);
 /* Give keyboard focus to a surface, with ⌘ (Super) reported as Ctrl. */
 void input_keyboard_enter(struct plat_server *server, struct wlr_surface *surface);
+/* Keyboard layouts: (re)build the keymap if the Keyboard panel's choice
+ * changed; use layout `index` (⌘-Space, the keyboard menu). */
+void input_apply_layouts(struct plat_server *server);
+void input_set_layout(struct plat_server *server, int index);
 
 /* view.c: window behaviour shared by every client type */
 void view_setup(struct plat_view *view, struct plat_server *server,
@@ -437,6 +448,8 @@ void platinum_shell_report_position(struct plat_view *view);
 void platinum_shell_focus_changed(struct plat_server *server);
 /* ⌘-Tab (1) or ⇧⌘-Tab (-1): ask the menu bar to switch programs. */
 void platinum_shell_switch_app(struct plat_server *server, int step);
+/* The keyboard layouts or the one in use changed: tell the menu bar. */
+void platinum_shell_layouts_changed(struct plat_server *server);
 void platinum_shell_launch_ready(struct plat_view *view);
 /* The process behind a window (X11: its _NET_WM_PID), or 0. */
 uint32_t view_pid(struct plat_view *view);

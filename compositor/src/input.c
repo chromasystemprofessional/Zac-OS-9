@@ -4,6 +4,7 @@
 #include <time.h>
 #include <string.h>
 #include <unistd.h>
+#include <wlr/interfaces/wlr_keyboard.h>
 #include <wlr/backend/session.h>
 #include <wlr/types/wlr_data_device.h>
 #include <wlr/types/wlr_cursor_shape_v1.h>
@@ -77,6 +78,77 @@ static void keyboard_modifiers(struct wl_listener *listener, void *data) {
 	wlr_seat_keyboard_notify_modifiers(kb->server->seat, &mods);
 }
 
+/* ---- keyboard layouts ---------------------------------------------------- */
+
+/* Every physical keyboard to the layout in use (the locked xkb group). */
+static void apply_group(struct plat_server *server, struct plat_keyboard *only) {
+	struct plat_keyboard *kb;
+	wl_list_for_each(kb, &server->keyboards, link) {
+		if (!kb->is_virtual && kb->wlr_keyboard->keymap && (!only || kb == only)) {
+			const struct wlr_keyboard_modifiers m = kb->wlr_keyboard->modifiers;
+			wlr_keyboard_notify_modifiers(kb->wlr_keyboard, m.depressed, m.latched, m.locked,
+				(uint32_t)server->kb_current);
+		}
+	}
+}
+
+void input_apply_layouts(struct plat_server *server) {
+	struct kb_layouts now;
+	kb_layouts_load(&now);
+	if (server->kb_keymap && kb_layouts_equal(&now, &server->kb_layouts)) {
+		return;
+	}
+	struct xkb_context *ctx = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
+	struct xkb_keymap *keymap = ctx ? kb_layouts_keymap(ctx, &now) : NULL;
+	xkb_context_unref(ctx);
+	if (!keymap) {
+		wlr_log(WLR_ERROR, "keyboard layouts: no keymap");
+		return;
+	}
+	xkb_keymap_unref(server->kb_keymap);
+	server->kb_keymap = keymap;
+	server->kb_layouts = now;
+	char code[64];
+	const int remembered = kb_layout_remembered(code, sizeof(code)) ?
+		kb_layouts_find(&now, code) : -1;
+	server->kb_current = remembered >= 0 &&
+		remembered < (int)xkb_keymap_num_layouts(keymap) ? remembered : 0;
+	struct plat_keyboard *kb;
+	wl_list_for_each(kb, &server->keyboards, link) {
+		if (!kb->is_virtual) {
+			wlr_keyboard_set_keymap(kb->wlr_keyboard, keymap);
+		}
+	}
+	apply_group(server, NULL);
+	platinum_shell_layouts_changed(server);
+}
+
+void input_set_layout(struct plat_server *server, int index) {
+	if (!server->kb_keymap || index < 0 || index >= (int)xkb_keymap_num_layouts(server->kb_keymap)) {
+		return;
+	}
+	server->kb_current = index;
+	apply_group(server, NULL);
+	if (index < server->kb_layouts.n) {
+		kb_layout_remember(server->kb_layouts.codes[index]);
+	}
+	platinum_shell_layouts_changed(server);
+}
+
+/* ⌘-Space (or ⌘-Option-Space) steps through the layouts, ⇧ backwards
+ * (Mac OS 9's keyboard menu shortcut); with one layout it is the
+ * program's. */
+static bool handle_layout_switch(struct plat_server *server, uint32_t mods, xkb_keysym_t sym) {
+	const int n = server->kb_keymap ? (int)xkb_keymap_num_layouts(server->kb_keymap) : 0;
+	if (sym != XKB_KEY_space || n < 2 || !(mods & WLR_MODIFIER_LOGO) ||
+			(mods & WLR_MODIFIER_CTRL) ||
+			!(mods & WLR_MODIFIER_ALT) != !prefs_layout_switch_option()) {
+		return false;
+	}
+	input_set_layout(server, (server->kb_current + ((mods & WLR_MODIFIER_SHIFT) ? n - 1 : 1)) % n);
+	return true;
+}
+
 /* Ctrl+Alt+F1..F12 on a real screen: switch to another console. */
 static bool handle_vt_switch(struct plat_server *server, xkb_keysym_t sym) {
 	if (sym < XKB_KEY_XF86Switch_VT_1 || sym > XKB_KEY_XF86Switch_VT_12) {
@@ -111,6 +183,9 @@ static bool handle_keybinding(struct plat_server *server, uint32_t mods,
 			platinum_shell_switch_app(server, (mods & WLR_MODIFIER_SHIFT) ? -1 : 1);
 			return true;
 		}
+	}
+	if (handle_layout_switch(server, mods, sym)) {
+		return true;
 	}
 	/* The Collar panel's hot key shows or hides the Collar (if one runs:
 	 * --toggle just asks it over D-Bus). */
@@ -179,7 +254,7 @@ static void keyboard_destroy(struct wl_listener *listener, void *data) {
 	free(kb);
 }
 
-/* Virtual keyboards bring their own keymap; physical ones get the default. */
+/* Virtual keyboards bring their own keymap; physical ones get the layouts. */
 static void new_keyboard(struct plat_server *server, struct wlr_input_device *device,
 		bool virtual) {
 	struct wlr_keyboard *wlr_keyboard = wlr_keyboard_from_input_device(device);
@@ -190,12 +265,10 @@ static void new_keyboard(struct plat_server *server, struct wlr_input_device *de
 	kb->is_virtual = virtual;
 
 	if (!virtual) {
-		struct xkb_context *ctx = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
-		struct xkb_keymap *keymap =
-			xkb_keymap_new_from_names(ctx, NULL, XKB_KEYMAP_COMPILE_NO_FLAGS);
-		wlr_keyboard_set_keymap(wlr_keyboard, keymap);
-		xkb_keymap_unref(keymap);
-		xkb_context_unref(ctx);
+		input_apply_layouts(server);
+		if (server->kb_keymap) {
+			wlr_keyboard_set_keymap(wlr_keyboard, server->kb_keymap);
+		}
 		wlr_keyboard_set_repeat_info(wlr_keyboard, prefs_repeat_rate(), prefs_repeat_delay());
 	}
 
@@ -212,6 +285,9 @@ static void new_keyboard(struct plat_server *server, struct wlr_input_device *de
 		wlr_seat_set_keyboard(server->seat, wlr_keyboard);
 	}
 	wl_list_insert(&server->keyboards, &kb->link);
+	if (!virtual) {
+		apply_group(server, kb);
+	}
 }
 
 static void server_new_input(struct wl_listener *listener, void *data) {

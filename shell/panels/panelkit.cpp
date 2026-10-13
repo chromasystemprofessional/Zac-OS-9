@@ -14,10 +14,10 @@
 
 /* ---- list boxes ------------------------------------------------------------ */
 
-void PanelList::setItems(const QStringList &list, const std::vector<int> &rowIcons) {
+void PanelList::setItems(const QStringList &list, const std::vector<int> &rowIcons, int indent) {
 	items = list;
 	icons = rowIcons.size() == static_cast<size_t>(list.size()) ? rowIcons : std::vector<int>{};
-	state.indent = icons.empty() ? 0 : PL_ICON_SMALL + 4;
+	state.indent = indent >= 0 ? indent : icons.empty() ? 0 : PL_ICON_SMALL + 4;
 	texts.clear();
 	for (const QString &s : list) {
 		texts.push_back(std::make_unique<Text>(s, frame.width() - SB_WIDTH - 8 - state.indent,

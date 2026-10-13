@@ -10,7 +10,7 @@
     when the generic rule (fixed size with a parent window) can't apply.
   </description>
 
-  <interface name="platinum_shell_v1" version="10">
+  <interface name="platinum_shell_v1" version="11">
     <enum name="style">
       <entry name="document" value="0" summary="standard document window"/>
       <entry name="movable_modal" value="1"
@@ -187,6 +187,22 @@
       <arg name="surface" type="object" interface="wl_surface"/>
       <arg name="option" type="uint"/>
     </event>
+    <event name="keyboard_layouts" since="11">
+      <description summary="the keyboard layouts and the one in use">
+        Sent on bind and whenever they change (the Keyboard panel, ⌘-Space):
+        one line per layout, "code TAB name" (code as in the Keyboard
+        panel's setting, such as "us(dvorak)"; empty if unknown), and the
+        index of the one in use. The menu bar's keyboard menu shows them.
+      </description>
+      <arg name="layouts" type="string"/>
+      <arg name="current" type="uint"/>
+    </event>
+    <request name="set_keyboard_layout" since="11">
+      <description summary="use another keyboard layout">
+        The index of one of the layouts in keyboard_layouts.
+      </description>
+      <arg name="index" type="uint"/>
+    </request>
   </interface>
 
   <interface name="platinum_keep_awake_v1" version="1">

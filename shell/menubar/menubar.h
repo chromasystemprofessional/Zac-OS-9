@@ -67,6 +67,7 @@ enum action {
 	ACT_EDIT_CLEAR,
 	ACT_FINDER,       /* arg: Finder command name */
 	ACT_DBUSMENU,     /* arg: dbusmenu "sender path id" or opaque GTK route */
+	ACT_KEYBOARD_LAYOUT, /* arg: the layout's index */
 };
 
 /* ⌘⌫ (delete) as a menu shortcut. */
@@ -97,10 +98,10 @@ struct mb_menu {
 struct mb_bar {
 	struct mb_menu left[MAX_TITLES];   /* logo menu, then app menus */
 	int n_left;
-	struct mb_menu right[2];           /* clock (no menu), Application menu */
+	struct mb_menu right[3];           /* clock (no menu), keyboard, Application menu */
 	int n_right;
 	bool has_clock;                    /* right[0] is the clock */
-	struct mbar_title left_titles[MAX_TITLES], right_titles[2];
+	struct mbar_title left_titles[MAX_TITLES], right_titles[3];
 };
 
 void menus_rebuild(struct mb_bar *bar, int screen_w);
@@ -217,5 +218,16 @@ void keys_send_clear(void);       /* Clear = Delete */
 struct wl_seat *menubar_seat(void);
 /* Called when the set of apps or the front app changes. */
 void menubar_apps_changed(void);
+/* Ask zacos9-wm to use keyboard layout `index`. */
+void menubar_set_keyboard_layout(int index);
+
+/* ---- the keyboard menu (kbmenu.c) ---------------------------------------- */
+
+/* zacos9-wm's keyboard_layouts: "code TAB name" lines, and the one in use. */
+void kbmenu_set(const char *layouts, uint32_t current);
+/* The menu's title for a layout: "US", "US-DV". */
+void kbmenu_abbrev(const char *code, const char *name, char *out, size_t size);
+/* Adds the keyboard menu, if more than one layout is in use. */
+void kbmenu_add(struct mb_menu *menus, int *n);
 
 #endif

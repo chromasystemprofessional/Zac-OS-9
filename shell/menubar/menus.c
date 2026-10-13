@@ -248,6 +248,8 @@ void menus_rebuild(struct mb_bar *bar, int screen_w) {
 		new_menu(bar->right, &bar->n_right, clock);
 	}
 
+	kbmenu_add(bar->right, &bar->n_right);
+
 	struct mb_menu *am = new_menu(bar->right, &bar->n_right, front ? front->name : "Sniffer");
 	if (front) {
 		char label[256];
@@ -344,6 +346,9 @@ void menus_perform(struct mb_item *item) {
 		break;
 	case ACT_ACTIVATE_APP:
 		app_activate(item->arg, menubar_seat());
+		break;
+	case ACT_KEYBOARD_LAYOUT:
+		menubar_set_keyboard_layout(atoi(item->arg));
 		break;
 	case ACT_EDIT_COMMAND:
 		keys_send_command(item->key);

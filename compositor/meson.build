@@ -84,6 +84,7 @@ compositor_exe = executable('zacos9-wm',
   'src/output.c',
   'src/snapshot.c',
   'src/input.c',
+  'src/kblayout.c',
   'src/window_sounds.c',
   'src/launch.c',
   'src/startup.c',
@@ -114,6 +115,14 @@ test('decor',
     dependencies: [decor_dep],
   ),
   args: [meson.project_source_root() / 'tools/measure/figs'],
+)
+
+test('keyboard-layouts',
+  executable('test-kblayout',
+    'tests/test_kblayout.c', 'src/kblayout.c',
+    include_directories: include_directories('src'),
+    dependencies: [platinum_dep, xkbcommon],
+  ),
 )
 
 test('startup-displays',
