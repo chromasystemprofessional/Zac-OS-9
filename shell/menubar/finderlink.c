@@ -65,6 +65,10 @@ static bool parse_line(const char *line) {
 		logout_begin();
 		return false;
 	}
+	if (strncmp(line, "context ", 8) == 0) {
+		menubar_context_menu(line + 8);
+		return false;
+	}
 	struct finder_state s = { .connected = true, .label = -1 };
 	if (sscanf(line, "state selection=%d window=%d trash=%d view=%d label=%d erase=%d network=%d unmount=%d",
 			&s.selection, &s.window, &s.trash, &s.view, &s.label, &s.erase,

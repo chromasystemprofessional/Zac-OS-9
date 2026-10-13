@@ -1,5 +1,7 @@
 #pragma once
 
+#include <QMouseEvent>
+
 #include <QLocalServer>
 #include <QTimer>
 #include <QLocalSocket>
@@ -14,6 +16,13 @@ class FolderWindow;
 class QWidget;
 
 /* Something showing a folder's icons: a Finder window or the desktop. */
+/* Control-click (the Mac's way) or a right-click: a contextual menu.
+ * ⌘ reaches us as Control too, so ⌘-click opens one as well. */
+inline bool isContextClick(const QMouseEvent *e) {
+	return e->button() == Qt::RightButton ||
+		(e->button() == Qt::LeftButton && (e->modifiers() & Qt::ControlModifier));
+}
+
 class FinderView {
 public:
 	virtual ~FinderView() = default;
@@ -72,6 +81,10 @@ public:
 	void makeAlias();
 	void putAway();
 	void unmountSelection(bool network);
+	/* A contextual menu (Control-click or right-click) on `hit` in
+	 * `view`, or on its background: the menu bar opens it at the pointer,
+	 * from the state just sent. */
+	void showContextMenu(FinderView *view, Item *hit);
 	/* Special > Eject (⌘E): every selected disk, local or network. */
 	void ejectSelection();
 	/* Special > Log Out (⇧⌘Q): asks, then has the menu bar quit the

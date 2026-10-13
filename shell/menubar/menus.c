@@ -1,3 +1,4 @@
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -55,6 +56,36 @@ static void add_edit_menu(struct mb_menu *menus, int *n, bool enabled) {
 	add(m, "Select All", 'A', enabled, ACT_EDIT_COMMAND, NULL);
 }
 
+/* File > Label and its contextual twin: the seven labels, the selection's
+ * checked. */
+static void add_label_submenu(struct mb_menu *m, bool enabled, int current) {
+	struct mb_item *label = add(m, "Label", 0, enabled, ACT_NONE, NULL);
+	label->submenu = calloc(1, sizeof(*label->submenu));
+	for (int i = 0; i < PL_LABEL_COUNT; i++) {
+		char command[16];
+		snprintf(command, sizeof(command), "label %d", i);
+		struct mb_item *it = add(label->submenu, pl_labels[i].name, 0, enabled,
+			ACT_FINDER, command);
+		it->swatch = pl_labels[i].color;
+		it->checked = enabled && current == i;
+		if (i == 0) {
+			sep(label->submenu);
+		}
+	}
+}
+
+/* View > Arrange and its contextual twin. */
+static void add_arrange_submenu(struct mb_menu *m, bool enabled) {
+	struct mb_item *arrange = add(m, "Arrange", 0, enabled, ACT_NONE, NULL);
+	arrange->submenu = calloc(1, sizeof(*arrange->submenu));
+	add(arrange->submenu, "by Name", 0, enabled, ACT_FINDER, "arrange name");
+	add(arrange->submenu, "by Date Modified", 0, enabled, ACT_FINDER, "arrange modified");
+	add(arrange->submenu, "by Date Created", 0, enabled, ACT_FINDER, "arrange created");
+	add(arrange->submenu, "by Size", 0, enabled, ACT_FINDER, "arrange size");
+	add(arrange->submenu, "by Kind", 0, enabled, ACT_FINDER, "arrange kind");
+	add(arrange->submenu, "by Label", 0, enabled, ACT_FINDER, "arrange label");
+}
+
 /* With the Finder (or nothing) in front, the Finder's menus. Commands go
  * to zacos9-finder; its reported state enables the items. */
 static void add_finder_menus(struct mb_menu *menus, int *n) {
@@ -74,19 +105,7 @@ static void add_finder_menus(struct mb_menu *menus, int *n) {
 	get_info->submenu = calloc(1, sizeof(*get_info->submenu));
 	add(get_info->submenu, "General Information", 'I', info, ACT_FINDER, "get-info");
 	add(get_info->submenu, "Sharing…", 0, info, ACT_FINDER, "get-info-sharing");
-	struct mb_item *label = add(m, "Label", 0, sel, ACT_NONE, NULL);
-	label->submenu = calloc(1, sizeof(*label->submenu));
-	for (int i = 0; i < PL_LABEL_COUNT; i++) {
-		char command[16];
-		snprintf(command, sizeof(command), "label %d", i);
-		struct mb_item *it = add(label->submenu, pl_labels[i].name, 0, sel,
-			ACT_FINDER, command);
-		it->swatch = pl_labels[i].color;
-		it->checked = sel && fs->label == i;
-		if (i == 0) {
-			sep(label->submenu);
-		}
-	}
+	add_label_submenu(m, sel, fs->label);
 	add(m, "Duplicate", 'D', sel, ACT_FINDER, "duplicate");
 	add(m, "Make Alias", 'M', sel, ACT_FINDER, "make-alias");
 	add(m, "Put Away", 'Y', sel, ACT_FINDER, "put-away");
@@ -112,14 +131,7 @@ static void add_finder_menus(struct mb_menu *menus, int *n) {
 	/* Mac OS 9: for an icon view, or the desktop when no window is in front. */
 	const bool iconView = up && (!fs->window || fs->view == 0);
 	add(m, "Clean Up", 0, iconView, ACT_FINDER, "clean-up");
-	struct mb_item *arrange = add(m, "Arrange", 0, iconView, ACT_NONE, NULL);
-	arrange->submenu = calloc(1, sizeof(*arrange->submenu));
-	add(arrange->submenu, "by Name", 0, iconView, ACT_FINDER, "arrange name");
-	add(arrange->submenu, "by Date Modified", 0, iconView, ACT_FINDER, "arrange modified");
-	add(arrange->submenu, "by Date Created", 0, iconView, ACT_FINDER, "arrange created");
-	add(arrange->submenu, "by Size", 0, iconView, ACT_FINDER, "arrange size");
-	add(arrange->submenu, "by Kind", 0, iconView, ACT_FINDER, "arrange kind");
-	add(arrange->submenu, "by Label", 0, iconView, ACT_FINDER, "arrange label");
+	add_arrange_submenu(m, iconView);
 	m = new_menu(menus, n, "Special");
 	add(m, "Empty Trash…", 0, up && fs->trash, ACT_FINDER, "empty-trash");
 	add(m, "Eject", 'E', up && (fs->network || fs->unmount), ACT_FINDER, "eject");
@@ -350,4 +362,73 @@ void menus_perform(struct mb_item *item) {
 	case ACT_NONE:
 		break;
 	}
+}
+
+/* A contextual menu (Control-click in the Sniffer) on an "icon", "disk",
+ * "trash", a "window" background or the "desktop". Like Mac OS 9's, it
+ * lists only what can be done right now, and no ⌘-keys. */
+void menus_context(struct mb_menu *m, const char *kind) {
+	memset(m, 0, sizeof(*m));
+	const struct finder_state *fs = finder_state();
+	if (!fs->connected) {
+		return;
+	}
+	const bool sel = fs->selection > 0;
+	if (strcmp(kind, "icon") == 0 && sel) {
+		add(m, "Open", 0, true, ACT_FINDER, "open");
+		add(m, "Move To Trash", 0, true, ACT_FINDER, "move-to-trash");
+		sep(m);
+		add(m, "Get Info", 0, true, ACT_FINDER, "get-info");
+		add_label_submenu(m, true, fs->label);
+		add(m, "Duplicate", 0, true, ACT_FINDER, "duplicate");
+		add(m, "Make Alias", 0, true, ACT_FINDER, "make-alias");
+	} else if (strcmp(kind, "disk") == 0 && sel) {
+		add(m, "Open", 0, true, ACT_FINDER, "open");
+		add(m, "Get Info", 0, true, ACT_FINDER, "get-info");
+		add_label_submenu(m, true, fs->label);
+		if (fs->network || fs->unmount || (fs->erase && fs->selection == 1)) {
+			sep(m);
+		}
+		if (fs->network || fs->unmount) {
+			add(m, "Eject", 0, true, ACT_FINDER, "eject");
+		}
+		if (fs->erase && fs->selection == 1) {
+			add(m, "Erase Disk…", 0, true, ACT_FINDER, "erase-disk");
+		}
+	} else if (strcmp(kind, "trash") == 0 && sel) {
+		add(m, "Open", 0, true, ACT_FINDER, "open");
+		if (fs->trash) {
+			add(m, "Empty Trash…", 0, true, ACT_FINDER, "empty-trash");
+		}
+	} else if (strcmp(kind, "window") == 0 && fs->window) {
+		add(m, "New Folder", 0, true, ACT_FINDER, "new-folder");
+		sep(m);
+		struct mb_item *view = add(m, "View", 0, true, ACT_NONE, NULL);
+		view->submenu = calloc(1, sizeof(*view->submenu));
+		add(view->submenu, "as Icons", 0, true, ACT_FINDER, "view-icons")->checked = fs->view == 0;
+		add(view->submenu, "as Buttons", 0, true, ACT_FINDER, "view-buttons")->checked = fs->view == 2;
+		add(view->submenu, "as List", 0, true, ACT_FINDER, "view-list")->checked = fs->view == 1;
+		if (fs->view == 0) {
+			add(m, "Clean Up", 0, true, ACT_FINDER, "clean-up");
+			add_arrange_submenu(m, true);
+		}
+		sep(m);
+		add(m, "Get Info", 0, true, ACT_FINDER, "get-info");
+		add(m, "Close Window", 0, true, ACT_FINDER, "close-window");
+	} else if (strcmp(kind, "desktop") == 0) {
+		add(m, "New Folder", 0, true, ACT_FINDER, "new-folder");
+		sep(m);
+		add(m, "Clean Up", 0, true, ACT_FINDER, "clean-up");
+		add_arrange_submenu(m, true);
+		sep(m);
+		char command[PATH_MAX + 64];
+		sibling_program("zacos9-appearance", command, sizeof(command));
+		strncat(command, " desktop", sizeof(command) - strlen(command) - 1);
+		add(m, "Change Desktop Background…", 0, true, ACT_LAUNCH, command);
+	}
+	render_menu_text(m);
+}
+
+void menus_free_menu(struct mb_menu *m) {
+	free_menu(m);
 }

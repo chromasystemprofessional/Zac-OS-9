@@ -920,9 +920,10 @@ test('idle-lock', find_program('dbus-run-session'),
     compositor_exe, idle_client, test_lock_exe, inhibit_exe, vptr_exe],
   timeout: 90,
 )
-# ⌘-Tab and Option-click on the desktop, with the real menu bar and Sniffer.
-test('app-switch', find_program('dbus-run-session'),
-  args: ['--', find_program('python3').full_path(), files('../compositor/tests/test_app_switch.py'),
+# ⌘-Tab, Option-click on the desktop, contextual menus and Log Out, with the
+# real menu bar and Sniffer.
+test('session-ui', find_program('dbus-run-session'),
+  args: ['--', find_program('python3').full_path(), files('../compositor/tests/test_session_ui.py'),
     compositor_exe, menubar_exe, finder_exe, idle_client, vptr_exe],
   timeout: 90,
 )

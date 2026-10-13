@@ -219,9 +219,9 @@ Section 3 lists every feature; section 5 is the plan.
 
 | Feature | Status | Notes |
 |---|---|---|
-| Control-click (and right-click) on icons, window backgrounds, the desktop, the Trash, disks | ✗ | **P1 M.** Menu painter exists (`lib/menudraw`); needs a popup surface from the Sniffer (xdg-popup or layer-shell like the menu bar's). |
-| Icon menu: Open, Get Info, Label, Duplicate, Make Alias, Add To Favorites, Move To Trash, Print | ✗ | Same commands as the File menu. |
-| Window/desktop menu: New Folder, View as …, Clean Up, Arrange, Sort List, View Options, Change Desktop Background | ✗ | |
+| Control-click (and right-click) on icons, window backgrounds, the desktop, the Trash, disks | ✅ | The Sniffer asks; the menu bar opens it at the pointer (press-drag-release, or click for a sticky menu), as its own menus (0.1.54). ⌘-click opens one too (⌘ reaches apps as Control). |
+| Icon menu: Open, Get Info, Label, Duplicate, Make Alias, Add To Favorites, Move To Trash, Print | ◐ | Open, Move To Trash, Get Info, Label ▸, Duplicate, Make Alias ✅; disks add Eject and Erase Disk…, the Trash Empty Trash…. Add To Favorites and Print wait for those features. |
+| Window/desktop menu: New Folder, View as …, Clean Up, Arrange, Sort List, View Options, Change Desktop Background | ◐ | New Folder, View ▸, Clean Up, Arrange ▸, Get Info, Close Window; the desktop's Change Desktop Background… ✅. Sort List and View Options wait for those features. |
 | Find Similar Items, Index Selection | ✗ | Need content search (3.13). P3 |
 | Attach a Folder Trick | ✗ | Needs folder tricks (3.12). P3 |
 | Summarize Text to Clipboard | — | Out of scope (or an LLM-free extractive summary later). |
@@ -470,7 +470,7 @@ updates `PROJECT_STATUS.md` and the relevant `docs/` page.
 | # | Work package | Components | Effort | Tests |
 |---|---|---|---|---|
 | 1.1 ✅ | **⌘-Tab / ⇧⌘-Tab** app cycling, and Option-click desktop or Option-choose an app to hide the one you leave | `compositor/src/hotkey.c`, `shell/menubar/toplevels.c` | S | Headless: three clients, ⌘-Tab order and focus; hidden state after Option-switch |
-| 1.2 | **Sniffer contextual menus** for icons, window backgrounds, the desktop, the Trash and disks; Control-click and right-click | `shell/finder/` (popup surface), `lib/menudraw` | M | Headless screenshot of each menu; each command reaches `Finder::command` |
+| 1.2 ✅ | **Sniffer contextual menus** for icons, window backgrounds, the desktop, the Trash and disks; Control-click and right-click | `shell/finder/` (popup surface), `lib/menudraw` | M | Headless screenshot of each menu; each command reaches `Finder::command` |
 | 1.3 ✅ | **Special ▸ Eject (⌘E)** and **Log Out (⇧⌘Q)**, with "quit your programs first" | `shell/menubar/menus.c`, `session/` | S | VM: Log Out returns to the login window |
 | 1.4 | **Window tricks**: Option-click close/collapse for all of an app's windows, ⌘-drag a background window, Option-zoom fills the screen | `compositor/src/input.c`, `view.c`, `frame.c` | S | Headless compositor tests (`compositor/tests/`) |
 | 1.5 | **Folder-path menu** on ⌘-click of a Sniffer window's title, ⌘-↑ / Option-⌘-↑ | compositor → Sniffer via `platinum-shell-v1` (new event: title clicked with modifiers), Sniffer menu | M | Headless: ⌘-click title shows the path; choosing opens the parent |

@@ -919,11 +919,32 @@ void FolderWindow::clearDropTarget() {
 /* ---- mouse ---------------------------------------------------------------------- */
 
 void FolderWindow::mousePressEvent(QMouseEvent *e) {
+	const QPoint pos = e->position().toPoint();
+	const int barX = width() - SB_WIDTH + 1, barY = height() - SB_WIDTH + 1;
+	if (isContextClick(e)) {
+		/* In the icons' area: as a plain click selects, then the menu. */
+		if (pos.y() < contentTop() || pos.x() >= barX || pos.y() >= barY) {
+			return;
+		}
+		if (m_editor.item()) {
+			m_editor.commit();
+		}
+		m_renameTimer.stop();
+		bool onTriangle = false;
+		Item *hit = itemAt(pos, &onTriangle);
+		if (!listSelectableAt(pos, hit)) {
+			hit = nullptr;
+		}
+		if (!hit || !hit->selected) {
+			forEachItem([&](Item *item) { item->selected = item == hit; });
+		}
+		update();
+		Finder::instance().showContextMenu(this, hit);
+		return;
+	}
 	if (e->button() != Qt::LeftButton) {
 		return;
 	}
-	const QPoint pos = e->position().toPoint();
-	const int barX = width() - SB_WIDTH + 1, barY = height() - SB_WIDTH + 1;
 
 	/* Scroll bars. */
 	if (pos.x() >= barX && pos.y() >= contentTop() - 1 && pos.y() < barY) {

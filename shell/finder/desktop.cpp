@@ -521,6 +521,18 @@ void Desktop::mousePressEvent(QMouseEvent *e) {
 		m_editor.commit();
 	}
 	Item *hit = itemAt(pos);
+	if (isContextClick(e)) {
+		/* As a plain click selects, then the contextual menu. */
+		m_renameTimer.stop();
+		if (!hit || !hit->selected) {
+			for (Item *item : allItems()) {
+				item->selected = item == hit;
+			}
+		}
+		update();
+		Finder::instance().showContextMenu(this, hit);
+		return;
+	}
 	const bool extend = e->modifiers() & Qt::ShiftModifier;
 	m_renameTimer.stop();
 	if (renamable(hit) && hit->selected && !extend && selectedItems().size() == 1 &&

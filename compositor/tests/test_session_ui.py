@@ -1,9 +1,10 @@
-"""⌘-Tab and Option-click on the desktop (compositor/src/input.c, view.c and
-the menu bar's app_switch_target), then Special > Log Out (the Sniffer asks,
-the menu bar quits the programs: shell/menubar/logout.c), with the real menu
-bar and Sniffer.
+"""The session's own UI, with the real menu bar and Sniffer in a headless
+zacos9-wm: ⌘-Tab and Option-click on the desktop (compositor/src/input.c,
+view.c, the menu bar's app_switch_target); a contextual menu on the desktop
+(the Sniffer asks, the menu bar opens it at the pointer); then Special > Log
+Out (shell/menubar/logout.c).
 
-usage: test_app_switch.py ZACOS9-WM MENUBAR FINDER IDLE-CLIENT VPTR
+usage: test_session_ui.py ZACOS9-WM MENUBAR FINDER IDLE-CLIENT VPTR
 """
 import os
 import shlex
@@ -124,6 +125,16 @@ with tempfile.TemporaryDirectory(prefix="zacos9-switch-") as directory:
                 # (the pointer, over the window in the first shot, is on the desktop now)
                 assert abs(green() - before) <= before // 100, "showing its window again"
             print("ok: Option-click on the desktop hides the program you leave")
+
+            # Control-click on the desktop: its contextual menu opens at the
+            # pointer and stays (a click); its first item, New Folder, makes one.
+            desktop = root / "home" / "Desktop"
+            desktop.mkdir(exist_ok=True)
+            # (the windows cover the middle; the desktop shows at the left)
+            vp("home", "move", "40", "450", "hold", "control", "click", "release", "control", "wait", "700")
+            vp("home", "move", "70", "458", "click", "wait", "1500")
+            wait_for("New Folder from the contextual menu", lambda: (desktop / "untitled folder").is_dir())
+            print("ok: a contextual menu on the desktop opens at the pointer; New Folder works")
 
             # Special > Log Out: the Sniffer asks; Return says Log Out; the
             # programs are asked to quit, and once they have, the session ends.

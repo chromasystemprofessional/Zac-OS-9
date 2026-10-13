@@ -46,7 +46,7 @@ void launch(const char *command) {
 
 /* A shell command running `program` from next to this binary (build tree
  * or install), else from $PATH. */
-static void sibling_program(const char *program, char *out, size_t size) {
+void sibling_program(const char *program, char *out, size_t size) {
 	char exe[PATH_MAX];
 	ssize_t len = readlink("/proc/self/exe", exe, sizeof(exe) - 1);
 	if (len > 0) {

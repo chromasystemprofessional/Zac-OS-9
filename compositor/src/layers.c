@@ -116,6 +116,9 @@ static void handle_map(struct wl_listener *listener, void *data) {
 	if (ls->layer_surface->current.keyboard_interactive ==
 			ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_EXCLUSIVE) {
 		layers_focus(ls);
+		/* A menu (or the lock) appearing under a still pointer gets it at
+		 * once: a contextual menu opens where the pointer is. */
+		input_pointer_refocus(ls->server);
 	}
 }
 

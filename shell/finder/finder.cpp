@@ -715,6 +715,20 @@ void Finder::ejectVolume(QString path, QString name, bool network) {
 	Alert::ask("The disk \"" + name + "\" is no longer mounted.", "OK", QString());
 }
 
+void Finder::showContextMenu(FinderView *view, Item *hit) {
+	setFront(view);
+	const char *kind = !hit ? (view == m_desktop ? "desktop" : "window")
+		: hit->kind == PL_ICON_TRASH_EMPTY || hit->kind == PL_ICON_TRASH_FULL ? "trash"
+		: hit->isLocalVolume || hit->isNetworkVolume || hit->kind == PL_ICON_DISK ? "disk"
+		: "icon";
+	notifyState(); /* the menu's items follow this state, sent first */
+	for (auto &c : m_clients) {
+		if (c) {
+			c->write(QByteArray("context ") + kind + "\n");
+		}
+	}
+}
+
 void Finder::ejectSelection() {
 	struct Disk {
 		QString path, name;

@@ -38,7 +38,8 @@
 #define BLINK_COUNT 1
 #define BLINK_MS 60
 
-enum side { SIDE_LEFT, SIDE_RIGHT };
+/* SIDE_CONTEXT: a contextual menu at the pointer, not from a title. */
+enum side { SIDE_LEFT, SIDE_RIGHT, SIDE_CONTEXT };
 
 static struct {
 	struct wl_display *display;
@@ -73,7 +74,7 @@ static struct {
 	struct wl_surface *menu_surface;
 	struct wl_subsurface *menu_sub;
 	bool overlay_configured;
-	int menu_x, menu_w, menu_h;
+	int menu_x, menu_y, menu_w, menu_h;
 	int height; /* logical screen height, from the overlay */
 	struct wl_surface *sub_surface;
 	struct wl_subsurface *sub_sub;
@@ -81,6 +82,12 @@ static struct {
 
 	struct mb_bar model;
 	bool rebuild_pending;
+
+	/* A contextual menu: where the pointer was when it opened (known once
+	 * the overlay has the pointer), and its items. */
+	struct mb_menu context;
+	bool context_placed;
+	double context_x, context_y;
 
 	/* Tracking. */
 	enum side open_side;
@@ -173,12 +180,15 @@ static struct mb_menu *open_menu_ptr(void) {
 	if (g.open_index < 0) {
 		return NULL;
 	}
+	if (g.open_side == SIDE_CONTEXT) {
+		return &g.context;
+	}
 	return g.open_side == SIDE_LEFT ? &g.model.left[g.open_index]
 		: &g.model.right[g.open_index];
 }
 
 static struct mbar_title *open_title_ptr(void) {
-	if (g.open_index < 0) {
+	if (g.open_index < 0 || g.open_side == SIDE_CONTEXT) {
 		return NULL;
 	}
 	return g.open_side == SIDE_LEFT ? &g.model.left_titles[g.open_index]
@@ -235,7 +245,7 @@ static void draw_submenu(struct menu_item *parent_items, int parent_n) {
 	if (g.sub_x + g.sub_w + MENU_SHADOW > g.width) {
 		g.sub_x = g.menu_x - g.sub_w + 1; /* no room: open to the left */
 	}
-	g.sub_y = MBAR_HEIGHT - 1 + menu_item_top(parent_items, parent_n, g.sub_parent) - 1;
+	g.sub_y = g.menu_y + menu_item_top(parent_items, parent_n, g.sub_parent) - 1;
 	if (g.height > 0 && g.sub_y + g.sub_h + MENU_SHADOW > g.height) {
 		g.sub_y = g.height - g.sub_h - MENU_SHADOW;
 	}
@@ -262,8 +272,25 @@ static void draw_menu(void) {
 	to_menu_items(m, items);
 	menu_measure(items, m->n, &g.menu_w, &g.menu_h);
 
-	/* The menu hangs from its title, kept on screen at the right edge. */
-	g.menu_x = open_title_ptr()->hi_l;
+	if (g.open_side == SIDE_CONTEXT) {
+		/* At the pointer, kept on screen: drawn once the overlay has
+		 * told us where the pointer is. */
+		if (!g.context_placed) {
+			return;
+		}
+		g.menu_x = (int)g.context_x;
+		g.menu_y = (int)g.context_y;
+		if (g.height > 0 && g.menu_y + g.menu_h + MENU_SHADOW > g.height) {
+			g.menu_y = g.height - g.menu_h - MENU_SHADOW;
+		}
+		if (g.menu_y < MBAR_HEIGHT - 1) {
+			g.menu_y = MBAR_HEIGHT - 1;
+		}
+	} else {
+		/* The menu hangs from its title, kept on screen at the right edge. */
+		g.menu_x = open_title_ptr()->hi_l;
+		g.menu_y = MBAR_HEIGHT - 1;
+	}
 	if (g.menu_x + g.menu_w + MENU_SHADOW > g.width) {
 		g.menu_x = g.width - g.menu_w - MENU_SHADOW;
 	}
@@ -277,7 +304,7 @@ static void draw_menu(void) {
 	int sel = g.blinks_left > 0 && !g.chosen_in_sub && !g.blink_on ? -1 : g.selected;
 	menu_paint(&c, items, m->n, g.menu_w, g.menu_h, sel, pl_accent_current());
 
-	wl_subsurface_set_position(g.menu_sub, g.menu_x, MBAR_HEIGHT - 1);
+	wl_subsurface_set_position(g.menu_sub, g.menu_x, g.menu_y);
 	present(g.menu_surface, px, w, h);
 	free(px);
 	draw_submenu(items, m->n);
@@ -409,6 +436,10 @@ static void close_menu(void) {
 	if (g.open_index < 0) {
 		return;
 	}
+	if (g.open_side == SIDE_CONTEXT) {
+		menus_free_menu(&g.context);
+		g.context_placed = false;
+	}
 	g.open_index = -1;
 	g.selected = -1;
 	g.sub_parent = g.sub_selected = -1;
@@ -426,7 +457,7 @@ static int item_under_pointer(void) {
 	if (!m) {
 		return -1;
 	}
-	int lx = (int)g.px - g.menu_x, ly = (int)g.py - (MBAR_HEIGHT - 1);
+	int lx = (int)g.px - g.menu_x, ly = (int)g.py - g.menu_y;
 	if (lx < 1 || lx > g.menu_w - 2) {
 		return -1;
 	}
@@ -505,9 +536,17 @@ static void pointer_moved(void) {
 	if (g.open_index < 0 || g.blinks_left > 0) {
 		return;
 	}
+	if (g.open_side == SIDE_CONTEXT && !g.context_placed) {
+		/* The overlay's first pointer event: the menu opens here. */
+		g.context_x = g.px;
+		g.context_y = g.py;
+		g.context_placed = true;
+		draw_menu();
+		return;
+	}
 	enum side side;
 	int index;
-	if (title_at(g.px, g.py, &side, &index)) {
+	if (g.open_side != SIDE_CONTEXT && title_at(g.px, g.py, &side, &index)) {
 		if (side != g.open_side || index != g.open_index) {
 			open_menu(side, index);
 		} else if (g.selected != -1) {
@@ -565,6 +604,14 @@ static void pointer_pressed(void) {
 		return;
 	}
 	/* A menu is open in sticky mode. */
+	if (g.open_side == SIDE_CONTEXT) {
+		if (item_under_pointer() >= 0 || sub_item_under_pointer() >= 0) {
+			g.button_down = true;
+		} else {
+			close_menu();
+		}
+		return;
+	}
 	if (on_title) {
 		if (side == g.open_side && index == g.open_index) {
 			close_menu();
@@ -601,6 +648,14 @@ static void pointer_released(void) {
 		choose(sel, false);
 		return;
 	}
+	if (g.open_side == SIDE_CONTEXT) {
+		/* Released where it opened (a click): it stays open, sticky. */
+		if (g.context_placed && abs((int)(g.px - g.context_x)) < 4 && abs((int)(g.py - g.context_y)) < 4) {
+			return;
+		}
+		close_menu();
+		return;
+	}
 	enum side side;
 	int index;
 	if (title_at(g.px, g.py, &side, &index) && side == g.open_side &&
@@ -608,6 +663,28 @@ static void pointer_released(void) {
 		return; /* released on its title: the menu stays open (sticky) */
 	}
 	close_menu();
+}
+
+/* The Sniffer's Control-click: its contextual menu, at the pointer. The
+ * button is still down from that click, so it tracks press-drag-release;
+ * a click without moving leaves it open. */
+void menubar_context_menu(const char *kind) {
+	if (g.open_index >= 0 || !g.bar_configured) {
+		return;
+	}
+	menus_context(&g.context, kind);
+	if (g.context.n == 0) {
+		menus_free_menu(&g.context);
+		return;
+	}
+	pl_sound_event("menu-open");
+	g.open_side = SIDE_CONTEXT;
+	g.open_index = 0;
+	g.selected = -1;
+	g.sub_parent = g.sub_selected = -1;
+	g.context_placed = false;
+	g.button_down = true;
+	create_overlay();
 }
 
 /* ---- input --------------------------------------------------------------- */

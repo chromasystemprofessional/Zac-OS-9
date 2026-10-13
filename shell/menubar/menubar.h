@@ -139,6 +139,9 @@ void appmenu_poll_dispatch(const struct pollfd *fds);
 /* ---- apple-menu-equivalent items and launching (launch.c) ---------------- */
 
 void launch(const char *command);
+/* `program` next to our own binary (installed or in the build tree), else
+ * from $PATH, as a shell-quoted command. */
+void sibling_program(const char *program, char *out, size_t size);
 uint32_t launch_feedback_begin(void);
 void launch_feedback_update(uint32_t cookie, uint32_t pid);
 void launch_feedback_cancel(uint32_t cookie);
@@ -162,6 +165,13 @@ int finder_fd(void);          /* -1 when not connected */
 bool finder_read(void);       /* true if the state changed */
 const struct finder_state *finder_state(void);
 void finder_send(const char *command);
+
+/* A Sniffer contextual menu ("icon", "disk", "trash", "window", "desktop"),
+ * from the Sniffer's state; empty when there is nothing to offer. */
+void menus_context(struct mb_menu *m, const char *kind);
+void menus_free_menu(struct mb_menu *m);
+/* The Sniffer asked for one at the pointer (main.c). */
+void menubar_context_menu(const char *kind);
 
 /* ---- Log Out (logout.c) --------------------------------------------------- */
 
