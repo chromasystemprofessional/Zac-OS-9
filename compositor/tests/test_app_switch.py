@@ -1,11 +1,14 @@
 """⌘-Tab and Option-click on the desktop (compositor/src/input.c, view.c and
-the menu bar's app_switch_target), with the real menu bar and Sniffer.
+the menu bar's app_switch_target), then Special > Log Out (the Sniffer asks,
+the menu bar quits the programs: shell/menubar/logout.c), with the real menu
+bar and Sniffer.
 
 usage: test_app_switch.py ZACOS9-WM MENUBAR FINDER IDLE-CLIENT VPTR
 """
 import os
 import shlex
 import shutil
+import socket
 import subprocess
 import sys
 import tempfile
@@ -38,7 +41,8 @@ with tempfile.TemporaryDirectory(prefix="zacos9-switch-") as directory:
                ZACOS9_STARTUP="0", ZACOS9_COLLAR="", ZACOS9_INHIBIT="",
                ZACOS9_MENUBAR=shlex.quote(menubar), ZACOS9_FINDER=shlex.quote(finder),
                QT_QPA_PLATFORM="wayland", QT_STYLE_OVERRIDE="",
-               QT_WAYLAND_DISABLE_WINDOWDECORATION="1")
+               QT_WAYLAND_DISABLE_WINDOWDECORATION="1",
+               ZACOS9_LOGOUT_COMMAND=f"touch {shlex.quote(str(root / 'logged-out'))}")
     env.pop("WAYLAND_DISPLAY", None)
     processes = []
     with (root / "compositor.log").open("w+") as log:
@@ -120,6 +124,18 @@ with tempfile.TemporaryDirectory(prefix="zacos9-switch-") as directory:
                 # (the pointer, over the window in the first shot, is on the desktop now)
                 assert abs(green() - before) <= before // 100, "showing its window again"
             print("ok: Option-click on the desktop hides the program you leave")
+
+            # Special > Log Out: the Sniffer asks; Return says Log Out; the
+            # programs are asked to quit, and once they have, the session ends.
+            with socket.socket(socket.AF_UNIX) as s:
+                s.connect(str(root / f"zacos9-finder.{sockets[0].name}.sock"))
+                s.sendall(b"cmd log-out\n")
+                time.sleep(1.5)
+                assert all(p.poll() is None for p in processes), "nothing quits before you answer"
+                vp("key", "Return")
+                wait_for("the programs to quit", lambda: all(p.poll() is not None for p in processes[1:]))
+                wait_for("the session to end", (root / "logged-out").exists)
+            print("ok: Log Out quits the programs, then ends the session")
         finally:
             for p in reversed(processes):
                 p.terminate()

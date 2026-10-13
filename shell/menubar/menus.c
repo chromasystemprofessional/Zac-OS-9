@@ -121,12 +121,8 @@ static void add_finder_menus(struct mb_menu *menus, int *n) {
 	add(arrange->submenu, "by Kind", 0, iconView, ACT_FINDER, "arrange kind");
 	add(arrange->submenu, "by Label", 0, iconView, ACT_FINDER, "arrange label");
 	m = new_menu(menus, n, "Special");
-	add(m, "Disconnect Network Drive", 0, up && fs->network && fs->selection == 1,
-		ACT_FINDER, "disconnect-network");
-	add(m, "Unmount Disk", 0, up && fs->unmount && fs->selection == 1,
-		ACT_FINDER, "unmount-disk");
-	sep(m);
 	add(m, "Empty Trash…", 0, up && fs->trash, ACT_FINDER, "empty-trash");
+	add(m, "Eject", 'E', up && (fs->network || fs->unmount), ACT_FINDER, "eject");
 	add(m, "Erase Disk…", 0, up && fs->erase && fs->selection == 1, ACT_FINDER, "erase-disk");
 	/* Restore legacy hidden overrides, not applications queued in Trash. */
 	add(m, "Show All Applications", 0, up, ACT_FINDER, "show-hidden-applications");
@@ -134,6 +130,8 @@ static void add_finder_menus(struct mb_menu *menus, int *n) {
 	add(m, "Sleep",     0, true, ACT_LAUNCH, "systemctl suspend");
 	add(m, "Restart",   0, true, ACT_LAUNCH, "systemctl reboot");
 	add(m, "Shut Down", 0, true, ACT_LAUNCH, "systemctl poweroff");
+	sep(m);
+	add(m, "Log Out…", 0, up, ACT_FINDER, "log-out");
 }
 
 struct mb_menu *menus_new_menu(struct mb_menu *menus, int *n, const char *title) {

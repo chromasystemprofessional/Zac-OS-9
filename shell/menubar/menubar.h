@@ -163,6 +163,15 @@ bool finder_read(void);       /* true if the state changed */
 const struct finder_state *finder_state(void);
 void finder_send(const char *command);
 
+/* ---- Log Out (logout.c) --------------------------------------------------- */
+
+/* The Sniffer asked, and the user said Log Out: quit the programs. */
+void logout_begin(void);
+/* -1, or how soon (ms) logout_tick wants to run again. */
+int logout_poll_timeout(void);
+/* Ends the session once the programs are gone, or gives up. */
+void logout_tick(void);
+
 /* ---- keystrokes for Edit commands (keys.c) -------------------------------- */
 
 void keys_init(struct zwp_virtual_keyboard_manager_v1 *mgr, struct wl_seat *seat);

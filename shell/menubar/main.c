@@ -989,6 +989,10 @@ int main(void) {
 		/* The Finder may start after us, or restart: while we have no line
 		 * to it, look again every second. */
 		int timeout = finder_fd() < 0 ? 1000 : -1;
+		const int logout = logout_poll_timeout();
+		if (logout >= 0 && (timeout < 0 || logout < timeout)) {
+			timeout = logout;
+		}
 		int n_glib = appmenu_poll_prepare(fds + 5, 16, &timeout);
 		if (poll(fds, 5 + n_glib, timeout) < 0 && errno != EINTR) {
 			wl_display_cancel_read(g.display);
@@ -1028,6 +1032,7 @@ int main(void) {
 			menubar_apps_changed(); /* state arrives shortly; rebuild then too */
 		}
 		appmenu_poll_dispatch(fds + 5); /* D-Bus: other programs' menus */
+		logout_tick();
 	}
 	return 0;
 }

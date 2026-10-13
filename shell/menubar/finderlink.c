@@ -61,6 +61,10 @@ static void disconnect(void) {
 }
 
 static bool parse_line(const char *line) {
+	if (strcmp(line, "logout") == 0) {
+		logout_begin();
+		return false;
+	}
 	struct finder_state s = { .connected = true, .label = -1 };
 	if (sscanf(line, "state selection=%d window=%d trash=%d view=%d label=%d erase=%d network=%d unmount=%d",
 			&s.selection, &s.window, &s.trash, &s.view, &s.label, &s.erase,

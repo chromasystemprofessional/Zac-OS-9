@@ -211,8 +211,8 @@ Section 3 lists every feature; section 5 is the plan.
 | View ▸ **as Window / as Pop-up Window** | ✗ | See 3.2. P2 L |
 | View ▸ **Sort List** (in list view), **Reset Column Positions**, **View Options…** | ✗ | P2 |
 | Special ▸ Empty Trash…, Erase Disk…, Sleep, Restart, Shut Down | ✅ | Erase Disk: format choices (Mac OS Extended, DOS/FAT, exFAT) to verify. |
-| Special ▸ **Eject** (⌘E) | ◐ | Put Away/Unmount exist; an Eject item with ⌘E is missing. P1 S |
-| Special ▸ **Log Out** (⇧⌘Q) | ✗ | Ends the session (`loginctl terminate-session`) after apps quit. P1 S |
+| Special ▸ **Eject** (⌘E) | ✅ | Every selected disk, local or network; replaces Disconnect Network Drive and Unmount Disk (0.1.54). |
+| Special ▸ **Log Out** (⇧⌘Q) | ✅ | Asks, quits the programs (each may offer to save), then ends the session; a program still open after 30 s cancels it (0.1.54). The menu doesn't show ⇧⌘Q yet (the painter has no ⇧ glyph). |
 | Help ▸ **Help Center**, **Show/Hide Hint Bubbles**, **ZacOS Help** | ✗ | See 3.17. P2 L |
 
 ### 3.4 Contextual menus (ch. 4 p. 64)
@@ -372,7 +372,7 @@ A zram/swap switch in a Memory panel is a possible P3.
 | Feature | Status | Notes |
 |---|---|---|
 | Login window with a user list and password | ✅ | `zacos9-login` (0.1.54) |
-| **Log Out** (Special menu), automatic logout or lock after idle | ◐ | Lock after idle ✅ (Screen Saver); Log Out missing (3.3). P1 S |
+| **Log Out** (Special menu), automatic logout or lock after idle | ✅ | Log Out ✅ (0.1.54); lock after idle ✅ (Screen Saver) |
 | **Users panel**: add/remove accounts, picture, can change password, can log in, can manage accounts | ✗ | **P2 L.** accountsservice over D-Bus; polkit for administrators. |
 | Account kinds: Normal, **Limited** (chosen apps only), **Puppy Mode** (the simplified desktop for children) | ✗ | P3 L. Limited: allowed-apps list enforced by the Sniffer and menu bar (not a security boundary — say so). |
 | Global options: welcome message, guest account, speak your name, alternate password | ◐ | Welcome message P3 S; guest account P3 M; voice login — . |
@@ -471,7 +471,7 @@ updates `PROJECT_STATUS.md` and the relevant `docs/` page.
 |---|---|---|---|---|
 | 1.1 ✅ | **⌘-Tab / ⇧⌘-Tab** app cycling, and Option-click desktop or Option-choose an app to hide the one you leave | `compositor/src/hotkey.c`, `shell/menubar/toplevels.c` | S | Headless: three clients, ⌘-Tab order and focus; hidden state after Option-switch |
 | 1.2 | **Sniffer contextual menus** for icons, window backgrounds, the desktop, the Trash and disks; Control-click and right-click | `shell/finder/` (popup surface), `lib/menudraw` | M | Headless screenshot of each menu; each command reaches `Finder::command` |
-| 1.3 | **Special ▸ Eject (⌘E)** and **Log Out (⇧⌘Q)**, with "quit your programs first" | `shell/menubar/menus.c`, `session/` | S | VM: Log Out returns to the login window |
+| 1.3 ✅ | **Special ▸ Eject (⌘E)** and **Log Out (⇧⌘Q)**, with "quit your programs first" | `shell/menubar/menus.c`, `session/` | S | VM: Log Out returns to the login window |
 | 1.4 | **Window tricks**: Option-click close/collapse for all of an app's windows, ⌘-drag a background window, Option-zoom fills the screen | `compositor/src/input.c`, `view.c`, `frame.c` | S | Headless compositor tests (`compositor/tests/`) |
 | 1.5 | **Folder-path menu** on ⌘-click of a Sniffer window's title, ⌘-↑ / Option-⌘-↑ | compositor → Sniffer via `platinum-shell-v1` (new event: title clicked with modifiers), Sniffer menu | M | Headless: ⌘-click title shows the path; choosing opens the parent |
 | 1.6 | **Favorites**: File ▸ Add To Favorites, Zac menu Favorites, Favorites in Open/Save | `shell/finder/`, `shell/menubar/launch.c`, file-chooser portal | S | Unit: alias written; menu lists it |

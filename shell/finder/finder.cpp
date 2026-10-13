@@ -3,6 +3,7 @@
 #include "settings.h"
 
 #include <QCoreApplication>
+#include <algorithm>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -181,8 +182,11 @@ QString Finder::stateLine() {
 	const auto items = v ? v->selectedItems() : std::vector<Item *>{};
 	const bool erase = items.size() == 1 && items[0]->isLocalVolume &&
 		diskCanEraseVolume(items[0]->path);
-	const bool network = items.size() == 1 && items[0]->isNetworkVolume;
-	const bool unmount = items.size() == 1 && items[0]->isLocalVolume;
+	/* Any selected disk, for Special > Eject. */
+	const bool network = std::any_of(items.begin(), items.end(),
+		[](const Item *i) { return i->isNetworkVolume; });
+	const bool unmount = std::any_of(items.begin(), items.end(),
+		[](const Item *i) { return i->isLocalVolume; });
 	return QStringLiteral("state selection=%1 window=%2 trash=%3 view=%4 label=%5 erase=%6 network=%7 unmount=%8")
 		.arg(selection).arg(window ? 1 : 0).arg(full ? 1 : 0).arg(list).arg(label).arg(erase ? 1 : 0)
 		.arg(network ? 1 : 0).arg(unmount ? 1 : 0);
@@ -214,6 +218,12 @@ void Finder::command(const QString &name) {
 				Alert::ask("“" + app + "” couldn't be forced to quit.", "OK", QString());
 			}
 		}
+	} else if (name == "eject") {
+		ejectSelection();
+	} else if (name == "log-out") {
+		logOut();
+	} else if (name == "log-out-cancelled") {
+		Alert::ask("Log Out was cancelled because a program didn't quit.", "OK", QString());
 	} else if (name == "new-folder") {
 		newFolder();
 	} else if (name == "open") {
@@ -703,6 +713,39 @@ void Finder::ejectVolume(QString path, QString name, bool network) {
 		}
 	}
 	Alert::ask("The disk \"" + name + "\" is no longer mounted.", "OK", QString());
+}
+
+void Finder::ejectSelection() {
+	struct Disk {
+		QString path, name;
+		bool network;
+	};
+	QList<Disk> disks;
+	for (const Item *item : front() ? front()->selectedItems() : std::vector<Item *>{}) {
+		if (item->isLocalVolume || item->isNetworkVolume) {
+			disks.append({ item->path, item->name, item->isNetworkVolume });
+		}
+	}
+	if (disks.isEmpty()) {
+		Alert::ask("Select a disk on the desktop to eject.", "OK", QString());
+		return;
+	}
+	for (const Disk &disk : disks) {
+		ejectVolume(disk.path, disk.name, disk.network);
+	}
+}
+
+void Finder::logOut() {
+	if (!Alert::ask("Are you sure you want to quit all programs and log out now?", "Log Out")) {
+		return;
+	}
+	/* The menu bar sees every program's windows: it asks them to close
+	 * (each can still ask to save) and ends the session once they have. */
+	for (auto &c : m_clients) {
+		if (c) {
+			c->write("logout\n");
+		}
+	}
 }
 
 void Finder::unmountSelection(bool network) {

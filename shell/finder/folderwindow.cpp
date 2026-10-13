@@ -1162,6 +1162,10 @@ bool finderShortcut(QKeyEvent *e) {
 		return false;
 	}
 	Finder &f = Finder::instance();
+	if (e->key() == Qt::Key_Q && (e->modifiers() & Qt::ShiftModifier)) {
+		f.logOut(); /* ⇧⌘Q */
+		return true;
+	}
 	switch (e->key()) {
 	case Qt::Key_N: f.newFolder(); return true;
 	case Qt::Key_A: f.command("select-all"); return true;
@@ -1172,6 +1176,7 @@ bool finderShortcut(QKeyEvent *e) {
 	case Qt::Key_D: f.duplicate(); return true;
 	case Qt::Key_M: f.makeAlias(); return true;
 	case Qt::Key_Y: f.putAway(); return true;
+	case Qt::Key_E: f.ejectSelection(); return true;
 	case Qt::Key_R: f.showOriginal(); return true;
 	default: return false;
 	}

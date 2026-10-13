@@ -72,6 +72,11 @@ public:
 	void makeAlias();
 	void putAway();
 	void unmountSelection(bool network);
+	/* Special > Eject (⌘E): every selected disk, local or network. */
+	void ejectSelection();
+	/* Special > Log Out (⇧⌘Q): asks, then has the menu bar quit the
+	 * programs and end the session. */
+	void logOut();
 	void showOriginal();
 	void setLabel(int label);
 	/* Start classic Mac OS (shell/classic/zacos9-classic), with extra
