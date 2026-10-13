@@ -12,6 +12,10 @@ static char context_kind[32];
 void menubar_context_menu(const char *kind) {
 	snprintf(context_kind, sizeof(context_kind), "%s", kind);
 }
+static char path_names[256];
+void menubar_path_menu(const char *names) {
+	snprintf(path_names, sizeof(path_names), "%s", names);
+}
 void sibling_program(const char *program, char *out, size_t size) {
 	snprintf(out, size, "%s", program);
 }
@@ -98,6 +102,16 @@ int main(void) {
 	context_labels("state selection=0 window=0 trash=0 view=0", "desktop", got, sizeof(got));
 	assert(strcmp(got, "New Folder|-|Clean Up|Arrange|-|Change Desktop Background…|") == 0);
 	assert(!parse_line("context desktop") && strcmp(context_kind, "desktop") == 0);
+
+	/* The folder-path menu: the names, each choosing its place in the list. */
+	assert(!parse_line("pathmenu Extensions\tSystem Folder\tZacintosh HD") &&
+		strcmp(path_names, "Extensions\tSystem Folder\tZacintosh HD") == 0);
+	struct mb_menu path;
+	menus_path(&path, path_names);
+	assert(path.n == 3 && strcmp(path.items[1].label, "System Folder") == 0 &&
+		path.items[1].action == ACT_FINDER && strcmp(path.items[1].arg, "path-menu 1") == 0 &&
+		strcmp(path.items[2].arg, "path-menu 2") == 0);
+	menus_free_menu(&path);
 
 	/* The Sniffer's "logout" line starts the logout, and isn't state. */
 	assert(!parse_line("logout") && logouts == 1);

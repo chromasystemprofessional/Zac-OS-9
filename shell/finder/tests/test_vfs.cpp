@@ -29,6 +29,7 @@
 #include "appdb.h"
 #include "apptrash.h"
 #include "resources.h"
+#include "folderpath.h"
 #include "vfs.h"
 
 static int fails;
@@ -948,6 +949,24 @@ int main(int argc, char **argv) {
 	vfsRefresh();
 	check(nestedRefresh, "reentrant refresh requests are suppressed safely");
 	vfsOffChange(refreshToken);
+
+	/* ---- folder paths (⌘-click on a title, ⌘-↑) -------------------------- */
+	{
+		const QString ext = vfsPathFor("system-folder/extensions");
+		check(folderChain(ext) == QStringList({ ext, vfsPathFor("system-folder"), vfsRoot() }),
+			"a folder in the Macintosh view goes up through it to the startup disk");
+		check(folderTitle(vfsRoot()) == vfsVolumeName() && enclosingFolder(vfsRoot()).isEmpty(),
+			"the startup disk is the top, by its own name");
+		const QString home = QDir::homePath();
+		QDir().mkpath(home + "/Desktop/Stuff");
+		check(vfsPathBacking(home) == vfsPathFor("home"), "Home stands for the home folder");
+		check(folderChain(home + "/Desktop/Stuff") == QStringList({ home + "/Desktop/Stuff",
+				home + "/Desktop", vfsPathFor("home"), vfsRoot() }),
+			"a real folder goes up through real folders, then Home, then the startup disk");
+		check(enclosingFolder(home) == vfsRoot(), "the home folder's enclosing folder is the startup disk");
+		check(folderTitle(home + "/Desktop/Stuff") == "Stuff", "a real folder shows its name");
+		check(enclosingFolder("/").isEmpty(), "and Unix (/) is a disk's top");
+	}
 
 	QTextStream(stdout) << (fails ? QString("%1 failed\n").arg(fails)
 		: QStringLiteral("all passed\n"));

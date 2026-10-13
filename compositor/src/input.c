@@ -446,6 +446,18 @@ static void grab_release(struct plat_server *server) {
 /* Mouse-down on a window frame (anything but the client area). */
 static void frame_press(struct plat_server *server, struct plat_view *view,
 		enum decor_part part, uint32_t time_msec) {
+	/* ⌘-click on the title text of a window whose program asked (the
+	 * Finder's folder-path menu): the program shows it; the button stays
+	 * with the menu. */
+	if (part == DECOR_PART_DRAG && command_held(server)) {
+		const struct wlr_box frame = view_frame_box(view);
+		if (decor_title_hit(&view->frame->st, (int)server->cursor->x - frame.x,
+				(int)server->cursor->y - frame.y) &&
+				platinum_shell_title_menu(view, option_held(server))) {
+			view_focus(view);
+			return;
+		}
+	}
 	/* ⌘-drag a window behind by its title bar or edge: it moves (or, with
 	 * a double-click, collapses) where it is, staying behind. */
 	if (!(part == DECOR_PART_DRAG && command_held(server) && view != server->focused_view)) {

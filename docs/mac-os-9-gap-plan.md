@@ -147,8 +147,8 @@ Section 3 lists every feature; section 5 is the plan.
 | Close box, ⌘-W | p. 9 | ✅ | |
 | Option-click close box / Option-⌘-W closes all of the app's windows | p. 10 | ◐ | Option-click ✅ (0.1.54); Option-⌘-W still to do. P2 S |
 | Title-bar stripes show the active window; drag to move | p. 10 | ✅ | |
-| ⌘-click title → folder-hierarchy menu; Option-⌘-click closes the inner window too | p. 11 | ✗ | Sniffer windows only (the Sniffer knows the path); compositor forwards ⌘-click on the title of a Sniffer window. P1 M |
-| ⌘-↑ opens the enclosing folder; Option-⌘-↑ also closes this one | p. 12 | ✗ | Sniffer key handling. P1 S |
+| ⌘-click title → folder-hierarchy menu; Option-⌘-click closes the inner window too | p. 11 | ✅ | Sniffer windows; through the Macintosh view (… Home, Zacintosh HD) (0.1.54). No small folder icons in the menu yet. |
+| ⌘-↑ opens the enclosing folder; Option-⌘-↑ also closes this one | p. 12 | ✅ | (0.1.54) |
 | ⌘-drag an inactive window without bringing it forward | p. 12 | ✅ | Title bar or edge (0.1.54). |
 | Double-click title to collapse (Appearance option) | p. 12 | ✅ | Option toggle in Appearance: see 3.10 |
 | ⌘-double-click an inactive title to collapse it in place | p. 12 | ✅ | Falls out of ⌘-drag (0.1.54). |
@@ -473,7 +473,7 @@ updates `PROJECT_STATUS.md` and the relevant `docs/` page.
 | 1.2 ✅ | **Sniffer contextual menus** for icons, window backgrounds, the desktop, the Trash and disks; Control-click and right-click | `shell/finder/` (popup surface), `lib/menudraw` | M | Headless screenshot of each menu; each command reaches `Finder::command` |
 | 1.3 ✅ | **Special ▸ Eject (⌘E)** and **Log Out (⇧⌘Q)**, with "quit your programs first" | `shell/menubar/menus.c`, `session/` | S | VM: Log Out returns to the login window |
 | 1.4 ✅ | **Window tricks**: Option-click close/collapse for all of an app's windows, ⌘-drag a background window, Option-zoom fills the screen | `compositor/src/input.c`, `view.c`, `frame.c` | S | Headless compositor tests (`compositor/tests/`) |
-| 1.5 | **Folder-path menu** on ⌘-click of a Sniffer window's title, ⌘-↑ / Option-⌘-↑ | compositor → Sniffer via `platinum-shell-v1` (new event: title clicked with modifiers), Sniffer menu | M | Headless: ⌘-click title shows the path; choosing opens the parent |
+| 1.5 ✅ | **Folder-path menu** on ⌘-click of a Sniffer window's title, ⌘-↑ / Option-⌘-↑ | compositor → Sniffer via `platinum-shell-v1` (new event: title clicked with modifiers), Sniffer menu | M | Headless: ⌘-click title shows the path; choosing opens the parent |
 | 1.6 | **Favorites**: File ▸ Add To Favorites, Zac menu Favorites, Favorites in Open/Save | `shell/finder/`, `shell/menubar/launch.c`, file-chooser portal | S | Unit: alias written; menu lists it |
 | 1.7 | **Recent Applications / Documents / Servers** in the Zac menu, with counts from a new Zac Menu Options panel | menu bar (launch record), `recently-used.xbel`, Neighbourhood, `shell/panels/` | M | Unit: list ordering and limits |
 | 1.8 | **General Controls** panel: show desktop in background, menu blinking, insertion-point blink rate, Documents folder for Open/Save, Toy Box at startup | `shell/panels/controlpanel.cpp`, menu bar, file-chooser portal, Qt/GTK cursor blink settings | M | Unit per setting; visual check |

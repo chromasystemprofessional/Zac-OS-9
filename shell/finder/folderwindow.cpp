@@ -137,6 +137,7 @@ FolderWindow *FolderWindow::open(const QString &path) {
 			platinumSetWindowPosition(w, w->m_state.position);
 		}
 		w->updateStandardSize();
+		platinumOnTitleMenu(w, [w](bool option) { Finder::instance().showPathMenu(w, option); });
 		platinumOnWindowPosition(w, [w](QPoint p) {
 			w->m_state.position = p;
 			w->m_state.hasPosition = true;
@@ -1208,6 +1209,10 @@ bool finderShortcut(QKeyEvent *e) {
 	Finder &f = Finder::instance();
 	if (e->key() == Qt::Key_Q && (e->modifiers() & Qt::ShiftModifier)) {
 		f.logOut(); /* ⇧⌘Q */
+		return true;
+	}
+	if (e->key() == Qt::Key_Up) {
+		f.openEnclosing(e->modifiers() & Qt::AltModifier); /* ⌘-↑, Option-⌘-↑ */
 		return true;
 	}
 	switch (e->key()) {

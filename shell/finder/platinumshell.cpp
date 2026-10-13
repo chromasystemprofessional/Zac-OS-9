@@ -43,15 +43,27 @@ static void handle_active_gtk_menu(void *, platinum_shell_v1 *, const char *, co
 }
 static void handle_switch_app(void *, platinum_shell_v1 *, int32_t) {
 }
+/* Windows that show a menu on a ⌘-click of their title. */
+static QHash<wl_surface *, std::function<void(bool)>> &titleMenus() {
+	static QHash<wl_surface *, std::function<void(bool)>> menus;
+	return menus;
+}
+static void handle_title_menu(void *, platinum_shell_v1 *, wl_surface *surface, uint32_t option) {
+	auto it = titleMenus().find(surface);
+	if (it != titleMenus().end()) {
+		it.value()(option != 0);
+	}
+}
 static const platinum_shell_v1_listener shell_listener = {
-	handle_window_position, handle_active_client, handle_active_gtk_menu, handle_switch_app
+	handle_window_position, handle_active_client, handle_active_gtk_menu, handle_switch_app,
+	handle_title_menu
 };
 
 static void global(void *, wl_registry *reg, uint32_t name, const char *iface, uint32_t version) {
 	if (std::strcmp(iface, platinum_shell_v1_interface.name) == 0) {
 		shell = static_cast<platinum_shell_v1 *>(
 			wl_registry_bind(reg, name, &platinum_shell_v1_interface,
-				std::min(version, 9u)));
+				std::min(version, 10u)));
 		platinum_shell_v1_add_listener(shell, &shell_listener, nullptr);
 	}
 }
@@ -156,6 +168,20 @@ void platinumSetStandardSize(QWidget *window, QSize size) {
 			static_cast<uint32_t>(std::max(0, size.height())));
 		wl_display_flush(display);
 	}
+}
+
+void platinumOnTitleMenu(QWidget *window, std::function<void(bool)> callback) {
+	if (!shell || wl_proxy_get_version(reinterpret_cast<wl_proxy *>(shell)) < 10) {
+		return;
+	}
+	wl_surface *surface = surfaceOf(window);
+	if (!surface) {
+		return;
+	}
+	titleMenus().insert(surface, std::move(callback));
+	QObject::connect(window, &QObject::destroyed, [surface] { titleMenus().remove(surface); });
+	platinum_shell_v1_enable_title_menu(shell, surface);
+	wl_display_flush(display);
 }
 
 void platinumSetFrameStyle(QWidget *window, FrameStyle style) {

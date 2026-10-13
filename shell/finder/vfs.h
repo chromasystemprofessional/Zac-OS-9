@@ -91,6 +91,9 @@ bool vfsLaunch(const QString &path);
  * Backed node's directory, or an application's desktop entry. Empty for
  * the curated and generated folders, which stand for nothing on disk. */
 QString vfsRealCounterpart(const QString &path);
+/* The other way: the Macintosh view's node that stands for this real
+ * folder (Home for $HOME, say), or empty. */
+QString vfsPathBacking(const QString &directory);
 /* Safe resource access: only generated aliases from the fixed providers
  * may return a source path. Metadata-only resources have no counterpart. */
 bool vfsResourceOpenPath(const QString &path, QString *sourcePath);

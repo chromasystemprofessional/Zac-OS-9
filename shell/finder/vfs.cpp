@@ -737,6 +737,20 @@ bool vfsLaunch(const QString &path) {
 	return false;
 }
 
+QString vfsPathBacking(const QString &directory) {
+	ensureLoaded();
+	const QString want = QDir::cleanPath(directory);
+	QString best;
+	for (const VNode &node : std::as_const(g_nodes)) {
+		if (node.kind == VKind::Backed && node.visible && !node.backing.isEmpty() &&
+				QDir::cleanPath(node.backing) == want &&
+				(best.isEmpty() || node.id.size() < best.size())) {
+			best = node.id;
+		}
+	}
+	return best.isEmpty() ? QString() : vfsPathFor(best);
+}
+
 QString vfsRealCounterpart(const QString &path) {
 	const VNode *node = vfsNode(path);
 	if (!node) {

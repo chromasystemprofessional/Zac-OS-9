@@ -33,6 +33,7 @@
 #include "alert.h"
 #include "desktop.h"
 #include "findwindow.h"
+#include "folderpath.h"
 #include "folderwindow.h"
 #include "infowindow.h"
 #include "resourcewindows.h"
@@ -216,6 +217,16 @@ void Finder::command(const QString &name) {
 				"” to quit? Any unsaved changes in it will be lost.", "Force Quit")) {
 			if (!platinumForceQuit(appId)) {
 				Alert::ask("“" + app + "” couldn't be forced to quit.", "OK", QString());
+			}
+		}
+	} else if (name.startsWith("path-menu ")) {
+		/* The folder-path menu's choice; the first is the window's own. */
+		const int i = name.mid(10).toInt();
+		if (i > 0 && i < m_pathMenu.folders.size()) {
+			QPointer<QWidget> from = m_pathMenu.from;
+			openFolder(m_pathMenu.folders[i]);
+			if (m_pathMenu.option && from) {
+				from->close();
 			}
 		}
 	} else if (name == "eject") {
@@ -726,6 +737,44 @@ void Finder::showContextMenu(FinderView *view, Item *hit) {
 		if (c) {
 			c->write(QByteArray("context ") + kind + "\n");
 		}
+	}
+}
+
+void Finder::showPathMenu(FolderWindow *window, bool option) {
+	setFront(window);
+	m_pathMenu.from = window;
+	m_pathMenu.folders = folderChain(window->folderPath());
+	m_pathMenu.option = option;
+	QStringList names;
+	for (const QString &folder : m_pathMenu.folders) {
+		names << folderTitle(folder).replace('\t', ' ').replace('\n', ' ');
+	}
+	for (auto &c : m_clients) {
+		if (c) {
+			c->write(("pathmenu " + names.join('\t') + "\n").toUtf8());
+		}
+	}
+}
+
+void Finder::openFolder(const QString &path) {
+	const QString real = vfsIsVirtual(path) ? vfsOpensAs(path) : QString();
+	FolderWindow::open(real.isEmpty() ? path : real);
+}
+
+void Finder::openEnclosing(bool closeThis) {
+	FinderView *v = front();
+	if (!v || v == m_desktop) {
+		return;
+	}
+	const QString parent = enclosingFolder(v->folderPath());
+	if (parent.isEmpty()) {
+		pl_sound_event("alert");
+		return;
+	}
+	QWidget *was = v->widget();
+	openFolder(parent);
+	if (closeThis && was) {
+		was->close();
 	}
 }
 

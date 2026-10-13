@@ -423,6 +423,8 @@ int platinum_shell_style_for(struct wlr_surface *surface);
 bool platinum_shell_position_for(struct wlr_surface *surface, int *x, int *y);
 /* The content size the zoom box gives this window, if its program said. */
 bool platinum_shell_standard_size_for(struct wlr_surface *surface, int *w, int *h);
+/* ⌘-click on a title: tell the program, if it asked (true), with Option. */
+bool platinum_shell_title_menu(struct plat_view *view, bool option);
 /* Tell the window's program (if it is one of ours) where it now is. */
 void platinum_shell_report_position(struct plat_view *view);
 /* The front window changed: tell the menu bar whose it is. */

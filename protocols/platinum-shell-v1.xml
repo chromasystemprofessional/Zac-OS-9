@@ -10,7 +10,7 @@
     when the generic rule (fixed size with a parent window) can't apply.
   </description>
 
-  <interface name="platinum_shell_v1" version="9">
+  <interface name="platinum_shell_v1" version="10">
     <enum name="style">
       <entry name="document" value="0" summary="standard document window"/>
       <entry name="movable_modal" value="1"
@@ -171,6 +171,22 @@
       <arg name="width" type="uint"/>
       <arg name="height" type="uint"/>
     </request>
+    <request name="enable_title_menu" since="10">
+      <description summary="⌘-click on the title is the program's">
+        A ⌘-click (or Option-⌘-click) on this window's title text no longer
+        moves the window: the program is sent title_menu instead, as the
+        Finder shows the folder's path there.
+      </description>
+      <arg name="surface" type="object" interface="wl_surface"/>
+    </request>
+    <event name="title_menu" since="10">
+      <description summary="⌘-click on the title">
+        The button is still down: a menu shown now can track it. `option`
+        is 1 for Option-⌘-click.
+      </description>
+      <arg name="surface" type="object" interface="wl_surface"/>
+      <arg name="option" type="uint"/>
+    </event>
   </interface>
 
   <interface name="platinum_keep_awake_v1" version="1">

@@ -429,6 +429,20 @@ void menus_context(struct mb_menu *m, const char *kind) {
 	render_menu_text(m);
 }
 
+void menus_path(struct mb_menu *m, const char *names) {
+	memset(m, 0, sizeof(*m));
+	char *copy = strdup(names);
+	int i = 0;
+	for (char *save = NULL, *name = strtok_r(copy, "\t", &save); name;
+			name = strtok_r(NULL, "\t", &save), i++) {
+		char command[32];
+		snprintf(command, sizeof(command), "path-menu %d", i);
+		add(m, name, 0, true, ACT_FINDER, command);
+	}
+	free(copy);
+	render_menu_text(m);
+}
+
 void menus_free_menu(struct mb_menu *m) {
 	free_menu(m);
 }

@@ -668,11 +668,27 @@ static void pointer_released(void) {
 /* The Sniffer's Control-click: its contextual menu, at the pointer. The
  * button is still down from that click, so it tracks press-drag-release;
  * a click without moving leaves it open. */
+static void open_context(void);
+
 void menubar_context_menu(const char *kind) {
 	if (g.open_index >= 0 || !g.bar_configured) {
 		return;
 	}
 	menus_context(&g.context, kind);
+	open_context();
+}
+
+/* The Sniffer's folder-path menu (⌘-click on a window's title), also at
+ * the pointer, with the button still down. */
+void menubar_path_menu(const char *names) {
+	if (g.open_index >= 0 || !g.bar_configured) {
+		return;
+	}
+	menus_path(&g.context, names);
+	open_context();
+}
+
+static void open_context(void) {
 	if (g.context.n == 0) {
 		menus_free_menu(&g.context);
 		return;

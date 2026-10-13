@@ -62,6 +62,10 @@ struct decor_state {
 void decor_paint(struct pl_canvas *canvas, const struct decor_state *st);
 enum decor_part decor_hit(const struct decor_state *st, int x, int y);
 
+/* (x, y), frame-local, falls on the title text (or the blank between it
+ * and the stripes). */
+bool decor_title_hit(const struct decor_state *st, int x, int y);
+
 /* Widest title ink that fits between the boxes, for text_render(). */
 int decor_title_max_width(const struct decor_state *st);
 

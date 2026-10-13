@@ -85,6 +85,15 @@ public:
 	 * `view`, or on its background: the menu bar opens it at the pointer,
 	 * from the state just sent. */
 	void showContextMenu(FinderView *view, Item *hit);
+	/* ⌘-click on a folder window's title: the folder and those enclosing
+	 * it, as a menu at the pointer (the menu bar draws it). Choosing one
+	 * opens it; with `option`, the window clicked closes. */
+	void showPathMenu(FolderWindow *window, bool option);
+	/* ⌘-↑ (Option-⌘-↑ also closes the front window): the enclosing folder. */
+	void openEnclosing(bool closeThis);
+	/* A folder's window, the Macintosh view's folders through their real
+	 * counterparts where they have one. */
+	void openFolder(const QString &path);
 	/* Special > Eject (⌘E): every selected disk, local or network. */
 	void ejectSelection();
 	/* Special > Log Out (⇧⌘Q): asks, then has the menu bar quit the
@@ -120,6 +129,12 @@ private:
 	QString stateLine();
 
 	Desktop *m_desktop = nullptr;
+	/* The folder-path menu on show: where it came from, and its folders. */
+	struct {
+		QPointer<QWidget> from;
+		QStringList folders;
+		bool option = false;
+	} m_pathMenu;
 	QString m_springPath;
 	QTimer *m_springTimer = nullptr;
 	std::vector<QPointer<QWidget>> m_sprung;

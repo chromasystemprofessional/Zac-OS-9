@@ -21,6 +21,10 @@ void platinumSetFrameStyle(QWidget *window, FrameStyle style);
 /* The content size the zoom box gives the window ("just big enough"); the
  * window must be shown. An empty size: the zoom box fills the screen. */
 void platinumSetStandardSize(QWidget *window, QSize size);
+/* ⌘-click (`option`: Option-⌘-click) on the window's title text calls
+ * `callback`, the button still down, instead of moving the window. Call
+ * once the window is shown. */
+void platinumOnTitleMenu(QWidget *window, std::function<void(bool option)> callback);
 /* Ask for the window to appear at `frameTopLeft` (layout coordinates);
  * call right after show(), before the window first draws. */
 void platinumSetWindowPosition(QWidget *window, QPoint frameTopLeft);

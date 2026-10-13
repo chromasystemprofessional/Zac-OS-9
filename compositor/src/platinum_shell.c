@@ -22,6 +22,7 @@ struct surface_hint {
 	int x, y;
 	bool reported;       /* last reported position, to avoid repeats */
 	int standard_w, standard_h; /* the zoom box's content size; 0: none */
+	bool title_menu;     /* ⌘-click on the title is the program's */
 	int rx, ry;
 	struct wl_listener surface_destroy;
 };
@@ -85,11 +86,8 @@ bool platinum_shell_standard_size_for(struct wlr_surface *surface, int *w, int *
 	return true;
 }
 
-void platinum_shell_report_position(struct plat_view *view) {
-	struct wlr_surface *surface = view->impl->get_surface(view);
-	if (!surface || !surface->resource || !view->mapped) {
-		return;
-	}
+/* The platinum_shell_v1 the surface's own program bound, if any. */
+static struct wl_resource *shell_of(struct wlr_surface *surface) {
 	struct wl_client *client = wl_resource_get_client(surface->resource);
 	struct wl_resource *shell = NULL, *r;
 	wl_resource_for_each(r, &resources) {
@@ -97,6 +95,26 @@ void platinum_shell_report_position(struct plat_view *view) {
 			shell = r;
 		}
 	}
+	return shell;
+}
+
+bool platinum_shell_title_menu(struct plat_view *view, bool option) {
+	struct wlr_surface *surface = view->impl->get_surface(view);
+	struct surface_hint *h = surface ? find_hint(surface) : NULL;
+	struct wl_resource *shell = h && h->title_menu && surface->resource ? shell_of(surface) : NULL;
+	if (!shell || wl_resource_get_version(shell) < PLATINUM_SHELL_V1_TITLE_MENU_SINCE_VERSION) {
+		return false;
+	}
+	platinum_shell_v1_send_title_menu(shell, surface->resource, option ? 1 : 0);
+	return true;
+}
+
+void platinum_shell_report_position(struct plat_view *view) {
+	struct wlr_surface *surface = view->impl->get_surface(view);
+	if (!surface || !surface->resource || !view->mapped) {
+		return;
+	}
+	struct wl_resource *shell = shell_of(surface);
 	if (!shell) {
 		return; /* not one of ours */
 	}
@@ -272,6 +290,11 @@ static void handle_set_standard_size(struct wl_client *client, struct wl_resourc
 	h->standard_h = height > 16384 ? 16384 : (int)height;
 }
 
+static void handle_enable_title_menu(struct wl_client *client, struct wl_resource *resource,
+		struct wl_resource *surface_resource) {
+	get_hint(wlr_surface_from_resource(surface_resource))->title_menu = true;
+}
+
 static void handle_activate_app(struct wl_client *client, struct wl_resource *resource,
 		const char *app_id) {
 	if (app_id && *app_id) {
@@ -303,6 +326,7 @@ static const struct platinum_shell_v1_interface shell_impl = {
 	.force_quit = handle_force_quit,
 	.activate_app = handle_activate_app,
 	.set_standard_size = handle_set_standard_size,
+	.enable_title_menu = handle_enable_title_menu,
 };
 
 static void resource_destroy(struct wl_resource *resource) {
@@ -326,5 +350,5 @@ void platinum_shell_init(struct plat_server *server) {
 	the_server = server;
 	wl_list_init(&hints);
 	wl_list_init(&resources);
-	wl_global_create(server->display, &platinum_shell_v1_interface, 9, NULL, bind_shell);
+	wl_global_create(server->display, &platinum_shell_v1_interface, 10, NULL, bind_shell);
 }

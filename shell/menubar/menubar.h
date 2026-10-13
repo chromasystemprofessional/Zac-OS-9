@@ -170,8 +170,12 @@ void finder_send(const char *command);
  * from the Sniffer's state; empty when there is nothing to offer. */
 void menus_context(struct mb_menu *m, const char *kind);
 void menus_free_menu(struct mb_menu *m);
+/* The folder-path menu: `names` tab-separated, the window's own folder
+ * first; choosing the n-th sends "path-menu n" to the Sniffer. */
+void menus_path(struct mb_menu *m, const char *names);
 /* The Sniffer asked for one at the pointer (main.c). */
 void menubar_context_menu(const char *kind);
+void menubar_path_menu(const char *names);
 
 /* ---- Log Out (logout.c) --------------------------------------------------- */
 

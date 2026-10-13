@@ -147,6 +147,16 @@ int decor_title_max_width(const struct decor_state *st) {
 	return half > 0 ? 2 * half + 1 : 0;
 }
 
+bool decor_title_hit(const struct decor_state *st, int x, int y) {
+	const struct plat_text *t = st->title;
+	if (!t || t->ink_l < 0 || y < 0 || y >= DECOR_TOP - 2) {
+		return false;
+	}
+	const int ink_w = t->ink_r - t->ink_l + 1;
+	const int ink_l = (st->width - 1) / 2 - (ink_w - 1) / 2;
+	return x >= ink_l - STRIPE_TEXT_GAP && x <= ink_l + ink_w - 1 + STRIPE_TEXT_GAP;
+}
+
 static void paint_title(struct pl_canvas *c, const struct decor_state *st) {
 	int x0, x1;
 	title_span(st, &x0, &x1);
