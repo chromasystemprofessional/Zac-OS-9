@@ -10,7 +10,7 @@ int main(int argc, char *argv[]) {
 	/* zacos9-wm draws every frame; Qt must not add its own. */
 	qputenv("QT_WAYLAND_DISABLE_WINDOWDECORATION", "1");
 	QApplication app(argc, argv);
-	QApplication::setApplicationName("File Exchange");
+	QApplication::setApplicationName("File Translator");
 	QGuiApplication::setDesktopFileName("zacos9-fileexchange"); /* Wayland app_id */
 	platinumShellInit();
 

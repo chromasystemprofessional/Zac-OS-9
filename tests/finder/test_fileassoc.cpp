@@ -155,7 +155,7 @@ int main(int argc, char **argv) {
 				t.description[0].isUpper();
 		}
 	}
-	check(listed, "the File Exchange list has the types applications open, with extensions");
+	check(listed, "the File Translator list has the types applications open, with extensions");
 
 	/* ---- the document icon ---- */
 	const std::vector<uint32_t> *large = documentIcon("text/plain", 32);

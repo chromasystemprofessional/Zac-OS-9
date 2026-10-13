@@ -234,12 +234,12 @@ int main(int argc, char **argv) {
 	const QStringList systemNames = namesIn(systemFolder);
 	for (const QString name : { "Sounds", "Startup Items", "Application Support",
 			"Device Drivers", "Network", "System Logs", "Software Components",
-			"Extensions", "System Information", "Extensions Manager" }) {
+			"Extensions", "System Information", "Tricks Manager" }) {
 		check(systemNames.contains(name), "System Folder contains " + name);
 	}
 	check(pathNamed(vfsPathFor("system-folder/utilities"), "System Information") != QString() &&
-		pathNamed(vfsPathFor("system-folder/utilities"), "Extensions Manager") != QString(),
-		"the trusted System Information and Extensions Manager launchers are also in Utilities");
+		pathNamed(vfsPathFor("system-folder/utilities"), "Tricks Manager") != QString(),
+		"the trusted System Information and Tricks Manager launchers are also in Utilities");
 	const QString sounds = vfsPathFor("system-folder/sounds");
 	const QString userSounds = pathNamed(sounds, "User");
 	check(!userSounds.isEmpty() && !pathNamed(sounds, "Computer").isEmpty(),

@@ -140,7 +140,7 @@ const struct pl_extension pl_extensions[] = {
 	{ "processor-temperature", "Processor Temperature", PL_ICON_EXT_SENSOR,
 		"Watches the processor's temperature and keeps it from overheating.",
 		(const char *const[]){ "coretemp", "x86_pkg_temp_thermal", "k10temp", NULL } },
-	{ "energy-saver", "Processor Energy Saver", PL_ICON_EXT_POWER,
+	{ "energy-saver", "Processor Power Saving", PL_ICON_EXT_POWER,
 		"Lets the processor save power when it isn't busy.",
 		(const char *const[]){ "intel_rapl_msr", "intel_powerclamp", "intel_cstate", "amd_pstate", NULL } },
 	{ "power-button", "Power & Sleep Buttons", PL_ICON_EXT_POWER,

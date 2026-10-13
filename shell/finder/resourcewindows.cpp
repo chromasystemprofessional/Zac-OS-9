@@ -41,9 +41,9 @@ public:
 	explicit ResourceListWindow(Page page) : m_page(page) {
 		setAttribute(Qt::WA_DeleteOnClose);
 		setMouseTracking(true);
-		setWindowTitle(page == Page::System ? "System Information" : "Extensions Manager");
+		setWindowTitle(page == Page::System ? "System Information" : "Tricks Manager");
 		setFixedSize(page == Page::System ? QSize(520, 420) : QSize(600, 460));
-		m_title = page == Page::System ? "System Information" : "Extensions Manager";
+		m_title = page == Page::System ? "System Information" : "Tricks Manager";
 		m_list.frame = page == Page::System ? QRect(12, 78, 496, 326) :
 			QRect(12, 96, 240, 352);
 		if (page == Page::Extensions) {

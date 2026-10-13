@@ -207,7 +207,7 @@ void launch_fill_logo_menu(struct mb_menu *menu, const struct app *apps, int n_a
 	}
 	add_item(menu, NULL, false, ACT_NONE, NULL);
 	/* Classic Mac OS in an emulator; the Finder explains what's missing. */
-	add_item(menu, "Classic", true, ACT_FINDER, "classic");
+	add_item(menu, "Old Dog", true, ACT_FINDER, "classic");
 	/* Screen Snapshot: drag out part of the screen; it goes on the Desktop
 	 * as "Picture N.png" and on the clipboard. */
 	{
@@ -226,7 +226,7 @@ void launch_fill_logo_menu(struct mb_menu *menu, const struct app *apps, int n_a
 	{
 		char command[PATH_MAX + 64];
 		sibling_program("zacos9-netbrowser", command, sizeof(command));
-		add_item(menu, "Network Browser", true, ACT_LAUNCH, command);
+		add_item(menu, "Neighbourhood", true, ACT_LAUNCH, command);
 	}
 	/* Control Panels, as a hierarchical menu. */
 	add_item(menu, "Control Panels", true, ACT_NONE, NULL);
@@ -238,12 +238,12 @@ void launch_fill_logo_menu(struct mb_menu *menu, const struct app *apps, int n_a
 		{ "Bluetooth", "zacos9-bluetooth", "" },
 		{ "Collar", "zacos9-collarpanel", "" },
 		{ "Date & Time", "zacos9-datetime", "" },
-		{ "Energy Saver", "zacos9-controlpanel", " energysaver" },
-		{ "File Exchange", "zacos9-fileexchange", "" },
 		{ "File Sharing", "zacos9-filesharing", "" },
+		{ "File Translator", "zacos9-fileexchange", "" },
 		{ "Keyboard", "zacos9-controlpanel", " keyboard" },
 		{ "Monitors", "zacos9-controlpanel", " monitors" },
 		{ "Mouse", "zacos9-controlpanel", " mouse" },
+		{ "Nap Time", "zacos9-controlpanel", " energysaver" },
 		{ "Screen Saver", "zacos9-controlpanel", " screensaver" },
 		{ "Sound", "zacos9-controlpanel", " sound" },
 		{ "TCP/IP", "zacos9-tcpip", "" },

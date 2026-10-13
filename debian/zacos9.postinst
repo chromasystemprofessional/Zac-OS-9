@@ -13,7 +13,7 @@ grant_rawio() {
 	[ -f "$sheepshaver" ] || return 0
 	if ! setcap cap_sys_rawio=ep "$sheepshaver" 2>/dev/null; then
 		echo "zacos9: could not give SheepShaver the low-memory permission;" \
-			"Classic may not start with an Old World ROM." >&2
+			"Old Dog may not start with an Old World ROM." >&2
 	fi
 }
 

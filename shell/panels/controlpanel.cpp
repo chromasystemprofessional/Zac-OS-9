@@ -930,7 +930,7 @@ static QString sleepText(int step) {
  * (compositor/src/idle.c). */
 class EnergySaverPanel : public ControlPanel {
 public:
-	EnergySaverPanel() : ControlPanel("Energy Saver", 202) {
+	EnergySaverPanel() : ControlPanel("Nap Time", 202) {
 		const int g1 = 26, g2 = g1 + SLIDER_GROUP_H + 12;
 		m_groups = { { g1, g1 + SLIDER_GROUP_H, "Put the display to sleep when inactive for" },
 			{ g2, g2 + SLIDER_GROUP_H, "Put the system to sleep when inactive for" } };
@@ -1011,7 +1011,7 @@ public:
 		m_password->on = pl_setting("require-password", v, sizeof(v)) && strcmp(v, "1") == 0;
 		m_password->toggled = [](bool on) { pl_setting_set("require-password", on ? "1" : nullptr); };
 		m_checks.push_back(m_password.get());
-		m_notes = { "It shows until the display sleeps (Energy Saver).",
+		m_notes = { "It shows until the display sleeps (Nap Time).",
 			"A window filling a screen keeps it away from that one." };
 		restartPreview();
 		m_clock.start();
@@ -1080,7 +1080,7 @@ int main(int argc, char *argv[]) {
 		QApplication::setApplicationName("Screen Saver");
 		panel = std::make_unique<ScreenSaverPanel>();
 	} else if (which == "energysaver") {
-		QApplication::setApplicationName("Energy Saver");
+		QApplication::setApplicationName("Nap Time");
 		panel = std::make_unique<EnergySaverPanel>();
 	} else if (which == "monitors") {
 		QApplication::setApplicationName("Monitors");

@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Name=Network Browser
+Name=Neighbourhood
 Comment=Connect to other computers over the network
 Exec=zacos9-netbrowser
 Categories=Network;

@@ -551,7 +551,7 @@ void Finder::launchClassic(const QStringList &disks) {
 	QObject::connect(check, &QProcess::errorOccurred, check, [check, cookie](QProcess::ProcessError error) {
 		if (error == QProcess::FailedToStart) {
 			platinumCancelLaunch(cookie);
-			Alert::ask("Classic could not be started: " + check->errorString(), "OK", QString());
+			Alert::ask("Old Dog could not be started: " + check->errorString(), "OK", QString());
 			check->deleteLater();
 		}
 	});
@@ -563,11 +563,11 @@ void Finder::launchClassic(const QStringList &disks) {
 				QString why = QString::fromUtf8(check->readAllStandardError()).trimmed();
 				if (why.isEmpty()) {
 					why = check->property("launchTimedOut").toBool()
-						? "Classic's startup check timed out." : "Classic could not be started.";
+						? "Old Dog's startup check timed out." : "Old Dog could not be started.";
 				}
 				Alert::ask(why, "OK", QString());
 			} else if (!platinumStartApplication(classicLauncher(), args)) {
-				Alert::ask("Classic could not be started.", "OK", QString());
+				Alert::ask("Old Dog could not be started.", "OK", QString());
 			}
 			check->deleteLater();
 		});

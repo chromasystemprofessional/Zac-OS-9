@@ -11,7 +11,7 @@ int main(int argc, char *argv[]) {
 	/* zacos9-wm draws every frame; Qt must not add its own. */
 	qputenv("QT_WAYLAND_DISABLE_WINDOWDECORATION", "1");
 	QApplication app(argc, argv);
-	QApplication::setApplicationName("Network Browser");
+	QApplication::setApplicationName("Neighbourhood");
 	QApplication::setDoubleClickInterval(pl_double_click_ms());
 	QGuiApplication::setDesktopFileName("zacos9-netbrowser"); /* Wayland app_id */
 	platinumShellInit(); /* dialogs are movable modals */

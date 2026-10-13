@@ -72,7 +72,7 @@ static const char *DEFAULT_REGISTRY = R"JSON({
       "kind": "resource", "provider": "software-components" },
     { "id": "system-folder/system-information", "name": "System Information",
       "kind": "launcher", "action": "system-information" },
-    { "id": "system-folder/extensions-manager", "name": "Extensions Manager",
+    { "id": "system-folder/extensions-manager", "name": "Tricks Manager",
       "kind": "launcher", "action": "extensions-manager" },
     { "id": "system-folder/fonts", "name": "Fonts", "kind": "backed",
       "backing": "$XDG_DATA_HOME/fonts" },
@@ -305,12 +305,12 @@ struct PanelDef {
 const PanelDef PANELS[] = {
 	{ "Appearance", "zacos9-appearance", nullptr },
 	{ "Date & Time", "zacos9-datetime", nullptr },
-	{ "Energy Saver", "zacos9-controlpanel", "energysaver" },
-	{ "File Exchange", "zacos9-fileexchange", nullptr },
 	{ "File Sharing", "zacos9-filesharing", nullptr },
+	{ "File Translator", "zacos9-fileexchange", nullptr },
 	{ "Keyboard", "zacos9-controlpanel", "keyboard" },
 	{ "Monitors", "zacos9-controlpanel", "monitors" },
 	{ "Mouse", "zacos9-controlpanel", "mouse" },
+	{ "Nap Time", "zacos9-controlpanel", "energysaver" },
 	{ "Screen Saver", "zacos9-controlpanel", "screensaver" },
 	{ "Sound", "zacos9-controlpanel", "sound" },
 	{ "TCP/IP", "zacos9-tcpip", nullptr },
@@ -382,7 +382,7 @@ void generatePanels(const VNode &parent) {
 void generateResourceLaunchers(const VNode &parent) {
 	for (const auto &entry : std::vector<std::pair<QString, QString>>{
 			{ "System Information", "system-information" },
-			{ "Extensions Manager", "extensions-manager" } }) {
+			{ "Tricks Manager", "extensions-manager" } }) {
 		VNode node;
 		node.id = parent.id + "/" + entry.second;
 		node.name = entry.first;

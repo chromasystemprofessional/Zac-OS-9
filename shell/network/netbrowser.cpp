@@ -22,7 +22,7 @@ static constexpr int W = 400, H = 320;
 static constexpr int MARGIN = 16;
 
 NetBrowserWindow::NetBrowserWindow() {
-	setWindowTitle("Network Browser");
+	setWindowTitle("Neighbourhood");
 	setFixedSize(W, H);
 	m_list.frame = QRect(MARGIN, 32, W - 2 * MARGIN, H - 32 - MARGIN - PL_BUTTON_H - 12);
 	m_list.picked = [this](int) { update(); };

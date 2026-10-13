@@ -70,7 +70,7 @@ set -e
 if [ "$1" = configure ] &&
 		! setcap cap_sys_rawio=ep /usr/libexec/zacos9/SheepShaver 2>/dev/null; then
 	echo "zacos9-emulators: could not give SheepShaver the low-memory permission;" \
-		"Classic may not start with an Old World ROM." >&2
+		"Old Dog may not start with an Old World ROM." >&2
 fi
 exit 0
 EOF

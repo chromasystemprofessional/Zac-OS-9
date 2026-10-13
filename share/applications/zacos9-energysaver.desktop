@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Name=Energy Saver
+Name=Nap Time
 Comment=When the display and the system go to sleep
 Exec=zacos9-controlpanel energysaver
 Categories=Settings;HardwareSettings;

@@ -104,7 +104,7 @@ static constexpr int GROUP_TOP = LIST_BOTTOM + 14, GROUP_BOTTOM = H - M - 2;
 static constexpr int LABEL_RIGHT = M + 92, VALUE_X = LABEL_RIGHT + 8;
 
 FileExchangePanel::FileExchangePanel() {
-	setWindowTitle("File Exchange");
+	setWindowTitle("File Translator");
 	setFixedSize(W, H);
 	m_list.frame = QRect(QPoint(M + 1, LIST_TOP), QPoint(W - M - 2, LIST_BOTTOM));
 	m_list.picked = [this](int) { showDetails(); };

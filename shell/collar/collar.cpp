@@ -690,7 +690,7 @@ void Collar::openModule(int index) {
 		add(description(index), false);
 		add(s.wifi ? "Turn Wi-Fi Off" : "Turn Wi-Fi On", enabled && s.networkAvailable,
 			[this, s] { m_controls.setWifi(!s.wifi); });
-		add("Network Browser...", true, [this] { launch("zacos9-netbrowser"); });
+		add("Neighbourhood...", true, [this] { launch("zacos9-netbrowser"); });
 		separator();
 		add("Open TCP/IP Control Panel", true, [this] { launch("zacos9-tcpip"); });
 	} else if (module.kind == Bluetooth) {

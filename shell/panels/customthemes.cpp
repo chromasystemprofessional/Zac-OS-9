@@ -91,7 +91,7 @@ QString cacheFolder() {
 class Catalog : public QObject {
 public:
 	QList<Theme> sounds{{ "none", "None", {} }, { "original", "ZacOS Original", {} }};
-	QList<Theme> presets{{ "platinum", "Platinum", {
+	QList<Theme> presets{{ "platinum", "Silver Coat", {
 		{ "accent", "" }, { "highlight", "" }, { "pattern", "" },
 		{ "background", "pattern" }, { "wallpaper", "" },
 		{ "wallpaper-mode", "fit" }, { "alert-sound", "" }, { "sound-theme", "none" }

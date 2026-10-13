@@ -529,7 +529,7 @@ ResourceDetails resourceDetails(const QString &provider, const QString &key) {
 			entry.key.isEmpty() ? safeDisplayName(key) : entry.name;
 		details.kind = key.isEmpty() ? "virtual collection" : "system extension";
 		details.description = entry.key.isEmpty() ?
-			"Familiar system extensions; open Extensions Manager and choose Show All "
+			"Familiar system extensions; open Tricks Manager and choose Show All "
 			"for every loaded kernel module." : entry.description;
 		return details;
 	}
