@@ -13,6 +13,7 @@ headless screens with 400 ms "minutes", under dbus-run-session:
 - without the setting nothing locks; ScreenSaver.Lock locks regardless.
 """
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -48,7 +49,7 @@ with tempfile.TemporaryDirectory(prefix="zacos9-lock-") as directory:
     env = dict(os.environ, XDG_RUNTIME_DIR=directory, XDG_CONFIG_HOME=directory,
                WLR_BACKENDS="headless", WLR_RENDERER="pixman", WLR_HEADLESS_OUTPUTS="2",
                ZACOS9_STARTUP="0", ZACOS9_MENUBAR="", ZACOS9_FINDER="", ZACOS9_COLLAR="",
-               ZACOS9_LOCK=lock, ZACOS9_INHIBIT=helper, ZACOS9_IDLE_MINUTE_MS=str(MINUTE),
+               ZACOS9_LOCK=shlex.quote(lock), ZACOS9_INHIBIT=shlex.quote(helper), ZACOS9_IDLE_MINUTE_MS=str(MINUTE),
                ZACOS9_SUSPEND_COMMAND="",
                DBUS_SYSTEM_BUS_ADDRESS="unix:path=/nonexistent",
                QT_QPA_PLATFORM="wayland", QT_STYLE_OVERRIDE="",
@@ -183,10 +184,15 @@ with tempfile.TemporaryDirectory(prefix="zacos9-lock-") as directory:
             print("ok: if the lock program dies, the screens stay locked and it comes back")
 
             time.sleep(0.5)  # its surfaces up
+            # No screen saver for a while: at 1 "minute" (400 ms) it came back
+            # over the window before the screenshots below could see it.
+            conf.write_text("[General]\nscreensaver=blank\nscreensaver-after=60\ndisplay-sleep=90\n"
+                            "require-password=1\n")
             move()
             type_text("sesame")
             wait_for("unlocked", lambda: not locked(), 4)
-            assert lock_said("unlocked") == 1, "unlocked, but not by the lock"
+            # Its own report can reach the log just after the compositor's state.
+            wait_for("the lock to say it unlocked", lambda: lock_said("unlocked") == 1, 2)
             if have_grim:
                 wait_for("the window back", green_anywhere, 2)
             subprocess.run([vptr, "type", "x"], env=env, check=True, timeout=10)

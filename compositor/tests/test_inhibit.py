@@ -7,6 +7,7 @@ app leaves the bus; the portal's Inhibit until its Request is closed;
 SimulateUserActivity wakes the screens and GetActive reports the screen
 saver. Two headless screens, "minutes" of 400 ms; run in dbus-run-session."""
 import os
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -58,7 +59,7 @@ with tempfile.TemporaryDirectory(prefix="zacos9-inhibit-") as directory:
     env = dict(os.environ, XDG_RUNTIME_DIR=directory, XDG_CONFIG_HOME=directory,
                WLR_BACKENDS="headless", WLR_RENDERER="pixman", WLR_HEADLESS_OUTPUTS="2",
                ZACOS9_STARTUP="0", ZACOS9_MENUBAR="", ZACOS9_FINDER="", ZACOS9_COLLAR="",
-               ZACOS9_INHIBIT=helper, ZACOS9_IDLE_MINUTE_MS=str(MINUTE),
+               ZACOS9_INHIBIT=shlex.quote(helper), ZACOS9_IDLE_MINUTE_MS=str(MINUTE),
                # Never the real logind: no sleep inhibitor on this machine.
                DBUS_SYSTEM_BUS_ADDRESS="unix:path=/nonexistent",
                ZACOS9_SUSPEND_COMMAND=f"echo slept >>'{slept}'",
