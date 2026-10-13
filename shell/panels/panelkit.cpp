@@ -437,7 +437,7 @@ void paintLock(pl_canvas *c, int x, int baseline, uint32_t color) {
 class PopupMenu : public QWidget {
 public:
 	PopupMenu(QWidget *owner, const std::vector<PopupItem> &items, int selected, int minWidth,
-			std::function<void(int)> done, std::function<void()> closed = {}, pl_font font = PL_FONT_SYSTEM)
+			std::function<void(int)> done, std::function<void()> closed = {}, pl_font font = PL_FONT_VIEWS)
 		: QWidget(owner, Qt::Popup | Qt::FramelessWindowHint), m_items(items),
 		  m_hover(selected), m_checked(selected), m_done(std::move(done)), m_closed(std::move(closed)) {
 		setAttribute(Qt::WA_TranslucentBackground);
@@ -598,7 +598,7 @@ private:
 
 void panelMenuAbove(QWidget *owner, const std::vector<PopupItem> &items, int checked,
 		const QRect &anchor, std::function<void(int)> chosen, std::function<void()> closed) {
-	panelMenuNear(owner, items, checked, anchor, INT_MAX, PL_FONT_SYSTEM, std::move(chosen), std::move(closed));
+	panelMenuNear(owner, items, checked, anchor, INT_MAX, PL_FONT_VIEWS, std::move(chosen), std::move(closed));
 }
 
 void panelMenuNear(QWidget *owner, const std::vector<PopupItem> &items, int checked,
@@ -608,7 +608,7 @@ void panelMenuNear(QWidget *owner, const std::vector<PopupItem> &items, int chec
 		return;
 	}
 	pl_sound_event("menu-open");
-	auto *menu = new PopupMenu(owner, items, checked, anchor.width(), std::move(chosen), std::move(closed), font);
+	auto *menu = new PopupMenu(owner, items, checked, anchor.width(), std::move(chosen), std::move(closed), font == PL_FONT_SYSTEM ? PL_FONT_VIEWS : font);
 	const int top = menu->height() <= roomAbove ? anchor.top() - menu->height() : anchor.bottom() + 1;
 	menu->move(owner->mapToGlobal(QPoint(anchor.left(), top)));
 	menu->show();
