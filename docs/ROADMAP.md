@@ -209,7 +209,6 @@ See `docs/packaging.md`.
   - `scripts/dev-boot.sh`: try system changes in a VM in minutes, on top of
     the last ISO build's system, with a recorded timeline of the screen.
 - Next:
-  - A Platinum login window in place of tuigreet.
   - A Platinum boot menu (shown on Esc).
   - Manual pages.
   - Testing on real hardware and in Hyper-V.

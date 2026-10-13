@@ -606,6 +606,33 @@ executable('zacos9-netbrowser',
   install: true,
 )
 
+# The login window greetd shows (session/zacos9-greeter runs it).
+executable('zacos9-login',
+  'greeter/main.cpp',
+  'greeter/greetd.cpp',
+  'finder/platinumshell.cpp',
+  finder_protocol,
+  link_with: panelkit,
+  include_directories: include_directories('finder', 'panels', 'greeter'),
+  dependencies: [platinum_dep, qt6, wayland_client],
+  cpp_args: ['-std=c++17'],
+  install: true,
+  install_dir: get_option('libexecdir') / 'zacos9',
+)
+
+# Talking to greetd, against a stand-in for its socket.
+test('greetd-client',
+  executable('test-greetd',
+    'greeter/tests/test_greetd.cpp',
+    'greeter/greetd.cpp',
+    include_directories: include_directories('greeter'),
+    dependencies: [qt6],
+    cpp_args: ['-std=c++17'],
+  ),
+  env: ['QT_QPA_PLATFORM=offscreen'],
+  timeout: 60,
+)
+
 executable('zacos9-picture',
   'picture/main.cpp',
   'picture/picturewindow.cpp',

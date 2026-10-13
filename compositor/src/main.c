@@ -243,8 +243,9 @@ int main(int argc, char *argv[]) {
 		spawn_component("ZACOS9_INHIBIT", "zacos9-inhibit", "");
 	}
 	/* On a live medium, open the installer automatically; on a freshly
-	 * installed system (zacos9-install leaves the flag), the Setup Assistant. */
-	{
+	 * installed system (zacos9-install leaves the flag), the Setup Assistant.
+	 * Not behind the login window (session/zacos9-greeter), as nobody yet. */
+	if (!getenv("ZACOS9_LOGIN_WINDOW")) {
 		struct stat st_live;
 		if (stat("/run/live", &st_live) == 0 && S_ISDIR(st_live.st_mode)) {
 			spawn("exec zacos9-installer");

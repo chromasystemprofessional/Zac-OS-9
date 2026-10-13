@@ -83,7 +83,11 @@ This builds the packages, then a Debian 13 live image with live-build:
 The configuration is in `iso/config/` and is copied over a fresh `lb config`.
 The live system includes:
 
-- **Login.** greetd with tuigreet (`iso/config/includes.chroot/etc/greetd`).
+- **Login.** greetd (`iso/config/includes.chroot/etc/greetd`) runs
+  `session/zacos9-greeter`: the Platinum login window (`zacos9-login`,
+  `shell/greeter/`) in a `zacos9-wm` of its own. It talks to greetd over
+  `$GREETD_SOCK`, and greetd checks the password with PAM. If the window
+  can't be shown, the script falls back to tuigreet.
 - **Session.** Xwayland, foot, PipeWire and NetworkManager (set up in the
   TCP/IP control panel), and UPower for The Collar's battery status.
 - **Firmware.** Debian's `non-free-firmware`, so that real hardware works.

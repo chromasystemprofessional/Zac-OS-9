@@ -5,4 +5,38 @@
 # normal colours back first, or the login screen draws white on white.
 # setvtrgb works on the greeter's own console without root.
 setvtrgb vga 2>/dev/null
+
+# The login window (zacos9-login) in a zacos9-wm of its own: no menu bar,
+# Finder, collar or keep-awake service, no start-up screen, and no
+# installer or Setup Assistant. It tells greetd who logs in; greetd starts
+# their session once this script exits, so the compositor goes when the
+# window does.
+export ZACOS9_LOGIN_WINDOW=1 ZACOS9_STARTUP=0
+export ZACOS9_MENUBAR= ZACOS9_FINDER= ZACOS9_COLLAR= ZACOS9_INHIBIT=
+export XDG_SESSION_TYPE=wayland QT_QPA_PLATFORM=wayland QT_STYLE_OVERRIDE=zacos9
+
+# Drawing with pixman where zacos9-session does (see there for why).
+if [ -z "${WLR_RENDERER:-}" ]; then
+	gpu=false
+	for node in /sys/class/drm/renderD*; do
+		[ -e "$node/device/driver" ] || continue
+		case $(basename "$(readlink -f "$node/device/driver")") in
+		virtio_gpu | virtio-pci | bochs* | qxl | cirrus* | vboxvideo | vmwgfx | simpledrm | radeon) ;;
+		*) gpu=true ;;
+		esac
+	done
+	$gpu || export WLR_RENDERER=pixman
+fi
+
+login=/usr/libexec/zacos9/zacos9-login
+status=$(mktemp "${XDG_RUNTIME_DIR:-/tmp}/zacos9-login.XXXXXX") || status=
+if [ -x "$login" ] && [ -n "$status" ]; then
+	zacos9-wm -s "'$login'; echo \$? >'$status'; kill \$PPID"
+	result=$(cat "$status" 2>/dev/null)
+	rm -f "$status"
+	[ "$result" = 0 ] && exit 0
+fi
+
+# The window couldn't be shown (no display, a broken install): the text
+# login, so nobody is ever locked out.
 exec tuigreet --time --remember --asterisks --greeting 'Welcome to ZacOS 9' --cmd zacos9-session
