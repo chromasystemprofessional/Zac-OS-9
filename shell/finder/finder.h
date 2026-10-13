@@ -94,11 +94,12 @@ public:
 	void folderChanged(const QString &folder);
 	/* Selection or front view changed: tell the menu bar. */
 	void notifyState();
+	/* Put Away a disk; the desktop's Trash also ejects network volumes. */
+	void ejectVolume(QString path, QString name, bool network);
 
 private:
 	Finder() = default;
 	QString stateLine();
-	void ejectVolume(QString path, QString name, bool network);
 
 	Desktop *m_desktop = nullptr;
 	QString m_springPath;

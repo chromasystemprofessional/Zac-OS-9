@@ -603,9 +603,9 @@ void Desktop::mouseMoveEvent(QMouseEvent *e) {
 	std::vector<Item *> items;
 	std::vector<QPoint> origins;
 	for (Item *item : selectedItems()) {
-		/* The disk and the Trash stay put. TODO: dragging the disk to the
+		/* The disk and the Trash stay put. Dragging a network volume to the
 		 * Trash ejects it on a Mac. */
-		if (!isFixed(item)) {
+		if (!isFixed(item) || item->isNetworkVolume) {
 			items.push_back(item);
 			origins.push_back(item->pos);
 		}
@@ -665,6 +665,16 @@ void Desktop::dragLeaveEvent(QDragLeaveEvent *) {
 void Desktop::dropEvent(QDropEvent *e) {
 	Item *target = dropTargetAt(e->position().toPoint(), draggedPaths(e->mimeData()));
 	clearDropTarget();
+	if (target == m_trash.get()) {
+		for (Item *item : selectedItems()) {
+			if (item->isNetworkVolume) {
+				Finder::instance().ejectVolume(item->path, item->name, true);
+			}
+		}
+		e->setDropAction(Qt::MoveAction);
+		e->accept();
+		return;
+	}
 	if (!target && e->source() == this && !(e->modifiers() & Qt::AltModifier)) {
 		/* Icons dragged about the desktop: they move there, and stay. */
 		const QPoint delta = e->position().toPoint() - m_dragStart;
