@@ -256,7 +256,7 @@ Section 3 lists every feature; section 5 is the plan.
 | **⌘-Tab / ⇧⌘-Tab** cycles programs | ✅ | By name, the Sniffer among them; hidden programs come back (0.1.54). |
 | **Option-click the desktop / Option-choose an app** hides the one you leave | ◐ | Desktop ✅ (0.1.54); Option-choosing from the Application menu still to do. P3 S |
 | **Pack palette** (tear off the Application menu; vertical/horizontal, small/large icons, names on/off; drop documents on tiles to open them) | ✗ | P2 M. A layer-shell palette from the menu bar. |
-| **F-keys launch** programs/documents/folders (Keyboard panel ▸ Function Keys); pressing again brings it forward | ✗ | P2 M |
+| **F-keys launch** programs/documents/folders (Keyboard panel ▸ Function Keys); pressing again brings it forward | ✅ | `compositor/src/fkeys.c`; only assigned keys are taken; "Use F1 through F12 as function keys" makes it ⌘-F-key. |
 | ⌘-period cancels a launch | — | |
 | Option-double-click an app closes its window | ✗ | P3 S |
 | "Application not found" → File Translator offers apps that can open the type | ✅ | File Translator panel and Open With. |
@@ -310,7 +310,7 @@ A zram/swap switch in a Memory panel is a possible P3.
 | **Internet** (email, web, default apps, downloads folder) | ✅ | `zacos9-controlpanel internet`: default browser and mail program (GIO, `mimeapps.list`), downloads folder (`user-dirs.dirs`). The Mac's personal details, news and home-page settings have no system-wide place on Linux. |
 | **Keyboard**: repeat rate/delay | ✅ | |
 | Keyboard ▸ **layouts** and the keyboard menu (flag at the right of the menu bar, ⌘-Space to switch) | ✅ | Up to four ticked in the Keyboard panel (xkb's group limit), else Debian's `/etc/default/keyboard`; an abbreviation (US, US-DV) instead of a flag; ⌘-Option-Space option. `compositor/src/kblayout.c`, `shell/menubar/kbmenu.c`. |
-| Keyboard ▸ **Function Keys** | ✗ | See 3.6. |
+| Keyboard ▸ **Function Keys** | ✅ | See 3.6. |
 | **Keychain Access** | ◐ | The Collar's Keychain module ✅; a control panel listing items, Lock/Unlock — use Seahorse or build one. P3 M |
 | **Toy Box** | ✅ | See 3.2. |
 | **Walkies** (snapshots of network, sound, time zone, printer, startup items) | ✗ | P3 L |
@@ -485,7 +485,7 @@ updates `PROJECT_STATUS.md` and the relevant `docs/` page.
 | # | Work package | Components | Effort |
 |---|---|---|---|
 | 2.1 | **Pack palette** (tear-off from the Application menu; layouts; drop documents on tiles) | new layer-shell surface in the menu bar | M |
-| 2.2 | **F-key launching** (Keyboard ▸ Function Keys; pressing again brings it forward) | Keyboard panel, compositor hotkeys | M |
+| 2.2 ✅ | **F-key launching** (Keyboard ▸ Function Keys; pressing again brings it forward) | Keyboard panel, compositor hotkeys | M |
 | 2.3 | **Pop-up windows** (View ▸ as Pop-up Window; tabs at the screen bottom; spring open during drags) | Sniffer + layer-shell tabs | L |
 | 2.4 ✅ | **Proxy icon** in Sniffer title bars (drag to move/copy; drop onto it when collapsed) | compositor frame + `platinum-shell-v1` + Sniffer drag source | M |
 | 2.5 | **Clippings** and **Show Clipboard** | Sniffer drop handling, clipping viewer | M |
