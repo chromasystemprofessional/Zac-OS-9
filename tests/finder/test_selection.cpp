@@ -275,21 +275,23 @@ int main(int argc, char **argv) {
 		QFileInfo(transferSource + "/Large").size() == 256 * 1024 * 1024,
 		"stopped copy preserves all originals");
 	touch(transferSource + "/Move me");
-	bool moveVisible = false;
-	QTimer moveObserver;
-	moveObserver.setInterval(0);
-	QObject::connect(&moveObserver, &QTimer::timeout, [&] {
-		for (QWidget *widget : QApplication::topLevelWidgets()) {
-			if (auto *progress = dynamic_cast<TransferDialog *>(widget); progress && progress->isVisible()) {
-				moveVisible = true;
+	/* A rename can finish before a polling timer ever runs: watch for the
+	 * dialog being shown instead. */
+	struct ShowWatcher : QObject {
+		bool seen = false;
+		bool eventFilter(QObject *o, QEvent *e) override {
+			if (e->type() == QEvent::Show && dynamic_cast<TransferDialog *>(o)) {
+				seen = true;
 			}
+			return false;
 		}
-	});
-	moveObserver.start();
+	} moveObserver;
+	qApp->installEventFilter(&moveObserver);
 	check(!transferItems({transferSource + "/Move me"}, transferTarget, false).isEmpty() &&
 		QFile::exists(transferTarget + "/Move me") && !QFile::exists(transferSource + "/Move me"),
 		"move progress preserves same-disk rename behavior");
-	moveObserver.stop();
+	qApp->removeEventFilter(&moveObserver);
+	const bool moveVisible = moveObserver.seen;
 	check(moveVisible, "same-disk moves also show a status dialog");
 	std::atomic_bool buttonStopped{false};
 	TransferDialog buttons(buttonStopped);
