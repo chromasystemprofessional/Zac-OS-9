@@ -6,12 +6,14 @@
  *                           browser playing video does; prints "inhibited
  *                           COOKIE" once the window shows
  *   idle_client --keys      an ordinary window that prints "shown", then
- *                           "key TEXT" for every key it gets
+ *                           "key TEXT" for every key it gets, "press X Y" and
+ *                           "release X Y" for every click
  *   ... --app-id ID         with that Wayland app id (test_app_switch.py) */
 #include <QApplication>
 #include <QKeyEvent>
 #include <QDBusInterface>
 #include <QDBusReply>
+#include <QMouseEvent>
 #include <QScreen>
 #include <QTimer>
 #include <QWidget>
@@ -24,6 +26,14 @@ class KeyWindow : public QWidget {
 protected:
 	void keyPressEvent(QKeyEvent *e) override {
 		std::printf("key %s\n", qPrintable(e->text()));
+		std::fflush(stdout);
+	}
+	void mousePressEvent(QMouseEvent *e) override {
+		std::printf("press %d %d\n", e->position().toPoint().x(), e->position().toPoint().y());
+		std::fflush(stdout);
+	}
+	void mouseReleaseEvent(QMouseEvent *e) override {
+		std::printf("release %d %d\n", e->position().toPoint().x(), e->position().toPoint().y());
 		std::fflush(stdout);
 	}
 };

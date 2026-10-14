@@ -13,6 +13,7 @@
 #include "platinum-shell-v1-protocol.h"
 #include "launch.h"
 #include "frame.h"
+#include "access.h"
 #include "server.h"
 
 struct surface_hint {
@@ -370,6 +371,22 @@ void platinum_shell_layouts_changed(struct plat_server *server) {
 	}
 }
 
+static void send_sticky(struct wl_resource *resource) {
+	if (wl_resource_get_version(resource) < PLATINUM_SHELL_V1_STICKY_KEYS_SINCE_VERSION) {
+		return;
+	}
+	unsigned latched, locked;
+	access_sticky_state(&latched, &locked);
+	platinum_shell_v1_send_sticky_keys(resource, access_sticky_on(), latched, locked);
+}
+
+void platinum_shell_sticky_changed(struct plat_server *server) {
+	struct wl_resource *resource;
+	wl_resource_for_each(resource, &resources) {
+		send_sticky(resource);
+	}
+}
+
 static void handle_set_keyboard_layout(struct wl_client *client, struct wl_resource *resource,
 		uint32_t index) {
 	input_set_layout(the_server, (int)index);
@@ -409,11 +426,12 @@ static void bind_shell(struct wl_client *client, void *data, uint32_t version, u
 	wl_list_insert(&resources, wl_resource_get_link(resource));
 	send_active(resource);
 	send_layouts(resource, the_server);
+	send_sticky(resource);
 }
 
 void platinum_shell_init(struct plat_server *server) {
 	the_server = server;
 	wl_list_init(&hints);
 	wl_list_init(&resources);
-	wl_global_create(server->display, &platinum_shell_v1_interface, 12, NULL, bind_shell);
+	wl_global_create(server->display, &platinum_shell_v1_interface, 13, NULL, bind_shell);
 }

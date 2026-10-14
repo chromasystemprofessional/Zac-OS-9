@@ -98,15 +98,20 @@ struct mb_menu {
 struct mb_bar {
 	struct mb_menu left[MAX_TITLES];   /* logo menu, then app menus */
 	int n_left;
-	struct mb_menu right[3];           /* clock (no menu), keyboard, Application menu */
+	struct mb_menu right[4];           /* clock (no menu), Sticky Keys (no menu), keyboard, Application menu */
 	int n_right;
 	bool has_clock;                    /* right[0] is the clock */
-	struct mbar_title left_titles[MAX_TITLES], right_titles[3];
+	struct mbar_title left_titles[MAX_TITLES], right_titles[4];
 };
 
 void menus_rebuild(struct mb_bar *bar, int screen_w);
 /* Clicking the clock flips it between the time and the date. */
 void menus_toggle_clock(void);
+/* Sticky Keys (platinum-shell-v1 sticky_keys): while it is on, the bar
+ * shows the modifiers it holds, a locked one in brackets. */
+void menus_set_sticky(bool on, unsigned latched, unsigned locked);
+/* Its title: "" when off, a dot when on with nothing held. */
+void menus_sticky_title(bool on, unsigned latched, unsigned locked, char *out, size_t size);
 void menus_free(struct mb_bar *bar);
 void menus_perform(struct mb_item *item);
 /* Building blocks for menus filled elsewhere (appmenu.c). */

@@ -1,10 +1,10 @@
 /*
- * zacos9-controlpanel: the Mouse, Keyboard, Sound, Monitors, Energy
- * Saver, Screen Saver, Zac Menu Options, General Controls and Internet control
- * panels, one per run:
+ * zacos9-controlpanel: the Mouse, Trackpad, Keyboard, Sound, Monitors, Energy
+ * Saver, Screen Saver, Zac Menu Options, General Controls, Internet and
+ * Accessibility control panels, one per run:
  *
- *   zacos9-controlpanel mouse | keyboard | sound | monitors | energysaver |
- *     screensaver | zacmenu | general | internet
+ *   zacos9-controlpanel mouse | trackpad | keyboard | sound | monitors |
+ *     energysaver | screensaver | zacmenu | general | internet | accessibility
  *
  * Each writes ~/.config/zacos9/desktop.conf; zacos9-wm applies the
  * mouse, keyboard, screen and sleep settings as they change (compositor/
@@ -1452,6 +1452,200 @@ private:
 	bool m_caretOn = true;
 };
 
+/* ---- Trackpad ------------------------------------------------------------------------ */
+
+static bool settingOn(const char *key, bool fallback) {
+	char v[16];
+	if (!pl_setting(key, v, sizeof(v))) {
+		return fallback;
+	}
+	return strcmp(v, "true") == 0 || strcmp(v, "1") == 0;
+}
+
+static void setOn(const char *key, bool on) {
+	pl_setting_set(key, on ? "true" : "false");
+}
+
+/* Mac OS 9's Trackpad panel (the PowerBooks'): tracking and double-click
+ * speed, shared with the Mouse panel, and what a tap on the pad does
+ * (zacos9-wm sets libinput's tapping from it, compositor/src/input.c). */
+class TrackpadPanel : public ControlPanel {
+public:
+	TrackpadPanel() : ControlPanel("Trackpad", PANEL_H) {
+		m_groups = { { G1, G1 + SLIDER_GROUP_H, "Tracking Speed" },
+			{ G2, G2 + ROWS(1), "Double-Click Speed" }, { G3, G3 + ROWS(3), "Use Trackpad for" } };
+		placeSlider(m_tracking, G1, 7, settingInt("mouse-speed", 3), "Very Slow", "Fast");
+		m_tracking.changed = [](int v) { setInt("mouse-speed", v); };
+
+		const char *const speeds[] = { "Slow", "Medium", "Fast" };
+		for (int i = 0; i < 3; i++) {
+			m_speed.add(speeds[i], QPoint(X + 88 * i, G2 + TOP));
+		}
+		const int ms = settingInt("double-click", 533);
+		m_speed.selected = ms > 650 ? 0 : ms < 450 ? 2 : 1;
+		m_speed.changed = [](int i) {
+			static const int times[] = { 800, 533, 333 };
+			if (i == 1) {
+				pl_setting_set("double-click", nullptr);
+			} else {
+				setInt("double-click", times[i]);
+			}
+		};
+		m_radios.push_back(&m_speed);
+
+		/* Unset, libinput's own defaults: no tapping, tap-dragging, no lock. */
+		m_clicking = PanelCheckbox("Clicking", QPoint(X, G3 + TOP));
+		m_clicking.on = settingOn("trackpad-tap", false);
+		m_clicking.toggled = [this](bool on) {
+			setOn("trackpad-tap", on);
+			enableDragging();
+		};
+		m_dragging = PanelCheckbox("Dragging", QPoint(X + 20, G3 + TOP + 20));
+		m_dragging.on = settingOn("trackpad-drag", true);
+		m_dragging.toggled = [this](bool on) {
+			setOn("trackpad-drag", on);
+			enableDragging();
+		};
+		m_dragLock = PanelCheckbox("Drag Lock", QPoint(X + 40, G3 + TOP + 40));
+		m_dragLock.on = settingOn("trackpad-drag-lock", false);
+		m_dragLock.toggled = [](bool on) { setOn("trackpad-drag-lock", on); };
+		m_checks = { &m_clicking, &m_dragging, &m_dragLock };
+		enableDragging();
+		m_notes = { "Clicking: tap the pad to click. Dragging: tap twice and keep",
+			"your finger down to drag. Drag Lock: tap again to let go." };
+	}
+
+private:
+	void enableDragging() {
+		m_dragging.enabled = m_clicking.on;
+		m_dragLock.enabled = m_clicking.on && m_dragging.on;
+		update();
+	}
+
+	static constexpr int X = M + IN, TOP = 1 + PL_GROUP_MARGIN_TOP;
+	static constexpr int G1 = 26, G2 = G1 + SLIDER_GROUP_H + 28, G3 = G2 + ROWS(1) + 28;
+	static constexpr int PANEL_H = G3 + ROWS(3) + 12 + 2 * 12 + 8;
+	PanelSlider m_tracking;
+	PanelRadios m_speed;
+	PanelCheckbox m_clicking, m_dragging, m_dragLock;
+};
+
+/* ---- Accessibility -------------------------------------------------------------------- */
+
+/* Mac OS 9's Easy Access, with CloseView's zoom (Missing Manual pp.
+ * 237-239): Sticky Keys, Slow Keys, Mouse Keys and Zoom, which zacos9-wm
+ * does (compositor/src/access.c). The shortcuts turn them on and off from
+ * the keyboard; the panel catches up when it comes forward. */
+class AccessibilityPanel : public ControlPanel {
+public:
+	AccessibilityPanel() : ControlPanel("Accessibility", PANEL_H) {
+		m_groups = { { G1, G1 + ROWS(1), "Sticky Keys" }, { G2, G2 + ROWS(2), "Slow Keys" },
+			{ G3, G3 + ROWS(3), "Mouse Keys" }, { G4, G4 + ROWS(2), "Zoom" } };
+
+		m_sticky = PanelCheckbox("On (or press Shift five times)", QPoint(X, G1 + TOP));
+		m_sticky.toggled = [](bool on) { pl_setting_set("sticky-keys", on ? "true" : nullptr); };
+
+		m_slow = PanelCheckbox("On", QPoint(X, G2 + TOP));
+		m_slow.toggled = [](bool on) { pl_setting_set("slow-keys", on ? "true" : nullptr); };
+		radioRow(m_slowDelay, "Delay:", G2 + TOP + 20, "slow-keys-delay", SLOW_DELAYS, 1);
+
+		m_mouse = PanelCheckbox("On (or press ⌘-Shift-Clear)", QPoint(X, G3 + TOP));
+		m_mouse.toggled = [](bool on) { pl_setting_set("mouse-keys", on ? "true" : nullptr); };
+		radioRow(m_mouseDelay, "Delay:", G3 + TOP + 20, "mouse-keys-delay", MOUSE_DELAYS, 1);
+		radioRow(m_mouseSpeed, "Speed:", G3 + TOP + 40, "mouse-keys-speed", MOUSE_SPEEDS, 1);
+
+		m_zoom = PanelCheckbox("On (or press ⌘-Option-K)", QPoint(X, G4 + TOP));
+		m_zoom.toggled = [](bool on) { pl_setting_set("zoom", on ? "true" : nullptr); };
+		const char *const factors[] = { "2×", "4×", "8×", "16×" };
+		for (int i = 0; i < 4; i++) {
+			m_zoomFactor.add(factors[i], QPoint(X + LABEL_W + 60 * i, G4 + TOP + 20));
+		}
+		m_zoomFactor.changed = [](int i) { setInt("zoom-factor", 2 << i); };
+		m_radios.push_back(&m_zoomFactor);
+
+		m_checks = { &m_sticky, &m_slow, &m_mouse, &m_zoom };
+		reload();
+		m_notes = { "Mouse Keys: the keypad's 1-9 move the pointer, 5 clicks, 0 holds",
+			"the button down and . lets it go. ⌘-Option-Up and Down zoom." };
+	}
+
+protected:
+	void changeEvent(QEvent *e) override {
+		if (e->type() == QEvent::ActivationChange && isActiveWindow()) {
+			reload(); /* turned on or off from the keyboard meanwhile */
+		}
+		ControlPanel::changeEvent(e);
+	}
+
+	void paintExtra(pl_canvas *c) override {
+		const std::pair<int, const char *> labels[] = { { G2 + TOP + 20, "Delay:" },
+			{ G3 + TOP + 20, "Delay:" }, { G3 + TOP + 40, "Speed:" }, { G4 + TOP + 20, "Size:" } };
+		for (const auto &[y, text] : labels) {
+			Text t(text, LABEL_W, PL_FONT_SYSTEM);
+			pl_text(c, t.t, X, y + 9, C_BLACK);
+		}
+	}
+
+private:
+	struct Choices {
+		const char *names[3];
+		int values[3];
+	};
+	static constexpr Choices SLOW_DELAYS = { { "Short", "Medium", "Long" }, { 300, 750, 1500 } };
+	static constexpr Choices MOUSE_DELAYS = { { "Short", "Medium", "Long" }, { 200, 500, 1000 } };
+	static constexpr Choices MOUSE_SPEEDS = { { "Slow", "Medium", "Fast" }, { 6, 12, 24 } };
+
+	void radioRow(PanelRadios &r, const char *, int y, const char *key, const Choices &c, int def) {
+		for (int i = 0; i < 3; i++) {
+			r.add(c.names[i], QPoint(X + LABEL_W + 80 * i, y));
+		}
+		r.changed = [key, c, def](int i) {
+			if (i == def) {
+				pl_setting_set(key, nullptr);
+			} else {
+				setInt(key, c.values[i]);
+			}
+		};
+		m_radios.push_back(&r);
+		m_rows.push_back({ &r, key, c, def });
+	}
+
+	void reload() {
+		m_sticky.on = settingOn("sticky-keys", false);
+		m_slow.on = settingOn("slow-keys", false);
+		m_mouse.on = settingOn("mouse-keys", false);
+		m_zoom.on = settingOn("zoom", false);
+		for (const Row &row : m_rows) {
+			const int v = settingInt(row.key, row.choices.values[row.def]);
+			int best = 0;
+			for (int i = 1; i < 3; i++) {
+				if (std::abs(row.choices.values[i] - v) < std::abs(row.choices.values[best] - v)) {
+					best = i;
+				}
+			}
+			row.radios->selected = best;
+		}
+		char v[16];
+		const double factor = pl_setting("zoom-factor", v, sizeof(v)) ? atof(v) : 2.0;
+		m_zoomFactor.selected = factor >= 12 ? 3 : factor >= 6 ? 2 : factor >= 3 ? 1 : 0;
+		update();
+	}
+
+	struct Row {
+		PanelRadios *radios;
+		const char *key;
+		Choices choices;
+		int def;
+	};
+	static constexpr int X = M + IN, TOP = 1 + PL_GROUP_MARGIN_TOP, LABEL_W = 56;
+	static constexpr int G1 = 26, G2 = G1 + ROWS(1) + 28, G3 = G2 + ROWS(2) + 28;
+	static constexpr int G4 = G3 + ROWS(3) + 28;
+	static constexpr int PANEL_H = G4 + ROWS(2) + 12 + 2 * 12 + 8;
+	PanelCheckbox m_sticky, m_slow, m_mouse, m_zoom;
+	PanelRadios m_slowDelay, m_mouseDelay, m_mouseSpeed, m_zoomFactor;
+	std::vector<Row> m_rows;
+};
+
 /* ---- main --------------------------------------------------------------------------- */
 
 int main(int argc, char *argv[]) {
@@ -1485,6 +1679,12 @@ int main(int argc, char *argv[]) {
 	} else if (which == "zacmenu") {
 		QApplication::setApplicationName("Zac Menu Options");
 		panel = std::make_unique<ZacMenuOptionsPanel>();
+	} else if (which == "trackpad") {
+		QApplication::setApplicationName("Trackpad");
+		panel = std::make_unique<TrackpadPanel>();
+	} else if (which == "accessibility") {
+		QApplication::setApplicationName("Accessibility");
+		panel = std::make_unique<AccessibilityPanel>();
 	} else if (which == "monitors") {
 		QApplication::setApplicationName("Monitors");
 		panel = std::make_unique<MonitorsPanel>();

@@ -198,6 +198,38 @@ static bool setting_on(const char *key) {
 	return pl_setting(key, v, sizeof(v)) && (strcmp(v, "1") == 0 || strcmp(v, "true") == 0);
 }
 
+static struct {
+	bool on;
+	unsigned latched, locked;
+} sticky;
+
+void menus_set_sticky(bool on, unsigned latched, unsigned locked) {
+	sticky.on = on;
+	sticky.latched = latched;
+	sticky.locked = locked;
+}
+
+void menus_sticky_title(bool on, unsigned latched, unsigned locked, char *out, size_t size) {
+	/* Shift, Control, Option, Command, in the bits' order. */
+	static const char *const glyphs[] = { "\u21E7", "\u2303", "\u2325", "\u2318" };
+	out[0] = '\0';
+	if (!on) {
+		return;
+	}
+	size_t n = 0;
+	for (int i = 0; i < 4; i++) {
+		const unsigned bit = 1u << i;
+		if (locked & bit) {
+			n += (size_t)snprintf(out + n, n < size ? size - n : 0, "[%s]", glyphs[i]);
+		} else if (latched & bit) {
+			n += (size_t)snprintf(out + n, n < size ? size - n : 0, "%s", glyphs[i]);
+		}
+	}
+	if (n == 0) {
+		snprintf(out, size, "\u00B7"); /* on, holding nothing */
+	}
+}
+
 /* The clock's options come from the Date & Time panel (desktop.conf). */
 static bool clock_shown(void) {
 	char v[16];
@@ -274,6 +306,12 @@ void menus_rebuild(struct mb_bar *bar, int screen_w) {
 		char clock[48];
 		clock_text(clock, sizeof(clock));
 		new_menu(bar->right, &bar->n_right, clock);
+	}
+
+	char held[64];
+	menus_sticky_title(sticky.on, sticky.latched, sticky.locked, held, sizeof(held));
+	if (*held) {
+		new_menu(bar->right, &bar->n_right, held);
 	}
 
 	kbmenu_add(bar->right, &bar->n_right);

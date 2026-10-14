@@ -1,6 +1,7 @@
 wayland_server = dependency('wayland-server')
 wayland_protos = dependency('wayland-protocols')
 wlroots = dependency('wlroots-0.18')
+libinput = dependency('libinput')
 xkbcommon = dependency('xkbcommon')
 xcb_icccm = dependency('xcb-icccm').partial_dependency(compile_args: true, includes: true)
 xcb = dependency('xcb')
@@ -86,6 +87,7 @@ compositor_exe = executable('zacos9-wm',
   'src/input.c',
   'src/kblayout.c',
   'src/fkeys.c',
+  'src/access.c',
   'src/window_sounds.c',
   'src/launch.c',
   'src/startup.c',
@@ -105,7 +107,7 @@ compositor_exe = executable('zacos9-wm',
   'src/outline.c',
   'src/pixbuf.c',
   protocol_headers,
-  dependencies: [decor_dep, wayland_server, wlroots, xkbcommon, libdrm, xcb_icccm, xcb],
+  dependencies: [decor_dep, wayland_server, wlroots, xkbcommon, libdrm, xcb_icccm, xcb, libinput],
   link_depends: cursor_theme,
   install: true,
 )
@@ -161,7 +163,18 @@ test('virtual-pointer-output',
     'tests/test_virtual_pointer.c',
     protocol_headers,
     include_directories: include_directories('src'),
-    dependencies: [decor_dep, wayland_server, wlroots, xkbcommon],
+    dependencies: [decor_dep, wayland_server, wlroots, xkbcommon, libinput],
+    c_args: ['-ffunction-sections', '-fdata-sections'],
+    link_args: ['-Wl,--gc-sections'],
+  ),
+)
+
+test('access',
+  executable('test-access',
+    'tests/test_access.c',
+    protocol_headers,
+    include_directories: include_directories('src', '../lib'),
+    dependencies: [decor_dep, wayland_server, wlroots, xkbcommon, libinput, meson.get_compiler('c').find_library('m')],
     c_args: ['-ffunction-sections', '-fdata-sections'],
     link_args: ['-Wl,--gc-sections'],
   ),

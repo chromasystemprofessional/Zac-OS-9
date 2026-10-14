@@ -16,6 +16,7 @@
 #include <wlr/util/log.h>
 
 #include "startup.h"
+#include "access.h"
 #include "server.h"
 #include "snapshot.h"
 
@@ -211,6 +212,7 @@ int main(int argc, char *argv[]) {
 	snapshot_init(&server);
 	xdg_init(&server);
 	input_init(&server);
+	access_init(&server);
 	prefs_init(&server);
 	lock_init(&server);
 	idle_init(&server);

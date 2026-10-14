@@ -307,6 +307,7 @@ struct PanelDef {
 };
 /* Alphabetical, as the Mac's Control Panels folder was. */
 const PanelDef PANELS[] = {
+	{ "Accessibility", "zacos9-controlpanel", "accessibility" },
 	{ "Appearance", "zacos9-appearance", nullptr },
 	{ "Date & Time", "zacos9-datetime", nullptr },
 	{ "File Sharing", "zacos9-filesharing", nullptr },
@@ -320,6 +321,7 @@ const PanelDef PANELS[] = {
 	{ "Screen Saver", "zacos9-controlpanel", "screensaver" },
 	{ "Sound", "zacos9-controlpanel", "sound" },
 	{ "TCP/IP", "zacos9-tcpip", nullptr },
+	{ "Trackpad", "zacos9-controlpanel", "trackpad" },
 	{ "Zac Menu Options", "zacos9-controlpanel", "zacmenu" },
 };
 

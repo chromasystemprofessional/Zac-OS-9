@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Trackpad
+Comment=Trackpad tracking, double-click speed and tapping
+Exec=zacos9-controlpanel trackpad
+Categories=Settings;HardwareSettings;
+OnlyShowIn=ZacOS9;

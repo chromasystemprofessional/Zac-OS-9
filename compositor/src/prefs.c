@@ -33,6 +33,7 @@
 #include <wlr/util/log.h>
 
 #include "hotkey.h"
+#include "access.h"
 #include "server.h"
 #include "settings.h"
 
@@ -66,6 +67,15 @@ int prefs_repeat_rate(void) {
 bool prefs_layout_switch_option(void) {
 	char v[16];
 	return pl_setting("keyboard-switch", v, sizeof(v)) && strcmp(v, "option") == 0;
+}
+
+bool prefs_flag(const char *key, bool *on) {
+	char v[16];
+	if (!pl_setting(key, v, sizeof(v))) {
+		return false;
+	}
+	*on = strcmp(v, "true") == 0 || strcmp(v, "1") == 0;
+	return true;
 }
 
 bool prefs_show_desktop(void) {
@@ -277,6 +287,8 @@ void prefs_apply(struct plat_server *server) {
 	server->double_click_ms = setting_int("double-click", PLAT_DOUBLE_CLICK_MS, 150, 2000);
 
 	input_apply_layouts(server);
+	input_apply_trackpads(server);
+	access_apply(server);
 	struct plat_keyboard *kb;
 	wl_list_for_each(kb, &server->keyboards, link) {
 		if (!kb->is_virtual) {

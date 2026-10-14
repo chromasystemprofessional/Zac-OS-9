@@ -9,7 +9,8 @@
  *   vptr down | up | click    left button
  *   vptr type TEXT            type printable ASCII
  *   vptr key NAME             Return, BackSpace, Tab, Escape, Delete,
- *                             Up, Down, Left, Right, F1..F12, or one character
+ *                             Up, Down, Left, Right, F1..F12, KP0..KP9,
+ *                             KPDot, NumLock, or one character
  *   vptr cmd C                ⌘C (the Super key, as zacos9-wm maps it)
  *   vptr hold MOD | release MOD   keep option, shift, control or command down
  *   vptr wait MS              pause
@@ -159,6 +160,9 @@ static bool named_key(const char *name, uint32_t *code, bool *shift) {
 		{ "Return", KEY_ENTER }, { "BackSpace", KEY_BACKSPACE }, { "Tab", KEY_TAB },
 		{ "Escape", KEY_ESC }, { "Delete", KEY_DELETE }, { "Up", KEY_UP },
 		{ "Down", KEY_DOWN }, { "Left", KEY_LEFT }, { "Right", KEY_RIGHT },
+		{ "KP0", KEY_KP0 }, { "KP1", KEY_KP1 }, { "KP2", KEY_KP2 }, { "KP3", KEY_KP3 },
+		{ "KP4", KEY_KP4 }, { "KP5", KEY_KP5 }, { "KP6", KEY_KP6 }, { "KP7", KEY_KP7 },
+		{ "KP8", KEY_KP8 }, { "KP9", KEY_KP9 }, { "KPDot", KEY_KPDOT }, { "NumLock", KEY_NUMLOCK },
 	};
 	for (size_t i = 0; i < sizeof(keys) / sizeof(keys[0]); i++) {
 		if (strcmp(name, keys[i].name) == 0) {

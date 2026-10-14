@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Accessibility
+Comment=Sticky Keys, Slow Keys, Mouse Keys and Zoom
+Exec=zacos9-controlpanel accessibility
+Categories=Settings;Accessibility;
+OnlyShowIn=ZacOS9;

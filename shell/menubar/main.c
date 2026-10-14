@@ -958,6 +958,15 @@ static void shell_keyboard_layouts(void *data, struct platinum_shell_v1 *shell,
 	menubar_apps_changed();
 }
 
+static void shell_proxy_drag(void *data, struct platinum_shell_v1 *shell, struct wl_surface *surface) {
+}
+
+static void shell_sticky_keys(void *data, struct platinum_shell_v1 *shell, uint32_t on,
+		uint32_t latched, uint32_t locked) {
+	menus_set_sticky(on != 0, latched, locked);
+	menubar_apps_changed();
+}
+
 void menubar_set_keyboard_layout(int index) {
 	if (g.platinum_shell && wl_proxy_get_version((struct wl_proxy *)g.platinum_shell) >=
 			PLATINUM_SHELL_V1_SET_KEYBOARD_LAYOUT_SINCE_VERSION) {
@@ -972,6 +981,8 @@ static const struct platinum_shell_v1_listener shell_listener = {
 	.switch_app = shell_switch_app,
 	.title_menu = shell_title_menu,
 	.keyboard_layouts = shell_keyboard_layouts,
+	.proxy_drag = shell_proxy_drag,
+	.sticky_keys = shell_sticky_keys,
 };
 
 static void flush_launch_feedback(void) {
@@ -1036,7 +1047,7 @@ static void registry_global(void *data, struct wl_registry *reg, uint32_t name,
 			&zwp_virtual_keyboard_manager_v1_interface, 1);
 	} else if (strcmp(iface, platinum_shell_v1_interface.name) == 0 && version >= 2) {
 		g.platinum_shell = wl_registry_bind(reg, name, &platinum_shell_v1_interface,
-			version < 11 ? version : 11);
+			version < 13 ? version : 13);
 		platinum_shell_v1_add_listener(g.platinum_shell, &shell_listener, NULL);
 	}
 }

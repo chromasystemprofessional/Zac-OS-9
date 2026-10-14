@@ -6,9 +6,12 @@
 #include <strings.h>
 #include <time.h>
 
+#include "access.h"
 #include "fkeys.h"
 #include <string.h>
 #include <unistd.h>
+#include <libinput.h>
+#include <wlr/backend/libinput.h>
 #include <wlr/interfaces/wlr_keyboard.h>
 #include <wlr/backend/session.h>
 #include <wlr/types/wlr_data_device.h>
@@ -57,6 +60,25 @@ static struct wlr_keyboard_modifiers command_as_ctrl(struct plat_server *server,
 	return out;
 }
 
+/* What clients are told of the modifiers: the keyboard's, with Sticky
+ * Keys', ⌘ made Ctrl. */
+static struct wlr_keyboard_modifiers seat_modifiers(struct plat_server *server,
+		struct wlr_surface *surface, const struct wlr_keyboard_modifiers *in) {
+	struct wlr_keyboard_modifiers merged = *in;
+	access_merge_modifiers(&merged);
+	return command_as_ctrl(server, surface, &merged);
+}
+
+void input_send_modifiers(struct plat_server *server) {
+	struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(server->seat);
+	if (!keyboard || !keyboard->keymap) {
+		return;
+	}
+	struct wlr_keyboard_modifiers mods = seat_modifiers(server,
+		server->seat->keyboard_state.focused_surface, &keyboard->modifiers);
+	wlr_seat_keyboard_notify_modifiers(server->seat, &mods);
+}
+
 void input_keyboard_enter(struct plat_server *server, struct wlr_surface *surface) {
 	struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(server->seat);
 	if (!surface || (lock_active(server) && !lock_owns(server, surface))) {
@@ -66,8 +88,7 @@ void input_keyboard_enter(struct plat_server *server, struct wlr_surface *surfac
 		wlr_seat_keyboard_notify_enter(server->seat, surface, NULL, 0, NULL);
 		return;
 	}
-	struct wlr_keyboard_modifiers mods =
-		command_as_ctrl(server, surface, &keyboard->modifiers);
+	struct wlr_keyboard_modifiers mods = seat_modifiers(server, surface, &keyboard->modifiers);
 	wlr_seat_keyboard_notify_enter(server->seat, surface, keyboard->keycodes,
 		keyboard->num_keycodes, &mods);
 }
@@ -78,9 +99,7 @@ static void keyboard_modifiers(struct wl_listener *listener, void *data) {
 		return;
 	}
 	wlr_seat_set_keyboard(kb->server->seat, kb->wlr_keyboard);
-	struct wlr_keyboard_modifiers mods = command_as_ctrl(kb->server,
-		kb->server->seat->keyboard_state.focused_surface, &kb->wlr_keyboard->modifiers);
-	wlr_seat_keyboard_notify_modifiers(kb->server->seat, &mods);
+	input_send_modifiers(kb->server);
 }
 
 /* ---- keyboard layouts ---------------------------------------------------- */
@@ -210,6 +229,10 @@ static bool handle_keybinding(struct plat_server *server, uint32_t mods,
 	if (handle_layout_switch(server, mods, sym)) {
 		return true;
 	}
+	/* Zoom: ⌘-Option-K, ⌘-Option-Up and Down. */
+	if (access_keybinding(server, mods, sym)) {
+		return true;
+	}
 	/* Function keys that open things (the Keyboard panel's). */
 	char target[1024];
 	if (fkey_target(mods & ~(uint32_t)(WLR_MODIFIER_CAPS | WLR_MODIFIER_MOD2), /* Num Lock */
@@ -241,14 +264,24 @@ static void keyboard_key(struct wl_listener *listener, void *data) {
 		server->idle_swallowed_key = 0;
 		return;
 	}
+	/* Easy Access first: Mouse Keys' keypad, a Slow Keys key not yet
+	 * held long enough, Sticky Keys' modifier taps. */
+	if (access_key(kb, event->keycode, event->state, event->time_msec)) {
+		return;
+	}
+	input_deliver_key(kb, event->keycode, event->state, event->time_msec);
+}
 
-	uint32_t keycode = event->keycode + 8;
+void input_deliver_key(struct plat_keyboard *kb, uint32_t evdev_keycode,
+		enum wl_keyboard_key_state state, uint32_t time_msec) {
+	struct plat_server *server = kb->server;
+	uint32_t keycode = evdev_keycode + 8;
 	const xkb_keysym_t *syms;
 	int nsyms = xkb_state_key_get_syms(kb->wlr_keyboard->xkb_state, keycode, &syms);
-	uint32_t mods = wlr_keyboard_get_modifiers(kb->wlr_keyboard);
+	uint32_t mods = wlr_keyboard_get_modifiers(kb->wlr_keyboard) | access_held_modifiers();
 
 	bool handled = false;
-	if (event->state == WL_KEYBOARD_KEY_STATE_PRESSED) {
+	if (state == WL_KEYBOARD_KEY_STATE_PRESSED) {
 		/* Locked, no shortcuts but for a text console. */
 		for (int i = 0; i < nsyms && !handled; i++) {
 			handled = lock_active(server) ? handle_vt_switch(server, syms[i]) :
@@ -257,9 +290,9 @@ static void keyboard_key(struct wl_listener *listener, void *data) {
 	}
 	if (!handled) {
 		wlr_seat_set_keyboard(server->seat, kb->wlr_keyboard);
-		wlr_seat_keyboard_notify_key(server->seat, event->time_msec,
-			event->keycode, event->state);
+		wlr_seat_keyboard_notify_key(server->seat, time_msec, evdev_keycode, state);
 	}
+	access_key_delivered(kb, evdev_keycode, state);
 }
 
 static void keyboard_destroy(struct wl_listener *listener, void *data) {
@@ -320,6 +353,53 @@ static void new_keyboard(struct plat_server *server, struct wlr_input_device *de
 	}
 }
 
+/* ---- trackpads ---------------------------------------------------------- */
+
+/* The Trackpad panel's "Use Trackpad for": tapping to click, to drag, and
+ * drag lock (libinput's tap settings); unset leaves libinput's default. */
+struct plat_pointer {
+	struct wl_list link;
+	struct wlr_input_device *device;
+	struct wl_listener destroy;
+};
+
+static void pointer_destroy(struct wl_listener *listener, void *data) {
+	struct plat_pointer *p = wl_container_of(listener, p, destroy);
+	wl_list_remove(&p->link);
+	wl_list_remove(&p->destroy.link);
+	free(p);
+}
+
+static void apply_trackpad(struct wlr_input_device *device) {
+	if (!wlr_input_device_is_libinput(device)) {
+		return;
+	}
+	struct libinput_device *li = wlr_libinput_get_device_handle(device);
+	if (!li || libinput_device_config_tap_get_finger_count(li) == 0) {
+		return; /* a mouse, not a trackpad */
+	}
+	bool on;
+	if (prefs_flag("trackpad-tap", &on)) {
+		libinput_device_config_tap_set_enabled(li,
+			on ? LIBINPUT_CONFIG_TAP_ENABLED : LIBINPUT_CONFIG_TAP_DISABLED);
+	}
+	if (prefs_flag("trackpad-drag", &on)) {
+		libinput_device_config_tap_set_drag_enabled(li,
+			on ? LIBINPUT_CONFIG_DRAG_ENABLED : LIBINPUT_CONFIG_DRAG_DISABLED);
+	}
+	if (prefs_flag("trackpad-drag-lock", &on)) {
+		libinput_device_config_tap_set_drag_lock_enabled(li,
+			on ? LIBINPUT_CONFIG_DRAG_LOCK_ENABLED : LIBINPUT_CONFIG_DRAG_LOCK_DISABLED);
+	}
+}
+
+void input_apply_trackpads(struct plat_server *server) {
+	struct plat_pointer *p;
+	wl_list_for_each(p, &server->pointers, link) {
+		apply_trackpad(p->device);
+	}
+}
+
 static void server_new_input(struct wl_listener *listener, void *data) {
 	struct plat_server *server = wl_container_of(listener, server, new_input);
 	struct wlr_input_device *device = data;
@@ -328,9 +408,16 @@ static void server_new_input(struct wl_listener *listener, void *data) {
 	case WLR_INPUT_DEVICE_KEYBOARD:
 		new_keyboard(server, device, false);
 		break;
-	case WLR_INPUT_DEVICE_POINTER:
+	case WLR_INPUT_DEVICE_POINTER: {
 		wlr_cursor_attach_input_device(server->cursor, device);
+		struct plat_pointer *p = calloc(1, sizeof(*p));
+		p->device = device;
+		p->destroy.notify = pointer_destroy;
+		wl_signal_add(&device->events.destroy, &p->destroy);
+		wl_list_insert(&server->pointers, &p->link);
+		apply_trackpad(device);
 		break;
+	}
 	default:
 		break;
 	}
@@ -362,12 +449,12 @@ static void new_virtual_keyboard(struct wl_listener *listener, void *data) {
 
 static bool option_held(struct plat_server *server) {
 	struct wlr_keyboard *kb = wlr_seat_get_keyboard(server->seat);
-	return kb && (wlr_keyboard_get_modifiers(kb) & WLR_MODIFIER_ALT);
+	return kb && ((wlr_keyboard_get_modifiers(kb) | access_held_modifiers()) & WLR_MODIFIER_ALT);
 }
 
 static bool command_held(struct plat_server *server) {
 	struct wlr_keyboard *kb = wlr_seat_get_keyboard(server->seat);
-	return kb && (wlr_keyboard_get_modifiers(kb) & WLR_MODIFIER_LOGO);
+	return kb && ((wlr_keyboard_get_modifiers(kb) | access_held_modifiers()) & WLR_MODIFIER_LOGO);
 }
 
 /* Option-click on a box acts on every window of the same program. */
@@ -746,6 +833,13 @@ static void refresh_cursor_or_hide(struct plat_server *server) {
 }
 
 static void process_cursor_motion(struct plat_server *server, uint32_t time) {
+	if (access_zoom_factor() > 1.0) {
+		/* Zoom follows the pointer. */
+		struct plat_output *output;
+		wl_list_for_each(output, &server->outputs, link) {
+			wlr_output_schedule_frame(output->wlr_output);
+		}
+	}
 	if (server->drag_icon) {
 		wlr_scene_node_set_position(&server->drag_icon->node,
 			(int)server->cursor->x, (int)server->cursor->y);
@@ -815,6 +909,15 @@ static void cursor_motion_absolute(struct wl_listener *listener, void *data) {
 static void cursor_button(struct wl_listener *listener, void *data) {
 	struct plat_server *server = wl_container_of(listener, server, cursor_button);
 	struct wlr_pointer_button_event *event = data;
+	input_pointer_button(server, event->time_msec, event->button, event->state);
+}
+
+static void pointer_button(struct plat_server *server, uint32_t time_msec, uint32_t button,
+		enum wl_pointer_button_state button_state) {
+	const struct {
+		uint32_t time_msec, button;
+		enum wl_pointer_button_state state;
+	} ev = { time_msec, button, button_state }, *event = &ev;
 
 	/* A click that only woke a dark screen goes no further, nor its release. */
 	if (event->state == WL_POINTER_BUTTON_STATE_PRESSED) {
@@ -902,6 +1005,14 @@ static void cursor_button(struct wl_listener *listener, void *data) {
 		event->button, event->state);
 	if (event->state == WL_POINTER_BUTTON_STATE_RELEASED) {
 		proxy_done(server);
+	}
+}
+
+void input_pointer_button(struct plat_server *server, uint32_t time_msec, uint32_t button,
+		enum wl_pointer_button_state button_state) {
+	pointer_button(server, time_msec, button, button_state);
+	if (button_state == WL_POINTER_BUTTON_STATE_RELEASED) {
+		access_click_done(); /* Sticky Keys: ⌘ then a click is a ⌘-click */
 	}
 }
 
@@ -1067,6 +1178,7 @@ void input_init(struct plat_server *server) {
 	use_zacos9_cursors();
 	server->cursor_mgr = wlr_xcursor_manager_create(ZACOS9_CURSOR_THEME, ZACOS9_CURSOR_SIZE);
 	server->cursor_mode = PLAT_CURSOR_PASSTHROUGH;
+	wl_list_init(&server->pointers);
 	server->spring_timer = wl_event_loop_add_timer(wl_display_get_event_loop(server->display),
 		spring_fire, server);
 	launch_init(server);

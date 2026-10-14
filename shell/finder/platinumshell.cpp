@@ -83,9 +83,11 @@ static void handle_proxy_drag(void *, platinum_shell_v1 *, wl_surface *surface) 
 		QTimer::singleShot(0, drag);
 	}
 }
+static void handle_sticky_keys(void *, platinum_shell_v1 *, uint32_t, uint32_t, uint32_t) {
+}
 static const platinum_shell_v1_listener shell_listener = {
 	handle_window_position, handle_active_client, handle_active_gtk_menu, handle_switch_app,
-	handle_title_menu, handle_keyboard_layouts, handle_proxy_drag
+	handle_title_menu, handle_keyboard_layouts, handle_proxy_drag, handle_sticky_keys
 };
 
 static void global(void *, wl_registry *reg, uint32_t name, const char *iface, uint32_t version) {

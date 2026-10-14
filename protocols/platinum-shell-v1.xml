@@ -10,7 +10,7 @@
     when the generic rule (fixed size with a parent window) can't apply.
   </description>
 
-  <interface name="platinum_shell_v1" version="12">
+  <interface name="platinum_shell_v1" version="13">
     <enum name="style">
       <entry name="document" value="0" summary="standard document window"/>
       <entry name="movable_modal" value="1"
@@ -220,6 +220,17 @@
         a drag of what the window shows, as from one of its own icons.
       </description>
       <arg name="surface" type="object" interface="wl_surface"/>
+    </event>
+    <event name="sticky_keys" since="13">
+      <description summary="the modifiers Sticky Keys holds">
+        Sent on bind and whenever they change. `on` is 1 while Sticky Keys
+        is on; `latched` (for the next key) and `locked` (until pressed
+        again) are bits: 1 Shift, 2 Control, 4 Option, 8 Command. The menu
+        bar shows them at its right end.
+      </description>
+      <arg name="on" type="uint"/>
+      <arg name="latched" type="uint"/>
+      <arg name="locked" type="uint"/>
     </event>
   </interface>
 

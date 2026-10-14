@@ -1,9 +1,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <wlr/render/swapchain.h>
+#include <wlr/types/wlr_cursor.h>
 #include <wlr/types/wlr_output.h>
+#include <wlr/types/wlr_output_layout.h>
 #include <wlr/util/log.h>
 
+#include "access.h"
 #include "server.h"
 #include "settings.h"
 #include "startup.h"
@@ -21,13 +25,75 @@ static void output_snapshot_commit(struct wl_listener *listener, void *data) {
 	}
 }
 
+void output_zoom_box(int width, int height, double px, double py, double factor, struct wlr_fbox *box) {
+	/* The part of the screen shown, so the point under the pointer stays
+	 * under it: its corner is at p(1 - 1/factor). */
+	box->width = width / factor;
+	box->height = height / factor;
+	box->x = px * (1 - 1 / factor);
+	box->y = py * (1 - 1 / factor);
+}
+
+/* Zoom (the Accessibility panel): the frame the scene drew, magnified
+ * about the pointer into another of the output's buffers. False to commit
+ * as usual. */
+static bool output_commit_zoomed(struct plat_output *output, struct wlr_scene_output *scene_output) {
+	const double factor = access_zoom_factor();
+	struct wlr_output *wlr_output = output->wlr_output;
+	if (factor <= 1.0 || wlr_output->transform != WL_OUTPUT_TRANSFORM_NORMAL) {
+		return false;
+	}
+	struct plat_server *server = output->server;
+	/* Everything moves at once: draw it all. */
+	wlr_damage_ring_add_whole(&scene_output->damage_ring);
+	struct wlr_output_state state;
+	wlr_output_state_init(&state);
+	bool ok = wlr_scene_output_build_state(scene_output, &state, NULL) &&
+		(state.committed & WLR_OUTPUT_STATE_BUFFER) && state.buffer;
+	struct wlr_texture *texture = ok ? wlr_texture_from_buffer(server->renderer, state.buffer) : NULL;
+	struct wlr_buffer *target = NULL;
+	if (texture && wlr_output_configure_primary_swapchain(wlr_output, &state, &wlr_output->swapchain)) {
+		target = wlr_swapchain_acquire(wlr_output->swapchain, NULL);
+	}
+	if (target) {
+		double lx = server->cursor->x, ly = server->cursor->y;
+		wlr_output_layout_output_coords(server->output_layout, wlr_output, &lx, &ly);
+		struct wlr_fbox box;
+		output_zoom_box(texture->width, texture->height, lx * wlr_output->scale,
+			ly * wlr_output->scale, factor, &box);
+		struct wlr_render_pass *pass = wlr_renderer_begin_buffer_pass(server->renderer, target, NULL);
+		if (pass) {
+			wlr_render_pass_add_texture(pass, &(struct wlr_render_texture_options){
+				.texture = texture,
+				.src_box = box,
+				.dst_box = { .width = target->width, .height = target->height },
+				.filter_mode = WLR_SCALE_FILTER_NEAREST, /* CloseView's fat pixels */
+			});
+			if (wlr_render_pass_submit(pass)) {
+				wlr_output_state_set_buffer(&state, target);
+			}
+		}
+		wlr_buffer_unlock(target);
+	}
+	if (texture) {
+		wlr_texture_destroy(texture);
+	}
+	if (ok) {
+		wlr_output_commit_state(wlr_output, &state);
+	}
+	wlr_output_state_finish(&state);
+	return true;
+}
+
 static void output_frame(struct wl_listener *listener, void *data) {
 	struct plat_output *output = wl_container_of(listener, output, frame);
 	struct wlr_scene_output *scene_output = wlr_scene_get_scene_output(
 			output->server->scene, output->wlr_output);
 
 	startup_output_frame(output, true);
-	wlr_scene_output_commit(scene_output, NULL);
+	if (!output_commit_zoomed(output, scene_output)) {
+		wlr_scene_output_commit(scene_output, NULL);
+	}
 	startup_output_frame(output, false);
 
 	struct timespec now;

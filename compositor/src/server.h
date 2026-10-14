@@ -128,6 +128,7 @@ struct plat_server {
 	struct wl_listener drag_destroy;
 	struct wlr_scene_tree *drag_icon; /* follows the pointer during a drag */
 	struct wl_list keyboards;
+	struct wl_list pointers; /* plat_pointer.link: real pointing devices */
 	/* Keyboard layouts (input.c, kblayout.c): one keymap for every
 	 * physical keyboard, a group each, and the group in use. */
 	struct kb_layouts kb_layouts;
@@ -320,6 +321,8 @@ bool prefs_collar_hotkey(uint32_t mods, xkb_keysym_t sym);
 /* General Controls' "Show Desktop when in background" ("show-desktop"). */
 bool prefs_show_desktop(void);
 bool prefs_layout_switch_option(void);
+/* A true/false setting: false if it isn't set. */
+bool prefs_flag(const char *key, bool *on);
 
 /* main.c: run a shell command, in its own session; its pid, or -1. */
 pid_t spawn(const char *command);
@@ -385,12 +388,23 @@ void input_cancel_grab(struct plat_server *server);
 /* What's under the pointer changed with no motion (a screen saver or the
  * lock came or went): its focus and image again. */
 void input_pointer_refocus(struct plat_server *server);
+/* Tells the focused client the modifiers again (Sticky Keys changed them). */
+void input_send_modifiers(struct plat_server *server);
 /* Give keyboard focus to a surface, with ⌘ (Super) reported as Ctrl. */
 void input_keyboard_enter(struct plat_server *server, struct wlr_surface *surface);
 /* Keyboard layouts: (re)build the keymap if the Keyboard panel's choice
  * changed; use layout `index` (⌘-Space, the keyboard menu). */
 void input_apply_layouts(struct plat_server *server);
 void input_set_layout(struct plat_server *server, int index);
+/* A key, after Easy Access (access.c): to the compositor's shortcuts or the
+ * focused client. */
+void input_deliver_key(struct plat_keyboard *kb, uint32_t evdev_keycode,
+	enum wl_keyboard_key_state state, uint32_t time_msec);
+/* A pointer button, as if from a mouse (Mouse Keys). */
+void input_pointer_button(struct plat_server *server, uint32_t time_msec, uint32_t button,
+	enum wl_pointer_button_state state);
+/* The Trackpad panel's settings, to every trackpad. */
+void input_apply_trackpads(struct plat_server *server);
 
 /* view.c: window behaviour shared by every client type */
 void view_setup(struct plat_view *view, struct plat_server *server,
@@ -460,6 +474,11 @@ void platinum_shell_focus_changed(struct plat_server *server);
 void platinum_shell_switch_app(struct plat_server *server, int step);
 /* The keyboard layouts or the one in use changed: tell the menu bar. */
 void platinum_shell_layouts_changed(struct plat_server *server);
+/* Sticky Keys turned on or off, or holds other modifiers. */
+void platinum_shell_sticky_changed(struct plat_server *server);
+/* Zoom: the part of a width x height screen shown magnified `factor` times
+ * about (px, py), so that point stays put. */
+void output_zoom_box(int width, int height, double px, double py, double factor, struct wlr_fbox *box);
 /* The window's proxy icon (pl_icon_kind + 1, 0 for none), and telling its
  * program it is being dragged (false if it can't be). */
 int platinum_shell_proxy_for(struct wlr_surface *surface);

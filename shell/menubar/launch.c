@@ -287,6 +287,7 @@ void launch_fill_logo_menu(struct mb_menu *menu, const struct app *apps, int n_a
 	menu->items[menu->n - 1].submenu = panels;
 	/* Alphabetical, as in the Mac's Control Panels folder. */
 	const struct { const char *name, *program, *arg; } panel_list[] = {
+		{ "Accessibility", "zacos9-controlpanel", " accessibility" },
 		{ "Appearance", "zacos9-appearance", "" },
 		{ "Bluetooth", "zacos9-bluetooth", "" },
 		{ "Collar", "zacos9-collarpanel", "" },
@@ -302,6 +303,7 @@ void launch_fill_logo_menu(struct mb_menu *menu, const struct app *apps, int n_a
 		{ "Screen Saver", "zacos9-controlpanel", " screensaver" },
 		{ "Sound", "zacos9-controlpanel", " sound" },
 		{ "TCP/IP", "zacos9-tcpip", "" },
+		{ "Trackpad", "zacos9-controlpanel", " trackpad" },
 		{ "Zac Menu Options", "zacos9-controlpanel", " zacmenu" },
 	};
 	bool toy_box_added = false;
