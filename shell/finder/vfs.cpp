@@ -312,6 +312,7 @@ const PanelDef PANELS[] = {
 	{ "File Sharing", "zacos9-filesharing", nullptr },
 	{ "File Translator", "zacos9-fileexchange", nullptr },
 	{ "General Controls", "zacos9-controlpanel", "general" },
+	{ "Internet", "zacos9-controlpanel", "internet" },
 	{ "Keyboard", "zacos9-controlpanel", "keyboard" },
 	{ "Monitors", "zacos9-controlpanel", "monitors" },
 	{ "Mouse", "zacos9-controlpanel", "mouse" },

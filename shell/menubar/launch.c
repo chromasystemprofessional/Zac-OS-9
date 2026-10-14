@@ -294,6 +294,7 @@ void launch_fill_logo_menu(struct mb_menu *menu, const struct app *apps, int n_a
 		{ "File Sharing", "zacos9-filesharing", "" },
 		{ "File Translator", "zacos9-fileexchange", "" },
 		{ "General Controls", "zacos9-controlpanel", " general" },
+		{ "Internet", "zacos9-controlpanel", " internet" },
 		{ "Keyboard", "zacos9-controlpanel", " keyboard" },
 		{ "Monitors", "zacos9-controlpanel", " monitors" },
 		{ "Mouse", "zacos9-controlpanel", " mouse" },
@@ -333,6 +334,12 @@ void launch_fill_logo_menu(struct mb_menu *menu, const struct app *apps, int n_a
 				n++;
 			}
 		}
+		/* And the desk accessories, as the Apple menu had them. */
+		char calculator[PATH_MAX + 64];
+		sibling_program("zacos9-calculator", calculator, sizeof(calculator));
+		entries[n].name = strdup("Calculator");
+		entries[n].exec = strdup(calculator);
+		n++;
 	}
 	/* The Apple menu listed its items alphabetically. */
 	qsort(entries, n, sizeof(entries[0]), by_name);

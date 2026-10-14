@@ -694,6 +694,29 @@ test('greetd-client',
   timeout: 60,
 )
 
+# The Calculator desk accessory.
+executable('zacos9-calculator',
+  'calculator/main.cpp', 'calculator/engine.cpp',
+  include_directories: include_directories('finder', 'calculator'),
+  dependencies: [platinum_dep, qt6],
+  cpp_args: ['-std=c++17'],
+  install: true,
+)
+test('calculator',
+  executable('test-calculator', 'calculator/tests/test_engine.cpp', 'calculator/engine.cpp',
+    include_directories: include_directories('calculator'),
+    dependencies: [qt6],
+    cpp_args: ['-std=c++17'],
+  ),
+)
+test('internet-defaults',
+  executable('test-internet-defaults', 'panels/tests/test_defaultapps.cpp', 'panels/defaultapps.cpp',
+    include_directories: include_directories('panels'),
+    dependencies: [qt6, gio, gio_unix],
+    cpp_args: ['-std=c++17'],
+  ),
+)
+
 executable('zacos9-picture',
   'picture/main.cpp',
   'picture/picturewindow.cpp',
@@ -775,15 +798,17 @@ test('store-client',
 
 # The Keyboard panel's layouts, read as zacos9-wm reads them.
 xkb_layouts_sources = ['panels/xkblayouts.cpp', '../compositor/src/kblayout.c']
+# The Internet panel's defaults, through GIO.
+default_apps_sources = ['panels/defaultapps.cpp']
 xkb_layouts_include = include_directories('../compositor/src')
 
 executable('zacos9-controlpanel',
   'panels/controlpanel.cpp',
   'panels/soundclient.cpp',
-  xkb_layouts_sources,
+  xkb_layouts_sources, default_apps_sources,
   link_with: panelkit,
   include_directories: [include_directories('finder'), xkb_layouts_include],
-  dependencies: [platinum_dep, qt6, xkbcommon_client],
+  dependencies: [platinum_dep, qt6, xkbcommon_client, gio, gio_unix],
   cpp_args: ['-std=c++17'],
   install: true,
 )

@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Calculator
+Comment=Add, subtract, multiply and divide
+Exec=zacos9-calculator
+Terminal=false
+Categories=Utility;Calculator;
+OnlyShowIn=ZacOS9;
