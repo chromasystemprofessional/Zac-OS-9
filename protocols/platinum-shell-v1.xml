@@ -10,7 +10,7 @@
     when the generic rule (fixed size with a parent window) can't apply.
   </description>
 
-  <interface name="platinum_shell_v1" version="11">
+  <interface name="platinum_shell_v1" version="12">
     <enum name="style">
       <entry name="document" value="0" summary="standard document window"/>
       <entry name="movable_modal" value="1"
@@ -203,6 +203,24 @@
       </description>
       <arg name="index" type="uint"/>
     </request>
+    <request name="set_proxy_icon" since="12">
+      <description summary="a proxy icon before the window's title">
+        Mac OS 9's Finder windows: the folder's small icon before its name
+        in the title bar. `icon` is a pl_icon_kind + 1 (lib/icons.h); 0
+        takes it away. Dragging it sends proxy_drag.
+      </description>
+      <arg name="surface" type="object" interface="wl_surface"/>
+      <arg name="icon" type="uint"/>
+    </request>
+    <event name="proxy_drag" since="12">
+      <description summary="the proxy icon is being dragged">
+        The pointer was pressed on the window's proxy icon and moved. The
+        press has been handed to the window (just above its content, the
+        button still down, so its serial starts a drag): the program starts
+        a drag of what the window shows, as from one of its own icons.
+      </description>
+      <arg name="surface" type="object" interface="wl_surface"/>
+    </event>
   </interface>
 
   <interface name="platinum_keep_awake_v1" version="1">

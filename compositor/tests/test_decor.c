@@ -12,6 +12,7 @@
 #include <string.h>
 
 #include "decor.h"
+#include "icons.h"
 
 struct rect {
 	int x, y, w, h; /* frame-local */
@@ -152,6 +153,56 @@ static int check_hit(const struct decor_state *st, int x, int y,
 	return 0;
 }
 
+/* A proxy icon before the title: centred with it, hit apart from it,
+ * drawn, and the title's room shrinks by it. */
+static int run_proxy_tests(void) {
+	struct decor_state st = { .width = 214, .height = 227, .active = true,
+		.has_close = true, .has_zoom = true, .has_collapse = true, .has_grow = true };
+	const int room = decor_title_max_width(&st);
+	st.proxy = PL_ICON_FOLDER + 1;
+	int fails = 0;
+	if (decor_title_max_width(&st) != room - 20) {
+		printf("FAIL proxy: the title's room is %d, not %d\n", decor_title_max_width(&st), room - 20);
+		fails++;
+	}
+	struct plat_text *t = text_render("Projects", decor_title_max_width(&st));
+	st.title = t;
+	const int ink_w = t->ink_r - t->ink_l + 1;
+	const int icon_x = (214 - 1) / 2 - (ink_w + 20 - 1) / 2, ink_l = icon_x + 20;
+	if (!decor_proxy_hit(&st, icon_x + 8, 10) || decor_proxy_hit(&st, icon_x - 6, 10) ||
+			decor_proxy_hit(&st, ink_l + 4, 10)) {
+		printf("FAIL proxy: hit testing around x %d\n", icon_x);
+		fails++;
+	}
+	if (!decor_title_hit(&st, ink_l + ink_w / 2, 10) || decor_title_hit(&st, icon_x + 4, 10)) {
+		printf("FAIL proxy: the title text moved right of the icon\n");
+		fails++;
+	}
+	uint32_t *px = calloc(214 * 22, sizeof(*px));
+	struct pl_canvas c = { .px = px, .stride = 214, .x = 0, .y = 0, .width = 214, .height = 22 };
+	decor_paint(&c, &st);
+	int lavender = 0;
+	for (int y = 3; y < 19; y++) {
+		for (int x = icon_x; x < icon_x + 16; x++) {
+			lavender += px[y * 214 + x] == 0xFFCCCCFFu;
+		}
+	}
+	if (lavender < 10) {
+		printf("FAIL proxy: no folder drawn before the title\n");
+		fails++;
+	}
+	struct decor_state modal = st;
+	modal.style = DECOR_STYLE_MOVABLE_MODAL;
+	if (decor_proxy_hit(&modal, icon_x + 8, 10)) {
+		printf("FAIL proxy: dialogs have none\n");
+		fails++;
+	}
+	free(px);
+	text_destroy(t);
+	printf("%s proxy icon\n", fails ? "FAIL" : "ok  ");
+	return fails;
+}
+
 static int run_hit_tests(void) {
 	struct decor_state st = { .width = 214, .height = 227, .active = true,
 		.has_close = true, .has_zoom = true, .has_collapse = true,
@@ -171,7 +222,7 @@ static int run_hit_tests(void) {
 	st.collapsed = true;
 	fails += check_hit(&st, 100, 30, DECOR_PART_NONE, "below collapsed");
 	printf("%s hit testing\n", fails ? "FAIL" : "ok  ");
-	return fails;
+	return fails + run_proxy_tests();
 }
 
 int main(int argc, char *argv[]) {

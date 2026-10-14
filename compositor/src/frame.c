@@ -148,6 +148,15 @@ void frame_set_collapsed(struct plat_frame *frame, bool collapsed) {
 	}
 }
 
+void frame_set_proxy(struct plat_frame *frame, int proxy) {
+	if (frame->st.proxy == proxy) {
+		return;
+	}
+	frame->st.proxy = proxy;
+	frame->title_max = -1; /* the title's room changed */
+	frame->dirty = true;
+}
+
 void frame_set_title(struct plat_frame *frame, const char *title) {
 	title = title ? title : "";
 	if (frame->title_str && strcmp(frame->title_str, title) == 0) {

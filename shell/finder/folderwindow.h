@@ -53,6 +53,8 @@ public:
 	/* Preferences changed (grid spacing, labels, standard views): every
 	 * window lays itself out again. */
 	static void preferencesChanged();
+	/* The proxy icon in the title bar (platinumSetProxyIcon). */
+	void setUpProxyIcon();
 
 	/* FinderView */
 	QString folderPath() const override { return m_path; }

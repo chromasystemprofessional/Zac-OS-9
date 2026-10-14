@@ -1051,6 +1051,11 @@ test('session-ui', find_program('dbus-run-session'),
     compositor_exe, menubar_exe, finder_exe, idle_client, vptr_exe],
   timeout: 90,
 )
+# Proxy icons and spring-open collapsed windows (decor.c, input.c, folderwindow.cpp).
+test('proxy-icon', find_program('python3'),
+  args: [files('../compositor/tests/test_proxy_icon.py'), compositor_exe, menubar_exe, finder_exe, vptr_exe],
+  timeout: 90,
+)
 # Keyboard layouts: ⌘-Space and the keyboard menu (input.c, kbmenu.c).
 test('keyboard-layout-switch', find_program('python3'),
   args: [files('../compositor/tests/test_keyboard_layouts.py'), compositor_exe, menubar_exe, vptr_exe],

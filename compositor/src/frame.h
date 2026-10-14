@@ -33,6 +33,8 @@ void frame_set_size(struct plat_frame *frame, int content_w, int content_h);
 void frame_set_active(struct plat_frame *frame, bool active);
 void frame_set_collapsed(struct plat_frame *frame, bool collapsed);
 void frame_set_title(struct plat_frame *frame, const char *title);
+/* The proxy icon before the title: a pl_icon_kind + 1, 0 for none. */
+void frame_set_proxy(struct plat_frame *frame, int proxy);
 void frame_set_features(struct plat_frame *frame, bool zoom, bool grow);
 /* Document window or dialog; dialogs have no boxes and no resize box. */
 void frame_set_style(struct plat_frame *frame, enum decor_style style);

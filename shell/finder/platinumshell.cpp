@@ -5,6 +5,7 @@
 #include <QList>
 #include <QPointer>
 #include <QProcess>
+#include <QTimer>
 #include <QDebug>
 #include <QWidget>
 #include <QWindow>
@@ -69,16 +70,29 @@ static void handle_title_menu(void *, platinum_shell_v1 *, wl_surface *surface, 
 }
 static void handle_keyboard_layouts(void *, platinum_shell_v1 *, const char *, uint32_t) {
 }
+/* Windows with a proxy icon, and what dragging it does. */
+static QHash<wl_surface *, std::function<void()>> &proxyDrags() {
+	static QHash<wl_surface *, std::function<void()>> drags;
+	return drags;
+}
+static void handle_proxy_drag(void *, platinum_shell_v1 *, wl_surface *surface) {
+	auto it = proxyDrags().find(surface);
+	if (it != proxyDrags().end() && it.value()) {
+		/* Not inside Wayland's event dispatch: the drag runs its own loop. */
+		std::function<void()> drag = it.value();
+		QTimer::singleShot(0, drag);
+	}
+}
 static const platinum_shell_v1_listener shell_listener = {
 	handle_window_position, handle_active_client, handle_active_gtk_menu, handle_switch_app,
-	handle_title_menu, handle_keyboard_layouts
+	handle_title_menu, handle_keyboard_layouts, handle_proxy_drag
 };
 
 static void global(void *, wl_registry *reg, uint32_t name, const char *iface, uint32_t version) {
 	if (std::strcmp(iface, platinum_shell_v1_interface.name) == 0) {
 		shell = static_cast<platinum_shell_v1 *>(
 			wl_registry_bind(reg, name, &platinum_shell_v1_interface,
-				std::min(version, 10u)));
+				std::min(version, 12u)));
 		platinum_shell_v1_add_listener(shell, &shell_listener, nullptr);
 	}
 }
@@ -191,6 +205,20 @@ uint32_t platinumActiveClient() {
 
 void platinumOnActiveClient(QObject *owner, std::function<void()> changed) {
 	activeWatches().append({ owner, std::move(changed) });
+}
+
+void platinumSetProxyIcon(QWidget *window, int iconKind, std::function<void()> dragged) {
+	if (!shell || wl_proxy_get_version(reinterpret_cast<wl_proxy *>(shell)) < 12) {
+		return;
+	}
+	wl_surface *surface = surfaceOf(window);
+	if (!surface) {
+		return;
+	}
+	proxyDrags().insert(surface, std::move(dragged));
+	QObject::connect(window, &QObject::destroyed, [surface] { proxyDrags().remove(surface); });
+	platinum_shell_v1_set_proxy_icon(shell, surface, static_cast<uint32_t>(iconKind + 1));
+	wl_display_flush(display);
 }
 
 void platinumOnTitleMenu(QWidget *window, std::function<void(bool)> callback) {

@@ -1,6 +1,8 @@
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <linux/input-event-codes.h>
+#include <math.h>
 #include <time.h>
 #include <string.h>
 #include <unistd.h>
@@ -370,6 +372,96 @@ void input_begin_grab(struct plat_server *server, struct plat_view *view,
 	}
 }
 
+/* ---- proxy icons and spring-open windows --------------------------------- */
+
+static uint32_t now_msec(void) {
+	struct timespec now;
+	clock_gettime(CLOCK_MONOTONIC, &now);
+	return (uint32_t)(now.tv_sec * 1000 + now.tv_nsec / 1000000);
+}
+
+static void proxy_done(struct plat_server *server) {
+	if (server->proxy_surface) {
+		wl_list_remove(&server->proxy_surface_destroy.link);
+		server->proxy_surface = NULL;
+	}
+}
+
+static void proxy_surface_destroy(struct wl_listener *listener, void *data) {
+	struct plat_server *server = wl_container_of(listener, server, proxy_surface_destroy);
+	proxy_done(server);
+}
+
+static void end_grab(struct plat_server *server);
+
+/* The proxy icon dragged: the press is handed to the window just above its
+ * content (only a press it was given lets a program start a drag), and
+ * the program is told to drag what the window shows. The pointer stays
+ * with that window until the drag starts or the button comes up. */
+static void proxy_hand_off(struct plat_server *server) {
+	struct plat_view *view = server->grabbed_view;
+	end_grab(server);
+	struct wlr_surface *surface = view ? view->impl->get_surface(view) : NULL;
+	if (!surface) {
+		return;
+	}
+	int cx, cy;
+	view_content_pos(view, &cx, &cy);
+	wlr_seat_pointer_notify_enter(server->seat, surface, server->cursor->x - cx, server->cursor->y - cy);
+	wlr_seat_pointer_notify_button(server->seat, now_msec(), BTN_LEFT, WL_POINTER_BUTTON_STATE_PRESSED);
+	wlr_seat_pointer_notify_frame(server->seat);
+	server->proxy_surface = surface;
+	server->proxy_cx = cx;
+	server->proxy_cy = cy;
+	server->proxy_surface_destroy.notify = proxy_surface_destroy;
+	wl_signal_add(&surface->events.destroy, &server->proxy_surface_destroy);
+	if (!platinum_shell_proxy_drag(view)) {
+		wlr_seat_pointer_notify_button(server->seat, now_msec(), BTN_LEFT, WL_POINTER_BUTTON_STATE_RELEASED);
+		proxy_done(server);
+	}
+}
+
+static bool view_still_there(struct plat_server *server, struct plat_view *view) {
+	struct plat_view *v;
+	wl_list_for_each(v, &server->views, link) {
+		if (v == view && v->mapped) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/* A drag resting on a collapsed window's title bar opens it, as a
+ * spring-loaded folder opens: the icons can then be dropped in it (the
+ * Mac's drop on a collapsed window's proxy icon). It collapses again when
+ * the drag is over. */
+static int spring_fire(void *data) {
+	struct plat_server *server = data;
+	struct plat_view *view = server->spring_view;
+	server->spring_view = NULL;
+	if (view && view_still_there(server, view) && view->collapsed && server->seat->drag) {
+		view_set_collapsed(view, false);
+		server->sprung_view = view;
+	}
+	return 0;
+}
+
+static void spring_track(struct plat_server *server, struct plat_view *view, struct wlr_surface *surface) {
+	const bool over = view && !surface && view->collapsed && server->seat->drag &&
+		server->cursor->y - view_frame_box(view).y < DECOR_TOP;
+	if (!over) {
+		if (server->spring_view) {
+			server->spring_view = NULL;
+			wl_event_source_timer_update(server->spring_timer, 0);
+		}
+		return;
+	}
+	if (server->spring_view != view) {
+		server->spring_view = view;
+		wl_event_source_timer_update(server->spring_timer, 600);
+	}
+}
+
 static void end_grab(struct plat_server *server) {
 	outline_hide(&server->outline);
 	server->cursor_mode = PLAT_CURSOR_PASSTHROUGH;
@@ -447,6 +539,11 @@ static void grab_motion(struct plat_server *server) {
 		server->grab_moved = true;
 		outline_show(&server->outline, resize_box(server));
 		break;
+	case PLAT_CURSOR_PROXY:
+		if (fabs(server->cursor->x - server->grab_x) + fabs(server->cursor->y - server->grab_y) >= 4) {
+			proxy_hand_off(server);
+		}
+		break;
 	case PLAT_CURSOR_TRACK_BOX: {
 		/* Mac controls track: highlighted only while the pointer is inside. */
 		enum decor_part part = view_part_at(view, server->cursor->x, server->cursor->y);
@@ -522,6 +619,16 @@ static void grab_release(struct plat_server *server) {
 /* Mouse-down on a window frame (anything but the client area). */
 static void frame_press(struct plat_server *server, struct plat_view *view,
 		enum decor_part part, uint32_t time_msec) {
+	/* A press on the proxy icon: a click, or a drag of the folder itself. */
+	if (part == DECOR_PART_DRAG && !command_held(server)) {
+		const struct wlr_box frame = view_frame_box(view);
+		if (decor_proxy_hit(&view->frame->st, (int)server->cursor->x - frame.x,
+				(int)server->cursor->y - frame.y)) {
+			view_focus(view);
+			input_begin_grab(server, view, PLAT_CURSOR_PROXY, 0, part);
+			return;
+		}
+	}
 	/* ⌘-click on the title text of a window whose program asked (the
 	 * Finder's folder-path menu): the program shows it; the button stays
 	 * with the menu. */
@@ -619,6 +726,12 @@ static void process_cursor_motion(struct plat_server *server, uint32_t time) {
 		grab_motion(server);
 		return;
 	}
+	if (server->proxy_surface && !server->seat->drag) {
+		/* Handing a proxy drag on: the pointer is that window's for now. */
+		wlr_seat_pointer_notify_motion(server->seat, time, server->cursor->x - server->proxy_cx,
+			server->cursor->y - server->proxy_cy);
+		return;
+	}
 
 	double sx, sy;
 	struct wlr_surface *surface = NULL;
@@ -634,7 +747,8 @@ static void process_cursor_motion(struct plat_server *server, uint32_t time) {
 		refresh_cursor_or_hide(server);
 		return;
 	}
-	view_at(server, server->cursor->x, server->cursor->y, &surface, &sx, &sy);
+	struct plat_view *under = view_at(server, server->cursor->x, server->cursor->y, &surface, &sx, &sy);
+	spring_track(server, under, surface);
 	if (surface) {
 		wlr_seat_pointer_notify_enter(server->seat, surface, sx, sy);
 		wlr_seat_pointer_notify_motion(server->seat, time, sx, sy);
@@ -758,6 +872,9 @@ static void cursor_button(struct wl_listener *listener, void *data) {
 	}
 	wlr_seat_pointer_notify_button(server->seat, event->time_msec,
 		event->button, event->state);
+	if (event->state == WL_POINTER_BUTTON_STATE_RELEASED) {
+		proxy_done(server);
+	}
 }
 
 static void cursor_axis(struct wl_listener *listener, void *data) {
@@ -866,12 +983,20 @@ static void drag_destroy(struct wl_listener *listener, void *data) {
 	/* The scene removes the icon's tree itself. */
 	server->drag_icon = NULL;
 	wl_list_remove(&server->drag_destroy.link);
+	/* A window sprung open for the drag collapses again. */
+	server->spring_view = NULL;
+	wl_event_source_timer_update(server->spring_timer, 0);
+	if (server->sprung_view && view_still_there(server, server->sprung_view)) {
+		view_set_collapsed(server->sprung_view, true);
+	}
+	server->sprung_view = NULL;
 	input_refresh_cursor(server);
 }
 
 static void seat_start_drag(struct wl_listener *listener, void *data) {
 	struct plat_server *server = wl_container_of(listener, server, start_drag);
 	struct wlr_drag *drag = data;
+	proxy_done(server); /* a proxy icon's drag has begun */
 	if (drag->icon) {
 		/* Above windows and menus, like the Mac's drag outlines. */
 		server->drag_icon = wlr_scene_drag_icon_create(server->overlay_layer, drag->icon);
@@ -914,6 +1039,8 @@ void input_init(struct plat_server *server) {
 	use_zacos9_cursors();
 	server->cursor_mgr = wlr_xcursor_manager_create(ZACOS9_CURSOR_THEME, ZACOS9_CURSOR_SIZE);
 	server->cursor_mode = PLAT_CURSOR_PASSTHROUGH;
+	server->spring_timer = wl_event_loop_add_timer(wl_display_get_event_loop(server->display),
+		spring_fire, server);
 	launch_init(server);
 	struct wlr_cursor_shape_manager_v1 *shapes =
 		wlr_cursor_shape_manager_v1_create(server->display, 1);

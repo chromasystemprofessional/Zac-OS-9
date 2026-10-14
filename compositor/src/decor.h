@@ -55,6 +55,9 @@ struct decor_state {
 	bool has_close, has_zoom, has_collapse, has_grow;
 	enum decor_part pressed; /* box being held down, if any */
 	const struct plat_text *title;
+	/* A proxy icon before the title (Mac OS 9's Finder windows): a
+	 * pl_icon_kind + 1, or 0 for none. */
+	int proxy;
 };
 
 /* Paints the part of the frame that falls inside the canvas, which is
@@ -65,6 +68,9 @@ enum decor_part decor_hit(const struct decor_state *st, int x, int y);
 /* (x, y), frame-local, falls on the title text (or the blank between it
  * and the stripes). */
 bool decor_title_hit(const struct decor_state *st, int x, int y);
+
+/* (x, y), frame-local, falls on the proxy icon. */
+bool decor_proxy_hit(const struct decor_state *st, int x, int y);
 
 /* Widest title ink that fits between the boxes, for text_render(). */
 int decor_title_max_width(const struct decor_state *st);

@@ -95,6 +95,7 @@ void view_update_frame(struct plat_view *view) {
 	bool dialog = hint >= 0 ? hint == DECOR_STYLE_MOVABLE_MODAL
 		: !view_resizable(view) && view->impl->has_parent(view);
 	frame_set_style(view->frame, dialog ? DECOR_STYLE_MOVABLE_MODAL : DECOR_STYLE_DOCUMENT);
+	frame_set_proxy(view->frame, platinum_shell_proxy_for(view->impl->get_surface(view)));
 	struct wlr_scene_tree *layer = view_window_layer(view);
 	if (view->scene_tree->node.parent != layer) {
 		wlr_scene_node_reparent(&view->scene_tree->node, layer);

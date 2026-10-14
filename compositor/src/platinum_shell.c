@@ -12,6 +12,7 @@
 
 #include "platinum-shell-v1-protocol.h"
 #include "launch.h"
+#include "frame.h"
 #include "server.h"
 
 struct surface_hint {
@@ -23,6 +24,7 @@ struct surface_hint {
 	bool reported;       /* last reported position, to avoid repeats */
 	int standard_w, standard_h; /* the zoom box's content size; 0: none */
 	bool title_menu;     /* ⌘-click on the title is the program's */
+	int proxy;           /* the proxy icon (pl_icon_kind + 1), or 0 */
 	int rx, ry;
 	struct wl_listener surface_destroy;
 };
@@ -96,6 +98,22 @@ static struct wl_resource *shell_of(struct wlr_surface *surface) {
 		}
 	}
 	return shell;
+}
+
+int platinum_shell_proxy_for(struct wlr_surface *surface) {
+	struct surface_hint *h = surface ? find_hint(surface) : NULL;
+	return h ? h->proxy : 0;
+}
+
+bool platinum_shell_proxy_drag(struct plat_view *view) {
+	struct wlr_surface *surface = view->impl->get_surface(view);
+	struct surface_hint *h = surface ? find_hint(surface) : NULL;
+	struct wl_resource *shell = h && h->proxy && surface->resource ? shell_of(surface) : NULL;
+	if (!shell || wl_resource_get_version(shell) < PLATINUM_SHELL_V1_PROXY_DRAG_SINCE_VERSION) {
+		return false;
+	}
+	platinum_shell_v1_send_proxy_drag(shell, surface->resource);
+	return true;
 }
 
 bool platinum_shell_title_menu(struct plat_view *view, bool option) {
@@ -290,6 +308,19 @@ static void handle_set_standard_size(struct wl_client *client, struct wl_resourc
 	h->standard_h = height > 16384 ? 16384 : (int)height;
 }
 
+static void handle_set_proxy_icon(struct wl_client *client, struct wl_resource *resource,
+		struct wl_resource *surface_resource, uint32_t icon) {
+	struct wlr_surface *surface = wlr_surface_from_resource(surface_resource);
+	get_hint(surface)->proxy = icon <= 200 ? (int)icon : 0;
+	struct plat_view *view;
+	wl_list_for_each(view, &the_server->views, link) {
+		if (view->impl->get_surface(view) == surface) {
+			frame_set_proxy(view->frame, (int)get_hint(surface)->proxy);
+			frame_commit(view->frame);
+		}
+	}
+}
+
 static void handle_enable_title_menu(struct wl_client *client, struct wl_resource *resource,
 		struct wl_resource *surface_resource) {
 	get_hint(wlr_surface_from_resource(surface_resource))->title_menu = true;
@@ -359,6 +390,7 @@ static const struct platinum_shell_v1_interface shell_impl = {
 	.set_standard_size = handle_set_standard_size,
 	.enable_title_menu = handle_enable_title_menu,
 	.set_keyboard_layout = handle_set_keyboard_layout,
+	.set_proxy_icon = handle_set_proxy_icon,
 };
 
 static void resource_destroy(struct wl_resource *resource) {
@@ -383,5 +415,5 @@ void platinum_shell_init(struct plat_server *server) {
 	the_server = server;
 	wl_list_init(&hints);
 	wl_list_init(&resources);
-	wl_global_create(server->display, &platinum_shell_v1_interface, 11, NULL, bind_shell);
+	wl_global_create(server->display, &platinum_shell_v1_interface, 12, NULL, bind_shell);
 }

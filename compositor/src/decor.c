@@ -1,4 +1,5 @@
 #include "decor.h"
+#include "icons.h"
 
 #define C_222 GRAY(0x2)
 #define C_555 GRAY(0x5)
@@ -19,6 +20,11 @@
 #define BOX_STRIPE_GAP 4 /* clear pixels between a box's emboss and stripes */
 #define STRIPE_TEXT_GAP 4 /* clear pixels between stripes and title ink */
 #define TITLE_BASELINE 14
+/* The proxy icon: a small icon, then a gap, then the title; the two
+ * centred together. TODO: measure against a Mac OS 9 Finder window. */
+#define PROXY_SIZE 16
+#define PROXY_GAP 4
+#define PROXY_Y 3
 #define NO_BOX_STRIPE_X 5
 #define TITLE_BAR_LAST_ROW 19
 
@@ -144,7 +150,25 @@ int decor_title_max_width(const struct decor_state *st) {
 	title_span(st, &x0, &x1);
 	int center = (st->width - 1) / 2;
 	int half = center - x0 < x1 - center ? center - x0 : x1 - center;
-	return half > 0 ? 2 * half + 1 : 0;
+	int width = half > 0 ? 2 * half + 1 : 0;
+	if (st->proxy) {
+		width -= PROXY_SIZE + PROXY_GAP;
+	}
+	return width > 0 ? width : 0;
+}
+
+/* Where the title's ink starts, and the proxy icon's left (if any): the
+ * icon and the title are centred as one. */
+static void title_layout(const struct decor_state *st, int ink_w, int *ink_l, int *proxy_x) {
+	const int group = ink_w + (st->proxy ? PROXY_SIZE + PROXY_GAP : 0);
+	const int left = (st->width - 1) / 2 - (group - 1) / 2;
+	*proxy_x = left;
+	*ink_l = st->proxy ? left + PROXY_SIZE + PROXY_GAP : left;
+}
+
+static int title_ink_width(const struct decor_state *st) {
+	const struct plat_text *t = st->title;
+	return t && t->ink_l >= 0 ? t->ink_r - t->ink_l + 1 : 0;
 }
 
 bool decor_title_hit(const struct decor_state *st, int x, int y) {
@@ -152,9 +176,20 @@ bool decor_title_hit(const struct decor_state *st, int x, int y) {
 	if (!t || t->ink_l < 0 || y < 0 || y >= DECOR_TOP - 2) {
 		return false;
 	}
-	const int ink_w = t->ink_r - t->ink_l + 1;
-	const int ink_l = (st->width - 1) / 2 - (ink_w - 1) / 2;
+	const int ink_w = title_ink_width(st);
+	int ink_l, proxy_x;
+	title_layout(st, ink_w, &ink_l, &proxy_x);
 	return x >= ink_l - STRIPE_TEXT_GAP && x <= ink_l + ink_w - 1 + STRIPE_TEXT_GAP;
+}
+
+bool decor_proxy_hit(const struct decor_state *st, int x, int y) {
+	if (!st->proxy || st->style != DECOR_STYLE_DOCUMENT) {
+		return false;
+	}
+	int ink_l, proxy_x;
+	title_layout(st, title_ink_width(st), &ink_l, &proxy_x);
+	return x >= proxy_x - 1 && x <= proxy_x + PROXY_SIZE && y >= PROXY_Y - 1 &&
+		y <= PROXY_Y + PROXY_SIZE;
 }
 
 static void paint_title(struct pl_canvas *c, const struct decor_state *st) {
@@ -162,20 +197,31 @@ static void paint_title(struct pl_canvas *c, const struct decor_state *st) {
 	title_span(st, &x0, &x1);
 
 	const struct plat_text *t = st->title;
-	if (!t || t->ink_l < 0) {
+	if ((!t || t->ink_l < 0) && !st->proxy) {
 		if (st->active) {
 			paint_stripes(c, x0, x1);
 		}
 		return;
 	}
 
-	int ink_w = t->ink_r - t->ink_l + 1;
-	int ink_l = (st->width - 1) / 2 - (ink_w - 1) / 2;
+	const int ink_w = title_ink_width(st);
+	int ink_l, proxy_x;
+	title_layout(st, ink_w, &ink_l, &proxy_x);
 	int ink_r = ink_l + ink_w - 1;
-	pl_text(c, t, ink_l, TITLE_BASELINE, st->active ? C_BLACK : C_666);
+	if (ink_w > 0) {
+		pl_text(c, t, ink_l, TITLE_BASELINE, st->active ? C_BLACK : C_666);
+	}
+	int left = ink_l;
+	if (st->proxy) {
+		pl_icon_paint(c, proxy_x, PROXY_Y, (enum pl_icon_kind)(st->proxy - 1), PROXY_SIZE, false);
+		left = proxy_x;
+		if (ink_w == 0) {
+			ink_r = proxy_x + PROXY_SIZE - 1;
+		}
+	}
 
 	if (st->active) {
-		paint_stripes(c, x0, ink_l - STRIPE_TEXT_GAP - 1);
+		paint_stripes(c, x0, left - STRIPE_TEXT_GAP - 1);
 		paint_stripes(c, ink_r + STRIPE_TEXT_GAP + 1, x1);
 	}
 }

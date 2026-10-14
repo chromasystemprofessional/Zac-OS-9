@@ -134,6 +134,7 @@ FolderWindow *FolderWindow::open(const QString &path) {
 		}
 		w->updateStandardSize();
 		platinumOnTitleMenu(w, [w](bool option) { Finder::instance().showPathMenu(w, option); });
+		w->setUpProxyIcon();
 		platinumOnWindowPosition(w, [w](QPoint p) {
 			w->m_state.position = p;
 			w->m_state.hasPosition = true;
@@ -234,6 +235,38 @@ void FolderWindow::setViewMode(ViewMode mode) {
 	relayout();
 	update();
 	Finder::instance().notifyState();
+}
+
+/* The folder's small icon in the title bar (Mac OS 9's proxy icon).
+ * Dragging it moves or copies the folder, as dragging its icon does; so
+ * only an ordinary folder can be dragged, not Home, a disk, the Trash or
+ * the Macintosh view's own folders, which keep just the icon. */
+void FolderWindow::setUpProxyIcon() {
+	const QString key = m_path;
+	const bool trash = QDir(key) == QDir(trashFilesPath());
+	const bool virtualFolder = vfsIsVirtual(key);
+	const bool mountRoot = !virtualFolder && QStorageInfo(key).rootPath() == QDir(key).absolutePath();
+	const bool home = !virtualFolder && QDir(key) == QDir::home();
+	const pl_icon_kind kind = trash ? PL_ICON_TRASH_FULL : mountRoot ? PL_ICON_DISK : PL_ICON_FOLDER;
+	std::function<void()> dragged;
+	if (!trash && !virtualFolder && !mountRoot && !home) {
+		dragged = [this] {
+			auto item = makeItem(QFileInfo(m_path));
+			if (!item) {
+				return;
+			}
+			/* The icon is above the window, in its title bar. */
+			const QPoint origin(width() / 2 - PL_ICON_LARGE / 2, -PL_ICON_LARGE);
+			startItemDrag(this, { item.get() }, { origin }, origin + QPoint(16, 24));
+			Finder::instance().dragEnded();
+			/* Moved away (into another folder, or the Trash): its window
+			 * goes, as for any folder that disappears from under it. */
+			if (!QFileInfo::exists(m_path)) {
+				close();
+			}
+		};
+	}
+	platinumSetProxyIcon(this, kind, dragged);
 }
 
 void FolderWindow::setViewOptions(const ViewOptions &options) {

@@ -30,6 +30,11 @@ void platinumOnTitleMenu(QWidget *window, std::function<void(bool option)> callb
  * callback for when it changes. */
 uint32_t platinumActiveClient();
 void platinumOnActiveClient(QObject *owner, std::function<void()> changed);
+/* Mac OS 9's proxy icon: the small icon (a pl_icon_kind) before the
+ * window's title. Dragging it calls `dragged`, the button still down, to
+ * start a drag of what the window shows; null: it can't be dragged. Call
+ * once the window is shown. */
+void platinumSetProxyIcon(QWidget *window, int iconKind, std::function<void()> dragged);
 /* Ask for the window to appear at `frameTopLeft` (layout coordinates);
  * call right after show(), before the window first draws. */
 void platinumSetWindowPosition(QWidget *window, QPoint frameTopLeft);

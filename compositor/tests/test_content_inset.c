@@ -24,6 +24,10 @@ static bool has_parent(struct plat_view *view) {
 	return false;
 }
 
+int platinum_shell_proxy_for(struct wlr_surface *surface) {
+	(void)surface;
+	return 0;
+}
 int platinum_shell_style_for(struct wlr_surface *surface) {
 	return style;
 }

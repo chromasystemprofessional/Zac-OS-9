@@ -35,6 +35,7 @@ enum plat_cursor_mode {
 	PLAT_CURSOR_MOVE,      /* dragging a window outline */
 	PLAT_CURSOR_RESIZE,    /* dragging a resize outline */
 	PLAT_CURSOR_TRACK_BOX, /* holding a title-bar box down */
+	PLAT_CURSOR_PROXY,     /* pressed on a proxy icon: a click, or a drag to hand on */
 };
 
 struct plat_server {
@@ -135,6 +136,15 @@ struct plat_server {
 
 	/* Interactive grab state. */
 	enum plat_cursor_mode cursor_mode;
+	/* A proxy icon's drag being handed to its program: the pointer stays
+	 * with this surface until the drag starts or the button comes up. */
+	struct wlr_surface *proxy_surface;
+	int proxy_cx, proxy_cy; /* its content's place on screen */
+	struct wl_listener proxy_surface_destroy;
+	/* A drag resting on a collapsed window's title bar springs it open;
+	 * it collapses again when the drag ends. */
+	struct plat_view *spring_view, *sprung_view;
+	struct wl_event_source *spring_timer;
 	struct plat_view *grabbed_view;
 	double grab_x, grab_y;       /* cursor position at grab start */
 	struct wlr_box grab_box;     /* frame box at grab start */
@@ -450,6 +460,10 @@ void platinum_shell_focus_changed(struct plat_server *server);
 void platinum_shell_switch_app(struct plat_server *server, int step);
 /* The keyboard layouts or the one in use changed: tell the menu bar. */
 void platinum_shell_layouts_changed(struct plat_server *server);
+/* The window's proxy icon (pl_icon_kind + 1, 0 for none), and telling its
+ * program it is being dragged (false if it can't be). */
+int platinum_shell_proxy_for(struct wlr_surface *surface);
+bool platinum_shell_proxy_drag(struct plat_view *view);
 void platinum_shell_launch_ready(struct plat_view *view);
 /* The process behind a window (X11: its _NET_WM_PID), or 0. */
 uint32_t view_pid(struct plat_view *view);
