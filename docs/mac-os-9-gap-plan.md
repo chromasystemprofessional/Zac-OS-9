@@ -255,7 +255,7 @@ Section 3 lists every feature; section 5 is the plan.
 | Ribbed handle to show/hide the app name in the menu bar | ✗ | P3 S |
 | **⌘-Tab / ⇧⌘-Tab** cycles programs | ✅ | By name, the Sniffer among them; hidden programs come back (0.1.54). |
 | **Option-click the desktop / Option-choose an app** hides the one you leave | ◐ | Desktop ✅ (0.1.54); Option-choosing from the Application menu still to do. P3 S |
-| **Pack palette** (tear off the Application menu; vertical/horizontal, small/large icons, names on/off; drop documents on tiles to open them) | ✗ | P2 M. A layer-shell palette from the menu bar. |
+| **Pack palette** (tear off the Application menu; vertical/horizontal, small/large icons, names on/off; drop documents on tiles to open them) | ✅ | `zacos9-pack`, a layer-shell palette above the windows; zoom box (names), Option-zoom (large), Shift-Option-zoom (across), collapse and close boxes; reopens at login. Not done: dragging its edge to set the width. |
 | **F-keys launch** programs/documents/folders (Keyboard panel ▸ Function Keys); pressing again brings it forward | ✅ | `compositor/src/fkeys.c`; only assigned keys are taken; "Use F1 through F12 as function keys" makes it ⌘-F-key. |
 | ⌘-period cancels a launch | — | |
 | Option-double-click an app closes its window | ✗ | P3 S |
@@ -484,7 +484,7 @@ updates `PROJECT_STATUS.md` and the relevant `docs/` page.
 
 | # | Work package | Components | Effort |
 |---|---|---|---|
-| 2.1 | **Pack palette** (tear-off from the Application menu; layouts; drop documents on tiles) | new layer-shell surface in the menu bar | M |
+| 2.1 ✅ | **Pack palette** (tear-off from the Application menu; layouts; drop documents on tiles) | new layer-shell surface in the menu bar | M |
 | 2.2 ✅ | **F-key launching** (Keyboard ▸ Function Keys; pressing again brings it forward) | Keyboard panel, compositor hotkeys | M |
 | 2.3 | **Pop-up windows** (View ▸ as Pop-up Window; tabs at the screen bottom; spring open during drags) | Sniffer + layer-shell tabs | L |
 | 2.4 ✅ | **Proxy icon** in Sniffer title bars (drag to move/copy; drop onto it when collapsed) | compositor frame + `platinum-shell-v1` + Sniffer drag source | M |
