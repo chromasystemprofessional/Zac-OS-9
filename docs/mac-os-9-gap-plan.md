@@ -187,7 +187,7 @@ Section 3 lists every feature; section 5 is the plan.
 | Paste a picture over the icon in Get Info for a custom icon | p. 32 | ✗ | Write `metadata::custom-icon` (gio) or a `.directory`. P3 M |
 | Labels: seven, applied from File ▸ Label; names and colours editable in Preferences | p. 40 | ✅ | Colours from the 16-colour system palette rather than a full colour picker. |
 | Spring-loaded folders; delay slider; Space opens at once | p. 35 | ◐ | On/off and delay in Preferences ✅; Space-to-open still to do. P3 S |
-| **Toy Box** (buttons in categories, pages; Option-drag between pages) | p. 43 | ✗ | A Sniffer window on `Toy Box Items` in button view gets most of the way. P2 M |
+| **Toy Box** (buttons in categories, pages; Option-drag between pages) | p. 43 | ✅ | Control Panels ▸ Toy Box; System Folder ▸ Toy Box Items; bulleted folders are pages. |
 | Trash: Empty Trash…, warn-before-emptying option (the ellipsis disappears), locked items need Option | p. 46 | ◐ | Empty with warning ✅; option to turn the warning off, locked items to verify. P3 S |
 | Put Away takes items out of the Trash back to where they were | p. 412 | ✅? | Verify for files from the Trash. |
 | **Encrypt** a file (password, optional Keychain) | p. 49, 412 | ✗ | `age`/gpg with the password kept in Secret Service; double-click asks. P3 M |
@@ -306,13 +306,13 @@ A zram/swap switch in a Memory panel is a possible P3.
 | File Translator | ✅ | |
 | File Sharing | ✅ | |
 | **Retriever** (folder pairs) | ✗ | rsync two-way with newest-wins and a warning. P3 M |
-| **General Controls**: show desktop in background, Toy Box at startup, shut-down warning, insertion-point and menu blinking, Documents folder for Open/Save | ◐ | `zacos9-controlpanel general`. Show Desktop, Menu Blinking, Insertion Point Blinking and Documents done. Launcher at startup waits for the Toy Box (2.6); Shut Down Warning (fsck covers it) and Folder Protection (already dead in Mac OS 9) left out. |
+| **General Controls**: show desktop in background, Toy Box at startup, shut-down warning, insertion-point and menu blinking, Documents folder for Open/Save | ✅ | `zacos9-controlpanel general`. Show Desktop, Menu Blinking, Insertion Point Blinking and Documents done. Show Toy Box at system startup ✅; Shut Down Warning (fsck covers it) and Folder Protection (already dead in Mac OS 9) left out. |
 | **Internet** (email, web, default apps, downloads folder) | ✗ | Map to `xdg-mime`/`mimeapps.list`: default browser and mail, Downloads folder. P2 S |
 | **Keyboard**: repeat rate/delay | ✅ | |
 | Keyboard ▸ **layouts** and the keyboard menu (flag at the right of the menu bar, ⌘-Space to switch) | ✅ | Up to four ticked in the Keyboard panel (xkb's group limit), else Debian's `/etc/default/keyboard`; an abbreviation (US, US-DV) instead of a flag; ⌘-Option-Space option. `compositor/src/kblayout.c`, `shell/menubar/kbmenu.c`. |
 | Keyboard ▸ **Function Keys** | ✗ | See 3.6. |
 | **Keychain Access** | ◐ | The Collar's Keychain module ✅; a control panel listing items, Lock/Unlock — use Seahorse or build one. P3 M |
-| **Toy Box** | ✗ | See 3.2. |
+| **Toy Box** | ✅ | See 3.2. |
 | **Walkies** (snapshots of network, sound, time zone, printer, startup items) | ✗ | P3 L |
 | Memory | — | |
 | **Monitors**: resolution, pixel size | ✅ | Several screens and arrangement still on the roadmap; colour depth — . |
@@ -489,7 +489,7 @@ updates `PROJECT_STATUS.md` and the relevant `docs/` page.
 | 2.3 | **Pop-up windows** (View ▸ as Pop-up Window; tabs at the screen bottom; spring open during drags) | Sniffer + layer-shell tabs | L |
 | 2.4 | **Proxy icon** in Sniffer title bars (drag to move/copy; drop onto it when collapsed) | compositor frame + `platinum-shell-v1` + Sniffer drag source | M |
 | 2.5 | **Clippings** and **Show Clipboard** | Sniffer drop handling, clipping viewer | M |
-| 2.6 | **Toy Box** (button view of `Toy Box Items`, categories as pages) | Sniffer | M |
+| 2.6 ✅ | **Toy Box** (button view of `Toy Box Items`, categories as pages) | Sniffer | M |
 | 2.7 | **Search**: more Find criteria now; then content search with an index (localsearch or recoll), Index Selection, Find Similar | `shell/finder/findwindow.cpp`, a search backend wrapper; packaging dependency | M + L |
 | 2.8 | **Printing**: Printer Picker, desktop printers with queue windows, File ▸ Print for documents, default printer in The Collar | new `shell/print/` over CUPS; Sniffer | L |
 | 2.9 | **Startup Disk** panel (GRUB entries, other OSes, Classic) | `shell/panels/`, polkit helper | M |
