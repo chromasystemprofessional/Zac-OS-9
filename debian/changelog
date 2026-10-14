@@ -1,3 +1,15 @@
+zacos9 (0.1.55) trixie; urgency=medium
+
+  * Finder list columns you can move, resize and reverse; View Options. The
+    Toy Box (Launcher). Internet control panel. Calculator, Dog Ears
+    (Stickies) and Scribble (SimpleText). Proxy icons in Finder title bars,
+    and collapsed windows spring open under a drag. Function keys that open
+    applications, documents and folders. The Pack: tear the Application
+    menu off into a palette. Trackpad and Accessibility panels: tap to
+    click, Sticky Keys, Slow Keys, Mouse Keys and Zoom.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Wed, 14 Oct 2026 19:14:18 -0400
+
 zacos9 (0.1.54) trixie; urgency=medium
 
   * A Platinum login window replaces the text login. The Zac menu gains
