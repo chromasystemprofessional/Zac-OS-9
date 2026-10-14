@@ -168,14 +168,14 @@ Section 3 lists every feature; section 5 is the plan.
 |---|---|---|---|
 | Icon, list, button views per window, remembered | p. 17 | ✅ | |
 | **Small-icon view** (names beside icons) | p. 18 | ✅ | View Options ▸ Icon Size; buttons too. |
-| Clean Up; ⌘-drag snaps one icon to the grid | p. 18 | ◐ | Clean Up ✅; ⌘-drag snap missing. P3 S |
+| Clean Up; ⌘-drag snaps one icon to the grid | p. 18 | ✅ | Windows and the desktop. |
 | Arrange by name/date/size/kind/label | p. 19 | ✅ | |
 | **Always snap to grid**, **Keep Arranged** (view options) | p. 18–20 | ✅ | Windows and the desktop; Arrange changes the order kept. |
 | Grid spacing Tight / Wide (Preferences) | p. 18 | ✅ | Windows, buttons and the desktop. |
-| List view: column headings sort; reverse-sort pyramid | p. 16, 23 | ✅? | Verify the pyramid button. |
+| List view: column headings sort; reverse-sort pyramid | p. 16, 23 | ✅ | The pyramid sits above the vertical scroll bar; the direction is kept per folder. |
 | Columns: Date Modified, Date Created, Size, Kind, Label, Comments, Version — chosen per window | p. 20–22 | ✅ | Comments are Get Info's (`user.xdg.comment`); Version is an application's package version, "n/a" otherwise. List icons standard, small or tiny (12 px generic shapes). |
-| Drag column headers to reorder; drag dividers to resize; dates/sizes shorten as the column narrows | p. 22 | ✗? | Verify. P2 M |
-| Reset Column Positions | p. 415 | ✗ | P3 S |
+| Drag column headers to reorder; drag dividers to resize; dates/sizes shorten as the column narrows | p. 22 | ✅ | Name stays first. Dates: long, medium, "10/1/26, 3:42 PM", "10/1/26". |
+| Reset Column Positions | p. 415 | ✅ | View menu, list view. |
 | Use relative dates ("Today", "Yesterday"); Calculate folder sizes | p. 24 | ✅ | Folder sizes are added up on another thread and filled in as they finish. |
 | Disclosure triangles; ⌘-→/⌘-← open/close them | p. 23 | ◐ | Triangles ✅; keys to verify. |
 | Button view; drag a button by its name | p. 23 | ✅ | |
@@ -209,7 +209,7 @@ Section 3 lists every feature; section 5 is the plan.
 | Edit ▸ **Preferences…** (General: Puppy Mode, spring-loaded, grid; Views: standard views; Labels) | ◐ | All but Puppy Mode (Simple Finder), which waits for account kinds (P3). |
 | View ▸ as Icons/Buttons/List, Clean Up, Arrange | ✅ | |
 | View ▸ **as Window / as Pop-up Window** | ✗ | See 3.2. P2 L |
-| View ▸ **Sort List** (in list view), **Reset Column Positions**, **View Options…** | ◐ | Sort List and View Options… ✅; Reset Column Positions waits for movable columns. |
+| View ▸ **Sort List** (in list view), **Reset Column Positions**, **View Options…** | ◐ | Sort List, Reset Column Positions and View Options… ✅. |
 | Special ▸ Empty Trash…, Erase Disk…, Sleep, Restart, Shut Down | ✅ | Erase Disk: format choices (Mac OS Extended, DOS/FAT, exFAT) to verify. |
 | Special ▸ **Eject** (⌘E) | ✅ | Every selected disk, local or network; replaces Disconnect Network Drive and Unmount Disk (0.1.54). |
 | Special ▸ **Log Out** (⇧⌘Q) | ✅ | Asks, quits the programs (each may offer to save), then ends the session; a program still open after 30 s cancels it (0.1.54). The menu doesn't show ⇧⌘Q yet (the painter has no ⇧ glyph). |
@@ -500,7 +500,7 @@ updates `PROJECT_STATUS.md` and the relevant `docs/` page.
 | 2.14 | **Users** panel (accounts, pictures, passwords, administrators) | panel over accountsservice + polkit | L |
 | 2.15 | **Help Center** with ZacOS help pages | `shell/help/`, `share/zacos9/help/` | L |
 | 2.16 | **Collar modules**: media playback (MPRIS), File Sharing on/off and visitors | `shell/collar/` | S each |
-| 2.17 | Sniffer list-view columns: choose, reorder, resize, shortening dates/sizes, Reset Column Positions | `shell/finder/folderwindow.cpp` | M |
+| 2.17 ✅ | Sniffer list-view columns: choose, reorder, resize, shortening dates/sizes, Reset Column Positions | `shell/finder/folderwindow.cpp` | M |
 
 ### Milestone 3 — Long tail (P3)
 
