@@ -83,6 +83,37 @@ bool setDefaultApp(AppRole role, const QString &id) {
 	return ok;
 }
 
+QList<InstalledApp> installedApps() {
+	QList<InstalledApp> apps;
+	GList *all = g_app_info_get_all();
+	for (GList *l = all; l; l = l->next) {
+		GAppInfo *info = G_APP_INFO(l->data);
+		const char *file = G_IS_DESKTOP_APP_INFO(info) ?
+			g_desktop_app_info_get_filename(G_DESKTOP_APP_INFO(info)) : nullptr;
+		if (file && g_app_info_should_show(info)) {
+			apps.append({ QString::fromUtf8(g_app_info_get_id(info)),
+				QString::fromUtf8(g_app_info_get_name(info)), QString::fromUtf8(file) });
+		}
+	}
+	g_list_free_full(all, g_object_unref);
+	std::sort(apps.begin(), apps.end(), [](const InstalledApp &a, const InstalledApp &b) {
+		return a.name.compare(b.name, Qt::CaseInsensitive) < 0;
+	});
+	return apps;
+}
+
+QString itemDisplayName(const QString &path) {
+	if (path.endsWith(".desktop")) {
+		GDesktopAppInfo *info = g_desktop_app_info_new_from_filename(path.toUtf8().constData());
+		if (info) {
+			const QString name = QString::fromUtf8(g_app_info_get_name(G_APP_INFO(info)));
+			g_object_unref(info);
+			return name;
+		}
+	}
+	return QFileInfo(path).fileName();
+}
+
 static QString userDirsFile() {
 	return QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + "/user-dirs.dirs";
 }

@@ -833,7 +833,7 @@ test('store-client',
 # The Keyboard panel's layouts, read as zacos9-wm reads them.
 xkb_layouts_sources = ['panels/xkblayouts.cpp', '../compositor/src/kblayout.c']
 # The Internet panel's defaults, through GIO.
-default_apps_sources = ['panels/defaultapps.cpp']
+default_apps_sources = ['panels/defaultapps.cpp', 'panels/functionkeys.cpp']
 xkb_layouts_include = include_directories('../compositor/src')
 
 executable('zacos9-controlpanel',
@@ -1050,6 +1050,11 @@ test('session-ui', find_program('dbus-run-session'),
   args: ['--', find_program('python3').full_path(), files('../compositor/tests/test_session_ui.py'),
     compositor_exe, menubar_exe, finder_exe, idle_client, vptr_exe],
   timeout: 90,
+)
+# Function keys that open things (fkeys.c, input.c).
+test('function-keys-session', find_program('python3'),
+  args: [files('../compositor/tests/test_function_keys.py'), compositor_exe, idle_client, vptr_exe],
+  timeout: 60,
 )
 # Proxy icons and spring-open collapsed windows (decor.c, input.c, folderwindow.cpp).
 test('proxy-icon', find_program('python3'),

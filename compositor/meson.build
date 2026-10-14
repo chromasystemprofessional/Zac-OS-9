@@ -85,6 +85,7 @@ compositor_exe = executable('zacos9-wm',
   'src/snapshot.c',
   'src/input.c',
   'src/kblayout.c',
+  'src/fkeys.c',
   'src/window_sounds.c',
   'src/launch.c',
   'src/startup.c',
@@ -115,6 +116,14 @@ test('decor',
     dependencies: [decor_dep],
   ),
   args: [meson.project_source_root() / 'tools/measure/figs'],
+)
+
+test('function-keys',
+  executable('test-fkeys',
+    'tests/test_fkeys.c', 'src/fkeys.c',
+    include_directories: include_directories('src'),
+    dependencies: [platinum_dep, xkbcommon],
+  ),
 )
 
 test('keyboard-layouts',

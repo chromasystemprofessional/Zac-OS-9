@@ -3,7 +3,10 @@
 #include <stdlib.h>
 #include <linux/input-event-codes.h>
 #include <math.h>
+#include <strings.h>
 #include <time.h>
+
+#include "fkeys.h"
 #include <string.h>
 #include <unistd.h>
 #include <wlr/interfaces/wlr_keyboard.h>
@@ -151,6 +154,24 @@ static bool handle_layout_switch(struct plat_server *server, uint32_t mods, xkb_
 	return true;
 }
 
+/* An F-key's item: a running application comes forward, as from the
+ * Application menu; anything else is opened. */
+static void fkey_open(struct plat_server *server, const char *target) {
+	char app_id[256];
+	if (fkey_app_id(target, app_id, sizeof(app_id))) {
+		struct plat_view *view;
+		wl_list_for_each(view, &server->views, link) {
+			if (view->mapped && view->app_id && strcasecmp(view->app_id, app_id) == 0) {
+				view_activate_app(server, view->app_id);
+				return;
+			}
+		}
+	}
+	char command[2304];
+	fkey_command(target, command, sizeof(command));
+	spawn(command);
+}
+
 /* Ctrl+Alt+F1..F12 on a real screen: switch to another console. */
 static bool handle_vt_switch(struct plat_server *server, xkb_keysym_t sym) {
 	if (sym < XKB_KEY_XF86Switch_VT_1 || sym > XKB_KEY_XF86Switch_VT_12) {
@@ -187,6 +208,13 @@ static bool handle_keybinding(struct plat_server *server, uint32_t mods,
 		}
 	}
 	if (handle_layout_switch(server, mods, sym)) {
+		return true;
+	}
+	/* Function keys that open things (the Keyboard panel's). */
+	char target[1024];
+	if (fkey_target(mods & ~(uint32_t)(WLR_MODIFIER_CAPS | WLR_MODIFIER_MOD2), /* Num Lock */
+			WLR_MODIFIER_LOGO, sym, target, sizeof(target))) {
+		fkey_open(server, target);
 		return true;
 	}
 	/* The Collar panel's hot key shows or hides the Collar (if one runs:

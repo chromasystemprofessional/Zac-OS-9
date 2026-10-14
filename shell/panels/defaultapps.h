@@ -23,6 +23,16 @@ QString defaultApp(AppRole role);
  * https and HTML; mail: mailto). False if it couldn't. */
 bool setDefaultApp(AppRole role, const QString &id);
 
+/* Every application to show, by name: id, name and desktop file's path
+ * (in `id`, `name`, `path`). */
+struct InstalledApp {
+	QString id, name, path;
+};
+QList<InstalledApp> installedApps();
+/* What a Function Keys item is called: an application's name from its
+ * desktop file, else the file or folder's own name. */
+QString itemDisplayName(const QString &path);
+
 /* The downloads folder: XDG_DOWNLOAD_DIR from user-dirs.dirs, else
  * ~/Downloads. Setting it writes the file (keeping its other lines). */
 QString downloadFolder();

@@ -30,6 +30,7 @@
 #include "settings.h"
 #include "soundclient.h"
 #include "defaultapps.h"
+#include "functionkeys.h"
 #include "xkblayouts.h"
 
 static constexpr uint32_t FACE = GRAY(0xD);
@@ -309,6 +310,8 @@ public:
 		m_field = QRect(M + 2, G3 - 6, W - 2 * M - 4, PL_EDIT_H);
 		m_caret.callOnTimeout([this] { m_caretOn = !m_caretOn; update(); });
 		m_caret.start(pl_caret_blink_ms() / 2);
+		m_fkeys = PanelButton("Function Keys…", QRect(W - M - 2 - 120, G3 - 6 + PL_EDIT_H + 12, 120, PL_BUTTON_H));
+		m_fkeys.clicked = [this] { showFunctionKeys(this); };
 	}
 
 protected:
@@ -337,10 +340,14 @@ protected:
 		if (m_caretOn && !m_listFocus) {
 			pl_vline(c, caret, r.top() + 4, r.bottom() - 4, C_BLACK);
 		}
+		m_fkeys.paint(c);
 	}
 
 	bool pressExtra(QPoint pos, bool) override {
 		m_focus = nullptr;
+		if (m_fkeys.press(pos)) {
+			return true;
+		}
 		m_listFocus = m_list.frame.contains(pos);
 		if (!m_listFocus) {
 			return m_field.contains(pos);
@@ -358,13 +365,14 @@ protected:
 	}
 
 	void moveExtra(QPoint pos) override {
-		if (m_list.move(pos)) {
+		if (m_list.move(pos) || m_fkeys.move(pos)) {
 			update();
 		}
 	}
 
-	void releaseExtra(QPoint) override {
+	void releaseExtra(QPoint pos) override {
 		m_list.release();
+		m_fkeys.release(pos);
 	}
 
 	void wheelEvent(QWheelEvent *e) override {
@@ -414,7 +422,8 @@ private:
 		PL_CHECKBOX_SIZE + PL_GROUP_MARGIN;
 	static constexpr int G1 = G0 + LAYOUTS_H + 12 + 16, G2 = G1 + SLIDER_GROUP_H + 12 + 16;
 	static constexpr int G3 = G2 + SLIDER_GROUP_H + 12 + 16;
-	static constexpr int PANEL_H = G3 - 6 + PL_EDIT_H + 14;
+	static constexpr int PANEL_H = G3 - 6 + PL_EDIT_H + 12 + PL_BUTTON_H + 12;
+	PanelButton m_fkeys;
 	QList<XkbLayout> m_layouts;
 	QStringList m_inUse;
 	PanelList m_list;
