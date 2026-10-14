@@ -1,3 +1,28 @@
+zacos9 (0.1.54) trixie; urgency=medium
+
+  * A Platinum login window replaces the text login. The Zac menu gains
+    Force Quit, Favorites, Recent Applications, Recent Documents and Recent
+    Servers, and Special gains Eject (⌘E) and Log Out (⇧⌘Q). ⌘-Tab
+    switches programs; Option-click on the desktop hides the one you leave.
+    Control-click or right-click on icons, windows, disks, the Trash and
+    the desktop for contextual menus. Option-click a close or collapse box
+    to act on all of a program's windows, ⌘-drag a window without
+    bringing it forward, and ⌘-click a Sniffer window's title for its
+    folder path (⌘-↑ opens the enclosing folder). Drag a network disk
+    to the Trash to eject it. New control panels: General Controls (hide
+    the desktop behind other programs, menu and cursor blinking, where Open
+    and Save start) and Zac Menu Options. The Keyboard panel now lists
+    every keyboard layout; tick up to four, switch with ⌘-Space or the
+    new keyboard menu, and ZacOS now follows the keyboard chosen at
+    install. In the Sniffer, View Options sets icon sizes, snap to grid,
+    Keep Arranged and list columns (Date Created, Label, Comments, Version,
+    folder sizes, relative dates), and Edit > Preferences sets
+    spring-loaded folders, grid spacing, standard views and your own label
+    names and colours. Some features now carry ZacOS names in place of
+    Apple's.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Tue, 13 Oct 2026 22:17:29 -0400
+
 zacos9 (0.1.53) trixie; urgency=medium
 
   * Update project status and assets
