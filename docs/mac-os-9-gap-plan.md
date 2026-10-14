@@ -325,9 +325,9 @@ A zram/swap switch in a Memory panel is a possible P3.
 | **Speech** (voice, talking alerts) | ✗ | See 3.16. |
 | **Startup Disk** | ✗ | GRUB default entry (`grub-reboot`/`grub-set-default`) through a polkit helper, listing other systems found by os-prober and Classic disks. P2 M |
 | **TCP/IP** | ✅ | |
-| **Trackpad** (tap to click, drag, drag lock) | ✗ | libinput options in prefs.c. P2 S |
+| **Trackpad** (tap to click, drag, drag lock) | ✅ | `zacos9-controlpanel trackpad`: tracking and double-click speed (shared with Mouse), Use Trackpad for Clicking / Dragging / Drag Lock, set on libinput touchpads by zacos9-wm (`input.c`). |
 | **Web Sharing** (personal web page, on/off) | ✗ | A small static server for `~/Web Pages` behind a switch. P3 S |
-| **Accessibility** (Sticky Keys, Slow Keys, Mouse Keys) and **Zoom** (zoom) | ✗ | P2 M. Accessibility is important even though Mac OS 9's own was minimal. |
+| **Accessibility** (Sticky Keys, Slow Keys, Mouse Keys) and **Zoom** (zoom) | ✅ | `zacos9-controlpanel accessibility`, done in zacos9-wm (`compositor/src/access.c`). Sticky Keys: latch, lock (twice), Shift ×5 toggles, menu bar shows held keys (platinum-shell-v1 v13 `sticky_keys`). Slow Keys: acceptance delay (physical keyboards only). Mouse Keys: keypad moves/clicks, 0 holds, . lets go, ⌘-Shift-Clear on. Zoom: CloseView-style, 2–16× about the pointer, ⌘-Option-K, ⌘-Option-↑/↓. No colour inversion (wlroots' render pass can't invert). |
 
 ### 3.11 The Collar (The Collar, ch. 4 p. 68)
 
@@ -494,7 +494,7 @@ updates `PROJECT_STATUS.md` and the relevant `docs/` page.
 | 2.8 | **Printing**: Printer Picker, desktop printers with queue windows, File ▸ Print for documents, default printer in The Collar | new `shell/print/` over CUPS; Sniffer | L |
 | 2.9 | **Startup Disk** panel (GRUB entries, other OSes, Classic) | `shell/panels/`, polkit helper | M |
 | 2.10 ✅ | **Internet** panel (default browser, mail app, downloads folder) | `shell/panels/`, `mimeapps.list`, xdg-user-dirs | S |
-| 2.11 | **Trackpad** and **Accessibility** (Sticky/Slow/Mouse Keys, zoom) | prefs.c (libinput, xkb a11y), panels | M |
+| 2.11 ✅ | **Trackpad** and **Accessibility** (Sticky/Slow/Mouse Keys, zoom) | prefs.c (libinput, xkb a11y), panels | M |
 | 2.12 ✅ | **Desk accessories I**: Calculator, Dog Ears, Scribble | new small Qt apps on panelkit | S + M + M |
 | 2.13 | **System Information** (Pedigree) | Qt app + read-only helper | M |
 | 2.14 | **Users** panel (accounts, pictures, passwords, administrators) | panel over accountsservice + polkit | L |
