@@ -307,7 +307,7 @@ A zram/swap switch in a Memory panel is a possible P3.
 | File Sharing | ✅ | |
 | **Retriever** (folder pairs) | ✗ | rsync two-way with newest-wins and a warning. P3 M |
 | **General Controls**: show desktop in background, Toy Box at startup, shut-down warning, insertion-point and menu blinking, Documents folder for Open/Save | ✅ | `zacos9-controlpanel general`. Show Desktop, Menu Blinking, Insertion Point Blinking and Documents done. Show Toy Box at system startup ✅; Shut Down Warning (fsck covers it) and Folder Protection (already dead in Mac OS 9) left out. |
-| **Internet** (email, web, default apps, downloads folder) | ✗ | Map to `xdg-mime`/`mimeapps.list`: default browser and mail, Downloads folder. P2 S |
+| **Internet** (email, web, default apps, downloads folder) | ✅ | `zacos9-controlpanel internet`: default browser and mail program (GIO, `mimeapps.list`), downloads folder (`user-dirs.dirs`). The Mac's personal details, news and home-page settings have no system-wide place on Linux. |
 | **Keyboard**: repeat rate/delay | ✅ | |
 | Keyboard ▸ **layouts** and the keyboard menu (flag at the right of the menu bar, ⌘-Space to switch) | ✅ | Up to four ticked in the Keyboard panel (xkb's group limit), else Debian's `/etc/default/keyboard`; an abbreviation (US, US-DV) instead of a flag; ⌘-Option-Space option. `compositor/src/kblayout.c`, `shell/menubar/kbmenu.c`. |
 | Keyboard ▸ **Function Keys** | ✗ | See 3.6. |
@@ -421,7 +421,7 @@ A zram/swap switch in a Memory panel is a possible P3.
 | **Dog Ears** | ✗ | P2 M. Platinum note windows (colours, collapse), saved in one file. |
 | **Notepad** | ✗ | P3 S. Paged notes in one window. |
 | **Stash** | ✗ | P3 M. Pages of pictures/text; drag in and out. |
-| **Calculator** | ✗ | P2 S. Small Platinum calculator; paste a number into it. |
+| **Calculator** | ✅ | `zacos9-calculator`, in the Zac menu; typed or clicked; ⌘C/⌘V. |
 | **Key Tags** | ✗ | P3 S. Shows the current xkb layout, Option/Shift states. |
 | **Scribble** | ✗ | P2 M. Plain/styled text editor with the Platinum look (Qt style already), opens Read Me files. |
 | **Pedigree** | ✗ | P2 M. "System Information": hardware, devices, network, software (lshw/udev/dmidecode via a helper). |
@@ -493,9 +493,9 @@ updates `PROJECT_STATUS.md` and the relevant `docs/` page.
 | 2.7 | **Search**: more Find criteria now; then content search with an index (localsearch or recoll), Index Selection, Find Similar | `shell/finder/findwindow.cpp`, a search backend wrapper; packaging dependency | M + L |
 | 2.8 | **Printing**: Printer Picker, desktop printers with queue windows, File ▸ Print for documents, default printer in The Collar | new `shell/print/` over CUPS; Sniffer | L |
 | 2.9 | **Startup Disk** panel (GRUB entries, other OSes, Classic) | `shell/panels/`, polkit helper | M |
-| 2.10 | **Internet** panel (default browser, mail app, downloads folder) | `shell/panels/`, `mimeapps.list`, xdg-user-dirs | S |
+| 2.10 ✅ | **Internet** panel (default browser, mail app, downloads folder) | `shell/panels/`, `mimeapps.list`, xdg-user-dirs | S |
 | 2.11 | **Trackpad** and **Accessibility** (Sticky/Slow/Mouse Keys, zoom) | prefs.c (libinput, xkb a11y), panels | M |
-| 2.12 | **Desk accessories I**: Calculator, Dog Ears, Scribble | new small Qt apps on panelkit | S + M + M |
+| 2.12 ◐ | **Desk accessories I**: Calculator ✅, Dog Ears, Scribble | new small Qt apps on panelkit | S + M + M |
 | 2.13 | **System Information** (Pedigree) | Qt app + read-only helper | M |
 | 2.14 | **Users** panel (accounts, pictures, passwords, administrators) | panel over accountsservice + polkit | L |
 | 2.15 | **Help Center** with ZacOS help pages | `shell/help/`, `share/zacos9/help/` | L |
