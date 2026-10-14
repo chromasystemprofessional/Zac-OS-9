@@ -35,7 +35,9 @@ configure_file(input: 'finder/zacos9-expand', output: 'zacos9-expand', copy: tru
 install_data('finder/zacos9-expand', install_dir: get_option('bindir'),
   install_mode: 'rwxr-xr-x')
 test('expand', find_program('python3'),
-  args: [files('../tests/finder/test_expand.py'), files('finder/zacos9-expand')])
+  args: [files('../tests/finder/test_expand.py'), files('finder/zacos9-expand')],
+  # About 9 s on an idle machine; a busy package build needs more.
+  timeout: 120)
 
 configure_file(input: 'finder/zacos9-mac-disks', output: 'zacos9-mac-disks', copy: true)
 install_data('finder/zacos9-mac-disks', install_dir: get_option('bindir'),
