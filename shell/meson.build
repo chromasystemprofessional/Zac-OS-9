@@ -694,6 +694,23 @@ test('greetd-client',
   timeout: 60,
 )
 
+# The Pack: Mac OS 9's Application palette, torn off the Application menu.
+pack_exe = executable('zacos9-pack',
+  'pack/main.cpp', 'pack/packwindow.cpp', 'pack/apps.cpp', 'pack/toplevels.cpp',
+  'finder/platinumshell.cpp', finder_protocol, client_protocol_src,
+  include_directories: include_directories('finder', 'pack'),
+  dependencies: [platinum_dep, qt6, layershellqt, wayland_client, gio, gio_unix],
+  cpp_args: ['-std=c++17'],
+  install: true,
+)
+test('pack-apps',
+  executable('test-pack-apps', 'pack/tests/test_apps.cpp', 'pack/apps.cpp',
+    include_directories: include_directories('pack'),
+    dependencies: [platinum_dep, qt6, gio, gio_unix],
+    cpp_args: ['-std=c++17'],
+  ),
+)
+
 # Scribble (SimpleText) and Dog Ears (Stickies).
 executable('zacos9-scribble',
   'scribble/main.cpp', 'scribble/scribblewindow.cpp', 'scribble/textfile.cpp',
@@ -1050,6 +1067,12 @@ test('session-ui', find_program('dbus-run-session'),
   args: ['--', find_program('python3').full_path(), files('../compositor/tests/test_session_ui.py'),
     compositor_exe, menubar_exe, finder_exe, idle_client, vptr_exe],
   timeout: 90,
+)
+# The Pack: torn off the Application menu (menubar/main.c, pack/).
+test('pack-session', find_program('python3'),
+  args: [files('../compositor/tests/test_pack.py'), compositor_exe, menubar_exe, idle_client, vptr_exe],
+  depends: [pack_exe],
+  timeout: 60,
 )
 # Function keys that open things (fkeys.c, input.c).
 test('function-keys-session', find_program('python3'),

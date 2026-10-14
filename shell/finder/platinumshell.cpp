@@ -221,6 +221,15 @@ void platinumSetProxyIcon(QWidget *window, int iconKind, std::function<void()> d
 	wl_display_flush(display);
 }
 
+void platinumActivateApp(const QString &appId) {
+	platinumShellInit();
+	if (!shell || wl_proxy_get_version(reinterpret_cast<wl_proxy *>(shell)) < 8) {
+		return;
+	}
+	platinum_shell_v1_activate_app(shell, appId.toUtf8().constData());
+	wl_display_flush(display);
+}
+
 void platinumOnTitleMenu(QWidget *window, std::function<void(bool)> callback) {
 	if (!shell || wl_proxy_get_version(reinterpret_cast<wl_proxy *>(shell)) < 10) {
 		return;

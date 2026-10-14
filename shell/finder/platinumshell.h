@@ -43,6 +43,9 @@ void platinumOnWindowPosition(QWidget *window, std::function<void(QPoint)> callb
 uint32_t platinumBeginLaunch(const QString &appId = {});
 void platinumUpdateLaunch(uint32_t cookie, uint32_t pid);
 void platinumCancelLaunch(uint32_t cookie);
+/* Bring a program forward, as the Application menu does (the Sniffer's
+ * id brings the desktop forward when it has no windows). */
+void platinumActivateApp(const QString &appId);
 /* Kill the processes behind an app's windows (the Apple menu's Force
  * Quit); false if the compositor can't. */
 bool platinumForceQuit(const QString &appId);

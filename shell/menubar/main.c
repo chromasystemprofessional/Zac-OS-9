@@ -14,6 +14,7 @@
 #include <errno.h>
 #include <linux/input-event-codes.h>
 #include <poll.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -639,10 +640,31 @@ static void pointer_pressed(void) {
 	}
 }
 
+/* Mac OS 9's tear-off: the Application menu dragged down past its bottom
+ * and let go there becomes the Pack (the Application palette), where the
+ * pointer is. */
+static bool tear_off_pack(void) {
+	if (g.open_side != SIDE_RIGHT || g.open_index != g.model.n_right - 1 ||
+			g.py < g.menu_y + g.menu_h + 8) {
+		return false;
+	}
+	close_menu();
+	char command[PATH_MAX + 96];
+	sibling_program("zacos9-pack", command, sizeof(command));
+	char at[48];
+	snprintf(at, sizeof(at), " --at %d,%d", (int)g.px - 10, (int)g.py - 6);
+	strncat(command, at, sizeof(command) - strlen(command) - 1);
+	launch(command);
+	return true;
+}
+
 static void pointer_released(void) {
 	bool was_down = g.button_down;
 	g.button_down = false;
 	if (g.open_index < 0 || g.blinks_left > 0 || !was_down) {
+		return;
+	}
+	if (tear_off_pack()) {
 		return;
 	}
 	int sub = sub_item_under_pointer();
@@ -1061,6 +1083,13 @@ int main(void) {
 	toplevels_init(g.toplevel_mgr);
 	if (g.platinum_shell) {
 		appmenu_init();
+	}
+	/* The Pack (the Application palette) comes back if it was left open. */
+	char pack_open[16];
+	if (pl_setting("pack-open", pack_open, sizeof(pack_open)) && strcmp(pack_open, "true") == 0) {
+		char command[PATH_MAX + 64];
+		sibling_program("zacos9-pack", command, sizeof(command));
+		launch(command);
 	}
 	/* zacos9-wm sets XCURSOR_THEME/SIZE to its own cursor theme. */
 	const char *cursor_size = getenv("XCURSOR_SIZE");
