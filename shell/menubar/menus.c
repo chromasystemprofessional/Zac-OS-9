@@ -157,6 +157,8 @@ static void add_finder_menus(struct mb_menu *menus, int *n) {
 	add(m, "Clean Up", 0, iconView, ACT_FINDER, "clean-up");
 	add_arrange_submenu(m, iconView);
 	add_sort_submenu(m, win && fs->view == 1, fs);
+	add(m, "Reset Column Positions", 0, win && fs->view == 1 && fs->custom, ACT_FINDER,
+		"reset-columns");
 	sep(m);
 	add(m, "View Options…", 0, up, ACT_FINDER, "view-options");
 	m = new_menu(menus, n, "Special");

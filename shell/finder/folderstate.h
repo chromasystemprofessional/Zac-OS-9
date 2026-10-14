@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QHash>
+#include <QList>
 #include <QPoint>
 #include <QSize>
 #include <QString>
@@ -19,6 +20,12 @@ struct FolderState {
 	QSize size;
 	int viewMode = 0;   /* 0 icons, 1 list, 2 buttons */
 	int sortColumn = 0; /* a ListColumn */
+	bool sortReversed = false; /* the list's sort-direction button */
+	/* List columns as the user arranged them (dragging headers and
+	 * dividers): the optional columns' order, hidden ones too, and any
+	 * widths changed. Empty: the Mac's order and widths. */
+	QList<int> columnOrder;
+	QHash<int, int> columnWidths;
 	/* View Options, for each view. A folder never opened before takes
 	 * those of the folder it is in, if that one was (Mac OS 9's parent-
 	 * window inheritance), else the standard views (Preferences). */

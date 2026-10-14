@@ -106,7 +106,7 @@ int main(void) {
 	/* View > Sort List: the list's columns shown (Name, Date Modified =1,
 	 * Size =2, Label =5), the sorted one checked; Edit > Preferences…. */
 	parse_line("state selection=0 window=1 trash=0 view=1 label=-1 erase=0 network=0 unmount=0 "
-		"sort=5 columns=39");
+		"sort=5 columns=39 custom=1");
 	struct mb_bar views = {0};
 	add_finder_menus(views.left, &views.n_left);
 	const struct mb_item *sortList = NULL, *viewOptions = NULL, *prefs = NULL;
@@ -119,6 +119,8 @@ int main(void) {
 				viewOptions = it;
 			} else if (it->arg && strcmp(it->arg, "preferences") == 0) {
 				prefs = it;
+			} else if (it->arg && strcmp(it->arg, "reset-columns") == 0) {
+				assert(it->enabled && strcmp(it->label, "Reset Column Positions") == 0);
 			}
 		}
 	}

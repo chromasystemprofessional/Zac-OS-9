@@ -63,6 +63,20 @@ FolderState FolderState::load(const QString &path) {
 	s.viewMode = st.value("view", inheritedView).toInt();
 	s.sortColumn = std::clamp(st.value("sort", 0).toInt(), 0, COL_COUNT - 1);
 	s.options = ViewOptions::load(st, inherited);
+	s.sortReversed = st.value("sort-reverse", false).toBool();
+	for (const QString &key : st.value("column-order").toString().split(',', Qt::SkipEmptyParts)) {
+		const int c = columnFromKey(key);
+		if (c > COL_NAME && !s.columnOrder.contains(c)) {
+			s.columnOrder << c;
+		}
+	}
+	for (const QString &pair : st.value("column-widths").toString().split(',', Qt::SkipEmptyParts)) {
+		const int c = columnFromKey(pair.section(':', 0, 0));
+		const int w = pair.section(':', 1).toInt();
+		if (c >= 0 && w > 0) {
+			s.columnWidths.insert(c, w);
+		}
+	}
 	st.beginGroup("icons");
 	for (const QString &key : st.childKeys()) {
 		const QStringList xy = st.value(key).toString().split(',');
@@ -89,6 +103,16 @@ void FolderState::save(const QString &path) const {
 	st.setValue("view", viewMode);
 	st.setValue("sort", sortColumn);
 	options.save(st);
+	st.setValue("sort-reverse", sortReversed);
+	QStringList order, widths;
+	for (int c : columnOrder) {
+		order << columnInfo(c).key;
+	}
+	for (auto it = columnWidths.cbegin(); it != columnWidths.cend(); ++it) {
+		widths << QStringLiteral("%1:%2").arg(columnInfo(it.key()).key).arg(it.value());
+	}
+	st.setValue("column-order", order.join(','));
+	st.setValue("column-widths", widths.join(','));
 	/* Names may hold '/', '=' and the like: store them percent-encoded. */
 	st.remove("icons");
 	st.beginGroup("icons");

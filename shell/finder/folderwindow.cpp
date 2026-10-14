@@ -275,13 +275,96 @@ void FolderWindow::sortBy(int column) {
 }
 
 std::vector<int> FolderWindow::columns() const {
-	std::vector<int> shown;
+	/* Name first, always; the rest as the user put them, any the order
+	 * doesn't mention where the Mac has them. */
+	std::vector<int> order = { COL_NAME };
+	for (int c : m_state.columnOrder) {
+		order.push_back(c);
+	}
 	for (int c : COLUMN_ORDER) {
+		if (std::find(order.begin(), order.end(), c) == order.end()) {
+			order.push_back(c);
+		}
+	}
+	std::vector<int> shown;
+	for (int c : order) {
 		if (c == COL_NAME || (m_state.options.list.columns & columnBit(c))) {
 			shown.push_back(c);
 		}
 	}
 	return shown;
+}
+
+int FolderWindow::columnWidth(int column) const {
+	return m_state.columnWidths.value(column, columnInfo(column).width);
+}
+
+bool FolderWindow::columnsCustomized() const {
+	return !m_state.columnOrder.isEmpty() || !m_state.columnWidths.isEmpty();
+}
+
+void FolderWindow::resetColumns() {
+	if (!columnsCustomized()) {
+		return;
+	}
+	m_state.columnOrder.clear();
+	m_state.columnWidths.clear();
+	saveStateSoon();
+	relayout();
+	update();
+	Finder::instance().notifyState();
+}
+
+void FolderWindow::setSortReversed(bool reversed) {
+	if (reversed == m_state.sortReversed) {
+		return;
+	}
+	m_state.sortReversed = reversed;
+	saveStateSoon();
+	relayout();
+	update();
+	Finder::instance().notifyState();
+}
+
+/* Drops `column` where the pointer is: before the column under it, or
+ * after the last. The full order (hidden columns too) is what's kept. */
+void FolderWindow::moveColumn(int column, int contentX) {
+	std::vector<int> order;
+	for (int c : columns()) {
+		if (c != COL_NAME && c != column) {
+			order.push_back(c);
+		}
+	}
+	size_t at = order.size();
+	int x = columnWidth(COL_NAME);
+	for (size_t i = 0; i < order.size(); i++) {
+		if (contentX < x + columnWidth(order[i]) / 2) {
+			at = i;
+			break;
+		}
+		x += columnWidth(order[i]);
+	}
+	order.insert(order.begin() + static_cast<long>(at), column);
+	/* Hidden columns keep their places after the shown ones. */
+	QList<int> full(order.begin(), order.end());
+	for (int c : COLUMN_ORDER) {
+		if (c != COL_NAME && !full.contains(c)) {
+			full << c;
+		}
+	}
+	for (int c : m_state.columnOrder) {
+		if (!full.contains(c)) {
+			full << c;
+		}
+	}
+	if (full == m_state.columnOrder) {
+		return;
+	}
+	m_state.columnOrder = full;
+	saveStateSoon();
+	relayout();
+	update();
+	Finder::instance().notifyState();
 }
 
 void FolderWindow::preferencesChanged() {
@@ -402,7 +485,7 @@ QRect FolderWindow::selectionRect(Item *item) {
 			continue;
 		}
 		const int d = m_rows[r].depth * INDENT, top = static_cast<int>(r) * m.rowH;
-		const int nameW = columnInfo(COL_NAME).width - m.nameX - d - 6;
+		const int nameW = columnWidth(COL_NAME) - m.nameX - d - 6;
 		Text name(item->visibleName(), std::max(8, nameW), item->nameFont());
 		return QRect(QPoint(m.iconX + d, top + m.iconY),
 			QPoint(m.nameX + d + name.inkWidth() + 1,
@@ -477,7 +560,7 @@ int FolderWindow::viewHeight() const {
 int FolderWindow::listWidth() const {
 	int w = 0;
 	for (int c : columns()) {
-		w += columnInfo(c).width;
+		w += columnWidth(c);
 	}
 	return w;
 }
@@ -907,6 +990,9 @@ void FolderWindow::sortItems(std::vector<std::unique_ptr<Item>> &items) const {
 		order.push_back(item.get());
 	}
 	sortByColumn(order, m_sortColumn);
+	if (m_state.sortReversed) {
+		std::reverse(order.begin(), order.end());
+	}
 	QHash<Item *, int> rank;
 	for (size_t i = 0; i < order.size(); i++) {
 		rank.insert(order[i], static_cast<int>(i));
@@ -1014,12 +1100,16 @@ void FolderWindow::toggleExpanded(Item *item) {
 int FolderWindow::columnAt(int contentX) const {
 	int x = 0;
 	for (int c : columns()) {
-		if (contentX < x + columnInfo(c).width) {
+		if (contentX < x + columnWidth(c)) {
 			return c;
 		}
-		x += columnInfo(c).width;
+		x += columnWidth(c);
 	}
 	return -1;
+}
+
+QRect FolderWindow::sortDirectionButton() const {
+	return QRect(viewWidth(), HEADER_H, width() - viewWidth(), BAND_H);
 }
 
 int FolderWindow::columnX(int column) const {
@@ -1028,7 +1118,7 @@ int FolderWindow::columnX(int column) const {
 		if (c == column) {
 			return x;
 		}
-		x += columnInfo(c).width;
+		x += columnWidth(c);
 	}
 	return -1;
 }
@@ -1066,7 +1156,7 @@ void FolderWindow::paintColumnHeaders(pl_canvas *b) {
 	};
 	int x = 0;
 	for (int c : columns()) {
-		const int x1 = x + columnInfo(c).width - 1;
+		const int x1 = x + columnWidth(c) - 1;
 		paintColumn(x, x1, c == m_sortColumn, columnInfo(c).title,
 			x + (c == COL_NAME ? metrics().nameX : COL_TEXT_X));
 		x = x1 + 1;
@@ -1087,9 +1177,9 @@ void FolderWindow::paintList(pl_canvas *c) {
 	/* Column backgrounds: the sorted column a shade darker. */
 	int x = 0;
 	for (int col : shown) {
-		pl_fill(c, x, y0, x + columnInfo(col).width - 1, y1,
+		pl_fill(c, x, y0, x + columnWidth(col) - 1, y1,
 			col == m_sortColumn ? GRAY(0xD) : GRAY(0xE));
-		x += columnInfo(col).width;
+		x += columnWidth(col);
 	}
 	pl_fill(c, x, y0, std::max(x, right), y1, GRAY(0xE));
 
@@ -1111,7 +1201,7 @@ void FolderWindow::paintList(pl_canvas *c) {
 			paintIcon(c, *item, m.iconX + d, top + m.iconY, m.icon, highlight);
 		}
 
-		const int nameW = columnInfo(COL_NAME).width - m.nameX - d - 6;
+		const int nameW = columnWidth(COL_NAME) - m.nameX - d - 6;
 		Text name(item->visibleName(), std::max(8, nameW), item->nameFont());
 		uint32_t ink = C_BLACK;
 		if (item->selected) {
@@ -1123,10 +1213,10 @@ void FolderWindow::paintList(pl_canvas *c) {
 
 		int cx = 0;
 		for (int col : shown) {
-			const int w = columnInfo(col).width;
+			const int w = columnWidth(col);
 			if (col != COL_NAME) {
-				Text t(columnText(*item, col, m_state.options.list, now), w - 2 * COL_TEXT_X,
-					PL_FONT_VIEWS);
+				Text t(columnText(*item, col, m_state.options.list, w - 2 * COL_TEXT_X, now),
+					w - 2 * COL_TEXT_X, PL_FONT_VIEWS);
 				pl_text(c, t.t, cx + COL_TEXT_X, top + m.baseline, C_BLACK);
 			}
 			cx += w;
@@ -1165,6 +1255,25 @@ void FolderWindow::paintEvent(QPaintEvent *) {
 	} else {
 		pl_canvas band = { c->px + HEADER_H * c->stride, c->stride, m_scrollX, 0, W, BAND_H };
 		paintColumnHeaders(&band);
+		if (m_headerDrag == HeaderDrag::Move) {
+			/* The header being moved, following the pointer. */
+			const int x0 = columnX(m_headerColumn) - m_scrollX + m_headerPointerX - m_headerPressX;
+			const int x1 = x0 + columnWidth(m_headerColumn) - 1;
+			pl_outline(c, x0, HEADER_H, x1, LIST_TOP - 1, C_BLACK);
+			pl_outline(c, x0 + 1, HEADER_H + 1, x1 - 1, LIST_TOP - 2, C_BLACK);
+		}
+		/* The sort-direction button: a pyramid, upside down when reversed. */
+		const QRect b = sortDirectionButton();
+		pl_fill(c, b.left(), b.top(), b.right(), b.bottom(), GRAY(0xC));
+		pl_hline(c, b.left(), b.right(), b.top(), C_WHITE);
+		pl_vline(c, b.left(), b.top(), b.bottom(), C_WHITE);
+		pl_hline(c, b.left(), b.right(), b.bottom(), GRAY(0x3));
+		pl_vline(c, b.right(), b.top(), b.bottom(), GRAY(0x8));
+		const int cx = b.center().x(), cy = b.center().y();
+		for (int row = 0; row < 4; row++) {
+			const int y = m_state.sortReversed ? cy + 2 - 2 * row : cy - 4 + 2 * row;
+			pl_hline(c, cx - row, cx + row, y, C_BLACK);
+		}
 		paintList(&content);
 	}
 	if (m_marquee) {
@@ -1284,9 +1393,34 @@ void FolderWindow::mousePressEvent(QMouseEvent *e) {
 		return;
 	}
 
-	/* List view: clicking a column header sorts by it. */
+	/* List view's column headers: the direction button reverses the
+	 * order; a divider resizes the column to its left; a header sorts
+	 * when clicked, and moves when dragged (Name stays first). */
 	if (m_mode == ViewMode::List && pos.y() >= HEADER_H && pos.y() < LIST_TOP) {
-		sortBy(columnAt(pos.x() + m_scrollX));
+		if (sortDirectionButton().contains(pos)) {
+			setSortReversed(!sortReversed());
+			return;
+		}
+		const int cx = pos.x() + m_scrollX;
+		int x = 0;
+		for (int c : columns()) {
+			x += columnWidth(c);
+			if (std::abs(cx - x) <= 3) {
+				m_headerDrag = HeaderDrag::Resize;
+				m_headerColumn = c;
+				m_headerPressX = pos.x();
+				m_headerStartWidth = columnWidth(c);
+				return;
+			}
+		}
+		const int col = columnAt(cx);
+		if (col <= COL_NAME) {
+			sortBy(col);
+			return;
+		}
+		m_headerDrag = HeaderDrag::Press;
+		m_headerColumn = col;
+		m_headerPressX = m_headerPointerX = pos.x();
 		return;
 	}
 	if (pos.y() < contentTop() || pos.x() >= barX) {
@@ -1359,6 +1493,26 @@ void FolderWindow::mousePressEvent(QMouseEvent *e) {
 }
 
 void FolderWindow::mouseMoveEvent(QMouseEvent *e) {
+	if (m_headerDrag != HeaderDrag::None) {
+		const int x = e->position().toPoint().x();
+		if (m_headerDrag == HeaderDrag::Resize) {
+			const int w = std::clamp(m_headerStartWidth + x - m_headerPressX,
+				m_headerColumn == COL_NAME ? 100 : 40, 800);
+			if (w != columnWidth(m_headerColumn)) {
+				m_state.columnWidths.insert(m_headerColumn, w);
+				relayout();
+				update();
+			}
+		} else {
+			if (m_headerDrag == HeaderDrag::Press &&
+					std::abs(x - m_headerPressX) >= QApplication::startDragDistance()) {
+				m_headerDrag = HeaderDrag::Move;
+			}
+			m_headerPointerX = x;
+			update();
+		}
+		return;
+	}
 	if (m_buttonDown) {
 		const bool inside = buttonRect(m_buttonDown).contains(toContent(e->position().toPoint()));
 		if (inside != m_buttonInside) {
@@ -1419,6 +1573,20 @@ void FolderWindow::mouseMoveEvent(QMouseEvent *e) {
 }
 
 void FolderWindow::mouseReleaseEvent(QMouseEvent *) {
+	if (m_headerDrag != HeaderDrag::None) {
+		const HeaderDrag drag = m_headerDrag;
+		m_headerDrag = HeaderDrag::None;
+		if (drag == HeaderDrag::Press) {
+			sortBy(m_headerColumn);
+		} else if (drag == HeaderDrag::Move) {
+			moveColumn(m_headerColumn, columnX(m_headerColumn) + m_headerPointerX - m_headerPressX);
+		} else {
+			saveStateSoon();
+			Finder::instance().notifyState();
+		}
+		update();
+		return;
+	}
 	if (Item *b = m_buttonDown) {
 		const bool open = m_buttonInside;
 		m_buttonDown = nullptr;
@@ -1606,7 +1774,8 @@ void FolderWindow::dropEvent(QDropEvent *e) {
 			item->pos = p;
 			m_state.icons.insert(item->key(), p);
 		}
-		if (arrangement == IconArrangement::SnapToGrid) {
+		/* ⌘-dragged (Ctrl, as zacos9-wm hands ⌘ on), they snap too. */
+		if (arrangement == IconArrangement::SnapToGrid || (e->modifiers() & Qt::ControlModifier)) {
 			snapToGrid(moved);
 		}
 		saveStateSoon();

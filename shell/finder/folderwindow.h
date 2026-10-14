@@ -39,8 +39,17 @@ public:
 	/* View > Sort List and the column headers: a ListColumn shown. */
 	void sortBy(int column);
 	int sortColumn() const { return m_sortColumn; }
-	/* The list's columns, left to right (Name first). */
+	/* The list's columns, left to right (Name first), and their widths:
+	 * the user's, from dragging headers and dividers, else the Mac's. */
 	std::vector<int> columns() const;
+	int columnWidth(int column) const;
+	bool columnsCustomized() const;
+	/* View > Reset Column Positions. */
+	void resetColumns();
+	/* The sort-direction button (or View > Sort List's twin): reversed
+	 * shows the list from the other end. */
+	bool sortReversed() const { return m_state.sortReversed; }
+	void setSortReversed(bool reversed);
 	/* Preferences changed (grid spacing, labels, standard views): every
 	 * window lays itself out again. */
 	static void preferencesChanged();
@@ -133,6 +142,15 @@ private:
 	};
 	ListMetrics metrics() const;
 	int columnX(int column) const;
+	/* The sort-direction button: above the vertical scroll bar, at the
+	 * end of the column headers. */
+	QRect sortDirectionButton() const;
+	/* A press in the column headers: a click sorts, a drag on a divider
+	 * resizes the column to its left, a drag on a header moves it. */
+	enum class HeaderDrag { None, Press, Move, Resize };
+	HeaderDrag m_headerDrag = HeaderDrag::None;
+	int m_headerColumn = -1, m_headerPressX = 0, m_headerPointerX = 0, m_headerStartWidth = 0;
+	void moveColumn(int column, int contentX);
 	void buildRows();
 	void paintColumnHeaders(pl_canvas *band);
 	void paintList(pl_canvas *content);

@@ -190,15 +190,16 @@ QString Finder::stateLine() {
 		[](const Item *i) { return i->isLocalVolume; });
 	/* View > Sort List: the list's sort column and the columns shown. */
 	const int sort = fw ? fw->sortColumn() : 0;
+	const bool custom = fw && fw->columnsCustomized();
 	unsigned columns = 0;
 	if (fw) {
 		for (int c : fw->columns()) {
 			columns |= columnBit(c);
 		}
 	}
-	return QStringLiteral("state selection=%1 window=%2 trash=%3 view=%4 label=%5 erase=%6 network=%7 unmount=%8 sort=%9 columns=%10")
+	return QStringLiteral("state selection=%1 window=%2 trash=%3 view=%4 label=%5 erase=%6 network=%7 unmount=%8 sort=%9 columns=%10 custom=%11")
 		.arg(selection).arg(window ? 1 : 0).arg(full ? 1 : 0).arg(list).arg(label).arg(erase ? 1 : 0)
-		.arg(network ? 1 : 0).arg(unmount ? 1 : 0).arg(sort).arg(columns);
+		.arg(network ? 1 : 0).arg(unmount ? 1 : 0).arg(sort).arg(columns).arg(custom ? 1 : 0);
 }
 
 void Finder::notifyState() {
@@ -330,6 +331,10 @@ void Finder::command(const QString &name) {
 				showViewOptions(front());
 			}
 		});
+	} else if (name == "reset-columns") {
+		if (auto *fw = dynamic_cast<FolderWindow *>(front())) {
+			fw->resetColumns();
+		}
 	} else if (name == "preferences") {
 		showPreferences();
 	} else if (name.startsWith("sort ")) {

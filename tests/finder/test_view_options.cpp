@@ -9,6 +9,7 @@
 #include <QDir>
 #include <QElapsedTimer>
 #include <QFile>
+#include <QMouseEvent>
 #include <QSettings>
 #include <QTemporaryDir>
 #include <QTextStream>
@@ -36,6 +37,19 @@ static void settle(int ms = 50) {
 	while (timer.elapsed() < ms) {
 		QApplication::processEvents(QEventLoop::AllEvents, 10);
 	}
+}
+
+static void mouse(QWidget *w, QEvent::Type type, QPoint p) {
+	QMouseEvent e(type, p, w->mapToGlobal(p), type == QEvent::MouseMove ? Qt::NoButton : Qt::LeftButton,
+		type == QEvent::MouseButtonRelease ? Qt::NoButton : Qt::LeftButton, Qt::NoModifier);
+	QApplication::sendEvent(w, &e);
+}
+
+static void drag(QWidget *w, QPoint from, QPoint to) {
+	mouse(w, QEvent::MouseButtonPress, from);
+	mouse(w, QEvent::MouseMove, (from + to) / 2);
+	mouse(w, QEvent::MouseMove, to);
+	mouse(w, QEvent::MouseButtonRelease, to);
 }
 
 static void write(const QString &path, int bytes) {
@@ -239,6 +253,55 @@ int main(int argc, char **argv) {
 	w->setViewOptions(icons);
 	check(w->buttonSide() == 26 && w->buttonRect(named(w, "apple")).width() == 26,
 		"small buttons hold small icons");
+
+	/* Narrow columns shorten their dates, as the Mac's did. */
+	const QDateTime then(QDate(2026, 10, 1), QTime(15, 42));
+	check(fitListDate(then, true, 1000, now) == "Thursday, October 1, 2026, 3:42 PM" &&
+		fitListDate(then, true, 150, now) == "Thu, Oct 1, 2026, 3:42 PM" &&
+		fitListDate(then, true, 90, now) == "10/1/26, 3:42 PM" &&
+		fitListDate(then, true, 10, now) == "10/1/26",
+		"dates shorten as the column narrows");
+	check(fitListDate(QDateTime(QDate(2026, 10, 13), QTime(9, 5)), true, 20, now) == "Today",
+		"and a relative date to its word");
+
+	/* Column headers: drag a divider, drag a header, click to sort, the
+	 * direction button; Reset Column Positions. */
+	w->setViewMode(FolderWindow::ViewMode::List);
+	ViewOptions cols = w->viewOptions();
+	cols.list.size = IconSize::Small;
+	cols.list.columns = columnBit(COL_NAME) | columnBit(COL_MODIFIED) | columnBit(COL_SIZE) |
+		columnBit(COL_KIND);
+	w->setViewOptions(cols);
+	w->sortBy(COL_NAME);
+	w->resize(800, 400);
+	w->relayout();
+	const int band = 21 + 10; /* the column headers' row */
+	const int nameEdge = w->columnWidth(COL_NAME);
+	drag(w, QPoint(nameEdge, band), QPoint(nameEdge + 50, band));
+	check(w->columnWidth(COL_NAME) == 270 && w->columnsCustomized(),
+		"dragging a divider widens the column to its left");
+	const int kindX = w->columnX(COL_KIND) + 20;
+	drag(w, QPoint(kindX, band), QPoint(w->columnWidth(COL_NAME) + 5, band));
+	check(w->columns() == std::vector<int>({ COL_NAME, COL_KIND, COL_MODIFIED, COL_SIZE }),
+		"dragging a header moves the column; Name stays first");
+	mouse(w, QEvent::MouseButtonPress, QPoint(w->columnX(COL_SIZE) + 20, band));
+	mouse(w, QEvent::MouseButtonRelease, QPoint(w->columnX(COL_SIZE) + 20, band));
+	check(w->sortColumn() == COL_SIZE, "a click on a header still sorts by it");
+	const QStringList bySize = rowNames(w);
+	mouse(w, QEvent::MouseButtonPress, w->sortDirectionButton().center());
+	mouse(w, QEvent::MouseButtonRelease, w->sortDirectionButton().center());
+	QStringList reversed = bySize;
+	std::reverse(reversed.begin(), reversed.end());
+	check(w->sortReversed() && rowNames(w) == reversed, "the direction button reverses the list");
+	w->m_state.save(folder);
+	const FolderState kept = FolderState::load(folder);
+	check(kept.sortReversed && kept.columnWidths.value(COL_NAME) == 270 &&
+		kept.columnOrder.value(0) == COL_KIND, "order, widths and direction are kept for the folder");
+	w->resetColumns();
+	check(!w->columnsCustomized() && w->columnWidth(COL_NAME) == 220 &&
+		w->columns() == std::vector<int>({ COL_NAME, COL_MODIFIED, COL_SIZE, COL_KIND }),
+		"Reset Column Positions puts them back");
+	check(!w->grab().isNull(), "the list draws its headers and button");
 
 	w->close();
 	settle();

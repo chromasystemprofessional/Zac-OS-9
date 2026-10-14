@@ -30,6 +30,8 @@ struct ColumnInfo {
 	const char *key;      /* in the menu bar's commands: "sort name" */
 };
 const ColumnInfo &columnInfo(int column);
+/* A column by its key ("modified"), or -1. */
+int columnFromKey(const QString &key);
 /* The order the columns appear in, left to right (the Mac's). */
 extern const int COLUMN_ORDER[COL_COUNT];
 inline constexpr unsigned columnBit(int column) { return 1u << column; }
@@ -83,8 +85,15 @@ bool tightGrid();                /* "grid-spacing=tight"; Wide by default */
 QString arrangeKey(Arrange how);
 Arrange arrangeFromKey(const QString &key, Arrange fallback = Arrange::Name);
 
-/* A list view's cell for `column` (not Name); dates as listDate(). */
-QString columnText(Item &item, int column, const ListViewOptions &options,
+/* A list view's cell for `column` (not Name), to fit `width` pixels in the
+ * views font: as the Mac's, dates shorten as the column narrows (see
+ * fitListDate), and sizes drop their decimals. */
+QString columnText(Item &item, int column, const ListViewOptions &options, int width = 100000,
+	const QDateTime &now = QDateTime::currentDateTime());
+/* The longest form of a date that fits: "Tuesday, October 13, 2026, 3:42 PM",
+ * "Tue, Oct 13, 2026, 3:42 PM", "10/13/26, 3:42 PM", "10/13/26" (relative:
+ * "Today, 3:42 PM", "Today"). */
+QString fitListDate(const QDateTime &t, bool relative, int width,
 	const QDateTime &now = QDateTime::currentDateTime());
 /* The list's order for `column`, as the Mac's: names A-Z, dates newest
  * first, sizes largest first, kinds, labels and comments A-Z, the

@@ -767,7 +767,9 @@ void Desktop::dropEvent(QDropEvent *e) {
 			moved.push_back(item);
 			m_state.icons.insert(item->key(), p);
 		}
-		if (arrangement == IconArrangement::SnapToGrid && !moved.empty()) {
+		/* ⌘-dragged (Ctrl, as zacos9-wm hands ⌘ on), they snap too. */
+		if ((arrangement == IconArrangement::SnapToGrid || (e->modifiers() & Qt::ControlModifier)) &&
+				!moved.empty()) {
 			int count = 0;
 			const auto slot = gridSlot(&count);
 			QSet<int> taken;

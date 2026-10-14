@@ -7,6 +7,7 @@
 #include <QStandardPaths>
 
 #include "appdb.h"
+#include "pixels.h"
 #include "settings.h"
 #include "vfs.h"
 
@@ -32,6 +33,15 @@ static const ColumnInfo COLUMNS[COL_COUNT] = {
 const int COLUMN_ORDER[COL_COUNT] = {
 	COL_NAME, COL_MODIFIED, COL_CREATED, COL_SIZE, COL_KIND, COL_LABEL, COL_COMMENTS, COL_VERSION,
 };
+
+int columnFromKey(const QString &key) {
+	for (int c = 0; c < COL_COUNT; c++) {
+		if (key == QLatin1String(COLUMNS[c].key)) {
+			return c;
+		}
+	}
+	return -1;
+}
 
 const ColumnInfo &columnInfo(int column) {
 	return COLUMNS[column >= 0 && column < COL_COUNT ? column : 0];
@@ -209,17 +219,55 @@ const QString &itemVersion(Item &item) {
 	return item.version;
 }
 
-QString columnText(Item &item, int column, const ListViewOptions &options, const QDateTime &now) {
+static int textWidth(const QString &s) {
+	Text t(s, 100000, PL_FONT_VIEWS);
+	return t.inkWidth();
+}
+
+QString fitListDate(const QDateTime &t, bool relative, int width, const QDateTime &now) {
+	if (!t.isValid()) {
+		return QStringLiteral("--");
+	}
+	const QLocale en(QLocale::English);
+	QStringList forms;
+	const qint64 days = now.date().daysTo(t.date());
+	const char *word = !relative ? nullptr : days == 0 ? "Today" : days == -1 ? "Yesterday" :
+		days == 1 ? "Tomorrow" : nullptr;
+	if (word) {
+		forms << QString(word) + ", " + en.toString(t, "h:mm AP") << QString(word);
+	} else {
+		forms << en.toString(t, "dddd, MMMM d, yyyy, h:mm AP") << en.toString(t, "ddd, MMM d, yyyy, h:mm AP")
+			<< en.toString(t, "M/d/yy, h:mm AP") << en.toString(t, "M/d/yy");
+	}
+	for (const QString &form : forms) {
+		if (textWidth(form) <= width) {
+			return form;
+		}
+	}
+	return forms.last();
+}
+
+/* "12.3 MB", or "12 MB" when that doesn't fit. */
+static QString fitSize(qint64 bytes, int width) {
+	const QString size = finderSize(bytes);
+	if (textWidth(size) <= width || !size.contains('.')) {
+		return size;
+	}
+	return QString::number(qRound(size.section(' ', 0, 0).toDouble())) + " " + size.section(' ', 1);
+}
+
+QString columnText(Item &item, int column, const ListViewOptions &options, int width,
+		const QDateTime &now) {
 	switch (column) {
 	case COL_MODIFIED:
-		return listDate(item.modified, options.relativeDate, now);
+		return fitListDate(item.modified, options.relativeDate, width, now);
 	case COL_CREATED:
-		return listDate(itemCreated(item), options.relativeDate, now);
+		return fitListDate(itemCreated(item), options.relativeDate, width, now);
 	case COL_SIZE:
 		if (!item.isDir) {
-			return finderSize(item.size);
+			return fitSize(item.size, width);
 		}
-		return options.folderSizes && item.folderSize >= 0 ? finderSize(item.folderSize) :
+		return options.folderSizes && item.folderSize >= 0 ? fitSize(item.folderSize, width) :
 			QStringLiteral("--");
 	case COL_KIND:
 		return item.kindName();

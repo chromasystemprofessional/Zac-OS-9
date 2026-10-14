@@ -161,6 +161,7 @@ struct finder_state {
 	int network, unmount; /* selected network/local mounted disk */
 	int sort;             /* the front list's sort column (viewoptions.h) */
 	unsigned columns;     /* and its columns shown, as bits */
+	int custom;           /* its columns were moved or resized */
 };
 
 bool finder_connect(void);
