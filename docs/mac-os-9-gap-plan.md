@@ -418,12 +418,12 @@ A zram/swap switch in a Memory panel is a possible P3.
 
 | Program | Status | Suggested approach |
 |---|---|---|
-| **Dog Ears** | ✗ | P2 M. Platinum note windows (colours, collapse), saved in one file. |
+| **Dog Ears** | ✅ | `zacos9-dogears`, in the Zac menu: coloured note windows saved as you type (`dog-ears.json`), New Note, Import/Export Text, Color menu; closing a note offers to save its text. |
 | **Notepad** | ✗ | P3 S. Paged notes in one window. |
 | **Stash** | ✗ | P3 M. Pages of pictures/text; drag in and out. |
 | **Calculator** | ✅ | `zacos9-calculator`, in the Zac menu; typed or clicked; ⌘C/⌘V. |
 | **Key Tags** | ✗ | P3 S. Shows the current xkb layout, Option/Shift states. |
-| **Scribble** | ✗ | P2 M. Plain/styled text editor with the Platinum look (Qt style already), opens Read Me files. |
+| **Scribble** | ◐ | `zacos9-scribble`: plain text (UTF-8 or Latin-1; CR, CR LF or LF kept), New/Open/Save/Save As, Find/Find Again, Font and Size menus. Styled text and Speech not done. |
 | **Pedigree** | ✗ | P2 M. "System Information": hardware, devices, network, software (lshw/udev/dmidecode via a helper). |
 | Plotter, Jigsaw Puzzle | ✗ | P3 — optional fun. |
 | AppleCD Audio Player, DVD Player, Apple Video Player | — | Use regular media apps; The Collar's media module covers control. |
@@ -495,7 +495,7 @@ updates `PROJECT_STATUS.md` and the relevant `docs/` page.
 | 2.9 | **Startup Disk** panel (GRUB entries, other OSes, Classic) | `shell/panels/`, polkit helper | M |
 | 2.10 ✅ | **Internet** panel (default browser, mail app, downloads folder) | `shell/panels/`, `mimeapps.list`, xdg-user-dirs | S |
 | 2.11 | **Trackpad** and **Accessibility** (Sticky/Slow/Mouse Keys, zoom) | prefs.c (libinput, xkb a11y), panels | M |
-| 2.12 ◐ | **Desk accessories I**: Calculator ✅, Dog Ears, Scribble | new small Qt apps on panelkit | S + M + M |
+| 2.12 ✅ | **Desk accessories I**: Calculator, Dog Ears, Scribble | new small Qt apps on panelkit | S + M + M |
 | 2.13 | **System Information** (Pedigree) | Qt app + read-only helper | M |
 | 2.14 | **Users** panel (accounts, pictures, passwords, administrators) | panel over accountsservice + polkit | L |
 | 2.15 | **Help Center** with ZacOS help pages | `shell/help/`, `share/zacos9/help/` | L |
