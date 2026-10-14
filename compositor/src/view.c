@@ -154,16 +154,29 @@ struct wlr_box view_default_frame_in(struct wlr_box area) {
 	};
 }
 
+/* ZacOS 9's own programs that size their windows themselves: the Finder,
+ * Picture Viewer (fitted to its picture), Dog Ears' notes and Scribble's
+ * documents, as small as the Mac's. */
+static bool sizes_own_windows(const char *app_id) {
+	static const char *const own[] = { "zacos9-finder", "zacos9-picture", "zacos9-dogears",
+		"zacos9-scribble" };
+	for (size_t i = 0; app_id && i < sizeof(own) / sizeof(own[0]); i++) {
+		if (strcmp(app_id, own[i]) == 0) {
+			return true;
+		}
+	}
+	return false;
+}
+
 /* Other programs' main windows open almost full-screen, leaving a strip of
- * desktop on every side so the disk icons stay in view. The Finder and
- * Picture Viewer (fitted to its picture) size their own windows, and dialogs
- * and fixed-size windows keep theirs. */
+ * desktop on every side so the disk icons stay in view. Dialogs, fixed-size
+ * windows and those of ours above keep their own sizes. */
 bool view_default_frame(struct plat_view *view, const char *app_id,
 		struct wlr_box *frame, int *content_w, int *content_h) {
 	struct wlr_surface *surface = view->impl->get_surface(view);
 	int hx, hy;
 	if (view->fullscreen || view->impl->has_parent(view) || !view_resizable(view) ||
-			(app_id && (strcmp(app_id, "zacos9-finder") == 0 || strcmp(app_id, "zacos9-picture") == 0)) ||
+			sizes_own_windows(app_id) ||
 			platinum_shell_style_for(surface) >= 0 ||
 			platinum_shell_position_for(surface, &hx, &hy)) {
 		return false;

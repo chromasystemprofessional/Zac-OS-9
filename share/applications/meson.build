@@ -4,7 +4,7 @@
 entries = ['zacos9-appearance.desktop', 'zacos9-collarpanel.desktop', 'zacos9-datetime.desktop',
   'zacos9-energysaver.desktop', 'zacos9-fileexchange.desktop', 'zacos9-filesharing.desktop',
   'zacos9-keyboard.desktop', 'zacos9-monitors.desktop', 'zacos9-mouse.desktop', 'zacos9-screensaver.desktop',
-  'zacos9-sound.desktop', 'zacos9-tcpip.desktop', 'zacos9-zacmenu.desktop', 'zacos9-general.desktop', 'zacos9-internet.desktop', 'zacos9-calculator.desktop', 'zacos9-store.desktop',
+  'zacos9-sound.desktop', 'zacos9-tcpip.desktop', 'zacos9-zacmenu.desktop', 'zacos9-general.desktop', 'zacos9-internet.desktop', 'zacos9-calculator.desktop', 'zacos9-dogears.desktop', 'zacos9-scribble.desktop', 'zacos9-store.desktop',
   'zacos9-netbrowser.desktop', 'zacos9-setup.desktop', 'zacos9-installer.desktop',
   'zacos9-wininstall.desktop', 'zacos9-appinstall.desktop', 'zacos9-update.desktop',
   'zacos9-bluetooth.desktop', 'zacos9-picture.desktop',

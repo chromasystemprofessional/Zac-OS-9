@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Dog Ears
+Comment=Coloured notes that keep themselves
+Exec=zacos9-dogears
+Terminal=false
+Categories=Utility;
+OnlyShowIn=ZacOS9;

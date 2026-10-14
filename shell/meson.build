@@ -694,6 +694,40 @@ test('greetd-client',
   timeout: 60,
 )
 
+# Scribble (SimpleText) and Dog Ears (Stickies).
+executable('zacos9-scribble',
+  'scribble/main.cpp', 'scribble/scribblewindow.cpp', 'scribble/textfile.cpp',
+  'finder/alert.cpp', 'finder/platinumshell.cpp', finder_protocol,
+  link_with: panelkit,
+  include_directories: include_directories('finder', 'panels', 'scribble'),
+  dependencies: [platinum_dep, qt6, wayland_client],
+  cpp_args: ['-std=c++17'],
+  install: true,
+)
+executable('zacos9-dogears',
+  'dogears/main.cpp', 'dogears/notes.cpp', 'scribble/textfile.cpp',
+  'finder/alert.cpp', 'finder/platinumshell.cpp', finder_protocol,
+  link_with: panelkit,
+  include_directories: include_directories('finder', 'panels', 'scribble', 'dogears'),
+  dependencies: [platinum_dep, qt6, wayland_client],
+  cpp_args: ['-std=c++17'],
+  install: true,
+)
+test('scribble-files',
+  executable('test-scribble-files', 'scribble/tests/test_textfile.cpp', 'scribble/textfile.cpp',
+    include_directories: include_directories('scribble'),
+    dependencies: [qt6],
+    cpp_args: ['-std=c++17'],
+  ),
+)
+test('dog-ears-notes',
+  executable('test-dog-ears-notes', 'dogears/tests/test_notes.cpp', 'dogears/notes.cpp',
+    include_directories: include_directories('dogears'),
+    dependencies: [qt6],
+    cpp_args: ['-std=c++17'],
+  ),
+)
+
 # The Calculator desk accessory.
 executable('zacos9-calculator',
   'calculator/main.cpp', 'calculator/engine.cpp',

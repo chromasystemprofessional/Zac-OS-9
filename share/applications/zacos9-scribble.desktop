@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Scribble
+Comment=Read and write plain text documents
+Exec=zacos9-scribble %F
+Terminal=false
+Categories=Utility;TextEditor;
+OnlyShowIn=ZacOS9;
+MimeType=text/plain;

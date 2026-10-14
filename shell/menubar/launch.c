@@ -335,11 +335,17 @@ void launch_fill_logo_menu(struct mb_menu *menu, const struct app *apps, int n_a
 			}
 		}
 		/* And the desk accessories, as the Apple menu had them. */
-		char calculator[PATH_MAX + 64];
-		sibling_program("zacos9-calculator", calculator, sizeof(calculator));
-		entries[n].name = strdup("Calculator");
-		entries[n].exec = strdup(calculator);
-		n++;
+		const struct { const char *name, *program; } accessories[] = {
+			{ "Calculator", "zacos9-calculator" },
+			{ "Dog Ears", "zacos9-dogears" },
+		};
+		for (size_t i = 0; i < sizeof(accessories) / sizeof(accessories[0]); i++) {
+			char command[PATH_MAX + 64];
+			sibling_program(accessories[i].program, command, sizeof(command));
+			entries[n].name = strdup(accessories[i].name);
+			entries[n].exec = strdup(command);
+			n++;
+		}
 	}
 	/* The Apple menu listed its items alphabetically. */
 	qsort(entries, n, sizeof(entries[0]), by_name);
