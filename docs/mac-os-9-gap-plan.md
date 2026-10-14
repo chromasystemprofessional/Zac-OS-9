@@ -158,7 +158,7 @@ Section 3 lists every feature; section 5 is the plan.
 | ⌘-drag inside a Sniffer window scrolls in any direction (grabber hand) | p. 14 | ✗ | P3 S |
 | Drag window edges to move the window | p. 14 | ✅? | Verify. |
 | Resize box with outline | p. 15 | ✅ | |
-| **Proxy icon** in a Sniffer window's title: drag to move/copy the folder; drop onto it when collapsed | p. 15 | ✗ | Needs a title-bar icon from the compositor and a drag started from it. P2 M |
+| **Proxy icon** in a Sniffer window's title: drag to move/copy the folder; drop onto it when collapsed | p. 15 | ✅ | zacos9-wm draws it (platinum-shell v12) and hands the press to the Sniffer, which drags the folder; Option copies. Home, disks, the Trash and the Macintosh view's folders show the icon but don't drag. A drag resting on a collapsed window's title bar springs it open for the drop. |
 | Info strip ("7 items, 2.1 GB available") | p. 16 | ✅? | Verify. |
 | Window sounds (collapse, close, zoom) | p. 13 | ✅ | `compositor/src/window_sounds.c` |
 
@@ -487,7 +487,7 @@ updates `PROJECT_STATUS.md` and the relevant `docs/` page.
 | 2.1 | **Pack palette** (tear-off from the Application menu; layouts; drop documents on tiles) | new layer-shell surface in the menu bar | M |
 | 2.2 | **F-key launching** (Keyboard ▸ Function Keys; pressing again brings it forward) | Keyboard panel, compositor hotkeys | M |
 | 2.3 | **Pop-up windows** (View ▸ as Pop-up Window; tabs at the screen bottom; spring open during drags) | Sniffer + layer-shell tabs | L |
-| 2.4 | **Proxy icon** in Sniffer title bars (drag to move/copy; drop onto it when collapsed) | compositor frame + `platinum-shell-v1` + Sniffer drag source | M |
+| 2.4 ✅ | **Proxy icon** in Sniffer title bars (drag to move/copy; drop onto it when collapsed) | compositor frame + `platinum-shell-v1` + Sniffer drag source | M |
 | 2.5 | **Clippings** and **Show Clipboard** | Sniffer drop handling, clipping viewer | M |
 | 2.6 ✅ | **Toy Box** (button view of `Toy Box Items`, categories as pages) | Sniffer | M |
 | 2.7 | **Search**: more Find criteria now; then content search with an index (localsearch or recoll), Index Selection, Find Similar | `shell/finder/findwindow.cpp`, a search backend wrapper; packaging dependency | M + L |
