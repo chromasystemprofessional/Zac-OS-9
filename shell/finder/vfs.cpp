@@ -33,7 +33,7 @@
  * doesn't have take their default, and nodes it doesn't know about are
  * added, while the user's own nodes and overrides are kept.
  */
-static constexpr int REGISTRY_VERSION = 11;
+static constexpr int REGISTRY_VERSION = 12;
 
 static const char *DEFAULT_REGISTRY = R"JSON({
   "version": 10,
@@ -78,6 +78,8 @@ static const char *DEFAULT_REGISTRY = R"JSON({
       "backing": "$XDG_DATA_HOME/fonts" },
     { "id": "system-folder/favorites", "name": "Favorites", "kind": "backed",
       "backing": "$XDG_CONFIG_HOME/zacos9/Favorites" },
+    { "id": "system-folder/toy-box-items", "name": "Toy Box Items", "kind": "backed",
+      "backing": "$XDG_CONFIG_HOME/zacos9/Toy Box Items" },
     { "id": "system-folder/preferences", "name": "Preferences", "kind": "backed",
       "backing": "$XDG_CONFIG_HOME" },
     { "id": "system-folder/utilities", "name": "Utilities", "kind": "apps" },
@@ -381,6 +383,15 @@ void generatePanels(const VNode &parent) {
 		}
 		addNode(node);
 	}
+	/* The Toy Box is the Sniffer's own window, listed here as the Mac
+	 * listed its Launcher. */
+	VNode toyBox;
+	toyBox.id = parent.id + "/toy-box";
+	toyBox.name = QStringLiteral("Toy Box");
+	toyBox.kind = VKind::Launcher;
+	toyBox.icon = PL_ICON_APPLICATION;
+	toyBox.builtinAction = QStringLiteral("toy-box");
+	addNode(toyBox);
 }
 
 void generateResourceLaunchers(const VNode &parent) {
@@ -729,7 +740,7 @@ bool vfsLaunch(const QString &path) {
 		return false;
 	}
 	if (node->builtinAction == "system-information" ||
-			node->builtinAction == "extensions-manager") {
+			node->builtinAction == "extensions-manager" || node->builtinAction == "toy-box") {
 		return true;
 	}
 	if (!node->appId.isEmpty()) {

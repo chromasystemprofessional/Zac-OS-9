@@ -94,6 +94,11 @@ QString favoritesPath() {
 		"/zacos9/Favorites";
 }
 
+QString toyBoxPath() {
+	return QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) +
+		"/zacos9/Toy Box Items";
+}
+
 QString displayName(const QString &path) {
 	if (vfsIsVirtual(path)) {
 		return vfsName(path);

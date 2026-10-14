@@ -35,6 +35,7 @@
 #include "findwindow.h"
 #include "folderpath.h"
 #include "folderwindow.h"
+#include "toybox.h"
 #include "viewoptionsdialog.h"
 #include "infowindow.h"
 #include "resourcewindows.h"
@@ -331,6 +332,8 @@ void Finder::command(const QString &name) {
 				showViewOptions(front());
 			}
 		});
+	} else if (name == "toy-box") {
+		ToyBox::open();
 	} else if (name == "reset-columns") {
 		if (auto *fw = dynamic_cast<FolderWindow *>(front())) {
 			fw->resetColumns();
@@ -437,6 +440,8 @@ void Finder::openItem(Item *item) {
 					openSystemInformation();
 				} else if (action == "extensions-manager") {
 					openExtensionsManager();
+				} else if (action == "toy-box") {
+					ToyBox::open();
 				} else if (!vfsLaunch(item->path)) {
 					Alert::ask(item->visibleName() + " could not be opened. Its "
 						"application may have been removed.", "OK", QString());

@@ -132,6 +132,8 @@ QString trashFilesPath();
 /* Favorites (File > Add To Favorites): aliases, listed in the Zac menu and
  * the Open and Save dialogs. */
 QString favoritesPath();
+/* The Toy Box's buttons: aliases, and bulleted folders for its pages. */
+QString toyBoxPath();
 
 /* Paint an icon with its label; `onDesktop` labels get a white box when
  * unselected (desktop pattern behind them). TODO: measure label metrics. */

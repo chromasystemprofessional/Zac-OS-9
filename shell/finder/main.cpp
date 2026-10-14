@@ -15,6 +15,9 @@
 #include "platinumshell.h"
 #include "secondarydesktop.h"
 #include "settings.h"
+#include "toybox.h"
+
+#include <cstring>
 
 int main(int argc, char *argv[]) {
 	/* zacos9-finder --open URI...: a folder opened from another program
@@ -51,6 +54,11 @@ int main(int argc, char *argv[]) {
 	};
 	Desktop *desktop = makeDesktop();
 	Finder::instance().start(desktop);
+	/* General Controls' "Show Toy Box at system startup". */
+	char toyBox[16];
+	if (pl_setting("toy-box-at-startup", toyBox, sizeof(toyBox)) && strcmp(toyBox, "true") == 0) {
+		ToyBox::open();
+	}
 	/* Other programs' "Show in Folder" (Firefox's downloads, ...). */
 	fileManager1Start();
 	/* More than one screen: the pattern on the others. */

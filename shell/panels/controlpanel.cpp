@@ -1247,13 +1247,19 @@ static constexpr int ROWS(int rows) {
 class GeneralControlsPanel : public ControlPanel {
 public:
 	GeneralControlsPanel() : ControlPanel("General Controls", PANEL_H) {
-		m_groups = { { G1, G1 + ROWS(1), "Desktop" }, { G2, G2 + ROWS(1), "Menu Blinking" },
+		m_groups = { { G1, G1 + ROWS(2), "Desktop" }, { G2, G2 + ROWS(1), "Menu Blinking" },
 			{ G3, G3 + ROWS(1), "Insertion Point Blinking" }, { G4, G4 + ROWS(4), "Documents" } };
 		char v[16];
 		m_desktop = PanelCheckbox("Show Desktop when in background", QPoint(X, G1 + TOP));
 		m_desktop.on = !(pl_setting("show-desktop", v, sizeof(v)) && strcmp(v, "false") == 0);
 		m_desktop.toggled = [](bool on) { pl_setting_set("show-desktop", on ? nullptr : "false"); };
 		m_checks.push_back(&m_desktop);
+		/* Mac OS 9's "Show Launcher at system startup": the Sniffer opens
+		 * the Toy Box as it starts. */
+		m_toyBox = PanelCheckbox("Show Toy Box at system startup", QPoint(X, G1 + TOP + 20));
+		m_toyBox.on = pl_setting("toy-box-at-startup", v, sizeof(v)) && strcmp(v, "true") == 0;
+		m_toyBox.toggled = [](bool on) { pl_setting_set("toy-box-at-startup", on ? "true" : nullptr); };
+		m_checks.push_back(&m_toyBox);
 
 		const char *const blinks[] = { "Off", "1", "2", "3" };
 		for (int i = 0; i < 4; i++) {
@@ -1335,10 +1341,10 @@ private:
 	}
 
 	static constexpr int X = M + IN, TOP = 1 + PL_GROUP_MARGIN_TOP;
-	static constexpr int G1 = 26, G2 = G1 + ROWS(1) + 28, G3 = G2 + ROWS(1) + 28;
+	static constexpr int G1 = 26, G2 = G1 + ROWS(2) + 28, G3 = G2 + ROWS(1) + 28;
 	static constexpr int G4 = G3 + ROWS(1) + 28;
 	static constexpr int PANEL_H = G4 + ROWS(4) + 12 + 2 * 12 + 8;
-	PanelCheckbox m_desktop;
+	PanelCheckbox m_desktop, m_toyBox;
 	PanelRadios m_menu, m_caretRate, m_documents;
 	QTimer m_caret;
 	bool m_caretOn = true;

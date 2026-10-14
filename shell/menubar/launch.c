@@ -303,10 +303,16 @@ void launch_fill_logo_menu(struct mb_menu *menu, const struct app *apps, int n_a
 		{ "TCP/IP", "zacos9-tcpip", "" },
 		{ "Zac Menu Options", "zacos9-controlpanel", " zacmenu" },
 	};
+	bool toy_box_added = false;
 	for (size_t i = 0; i < sizeof(panel_list) / sizeof(panel_list[0]); i++) {
 		char command[PATH_MAX + 64];
 		sibling_program(panel_list[i].program, command, sizeof(command));
 		strncat(command, panel_list[i].arg, sizeof(command) - strlen(command) - 1);
+		/* The Toy Box (the Sniffer's own window) goes in its place by name. */
+		if (!toy_box_added && strcmp(panel_list[i].name, "Toy Box") > 0) {
+			add_item(panels, "Toy Box", true, ACT_FINDER, "toy-box");
+			toy_box_added = true;
+		}
 		add_item(panels, panel_list[i].name, true, ACT_LAUNCH, command);
 	}
 	add_favorites(menu);
