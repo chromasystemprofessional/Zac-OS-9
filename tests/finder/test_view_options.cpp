@@ -126,9 +126,9 @@ int main(int argc, char **argv) {
 
 	/* A list with every column; labels as the user named them. */
 	const QString folder = home.path() + "/Work";
-	QDir().mkpath(folder + "/Big Folder/Inner");
-	write(folder + "/Big Folder/one", 1000);
-	write(folder + "/Big Folder/Inner/two", 2000);
+	QDir().mkpath(folder + "/dossier/Inner");
+	write(folder + "/dossier/one", 1000);
+	write(folder + "/dossier/Inner/two", 2000);
 	write(folder + "/apple", 10);
 	write(folder + "/banana", 20);
 	write(folder + "/cherry", 30);
@@ -166,14 +166,14 @@ int main(int argc, char **argv) {
 	/* Calculate folder sizes, off the main thread. */
 	QElapsedTimer waited;
 	waited.start();
-	while (named(w, "Big Folder")->folderSize < 0 && waited.elapsed() < 5000) {
+	while (named(w, "dossier")->folderSize < 0 && waited.elapsed() < 5000) {
 		settle(20);
 	}
-	check(named(w, "Big Folder")->folderSize == 3000 &&
-		columnText(*named(w, "Big Folder"), COL_SIZE, all.list) == "3K",
+	check(named(w, "dossier")->folderSize == 3000 &&
+		columnText(*named(w, "dossier"), COL_SIZE, all.list) == "3K",
 		"a folder's size is its contents', subfolders too");
 	w->sortBy(COL_SIZE);
-	check(rowNames(w).first() == "Big Folder", "and it sorts by that size");
+	check(rowNames(w).first() == "dossier", "and it sorts by that size");
 	ViewOptions fewer = w->viewOptions();
 	fewer.list.columns = columnBit(COL_NAME) | columnBit(COL_KIND);
 	w->setViewOptions(fewer);

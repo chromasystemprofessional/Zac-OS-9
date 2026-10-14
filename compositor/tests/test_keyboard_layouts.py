@@ -77,8 +77,14 @@ with tempfile.TemporaryDirectory(prefix="zacos9-kb-") as directory:
                         return now
                     last = now
 
-            empty = bar()
-            wait_for("the menu bar", lambda: bar() != empty)
+            def drawn():
+                """The menu bar is up: its #DDDDDD face fills most of the strip."""
+                data = bar()
+                pixels = data[data.index(b"255\n") + 4:]
+                face = sum(pixels[i:i + 3] == b"\xdd\xdd\xdd" for i in range(0, len(pixels) - 2, 3))
+                return face > len(pixels) // 3 // 2
+
+            wait_for("the menu bar", drawn)
             us = settle()
 
             vp("cmd", " ", "wait", "300")
