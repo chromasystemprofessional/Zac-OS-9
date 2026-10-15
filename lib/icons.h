@@ -44,6 +44,8 @@ enum pl_icon_kind {
 	PL_ICON_EXT_SENSOR,
 	PL_ICON_EXT_SECURITY,
 	PL_ICON_EXT_CHIP,
+	PL_ICON_CLIPPING,          /* text or a picture dragged out of a document */
+	PL_ICON_INTERNET_LOCATION, /* a link dragged out of a browser */
 	PL_ICON_COUNT,
 };
 

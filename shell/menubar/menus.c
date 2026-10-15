@@ -142,6 +142,8 @@ static void add_finder_menus(struct mb_menu *menus, int *n) {
 	select_all->action = ACT_FINDER;
 	select_all->arg = strdup("select-all");
 	sep(edit);
+	add(edit, "Show Clipboard", 0, up, ACT_FINDER, "show-clipboard");
+	sep(edit);
 	add(edit, "Preferences…", 0, up, ACT_FINDER, "preferences");
 	m = new_menu(menus, n, "View");
 	const bool win = up && fs->window;

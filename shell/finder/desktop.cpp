@@ -1,4 +1,6 @@
 #include "desktop.h"
+
+#include "clippings.h"
 #include "thumbnails.h"
 #include "fileassoc.h"
 #include "customthemes.h"
@@ -715,6 +717,7 @@ void Desktop::clearDropTarget() {
 
 void Desktop::dragEnterEvent(QDragEnterEvent *e) {
 	if (iconsShown() && (e->mimeData()->hasUrls() || e->mimeData()->hasFormat(ALIAS_ITEMS_MIME) ||
+			(e->source() == nullptr && canMakeClipping(e->mimeData())) ||
 			e->mimeData()->hasFormat(APPLICATION_ITEMS_MIME) ||
 			e->mimeData()->hasFormat(STARTUP_ITEMS_MIME))) {
 		e->acceptProposedAction();
@@ -798,6 +801,21 @@ void Desktop::dropEvent(QDropEvent *e) {
 		update();
 		e->setDropAction(Qt::MoveAction);
 		e->accept();
+		return;
+	}
+	if (isClippingDrop(e)) {
+		/* A clipping lands where it was dropped. */
+		QPoint p = e->position().toPoint() - QPoint(PL_ICON_LARGE / 2, PL_ICON_LARGE / 2);
+		dropClippings(e, target, folderPath(), [this, &p](const QString &into, const QStringList &made) {
+			if (QDir(into) != QDir(folderPath())) {
+				return;
+			}
+			for (const QString &path : made) {
+				m_state.icons.insert(QFileInfo(path).fileName(), p);
+				p += QPoint(0, PL_ICON_LARGE + 24);
+			}
+			m_state.save(folderPath());
+		});
 		return;
 	}
 	dropItems(e, target, folderPath());

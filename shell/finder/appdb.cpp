@@ -685,6 +685,23 @@ static void rememberRecentDocument(GFile *file, GAppInfo *info) {
 	g_free(xbel);
 }
 
+bool appOpenUrl(const QString &url) {
+	const QByteArray uri = url.toUtf8();
+	char *scheme = g_uri_parse_scheme(uri.constData());
+	GAppInfo *info = scheme ? g_app_info_get_default_for_uri_scheme(scheme) : nullptr;
+	g_free(scheme);
+	if (!info) {
+		qWarning() << "No application for" << url;
+		return false;
+	}
+	GFile *file = g_file_new_for_uri(uri.constData());
+	GList files = { file, nullptr, nullptr };
+	const bool ok = launchInfo(info, &files);
+	g_object_unref(info);
+	g_object_unref(file);
+	return ok;
+}
+
 bool appOpenFile(const QString &path) {
 	GFile *file = g_file_new_for_path(path.toUtf8().constData());
 	GError *error = nullptr;

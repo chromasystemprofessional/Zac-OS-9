@@ -1,4 +1,6 @@
 #include "finder.h"
+
+#include "clippings.h"
 #include "platinumshell.h"
 #include "settings.h"
 
@@ -275,6 +277,8 @@ void Finder::command(const QString &name) {
 		const QString path = QDir::cleanPath(name.mid(5));
 		InfoWindow::open(path, path == "/" ? PL_ICON_DISK
 			: QFileInfo(path).isDir() ? PL_ICON_FOLDER : PL_ICON_DOCUMENT, displayName(path));
+	} else if (name == "show-clipboard") {
+		showClipboardWindow();
 	} else if (name == "select-all") {
 		if (FinderView *v = front()) {
 			v->selectAll();
@@ -489,6 +493,14 @@ void Finder::openItem(Item *item) {
 			launchClassic();
 		} else if (isExpandable(item->path)) {
 			expandArchive(item->path);
+		} else if (item->kind == PL_ICON_CLIPPING) {
+			openClippingWindow(item->path);
+		} else if (item->kind == PL_ICON_INTERNET_LOCATION) {
+			const QString url = internetLocationUrl(item->path);
+			if (url.isEmpty() || !appOpenUrl(url)) {
+				Alert::ask(item->visibleName() + " could not be opened." +
+					(url.isEmpty() ? QString(" It holds no address.") : QString()), "OK", QString());
+			}
 		} else {
 			if (!appOpenFile(item->path)) {
 				Alert::ask(item->visibleName() + " could not be opened.", "OK", QString());

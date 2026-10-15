@@ -1,4 +1,6 @@
 #include "folderwindow.h"
+
+#include "clippings.h"
 #include "tinyicons.h"
 #include "thumbnails.h"
 #include "fileassoc.h"
@@ -1724,7 +1726,9 @@ void FolderWindow::dragEnterEvent(QDragEnterEvent *e) {
 			/* Applications dragged to Startup Items, or to its folder. */
 			(e->source() != this && acceptsStartupDrops() &&
 				(mime->hasFormat(APPLICATION_ITEMS_MIME) || mime->hasFormat(ALIAS_ITEMS_MIME))) ||
-			e->mimeData()->hasUrls() || (e->mimeData()->hasFormat(ALIAS_ITEMS_MIME) &&
+			e->mimeData()->hasUrls() ||
+			(e->source() == nullptr && canMakeClipping(mime) && !vfsIsVirtual(m_path)) ||
+			(e->mimeData()->hasFormat(ALIAS_ITEMS_MIME) &&
 			!vfsIsVirtual(m_path)) ||
 			(e->mimeData()->hasFormat(ICON_MOVE_MIME) && e->source() == this)) {
 		e->acceptProposedAction();
@@ -1816,6 +1820,21 @@ void FolderWindow::dropEvent(QDropEvent *e) {
 		update();
 		e->setDropAction(Qt::MoveAction);
 		e->accept();
+		return;
+	}
+	if (isClippingDrop(e)) {
+		/* A clipping lands where it was dropped (in icon view). */
+		QPoint p = toContent(e->position().toPoint()) - QPoint(PL_ICON_LARGE / 2, PL_ICON_LARGE / 2);
+		dropClippings(e, target, m_path, [this, &p](const QString &into, const QStringList &made) {
+			if (QDir(into) != QDir(m_path) || m_mode != ViewMode::Icons) {
+				return;
+			}
+			for (const QString &path : made) {
+				m_state.icons.insert(QFileInfo(path).fileName(), p);
+				p += QPoint(0, PL_ICON_LARGE + 24);
+			}
+			saveStateSoon();
+		});
 		return;
 	}
 	dropItems(e, target, m_path);

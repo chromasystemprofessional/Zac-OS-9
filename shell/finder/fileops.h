@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <QMimeData>
 #include <QPoint>
 #include <QStringList>
@@ -45,6 +46,12 @@ QStringList draggedPaths(const QMimeData *mime);
 /* Drop onto `target` (a folder, the disk or the Trash item) or, with
  * target == nullptr, into `folder`. Notifies the Finder of changes. */
 void dropItems(QDropEvent *e, const Item *target, const QString &folder);
+/* Text, a picture or links dragged in from another program (clippings.h). */
+bool isClippingDrop(const QDropEvent *e);
+/* Makes them in `target` if it's a folder, else in `folder`: their paths. */
+/* `placed` (before the folder is shown again) may say where they go. */
+QStringList dropClippings(QDropEvent *e, const Item *target, const QString &folder,
+	const std::function<void(const QString &into, const QStringList &made)> &placed = {});
 /* Stop these Startup Items (desktop-file IDs) opening at login: the
  * Trash gesture on them, by drag or Move To Trash. */
 void removeFromStartupItems(const QStringList &ids);

@@ -87,3 +87,5 @@ const AppEntry *appByFile(const QString &desktopFile);
 bool appLaunchFile(const QString &desktopFile);
 /* Open a document with its registered application and launch feedback. */
 bool appOpenFile(const QString &path);
+/* An address (an Internet location's) in the program for its scheme. */
+bool appOpenUrl(const QString &url);

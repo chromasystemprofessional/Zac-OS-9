@@ -1,4 +1,6 @@
 #include "fileops.h"
+
+#include "clippings.h"
 #include "alias.h"
 #include "platinumshell.h"
 #include "settings.h"
@@ -492,6 +494,10 @@ QMimeData *itemDragMime(const std::vector<Item *> &items) {
 			urls << QUrl::fromLocalFile(item->path);
 		}
 		mime->setUrls(urls);
+		/* A clipping dragged into a document puts back what it holds. */
+		if (items.size() == 1) {
+			addClippingContent(mime, items.front()->path);
+		}
 	}
 	return mime;
 }
@@ -686,7 +692,39 @@ void removeFromStartupItems(const QStringList &ids) {
 	}
 }
 
+bool isClippingDrop(const QDropEvent *e) {
+	return e->source() == nullptr && canMakeClipping(e->mimeData());
+}
+
+QStringList dropClippings(QDropEvent *e, const Item *target, const QString &folder,
+		const std::function<void(const QString &into, const QStringList &made)> &placed) {
+	const QString into = target && target->kind == PL_ICON_FOLDER ? target->path : folder;
+	if (vfsIsVirtual(into) || !QFileInfo(into).isDir()) {
+		e->ignore();
+		return {};
+	}
+	QString error;
+	const QStringList made = makeClippings(e->mimeData(), into, &error);
+	e->setDropAction(Qt::CopyAction);
+	e->accept();
+	if (placed) {
+		placed(into, made);
+	}
+	Finder::instance().folderChanged(into);
+	if (made.isEmpty()) {
+		QTimer::singleShot(0, QCoreApplication::instance(), [error] {
+			Alert::ask("The clipping couldn't be made. " + error, "OK", QString());
+		});
+	}
+	return made;
+}
+
 void dropItems(QDropEvent *e, const Item *target, const QString &folder) {
+	/* Text, a picture or a link from another program: clippings. */
+	if (isClippingDrop(e)) {
+		dropClippings(e, target, folder);
+		return;
+	}
 	const bool toTrash = (target &&
 		(target->kind == PL_ICON_TRASH_EMPTY || target->kind == PL_ICON_TRASH_FULL)) ||
 		(!target && QDir(folder) == QDir(trashFilesPath()));

@@ -1,5 +1,7 @@
 #include "items.h"
 
+#include "clippings.h"
+
 #include <QDir>
 #include <QFileInfo>
 #include <QImage>
@@ -76,6 +78,10 @@ const QString &Item::kindName() {
 			kindText = "classic application";
 		} else if (kind == PL_ICON_APPLICATION) {
 			kindText = "application program";
+		} else if (kind == PL_ICON_CLIPPING) {
+			kindText = clippingKind(path) == ClippingKind::Picture ? "picture clipping" : "text clipping";
+		} else if (kind == PL_ICON_INTERNET_LOCATION) {
+			kindText = "Internet location";
 		} else {
 			static QMimeDatabase db;
 			kindText = db.mimeTypeForFile(path).comment();
@@ -165,6 +171,12 @@ pl_icon_kind iconKindFor(const QString &path) {
 	}
 	if (info.isDir()) {
 		return PL_ICON_FOLDER;
+	}
+	switch (clippingKind(iconPath)) {
+	case ClippingKind::Text:
+	case ClippingKind::Picture: return PL_ICON_CLIPPING;
+	case ClippingKind::Location: return PL_ICON_INTERNET_LOCATION;
+	case ClippingKind::None: break;
 	}
 	if (isWindowsExecutable(iconPath)) {
 		return PL_ICON_WINDOWS;
