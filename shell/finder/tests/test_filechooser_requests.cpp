@@ -1,3 +1,5 @@
+#include <gio/gio.h>
+
 #include "filechooserportal.h"
 #include "alias.h"
 #include "settings.h"
@@ -15,6 +17,9 @@
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QListWidget>
+#include <QMenu>
+#include <QMimeData>
+#include <QDropEvent>
 #include <QLineEdit>
 #include <QPushButton>
 #include <QStandardPaths>
@@ -456,6 +461,100 @@ int main(int argc, char **argv) {
 		});
 	check(listed, "Other Locations... shows the list of disks");
 	check(other.arguments().value(0).toUInt() == 1, "and cancelling it cancels the request");
+
+	/* Recent: documents and folders used lately, newest first; gone ones
+	 * aren't offered. Choosing one opens its folder with it selected. */
+	const QString letters = base + "/Letters";
+	check(QDir().mkpath(letters), "create a folder of recent documents");
+	const QString report = letters + "/report.txt";
+	QFile reportFile(report);
+	check(reportFile.open(QIODevice::WriteOnly), "create a recent document");
+	reportFile.close();
+	{
+		GBookmarkFile *bookmarks = g_bookmark_file_new();
+		const QByteArray reportUri = QUrl::fromLocalFile(report).toEncoded();
+		const QByteArray goneUri = QUrl::fromLocalFile(base + "/gone.txt").toEncoded();
+		const QByteArray lettersUri = QUrl::fromLocalFile(letters).toEncoded();
+		const QByteArray xbel = QFile::encodeName(base + "/data/recently-used.xbel");
+		g_bookmark_file_set_mime_type(bookmarks, reportUri.constData(), "text/plain");
+		g_bookmark_file_set_mime_type(bookmarks, goneUri.constData(), "text/plain");
+		g_bookmark_file_set_mime_type(bookmarks, lettersUri.constData(), "inode/directory");
+		for (const auto &[uri, when] : { std::pair{ lettersUri, 1000 }, { reportUri, 3000 }, { goneUri, 4000 } }) {
+			/* GLib drops bookmarks no program registered. */
+			g_bookmark_file_add_application(bookmarks, uri.constData(), "test", "true %u");
+			GDateTime *at = g_date_time_new_from_unix_utc(when);
+			g_bookmark_file_set_modified_date_time(bookmarks, uri.constData(), at);
+			g_date_time_unref(at);
+		}
+		QDir().mkpath(base + "/data");
+		check(g_bookmark_file_to_file(bookmarks, xbel.constData(), nullptr), "write recently-used.xbel");
+		g_bookmark_file_free(bookmarks);
+	}
+	check(fileChooserRecentItems() == QStringList{ report, letters },
+		"Recent lists documents and folders used lately, newest first, without gone ones");
+
+	bool reopened = false;
+	results = successfulResults(choose(client, "OpenFile", {},
+		[&](QDialog *dialog, const QString &) {
+			auto *button = dialog->findChild<QPushButton *>("recentButton");
+			check(button && button->menu(), "Open offers a Recent pop-up");
+			if (!button || !button->menu()) {
+				dialog->reject();
+				return;
+			}
+			auto *wait = new QTimer(&app);
+			QObject::connect(wait, &QTimer::timeout, [&reopened, wait, letters]() {
+				auto *picker = qobject_cast<QFileDialog *>(QApplication::activeModalWidget());
+				/* (the new dialog may sit where the old one was: same address) */
+				if (picker &&
+						QFileInfo(picker->directory().absolutePath()).canonicalFilePath() == letters) {
+					reopened = true;
+					wait->deleteLater();
+					QMetaObject::invokeMethod(picker, "accept");
+				}
+			});
+			wait->start(20);
+			emit button->menu()->aboutToShow();
+			for (QAction *action : button->menu()->actions()) {
+				if (action->text() == "report.txt") {
+					action->trigger();
+					return;
+				}
+			}
+			check(false, "the Recent pop-up lists the recent document");
+			dialog->reject();
+		}));
+	check(reopened, "choosing a recent document opens its folder");
+	check(results.value("uris").toStringList() ==
+		QStringList{ QUrl::fromLocalFile(report).toString(QUrl::FullyEncoded) },
+		"with the document selected, ready to open");
+
+	/* A folder dragged onto the dialog opens there. */
+	bool dropped = false;
+	const QDBusMessage drop = choose(client, "SaveFile", {},
+		[&](QDialog *dialog, const QString &) {
+			auto *wait = new QTimer(&app);
+			QObject::connect(wait, &QTimer::timeout, [&dropped, wait, letters]() {
+				auto *picker = qobject_cast<QFileDialog *>(QApplication::activeModalWidget());
+				/* (the new dialog may sit where the old one was: same address) */
+				if (picker &&
+						QFileInfo(picker->directory().absolutePath()).canonicalFilePath() == letters) {
+					dropped = true;
+					wait->deleteLater();
+					picker->reject();
+				}
+			});
+			wait->start(20);
+			QMimeData mime;
+			mime.setUrls({ QUrl::fromLocalFile(letters) });
+			QDragEnterEvent enter(QPoint(10, 10), Qt::CopyAction, &mime, Qt::LeftButton, Qt::NoModifier);
+			QApplication::sendEvent(dialog, &enter);
+			check(enter.isAccepted(), "the dialog takes a dragged folder");
+			QDropEvent dropEvent(QPointF(10, 10), Qt::CopyAction, &mime, Qt::LeftButton, Qt::NoModifier);
+			QApplication::sendEvent(dialog, &dropEvent);
+		});
+	check(dropped && drop.arguments().value(0).toUInt() == 1,
+		"a folder dropped on the dialog opens there");
 	pl_setting_set("documents-folder", nullptr);
 	return failures ? 1 : 0;
 }

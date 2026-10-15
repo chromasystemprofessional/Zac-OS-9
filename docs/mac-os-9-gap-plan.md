@@ -274,8 +274,8 @@ A zram/swap switch in a Memory panel is a possible P3.
 |---|---|---|
 | Open/Save through the ZacOS file-chooser portal | ✅ | `shell/finder/filechooserportal.cpp` |
 | Keyboard navigation (type-select, arrows, ⌘-↑, ⌘-D desktop, ⌘-N new folder) | ✅? | Verify against p. 127. |
-| Shortcuts, **Favorites** and **Recent** pop-ups (Navigation Services) | ◐ | Favorite folders are offered as locations (0.1.54); Recent still to do. P3 S |
-| Drag a folder onto the dialog to jump there | ✗? | Verify. P3 S |
+| Shortcuts, **Favorites** and **Recent** pop-ups (Navigation Services) | ✅ | Favorite folders are offered as locations (0.1.54); a Recent button on the location list and the file dialog lists recently-used.xbel's documents and folders (Zac Menu Options' count): a document opens its folder with it selected. No separate Shortcuts pop-up: the location list is that. |
+| Drag a folder onto the dialog to jump there | ✅ | It didn't: the dialog now takes a dropped folder (or file, selected) and opens again in the location holding it. |
 | General Controls ▸ Documents: default save folder | ✅ | Folder set by the application (the list of disks, as before), last folder used in the program, or Documents; the latter two open straight in the folder, with Other Locations… |
 
 ### 3.9 Moving data (ch. 9)

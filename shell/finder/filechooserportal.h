@@ -45,6 +45,10 @@ void fileChooserRememberFolder(const QString &appId, const QString &folder);
  * an empty location if none does. */
 FileChooserLocation fileChooserLocationFor(const QList<FileChooserLocation> &locations,
 	const QString &folder, QString *browse);
+/* Mac OS 9's Recent pop-up: documents and folders used lately, newest
+ * first (recently-used.xbel), at most Zac Menu Options' count of recent
+ * documents; gone ones and other computers' are left out. */
+QStringList fileChooserRecentItems();
 /* Loads the Finder's Macintosh view ahead of the first request. */
 void fileChooserWarmUp();
 /* Rebuilds the startup disk's chooser tree under `parent` (replacing it). */

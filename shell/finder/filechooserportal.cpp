@@ -42,6 +42,10 @@
 #include <QSharedPointer>
 #include <QTimer>
 #include <QComboBox>
+#include <QDragEnterEvent>
+#include <QDropEvent>
+#include <QMenu>
+#include <QMimeData>
 #include <QToolButton>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -81,10 +85,40 @@ bool hiddenSystemMount(const QString &path) {
 	return false;
 }
 
+/* A Recent button: its menu lists fileChooserRecentItems(); choosing one
+ * calls `chosen` with its path. */
+QPushButton *recentButton(QWidget *parent, std::function<void(const QString &)> chosen) {
+	auto *button = new QPushButton("Recent", parent);
+	button->setObjectName("recentButton");
+	button->setAutoDefault(false);
+	auto *menu = new QMenu(button);
+	QObject::connect(menu, &QMenu::aboutToShow, menu, [menu, chosen] {
+		menu->clear();
+		const QStringList items = fileChooserRecentItems();
+		for (const QString &path : items) {
+			menu->addAction(QFileInfo(path).fileName(), menu, [chosen, path] { chosen(path); });
+		}
+		if (items.isEmpty()) {
+			menu->addAction("No recent items")->setEnabled(false);
+		}
+	});
+	button->setMenu(menu);
+	return button;
+}
+
+/* The local folder or file a drag carries, if just one. */
+QString droppedPath(const QMimeData *mime) {
+	const QList<QUrl> urls = mime ? mime->urls() : QList<QUrl>{};
+	return urls.size() == 1 && urls[0].isLocalFile() && QFileInfo::exists(urls[0].toLocalFile()) ?
+		QDir::cleanPath(urls[0].toLocalFile()) : QString();
+}
+
 class DriveFileDialog : public QFileDialog {
 public:
-	/* What exec() returns for Other Locations... */
+	/* What exec() returns for Other Locations..., and for a Recent item or
+	 * a dropped folder (see jumpTo()). */
 	static constexpr int OtherLocations = 2;
+	static constexpr int JumpElsewhere = 3;
 
 	/* `otherLocations`: it opened straight in a folder (General Controls'
 	 * Documents), so it offers the list of disks, too. */
@@ -108,6 +142,9 @@ public:
 			layout()->addWidget(other);
 			connect(other, &QPushButton::clicked, this, [this] { done(OtherLocations); });
 		}
+		layout()->addWidget(recentButton(this, [this](const QString &path) { jump(path); }));
+		/* A folder dragged onto the dialog opens there (Navigation Services). */
+		setAcceptDrops(true);
 		for (const char *name : { "backButton", "forwardButton" }) {
 			if (auto *button = findChild<QToolButton *>(name)) {
 				button->hide();
@@ -123,7 +160,38 @@ public:
 		updateLocation();
 	}
 
+	/* The Recent item or dropped folder to go to, once exec() has returned
+	 * JumpElsewhere. */
+	QString jumpTo() const { return m_jumpTo; }
+
+	/* Go to `path` (a folder, or a file to select in its folder): the
+	 * dialog ends with JumpElsewhere and opens again in the location that
+	 * holds it, through the startup disk's links if that's where it is
+	 * (finding them rebuilds the tree this dialog is showing). */
+	void jump(const QString &path) {
+		m_jumpTo = path;
+		done(JumpElsewhere);
+	}
+
 protected:
+	void dragEnterEvent(QDragEnterEvent *e) override {
+		if (!droppedPath(e->mimeData()).isEmpty()) {
+			e->acceptProposedAction();
+		}
+	}
+	void dragMoveEvent(QDragMoveEvent *e) override {
+		if (!droppedPath(e->mimeData()).isEmpty()) {
+			e->acceptProposedAction();
+		}
+	}
+	void dropEvent(QDropEvent *e) override {
+		const QString path = droppedPath(e->mimeData());
+		if (!path.isEmpty()) {
+			e->acceptProposedAction();
+			jump(path);
+		}
+	}
+
 	void accept() override {
 		for (const QString &path : selectedFiles()) {
 			if (!fileChooserPathWithinDisk(path, m_root, m_realRoots, false)) {
@@ -168,6 +236,7 @@ private:
 
 	QString m_root;
 	QStringList m_realRoots;
+	QString m_jumpTo;
 	QLabel *m_location = nullptr;
 	QLabel *m_error = nullptr;
 };
@@ -284,6 +353,10 @@ public:
 
 		auto *buttons = new QDialogButtonBox(QDialogButtonBox::Open |
 			QDialogButtonBox::Cancel, this);
+		buttons->addButton(recentButton(this, [this](const QString &path) {
+			m_recent = path;
+			done(DriveFileDialog::JumpElsewhere);
+		}), QDialogButtonBox::ActionRole);
 		m_open = buttons->button(QDialogButtonBox::Open);
 		m_open->setEnabled(m_locations->count() > 0);
 		layout->addWidget(buttons);
@@ -299,6 +372,8 @@ public:
 		const QListWidgetItem *item = m_locations->currentItem();
 		return item ? m_drives.value(item->data(Qt::UserRole).toInt()) : FileChooserLocation{};
 	}
+	/* The Recent item chosen instead, after exec() returned JumpElsewhere. */
+	QString recent() const { return m_recent; }
 
 protected:
 	void accept() override {
@@ -328,6 +403,7 @@ protected:
 	}
 
 private:
+	QString m_recent;
 	QList<FileChooserLocation> m_drives;
 	QListWidget *m_locations = nullptr;
 	QPushButton *m_open = nullptr;
@@ -399,16 +475,32 @@ private:
 	 * goes back to the list. */
 	static QStringList run(QWidget *parent, const QString &title, const QString &appId,
 			ChooserRequest &request, const std::function<void(DriveFileDialog &)> &setUp) {
-		QString folder;
+		QString folder, select;
 		FileChooserLocation start;
 		const QString startFolder = fileChooserStartFolder(appId);
 		if (!startFolder.isEmpty()) {
 			start = fileChooserLocationFor(fileChooserLocations(), startFolder, &folder);
 		}
+		/* A Recent item or dropped folder: the location holding it, opened
+		 * there (a document selected). Somewhere we can't go: the list. */
+		auto jump = [&](const QString &path) {
+			const QFileInfo info(path);
+			select = info.isDir() ? QString() : info.fileName();
+			start = fileChooserLocationFor(fileChooserLocations(),
+				info.isDir() ? path : info.absolutePath(), &folder);
+		};
 		for (;;) {
 			if (start.path.isEmpty()) {
 				folder.clear();
-				start = chooseLocation(parent, title, request);
+				select.clear();
+				QString recent;
+				start = chooseLocation(parent, title, request, &recent);
+				if (!recent.isEmpty()) {
+					jump(recent);
+					if (start.path.isEmpty()) {
+						continue;
+					}
+				}
 				if (start.path.isEmpty()) {
 					return {};
 				}
@@ -418,9 +510,16 @@ private:
 			if (!folder.isEmpty()) {
 				dialog.setDirectory(folder);
 			}
+			if (!select.isEmpty()) {
+				dialog.selectFile(select);
+			}
 			const int result = request.run(dialog);
 			if (result == DriveFileDialog::OtherLocations && !request.cancelled) {
 				start = {};
+				continue;
+			}
+			if (result == DriveFileDialog::JumpElsewhere && !request.cancelled) {
+				jump(dialog.jumpTo());
 				continue;
 			}
 			if (result != QDialog::Accepted) {
@@ -432,13 +531,16 @@ private:
 	}
 
 	static FileChooserLocation chooseLocation(QWidget *parent, const QString &title,
-			ChooserRequest &request) {
+			ChooserRequest &request, QString *recent) {
 		LocationDialog locations(title);
 		if (parent) {
 			locations.setParent(parent, Qt::Dialog);
 		}
-		return request.run(locations) == QDialog::Accepted ? locations.selectedDrive() :
-			FileChooserLocation{};
+		const int result = request.run(locations);
+		if (result == DriveFileDialog::JumpElsewhere && !request.cancelled) {
+			*recent = locations.recent();
+		}
+		return result == QDialog::Accepted ? locations.selectedDrive() : FileChooserLocation{};
 	}
 
 	static void applyFilters(QFileDialog &dialog, const QVariantMap &options) {
@@ -826,6 +928,42 @@ FileChooserLocation fileChooserLocationFor(const QList<FileChooserLocation> &loc
 		}
 	}
 	return {};
+}
+
+QStringList fileChooserRecentItems() {
+	char v[16];
+	const int max = pl_setting("recent-documents", v, sizeof(v)) ? std::clamp(atoi(v), 0, 50) : 10;
+	struct Recent {
+		QString path;
+		qint64 when;
+	};
+	QList<Recent> recent;
+	char *xbel = g_build_filename(g_get_user_data_dir(), "recently-used.xbel", nullptr);
+	GBookmarkFile *bookmarks = g_bookmark_file_new();
+	if (g_bookmark_file_load_from_file(bookmarks, xbel, nullptr)) {
+		gsize n = 0;
+		char **uris = g_bookmark_file_get_uris(bookmarks, &n);
+		for (gsize i = 0; i < n; i++) {
+			char *file = g_filename_from_uri(uris[i], nullptr, nullptr);
+			if (file && g_file_test(file, G_FILE_TEST_EXISTS)) {
+				GDateTime *modified = g_bookmark_file_get_modified_date_time(bookmarks, uris[i], nullptr);
+				recent << Recent{ QFile::decodeName(file), modified ? g_date_time_to_unix(modified) : 0 };
+			}
+			g_free(file);
+		}
+		g_strfreev(uris);
+	}
+	g_bookmark_file_free(bookmarks);
+	g_free(xbel);
+	std::stable_sort(recent.begin(), recent.end(),
+		[](const Recent &a, const Recent &b) { return a.when > b.when; });
+	QStringList paths;
+	for (const Recent &r : recent) {
+		if (paths.size() < max) {
+			paths << r.path;
+		}
+	}
+	return paths;
 }
 
 /* Removes a chooser tree without following its links into real folders. */
