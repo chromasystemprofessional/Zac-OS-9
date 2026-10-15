@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Pedigree
+Comment=What this computer is, what's in it and what it runs
+Exec=zacos9-pedigree
+Terminal=false
+Categories=System;Monitor;
+OnlyShowIn=ZacOS9;

@@ -771,6 +771,27 @@ test('dog-ears-notes',
   ),
 )
 
+# Pedigree (Apple System Profiler).
+pedigree_sources = ['pedigree/pedigreewindow.cpp', 'pedigree/profile.cpp',
+  'finder/alert.cpp', 'finder/platinumshell.cpp', finder_protocol]
+executable('zacos9-pedigree', 'pedigree/main.cpp', pedigree_sources,
+  link_with: panelkit,
+  include_directories: include_directories('finder', 'panels', 'pedigree'),
+  dependencies: [platinum_dep, qt6, wayland_client],
+  cpp_args: ['-std=c++17'],
+  install: true,
+)
+test('pedigree',
+  executable('test-pedigree', 'pedigree/tests/test_pedigree.cpp', pedigree_sources,
+    link_with: panelkit,
+    include_directories: include_directories('finder', 'panels', 'pedigree'),
+    dependencies: [platinum_dep, qt6, wayland_client],
+    cpp_args: ['-std=c++17'],
+  ),
+  env: ['QT_QPA_PLATFORM=offscreen'],
+  timeout: 30,
+)
+
 # The Calculator desk accessory.
 executable('zacos9-calculator',
   'calculator/main.cpp', 'calculator/engine.cpp',

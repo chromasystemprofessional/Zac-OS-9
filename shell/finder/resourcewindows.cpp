@@ -20,6 +20,8 @@
 #include "pixels.h"
 #include "resources.h"
 #include "userservices.h"
+#include "platinumshell.h"
+#include "vfs.h"
 
 namespace {
 
@@ -499,6 +501,10 @@ QPointer<ResourceListWindow> &extensionsWindow() {
 } // namespace
 
 void openSystemInformation() {
+	// Pedigree, if it's here; this summary otherwise.
+	if (platinumStartApplication(siblingProgram("zacos9-pedigree"), {})) {
+		return;
+	}
 	if (!systemWindow()) {
 		systemWindow() = new ResourceListWindow(ResourceListWindow::Page::System);
 	}

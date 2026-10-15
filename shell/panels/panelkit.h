@@ -194,6 +194,10 @@ void panelMenuNear(QWidget *owner, const std::vector<PopupItem> &items, int chec
 	const QRect &anchor, int roomAbove, pl_font font, std::function<void(int)> chosen,
 	std::function<void()> closed = {});
 
+/* A disclosure triangle (HIG figure 2-24), 7 x 12 at (x, y): pointing
+ * right, or down when expanded. */
+void panelDisclosure(pl_canvas *c, int x, int y, bool expanded);
+
 /* An ARGB icon at (x, y), where it isn't transparent. */
 void panelIcon(pl_canvas *c, const QImage &icon, int x, int y);
 

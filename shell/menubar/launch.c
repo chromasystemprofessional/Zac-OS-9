@@ -341,6 +341,7 @@ void launch_fill_logo_menu(struct mb_menu *menu, const struct app *apps, int n_a
 		const struct { const char *name, *program; } accessories[] = {
 			{ "Calculator", "zacos9-calculator" },
 			{ "Dog Ears", "zacos9-dogears" },
+			{ "Pedigree", "zacos9-pedigree" },
 		};
 		for (size_t i = 0; i < sizeof(accessories) / sizeof(accessories[0]); i++) {
 			char command[PATH_MAX + 64];

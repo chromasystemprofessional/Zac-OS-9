@@ -22,6 +22,7 @@
 #include "infowindow.h"
 #include "settings.h"
 #include "platinumshell.h"
+#include "panelkit.h"
 
 /* Item-count header: HIG figure 2-24. */
 static constexpr int HEADER_H = 21;       /* white row, #DDD, #AAA shade */
@@ -50,48 +51,6 @@ static constexpr int COL_TEXT_X = 6;      /* text inset in non-name columns */
 
 static constexpr int ARROW_STEP = 16;
 static constexpr int REPEAT_FIRST_MS = 300, REPEAT_MS = 50;
-
-/* Disclosure triangle, collapsed (pointing right), with its shadow:
- * HIG figure 2-24. 0 black, d/c/e lavender light/mid/dark, 6 #888, f #BBB. */
-static const char *const TRIANGLE[12] = {
-	"0......",
-	"00.....",
-	"0d0....",
-	"0dc0...",
-	"0dcc0..",
-	"0dcce0.",
-	"0dce06f",
-	"0de06f.",
-	"0c06f..",
-	"006f...",
-	"06f....",
-	".f.....",
-};
-
-static uint32_t triangleColor(char ch) {
-	switch (ch) {
-	case '0': return C_BLACK;
-	case 'd': return RGB(0xCC, 0xCC, 0xFF);
-	case 'c': return RGB(0x99, 0x99, 0xFF);
-	case 'e': return RGB(0x66, 0x66, 0xCC);
-	case '6': return GRAY(0x8);
-	case 'f': return GRAY(0xB);
-	default: return 0;
-	}
-}
-
-/* Expanded triangles point down: the same art transposed.
- * TODO: measure the expanded triangle (figure 2-24's right window). */
-static void paintTriangle(pl_canvas *c, int x, int y, bool expanded) {
-	for (int j = 0; j < 12; j++) {
-		for (int i = 0; i < 7; i++) {
-			uint32_t v = triangleColor(TRIANGLE[j][i]);
-			if (v) {
-				pl_put(c, expanded ? x + j - 3 : x + i, expanded ? y + i + 3 : y + j, v);
-			}
-		}
-	}
-}
 
 /* ---- windows --------------------------------------------------------------- */
 
@@ -1227,7 +1186,7 @@ void FolderWindow::paintList(pl_canvas *c) {
 		pl_hline(c, 0, std::max(listWidth(), right), top + m.rowH - 1, C_WHITE);
 
 		if (item->isDir) {
-			paintTriangle(c, TRI_X + d, top + (m.rowH - 13) / 2, m_expanded.contains(item->path));
+			panelDisclosure(c, TRI_X + d, top + (m.rowH - 13) / 2, m_expanded.contains(item->path));
 		}
 		const bool highlight = item->selected || item->dropTarget;
 		if (m.icon == TINY_ICON) {

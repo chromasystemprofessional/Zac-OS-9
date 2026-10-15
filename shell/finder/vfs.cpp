@@ -296,11 +296,14 @@ bool migrate(QJsonObject *root) {
 
 /* ---- generated nodes ---------------------------------------------------- */
 
-/* A program of ours, from next to this binary in a build tree, else $PATH. */
+} // namespace
+
 QString siblingProgram(const QString &name) {
 	const QString local = QCoreApplication::applicationDirPath() + "/" + name;
 	return QFileInfo(local).isExecutable() ? local : name;
 }
+
+namespace {
 
 struct PanelDef {
 	const char *name, *program, *arg;
