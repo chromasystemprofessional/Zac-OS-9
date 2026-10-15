@@ -12,9 +12,14 @@
 # Basilisk II (System 7 to Mac OS 8.1). The home folder is shared with
 # the Mac as the "Unix" volume. --check only reports what would run;
 # problems go to stderr, one line, with exit status 2.
+#
+# The Startup Disk control panel picks the disk the Mac starts up from
+# ("startup-disk=PATH" in ~/.config/zacos9/classic.conf): it is attached
+# first, and a CD is started from as a CD.
 set -eu
 
 classic_dir=${ZACOS9_CLASSIC_DIR:-$HOME/Classic}
+classic_conf=${XDG_CONFIG_HOME:-$HOME/.config}/zacos9/classic.conf
 self_dir=$(cd "$(dirname "$0")" && pwd)
 check=false
 arch=ppc
@@ -123,6 +128,14 @@ exe=$(emulator $program) || fail "$program isn't installed. Build it with emulat
 
 disks=$(printf '%s\n%s\n' "$extra_disks" "$(find_disks)" | grep . | awk '!seen[$0]++' || true)
 
+# The chosen startup disk, if it is still there, goes first.
+startup=$(sed -n 's/^startup-disk=//p' "$classic_conf" 2>/dev/null | tail -n 1)
+if [ -n "$startup" ] && [ -f "$startup" ]; then
+	disks=$(printf '%s\n%s\n' "$startup" "$disks" | grep . | awk '!seen[$0]++')
+else
+	startup=""
+fi
+
 # Installing from a CD image needs a hard disk to install onto: make a
 # blank one (sparse, 2 GB), which the installer offers to initialise.
 is_cd() {
@@ -156,6 +169,7 @@ if $check; then
 	echo "emulator: $exe"
 	echo "rom: $rom"
 	echo "$disks" | sed -n 's/^./disk: &/p'
+	[ -z "$startup" ] || echo "startup: $startup"
 	[ -n "$disks" ] || echo "disks: none (the Mac will wait for a startup disk)"
 	exit 0
 fi
@@ -179,6 +193,10 @@ for d in $disks; do
 	! is_cd "$d" || set -- "$@" --disk "*$d"
 done
 IFS=$old_ifs
+# Started from a CD on purpose: the CD-ROM driver's number.
+if [ -n "$startup" ] && is_cd "$startup"; then
+	set -- "$@" --bootdriver -62
+fi
 
 # SDL's Wayland backend never shows a window here; Xwayland works.
 # TODO: find out why (frame callbacks? libdecor?).

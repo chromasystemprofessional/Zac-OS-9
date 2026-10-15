@@ -8,6 +8,11 @@
  * Restart starts it now. zacos9-startupdisk-helper (as root, through
  * pkexec) reads and sets GRUB's default; ZACOS9_STARTUPDISK_HELPER points
  * at another one, for tests.
+ *
+ * Below the list, the disk Old Dog (Classic) starts up with: of the disks
+ * zacos9-classic attaches, those with a System Folder. The choice goes to
+ * ~/.config/zacos9/classic.conf, which the launcher reads; ZACOS9_CLASSIC
+ * points at another launcher, for tests.
  */
 
 #include <QList>
@@ -26,6 +31,20 @@ QList<StartupEntry> parseStartupEntries(const QString &output, QString *current)
 /* An entry's icon (a pl_icon_kind). */
 int startupEntryIcon(const StartupEntry &entry);
 
+/* A Classic disk image: its volume's name and whether it has a System
+ * Folder (a blessed folder on its HFS or HFS+ volume, bare or in an Apple
+ * partition map). */
+struct ClassicDisk {
+	QString path, name;
+	bool cd = false, system = false;
+};
+ClassicDisk classicDisk(const QString &path);
+/* zacos9-classic --check's output: the disks, and the chosen one. */
+QStringList parseClassicCheck(const QString &output, QString *startup);
+/* Where the choice is kept, and keeping it there. */
+QString classicConfPath();
+bool setClassicStartupDisk(const QString &path);
+
 class StartupDiskPanel : public QWidget {
 public:
 	StartupDiskPanel();
@@ -38,6 +57,10 @@ public:
 	void setShowEveryVersion(bool on);
 	/* As a click on a row. */
 	void pick(int row);
+	QStringList classicRows() const;
+	int classicSelected() const;
+	QString classicProblem() const;
+	void pickClassic(int row);
 
 protected:
 	void paintEvent(QPaintEvent *) override;
@@ -56,4 +79,6 @@ private:
 	void choose(int row);
 	void restart();
 	void lookForOthers();
+	void reloadClassic();
+	void chooseClassic(int row);
 };

@@ -10,3 +10,6 @@ install_data('50-zacos9-startupdisk.rules',
 test('startupdisk-helper', find_program('python3'),
   args: [files('../tests/startupdisk/test_helper.py'), files('zacos9-startupdisk-helper'),
     files('../tests/startupdisk/grub.cfg')])
+# Old Dog's launcher and the startup disk the panel chose for it.
+test('startupdisk-classic', find_program('python3'),
+  args: [files('../tests/startupdisk/test_classic.py'), files('../shell/classic/zacos9-classic')])
