@@ -1,3 +1,12 @@
+zacos9 (0.1.58) trixie; urgency=medium
+
+  * Users control panel: add, change and remove the accounts of the people
+    who use this computer, their pictures and passwords, who can administer
+    it and who can log in. Changes to other accounts ask for an
+    administrator's password. ZacOS now uses accountsservice for this.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Thu, 15 Oct 2026 12:01:07 -0400
+
 zacos9 (0.1.57) trixie; urgency=medium
 
   * Pop-up windows: View > as Pop-up Window keeps a folder as a tab along
