@@ -198,6 +198,7 @@ int main(int argc, char *argv[]) {
 	server.lock_layer = wlr_scene_tree_create(root);
 	server.saver_layer = wlr_scene_tree_create(root);
 	outline_init(&server.outline, server.overlay_layer);
+	tracks_init(&server);
 
 	/* GTK3 asks for decorations through the older KDE protocol. */
 	wlr_server_decoration_manager_set_default_mode(

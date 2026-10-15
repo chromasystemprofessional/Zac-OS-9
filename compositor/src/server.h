@@ -56,6 +56,8 @@ struct plat_server {
 	/* Mouse and Keyboard panel settings (prefs.c). */
 	double pointer_speed;
 	int double_click_ms;
+	bool mouse_tracks; /* a trail of arrows behind the pointer (tracks.c) */
+	bool thick_ibeam;  /* the text cursor, when asked for by name, is thicker */
 
 	/* Scene layers, bottom to top:
 	 *   desktop, shell[BACKGROUND], shell[BOTTOM], view_layer, popup_layer,
@@ -507,6 +509,9 @@ void output_zoom_box(int width, int height, double px, double py, double factor,
  * program it is being dragged (false if it can't be). */
 int platinum_shell_proxy_for(struct wlr_surface *surface);
 bool platinum_shell_proxy_drag(struct plat_view *view);
+/* Mouse Tracks (tracks.c): call after the pointer moves. */
+void tracks_init(struct plat_server *server);
+void tracks_moved(struct plat_server *server);
 /* Space during a drag: tell the program under it to spring its folder
  * open now (false if it can't be told). */
 bool platinum_shell_drag_spring(struct wlr_drag *drag);

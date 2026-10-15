@@ -55,3 +55,12 @@ with tempfile.TemporaryDirectory(prefix="zacos9-cursors-") as directory:
     arrow = (theme / "default").read_bytes()
     assert struct.unpack_from("<I", arrow, 12)[0] == 2, "Normal pointer must remain static"
 print("ok: dog bone spins clockwise; aliases, hotspots, timing and HiDPI pixels")
+
+# The Mouse panel's Thick I-Beam: the text cursor, twice as thick, with
+# no other names (zacos9-wm picks it for "text" itself).
+thin = next(c for c in definitions if c["name"] == "text")
+thick = next(c for c in definitions if c["name"] == "text-thick")
+stem = lambda c: c["rows"][8].count("K")  # the middle row
+assert thick["aliases"] == [] and thick["hot"] == thin["hot"]
+assert (stem(thin), stem(thick)) == (1, 2), (stem(thin), stem(thick))
+print("ok: the thick I-beam is the text cursor, thicker")

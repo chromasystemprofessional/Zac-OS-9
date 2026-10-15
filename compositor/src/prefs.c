@@ -290,6 +290,10 @@ static void apply_layout(struct plat_server *server) {
 void prefs_apply(struct plat_server *server) {
 	server->pointer_speed = tracking[setting_int("mouse-speed", TRACKING_DEFAULT, 0, 6)];
 	server->double_click_ms = setting_int("double-click", PLAT_DOUBLE_CLICK_MS, 150, 2000);
+	bool on = false;
+	server->mouse_tracks = prefs_flag("mouse-tracks", &on) && on;
+	on = false;
+	server->thick_ibeam = prefs_flag("thick-ibeam", &on) && on;
 
 	input_apply_layouts(server);
 	input_apply_trackpads(server);

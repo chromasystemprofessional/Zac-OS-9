@@ -866,8 +866,11 @@ void input_refresh_cursor(struct plat_server *server) {
 	if (server->cursor_client &&
 			server->cursor_client == server->seat->pointer_state.focused_client) {
 		if (server->client_cursor_name) {
+			/* The Mouse panel's Thick I-Beam, for programs that ask for
+			 * the text cursor by name (cursor-shape-v1). */
+			const bool text = strcmp(server->client_cursor_name, "text") == 0;
 			wlr_cursor_set_xcursor(server->cursor, server->cursor_mgr,
-				server->client_cursor_name);
+				text && server->thick_ibeam ? "text-thick" : server->client_cursor_name);
 		} else {
 			wlr_cursor_set_surface(server->cursor, server->client_cursor_surface,
 				server->cursor_hotspot_x, server->cursor_hotspot_y);
@@ -889,6 +892,7 @@ static void refresh_cursor_or_hide(struct plat_server *server) {
 }
 
 static void process_cursor_motion(struct plat_server *server, uint32_t time) {
+	tracks_moved(server);
 	if (access_zoom_factor() > 1.0) {
 		/* Zoom follows the pointer. */
 		struct plat_output *output;

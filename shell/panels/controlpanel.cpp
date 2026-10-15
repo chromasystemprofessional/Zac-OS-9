@@ -51,6 +51,18 @@ static void setInt(const char *key, int value) {
 	pl_setting_set(key, QByteArray::number(value).constData());
 }
 
+static bool settingOn(const char *key, bool fallback) {
+	char v[16];
+	if (!pl_setting(key, v, sizeof(v))) {
+		return fallback;
+	}
+	return strcmp(v, "true") == 0 || strcmp(v, "1") == 0;
+}
+
+static void setOn(const char *key, bool on) {
+	pl_setting_set(key, on ? "true" : "false");
+}
+
 /* A group box: its top line, its title, and its bottom line. */
 struct Group {
 	int top, bottom;
@@ -206,10 +218,22 @@ static constexpr int SLIDER_GROUP_H = 1 + PL_GROUP_MARGIN_TOP + PL_SLIDER_H + 14
 
 class MousePanel : public ControlPanel {
 public:
-	MousePanel() : ControlPanel("Mouse", 230) {
+	MousePanel() : ControlPanel("Mouse", 230 + OPTIONS_H + 12 + 16) {
 		const int g1 = 26, g2 = g1 + SLIDER_GROUP_H + 12 + 16;
+		const int g3 = g2 + 1 + PL_GROUP_MARGIN_TOP + 52 + PL_GROUP_MARGIN + 12 + 16;
 		m_groups = { { g1, g1 + SLIDER_GROUP_H, "Mouse Tracking" },
-			{ g2, g2 + 1 + PL_GROUP_MARGIN_TOP + 52 + PL_GROUP_MARGIN, "Double-Click Speed" } };
+			{ g2, g2 + 1 + PL_GROUP_MARGIN_TOP + 52 + PL_GROUP_MARGIN, "Double-Click Speed" },
+			{ g3, g3 + OPTIONS_H, "Options" } };
+
+		/* The PowerBooks' options, for a pointer that's hard to follow:
+		 * zacos9-wm draws both (compositor/src/tracks.c, input.c). */
+		m_tracks = PanelCheckbox("Mouse Tracks", QPoint(M + IN, g3 + 1 + PL_GROUP_MARGIN_TOP));
+		m_tracks.on = settingOn("mouse-tracks", false);
+		m_tracks.toggled = [](bool on) { setOn("mouse-tracks", on); };
+		m_ibeam = PanelCheckbox("Thick I-Beam", QPoint(M + IN, g3 + 1 + PL_GROUP_MARGIN_TOP + 20));
+		m_ibeam.on = settingOn("thick-ibeam", false);
+		m_ibeam.toggled = [](bool on) { setOn("thick-ibeam", on); };
+		m_checks = { &m_tracks, &m_ibeam };
 		placeSlider(m_tracking, g1, 7, settingInt("mouse-speed", 3), "Very Slow", "Fast");
 		m_tracking.changed = [](int v) { setInt("mouse-speed", v); };
 
@@ -259,8 +283,10 @@ protected:
 	}
 
 private:
+	static constexpr int OPTIONS_H = 1 + PL_GROUP_MARGIN_TOP + 32 + PL_GROUP_MARGIN;
 	PanelSlider m_tracking;
 	PanelRadios m_speed;
+	PanelCheckbox m_tracks, m_ibeam;
 	QRect m_test;
 	QTimer m_flash;
 	bool m_lit = false;
@@ -1457,18 +1483,6 @@ private:
 };
 
 /* ---- Trackpad ------------------------------------------------------------------------ */
-
-static bool settingOn(const char *key, bool fallback) {
-	char v[16];
-	if (!pl_setting(key, v, sizeof(v))) {
-		return fallback;
-	}
-	return strcmp(v, "true") == 0 || strcmp(v, "1") == 0;
-}
-
-static void setOn(const char *key, bool on) {
-	pl_setting_set(key, on ? "true" : "false");
-}
 
 /* Mac OS 9's Trackpad panel (the PowerBooks'): tracking and double-click
  * speed, shared with the Mouse panel, and what a tap on the pad does
