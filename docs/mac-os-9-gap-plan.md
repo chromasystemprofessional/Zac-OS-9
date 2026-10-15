@@ -502,17 +502,83 @@ updates `PROJECT_STATUS.md` and the relevant `docs/` page.
 | 2.16 ✅ | **Collar modules**: media playback (MPRIS), File Sharing on/off and visitors | `shell/collar/` | S each |
 | 2.17 ✅ | Sniffer list-view columns: choose, reorder, resize, shortening dates/sizes, Reset Column Positions | `shell/finder/folderwindow.cpp` | M |
 
-### Milestone 3 — Long tail (P3)
+### Milestone 3 — Finishing touches (P3)
 
-Hint Bubbles · Notepad · Stash · Key Tags · Bark Recorder · Plotter · Jigsaw · Walkies · Retriever · Web Sharing ·
-Folder Tricks and Automated Tasks · Encrypt · Shutdown Items and
-startup/shutdown sounds · Shift-at-login safe session · Nap Time
-scheduled start-up/shut-down · Date & Time formats and chimes · Numbers and
-Text (locale) · Sound input and speaker balance · Talking Alerts and
-text-to-speech · Limited and Panels (Puppy Mode) accounts, guest account,
-Shared Documents · Disk Vet · custom icons by pasting · Fonts folder
-install · search channels for the web · Search Internet menu item ·
-Print Window · scroll-arrow placement and other Appearance options.
+Small gaps left in features that already ship.
+
+| # | Work package | Components | Effort |
+|---|---|---|---|
+| 3.1 ✅ | **⌘-drag scrolls** a Sniffer window with the grabber hand (a Ctrl-press waits: moved, it scrolls; still, it's a Control-click) | `shell/finder/folderwindow.cpp` | S |
+| 3.2 ✅ | **Space opens a spring-loaded folder** at once (`platinum-shell-v1` 15 `drag_spring`: programs get no keys during a drag) | compositor `input.c`, `platinum_shell.c`; Sniffer | S |
+| 3.3 ◐ | **Trash: Warn before emptying** in the Trash's Get Info ✅; locked items not forced with Option | Sniffer, menu bar | S |
+| 3.4 ✅ | **Option-choosing a program** in the Application menu hides the one you leave | `shell/menubar/` | S |
+| 3.5 ◐ | **Option-double-click** closes the window an icon was in ✅; **ribbed handle** switches the Application menu between name and icon (the generic application icon, not the program's own) | Sniffer, menu bar, `lib/menudraw` | S |
+| 3.6 ✅ | Open/Save: **Recent** button; a **folder dropped** on the dialog opens there | `shell/finder/filechooserportal.cpp` | S |
+| 3.7 ◐ | Appearance ▸ **Options** tab with double-click title bar to collapse ✅; **Smart Scrolling** (arrows together, proportional thumb) not done: it reaches every scroll bar, the Qt style and the GTK theme (L) | `shell/panels/appearance.cpp`, compositor | S + L |
+| 3.8 ✅ | Reset Column Positions (was already done with 2.17) | `shell/finder/folderwindow.cpp` | — |
+| 3.9 ✅ | **Login window** shows the chosen person's picture | `shell/greeter/`, panelkit | S |
+| 3.10 ✅ | Mouse panel: **Mouse Tracks** and **Thick I-Beam** | compositor `tracks.c`, cursor theme, `controlpanel.cpp` | S |
+
+### Milestone 4 — Startup, session and system settings (P3)
+
+| # | Work package | Components | Effort |
+|---|---|---|---|
+| 4.1 | **Shutdown Items** and startup/shutdown sounds | `session/`, System Folder | S |
+| 4.2 | **Shift held at login**: a session without startup items | `session/` | S |
+| 4.3 | **Tricks Manager sets**: on/off sets for startup items and user services | `lib/extensions.c`, panel | M |
+| 4.4 | **Nap Time** scheduled start-up and shut-down | `rtcwake` + systemd timer, polkit helper | M |
+| 4.5 | **Date & Time** formats and hourly chimes | `controlpanel.cpp` | S + S |
+| 4.6 | **Numbers / Text** panels (locale) | `localectl`, `locale.conf` | S |
+| 4.7 | **Sound**: input source, speaker balance, record an alert sound; input source in The Collar | panels, `shell/collar/` | S each |
+| 4.8 | **CD/media autoplay** as a Sniffer setting | Sniffer | S |
+
+### Milestone 5 — Accounts, privacy and sharing (P3)
+
+| # | Work package | Components | Effort |
+|---|---|---|---|
+| 5.1 | **Limited accounts**: allowed programs enforced by the Sniffer and menu bar (not a security boundary; say so) | Users panel, Sniffer, menu bar | L |
+| 5.2 | **Puppy Mode** (Simple Finder) and its Sniffer preference | Sniffer | L |
+| 5.3 | **Guest account** and a welcome message | Users panel, login window | M + S |
+| 5.4 | **Shared Documents** (`/home/Shared` with a group) | `sharing/` | S |
+| 5.5 | **Encrypt** (File and contextual menus): age or gpg, password in Secret Service | Sniffer | M |
+| 5.6 | **Keychain Access** panel: list items, Lock/Unlock | `shell/panels/` | M |
+| 5.7 | **Web Sharing**: a static server for `~/Web Pages` behind a switch | `sharing/`, panel | S |
+| 5.8 | **Retriever** (folder pairs: two-way rsync, newest wins, with a warning) | new app | M |
+
+### Milestone 6 — Help, automation and speech (P3)
+
+| # | Work package | Components | Effort |
+|---|---|---|---|
+| 6.1 | **Hint Bubbles**: drawn by the menu bar over its menus, and by our panels from their tooltips | menu bar, panelkit | M |
+| 6.2 | **Folder Tricks**: inotify watcher, scripts, "Attach a Folder Trick" in the contextual menu | Sniffer | M |
+| 6.3 | **Automated Tasks** in the Zac menu | `Menu Items` | S |
+| 6.4 | **`zacos9-finder-ctl`**: a documented CLI over the Sniffer's socket | Sniffer | S |
+| 6.5 | **Text-to-speech**: voices, Talking Alerts, read selected text | speech-dispatcher / espeak-ng | M |
+| 6.6 | **Search**: saved searches, several at once, Internet channels, File ▸ Search Internet (⌘H) | `findwindow.cpp` | S + M + S |
+
+### Milestone 7 — Disks, fonts and printing (P3)
+
+| # | Work package | Components | Effort |
+|---|---|---|---|
+| 7.1 | **Disk Vet**: fsck of unmounted volumes, SMART status | `zacos9-disk-helper` | M |
+| 7.2 | **Fonts folder**: drop to install (copy, `fc-cache`) | Sniffer | S |
+| 7.3 | **Print Window / Print Desktop** and Page Setup | Sniffer, `shell/print/` | M |
+| 7.4 | Printing leftovers: non-modal print errors, job reordering, the default printer's bold outline | `shell/print/` | S |
+| 7.5 | **Custom icons by pasting** in Get Info | Sniffer, gio metadata | M |
+| 7.6 | **Disk Setup** partitioning | disk helper | L |
+| 7.7 | Video mirroring on/off (with multi-monitor work) | compositor | M |
+
+### Milestone 8 — Desk accessories and extras (P3)
+
+| # | Work package | Effort |
+|---|---|---|
+| 8.1 | **Notepad** | S |
+| 8.2 | **Key Tags** (current layout, modifier states) | S |
+| 8.3 | **Bark Recorder** (`pw-record`) | S |
+| 8.4 | **Stash** (pages of pictures and text) | M |
+| 8.5 | **Walkies** (snapshots of network, sound, time zone, printer, startup items) | L |
+| 8.6 | Plotter, Jigsaw Puzzle | optional |
+| 8.7 | A Memory panel's zram/swap switch | optional |
 
 ### Cross-cutting work
 
@@ -533,10 +599,9 @@ Print Window · scroll-arrow placement and other Appearance options.
 
 ### Suggested next three sessions
 
-1. **1.1 ⌘-Tab and Option-hide** — small, high value, self-contained in
-   the compositor and menu bar.
-2. **1.3 Eject and Log Out** — small; Log Out completes the new login
-   window.
-3. **1.2 Contextual menus** — the largest everyday gap; sets up the popup
-   surface reused by the folder-path menu (1.5) and the Pack
-   palette (2.1).
+1. **6.1 Hint Bubbles** — seen everywhere; the Help Center was left
+   waiting for it.
+2. **4.1 + 4.2 Shutdown Items and the Shift-at-login safe session** —
+   both small, both in `session/`.
+3. **Smart Scrolling** (3.7's remainder) or **5.1 Limited accounts** —
+   the next large pieces; each wants a short plan first.
