@@ -337,11 +337,11 @@ A zram/swap switch in a Memory panel is a possible P3.
 | Monitor resolution, brightness | ✅ | |
 | Bit depth, TV/Video Mirroring | — / ✗ | Mirroring on/off belongs with multi-monitor work. P3 |
 | Energy (sleep now), battery | ✅ | |
-| File Sharing (on/off, who's connected) | ✗? | Verify; ✅ in the control panel. P2 S |
+| File Sharing (on/off, who's connected) | ✅ | `shell/collar/filesharing.cpp`: shown once File Sharing is set up; on/off through the sharing helper (the servers that were on come back); visitors by address from `ss` (no root needed, so no user names). |
 | Keychain | ✅ | |
 | Walkies | ✗ | With 3.10. |
 | AppleTalk, Remote Access, AirPort | ◐ | Network module with Wi-Fi ✅; dial-up — |
-| CD audio (play, tracks, eject) | ✗ | MPRIS media controls module (play/pause/next for whatever is playing). P2 S |
+| CD audio (play, tracks, eject) | ✅ | As a media module over MPRIS (`shell/collar/media.cpp`): what's playing, Play/Pause, Next/Previous Track, Show the player, a choice of player when several run. Eject belongs to the Sniffer. |
 | Printer selector | ✗ | With printing (3.15). P3 S |
 | Web Sharing | ✗ | With 3.10. |
 | Speakable Items | — | |
@@ -499,7 +499,7 @@ updates `PROJECT_STATUS.md` and the relevant `docs/` page.
 | 2.13 | **System Information** (Pedigree) | Qt app + read-only helper | M |
 | 2.14 | **Users** panel (accounts, pictures, passwords, administrators) | panel over accountsservice + polkit | L |
 | 2.15 | **Help Center** with ZacOS help pages | `shell/help/`, `share/zacos9/help/` | L |
-| 2.16 | **Collar modules**: media playback (MPRIS), File Sharing on/off and visitors | `shell/collar/` | S each |
+| 2.16 ✅ | **Collar modules**: media playback (MPRIS), File Sharing on/off and visitors | `shell/collar/` | S each |
 | 2.17 ✅ | Sniffer list-view columns: choose, reorder, resize, shortening dates/sizes, Reset Column Positions | `shell/finder/folderwindow.cpp` | M |
 
 ### Milestone 3 — Long tail (P3)
