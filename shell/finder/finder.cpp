@@ -1,6 +1,7 @@
 #include "finder.h"
 
 #include "clippings.h"
+#include "findindex.h"
 #include "platinumshell.h"
 #include "settings.h"
 
@@ -314,7 +315,18 @@ void Finder::command(const QString &name) {
 	} else if (name == "show-hidden-applications") {
 		vfsShowAllHidden();
 	} else if (name == "find") {
-		FindDialog::open();
+		/* A folder window in front: offered as the place to look. */
+		auto *folder = dynamic_cast<FolderWindow *>(front());
+		FindDialog::open(folder && !vfsIsVirtual(folder->folderPath()) ? folder->folderPath() : QString());
+	} else if (name == "find-similar") {
+		const std::vector<Item *> sel = front() ? front()->selectedItems() : std::vector<Item *>{};
+		if (sel.size() == 1 && !sel[0]->isVirtual && !sel[0]->isDir) {
+			FoundWindow::similarTo(sel[0]->path);
+		} else {
+			Alert::ask("Select one document to find items similar to it.", "OK", QString());
+		}
+	} else if (name == "index-selection") {
+		indexSelection();
 	} else if (name == "about") {
 		AboutWindow::open();
 	} else if (name == "clean-up" || name.startsWith("arrange ")) {
@@ -858,6 +870,40 @@ void Finder::addToFavorites() {
 		createAlias(target, favorites, item->visibleName(), QString());
 	}
 	folderChanged(favorites);
+}
+
+void Finder::indexSelection() {
+	QStringList folders;
+	for (Item *item : front() ? front()->selectedItems() : std::vector<Item *>{}) {
+		const QString path = item->isVirtual ? vfsRealCounterpart(item->path) : item->path;
+		if (!path.isEmpty() && QFileInfo(path).isDir()) {
+			folders << path;
+		}
+	}
+	if (folders.isEmpty() && front() && !vfsIsVirtual(front()->folderPath()) &&
+			QFileInfo(front()->folderPath()).isDir()) {
+		folders << front()->folderPath();
+	}
+	if (folders.isEmpty()) {
+		Alert::ask("Select a folder or disk to index.", "OK", QString());
+		return;
+	}
+	auto left = std::make_shared<int>(folders.size());
+	auto errors = std::make_shared<QStringList>();
+	for (const QString &folder : folders) {
+		indexAddFolder(folder, [left, errors, folders](const QString &error) {
+			if (!error.isEmpty()) {
+				*errors << error;
+			}
+			if (--*left == 0) {
+				Alert::ask(errors->isEmpty()
+					? QString("%1 will be indexed in the background. Find can search its contents "
+						"once that's done.").arg(folders.size() == 1 ? "“" + displayName(folders.first()) + "”"
+						: QString("The %1 folders").arg(folders.size()))
+					: errors->first(), "OK", QString());
+			}
+		});
+	}
 }
 
 void Finder::openPath(const QString &path) {

@@ -133,6 +133,8 @@ static void add_finder_menus(struct mb_menu *menus, int *n) {
 	add(m, "Put Away", 'Y', sel, ACT_FINDER, "put-away");
 	sep(m);
 	add(m, "Find…", 'F', up, ACT_FINDER, "find");
+	add(m, "Find Similar Items", 0, sel, ACT_FINDER, "find-similar");
+	add(m, "Index Selection", 0, up, ACT_FINDER, "index-selection");
 	add(m, "Show Original", 'R', sel, ACT_FINDER, "show-original");
 	/* Sniffer has no undoable edits or clipboard yet; it can select. */
 	add_edit_menu(menus, n, false);

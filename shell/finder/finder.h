@@ -80,6 +80,9 @@ public:
 	void duplicate();
 	void makeAlias();
 	void putAway();
+	/* File > Index Selection: the selected folders (or the front window's)
+	 * into the search index, for Find's contents searches. */
+	void indexSelection();
 	void unmountSelection(bool network);
 	/* A contextual menu (Control-click or right-click) on `hit` in
 	 * `view`, or on its background: the menu bar opens it at the pointer,

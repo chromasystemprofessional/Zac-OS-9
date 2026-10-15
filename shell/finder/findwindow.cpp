@@ -5,6 +5,7 @@
 #include <QApplication>
 #include <QDir>
 #include <QElapsedTimer>
+#include <QDate>
 #include <QFileInfo>
 #include <QKeyEvent>
 #include <QMouseEvent>
@@ -12,43 +13,199 @@
 
 #include "settings.h"
 #include "infowindow.h"
+#include "findindex.h"
+#include "sharingclient.h"
 
 static constexpr uint32_t FACE = GRAY(0xD);
 
-/* ---- Find File ------------------------------------------------------------ */
+/* ---- Find ------------------------------------------------------------------ */
 
-static constexpr int DIALOG_W = 380, DIALOG_H = 100;
-static constexpr int FIELD_TOP = 32, FIELD_H = 22;
-static constexpr int FIELD_BASELINE = 15;
+static constexpr int DIALOG_W = 540;
+static constexpr int M = 12;              /* window margin */
+static constexpr int SCOPE_Y = 12;
+static constexpr int ROWS_Y = 44, ROW_STEP = 30, MAX_ROWS = 6;
+static constexpr int FIELD_W = 130, OP_W = 190, GAP = 6;
+static constexpr int NOTE_H = 18;
+
+/* The fields, in the menu's order. */
+static const FindField FIELDS[] = { FindField::Name, FindField::Contents, FindField::Modified,
+	FindField::Created, FindField::Size, FindField::Kind, FindField::Label, FindField::Locked,
+	FindField::Folder };
+
+struct FindDialog::Row {
+	FindField field = FindField::Name;
+	PanelPopup fieldPopup, opPopup, choicePopup;
+	PanelEdit edit;
+	FindOp op() const {
+		const QList<FindOp> ops = findOpsFor(field);
+		return ops.value(std::clamp(opPopup.selected, 0, int(ops.size()) - 1));
+	}
+};
 
 static QPointer<FindDialog> &findDialog() {
 	static QPointer<FindDialog> dialog;
 	return dialog;
 }
 
-void FindDialog::open() {
+void FindDialog::open(const QString &folder) {
 	if (!findDialog()) {
-		findDialog() = new FindDialog;
+		findDialog() = new FindDialog(folder);
 	}
 	findDialog()->show();
 	findDialog()->raise();
 	findDialog()->activateWindow();
 }
 
-FindDialog::FindDialog() {
+FindDialog::~FindDialog() = default;
+
+FindDialog::FindDialog(const QString &folder) : m_folder(folder) {
 	setAttribute(Qt::WA_DeleteOnClose);
-	setWindowTitle("Find File");
-	setFixedSize(DIALOG_W, DIALOG_H);
-	m_caretTimer.callOnTimeout([this] {
-		m_caretOn = !m_caretOn;
-		update();
-	});
-	m_caretTimer.start(QApplication::cursorFlashTime() / 2);
+	setWindowTitle("Find");
+	m_scope.label = "Find items";
+	m_scope.items = { PopupItem("on all disks"), PopupItem("in my Home folder") };
+	if (!folder.isEmpty() && QDir(folder) != QDir::home() && QDir(folder) != QDir::root()) {
+		m_scope.items.push_back(PopupItem(QString("in “%1”").arg(displayName(folder))));
+		m_scope.selected = 2;
+	}
+	m_scope.chosen = [this](int i) { m_scope.selected = i; update(); };
+	// Sized here: a button lays out its label when it's made; relayout() moves them.
+	m_more = PanelButton("More Choices", QRect(0, 0, 110, PL_BUTTON_H), false);
+	m_more.clicked = [this] {
+		addRow(FindField::Modified);
+		relayout();
+	};
+	m_fewer = PanelButton("Fewer Choices", QRect(0, 0, 110, PL_BUTTON_H), false);
+	m_fewer.clicked = [this] {
+		if (m_rows.size() > 1) {
+			m_rows.pop_back();
+			relayout();
+		}
+	};
+	m_find = PanelButton("Find", QRect(0, 0, PL_BUTTON_MIN_W, PL_BUTTON_H), true);
+	m_find.clicked = [this] { find(); };
+	m_host.defaultButton = &m_find;
+	addRow(FindField::Name);
+	relayout();
+	m_host.setFocus(&m_rows.front()->edit);
 }
 
-QRect FindDialog::findButton() const {
-	return QRect(width() - 12 - PL_BUTTON_MIN_W, height() - 12 - PL_BUTTON_H,
-		PL_BUTTON_MIN_W, PL_BUTTON_H);
+void FindDialog::addRow(FindField field) {
+	auto row = std::make_unique<Row>();
+	Row *r = row.get();
+	for (FindField f : FIELDS) {
+		r->fieldPopup.items.push_back(PopupItem(findFieldName(f)));
+	}
+	r->fieldPopup.chosen = [this, r](int i) {
+		setField(*r, FIELDS[i]);
+		relayout();
+	};
+	r->opPopup.chosen = [this, r](int i) {
+		r->opPopup.selected = i;
+		relayout();
+	};
+	r->choicePopup.chosen = [this, r](int i) {
+		r->choicePopup.selected = i;
+		update();
+	};
+	r->edit.edited = [this] { m_problem.clear(); update(); };
+	setField(*r, field);
+	m_rows.push_back(std::move(row));
+}
+
+void FindDialog::setField(Row &row, FindField field) {
+	row.field = field;
+	row.fieldPopup.selected = int(std::find(std::begin(FIELDS), std::end(FIELDS), field) - std::begin(FIELDS));
+	row.opPopup.items.clear();
+	for (FindOp op : findOpsFor(field)) {
+		row.opPopup.items.push_back(PopupItem(findOpName(op)));
+	}
+	row.opPopup.selected = 0;
+	row.choicePopup.items.clear();
+	row.choicePopup.selected = 0;
+	if (field == FindField::Kind) {
+		for (const QString &kind : findKindNames()) {
+			row.choicePopup.items.push_back(PopupItem(kind));
+		}
+	} else if (field == FindField::Label) {
+		for (int i = 0; i < PL_LABEL_COUNT; i++) {
+			PopupItem item(QString::fromUtf8(pl_labels[i].name));
+			row.choicePopup.items.push_back(item);
+		}
+	}
+	// A date to start from: today, which the user changes.
+	row.edit.setText(field == FindField::Modified || field == FindField::Created
+		? QDate::currentDate().toString(Qt::ISODate) : QString());
+	row.edit.accepts = field == FindField::Size ? std::function<bool(QChar)>([](QChar c) { return c.isDigit(); })
+		: std::function<bool(QChar)>();
+}
+
+void FindDialog::relayout() {
+	const int n = int(m_rows.size());
+	bool contents = false;
+	m_host.popups = { &m_scope };
+	m_host.edits.clear();
+	int y = ROWS_Y;
+	PanelEdit *firstEdit = nullptr;
+	for (auto &row : m_rows) {
+		row->fieldPopup.rect = QRect(M, y, FIELD_W, PL_POPUP_H);
+		row->opPopup.rect = QRect(M + FIELD_W + GAP, y, OP_W, PL_POPUP_H);
+		const int vx = M + FIELD_W + GAP + OP_W + GAP;
+		row->choicePopup.rect = QRect(vx, y, DIALOG_W - M - vx, PL_POPUP_H);
+		row->edit.rect = QRect(vx, y - 1, DIALOG_W - M - vx, PL_EDIT_H);
+		m_host.popups.push_back(&row->fieldPopup);
+		m_host.popups.push_back(&row->opPopup);
+		if (row->field == FindField::Kind || row->field == FindField::Label) {
+			m_host.popups.push_back(&row->choicePopup);
+		} else if (findOpTakesText(row->field, row->op())) {
+			m_host.edits.push_back(&row->edit);
+			firstEdit = firstEdit ? firstEdit : &row->edit;
+		}
+		contents = contents || row->field == FindField::Contents;
+		y += ROW_STEP;
+	}
+	const int bottom = y + (contents ? NOTE_H : 0) + 8;
+	m_scope.rect = QRect(M + 80, SCOPE_Y, 220, PL_POPUP_H);
+	m_more.rect.moveTo(M, bottom);
+	m_fewer.rect.moveTo(M + m_more.rect.width() + 10, bottom);
+	m_find.rect.moveTo(DIALOG_W - M - 4 - m_find.rect.width(), bottom);
+	m_more.enabled = n < MAX_ROWS;
+	m_fewer.enabled = n > 1;
+	m_host.buttons = { &m_more, &m_fewer, &m_find };
+	if (std::find(m_host.edits.begin(), m_host.edits.end(), m_host.focus) == m_host.edits.end()) {
+		m_host.setFocus(firstEdit);
+	}
+	setFixedSize(DIALOG_W, bottom + PL_BUTTON_H + M + (m_problem.isEmpty() ? 0 : NOTE_H));
+	update();
+}
+
+FindQuery FindDialog::query() const {
+	FindQuery q;
+	q.scope = m_scope.selected == 2 ? FindScope::Folder : m_scope.selected == 1 ? FindScope::Home : FindScope::AllDisks;
+	q.folder = m_folder;
+	for (const auto &row : m_rows) {
+		FindCriterion c;
+		c.field = row->field;
+		c.op = row->op();
+		c.text = row->edit.text;
+		c.choice = row->choicePopup.selected;
+		q.criteria << c;
+	}
+	return q;
+}
+
+void FindDialog::find() {
+	FindQuery q = query();
+	QString why;
+	if (!q.ready(&why)) {
+		m_problem = why;
+		relayout();
+		return;
+	}
+	for (const SharedFolder &f : sharedFolders()) {
+		q.sharedFolders << QFileInfo(f.path).canonicalFilePath();
+	}
+	FoundWindow::search(q);
+	close();
 }
 
 void FindDialog::paintEvent(QPaintEvent *) {
@@ -56,102 +213,50 @@ void FindDialog::paintEvent(QPaintEvent *) {
 	Pixels px(W, H);
 	pl_canvas *c = &px.c;
 	pl_fill(c, 0, 0, W - 1, H - 1, FACE);
-
-	Text prompt("Find items whose name contains:", W - 24, PL_FONT_SYSTEM);
-	pl_text(c, prompt.t, 12, 22, C_BLACK);
-
-	/* Edit text box: an inset frame around a white field.
-	 * TODO: measure the Platinum edit-text frame. */
-	const int x0 = 12, x1 = W - 13, y0 = FIELD_TOP, y1 = FIELD_TOP + FIELD_H - 1;
-	pl_hline(c, x0, x1, y0, GRAY(0x8));
-	pl_vline(c, x0, y0, y1, GRAY(0x8));
-	pl_hline(c, x0, x1, y1, C_WHITE);
-	pl_vline(c, x1, y0, y1, C_WHITE);
-	pl_outline(c, x0 + 1, y0 + 1, x1 - 1, y1 - 1, C_BLACK);
-	pl_fill(c, x0 + 2, y0 + 2, x1 - 2, y1 - 2, C_WHITE);
-	Text field(m_text, x1 - x0 - 12, PL_FONT_VIEWS);
-	int caretX = x0 + 5;
-	if (field.t && field.t->ink_l >= 0) {
-		pl_text(c, field.t, x0 + 5 + field.t->ink_l - 1, y0 + FIELD_BASELINE, C_BLACK);
-		caretX = x0 + 5 + field.t->advance;
+	Text whose("whose", 80, PL_FONT_SYSTEM);
+	pl_text(c, whose.t, m_scope.rect.right() + 8, m_scope.rect.y() + PL_POPUP_BASELINE(PL_POPUP_H), C_BLACK);
+	bool contents = false;
+	for (const auto &row : m_rows) {
+		contents = contents || row->field == FindField::Contents;
 	}
-	if (m_caretOn) {
-		pl_vline(c, caretX, y0 + 4, y1 - 4, C_BLACK);
+	const int notesY = ROWS_Y + int(m_rows.size()) * ROW_STEP;
+	if (contents) {
+		Text note("Contents are searched in indexed folders; File ▸ Index Selection adds one.",
+			W - 2 * M, PL_FONT_VIEWS);
+		pl_text(c, note.t, M, notesY + 4, GRAY(0x5));
 	}
-
-	const QRect b = findButton();
-	Text label("Find", 100, PL_FONT_SYSTEM);
-	unsigned flags = PL_BUTTON_DEFAULT;
-	if (m_tracking && m_inside) {
-		flags |= PL_BUTTON_PRESSED;
+	if (!m_problem.isEmpty()) {
+		Text problem(m_problem, W - 2 * M, PL_FONT_VIEWS);
+		pl_text(c, problem.t, M, H - 8, RGB(0xAA, 0x22, 0x22));
 	}
-	if (m_text.isEmpty()) {
-		flags |= PL_BUTTON_DISABLED;
-	}
-	pl_button_paint(c, b.x(), b.y(), b.width(), label.t, flags);
-
+	m_host.paintControls(c, FACE);
 	QPainter p(this);
 	px.blit(p);
 }
 
-void FindDialog::find() {
-	if (m_text.isEmpty()) {
-		return;
-	}
-	FoundWindow::search(m_text);
-	close();
-}
-
 void FindDialog::keyPressEvent(QKeyEvent *e) {
 	const bool cmd = e->modifiers() & Qt::ControlModifier;
-	if (e->key() == Qt::Key_Escape || (cmd && (e->key() == Qt::Key_W ||
-			e->key() == Qt::Key_Period))) {
+	if (e->key() == Qt::Key_Escape || (cmd && (e->key() == Qt::Key_W || e->key() == Qt::Key_Period))) {
 		close();
 		return;
 	}
-	if (e->key() == Qt::Key_Return || e->key() == Qt::Key_Enter) {
-		find();
-		return;
-	}
-	if (e->key() == Qt::Key_Backspace) {
-		m_text.chop(1);
-	} else if (!cmd && !e->text().isEmpty() && e->text().at(0).isPrint()) {
-		m_text += e->text();
-	} else {
-		return;
-	}
-	m_caretOn = true;
+	m_host.hostKey(e);
 	update();
 }
 
 void FindDialog::mousePressEvent(QMouseEvent *e) {
-	if (e->button() == Qt::LeftButton && !m_text.isEmpty() &&
-			findButton().contains(e->position().toPoint())) {
-		m_tracking = m_inside = true;
-		update();
-	}
+	m_host.hostPress(e);
+	update();
 }
 
 void FindDialog::mouseMoveEvent(QMouseEvent *e) {
-	if (m_tracking) {
-		const bool inside = findButton().contains(e->position().toPoint());
-		if (inside != m_inside) {
-			m_inside = inside;
-			update();
-		}
-	}
+	m_host.hostMove(e);
+	update();
 }
 
-void FindDialog::mouseReleaseEvent(QMouseEvent *) {
-	if (!m_tracking) {
-		return;
-	}
-	const bool chosen = m_inside;
-	m_tracking = m_inside = false;
+void FindDialog::mouseReleaseEvent(QMouseEvent *e) {
+	m_host.hostRelease(e);
 	update();
-	if (chosen) {
-		find();
-	}
 }
 
 /* ---- Items Found ---------------------------------------------------------- */
@@ -177,11 +282,54 @@ static std::vector<QPointer<FoundWindow>> &foundWindows() {
 	return windows;
 }
 
-void FoundWindow::search(const QString &text) {
-	auto *w = new FoundWindow(text);
+void FoundWindow::search(const FindQuery &query) {
+	auto *w = new FoundWindow("whose " + query.describe());
 	foundWindows().push_back(w);
 	w->show();
 	Finder::instance().setFront(w);
+	if (!query.hasContents()) {
+		w->walk(query, {}, false);
+		return;
+	}
+	// Contents come from the index; the other rows sift what it finds.
+	QPointer<FoundWindow> self(w);
+	indexSearch(query.contentWords(), query.root(), [self, query](const QStringList &paths, const QString &error) {
+		if (!self) {
+			return;
+		}
+		if (!error.isEmpty()) {
+			self->m_problem = error;
+			self->finished();
+			return;
+		}
+		self->walk(query, paths, true);
+	});
+}
+
+void FoundWindow::similarTo(const QString &path) {
+	auto *w = new FoundWindow(QString("similar to “%1”").arg(displayName(path)));
+	foundWindows().push_back(w);
+	w->show();
+	Finder::instance().setFront(w);
+	QPointer<FoundWindow> self(w);
+	indexSimilar(path, [self](const QStringList &paths, const QString &error) {
+		if (!self) {
+			return;
+		}
+		self->m_problem = error;
+		QStringList present;
+		for (const QString &p : paths) {
+			if (QFileInfo::exists(p)) {
+				present << p;
+			}
+		}
+		self->addResults(present);
+		self->finished();
+	});
+}
+
+std::vector<QPointer<FoundWindow>> &FoundWindow::windows() {
+	return foundWindows();
 }
 
 void FoundWindow::reloadAll() {
@@ -192,21 +340,25 @@ void FoundWindow::reloadAll() {
 	}
 }
 
-FoundWindow::FoundWindow(const QString &text) : m_text(text) {
+FoundWindow::FoundWindow(const QString &title) : m_title(title) {
 	watchThumbnails(this);
 	watchFileAssociations(this);
 	setAttribute(Qt::WA_DeleteOnClose);
 	resize(560, 320);
 	setMinimumSize(300, 160);
 	updateTitle();
+}
 
-	/* Walk the disk off the main thread, handing matches over in batches. */
+/* Walks the disk from the query's root, or goes through the index's
+ * candidates, off the main thread, handing matches over in batches. */
+void FoundWindow::walk(const FindQuery &query, const QStringList &candidates, bool useCandidates) {
 	QPointer<FoundWindow> self(this);
-	m_worker = QThread::create([self, text] {
-		QStringList batch, stack = { "/" };
+	m_worker = QThread::create([self, query, candidates, useCandidates] {
+		QStringList batch;
 		int found = 0;
 		QElapsedTimer sent;
 		sent.start();
+		const QDate today = QDate::currentDate();
 		auto flush = [&] {
 			if (batch.isEmpty()) {
 				return;
@@ -219,24 +371,40 @@ FoundWindow::FoundWindow(const QString &text) : m_text(text) {
 			batch.clear();
 			sent.restart();
 		};
-		while (!stack.isEmpty() && found < MAX_RESULTS &&
-				!QThread::currentThread()->isInterruptionRequested()) {
-			const QString dir = stack.takeLast();
-			const auto entries = QDir(dir).entryInfoList(
-				QDir::AllEntries | QDir::NoDotAndDotDot | QDir::System,
-				QDir::Name | QDir::IgnoreCase | QDir::Reversed);
-			for (const QFileInfo &info : entries) {
-				const QString path = info.absoluteFilePath();
-				if (info.isDir() && !info.isSymLink() && !skipDir(path)) {
-					stack.push_back(path);
-				}
-				if (info.fileName().contains(text, Qt::CaseInsensitive) && found < MAX_RESULTS) {
-					batch << path;
-					found++;
-				}
+		auto consider = [&](const QFileInfo &info) {
+			if (found < MAX_RESULTS && findMatches(query, info, today)) {
+				batch << info.absoluteFilePath();
+				found++;
 			}
 			if (batch.size() >= 200 || sent.elapsed() > 250) {
 				flush();
+			}
+		};
+		if (useCandidates) {
+			for (const QString &path : candidates) {
+				if (QThread::currentThread()->isInterruptionRequested()) {
+					break;
+				}
+				const QFileInfo info(path);
+				if (info.exists()) {
+					consider(info);
+				}
+			}
+		} else {
+			QStringList stack = { query.root() };
+			while (!stack.isEmpty() && found < MAX_RESULTS &&
+					!QThread::currentThread()->isInterruptionRequested()) {
+				const QString dir = stack.takeLast();
+				const auto entries = QDir(dir).entryInfoList(
+					QDir::AllEntries | QDir::NoDotAndDotDot | QDir::System,
+					QDir::Name | QDir::IgnoreCase | QDir::Reversed);
+				for (const QFileInfo &info : entries) {
+					const QString path = info.absoluteFilePath();
+					if (info.isDir() && !info.isSymLink() && !skipDir(path)) {
+						stack.push_back(path);
+					}
+					consider(info);
+				}
 			}
 		}
 		flush();
@@ -273,6 +441,7 @@ void FoundWindow::finished() {
 
 void FoundWindow::updateTitle() {
 	setWindowTitle(QStringLiteral("Items Found: %1").arg(m_items.size()));
+	setToolTip(m_title);
 }
 
 QString FoundWindow::folderPath() const {
@@ -362,7 +531,8 @@ void FoundWindow::paintEvent(QPaintEvent *) {
 	pl_hline(c, 0, W - 1, HEADER_H - 1, GRAY(0xA));
 	const QString count = QStringLiteral("%1 %2").arg(m_items.size())
 		.arg(m_items.size() == 1 ? "item" : "items");
-	Text header(m_searching ? "Searching…  " + count : count + " found", W - 20, PL_FONT_VIEWS);
+	Text header(m_searching ? "Searching…  " + count : !m_problem.isEmpty() && m_items.empty() ? m_problem
+		: count + " found " + m_title, W - 20, PL_FONT_VIEWS);
 	pl_text(c, header.t, (W - header.inkWidth()) / 2, 13, C_BLACK);
 
 	/* Column titles, drawn like a folder window's unsorted columns. */
