@@ -223,15 +223,18 @@ void menus_toggle_clock(void) {
 }
 
 /* The Application menu shows the front program's name, unless its handle
- * was clicked: then the generic application icon (TODO: the program's own,
- * which needs an icon theme and image loading here). */
+ * hid it: then the program's icon (appicon.c), or the generic one. */
 static bool app_name_shown(void) {
 	char v[16];
 	return !(pl_setting("app-menu-name", v, sizeof(v)) && strcmp(v, "false") == 0);
 }
 
+void menus_show_app_name(bool shown) {
+	pl_setting_set("app-menu-name", shown ? NULL : "false");
+}
+
 void menus_toggle_app_name(void) {
-	pl_setting_set("app-menu-name", app_name_shown() ? "false" : NULL);
+	menus_show_app_name(!app_name_shown());
 }
 
 static const uint32_t *app_menu_icon(void) {
@@ -382,7 +385,8 @@ void menus_rebuild(struct mb_bar *bar, int screen_w) {
 	const bool named = app_name_shown();
 	struct mb_menu *am = new_menu(bar->right, &bar->n_right,
 		!named ? NULL : front ? front->name : "Sniffer");
-	am->icon = named ? NULL : app_menu_icon();
+	const uint32_t *own = named ? NULL : app_icon_title(front ? front->app_id : FINDER_APP_ID);
+	am->icon = named ? NULL : own ? own : app_menu_icon();
 	am->handle = true;
 	if (front) {
 		char label[256];

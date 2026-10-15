@@ -38,6 +38,12 @@ with tempfile.TemporaryDirectory(prefix="zacos9-switch-") as directory:
     root = Path(directory)
     for d in ("config", "data", "cache", "home"):
         (root / d).mkdir()
+    # Alpha's own icon, for the Application menu's title without its name.
+    # (The menu bar looks in ~/.local/share, as it does for names.)
+    (root / "home/.local/share/applications").mkdir(parents=True)
+    (root / "home/.local/share/applications/alpha.desktop").write_text(
+        "[Desktop Entry]\nType=Application\nName=Alpha\nExec=true\nIcon=" +
+        str(Path(__file__).resolve().parents[2] / "assets/boot/happy-zac.png") + "\n")
     env = dict(os.environ, XDG_RUNTIME_DIR=directory, HOME=str(root / "home"),
                XDG_CONFIG_HOME=str(root / "config"), XDG_DATA_HOME=str(root / "data"),
                XDG_CACHE_HOME=str(root / "cache"),
@@ -149,8 +155,9 @@ with tempfile.TemporaryDirectory(prefix="zacos9-switch-") as directory:
             print("ok: Option-choosing a program in the Application menu hides the one you leave")
 
             # The Application menu's ribbed handle, before its title: a click
-            # shows an icon instead of the program's name, and back. (Titled
-            # Alpha, the handle is about 1217; as an icon, about 1232.)
+            # shows the program's own icon instead of its name; dragged left,
+            # the name is back. (Titled Alpha, the handle is about 1217; as an
+            # icon, about 1232.)
             conf = root / "config/zacos9/desktop.conf"
 
             def title_area():
@@ -165,9 +172,14 @@ with tempfile.TemporaryDirectory(prefix="zacos9-switch-") as directory:
             assert "app-menu-name=false" in (conf.read_text() if conf.exists() else ""), \
                 "a click on the handle hides the program's name"
             if have_grim:
-                assert title_area() != named, "the title becomes an icon"
-            vp("home", "move", "1232", "9", "click", "move", "-400", "300", "wait", "500")
-            assert "app-menu-name" not in conf.read_text(), "another click shows the name again"
+                icon = title_area()
+                assert icon != named, "the title becomes an icon"
+                colourful = sum(1 for i in range(len(icon) - 30 * 15 * 3, len(icon) - 2, 3)
+                                if max(icon[i:i + 3]) - min(icon[i:i + 3]) > 60)
+                assert colourful > 10, "Alpha's own icon, not the grey generic one"
+            vp("home", "move", "1232", "9", "down", "move", "-20", "0", "up",
+               "move", "-400", "300", "wait", "500")
+            assert "app-menu-name" not in conf.read_text(), "dragging the handle left shows the name again"
             if have_grim:
                 assert title_area() == named, "and the title is the name again"
             print("ok: the Application menu's handle hides and shows the program's name")

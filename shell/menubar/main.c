@@ -101,6 +101,9 @@ static struct {
 	bool blink_on;
 	bool chosen_in_sub;
 	struct mb_item chosen; /* copy of the item being performed */
+	/* A press on the Application menu's handle, and where. */
+	bool handle_down;
+	double handle_x;
 	/* Option, from the keyboard we have while a menu is open. */
 	uint32_t option_mask, mods;
 
@@ -603,9 +606,10 @@ static void pointer_pressed(void) {
 	bool on_title = title_at(g.px, g.py, &side, &index);
 	if (g.open_index < 0 && !on_title && g.py < MBAR_HEIGHT &&
 			mbar_handle_at(g.model.right_titles, g.model.n_right, (int)g.px) >= 0) {
-		/* The Application menu's handle: its name, or just an icon. */
-		menus_toggle_app_name();
-		rebuild();
+		/* The Application menu's handle: its name, or just an icon,
+		 * once the button comes up (pointer_released). */
+		g.handle_down = true;
+		g.handle_x = g.px;
 		return;
 	}
 	if (g.open_index < 0 && !on_title && g.py < MBAR_HEIGHT && g.model.has_clock &&
@@ -670,6 +674,18 @@ static bool tear_off_pack(void) {
 }
 
 static void pointer_released(void) {
+	if (g.handle_down) {
+		/* Dragged left, the name shows; right, it hides; a click switches. */
+		g.handle_down = false;
+		const double dx = g.px - g.handle_x;
+		if (dx <= -6 || dx >= 6) {
+			menus_show_app_name(dx < 0);
+		} else {
+			menus_toggle_app_name();
+		}
+		rebuild();
+		return;
+	}
 	bool was_down = g.button_down;
 	g.button_down = false;
 	if (g.open_index < 0 || g.blinks_left > 0 || !was_down) {

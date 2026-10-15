@@ -109,9 +109,14 @@ struct mb_bar {
 void menus_rebuild(struct mb_bar *bar, int screen_w);
 /* Clicking the clock flips it between the time and the date. */
 void menus_toggle_clock(void);
-/* Clicking the Application menu's ribbed handle shows or hides the front
- * program's name there (an icon instead), as dragging it did in Mac OS 9. */
+/* The Application menu's ribbed handle shows or hides the front program's
+ * name there (its icon instead): dragged left, shown; right, hidden; a
+ * click switches. */
 void menus_toggle_app_name(void);
+void menus_show_app_name(bool shown);
+/* The program's own icon for that title (appicon.c), MBAR_ICON_W x
+ * MBAR_ICON_H straight-alpha ARGB, or NULL if it has none we can load. */
+const uint32_t *app_icon_title(const char *app_id);
 /* Sticky Keys (platinum-shell-v1 sticky_keys): while it is on, the bar
  * shows the modifiers it holds, a locked one in brackets. */
 void menus_set_sticky(bool on, unsigned latched, unsigned locked);

@@ -97,9 +97,11 @@ menubar_exe = executable('zacos9-menubar',
   'menubar/logout.c',
   'menubar/recent.c',
   'menubar/kbmenu.c',
+  'menubar/appicon.c',
   client_protocol_src,
   finder_protocol,
-  dependencies: [platinum_dep, wayland_client, wayland_cursor, xkbcommon_client, gio],
+  dependencies: [platinum_dep, wayland_client, wayland_cursor, xkbcommon_client, gio,
+    dependency('gdk-pixbuf-2.0')],
   install: true,
 )
 

@@ -252,7 +252,7 @@ Section 3 lists every feature; section 5 is the plan.
 | Feature | Status | Notes |
 |---|---|---|
 | Application menu at the right: lists apps, Hide, Hide Others, Show All, current app's name | ✅ | |
-| Ribbed handle to show/hide the app name in the menu bar | ◐ | A click on the handle (not a drag) switches between the name and an icon (`app-menu-name`). The icon is the generic application icon: the program's own needs icon-theme lookup and image loading in the menu bar. Handle not measured. |
+| Ribbed handle to show/hide the app name in the menu bar | ✅ | Drag it left for the name, right for the program's own icon (`shell/menubar/appicon.c`: its desktop entry's icon from the icon theme, hicolor or pixmaps, through gdk-pixbuf; the generic application icon if none loads); a click switches (`app-menu-name`). Handle not measured. |
 | **⌘-Tab / ⇧⌘-Tab** cycles programs | ✅ | By name, the Sniffer among them; hidden programs come back (0.1.54). |
 | **Option-click the desktop / Option-choose an app** hides the one you leave | ✅ | Desktop (0.1.54); Option-choosing a program in the Application menu (the menu bar reads Option from its keyboard while the menu is open). |
 | **Pack palette** (tear off the Application menu; vertical/horizontal, small/large icons, names on/off; drop documents on tiles to open them) | ✅ | `zacos9-pack`, a layer-shell palette above the windows; zoom box (names), Option-zoom (large), Shift-Option-zoom (across), collapse and close boxes; reopens at login. Not done: dragging its edge to set the width. |
@@ -512,7 +512,7 @@ Small gaps left in features that already ship.
 | 3.2 ✅ | **Space opens a spring-loaded folder** at once (`platinum-shell-v1` 15 `drag_spring`: programs get no keys during a drag) | compositor `input.c`, `platinum_shell.c`; Sniffer | S |
 | 3.3 ✅ | **Trash: Warn before emptying** in the Trash's Get Info; locked items stay unless Option-Empty Trash | Sniffer, menu bar | S |
 | 3.4 ✅ | **Option-choosing a program** in the Application menu hides the one you leave | `shell/menubar/` | S |
-| 3.5 ◐ | **Option-double-click** closes the window an icon was in ✅; **ribbed handle** switches the Application menu between name and icon (the generic application icon, not the program's own) | Sniffer, menu bar, `lib/menudraw` | S |
+| 3.5 ✅ | **Option-double-click** closes the window an icon was in; the **ribbed handle** switches the Application menu between the program's name and its own icon (dragged or clicked) | Sniffer, menu bar, `lib/menudraw`, `appicon.c` | S |
 | 3.6 ✅ | Open/Save: **Recent** button; a **folder dropped** on the dialog opens there | `shell/finder/filechooserportal.cpp` | S |
 | 3.7 ◐ | Appearance ▸ **Options** tab with double-click title bar to collapse ✅; **Smart Scrolling** (arrows together, proportional thumb) not done: it reaches every scroll bar, the Qt style and the GTK theme (L) | `shell/panels/appearance.cpp`, compositor | S + L |
 | 3.8 ✅ | Reset Column Positions (was already done with 2.17) | `shell/finder/folderwindow.cpp` | — |
