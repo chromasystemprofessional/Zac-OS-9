@@ -16,6 +16,7 @@
 #include <QTimer>
 #include <QUrl>
 
+#include <QLabel>
 #include "filechooserportal.h"
 #include "alert.h"
 #include "appdb.h"
@@ -830,6 +831,48 @@ esac
 	settle();
 	check(!asked && QDir(trashFilesPath()).isEmpty(),
 		"without the warning, Empty Trash empties at once");
+
+	/* Locked items (they can't be changed) stay, and it says so even
+	 * without the warning; Option-Empty Trash removes them too, unasked. */
+	const QString trashInfo = QFileInfo(trashFilesPath()).absolutePath() + "/info";
+	QDir().mkpath(trashInfo);
+	fixture(trashFilesPath() + "/Loose", "loose");
+	fixture(trashFilesPath() + "/Locked note", "locked");
+	QDir().mkpath(trashFilesPath() + "/Locked folder");
+	fixture(trashFilesPath() + "/Locked folder/Inside", "inside");
+	for (const char *name : { "Loose", "Locked note", "Locked folder" }) {
+		fixture(trashInfo + "/" + name + ".trashinfo", "[Trash Info]\nPath=/tmp/x\n");
+	}
+	QFile::setPermissions(trashFilesPath() + "/Locked note", QFileDevice::ReadOwner);
+	QFile::setPermissions(trashFilesPath() + "/Locked folder",
+		QFileDevice::ReadOwner | QFileDevice::ExeOwner);
+	QString question;
+	QTimer::singleShot(0, [&question] {
+		if (auto *alert = dynamic_cast<Alert *>(QApplication::activeModalWidget())) {
+			question = alert->findChild<QLabel *>() ? alert->findChild<QLabel *>()->text() : "asked";
+			alert->accept();
+		}
+	});
+	Finder::instance().emptyTrash();
+	settle();
+	check(!question.isEmpty(), "with locked items, Empty Trash asks even without the warning");
+	check(!QFile::exists(trashFilesPath() + "/Loose") && !QFile::exists(trashInfo + "/Loose.trashinfo") &&
+		QFile::exists(trashFilesPath() + "/Locked note") &&
+		QFile::exists(trashFilesPath() + "/Locked folder/Inside") &&
+		QFile::exists(trashInfo + "/Locked note.trashinfo") &&
+		QFile::exists(trashInfo + "/Locked folder.trashinfo"),
+		"and the locked items stay, with their records for Put Away; the rest goes");
+	asked = false;
+	QTimer::singleShot(0, [&asked] {
+		if (auto *alert = dynamic_cast<Alert *>(QApplication::activeModalWidget())) {
+			asked = true;
+			alert->reject();
+		}
+	});
+	Finder::instance().emptyTrash(true);
+	settle();
+	check(!asked && QDir(trashFilesPath()).isEmpty(),
+		"Option-Empty Trash removes locked items too, without asking");
 	fixture(apps + "/com.example.TrashTest.desktop",
 		"[Desktop Entry]\nType=Application\nName=Trash Test\nExec=/bin/true\n"
 		"X-Flatpak=com.example.TrashTest\n");

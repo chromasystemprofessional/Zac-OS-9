@@ -75,7 +75,10 @@ public:
 	void openItem(Item *item);
 	void closeWindow();
 	void moveSelectionToTrash();
-	void emptyTrash();
+	/* Special > Empty Trash. Locked items (ones that can't be changed)
+	 * stay unless `option`: Option-Empty Trash removes them as well, and
+	 * doesn't ask first (uninstalling programs still asks). */
+	void emptyTrash(bool option = false);
 	void getInfo(bool sharing = false);
 	void duplicate();
 	void makeAlias();

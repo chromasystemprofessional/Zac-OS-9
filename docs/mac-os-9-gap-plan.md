@@ -188,7 +188,7 @@ Section 3 lists every feature; section 5 is the plan.
 | Labels: seven, applied from File ▸ Label; names and colours editable in Preferences | p. 40 | ✅ | Colours from the 16-colour system palette rather than a full colour picker. |
 | Spring-loaded folders; delay slider; Space opens at once | p. 35 | ✅ | On/off and delay in Preferences; Space during a drag opens the folder at once (`platinum-shell-v1` 15 `drag_spring`: programs get no keys during a drag, so `zacos9-wm` tells the one under it). |
 | **Toy Box** (buttons in categories, pages; Option-drag between pages) | p. 43 | ✅ | Control Panels ▸ Toy Box; System Folder ▸ Toy Box Items; bulleted folders are pages. |
-| Trash: Empty Trash…, warn-before-emptying option (the ellipsis disappears), locked items need Option | p. 46 | ◐ | Warn before emptying in the Trash's Get Info (`trash-warn`) ✅; without it Empty Trash has no ellipsis and doesn't ask, except before uninstalling applications. Locked items: a read-only folder in the Trash isn't removed and Empty Trash says it couldn't empty completely; no Option-to-force yet. P3 S |
+| Trash: Empty Trash…, warn-before-emptying option (the ellipsis disappears), locked items need Option | p. 46 | ✅ | Warn before emptying in the Trash's Get Info (`trash-warn`) ✅; without it Empty Trash has no ellipsis and doesn't ask, except before uninstalling applications. Locked items (can't be changed) stay, with their Put Away records, and Empty Trash says so even without the warning; Option-Empty Trash removes them too without asking. |
 | Put Away takes items out of the Trash back to where they were | p. 412 | ✅? | Verify for files from the Trash. |
 | **Encrypt** a file (password, optional Keychain) | p. 49, 412 | ✗ | `age`/gpg with the password kept in Secret Service; double-click asks. P3 M |
 | Rebuild the desktop (generic icons) | p. 51 | — | No desktop database; MIME cache refresh is automatic. |
@@ -510,7 +510,7 @@ Small gaps left in features that already ship.
 |---|---|---|---|
 | 3.1 ✅ | **⌘-drag scrolls** a Sniffer window with the grabber hand (a Ctrl-press waits: moved, it scrolls; still, it's a Control-click) | `shell/finder/folderwindow.cpp` | S |
 | 3.2 ✅ | **Space opens a spring-loaded folder** at once (`platinum-shell-v1` 15 `drag_spring`: programs get no keys during a drag) | compositor `input.c`, `platinum_shell.c`; Sniffer | S |
-| 3.3 ◐ | **Trash: Warn before emptying** in the Trash's Get Info ✅; locked items not forced with Option | Sniffer, menu bar | S |
+| 3.3 ✅ | **Trash: Warn before emptying** in the Trash's Get Info; locked items stay unless Option-Empty Trash | Sniffer, menu bar | S |
 | 3.4 ✅ | **Option-choosing a program** in the Application menu hides the one you leave | `shell/menubar/` | S |
 | 3.5 ◐ | **Option-double-click** closes the window an icon was in ✅; **ribbed handle** switches the Application menu between name and icon (the generic application icon, not the program's own) | Sniffer, menu bar, `lib/menudraw` | S |
 | 3.6 ✅ | Open/Save: **Recent** button; a **folder dropped** on the dialog opens there | `shell/finder/filechooserportal.cpp` | S |

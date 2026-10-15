@@ -271,8 +271,8 @@ void Finder::command(const QString &name) {
 		closeWindow();
 	} else if (name == "move-to-trash") {
 		moveSelectionToTrash();
-	} else if (name == "empty-trash") {
-		emptyTrash();
+	} else if (name == "empty-trash" || name == "empty-trash-option") {
+		emptyTrash(name == "empty-trash-option");
 	} else if (name == "erase-disk") {
 		const auto items = front() ? front()->selectedItems() : std::vector<Item *>{};
 		if (items.size() != 1 || !items[0]->isLocalVolume) {
@@ -1274,7 +1274,47 @@ void Finder::moveSelectionToTrash() {
 	folderChanged(trashFilesPath());
 }
 
-void Finder::emptyTrash() {
+/* Locked as the Mac meant it (Find's "is locked"): it can't be changed.
+ * Removing an alias doesn't touch its original, so links never are. */
+static bool trashLocked(const QFileInfo &info) {
+	return !info.isSymLink() && !info.isWritable();
+}
+
+/* Removes what isn't locked under `path`: true if all of it went. A
+ * locked folder keeps all it holds (its entries can't be removed). */
+static bool removeUnlocked(const QString &path) {
+	const QFileInfo info(path);
+	if (trashLocked(info)) {
+		return false;
+	}
+	if (info.isSymLink() || !info.isDir()) {
+		return QFile::remove(path);
+	}
+	bool all = true;
+	for (const QFileInfo &child : QDir(path).entryInfoList(
+			QDir::AllEntries | QDir::NoDotAndDotDot | QDir::Hidden | QDir::System)) {
+		all = removeUnlocked(child.absoluteFilePath()) && all;
+	}
+	return all && QDir().rmdir(path);
+}
+
+/* Option-Empty Trash: locked items are unlocked (they're ours) and go too. */
+static bool removeForced(const QString &path) {
+	const QFileInfo info(path);
+	if (info.isSymLink() || !info.isDir()) {
+		return QFile::remove(path);
+	}
+	QFile::setPermissions(path, info.permissions() | QFileDevice::ReadOwner |
+		QFileDevice::WriteOwner | QFileDevice::ExeOwner);
+	bool all = true;
+	for (const QFileInfo &child : QDir(path).entryInfoList(
+			QDir::AllEntries | QDir::NoDotAndDotDot | QDir::Hidden | QDir::System)) {
+		all = removeForced(child.absoluteFilePath()) && all;
+	}
+	return all && QDir().rmdir(path);
+}
+
+void Finder::emptyTrash(bool option) {
 	static bool emptying = false;
 	if (emptying) {
 		return;
@@ -1287,13 +1327,14 @@ void Finder::emptyTrash() {
 		Alert::ask(queueError, "OK", QString());
 		return;
 	}
-	int count = 0;
+	int count = 0, locked = 0;
 	qint64 bytes = 0;
 	QDirIterator it(files, QDir::AllEntries | QDir::NoDotAndDotDot | QDir::Hidden |
 		QDir::System, QDirIterator::Subdirectories);
 	while (it.hasNext()) {
 		it.next();
 		count++;
+		locked += trashLocked(it.fileInfo()) ? 1 : 0;
 		bytes += it.fileInfo().isFile() ? it.fileInfo().size() : 0;
 	}
 	if (count == 0) {
@@ -1313,9 +1354,17 @@ void Finder::emptyTrash() {
 		message += "\n\nThis will uninstall: " + names.join(", ") +
 			". Personal application data is kept. Debian removal may also remove dependent packages.";
 	}
-	/* Without the warning (the Trash's Get Info), it empties at once;
-	 * uninstalling applications still asks. */
-	if ((trashWarns() || !applications.empty()) && !Alert::ask(message)) {
+	/* Locked items stay, and the Mac says so even without the warning. */
+	const bool keepLocked = locked > 0 && !option;
+	if (keepLocked) {
+		message += QStringLiteral("\n\n%1 locked %2 will stay in the Trash. To remove %3 too, "
+			"hold down Option while you choose Empty Trash.")
+			.arg(locked).arg(locked == 1 ? "item" : "items").arg(locked == 1 ? "it" : "them");
+	}
+	/* Without the warning (the Trash's Get Info), or with Option, it
+	 * empties at once; uninstalling applications still asks. */
+	if (((trashWarns() && !option) || keepLocked || !applications.empty()) &&
+			!Alert::ask(message)) {
 		return;
 	}
 	if (!applications.empty()) {
@@ -1404,8 +1453,21 @@ void Finder::emptyTrash() {
 		folderChanged(files);
 		return;
 	}
-	if (!QDir(files).removeRecursively() ||
-			!QDir(QFileInfo(files).absolutePath() + "/info").removeRecursively()) {
+	/* Each item, and its record for Put Away once it's all gone. */
+	const QString info = QFileInfo(files).absolutePath() + "/info";
+	bool all = true;
+	for (const QFileInfo &entry : QDir(files).entryInfoList(
+			QDir::AllEntries | QDir::NoDotAndDotDot | QDir::Hidden | QDir::System)) {
+		const QString path = entry.absoluteFilePath();
+		if (option ? removeForced(path) : removeUnlocked(path)) {
+			QFile::remove(info + "/" + entry.fileName() + ".trashinfo");
+		} else {
+			all = false;
+		}
+	}
+	if (all) {
+		QDir(info).removeRecursively();
+	} else if (!keepLocked) {
 		Alert::ask("The Trash could not be completely emptied.", "OK", QString());
 		folderChanged(files);
 		return;

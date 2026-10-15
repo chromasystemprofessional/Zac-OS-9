@@ -501,7 +501,9 @@ void menus_perform(struct mb_item *item) {
 		keys_send_clear();
 		break;
 	case ACT_FINDER:
-		finder_send(item->arg);
+		/* Option-Empty Trash: locked items too, without asking. */
+		finder_send(item->option && strcmp(item->arg, "empty-trash") == 0 ?
+			"empty-trash-option" : item->arg);
 		break;
 	case ACT_DBUSMENU:
 		appmenu_perform(item->arg);
