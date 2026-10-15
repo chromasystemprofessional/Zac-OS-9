@@ -213,7 +213,7 @@ Section 3 lists every feature; section 5 is the plan.
 | Special ▸ Empty Trash…, Erase Disk…, Sleep, Restart, Shut Down | ✅ | Erase Disk: format choices (Mac OS Extended, DOS/FAT, exFAT) to verify. |
 | Special ▸ **Eject** (⌘E) | ✅ | Every selected disk, local or network; replaces Disconnect Network Drive and Unmount Disk (0.1.54). |
 | Special ▸ **Log Out** (⇧⌘Q) | ✅ | Asks, quits the programs (each may offer to save), then ends the session; a program still open after 30 s cancels it (0.1.54). The menu doesn't show ⇧⌘Q yet (the painter has no ⇧ glyph). |
-| Help ▸ **Help Center**, **Show/Hide Hint Bubbles**, **ZacOS Help** | ✗ | See 3.17. P2 L |
+| Help ▸ **Help Center**, **Show/Hide Hint Bubbles**, **ZacOS Help** | ◐ | Help Center and ZacOS Help (⌘-?) ✅; Hint Bubbles wait for 3.17. |
 
 ### 3.4 Contextual menus (ch. 4 p. 64)
 
@@ -410,9 +410,9 @@ A zram/swap switch in a Memory panel is a possible P3.
 
 | Feature | Status | Notes |
 |---|---|---|
-| **Help Center** (browser-like, searchable HTML help) | ✗ | P2 L. Write help pages for ZacOS itself; a Platinum viewer (QTextBrowser) with Back/Home/Search. |
+| **Help Center** (browser-like, searchable HTML help) | ✅ | `zacos9-help` (`shell/help/`): Back, Forward, Help Center and a search field above the page; the Help Center lists every book in `share/zacos9/help` (a folder with an index.html); search ranks every page (title words count most) with the best sentence and a relevance bar. ZacOS Help: 14 pages (basics, the Sniffer, files, Find, Zac menu, programs, The Collar, Old Dog, control panels, accessibility, networks, shortcuts, troubleshooting). |
 | **Hint Bubbles** (Show Hint Bubbles) | ✗ | P3 M. Bubbles drawn by the menu bar over its menus, and by our own panels from their tooltips; other apps' tooltips stay as they are. |
-| ZacOS Help from the Sniffer | ✗ | Part of Help Center. |
+| ZacOS Help from the Sniffer | ✅ | Help ▸ Help Center and ZacOS Help (⌘-?) when the Sniffer is in front. |
 
 ### 3.18 Desk accessories and utilities (ch. 5, 13)
 
@@ -498,7 +498,7 @@ updates `PROJECT_STATUS.md` and the relevant `docs/` page.
 | 2.12 ✅ | **Desk accessories I**: Calculator, Dog Ears, Scribble | new small Qt apps on panelkit | S + M + M |
 | 2.13 ✅ | **System Information** (Pedigree) | Qt app + read-only helper | M |
 | 2.14 | **Users** panel (accounts, pictures, passwords, administrators) | panel over accountsservice + polkit | L |
-| 2.15 | **Help Center** with ZacOS help pages | `shell/help/`, `share/zacos9/help/` | L |
+| 2.15 ✅ | **Help Center** with ZacOS help pages | `shell/help/`, `share/zacos9/help/` | L |
 | 2.16 ✅ | **Collar modules**: media playback (MPRIS), File Sharing on/off and visitors | `shell/collar/` | S each |
 | 2.17 ✅ | Sniffer list-view columns: choose, reorder, resize, shortening dates/sizes, Reset Column Positions | `shell/finder/folderwindow.cpp` | M |
 
