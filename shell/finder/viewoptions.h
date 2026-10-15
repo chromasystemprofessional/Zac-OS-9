@@ -79,6 +79,8 @@ void setStandardViews(const ViewOptions &options);
 /* Preferences > General (desktop.conf). */
 bool springLoadedFolders();      /* "spring-loaded", on unless "false" */
 int springDelayMs();             /* "spring-delay", 900 by default */
+bool trashWarns();              /* "trash-warn", on unless "false" */
+void setTrashWarns(bool on);
 bool tightGrid();                /* "grid-spacing=tight"; Wide by default */
 
 /* Arrange's names in settings and commands: "name", "modified", ... */

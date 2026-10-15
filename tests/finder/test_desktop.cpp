@@ -29,6 +29,7 @@
 #include "localvolumes.h"
 #include "zacos9style.h"
 #include "vfs.h"
+#include "viewoptions.h"
 
 #define private public
 #define protected public
@@ -812,6 +813,40 @@ esac
 		"Flatpak uninstall is user-scoped and does not delete data");
 	check(commands.contains("remove coreutils") && !commands.contains("purge"),
 		"Debian uninstall uses the existing helper without purging configuration");
+
+	/* Warn before emptying off (the Trash's Get Info): it empties without
+	 * asking, but queued applications still ask before uninstalling. */
+	setTrashWarns(false);
+	check(!trashWarns(), "Warn before emptying can be turned off");
+	fixture(trashFilesPath() + "/Old draft", "draft");
+	bool asked = false;
+	QTimer::singleShot(0, [&asked] {
+		if (auto *alert = dynamic_cast<Alert *>(QApplication::activeModalWidget())) {
+			asked = true;
+			alert->reject();
+		}
+	});
+	Finder::instance().emptyTrash();
+	settle();
+	check(!asked && QDir(trashFilesPath()).isEmpty(),
+		"without the warning, Empty Trash empties at once");
+	fixture(apps + "/com.example.TrashTest.desktop",
+		"[Desktop Entry]\nType=Application\nName=Trash Test\nExec=/bin/true\n"
+		"X-Flatpak=com.example.TrashTest\n");
+	vfsRefresh();
+	check(appTrashQueue("com.example.TrashTest.desktop", &error), "queue an app with the warning off");
+	vfsRefresh();
+	asked = false;
+	QTimer::singleShot(0, [&asked] {
+		if (auto *alert = dynamic_cast<Alert *>(QApplication::activeModalWidget())) {
+			asked = true;
+			alert->reject();
+		}
+	});
+	Finder::instance().emptyTrash();
+	check(asked && appTrashEntries(&error).size() == 1,
+		"uninstalling applications still asks first with the warning off");
+	setTrashWarns(true);
 	for (QWidget *widget : QApplication::topLevelWidgets()) {
 		if (dynamic_cast<FolderWindow *>(widget)) {
 			widget->close();

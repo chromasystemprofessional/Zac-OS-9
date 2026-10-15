@@ -188,7 +188,7 @@ Section 3 lists every feature; section 5 is the plan.
 | Labels: seven, applied from File ▸ Label; names and colours editable in Preferences | p. 40 | ✅ | Colours from the 16-colour system palette rather than a full colour picker. |
 | Spring-loaded folders; delay slider; Space opens at once | p. 35 | ✅ | On/off and delay in Preferences; Space during a drag opens the folder at once (`platinum-shell-v1` 15 `drag_spring`: programs get no keys during a drag, so `zacos9-wm` tells the one under it). |
 | **Toy Box** (buttons in categories, pages; Option-drag between pages) | p. 43 | ✅ | Control Panels ▸ Toy Box; System Folder ▸ Toy Box Items; bulleted folders are pages. |
-| Trash: Empty Trash…, warn-before-emptying option (the ellipsis disappears), locked items need Option | p. 46 | ◐ | Empty with warning ✅; option to turn the warning off, locked items to verify. P3 S |
+| Trash: Empty Trash…, warn-before-emptying option (the ellipsis disappears), locked items need Option | p. 46 | ◐ | Warn before emptying in the Trash's Get Info (`trash-warn`) ✅; without it Empty Trash has no ellipsis and doesn't ask, except before uninstalling applications. Locked items: a read-only folder in the Trash isn't removed and Empty Trash says it couldn't empty completely; no Option-to-force yet. P3 S |
 | Put Away takes items out of the Trash back to where they were | p. 412 | ✅? | Verify for files from the Trash. |
 | **Encrypt** a file (password, optional Keychain) | p. 49, 412 | ✗ | `age`/gpg with the password kept in Secret Service; double-click asks. P3 M |
 | Rebuild the desktop (generic icons) | p. 51 | — | No desktop database; MIME cache refresh is automatic. |

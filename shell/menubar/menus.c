@@ -56,6 +56,14 @@ static void add_edit_menu(struct mb_menu *menus, int *n, bool enabled) {
 	add(m, "Select All", 'A', enabled, ACT_EDIT_COMMAND, NULL);
 }
 
+/* Special > Empty Trash: "…" while it asks first (the Trash's Get Info,
+ * Warn before emptying), as Mac OS 9 dropped the ellipsis without it. */
+static const char *empty_trash_title(void) {
+	char v[16];
+	const bool warns = !(pl_setting("trash-warn", v, sizeof(v)) && strcmp(v, "false") == 0);
+	return warns ? "Empty Trash…" : "Empty Trash";
+}
+
 /* File > Label and its contextual twin: the seven labels, the selection's
  * checked. */
 static void add_label_submenu(struct mb_menu *m, bool enabled, int current) {
@@ -174,7 +182,7 @@ static void add_finder_menus(struct mb_menu *menus, int *n) {
 	sep(m);
 	add(m, "View Options…", 0, up, ACT_FINDER, "view-options");
 	m = new_menu(menus, n, "Special");
-	add(m, "Empty Trash…", 0, up && fs->trash, ACT_FINDER, "empty-trash");
+	add(m, empty_trash_title(), 0, up && fs->trash, ACT_FINDER, "empty-trash");
 	add(m, "Eject", 'E', up && (fs->network || fs->unmount), ACT_FINDER, "eject");
 	add(m, "Erase Disk…", 0, up && fs->erase && fs->selection == 1, ACT_FINDER, "erase-disk");
 	/* Restore legacy hidden overrides, not applications queued in Trash. */
@@ -496,7 +504,7 @@ void menus_context(struct mb_menu *m, const char *kind) {
 	} else if (strcmp(kind, "trash") == 0 && sel) {
 		add(m, "Open", 0, true, ACT_FINDER, "open");
 		if (fs->trash) {
-			add(m, "Empty Trash…", 0, true, ACT_FINDER, "empty-trash");
+			add(m, empty_trash_title(), 0, true, ACT_FINDER, "empty-trash");
 		}
 	} else if (strcmp(kind, "window") == 0 && fs->window) {
 		add(m, "New Folder", 0, true, ACT_FINDER, "new-folder");

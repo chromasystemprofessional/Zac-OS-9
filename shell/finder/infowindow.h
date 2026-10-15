@@ -70,6 +70,11 @@ private:
 	QString m_owner, m_group, m_origOwner, m_origGroup;
 	int m_mode = 0, m_origMode = 0; /* rwx bits for owner, group, others */
 	PanelCheckbox m_shareBox;
+
+	/* The Trash's Get Info: Warn before emptying (Mac OS 9's, under
+	 * its comments), the "trash-warn" setting. */
+	bool m_isTrash = false;
+	PanelCheckbox m_trashWarn;
 	PanelPopup m_ownerPopup, m_groupPopup, m_privilege[3];
 	PanelButton m_copy;
 

@@ -1,4 +1,7 @@
 #include <assert.h>
+#include <stdlib.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 /* Exercise the private state parser and menu builder without a Wayland server. */
 #include "finderlink.c"
@@ -93,6 +96,23 @@ int main(void) {
 	assert(strcmp(got, "Open|Get Info|Label|") == 0); /* the startup disk */
 	context_labels("state selection=1 window=0 trash=1", "trash", got, sizeof(got));
 	assert(strcmp(got, "Open|Empty Trash…|") == 0);
+	/* Without Warn before emptying, no ellipsis: it doesn't ask. */
+	char conf[] = "/tmp/zacos9-menu-test-XXXXXX";
+	assert(mkdtemp(conf));
+	char dir[sizeof(conf) + 16], file[sizeof(conf) + 32];
+	snprintf(dir, sizeof(dir), "%s/zacos9", conf);
+	snprintf(file, sizeof(file), "%s/desktop.conf", dir);
+	mkdir(dir, 0700);
+	FILE *f = fopen(file, "w");
+	fputs("trash-warn=false\n", f);
+	fclose(f);
+	setenv("XDG_CONFIG_HOME", conf, 1);
+	context_labels("state selection=1 window=0 trash=1", "trash", got, sizeof(got));
+	assert(strcmp(got, "Open|Empty Trash|") == 0);
+	unsetenv("XDG_CONFIG_HOME");
+	unlink(file);
+	rmdir(dir);
+	rmdir(conf);
 	context_labels("state selection=1 window=0 trash=0", "trash", got, sizeof(got));
 	assert(strcmp(got, "Open|") == 0);
 	context_labels("state selection=0 window=1 trash=0 view=0", "window", got, sizeof(got));

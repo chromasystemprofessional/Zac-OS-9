@@ -32,6 +32,7 @@
 #include "logo.h"
 #include "resources.h"
 #include "sharingclient.h"
+#include "viewoptions.h"
 
 static constexpr uint32_t FACE = GRAY(0xD);
 static constexpr int LABEL_RIGHT = 74; /* right edge of "Kind:" etc. */
@@ -225,7 +226,13 @@ InfoWindow::InfoWindow(const QString &path, pl_icon_kind kind, const QString &na
 	}
 
 	QFileInfo info(path);
-	if (kind == PL_ICON_DISK) {
+	m_isTrash = kind == PL_ICON_TRASH_EMPTY || kind == PL_ICON_TRASH_FULL;
+	if (m_isTrash) {
+		m_kindText = "trash";
+		m_trashWarn = PanelCheckbox("Warn before emptying", QPoint(INSIDE_X, BOX_Y1 - 26));
+		m_trashWarn.on = trashWarns();
+		m_trashWarn.toggled = [](bool on) { setTrashWarns(on); };
+	} else if (kind == PL_ICON_DISK) {
 		m_kindText = "disk";
 	} else if (info.isDir()) {
 		m_kindText = "folder";
@@ -236,7 +243,7 @@ InfoWindow::InfoWindow(const QString &path, pl_icon_kind kind, const QString &na
 			m_kindText = "application program";
 		}
 	}
-	m_where = macPath(path == "/" ? "/" : info.absolutePath());
+	m_where = m_isTrash ? QStringLiteral("Desktop") : macPath(path == "/" ? "/" : info.absolutePath());
 	if (info.isSymLink()) {
 		m_kindText = "alias";
 		const AliasResolution r = aliasResolve(path, false);
@@ -247,7 +254,7 @@ InfoWindow::InfoWindow(const QString &path, pl_icon_kind kind, const QString &na
 	}
 
 	/* Show: folders can be shared; files, aliases and disks can't. */
-	const bool folder = info.isDir() && !info.isSymLink() && kind != PL_ICON_DISK;
+	const bool folder = info.isDir() && !info.isSymLink() && kind != PL_ICON_DISK && !m_isTrash;
 	m_show.rect = QRect(SHOW_X, SHOW_Y, SHOW_W, PL_POPUP_H);
 	m_show.items = { PopupItem{ "General Information" }, PopupItem{ "Sharing", folder } };
 	m_show.chosen = [this](int i) { showView(i); };
@@ -337,6 +344,8 @@ bool InfoWindow::showView(int view) {
 			m_host.checks = { &m_shareBox };
 		}
 		m_host.buttons = { &m_copy };
+	} else if (m_isTrash) {
+		m_host.checks = { &m_trashWarn };
 	}
 	setFixedSize(INFO_W, INFO_H);
 	update();
@@ -444,7 +453,7 @@ void InfoWindow::paintGeneral(pl_canvas *c) {
 
 	/* Comments box: click to type. */
 	panelText(c, "Comments:", INSIDE_X, y + 16);
-	m_commentBox = QRect(QPoint(INSIDE_X, y + 22), QPoint(BOX_X1 - 9, BOX_Y1 - 10));
+	m_commentBox = QRect(QPoint(INSIDE_X, y + 22), QPoint(BOX_X1 - 9, BOX_Y1 - (m_isTrash ? 34 : 10)));
 	pl_fill(c, m_commentBox.left(), m_commentBox.top(), m_commentBox.right(), m_commentBox.bottom(), C_WHITE);
 	pl_outline(c, m_commentBox.left(), m_commentBox.top(), m_commentBox.right(), m_commentBox.bottom(),
 		m_editingComment ? C_BLACK : GRAY(0x8));

@@ -166,6 +166,15 @@ bool springLoadedFolders() {
 	return !(pl_setting("spring-loaded", v, sizeof(v)) && strcmp(v, "false") == 0);
 }
 
+bool trashWarns() {
+	char v[16];
+	return !(pl_setting("trash-warn", v, sizeof(v)) && strcmp(v, "false") == 0);
+}
+
+void setTrashWarns(bool on) {
+	pl_setting_set("trash-warn", on ? nullptr : "false");
+}
+
 int springDelayMs() {
 	char v[16];
 	const int ms = pl_setting("spring-delay", v, sizeof(v)) ? atoi(v) : 0;

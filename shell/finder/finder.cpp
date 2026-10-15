@@ -1313,7 +1313,9 @@ void Finder::emptyTrash() {
 		message += "\n\nThis will uninstall: " + names.join(", ") +
 			". Personal application data is kept. Debian removal may also remove dependent packages.";
 	}
-	if (!Alert::ask(message)) {
+	/* Without the warning (the Trash's Get Info), it empties at once;
+	 * uninstalling applications still asks. */
+	if ((trashWarns() || !applications.empty()) && !Alert::ask(message)) {
 		return;
 	}
 	if (!applications.empty()) {
