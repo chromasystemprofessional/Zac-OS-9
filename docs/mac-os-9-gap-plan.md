@@ -323,7 +323,7 @@ A zram/swap switch in a Memory panel is a possible P3.
 | **Fetch Updates** | ✅ | Scheduled checks to verify. |
 | **Sound**: alert sounds, output volume, input source | ◐ | Alert sound and output ✅; **Input** source and **Speaker balance** missing. P3 S |
 | **Speech** (voice, talking alerts) | ✗ | See 3.16. |
-| **Startup Disk** | ✗ | GRUB default entry (`grub-reboot`/`grub-set-default`) through a polkit helper, listing other systems found by os-prober and Classic disks. P2 M |
+| **Startup Disk** | ◐ | `zacos9-controlpanel startupdisk`: GRUB's entries (other versions behind Show every version), the one it starts with selected; choosing one sets it through `zacos9-startupdisk-helper` (polkit; GRUB_DEFAULT=saved the first time), Look for Other Systems turns os-prober on, Restart. Choosing Classic's startup disk is still to do. |
 | **TCP/IP** | ✅ | |
 | **Trackpad** (tap to click, drag, drag lock) | ✅ | `zacos9-controlpanel trackpad`: tracking and double-click speed (shared with Mouse), Use Trackpad for Clicking / Dragging / Drag Lock, set on libinput touchpads by zacos9-wm (`input.c`). |
 | **Web Sharing** (personal web page, on/off) | ✗ | A small static server for `~/Web Pages` behind a switch. P3 S |
@@ -492,7 +492,7 @@ updates `PROJECT_STATUS.md` and the relevant `docs/` page.
 | 2.6 ✅ | **Toy Box** (button view of `Toy Box Items`, categories as pages) | Sniffer | M |
 | 2.7 ✅ | **Search**: more Find criteria now; then content search with an index (localsearch or recoll), Index Selection, Find Similar | `shell/finder/findwindow.cpp`, a search backend wrapper; packaging dependency | M + L |
 | 2.8 | **Printing**: Printer Picker, desktop printers with queue windows, File ▸ Print for documents, default printer in The Collar | new `shell/print/` over CUPS; Sniffer | L |
-| 2.9 | **Startup Disk** panel (GRUB entries, other OSes, Classic) | `shell/panels/`, polkit helper | M |
+| 2.9 ◐ | **Startup Disk** panel (GRUB entries, other OSes, Classic) | `shell/panels/`, polkit helper | M |
 | 2.10 ✅ | **Internet** panel (default browser, mail app, downloads folder) | `shell/panels/`, `mimeapps.list`, xdg-user-dirs | S |
 | 2.11 ✅ | **Trackpad** and **Accessibility** (Sticky/Slow/Mouse Keys, zoom) | prefs.c (libinput, xkb a11y), panels | M |
 | 2.12 ✅ | **Desk accessories I**: Calculator, Dog Ears, Scribble | new small Qt apps on panelkit | S + M + M |
