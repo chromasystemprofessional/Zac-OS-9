@@ -961,13 +961,27 @@ test('startupdisk-panel',
   env: ['QT_QPA_PLATFORM=offscreen'],
   timeout: 30,
 )
+crypt = dependency('libxcrypt')
+users_sources = ['panels/users.cpp']
+# Users with a stand-in accountsservice on a private session bus (users.cpp).
+test('users-panel', find_program('dbus-run-session'),
+  args: ['--', executable('test-users-panel', '../tests/users/test_panel.cpp', users_sources,
+      'finder/alert.cpp', 'finder/platinumshell.cpp', finder_protocol,
+      link_with: panelkit,
+      include_directories: include_directories('finder', 'panels'),
+      dependencies: [platinum_dep, qt6, wayland_client, crypt],
+      cpp_args: ['-std=c++17'],
+    ).full_path(), files('../tests/users/fake_accounts.py')],
+  timeout: 60,
+)
 executable('zacos9-controlpanel',
   'panels/controlpanel.cpp',
   'panels/soundclient.cpp',
+  users_sources,
   xkb_layouts_sources, default_apps_sources, startup_disk_sources,
   link_with: panelkit,
   include_directories: [include_directories('finder'), xkb_layouts_include],
-  dependencies: [platinum_dep, qt6, xkbcommon_client, gio, gio_unix, wayland_client],
+  dependencies: [platinum_dep, qt6, xkbcommon_client, gio, gio_unix, wayland_client, crypt],
   cpp_args: ['-std=c++17'],
   install: true,
 )

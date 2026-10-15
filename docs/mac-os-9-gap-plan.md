@@ -317,7 +317,7 @@ A zram/swap switch in a Memory panel is a possible P3.
 | Memory | — | |
 | **Monitors**: resolution, pixel size | ✅ | Several screens and arrangement still on the roadmap; colour depth — . |
 | **Mouse**: tracking, double-click | ✅ | Mouse tracks and thick I-beam (laptops) P3 S. |
-| **Users** | ✗ | See 3.14. |
+| **Users** | ✅ | See 3.14. |
 | **Numbers** / **Text** (number and sort formats, language) | ✗ | locale via `localectl`/`~/.config/locale.conf`. P3 S |
 | Media Settings (CD AutoPlay) | ✗ | Audio CD/media autoplay as a Sniffer setting. P3 S |
 | **Fetch Updates** | ✅ | Scheduled checks to verify. |
@@ -373,7 +373,7 @@ A zram/swap switch in a Memory panel is a possible P3.
 |---|---|---|
 | Login window with a user list and password | ✅ | `zacos9-login` (0.1.54) |
 | **Log Out** (Special menu), automatic logout or lock after idle | ✅ | Log Out ✅ (0.1.54); lock after idle ✅ (Screen Saver) |
-| **Users panel**: add/remove accounts, picture, can change password, can log in, can manage accounts | ✗ | **P2 L.** accountsservice over D-Bus; polkit for administrators. |
+| **Users panel**: add/remove accounts, picture, can change password, can log in, can manage accounts | ✅ | `zacos9-controlpanel users` over accountsservice (D-Bus, its own polkit rules: your name and picture freely, the rest with an administrator's password through the session's polkit agent); passwords hashed in the panel by crypt(3). You can't delete, demote or lock yourself. |
 | Account kinds: Normal, **Limited** (chosen apps only), **Puppy Mode** (the simplified desktop for children) | ✗ | P3 L. Limited: allowed-apps list enforced by the Sniffer and menu bar (not a security boundary — say so). |
 | Global options: welcome message, guest account, speak your name, alternate password | ◐ | Welcome message P3 S; guest account P3 M; voice login — . |
 | Shared Documents folder | ✗ | `/home/Shared` with a group. P3 S |
@@ -497,7 +497,7 @@ updates `PROJECT_STATUS.md` and the relevant `docs/` page.
 | 2.11 ✅ | **Trackpad** and **Accessibility** (Sticky/Slow/Mouse Keys, zoom) | prefs.c (libinput, xkb a11y), panels | M |
 | 2.12 ✅ | **Desk accessories I**: Calculator, Dog Ears, Scribble | new small Qt apps on panelkit | S + M + M |
 | 2.13 ✅ | **System Information** (Pedigree) | Qt app + read-only helper | M |
-| 2.14 | **Users** panel (accounts, pictures, passwords, administrators) | panel over accountsservice + polkit | L |
+| 2.14 ✅ | **Users** panel (accounts, pictures, passwords, administrators) | panel over accountsservice + polkit | L |
 | 2.15 ✅ | **Help Center** with ZacOS help pages | `shell/help/`, `share/zacos9/help/` | L |
 | 2.16 ✅ | **Collar modules**: media playback (MPRIS), File Sharing on/off and visitors | `shell/collar/` | S each |
 | 2.17 ✅ | Sniffer list-view columns: choose, reorder, resize, shortening dates/sizes, Reset Column Positions | `shell/finder/folderwindow.cpp` | M |

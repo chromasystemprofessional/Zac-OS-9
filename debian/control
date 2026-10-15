@@ -5,6 +5,7 @@ Maintainer: adamjlawson-ctrl <adamjlawson@gmail.com>
 Build-Depends: debhelper-compat (= 13),
                meson,
                ninja-build,
+               libcrypt-dev,
                dbus-daemon,
                pkgconf,
                libpam0g-dev,
@@ -41,6 +42,7 @@ Package: zacos9
 Architecture: any
 Depends: ${shlibs:Depends},
          ${misc:Depends},
+         accountsservice,
          qt6-wayland,
          qt6-svg-plugins,
          qt6-image-formats-plugins,

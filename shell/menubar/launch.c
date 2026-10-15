@@ -311,6 +311,7 @@ void launch_fill_logo_menu(struct mb_menu *menu, const struct app *apps, int n_a
 		{ "Startup Disk", "zacos9-controlpanel", " startupdisk" },
 		{ "TCP/IP", "zacos9-tcpip", "" },
 		{ "Trackpad", "zacos9-controlpanel", " trackpad" },
+		{ "Users", "zacos9-controlpanel", " users" },
 		{ "Zac Menu Options", "zacos9-controlpanel", " zacmenu" },
 	};
 	bool toy_box_added = false;

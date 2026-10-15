@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Users
+Comment=Add, change and remove the accounts of the people who use this computer
+Exec=zacos9-controlpanel users
+Categories=Settings;System;
+OnlyShowIn=ZacOS9;
