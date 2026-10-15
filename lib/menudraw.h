@@ -22,6 +22,9 @@ extern "C" {
 #define MBAR_ICON_Y 2          /* 1 px clear of the bar's top and bottom shading */
 #define MBAR_ICON_W 20         /* the logo: Happy Zac's head is wider than tall */
 #define MBAR_ICON_H 15
+/* The Application menu's ribbed handle, before its title (estimate; not
+ * in the HIG): three ridges, then the usual gap to the title's highlight. */
+#define MBAR_HANDLE_W 6
 
 /* Pull-down menus (HIG figures 4-1, 4-2). */
 #define MENU_ITEM_H 16
@@ -43,9 +46,11 @@ struct mbar_title {
 	const struct plat_text *text; /* text title, or */
 	const uint32_t *icon;         /* MBAR_ICON_W × MBAR_ICON_H ARGB icon title */
 	bool dimmed;
+	bool handle;                  /* a ribbed handle before it (right side only) */
 	/* Filled in by mbar_layout_*: */
 	int ink_l, ink_r; /* text ink, or the icon cell */
 	int hi_l, hi_r;   /* highlight extent; also the hit-test area */
+	int handle_l;     /* the handle's left edge, if it has one */
 };
 
 /* Lay titles out left to right from the left screen edge (an icon title
@@ -58,6 +63,8 @@ void mbar_layout_right(struct mbar_title *titles, int n, int screen_w);
 void mbar_paint_background(struct pl_canvas *c, int screen_w);
 void mbar_paint_titles(struct pl_canvas *c, const struct mbar_title *titles,
 		int n, int highlighted, struct pl_accent accent);
+/* The title whose handle is at x, or -1. */
+int mbar_handle_at(const struct mbar_title *titles, int n, int x);
 int mbar_title_at(const struct mbar_title *titles, int n, int x);
 
 struct menu_item {

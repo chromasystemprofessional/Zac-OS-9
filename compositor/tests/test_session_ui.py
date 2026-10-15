@@ -3,7 +3,7 @@ zacos9-wm: ⌘-Tab and Option-click on the desktop (compositor/src/input.c,
 view.c, the menu bar's app_switch_target); a contextual menu on the desktop
 (the Sniffer asks, the menu bar opens it at the pointer); then Special > Log
 Out (shell/menubar/logout.c); Option-choosing a program in the
-Application menu (menus.c). Between them, General Controls' "Show Desktop
+Application menu and its ribbed handle (menus.c). Between them, General Controls' "Show Desktop
 when in background", off: the desktop's icons go while a program is in
 front, and a click there goes nowhere.
 
@@ -148,6 +148,30 @@ with tempfile.TemporaryDirectory(prefix="zacos9-switch-") as directory:
                 assert green() > hidden, "and Bravo stays shown (below Alpha)"
             print("ok: Option-choosing a program in the Application menu hides the one you leave")
 
+            # The Application menu's ribbed handle, before its title: a click
+            # shows an icon instead of the program's name, and back. (Titled
+            # Alpha, the handle is about 1217; as an icon, about 1232.)
+            conf = root / "config/zacos9/desktop.conf"
+
+            def title_area():
+                path = root / "title.ppm"
+                subprocess.run(["grim", "-g", "1240,2 30x15", "-t", "ppm", str(path)], env=env,
+                               check=True, timeout=10)
+                return path.read_bytes()
+
+            vp("home", "move", "600", "300", "wait", "200")  # the pointer out of the way
+            named = title_area() if have_grim else None
+            vp("home", "move", "1217", "9", "click", "move", "-400", "300", "wait", "500")
+            assert "app-menu-name=false" in (conf.read_text() if conf.exists() else ""), \
+                "a click on the handle hides the program's name"
+            if have_grim:
+                assert title_area() != named, "the title becomes an icon"
+            vp("home", "move", "1232", "9", "click", "move", "-400", "300", "wait", "500")
+            assert "app-menu-name" not in conf.read_text(), "another click shows the name again"
+            if have_grim:
+                assert title_area() == named, "and the title is the name again"
+            print("ok: the Application menu's handle hides and shows the program's name")
+
             # Control-click on the desktop: its contextual menu opens at the
             # pointer and stays (a click); its first item, New Folder, makes one.
             desktop = root / "home" / "Desktop"
@@ -173,7 +197,12 @@ with tempfile.TemporaryDirectory(prefix="zacos9-switch-") as directory:
                 conf = root / "config" / "zacos9" / "desktop.conf"
                 text = conf.read_text() if conf.exists() else "[General]\n"
                 conf.parent.mkdir(parents=True, exist_ok=True)
-                conf.write_text(text.replace("[General]\n", "[General]\nshow-desktop=false\n", 1))
+                # Written aside and renamed over, as the panels do (the Sniffer
+                # watches the folder, which an in-place write doesn't touch).
+                new = conf.with_suffix(".new")
+                new.write_text(text.replace("[General]\n", "[General]\nshow-desktop=false\n", 1)
+                               if "[General]\n" in text else "show-desktop=false\n" + text)
+                new.replace(conf)
                 wait_for("the desktop's icons to go", lambda: corner() != shown)
                 vp("home", "move", "40", "450", "click", "wait", "400")
                 assert typed("a") == "bravo", "a click on the hidden desktop leaves Bravo in front"

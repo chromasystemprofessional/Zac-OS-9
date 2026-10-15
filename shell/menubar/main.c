@@ -601,6 +601,13 @@ static void pointer_pressed(void) {
 	enum side side;
 	int index;
 	bool on_title = title_at(g.px, g.py, &side, &index);
+	if (g.open_index < 0 && !on_title && g.py < MBAR_HEIGHT &&
+			mbar_handle_at(g.model.right_titles, g.model.n_right, (int)g.px) >= 0) {
+		/* The Application menu's handle: its name, or just an icon. */
+		menus_toggle_app_name();
+		rebuild();
+		return;
+	}
 	if (g.open_index < 0 && !on_title && g.py < MBAR_HEIGHT && g.model.has_clock &&
 			mbar_title_at(g.model.right_titles, 1, (int)g.px) == 0) {
 		/* The clock: a click flips between time and date. */

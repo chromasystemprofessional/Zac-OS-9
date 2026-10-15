@@ -252,7 +252,7 @@ Section 3 lists every feature; section 5 is the plan.
 | Feature | Status | Notes |
 |---|---|---|
 | Application menu at the right: lists apps, Hide, Hide Others, Show All, current app's name | ✅ | |
-| Ribbed handle to show/hide the app name in the menu bar | ✗ | P3 S |
+| Ribbed handle to show/hide the app name in the menu bar | ◐ | A click on the handle (not a drag) switches between the name and an icon (`app-menu-name`). The icon is the generic application icon: the program's own needs icon-theme lookup and image loading in the menu bar. Handle not measured. |
 | **⌘-Tab / ⇧⌘-Tab** cycles programs | ✅ | By name, the Sniffer among them; hidden programs come back (0.1.54). |
 | **Option-click the desktop / Option-choose an app** hides the one you leave | ✅ | Desktop (0.1.54); Option-choosing a program in the Application menu (the menu bar reads Option from its keyboard while the menu is open). |
 | **Pack palette** (tear off the Application menu; vertical/horizontal, small/large icons, names on/off; drop documents on tiles to open them) | ✅ | `zacos9-pack`, a layer-shell palette above the windows; zoom box (names), Option-zoom (large), Shift-Option-zoom (across), collapse and close boxes; reopens at login. Not done: dragging its edge to set the width. |

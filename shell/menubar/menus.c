@@ -222,6 +222,40 @@ void menus_toggle_clock(void) {
 	clock_shows_date = !clock_shows_date;
 }
 
+/* The Application menu shows the front program's name, unless its handle
+ * was clicked: then the generic application icon (TODO: the program's own,
+ * which needs an icon theme and image loading here). */
+static bool app_name_shown(void) {
+	char v[16];
+	return !(pl_setting("app-menu-name", v, sizeof(v)) && strcmp(v, "false") == 0);
+}
+
+void menus_toggle_app_name(void) {
+	pl_setting_set("app-menu-name", app_name_shown() ? "false" : NULL);
+}
+
+static const uint32_t *app_menu_icon(void) {
+	static uint32_t px[MBAR_ICON_W * MBAR_ICON_H];
+	static bool made;
+	if (!made) {
+		const uint32_t *icon = pl_icon(PL_ICON_APPLICATION, PL_ICON_SMALL);
+		/* 16 px in the 20 x 15 slot: centred across; a blank top row goes. */
+		int top = 0;
+		for (int x = 0; icon && x < PL_ICON_SMALL && top == 0; x++) {
+			top = icon[x] >> 24 ? -1 : 0;
+		}
+		top = top < 0 ? 0 : 1;
+		for (int y = 0; icon && y < MBAR_ICON_H && y + top < PL_ICON_SMALL; y++) {
+			for (int x = 0; x < PL_ICON_SMALL; x++) {
+				px[y * MBAR_ICON_W + x + (MBAR_ICON_W - PL_ICON_SMALL) / 2] =
+					icon[(y + top) * PL_ICON_SMALL + x];
+			}
+		}
+		made = true;
+	}
+	return px;
+}
+
 static bool setting_on(const char *key) {
 	char v[16];
 	return pl_setting(key, v, sizeof(v)) && (strcmp(v, "1") == 0 || strcmp(v, "true") == 0);
@@ -345,7 +379,11 @@ void menus_rebuild(struct mb_bar *bar, int screen_w) {
 
 	kbmenu_add(bar->right, &bar->n_right);
 
-	struct mb_menu *am = new_menu(bar->right, &bar->n_right, front ? front->name : "Sniffer");
+	const bool named = app_name_shown();
+	struct mb_menu *am = new_menu(bar->right, &bar->n_right,
+		!named ? NULL : front ? front->name : "Sniffer");
+	am->icon = named ? NULL : app_menu_icon();
+	am->handle = true;
 	if (front) {
 		char label[256];
 		snprintf(label, sizeof(label), "Hide %s", front->name);
@@ -377,7 +415,11 @@ void menus_rebuild(struct mb_bar *bar, int screen_w) {
 	}
 	for (int i = 0; i < bar->n_right; i++) {
 		render_menu_text(&bar->right[i]);
-		bar->right_titles[i] = (struct mbar_title){ .text = bar->right[i].title_text };
+		bar->right_titles[i] = (struct mbar_title){
+			.text = bar->right[i].title_text,
+			.icon = bar->right[i].icon,
+			.handle = bar->right[i].handle,
+		};
 	}
 	mbar_layout_left(bar->left_titles, bar->n_left);
 	mbar_layout_right(bar->right_titles, bar->n_right, screen_w);

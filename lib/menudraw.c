@@ -79,6 +79,10 @@ void mbar_layout_right(struct mbar_title *titles, int n, int screen_w) {
 		int w = titles[i].icon ? MBAR_ICON_W : ink_width(titles[i].text);
 		set_extent(&titles[i], right - (w > 0 ? w : 1) + 1);
 		right = titles[i].ink_l - 1 - MBAR_TITLE_GAP;
+		if (titles[i].handle) {
+			titles[i].handle_l = titles[i].hi_l - 1 - MBAR_HANDLE_W;
+			right = titles[i].handle_l - 1 - MBAR_TITLE_GAP;
+		}
 	}
 }
 
@@ -116,6 +120,13 @@ void mbar_paint_titles(struct pl_canvas *c, const struct mbar_title *titles,
 			pl_fill(c, t->hi_l, 1, t->hi_r, MBAR_HEIGHT - 3, accent.shadow);
 			pl_hline(c, t->hi_l, t->hi_r, MBAR_HEIGHT - 2, accent.deep);
 		}
+		if (t->handle) {
+			/* Ridges: a highlight and a shadow each. */
+			for (int r = 0; r < 3; r++) {
+				pl_vline(c, t->handle_l + 2 * r, 4, MBAR_HEIGHT - 6, C_WHITE);
+				pl_vline(c, t->handle_l + 2 * r + 1, 4, MBAR_HEIGHT - 6, C_888);
+			}
+		}
 		if (t->icon) {
 			/* Blended: the logo's edge is soft. */
 			pl_image_blend(c, t->ink_l, MBAR_ICON_Y, t->icon, MBAR_ICON_W, MBAR_ICON_H, false);
@@ -124,6 +135,16 @@ void mbar_paint_titles(struct pl_canvas *c, const struct mbar_title *titles,
 			pl_text(c, t->text, t->ink_l, MBAR_BASELINE, color);
 		}
 	}
+}
+
+int mbar_handle_at(const struct mbar_title *titles, int n, int x) {
+	for (int i = 0; i < n; i++) {
+		if (titles[i].handle && x >= titles[i].handle_l - 2 &&
+				x <= titles[i].handle_l + MBAR_HANDLE_W + 1) {
+			return i;
+		}
+	}
+	return -1;
 }
 
 int mbar_title_at(const struct mbar_title *titles, int n, int x) {

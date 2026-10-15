@@ -90,6 +90,7 @@ struct mb_item {
 struct mb_menu {
 	char *title;            /* NULL for an icon title */
 	const uint32_t *icon;
+	bool handle;            /* the Application menu's ribbed handle */
 	struct mb_item items[MAX_ITEMS];
 	int n;
 	struct plat_text *title_text;
@@ -108,6 +109,9 @@ struct mb_bar {
 void menus_rebuild(struct mb_bar *bar, int screen_w);
 /* Clicking the clock flips it between the time and the date. */
 void menus_toggle_clock(void);
+/* Clicking the Application menu's ribbed handle shows or hides the front
+ * program's name there (an icon instead), as dragging it did in Mac OS 9. */
+void menus_toggle_app_name(void);
 /* Sticky Keys (platinum-shell-v1 sticky_keys): while it is on, the bar
  * shows the modifiers it holds, a locked one in brackets. */
 void menus_set_sticky(bool on, unsigned latched, unsigned locked);
