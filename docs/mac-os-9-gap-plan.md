@@ -155,7 +155,7 @@ Section 3 lists every feature; section 5 is the plan.
 | Zoom box: fit contents; Option-click zoom fills the screen | p. 12 | ✅ | Sniffer windows zoom to fit their icons or list (`platinum_shell_v1.set_standard_size`, v9); Option-click fills the screen; other programs' zoom fills it (0.1.54). |
 | Collapse box; Option-click collapses all of the app's windows | p. 13 | ✅ | Only the program's own windows now (it was every window) (0.1.54). |
 | Scroll bars; arrows together or at both ends (Appearance) | p. 13 | ◐ | Arrows-together only; option missing. P3 S |
-| ⌘-drag inside a Sniffer window scrolls in any direction (grabber hand) | p. 14 | ✗ | P3 S |
+| ⌘-drag inside a Sniffer window scrolls in any direction (grabber hand) | p. 14 | ✅ | Control-click is Ctrl to clients too, so a Ctrl-press in a window that can scroll grabs when moved and shows the contextual menu when released still. |
 | Drag window edges to move the window | p. 14 | ✅? | Verify. |
 | Resize box with outline | p. 15 | ✅ | |
 | **Proxy icon** in a Sniffer window's title: drag to move/copy the folder; drop onto it when collapsed | p. 15 | ✅ | zacos9-wm draws it (platinum-shell v12) and hands the press to the Sniffer, which drags the folder; Option copies. Home, disks, the Trash and the Macintosh view's folders show the icon but don't drag. A drag resting on a collapsed window's title bar springs it open for the drop. |

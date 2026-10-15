@@ -203,6 +203,20 @@ int main(int argc, char **argv) {
 	check(scrolled > 0 && w->selectedItems().size() > 6,
 		"dragging a rectangle below a list window scrolls and extends the selection");
 
+	/* ⌘-drag (Ctrl to clients) scrolls with the grabber hand. */
+	const int before = w->m_scrollY;
+	const int grabbed = static_cast<int>(w->selectedItems().size());
+	const QPoint hand(200, listTop + 60);
+	mouse(w, QEvent::MouseButtonPress, hand, Qt::LeftButton, Qt::ControlModifier);
+	mouse(w, QEvent::MouseMove, hand + QPoint(0, 30), Qt::LeftButton, Qt::ControlModifier);
+	const bool closedHand = w->cursor().shape() == Qt::ClosedHandCursor;
+	const int handScrolled = w->m_scrollY;
+	mouse(w, QEvent::MouseButtonRelease, hand + QPoint(0, 30), Qt::NoButton, Qt::ControlModifier);
+	check(closedHand && handScrolled == std::max(0, before - 30) &&
+		!w->m_grabPending && w->cursor().shape() == Qt::ArrowCursor &&
+		static_cast<int>(w->selectedItems().size()) == grabbed,
+		"Command-drag scrolls the window with the hand and leaves the selection alone");
+
 	QStringList paths;
 	for (const char *name : { "Alpha", "Bravo", "Charlie" }) {
 		paths << folder + "/" + name;

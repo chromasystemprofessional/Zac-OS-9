@@ -227,6 +227,14 @@ private:
 	sb_part m_sbPart = SB_NONE;
 	int m_thumbGrab = 0; /* pointer offset within the thumb */
 	QTimer m_repeat;
+
+	/* ⌘-drag scrolls with the grabber hand. Clients see ⌘ and Control
+	 * both as Ctrl, so a Ctrl-press waits: moved, it grabs; released
+	 * still, it was a Control-click and shows the contextual menu. */
+	bool m_grabPending = false;
+	bool m_grabbing = false;
+	QPoint m_grabPress, m_grabScroll;
+	void contextClick(QPoint pos);
 };
 
 /* ⌘-key equivalents shared by Finder windows and the desktop. Linux apps

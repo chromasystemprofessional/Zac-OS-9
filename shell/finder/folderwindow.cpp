@@ -1370,20 +1370,13 @@ void FolderWindow::mousePressEvent(QMouseEvent *e) {
 		if (pos.y() < contentTop() || pos.x() >= barX || pos.y() >= barY) {
 			return;
 		}
-		if (m_editor.item()) {
-			m_editor.commit();
+		if (e->button() == Qt::LeftButton && (scrollMaxX() > 0 || scrollMaxY() > 0)) {
+			m_grabPending = true;
+			m_grabPress = pos;
+			m_grabScroll = QPoint(m_scrollX, m_scrollY);
+			return;
 		}
-		m_renameTimer.stop();
-		bool onTriangle = false;
-		Item *hit = itemAt(pos, &onTriangle);
-		if (!listSelectableAt(pos, hit)) {
-			hit = nullptr;
-		}
-		if (!hit || !hit->selected) {
-			forEachItem([&](Item *item) { item->selected = item == hit; });
-		}
-		update();
-		Finder::instance().showContextMenu(this, hit);
+		contextClick(pos);
 		return;
 	}
 	if (e->button() != Qt::LeftButton) {
@@ -1517,7 +1510,37 @@ void FolderWindow::mousePressEvent(QMouseEvent *e) {
 	Finder::instance().notifyState();
 }
 
+void FolderWindow::contextClick(QPoint pos) {
+	if (m_editor.item()) {
+		m_editor.commit();
+	}
+	m_renameTimer.stop();
+	bool onTriangle = false;
+	Item *hit = itemAt(pos, &onTriangle);
+	if (!listSelectableAt(pos, hit)) {
+		hit = nullptr;
+	}
+	if (!hit || !hit->selected) {
+		forEachItem([&](Item *item) { item->selected = item == hit; });
+	}
+	update();
+	Finder::instance().showContextMenu(this, hit);
+}
+
 void FolderWindow::mouseMoveEvent(QMouseEvent *e) {
+	if (m_grabPending) {
+		const QPoint pos = e->position().toPoint();
+		if (!m_grabbing && (pos - m_grabPress).manhattanLength() >= QApplication::startDragDistance()) {
+			m_grabbing = true;
+			setCursor(Qt::ClosedHandCursor);
+		}
+		if (m_grabbing) {
+			/* The content follows the hand. */
+			const QPoint d = pos - m_grabPress;
+			scrollTo(m_grabScroll.x() - d.x(), m_grabScroll.y() - d.y());
+		}
+		return;
+	}
 	if (m_headerDrag != HeaderDrag::None) {
 		const int x = e->position().toPoint().x();
 		if (m_headerDrag == HeaderDrag::Resize) {
@@ -1598,6 +1621,16 @@ void FolderWindow::mouseMoveEvent(QMouseEvent *e) {
 }
 
 void FolderWindow::mouseReleaseEvent(QMouseEvent *) {
+	if (m_grabPending) {
+		m_grabPending = false;
+		if (m_grabbing) {
+			m_grabbing = false;
+			unsetCursor();
+		} else {
+			contextClick(m_grabPress);
+		}
+		return;
+	}
 	if (m_headerDrag != HeaderDrag::None) {
 		const HeaderDrag drag = m_headerDrag;
 		m_headerDrag = HeaderDrag::None;
