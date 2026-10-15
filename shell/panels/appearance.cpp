@@ -12,7 +12,7 @@
 
 /* The window, its tab control, and the layout inside a pane following
  * the HIG's group box measurements (figure 3-29). */
-static constexpr int W = 580, H = 300;
+static constexpr int W = 640, H = 300;
 static constexpr int MARGIN = 10;
 static constexpr int TABS_Y = 10;
 static constexpr uint32_t FACE = GRAY(0xD);
@@ -45,9 +45,21 @@ static void setSetting(const char *key, const QString &value) {
 AppearancePanel::AppearancePanel() {
 	setWindowTitle("Appearance");
 	setFixedSize(W, H);
-	for (const char *label : { "Color", "Desktop", "Wallpaper", "Sound", "Themes", "Sound Sets" }) {
+	for (const char *label : { "Color", "Desktop", "Wallpaper", "Sound", "Themes", "Sound Sets",
+			"Options" }) {
 		m_tabLabels.push_back(std::make_unique<Text>(label, 200, PL_FONT_SYSTEM));
 	}
+
+	/* Options. Not part of a theme, so it leaves the chosen one alone. */
+	m_titleCollapse = PanelCheckbox("Double-click title bar to collapse windows",
+		QPoint(BOX_L + ITEM_INSET, ITEM_TOP));
+	m_titleCollapse.on = setting("title-collapse") != "false";
+	m_titleCollapse.toggled = [this](bool on) {
+		if (!pl_setting_set("title-collapse", on ? nullptr : "false")) {
+			qWarning() << "Could not save appearance preference: title-collapse";
+		}
+		update();
+	};
 
 	/* Accent colour. */
 	m_accents.frame = QRect(QPoint(BOX_L + ITEM_INSET, ITEM_TOP),
@@ -265,7 +277,9 @@ void AppearancePanel::loadWallpapers() {
 }
 
 void AppearancePanel::showTab(int tab) {
-	m_tab = std::clamp(tab, 0, 5);
+	m_tab = std::clamp(tab, 0, 6);
+	m_host.checks = m_tab == 6 ? std::vector<PanelCheckbox *>{ &m_titleCollapse }
+		: std::vector<PanelCheckbox *>{};
 	m_host.buttons = m_tab == 4 ? std::vector<PanelButton *>{ &m_saveTheme }
 		: m_tab == 5 ? std::vector<PanelButton *>{ &m_previewTheme } : std::vector<PanelButton *>{};
 	m_host.edits = m_tab == 4 ? std::vector<PanelEdit *>{ &m_themeName } : std::vector<PanelEdit *>{};
@@ -275,7 +289,8 @@ void AppearancePanel::showTab(int tab) {
 	if (m_tab == 4 || m_tab == 5) {
 		loadThemes();
 	}
-	m_focus = visibleLists().front();
+	const auto lists = visibleLists();
+	m_focus = lists.empty() ? nullptr : lists.front();
 	update();
 }
 
@@ -286,7 +301,8 @@ std::vector<PanelList *> AppearancePanel::visibleLists() {
 	case 2: return { &m_wallpapers };
 	case 3: return { &m_sounds };
 	case 4: return { &m_themes };
-	default: return { &m_soundThemes };
+	case 5: return { &m_soundThemes };
+	default: return {};
 	}
 }
 
@@ -393,6 +409,11 @@ void AppearancePanel::paintThemesTab(pl_canvas *c) {
 		: "Custom presets: Appearance > Themes", BOX_L + 4, H - 24, PL_FONT_VIEWS, C_BLACK, BOX_R - BOX_L);
 }
 
+void AppearancePanel::paintOptionsTab(pl_canvas *c) {
+	groupAround(c, m_titleCollapse.hitRect(), "Windows", BOX_R);
+	m_host.paintControls(c, PANE);
+}
+
 void AppearancePanel::paintSoundThemesTab(pl_canvas *c) {
 	groupAround(c, m_soundThemes.frame, "Sound Set", BOX_R);
 	paintList(c, m_soundThemes, m_focus == &m_soundThemes);
@@ -422,7 +443,8 @@ void AppearancePanel::paintEvent(QPaintEvent *) {
 	case 2: paintWallpaperTab(c); break;
 	case 3: paintSoundTab(c); break;
 	case 4: paintThemesTab(c); break;
-	default: paintSoundThemesTab(c); break;
+	case 5: paintSoundThemesTab(c); break;
+	default: paintOptionsTab(c); break;
 	}
 	QPainter p(this);
 	px.blit(p);
@@ -447,7 +469,7 @@ void AppearancePanel::mousePressEvent(QMouseEvent *e) {
 		update();
 		return;
 	}
-	if ((m_tab == 4 || m_tab == 5) && m_host.hostPress(e)) {
+	if ((m_tab >= 4) && m_host.hostPress(e)) {
 		return;
 	}
 	for (PanelList *l : visibleLists()) {
@@ -463,7 +485,7 @@ void AppearancePanel::mouseMoveEvent(QMouseEvent *e) {
 	if (m_tab == 5 && m_interfaceVolume.move(e->position().toPoint())) {
 		update();
 	}
-	if (m_tab == 4 || m_tab == 5) {
+	if (m_tab >= 4) {
 		m_host.hostMove(e);
 	}
 	for (PanelList *l : visibleLists()) {
@@ -477,7 +499,7 @@ void AppearancePanel::mouseReleaseEvent(QMouseEvent *e) {
 	if (m_tab == 5) {
 		m_interfaceVolume.release(e->position().toPoint());
 	}
-	if (m_tab == 4 || m_tab == 5) {
+	if (m_tab >= 4) {
 		m_host.hostRelease(e);
 	}
 	for (PanelList *l : visibleLists()) {

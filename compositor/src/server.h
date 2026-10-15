@@ -329,6 +329,9 @@ int prefs_repeat_delay(void);
 bool prefs_collar_hotkey(uint32_t mods, xkb_keysym_t sym);
 /* General Controls' "Show Desktop when in background" ("show-desktop"). */
 bool prefs_show_desktop(void);
+/* Appearance > Options: a double-click on a title bar collapses the
+ * window (on unless "title-collapse" is "false"). */
+bool prefs_title_collapse(void);
 bool prefs_layout_switch_option(void);
 /* A true/false setting: false if it isn't set. */
 bool prefs_flag(const char *key, bool *on);

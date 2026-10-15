@@ -1,7 +1,8 @@
 """Window tricks from Mac OS 9 (compositor/src/input.c): Option-click on the
 close box closes all of the program's windows, on the collapse box collapses
-only the program's; ⌘-dragging a window behind moves it without bringing it
-forward. General Controls' "Show Desktop when in background", off: the
+only the program's; a double-click on a title bar collapses the window,
+unless Appearance > Options turns that off; ⌘-dragging a window behind
+moves it without bringing it forward. General Controls' "Show Desktop when in background", off: the
 Sniffer's windows hide while another program is in front, and come back
 when nothing else is left.
 
@@ -124,6 +125,30 @@ with tempfile.TemporaryDirectory(prefix="zacos9-tricks-") as directory:
             click((CLOSE[0], CLOSE[1] + dy), "option")
             wait_for("Bravo to quit", lambda: b.poll() is not None)
             print("ok: Option-click on the close box closes all of the program's windows")
+
+            # Double-clicking a title bar collapses the window, and again
+            # expands it; with Appearance > Options' "Double-click title bar to
+            # collapse windows" off, a double-click does nothing. (One window,
+            # so what it covers isn't green.)
+            c, _ = window("charlie")
+
+            def double_click_title():
+                vp("home", "move", *map(str, TITLE), "click", "click", "wait", "500")
+
+            before = green()
+            double_click_title()
+            assert green() < before * 0.1, "a double-click on the title bar collapses the window"
+            double_click_title()
+            assert green() >= before * 0.99, "and another expands it"
+            conf = root / "zacos9" / "desktop.conf"
+            conf.parent.mkdir(exist_ok=True)
+            conf.write_text("title-collapse=false\n")
+            double_click_title()
+            assert green() >= before * 0.99, "with the option off, a double-click leaves it be"
+            conf.unlink()
+            click(CLOSE)
+            wait_for("Charlie to quit", lambda: c.poll() is not None)
+            print("ok: a double-click on the title bar collapses, unless Appearance > Options says not to")
 
             # Show Desktop when in background, off (read as it changes). A
             # stand-in Sniffer window, then another program's over it, moved

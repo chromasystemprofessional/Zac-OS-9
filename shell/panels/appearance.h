@@ -21,7 +21,7 @@ class AppearancePanel : public QWidget {
 public:
 	AppearancePanel();
 	/* 0 Color, 1 Desktop patterns, 2 Wallpaper, 3 Alert Sound,
-	 * 4 Appearance Themes, 5 Sound Sets. */
+	 * 4 Appearance Themes, 5 Sound Sets, 6 Options. */
 	void showTab(int tab);
 
 protected:
@@ -43,6 +43,11 @@ private:
 	void loadThemes();
 	void paintThemesTab(pl_canvas *c);
 	void paintSoundThemesTab(pl_canvas *c);
+	/* Options: Mac OS 9's "Double-click title bar to collapse windows"
+	 * (title-collapse, read by zacos9-wm). Smart Scrolling isn't here:
+	 * the scroll bars keep an arrow at each end and a fixed thumb. */
+	void paintOptionsTab(pl_canvas *c);
+	PanelCheckbox m_titleCollapse;
 
 	int m_tab = 0;
 	std::vector<std::unique_ptr<Text>> m_tabLabels;

@@ -1,7 +1,7 @@
 /*
  * zacos9-appearance: the Appearance control panel.
  *
- *   zacos9-appearance [color | desktop | wallpaper | sound]
+ *   zacos9-appearance [color | desktop | wallpaper | sound | themes | sound-themes | options]
  *
  * The argument picks the tab it opens on.
  */
@@ -19,7 +19,7 @@ int main(int argc, char *argv[]) {
 	AppearancePanel panel;
 	const QString tab = argc > 1 ? QString::fromUtf8(argv[1]) : QString();
 	panel.showTab(tab == "desktop" ? 1 : tab == "wallpaper" ? 2 : tab == "sound" ? 3
-		: tab == "themes" ? 4 : tab == "sound-themes" ? 5 : 0);
+		: tab == "themes" ? 4 : tab == "sound-themes" ? 5 : tab == "options" ? 6 : 0);
 	panel.show();
 	return app.exec();
 }

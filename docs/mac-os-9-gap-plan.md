@@ -154,7 +154,7 @@ Section 3 lists every feature; section 5 is the plan.
 | ⌘-double-click an inactive title to collapse it in place | p. 12 | ✅ | Falls out of ⌘-drag (0.1.54). |
 | Zoom box: fit contents; Option-click zoom fills the screen | p. 12 | ✅ | Sniffer windows zoom to fit their icons or list (`platinum_shell_v1.set_standard_size`, v9); Option-click fills the screen; other programs' zoom fills it (0.1.54). |
 | Collapse box; Option-click collapses all of the app's windows | p. 13 | ✅ | Only the program's own windows now (it was every window) (0.1.54). |
-| Scroll bars; arrows together or at both ends (Appearance) | p. 13 | ◐ | Arrows-together only; option missing. P3 S |
+| Scroll bars; arrows together or at both ends (Appearance) | p. 13 | ◐ | An arrow at each end and a fixed-size thumb (Mac OS 9 without Smart Scrolling). Smart Scrolling (arrows together, proportional thumb) would change `lib/widgets` scroll bars and every caller's thumb arithmetic, the Qt style and the GTK theme: P3 L, not S. |
 | ⌘-drag inside a Sniffer window scrolls in any direction (grabber hand) | p. 14 | ✅ | Control-click is Ctrl to clients too, so a Ctrl-press in a window that can scroll grabs when moved and shows the contextual menu when released still. |
 | Drag window edges to move the window | p. 14 | ✅? | Verify. |
 | Resize box with outline | p. 15 | ✅ | |
@@ -294,7 +294,7 @@ A zram/swap switch in a Memory panel is a possible P3.
 |---|---|---|
 | **Appearance**: Themes, Color (accent, highlight), Desktop (patterns, pictures), Sound (sound sets) | ✅ | Desktop picture placement — Tile / Center / Scale / Position Automatically — to verify. |
 | Appearance ▸ **Fonts** (Large System Font, Small System Font, Views font and size, Smooth all fonts) | ✗ | P2 M — the bitmap fonts are fixed; offer the Views size and smoothing for apps (GTK/Qt settings). |
-| Appearance ▸ **Options** (smart scrolling, double-click title to collapse) | ◐ | Collapse option exists? Verify; scroll-arrow placement missing. P3 S |
+| Appearance ▸ **Options** (smart scrolling, double-click title to collapse) | ◐ | Options tab ✅ with "Double-click title bar to collapse windows" (`title-collapse`; it was always on). Smart Scrolling not done: see Scroll bars in 3.1. |
 | **Zac Menu Options** | ◐ | Recent counts ✅ (0.1.54); submenus always on. |
 | AppleTalk | — | |
 | ColorSync | — | colord is out of scope for now. |
