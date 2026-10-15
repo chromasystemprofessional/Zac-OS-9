@@ -868,7 +868,8 @@ executable('zacos9-controlpanel',
 
 collar_sources = [
   'collar/collar.cpp', 'collar/collarart.cpp', 'collar/systemcontrols.cpp',
-  'collar/displaycontrols.cpp', 'collar/kdeconnect.cpp', 'collar/keychain.cpp', 'panels/soundclient.cpp', 'finder/alert.cpp', 'finder/platinumshell.cpp',
+  'collar/displaycontrols.cpp', 'collar/kdeconnect.cpp', 'collar/keychain.cpp', 'collar/media.cpp',
+  'collar/filesharing.cpp', 'panels/sharingclient.cpp', 'panels/soundclient.cpp', 'finder/alert.cpp', 'finder/platinumshell.cpp',
   finder_protocol,
 ]
 collar_exe = executable('zacos9-collar', 'collar/main.cpp', collar_sources,
@@ -885,9 +886,11 @@ collar_ui_test = executable('test-collar', 'collar/tests/test_collar.cpp', colla
   dependencies: [platinum_dep, qt6, layershellqt, wayland_client],
   cpp_args: ['-std=c++17'],
 )
+# No media players or File Sharing settings from the computer running the tests.
+collar_test_env = ['ZACOS9_MPRIS_PREFIX=org.zacos9.test.NoMpris.', 'ZACOS9_SHARING_CONF=/nonexistent']
 test('collar-ui', collar_ui_test,
   env: ['QT_QPA_PLATFORM=offscreen', 'ZACOS9_KDECONNECT_SERVICE=org.zacos9.test.NoKdeConnect',
-    'ZACOS9_SECRETS_SERVICE=org.zacos9.test.NoSecrets'], timeout: 30)
+    'ZACOS9_SECRETS_SERVICE=org.zacos9.test.NoSecrets'] + collar_test_env, timeout: 30)
 collar_kdeconnect_test = executable('test-collar-kdeconnect', 'collar/tests/test_kdeconnect.cpp',
   collar_sources,
   link_with: panelkit,
@@ -897,7 +900,8 @@ collar_kdeconnect_test = executable('test-collar-kdeconnect', 'collar/tests/test
 )
 test('collar-kdeconnect', find_program('dbus-run-session'),
   args: ['--', collar_kdeconnect_test],
-  env: ['QT_QPA_PLATFORM=offscreen', 'ZACOS9_SECRETS_SERVICE=org.zacos9.test.NoSecrets'], timeout: 60,
+  env: ['QT_QPA_PLATFORM=offscreen', 'ZACOS9_SECRETS_SERVICE=org.zacos9.test.NoSecrets'] + collar_test_env,
+  timeout: 60,
 )
 collar_keychain_test = executable('test-collar-keychain', 'collar/tests/test_keychain.cpp',
   collar_sources,
@@ -907,7 +911,17 @@ collar_keychain_test = executable('test-collar-keychain', 'collar/tests/test_key
   cpp_args: ['-std=c++17'],
 )
 test('collar-keychain', find_program('dbus-run-session'),
-  args: ['--', collar_keychain_test], env: ['QT_QPA_PLATFORM=offscreen'], timeout: 60,
+  args: ['--', collar_keychain_test], env: ['QT_QPA_PLATFORM=offscreen'] + collar_test_env, timeout: 60,
+)
+collar_media_test = executable('test-collar-media', 'collar/tests/test_media_sharing.cpp',
+  collar_sources,
+  link_with: panelkit,
+  include_directories: include_directories('collar', 'finder', 'panels'),
+  dependencies: [platinum_dep, qt6, layershellqt, wayland_client],
+  cpp_args: ['-std=c++17'],
+)
+test('collar-media-sharing', find_program('dbus-run-session'),
+  args: ['--', collar_media_test], env: ['QT_QPA_PLATFORM=offscreen'], timeout: 60,
 )
 collar_controls_test = executable('test-collar-controls',
   'collar/tests/test_controls.cpp', 'collar/systemcontrols.cpp',

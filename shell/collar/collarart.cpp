@@ -1,3 +1,4 @@
+#include <cmath>
 #include "collarart.h"
 
 #include <QtGlobal>
@@ -261,6 +262,39 @@ void icon(pl_canvas *c, CollarParts::Kind kind, int x, int y, bool on, int level
 		pl_put(c, x + 6, y + 12, ink);
 		break;
 	}
+	case CollarParts::Media:
+		// A disc, as Mac OS 9's CD Strip, with a play mark; coloured while something plays.
+		for (int py = 0; py < 16; ++py) {
+			for (int px = 0; px < 16; ++px) {
+				const double d = std::hypot(px - 7.5, py - 7.5);
+				if (d <= 7.6) {
+					pl_put(c, x + px, y + py, d > 6.6 ? ink : d < 1.8 ? Face : d < 2.8 ? ink
+						: (px + py) % 7 == 0 ? light : px < py ? blue : light);
+				}
+			}
+		}
+		for (int k = 0; k < 4; ++k) {
+			pl_vline(c, x + 11 + k, y + 9 + k, y + 15 - k, ink);
+		}
+		pl_vline(c, x + 10, y + 8, y + 15, Face);
+		break;
+	case CollarParts::FileSharing:
+		// A folder on the network's line; a visitor's head and shoulders on it while anyone is connected.
+		pl_fill(c, x + 1, y + 3, x + 14, y + 10, gold);
+		pl_hline(c, x + 1, x + 5, y + 1, ink);
+		line(0, 2, 0, 2, ink); line(6, 2, 6, 2, ink);
+		pl_outline(c, x, y + 3, x + 15, y + 11, ink);
+		pl_hline(c, x + 1, x + 14, y + 4, on ? RGB(0xFF, 0xEE, 0x99) : GRAY(0xD));
+		pl_fill(c, x + 1, y + 2, x + 5, y + 2, gold);
+		pl_vline(c, x + 7, y + 12, y + 14, ink);
+		pl_hline(c, x + 1, x + 14, y + 15, ink);
+		if (level > 0) {
+			const uint32_t person = on ? RGB(0x66, 0x66, 0xCC) : GRAY(0xA);
+			pl_fill(c, x + 7, y + 5, x + 8, y + 6, person);
+			pl_fill(c, x + 5, y + 8, x + 10, y + 10, person);
+			pl_outline(c, x + 6, y + 4, x + 9, y + 7, ink);
+		}
+		break;
 	}
 }
 

@@ -93,6 +93,10 @@ Collar::Collar(bool monitor)
 	m_kdeConnect.failed = [](const QString &error) { Alert::ask(error, "OK", {}); };
 	m_keychains.changed = [this] { rebuildModules(); };
 	m_keychains.failed = [](const QString &error) { Alert::ask(error, "OK", {}); };
+	m_media.changed = [this] { rebuildModules(); };
+	m_media.failed = [](const QString &error) { Alert::ask(error, "OK", {}); };
+	m_sharing.changed = [this] { rebuildModules(); };
+	m_sharing.failed = [](const QString &error) { Alert::ask(error, "OK", {}); };
 	// The Collar control panel writes desktop.conf; follow it as it changes.
 	QDir().mkpath(configDir());
 	auto *settingsWatcher = new QFileSystemWatcher(this);
@@ -112,6 +116,8 @@ Collar::Collar(bool monitor)
 			m_displays.refresh();
 			m_kdeConnect.refresh();
 			m_keychains.refresh();
+			m_media.refresh();
+			m_sharing.refresh();
 		});
 		timer->start(5000);
 		m_sound.refresh();
@@ -119,11 +125,23 @@ Collar::Collar(bool monitor)
 		m_displays.refresh();
 		m_kdeConnect.refresh();
 		m_keychains.refresh();
+		m_media.refresh();
+		m_sharing.refresh();
 	}
 }
 
 void Collar::rebuildModules() {
-	QList<Module> modules = { { Volume, {} }, { SoundSet, {} }, { Network, {} }, { Bluetooth, {} } };
+	QList<Module> modules = { { Volume, {} }, { SoundSet, {} } };
+	// A player playing (MPRIS), as Mac OS 9's CD Strip.
+	if (!m_media.players.isEmpty()) {
+		modules.append(Module{ Media, QString() });
+	}
+	modules.append(Module{ Network, QString() });
+	// File Sharing, once it has been set up in its control panel.
+	if (m_sharing.configured) {
+		modules.append(Module{ FileSharing, QString() });
+	}
+	modules.append(Module{ Bluetooth, QString() });
 	// KDE Connect, when installed: a module per phone or tablet in reach, else one to pair a device.
 	for (const PhoneDevice &phone : m_kdeConnect.devices) {
 		modules.append(Module{ Phone, phone.id });
@@ -273,6 +291,8 @@ bool Collar::active(int index) const {
 	case Power: return s.powerError.isEmpty();
 	case Phone: return m_kdeConnect.device(m.device) || !m_kdeConnect.requests.isEmpty();
 	case Keychain: return !m_keychains.keychains.isEmpty();
+	case Media: return m_media.current() && m_media.current()->playing();
+	case FileSharing: return m_sharing.on();
 	}
 	return false;
 }
@@ -302,7 +322,9 @@ void Collar::paintEvent(QPaintEvent *) {
 			pl_vline(c, r.right() + 1, 0, Height - 1, C_BLACK);
 			const PhoneDevice *phone = m.kind == Phone ? m_kdeConnect.device(m.device) : nullptr;
 			const KeychainInfo *keychain = m.kind == Keychain ? m_keychains.defaultKeychain() : nullptr;
-			icon(c, m.kind, r.left() + 2, 4, on, phone ? phone->charge : keychain ? !keychain->locked : -1);
+			const int level = phone ? phone->charge : keychain ? !keychain->locked
+				: m.kind == FileSharing ? int(m_sharing.visitors.size()) : -1;
+			icon(c, m.kind, r.left() + 2, 4, on, level);
 			menuArrow(c, r.left() + 22);
 			if (m.kind == Volume) {
 				for (const SoundOutput &output : m_sound.outputs) {
@@ -356,6 +378,12 @@ QString Collar::menuLabel(int index) const {
 		}
 		return "KDE Connect";
 	case Keychain: return "Keychain";
+	case Media:
+		if (const MediaPlayer *p = m_media.current()) {
+			return p->identity;
+		}
+		return "Media";
+	case FileSharing: return "File Sharing";
 	}
 	return "The Collar";
 }
@@ -435,6 +463,24 @@ QString Collar::description(int index) const {
 			return QString("Keychain “%1” is %2").arg(k->name, k->locked ? "locked" : "unlocked");
 		}
 		return m_keychains.keychains.isEmpty() ? "No keychains" : "No default keychain";
+	case Media: {
+		const MediaPlayer *p = m_media.current();
+		if (!p) {
+			return "Nothing playing";
+		}
+		const QString what = p->title.isEmpty() ? QString() :
+			p->artist.isEmpty() ? p->title : QString("%1 — %2").arg(p->title, p->artist);
+		const QString state = p->playing() ? "Playing" : p->status == "Paused" ? "Paused" : "Stopped";
+		return what.isEmpty() ? QString("%1: %2").arg(p->identity, state) : QString("%1: %2").arg(state, what);
+	}
+	case FileSharing: {
+		if (!m_sharing.on()) {
+			return "File Sharing off";
+		}
+		const int n = m_sharing.visitors.size();
+		return n == 0 ? QString("File Sharing on, no one connected")
+			: QString("File Sharing on, %1 connected").arg(n);
+	}
 	}
 	return "The Collar";
 }
@@ -568,6 +614,85 @@ void Collar::addPhoneItems(const QString &id, std::vector<PopupItem> &items,
 		settings = kdeConnectProgram("kdeconnect-app");
 	}
 	add("KDE Connect Settings...", !settings.isEmpty(), [this, settings] { launch(settings); });
+}
+
+void Collar::addMediaItems(std::vector<PopupItem> &items, std::vector<std::function<void()>> &actions,
+		int &checked) {
+	auto add = [&](const QString &label, bool enabled, std::function<void()> action = {}) {
+		items.emplace_back(label, enabled);
+		actions.push_back(std::move(action));
+	};
+	auto separator = [&] { items.emplace_back(QString(), false, true); actions.emplace_back(); };
+	const MediaPlayer *current = m_media.current();
+	if (!current) {
+		add("Nothing playing", false);
+		return;
+	}
+	const MediaPlayer p = *current;
+	if (!p.title.isEmpty()) {
+		add(p.title, false);
+		if (!p.artist.isEmpty()) {
+			add(p.artist, false);
+		}
+		separator();
+	}
+	const QString service = p.service;
+	add(p.playing() ? "Pause" : "Play", p.playing() ? p.canPause : p.canPlay,
+		[this, service] { m_media.playPause(service); });
+	add("Next Track", p.canNext, [this, service] { m_media.next(service); });
+	add("Previous Track", p.canPrevious, [this, service] { m_media.previous(service); });
+	// With several players, the menu picks which one it works.
+	if (m_media.players.size() > 1) {
+		separator();
+		for (const MediaPlayer &other : m_media.players) {
+			if (other.service == service) {
+				checked = static_cast<int>(items.size());
+			}
+			const QString s = other.service;
+			add(other.playing() ? other.identity + " (playing)" : other.identity, true,
+				[this, s] { m_media.choose(s); });
+		}
+	}
+	separator();
+	add("Show " + p.identity, p.canRaise, [this, service] { m_media.raise(service); });
+}
+
+void Collar::addSharingItems(std::vector<PopupItem> &items, std::vector<std::function<void()>> &actions) {
+	auto add = [&](const QString &label, bool enabled, std::function<void()> action = {}) {
+		items.emplace_back(label, enabled);
+		actions.push_back(std::move(action));
+	};
+	auto separator = [&] { items.emplace_back(QString(), false, true); actions.emplace_back(); };
+	const bool on = m_sharing.on();
+	QStringList kinds;
+	if (m_sharing.afp) {
+		kinds << "Mac";
+	}
+	if (m_sharing.smb) {
+		kinds << "Windows";
+	}
+	add(on ? QString("File Sharing on (%1)").arg(kinds.join(", ")) : QString("File Sharing off"), false);
+	add(on ? "Turn File Sharing Off" : "Turn File Sharing On", !m_sharing.busy, [this, on] {
+		if (on) {
+			// Remembered, so turning it on again brings back the same servers.
+			m_settings.setValue("sharing-afp", m_sharing.afp);
+			m_settings.setValue("sharing-smb", m_sharing.smb);
+			m_settings.sync();
+		}
+		m_sharing.setOn(!on, m_settings.value("sharing-afp", true).toBool(),
+			m_settings.value("sharing-smb", false).toBool());
+	});
+	if (on) {
+		separator();
+		if (m_sharing.visitors.isEmpty()) {
+			add("No one is connected", false);
+		}
+		for (const SharingVisitor &v : m_sharing.visitors) {
+			add(QString("%1 (%2)").arg(v.address, v.kind), false);
+		}
+	}
+	separator();
+	add("Open File Sharing Control Panel", true, [this] { launch("zacos9-filesharing"); });
 }
 
 void Collar::addKeychainItems(std::vector<PopupItem> &items, std::vector<std::function<void()>> &actions,
@@ -755,6 +880,10 @@ void Collar::openModule(int index) {
 		addPhoneItems(module.device, items, actions);
 	} else if (module.kind == Keychain) {
 		addKeychainItems(items, actions, checked);
+	} else if (module.kind == Media) {
+		addMediaItems(items, actions, checked);
+	} else if (module.kind == FileSharing) {
+		addSharingItems(items, actions);
 	}
 	int room = INT_MAX, below = 0;
 	if (QScreen *screen = windowHandle()->screen()) {
