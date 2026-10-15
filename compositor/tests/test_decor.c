@@ -225,8 +225,49 @@ static int run_hit_tests(void) {
 	return fails + run_proxy_tests();
 }
 
+/* A pop-up window: only its tab takes clicks above the body, nothing but
+ * the tab when closed, and the body's top corners resize it. */
+static int run_popup_tests(void) {
+	int fails = 0;
+	struct decor_state st = {
+		.style = DECOR_STYLE_POPUP, .width = 300, .height = 200, .active = true, .tab_x = 100,
+	};
+	const int tab_w = decor_tab_width(&st);
+	fails += check_hit(&st, 100, 5, DECOR_PART_TAB, "popup tab left edge");
+	fails += check_hit(&st, 100 + tab_w - 1, 5, DECOR_PART_TAB, "popup tab right edge");
+	fails += check_hit(&st, 99, 5, DECOR_PART_NONE, "popup beside the tab");
+	fails += check_hit(&st, 100 + tab_w, 5, DECOR_PART_NONE, "popup after the tab");
+	fails += check_hit(&st, 150, 100, DECOR_PART_CLIENT, "popup body");
+	fails += check_hit(&st, 2, DECOR_TAB_H + 2, DECOR_PART_GROW_TOP_LEFT, "popup top-left corner");
+	fails += check_hit(&st, 297, DECOR_TAB_H + 2, DECOR_PART_GROW_TOP_RIGHT, "popup top-right corner");
+	fails += check_hit(&st, 150, DECOR_TAB_H + 2, DECOR_PART_BORDER, "popup top edge");
+	fails += check_hit(&st, 2, 150, DECOR_PART_BORDER, "popup side edge");
+	if (decor_frame_height(&st) != 200 || tab_w < 64) {
+		printf("FAIL popup open height %d, tab %d\n", decor_frame_height(&st), tab_w);
+		fails++;
+	}
+	uint32_t px[300 * 200] = { 0 };
+	struct pl_canvas c = { .px = px, .stride = 300, .width = 300, .height = 200 };
+	decor_paint(&c, &st);
+	if (px[102] != C_BLACK || px[50] != 0 || px[0 + 300 * DECOR_TAB_H] != C_BLACK) {
+		printf("FAIL popup paint: tab top %08x, beside %08x, body corner %08x\n",
+			px[102], px[50], px[300 * DECOR_TAB_H]);
+		fails++;
+	}
+	st.collapsed = true;
+	fails += check_hit(&st, 120, 5, DECOR_PART_TAB, "closed popup tab");
+	fails += check_hit(&st, 150, 100, DECOR_PART_NONE, "closed popup body is gone");
+	fails += check_hit(&st, 150, DECOR_TAB_H, DECOR_PART_NONE, "closed popup below the tab");
+	if (decor_frame_height(&st) != DECOR_TAB_H) {
+		printf("FAIL closed popup height %d\n", decor_frame_height(&st));
+		fails++;
+	}
+	printf("%s popup windows\n", fails ? "FAIL" : "ok  ");
+	return fails;
+}
+
 int main(int argc, char *argv[]) {
-	int fails = run_hit_tests();
+	int fails = run_hit_tests() + run_popup_tests();
 	const char *dir = argc > 1 ? argv[1] : "tools/measure/figs";
 	bool ran = false;
 	for (size_t i = 0; i < sizeof(fixtures) / sizeof(fixtures[0]); i++) {

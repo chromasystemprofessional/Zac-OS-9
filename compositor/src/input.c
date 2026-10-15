@@ -489,6 +489,9 @@ void input_begin_grab(struct plat_server *server, struct plat_view *view,
 
 /* ---- proxy icons and spring-open windows --------------------------------- */
 
+/* How far a pop-up's tab is dragged up before it becomes a window. */
+#define POPUP_DETACH_DY 40
+
 static uint32_t now_msec(void) {
 	struct timespec now;
 	clock_gettime(CLOCK_MONOTONIC, &now);
@@ -659,6 +662,29 @@ static void grab_motion(struct plat_server *server) {
 			proxy_hand_off(server);
 		}
 		break;
+	case PLAT_CURSOR_POPUP_TAB: {
+		const double dx = server->cursor->x - server->grab_x;
+		const double dy = server->cursor->y - server->grab_y;
+		if (!server->grab_moved && fabs(dx) + fabs(dy) < 4) {
+			break;
+		}
+		server->grab_moved = true;
+		if (dy < -POPUP_DETACH_DY) {
+			/* Dragged up off the bottom of the screen: an ordinary window
+			 * again, carried on being moved by its title bar. */
+			view_popup_detach(view);
+			server->cursor_mode = PLAT_CURSOR_MOVE;
+			server->grab_part = DECOR_PART_DRAG;
+			server->grab_box = view_frame_box(view);
+			server->grab_x = server->cursor->x;
+			server->grab_y = server->cursor->y;
+			outline_show(&server->outline, server->grab_box);
+			break;
+		}
+		view->popup_tab_x = server->grab_tab_x + (int)dx;
+		view_popup_layout(view);
+		break;
+	}
 	case PLAT_CURSOR_TRACK_BOX: {
 		/* Mac controls track: highlighted only while the pointer is inside. */
 		enum decor_part part = view_part_at(view, server->cursor->x, server->cursor->y);
@@ -684,6 +710,18 @@ static void grab_release(struct plat_server *server) {
 		if (server->grab_moved) {
 			view->zoomed = false;
 			view_resize_frame(view, resize_box(server));
+		}
+		break;
+	case PLAT_CURSOR_POPUP_TAB:
+		if (server->grab_moved) {
+			platinum_shell_popup_tab_moved(view);
+		} else if (view->collapsed) {
+			view_focus(view); /* opens it */
+		} else {
+			view_set_collapsed(view, true);
+			if (server->focused_view == view) {
+				view_clear_focus(server);
+			}
 		}
 		break;
 	case PLAT_CURSOR_TRACK_BOX: {
@@ -734,6 +772,13 @@ static void grab_release(struct plat_server *server) {
 /* Mouse-down on a window frame (anything but the client area). */
 static void frame_press(struct plat_server *server, struct plat_view *view,
 		enum decor_part part, uint32_t time_msec) {
+	/* A pop-up window's tab: a click opens or closes it, a drag along the
+	 * bottom of the screen moves it, a drag up makes it a window again. */
+	if (part == DECOR_PART_TAB) {
+		input_begin_grab(server, view, PLAT_CURSOR_POPUP_TAB, 0, part);
+		server->grab_tab_x = view->popup_tab_x;
+		return;
+	}
 	/* A press on the proxy icon: a click, or a drag of the folder itself. */
 	if (part == DECOR_PART_DRAG && !command_held(server)) {
 		const struct wlr_box frame = view_frame_box(view);
@@ -771,6 +816,12 @@ static void frame_press(struct plat_server *server, struct plat_view *view,
 	case DECOR_PART_GROW:
 		input_begin_grab(server, view, PLAT_CURSOR_RESIZE,
 			WLR_EDGE_RIGHT | WLR_EDGE_BOTTOM, part);
+		break;
+	case DECOR_PART_GROW_TOP_LEFT:
+	case DECOR_PART_GROW_TOP_RIGHT:
+		/* A pop-up stands on the screen's bottom: it grows up and out. */
+		input_begin_grab(server, view, PLAT_CURSOR_RESIZE, WLR_EDGE_TOP |
+			(part == DECOR_PART_GROW_TOP_LEFT ? WLR_EDGE_LEFT : WLR_EDGE_RIGHT), part);
 		break;
 	case DECOR_PART_DRAG: {
 		/* Title-bar double-click collapses document windows only. */

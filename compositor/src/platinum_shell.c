@@ -26,6 +26,8 @@ struct surface_hint {
 	int standard_w, standard_h; /* the zoom box's content size; 0: none */
 	bool title_menu;     /* ⌘-click on the title is the program's */
 	int proxy;           /* the proxy icon (pl_icon_kind + 1), or 0 */
+	bool has_tab;        /* a pop-up's remembered tab */
+	int tab_x;
 	int rx, ry;
 	struct wl_listener surface_destroy;
 };
@@ -67,6 +69,15 @@ static struct surface_hint *get_hint(struct wlr_surface *surface) {
 int platinum_shell_style_for(struct wlr_surface *surface) {
 	struct surface_hint *h = find_hint(surface);
 	return h ? h->style : -1;
+}
+
+bool platinum_shell_popup_tab_for(struct wlr_surface *surface, int *x) {
+	struct surface_hint *h = surface ? find_hint(surface) : NULL;
+	if (!h || !h->has_tab) {
+		return false;
+	}
+	*x = h->tab_x;
+	return true;
 }
 
 bool platinum_shell_position_for(struct wlr_surface *surface, int *x, int *y) {
@@ -130,7 +141,8 @@ bool platinum_shell_title_menu(struct plat_view *view, bool option) {
 
 void platinum_shell_report_position(struct plat_view *view) {
 	struct wlr_surface *surface = view->impl->get_surface(view);
-	if (!surface || !surface->resource || !view->mapped) {
+	/* A pop-up's place is its tab's (popup_tab), not where it was as a window. */
+	if (!surface || !surface->resource || !view->mapped || view->popup) {
 		return;
 	}
 	struct wl_resource *shell = shell_of(surface);
@@ -162,7 +174,8 @@ static void handle_set_window_style(struct wl_client *client, struct wl_resource
 		struct wl_resource *surface_resource, uint32_t style) {
 	struct wlr_surface *surface = wlr_surface_from_resource(surface_resource);
 	get_hint(surface)->style = style == PLATINUM_SHELL_V1_STYLE_MOVABLE_MODAL
-		? DECOR_STYLE_MOVABLE_MODAL : DECOR_STYLE_DOCUMENT;
+		? DECOR_STYLE_MOVABLE_MODAL
+		: style == PLATINUM_SHELL_V1_STYLE_POPUP ? DECOR_STYLE_POPUP : DECOR_STYLE_DOCUMENT;
 	/* Already on screen: reframe now. */
 	struct plat_view *view = mapped_view_for(surface);
 	if (view) {
@@ -322,6 +335,43 @@ static void handle_set_proxy_icon(struct wl_client *client, struct wl_resource *
 	}
 }
 
+static void handle_set_popup_tab(struct wl_client *client, struct wl_resource *resource,
+		struct wl_resource *surface_resource, int32_t x) {
+	struct wlr_surface *surface = wlr_surface_from_resource(surface_resource);
+	struct surface_hint *h = get_hint(surface);
+	h->has_tab = x >= 0;
+	h->tab_x = x;
+	struct plat_view *view = mapped_view_for(surface);
+	if (view && view->popup && x >= 0) {
+		view->popup_tab_x = x;
+		view_popup_layout(view);
+	}
+}
+
+void platinum_shell_popup_tab_moved(struct plat_view *view) {
+	struct wlr_surface *surface = view->impl->get_surface(view);
+	struct wl_resource *shell = surface && surface->resource ? shell_of(surface) : NULL;
+	if (!shell || wl_resource_get_version(shell) < PLATINUM_SHELL_V1_POPUP_TAB_SINCE_VERSION) {
+		return;
+	}
+	struct surface_hint *h = get_hint(surface);
+	h->has_tab = true;
+	h->tab_x = view->popup_tab_x;
+	platinum_shell_v1_send_popup_tab(shell, surface->resource, view->popup_tab_x);
+}
+
+void platinum_shell_popup_detached(struct plat_view *view) {
+	struct wlr_surface *surface = view->impl->get_surface(view);
+	if (!surface) {
+		return;
+	}
+	get_hint(surface)->style = DECOR_STYLE_DOCUMENT;
+	struct wl_resource *shell = surface->resource ? shell_of(surface) : NULL;
+	if (shell && wl_resource_get_version(shell) >= PLATINUM_SHELL_V1_POPUP_DETACH_SINCE_VERSION) {
+		platinum_shell_v1_send_popup_detach(shell, surface->resource);
+	}
+}
+
 static void handle_enable_title_menu(struct wl_client *client, struct wl_resource *resource,
 		struct wl_resource *surface_resource) {
 	get_hint(wlr_surface_from_resource(surface_resource))->title_menu = true;
@@ -408,6 +458,7 @@ static const struct platinum_shell_v1_interface shell_impl = {
 	.enable_title_menu = handle_enable_title_menu,
 	.set_keyboard_layout = handle_set_keyboard_layout,
 	.set_proxy_icon = handle_set_proxy_icon,
+	.set_popup_tab = handle_set_popup_tab,
 };
 
 static void resource_destroy(struct wl_resource *resource) {
@@ -433,5 +484,5 @@ void platinum_shell_init(struct plat_server *server) {
 	the_server = server;
 	wl_list_init(&hints);
 	wl_list_init(&resources);
-	wl_global_create(server->display, &platinum_shell_v1_interface, 13, NULL, bind_shell);
+	wl_global_create(server->display, &platinum_shell_v1_interface, 14, NULL, bind_shell);
 }

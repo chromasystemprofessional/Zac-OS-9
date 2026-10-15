@@ -43,7 +43,7 @@ struct wlr_box view_frame_box(struct plat_view *view) {
 		.x = view->scene_tree->node.x,
 		.y = view->scene_tree->node.y,
 		.width = st->width,
-		.height = st->collapsed ? DECOR_COLLAPSED_H : st->height,
+		.height = decor_frame_height(st),
 	};
 }
 
@@ -62,8 +62,121 @@ static bool view_resizable(struct plat_view *view) {
 }
 
 static struct wlr_scene_tree *view_window_layer(struct plat_view *view) {
-	return view->frame->st.style == DECOR_STYLE_MOVABLE_MODAL
-		? view->server->dialog_layer : view->server->view_layer;
+	switch (view->frame->st.style) {
+	case DECOR_STYLE_MOVABLE_MODAL:
+		return view->server->dialog_layer;
+	case DECOR_STYLE_POPUP:
+		return view->server->popup_layer;
+	default:
+		return view->server->view_layer;
+	}
+}
+
+/* ---- pop-up windows ------------------------------------------------------ */
+
+/* The first place along the bottom of `area` where a tab `tab_w` wide
+ * covers no other pop-up's tab. */
+static int popup_free_tab_x(struct plat_view *view, struct wlr_box area, int tab_w) {
+	int x = area.x + 8;
+	for (int pass = 0; pass < 64; pass++) {
+		bool moved = false;
+		struct plat_view *v;
+		wl_list_for_each(v, &view->server->views, link) {
+			if (v == view || !v->popup || !v->mapped) {
+				continue;
+			}
+			const int end = v->popup_tab_x + decor_tab_width(&v->frame->st);
+			if (x < end && v->popup_tab_x < x + tab_w) {
+				x = end + 4;
+				moved = true;
+			}
+		}
+		if (!moved) {
+			break;
+		}
+	}
+	return x;
+}
+
+void view_popup_layout(struct plat_view *view) {
+	if (!view->popup) {
+		return;
+	}
+	struct wlr_box area = output_usable_area(view->server, view->popup_out_x, view->popup_out_y);
+	if (wlr_box_empty(&area)) {
+		return;
+	}
+	struct plat_frame *frame = view->frame;
+	frame_commit(frame); /* the title, and so the tab's width, for this width */
+	const struct decor_state *st = &frame->st;
+	const int W = st->width, tab_w = decor_tab_width(st);
+	if (view->popup_tab_x > area.x + area.width - tab_w) {
+		view->popup_tab_x = area.x + area.width - tab_w;
+	}
+	if (view->popup_tab_x < area.x) {
+		view->popup_tab_x = area.x;
+	}
+	/* The body is centred under its tab, as far as the screen allows. */
+	int x = view->popup_tab_x + tab_w / 2 - W / 2;
+	if (x > area.x + area.width - W) {
+		x = area.x + area.width - W;
+	}
+	if (x < area.x) {
+		x = area.x;
+	}
+	int y = area.y + area.height - decor_frame_height(st);
+	if (y < area.y) {
+		y = area.y;
+	}
+	frame_set_tab_x(frame, view->popup_tab_x - x);
+	frame_commit(frame);
+	view_move_to(view, x, y);
+}
+
+void view_popups_close(struct plat_server *server, struct plat_view *except) {
+	struct plat_view *v;
+	wl_list_for_each(v, &server->views, link) {
+		if (v != except && v->popup && v->mapped && !v->collapsed) {
+			view_set_collapsed(v, true);
+		}
+	}
+}
+
+/* The window becomes, or stops being, a pop-up (its program asked, or
+ * its tab was dragged up): its tab where the program remembered or in
+ * the first free place; an ordinary window again is open. */
+static void popup_changed(struct plat_view *view, bool popup) {
+	struct plat_server *server = view->server;
+	view->popup = popup;
+	if (popup) {
+		view->popup_out_x = (int)server->cursor->x;
+		view->popup_out_y = (int)server->cursor->y;
+		struct wlr_box area = output_usable_area(server, view->popup_out_x, view->popup_out_y);
+		int tab_x;
+		if (platinum_shell_popup_tab_for(view->impl->get_surface(view), &tab_x)) {
+			view->popup_tab_x = tab_x;
+		} else {
+			view->popup_tab_x = popup_free_tab_x(view, area, decor_tab_width(&view->frame->st));
+		}
+	}
+	/* The window in front stays open as a pop-up (View > as Pop-up
+	 * Window); a new one is closed until it comes forward. */
+	view->collapsed = popup && server->focused_view != view;
+	if (view->surface_tree) {
+		wlr_scene_node_set_enabled(&view->surface_tree->node, !view->collapsed);
+	}
+	frame_set_collapsed(view->frame, view->collapsed);
+}
+
+void view_popup_detach(struct plat_view *view) {
+	struct plat_server *server = view->server;
+	platinum_shell_popup_detached(view);
+	popup_changed(view, false);
+	view_update_frame(view);
+	/* Its title bar under the pointer, as if picked up by it. */
+	struct wlr_box box = view_frame_box(view);
+	view_move_to(view, (int)server->cursor->x - box.width / 2, (int)server->cursor->y - 10);
+	view_focus(view);
 }
 
 void view_min_frame_size(struct plat_view *view, int *w, int *h) {
@@ -94,7 +207,12 @@ void view_update_frame(struct plat_view *view) {
 	int hint = platinum_shell_style_for(view->impl->get_surface(view));
 	bool dialog = hint >= 0 ? hint == DECOR_STYLE_MOVABLE_MODAL
 		: !view_resizable(view) && view->impl->has_parent(view);
-	frame_set_style(view->frame, dialog ? DECOR_STYLE_MOVABLE_MODAL : DECOR_STYLE_DOCUMENT);
+	const bool popup = hint == DECOR_STYLE_POPUP;
+	frame_set_style(view->frame, popup ? DECOR_STYLE_POPUP
+		: dialog ? DECOR_STYLE_MOVABLE_MODAL : DECOR_STYLE_DOCUMENT);
+	if (popup != view->popup) {
+		popup_changed(view, popup);
+	}
 	frame_set_proxy(view->frame, platinum_shell_proxy_for(view->impl->get_surface(view)));
 	struct wlr_scene_tree *layer = view_window_layer(view);
 	if (view->scene_tree->node.parent != layer) {
@@ -109,6 +227,7 @@ void view_update_frame(struct plat_view *view) {
 	frame_set_features(view->frame, resizable, resizable);
 	frame_set_size(view->frame, geo.width, geo.height);
 	frame_commit(view->frame);
+	view_popup_layout(view);
 }
 
 void view_set_title(struct plat_view *view, const char *title) {
@@ -257,6 +376,7 @@ void view_clear_focus(struct plat_server *server) {
 		set_active(server->focused_view, false);
 		server->focused_view = NULL;
 	}
+	view_popups_close(server, NULL);
 	platinum_shell_focus_changed(server);
 }
 
@@ -369,6 +489,12 @@ void view_focus(struct plat_view *view) {
 	platinum_shell_launch_ready(view);
 	if (view->hidden) {
 		view_set_hidden(view, false);
+	}
+	/* One pop-up window open at a time, and only while it is in front:
+	 * bringing a closed one forward opens it. */
+	view_popups_close(server, view);
+	if (view->popup && view->collapsed) {
+		view_set_collapsed(view, false);
 	}
 	wlr_scene_node_raise_to_top(&view->scene_tree->node);
 	wl_list_remove(&view->link);
@@ -608,6 +734,7 @@ void view_set_collapsed(struct plat_view *view, bool collapsed) {
 	}
 	frame_set_collapsed(view->frame, collapsed);
 	frame_commit(view->frame);
+	view_popup_layout(view);
 	window_sound_collapse(collapsed);
 }
 
@@ -689,6 +816,8 @@ void view_handle_map(struct plat_view *view) {
 	int hx, hy;
 	if (view->fullscreen) {
 		view_set_fullscreen(view, true, view->fullscreen_output);
+	} else if (view->popup) {
+		view_popup_layout(view); /* docked at the bottom, not where it was a window */
 	} else if (platinum_shell_position_for(view->impl->get_surface(view), &hx, &hy)) {
 		/* Spatial: back where its program remembers it, but always with
 		 * the title bar on screen and below the menu bar. */

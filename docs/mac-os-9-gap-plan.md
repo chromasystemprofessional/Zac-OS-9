@@ -180,7 +180,7 @@ Section 3 lists every feature; section 5 is the plan.
 | Disclosure triangles; ⌘-→/⌘-← open/close them | p. 23 | ◐ | Triangles ✅; keys to verify. |
 | Button view; drag a button by its name | p. 23 | ✅ | |
 | **View Options** dialog (per view); Set to Standard Views | p. 24, 415 | ✅ | New folders inherit their parent window's view, else the standard views. |
-| **Pop-up windows**: as Pop-up Window, tabs along the bottom of the screen, spring open on drag | p. 27 | ✗ | Layer-shell tabs from the Sniffer. Iconic Mac OS 8/9 feature. P2 L |
+| **Pop-up windows**: as Pop-up Window, tabs along the bottom of the screen, spring open on drag | p. 27 | ✅ | A frame style of `zacos9-wm` (`platinum-shell-v1` 14: `popup`, `set_popup_tab`, `popup_tab`, `popup_detach`): the tab opens and closes it, a click elsewhere or another window coming forward closes it, drag along to move, drag up to make it a window, a drag resting on the tab springs it open, its top corners resize it. The Sniffer remembers it and the tab's place per folder. Tab drawn to match the title bar, not measured. |
 | Select by typing, Tab/Shift-Tab alphabetically, arrows, Shift-click, drag-select | p. 33 | ✅? | Verify Tab order. |
 | Rename by clicking the name; Undo while editing | p. 31 | ✅ | |
 | Option-drag copies; ⌘-Option-drag makes an alias | p. 34–37 | ✅ | |
@@ -208,7 +208,7 @@ Section 3 lists every feature; section 5 is the plan.
 | Edit ▸ **Show Clipboard** | ✅ | `shell/finder/clippings.cpp`: a window that follows the clipboard (text or picture), "Clipboard contents: …" below. |
 | Edit ▸ **Preferences…** (General: Puppy Mode, spring-loaded, grid; Views: standard views; Labels) | ◐ | All but Puppy Mode (Simple Finder), which waits for account kinds (P3). |
 | View ▸ as Icons/Buttons/List, Clean Up, Arrange | ✅ | |
-| View ▸ **as Window / as Pop-up Window** | ✗ | See 3.2. P2 L |
+| View ▸ **as Window / as Pop-up Window** | ✅ | See 3.2. |
 | View ▸ **Sort List** (in list view), **Reset Column Positions**, **View Options…** | ◐ | Sort List, Reset Column Positions and View Options… ✅. |
 | Special ▸ Empty Trash…, Erase Disk…, Sleep, Restart, Shut Down | ✅ | Erase Disk: format choices (Mac OS Extended, DOS/FAT, exFAT) to verify. |
 | Special ▸ **Eject** (⌘E) | ✅ | Every selected disk, local or network; replaces Disconnect Network Drive and Unmount Disk (0.1.54). |
@@ -486,7 +486,7 @@ updates `PROJECT_STATUS.md` and the relevant `docs/` page.
 |---|---|---|---|
 | 2.1 ✅ | **Pack palette** (tear-off from the Application menu; layouts; drop documents on tiles) | new layer-shell surface in the menu bar | M |
 | 2.2 ✅ | **F-key launching** (Keyboard ▸ Function Keys; pressing again brings it forward) | Keyboard panel, compositor hotkeys | M |
-| 2.3 | **Pop-up windows** (View ▸ as Pop-up Window; tabs at the screen bottom; spring open during drags) | Sniffer + layer-shell tabs | L |
+| 2.3 ✅ | **Pop-up windows** (View ▸ as Pop-up Window; tabs at the screen bottom; spring open during drags) | `zacos9-wm` frame style + Sniffer | L |
 | 2.4 ✅ | **Proxy icon** in Sniffer title bars (drag to move/copy; drop onto it when collapsed) | compositor frame + `platinum-shell-v1` + Sniffer drag source | M |
 | 2.5 ✅ | **Clippings** and **Show Clipboard** | Sniffer drop handling, clipping viewer | M |
 | 2.6 ✅ | **Toy Box** (button view of `Toy Box Items`, categories as pages) | Sniffer | M |

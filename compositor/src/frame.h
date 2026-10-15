@@ -39,6 +39,8 @@ void frame_set_features(struct plat_frame *frame, bool zoom, bool grow);
 /* Document window or dialog; dialogs have no boxes and no resize box. */
 void frame_set_style(struct plat_frame *frame, enum decor_style style);
 void frame_set_pressed(struct plat_frame *frame, enum decor_part part);
+/* A pop-up window's tab: its left edge, frame-local. */
+void frame_set_tab_x(struct plat_frame *frame, int tab_x);
 void frame_commit(struct plat_frame *frame);
 
 /* Width and height of the frame (excluding shadow) for given content size. */

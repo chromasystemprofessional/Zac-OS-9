@@ -157,6 +157,13 @@ static void add_finder_menus(struct mb_menu *menus, int *n) {
 	struct mb_item *list = add(m, "as List", 0, win, ACT_FINDER, "view-list");
 	list->checked = win && fs->view == 1;
 	sep(m);
+	/* Mac OS 8/9: a window, or a pop-up window's tab at the screen's bottom. */
+	struct mb_item *as_window = add(m, "as Window", 0, win && fs->popups, ACT_FINDER, "view-window");
+	as_window->checked = win && !fs->popup;
+	struct mb_item *as_popup = add(m, "as Pop-up Window", 0, win && fs->popups, ACT_FINDER,
+		"view-popup");
+	as_popup->checked = win && fs->popup;
+	sep(m);
 	/* Mac OS 9: for an icon view, or the desktop when no window is in front. */
 	const bool iconView = up && (!fs->window || fs->view == 0);
 	add(m, "Clean Up", 0, iconView, ACT_FINDER, "clean-up");

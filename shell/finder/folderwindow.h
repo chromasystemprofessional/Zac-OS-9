@@ -32,6 +32,10 @@ public:
 
 	void setViewMode(ViewMode mode);
 	ViewMode viewMode() const { return m_mode; }
+	/* View > as Window / as Pop-up Window: the window docked at the bottom
+	 * of the screen as a tab, opening above it when clicked. */
+	void setPopup(bool popup);
+	bool isPopup() const { return m_state.popup; }
 
 	/* View Options (viewoptions.h): this window's, for each of its views. */
 	const ViewOptions &viewOptions() const { return m_state.options; }

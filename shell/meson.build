@@ -1212,6 +1212,11 @@ test('proxy-icon', find_program('python3'),
   args: [files('../compositor/tests/test_proxy_icon.py'), compositor_exe, menubar_exe, finder_exe, vptr_exe],
   timeout: 90,
 )
+# Pop-up windows: tabs at the bottom of the screen (decor.c, view.c, input.c, folderwindow.cpp).
+test('popup-windows', find_program('python3'),
+  args: [files('../compositor/tests/test_popup_windows.py'), compositor_exe, menubar_exe, finder_exe, vptr_exe],
+  timeout: 120,
+)
 # Keyboard layouts: ⌘-Space and the keyboard menu (input.c, kbmenu.c).
 test('keyboard-layout-switch', find_program('python3'),
   args: [files('../compositor/tests/test_keyboard_layouts.py'), compositor_exe, menubar_exe, vptr_exe],

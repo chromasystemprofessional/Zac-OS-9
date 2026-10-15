@@ -90,9 +90,22 @@ FolderWindow *FolderWindow::open(const QString &path) {
 		w->resize(w->m_state.size);
 		w->show();
 		pl_sound_event("window-open");
-		if (w->m_state.hasPosition) {
+		if (w->m_state.popup && platinumHasPopupWindows()) {
+			/* Before it first draws: a tab, never a window for a moment. */
+			platinumSetPopupTab(w, w->m_state.tabX);
+			platinumSetFrameStyle(w, FrameStyle::Popup);
+		} else if (w->m_state.hasPosition) {
 			platinumSetWindowPosition(w, w->m_state.position);
 		}
+		platinumOnPopup(w, [w](int x) {
+			w->m_state.tabX = x;
+			w->saveStateSoon();
+		}, [w] {
+			/* Its tab dragged up: an ordinary window again, where it lands. */
+			w->m_state.popup = false;
+			w->saveStateSoon();
+			Finder::instance().notifyState();
+		});
 		w->updateStandardSize();
 		platinumOnTitleMenu(w, [w](bool option) { Finder::instance().showPathMenu(w, option); });
 		w->setUpProxyIcon();
@@ -195,6 +208,24 @@ void FolderWindow::setViewMode(ViewMode mode) {
 	m_scrollX = m_scrollY = 0;
 	relayout();
 	update();
+	Finder::instance().notifyState();
+}
+
+void FolderWindow::setPopup(bool popup) {
+	if (popup == m_state.popup || (popup && !platinumHasPopupWindows())) {
+		return;
+	}
+	m_state.popup = popup;
+	saveStateSoon();
+	if (popup) {
+		platinumSetPopupTab(this, m_state.tabX);
+		platinumSetFrameStyle(this, FrameStyle::Popup);
+	} else {
+		platinumSetFrameStyle(this, FrameStyle::Document);
+		if (m_state.hasPosition) {
+			platinumSetWindowPosition(this, m_state.position);
+		}
+	}
 	Finder::instance().notifyState();
 }
 

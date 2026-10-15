@@ -96,7 +96,9 @@ void frame_commit(struct plat_frame *frame) {
 	const struct decor_state *st = &frame->st;
 	const int W = st->width, S = DECOR_SHADOW;
 	if (st->collapsed) {
-		render_part(frame, frame->top, 0, 0, W + S, DECOR_COLLAPSED_H + S);
+		/* A pop-up's tab sits on the screen's edge: no shadow below it. */
+		const bool popup = st->style == DECOR_STYLE_POPUP;
+		render_part(frame, frame->top, 0, 0, W + S, decor_frame_height(st) + (popup ? 0 : S));
 		wlr_scene_node_set_enabled(&frame->bottom->node, false);
 		wlr_scene_node_set_enabled(&frame->left->node, false);
 		wlr_scene_node_set_enabled(&frame->right->node, false);
@@ -198,6 +200,13 @@ void frame_set_style(struct plat_frame *frame, enum decor_style style) {
 void frame_set_pressed(struct plat_frame *frame, enum decor_part part) {
 	if (frame->st.pressed != part) {
 		frame->st.pressed = part;
+		frame->dirty = true;
+	}
+}
+
+void frame_set_tab_x(struct plat_frame *frame, int tab_x) {
+	if (frame->st.tab_x != tab_x) {
+		frame->st.tab_x = tab_x;
 		frame->dirty = true;
 	}
 }

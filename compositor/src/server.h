@@ -36,6 +36,8 @@ enum plat_cursor_mode {
 	PLAT_CURSOR_RESIZE,    /* dragging a resize outline */
 	PLAT_CURSOR_TRACK_BOX, /* holding a title-bar box down */
 	PLAT_CURSOR_PROXY,     /* pressed on a proxy icon: a click, or a drag to hand on */
+	PLAT_CURSOR_POPUP_TAB, /* pressed on a pop-up window's tab: a click opens or
+	                        * closes it, a drag along moves it, up detaches it */
 };
 
 struct plat_server {
@@ -56,7 +58,7 @@ struct plat_server {
 	int double_click_ms;
 
 	/* Scene layers, bottom to top:
-	 *   desktop, shell[BACKGROUND], shell[BOTTOM], view_layer,
+	 *   desktop, shell[BACKGROUND], shell[BOTTOM], view_layer, popup_layer,
 	 *   shell[TOP] (menu bar), fullscreen_layer, dialog_layer, unmanaged_layer,
 	 *   shell[OVERLAY], overlay_layer */
 	struct wlr_scene *scene;
@@ -64,6 +66,7 @@ struct plat_server {
 	struct wlr_scene_rect *desktop;
 	struct wlr_scene_tree *shell_layers[4]; /* indexed by zwlr_layer_shell_v1_layer */
 	struct wlr_scene_tree *view_layer;
+	struct wlr_scene_tree *popup_layer; /* Sniffer pop-up windows, above the others */
 	struct wlr_scene_tree *unmanaged_layer; /* X11 menus, tooltips */
 	struct wlr_scene_tree *fullscreen_layer;
 	struct wlr_scene_tree *dialog_layer; /* movable-modal windows above app windows */
@@ -152,6 +155,7 @@ struct plat_server {
 	uint32_t resize_edges;
 	enum decor_part grab_part;
 	bool grab_moved;
+	int grab_tab_x;              /* a pop-up's tab at grab start */
 	struct window_sound_state window_sound;
 
 	/* Double-click detection on title bars. */
@@ -253,7 +257,12 @@ struct plat_view {
 	char *app_id;
 	bool mapped;
 	bool hidden;    /* "Hide <app>" from the Application menu */
-	bool collapsed;
+	bool collapsed; /* a pop-up window: closed, only its tab shown */
+	/* A Sniffer pop-up window (DECOR_STYLE_POPUP), docked at the bottom of
+	 * the screen holding (popup_out_x, popup_out_y). */
+	bool popup;
+	int popup_tab_x; /* the tab's left edge, layout coordinates */
+	int popup_out_x, popup_out_y;
 	bool zoomed;
 	bool fullscreen;
 	struct wlr_output *fullscreen_output;
@@ -448,6 +457,12 @@ void view_toggle_zoom(struct plat_view *view, bool fill);
 void view_set_fullscreen(struct plat_view *view, bool fullscreen, struct wlr_output *output);
 void view_refresh_fullscreen(struct plat_server *server);
 void view_set_collapsed(struct plat_view *view, bool collapsed);
+/* Pop-up windows (view.c): dock the window at its screen's bottom, its
+ * tab where it was put; close every open one but `except`; turn one into
+ * an ordinary window under the pointer (its tab dragged up). */
+void view_popup_layout(struct plat_view *view);
+void view_popups_close(struct plat_server *server, struct plat_view *except);
+void view_popup_detach(struct plat_view *view);
 void view_set_pressed(struct plat_view *view, enum decor_part part);
 void view_min_frame_size(struct plat_view *view, int *w, int *h);
 
@@ -460,6 +475,12 @@ void xdg_attach_popup(struct plat_server *server, struct wlr_xdg_popup *popup,
 void platinum_shell_init(struct plat_server *server);
 /* The hinted decor_style for a surface, or -1. */
 int platinum_shell_style_for(struct wlr_surface *surface);
+/* A pop-up window's remembered tab (layout x), if its program gave one. */
+bool platinum_shell_popup_tab_for(struct wlr_surface *surface, int *x);
+/* Tell the program its pop-up's tab moved, or that it was dragged up into
+ * an ordinary window (which it now is). */
+void platinum_shell_popup_tab_moved(struct plat_view *view);
+void platinum_shell_popup_detached(struct plat_view *view);
 /* A remembered position for a surface's window, if its program gave one. */
 bool platinum_shell_position_for(struct wlr_surface *surface, int *x, int *y);
 /* The content size the zoom box gives this window, if its program said. */
