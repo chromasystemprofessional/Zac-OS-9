@@ -7,6 +7,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <wlr/types/wlr_compositor.h>
+#include <wlr/types/wlr_data_device.h>
 #include <wlr/util/log.h>
 #include <wlr/xwayland.h>
 
@@ -125,6 +126,16 @@ bool platinum_shell_proxy_drag(struct plat_view *view) {
 		return false;
 	}
 	platinum_shell_v1_send_proxy_drag(shell, surface->resource);
+	return true;
+}
+
+bool platinum_shell_drag_spring(struct wlr_drag *drag) {
+	struct wlr_surface *surface = drag ? drag->focus : NULL;
+	struct wl_resource *shell = surface && surface->resource ? shell_of(surface) : NULL;
+	if (!shell || wl_resource_get_version(shell) < PLATINUM_SHELL_V1_DRAG_SPRING_SINCE_VERSION) {
+		return false;
+	}
+	platinum_shell_v1_send_drag_spring(shell, surface->resource);
 	return true;
 }
 
@@ -484,5 +495,5 @@ void platinum_shell_init(struct plat_server *server) {
 	the_server = server;
 	wl_list_init(&hints);
 	wl_list_init(&resources);
-	wl_global_create(server->display, &platinum_shell_v1_interface, 14, NULL, bind_shell);
+	wl_global_create(server->display, &platinum_shell_v1_interface, 15, NULL, bind_shell);
 }

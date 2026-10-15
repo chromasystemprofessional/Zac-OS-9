@@ -186,7 +186,7 @@ Section 3 lists every feature; section 5 is the plan.
 | Option-drag copies; ⌘-Option-drag makes an alias | p. 34–37 | ✅ | |
 | Paste a picture over the icon in Get Info for a custom icon | p. 32 | ✗ | Write `metadata::custom-icon` (gio) or a `.directory`. P3 M |
 | Labels: seven, applied from File ▸ Label; names and colours editable in Preferences | p. 40 | ✅ | Colours from the 16-colour system palette rather than a full colour picker. |
-| Spring-loaded folders; delay slider; Space opens at once | p. 35 | ◐ | On/off and delay in Preferences ✅; Space-to-open still to do. P3 S |
+| Spring-loaded folders; delay slider; Space opens at once | p. 35 | ✅ | On/off and delay in Preferences; Space during a drag opens the folder at once (`platinum-shell-v1` 15 `drag_spring`: programs get no keys during a drag, so `zacos9-wm` tells the one under it). |
 | **Toy Box** (buttons in categories, pages; Option-drag between pages) | p. 43 | ✅ | Control Panels ▸ Toy Box; System Folder ▸ Toy Box Items; bulleted folders are pages. |
 | Trash: Empty Trash…, warn-before-emptying option (the ellipsis disappears), locked items need Option | p. 46 | ◐ | Empty with warning ✅; option to turn the warning off, locked items to verify. P3 S |
 | Put Away takes items out of the Trash back to where they were | p. 412 | ✅? | Verify for files from the Trash. |

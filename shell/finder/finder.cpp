@@ -66,23 +66,28 @@ void Finder::springHover(const QString &folder) {
 	if (!m_springTimer) {
 		m_springTimer = new QTimer;
 		m_springTimer->setSingleShot(true);
-		QObject::connect(m_springTimer, &QTimer::timeout, [this] {
-			if (m_springPath.isEmpty()) {
-				return;
-			}
-			const bool wasOpen = FolderWindow::isOpen(m_springPath);
-			FolderWindow *w = FolderWindow::open(m_springPath);
-			if (!wasOpen) {
-				m_sprung.push_back(w);
-			}
-			m_springPath.clear();
-		});
+		QObject::connect(m_springTimer, &QTimer::timeout, [this] { springNow(); });
 	}
 	if (folder.isEmpty()) {
 		m_springTimer->stop();
 	} else {
 		m_springTimer->start(springDelayMs());
 	}
+}
+
+void Finder::springNow() {
+	if (m_springTimer) {
+		m_springTimer->stop();
+	}
+	if (m_springPath.isEmpty()) {
+		return;
+	}
+	const bool wasOpen = FolderWindow::isOpen(m_springPath);
+	FolderWindow *w = FolderWindow::open(m_springPath);
+	if (!wasOpen) {
+		m_sprung.push_back(w);
+	}
+	m_springPath.clear();
 }
 
 void Finder::dragEnded() {
@@ -98,6 +103,7 @@ void Finder::dragEnded() {
 void Finder::start(Desktop *desktop) {
 	m_desktop = desktop;
 	m_front = desktop;
+	platinumOnDragSpring([this] { springNow(); });
 	QLocalServer::removeServer(socketPath());
 	m_server.listen(socketPath());
 	QObject::connect(&m_server, &QLocalServer::newConnection, [this] {

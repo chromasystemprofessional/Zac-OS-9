@@ -1231,6 +1231,11 @@ test('popup-windows', find_program('python3'),
   args: [files('../compositor/tests/test_popup_windows.py'), compositor_exe, menubar_exe, finder_exe, vptr_exe],
   timeout: 120,
 )
+# Spring-loaded folders: Space during a drag opens one at once (drag_spring).
+test('spring-space', find_program('python3'),
+  args: [files('../compositor/tests/test_spring_space.py'), compositor_exe, menubar_exe, finder_exe, vptr_exe],
+  timeout: 120,
+)
 # Keyboard layouts: ⌘-Space and the keyboard menu (input.c, kbmenu.c).
 test('keyboard-layout-switch', find_program('python3'),
   args: [files('../compositor/tests/test_keyboard_layouts.py'), compositor_exe, menubar_exe, vptr_exe],

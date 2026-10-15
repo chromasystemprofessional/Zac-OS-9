@@ -10,7 +10,7 @@
     when the generic rule (fixed size with a parent window) can't apply.
   </description>
 
-  <interface name="platinum_shell_v1" version="14">
+  <interface name="platinum_shell_v1" version="15">
     <enum name="style">
       <entry name="document" value="0" summary="standard document window"/>
       <entry name="movable_modal" value="1"
@@ -258,6 +258,15 @@
         Its tab was dragged up off the bottom of the screen: the window is
         an ordinary document window now (as if set_window_style had made
         it one), being moved by the user. window_position follows.
+      </description>
+      <arg name="surface" type="object" interface="wl_surface"/>
+    </event>
+    <event name="drag_spring" since="15">
+      <description summary="Space was pressed during a drag">
+        Sent to the program whose surface a drag is over when the user
+        presses Space: open the spring-loaded folder under the pointer
+        now, without waiting for the delay. Keys don't otherwise reach
+        programs during a drag; the Space press itself is not delivered.
       </description>
       <arg name="surface" type="object" interface="wl_surface"/>
     </event>

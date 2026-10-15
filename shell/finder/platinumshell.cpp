@@ -107,17 +107,26 @@ static void handle_popup_detach(void *, platinum_shell_v1 *, wl_surface *surface
 		it->detached();
 	}
 }
+static std::function<void()> &dragSpring() {
+	static std::function<void()> spring;
+	return spring;
+}
+static void handle_drag_spring(void *, platinum_shell_v1 *, wl_surface *) {
+	if (dragSpring()) {
+		QTimer::singleShot(0, dragSpring());
+	}
+}
 static const platinum_shell_v1_listener shell_listener = {
 	handle_window_position, handle_active_client, handle_active_gtk_menu, handle_switch_app,
 	handle_title_menu, handle_keyboard_layouts, handle_proxy_drag, handle_sticky_keys,
-	handle_popup_tab, handle_popup_detach
+	handle_popup_tab, handle_popup_detach, handle_drag_spring
 };
 
 static void global(void *, wl_registry *reg, uint32_t name, const char *iface, uint32_t version) {
 	if (std::strcmp(iface, platinum_shell_v1_interface.name) == 0) {
 		shell = static_cast<platinum_shell_v1 *>(
 			wl_registry_bind(reg, name, &platinum_shell_v1_interface,
-				std::min(version, 14u)));
+				std::min(version, 15u)));
 		platinum_shell_v1_add_listener(shell, &shell_listener, nullptr);
 	}
 }
@@ -297,6 +306,10 @@ void platinumOnPopup(QWidget *window, std::function<void(int)> tabMoved,
 	}
 	popupWatches().insert(surface, { std::move(tabMoved), std::move(detached) });
 	QObject::connect(window, &QObject::destroyed, [surface] { popupWatches().remove(surface); });
+}
+
+void platinumOnDragSpring(std::function<void()> spring) {
+	dragSpring() = std::move(spring);
 }
 
 void platinumSetWindowPosition(QWidget *window, QPoint pos) {

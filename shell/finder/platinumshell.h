@@ -45,6 +45,9 @@ bool platinumHasPopupWindows();
 void platinumSetPopupTab(QWidget *window, int x);
 void platinumOnPopup(QWidget *window, std::function<void(int x)> tabMoved,
 	std::function<void()> detached);
+/* Space pressed during a drag over one of our windows (zacos9-wm 15+):
+ * spring the folder under it open now. */
+void platinumOnDragSpring(std::function<void()> spring);
 /* Ask for the window to appear at `frameTopLeft` (layout coordinates);
  * call right after show(), before the window first draws. */
 void platinumSetWindowPosition(QWidget *window, QPoint frameTopLeft);

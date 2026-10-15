@@ -282,6 +282,11 @@ void input_deliver_key(struct plat_keyboard *kb, uint32_t evdev_keycode,
 
 	bool handled = false;
 	if (state == WL_KEYBOARD_KEY_STATE_PRESSED) {
+		/* Space during a drag springs the folder under it open now
+		 * (the drag's grab keeps keys from programs otherwise). */
+		for (int i = 0; i < nsyms && !handled && server->seat->drag && !lock_active(server); i++) {
+			handled = syms[i] == XKB_KEY_space && platinum_shell_drag_spring(server->seat->drag);
+		}
 		/* Locked, no shortcuts but for a text console. */
 		for (int i = 0; i < nsyms && !handled; i++) {
 			handled = lock_active(server) ? handle_vt_switch(server, syms[i]) :

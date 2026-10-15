@@ -504,6 +504,9 @@ void output_zoom_box(int width, int height, double px, double py, double factor,
  * program it is being dragged (false if it can't be). */
 int platinum_shell_proxy_for(struct wlr_surface *surface);
 bool platinum_shell_proxy_drag(struct plat_view *view);
+/* Space during a drag: tell the program under it to spring its folder
+ * open now (false if it can't be told). */
+bool platinum_shell_drag_spring(struct wlr_drag *drag);
 void platinum_shell_launch_ready(struct plat_view *view);
 /* The process behind a window (X11: its _NET_WM_PID), or 0. */
 uint32_t view_pid(struct plat_view *view);

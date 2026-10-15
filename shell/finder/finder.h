@@ -128,8 +128,10 @@ public:
 
 	/* Spring-loaded folders: hovering a drag over a folder opens it; the
 	 * windows that sprang open close again when the drag ends. Each view
-	 * calls springHover() from its drag handlers. */
+	 * calls springHover() from its drag handlers. Space during the drag
+	 * calls springNow(): the folder hovered opens without the delay. */
 	void springHover(const QString &folderOrEmpty);
+	void springNow();
 	void dragEnded();
 
 	/* Re-read every view showing `folder`, and the Trash icon. */
