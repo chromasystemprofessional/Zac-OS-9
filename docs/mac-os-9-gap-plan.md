@@ -371,7 +371,7 @@ A zram/swap switch in a Memory panel is a possible P3.
 
 | Feature | Status | Notes |
 |---|---|---|
-| Login window with a user list and password | ✅ | `zacos9-login` (0.1.54) |
+| Login window with a user list and password | ✅ | `zacos9-login` (0.1.54); the chosen person's picture from the Users panel (accountsservice's icons folder), or a blank face with their initial. |
 | **Log Out** (Special menu), automatic logout or lock after idle | ✅ | Log Out ✅ (0.1.54); lock after idle ✅ (Screen Saver) |
 | **Users panel**: add/remove accounts, picture, can change password, can log in, can manage accounts | ✅ | `zacos9-controlpanel users` over accountsservice (D-Bus, its own polkit rules: your name and picture freely, the rest with an administrator's password through the session's polkit agent); passwords hashed in the panel by crypt(3). You can't delete, demote or lock yourself. |
 | Account kinds: Normal, **Limited** (chosen apps only), **Puppy Mode** (the simplified desktop for children) | ✗ | P3 L. Limited: allowed-apps list enforced by the Sniffer and menu bar (not a security boundary — say so). |

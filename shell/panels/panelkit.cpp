@@ -668,6 +668,34 @@ void panelIcon(pl_canvas *c, const QImage &icon, int x, int y) {
 	}
 }
 
+QImage accountPicture(const QString &file, const QString &name, int size) {
+	QImage image;
+	if (!file.isEmpty()) {
+		image.load(file);
+	}
+	if (!image.isNull()) {
+		return image.scaled(size, size, Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation)
+			.copy(0, 0, size, size).convertToFormat(QImage::Format_ARGB32);
+	}
+	QImage blank(size, size, QImage::Format_ARGB32);
+	blank.fill(QColor(0xbb, 0xbb, 0xdd));
+	QPainter p(&blank);
+	p.setPen(Qt::black);
+	QFont font = p.font();
+	font.setPixelSize(size * 26 / 48);
+	font.setBold(true);
+	p.setFont(font);
+	p.drawText(blank.rect(), Qt::AlignCenter, name.left(1).toUpper());
+	p.drawRect(0, 0, size - 1, size - 1);
+	return blank;
+}
+
+QString accountPictureFile(const QString &user) {
+	const QByteArray folder = qgetenv("ZACOS9_ACCOUNT_ICONS");
+	return (folder.isEmpty() ? QStringLiteral("/var/lib/AccountsService/icons")
+		: QString::fromLocal8Bit(folder)) + '/' + user;
+}
+
 /* The small button with only the double triangle, beside an icon well:
  * a black frame with cut corners, lit inside its top and left, shaded
  * inside its bottom and right. Measured from Mac OS 9's Get Info. */

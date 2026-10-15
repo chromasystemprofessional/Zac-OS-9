@@ -27,6 +27,7 @@
 static constexpr int W = 320;
 static constexpr int MARGIN = 16;
 static constexpr int FIELD_X = MARGIN + 72;
+static constexpr int PICTURE = 48, PICTURE_Y = 12; /* at the top right */
 
 struct Account {
 	QString user, name;
@@ -81,7 +82,8 @@ public:
 	LoginWindow() : m_accounts(accounts()) {
 		setWindowTitle("Log In");
 
-		int y = 44;
+		/* Under the welcome and the chosen person's picture. */
+		int y = PICTURE_Y + PICTURE + 8;
 		const int rows = std::clamp(static_cast<int>(m_accounts.size()), 3, 6);
 		m_list.frame = QRect(MARGIN, y, W - 2 * MARGIN, rows * PL_LIST_ROW_H + 2);
 		QStringList names;
@@ -150,7 +152,14 @@ protected:
 		Pixels px(width(), height());
 		pl_canvas *c = &px.c;
 		pl_fill(c, 0, 0, width() - 1, height() - 1, GRAY(0xD));
-		panelText(c, "Welcome to ZacOS 9.", MARGIN, 29);
+		panelText(c, "Welcome to ZacOS 9.", MARGIN, PICTURE_Y + PICTURE / 2 + 5);
+		/* The chosen person's picture (Users control panel), as Mac OS 9's
+		 * Multiple Users showed it. */
+		if (const int row = m_list.state.selected; row >= 0) {
+			const Account &a = m_accounts[static_cast<size_t>(row)];
+			panelIcon(c, accountPicture(accountPictureFile(a.user), a.name, PICTURE),
+				W - MARGIN - PICTURE, PICTURE_Y);
+		}
 		m_list.paint(c, false);
 		panelLabel(c, "Password:", FIELD_X - 8, m_password.rect.top() + 15);
 		const QString status = m_greetd.busy() ? QString("Logging in…") : m_error;

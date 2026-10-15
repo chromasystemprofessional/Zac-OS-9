@@ -201,6 +201,15 @@ void panelDisclosure(pl_canvas *c, int x, int y, bool expanded);
 /* An ARGB icon at (x, y), where it isn't transparent. */
 void panelIcon(pl_canvas *c, const QImage &icon, int x, int y);
 
+/* A person's picture, size x size (the Users panel, the login window):
+ * the picture in `file`, else a blank face with the first letter of
+ * `name`. */
+QImage accountPicture(const QString &file, const QString &name, int size = 48);
+/* Where accountsservice keeps `user`'s picture (readable by anyone, so
+ * the login window needn't ask it); ZACOS9_ACCOUNT_ICONS replaces the
+ * folder, for tests. */
+QString accountPictureFile(const QString &user);
+
 /* A Platinum edit text field (HIG figures 2-28, 3-30): one line, or
  * several (Return starts a new one). Click or drag to place the caret
  * and select; ⌘A, ⌘C, ⌘X and ⌘V work. */

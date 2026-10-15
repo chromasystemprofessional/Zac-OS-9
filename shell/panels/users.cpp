@@ -55,30 +55,6 @@ QString errorOf(const QDBusMessage &reply) {
 		? accountsErrorText(reply.errorName(), reply.errorMessage()) : QString();
 }
 
-/* A picture as the panel shows it: the account's own, else a blank face
- * with its initial. */
-QImage pictureOf(const QString &file, const QString &name) {
-	QImage image;
-	if (!file.isEmpty()) {
-		image.load(file);
-	}
-	if (!image.isNull()) {
-		return image.scaled(PICTURE, PICTURE, Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation)
-			.copy(0, 0, PICTURE, PICTURE).convertToFormat(QImage::Format_ARGB32);
-	}
-	QImage blank(PICTURE, PICTURE, QImage::Format_ARGB32);
-	blank.fill(QColor(0xbb, 0xbb, 0xdd));
-	QPainter p(&blank);
-	p.setPen(Qt::black);
-	QFont font = p.font();
-	font.setPixelSize(26);
-	font.setBold(true);
-	p.setFont(font);
-	p.drawText(blank.rect(), Qt::AlignCenter, name.left(1).toUpper());
-	p.drawRect(0, 0, PICTURE - 1, PICTURE - 1);
-	return blank;
-}
-
 } // namespace
 
 bool validShortName(const QString &name) {
@@ -367,7 +343,7 @@ void UsersPanel::paintEvent(QPaintEvent *) {
 	} else if (!d->error.isEmpty()) {
 		about = d->error;
 	} else if (const Account *a = selected()) {
-		panelIcon(c, pictureOf(a->iconFile, a->shownName()), M, y - 8);
+		panelIcon(c, accountPicture(a->iconFile, a->shownName()), M, y - 8);
 		const int x = M + PICTURE + 10;
 		panelText(c, a->shownName(), x, y + 2, PL_FONT_SYSTEM);
 		panelText(c, "Short name: " + a->userName, x, y + 16, PL_FONT_VIEWS);
@@ -697,7 +673,7 @@ void AccountWindow::paintEvent(QPaintEvent *) {
 	panelLabel(c, "Name:", LABEL, d->realName.rect.y() + base);
 	panelLabel(c, "Short name:", LABEL, d->userName.rect.y() + base);
 	panelLabel(c, "Picture:", LABEL, 76 + base);
-	panelIcon(c, pictureOf(d->picture.isEmpty() ? d->original.iconFile : d->picture,
+	panelIcon(c, accountPicture(d->picture.isEmpty() ? d->original.iconFile : d->picture,
 		d->realName.text.isEmpty() ? d->userName.text : d->realName.text), FIELD, 76);
 	panelLabel(c, d->creating ? "Password:" : "New password:", LABEL, d->password.rect.y() + base);
 	panelLabel(c, "Verify:", LABEL, d->verify.rect.y() + base);
