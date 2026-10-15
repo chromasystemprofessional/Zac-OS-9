@@ -5,6 +5,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QTemporaryDir>
+#include <sys/stat.h>
 #include <cstdio>
 
 #include "alias.h"
@@ -166,13 +167,42 @@ int main(int argc, char **argv) {
 	check(aliasResolve(r + "/aliases/other").state == AliasState::Missing, "deleted target is Missing");
 	check(!QFileInfo::exists(r + "/docs/again.txt"), "missing target is not recreated");
 
-	/* A new file at the old path is a different item. */
+	/* A new file at the old path is the original replaced (a save, a
+	 * package upgrade): Mac OS 9 fell back to the path too. */
 	touch(r + "/docs/again.txt", "new");
 	res = aliasResolve(r + "/aliases/other");
-	check(res.state == AliasState::Changed, "replaced target needs confirmation");
-	check(QFileInfo(r + "/aliases/other").symLinkTarget() == r + "/docs/again.txt", "link not rewritten silently");
+	check(res.state == AliasState::Ok && res.target == r + "/docs/again.txt",
+		"a replaced original at its path is accepted");
+	check(QFileInfo(r + "/aliases/other").symLinkTarget() == r + "/docs/again.txt" &&
+		aliasResolve(r + "/aliases/other", false).state == AliasState::Ok, "and remembered as the original");
+
+	/* Its old inode number reused by something else nearby (the MIME
+	 * database's files, after an upgrade replaced three programs' desktop
+	 * entries): never taken for the original. */
+	touch(r + "/docs/decoy");
+	{
+		struct stat decoy;
+		stat(QFile::encodeName(r + "/docs/decoy").constData(), &decoy);
+		/* tmpfs's clock is coarse, so files made a moment apart can share
+		 * a birth time: the original's is set to one no file here has. */
+		check(recordField(r + "/aliases/other", "ino", QByteArray::number(quint64(decoy.st_ino))) &&
+			recordField(r + "/aliases/other", "birth", "1000000000.5"),
+			"simulate the original's inode number given to another file");
+	}
+	QFile::remove(r + "/docs/again.txt");
+	res = aliasResolve(r + "/aliases/other");
+	check(res.state == AliasState::Missing && QFileInfo(r + "/aliases/other").symLinkTarget() == r + "/docs/again.txt",
+		"a reused inode number with another birth time isn't the original");
+	touch(r + "/docs/again.txt", "back");
+	check(recordField(r + "/aliases/other", "birth", "") && recordField(r + "/aliases/other", "name", "again.txt"),
+		"an old record without a birth time");
+	QFile::remove(r + "/docs/again.txt");
+	check(aliasResolve(r + "/aliases/other").state == AliasState::Missing,
+		"an old record only reconnects to an item that kept its name");
+	QFile::remove(r + "/docs/decoy");
+	touch(r + "/docs/again.txt", "new");
 	check(aliasReconnect(r + "/aliases/other", r + "/docs/again.txt") &&
-		aliasResolve(r + "/aliases/other").state == AliasState::Ok, "user confirms the new item");
+		aliasResolve(r + "/aliases/other").state == AliasState::Ok, "the user points it at the item again");
 
 	check(recordField(r + "/aliases/other", "filesystem", "") &&
 		recordField(r + "/aliases/other", "dev", "18446744073709551615") &&

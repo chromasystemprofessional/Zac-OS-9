@@ -7,6 +7,7 @@
 #include <QSet>
 #include <QStandardPaths>
 #include <QDirIterator>
+#include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/vfs.h>
 #include <unistd.h>
@@ -16,6 +17,10 @@ namespace {
 struct Identity {
 	quint64 dev = 0, ino = 0;
 	QByteArray filesystem;
+	/* When the item was made ("sec.nsec"), where the filesystem keeps it:
+	 * a deleted file's inode number is soon given to a new one, but not its
+	 * birth time. Empty in old records and on filesystems without it. */
+	QByteArray birth;
 	QString name, parent;
 	bool valid = false;
 };
@@ -32,6 +37,15 @@ QString recordPath(const QString &aliasPath) {
 bool statOf(const QString &path, struct stat *st, bool follow) {
 	return (follow ? stat(QFile::encodeName(path).constData(), st)
 		: lstat(QFile::encodeName(path).constData(), st)) == 0;
+}
+
+QByteArray birthOf(const QString &path, bool follow) {
+	struct statx stx;
+	if (statx(AT_FDCWD, QFile::encodeName(path).constData(), follow ? 0 : AT_SYMLINK_NOFOLLOW,
+			STATX_BTIME, &stx) != 0 || !(stx.stx_mask & STATX_BTIME)) {
+		return {};
+	}
+	return QByteArray::number(qint64(stx.stx_btime.tv_sec)) + "." + QByteArray::number(stx.stx_btime.tv_nsec);
 }
 
 QByteArray filesystemOf(const QString &path) {
@@ -58,6 +72,7 @@ Identity identityOf(const QString &path) {
 		id.dev = st.st_dev;
 		id.ino = st.st_ino;
 		id.filesystem = filesystemOf(intended);
+		id.birth = birthOf(intended, true);
 		id.name = QFileInfo(intended).fileName();
 		id.parent = QFileInfo(intended).absolutePath();
 		id.valid = true;
@@ -80,6 +95,8 @@ Identity readRecord(const QString &aliasPath) {
 			id.ino = value.toULongLong();
 		} else if (key == "filesystem") {
 			id.filesystem = value;
+		} else if (key == "birth") {
+			id.birth = value;
 		} else if (key == "name") {
 			id.name = QString::fromUtf8(value);
 		} else if (key == "parent") {
@@ -100,13 +117,26 @@ bool writeRecord(const QString &aliasPath, const Identity &id) {
 	}
 	const QByteArray data = "dev=" + QByteArray::number(id.dev) + "\nino=" +
 		QByteArray::number(id.ino) + "\nname=" + id.name.toUtf8() + "\nparent=" +
-		id.parent.toUtf8() + "\nfilesystem=" + id.filesystem + "\n";
+		id.parent.toUtf8() + "\nfilesystem=" + id.filesystem + "\nbirth=" + id.birth + "\n";
 	return f.write(data) == data.size() && f.commit();
+}
+
+/* An inode number alone isn't enough: after a package upgrade or a save
+ * that replaces a file, its old number is soon reused for something else
+ * nearby (the MIME database, once, for three desktop aliases). The birth
+ * time tells them apart; an old record without one only matches an item
+ * that kept the recorded name. */
+bool sameBirth(const QString &path, const Identity &id, bool follow) {
+	if (id.birth.isEmpty()) {
+		return QFileInfo(path).fileName() == id.name;
+	}
+	const QByteArray birth = birthOf(path, follow);
+	return birth.isEmpty() || birth == id.birth;
 }
 
 bool sameIdentity(const QString &path, const Identity &id) {
 	struct stat st;
-	if (!statOf(path, &st, true) || quint64(st.st_ino) != id.ino) {
+	if (!statOf(path, &st, true) || quint64(st.st_ino) != id.ino || !sameBirth(path, id, true)) {
 		return false;
 	}
 	if (sameFilesystem(path, st, id)) {
@@ -172,7 +202,7 @@ QString search(const Identity &id, const QString &aliasPath) {
 			if (!statOf(path, &st, false)) {
 				continue;
 			}
-			if (quint64(st.st_dev) == level.dev && quint64(st.st_ino) == id.ino) {
+			if (quint64(st.st_dev) == level.dev && quint64(st.st_ino) == id.ino && sameBirth(path, id, false)) {
 				return path;
 			}
 			if (S_ISDIR(st.st_mode) && quint64(st.st_dev) == level.dev && level.depth < kMaxDepth &&
@@ -226,6 +256,10 @@ AliasResolution aliasResolve(const QString &aliasPath, bool reconnect) {
 				out.error = "The alias identity record could not be saved.";
 			}
 		} else if (!sameIdentity(final, id)) {
+			/* As Mac OS 9 did: the original by its identity first, if it
+			 * has moved; else a file at its path now, which is the same
+			 * document or program replaced (a save, an upgrade). A folder
+			 * isn't replaced like that, so a new one there is asked about. */
 			const QString moved = reconnect ? search(id, aliasPath) : QString();
 			if (!moved.isEmpty()) {
 				if (!aliasRecord(aliasPath, moved)) {
@@ -240,6 +274,15 @@ AliasResolution aliasResolve(const QString &aliasPath, bool reconnect) {
 				}
 				out.state = AliasState::Reconnected;
 				out.target = moved;
+				return out;
+			}
+			if (QFileInfo(final).canonicalFilePath() == QDir(id.parent).filePath(id.name) &&
+					!id.filesystem.isEmpty() && filesystemOf(final) == id.filesystem && !QFileInfo(final).isDir()) {
+				if (!aliasRecord(aliasPath, final)) {
+					out.error = "The alias identity record could not be saved.";
+				}
+				out.state = AliasState::Ok;
+				out.target = final;
 				return out;
 			}
 			out.state = AliasState::Changed;
