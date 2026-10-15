@@ -743,15 +743,21 @@ void Desktop::dragLeaveEvent(QDragLeaveEvent *) {
 void Desktop::dropEvent(QDropEvent *e) {
 	Item *target = dropTargetAt(e->position().toPoint(), draggedPaths(e->mimeData()));
 	clearDropTarget();
-	if (target == m_trash.get()) {
+	/* A network volume dragged to the Trash is ejected; anything else
+	 * dropped there goes in it, below. */
+	if (target == m_trash.get() && e->source() == this) {
+		bool ejected = false;
 		for (Item *item : selectedItems()) {
 			if (item->isNetworkVolume) {
 				Finder::instance().ejectVolume(item->path, item->name, true);
+				ejected = true;
 			}
 		}
-		e->setDropAction(Qt::MoveAction);
-		e->accept();
-		return;
+		if (ejected) {
+			e->setDropAction(Qt::MoveAction);
+			e->accept();
+			return;
+		}
 	}
 	if (!target && e->source() == this && !(e->modifiers() & Qt::AltModifier)) {
 		/* Icons dragged about the desktop: they move there, and stay (on

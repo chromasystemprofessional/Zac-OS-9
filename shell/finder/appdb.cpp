@@ -188,15 +188,20 @@ PackageInfo lookupPackage(const QString &exePath) {
 	PackageInfo info;
 	QProcess owner;
 	owner.start("dpkg", { "-S", exePath });
-	if (finishPackageQuery(owner) && owner.exitCode() == 0) {
+	const bool finished = finishPackageQuery(owner);
+	if (finished && owner.exitCode() == 0) {
 		const QString out = QString::fromUtf8(owner.readAllStandardOutput());
 		const int colon = out.indexOf(": ");
 		if (colon > 0) {
 			info.name = out.left(colon).trimmed();
 		}
-	} else if (owner.exitCode() != 1) {
+	} else if (!finished || owner.exitCode() != 1) {
+		/* Not an answer (a slow dpkg on a cold cache times out): don't
+		 * remember it as "no package", or the next lookup falls through
+		 * to the Exec= program and names the wrong one. */
 		qWarning().noquote() << "Could not query application package ownership:"
 			<< exePath << owner.readAllStandardError();
+		return info;
 	}
 	if (!info.name.isEmpty()) {
 		QProcess version;
@@ -293,11 +298,21 @@ void resolveOrigin(GDesktopAppInfo *desktop, AppEntry *entry) {
 	if (exePath.isEmpty()) {
 		return;
 	}
+	/* "Exec=env ...", "Exec=systemctl start ...": a program that only
+	 * starts the application, from a package (coreutils, systemd) that
+	 * has nothing to do with it. */
+	static const QStringList launchers = { "env", "sh", "dash", "bash", "systemctl",
+		"systemd-run", "gio", "xdg-open", "flatpak", "snap", "nice", "ionice", "taskset",
+		"pkexec", "sudo", "python3", "perl", "java", "wine", "mono" };
+	const QString canonical = QFileInfo(exePath).canonicalFilePath();
+	if (launchers.contains(QFileInfo(exePath).fileName()) ||
+			launchers.contains(QFileInfo(canonical).fileName())) {
+		return;
+	}
 	/* dpkg's file database has the packaged path, which on a merged-/usr
 	 * system is /usr/bin/x even though /bin/x (what most Exec= lines
 	 * name) is a symlink to it; dpkg -S on the symlink path itself finds
 	 * nothing. */
-	const QString canonical = QFileInfo(exePath).canonicalFilePath();
 	if (!canonical.isEmpty()) {
 		exePath = canonical;
 	}

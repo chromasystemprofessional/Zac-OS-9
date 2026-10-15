@@ -607,8 +607,13 @@ int main(int argc, char **argv) {
 	const QString toTrash = path + "/External folder alias copy";
 	QMimeData trashMime;
 	trashMime.setUrls({QUrl::fromLocalFile(toTrash)});
-	QDropEvent trashDrop(QPointF(0, 0), Qt::MoveAction, &trashMime, Qt::LeftButton, Qt::NoModifier);
-	dropItems(&trashDrop, desktop.m_trash.get(), path);
+	/* Dropped on the Desktop's own Trash icon, as a drag from the Desktop
+	 * lands: through dropEvent, which once kept it for network volumes. */
+	QDropEvent trashDrop(QPointF(desktop.m_trash->pos + QPoint(PL_ICON_LARGE / 2, PL_ICON_LARGE / 2)),
+		Qt::MoveAction, &trashMime, Qt::LeftButton, Qt::NoModifier);
+	check(desktop.itemAt(trashDrop.position().toPoint()) == desktop.m_trash.get(),
+		"the Trash icon is under the drop point");
+	desktop.dropEvent(&trashDrop);
 	check(trashDrop.isAccepted() && !QFileInfo(toTrash).isSymLink() &&
 		QFile::exists(path + "/External folder/From application"),
 		"trashing folder alias removes link without deleting target or saved contents");
@@ -763,12 +768,17 @@ esac
 	confirmations.start();
 	Finder::instance().emptyTrash();
 	confirmations.stop();
-	check(appTrashEntries(&error).size() == 1 && QFile::exists(home.path() + "/installed"),
-		"an already queued app that becomes a system tool is not uninstalled");
+	check(appTrashEntries(&error).empty() && QFile::exists(home.path() + "/installed"),
+		"an already queued app that becomes a system tool is not uninstalled but put back");
+	check(QDir(trashFilesPath()).isEmpty(),
+		"an app that can't be uninstalled doesn't keep the rest of the Trash from emptying");
 	fixture(apps + "/com.example.TrashTest.desktop",
 		"[Desktop Entry]\nType=Application\nName=Trash Test\nExec=/bin/true\n"
 		"X-Flatpak=com.example.TrashTest\n");
 	vfsRefresh();
+	check(appTrashQueue("com.example.TrashTest.desktop", &error) &&
+		QFile::link(path + "/External folder", toTrash) && QFile::moveToTrash(toTrash),
+		"queue the app again beside an ordinary alias");
 	fixture(home.path() + "/fail", "fail");
 	confirmations.start();
 	Finder::instance().emptyTrash();

@@ -1312,6 +1312,7 @@ void Finder::emptyTrash() {
 		progress.show();
 		platinumSetFrameStyle(&progress, FrameStyle::MovableModal);
 		quint64 completed = 0;
+		QStringList returned;
 		for (const auto &entry : applications) {
 			progress.setLabelText(QString("Uninstalling %1 (%2 of %3). Personal data is kept.")
 				.arg(entry.name).arg(completed + 1).arg(applications.size()));
@@ -1320,32 +1321,45 @@ void Finder::emptyTrash() {
 			const AppEntry *app = appById(entry.id);
 			bool ok = true;
 			QString error;
+			/* Nothing to uninstall safely: it goes back to Applications
+			 * rather than keep the rest of the Trash from emptying. */
+			QString why;
 			if (app && (app->systemUtility || !app->userInstalled)) {
-				ok = false;
-				error = "This application is now a system utility or an automatically installed "
-					"dependency and cannot be uninstalled through Finder: " + entry.name;
+				why = "it is now a system utility or an automatically installed dependency";
 			} else if (app && app->origin != entry.origin) {
-				ok = false;
-				error = "The application's install source has changed: " + entry.name;
-			} else {
-				const QString source = entry.origin.section(':', 0, 0);
-				const QString id = entry.origin.section(':', 1);
-				bool installed = source == "flatpak" ? flatpakInstalled(id, &ok, &error)
-					: packagesInstalled({ id }, &ok, &error);
-				if (ok && installed) {
-					if (source == "flatpak") {
-						runFlatpak({ "uninstall", "--noninteractive", "--", id }, &ok, &error);
-					} else {
-						runAppstoreHelper({ "remove", id }, &ok, &error);
-					}
-					if (ok) {
-						installed = source == "flatpak" ? flatpakInstalled(id, &ok, &error)
-							: packagesInstalled({ id }, &ok, &error);
-						if (ok && installed) {
-							ok = false;
-							error = "The uninstall command finished, but the application is still installed: " +
-								entry.name;
-						}
+				why = "its install source has changed";
+			}
+			if (!why.isEmpty()) {
+				if (!appTrashRestore(entry.path, &error)) {
+					progress.hide();
+					Alert::ask(error, "OK", QString());
+					vfsRefresh();
+					folderChanged(files);
+					return;
+				}
+				returned << QStringLiteral("“%1” was not uninstalled because %2. It is back in "
+					"Applications.").arg(entry.name, why);
+				++completed;
+				vfsRefresh();
+				continue;
+			}
+			const QString source = entry.origin.section(':', 0, 0);
+			const QString id = entry.origin.section(':', 1);
+			bool installed = source == "flatpak" ? flatpakInstalled(id, &ok, &error)
+				: packagesInstalled({ id }, &ok, &error);
+			if (ok && installed) {
+				if (source == "flatpak") {
+					runFlatpak({ "uninstall", "--noninteractive", "--", id }, &ok, &error);
+				} else {
+					runAppstoreHelper({ "remove", id }, &ok, &error);
+				}
+				if (ok) {
+					installed = source == "flatpak" ? flatpakInstalled(id, &ok, &error)
+						: packagesInstalled({ id }, &ok, &error);
+					if (ok && installed) {
+						ok = false;
+						error = "The uninstall command finished, but the application is still installed: " +
+							entry.name;
 					}
 				}
 			}
@@ -1365,6 +1379,9 @@ void Finder::emptyTrash() {
 			vfsRefresh();
 		}
 		progress.hide();
+		if (!returned.isEmpty()) {
+			Alert::ask(returned.join("\n\n"), "OK", QString());
+		}
 	}
 	if (!appTrashEntries(&queueError).empty() || !queueError.isEmpty()) {
 		Alert::ask(queueError.isEmpty() ? "New applications were queued while emptying Trash. "
