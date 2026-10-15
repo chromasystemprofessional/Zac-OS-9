@@ -1,6 +1,9 @@
 #include "appearance.h"
 
 #include <QDir>
+#include <QFile>
+#include <QSaveFile>
+#include <QStandardPaths>
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QWheelEvent>
@@ -40,6 +43,47 @@ static void setSetting(const char *key, const QString &value) {
 	}
 }
 
+/* GTK 3 programs read the theme once, so Smart Scrolling reaches them as a
+ * marked block in the user's own gtk.css (new programs see it); anything
+ * else there stays as it is. */
+static const char *const GTK_BEGIN = "/* ZacOS 9 Smart Scrolling (Appearance > Options) */";
+static const char *const GTK_END = "/* end of ZacOS 9 Smart Scrolling */";
+
+void setGtkSmartScrolling(bool on) {
+	const QString path = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) +
+		"/gtk-3.0/gtk.css";
+	QFile old(path);
+	QString css = old.open(QIODevice::ReadOnly) ? QString::fromUtf8(old.readAll()) : QString();
+	old.close();
+	const int begin = css.indexOf(GTK_BEGIN);
+	const int end = begin >= 0 ? css.indexOf(GTK_END, begin) : -1;
+	if (begin >= 0 && end >= 0) {
+		int after = end + static_cast<int>(strlen(GTK_END));
+		if (after < css.size() && css[after] == '\n') {
+			after++;
+		}
+		css.remove(begin, after - begin);
+	}
+	if (on) {
+		if (!css.isEmpty() && !css.endsWith('\n')) {
+			css += '\n';
+		}
+		css += QString(GTK_BEGIN) + "\nscrollbar {\n"
+			"\t-GtkScrollbar-has-backward-stepper: false;\n"
+			"\t-GtkScrollbar-has-secondary-backward-stepper: true;\n"
+			"\t-GtkScrollbar-fixed-slider-length: false;\n"
+			"}\n" + GTK_END + "\n";
+	}
+	if (css.isEmpty() && !QFile::exists(path)) {
+		return;
+	}
+	QDir().mkpath(QFileInfo(path).path());
+	QSaveFile file(path);
+	if (!file.open(QIODevice::WriteOnly) || file.write(css.toUtf8()) < 0 || !file.commit()) {
+		qWarning() << "Could not update" << path;
+	}
+}
+
 /* ---- the panel ---------------------------------------------------------------- */
 
 AppearancePanel::AppearancePanel() {
@@ -58,6 +102,18 @@ AppearancePanel::AppearancePanel() {
 		if (!pl_setting_set("title-collapse", on ? nullptr : "false")) {
 			qWarning() << "Could not save appearance preference: title-collapse";
 		}
+		update();
+	};
+	/* Smart Scrolling: below, in a group of its own (paintOptionsTab). */
+	m_scrollGroupTop = m_titleCollapse.hitRect().bottom() + PL_GROUP_MARGIN + 1 + 12 + 16;
+	m_smartScrolling = PanelCheckbox("Smart Scrolling",
+		QPoint(BOX_L + ITEM_INSET, m_scrollGroupTop + 1 + PL_GROUP_MARGIN_TOP));
+	m_smartScrolling.on = pl_smart_scrolling();
+	m_smartScrolling.toggled = [this](bool on) {
+		if (!pl_setting_set("smart-scrolling", on ? "true" : nullptr)) {
+			qWarning() << "Could not save appearance preference: smart-scrolling";
+		}
+		setGtkSmartScrolling(on);
 		update();
 	};
 
@@ -278,7 +334,7 @@ void AppearancePanel::loadWallpapers() {
 
 void AppearancePanel::showTab(int tab) {
 	m_tab = std::clamp(tab, 0, 6);
-	m_host.checks = m_tab == 6 ? std::vector<PanelCheckbox *>{ &m_titleCollapse }
+	m_host.checks = m_tab == 6 ? std::vector<PanelCheckbox *>{ &m_titleCollapse, &m_smartScrolling }
 		: std::vector<PanelCheckbox *>{};
 	m_host.buttons = m_tab == 4 ? std::vector<PanelButton *>{ &m_saveTheme }
 		: m_tab == 5 ? std::vector<PanelButton *>{ &m_previewTheme } : std::vector<PanelButton *>{};
@@ -329,7 +385,9 @@ void AppearancePanel::paintColorTab(pl_canvas *c) {
 	Text sample("Sample", 200, PL_FONT_SYSTEM);
 	pl_group_box_paint(c, BOX_L, top, BOX_R, top + 1 + PL_GROUP_MARGIN_TOP + 16 + PL_GROUP_MARGIN,
 		sample.t, PANE);
-	pl_scrollbar sb = { false, 150, true, 40 };
+	pl_scrollbar sb = { false, 150, true, 0 };
+	sb_smart(&sb, 1, 3); /* a third of a page shows: Smart Scrolling's thumb */
+	sb.thumb = sb_thumb_span(&sb) / 3;
 	pl_scrollbar_paint(c, BOX_L + ITEM_INSET, top + 1 + PL_GROUP_MARGIN_TOP, &sb,
 		pl_accent_current());
 	pl_progress_paint(c, MID + 6 + ITEM_INSET, top + 1 + PL_GROUP_MARGIN_TOP + 2, 140, 0.6,
@@ -411,6 +469,14 @@ void AppearancePanel::paintThemesTab(pl_canvas *c) {
 
 void AppearancePanel::paintOptionsTab(pl_canvas *c) {
 	groupAround(c, m_titleCollapse.hitRect(), "Windows", BOX_R);
+	Text scrollBars("Scroll Bars", 300, PL_FONT_SYSTEM);
+	const int bottom = m_smartScrolling.hitRect().bottom() + 6 + 2 * 13 + PL_GROUP_MARGIN + 1;
+	pl_group_box_paint(c, BOX_L, m_scrollGroupTop, BOX_R, bottom, scrollBars.t, PANE);
+	const int x = m_smartScrolling.hitRect().left() + 20;
+	panelText(c, "Scroll arrows together at the end, and a scroll box that",
+		x, m_smartScrolling.hitRect().bottom() + 14, PL_FONT_VIEWS);
+	panelText(c, "shows how much of the contents the window holds.",
+		x, m_smartScrolling.hitRect().bottom() + 27, PL_FONT_VIEWS);
 	m_host.paintControls(c, PANE);
 }
 

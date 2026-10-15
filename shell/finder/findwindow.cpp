@@ -497,9 +497,10 @@ pl_scrollbar FoundWindow::bar() const {
 	const int content = static_cast<int>(m_items.size()) * ROW_H;
 	const int view = listHeight();
 	pl_scrollbar v = { true, view + 2, content > view, 0 };
+	sb_smart(&v, view, content);
 	if (v.enabled) {
 		v.thumb = static_cast<int>(static_cast<long long>(m_scrollY) *
-			sb_thumb_range(v.length) / (content - view));
+			sb_thumb_span(&v) / (content - view));
 	}
 	return v;
 }
@@ -615,7 +616,7 @@ void FoundWindow::mousePressEvent(QMouseEvent *e) {
 		case SB_INC_ARROW: scrollTo(m_scrollY + ROW_H); break;
 		case SB_DEC_PAGE: scrollTo(m_scrollY - page); break;
 		case SB_INC_PAGE: scrollTo(m_scrollY + page); break;
-		case SB_THUMB_PART: m_thumbGrab = along - (SB_ARROW + 1 + v.thumb); break;
+		case SB_THUMB_PART: m_thumbGrab = along - (sb_track_start(&v) + v.thumb); break;
 		default: break;
 		}
 		return;
@@ -639,13 +640,13 @@ void FoundWindow::mouseMoveEvent(QMouseEvent *e) {
 		return;
 	}
 	pl_scrollbar v = bar();
-	const int range = sb_thumb_range(v.length);
+	const int range = sb_thumb_span(&v);
 	const int content = static_cast<int>(m_items.size()) * ROW_H - listHeight();
 	if (range <= 0 || content <= 0) {
 		return;
 	}
 	const int thumb = static_cast<int>(e->position().y()) - (listTop() - 1) - m_thumbGrab -
-		(SB_ARROW + 1);
+		sb_track_start(&v);
 	scrollTo(static_cast<int>(static_cast<long long>(thumb) * content / range));
 }
 

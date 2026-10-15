@@ -21,11 +21,26 @@ struct pl_scrollbar {
 	bool vertical;
 	int length;   /* along the bar, including both end border lines */
 	bool enabled; /* false: nothing to scroll (flat track, gray arrows) */
-	int thumb;    /* thumb offset, 0 .. sb_thumb_range() */
+	int thumb;    /* thumb offset, 0 .. sb_thumb_span() */
+	/* Smart Scrolling (see sb_smart()): both arrows together at the far
+	 * end, and the thumb's interior this long (0: SB_THUMB). */
+	bool together;
+	int thumb_len;
 };
 
-/* Largest thumb offset for a bar of this length. */
+/* Largest thumb offset for a bar of this length, arrows apart and the
+ * thumb its usual size. */
 int sb_thumb_range(int length);
+/* Largest thumb offset for this bar. */
+int sb_thumb_span(const struct pl_scrollbar *sb);
+/* Where the thumb's leading line is at offset 0, along the bar (the
+ * up/left arrow's separator, or with the arrows together the border):
+ * the thumb's line is sb_track_start() + thumb. */
+int sb_track_start(const struct pl_scrollbar *sb);
+/* With Appearance > Options' Smart Scrolling on: arrows together, and a
+ * thumb as long, against the track, as `visible` is against `total` (in
+ * any one unit). Off: the bar as it was. Call before sb_thumb_span(). */
+void sb_smart(struct pl_scrollbar *sb, int visible, int total);
 
 /* Paint with the bar's top-left border pixel at (x, y). */
 void pl_scrollbar_paint(struct pl_canvas *c, int x, int y,

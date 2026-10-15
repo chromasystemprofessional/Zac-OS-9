@@ -614,6 +614,12 @@ int pl_caret_blink_ms(void) {
 	return ms >= 200 && ms <= 4000 ? ms : 1066;
 }
 
+bool pl_smart_scrolling(void) {
+	char v[16];
+	return pl_setting("smart-scrolling", v, sizeof(v)) &&
+		(strcmp(v, "true") == 0 || strcmp(v, "1") == 0);
+}
+
 /* ---- labels ----------------------------------------------------------------- */
 
 const uint32_t pl_palette16[PL_PALETTE16_COUNT] = {

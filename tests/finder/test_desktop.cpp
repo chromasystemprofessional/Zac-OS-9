@@ -17,6 +17,8 @@
 #include <QUrl>
 
 #include <QLabel>
+#include <QScrollBar>
+#include <QStyleOptionSlider>
 #include "filechooserportal.h"
 #include "alert.h"
 #include "appdb.h"
@@ -186,6 +188,34 @@ int main(int argc, char **argv) {
 	check(prompt.palette().color(QPalette::Window) == QColor(0xDD, 0xDD, 0xDD) &&
 		prompt.palette().color(QPalette::WindowText) == QColor(Qt::black),
 		"Qt application prompts inherit the ZacOS Platinum palette");
+	{
+		/* Scroll bars: an arrow at each end and a fixed thumb; with Smart
+		 * Scrolling, both arrows at the end and a thumb sized to the page. */
+		QScrollBar bar(Qt::Vertical);
+		bar.setRange(0, 300);
+		bar.setPageStep(100);
+		bar.resize(16, 200);
+		QStyleOptionSlider opt;
+		opt.initFrom(&bar);
+		opt.orientation = Qt::Vertical;
+		opt.minimum = 0;
+		opt.maximum = 300;
+		opt.pageStep = 100;
+		opt.sliderPosition = 0;
+		opt.rect = QRect(0, 0, 16, 200);
+		auto rect = [&](QStyle::SubControl sub) {
+			return app.style()->subControlRect(QStyle::CC_ScrollBar, &opt, sub, &bar);
+		};
+		const bool apart = rect(QStyle::SC_ScrollBarSubLine).top() == 0 &&
+			rect(QStyle::SC_ScrollBarSlider).height() == SB_THUMB + 2;
+		pl_setting_set("smart-scrolling", "true");
+		const QRect up = rect(QStyle::SC_ScrollBarSubLine), down = rect(QStyle::SC_ScrollBarAddLine);
+		const int thumb = rect(QStyle::SC_ScrollBarSlider).height();
+		pl_setting_set("smart-scrolling", nullptr);
+		check(apart && up.bottom() >= down.top() - 1 && up.top() > 150 &&
+			thumb > 35 && thumb < 60,
+			"Qt scroll bars: arrows apart and a fixed thumb, or with Smart Scrolling together and a quarter-page thumb");
+	}
 
 	Desktop desktop;
 	desktop.resize(1024, 768);

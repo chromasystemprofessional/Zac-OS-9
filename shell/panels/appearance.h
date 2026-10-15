@@ -17,6 +17,10 @@
  * ~/.config/zacos9/desktop.conf, which the shell watches.
  * TODO: the layout inside the panes is ours; the HIG shows only "Options".
  */
+/* Smart Scrolling for GTK 3 programs: adds or removes its marked block in
+ * ~/.config/gtk-3.0/gtk.css, leaving the rest of that file as it is. */
+void setGtkSmartScrolling(bool on);
+
 class AppearancePanel : public QWidget {
 public:
 	AppearancePanel();
@@ -44,10 +48,12 @@ private:
 	void paintThemesTab(pl_canvas *c);
 	void paintSoundThemesTab(pl_canvas *c);
 	/* Options: Mac OS 9's "Double-click title bar to collapse windows"
-	 * (title-collapse, read by zacos9-wm). Smart Scrolling isn't here:
-	 * the scroll bars keep an arrow at each end and a fixed thumb. */
+	 * (title-collapse, read by zacos9-wm) and Smart Scrolling
+	 * (smart-scrolling: lib/widgets' scroll bars and the Qt style read it;
+	 * GTK 3 programs from a block in ~/.config/gtk-3.0/gtk.css). */
 	void paintOptionsTab(pl_canvas *c);
-	PanelCheckbox m_titleCollapse;
+	PanelCheckbox m_titleCollapse, m_smartScrolling;
+	int m_scrollGroupTop = 0;
 
 	int m_tab = 0;
 	std::vector<std::unique_ptr<Text>> m_tabLabels;

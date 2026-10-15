@@ -154,7 +154,7 @@ Section 3 lists every feature; section 5 is the plan.
 | ⌘-double-click an inactive title to collapse it in place | p. 12 | ✅ | Falls out of ⌘-drag (0.1.54). |
 | Zoom box: fit contents; Option-click zoom fills the screen | p. 12 | ✅ | Sniffer windows zoom to fit their icons or list (`platinum_shell_v1.set_standard_size`, v9); Option-click fills the screen; other programs' zoom fills it (0.1.54). |
 | Collapse box; Option-click collapses all of the app's windows | p. 13 | ✅ | Only the program's own windows now (it was every window) (0.1.54). |
-| Scroll bars; arrows together or at both ends (Appearance) | p. 13 | ◐ | An arrow at each end and a fixed-size thumb (Mac OS 9 without Smart Scrolling). Smart Scrolling (arrows together, proportional thumb) would change `lib/widgets` scroll bars and every caller's thumb arithmetic, the Qt style and the GTK theme: P3 L, not S. |
+| Scroll bars; arrows together or at both ends (Appearance) | p. 13 | ✅ | Arrows at each end and a fixed thumb by default; Smart Scrolling (`smart-scrolling`) puts them together with a proportional thumb in `lib/widgets` (every ZacOS window and list), the Qt style, and GTK 3 (theme steppers, plus a marked block in `~/.config/gtk-3.0/gtk.css`; the session turns GTK's overlay scroll bars off). GTK 4 has no arrows. |
 | ⌘-drag inside a Sniffer window scrolls in any direction (grabber hand) | p. 14 | ✅ | Control-click is Ctrl to clients too, so a Ctrl-press in a window that can scroll grabs when moved and shows the contextual menu when released still. |
 | Drag window edges to move the window | p. 14 | ✅? | Verify. |
 | Resize box with outline | p. 15 | ✅ | |
@@ -294,7 +294,7 @@ A zram/swap switch in a Memory panel is a possible P3.
 |---|---|---|
 | **Appearance**: Themes, Color (accent, highlight), Desktop (patterns, pictures), Sound (sound sets) | ✅ | Desktop picture placement — Tile / Center / Scale / Position Automatically — to verify. |
 | Appearance ▸ **Fonts** (Large System Font, Small System Font, Views font and size, Smooth all fonts) | ✗ | P2 M — the bitmap fonts are fixed; offer the Views size and smoothing for apps (GTK/Qt settings). |
-| Appearance ▸ **Options** (smart scrolling, double-click title to collapse) | ◐ | Options tab ✅ with "Double-click title bar to collapse windows" (`title-collapse`; it was always on). Smart Scrolling not done: see Scroll bars in 3.1. |
+| Appearance ▸ **Options** (smart scrolling, double-click title to collapse) | ✅ | Options tab: "Double-click title bar to collapse windows" (`title-collapse`) and Smart Scrolling (see Scroll bars in 3.1). |
 | **Zac Menu Options** | ◐ | Recent counts ✅ (0.1.54); submenus always on. |
 | AppleTalk | — | |
 | ColorSync | — | colord is out of scope for now. |
@@ -514,7 +514,7 @@ Small gaps left in features that already ship.
 | 3.4 ✅ | **Option-choosing a program** in the Application menu hides the one you leave | `shell/menubar/` | S |
 | 3.5 ✅ | **Option-double-click** closes the window an icon was in; the **ribbed handle** switches the Application menu between the program's name and its own icon (dragged or clicked) | Sniffer, menu bar, `lib/menudraw`, `appicon.c` | S |
 | 3.6 ✅ | Open/Save: **Recent** button; a **folder dropped** on the dialog opens there | `shell/finder/filechooserportal.cpp` | S |
-| 3.7 ◐ | Appearance ▸ **Options** tab with double-click title bar to collapse ✅; **Smart Scrolling** (arrows together, proportional thumb) not done: it reaches every scroll bar, the Qt style and the GTK theme (L) | `shell/panels/appearance.cpp`, compositor | S + L |
+| 3.7 ✅ | Appearance ▸ **Options** tab: double-click title bar to collapse, and **Smart Scrolling** (arrows together, proportional thumb) in ZacOS's own windows, Qt and GTK 3 programs | `shell/panels/appearance.cpp`, `lib/widgets.c`, Qt style, GTK 3 theme, compositor | S + L |
 | 3.8 ✅ | Reset Column Positions (was already done with 2.17) | `shell/finder/folderwindow.cpp` | — |
 | 3.9 ✅ | **Login window** shows the chosen person's picture | `shell/greeter/`, panelkit | S |
 | 3.10 ✅ | Mouse panel: **Mouse Tracks** and **Thick I-Beam** | compositor `tracks.c`, cursor theme, `controlpanel.cpp` | S |

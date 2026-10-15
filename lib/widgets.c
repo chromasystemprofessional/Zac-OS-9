@@ -1,6 +1,7 @@
 #include <string.h>
 
 #include "widgets.h"
+#include "settings.h"
 
 /* Push-button art: left columns, one stretchable column, right columns. */
 struct nine_slice {
@@ -429,8 +430,9 @@ struct pl_scrollbar pl_list_scrollbar(int y0, int y1, const struct pl_list *list
 	const int visible = pl_list_visible_rows(y0, y1);
 	struct pl_scrollbar sb = { .vertical = true, .length = y1 - y0 + 1,
 		.enabled = list->n > visible };
+	sb_smart(&sb, visible, list->n);
 	if (sb.enabled) {
-		sb.thumb = list->top * sb_thumb_range(sb.length) / (list->n - visible);
+		sb.thumb = list->top * sb_thumb_span(&sb) / (list->n - visible);
 	}
 	return sb;
 }
@@ -770,6 +772,44 @@ int sb_thumb_range(int length) {
 	return r > 0 ? r : 0;
 }
 
+static int thumb_len_of(const struct pl_scrollbar *sb) {
+	return sb->thumb_len > SB_THUMB ? sb->thumb_len : SB_THUMB;
+}
+
+/* The lines the thumb moves between: the arrow separators, or with the
+ * arrows together, the leading border and the first arrow's separator. */
+static void track_lines(const struct pl_scrollbar *sb, int *start, int *end) {
+	const int inc_sep = sb->length - 2 - SB_ARROW;
+	*start = sb->together ? 0 : SB_ARROW + 1;
+	*end = sb->together ? inc_sep - SB_ARROW - 1 : inc_sep;
+}
+
+int sb_track_start(const struct pl_scrollbar *sb) {
+	int start, end;
+	track_lines(sb, &start, &end);
+	return start;
+}
+
+int sb_thumb_span(const struct pl_scrollbar *sb) {
+	int start, end;
+	track_lines(sb, &start, &end);
+	const int r = end - start - (thumb_len_of(sb) + 1);
+	return r > 0 ? r : 0;
+}
+
+void sb_smart(struct pl_scrollbar *sb, int visible, int total) {
+	sb->together = pl_smart_scrolling();
+	sb->thumb_len = 0;
+	if (!sb->together || total <= 0 || visible <= 0) {
+		return;
+	}
+	int start, end;
+	track_lines(sb, &start, &end);
+	const int track = end - start - 1; /* the thumb's interior can fill it */
+	const long len = (long)track * (visible < total ? visible : total) / total;
+	sb->thumb_len = len < SB_THUMB ? SB_THUMB : len > track - 1 ? track - 1 : (int)len;
+}
+
 /* Arrow glyph: a 4x8 triangle pointing to `dir` (-1 = towards a=0). */
 static void sb_arrow_glyph(struct sb_ctx *s, int box_a, int dir, uint32_t color) {
 	/* Rows across 4..11, columns 5..8 of the box: widths 1,2,3,4,4,3,2,1
@@ -823,10 +863,10 @@ static void sb_track_shadow(struct sb_ctx *s, int a, int a_max) {
 	}
 }
 
-static void sb_thumb(struct sb_ctx *s, int line_a, struct pl_accent ac) {
-	int t0 = line_a + 1, t1 = line_a + SB_THUMB; /* interior along */
+static void sb_thumb(struct sb_ctx *s, int line_a, int len, struct pl_accent ac) {
+	int t0 = line_a + 1, t1 = line_a + len; /* interior along */
 	sb_col(s, line_a, 1, SB_ARROW, C_BLACK);
-	sb_col(s, line_a + SB_THUMB + 1, 1, SB_ARROW, C_BLACK);
+	sb_col(s, line_a + len + 1, 1, SB_ARROW, C_BLACK);
 
 	sbp(s, t0, 1, ac.corner);
 	sb_run(s, t0 + 1, t1 - 1, 1, ac.light);
@@ -839,9 +879,10 @@ static void sb_thumb(struct sb_ctx *s, int line_a, struct pl_accent ac) {
 	sbp(s, t0, SB_ARROW, ac.body);
 	sb_run(s, t0 + 1, t1, SB_ARROW, ac.dark);
 
-	/* Grip: four ridges at interior offsets 3..10, rows 4..11. */
+	/* Grip: four ridges in the middle (offsets 3..10 of the usual
+	 * thumb), rows 4..11. */
 	for (int r = 0; r < 4; r++) {
-		int la = t0 + 3 + 2 * r;
+		int la = t0 + (len - 8) / 2 + 2 * r;
 		sbp(s, la, 4, ac.grip_hi);
 		sb_col(s, la, 5, 10, ac.light);
 		sb_col(s, la + 1, 5, 11, ac.shadow);
@@ -852,7 +893,13 @@ void pl_scrollbar_paint(struct pl_canvas *c, int x, int y,
 		const struct pl_scrollbar *sb, struct pl_accent accent) {
 	struct sb_ctx s = { .c = c, .x = x, .y = y, .vertical = sb->vertical };
 	const int L = sb->length;
-	const int dec_sep = SB_ARROW + 1, inc_sep = L - 2 - SB_ARROW;
+	/* Arrows apart: the up/left arrow, then the track. Together: the
+	 * track, then both arrows. */
+	const int inc_sep = L - 2 - SB_ARROW;
+	const int dec_sep = sb->together ? inc_sep - SB_ARROW - 1 : SB_ARROW + 1;
+	int start, end;
+	track_lines(sb, &start, &end);
+	const int len = thumb_len_of(sb);
 	const uint32_t line = sb->enabled ? C_BLACK : C_555;
 
 	/* Border lines along both sides and at both ends. */
@@ -863,10 +910,10 @@ void pl_scrollbar_paint(struct pl_canvas *c, int x, int y,
 	sb_col(&s, dec_sep, 1, SB_ARROW, line);
 	sb_col(&s, inc_sep, 1, SB_ARROW, line);
 
-	sb_arrow_box(&s, 1, -1, sb->enabled);
+	sb_arrow_box(&s, sb->together ? dec_sep + 1 : 1, -1, sb->enabled);
 	sb_arrow_box(&s, inc_sep + 1, +1, sb->enabled);
 
-	int t0 = dec_sep + 1, t1 = inc_sep - 1;
+	int t0 = start + 1, t1 = end - 1;
 	if (!sb->enabled) {
 		for (int b = 1; b <= SB_ARROW; b++) {
 			sb_run(&s, t0, t1, b, C_EEE);
@@ -875,16 +922,19 @@ void pl_scrollbar_paint(struct pl_canvas *c, int x, int y,
 	}
 	sb_track(&s, t0, t1);
 	int thumb = sb->thumb < 0 ? 0 : sb->thumb;
-	int range = sb_thumb_range(L);
+	int range = sb_thumb_span(sb);
 	if (thumb > range) {
 		thumb = range;
 	}
-	int line_a = dec_sep + thumb;
-	if (line_a > dec_sep) {
+	int line_a = start + thumb;
+	if (line_a > start) {
 		sb_track_shadow(&s, t0, line_a - 1);
 	}
-	sb_thumb(&s, line_a, accent);
-	sb_track_shadow(&s, line_a + SB_THUMB + 2, t1);
+	sb_thumb(&s, line_a, len, accent);
+	sb_track_shadow(&s, line_a + len + 2, t1);
+	if (line_a == 0) {
+		sb_col(&s, 0, 0, SB_WIDTH - 1, C_BLACK); /* the thumb's line is the border */
+	}
 }
 
 enum sb_part sb_hit(const struct pl_scrollbar *sb, int along) {
@@ -892,20 +942,22 @@ enum sb_part sb_hit(const struct pl_scrollbar *sb, int along) {
 	if (along <= 0 || along >= L - 1) {
 		return SB_NONE;
 	}
-	if (along <= SB_ARROW) {
-		return SB_DEC_ARROW;
-	}
+	int start, end;
+	track_lines(sb, &start, &end);
 	if (along >= L - 1 - SB_ARROW) {
 		return SB_INC_ARROW;
 	}
-	if (!sb->enabled) {
+	if (sb->together ? along > end : along <= SB_ARROW) {
+		return SB_DEC_ARROW;
+	}
+	if (!sb->enabled || (sb->together && along == end)) {
 		return SB_NONE;
 	}
-	int line_a = SB_ARROW + 1 + sb->thumb;
+	int line_a = start + sb->thumb;
 	if (along < line_a) {
 		return SB_DEC_PAGE;
 	}
-	if (along > line_a + SB_THUMB + 1) {
+	if (along > line_a + thumb_len_of(sb) + 1) {
 		return SB_INC_PAGE;
 	}
 	return SB_THUMB_PART;

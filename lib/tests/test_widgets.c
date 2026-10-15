@@ -6,6 +6,8 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #include "figcompare.h"
 #include "text.h"
@@ -73,6 +75,54 @@ static int run_hit_tests(void) {
 		}
 	}
 	printf("%s scroll bar hit testing\n", fails ? "FAIL" : "ok  ");
+	return fails;
+}
+
+/* Smart Scrolling: arrows together at the far end, a longer thumb. */
+static int run_smart_tests(void) {
+	struct pl_scrollbar sb = { .length = 254, .enabled = true, .thumb = 40,
+		.together = true, .thumb_len = 60 };
+	int fails = 0;
+	struct { int along; enum sb_part want; } cases[] = {
+		{ 0, SB_NONE }, { 5, SB_DEC_PAGE }, { 60, SB_THUMB_PART }, { 150, SB_INC_PAGE },
+		{ 223, SB_NONE }, { 230, SB_DEC_ARROW }, { 245, SB_INC_ARROW },
+	};
+	for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+		enum sb_part got = sb_hit(&sb, cases[i].along);
+		if (got != cases[i].want) {
+			fprintf(stderr, "FAIL smart sb_hit(%d) = %d, want %d\n",
+				cases[i].along, got, cases[i].want);
+			fails++;
+		}
+	}
+	if (sb_thumb_span(&sb) != 223 - 61) {
+		fprintf(stderr, "FAIL smart span %d\n", sb_thumb_span(&sb));
+		fails++;
+	}
+	/* The setting on, half of the content shown: half the track. */
+	char dir[] = "/tmp/zacos9-widgets-XXXXXX";
+	if (mkdtemp(dir)) {
+		char path[sizeof(dir) + 32];
+		snprintf(path, sizeof(path), "%s/zacos9", dir);
+		mkdir(path, 0700);
+		snprintf(path, sizeof(path), "%s/zacos9/desktop.conf", dir);
+		FILE *f = fopen(path, "w");
+		fputs("smart-scrolling=true\n", f);
+		fclose(f);
+		setenv("XDG_CONFIG_HOME", dir, 1);
+		struct pl_scrollbar half = { .length = 254, .enabled = true };
+		sb_smart(&half, 50, 100);
+		if (!half.together || half.thumb_len != 222 / 2) {
+			fprintf(stderr, "FAIL sb_smart: together %d, thumb %d\n", half.together, half.thumb_len);
+			fails++;
+		}
+		unsetenv("XDG_CONFIG_HOME");
+		unlink(path);
+		snprintf(path, sizeof(path), "%s/zacos9", dir);
+		rmdir(path);
+		rmdir(dir);
+	}
+	printf("%s smart scrolling layout and thumb size\n", fails ? "FAIL" : "ok  ");
 	return fails;
 }
 
@@ -303,7 +353,7 @@ static int run_small_controls(const char *dir, int *ran) {
 int main(int argc, char *argv[]) {
 	const char *dir = argc > 1 ? argv[1] : "tools/measure/figs";
 	int ran = 0;
-	int fails = run_hit_tests();
+	int fails = run_hit_tests() + run_smart_tests();
 	fails += run_hbar(dir, "horizontal scroll bar, left window (fig 2-24)", 5, &ran);
 	fails += run_button(dir, "standard push button (fig 3-2)", 0, 223, 161, &ran);
 	fails += run_button(dir, "default push button (fig 3-2)", PL_BUTTON_DEFAULT, 220, 125, &ran);

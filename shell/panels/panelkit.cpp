@@ -91,7 +91,7 @@ bool PanelList::press(QPoint pos) {
 		case SB_INC_PAGE: scrollTo(state.top + visible); break;
 		case SB_THUMB_PART:
 			/* Drag the thumb: remember where on it the press landed. */
-			m_thumbGrab = pos.y() - frame.top() - (SB_ARROW + 1 + sb.thumb);
+			m_thumbGrab = pos.y() - frame.top() - (sb_track_start(&sb) + sb.thumb);
 			break;
 		default: break;
 		}
@@ -111,12 +111,12 @@ bool PanelList::move(QPoint pos) {
 		return false;
 	}
 	const pl_scrollbar sb = pl_list_scrollbar(frame.top(), frame.bottom(), &state);
-	const int range = sb_thumb_range(sb.length);
+	const int range = sb_thumb_span(&sb);
 	const int visible = pl_list_visible_rows(frame.top(), frame.bottom());
 	if (range <= 0 || state.n <= visible) {
 		return false;
 	}
-	const int thumb = std::clamp(pos.y() - frame.top() - (SB_ARROW + 1) - m_thumbGrab, 0, range);
+	const int thumb = std::clamp(pos.y() - frame.top() - sb_track_start(&sb) - m_thumbGrab, 0, range);
 	const int top = (thumb * (state.n - visible) + range / 2) / range;
 	if (top == state.top) {
 		return false;

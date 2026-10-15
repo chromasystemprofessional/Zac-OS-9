@@ -81,6 +81,10 @@ int pl_menu_blinks(void);
 /* The insertion point's blink cycle in ms, on and off ("caret-blink":
  * slow 1600, medium 1066, fast 534; Mac OS's 32-tick default is medium). */
 int pl_caret_blink_ms(void);
+/* Appearance > Options' Smart Scrolling ("smart-scrolling", off by
+ * default): scroll arrows together at the end, a thumb sized to what
+ * shows. */
+bool pl_smart_scrolling(void);
 
 #ifdef __cplusplus
 }

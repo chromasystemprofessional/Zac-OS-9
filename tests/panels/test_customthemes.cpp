@@ -134,5 +134,24 @@ int main(int argc, char **argv) {
 	assert(preference("sound-theme") == id);
 	assert(preference("sound.button-click").isEmpty());
 	assert(!applySoundTheme(2, &error));
+
+	/* Smart Scrolling for GTK 3: a marked block in the user's gtk.css,
+	 * added and taken out without touching what else is there. */
+	const QString gtk = root.path() + "/config/gtk-3.0/gtk.css";
+	setGtkSmartScrolling(false);
+	assert(!QFile::exists(gtk));
+	QDir().mkpath(root.path() + "/config/gtk-3.0");
+	write(gtk, "label { color: red; }");
+	setGtkSmartScrolling(true);
+	setGtkSmartScrolling(true);
+	QFile css(gtk);
+	assert(css.open(QIODevice::ReadOnly));
+	const QString on = QString::fromUtf8(css.readAll());
+	css.close();
+	assert(on.startsWith("label { color: red; }\n"));
+	assert(on.count("has-secondary-backward-stepper: true") == 1);
+	setGtkSmartScrolling(false);
+	assert(css.open(QIODevice::ReadOnly));
+	assert(QString::fromUtf8(css.readAll()) == "label { color: red; }\n");
 	return 0;
 }

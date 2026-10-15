@@ -22,8 +22,10 @@ export _JAVA_AWT_WM_NONREPARENTING=1
 # draw their own title bars ignore these.)
 export GTK_CSD=0
 export QT_WAYLAND_DISABLE_WINDOWDECORATION=1
-# GTK 3 applications wear the Platinum theme (share/themes/ZacOS9).
+# GTK 3 applications wear the Platinum theme (share/themes/ZacOS9), with
+# real scroll bars (arrows and all) rather than ones that appear on hover.
 export GTK_THEME=ZacOS9
+export GTK_OVERLAY_SCROLLING=0
 # Standard application file dialogs use the ZacOS file chooser portal.
 export GTK_USE_PORTAL=1
 export QT_USE_PORTAL=1
@@ -83,7 +85,7 @@ startup=
 if command -v dbus-update-activation-environment >/dev/null; then
 	startup="dbus-update-activation-environment --systemd WAYLAND_DISPLAY DISPLAY \
 XDG_CURRENT_DESKTOP XDG_SESSION_TYPE XDG_CONFIG_DIRS XDG_DATA_DIRS QT_QPA_PLATFORM QT_USE_PORTAL \
-GTK_USE_PORTAL GTK_CSD GTK_THEME GTK_MODULES UBUNTU_MENUPROXY QT_STYLE_OVERRIDE XCURSOR_THEME XCURSOR_PATH XCURSOR_SIZE"
+GTK_USE_PORTAL GTK_CSD GTK_THEME GTK_OVERLAY_SCROLLING GTK_MODULES UBUNTU_MENUPROXY QT_STYLE_OVERRIDE XCURSOR_THEME XCURSOR_PATH XCURSOR_SIZE"
 fi
 # The compositor runs its startup command after starting the Wayland backend,
 # setting WAYLAND_DISPLAY, and launching the desktop surfaces. Import the

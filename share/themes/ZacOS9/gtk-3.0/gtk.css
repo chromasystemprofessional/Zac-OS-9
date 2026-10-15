@@ -203,13 +203,46 @@ headerbar, .titlebar {
 	box-shadow: none;
 }
 
-/* Scroll bars: a grey groove and a square, outlined thumb. */
+/* Scroll bars: a grey groove and a square, outlined thumb, an arrow at
+ * each end and a thumb of fixed size, as Mac OS 9 without Smart
+ * Scrolling. With it (Appearance > Options), the panel adds a block to
+ * ~/.config/gtk-3.0/gtk.css that puts the arrows together and sizes the
+ * thumb to the page. */
 scrollbar {
 	background-color: #eeeeee;
 	background-image: none;
 	border: none;
 	border-left: 1px solid #888888;
+	-GtkScrollbar-has-backward-stepper: true;
+	-GtkScrollbar-has-forward-stepper: true;
+	-GtkScrollbar-fixed-slider-length: true;
 }
+scrollbar button {
+	min-width: 14px;
+	min-height: 14px;
+	padding: 0;
+	margin: 0;
+	border: 1px solid #000000;
+	border-radius: 0;
+	background-color: #dddddd;
+	background-image: none;
+	box-shadow: inset 1px 1px #ffffff, inset -1px -1px #bbbbbb;
+	color: #000000;
+}
+scrollbar button:active {
+	background-color: #888888;
+	box-shadow: inset 1px 1px #555555;
+}
+scrollbar button:disabled {
+	background-color: #eeeeee;
+	border-color: #888888;
+	box-shadow: none;
+	color: #888888;
+}
+scrollbar button.up { -gtk-icon-source: -gtk-icontheme("pan-up-symbolic"); }
+scrollbar button.down { -gtk-icon-source: -gtk-icontheme("pan-down-symbolic"); }
+scrollbar button.left { -gtk-icon-source: -gtk-icontheme("pan-start-symbolic"); }
+scrollbar button.right { -gtk-icon-source: -gtk-icontheme("pan-end-symbolic"); }
 scrollbar.horizontal {
 	border-left: none;
 	border-top: 1px solid #888888;
@@ -218,6 +251,7 @@ scrollbar slider {
 	background-image: linear-gradient(to right, #eeeeee, #bbbbcc);
 	background-color: #ccccdd;
 	border: 1px solid #000000;
+	border-radius: 0;
 	min-width: 14px;
 	min-height: 14px;
 	margin: 0;

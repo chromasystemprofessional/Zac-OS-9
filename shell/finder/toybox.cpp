@@ -257,7 +257,8 @@ pl_scrollbar ToyBox::scrollBar() const {
 	sb.length = height() - topicsHeight() + 1;
 	const int max = std::max(0, contentHeight() - viewHeight());
 	sb.enabled = max > 0;
-	sb.thumb = sb.enabled ? m_scroll * sb_thumb_range(sb.length) / max : 0;
+	sb_smart(&sb, viewHeight(), viewHeight() + max);
+	sb.thumb = sb.enabled ? m_scroll * sb_thumb_span(&sb) / max : 0;
 	return sb;
 }
 
@@ -373,7 +374,7 @@ void ToyBox::mousePressEvent(QMouseEvent *e) {
 		case SB_INC_ARROW: scrollTo(m_scroll + ARROW_STEP); break;
 		case SB_DEC_PAGE: scrollTo(m_scroll - view); break;
 		case SB_INC_PAGE: scrollTo(m_scroll + view); break;
-		case SB_THUMB_PART: m_thumbGrab = along - (SB_ARROW + 1 + sb.thumb); break;
+		case SB_THUMB_PART: m_thumbGrab = along - (sb_track_start(&sb) + sb.thumb); break;
 		default: break;
 		}
 		return;
@@ -402,9 +403,9 @@ void ToyBox::mouseMoveEvent(QMouseEvent *e) {
 	const QPoint pos = e->position().toPoint();
 	if (m_thumbGrab >= 0) {
 		pl_scrollbar sb = scrollBar();
-		const int range = sb_thumb_range(sb.length);
+		const int range = sb_thumb_span(&sb);
 		const int along = pos.y() - (topicsHeight() - 1);
-		const int thumb = std::clamp(along - (SB_ARROW + 1) - m_thumbGrab, 0, std::max(1, range));
+		const int thumb = std::clamp(along - sb_track_start(&sb) - m_thumbGrab, 0, std::max(1, range));
 		scrollTo(range > 0 ? thumb * std::max(0, contentHeight() - viewHeight()) / range : 0);
 		return;
 	}

@@ -667,7 +667,8 @@ pl_scrollbar FolderWindow::verticalBar() const {
 	const int top = contentTop() - 1; /* shares the line above the content */
 	sb.length = height() - (SB_WIDTH - 1) - top + 1;
 	sb.enabled = scrollMaxY() > 0;
-	int range = sb_thumb_range(sb.length);
+	sb_smart(&sb, viewHeight(), viewHeight() + scrollMaxY());
+	int range = sb_thumb_span(&sb);
 	sb.thumb = sb.enabled ? m_scrollY * range / scrollMaxY() : 0;
 	return sb;
 }
@@ -676,7 +677,8 @@ pl_scrollbar FolderWindow::horizontalBar() const {
 	pl_scrollbar sb{};
 	sb.length = width() - SB_WIDTH + 3;
 	sb.enabled = scrollMaxX() > 0;
-	int range = sb_thumb_range(sb.length);
+	sb_smart(&sb, viewWidth(), viewWidth() + scrollMaxX());
+	int range = sb_thumb_span(&sb);
 	sb.thumb = sb.enabled ? m_scrollX * range / scrollMaxX() : 0;
 	return sb;
 }
@@ -1390,7 +1392,7 @@ void FolderWindow::mousePressEvent(QMouseEvent *e) {
 		m_sbVertical = true;
 		m_sbPart = sb_hit(&v, along);
 		if (m_sbPart == SB_THUMB_PART) {
-			m_thumbGrab = along - (SB_ARROW + 1 + v.thumb);
+			m_thumbGrab = along - (sb_track_start(&v) + v.thumb);
 		} else if (m_sbPart != SB_NONE) {
 			scrollStep();
 			m_repeat.start(REPEAT_FIRST_MS);
@@ -1403,7 +1405,7 @@ void FolderWindow::mousePressEvent(QMouseEvent *e) {
 		m_sbVertical = false;
 		m_sbPart = sb_hit(&h, along);
 		if (m_sbPart == SB_THUMB_PART) {
-			m_thumbGrab = along - (SB_ARROW + 1 + h.thumb);
+			m_thumbGrab = along - (sb_track_start(&h) + h.thumb);
 		} else if (m_sbPart != SB_NONE) {
 			scrollStep();
 			m_repeat.start(REPEAT_FIRST_MS);
@@ -1606,13 +1608,13 @@ void FolderWindow::mouseMoveEvent(QMouseEvent *e) {
 		return;
 	}
 	pl_scrollbar bar = m_sbVertical ? verticalBar() : horizontalBar();
-	int range = sb_thumb_range(bar.length);
+	int range = sb_thumb_span(&bar);
 	if (range <= 0) {
 		return;
 	}
 	const int along = m_sbVertical ? static_cast<int>(e->position().y()) - (contentTop() - 1)
 		: static_cast<int>(e->position().x()) + 1;
-	int thumb = std::clamp(along - (SB_ARROW + 1) - m_thumbGrab, 0, range);
+	int thumb = std::clamp(along - sb_track_start(&bar) - m_thumbGrab, 0, range);
 	if (m_sbVertical) {
 		scrollTo(m_scrollX, thumb * scrollMaxY() / range);
 	} else {

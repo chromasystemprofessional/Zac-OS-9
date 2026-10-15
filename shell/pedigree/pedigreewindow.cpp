@@ -47,7 +47,8 @@ public:
 		const QRect r = m_w->outline();
 		const int max = std::max(0, static_cast<int>(m_w->m_rows.size()) - m_w->visibleCount());
 		pl_scrollbar sb{ true, r.height(), max > 0, 0 };
-		sb.thumb = max > 0 ? m_w->m_top * sb_thumb_range(sb.length) / max : 0;
+		sb_smart(&sb, m_w->visibleCount(), static_cast<int>(m_w->m_rows.size()));
+		sb.thumb = max > 0 ? m_w->m_top * sb_thumb_span(&sb) / max : 0;
 		return sb;
 	}
 
@@ -145,7 +146,7 @@ protected:
 		}
 		const QRect r = m_w->outline();
 		const pl_scrollbar sb = scrollbar();
-		const int range = sb_thumb_range(sb.length);
+		const int range = sb_thumb_span(&sb);
 		const int max = std::max(0, static_cast<int>(m_w->m_rows.size()) - m_w->visibleCount());
 		const int thumb = std::clamp(static_cast<int>(e->position().y()) - r.top() - m_w->m_dragOffset, 0, range);
 		m_w->scrollTo(range > 0 ? (thumb * max + range / 2) / range : 0);

@@ -47,24 +47,37 @@ QColor fromArgb(uint32_t c) {
 }
 
 /* Scroll bar geometry, along the bar, from lib/widgets.c: an arrow box and
- * its separator line at each end, and a fixed 17-pixel thumb (SB_THUMB and
- * the two lines either side) that travels between the separators. */
+ * its separator line at each end, and a 17-pixel thumb (SB_THUMB and the
+ * two lines either side) that travels between the separators. With
+ * Appearance > Options' Smart Scrolling, both arrows sit together at the
+ * far end and the thumb is as long as the page is against the whole. */
 constexpr int SB_END = SB_ARROW + 2;
 constexpr int SB_SLIDER = SB_THUMB + 2;
 
 struct SbGeom {
+	pl_scrollbar bar; /* thumb not set */
 	int length;  /* along the bar */
 	int groove0; /* where the groove starts */
 	int grooveLen;
+	int slider;  /* the thumb, with its lines */
+	int subLine; /* where the up/left arrow (with a separator) starts */
 	int range;   /* how far the thumb may travel */
 };
 
-SbGeom sbGeom(int length) {
+SbGeom sbGeom(const QStyleOptionSlider *sb) {
 	SbGeom g;
-	g.length = length;
-	g.groove0 = SB_END - 1;
-	g.grooveLen = std::max(0, length - 2 * (SB_END - 1));
-	g.range = sb_thumb_range(length);
+	const bool vertical = sb->orientation == Qt::Vertical;
+	g.length = vertical ? sb->rect.height() : sb->rect.width();
+	g.bar = {};
+	g.bar.vertical = vertical;
+	g.bar.length = g.length;
+	g.bar.enabled = (sb->state & QStyle::State_Enabled) && sb->maximum > sb->minimum;
+	sb_smart(&g.bar, std::max(1, sb->pageStep), std::max(1, sb->maximum - sb->minimum + sb->pageStep));
+	g.groove0 = sb_track_start(&g.bar);
+	g.range = sb_thumb_span(&g.bar);
+	g.slider = std::max(g.bar.thumb_len, SB_THUMB) + 2;
+	g.grooveLen = std::max(0, g.range + g.slider);
+	g.subLine = g.bar.together ? g.groove0 + g.grooveLen - 1 : 0;
 	return g;
 }
 
@@ -272,7 +285,7 @@ QRect Zacos9Style::subControlRect(ComplexControl control, const QStyleOptionComp
 	}
 	const bool vertical = sb->orientation == Qt::Vertical;
 	const QRect r = sb->rect;
-	const SbGeom g = sbGeom(vertical ? r.height() : r.width());
+	const SbGeom g = sbGeom(sb);
 	/* A span along the bar, as a rectangle. */
 	auto along = [&](int a0, int len) {
 		return vertical ? QRect(r.x(), r.y() + a0, r.width(), len)
@@ -283,18 +296,18 @@ QRect Zacos9Style::subControlRect(ComplexControl control, const QStyleOptionComp
 	const int thumb0 = g.groove0 + travel;
 	switch (sub) {
 	case SC_ScrollBarSubLine:
-		return along(0, SB_END);
+		return along(g.subLine, SB_END);
 	case SC_ScrollBarAddLine:
 		return along(g.length - SB_END, SB_END);
 	case SC_ScrollBarGroove:
 		return along(g.groove0, g.grooveLen);
 	case SC_ScrollBarSlider:
-		return along(thumb0, SB_SLIDER);
+		return along(thumb0, g.slider);
 	case SC_ScrollBarSubPage:
 		return along(g.groove0, std::max(0, thumb0 - g.groove0));
 	case SC_ScrollBarAddPage:
-		return along(thumb0 + SB_SLIDER,
-			std::max(0, g.groove0 + g.grooveLen - (thumb0 + SB_SLIDER)));
+		return along(thumb0 + g.slider,
+			std::max(0, g.groove0 + g.grooveLen - (thumb0 + g.slider)));
 	default:
 		return QRect();
 	}
@@ -308,13 +321,9 @@ void Zacos9Style::drawComplexControl(ComplexControl control, const QStyleOptionC
 		QProxyStyle::drawComplexControl(control, option, painter, widget);
 		return;
 	}
-	const bool vertical = sb->orientation == Qt::Vertical;
 	const QRect r = sb->rect;
-	const SbGeom g = sbGeom(vertical ? r.height() : r.width());
-	pl_scrollbar bar;
-	bar.vertical = vertical;
-	bar.length = g.length;
-	bar.enabled = (option->state & State_Enabled) && sb->maximum > sb->minimum;
+	const SbGeom g = sbGeom(sb);
+	pl_scrollbar bar = g.bar;
 	bar.thumb = QStyle::sliderPositionFromValue(sb->minimum, sb->maximum, sb->sliderPosition,
 		g.range, sb->upsideDown);
 	Canvas cv(r.width(), r.height());
