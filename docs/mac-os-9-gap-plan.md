@@ -603,5 +603,5 @@ Small gaps left in features that already ship.
    waiting for it.
 2. **4.1 + 4.2 Shutdown Items and the Shift-at-login safe session** —
    both small, both in `session/`.
-3. **Smart Scrolling** (3.7's remainder) or **5.1 Limited accounts** —
-   the next large pieces; each wants a short plan first.
+3. **5.1 Limited accounts** — the next large piece; it wants a short
+   plan first.
