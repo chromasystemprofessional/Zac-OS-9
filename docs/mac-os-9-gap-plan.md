@@ -205,7 +205,7 @@ Section 3 lists every feature; section 5 is the plan.
 | File ▸ **Search Internet…** (⌘H) | ✗ | Opens the search window on its Internet channel. P3 S |
 | File ▸ **Page Setup…**, **Print Window/Print Desktop…** | ✗ | Render the window with the existing painter to PDF, then print. P3 M |
 | Edit ▸ Undo, Cut, Copy, Paste, Clear, Select All | ◐ | Edit menu sends keys to apps ✅; in the Sniffer: copying icons copies their names (p. 414), to verify. |
-| Edit ▸ **Show Clipboard** | ✗ | A Sniffer window showing the clipboard's text or picture. P2 S |
+| Edit ▸ **Show Clipboard** | ✅ | `shell/finder/clippings.cpp`: a window that follows the clipboard (text or picture), "Clipboard contents: …" below. |
 | Edit ▸ **Preferences…** (General: Puppy Mode, spring-loaded, grid; Views: standard views; Labels) | ◐ | All but Puppy Mode (Simple Finder), which waits for account kinds (P3). |
 | View ▸ as Icons/Buttons/List, Clean Up, Arrange | ✅ | |
 | View ▸ **as Window / as Pop-up Window** | ✗ | See 3.2. P2 L |
@@ -283,8 +283,8 @@ A zram/swap switch in a Memory panel is a possible P3.
 | Feature | Status | Notes |
 |---|---|---|
 | Cut/Copy/Paste, drag and drop between apps | ✅ | |
-| **Clipping files**: drag text or pictures to the desktop or a folder | ✗ | P2 M. Accept `text/plain`, `text/uri-list` (→ Internet location file), `image/*` drops in the Sniffer; a clipping icon and viewer. |
-| Show Clipboard window | ✗ | See 3.3. |
+| **Clipping files**: drag text or pictures to the desktop or a folder | ✅ | `shell/finder/clippings.cpp`. Text → "First words clipping.txt", a picture → "picture clipping.png", a link → an Internet location "Title.url" ([InternetShortcut]; opens in the browser). Ordinary files other programs open; they land where dropped, have their own icons and kinds, open in a viewer window, and dragged into a document carry their text or picture (an Internet location its address). |
+| Show Clipboard window | ✅ | See 3.3. |
 | Publish and Subscribe | — | |
 | Exchanging files with Windows (File Translator, PC disks) | ✅ | |
 
@@ -488,7 +488,7 @@ updates `PROJECT_STATUS.md` and the relevant `docs/` page.
 | 2.2 ✅ | **F-key launching** (Keyboard ▸ Function Keys; pressing again brings it forward) | Keyboard panel, compositor hotkeys | M |
 | 2.3 | **Pop-up windows** (View ▸ as Pop-up Window; tabs at the screen bottom; spring open during drags) | Sniffer + layer-shell tabs | L |
 | 2.4 ✅ | **Proxy icon** in Sniffer title bars (drag to move/copy; drop onto it when collapsed) | compositor frame + `platinum-shell-v1` + Sniffer drag source | M |
-| 2.5 | **Clippings** and **Show Clipboard** | Sniffer drop handling, clipping viewer | M |
+| 2.5 ✅ | **Clippings** and **Show Clipboard** | Sniffer drop handling, clipping viewer | M |
 | 2.6 ✅ | **Toy Box** (button view of `Toy Box Items`, categories as pages) | Sniffer | M |
 | 2.7 | **Search**: more Find criteria now; then content search with an index (localsearch or recoll), Index Selection, Find Similar | `shell/finder/findwindow.cpp`, a search backend wrapper; packaging dependency | M + L |
 | 2.8 | **Printing**: Printer Picker, desktop printers with queue windows, File ▸ Print for documents, default printer in The Collar | new `shell/print/` over CUPS; Sniffer | L |
