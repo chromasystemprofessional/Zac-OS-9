@@ -316,7 +316,7 @@ A zram/swap switch in a Memory panel is a possible P3.
 | **Walkies** (snapshots of network, sound, time zone, printer, startup items) | ✗ | P3 L |
 | Memory | — | |
 | **Monitors**: resolution, pixel size | ✅ | Several screens and arrangement still on the roadmap; colour depth — . |
-| **Mouse**: tracking, double-click | ✅ | Options: Mouse Tracks (`compositor/src/tracks.c`: six arrows behind the moving pointer, going 50 ms apart) and Thick I-Beam (a `text-thick` cursor zacos9-wm shows for programs that ask for "text" by cursor-shape-v1; ones that draw their own cursor, such as GTK 3, keep the thin one; not checked with a real program yet). |
+| **Mouse**: tracking, double-click | ✅ | Options: Mouse Tracks (`compositor/src/tracks.c`: six arrows behind the moving pointer, going 50 ms apart) and Thick I-Beam (a `text-thick` cursor zacos9-wm shows for programs that ask for "text" by cursor-shape-v1; Qt 6 programs ask that way and get it (checked with Scribble); ones that draw their own cursor, such as GTK 3, keep the thin one). |
 | **Users** | ✅ | See 3.14. |
 | **Numbers** / **Text** (number and sort formats, language) | ✗ | locale via `localectl`/`~/.config/locale.conf`. P3 S |
 | Media Settings (CD AutoPlay) | ✗ | Audio CD/media autoplay as a Sniffer setting. P3 S |

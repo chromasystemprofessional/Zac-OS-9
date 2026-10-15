@@ -738,7 +738,7 @@ test('pack-apps',
 )
 
 # Scribble (SimpleText) and Dog Ears (Stickies).
-executable('zacos9-scribble',
+scribble_exe = executable('zacos9-scribble',
   'scribble/main.cpp', 'scribble/scribblewindow.cpp', 'scribble/textfile.cpp',
   'finder/alert.cpp', 'finder/platinumshell.cpp', finder_protocol,
   link_with: panelkit,
@@ -1233,7 +1233,8 @@ test('popup-windows', find_program('python3'),
 )
 # Mouse Tracks: a trail behind the moving pointer (compositor/src/tracks.c).
 test('mouse-tracks', find_program('python3'),
-  args: [files('../compositor/tests/test_mouse_tracks.py'), compositor_exe, vptr_exe],
+  args: [files('../compositor/tests/test_mouse_tracks.py'), compositor_exe, vptr_exe,
+    scribble_exe],
   timeout: 60,
 )
 # Spring-loaded folders: Space during a drag opens one at once (drag_spring).
