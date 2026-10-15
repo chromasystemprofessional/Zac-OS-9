@@ -1,3 +1,14 @@
+zacos9 (0.1.57) trixie; urgency=medium
+
+  * Pop-up windows: View > as Pop-up Window keeps a folder as a tab along
+    the bottom of the screen that opens when clicked or when something is
+    dragged onto it. Dragging items onto the desktop Trash works again, and
+    Empty Trash no longer stops at an application it can't uninstall.
+    LibreOffice installed from Software gets its GTK backend, so its menus
+    work in the menu bar.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Thu, 15 Oct 2026 11:38:29 -0400
+
 zacos9 (0.1.56) trixie; urgency=medium
 
   * Help Center and ZacOS Help; System Profile and Devices and Volumes;
