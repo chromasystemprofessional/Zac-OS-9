@@ -84,6 +84,7 @@ struct mb_item {
 	struct mb_menu *submenu; /* hierarchical menu (owned), or NULL */
 	uint32_t swatch;         /* label color square, or 0 */
 	struct plat_text *label_text, *key_text;
+	bool option;             /* chosen with Option held (menus_perform) */
 };
 
 struct mb_menu {

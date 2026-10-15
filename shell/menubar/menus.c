@@ -440,7 +440,14 @@ void menus_perform(struct mb_item *item) {
 		}
 		break;
 	case ACT_ACTIVATE_APP:
+		/* Option-choosing another program hides the one you leave. */
+		n_apps = item->option ? apps_collect(apps, MAX_ITEMS) : 0;
 		app_activate(item->arg, menubar_seat());
+		for (int i = 0; i < n_apps; i++) {
+			if (apps[i].active && strcmp(apps[i].app_id, item->arg) != 0) {
+				app_set_hidden(apps[i].app_id, true);
+			}
+		}
 		break;
 	case ACT_KEYBOARD_LAYOUT:
 		menubar_set_keyboard_layout(atoi(item->arg));

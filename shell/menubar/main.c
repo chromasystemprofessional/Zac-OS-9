@@ -25,6 +25,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <wayland-cursor.h>
+#include <xkbcommon/xkbcommon.h>
 
 #include "menubar.h"
 #include "platinum-shell-v1-client-protocol.h"
@@ -100,6 +101,8 @@ static struct {
 	bool blink_on;
 	bool chosen_in_sub;
 	struct mb_item chosen; /* copy of the item being performed */
+	/* Option, from the keyboard we have while a menu is open. */
+	uint32_t option_mask, mods;
 
 	int clock_fd, blink_fd;
 	bool running;
@@ -503,6 +506,7 @@ static void choose(int index, bool in_sub) {
 		.action = it->action,
 		.key = it->key,
 		.arg = it->arg ? strdup(it->arg) : NULL,
+		.option = g.option_mask && (g.mods & g.option_mask),
 	};
 	g.chosen_in_sub = in_sub;
 	if (in_sub) {
@@ -825,7 +829,23 @@ static const struct wl_pointer_listener pointer_listener = {
 
 static void kb_keymap(void *data, struct wl_keyboard *k, uint32_t format, int fd,
 		uint32_t size) {
+	/* Only to know Option's bit in the modifiers. */
+	char *map = format == WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1 ?
+		mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0) : MAP_FAILED;
 	close(fd);
+	if (map == MAP_FAILED) {
+		return;
+	}
+	struct xkb_context *ctx = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
+	struct xkb_keymap *keymap = ctx ? xkb_keymap_new_from_buffer(ctx, map, strnlen(map, size),
+		XKB_KEYMAP_FORMAT_TEXT_V1, XKB_KEYMAP_COMPILE_NO_FLAGS) : NULL;
+	munmap(map, size);
+	if (keymap) {
+		const xkb_mod_index_t alt = xkb_keymap_mod_get_index(keymap, XKB_MOD_NAME_ALT);
+		g.option_mask = alt == XKB_MOD_INVALID ? 0 : 1u << alt;
+		xkb_keymap_unref(keymap);
+	}
+	xkb_context_unref(ctx);
 }
 
 static void kb_enter(void *data, struct wl_keyboard *k, uint32_t serial,
@@ -834,6 +854,7 @@ static void kb_enter(void *data, struct wl_keyboard *k, uint32_t serial,
 
 static void kb_leave(void *data, struct wl_keyboard *k, uint32_t serial,
 		struct wl_surface *surface) {
+	g.mods = 0; /* until the next enter's modifiers */
 }
 
 static void kb_key(void *data, struct wl_keyboard *k, uint32_t serial, uint32_t time,
@@ -845,6 +866,7 @@ static void kb_key(void *data, struct wl_keyboard *k, uint32_t serial, uint32_t 
 
 static void kb_modifiers(void *data, struct wl_keyboard *k, uint32_t serial,
 		uint32_t depressed, uint32_t latched, uint32_t locked, uint32_t group) {
+	g.mods = depressed | latched | locked;
 }
 
 static void kb_repeat_info(void *data, struct wl_keyboard *k, int32_t rate, int32_t delay) {

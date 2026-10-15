@@ -254,7 +254,7 @@ Section 3 lists every feature; section 5 is the plan.
 | Application menu at the right: lists apps, Hide, Hide Others, Show All, current app's name | ✅ | |
 | Ribbed handle to show/hide the app name in the menu bar | ✗ | P3 S |
 | **⌘-Tab / ⇧⌘-Tab** cycles programs | ✅ | By name, the Sniffer among them; hidden programs come back (0.1.54). |
-| **Option-click the desktop / Option-choose an app** hides the one you leave | ◐ | Desktop ✅ (0.1.54); Option-choosing from the Application menu still to do. P3 S |
+| **Option-click the desktop / Option-choose an app** hides the one you leave | ✅ | Desktop (0.1.54); Option-choosing a program in the Application menu (the menu bar reads Option from its keyboard while the menu is open). |
 | **Pack palette** (tear off the Application menu; vertical/horizontal, small/large icons, names on/off; drop documents on tiles to open them) | ✅ | `zacos9-pack`, a layer-shell palette above the windows; zoom box (names), Option-zoom (large), Shift-Option-zoom (across), collapse and close boxes; reopens at login. Not done: dragging its edge to set the width. |
 | **F-keys launch** programs/documents/folders (Keyboard panel ▸ Function Keys); pressing again brings it forward | ✅ | `compositor/src/fkeys.c`; only assigned keys are taken; "Use F1 through F12 as function keys" makes it ⌘-F-key. |
 | ⌘-period cancels a launch | — | |

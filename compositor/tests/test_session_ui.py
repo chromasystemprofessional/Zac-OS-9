@@ -2,7 +2,8 @@
 zacos9-wm: ⌘-Tab and Option-click on the desktop (compositor/src/input.c,
 view.c, the menu bar's app_switch_target); a contextual menu on the desktop
 (the Sniffer asks, the menu bar opens it at the pointer); then Special > Log
-Out (shell/menubar/logout.c). Between them, General Controls' "Show Desktop
+Out (shell/menubar/logout.c); Option-choosing a program in the
+Application menu (menus.c). Between them, General Controls' "Show Desktop
 when in background", off: the desktop's icons go while a program is in
 front, and a click there goes nowhere.
 
@@ -127,6 +128,25 @@ with tempfile.TemporaryDirectory(prefix="zacos9-switch-") as directory:
                 # (the pointer, over the window in the first shot, is on the desktop now)
                 assert abs(green() - before) <= before // 100, "showing its window again"
             print("ok: Option-click on the desktop hides the program you leave")
+
+            # Option-choosing Alpha in the Application menu (titled Bravo, at the
+            # bar's right; its programs most recent first, so the second is the
+            # other one): Bravo, the program left, hides too.
+            vp("home", "move", "1250", "9", "hold", "option", "down", "wait", "300",
+               "move", "-40", "88", "wait", "300", "up", "release", "option", "wait", "800")
+            assert typed("z") == "alpha", "Option-choosing Alpha brings it forward"
+            hidden = green() if have_grim else None
+            if have_grim:
+                assert hidden < before, "and hides Bravo, the program you were in"
+            vp("home", "move", "1250", "9", "down", "wait", "300", "move", "-40", "88", "wait", "300",
+               "up", "wait", "800")
+            assert typed("0") == "bravo", "choosing Bravo without Option brings it back"
+            vp("home", "move", "1250", "9", "down", "wait", "300", "move", "-40", "88", "wait", "300",
+               "up", "wait", "800")
+            assert typed("1") == "alpha", "without Option, Alpha comes forward"
+            if have_grim:
+                assert green() > hidden, "and Bravo stays shown (below Alpha)"
+            print("ok: Option-choosing a program in the Application menu hides the one you leave")
 
             # Control-click on the desktop: its contextual menu opens at the
             # pointer and stays (a click); its first item, New Folder, makes one.
