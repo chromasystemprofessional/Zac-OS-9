@@ -1,3 +1,13 @@
+zacos9 (0.1.56) trixie; urgency=medium
+
+  * Help Center and ZacOS Help; System Profile and Devices and Volumes;
+    printer selection, desktop printers and print queues, and File > Print;
+    Old Dog startup disk selection; Finder search improvements, Clippings,
+    Internet locations, Show Clipboard, and new media and file-sharing
+    modules in The Collar.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Wed, 14 Oct 2026 21:45:07 -0400
+
 zacos9 (0.1.55) trixie; urgency=medium
 
   * Finder list columns you can move, resize and reverse; View Options. The
