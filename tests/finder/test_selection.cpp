@@ -395,5 +395,21 @@ int main(int argc, char **argv) {
 
 	w->close();
 	settle();
+
+	/* Option-double-click: the folder opens and the window it was in closes. */
+	const QString outer = home.path() + "/Outer";
+	QDir().mkpath(outer + "/Inner");
+	FolderWindow *ow = FolderWindow::open(outer);
+	ow->setViewMode(FolderWindow::ViewMode::Icons);
+	ow->relayout();
+	settle();
+	std::vector<Item *> outerIcons = iconOrder(ow);
+	const QPoint inner = ow->toWindow(outerIcons.front()->pos) + QPoint(PL_ICON_LARGE / 2, PL_ICON_LARGE / 2);
+	QMouseEvent twice(QEvent::MouseButtonDblClick, inner, ow->mapToGlobal(inner), Qt::LeftButton,
+		Qt::LeftButton, Qt::AltModifier);
+	QApplication::sendEvent(ow, &twice);
+	settle(200);
+	check(FolderWindow::isOpen(outer + "/Inner") && !FolderWindow::isOpen(outer),
+		"Option-double-click opens the folder and closes the window it was in");
 	return fails ? 1 : 0;
 }

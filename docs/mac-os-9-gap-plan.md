@@ -258,7 +258,7 @@ Section 3 lists every feature; section 5 is the plan.
 | **Pack palette** (tear off the Application menu; vertical/horizontal, small/large icons, names on/off; drop documents on tiles to open them) | ✅ | `zacos9-pack`, a layer-shell palette above the windows; zoom box (names), Option-zoom (large), Shift-Option-zoom (across), collapse and close boxes; reopens at login. Not done: dragging its edge to set the width. |
 | **F-keys launch** programs/documents/folders (Keyboard panel ▸ Function Keys); pressing again brings it forward | ✅ | `compositor/src/fkeys.c`; only assigned keys are taken; "Use F1 through F12 as function keys" makes it ⌘-F-key. |
 | ⌘-period cancels a launch | — | |
-| Option-double-click an app closes its window | ✗ | P3 S |
+| Option-double-click an app closes its window | ✅ | Any icon in a Sniffer window, as Mac OS 9: it opens and the window it was in closes. |
 | "Application not found" → File Translator offers apps that can open the type | ✅ | File Translator panel and Open With. |
 | Type/creator codes | — | MIME types instead. |
 

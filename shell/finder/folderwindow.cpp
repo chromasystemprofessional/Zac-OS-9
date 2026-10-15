@@ -1674,6 +1674,10 @@ void FolderWindow::mouseDoubleClickEvent(QMouseEvent *e) {
 		update();
 		Finder::instance().notifyState();
 		Finder::instance().openItem(hit);
+		/* Option-double-click: the window it was in closes behind it. */
+		if (e->modifiers() & Qt::AltModifier) {
+			close();
+		}
 	}
 }
 
