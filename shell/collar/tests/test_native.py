@@ -37,9 +37,10 @@ class NativeCollar(unittest.TestCase):
                 "ZACOS9_COLLAR": "",
                 "ZACOS9_KDECONNECT_SERVICE": "org.zacos9.test.NoKdeConnect",
                 "ZACOS9_SECRETS_SERVICE": "org.zacos9.test.NoSecrets",
-                # No File Sharing settings or media players from this computer.
+                # No File Sharing settings, media players or printers from this computer.
                 "ZACOS9_SHARING_CONF": str(root / "no-sharing"),
                 "ZACOS9_MPRIS_PREFIX": "org.zacos9.test.NoMpris.",
+                "ZACOS9_CUPS_BIN": str(Path(__file__).resolve().parent / "no-printers"),
                 "ZACOS9_STARTUP": "0",
                 "QT_QPA_PLATFORM": "wayland",
                 "QT_USE_PORTAL": "0",

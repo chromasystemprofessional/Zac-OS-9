@@ -112,6 +112,13 @@ public:
 	/* Start classic Mac OS (shell/classic/zacos9-classic), with extra
 	 * disk images; explains in an alert when ROM or emulator is missing. */
 	void launchClassic(const QStringList &disks = {});
+	/* File > Print (⌘P): the selected documents, on your printer. */
+	void printSelection();
+	/* Documents printed on a queue (your printer's if ""): what CUPS can
+	 * print itself goes there; the rest is explained. */
+	void printDocuments(const QStringList &files, const QString &queue = {});
+	/* A desktop printer's window: zacos9-printqueue. */
+	void openPrintQueue(const QString &queue);
 	/* Open a .exe or .msi in the Windows Installer. */
 	void launchWindows(const QString &exe);
 	/* A supported archive expanded beside itself (zacos9-expand), with a

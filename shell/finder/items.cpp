@@ -1,6 +1,7 @@
 #include "items.h"
 
 #include "clippings.h"
+#include "desktopprinter.h"
 
 #include <QDir>
 #include <QFileInfo>
@@ -82,6 +83,8 @@ const QString &Item::kindName() {
 			kindText = clippingKind(path) == ClippingKind::Picture ? "picture clipping" : "text clipping";
 		} else if (kind == PL_ICON_INTERNET_LOCATION) {
 			kindText = "Internet location";
+		} else if (kind == PL_ICON_PRINTER) {
+			kindText = "desktop printer";
 		} else {
 			static QMimeDatabase db;
 			kindText = db.mimeTypeForFile(path).comment();
@@ -177,6 +180,9 @@ pl_icon_kind iconKindFor(const QString &path) {
 	case ClippingKind::Picture: return PL_ICON_CLIPPING;
 	case ClippingKind::Location: return PL_ICON_INTERNET_LOCATION;
 	case ClippingKind::None: break;
+	}
+	if (!desktopPrinterQueue(iconPath).isEmpty()) {
+		return PL_ICON_PRINTER;
 	}
 	if (isWindowsExecutable(iconPath)) {
 		return PL_ICON_WINDOWS;
@@ -388,8 +394,9 @@ bool acceptsDrops(const Item &item) {
 	if (item.isVirtual) {
 		return vfsAcceptsDrops(item.path);
 	}
+	/* A desktop printer prints what's dropped on it. */
 	return item.kind == PL_ICON_FOLDER || item.kind == PL_ICON_DISK ||
-		item.kind == PL_ICON_TRASH_EMPTY || item.kind == PL_ICON_TRASH_FULL;
+		item.kind == PL_ICON_TRASH_EMPTY || item.kind == PL_ICON_TRASH_FULL || item.kind == PL_ICON_PRINTER;
 }
 
 bool iconLabelContains(Item &item, int x, int y, QPoint p) {

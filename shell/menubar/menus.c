@@ -117,6 +117,7 @@ static void add_finder_menus(struct mb_menu *menus, int *n) {
 	struct mb_menu *m = new_menu(menus, n, "File");
 	add(m, "New Folder", 'N', up, ACT_FINDER, "new-folder");
 	add(m, "Open", 'O', sel, ACT_FINDER, "open");
+	add(m, "Print", 'P', sel, ACT_FINDER, "print");
 	add(m, "Move To Trash", KEY_DELETE_GLYPH, sel, ACT_FINDER, "move-to-trash");
 	add(m, "Close Window", 'W', up && fs->window, ACT_FINDER, "close-window");
 	sep(m);

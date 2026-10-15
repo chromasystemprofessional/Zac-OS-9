@@ -18,7 +18,7 @@ KINDS = ["folder", "document", "application", "disk", "trash-empty", "trash-full
          "ext-opentransport", "ext-appletalk", "ext-bluetooth", "ext-audio", "ext-printmonitor",
          "ext-generic", "ext-display", "ext-ethernet", "ext-wifi", "ext-usb", "ext-input",
          "ext-camera", "ext-power", "ext-sensor", "ext-security", "ext-chip", "clipping",
-         "internet-location"]
+         "internet-location", "printer"]
 
 
 def parse():

@@ -1,0 +1,4 @@
+#!/bin/sh
+# lpstat for the Collar tests: no printers, no default.
+[ "$1" = -d ] && echo "no system default destination"
+exit 0

@@ -1,6 +1,7 @@
 #include "fileops.h"
 
 #include "clippings.h"
+#include "desktopprinter.h"
 #include "alias.h"
 #include "platinumshell.h"
 #include "settings.h"
@@ -720,6 +721,23 @@ QStringList dropClippings(QDropEvent *e, const Item *target, const QString &fold
 }
 
 void dropItems(QDropEvent *e, const Item *target, const QString &folder) {
+	/* Documents dropped on a desktop printer are printed there. */
+	if (target && target->kind == PL_ICON_PRINTER) {
+		QStringList files;
+		for (const QUrl &url : e->mimeData()->urls()) {
+			if (url.isLocalFile() && QFileInfo(url.toLocalFile()).isFile()) {
+				files << QFileInfo(url.toLocalFile()).canonicalFilePath();
+			}
+		}
+		e->setDropAction(Qt::CopyAction);
+		e->accept();
+		const QString queue = desktopPrinterQueue(target->path);
+		if (!files.isEmpty()) {
+			/* After the drag has finished, so its source isn't kept waiting. */
+			QTimer::singleShot(0, [files, queue] { Finder::instance().printDocuments(files, queue); });
+		}
+		return;
+	}
 	/* Text, a picture or a link from another program: clippings. */
 	if (isClippingDrop(e)) {
 		dropClippings(e, target, folder);

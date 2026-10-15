@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Print Queue
+Comment=A printer's waiting documents
+Exec=zacos9-printqueue %F
+Terminal=false
+NoDisplay=true
+OnlyShowIn=ZacOS9;

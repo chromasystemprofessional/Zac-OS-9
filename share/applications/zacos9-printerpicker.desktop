@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Printer Picker
+Comment=Choose the printer your documents go to
+Exec=zacos9-printerpicker
+Terminal=false
+Categories=Settings;Printing;HardwareSettings;
+OnlyShowIn=ZacOS9;

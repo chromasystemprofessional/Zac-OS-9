@@ -252,6 +252,10 @@ QString fileMimeType(const QString &path) {
 }
 
 QString hiddenExtension(const QString &fileName) {
+	/* A desktop printer is called by its printer's name alone. */
+	if (fileName.endsWith(QLatin1String(".printer")) && fileName.size() > 8) {
+		return QStringLiteral(".printer");
+	}
 	const QString suffix = mimeDb().suffixForFileName(fileName);
 	if (suffix.isEmpty() || fileName.size() <= suffix.size() + 1) {
 		return QString();

@@ -281,6 +281,12 @@ void launch_fill_logo_menu(struct mb_menu *menu, const struct app *apps, int n_a
 		sibling_program("zacos9-netbrowser", command, sizeof(command));
 		add_item(menu, "Neighbourhood", true, ACT_LAUNCH, command);
 	}
+	/* Printer Picker: Mac OS 9's Chooser, which was here too. */
+	{
+		char command[PATH_MAX + 64];
+		sibling_program("zacos9-printerpicker", command, sizeof(command));
+		add_item(menu, "Printer Picker", true, ACT_LAUNCH, command);
+	}
 	/* Control Panels, as a hierarchical menu. */
 	add_item(menu, "Control Panels", true, ACT_NONE, NULL);
 	struct mb_menu *panels = calloc(1, sizeof(*panels));

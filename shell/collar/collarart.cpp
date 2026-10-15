@@ -278,6 +278,18 @@ void icon(pl_canvas *c, CollarParts::Kind kind, int x, int y, bool on, int level
 		}
 		pl_vline(c, x + 10, y + 8, y + 15, Face);
 		break;
+	case CollarParts::Printer:
+		// A printer with a sheet in it; its light green while you have a printer chosen.
+		pl_fill(c, x + 4, y + 1, x + 11, y + 4, C_WHITE);
+		pl_outline(c, x + 3, y, x + 12, y + 5, ink);
+		pl_hline(c, x + 5, x + 9, y + 2, GRAY(0xA));
+		pl_fill(c, x + 1, y + 6, x + 14, y + 13, on ? Face : GRAY(0xD));
+		pl_outline(c, x, y + 5, x + 15, y + 14, ink);
+		pl_hline(c, x + 1, x + 14, y + 6, C_WHITE);
+		pl_hline(c, x + 2, x + 13, y + 11, ink);
+		pl_fill(c, x + 11, y + 8, x + 12, y + 9, on ? RGB(0x00, 0xBB, 0x00) : GRAY(0xA));
+		pl_hline(c, x + 1, x + 15, y + 15, Shadow);
+		break;
 	case CollarParts::FileSharing:
 		// A folder on the network's line; a visitor's head and shoulders on it while anyone is connected.
 		pl_fill(c, x + 1, y + 3, x + 14, y + 10, gold);

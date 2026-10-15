@@ -1,4 +1,7 @@
-"""Execute the mount rule with mocked subjects; never change host policy."""
+"""Execute a polkit rule with mocked subjects; never change host policy.
+
+usage: test_mount_rule.py RULE [GRANTED_ACTION...]  (the mount rule's actions if none)
+"""
 import ctypes
 import ctypes.util
 import json
@@ -8,6 +11,8 @@ import unittest
 
 
 rule_path = Path(sys.argv.pop(1))
+granted_actions = set(sys.argv[1:])
+del sys.argv[1:]
 
 
 class MountAuthorizationTests(unittest.TestCase):
@@ -44,7 +49,7 @@ class MountAuthorizationTests(unittest.TestCase):
 var rule;
 var polkit = {Result: {YES: "yes"}, addRule: function(callback) {rule = callback;}};
 """ + rule_path.read_text())
-        granted = {
+        granted = granted_actions or {
             "org.freedesktop.udisks2.filesystem-mount-system",
             "org.freedesktop.udisks2.filesystem-mount",
             "org.zacos9.disks.mac-mount",
@@ -53,6 +58,8 @@ var polkit = {Result: {YES: "yes"}, addRule: function(callback) {rule = callback
             "org.zacos9.disks", "org.freedesktop.udisks2.encrypted-unlock",
             "org.freedesktop.udisks2.filesystem-mount-other-user",
             "org.freedesktop.policykit.exec", "unrelated.action",
+            "org.opensuse.cupspkhelper.mechanism.all-edit",
+            "org.opensuse.cupspkhelper.mechanism.printeraddremove",
         }):
             for local in (False, True):
                 for active in (False, True):

@@ -97,6 +97,8 @@ Collar::Collar(bool monitor)
 	m_media.failed = [](const QString &error) { Alert::ask(error, "OK", {}); };
 	m_sharing.changed = [this] { rebuildModules(); };
 	m_sharing.failed = [](const QString &error) { Alert::ask(error, "OK", {}); };
+	m_printers.changed = [this] { rebuildModules(); };
+	m_printers.failed = [](const QString &error) { Alert::ask(error, "OK", {}); };
 	// The Collar control panel writes desktop.conf; follow it as it changes.
 	QDir().mkpath(configDir());
 	auto *settingsWatcher = new QFileSystemWatcher(this);
@@ -118,6 +120,7 @@ Collar::Collar(bool monitor)
 			m_keychains.refresh();
 			m_media.refresh();
 			m_sharing.refresh();
+			m_printers.refresh();
 		});
 		timer->start(5000);
 		m_sound.refresh();
@@ -127,6 +130,7 @@ Collar::Collar(bool monitor)
 		m_keychains.refresh();
 		m_media.refresh();
 		m_sharing.refresh();
+		m_printers.refresh();
 	}
 }
 
@@ -140,6 +144,10 @@ void Collar::rebuildModules() {
 	// File Sharing, once it has been set up in its control panel.
 	if (m_sharing.configured) {
 		modules.append(Module{ FileSharing, QString() });
+	}
+	// The printer, once CUPS knows one (Mac OS 9's Printer Selector).
+	if (!m_printers.printers.isEmpty()) {
+		modules.append(Module{ Printer, QString() });
 	}
 	modules.append(Module{ Bluetooth, QString() });
 	// KDE Connect, when installed: a module per phone or tablet in reach, else one to pair a device.
@@ -293,6 +301,7 @@ bool Collar::active(int index) const {
 	case Keychain: return !m_keychains.keychains.isEmpty();
 	case Media: return m_media.current() && m_media.current()->playing();
 	case FileSharing: return m_sharing.on();
+	case Printer: return !m_printers.current.isEmpty();
 	}
 	return false;
 }
@@ -384,6 +393,7 @@ QString Collar::menuLabel(int index) const {
 		}
 		return "Media";
 	case FileSharing: return "File Sharing";
+	case Printer: return "Printer";
 	}
 	return "The Collar";
 }
@@ -481,6 +491,9 @@ QString Collar::description(int index) const {
 		return n == 0 ? QString("File Sharing on, no one connected")
 			: QString("File Sharing on, %1 connected").arg(n);
 	}
+	case Printer:
+		return m_printers.current.isEmpty() ? QString("No printer chosen")
+			: "Printing on " + PrinterChoice::shownName(m_printers.current);
 	}
 	return "The Collar";
 }
@@ -695,6 +708,30 @@ void Collar::addSharingItems(std::vector<PopupItem> &items, std::vector<std::fun
 	add("Open File Sharing Control Panel", true, [this] { launch("zacos9-filesharing"); });
 }
 
+void Collar::addPrinterItems(std::vector<PopupItem> &items, std::vector<std::function<void()>> &actions,
+		int &checked) {
+	auto add = [&](const QString &label, bool enabled, std::function<void()> action = {}) {
+		items.emplace_back(label, enabled);
+		actions.push_back(std::move(action));
+	};
+	auto separator = [&] { items.emplace_back(QString(), false, true); actions.emplace_back(); };
+	add("Printer", false);
+	for (const QString &queue : m_printers.printers) {
+		if (queue == m_printers.current) {
+			checked = static_cast<int>(items.size());
+		}
+		add(PrinterChoice::shownName(queue), true, [this, queue] {
+			if (queue != m_printers.current) {
+				m_printers.choose(queue);
+			}
+		});
+	}
+	separator();
+	add("Open Print Queue", !m_printers.current.isEmpty(),
+		[this] { launch("zacos9-printqueue", { m_printers.current }); });
+	add("Open Printer Picker", true, [this] { launch("zacos9-printerpicker"); });
+}
+
 void Collar::addKeychainItems(std::vector<PopupItem> &items, std::vector<std::function<void()>> &actions,
 		int &checked) {
 	auto add = [&](const QString &label, bool enabled, std::function<void()> action = {}) {
@@ -884,6 +921,8 @@ void Collar::openModule(int index) {
 		addMediaItems(items, actions, checked);
 	} else if (module.kind == FileSharing) {
 		addSharingItems(items, actions);
+	} else if (module.kind == Printer) {
+		addPrinterItems(items, actions, checked);
 	}
 	int room = INT_MAX, below = 0;
 	if (QScreen *screen = windowHandle()->screen()) {

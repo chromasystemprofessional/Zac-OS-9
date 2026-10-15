@@ -1,6 +1,8 @@
 #include "finder.h"
 
 #include "clippings.h"
+#include "desktopprinter.h"
+#include "printers.h"
 #include "findindex.h"
 #include "platinumshell.h"
 #include "settings.h"
@@ -314,6 +316,8 @@ void Finder::command(const QString &name) {
 		vfsSetUnixVolumeShown(!vfsUnixVolumeShown());
 	} else if (name == "show-hidden-applications") {
 		vfsShowAllHidden();
+	} else if (name == "print") {
+		printSelection();
 	} else if (name == "find") {
 		/* A folder window in front: offered as the place to look. */
 		auto *folder = dynamic_cast<FolderWindow *>(front());
@@ -507,6 +511,8 @@ void Finder::openItem(Item *item) {
 			expandArchive(item->path);
 		} else if (item->kind == PL_ICON_CLIPPING) {
 			openClippingWindow(item->path);
+		} else if (item->kind == PL_ICON_PRINTER) {
+			openPrintQueue(desktopPrinterQueue(item->path));
 		} else if (item->kind == PL_ICON_INTERNET_LOCATION) {
 			const QString url = internetLocationUrl(item->path);
 			if (url.isEmpty() || !appOpenUrl(url)) {
@@ -618,6 +624,52 @@ void Finder::launchWindows(const QString &exe) {
 			QFileInfo(local).isExecutable() ? local : QStringLiteral("zacos9-wininstall"),
 			QStringList{ exe })) {
 		Alert::ask("The Windows Installer could not be opened.", "OK", QString());
+	}
+}
+
+void Finder::printSelection() {
+	QStringList files;
+	for (Item *item : front()->selectedItems()) {
+		if (!item->isVirtual && !item->isDir && item->kind != PL_ICON_PRINTER) {
+			files << QFileInfo(item->path).canonicalFilePath(); /* through aliases */
+		}
+	}
+	files.removeAll(QString());
+	if (!files.isEmpty()) {
+		printDocuments(files);
+	}
+}
+
+void Finder::printDocuments(const QStringList &files, const QString &queue) {
+	const QString printer = queue.isEmpty() ? defaultPrinter() : queue;
+	if (printer.isEmpty()) {
+		if (Alert::ask("No printer has been chosen. Choose one in Printer Picker, then print again.",
+				"Printer Picker", "Cancel")) {
+			platinumStartApplication(siblingProgram("zacos9-printerpicker"), {});
+		}
+		return;
+	}
+	QStringList printable, others;
+	for (const QString &f : files) {
+		(canPrintDirectly(f) ? printable : others) << f;
+	}
+	QString error;
+	if (!printable.isEmpty() && printFiles(printer, printable, &error).size() < printable.size()) {
+		Alert::ask("Not everything could be printed. " + error, "OK", QString());
+	}
+	if (others.size() == 1) {
+		Alert::ask(QString::fromUtf8("“%1” can't be printed from the Sniffer. Open it and choose Print in its program.")
+			.arg(QFileInfo(others[0]).fileName()), "OK", QString());
+	} else if (others.size() > 1) {
+		Alert::ask(QString("%1 of the documents can't be printed from the Sniffer. Open them and choose Print in "
+			"their programs.").arg(others.size()), "OK", QString());
+	}
+}
+
+void Finder::openPrintQueue(const QString &queue) {
+	if (!platinumStartApplication(siblingProgram("zacos9-printqueue"), queue.isEmpty() ? QStringList()
+			: QStringList{ queue })) {
+		Alert::ask("The print queue couldn't be opened.", "OK", QString());
 	}
 }
 

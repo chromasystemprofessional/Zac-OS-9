@@ -1675,6 +1675,7 @@ bool finderShortcut(QKeyEvent *e) {
 	case Qt::Key_E: f.ejectSelection(); return true;
 	case Qt::Key_R: f.showOriginal(); return true;
 	case Qt::Key_F: f.command("find"); return true;
+	case Qt::Key_P: f.printSelection(); return true;
 	default: return false;
 	}
 }

@@ -10,6 +10,7 @@
 #include <QDBusMessage>
 #include <QDBusVariant>
 #include <QDBusVirtualObject>
+#include <QDir>
 #include <QElapsedTimer>
 #include <QFile>
 #include <QKeyEvent>
@@ -139,6 +140,17 @@ int main(int argc, char **argv) {
 	QDir(root).mkpath("bin");
 	write(root + "/bin/pkexec", "#!/bin/sh\nexec \"$@\"\n", true);
 	qputenv("PATH", (root + "/bin:" + qgetenv("PATH")).toUtf8());
+	// Printers: lpstat and lpoptions stand-ins reading and writing files.
+	const QString cups = root + "/cups";
+	QDir().mkpath(cups + "/bin");
+	write(cups + "/printers", "");
+	write(cups + "/default", "");
+	write(cups + "/bin/lpstat", QString("#!/bin/sh\nS='" + cups + "'\ncase $1 in -e) cat $S/printers ;; -d) "
+		"d=$(cat $S/default); if [ -n \"$d\" ]; then echo \"system default destination: $d\"; else "
+		"echo 'no system default destination'; fi ;; esac\n").toUtf8(), true);
+	write(cups + "/bin/lpoptions", ("#!/bin/sh\n[ \"$1\" = -d ] && printf %s \"$2\" > '" + cups + "/default'\n").toUtf8(),
+		true);
+	qputenv("ZACOS9_CUPS_BIN", (cups + "/bin").toUtf8());
 	QApplication app(argc, argv);
 	app.setQuitOnLastWindowClosed(false);
 	pl_setting_set("sound-theme", "none");
@@ -221,5 +233,22 @@ int main(int argc, char **argv) {
 	sharing.refresh();
 	check(until([&] { return collar.moduleIndex(Collar::FileSharing) < 0; }),
 		"without its settings the module goes away");
+
+	// ---- Printer ----
+	PrinterChoice &printers = collar.printerChoice();
+	printers.refresh();
+	settle(300);
+	check(collar.moduleIndex(Collar::Printer) < 0, "no printers, no printer module");
+	write(cups + "/printers", "Laser\nInk_Jet\n");
+	write(cups + "/default", "Laser");
+	printers.refresh();
+	check(until([&] { return collar.moduleIndex(Collar::Printer) >= 0; }) && printers.current == "Laser",
+		"a printer module once CUPS knows a printer, yours ticked");
+	check(collar.modules().value(collar.moduleIndex(Collar::Printer) - 1).kind == Collar::Network,
+		"after the network");
+	// The menu opens on the ticked printer; one down is the next.
+	check(choose(Collar::Printer, 1) && until([&] { return printers.current == "Ink_Jet"; }),
+		"choosing another makes it yours (lpoptions -d)");
+	check(PrinterChoice::shownName("Ink_Jet") == "Ink Jet", "queues shown with spaces");
 	return failures ? 1 : 0;
 }
