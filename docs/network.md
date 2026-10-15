@@ -24,17 +24,23 @@ the rest of the control panels already use, the same honest approach
 
 ## Discovery
 
-**Bonjour**, through `avahi-browse -k -a -p -r -t`, not linking
-avahi-client directly — simpler, and no less robust for what this needs.
-Three things about it only became clear by actually running it against
-this project's own Netatalk test server:
+**Bonjour**, through two concurrent, service-specific commands:
+`avahi-browse -k -p -r -t _afpovertcp._tcp` and
+`avahi-browse -k -p -r -t _smb._tcp`, not linking avahi-client directly.
+Each query is bounded by the same scan timeout, and unrelated services cannot
+delay AFP resolution. Three things about it only became clear by actually
+running it against this project's own Netatalk test server:
 
 - `avahi-browse` takes **at most one service type** as an argument.
   Given two (`_afpovertcp._tcp` and `_smb._tcp`), it refuses outright
   with "Too many arguments" and browses nothing — silently, from the
   caller's point of view, since the failure is in argument parsing, not
-  in finding anything. Fixed by asking for **every** service (`-a`) and
-  filtering client-side, which `parseAvahiBrowseLine` already did.
+  in finding anything. The two service types are queried separately.
+- Browsing **every** service (`-a`) can take longer because Avahi resolves
+  unrelated records too. The Network Browser's 1.5-second scan budget could
+  expire after AFP's unresolved `+` records arrived but before its resolved
+  `=` records, making an available AFP server disappear from the list. The
+  focused AFP/SMB queries now run concurrently under one shared deadline.
 - Without `-k`, avahi-browse substitutes a friendly name for the service
   type even in parseable (`-p`) output — `_afpovertcp._tcp` comes back
   as `Apple File Sharing`. `-k` turns that off. (`test_discovery.cpp`

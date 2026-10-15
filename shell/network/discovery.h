@@ -23,12 +23,11 @@ struct DiscoveredServer {
 	}
 };
 
-/* Bonjour: every _afpovertcp._tcp and _smb._tcp instance on the LAN,
- * through `avahi-browse -p -r -t` (parseable, resolved, one-shot —
- * avahi's own daemon keeps the cache current, so a few seconds of
- * listening is enough; this is simpler and no less robust than linking
- * avahi-client for the same information). Empty, not an error, if
- * avahi-browse isn't installed or nothing answers. */
+/* Bonjour: _afpovertcp._tcp and _smb._tcp instances on the LAN, through
+ * concurrent, service-specific `avahi-browse -k -p -r -t` queries (parseable,
+ * resolved, one-shot). A shared timeout bounds both queries; unrelated
+ * service resolution cannot delay their results. Empty if avahi-browse isn't
+ * installed or nothing answers. */
 std::vector<DiscoveredServer> bonjourServers(int timeoutMs = 3000);
 
 /* Windows computers: a WS-Discovery Probe multicast to 239.255.255.250,

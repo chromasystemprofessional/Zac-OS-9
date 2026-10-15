@@ -1,6 +1,8 @@
 #include "discovery.h"
 
+#include <QCoreApplication>
 #include <QElapsedTimer>
+#include <QEventLoop>
 #include <QHostAddress>
 #include <QProcess>
 #include <QRegularExpression>
@@ -8,6 +10,7 @@
 #include <QUdpSocket>
 #include <QUuid>
 #include <algorithm>
+#include <array>
 #include <cctype>
 
 /* Avahi escapes any byte that isn't a plain label character as a
@@ -71,27 +74,48 @@ bool parseAvahiBrowseLine(const QString &line, DiscoveredServer *out) {
 }
 
 std::vector<DiscoveredServer> bonjourServers(int timeoutMs) {
-	std::vector<DiscoveredServer> out;
-	QProcess p;
-	/* -a: every service type, not just one — avahi-browse takes at
-	 * most a single type argument (tested live: given two, it refuses
-	 * with "Too many arguments" and nothing is browsed at all), so
-	 * asking for both AFP and SMB in one pass means asking for
-	 * everything and filtering client-side, which parseAvahiBrowseLine
-	 * already does. -p: parseable (';'-separated); -r: resolve; -t:
-	 * list what's cached and exit, rather than following the network
-	 * forever (measured live against this project's own test server:
-	 * under a second, since the daemon already has it cached); -k:
-	 * without it, avahi-browse still substitutes a friendly name for
-	 * the service type in the TYPE field even in parseable mode (tested
-	 * live: "_afpovertcp._tcp" comes back as "Apple File Sharing"), so
-	 * the exact-match in parseAvahiBrowseLine needs it. */
-	p.start("avahi-browse", { "-k", "-a", "-p", "-r", "-t" });
-	if (!p.waitForFinished(timeoutMs) && p.state() != QProcess::NotRunning) {
-		p.kill();
-		p.waitForFinished(1000);
+	QProcess afp, smb;
+	std::array<QProcess *, 2> processes{ &afp, &smb };
+	const std::array<QString, 2> serviceTypes{
+		"_afpovertcp._tcp", "_smb._tcp"
+	};
+	/* Query just the two service types we use, in parallel. A broad -a
+	 * browse may resolve many unrelated records and take longer than the
+	 * Network Browser's scan budget; it then exits before AFP's resolved
+	 * "=" records arrive, leaving only unusable "+" records. */
+	for (size_t i = 0; i < processes.size(); i++) {
+		processes[i]->start("avahi-browse", {
+			"-k", "-p", "-r", "-t", serviceTypes[i]
+		});
 	}
-	return parseAvahiBrowse(QString::fromUtf8(p.readAllStandardOutput()));
+	QElapsedTimer clock;
+	clock.start();
+	auto running = [&] {
+		return std::any_of(processes.begin(), processes.end(), [](QProcess *p) {
+			return p->state() != QProcess::NotRunning;
+		});
+	};
+	while (running() && clock.elapsed() < timeoutMs) {
+		QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents |
+			QEventLoop::WaitForMoreEvents, 50);
+	}
+	if (running()) {
+		for (QProcess *p : processes) {
+			if (p->state() != QProcess::NotRunning) {
+				p->kill();
+			}
+		}
+		clock.restart();
+		while (running() && clock.elapsed() < 1000) {
+			QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents |
+				QEventLoop::WaitForMoreEvents, 50);
+		}
+	}
+	QString output;
+	for (QProcess *p : processes) {
+		output += QString::fromUtf8(p->readAllStandardOutput());
+	}
+	return parseAvahiBrowse(output);
 }
 
 std::vector<DiscoveredServer> parseAvahiBrowse(const QString &text) {

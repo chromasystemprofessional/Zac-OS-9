@@ -8,6 +8,10 @@
  * invented, so the format this depends on is the format avahi-browse
  * actually produces, not a guess at it.
  */
+#include <QCoreApplication>
+#include <QDir>
+#include <QFile>
+#include <QTemporaryDir>
 #include <QTextStream>
 
 #include "discovery.h"
@@ -19,7 +23,8 @@ static void check(bool ok, const QString &what) {
 	fails += !ok;
 }
 
-int main() {
+int main(int argc, char **argv) {
+	QCoreApplication app(argc, argv);
 	/* An unresolved line ("+"): found, not yet resolved — nothing to
 	 * connect to yet, so it's skipped, not shown as a broken entry. */
 	DiscoveredServer s;
@@ -94,6 +99,66 @@ int main() {
 	check(wsDiscoveryComputerName("<soap:Envelope><soap:Body>no name here"
 		"</soap:Body></soap:Envelope>").isEmpty(),
 		"no ComputerName means an empty name, not a crash");
+
+	QTemporaryDir fakeAvahi;
+	const QString fakePath = fakeAvahi.path() + "/avahi-browse";
+	QFile fake(fakePath);
+	const QByteArray script =
+		"#!/bin/sh\n"
+		"printf '%s\\n' \"$*\" >> \"$ZACOS9_TEST_AVAHI_ARGS\"\n"
+		"case \"$*\" in\n"
+		"  *\"_afpovertcp._tcp\") sleep 0.6; printf '%s\\n' "
+		"\"=;eth0;IPv4;Delayed\\\\032AFP;_afpovertcp._tcp;local;delayed.local;192.0.2.10;548;\" ;;\n"
+		"  *\"_smb._tcp\") sleep 0.6; printf '%s\\n' "
+		"\"=;eth0;IPv4;Delayed\\\\032SMB;_smb._tcp;local;delayed.local;192.0.2.11;445;\" ;;\n"
+		"  *) exit 2 ;;\n"
+		"esac\n";
+	check(fake.open(QIODevice::WriteOnly) &&
+		fake.write(script) == script.size(),
+		"create a delayed fake avahi-browse command");
+	fake.close();
+	const QFileDevice::Permissions executablePermissions =
+		QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner;
+	check(fake.setPermissions(executablePermissions),
+		"make the fake avahi-browse executable");
+	const QByteArray oldPath = qgetenv("PATH");
+	const QByteArray oldArgsPath = qgetenv("ZACOS9_TEST_AVAHI_ARGS");
+	const QString argsPath = fakeAvahi.path() + "/arguments";
+	qputenv("PATH", (fakeAvahi.path().toUtf8() + ':' + oldPath));
+	qputenv("ZACOS9_TEST_AVAHI_ARGS", argsPath.toUtf8());
+	const std::vector<DiscoveredServer> delayed = bonjourServers(1500);
+	qputenv("PATH", oldPath);
+	if (oldArgsPath.isNull()) {
+		qunsetenv("ZACOS9_TEST_AVAHI_ARGS");
+	} else {
+		qputenv("ZACOS9_TEST_AVAHI_ARGS", oldArgsPath);
+	}
+	check(delayed.size() == 2,
+		"parallel service-specific browsing resolves AFP and SMB within one scan budget");
+	bool delayedAfp = false, delayedSmb = false;
+	for (const DiscoveredServer &server : delayed) {
+		delayedAfp |= server.kind == DiscoveredServer::AFP &&
+			server.name == "Delayed AFP" && server.address == "192.0.2.10";
+		delayedSmb |= server.kind == DiscoveredServer::SMB &&
+			server.name == "Delayed SMB" && server.address == "192.0.2.11";
+	}
+	check(delayedAfp && delayedSmb,
+		"late resolved records are retained for both Bonjour service types");
+	QFile argsFile(argsPath);
+	QStringList recordedArgs;
+	if (argsFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+		recordedArgs = QString::fromUtf8(argsFile.readAll()).split('\n', Qt::SkipEmptyParts);
+	}
+	bool queriedAfp = false, queriedSmb = false, argsValid = recordedArgs.size() == 2;
+	for (const QString &args : recordedArgs) {
+		queriedAfp |= args.endsWith("_afpovertcp._tcp");
+		queriedSmb |= args.endsWith("_smb._tcp");
+		argsValid &= args.contains("-k") && args.contains("-p") &&
+			args.contains("-r") && args.contains("-t") &&
+			!(args.contains("_afpovertcp._tcp") && args.contains("_smb._tcp"));
+	}
+	check(argsValid && queriedAfp && queriedSmb,
+		"each avahi-browse process requests one supported service type with parseable resolution");
 
 	if (fails) {
 		QTextStream(stdout) << fails << " failed\n";
