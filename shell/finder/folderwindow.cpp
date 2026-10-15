@@ -1658,6 +1658,10 @@ bool finderShortcut(QKeyEvent *e) {
 		f.openEnclosing(e->modifiers() & Qt::AltModifier); /* ⌘-↑, Option-⌘-↑ */
 		return true;
 	}
+	if (e->key() == Qt::Key_Question || (e->key() == Qt::Key_Slash && (e->modifiers() & Qt::ShiftModifier))) {
+		platinumStartApplication(siblingProgram("zacos9-help"), { "zacos9" }); /* ⌘-?: ZacOS Help */
+		return true;
+	}
 	switch (e->key()) {
 	case Qt::Key_N: f.newFolder(); return true;
 	case Qt::Key_A: f.command("select-all"); return true;
@@ -1670,6 +1674,7 @@ bool finderShortcut(QKeyEvent *e) {
 	case Qt::Key_Y: f.putAway(); return true;
 	case Qt::Key_E: f.ejectSelection(); return true;
 	case Qt::Key_R: f.showOriginal(); return true;
+	case Qt::Key_F: f.command("find"); return true;
 	default: return false;
 	}
 }

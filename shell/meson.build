@@ -771,6 +771,26 @@ test('dog-ears-notes',
   ),
 )
 
+# The Help Center (Mac Help).
+help_sources = ['help/helpwindow.cpp', 'help/helpbook.cpp', 'finder/platinumshell.cpp', finder_protocol]
+executable('zacos9-help', 'help/main.cpp', help_sources,
+  link_with: panelkit,
+  include_directories: include_directories('finder', 'panels', 'help'),
+  dependencies: [platinum_dep, qt6, wayland_client],
+  cpp_args: ['-std=c++17'],
+  install: true,
+)
+test('help-center',
+  executable('test-help-center', 'help/tests/test_help.cpp', help_sources,
+    link_with: panelkit,
+    include_directories: include_directories('finder', 'panels', 'help'),
+    dependencies: [platinum_dep, qt6, wayland_client],
+    cpp_args: ['-std=c++17'],
+  ),
+  env: ['QT_QPA_PLATFORM=offscreen', 'ZACOS9_HELP_SOURCE=' + meson.project_source_root() / 'share/zacos9/help'],
+  timeout: 30,
+)
+
 # Pedigree (Apple System Profiler).
 pedigree_sources = ['pedigree/pedigreewindow.cpp', 'pedigree/profile.cpp',
   'finder/alert.cpp', 'finder/platinumshell.cpp', finder_protocol]

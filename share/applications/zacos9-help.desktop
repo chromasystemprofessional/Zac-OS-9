@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Help Center
+Comment=Help for ZacOS and its programs
+Exec=zacos9-help
+Terminal=false
+Categories=Documentation;
+OnlyShowIn=ZacOS9;

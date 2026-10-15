@@ -177,6 +177,15 @@ static void add_finder_menus(struct mb_menu *menus, int *n) {
 	add(m, "Shut Down", 0, true, ACT_LAUNCH, "systemctl poweroff");
 	sep(m);
 	add(m, "Log Out…", 0, up, ACT_FINDER, "log-out");
+	/* Mac OS 9's Help menu: Help Center, then the Finder's own book. */
+	m = new_menu(menus, n, "Help");
+	char help[PATH_MAX + 64];
+	sibling_program("zacos9-help", help, sizeof(help));
+	add(m, "Help Center", 0, true, ACT_LAUNCH, help);
+	sep(m);
+	char book[PATH_MAX + 80];
+	snprintf(book, sizeof(book), "%s zacos9", help);
+	add(m, "ZacOS Help", '?', true, ACT_LAUNCH, book);
 }
 
 struct mb_menu *menus_new_menu(struct mb_menu *menus, int *n, const char *title) {
