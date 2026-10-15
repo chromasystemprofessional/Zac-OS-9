@@ -1,3 +1,10 @@
+zacos9 (0.1.59) trixie; urgency=medium
+
+  * Milestone 3: Smart Scrolling, Mouse Tracks, Recent in Open/Save, Trash
+    locked items, and more.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Thu, 15 Oct 2026 18:25:41 -0400
+
 zacos9 (0.1.58) trixie; urgency=medium
 
   * Users control panel: add, change and remove the accounts of the people
