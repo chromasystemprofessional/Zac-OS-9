@@ -424,7 +424,7 @@ A zram/swap switch in a Memory panel is a possible P3.
 | **Calculator** | ✅ | `zacos9-calculator`, in the Zac menu; typed or clicked; ⌘C/⌘V. |
 | **Key Tags** | ✗ | P3 S. Shows the current xkb layout, Option/Shift states. |
 | **Scribble** | ◐ | `zacos9-scribble`: plain text (UTF-8 or Latin-1; CR, CR LF or LF kept), New/Open/Save/Save As, Find/Find Again, Font and Size menus. Styled text and Speech not done. |
-| **Pedigree** | ✗ | P2 M. "System Information": hardware, devices, network, software (lshw/udev/dmidecode via a helper). |
+| **Pedigree** | ✅ | `zacos9-pedigree`, in the Zac menu and behind the Sniffer's System Information: tabs System Profile (system, hardware, battery, displays, network) and Devices and Volumes (disks and their volumes, USB, PCI, Bluetooth, sound), outlines opened by their triangles; File > Save Report, Edit > Copy, View > Refresh/Open All/Close All. Read from /sys, /proc, os-release, dpkg and pci.ids/usb.ids, no password: memory slots and serials only root can read are left out. |
 | Plotter, Jigsaw Puzzle | ✗ | P3 — optional fun. |
 | AppleCD Audio Player, DVD Player, Apple Video Player | — | Use regular media apps; The Collar's media module covers control. |
 | Disk Copy, Disk Vet, Disk Setup | see 3.15 | |
@@ -496,7 +496,7 @@ updates `PROJECT_STATUS.md` and the relevant `docs/` page.
 | 2.10 ✅ | **Internet** panel (default browser, mail app, downloads folder) | `shell/panels/`, `mimeapps.list`, xdg-user-dirs | S |
 | 2.11 ✅ | **Trackpad** and **Accessibility** (Sticky/Slow/Mouse Keys, zoom) | prefs.c (libinput, xkb a11y), panels | M |
 | 2.12 ✅ | **Desk accessories I**: Calculator, Dog Ears, Scribble | new small Qt apps on panelkit | S + M + M |
-| 2.13 | **System Information** (Pedigree) | Qt app + read-only helper | M |
+| 2.13 ✅ | **System Information** (Pedigree) | Qt app + read-only helper | M |
 | 2.14 | **Users** panel (accounts, pictures, passwords, administrators) | panel over accountsservice + polkit | L |
 | 2.15 | **Help Center** with ZacOS help pages | `shell/help/`, `share/zacos9/help/` | L |
 | 2.16 ✅ | **Collar modules**: media playback (MPRIS), File Sharing on/off and visitors | `shell/collar/` | S each |
