@@ -1,0 +1,229 @@
+#!/usr/bin/python3 -I
+"""The Startup Disk control panel's helper, run as root through pkexec:
+which system the computer starts up with, as GRUB's default entry.
+
+  zacos9-startupdisk-helper list        the entries and the default:
+      "default\tID" then "entry\tID\tTITLE\tKIND\tDEPTH" for each
+      (ID as grub-set-default takes it: "submenu-id>entry-id" inside a
+      submenu; KIND linux, windows, mac, firmware or other; DEPTH 0 at
+      the top of GRUB's menu, 1 inside a submenu such as Advanced options)
+  zacos9-startupdisk-helper set ID      start up with it from now on
+  zacos9-startupdisk-helper detect      look for other systems (os-prober)
+
+GRUB only remembers a choice with GRUB_DEFAULT=saved; the first "set"
+makes it so and regenerates grub.cfg. Problems go to stderr, exit 1.
+
+For tests (only when not run as root): ZACOS9_GRUB_CFG, ZACOS9_GRUB_DEFAULTS,
+ZACOS9_GRUBENV, ZACOS9_UPDATE_GRUB and ZACOS9_GRUB_SET_DEFAULT stand in for
+/boot/grub/grub.cfg, /etc/default/grub, /boot/grub/grubenv, update-grub and
+grub-set-default.
+"""
+import os
+import re
+import shlex
+import subprocess
+import sys
+
+
+def setting(name, default):
+    if os.geteuid() != 0:
+        return os.environ.get(name, default)
+    return default
+
+
+GRUB_CFG = setting("ZACOS9_GRUB_CFG", "/boot/grub/grub.cfg")
+DEFAULTS = setting("ZACOS9_GRUB_DEFAULTS", "/etc/default/grub")
+GRUBENV = setting("ZACOS9_GRUBENV", "/boot/grub/grubenv")
+UPDATE_GRUB = setting("ZACOS9_UPDATE_GRUB", "update-grub")
+SET_DEFAULT = setting("ZACOS9_GRUB_SET_DEFAULT", "grub-set-default")
+
+
+def die(message):
+    print(message, file=sys.stderr)
+    sys.exit(1)
+
+
+def words(line):
+    """GRUB's shell words: 'single' (with '\\'' for a quote), "double", bare."""
+    out, i, n = [], 0, len(line)
+    while i < n:
+        while i < n and line[i] in " \t":
+            i += 1
+        if i >= n:
+            break
+        word = ""
+        while i < n and line[i] not in " \t":
+            c = line[i]
+            if c == "'":
+                j = line.find("'", i + 1)
+                j = n if j < 0 else j
+                word += line[i + 1:j]
+                i = j + 1
+            elif c == '"':
+                j = i + 1
+                while j < n and line[j] != '"':
+                    if line[j] == "\\" and j + 1 < n:
+                        j += 1
+                    word += line[j]
+                    j += 1
+                i = j + 1
+            elif c == "\\" and i + 1 < n:
+                word += line[i + 1]
+                i += 2
+            else:
+                word += c
+                i += 1
+        out.append(word)
+    return out
+
+
+def kind_of(classes, title):
+    t = title.lower()
+    if "firmware" in t or "uefi" in classes:
+        return "firmware"
+    if "windows" in classes or "windows" in t:
+        return "windows"
+    if {"osx", "macosx", "macos"} & classes or "mac os" in t or "macos" in t:
+        return "mac"
+    if {"gnu-linux", "gnu", "debian", "ubuntu", "fedora", "arch"} & classes or "linux" in t:
+        return "linux"
+    return "other"
+
+
+def entries(cfg_text):
+    """[(id, title, kind, depth, title_path)] in menu order."""
+    found = []
+    stack = []  # one per open "{": (kind, id, title) for submenus, else None
+    for raw in cfg_text.splitlines():
+        line = raw.strip()
+        if line == "}":
+            if stack:
+                stack.pop()
+            continue
+        if not line.endswith("{"):
+            continue
+        w = words(line[:-1])
+        if not w or w[0] not in ("menuentry", "submenu"):
+            stack.append(None)
+            continue
+        title = w[1] if len(w) > 1 else ""
+        classes, ident = set(), ""
+        for k, word in enumerate(w):
+            if word == "--class" and k + 1 < len(w):
+                classes.add(w[k + 1].lower())
+            if (word == "--id" or word.endswith("menuentry_id_option")) and k + 1 < len(w):
+                ident = w[k + 1]
+        ident = ident or title
+        parents = [s for s in stack if s]
+        path_ids = ">".join([p[1] for p in parents] + [ident])
+        path_titles = ">".join([p[2] for p in parents] + [title])
+        if w[0] == "submenu":
+            stack.append(("submenu", ident, title))
+        else:
+            stack.append(None)
+            found.append((path_ids, title, kind_of(classes, title), len(parents), path_titles))
+    return found
+
+
+def read(path):
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            return f.read()
+    except FileNotFoundError:
+        return None
+    except PermissionError:
+        die(f"{path} can't be read.")
+
+
+def grub_default():
+    text = read(DEFAULTS) or ""
+    value = "0"
+    for line in text.splitlines():
+        m = re.match(r"\s*GRUB_DEFAULT=(.*)$", line)
+        if m:
+            value = words(m.group(1))[0] if words(m.group(1)) else ""
+    return value
+
+
+def saved_entry():
+    for line in (read(GRUBENV) or "").splitlines():
+        if line.startswith("saved_entry="):
+            return line[len("saved_entry="):]
+    return ""
+
+
+def current(found):
+    """The entry GRUB starts: its id, or "" if it can't be told."""
+    want = grub_default()
+    if want == "saved":
+        want = saved_entry() or "0"
+    tops = [e for e in found if e[3] == 0]
+    if want.isdigit():
+        return tops[int(want)][0] if int(want) < len(tops) else ""
+    for e in found:
+        if want in (e[0], e[4], e[1]):
+            return e[0]
+    return ""
+
+
+def load():
+    text = read(GRUB_CFG)
+    if text is None:
+        die("This computer doesn't start up through GRUB, so its startup system can't be chosen here.")
+    return entries(text)
+
+
+def set_defaults_line(name, value):
+    """NAME=value in /etc/default/grub, replacing its first uncommented
+    setting or added at the end; True if that changed anything."""
+    lines = (read(DEFAULTS) or "").splitlines()
+    new = f"{name}={value}"
+    for i, line in enumerate(lines):
+        if re.match(rf"\s*{name}=", line):
+            if line.strip() == new:
+                return False
+            lines[i] = new
+            break
+    else:
+        lines.append(new)
+    tmp = DEFAULTS + ".zacos9-new"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+    os.replace(tmp, DEFAULTS)
+    return True
+
+
+def run(program, *args):
+    command = shlex.split(program) + list(args)  # a test's stand-in may have arguments
+    r = subprocess.run(command, capture_output=True, text=True)
+    if r.returncode != 0:
+        last = (r.stderr.strip().splitlines() or [f"{command[0]} failed."])[-1]
+        die(last)
+
+
+def main(argv):
+    if len(argv) < 2:
+        die(__doc__.strip().splitlines()[0])
+    command = argv[1]
+    if command == "list":
+        found = load()
+        print(f"default\t{current(found)}")
+        for ident, title, kind, depth, _ in found:
+            print(f"entry\t{ident}\t{title}\t{kind}\t{depth}")
+    elif command == "set" and len(argv) == 3:
+        found = load()
+        ident = argv[2]
+        if ident not in [e[0] for e in found]:
+            die("That isn't one of the systems this computer can start up with.")
+        if set_defaults_line("GRUB_DEFAULT", "saved"):
+            run(UPDATE_GRUB)
+        run(SET_DEFAULT, ident)
+    elif command == "detect":
+        set_defaults_line("GRUB_DISABLE_OS_PROBER", "false")
+        run(UPDATE_GRUB)
+    else:
+        die("usage: zacos9-startupdisk-helper list | set ID | detect")
+
+
+if __name__ == "__main__":
+    main(sys.argv)

@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Startup Disk
+Comment=Choose the system the computer starts up with
+Exec=zacos9-controlpanel startupdisk
+Categories=Settings;HardwareSettings;
+OnlyShowIn=ZacOS9;

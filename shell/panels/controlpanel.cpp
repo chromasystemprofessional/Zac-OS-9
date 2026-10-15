@@ -4,7 +4,8 @@
  * Accessibility control panels, one per run:
  *
  *   zacos9-controlpanel mouse | trackpad | keyboard | sound | monitors |
- *     energysaver | screensaver | zacmenu | general | internet | accessibility
+ *     energysaver | screensaver | zacmenu | general | internet | accessibility |
+ *     startupdisk
  *
  * Each writes ~/.config/zacos9/desktop.conf; zacos9-wm applies the
  * mouse, keyboard, screen and sleep settings as they change (compositor/
@@ -29,6 +30,8 @@
 #include "savers.h"
 #include "settings.h"
 #include "soundclient.h"
+#include "startupdisk.h"
+#include "platinumshell.h"
 #include "defaultapps.h"
 #include "functionkeys.h"
 #include "xkblayouts.h"
@@ -1679,6 +1682,10 @@ int main(int argc, char *argv[]) {
 	} else if (which == "zacmenu") {
 		QApplication::setApplicationName("Zac Menu Options");
 		panel = std::make_unique<ZacMenuOptionsPanel>();
+	} else if (which == "startupdisk") {
+		QApplication::setApplicationName("Startup Disk");
+		platinumShellInit(); /* for its alerts */
+		panel = std::make_unique<StartupDiskPanel>();
 	} else if (which == "trackpad") {
 		QApplication::setApplicationName("Trackpad");
 		panel = std::make_unique<TrackpadPanel>();
