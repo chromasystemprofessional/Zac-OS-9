@@ -222,7 +222,7 @@ Section 3 lists every feature; section 5 is the plan.
 | Control-click (and right-click) on icons, window backgrounds, the desktop, the Trash, disks | ✅ | The Sniffer asks; the menu bar opens it at the pointer (press-drag-release, or click for a sticky menu), as its own menus (0.1.54). ⌘-click opens one too (⌘ reaches apps as Control). |
 | Icon menu: Open, Get Info, Label, Duplicate, Make Alias, Add To Favorites, Move To Trash, Print | ◐ | Open, Move To Trash, Get Info, Label ▸, Duplicate, Make Alias ✅; disks add Eject and Erase Disk…, the Trash Empty Trash…. Add To Favorites and Print wait for those features. |
 | Window/desktop menu: New Folder, View as …, Clean Up, Arrange, Sort List, View Options, Change Desktop Background | ◐ | New Folder, View ▸, Clean Up, Arrange ▸, Get Info, Close Window; the desktop's Change Desktop Background… ✅. Sort List (list view) and View Options… ✅ too. |
-| Find Similar Items, Index Selection | ✗ | Need content search (3.13). P3 |
+| Find Similar Items, Index Selection | ✅ | File menu; see 3.13. |
 | Attach a Folder Trick | ✗ | Needs folder tricks (3.12). P3 |
 | Summarize Text to Clipboard | — | Out of scope (or an LLM-free extractive summary later). |
 | Add-on commands from a folder (Contextual Menu Items) | ✗ | `.desktop` file-manager actions in `~/.local/share/zacos9/contextual`. P2 S |
@@ -243,7 +243,7 @@ Section 3 lists every feature; section 5 is the plan.
 | Pedigree | ✗ | See 3.18. |
 | Neighbourhood | ✅ | |
 | Remote Access Status | — | Dial-up; out of scope. |
-| Bloodhound | ◐ | Find by name only; see 3.13. |
+| Bloodhound | ◐ | Find with criteria and contents; Internet channels still to do. See 3.13. |
 | Automated Tasks (scripts) | ✗ | See 3.12. |
 | Force Quit (ZacOS addition) | ✅ | |
 
@@ -361,9 +361,9 @@ A zram/swap switch in a Memory panel is a possible P3.
 | Feature | Status | Notes |
 |---|---|---|
 | Find by name, results as a Sniffer view | ✅ | |
-| Criteria: dates, comments, size, kind, label, version, locked, empty/shared folder, invisible, custom icon | ✗ | **P2 M.** More criteria in the Find window. |
-| **Search contents** with an index; schedule indexing; Index Selection | ✗ | **P2 L.** localsearch/tracker3 (`tinysparql` queries) or recoll. |
-| Find Similar Items | ✗ | P3 |
+| Criteria: dates, comments, size, kind, label, version, locked, empty/shared folder, invisible, custom icon | ◐ | `shell/finder/findcriteria.cpp`: where (all disks, Home, the front folder) and up to six rows that must all match: name (contains, starts/ends with, is, is not, doesn't contain), date modified/created (today, past week/month, before/after a date), size, kind, label, lock, folder empty/shared. Comments, version, invisible and custom icon not yet. |
+| **Search contents** with an index; schedule indexing; Index Selection | ✅ | `shell/finder/findindex.cpp`: "contents include" asks localsearch (tinysparql full-text query, kept to the chosen place; the other rows sift its answers); File ▸ Index Selection adds folders to its index. Scheduling is localsearch's own. |
+| Find Similar Items | ✅ | The document's most distinctive words, any of them, ranked by the index. |
 | Save a search; several searches at once | ✗ | P3 S |
 | Internet channels (web search with plug-ins) | ✗ | P3 M. One search box over a few engines; opens the browser. |
 
@@ -490,7 +490,7 @@ updates `PROJECT_STATUS.md` and the relevant `docs/` page.
 | 2.4 ✅ | **Proxy icon** in Sniffer title bars (drag to move/copy; drop onto it when collapsed) | compositor frame + `platinum-shell-v1` + Sniffer drag source | M |
 | 2.5 ✅ | **Clippings** and **Show Clipboard** | Sniffer drop handling, clipping viewer | M |
 | 2.6 ✅ | **Toy Box** (button view of `Toy Box Items`, categories as pages) | Sniffer | M |
-| 2.7 | **Search**: more Find criteria now; then content search with an index (localsearch or recoll), Index Selection, Find Similar | `shell/finder/findwindow.cpp`, a search backend wrapper; packaging dependency | M + L |
+| 2.7 ✅ | **Search**: more Find criteria now; then content search with an index (localsearch or recoll), Index Selection, Find Similar | `shell/finder/findwindow.cpp`, a search backend wrapper; packaging dependency | M + L |
 | 2.8 | **Printing**: Printer Picker, desktop printers with queue windows, File ▸ Print for documents, default printer in The Collar | new `shell/print/` over CUPS; Sniffer | L |
 | 2.9 | **Startup Disk** panel (GRUB entries, other OSes, Classic) | `shell/panels/`, polkit helper | M |
 | 2.10 ✅ | **Internet** panel (default browser, mail app, downloads folder) | `shell/panels/`, `mimeapps.list`, xdg-user-dirs | S |
