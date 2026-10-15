@@ -198,7 +198,7 @@ Section 3 lists every feature; section 5 is the plan.
 | Menu item | Status | Notes |
 |---|---|---|
 | File ▸ New Folder, Open, Move To Trash, Close Window, Get Info, Label, Duplicate, Make Alias, Put Away, Find…, Show Original | ✅ | |
-| File ▸ **Print** (⌘P) — prints the selected documents through their apps | ✗ | `lp` for PDFs/images/text; else open the app with its print action. P2 M |
+| File ▸ **Print** (⌘P) — prints the selected documents through their apps | ◐ | PDFs, PostScript, text and pictures go to your printer with `lp`; other documents get an alert to print from their own program (opening the app with its print action is still to do). |
 | File ▸ Get Info ▸ General Information / Sharing / Memory submenu | ◐ | General and Sharing ✅; Memory — (out of scope) |
 | File ▸ **Add To Favorites** | ✅ | Aliases in `~/.config/zacos9/Favorites` (System Folder ▸ Favorites); also on icons' and disks' contextual menus (0.1.54). |
 | File ▸ **Encrypt** | ✗ | See 3.2. P3 |
@@ -238,7 +238,7 @@ Section 3 lists every feature; section 5 is the plan.
 | **Favorites** submenu (and Add To Favorites) | ✅ | (0.1.54) |
 | **Zac Menu Options** panel: submenus on/off, how many recent items | ◐ | How many of each ✅ (0.1.54); submenus are always on. |
 | Control Panels submenu | ✅ | |
-| Printer Picker | ✗ | See 3.15. |
+| Printer Picker | ✅ | See 3.15. |
 | Calculator, Key Tags, Notepad, Stash, Dog Ears, Bark Recorder, Jigsaw Puzzle, Plotter | ✗ | See 3.18. |
 | Pedigree | ✗ | See 3.18. |
 | Neighbourhood | ✅ | |
@@ -342,7 +342,7 @@ A zram/swap switch in a Memory panel is a possible P3.
 | Walkies | ✗ | With 3.10. |
 | AppleTalk, Remote Access, AirPort | ◐ | Network module with Wi-Fi ✅; dial-up — |
 | CD audio (play, tracks, eject) | ✅ | As a media module over MPRIS (`shell/collar/media.cpp`): what's playing, Play/Pause, Next/Previous Track, Show the player, a choice of player when several run. Eject belongs to the Sniffer. |
-| Printer selector | ✗ | With printing (3.15). P3 S |
+| Printer selector | ✅ | `shell/collar/printing.cpp`: shown once CUPS knows a printer; yours ticked, choosing another makes it yours; Open Print Queue, Open Printer Picker. |
 | Web Sharing | ✗ | With 3.10. |
 | Speakable Items | — | |
 | Option-drag to move The Collar and its modules; ⌘-Ctrl-S hot key | ✅ | |
@@ -388,8 +388,8 @@ A zram/swap switch in a Memory panel is a possible P3.
 | **Disk Vet** (verify/repair) | ✗ | fsck of unmounted volumes through `zacos9-disk-helper`; SMART status. P3 M |
 | **Disk Setup** (partition, initialize) | ◐ | `diskinit.cpp` initializes; partitioning — P3 L |
 | Disk Copy (mount images) | ✅ | Mac disk images; ISO/IMG via udisks to verify. |
-| **Printer Picker** (pick a printer; AppleShare servers) | ✗ | P2 M. CUPS printers found by Avahi/IPP Everywhere; servers already in the Neighbourhood. |
-| **Desktop printer icons**: drag documents to print, queue window (pause, reorder, remove), default printer (bold outline) | ✗ | P2 L. CUPS queues as desktop items. |
+| **Printer Picker** (pick a printer; AppleShare servers) | ✅ | `zacos9-printerpicker`, in the Zac menu: the printers CUPS knows and finds (IPP Everywhere, `lpstat -e`), with model, location and status; clicking one makes it yours (`lpoptions -d`, no password); Create Desktop Printer, Print Queue, Settings… (system-config-printer). Servers stay in the Neighbourhood. |
+| **Desktop printer icons**: drag documents to print, queue window (pause, reorder, remove), default printer (bold outline) | ◐ | `NAME.printer` files on the desktop (`[Desktop Printer]` Queue=…) with a printer icon: documents dropped on one print there, opening one opens `zacos9-printqueue` (printer status, documents, Hold/Resume, Remove, Stop/Start Printing through cups-pk-helper and a polkit rule for administrators; drops print). Reordering jobs and the default's bold outline are still to do. |
 | Print Queue / non-modal print errors | ✗ | Notification-style messages (Mac OS 9's yellow box, p. 2). P3 S |
 | Page Setup / Print dialogs | ✅ | Apps use their own (GTK/Qt). |
 | Fonts folder (drop to install) | ✗ | Drop onto `Fonts` copies to `~/.local/share/fonts` and runs fc-cache. P3 S |
@@ -491,7 +491,7 @@ updates `PROJECT_STATUS.md` and the relevant `docs/` page.
 | 2.5 ✅ | **Clippings** and **Show Clipboard** | Sniffer drop handling, clipping viewer | M |
 | 2.6 ✅ | **Toy Box** (button view of `Toy Box Items`, categories as pages) | Sniffer | M |
 | 2.7 ✅ | **Search**: more Find criteria now; then content search with an index (localsearch or recoll), Index Selection, Find Similar | `shell/finder/findwindow.cpp`, a search backend wrapper; packaging dependency | M + L |
-| 2.8 | **Printing**: Printer Picker, desktop printers with queue windows, File ▸ Print for documents, default printer in The Collar | new `shell/print/` over CUPS; Sniffer | L |
+| 2.8 ✅ | **Printing**: Printer Picker, desktop printers with queue windows, File ▸ Print for documents, default printer in The Collar | new `shell/print/` over CUPS; Sniffer | L |
 | 2.9 ✅ | **Startup Disk** panel (GRUB entries, other OSes, Classic) | `shell/panels/`, polkit helper | M |
 | 2.10 ✅ | **Internet** panel (default browser, mail app, downloads folder) | `shell/panels/`, `mimeapps.list`, xdg-user-dirs | S |
 | 2.11 ✅ | **Trackpad** and **Accessibility** (Sticky/Slow/Mouse Keys, zoom) | prefs.c (libinput, xkb a11y), panels | M |
