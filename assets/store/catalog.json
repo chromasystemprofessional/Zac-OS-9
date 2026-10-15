@@ -25,7 +25,7 @@
       "blurb": "Organize and touch up your photographs.", "packages": ["shotwell"] },
 
     { "id": "libreoffice", "name": "LibreOffice", "category": "Productivity", "featured": true,
-      "blurb": "Write, calculate and present.", "packages": ["libreoffice"] },
+      "blurb": "Write, calculate and present.", "packages": ["libreoffice", "libreoffice-gtk3"] },
     { "id": "gnucash", "name": "GnuCash", "category": "Productivity",
       "blurb": "Keep track of your money.", "packages": ["gnucash"] },
 

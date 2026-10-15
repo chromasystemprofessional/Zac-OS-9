@@ -330,6 +330,29 @@ restarted (its scale factor is fixed at launch). If an Electron app runs under
 X11 without the scale argument it draws at 1x and is enlarged (blurry), as
 before.
 
+## Global menus, LibreOffice: through its GTK 3 backend
+
+Debian's `libreoffice` brings no desktop toolkit backend of its own (a
+desktop task normally adds `libreoffice-gnome` or `-kf5`); without one it
+runs on `gen`, plain X11 through Xwayland, drawing its own menu bar, which
+can't be shared and whose menus didn't open. With `libreoffice-gtk3` it is
+a Wayland GTK 3 program that exports its own menus (`GtkSalMenu`: a
+`GMenuModel` and actions, published on `gtk_surface1`), so the GTK 3 path
+above shows them with no help from `zacos9-appmenu`, and its in-window
+menu bar goes. So:
+
+- `zacos9-appstore-helper install` adds `libreoffice-gtk3` to any install
+  of a `libreoffice*` package (the Software window's own entry, or one from
+  Debian's catalog such as `libreoffice-writer`);
+- the catalog's LibreOffice entry lists both packages, so an installation
+  without the backend shows as not installed, and Install adds it.
+
+Checked headless (a private LibreOffice tree with the backend, the real
+menu bar and `GTK_MODULES=zacos9-appmenu`): Writer's File … Help in the menu
+bar, File opening with every item and its shortcut. A first start with a
+new profile exits with status 81 to restart itself; `soffice` does that,
+a test calling `soffice.bin` directly must too.
+
 ## Gaps (known, not planned yet)
 
 - **GTK 4 / libadwaita** ignore themes and draw their own title bars.

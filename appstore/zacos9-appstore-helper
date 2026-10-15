@@ -68,7 +68,16 @@ installed)
 install)
 	check_pkgs "$@"
 	[ "$(id -u)" = 0 ] || die "zacos9-appstore-helper install must run as root (through pkexec)."
-	apt-get -y -o Dpkg::Options::="--force-confold" -o Dpkg::Progress-Fancy=0 install -- "$@"
+	# Debian's LibreOffice has no desktop toolkit of its own unless a desktop
+	# task adds one, and plain X11 can't share its menus: any LibreOffice
+	# package brings the GTK 3 one, which puts them in the menu bar.
+	toolkit=
+	for pkg in "$@"; do
+		case "$pkg" in
+		libreoffice*) toolkit=libreoffice-gtk3 ;;
+		esac
+	done
+	apt-get -y -o Dpkg::Options::="--force-confold" -o Dpkg::Progress-Fancy=0 install -- "$@" $toolkit
 	;;
 install-deb)
 	[ "$#" -eq 1 ] || die "usage: zacos9-appstore-helper install-deb FILE"
