@@ -64,6 +64,8 @@ FolderState FolderState::load(const QString &path) {
 	s.sortColumn = std::clamp(st.value("sort", 0).toInt(), 0, COL_COUNT - 1);
 	s.options = ViewOptions::load(st, inherited);
 	s.sortReversed = st.value("sort-reverse", false).toBool();
+	s.popup = st.value("popup", false).toBool();
+	s.tabX = st.value("tab-x", -1).toInt();
 	for (const QString &key : st.value("column-order").toString().split(',', Qt::SkipEmptyParts)) {
 		const int c = columnFromKey(key);
 		if (c > COL_NAME && !s.columnOrder.contains(c)) {
@@ -104,6 +106,8 @@ void FolderState::save(const QString &path) const {
 	st.setValue("sort", sortColumn);
 	options.save(st);
 	st.setValue("sort-reverse", sortReversed);
+	st.setValue("popup", popup);
+	st.setValue("tab-x", tabX);
 	QStringList order, widths;
 	for (int c : columnOrder) {
 		order << columnInfo(c).key;

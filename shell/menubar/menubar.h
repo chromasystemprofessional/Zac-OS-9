@@ -167,6 +167,8 @@ struct finder_state {
 	int sort;             /* the front list's sort column (viewoptions.h) */
 	unsigned columns;     /* and its columns shown, as bits */
 	int custom;           /* its columns were moved or resized */
+	int popup;            /* the front window is a pop-up window */
+	int popups;           /* zacos9-wm has pop-up windows */
 };
 
 bool finder_connect(void);

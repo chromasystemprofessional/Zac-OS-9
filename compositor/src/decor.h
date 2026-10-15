@@ -18,6 +18,9 @@
 enum decor_style {
 	DECOR_STYLE_DOCUMENT,      /* HIG figure 5-1 */
 	DECOR_STYLE_MOVABLE_MODAL, /* dialogs: title bar, no boxes (HIG fig 3-2) */
+	/* A Sniffer pop-up window (Mac OS 8/9): a tab on top of a body that
+	 * rises from the bottom of the screen; collapsed, only the tab. */
+	DECOR_STYLE_POPUP,
 };
 
 /* Document-window margins around the client surface. */
@@ -33,6 +36,11 @@ struct decor_margins {
 struct decor_margins decor_margins(enum decor_style style);
 /* Height of a collapsed (WindowShaded) frame, excluding shadow. */
 #define DECOR_COLLAPSED_H 22
+/* A pop-up window's tab: the title row's height. TODO: measure against
+ * a Mac OS 9 pop-up window; drawn to match the document title bar. */
+#define DECOR_TAB_H 20
+/* A pop-up's body corners (top-left, top-right) that resize it. */
+#define DECOR_POPUP_CORNER 20
 /* Resize-box cell: top-left corner relative to the frame's bottom-right. */
 #define DECOR_GROW_INSET 21
 
@@ -45,6 +53,9 @@ enum decor_part {
 	DECOR_PART_COLLAPSE,
 	DECOR_PART_GROW,
 	DECOR_PART_BORDER,   /* a dialog's frame: clicks do nothing */
+	DECOR_PART_TAB,      /* a pop-up window's tab */
+	DECOR_PART_GROW_TOP_LEFT,  /* a pop-up body's top corners */
+	DECOR_PART_GROW_TOP_RIGHT,
 };
 
 struct decor_state {
@@ -58,7 +69,14 @@ struct decor_state {
 	/* A proxy icon before the title (Mac OS 9's Finder windows): a
 	 * pl_icon_kind + 1, or 0 for none. */
 	int proxy;
+	/* A pop-up window's tab: its left edge, frame-local. */
+	int tab_x;
 };
+
+/* Height of the frame as drawn (collapsed, a title bar or a tab). */
+int decor_frame_height(const struct decor_state *st);
+/* A pop-up window's tab width for its title. */
+int decor_tab_width(const struct decor_state *st);
 
 /* Paints the part of the frame that falls inside the canvas, which is
  * positioned in frame-local coordinates. */

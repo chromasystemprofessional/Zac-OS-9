@@ -45,6 +45,7 @@ static void show_session(struct plat_server *server, bool shown) {
 		wlr_scene_node_set_enabled(&server->shell_layers[i]->node, shown);
 	}
 	wlr_scene_node_set_enabled(&server->view_layer->node, shown);
+	wlr_scene_node_set_enabled(&server->popup_layer->node, shown);
 	wlr_scene_node_set_enabled(&server->fullscreen_layer->node, shown);
 	wlr_scene_node_set_enabled(&server->dialog_layer->node, shown);
 	wlr_scene_node_set_enabled(&server->unmanaged_layer->node, shown);

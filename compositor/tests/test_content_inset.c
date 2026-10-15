@@ -28,6 +28,18 @@ int platinum_shell_proxy_for(struct wlr_surface *surface) {
 	(void)surface;
 	return 0;
 }
+/* Pop-up windows are never made here. */
+bool platinum_shell_popup_tab_for(struct wlr_surface *surface, int *x) {
+	return false;
+}
+
+void platinum_shell_report_position(struct plat_view *view) {
+}
+
+struct wlr_box output_usable_area(struct plat_server *server, double lx, double ly) {
+	return (struct wlr_box){ 0 };
+}
+
 int platinum_shell_style_for(struct wlr_surface *surface) {
 	return style;
 }

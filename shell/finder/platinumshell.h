@@ -13,6 +13,8 @@ class QWidget;
 enum class FrameStyle {
 	Document = 0,
 	MovableModal = 1,
+	/* A pop-up window: a tab at the bottom of the screen (zacos9-wm 14+). */
+	Popup = 2,
 };
 
 /* Bind platinum-shell-v1 if the compositor offers it (zacos9-wm does). */
@@ -35,6 +37,14 @@ void platinumOnActiveClient(QObject *owner, std::function<void()> changed);
  * start a drag of what the window shows; null: it can't be dragged. Call
  * once the window is shown. */
 void platinumSetProxyIcon(QWidget *window, int iconKind, std::function<void()> dragged);
+/* Pop-up windows (View > as Pop-up Window): whether zacos9-wm has them;
+ * where the window's tab goes along the bottom of the screen (layout x,
+ * negative for the first free place); and being told when the user moves
+ * the tab, or drags it up into an ordinary window. Call once shown. */
+bool platinumHasPopupWindows();
+void platinumSetPopupTab(QWidget *window, int x);
+void platinumOnPopup(QWidget *window, std::function<void(int x)> tabMoved,
+	std::function<void()> detached);
 /* Ask for the window to appear at `frameTopLeft` (layout coordinates);
  * call right after show(), before the window first draws. */
 void platinumSetWindowPosition(QWidget *window, QPoint frameTopLeft);

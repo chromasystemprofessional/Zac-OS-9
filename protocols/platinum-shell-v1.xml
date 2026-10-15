@@ -10,11 +10,13 @@
     when the generic rule (fixed size with a parent window) can't apply.
   </description>
 
-  <interface name="platinum_shell_v1" version="13">
+  <interface name="platinum_shell_v1" version="14">
     <enum name="style">
       <entry name="document" value="0" summary="standard document window"/>
       <entry name="movable_modal" value="1"
         summary="dialog: title bar without boxes, no resize box"/>
+      <entry name="popup" value="2" since="14"
+        summary="pop-up window: a tab at the bottom of the screen"/>
     </enum>
 
     <request name="set_window_style">
@@ -231,6 +233,33 @@
       <arg name="on" type="uint"/>
       <arg name="latched" type="uint"/>
       <arg name="locked" type="uint"/>
+    </event>
+    <request name="set_popup_tab" since="14">
+      <description summary="where a pop-up window's tab goes">
+        For a surface of style popup: the left edge of its tab along the
+        bottom of the screen, in layout coordinates, as remembered from
+        popup_tab. Negative: the first free place. The window is docked
+        there, closed; bringing it forward (activation) opens it, and
+        bringing any other window forward closes it again.
+      </description>
+      <arg name="surface" type="object" interface="wl_surface"/>
+      <arg name="x" type="int"/>
+    </request>
+    <event name="popup_tab" since="14">
+      <description summary="the user moved a pop-up window's tab">
+        Its new left edge, in layout coordinates, to give back to
+        set_popup_tab next time.
+      </description>
+      <arg name="surface" type="object" interface="wl_surface"/>
+      <arg name="x" type="int"/>
+    </event>
+    <event name="popup_detach" since="14">
+      <description summary="a pop-up window was dragged into a window">
+        Its tab was dragged up off the bottom of the screen: the window is
+        an ordinary document window now (as if set_window_style had made
+        it one), being moved by the user. window_position follows.
+      </description>
+      <arg name="surface" type="object" interface="wl_surface"/>
     </event>
   </interface>
 

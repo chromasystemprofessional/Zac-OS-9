@@ -85,16 +85,39 @@ static void handle_proxy_drag(void *, platinum_shell_v1 *, wl_surface *surface) 
 }
 static void handle_sticky_keys(void *, platinum_shell_v1 *, uint32_t, uint32_t, uint32_t) {
 }
+/* Pop-up windows: where the user put each one's tab, and being dragged
+ * up into an ordinary window. */
+struct PopupWatch {
+	std::function<void(int)> tabMoved;
+	std::function<void()> detached;
+};
+static QHash<wl_surface *, PopupWatch> &popupWatches() {
+	static QHash<wl_surface *, PopupWatch> watches;
+	return watches;
+}
+static void handle_popup_tab(void *, platinum_shell_v1 *, wl_surface *surface, int32_t x) {
+	auto it = popupWatches().find(surface);
+	if (it != popupWatches().end() && it->tabMoved) {
+		it->tabMoved(x);
+	}
+}
+static void handle_popup_detach(void *, platinum_shell_v1 *, wl_surface *surface) {
+	auto it = popupWatches().find(surface);
+	if (it != popupWatches().end() && it->detached) {
+		it->detached();
+	}
+}
 static const platinum_shell_v1_listener shell_listener = {
 	handle_window_position, handle_active_client, handle_active_gtk_menu, handle_switch_app,
-	handle_title_menu, handle_keyboard_layouts, handle_proxy_drag, handle_sticky_keys
+	handle_title_menu, handle_keyboard_layouts, handle_proxy_drag, handle_sticky_keys,
+	handle_popup_tab, handle_popup_detach
 };
 
 static void global(void *, wl_registry *reg, uint32_t name, const char *iface, uint32_t version) {
 	if (std::strcmp(iface, platinum_shell_v1_interface.name) == 0) {
 		shell = static_cast<platinum_shell_v1 *>(
 			wl_registry_bind(reg, name, &platinum_shell_v1_interface,
-				std::min(version, 12u)));
+				std::min(version, 14u)));
 		platinum_shell_v1_add_listener(shell, &shell_listener, nullptr);
 	}
 }
@@ -252,6 +275,28 @@ void platinumSetFrameStyle(QWidget *window, FrameStyle style) {
 		platinum_shell_v1_set_window_style(shell, surface, static_cast<uint32_t>(style));
 		wl_display_flush(display);
 	}
+}
+
+bool platinumHasPopupWindows() {
+	return shell && wl_proxy_get_version(reinterpret_cast<wl_proxy *>(shell)) >= 14;
+}
+
+void platinumSetPopupTab(QWidget *window, int x) {
+	wl_surface *surface = platinumHasPopupWindows() ? surfaceOf(window) : nullptr;
+	if (surface) {
+		platinum_shell_v1_set_popup_tab(shell, surface, x);
+		wl_display_flush(display);
+	}
+}
+
+void platinumOnPopup(QWidget *window, std::function<void(int)> tabMoved,
+		std::function<void()> detached) {
+	wl_surface *surface = platinumHasPopupWindows() ? surfaceOf(window) : nullptr;
+	if (!surface) {
+		return;
+	}
+	popupWatches().insert(surface, { std::move(tabMoved), std::move(detached) });
+	QObject::connect(window, &QObject::destroyed, [surface] { popupWatches().remove(surface); });
 }
 
 void platinumSetWindowPosition(QWidget *window, QPoint pos) {

@@ -53,8 +53,19 @@ static const char *const grow_active[20] = {
 	"99999999999999999999",
 };
 
+/* A pop-up's tab: room either side of the title, and its narrowest. */
+#define TAB_PAD 12
+#define TAB_MIN_W 64
+
 static int frame_height(const struct decor_state *st) {
-	return st->collapsed ? DECOR_COLLAPSED_H : st->height;
+	if (st->collapsed) {
+		return st->style == DECOR_STYLE_POPUP ? DECOR_TAB_H : DECOR_COLLAPSED_H;
+	}
+	return st->height;
+}
+
+int decor_frame_height(const struct decor_state *st) {
+	return frame_height(st);
 }
 
 void decor_box_origin(const struct decor_state *st, enum decor_part part,
@@ -137,6 +148,11 @@ static void title_span(const struct decor_state *st, int *x0, int *x1) {
 }
 
 struct decor_margins decor_margins(enum decor_style style) {
+	if (style == DECOR_STYLE_POPUP) {
+		/* The body's edge is a document window's, under the tab. */
+		return (struct decor_margins){ .left = DECOR_LEFT, .right = DECOR_RIGHT,
+			.top = DECOR_TAB_H + 6, .bottom = DECOR_BOTTOM };
+	}
 	if (style == DECOR_STYLE_MOVABLE_MODAL) {
 		return (struct decor_margins){ .left = 3, .right = 3, .top = 24, .bottom = 3 };
 	}
@@ -146,6 +162,10 @@ struct decor_margins decor_margins(enum decor_style style) {
 }
 
 int decor_title_max_width(const struct decor_state *st) {
+	if (st->style == DECOR_STYLE_POPUP) {
+		const int width = st->width - 2 * TAB_PAD;
+		return width > 0 ? width : 0;
+	}
 	int x0, x1;
 	title_span(st, &x0, &x1);
 	int center = (st->width - 1) / 2;
@@ -173,7 +193,7 @@ static int title_ink_width(const struct decor_state *st) {
 
 bool decor_title_hit(const struct decor_state *st, int x, int y) {
 	const struct plat_text *t = st->title;
-	if (!t || t->ink_l < 0 || y < 0 || y >= DECOR_TOP - 2) {
+	if (st->style == DECOR_STYLE_POPUP || !t || t->ink_l < 0 || y < 0 || y >= DECOR_TOP - 2) {
 		return false;
 	}
 	const int ink_w = title_ink_width(st);
@@ -278,9 +298,85 @@ static void paint_modal(struct pl_canvas *c, const struct decor_state *st) {
 	paint_title(c, st);
 }
 
+int decor_tab_width(const struct decor_state *st) {
+	int w = title_ink_width(st) + 2 * TAB_PAD;
+	w = w < TAB_MIN_W ? TAB_MIN_W : w;
+	return w > st->width ? st->width : w;
+}
+
+/* A pop-up window: the tab (rows 0..DECOR_TAB_H-1) with its top corners
+ * cut, standing on a body edged like a document window, which opens into
+ * the tab. Collapsed, the tab alone, at the bottom of the screen. */
+static void paint_popup(struct pl_canvas *c, const struct decor_state *st) {
+	const int W = st->width, H = frame_height(st);
+	const bool act = st->active;
+	const uint32_t border = act ? C_BLACK : C_555;
+	const uint32_t face = act ? C_CCC : C_DDD;
+	const int x0 = st->tab_x, x1 = st->tab_x + decor_tab_width(st) - 1;
+	const int y0 = DECOR_TAB_H; /* the body's top row */
+
+	if (!st->collapsed) {
+		pl_fill(c, 0, y0, W - 1, y0 + 5, face);
+		pl_fill(c, 0, H - DECOR_BOTTOM, W - 1, H - 1, face);
+		pl_fill(c, 0, y0, DECOR_LEFT - 1, H - 1, face);
+		pl_fill(c, W - DECOR_RIGHT, y0, W - 1, H - 1, face);
+		pl_outline(c, 0, y0, W - 1, H - 1, border);
+		if (act) {
+			pl_hline(c, 1, W - 3, y0 + 1, C_WHITE);
+			pl_vline(c, 1, y0 + 1, H - 3, C_WHITE);
+			pl_vline(c, W - 2, y0 + 2, H - 2, C_999);
+			pl_hline(c, 2, W - 2, H - 2, C_999);
+			pl_hline(c, 4, W - 6, y0 + 4, C_999);
+			pl_vline(c, 4, y0 + 4, H - 6, C_999);
+		}
+		pl_outline(c, 5, y0 + 5, W - 6, H - 6, border);
+		if (act) {
+			pl_vline(c, W - 5, y0 + 5, H - 5, C_WHITE);
+			pl_hline(c, 4, W - 5, H - 5, C_WHITE);
+		}
+		/* The resizing corners, marked off on the top edge. */
+		pl_vline(c, DECOR_POPUP_CORNER, y0 + 1, y0 + 4, C_888);
+		pl_vline(c, W - 1 - DECOR_POPUP_CORNER, y0 + 1, y0 + 4, C_888);
+	}
+
+	/* The tab: face, a black edge with its two top corners cut, the
+	 * emboss of a title bar. A closed one along the bottom of the screen
+	 * always reads as active. */
+	const bool tab_act = act || st->collapsed;
+	const uint32_t tab_border = tab_act ? C_BLACK : C_555;
+	const uint32_t tab_face = tab_act ? C_CCC : C_DDD;
+	pl_fill(c, x0 + 1, 1, x1 - 1, H > y0 ? y0 : H - 1, tab_face);
+	pl_hline(c, x0 + 2, x1 - 2, 0, tab_border);
+	pl_put(c, x0 + 1, 1, tab_border);
+	pl_put(c, x1 - 1, 1, tab_border);
+	pl_vline(c, x0, 2, y0 - 1, tab_border);
+	pl_vline(c, x1, 2, y0 - 1, tab_border);
+	if (tab_act) {
+		pl_hline(c, x0 + 2, x1 - 2, 1, C_WHITE);
+		pl_vline(c, x0 + 1, 2, st->collapsed ? y0 - 1 : y0 + 1, C_WHITE);
+		pl_vline(c, x1 - 1, 2, st->collapsed ? y0 - 1 : y0 + 1, C_999);
+	}
+	if (!st->collapsed) {
+		/* Open: the tab's sides run on into the body's edge. */
+		pl_put(c, x0, y0, tab_border);
+		pl_put(c, x1, y0, tab_border);
+	}
+
+	const struct plat_text *t = st->title;
+	const int ink_w = title_ink_width(st);
+	if (ink_w > 0) {
+		pl_text(c, t, x0 + (x1 - x0 + 1 - ink_w) / 2, TITLE_BASELINE,
+			tab_act ? C_BLACK : C_666);
+	}
+}
+
 void decor_paint(struct pl_canvas *c, const struct decor_state *st) {
 	if (st->style == DECOR_STYLE_MOVABLE_MODAL) {
 		paint_modal(c, st);
+		return;
+	}
+	if (st->style == DECOR_STYLE_POPUP) {
+		paint_popup(c, st);
 		return;
 	}
 	const int W = st->width, H = frame_height(st);
@@ -351,6 +447,28 @@ enum decor_part decor_hit(const struct decor_state *st, int x, int y) {
 	const int W = st->width, H = frame_height(st);
 	if (x < 0 || y < 0 || x >= W || y >= H) {
 		return DECOR_PART_NONE;
+	}
+	if (st->style == DECOR_STYLE_POPUP) {
+		/* Above the body only the tab is there; the rest lets clicks
+		 * through, as does all but the tab when it is closed. */
+		if (y < DECOR_TAB_H) {
+			return x >= st->tab_x && x < st->tab_x + decor_tab_width(st)
+				? DECOR_PART_TAB : DECOR_PART_NONE;
+		}
+		if (st->collapsed) {
+			return DECOR_PART_NONE;
+		}
+		const struct decor_margins m = decor_margins(st->style);
+		if (y < DECOR_TAB_H + DECOR_POPUP_CORNER && (x < DECOR_POPUP_CORNER ||
+				x >= W - DECOR_POPUP_CORNER) && !(x >= m.left && x < W - m.right &&
+				y >= m.top)) {
+			return x < DECOR_POPUP_CORNER ? DECOR_PART_GROW_TOP_LEFT
+				: DECOR_PART_GROW_TOP_RIGHT;
+		}
+		if (x >= m.left && x < W - m.right && y >= m.top && y < H - m.bottom) {
+			return DECOR_PART_CLIENT;
+		}
+		return DECOR_PART_BORDER;
 	}
 	if (st->style == DECOR_STYLE_MOVABLE_MODAL) {
 		/* Dialogs move by their title bar only. */

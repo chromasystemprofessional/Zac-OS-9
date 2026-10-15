@@ -203,9 +203,12 @@ QString Finder::stateLine() {
 			columns |= columnBit(c);
 		}
 	}
-	return QStringLiteral("state selection=%1 window=%2 trash=%3 view=%4 label=%5 erase=%6 network=%7 unmount=%8 sort=%9 columns=%10 custom=%11")
+	/* View > as Window / as Pop-up Window, where zacos9-wm has pop-ups. */
+	const bool popup = fw && fw->isPopup();
+	return QStringLiteral("state selection=%1 window=%2 trash=%3 view=%4 label=%5 erase=%6 network=%7 unmount=%8 sort=%9 columns=%10 custom=%11 popup=%12 popups=%13")
 		.arg(selection).arg(window ? 1 : 0).arg(full ? 1 : 0).arg(list).arg(label).arg(erase ? 1 : 0)
-		.arg(network ? 1 : 0).arg(unmount ? 1 : 0).arg(sort).arg(columns).arg(custom ? 1 : 0);
+		.arg(network ? 1 : 0).arg(unmount ? 1 : 0).arg(sort).arg(columns).arg(custom ? 1 : 0)
+		.arg(popup ? 1 : 0).arg(platinumHasPopupWindows() ? 1 : 0);
 }
 
 void Finder::notifyState() {
@@ -373,6 +376,10 @@ void Finder::command(const QString &name) {
 			fw->setViewMode(name == "view-list" ? FolderWindow::ViewMode::List
 				: name == "view-buttons" ? FolderWindow::ViewMode::Buttons
 				: FolderWindow::ViewMode::Icons);
+		}
+	} else if (name == "view-window" || name == "view-popup") {
+		if (auto *fw = dynamic_cast<FolderWindow *>(front())) {
+			fw->setPopup(name == "view-popup");
 		}
 	}
 }
