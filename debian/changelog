@@ -1,3 +1,12 @@
+zacos9 (0.1.60) trixie; urgency=medium
+
+  * Fix AFP servers disappearing from Neighbourhood. Bonjour now resolves
+    AFP and SMB services in parallel without waiting for unrelated LAN
+    services, so advertised servers are found within the scan deadline.
+    Direct-IP connections are unchanged.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Thu, 15 Oct 2026 19:50:10 -0400
+
 zacos9 (0.1.59) trixie; urgency=medium
 
   * Milestone 3: Smart Scrolling, Mouse Tracks, Recent in Open/Save, Trash
