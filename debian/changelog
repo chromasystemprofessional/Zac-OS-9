@@ -1,3 +1,11 @@
+zacos9 (0.1.63) trixie; urgency=medium
+
+  * The Network Browser opens Macs that share files only over AppleTalk
+    (Mac OS 8.6 and earlier, such as a Power Mac 7500): they are listed as
+    NAME (AppleTalk), and log in and mount like any other server.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Fri, 16 Oct 2026 19:59:55 -0400
+
 zacos9 (0.1.62) trixie; urgency=medium
 
   * File Sharing lets Mac OS 8.1 and earlier connect, with a short password
