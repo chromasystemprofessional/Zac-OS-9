@@ -228,8 +228,11 @@ the FUSE mount are the TCP/IP ones.
 Checked live against a Power Mac 7500 (File Sharing, AFP 1.1–2.1, Randnum
 and 2-Way Randnum): NBP lookup, server info, guest login, its volume
 ("Adam’s Shared Files", Mac Roman apostrophe and all) and its size, a
-mount, and an empty listing (AFP's -5018 at the end). TODO: files in it
-read and written, a Randnum login, the 7500 shut down under a mount.
+mount, and an empty listing (AFP's -5018 at the end). Then, from the
+installed package through the Network Browser: the owner's login (Randnum,
+the 7500's 8-character limit) and its Macintosh HD mounted on the desktop,
+with files copied to and from it (reported working by its owner). TODO:
+the 7500 shut down under a mount; zones and routers.
 
 ## SMB
 
