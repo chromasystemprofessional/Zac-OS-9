@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+import fcntl
 import json
 import os
 import sys
@@ -15,6 +16,8 @@ if os.environ.get("SOUND_TEST_FAIL") == args[0]:
 if os.environ.get("SOUND_TEST_TIMEOUT"):
     time.sleep(10)
 
+lock = path.with_suffix(".lock").open("a")
+fcntl.flock(lock, fcntl.LOCK_EX)
 state = json.loads(path.read_text())
 if args == ["get-default-sink"]:
     print(state["default"])
@@ -50,4 +53,7 @@ elif args[0] == "set-sink-mute":
 else:
     print("unexpected pactl arguments", file=sys.stderr)
     sys.exit(1)
-path.write_text(json.dumps(state))
+if args[0].startswith("set-") or args[0] == "move-sink-input":
+    temporary = path.with_suffix(f".{os.getpid()}.tmp")
+    temporary.write_text(json.dumps(state))
+    temporary.replace(path)

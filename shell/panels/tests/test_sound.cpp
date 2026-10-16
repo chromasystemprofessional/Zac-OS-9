@@ -6,6 +6,8 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QProcess>
+#include <QSaveFile>
 #include <QTemporaryDir>
 #include <QTextStream>
 #include <QThread>
@@ -51,9 +53,10 @@ static const QByteArray sources = R"JSON([
 ])JSON";
 
 static bool save(const QString &path, const QJsonObject &state) {
-	QFile file(path);
+	QSaveFile file(path);
+	const QByteArray json = QJsonDocument(state).toJson();
 	return file.open(QIODevice::WriteOnly)
-		&& file.write(QJsonDocument(state).toJson()) > 0;
+		&& file.write(json) == json.size() && file.commit();
 }
 
 int main(int argc, char **argv) {
@@ -254,6 +257,8 @@ int main(int argc, char **argv) {
 	check(until([&] { return !error.isEmpty(); }) && error.contains("in time"),
 		"timeout an unresponsive audio server without blocking the event loop");
 	qunsetenv("SOUND_TEST_TIMEOUT");
+	check(until([&] { return client.findChildren<QProcess *>().isEmpty(); }),
+		"finish pending sound queries before testing a missing executable");
 	error.clear();
 	qputenv("PATH", (dir.path() + "/missing").toUtf8());
 	client.refresh();
