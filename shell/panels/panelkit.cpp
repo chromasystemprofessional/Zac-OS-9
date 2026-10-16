@@ -949,6 +949,9 @@ void PanelEdit::insert(const QString &raw) {
 		}
 	}
 	const int s0 = std::min(caret, anchor), s1 = std::max(caret, anchor);
+	if (maxLength > 0) {
+		s.truncate(std::max(0, maxLength - static_cast<int>(text.size()) + (s1 - s0)));
+	}
 	text.replace(s0, s1 - s0, s);
 	caret = anchor = s0 + static_cast<int>(s.size());
 }

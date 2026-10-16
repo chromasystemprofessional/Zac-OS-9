@@ -1,11 +1,12 @@
 # Project Status
 
-Updated: 2026-10-15
+Updated: 2026-10-16
 
 ## Completed
 
 | Commit | Feature |
 |---|---|
+| *(0.1.62)* | **File Sharing for Mac OS 8.1 and earlier** (`sharing/zacos9-sharing-helper`, `shell/panels/filesharing.cpp`). The Chooser finds the server over AppleTalk: `appletalk = yes` in afp.conf where atalkd is installed (now Recommended), atalkd started before netatalk. "Allow clear-text passwords" becomes "Allow Mac OS 8.1 and earlier to connect": Randnum (`uams_randnum.so`) instead of clear text, with a Short Password of up to 8 printable ASCII characters (`zacos9-sharing-helper macpassword`, written to /etc/netatalk/afppasswd directly so it never shows in `ps`), since those Macs can't send longer ones; `status` reports `macpassword set`. sharing.conf's key is now `oldmacs` (`cleartext` still read). PanelEdit gains `maxLength`. Checked live against a Power Mac 7500 by hand (afp.conf edits); the helper's file format checked against afppasswd's own in a user namespace; the panel seen headless (snapshot.sh) reading the short password as set. Not done: the panel's own Save path run end to end |
 | *(release validation)* | **Sound fixture concurrency**. Concurrent input polling and output commands exposed stale rewrites and truncated JSON in the fake sound server. Read-only queries no longer write state; fixture mutations are serialized and atomic, test-driven hot-plug state uses QSaveFile, and timeout probes finish before changing failure modes. Ten consecutive sound-output runs pass. This changes test infrastructure, not live audio behavior. |
 | *(release integration)* | **Latest session updates integrated with main**. Preserves Smart Scrolling, drag-time Space delivery, locked-item Trash handling, application-menu icons and the AFP discovery fix alongside the new Finder, accessories, sound and session features. Trash Get Info and Finder Preferences share `trash-warn`; the new close-app-window request is appended in Platinum protocol v16, preserving existing request opcodes. Hint Bubbles switches off on its first click. Debian requires GnuPG for encryption and recommends speech-dispatcher for Scribble speech. Classic remains feasibility-only; no production guest color capture or app handoff is claimed. |
 | `3634055` | **Network Browser AFP discovery timeout** (`shell/network/discovery.cpp`). AFP disappeared because the broad Avahi browse resolved unrelated services past the 1.5-second UI budget; AFP and SMB now have concurrent focused queries under the shared deadline. A delayed fake-Avahi test verifies late resolved records. |

@@ -3,7 +3,10 @@
  *
  *   Start/Stop        Network Identity (owner, password, computer name),
  *                     File Sharing for Macs (AFP, through Netatalk: Mac OS
- *                     8.5 and later over TCP/IP, and macOS), and, where Mac
+ *                     8.5 and later over TCP/IP, and macOS; if allowed,
+ *                     Mac OS 8.1 and earlier, with a short password of their
+ *                     own, and the Chooser finds it over AppleTalk where
+ *                     atalkd is installed), and, where Mac
  *                     OS 9 had Program Linking, Windows File Sharing (SMB,
  *                     through Samba; wsdd2 makes it show up in Windows'
  *                     Network)
@@ -35,7 +38,7 @@
 #include "settings.h"
 #include "sharingclient.h"
 
-static constexpr int W = 470, H = 392;
+static constexpr int W = 470, H = 420;
 static constexpr int MARGIN = 10;
 static constexpr int TABS_Y = 10;
 static constexpr uint32_t FACE = GRAY(0xD);
@@ -82,7 +85,7 @@ static bool loginPassword(const QString &user, const QString &password) {
 
 struct Settings {
 	QString name, owner;
-	bool afp = false, smb = false, guests = false, cleartext = false;
+	bool afp = false, smb = false, guests = false, oldMacs = false;
 };
 
 static Settings readSettings() {
@@ -97,7 +100,7 @@ static Settings readSettings() {
 			else if (key == "afp") s.afp = value == "yes";
 			else if (key == "smb") s.smb = value == "yes";
 			else if (key == "guests") s.guests = value == "yes";
-			else if (key == "cleartext") s.cleartext = value == "yes";
+			else if (key == "oldmacs" || key == "cleartext") s.oldMacs = value == "yes";
 		}
 	}
 	if (s.name.isEmpty()) {
@@ -180,7 +183,9 @@ public:
 		refreshServers();
 		bool ok;
 		const QString status = runSharingHelper({ "status", m_settings.owner }, QByteArray(), &ok);
-		m_hasWindowsPassword = ok && status.contains("password\tset");
+		const QStringList lines = status.split('\n');
+		m_hasWindowsPassword = ok && lines.contains("password\tset");
+		m_hasMacPassword = ok && lines.contains("macpassword\tset");
 		showTab(0);
 		m_timer.callOnTimeout([this] {
 			refreshServers();
@@ -249,7 +254,8 @@ protected:
 			close();
 			return;
 		}
-		if ((e->key() == Qt::Key_Return || e->key() == Qt::Key_Enter) && m_host.focus == &m_password) {
+		if ((e->key() == Qt::Key_Return || e->key() == Qt::Key_Enter) &&
+			(m_host.focus == &m_password || m_host.focus == &m_macPassword)) {
 			savePassword();
 			return;
 		}
@@ -296,19 +302,34 @@ private:
 			const int inner = y + 1 + PL_GROUP_MARGIN_TOP;
 			g->button = PanelButton(g->on ? "Stop" : "Start",
 				QRect(BOX_L + IN, inner + 4, 66, PL_BUTTON_H));
-			g->bottom = inner + (g == &m_mac ? 64 : 40) + PL_GROUP_MARGIN;
+			g->bottom = inner + (g == &m_mac ? 92 : 40) + PL_GROUP_MARGIN;
 			y = g->bottom + BOX_GAP;
 		}
-		m_cleartext = PanelCheckbox("Allow clear-text passwords (Mac OS 8.1 and earlier)",
-			QPoint(BOX_L + IN, m_mac.top + 1 + PL_GROUP_MARGIN_TOP + 46));
-		m_cleartext.on = m_settings.cleartext;
-		m_cleartext.toggled = [this](bool on) {
+		const int macInner = m_mac.top + 1 + PL_GROUP_MARGIN_TOP;
+		m_oldMacs = PanelCheckbox("Allow Mac OS 8.1 and earlier to connect", QPoint(BOX_L + IN, macInner + 46));
+		m_oldMacs.on = m_settings.oldMacs;
+		m_oldMacs.toggled = [this](bool on) {
 			Settings s = m_settings;
-			s.cleartext = on;
+			s.oldMacs = on;
 			if (!apply(s, nullptr)) {
-				m_cleartext.on = !on;
+				m_oldMacs.on = !on;
 			}
+			m_macPassword.enabled = m_oldMacs.on;
+			if (on && m_oldMacs.on && !m_hasMacPassword) {
+				Alert::ask("Type a password of up to 8 characters in Short Password. Mac OS 8.1 and "
+					"earlier can’t send a longer one, so they connect with this one instead of "
+					"the password you log in with.", "OK", "");
+				m_host.setFocus(&m_macPassword);
+			}
+			update();
 		};
+		/* Older Macs' own password (afppasswd, through the helper). */
+		m_macPassword.rect = QRect(FIELD_X, macInner + 66, 80, PL_EDIT_H);
+		m_macPassword.password = true;
+		m_macPassword.maxLength = 8;
+		m_macPassword.accepts = [](QChar ch) { return ch.unicode() >= 0x20 && ch.unicode() < 0x7F; };
+		m_macPassword.enabled = m_settings.oldMacs;
+		m_macPassword.edited = [this] { m_macPasswordEdited = true; };
 	}
 
 	void paintStartStop(pl_canvas *c, uint32_t pane) {
@@ -338,6 +359,11 @@ private:
 				base += 12;
 			}
 		}
+		const uint32_t ink = m_oldMacs.on ? C_BLACK : GRAY(0x8);
+		panelLabel(c, "Short Password:", LABEL_R, m_macPassword.rect.top() + 15, ink);
+		panelText(c, m_hasMacPassword ? "Set (8 characters at most)" : "Not set yet (8 characters at most)",
+			m_macPassword.rect.right() + 10, m_macPassword.rect.top() + 15, PL_FONT_VIEWS,
+			m_oldMacs.on ? GRAY(0x5) : GRAY(0x8));
 	}
 
 	void refreshServers() {
@@ -374,9 +400,9 @@ private:
 			Alert::ask("The computer needs a name.", "OK", "");
 			return false;
 		}
-		const QByteArray conf = QString("name=%1\nowner=%2\nafp=%3\nsmb=%4\nguests=%5\ncleartext=%6\n")
+		const QByteArray conf = QString("name=%1\nowner=%2\nafp=%3\nsmb=%4\nguests=%5\noldmacs=%6\n")
 			.arg(s.name, s.owner, s.afp ? "yes" : "no", s.smb ? "yes" : "no",
-				s.guests ? "yes" : "no", s.cleartext ? "yes" : "no").toUtf8();
+				s.guests ? "yes" : "no", s.oldMacs ? "yes" : "no").toUtf8();
 		if (g) {
 			g->busy = true;
 			g->button.enabled = false;
@@ -400,9 +426,25 @@ private:
 		return ok;
 	}
 
-	/* A typed Owner Password: checked against the login password, then
-	 * stored for Windows sharing. False if it was wrong. */
+	/* Typed passwords: the Owner Password, checked against the login
+	 * password, then stored for Windows sharing; the Short Password, for
+	 * older Macs. False if one was wrong or couldn't be stored. */
 	bool savePassword() {
+		if (m_macPasswordEdited && !m_macPassword.text.isEmpty()) {
+			bool ok;
+			QString err;
+			runSharingHelper({ "macpassword" }, m_macPassword.text.toUtf8() + '\n', &ok, &err);
+			if (!ok) {
+				Alert::ask(QString("The Short Password couldn’t be stored. %1").arg(err.section('\n', -1)),
+					"OK", "");
+				m_host.setFocus(&m_macPassword);
+				return false;
+			}
+			m_hasMacPassword = true;
+			m_macPasswordEdited = false;
+			m_macPassword.setText(QString());
+			update();
+		}
 		if (!m_passwordEdited || m_password.text.isEmpty()) {
 			return true;
 		}
@@ -562,8 +604,8 @@ private:
 		m_host.focus = nullptr;
 		if (tab == 0) {
 			m_host.buttons = { &m_mac.button, &m_win.button };
-			m_host.edits = { &m_password, &m_name };
-			m_host.checks = { &m_cleartext };
+			m_host.edits = { &m_password, &m_name, &m_macPassword };
+			m_host.checks = { &m_oldMacs };
 		} else if (tab == 1) {
 			m_host.buttons = { &m_disconnect };
 			refreshActivity();
@@ -579,10 +621,11 @@ private:
 	Settings m_settings;
 	QTimer m_timer;
 
-	PanelEdit m_password, m_name;
+	PanelEdit m_password, m_name, m_macPassword;
 	bool m_passwordEdited = false, m_hasWindowsPassword = false;
+	bool m_macPasswordEdited = false, m_hasMacPassword = false;
 	ServerGroup m_mac, m_win;
-	PanelCheckbox m_cleartext;
+	PanelCheckbox m_oldMacs;
 	int m_identityTop = 0, m_identityBottom = 0, m_ownerBaseline = 0, m_ipBaseline = 0;
 
 	PanelList m_users, m_items;

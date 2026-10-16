@@ -221,6 +221,7 @@ struct PanelEdit {
 	bool enabled = true;
 	/* Characters the field takes (all printable ones if unset). */
 	std::function<bool(QChar)> accepts;
+	int maxLength = 0; /* characters at most; 0: no limit */
 	std::function<void()> edited;
 
 	int caret = 0, anchor = 0;

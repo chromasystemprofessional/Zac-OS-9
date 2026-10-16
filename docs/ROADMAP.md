@@ -136,7 +136,9 @@ scaling only, original behaviors and timings).
   - File Sharing control panel (zacos9-filesharing), after Mac OS 9's:
     - Start/Stop: Network Identity, File Sharing for Macs (AFP through
       Netatalk 4: Mac OS 8.5 to 9 over TCP/IP with DHX, older Macs with
-      clear-text passwords if allowed, macOS with DHX2 and Bonjour), and
+      Randnum and a short password of their own if allowed, listed in the
+      Chooser over AppleTalk where atalkd is installed, macOS with DHX2
+      and Bonjour), and
       Windows File Sharing (SMB through Samba, wsdd2 for Windows'
       Network) where Mac OS 9 had Program Linking.
     - Activity Monitor (connected users, Disconnect) and Users & Groups

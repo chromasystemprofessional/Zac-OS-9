@@ -6,14 +6,20 @@
 #
 #   zacos9-sharing-helper apply        settings on stdin, key=value lines:
 #                                        name, owner, afp, smb, guests,
-#                                        cleartext (yes/no for the last four)
+#                                        oldmacs (yes/no for the last four;
+#                                        "cleartext" is read as oldmacs)
 #   zacos9-sharing-helper password     your password for Windows sharing on
 #                                        stdin (only for yourself)
+#   zacos9-sharing-helper macpassword  your password for Mac OS 8.1 and
+#                                        earlier on stdin: 1 to 8 printable
+#                                        ASCII characters (only for yourself)
 #   zacos9-sharing-helper status [USER]
 #                                        who is connected: conn<TAB>kind<TAB>
 #                                        user<TAB>address<TAB>pid lines; and
 #                                        password<TAB>set if USER (you, by
-#                                        default) has a Windows sharing password
+#                                        default) has a Windows sharing
+#                                        password, macpassword<TAB>set if one
+#                                        for older Macs
 #   zacos9-sharing-helper disconnect PID
 #   zacos9-sharing-helper share FOLDER     share a folder of yours (Get Info's
 #   zacos9-sharing-helper unshare FOLDER   "Share this item and its contents")
@@ -36,6 +42,7 @@
 set -eu
 PATH=/usr/sbin:/usr/bin:/sbin:/bin
 conf=/etc/zacos9/sharing.conf
+afppasswd=/etc/netatalk/afppasswd
 shares=/etc/zacos9/shared-folders
 tab=$(printf '\t')
 
@@ -93,8 +100,16 @@ keep_original() {
 
 write_afp_conf() {
 	uams="uams_dhx2.so uams_dhx.so"
-	[ "$cleartext" = yes ] && uams="$uams uams_clrtxt.so"
+	# Mac OS 8.1 and earlier know only clear text and Randnum, and take
+	# passwords of 8 characters at most: Randnum, with a password of its
+	# own (macpassword), which never crosses the network.
+	[ "$oldmacs" = yes ] && uams="$uams uams_randnum.so"
 	[ "$guests" = yes ] && uams="$uams uams_guest.so"
+	# Mac OS 9's Chooser finds servers by AppleTalk (NBP), not Bonjour:
+	# afpd registers itself there only if asked to, and only atalkd (a
+	# package of its own) can take that registration.
+	appletalk=no
+	[ -x /usr/sbin/atalkd ] && appletalk=yes
 	# Netatalk can't have a volume inside another: it keeps each folder's ID
 	# on the folder, and a shared folder's (its volume's root) would clash
 	# in the home volume around it. So home volumes hide the shared folders
@@ -113,8 +128,12 @@ write_afp_conf() {
 
 [Global]
 server name = $name
-; DHX2: macOS. DHX: Mac OS 8.5 to 9. Clear text: older Macs, if allowed.
+; DHX2: macOS. DHX: Mac OS 8.5 to 9. Randnum: older Macs, if allowed, with
+; the password in $afppasswd.
 uam list = $uams
+passwd file = $afppasswd
+; The Chooser's AppleShare list (needs atalkd running).
+appletalk = $appletalk
 guest account = nobody
 mac charset = MAC_ROMAN
 
@@ -226,7 +245,7 @@ services() { # services on|off UNIT...
 			if ! systemctl restart "$u.service" 2>/dev/null; then
 				case $u in
 				# Only announce the computer on the network: sharing works without.
-				nmbd | wsdd2 | avahi-daemon) echo "warning: $u didn't start" >&2 ;;
+				nmbd | wsdd2 | avahi-daemon | atalkd) echo "warning: $u didn't start" >&2 ;;
 				*) die "$u didn't start; see: journalctl -u $u" ;;
 				esac
 			fi
@@ -237,7 +256,7 @@ services() { # services on|off UNIT...
 }
 
 apply() {
-	name="" owner="" afp=no smb=no guests=no cleartext=no
+	name="" owner="" afp=no smb=no guests=no oldmacs=no
 	while IFS= read -r line; do
 		key=${line%%=*}
 		value=${line#*=}
@@ -247,7 +266,7 @@ apply() {
 		afp) afp=$(yesno "$value") ;;
 		smb) smb=$(yesno "$value") ;;
 		guests) guests=$(yesno "$value") ;;
-		cleartext) cleartext=$(yesno "$value") ;;
+		oldmacs | cleartext) oldmacs=$(yesno "$value") ;;
 		"") ;;
 		*) die "Unknown setting \"$key\"." ;;
 		esac
@@ -263,7 +282,7 @@ owner=$owner
 afp=$afp
 smb=$smb
 guests=$guests
-cleartext=$cleartext
+oldmacs=$oldmacs
 EOF
 	mv "$conf.new" "$conf"
 	configure
@@ -272,7 +291,7 @@ EOF
 # The settings from sharing.conf (false if there are none yet).
 load_settings() {
 	[ -f "$conf" ] || return 1
-	name="" owner="" afp=no smb=no guests=no cleartext=no
+	name="" owner="" afp=no smb=no guests=no oldmacs=no
 	while IFS= read -r line; do
 		value=${line#*=}
 		case ${line%%=*} in
@@ -281,7 +300,7 @@ load_settings() {
 		afp) afp=$value ;;
 		smb) smb=$value ;;
 		guests) guests=$value ;;
-		cleartext) cleartext=$value ;;
+		oldmacs | cleartext) oldmacs=$value ;;
 		esac
 	done <"$conf"
 }
@@ -290,7 +309,8 @@ load_settings() {
 configure() {
 	if [ "$afp" = yes ]; then
 		write_afp_conf
-		services on avahi-daemon netatalk
+		# atalkd first: afpd registers its name with it as it starts.
+		services on avahi-daemon atalkd netatalk
 	else
 		services off netatalk
 	fi
@@ -430,6 +450,37 @@ password() {
 	smbpasswd -e "$user" >/dev/null
 }
 
+# Randnum's password: afppasswd's file, NAME:HEX:… lines, the password's
+# bytes in hex padded with zeros to 8. Written here, not with afppasswd -w,
+# which would show it in ps; afppasswd only if a key file encrypts them.
+macpassword() {
+	user=$(caller)
+	[ "$user" != root ] || die "Run this as the user whose password it is."
+	IFS= read -r pw || true
+	[ -n "$pw" ] || die "The password is empty."
+	[ ${#pw} -le 8 ] || die "Mac OS 8.1 and earlier take passwords of 8 characters at most."
+	if printf %s "$pw" | LC_ALL=C grep -q '[^ -~]'; then
+		die "Use only letters, digits and punctuation from a US keyboard: older Macs encode others differently."
+	fi
+	umask 077
+	[ -f "$afppasswd" ] || afppasswd -c -p "$afppasswd" >/dev/null
+	if [ -e "$afppasswd.key" ]; then
+		if grep -q "^$user:" "$afppasswd"; then
+			afppasswd -n -p "$afppasswd" -w "$pw" "$user" >/dev/null
+		else
+			afppasswd -a -n -p "$afppasswd" -w "$pw" "$user" >/dev/null
+		fi
+		return
+	fi
+	hex=$(printf %s "$pw" | od -An -tx1 | tr -d ' \n' | tr a-f A-F)
+	while [ ${#hex} -lt 16 ]; do hex=${hex}00; done
+	awk -F: -v OFS=: -v u="$user" -v h="$hex" '
+		$1 == u { $2 = h; found = 1 } { print }
+		END { if (!found) print u, h, "****************", "********" }' \
+		"$afppasswd" >"$afppasswd.new"
+	mv "$afppasswd.new" "$afppasswd"
+}
+
 status() {
 	who=${1:-$(caller)}
 	if [ "$who" != "$(caller)" ] && [ "$(caller)" != root ]; then
@@ -437,6 +488,9 @@ status() {
 	fi
 	if pdbedit -L 2>/dev/null | cut -d: -f1 | grep -qxF "$who"; then
 		printf 'password\tset\n'
+	fi
+	if [ -f "$afppasswd" ] && awk -F: -v u="$who" '$1 == u && $2 !~ /^\*+$/ { f = 1 } END { exit !f }' "$afppasswd"; then
+		printf 'macpassword\tset\n'
 	fi
 	# AFP: each session is an afpd running as the user who logged in.
 	ss -Htnp state established '( sport = :548 )' 2>/dev/null | while read -r _ _ _ peer rest; do
@@ -468,6 +522,7 @@ disconnect() {
 case ${1:-} in
 apply) apply ;;
 password) password ;;
+macpassword) macpassword ;;
 status) status "${2:-}" ;;
 disconnect) disconnect "${2:-}" ;;
 share) share "${2:-}" ;;
@@ -476,5 +531,5 @@ privileges)
 	[ $# -ge 5 ] || die "usage: zacos9-sharing-helper privileges FOLDER OWNER GROUP MODE [all]"
 	privileges "$2" "$3" "$4" "$5" "${6:-}"
 	;;
-*) die "usage: zacos9-sharing-helper apply | password | status | disconnect PID | share FOLDER | unshare FOLDER | privileges FOLDER OWNER GROUP MODE [all]" ;;
+*) die "usage: zacos9-sharing-helper apply | password | macpassword | status | disconnect PID | share FOLDER | unshare FOLDER | privileges FOLDER OWNER GROUP MODE [all]" ;;
 esac
