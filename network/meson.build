@@ -9,6 +9,7 @@ afp_client = executable('zacos9-afp',
   'afp/afp.c',
   'afp/afpfs.c',
   'afp/dsi.c',
+  'afp/asp.c',
   dependencies: [fuse3, gcrypt, threads],
   install: true,
 )

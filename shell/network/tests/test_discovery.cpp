@@ -212,6 +212,20 @@ int main(int argc, char **argv) {
 	check(!wsDiscoveryIsComputer("<wsd:ProbeMatch></wsd:ProbeMatch>"), "a reply without Types isn't");
 	check(parseAvahiResolve("192.168.2.30\t74\\05838\\058b7.local\n").value("192.168.2.30") == "74:38:b7",
 		"avahi-resolve's escapes are undone");
+	/* AppleTalk: zacos9-afp appletalk-servers on this LAN (a Power Mac
+	 * 7500 on Mac OS 8, and this computer's own Netatalk). */
+	const std::vector<DiscoveredServer> atalk = parseAppleTalkServers(
+		"ChromaSystem Pro Server\t65280.163:128\nPowerMac 7500\t65463.88:249\n");
+	check(atalk.size() == 2 && atalk[1].name == "PowerMac 7500" &&
+			atalk[1].address == "appletalk:PowerMac 7500" && atalk[1].appleTalk() &&
+			atalk[1].kind == DiscoveredServer::AFP,
+		"AppleTalk servers are AFP servers at appletalk:NAME");
+	const std::vector<DiscoveredServer> withAtalk = mergeServers(
+		{ server(DiscoveredServer::AFP, "ChromaSystem Pro Server", "192.168.2.110") }, {}, atalk);
+	check(withAtalk.size() == 2 && !withAtalk[0].appleTalk() && withAtalk[1].appleTalk() &&
+			withAtalk[1].name == "PowerMac 7500",
+		"a server also on TCP/IP is listed once, for TCP/IP; one only on AppleTalk is listed");
+
 	/* Real avahi-resolve -a output, from this computer's LAN. */
 	const QHash<QString, QString> hosts = parseAvahiResolve(
 		"192.168.2.111\tadams-zacos-9.local\n192.168.2.1\tmynetwork.home\nFailed to resolve address '192.168.2.9': Timeout reached\n");

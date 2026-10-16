@@ -18,7 +18,7 @@
 | Session entry | `session/` | sh |
 | Boot splash, extension parade, splash→desktop hand-off | `boot/` | Plymouth script + C + sh — see `docs/boot.md` |
 | Hardware quirks (Haswell HDMI audio, Mac ACPI interrupt storms) | `hardware/` | sh + modprobe.d + systemd — see `docs/hardware.md` |
-| AFP 2.x FUSE client | `network/afp/` | C (libfuse3) |
+| AFP 2.x FUSE client (TCP/IP, and AppleTalk through ASP: `asp.c`) | `network/afp/` | C (libfuse3) — see `docs/network.md` |
 | File sharing helper + polkit | `sharing/` | sh + policy XML |
 | Software helper + polkit | `appstore/` | sh + policy XML |
 | Emulation integration | `emulation/` | sh + config |

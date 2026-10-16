@@ -5,7 +5,9 @@
  * fills in: Bonjour (modern Macs, and our own server once File Sharing
  * announces it) through avahi, and Windows computers through our own
  * WS-Discovery probe (Debian ships no query tool: wsdd2 only answers
- * other computers' probes, it has no "ask the network" mode of its own).
+ * other computers' probes, it has no "ask the network" mode of its own),
+ * and Macs that share only over AppleTalk (Mac OS 8.6 and earlier)
+ * through `zacos9-afp appletalk-servers` (NBP).
  */
 
 #include <QHash>
@@ -18,6 +20,9 @@ struct DiscoveredServer {
 	QString name; /* a person-readable name: the announced one, or the address */
 	QString address; /* host or "host:port", ready for zacos9-afp or smb:// */
 	bool byHostName = false; /* announced over IPv6 alone: address is its .local name */
+
+	/* Reached over AppleTalk: address is "appletalk:NAME". */
+	bool appleTalk() const { return address.startsWith(QLatin1String("appletalk:")); }
 
 	bool operator==(const DiscoveredServer &o) const {
 		return kind == o.kind && address == o.address;
@@ -56,14 +61,22 @@ bool wsDiscoveryIsComputer(const QString &xml);
  * reply without a live Windows computer to probe. */
 QString wsDiscoveryComputerName(const QString &xml);
 
-/* Bonjour's and WS-Discovery's lists as one, sorted by name: each
+/* `zacos9-afp appletalk-servers` output (NAME<TAB>NET.NODE:SOCKET lines)
+ * as AFP servers at "appletalk:NAME": by name, since a Mac's AppleTalk
+ * address can change from one start to the next. */
+std::vector<DiscoveredServer> parseAppleTalkServers(const QString &text);
+
+/* Bonjour's, WS-Discovery's and AppleTalk's lists as one, sorted by name: each
  * computer once per kind, and no Windows entry for a computer that also
  * shares over AFP (a Mac, or ZacOS with both on: its AFP entry is the
  * one to use, and Connect to Server still reaches its Windows sharing).
  * A WS-Discovery reply without a ComputerName takes the name Bonjour
- * announced for that address, if any. */
+ * announced for that address, if any. A server found over AppleTalk
+ * and also over TCP/IP (Mac OS 9, ZacOS) is listed once, for TCP/IP:
+ * it's much faster. */
 std::vector<DiscoveredServer> mergeServers(const std::vector<DiscoveredServer> &bonjour,
-	const std::vector<DiscoveredServer> &windows);
+	const std::vector<DiscoveredServer> &windows,
+	const std::vector<DiscoveredServer> &appleTalk = {});
 
 /* `avahi-resolve -a ADDRESS...` output ("address<TAB>host" lines) as
  * address -> host, without ".local". */

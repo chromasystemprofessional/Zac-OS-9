@@ -6,6 +6,10 @@
  * the same request ID. The server also sends tickles (ignored), and
  * attentions (acknowledged); a thread monitors idle messages and tickles
  * the server every 30 s so an idle session isn't dropped.
+ *
+ * A host "appletalk:NAME" (an AFPServer by NBP name) or
+ * "appletalk:NET.NODE:SOCKET" is reached over AppleTalk instead, through
+ * ASP (asp.h), behind the same calls.
  */
 
 #include <pthread.h>
@@ -25,8 +29,11 @@ enum dsi_command {
 /* dsi_request's result when the connection fails (AFP codes are -5000ish). */
 #define DSI_ERR_IO (-100000)
 
+struct asp;
+
 struct dsi {
 	int fd;
+	struct asp *asp; /* over AppleTalk: the ASP session, fd its socket */
 	uint16_t next_id;
 	pthread_mutex_t lock;
 	pthread_t tickler;
@@ -38,7 +45,9 @@ struct dsi {
 	uint32_t server_quantum;
 };
 
-/* Connects to host:port (port NULL for 548). 0, or -errno. */
+/* Connects to host:port (port NULL for 548), or to an AppleTalk server.
+ * 0, or -errno (-ENOENT: no AppleTalk server by that name; -ENETDOWN:
+ * this computer has no AppleTalk address). */
 int dsi_connect(struct dsi *d, const char *host, const char *port);
 /* DSIOpenSession; learns the server's request quantum. 0 or an error. */
 int dsi_open_session(struct dsi *d);

@@ -1,7 +1,12 @@
 /*
  * zacos9-afp: connect to Apple file servers the way a classic Mac does
- * (AFP 2.1/2.2 over TCP/IP), for the Network Browser.
+ * (AFP 2.1/2.2 over TCP/IP, or over AppleTalk), for the Network Browser.
  *
+ *   zacos9-afp appletalk-servers
+ *       the AFP servers on this computer's AppleTalk network (NBP), one
+ *       "NAME<TAB>NET.NODE:SOCKET" line each; nothing if there are none,
+ *       exit status 3 if this computer has no AppleTalk address (atalkd
+ *       isn't running)
  *   zacos9-afp info SERVER
  *       what the Chooser shows before logging in: tab-separated
  *       name / machine / version / uam lines, and "guest yes" if guests
@@ -13,7 +18,9 @@
  *       logs in and serves the volume at DIR (FUSE) until it is unmounted
  *       (fusermount3 -u DIR)
  *
- * SERVER is a host name or address, with ":PORT" if not 548. Without
+ * SERVER is a host name or address, with ":PORT" if not 548, or
+ * "appletalk:NAME" (Mac OS 8.6 and earlier share only over AppleTalk),
+ * looked up by name each time: a Mac's AppleTalk address can change. Without
  * --user, as a guest. --cleartext allows sending the password as is, for
  * servers that know nothing better. On failure, a sentence for the person
  * goes to stderr; the exit status is 2 when logging in was refused.
@@ -24,19 +31,28 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <arpa/inet.h>
+
 #include "afp.h"
 #include "afpfs.h"
+#include "asp.h"
 
 static void usage(void) {
-	fprintf(stderr, "usage: zacos9-afp info SERVER\n"
+	fprintf(stderr, "usage: zacos9-afp appletalk-servers\n"
+		"       zacos9-afp info SERVER\n"
 		"       zacos9-afp volumes [--user NAME] [--cleartext] SERVER\n"
 		"       zacos9-afp mount [--user NAME] [--cleartext] [--foreground] SERVER VOLUME DIR\n");
 	exit(64);
 }
 
-/* "host", "host:port", "[v6]:port" */
+/* "host", "host:port", "[v6]:port", "appletalk:NAME" (all of it the host) */
 static void parse_server(const char *s, char *host, size_t hostlen, char *port, size_t portlen) {
 	const char *colon = NULL;
+	if (strncmp(s, "appletalk:", 10) == 0) {
+		snprintf(host, hostlen, "%s", s);
+		snprintf(port, portlen, "%s", "");
+		return;
+	}
 	if (s[0] == '[') {
 		const char *end = strchr(s, ']');
 		if (end) {
@@ -55,14 +71,32 @@ static void parse_server(const char *s, char *host, size_t hostlen, char *port, 
 	snprintf(port, portlen, "%s", colon ? colon + 1 : "548");
 }
 
+static int appletalk_servers(void) {
+	struct nbp_entry e[64];
+	int n;
+	int r = nbp_lookup("=", "AFPServer", e, 64, &n, 1500);
+	if (r < 0) {
+		fprintf(stderr, "AppleTalk isn’t on here (%s).\n", strerror(-r));
+		return 3;
+	}
+	for (int i = 0; i < n; i++) {
+		printf("%s\t%u.%u:%u\n", e[i].name, ntohs(e[i].addr.sat_addr.s_net), e[i].addr.sat_addr.s_node,
+			e[i].addr.sat_port);
+	}
+	return 0;
+}
+
 static int info(const char *server) {
 	char host[256], port[16];
 	parse_server(server, host, sizeof(host), port, sizeof(port));
 	struct afp_server_info si;
 	int r = afp_server_info(host, port, &si);
 	if (r < 0) {
+		const char *shown = strncmp(server, "appletalk:", 10) == 0 ? server + 10 : server;
 		fprintf(stderr, r == -EPROTO ? "“%s” isn’t a file server.\n"
-			: "The server “%s” could not be reached. It may not be on the network.\n", server);
+			: r == -ENETDOWN ? "AppleTalk isn’t on here, so “%s” can’t be reached.\n"
+			                 : "The server “%s” could not be reached. It may not be on the network.\n",
+			shown);
 		return 1;
 	}
 	printf("name\t%s\nmachine\t%s\n", si.name, si.machine);
@@ -79,6 +113,9 @@ static int info(const char *server) {
 }
 
 int main(int argc, char **argv) {
+	if (argc == 2 && strcmp(argv[1], "appletalk-servers") == 0) {
+		return appletalk_servers();
+	}
 	if (argc < 3) {
 		usage();
 	}

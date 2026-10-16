@@ -2,6 +2,7 @@
 
 #include <QCoreApplication>
 #include <QElapsedTimer>
+#include <QFileInfo>
 #include <QEventLoop>
 #include <QHash>
 #include <QHostAddress>
@@ -244,8 +245,41 @@ static QString hostOf(const QString &address) {
 	return address.section(':', 0, 0);
 }
 
+std::vector<DiscoveredServer> parseAppleTalkServers(const QString &text) {
+	std::vector<DiscoveredServer> out;
+	for (const QString &line : text.split('\n', Qt::SkipEmptyParts)) {
+		const QString name = line.section('\t', 0, 0);
+		if (name.isEmpty() || !line.contains('\t')) {
+			continue;
+		}
+		DiscoveredServer s;
+		s.kind = DiscoveredServer::AFP;
+		s.name = name;
+		s.address = "appletalk:" + name;
+		out.push_back(s);
+	}
+	return out;
+}
+
+/* zacos9-afp: as afpclient.cpp finds it (ZACOS9_AFP_CLIENT for tests). */
+static QString afpClient() {
+	const QString env = qEnvironmentVariable("ZACOS9_AFP_CLIENT");
+	if (!env.isEmpty()) {
+		return env;
+	}
+	const QString dir = QCoreApplication::applicationDirPath();
+	for (const QString &candidate : { dir + "/../libexec/zacos9/zacos9-afp",
+			dir + "/../network/zacos9-afp" }) {
+		if (QFileInfo(candidate).isExecutable()) {
+			return QFileInfo(candidate).canonicalFilePath();
+		}
+	}
+	return "zacos9-afp";
+}
+
 std::vector<DiscoveredServer> mergeServers(const std::vector<DiscoveredServer> &bonjour,
-		const std::vector<DiscoveredServer> &windows) {
+		const std::vector<DiscoveredServer> &windows,
+		const std::vector<DiscoveredServer> &appleTalk) {
 	/* Bonjour's names by address, and the computers sharing over AFP. */
 	QHash<QString, QString> names;
 	QSet<QString> afpHosts;
@@ -282,6 +316,17 @@ std::vector<DiscoveredServer> mergeServers(const std::vector<DiscoveredServer> &
 			s.name = names.value(hostOf(s.address));
 		}
 		out.push_back(s);
+	}
+	QSet<QString> afpNames;
+	for (const DiscoveredServer &s : bonjour) {
+		if (s.kind == DiscoveredServer::AFP) {
+			afpNames.insert(s.name.toCaseFolded());
+		}
+	}
+	for (const DiscoveredServer &s : appleTalk) {
+		if (!afpNames.contains(s.name.toCaseFolded())) {
+			out.push_back(s);
+		}
 	}
 	std::sort(out.begin(), out.end(), [](const DiscoveredServer &a, const DiscoveredServer &b) {
 		return a.name.compare(b.name, Qt::CaseInsensitive) < 0;
@@ -321,8 +366,30 @@ QHash<QString, QString> parseAvahiResolve(const QString &text) {
 }
 
 std::vector<DiscoveredServer> discoverServers(int timeoutMs) {
-	std::vector<DiscoveredServer> servers = mergeServers(bonjourServers(timeoutMs),
-		wsDiscoveryServers(timeoutMs));
+	/* AppleTalk alongside the others: NBP takes about as long. Nothing if
+	 * this computer isn't on AppleTalk (exit status 3). */
+	QProcess appleTalk;
+	appleTalk.start(afpClient(), { "appletalk-servers" });
+	const std::vector<DiscoveredServer> bonjour = bonjourServers(timeoutMs);
+	const std::vector<DiscoveredServer> windows = wsDiscoveryServers(timeoutMs);
+	QElapsedTimer waited;
+	waited.start();
+	while (appleTalk.state() != QProcess::NotRunning && waited.elapsed() < 3000) {
+		QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents |
+			QEventLoop::WaitForMoreEvents, 50);
+	}
+	if (appleTalk.state() != QProcess::NotRunning) {
+		appleTalk.kill();
+		waited.restart();
+		while (appleTalk.state() != QProcess::NotRunning && waited.elapsed() < 1000) {
+			QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents |
+				QEventLoop::WaitForMoreEvents, 50);
+		}
+	}
+	const bool answered = appleTalk.exitStatus() == QProcess::NormalExit && appleTalk.exitCode() == 0;
+	std::vector<DiscoveredServer> servers = mergeServers(bonjour, windows,
+		answered ? parseAppleTalkServers(QString::fromUtf8(appleTalk.readAllStandardOutput()))
+		         : std::vector<DiscoveredServer>());
 	QStringList nameless;
 	for (const DiscoveredServer &s : servers) {
 		if (s.name == s.address) {

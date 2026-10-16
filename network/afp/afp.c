@@ -541,8 +541,13 @@ int afp_connect(struct afp *a, const char *host, const char *port, const char *u
 	struct afp_server_info info;
 	int r = afp_server_info(host, port, &info);
 	if (r < 0) {
-		snprintf(err, errlen, r == -EPROTO ? "“%s” isn’t a file server." :
-			"The server “%s” could not be reached. It may not be on the network.", host);
+		/* "appletalk:NAME" is NAME to the person. */
+		const char *shown = strncmp(host, "appletalk:", 10) == 0 ? host + 10 : host;
+		snprintf(err, errlen, r == -EPROTO ? "“%s” isn’t a file server."
+			: r == -ENETDOWN ? "AppleTalk isn’t on here, so “%s” can’t be reached. "
+			                   "It needs atalkd (the atalkd package) running."
+			                 : "The server “%s” could not be reached. It may not be on the network.",
+			shown);
 		return r;
 	}
 	static const char *const ours[] = { "AFP2.2", "AFPVersion 2.1", "AFPVersion 2.0" };
@@ -899,18 +904,32 @@ ssize_t afp_write(struct afp *a, uint16_t fork, uint32_t offset, const void *buf
 		put16(&b, fork);
 		put32(&b, offset + (uint32_t)done);
 		put32(&b, (uint32_t)n);
+		uint8_t *reply;
+		size_t len;
 		int code = dsi_request(&a->dsi, DSI_WRITE, b.data, b.len, (const uint8_t *)buf + done, n,
-			NULL, NULL);
+			&reply, &len);
+		/* The reply is where the write ended: over AppleTalk a server takes
+		 * only what its buffer holds, maybe less than n. */
+		size_t wrote = n;
+		if (code == 0 && len >= 4) {
+			const uint32_t end = get32(reply);
+			const uint32_t start = offset + (uint32_t)done;
+			if (end > start && end - start < n) {
+				wrote = end - start;
+			}
+		}
+		free(reply);
 		if (code == AFP_SESSION_CLOSED || code == AFP_SERVER_GOING_DOWN) {
 			dsi_fail(&a->dsi);
 		}
 		if (getenv("ZACOS9_AFP_DEBUG")) {
-			fprintf(stderr, "afp: write %zu bytes at %u -> %d\n", n, offset + (unsigned)done, code);
+			fprintf(stderr, "afp: write %zu bytes at %u -> %d (%zu taken)\n", n,
+				offset + (unsigned)done, code, wrote);
 		}
 		if (code != 0) {
 			return done ? (ssize_t)done : to_errno(code);
 		}
-		done += n;
+		done += wrote;
 	}
 	return (ssize_t)done;
 }

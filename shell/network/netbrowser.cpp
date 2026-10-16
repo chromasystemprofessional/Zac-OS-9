@@ -61,7 +61,9 @@ void NetBrowserWindow::scan() {
 	m_found = discoverServers(1500);
 	QStringList names;
 	for (const DiscoveredServer &s : m_found) {
-		names << s.name + (s.kind == DiscoveredServer::AFP ? "  (AFP)" : "  (Windows)");
+		names << s.name + (s.kind == DiscoveredServer::SMB ? "  (Windows)"
+		                   : s.appleTalk()                 ? "  (AppleTalk)"
+		                                                   : "  (AFP)");
 	}
 	m_list.setItems(names);
 	if (!names.isEmpty()) {

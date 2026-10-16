@@ -183,6 +183,54 @@ Both were only found by actually connecting end to end against this
 project's own Netatalk test server and reading what came back — neither
 would have been caught by code review alone.
 
+## AFP over AppleTalk
+
+Macs before Mac OS 9 share files only over AppleTalk: their File Sharing
+has no TCP/IP. `zacos9-afp` reaches them through ASP (AppleTalk Session
+Protocol) on ATP transactions on DDP datagrams, from the kernel's
+`AF_APPLETALK` sockets (`network/afp/asp.c`; Inside AppleTalk, 2nd
+edition, chapters 7, 9 and 11). Nothing in Debian has an AFP-over-ASP
+client (Netatalk's libatalk has only the server side), so this is our own.
+`dsi.c` hands any host "appletalk:NAME" to it, behind the same calls, so
+`afp.c`'s logins (2-Way Randnum, Randnum, clear text, guest), volumes and
+the FUSE mount are the TCP/IP ones.
+
+- **AppleTalk address:** this computer needs one, from atalkd (the
+  `atalkd` package, Recommended; File Sharing turns it on with AFP). Without
+  it `zacos9-afp appletalk-servers` exits 3 and the Network Browser lists
+  no AppleTalk servers. No root needed: a dynamic socket (129-254) takes
+  replies, and the server's own requests come to the same one.
+- **Finding servers:** NBP LkUp `=:AFPServer@*`, broadcast on this
+  network, three times 500 ms apart (`zacos9-afp appletalk-servers`). The
+  Network Browser runs it alongside Bonjour and lists "NAME (AppleTalk)",
+  except for servers also found over TCP/IP by the same name (Mac OS 9,
+  ZacOS), which are far faster that way. Not done: zones, and BrRq through
+  an AppleTalk router (none here: atalkd's startup range).
+- **By name, not address:** "appletalk:NAME" is looked up each time it's
+  used. A Power Mac 7500's server socket moved from 254 to 249 between two
+  of its starts, an hour apart.
+- **ATP:** a request asks for as many response packets as it expects. Mac
+  OS answers SPOpenSession's one-packet request without EOM, so asking for
+  8 waited for 7 that never came (seen live). Commands are XO (exactly
+  once) and released; they're retried every 2 s for 30 s. One TID counter
+  for the whole process: two sockets opened in the same second once
+  started at the same TID.
+- **Sizes:** an ATP response is at most 8 × 578 bytes, so reads and
+  writes go in pieces of ASP_QUANTUM (4624) less 64. A write's data goes
+  out when the server asks for it (SPWriteContinue), as much as its buffer
+  takes; FPWrite's reply (the last byte written) says how much that was,
+  and `afp_write` carries on from there.
+- **Keeping the session:** our tickle every 30 s; the server's own
+  tickles show it's still there, and two minutes without a packet from it
+  ends the mount, as a TCP/IP connection loss does. Attentions are
+  answered; the server's SPCloseSession ends the session.
+
+Checked live against a Power Mac 7500 (File Sharing, AFP 1.1–2.1, Randnum
+and 2-Way Randnum): NBP lookup, server info, guest login, its volume
+("Adam’s Shared Files", Mac Roman apostrophe and all) and its size, a
+mount, and an empty listing (AFP's -5018 at the end). TODO: files in it
+read and written, a Randnum login, the 7500 shut down under a mount.
+
 ## SMB
 
 Through `gio mount`, not a client of our own. One real finding changed

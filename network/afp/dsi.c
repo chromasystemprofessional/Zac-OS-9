@@ -1,5 +1,6 @@
 #define _GNU_SOURCE
 #include "dsi.h"
+#include "asp.h"
 
 #include <errno.h>
 #include <stdio.h>
@@ -143,11 +144,62 @@ static int send_header(struct dsi *d, const struct header *h, const void *a, siz
 	return 0;
 }
 
+#define APPLETALK "appletalk:"
+
+static int asp_connect(struct dsi *d, const char *server) {
+	struct sockaddr_at sls;
+	int r = asp_resolve(server, &sls);
+	if (r < 0) {
+		return r;
+	}
+	if (!(d->asp = malloc(sizeof(*d->asp)))) {
+		return -ENOMEM;
+	}
+	if ((r = asp_open(d->asp, &sls)) < 0) {
+		free(d->asp);
+		d->asp = NULL;
+		return r;
+	}
+	d->fd = d->asp->fd;
+	d->server_quantum = ASP_QUANTUM;
+	return 0;
+}
+
+/* dsi_request over ASP. -EIO from it means the server stopped answering. */
+static int asp_request(struct dsi *d, enum dsi_command command, const void *req, size_t reqlen,
+		const void *data, size_t datalen, uint8_t **out, size_t *outlen) {
+	int code;
+	switch (command) {
+	case DSI_GET_STATUS:
+		code = asp_get_status(d->asp, out, outlen);
+		break;
+	case DSI_OPEN_SESSION:
+		code = asp_open_session(d->asp);
+		break;
+	case DSI_COMMAND:
+		code = asp_command(d->asp, req, reqlen, out, outlen);
+		break;
+	case DSI_WRITE:
+		code = asp_write(d->asp, req, reqlen, data, datalen, out, outlen);
+		break;
+	default:
+		return 0;
+	}
+	if (code == -EIO || code == -EMSGSIZE) {
+		failed(d);
+		return DSI_ERR_IO;
+	}
+	return code;
+}
+
 int dsi_connect(struct dsi *d, const char *host, const char *port) {
 	memset(d, 0, sizeof(*d));
 	d->fd = -1;
 	d->server_quantum = 128 * 1024;
 	pthread_mutex_init(&d->lock, NULL);
+	if (strncmp(host, APPLETALK, strlen(APPLETALK)) == 0) {
+		return asp_connect(d, host + strlen(APPLETALK));
+	}
 	struct addrinfo hints = { .ai_socktype = SOCK_STREAM, .ai_family = AF_UNSPEC }, *res;
 	int err = getaddrinfo(host, port && *port ? port : "548", &hints, &res);
 	if (err) {
@@ -199,6 +251,11 @@ int dsi_request(struct dsi *d, enum dsi_command command, const void *req, size_t
 	if (d->dead) {
 		pthread_mutex_unlock(&d->lock);
 		return DSI_ERR_IO;
+	}
+	if (d->asp) {
+		int code = asp_request(d, command, req, reqlen, data, datalen, out, outlen);
+		pthread_mutex_unlock(&d->lock);
+		return code;
 	}
 	struct header h = {
 		.flags = 0,
@@ -258,6 +315,9 @@ int dsi_request(struct dsi *d, enum dsi_command command, const void *req, size_t
 }
 
 int dsi_open_session(struct dsi *d) {
+	if (d->asp) {
+		return dsi_request(d, DSI_OPEN_SESSION, NULL, 0, NULL, 0, NULL, NULL);
+	}
 	/* Option 1: our attention quantum. */
 	uint8_t opt[6] = { 0x01, 4 };
 	put32(opt + 2, 1024);
@@ -300,7 +360,13 @@ static void *tickle(void *arg) {
 			pthread_mutex_unlock(&d->lock);
 			return NULL;
 		}
-		if (result < 0 || (ready.revents & (POLLERR | POLLHUP | POLLNVAL))) {
+		if (d->asp) {
+			/* Over AppleTalk: answer what came while idle; the server's
+			 * own tickles show it's still there. */
+			if (result < 0 || asp_idle(d->asp) < 0) {
+				failed(d);
+			}
+		} else if (result < 0 || (ready.revents & (POLLERR | POLLHUP | POLLNVAL))) {
 			failed(d);
 		} else if (ready.revents & POLLIN) {
 			/* Requests own the lock through their reply, and may consume
@@ -326,8 +392,12 @@ static void *tickle(void *arg) {
 			}
 		}
 		if (!d->dead && time(NULL) >= next) {
-			struct header h = { .command = DSI_TICKLE, .id = d->next_id++ };
-			send_header(d, &h, NULL, 0, NULL, 0);
+			if (d->asp) {
+				asp_tickle(d->asp);
+			} else {
+				struct header h = { .command = DSI_TICKLE, .id = d->next_id++ };
+				send_header(d, &h, NULL, 0, NULL, 0);
+			}
 			next = time(NULL) + TICKLE_SECONDS;
 		}
 		const int dead = d->dead;
@@ -356,12 +426,21 @@ void dsi_close(struct dsi *d) {
 	}
 	pthread_mutex_lock(&d->lock);
 	d->disconnected = NULL;
-	if (!d->dead) {
-		struct header h = { .command = DSI_CLOSE_SESSION, .id = d->next_id++ };
-		send_header(d, &h, NULL, 0, NULL, 0);
+	if (d->asp) {
+		if (d->dead) {
+			d->asp->closed = 1; /* nothing to say goodbye to */
+		}
+		asp_close(d->asp);
+		free(d->asp);
+		d->asp = NULL;
+	} else {
+		if (!d->dead) {
+			struct header h = { .command = DSI_CLOSE_SESSION, .id = d->next_id++ };
+			send_header(d, &h, NULL, 0, NULL, 0);
+		}
+		close(d->fd);
 	}
 	d->dead = 1;
-	close(d->fd);
 	d->fd = -1;
 	pthread_mutex_unlock(&d->lock);
 	if (d->tickling) {
