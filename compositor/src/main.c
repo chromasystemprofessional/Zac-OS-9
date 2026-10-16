@@ -19,6 +19,7 @@
 #include "access.h"
 #include "server.h"
 #include "snapshot.h"
+#include "settings.h"
 
 static void usage(const char *argv0) {
 	printf("Usage: %s [-d] [-S scale] [-s startup-command]\n"
@@ -235,6 +236,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	setenv("WAYLAND_DISPLAY", socket, true);
+	pl_sound_event("startup");
 	prefs_write_outputs(&server);
 	share_our_data();
 	startup_begin(&server);

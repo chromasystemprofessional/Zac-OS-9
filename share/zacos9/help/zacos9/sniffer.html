@@ -3,6 +3,7 @@
 <body>
 <h1>Working in the Sniffer</h1>
 <p>The <b>Sniffer</b> is the program that draws the desktop and the windows of your disks and folders. Its menus (File, Edit, View, Special and Help) are in the menu bar whenever you click the desktop or one of its windows.</p>
+<p>Choose <b>Help ▸ Show Hint Bubbles</b> to turn short hover hints on or off. The setting applies to Qt programs using the ZacOS Platinum style.</p>
 <h2>Disks and folders</h2>
 <p><b>Zacintosh HD</b>, at the top right of the desktop, holds Applications, the System Folder and your Home folder. Your home folder holds your own Documents, Downloads, Pictures and so on. Disks you plug in, and network volumes you connect to, appear on the desktop too.</p>
 <p>Double-click a disk or folder to open its window. ⌘-↑ opens the folder that encloses the one in front; Option-⌘-↑ also closes the window you were in, and so does Option-double-clicking an icon. ⌘-click a window's title for a menu of the folders it's inside.</p>
@@ -14,19 +15,26 @@
 <li><b>View Options…</b> sets icon size, grid snapping, Keep Arranged, and which columns a list shows. Edit ▸ Preferences sets the standard views and spring-loaded folders.</li>
 <li>⌘-drag inside a window to scroll it in any direction with the hand.</li>
 </ul>
+<p>Choose <b>File ▸ Search Internet</b>, choose DuckDuckGo, Google or Bing, and enter words to search in your web browser.</p>
 <h2>Pop-up windows</h2>
 <p>Choose <b>View ▸ as Pop-up Window</b> to keep a folder you use often at the bottom of the screen as a tab with its name. Click the tab to open the window above it; click the tab again, or anywhere else, to close it. Drag the tab along the bottom of the screen to move it. To drop something in, drag it onto the tab and hold it there: the window springs open. To make it an ordinary window again, choose <b>View ▸ as Window</b>, or drag its tab up off the bottom of the screen. Resize an open pop-up window by its top corners.</p>
 <h2>Icons</h2>
 <ul>
 <li>Click an icon to select it; Shift-click to add more, or drag a box around several. Type the first letters of a name to select it.</li>
 <li>Click a selected icon's name to rename it.</li>
-<li><b>File ▸ Get Info</b> (⌘-I) shows an item's size, kind, where it is and its comments; Get Info ▸ Sharing shows who may read or change it.</li>
+<li><b>File ▸ Get Info</b> (⌘-I) shows an item's size, kind, where it is and its comments; Get Info ▸ Sharing shows who may read or change it. To change an item's icon, click its picture and paste a picture from the Clipboard; press Delete to restore the default icon.</li>
+<li>With spring-loaded folders enabled, drag an item over a folder and wait for it to open, or press Space to open it immediately. Folders opened during a drag close when the drag ends.</li>
 <li><b>File ▸ Label</b> colours an item. Label names and colours can be changed in Edit ▸ Preferences.</li>
 </ul>
 <h2>The Trash</h2>
 <p>Drag items to the Trash, or press ⌘-Delete, to throw them away. They stay there until you choose Special ▸ Empty Trash…. To take something back out, select it in the Trash and choose File ▸ Put Away (⌘-Y). Dragging a network volume to the Trash disconnects it. Empty Trash asks first; to stop it asking, select the Trash, choose File ▸ Get Info and turn off <b>Warn before emptying</b>. It still asks before uninstalling programs. Locked items stay in the Trash; hold down Option while you choose Empty Trash to remove them too.</p>
+<p>The same warning preference is also available in Sniffer ▸ Preferences ▸ General.</p>
 <h2>Toy Box</h2>
 <p>The <b>Toy Box</b> (Zac menu ▸ Control Panels ▸ Toy Box) is a window of big buttons for the programs, documents and folders you use most. It shows the items in System Folder ▸ Toy Box Items; folders there whose names start with a bullet (•) become pages.</p>
+<h2>Folder Tricks</h2>
+<p>A <b>folder trick</b> is a program that runs by itself whenever items arrive in a folder: to sort photos, resize pictures or tell you a file has come in. Put the program (any executable file, such as a shell script) in System Folder ▸ <b>Folder Tricks</b>, then Control-click the folder, its window's background or the desktop and choose <b>Attach a Folder Trick</b> ▸ and the trick. From then on, whenever items arrive the trick runs in that folder, given the folder and the new items, once everything has finished arriving. <b>Remove a Folder Trick</b> ▸ takes it off. Hidden files and downloads still in progress wait until they're complete. Tricks run while you're logged in.</p>
+<h2>Adding commands to contextual menus</h2>
+<p>Put a program's .desktop file in System Folder ▸ <b>Contextual Menu Items</b> and it appears at the bottom of the contextual menu of the items it can open, as listed by its MimeType line (folders and window backgrounds are inode/directory; without a MimeType line it's offered for everything). Choosing it opens the items with that program.</p>
 <p>See also: <a href="files.html">Copying, moving and organising files</a>, <a href="find.html">Finding files</a>.</p>
 <p><a href="index.html">ZacOS Help</a></p>
 </body></html>

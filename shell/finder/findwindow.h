@@ -46,7 +46,7 @@ private:
 	PanelHost m_host{ this };
 	PanelPopup m_scope;
 	std::vector<std::unique_ptr<Row>> m_rows;
-	PanelButton m_more, m_fewer, m_find;
+	PanelButton m_more, m_fewer, m_saveSearch, m_savedSearches, m_find;
 	QString m_problem;
 };
 

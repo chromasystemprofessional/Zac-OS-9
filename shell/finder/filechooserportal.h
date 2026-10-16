@@ -5,6 +5,7 @@
 #include <QList>
 #include <QString>
 #include <QStringList>
+#include <QUrl>
 
 class QFileDialog;
 
@@ -31,6 +32,8 @@ bool fileChooserPathWithinDrive(const QString &path, const QString &root);
 /* `browsing` also admits the startup disk's own (virtual) folders. */
 bool fileChooserPathWithinDisk(const QString &path, const QString &root,
 	const QStringList &realRoots, bool browsing);
+QString fileChooserDroppedFolder(const QList<QUrl> &urls, const QString &root,
+	const QStringList &realRoots);
 QString fileChooserRealPath(const QString &path);
 /* General Controls' Documents: the folder an Open or Save dialog for
  * `appId` starts in ("last": the one last used in that program; "documents":
@@ -40,6 +43,9 @@ QString fileChooserRealPath(const QString &path);
 QString fileChooserStartFolder(const QString &appId);
 /* The folder last used in `appId`'s dialog, for "last". */
 void fileChooserRememberFolder(const QString &appId, const QString &folder);
+QStringList fileChooserRecentFolders();
+QStringList fileChooserRecentFolders(const FileChooserLocation &location);
+void fileChooserRememberRecentFolder(const QString &folder);
 /* The location among `locations` holding the real folder `folder`, and in
  * *browse the path to it there (on the startup disk, through its links);
  * an empty location if none does. */

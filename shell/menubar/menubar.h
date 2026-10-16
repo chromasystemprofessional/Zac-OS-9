@@ -50,6 +50,8 @@ void app_quit(const char *app_id);
 const char *app_switch_target(int step);
 /* The same choice on a given list (front first, as apps_collect gives). */
 const char *app_switch_pick(struct app *apps, int n, int step);
+/* The active app to hide when Option-selecting target, or NULL if unchanged. */
+const char *app_switch_option_previous(struct app *apps, int n, const char *target);
 
 /* ---- menus (menus.c) ----------------------------------------------------- */
 
@@ -63,6 +65,7 @@ enum action {
 	ACT_SHOW_ALL,
 	ACT_ACTIVATE_APP, /* arg: app id */
 	ACT_ABOUT,
+	ACT_TOGGLE_SETTING, /* arg: desktop.conf key, toggled between 0 and 1 */
 	ACT_EDIT_COMMAND, /* key: the ⌘ letter, sent to the front app */
 	ACT_EDIT_CLEAR,
 	ACT_FINDER,       /* arg: Finder command name */
@@ -117,13 +120,14 @@ void menus_show_app_name(bool shown);
 /* The program's own icon for that title (appicon.c), MBAR_ICON_W x
  * MBAR_ICON_H straight-alpha ARGB, or NULL if it has none we can load. */
 const uint32_t *app_icon_title(const char *app_id);
+void menus_hourly_chime(void);
 /* Sticky Keys (platinum-shell-v1 sticky_keys): while it is on, the bar
  * shows the modifiers it holds, a locked one in brackets. */
 void menus_set_sticky(bool on, unsigned latched, unsigned locked);
 /* Its title: "" when off, a dot when on with nothing held. */
 void menus_sticky_title(bool on, unsigned latched, unsigned locked, char *out, size_t size);
 void menus_free(struct mb_bar *bar);
-void menus_perform(struct mb_item *item);
+void menus_perform(struct mb_item *item, bool option_held);
 /* Building blocks for menus filled elsewhere (appmenu.c). */
 struct mb_menu *menus_new_menu(struct mb_menu *menus, int *n, const char *title);
 struct mb_item *menus_add_item(struct mb_menu *m, const char *label, char key,
@@ -179,12 +183,26 @@ struct finder_state {
 	int custom;           /* its columns were moved or resized */
 	int popup;            /* the front window is a pop-up window */
 	int popups;           /* zacos9-wm has pop-up windows */
+	int documents;        /* the selection has documents to print */
 };
 
 bool finder_connect(void);
 int finder_fd(void);          /* -1 when not connected */
 bool finder_read(void);       /* true if the state changed */
 const struct finder_state *finder_state(void);
+/* What the Sniffer sent with its last contextual menu: the Folder Tricks
+ * for what was clicked, and the Contextual Menu Items' commands. */
+#define FINDER_EXTRAS 32
+struct finder_extras {
+	bool can_trick;               /* a folder that tricks attach to */
+	char *attached[FINDER_EXTRAS]; /* tricks attached to it */
+	int n_attached;
+	char *available[FINDER_EXTRAS]; /* the Folder Tricks folder's */
+	int n_available;
+	char *commands[FINDER_EXTRAS];
+	int n_commands;
+};
+const struct finder_extras *finder_extras(void);
 void finder_send(const char *command);
 
 /* A Sniffer contextual menu ("icon", "disk", "trash", "window", "desktop"),

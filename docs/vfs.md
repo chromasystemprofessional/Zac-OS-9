@@ -569,7 +569,9 @@ alias does not queue or uninstall its original.
 
 **Put Away**, or dragging a queued app back to Applications, cancels removal
 and restores its launcher. **Empty Trash** asks for confirmation listing queued
-app names and install sources, then shows progress while uninstalling them.
+app names and install sources by default; Finder Preferences > General can
+turn off the warning. Locked items remain unless Option is held while choosing
+Empty Trash. It then shows progress while uninstalling applications.
 Debian uses the existing software helper's `remove` operation, not `purge`;
 user Flatpak uses `flatpak --user uninstall` without `--delete-data`. Personal
 data is retained. A Debian package can own several applications or have
@@ -640,6 +642,8 @@ from the icon set's plain on/off transparency.
 `finder-desktop` tests menu and drag-to-Trash queueing, persisted records,
 Put Away, cancellation, failed-removal retries, both uninstall command routes,
 and personal-data preservation with isolated commands (no real uninstall).
+The file-chooser location test checks Favorites, the recent-folder order and
+limit, unavailable destinations, and each disk's navigation boundaries.
 `tests/ui/finder-startup-disk.sh` and `tests/ui/finder-hide-application.sh`
 are the matching look at the screen; the latter queues and restores an app
 without emptying Trash.

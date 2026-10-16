@@ -13,6 +13,7 @@
 #include <QPointer>
 #include <QPainter>
 #include <QProcess>
+#include <QPixmap>
 #include <QStandardPaths>
 #include <QTimer>
 #include <algorithm>
@@ -302,7 +303,7 @@ void desktopWallpaperFill(pl_canvas *canvas, int index, const QString &mode,
 		}
 		uncached.fill(GRAY(3));
 		QImage scaled;
-		if (mode == "center") {
+		if (mode == "center" || mode == "tile") {
 			scaled = tile.image;
 		} else if (mode == "fill") {
 			// Crop before scaling: extreme aspect ratios must not allocate
@@ -326,8 +327,12 @@ void desktopWallpaperFill(pl_canvas *canvas, int index, const QString &mode,
 			qWarning() << "Could not scale desktop wallpaper" << tile.name << size;
 		}
 		QPainter painter(&uncached);
-		painter.drawImage((size.width() - scaled.width()) / 2,
-			(size.height() - scaled.height()) / 2, scaled);
+		if (mode == "tile") {
+			painter.drawTiledPixmap(uncached.rect(), QPixmap::fromImage(scaled));
+		} else {
+			painter.drawImage((size.width() - scaled.width()) / 2,
+				(size.height() - scaled.height()) / 2, scaled);
+		}
 		painter.end();
 		const int cost = static_cast<int>(uncached.sizeInBytes() / 1024 + 1);
 		if (cost <= photos.rendered.maxCost()) {

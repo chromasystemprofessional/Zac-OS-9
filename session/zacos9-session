@@ -90,7 +90,9 @@ fi
 # The compositor runs its startup command after starting the Wayland backend,
 # setting WAYLAND_DISPLAY, and launching the desktop surfaces. Import the
 # session environment first, then process the effective FreeDesktop entries.
-startup="${startup:+$startup; }zacos9-autostart"
+if [ "${ZACOS9_SAFE_MODE:-0}" != 1 ]; then
+	startup="${startup:+$startup; }zacos9-autostart"
+fi
 # Start the file chooser now: its first scan of the Finder's applications
 # takes a few seconds, which the first Open/Save dialog shouldn't wait for.
 if command -v dbus-send >/dev/null; then

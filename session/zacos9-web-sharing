@@ -1,0 +1,187 @@
+#!/usr/bin/python3
+"""Serve the user's Web Pages folder on port 8080 when explicitly enabled."""
+
+import http.server
+import os
+from pathlib import Path
+import signal
+import stat
+import subprocess
+import sys
+import time
+from urllib.parse import unquote, urlsplit
+
+PORT = int(os.environ.get("ZACOS9_WEB_SHARING_PORT", "8080"))
+ROOT = Path.home() / "Web Pages"
+RUNTIME = (Path(os.environ["XDG_RUNTIME_DIR"]) / "zacos9"
+           if os.environ.get("XDG_RUNTIME_DIR")
+           else Path.home() / ".cache/zacos9/run")
+PIDFILE = RUNTIME / "zacos9-web-sharing.pid"
+LOGFILE = Path.home() / ".cache/zacos9/web-sharing.log"
+
+
+def runtime_dir():
+    RUNTIME.mkdir(mode=0o700, parents=True, exist_ok=True)
+    if RUNTIME.is_symlink() or RUNTIME.stat().st_uid != os.getuid():
+        raise RuntimeError(f"Unsafe runtime directory: {RUNTIME}")
+    RUNTIME.chmod(0o700)
+    return RUNTIME
+
+
+class WebHandler(http.server.SimpleHTTPRequestHandler):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, directory=str(ROOT), **kwargs)
+
+    def translate_path(self, path):
+        root = ROOT.resolve()
+        raw = unquote(urlsplit(path).path)
+        candidate = root
+        for part in raw.split("/"):
+            if part in ("", ".", ".."):
+                continue
+            candidate /= part
+        try:
+            candidate.resolve().relative_to(root)
+        except (OSError, ValueError):
+            return str(root / ".zacos9-outside-root")
+        return str(candidate)
+
+    def log_message(self, fmt, *args):
+        return
+
+
+def process_matches(pid):
+    try:
+        cmdline = Path(f"/proc/{pid}/cmdline").read_bytes().split(b"\0")
+        return os.fsencode(str(Path(__file__).resolve())) in cmdline and b"_serve" in cmdline
+    except (FileNotFoundError, PermissionError, ProcessLookupError):
+        return False
+
+
+def read_pid():
+    try:
+        info = PIDFILE.lstat()
+        if info.st_uid != os.getuid() or not stat.S_ISREG(info.st_mode):
+            raise RuntimeError("The Web Sharing process file is not a regular file owned by you.")
+        return int(PIDFILE.read_text(encoding="ascii").strip())
+    except FileNotFoundError:
+        return None
+    except (ValueError, OSError) as exc:
+        raise RuntimeError(f"Cannot read Web Sharing process file: {exc}") from exc
+
+
+def status():
+    runtime_dir()
+    pid = read_pid()
+    if pid is not None and process_matches(pid):
+        print("on")
+        return
+    if pid is not None:
+        PIDFILE.unlink(missing_ok=True)
+    print("off")
+
+
+def serve():
+    runtime_dir()
+    ROOT.mkdir(mode=0o755, parents=True, exist_ok=True)
+    pid = os.getpid()
+    with http.server.ThreadingHTTPServer(("0.0.0.0", PORT), WebHandler) as server:
+        fd = os.open(PIDFILE, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        try:
+            os.write(fd, f"{pid}\n".encode("ascii"))
+        finally:
+            os.close(fd)
+        try:
+            def stop_server(_signum, _frame):
+                raise KeyboardInterrupt
+
+            server.daemon_threads = True
+            signal.signal(signal.SIGTERM, stop_server)
+            print(f"Serving {ROOT} on port {PORT}", file=sys.stderr, flush=True)
+            try:
+                server.serve_forever()
+            except KeyboardInterrupt:
+                pass
+        finally:
+            try:
+                if read_pid() == pid:
+                    PIDFILE.unlink(missing_ok=True)
+            except (OSError, RuntimeError):
+                pass
+
+
+def start():
+    runtime_dir()
+    pid = read_pid()
+    if pid is not None and process_matches(pid):
+        print("Web Sharing is already on.")
+        return
+    if pid is not None:
+        PIDFILE.unlink(missing_ok=True)
+    ROOT.mkdir(mode=0o755, parents=True, exist_ok=True)
+    LOGFILE.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    with LOGFILE.open("wb") as log:
+        child = subprocess.Popen(
+            [sys.executable, str(Path(__file__).resolve()), "_serve"],
+            stdin=subprocess.DEVNULL, stdout=log, stderr=log, start_new_session=True,
+            close_fds=True,
+        )
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        pid = read_pid()
+        if pid == child.pid and process_matches(pid):
+            print(f"Web Sharing is on at http://<this-computer>:{PORT}/")
+            return
+        if child.poll() is not None:
+            break
+        time.sleep(0.05)
+    try:
+        child.terminate()
+        child.wait(timeout=2)
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    tail = LOGFILE.read_text(encoding="utf-8", errors="replace")[-1200:]
+    raise RuntimeError(f"Web Sharing could not start on port {PORT}.\n{tail}".strip())
+
+
+def stop():
+    runtime_dir()
+    pid = read_pid()
+    if pid is None:
+        print("off")
+        return
+    if not process_matches(pid):
+        PIDFILE.unlink(missing_ok=True)
+        print("off")
+        return
+    os.kill(pid, signal.SIGTERM)
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        if not process_matches(pid):
+            PIDFILE.unlink(missing_ok=True)
+            print("off")
+            return
+        time.sleep(0.05)
+    raise RuntimeError("Web Sharing did not stop after receiving the stop request.")
+
+
+def main():
+    try:
+        if len(sys.argv) == 2 and sys.argv[1] == "_serve":
+            serve()
+        elif len(sys.argv) == 2 and sys.argv[1] == "start":
+            start()
+        elif len(sys.argv) == 2 and sys.argv[1] == "stop":
+            stop()
+        elif len(sys.argv) == 2 and sys.argv[1] == "status":
+            status()
+        else:
+            raise RuntimeError("Usage: zacos9-web-sharing {start|stop|status}")
+    except (OSError, RuntimeError, ValueError) as exc:
+        print(f"zacos9-web-sharing: {exc}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -356,6 +356,15 @@ public:
 		m_grid.add("Wide (neater arrangement)", QPoint(X + IN, gridTop + TOP + ROW));
 		m_grid.selected = tightGrid() ? 0 : 1;
 		m_grid.changed = [](int i) { pl_setting_set("grid-spacing", i == 0 ? "tight" : nullptr); };
+		const int trashTop = gridTop + groupH(2) + 8;
+		m_warnTrash = PanelCheckbox("Warn before emptying Trash",
+			QPoint(X + IN, trashTop + TOP));
+		m_warnTrash.on = warnBeforeEmptyingTrash();
+		m_warnTrash.toggled = [this](bool warn) {
+			if (!setWarnBeforeEmptyingTrash(warn)) {
+				m_warnTrash.on = !warn;
+			}
+		};
 
 		/* Views. */
 		m_viewFor.rect = QRect(X + 196, PANE + 14, 110, PL_POPUP_H);
@@ -403,6 +412,9 @@ protected:
 			m_delay.paint(c);
 			const int gridTop = PANE + 16 + SPRING_H + GAP;
 			panelGroup(c, X, gridTop, W - X - 2, gridTop + groupH(2), "Grid Spacing", PANE_BG);
+			const int trashTop = gridTop + groupH(2) + 8;
+			panelGroup(c, X, trashTop, W - X - 2, trashTop + TOP + PL_CHECKBOX_SIZE +
+				PL_GROUP_MARGIN, "Trash", PANE_BG);
 		} else if (m_tab == 1) {
 			panelText(c, "Standard View Options for:", X, m_viewFor.rect.top() + 14);
 			m_views.paint(c, PANE_BG);
@@ -475,7 +487,7 @@ private:
 		m_host.edits.clear();
 		m_host.setFocus(nullptr);
 		if (tab == 0) {
-			m_host.checks = { &m_spring };
+			m_host.checks = { &m_spring, &m_warnTrash };
 			m_host.radios = { &m_grid };
 		} else if (tab == 1) {
 			showView(m_viewFor.selected);
@@ -545,6 +557,7 @@ private:
 	std::vector<Text> m_tabTexts;
 	std::vector<const plat_text *> m_tabs;
 	PanelCheckbox m_spring;
+	PanelCheckbox m_warnTrash;
 	PanelSlider m_delay;
 	bool m_sliding = false;
 	PanelRadios m_grid;

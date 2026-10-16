@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QDateTime>
+#include <QImage>
 #include <QPoint>
 #include <QRect>
 #include <QString>
@@ -124,6 +125,10 @@ inline constexpr const char *LABEL_ATTR = "user.zacos9.label";
 int readLabel(const QString &path);
 /* Label 0 removes the attribute. Returns false if it can't be stored. */
 bool writeLabel(const QString &path, int label);
+/* A Get Info icon pasted by the user (32x32 PNG in a user xattr). */
+QImage customIconImage(const QString &path);
+bool writeCustomIconImage(const QString &path, const QImage &image);
+bool clearCustomIconImage(const QString &path);
 
 /* The node's name for a virtual path, "Unix" for /, "Trash" for the
  * trash, else the last path component. */

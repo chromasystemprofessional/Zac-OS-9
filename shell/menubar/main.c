@@ -542,7 +542,7 @@ static void blink_tick(void) {
 	}
 	close_menu();
 	pl_sound_event("menu-command");
-	menus_perform(&g.chosen);
+	menus_perform(&g.chosen, g.chosen.option);
 	free(g.chosen.arg);
 	g.chosen.arg = NULL;
 }
@@ -852,23 +852,28 @@ static const struct wl_pointer_listener pointer_listener = {
 
 static void kb_keymap(void *data, struct wl_keyboard *k, uint32_t format, int fd,
 		uint32_t size) {
-	/* Only to know Option's bit in the modifiers. */
-	char *map = format == WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1 ?
-		mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0) : MAP_FAILED;
+	if (format != WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1 || size == 0) {
+		close(fd);
+		return;
+	}
+	void *map = mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
 	close(fd);
 	if (map == MAP_FAILED) {
 		return;
 	}
-	struct xkb_context *ctx = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
-	struct xkb_keymap *keymap = ctx ? xkb_keymap_new_from_buffer(ctx, map, strnlen(map, size),
-		XKB_KEYMAP_FORMAT_TEXT_V1, XKB_KEYMAP_COMPILE_NO_FLAGS) : NULL;
+	struct xkb_context *context = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
+	struct xkb_keymap *keymap = context
+		? xkb_keymap_new_from_buffer(context, map, strnlen(map, size),
+			XKB_KEYMAP_FORMAT_TEXT_V1, XKB_KEYMAP_COMPILE_NO_FLAGS)
+		: NULL;
 	munmap(map, size);
+	g.option_mask = 0;
 	if (keymap) {
 		const xkb_mod_index_t alt = xkb_keymap_mod_get_index(keymap, XKB_MOD_NAME_ALT);
-		g.option_mask = alt == XKB_MOD_INVALID ? 0 : 1u << alt;
+		g.option_mask = alt < 32 ? 1u << alt : 0;
 		xkb_keymap_unref(keymap);
 	}
-	xkb_context_unref(ctx);
+	xkb_context_unref(context);
 }
 
 static void kb_enter(void *data, struct wl_keyboard *k, uint32_t serial,
@@ -1224,6 +1229,7 @@ int main(void) {
 		uint64_t expirations;
 		if ((fds[1].revents & POLLIN) &&
 				read(g.clock_fd, &expirations, sizeof(expirations)) > 0) {
+			menus_hourly_chime();
 			menubar_apps_changed(); /* rebuilds the clock title */
 		}
 		if ((fds[2].revents & POLLIN) &&

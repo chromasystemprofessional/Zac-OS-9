@@ -10,7 +10,7 @@
     when the generic rule (fixed size with a parent window) can't apply.
   </description>
 
-  <interface name="platinum_shell_v1" version="15">
+  <interface name="platinum_shell_v1" version="16">
     <enum name="style">
       <entry name="document" value="0" summary="standard document window"/>
       <entry name="movable_modal" value="1"
@@ -270,6 +270,13 @@
       </description>
       <arg name="surface" type="object" interface="wl_surface"/>
     </event>
+    <request name="close_app_window" since="16">
+      <description summary="close the front window of an application">
+        Ask the frontmost mapped window with this app id to close, without
+        quitting its application. Used by the Sniffer's Option-double-click.
+      </description>
+      <arg name="app_id" type="string"/>
+    </request>
   </interface>
 
   <interface name="platinum_keep_awake_v1" version="1">

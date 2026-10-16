@@ -7,6 +7,7 @@
 #include "vfs.h"
 
 #include <QApplication>
+#include <QClipboard>
 #include <QDir>
 #include <QDirIterator>
 #include <QFile>
@@ -330,6 +331,9 @@ bool InfoWindow::showView(int view) {
 		return false;
 	}
 	m_view = view;
+	if (view != General) {
+		m_iconFocused = false;
+	}
 	m_show.selected = view;
 	m_host.popups = { &m_show };
 	m_host.checks.clear();
@@ -370,10 +374,17 @@ void InfoWindow::paintEvent(QPaintEvent *) {
 /* The item's icon (framed) and name, and the group box the Show pop-up
  * titles. */
 void InfoWindow::paintHeader(pl_canvas *c) {
-	pl_outline(c, ICON_BOX_X, ICON_BOX_Y, ICON_BOX_X + 37, ICON_BOX_Y + 37, C_BLACK);
+	pl_outline(c, ICON_BOX_X, ICON_BOX_Y, ICON_BOX_X + 37, ICON_BOX_Y + 37,
+		m_iconFocused ? GRAY(0x5) : C_BLACK);
 	std::vector<uint32_t> preview, small;
 	const std::vector<uint32_t> *document = nullptr;
-	if (m_kind == PL_ICON_DOCUMENT && !m_isResourceInfo &&
+	const QImage customIcon = m_isResourceInfo || m_isVolumeInfo ? QImage() :
+		customIconImage(m_path);
+	if (!customIcon.isNull()) {
+		pl_image_blend(c, ICON_BOX_X + 3, ICON_BOX_Y + 3,
+			reinterpret_cast<const uint32_t *>(customIcon.constBits()),
+			PL_ICON_LARGE, PL_ICON_LARGE, false);
+	} else if (m_kind == PL_ICON_DOCUMENT && !m_isResourceInfo &&
 			thumbnailFor(m_path, &preview, &small) == ThumbnailState::Ready) {
 		pl_image_blend(c, ICON_BOX_X + 3, ICON_BOX_Y + 3, preview.data(),
 			PL_ICON_LARGE, PL_ICON_LARGE, false);
@@ -743,6 +754,16 @@ void InfoWindow::mousePressEvent(QMouseEvent *e) {
 	if (m_host.hostPress(e) || m_view != 0) {
 		return;
 	}
+	if (!m_isResourceInfo && !m_isVolumeInfo &&
+			QRect(ICON_BOX_X, ICON_BOX_Y, 38, 38).contains(e->position().toPoint())) {
+		m_iconFocused = true;
+		m_editingComment = false;
+		m_caretTimer.stop();
+		setFocus(Qt::MouseFocusReason);
+		update();
+		return;
+	}
+	m_iconFocused = false;
 	const bool inBox = m_commentBox.contains(e->position().toPoint());
 	if (inBox != m_editingComment) {
 		m_editingComment = inBox;
@@ -763,6 +784,35 @@ void InfoWindow::mouseReleaseEvent(QMouseEvent *e) {
 void InfoWindow::keyPressEvent(QKeyEvent *e) {
 	if ((e->modifiers() & Qt::ControlModifier) && e->key() == Qt::Key_W) {
 		close();
+		return;
+	}
+	const bool command = e->modifiers() & (Qt::ControlModifier | Qt::MetaModifier);
+	if (m_iconFocused && command && (e->key() == Qt::Key_C || e->key() == Qt::Key_V)) {
+		if (e->key() == Qt::Key_C) {
+			const QImage icon = grab(QRect(ICON_BOX_X + 3, ICON_BOX_Y + 3,
+				PL_ICON_LARGE, PL_ICON_LARGE)).toImage();
+			QApplication::clipboard()->setImage(icon);
+		} else {
+			const QImage image = QApplication::clipboard()->image();
+			if (image.isNull()) {
+				Alert::ask("The Clipboard doesn’t contain a picture to use as an icon.", "OK", "");
+			} else if (!writeCustomIconImage(m_path, image)) {
+				Alert::ask("This item’s icon couldn’t be changed. The file system may not support "
+					"custom icons, or the picture may be too large.", "OK", "");
+			} else {
+				update();
+				Finder::instance().folderChanged(QFileInfo(m_path).absolutePath());
+			}
+		}
+		return;
+	}
+	if (m_iconFocused && (e->key() == Qt::Key_Backspace || e->key() == Qt::Key_Delete)) {
+		if (!clearCustomIconImage(m_path)) {
+			Alert::ask("This item’s custom icon couldn’t be removed.", "OK", "");
+		} else {
+			update();
+			Finder::instance().folderChanged(QFileInfo(m_path).absolutePath());
+		}
 		return;
 	}
 	if (!m_editingComment) {

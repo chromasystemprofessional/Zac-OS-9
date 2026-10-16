@@ -67,8 +67,56 @@ static void check(const char *line, bool enabled, bool eject) {
 	menus_free(&bar);
 }
 
+/* The File menu's item for `arg`, as the state line makes it. */
+static void file_item(const char *line, const char *arg, char *label, size_t size, bool *enabled) {
+	parse_line(line);
+	struct mb_bar bar = {0};
+	add_finder_menus(bar.left, &bar.n_left);
+	label[0] = '\0';
+	for (int m = 0; m < bar.n_left; m++) {
+		for (int i = 0; bar.left[m].title && strcmp(bar.left[m].title, "File") == 0 &&
+				i < bar.left[m].n; i++) {
+			const struct mb_item *item = &bar.left[m].items[i];
+			if (item->arg && strcmp(item->arg, arg) == 0) {
+				snprintf(label, size, "%s", item->label);
+				*enabled = item->enabled;
+			}
+		}
+	}
+	menus_free(&bar);
+}
+
 int main(void) {
 	setenv("XDG_RUNTIME_DIR", "/nonexistent-zacos9-menu-test", 1);
+	char config[] = "/tmp/zacos9-menu-test-XXXXXX";
+	assert(mkdtemp(config));
+	setenv("XDG_CONFIG_HOME", config, 1);
+	char hints[16];
+	assert(!pl_setting("hint-bubbles", hints, sizeof(hints)));
+	toggle_setting("hint-bubbles");
+	assert(pl_setting("hint-bubbles", hints, sizeof(hints)) && strcmp(hints, "0") == 0);
+	toggle_setting("hint-bubbles");
+	assert(pl_setting("hint-bubbles", hints, sizeof(hints)) && strcmp(hints, "1") == 0);
+	assert(strcmp(finder_command_arg("empty-trash", true), "empty-trash-option") == 0);
+	assert(strcmp(finder_command_arg("empty-trash", false), "empty-trash") == 0);
+	assert(strcmp(finder_command_arg("open", true), "open") == 0);
+	assert(pl_setting_set("trash-warn", "false"));
+	struct mb_bar no_warning = {0};
+	add_finder_menus(no_warning.left, &no_warning.n_left);
+	bool plainEmptyTrash = false;
+	for (int m = 0; m < no_warning.n_left; m++) {
+		if (strcmp(no_warning.left[m].title, "Special") != 0) continue;
+		for (int i = 0; i < no_warning.left[m].n; i++) {
+			plainEmptyTrash |= no_warning.left[m].items[i].arg &&
+				strcmp(no_warning.left[m].items[i].arg, "empty-trash") == 0 &&
+				strcmp(no_warning.left[m].items[i].label, "Empty Trash") == 0;
+		}
+	}
+	assert(plainEmptyTrash);
+	menus_free(&no_warning);
+	assert(strcmp(empty_trash_title(), "Empty Trash") == 0);
+	assert(pl_setting_set("trash-warn", NULL));
+	assert(strcmp(empty_trash_title(), "Empty Trash…") == 0);
 	check("state selection=1 window=0 trash=0 view=0 label=0 erase=1", true, false);
 	check("state selection=2 window=0 trash=0 view=0 label=0 erase=1", false, false);
 	check("state selection=0 window=0 trash=0 view=0 label=0 erase=1", false, false);
@@ -89,6 +137,11 @@ int main(void) {
 	char got[512];
 	context_labels("state selection=1 window=1 trash=0 view=0 label=0", "icon", got, sizeof(got));
 	assert(strcmp(got, "Open|Move To Trash|-|Get Info|Label|Duplicate|Make Alias|Add To Favorites|") == 0);
+	/* Print, when there's a document among them (not only folders). */
+	context_labels("state selection=2 window=1 trash=0 view=0 label=0 erase=0 network=0 unmount=0 "
+		"sort=0 columns=0 custom=0 popup=0 popups=0 documents=1", "icon", got, sizeof(got));
+	assert(strcmp(got, "Open|Print|Move To Trash|-|Get Info|Label|Duplicate|Make Alias|"
+		"Add To Favorites|") == 0);
 	context_labels("state selection=1 window=0 trash=0 view=0 label=0 erase=1 network=0 unmount=1",
 		"disk", got, sizeof(got));
 	assert(strcmp(got, "Open|Get Info|Label|Add To Favorites|-|Eject|Erase Disk…|") == 0);
@@ -121,6 +174,47 @@ int main(void) {
 	assert(strcmp(got, "New Folder|-|View|Sort List|View Options…|-|Get Info|Close Window|") == 0);
 	context_labels("state selection=0 window=0 trash=0 view=0", "desktop", got, sizeof(got));
 	assert(strcmp(got, "New Folder|-|Clean Up|Arrange|View Options…|-|Change Desktop Background…|") == 0);
+	/* File > Page Setup… and Print Window… (Print Desktop… for the desktop). */
+	{
+		char label[64];
+		bool enabled = false;
+		file_item("state selection=0 window=1 trash=0", "page-setup", label, sizeof(label), &enabled);
+		assert(strcmp(label, "Page Setup…") == 0 && enabled);
+		file_item("state selection=0 window=1 trash=0", "print-window", label, sizeof(label), &enabled);
+		assert(strcmp(label, "Print Window…") == 0 && enabled);
+		file_item("state selection=0 window=0 trash=0", "print-window", label, sizeof(label), &enabled);
+		assert(strcmp(label, "Print Desktop…") == 0 && enabled);
+	}
+	/* Folder Tricks and the Contextual Menu Items' commands, sent first. */
+	assert(!parse_line("tricks 1\t+Log Arrivals\t*Another\t*Log Arrivals"));
+	assert(!parse_line("commands\tOpen Terminal Here"));
+	context_labels("state selection=0 window=1 trash=0 view=1", "window", got, sizeof(got));
+	assert(strcmp(got, "New Folder|-|View|Sort List|View Options…|-|Get Info|Close Window|"
+		"-|Attach a Folder Trick|Remove a Folder Trick|-|Open Terminal Here|") == 0);
+	{
+		struct mb_menu m;
+		menus_context(&m, "window");
+		const struct mb_menu *attach = m.items[m.n - 4].submenu;
+		assert(attach->n == 4 && strcmp(attach->items[0].label, "Another") == 0 &&
+			attach->items[0].enabled && !attach->items[0].checked);
+		assert(!attach->items[1].enabled && attach->items[1].checked);
+		assert(strcmp(attach->items[1].arg, "attach-trick Log Arrivals") == 0);
+		assert(strcmp(attach->items[3].arg, "open-folder-tricks") == 0);
+		const struct mb_menu *remove = m.items[m.n - 3].submenu;
+		assert(remove->n == 1 && strcmp(remove->items[0].arg, "remove-trick Log Arrivals") == 0);
+		assert(strcmp(m.items[m.n - 1].arg, "contextual 0") == 0);
+		menus_free_menu(&m);
+	}
+	/* Nothing attaches to a document; no trick yet: Attach only. */
+	assert(!parse_line("tricks 0"));
+	assert(!parse_line("commands"));
+	context_labels("state selection=0 window=1 trash=0 view=1", "window", got, sizeof(got));
+	assert(strcmp(got, "New Folder|-|View|Sort List|View Options…|-|Get Info|Close Window|") == 0);
+	assert(!parse_line("tricks 1"));
+	context_labels("state selection=0 window=1 trash=0 view=1", "window", got, sizeof(got));
+	assert(strcmp(got, "New Folder|-|View|Sort List|View Options…|-|Get Info|Close Window|"
+		"-|Attach a Folder Trick|") == 0);
+	assert(!parse_line("tricks 0"));
 	assert(!parse_line("context desktop") && strcmp(context_kind, "desktop") == 0);
 
 	/* View > Sort List: the list's columns shown (Name, Date Modified =1,
@@ -171,6 +265,12 @@ int main(void) {
 	add_finder_menus(bar.left, &bar.n_left);
 	assert(!state.connected && !state.erase && !state.network && !state.unmount);
 	menus_free(&bar);
+	char settings_file[512], settings_dir[256];
+	snprintf(settings_dir, sizeof(settings_dir), "%s/zacos9", config);
+	snprintf(settings_file, sizeof(settings_file), "%s/desktop.conf", settings_dir);
+	unlink(settings_file);
+	rmdir(settings_dir);
+	rmdir(config);
 	puts("ok: Special menu gating (Erase Disk, Eject, Log Out) and Finder state");
 	return 0;
 }

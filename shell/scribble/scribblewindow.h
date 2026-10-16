@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QMainWindow>
+#include <QProcess>
 
 #include "textfile.h"
 
@@ -29,9 +30,13 @@ private:
 	void updateTitle();
 	void find(bool again);
 	void applyFont();
+	void speakSelection();
+	void stopSpeaking();
 
 	QPlainTextEdit *m_edit = nullptr;
 	QString m_path;
 	TextFile m_file;
 	QString m_findText;
+	QProcess m_speech;
+	bool m_speechStopped = false;
 };

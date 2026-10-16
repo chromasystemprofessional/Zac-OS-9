@@ -343,6 +343,16 @@ const char *app_switch_pick(struct app *apps, int n, int step) {
 	return apps[((at + step) % n + n) % n].app_id;
 }
 
+const char *app_switch_option_previous(struct app *apps, int n, const char *target) {
+	for (int i = 0; i < n; i++) {
+		if (apps[i].active && strcmp(apps[i].app_id, target) != 0 &&
+				strcmp(apps[i].app_id, FINDER_APP_ID) != 0) {
+			return apps[i].app_id;
+		}
+	}
+	return NULL;
+}
+
 const char *app_switch_target(int step) {
 	static struct app apps[MAX_ITEMS];
 	const int n = apps_collect(apps, MAX_ITEMS - 1);

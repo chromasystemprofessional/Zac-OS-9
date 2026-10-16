@@ -52,17 +52,71 @@ const struct finder_state *finder_state(void) {
 	return &state;
 }
 
+static void clear_extras(bool tricks, bool commands);
+
 static void disconnect(void) {
 	if (fd >= 0) {
 		close(fd);
 	}
 	fd = -1;
 	memset(&state, 0, sizeof(state));
+	clear_extras(true, true);
+}
+
+static struct finder_extras extras;
+
+const struct finder_extras *finder_extras(void) {
+	return &extras;
+}
+
+static void clear_list(char **list, int *n) {
+	for (int i = 0; i < *n; i++) {
+		free(list[i]);
+	}
+	*n = 0;
+}
+
+static void clear_extras(bool tricks, bool commands) {
+	if (tricks) {
+		extras.can_trick = false;
+		clear_list(extras.attached, &extras.n_attached);
+		clear_list(extras.available, &extras.n_available);
+	}
+	if (commands) {
+		clear_list(extras.commands, &extras.n_commands);
+	}
+}
+
+/* "tricks 1\t+attached\t*available..." and "commands\tname...". */
+static void parse_extras(const char *line) {
+	const bool tricks = strncmp(line, "tricks ", 7) == 0;
+	clear_extras(tricks, !tricks);
+	char *copy = strdup(line);
+	char *save = NULL;
+	char *field = strtok_r(copy, "\t", &save);
+	if (tricks) {
+		extras.can_trick = strcmp(field, "tricks 1") == 0;
+	}
+	while ((field = strtok_r(NULL, "\t", &save))) {
+		if (!tricks && extras.n_commands < FINDER_EXTRAS) {
+			extras.commands[extras.n_commands++] = strdup(field);
+		} else if (tricks && field[0] == '+' && field[1] && extras.n_attached < FINDER_EXTRAS) {
+			extras.attached[extras.n_attached++] = strdup(field + 1);
+		} else if (tricks && field[0] == '*' && field[1] && extras.n_available < FINDER_EXTRAS) {
+			extras.available[extras.n_available++] = strdup(field + 1);
+		}
+	}
+	free(copy);
 }
 
 static bool parse_line(const char *line) {
 	if (strcmp(line, "logout") == 0) {
 		logout_begin();
+		return false;
+	}
+	if (strncmp(line, "tricks ", 7) == 0 || strcmp(line, "commands") == 0 ||
+			strncmp(line, "commands\t", 9) == 0) {
+		parse_extras(line);
 		return false;
 	}
 	if (strncmp(line, "context ", 8) == 0) {
@@ -74,9 +128,10 @@ static bool parse_line(const char *line) {
 		return false;
 	}
 	struct finder_state s = { .connected = true, .label = -1 };
-	if (sscanf(line, "state selection=%d window=%d trash=%d view=%d label=%d erase=%d network=%d unmount=%d sort=%d columns=%u custom=%d popup=%d popups=%d",
+	if (sscanf(line, "state selection=%d window=%d trash=%d view=%d label=%d erase=%d network=%d unmount=%d sort=%d columns=%u custom=%d popup=%d popups=%d documents=%d",
 			&s.selection, &s.window, &s.trash, &s.view, &s.label, &s.erase,
-			&s.network, &s.unmount, &s.sort, &s.columns, &s.custom, &s.popup, &s.popups) < 3) {
+			&s.network, &s.unmount, &s.sort, &s.columns, &s.custom, &s.popup, &s.popups,
+			&s.documents) < 3) {
 		return false;
 	}
 	bool changed = memcmp(&s, &state, sizeof(s)) != 0;

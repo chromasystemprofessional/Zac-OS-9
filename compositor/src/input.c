@@ -29,6 +29,7 @@
 #include "launch.h"
 #include "idle_policy.h"
 #include "server.h"
+#include "settings.h"
 
 /* ---- keyboard ---------------------------------------------------------- */
 
@@ -840,7 +841,7 @@ static void frame_press(struct plat_server *server, struct plat_view *view,
 			view_set_collapsed(view, !view->collapsed);
 			break;
 		}
-		server->last_click_view = in_title ? view : NULL;
+		server->last_click_view = in_title && prefs_title_collapse() ? view : NULL;
 		server->last_click_msec = time_msec;
 		input_begin_grab(server, view, PLAT_CURSOR_MOVE, 0, part);
 		break;

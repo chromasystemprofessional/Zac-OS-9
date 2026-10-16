@@ -11,11 +11,15 @@
 
 #include <QDate>
 #include <QFileInfo>
+#include <QHash>
 #include <QList>
 #include <QString>
 #include <QStringList>
 
-enum class FindField { Name, Contents, Modified, Created, Size, Kind, Label, Locked, Folder };
+enum class FindField {
+	Name, Contents, Modified, Created, Size, Kind, Label, Locked, Folder, CustomIcon, Comment,
+	Invisible, Version
+};
 enum class FindOp {
 	/* name */
 	Contains, StartsWith, EndsWith, Is, IsNot, DoesNotContain,
@@ -45,10 +49,14 @@ struct FindQuery {
 	/* Folders shared from Get Info, read before the search starts (the
 	 * search runs on another thread). */
 	QStringList sharedFolders;
+	/* Package versions resolved on the GUI thread before the search worker. */
+	QHash<QString, QString> applicationVersions;
 
 	/* Where the search starts. */
 	QString root() const;
 	bool hasContents() const;
+	bool hasVisibilityCriterion() const;
+	bool hasVersionCriterion() const;
 	/* The words every contents row asks for. */
 	QStringList contentWords() const;
 	/* Enough filled in to search with; else why not. */
@@ -71,3 +79,8 @@ int findKindOf(const QFileInfo &info);
 
 /* Does a file pass every row but contents? `today` for the date rows. */
 bool findMatches(const FindQuery &query, const QFileInfo &info, const QDate &today = QDate::currentDate());
+
+/* Saved Find queries live in the user's ZacOS configuration and are versioned. */
+QStringList savedFindQueryNames(QString *error = nullptr);
+bool saveFindQuery(const QString &name, const FindQuery &query, QString *error = nullptr);
+bool loadFindQuery(const QString &name, FindQuery *query, QString *error = nullptr);

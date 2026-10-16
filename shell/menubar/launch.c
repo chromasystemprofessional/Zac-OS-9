@@ -4,13 +4,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#include <sys/stat.h>
 #include <unistd.h>
 #include <glib.h>
 
 #include "electron.h"
 #include "menubar.h"
-
-#define ITEMS_DIR "/.config/zacos9/ZacOS 9 Menu Items"
 
 static void detach_session(void *data) {
 	if (setsid() < 0) {
@@ -99,7 +98,9 @@ static char *strip_field_codes(const char *exec) {
 }
 
 struct entry {
-	char *name, *exec;
+	char *name, *exec, *path;
+	bool directory;
+	enum action action;
 };
 
 static bool read_desktop(const char *path, struct entry *e) {
@@ -143,13 +144,15 @@ static int by_name(const void *a, const void *b) {
 	return strcasecmp(((const struct entry *)a)->name, ((const struct entry *)b)->name);
 }
 
-static int read_items_dir(struct entry *entries, int max) {
-	const char *home = getenv("HOME");
-	if (!home) {
-		return 0;
+static void free_entries(struct entry *entries, int n) {
+	for (int i = 0; i < n; i++) {
+		free(entries[i].name);
+		free(entries[i].exec);
+		free(entries[i].path);
 	}
-	char dir_path[1024];
-	snprintf(dir_path, sizeof(dir_path), "%s%s", home, ITEMS_DIR);
+}
+
+static int read_items_dir(const char *dir_path, struct entry *entries, int max) {
 	DIR *dir = opendir(dir_path);
 	if (!dir) {
 		return 0;
@@ -157,18 +160,86 @@ static int read_items_dir(struct entry *entries, int max) {
 	int n = 0;
 	struct dirent *de;
 	while ((de = readdir(dir)) && n < max) {
-		size_t len = strlen(de->d_name);
-		if (len < 9 || strcmp(de->d_name + len - 8, ".desktop") != 0) {
+		if (de->d_name[0] == '.') {
 			continue;
 		}
-		char path[2048];
-		snprintf(path, sizeof(path), "%s/%s", dir_path, de->d_name);
-		if (read_desktop(path, &entries[n])) {
+		char path[PATH_MAX];
+		const int length = snprintf(path, sizeof(path), "%s/%s", dir_path, de->d_name);
+		if (length < 0 || (size_t)length >= sizeof(path)) {
+			continue;
+		}
+		struct stat info;
+		if (lstat(path, &info) != 0) {
+			continue;
+		}
+		if (S_ISDIR(info.st_mode)) {
+			entries[n] = (struct entry){
+				.name = strdup(de->d_name), .path = strdup(path), .directory = true,
+				.action = ACT_NONE,
+			};
 			n++;
+			continue;
+		}
+		if (S_ISLNK(info.st_mode) && !strchr(path, '\n') && !strchr(path, '\r')) {
+			struct stat target;
+			if (stat(path, &target) == 0 && (S_ISREG(target.st_mode) || S_ISDIR(target.st_mode))) {
+				entries[n++] = (struct entry){
+					.name = strdup(de->d_name),
+					.exec = g_strdup_printf("open-path %s", path),
+					.path = strdup(path),
+					.action = ACT_FINDER,
+				};
+			}
+			continue;
+		}
+		const size_t len = strlen(de->d_name);
+		if (!S_ISREG(info.st_mode) || len < 9 ||
+				strcmp(de->d_name + len - 8, ".desktop") != 0) {
+			continue;
+		}
+		struct entry entry = { .path = strdup(path), .action = ACT_LAUNCH };
+		if (read_desktop(path, &entry)) {
+			entries[n++] = entry;
+		} else {
+			free(entry.path);
 		}
 	}
 	closedir(dir);
+	qsort(entries, n, sizeof(entries[0]), by_name);
 	return n;
+}
+
+static void add_item(struct mb_menu *menu, const char *label, bool enabled,
+		enum action action, const char *arg);
+
+static int populate_items_menu(struct mb_menu *menu, const char *path, int depth) {
+	if (depth > 4 || menu->n >= MAX_ITEMS) {
+		return 0;
+	}
+	struct entry entries[MAX_ITEMS];
+	const int n = read_items_dir(path, entries, MAX_ITEMS);
+	int added = 0;
+	for (int i = 0; i < n && menu->n < MAX_ITEMS; i++) {
+		if (entries[i].directory) {
+			struct mb_menu *sub = calloc(1, sizeof(*sub));
+			if (!sub) {
+				continue;
+			}
+			const int children = populate_items_menu(sub, entries[i].path, depth + 1);
+			if (children > 0) {
+				add_item(menu, entries[i].name, true, ACT_NONE, NULL);
+				menu->items[menu->n - 1].submenu = sub;
+				added++;
+			} else {
+				free(sub);
+			}
+		} else {
+			add_item(menu, entries[i].name, true, entries[i].action, entries[i].exec);
+			added++;
+		}
+	}
+	free_entries(entries, n);
+	return added;
 }
 
 static void add_item(struct mb_menu *menu, const char *label, bool enabled,
@@ -224,6 +295,59 @@ static void add_favorites(struct mb_menu *menu) {
 		char arg[PATH_MAX + 300];
 		snprintf(arg, sizeof(arg), "open-path %s/%s", dir_path, names[i]);
 		add_item(favorites, names[i], true, ACT_FINDER, arg);
+		free(names[i]);
+	}
+}
+
+/* User scripts in ZacOS 9 Menu Items/Automated Tasks appear as a submenu.
+ * Only executable regular files are offered; each path is shell-quoted. */
+static void add_automated_tasks(struct mb_menu *menu) {
+	char root[PATH_MAX], dir_path[PATH_MAX];
+	config_path("ZacOS 9 Menu Items", root, sizeof(root));
+	if (snprintf(dir_path, sizeof(dir_path), "%s/Automated Tasks", root) >=
+			(int)sizeof(dir_path)) {
+		return;
+	}
+	char *names[MAX_ITEMS];
+	int n = 0;
+	DIR *dir = opendir(dir_path);
+	if (dir) {
+		struct dirent *de;
+		while ((de = readdir(dir)) && n < MAX_ITEMS) {
+			if (de->d_name[0] == '.') {
+				continue;
+			}
+			char path[PATH_MAX];
+			if (snprintf(path, sizeof(path), "%s/%s", dir_path, de->d_name) <
+					(int)sizeof(path) && access(path, X_OK) == 0 &&
+					g_file_test(path, G_FILE_TEST_IS_REGULAR)) {
+				names[n++] = strdup(de->d_name);
+			}
+		}
+		closedir(dir);
+	}
+	qsort(names, n, sizeof(names[0]), by_label);
+	if (menu->n >= MAX_ITEMS) {
+		for (int i = 0; i < n; i++) {
+			free(names[i]);
+		}
+		return;
+	}
+	add_item(menu, "Automated Tasks", n > 0, ACT_NONE, NULL);
+	struct mb_item *item = &menu->items[menu->n - 1];
+	item->submenu = calloc(1, sizeof(*item->submenu));
+	for (int i = 0; i < n; i++) {
+		char path[PATH_MAX], *quoted;
+		if (snprintf(path, sizeof(path), "%s/%s", dir_path, names[i]) >=
+				(int)sizeof(path)) {
+			free(names[i]);
+			continue;
+		}
+		quoted = g_shell_quote(path);
+		char command[PATH_MAX * 2];
+		snprintf(command, sizeof(command), "exec %s", quoted);
+		add_item(item->submenu, names[i], true, ACT_LAUNCH, command);
+		g_free(quoted);
 		free(names[i]);
 	}
 }
@@ -329,10 +453,15 @@ void launch_fill_logo_menu(struct mb_menu *menu, const struct app *apps, int n_a
 	add_favorites(menu);
 	recent_fill_menu(menu);
 
-	struct entry entries[MAX_ITEMS];
-	int n = read_items_dir(entries, MAX_ITEMS - 4);
-	if (n == 0) {
+	char items_dir[PATH_MAX];
+	config_path("ZacOS 9 Menu Items", items_dir, sizeof(items_dir));
+	const int path_length = (int)strlen(items_dir);
+	const int populated = path_length >= 0 && (size_t)path_length < sizeof(items_dir)
+		? populate_items_menu(menu, items_dir, 0) : 0;
+	if (populated == 0) {
 		/* No ZacOS 9 Menu Items folder yet: offer the terminals we have. */
+		struct entry entries[MAX_ITEMS] = { 0 };
+		int n = 0;
 		const struct { const char *name, *program; } defaults[] = {
 			{ "Terminal", "foot" },
 			{ "XTerm", "xterm" },
@@ -348,7 +477,11 @@ void launch_fill_logo_menu(struct mb_menu *menu, const struct app *apps, int n_a
 		const struct { const char *name, *program; } accessories[] = {
 			{ "Calculator", "zacos9-calculator" },
 			{ "Dog Ears", "zacos9-dogears" },
+			{ "Bark Recorder", "zacos9-barkrecorder" },
+			{ "Key Tags", "zacos9-keytags" },
+			{ "Notepad", "zacos9-notepad" },
 			{ "Pedigree", "zacos9-pedigree" },
+			{ "Stash", "zacos9-stash" },
 		};
 		for (size_t i = 0; i < sizeof(accessories) / sizeof(accessories[0]); i++) {
 			char command[PATH_MAX + 64];
@@ -357,12 +490,12 @@ void launch_fill_logo_menu(struct mb_menu *menu, const struct app *apps, int n_a
 			entries[n].exec = strdup(command);
 			n++;
 		}
-	}
-	/* The Apple menu listed its items alphabetically. */
-	qsort(entries, n, sizeof(entries[0]), by_name);
-	for (int i = 0; i < n; i++) {
+		/* The Apple menu listed its items alphabetically. */
+		qsort(entries, n, sizeof(entries[0]), by_name);
+		for (int i = 0; i < n; i++) {
 		add_item(menu, entries[i].name, true, ACT_LAUNCH, entries[i].exec);
-		free(entries[i].name);
-		free(entries[i].exec);
+		}
+		free_entries(entries, n);
 	}
+	add_automated_tasks(menu);
 }

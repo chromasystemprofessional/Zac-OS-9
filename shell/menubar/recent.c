@@ -45,6 +45,12 @@ static int setting_count(const char *key) {
 	return n < 0 ? 0 : n > MAX_ITEMS ? MAX_ITEMS : n;
 }
 
+static bool show_submenus(void) {
+	char value[16];
+	return !pl_setting("recent-submenus", value, sizeof(value)) ||
+		(strcmp(value, "0") != 0 && strcmp(value, "false") != 0);
+}
+
 /* The file's lines (at most `max`), newest first; free with g_strfreev. */
 static char **read_lines(const char *path) {
 	char *text = NULL;
@@ -105,26 +111,42 @@ static void dim_if_empty(struct mb_menu *menu, const struct mb_menu *sub) {
 	}
 }
 
-static void fill_applications(struct mb_menu *menu, int count) {
-	struct mb_menu *sub = submenu(menu, "Recent Applications");
+static struct mb_menu *recent_list(struct mb_menu *menu, const char *title, bool nested) {
+	return nested ? submenu(menu, title) : menu;
+}
+
+static void add_recent_item(struct mb_menu *menu, const char *title, const char *label,
+		bool nested, enum action action, const char *arg) {
+	char *shown = nested ? g_strdup(label) : g_strdup_printf("%s: %s", title, label);
+	menus_add_item(menu, shown, 0, true, action, arg);
+	g_free(shown);
+}
+
+static void fill_applications(struct mb_menu *menu, int count, bool nested) {
+	const char *title = "Recent Applications";
+	struct mb_menu *sub = recent_list(menu, title, nested);
 	if (!sub) {
 		return;
 	}
 	char path[PATH_MAX];
 	state_path("recent-applications", path, sizeof(path));
 	char **ids = read_lines(path);
-	for (int i = 0; ids[i] && sub->n < count; i++) {
+	int added = 0;
+	for (int i = 0; ids[i] && added < count && (nested || menu->n < MAX_ITEMS); i++) {
 		char *desktop = app_desktop_file(ids[i]);
 		char *name, *exec;
 		if (desktop && launch_read_desktop(desktop, &name, &exec)) {
-			menus_add_item(sub, name, 0, true, ACT_LAUNCH, exec);
+			add_recent_item(sub, title, name, nested, ACT_LAUNCH, exec);
+			added++;
 			free(name);
 			free(exec);
 		}
 		free(desktop);
 	}
 	g_strfreev(ids);
-	dim_if_empty(menu, sub);
+	if (nested) {
+		dim_if_empty(menu, sub);
+	}
 }
 
 struct document {
@@ -137,8 +159,9 @@ static int newest_first(const void *a, const void *b) {
 	return x < y ? 1 : x > y ? -1 : 0;
 }
 
-static void fill_documents(struct mb_menu *menu, int count) {
-	struct mb_menu *sub = submenu(menu, "Recent Documents");
+static void fill_documents(struct mb_menu *menu, int count, bool nested) {
+	const char *title = "Recent Documents";
+	struct mb_menu *sub = recent_list(menu, title, nested);
 	if (!sub) {
 		return;
 	}
@@ -161,11 +184,13 @@ static void fill_documents(struct mb_menu *menu, int count) {
 			found++;
 		}
 		qsort(docs, found, sizeof(docs[0]), newest_first);
+		int added = 0;
 		for (gsize i = 0; i < found; i++) {
-			if (sub->n < count) {
+			if (added < count && (nested || menu->n < MAX_ITEMS)) {
 				char *name = g_path_get_basename(docs[i].path);
 				char *arg = g_strconcat("open-path ", docs[i].path, NULL);
-				menus_add_item(sub, name, 0, true, ACT_FINDER, arg);
+				add_recent_item(sub, title, name, nested, ACT_FINDER, arg);
+				added++;
 				g_free(name);
 				g_free(arg);
 			}
@@ -176,11 +201,14 @@ static void fill_documents(struct mb_menu *menu, int count) {
 	}
 	g_bookmark_file_free(bookmarks);
 	g_free(xbel);
-	dim_if_empty(menu, sub);
+	if (nested) {
+		dim_if_empty(menu, sub);
+	}
 }
 
-static void fill_servers(struct mb_menu *menu, int count) {
-	struct mb_menu *sub = submenu(menu, "Recent Servers");
+static void fill_servers(struct mb_menu *menu, int count, bool nested) {
+	const char *title = "Recent Servers";
+	struct mb_menu *sub = recent_list(menu, title, nested);
 	if (!sub) {
 		return;
 	}
@@ -188,32 +216,37 @@ static void fill_servers(struct mb_menu *menu, int count) {
 	state_path("recent-servers", path, sizeof(path));
 	sibling_program("zacos9-netbrowser", netbrowser, sizeof(netbrowser));
 	char **lines = read_lines(path);
-	for (int i = 0; lines[i] && sub->n < count; i++) {
+	int added = 0;
+	for (int i = 0; lines[i] && added < count && (nested || menu->n < MAX_ITEMS); i++) {
 		char **f = g_strsplit(lines[i], "\t", 3);
 		if (f[0] && f[1] && f[2] && (strcmp(f[0], "afp") == 0 || strcmp(f[0], "smb") == 0)) {
 			char *address = g_shell_quote(f[1]);
 			char *command = g_strdup_printf("%s --connect %s %s", netbrowser, f[0], address);
-			menus_add_item(sub, f[2], 0, true, ACT_LAUNCH, command);
+			add_recent_item(sub, title, f[2], nested, ACT_LAUNCH, command);
+			added++;
 			g_free(command);
 			g_free(address);
 		}
 		g_strfreev(f);
 	}
 	g_strfreev(lines);
-	dim_if_empty(menu, sub);
+	if (nested) {
+		dim_if_empty(menu, sub);
+	}
 }
 
 void recent_fill_menu(struct mb_menu *menu) {
 	const int apps = setting_count("recent-applications");
 	const int docs = setting_count("recent-documents");
 	const int servers = setting_count("recent-servers");
+	const bool nested = show_submenus();
 	if (apps > 0) {
-		fill_applications(menu, apps);
+		fill_applications(menu, apps, nested);
 	}
 	if (docs > 0) {
-		fill_documents(menu, docs);
+		fill_documents(menu, docs, nested);
 	}
 	if (servers > 0) {
-		fill_servers(menu, servers);
+		fill_servers(menu, servers, nested);
 	}
 }

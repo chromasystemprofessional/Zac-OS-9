@@ -344,18 +344,36 @@ void pl_sound_play(const char *name) {
 		pl_setting("alert-sound", chosen, sizeof(chosen));
 		name = chosen;
 	}
-	if (strcmp(name, "none") == 0 || strchr(name, '/')) {
+	if (strcmp(name, "none") == 0 || !*name) {
 		return;
 	}
 	char path[1200], v[8];
-	snprintf(path, sizeof(path), "%s/sounds/%s.wav", pl_data_dir(), name);
+	for (const char *p = name; *p; p++) {
+		if (!( (*p >= 'A' && *p <= 'Z') || (*p >= 'a' && *p <= 'z') ||
+				(*p >= '0' && *p <= '9') || *p == '_' || *p == '-')) {
+			return;
+		}
+	}
+	const char *data_home = getenv("XDG_DATA_HOME");
+	const char *home = getenv("HOME");
+	if (data_home && *data_home) {
+		snprintf(path, sizeof(path), "%s/zacos9/sounds/%s.wav", data_home, name);
+	} else {
+		snprintf(path, sizeof(path), "%s/.local/share/zacos9/sounds/%s.wav",
+			home ? home : "", name);
+	}
+	struct stat st;
+	if (lstat(path, &st) != 0 || !S_ISREG(st.st_mode)) {
+		snprintf(path, sizeof(path), "%s/sounds/%s.wav", pl_data_dir(), name);
+	}
 	pl_sound_preview(path, pl_setting("alert-volume", v, sizeof(v)) ? atoi(v) : 7);
 }
 
 static bool event_sound(const char *event, char *path, size_t size, int *level) {
 	static const char *const events[] = { "button-click", "checkbox-toggle", "menu-open",
 		"menu-command", "window-open", "window-close", "trash-move", "trash-empty",
-		"window-collapse", "window-expand", "window-drag", "window-drag-end" };
+		"window-collapse", "window-expand", "window-drag", "window-drag-end",
+		"startup", "shutdown" };
 	int index = -1;
 	for (size_t i = 0; event && i < sizeof(events) / sizeof(events[0]); i++) {
 		if (strcmp(event, events[i]) == 0) {
@@ -381,7 +399,8 @@ static bool event_sound(const char *event, char *path, size_t size, int *level) 
 	}
 	if (strcmp(theme, "original") == 0) {
 		static const char *const sounds[] = { "woodblock", "pluck", "droplet", "woodblock",
-			"chirp", "pluck", "droplet", "woodblock", "pluck", "chirp", "droplet", "woodblock" };
+			"chirp", "pluck", "droplet", "woodblock", "pluck", "chirp", "droplet", "woodblock",
+			"chirp", "platinum" };
 		snprintf(path, size, "%s/sounds/%s.wav", pl_data_dir(), sounds[index]);
 	} else {
 		snprintf(key, sizeof(key), "sound.%s", event);

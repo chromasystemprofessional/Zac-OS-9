@@ -1,8 +1,16 @@
 #include "findcriteria.h"
 
 #include <QDir>
+#include <QFile>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QMimeDatabase>
+#include <QSaveFile>
+#include <QStandardPaths>
+#include <sys/xattr.h>
 
+#include "appdb.h"
 #include "clippings.h"
 #include "icons.h"
 #include "items.h"
@@ -19,6 +27,24 @@ QString FindQuery::root() const {
 bool FindQuery::hasContents() const {
 	for (const FindCriterion &c : criteria) {
 		if (c.field == FindField::Contents) {
+			return true;
+		}
+	}
+	return false;
+}
+
+bool FindQuery::hasVisibilityCriterion() const {
+	for (const FindCriterion &c : criteria) {
+		if (c.field == FindField::Invisible) {
+			return true;
+		}
+	}
+	return false;
+}
+
+bool FindQuery::hasVersionCriterion() const {
+	for (const FindCriterion &c : criteria) {
+		if (c.field == FindField::Version) {
 			return true;
 		}
 	}
@@ -104,6 +130,12 @@ QList<FindOp> findOpsFor(FindField field) {
 	case FindField::Label: return { FindOp::Is, FindOp::IsNot };
 	case FindField::Locked: return { FindOp::IsLocked, FindOp::IsUnlocked };
 	case FindField::Folder: return { FindOp::IsEmpty, FindOp::IsShared };
+	case FindField::CustomIcon: return { FindOp::Is, FindOp::IsNot };
+	case FindField::Comment:
+		return { FindOp::Contains, FindOp::Is, FindOp::IsNot, FindOp::DoesNotContain };
+	case FindField::Invisible: return { FindOp::Is, FindOp::IsNot };
+	case FindField::Version:
+		return { FindOp::Contains, FindOp::Is, FindOp::IsNot, FindOp::DoesNotContain };
 	}
 	return {};
 }
@@ -143,6 +175,10 @@ QString findFieldName(FindField field) {
 	case FindField::Label: return "label";
 	case FindField::Locked: return "lock";
 	case FindField::Folder: return "folder";
+	case FindField::CustomIcon: return "custom icon";
+	case FindField::Comment: return "comments";
+	case FindField::Invisible: return "invisible";
+	case FindField::Version: return "version";
 	}
 	return {};
 }
@@ -151,6 +187,8 @@ bool findOpTakesText(FindField field, FindOp op) {
 	switch (field) {
 	case FindField::Name:
 	case FindField::Contents:
+	case FindField::Comment:
+	case FindField::Version:
 	case FindField::Size: return true;
 	case FindField::Modified:
 	case FindField::Created: return op == FindOp::Before || op == FindOp::After;
@@ -244,6 +282,20 @@ static bool locked(const QFileInfo &info) {
 	return !info.isWritable();
 }
 
+static QByteArray comment(const QFileInfo &info) {
+	const QByteArray path = QFile::encodeName(info.absoluteFilePath());
+	const ssize_t size = getxattr(path.constData(), "user.xdg.comment", nullptr, 0);
+	if (size <= 0 || size > 4096) {
+		return {};
+	}
+	QByteArray value(static_cast<int>(size), Qt::Uninitialized);
+	if (getxattr(path.constData(), "user.xdg.comment", value.data(),
+			static_cast<size_t>(value.size())) != size) {
+		return {};
+	}
+	return value;
+}
+
 bool findMatches(const FindQuery &query, const QFileInfo &info, const QDate &today) {
 	for (const FindCriterion &c : query.criteria) {
 		bool ok = true;
@@ -288,10 +340,214 @@ bool findMatches(const FindQuery &query, const QFileInfo &info, const QDate &tod
 				ok = query.sharedFolders.contains(info.canonicalFilePath());
 			}
 			break;
+		case FindField::CustomIcon:
+			ok = (!customIconImage(info.absoluteFilePath()).isNull()) == (c.op == FindOp::Is);
+			break;
+		case FindField::Comment: {
+			const QString value = QString::fromUtf8(comment(info));
+			const QString text = c.text.trimmed();
+			switch (c.op) {
+			case FindOp::Contains: ok = value.contains(text, Qt::CaseInsensitive); break;
+			case FindOp::Is: ok = value.compare(text, Qt::CaseInsensitive) == 0; break;
+			case FindOp::IsNot: ok = value.compare(text, Qt::CaseInsensitive) != 0; break;
+			case FindOp::DoesNotContain: ok = !value.contains(text, Qt::CaseInsensitive); break;
+			default: ok = false; break;
+			}
+			break;
+		}
+		case FindField::Invisible:
+			ok = info.isHidden() == (c.op == FindOp::Is);
+			break;
+		case FindField::Version: {
+			const QString value = query.applicationVersions.value(info.canonicalFilePath());
+			const QString text = c.text.trimmed();
+			switch (c.op) {
+			case FindOp::Contains: ok = !value.isEmpty() && value.contains(text, Qt::CaseInsensitive); break;
+			case FindOp::Is: ok = !value.isEmpty() && value.compare(text, Qt::CaseInsensitive) == 0; break;
+			case FindOp::IsNot: ok = !value.isEmpty() && value.compare(text, Qt::CaseInsensitive) != 0; break;
+			case FindOp::DoesNotContain:
+				ok = !value.isEmpty() && !value.contains(text, Qt::CaseInsensitive);
+				break;
+			default: ok = false; break;
+			}
+			break;
+		}
 		}
 		if (!ok) {
 			return false;
 		}
 	}
 	return true;
+}
+
+static QString savedFindQueriesPath() {
+	return QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) +
+		"/zacos9/find-searches.json";
+}
+
+static bool readSavedFindQueries(QJsonObject *root, QString *error) {
+	const QString path = savedFindQueriesPath();
+	QFile file(path);
+	if (!file.exists()) {
+		*root = QJsonObject{{"version", 1}, {"searches", QJsonArray{}}};
+		return true;
+	}
+	if (!file.open(QIODevice::ReadOnly)) {
+		if (error) *error = "Could not read saved searches: " + file.errorString();
+		return false;
+	}
+	QJsonParseError parse;
+	const QJsonDocument doc = QJsonDocument::fromJson(file.readAll(), &parse);
+	if (parse.error != QJsonParseError::NoError || !doc.isObject() ||
+			doc.object().value("version").toInt() != 1 ||
+			!doc.object().value("searches").isArray()) {
+		if (error) *error = "Saved searches are damaged or use an unsupported format.";
+		return false;
+	}
+	*root = doc.object();
+	return true;
+}
+
+static bool writeSavedFindQueries(const QJsonObject &root, QString *error) {
+	const QString path = savedFindQueriesPath();
+	if (!QDir().mkpath(QFileInfo(path).absolutePath())) {
+		if (error) *error = "Could not create the saved searches folder.";
+		return false;
+	}
+	QSaveFile file(path);
+	if (!file.open(QIODevice::WriteOnly)) {
+		if (error) *error = "Could not write saved searches: " + file.errorString();
+		return false;
+	}
+	const QByteArray data = QJsonDocument(root).toJson(QJsonDocument::Indented);
+	if (file.write(data) != data.size() || !file.commit()) {
+		if (error) *error = "Could not save Find searches: " + file.errorString();
+		return false;
+	}
+	return true;
+}
+
+QStringList savedFindQueryNames(QString *error) {
+	if (error) error->clear();
+	QJsonObject root;
+	if (!readSavedFindQueries(&root, error)) {
+		return {};
+	}
+	QStringList names;
+	for (const QJsonValue &value : root.value("searches").toArray()) {
+		if (!value.isObject() || !value.toObject().value("name").isString() ||
+				value.toObject().value("name").toString().isEmpty()) {
+			if (error) *error = "Saved searches are damaged or use an unsupported format.";
+			return {};
+		}
+		names << value.toObject().value("name").toString();
+	}
+	names.removeDuplicates();
+	names.sort(Qt::CaseInsensitive);
+	return names;
+}
+
+bool saveFindQuery(const QString &name, const FindQuery &query, QString *error) {
+	if (error) error->clear();
+	const QString cleanName = name.trimmed();
+	if (cleanName.isEmpty() || cleanName.size() > 80 || cleanName.contains(QChar::Null)) {
+		if (error) *error = "Enter a saved-search name of 1 to 80 characters.";
+		return false;
+	}
+	QString why;
+	if (!query.ready(&why)) {
+		if (error) *error = why;
+		return false;
+	}
+	QJsonObject root;
+	if (!readSavedFindQueries(&root, error)) {
+		return false;
+	}
+	QJsonArray searches;
+	for (const QJsonValue &value : root.value("searches").toArray()) {
+		if (!value.isObject() ||
+				value.toObject().value("name").toString().compare(cleanName, Qt::CaseInsensitive) != 0) {
+			searches.append(value);
+		}
+	}
+	QJsonArray criteria;
+	for (const FindCriterion &criterion : query.criteria) {
+		criteria.append(QJsonObject{
+			{"field", int(criterion.field)}, {"op", int(criterion.op)},
+			{"text", criterion.text}, {"choice", criterion.choice},
+		});
+	}
+	searches.append(QJsonObject{
+		{"name", cleanName}, {"scope", int(query.scope)}, {"folder", query.folder},
+		{"criteria", criteria},
+	});
+	root.insert("searches", searches);
+	return writeSavedFindQueries(root, error);
+}
+
+bool loadFindQuery(const QString &name, FindQuery *query, QString *error) {
+	if (error) error->clear();
+	if (!query) {
+		if (error) *error = "No query destination was provided.";
+		return false;
+	}
+	QJsonObject root;
+	if (!readSavedFindQueries(&root, error)) {
+		return false;
+	}
+	for (const QJsonValue &value : root.value("searches").toArray()) {
+		if (!value.isObject()) {
+			continue;
+		}
+		const QJsonObject saved = value.toObject();
+		if (saved.value("name").toString().compare(name, Qt::CaseInsensitive) != 0) {
+			continue;
+		}
+		const int scope = saved.value("scope").toInt(-1);
+		const QJsonArray rows = saved.value("criteria").toArray();
+		if (scope < int(FindScope::AllDisks) || scope > int(FindScope::Folder) ||
+				rows.isEmpty() || rows.size() > 6) {
+			break;
+		}
+		FindQuery loaded;
+		loaded.scope = FindScope(scope);
+		loaded.folder = saved.value("folder").toString();
+		bool valid = true;
+		for (const QJsonValue &rowValue : rows) {
+			if (!rowValue.isObject()) {
+				valid = false;
+				break;
+			}
+			const QJsonObject row = rowValue.toObject();
+			const int field = row.value("field").toInt(-1);
+			const int op = row.value("op").toInt(-1);
+			if (field < int(FindField::Name) || field > int(FindField::Version) ||
+					op < int(FindOp::Contains) || op > int(FindOp::IsShared) ||
+					!row.value("text").isString() || !row.value("choice").isDouble()) {
+				valid = false;
+				break;
+			}
+			const auto fieldOps = findOpsFor(FindField(field));
+			if (!fieldOps.contains(FindOp(op))) {
+				valid = false;
+				break;
+			}
+			loaded.criteria << FindCriterion{
+				FindField(field), FindOp(op), row.value("text").toString(),
+				row.value("choice").toInt(),
+			};
+		}
+		if (!valid || loaded.criteria.size() != rows.size()) {
+			break;
+		}
+		QString why;
+		if (!loaded.ready(&why)) {
+			if (error) *error = "The saved search has invalid criteria: " + why;
+			return false;
+		}
+		*query = loaded;
+		return true;
+	}
+	if (error) *error = "The saved search could not be found or has invalid criteria.";
+	return false;
 }

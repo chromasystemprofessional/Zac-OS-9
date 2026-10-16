@@ -117,6 +117,20 @@ int main(void) {
 	assert(strcmp(got, "newer.txt|") == 0);
 	assert(!sub(&fewer, "Recent Servers") && sub(&fewer, "Recent Applications"));
 
+	/* Disabling submenus flattens the lists and keeps their categories clear. */
+	write_file(conf, "[General]\nrecent-documents=1\nrecent-servers=1\nrecent-submenus=0\n");
+	struct mb_menu flat = { 0 };
+	recent_fill_menu(&flat);
+	assert(!sub(&flat, "Recent Applications") && !sub(&flat, "Recent Documents") &&
+		!sub(&flat, "Recent Servers"));
+	labels(&flat, got, sizeof(got));
+	assert(strcmp(got, "Recent Applications: Alpha|Recent Applications: Bravo|"
+		"Recent Documents: newer.txt|Recent Servers: Studio Mac|") == 0);
+	assert(strcmp(flat.items[2].arg, "open-path ") != 0);
+	assert(strncmp(flat.items[2].arg, "open-path /", 11) == 0);
+	assert(strcmp(flat.items[3].arg,
+		"exec zacos9-netbrowser --connect afp '10.0.0.5:548'") == 0);
+
 	char *quoted = g_shell_quote(root);
 	char *cleanup = g_strconcat("rm -rf ", quoted, NULL);
 	g_spawn_command_line_sync(cleanup, NULL, NULL, NULL, NULL);

@@ -47,6 +47,8 @@ void pl_sound_play(const char *name);
 /* The alert sound, for alerts and refused actions. */
 void pl_beep(void);
 /* Interface events use the selected sound theme, independently of alerts.
+ * "startup" and "shutdown" are played at desktop login and logout when
+ * the selected theme supplies them.
  * window-drag-end bypasses the event throttle and retries a busy interface
  * lock for up to 300 ms in the detached player, allowing stop then end without
  * waiting in the GUI. Other interface events skip a busy lock immediately. */

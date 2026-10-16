@@ -439,6 +439,7 @@ void view_set_app_id(struct plat_view *view, const char *app_id);
 void view_set_hidden(struct plat_view *view, bool hidden);
 /* Every window of `app_id` forward (front one active), or hidden. */
 void view_activate_app(struct plat_server *server, const char *app_id);
+void view_close_front_app_window(struct plat_server *server, const char *app_id);
 void view_hide_app(struct plat_server *server, const char *app_id);
 /* False while General Controls hides the desktop behind another program. */
 bool view_desktop_shown(struct plat_server *server);

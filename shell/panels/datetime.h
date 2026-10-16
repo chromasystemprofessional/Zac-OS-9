@@ -68,8 +68,8 @@ private:
  * The Date & Time control panel: the date and time (set through
  * systemd's timedated, `timedatectl`), the time zone, network time, and
  * the menu bar clock's options (desktop.conf: clock, clock-24h,
- * clock-weekday). TODO: the layout is ours; the HIG shows its controls
- * but not this panel.
+ * clock-weekday, clock-date-format). TODO: the layout is ours; the HIG
+ * shows its controls but not this panel.
  */
 class DateTimePanel : public QWidget {
 public:
@@ -93,7 +93,8 @@ private:
 	ClockField m_date, m_time;
 	ClockField *m_focus = nullptr;
 	PanelButton m_zoneButton;
-	PanelCheckbox m_ntp, m_showClock, m_clock24, m_weekday;
+	PanelCheckbox m_ntp, m_showClock, m_clock24, m_weekday, m_hourChime;
+	PanelPopup m_dateFormat;
 	QTimer m_tick, m_applyTimer;
 	QDateTime m_pending;
 	qint64 m_offset = 0; /* edited time minus real time, while editing */

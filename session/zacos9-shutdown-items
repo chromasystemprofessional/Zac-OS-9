@@ -1,0 +1,25 @@
+#!/bin/sh
+# Run the user's shutdown items in name order, then end this login session.
+set -u
+export LC_ALL=C
+
+data=${XDG_DATA_HOME:-"${HOME:-/nonexistent}/.local/share"}
+items="$data/zacos9/Shutdown Items"
+if [ -d "$items" ]; then
+	for item in "$items"/*; do
+		[ -f "$item" ] && [ -x "$item" ] || continue
+		if ! timeout 30s "$item"; then
+			printf 'zacos9-shutdown-items: failed or timed out: %s\n' "$item" >&2
+		fi
+	done
+fi
+
+if [ "${ZACOS9_LOGOUT_COMMAND:-}" ]; then
+	exec /bin/sh -c "$ZACOS9_LOGOUT_COMMAND"
+fi
+
+session=${XDG_SESSION_ID:-self}
+case $session in
+	''|*[!A-Za-z0-9_-]*) session=self ;;
+esac
+exec loginctl terminate-session "$session"

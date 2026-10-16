@@ -126,6 +126,8 @@ static void add_finder_menus(struct mb_menu *menus, int *n) {
 	add(m, "New Folder", 'N', up, ACT_FINDER, "new-folder");
 	add(m, "Open", 'O', sel, ACT_FINDER, "open");
 	add(m, "Print", 'P', sel, ACT_FINDER, "print");
+	add(m, "Encrypt…", 0, sel, ACT_FINDER, "encrypt");
+	add(m, "Decrypt…", 0, sel, ACT_FINDER, "decrypt");
 	add(m, "Move To Trash", KEY_DELETE_GLYPH, sel, ACT_FINDER, "move-to-trash");
 	add(m, "Close Window", 'W', up && fs->window, ACT_FINDER, "close-window");
 	sep(m);
@@ -141,10 +143,15 @@ static void add_finder_menus(struct mb_menu *menus, int *n) {
 	add(m, "Add To Favorites", 0, sel, ACT_FINDER, "add-to-favorites");
 	add(m, "Put Away", 'Y', sel, ACT_FINDER, "put-away");
 	sep(m);
+	add(m, "Search Internet…", 'H', up, ACT_FINDER, "search-internet");
 	add(m, "Find…", 'F', up, ACT_FINDER, "find");
 	add(m, "Find Similar Items", 0, sel, ACT_FINDER, "find-similar");
 	add(m, "Index Selection", 0, up, ACT_FINDER, "index-selection");
 	add(m, "Show Original", 'R', sel, ACT_FINDER, "show-original");
+	sep(m);
+	add(m, "Page Setup…", 0, up, ACT_FINDER, "page-setup");
+	add(m, up && fs->window ? "Print Window…" : "Print Desktop…", 0, up, ACT_FINDER,
+		"print-window");
 	/* Sniffer has no undoable edits or clipboard yet; it can select. */
 	add_edit_menu(menus, n, false);
 	struct mb_menu *edit = &menus[*n - 1];
@@ -202,6 +209,11 @@ static void add_finder_menus(struct mb_menu *menus, int *n) {
 	char book[PATH_MAX + 80];
 	snprintf(book, sizeof(book), "%s zacos9", help);
 	add(m, "ZacOS Help", '?', true, ACT_LAUNCH, book);
+	char hints[16];
+	struct mb_item *hint_bubbles = add(m, "Show Hint Bubbles", 0, true,
+		ACT_TOGGLE_SETTING, "hint-bubbles");
+	hint_bubbles->checked = !pl_setting("hint-bubbles", hints, sizeof(hints)) ||
+		(strcmp(hints, "0") != 0 && strcmp(hints, "false") != 0);
 }
 
 struct mb_menu *menus_new_menu(struct mb_menu *menus, int *n, const char *title) {
@@ -264,6 +276,24 @@ static bool setting_on(const char *key) {
 	return pl_setting(key, v, sizeof(v)) && (strcmp(v, "1") == 0 || strcmp(v, "true") == 0);
 }
 
+void menus_hourly_chime(void) {
+	if (!setting_on("clock-hour-chime")) {
+		return;
+	}
+	time_t now = time(NULL);
+	struct tm tm;
+	localtime_r(&now, &tm);
+	static int last_year = -1, last_yday = -1, last_hour = -1;
+	if (tm.tm_min != 0 || (last_year == tm.tm_year && last_yday == tm.tm_yday &&
+			last_hour == tm.tm_hour)) {
+		return;
+	}
+	last_year = tm.tm_year;
+	last_yday = tm.tm_yday;
+	last_hour = tm.tm_hour;
+	pl_sound_play("chirp");
+}
+
 static struct {
 	bool on;
 	unsigned latched, locked;
@@ -308,7 +338,16 @@ static void clock_text(char *buf, size_t size) {
 	tzset(); /* the time zone may have just changed */
 	localtime_r(&now, &tm);
 	if (clock_shows_date) {
-		strftime(buf, size, "%a, %b %-d, %Y", &tm);
+		char format[16];
+		const char *date_format = "%b %-d, %Y";
+		if (pl_setting("clock-date-format", format, sizeof(format))) {
+			if (strcmp(format, "dmy") == 0) {
+				date_format = "%-d %b %Y";
+			} else if (strcmp(format, "ymd") == 0) {
+				date_format = "%Y-%m-%d";
+			}
+		}
+		strftime(buf, size, date_format, &tm);
 		return;
 	}
 	char day[16] = "";
@@ -455,7 +494,23 @@ void menus_free(struct mb_bar *bar) {
 	bar->n_left = bar->n_right = 0;
 }
 
-void menus_perform(struct mb_item *item) {
+static const char *finder_command_arg(const char *arg, bool option_held) {
+	return option_held && arg && strcmp(arg, "empty-trash") == 0
+		? "empty-trash-option" : arg;
+}
+
+static void toggle_setting(const char *key) {
+	char current[16];
+	const bool present = pl_setting(key, current, sizeof(current));
+	const bool enabled = present
+		? strcmp(current, "0") != 0 && strcmp(current, "false") != 0
+		: strcmp(key, "hint-bubbles") == 0;
+	if (!pl_setting_set(key, enabled ? "0" : "1")) {
+		fprintf(stderr, "zacos9-menubar: could not save setting %s\n", key);
+	}
+}
+
+void menus_perform(struct mb_item *item, bool option_held) {
 	struct app apps[MAX_ITEMS];
 	int n_apps;
 	switch (item->action) {
@@ -486,17 +541,20 @@ void menus_perform(struct mb_item *item) {
 		}
 		break;
 	case ACT_ACTIVATE_APP:
-		/* Option-choosing another program hides the one you leave. */
-		n_apps = item->option ? apps_collect(apps, MAX_ITEMS) : 0;
-		app_activate(item->arg, menubar_seat());
-		for (int i = 0; i < n_apps; i++) {
-			if (apps[i].active && strcmp(apps[i].app_id, item->arg) != 0) {
-				app_set_hidden(apps[i].app_id, true);
+		if (option_held) {
+			n_apps = apps_collect(apps, MAX_ITEMS);
+			const char *previous = app_switch_option_previous(apps, n_apps, item->arg);
+			if (previous) {
+				app_set_hidden(previous, true);
 			}
 		}
+		app_activate(item->arg, menubar_seat());
 		break;
 	case ACT_KEYBOARD_LAYOUT:
 		menubar_set_keyboard_layout(atoi(item->arg));
+		break;
+	case ACT_TOGGLE_SETTING:
+		toggle_setting(item->arg);
 		break;
 	case ACT_EDIT_COMMAND:
 		keys_send_command(item->key);
@@ -505,9 +563,7 @@ void menus_perform(struct mb_item *item) {
 		keys_send_clear();
 		break;
 	case ACT_FINDER:
-		/* Option-Empty Trash: locked items too, without asking. */
-		finder_send(item->option && strcmp(item->arg, "empty-trash") == 0 ?
-			"empty-trash-option" : item->arg);
+		finder_send(finder_command_arg(item->arg, option_held));
 		break;
 	case ACT_DBUSMENU:
 		appmenu_perform(item->arg);
@@ -517,6 +573,60 @@ void menus_perform(struct mb_item *item) {
 		break;
 	case ACT_NONE:
 		break;
+	}
+}
+
+/* Folder Tricks for the folder clicked: Attach ▸ the Folder Tricks
+ * folder's programs (and the folder itself), Remove ▸ those attached. */
+static void add_trick_items(struct mb_menu *m) {
+	const struct finder_extras *x = finder_extras();
+	if (!x->can_trick) {
+		return;
+	}
+	sep(m);
+	struct mb_item *attach = add(m, "Attach a Folder Trick", 0, true, ACT_NONE, NULL);
+	if (!attach) {
+		return;
+	}
+	attach->submenu = calloc(1, sizeof(*attach->submenu));
+	char command[256];
+	for (int i = 0; i < x->n_available; i++) {
+		bool on = false;
+		for (int j = 0; j < x->n_attached; j++) {
+			on |= strcmp(x->attached[j], x->available[i]) == 0;
+		}
+		snprintf(command, sizeof(command), "attach-trick %s", x->available[i]);
+		struct mb_item *it = add(attach->submenu, x->available[i], 0, !on, ACT_FINDER, command);
+		if (it) {
+			it->checked = on; /* attached already */
+		}
+	}
+	if (x->n_available) {
+		sep(attach->submenu);
+	}
+	add(attach->submenu, "Open Folder Tricks Folder", 0, true, ACT_FINDER, "open-folder-tricks");
+	if (x->n_attached) {
+		struct mb_item *remove = add(m, "Remove a Folder Trick", 0, true, ACT_NONE, NULL);
+		if (remove) {
+			remove->submenu = calloc(1, sizeof(*remove->submenu));
+			for (int i = 0; i < x->n_attached; i++) {
+				snprintf(command, sizeof(command), "remove-trick %s", x->attached[i]);
+				add(remove->submenu, x->attached[i], 0, true, ACT_FINDER, command);
+			}
+		}
+	}
+}
+
+/* The Contextual Menu Items folder's commands that apply. */
+static void add_context_commands(struct mb_menu *m) {
+	const struct finder_extras *x = finder_extras();
+	if (x->n_commands) {
+		sep(m);
+	}
+	for (int i = 0; i < x->n_commands; i++) {
+		char command[32];
+		snprintf(command, sizeof(command), "contextual %d", i);
+		add(m, x->commands[i], 0, true, ACT_FINDER, command);
 	}
 }
 
@@ -532,6 +642,10 @@ void menus_context(struct mb_menu *m, const char *kind) {
 	const bool sel = fs->selection > 0;
 	if (strcmp(kind, "icon") == 0 && sel) {
 		add(m, "Open", 0, true, ACT_FINDER, "open");
+		/* As the File menu: Print after Open, when there's a document. */
+		if (fs->documents) {
+			add(m, "Print", 0, true, ACT_FINDER, "print");
+		}
 		add(m, "Move To Trash", 0, true, ACT_FINDER, "move-to-trash");
 		sep(m);
 		add(m, "Get Info", 0, true, ACT_FINDER, "get-info");
@@ -539,6 +653,8 @@ void menus_context(struct mb_menu *m, const char *kind) {
 		add(m, "Duplicate", 0, true, ACT_FINDER, "duplicate");
 		add(m, "Make Alias", 0, true, ACT_FINDER, "make-alias");
 		add(m, "Add To Favorites", 0, true, ACT_FINDER, "add-to-favorites");
+		add_trick_items(m);
+		add_context_commands(m);
 	} else if (strcmp(kind, "disk") == 0 && sel) {
 		add(m, "Open", 0, true, ACT_FINDER, "open");
 		add(m, "Get Info", 0, true, ACT_FINDER, "get-info");
@@ -556,6 +672,7 @@ void menus_context(struct mb_menu *m, const char *kind) {
 		if (fs->erase && fs->selection == 1) {
 			add(m, "Erase Disk…", 0, true, ACT_FINDER, "erase-disk");
 		}
+		add_context_commands(m);
 	} else if (strcmp(kind, "trash") == 0 && sel) {
 		add(m, "Open", 0, true, ACT_FINDER, "open");
 		if (fs->trash) {
@@ -579,6 +696,8 @@ void menus_context(struct mb_menu *m, const char *kind) {
 		sep(m);
 		add(m, "Get Info", 0, true, ACT_FINDER, "get-info");
 		add(m, "Close Window", 0, true, ACT_FINDER, "close-window");
+		add_trick_items(m);
+		add_context_commands(m);
 	} else if (strcmp(kind, "desktop") == 0) {
 		add(m, "New Folder", 0, true, ACT_FINDER, "new-folder");
 		sep(m);
@@ -590,6 +709,8 @@ void menus_context(struct mb_menu *m, const char *kind) {
 		sibling_program("zacos9-appearance", command, sizeof(command));
 		strncat(command, " desktop", sizeof(command) - strlen(command) - 1);
 		add(m, "Change Desktop Background…", 0, true, ACT_LAUNCH, command);
+		add_trick_items(m);
+		add_context_commands(m);
 	}
 	render_menu_text(m);
 }

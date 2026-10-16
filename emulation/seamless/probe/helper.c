@@ -141,8 +141,8 @@ static void observe_rectangle(GrafVerb verb, const Rect *rect, int replay) {
 		if (id == 2) {
 			return;
 		}
-		/* Ignore unrelated dialogs; never read a target color port as GrafPort. */
-		if ((port->portBits.rowBytes & 0xC000) == 0xC000) {
+		/* CGrafPort and GrafPort have different layouts; classify before reading fields. */
+		if (IsPortColor(port)) {
 			observation_error = paramErr;
 			observation_reason = "color port";
 			return;
@@ -285,7 +285,7 @@ static pascal void capture_bits(BitMap *source, BitMap *destination,
 	int nested = in_callback;
 	GrafPtr original;
 	GetPort(&original);
-	if ((original->portBits.rowBytes & 0xC000) != 0xC000 &&
+	if (!IsPortColor(original) &&
 			destination == &original->portBits && begin_replay()) {
 		BitMap *replay_source = source;
 		if (source->rowBytes & 0xC000) {

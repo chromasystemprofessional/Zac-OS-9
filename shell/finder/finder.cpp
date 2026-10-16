@@ -1,17 +1,23 @@
 #include "finder.h"
 
 #include "clippings.h"
+#include "cryptofiles.h"
 #include "desktopprinter.h"
 #include "printers.h"
+#include "printwindow.h"
 #include "findindex.h"
 #include "platinumshell.h"
 #include "settings.h"
 
 #include <QCoreApplication>
+#include <QApplication>
+#include <QClipboard>
+#include <QGuiApplication>
 #include <algorithm>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QInputDialog>
 #include <QProgressDialog>
 #include <QProcess>
 #include <QMetaObject>
@@ -21,7 +27,9 @@
 #include <QTimer>
 
 #include <QDirIterator>
+#include <QTemporaryDir>
 #include <QUrl>
+#include <QUrlQuery>
 
 #include "appdb.h"
 #include "apptrash.h"
@@ -39,6 +47,7 @@
 #include "desktop.h"
 #include "findwindow.h"
 #include "folderpath.h"
+#include "foldertricks.h"
 #include "folderwindow.h"
 #include "toybox.h"
 #include "viewoptionsdialog.h"
@@ -76,18 +85,24 @@ void Finder::springHover(const QString &folder) {
 }
 
 void Finder::springNow() {
+	springOpenNow();
+}
+
+bool Finder::springOpenNow() {
+	if (m_springPath.isEmpty() || !springLoadedFolders()) {
+		return false;
+	}
 	if (m_springTimer) {
 		m_springTimer->stop();
 	}
-	if (m_springPath.isEmpty()) {
-		return;
-	}
-	const bool wasOpen = FolderWindow::isOpen(m_springPath);
-	FolderWindow *w = FolderWindow::open(m_springPath);
-	if (!wasOpen) {
-		m_sprung.push_back(w);
-	}
+	const QString folder = m_springPath;
 	m_springPath.clear();
+	const bool wasOpen = FolderWindow::isOpen(folder);
+	FolderWindow *window = FolderWindow::open(folder);
+	if (!wasOpen) {
+		m_sprung.push_back(window);
+	}
+	return true;
 }
 
 void Finder::dragEnded() {
@@ -104,6 +119,7 @@ void Finder::start(Desktop *desktop) {
 	m_desktop = desktop;
 	m_front = desktop;
 	platinumOnDragSpring([this] { springNow(); });
+	FolderTricks::instance(); /* watches the folders with tricks attached */
 	QLocalServer::removeServer(socketPath());
 	m_server.listen(socketPath());
 	QObject::connect(&m_server, &QLocalServer::newConnection, [this] {
@@ -172,6 +188,25 @@ void Finder::viewClosed(FinderView *view) {
 	}
 }
 
+void Finder::closeAllWindows() {
+	QList<QPointer<QWidget>> windows;
+	for (QWidget *window : QApplication::topLevelWidgets()) {
+		windows.append(window);
+	}
+	QWidget *desktop = m_desktop ? m_desktop->widget() : nullptr;
+	for (const QPointer<QWidget> &window : windows) {
+		if (window && window != desktop && window->windowType() == Qt::Window) {
+			window->close();
+		}
+	}
+}
+
+/* A document File > Print can send somewhere: not a folder, a printer or
+ * one of the Macintosh view's items. */
+static bool isPrintable(const Item *item) {
+	return !item->isVirtual && !item->isDir && item->kind != PL_ICON_PRINTER;
+}
+
 QString Finder::stateLine() {
 	FinderView *v = front();
 	int selection = v ? static_cast<int>(v->selectedItems().size()) : 0;
@@ -211,10 +246,12 @@ QString Finder::stateLine() {
 	}
 	/* View > as Window / as Pop-up Window, where zacos9-wm has pop-ups. */
 	const bool popup = fw && fw->isPopup();
-	return QStringLiteral("state selection=%1 window=%2 trash=%3 view=%4 label=%5 erase=%6 network=%7 unmount=%8 sort=%9 columns=%10 custom=%11 popup=%12 popups=%13")
+	/* Documents File > Print would print, for the contextual menu's Print. */
+	const bool documents = std::any_of(items.begin(), items.end(), isPrintable);
+	return QStringLiteral("state selection=%1 window=%2 trash=%3 view=%4 label=%5 erase=%6 network=%7 unmount=%8 sort=%9 columns=%10 custom=%11 popup=%12 popups=%13 documents=%14")
 		.arg(selection).arg(window ? 1 : 0).arg(full ? 1 : 0).arg(list).arg(label).arg(erase ? 1 : 0)
 		.arg(network ? 1 : 0).arg(unmount ? 1 : 0).arg(sort).arg(columns).arg(custom ? 1 : 0)
-		.arg(popup ? 1 : 0).arg(platinumHasPopupWindows() ? 1 : 0);
+		.arg(popup ? 1 : 0).arg(platinumHasPopupWindows() ? 1 : 0).arg(documents ? 1 : 0);
 }
 
 void Finder::notifyState() {
@@ -245,6 +282,26 @@ void Finder::command(const QString &name) {
 		}
 	} else if (name == "add-to-favorites") {
 		addToFavorites();
+	} else if (name.startsWith("attach-trick ")) {
+		const QString trick = name.mid(13);
+		if (m_trickFolder.isEmpty() || !FolderTricks::instance().attach(m_trickFolder, trick)) {
+			Alert::ask("“" + trick + "” couldn't be attached to “" +
+				displayName(m_trickFolder) + "”.", "OK", QString());
+		}
+	} else if (name.startsWith("remove-trick ")) {
+		FolderTricks::instance().remove(m_trickFolder, name.mid(13));
+	} else if (name == "open-folder-tricks") {
+		const QString dir = FolderTricks::instance().tricksDir();
+		QDir().mkpath(dir);
+		openFolder(dir);
+	} else if (name.startsWith("contextual ")) {
+		bool ok = false;
+		const int index = name.mid(11).toInt(&ok);
+		QString error;
+		if (ok && index >= 0 && index < m_contextCommands.size() &&
+				!runContextCommand(m_contextCommands[index], m_contextPaths, &error)) {
+			Alert::ask(error, "OK", QString());
+		}
 	} else if (name.startsWith("open-path ")) {
 		openPath(name.mid(10));
 	} else if (name.startsWith("path-menu ")) {
@@ -327,10 +384,41 @@ void Finder::command(const QString &name) {
 		vfsShowAllHidden();
 	} else if (name == "print") {
 		printSelection();
+	} else if (name == "page-setup") {
+		showPageSetup();
+	} else if (name == "print-window") {
+		printWindow();
+	} else if (name == "encrypt") {
+		encryptSelection();
+	} else if (name == "decrypt") {
+		decryptSelection();
 	} else if (name == "find") {
 		/* A folder window in front: offered as the place to look. */
 		auto *folder = dynamic_cast<FolderWindow *>(front());
 		FindDialog::open(folder && !vfsIsVirtual(folder->folderPath()) ? folder->folderPath() : QString());
+	} else if (name == "search-internet") {
+		bool accepted = false;
+		const QStringList searchChannels = { "DuckDuckGo", "Google", "Bing" };
+		const QString channel = QInputDialog::getItem(nullptr, "Search Internet",
+			"Search the web with:", searchChannels, 0, false, &accepted);
+		if (!accepted) {
+			return;
+		}
+		const QString words = QInputDialog::getText(nullptr, "Search Internet",
+			"Search for:", QLineEdit::Normal, QString(), &accepted).trimmed();
+		if (accepted && !words.isEmpty()) {
+			const QString baseUrl = channel == "Google" ? "https://www.google.com/search"
+				: channel == "Bing" ? "https://www.bing.com/search"
+				: "https://duckduckgo.com/";
+			QUrl url(baseUrl);
+			QUrlQuery query;
+			query.addQueryItem("q", words);
+			url.setQuery(query);
+			if (!appOpenUrl(url.toString(QUrl::FullyEncoded))) {
+				Alert::ask("The web search could not be opened. Check that a web browser is available.",
+					"OK", QString());
+			}
+		}
 	} else if (name == "find-similar") {
 		const std::vector<Item *> sel = front() ? front()->selectedItems() : std::vector<Item *>{};
 		if (sel.size() == 1 && !sel[0]->isVirtual && !sel[0]->isDir) {
@@ -540,6 +628,25 @@ void Finder::openItem(Item *item) {
 	}
 }
 
+bool Finder::closeApplicationWindow(Item *item) {
+	if (!item || item->kind != PL_ICON_APPLICATION) {
+		return false;
+	}
+	QString appId;
+	if (item->isVirtual) {
+		const VNode *node = vfsNode(item->path);
+		if (node && node->kind == VKind::Launcher) {
+			appId = node->appId;
+		}
+	} else if (const AppEntry *app = appByFile(item->path)) {
+		appId = app->id;
+	}
+	if (appId.isEmpty()) {
+		return false;
+	}
+	return platinumCloseFrontAppWindow(appId);
+}
+
 void Finder::mountMacImage(const QString &image) {
 	auto *progress = new QProgressDialog("Mounting " + QFileInfo(image).fileName() + " read-only...",
 		QString(), 0, 0);
@@ -624,6 +731,20 @@ void Finder::openSelection() {
 	}
 }
 
+void Finder::copySelectionNames() {
+	FinderView *view = front();
+	if (!view) {
+		return;
+	}
+	QStringList names;
+	for (const Item *item : view->selectedItems()) {
+		names.push_back(item->visibleName());
+	}
+	if (!names.isEmpty()) {
+		QGuiApplication::clipboard()->setText(names.join('\n'));
+	}
+}
+
 static QString classicLauncher() {
 	const QString local = QCoreApplication::applicationDirPath() + "/zacos9-classic";
 	return QFileInfo(local).isExecutable() ? local : QStringLiteral("zacos9-classic");
@@ -640,10 +761,22 @@ void Finder::launchWindows(const QString &exe) {
 	}
 }
 
+/* The printer to use: `queue`, else yours; with none chosen, says so
+ * and offers Printer Picker. */
+static QString printerFor(const QString &queue) {
+	const QString printer = queue.isEmpty() ? defaultPrinter() : queue;
+	if (printer.isEmpty() &&
+			Alert::ask("No printer has been chosen. Choose one in Printer Picker, then print again.",
+				"Printer Picker", "Cancel")) {
+		platinumStartApplication(siblingProgram("zacos9-printerpicker"), {});
+	}
+	return printer;
+}
+
 void Finder::printSelection() {
 	QStringList files;
 	for (Item *item : front()->selectedItems()) {
-		if (!item->isVirtual && !item->isDir && item->kind != PL_ICON_PRINTER) {
+		if (isPrintable(item)) {
 			files << QFileInfo(item->path).canonicalFilePath(); /* through aliases */
 		}
 	}
@@ -653,13 +786,170 @@ void Finder::printSelection() {
 	}
 }
 
-void Finder::printDocuments(const QStringList &files, const QString &queue) {
-	const QString printer = queue.isEmpty() ? defaultPrinter() : queue;
+void Finder::printWindow() {
+	FinderView *v = front();
+	auto *fw = dynamic_cast<FolderWindow *>(v);
+	if (!v || (!fw && v != m_desktop)) {
+		return;
+	}
+	const QString printer = printerFor(QString());
 	if (printer.isEmpty()) {
-		if (Alert::ask("No printer has been chosen. Choose one in Printer Picker, then print again.",
-				"Printer Picker", "Cancel")) {
-			platinumStartApplication(siblingProgram("zacos9-printerpicker"), {});
+		return;
+	}
+	const QString title = fw ? fw->windowTitle() : QStringLiteral("Desktop");
+	const QImage image = fw ? fw->printImage() : m_desktop->printImage();
+	if (image.isNull()) {
+		Alert::ask("There's nothing in “" + title + "” to print.", "OK", QString());
+		return;
+	}
+	/* A PDF named for the window (the print job's name), gone once lp
+	 * has taken it. */
+	QTemporaryDir dir;
+	const QString pdf = dir.path() + "/" + QString(title).replace('/', '-') + ".pdf";
+	if (!dir.isValid() || writeWindowPdf(title, image, loadPageSetup(), pdf) == 0) {
+		Alert::ask("“" + title + "” couldn't be prepared for printing.", "OK", QString());
+		return;
+	}
+	QString error;
+	if (printFiles(printer, { pdf }, &error).isEmpty()) {
+		Alert::ask("“" + title + "” couldn't be printed. " + error, "OK", QString());
+	}
+}
+
+static QString cryptoSelectionPath(FinderView *view) {
+	if (!view) {
+		return {};
+	}
+	const std::vector<Item *> selected = view->selectedItems();
+	if (selected.size() != 1 || selected.front()->isVirtual || selected.front()->isDir ||
+			selected.front()->kind == PL_ICON_DISK || selected.front()->kind == PL_ICON_PRINTER) {
+		Alert::ask("Select one regular file.", "OK", QString());
+		return {};
+	}
+	const QString path = QFileInfo(selected.front()->path).canonicalFilePath();
+	if (path.isEmpty() || !QFileInfo(path).isFile() || !QFileInfo(path).isReadable()) {
+		Alert::ask("The selected file is not readable.", "OK", QString());
+		return {};
+	}
+	return path;
+}
+
+static QString cryptoPassword(bool confirm) {
+	bool accepted = false;
+	QString password = QInputDialog::getText(nullptr, confirm ? "Encrypt File" : "Decrypt File",
+		confirm ? "Enter a passphrase (at least 8 characters):" : "Enter the passphrase:",
+		QLineEdit::Password, QString(), &accepted);
+	if (!accepted) {
+		return {};
+	}
+	if (password.contains('\n') || password.contains('\r') ||
+			(confirm && password.size() < 8)) {
+		Alert::ask(confirm
+			? "Use a passphrase of at least 8 characters without line breaks."
+			: "The passphrase cannot contain a line break.", "OK", QString());
+		password.fill(QChar('\0'));
+		return {};
+	}
+	if (confirm) {
+		QString repeated = QInputDialog::getText(nullptr, "Encrypt File", "Re-enter the passphrase:",
+			QLineEdit::Password, QString(), &accepted);
+		if (!accepted || repeated != password) {
+			password.fill(QChar('\0'));
+			repeated.fill(QChar('\0'));
+			if (accepted) {
+				Alert::ask("The passphrases did not match.", "OK", QString());
+			}
+			return {};
 		}
+		repeated.fill(QChar('\0'));
+	}
+	return password;
+}
+
+static QProgressDialog *cryptoProgress(const QString &text) {
+	auto *progress = new QProgressDialog(text, QString(), 0, 0);
+	progress->setWindowTitle("File Encryption");
+	progress->setCancelButton(nullptr);
+	progress->setWindowModality(Qt::ApplicationModal);
+	progress->setMinimumDuration(0);
+	progress->show();
+	platinumSetFrameStyle(progress, FrameStyle::MovableModal);
+	return progress;
+}
+
+void Finder::encryptSelection() {
+	const QString source = cryptoSelectionPath(front());
+	if (source.isEmpty()) {
+		return;
+	}
+	const QString destination = QFileDialog::getSaveFileName(nullptr, "Encrypt File",
+		source + ".gpg", "GPG encrypted files (*.gpg);;All files (*)");
+	if (destination.isEmpty()) {
+		return;
+	}
+	if (QFileInfo(destination).absoluteFilePath() == source) {
+		Alert::ask("The encrypted copy must be saved as a different file.", "OK", QString());
+		return;
+	}
+	QString password = cryptoPassword(true);
+	if (password.isEmpty()) {
+		return;
+	}
+	auto *progress = cryptoProgress("Encrypting “" + QFileInfo(source).fileName() + "”…");
+	encryptFile(source, destination, password, [progress, destination](bool ok, const QString &problem) {
+		progress->hide();
+		progress->deleteLater();
+		if (ok) {
+			Alert::ask("Encrypted copy saved to “" + QFileInfo(destination).fileName() + "”.",
+				"OK", QString());
+		} else {
+			Alert::ask("The file could not be encrypted. " + problem, "OK", QString());
+		}
+	});
+	password.fill(QChar('\0'));
+}
+
+void Finder::decryptSelection() {
+	const QString source = cryptoSelectionPath(front());
+	if (source.isEmpty()) {
+		return;
+	}
+	QString suggested = source;
+	if (suggested.endsWith(".gpg", Qt::CaseInsensitive)) {
+		suggested.chop(4);
+	} else {
+		suggested += ".decrypted";
+	}
+	const QString destination = QFileDialog::getSaveFileName(nullptr, "Decrypt File",
+		suggested, "All files (*)");
+	if (destination.isEmpty()) {
+		return;
+	}
+	if (QFileInfo(destination).absoluteFilePath() == source) {
+		Alert::ask("The decrypted file must be saved as a different file.", "OK", QString());
+		return;
+	}
+	QString password = cryptoPassword(false);
+	if (password.isEmpty()) {
+		return;
+	}
+	auto *progress = cryptoProgress("Decrypting “" + QFileInfo(source).fileName() + "”…");
+	decryptFile(source, destination, password, [progress, destination](bool ok, const QString &problem) {
+		progress->hide();
+		progress->deleteLater();
+		if (ok) {
+			Alert::ask("Decrypted file saved to “" + QFileInfo(destination).fileName() + "”.",
+				"OK", QString());
+		} else {
+			Alert::ask("The file could not be decrypted. " + problem, "OK", QString());
+		}
+	});
+	password.fill(QChar('\0'));
+}
+
+void Finder::printDocuments(const QStringList &files, const QString &queue) {
+	const QString printer = printerFor(queue);
+	if (printer.isEmpty()) {
 		return;
 	}
 	QStringList printable, others;
@@ -670,12 +960,23 @@ void Finder::printDocuments(const QStringList &files, const QString &queue) {
 	if (!printable.isEmpty() && printFiles(printer, printable, &error).size() < printable.size()) {
 		Alert::ask("Not everything could be printed. " + error, "OK", QString());
 	}
-	if (others.size() == 1) {
-		Alert::ask(QString::fromUtf8("“%1” can't be printed from the Sniffer. Open it and choose Print in its program.")
-			.arg(QFileInfo(others[0]).fileName()), "OK", QString());
-	} else if (others.size() > 1) {
-		Alert::ask(QString("%1 of the documents can't be printed from the Sniffer. Open them and choose Print in "
-			"their programs.").arg(others.size()), "OK", QString());
+	QStringList failedToOpen;
+	for (const QString &file : others) {
+		if (!appOpenFile(file)) {
+			failedToOpen << QFileInfo(file).fileName();
+		}
+	}
+	if (!others.isEmpty() && failedToOpen.isEmpty()) {
+		Alert::ask(others.size() == 1
+			? QString::fromUtf8("“%1” is open in its application. Choose Print there to print it.")
+				.arg(QFileInfo(others.first()).fileName())
+			: QString("%1 documents are open in their applications. Choose Print in each application to print them.")
+				.arg(others.size()), "OK", QString());
+	} else if (!failedToOpen.isEmpty()) {
+		Alert::ask("Some documents could not be opened in their applications: " +
+			failedToOpen.join(", ") + ". " + (others.size() > failedToOpen.size()
+				? "The others were opened; choose Print in their applications." : ""),
+			"OK", QString());
 	}
 }
 
@@ -863,9 +1164,64 @@ void Finder::showContextMenu(FinderView *view, Item *hit) {
 		: hit->isLocalVolume || hit->isNetworkVolume || hit->kind == PL_ICON_DISK ? "disk"
 		: "icon";
 	notifyState(); /* the menu's items follow this state, sent first */
+	sendContextExtras(view, hit, kind);
 	for (auto &c : m_clients) {
 		if (c) {
 			c->write(QByteArray("context ") + kind + "\n");
+		}
+	}
+}
+
+/* Before a contextual menu: the Folder Tricks for what was clicked
+ * ("tricks <can attach>", then TAB "+name" for each attached and TAB
+ * "*name" for each in the Folder Tricks folder) and the Contextual Menu
+ * Items' commands that apply ("commands", then TAB "name" each). */
+void Finder::sendContextExtras(FinderView *view, Item *hit, const char *kind) {
+	const auto real = [](const QString &path) {
+		return vfsIsVirtual(path) ? vfsRealCounterpart(path) : path;
+	};
+	m_contextPaths.clear();
+	m_trickFolder.clear();
+	if (!hit) {
+		/* A window's background or the desktop: its folder. */
+		const QString folder = real(view->folderPath());
+		if (!folder.isEmpty() && QFileInfo(folder).isDir()) {
+			m_contextPaths << folder;
+			m_trickFolder = folder;
+		}
+	} else if (strcmp(kind, "icon") == 0 || strcmp(kind, "disk") == 0) {
+		for (Item *item : view->selectedItems()) {
+			const QString path = real(item->path);
+			if (path.isEmpty()) {
+				m_contextPaths.clear(); /* a command has to apply to them all */
+				break;
+			}
+			m_contextPaths << path;
+		}
+		if (strcmp(kind, "icon") == 0 && m_contextPaths.size() == 1 &&
+				QFileInfo(m_contextPaths.first()).isDir()) {
+			m_trickFolder = m_contextPaths.first();
+		}
+	}
+	m_contextCommands = contextCommands(contextItemsDir(), m_contextPaths);
+
+	FolderTricks &tricks = FolderTricks::instance();
+	QString line = m_trickFolder.isEmpty() ? "tricks 0" : "tricks 1";
+	if (!m_trickFolder.isEmpty()) {
+		for (const QString &name : tricks.attached(m_trickFolder)) {
+			line += "\t+" + name;
+		}
+		for (const QString &name : tricks.available()) {
+			line += "\t*" + name;
+		}
+	}
+	QString commands = "commands";
+	for (const ContextCommand &command : m_contextCommands) {
+		commands += "\t" + command.name;
+	}
+	for (auto &c : m_clients) {
+		if (c) {
+			c->write((line + "\n" + commands + "\n").toUtf8());
 		}
 	}
 }

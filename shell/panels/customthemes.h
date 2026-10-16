@@ -5,6 +5,8 @@
 
 class QObject;
 QString soundThemesFolder();
+QString userAlertSoundsFolder();
+bool importAlertSound(const QString &source, QString *id, QString *error);
 QString appearanceThemesFolder();
 void watchCustomThemes(QObject *owner, std::function<void()> changed);
 int soundThemeCount();

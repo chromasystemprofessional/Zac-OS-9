@@ -11,7 +11,9 @@
 
 #include <QDialog>
 #include <QAbstractItemView>
+#include <QDragEnterEvent>
 #include <QDialogButtonBox>
+#include <QDropEvent>
 #include <QItemSelectionModel>
 #include <QLineEdit>
 #include <QIcon>
@@ -22,6 +24,7 @@
 #include <QLabel>
 #include <QListView>
 #include <QListWidget>
+#include <QMimeData>
 #include <QMimeDatabase>
 #include <QPushButton>
 #include <QRegularExpression>
@@ -39,6 +42,7 @@
 #include <QDBusVirtualObject>
 #include <QDBusArgument>
 #include <QPointer>
+#include <QSaveFile>
 #include <QSharedPointer>
 #include <QTimer>
 #include <QComboBox>
@@ -127,6 +131,7 @@ public:
 		: QFileDialog(parent, title, drive.path), m_root(QFileInfo(drive.path).canonicalFilePath()),
 		  m_realRoots(drive.realRoots) {
 		prepareFileChooserDialog(*this);
+		setAcceptDrops(true);
 		if (auto *locations = findChild<QComboBox *>("lookInCombo")) {
 			locations->hide();
 		}
@@ -134,7 +139,30 @@ public:
 		m_error = new QLabel(this);
 		m_error->setWordWrap(true);
 		layout()->addWidget(m_location);
+		m_recent = new QComboBox(this);
+		m_recent->addItem("Recent Folders", QString());
+		const FileChooserLocation recentLocation{ {}, m_root, false, m_realRoots };
+		for (const QString &path : fileChooserRecentFolders(recentLocation)) {
+			m_recent->addItem(QDir::home().relativeFilePath(path), path);
+		}
+		m_recent->setEnabled(m_recent->count() > 1);
+		layout()->addWidget(m_recent);
 		layout()->addWidget(m_error);
+		connect(m_recent, qOverload<int>(&QComboBox::currentIndexChanged), this, [this](int index) {
+			const QString path = m_recent->itemData(index).toString();
+			if (path.isEmpty()) {
+				return;
+			}
+			if (!QFileInfo(path).isDir() ||
+					!fileChooserPathWithinDisk(path, m_root, m_realRoots, true)) {
+				m_error->setText("That recent folder is no longer available in this location.");
+			} else {
+				setDirectory(path);
+				m_error->clear();
+				updateLocation();
+			}
+			m_recent->setCurrentIndex(0);
+		});
 		if (otherLocations) {
 			auto *other = new QPushButton("Other Locations...", this);
 			other->setObjectName("otherLocationsButton");
@@ -238,6 +266,7 @@ private:
 	QStringList m_realRoots;
 	QString m_jumpTo;
 	QLabel *m_location = nullptr;
+	QComboBox *m_recent = nullptr;
 	QLabel *m_error = nullptr;
 };
 
@@ -526,6 +555,7 @@ private:
 				return {};
 			}
 			fileChooserRememberFolder(appId, fileChooserRealPath(dialog.directory().absolutePath()));
+			fileChooserRememberRecentFolder(fileChooserRealPath(dialog.directory().absolutePath()));
 			return dialog.chosenFiles();
 		}
 	}
@@ -816,6 +846,19 @@ bool fileChooserPathWithinDisk(const QString &path, const QString &root,
 		[&target](const QString &real) { return under(target, real); });
 }
 
+QString fileChooserDroppedFolder(const QList<QUrl> &urls, const QString &root,
+		const QStringList &realRoots) {
+	if (urls.size() != 1 || !urls.front().isLocalFile()) {
+		return {};
+	}
+	const QString path = QFileInfo(urls.front().toLocalFile()).canonicalFilePath();
+	if (path.isEmpty() || !QFileInfo(path).isDir() ||
+			!fileChooserPathWithinDisk(path, root, realRoots, true)) {
+		return {};
+	}
+	return path;
+}
+
 QString fileChooserRealPath(const QString &path) {
 	const QString target = canonicalTarget(path);
 	return target.isEmpty() ? QDir::cleanPath(QFileInfo(path).absoluteFilePath()) : target;
@@ -834,6 +877,87 @@ static QStringList lastFolders() {
 	QFile f(lastFoldersPath());
 	return f.open(QIODevice::ReadOnly) ?
 		QString::fromUtf8(f.readAll()).split('\n', Qt::SkipEmptyParts) : QStringList();
+}
+
+static QString recentFoldersPath() {
+	QString state = qEnvironmentVariable("XDG_STATE_HOME");
+	if (state.isEmpty()) {
+		state = QDir::homePath() + "/.local/state";
+	}
+	return state + "/zacos9/open-save-recent";
+}
+
+static QStringList recentFolders() {
+	QFile f(recentFoldersPath());
+	if (!f.open(QIODevice::ReadOnly)) {
+		if (f.exists()) {
+			qWarning() << "Could not read Open/Save recent folders:" << f.errorString();
+		}
+		return {};
+	}
+	QJsonParseError parseError;
+	const QJsonDocument document = QJsonDocument::fromJson(f.readAll(), &parseError);
+	if (parseError.error != QJsonParseError::NoError || !document.isArray()) {
+		qWarning() << "Could not parse Open/Save recent folders:"
+			<< parseError.errorString();
+		return {};
+	}
+	QStringList folders;
+	for (const QJsonValue &value : document.array()) {
+		if (!value.isString()) {
+			continue;
+		}
+		const QString path = value.toString();
+		if (QFileInfo(path).isDir() && !folders.contains(path)) {
+			folders << path;
+			if (folders.size() == 10) {
+				break;
+			}
+		}
+	}
+	return folders;
+}
+
+QStringList fileChooserRecentFolders() {
+	return recentFolders();
+}
+
+QStringList fileChooserRecentFolders(const FileChooserLocation &location) {
+	const QString root = QFileInfo(location.path).canonicalFilePath();
+	if (root.isEmpty()) {
+		return {};
+	}
+	QStringList folders;
+	for (const QString &path : recentFolders()) {
+		if (QFileInfo(path).isDir() &&
+				fileChooserPathWithinDisk(path, root, location.realRoots, true)) {
+			folders << path;
+		}
+	}
+	return folders;
+}
+
+void fileChooserRememberRecentFolder(const QString &folder) {
+	const QString path = QFileInfo(folder).canonicalFilePath();
+	if (path.isEmpty() || !QFileInfo(path).isDir()) {
+		return;
+	}
+	QJsonArray folders{ path };
+	for (const QString &recent : fileChooserRecentFolders()) {
+		if (recent != path && folders.size() < 10) {
+			folders << recent;
+		}
+	}
+	const QString filePath = recentFoldersPath();
+	if (!QDir().mkpath(QFileInfo(filePath).absolutePath())) {
+		qWarning() << "Could not create the Open/Save recent-folders directory.";
+		return;
+	}
+	QSaveFile f(filePath);
+	const QByteArray contents = QJsonDocument(folders).toJson();
+	if (!f.open(QIODevice::WriteOnly) || f.write(contents) != contents.size() || !f.commit()) {
+		qWarning() << "Could not save Open/Save recent folders.";
+	}
 }
 
 QString fileChooserStartFolder(const QString &appId) {

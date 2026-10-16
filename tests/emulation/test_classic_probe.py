@@ -36,6 +36,21 @@ def graphics_bytes(window, frame, mode="candidate"):
     ).replace(f" {frame}\n".encode(), f" {frame} graphics\n".encode(), 1)
 
 
+def color_bytes(window, frame, mode="candidate"):
+    width, height = 320, 192
+    pixels = bytearray()
+    for y in range(height):
+        for x in range(width):
+            if y < 8 and x < 256:
+                channel = 255 if (((frame >> (x // 8)) ^ window) & 1) else 0
+                pixels.extend((channel,) * 3)
+            else:
+                pixels.extend(((x + frame) & 0xff, (y + window) & 0xff,
+                               (x + y + frame + window) & 0xff))
+    return (f"P6\n# zacos9-classic-probe 3 {mode} {window} {frame} color\n"
+            f"{width} {height}\n255\n").encode("ascii") + pixels
+
+
 class ProbeTests(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
@@ -145,6 +160,72 @@ class ProbeTests(unittest.TestCase):
             path.write_bytes(data)
             with self.assertRaisesRegex(ValueError, "version/profile"):
                 probe.read_capture(path)
+
+    def test_color_requires_independent_references_and_matches_exactly(self):
+        candidates = [self.root / f"candidate-{window}.ppm" for window in (0, 1)]
+        references = [self.root / f"reference-{window}.ppm" for window in (0, 1)]
+        for window in (0, 1):
+            candidates[window].write_bytes(color_bytes(window, 33))
+            references[window].write_bytes(color_bytes(window, 33, "reference"))
+        with self.assertRaisesRegex(ValueError, "independent reference"):
+            probe.verify_pair(candidates, 33, "candidate")
+        self.assertEqual(
+            len(probe.verify_against_references(candidates, references, 33)), 2
+        )
+        data = bytearray(candidates[0].read_bytes())
+        data[-1] ^= 1
+        candidates[0].write_bytes(data)
+        with self.assertRaisesRegex(ValueError, "1 pixels differ"):
+            probe.verify_against_references(candidates, references, 33)
+
+    def test_color_marker_catches_relabelled_stale_frames(self):
+        candidates = [self.root / f"candidate-{window}.ppm" for window in (0, 1)]
+        references = [self.root / f"reference-{window}.ppm" for window in (0, 1)]
+        for window in (0, 1):
+            candidates[window].write_bytes(
+                color_bytes(window, 32).replace(b" 32 color", b" 33 color", 1)
+            )
+            references[window].write_bytes(color_bytes(window, 33, "reference"))
+        with self.assertRaisesRegex(ValueError, "pixels differ"):
+            probe.verify_against_references(candidates, references, 33)
+
+    def test_color_export_rejects_bad_headers_and_payloads(self):
+        path = self.root / "bad.ppm"
+        valid = color_bytes(0, 33)
+        header, payload = valid.split(b"255\n", 1)
+        for data in (valid.replace(b"P6\n", b"P4\n", 1),
+                     valid.replace(b"255\n", b"65535\n", 1),
+                     valid[:-1], valid + b"x",
+                     header.replace(b"color", b"pattern") + b"255\n" + payload):
+            with self.subTest(data_length=len(data)):
+                path.write_bytes(data)
+                with self.assertRaises(ValueError):
+                    probe.read_capture(path)
+
+    def test_color_cli_requires_and_checks_independent_references(self):
+        candidates = [self.root / f"candidate-{window}.ppm" for window in (0, 1)]
+        references = [self.root / f"reference-{window}.ppm" for window in (0, 1)]
+        for window in (0, 1):
+            candidates[window].write_bytes(color_bytes(window, 33))
+            references[window].write_bytes(color_bytes(window, 33, "reference"))
+        command = [
+            sys.executable,
+            "-B",
+            str(ROOT / "emulation/seamless/verify_probe.py"),
+            "--frame",
+            "33",
+            "--mode",
+            "candidate",
+        ]
+        result = subprocess.run(command + list(map(str, candidates)),
+                                capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("independent reference", result.stderr)
+        result = subprocess.run(command + ["--references", *map(str, references),
+                                           *map(str, candidates)],
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("exact pixels (candidate)", result.stdout)
 
     def test_graphics_cli_requires_references(self):
         candidates = [self.root / f"candidate-{w}.pbm" for w in (0, 1)]

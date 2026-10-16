@@ -82,6 +82,8 @@ int springDelayMs();             /* "spring-delay", 900 by default */
 bool trashWarns();              /* "trash-warn", on unless "false" */
 void setTrashWarns(bool on);
 bool tightGrid();                /* "grid-spacing=tight"; Wide by default */
+bool warnBeforeEmptyingTrash();  /* on unless "false" */
+bool setWarnBeforeEmptyingTrash(bool warn);
 
 /* Arrange's names in settings and commands: "name", "modified", ... */
 QString arrangeKey(Arrange how);

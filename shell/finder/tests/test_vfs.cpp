@@ -28,6 +28,7 @@
 
 #include "appdb.h"
 #include "apptrash.h"
+#include "items.h"
 #include "resources.h"
 #include "folderpath.h"
 #include "vfs.h"
@@ -180,6 +181,28 @@ int main(int argc, char **argv) {
 	 * it does for a tool with no GUI platform at all. */
 	QGuiApplication app(argc, argv);
 	QStandardPaths::setTestModeEnabled(false);
+
+	/* ---- pasted custom icons ------------------------------------------ */
+	const QString iconFixture = root + "/custom-icon-fixture.dat";
+	writeEntry(root, "custom-icon-fixture.dat", "fixture");
+	QImage pasted(48, 24, QImage::Format_ARGB32);
+	pasted.fill(0xffff0000);
+	check(writeCustomIconImage(iconFixture, pasted),
+		"a pasted picture is stored as a bounded custom icon");
+	const QImage storedIcon = customIconImage(iconFixture);
+	check(storedIcon.size() == QSize(32, 32) &&
+		storedIcon.pixel(16, 16) == 0xffff0000 && qAlpha(storedIcon.pixel(0, 0)) == 0,
+		"custom icons persist as centered 32x32 transparent PNGs");
+	const auto iconItem = makeItem(QFileInfo(iconFixture));
+	check(iconItem && iconItem->customIcon32.size() == 32 * 32 &&
+		iconItem->customIcon32[16 * 32 + 16] == 0xffff0000,
+		"Finder items use the persisted custom icon");
+	check(!writeCustomIconImage(iconFixture, QImage()),
+		"an empty Clipboard image is rejected without replacing the icon");
+	check(!writeCustomIconImage(iconFixture, QImage(4097, 1, QImage::Format_ARGB32)),
+		"oversized pictures are rejected before encoding");
+	check(clearCustomIconImage(iconFixture) && customIconImage(iconFixture).isNull(),
+		"clearing a custom icon removes its persisted metadata");
 
 	/* ---- discovery ---------------------------------------------------- */
 	writeEntry(appsDir, "simpletext.desktop", entry("SimpleText"));

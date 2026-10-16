@@ -82,6 +82,7 @@ private:
 	 * (the freedesktop convention), at most 200 characters like the Mac's. */
 	QString m_comment;
 	bool m_editingComment = false;
+	bool m_iconFocused = false;
 	bool m_caretOn = true;
 	QRect m_commentBox;
 	QTimer m_caretTimer;

@@ -305,7 +305,7 @@ void TimeZoneDialog::keyPressEvent(QKeyEvent *e) {
 static constexpr int W = 420;
 /* Tall enough for the menu bar clock options, plus a note when the
  * system time can't be changed from here. */
-static constexpr int H = 262, H_NOTE = 280;
+static constexpr int H = 308, H_NOTE = 326;
 static constexpr int M = 12;              /* window margin */
 static constexpr int COL = 206;           /* the right column's group boxes */
 static constexpr int ROW1 = 26, ROW2 = 98; /* group boxes' top lines */
@@ -342,9 +342,25 @@ DateTimePanel::DateTimePanel() {
 	m_showClock = PanelCheckbox("Show the clock in the menu bar", QPoint(M + 11, ROW3 + 14));
 	m_clock24 = PanelCheckbox("Use 24-hour time", QPoint(M + 11, ROW3 + 34));
 	m_weekday = PanelCheckbox("Show the day of the week", QPoint(M + 11, ROW3 + 54));
+	m_hourChime = PanelCheckbox("Play a sound on the hour", QPoint(M + 11, ROW3 + 74));
+	m_dateFormat.label = "Date format:";
+	m_dateFormat.rect = QRect(M + 112, ROW3 + 98, W - M - 112 - M - 2, PL_POPUP_H);
+	m_dateFormat.items = { PopupItem("Jan 5, 2026"), PopupItem("5 Jan 2026"),
+		PopupItem("2026-01-05") };
+	char dateFormat[16];
+	const QString storedFormat = pl_setting("clock-date-format", dateFormat, sizeof(dateFormat))
+		? QString::fromLatin1(dateFormat) : QString("mdy");
+	m_dateFormat.selected = storedFormat == "dmy" ? 1 : storedFormat == "ymd" ? 2 : 0;
+	m_dateFormat.chosen = [this](int index) {
+		const char *formats[] = { "mdy", "dmy", "ymd" };
+		if (index >= 0 && index < 3) {
+			pl_setting_set("clock-date-format", formats[index]);
+		}
+	};
 	m_showClock.toggled = [this](bool on) {
 		pl_setting_set("clock", on ? nullptr : "off");
 		m_clock24.enabled = m_weekday.enabled = on;
+		m_hourChime.enabled = on;
 		update();
 	};
 	m_clock24.toggled = [this](bool on) {
@@ -355,11 +371,16 @@ DateTimePanel::DateTimePanel() {
 	m_weekday.toggled = [this](bool on) {
 		pl_setting_set("clock-weekday", on ? "1" : nullptr);
 	};
+	m_hourChime.toggled = [](bool on) {
+		pl_setting_set("clock-hour-chime", on ? "1" : nullptr);
+	};
 	char v[16];
 	m_showClock.on = !(pl_setting("clock", v, sizeof(v)) && strcmp(v, "off") == 0);
 	m_clock24.on = setting("clock-24h");
 	m_weekday.on = setting("clock-weekday");
+	m_hourChime.on = setting("clock-hour-chime");
 	m_clock24.enabled = m_weekday.enabled = m_showClock.on;
+	m_hourChime.enabled = m_showClock.on;
 
 	m_tick.callOnTimeout([this] {
 		const QDateTime now = QDateTime::currentDateTime();
@@ -474,10 +495,12 @@ void DateTimePanel::paintEvent(QPaintEvent *) {
 	m_ntp.pos = QPoint(COL + 11, ROW2 + 14 + 13);
 	m_ntp.paint(c);
 
-	panelGroup(c, M, ROW3, W - M - 2, ROW3 + 78, "Menu Bar Clock", FACE);
+	panelGroup(c, M, ROW3, W - M - 2, ROW3 + 124, "Menu Bar Clock", FACE);
 	m_showClock.paint(c);
 	m_clock24.paint(c);
 	m_weekday.paint(c);
+	m_hourChime.paint(c);
+	m_dateFormat.paint(c);
 
 	if (!m_available) {
 		Text note("The date, time and time zone are set by the system here.", W - 2 * M,
@@ -490,6 +513,9 @@ void DateTimePanel::paintEvent(QPaintEvent *) {
 
 void DateTimePanel::mousePressEvent(QMouseEvent *e) {
 	const QPoint pos = e->position().toPoint();
+	if (m_dateFormat.press(this, pos)) {
+		return;
+	}
 	for (ClockField *f : { &m_date, &m_time }) {
 		if (f->press(pos)) {
 			for (ClockField *g : { &m_date, &m_time }) {
@@ -501,7 +527,7 @@ void DateTimePanel::mousePressEvent(QMouseEvent *e) {
 		}
 	}
 	if (m_zoneButton.press(pos) || m_ntp.press(pos) || m_showClock.press(pos) ||
-			m_clock24.press(pos) || m_weekday.press(pos)) {
+			m_clock24.press(pos) || m_weekday.press(pos) || m_hourChime.press(pos)) {
 		update();
 	}
 }
@@ -509,7 +535,7 @@ void DateTimePanel::mousePressEvent(QMouseEvent *e) {
 void DateTimePanel::mouseMoveEvent(QMouseEvent *e) {
 	const QPoint pos = e->position().toPoint();
 	if (m_zoneButton.move(pos) || m_ntp.move(pos) || m_showClock.move(pos) ||
-			m_clock24.move(pos) || m_weekday.move(pos)) {
+			m_clock24.move(pos) || m_weekday.move(pos) || m_hourChime.move(pos)) {
 		update();
 	}
 }
@@ -523,6 +549,7 @@ void DateTimePanel::mouseReleaseEvent(QMouseEvent *e) {
 	m_showClock.release(pos);
 	m_clock24.release(pos);
 	m_weekday.release(pos);
+	m_hourChime.release(pos);
 	update();
 }
 

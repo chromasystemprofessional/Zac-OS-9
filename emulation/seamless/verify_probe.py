@@ -8,10 +8,11 @@ import re
 
 MAX_WIDTH = 640
 MAX_HEIGHT = 384
-MAX_FILE_BYTES = MAX_WIDTH * MAX_HEIGHT // 8 + 256
+MAX_FILE_BYTES = MAX_WIDTH * MAX_HEIGHT * 3 + 256
 HEADER = re.compile(
-    rb"P4\n# zacos9-classic-probe ([12]) (reference|screen|candidate) ([01]) "
-    rb"([0-9]{1,10})( graphics)?\n([0-9]{1,3}) ([0-9]{1,3})\n"
+    rb"(P[46])\n# zacos9-classic-probe ([123]) "
+    rb"(reference|screen|candidate) ([01]) ([0-9]{1,10})( graphics| color)?\n"
+    rb"([0-9]{1,3}) ([0-9]{1,3})\n"
 )
 
 
@@ -34,24 +35,38 @@ def read_capture(path):
     header = HEADER.match(data)
     if header is None:
         raise ValueError(f"{path}: invalid or unsupported probe header")
-    version, mode, window, frame, graphics, width, height = header.groups()
-    if (version == b"2") != bool(graphics):
+    magic, version, mode, window, frame, profile, width, height = header.groups()
+    expected = {
+        (b"P4", b"1", None): "pattern",
+        (b"P4", b"2", b" graphics"): "graphics",
+        (b"P6", b"3", b" color"): "color",
+    }
+    capture_profile = expected.get((magic, version, profile))
+    if capture_profile is None:
         raise ValueError(f"{path}: invalid fixture version/profile combination")
     window, frame, width, height = map(int, (window, frame, width, height))
     if frame > 0xffffffff or not 64 <= width <= MAX_WIDTH or not 64 <= height <= MAX_HEIGHT:
         raise ValueError(f"{path}: invalid frame number or dimensions")
-    if graphics and width < 256:
-        raise ValueError(f"{path}: graphics capture is too narrow for the complete frame marker")
-    pixels = data[header.end():]
-    if len(pixels) != ((width + 7) // 8) * height:
+    if capture_profile in ("graphics", "color") and width < 256:
+        raise ValueError(f"{path}: capture is too narrow for the complete frame marker")
+    payload_start = header.end()
+    if capture_profile == "color":
+        if not data.startswith(b"255\n", payload_start):
+            raise ValueError(f"{path}: invalid PPM maximum channel value")
+        payload_start += 4
+        expected_length = width * height * 3
+    else:
+        expected_length = ((width + 7) // 8) * height
+    pixels = data[payload_start:]
+    if len(pixels) != expected_length:
         raise ValueError(f"{path}: truncated or trailing pixel data")
     return Capture(mode.decode("ascii"), window, frame, width, height, pixels,
-                   "graphics" if graphics else "pattern")
+                   capture_profile)
 
 
 def mismatch_count(capture):
     if capture.profile != "pattern":
-        raise ValueError("graphics captures require independent reference comparison")
+        raise ValueError("non-pattern captures require independent reference comparison")
     mismatches = 0
     stride = (capture.width + 7) // 8
     for y in range(capture.height):
@@ -65,7 +80,7 @@ def mismatch_count(capture):
     return mismatches
 
 
-def verify_pair(paths, frame, mode, allow_graphics=False):
+def verify_pair(paths, frame, mode, allow_reference_profiles=False):
     if mode not in ("reference", "screen", "candidate"):
         raise ValueError("unknown capture mode")
     captures = [read_capture(path) for path in paths]
@@ -80,15 +95,18 @@ def verify_pair(paths, frame, mode, allow_graphics=False):
             raise ValueError(
                 f"window {capture.window}: mode {capture.mode}; expected {mode}"
             )
-        if capture.profile == "graphics":
-            if not allow_graphics:
-                raise ValueError("graphics captures require independent reference comparison")
-            stride = (capture.width + 7) // 8
-            mismatches = sum(
-                ((capture.pixels[y * stride + x // 8] >> (7 - x % 8)) & 1) !=
-                (((frame >> (x // 8)) ^ capture.window) & 1)
-                for y in range(8) for x in range(min(capture.width, 256))
-            )
+        if capture.profile in ("graphics", "color"):
+            if not allow_reference_profiles:
+                raise ValueError("graphics and color captures require independent reference comparison")
+            if capture.profile == "graphics":
+                stride = (capture.width + 7) // 8
+                mismatches = sum(
+                    ((capture.pixels[y * stride + x // 8] >> (7 - x % 8)) & 1) !=
+                    (((frame >> (x // 8)) ^ capture.window) & 1)
+                    for y in range(8) for x in range(min(capture.width, 256))
+                )
+            else:
+                mismatches = _color_marker_mismatches(capture, frame)
         else:
             mismatches = mismatch_count(capture)
         if mismatches:
@@ -99,10 +117,12 @@ def verify_pair(paths, frame, mode, allow_graphics=False):
 
 
 def verify_against_references(paths, reference_paths, frame, mode="candidate"):
-    captures = verify_pair(paths, frame, mode, allow_graphics=True)
+    captures = verify_pair(paths, frame, mode, allow_reference_profiles=True)
     references = {
         capture.window: capture
-        for capture in verify_pair(reference_paths, frame, "reference", allow_graphics=True)
+        for capture in verify_pair(
+            reference_paths, frame, "reference", allow_reference_profiles=True
+        )
     }
     for capture in captures:
         reference = references[capture.window]
@@ -112,17 +132,33 @@ def verify_against_references(paths, reference_paths, frame, mode="candidate"):
             raise ValueError(
                 f"window {capture.window}: candidate dimensions do not match reference"
             )
-        stride = (capture.width + 7) // 8
-        differing = sum(
-            ((capture.pixels[y * stride + x // 8] ^
-              reference.pixels[y * stride + x // 8]) >> (7 - x % 8)) & 1
-            for y in range(capture.height) for x in range(capture.width)
-        )
+        if capture.profile == "color":
+            differing = sum(
+                capture.pixels[offset:offset + 3] != reference.pixels[offset:offset + 3]
+                for offset in range(0, len(capture.pixels), 3)
+            )
+        else:
+            stride = (capture.width + 7) // 8
+            differing = sum(
+                ((capture.pixels[y * stride + x // 8] ^
+                  reference.pixels[y * stride + x // 8]) >> (7 - x % 8)) & 1
+                for y in range(capture.height) for x in range(capture.width)
+            )
         if differing:
             raise ValueError(
                 f"window {capture.window}: {differing} pixels differ from independent reference"
             )
     return captures
+
+
+def _color_marker_mismatches(capture, frame):
+    mismatches = 0
+    for y in range(8):
+        for x in range(256):
+            expected = 255 if (((frame >> (x // 8)) ^ capture.window) & 1) else 0
+            offset = (y * capture.width + x) * 3
+            mismatches += capture.pixels[offset:offset + 3] != bytes((expected,) * 3)
+    return mismatches
 
 
 def main():

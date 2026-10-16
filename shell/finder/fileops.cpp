@@ -15,6 +15,7 @@
 #include <QFileInfo>
 #include <QPixmap>
 #include <QStorageInfo>
+#include <QStandardPaths>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -40,6 +41,38 @@
 
 static bool sameDisk(const QString &a, const QString &b) {
 	return QStorageInfo(a).device() == QStorageInfo(b).device();
+}
+
+static void refreshUserFontCache(const QString &directory) {
+	const QString fonts = QStandardPaths::writableLocation(QStandardPaths::FontsLocation);
+	if (fonts.isEmpty() || QDir(directory) != QDir(fonts)) {
+		return;
+	}
+	auto *process = new QProcess(QCoreApplication::instance());
+	auto *timeout = new QTimer(process);
+	timeout->setSingleShot(true);
+	QObject::connect(timeout, &QTimer::timeout, process, [process] {
+		process->kill();
+	});
+	QObject::connect(process, &QProcess::finished, process,
+		[process, timeout, directory](int code, QProcess::ExitStatus status) {
+			timeout->stop();
+			if (status != QProcess::NormalExit || code != 0) {
+				Alert::ask("Fonts were copied, but the font list could not be updated for " +
+					directory + ".", "OK", QString());
+			}
+			process->deleteLater();
+		});
+	QObject::connect(process, &QProcess::errorOccurred, process,
+		[process, timeout](QProcess::ProcessError error) {
+			if (error == QProcess::FailedToStart) {
+				timeout->stop();
+				Alert::ask("Fonts were copied, but fc-cache could not be started.", "OK", QString());
+				process->deleteLater();
+			}
+		});
+	process->start("fc-cache", { "-f", directory });
+	timeout->start(30000);
 }
 
 struct TransferState {
@@ -923,8 +956,12 @@ void dropItems(QDropEvent *e, const Item *target, const QString &folder) {
 		/* Release Finder's drag grab before opening the modal Stop dialog.
 		 * Our drag source never deletes files based on the returned action. */
 		QTimer::singleShot(0, QCoreApplication::instance(), [paths, dest, option] {
-			for (const auto &folder : transferItems(paths, dest, option)) {
+			const QStringList changed = transferItems(paths, dest, option);
+			for (const auto &folder : changed) {
 				Finder::instance().folderChanged(folder);
+			}
+			if (changed.contains(dest)) {
+				refreshUserFontCache(dest);
 			}
 		});
 		e->setDropAction(copied ? Qt::CopyAction : Qt::MoveAction);
@@ -932,12 +969,16 @@ void dropItems(QDropEvent *e, const Item *target, const QString &folder) {
 		return;
 	}
 	bool finished = false;
-	for (const QString &d : transferItems(paths, dest, option, &finished)) {
+	const QStringList changed = transferItems(paths, dest, option, &finished);
+	for (const QString &d : changed) {
 		finder.folderChanged(d);
 	}
 	if (!finished) {
 		e->ignore();
 		return;
+	}
+	if (changed.contains(dest)) {
+		refreshUserFontCache(dest);
 	}
 	e->setDropAction(copied ? Qt::CopyAction : Qt::MoveAction);
 	e->accept();

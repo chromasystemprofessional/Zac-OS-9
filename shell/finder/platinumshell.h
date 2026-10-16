@@ -32,6 +32,10 @@ void platinumOnTitleMenu(QWidget *window, std::function<void(bool option)> callb
  * callback for when it changes. */
 uint32_t platinumActiveClient();
 void platinumOnActiveClient(QObject *owner, std::function<void()> changed);
+/* The keyboard layout in use, by its code ("us", "de(nodeadkeys)"; empty
+ * until zacos9-wm says), and a callback for when it changes. */
+QString platinumKeyboardLayout();
+void platinumOnKeyboardLayout(QObject *owner, std::function<void()> changed);
 /* Mac OS 9's proxy icon: the small icon (a pl_icon_kind) before the
  * window's title. Dragging it calls `dragged`, the button still down, to
  * start a drag of what the window shows; null: it can't be dragged. Call
@@ -59,6 +63,8 @@ void platinumCancelLaunch(uint32_t cookie);
 /* Bring a program forward, as the Application menu does (the Sniffer's
  * id brings the desktop forward when it has no windows). */
 void platinumActivateApp(const QString &appId);
+/* Ask the compositor to close the application's frontmost window. */
+bool platinumCloseFrontAppWindow(const QString &appId);
 /* Kill the processes behind an app's windows (the Apple menu's Force
  * Quit); false if the compositor can't. */
 bool platinumForceQuit(const QString &appId);

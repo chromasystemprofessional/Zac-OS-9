@@ -17,6 +17,8 @@
 #include <QDirIterator>
 #include <QThreadPool>
 #include <algorithm>
+#include <cstdlib>
+#include <limits>
 
 #include "fileops.h"
 #include "infowindow.h"
@@ -125,6 +127,15 @@ bool FolderWindow::isOpen(const QString &path) {
 	return openWindows().contains(QDir(path).absolutePath());
 }
 
+void FolderWindow::closeAll() {
+	const QList<FolderWindow *> windows = openWindows().values();
+	for (FolderWindow *window : windows) {
+		if (window) {
+			window->close();
+		}
+	}
+}
+
 void FolderWindow::reloadAll(const QString &folder) {
 	const QString key = windowKey(folder);
 	for (FolderWindow *w : openWindows()) {
@@ -152,6 +163,9 @@ FolderWindow::FolderWindow(const QString &path) : m_path(path) {
 	m_repeat.callOnTimeout([this] { scrollStep(); });
 	m_renameTimer.setSingleShot(true);
 	m_renameTimer.callOnTimeout([this] { beginRename(m_renameItem); });
+	m_typeSelectTimer.setSingleShot(true);
+	m_typeSelectTimer.setInterval(1000);
+	m_typeSelectTimer.callOnTimeout([this] { m_typeSelect.clear(); });
 	m_marqueeScroll.setInterval(REPEAT_MS);
 	m_marqueeScroll.callOnTimeout([this] { updateMarquee(m_marqueePointer); });
 	/* Other programs change folders too; follow them. */
@@ -1253,6 +1267,68 @@ void FolderWindow::paintList(pl_canvas *c) {
 
 /* ---- painting ---------------------------------------------------------------- */
 
+QImage FolderWindow::printImage() {
+	const int viewW = viewWidth(), viewH = viewHeight();
+	if (viewW <= 0 || viewH <= 0) {
+		return {};
+	}
+	const bool list = m_mode == ViewMode::List;
+	const int W = std::max(64, list ? listWidth() : std::max(m_contentWidth, viewW));
+	const int H = std::max(1, m_contentHeight);
+	const int band = list ? BAND_H : 0;
+	Pixels px(W, band + H);
+	px.img.fill(Qt::white);
+
+	/* Printed as it would look with nothing selected or being dropped on. */
+	std::vector<std::pair<Item *, std::pair<bool, bool>>> flags;
+	const auto unmark = [&](Item *item) {
+		flags.push_back({ item, { item->selected, item->dropTarget } });
+		item->selected = item->dropTarget = false;
+	};
+	for (auto &item : m_items) {
+		unmark(item.get());
+	}
+	for (const Row &row : m_rows) {
+		unmark(row.item);
+	}
+	const int scrollX = m_scrollX, scrollY = m_scrollY;
+	const bool marquee = m_marquee;
+	m_marquee = false;
+
+	/* The painters draw what's in view: tile the whole by scrolling. */
+	for (int sx = 0; sx < W; sx += viewW) {
+		m_scrollX = sx;
+		const int w = std::min(viewW, W - sx);
+		if (list) {
+			pl_canvas header = { px.c.px + sx, px.c.stride, sx, 0, w, BAND_H };
+			paintColumnHeaders(&header);
+		}
+		for (int sy = 0; sy < H; sy += viewH) {
+			m_scrollY = sy;
+			pl_canvas tile = { px.c.px + (band + sy) * px.c.stride + sx, px.c.stride, sx, sy,
+				w, std::min(viewH, H - sy) };
+			if (list) {
+				paintList(&tile);
+			} else if (m_mode == ViewMode::Buttons) {
+				paintButtons(&tile);
+			} else {
+				paintIcons(&tile);
+			}
+		}
+	}
+
+	m_scrollX = scrollX;
+	m_scrollY = scrollY;
+	m_marquee = marquee;
+	/* Backwards: an item both listed and a row was saved twice, the
+	 * second time already unmarked. */
+	for (auto it = flags.rbegin(); it != flags.rend(); ++it) {
+		it->first->selected = it->second.first;
+		it->first->dropTarget = it->second.second;
+	}
+	return px.img;
+}
+
 void FolderWindow::paintEvent(QPaintEvent *) {
 	const int W = width(), H = height();
 	Pixels px(W, H);
@@ -1364,6 +1440,27 @@ void FolderWindow::clearDropTarget() {
 
 /* ---- mouse ---------------------------------------------------------------------- */
 
+void FolderWindow::showContextMenuAt(QPoint pos) {
+	const int barX = width() - SB_WIDTH + 1, barY = height() - SB_WIDTH + 1;
+	if (pos.y() < contentTop() || pos.x() >= barX || pos.y() >= barY) {
+		return;
+	}
+	if (m_editor.item()) {
+		m_editor.commit();
+	}
+	m_renameTimer.stop();
+	bool onTriangle = false;
+	Item *hit = itemAt(pos, &onTriangle);
+	if (!listSelectableAt(pos, hit)) {
+		hit = nullptr;
+	}
+	if (!hit || !hit->selected) {
+		forEachItem([&](Item *item) { item->selected = item == hit; });
+	}
+	update();
+	Finder::instance().showContextMenu(this, hit);
+}
+
 void FolderWindow::mousePressEvent(QMouseEvent *e) {
 	const QPoint pos = e->position().toPoint();
 	const int barX = width() - SB_WIDTH + 1, barY = height() - SB_WIDTH + 1;
@@ -1412,7 +1509,6 @@ void FolderWindow::mousePressEvent(QMouseEvent *e) {
 		}
 		return;
 	}
-
 	/* List view's column headers: the direction button reverses the
 	 * order; a divider resizes the column to its left; a header sorts
 	 * when clicked, and moves when dragged (Name stays first). */
@@ -1675,6 +1771,10 @@ void FolderWindow::mouseDoubleClickEvent(QMouseEvent *e) {
 		forEachItem([&](Item *item) { item->selected = item == hit; });
 		update();
 		Finder::instance().notifyState();
+		if ((e->modifiers() & Qt::AltModifier) &&
+				Finder::instance().closeApplicationWindow(hit)) {
+			return;
+		}
 		Finder::instance().openItem(hit);
 		/* Option-double-click: the window it was in closes behind it. */
 		if (e->modifiers() & Qt::AltModifier) {
@@ -1702,6 +1802,138 @@ void FolderWindow::beginRename(Item *item) {
 
 void FolderWindow::keyPressEvent(QKeyEvent *e) {
 	if (m_editor.key(e)) {
+		return;
+	}
+	if (e->key() == Qt::Key_Tab || e->key() == Qt::Key_Backtab) {
+		std::vector<Item *> items = visibleItems();
+		std::sort(items.begin(), items.end(), [](const Item *a, const Item *b) {
+			const int order = a->visibleName().compare(b->visibleName(), Qt::CaseInsensitive);
+			return order == 0 ? a->visibleName() < b->visibleName() : order < 0;
+		});
+		if (!items.empty()) {
+			const std::vector<Item *> selected = selectedItems();
+			auto current = selected.empty() ? items.end()
+				: std::find(items.begin(), items.end(), selected.front());
+			const bool backwards = e->key() == Qt::Key_Backtab ||
+				(e->modifiers() & Qt::ShiftModifier);
+			int index = current == items.end() ? (backwards ? 0 : -1)
+				: static_cast<int>(std::distance(items.begin(), current));
+			index = (index + (backwards ? static_cast<int>(items.size()) - 1 : 1)) %
+				static_cast<int>(items.size());
+			forEachItem([](Item *item) { item->selected = false; });
+			items[index]->selected = true;
+			update();
+			Finder::instance().notifyState();
+		}
+		e->accept();
+		return;
+	}
+	if (!(e->modifiers() & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier)) &&
+			!e->text().isEmpty() && e->text().at(0).isPrint()) {
+		std::vector<Item *> items = visibleItems();
+		std::sort(items.begin(), items.end(), [](const Item *a, const Item *b) {
+			const int order = a->visibleName().compare(b->visibleName(), Qt::CaseInsensitive);
+			return order == 0 ? a->visibleName() < b->visibleName() : order < 0;
+		});
+		const QString typed = e->text();
+		const QString repeated = m_typeSelect + typed;
+		const QString prefix = !m_typeSelect.isEmpty() &&
+				m_typeSelect.compare(typed, Qt::CaseInsensitive) == 0 ? typed : repeated;
+		auto match = std::find_if(items.begin(), items.end(), [&](const Item *item) {
+			return item->visibleName().startsWith(prefix, Qt::CaseInsensitive);
+		});
+		if (match == items.end() && prefix != typed) {
+			match = std::find_if(items.begin(), items.end(), [&](const Item *item) {
+				return item->visibleName().startsWith(typed, Qt::CaseInsensitive);
+			});
+			m_typeSelect = typed;
+		} else {
+			m_typeSelect = prefix;
+		}
+		m_typeSelectTimer.start();
+		if (match != items.end()) {
+			forEachItem([](Item *item) { item->selected = false; });
+			(*match)->selected = true;
+			update();
+			Finder::instance().notifyState();
+			e->accept();
+			return;
+		}
+		m_typeSelect.clear();
+	}
+	if (!(e->modifiers() & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier)) &&
+			(e->key() == Qt::Key_Up || e->key() == Qt::Key_Down ||
+			e->key() == Qt::Key_Left || e->key() == Qt::Key_Right)) {
+		std::vector<Item *> items = visibleItems();
+		if (items.empty()) {
+			e->accept();
+			return;
+		}
+		const std::vector<Item *> selected = selectedItems();
+		auto current = selected.empty() ? items.end()
+			: std::find(items.begin(), items.end(), selected.front());
+		Item *next = nullptr;
+		if (current == items.end()) {
+			next = *std::min_element(items.begin(), items.end(), [](const Item *a, const Item *b) {
+				return a->pos.y() == b->pos.y() ? a->pos.x() < b->pos.x() : a->pos.y() < b->pos.y();
+			});
+		} else if (m_mode == ViewMode::List) {
+			if (e->key() == Qt::Key_Up || e->key() == Qt::Key_Down) {
+				const int index = static_cast<int>(std::distance(items.begin(), current));
+				const int direction = e->key() == Qt::Key_Up ? -1 : 1;
+				const int target = std::clamp(index + direction, 0, static_cast<int>(items.size()) - 1);
+				next = items[target];
+			}
+		} else {
+			const QPoint origin = (*current)->pos;
+			int bestScore = std::numeric_limits<int>::max();
+			for (Item *candidate : items) {
+				if (candidate == *current) {
+					continue;
+				}
+				const QPoint delta = candidate->pos - origin;
+				const int primary = e->key() == Qt::Key_Right ? delta.x()
+					: e->key() == Qt::Key_Left ? -delta.x()
+					: e->key() == Qt::Key_Down ? delta.y() : -delta.y();
+				if (primary <= 0) {
+					continue;
+				}
+				const int secondary = e->key() == Qt::Key_Left || e->key() == Qt::Key_Right
+					? std::abs(delta.y()) : std::abs(delta.x());
+				const int score = primary * 2 + secondary;
+				if (score < bestScore) {
+					bestScore = score;
+					next = candidate;
+				}
+			}
+		}
+		if (next) {
+			if (!(e->modifiers() & Qt::ShiftModifier)) {
+				forEachItem([](Item *item) { item->selected = false; });
+			}
+			next->selected = true;
+			update();
+			Finder::instance().notifyState();
+		}
+		e->accept();
+		return;
+	}
+	if (m_mode == ViewMode::List && (e->modifiers() & Qt::ControlModifier) &&
+			(e->key() == Qt::Key_Right || e->key() == Qt::Key_Left)) {
+		const std::vector<Item *> selected = selectedItems();
+		if (selected.size() == 1 && selected.front()->isDir) {
+			const QString path = selected.front()->path;
+			const bool expanded = m_expanded.contains(path);
+			if ((e->key() == Qt::Key_Right && !expanded) ||
+					(e->key() == Qt::Key_Left && expanded)) {
+				toggleExpanded(selected.front());
+			}
+			e->accept();
+			return;
+		}
+	}
+	if (e->key() == Qt::Key_Space && Finder::instance().springOpenNow()) {
+		e->accept();
 		return;
 	}
 	/* Return on the one selected icon: rename it (the Finder's way). */
@@ -1735,8 +1967,15 @@ bool finderShortcut(QKeyEvent *e) {
 	switch (e->key()) {
 	case Qt::Key_N: f.newFolder(); return true;
 	case Qt::Key_A: f.command("select-all"); return true;
+	case Qt::Key_C: f.copySelectionNames(); return true;
 	case Qt::Key_O: f.openSelection(); return true;
-	case Qt::Key_W: f.closeWindow(); return true;
+	case Qt::Key_W:
+		if (e->modifiers() & Qt::AltModifier) {
+			f.closeAllWindows();
+		} else {
+			f.closeWindow();
+		}
+		return true;
 	case Qt::Key_Backspace: f.moveSelectionToTrash(); return true;
 	case Qt::Key_I: f.getInfo(); return true;
 	case Qt::Key_D: f.duplicate(); return true;

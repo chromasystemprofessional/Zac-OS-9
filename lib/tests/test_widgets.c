@@ -10,6 +10,7 @@
 #include <unistd.h>
 
 #include "figcompare.h"
+#include "settings.h"
 #include "text.h"
 #include "widgets.h"
 
@@ -351,6 +352,9 @@ static int run_small_controls(const char *dir, int *ran) {
 }
 
 int main(int argc, char *argv[]) {
+	char config_home[128];
+	snprintf(config_home, sizeof(config_home), "/tmp/zacos9-widgets-test-%ld", (long)getpid());
+	setenv("XDG_CONFIG_HOME", config_home, 1);
 	const char *dir = argc > 1 ? argv[1] : "tools/measure/figs";
 	int ran = 0;
 	int fails = run_hit_tests() + run_smart_tests();

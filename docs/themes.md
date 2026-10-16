@@ -70,7 +70,9 @@ files:
     "window-drag": "drag.wav",
     "window-drag-end": "drop.wav",
     "trash-move": "trash.wav",
-    "trash-empty": "empty.wav"
+    "trash-empty": "empty.wav",
+    "startup": "startup.wav",
+    "shutdown": "shutdown.wav"
   }
 }
 ```
@@ -79,6 +81,8 @@ Files are PCM WAV audio; missing events stay silent. Relative paths must stay
 inside the set; symbolic links and unsafe paths are rejected. Catalog discovery
 checks for additions, replacements and removals every two seconds. Imported
 audio is cached under the user's XDG cache directory; source files are unchanged.
+The optional `startup` and `shutdown` events play when the desktop starts and
+when the user logs out after applications close.
 Missing selected sets become silent while retaining their selection ID.
 Malformed or unsupported sets report an error in Appearance and the session log.
 

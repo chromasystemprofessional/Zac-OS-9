@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Key Tags
+Comment=See which character each key types
+Exec=zacos9-keytags
+Terminal=false
+Categories=Utility;
+OnlyShowIn=ZacOS9;

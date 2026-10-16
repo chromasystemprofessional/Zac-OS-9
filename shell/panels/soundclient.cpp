@@ -49,14 +49,26 @@ bool parseSoundOutputs(const QByteArray &json, const QString &defaultSink,
 		}
 		const QJsonObject volumes = sink.value("volume").toObject();
 		double total = 0;
-		for (const QJsonValue &channel : volumes) {
+		double left = 0, right = 0;
+		bool hasLeft = false, hasRight = false;
+		for (auto channelIt = volumes.constBegin(); channelIt != volumes.constEnd(); ++channelIt) {
+			const QJsonValue &channel = channelIt.value();
 			const QJsonValue v = channel.toObject().value("value");
 			if (!v.isDouble() || v.toDouble() < 0) {
 				error = "The sound server returned an invalid volume.";
 				outputs.clear();
 				return false;
 			}
-			total += v.toDouble();
+			const double level = v.toDouble();
+			total += level;
+			const QString name = channelIt.key();
+			if (name == "left" || name == "front-left") {
+				left = level;
+				hasLeft = true;
+			} else if (name == "right" || name == "front-right") {
+				right = level;
+				hasRight = true;
+			}
 		}
 		if (volumes.isEmpty()) {
 			error = "The sound server returned no volume channels.";
@@ -64,10 +76,14 @@ bool parseSoundOutputs(const QByteArray &json, const QString &defaultSink,
 			return false;
 		}
 		const int percent = static_cast<int>(std::clamp(total / volumes.size() * 100 / 65536, 0.0, 100.0) + 0.5);
+		const bool stereo = volumes.size() == 2 && hasLeft && hasRight;
+		const int balance = stereo && left + right > 0
+			? static_cast<int>(right * 100 / (left + right) + 0.5) : 50;
 		const QString active = sink.value("active_port").toString();
 		const QJsonArray ports = sink.value("ports").toArray();
 		if (ports.isEmpty()) {
-			outputs.push_back({ name, {}, description, percent, sink.value("mute").toBool(), name == defaultSink });
+			outputs.push_back({ name, {}, description, percent, balance,
+				sink.value("mute").toBool(), name == defaultSink, stereo });
 		} else {
 			for (const QJsonValue &p : ports) {
 				const QJsonObject port = p.toObject();
@@ -82,9 +98,39 @@ bool parseSoundOutputs(const QByteArray &json, const QString &defaultSink,
 				}
 				const QString label = port.value("description").toString(portName);
 				outputs.push_back({ name, portName, description + " - " + label,
-					percent, sink.value("mute").toBool(), name == defaultSink && portName == active });
+					percent, balance, sink.value("mute").toBool(),
+					name == defaultSink && portName == active, stereo });
 			}
 		}
+	}
+	return true;
+}
+
+bool parseSoundInputs(const QByteArray &json, const QString &defaultSource,
+		QVector<SoundInput> &inputs, QString &error) {
+	inputs.clear();
+	error.clear();
+	QJsonArray sources;
+	if (!jsonArray(json, sources, error)) {
+		return false;
+	}
+	for (const QJsonValue &value : sources) {
+		const QJsonObject source = value.toObject();
+		const QString name = source.value("name").toString();
+		if (name.isEmpty()) {
+			error = "The sound server returned an unnamed input.";
+			inputs.clear();
+			return false;
+		}
+		if (name.endsWith(".monitor") ||
+				source.value("properties").toObject().value("device.class").toString() == "monitor") {
+			continue;
+		}
+		QString description = source.value("description").toString();
+		if (description.isEmpty()) {
+			description = name;
+		}
+		inputs.push_back({ name, description, name == defaultSource });
 	}
 	return true;
 }
@@ -153,6 +199,7 @@ void SoundClient::refresh() {
 				if (changed) {
 					changed();
 				}
+				refreshInputs();
 			}
 			return;
 		}
@@ -175,7 +222,53 @@ void SoundClient::refresh() {
 			if (changed) {
 				changed();
 			}
+			refreshInputs();
 		});
+	});
+}
+
+void SoundClient::refreshInputs() {
+	if (m_inputRefreshing || inputSwitching) {
+		return;
+	}
+	m_inputRefreshing = true;
+	const unsigned generation = ++m_inputGeneration;
+	run({ "get-default-source" }, [this, generation](const QByteArray &out, const QString &error) {
+		if (generation != m_inputGeneration) {
+			m_inputRefreshing = false;
+			refreshInputs();
+			return;
+		}
+		if (!error.isEmpty()) {
+			m_inputRefreshing = false;
+			inputs.clear();
+			report(error);
+			if (changed) {
+				changed();
+			}
+			return;
+		}
+		const QString source = QString::fromUtf8(out).trimmed();
+		run({ "--format=json", "list", "sources" },
+			[this, source, generation](const QByteArray &json, const QString &error) {
+				m_inputRefreshing = false;
+				if (inputSwitching || generation != m_inputGeneration) {
+					refreshInputs();
+					return;
+				}
+				QString problem = error;
+				QVector<SoundInput> fresh;
+				if (problem.isEmpty()) {
+					parseSoundInputs(json, source, fresh, problem);
+				}
+				inputs = fresh;
+				if (!problem.isEmpty()) {
+					report(problem);
+				}
+				if (changed) {
+					changed();
+				}
+			});
 	});
 }
 
@@ -264,21 +357,79 @@ void SoundClient::selectOutput(const SoundOutput &output) {
 	}
 }
 
-void SoundClient::setVolume(const QString &sink, int percent) {
-	if (sink.isEmpty() || percent < 0 || percent > 100) {
+void SoundClient::selectInput(const SoundInput &input) {
+	if (inputSwitching) {
+		report("An input change is already in progress.", true);
+		return;
+	}
+	if (input.source.isEmpty()) {
+		report("No sound input was selected.", true);
+		return;
+	}
+	inputSwitching = true;
+	++m_inputGeneration;
+	if (changed) {
+		changed();
+	}
+	run({ "set-default-source", input.source }, [this](const QByteArray &, const QString &error) {
+		inputSwitching = false;
+		if (!error.isEmpty()) {
+			report(error, true);
+		}
+		refreshInputs();
+	});
+}
+
+void SoundClient::setVolume(const SoundOutput &output, int percent) {
+	applyVolume(output, percent, true);
+}
+
+void SoundClient::applyVolume(const SoundOutput &output, int percent, bool feedback) {
+	if (output.sink.isEmpty() || percent < 0 || percent > 100) {
 		report("No valid sound output or volume was selected.", true);
 		return;
 	}
+	QStringList args{ "set-sink-volume", output.sink };
+	if (output.stereo) {
+		const int balance = std::clamp(output.balance, 0, 100);
+		const int left = balance <= 50 ? percent : percent * (100 - balance) / balance;
+		const int right = balance >= 50 ? percent : percent * balance / (100 - balance);
+		args << QString::number(left) + "%" << QString::number(right) + "%";
+	} else {
+		args << QString::number(percent) + "%";
+	}
 	const unsigned generation = ++m_volumeGeneration;
-	run({ "set-sink-volume", sink, QString::number(percent) + "%" },
-		[this, generation](const QByteArray &, const QString &error) {
+	run(args,
+		[this, generation, feedback](const QByteArray &, const QString &error) {
 			if (!error.isEmpty()) {
 				report(error, true);
-			} else if (generation == m_volumeGeneration && volumeApplied) {
+			} else if (feedback && generation == m_volumeGeneration && volumeApplied) {
 				volumeApplied();
 			}
 			refresh();
 		});
+}
+
+void SoundClient::setVolume(const QString &sink, int percent) {
+	const auto output = std::find_if(outputs.cbegin(), outputs.cend(),
+		[&sink](const SoundOutput &candidate) { return candidate.sink == sink; });
+	if (output != outputs.cend()) {
+		setVolume(*output, percent);
+		return;
+	}
+	SoundOutput fallback;
+	fallback.sink = sink;
+	setVolume(fallback, percent);
+}
+
+void SoundClient::setBalance(const SoundOutput &output, int percent, int balance) {
+		if (!output.stereo || balance < 0 || balance > 100) {
+			report("Speaker balance is available only for stereo outputs.", true);
+			return;
+		}
+		SoundOutput adjusted = output;
+		adjusted.balance = balance;
+		applyVolume(adjusted, percent, false);
 }
 
 void SoundClient::setMuted(const QString &sink, bool muted) {

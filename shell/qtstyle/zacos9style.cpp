@@ -12,6 +12,7 @@
 #include <QPainter>
 #include <QStyleFactory>
 #include <QStyleOption>
+#include <QToolTip>
 #include <algorithm>
 #include <cstring>
 
@@ -44,6 +45,12 @@ struct Canvas {
 
 QColor fromArgb(uint32_t c) {
 	return QColor((c >> 16) & 0xFF, (c >> 8) & 0xFF, c & 0xFF);
+}
+
+bool hintBubblesEnabled() {
+	char value[16];
+	return !pl_setting("hint-bubbles", value, sizeof(value)) ||
+		(strcmp(value, "0") != 0 && strcmp(value, "false") != 0);
 }
 
 /* Scroll bar geometry, along the bar, from lib/widgets.c: an arrow box and
@@ -118,9 +125,7 @@ void Zacos9Style::polish(QPalette &p) {
 
 void Zacos9Style::polish(QWidget *widget) {
 	QProxyStyle::polish(widget);
-	if (qobject_cast<QFileDialog *>(widget)) {
-		widget->installEventFilter(this);
-	}
+	widget->installEventFilter(this);
 }
 
 void Zacos9Style::unpolish(QWidget *widget) {
@@ -129,6 +134,10 @@ void Zacos9Style::unpolish(QWidget *widget) {
 }
 
 bool Zacos9Style::eventFilter(QObject *object, QEvent *event) {
+	if (event->type() == QEvent::ToolTip && !hintBubblesEnabled()) {
+		QToolTip::hideText();
+		return true;
+	}
 	if (event->type() == QEvent::Show) {
 		if (auto *dialog = qobject_cast<QFileDialog *>(object)) {
 			if (dialog->property("zacos9-file-portal-dialog").toBool()) {
@@ -184,6 +193,14 @@ bool Zacos9Style::eventFilter(QObject *object, QEvent *event) {
 	return QProxyStyle::eventFilter(object, event);
 }
 
+int Zacos9Style::styleHint(StyleHint hint, const QStyleOption *option,
+		const QWidget *widget, QStyleHintReturn *returnData) const {
+	if (hint == SH_ToolTip_WakeUpDelay && !hintBubblesEnabled()) {
+		return 600000;
+	}
+	return QProxyStyle::styleHint(hint, option, widget, returnData);
+}
+
 int Zacos9Style::pixelMetric(PixelMetric metric, const QStyleOption *option,
 		const QWidget *widget) const {
 	switch (metric) {
@@ -218,6 +235,13 @@ void Zacos9Style::drawPrimitive(PrimitiveElement element, const QStyleOption *op
 	const bool enabled = option->state & State_Enabled;
 	const bool pressed = option->state & State_Sunken;
 	switch (element) {
+	case PE_PanelTipLabel:
+		painter->save();
+		painter->fillRect(r, option->palette.color(QPalette::ToolTipBase));
+		painter->setPen(option->palette.color(QPalette::ToolTipText));
+		painter->drawRect(r.adjusted(0, 0, -1, -1));
+		painter->restore();
+		return;
 	case PE_IndicatorCheckBox: {
 		Canvas cv(PL_CHECKBOX_SIZE + 2, PL_CHECKBOX_SIZE);
 		pl_checkbox_paint(&cv.c, 0, 0,

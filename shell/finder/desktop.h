@@ -1,5 +1,7 @@
 #pragma once
 
+#include <QImage>
+
 #include <QFileSystemWatcher>
 #include <QSet>
 #include <QWidget>
@@ -21,6 +23,9 @@ class Desktop : public QWidget, public FinderView {
 public:
 	Desktop();
 	~Desktop() override;
+	/* File > Print Desktop: the desktop's icons on white, nothing
+	 * selected, cut down to where they are. */
+	QImage printImage();
 	/* Turn this widget into the layer surface; call before show(). */
 	void becomeLayerSurface();
 	/* Something changed in `folder`: refresh desktop items or the Trash. */

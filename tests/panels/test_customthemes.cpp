@@ -43,7 +43,18 @@ int main(int argc, char **argv) {
 	qputenv("TEST_LOG", (root.path() + "/played").toUtf8());
 	QApplication app(argc, argv);
 	assert(soundThemesFolder() == root.path() + "/data/zacos9/appearance/Sound Themes");
+	assert(userAlertSoundsFolder() == root.path() + "/data/zacos9/sounds");
 	assert(appearanceThemesFolder() == root.path() + "/data/zacos9/appearance/Themes");
+	const QString recording = root.path() + "/Recorded Chime.wav";
+	assert(QFile::copy(QString::fromUtf8(argv[1]), recording));
+	QString customAlert, importError;
+	assert(importAlertSound(recording, &customAlert, &importError));
+	assert(customAlert == "Recorded_Chime" &&
+		QFile::exists(userAlertSoundsFolder() + "/" + customAlert + ".wav"));
+	const QString badRecording = root.path() + "/not-a-wave.wav";
+	write(badRecording, "not a wave file");
+	assert(!importAlertSound(badRecording, &customAlert, &importError) && !importError.isEmpty());
+	assert(!importAlertSound(recording, &customAlert, &importError) && importError.contains("already exists"));
 	QObject owner;
 	int changes = 0;
 	watchCustomThemes(&owner, [&] { ++changes; });
@@ -53,11 +64,16 @@ int main(int argc, char **argv) {
 	write(custom + "/theme.json", R"JSON({"version":1,"name":"Original Test",
 		"events":{"button-click":"click.wav","checkbox-toggle":"click.wav",
 		"window-collapse":"click.wav","window-expand":"click.wav",
-		"window-drag":"click.wav","window-drag-end":"click.wav"}})JSON");
+		"window-drag":"click.wav","window-drag-end":"click.wav",
+		"startup":"click.wav","shutdown":"click.wav"}})JSON");
 	assert(waitFor([] { return soundThemeCount() == 3; }));
 	assert(changes > 0);
 	assert(soundThemeName(2) == "Original Test");
 	AppearancePanel panel;
+	panel.showTab(3);
+	QKeyEvent selectAlert(QEvent::KeyPress, Qt::Key_R, Qt::NoModifier, "Recorded_Chime");
+	QApplication::sendEvent(&panel, &selectAlert);
+	assert(preference("alert-sound") == "Recorded_Chime");
 	panel.showTab(5);
 	panel.show();
 	QKeyEvent selectSound(QEvent::KeyPress, Qt::Key_O, Qt::NoModifier, "Original Test");
@@ -73,13 +89,21 @@ int main(int argc, char **argv) {
 	assert(preference("sound-theme") == id);
 	assert(!preference("sound.button-click").isEmpty());
 	for (const char *key : { "sound.window-collapse", "sound.window-expand",
-			"sound.window-drag", "sound.window-drag-end" }) {
+			"sound.window-drag", "sound.window-drag-end", "sound.startup",
+			"sound.shutdown" }) {
 		assert(!preference(key).isEmpty());
 	}
 	assert(preference("sound.window-open").isEmpty());
 	write(root.path() + "/pw-play", "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$TEST_LOG\"\nsleep 0.4\n");
 	QFile player(root.path() + "/pw-play");
 	assert(player.setPermissions(QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner));
+	pl_sound_play("Recorded_Chime");
+	assert(waitFor([&] { return QFile::exists(root.path() + "/played"); }));
+	QFile customPlayback(root.path() + "/played");
+	assert(customPlayback.open(QIODevice::ReadOnly));
+	assert(customPlayback.readAll().contains("/data/zacos9/sounds/Recorded_Chime.wav"));
+	customPlayback.close();
+	assert(QFile::remove(root.path() + "/played"));
 	assert(pl_setting_set("interface-volume", "3"));
 	pl_sound_event("button-click");
 	assert(waitFor([&] { return QFile::exists(root.path() + "/played"); }));

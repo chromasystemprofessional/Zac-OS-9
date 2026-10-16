@@ -27,7 +27,8 @@ public:
 
 	/* Log `user` in and, once PAM accepts, start `command` as their
 	 * session. One login at a time; busy() until it ends. */
-	void login(const QString &user, const QString &password, const QStringList &command);
+	void login(const QString &user, const QString &password, const QStringList &command,
+		const QStringList &environment = {});
 	bool busy() const { return m_state != Idle; }
 
 	/* The session will start once we exit. */
@@ -51,6 +52,7 @@ private:
 	State m_state = Idle;
 	QString m_password;
 	QStringList m_command;
+	QStringList m_environment;
 	bool m_answered = false; /* the password went to one secret prompt */
 	QString m_note;          /* PAM's last info or error text */
 	QString m_why;           /* reported once the cancel is acknowledged */

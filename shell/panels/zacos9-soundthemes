@@ -29,7 +29,8 @@ MAX_OUTPUT = 256 * 1024 * 1024
 MAX_SCAN_ENTRIES = 1024
 EVENTS = frozenset(("button-click", "checkbox-toggle", "menu-open", "menu-command",
                     "window-open", "window-close", "trash-move", "trash-empty",
-                    "window-collapse", "window-expand", "window-drag", "window-drag-end"))
+                    "window-collapse", "window-expand", "window-drag", "window-drag-end",
+                    "startup", "shutdown"))
 # Public Carbon HIToolbox Appearance.h kThemeSound* FourCCs. There is no
 # documented move-to-trash equivalent; fdrp is a generic Finder drop, not trash.
 CLASSIC_EVENTS = {b"btnp": "button-click", b"chkp": "checkbox-toggle",

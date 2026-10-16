@@ -407,6 +407,15 @@ the checkerboard oracle. Padding bits are ignored. Graphics exports narrower
 than 256 pixels are refused because they cannot encode the complete marker.
 For the negative control, use `--mode screen --references ...`.
 
+The host verifier also accepts a bounded color-reference contract, version 3
+PPM (`P6`): a `zacos9-classic-probe 3 <mode> <window> <frame> color` comment,
+dimensions, max channel value `255`, then exactly three RGB bytes per pixel.
+The first 256 pixels of the first eight rows encode the sequence marker as
+grayscale, using the same bit order as the PBM fixtures. Color candidates are
+accepted only with independent reference PPMs and must match every RGB pixel.
+This is host-side test infrastructure only: no guest GWorld exporter or color
+replay hook has been proven or implemented.
+
 ### Runtime results
 
 All helper candidate pairs below matched their independent references exactly:
@@ -441,14 +450,19 @@ The final build's graphics trial also passed, then shrinking A below 256 pixels
 confirmed explicit refusal by both fixture and helper without overwriting the
 previous exports. Fixture graphics resources are released on normal exit and
 initialization failures.
-All three guest targets build with strict warnings. Fourteen host tests pass
-directly and through Meson, including graphics profile enforcement, full-pixel
+All three guest targets build with strict warnings. Eighteen host tests pass
+directly, including graphics and color profile enforcement, full-pixel
 comparison, stale/relabelled markers, CLI reference requirements and original
-version-1 behavior.
+version-1 behavior. The host suite has also passed through Meson in a
+configured build.
+
+Host tests now enforce the bounded version-3 PPM color-reference contract,
+including exact RGB comparison, frame marker, dimensions and payload length.
+This only validates the future export format; it is not guest color evidence.
 
 **Next prerequisite:** a dedicated color-port/GWorld backing-store experiment
-with RGB/PixMap and color-state-preserving replay and a bounded color export
-format. Do not enable color capture by casting through the monochrome structs.
+with verified RGB/PixMap layout and color-state-preserving replay. Do not
+enable color capture by casting through the monochrome structs.
 General application clipping/origins, other text APIs, cross-window blits,
 custom drawing procedures, lifecycle recovery and production integration also
 remain unproven; milestone 0 has not passed.

@@ -24,8 +24,10 @@ class PlaybackTests(unittest.TestCase):
                          "sound.window-drag": "drag.wav",
                          "sound.window-collapse": "collapse.wav",
                          "sound.window-expand": "expand.wav",
-                         "sound.window-drag-end": "end.wav"}
-        for name in ("drag", "collapse", "expand", "end"):
+                         "sound.window-drag-end": "end.wav",
+                         "sound.startup": "startup.wav",
+                         "sound.shutdown": "shutdown.wav"}
+        for name in ("drag", "collapse", "expand", "end", "startup", "shutdown"):
             (self.root / f"zacos9/sounds/{name}.wav").write_bytes(b"mock")
         self.configure()
         self.player("pw-play")
@@ -179,7 +181,9 @@ with open(os.environ["SOUND_TEST_LOG"], "a") as f:
     def test_routes_and_original_assets(self):
         for event, filename in (("window-collapse", "collapse.wav"),
                                 ("window-expand", "expand.wav"),
-                                ("window-drag-end", "end.wav")):
+                                ("window-drag-end", "end.wav"),
+                                ("startup", "startup.wav"),
+                                ("shutdown", "shutdown.wav")):
             count = len(self.records())
             self.command("event " + event)
             self.wait_for(lambda: len(self.records()) > count)
@@ -189,7 +193,9 @@ with open(os.environ["SOUND_TEST_LOG"], "a") as f:
         for event, filename in (("window-collapse", "pluck.wav"),
                                 ("window-expand", "chirp.wav"),
                                 ("window-drag", "droplet.wav"),
-                                ("window-drag-end", "woodblock.wav")):
+                                ("window-drag-end", "woodblock.wav"),
+                                ("startup", "chirp.wav"),
+                                ("shutdown", "platinum.wav")):
             count = len(self.records())
             self.command("event " + event)
             self.wait_for(lambda: len(self.records()) > count)
