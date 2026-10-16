@@ -1,3 +1,17 @@
+zacos9 (0.1.61) trixie; urgency=medium
+
+  * Finder and desktop update: custom icons, richer Find criteria and saved
+    searches, close-all and keyboard navigation, passphrase-protected file
+    copies, Folder Tricks and contextual commands, and Print
+    Window/Desktop. Adds Notepad, Stash, Key Tags and Bark Recorder;
+    expands appearance, sound and clock options, Web Sharing, shutdown
+    items and safe-mode login. Includes the AFP neighbourhood discovery fix
+    and preserves main's Smart Scrolling, Trash and menu improvements.
+    Classic updates are host-side feasibility groundwork only; production
+    color capture and direct guest app launching remain gated.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Thu, 15 Oct 2026 21:53:36 -0400
+
 zacos9 (0.1.60) trixie; urgency=medium
 
   * Fix AFP servers disappearing from Neighbourhood. Bonjour now resolves
