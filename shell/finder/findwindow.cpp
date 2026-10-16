@@ -7,11 +7,14 @@
 #include <QElapsedTimer>
 #include <QDate>
 #include <QFileInfo>
+#include <QInputDialog>
 #include <QKeyEvent>
+#include <QMenu>
 #include <QMouseEvent>
 #include <QWheelEvent>
 
 #include "settings.h"
+#include "appdb.h"
 #include "infowindow.h"
 #include "findindex.h"
 #include "sharingclient.h"
@@ -30,7 +33,8 @@ static constexpr int NOTE_H = 18;
 /* The fields, in the menu's order. */
 static const FindField FIELDS[] = { FindField::Name, FindField::Contents, FindField::Modified,
 	FindField::Created, FindField::Size, FindField::Kind, FindField::Label, FindField::Locked,
-	FindField::Folder };
+	FindField::Folder, FindField::CustomIcon, FindField::Comment, FindField::Invisible,
+	FindField::Version };
 
 struct FindDialog::Row {
 	FindField field = FindField::Name;
@@ -83,6 +87,54 @@ FindDialog::FindDialog(const QString &folder) : m_folder(folder) {
 	};
 	m_find = PanelButton("Find", QRect(0, 0, PL_BUTTON_MIN_W, PL_BUTTON_H), true);
 	m_find.clicked = [this] { find(); };
+	m_saveSearch = PanelButton("Save Search…", QRect(0, 0, 100, PL_BUTTON_H), false);
+	m_saveSearch.clicked = [this] {
+		bool accepted = false;
+		const QString name = QInputDialog::getText(this, "Save Find Search",
+			"Name:", QLineEdit::Normal, QString(), &accepted);
+		if (!accepted) {
+			return;
+		}
+		QString why;
+		if (!saveFindQuery(name, query(), &why)) {
+			m_problem = why;
+			relayout();
+			return;
+		}
+		m_problem.clear();
+		relayout();
+	};
+	m_savedSearches = PanelButton("Saved Searches…", QRect(0, 0, 115, PL_BUTTON_H), false);
+	m_savedSearches.clicked = [this] {
+		QString why;
+		const QStringList names = savedFindQueryNames(&why);
+		if (!why.isEmpty()) {
+			m_problem = why;
+			relayout();
+			return;
+		}
+		if (names.isEmpty()) {
+			m_problem = "No saved Find searches yet.";
+			relayout();
+			return;
+		}
+		QMenu menu(this);
+		for (const QString &name : names) {
+			QAction *action = menu.addAction(name);
+			connect(action, &QAction::triggered, this, [this, name] {
+				FindQuery saved;
+				QString error;
+				if (!loadFindQuery(name, &saved, &error)) {
+					m_problem = error;
+					relayout();
+					return;
+				}
+				FoundWindow::search(saved);
+				close();
+			});
+		}
+		menu.exec(mapToGlobal(m_savedSearches.rect.bottomLeft()));
+	};
 	m_host.defaultButton = &m_find;
 	addRow(FindField::Name);
 	relayout();
@@ -167,10 +219,12 @@ void FindDialog::relayout() {
 	m_scope.rect = QRect(M + 80, SCOPE_Y, 220, PL_POPUP_H);
 	m_more.rect.moveTo(M, bottom);
 	m_fewer.rect.moveTo(M + m_more.rect.width() + 10, bottom);
+	m_saveSearch.rect.moveTo(m_fewer.rect.right() + 10, bottom);
+	m_savedSearches.rect.moveTo(m_saveSearch.rect.right() + 10, bottom);
 	m_find.rect.moveTo(DIALOG_W - M - 4 - m_find.rect.width(), bottom);
 	m_more.enabled = n < MAX_ROWS;
 	m_fewer.enabled = n > 1;
-	m_host.buttons = { &m_more, &m_fewer, &m_find };
+	m_host.buttons = { &m_more, &m_fewer, &m_saveSearch, &m_savedSearches, &m_find };
 	if (std::find(m_host.edits.begin(), m_host.edits.end(), m_host.focus) == m_host.edits.end()) {
 		m_host.setFocus(firstEdit);
 	}
@@ -200,9 +254,6 @@ void FindDialog::find() {
 		m_problem = why;
 		relayout();
 		return;
-	}
-	for (const SharedFolder &f : sharedFolders()) {
-		q.sharedFolders << QFileInfo(f.path).canonicalFilePath();
 	}
 	FoundWindow::search(q);
 	close();
@@ -283,17 +334,33 @@ static std::vector<QPointer<FoundWindow>> &foundWindows() {
 }
 
 void FoundWindow::search(const FindQuery &query) {
+	FindQuery prepared = query;
+	for (const SharedFolder &folder : sharedFolders()) {
+		const QString path = QFileInfo(folder.path).canonicalFilePath();
+		if (!path.isEmpty() && !prepared.sharedFolders.contains(path)) {
+			prepared.sharedFolders << path;
+		}
+	}
+	if (prepared.hasVersionCriterion()) {
+		for (const AppEntry &app : appList()) {
+			const QString path = QFileInfo(app.file).canonicalFilePath();
+			if (!path.isEmpty() && !app.version.isEmpty()) {
+				prepared.applicationVersions.insert(path, app.version);
+			}
+		}
+	}
 	auto *w = new FoundWindow("whose " + query.describe());
 	foundWindows().push_back(w);
 	w->show();
 	Finder::instance().setFront(w);
-	if (!query.hasContents()) {
-		w->walk(query, {}, false);
+	if (!prepared.hasContents()) {
+		w->walk(prepared, {}, false);
 		return;
 	}
 	// Contents come from the index; the other rows sift what it finds.
 	QPointer<FoundWindow> self(w);
-	indexSearch(query.contentWords(), query.root(), [self, query](const QStringList &paths, const QString &error) {
+	indexSearch(prepared.contentWords(), prepared.root(),
+			[self, prepared](const QStringList &paths, const QString &error) {
 		if (!self) {
 			return;
 		}
@@ -302,7 +369,7 @@ void FoundWindow::search(const FindQuery &query) {
 			self->finished();
 			return;
 		}
-		self->walk(query, paths, true);
+		self->walk(prepared, paths, true);
 	});
 }
 
@@ -395,8 +462,12 @@ void FoundWindow::walk(const FindQuery &query, const QStringList &candidates, bo
 			while (!stack.isEmpty() && found < MAX_RESULTS &&
 					!QThread::currentThread()->isInterruptionRequested()) {
 				const QString dir = stack.takeLast();
+				QDir::Filters filters = QDir::AllEntries | QDir::NoDotAndDotDot | QDir::System;
+				if (query.hasVisibilityCriterion()) {
+					filters |= QDir::Hidden;
+				}
 				const auto entries = QDir(dir).entryInfoList(
-					QDir::AllEntries | QDir::NoDotAndDotDot | QDir::System,
+					filters,
 					QDir::Name | QDir::IgnoreCase | QDir::Reversed);
 				for (const QFileInfo &info : entries) {
 					const QString path = info.absoluteFilePath();

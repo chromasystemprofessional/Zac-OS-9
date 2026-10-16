@@ -177,6 +177,15 @@ bool tightGrid() {
 	return pl_setting("grid-spacing", v, sizeof(v)) && strcmp(v, "tight") == 0;
 }
 
+bool warnBeforeEmptyingTrash() {
+	char v[16];
+	return !(pl_setting("warn-empty-trash", v, sizeof(v)) && strcmp(v, "false") == 0);
+}
+
+bool setWarnBeforeEmptyingTrash(bool warn) {
+	return pl_setting_set("warn-empty-trash", warn ? nullptr : "false");
+}
+
 const QDateTime &itemCreated(Item &item) {
 	if (!item.createdResolved) {
 		item.createdResolved = true;

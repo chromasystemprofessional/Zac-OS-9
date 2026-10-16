@@ -22,6 +22,7 @@
 #include "apptrash.h"
 #include "fileops.h"
 #include "finder.h"
+#include "foldertricks.h"
 #include "folderstate.h"
 #include "infowindow.h"
 #include "items.h"
@@ -345,6 +346,91 @@ int main(int argc, char **argv) {
 	check(desktop.m_disk && desktop.m_trash &&
 		desktop.m_disk->isVirtual && !desktop.m_trash->path.isEmpty(),
 		"startup disk and Trash remain separate from real Desktop files");
+	/* The contextual menu's Print: offered for documents, not folders. */
+	const auto stateWith = [&](const QString &name) {
+		desktop.selectByName(name);
+		Finder::instance().setFront(&desktop);
+		QLocalSocket probe;
+		probe.connectToServer(Finder::socketPath());
+		QByteArray line;
+		waitFor([&] { return probe.canReadLine() && !(line = probe.readLine()).isEmpty(); });
+		probe.disconnectFromServer();
+		return line;
+	};
+	check(stateWith("External folder").contains("documents=0"),
+		"a selected folder offers no Print in its contextual menu");
+	check(stateWith("External file").contains("documents=1"),
+		"a selected document offers Print in its contextual menu");
+	/* A folder's contextual menu offers Folder Tricks; attaching one. */
+	const QString tricksDir = FolderTricks::instance().tricksDir();
+	check(QDir().mkpath(tricksDir) && write(tricksDir + "/Tidy Up") &&
+		QFile::setPermissions(tricksDir + "/Tidy Up", QFile::ReadOwner | QFile::WriteOwner |
+			QFile::ExeOwner), "a program in the Folder Tricks folder");
+	desktop.selectByName("External folder");
+	{
+		QLocalSocket menu;
+		menu.connectToServer(Finder::socketPath());
+		check(waitFor([&] { return menu.canReadLine(); }),
+			"menu bar connects for the contextual menu");
+		menu.readAll(); /* the state the Sniffer greets it with */
+		Item *folder = nullptr;
+		for (const auto &item : desktop.m_files) {
+			folder = item->name == "External folder" ? item.get() : folder;
+		}
+		QByteArray lines;
+		Finder::instance().showContextMenu(&desktop, folder);
+		waitFor([&] { lines += menu.readAll(); return lines.contains("context icon\n"); });
+		check(lines.contains("tricks 1\t*Tidy Up\ncommands\ncontext icon\n"),
+			"the folder's menu offers the Folder Tricks folder's programs");
+		Finder::instance().command("attach-trick Tidy Up");
+		check(FolderTricks::instance().attached(path + "/External folder") ==
+			QStringList({ "Tidy Up" }), "Attach a Folder Trick attaches it to that folder");
+		Finder::instance().command("remove-trick Tidy Up");
+		check(FolderTricks::instance().attached(path + "/External folder").isEmpty(),
+			"Remove a Folder Trick takes it off");
+		menu.disconnectFromServer();
+	}
+	/* Print Window and Print Desktop, on stand-ins for CUPS's lpstat and lp
+	 * that keep what they were given. */
+	{
+		const QString cups = home.path() + "/cups", spool = home.path() + "/spool";
+		check(QDir().mkpath(cups) && QDir().mkpath(spool), "stand-in CUPS folders");
+		const auto program = [&](const QString &name, const QByteArray &body) {
+			return write(cups + "/" + name) && [&] {
+				QFile f(cups + "/" + name);
+				return f.open(QIODevice::WriteOnly) && f.write("#!/bin/sh\n" + body) > 0 &&
+					f.setPermissions(QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
+			}();
+		};
+		check(program("lpstat", "echo 'system default destination: Laser'\n") &&
+			program("lp", "for last; do :; done\nprintf '%s\\n' \"$@\" > '" +
+				spool.toUtf8() + "/args'\ncp \"$last\" '" + spool.toUtf8() + "/job.pdf'\n"
+				"echo 'request id is Laser-7 (1 file(s))'\n"), "stand-in lpstat and lp");
+		qputenv("ZACOS9_CUPS_BIN", cups.toUtf8());
+		desktop.selectByName("External file");
+		const QImage desk = desktop.printImage();
+		check(!desk.isNull() && desk.width() < desktop.width(),
+			"Print Desktop draws the icons, cut down to where they are");
+		Finder::instance().setFront(&desktop);
+		Finder::instance().command("print-window");
+		QFile job(spool + "/job.pdf"), args(spool + "/args");
+		check(job.open(QIODevice::ReadOnly) && job.read(5) == "%PDF-",
+			"Print Desktop sends a PDF to the printer");
+		check(args.open(QIODevice::ReadOnly) && args.readAll().contains("Laser\n-t\nDesktop.pdf\n"),
+			"on your printer, named for the desktop");
+		auto *window = FolderWindow::open(path + "/External folder");
+		check(window && !window->printImage().isNull(), "Print Window draws a folder window");
+		QFile::remove(spool + "/job.pdf");
+		Finder::instance().setFront(window);
+		Finder::instance().command("print-window");
+		args.close();
+		check(QFile::exists(spool + "/job.pdf") && args.open(QIODevice::ReadOnly) &&
+			args.readAll().contains("-t\nExternal folder.pdf\n"), "Print Window prints the window");
+		window->close();
+		qunsetenv("ZACOS9_CUPS_BIN");
+		settle();
+	}
+	desktop.selectByName(QString());
 	Finder::instance().command("new-folder");
 	check(hasFile(desktop, "untitled folder"), "New Folder works on Desktop");
 	desktop.selectByName("External folder");
@@ -812,6 +898,22 @@ esac
 		"Flatpak uninstall is user-scoped and does not delete data");
 	check(commands.contains("remove coreutils") && !commands.contains("purge"),
 		"Debian uninstall uses the existing helper without purging configuration");
+	const QString lockedFolder = trashFilesPath() + "/Locked folder";
+	check(QDir().mkpath(lockedFolder) &&
+		write(lockedFolder + "/locked.txt") &&
+		QFile::setPermissions(lockedFolder + "/locked.txt", QFileDevice::ReadOwner) &&
+		QFile::setPermissions(lockedFolder, QFileDevice::ReadOwner | QFileDevice::ExeOwner),
+		"create a locked Trash folder and file");
+	confirmations.start();
+	Finder::instance().emptyTrash();
+	confirmations.stop();
+	check(QFile::exists(lockedFolder + "/locked.txt"),
+		"Empty Trash preserves locked items unless Option is held");
+	confirmations.start();
+	Finder::instance().emptyTrash(true);
+	confirmations.stop();
+	check(!QFileInfo::exists(lockedFolder) && QDir(trashFilesPath()).isEmpty(),
+		"Option-Empty Trash removes locked files and folders");
 	for (QWidget *widget : QApplication::topLevelWidgets()) {
 		if (dynamic_cast<FolderWindow *>(widget)) {
 			widget->close();

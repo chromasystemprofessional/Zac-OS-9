@@ -29,6 +29,7 @@
 #include "launch.h"
 #include "idle_policy.h"
 #include "server.h"
+#include "settings.h"
 
 /* ---- keyboard ---------------------------------------------------------- */
 
@@ -827,15 +828,18 @@ static void frame_press(struct plat_server *server, struct plat_view *view,
 		/* Title-bar double-click collapses document windows only. */
 		bool in_title = server->cursor->y - view_frame_box(view).y < DECOR_TOP - 2 &&
 			view->frame->st.style == DECOR_STYLE_DOCUMENT;
+		char collapse[16];
+		bool collapse_on_double_click = !pl_setting("double-click-title-collapse", collapse,
+			sizeof(collapse)) || strcmp(collapse, "false") != 0;
 		bool dbl = in_title && server->last_click_view == view &&
 			time_msec - server->last_click_msec <= (uint32_t)server->double_click_ms;
-		if (dbl) {
+		if (dbl && collapse_on_double_click) {
 			/* Appearance option "double-click title bar to collapse". */
 			server->last_click_view = NULL;
 			view_set_collapsed(view, !view->collapsed);
 			break;
 		}
-		server->last_click_view = in_title ? view : NULL;
+		server->last_click_view = in_title && collapse_on_double_click ? view : NULL;
 		server->last_click_msec = time_msec;
 		input_begin_grab(server, view, PLAT_CURSOR_MOVE, 0, part);
 		break;

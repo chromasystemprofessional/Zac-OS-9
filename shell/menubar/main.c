@@ -25,6 +25,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <wayland-cursor.h>
+#include <xkbcommon/xkbcommon.h>
 
 #include "menubar.h"
 #include "platinum-shell-v1-client-protocol.h"
@@ -57,6 +58,10 @@ static struct {
 
 	struct wl_pointer *pointer;
 	struct wl_keyboard *keyboard;
+	struct xkb_context *xkb_context;
+	struct xkb_keymap *keymap;
+	xkb_mod_index_t option_mod;
+	bool option_held;
 	struct wl_cursor_theme *cursor_theme;
 	struct wl_surface *cursor_surface;
 	double px, py; /* pointer, in screen (= surface) coordinates */
@@ -99,13 +104,14 @@ static struct {
 	int blinks_left;
 	bool blink_on;
 	bool chosen_in_sub;
+	bool chosen_option;
 	struct mb_item chosen; /* copy of the item being performed */
 
 	int clock_fd, blink_fd;
 	bool running;
 } g = {
 	.scale = 1, .open_index = -1, .selected = -1, .sub_parent = -1, .sub_selected = -1,
-	.clock_fd = -1, .blink_fd = -1,
+	.clock_fd = -1, .blink_fd = -1, .option_mod = XKB_MOD_INVALID,
 };
 
 struct wl_seat *menubar_seat(void) {
@@ -504,6 +510,7 @@ static void choose(int index, bool in_sub) {
 		.key = it->key,
 		.arg = it->arg ? strdup(it->arg) : NULL,
 	};
+	g.chosen_option = g.option_held;
 	g.chosen_in_sub = in_sub;
 	if (in_sub) {
 		g.sub_selected = index;
@@ -535,7 +542,7 @@ static void blink_tick(void) {
 	}
 	close_menu();
 	pl_sound_event("menu-command");
-	menus_perform(&g.chosen);
+	menus_perform(&g.chosen, g.chosen_option);
 	free(g.chosen.arg);
 	g.chosen.arg = NULL;
 }
@@ -825,7 +832,29 @@ static const struct wl_pointer_listener pointer_listener = {
 
 static void kb_keymap(void *data, struct wl_keyboard *k, uint32_t format, int fd,
 		uint32_t size) {
+	if (format != WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1 || size == 0) {
+		close(fd);
+		return;
+	}
+	void *map = mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
 	close(fd);
+	if (map == MAP_FAILED) {
+		return;
+	}
+	if (!g.xkb_context) {
+		g.xkb_context = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
+	}
+	struct xkb_keymap *keymap = g.xkb_context
+		? xkb_keymap_new_from_string(g.xkb_context, map,
+			XKB_KEYMAP_FORMAT_TEXT_V1, XKB_KEYMAP_COMPILE_NO_FLAGS)
+		: NULL;
+	munmap(map, size);
+	if (!keymap) {
+		return;
+	}
+	xkb_keymap_unref(g.keymap);
+	g.keymap = keymap;
+	g.option_mod = xkb_keymap_mod_get_index(g.keymap, XKB_MOD_NAME_ALT);
 }
 
 static void kb_enter(void *data, struct wl_keyboard *k, uint32_t serial,
@@ -845,6 +874,12 @@ static void kb_key(void *data, struct wl_keyboard *k, uint32_t serial, uint32_t 
 
 static void kb_modifiers(void *data, struct wl_keyboard *k, uint32_t serial,
 		uint32_t depressed, uint32_t latched, uint32_t locked, uint32_t group) {
+	g.option_held = false;
+	if (g.option_mod != XKB_MOD_INVALID &&
+			g.option_mod < sizeof(uint32_t) * 8) {
+		const uint32_t option_mask = 1u << g.option_mod;
+		g.option_held = ((depressed | latched | locked) & option_mask) != 0;
+	}
 }
 
 static void kb_repeat_info(void *data, struct wl_keyboard *k, int32_t rate, int32_t delay) {
@@ -1179,6 +1214,7 @@ int main(void) {
 		uint64_t expirations;
 		if ((fds[1].revents & POLLIN) &&
 				read(g.clock_fd, &expirations, sizeof(expirations)) > 0) {
+			menus_hourly_chime();
 			menubar_apps_changed(); /* rebuilds the clock title */
 		}
 		if ((fds[2].revents & POLLIN) &&

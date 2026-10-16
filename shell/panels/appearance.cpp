@@ -1,8 +1,11 @@
 #include "appearance.h"
 
 #include <QDir>
+#include <QFileDialog>
+#include <QFileInfo>
 #include <QKeyEvent>
 #include <QMouseEvent>
+#include <QRegularExpression>
 #include <QWheelEvent>
 
 #include "patterns.h"
@@ -45,9 +48,38 @@ static void setSetting(const char *key, const QString &value) {
 AppearancePanel::AppearancePanel() {
 	setWindowTitle("Appearance");
 	setFixedSize(W, H);
-	for (const char *label : { "Color", "Desktop", "Wallpaper", "Sound", "Themes", "Sound Sets" }) {
+	for (const char *label : { "Color", "Desktop", "Wallpaper", "Sound", "Themes", "Sound Sets",
+			"Options" }) {
 		m_tabLabels.push_back(std::make_unique<Text>(label, 200, PL_FONT_SYSTEM));
 	}
+	m_collapseTitle = PanelCheckbox("Double-click a window title bar to collapse",
+		QPoint(BOX_L + ITEM_INSET, ITEM_TOP));
+	char collapse[16];
+	m_collapseTitle.on = !pl_setting("double-click-title-collapse", collapse, sizeof(collapse)) ||
+		QString::fromUtf8(collapse) != "false";
+	m_collapseTitle.toggled = [this](bool enabled) {
+		if (!pl_setting_set("double-click-title-collapse", enabled ? nullptr : "false")) {
+			m_collapseTitle.on = !enabled;
+			m_themeError = "Could not save the title-bar preference.";
+		} else {
+			m_themeError.clear();
+		}
+		update();
+	};
+	m_arrowsTogether = PanelCheckbox("Scroll bar arrows together",
+		QPoint(BOX_L + ITEM_INSET, ITEM_TOP + 24));
+	char arrowsTogether[16];
+	m_arrowsTogether.on = pl_setting("scrollbar-arrows-together", arrowsTogether,
+		sizeof(arrowsTogether)) && QString::fromUtf8(arrowsTogether) == "true";
+	m_arrowsTogether.toggled = [this](bool enabled) {
+		if (!pl_setting_set("scrollbar-arrows-together", enabled ? "true" : nullptr)) {
+			m_arrowsTogether.on = !enabled;
+			m_themeError = "Could not save the scroll-bar preference.";
+		} else {
+			m_themeError.clear();
+		}
+		update();
+	};
 
 	/* Accent colour. */
 	m_accents.frame = QRect(QPoint(BOX_L + ITEM_INSET, ITEM_TOP),
@@ -116,43 +148,50 @@ AppearancePanel::AppearancePanel() {
 	m_placement.rect = QRect(BOX_L + 80, m_wallpapers.frame.bottom() + 16, 100, PL_POPUP_H);
 	m_placement.label = "Placement:";
 	m_placement.items = { "Fit", "Fill", "Stretch", "Center" };
-	const QStringList modes{"fit", "fill", "stretch", "center"};
+	const QStringList modes{ "fit", "fill", "stretch", "center", "tile" };
 	m_placement.selected = std::max<int>(0, modes.indexOf(setting("wallpaper-mode")));
+	m_placement.items = { "Fit", "Fill", "Stretch", "Center", "Tile" };
 	m_placement.chosen = [this, modes](int i) {
 		m_placement.selected = i;
 		setSetting("wallpaper-mode", modes[i]);
 		update();
 	};
 
-	/* Alert sound: what's in sounds/, plus None. */
+	/* Alert sounds include the installed set and personal recordings. */
 	m_sounds.frame = QRect(QPoint(BOX_L + ITEM_INSET, ITEM_TOP),
 		QPoint(BOX_L + ITEM_INSET + 170, ITEM_TOP + 8 * PL_LIST_ROW_H + 1));
-	QDir dir(QString::fromUtf8(pl_data_dir()) + "/sounds");
-	m_soundIds = { "platinum" };
-	for (const QString &f : dir.entryList({ "*.wav" }, QDir::Files, QDir::Name)) {
-		const QString id = f.chopped(4);
-		if (id != "platinum") {
-			m_soundIds << id;
-		}
-	}
-	m_soundIds << "none";
-	QStringList soundNames;
-	for (const QString &id : m_soundIds) {
-		/* The default alert sound's file is still platinum.wav (sound
-		 * assets, like the fonts and icons, keep their internal names);
-		 * shown as "Chime" rather than capitalizing that into the
-		 * product's old name. */
-		QString name = id == "platinum" ? "Chime" : id;
-		name[0] = name[0].toUpper();
-		soundNames << name;
-	}
-	m_sounds.setItems(soundNames);
+	loadAlertSounds();
 	const QString chosen = setting("alert-sound");
 	m_sounds.select(std::max<int>(0, m_soundIds.indexOf(chosen.isEmpty() ? "platinum" : chosen)),
 		false);
 	m_sounds.picked = [this](int i) {
+		if (i < 0 || i >= m_soundIds.size()) {
+			return;
+		}
 		const QString id = m_soundIds[i];
 		setSetting("alert-sound", id == "platinum" ? QString() : id);
+		pl_sound_play(id.toUtf8().constData());
+		update();
+	};
+	m_addSound = PanelButton("Add Recording...", QRect(m_sounds.frame.right() + 20,
+		ITEM_TOP + 58, 128, 22));
+	m_addSound.clicked = [this] {
+		const QString source = QFileDialog::getOpenFileName(this, "Add Alert Sound Recording",
+			QDir::homePath(), "WAVE recordings (*.wav)");
+		if (source.isEmpty()) {
+			return;
+		}
+		QString id, error;
+		m_themeError.clear();
+		if (!importAlertSound(source, &id, &error)) {
+			m_themeError = error;
+			update();
+			return;
+		}
+		loadAlertSounds();
+		const int index = m_soundIds.indexOf(id);
+		m_sounds.select(index, false);
+		setSetting("alert-sound", id);
 		pl_sound_play(id.toUtf8().constData());
 		update();
 	};
@@ -194,7 +233,7 @@ AppearancePanel::AppearancePanel() {
 			m_highlights.select(selected, false);
 			const QString alert = setting("alert-sound");
 			m_sounds.select(std::max<int>(0, m_soundIds.indexOf(alert.isEmpty() ? "platinum" : alert)), false);
-			const QStringList modes{ "fit", "fill", "stretch", "center" };
+			const QStringList modes{ "fit", "fill", "stretch", "center", "tile" };
 			m_placement.selected = std::max<int>(0, modes.indexOf(setting("wallpaper-mode")));
 			loadPatterns();
 			loadWallpapers();
@@ -210,6 +249,31 @@ AppearancePanel::AppearancePanel() {
 	loadThemes();
 	watchCustomThemes(this, [this] { loadThemes(); update(); });
 	m_focus = &m_accents;
+}
+
+void AppearancePanel::loadAlertSounds() {
+	m_soundIds = { "platinum" };
+	for (const QString &folder : { QString::fromUtf8(pl_data_dir()) + "/sounds",
+			userAlertSoundsFolder() }) {
+		const QDir dir(folder);
+		for (const QString &file : dir.entryList({ "*.wav" }, QDir::Files, QDir::Name)) {
+			const QFileInfo info(dir.filePath(file));
+			const QString id = info.completeBaseName();
+			if (!info.isSymLink() && info.isFile() && !m_soundIds.contains(id) &&
+					QRegularExpression("\\A[A-Za-z0-9_-]{1,48}\\z")
+					.match(id).hasMatch()) {
+				m_soundIds << id;
+			}
+		}
+	}
+	m_soundIds << "none";
+	QStringList names;
+	for (const QString &id : m_soundIds) {
+		QString name = id == "platinum" ? "Chime" : id;
+		name[0] = name[0].toUpper();
+		names << name;
+	}
+	m_sounds.setItems(names);
 }
 
 void AppearancePanel::loadThemes() {
@@ -265,9 +329,14 @@ void AppearancePanel::loadWallpapers() {
 }
 
 void AppearancePanel::showTab(int tab) {
-	m_tab = std::clamp(tab, 0, 5);
+	m_tab = std::clamp(tab, 0, 6);
+	m_host.checks.clear();
+	if (m_tab == 6) {
+		m_host.checks = { &m_collapseTitle, &m_arrowsTogether };
+	}
 	m_host.buttons = m_tab == 4 ? std::vector<PanelButton *>{ &m_saveTheme }
-		: m_tab == 5 ? std::vector<PanelButton *>{ &m_previewTheme } : std::vector<PanelButton *>{};
+		: m_tab == 5 ? std::vector<PanelButton *>{ &m_previewTheme }
+		: m_tab == 3 ? std::vector<PanelButton *>{ &m_addSound } : std::vector<PanelButton *>{};
 	m_host.edits = m_tab == 4 ? std::vector<PanelEdit *>{ &m_themeName } : std::vector<PanelEdit *>{};
 	if (m_tab != 4) {
 		m_host.setFocus(nullptr);
@@ -275,7 +344,8 @@ void AppearancePanel::showTab(int tab) {
 	if (m_tab == 4 || m_tab == 5) {
 		loadThemes();
 	}
-	m_focus = visibleLists().front();
+	const auto lists = visibleLists();
+	m_focus = lists.empty() ? nullptr : lists.front();
 	update();
 }
 
@@ -286,6 +356,7 @@ std::vector<PanelList *> AppearancePanel::visibleLists() {
 	case 2: return { &m_wallpapers };
 	case 3: return { &m_sounds };
 	case 4: return { &m_themes };
+	case 6: return {};
 	default: return { &m_soundThemes };
 	}
 }
@@ -352,7 +423,7 @@ void AppearancePanel::paintWallpaperTab(pl_canvas *c) {
 	pl_vline(c, x - 1, y - 1, y + size, GRAY(8));
 	pl_hline(c, x, x + size, y + size, C_WHITE);
 	pl_vline(c, x + size, y, y + size, C_WHITE);
-	const QStringList modes{"fit", "fill", "stretch", "center"};
+	const QStringList modes{ "fit", "fill", "stretch", "center", "tile" };
 	desktopWallpaperFill(c, m_wallpapers.state.selected, modes[m_placement.selected],
 		x, y, x + size - 1, y + size - 1);
 	m_placement.paint(c);
@@ -368,16 +439,28 @@ void AppearancePanel::paintWallpaperTab(pl_canvas *c) {
 	pl_text(c, hint.t, BOX_L + 4, m_patterns.frame.bottom() + 20, C_BLACK);
 }
 
+void AppearancePanel::paintOptionsTab(pl_canvas *c) {
+	panelGroup(c, BOX_L, BOX_TOP, BOX_R, ITEM_TOP + 2 * PL_CHECKBOX_SIZE + 24 + PL_GROUP_MARGIN,
+		"Window Options", PANE);
+	if (!m_themeError.isEmpty()) {
+		panelText(c, m_themeError, BOX_L + 4, H - 24, PL_FONT_VIEWS, C_BLACK, BOX_R - BOX_L);
+	}
+}
+
 void AppearancePanel::paintSoundTab(pl_canvas *c) {
 	groupAround(c, m_sounds.frame, "Alert Sound", BOX_R);
 	paintList(c, m_sounds, m_focus == &m_sounds);
 	const int x = m_sounds.frame.right() + 20;
 	int y = ITEM_TOP + 11;
 	for (const char *line : { "Click a sound to hear it.", "It plays whenever an",
-			"alert appears." }) {
+			"alert appears.", "Record a WAV with Bark Recorder." }) {
 		Text t(line, BOX_R - x - 4, PL_FONT_VIEWS);
 		pl_text(c, t.t, x, y, C_BLACK);
 		y += 13;
+	}
+	m_host.paintControls(c, PANE);
+	if (!m_themeError.isEmpty()) {
+		panelText(c, m_themeError, BOX_L + 4, H - 24, PL_FONT_VIEWS, C_BLACK, BOX_R - BOX_L);
 	}
 }
 
@@ -422,7 +505,11 @@ void AppearancePanel::paintEvent(QPaintEvent *) {
 	case 2: paintWallpaperTab(c); break;
 	case 3: paintSoundTab(c); break;
 	case 4: paintThemesTab(c); break;
-	default: paintSoundThemesTab(c); break;
+	case 5: paintSoundThemesTab(c); break;
+	default:
+		paintOptionsTab(c);
+		m_host.paintControls(c, PANE);
+		break;
 	}
 	QPainter p(this);
 	px.blit(p);
@@ -447,7 +534,10 @@ void AppearancePanel::mousePressEvent(QMouseEvent *e) {
 		update();
 		return;
 	}
-	if ((m_tab == 4 || m_tab == 5) && m_host.hostPress(e)) {
+	if (m_tab == 6 && m_host.hostPress(e)) {
+		return;
+	}
+	if ((m_tab == 3 || m_tab == 4 || m_tab == 5) && m_host.hostPress(e)) {
 		return;
 	}
 	for (PanelList *l : visibleLists()) {
@@ -463,7 +553,7 @@ void AppearancePanel::mouseMoveEvent(QMouseEvent *e) {
 	if (m_tab == 5 && m_interfaceVolume.move(e->position().toPoint())) {
 		update();
 	}
-	if (m_tab == 4 || m_tab == 5) {
+	if (m_tab == 3 || m_tab == 4 || m_tab == 5 || m_tab == 6) {
 		m_host.hostMove(e);
 	}
 	for (PanelList *l : visibleLists()) {
@@ -477,7 +567,7 @@ void AppearancePanel::mouseReleaseEvent(QMouseEvent *e) {
 	if (m_tab == 5) {
 		m_interfaceVolume.release(e->position().toPoint());
 	}
-	if (m_tab == 4 || m_tab == 5) {
+	if (m_tab == 3 || m_tab == 4 || m_tab == 5 || m_tab == 6) {
 		m_host.hostRelease(e);
 	}
 	for (PanelList *l : visibleLists()) {
@@ -498,7 +588,7 @@ void AppearancePanel::keyPressEvent(QKeyEvent *e) {
 		close();
 		return;
 	}
-	if ((m_tab == 4 || m_tab == 5) && m_host.hostKey(e)) {
+	if ((m_tab == 3 || m_tab == 4 || m_tab == 5 || m_tab == 6) && m_host.hostKey(e)) {
 		update();
 		return;
 	}

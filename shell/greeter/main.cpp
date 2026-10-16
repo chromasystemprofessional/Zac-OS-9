@@ -9,6 +9,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QGuiApplication>
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QPainter>
@@ -153,7 +154,8 @@ protected:
 		panelText(c, "Welcome to ZacOS 9.", MARGIN, 29);
 		m_list.paint(c, false);
 		panelLabel(c, "Password:", FIELD_X - 8, m_password.rect.top() + 15);
-		const QString status = m_greetd.busy() ? QString("Logging in…") : m_error;
+		const QString status = m_greetd.busy() ? QString("Logging in…") : !m_error.isEmpty()
+			? m_error : m_safeMode ? QString("Safe mode: Startup Items will not run.") : QString();
 		if (!status.isEmpty()) {
 			panelText(c, status, MARGIN, m_password.rect.bottom() + 20, PL_FONT_VIEWS,
 				m_greetd.busy() ? C_BLACK : RGB(0x99, 0x00, 0x00), W - 2 * MARGIN);
@@ -188,6 +190,11 @@ protected:
 		}
 	}
 	void keyPressEvent(QKeyEvent *e) override {
+		if (e->key() == Qt::Key_Shift) {
+			m_safeMode = true;
+			update();
+			return;
+		}
 		/* Up and Down choose the person; typing goes to the password. */
 		if ((e->key() == Qt::Key_Up || e->key() == Qt::Key_Down) && !m_greetd.busy() &&
 				m_list.key(e->key(), QString())) {
@@ -202,6 +209,14 @@ protected:
 			return;
 		}
 		QWidget::keyPressEvent(e);
+	}
+	void keyReleaseEvent(QKeyEvent *e) override {
+		if (e->key() == Qt::Key_Shift) {
+			m_safeMode = (e->modifiers() & Qt::ShiftModifier) != 0;
+			update();
+			return;
+		}
+		QWidget::keyReleaseEvent(e);
 	}
 
 private:
@@ -225,7 +240,10 @@ private:
 			last.write(user.toUtf8() + '\n');
 		}
 		m_error.clear();
-		m_greetd.login(user, m_password.text, { "zacos9-session" });
+		m_safeMode = (QGuiApplication::keyboardModifiers() & Qt::ShiftModifier) != 0 ||
+			m_safeMode;
+		m_greetd.login(user, m_password.text, { "zacos9-session" },
+			m_safeMode ? QStringList{ "ZACOS9_SAFE_MODE=1" } : QStringList{});
 		updateEnabled();
 		update();
 	}
@@ -233,6 +251,7 @@ private:
 	std::vector<Account> m_accounts;
 	Greetd m_greetd;
 	QString m_error;
+	bool m_safeMode = false;
 	PanelList m_list;
 	PanelEdit m_password;
 	PanelButton m_shutDown, m_restart, m_logIn;

@@ -24,7 +24,8 @@
 namespace {
 const QStringList events{ "button-click", "checkbox-toggle", "menu-open", "menu-command",
 	"window-open", "window-close", "trash-move", "trash-empty",
-	"window-collapse", "window-expand", "window-drag", "window-drag-end" };
+	"window-collapse", "window-expand", "window-drag", "window-drag-end",
+	"startup", "shutdown" };
 struct Theme {
 	QString id, name;
 	QMap<QString, QString> values;
@@ -86,6 +87,21 @@ bool writeSettings(const QMap<QString, QString> &values, QString *error) {
 
 QString cacheFolder() {
 	return QStandardPaths::writableLocation(QStandardPaths::GenericCacheLocation) + "/zacos9/sounds";
+}
+
+bool alertSoundAvailable(const QString &id) {
+	if (!QRegularExpression("\\A[A-Za-z0-9_-]{1,48}\\z").match(id).hasMatch()) {
+		return false;
+	}
+	for (const QString &path : {
+			userAlertSoundsFolder() + "/" + id + ".wav",
+			QString::fromUtf8(pl_data_dir()) + "/sounds/" + id + ".wav" }) {
+		const QFileInfo file(path);
+		if (!file.isSymLink() && file.isFile()) {
+			return true;
+		}
+	}
+	return false;
 }
 
 class Catalog : public QObject {
@@ -290,6 +306,84 @@ Catalog &catalog() {
 QString soundThemesFolder() {
 	return QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + "/zacos9/appearance/Sound Themes";
 }
+QString userAlertSoundsFolder() {
+	return QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + "/zacos9/sounds";
+}
+
+bool importAlertSound(const QString &source, QString *id, QString *error) {
+	const QFileInfo info(source);
+	if (info.isSymLink() || !info.isFile() || info.size() < 12 || info.size() > 8 * 1024 * 1024) {
+		*error = "Choose a regular WAVE file no larger than 8 MiB.";
+		return false;
+	}
+	QFile input(source);
+	if (!input.open(QIODevice::ReadOnly)) {
+		*error = input.errorString();
+		return false;
+	}
+	const QByteArray header = input.read(12);
+	if (header.size() != 12 || header.left(4) != "RIFF" || header.mid(8, 4) != "WAVE") {
+		*error = "The selected file is not a RIFF WAVE recording.";
+		return false;
+	}
+
+	QString name = info.completeBaseName();
+	name.replace(QRegularExpression("[^A-Za-z0-9_-]"), "_");
+	name = name.left(48);
+	if (name.isEmpty() || name == "none" || name == "platinum") {
+		name = "custom-alert";
+	}
+	const QString folder = userAlertSoundsFolder();
+	if (!QDir().mkpath(folder)) {
+		*error = "Could not create the personal alert-sounds folder.";
+		return false;
+	}
+	const QString target = folder + "/" + name + ".wav";
+	const QString systemTarget = QString::fromUtf8(pl_data_dir()) + "/sounds/" + name + ".wav";
+	if (QFileInfo::exists(target) || QFileInfo(target).isSymLink() ||
+			QFileInfo::exists(systemTarget)) {
+		*error = "A sound with that name already exists. Rename the recording and try again.";
+		return false;
+	}
+	QSaveFile output(target);
+	if (!output.open(QIODevice::WriteOnly)) {
+		*error = output.errorString();
+		return false;
+	}
+	if (output.write(header) != header.size()) {
+		output.cancelWriting();
+		*error = output.errorString();
+		return false;
+	}
+	qint64 copied = header.size();
+	QByteArray buffer;
+	while (!(buffer = input.read(64 * 1024)).isEmpty()) {
+		copied += buffer.size();
+		if (copied > 8 * 1024 * 1024) {
+			output.cancelWriting();
+			*error = "The WAVE recording grew beyond the 8 MiB limit.";
+			return false;
+		}
+		if (output.write(buffer) != buffer.size()) {
+			output.cancelWriting();
+			*error = output.errorString();
+			return false;
+		}
+	}
+	if (input.error() != QFileDevice::NoError || copied != info.size()) {
+		output.cancelWriting();
+		*error = input.errorString().isEmpty() ? "The WAVE recording changed while it was copied."
+			: input.errorString();
+		return false;
+	}
+	if (!output.commit()) {
+		*error = output.errorString().isEmpty() ? input.errorString() : output.errorString();
+		return false;
+	}
+	*id = name;
+	return true;
+}
+
 QString appearanceThemesFolder() {
 	return QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + "/zacos9/appearance/Themes";
 }
@@ -355,7 +449,7 @@ bool applyAppearanceTheme(int index, QString *error) {
 		return false;
 	}
 	if (values.contains("wallpaper-mode") &&
-			!QStringList{ "fit", "fill", "stretch", "center" }.contains(values["wallpaper-mode"])) {
+			!QStringList{ "fit", "fill", "stretch", "center", "tile" }.contains(values["wallpaper-mode"])) {
 		*error = "The theme specifies an unknown wallpaper placement.";
 		return false;
 	}
@@ -370,8 +464,7 @@ bool applyAppearanceTheme(int index, QString *error) {
 	}
 	if (values.contains("alert-sound") && !values["alert-sound"].isEmpty() && values["alert-sound"] != "none") {
 		const QString id = values["alert-sound"];
-		if (id.contains('/') || id.contains('\\') || id.contains("..") ||
-				!QFileInfo::exists(QString::fromUtf8(pl_data_dir()) + "/sounds/" + id + ".wav")) {
+		if (!alertSoundAvailable(id)) {
 			*error = "The preset's alert sound is missing.";
 			return false;
 		}

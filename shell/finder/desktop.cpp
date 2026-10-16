@@ -473,6 +473,38 @@ bool Desktop::iconsShown() const {
 		front == static_cast<uint32_t>(QCoreApplication::applicationPid());
 }
 
+QImage Desktop::printImage() {
+	Pixels px(width(), height());
+	px.img.fill(Qt::white);
+	std::vector<Item *> all = fixedItems();
+	for (auto &item : m_files) {
+		all.push_back(item.get());
+	}
+	std::vector<std::pair<bool, bool>> flags;
+	for (Item *item : all) {
+		flags.push_back({ item->selected, item->dropTarget });
+		item->selected = item->dropTarget = false;
+	}
+	for (Item *item : all) {
+		paintIconItem(&px.c, *item, item->pos.x(), item->pos.y(), true);
+	}
+	for (size_t i = 0; i < all.size(); i++) {
+		all[i]->selected = flags[i].first;
+		all[i]->dropTarget = flags[i].second;
+	}
+	/* Only as far as the icons go. */
+	QRect ink;
+	for (int y = 0; y < px.img.height(); y++) {
+		const QRgb *line = reinterpret_cast<const QRgb *>(px.img.constScanLine(y));
+		for (int x = 0; x < px.img.width(); x++) {
+			if ((line[x] & 0xFFFFFF) != 0xFFFFFF) {
+				ink |= QRect(x, y, 1, 1);
+			}
+		}
+	}
+	return ink.isEmpty() ? QImage() : px.img.copy(ink.adjusted(-8, -8, 8, 8) & px.img.rect());
+}
+
 void Desktop::paintEvent(QPaintEvent *) {
 	Pixels px(width(), height());
 	pl_canvas *c = &px.c;
@@ -642,6 +674,10 @@ void Desktop::mouseDoubleClickEvent(QMouseEvent *e) {
 		}
 		update();
 		Finder::instance().notifyState();
+		if ((e->modifiers() & Qt::AltModifier) &&
+				Finder::instance().closeApplicationWindow(hit)) {
+			return;
+		}
 		Finder::instance().openItem(hit);
 	}
 }
@@ -830,6 +866,10 @@ void Desktop::dropEvent(QDropEvent *e) {
 
 void Desktop::keyPressEvent(QKeyEvent *e) {
 	if (m_editor.key(e)) {
+		return;
+	}
+	if (e->key() == Qt::Key_Space && Finder::instance().springOpenNow()) {
+		e->accept();
 		return;
 	}
 	if ((e->key() == Qt::Key_Return || e->key() == Qt::Key_Enter) &&

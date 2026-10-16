@@ -15,7 +15,8 @@ QByteArray Greetd::frame(const QJsonObject &message) {
 	return bytes + json;
 }
 
-void Greetd::login(const QString &user, const QString &password, const QStringList &command) {
+void Greetd::login(const QString &user, const QString &password, const QStringList &command,
+		const QStringList &environment) {
 	if (busy()) {
 		return;
 	}
@@ -42,6 +43,7 @@ void Greetd::login(const QString &user, const QString &password, const QStringLi
 	m_state = Authenticating;
 	m_password = password;
 	m_command = command;
+	m_environment = environment;
 	m_answered = false;
 	m_note.clear();
 	m_why.clear();
@@ -90,7 +92,7 @@ void Greetd::handle(const QJsonObject &message) {
 			m_password.clear();
 			m_state = Starting;
 			send({ { "type", "start_session" }, { "cmd", QJsonArray::fromStringList(m_command) },
-				{ "env", QJsonArray() } });
+				{ "env", QJsonArray::fromStringList(m_environment) } });
 		} else if (m_state == Starting) {
 			m_state = Idle;
 			if (started) {

@@ -11,10 +11,12 @@
 #include <QThread>
 #include <QUrl>
 #include <sys/stat.h>
+#include <sys/xattr.h>
 #include <unistd.h>
 
 #include "findcriteria.h"
 #include "findindex.h"
+#include "appdb.h"
 #include "items.h"
 
 #define private public
@@ -94,11 +96,33 @@ int main(int argc, char **argv) {
 	qputenv("XDG_CONFIG_HOME", (home.path() + "/config").toUtf8());
 	qputenv("XDG_DATA_HOME", (home.path() + "/data").toUtf8());
 	qputenv("XDG_RUNTIME_DIR", home.path().toUtf8());
+	const QString dataHome = home.path() + "/data";
+	const QString systemData = home.path() + "/system";
+	const QString appDir = dataHome + "/applications";
+	const QString fakeBin = home.path() + "/bin";
+	QDir().mkpath(appDir);
+	QDir().mkpath(systemData);
+	QDir().mkpath(fakeBin);
+	qputenv("XDG_DATA_DIRS", (systemData + ":/usr/share").toUtf8());
+	qputenv("XDG_CURRENT_DESKTOP", "ZacOS9");
+	write(appDir + "/version-fixture.desktop",
+		"[Desktop Entry]\nType=Application\nName=Version Fixture\nExec=/bin/true\n");
+	write(fakeBin + "/dpkg",
+		"#!/bin/sh\ncase \"$1:$2\" in\n"
+		"-S:*version-fixture.desktop) printf 'finder-version-fixture: %s\\n' \"$2\" ;;\n"
+		"*) exit 1 ;;\nesac\n");
+	write(fakeBin + "/dpkg-query", "#!/bin/sh\nprintf '4.2.1-zac\\n'\n");
+	for (const QString tool : { "dpkg", "dpkg-query" }) {
+		QFile::setPermissions(fakeBin + "/" + tool,
+			QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
+	}
+	qputenv("PATH", (fakeBin + ":" + QString::fromLocal8Bit(qgetenv("PATH"))).toUtf8());
 	const QString d = home.path() + "/Stuff";
 	QDir().mkpath(d + "/Empty folder");
 	QDir().mkpath(d + "/Full folder");
 	write(d + "/Full folder/inside.txt", "x");
 	write(d + "/Budget notes.txt", "Budget for the harbour project: harbour, ferry, harbour.");
+	write(d + "/.hidden.txt", "hidden fixture");
 	write(d + "/big.bin", QByteArray(300 * 1024, 'x'));
 	QImage(4, 4, QImage::Format_RGB32).save(d + "/photo.png");
 	write(d + "/Hello clipping.txt", "hi");
@@ -111,6 +135,49 @@ int main(int argc, char **argv) {
 	write(d + "/locked.txt", "can't touch");
 	chmod(QFile::encodeName(d + "/locked.txt").constData(), 0444);
 	QApplication app(argc, argv);
+
+	FindQuery savedQuery = in(d, {
+		row(FindField::Name, FindOp::Contains, "Budget"),
+		row(FindField::Comment, FindOp::DoesNotContain, "archived"),
+	});
+	QString savedError;
+	check(saveFindQuery("Budget Notes", savedQuery, &savedError),
+		"save a named Find query without losing its criteria");
+	FindQuery loadedQuery;
+	check(loadFindQuery("budget notes", &loadedQuery, &savedError) &&
+		loadedQuery.scope == savedQuery.scope && loadedQuery.folder == savedQuery.folder &&
+		loadedQuery.criteria.size() == 2 &&
+		loadedQuery.criteria[0].field == FindField::Name &&
+		loadedQuery.criteria[0].op == FindOp::Contains &&
+		loadedQuery.criteria[0].text == "Budget" &&
+		loadedQuery.criteria[1].field == FindField::Comment &&
+		loadedQuery.criteria[1].op == FindOp::DoesNotContain,
+		"saved Find query round-trips its scope, folder and typed rows case-insensitively");
+	FindQuery anotherSavedQuery = in(d, { row(FindField::Name, FindOp::EndsWith, ".txt") });
+	check(saveFindQuery("Text Files", anotherSavedQuery, &savedError) &&
+		savedFindQueryNames(&savedError) == QStringList{ "Budget Notes", "Text Files" },
+		"list multiple saved Find queries in stable name order");
+	const int savedWindowCount = int(FoundWindow::windows().size());
+	FoundWindow::search(loadedQuery);
+	FoundWindow::search(loadedQuery);
+	const bool bothSavedSearchesFinished = until([&] {
+		auto &open = FoundWindow::windows();
+		return int(open.size()) >= savedWindowCount + 2 &&
+			!open[savedWindowCount]->m_searching && !open[savedWindowCount + 1]->m_searching;
+	});
+	check(bothSavedSearchesFinished &&
+		FoundWindow::windows()[savedWindowCount]->m_items.size() == 1 &&
+		FoundWindow::windows()[savedWindowCount + 1]->m_items.size() == 1,
+		"saved queries can open in separate concurrent Items Found windows");
+	if (bothSavedSearchesFinished) {
+		FoundWindow::windows()[savedWindowCount]->close();
+		FoundWindow::windows()[savedWindowCount + 1]->close();
+	}
+	check(saveFindQuery(" budget notes ", anotherSavedQuery, &savedError) &&
+		savedFindQueryNames(&savedError).size() == 2 &&
+		loadFindQuery("BUDGET NOTES", &loadedQuery, &savedError) &&
+		loadedQuery.criteria.size() == 1 && loadedQuery.criteria[0].text == ".txt",
+		"saving the same name replaces that query without adding a duplicate");
 
 	// ---- the criteria ----
 	const QString budget = d + "/Budget notes.txt";
@@ -149,6 +216,49 @@ int main(int argc, char **argv) {
 	} else {
 		QTextStream(stdout) << "skip  label (no extended attributes here)\n";
 	}
+	const QString customizedIcon = d + "/custom-icon.fixture";
+	write(customizedIcon, "custom icon target");
+	QImage customPicture(16, 16, QImage::Format_ARGB32);
+	customPicture.fill(0xff123456);
+	if (writeCustomIconImage(customizedIcon, customPicture)) {
+		check(matches(customizedIcon, { row(FindField::CustomIcon, FindOp::Is) }) &&
+			!matches(budget, { row(FindField::CustomIcon, FindOp::Is) }) &&
+			matches(budget, { row(FindField::CustomIcon, FindOp::IsNot) }),
+			"custom icon: is and is not");
+	} else {
+		QTextStream(stdout) << "skip  custom icon (no extended attributes here)\n";
+	}
+	const QByteArray commentText = "A harbour itinerary";
+	if (setxattr(QFile::encodeName(budget).constData(), "user.xdg.comment",
+			commentText.constData(), static_cast<size_t>(commentText.size()), 0) == 0) {
+		check(matches(budget, { row(FindField::Comment, FindOp::Contains, "HARBOUR") }) &&
+			matches(budget, { row(FindField::Comment, FindOp::Is, "a harbour itinerary") }) &&
+			!matches(budget, { row(FindField::Comment, FindOp::IsNot, "A harbour itinerary") }) &&
+			!matches(budget, { row(FindField::Comment, FindOp::DoesNotContain, "harbour") }) &&
+			matches(d + "/big.bin", { row(FindField::Comment, FindOp::DoesNotContain, "harbour") }),
+			"comments: contains, is, is not and doesn't contain");
+	} else {
+		QTextStream(stdout) << "skip  comments (no extended attributes here)\n";
+	}
+	const QString versionFixture = appDir + "/version-fixture.desktop";
+	const AppEntry *fixtureApp = appByFile(versionFixture);
+	auto versionMatches = [&](const QString &path, FindOp op, const QString &text) {
+		FindQuery query = in(d, { row(FindField::Version, op, text) });
+		query.applicationVersions.insert(QFileInfo(versionFixture).canonicalFilePath(),
+			fixtureApp ? fixtureApp->version : QString());
+		return findMatches(query, QFileInfo(path));
+	};
+	check(fixtureApp && fixtureApp->version == "4.2.1-zac" &&
+		versionMatches(versionFixture, FindOp::Contains, "2.1") &&
+		versionMatches(versionFixture, FindOp::Is, "4.2.1-ZAC") &&
+		!versionMatches(versionFixture, FindOp::IsNot, "4.2.1-zac") &&
+		!versionMatches(versionFixture, FindOp::DoesNotContain, "zac") &&
+		!versionMatches(budget, FindOp::Contains, "2.1"),
+		"version: searches the owning application package version");
+	check(matches(d + "/.hidden.txt", { row(FindField::Invisible, FindOp::Is) }) &&
+		matches(budget, { row(FindField::Invisible, FindOp::IsNot) }) &&
+		in(d, { row(FindField::Invisible, FindOp::Is) }).hasVisibilityCriterion(),
+		"invisible: dotfiles are found only when visibility is part of the search");
 	if (getuid() != 0) {
 		check(matches(d + "/locked.txt", { row(FindField::Locked, FindOp::IsLocked) }) &&
 			matches(budget, { row(FindField::Locked, FindOp::IsUnlocked) }), "lock: locked and unlocked");
@@ -196,6 +306,11 @@ int main(int argc, char **argv) {
 	FoundWindow::search(in(d, { row(FindField::Name, FindOp::EndsWith, ".txt"), row(FindField::Size, FindOp::SmallerThan, "1") }));
 	check(results(before) == QStringList({ "Budget notes.txt", "Hello clipping.txt", "inside.txt", "locked.txt", "old.txt" }),
 		"a search walks the folder and lists what matches every row");
+
+	before = int(FoundWindow::windows().size());
+	FoundWindow::search(in(d, { row(FindField::Invisible, FindOp::Is) }));
+	check(results(before).contains(".hidden.txt"),
+		"an invisible-item search traverses hidden directory entries");
 
 	before = int(FoundWindow::windows().size());
 	FoundWindow::search(in(d, { row(FindField::Contents, FindOp::Includes, "harbour"),

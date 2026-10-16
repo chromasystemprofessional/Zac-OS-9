@@ -384,6 +384,11 @@ static void handle_activate_app(struct wl_client *client, struct wl_resource *re
 	}
 }
 
+static void handle_close_app_window(struct wl_client *client, struct wl_resource *resource,
+		const char *app_id) {
+	view_close_front_app_window(the_server, app_id);
+}
+
 /* ⌘-Tab: the menu bar (the one client that knows the programs' names)
  * picks the program and answers with activate_app. */
 void platinum_shell_switch_app(struct plat_server *server, int step) {
@@ -454,6 +459,7 @@ static const struct platinum_shell_v1_interface shell_impl = {
 	.lock = handle_lock,
 	.force_quit = handle_force_quit,
 	.activate_app = handle_activate_app,
+	.close_app_window = handle_close_app_window,
 	.set_standard_size = handle_set_standard_size,
 	.enable_title_menu = handle_enable_title_menu,
 	.set_keyboard_layout = handle_set_keyboard_layout,
@@ -484,5 +490,5 @@ void platinum_shell_init(struct plat_server *server) {
 	the_server = server;
 	wl_list_init(&hints);
 	wl_list_init(&resources);
-	wl_global_create(server->display, &platinum_shell_v1_interface, 14, NULL, bind_shell);
+	wl_global_create(server->display, &platinum_shell_v1_interface, 15, NULL, bind_shell);
 }

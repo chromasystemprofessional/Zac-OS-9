@@ -4,12 +4,14 @@
 #include "settings.h"
 
 #include <QApplication>
+#include <QAbstractItemView>
 #include <QDir>
 #include <QElapsedTimer>
 #include <QFile>
 #include <QFileInfo>
 #include <QTemporaryDir>
 #include <QFileDialog>
+#include <QKeyEvent>
 #include <QStandardPaths>
 #include <QSet>
 #include <QUrl>
@@ -152,6 +154,40 @@ int main(int argc, char **argv) {
 	if (QWidget *sidebar = dialog.findChild<QWidget *>("sidebar")) {
 		check(!sidebar->isVisible(), "the built-in places sidebar is hidden");
 	}
+	const QString keyboardFolder = base + "/Keyboard";
+	QDir().mkpath(keyboardFolder);
+	QFile keyboardFirst(keyboardFolder + "/alpha.txt");
+	check(keyboardFirst.open(QIODevice::WriteOnly), "create the first chooser keyboard fixture");
+	keyboardFirst.close();
+	QFile keyboardFixture(keyboardFolder + "/note.txt");
+	check(keyboardFixture.open(QIODevice::WriteOnly), "create a chooser keyboard fixture");
+	keyboardFixture.close();
+	QFileDialog keyboardDialog;
+	keyboardDialog.setOption(QFileDialog::DontUseNativeDialog, true);
+	keyboardDialog.setDirectory(keyboardFolder);
+	keyboardDialog.setFileMode(QFileDialog::ExistingFile);
+	keyboardDialog.setNameFilter("Text files (*.txt)");
+	prepareFileChooserDialog(keyboardDialog);
+	keyboardDialog.show();
+	QApplication::processEvents();
+	if (QAbstractItemView *list = keyboardDialog.findChild<QAbstractItemView *>("listView")) {
+		list->setFocus();
+		QKeyEvent typeName(QEvent::KeyPress, Qt::Key_A, Qt::NoModifier, "a");
+		QApplication::sendEvent(list, &typeName);
+		QApplication::processEvents();
+		check(list->currentIndex().isValid() &&
+			list->currentIndex().data().toString() == "alpha.txt",
+			"Open dialog supports type-to-select in the file list");
+		QKeyEvent moveDown(QEvent::KeyPress, Qt::Key_Down, Qt::NoModifier);
+		QApplication::sendEvent(list, &moveDown);
+		QApplication::processEvents();
+		check(list->currentIndex().isValid() &&
+			list->currentIndex().data().toString() == "note.txt",
+			"Open dialog arrow navigation moves to the next listed file");
+	} else {
+		check(false, "Open dialog exposes its keyboard-navigable file list");
+	}
+	keyboardDialog.close();
 	check(QFile::link("/", desktop + "/Filesystem alias"),
 		"create an explicit alias to the filesystem root");
 	const auto rootLocations = fileChooserLocations();
@@ -203,6 +239,14 @@ int main(int argc, char **argv) {
 		"a folder in Home opens on the startup disk, through its links");
 	check(fileChooserLocationFor(refreshed, "/proc", &browse).path.isEmpty(),
 		"a folder no location reaches has none");
+	check(fileChooserDroppedFolder({ QUrl::fromLocalFile(serverRoot + "/AFP/Projects") },
+		serverRoot + "/AFP", {}) == serverRoot + "/AFP/Projects" &&
+		fileChooserDroppedFolder({ QUrl::fromLocalFile(base) }, serverRoot + "/AFP", {}).isEmpty() &&
+		fileChooserDroppedFolder({ QUrl::fromLocalFile(base + "/note.txt") },
+			serverRoot + "/AFP", {}).isEmpty() &&
+		fileChooserDroppedFolder({ QUrl("https://example.invalid/folder") },
+			serverRoot + "/AFP", {}).isEmpty(),
+		"dropping a local folder navigates only inside the selected disk");
 	pl_setting_set("documents-folder", "last");
 	check(fileChooserStartFolder("org.example.Writer").isEmpty(), "nothing used yet: the list of disks");
 	fileChooserRememberFolder("org.example.Writer", serverRoot + "/AFP/Projects");
@@ -212,6 +256,33 @@ int main(int argc, char **argv) {
 		fileChooserStartFolder("org.example.Paint") == base &&
 		fileChooserStartFolder("org.example.Other").isEmpty(),
 		"Last folder used: each program starts where it last was");
+	fileChooserRememberRecentFolder(serverRoot + "/AFP/Projects");
+	fileChooserRememberRecentFolder(base);
+	fileChooserRememberRecentFolder(serverRoot + "/AFP/Projects");
+	check(fileChooserRecentFolders() == QStringList({ serverRoot + "/AFP/Projects", base }),
+		"recent folders are ordered newest-first and repeated locations move to the front");
+	const FileChooserLocation afpLocation{ "AFP", serverRoot + "/AFP", false, {} };
+	check(fileChooserRecentFolders(afpLocation) ==
+		QStringList({ serverRoot + "/AFP/Projects" }),
+		"Recent Folders only offers destinations inside the selected disk");
+	fileChooserRememberRecentFolder(base + "/missing");
+	check(fileChooserRecentFolders() == QStringList({ serverRoot + "/AFP/Projects", base }),
+		"unavailable folders are not added to Recent Folders");
+	QStringList expectedRecent;
+	for (int i = 0; i < 12; i++) {
+		const QString recent = base + QStringLiteral("/recent-%1").arg(i);
+		QDir().mkpath(recent);
+		fileChooserRememberRecentFolder(recent);
+		expectedRecent.prepend(recent);
+	}
+	expectedRecent = expectedRecent.mid(0, 10);
+	check(fileChooserRecentFolders() == expectedRecent,
+		"Recent Folders keeps only the ten newest locations");
+	const QString newlineFolder = base + "/recent\nfolder";
+	QDir().mkpath(newlineFolder);
+	fileChooserRememberRecentFolder(newlineFolder);
+	check(fileChooserRecentFolders().first() == newlineFolder,
+		"recent-folder persistence safely round-trips unusual legal path characters");
 	pl_setting_set("documents-folder", nullptr);
 	return failures ? 1 : 0;
 }

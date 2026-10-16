@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Bark Recorder
+Comment=Record and play sounds
+Exec=zacos9-barkrecorder
+Terminal=false
+Categories=AudioVideo;Audio;Utility;
+OnlyShowIn=ZacOS9;

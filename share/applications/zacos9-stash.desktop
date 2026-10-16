@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Stash
+Comment=Keep pictures and text to use again
+Exec=zacos9-stash
+Terminal=false
+Categories=Utility;
+OnlyShowIn=ZacOS9;

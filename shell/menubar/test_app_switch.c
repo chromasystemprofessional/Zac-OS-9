@@ -29,6 +29,13 @@ int main(void) {
 	/* By name: Firefox, Sniffer, Terminal, Zebra. */
 	assert(strcmp(pick(apps, 3, 1), "org.mozilla.firefox") == 0); /* wraps */
 	assert(strcmp(pick(apps, 3, -1), "foot") == 0); /* hidden ones count */
+	assert(strcmp(app_switch_option_previous(apps, 3, "org.mozilla.firefox"), "zebra") == 0);
+	assert(app_switch_option_previous(apps, 3, "zebra") == NULL);
+	struct app finder_front[] = {
+		{ .app_id = FINDER_APP_ID, .name = "Sniffer", .active = true },
+		{ .app_id = "zebra", .name = "Zebra" },
+	};
+	assert(app_switch_option_previous(finder_front, 2, "zebra") == NULL);
 
 	apps[0].active = false; /* the desktop was clicked: the Sniffer is in front */
 	assert(strcmp(pick(apps, 3, 1), "foot") == 0);

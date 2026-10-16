@@ -1,5 +1,6 @@
 #include <string.h>
 
+#include "settings.h"
 #include "widgets.h"
 
 /* Push-button art: left columns, one stretchable column, right columns. */
@@ -852,7 +853,11 @@ void pl_scrollbar_paint(struct pl_canvas *c, int x, int y,
 		const struct pl_scrollbar *sb, struct pl_accent accent) {
 	struct sb_ctx s = { .c = c, .x = x, .y = y, .vertical = sb->vertical };
 	const int L = sb->length;
-	const int dec_sep = SB_ARROW + 1, inc_sep = L - 2 - SB_ARROW;
+	char together_value[8];
+	const bool together = pl_setting("scrollbar-arrows-together", together_value,
+		sizeof(together_value)) && strcmp(together_value, "true") == 0;
+	const int dec_sep = SB_ARROW + 1;
+	const int inc_sep = together ? 2 * (SB_ARROW + 1) : L - 2 - SB_ARROW;
 	const uint32_t line = sb->enabled ? C_BLACK : C_555;
 
 	/* Border lines along both sides and at both ends. */
@@ -864,9 +869,10 @@ void pl_scrollbar_paint(struct pl_canvas *c, int x, int y,
 	sb_col(&s, inc_sep, 1, SB_ARROW, line);
 
 	sb_arrow_box(&s, 1, -1, sb->enabled);
-	sb_arrow_box(&s, inc_sep + 1, +1, sb->enabled);
+	sb_arrow_box(&s, together ? SB_ARROW + 2 : inc_sep + 1, +1, sb->enabled);
 
-	int t0 = dec_sep + 1, t1 = inc_sep - 1;
+	int t0 = together ? inc_sep + 1 : dec_sep + 1;
+	int t1 = together ? L - 2 : inc_sep - 1;
 	if (!sb->enabled) {
 		for (int b = 1; b <= SB_ARROW; b++) {
 			sb_run(&s, t0, t1, b, C_EEE);
@@ -879,7 +885,7 @@ void pl_scrollbar_paint(struct pl_canvas *c, int x, int y,
 	if (thumb > range) {
 		thumb = range;
 	}
-	int line_a = dec_sep + thumb;
+	int line_a = (together ? inc_sep : dec_sep) + thumb;
 	if (line_a > dec_sep) {
 		sb_track_shadow(&s, t0, line_a - 1);
 	}
@@ -889,19 +895,23 @@ void pl_scrollbar_paint(struct pl_canvas *c, int x, int y,
 
 enum sb_part sb_hit(const struct pl_scrollbar *sb, int along) {
 	const int L = sb->length;
+	char together_value[8];
+	const bool together = pl_setting("scrollbar-arrows-together", together_value,
+		sizeof(together_value)) && strcmp(together_value, "true") == 0;
 	if (along <= 0 || along >= L - 1) {
 		return SB_NONE;
 	}
 	if (along <= SB_ARROW) {
 		return SB_DEC_ARROW;
 	}
-	if (along >= L - 1 - SB_ARROW) {
+	if (together ? along >= SB_ARROW + 2 && along <= 2 * SB_ARROW + 1
+			: along >= L - 1 - SB_ARROW) {
 		return SB_INC_ARROW;
 	}
 	if (!sb->enabled) {
 		return SB_NONE;
 	}
-	int line_a = SB_ARROW + 1 + sb->thumb;
+	int line_a = (together ? 2 * (SB_ARROW + 1) : SB_ARROW + 1) + sb->thumb;
 	if (along < line_a) {
 		return SB_DEC_PAGE;
 	}

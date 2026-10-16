@@ -18,12 +18,18 @@ if os.environ.get("SOUND_TEST_TIMEOUT"):
 state = json.loads(path.read_text())
 if args == ["get-default-sink"]:
     print(state["default"])
+elif args == ["get-default-source"]:
+    print(state["default_source"])
 elif args == ["--format=json", "list", "sinks"]:
     print(json.dumps(state["sinks"]))
+elif args == ["--format=json", "list", "sources"]:
+    print(json.dumps(state["sources"]))
 elif args == ["--format=json", "list", "sink-inputs"]:
     print(json.dumps(state["inputs"]))
 elif args[0] == "set-default-sink":
     state["default"] = args[1]
+elif args[0] == "set-default-source":
+    state["default_source"] = args[1]
 elif args[0] == "set-sink-port":
     sink = next(s for s in state["sinks"] if s["name"] == args[1])
     sink["active_port"] = args[2]
@@ -32,8 +38,12 @@ elif args[0] == "move-sink-input":
     stream["target"] = args[2]
 elif args[0] == "set-sink-volume":
     sink = next(s for s in state["sinks"] if s["name"] == args[1])
-    for channel in sink["volume"].values():
-        channel["value"] = int(args[2].rstrip("%")) * 65536 / 100
+    channels = list(sink["volume"].values())
+    levels = args[2:]
+    if len(levels) == 1:
+        levels *= len(channels)
+    for channel, level in zip(channels, levels):
+        channel["value"] = int(level.rstrip("%")) * 65536 / 100
 elif args[0] == "set-sink-mute":
     sink = next(s for s in state["sinks"] if s["name"] == args[1])
     sink["mute"] = args[2] == "1"

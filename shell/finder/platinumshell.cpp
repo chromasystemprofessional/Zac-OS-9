@@ -68,7 +68,23 @@ static void handle_title_menu(void *, platinum_shell_v1 *, wl_surface *surface, 
 		it.value()(option != 0);
 	}
 }
-static void handle_keyboard_layouts(void *, platinum_shell_v1 *, const char *, uint32_t) {
+/* The keyboard layout in use ("us", "de(nodeadkeys)"), as zacos9-wm says. */
+static QString keyboardLayout;
+static QList<QPair<QPointer<QObject>, std::function<void()>>> &layoutWatches() {
+	static QList<QPair<QPointer<QObject>, std::function<void()>>> watches;
+	return watches;
+}
+static void handle_keyboard_layouts(void *, platinum_shell_v1 *, const char *layouts,
+		uint32_t current) {
+	const QStringList lines = QString::fromUtf8(layouts).split('\n', Qt::SkipEmptyParts);
+	keyboardLayout = current < uint32_t(lines.size()) ? lines[current].section('\t', 0, 0)
+		: QString();
+	const auto watches = layoutWatches();
+	for (const auto &watch : watches) {
+		if (watch.first) {
+			watch.second();
+		}
+	}
 }
 /* Windows with a proxy icon, and what dragging it does. */
 static QHash<wl_surface *, std::function<void()>> &proxyDrags() {
@@ -232,6 +248,14 @@ void platinumOnActiveClient(QObject *owner, std::function<void()> changed) {
 	activeWatches().append({ owner, std::move(changed) });
 }
 
+QString platinumKeyboardLayout() {
+	return keyboardLayout;
+}
+
+void platinumOnKeyboardLayout(QObject *owner, std::function<void()> changed) {
+	layoutWatches().append({ owner, std::move(changed) });
+}
+
 void platinumSetProxyIcon(QWidget *window, int iconKind, std::function<void()> dragged) {
 	if (!shell || wl_proxy_get_version(reinterpret_cast<wl_proxy *>(shell)) < 12) {
 		return;
@@ -253,6 +277,17 @@ void platinumActivateApp(const QString &appId) {
 	}
 	platinum_shell_v1_activate_app(shell, appId.toUtf8().constData());
 	wl_display_flush(display);
+}
+
+bool platinumCloseFrontAppWindow(const QString &appId) {
+	platinumShellInit();
+	if (!shell || wl_proxy_get_version(reinterpret_cast<wl_proxy *>(shell)) <
+			PLATINUM_SHELL_V1_CLOSE_APP_WINDOW_SINCE_VERSION) {
+		return false;
+	}
+	platinum_shell_v1_close_app_window(shell, appId.toUtf8().constData());
+	wl_display_flush(display);
+	return true;
 }
 
 void platinumOnTitleMenu(QWidget *window, std::function<void(bool)> callback) {

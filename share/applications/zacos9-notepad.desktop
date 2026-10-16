@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Notepad
+Comment=Keep eight pages of notes
+Exec=zacos9-notepad
+Terminal=false
+Categories=Utility;TextEditor;
+OnlyShowIn=ZacOS9;

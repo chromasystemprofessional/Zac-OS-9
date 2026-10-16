@@ -275,11 +275,11 @@ struct wlr_box view_default_frame_in(struct wlr_box area) {
 }
 
 /* ZacOS 9's own programs that size their windows themselves: the Finder,
- * Picture Viewer (fitted to its picture), Dog Ears' notes and Scribble's
- * documents, as small as the Mac's. */
+ * Picture Viewer (fitted to its picture), Dog Ears' notes, Scribble's
+ * documents, the Stash and Key Tags, as small as the Mac's. */
 static bool sizes_own_windows(const char *app_id) {
 	static const char *const own[] = { "zacos9-finder", "zacos9-picture", "zacos9-dogears",
-		"zacos9-scribble" };
+		"zacos9-scribble", "zacos9-stash", "zacos9-keytags" };
 	for (size_t i = 0; app_id && i < sizeof(own) / sizeof(own[0]); i++) {
 		if (strcmp(app_id, own[i]) == 0) {
 			return true;
@@ -469,6 +469,19 @@ void view_activate_app(struct plat_server *server, const char *app_id) {
 	}
 	for (int i = n - 1; i >= 0; i--) {
 		view_focus(mine[i]);
+	}
+}
+
+void view_close_front_app_window(struct plat_server *server, const char *app_id) {
+	if (!app_id || !*app_id) {
+		return;
+	}
+	struct plat_view *view;
+	wl_list_for_each(view, &server->views, link) {
+		if (view->mapped && view->app_id && strcmp(view->app_id, app_id) == 0) {
+			view_close(view);
+			return;
+		}
 	}
 }
 

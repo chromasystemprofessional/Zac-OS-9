@@ -24,6 +24,7 @@ console-setup
 keyboard-configuration
 network-manager
 upower
+gnupg
 # External-monitor brightness for The Collar (DDC/CI); loads i2c-dev itself
 ddcutil
 

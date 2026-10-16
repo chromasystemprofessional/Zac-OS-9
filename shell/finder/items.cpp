@@ -4,9 +4,12 @@
 #include "desktopprinter.h"
 
 #include <QDir>
+#include <QBuffer>
 #include <QFileInfo>
 #include <QImage>
+#include <QImageReader>
 #include <QMimeDatabase>
+#include <QPainter>
 #include <QStandardPaths>
 #include <QFile>
 #include <QSet>
@@ -28,6 +31,8 @@ static constexpr int LABEL_GAP = 2;      /* icon bottom to label box top */
 static constexpr int LABEL_PAD_X = 2;    /* label box padding beside the ink */
 static constexpr int LABEL_H = 13;       /* label box height */
 static constexpr int LABEL_BASELINE = 10;
+static constexpr const char *CUSTOM_ICON_ATTR = "user.zacos9.custom-icon";
+static constexpr ssize_t CUSTOM_ICON_MAX = 64 * 1024;
 
 /* `name` cut in the middle with an ellipsis so its ink fits `maxInk`, as
  * Mac OS 8 and 9 shortened long names in icon views: both the start and
@@ -250,6 +255,62 @@ bool writeLabel(const QString &path, int label) {
 	return lsetxattr(name.constData(), LABEL_ATTR, value.constData(), value.size(), 0) == 0;
 }
 
+QImage customIconImage(const QString &path) {
+	const QByteArray name = QFile::encodeName(path);
+	const ssize_t size = lgetxattr(name.constData(), CUSTOM_ICON_ATTR, nullptr, 0);
+	if (size <= 0 || size > CUSTOM_ICON_MAX) {
+		return {};
+	}
+	QByteArray encoded(static_cast<int>(size), Qt::Uninitialized);
+	if (lgetxattr(name.constData(), CUSTOM_ICON_ATTR, encoded.data(),
+			static_cast<size_t>(encoded.size())) != size) {
+		return {};
+	}
+	QBuffer buffer(&encoded);
+	if (!buffer.open(QIODevice::ReadOnly)) {
+		return {};
+	}
+	QImageReader reader(&buffer, "PNG");
+	if (reader.size() != QSize(PL_ICON_LARGE, PL_ICON_LARGE)) {
+		return {};
+	}
+	const QImage image = reader.read();
+	if (image.isNull()) {
+		return {};
+	}
+	return image.convertToFormat(QImage::Format_ARGB32);
+}
+
+bool writeCustomIconImage(const QString &path, const QImage &source) {
+	if (source.isNull() || source.width() > 4096 || source.height() > 4096 ||
+			static_cast<qint64>(source.width()) * source.height() > 16 * 1024 * 1024) {
+		errno = source.isNull() ? EINVAL : EFBIG;
+		return false;
+	}
+	QImage image(PL_ICON_LARGE, PL_ICON_LARGE, QImage::Format_ARGB32);
+	image.fill(Qt::transparent);
+	const QImage scaled = source.scaled(PL_ICON_LARGE, PL_ICON_LARGE, Qt::KeepAspectRatio,
+		Qt::SmoothTransformation);
+	QPainter painter(&image);
+	painter.drawImage((PL_ICON_LARGE - scaled.width()) / 2,
+		(PL_ICON_LARGE - scaled.height()) / 2, scaled);
+	QByteArray encoded;
+	QBuffer buffer(&encoded);
+	if (!buffer.open(QIODevice::WriteOnly) || !image.save(&buffer, "PNG") ||
+			encoded.isEmpty() || encoded.size() > CUSTOM_ICON_MAX) {
+		errno = EFBIG;
+		return false;
+	}
+	const QByteArray name = QFile::encodeName(path);
+	return lsetxattr(name.constData(), CUSTOM_ICON_ATTR, encoded.constData(),
+		static_cast<size_t>(encoded.size()), 0) == 0;
+}
+
+bool clearCustomIconImage(const QString &path) {
+	const QByteArray name = QFile::encodeName(path);
+	return lremovexattr(name.constData(), CUSTOM_ICON_ATTR) == 0 || errno == ENODATA;
+}
+
 /* Folders a classic Mac makes on any file server it writes to, and hides
  * there with its own invisible flag. */
 static bool macHousekeeping(const QString &name) {
@@ -285,6 +346,21 @@ std::unique_ptr<Item> makeItem(const QFileInfo &info) {
 	item->size = info.isDir() ? 0 : info.size();
 	item->modified = info.lastModified();
 	item->labelIndex = readLabel(item->path);
+	const QImage custom = customIconImage(item->path);
+	if (!custom.isNull()) {
+		const QImage small = custom.scaled(PL_ICON_SMALL, PL_ICON_SMALL,
+			Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+		item->customIcon32.resize(PL_ICON_LARGE * PL_ICON_LARGE);
+		item->customIcon16.resize(PL_ICON_SMALL * PL_ICON_SMALL);
+		for (int y = 0; y < PL_ICON_LARGE; y++) {
+			memcpy(item->customIcon32.data() + y * PL_ICON_LARGE, custom.constScanLine(y),
+				PL_ICON_LARGE * sizeof(uint32_t));
+		}
+		for (int y = 0; y < PL_ICON_SMALL; y++) {
+			memcpy(item->customIcon16.data() + y * PL_ICON_SMALL, small.constScanLine(y),
+				PL_ICON_SMALL * sizeof(uint32_t));
+		}
+	}
 	if (!item->isDir) {
 		const QString shown = nameWithoutExtension(item->name);
 		if (shown != item->name) {
@@ -298,9 +374,11 @@ std::unique_ptr<Item> makeItem(const QFileInfo &info) {
 		if (appTrashRead(item->path, &entry, &error)) {
 			item->name = entry.name;
 			item->kind = PL_ICON_APPLICATION;
-			if (const AppEntry *app = appById(entry.id)) {
-				item->customIcon32 = app->icon32;
-				item->customIcon16 = app->icon16;
+			if (item->customIcon32.empty()) {
+				if (const AppEntry *app = appById(entry.id)) {
+					item->customIcon32 = app->icon32;
+					item->customIcon16 = app->icon16;
+				}
 			}
 		} else {
 			qWarning().noquote() << error;
@@ -311,9 +389,11 @@ std::unique_ptr<Item> makeItem(const QFileInfo &info) {
 	const QString target = item->isAlias ? info.canonicalFilePath() : QString();
 	if (target.endsWith(QLatin1String(".desktop"))) {
 		item->kind = PL_ICON_APPLICATION;
-		if (const AppEntry *app = appByFile(target)) {
-			item->customIcon32 = app->icon32;
-			item->customIcon16 = app->icon16;
+		if (item->customIcon32.empty()) {
+			if (const AppEntry *app = appByFile(target)) {
+				item->customIcon32 = app->icon32;
+				item->customIcon16 = app->icon16;
+			}
 		}
 	}
 	return item;

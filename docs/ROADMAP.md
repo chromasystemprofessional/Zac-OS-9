@@ -80,7 +80,19 @@ scaling only, original behaviors and timings).
   - Mac OS 9.0 installed from the user's CD image onto a blank disk and
     booted from it; the home folder shows up as the "Unix" volume.
 - Next:
-  - Double-clicking a classic app or document launches it in the emulator.
+  - **Milestone 0 (feasibility) is in progress:** the original guest probe
+    and host verifier now establish exact monochrome capture for several
+    QuickDraw operations, but color/GWorlds, general drawing coverage,
+    lifecycle recovery and input remain unproven. The `classic-window-probe`
+    host test passes; see `docs/classic-seamless.md` for the measured results
+    and acceptance gate. Host-side version-3 RGB PPM verification is now
+    available, but it is not guest color evidence; the dedicated color-port/
+    GWorld experiment remains the next rendering prerequisite.
+  - After that gate, double-clicking a Classic app or document in the Sniffer
+    should launch it in Old Dog. The current emulator startup path only
+    attaches disks; launching an item from the shared home volume remains
+    unimplemented. Do not add guessed emulator flags or claim direct launching
+    until a guest/host open-request mechanism is validated.
   - SDL's Wayland backend under zacos9-wm (Xwayland for now).
   - Packaging the emulators (Phase 7).
 
@@ -102,7 +114,8 @@ scaling only, original behaviors and timings).
     the menu bar follows live.
   - Radio buttons and the slider (HIG figures 2-4, 2-17), pixel for pixel.
   - Mouse (tracking speed, double-click speed), Keyboard (key repeat rate
-    and delay), Sound (volume and mute through pactl, alert volume) and
+    and delay), Sound (input/output selection, volume and mute through pactl,
+    alert volume) and
     Monitors (resolution, 1x/2x/3x pixel size) panels in
     zacos9-controlpanel. zacos9-wm applies the mouse, keyboard and
     screen settings live (compositor/src/prefs.c) and publishes the

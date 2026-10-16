@@ -27,6 +27,7 @@
 #include <QWidget>
 
 #include "panelkit.h"
+#include "alert.h"
 #include "savers.h"
 #include "settings.h"
 #include "soundclient.h"
@@ -442,16 +443,21 @@ private:
 
 /* ---- Sound ---------------------------------------------------------------------- */
 
-/* The system volume through PulseAudio or PipeWire's pulse server. */
+/* PulseAudio or PipeWire's pulse server: output and input selection, volume
+ * and mute, plus the independent alert volume. */
 class SoundPanel : public ControlPanel {
 public:
-	SoundPanel() : ControlPanel("Sound", 336), m_sound(this) {
-		const int g0 = 26, g1 = 102, g2 = g1 + SLIDER_GROUP_H + 12 + 16 + 20;
-		m_groups = { { g0, 78, "Sound Output" },
-			{ g1, g1 + SLIDER_GROUP_H + 20, "Volume" },
-			{ g2, g2 + SLIDER_GROUP_H, "Alert Volume" } };
-		m_output.rect = QRect(M + IN, g0 + 1 + PL_GROUP_MARGIN_TOP,
-			W - 2 * M - 2 * IN - 2, PL_POPUP_H);
+	SoundPanel() : ControlPanel("Sound", PANEL_H), m_sound(this) {
+		const int g0 = 26, g1 = g0 + OUTPUT_GROUP_H + 12 + 16;
+		const int g2 = g1 + VOLUME_GROUP_H + 12 + 16 + 20;
+		const int g3 = g2 + SLIDER_GROUP_H + 12 + 16;
+		m_groups = { { g0, g0 + OUTPUT_GROUP_H, "Sound Devices" },
+			{ g1, g1 + VOLUME_GROUP_H, "Volume" },
+			{ g2, g2 + SLIDER_GROUP_H, "Alert Volume" },
+			{ g3, g3 + INPUT_GROUP_H, "Sound Input" } };
+		m_output.rect = QRect(M + IN + 80, g0 + 1 + PL_GROUP_MARGIN_TOP,
+			W - 2 * M - 2 * IN - 84, PL_POPUP_H);
+		m_output.label = "Output:";
 		m_output.items = { PopupItem("Reading sound outputs...", false) };
 		m_output.enabled = false;
 		m_output.chosen = [this](int row) {
@@ -460,6 +466,19 @@ public:
 			}
 			m_error.clear();
 			m_sound.selectOutput(m_sound.outputs[row]);
+		};
+		m_input.rect = QRect(M + IN + 80,
+			g0 + 1 + PL_GROUP_MARGIN_TOP + PL_POPUP_H + 6,
+			W - 2 * M - 2 * IN - 84, PL_POPUP_H);
+		m_input.label = "Input:";
+		m_input.items = { PopupItem("Reading sound inputs...", false) };
+		m_input.enabled = false;
+		m_input.chosen = [this](int row) {
+			if (row < 0 || row >= m_sound.inputs.size()) {
+				return;
+			}
+			m_error.clear();
+			m_sound.selectInput(m_sound.inputs[row]);
 		};
 
 		/* Volume in eight steps, 0..7, as on the Mac. */
@@ -484,6 +503,13 @@ public:
 			m_sound.setMuted(m_currentSink, on);
 		};
 		m_checks.push_back(&m_mute);
+		placeSlider(m_balance, g1 + SLIDER_GROUP_H + 20, 11, 5, "Left", "Right");
+		m_balance.changed = [this](int value) {
+			if (m_currentOutput.stereo) {
+				m_error.clear();
+				m_sound.setBalance(m_currentOutput, m_volume.value * 100 / 7, value * 10);
+			}
+		};
 
 		placeSlider(m_alert, g2, 8, settingInt("alert-volume", 7), "Off", "Loud");
 		m_alert.changed = [](int v) {
@@ -502,11 +528,12 @@ public:
 protected:
 	void paintExtra(pl_canvas *c) override {
 		m_output.paint(c);
+		m_input.paint(c);
 	}
 
 	bool pressExtra(QPoint p, bool) override {
 		m_focus = nullptr;
-		return m_output.press(this, p);
+		return m_output.press(this, p) || m_input.press(this, p);
 	}
 
 	void mouseReleaseEvent(QMouseEvent *e) override {
@@ -537,13 +564,34 @@ private:
 		}
 		m_output.selected = selected < 0 ? static_cast<int>(m_output.items.size()) - 1 : selected;
 		m_output.enabled = !m_sound.switching && !m_sound.outputs.isEmpty();
+		m_input.items.clear();
+		int selectedInput = -1;
+		for (int i = 0; i < m_sound.inputs.size(); i++) {
+			const SoundInput &input = m_sound.inputs[i];
+			m_input.items.emplace_back(input.label);
+			if (input.current) {
+				selectedInput = i;
+			}
+		}
+		if (m_input.items.empty()) {
+			m_input.items.emplace_back("No sound inputs available", false);
+		} else if (selectedInput < 0) {
+			m_input.items.emplace_back("Choose a sound input", false);
+		}
+		m_input.selected = selectedInput < 0 ? static_cast<int>(m_input.items.size()) - 1 : selectedInput;
+		m_input.enabled = !m_sound.inputSwitching && !m_sound.inputs.isEmpty();
 		m_volume.enabled = m_mute.enabled = !m_sound.switching && selected >= 0;
+		m_balance.enabled = !m_sound.switching && selected >= 0 && m_sound.outputs[selected].stereo;
 		m_currentSink.clear();
 		if (selected >= 0) {
 			const SoundOutput &output = m_sound.outputs[selected];
+			m_currentOutput = output;
 			m_currentSink = output.sink;
 			if (!m_volume.dragging) {
 				m_volume.value = (output.volume * 7 + 50) / 100;
+			}
+			if (!m_balance.dragging) {
+				m_balance.value = (output.balance + 5) / 10;
 			}
 			if (!m_mute.down) {
 				m_mute.on = output.muted;
@@ -552,7 +600,7 @@ private:
 		const QString note = !m_error.isEmpty() ? m_error
 			: m_sound.switching ? "Changing sound output..."
 			: m_sound.outputs.isEmpty() ? "No sound outputs are available."
-			: "Choose built-in speakers, a monitor or another output.";
+			: "Choose a sound output and an input source.";
 		m_notes.clear();
 		const QStringList lines = panelWrap(note, W - 2 * M, PL_FONT_VIEWS);
 		for (const QString &line : lines.mid(0, 3)) {
@@ -563,11 +611,20 @@ private:
 
 	SoundClient m_sound;
 	QTimer m_refresh;
-	PanelPopup m_output;
+	PanelPopup m_output, m_input;
 	QString m_currentSink, m_error;
 	bool m_volumeFeedbackReady = false;
-	PanelSlider m_volume, m_alert;
+	PanelSlider m_volume, m_balance, m_alert;
 	PanelCheckbox m_mute;
+	SoundOutput m_currentOutput;
+	static constexpr int OUTPUT_GROUP_H = 1 + PL_GROUP_MARGIN_TOP + 2 * PL_POPUP_H + 6 +
+		PL_GROUP_MARGIN;
+	static constexpr int INPUT_GROUP_H = 1 + PL_GROUP_MARGIN_TOP + PL_POPUP_H + PL_GROUP_MARGIN;
+	static constexpr int G0 = 26, G1 = G0 + OUTPUT_GROUP_H + 12 + 16;
+	static constexpr int VOLUME_GROUP_H = 2 * SLIDER_GROUP_H + 20;
+	static constexpr int G2 = G1 + VOLUME_GROUP_H + 12 + 16 + 20;
+	static constexpr int G3 = G2 + SLIDER_GROUP_H + 12 + 16;
+	static constexpr int PANEL_H = G3 + INPUT_GROUP_H + 12 + 3 * 12 + 8;
 };
 
 /* ---- Monitors ----------------------------------------------------------------------- */
@@ -1219,7 +1276,21 @@ public:
 				update();
 			};
 		}
-		m_notes = { "Each shows as a submenu of the Zac menu;", "None leaves it out." };
+		m_submenus = PanelCheckbox("Show recent items as submenus", QPoint(M + IN, G + GROUP_H + 6));
+		m_submenus.on = settingInt("recent-submenus", 1) != 0;
+		m_submenus.toggled = [this](bool enabled) {
+			if (!pl_setting_set("recent-submenus", enabled ? "1" : "0")) {
+				m_submenus.on = !enabled;
+				m_notes = { "Could not save the recent-menu preference." };
+				update();
+				return;
+			}
+			m_notes = { "Turn this off to list recent items directly",
+				"in the Zac menu, with their category." };
+			update();
+		};
+		m_checks.push_back(&m_submenus);
+		m_notes = { "Turn this off to list recent items directly", "in the Zac menu, with their category." };
 	}
 
 protected:
@@ -1242,6 +1313,7 @@ private:
 	static constexpr int GROUP_H = 1 + PL_GROUP_MARGIN_TOP + 3 * ROW - 8 + PL_GROUP_MARGIN;
 	static constexpr int PANEL_H = G + GROUP_H + 12 + 2 * 12 + 8;
 	PanelPopup m_counts[3];
+	PanelCheckbox m_submenus;
 };
 
 /* ---- Internet ------------------------------------------------------------------------ */
@@ -1265,7 +1337,25 @@ public:
 				update();
 			}
 		};
+		m_webSharing = PanelCheckbox("Share my Web Pages folder (port 8080)",
+			QPoint(M + IN, y + 48));
+		m_webSharing.enabled = false;
+		m_checks.push_back(&m_webSharing);
+		m_webSharing.toggled = [this](bool on) { setWebSharing(on); };
+		connect(&m_webProcess, &QProcess::finished, this,
+			[this](int code, QProcess::ExitStatus status) {
+				finishWebSharing(status == QProcess::NormalExit && code == 0,
+					QString::fromLocal8Bit(m_webProcess.readAllStandardOutput()).trimmed(),
+					QString::fromLocal8Bit(m_webProcess.readAllStandardError()).trimmed());
+			});
+		connect(&m_webProcess, &QProcess::errorOccurred, this, [this](QProcess::ProcessError error) {
+			if (error == QProcess::FailedToStart) {
+				finishWebSharing(false, {}, m_webProcess.errorString());
+			}
+		});
 		m_notes = { "Programs that ask for the system's browser, mail program", "or downloads folder use these." };
+		m_webPending = true;
+		m_webProcess.start("zacos9-web-sharing", { "status" });
 	}
 
 protected:
@@ -1297,6 +1387,40 @@ protected:
 	}
 
 private:
+	void setWebSharing(bool on) {
+		if (m_webPending) {
+			return;
+		}
+		m_webWanted = on;
+		m_webCommandStatus = false;
+		m_webPending = true;
+		m_webSharing.enabled = false;
+		m_webProcess.start("zacos9-web-sharing", { on ? "start" : "stop" });
+		update();
+	}
+
+	void finishWebSharing(bool ok, const QString &out, const QString &error) {
+		if (!m_webPending) {
+			return;
+		}
+		m_webPending = false;
+		if (ok) {
+			if (m_webCommandStatus) {
+				m_webOn = out == "on";
+			} else {
+				m_webOn = m_webWanted;
+			}
+			m_webSharing.on = m_webOn;
+		} else {
+			m_webSharing.on = m_webOn;
+			Alert::ask(error.isEmpty() ? "Web Sharing couldn't be changed." : error, "OK",
+				QString());
+		}
+		m_webCommandStatus = false;
+		m_webSharing.enabled = true;
+		update();
+	}
+
 	void setUp(PanelPopup &popup, const char *label, int y, AppRole role) {
 		popup.rect = QRect(M + IN + LABEL_W, y - 4, W - 2 * M - 2 * IN - LABEL_W - 2, PL_POPUP_H);
 		popup.label = label;
@@ -1327,12 +1451,17 @@ private:
 	}
 
 	static constexpr int G1 = 26, ROW = PL_POPUP_H + 8, LABEL_W = 120;
-	static constexpr int WEB_H = 1 + PL_GROUP_MARGIN_TOP + ROW + 18 + PL_BUTTON_H + PL_GROUP_MARGIN;
+	static constexpr int WEB_H = 1 + PL_GROUP_MARGIN_TOP + ROW + 18 + PL_BUTTON_H + 48 +
+		PL_CHECKBOX_SIZE + PL_GROUP_MARGIN;
 	static constexpr int G2 = G1 + WEB_H + 28;
 	static constexpr int MAIL_H = 1 + PL_GROUP_MARGIN_TOP + PL_POPUP_H + PL_GROUP_MARGIN - 4;
 	static constexpr int PANEL_H = G2 + MAIL_H + 12 + 2 * 12 + 8;
 	PanelPopup m_browser, m_mail;
 	PanelButton m_select;
+	PanelCheckbox m_webSharing;
+	QProcess m_webProcess;
+	bool m_webOn = false, m_webWanted = false, m_webPending = false;
+	bool m_webCommandStatus = true;
 };
 
 /* ---- General Controls ---------------------------------------------------------------- */

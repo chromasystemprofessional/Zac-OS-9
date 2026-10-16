@@ -9,8 +9,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <limits.h>
 
 #include "menubar.h"
+#include "settings.h"
 
 #define LOGOUT_WAIT_MS 30000
 
@@ -54,17 +56,16 @@ void logout_tick(void) {
 	}
 	if (programs_open() == 0) {
 		deadline = 0;
-		/* $ZACOS9_LOGOUT_COMMAND for tests and nested sessions. */
+		pl_sound_event("shutdown");
+		/* Keep the test/nested-session hook; ordinary logout runs Shutdown Items. */
 		const char *command = getenv("ZACOS9_LOGOUT_COMMAND");
-		char own[128];
-		if (!command) {
-			const char *id = getenv("XDG_SESSION_ID");
-			snprintf(own, sizeof(own), "loginctl terminate-session %s",
-				id && *id && strspn(id, "0123456789abcdefghijklmnopqrstuvwxyz") == strlen(id)
-					? id : "self");
-			command = own;
+		if (command) {
+			launch(command);
+		} else {
+			char helper[PATH_MAX + 64];
+			sibling_program("zacos9-shutdown-items", helper, sizeof(helper));
+			launch(helper);
 		}
-		launch(command);
 	} else if (now_ms() > deadline) {
 		deadline = 0;
 		finder_send("log-out-cancelled");

@@ -17,6 +17,7 @@
 #include "patterns.h"
 #include "appearance.h"
 #include "settings.h"
+#include "widgets.h"
 
 static bool waitFor(std::function<bool()> ready) {
 	QElapsedTimer timer;
@@ -164,7 +165,7 @@ int main(int argc, char **argv) {
 	QApplication::sendEvent(popup, &applyPlacement);
 	assert(pl_setting("wallpaper-mode", selected, sizeof(selected)) &&
 		QString::fromUtf8(selected) == "fill");
-	for (const QString mode : { "fit", "fill", "stretch", "center" }) {
+	for (const QString mode : { "fit", "fill", "stretch", "center", "tile" }) {
 		uint32_t background[64] = {};
 		pl_canvas screen = {background, 8, 0, 0, 8, 8};
 		desktopWallpaperFill(&screen, 0, mode, 0, 0, 7, 7);
@@ -217,6 +218,9 @@ int main(int argc, char **argv) {
 	}
 	desktopWallpaperFill(&crop, 0, "stretch", 0, 0, 3, 3);
 	assert(cropped[0] != qRgb(0, 255, 0) && cropped[3] != qRgb(0, 255, 0));
+	desktopWallpaperFill(&crop, 0, "tile", 0, 0, 3, 3);
+	assert(cropped[0] == qRgb(255, 0, 0) && cropped[1] == qRgb(0, 255, 0) &&
+		cropped[2] == qRgb(0, 255, 0) && cropped[3] == qRgb(0, 255, 0));
 	assert(QFile::remove(photoPath));
 	assert(waitFor([] { return desktopWallpaperCount() == 0; }));
 	assert(desktopWallpaperFind(photoId) == -1);
@@ -226,6 +230,48 @@ int main(int argc, char **argv) {
 	QApplication::sendEvent(&panel, &choosePattern);
 	assert(pl_setting("background", selected, sizeof(selected)) && QString::fromUtf8(selected) == "pattern");
 	assert(pl_setting("wallpaper", selected, sizeof(selected)) && QString::fromUtf8(selected) == photoId);
+	panel.showTab(6);
+	assert(!pl_setting("double-click-title-collapse", selected, sizeof(selected)));
+	const QPointF optionPosition(36, 65);
+	QMouseEvent optionPress(QEvent::MouseButtonPress, optionPosition,
+		panel.mapToGlobal(optionPosition.toPoint()), Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+	QMouseEvent optionRelease(QEvent::MouseButtonRelease, optionPosition,
+		panel.mapToGlobal(optionPosition.toPoint()), Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+	QApplication::sendEvent(&panel, &optionPress);
+	QApplication::sendEvent(&panel, &optionRelease);
+	assert(pl_setting("double-click-title-collapse", selected, sizeof(selected)) &&
+		QString::fromUtf8(selected) == "false");
+	QApplication::sendEvent(&panel, &optionPress);
+	QApplication::sendEvent(&panel, &optionRelease);
+	assert(!pl_setting("double-click-title-collapse", selected, sizeof(selected)));
+	assert(!pl_setting("scrollbar-arrows-together", selected, sizeof(selected)));
+	const QPointF arrowsPosition(36, 89);
+	QMouseEvent arrowsPress(QEvent::MouseButtonPress, arrowsPosition,
+		panel.mapToGlobal(arrowsPosition.toPoint()), Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+	QMouseEvent arrowsRelease(QEvent::MouseButtonRelease, arrowsPosition,
+		panel.mapToGlobal(arrowsPosition.toPoint()), Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+	QApplication::sendEvent(&panel, &arrowsPress);
+	QApplication::sendEvent(&panel, &arrowsRelease);
+	assert(pl_setting("scrollbar-arrows-together", selected, sizeof(selected)) &&
+		QString::fromUtf8(selected) == "true");
+	const pl_scrollbar bar{ false, 254, true, 0 };
+	assert(sb_hit(&bar, 10) == SB_DEC_ARROW && sb_hit(&bar, 20) == SB_INC_ARROW &&
+		sb_hit(&bar, 245) == SB_INC_PAGE);
+	uint32_t togetherPixels[254 * SB_WIDTH] = {};
+	pl_canvas togetherCanvas{ togetherPixels, 254, 0, 0, 254, SB_WIDTH };
+	pl_scrollbar_paint(&togetherCanvas, 0, 0, &bar, PL_ACCENT_DEFAULT);
+	assert(togetherPixels[1 * 254 + 30] == C_BLACK);
+	assert(togetherPixels[1 * 254 + 238] != C_BLACK);
+	QApplication::sendEvent(&panel, &arrowsPress);
+	QApplication::sendEvent(&panel, &arrowsRelease);
+	assert(!pl_setting("scrollbar-arrows-together", selected, sizeof(selected)));
+	assert(sb_hit(&bar, 245) == SB_INC_ARROW);
+	uint32_t separatePixels[254 * SB_WIDTH] = {};
+	pl_canvas separateCanvas{ separatePixels, 254, 0, 0, 254, SB_WIDTH };
+	pl_scrollbar_paint(&separateCanvas, 0, 0, &bar, PL_ACCENT_DEFAULT);
+	assert(separatePixels[1 * 254 + 238] == C_BLACK);
+	assert(separatePixels[1 * 254 + 30] != C_BLACK);
 	QTextStream(stdout) << "ok: discovery, selection persistence, 112x112 preview, tiled pixels, replacement, IDs, errors, removal and watchers\n";
-	QTextStream(stdout) << "ok: separate wallpaper folder, four placement modes, per-monitor geometry, switching and cache invalidation\n";
+	QTextStream(stdout) << "ok: separate wallpaper folder, five placement modes, per-monitor geometry, switching and cache invalidation\n";
+	QTextStream(stdout) << "ok: title-bar collapse preference toggle and default behavior\n";
 }

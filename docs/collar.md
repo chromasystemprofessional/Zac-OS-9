@@ -56,7 +56,7 @@ two Brightness modules. Their menus are headed "Display 1: NAME (Main)" and
 
 | Module | Quick controls | Backend |
 |---|---|---|
-| Sound | Volume levels, mute, output selection, Sound control panel | `SoundClient` via `pactl` |
+| Sound | Volume levels, mute, output/input selection, Sound control panel | `SoundClient` via `pactl` |
 | Sound Set | Every installed sound set, with the current one checked; Appearance control panel | ZacOS sound-theme catalog |
 | Network | Status, Wi-Fi on/off, Network Browser, TCP/IP control panel | NetworkManager (system D-Bus) |
 | Bluetooth | Adapter power, Bluetooth control panel | BlueZ (system D-Bus) |

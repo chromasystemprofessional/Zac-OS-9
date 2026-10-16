@@ -1,5 +1,7 @@
 #pragma once
 
+#include <QImage>
+
 #include <QFileSystemWatcher>
 #include <QSet>
 #include <QTimer>
@@ -25,7 +27,12 @@ public:
 
 	/* Opens (or brings back) the window for `path`. */
 	static FolderWindow *open(const QString &path);
+	/* File > Print Window: everything in the window, not just what's
+	 * scrolled into view, on white and with nothing selected; a list
+	 * with its column headings. */
+	QImage printImage();
 	static bool isOpen(const QString &path);
+	static void closeAll();
 	/* Reload every open window showing `folder` (or a folder expanded in it). */
 	static void reloadAll(const QString &folder);
 	~FolderWindow() override;
@@ -107,6 +114,7 @@ private:
 	QPoint toContent(QPoint windowPos) const;
 	QPoint toWindow(QPoint contentPos) const;
 	void scrollStep();
+	void showContextMenuAt(QPoint pos);
 
 	/* Icon view, standard or small icons, on a Wide or Tight grid. */
 	struct IconGrid {
@@ -193,6 +201,10 @@ private:
 	int m_scrollX = 0, m_scrollY = 0;
 	int m_contentHeight = 0;
 	int m_contentWidth = 0; /* icon view: rightmost placed icon */
+	bool m_panning = false;
+	QPoint m_panPointer;
+	bool m_contextPending = false;
+	QPoint m_contextPress;
 	QPoint m_dragStart;     /* where a drag of our own icons began */
 	QFileSystemWatcher m_watcher;
 	/* Virtual folders have no directory to watch: they are reloaded when
@@ -221,6 +233,8 @@ private:
 	QTimer m_renameTimer;
 	Item *m_renameItem = nullptr;
 	void beginRename(Item *item);
+	QTimer m_typeSelectTimer;
+	QString m_typeSelect;
 
 	/* Scroll bar tracking. */
 	bool m_sbVertical = true;

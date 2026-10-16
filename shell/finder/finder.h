@@ -1,5 +1,6 @@
 #pragma once
 
+#include "contextitems.h"
 #include <QMouseEvent>
 
 #include <QLocalServer>
@@ -52,7 +53,16 @@ public:
  *                         label=<the selection's common label, or -1>
  *                         erase=<0|1 selected mounted USB disk>
  *                         network=<0|1 selected network disk>
- *                         unmount=<0|1 selected local mounted disk>"
+ *                         unmount=<0|1 selected local mounted disk>
+ *                         sort=<column> columns=<bits> custom=<0|1>
+ *                         popup=<0|1> popups=<0|1>
+ *                         documents=<0|1 selection has documents to print>"
+ *   and before "context <kind>" (a contextual menu, at the pointer):
+ *                        "tricks <0|1 a folder to attach to>" then TAB "+name"
+ *                         per trick attached, TAB "*name" per trick there is;
+ *                        "commands" then TAB "name" per Contextual Menu Item
+ *   menu bar -> Finder:  "cmd attach-trick NAME", "cmd remove-trick NAME",
+ *                        "cmd open-folder-tricks", "cmd contextual INDEX"
  */
 class Finder {
 public:
@@ -65,17 +75,23 @@ public:
 	void setFront(FinderView *view);
 	void viewClosed(FinderView *view);
 	FinderView *front();
+	/* Option-Command-W: close the Finder's open windows, not its desktop. */
+	void closeAllWindows();
 
 	/* Commands (from menus or ⌘-keys). */
 	void command(const QString &name);
 	void newFolder();
+	/* Edit > Copy in the Sniffer copies the selected names as text. */
+	void copySelectionNames();
 	void openSelection();
 	/* Opens just this item, whatever else is selected: what a double-click
 	 * means, so two icons selected by accident aren't both opened. */
 	void openItem(Item *item);
+	/* Option-double-click on an application icon closes its front window. */
+	bool closeApplicationWindow(Item *item);
 	void closeWindow();
 	void moveSelectionToTrash();
-	void emptyTrash();
+	void emptyTrash(bool removeLocked = false);
 	void getInfo(bool sharing = false);
 	void duplicate();
 	void makeAlias();
@@ -114,6 +130,11 @@ public:
 	void launchClassic(const QStringList &disks = {});
 	/* File > Print (⌘P): the selected documents, on your printer. */
 	void printSelection();
+	/* File > Print Window… / Print Desktop…: the front window's contents
+	 * as pages (Page Setup's paper, orientation and scale). */
+	void printWindow();
+	void encryptSelection();
+	void decryptSelection();
 	/* Documents printed on a queue (your printer's if ""): what CUPS can
 	 * print itself goes there; the rest is explained. */
 	void printDocuments(const QStringList &files, const QString &queue = {});
@@ -130,6 +151,8 @@ public:
 	 * windows that sprang open close again when the drag ends. Each view
 	 * calls springHover() from its drag handlers. */
 	void springHover(const QString &folderOrEmpty);
+	/* Open the currently hovered spring-loaded folder immediately. */
+	bool springOpenNow();
 	void dragEnded();
 
 	/* Re-read every view showing `folder`, and the Trash icon. */
@@ -157,4 +180,10 @@ private:
 	QLocalServer m_server;
 	std::vector<QPointer<QLocalSocket>> m_clients;
 	QString m_lastState;
+	/* What the last contextual menu was for: the paths its add-on
+	 * commands get, and the folder Folder Tricks attach to. */
+	void sendContextExtras(FinderView *view, Item *hit, const char *kind);
+	QStringList m_contextPaths;
+	QList<ContextCommand> m_contextCommands;
+	QString m_trickFolder;
 };

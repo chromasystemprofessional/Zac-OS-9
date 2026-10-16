@@ -40,6 +40,24 @@ ScribbleWindow::ScribbleWindow() {
 	buildMenus();
 	applyFont();
 	connect(m_edit->document(), &QTextDocument::modificationChanged, this, [this] { updateTitle(); });
+	connect(&m_speech, &QProcess::errorOccurred, this, [this](QProcess::ProcessError error) {
+		if (error == QProcess::FailedToStart && !m_speechStopped) {
+			Alert::ask("Speech could not start. Install and configure speech-dispatcher.",
+				"OK", QString());
+		}
+	});
+	connect(&m_speech, &QProcess::finished, this,
+		[this](int exitCode, QProcess::ExitStatus status) {
+			const bool stopped = m_speechStopped;
+			m_speechStopped = false;
+			if (!stopped && (status != QProcess::NormalExit || exitCode != 0)) {
+				QString reason = QString::fromUtf8(m_speech.readAllStandardError()).trimmed();
+				if (reason.isEmpty()) {
+					reason = "speech-dispatcher returned an error.";
+				}
+				Alert::ask("Speech failed: " + reason, "OK", QString());
+			}
+		});
 	updateTitle();
 	windows().append(this);
 	connect(this, &QObject::destroyed, [this] { windows().removeOne(this); });
@@ -114,6 +132,7 @@ bool ScribbleWindow::saveAs() {
 }
 
 void ScribbleWindow::closeEvent(QCloseEvent *e) {
+	stopSpeaking();
 	if (m_edit->document()->isModified() && !m_edit->toPlainText().isEmpty()) {
 		const QString name = m_path.isEmpty() ? QStringLiteral("untitled") : QFileInfo(m_path).fileName();
 		switch (Alert::choose(QString::fromUtf8("Save changes to the document “%1” before closing?").arg(name),
@@ -132,6 +151,33 @@ void ScribbleWindow::closeEvent(QCloseEvent *e) {
 		}
 	}
 	e->accept();
+}
+
+void ScribbleWindow::speakSelection() {
+	if (m_speech.state() != QProcess::NotRunning) {
+		Alert::ask("Speech is already in progress. Choose Stop Speaking first.", "OK", QString());
+		return;
+	}
+	QString text = m_edit->textCursor().selectedText();
+	text.replace(QChar::ParagraphSeparator, '\n');
+	text.replace(QChar::LineSeparator, '\n');
+	if (text.trimmed().isEmpty()) {
+		Alert::ask("Select some text to speak.", "OK", QString());
+		return;
+	}
+	if (text.size() > 16000) {
+		Alert::ask("The selection is too long to speak at once.", "OK", QString());
+		return;
+	}
+	m_speechStopped = false;
+	m_speech.start("spd-say", { "--wait", "--", text });
+}
+
+void ScribbleWindow::stopSpeaking() {
+	if (m_speech.state() != QProcess::NotRunning) {
+		m_speechStopped = true;
+		m_speech.kill();
+	}
 }
 
 void ScribbleWindow::find(bool again) {
@@ -200,6 +246,10 @@ void ScribbleWindow::buildMenus() {
 	edit->addSeparator();
 	edit->addAction("Find...", QKeySequence::Find, this, [this] { find(false); });
 	edit->addAction("Find Again", QKeySequence(Qt::CTRL | Qt::Key_G), this, [this] { find(true); });
+
+	QMenu *speech = menuBar()->addMenu("Speech");
+	speech->addAction("Speak Selection", this, [this] { speakSelection(); });
+	speech->addAction("Stop Speaking", this, [this] { stopSpeaking(); });
 
 	QMenu *fontMenu = menuBar()->addMenu("Font");
 	auto *fonts = new QActionGroup(fontMenu);

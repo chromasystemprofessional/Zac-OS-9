@@ -24,6 +24,12 @@ color/PixMap/GWorld state, general graphics APIs/origins, broader lifetime
 handling and input still need proof. The exact tested guest OS version is not
 yet confirmed.
 
+The host verifier now has a bounded version-3 PPM contract for future RGB
+reference/candidate captures, with independent-reference enforcement, frame
+markers, payload bounds and exact pixel comparison. This is test
+infrastructure, not guest color evidence; the dedicated color-port/GWorld
+experiment remains the next rendering prerequisite.
+
 ## Goal and agreed scope
 
 Double-click a Classic application in ZacOS Finder and see its document

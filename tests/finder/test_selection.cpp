@@ -4,10 +4,13 @@
  * items into another folder with one drop.
  */
 #include <QApplication>
+#include <QClipboard>
+#include <QCloseEvent>
 #include <QDir>
 #include <QDropEvent>
 #include <QElapsedTimer>
 #include <QFile>
+#include <QFileInfo>
 #include <QFileSystemWatcher>
 #include <QImage>
 #include <QKeyEvent>
@@ -30,6 +33,7 @@
 #include "widgets.h"
 #include "transferdialog.h"
 #include "alert.h"
+#include "viewoptions.h"
 
 #define private public
 #define protected public
@@ -38,6 +42,17 @@
 #undef private
 
 static int fails;
+
+class CloseTrackedWindow : public QWidget {
+public:
+	bool closed = false;
+
+protected:
+	void closeEvent(QCloseEvent *event) override {
+		closed = true;
+		QWidget::closeEvent(event);
+	}
+};
 
 static void check(bool ok, const QString &what) {
 	QTextStream(stdout) << (ok ? "ok    " : "FAIL  ") << what << "\n";
@@ -111,6 +126,11 @@ int main(int argc, char **argv) {
 	qputenv("XDG_DATA_HOME", (home.path() + "/data").toUtf8());
 	qputenv("XDG_RUNTIME_DIR", home.path().toUtf8());
 	QApplication app(argc, argv);
+	check(warnBeforeEmptyingTrash(), "Trash warning defaults to on");
+	check(setWarnBeforeEmptyingTrash(false) && !warnBeforeEmptyingTrash(),
+		"Trash warning preference can be turned off");
+	check(setWarnBeforeEmptyingTrash(true) && warnBeforeEmptyingTrash(),
+		"Trash warning preference can be restored");
 
 	const QString folder = home.path() + "/Source";
 	const QString target = home.path() + "/Target";
@@ -121,6 +141,50 @@ int main(int argc, char **argv) {
 	}
 
 	FolderWindow *w = FolderWindow::open(folder);
+	check(w->headerText().startsWith("4 items, ") &&
+		w->headerText().endsWith(" available"),
+		"the Finder info strip reports the item count and available disk space");
+	QKeyEvent nextItem(QEvent::KeyPress, Qt::Key_Tab, Qt::NoModifier, "\t");
+	QApplication::sendEvent(w, &nextItem);
+	check(selectedNames(w) == QSet<QString>{ "Alpha" },
+		"Tab selects the first item alphabetically");
+	QKeyEvent nextAgain(QEvent::KeyPress, Qt::Key_Tab, Qt::NoModifier, "\t");
+	QApplication::sendEvent(w, &nextAgain);
+	check(selectedNames(w) == QSet<QString>{ "Bravo" },
+		"Tab advances alphabetically");
+	QKeyEvent previousItem(QEvent::KeyPress, Qt::Key_Backtab, Qt::ShiftModifier);
+	QApplication::sendEvent(w, &previousItem);
+	check(selectedNames(w) == QSet<QString>{ "Alpha" },
+		"Shift-Tab moves backward alphabetically");
+	QKeyEvent typeSelect(QEvent::KeyPress, Qt::Key_C, Qt::NoModifier, "C");
+	QApplication::sendEvent(w, &typeSelect);
+	check(selectedNames(w) == QSet<QString>{ "Charlie" },
+		"typing selects the matching item by name");
+	QKeyEvent moveRight(QEvent::KeyPress, Qt::Key_Right, Qt::NoModifier);
+	QApplication::sendEvent(w, &moveRight);
+	check(selectedNames(w) == QSet<QString>{ "Delta" },
+		"arrow keys move the selection to the next item in that direction");
+	const QString trash = trashFilesPath();
+	const QString original = home.path() + "/Put Away.txt";
+	const QString trashed = trash + "/Put Away.txt";
+	QDir().mkpath(trash);
+	QDir().mkpath(QFileInfo(trash).absolutePath() + "/info");
+	touch(original);
+	check(QFile::rename(original, trashed), "move a fixture file into the Trash");
+	QFile trashInfo(QFileInfo(trash).absolutePath() + "/info/Put Away.txt.trashinfo");
+	check(trashInfo.open(QIODevice::WriteOnly | QIODevice::Text),
+		"create the Trash origin record");
+	trashInfo.write("[Trash Info]\nPath=");
+	trashInfo.write(QUrl::toPercentEncoding(original));
+	trashInfo.write("\n");
+	trashInfo.close();
+	FolderWindow *trashWindow = FolderWindow::open(trash);
+	trashWindow->selectByName("Put Away.txt");
+	check(trashWindow->selectedItems().size() == 1, "select the trashed fixture");
+	Finder::instance().putAway();
+	check(QFile::exists(original) && !QFile::exists(trashed) && !QFile::exists(trashInfo.fileName()),
+		"Put Away restores a file to its recorded original location");
+	Finder::instance().setFront(w);
 	w->resize(520, 360);
 	w->setViewMode(FolderWindow::ViewMode::Icons);
 	w->relayout();
@@ -128,6 +192,16 @@ int main(int argc, char **argv) {
 	std::vector<Item *> icons = iconOrder(w);
 	check(icons.size() == 4 && icons[0]->pos.y() == icons[3]->pos.y(),
 		"icon view lays the four test items out in one row");
+
+	Finder::instance().springHover(target);
+	QKeyEvent openSpring(QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier);
+	QApplication::sendEvent(w, &openSpring);
+	check(FolderWindow::isOpen(target),
+		"pressing Space opens the folder currently under the drag immediately");
+	Finder::instance().dragEnded();
+	settle();
+	check(!FolderWindow::isOpen(target),
+		"the Space-opened spring-loaded folder closes when the drag ends");
 
 	const QPoint blank = w->toWindow(QPoint(1, 1));
 	const QPoint secondIcon = w->toWindow(icons[1]->pos + QPoint(16, 16));
@@ -165,6 +239,12 @@ int main(int argc, char **argv) {
 	check(w->selectedItems().empty(), "clicking blank space deselects everything");
 	Finder::instance().command("select-all");
 	check(w->selectedItems().size() == 4, "Edit > Select All selects every icon");
+	QKeyEvent copy(QEvent::KeyPress, Qt::Key_C, Qt::ControlModifier, "c");
+	QApplication::sendEvent(w, &copy);
+	const QStringList copiedList = QApplication::clipboard()->text().split('\n');
+	const QSet<QString> copiedNames(copiedList.cbegin(), copiedList.cend());
+	check(copiedNames == QSet<QString>{ "Alpha", "Bravo", "Charlie", "Delta" },
+		"Command-C copies the selected Finder item names as newline-separated text");
 
 	w->setViewMode(FolderWindow::ViewMode::List);
 	w->resize(640, 360);
@@ -202,6 +282,58 @@ int main(int argc, char **argv) {
 	mouse(w, QEvent::MouseButtonRelease, QPoint(56, w->height() + 20), Qt::NoButton);
 	check(scrolled > 0 && w->selectedItems().size() > 6,
 		"dragging a rectangle below a list window scrolls and extends the selection");
+	w->scrollTo(0, w->scrollMaxY() / 2);
+	const int beforePan = w->m_scrollY;
+	const QPoint panStart(180, listTop + 28);
+	check(panStart.y() >= w->contentTop() && panStart.y() < w->height() - SB_WIDTH + 1 &&
+		panStart.x() < w->width() - SB_WIDTH + 1, "panning test press is inside list content");
+	mouse(w, QEvent::MouseButtonPress, panStart, Qt::LeftButton, Qt::ControlModifier);
+	check(w->m_contextPending, "Command press waits to distinguish a context click from a drag");
+	mouse(w, QEvent::MouseMove, panStart + QPoint(0, 32), Qt::LeftButton, Qt::ControlModifier);
+	check(w->m_panning, "Command drag past the click threshold starts panning");
+	mouse(w, QEvent::MouseButtonRelease, panStart + QPoint(0, 32), Qt::NoButton, Qt::ControlModifier);
+	check(!w->m_panning && w->m_scrollY < beforePan,
+		"Command-dragging the list content pans it in the drag direction");
+	const int maxPanX = w->scrollMaxX();
+	check(maxPanX > 0, "list content is wider than the test window");
+	if (maxPanX > 0) {
+		w->scrollTo(maxPanX / 2, w->m_scrollY);
+		const int beforeHorizontalPan = w->m_scrollX;
+		mouse(w, QEvent::MouseButtonPress, panStart, Qt::LeftButton, Qt::ControlModifier);
+		mouse(w, QEvent::MouseMove, panStart + QPoint(32, 0), Qt::LeftButton, Qt::ControlModifier);
+		mouse(w, QEvent::MouseButtonRelease, panStart + QPoint(32, 0), Qt::NoButton,
+			Qt::ControlModifier);
+		check(w->m_scrollX < beforeHorizontalPan,
+			"Command-dragging the list content pans horizontally");
+	}
+
+	const QString expandable = folder + "/Expandable";
+	QDir().mkpath(expandable);
+	touch(expandable + "/Inside");
+	w->reload();
+	Item *expandableItem = nullptr;
+	for (auto &item : w->m_items) {
+		item->selected = false;
+		if (item->name == "Expandable") {
+			expandableItem = item.get();
+		}
+	}
+	check(expandableItem && expandableItem->isDir, "list view exposes the expandable test folder");
+	if (expandableItem) {
+		expandableItem->selected = true;
+		QKeyEvent expand(QEvent::KeyPress, Qt::Key_Right, Qt::ControlModifier);
+		QApplication::sendEvent(w, &expand);
+		const bool childVisible = std::any_of(w->m_rows.begin(), w->m_rows.end(),
+			[&](const FolderWindow::Row &row) { return row.item->path == expandable + "/Inside"; });
+		check(expand.isAccepted() && childVisible,
+			"Command-Right expands the selected folder in list view");
+		QKeyEvent collapse(QEvent::KeyPress, Qt::Key_Left, Qt::ControlModifier);
+		QApplication::sendEvent(w, &collapse);
+		const bool childHidden = std::none_of(w->m_rows.begin(), w->m_rows.end(),
+			[&](const FolderWindow::Row &row) { return row.item->path == expandable + "/Inside"; });
+		check(collapse.isAccepted() && childHidden,
+			"Command-Left collapses the selected folder in list view");
+	}
 
 	QStringList paths;
 	for (const char *name : { "Alpha", "Bravo", "Charlie" }) {
@@ -379,7 +511,22 @@ int main(int argc, char **argv) {
 		QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner);
 	QFile::setPermissions(broken + "/Z unreadable", QFileDevice::ReadOwner | QFileDevice::WriteOwner);
 
-	w->close();
+	const QString anotherFolder = home.path() + "/Another";
+	QDir().mkpath(anotherFolder);
+	FolderWindow::open(anotherFolder);
+	CloseTrackedWindow auxiliary;
+	auxiliary.setWindowTitle("Auxiliary Finder window");
+	auxiliary.show();
 	settle();
+	check(FolderWindow::isOpen(folder) && FolderWindow::isOpen(anotherFolder),
+		"open multiple Sniffer folder windows for the close-all shortcut");
+	auxiliary.hide();
+	QKeyEvent closeAll(QEvent::KeyPress, Qt::Key_W,
+		Qt::ControlModifier | Qt::AltModifier);
+	QApplication::sendEvent(w, &closeAll);
+	settle();
+	check(!FolderWindow::isOpen(folder) && !FolderWindow::isOpen(anotherFolder) &&
+		auxiliary.closed,
+		"Option-Command-W closes folder, auxiliary, and hidden top-level windows");
 	return fails ? 1 : 0;
 }

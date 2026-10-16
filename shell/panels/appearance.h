@@ -12,8 +12,8 @@
 /*
  * The Appearance control panel, after Mac OS 8's (HIG figure 6-1): a tab
  * control with Color (accent and highlight colours), Desktop (patterns),
- * Wallpaper (photos and placement) and Sound (alert sound). Choices apply
- * at once and are kept in
+ * Wallpaper (photos and placement), Sound (alert sound), and Options.
+ * Choices apply at once and are kept in
  * ~/.config/zacos9/desktop.conf, which the shell watches.
  * TODO: the layout inside the panes is ours; the HIG shows only "Options".
  */
@@ -21,7 +21,7 @@ class AppearancePanel : public QWidget {
 public:
 	AppearancePanel();
 	/* 0 Color, 1 Desktop patterns, 2 Wallpaper, 3 Alert Sound,
-	 * 4 Appearance Themes, 5 Sound Sets. */
+	 * 4 Appearance Themes, 5 Sound Sets, 6 Options. */
 	void showTab(int tab);
 
 protected:
@@ -39,7 +39,9 @@ private:
 	void paintSoundTab(pl_canvas *c);
 	void loadPatterns();
 	void loadWallpapers();
+	void loadAlertSounds();
 	void paintWallpaperTab(pl_canvas *c);
+	void paintOptionsTab(pl_canvas *c);
 	void loadThemes();
 	void paintThemesTab(pl_canvas *c);
 	void paintSoundThemesTab(pl_canvas *c);
@@ -47,7 +49,8 @@ private:
 	int m_tab = 0;
 	std::vector<std::unique_ptr<Text>> m_tabLabels;
 	PanelList m_accents, m_highlights, m_patterns, m_wallpapers, m_sounds, m_themes, m_soundThemes;
-	PanelButton m_previewTheme, m_saveTheme;
+	PanelButton m_previewTheme, m_saveTheme, m_addSound;
+	PanelCheckbox m_collapseTitle, m_arrowsTogether;
 	PanelEdit m_themeName;
 	PanelSlider m_interfaceVolume;
 	PanelHost m_host{ this };

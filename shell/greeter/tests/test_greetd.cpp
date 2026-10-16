@@ -157,6 +157,13 @@ int main(int argc, char *argv[]) {
 		assert(fake.received[0]["username"] == "alice");
 		assert(fake.received[1]["response"] == "sesame");
 		assert(fake.received[2]["cmd"].toArray() == QJsonArray{ "zacos9-session" });
+		assert(fake.received[2]["env"].toArray().isEmpty());
+		fake.received.clear();
+		o = Outcome();
+		g.login("alice", "sesame", { "zacos9-session" }, { "ZACOS9_SAFE_MODE=1" });
+		assert(waitFor([&] { return o.done(); }));
+		assert(o.started && fake.received[2]["env"].toArray() ==
+			QJsonArray{ "ZACOS9_SAFE_MODE=1" });
 	}
 
 	/* A wrong password: cancelled, then said; and the next try works. */
