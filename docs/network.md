@@ -86,6 +86,14 @@ follows the spec as published; if it doesn't find a real Windows
 computer on a real network, that is the first thing to check against a
 packet capture.
 
+The Probe asks for `pub:Computer` only, and replies whose Types don't
+include it are dropped: an empty Probe had two Brother printer/scanners
+(`wsdp:Device wprt:PrintDeviceType wscn:ScanDeviceType`, no
+ComputerName) answer on a real LAN, listed as "192.168.2.27 (Windows)".
+After merging (`mergeServers`), a computer that shares over AFP has no
+Windows entry, and Windows computers still known only by address are
+named by reverse mDNS (`avahi-resolve -a`, one call, a second at most).
+
 ## AFP: login, volumes, mount
 
 Select one network disk on the desktop and choose **Special → Disconnect

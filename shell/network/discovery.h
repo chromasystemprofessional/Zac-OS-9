@@ -8,6 +8,7 @@
  * other computers' probes, it has no "ask the network" mode of its own).
  */
 
+#include <QHash>
 #include <QString>
 #include <vector>
 
@@ -30,7 +31,7 @@ struct DiscoveredServer {
  * installed or nothing answers. */
 std::vector<DiscoveredServer> bonjourServers(int timeoutMs = 3000);
 
-/* Windows computers: a WS-Discovery Probe multicast to 239.255.255.250,
+/* Windows computers: a WS-Discovery Probe for pub:Computer multicast to 239.255.255.250,
  * collecting the ProbeMatch replies that come back (addressed straight
  * to the probing socket, not multicast, per the spec). Named by the
  * reply's ComputerName when one is given, else its source address. */
@@ -46,11 +47,29 @@ bool parseAvahiBrowseLine(const QString &line, DiscoveredServer *out);
  * while even when it has an IPv4 address - by its .local host name. */
 std::vector<DiscoveredServer> parseAvahiBrowse(const QString &text);
 
+/* Is this ProbeMatch from a computer (pub:Computer among its Types),
+ * not a printer or scanner? */
+bool wsDiscoveryIsComputer(const QString &xml);
+
 /* Pulls ComputerName (if present) and the sender's own name out of a
  * WS-Discovery ProbeMatch body; exposed for testing against a recorded
  * reply without a live Windows computer to probe. */
 QString wsDiscoveryComputerName(const QString &xml);
 
-/* Both, merged and de-duplicated, sorted by name. What the Network
- * Browser window actually shows. */
+/* Bonjour's and WS-Discovery's lists as one, sorted by name: each
+ * computer once per kind, and no Windows entry for a computer that also
+ * shares over AFP (a Mac, or ZacOS with both on: its AFP entry is the
+ * one to use, and Connect to Server still reaches its Windows sharing).
+ * A WS-Discovery reply without a ComputerName takes the name Bonjour
+ * announced for that address, if any. */
+std::vector<DiscoveredServer> mergeServers(const std::vector<DiscoveredServer> &bonjour,
+	const std::vector<DiscoveredServer> &windows);
+
+/* `avahi-resolve -a ADDRESS...` output ("address<TAB>host" lines) as
+ * address -> host, without ".local". */
+QHash<QString, QString> parseAvahiResolve(const QString &text);
+
+/* Both, found and merged (mergeServers); Windows computers still known
+ * only by address are named by reverse mDNS (avahi-resolve -a), if they
+ * answer it. What the Network Browser window actually shows. */
 std::vector<DiscoveredServer> discoverServers(int timeoutMs = 3000);

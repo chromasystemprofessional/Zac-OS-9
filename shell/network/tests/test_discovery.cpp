@@ -160,6 +160,65 @@ int main(int argc, char **argv) {
 	check(argsValid && queriedAfp && queriedSmb,
 		"each avahi-browse process requests one supported service type with parseable resolution");
 
+	/* Merging: a ZacOS computer with both servers on (AFP and SMB over
+	 * Bonjour, and wsdd2 answering WS-Discovery without a ComputerName,
+	 * as seen live), a Windows PC that gives its name, and one that
+	 * doesn't and isn't on Bonjour. */
+	auto server = [](DiscoveredServer::Kind kind, const QString &name, const QString &address) {
+		DiscoveredServer d;
+		d.kind = kind;
+		d.name = name;
+		d.address = address;
+		return d;
+	};
+	const std::vector<DiscoveredServer> merged = mergeServers(
+		{ server(DiscoveredServer::AFP, "iMac 2013", "192.168.2.111"),
+			server(DiscoveredServer::SMB, "iMac 2013", "192.168.2.111"),
+			server(DiscoveredServer::SMB, "Laptop", "192.168.2.130") },
+		{ server(DiscoveredServer::SMB, "192.168.2.111", "192.168.2.111"),
+			server(DiscoveredServer::SMB, "DESKTOP-PC", "192.168.2.120"),
+			server(DiscoveredServer::SMB, "192.168.2.130", "192.168.2.130"),
+			server(DiscoveredServer::SMB, "192.168.2.140", "192.168.2.140") });
+	QStringList shown;
+	for (const DiscoveredServer &d : merged) {
+		shown << QString("%1 %2 %3").arg(d.kind == DiscoveredServer::AFP ? "afp" : "smb", d.name, d.address);
+	}
+	check(shown == QStringList({ "smb 192.168.2.140 192.168.2.140", "smb DESKTOP-PC 192.168.2.120",
+			"afp iMac 2013 192.168.2.111", "smb Laptop 192.168.2.130" }),
+		"a computer sharing over AFP has no Windows entry; others keep theirs (" + shown.join(", ") + ")");
+	const std::vector<DiscoveredServer> otherPort = mergeServers(
+		{ server(DiscoveredServer::AFP, "Studio", "192.168.2.150:5548") },
+		{ server(DiscoveredServer::SMB, "192.168.2.150", "192.168.2.150") });
+	check(otherPort.size() == 1 && otherPort[0].kind == DiscoveredServer::AFP,
+		"AFP on another port still stands for its computer");
+	const std::vector<DiscoveredServer> renamed = mergeServers(
+		{ server(DiscoveredServer::SMB, "NAS", "192.168.2.160:4450") },
+		{ server(DiscoveredServer::SMB, "192.168.2.161", "192.168.2.161"),
+			server(DiscoveredServer::SMB, "192.168.2.160", "192.168.2.160") });
+	int nas = 0, byAddress = 0;
+	for (const DiscoveredServer &d : renamed) {
+		nas += d.name == "NAS";
+		byAddress += d.name == "192.168.2.160";
+	}
+	check(renamed.size() == 2 && nas == 1 && byAddress == 0,
+		"a nameless Windows reply takes Bonjour's name for its address, and is then one entry with it");
+	/* ProbeMatch Types: a Brother printer's, as it answered live, and
+	 * wsdd's for a computer. */
+	check(!wsDiscoveryIsComputer("<wsd:ProbeMatch><wsd:Types>wsdp:Device wprt:PrintDeviceType "
+			"wscn:ScanDeviceType</wsd:Types></wsd:ProbeMatch>"),
+		"a printer's reply isn't a computer");
+	check(wsDiscoveryIsComputer("<wsd:ProbeMatch><wsd:Types>wsdp:Device pub:Computer</wsd:Types></wsd:ProbeMatch>"),
+		"a computer's reply is");
+	check(!wsDiscoveryIsComputer("<wsd:ProbeMatch></wsd:ProbeMatch>"), "a reply without Types isn't");
+	check(parseAvahiResolve("192.168.2.30\t74\\05838\\058b7.local\n").value("192.168.2.30") == "74:38:b7",
+		"avahi-resolve's escapes are undone");
+	/* Real avahi-resolve -a output, from this computer's LAN. */
+	const QHash<QString, QString> hosts = parseAvahiResolve(
+		"192.168.2.111\tadams-zacos-9.local\n192.168.2.1\tmynetwork.home\nFailed to resolve address '192.168.2.9': Timeout reached\n");
+	check(hosts.value("192.168.2.111") == "adams-zacos-9" && hosts.value("192.168.2.1") == "mynetwork.home" &&
+			hosts.size() == 2,
+		"avahi-resolve's names, without .local, and its failures skipped");
+
 	if (fails) {
 		QTextStream(stdout) << fails << " failed\n";
 	} else {

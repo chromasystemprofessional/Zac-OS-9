@@ -3,6 +3,7 @@
 #include <QCoreApplication>
 #include <QElapsedTimer>
 #include <QEventLoop>
+#include <QHash>
 #include <QHostAddress>
 #include <QProcess>
 #include <QRegularExpression>
@@ -154,10 +155,31 @@ static QByteArray wsDiscoveryProbe() {
 		"<wsa:Action>http://schemas.xmlsoap.org/ws/2005/04/discovery/Probe</wsa:Action>"
 		"<wsa:MessageID>urn:uuid:%1</wsa:MessageID>"
 		"</soap:Header>"
-		"<soap:Body><wsd:Probe/></soap:Body>"
+		/* Computers only: an empty Probe has printers and scanners
+		 * answer too (seen live: two Brother printers, listed by
+		 * address as if they were Windows computers). */
+		"<soap:Body><wsd:Probe><wsd:Types "
+		"xmlns:pub=\"http://schemas.microsoft.com/windows/pub/2005/07\">pub:Computer"
+		"</wsd:Types></wsd:Probe></soap:Body>"
 		"</soap:Envelope>")
 		.arg(id)
 		.toUtf8();
+}
+
+bool wsDiscoveryIsComputer(const QString &xml) {
+	/* <wsd:Types>wsdp:Device pub:Computer</wsd:Types>; a device that
+	 * ignores the Probe's Types still names its own here. */
+	static const QRegularExpression types("<[\\w:]*Types>([^<]*)</[\\w:]*Types>");
+	const auto m = types.match(xml);
+	if (!m.hasMatch()) {
+		return false;
+	}
+	for (const QString &t : m.captured(1).split(' ', Qt::SkipEmptyParts)) {
+		if (t.section(':', -1) == "Computer") {
+			return true;
+		}
+	}
+	return false;
 }
 
 QString wsDiscoveryComputerName(const QString &xml) {
@@ -202,8 +224,8 @@ std::vector<DiscoveredServer> wsDiscoveryServers(int timeoutMs) {
 			}
 			seen.insert(addr);
 			const QString xml = QString::fromUtf8(buf);
-			if (!xml.contains("ProbeMatch")) {
-				continue; /* some other WS-Discovery chatter, not an answer */
+			if (!xml.contains("ProbeMatch") || !wsDiscoveryIsComputer(xml)) {
+				continue; /* other WS-Discovery chatter, or not a computer */
 			}
 			DiscoveredServer s;
 			s.kind = DiscoveredServer::SMB;
@@ -216,22 +238,50 @@ std::vector<DiscoveredServer> wsDiscoveryServers(int timeoutMs) {
 	return out;
 }
 
-std::vector<DiscoveredServer> discoverServers(int timeoutMs) {
-	std::vector<DiscoveredServer> out = bonjourServers(timeoutMs);
+/* "host:port" -> "host". IPv4 addresses and .local names only here,
+ * never a bare IPv6 address (see parseAvahiBrowseLine). */
+static QString hostOf(const QString &address) {
+	return address.section(':', 0, 0);
+}
+
+std::vector<DiscoveredServer> mergeServers(const std::vector<DiscoveredServer> &bonjour,
+		const std::vector<DiscoveredServer> &windows) {
+	/* Bonjour's names by address, and the computers sharing over AFP. */
+	QHash<QString, QString> names;
+	QSet<QString> afpHosts;
+	for (const DiscoveredServer &s : bonjour) {
+		if (!s.byHostName) {
+			names.insert(hostOf(s.address), s.name);
+		}
+		if (s.kind == DiscoveredServer::AFP) {
+			afpHosts.insert(hostOf(s.address));
+		}
+	}
+	std::vector<DiscoveredServer> out;
+	for (const DiscoveredServer &s : bonjour) {
+		if (s.kind == DiscoveredServer::SMB && afpHosts.contains(hostOf(s.address))) {
+			continue;
+		}
+		out.push_back(s);
+	}
 	/* A computer already found announcing _smb._tcp over Bonjour (a
 	 * modern Mac, or ourselves) needn't also be probed for over
 	 * WS-Discovery; only the addresses differ in practice, but comparing
 	 * by address keeps a dual-stack host from showing up twice. */
 	QSet<QString> smbAddresses;
-	for (const DiscoveredServer &s : out) {
+	for (const DiscoveredServer &s : bonjour) {
 		if (s.kind == DiscoveredServer::SMB) {
 			smbAddresses.insert(s.address);
 		}
 	}
-	for (const DiscoveredServer &s : wsDiscoveryServers(timeoutMs)) {
-		if (!smbAddresses.contains(s.address)) {
-			out.push_back(s);
+	for (DiscoveredServer s : windows) {
+		if (smbAddresses.contains(s.address) || afpHosts.contains(hostOf(s.address))) {
+			continue;
 		}
+		if (s.name == s.address && names.contains(hostOf(s.address))) {
+			s.name = names.value(hostOf(s.address));
+		}
+		out.push_back(s);
 	}
 	std::sort(out.begin(), out.end(), [](const DiscoveredServer &a, const DiscoveredServer &b) {
 		return a.name.compare(b.name, Qt::CaseInsensitive) < 0;
@@ -253,4 +303,61 @@ std::vector<DiscoveredServer> discoverServers(int timeoutMs) {
 		unique.push_back(s);
 	}
 	return unique;
+}
+
+QHash<QString, QString> parseAvahiResolve(const QString &text) {
+	QHash<QString, QString> hosts;
+	for (const QString &line : text.split('\n', Qt::SkipEmptyParts)) {
+		const QString address = line.section('\t', 0, 0).trimmed();
+		QString host = unescapeAvahi(line.section('\t', 1).trimmed());
+		if (host.endsWith(".local")) {
+			host.chop(6);
+		}
+		if (!address.isEmpty() && !host.isEmpty()) {
+			hosts.insert(address, host);
+		}
+	}
+	return hosts;
+}
+
+std::vector<DiscoveredServer> discoverServers(int timeoutMs) {
+	std::vector<DiscoveredServer> servers = mergeServers(bonjourServers(timeoutMs),
+		wsDiscoveryServers(timeoutMs));
+	QStringList nameless;
+	for (const DiscoveredServer &s : servers) {
+		if (s.name == s.address) {
+			nameless << s.address;
+		}
+	}
+	if (nameless.isEmpty()) {
+		return servers;
+	}
+	/* One query for all of them, a second at most: those that don't
+	 * answer keep their address. */
+	QProcess resolve;
+	resolve.start("avahi-resolve", QStringList{ "-a" } + nameless);
+	QElapsedTimer clock;
+	clock.start();
+	while (resolve.state() != QProcess::NotRunning && clock.elapsed() < 1000) {
+		QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents |
+			QEventLoop::WaitForMoreEvents, 50);
+	}
+	if (resolve.state() != QProcess::NotRunning) {
+		resolve.kill();
+		clock.restart();
+		while (resolve.state() != QProcess::NotRunning && clock.elapsed() < 1000) {
+			QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents |
+				QEventLoop::WaitForMoreEvents, 50);
+		}
+	}
+	const QHash<QString, QString> hosts = parseAvahiResolve(QString::fromUtf8(resolve.readAllStandardOutput()));
+	for (DiscoveredServer &s : servers) {
+		if (s.name == s.address && hosts.contains(s.address)) {
+			s.name = hosts.value(s.address);
+		}
+	}
+	std::sort(servers.begin(), servers.end(), [](const DiscoveredServer &a, const DiscoveredServer &b) {
+		return a.name.compare(b.name, Qt::CaseInsensitive) < 0;
+	});
+	return servers;
 }
