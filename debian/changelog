@@ -1,3 +1,11 @@
+zacos9 (0.1.62) trixie; urgency=medium
+
+  * File Sharing lets Mac OS 8.1 and earlier connect, with a short password
+    of their own, and the Chooser lists this computer over AppleTalk. The
+    Network Browser no longer lists printers as Windows computers.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Fri, 16 Oct 2026 18:32:56 -0400
+
 zacos9 (0.1.61) trixie; urgency=medium
 
   * Finder and desktop update: custom icons, richer Find criteria and saved
