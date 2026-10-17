@@ -1,3 +1,10 @@
+zacos9 (0.1.64) trixie; urgency=medium
+
+  * The Network Browser no longer lists this computer's own file server,
+    and won't connect to it: its shared folders are already in the Sniffer.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Fri, 16 Oct 2026 20:37:25 -0400
+
 zacos9 (0.1.63) trixie; urgency=medium
 
   * The Network Browser opens Macs that share files only over AppleTalk
