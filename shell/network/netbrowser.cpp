@@ -110,6 +110,11 @@ static void rememberServer(DiscoveredServer::Kind kind, const QString &address, 
 }
 
 void NetBrowserWindow::connectTo(const QString &address, DiscoveredServer::Kind kind) {
+	if (isThisComputer(address, thisComputer())) {
+		Alert::ask(QString("“%1” is this computer. Its shared folders are already here: open "
+			"them in the Sniffer.").arg(address), "OK", QString());
+		return;
+	}
 	if (kind == DiscoveredServer::SMB) {
 		const LoginDialog::Result login = LoginDialog::ask(this, address, true, true);
 		if (!login.accepted) {

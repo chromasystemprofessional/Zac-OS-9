@@ -4,7 +4,8 @@
  *
  *   zacos9-afp appletalk-servers
  *       the AFP servers on this computer's AppleTalk network (NBP), one
- *       "NAME<TAB>NET.NODE:SOCKET" line each; nothing if there are none,
+ *       "NAME<TAB>NET.NODE:SOCKET" line each, not this computer's own
+ *       (connecting to yourself isn't offered); nothing if there are none,
  *       exit status 3 if this computer has no AppleTalk address (atalkd
  *       isn't running)
  *   zacos9-afp info SERVER
@@ -79,7 +80,13 @@ static int appletalk_servers(void) {
 		fprintf(stderr, "AppleTalk isn’t on here (%s).\n", strerror(-r));
 		return 3;
 	}
+	struct sockaddr_at self;
+	const bool know_self = appletalk_self(&self) == 0;
 	for (int i = 0; i < n; i++) {
+		if (know_self && e[i].addr.sat_addr.s_net == self.sat_addr.s_net &&
+				e[i].addr.sat_addr.s_node == self.sat_addr.s_node) {
+			continue;
+		}
 		printf("%s\t%u.%u:%u\n", e[i].name, ntohs(e[i].addr.sat_addr.s_net), e[i].addr.sat_addr.s_node,
 			e[i].addr.sat_port);
 	}

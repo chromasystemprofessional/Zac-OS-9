@@ -226,6 +226,19 @@ int main(int argc, char **argv) {
 			withAtalk[1].name == "PowerMac 7500",
 		"a server also on TCP/IP is listed once, for TCP/IP; one only on AppleTalk is listed");
 
+	/* This computer: as found (Bonjour on lo and the LAN) and as typed. */
+	const QStringList self = { "192.168.2.110", "fe80::cc80:cc16:532c:4d3f", "adams-zacos-9",
+		"adams-zacos-9.local", "localhost", "appletalk:chromasystem pro server" };
+	check(isThisComputer("127.0.0.1", self) && isThisComputer("192.168.2.110", self) &&
+			isThisComputer("192.168.2.110:548", self) && isThisComputer("adams-zacos-9.local", self) &&
+			isThisComputer("ADAMS-ZACOS-9.local.", self) && isThisComputer("adam@192.168.2.110/Shared", self) &&
+			isThisComputer("[fe80::cc80:cc16:532c:4d3f]:548", self) && isThisComputer("[::1]", self) &&
+			isThisComputer("appletalk:ChromaSystem Pro Server", self),
+		"this computer is recognized by address, name, port, user, share and AppleTalk name");
+	check(!isThisComputer("192.168.2.111", self) && !isThisComputer("appletalk:PowerMac 7500", self) &&
+			!isThisComputer("adams-zacos-10.local", self) && !isThisComputer("", self),
+		"other computers aren't");
+
 	/* Real avahi-resolve -a output, from this computer's LAN. */
 	const QHash<QString, QString> hosts = parseAvahiResolve(
 		"192.168.2.111\tadams-zacos-9.local\n192.168.2.1\tmynetwork.home\nFailed to resolve address '192.168.2.9': Timeout reached\n");

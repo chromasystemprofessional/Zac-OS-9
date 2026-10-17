@@ -94,6 +94,14 @@ After merging (`mergeServers`), a computer that shares over AFP has no
 Windows entry, and Windows computers still known only by address are
 named by reverse mDNS (`avahi-resolve -a`, one call, a second at most).
 
+**This computer isn't listed, and isn't connected to.** Its own servers
+(Bonjour on lo and on the LAN, WS-Discovery, AppleTalk) are left out of
+the list, and `connectTo` - the list, Connect to Server and Recent Servers
+alike - refuses its addresses (loopback too), host name, HOST.local and
+"appletalk:" + File Sharing's name, whatever the port, user or share
+(`thisComputer`, `isThisComputer`), with an alert to use the Sniffer.
+`zacos9-afp appletalk-servers` leaves out this computer's own node.
+
 ## AFP: login, volumes, mount
 
 Select one network disk on the desktop and choose **Special → Disconnect

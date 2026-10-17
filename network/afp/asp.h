@@ -43,6 +43,9 @@ struct nbp_entry {
 int nbp_lookup(const char *name, const char *type, struct nbp_entry *out, int max, int *n,
 	int timeout_ms);
 
+/* This computer's own AppleTalk address (port 0). 0, or -ENETDOWN. */
+int appletalk_self(struct sockaddr_at *self);
+
 /* "NAME" (an AFPServer by NBP name) or "NET.NODE:SOCKET" -> the server's
  * listening socket. 0, -ENOENT if no server answers to the name, or
  * -errno. */

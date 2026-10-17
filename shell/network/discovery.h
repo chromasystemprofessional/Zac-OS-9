@@ -82,7 +82,17 @@ std::vector<DiscoveredServer> mergeServers(const std::vector<DiscoveredServer> &
  * address -> host, without ".local". */
 QHash<QString, QString> parseAvahiResolve(const QString &text);
 
+/* This computer's own names: its addresses (loopback too), its host name
+ * and HOST.local, and "appletalk:" + the name its File Sharing serves
+ * under (sharing.conf). All lowercase. */
+QStringList thisComputer();
+/* Is `address` - as found, or as typed in Connect to Server (host,
+ * host:port, [v6]:port, user@host, host/share, appletalk:NAME) - one of
+ * `self` (thisComputer())? Connecting to yourself isn't offered. */
+bool isThisComputer(const QString &address, const QStringList &self);
+
 /* Both, found and merged (mergeServers); Windows computers still known
  * only by address are named by reverse mDNS (avahi-resolve -a), if they
- * answer it. What the Network Browser window actually shows. */
+ * answer it; this computer's own servers left out. What the Network
+ * Browser window actually shows. */
 std::vector<DiscoveredServer> discoverServers(int timeoutMs = 3000);

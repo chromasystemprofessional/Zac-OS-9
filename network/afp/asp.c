@@ -221,6 +221,18 @@ int nbp_lookup(const char *name, const char *type, struct nbp_entry *out, int ma
 	return 0;
 }
 
+int appletalk_self(struct sockaddr_at *self) {
+	int fd = ddp_socket(NULL);
+	if (fd < 0) {
+		return fd;
+	}
+	socklen_t len = sizeof(*self);
+	int r = getsockname(fd, (struct sockaddr *)self, &len) < 0 ? -errno : 0;
+	close(fd);
+	self->sat_port = 0;
+	return r;
+}
+
 int asp_resolve(const char *server, struct sockaddr_at *sls) {
 	unsigned net, node, port;
 	char extra;

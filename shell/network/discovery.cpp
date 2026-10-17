@@ -4,7 +4,10 @@
 #include <QElapsedTimer>
 #include <QFileInfo>
 #include <QEventLoop>
+#include <QFile>
 #include <QHash>
+#include <QHostInfo>
+#include <QNetworkInterface>
 #include <QHostAddress>
 #include <QProcess>
 #include <QRegularExpression>
@@ -365,6 +368,56 @@ QHash<QString, QString> parseAvahiResolve(const QString &text) {
 	return hosts;
 }
 
+QStringList thisComputer() {
+	QStringList self;
+	for (const QHostAddress &a : QNetworkInterface::allAddresses()) {
+		QHostAddress plain = a;
+		plain.setScopeId(QString());
+		self << plain.toString().toLower();
+		bool v4;
+		const quint32 ip = a.toIPv4Address(&v4);
+		if (v4) {
+			self << QHostAddress(ip).toString(); /* ::ffff:a.b.c.d too */
+		}
+	}
+	self << "localhost";
+	const QString host = QHostInfo::localHostName().toLower();
+	if (!host.isEmpty()) {
+		self << host << host + ".local";
+	}
+	QFile conf(qEnvironmentVariable("ZACOS9_SHARING_CONF", "/etc/zacos9") + "/sharing.conf");
+	if (conf.open(QIODevice::ReadOnly)) {
+		for (const QByteArray &line : conf.readAll().split('\n')) {
+			if (line.startsWith("name=") && line.size() > 5) {
+				self << "appletalk:" + QString::fromUtf8(line.mid(5)).trimmed().toLower();
+			}
+		}
+	}
+	self.removeDuplicates();
+	return self;
+}
+
+bool isThisComputer(const QString &address, const QStringList &self) {
+	QString a = address.trimmed().toLower();
+	if (a.startsWith("appletalk:")) {
+		return self.contains(a);
+	}
+	a = a.section('/', 0, 0);           /* host/share */
+	a = a.section('@', -1);             /* user@host */
+	if (a.startsWith('[')) {
+		a = a.mid(1).section(']', 0, 0); /* [v6]:port */
+	} else if (a.count(':') == 1) {
+		a = a.section(':', 0, 0);        /* host:port */
+	}
+	if (a.endsWith('.')) {
+		a.chop(1);
+	}
+	if (a.startsWith("127.") || a == "::1") {
+		return true;
+	}
+	return !a.isEmpty() && self.contains(a);
+}
+
 std::vector<DiscoveredServer> discoverServers(int timeoutMs) {
 	/* AppleTalk alongside the others: NBP takes about as long. Nothing if
 	 * this computer isn't on AppleTalk (exit status 3). */
@@ -387,8 +440,17 @@ std::vector<DiscoveredServer> discoverServers(int timeoutMs) {
 		}
 	}
 	const bool answered = appleTalk.exitStatus() == QProcess::NormalExit && appleTalk.exitCode() == 0;
-	std::vector<DiscoveredServer> servers = mergeServers(bonjour, windows,
-		answered ? parseAppleTalkServers(QString::fromUtf8(appleTalk.readAllStandardOutput()))
+	/* This computer's own servers aren't offered (Bonjour on lo and
+	 * the LAN, WS-Discovery, and AppleTalk by File Sharing's name). */
+	const QStringList self = thisComputer();
+	auto others = [&self](std::vector<DiscoveredServer> found) {
+		found.erase(std::remove_if(found.begin(), found.end(),
+			[&self](const DiscoveredServer &s) { return isThisComputer(s.address, self); }),
+			found.end());
+		return found;
+	};
+	std::vector<DiscoveredServer> servers = mergeServers(others(bonjour), others(windows),
+		answered ? others(parseAppleTalkServers(QString::fromUtf8(appleTalk.readAllStandardOutput())))
 		         : std::vector<DiscoveredServer>());
 	QStringList nameless;
 	for (const DiscoveredServer &s : servers) {
