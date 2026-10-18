@@ -54,8 +54,12 @@ private:
 	 * (smart-scrolling: lib/widgets' scroll bars and the Qt style read it;
 	 * GTK 3 programs from a block in ~/.config/gtk-3.0/gtk.css). */
 	void paintOptionsTab(pl_canvas *c);
+	void applyProgramFonts();
 	PanelCheckbox m_titleCollapse, m_smartScrolling;
 	int m_scrollGroupTop = 0;
+	int m_fontGroupTop = 0;
+	PanelPopup m_fontSize;   /* Options: programs' text size */
+	PanelCheckbox m_smoothFonts;
 
 	int m_tab = 0;
 	std::vector<std::unique_ptr<Text>> m_tabLabels;

@@ -25,6 +25,9 @@ public:
 	UpdateWindow();
 	/* Begins checking, once the window is up. */
 	void start() { QTimer::singleShot(0, this, [this] { check(); }); }
+	/* The daily check (zacos9-update --background, from a user timer): no
+	 * window unless there's something to install. */
+	bool background = false;
 
 protected:
 	void paintEvent(QPaintEvent *) override;
@@ -54,6 +57,7 @@ private:
 	QString m_debPath;       /* the downloaded .deb */
 
 	PanelButton m_primary, m_secondary;
+	PanelCheckbox m_daily; /* "update-check": daily, unless "never" */
 	PanelHost m_host{ this };
 	QTimer m_sweep;
 	QNetworkAccessManager m_net;

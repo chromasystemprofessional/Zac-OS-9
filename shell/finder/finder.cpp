@@ -1,6 +1,7 @@
 #include "finder.h"
 
 #include <sys/xattr.h>
+#include <QMimeDatabase>
 
 #include "clippings.h"
 #include "cryptofiles.h"
@@ -651,6 +652,8 @@ void Finder::openItem(Item *item) {
 				item->kind == PL_ICON_TRASH_EMPTY || item->kind == PL_ICON_TRASH_FULL) {
 			QDir().mkpath(item->path);
 			FolderWindow::open(item->path);
+		} else if (item->kind == PL_ICON_DISK_IMAGE && isDiscImage(item->path) && !isMacDiskImage(item->path)) {
+			mountDiscImage(item->path);
 		} else if (item->kind == PL_ICON_DISK_IMAGE) {
 			mountMacImage(item->path);
 		} else if (item->kind == PL_ICON_WINDOWS) {
@@ -715,6 +718,27 @@ void Finder::mountMacImage(const QString &image) {
 			FolderWindow::open(path);
 		}
 	});
+}
+
+/* A CD or DVD image: a read-only loop device (UDisks; polkit lets the
+ * person at the computer), which the desktop then mounts like any disk. */
+void Finder::mountDiscImage(const QString &image) {
+	auto *p = new QProcess;
+	QObject::connect(p, &QProcess::finished, [p, image](int code, QProcess::ExitStatus status) {
+		p->deleteLater();
+		if (status != QProcess::NormalExit || code != 0) {
+			const QString why = QString::fromUtf8(p->readAllStandardError()).trimmed().section('\n', -1);
+			Alert::ask("“" + QFileInfo(image).fileName() + "” couldn't be mounted. " + why, "OK", QString());
+		}
+	});
+	QObject::connect(p, &QProcess::errorOccurred, [p, image](QProcess::ProcessError e) {
+		if (e == QProcess::FailedToStart) {
+			p->deleteLater();
+			Alert::ask("“" + QFileInfo(image).fileName() + "” couldn't be mounted: udisksctl isn't installed.",
+				"OK", QString());
+		}
+	});
+	p->start("udisksctl", { "loop-setup", "--read-only", "--no-user-interaction", "-f", image });
 }
 
 /* ---- archives ------------------------------------------------------------------------ */
@@ -1018,13 +1042,27 @@ void Finder::printDocuments(const QStringList &files, const QString &queue) {
 	if (printer.isEmpty()) {
 		return;
 	}
-	QStringList printable, others;
+	/* Office documents print through LibreOffice, to this printer and
+	 * without opening a window (--pt); others open in their program. */
+	const QString office = QStandardPaths::findExecutable("libreoffice");
+	const auto isOffice = [](const QString &f) {
+		const QString type = QMimeDatabase().mimeTypeForFile(f).name();
+		return type.startsWith("application/vnd.oasis.opendocument.") || type == "application/msword" ||
+			type.startsWith("application/vnd.openxmlformats-officedocument.") ||
+			type.startsWith("application/vnd.ms-") || type == "application/rtf" || type == "text/rtf";
+	};
+	QStringList printable, viaOffice, others;
 	for (const QString &f : files) {
-		(canPrintDirectly(f) ? printable : others) << f;
+		(canPrintDirectly(f) ? printable : !office.isEmpty() && isOffice(f) ? viaOffice : others) << f;
 	}
 	QString error;
 	if (!printable.isEmpty() && printFiles(printer, printable, &error).size() < printable.size()) {
 		printProblem("Not everything could be printed. " + error);
+	}
+	for (const QString &f : viaOffice) {
+		if (!QProcess::startDetached(office, { "--headless", "--pt", printer, f })) {
+			printProblem(QString::fromUtf8("“%1” couldn't be printed with LibreOffice.").arg(QFileInfo(f).fileName()));
+		}
 	}
 	QStringList failedToOpen;
 	for (const QString &file : others) {

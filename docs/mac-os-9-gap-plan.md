@@ -200,7 +200,7 @@ Section 3 lists every feature; section 5 is the plan.
 | View ▸ as Icons/Buttons/List, Clean Up, Arrange | ✅ | |
 | View ▸ **as Window / as Pop-up Window** | ✅ | See §3.2. |
 | View ▸ **Sort List** (in list view), **Reset Column Positions**, **View Options…** | ✅ | Sort List, Reset Column Positions and View Options… ✅. |
-| Special ▸ Empty Trash…, Erase Disk…, Sleep, Restart, Shut Down | ✅ | Erase Disk: format choices (Mac OS Extended, DOS/FAT, exFAT) to verify. **→ 9.10** |
+| Special ▸ Empty Trash…, Erase Disk…, Sleep, Restart, Shut Down | ✅ | Erase Disk (USB disks) makes FAT32, and says so; other formats are in Disk Setup's Erase. |
 | Special ▸ **Eject** (⌘E) | ✅ | Every selected disk, local or network; replaces Disconnect Network Drive and Unmount Disk (0.1.54). |
 | Special ▸ **Log Out** (⇧⌘Q) | ✅ | Asks, quits the programs (each may offer to save), then ends the session; a program still open after 30 s cancels it (0.1.54). The menu doesn't show ⇧⌘Q yet (the painter has no ⇧ glyph). |
 | Help ▸ **Help Center**, **Show Hint Bubbles**, **ZacOS Help** | ✅ | Help Center and ZacOS Help (⌘-?); Hint Bubbles in Qt tooltips, the menu bar's own menus (`shell/menubar/hints.c`) and every ZacOS panel's controls. GTK programs keep their own tooltips. |
@@ -309,7 +309,7 @@ A zram/swap switch in a Memory panel is a possible P3. **→ 8.7**
 | **Toy Box** | ✅ | See §3.2. |
 | **Walkies** (snapshots of network, sound, time zone, printer, startup items) | ✗ | P3 L **→ 8.5** |
 | Memory | — | |
-| **Monitors**: resolution, pixel size | ✅ | Several screens and arrangement still on the roadmap; colour depth — . |
+| **Monitors**: resolution, pixel size | ✅ | Several screens: Arrangement (drag the screens), the main display (menu bar and icons), each screen's resolution, Mirror Displays (`compositor/src/prefs.c`); the desktop's pattern on the others (`secondarydesktop.cpp`); pop-up tabs on their own screen. Colour depth — . |
 | **Mouse**: tracking, double-click | ✅ | Options: Mouse Tracks (`compositor/src/tracks.c`: six arrows behind the moving pointer, going 50 ms apart) and Thick I-Beam (a `text-thick` cursor zacos9-wm shows for programs that ask for "text" by cursor-shape-v1; Qt 6 programs ask that way and get it (checked with Scribble); ones that draw their own cursor, such as GTK 3, keep the thin one). |
 | **Users** | ✅ | See 3.14. |
 | **Numbers** / **Text** (number and sort formats, language) | ✅ | `zacos9-controlpanel numbers` / `text`: the system's UTF-8 locales by their own names, with a live sample, kept in `~/.config/locale.conf` (read by `zacos9-session` at login); a locale not yet made is made by `zacos9-accounts-helper locale`. |
@@ -329,7 +329,7 @@ A zram/swap switch in a Memory panel is a possible P3. **→ 8.7**
 |---|---|---|
 | Sound volume, Sound source | ✅ | Output and input selection, with stereo balance; tested by `sound-output`. |
 | Monitor resolution, brightness | ✅ | |
-| Bit depth, TV/Video Mirroring | — / ✗ | Mirroring on/off belongs with multi-monitor work (9.9). P3 **→ 7.7** |
+| Bit depth, TV/Video Mirroring | — / ✅ | Monitors ▸ Mirror Displays (`mirror`): every screen at the same place. |
 | Energy (sleep now), battery | ✅ | |
 | File Sharing (on/off, who's connected) | ✅ | `shell/collar/filesharing.cpp`: shown once File Sharing is set up; on/off through the sharing helper (the servers that were on come back); visitors by address from `ss` (no root needed, so no user names). |
 | Keychain | ✅ | |
@@ -377,11 +377,11 @@ A zram/swap switch in a Memory panel is a possible P3. **→ 8.7**
 
 | Feature | Status | Notes |
 |---|---|---|
-| Disks on the desktop, Put Away/eject, drag a disk to the Trash to eject | ◐ | Network volumes eject via the Trash (0.1.54); local disks to verify. P2 S **→ 9.10** |
-| Erase Disk with format choice | ◐ | Verify formats. **→ 9.10** |
+| Disks on the desktop, Put Away/eject, drag a disk to the Trash to eject | ✅ | Network volumes (0.1.54) and USB disks eject when dragged to the Trash. |
+| Erase Disk with format choice | ✅ | Erase Disk: FAT32 for USB disks; Disk Setup erases with a choice of ext4, FAT32, exFAT or NTFS. |
 | **Disk Vet** (verify/repair) | ✅ | Disk Setup's First Aid tab (`zacos9-disksetup`): the volumes UDisks2 can check, Verify (Filesystem.Check) and Repair (Filesystem.Repair) with polkit's password, refused while in use; the drive's SMART health (ATA and NVMe: passing or failing, temperature, hours). |
 | **Disk Setup** (partition, initialize) | ✅ | `zacos9-disksetup` Partition tab: a drive's layout (a bar and a list), New/Delete/Erase/Resize partitions (ext4, FAT32, exFAT, NTFS; resizing ext4 and NTFS) and New Table (GPT/MBR), queued until Apply, which says what it will erase; all through UDisks2 and polkit. Never the live medium's drive, a partition in use, the running system's drive as a whole or its EFI System partition (`shell/disksetup/plan.cpp`). The installer's Select Disk has Prepare Disk… (it opens here) and lists ext4 partitions as places to install. `diskinit.cpp` still initializes new disks. |
-| Disk Copy (mount images) | ✅ | Mac disk images; ISO/IMG via udisks to verify. **→ 9.10** |
+| Disk Copy (mount images) | ✅ | Mac disk images, GPT/MBR images (zacos9-mac-mount), and CD/DVD images (`.iso`, ISO 9660): a read-only loop device through `udisksctl`, mounted on the desktop like any disk. |
 | **Printer Picker** (pick a printer; AppleShare servers) | ✅ | `zacos9-printerpicker`, in the Zac menu: the printers CUPS knows and finds (IPP Everywhere, `lpstat -e`), with model, location and status; clicking one makes it yours (`lpoptions -d`, no password); Create Desktop Printer, Print Queue, Settings… (system-config-printer). Servers stay in the Neighbourhood. |
 | **Desktop printer icons**: drag documents to print, queue window (pause, reorder, remove), default printer (bold outline) | ◐ | `NAME.printer` files on the desktop (`[Desktop Printer]` Queue=…) with a printer icon: documents dropped on one print there, opening one opens `zacos9-printqueue` (printer status, documents, Hold/Resume, Remove, Stop/Start Printing through cups-pk-helper and a polkit rule for administrators; drops print). Print Next (CUPS priority 100) moves a waiting job ahead; the default printer's desktop icon has Mac OS 9's bold outline (`lpstat -d`, read in the background every 10 s). |
 | Print Queue / non-modal print errors | ✅ | Print errors (the Sniffer's and the queue window's) are alerts that don't stop you working. |
@@ -575,7 +575,7 @@ partial entries retain the remaining work described in the inventory above.
 | 7.4 ✅ | Printing leftovers: non-modal print errors, job reordering, the default printer's bold outline | `shell/print/` | S |
 | 7.5 ✅ | **Custom icons by pasting** in Get Info | Sniffer, gio metadata | M |
 | 7.6 ✅ | **Disk Setup** partitioning | disk helper | L |
-| 7.7 | Video mirroring on/off (after 9.9, several screens) | compositor | M |
+| 7.7 ✅ | Video mirroring on/off (after 9.9, several screens) | compositor | M |
 
 ### Milestone 8 — Desk accessories and extras (P3)
 
@@ -599,13 +599,13 @@ alongside the others; most are small.
 | 9.1 ✅ | **Option-⌘-W** closes all of the program's windows (Option-click on the close box already does) | `compositor/src/input.c`, menu bar | S |
 | 9.2 ✅ | **Contextual Menu Items folder**: `.desktop` file-manager actions in `~/.local/share/zacos9/contextual`, offered in the Sniffer's contextual menus (shares a format with Folder Tricks, 6.2) | Sniffer, menu bar | S |
 | 9.3 ✅ | **Zac menu**: folders in Menu Items sprout submenus (verify), and Zac Menu Options' submenus on/off | `shell/menubar/launch.c`, `shell/panels/` | S |
-| 9.4 | **Appearance ▸ Fonts**: the Views font size and font smoothing, for Qt and GTK programs (the bitmap system fonts stay fixed) | `appearance.cpp`, Qt style, GTK settings | M |
+| 9.4 ✅ | **Appearance ▸ Fonts**: the Views font size and font smoothing, for Qt and GTK programs (the bitmap system fonts stay fixed) | `appearance.cpp`, Qt style, GTK settings | M |
 | 9.5 ✅ | **Find criteria**: comments, version, invisible, custom icon | `shell/finder/findcriteria.cpp` | S |
-| 9.6 ◐ | **Printing through programs**: File ▸ Print, and Print in an icon's contextual menu, open other documents in their program with its print action | Sniffer, `shell/print/` | M |
-| 9.7 | **Menu and Pack details**: a ⇧ glyph so Log Out shows ⇧⌘Q; dragging the Pack's edge sets its width | `lib/menudraw.c`, `shell/pack/` | S |
-| 9.8 | **Scribble**: styled text, and Speech (after 6.5) | `shell/scribble/` | M |
-| 9.9 | **Several screens**: arrangement in Monitors, the desktop and menu bar per screen, pop-up tabs on any screen; then video mirroring (7.7) | compositor, Monitors panel, Sniffer | L |
-| 9.10 | **Checks** (the inventory's "to verify"): ⌘-→/⌘-← on disclosure triangles; Edit ▸ Copy on icons copies their names; local disks eject when dragged to the Trash; Erase Disk's formats; desktop picture placement; scheduled update checks; ISO/IMG images in Disk Copy. Confirm each, fix what fails, update its row | various | S each |
+| 9.6 ✅ | **Printing through programs**: File ▸ Print, and Print in an icon's contextual menu, open other documents in their program with its print action | Sniffer, `shell/print/` | M |
+| 9.7 ✅ | **Menu and Pack details**: a ⇧ glyph so Log Out shows ⇧⌘Q; dragging the Pack's edge sets its width | `lib/menudraw.c`, `shell/pack/` | S |
+| 9.8 ✅ | **Scribble**: styled text, and Speech (after 6.5) | `shell/scribble/` | M |
+| 9.9 ✅ | **Several screens**: arrangement in Monitors, the desktop and menu bar per screen, pop-up tabs on any screen; then video mirroring (7.7) | compositor, Monitors panel, Sniffer | L |
+| 9.10 ✅ | **Checks** (the inventory's "to verify"): ⌘-→/⌘-← on disclosure triangles; Edit ▸ Copy on icons copies their names; local disks eject when dragged to the Trash; Erase Disk's formats; desktop picture placement; scheduled update checks; ISO/IMG images in Disk Copy. Confirm each, fix what fails, update its row | various | S each |
 
 ### Cross-cutting work
 
@@ -626,4 +626,5 @@ alongside the others; most are small.
 
 ### Suggested next three sessions
 
-1. **Milestone 7 — disks, fonts and printing:** 7.1 Disk Vet, 7.4 printing leftovers, 7.6 Disk Setup, 7.7 video mirroring.
+1. **Milestone 8 — desk accessories and extras:** 8.5 Walkies, then the optional 8.6 (Plotter, Jigsaw Puzzle) and 8.7.
+2. **Hardware checks** of what was built and only tested in VMs or headless: Disk Setup on a real disk, Nap Time's wake alarm, CD/DVD AutoPlay, recording an alert sound, several real screens.

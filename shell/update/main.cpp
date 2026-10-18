@@ -5,6 +5,9 @@
 
 #include "platinumshell.h"
 #include "update.h"
+#include "settings.h"
+
+#include <cstring>
 
 int main(int argc, char *argv[]) {
 	/* zacos9-wm draws every frame; Qt must not add its own. */
@@ -15,8 +18,16 @@ int main(int argc, char *argv[]) {
 	platinumShellInit();
 
 	UpdateWindow w;
-	w.show();
-	platinumSetFrameStyle(&w, FrameStyle::MovableModal);
+	if (app.arguments().contains("--background")) {
+		char v[16];
+		if (pl_setting("update-check", v, sizeof(v)) && strcmp(v, "never") == 0) {
+			return 0; /* Check daily is off */
+		}
+		w.background = true;
+	} else {
+		w.show();
+		platinumSetFrameStyle(&w, FrameStyle::MovableModal);
+	}
 	w.start();
 	return app.exec();
 }

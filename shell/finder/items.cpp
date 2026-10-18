@@ -174,7 +174,7 @@ pl_icon_kind iconKindFor(const QString &path) {
 		info.setFile(target);
 	}
 	const QString iconPath = info.absoluteFilePath();
-	if (isMacDiskImage(iconPath)) {
+	if (isMacDiskImage(iconPath) || isDiscImage(iconPath)) {
 		return PL_ICON_DISK_IMAGE;
 	}
 	if (info.isDir()) {
@@ -203,6 +203,16 @@ pl_icon_kind iconKindFor(const QString &path) {
 		return PL_ICON_APPLICATION;
 	}
 	return PL_ICON_DOCUMENT;
+}
+
+/* A CD or DVD image (ISO 9660, "CD001" in its first volume descriptor). */
+bool isDiscImage(const QString &path) {
+	const QFileInfo info(path);
+	if (!info.isFile() || info.size() < 34 * 1024 || info.suffix().compare("iso", Qt::CaseInsensitive) != 0) {
+		return false;
+	}
+	QFile f(path);
+	return f.open(QIODevice::ReadOnly) && f.seek(32769) && f.read(5) == "CD001";
 }
 
 bool isMacDiskImage(const QString &path) {

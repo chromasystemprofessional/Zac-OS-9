@@ -231,7 +231,10 @@ static void add_finder_menus(struct mb_menu *menus, int *n) {
 	add(m, "Restart",   0, true, ACT_LAUNCH, "systemctl reboot");
 	add(m, "Shut Down", 0, true, ACT_LAUNCH, "systemctl poweroff");
 	sep(m);
-	add(m, "Log Out…", 0, up, ACT_FINDER, "log-out");
+	struct mb_item *log_out = add(m, "Log Out…", 'Q', up, ACT_FINDER, "log-out");
+	if (log_out) {
+		log_out->shift = true; /* ⇧⌘Q */
+	}
 	/* Mac OS 9's Help menu: Help Center, then the Finder's own book. */
 	m = new_menu(menus, n, "Help");
 	char help[PATH_MAX + 64];

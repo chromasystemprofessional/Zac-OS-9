@@ -31,6 +31,19 @@ static const char *const cmd_glyph[9] = {
 	".##...##.",
 };
 
+/* ⇧ (shift), 9x9, outlined in the ⌘'s weight; not measured. */
+static const char *const shift_glyph[9] = {
+	"....#....",
+	"...#.#...",
+	"..#...#..",
+	".#.....#.",
+	"###...###",
+	"..#...#..",
+	"..#...#..",
+	"..#...#..",
+	"..#####..",
+};
+
 /* Checkmark, 9x8, HIG figure 4-3: x=4 in the menu, bottom row on the
  * item's baseline. */
 static const char *const check_glyph[8] = {
@@ -176,7 +189,8 @@ void menu_measure(const struct menu_item *items, int n, int *width, int *height)
 			need = text_r + MENU_SHORTCUT_GAP + MENU_ARROW_FROM_RIGHT;
 		}
 		if (items[i].key) {
-			need = text_r + MENU_SHORTCUT_GAP + MENU_CMD_FROM_RIGHT;
+			need = text_r + MENU_SHORTCUT_GAP + MENU_CMD_FROM_RIGHT +
+				(items[i].shift ? MENU_SHIFT_BEFORE_CMD : 0);
 		}
 		if (need > w) {
 			w = need;
@@ -251,6 +265,9 @@ void menu_paint(struct pl_canvas *c, const struct menu_item *items, int n,
 		if (it->key) {
 			int cx = W - MENU_CMD_FROM_RIGHT;
 			paint_glyph(c, cmd_glyph, 9, cx, y + MENU_ITEM_BASELINE - 8, color);
+			if (it->shift) {
+				paint_glyph(c, shift_glyph, 9, cx - MENU_SHIFT_BEFORE_CMD, y + MENU_ITEM_BASELINE - 8, color);
+			}
 			pl_text(c, it->key, cx + MENU_KEY_AFTER_CMD, y + MENU_ITEM_BASELINE, color);
 		}
 		y += MENU_ITEM_H;

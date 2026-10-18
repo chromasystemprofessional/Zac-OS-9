@@ -5,7 +5,7 @@
 
 #include "textfile.h"
 
-class QPlainTextEdit;
+class QTextEdit;
 
 /*
  * A Scribble document window (Mac OS 9's SimpleText): one text file, its
@@ -33,7 +33,9 @@ private:
 	void speakSelection();
 	void stopSpeaking();
 
-	QPlainTextEdit *m_edit = nullptr;
+	QTextEdit *m_edit = nullptr;
+	static bool isStyledPath(const QString &path);
+	bool hasStyles() const;
 	QString m_path;
 	TextFile m_file;
 	QString m_findText;

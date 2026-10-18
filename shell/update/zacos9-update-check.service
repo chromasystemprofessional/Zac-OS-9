@@ -1,0 +1,8 @@
+[Unit]
+Description=ZacOS 9 Software Update's daily check
+# The desktop session's, for the window when there's something to install.
+After=graphical-session.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/zacos9-update --background

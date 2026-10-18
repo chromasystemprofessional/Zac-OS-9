@@ -1,4 +1,7 @@
 #include "update.h"
+#include "platinumshell.h"
+#include <cstring>
+#include <QApplication>
 
 #include <QCloseEvent>
 #include <QCryptographicHash>
@@ -27,6 +30,12 @@ static const QString PACKAGE = QStringLiteral("zacos9");
 UpdateWindow::UpdateWindow() {
 	setWindowTitle("Software Update");
 	setFixedSize(W, H);
+	m_daily = PanelCheckbox("Check daily", QPoint(14, H - 14 - PL_BUTTON_H + 4));
+	char v[16];
+	m_daily.on = !(pl_setting("update-check", v, sizeof(v)) && strcmp(v, "never") == 0);
+	m_daily.hint = "Looks for updates every day, and shows this window only if there are some.";
+	m_daily.toggled = [](bool on) { pl_setting_set("update-check", on ? nullptr : "never"); };
+	m_host.checks = { &m_daily };
 	m_sweep.setInterval(30);
 	m_sweep.callOnTimeout([this] {
 		m_sweepPos += 0.03;
@@ -239,7 +248,15 @@ void UpdateWindow::showResults() {
 		m_state = State::Available;
 		setText("Updates are available for this computer.", detail.trimmed());
 		setButtons("Update", "Later");
+		if (background && !isVisible()) {
+			show();
+			platinumSetFrameStyle(this, FrameStyle::MovableModal);
+		}
 	} else {
+		if (background) {
+			qApp->quit(); /* nothing to install: nothing to say */
+			return;
+		}
 		m_state = State::UpToDate;
 		setText(m_releaseError.isEmpty() ? "Your software is up to date." : "No updates were found.",
 			m_releaseError.isEmpty()

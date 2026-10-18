@@ -1340,6 +1340,10 @@ executable('zacos9-appinstall',
 
 # Software Update (Apple menu): ZacOS 9 releases from GitHub, Debian's
 # updates through apt; installs through zacos9-appstore-helper.
+# Software Update's daily check (a user timer; Check daily turns it off).
+install_data('update/zacos9-update-check.service', 'update/zacos9-update-check.timer',
+  install_dir: get_option('prefix') / 'lib' / 'systemd' / 'user')
+
 executable('zacos9-update',
   'update/main.cpp',
   'update/update.cpp',

@@ -81,6 +81,7 @@ struct mb_menu;
 struct mb_item {
 	char *label;  /* NULL = separator */
 	char key;     /* ⌘ shortcut, or 0 */
+	bool shift;   /* with ⇧ (⇧⌘Q) */
 	bool enabled, checked;
 	enum action action;
 	char *arg;

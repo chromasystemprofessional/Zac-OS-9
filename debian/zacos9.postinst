@@ -41,6 +41,8 @@ case "$1" in
 		grant_rawio
 		redraw_grub_logo
 		make_shared_documents
+		# Software Update's daily check, for every account.
+		systemctl --global enable zacos9-update-check.timer >/dev/null 2>&1 || true
 		;;
 	triggered)
 		grant_rawio

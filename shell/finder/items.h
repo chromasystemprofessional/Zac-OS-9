@@ -112,6 +112,8 @@ pl_icon_kind iconKindFor(const QString &path);
 bool isSharedFolder(const QString &path);
 /* A Macintosh disk or CD image (HFS, HFS+ or partitioned): opening one
  * starts it in Classic. */
+/* A CD or DVD image (.iso, ISO 9660): Disk Copy mounts it read-only. */
+bool isDiscImage(const QString &path);
 bool isMacDiskImage(const QString &path);
 /* A Windows .exe or .msi: opening one runs it via Wine. */
 bool isWindowsExecutable(const QString &path);

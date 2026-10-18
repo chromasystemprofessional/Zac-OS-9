@@ -224,6 +224,7 @@ static void to_menu_items(const struct mb_menu *m, struct menu_item *out) {
 		out[i] = (struct menu_item){
 			.label = m->items[i].label_text,
 			.key = m->items[i].key_text,
+			.shift = m->items[i].shift,
 			.enabled = m->items[i].enabled,
 			.checked = m->items[i].checked,
 			.submenu = m->items[i].submenu != NULL,

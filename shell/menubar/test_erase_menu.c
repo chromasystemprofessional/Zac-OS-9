@@ -59,7 +59,8 @@ static void check(const char *line, bool enabled, bool eject) {
 				assert(item->action == ACT_FINDER && item->enabled == eject);
 				foundEject = true;
 			} else if (item->arg && strcmp(item->arg, "log-out") == 0) {
-				assert(strcmp(item->label, "Log Out…") == 0 && item->action == ACT_FINDER);
+				assert(strcmp(item->label, "Log Out…") == 0 && item->action == ACT_FINDER &&
+					item->key == 'Q' && item->shift); /* ⇧⌘Q */
 				foundLogOut = true;
 			}
 		}

@@ -127,6 +127,31 @@ AppearancePanel::AppearancePanel() {
 		setGtkSmartScrolling(on);
 		update();
 	};
+	/* Fonts, for programs (ZacOS's own bitmap fonts stay as they are): GTK
+	 * through gsettings, Qt through the Platinum style when it starts. */
+	m_fontGroupTop = m_smartScrolling.hitRect().bottom() + 6 + 2 * 13 + PL_GROUP_MARGIN + 1 + 28;
+	static const int sizes[4] = { 9, 10, 12, 14 };
+	m_fontSize.rect = QRect(BOX_L + ITEM_INSET + 196, m_fontGroupTop + 1 + PL_GROUP_MARGIN_TOP, 170, PL_POPUP_H);
+	m_fontSize.items = { PopupItem("Small (9 pt)"), PopupItem("Medium (10 pt)"), PopupItem("Large (12 pt)"),
+		PopupItem("Larger (14 pt)") };
+	const int size = setting("app-font-size").toInt();
+	m_fontSize.selected = size >= 14 ? 3 : size >= 12 ? 2 : size == 9 ? 0 : 1;
+	m_fontSize.hint = "Sets how big text is in programs. Programs already open change when opened again.";
+	m_fontSize.chosen = [this](int row) {
+		m_fontSize.selected = row;
+		pl_setting_set("app-font-size", row == 1 ? nullptr : QByteArray::number(sizes[row]).constData());
+		applyProgramFonts();
+		update();
+	};
+	m_smoothFonts = PanelCheckbox("Smooth text in programs",
+		QPoint(BOX_L + ITEM_INSET, m_fontSize.rect.bottom() + 10));
+	m_smoothFonts.on = setting("font-smoothing") != "false";
+	m_smoothFonts.hint = "Softens the edges of text in programs. Off: crisp, jagged text like the 1990s'.";
+	m_smoothFonts.toggled = [this](bool on) {
+		pl_setting_set("font-smoothing", on ? nullptr : "false");
+		applyProgramFonts();
+		update();
+	};
 
 	/* Accent colour. */
 	m_accents.frame = QRect(QPoint(BOX_L + ITEM_INSET, ITEM_TOP),
@@ -395,7 +420,7 @@ void AppearancePanel::loadWallpapers() {
 
 void AppearancePanel::showTab(int tab) {
 	m_tab = std::clamp(tab, 0, 6);
-	m_host.checks = m_tab == 6 ? std::vector<PanelCheckbox *>{ &m_titleCollapse, &m_smartScrolling }
+	m_host.checks = m_tab == 6 ? std::vector<PanelCheckbox *>{ &m_titleCollapse, &m_smartScrolling, &m_smoothFonts }
 		: std::vector<PanelCheckbox *>{};
 	m_host.buttons = m_tab == 4 ? std::vector<PanelButton *>{ &m_saveTheme }
 		: m_tab == 5 ? std::vector<PanelButton *>{ &m_previewTheme }
@@ -557,6 +582,17 @@ void AppearancePanel::paintThemesTab(pl_canvas *c) {
 		: "Custom presets: Appearance > Themes", BOX_L + 4, H - 24, PL_FONT_VIEWS, C_BLACK, BOX_R - BOX_L);
 }
 
+/* GTK programs read their font from gsettings (the session runs no
+ * XSETTINGS); Qt ones from the Platinum style, at start. */
+void AppearancePanel::applyProgramFonts() {
+	static const int sizes[4] = { 9, 10, 12, 14 };
+	const int size = sizes[std::clamp(m_fontSize.selected, 0, 3)];
+	QProcess::startDetached("gsettings", { "set", "org.gnome.desktop.interface", "font-name",
+		QString("Sans %1").arg(size) });
+	QProcess::startDetached("gsettings", { "set", "org.gnome.desktop.interface", "font-antialiasing",
+		m_smoothFonts.on ? "grayscale" : "none" });
+}
+
 void AppearancePanel::paintOptionsTab(pl_canvas *c) {
 	groupAround(c, m_titleCollapse.hitRect(), "Windows", BOX_R);
 	Text scrollBars("Scroll Bars", 300, PL_FONT_SYSTEM);
@@ -567,6 +603,11 @@ void AppearancePanel::paintOptionsTab(pl_canvas *c) {
 		x, m_smartScrolling.hitRect().bottom() + 14, PL_FONT_VIEWS);
 	panelText(c, "shows how much of the contents the window holds.",
 		x, m_smartScrolling.hitRect().bottom() + 27, PL_FONT_VIEWS);
+	Text fonts("Fonts", 300, PL_FONT_SYSTEM);
+	pl_group_box_paint(c, BOX_L, m_fontGroupTop, BOX_R, m_smoothFonts.hitRect().bottom() + PL_GROUP_MARGIN + 1,
+		fonts.t, PANE);
+	panelText(c, "Size of text in programs:", BOX_L + ITEM_INSET, m_fontSize.rect.top() + 15);
+	m_fontSize.paint(c);
 	m_host.paintControls(c, PANE);
 }
 
@@ -616,6 +657,10 @@ void AppearancePanel::mousePressEvent(QMouseEvent *e) {
 		pos.x(), pos.y());
 	if (tab >= 0 && tab != m_tab) {
 		showTab(tab);
+		return;
+	}
+	if (m_tab == 6 && m_fontSize.press(this, pos)) {
+		update();
 		return;
 	}
 	if (m_tab == 2 && m_placement.press(this, pos)) {
