@@ -90,7 +90,7 @@ for m in proc sys dev dev/pts run; do
 done
 sudo_ chroot "$r" /bin/sh -c "
 	set -e
-	export DEBIAN_FRONTEND=noninteractive
+	export DEBIAN_FRONTEND=noninteractive LC_ALL=C
 	missing=''
 	for p in $packages; do dpkg -s \$p >/dev/null 2>&1 || missing=\"\$missing \$p\"; done
 	if [ -n \"\$missing\" ]; then
@@ -99,7 +99,13 @@ sudo_ chroot "$r" /bin/sh -c "
 		# Keep iso/config's versions of files the packages also bring.
 		apt-get install -y -qq -o Dpkg::Options::=--force-confold \$missing </dev/null >/dev/null
 	fi
-	dpkg -i --force-confold /tmp/dev-boot/*.deb </dev/null >/dev/null
+	# Our packages' own dependencies may be newer than the ISO build's
+	# system: if dpkg can't configure them, apt fetches what's missing.
+	if ! dpkg -i --force-confold /tmp/dev-boot/*.deb </dev/null >/dev/null; then
+		echo 'installing what our packages depend on'
+		apt-get update -qq
+		apt-get install -f -y -qq -o Dpkg::Options::=--force-confold </dev/null >/dev/null
+	fi
 	for h in /tmp/dev-boot/*.hook.chroot; do sh \$h; done
 	# Dev boots only: a login on the serial port, for tests/vm/serial.py.
 	systemctl enable serial-getty@ttyS0.service >/dev/null 2>&1
