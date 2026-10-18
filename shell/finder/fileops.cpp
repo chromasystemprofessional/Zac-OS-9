@@ -459,7 +459,7 @@ QStringList draggedPaths(const QMimeData *mime) {
 
 /* Gray dotted outline of an icon's silhouette and its label box. */
 static void outlineItem(pl_canvas *c, Item *item, int ox, int oy) {
-	const uint32_t *px = pl_icon(item->kind, PL_ICON_LARGE);
+	const uint32_t *px = pl_icon(item->iconKind(), PL_ICON_LARGE);
 	auto opaque = [&](int x, int y) {
 		return x >= 0 && y >= 0 && x < PL_ICON_LARGE && y < PL_ICON_LARGE &&
 			(px[y * PL_ICON_LARGE + x] >> 24);

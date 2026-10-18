@@ -229,7 +229,7 @@ static void fill_servers(struct mb_menu *menu, int count, bool nested) {
 		if (f[0] && f[1] && f[2] && (strcmp(f[0], "afp") == 0 || strcmp(f[0], "smb") == 0)) {
 			char *address = g_shell_quote(f[1]);
 			char *command = g_strdup_printf("%s --connect %s %s", netbrowser, f[0], address);
-			add_recent_item(sub, title, f[2], nested, ACT_LAUNCH, command, NULL, PL_ICON_EXT_APPLETALK);
+			add_recent_item(sub, title, f[2], nested, ACT_LAUNCH, command, NULL, PL_ICON_NETWORK_DISK);
 			added++;
 			g_free(command);
 			g_free(address);

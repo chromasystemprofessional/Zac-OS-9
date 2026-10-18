@@ -61,7 +61,9 @@ struct Item {
 	 * See shell/network/netvolumes.h. */
 	bool isNetworkVolume = false;
 	pl_icon_kind iconKind() const {
-		return shared && kind == PL_ICON_FOLDER ? PL_ICON_SHARED_FOLDER : kind;
+		/* Drawn so; the kind stays (a network volume opens as a disk does). */
+		return shared && kind == PL_ICON_FOLDER ? PL_ICON_SHARED_FOLDER
+			: isNetworkVolume && kind == PL_ICON_DISK ? PL_ICON_NETWORK_DISK : kind;
 	}
 
 	/* A virtual item: `path` names a node in the Macintosh view of this

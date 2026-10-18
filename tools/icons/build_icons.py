@@ -18,7 +18,11 @@ KINDS = ["folder", "document", "application", "disk", "trash-empty", "trash-full
          "ext-opentransport", "ext-appletalk", "ext-bluetooth", "ext-audio", "ext-printmonitor",
          "ext-generic", "ext-display", "ext-ethernet", "ext-wifi", "ext-usb", "ext-input",
          "ext-camera", "ext-power", "ext-sensor", "ext-security", "ext-chip", "clipping",
-         "internet-location", "printer"]
+         "internet-location", "printer"] + [
+    "cp-mouse", "cp-keyboard", "cp-trackpad", "cp-accessibility", "cp-general", "cp-numbers",
+    "cp-text", "cp-datetime", "cp-zacmenu", "cp-appearance", "cp-screensaver", "cp-users",
+    "cp-keychain", "cp-collar", "cp-speech", "cp-retriever", "cp-filetranslator", "cp-walkies",
+    "network-disk"]
 
 
 def parse():
@@ -48,6 +52,9 @@ def parse():
         if len(rows) != size or any(len(r) != size for r in rows):
             sys.exit(f"{SRC}: icon {name} {size} must be {size} rows of {size}")
     for k in KINDS:
+        # Drawn only at 16 px: each pixel doubled for 32 px.
+        if (k, 32) not in icons and (k, 16) in icons:
+            icons[(k, 32)] = ["".join(c * 2 for c in r) for r in icons[(k, 16)] for _ in (0, 1)]
         for s in (32, 16):
             if (k, s) not in icons:
                 sys.exit(f"{SRC}: missing icon {k} {s}")

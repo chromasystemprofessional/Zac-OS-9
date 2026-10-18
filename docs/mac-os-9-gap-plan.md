@@ -223,7 +223,7 @@ Section 3 lists every feature; section 5 is the plan.
 | Feature | Status | Notes |
 |---|---|---|
 | About This Computer (system and memory summary) | ✅ | Reports processor, graphics, total and available memory, and swap when the system exposes those values; it does not attribute memory per application. |
-| Small icons before every item (Mac OS 9's Apple menu) | ✅ | A program's own (its desktop entry's Icon=, through the icon theme), else ZacOS's 16 px set: folders for submenus, a control panel's own kind in Control Panels, the generic application or document; a dimmed item's icon dimmed (`shell/menubar/appicon.c`, `launch.c`, `main.c`). Our panels borrow the nearest icons from the set; distinct originals for each would be an art pass. |
+| Small icons before every item (Mac OS 9's Apple menu) | ✅ | A program's own (its desktop entry's Icon=, through the icon theme), else ZacOS's 16 px set: folders for submenus, a control panel's own kind in Control Panels, the generic application or document; a dimmed item's icon dimmed (`shell/menubar/appicon.c`, `launch.c`, `main.c`). Every control panel has its own original 16 px icon (`cp-*` in `assets/icons/platinum-icons.picon`; `build_icons.py` doubles a 16 px-only icon for 32 px). |
 | Items from a folder; aliases; folders sprout submenus | ✅ | Top-level and nested `.desktop` launchers are sorted into the Zac menu; symlink aliases to files/folders open in the Sniffer; real directories containing entries become submenus (depth limited to four). Broken links, symlinked directories with newline paths, and deeper nesting are not traversed. |
 | **Recent Applications / Recent Documents / Recent Servers** | ✅ | Programs whose windows appeared; `recently-used.xbel` (the Sniffer adds what it opens); servers Neighbourhood connected to, reconnected with `--connect` (0.1.54). |
 | **Favorites** submenu (and Add To Favorites) | ✅ | (0.1.54) |
@@ -378,6 +378,7 @@ A zram/swap switch in a Memory panel is a possible P3. **→ 8.7**
 
 | Feature | Status | Notes |
 |---|---|---|
+| Network volumes drawn as such (AppleShare's look) | ✅ | The `network-disk` icon: a drive on a network line. |
 | Disks on the desktop, Put Away/eject, drag a disk to the Trash to eject | ✅ | Network volumes (0.1.54) and USB disks eject when dragged to the Trash. |
 | Erase Disk with format choice | ✅ | Erase Disk: FAT32 for USB disks; Disk Setup erases with a choice of ext4, FAT32, exFAT or NTFS. |
 | **Disk Vet** (verify/repair) | ✅ | Disk Setup's First Aid tab (`zacos9-disksetup`): the volumes UDisks2 can check, Verify (Filesystem.Check) and Repair (Filesystem.Repair) with polkit's password, refused while in use; the drive's SMART health (ATA and NVMe: passing or failing, temperature, hours). |
