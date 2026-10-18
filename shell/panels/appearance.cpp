@@ -99,6 +99,7 @@ AppearancePanel::AppearancePanel() {
 	/* Options. Not part of a theme, so it leaves the chosen one alone. */
 	m_titleCollapse = PanelCheckbox("Double-click title bar to collapse windows",
 		QPoint(BOX_L + ITEM_INSET, ITEM_TOP));
+	m_titleCollapse.hint = "Collapses a window to its title bar when you double-click the title bar.";
 	m_titleCollapse.on = setting("title-collapse") != "false";
 	m_titleCollapse.toggled = [this](bool on) {
 		if (!pl_setting_set("title-collapse", on ? nullptr : "false")) {
@@ -110,6 +111,7 @@ AppearancePanel::AppearancePanel() {
 	m_scrollGroupTop = m_titleCollapse.hitRect().bottom() + PL_GROUP_MARGIN + 1 + 12 + 16;
 	m_smartScrolling = PanelCheckbox("Smart Scrolling",
 		QPoint(BOX_L + ITEM_INSET, m_scrollGroupTop + 1 + PL_GROUP_MARGIN_TOP));
+	m_smartScrolling.hint = "Puts both scroll arrows together, and sizes the scroll box to show how much of the window you can see.";
 	m_smartScrolling.on = pl_smart_scrolling();
 	m_smartScrolling.toggled = [this](bool on) {
 		if (!pl_setting_set("smart-scrolling", on ? "true" : nullptr)) {
@@ -213,6 +215,7 @@ AppearancePanel::AppearancePanel() {
 	};
 	m_addSound = PanelButton("Add Recording...", QRect(m_sounds.frame.right() + 20,
 		ITEM_TOP + 58, 128, 22));
+	m_addSound.hint = "Records a new alert sound with the microphone.";
 	m_addSound.clicked = [this] {
 		const QString source = QFileDialog::getOpenFileName(this, "Add Alert Sound Recording",
 			QDir::homePath(), "WAVE recordings (*.wav)");
@@ -236,6 +239,7 @@ AppearancePanel::AppearancePanel() {
 
 	m_themes.frame = m_soundThemes.frame = m_sounds.frame;
 	m_previewTheme = PanelButton("Preview", QRect(m_soundThemes.frame.right() + 20, ITEM_TOP + 20, 90, 20));
+	m_previewTheme.hint = "Plays the sounds of the selected sound set.";
 	m_previewTheme.clicked = [this] { previewSoundTheme(m_soundThemes.state.selected); };
 	m_interfaceVolume.pos = QPoint(m_soundThemes.frame.right() + 20, ITEM_TOP + 78);
 	m_interfaceVolume.width = 170;
@@ -250,8 +254,10 @@ AppearancePanel::AppearancePanel() {
 		update();
 	};
 	m_themeName.rect = QRect(m_themes.frame.right() + 20, ITEM_TOP + 48, 170, PL_EDIT_H);
+	m_themeName.hint = "The name for a theme you save.";
 	m_themeName.setText("My Theme");
 	m_saveTheme = PanelButton("Save Current", QRect(m_themes.frame.right() + 20, ITEM_TOP + 82, 130, 20));
+	m_saveTheme.hint = "Saves the current colours, pattern, picture and sounds as a theme, with the name you typed.";
 	m_saveTheme.clicked = [this] {
 		m_themeError.clear();
 		saveAppearanceTheme(m_themeName.text, &m_themeError);
@@ -374,6 +380,30 @@ void AppearancePanel::showTab(int tab) {
 		: m_tab == 5 ? std::vector<PanelButton *>{ &m_previewTheme }
 		: m_tab == 3 ? std::vector<PanelButton *>{ &m_addSound } : std::vector<PanelButton *>{};
 	m_host.edits = m_tab == 4 ? std::vector<PanelEdit *>{ &m_themeName } : std::vector<PanelEdit *>{};
+	/* Hint Bubbles for this tab's lists, slider and pop-up. */
+	m_host.hintAreas.clear();
+	switch (m_tab) {
+	case 0:
+		m_host.hintAreas.push_back({ &m_accents.frame, "Chooses the colour of scroll bars, sliders and progress bars." });
+		m_host.hintAreas.push_back({ &m_highlights.frame, "Chooses the colour of selected text." });
+		break;
+	case 1:
+		m_host.hintAreas.push_back({ &m_patterns.frame, "Chooses the pattern that covers the desktop." });
+		break;
+	case 2:
+		m_host.hintAreas.push_back({ &m_wallpapers.frame, "Chooses a picture for the desktop, over its pattern." });
+		m_host.hintAreas.push_back({ &m_placement.rect, "Chooses how the picture fills the screen." });
+		break;
+	case 3:
+		m_host.hintAreas.push_back({ &m_sounds.frame, "Chooses the sound alerts play." });
+		break;
+	case 4:
+		m_host.hintAreas.push_back({ &m_themes.frame, "Saved themes: colours, pattern, picture and sounds together. Click one to use it." });
+		break;
+	case 5:
+		m_host.hintAreas.push_back({ &m_soundThemes.frame, "Chooses the sounds menus, windows and controls make." });
+		break;
+	}
 	if (m_tab != 4) {
 		m_host.setFocus(nullptr);
 	}

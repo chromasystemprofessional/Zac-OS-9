@@ -98,11 +98,20 @@ menubar_exe = executable('zacos9-menubar',
   'menubar/recent.c',
   'menubar/kbmenu.c',
   'menubar/appicon.c',
+  'menubar/hints.c',
   client_protocol_src,
   finder_protocol,
   dependencies: [platinum_dep, wayland_client, wayland_cursor, xkbcommon_client, gio,
     dependency('gdk-pixbuf-2.0')],
   install: true,
+)
+
+# Hint Bubbles over the menu bar's menus (menubar/hints.c).
+test('menu-hints',
+  executable('test-hints', 'menubar/test_hints.c', 'menubar/hints.c',
+    dependencies: [platinum_dep, wayland_client],
+  ),
+  timeout: 10,
 )
 
 # The Zac menu's recent items (menubar/recent.c).
@@ -1172,6 +1181,16 @@ collar_displays_test = executable('test-collar-displays',
 )
 test('collar-displays', find_program('dbus-run-session'),
   args: ['--', collar_displays_test, files('collar/tests/fake-ddcutil.sh')], timeout: 30,
+)
+
+test('panel-hints',
+  executable('test-panel-hints', 'panels/tests/test_hints.cpp',
+    link_with: panelkit,
+    include_directories: include_directories('finder', 'panels'),
+    dependencies: [platinum_dep, qt6],
+    cpp_args: ['-std=c++17'],
+  ),
+  env: ['QT_QPA_PLATFORM=offscreen'], timeout: 30,
 )
 
 test('collar-panel',

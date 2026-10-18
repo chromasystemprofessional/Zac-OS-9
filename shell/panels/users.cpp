@@ -202,13 +202,17 @@ UsersPanel::UsersPanel() : d(std::make_unique<Parts>(this)) {
 	setWindowTitle("Users");
 	setFixedSize(PW, PH);
 	d->list.frame = QRect(M, LIST_TOP, PW - 2 * M, LIST_BOTTOM - LIST_TOP);
+	d->host.hintAreas.push_back({ &d->list.frame, "The people who can use this computer. Double-click one to change it." });
 	d->list.picked = [this](int) { updateButtons(); };
 	const int y = PH - M - PL_BUTTON_H;
 	d->add = PanelButton("New User…", QRect(M, y, 96, PL_BUTTON_H));
+	d->add.hint = "Makes an account for a new person.";
 	d->add.clicked = [this] { newUser(); };
 	d->open = PanelButton("Open…", QRect(M + 104, y, 80, PL_BUTTON_H));
+	d->open.hint = "Changes the selected person's name, picture, password or kind of account.";
 	d->open.clicked = [this] { openSelected(); };
 	d->remove = PanelButton("Delete…", QRect(PW - M - 4 - 80, y, 80, PL_BUTTON_H));
+	d->remove.hint = "Deletes the selected person's account.";
 	d->remove.clicked = [this] { deleteSelected(false); };
 	d->host.buttons = { &d->add, &d->open, &d->remove };
 	updateButtons();
@@ -459,6 +463,7 @@ AccountWindow::AccountWindow(UsersPanel *panel, AccountsClient *client, const Ac
 	setFixedSize(AW, AH);
 	int y = 16;
 	d->realName.rect = QRect(FIELD, y, AW - FIELD - M, PL_EDIT_H);
+	d->realName.hint = "The person's full name, shown at login.";
 	d->realName.setText(d->original.realName);
 	d->realName.edited = [this] {
 		if (d->creating && !d->userNameTouched) {
@@ -468,6 +473,7 @@ AccountWindow::AccountWindow(UsersPanel *panel, AccountsClient *client, const Ac
 	};
 	y += 30;
 	d->userName.rect = QRect(FIELD, y, 160, PL_EDIT_H);
+	d->userName.hint = "The short name the system uses: lowercase letters, digits and - or _.";
 	d->userName.setText(d->original.userName);
 	d->userName.enabled = d->creating; /* a home folder and files are named after it */
 	d->userName.accepts = [](QChar c) {
@@ -480,6 +486,7 @@ AccountWindow::AccountWindow(UsersPanel *panel, AccountsClient *client, const Ac
 	y += 30 + PICTURE + 14;
 	d->choose = PanelButton("Choose…", QRect(FIELD + PICTURE + 12, 76 + (PICTURE - PL_BUTTON_H) / 2,
 		80, PL_BUTTON_H));
+	d->choose.hint = "Chooses the person's picture, shown at login.";
 	d->choose.clicked = [this] {
 		const QString file = QFileDialog::getOpenFileName(this, "Choose a Picture",
 			QDir::homePath() + "/Pictures", "Pictures (*.png *.jpg *.jpeg *.gif *.bmp)");
@@ -488,17 +495,21 @@ AccountWindow::AccountWindow(UsersPanel *panel, AccountsClient *client, const Ac
 		}
 	};
 	d->password.rect = QRect(FIELD, y, 160, PL_EDIT_H);
+	d->password.hint = "The person's login password.";
 	d->password.password = true;
 	y += 30;
 	d->verify.rect = QRect(FIELD, y, 160, PL_EDIT_H);
+	d->verify.hint = "Type the password again, to be sure it is right.";
 	d->verify.password = true;
 	y += 36;
 	d->admin = PanelCheckbox("Can administer this computer", QPoint(FIELD, y));
+	d->admin.hint = "Lets this person change system settings and install software.";
 	d->admin.on = d->original.admin;
 	/* Your own: you couldn't give it back. */
 	d->admin.enabled = !you;
 	y += 22;
 	d->canLogIn = PanelCheckbox("Can log in", QPoint(FIELD, y));
+	d->canLogIn.hint = "Lets this person log in. Off: the account stays, but can't be used.";
 	d->canLogIn.on = !d->original.locked;
 	d->canLogIn.enabled = !you;
 	const int by = AH - M - PL_BUTTON_H;

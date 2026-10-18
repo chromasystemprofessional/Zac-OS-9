@@ -476,9 +476,11 @@ public:
 		int y = 52;
 		if (other) {
 			m_name.rect = QRect(FIELD_X, y, 220, PL_EDIT_H);
+			m_name.hint = "The name of the Wi-Fi network to join.";
 			m_name.edited = [this] { validate(); };
 			y += PL_EDIT_H + 10;
 			m_security.rect = QRect(FIELD_X, y, 220, PL_POPUP_H);
+			m_security.hint = "Chooses the kind of security the network uses.";
 			m_security.label = "Security:";
 			m_security.items = { { "None" }, { "WPA/WPA2 Personal" }, { "WPA3 Personal" } };
 			m_security.selected = 1;
@@ -491,9 +493,11 @@ public:
 			y += PL_POPUP_H + 10;
 		}
 		m_password.rect = QRect(FIELD_X, y, 220, PL_EDIT_H);
+		m_password.hint = "The network's password. It is kept by the system, never put on a command line.";
 		m_password.password = true;
 		m_password.edited = [this] { validate(); };
 		m_show = PanelCheckbox("Show password", QPoint(FIELD_X, y + PL_EDIT_H + 9));
+		m_show.hint = "Shows the password as you type it.";
 		m_show.toggled = [this](bool on) { m_password.password = !on; };
 		m_host.checks = { &m_show };
 		placeButtons(m_cancel, "Cancel", m_join, "Join");
@@ -555,6 +559,7 @@ public:
 		setFixedSize(360, wifi ? 196 : 148);
 		static const char *const methods[] = { "auto", "link-local", "disabled" };
 		m_ipv6.rect = QRect(112, 16, 200, PL_POPUP_H);
+		m_ipv6.hint = "Chooses how this computer gets an IPv6 address, or turns IPv6 off.";
 		m_ipv6.label = "IPv6:";
 		m_ipv6.items = { { "Automatic" }, { "Link-local only" }, { "Off" } };
 		m_ipv6.selected = 0;
@@ -570,14 +575,17 @@ public:
 		m_host.popups = { &m_ipv6 };
 		int y = 56;
 		m_onlyDns = PanelCheckbox("Use only the name servers set here", QPoint(20, y));
+		m_onlyDns.hint = "Uses only the name servers in the TCP/IP window, ignoring those the network suggests.";
 		m_onlyDns.on = p.ignoreAutoDns;
 		m_onlyDns.toggled = [this](bool on) { m_profile.ignoreAutoDns = on; };
 		m_auto = PanelCheckbox("Connect automatically", QPoint(20, y += 24));
+		m_auto.hint = "Connects to this network whenever it is in range.";
 		m_auto.on = p.autoconnect;
 		m_auto.toggled = [this](bool on) { m_profile.autoconnect = on; };
 		m_host.checks = { &m_onlyDns, &m_auto };
 		if (wifi) {
 			m_private = PanelCheckbox("Private Wi-Fi address", QPoint(20, y += 24));
+			m_private.hint = "Uses a different hardware address on this network, so it is harder to track the computer.";
 			m_private.on = p.cloned == "stable" || p.cloned == "random";
 			m_private.toggled = [this](bool on) { m_profile.cloned = on ? "stable" : "permanent"; };
 			m_host.checks.push_back(&m_private);
@@ -674,8 +682,10 @@ public:
 		m_search.accepts = domainChar;
 		m_dns.edited = m_search.edited = [this] { edited(); };
 		m_info = PanelButton("Info…", QRect(0, 0, PL_BUTTON_MIN_W + 4, PL_BUTTON_H));
+		m_info.hint = "Shows this computer's addresses on the network.";
 		m_info.clicked = [this] { showInfo(); };
 		m_options = PanelButton("Options…", QRect(0, 0, PL_BUTTON_MIN_W + 16, PL_BUTTON_H));
+		m_options.hint = "Sets IPv6, private Wi-Fi addresses and automatic connection.";
 		m_options.clicked = [this] { showOptions(); };
 
 		refreshDevices();
@@ -758,18 +768,24 @@ private:
 		const int popW = 240;
 		int y = 14;
 		m_via.rect = QRect(FIELD_X, y, popW, PL_POPUP_H);
+		m_via.hint = "Chooses how this computer connects to the network: Ethernet or Wi-Fi.";
 		m_groupTop = y + PL_POPUP_H + 14;
 		y = m_groupTop + 1 + PL_GROUP_MARGIN_TOP;
 		m_host.popups = { &m_via };
 		if (wifi()) {
 			m_network.rect = QRect(FIELD_X, y, popW, PL_POPUP_H);
+			m_network.hint = "Chooses the Wi-Fi network to join, or turns Wi-Fi on or off.";
 			m_host.popups.push_back(&m_network);
 			y += PL_POPUP_H + PL_POPUP_SPACING;
 		}
 		m_configure.rect = QRect(FIELD_X, y, popW, PL_POPUP_H);
+		m_configure.hint = "Chooses whether the network gives this computer its address (DHCP) or you type it in (Manually).";
 		m_host.popups.push_back(&m_configure);
 		y += PL_POPUP_H + 16;
 		PanelEdit *rows[3] = { &m_ip, &m_mask, &m_router };
+		m_ip.hint = "This computer's IP address.";
+		m_mask.hint = "The subnet mask: which addresses are on the local network.";
+		m_router.hint = "The address of the router that reaches other networks.";
 		for (int i = 0; i < 3; i++) {
 			m_rowTop[i] = y;
 			rows[i]->rect = QRect(FIELD_X, y, FIELD_W, PL_EDIT_H);
@@ -777,8 +793,10 @@ private:
 		}
 		y += 20;
 		m_dns.rect = QRect(FIELD_X, y, FIELD_W, LIST_H);
+		m_dns.hint = "The name servers, one address per line, that turn names into addresses.";
 		const int sx = FIELD_X + FIELD_W + 22;
 		m_search.rect = QRect(sx, y, W - M - 2 - PL_GROUP_MARGIN - sx, LIST_H);
+		m_search.hint = "Domains tried after a short name, one per line.";
 		m_groupBottom = y + LIST_H + PL_GROUP_MARGIN;
 		m_statusBaseline = m_groupBottom + 18;
 		const int by = m_statusBaseline + 12;

@@ -230,8 +230,14 @@ public:
 		qDBusRegisterMetaType<ManagedObjects>();
 
 		m_power = PanelCheckbox("Bluetooth On", QPoint(M, 16));
+		m_power.hint = "Turns Bluetooth on or off.";
 		m_power.toggled = [this](bool on) { setPowered(on); };
 		m_list.frame = QRect(M, 58, W - 2 * M, 150);
+		m_search.hint = "Looks for Bluetooth devices nearby. Put the device in pairing mode first.";
+		m_forget.hint = "Removes the selected device. You must pair it again to use it.";
+		m_sound.hint = "Plays sound through the selected device.";
+		m_connect.hint = "Pairs with or connects to the selected device, or disconnects it.";
+		m_host.hintAreas.push_back({ &m_list.frame, "Bluetooth devices this computer knows, and ones found nearby." });
 		m_list.picked = [this](int row) {
 			m_selected = row >= 0 && row < int(m_state.devices.size()) ? m_state.devices[row].path : QString();
 			updateButtons();
@@ -417,7 +423,9 @@ private:
 	static void place(PanelButton &b, QString &shown, const QString &text, QRect r, bool isDefault,
 			std::function<void()> clicked) {
 		if (shown != text) {
+			const QString hint = b.hint;
 			b = PanelButton(text, r, isDefault);
+			b.hint = hint;
 			b.clicked = std::move(clicked);
 			shown = text;
 		}

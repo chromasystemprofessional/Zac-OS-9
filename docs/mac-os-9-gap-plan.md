@@ -203,7 +203,7 @@ Section 3 lists every feature; section 5 is the plan.
 | Special ▸ Empty Trash…, Erase Disk…, Sleep, Restart, Shut Down | ✅ | Erase Disk: format choices (Mac OS Extended, DOS/FAT, exFAT) to verify. **→ 9.10** |
 | Special ▸ **Eject** (⌘E) | ✅ | Every selected disk, local or network; replaces Disconnect Network Drive and Unmount Disk (0.1.54). |
 | Special ▸ **Log Out** (⇧⌘Q) | ✅ | Asks, quits the programs (each may offer to save), then ends the session; a program still open after 30 s cancels it (0.1.54). The menu doesn't show ⇧⌘Q yet (the painter has no ⇧ glyph). |
-| Help ▸ **Help Center**, **Show Hint Bubbles**, **ZacOS Help** | ◐ | Help Center and ZacOS Help (⌘-?) ✅; Qt tooltip styling and the persistent toggle are in place, but menu-bar and non-Qt balloon help remain. |
+| Help ▸ **Help Center**, **Show Hint Bubbles**, **ZacOS Help** | ✅ | Help Center and ZacOS Help (⌘-?); Hint Bubbles in Qt tooltips, the menu bar's own menus (`shell/menubar/hints.c`) and every ZacOS panel's controls. GTK programs keep their own tooltips. |
 
 ### §3.4 Contextual menus (ch. 4 p. 64)
 
@@ -405,7 +405,7 @@ A zram/swap switch in a Memory panel is a possible P3. **→ 8.7**
 | Feature | Status | Notes |
 |---|---|---|
 | **Help Center** (browser-like, searchable HTML help) | ✅ | `zacos9-help` (`shell/help/`): Back, Forward, Help Center and a search field above the page; the Help Center lists every book in `share/zacos9/help` (a folder with an index.html); search ranks every page (title words count most) with the best sentence and a relevance bar. ZacOS Help: 14 pages (basics, the Sniffer, files, Find, Zac menu, programs, The Collar, Old Dog, control panels, accessibility, networks, shortcuts, troubleshooting). |
-| **Hint Bubbles** (Show Hint Bubbles) | ◐ | Qt tooltips use the Platinum bubble style, and the Sniffer Help menu toggles them persistently for Qt apps using ZacOS style. Menu-bar and non-Qt balloon help remain. |
+| **Hint Bubbles** (Show Hint Bubbles) | ✅ | Qt tooltips use the Platinum bubble style; the menu bar draws a bubble beside the item under the pointer in its own menus (Zac, Sniffer, Application, Help; programs' global menus have none), tail pointing into the item, on the menu's left when there's no room. Panels: every panelkit control has a `hint` (`hintAreas` for lists and the like), answered as the window's tooltip by `panelHintEvent`; all the ZacOS panels have their text. Help ▸ Show Hint Bubbles (`hint-bubbles`) turns them all on and off. Not measured. |
 | ZacOS Help from the Sniffer | ✅ | Help ▸ Help Center and ZacOS Help (⌘-?) when the Sniffer is in front. |
 
 ### §3.18 Desk accessories and utilities (ch. 5, 13)
@@ -558,7 +558,7 @@ partial entries retain the remaining work described in the inventory above.
 
 | # | Work package | Components | Effort |
 |---|---|---|---|
-| 6.1 ◐ | **Hint Bubbles**: drawn by the menu bar over its menus, and by our panels from their tooltips | menu bar, panelkit | M |
+| 6.1 ✅ | **Hint Bubbles**: drawn by the menu bar over its menus, and by our panels from their tooltips | menu bar, panelkit | M |
 | 6.2 ✅ | **Folder Tricks**: inotify watcher, scripts, "Attach a Folder Trick" in the contextual menu | Sniffer | M |
 | 6.3 ✅ | **Automated Tasks** in the Zac menu | `Menu Items` | S |
 | 6.4 | **`zacos9-finder-ctl`**: a documented CLI over the Sniffer's socket | Sniffer | S |
@@ -626,9 +626,8 @@ alongside the others; most are small.
 
 ### Suggested next three sessions
 
-1. **6.1 Hint Bubbles** — seen everywhere; the Help Center was left
-   waiting for it.
-2. **4.1 + 4.2 Shutdown Items and the Shift-at-login safe session** —
-   both small, both in `session/`.
-3. **5.1 Limited accounts** — the next large piece; it wants a short
+1. **5.1 Limited accounts** — the next large piece; it wants a short
    plan first.
+2. **5.2 Puppy Mode** — builds on 5.1's per-account settings.
+3. **Small batch: 4.6 Numbers / Text, 4.8 media autoplay, 6.4
+   `zacos9-finder-ctl`, 9.7 the ⇧ glyph and the Pack's width.**

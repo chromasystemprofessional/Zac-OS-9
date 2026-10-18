@@ -80,6 +80,9 @@ static struct {
 	struct wl_surface *sub_surface;
 	struct wl_subsurface *sub_sub;
 	int sub_x, sub_y, sub_w, sub_h; /* screen position of the border */
+	struct wl_surface *hint_surface; /* Hint Bubbles (hints.c) */
+	struct wl_subsurface *hint_sub;
+	bool hints; /* Show Hint Bubbles, read when a menu opens */
 
 	struct mb_bar model;
 	bool rebuild_pending;
@@ -269,6 +272,53 @@ static void draw_submenu(struct menu_item *parent_items, int parent_n) {
 	free(px);
 }
 
+/* The selected item's Hint Bubble, beside its menu with the tail pointing
+ * into the item; on the menu's left if there's no room on its right. */
+static void draw_hint(struct menu_item *parent_items, int parent_n) {
+	struct mb_menu *m = open_menu_ptr(), *s = sub_menu_ptr();
+	const struct mb_item *it = NULL;
+	int mx = g.menu_x, mw = g.menu_w, iy = 0;
+	if (g.hints && g.blinks_left == 0 && s && g.sub_selected >= 0) {
+		struct menu_item items[MAX_ITEMS];
+		to_menu_items(s, items);
+		it = &s->items[g.sub_selected];
+		mx = g.sub_x, mw = g.sub_w;
+		iy = g.sub_y + menu_item_top(items, s->n, g.sub_selected);
+	} else if (g.hints && g.blinks_left == 0 && g.selected >= 0 && g.sub_parent < 0) {
+		it = &m->items[g.selected];
+		iy = g.menu_y + menu_item_top(parent_items, parent_n, g.selected);
+	}
+	char buf[256];
+	const char *text = it ? hint_text(it, buf, sizeof(buf)) : NULL;
+	int w, h;
+	uint32_t *px = NULL;
+	bool left = false;
+	if (text) {
+		px = hint_paint(text, false, &w, &h);
+		if (px && mx + mw - 8 + w > g.width) {
+			free(px);
+			px = hint_paint(text, true, &w, &h);
+			left = true;
+		}
+	}
+	if (!px) {
+		wl_surface_attach(g.hint_surface, NULL, 0, 0);
+		wl_surface_commit(g.hint_surface);
+		return;
+	}
+	int x = left ? mx + 8 - w : mx + mw - 8;
+	int y = iy + MENU_ITEM_H / 2 - HINT_TIP_Y;
+	if (g.height > 0 && y + h > g.height) {
+		y = g.height - h;
+	}
+	if (y < MBAR_HEIGHT) {
+		y = MBAR_HEIGHT;
+	}
+	wl_subsurface_set_position(g.hint_sub, x < 0 ? 0 : x, y);
+	present(g.hint_surface, px, w, h);
+	free(px);
+}
+
 static void draw_menu(void) {
 	struct mb_menu *m = open_menu_ptr();
 	if (!m || !g.overlay_configured) {
@@ -314,6 +364,7 @@ static void draw_menu(void) {
 	present(g.menu_surface, px, w, h);
 	free(px);
 	draw_submenu(items, m->n);
+	draw_hint(items, m->n);
 	wl_surface_commit(g.overlay); /* applies the subsurface position */
 }
 
@@ -370,6 +421,10 @@ static void create_overlay(void) {
 	g.sub_sub = wl_subcompositor_get_subsurface(g.subcompositor, g.sub_surface, g.overlay);
 	wl_subsurface_set_desync(g.sub_sub);
 	wl_surface_set_input_region(g.sub_surface, none);
+	g.hint_surface = wl_compositor_create_surface(g.compositor);
+	g.hint_sub = wl_subcompositor_get_subsurface(g.subcompositor, g.hint_surface, g.overlay);
+	wl_subsurface_set_desync(g.hint_sub);
+	wl_surface_set_input_region(g.hint_surface, none);
 	wl_region_destroy(none);
 
 	g.overlay_configured = false;
@@ -380,6 +435,8 @@ static void destroy_overlay(void) {
 	if (!g.overlay) {
 		return;
 	}
+	wl_subsurface_destroy(g.hint_sub);
+	wl_surface_destroy(g.hint_surface);
 	wl_subsurface_destroy(g.sub_sub);
 	wl_surface_destroy(g.sub_surface);
 	wl_subsurface_destroy(g.menu_sub);
@@ -433,6 +490,9 @@ static void open_menu(enum side side, int index) {
 	g.open_index = index;
 	g.selected = -1;
 	g.sub_parent = g.sub_selected = -1;
+	char hints[8];
+	g.hints = !pl_setting("hint-bubbles", hints, sizeof(hints)) ||
+		(strcmp(hints, "0") != 0 && strcmp(hints, "false") != 0);
 	create_overlay();
 	draw_bar();
 	draw_menu();

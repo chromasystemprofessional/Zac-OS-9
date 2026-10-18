@@ -205,6 +205,7 @@ CollarPanel::CollarPanel() : m_host(this) {
 	m_visibility.add("Show Collar", QPoint(RADIO_X, RADIO_Y));
 	m_visibility.add("Hide Collar", QPoint(RADIO_X, RADIO_Y + RADIO_STEP));
 	m_visibility.add("Hot key to show/hide", QPoint(RADIO_X, RADIO_Y + 2 * RADIO_STEP));
+	m_visibility.hint = "Chooses whether The Collar is shown, hidden, or shown and hidden with a hot key.";
 	char value[16];
 	if (pl_setting("collar-visibility", value, sizeof(value))) {
 		m_visibility.selected = !strcmp(value, "hide") ? 1 : !strcmp(value, "hotkey") ? 2 : 0;
@@ -218,6 +219,7 @@ CollarPanel::CollarPanel() : m_host(this) {
 
 	m_hotkey = collarhotkey::current();
 	m_define = PanelButton("Define hot key…", QRect(82, 85, 130, 20));
+	m_define.hint = "Sets the key that shows and hides The Collar.";
 	m_define.enabled = m_visibility.selected == 2;
 	m_define.clicked = [this] { defineHotKey(); };
 

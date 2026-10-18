@@ -268,4 +268,14 @@ void kbmenu_abbrev(const char *code, const char *name, char *out, size_t size);
 /* Adds the keyboard menu, if more than one layout is in use. */
 void kbmenu_add(struct mb_menu *menus, int *n);
 
+/* hints.c: Hint Bubbles over the menu bar's menus. */
+#define HINT_TAIL_W 12 /* the tail's length */
+#define HINT_TAIL_H 6
+#define HINT_TIP_Y 6   /* the tail's tip, from the bubble's top */
+/* The item's hint, or NULL (programs' own menu items have none). */
+const char *hint_text(const struct mb_item *it, char *buf, size_t n);
+/* A bubble with the text wrapped in it, the tail's tip at (0, HINT_TIP_Y),
+ * or at the right edge if tail_right. Free with free(). */
+uint32_t *hint_paint(const char *text, bool tail_right, int *w, int *h);
+
 #endif

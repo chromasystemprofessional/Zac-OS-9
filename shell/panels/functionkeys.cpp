@@ -38,11 +38,14 @@ public:
 			names << a.name;
 		}
 		m_list.frame = QRect(16, 36, W - 32, 12 * PL_LIST_ROW_H + 2);
+		m_host.hintAreas.push_back({ &m_list.frame, "Your programs. Choose the one the F-key opens." });
 		m_list.setItems(names);
 		m_list.state.selected = m_apps.isEmpty() ? -1 : 0;
 		const int by = H - 14 - PL_BUTTON_H;
 		m_document = PanelButton("Document…", QRect(16, by, 96, PL_BUTTON_H));
+		m_document.hint = "Chooses a document for the F-key to open instead.";
 		m_folder = PanelButton("Folder…", QRect(120, by, 80, PL_BUTTON_H));
+		m_folder.hint = "Chooses a folder for the F-key to open instead.";
 		m_cancel = PanelButton("Cancel", QRect(W - 16 - 2 * 76 - 10, by, 76, PL_BUTTON_H));
 		m_choose = PanelButton("Choose", QRect(W - 16 - 76, by, 76, PL_BUTTON_H), true);
 		m_document.clicked = [this] { pickFile(false); };
@@ -133,7 +136,9 @@ public:
 			m_items[i] = pl_setting(key.constData(), v, sizeof(v)) ? QString::fromUtf8(v) : QString();
 			const int y = rowY(i);
 			m_choose[i] = PanelButton("Choose…", QRect(W - 16 - 64 - 8 - 84, y, 84, PL_BUTTON_H));
+			m_choose[i].hint = "Chooses the program, document or folder this F-key opens.";
 			m_clear[i] = PanelButton("Clear", QRect(W - 16 - 64, y, 64, PL_BUTTON_H));
+			m_clear[i].hint = "Makes this F-key an ordinary key again.";
 			m_choose[i].clicked = [this, i] {
 				ChooseItemDialog choose(this);
 				if (choose.exec() == QDialog::Accepted && !choose.path().isEmpty()) {
@@ -150,6 +155,7 @@ public:
 		}
 		m_command = PanelCheckbox("Use F1 through F12 as function keys (hold ⌘ for these)",
 			QPoint(16, rowY(12) + 6));
+		m_command.hint = "Leaves F1 to F12 to programs; hold ⌘ with an F-key to open what it is set to.";
 		m_command.on = pl_setting("fkeys-command", v, sizeof(v)) && strcmp(v, "true") == 0;
 		m_host.checks = { &m_command };
 		const int by = H - 14 - PL_BUTTON_H;

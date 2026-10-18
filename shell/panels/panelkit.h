@@ -24,6 +24,7 @@
 /* A Platinum list box: its rows, selection and scrolling. */
 struct PanelList {
 	QRect frame; /* the black frame */
+	QString hint;
 	QStringList items;
 	std::vector<std::unique_ptr<Text>> texts;
 	std::vector<int> icons;
@@ -60,6 +61,7 @@ private:
 /* A push button that tracks the mouse and fires on release inside it. */
 struct PanelButton {
 	QRect rect; /* the button, without a default ring */
+	QString hint; /* its Hint Bubble (PanelHost shows it) */
 	std::unique_ptr<Text> label;
 	bool isDefault = false;
 	bool enabled = true;
@@ -78,6 +80,7 @@ struct PanelButton {
 /* A checkbox with its label; clicking the box or the label toggles it. */
 struct PanelCheckbox {
 	QPoint pos; /* the box's top-left */
+	QString hint;
 	std::unique_ptr<Text> label;
 	bool on = false;
 	bool enabled = true;
@@ -98,6 +101,7 @@ struct PanelCheckbox {
  * picks a step, and `changed` fires as the value changes. */
 struct PanelSlider {
 	QPoint pos; /* the track's left end, at the thumb's top */
+	QString hint;
 	int width = 200;
 	int steps = 7;
 	int value = 0;
@@ -125,6 +129,7 @@ struct PanelRadios {
 		std::unique_ptr<Text> label;
 	};
 	std::vector<Button> buttons;
+	QString hint; /* the same for every button */
 	int selected = 0;
 	bool enabled = true;
 	std::function<void(int)> changed;
@@ -136,9 +141,7 @@ struct PanelRadios {
 	bool press(QPoint p);
 	bool move(QPoint p);
 	bool release(QPoint p);
-
-private:
-	int hit(QPoint p) const;
+	int hit(QPoint p) const; /* the button at p, or -1 */
 };
 
 /* A titled group box drawn on `bg`. */
@@ -166,6 +169,7 @@ constexpr int PANEL_ICON_W = 20;
  * release quickly to leave the menu open (a "sticky" menu). */
 struct PanelPopup {
 	QRect rect; /* the button: PL_POPUP_H tall */
+	QString hint;
 	QString label;
 	std::vector<PopupItem> items;
 	int selected = 0;
@@ -215,6 +219,7 @@ QString accountPictureFile(const QString &user);
  * and select; ⌘A, ⌘C, ⌘X and ⌘V work. */
 struct PanelEdit {
 	QRect rect; /* the black frame; PL_EDIT_H tall for one line */
+	QString hint;
 	QString text;
 	bool multiline = false;
 	bool password = false;
@@ -260,7 +265,14 @@ public:
 	PanelEdit *focus = nullptr;
 	PanelButton *defaultButton = nullptr, *cancelButton = nullptr;
 
+	/* Hint Bubbles for what the host doesn't track (sliders, lists,
+	 * labels): checked before the controls' own hints. */
+	std::vector<std::pair<const QRect *, QString>> hintAreas;
+
 	explicit PanelHost(QWidget *w);
+	~PanelHost();
+	/* The hint at pos (Help ▸ Show Hint Bubbles), or empty. */
+	QString hintAt(QPoint pos) const;
 	void setFocus(PanelEdit *e);
 	void paintControls(pl_canvas *c, uint32_t bg) const;
 	bool hostPress(QMouseEvent *e);
@@ -273,7 +285,13 @@ private:
 	std::unique_ptr<QTimer> m_caret;
 	bool m_caretOn = true;
 	PanelEdit *m_pressedEdit = nullptr;
+	QObject *m_hints;
 };
+
+/* Hint Bubbles: answers a tooltip event on w with at(pos), shown as a
+ * tooltip (the Platinum style draws it as a bubble, and swallows it with
+ * Help ▸ Show Hint Bubbles off). True if e was a tooltip event. */
+bool panelHintEvent(QWidget *w, QEvent *e, const std::function<QString(QPoint)> &at);
 
 /* Text at a pen position, and a label right-aligned so its ink ends at
  * `right`; both on `baseline`. */

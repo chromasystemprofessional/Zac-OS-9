@@ -92,6 +92,36 @@ protected:
 	virtual void keyExtra(QKeyEvent *) {}
 	virtual void moveExtra(QPoint) {}
 	virtual void releaseExtra(QPoint) {}
+	/* Hint Bubbles for lists, pop-ups and buttons, by their rectangles. */
+	std::vector<std::pair<const QRect *, QString>> m_hintRects;
+	/* Hint Bubbles for controls the panel draws itself. */
+	virtual QString hintExtra(QPoint) const { return {}; }
+
+	bool event(QEvent *e) override {
+		return panelHintEvent(this, e, [this](QPoint p) {
+			for (const PanelSlider *s : m_sliders) {
+				if (s->hitRect().contains(p) && !s->hint.isEmpty()) {
+					return s->hint;
+				}
+			}
+			for (const PanelRadios *r : m_radios) {
+				if (r->hit(p) >= 0 && !r->hint.isEmpty()) {
+					return r->hint;
+				}
+			}
+			for (const PanelCheckbox *k : m_checks) {
+				if (k->hitRect().contains(p) && !k->hint.isEmpty()) {
+					return k->hint;
+				}
+			}
+			for (const auto &[r, text] : m_hintRects) {
+				if (r->contains(p)) {
+					return text;
+				}
+			}
+			return hintExtra(p);
+		}) || QWidget::event(e);
+	}
 
 	void paintEvent(QPaintEvent *) override {
 		const int h = height();
@@ -257,6 +287,11 @@ public:
 		m_test = QRect(W / 2 + 10, y - 2, W / 2 - M - IN - 12, 52);
 		m_flash.setSingleShot(true);
 		m_flash.callOnTimeout([this] { m_lit = false; update(); });
+		/* Hint Bubbles. */
+		m_tracking.hint = "Sets how fast the pointer moves when you move the mouse.";
+		m_speed.hint = "Sets how quickly you must click twice for a double-click.";
+		m_tracks.hint = "Leaves a trail behind the pointer, so it is easier to follow.";
+		m_ibeam.hint = "Makes the text pointer (the I-beam) thicker, so it is easier to see.";
 	}
 
 protected:
@@ -343,6 +378,12 @@ public:
 		m_caret.start(pl_caret_blink_ms() / 2);
 		m_fkeys = PanelButton("Function Keys…", QRect(W - M - 2 - 120, G3 - 6 + PL_EDIT_H + 12, 120, PL_BUTTON_H));
 		m_fkeys.clicked = [this] { showFunctionKeys(this); };
+		/* Hint Bubbles. */
+		m_rate.hint = "Sets how fast a key repeats while you hold it down. Off: keys never repeat.";
+		m_delay.hint = "Sets how long you hold a key down before it starts to repeat.";
+		m_option.hint = "Switches keyboard layouts with Command-Option-Space as well as Command-Space.";
+		m_hintRects.push_back({ &m_list.frame, "The keyboard layouts you can type with. Check the ones you want in the keyboard menu." });
+		m_hintRects.push_back({ &m_fkeys.rect, "Opens Function Keys, where F-keys can open programs, documents and folders." });
 	}
 
 protected:
@@ -549,6 +590,13 @@ public:
 		m_refresh.callOnTimeout([this] { m_sound.refresh(); });
 		m_refresh.start(2000);
 		m_sound.refresh();
+		/* Hint Bubbles. */
+		m_volume.hint = "Sets how loud the computer plays sound.";
+		m_balance.hint = "Sets how much sound comes from the left and right speakers.";
+		m_alert.hint = "Sets how loud alert sounds are, compared with other sound.";
+		m_mute.hint = "Turns all sound off. Click again to turn it back on.";
+		m_hintRects.push_back({ &m_output.rect, "Chooses the speakers or headphones that play sound." });
+		m_hintRects.push_back({ &m_input.rect, "Chooses the microphone or line input that records sound." });
 	}
 
 protected:
@@ -675,6 +723,12 @@ public:
 	MonitorsPanel() : ControlPanel("Monitors", 236) {
 		readOutputs();
 		build();
+		/* Hint Bubbles. */
+		m_scale.hint = "Sets how big everything on the screen is drawn: each dot as one, two or three screen pixels.";
+		if (m_mirror) {
+			m_mirror->hint = "Shows the same picture on every screen.";
+		}
+		m_hintRects.push_back({ &m_list.frame, "The resolutions this screen can show. Click one to use it." });
 	}
 
 protected:
@@ -1155,6 +1209,9 @@ public:
 		m_system.changed = [](int v) { setInt("system-sleep", SLEEP_MINUTES[v]); };
 		m_notes = { "A window filling a screen keeps that screen awake,",
 			"and the system too. Any key or the mouse wakes them." };
+		/* Hint Bubbles. */
+		m_display.hint = "Sets how long the computer waits, while you aren't using it, before it turns the screen off.";
+		m_system.hint = "Sets how long the computer waits, while you aren't using it, before it goes to sleep.";
 	}
 
 protected:
@@ -1230,6 +1287,12 @@ public:
 		m_clock.start();
 		m_tick.callOnTimeout([this] { update(m_preview); });
 		m_tick.start(40);
+		/* Hint Bubbles. */
+		m_which.hint = "Chooses what the screen shows while you aren't using the computer.";
+		m_after.hint = "Sets how long the computer waits, while you aren't using it, before the screen saver starts.";
+		if (m_password) {
+			m_password->hint = "Asks for your login password before the screen saver or sleep gives the screen back.";
+		}
 	}
 
 	~ScreenSaverPanel() override {
@@ -1317,6 +1380,11 @@ public:
 		};
 		m_checks.push_back(&m_submenus);
 		m_notes = { "Turn this off to list recent items directly", "in the Zac menu, with their category." };
+		/* Hint Bubbles. */
+		m_submenus.hint = "Shows recent items in submenus of the Zac menu, rather than all in the menu itself.";
+		for (PanelPopup &u : m_counts) {
+			m_hintRects.push_back({ &u.rect, "Sets how many recent items the Zac menu remembers." });
+		}
 	}
 
 protected:
@@ -1382,6 +1450,11 @@ public:
 		m_notes = { "Programs that ask for the system's browser, mail program", "or downloads folder use these." };
 		m_webPending = true;
 		m_webProcess.start("zacos9-web-sharing", { "status" });
+		/* Hint Bubbles. */
+		m_hintRects.push_back({ &m_browser.rect, "Chooses the program that opens web pages." });
+		m_hintRects.push_back({ &m_mail.rect, "Chooses the program that writes e-mail." });
+		m_hintRects.push_back({ &m_select.rect, "Chooses the folder where downloaded files go." });
+		m_webSharing.hint = "Lets other computers read the pages in your Web Pages folder with a web browser.";
 	}
 
 protected:
@@ -1576,6 +1649,12 @@ public:
 		m_radios.push_back(&m_documents);
 		m_notes = { "With the desktop hidden, Command-Tab or the Application",
 			"menu brings the Sniffer back." };
+		/* Hint Bubbles. */
+		m_desktop.hint = "Shows the desktop's icons while another program is in front. Off: they hide, and a click on the desktop does nothing.";
+		m_toyBox.hint = "Opens the Toy Box when you log in.";
+		m_menu.hint = "Sets how many times a menu item blinks when you choose it.";
+		m_caretRate.hint = "Sets how fast the insertion point blinks in text.";
+		m_documents.hint = "Chooses the folder Open and Save dialogs start in.";
 	}
 
 protected:
@@ -1660,6 +1739,12 @@ public:
 		enableDragging();
 		m_notes = { "Clicking: tap the pad to click. Dragging: tap twice and keep",
 			"your finger down to drag. Drag Lock: tap again to let go." };
+		/* Hint Bubbles. */
+		m_tracking.hint = "Sets how fast the pointer moves when you move your finger on the trackpad.";
+		m_speed.hint = "Sets how quickly you must tap twice for a double-click.";
+		m_clicking.hint = "Lets you tap the trackpad to click.";
+		m_dragging.hint = "Lets you tap twice and slide your finger to drag.";
+		m_dragLock.hint = "Keeps a drag going when you lift your finger, until you tap again.";
 	}
 
 private:
@@ -1714,6 +1799,15 @@ public:
 		reload();
 		m_notes = { "Mouse Keys: the keypad's 1-9 move the pointer, 5 clicks, 0 holds",
 			"the button down and . lets it go. ⌘-Option-Up and Down zoom." };
+		/* Hint Bubbles. */
+		m_sticky.hint = "Sticky Keys: press Shift, Command, Option or Control and then a key, rather than both at once.";
+		m_slow.hint = "Slow Keys: a key types only after you hold it down for a moment, so brief presses are ignored.";
+		m_slowDelay.hint = "Sets how long you hold a key down before it types.";
+		m_mouse.hint = "Mouse Keys: move the pointer with the numeric keypad; 5 clicks.";
+		m_mouseDelay.hint = "Sets how long you hold a keypad key before the pointer starts to move.";
+		m_mouseSpeed.hint = "Sets how fast the pointer moves with Mouse Keys.";
+		m_zoom.hint = "Zoom: magnifies the screen around the pointer.";
+		m_zoomFactor.hint = "Sets how much Zoom magnifies.";
 	}
 
 protected:
