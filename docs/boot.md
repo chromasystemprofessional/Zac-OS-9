@@ -49,6 +49,21 @@ first, together. After the handover, the compositor re-reads
 or after a log out), it shows what `/proc/modules` lists, marching in
 while the Welcome box is up.
 
+### Changing an extension's icon
+
+`tools/extension-icons/extension_icons.py` (a developer tool: never built or
+installed; needs python3-tk and Pillow) lists every extension, its icon and
+its place in this boot's parade, and changes the icon: to another built-in
+icon, to an imported picture (fitted to 32 and 16 px, reduced to the icon
+palette), or to pixel art drawn in its editor. **Apply to Source** edits
+`lib/extensions.c`, stores a new picture as `ext-custom-KEY` in
+`assets/icons/platinum-icons.picon`, and runs `tools/icons/build_icons.py`,
+which gives it the enum `PL_ICON_EXT_CUSTOM_KEY` (in the generated
+`lib/icons_custom.h`). Custom icons nothing uses are dropped. Rebuild and
+the splash, the desktop parade and Extensions Manager all show it.
+`--list`, `--set KEY KIND`, `--import KEY PNG` and `--revert KEY` do the
+same from the command line.
+
 ## Splash art from the compositor's code
 
 `boot/make-splash.c` runs at build time. It draws the splash's pictures with

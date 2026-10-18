@@ -1,6 +1,7 @@
 #ifndef ZACOS9_SERVER_H
 #define ZACOS9_SERVER_H
 
+#include <stdio.h>
 #include <sys/types.h>
 #include <wayland-server-core.h>
 #include <wlr/backend.h>
@@ -139,6 +140,14 @@ struct plat_server {
 	struct kb_layouts kb_layouts;
 	struct xkb_keymap *kb_keymap;
 	int kb_current;
+	/* Graphics tablets (tablet.c): pressure and tilt to apps that take
+	 * zwp_tablet_v2, a mouse to every other. */
+	struct wlr_tablet_manager_v2 *tablet_manager;
+	struct wl_list tablets; /* tablet.c plat_tablet.link */
+	struct wl_listener tablet_tool_axis;
+	struct wl_listener tablet_tool_proximity;
+	struct wl_listener tablet_tool_tip;
+	struct wl_listener tablet_tool_button;
 
 	/* Interactive grab state. */
 	enum plat_cursor_mode cursor_mode;
@@ -419,6 +428,20 @@ void input_pointer_button(struct plat_server *server, uint32_t time_msec, uint32
 	enum wl_pointer_button_state state);
 /* The Trackpad panel's settings, to every trackpad. */
 void input_apply_trackpads(struct plat_server *server);
+/* The pointer moved to server->cursor: grabs, focus, image (no frame). */
+void input_pointer_motion(struct plat_server *server, uint32_t time);
+/* Mouse-down activation under the pointer. True if it hit a window frame,
+ * the compositor's to track, not the client's. */
+bool input_press_focus(struct plat_server *server, uint32_t time_msec);
+
+/* tablet.c: graphics tablets (Wacom and the like) */
+void tablet_init(struct plat_server *server);
+void tablet_new(struct plat_server *server, struct wlr_input_device *device);
+/* Put each tablet on its screen (the Tablet panel's choice, else the main
+ * display); again whenever the screens or that choice change. */
+void tablet_map(struct plat_server *server);
+/* "tablet NAME" lines for zacos9-outputs, one per tablet. */
+void tablet_write_status(struct plat_server *server, FILE *f);
 
 /* view.c: window behaviour shared by every client type */
 void view_setup(struct plat_view *view, struct plat_server *server,

@@ -67,6 +67,8 @@ enum pl_icon_kind {
 	PL_ICON_CP_FILETRANSLATOR,
 	PL_ICON_CP_WALKIES,
 	PL_ICON_NETWORK_DISK, /* a network volume (AFP, SMB), as AppleShare's were */
+	/* One extension's own icon each (tools/extension-icons). */
+#include "icons_custom.h"
 	PL_ICON_COUNT,
 };
 

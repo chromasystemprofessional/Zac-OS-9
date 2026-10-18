@@ -8,7 +8,7 @@
  * in $XDG_RUNTIME_DIR/zacos9-outputs-$WAYLAND_DISPLAY:
  *   output NAME WxH scale S nested 0|1 x X y Y main 0|1
  *   mode WxH@mHz
- * and, once, "mirror 0|1". X and Y are the screen's place in the layout
+ * and, once, "mirror 0|1", then "tablet NAME" for each tablet. X and Y are the screen's place in the layout
  * (logical pixels: the size divided by the scale).
  *
  * Several screens: "main-display=NAME" has the menu bar and desktop icons;
@@ -128,6 +128,7 @@ void prefs_write_outputs(struct plat_server *server) {
 			fprintf(f, "mode %dx%d@%d\n", mode->width, mode->height, mode->refresh);
 		}
 	}
+	tablet_write_status(server, f);
 	fclose(f);
 	rename(tmp, path);
 }
@@ -310,6 +311,7 @@ void prefs_apply(struct plat_server *server) {
 		apply_output(server, output);
 	}
 	apply_layout(server);
+	tablet_map(server); /* the Tablet panel's screen, or a new main display */
 	view_refresh_fullscreen(server);
 	prefs_write_outputs(server);
 	idle_update(server); /* the Energy Saver panel's timings */

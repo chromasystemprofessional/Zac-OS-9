@@ -331,6 +331,7 @@ const PanelDef PANELS[] = {
 	{ "Screen Saver", "zacos9-controlpanel", "screensaver" },
 	{ "Sound", "zacos9-controlpanel", "sound" },
 	{ "Startup Disk", "zacos9-controlpanel", "startupdisk" },
+	{ "Tablet", "zacos9-controlpanel", "tablet" },
 	{ "TCP/IP", "zacos9-tcpip", nullptr },
 	{ "Trackpad", "zacos9-controlpanel", "trackpad" },
 	{ "Zac Menu Options", "zacos9-controlpanel", "zacmenu" },

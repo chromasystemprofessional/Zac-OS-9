@@ -424,6 +424,9 @@ static void server_new_input(struct wl_listener *listener, void *data) {
 		apply_trackpad(device);
 		break;
 	}
+	case WLR_INPUT_DEVICE_TABLET:
+		tablet_new(server, device);
+		break;
 	default:
 		break;
 	}
@@ -942,6 +945,11 @@ static void process_cursor_motion(struct plat_server *server, uint32_t time) {
 	refresh_cursor_or_hide(server);
 }
 
+/* The pointer moved (a tablet's pen, too: tablet.c). */
+void input_pointer_motion(struct plat_server *server, uint32_t time) {
+	process_cursor_motion(server, time);
+}
+
 void input_pointer_refocus(struct plat_server *server) {
 	struct timespec now;
 	clock_gettime(CLOCK_MONOTONIC, &now);
@@ -971,6 +979,73 @@ static void cursor_button(struct wl_listener *listener, void *data) {
 	struct plat_server *server = wl_container_of(listener, server, cursor_button);
 	struct wlr_pointer_button_event *event = data;
 	input_pointer_button(server, event->time_msec, event->button, event->state);
+}
+
+/* A press's focus: the window, desktop or shell surface under the pointer.
+ * True if it's the compositor's (a window frame, or a desktop hidden behind
+ * a program), not the client's. */
+static bool press_focus(struct plat_server *server, uint32_t time_msec, uint32_t button) {
+	double sx, sy;
+	struct wlr_surface *surface = NULL;
+	struct plat_view *view = view_at(server, server->cursor->x,
+		server->cursor->y, &surface, &sx, &sy);
+	struct wlr_layer_surface_v1 *layer = surface ?
+		wlr_layer_surface_v1_try_from_wlr_surface(surface) : NULL;
+	if (layer) {
+		/* Shell surfaces (the menu bar) never activate windows, but a
+		 * click on the desktop (the Finder's, on any display) puts the
+		 * Finder in front, its menus in the menu bar. */
+		const bool desktop = layer->namespace &&
+			(strcmp(layer->namespace, "zacos9-desktop") == 0 ||
+			strcmp(layer->namespace, "desktop-extra") == 0);
+		if (desktop && !view_desktop_shown(server)) {
+			/* General Controls hid the desktop behind this program:
+			 * there is nothing there to click. */
+			server->swallowed_button = button;
+			return true;
+		}
+		if (desktop) {
+			/* Option-click: the program you leave hides, too. */
+			struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(server->seat);
+			struct plat_view *left = server->focused_view;
+			if (keyboard && (wlr_keyboard_get_modifiers(keyboard) & WLR_MODIFIER_ALT) &&
+					left && left->app_id && strcmp(left->app_id, "zacos9-finder") != 0) {
+				view_hide_app(server, left->app_id);
+			}
+			view_clear_focus(server);
+		}
+		if (layer->current.keyboard_interactive !=
+				ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_NONE) {
+			layers_focus(layer->data);
+		}
+	} else {
+		struct plat_layer_surface *fl = server->focused_layer;
+		if (fl && fl->layer_surface->current.keyboard_interactive !=
+				ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_EXCLUSIVE) {
+			server->focused_layer = NULL;
+		}
+		if (view && !surface) {
+			enum decor_part part =
+				view_part_at(view, server->cursor->x, server->cursor->y);
+			frame_press(server, view, part, time_msec);
+			return true;
+		}
+		view_focus(view);
+	}
+		return false;
+}
+
+/* The same, for a tablet's pen (tablet.c). */
+bool input_press_focus(struct plat_server *server, uint32_t time_msec) {
+	if (lock_active(server)) {
+		double sx, sy;
+		struct wlr_surface *surface = lock_surface_at(server, server->cursor->x, server->cursor->y, &sx, &sy);
+		if (surface) {
+			input_keyboard_enter(server, surface);
+		}
+		return false;
+	}
+	return press_focus(server, time_msec, 0);
 }
 
 static void pointer_button(struct plat_server *server, uint32_t time_msec, uint32_t button,
@@ -1013,54 +1088,8 @@ static void pointer_button(struct plat_server *server, uint32_t time_msec, uint3
 		return;
 	}
 
-	if (event->state == WL_POINTER_BUTTON_STATE_PRESSED) {
-		double sx, sy;
-		struct wlr_surface *surface = NULL;
-		struct plat_view *view = view_at(server, server->cursor->x,
-			server->cursor->y, &surface, &sx, &sy);
-		struct wlr_layer_surface_v1 *layer = surface ?
-			wlr_layer_surface_v1_try_from_wlr_surface(surface) : NULL;
-		if (layer) {
-			/* Shell surfaces (the menu bar) never activate windows, but a
-			 * click on the desktop (the Finder's, on any display) puts the
-			 * Finder in front, its menus in the menu bar. */
-			const bool desktop = layer->namespace &&
-				(strcmp(layer->namespace, "zacos9-desktop") == 0 ||
-				strcmp(layer->namespace, "desktop-extra") == 0);
-			if (desktop && !view_desktop_shown(server)) {
-				/* General Controls hid the desktop behind this program:
-				 * there is nothing there to click. */
-				server->swallowed_button = event->button;
-				return;
-			}
-			if (desktop) {
-				/* Option-click: the program you leave hides, too. */
-				struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(server->seat);
-				struct plat_view *left = server->focused_view;
-				if (keyboard && (wlr_keyboard_get_modifiers(keyboard) & WLR_MODIFIER_ALT) &&
-						left && left->app_id && strcmp(left->app_id, "zacos9-finder") != 0) {
-					view_hide_app(server, left->app_id);
-				}
-				view_clear_focus(server);
-			}
-			if (layer->current.keyboard_interactive !=
-					ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_NONE) {
-				layers_focus(layer->data);
-			}
-		} else {
-			struct plat_layer_surface *fl = server->focused_layer;
-			if (fl && fl->layer_surface->current.keyboard_interactive !=
-					ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_EXCLUSIVE) {
-				server->focused_layer = NULL;
-			}
-			if (view && !surface) {
-				enum decor_part part =
-					view_part_at(view, server->cursor->x, server->cursor->y);
-				frame_press(server, view, part, event->time_msec);
-				return;
-			}
-			view_focus(view);
-		}
+	if (event->state == WL_POINTER_BUTTON_STATE_PRESSED && press_focus(server, event->time_msec, event->button)) {
+		return;
 	}
 	wlr_seat_pointer_notify_button(server->seat, event->time_msec,
 		event->button, event->state);
@@ -1278,6 +1307,7 @@ void input_init(struct plat_server *server) {
 	wl_signal_add(&vkbd->events.new_virtual_keyboard, &server->new_virtual_keyboard);
 
 	server->seat = wlr_seat_create(server->display, "seat0");
+	tablet_init(server);
 	server->request_cursor.notify = seat_request_cursor;
 	wl_signal_add(&server->seat->events.request_set_cursor, &server->request_cursor);
 	server->request_set_selection.notify = seat_request_set_selection;
