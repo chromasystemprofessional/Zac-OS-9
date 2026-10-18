@@ -44,6 +44,7 @@ Architecture: any
 Depends: ${shlibs:Depends},
          ${misc:Depends},
          accountsservice,
+         malcontent,
          qt6-wayland,
          qt6-svg-plugins,
          qt6-image-formats-plugins,

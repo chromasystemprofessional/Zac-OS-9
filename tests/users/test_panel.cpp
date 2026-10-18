@@ -130,6 +130,21 @@ int main(int argc, char **argv) {
 	check(calls().contains("SetRealName bob Robert Builder") && calls().contains("SetLocked bob True") &&
 		!calls().contains("SetPassword bob"), "only what changed is sent; a blank password keeps it");
 
+	/* Limited: only the chosen programs (malcontent's allowlist). */
+	w = panel.openSelected();
+	waitFor([] { return calls().contains("Get"); }, 500); /* the filter read */
+	w->setLimited(true, { "/usr/bin/gimp", "app/org.example.Paint/x86_64/stable" });
+	check(w->save(), "Bob's programs save");
+	check(waitFor([] { return calls().contains(
+			"SetAppFilter bob True /usr/bin/gimp app/org.example.Paint/x86_64/stable"); }),
+		"a Limited account is an allowlist of its programs");
+	w = panel.openSelected();
+	waitFor([] { return false; }, 300); /* the filter read back */
+	w->setLimited(false, {});
+	check(w->save(), "unlimiting saves");
+	check(waitFor([] { return calls().contains("SetAppFilter bob False\n"); }),
+		"not limited is an empty blocklist");
+
 	/* Refused (no administrator's password): nothing changes. */
 	QFile deny(logPath + ".deny");
 	deny.open(QIODevice::WriteOnly);

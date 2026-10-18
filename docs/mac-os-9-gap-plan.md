@@ -368,7 +368,7 @@ A zram/swap switch in a Memory panel is a possible P3. **→ 8.7**
 | Login window with a user list and password | ✅ | `zacos9-login` (0.1.54); the chosen person's picture from the Users panel (accountsservice's icons folder), or a blank face with their initial. |
 | **Log Out** (Special menu), automatic logout or lock after idle | ✅ | Log Out ✅ (0.1.54); lock after idle ✅ (Screen Saver) |
 | **Users panel**: add/remove accounts, picture, can change password, can log in, can manage accounts | ✅ | `zacos9-controlpanel users` over accountsservice (D-Bus, its own polkit rules: your name and picture freely, the rest with an administrator's password through the session's polkit agent); passwords hashed in the panel by crypt(3). You can't delete, demote or lock yourself. |
-| Account kinds: Normal, **Limited** (chosen apps only), **Puppy Mode** (the simplified desktop for children) | ✗ | P3 L. Limited: allowed-apps list enforced by the Sniffer and menu bar (not a security boundary — say so). **→ 5.1, 5.2** |
+| Account kinds: Normal, **Limited** (chosen apps only), **Puppy Mode** (the simplified desktop for children) | ◐ | Limited ✅: Users ▸ Open… ▸ "Use only chosen programs" and Programs…, kept as malcontent's app filter (an allowlist of program paths and Flatpak refs, in accountsservice, changed only by administrators); `lib/appfilter.c` reads it at login. The Sniffer's Applications folder and its launches (Open, Open With, aliases, Favorites, Toy Box) and the Zac menu's items and Recent Applications leave out or refuse other programs; ZacOS's own (`zacos9-*`) are always allowed. Not a security boundary, and said so. F-keys aren't filtered. Puppy Mode **→ 5.2** |
 | Global options: welcome message, guest account, speak your name, alternate password | ◐ | Welcome message P3 S; guest account P3 M; voice login — . **→ 5.3** |
 | Shared Documents folder | ✗ | `/home/Shared` with a group. P3 S **→ 5.4** |
 | Fast user switching | — | Mac OS 9 didn't have it. |
@@ -545,7 +545,7 @@ partial entries retain the remaining work described in the inventory above.
 
 | # | Work package | Components | Effort |
 |---|---|---|---|
-| 5.1 | **Limited accounts**: allowed programs enforced by the Sniffer and menu bar (not a security boundary; say so) | Users panel, Sniffer, menu bar | L |
+| 5.1 ✅ | **Limited accounts**: allowed programs enforced by the Sniffer and menu bar (not a security boundary; say so) | Users panel, Sniffer, menu bar | L |
 | 5.2 | **Puppy Mode** (Simple Finder) and its Sniffer preference | Sniffer | L |
 | 5.3 | **Guest account** and a welcome message | Users panel, login window | M + S |
 | 5.4 | **Shared Documents** (`/home/Shared` with a group) | `sharing/` | S |
@@ -626,8 +626,6 @@ alongside the others; most are small.
 
 ### Suggested next three sessions
 
-1. **5.1 Limited accounts** — the next large piece; it wants a short
-   plan first.
-2. **5.2 Puppy Mode** — builds on 5.1's per-account settings.
-3. **Small batch: 4.6 Numbers / Text, 4.8 media autoplay, 6.4
+1. **5.2 Puppy Mode** — builds on 5.1's per-account settings.
+2. **Small batch: 4.6 Numbers / Text, 4.8 media autoplay, 6.4
    `zacos9-finder-ctl`, 9.7 the ⇧ glyph and the Pack's width.**

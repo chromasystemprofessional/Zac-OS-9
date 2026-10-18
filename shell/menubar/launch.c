@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <glib.h>
 
+#include "appfilter.h"
 #include "electron.h"
 #include "menubar.h"
 
@@ -104,6 +105,9 @@ struct entry {
 };
 
 static bool read_desktop(const char *path, struct entry *e) {
+	if (!pl_app_allowed_file(path)) {
+		return false; /* a Limited account's other programs aren't listed */
+	}
 	FILE *f = fopen(path, "r");
 	if (!f) {
 		return false;

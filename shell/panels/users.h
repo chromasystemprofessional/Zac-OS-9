@@ -24,6 +24,9 @@ struct Account {
 	QString userName, realName, iconFile, home;
 	qint64 uid = -1;
 	bool admin = false, locked = false;
+	/* Limited (malcontent's allowlist), read when its window opens. */
+	bool filterKnown = false, limited = false;
+	QStringList allowed;
 	/* As the list shows it: the full name, else the short one. */
 	QString shownName() const { return realName.isEmpty() ? userName : realName; }
 };
@@ -53,6 +56,36 @@ public:
 	void remove(qint64 uid, bool removeFiles, Done done);
 	/* A method of org.freedesktop.Accounts.User on `path`. */
 	void callUser(const QString &path, const QString &method, const QVariantList &args, Done done);
+	/* Limited accounts: malcontent's app filter on `path` (lib/appfilter.h).
+	 * `known` is false without malcontent; `limited` is an allowlist. */
+	void appFilter(const QString &path,
+		std::function<void(bool known, bool limited, const QStringList &allowed)> done);
+	void setAppFilter(const QString &path, bool limited, const QStringList &allowed, Done done);
+};
+
+/* The programs a Limited account may use: installed programs, each with a
+ * checkbox. OK hands back malcontent's entries for the checked ones. */
+class ProgramsWindow : public QWidget {
+public:
+	ProgramsWindow(QWidget *parent, const QString &who, const QStringList &allowed,
+		std::function<void(const QStringList &)> done);
+	~ProgramsWindow() override;
+	/* For tests: the programs listed, and checking one as a click would. */
+	QStringList names() const;
+	void toggle(int row);
+	void accept();
+
+protected:
+	void paintEvent(QPaintEvent *) override;
+	void mousePressEvent(QMouseEvent *) override;
+	void mouseMoveEvent(QMouseEvent *) override;
+	void mouseReleaseEvent(QMouseEvent *) override;
+	void wheelEvent(QWheelEvent *) override;
+	void keyPressEvent(QKeyEvent *) override;
+
+private:
+	struct Parts;
+	std::unique_ptr<Parts> d;
 };
 
 class AccountWindow;
@@ -107,6 +140,8 @@ public:
 	void setAdmin(bool admin);
 	void setCanLogIn(bool can);
 	void setPicture(const QString &file);
+	/* Use only chosen programs, and which (malcontent entries). */
+	void setLimited(bool limited, const QStringList &allowed);
 	/* Save: false (with the reason) if it can't be saved as it is. */
 	bool save(QString *problem = nullptr);
 

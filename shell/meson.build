@@ -102,7 +102,7 @@ menubar_exe = executable('zacos9-menubar',
   client_protocol_src,
   finder_protocol,
   dependencies: [platinum_dep, wayland_client, wayland_cursor, xkbcommon_client, gio,
-    dependency('gdk-pixbuf-2.0')],
+    dependency('gdk-pixbuf-2.0'), appfilter_dep],
   install: true,
 )
 
@@ -179,7 +179,7 @@ inhibit_exe = executable('zacos9-inhibit',
 test('menu-launch-feedback',
   executable('test-menu-launch',
     'menubar/test_launch.c', 'menubar/launch.c',
-    dependencies: [platinum_dep, wayland_client, gio],
+    dependencies: [platinum_dep, wayland_client, gio, appfilter_dep],
   ),
   timeout: 10,
 )
@@ -223,7 +223,9 @@ layershellqt = dependency('LayerShellQt', method: 'cmake',
   modules: ['LayerShellQt::Interface'])
 # GIO reads and launches XDG desktop entries for the Applications folder,
 # so the desktop entry specification is followed rather than approximated.
-gio_unix = dependency('gio-unix-2.0')
+# With it, Limited accounts' program filter (lib/appfilter.c): every
+# program that lists or launches applications through GIO uses both.
+gio_unix = [dependency('gio-unix-2.0'), appfilter_dep]
 
 executable('zacos9-autostart',
   'finder/autostart_main.cpp',
@@ -1090,7 +1092,7 @@ test('users-panel', find_program('dbus-run-session'),
       'finder/alert.cpp', 'finder/platinumshell.cpp', finder_protocol,
       link_with: panelkit,
       include_directories: include_directories('finder', 'panels'),
-      dependencies: [platinum_dep, qt6, wayland_client, crypt],
+      dependencies: [platinum_dep, qt6, wayland_client, crypt, gio_unix],
       cpp_args: ['-std=c++17'],
     ).full_path(), files('../tests/users/fake_accounts.py')],
   timeout: 60,

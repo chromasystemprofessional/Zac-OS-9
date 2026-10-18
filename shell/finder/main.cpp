@@ -8,6 +8,8 @@
 #include <QTimer>
 #include <cstdio>
 
+#include "alert.h"
+#include "appdb.h"
 #include "desktop.h"
 #include "diskinit.h"
 #include "filemanager1.h"
@@ -43,6 +45,16 @@ int main(int argc, char *argv[]) {
 	QApplication::setQuitOnLastWindowClosed(false);
 	platinumShellInit();
 	diskInitializationStart([] { Finder::instance().notifyState(); });
+	/* A Limited account opening a program it may not use. */
+	appOnRefused([](const QString &name) {
+		const QString message = QStringLiteral(
+			"You don't have permission to use \"%1\". "
+			"Ask the computer's administrator to add it to your programs.").arg(name);
+		auto *alert = new Alert(message, "OK", QString());
+		alert->setAttribute(Qt::WA_DeleteOnClose);
+		alert->setAccessibleDescription(message);
+		alert->open();
+	});
 
 	QScreen *screen = QGuiApplication::primaryScreen();
 	const auto makeDesktop = [screen] {

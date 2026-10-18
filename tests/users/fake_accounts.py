@@ -52,10 +52,13 @@ XML = """
     <property name="Locked" type="b" access="read"/>
     <property name="SystemAccount" type="b" access="read"/>
   </interface>
+  <interface name="com.endlessm.ParentalControls.AppFilter">
+    <property name="AppFilter" type="(bas)" access="readwrite"/>
+  </interface>
 </node>
 """
 node = Gio.DBusNodeInfo.new_for_xml(XML)
-root_iface, user_iface = node.interfaces
+root_iface, user_iface, filter_iface = node.interfaces
 
 users = {}   # uid -> dict
 objects = {}  # uid -> registration id
@@ -107,9 +110,26 @@ def on_user_get(conn, sender, path, iface, prop):
     return user_props(users[int(path.rsplit("User", 1)[1])])[prop]
 
 
+def on_filter_get(conn, sender, path, iface, prop):
+    return GLib.Variant("(bas)", users[int(path.rsplit("User", 1)[1])]["filter"])
+
+
+def on_filter_set(conn, sender, path, iface, prop, value):
+    """malcontent's app filter: logged as "SetAppFilter NAME ALLOWLIST ENTRY…"."""
+    u = users[int(path.rsplit("User", 1)[1])]
+    allow, entries = value.unpack()
+    log(" ".join(["SetAppFilter", u["name"], str(allow), *entries]))
+    if denied("SetAppFilter"):
+        return False
+    u["filter"] = (allow, entries)
+    return True
+
+
 def add(uid, name, real, type_, system=False):
-    users[uid] = dict(uid=uid, name=name, real=real, type=type_, icon="", locked=False, system=system)
-    objects[uid] = bus.register_object(path_of(uid), user_iface, on_user_call, on_user_get, None)
+    users[uid] = dict(uid=uid, name=name, real=real, type=type_, icon="", locked=False, system=system,
+                      filter=(False, []))
+    objects[uid] = [bus.register_object(path_of(uid), user_iface, on_user_call, on_user_get, None),
+                    bus.register_object(path_of(uid), filter_iface, None, on_filter_get, on_filter_set)]
 
 
 def on_root_call(conn, sender, path, iface, method, params, invocation):
@@ -129,7 +149,8 @@ def on_root_call(conn, sender, path, iface, method, params, invocation):
         invocation.return_value(GLib.Variant("(o)", (path_of(uid),)))
     elif method == "DeleteUser":
         uid, _ = args
-        bus.unregister_object(objects.pop(uid))
+        for registration in objects.pop(uid):
+            bus.unregister_object(registration)
         users.pop(uid)
         invocation.return_value(None)
 

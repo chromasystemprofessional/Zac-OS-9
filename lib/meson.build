@@ -44,6 +44,15 @@ platinum_dep = declare_dependency(
 
 # Pixel tests against the Apple HIG figures (tools/measure/fetch.sh).
 figs_dir = meson.project_source_root() / 'tools/measure/figs'
+# Limited accounts' program filter (malcontent, over accountsservice).
+appfilter_lib = static_library('appfilter', 'appfilter.c',
+  dependencies: dependency('gio-unix-2.0'))
+appfilter_dep = declare_dependency(link_with: appfilter_lib,
+  include_directories: include_directories('.'),
+  dependencies: dependency('gio-unix-2.0'))
+test('appfilter', executable('test-appfilter', 'tests/test_appfilter.c',
+  dependencies: [appfilter_dep]))
+
 figcompare_dep = declare_dependency(
   sources: 'tests/figcompare.c',
   include_directories: include_directories('tests'),
