@@ -144,6 +144,33 @@ installer path, partition-preserving installation, actual Fonts drag/drop,
 audible output/input, and physical hardware coverage. Do not interpret these
 VM results as a complete 1.0 acceptance pass.
 
+### 1.0 acceptance (2026-10-18)
+
+An ISO freshly built by `scripts/build-iso.sh` from the release branch
+(package tests: 142 passed, 0 failed, 4 documented skips) was tested in
+QEMU/KVM on new, disposable 24 GiB disks:
+
+| Check | Result |
+|---|---|
+| ISO boot menu, BIOS (SeaBIOS) | Default entry reached the live desktop and Installer in 26 s (`tests/vm/boot.sh`). |
+| ISO boot menu, UEFI (OVMF) | Same, 26 s (`tests/vm/boot.sh --uefi`). |
+| Whole-disk install, BIOS | `zacos9-install /dev/vda`: six steps in 134 s; GRUB for i386-pc in the MBR. Booted from the disk alone into the Setup Assistant in 31 s. |
+| Install beside other partitions, UEFI | GPT disk with an ESP holding another system's `EFI/Other/other.efi`, an ext4 "Other" partition holding an 8 MiB file, and an empty third partition. `zacos9-install /dev/vda3`: 134 s. Partitions 1 and 2 kept their entries in the table exactly (`sfdisk -d`) and both files their SHA-256; ZacOS added `EFI/ZacOS9` and a `ZacOS9` NVRAM entry first in the boot order. Booted from the disk alone into the Setup Assistant in 31 s. |
+| Installed system | `zacos9` installed, `setup-pending` set, the `macipgw` drop-in present. |
+| Fonts drag/drop, audible output and recording | Checked by hand on the developer's own computer (physical hardware) running 0.2.1. |
+
+The live system was started for the install checks with the ISO's own kernel
+and a serial console added (`console=ttyS0`), so the installer could be
+driven as root; the boot menus themselves were tested separately above.
+
+Notes:
+
+- The installer writes the removable-media fallback loader,
+  `EFI/BOOT/BOOTX64.EFI`, only when the ESP has none, so another system's
+  is never replaced (this disk had none, so ZacOS's was added).
+- Shutting the live system down waits at live-boot's "remove the
+  installation medium" prompt, as on any Debian live medium.
+
 The guest's `macipgw.service` failed with exit status 64. It comes with
 `atalkd` (a Recommends) and needs an IP network of its own, which Debian's
 `/etc/netatalk/macipgw.conf` leaves commented out. ZacOS doesn't use a MacIP
