@@ -918,12 +918,16 @@ int main(int argc, char **argv) {
 	 * belongs to the user, so no ordinary action needs root and none can
 	 * reach into a system location. */
 	bool allInHome = true;
-	for (const QString id : { "home", "system-folder/preferences",
-			"system-folder/fonts", "system-folder/appearance" }) {
+	for (const QString id : { "home", "system-folder/preferences", "system-folder/appearance" }) {
 		const QString real = vfsOpensAs(vfsPathFor(id));
 		allInHome = allInHome && !real.isEmpty() && real.startsWith(root);
 	}
 	check(allInHome, "every writable folder is inside the user's own directories");
+	check(vfsIsFonts(vfsPathFor("system-folder/fonts")) &&
+		vfsAcceptsDrops(vfsPathFor("system-folder/fonts")) &&
+		vfsOpensAs(vfsPathFor("system-folder/fonts")).isEmpty() &&
+		vfsRealCounterpart(vfsPathFor("system-folder/fonts")).startsWith(root),
+		"Fonts is a writable catalog with a user-owned file-chooser counterpart");
 	check(vfsOpensAs(vfsPathFor("applications")).isEmpty() &&
 		vfsOpensAs(vfsPathFor("system-folder/control-panels")).isEmpty(),
 		"the generated folders are not backed by any directory to write to");

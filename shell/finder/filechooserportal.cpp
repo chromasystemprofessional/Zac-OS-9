@@ -1122,7 +1122,7 @@ static void addStartupDiskItems(const QString &virtualPath, const QString &folde
 		const QString entry = QDir(folder).filePath(name);
 		const bool application = node->kind == VKind::Launcher && !node->appId.isEmpty() &&
 			node->actionId.isEmpty();
-		if (node->kind == VKind::Backed || application) {
+		if (node->kind == VKind::Backed || node->kind == VKind::Fonts || application) {
 			const QString real = QFileInfo(vfsRealCounterpart(item->path)).canonicalFilePath();
 			if (!real.isEmpty() && real != "/" && QFile::link(real, entry)) {
 				*realRoots << real;

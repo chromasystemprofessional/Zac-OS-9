@@ -1,11 +1,12 @@
 # Project Status
 
-Updated: 2026-10-17
+Updated: 2026-10-18
 
 ## Completed
 
 | Commit | Feature |
 |---|---|
+| *(uncommitted)* | **Font-aware System Folder > Fonts**: Fontconfig catalog of user/system faces, intrinsic font names rendered from their exact file/face through FreeType and HarfBuzz in icon, small-icon, button and list views. Drop TrueType/OpenType files or collections in to install; move user fonts out or to Trash to uninstall; Option/cross-disk copies leave them installed, and Put Away restores them. System fonts are copy-only; collections transfer once with whole-file removal confirmation. Validated, non-overwriting/staged installs, asynchronous cache refresh after install/removal, external-change watching, registry v14 migration and real user-font access in file choosers. Tests: `finder-fonts`, `finder-selection`, `finder-view-options`, `finder-desktop`, `filechooser-locations`, `filechooser-requests`; Finder builds. `finder-vfs` retains two baseline failures when `/home/Shared` exists (its old three-root-item assumptions), reproduced with unchanged HEAD sources. |
 | *(uncommitted)* | **Network volumes look like network volumes**: a new `network-disk` icon (32 and 16 px; a drive on a network line, as Mac OS 9's AppleShare volumes were drawn) for AFP and SMB volumes on the desktop, in windows, while dragged and in Get Info (`Item::iconKind()`: the kind stays a disk's), and for Recent Servers in the Zac menu. Neighbourhood's own lists still have no icons |
 | *(uncommitted)* | **Control panels' own icons**: 18 original 16 px icons (Mouse, Keyboard, Trackpad, Accessibility, General Controls, Numbers, Text, Date & Time, Zac Menu Options, Appearance, Screen Saver, Users, Keychain Access, The Collar, Speech, Retriever, File Translator, Walkies) in the Platinum palette, shown in the Zac menu's Control Panels; `build_icons.py` makes their 32 px versions by doubling |
 | *(uncommitted)* | **Icons in the Zac menu** (Mac OS 9's Apple menu): a small icon before every item and in Control Panels, Favorites, Recent and Automated Tasks: a program's own (Icon=, via the icon theme), else ZacOS's 16 px icons; dimmed items' icons dimmed. Control Panels now lists Keychain Access, Numbers, Retriever, Speech, Text and Walkies. Checked in a headless session screenshot |

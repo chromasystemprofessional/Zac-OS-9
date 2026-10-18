@@ -23,6 +23,7 @@
 #include "apptrash.h"
 #include "sharingclient.h"
 #include "thumbnails.h"
+#include "fonts.h"
 #include "vfs.h"
 
 static constexpr int LABEL_SHORT_INK = 72; /* inside an 80-px grid cell, with room between */
@@ -59,17 +60,28 @@ static QString middleTruncated(const QString &name, int maxInk, pl_font font) {
 
 const Text &Item::labelText() {
 	if (!label) {
-		label = std::make_unique<Text>(middleTruncated(visibleName(), LABEL_SHORT_INK, nameFont()),
-			LABEL_SHORT_INK, nameFont());
+		label = fontFile.isEmpty() ?
+			std::make_unique<Text>(middleTruncated(visibleName(), LABEL_SHORT_INK, nameFont()),
+				LABEL_SHORT_INK, nameFont()) :
+			std::make_unique<Text>(renderName(LABEL_SHORT_INK));
 	}
 	return *label;
 }
 
 const Text &Item::fullLabelText() {
 	if (!fullLabel) {
-		fullLabel = std::make_unique<Text>(visibleName(), LABEL_MAX_INK, nameFont());
+		fullLabel = std::make_unique<Text>(renderName(LABEL_MAX_INK));
 	}
 	return *fullLabel;
+}
+
+Text Item::renderName(int maxWidth) const {
+	if (fontFile.isEmpty()) {
+		return Text(visibleName(), maxWidth, nameFont());
+	}
+	Text result;
+	result.t = fontRenderName(visibleName(), maxWidth, fontFile, fontFaceIndex);
+	return result;
 }
 
 const QString &Item::kindName() {
@@ -422,7 +434,8 @@ static void labelBox(Item &item, int x, int y, int *l, int *t, int *r, int *b, i
 		*r += shift;
 	}
 	*t = y + PL_ICON_LARGE + LABEL_GAP;
-	*b = *t + LABEL_H - 1;
+	const auto *text = item.shownLabel().t;
+	*b = *t + (item.fontFile.isEmpty() || !text ? LABEL_H : text->height + 2) - 1;
 }
 
 int nearestFreeSlot(QPoint p, const std::function<QPoint(int)> &slot, int slotCount,
@@ -644,7 +657,9 @@ void paintIconLabel(pl_canvas *c, Item &item, int x, int y, bool onDesktop) {
 	} else if (onDesktop) {
 		pl_fill(c, l, t, r, b, C_WHITE);
 	}
-	pl_text(c, item.shownLabel().t, l + LABEL_PAD_X, t + LABEL_BASELINE, ink);
+	const auto *text = item.shownLabel().t;
+	pl_text(c, text, l + LABEL_PAD_X,
+		t + (item.fontFile.isEmpty() || !text ? LABEL_BASELINE : text->baseline + 1), ink);
 }
 
 bool iconItemContains(Item &item, int x, int y, QPoint p) {

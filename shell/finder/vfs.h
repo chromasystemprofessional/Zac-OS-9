@@ -39,6 +39,8 @@ enum class VKind {
 	Launcher,   /* generated: starts an application or a control panel */
 	Unix,       /* the real filesystem root, for inspecting Debian */
 	Resource,   /* lazily generated, provider-backed read-only information */
+	Fonts,      /* installed font faces, backed by Fontconfig */
+	Font,       /* one face; several may share an installation file */
 };
 
 struct VNode {
@@ -63,6 +65,7 @@ struct VNode {
 	bool resourceDirectory = false;
 	QStringList resourceMetadata;
 	QString builtinAction;
+	int fontFaceIndex = 0;
 
 	QString parentId() const {
 		const int slash = id.lastIndexOf('/');
@@ -137,7 +140,7 @@ bool vfsIsAppFolder(const QString &path);
 bool vfsHideApplication(const QString &path);
 /* Brings back every application hidden this way. */
 void vfsShowAllHidden();
-/* Can items be dropped into this virtual folder? A Backed one,
+/* Can items be dropped into this virtual folder? A Backed one, Fonts,
  * Applications (where a dropped install file is installed) and Startup
  * Items (where a dropped application is set to open at login). */
 bool vfsAcceptsDrops(const QString &path);
@@ -148,6 +151,9 @@ QString vfsStartupItemId(const QString &path);
 QString vfsStartupItemsPath();
 /* Is this the Applications folder? */
 bool vfsIsApplications(const QString &path);
+bool vfsIsFonts(const QString &path);
+QString vfsFontFile(const QString &path);
+void vfsFontsChanged();
 
 /* The real filesystem, shown as a second disk for inspecting Debian.
  * Off by default, so the Finder's ordinary views never show Unix. */

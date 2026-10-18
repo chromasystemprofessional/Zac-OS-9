@@ -80,6 +80,9 @@ struct Item {
 	/* An alias (a symbolic link): its name is shown in italics. */
 	bool isAlias = false;
 	pl_font nameFont() const { return isAlias ? PL_FONT_VIEWS_ITALIC : PL_FONT_VIEWS; }
+	QString fontFile;
+	int fontFaceIndex = 0;
+	Text renderName(int maxWidth) const;
 
 	/* For list view. */
 	bool isDir = false;

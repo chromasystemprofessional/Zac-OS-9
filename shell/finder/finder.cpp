@@ -606,6 +606,13 @@ void Finder::openItem(Item *item) {
 	{
 		if (item->isVirtual) {
 			const VNode *node = vfsNode(item->path);
+			if (node && node->kind == VKind::Font) {
+				ResourceDetails details;
+				vfsResourceDetails(item->path, &details.metadata, &details.kind,
+					&details.location, &details.sources, &details.access);
+				InfoWindow::openVirtual(item->path, item->kind, item->name, details);
+				return;
+			}
 			if (node && node->kind == VKind::Launcher) {
 				const QString action = vfsBuiltinAction(item->path);
 				if (action == "system-information") {
@@ -1685,7 +1692,13 @@ void Finder::moveSelectionToTrash() {
 		}
 	}
 	QStringList startupIds;
+	QStringList fontFiles;
 	for (const QString &path : paths) {
+		const QString fontFile = vfsFontFile(path);
+		if (!fontFile.isEmpty()) {
+			fontFiles << fontFile;
+			continue;
+		}
 		const QString startupId = vfsStartupItemId(path);
 		if (!startupId.isEmpty()) {
 			startupIds << startupId;
@@ -1723,6 +1736,9 @@ void Finder::moveSelectionToTrash() {
 	}
 	if (!startupIds.isEmpty()) {
 		removeFromStartupItems(startupIds);
+	}
+	if (!fontFiles.isEmpty()) {
+		trashFontFiles(fontFiles);
 	}
 	changed.removeDuplicates();
 	for (const QString &folder : changed) {
@@ -1939,6 +1955,7 @@ void Finder::emptyTrash(bool option) {
 
 void Finder::folderChanged(const QString &folder) {
 	const QString abs = QDir(folder).absolutePath();
+	refreshUserFontCache(abs);
 	FolderWindow::reloadAll(abs);
 	FoundWindow::reloadAll();
 	if (m_desktop) {

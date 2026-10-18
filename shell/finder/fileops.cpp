@@ -25,6 +25,7 @@
 #include <QTimer>
 #include <QScopedValueRollback>
 #include <QSet>
+#include <QTemporaryDir>
 #include <algorithm>
 #include <mutex>
 #include <sys/stat.h>
@@ -38,41 +39,113 @@
 #include "autostart.h"
 #include "fileassoc.h"
 #include "transferdialog.h"
+#include "fonts.h"
 
 static bool sameDisk(const QString &a, const QString &b) {
 	return QStorageInfo(a).device() == QStorageInfo(b).device();
 }
 
-static void refreshUserFontCache(const QString &directory) {
-	const QString fonts = QStandardPaths::writableLocation(QStandardPaths::FontsLocation);
-	if (fonts.isEmpty() || QDir(directory) != QDir(fonts)) {
+void refreshUserFontCache(const QString &directory) {
+	if (!fontUserDirectory(directory)) {
 		return;
 	}
-	auto *process = new QProcess(QCoreApplication::instance());
-	auto *timeout = new QTimer(process);
-	timeout->setSingleShot(true);
-	QObject::connect(timeout, &QTimer::timeout, process, [process] {
-		process->kill();
-	});
-	QObject::connect(process, &QProcess::finished, process,
-		[process, timeout, directory](int code, QProcess::ExitStatus status) {
-			timeout->stop();
-			if (status != QProcess::NormalExit || code != 0) {
-				Alert::ask("Fonts were copied, but the font list could not be updated for " +
-					directory + ".", "OK", QString());
+	static QSet<QString> running, dirty;
+	if (running.contains(directory)) {
+		dirty.insert(directory);
+		return;
+	}
+	running.insert(directory);
+	QTimer::singleShot(0, QCoreApplication::instance(), [directory] {
+		auto *process = new QProcess(QCoreApplication::instance());
+		auto *timeout = new QTimer(process);
+		const auto finished = [directory] {
+			running.remove(directory);
+			vfsFontsChanged();
+			if (dirty.remove(directory)) {
+				refreshUserFontCache(directory);
 			}
-			process->deleteLater();
+		};
+		timeout->setSingleShot(true);
+		QObject::connect(timeout, &QTimer::timeout, process, [process] {
+			process->setProperty("font-cache-timeout", true);
+			process->kill();
 		});
-	QObject::connect(process, &QProcess::errorOccurred, process,
-		[process, timeout](QProcess::ProcessError error) {
-			if (error == QProcess::FailedToStart) {
+		QObject::connect(process, &QProcess::finished, process,
+			[process, timeout, directory, finished](int code, QProcess::ExitStatus status) {
 				timeout->stop();
-				Alert::ask("Fonts were copied, but fc-cache could not be started.", "OK", QString());
+				if (status != QProcess::NormalExit || code != 0) {
+					const QString reason = process->property("font-cache-timeout").toBool() ?
+						"The refresh timed out." : QString::fromUtf8(process->readAllStandardError());
+					Alert::ask("The font files changed, but the font cache could not be updated for " +
+						directory + ". " + reason, "OK", QString());
+				}
+				finished();
 				process->deleteLater();
-			}
-		});
-	process->start("fc-cache", { "-f", directory });
-	timeout->start(30000);
+			});
+		QObject::connect(process, &QProcess::errorOccurred, process,
+			[process, timeout, finished](QProcess::ProcessError error) {
+				if (error == QProcess::FailedToStart) {
+					timeout->stop();
+					Alert::ask("The font files changed, but fc-cache could not be started.", "OK", QString());
+					finished();
+					process->deleteLater();
+				}
+			});
+		process->start("fc-cache", QDir(directory).exists() ?
+			QStringList{ "-f", directory } : QStringList{ "-f" });
+		timeout->start(30000);
+	});
+}
+
+static bool fontRemovalAllowed(const QStringList &files, bool confirm) {
+	bool collection = false;
+	for (const QString &file : files) {
+		if (!fontCanRemove(file)) {
+			Alert::ask("This font cannot be removed: " + file +
+				". Only your own installed fonts can be moved out or put in Trash. "
+				"Option-drag to export a copy instead.", "OK", QString());
+			return false;
+		}
+		QString error;
+		const auto faces = fontInspect(file, &error);
+		if (faces.empty()) {
+			Alert::ask(error, "OK", QString());
+			return false;
+		}
+		collection |= faces.size() > 1;
+	}
+	return !confirm || !collection || Alert::ask(
+		"Moving a font collection removes every font face in that file. Continue?",
+		"Continue", "Cancel");
+}
+
+static bool fontTransferAllowed(const QStringList &files, const QString &destination, bool copy) {
+	QStringList moving;
+	for (const QString &file : files) {
+		if (!copy && sameDisk(file, destination)) {
+			moving << file;
+		}
+	}
+	return fontRemovalAllowed(moving, true);
+}
+
+bool trashFontFiles(const QStringList &files) {
+	QStringList unique = files;
+	unique.removeDuplicates();
+	if (!fontRemovalAllowed(unique, true)) {
+		return false;
+	}
+	bool removed = true;
+	for (const QString &file : unique) {
+		if (!fontCanRemove(file) || !QFile::moveToTrash(file)) {
+			Alert::ask("The font could not be moved to Trash: " + file, "OK", QString());
+			removed = false;
+			continue;
+		}
+		Finder::instance().folderChanged(QFileInfo(file).absolutePath());
+	}
+	Finder::instance().folderChanged(trashFilesPath());
+	return removed;
 }
 
 struct TransferState {
@@ -299,6 +372,15 @@ QStringList transferItems(const QStringList &paths, const QString &destDir, bool
 		Alert::ask("The destination folder is unavailable. Nothing was transferred.", "OK", QString());
 		return {};
 	}
+	if (fontUserDirectory(realDest)) {
+		for (const QString &src : paths) {
+			QString error;
+			if (!fontCanInstall(src, &error)) {
+				Alert::ask(error, "OK", QString());
+				return {};
+			}
+		}
+	}
 	for (const QString &src : paths) {
 		if (appTrashMarker(src)) {
 			Alert::ask("Queued applications cannot be copied or moved as files. "
@@ -318,7 +400,7 @@ QStringList transferItems(const QStringList &paths, const QString &destDir, bool
 		}
 		const bool sameFolder = QFileInfo(info.absolutePath()).canonicalFilePath() == realDest;
 		const bool copy = forceCopy || !sameDisk(srcAbs, destAbs);
-		if (sameFolder && !copy) {
+		if (sameFolder && (!copy || fontUserDirectory(realDest))) {
 			continue; /* dropped where it already is */
 		}
 		QString name = info.fileName();
@@ -395,8 +477,16 @@ QStringList transferItems(const QStringList &paths, const QString &destDir, bool
 				break;
 			}
 			state.current(task.src, task.copy ? "Copying" : "Moving");
-			bool ok = task.copy ? copyRecursively(task.src, task.target, state) :
-				QDir().rename(task.src, task.target);
+			bool ok;
+			if (task.copy && fontUserDirectory(realDest)) {
+				QTemporaryDir staging(realDest + "/.zacos-font-XXXXXX");
+				ok = staging.isValid() &&
+					copyRecursively(task.src, staging.filePath("pending"), state) &&
+					QDir().rename(staging.filePath("pending"), task.target);
+			} else {
+				ok = task.copy ? copyRecursively(task.src, task.target, state) :
+					QDir().rename(task.src, task.target);
+			}
 			if (ok) {
 				if (!aliasMoveRecord(task.src, task.target, task.copy)) {
 					state.errors << "The item was transferred, but its alias identity record could "
@@ -479,6 +569,23 @@ QMimeData *itemDragMime(const std::vector<Item *> &items) {
 	const bool anyVirtual = std::any_of(items.begin(), items.end(),
 		[](const Item *item) { return item->isVirtual; });
 	auto *mime = new QMimeData;
+	const bool allFonts = !items.empty() && std::all_of(items.begin(), items.end(),
+		[](const Item *item) { return !item->fontFile.isEmpty(); });
+	if (allFonts) {
+		QList<QUrl> urls;
+		QJsonArray files;
+		QSet<QString> seen;
+		for (const Item *item : items) {
+			if (!seen.contains(item->fontFile)) {
+				seen.insert(item->fontFile);
+				urls << QUrl::fromLocalFile(item->fontFile);
+				files.append(item->fontFile);
+			}
+		}
+		mime->setUrls(urls);
+		mime->setData(FONT_ITEMS_MIME, QJsonDocument(files).toJson(QJsonDocument::Compact));
+		return mime;
+	}
 	if (anyVirtual) {
 		mime->setData(ICON_MOVE_MIME, QByteArray());
 		QJsonArray applications;
@@ -542,7 +649,11 @@ void startItemDrag(QWidget *source, const std::vector<Item *> &items,
 		return;
 	}
 	const bool anyVirtual = std::any_of(items.begin(), items.end(),
-		[](const Item *item) { return item->isVirtual; });
+		[](const Item *item) { return item->isVirtual && item->fontFile.isEmpty(); });
+	const bool fonts = std::all_of(items.begin(), items.end(),
+		[](const Item *item) { return !item->fontFile.isEmpty(); });
+	const bool protectedFonts = fonts && std::any_of(items.begin(), items.end(),
+		[](const Item *item) { return !fontCanRemove(item->fontFile); });
 	QRect bounds;
 	for (const QPoint &o : itemOrigins) {
 		bounds = bounds.united(QRect(o, QSize(PL_ICON_LARGE, PL_ICON_LARGE)));
@@ -561,9 +672,11 @@ void startItemDrag(QWidget *source, const std::vector<Item *> &items,
 	drag->setMimeData(itemDragMime(items));
 	drag->setPixmap(pixmap);
 	drag->setHotSpot(pointer - bounds.topLeft());
-	const Qt::DropAction done = drag->exec(
+	const Qt::DropAction done = drag->exec(protectedFonts ? Qt::CopyAction :
+		fonts ? Qt::MoveAction | Qt::CopyAction :
 		anyVirtual ? Qt::MoveAction | Qt::LinkAction :
-			Qt::MoveAction | Qt::CopyAction | Qt::LinkAction, Qt::MoveAction);
+			Qt::MoveAction | Qt::CopyAction | Qt::LinkAction,
+		protectedFonts ? Qt::CopyAction : Qt::MoveAction);
 
 	/* Their own window always takes such a drag back; anywhere else
 	 * leaves it nowhere to go, so say why rather than do nothing. */
@@ -754,6 +867,40 @@ QStringList dropClippings(QDropEvent *e, const Item *target, const QString &fold
 }
 
 void dropItems(QDropEvent *e, const Item *target, const QString &folder) {
+	const bool fontDrag = e->mimeData()->hasFormat(FONT_ITEMS_MIME);
+	const QString fontDestination = target ? target->path : folder;
+	if (fontDrag) {
+		const auto document = QJsonDocument::fromJson(e->mimeData()->data(FONT_ITEMS_MIME));
+		QStringList declared;
+		bool valid = document.isArray();
+		if (document.isArray()) {
+			for (const auto &entry : document.array()) {
+				if (entry.isString() && QDir::isAbsolutePath(entry.toString())) {
+					declared << entry.toString();
+				} else {
+					valid = false;
+				}
+			}
+		}
+		const QStringList paths = draggedPaths(e->mimeData());
+		if (!valid || declared.isEmpty() || declared.size() > 4096 || declared != paths) {
+			Alert::ask("The dragged font information is invalid.", "OK", QString());
+			e->ignore();
+			return;
+		}
+		for (const QString &path : paths) {
+			QString error;
+			if (fontInspect(path, &error).empty()) {
+				Alert::ask(error, "OK", QString());
+				e->ignore();
+				return;
+			}
+		}
+		if (vfsIsFonts(fontDestination)) {
+			e->ignore(); // Already installed; an internal drop only arranges icons.
+			return;
+		}
+	}
 	/* Documents dropped on a desktop printer are printed there. */
 	if (target && target->kind == PL_ICON_PRINTER) {
 		QStringList files;
@@ -833,9 +980,9 @@ void dropItems(QDropEvent *e, const Item *target, const QString &folder) {
 		return;
 	}
 	const bool aliasDrag = e->mimeData()->hasFormat(ALIAS_ITEMS_MIME);
-	const bool link = aliasDrag || e->proposedAction() == Qt::LinkAction ||
+	const bool link = !fontDrag && (aliasDrag || e->proposedAction() == Qt::LinkAction ||
 		(e->modifiers() & (Qt::ControlModifier | Qt::AltModifier)) ==
-			(Qt::ControlModifier | Qt::AltModifier);
+			(Qt::ControlModifier | Qt::AltModifier));
 	if (link) {
 		if (!(e->possibleActions() & Qt::LinkAction)) {
 			Alert::ask("This drag source does not support aliases. Use File > Make Alias instead.",
@@ -897,6 +1044,20 @@ void dropItems(QDropEvent *e, const Item *target, const QString &folder) {
 	}
 	Finder &finder = Finder::instance();
 	if (toTrash) {
+		if (fontDrag) {
+			if (e->source()) {
+				e->setDropAction(Qt::MoveAction);
+				e->accept();
+				QTimer::singleShot(0, QCoreApplication::instance(),
+					[paths] { trashFontFiles(paths); });
+			} else if (trashFontFiles(paths)) {
+				e->setDropAction(Qt::MoveAction);
+				e->accept();
+			} else {
+				e->ignore();
+			}
+			return;
+		}
 		QStringList changed;
 		for (const QString &p : paths) {
 			if (QFile::moveToTrash(p)) {
@@ -915,6 +1076,14 @@ void dropItems(QDropEvent *e, const Item *target, const QString &folder) {
 		return;
 	}
 	QString dest = target ? target->path : folder;
+	if (vfsIsFonts(dest)) {
+		dest = userFontsPath();
+		if (dest.isEmpty() || !QDir().mkpath(dest) || !fontUserDirectory(dest)) {
+			Alert::ask("The user Fonts folder could not be created: " + dest, "OK", QString());
+			e->ignore();
+			return;
+		}
+	}
 	if (vfsIsApplications(dest)) {
 		QStringList installers;
 		bool restored = false;
@@ -949,19 +1118,24 @@ void dropItems(QDropEvent *e, const Item *target, const QString &folder) {
 			return;
 		}
 	}
-	const bool option = e->modifiers() & Qt::AltModifier;
+	const bool option = (e->modifiers() & Qt::AltModifier) ||
+		((fontDrag || fontUserDirectory(dest)) && !(e->possibleActions() & Qt::MoveAction));
 	const bool copied = option || std::any_of(paths.begin(), paths.end(),
 		[&dest](const QString &path) { return !sameDisk(path, dest); });
+	if (fontDrag && !e->source() && !fontTransferAllowed(paths, dest, option)) {
+		e->ignore();
+		return;
+	}
 	if (e->source()) {
 		/* Release Finder's drag grab before opening the modal Stop dialog.
 		 * Our drag source never deletes files based on the returned action. */
-		QTimer::singleShot(0, QCoreApplication::instance(), [paths, dest, option] {
+		QTimer::singleShot(0, QCoreApplication::instance(), [paths, dest, option, fontDrag] {
+			if (fontDrag && !fontTransferAllowed(paths, dest, option)) {
+				return;
+			}
 			const QStringList changed = transferItems(paths, dest, option);
 			for (const auto &folder : changed) {
 				Finder::instance().folderChanged(folder);
-			}
-			if (changed.contains(dest)) {
-				refreshUserFontCache(dest);
 			}
 		});
 		e->setDropAction(copied ? Qt::CopyAction : Qt::MoveAction);
@@ -976,9 +1150,6 @@ void dropItems(QDropEvent *e, const Item *target, const QString &folder) {
 	if (!finished) {
 		e->ignore();
 		return;
-	}
-	if (changed.contains(dest)) {
-		refreshUserFontCache(dest);
 	}
 	e->setDropAction(copied ? Qt::CopyAction : Qt::MoveAction);
 	e->accept();

@@ -22,6 +22,7 @@
 #include "apptrash.h"
 #include "autostart.h"
 #include "resources.h"
+#include "fonts.h"
 
 /*
  * The default mapping. Written to the registry the first time the Finder
@@ -33,11 +34,11 @@
  * doesn't have take their default, and nodes it doesn't know about are
  * added, while the user's own nodes and overrides are kept.
  */
-/* 13: Shared Documents (/home/Shared). */
-static constexpr int REGISTRY_VERSION = 13;
+/* 14: Fonts is a generated catalog, not a raw directory. */
+static constexpr int REGISTRY_VERSION = 14;
 
 static const char *DEFAULT_REGISTRY = R"JSON({
-  "version": 10,
+  "version": 14,
   "volume": {},
   "showUnixVolume": false,
   "nodes": [
@@ -75,8 +76,7 @@ static const char *DEFAULT_REGISTRY = R"JSON({
       "kind": "launcher", "action": "system-information" },
     { "id": "system-folder/extensions-manager", "name": "Tricks Manager",
       "kind": "launcher", "action": "extensions-manager" },
-    { "id": "system-folder/fonts", "name": "Fonts", "kind": "backed",
-      "backing": "$XDG_DATA_HOME/fonts" },
+    { "id": "system-folder/fonts", "name": "Fonts", "kind": "fonts" },
     { "id": "system-folder/favorites", "name": "Favorites", "kind": "backed",
       "backing": "$XDG_CONFIG_HOME/zacos9/Favorites" },
     { "id": "system-folder/toy-box-items", "name": "Toy Box Items", "kind": "backed",
@@ -146,6 +146,9 @@ QString expand(const QString &in) {
 }
 
 VKind kindFromName(const QString &name) {
+	if (name == "fonts") {
+		return VKind::Fonts;
+	}
 	if (name == "backed") {
 		return VKind::Backed;
 	}
@@ -224,6 +227,11 @@ bool migrate(QJsonObject *root) {
 	QJsonArray nodes = root->value("nodes").toArray();
 	for (int i = 0; i < nodes.size(); i++) {
 		QJsonObject n = nodes.at(i).toObject();
+		if (n.value("id").toString() == QLatin1String("system-folder/fonts")) {
+			n.insert("kind", "fonts");
+			n.remove("backing");
+			nodes.replace(i, n);
+		}
 		if (n.value("id").toString() == QLatin1String("system-folder/extensions")) {
 			n.insert("kind", "resource");
 			n.insert("provider", "extensions");
@@ -667,6 +675,25 @@ std::vector<std::unique_ptr<Item>> vfsList(const QString &path) {
 	}
 	const QString parentId = parent->id;
 	const VNode parentCopy = *parent;
+	if (parentCopy.kind == VKind::Fonts) {
+		for (auto it = g_nodes.begin(); it != g_nodes.end();) {
+			if (it->kind == VKind::Font && it->parentId() == parentId) {
+				it = g_nodes.erase(it);
+			} else {
+				++it;
+			}
+		}
+		for (const FontFace &face : fontCatalog()) {
+			VNode node;
+			node.id = parentId + '/' + face.id();
+			node.name = face.name;
+			node.kind = VKind::Font;
+			node.icon = PL_ICON_DOCUMENT;
+			node.backing = face.file;
+			node.fontFaceIndex = face.index;
+			addNode(node);
+		}
+	}
 	if (parentCopy.kind == VKind::Resource) {
 		refreshResourceChildren(parentCopy);
 	}
@@ -696,10 +723,17 @@ std::vector<std::unique_ptr<Item>> vfsList(const QString &path) {
 		item->kind = node->kind == VKind::Backed ||
 			(node->kind == VKind::Resource && node->resourceDirectory) ?
 			PL_ICON_FOLDER : node->icon;
-		item->isDir = node->kind != VKind::Launcher &&
+		item->isDir = node->kind != VKind::Launcher && node->kind != VKind::Font &&
 			(node->kind != VKind::Resource || node->resourceDirectory);
 		item->labelIndex = vfsLabel(item->path);
-		if (node->kind == VKind::Launcher) {
+		if (node->kind == VKind::Font) {
+			item->fontFile = node->backing;
+			item->fontFaceIndex = node->fontFaceIndex;
+			item->kindText = fontCanRemove(node->backing) ? "user font" : "system font (read-only)";
+			const QFileInfo source(node->backing);
+			item->size = source.size();
+			item->modified = source.lastModified();
+		} else if (node->kind == VKind::Launcher) {
 			item->kindText = node->actionId.isEmpty()
 				? QStringLiteral("application program")
 				: QStringLiteral("application command");
@@ -792,6 +826,14 @@ QString vfsRealCounterpart(const QString &path) {
 	if (node->kind == VKind::Backed || node->kind == VKind::Unix) {
 		return vfsOpensAs(path);
 	}
+	if (node->kind == VKind::Fonts) {
+		const QString directory = userFontsPath();
+		if (!QDir().mkpath(directory)) {
+			qWarning() << "Cannot create the user Fonts folder:" << directory;
+			return {};
+		}
+		return directory;
+	}
 	if (!node->appId.isEmpty()) {
 		const AppEntry *app = appById(node->appId);
 		return app ? app->file : QString();
@@ -812,7 +854,18 @@ bool vfsResourceDetails(const QString &path, QStringList *details, QString *kind
 		return false;
 	}
 	ResourceDetails info;
-	if (node->kind == VKind::Resource) {
+	if (node->kind == VKind::Font) {
+		info.name = node->name;
+		info.kind = "installed font";
+		info.location = "System Folder / Fonts";
+		info.sources = node->backing;
+		info.access = fontCanRemove(node->backing) ?
+			"Move out to uninstall; Option-drag exports a copy without uninstalling." :
+			"System font: may be copied, but not removed through Finder.";
+		info.metadata = { "Face index: " + QString::number(node->fontFaceIndex),
+			"Removing a collection file removes every face in that file.",
+			"Applications already using this font may need to be restarted after removal." };
+	} else if (node->kind == VKind::Resource) {
 		info = resourceDetails(node->resourceProvider, node->resourceKey);
 		QString parentKey;
 		if (const VNode *parent = vfsNode(vfsPathFor(node->parentId()))) {
@@ -927,7 +980,7 @@ bool vfsCanRename(const QString &path) {
 	/* A Desktop Action isn't a thing of its own; everything else the user
 	 * sees may carry a name of their choosing. */
 	return node->actionId.isEmpty() && node->builtinAction.isEmpty() &&
-		node->kind != VKind::Resource;
+		node->kind != VKind::Resource && node->kind != VKind::Font;
 }
 
 /* The folder user-made nodes keep their contents in. */
@@ -1050,8 +1103,24 @@ void vfsShowAllHidden() {
 bool vfsAcceptsDrops(const QString &path) {
 	const VNode *node = vfsNode(path);
 	return node && (node->kind == VKind::Backed || node->kind == VKind::Unix ||
+		node->kind == VKind::Fonts ||
 		(node->kind == VKind::Apps && !node->id.startsWith("system-folder/")) ||
 		vfsIsStartupItems(path));
+}
+
+bool vfsIsFonts(const QString &path) {
+	const VNode *node = vfsNode(path);
+	return node && node->kind == VKind::Fonts;
+}
+
+QString vfsFontFile(const QString &path) {
+	const VNode *node = vfsNode(path);
+	return node && node->kind == VKind::Font ? node->backing : QString();
+}
+
+void vfsFontsChanged() {
+	fontInvalidate();
+	notifyChanged();
 }
 
 bool vfsIsStartupItems(const QString &path) {
@@ -1239,6 +1308,7 @@ int vfsOnChange(std::function<void()> f) {
 			notifyChanged();
 		});
 		watchResourceSources();
+		fontWatchChanges([] { notifyChanged(); });
 	}
 	return token;
 }

@@ -181,7 +181,7 @@ Zacintosh HD
 │   ├── Software Components (generated, read-only installed app/package metadata)
 │   ├── System Information (generated launcher, read-only status window)
 │   ├── Extensions Manager (generated launcher, read-only status window)
-│   ├── Fonts             → ~/.local/share/fonts
+│   ├── Fonts               (generated: available font faces; drop in to install, move out to uninstall)
 │   ├── Preferences       → ~/.config
 │   └── Utilities           (generated: settings, file managers and system tools,
 │                            including shipped tools such as balenaEtcher)
@@ -213,10 +213,76 @@ adds read-only System Folder resource providers (Sounds, Startup Items,
 Application Support, Device Drivers, Network, System Logs, Software Components
 and Extensions) and built-in launchers for System Information and Extensions
 Manager.
+Version 14 turns Fonts into a generated font catalog, preserving its folder ID,
+custom name, labels and remembered window/icon positions. Existing font files
+are not moved. The old Fonts node's `backing` field is replaced by the catalog;
+new installations use the user's standard XDG font directory.
 See
 [custom desktop patterns](../README.md#custom-desktop-patterns) and
 [desktop wallpaper](../README.md#desktop-wallpaper) for supported formats,
 placement choices and import limits.
+
+## Fonts
+
+**System Folder > Fonts** lists the fonts available through Fontconfig, including
+both user and system installations. Items use the font's internal full name,
+not the source filename. Each name is rendered from that exact file and face
+with FreeType and HarfBuzz at 12 logical pixels, using the same monochrome
+canvas and integer scaling as the rest of Finder. Missing characters fall back
+individually to the normal views font. Unreadable or unsupported preview faces
+log a warning and use the views font. Other Finder text is unchanged.
+
+Icon, small-icon, button and list views measure the rendered labels for
+selection, clipping and hit testing. Collection files have an item for each
+face, but all of those items refer to the same installation file. A face's
+stable ID includes its source path and face index; duplicate family names do
+not collapse distinct files.
+
+| Gesture | Effect |
+|---|---|
+| Drop a `.ttf`, `.otf`, `.ttc` or `.otc` file into Fonts | Validate its signature and font metadata, then install in `$XDG_DATA_HOME/fonts` (normally `~/.local/share/fonts`). |
+| Option-drag into Fonts, or drag from a copy-only source | Install a copy, leaving the source intact. |
+| Move a user font out to a real folder or Desktop | Move its installation file out, uninstalling it. |
+| Option-drag out, or drag to another disk | Export a copy; the installed file stays in place. |
+| Drag a user font to Trash / choose Move To Trash | Uninstall by moving its installation file to Trash. Put Away restores it. |
+| Drag a protected font | Offer copy/export only. Trash/removal attempts report that it cannot be removed. |
+| Drop installed items back into the Fonts view | Arrange their icons within that view; do not reinstall them. |
+
+Finder only uninstalls files owned by the current user under the XDG font
+directory or legacy `~/.fonts`, including subdirectories. Directory links cannot
+escape those roots. System and other font locations are never uninstalled by
+the font-item gesture, even if their permissions happen to permit writing.
+Removing a collection asks for confirmation because it removes **every face
+in that file**; selecting several faces transfers the file only once.
+
+Installation never replaces an existing filename. Invalid files, symbolic
+links, archives, Debian packages, folders and classic Macintosh font suitcases
+are rejected rather than copied into the active font directory. Font copies are
+staged privately and published by rename, so an incomplete copy is not installed.
+Failed or canceled transfers retain the source.
+
+Font changes made through Finder refresh `fc-cache` asynchronously after both
+installation and removal (including menu removal and Put Away). Refreshes are
+serialized per changed directory, with a 30-second timeout and visible errors;
+cache failure does not pretend the completed file operation was undone. A
+debounced filesystem watcher invalidates the catalog and preview masks after
+external font changes, watching existing font directories/files and the nearest
+ancestor of missing user directories. Watches are bounded at 8,192 paths;
+watch failures are logged, and closing/reopening Fonts rescans the catalog.
+Applications already using a removed font may retain it until they refresh
+their font list or restart.
+
+The standard file chooser still exposes Fonts as the real writable user font
+directory, not as Finder's generated face items. It does not install fonts
+merely by browsing them.
+
+Implementation: [`fonts.cpp`](../shell/finder/fonts.cpp),
+[`vfs.cpp`](../shell/finder/vfs.cpp), [`items.cpp`](../shell/finder/items.cpp)
+and [`fileops.cpp`](../shell/finder/fileops.cpp). Build dependencies include
+Fontconfig, FreeType and HarfBuzz; the runtime cache tool is `fontconfig`'s
+`fc-cache`. The `finder-fonts` test uses temporary directories, redistributable
+DejaVu fonts and a generated two-face collection; no reference/Apple assets
+are included.
 
 ## How applications are found
 
@@ -322,14 +388,13 @@ the name it was installed with (`/etc/zacos9/disk-name`, written by
 
 ```json
 {
-  "version": 1,
+  "version": 14,
   "volume": {},
   "showUnixVolume": false,
   "nodes": [
     { "id": "system-folder", "name": "System Folder", "kind": "folder",
       "icon": "system-folder", "order": 0 },
-    { "id": "system-folder/fonts", "name": "Fonts", "kind": "backed",
-      "backing": "$XDG_DATA_HOME/fonts" },
+    { "id": "system-folder/fonts", "name": "Fonts", "kind": "fonts" },
     { "id": "applications", "name": "Applications", "kind": "apps", "order": 1 },
     { "id": "utilities", "name": "Utilities", "kind": "apps", "visible": false,
       "categories": ["Utility", "System", "Settings"] }
@@ -344,7 +409,7 @@ A node's fields:
 |---|---|
 | `id` | Stable and unique. `/` separates it from its parent, so `system-folder/fonts` sits in `system-folder`. |
 | `name` | What the Finder shows. |
-| `kind` | `folder` (curated), `backed` (real directory), `apps`, `panels`, `resource`, `launcher`, `unix`. |
+| `kind` | `folder` (curated), `backed` (real directory), `apps`, `panels`, `fonts` (installed font catalog), `resource`, `launcher`, `unix`. |
 | `backing` | For `backed`. `$HOME`, `$XDG_CONFIG_HOME`, `$XDG_DATA_HOME` and `$XDG_DOCUMENTS_DIR` are expanded. |
 | `provider` | For `resource`: fixed provider id (`sounds`, `startup-items`, …), never a command or arbitrary path. |
 | `action` | For built-in `launcher` rows: trusted internal actions (`system-information`, `extensions-manager`) only. |

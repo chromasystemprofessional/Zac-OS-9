@@ -35,6 +35,7 @@ inline constexpr char ALIAS_ITEMS_MIME[] = "application/x-zacos9-alias-items";
 inline constexpr char APPLICATION_ITEMS_MIME[] = "application/x-zacos9-application-items";
 /* Startup Items being dragged out: a JSON array of desktop-file IDs. */
 inline constexpr char STARTUP_ITEMS_MIME[] = "application/x-zacos9-startup-items";
+inline constexpr char FONT_ITEMS_MIME[] = "application/x-zacos9-font-items";
 /* Caller owns the file URLs or private virtual-item alias payload. */
 QMimeData *itemDragMime(const std::vector<Item *> &items);
 void startItemDrag(QWidget *source, const std::vector<Item *> &items,
@@ -55,3 +56,5 @@ QStringList dropClippings(QDropEvent *e, const Item *target, const QString &fold
 /* Stop these Startup Items (desktop-file IDs) opening at login: the
  * Trash gesture on them, by drag or Move To Trash. */
 void removeFromStartupItems(const QStringList &ids);
+bool trashFontFiles(const QStringList &files);
+void refreshUserFontCache(const QString &directory);

@@ -82,6 +82,8 @@ int main(int argc, char **argv) {
 		"Home stands for the real Home folder");
 	check(QFileInfo(root.filePath("System Folder/Preferences")).canonicalFilePath() ==
 		base + "/config", "System Folder's real folders stand for their backing folders");
+	check(QFileInfo(root.filePath("System Folder/Fonts")).canonicalFilePath() ==
+		base + "/data/fonts", "the Fonts catalog keeps its real user folder in file choosers");
 	check(!root.exists("System Folder/Control Panels") && !root.exists("System Folder/Extensions"),
 		"generated System Folder listings that are not files are left out");
 	check(disk.realRoots.contains(base), "Home's real folder can be chosen");
