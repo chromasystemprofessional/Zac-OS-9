@@ -1,3 +1,13 @@
+zacos9 (1.0.0) trixie; urgency=medium
+
+  * ZacOS 9 1.0. The installer has been tested from a freshly built ISO
+    under BIOS and UEFI, onto a whole disk and onto a partition beside
+    another system, which it leaves untouched. Fixes a Sniffer crash when a
+    program asking it to do something quit while an alert was open, and the
+    MacIP gateway no longer shows as a failed service at start-up.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Sun, 18 Oct 2026 19:22:30 -0400
+
 zacos9 (0.2.1) trixie; urgency=medium
 
   * The System Folder's Fonts view now lists available fonts with each name
