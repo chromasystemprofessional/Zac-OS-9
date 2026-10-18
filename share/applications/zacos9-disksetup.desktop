@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Disk Setup
+Comment=Verify and repair disks, see their health, and partition and erase drives
+Exec=zacos9-disksetup
+Categories=System;Utility;X-ZacOS9-Utility;
+OnlyShowIn=ZacOS9;

@@ -1,4 +1,5 @@
 #include "desktop.h"
+#include "desktopprinter.h"
 
 #include "clippings.h"
 #include "thumbnails.h"
@@ -75,6 +76,7 @@ Desktop::Desktop() {
 	watchDesktopWallpaper(this, [this] { update(); });
 	platinumOnActiveClient(this, [this] { update(); });
 	watchCustomThemes(this, [this] { update(); });
+	watchDefaultPrinter(this, [this] { update(); });
 	setAttribute(Qt::WA_OpaquePaintEvent);
 	setAcceptDrops(true);
 	m_renameTimer.setSingleShot(true);

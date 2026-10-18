@@ -26,7 +26,13 @@ static constexpr int LINE_H = 14;           /* body text line height */
 QString DiskEntry::label() const {
 	/* Only the drive's make and model, as the Mac OS installer names a disk: no
 	 * size, no device name. A drive that reports none is just a disk. */
-	return model.isEmpty() ? QStringLiteral("Hard Disk") : model;
+	const QString disk = model.isEmpty() ? QStringLiteral("Hard Disk") : model;
+	if (isDisk) {
+		return disk;
+	}
+	/* A partition prepared in Disk Setup: its name, and the disk it's on. */
+	return (partLabel.isEmpty() ? "Partition " + device.section('/', -1) : "\u201c" + partLabel + "\u201d")
+		+ " on " + disk;
 }
 
 /* zacos9-install, as root through pkexec; ZACOS9_INSTALL_HELPER runs
@@ -75,7 +81,12 @@ void InstallerWindow::showSelect() {
 	if (m_diskName.text.isEmpty()) {
 		m_diskName.setText(QStringLiteral("Zacintosh HD"));
 	}
+	m_prepare = PanelButton("Prepare Disk\u2026", QRect(MARGIN, BTN_Y, 112, BTN_H));
+	m_prepare.hint = "Opens Disk Setup to partition or erase a disk first: to keep Windows beside ZacOS 9, "
+		"make a ZacOS (ext4) partition there, then choose it here.";
+	m_prepare.clicked = [this] { prepareDisk(); };
 	m_host.edits = { &m_diskName };
+	m_host.buttons = { &m_prepare };
 	m_host.setFocus(&m_diskName);
 	m_diskName.selectAll();
 	update();
@@ -95,6 +106,28 @@ void InstallerWindow::updateSelectButtons() {
 		QRect(BTN_R - BTN_W, BTN_Y, BTN_W, BTN_H), true);
 	m_erase = PanelButton("Erase & Install", QRect(BTN_R - BTN_W - 12 - 112, BTN_Y, 112, BTN_H));
 	update();
+}
+
+/* Disk Setup's Partition tab, to make room for ZacOS 9 (a partition beside
+ * Windows, say); the list is read again when it closes. */
+void InstallerWindow::prepareDisk() {
+	if (m_diskSetup) {
+		return;
+	}
+	m_diskSetup = new QProcess(this);
+	connect(m_diskSetup, &QProcess::finished, this, [this] {
+		m_diskSetup->deleteLater();
+		m_diskSetup = nullptr;
+		enumerateDisks();
+		updateSelectButtons();
+	});
+	connect(m_diskSetup, &QProcess::errorOccurred, this, [this](QProcess::ProcessError e) {
+		if (e == QProcess::FailedToStart) {
+			m_diskSetup->deleteLater();
+			m_diskSetup = nullptr;
+		}
+	});
+	m_diskSetup->start("zacos9-disksetup", { "--partition" });
 }
 
 void InstallerWindow::showInstalling(const QStringList &args, bool updating) {
@@ -210,7 +243,8 @@ void InstallerWindow::enumerateDisks() {
 	/* -P: machine-readable pairs; -e 1,7,11: leave out RAM disks (1), loop
 	 * devices (7) and optical drives (11) */
 	QProcess p;
-	p.start("lsblk", { "-P", "-n", "-e", "1,7,11", "-o", "NAME,TYPE,SIZE,FSTYPE,MODEL" });
+	p.start("lsblk", { "-P", "-n", "-e", "1,7,11", "-o", "NAME,TYPE,SIZE,FSTYPE,MODEL,PKNAME,LABEL" });
+	QMap<QString, QString> models; /* each disk's, for its partitions */
 	waitSync(&p, 5000);
 	for (const QByteArray &raw : p.readAllStandardOutput().split('\n')) {
 		const QString line = QString::fromUtf8(raw).trimmed();
@@ -232,13 +266,20 @@ void InstallerWindow::enumerateDisks() {
 		}
 		const QString type = kv.value("TYPE");
 		const QString name = kv.value("NAME");
-		/* Whole drives only: partitions are not offered. */
-		if (name.isEmpty() || type != "disk" || name == live) continue;
+		/* Whole drives, and ext4 partitions on them (made for ZacOS in Disk
+		 * Setup): only that partition is formatted, the rest of its disk
+		 * kept. Never the live medium's drive. */
+		if (type == "disk") {
+			models[name] = kv.value("MODEL").trimmed();
+		}
+		const bool part = type == "part" && kv.value("FSTYPE") == "ext4";
+		if (name.isEmpty() || (type != "disk" && !part) || name == live || kv.value("PKNAME") == live) continue;
 		DiskEntry d;
 		d.device = "/dev/" + name;
 		d.size   = kv.value("SIZE");
-		d.isDisk = true;
-		d.model  = kv.value("MODEL").trimmed();
+		d.isDisk = !part;
+		d.model  = part ? models.value(kv.value("PKNAME")) : kv.value("MODEL").trimmed();
+		d.partLabel = part ? kv.value("LABEL") : QString();
 		m_disks.push_back(d);
 	}
 	/* ZacOS 9 already on a disk: the helper looks, read-only (it needs root

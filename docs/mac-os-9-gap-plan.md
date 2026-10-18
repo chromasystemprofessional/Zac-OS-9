@@ -379,12 +379,12 @@ A zram/swap switch in a Memory panel is a possible P3. **→ 8.7**
 |---|---|---|
 | Disks on the desktop, Put Away/eject, drag a disk to the Trash to eject | ◐ | Network volumes eject via the Trash (0.1.54); local disks to verify. P2 S **→ 9.10** |
 | Erase Disk with format choice | ◐ | Verify formats. **→ 9.10** |
-| **Disk Vet** (verify/repair) | ✗ | fsck of unmounted volumes through `zacos9-disk-helper`; SMART status. P3 M **→ 7.1** |
-| **Disk Setup** (partition, initialize) | ◐ | `diskinit.cpp` initializes; partitioning — P3 L **→ 7.6** |
+| **Disk Vet** (verify/repair) | ✅ | Disk Setup's First Aid tab (`zacos9-disksetup`): the volumes UDisks2 can check, Verify (Filesystem.Check) and Repair (Filesystem.Repair) with polkit's password, refused while in use; the drive's SMART health (ATA and NVMe: passing or failing, temperature, hours). |
+| **Disk Setup** (partition, initialize) | ✅ | `zacos9-disksetup` Partition tab: a drive's layout (a bar and a list), New/Delete/Erase/Resize partitions (ext4, FAT32, exFAT, NTFS; resizing ext4 and NTFS) and New Table (GPT/MBR), queued until Apply, which says what it will erase; all through UDisks2 and polkit. Never the live medium's drive, a partition in use, the running system's drive as a whole or its EFI System partition (`shell/disksetup/plan.cpp`). The installer's Select Disk has Prepare Disk… (it opens here) and lists ext4 partitions as places to install. `diskinit.cpp` still initializes new disks. |
 | Disk Copy (mount images) | ✅ | Mac disk images; ISO/IMG via udisks to verify. **→ 9.10** |
 | **Printer Picker** (pick a printer; AppleShare servers) | ✅ | `zacos9-printerpicker`, in the Zac menu: the printers CUPS knows and finds (IPP Everywhere, `lpstat -e`), with model, location and status; clicking one makes it yours (`lpoptions -d`, no password); Create Desktop Printer, Print Queue, Settings… (system-config-printer). Servers stay in the Neighbourhood. |
-| **Desktop printer icons**: drag documents to print, queue window (pause, reorder, remove), default printer (bold outline) | ◐ | `NAME.printer` files on the desktop (`[Desktop Printer]` Queue=…) with a printer icon: documents dropped on one print there, opening one opens `zacos9-printqueue` (printer status, documents, Hold/Resume, Remove, Stop/Start Printing through cups-pk-helper and a polkit rule for administrators; drops print). Reordering jobs and the default's bold outline are still to do. **→ 7.4** |
-| Print Queue / non-modal print errors | ✗ | Notification-style messages (Mac OS 9's yellow box, p. 2). P3 S **→ 7.4** |
+| **Desktop printer icons**: drag documents to print, queue window (pause, reorder, remove), default printer (bold outline) | ◐ | `NAME.printer` files on the desktop (`[Desktop Printer]` Queue=…) with a printer icon: documents dropped on one print there, opening one opens `zacos9-printqueue` (printer status, documents, Hold/Resume, Remove, Stop/Start Printing through cups-pk-helper and a polkit rule for administrators; drops print). Print Next (CUPS priority 100) moves a waiting job ahead; the default printer's desktop icon has Mac OS 9's bold outline (`lpstat -d`, read in the background every 10 s). |
+| Print Queue / non-modal print errors | ✅ | Print errors (the Sniffer's and the queue window's) are alerts that don't stop you working. |
 | Page Setup / Print dialogs | ✅ | Apps use their own (GTK/Qt). |
 | Fonts folder (drop to install) | ✅ | Drop files into the backed `Fonts` folder; after successful copies the Sniffer runs `fc-cache -f` asynchronously, with a visible alert if the cache update fails. |
 | FontSync, ColorSync | — | |
@@ -569,12 +569,12 @@ partial entries retain the remaining work described in the inventory above.
 
 | # | Work package | Components | Effort |
 |---|---|---|---|
-| 7.1 | **Disk Vet**: fsck of unmounted volumes, SMART status | `zacos9-disk-helper` | M |
+| 7.1 ✅ | **Disk Vet**: fsck of unmounted volumes, SMART status | `zacos9-disk-helper` | M |
 | 7.2 ✅ | **Fonts folder**: drop to install (copy, `fc-cache`) | Sniffer | S |
 | 7.3 ✅ | **Print Window / Print Desktop** and Page Setup | Sniffer, `shell/print/` | M |
-| 7.4 | Printing leftovers: non-modal print errors, job reordering, the default printer's bold outline | `shell/print/` | S |
+| 7.4 ✅ | Printing leftovers: non-modal print errors, job reordering, the default printer's bold outline | `shell/print/` | S |
 | 7.5 ✅ | **Custom icons by pasting** in Get Info | Sniffer, gio metadata | M |
-| 7.6 | **Disk Setup** partitioning | disk helper | L |
+| 7.6 ✅ | **Disk Setup** partitioning | disk helper | L |
 | 7.7 | Video mirroring on/off (after 9.9, several screens) | compositor | M |
 
 ### Milestone 8 — Desk accessories and extras (P3)

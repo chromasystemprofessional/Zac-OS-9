@@ -610,6 +610,15 @@ void paintIcon(pl_canvas *c, Item &item, int x, int y, int size, bool highlight)
 void paintIconItem(pl_canvas *c, Item &item, int x, int y, bool onDesktop, bool showLabel) {
 	const bool highlight = item.selected || item.dropTarget;
 	paintIcon(c, item, x, y, PL_ICON_LARGE, highlight);
+	/* Mac OS 9's default desktop printer: a bold outline round its icon. */
+	if (item.kind == PL_ICON_PRINTER) {
+		const QString def = desktopDefaultPrinter();
+		if (!def.isEmpty() && desktopPrinterQueue(item.path) == def) {
+			for (int i = 0; i < 2; i++) {
+				pl_outline(c, x - 3 + i, y - 3 + i, x + PL_ICON_LARGE + 2 - i, y + PL_ICON_LARGE + 2 - i, C_BLACK);
+			}
+		}
+	}
 	if (showLabel) {
 		paintIconLabel(c, item, x, y, onDesktop);
 	}

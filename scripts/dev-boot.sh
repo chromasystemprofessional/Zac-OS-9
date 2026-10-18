@@ -14,6 +14,10 @@
 #   scripts/dev-boot.sh --keep       # with --record: leave the VM running after
 #   scripts/dev-boot.sh --retina     # a 2560 x 1600 screen
 #   scripts/dev-boot.sh --clean      # start over from the ISO build's system
+#   scripts/dev-boot.sh --disk       # with a scratch 20 GB hard disk, for Disk
+#                                    # Setup and the installer (kept in the VM
+#                                    # folder as devboot-disk.qcow2; delete it to
+#                                    # start over)
 #
 # A login runs on the VM's serial port (user / live):
 #   python3 tests/vm/serial.py ~/.local/share/zacos9-vm/serial.sock 'command'
@@ -40,7 +44,8 @@ for arg in "$@"; do
 	--clean) clean=true ;;
 	--keep) keep=true ;;
 	--retina) gpu=virtio-vga,xres=2560,yres=1600 ;;
-	*) echo "usage: dev-boot.sh [--no-debs] [--record] [--retina] [--clean]" >&2; exit 64 ;;
+	--disk) disk=true ;;
+	*) echo "usage: dev-boot.sh [--no-debs] [--record] [--retina] [--clean] [--disk]" >&2; exit 64 ;;
 	esac
 done
 
@@ -136,6 +141,10 @@ set -- -machine q35 -m 4096 -smp 4 -device "$gpu" \
 	-monitor "unix:$vm/monitor.sock,server,nowait" -serial "unix:$vm/serial.sock,server,nowait" \
 	-name "ZacOS 9 (dev boot)"
 [ -w /dev/kvm ] && set -- "$@" -enable-kvm -cpu host
+if ${disk:-false}; then
+	[ -e "$vm/devboot-disk.qcow2" ] || qemu-img create -q -f qcow2 "$vm/devboot-disk.qcow2" 20G
+	set -- "$@" -drive "file=$vm/devboot-disk.qcow2,format=qcow2,if=virtio"
+fi
 if ! $record; then
 	exec qemu-system-x86_64 "$@" -display gtk,zoom-to-fit=off
 fi

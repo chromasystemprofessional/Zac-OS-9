@@ -700,6 +700,35 @@ test('finder-ctl', find_program('python3'),
   args: [files('finderctl/test_finderctl.py'), finderctl_exe.full_path()],
   depends: finderctl_exe, timeout: 20)
 
+# Disk Setup: First Aid (verify, repair, drive health) and partitioning,
+# all through UDisks2 (disksetup/); the installer opens it too.
+executable('zacos9-disksetup',
+  'disksetup/main.cpp', 'disksetup/udisks.cpp', 'disksetup/plan.cpp',
+  'finder/alert.cpp',
+  'finder/platinumshell.cpp',
+  finder_protocol,
+  link_with: panelkit,
+  include_directories: include_directories('finder', 'panels', 'disksetup'),
+  dependencies: [platinum_dep, qt6, wayland_client],
+  cpp_args: ['-std=c++17'],
+  install: true,
+)
+
+test('disksetup-plan',
+  executable('test-disksetup-plan', 'disksetup/test_plan.cpp', 'disksetup/plan.cpp', 'disksetup/udisks.cpp',
+    dependencies: [qt6],
+    cpp_args: ['-std=c++17'],
+  ),
+  env: ['LC_ALL=en_US.UTF-8'], timeout: 10,
+)
+test('disksetup-udisks',
+  executable('test-disksetup-udisks', 'disksetup/test_udisks.cpp', 'disksetup/udisks.cpp',
+    dependencies: [qt6],
+    cpp_args: ['-std=c++17'],
+  ),
+  env: ['LC_ALL=en_US.UTF-8'], timeout: 10,
+)
+
 # Retriever: folder pairs kept alike with rsync (retriever/sync.cpp).
 executable('zacos9-retriever',
   'retriever/main.cpp', 'retriever/sync.cpp',

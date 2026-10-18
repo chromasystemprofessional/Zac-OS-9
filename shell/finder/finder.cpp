@@ -76,6 +76,13 @@ bool openWebSearch(const QString &channel, const QString &words) {
 	return true;
 }
 
+/* Printing's messages don't stop you (Mac OS 9's didn't either). */
+static void printProblem(const QString &message) {
+	auto *alert = new Alert(message, "OK", QString());
+	alert->setAttribute(Qt::WA_DeleteOnClose);
+	alert->open();
+}
+
 Finder &Finder::instance() {
 	static Finder finder;
 	return finder;
@@ -842,7 +849,7 @@ void Finder::printWindow() {
 	const QString title = fw ? fw->windowTitle() : QStringLiteral("Desktop");
 	const QImage image = fw ? fw->printImage() : m_desktop->printImage();
 	if (image.isNull()) {
-		Alert::ask("There's nothing in “" + title + "” to print.", "OK", QString());
+		printProblem("There's nothing in “" + title + "” to print.");
 		return;
 	}
 	/* A PDF named for the window (the print job's name), gone once lp
@@ -850,12 +857,12 @@ void Finder::printWindow() {
 	QTemporaryDir dir;
 	const QString pdf = dir.path() + "/" + QString(title).replace('/', '-') + ".pdf";
 	if (!dir.isValid() || writeWindowPdf(title, image, loadPageSetup(), pdf) == 0) {
-		Alert::ask("“" + title + "” couldn't be prepared for printing.", "OK", QString());
+		printProblem("“" + title + "” couldn't be prepared for printing.");
 		return;
 	}
 	QString error;
 	if (printFiles(printer, { pdf }, &error).isEmpty()) {
-		Alert::ask("“" + title + "” couldn't be printed. " + error, "OK", QString());
+		printProblem("“" + title + "” couldn't be printed. " + error);
 	}
 }
 
@@ -1017,7 +1024,7 @@ void Finder::printDocuments(const QStringList &files, const QString &queue) {
 	}
 	QString error;
 	if (!printable.isEmpty() && printFiles(printer, printable, &error).size() < printable.size()) {
-		Alert::ask("Not everything could be printed. " + error, "OK", QString());
+		printProblem("Not everything could be printed. " + error);
 	}
 	QStringList failedToOpen;
 	for (const QString &file : others) {

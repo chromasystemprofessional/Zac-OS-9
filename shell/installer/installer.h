@@ -25,7 +25,8 @@ struct DiskEntry {
 	QString device;   /* /dev/sda or /dev/sda2 */
 	QString size;     /* human-readable, e.g. "500G" (not shown) */
 	QString model;    /* the drive's make and model: its name in the list */
-	bool isDisk = true; /* the list holds whole disks only */
+	bool isDisk = true; /* a whole disk, or an ext4 partition (made in Disk Setup) */
+	QString partLabel;  /* a partition's name */
 	/* A ZacOS 9 already installed on it (zacos9-install --detect). */
 	QString zacosPart, zacosVersion, zacosName;
 	int zacosCmp = 0; /* its version against this installer's: -1, 0, 1 */
@@ -56,6 +57,8 @@ private:
 	PanelList m_diskList;
 	PanelButton m_install;  /* Install, or Update / Reinstall for a ZacOS 9 disk */
 	PanelButton m_erase;    /* Erase & Install, beside Update */
+	PanelButton m_prepare;  /* Prepare Disk…: Disk Setup's Partition tab */
+	QProcess *m_diskSetup = nullptr;
 	QString m_liveVersion;  /* this installer's ZacOS 9 */
 	PanelEdit m_diskName; /* what the installed disk is called */
 	PanelHost m_host{ this }; /* the name field's caret, typing, Tab */
@@ -75,6 +78,7 @@ private:
 	void showSelect();
 	void showInstalling(const QStringList &args, bool updating);
 	void updateSelectButtons();
+	void prepareDisk();
 	const DiskEntry *selectedDisk() const;
 	void showDone();
 
