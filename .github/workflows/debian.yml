@@ -1,0 +1,97 @@
+name: Debian build and tests
+
+on:
+  push:
+    branches: [main, "agents/**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: debian-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    container: debian:13-slim
+    timeout-minutes: 60
+    env:
+      DEBIAN_FRONTEND: noninteractive
+    steps:
+      - name: Install bootstrap tools
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates git build-essential debhelper devscripts fakeroot passwd
+
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Install declared build dependencies
+        run: apt-get build-dep -y --no-install-recommends ./
+
+      - name: Build and test the Debian package
+        shell: bash
+        run: |
+          useradd --create-home builder
+          mkdir -p /tmp/zacos9-debian/source
+          git -c safe.directory="$GITHUB_WORKSPACE" archive HEAD | tar -x -C /tmp/zacos9-debian/source
+          chown -R builder:builder /tmp/zacos9-debian
+          cd /tmp/zacos9-debian/source
+          status=0
+          runuser -u builder -- env -u DEB_BUILD_OPTIONS -u DEB_BUILD_PROFILES \
+            xvfb-run -a dpkg-buildpackage -b -us -uc -j2 > /tmp/zacos9-package.log 2>&1 || status=$?
+          tail -80 /tmp/zacos9-package.log
+          exit "$status"
+
+      - name: Audit skipped tests
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          logs = list(Path("/tmp/zacos9-debian/source").glob("obj-*/meson-logs/testlog.json"))
+          if len(logs) != 1:
+              raise SystemExit(f"Expected one Meson test log, found {len(logs)}")
+          results = [json.loads(line) for line in logs[0].read_text().splitlines()]
+          if not results:
+              raise SystemExit("Meson test log is empty")
+          allowed = {"menudraw", "widgets", "decor", "screen-sharing-session", "afp-disconnect"}
+          skipped = {test["name"] for test in results if test["result"] == "SKIP"}
+          unexpected = skipped - allowed
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as summary:
+              summary.write(f"Debian 13: {len(results)} tests recorded.\n\n")
+              summary.write("Skipped tests: " + (", ".join(sorted(skipped)) or "none") + "\n")
+          if unexpected:
+              raise SystemExit("Unexpected skipped tests: " + ", ".join(sorted(unexpected)))
+          PY
+
+      - name: Collect packages and checksums
+        run: |
+          mkdir -p ci-artifacts
+          cp /tmp/zacos9-debian/zacos9*.deb ci-artifacts/
+          cd ci-artifacts
+          sha256sum *.deb > SHA256SUMS
+
+      - name: Upload build and test logs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: debian-13-logs
+          path: |
+            /tmp/zacos9-package.log
+            /tmp/zacos9-debian/source/obj-*/meson-logs/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload tested packages
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: debian-13-amd64-packages
+          path: ci-artifacts/
+          if-no-files-found: error
+          retention-days: 14

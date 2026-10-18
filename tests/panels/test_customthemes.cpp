@@ -39,6 +39,7 @@ int main(int argc, char **argv) {
 	qputenv("XDG_DATA_HOME", (root.path() + "/data").toUtf8());
 	qputenv("XDG_CONFIG_HOME", (root.path() + "/config").toUtf8());
 	qputenv("XDG_CACHE_HOME", (root.path() + "/cache").toUtf8());
+	qputenv("XDG_RUNTIME_DIR", root.path().toUtf8());
 	qputenv("PATH", (root.path() + ":/usr/bin:/bin").toUtf8());
 	qputenv("TEST_LOG", (root.path() + "/played").toUtf8());
 	QApplication app(argc, argv);
@@ -98,7 +99,11 @@ int main(int argc, char **argv) {
 	QFile player(root.path() + "/pw-play");
 	assert(player.setPermissions(QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner));
 	pl_sound_play("Recorded_Chime");
-	assert(waitFor([&] { return QFile::exists(root.path() + "/played"); }));
+	assert(waitFor([&] {
+		QFile playback(root.path() + "/played");
+		return playback.open(QIODevice::ReadOnly) &&
+			playback.readAll().contains("/data/zacos9/sounds/Recorded_Chime.wav");
+	}));
 	QFile customPlayback(root.path() + "/played");
 	assert(customPlayback.open(QIODevice::ReadOnly));
 	assert(customPlayback.readAll().contains("/data/zacos9/sounds/Recorded_Chime.wav"));
@@ -106,7 +111,14 @@ int main(int argc, char **argv) {
 	assert(QFile::remove(root.path() + "/played"));
 	assert(pl_setting_set("interface-volume", "3"));
 	pl_sound_event("button-click");
-	assert(waitFor([&] { return QFile::exists(root.path() + "/played"); }));
+	assert(waitFor([&] {
+		QFile playback(root.path() + "/played");
+		if (!playback.open(QIODevice::ReadOnly)) {
+			return false;
+		}
+		const QByteArray played = playback.readAll();
+		return played.contains("--volume 0.429") && played.contains("/cache/zacos9/sounds/");
+	}));
 	QFile log(root.path() + "/played");
 	assert(log.open(QIODevice::ReadOnly));
 	const QByteArray played = log.readAll();

@@ -18,8 +18,10 @@ def main():
                            path="/usr/libexec:/usr/lib/xdg-desktop-portal")
     frontend = shutil.which("xdg-desktop-portal",
                             path="/usr/libexec:/usr/lib/xdg-desktop-portal")
+    document_portal = shutil.which("xdg-document-portal",
+                                   path="/usr/libexec:/usr/lib/xdg-desktop-portal")
     runtime = Path(os.environ.get("XDG_RUNTIME_DIR", "/nonexistent"))
-    if not backend or not frontend or not (runtime / "pipewire-0").is_socket():
+    if not backend or not frontend or not document_portal or not (runtime / "pipewire-0").is_socket():
         print("SKIP: installed wlroots portal and a running PipeWire session are required")
         return 77
     renderer = os.environ.get("ZACOS9_SCREENCAST_TEST_RENDERER", "gles2")
@@ -33,13 +35,16 @@ def main():
         config.write_text("[screencast]\nchooser_type=none\n")
         portal_config = root / "config/xdg-desktop-portal/portals.conf"
         portal_config.parent.mkdir(parents=True)
-        portal_config.write_text("[preferred]\norg.freedesktop.impl.portal.ScreenCast=wlr\n")
+        portal_config.write_text(
+            "[preferred]\ndefault=none\norg.freedesktop.impl.portal.ScreenCast=wlr\n")
         desktop_entry = root / "data/applications/org.zacos9.CaptureTest.desktop"
         desktop_entry.parent.mkdir(parents=True)
         desktop_entry.write_text(
             "[Desktop Entry]\nType=Application\nName=Capture Test\nExec=python3\n")
         env = dict(os.environ, HOME=temporary, XDG_CONFIG_HOME=str(root / "config"),
                    XDG_DATA_HOME=str(root / "data"), XDG_RUNTIME_DIR=temporary,
+                   XDG_CURRENT_DESKTOP="ZacOSCaptureTest", GTK_USE_PORTAL="0",
+                   GIO_USE_VFS="local",
                    WAYLAND_DISPLAY="wayland-0", WLR_BACKENDS="headless",
                    WLR_RENDERER=renderer,
                    WLR_HEADLESS_OUTPUTS="1",
@@ -48,6 +53,15 @@ def main():
         processes = []
         with (root / "capture.log").open("w+") as log:
             try:
+                bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+                bus.call_sync(
+                    "org.freedesktop.DBus", "/org/freedesktop/DBus",
+                    "org.freedesktop.DBus", "UpdateActivationEnvironment",
+                    GLib.Variant("(a{ss})", ({key: env[key] for key in (
+                        "HOME", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_RUNTIME_DIR",
+                        "XDG_CURRENT_DESKTOP", "GTK_USE_PORTAL", "GIO_USE_VFS",
+                        "WAYLAND_DISPLAY", "PIPEWIRE_REMOTE")},)),
+                    None, Gio.DBusCallFlags.NONE, 5000, None)
                 processes.append(subprocess.Popen([sys.argv[1], "-d"], env=env, stdout=log, stderr=log))
                 deadline = time.monotonic() + 8
                 while not (root / "wayland-0").is_socket():
@@ -58,8 +72,6 @@ def main():
                 processes.append(subprocess.Popen(
                     [backend, "-c", str(config), "-l", "INFO"],
                     env=env, stdout=log, stderr=log))
-                bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
-
                 def wait_for_owner(destination, process):
                     deadline = time.monotonic() + 8
                     while True:
@@ -69,6 +81,13 @@ def main():
                             GLib.Variant("(s)", (destination,)), None,
                             Gio.DBusCallFlags.NONE, 1000, None).unpack()[0]
                         if owned:
+                            pid = bus.call_sync(
+                                "org.freedesktop.DBus", "/org/freedesktop/DBus",
+                                "org.freedesktop.DBus", "GetConnectionUnixProcessID",
+                                GLib.Variant("(s)", (destination,)), None,
+                                Gio.DBusCallFlags.NONE, 1000, None).unpack()[0]
+                            if pid != process.pid:
+                                raise RuntimeError(f"{destination} is owned by an unexpected process")
                             return
                         if process.poll() is not None or time.monotonic() >= deadline:
                             raise RuntimeError(f"private {destination} did not start")
@@ -76,6 +95,9 @@ def main():
 
                 wait_for_owner("org.freedesktop.impl.portal.desktop.wlr", processes[-1])
 
+                processes.append(subprocess.Popen(
+                    [document_portal], env=env, stdout=log, stderr=log))
+                wait_for_owner("org.freedesktop.portal.Documents", processes[-1])
                 processes.append(subprocess.Popen(
                     [frontend], env=env, stdout=log, stderr=log))
                 destination = "org.freedesktop.portal.Desktop"
