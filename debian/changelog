@@ -1,3 +1,15 @@
+zacos9 (0.2.0) trixie; urgency=medium
+
+  * A big update. Accounts: Limited accounts, Puppy Mode, a Guest account,
+    a login welcome message and Shared Documents. Disk Setup checks,
+    repairs and partitions disks, and the installer can prepare a disk.
+    New: Walkies, Keychain Access, Retriever, Speech, Numbers and Text,
+    Plotter, Jigsaw Puzzle and graphics tablet support. Also Hint Bubbles,
+    icons in the Zac menu, Tricks Manager sets, scheduled start-up and
+    shut-down, daily update checks, styled text in Scribble and much more.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Sun, 18 Oct 2026 00:28:14 -0400
+
 zacos9 (0.1.64) trixie; urgency=medium
 
   * The Network Browser no longer lists this computer's own file server,
