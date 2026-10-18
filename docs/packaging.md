@@ -84,16 +84,24 @@ build dependencies declared in `debian/control`, and runs normal
 `dpkg-buildpackage -b -us -uc` as an unprivileged user. Tests remain serial
 through `debian/rules`; neither `nocheck` option is allowed into the build.
 The manifest includes the AFP development libraries and the fonts, Wayland,
-screenshot, Xwayland and rsync tools needed by the tests.
+screenshot, Xwayland and rsync tools needed by the tests. Xvfb supplies a display
+for GTK chooser tests; the declared desktop schemas, locale data and Plymouth
+interpreter keep their checks active even in a minimal Debian image.
 
-An additional gate rejects Meson skips outside the four documented above and
-lists skips in the workflow summary. Build/Meson logs are retained even on
+An additional gate rejects Meson skips outside the four documented above plus
+`afp-disconnect`: the unprivileged hosted container has no usable `/dev/fuse`,
+so real FUSE disconnect/teardown verification still needs a suitable machine.
+All skips are listed in the workflow summary. Build/Meson logs are retained even on
 failure; successful jobs retain the tested amd64 packages and SHA-256 sums
 for 14 days. These are CI artifacts, not published releases. The conditional
 screen-sharing check still needs a suitable session outside this container.
-Workflow syntax and skip-audit cases have been checked locally; a successful
-hosted run must be confirmed after the branch is pushed. Configure the
-`package` job as a required branch-protection check before the 1.0 release.
+
+The first hosted run exposed missing prerequisites and a sound-test race:
+checking that the mock player's log existed could read it before `printf`
+wrote its contents. The fixture now waits for the expected playback arguments
+and uses a private runtime directory. Seven focused prerequisite/sound/GTK/boot
+tests pass locally under Xvfb. The hosted `package` result, not local success,
+is the gate to require before merging or releasing.
 
 To install the packages on a Debian 13 machine:
 

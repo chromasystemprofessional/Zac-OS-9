@@ -40,7 +40,7 @@ jobs:
           chown -R builder:builder "$GITHUB_WORKSPACE"
           status=0
           runuser -u builder -- env -u DEB_BUILD_OPTIONS -u DEB_BUILD_PROFILES \
-            dpkg-buildpackage -b -us -uc -j2 > /tmp/zacos9-package.log 2>&1 || status=$?
+            xvfb-run -a dpkg-buildpackage -b -us -uc -j2 > /tmp/zacos9-package.log 2>&1 || status=$?
           tail -80 /tmp/zacos9-package.log
           exit "$status"
 
@@ -57,7 +57,7 @@ jobs:
           results = [json.loads(line) for line in logs[0].read_text().splitlines()]
           if not results:
               raise SystemExit("Meson test log is empty")
-          allowed = {"menudraw", "widgets", "decor", "screen-sharing-session"}
+          allowed = {"menudraw", "widgets", "decor", "screen-sharing-session", "afp-disconnect"}
           skipped = {test["name"] for test in results if test["result"] == "SKIP"}
           unexpected = skipped - allowed
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as summary:
