@@ -37,7 +37,10 @@ jobs:
         shell: bash
         run: |
           useradd --create-home builder
-          chown -R builder:builder "$GITHUB_WORKSPACE"
+          mkdir -p /tmp/zacos9-debian/source
+          git archive HEAD | tar -x -C /tmp/zacos9-debian/source
+          chown -R builder:builder /tmp/zacos9-debian
+          cd /tmp/zacos9-debian/source
           status=0
           runuser -u builder -- env -u DEB_BUILD_OPTIONS -u DEB_BUILD_PROFILES \
             xvfb-run -a dpkg-buildpackage -b -us -uc -j2 > /tmp/zacos9-package.log 2>&1 || status=$?
@@ -51,7 +54,7 @@ jobs:
           import os
           from pathlib import Path
 
-          logs = list(Path(".").glob("obj-*/meson-logs/testlog.json"))
+          logs = list(Path("/tmp/zacos9-debian/source").glob("obj-*/meson-logs/testlog.json"))
           if len(logs) != 1:
               raise SystemExit(f"Expected one Meson test log, found {len(logs)}")
           results = [json.loads(line) for line in logs[0].read_text().splitlines()]
@@ -70,7 +73,7 @@ jobs:
       - name: Collect packages and checksums
         run: |
           mkdir -p ci-artifacts
-          cp ../zacos9*.deb ci-artifacts/
+          cp /tmp/zacos9-debian/zacos9*.deb ci-artifacts/
           cd ci-artifacts
           sha256sum *.deb > SHA256SUMS
 
@@ -81,7 +84,7 @@ jobs:
           name: debian-13-logs
           path: |
             /tmp/zacos9-package.log
-            obj-*/meson-logs/
+            /tmp/zacos9-debian/source/obj-*/meson-logs/
           if-no-files-found: warn
           retention-days: 14
 

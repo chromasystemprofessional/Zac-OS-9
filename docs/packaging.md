@@ -87,6 +87,9 @@ The manifest includes the AFP development libraries and the fonts, Wayland,
 screenshot, Xwayland and rsync tools needed by the tests. Xvfb supplies a display
 for GTK chooser tests; the declared desktop schemas, locale data and Plymouth
 interpreter keep their checks active even in a minimal Debian image.
+The checked-out commit is archived into a builder-owned temporary tree, so
+Debian's package outputs can be written beside the source without granting the
+builder access to the runner's checkout parent directory.
 
 An additional gate rejects Meson skips outside the four documented above plus
 `afp-disconnect`: the unprivileged hosted container has no usable `/dev/fuse`,
