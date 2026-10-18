@@ -1,10 +1,17 @@
 #include "appearance.h"
 
+#include <QApplication>
 #include <QDir>
 #include <QFile>
 #include <QSaveFile>
 #include <QStandardPaths>
 #include <QFileDialog>
+#include <QInputDialog>
+#include <QMessageBox>
+#include <QProcess>
+#include <QPushButton>
+#include <QTemporaryDir>
+#include <QTimer>
 #include <QFileInfo>
 #include <QKeyEvent>
 #include <QMouseEvent>
@@ -217,8 +224,22 @@ AppearancePanel::AppearancePanel() {
 		ITEM_TOP + 58, 128, 22));
 	m_addSound.hint = "Records a new alert sound with the microphone.";
 	m_addSound.clicked = [this] {
-		const QString source = QFileDialog::getOpenFileName(this, "Add Alert Sound Recording",
-			QDir::homePath(), "WAVE recordings (*.wav)");
+		/* Mac OS 9's Add…: record one with the microphone, or use a file. */
+		QMessageBox ask(QMessageBox::Question, "Add Alert Sound",
+			"Record a new alert sound with the microphone, or use a sound file?",
+			QMessageBox::NoButton, this);
+		QPushButton *record = ask.addButton("Record…", QMessageBox::AcceptRole);
+		QPushButton *file = ask.addButton("Use File…", QMessageBox::ActionRole);
+		ask.addButton(QMessageBox::Cancel);
+		ask.setDefaultButton(record);
+		ask.exec();
+		QString source;
+		if (ask.clickedButton() == record) {
+			source = recordAlertSound();
+		} else if (ask.clickedButton() == file) {
+			source = QFileDialog::getOpenFileName(this, "Add Alert Sound Recording",
+				QDir::homePath(), "WAVE recordings (*.wav)");
+		}
 		if (source.isEmpty()) {
 			return;
 		}
@@ -671,4 +692,49 @@ void AppearancePanel::keyPressEvent(QKeyEvent *e) {
 		return;
 	}
 	update();
+}
+
+/* Records up to ten seconds from the sound input (pw-record, as Bark
+ * Recorder does) while an alert offers Stop; then asks for its name. The
+ * WAV file it made, named so, or empty. Never waitForFinished (CLAUDE.md). */
+QString AppearancePanel::recordAlertSound() {
+	static QTemporaryDir dir;
+	const QString raw = dir.filePath("recording.wav");
+	QFile::remove(raw);
+	QProcess recorder;
+	recorder.start("pw-record", { "--rate", "22050", "--channels", "1", raw });
+	if (!recorder.waitForStarted(3000)) {
+		m_themeError = "Recording needs PipeWire's pw-record, which couldn't be started.";
+		update();
+		return {};
+	}
+	QMessageBox stop(QMessageBox::Information, "Recording", "Recording… Make the sound now, then click Stop.",
+		QMessageBox::NoButton, this);
+	stop.addButton("Stop", QMessageBox::AcceptRole);
+	QTimer::singleShot(10000, &stop, [&stop] { stop.accept(); }); /* ten seconds at most */
+	stop.exec();
+	recorder.terminate(); /* pw-record finishes the file on SIGTERM */
+	bool done = recorder.state() == QProcess::NotRunning;
+	QObject::connect(&recorder, &QProcess::finished, [&done] { done = true; });
+	for (int waited = 0; !done && waited < 3000; waited += 50) {
+		QApplication::processEvents(QEventLoop::ExcludeUserInputEvents | QEventLoop::WaitForMoreEvents, 50);
+	}
+	if (!done) {
+		recorder.kill();
+	}
+	if (QFileInfo(raw).size() <= 44) { /* a WAV header and nothing else */
+		m_themeError = "Nothing was recorded. Check the sound input in the Sound control panel.";
+		update();
+		return {};
+	}
+	bool ok = false;
+	QString name = QInputDialog::getText(this, "Add Alert Sound", "Name of the new alert sound:",
+		QLineEdit::Normal, "Recording", &ok).trimmed();
+	name.remove(QRegularExpression("[/\\\\:\\x00-\\x1f]"));
+	if (!ok || name.isEmpty()) {
+		return {};
+	}
+	const QString named = dir.filePath(name + ".wav");
+	QFile::remove(named);
+	return QFile::rename(raw, named) ? named : QString();
 }

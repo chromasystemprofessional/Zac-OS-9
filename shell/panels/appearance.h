@@ -44,6 +44,7 @@ private:
 	void loadPatterns();
 	void loadWallpapers();
 	void loadAlertSounds();
+	QString recordAlertSound();
 	void paintWallpaperTab(pl_canvas *c);
 	void loadThemes();
 	void paintThemesTab(pl_canvas *c);

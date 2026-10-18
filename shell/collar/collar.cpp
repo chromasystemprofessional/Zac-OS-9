@@ -827,6 +827,15 @@ void Collar::openModule(int index) {
 				add("Play on " + target.label, !m_sound.switching,
 					[this, target] { m_sound.selectOutput(target); });
 			}
+			/* Mac OS 9's Sound Source strip: where recordings come from. The
+			 * one in use is shown, dimmed, as the menu has a single check. */
+			if (!m_sound.inputs.isEmpty()) {
+				separator();
+				for (const SoundInput &input : m_sound.inputs) {
+					add((input.current ? "Recording from " : "Record from ") + input.label,
+						!input.current && !m_sound.switching, [this, input] { m_sound.selectInput(input); });
+				}
+			}
 		} else {
 			add(description(index), false);
 		}

@@ -1,0 +1,11 @@
+[Unit]
+Description=ZacOS 9 scheduled start-up (Nap Time): sets the wake alarm at shut-down
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/true
+ExecStop=/usr/libexec/zacos9/zacos9-accounts-helper wakealarm
+
+[Install]
+WantedBy=multi-user.target

@@ -295,8 +295,8 @@ A zram/swap switch in a Memory panel is a possible P3. **→ 8.7**
 | **The Collar** panel (show/hide, hot key, font) | ✅ | The Collar panel. |
 | **Date & Time**: date/time, time zone, network time, clock options | ✅ | Menu-bar date formats (month-day-year, day-month-year, ISO year-month-day) and optional hourly ZacOS sound are set in the Date & Time panel. |
 | DialAssist, Modem, Remote Access | — | |
-| **Nap Time**: sleep, display sleep | ✅ | **Scheduled start-up and shut-down** missing (`rtcwake` + a systemd timer, via a helper). P3 M **→ 4.4** |
-| **Tricks Manager** (sets, item information) | ◐ | Catalog exists (`lib/extensions.c`); on/off sets for autostart items and user services to plan. P3 M **→ 4.3** |
+| **Nap Time**: sleep, display sleep | ✅ | Schedule: Start up / Shut down, every day, weekdays or weekends at a time (`/etc/zacos9/schedule` through `zacos9-accounts-helper schedule`): shut-down is a generated systemd timer, start-up the RTC wake alarm, set again at every shut-down by `zacos9-wakealarm.service`. |
+| **Tricks Manager** (sets, item information) | ✅ | Login items and user services with item information and on/off; the Set pop-up saves the current choices as a named set (`~/.config/zacos9/Tricks Sets`), applies one, or deletes it. |
 | File Translator | ✅ | |
 | File Sharing | ✅ | |
 | **Retriever** (folder pairs) | ✅ | `zacos9-retriever`: folder pairs (`~/.config/zacos9/retriever.conf`), Synchronize Now copies newer files each way with rsync (newest wins, nothing deleted), and says so. Not automatic yet. |
@@ -312,8 +312,8 @@ A zram/swap switch in a Memory panel is a possible P3. **→ 8.7**
 | **Monitors**: resolution, pixel size | ✅ | Several screens and arrangement still on the roadmap; colour depth — . |
 | **Mouse**: tracking, double-click | ✅ | Options: Mouse Tracks (`compositor/src/tracks.c`: six arrows behind the moving pointer, going 50 ms apart) and Thick I-Beam (a `text-thick` cursor zacos9-wm shows for programs that ask for "text" by cursor-shape-v1; Qt 6 programs ask that way and get it (checked with Scribble); ones that draw their own cursor, such as GTK 3, keep the thin one). |
 | **Users** | ✅ | See 3.14. |
-| **Numbers** / **Text** (number and sort formats, language) | ✗ | locale via `localectl`/`~/.config/locale.conf`. P3 S |
-| Media Settings (CD AutoPlay) | ✗ | Audio CD/media autoplay as a Sniffer setting. P3 S |
+| **Numbers** / **Text** (number and sort formats, language) | ✅ | `zacos9-controlpanel numbers` / `text`: the system's UTF-8 locales by their own names, with a live sample, kept in `~/.config/locale.conf` (read by `zacos9-session` at login); a locale not yet made is made by `zacos9-accounts-helper locale`. |
+| Media Settings (CD AutoPlay) | ✅ | Sniffer Preferences ▸ General ▸ Media: "Play audio CDs and video DVDs when inserted" (`media-autoplay`, on): the default player for the disc's content type opens it; programs on a disc never start. |
 | **Fetch Updates** | ✅ | Scheduled checks to verify. |
 | **Sound**: alert sounds, output volume, input source | ✅ | Alert sound, output selection, volume/mute, input-source selection, and left/right balance for stereo outputs. |
 | **Speech** (voice, talking alerts) | ✅ | The Speech control panel (`zacos9-controlpanel speech`). See 3.16. |
@@ -534,12 +534,12 @@ partial entries retain the remaining work described in the inventory above.
 |---|---|---|---|
 | 4.1 ✅ | **Shutdown Items** and startup/shutdown sounds | `session/`, System Folder | S |
 | 4.2 ✅ | **Shift held at login**: a session without startup items | `session/` | S |
-| 4.3 | **Tricks Manager sets**: on/off sets for startup items and user services | `lib/extensions.c`, panel | M |
-| 4.4 | **Nap Time** scheduled start-up and shut-down | `rtcwake` + systemd timer, polkit helper | M |
+| 4.3 ✅ | **Tricks Manager sets**: on/off sets for startup items and user services | `lib/extensions.c`, panel | M |
+| 4.4 ✅ | **Nap Time** scheduled start-up and shut-down | `rtcwake` + systemd timer, polkit helper | M |
 | 4.5 ✅ | **Date & Time** formats and hourly chimes | `controlpanel.cpp` | S + S |
-| 4.6 | **Numbers / Text** panels (locale) | `localectl`, `locale.conf` | S |
-| 4.7 ◐ | **Sound**: input source, speaker balance, record an alert sound; input source in The Collar | panels, `shell/collar/` | S each |
-| 4.8 | **CD/media autoplay** as a Sniffer setting | Sniffer | S |
+| 4.6 ✅ | **Numbers / Text** panels (locale) | `localectl`, `locale.conf` | S |
+| 4.7 ✅ | **Sound**: input source, speaker balance, record an alert sound (Appearance ▸ Sound ▸ Add Recording… ▸ Record…); input source in The Collar's Sound menu | panels, `shell/collar/` | S each |
+| 4.8 ✅ | **CD/media autoplay** as a Sniffer setting | Sniffer | S |
 
 ### Milestone 5 — Accounts, privacy and sharing (P3)
 
@@ -626,5 +626,4 @@ alongside the others; most are small.
 
 ### Suggested next three sessions
 
-1. **Small batch: 4.6 Numbers / Text, 4.8 media autoplay, 6.4
-   `zacos9-finder-ctl`, 9.7 the ⇧ glyph and the Pack's width.**
+1. **Milestone 7 — disks, fonts and printing:** 7.1 Disk Vet, 7.4 printing leftovers, 7.6 Disk Setup, 7.7 video mirroring.

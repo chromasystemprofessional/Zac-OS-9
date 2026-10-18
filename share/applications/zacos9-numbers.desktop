@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Numbers
+Comment=How numbers, money, dates and measurements are written
+Exec=zacos9-controlpanel numbers
+Categories=Settings;
+OnlyShowIn=ZacOS9;
