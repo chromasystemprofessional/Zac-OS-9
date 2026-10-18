@@ -265,6 +265,40 @@ int main(void) {
 	add_finder_menus(bar.left, &bar.n_left);
 	assert(!state.connected && !state.erase && !state.network && !state.unmount);
 	menus_free(&bar);
+	/* Puppy Mode: only the essential commands, in the menus and the
+	 * contextual menus, without doubled separators. */
+	setenv("XDG_CONFIG_HOME", config, 1);
+	assert(pl_setting_set("puppy-mode", "true"));
+	assert(!parse_line("tricks 1"));
+	assert(!parse_line("commands\tOpen Terminal Here"));
+	{
+		parse_line("state selection=1 window=1 trash=1 view=0");
+		struct mb_bar puppy = {0};
+		add_finder_menus(puppy.left, &puppy.n_left);
+		char got[512] = "";
+		for (int m = 0; m < puppy.n_left; m++) {
+			strncat(got, puppy.left[m].title, sizeof(got) - strlen(got) - 1);
+			strncat(got, ":", sizeof(got) - strlen(got) - 1);
+			for (int i = 0; i < puppy.left[m].n; i++) {
+				const char *l = puppy.left[m].items[i].label;
+				strncat(got, l ? l : "-", sizeof(got) - strlen(got) - 1);
+				strncat(got, "|", sizeof(got) - strlen(got) - 1);
+			}
+		}
+		assert(strstr(got, "File:New Folder|Open|Close Window|-|Put Away|-|Find…|Edit:"));
+		assert(strstr(got, "View:as Icons|as Buttons|as List|-|Clean Up|Arrange|Special:"));
+		assert(strstr(got, "Special:Empty Trash…|Eject|-|Sleep|"));
+		assert(!strstr(got, "Duplicate") && !strstr(got, "Get Info") && !strstr(got, "View Options"));
+		menus_free(&puppy);
+	}
+	char puppy_context[512];
+	context_labels("state selection=0 window=1 trash=0 view=1", "window", puppy_context,
+		sizeof(puppy_context));
+	assert(strcmp(puppy_context, "New Folder|-|View|-|Close Window|") == 0);
+	assert(!pl_puppy_allows("duplicate") && !pl_puppy_allows("label 2") && pl_puppy_allows("open"));
+	assert(pl_setting_set("puppy-mode", NULL));
+	assert(pl_puppy_allows("duplicate"));
+	puts("ok: Puppy Mode keeps only the essential commands");
 	char settings_file[512], settings_dir[256];
 	snprintf(settings_dir, sizeof(settings_dir), "%s/zacos9", config);
 	snprintf(settings_file, sizeof(settings_file), "%s/desktop.conf", settings_dir);

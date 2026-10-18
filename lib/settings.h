@@ -88,6 +88,13 @@ int pl_caret_blink_ms(void);
  * shows. */
 bool pl_smart_scrolling(void);
 
+/* Sniffer Preferences' Puppy Mode ("puppy-mode", off by default; Mac OS
+ * 9's Simple Finder): only the essential commands. */
+bool pl_puppy_mode(void);
+/* Whether Puppy Mode keeps a Sniffer command (as the menu bar sends it:
+ * "duplicate", "label 3"…); true for every command outside Puppy Mode. */
+bool pl_puppy_allows(const char *command);
+
 #ifdef __cplusplus
 }
 #endif

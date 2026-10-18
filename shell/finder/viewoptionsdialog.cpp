@@ -366,6 +366,13 @@ public:
 			}
 		};
 
+		const int puppyTop = trashTop + TOP + PL_CHECKBOX_SIZE + PL_GROUP_MARGIN + GAP;
+		m_puppy = PanelCheckbox("Use Puppy Mode", QPoint(X + IN, puppyTop + TOP));
+		m_puppy.on = pl_puppy_mode();
+		m_puppy.hint = "Shows only the essential commands in the Sniffer's menus, for children "
+			"and people new to computers.";
+		m_puppy.toggled = [](bool on) { pl_setting_set("puppy-mode", on ? "true" : nullptr); };
+
 		/* Views. */
 		m_viewFor.rect = QRect(X + 196, PANE + 14, 110, PL_POPUP_H);
 		m_viewFor.items = { PopupItem("Icon"), PopupItem("Button"), PopupItem("List") };
@@ -415,6 +422,11 @@ protected:
 			const int trashTop = gridTop + groupH(2) + 8;
 			panelGroup(c, X, trashTop, W - X - 2, trashTop + TOP + PL_CHECKBOX_SIZE +
 				PL_GROUP_MARGIN, "Trash", PANE_BG);
+			const int puppyTop = trashTop + TOP + PL_CHECKBOX_SIZE + PL_GROUP_MARGIN + GAP;
+			panelGroup(c, X, puppyTop, W - X - 2, puppyTop + TOP + PL_CHECKBOX_SIZE + 4 + 12 +
+				PL_GROUP_MARGIN, "Puppy Mode", PANE_BG);
+			panelText(c, "Only the essential commands and features.", X + IN + 20,
+				puppyTop + TOP + PL_CHECKBOX_SIZE + 14, PL_FONT_VIEWS);
 		} else if (m_tab == 1) {
 			panelText(c, "Standard View Options for:", X, m_viewFor.rect.top() + 14);
 			m_views.paint(c, PANE_BG);
@@ -487,7 +499,7 @@ private:
 		m_host.edits.clear();
 		m_host.setFocus(nullptr);
 		if (tab == 0) {
-			m_host.checks = { &m_spring, &m_warnTrash };
+			m_host.checks = { &m_spring, &m_warnTrash, &m_puppy };
 			m_host.radios = { &m_grid };
 		} else if (tab == 1) {
 			showView(m_viewFor.selected);
@@ -557,7 +569,7 @@ private:
 	std::vector<Text> m_tabTexts;
 	std::vector<const plat_text *> m_tabs;
 	PanelCheckbox m_spring;
-	PanelCheckbox m_warnTrash;
+	PanelCheckbox m_warnTrash, m_puppy;
 	PanelSlider m_delay;
 	bool m_sliding = false;
 	PanelRadios m_grid;

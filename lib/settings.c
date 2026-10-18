@@ -639,6 +639,43 @@ bool pl_smart_scrolling(void) {
 		(strcmp(v, "true") == 0 || strcmp(v, "1") == 0);
 }
 
+bool pl_puppy_mode(void) {
+	char v[16];
+	return pl_setting("puppy-mode", v, sizeof(v)) &&
+		(strcmp(v, "true") == 0 || strcmp(v, "1") == 0);
+}
+
+bool pl_puppy_allows(const char *command) {
+	/* What Simple Finder left out: Get Info, labels, aliases, printing,
+	 * finding more than names, view options, erasing, add-on commands.
+	 * New Folder, Open, Close Window, Put Away, Find, the views, Clean Up,
+	 * Arrange, Empty Trash, Eject and Log Out stay. */
+	static const char *const hidden[] = {
+		"duplicate", "make-alias", "get-info", "get-info-sharing", "move-to-trash", "encrypt",
+		"decrypt", "print", "print-window", "page-setup", "add-to-favorites", "search-internet",
+		"find-similar", "index-selection", "show-original", "erase-disk",
+		"show-hidden-applications", "view-window", "view-popup", "view-options", "reset-columns",
+		"open-folder-tricks",
+	};
+	static const char *const hidden_prefixes[] = {
+		"label ", "sort ", "attach-trick ", "remove-trick ", "contextual ",
+	};
+	if (!command || !pl_puppy_mode()) {
+		return true;
+	}
+	for (size_t i = 0; i < sizeof(hidden) / sizeof(hidden[0]); i++) {
+		if (strcmp(command, hidden[i]) == 0) {
+			return false;
+		}
+	}
+	for (size_t i = 0; i < sizeof(hidden_prefixes) / sizeof(hidden_prefixes[0]); i++) {
+		if (strncmp(command, hidden_prefixes[i], strlen(hidden_prefixes[i])) == 0) {
+			return false;
+		}
+	}
+	return true;
+}
+
 /* ---- labels ----------------------------------------------------------------- */
 
 const uint32_t pl_palette16[PL_PALETTE16_COUNT] = {

@@ -268,6 +268,10 @@ void Finder::notifyState() {
 }
 
 void Finder::command(const QString &name) {
+	if (!pl_puppy_allows(name.toUtf8().constData())) {
+		pl_beep(); /* Puppy Mode leaves it out (Sniffer Preferences) */
+		return;
+	}
 	if (name.startsWith("force-quit ")) {
 		/* "force-quit APP-ID NAME", from the Apple menu: Mac OS's own
 		 * question first, as the menu bar can't ask it. */

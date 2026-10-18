@@ -1964,6 +1964,15 @@ bool finderShortcut(QKeyEvent *e) {
 		platinumStartApplication(siblingProgram("zacos9-help"), { "zacos9" }); /* ⌘-?: ZacOS Help */
 		return true;
 	}
+	/* Puppy Mode: only the essential commands' keys. */
+	static const QHash<int, const char *> commands = {
+		{ Qt::Key_Backspace, "move-to-trash" }, { Qt::Key_I, "get-info" }, { Qt::Key_D, "duplicate" },
+		{ Qt::Key_M, "make-alias" }, { Qt::Key_R, "show-original" }, { Qt::Key_P, "print" },
+	};
+	if (commands.contains(e->key()) && !pl_puppy_allows(commands.value(e->key()))) {
+		pl_beep();
+		return true;
+	}
 	switch (e->key()) {
 	case Qt::Key_N: f.newFolder(); return true;
 	case Qt::Key_A: f.command("select-all"); return true;

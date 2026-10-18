@@ -196,7 +196,7 @@ Section 3 lists every feature; section 5 is the plan.
 | File ▸ **Page Setup…**, **Print Window/Print Desktop…** | ✅ | Page Setup: paper (US Letter, US Legal, A4, A5, B5; Letter by default where US units are used), orientation, scale 50–200%, in `desktop.conf`. Print Window draws the whole window (every row or icon, not just what's scrolled into view; a list with its headings) on white with nothing selected; Print Desktop the desktop's icons, cut to where they are. Laid out on PDF pages with the name, date and page number, shrunk to the page's width if wider, sent to your printer with `lp`. No Print dialog (copies, page range): one copy of everything. |
 | Edit ▸ Undo, Cut, Copy, Paste, Clear, Select All | ◐ | Edit menu sends keys to apps ✅; Command-C in the Sniffer copies selected item names as newline-separated text. Undo, Cut and Paste remain application-specific or unimplemented in the Sniffer. |
 | Edit ▸ **Show Clipboard** | ✅ | `shell/finder/clippings.cpp`: a window that follows the clipboard (text or picture), "Clipboard contents: …" below. |
-| Edit ▸ **Preferences…** (General: Puppy Mode, spring-loaded, grid; Views: standard views; Labels) | ◐ | All but Puppy Mode (Simple Finder), which waits for account kinds (P3). **→ 5.2** |
+| Edit ▸ **Preferences…** (General: Puppy Mode, spring-loaded, grid; Views: standard views; Labels) | ✅ | General ▸ Puppy Mode ▸ Use Puppy Mode (`puppy-mode`). |
 | View ▸ as Icons/Buttons/List, Clean Up, Arrange | ✅ | |
 | View ▸ **as Window / as Pop-up Window** | ✅ | See §3.2. |
 | View ▸ **Sort List** (in list view), **Reset Column Positions**, **View Options…** | ✅ | Sort List, Reset Column Positions and View Options… ✅. |
@@ -368,7 +368,7 @@ A zram/swap switch in a Memory panel is a possible P3. **→ 8.7**
 | Login window with a user list and password | ✅ | `zacos9-login` (0.1.54); the chosen person's picture from the Users panel (accountsservice's icons folder), or a blank face with their initial. |
 | **Log Out** (Special menu), automatic logout or lock after idle | ✅ | Log Out ✅ (0.1.54); lock after idle ✅ (Screen Saver) |
 | **Users panel**: add/remove accounts, picture, can change password, can log in, can manage accounts | ✅ | `zacos9-controlpanel users` over accountsservice (D-Bus, its own polkit rules: your name and picture freely, the rest with an administrator's password through the session's polkit agent); passwords hashed in the panel by crypt(3). You can't delete, demote or lock yourself. |
-| Account kinds: Normal, **Limited** (chosen apps only), **Puppy Mode** (the simplified desktop for children) | ◐ | Limited ✅: Users ▸ Open… ▸ "Use only chosen programs" and Programs…, kept as malcontent's app filter (an allowlist of program paths and Flatpak refs, in accountsservice, changed only by administrators); `lib/appfilter.c` reads it at login. The Sniffer's Applications folder and its launches (Open, Open With, aliases, Favorites, Toy Box) and the Zac menu's items and Recent Applications leave out or refuse other programs; ZacOS's own (`zacos9-*`) are always allowed. Not a security boundary, and said so. F-keys aren't filtered. Puppy Mode **→ 5.2** |
+| Account kinds: Normal, **Limited** (chosen apps only), **Puppy Mode** (the simplified desktop for children) | ◐ | Limited ✅: Users ▸ Open… ▸ "Use only chosen programs" and Programs…, kept as malcontent's app filter (an allowlist of program paths and Flatpak refs, in accountsservice, changed only by administrators); `lib/appfilter.c` reads it at login. The Sniffer's Applications folder and its launches (Open, Open With, aliases, Favorites, Toy Box) and the Zac menu's items and Recent Applications leave out or refuse other programs; ZacOS's own (`zacos9-*`) are always allowed. Not a security boundary, and said so. F-keys aren't filtered. Puppy Mode ◐: the Sniffer preference (Simple Finder): the menus and contextual menus keep New Folder, Open, Close Window, Put Away, Find, Edit, the views, Clean Up, Arrange, Empty Trash, Eject, Sleep, Restart, Shut Down, Log Out and Help (one list, `pl_puppy_allows` in `lib/settings.c`); other commands and their ⌘-keys beep. Not yet: an administrator setting it for a person and locking it (needs a store outside their home). **→ 5.2** |
 | Global options: welcome message, guest account, speak your name, alternate password | ◐ | Welcome message P3 S; guest account P3 M; voice login — . **→ 5.3** |
 | Shared Documents folder | ✗ | `/home/Shared` with a group. P3 S **→ 5.4** |
 | Fast user switching | — | Mac OS 9 didn't have it. |
@@ -546,7 +546,7 @@ partial entries retain the remaining work described in the inventory above.
 | # | Work package | Components | Effort |
 |---|---|---|---|
 | 5.1 ✅ | **Limited accounts**: allowed programs enforced by the Sniffer and menu bar (not a security boundary; say so) | Users panel, Sniffer, menu bar | L |
-| 5.2 | **Puppy Mode** (Simple Finder) and its Sniffer preference | Sniffer | L |
+| 5.2 ◐ | **Puppy Mode** (Simple Finder) and its Sniffer preference ✅; remaining: set and locked for a person by an administrator (Users panel) | Sniffer | L |
 | 5.3 | **Guest account** and a welcome message | Users panel, login window | M + S |
 | 5.4 | **Shared Documents** (`/home/Shared` with a group) | `sharing/` | S |
 | 5.5 ◐ | **Encrypt / Decrypt**: GPG passphrase-protected copies ship; optional Secret Service integration remains | Sniffer | M |
@@ -626,6 +626,6 @@ alongside the others; most are small.
 
 ### Suggested next three sessions
 
-1. **5.2 Puppy Mode** — builds on 5.1's per-account settings.
+1. **5.2 Puppy Mode, per person** — an administrator turns it on for someone and they can't turn it off; needs a root-owned setting (a polkit helper) the Sniffer and menu bar read.
 2. **Small batch: 4.6 Numbers / Text, 4.8 media autoplay, 6.4
    `zacos9-finder-ctl`, 9.7 the ⇧ glyph and the Pack's width.**
