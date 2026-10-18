@@ -1,7 +1,7 @@
 wayland_server = dependency('wayland-server')
 wayland_protos = dependency('wayland-protocols')
 wlroots = dependency('wlroots-0.18')
-libinput = dependency('libinput')
+libinput = dependency('libinput') # tablet.c: a tablet's handedness
 xkbcommon = dependency('xkbcommon')
 xcb_icccm = dependency('xcb-icccm').partial_dependency(compile_args: true, includes: true)
 xcb = dependency('xcb')
@@ -18,6 +18,7 @@ protocols = [
   wl_protocol_dir / 'unstable/xdg-decoration/xdg-decoration-unstable-v1.xml',
   wl_protocol_dir / 'staging/cursor-shape/cursor-shape-v1.xml',
   wl_protocol_dir / 'unstable/xdg-output/xdg-output-unstable-v1.xml',
+  wl_protocol_dir / 'stable/tablet/tablet-v2.xml',
   meson.project_source_root() / 'protocols/wlr-layer-shell-unstable-v1.xml',
   meson.project_source_root() / 'protocols/platinum-shell-v1.xml',
   meson.project_source_root() / 'protocols/zacos-snapshot-v1.xml',
@@ -88,6 +89,7 @@ compositor_exe = executable('zacos9-wm',
   'src/kblayout.c',
   'src/fkeys.c',
   'src/access.c',
+  'src/tablet.c',
   'src/window_sounds.c',
   'src/launch.c',
   'src/startup.c',

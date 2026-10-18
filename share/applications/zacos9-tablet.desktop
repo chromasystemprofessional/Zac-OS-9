@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Tablet
+Comment=Which screen a graphics tablet covers
+Exec=zacos9-controlpanel tablet
+Categories=Settings;HardwareSettings;
+OnlyShowIn=ZacOS9;

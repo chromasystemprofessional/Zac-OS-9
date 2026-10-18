@@ -478,6 +478,7 @@ void launch_fill_logo_menu(struct mb_menu *menu, const struct app *apps, int n_a
 		{ "Sound", "zacos9-controlpanel", " sound", PL_ICON_EXT_AUDIO },
 		{ "Speech", "zacos9-controlpanel", " speech", PL_ICON_CP_SPEECH },
 		{ "Startup Disk", "zacos9-controlpanel", " startupdisk", PL_ICON_DISK },
+		{ "Tablet", "zacos9-controlpanel", " tablet", PL_ICON_EXT_INPUT },
 		{ "TCP/IP", "zacos9-tcpip", "", PL_ICON_EXT_ETHERNET },
 		{ "Text", "zacos9-controlpanel", " text", PL_ICON_CP_TEXT },
 		{ "Trackpad", "zacos9-controlpanel", " trackpad", PL_ICON_CP_TRACKPAD },
