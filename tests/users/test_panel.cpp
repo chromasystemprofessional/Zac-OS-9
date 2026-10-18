@@ -78,6 +78,19 @@ int main(int argc, char **argv) {
 
 	QTemporaryDir dir;
 	logPath = dir.filePath("calls.log");
+	/* zacos9-accounts-helper from the sources, its settings here, and a
+	 * pkexec that just runs it. */
+	const QString conf = dir.filePath("etc");
+	QDir().mkpath(conf);
+	qputenv("ZACOS9_ACCOUNTS_CONF", conf.toUtf8());
+	qputenv("ZACOS9_ACCOUNTS_HELPER", (QFileInfo(QString::fromLocal8Bit(argv[1])).absolutePath() +
+		"/../../accounts/zacos9-accounts-helper").toUtf8());
+	QFile pkexec(dir.filePath("pkexec"));
+	pkexec.open(QIODevice::WriteOnly);
+	pkexec.write("#!/bin/sh\nexec \"$@\"\n");
+	pkexec.close();
+	pkexec.setPermissions(QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
+	qputenv("PATH", (dir.path() + ':' + qgetenv("PATH")).toUtf8());
 	QProcess fake;
 	fake.setProcessChannelMode(QProcess::ForwardedChannels);
 	fake.start("python3", { argv[1], logPath });
@@ -144,6 +157,25 @@ int main(int argc, char **argv) {
 	check(w->save(), "unlimiting saves");
 	check(waitFor([] { return calls().contains("SetAppFilter bob False\n"); }),
 		"not limited is an empty blocklist");
+
+	/* Puppy Mode, set by an administrator (zacos9-accounts-helper). */
+	w = panel.openSelected();
+	w->setPuppy(true);
+	check(w->save(), "Bob's Puppy Mode saves");
+	check(waitFor([&] { return QFile::exists(conf + "/puppy/bob"); }), "Puppy Mode is kept for Bob");
+	w = panel.openSelected();
+	w->setPuppy(false);
+	w->save();
+	check(waitFor([&] { return !QFile::exists(conf + "/puppy/bob"); }), "and taken away");
+
+	/* Options: the welcome message. */
+	OptionsWindow *options = panel.openOptions();
+	options->setWelcome("Hello,\n   family");
+	check(options->save(), "the welcome message saves");
+	QFile welcome(conf + "/welcome");
+	check(welcome.open(QIODevice::ReadOnly) && welcome.readAll() == "Hello, family\n",
+		"the login window's welcome message is kept, on one line");
+	options->close();
 
 	/* Refused (no administrator's password): nothing changes. */
 	QFile deny(logPath + ".deny");

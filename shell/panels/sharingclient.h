@@ -21,6 +21,9 @@ void sharingHelperCommand(QProcess *p, const QStringList &args);
  * *err gets its last line of complaint. */
 QString runSharingHelper(const QStringList &args, const QByteArray &input, bool *ok,
 	QString *err = nullptr);
+/* The same for another of ZacOS's helpers: zacos9-KIND-helper ("accounts"). */
+QString runPrivilegedHelper(const QString &kind, const QStringList &args, const QByteArray &input,
+	bool *ok, QString *err = nullptr);
 
 /* A file the helper writes: /etc/zacos9/NAME (or under
  * $ZACOS9_SHARING_CONF, for tests). */

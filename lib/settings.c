@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <poll.h>
 #include <pthread.h>
+#include <pwd.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -639,10 +640,21 @@ bool pl_smart_scrolling(void) {
 		(strcmp(v, "true") == 0 || strcmp(v, "1") == 0);
 }
 
+bool pl_puppy_locked(void) {
+	const char *conf = getenv("ZACOS9_ACCOUNTS_CONF");
+	const struct passwd *pw = getpwuid(getuid());
+	if (!pw) {
+		return false;
+	}
+	char path[512];
+	snprintf(path, sizeof(path), "%s/puppy/%s", conf && *conf ? conf : "/etc/zacos9", pw->pw_name);
+	return access(path, F_OK) == 0;
+}
+
 bool pl_puppy_mode(void) {
 	char v[16];
-	return pl_setting("puppy-mode", v, sizeof(v)) &&
-		(strcmp(v, "true") == 0 || strcmp(v, "1") == 0);
+	return pl_puppy_locked() || (pl_setting("puppy-mode", v, sizeof(v)) &&
+		(strcmp(v, "true") == 0 || strcmp(v, "1") == 0));
 }
 
 bool pl_puppy_allows(const char *command) {

@@ -65,6 +65,17 @@ if [ -z "${WLR_RENDERER:-}" ]; then
 	$gpu || export WLR_RENDERER=pixman
 fi
 
+# The Guest account (Users control panel) starts each login afresh: its
+# home is emptied and filled from /etc/skel. Only the account the Users
+# panel made (named in /etc/zacos9/guest-account) is ever emptied.
+guest_account=$(cat "${ZACOS9_ACCOUNTS_CONF:-/etc/zacos9}/guest-account" 2>/dev/null || true)
+if [ -n "$guest_account" ] && [ "$(id -un)" = "$guest_account" ] && [ -z "${ZACOS9_GUEST_FRESH:-}" ] &&
+		[ -d "${HOME:-}" ] && [ "$(cd "$HOME" && pwd -P)" != / ]; then
+	find "$HOME" -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null || true
+	cp -a /etc/skel/. "$HOME"/ 2>/dev/null || true
+	export ZACOS9_GUEST_FRESH=1 # once, if the session starts again below
+fi
+
 # Apps want a D-Bus session bus. A systemd login has one in the runtime
 # folder; elsewhere, start one for the session.
 if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then

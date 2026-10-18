@@ -369,6 +369,7 @@ public:
 		const int puppyTop = trashTop + TOP + PL_CHECKBOX_SIZE + PL_GROUP_MARGIN + GAP;
 		m_puppy = PanelCheckbox("Use Puppy Mode", QPoint(X + IN, puppyTop + TOP));
 		m_puppy.on = pl_puppy_mode();
+		m_puppy.enabled = !pl_puppy_locked(); /* set by an administrator */
 		m_puppy.hint = "Shows only the essential commands in the Sniffer's menus, for children "
 			"and people new to computers.";
 		m_puppy.toggled = [](bool on) { pl_setting_set("puppy-mode", on ? "true" : nullptr); };

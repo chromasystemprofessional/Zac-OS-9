@@ -10,32 +10,45 @@ QString sharingConfFile(const QString &name) {
 	return (env.isEmpty() ? QString("/etc/zacos9") : env) + '/' + name;
 }
 
-static QString helperPath() {
-	const QString env = qEnvironmentVariable("ZACOS9_SHARING_HELPER");
+/* `kind` is "sharing" or "accounts": zacos9-KIND-helper, from its source
+ * folder of that name in a build tree; ZACOS9_SHARING_HELPER or
+ * ZACOS9_ACCOUNTS_HELPER stand in for tests. */
+static QString helperPath(const QString &kind = "sharing") {
+	const QString env = qEnvironmentVariable(("ZACOS9_" + kind.toUpper() + "_HELPER").toUtf8().constData());
 	if (!env.isEmpty()) {
 		return env;
 	}
+	const QString name = "zacos9-" + kind + "-helper";
 	/* Installed beside us (prefix/libexec/zacos9), or, running from a
 	 * build tree (build/shell/...), the one in the sources. */
 	const QString dir = QCoreApplication::applicationDirPath();
-	for (const QString &candidate : { dir + "/../libexec/zacos9/zacos9-sharing-helper",
-			dir + "/../../sharing/zacos9-sharing-helper" }) {
+	for (const QString &candidate : { dir + "/../libexec/zacos9/" + name,
+			dir + "/../../" + kind + "/" + name }) {
 		if (QFileInfo(candidate).isExecutable()) {
 			return QFileInfo(candidate).canonicalFilePath();
 		}
 	}
-	return "/usr/libexec/zacos9/zacos9-sharing-helper";
+	return "/usr/libexec/zacos9/" + name;
 }
 
-void sharingHelperCommand(QProcess *p, const QStringList &args) {
+static void helperCommand(QProcess *p, const QString &kind, const QStringList &args) {
 	if (geteuid() == 0) {
-		p->start(helperPath(), args);
+		p->start(helperPath(kind), args);
 	} else {
-		p->start("pkexec", QStringList{ helperPath() } + args);
+		p->start("pkexec", QStringList{ helperPath(kind) } + args);
 	}
 }
 
+void sharingHelperCommand(QProcess *p, const QStringList &args) {
+	helperCommand(p, "sharing", args);
+}
+
 QString runSharingHelper(const QStringList &args, const QByteArray &input, bool *ok, QString *err) {
+	return runPrivilegedHelper("sharing", args, input, ok, err);
+}
+
+QString runPrivilegedHelper(const QString &kind, const QStringList &args, const QByteArray &input,
+		bool *ok, QString *err) {
 	QProcess p;
 	bool done = false;
 	QObject::connect(&p, &QProcess::finished, [&done] { done = true; });
@@ -44,7 +57,8 @@ QString runSharingHelper(const QStringList &args, const QByteArray &input, bool 
 			done = true;
 		}
 	});
-	sharingHelperCommand(&p, args);
+	const QString what = kind == "sharing" ? QString("file sharing") : kind;
+	helperCommand(&p, kind, args);
 	p.write(input);
 	p.closeWriteChannel();
 	/* Wait, keeping the windows drawn (servers take a moment to start, and
@@ -58,8 +72,8 @@ QString runSharingHelper(const QStringList &args, const QByteArray &input, bool 
 		*err = QString::fromUtf8(p.readAllStandardError()).trimmed().section('\n', -1);
 		if (!*ok && err->isEmpty()) {
 			*err = started && p.exitStatus() == QProcess::NormalExit
-				? QString("The file sharing helper stopped with status %1.").arg(p.exitCode())
-				: QString("The file sharing helper couldn’t be run (%1).").arg(p.errorString());
+				? QString("The %1 helper stopped with status %2.").arg(what).arg(p.exitCode())
+				: QString("The %1 helper couldn’t be run (%2).").arg(what, p.errorString());
 		}
 	}
 	return QString::fromUtf8(p.readAllStandardOutput());

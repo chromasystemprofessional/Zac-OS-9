@@ -63,6 +63,34 @@ public:
 	void setAppFilter(const QString &path, bool limited, const QStringList &allowed, Done done);
 };
 
+/* Computer-wide settings (Mac OS 9's Multiple Users Options): the Guest
+ * account and the login window's welcome message, through
+ * zacos9-accounts-helper. */
+class OptionsWindow : public QWidget {
+public:
+	explicit OptionsWindow(QWidget *parent);
+	~OptionsWindow() override;
+	/* For tests, as clicking and typing would. */
+	void setGuest(bool on);
+	void setWelcome(const QString &text);
+	bool save(QString *error = nullptr);
+
+protected:
+	void paintEvent(QPaintEvent *) override;
+	void mousePressEvent(QMouseEvent *) override;
+	void mouseMoveEvent(QMouseEvent *) override;
+	void mouseReleaseEvent(QMouseEvent *) override;
+	void keyPressEvent(QKeyEvent *) override;
+
+private:
+	struct Parts;
+	std::unique_ptr<Parts> d;
+};
+
+/* Where zacos9-accounts-helper keeps its settings (ZACOS9_ACCOUNTS_CONF,
+ * for tests): puppy/USER, guest-account, welcome. */
+QString accountsConf(const QString &name);
+
 /* The programs a Limited account may use: installed programs, each with a
  * checkbox. OK hands back malcontent's entries for the checked ones. */
 class ProgramsWindow : public QWidget {
@@ -101,6 +129,7 @@ public:
 	void select(int row);
 	AccountWindow *newUser();
 	AccountWindow *openSelected();
+	OptionsWindow *openOptions();
 	/* Delete…: asks first, unless `ask` is false (tests). */
 	void deleteSelected(bool removeFiles, bool ask = true);
 	QString lastError() const;
@@ -142,6 +171,7 @@ public:
 	void setPicture(const QString &file);
 	/* Use only chosen programs, and which (malcontent entries). */
 	void setLimited(bool limited, const QStringList &allowed);
+	void setPuppy(bool puppy);
 	/* Save: false (with the reason) if it can't be saved as it is. */
 	bool save(QString *problem = nullptr);
 

@@ -33,7 +33,8 @@
  * doesn't have take their default, and nodes it doesn't know about are
  * added, while the user's own nodes and overrides are kept.
  */
-static constexpr int REGISTRY_VERSION = 12;
+/* 13: Shared Documents (/home/Shared). */
+static constexpr int REGISTRY_VERSION = 13;
 
 static const char *DEFAULT_REGISTRY = R"JSON({
   "version": 10,
@@ -91,6 +92,8 @@ static const char *DEFAULT_REGISTRY = R"JSON({
       "excludeCategories": ["X-ZacOS9-Utility"] },
     { "id": "home", "name": "Home", "kind": "backed",
       "backing": "$HOME", "order": 2 },
+    { "id": "shared-documents", "name": "Shared Documents", "kind": "backed",
+      "backing": "/home/Shared", "order": 3 },
     { "id": "utilities", "name": "Utilities", "kind": "apps", "order": 4,
       "visible": false,
       "categories": ["Utility", "System", "Settings"] }
@@ -668,7 +671,10 @@ std::vector<std::unique_ptr<Item>> vfsList(const QString &path) {
 	}
 	std::vector<const VNode *> children;
 	for (auto it = g_nodes.cbegin(); it != g_nodes.cend(); ++it) {
-		if (it->parentId() == parentId && it->visible && !it->id.isEmpty()) {
+		/* Shared Documents shows once the package has made it. */
+		const bool missing = it->id == QLatin1String("shared-documents") &&
+			!QDir(it->backing).exists();
+		if (it->parentId() == parentId && it->visible && !it->id.isEmpty() && !missing) {
 			children.push_back(&*it);
 		}
 	}

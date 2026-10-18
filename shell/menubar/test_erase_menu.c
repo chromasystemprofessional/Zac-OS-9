@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <pwd.h>
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -298,6 +299,21 @@ int main(void) {
 	assert(!pl_puppy_allows("duplicate") && !pl_puppy_allows("label 2") && pl_puppy_allows("open"));
 	assert(pl_setting_set("puppy-mode", NULL));
 	assert(pl_puppy_allows("duplicate"));
+	/* Set by an administrator: on whatever the person's own setting says. */
+	{
+		char locked[512];
+		snprintf(locked, sizeof(locked), "%s/puppy", config);
+		mkdir(locked, 0755);
+		snprintf(locked, sizeof(locked), "%s/puppy/%s", config, getpwuid(getuid())->pw_name);
+		fclose(fopen(locked, "w"));
+		setenv("ZACOS9_ACCOUNTS_CONF", config, 1);
+		assert(pl_puppy_locked() && pl_puppy_mode() && !pl_puppy_allows("duplicate"));
+		unlink(locked);
+		snprintf(locked, sizeof(locked), "%s/puppy", config);
+		rmdir(locked);
+		unsetenv("ZACOS9_ACCOUNTS_CONF");
+		assert(!pl_puppy_mode());
+	}
 	puts("ok: Puppy Mode keeps only the essential commands");
 	char settings_file[512], settings_dir[256];
 	snprintf(settings_dir, sizeof(settings_dir), "%s/zacos9", config);

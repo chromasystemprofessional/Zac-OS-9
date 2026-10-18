@@ -1,0 +1,10 @@
+// Administrators at the computer (in the sudo group, logged in on its
+// screen) may change the computer's account settings (Puppy Mode for a
+// person, the Guest account, the welcome message) without a password, as
+// the Users control panel's other changes go through accountsservice.
+polkit.addRule(function(action, subject) {
+	if (action.id == "org.zacos9.accounts" &&
+			subject.local && subject.active && subject.isInGroup("sudo")) {
+		return polkit.Result.YES;
+	}
+});
