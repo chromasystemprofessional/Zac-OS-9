@@ -9,6 +9,7 @@
 #include <glib.h>
 
 #include "appfilter.h"
+#include "icons.h"
 #include "electron.h"
 #include "menubar.h"
 
@@ -213,8 +214,24 @@ static int read_items_dir(const char *dir_path, struct entry *entries, int max) 
 	return n;
 }
 
-static void add_item(struct mb_menu *menu, const char *label, bool enabled,
+static struct mb_item *add_item(struct mb_menu *menu, const char *label, bool enabled,
 		enum action action, const char *arg);
+
+/* An item's icon: one of ours, or a desktop entry's own. */
+static void with_kind(struct mb_item *it, enum pl_icon_kind kind) {
+	if (it) {
+		it->icon_kind = (int)kind + 1;
+	}
+}
+static void with_desktop_icon(struct mb_item *it, const char *desktop, enum pl_icon_kind otherwise) {
+	if (!it) {
+		return;
+	}
+	it->icon_px = desktop && menu_icon_for_desktop ? menu_icon_for_desktop(desktop) : NULL;
+	if (!it->icon_px) {
+		with_kind(it, otherwise);
+	}
+}
 
 static int populate_items_menu(struct mb_menu *menu, const char *path, int depth) {
 	if (depth > 4 || menu->n >= MAX_ITEMS) {
@@ -231,14 +248,22 @@ static int populate_items_menu(struct mb_menu *menu, const char *path, int depth
 			}
 			const int children = populate_items_menu(sub, entries[i].path, depth + 1);
 			if (children > 0) {
-				add_item(menu, entries[i].name, true, ACT_NONE, NULL);
+				with_kind(add_item(menu, entries[i].name, true, ACT_NONE, NULL), PL_ICON_FOLDER);
 				menu->items[menu->n - 1].submenu = sub;
 				added++;
 			} else {
 				free(sub);
 			}
 		} else {
-			add_item(menu, entries[i].name, true, entries[i].action, entries[i].exec);
+			struct mb_item *it = add_item(menu, entries[i].name, true, entries[i].action, entries[i].exec);
+			/* A program: its own icon; an alias: a folder's or a document's. */
+			struct stat st;
+			if (entries[i].action == ACT_LAUNCH) {
+				with_desktop_icon(it, entries[i].path, PL_ICON_APPLICATION);
+			} else {
+				with_kind(it, entries[i].exec && stat(entries[i].exec + (strncmp(entries[i].exec, "open-path ", 10) == 0 ? 10 : 0), &st) == 0
+					&& S_ISDIR(st.st_mode) ? PL_ICON_FOLDER : PL_ICON_DOCUMENT);
+			}
 			added++;
 		}
 	}
@@ -246,10 +271,10 @@ static int populate_items_menu(struct mb_menu *menu, const char *path, int depth
 	return added;
 }
 
-static void add_item(struct mb_menu *menu, const char *label, bool enabled,
+static struct mb_item *add_item(struct mb_menu *menu, const char *label, bool enabled,
 		enum action action, const char *arg) {
 	if (menu->n >= MAX_ITEMS) {
-		return;
+		return NULL;
 	}
 	struct mb_item *it = &menu->items[menu->n++];
 	*it = (struct mb_item){
@@ -258,6 +283,7 @@ static void add_item(struct mb_menu *menu, const char *label, bool enabled,
 		.action = action,
 		.arg = arg ? strdup(arg) : NULL,
 	};
+	return it;
 }
 
 /* $XDG_CONFIG_HOME/zacos9/NAME (the Sniffer's QStandardPaths agrees). */
@@ -292,13 +318,17 @@ static void add_favorites(struct mb_menu *menu) {
 		closedir(dir);
 	}
 	qsort(names, n, sizeof(names[0]), by_label);
-	add_item(menu, "Favorites", n > 0, ACT_NONE, NULL);
+	with_kind(add_item(menu, "Favorites", n > 0, ACT_NONE, NULL), PL_ICON_FOLDER);
 	struct mb_menu *favorites = calloc(1, sizeof(*favorites));
 	menu->items[menu->n - 1].submenu = favorites;
 	for (int i = 0; i < n; i++) {
 		char arg[PATH_MAX + 300];
 		snprintf(arg, sizeof(arg), "open-path %s/%s", dir_path, names[i]);
-		add_item(favorites, names[i], true, ACT_FINDER, arg);
+		struct stat st;
+		char target[PATH_MAX + 300];
+		snprintf(target, sizeof(target), "%s/%s", dir_path, names[i]);
+		with_kind(add_item(favorites, names[i], true, ACT_FINDER, arg),
+			stat(target, &st) == 0 && S_ISDIR(st.st_mode) ? PL_ICON_FOLDER : PL_ICON_DOCUMENT);
 		free(names[i]);
 	}
 }
@@ -337,7 +367,7 @@ static void add_automated_tasks(struct mb_menu *menu) {
 		}
 		return;
 	}
-	add_item(menu, "Automated Tasks", n > 0, ACT_NONE, NULL);
+	with_kind(add_item(menu, "Automated Tasks", n > 0, ACT_NONE, NULL), PL_ICON_FOLDER);
 	struct mb_item *item = &menu->items[menu->n - 1];
 	item->submenu = calloc(1, sizeof(*item->submenu));
 	for (int i = 0; i < n; i++) {
@@ -350,7 +380,7 @@ static void add_automated_tasks(struct mb_menu *menu) {
 		quoted = g_shell_quote(path);
 		char command[PATH_MAX * 2];
 		snprintf(command, sizeof(command), "exec %s", quoted);
-		add_item(item->submenu, names[i], true, ACT_LAUNCH, command);
+		with_kind(add_item(item->submenu, names[i], true, ACT_LAUNCH, command), PL_ICON_APPLICATION);
 		g_free(quoted);
 		free(names[i]);
 	}
@@ -358,18 +388,18 @@ static void add_automated_tasks(struct mb_menu *menu) {
 
 void launch_fill_logo_menu(struct mb_menu *menu, const struct app *apps, int n_apps) {
 	/* About and software tools are the top group in the Apple menu. */
-	add_item(menu, "About This Computer…", true, ACT_ABOUT, NULL);
+	with_kind(add_item(menu, "About This Computer…", true, ACT_ABOUT, NULL), PL_ICON_EXT_CHIP);
 	/* The app catalog over apt. */
 	{
 		char command[PATH_MAX + 64];
 		sibling_program("zacos9-store", command, sizeof(command));
-		add_item(menu, "New Tricks", true, ACT_LAUNCH, command);
+		with_kind(add_item(menu, "New Tricks", true, ACT_LAUNCH, command), PL_ICON_APPLICATION);
 	}
 	/* New ZacOS 9 releases and Debian's own updates. */
 	{
 		char command[PATH_MAX + 64];
 		sibling_program("zacos9-update", command, sizeof(command));
-		add_item(menu, "Fetch Updates", true, ACT_LAUNCH, command);
+		with_kind(add_item(menu, "Fetch Updates", true, ACT_LAUNCH, command), PL_ICON_EXT_OPENTRANSPORT);
 	}
 	/* Force Quit: the open applications, front-most first; the Finder
 	 * asks first, then has zacos9-wm end the one chosen. */
@@ -381,66 +411,79 @@ void launch_fill_logo_menu(struct mb_menu *menu, const struct app *apps, int n_a
 			}
 			char arg[512];
 			snprintf(arg, sizeof(arg), "force-quit %s %s", apps[i].app_id, apps[i].name);
-			add_item(quit, apps[i].name, true, ACT_FINDER, arg);
+			struct mb_item *it = add_item(quit, apps[i].name, true, ACT_FINDER, arg);
+			if (it && menu_icon_for_app) {
+				it->icon_px = menu_icon_for_app(apps[i].app_id);
+			}
+			if (it && !it->icon_px) {
+				with_kind(it, PL_ICON_APPLICATION);
+			}
 		}
-		add_item(menu, "Force Quit", quit->n > 0, ACT_NONE, NULL);
+		with_kind(add_item(menu, "Force Quit", quit->n > 0, ACT_NONE, NULL), PL_ICON_CAUTION);
 		menu->items[menu->n - 1].submenu = quit;
 	}
 	add_item(menu, NULL, false, ACT_NONE, NULL);
 	/* Classic Mac OS in an emulator; the Finder explains what's missing. */
-	add_item(menu, "Old Dog", true, ACT_FINDER, "classic");
+	with_kind(add_item(menu, "Old Dog", true, ACT_FINDER, "classic"), PL_ICON_CLASSIC);
 	/* Screen Snapshot: drag out part of the screen; it goes on the Desktop
 	 * as "Picture N.png" and on the clipboard. */
 	{
 		char command[PATH_MAX + 64];
 		sibling_program("zacos9-snapshot", command, sizeof(command));
-		add_item(menu, "Screen Snapshot", true, ACT_LAUNCH, command);
+		with_kind(add_item(menu, "Screen Snapshot", true, ACT_LAUNCH, command), PL_ICON_EXT_CAMERA);
 	}
 	/* Windows programs, installed through Wine. */
 	{
 		char command[PATH_MAX + 64];
 		sibling_program("zacos9-wininstall", command, sizeof(command));
-		add_item(menu, "Windows Installer", true, ACT_LAUNCH, command);
+		with_kind(add_item(menu, "Windows Installer", true, ACT_LAUNCH, command), PL_ICON_WINDOWS);
 	}
 	/* The Network Browser: connecting to other computers, as Mac OS 9's
 	 * own Apple Menu Item of the same name did. */
 	{
 		char command[PATH_MAX + 64];
 		sibling_program("zacos9-netbrowser", command, sizeof(command));
-		add_item(menu, "Neighbourhood", true, ACT_LAUNCH, command);
+		with_kind(add_item(menu, "Neighbourhood", true, ACT_LAUNCH, command), PL_ICON_EXT_APPLETALK);
 	}
 	/* Printer Picker: Mac OS 9's Chooser, which was here too. */
 	{
 		char command[PATH_MAX + 64];
 		sibling_program("zacos9-printerpicker", command, sizeof(command));
-		add_item(menu, "Printer Picker", true, ACT_LAUNCH, command);
+		with_kind(add_item(menu, "Printer Picker", true, ACT_LAUNCH, command), PL_ICON_EXT_PRINTMONITOR);
 	}
 	/* Control Panels, as a hierarchical menu. */
-	add_item(menu, "Control Panels", true, ACT_NONE, NULL);
+	with_kind(add_item(menu, "Control Panels", true, ACT_NONE, NULL), PL_ICON_CONTROL_PANELS);
 	struct mb_menu *panels = calloc(1, sizeof(*panels));
 	menu->items[menu->n - 1].submenu = panels;
 	/* Alphabetical, as in the Mac's Control Panels folder. */
-	const struct { const char *name, *program, *arg; } panel_list[] = {
-		{ "Accessibility", "zacos9-controlpanel", " accessibility" },
-		{ "Appearance", "zacos9-appearance", "" },
-		{ "Bluetooth", "zacos9-bluetooth", "" },
-		{ "Collar", "zacos9-collarpanel", "" },
-		{ "Date & Time", "zacos9-datetime", "" },
-		{ "File Sharing", "zacos9-filesharing", "" },
-		{ "File Translator", "zacos9-fileexchange", "" },
-		{ "General Controls", "zacos9-controlpanel", " general" },
-		{ "Internet", "zacos9-controlpanel", " internet" },
-		{ "Keyboard", "zacos9-controlpanel", " keyboard" },
-		{ "Monitors", "zacos9-controlpanel", " monitors" },
-		{ "Mouse", "zacos9-controlpanel", " mouse" },
-		{ "Nap Time", "zacos9-controlpanel", " energysaver" },
-		{ "Screen Saver", "zacos9-controlpanel", " screensaver" },
-		{ "Sound", "zacos9-controlpanel", " sound" },
-		{ "Startup Disk", "zacos9-controlpanel", " startupdisk" },
-		{ "TCP/IP", "zacos9-tcpip", "" },
-		{ "Trackpad", "zacos9-controlpanel", " trackpad" },
-		{ "Users", "zacos9-controlpanel", " users" },
-		{ "Zac Menu Options", "zacos9-controlpanel", " zacmenu" },
+	/* Each with an icon from ZacOS's own set (lib/icons.h). */
+	const struct { const char *name, *program, *arg; enum pl_icon_kind icon; } panel_list[] = {
+		{ "Accessibility", "zacos9-controlpanel", " accessibility", PL_ICON_EXT_INPUT },
+		{ "Appearance", "zacos9-appearance", "", PL_ICON_EXT_DISPLAY },
+		{ "Bluetooth", "zacos9-bluetooth", "", PL_ICON_EXT_BLUETOOTH },
+		{ "Collar", "zacos9-collarpanel", "", PL_ICON_CONTROL_PANELS },
+		{ "Date & Time", "zacos9-datetime", "", PL_ICON_EXT_SENSOR },
+		{ "File Sharing", "zacos9-filesharing", "", PL_ICON_SHARED_FOLDER },
+		{ "File Translator", "zacos9-fileexchange", "", PL_ICON_DOCUMENT },
+		{ "General Controls", "zacos9-controlpanel", " general", PL_ICON_CONTROL_PANELS },
+		{ "Internet", "zacos9-controlpanel", " internet", PL_ICON_INTERNET_LOCATION },
+		{ "Keyboard", "zacos9-controlpanel", " keyboard", PL_ICON_EXT_INPUT },
+		{ "Keychain Access", "zacos9-keychain", "", PL_ICON_EXT_SECURITY },
+		{ "Monitors", "zacos9-controlpanel", " monitors", PL_ICON_EXT_DISPLAY },
+		{ "Mouse", "zacos9-controlpanel", " mouse", PL_ICON_EXT_INPUT },
+		{ "Nap Time", "zacos9-controlpanel", " energysaver", PL_ICON_EXT_POWER },
+		{ "Numbers", "zacos9-controlpanel", " numbers", PL_ICON_CONTROL_PANELS },
+		{ "Retriever", "zacos9-retriever", "", PL_ICON_FOLDER },
+		{ "Screen Saver", "zacos9-controlpanel", " screensaver", PL_ICON_EXT_DISPLAY },
+		{ "Sound", "zacos9-controlpanel", " sound", PL_ICON_EXT_AUDIO },
+		{ "Speech", "zacos9-controlpanel", " speech", PL_ICON_EXT_AUDIO },
+		{ "Startup Disk", "zacos9-controlpanel", " startupdisk", PL_ICON_DISK },
+		{ "TCP/IP", "zacos9-tcpip", "", PL_ICON_EXT_ETHERNET },
+		{ "Text", "zacos9-controlpanel", " text", PL_ICON_DOCUMENT },
+		{ "Trackpad", "zacos9-controlpanel", " trackpad", PL_ICON_EXT_INPUT },
+		{ "Users", "zacos9-controlpanel", " users", PL_ICON_EXT_SECURITY },
+		{ "Walkies", "zacos9-walkies", "", PL_ICON_EXT_WIFI },
+		{ "Zac Menu Options", "zacos9-controlpanel", " zacmenu", PL_ICON_CONTROL_PANELS },
 	};
 	bool toy_box_added = false;
 	for (size_t i = 0; i < sizeof(panel_list) / sizeof(panel_list[0]); i++) {
@@ -449,10 +492,10 @@ void launch_fill_logo_menu(struct mb_menu *menu, const struct app *apps, int n_a
 		strncat(command, panel_list[i].arg, sizeof(command) - strlen(command) - 1);
 		/* The Toy Box (the Sniffer's own window) goes in its place by name. */
 		if (!toy_box_added && strcmp(panel_list[i].name, "Toy Box") > 0) {
-			add_item(panels, "Toy Box", true, ACT_FINDER, "toy-box");
+			with_kind(add_item(panels, "Toy Box", true, ACT_FINDER, "toy-box"), PL_ICON_FOLDER);
 			toy_box_added = true;
 		}
-		add_item(panels, panel_list[i].name, true, ACT_LAUNCH, command);
+		with_kind(add_item(panels, panel_list[i].name, true, ACT_LAUNCH, command), panel_list[i].icon);
 	}
 	add_favorites(menu);
 	recent_fill_menu(menu);

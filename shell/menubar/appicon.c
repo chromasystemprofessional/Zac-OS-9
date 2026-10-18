@@ -92,9 +92,9 @@ static char *find_icon(const char *name) {
 	return found;
 }
 
-/* MBAR_ICON_W x MBAR_ICON_H straight-alpha ARGB, the icon centred. */
-static uint32_t *load(const char *path) {
-	GdkPixbuf *pixbuf = gdk_pixbuf_new_from_file_at_scale(path, MBAR_ICON_H, MBAR_ICON_H, TRUE, NULL);
+/* W x H straight-alpha ARGB, the icon centred at H tall. */
+static uint32_t *load_at(const char *path, int W, int H) {
+	GdkPixbuf *pixbuf = gdk_pixbuf_new_from_file_at_scale(path, H, H, TRUE, NULL);
 	if (!pixbuf) {
 		return NULL;
 	}
@@ -102,18 +102,22 @@ static uint32_t *load(const char *path) {
 	const int n = gdk_pixbuf_get_n_channels(pixbuf), stride = gdk_pixbuf_get_rowstride(pixbuf);
 	const bool alpha = gdk_pixbuf_get_has_alpha(pixbuf);
 	const guchar *src = gdk_pixbuf_read_pixels(pixbuf);
-	uint32_t *px = calloc(MBAR_ICON_W * MBAR_ICON_H, sizeof(*px));
-	const int x0 = (MBAR_ICON_W - w) / 2, y0 = (MBAR_ICON_H - h) / 2;
-	for (int y = 0; px && y < h && y0 + y < MBAR_ICON_H; y++) {
-		for (int x = 0; x < w && x0 + x < MBAR_ICON_W; x++) {
+	uint32_t *px = calloc(W * H, sizeof(*px));
+	const int x0 = (W - w) / 2, y0 = (H - h) / 2;
+	for (int y = 0; px && y < h && y0 + y < H; y++) {
+		for (int x = 0; x < w && x0 + x < W; x++) {
 			const guchar *p = src + y * stride + x * n;
 			const uint32_t a = alpha ? p[3] : 255;
-			px[(y0 + y) * MBAR_ICON_W + x0 + x] = a << 24 | (uint32_t)p[0] << 16 |
+			px[(y0 + y) * W + x0 + x] = a << 24 | (uint32_t)p[0] << 16 |
 				(uint32_t)p[1] << 8 | p[2];
 		}
 	}
 	g_object_unref(pixbuf);
 	return px;
+}
+
+static uint32_t *load(const char *path) {
+	return load_at(path, MBAR_ICON_W, MBAR_ICON_H);
 }
 
 const uint32_t *app_icon_title(const char *app_id) {
@@ -137,5 +141,50 @@ const uint32_t *app_icon_title(const char *app_id) {
 		cache[n_cache].px = px;
 		n_cache++;
 	}
+	return px;
+}
+
+/* The Zac menu's icons: a desktop entry's Icon=, MENU_ICON x MENU_ICON,
+ * cached by the desktop file's path. */
+static char *desktop_icon_name(const char *desktop) {
+	GKeyFile *file = g_key_file_new();
+	char *icon = g_key_file_load_from_file(file, desktop, G_KEY_FILE_NONE, NULL) ?
+		g_key_file_get_string(file, G_KEY_FILE_DESKTOP_GROUP, G_KEY_FILE_DESKTOP_KEY_ICON, NULL) :
+		NULL;
+	g_key_file_free(file);
+	return icon;
+}
+
+const uint32_t *menu_icon_for_desktop(const char *desktop) {
+	static struct {
+		char *path;
+		uint32_t *px;
+	} cache[128];
+	static int n_cache;
+	if (!desktop) {
+		return NULL;
+	}
+	for (int i = 0; i < n_cache; i++) {
+		if (strcmp(cache[i].path, desktop) == 0) {
+			return cache[i].px;
+		}
+	}
+	char *name = desktop_icon_name(desktop);
+	char *path = name && *name ? find_icon(name) : NULL;
+	uint32_t *px = path ? load_at(path, MENU_ICON, MENU_ICON) : NULL;
+	g_free(path);
+	g_free(name);
+	if (n_cache < 128) {
+		cache[n_cache].path = strdup(desktop);
+		cache[n_cache].px = px;
+		n_cache++;
+	}
+	return px;
+}
+
+const uint32_t *menu_icon_for_app(const char *app_id) {
+	char *desktop = app_desktop_file(app_id);
+	const uint32_t *px = menu_icon_for_desktop(desktop);
+	free(desktop);
 	return px;
 }

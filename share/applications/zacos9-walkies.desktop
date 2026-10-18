@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Walkies
+Comment=Switch the network, sound, time zone and printer for the place you are
+Exec=zacos9-walkies
+Categories=Settings;Network;
+OnlyShowIn=ZacOS9;

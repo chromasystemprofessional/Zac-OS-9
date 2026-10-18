@@ -729,6 +729,57 @@ test('disksetup-udisks',
   env: ['LC_ALL=en_US.UTF-8'], timeout: 10,
 )
 
+# Walkies: places, each with its network, sound, time zone, printer and
+# startup set (walkies/location.cpp).
+executable('zacos9-walkies',
+  'walkies/main.cpp', 'walkies/location.cpp',
+  'finder/tricksets.cpp', 'finder/autostart.cpp',
+  'finder/alert.cpp',
+  'finder/platinumshell.cpp',
+  finder_protocol,
+  link_with: panelkit,
+  include_directories: include_directories('finder', 'panels', 'walkies'),
+  dependencies: [platinum_dep, qt6, wayland_client, gio, gio_unix],
+  cpp_args: ['-std=c++17'],
+  install: true,
+)
+test('walkies-locations',
+  executable('test-walkies-locations', 'walkies/test_location.cpp', 'walkies/location.cpp',
+    include_directories: include_directories('walkies'),
+    dependencies: [platinum_dep, qt6],
+    cpp_args: ['-std=c++17'],
+  ),
+  timeout: 10,
+)
+
+# Jigsaw Puzzle: a picture in pieces.
+executable('zacos9-jigsaw',
+  'jigsaw/main.cpp',
+  'finder/alert.cpp',
+  'finder/platinumshell.cpp',
+  finder_protocol,
+  include_directories: include_directories('finder'),
+  dependencies: [platinum_dep, qt6, wayland_client],
+  cpp_args: ['-std=c++17'],
+  install: true,
+)
+
+# Plotter: graphs of y = f(x) (plotter/expr.cpp reads them).
+executable('zacos9-plotter',
+  'plotter/main.cpp', 'plotter/expr.cpp',
+  'finder/platinumshell.cpp',
+  finder_protocol,
+  link_with: panelkit,
+  include_directories: include_directories('finder', 'panels', 'plotter'),
+  dependencies: [platinum_dep, qt6, wayland_client],
+  cpp_args: ['-std=c++17'],
+  install: true,
+)
+test('plotter-expr',
+  executable('test-plotter-expr', 'plotter/test_expr.cpp', 'plotter/expr.cpp',
+    dependencies: [qt6], cpp_args: ['-std=c++17']),
+  timeout: 10)
+
 # Retriever: folder pairs kept alike with rsync (retriever/sync.cpp).
 executable('zacos9-retriever',
   'retriever/main.cpp', 'retriever/sync.cpp',

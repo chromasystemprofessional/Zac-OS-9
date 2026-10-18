@@ -223,16 +223,17 @@ Section 3 lists every feature; section 5 is the plan.
 | Feature | Status | Notes |
 |---|---|---|
 | About This Computer (system and memory summary) | ✅ | Reports processor, graphics, total and available memory, and swap when the system exposes those values; it does not attribute memory per application. |
+| Small icons before every item (Mac OS 9's Apple menu) | ✅ | A program's own (its desktop entry's Icon=, through the icon theme), else ZacOS's 16 px set: folders for submenus, a control panel's own kind in Control Panels, the generic application or document; a dimmed item's icon dimmed (`shell/menubar/appicon.c`, `launch.c`, `main.c`). Our panels borrow the nearest icons from the set; distinct originals for each would be an art pass. |
 | Items from a folder; aliases; folders sprout submenus | ✅ | Top-level and nested `.desktop` launchers are sorted into the Zac menu; symlink aliases to files/folders open in the Sniffer; real directories containing entries become submenus (depth limited to four). Broken links, symlinked directories with newline paths, and deeper nesting are not traversed. |
 | **Recent Applications / Recent Documents / Recent Servers** | ✅ | Programs whose windows appeared; `recently-used.xbel` (the Sniffer adds what it opens); servers Neighbourhood connected to, reconnected with `--connect` (0.1.54). |
 | **Favorites** submenu (and Add To Favorites) | ✅ | (0.1.54) |
 | **Zac Menu Options** panel: submenus on/off, how many recent items | ✅ | Per-category recent counts and the option to show items in submenus or directly (category-prefixed). |
-| Control Panels submenu | ✅ | |
+| Control Panels submenu | ✅ | Every ZacOS panel, Keychain Access, Walkies, Retriever, Speech, Numbers and Text among them. |
 | Printer Picker | ✅ | See 3.15. |
 | Notepad, Calculator, Dog Ears | ✅ | See 3.18. |
 | Stash | ✅ | See 3.18. |
 | Key Tags | ✅ | See 3.18. |
-| Jigsaw Puzzle, Plotter | ✗ | See 3.18. |
+| Jigsaw Puzzle, Plotter | ✅ | See 3.18. |
 | Bark Recorder | ✅ | See 3.18. |
 | Pedigree | ✅ | See 3.18. |
 | Neighbourhood | ✅ | |
@@ -307,7 +308,7 @@ A zram/swap switch in a Memory panel is a possible P3. **→ 8.7**
 | Keyboard ▸ **Function Keys** | ✅ | See §3.6. |
 | **Keychain Access** | ✅ | `zacos9-keychain`: the keychains (Secret Service collections), Unlock/Lock, Make Default, and each one's items by name with Remove; The Collar's Keychain module opens it. Passwords aren't shown. |
 | **Toy Box** | ✅ | See §3.2. |
-| **Walkies** (snapshots of network, sound, time zone, printer, startup items) | ✗ | P3 L **→ 8.5** |
+| **Walkies** (snapshots of network, sound, time zone, printer, startup items) | ✅ | `zacos9-walkies`: places (`~/.config/zacos9/Walkies`) remembering the NetworkManager connection, sound output and volume, time zone, default printer and Tricks Manager set; Switch To restores them (nmcli, pactl, timedatectl, lpoptions, the set's login items and user services). |
 | Memory | — | |
 | **Monitors**: resolution, pixel size | ✅ | Several screens: Arrangement (drag the screens), the main display (menu bar and icons), each screen's resolution, Mirror Displays (`compositor/src/prefs.c`); the desktop's pattern on the others (`secondarydesktop.cpp`); pop-up tabs on their own screen. Colour depth — . |
 | **Mouse**: tracking, double-click | ✅ | Options: Mouse Tracks (`compositor/src/tracks.c`: six arrows behind the moving pointer, going 50 ms apart) and Thick I-Beam (a `text-thick` cursor zacos9-wm shows for programs that ask for "text" by cursor-shape-v1; Qt 6 programs ask that way and get it (checked with Scribble); ones that draw their own cursor, such as GTK 3, keep the thin one). |
@@ -333,7 +334,7 @@ A zram/swap switch in a Memory panel is a possible P3. **→ 8.7**
 | Energy (sleep now), battery | ✅ | |
 | File Sharing (on/off, who's connected) | ✅ | `shell/collar/filesharing.cpp`: shown once File Sharing is set up; on/off through the sharing helper (the servers that were on come back); visitors by address from `ss` (no root needed, so no user names). |
 | Keychain | ✅ | |
-| Walkies | ✗ | With §3.10. **→ 8.5** |
+| Walkies | ✅ | See above. |
 | AppleTalk, Remote Access, AirPort | ◐ | Network module with Wi-Fi ✅; dial-up — (out of scope) |
 | CD audio (play, tracks, eject) | ✅ | As a media module over MPRIS (`shell/collar/media.cpp`): what's playing, Play/Pause, Next/Previous Track, Show the player, a choice of player when several run. Eject belongs to the Sniffer. |
 | Printer selector | ✅ | `shell/collar/printing.cpp`: shown once CUPS knows a printer; yours ticked, choosing another makes it yours; Open Print Queue, Open Printer Picker. |
@@ -419,7 +420,7 @@ A zram/swap switch in a Memory panel is a possible P3. **→ 8.7**
 | **Key Tags** | ✅ | `zacos9-keytags`, in the Zac menu: the main keys of an extended keyboard drawn with what each types in the layout in use (read from xkb with zacos9-wm's model and options), following ⌘-Space and the keyboard menu; Layout menu for the others in use. Holding Shift or Alt Gr, or clicking Shift or Option in the picture, shows their characters; dead keys are outlined. Typing or clicking keys fills a line to copy from. Option in the picture means xkb's third level (Alt Gr): Linux reads the left Option key as Alt. No Font menu. |
 | **Scribble** | ◐ | `zacos9-scribble`: plain text (UTF-8 or Latin-1; CR, CR LF or LF kept), New/Open/Save/Save As, Find/Find Again, Font and Size menus; Speech ▸ Speak Selection and Stop Speaking. Styled text remains. |
 | **Pedigree** | ✅ | `zacos9-pedigree`, in the Zac menu and behind the Sniffer's System Information: tabs System Profile (system, hardware, battery, displays, network) and Devices and Volumes (disks and their volumes, USB, PCI, Bluetooth, sound), outlines opened by their triangles; File > Save Report, Edit > Copy, View > Refresh/Open All/Close All. Read from /sys, /proc, os-release, dpkg and pci.ids/usb.ids, no password: memory slots and serials only root can read are left out. |
-| Plotter, Jigsaw Puzzle | ✗ | P3 — optional fun. **→ 8.6** |
+| Plotter, Jigsaw Puzzle | ✅ | `zacos9-plotter`: y = f(x) with functions, implied multiplication and zoom (`plotter/expr.cpp`, tested). `zacos9-jigsaw`: a picture (Happy Zac, or Open Picture…) in tabbed pieces, three sizes; pieces snap home. |
 | AppleCD Audio Player, DVD Player, Apple Video Player | — | Use regular media apps; The Collar's media module covers control. |
 | Disk Copy, Disk Vet, Disk Setup | see §3.15 | |
 
@@ -585,8 +586,8 @@ partial entries retain the remaining work described in the inventory above.
 | 8.2 ✅ | **Key Tags** (current layout, modifier states) | S |
 | 8.3 ✅ | **Bark Recorder** (`pw-record`) | S |
 | 8.4 ✅ | **Stash** (pages of pictures and text) | M |
-| 8.5 | **Walkies** (snapshots of network, sound, time zone, printer, startup items) | L |
-| 8.6 | Plotter, Jigsaw Puzzle | optional |
+| 8.5 ✅ | **Walkies** (snapshots of network, sound, time zone, printer, startup items) | L |
+| 8.6 ✅ | Plotter, Jigsaw Puzzle | optional |
 | 8.7 | A Memory panel's zram/swap switch | optional |
 
 ### Milestone 9 — Leftovers and checks from Milestones 1–2 (P2)
@@ -626,5 +627,5 @@ alongside the others; most are small.
 
 ### Suggested next three sessions
 
-1. **Milestone 8 — desk accessories and extras:** 8.5 Walkies, then the optional 8.6 (Plotter, Jigsaw Puzzle) and 8.7.
+1. **8.7 (optional):** a Memory panel's zram/swap switch.
 2. **Hardware checks** of what was built and only tested in VMs or headless: Disk Setup on a real disk, Nap Time's wake alarm, CD/DVD AutoPlay, recording an alert sound, several real screens.

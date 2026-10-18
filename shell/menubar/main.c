@@ -27,6 +27,7 @@
 #include <wayland-cursor.h>
 #include <xkbcommon/xkbcommon.h>
 
+#include "icons.h"
 #include "menubar.h"
 #include "platinum-shell-v1-client-protocol.h"
 #include "settings.h"
@@ -219,17 +220,60 @@ static void draw_bar(void) {
 	free(px);
 }
 
+/* The Zac menu's icons: in a menu with any, every name moves over for one. */
+#define MENU_ICON_INDENT (MENU_ICON + 4)
+
+static bool menu_has_icons(const struct mb_menu *m) {
+	for (int i = 0; i < m->n; i++) {
+		if (m->items[i].icon_px || m->items[i].icon_kind) {
+			return true;
+		}
+	}
+	return false;
+}
+
 static void to_menu_items(const struct mb_menu *m, struct menu_item *out) {
+	const int indent = menu_has_icons(m) ? MENU_ICON_INDENT : 0;
 	for (int i = 0; i < m->n; i++) {
 		out[i] = (struct menu_item){
 			.label = m->items[i].label_text,
 			.key = m->items[i].key_text,
 			.shift = m->items[i].shift,
+			.indent = m->items[i].label ? indent : 0,
 			.enabled = m->items[i].enabled,
 			.checked = m->items[i].checked,
 			.submenu = m->items[i].submenu != NULL,
 			.swatch = m->items[i].swatch,
 		};
+	}
+}
+
+/* Each item's icon, before its name; a dimmed item's dimmed too, half
+ * way to the menu's own colour, as Mac OS 9 drew them. */
+static void paint_icons(struct pl_canvas *c, const struct mb_menu *m, const struct menu_item *items) {
+	for (int i = 0; i < m->n; i++) {
+		const struct mb_item *it = &m->items[i];
+		const int y = menu_item_top(items, m->n, i) + (MENU_ITEM_H - MENU_ICON) / 2;
+		const uint32_t back = c->px[(size_t)(y + MENU_ICON / 2) * c->stride + MENU_TEXT_X - 2];
+		if (it->icon_px) {
+			pl_image_blend(c, MENU_TEXT_X, y, it->icon_px, MENU_ICON, MENU_ICON, false);
+		} else if (it->icon_kind) {
+			pl_icon_paint(c, MENU_TEXT_X, y, (enum pl_icon_kind)(it->icon_kind - 1), PL_ICON_SMALL, false);
+		} else {
+			continue;
+		}
+		if (!it->enabled) {
+			for (int yy = y; yy < y + MENU_ICON && yy < c->height; yy++) {
+				for (int xx = MENU_TEXT_X; xx < MENU_TEXT_X + MENU_ICON && xx < c->width; xx++) {
+					uint32_t *p = &c->px[(size_t)yy * c->stride + xx];
+					uint32_t mixed = 0xFF000000u;
+					for (int shift = 0; shift < 24; shift += 8) {
+						mixed |= ((((*p >> shift) & 0xFF) + ((back >> shift) & 0xFF)) / 2) << shift;
+					}
+					*p = mixed;
+				}
+			}
+		}
 	}
 }
 
@@ -268,6 +312,7 @@ static void draw_submenu(struct menu_item *parent_items, int parent_n) {
 	struct pl_canvas c = { .px = px, .stride = w, .width = w, .height = h };
 	int sel = g.blinks_left > 0 && g.chosen_in_sub && !g.blink_on ? -1 : g.sub_selected;
 	menu_paint(&c, items, s->n, g.sub_w, g.sub_h, sel, pl_accent_current());
+	paint_icons(&c, s, items);
 	wl_subsurface_set_position(g.sub_sub, g.sub_x, g.sub_y);
 	present(g.sub_surface, px, w, h);
 	free(px);
@@ -360,6 +405,7 @@ static void draw_menu(void) {
 	struct pl_canvas c = { .px = px, .stride = w, .width = w, .height = h };
 	int sel = g.blinks_left > 0 && !g.chosen_in_sub && !g.blink_on ? -1 : g.selected;
 	menu_paint(&c, items, m->n, g.menu_w, g.menu_h, sel, pl_accent_current());
+	paint_icons(&c, m, items);
 
 	wl_subsurface_set_position(g.menu_sub, g.menu_x, g.menu_y);
 	present(g.menu_surface, px, w, h);
