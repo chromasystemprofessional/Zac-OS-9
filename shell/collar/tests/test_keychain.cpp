@@ -55,6 +55,8 @@ public:
 	QMap<QString, bool> locked = { { Login, true }, { Default, true }, { Session, false } };
 	QString alias = Default;
 	QStringList calls, pendingUnlock;
+	/* Login's items: path -> label. */
+	QMap<QString, QString> items = { { Login + "/2", "Wi-Fi “Home”" }, { Login + "/1", "Encrypted file “a.gpg”" } };
 	QString introspect(const QString &) const override { return {}; }
 
 	bool handleMessage(const QDBusMessage &message, const QDBusConnection &bus) override {
@@ -68,7 +70,18 @@ public:
 			}
 			return out;
 		};
-		if (path == Root && member == "Get") {
+		if (path.startsWith(Login + "/") && member == "Get") {
+			bus.send(message.createReply(variant(items.value(path))));
+		} else if (path.startsWith(Login + "/") && member == "Delete") {
+			calls << "Delete " + items.take(path);
+			bus.send(message.createReply(QVariant::fromValue(QDBusObjectPath("/"))));
+		} else if (path == Login && member == "Get") {
+			QList<QDBusObjectPath> list;
+			for (const QString &p : items.keys()) {
+				list << QDBusObjectPath(p);
+			}
+			bus.send(message.createReply(variant(QVariant::fromValue(list))));
+		} else if (path == Root && member == "Get") {
 			bus.send(message.createReply(variant(QVariant::fromValue(QList<QDBusObjectPath>{
 				QDBusObjectPath(Login), QDBusObjectPath(Default), QDBusObjectPath(Session) }))));
 		} else if (path == Root && member == "ReadAlias") {
@@ -199,6 +212,18 @@ int main(int argc, char **argv) {
 	check(choose(Qt::Key_Down, 4) && fake.calls.value(0) == "Lock " + Default &&
 		until([&] { return keys.keychain(Default) && keys.keychain(Default)->locked; }),
 		"Lock All Keychains locks every unlocked keychain");
+	fake.calls.clear();
+
+	// Keychain Access: a keychain's items by name; removing one.
+	QList<KeychainItem> found;
+	bool listed = false;
+	keys.items(Login, [&](const QList<KeychainItem> &items) { found = items; listed = true; });
+	check(until([&] { return listed; }) && found.size() == 2 &&
+		found.value(0).label == "Encrypted file “a.gpg”" && found.value(1).label == "Wi-Fi “Home”",
+		"a keychain's items are listed by name");
+	keys.removeItem(found.value(1));
+	check(until([&] { return fake.calls.contains("Delete Wi-Fi “Home”"); }) && fake.items.size() == 1,
+		"Remove deletes the item");
 	fake.calls.clear();
 
 	daemon.unregisterService(Service);

@@ -180,7 +180,7 @@ Section 3 lists every feature; section 5 is the plan.
 | **Toy Box** (buttons in categories, pages; Option-drag between pages) | p. 43 | ✅ | Control Panels ▸ Toy Box; System Folder ▸ Toy Box Items; bulleted folders are pages. |
 | Trash: Empty Trash…, warn-before-emptying option (the ellipsis disappears), locked items need Option | p. 46 | ✅ | Warn before emptying in the Trash's Get Info (`trash-warn`) ✅; without it Empty Trash has no ellipsis and doesn't ask, except before uninstalling applications. Locked items (can't be changed) stay, with their Put Away records, and Empty Trash says so even without the warning; Option-Empty Trash removes them too without asking. |
 | Put Away takes items out of the Trash back to where they were | p. 412 | ✅ | Restores files using the recorded Trash origin; `finder-selection` verifies the file and origin record are both restored/removed. |
-| **Encrypt** a file (password, optional Keychain) | p. 49, 412 | ✅ | File ▸ Encrypt… creates a separate GPG AES-256 encrypted copy after confirming a passphrase; Decrypt… verifies the passphrase and saves an owner-only output file. Original files are preserved. Keychain integration remains optional/not implemented. Tested by `finder-crypto`. |
+| **Encrypt** a file (password, optional Keychain) | p. 49, 412 | ✅ | File ▸ Encrypt… creates a separate GPG AES-256 encrypted copy after confirming a passphrase; Decrypt… verifies the passphrase and saves an owner-only output file. Original files are preserved. After encrypting, it offers to add the passphrase to the keychain (`secret-tool`, keyed by the encrypted file's path); Decrypt uses it without asking. Tested by `finder-crypto`. |
 | Rebuild the desktop (generic icons) | p. 51 | — | No desktop database; MIME cache refresh is automatic. |
 
 ### §3.3 Sniffer menus (Appendix A)
@@ -299,13 +299,13 @@ A zram/swap switch in a Memory panel is a possible P3. **→ 8.7**
 | **Tricks Manager** (sets, item information) | ◐ | Catalog exists (`lib/extensions.c`); on/off sets for autostart items and user services to plan. P3 M **→ 4.3** |
 | File Translator | ✅ | |
 | File Sharing | ✅ | |
-| **Retriever** (folder pairs) | ✗ | rsync two-way with newest-wins and a warning. P3 M **→ 5.8** |
+| **Retriever** (folder pairs) | ✅ | `zacos9-retriever`: folder pairs (`~/.config/zacos9/retriever.conf`), Synchronize Now copies newer files each way with rsync (newest wins, nothing deleted), and says so. Not automatic yet. |
 | **General Controls**: show desktop in background, Toy Box at startup, shut-down warning, insertion-point and menu blinking, Documents folder for Open/Save | ✅ | `zacos9-controlpanel general`. Show Desktop, Menu Blinking, Insertion Point Blinking and Documents done. Show Toy Box at system startup ✅; Shut Down Warning (fsck covers it) and Folder Protection (already dead in Mac OS 9) left out. |
 | **Internet** (email, web, default apps, downloads folder) | ✅ | `zacos9-controlpanel internet`: default browser and mail program (GIO, `mimeapps.list`), downloads folder (`user-dirs.dirs`). The Mac's personal details, news and home-page settings have no system-wide place on Linux. |
 | **Keyboard**: repeat rate/delay | ✅ | |
 | Keyboard ▸ **layouts** and the keyboard menu (flag at the right of the menu bar, ⌘-Space to switch) | ✅ | Up to four ticked in the Keyboard panel (xkb's group limit), else Debian's `/etc/default/keyboard`; an abbreviation (US, US-DV) instead of a flag; ⌘-Option-Space option. `compositor/src/kblayout.c`, `shell/menubar/kbmenu.c`. |
 | Keyboard ▸ **Function Keys** | ✅ | See §3.6. |
-| **Keychain Access** | ◐ | The Collar's Keychain module ✅; a control panel listing items, Lock/Unlock — use Seahorse or build one. P3 M **→ 5.6** |
+| **Keychain Access** | ✅ | `zacos9-keychain`: the keychains (Secret Service collections), Unlock/Lock, Make Default, and each one's items by name with Remove; The Collar's Keychain module opens it. Passwords aren't shown. |
 | **Toy Box** | ✅ | See §3.2. |
 | **Walkies** (snapshots of network, sound, time zone, printer, startup items) | ✗ | P3 L **→ 8.5** |
 | Memory | — | |
@@ -549,10 +549,10 @@ partial entries retain the remaining work described in the inventory above.
 | 5.2 ✅ | **Puppy Mode** (Simple Finder): the Sniffer preference, and set for a person by an administrator | Sniffer, Users panel, `accounts/` | L |
 | 5.3 ✅ | **Guest account** and a welcome message | Users panel, login window | M + S |
 | 5.4 ✅ | **Shared Documents** (`/home/Shared`, sticky) | `sharing/` | S |
-| 5.5 ◐ | **Encrypt / Decrypt**: GPG passphrase-protected copies ship; optional Secret Service integration remains | Sniffer | M |
-| 5.6 | **Keychain Access** panel: list items, Lock/Unlock | `shell/panels/` | M |
+| 5.5 ✅ | **Encrypt / Decrypt**: GPG passphrase-protected copies, the passphrase kept in the keychain if wanted | Sniffer | M |
+| 5.6 ✅ | **Keychain Access** panel: list items, Lock/Unlock | `shell/panels/` | M |
 | 5.7 ✅ | **Web Sharing**: a static server for `~/Web Pages` behind a switch | `sharing/`, panel | S |
-| 5.8 | **Retriever** (folder pairs: two-way rsync, newest wins, with a warning) | new app | M |
+| 5.8 ✅ | **Retriever** (folder pairs: two-way rsync, newest wins, with a warning) | new app | M |
 
 ### Milestone 6 — Help, automation and speech (P3)
 

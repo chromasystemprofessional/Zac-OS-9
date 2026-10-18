@@ -680,6 +680,41 @@ executable('zacos9-bluetooth',
   install: true,
 )
 
+# Retriever: folder pairs kept alike with rsync (retriever/sync.cpp).
+executable('zacos9-retriever',
+  'retriever/main.cpp', 'retriever/sync.cpp',
+  'finder/alert.cpp',
+  'finder/platinumshell.cpp',
+  finder_protocol,
+  link_with: panelkit,
+  include_directories: include_directories('finder', 'panels', 'retriever'),
+  dependencies: [platinum_dep, qt6, wayland_client],
+  cpp_args: ['-std=c++17'],
+  install: true,
+)
+test('retriever-sync',
+  executable('test-retriever-sync', 'retriever/test_sync.cpp', 'retriever/sync.cpp',
+    dependencies: [qt6],
+    cpp_args: ['-std=c++17'],
+  ),
+  timeout: 30,
+)
+
+# Keychain Access: the Secret Service's keychains and their items
+# (collar/keychain.cpp, shared with The Collar's Keychain module).
+executable('zacos9-keychain',
+  'panels/keychainaccess.cpp',
+  'collar/keychain.cpp',
+  'finder/alert.cpp',
+  'finder/platinumshell.cpp',
+  finder_protocol,
+  link_with: panelkit,
+  include_directories: include_directories('finder', 'collar'),
+  dependencies: [platinum_dep, qt6, wayland_client],
+  cpp_args: ['-std=c++17'],
+  install: true,
+)
+
 executable('zacos9-filesharing',
   'panels/filesharing.cpp',
   'finder/alert.cpp',

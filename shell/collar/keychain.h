@@ -22,6 +22,11 @@ struct KeychainInfo {
 	bool operator==(const KeychainInfo &o) const { return path == o.path && name == o.name && locked == o.locked; }
 };
 
+/* A password or other secret kept in a keychain, by its name. */
+struct KeychainItem {
+	QString path, label;
+};
+
 class Keychains : public QObject {
 public:
 	explicit Keychains(QObject *parent = nullptr, const QString &service = defaultService());
@@ -40,6 +45,10 @@ public:
 	void lock(const QString &path);
 	void lockAll();
 	void setDefault(const QString &path);
+	/* Keychain Access: a keychain's items, by name; removing one (the
+	 * keyring may ask to unlock first). */
+	void items(const QString &path, std::function<void(const QList<KeychainItem> &)> done);
+	void removeItem(const KeychainItem &item);
 
 private:
 	QString m_service;

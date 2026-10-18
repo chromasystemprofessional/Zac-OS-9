@@ -900,12 +900,23 @@ void Finder::encryptSelection() {
 		return;
 	}
 	auto *progress = cryptoProgress("Encrypting “" + QFileInfo(source).fileName() + "”…");
-	encryptFile(source, destination, password, [progress, destination](bool ok, const QString &problem) {
+	encryptFile(source, destination, password, [progress, destination, password](bool ok,
+			const QString &problem) mutable {
 		progress->hide();
 		progress->deleteLater();
 		if (ok) {
-			Alert::ask("Encrypted copy saved to “" + QFileInfo(destination).fileName() + "”.",
-				"OK", QString());
+			/* Mac OS 9's "Add to keychain": Decrypt then needn't ask. */
+			if (Alert::ask("Encrypted copy saved to “" + QFileInfo(destination).fileName() +
+					"”. Add its passphrase to your keychain, so Decrypt can open it without asking?",
+					"Add to Keychain", "Don't Add")) {
+				keychainStorePassphrase(destination, password, [](bool stored) {
+					if (!stored) {
+						Alert::ask("The passphrase couldn't be added to your keychain. "
+							"Is the keychain unlocked?", "OK", QString());
+					}
+				});
+			}
+			password.fill(QChar('\0'));
 		} else {
 			Alert::ask("The file could not be encrypted. " + problem, "OK", QString());
 		}
@@ -933,22 +944,27 @@ void Finder::decryptSelection() {
 		Alert::ask("The decrypted file must be saved as a different file.", "OK", QString());
 		return;
 	}
-	QString password = cryptoPassword(false);
-	if (password.isEmpty()) {
-		return;
-	}
-	auto *progress = cryptoProgress("Decrypting “" + QFileInfo(source).fileName() + "”…");
-	decryptFile(source, destination, password, [progress, destination](bool ok, const QString &problem) {
-		progress->hide();
-		progress->deleteLater();
-		if (ok) {
-			Alert::ask("Decrypted file saved to “" + QFileInfo(destination).fileName() + "”.",
-				"OK", QString());
-		} else {
-			Alert::ask("The file could not be decrypted. " + problem, "OK", QString());
+	/* The keychain's passphrase if it has one, else ask. */
+	keychainFindPassphrase(source, [source, destination](QString password) {
+		if (password.isEmpty()) {
+			password = cryptoPassword(false);
 		}
+		if (password.isEmpty()) {
+			return;
+		}
+		auto *progress = cryptoProgress("Decrypting “" + QFileInfo(source).fileName() + "”…");
+		decryptFile(source, destination, password, [progress, destination](bool ok, const QString &problem) {
+			progress->hide();
+			progress->deleteLater();
+			if (ok) {
+				Alert::ask("Decrypted file saved to “" + QFileInfo(destination).fileName() + "”.",
+					"OK", QString());
+			} else {
+				Alert::ask("The file could not be decrypted. " + problem, "OK", QString());
+			}
+		});
+		password.fill(QChar('\0'));
 	});
-	password.fill(QChar('\0'));
 }
 
 void Finder::printDocuments(const QStringList &files, const QString &queue) {

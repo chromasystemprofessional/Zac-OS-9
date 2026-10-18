@@ -88,6 +88,37 @@ int main(int argc, char **argv) {
 		std::fprintf(stderr, "FAIL: wrong passphrase succeeded or left an output file\n");
 		return 1;
 	}
+	/* The keychain (a stand-in secret-tool keeping KEY<TAB>SECRET lines). */
+	const QString tool = dir.path() + "/secret-tool";
+	QFile script(tool);
+	script.open(QIODevice::WriteOnly);
+	script.write("#!/bin/sh\ndb=\"$(dirname \"$0\")/secrets\"\n"
+		"case $1 in\n"
+		"store) secret=$(cat); printf '%s\\t%s\\n' \"$5\" \"$secret\" >>\"$db\" ;;\n"
+		"lookup) grep -F \"$3\t\" \"$db\" 2>/dev/null | tail -1 | cut -f2- ;"
+		" grep -qF \"$3\t\" \"$db\" 2>/dev/null ;;\n"
+		"esac\n");
+	script.close();
+	script.setPermissions(QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
+	qputenv("ZACOS9_SECRET_TOOL", QFile::encodeName(tool));
+	QString found = "unset";
+	QEventLoop wait;
+	keychainFindPassphrase(encrypted, [&](const QString &p) { found = p; wait.quit(); });
+	wait.exec();
+	if (!found.isEmpty()) {
+		std::fprintf(stderr, "FAIL: a passphrase found before one was added\n");
+		return 1;
+	}
+	bool stored = false;
+	keychainStorePassphrase(encrypted, "correct horse battery", [&](bool ok) { stored = ok; wait.quit(); });
+	wait.exec();
+	keychainFindPassphrase(encrypted, [&](const QString &p) { found = p; wait.quit(); });
+	wait.exec();
+	if (!stored || found != "correct horse battery") {
+		std::fprintf(stderr, "FAIL: keychain round trip gave \"%s\"\n", qPrintable(found));
+		return 1;
+	}
 	std::puts("ok: authenticated GPG encryption, secure output permissions, round-trip, and wrong-passphrase rejection");
+	std::puts("ok: an encrypted file's passphrase kept in, and found in, the keychain");
 	return 0;
 }

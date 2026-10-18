@@ -765,7 +765,11 @@ void Collar::addKeychainItems(std::vector<PopupItem> &items, std::vector<std::fu
 			[](const KeychainInfo &k) { return !k.locked; });
 		add("Lock All Keychains", anyUnlocked, [this] { m_keychains.lockAll(); });
 	}
-	const QString access = QStandardPaths::findExecutable("seahorse");
+	/* Our Keychain Access panel, else GNOME's. */
+	QString access = QStandardPaths::findExecutable("zacos9-keychain");
+	if (access.isEmpty()) {
+		access = QStandardPaths::findExecutable("seahorse");
+	}
 	if (!access.isEmpty()) {
 		separator();
 		add("Keychain Access...", true, [this, access] { launch(access); });

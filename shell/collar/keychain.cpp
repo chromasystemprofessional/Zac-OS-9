@@ -1,5 +1,6 @@
 #include "keychain.h"
 
+
 #include <QDBusArgument>
 #include <QDBusConnection>
 #include <QDBusMetaType>
@@ -8,6 +9,7 @@
 #include <QDBusServiceWatcher>
 #include <QDBusVariant>
 #include <QTimer>
+#include <algorithm>
 #include <memory>
 
 static const QString Root = "/org/freedesktop/secrets";
@@ -217,4 +219,52 @@ void Keychains::setDefault(const QString &path) {
 			}
 			m_debounce->start();
 		});
+}
+
+void Keychains::items(const QString &path, std::function<void(const QList<KeychainItem> &)> done) {
+	call(path, Properties, "Get", { CollectionInterface, QString("Items") }, [this, done](const QDBusMessage &reply) {
+		const QStringList paths = reply.type() == QDBusMessage::ReplyMessage
+			? objectPaths(reply.arguments().value(0)) : QStringList();
+		if (paths.isEmpty()) {
+			done({});
+			return;
+		}
+		auto found = std::make_shared<QList<KeychainItem>>();
+		auto pending = std::make_shared<int>(paths.size());
+		for (const QString &item : paths) {
+			call(item, Properties, "Get", { QString("org.freedesktop.Secret.Item"), QString("Label") },
+					[found, pending, done, item](const QDBusMessage &r) {
+				if (r.type() == QDBusMessage::ReplyMessage) {
+					found->append({ item, unwrap(r.arguments().value(0)).toString() });
+				}
+				if (--*pending == 0) {
+					std::sort(found->begin(), found->end(), [](const KeychainItem &a, const KeychainItem &b) {
+						return a.label.compare(b.label, Qt::CaseInsensitive) < 0;
+					});
+					done(*found);
+				}
+			});
+		}
+	});
+}
+
+void Keychains::removeItem(const KeychainItem &item) {
+	const QString what = QString("Couldn't remove “%1” from the keychain.").arg(item.label);
+	call(item.path, "org.freedesktop.Secret.Item", "Delete", {}, [this, what](const QDBusMessage &reply) {
+		if (reply.type() != QDBusMessage::ReplyMessage) {
+			fail(reply, what);
+			return;
+		}
+		/* Delete answers with only a prompt ("/" for none). */
+		const QString promptPath = objectPath(reply.arguments().value(0));
+		if (promptPath.isEmpty() || promptPath == "/") {
+			m_debounce->start();
+			return;
+		}
+		call(promptPath, PromptInterface, "Prompt", { QString() }, [this, what](const QDBusMessage &r) {
+			if (r.type() != QDBusMessage::ReplyMessage) {
+				fail(r, what);
+			}
+		});
+	});
 }
