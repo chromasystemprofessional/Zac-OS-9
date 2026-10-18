@@ -64,6 +64,8 @@ QList<PrintJob> listJobs(const QString &printer);
 QList<int> printFiles(const QString &printer, const QStringList &files, QString *error);
 bool cancelJob(const QString &printer, int id, QString *error);
 bool holdJob(const QString &printer, int id, bool hold, QString *error);
+/* Print Next: the job goes ahead of the others waiting (priority 100). */
+bool urgentJob(const QString &printer, int id, QString *error);
 /* Your default printer (lpoptions -d): no password needed. */
 bool setDefaultPrinter(const QString &printer, QString *error);
 /* Stop Printing / Start Printing: an administrator's, through cups-pk-helper. */

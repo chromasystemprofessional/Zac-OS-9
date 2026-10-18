@@ -98,11 +98,20 @@ menubar_exe = executable('zacos9-menubar',
   'menubar/recent.c',
   'menubar/kbmenu.c',
   'menubar/appicon.c',
+  'menubar/hints.c',
   client_protocol_src,
   finder_protocol,
   dependencies: [platinum_dep, wayland_client, wayland_cursor, xkbcommon_client, gio,
-    dependency('gdk-pixbuf-2.0')],
+    dependency('gdk-pixbuf-2.0'), appfilter_dep],
   install: true,
+)
+
+# Hint Bubbles over the menu bar's menus (menubar/hints.c).
+test('menu-hints',
+  executable('test-hints', 'menubar/test_hints.c', 'menubar/hints.c',
+    dependencies: [platinum_dep, wayland_client],
+  ),
+  timeout: 10,
 )
 
 # The Zac menu's recent items (menubar/recent.c).
@@ -170,7 +179,7 @@ inhibit_exe = executable('zacos9-inhibit',
 test('menu-launch-feedback',
   executable('test-menu-launch',
     'menubar/test_launch.c', 'menubar/launch.c',
-    dependencies: [platinum_dep, wayland_client, gio],
+    dependencies: [platinum_dep, wayland_client, gio, appfilter_dep],
   ),
   timeout: 10,
 )
@@ -214,7 +223,9 @@ layershellqt = dependency('LayerShellQt', method: 'cmake',
   modules: ['LayerShellQt::Interface'])
 # GIO reads and launches XDG desktop entries for the Applications folder,
 # so the desktop entry specification is followed rather than approximated.
-gio_unix = dependency('gio-unix-2.0')
+# With it, Limited accounts' program filter (lib/appfilter.c): every
+# program that lists or launches applications through GIO uses both.
+gio_unix = [dependency('gio-unix-2.0'), appfilter_dep]
 
 executable('zacos9-autostart',
   'finder/autostart_main.cpp',
@@ -350,6 +361,7 @@ finder_exe = executable('zacos9-finder',
   'finder/resources.cpp',
   'finder/extensioncatalog.cpp',
   'finder/resourcewindows.cpp',
+  'finder/tricksets.cpp',
   'finder/appdb.cpp',
   'finder/apptrash.cpp',
   'finder/localvolumes.cpp',
@@ -396,6 +408,7 @@ finder_test_sources = [
   'finder/resources.cpp',
   'finder/extensioncatalog.cpp',
   'finder/resourcewindows.cpp',
+  'finder/tricksets.cpp',
   'finder/appdb.cpp',
   'finder/apptrash.cpp',
   'finder/diskinit.cpp',
@@ -584,7 +597,7 @@ test('disk-initialization-ui',
 test('local-volume-hotplug',
   executable('test-localvolumes', '../tests/finder/test_localvolumes.cpp',
     'finder/localvolumes.cpp',
-    dependencies: [qt6, gio],
+    dependencies: [platinum_dep, qt6, gio],
     include_directories: include_directories('finder', 'print', 'network'),
     cpp_args: ['-std=c++17'],
   ),
@@ -664,6 +677,139 @@ executable('zacos9-bluetooth',
   finder_protocol,
   link_with: panelkit,
   include_directories: include_directories('finder'),
+  dependencies: [platinum_dep, qt6, wayland_client],
+  cpp_args: ['-std=c++17'],
+  install: true,
+)
+
+test('tricks-sets',
+  executable('test-tricks-sets', 'finder/tests/test_tricksets.cpp', 'finder/tricksets.cpp',
+    include_directories: include_directories('finder'),
+    dependencies: [platinum_dep, qt6],
+    cpp_args: ['-std=c++17'],
+  ),
+  timeout: 10,
+)
+
+# zacos9-finder-ctl: scripting the Sniffer over its socket.
+finderctl_exe = executable('zacos9-finder-ctl', 'finderctl/main.c',
+  dependencies: [platinum_dep],
+  install: true,
+)
+test('finder-ctl', find_program('python3'),
+  args: [files('finderctl/test_finderctl.py'), finderctl_exe.full_path()],
+  depends: finderctl_exe, timeout: 20)
+
+# Disk Setup: First Aid (verify, repair, drive health) and partitioning,
+# all through UDisks2 (disksetup/); the installer opens it too.
+executable('zacos9-disksetup',
+  'disksetup/main.cpp', 'disksetup/udisks.cpp', 'disksetup/plan.cpp',
+  'finder/alert.cpp',
+  'finder/platinumshell.cpp',
+  finder_protocol,
+  link_with: panelkit,
+  include_directories: include_directories('finder', 'panels', 'disksetup'),
+  dependencies: [platinum_dep, qt6, wayland_client],
+  cpp_args: ['-std=c++17'],
+  install: true,
+)
+
+test('disksetup-plan',
+  executable('test-disksetup-plan', 'disksetup/test_plan.cpp', 'disksetup/plan.cpp', 'disksetup/udisks.cpp',
+    dependencies: [qt6],
+    cpp_args: ['-std=c++17'],
+  ),
+  env: ['LC_ALL=en_US.UTF-8'], timeout: 10,
+)
+test('disksetup-udisks',
+  executable('test-disksetup-udisks', 'disksetup/test_udisks.cpp', 'disksetup/udisks.cpp',
+    dependencies: [qt6],
+    cpp_args: ['-std=c++17'],
+  ),
+  env: ['LC_ALL=en_US.UTF-8'], timeout: 10,
+)
+
+# Walkies: places, each with its network, sound, time zone, printer and
+# startup set (walkies/location.cpp).
+executable('zacos9-walkies',
+  'walkies/main.cpp', 'walkies/location.cpp',
+  'finder/tricksets.cpp', 'finder/autostart.cpp',
+  'finder/alert.cpp',
+  'finder/platinumshell.cpp',
+  finder_protocol,
+  link_with: panelkit,
+  include_directories: include_directories('finder', 'panels', 'walkies'),
+  dependencies: [platinum_dep, qt6, wayland_client, gio, gio_unix],
+  cpp_args: ['-std=c++17'],
+  install: true,
+)
+test('walkies-locations',
+  executable('test-walkies-locations', 'walkies/test_location.cpp', 'walkies/location.cpp',
+    include_directories: include_directories('walkies'),
+    dependencies: [platinum_dep, qt6],
+    cpp_args: ['-std=c++17'],
+  ),
+  timeout: 10,
+)
+
+# Jigsaw Puzzle: a picture in pieces.
+executable('zacos9-jigsaw',
+  'jigsaw/main.cpp',
+  'finder/alert.cpp',
+  'finder/platinumshell.cpp',
+  finder_protocol,
+  include_directories: include_directories('finder'),
+  dependencies: [platinum_dep, qt6, wayland_client],
+  cpp_args: ['-std=c++17'],
+  install: true,
+)
+
+# Plotter: graphs of y = f(x) (plotter/expr.cpp reads them).
+executable('zacos9-plotter',
+  'plotter/main.cpp', 'plotter/expr.cpp',
+  'finder/platinumshell.cpp',
+  finder_protocol,
+  link_with: panelkit,
+  include_directories: include_directories('finder', 'panels', 'plotter'),
+  dependencies: [platinum_dep, qt6, wayland_client],
+  cpp_args: ['-std=c++17'],
+  install: true,
+)
+test('plotter-expr',
+  executable('test-plotter-expr', 'plotter/test_expr.cpp', 'plotter/expr.cpp',
+    dependencies: [qt6], cpp_args: ['-std=c++17']),
+  timeout: 10)
+
+# Retriever: folder pairs kept alike with rsync (retriever/sync.cpp).
+executable('zacos9-retriever',
+  'retriever/main.cpp', 'retriever/sync.cpp',
+  'finder/alert.cpp',
+  'finder/platinumshell.cpp',
+  finder_protocol,
+  link_with: panelkit,
+  include_directories: include_directories('finder', 'panels', 'retriever'),
+  dependencies: [platinum_dep, qt6, wayland_client],
+  cpp_args: ['-std=c++17'],
+  install: true,
+)
+test('retriever-sync',
+  executable('test-retriever-sync', 'retriever/test_sync.cpp', 'retriever/sync.cpp',
+    dependencies: [qt6],
+    cpp_args: ['-std=c++17'],
+  ),
+  timeout: 30,
+)
+
+# Keychain Access: the Secret Service's keychains and their items
+# (collar/keychain.cpp, shared with The Collar's Keychain module).
+executable('zacos9-keychain',
+  'panels/keychainaccess.cpp',
+  'collar/keychain.cpp',
+  'finder/alert.cpp',
+  'finder/platinumshell.cpp',
+  finder_protocol,
+  link_with: panelkit,
+  include_directories: include_directories('finder', 'collar'),
   dependencies: [platinum_dep, qt6, wayland_client],
   cpp_args: ['-std=c++17'],
   install: true,
@@ -1081,7 +1227,7 @@ test('users-panel', find_program('dbus-run-session'),
       'finder/alert.cpp', 'finder/platinumshell.cpp', finder_protocol,
       link_with: panelkit,
       include_directories: include_directories('finder', 'panels'),
-      dependencies: [platinum_dep, qt6, wayland_client, crypt],
+      dependencies: [platinum_dep, qt6, wayland_client, crypt, gio_unix],
       cpp_args: ['-std=c++17'],
     ).full_path(), files('../tests/users/fake_accounts.py')],
   timeout: 60,
@@ -1174,6 +1320,16 @@ test('collar-displays', find_program('dbus-run-session'),
   args: ['--', collar_displays_test, files('collar/tests/fake-ddcutil.sh')], timeout: 30,
 )
 
+test('panel-hints',
+  executable('test-panel-hints', 'panels/tests/test_hints.cpp',
+    link_with: panelkit,
+    include_directories: include_directories('finder', 'panels'),
+    dependencies: [platinum_dep, qt6],
+    cpp_args: ['-std=c++17'],
+  ),
+  env: ['QT_QPA_PLATFORM=offscreen'], timeout: 30,
+)
+
 test('collar-panel',
   executable('test-collar-panel',
     'panels/tests/test_collarpanel.cpp',
@@ -1235,6 +1391,10 @@ executable('zacos9-appinstall',
 
 # Software Update (Apple menu): ZacOS 9 releases from GitHub, Debian's
 # updates through apt; installs through zacos9-appstore-helper.
+# Software Update's daily check (a user timer; Check daily turns it off).
+install_data('update/zacos9-update-check.service', 'update/zacos9-update-check.timer',
+  install_dir: get_option('prefix') / 'lib' / 'systemd' / 'user')
+
 executable('zacos9-update',
   'update/main.cpp',
   'update/update.cpp',

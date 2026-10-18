@@ -117,12 +117,44 @@ static void add_sort_submenu(struct mb_menu *m, bool enabled, const struct finde
 
 /* With the Finder (or nothing) in front, the Finder's menus. Commands go
  * to zacos9-finder; its reported state enables the items. */
+static void free_menu(struct mb_menu *m);
+
+/* Puppy Mode: the Sniffer's commands it leaves out go (lib/settings.c),
+ * with submenus left empty and separators left doubled or at the ends. */
+static void puppy_trim(struct mb_menu *m) {
+	int out = 0;
+	for (int i = 0; i < m->n; i++) {
+		struct mb_item *it = &m->items[i];
+		bool keep = it->action != ACT_FINDER || pl_puppy_allows(it->arg);
+		if (keep && it->submenu) {
+			puppy_trim(it->submenu);
+			keep = it->submenu->n > 0;
+		}
+		if (keep && !it->label && (out == 0 || !m->items[out - 1].label)) {
+			keep = false;
+		}
+		if (!keep) {
+			struct mb_menu gone = { .n = 1 };
+			gone.items[0] = *it;
+			free_menu(&gone);
+			continue;
+		}
+		m->items[out++] = *it;
+	}
+	while (out > 0 && !m->items[out - 1].label) {
+		out--;
+		free(m->items[out].arg);
+	}
+	m->n = out;
+}
+
 static void add_finder_menus(struct mb_menu *menus, int *n) {
 	finder_connect();
 	const struct finder_state *fs = finder_state();
 	const bool up = fs->connected, sel = up && fs->selection > 0;
 
 	struct mb_menu *m = new_menu(menus, n, "File");
+	struct mb_menu *const first = m;
 	add(m, "New Folder", 'N', up, ACT_FINDER, "new-folder");
 	add(m, "Open", 'O', sel, ACT_FINDER, "open");
 	add(m, "Print", 'P', sel, ACT_FINDER, "print");
@@ -199,7 +231,10 @@ static void add_finder_menus(struct mb_menu *menus, int *n) {
 	add(m, "Restart",   0, true, ACT_LAUNCH, "systemctl reboot");
 	add(m, "Shut Down", 0, true, ACT_LAUNCH, "systemctl poweroff");
 	sep(m);
-	add(m, "Log Out…", 0, up, ACT_FINDER, "log-out");
+	struct mb_item *log_out = add(m, "Log Out…", 'Q', up, ACT_FINDER, "log-out");
+	if (log_out) {
+		log_out->shift = true; /* ⇧⌘Q */
+	}
 	/* Mac OS 9's Help menu: Help Center, then the Finder's own book. */
 	m = new_menu(menus, n, "Help");
 	char help[PATH_MAX + 64];
@@ -214,6 +249,11 @@ static void add_finder_menus(struct mb_menu *menus, int *n) {
 		ACT_TOGGLE_SETTING, "hint-bubbles");
 	hint_bubbles->checked = !pl_setting("hint-bubbles", hints, sizeof(hints)) ||
 		(strcmp(hints, "0") != 0 && strcmp(hints, "false") != 0);
+	if (pl_puppy_mode()) {
+		for (struct mb_menu *f = first; f < &menus[*n]; f++) {
+			puppy_trim(f);
+		}
+	}
 }
 
 struct mb_menu *menus_new_menu(struct mb_menu *menus, int *n, const char *title) {
@@ -711,6 +751,9 @@ void menus_context(struct mb_menu *m, const char *kind) {
 		add(m, "Change Desktop Background…", 0, true, ACT_LAUNCH, command);
 		add_trick_items(m);
 		add_context_commands(m);
+	}
+	if (pl_puppy_mode()) {
+		puppy_trim(m);
 	}
 	render_menu_text(m);
 }

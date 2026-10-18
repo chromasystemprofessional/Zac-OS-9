@@ -26,6 +26,7 @@ public:
 	void selectJob(int row);
 	void holdOrResume();
 	void removeJob();
+	void printNext();
 	void stopOrStart();
 	void printDropped(const QStringList &files);
 

@@ -88,6 +88,28 @@ int pl_caret_blink_ms(void);
  * shows. */
 bool pl_smart_scrolling(void);
 
+/* The Speech control panel's choices: the voice ("speech-voice", a name
+ * `spd-say -L` lists; empty for the default) and rate ("speech-rate",
+ * -100..100). pl_speech_args fills argv with spd-say and them, ready for
+ * the text: returns the count (at most 7), the strings in buf. */
+int pl_speech_rate(void);
+int pl_speech_args(const char **argv, char *buf, size_t size);
+/* Says `text` in the background (speech-dispatcher's spd-say); nothing if
+ * it isn't installed. */
+void pl_speak(const char *text);
+/* Talking Alerts ("talking-alerts", off by default): alerts speak. */
+bool pl_talking_alerts(void);
+
+/* Sniffer Preferences' Puppy Mode ("puppy-mode", off by default; Mac OS
+ * 9's Simple Finder): only the essential commands. */
+bool pl_puppy_mode(void);
+/* Puppy Mode set for this person by an administrator (the Users panel;
+ * /etc/zacos9/puppy/USER): always on, and the preference can't change it. */
+bool pl_puppy_locked(void);
+/* Whether Puppy Mode keeps a Sniffer command (as the menu bar sends it:
+ * "duplicate", "label 3"…); true for every command outside Puppy Mode. */
+bool pl_puppy_allows(const char *command);
+
 #ifdef __cplusplus
 }
 #endif

@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Plotter
+Comment=Draw the graph of a function
+Exec=zacos9-plotter
+Categories=Education;Math;
+OnlyShowIn=ZacOS9;

@@ -1,10 +1,17 @@
 #include "appearance.h"
 
+#include <QApplication>
 #include <QDir>
 #include <QFile>
 #include <QSaveFile>
 #include <QStandardPaths>
 #include <QFileDialog>
+#include <QInputDialog>
+#include <QMessageBox>
+#include <QProcess>
+#include <QPushButton>
+#include <QTemporaryDir>
+#include <QTimer>
 #include <QFileInfo>
 #include <QKeyEvent>
 #include <QMouseEvent>
@@ -99,6 +106,7 @@ AppearancePanel::AppearancePanel() {
 	/* Options. Not part of a theme, so it leaves the chosen one alone. */
 	m_titleCollapse = PanelCheckbox("Double-click title bar to collapse windows",
 		QPoint(BOX_L + ITEM_INSET, ITEM_TOP));
+	m_titleCollapse.hint = "Collapses a window to its title bar when you double-click the title bar.";
 	m_titleCollapse.on = setting("title-collapse") != "false";
 	m_titleCollapse.toggled = [this](bool on) {
 		if (!pl_setting_set("title-collapse", on ? nullptr : "false")) {
@@ -110,12 +118,38 @@ AppearancePanel::AppearancePanel() {
 	m_scrollGroupTop = m_titleCollapse.hitRect().bottom() + PL_GROUP_MARGIN + 1 + 12 + 16;
 	m_smartScrolling = PanelCheckbox("Smart Scrolling",
 		QPoint(BOX_L + ITEM_INSET, m_scrollGroupTop + 1 + PL_GROUP_MARGIN_TOP));
+	m_smartScrolling.hint = "Puts both scroll arrows together, and sizes the scroll box to show how much of the window you can see.";
 	m_smartScrolling.on = pl_smart_scrolling();
 	m_smartScrolling.toggled = [this](bool on) {
 		if (!pl_setting_set("smart-scrolling", on ? "true" : nullptr)) {
 			qWarning() << "Could not save appearance preference: smart-scrolling";
 		}
 		setGtkSmartScrolling(on);
+		update();
+	};
+	/* Fonts, for programs (ZacOS's own bitmap fonts stay as they are): GTK
+	 * through gsettings, Qt through the Platinum style when it starts. */
+	m_fontGroupTop = m_smartScrolling.hitRect().bottom() + 6 + 2 * 13 + PL_GROUP_MARGIN + 1 + 28;
+	static const int sizes[4] = { 9, 10, 12, 14 };
+	m_fontSize.rect = QRect(BOX_L + ITEM_INSET + 196, m_fontGroupTop + 1 + PL_GROUP_MARGIN_TOP, 170, PL_POPUP_H);
+	m_fontSize.items = { PopupItem("Small (9 pt)"), PopupItem("Medium (10 pt)"), PopupItem("Large (12 pt)"),
+		PopupItem("Larger (14 pt)") };
+	const int size = setting("app-font-size").toInt();
+	m_fontSize.selected = size >= 14 ? 3 : size >= 12 ? 2 : size == 9 ? 0 : 1;
+	m_fontSize.hint = "Sets how big text is in programs. Programs already open change when opened again.";
+	m_fontSize.chosen = [this](int row) {
+		m_fontSize.selected = row;
+		pl_setting_set("app-font-size", row == 1 ? nullptr : QByteArray::number(sizes[row]).constData());
+		applyProgramFonts();
+		update();
+	};
+	m_smoothFonts = PanelCheckbox("Smooth text in programs",
+		QPoint(BOX_L + ITEM_INSET, m_fontSize.rect.bottom() + 10));
+	m_smoothFonts.on = setting("font-smoothing") != "false";
+	m_smoothFonts.hint = "Softens the edges of text in programs. Off: crisp, jagged text like the 1990s'.";
+	m_smoothFonts.toggled = [this](bool on) {
+		pl_setting_set("font-smoothing", on ? nullptr : "false");
+		applyProgramFonts();
 		update();
 	};
 
@@ -213,9 +247,24 @@ AppearancePanel::AppearancePanel() {
 	};
 	m_addSound = PanelButton("Add Recording...", QRect(m_sounds.frame.right() + 20,
 		ITEM_TOP + 58, 128, 22));
+	m_addSound.hint = "Records a new alert sound with the microphone.";
 	m_addSound.clicked = [this] {
-		const QString source = QFileDialog::getOpenFileName(this, "Add Alert Sound Recording",
-			QDir::homePath(), "WAVE recordings (*.wav)");
+		/* Mac OS 9's Add…: record one with the microphone, or use a file. */
+		QMessageBox ask(QMessageBox::Question, "Add Alert Sound",
+			"Record a new alert sound with the microphone, or use a sound file?",
+			QMessageBox::NoButton, this);
+		QPushButton *record = ask.addButton("Record…", QMessageBox::AcceptRole);
+		QPushButton *file = ask.addButton("Use File…", QMessageBox::ActionRole);
+		ask.addButton(QMessageBox::Cancel);
+		ask.setDefaultButton(record);
+		ask.exec();
+		QString source;
+		if (ask.clickedButton() == record) {
+			source = recordAlertSound();
+		} else if (ask.clickedButton() == file) {
+			source = QFileDialog::getOpenFileName(this, "Add Alert Sound Recording",
+				QDir::homePath(), "WAVE recordings (*.wav)");
+		}
 		if (source.isEmpty()) {
 			return;
 		}
@@ -236,6 +285,7 @@ AppearancePanel::AppearancePanel() {
 
 	m_themes.frame = m_soundThemes.frame = m_sounds.frame;
 	m_previewTheme = PanelButton("Preview", QRect(m_soundThemes.frame.right() + 20, ITEM_TOP + 20, 90, 20));
+	m_previewTheme.hint = "Plays the sounds of the selected sound set.";
 	m_previewTheme.clicked = [this] { previewSoundTheme(m_soundThemes.state.selected); };
 	m_interfaceVolume.pos = QPoint(m_soundThemes.frame.right() + 20, ITEM_TOP + 78);
 	m_interfaceVolume.width = 170;
@@ -250,8 +300,10 @@ AppearancePanel::AppearancePanel() {
 		update();
 	};
 	m_themeName.rect = QRect(m_themes.frame.right() + 20, ITEM_TOP + 48, 170, PL_EDIT_H);
+	m_themeName.hint = "The name for a theme you save.";
 	m_themeName.setText("My Theme");
 	m_saveTheme = PanelButton("Save Current", QRect(m_themes.frame.right() + 20, ITEM_TOP + 82, 130, 20));
+	m_saveTheme.hint = "Saves the current colours, pattern, picture and sounds as a theme, with the name you typed.";
 	m_saveTheme.clicked = [this] {
 		m_themeError.clear();
 		saveAppearanceTheme(m_themeName.text, &m_themeError);
@@ -368,12 +420,36 @@ void AppearancePanel::loadWallpapers() {
 
 void AppearancePanel::showTab(int tab) {
 	m_tab = std::clamp(tab, 0, 6);
-	m_host.checks = m_tab == 6 ? std::vector<PanelCheckbox *>{ &m_titleCollapse, &m_smartScrolling }
+	m_host.checks = m_tab == 6 ? std::vector<PanelCheckbox *>{ &m_titleCollapse, &m_smartScrolling, &m_smoothFonts }
 		: std::vector<PanelCheckbox *>{};
 	m_host.buttons = m_tab == 4 ? std::vector<PanelButton *>{ &m_saveTheme }
 		: m_tab == 5 ? std::vector<PanelButton *>{ &m_previewTheme }
 		: m_tab == 3 ? std::vector<PanelButton *>{ &m_addSound } : std::vector<PanelButton *>{};
 	m_host.edits = m_tab == 4 ? std::vector<PanelEdit *>{ &m_themeName } : std::vector<PanelEdit *>{};
+	/* Hint Bubbles for this tab's lists, slider and pop-up. */
+	m_host.hintAreas.clear();
+	switch (m_tab) {
+	case 0:
+		m_host.hintAreas.push_back({ &m_accents.frame, "Chooses the colour of scroll bars, sliders and progress bars." });
+		m_host.hintAreas.push_back({ &m_highlights.frame, "Chooses the colour of selected text." });
+		break;
+	case 1:
+		m_host.hintAreas.push_back({ &m_patterns.frame, "Chooses the pattern that covers the desktop." });
+		break;
+	case 2:
+		m_host.hintAreas.push_back({ &m_wallpapers.frame, "Chooses a picture for the desktop, over its pattern." });
+		m_host.hintAreas.push_back({ &m_placement.rect, "Chooses how the picture fills the screen." });
+		break;
+	case 3:
+		m_host.hintAreas.push_back({ &m_sounds.frame, "Chooses the sound alerts play." });
+		break;
+	case 4:
+		m_host.hintAreas.push_back({ &m_themes.frame, "Saved themes: colours, pattern, picture and sounds together. Click one to use it." });
+		break;
+	case 5:
+		m_host.hintAreas.push_back({ &m_soundThemes.frame, "Chooses the sounds menus, windows and controls make." });
+		break;
+	}
 	if (m_tab != 4) {
 		m_host.setFocus(nullptr);
 	}
@@ -506,6 +582,17 @@ void AppearancePanel::paintThemesTab(pl_canvas *c) {
 		: "Custom presets: Appearance > Themes", BOX_L + 4, H - 24, PL_FONT_VIEWS, C_BLACK, BOX_R - BOX_L);
 }
 
+/* GTK programs read their font from gsettings (the session runs no
+ * XSETTINGS); Qt ones from the Platinum style, at start. */
+void AppearancePanel::applyProgramFonts() {
+	static const int sizes[4] = { 9, 10, 12, 14 };
+	const int size = sizes[std::clamp(m_fontSize.selected, 0, 3)];
+	QProcess::startDetached("gsettings", { "set", "org.gnome.desktop.interface", "font-name",
+		QString("Sans %1").arg(size) });
+	QProcess::startDetached("gsettings", { "set", "org.gnome.desktop.interface", "font-antialiasing",
+		m_smoothFonts.on ? "grayscale" : "none" });
+}
+
 void AppearancePanel::paintOptionsTab(pl_canvas *c) {
 	groupAround(c, m_titleCollapse.hitRect(), "Windows", BOX_R);
 	Text scrollBars("Scroll Bars", 300, PL_FONT_SYSTEM);
@@ -516,6 +603,11 @@ void AppearancePanel::paintOptionsTab(pl_canvas *c) {
 		x, m_smartScrolling.hitRect().bottom() + 14, PL_FONT_VIEWS);
 	panelText(c, "shows how much of the contents the window holds.",
 		x, m_smartScrolling.hitRect().bottom() + 27, PL_FONT_VIEWS);
+	Text fonts("Fonts", 300, PL_FONT_SYSTEM);
+	pl_group_box_paint(c, BOX_L, m_fontGroupTop, BOX_R, m_smoothFonts.hitRect().bottom() + PL_GROUP_MARGIN + 1,
+		fonts.t, PANE);
+	panelText(c, "Size of text in programs:", BOX_L + ITEM_INSET, m_fontSize.rect.top() + 15);
+	m_fontSize.paint(c);
 	m_host.paintControls(c, PANE);
 }
 
@@ -565,6 +657,10 @@ void AppearancePanel::mousePressEvent(QMouseEvent *e) {
 		pos.x(), pos.y());
 	if (tab >= 0 && tab != m_tab) {
 		showTab(tab);
+		return;
+	}
+	if (m_tab == 6 && m_fontSize.press(this, pos)) {
+		update();
 		return;
 	}
 	if (m_tab == 2 && m_placement.press(this, pos)) {
@@ -641,4 +737,49 @@ void AppearancePanel::keyPressEvent(QKeyEvent *e) {
 		return;
 	}
 	update();
+}
+
+/* Records up to ten seconds from the sound input (pw-record, as Bark
+ * Recorder does) while an alert offers Stop; then asks for its name. The
+ * WAV file it made, named so, or empty. Never waitForFinished (CLAUDE.md). */
+QString AppearancePanel::recordAlertSound() {
+	static QTemporaryDir dir;
+	const QString raw = dir.filePath("recording.wav");
+	QFile::remove(raw);
+	QProcess recorder;
+	recorder.start("pw-record", { "--rate", "22050", "--channels", "1", raw });
+	if (!recorder.waitForStarted(3000)) {
+		m_themeError = "Recording needs PipeWire's pw-record, which couldn't be started.";
+		update();
+		return {};
+	}
+	QMessageBox stop(QMessageBox::Information, "Recording", "Recording… Make the sound now, then click Stop.",
+		QMessageBox::NoButton, this);
+	stop.addButton("Stop", QMessageBox::AcceptRole);
+	QTimer::singleShot(10000, &stop, [&stop] { stop.accept(); }); /* ten seconds at most */
+	stop.exec();
+	recorder.terminate(); /* pw-record finishes the file on SIGTERM */
+	bool done = recorder.state() == QProcess::NotRunning;
+	QObject::connect(&recorder, &QProcess::finished, [&done] { done = true; });
+	for (int waited = 0; !done && waited < 3000; waited += 50) {
+		QApplication::processEvents(QEventLoop::ExcludeUserInputEvents | QEventLoop::WaitForMoreEvents, 50);
+	}
+	if (!done) {
+		recorder.kill();
+	}
+	if (QFileInfo(raw).size() <= 44) { /* a WAV header and nothing else */
+		m_themeError = "Nothing was recorded. Check the sound input in the Sound control panel.";
+		update();
+		return {};
+	}
+	bool ok = false;
+	QString name = QInputDialog::getText(this, "Add Alert Sound", "Name of the new alert sound:",
+		QLineEdit::Normal, "Recording", &ok).trimmed();
+	name.remove(QRegularExpression("[/\\\\:\\x00-\\x1f]"));
+	if (!ok || name.isEmpty()) {
+		return {};
+	}
+	const QString named = dir.filePath(name + ".wav");
+	QFile::remove(named);
+	return QFile::rename(raw, named) ? named : QString();
 }

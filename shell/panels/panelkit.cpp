@@ -4,7 +4,9 @@
 #include <QClipboard>
 #include <QDateTime>
 #include <QElapsedTimer>
+#include <QHelpEvent>
 #include <QPainter>
+#include <QToolTip>
 #include <algorithm>
 #include <climits>
 
@@ -1058,6 +1060,37 @@ bool PanelEdit::key(QKeyEvent *e) {
 
 /* ---- the host --------------------------------------------------------------------- */
 
+bool panelHintEvent(QWidget *w, QEvent *e, const std::function<QString(QPoint)> &at) {
+	if (e->type() != QEvent::ToolTip) {
+		return false;
+	}
+	auto *help = static_cast<QHelpEvent *>(e);
+	const QString text = at(help->pos());
+	if (text.isEmpty()) {
+		QToolTip::hideText();
+	} else {
+		QToolTip::showText(help->globalPos(), text, w);
+	}
+	return true;
+}
+
+/* Hint Bubbles: the window's tooltip is the hint under the pointer. The
+ * Platinum style draws it as a bubble, and swallows it with Help ▸ Show
+ * Hint Bubbles off. */
+namespace {
+class HintFilter : public QObject {
+public:
+	HintFilter(const PanelHost *host, QObject *parent) : QObject(parent), m_host(host) {}
+	bool eventFilter(QObject *o, QEvent *e) override {
+		return panelHintEvent(static_cast<QWidget *>(o), e,
+			[this](QPoint p) { return m_host->hintAt(p); });
+	}
+
+private:
+	const PanelHost *m_host;
+};
+}
+
 PanelHost::PanelHost(QWidget *w) : m_widget(w), m_caret(std::make_unique<QTimer>()) {
 	QObject::connect(m_caret.get(), &QTimer::timeout, w, [this] {
 		m_caretOn = !m_caretOn;
@@ -1066,6 +1099,46 @@ PanelHost::PanelHost(QWidget *w) : m_widget(w), m_caret(std::make_unique<QTimer>
 		}
 	});
 	m_caret->start(std::max(200, QApplication::cursorFlashTime() / 2));
+	m_hints = new HintFilter(this, w);
+	w->installEventFilter(m_hints);
+}
+
+PanelHost::~PanelHost() {
+	delete m_hints;
+}
+
+QString PanelHost::hintAt(QPoint p) const {
+	for (const auto &[r, text] : hintAreas) {
+		if (r->contains(p)) {
+			return text;
+		}
+	}
+	for (const PanelEdit *e : edits) {
+		if (e->rect.contains(p) && !e->hint.isEmpty()) {
+			return e->hint;
+		}
+	}
+	for (const PanelPopup *u : popups) {
+		if (u->rect.contains(p) && !u->hint.isEmpty()) {
+			return u->hint;
+		}
+	}
+	for (const PanelCheckbox *b : checks) {
+		if (b->hitRect().contains(p) && !b->hint.isEmpty()) {
+			return b->hint;
+		}
+	}
+	for (const PanelRadios *r : radios) {
+		if (r->hit(p) >= 0 && !r->hint.isEmpty()) {
+			return r->hint;
+		}
+	}
+	for (const PanelButton *b : buttons) {
+		if (b->rect.contains(p) && !b->hint.isEmpty()) {
+			return b->hint;
+		}
+	}
+	return {};
 }
 
 void PanelHost::setFocus(PanelEdit *e) {

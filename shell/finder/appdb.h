@@ -76,6 +76,9 @@ void appRefresh();
 /* Watch the XDG application directories and call `f` after a change.
  * Safe to call more than once; every callback is kept. */
 void appOnChange(std::function<void()> f);
+/* Called with a program's name when a Limited account may not use it
+ * (lib/appfilter.h); the launch is refused. */
+void appOnRefused(std::function<void(const QString &)> f);
 
 /* Launch an application by desktop file ID, or one of its Desktop
  * Actions. Returns false if the entry has gone away or won't start. */

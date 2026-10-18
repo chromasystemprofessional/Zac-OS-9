@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <pwd.h>
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -58,7 +59,8 @@ static void check(const char *line, bool enabled, bool eject) {
 				assert(item->action == ACT_FINDER && item->enabled == eject);
 				foundEject = true;
 			} else if (item->arg && strcmp(item->arg, "log-out") == 0) {
-				assert(strcmp(item->label, "Log Out…") == 0 && item->action == ACT_FINDER);
+				assert(strcmp(item->label, "Log Out…") == 0 && item->action == ACT_FINDER &&
+					item->key == 'Q' && item->shift); /* ⇧⌘Q */
 				foundLogOut = true;
 			}
 		}
@@ -265,6 +267,55 @@ int main(void) {
 	add_finder_menus(bar.left, &bar.n_left);
 	assert(!state.connected && !state.erase && !state.network && !state.unmount);
 	menus_free(&bar);
+	/* Puppy Mode: only the essential commands, in the menus and the
+	 * contextual menus, without doubled separators. */
+	setenv("XDG_CONFIG_HOME", config, 1);
+	assert(pl_setting_set("puppy-mode", "true"));
+	assert(!parse_line("tricks 1"));
+	assert(!parse_line("commands\tOpen Terminal Here"));
+	{
+		parse_line("state selection=1 window=1 trash=1 view=0");
+		struct mb_bar puppy = {0};
+		add_finder_menus(puppy.left, &puppy.n_left);
+		char got[512] = "";
+		for (int m = 0; m < puppy.n_left; m++) {
+			strncat(got, puppy.left[m].title, sizeof(got) - strlen(got) - 1);
+			strncat(got, ":", sizeof(got) - strlen(got) - 1);
+			for (int i = 0; i < puppy.left[m].n; i++) {
+				const char *l = puppy.left[m].items[i].label;
+				strncat(got, l ? l : "-", sizeof(got) - strlen(got) - 1);
+				strncat(got, "|", sizeof(got) - strlen(got) - 1);
+			}
+		}
+		assert(strstr(got, "File:New Folder|Open|Close Window|-|Put Away|-|Find…|Edit:"));
+		assert(strstr(got, "View:as Icons|as Buttons|as List|-|Clean Up|Arrange|Special:"));
+		assert(strstr(got, "Special:Empty Trash…|Eject|-|Sleep|"));
+		assert(!strstr(got, "Duplicate") && !strstr(got, "Get Info") && !strstr(got, "View Options"));
+		menus_free(&puppy);
+	}
+	char puppy_context[512];
+	context_labels("state selection=0 window=1 trash=0 view=1", "window", puppy_context,
+		sizeof(puppy_context));
+	assert(strcmp(puppy_context, "New Folder|-|View|-|Close Window|") == 0);
+	assert(!pl_puppy_allows("duplicate") && !pl_puppy_allows("label 2") && pl_puppy_allows("open"));
+	assert(pl_setting_set("puppy-mode", NULL));
+	assert(pl_puppy_allows("duplicate"));
+	/* Set by an administrator: on whatever the person's own setting says. */
+	{
+		char locked[512];
+		snprintf(locked, sizeof(locked), "%s/puppy", config);
+		mkdir(locked, 0755);
+		snprintf(locked, sizeof(locked), "%s/puppy/%s", config, getpwuid(getuid())->pw_name);
+		fclose(fopen(locked, "w"));
+		setenv("ZACOS9_ACCOUNTS_CONF", config, 1);
+		assert(pl_puppy_locked() && pl_puppy_mode() && !pl_puppy_allows("duplicate"));
+		unlink(locked);
+		snprintf(locked, sizeof(locked), "%s/puppy", config);
+		rmdir(locked);
+		unsetenv("ZACOS9_ACCOUNTS_CONF");
+		assert(!pl_puppy_mode());
+	}
+	puts("ok: Puppy Mode keeps only the essential commands");
 	char settings_file[512], settings_dir[256];
 	snprintf(settings_dir, sizeof(settings_dir), "%s/zacos9", config);
 	snprintf(settings_file, sizeof(settings_file), "%s/desktop.conf", settings_dir);

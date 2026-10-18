@@ -3,7 +3,7 @@
 #include <QDir>
 #include <QElapsedTimer>
 #include <QFile>
-#include <QPlainTextEdit>
+#include <QTextEdit>
 #include <QTemporaryDir>
 #include <QTextCursor>
 #include <QThread>
@@ -38,7 +38,7 @@ int main(int argc, char **argv) {
 	QApplication app(argc, argv);
 	QApplication::setQuitOnLastWindowClosed(false);
 	ScribbleWindow window;
-	auto *edit = qobject_cast<QPlainTextEdit *>(window.centralWidget());
+	auto *edit = qobject_cast<QTextEdit *>(window.centralWidget());
 	assert(edit);
 	const QString document = "Ignore this.\nThis is selected.\nSecond line.\nAnd this.";
 	const QString selected = "This is selected.\nSecond line.";
@@ -66,5 +66,20 @@ int main(int argc, char **argv) {
 	QFile log(logPath);
 	assert(log.open(QIODevice::ReadOnly));
 	assert(log.readAll() == "--wait\n--\n" + selected.toUtf8());
+
+	/* Styled text: kept as HTML, read back with its styles. */
+	const QString styledPath = root.path() + "/letter.html";
+	QFile styled(styledPath);
+	assert(styled.open(QIODevice::WriteOnly) && styled.write("<p>Dear <b>Zac</b></p>") > 0);
+	styled.close();
+	ScribbleWindow letter;
+	assert(letter.open(styledPath));
+	auto *text = qobject_cast<QTextEdit *>(letter.centralWidget());
+	text->moveCursor(QTextCursor::End);
+	text->insertPlainText("!");
+	assert(letter.save());
+	assert(styled.open(QIODevice::ReadOnly));
+	const QByteArray html = styled.readAll();
+	assert(html.contains("font-weight:700") && html.contains("Zac") && html.contains("!"));
 	return 0;
 }

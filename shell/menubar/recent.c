@@ -22,6 +22,7 @@
 #include <sys/stat.h>
 #include <glib.h>
 
+#include "icons.h"
 #include "menubar.h"
 #include "settings.h"
 
@@ -102,6 +103,7 @@ static struct mb_menu *submenu(struct mb_menu *menu, const char *title) {
 		return NULL;
 	}
 	it->submenu = calloc(1, sizeof(*it->submenu));
+	it->icon_kind = PL_ICON_FOLDER + 1; /* the Zac menu's folders */
 	return it->submenu;
 }
 
@@ -115,11 +117,16 @@ static struct mb_menu *recent_list(struct mb_menu *menu, const char *title, bool
 	return nested ? submenu(menu, title) : menu;
 }
 
+/* `desktop`: a program's desktop file, for its own icon; else `kind`. */
 static void add_recent_item(struct mb_menu *menu, const char *title, const char *label,
-		bool nested, enum action action, const char *arg) {
+		bool nested, enum action action, const char *arg, const char *desktop, enum pl_icon_kind kind) {
 	char *shown = nested ? g_strdup(label) : g_strdup_printf("%s: %s", title, label);
-	menus_add_item(menu, shown, 0, true, action, arg);
+	struct mb_item *it = menus_add_item(menu, shown, 0, true, action, arg);
 	g_free(shown);
+	if (it) {
+		it->icon_px = desktop && menu_icon_for_desktop ? menu_icon_for_desktop(desktop) : NULL;
+		it->icon_kind = it->icon_px ? 0 : (int)kind + 1;
+	}
 }
 
 static void fill_applications(struct mb_menu *menu, int count, bool nested) {
@@ -136,7 +143,7 @@ static void fill_applications(struct mb_menu *menu, int count, bool nested) {
 		char *desktop = app_desktop_file(ids[i]);
 		char *name, *exec;
 		if (desktop && launch_read_desktop(desktop, &name, &exec)) {
-			add_recent_item(sub, title, name, nested, ACT_LAUNCH, exec);
+			add_recent_item(sub, title, name, nested, ACT_LAUNCH, exec, desktop, PL_ICON_APPLICATION);
 			added++;
 			free(name);
 			free(exec);
@@ -189,7 +196,7 @@ static void fill_documents(struct mb_menu *menu, int count, bool nested) {
 			if (added < count && (nested || menu->n < MAX_ITEMS)) {
 				char *name = g_path_get_basename(docs[i].path);
 				char *arg = g_strconcat("open-path ", docs[i].path, NULL);
-				add_recent_item(sub, title, name, nested, ACT_FINDER, arg);
+				add_recent_item(sub, title, name, nested, ACT_FINDER, arg, NULL, PL_ICON_DOCUMENT);
 				added++;
 				g_free(name);
 				g_free(arg);
@@ -222,7 +229,7 @@ static void fill_servers(struct mb_menu *menu, int count, bool nested) {
 		if (f[0] && f[1] && f[2] && (strcmp(f[0], "afp") == 0 || strcmp(f[0], "smb") == 0)) {
 			char *address = g_shell_quote(f[1]);
 			char *command = g_strdup_printf("%s --connect %s %s", netbrowser, f[0], address);
-			add_recent_item(sub, title, f[2], nested, ACT_LAUNCH, command);
+			add_recent_item(sub, title, f[2], nested, ACT_LAUNCH, command, NULL, PL_ICON_NETWORK_DISK);
 			added++;
 			g_free(command);
 			g_free(address);

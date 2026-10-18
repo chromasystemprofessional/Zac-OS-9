@@ -47,6 +47,26 @@ enum pl_icon_kind {
 	PL_ICON_CLIPPING,          /* text or a picture dragged out of a document */
 	PL_ICON_INTERNET_LOCATION, /* a link dragged out of a browser */
 	PL_ICON_PRINTER,           /* a desktop printer */
+	/* Control panels' own (the Zac menu's Control Panels). */
+	PL_ICON_CP_MOUSE,
+	PL_ICON_CP_KEYBOARD,
+	PL_ICON_CP_TRACKPAD,
+	PL_ICON_CP_ACCESSIBILITY,
+	PL_ICON_CP_GENERAL,
+	PL_ICON_CP_NUMBERS,
+	PL_ICON_CP_TEXT,
+	PL_ICON_CP_DATETIME,
+	PL_ICON_CP_ZACMENU,
+	PL_ICON_CP_APPEARANCE,
+	PL_ICON_CP_SCREENSAVER,
+	PL_ICON_CP_USERS,
+	PL_ICON_CP_KEYCHAIN,
+	PL_ICON_CP_COLLAR,
+	PL_ICON_CP_SPEECH,
+	PL_ICON_CP_RETRIEVER,
+	PL_ICON_CP_FILETRANSLATOR,
+	PL_ICON_CP_WALKIES,
+	PL_ICON_NETWORK_DISK, /* a network volume (AFP, SMB), as AppleShare's were */
 	PL_ICON_COUNT,
 };
 

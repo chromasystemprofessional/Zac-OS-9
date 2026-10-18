@@ -109,6 +109,7 @@ FileExchangePanel::FileExchangePanel() {
 	m_list.frame = QRect(QPoint(M + 1, LIST_TOP), QPoint(W - M - 2, LIST_BOTTOM));
 	m_list.picked = [this](int) { showDetails(); };
 	m_change = PanelButton("Change…", QRect(W - M - 14 - 80, GROUP_BOTTOM - 13 - 20, 80, 20));
+	m_change.hint = "Chooses the program that opens this kind of document.";
 	m_change.clicked = [this] { change(); };
 	/* Another program (or the Finder) changed an association. */
 	fileAssocOnChange([this] {

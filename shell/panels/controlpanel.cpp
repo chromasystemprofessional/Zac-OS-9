@@ -13,6 +13,10 @@
  * TODO: the layouts are ours, built from HIG controls and spacing.
  */
 #include <QApplication>
+#include <QCollator>
+#include <QDate>
+#include <QLocale>
+#include <QSaveFile>
 #include <QDateTime>
 #include <QElapsedTimer>
 #include <QFileDialog>
@@ -25,8 +29,11 @@
 #include <QTimer>
 #include <QWheelEvent>
 #include <QWidget>
+#include <clocale>
+#include <numeric>
 
 #include "panelkit.h"
+#include "sharingclient.h"
 #include "alert.h"
 #include "savers.h"
 #include "settings.h"
@@ -92,6 +99,36 @@ protected:
 	virtual void keyExtra(QKeyEvent *) {}
 	virtual void moveExtra(QPoint) {}
 	virtual void releaseExtra(QPoint) {}
+	/* Hint Bubbles for lists, pop-ups and buttons, by their rectangles. */
+	std::vector<std::pair<const QRect *, QString>> m_hintRects;
+	/* Hint Bubbles for controls the panel draws itself. */
+	virtual QString hintExtra(QPoint) const { return {}; }
+
+	bool event(QEvent *e) override {
+		return panelHintEvent(this, e, [this](QPoint p) {
+			for (const PanelSlider *s : m_sliders) {
+				if (s->hitRect().contains(p) && !s->hint.isEmpty()) {
+					return s->hint;
+				}
+			}
+			for (const PanelRadios *r : m_radios) {
+				if (r->hit(p) >= 0 && !r->hint.isEmpty()) {
+					return r->hint;
+				}
+			}
+			for (const PanelCheckbox *k : m_checks) {
+				if (k->hitRect().contains(p) && !k->hint.isEmpty()) {
+					return k->hint;
+				}
+			}
+			for (const auto &[r, text] : m_hintRects) {
+				if (r->contains(p)) {
+					return text;
+				}
+			}
+			return hintExtra(p);
+		}) || QWidget::event(e);
+	}
 
 	void paintEvent(QPaintEvent *) override {
 		const int h = height();
@@ -257,6 +294,11 @@ public:
 		m_test = QRect(W / 2 + 10, y - 2, W / 2 - M - IN - 12, 52);
 		m_flash.setSingleShot(true);
 		m_flash.callOnTimeout([this] { m_lit = false; update(); });
+		/* Hint Bubbles. */
+		m_tracking.hint = "Sets how fast the pointer moves when you move the mouse.";
+		m_speed.hint = "Sets how quickly you must click twice for a double-click.";
+		m_tracks.hint = "Leaves a trail behind the pointer, so it is easier to follow.";
+		m_ibeam.hint = "Makes the text pointer (the I-beam) thicker, so it is easier to see.";
 	}
 
 protected:
@@ -343,6 +385,12 @@ public:
 		m_caret.start(pl_caret_blink_ms() / 2);
 		m_fkeys = PanelButton("Function Keys…", QRect(W - M - 2 - 120, G3 - 6 + PL_EDIT_H + 12, 120, PL_BUTTON_H));
 		m_fkeys.clicked = [this] { showFunctionKeys(this); };
+		/* Hint Bubbles. */
+		m_rate.hint = "Sets how fast a key repeats while you hold it down. Off: keys never repeat.";
+		m_delay.hint = "Sets how long you hold a key down before it starts to repeat.";
+		m_option.hint = "Switches keyboard layouts with Command-Option-Space as well as Command-Space.";
+		m_hintRects.push_back({ &m_list.frame, "The keyboard layouts you can type with. Check the ones you want in the keyboard menu." });
+		m_hintRects.push_back({ &m_fkeys.rect, "Opens Function Keys, where F-keys can open programs, documents and folders." });
 	}
 
 protected:
@@ -549,6 +597,13 @@ public:
 		m_refresh.callOnTimeout([this] { m_sound.refresh(); });
 		m_refresh.start(2000);
 		m_sound.refresh();
+		/* Hint Bubbles. */
+		m_volume.hint = "Sets how loud the computer plays sound.";
+		m_balance.hint = "Sets how much sound comes from the left and right speakers.";
+		m_alert.hint = "Sets how loud alert sounds are, compared with other sound.";
+		m_mute.hint = "Turns all sound off. Click again to turn it back on.";
+		m_hintRects.push_back({ &m_output.rect, "Chooses the speakers or headphones that play sound." });
+		m_hintRects.push_back({ &m_input.rect, "Chooses the microphone or line input that records sound." });
 	}
 
 protected:
@@ -675,6 +730,12 @@ public:
 	MonitorsPanel() : ControlPanel("Monitors", 236) {
 		readOutputs();
 		build();
+		/* Hint Bubbles. */
+		m_scale.hint = "Sets how big everything on the screen is drawn: each dot as one, two or three screen pixels.";
+		if (m_mirror) {
+			m_mirror->hint = "Shows the same picture on every screen.";
+		}
+		m_hintRects.push_back({ &m_list.frame, "The resolutions this screen can show. Click one to use it." });
 	}
 
 protected:
@@ -1143,10 +1204,14 @@ static QString sleepText(int step) {
  * (compositor/src/idle.c). */
 class EnergySaverPanel : public ControlPanel {
 public:
-	EnergySaverPanel() : ControlPanel("Nap Time", 202) {
-		const int g1 = 26, g2 = g1 + SLIDER_GROUP_H + 12;
+	static constexpr int SCHEDULE_H = 1 + PL_GROUP_MARGIN_TOP + 2 * (PL_POPUP_H + 6) + PL_BUTTON_H + PL_GROUP_MARGIN;
+
+	EnergySaverPanel() : ControlPanel("Nap Time", 202 + SCHEDULE_H + 20) {
+		const int g1 = 26, g2 = g1 + SLIDER_GROUP_H + 12, g3 = g2 + SLIDER_GROUP_H + 20;
 		m_groups = { { g1, g1 + SLIDER_GROUP_H, "Put the display to sleep when inactive for" },
-			{ g2, g2 + SLIDER_GROUP_H, "Put the system to sleep when inactive for" } };
+			{ g2, g2 + SLIDER_GROUP_H, "Put the system to sleep when inactive for" },
+			{ g3, g3 + SCHEDULE_H, "Schedule" } };
+		setupSchedule(g3 + 1 + PL_GROUP_MARGIN_TOP);
 		placeSlider(m_display, g1, SLEEP_STEPS, sleepStep(settingInt("display-sleep", 10)),
 			"1 min", "Never");
 		m_display.changed = [](int v) { setInt("display-sleep", SLEEP_MINUTES[v]); };
@@ -1155,10 +1220,14 @@ public:
 		m_system.changed = [](int v) { setInt("system-sleep", SLEEP_MINUTES[v]); };
 		m_notes = { "A window filling a screen keeps that screen awake,",
 			"and the system too. Any key or the mouse wakes them." };
+		/* Hint Bubbles. */
+		m_display.hint = "Sets how long the computer waits, while you aren't using it, before it turns the screen off.";
+		m_system.hint = "Sets how long the computer waits, while you aren't using it, before it goes to sleep.";
 	}
 
 protected:
 	void paintExtra(pl_canvas *c) override {
+		paintSchedule(c);
 		/* The chosen time, between the slider's end labels (at an end,
 		 * that end's label says it already). */
 		for (const PanelSlider *s : { &m_display, &m_system }) {
@@ -1171,8 +1240,112 @@ protected:
 		}
 	}
 
+	bool pressExtra(QPoint pos, bool) override {
+		for (Row &r : m_rows) {
+			if (r.days.press(this, pos) || r.hour.press(this, pos) || r.minute.press(this, pos)) {
+				return true;
+			}
+		}
+		return m_set.press(pos);
+	}
+	void moveExtra(QPoint pos) override {
+		if (m_set.move(pos)) {
+			update();
+		}
+	}
+	void releaseExtra(QPoint pos) override {
+		m_set.release(pos);
+	}
+
 private:
 	PanelSlider m_display, m_system;
+	/* Nap Time's schedule (/etc/zacos9/schedule, through
+	 * zacos9-accounts-helper): start up and shut down, on chosen days at
+	 * a chosen time. */
+	struct Row {
+		PanelCheckbox on;
+		PanelPopup days, hour, minute;
+	};
+	Row m_rows[2];
+	PanelButton m_set;
+	QString m_scheduleError;
+
+	void setupSchedule(int y) {
+		const char *names[2] = { "Start up", "Shut down" };
+		const char *keys[2] = { "startup", "shutdown" };
+		QFile f(qEnvironmentVariable("ZACOS9_ACCOUNTS_CONF", "/etc/zacos9") + "/schedule");
+		const QString saved = f.open(QIODevice::ReadOnly) ? QString::fromUtf8(f.readAll()) : QString();
+		for (int i = 0; i < 2; i++) {
+			Row &r = m_rows[i];
+			const int ry = y + i * (PL_POPUP_H + 6);
+			r.on = PanelCheckbox(names[i], QPoint(M + IN, ry + 4));
+			r.days.rect = QRect(M + IN + 92, ry, 100, PL_POPUP_H);
+			r.days.items = { PopupItem("Every Day"), PopupItem("Weekdays"), PopupItem("Weekends") };
+			r.hour.rect = QRect(M + IN + 200, ry, 56, PL_POPUP_H);
+			for (int h = 0; h < 24; h++) {
+				r.hour.items.emplace_back(QString::asprintf("%02d", h));
+			}
+			r.minute.rect = QRect(M + IN + 262, ry, 56, PL_POPUP_H);
+			for (int m = 0; m < 60; m += 5) {
+				r.minute.items.emplace_back(QString::asprintf("%02d", m));
+			}
+			r.hour.selected = i == 0 ? 7 : 23;
+			r.minute.selected = 0;
+			r.days.selected = i == 0 ? 1 : 0;
+			/* "startup weekdays 07:30" */
+			for (const QString &line : saved.split('\n')) {
+				const QStringList f = line.split(' ');
+				if (f.size() == 3 && f[0] == keys[i]) {
+					r.on.on = true;
+					r.days.selected = f[1] == "weekdays" ? 1 : f[1] == "weekends" ? 2 : 0;
+					r.hour.selected = f[2].section(':', 0, 0).toInt();
+					r.minute.selected = f[2].section(':', 1).toInt() / 5;
+				}
+			}
+			for (PanelPopup *p : { &r.days, &r.hour, &r.minute }) {
+				p->chosen = [this, p](int row) { p->selected = row; update(); };
+			}
+			m_checks.push_back(&r.on);
+		}
+		m_rows[0].on.hint = "Turns the computer on by itself at the time chosen, if it is shut down "
+			"(not every computer can).";
+		m_rows[1].on.hint = "Shuts the computer down by itself at the time chosen. Save your work first.";
+		m_set = PanelButton("Set Schedule", QRect(W - M - IN - 4 - 110, y + 2 * (PL_POPUP_H + 6), 110, PL_BUTTON_H));
+		m_set.hint = "Saves the schedule. An administrator's password may be asked for.";
+		m_set.clicked = [this] { saveSchedule(); };
+	}
+
+	void saveSchedule() {
+		const char *keys[2] = { "startup", "shutdown" };
+		const char *days[3] = { "daily", "weekdays", "weekends" };
+		QByteArray input;
+		for (int i = 0; i < 2; i++) {
+			const Row &r = m_rows[i];
+			if (r.on.on) {
+				input += QString::asprintf("%s %s %02d:%02d\n", keys[i], days[r.days.selected],
+					r.hour.selected, r.minute.selected * 5).toUtf8();
+			}
+		}
+		bool ok = false;
+		QString error;
+		runPrivilegedHelper("accounts", { "schedule" }, input, &ok, &error);
+		m_scheduleError = ok ? QString("Schedule saved.") : error;
+		update();
+	}
+
+	void paintSchedule(pl_canvas *c) {
+		for (Row &r : m_rows) {
+			r.days.enabled = r.hour.enabled = r.minute.enabled = r.on.on;
+			r.days.paint(c);
+			r.hour.paint(c);
+			r.minute.paint(c);
+		}
+		m_set.paint(c);
+		if (!m_scheduleError.isEmpty()) {
+			panelText(c, m_scheduleError, M + IN, m_set.rect.y() + 14, PL_FONT_VIEWS, GRAY(0x5),
+				m_set.rect.x() - M - IN - 8);
+		}
+	}
 };
 
 /* ---- Screen Saver ------------------------------------------------------------------ */
@@ -1230,6 +1403,12 @@ public:
 		m_clock.start();
 		m_tick.callOnTimeout([this] { update(m_preview); });
 		m_tick.start(40);
+		/* Hint Bubbles. */
+		m_which.hint = "Chooses what the screen shows while you aren't using the computer.";
+		m_after.hint = "Sets how long the computer waits, while you aren't using it, before the screen saver starts.";
+		if (m_password) {
+			m_password->hint = "Asks for your login password before the screen saver or sleep gives the screen back.";
+		}
 	}
 
 	~ScreenSaverPanel() override {
@@ -1317,6 +1496,11 @@ public:
 		};
 		m_checks.push_back(&m_submenus);
 		m_notes = { "Turn this off to list recent items directly", "in the Zac menu, with their category." };
+		/* Hint Bubbles. */
+		m_submenus.hint = "Shows recent items in submenus of the Zac menu, rather than all in the menu itself.";
+		for (PanelPopup &u : m_counts) {
+			m_hintRects.push_back({ &u.rect, "Sets how many recent items the Zac menu remembers." });
+		}
 	}
 
 protected:
@@ -1382,6 +1566,11 @@ public:
 		m_notes = { "Programs that ask for the system's browser, mail program", "or downloads folder use these." };
 		m_webPending = true;
 		m_webProcess.start("zacos9-web-sharing", { "status" });
+		/* Hint Bubbles. */
+		m_hintRects.push_back({ &m_browser.rect, "Chooses the program that opens web pages." });
+		m_hintRects.push_back({ &m_mail.rect, "Chooses the program that writes e-mail." });
+		m_hintRects.push_back({ &m_select.rect, "Chooses the folder where downloaded files go." });
+		m_webSharing.hint = "Lets other computers read the pages in your Web Pages folder with a web browser.";
 	}
 
 protected:
@@ -1576,6 +1765,12 @@ public:
 		m_radios.push_back(&m_documents);
 		m_notes = { "With the desktop hidden, Command-Tab or the Application",
 			"menu brings the Sniffer back." };
+		/* Hint Bubbles. */
+		m_desktop.hint = "Shows the desktop's icons while another program is in front. Off: they hide, and a click on the desktop does nothing.";
+		m_toyBox.hint = "Opens the Toy Box when you log in.";
+		m_menu.hint = "Sets how many times a menu item blinks when you choose it.";
+		m_caretRate.hint = "Sets how fast the insertion point blinks in text.";
+		m_documents.hint = "Chooses the folder Open and Save dialogs start in.";
 	}
 
 protected:
@@ -1660,6 +1855,12 @@ public:
 		enableDragging();
 		m_notes = { "Clicking: tap the pad to click. Dragging: tap twice and keep",
 			"your finger down to drag. Drag Lock: tap again to let go." };
+		/* Hint Bubbles. */
+		m_tracking.hint = "Sets how fast the pointer moves when you move your finger on the trackpad.";
+		m_speed.hint = "Sets how quickly you must tap twice for a double-click.";
+		m_clicking.hint = "Lets you tap the trackpad to click.";
+		m_dragging.hint = "Lets you tap twice and slide your finger to drag.";
+		m_dragLock.hint = "Keeps a drag going when you lift your finger, until you tap again.";
 	}
 
 private:
@@ -1714,6 +1915,15 @@ public:
 		reload();
 		m_notes = { "Mouse Keys: the keypad's 1-9 move the pointer, 5 clicks, 0 holds",
 			"the button down and . lets it go. ⌘-Option-Up and Down zoom." };
+		/* Hint Bubbles. */
+		m_sticky.hint = "Sticky Keys: press Shift, Command, Option or Control and then a key, rather than both at once.";
+		m_slow.hint = "Slow Keys: a key types only after you hold it down for a moment, so brief presses are ignored.";
+		m_slowDelay.hint = "Sets how long you hold a key down before it types.";
+		m_mouse.hint = "Mouse Keys: move the pointer with the numeric keypad; 5 clicks.";
+		m_mouseDelay.hint = "Sets how long you hold a keypad key before the pointer starts to move.";
+		m_mouseSpeed.hint = "Sets how fast the pointer moves with Mouse Keys.";
+		m_zoom.hint = "Zoom: magnifies the screen around the pointer.";
+		m_zoomFactor.hint = "Sets how much Zoom magnifies.";
 	}
 
 protected:
@@ -1793,6 +2003,326 @@ private:
 	std::vector<Row> m_rows;
 };
 
+/* ---- Numbers and Text -------------------------------------------------------------------- */
+
+/* Mac OS 9's Numbers and Text control panels, over the locale: Numbers sets
+ * how numbers, money, dates and measurements are written (LC_NUMERIC,
+ * LC_MONETARY, LC_TIME, LC_MEASUREMENT, LC_PAPER), Text the language and
+ * sort order (LANG, LC_COLLATE). Kept in ~/.config/locale.conf, which
+ * zacos9-session reads at login; a locale the system hasn't made yet is made
+ * by zacos9-accounts-helper. */
+class LocalePanel : public ControlPanel {
+	static constexpr int G0 = 12, LIST_ROWS = 9;
+	static constexpr int LIST_GROUP_H = 1 + PL_GROUP_MARGIN_TOP + LIST_ROWS * PL_LIST_ROW_H + 2 + PL_GROUP_MARGIN;
+	static constexpr int G1 = G0 + LIST_GROUP_H + 20, SAMPLE_H = 1 + PL_GROUP_MARGIN_TOP + 4 * 14 + PL_GROUP_MARGIN;
+	static constexpr int PANEL_H = G1 + SAMPLE_H + 34;
+
+public:
+	explicit LocalePanel(bool numbers)
+		: ControlPanel(numbers ? "Numbers" : "Text", PANEL_H), m_numbers(numbers) {
+		m_groups = { { G0, G0 + LIST_GROUP_H, numbers ? "Number Format" : "Language" },
+			{ G1, G1 + SAMPLE_H, "Sample" } };
+		m_list.frame = QRect(M + IN, G0 + 1 + PL_GROUP_MARGIN_TOP, W - 2 * M - 2 * IN - 2,
+			LIST_ROWS * PL_LIST_ROW_H + 2);
+		m_hintRects.push_back({ &m_list.frame, numbers
+			? "Chooses how numbers, money, dates and measurements are written. Type to find one."
+			: "Chooses the language programs use and how lists are sorted. Type to find one." });
+		/* The system's UTF-8 locales, by their own name for themselves. */
+		QFile supported("/usr/share/i18n/SUPPORTED");
+		if (supported.open(QIODevice::ReadOnly)) {
+			for (const QByteArray &line : supported.readAll().split('\n')) {
+				const QList<QByteArray> f = line.simplified().split(' ');
+				if (f.size() == 2 && f[1] == "UTF-8" && !f[0].contains('@')) {
+					const QString code = QString::fromLatin1(f[0]);
+					const QLocale l(code.section('.', 0, 0));
+					if (l.language() == QLocale::C) {
+						continue;
+					}
+					m_codes << code;
+					m_names << QString("%1 (%2)").arg(l.nativeLanguageName(), l.nativeTerritoryName());
+				}
+			}
+		}
+		/* Sorted by those names. */
+		QList<int> order(m_codes.size());
+		std::iota(order.begin(), order.end(), 0);
+		std::sort(order.begin(), order.end(), [this](int a, int b) {
+			return m_names[a].compare(m_names[b], Qt::CaseInsensitive) < 0;
+		});
+		QStringList codes, names;
+		for (int i : order) {
+			codes << m_codes[i];
+			names << m_names[i];
+		}
+		m_codes = codes;
+		m_names = names;
+		m_list.setItems(m_names);
+		const QString current = currentLocale().section('.', 0, 0);
+		for (int i = 0; i < m_codes.size(); i++) {
+			if (m_codes[i].section('.', 0, 0) == current) {
+				m_list.select(i, false);
+				m_list.ensureVisible(i);
+			}
+		}
+		m_list.picked = [this](int row) { choose(row); };
+		m_notes = { "Programs you open after your next login use it." };
+	}
+
+protected:
+	void paintExtra(pl_canvas *c) override {
+		m_list.paint(c, true);
+		const int row = m_list.state.selected;
+		const QLocale l(row >= 0 ? m_codes[row].section('.', 0, 0) : QString("C"));
+		QStringList lines;
+		if (m_numbers) {
+			lines << "Number:  " + l.toString(1234567.89, 'f', 2)
+				<< "Money:  " + l.toCurrencyString(1234.5)
+				<< "Date:  " + l.toString(QDate::currentDate(), QLocale::LongFormat)
+				<< QString("Measurement:  ") + (l.measurementSystem() == QLocale::MetricSystem ? "metric" : "U.S.");
+		} else {
+			QStringList words = { "zebra", "Apple", "émigré", "Zoo", "apple", "Ångström" };
+			QCollator collator(l);
+			std::sort(words.begin(), words.end(), collator);
+			lines << "Language:  " + l.nativeLanguageName() << "Sorted:  " + words.join(", ");
+		}
+		int y = G1 + 1 + PL_GROUP_MARGIN_TOP + 10;
+		for (const QString &line : lines) {
+			panelText(c, line, M + IN, y, PL_FONT_SYSTEM, C_BLACK, W - 2 * M - 2 * IN);
+			y += 14;
+		}
+		if (!m_error.isEmpty()) {
+			panelText(c, m_error, M, height() - 20, PL_FONT_VIEWS, RGB(0x99, 0, 0), W - 2 * M);
+		}
+	}
+	bool pressExtra(QPoint pos, bool) override {
+		return m_list.press(pos);
+	}
+	void moveExtra(QPoint pos) override {
+		if (m_list.move(pos)) {
+			update();
+		}
+	}
+	void releaseExtra(QPoint) override {
+		m_list.release();
+	}
+	void keyExtra(QKeyEvent *e) override {
+		if (m_list.key(e->key(), e->text())) {
+			update();
+		}
+	}
+	void wheelEvent(QWheelEvent *e) override {
+		if (m_list.wheel(e->position().toPoint(), e->angleDelta().y())) {
+			update();
+		}
+	}
+
+private:
+	bool m_numbers;
+	PanelList m_list;
+	QStringList m_codes, m_names;
+	QString m_error;
+
+	static QString confPath() {
+		return QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + "/locale.conf";
+	}
+
+	QStringList keys() const {
+		return m_numbers ? QStringList{ "LC_NUMERIC", "LC_MONETARY", "LC_TIME", "LC_MEASUREMENT", "LC_PAPER" }
+			: QStringList{ "LANG", "LC_COLLATE" };
+	}
+
+	/* This panel's locale: locale.conf's, else the session's. */
+	QString currentLocale() const {
+		QFile f(confPath());
+		const QString key = keys().first();
+		if (f.open(QIODevice::ReadOnly)) {
+			for (const QByteArray &line : f.readAll().split('\n')) {
+				if (line.startsWith(key.toLatin1() + '=')) {
+					return QString::fromLatin1(line.mid(key.size() + 1)).remove('"');
+				}
+			}
+		}
+		const QString env = qEnvironmentVariable(key.toLatin1().constData());
+		return env.isEmpty() ? qEnvironmentVariable("LANG") : env;
+	}
+
+	void choose(int row) {
+		if (row < 0 || row >= m_codes.size()) {
+			return;
+		}
+		m_error.clear();
+		const QString code = m_codes[row];
+		/* Made by the system yet? (locale -a writes "fr_FR.utf8".) */
+		if (!localeAvailable(code)) {
+			bool ok = false;
+			QString error;
+			runPrivilegedHelper("accounts", { "locale", code }, QByteArray(), &ok, &error);
+			if (!ok) {
+				m_error = error.isEmpty() ? QString("That language couldn't be added to the system.") : error;
+				update();
+				return;
+			}
+		}
+		/* Rewrite this panel's lines, keeping the other panel's. */
+		QStringList lines;
+		QFile f(confPath());
+		if (f.open(QIODevice::ReadOnly)) {
+			for (const QString &line : QString::fromUtf8(f.readAll()).split('\n')) {
+				if (!line.isEmpty() && !keys().contains(line.section('=', 0, 0))) {
+					lines << line;
+				}
+			}
+			f.close();
+		}
+		for (const QString &key : keys()) {
+			lines << key + "=" + code;
+		}
+		QDir().mkpath(QFileInfo(confPath()).path());
+		QSaveFile out(confPath());
+		if (!out.open(QIODevice::WriteOnly) || out.write((lines.join('\n') + '\n').toUtf8()) < 0 || !out.commit()) {
+			m_error = "Your choice couldn't be saved.";
+		}
+		update();
+	}
+
+	static bool localeAvailable(const QString &code) {
+		/* glibc's own check: setlocale with the name. */
+		const QByteArray name = code.toLatin1();
+		const char *was = setlocale(LC_CTYPE, nullptr);
+		const QByteArray saved = was ? QByteArray(was) : QByteArray("C");
+		const bool ok = setlocale(LC_CTYPE, name.constData()) != nullptr;
+		setlocale(LC_CTYPE, saved.constData());
+		return ok;
+	}
+};
+
+/* ---- Speech --------------------------------------------------------------------------- */
+
+/* Mac OS 9's Speech control panel: the voice and its rate (speech-dispatcher,
+ * as Scribble and Talking Alerts use them), and Talking Alerts. */
+class SpeechPanel : public ControlPanel {
+	static constexpr int VOICE_H = 1 + PL_GROUP_MARGIN_TOP + PL_POPUP_H + 8 + PL_BUTTON_H + PL_GROUP_MARGIN;
+	static constexpr int G0 = 12, G1 = G0 + VOICE_H + 20, G2 = G1 + SLIDER_GROUP_H + 20;
+	static constexpr int PANEL_H = G2 + 1 + PL_GROUP_MARGIN_TOP + PL_CHECKBOX_SIZE + PL_GROUP_MARGIN + 16;
+
+public:
+	SpeechPanel() : ControlPanel("Speech", PANEL_H) {
+		m_groups = { { G0, G0 + VOICE_H, "Voice" }, { G1, G1 + SLIDER_GROUP_H, "Rate" },
+			{ G2, G2 + 1 + PL_GROUP_MARGIN_TOP + PL_CHECKBOX_SIZE + PL_GROUP_MARGIN, "Talking Alerts" } };
+		m_voice.rect = QRect(M + IN, G0 + 1 + PL_GROUP_MARGIN_TOP, W - 2 * M - 2 * IN - 4, PL_POPUP_H);
+		m_voice.items = { PopupItem("Reading voices…", false) };
+		m_voice.enabled = false;
+		m_voice.chosen = [this](int row) {
+			if (row >= 0 && row < m_voices.size()) {
+				m_voice.selected = row;
+				pl_setting_set("speech-voice", row == 0 ? nullptr : m_voices[row].toUtf8().constData());
+				update();
+			}
+		};
+		m_try = PanelButton("Try Voice", QRect(W - M - IN - 4 - 96, G0 + 1 + PL_GROUP_MARGIN_TOP +
+			PL_POPUP_H + 8, 96, PL_BUTTON_H));
+		m_try.clicked = [] { pl_speak("Hello. This is how I sound."); };
+		/* -100..100 in nine steps of 25; the middle is speech-dispatcher's own. */
+		placeSlider(m_rate, G1, 9, pl_speech_rate() / 25 + 4, "Slow", "Fast");
+		m_rate.changed = [](int step) {
+			pl_setting_set("speech-rate", step == 4 ? nullptr
+				: QByteArray::number((step - 4) * 25).constData());
+		};
+		m_alerts = PanelCheckbox("Speak the text of alerts", QPoint(M + IN, G2 + 1 + PL_GROUP_MARGIN_TOP));
+		m_alerts.on = pl_talking_alerts();
+		m_alerts.toggled = [](bool on) { pl_setting_set("talking-alerts", on ? "true" : nullptr); };
+		m_checks.push_back(&m_alerts);
+
+		/* Hint Bubbles. */
+		m_hintRects.push_back({ &m_voice.rect, "Chooses the voice ZacOS speaks with." });
+		m_hintRects.push_back({ &m_try.rect, "Speaks a sentence in the chosen voice and rate." });
+		m_rate.hint = "Sets how fast the voice speaks.";
+		m_alerts.hint = "When an alert isn't answered after a moment, it speaks its message.";
+
+		readVoices();
+	}
+
+protected:
+	void paintExtra(pl_canvas *c) override {
+		m_voice.paint(c);
+		m_try.paint(c);
+		if (!m_error.isEmpty()) {
+			panelText(c, m_error, M, height() - 6, PL_FONT_VIEWS, GRAY(0x5), W - 2 * M);
+		}
+	}
+	bool pressExtra(QPoint pos, bool) override {
+		return m_voice.press(this, pos) || m_try.press(pos);
+	}
+	void moveExtra(QPoint pos) override {
+		if (m_try.move(pos)) {
+			update();
+		}
+	}
+	void releaseExtra(QPoint pos) override {
+		m_try.release(pos);
+	}
+
+private:
+	PanelPopup m_voice;
+	PanelButton m_try;
+	PanelSlider m_rate;
+	PanelCheckbox m_alerts;
+	QStringList m_voices; /* [0] is the default ("") */
+	QString m_error;
+	QProcess m_list;
+
+	/* `spd-say -L`: a heading, then NAME LANGUAGE VARIANT lines. Never
+	 * waitForFinished (CLAUDE.md). */
+	void readVoices() {
+		QObject::connect(&m_list, &QProcess::finished, this, [this] {
+			const QStringList lines = QString::fromUtf8(m_list.readAllStandardOutput()).split('\n');
+			fillVoices(lines.mid(1));
+		});
+		QObject::connect(&m_list, &QProcess::errorOccurred, this, [this](QProcess::ProcessError e) {
+			if (e == QProcess::FailedToStart) {
+				m_error = "Speech needs speech-dispatcher, which isn't installed.";
+				fillVoices({});
+			}
+		});
+		m_list.start("spd-say", { "-L" });
+	}
+
+	void fillVoices(const QStringList &lines) {
+		char current[96] = "";
+		pl_setting("speech-voice", current, sizeof(current));
+		m_voices = { QString() };
+		m_voice.items = { PopupItem("Default voice") };
+		m_voice.selected = 0;
+		/* NAME (which may have spaces) LANGUAGE VARIANT, right-aligned: the
+		 * base voices ("none") only, in the person's language if any are. */
+		struct Voice {
+			QString name, language;
+		};
+		QList<Voice> all;
+		for (const QString &line : lines) {
+			const QStringList f = line.simplified().split(' ');
+			if (f.size() >= 3 && f.last() == "none") {
+				all.append({ f.mid(0, f.size() - 2).join(' '), f[f.size() - 2] });
+			}
+		}
+		const QString language = QLocale().name().section('_', 0, 0);
+		const bool any = std::any_of(all.cbegin(), all.cend(),
+			[&](const Voice &v) { return v.language.section('-', 0, 0) == language; });
+		for (const Voice &v : all) {
+			if (any && v.language.section('-', 0, 0) != language && v.name != QString::fromUtf8(current)) {
+				continue;
+			}
+			m_voices << v.name;
+			m_voice.items.emplace_back(v.name);
+			if (v.name == QString::fromUtf8(current)) {
+				m_voice.selected = m_voices.size() - 1;
+			}
+		}
+		m_voice.enabled = true;
+		update();
+	}
+};
+
 /* ---- main --------------------------------------------------------------------------- */
 
 int main(int argc, char *argv[]) {
@@ -1840,6 +2370,13 @@ int main(int argc, char *argv[]) {
 	} else if (which == "accessibility") {
 		QApplication::setApplicationName("Accessibility");
 		panel = std::make_unique<AccessibilityPanel>();
+	} else if (which == "numbers" || which == "text") {
+		QApplication::setApplicationName(which == "numbers" ? "Numbers" : "Text");
+		platinumShellInit(); /* the helper's password prompt */
+		panel = std::make_unique<LocalePanel>(which == "numbers");
+	} else if (which == "speech") {
+		QApplication::setApplicationName("Speech");
+		panel = std::make_unique<SpeechPanel>();
 	} else if (which == "monitors") {
 		QApplication::setApplicationName("Monitors");
 		panel = std::make_unique<MonitorsPanel>();

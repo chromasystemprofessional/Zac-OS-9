@@ -1,4 +1,5 @@
 #include "desktop.h"
+#include "desktopprinter.h"
 
 #include "clippings.h"
 #include "thumbnails.h"
@@ -75,6 +76,7 @@ Desktop::Desktop() {
 	watchDesktopWallpaper(this, [this] { update(); });
 	platinumOnActiveClient(this, [this] { update(); });
 	watchCustomThemes(this, [this] { update(); });
+	watchDefaultPrinter(this, [this] { update(); });
 	setAttribute(Qt::WA_OpaquePaintEvent);
 	setAcceptDrops(true);
 	m_renameTimer.setSingleShot(true);
@@ -716,9 +718,9 @@ void Desktop::mouseMoveEvent(QMouseEvent *e) {
 	std::vector<Item *> items;
 	std::vector<QPoint> origins;
 	for (Item *item : selectedItems()) {
-		/* The disk and the Trash stay put. Dragging a network volume to the
-		 * Trash ejects it on a Mac. */
-		if (!isFixed(item) || item->isNetworkVolume) {
+		/* The disk and the Trash stay put. Dragging a disk (a USB one, or a
+		 * network volume) to the Trash ejects it on a Mac. */
+		if (!isFixed(item) || item->isNetworkVolume || item->isLocalVolume) {
 			items.push_back(item);
 			origins.push_back(item->pos);
 		}
@@ -779,13 +781,13 @@ void Desktop::dragLeaveEvent(QDragLeaveEvent *) {
 void Desktop::dropEvent(QDropEvent *e) {
 	Item *target = dropTargetAt(e->position().toPoint(), draggedPaths(e->mimeData()));
 	clearDropTarget();
-	/* A network volume dragged to the Trash is ejected; anything else
-	 * dropped there goes in it, below. */
+	/* A disk dragged to the Trash is ejected; anything else dropped
+	 * there goes in it, below. */
 	if (target == m_trash.get() && e->source() == this) {
 		bool ejected = false;
 		for (Item *item : selectedItems()) {
-			if (item->isNetworkVolume) {
-				Finder::instance().ejectVolume(item->path, item->name, true);
+			if (item->isNetworkVolume || item->isLocalVolume) {
+				Finder::instance().ejectVolume(item->path, item->name, item->isNetworkVolume);
 				ejected = true;
 			}
 		}

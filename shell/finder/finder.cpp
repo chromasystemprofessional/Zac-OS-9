@@ -1,5 +1,8 @@
 #include "finder.h"
 
+#include <sys/xattr.h>
+#include <QMimeDatabase>
+
 #include "clippings.h"
 #include "cryptofiles.h"
 #include "desktopprinter.h"
@@ -53,6 +56,33 @@
 #include "viewoptionsdialog.h"
 #include "infowindow.h"
 #include "resourcewindows.h"
+
+QStringList webSearchChannels() {
+	return { "DuckDuckGo", "Google", "Bing" };
+}
+
+bool openWebSearch(const QString &channel, const QString &words) {
+	const QString baseUrl = channel == "Google" ? "https://www.google.com/search"
+		: channel == "Bing" ? "https://www.bing.com/search"
+		: "https://duckduckgo.com/";
+	QUrl url(baseUrl);
+	QUrlQuery query;
+	query.addQueryItem("q", words);
+	url.setQuery(query);
+	if (!appOpenUrl(url.toString(QUrl::FullyEncoded))) {
+		Alert::ask("The web search could not be opened. Check that a web browser is available.",
+			"OK", QString());
+		return false;
+	}
+	return true;
+}
+
+/* Printing's messages don't stop you (Mac OS 9's didn't either). */
+static void printProblem(const QString &message) {
+	auto *alert = new Alert(message, "OK", QString());
+	alert->setAttribute(Qt::WA_DeleteOnClose);
+	alert->open();
+}
 
 Finder &Finder::instance() {
 	static Finder finder;
@@ -268,6 +298,10 @@ void Finder::notifyState() {
 }
 
 void Finder::command(const QString &name) {
+	if (!pl_puppy_allows(name.toUtf8().constData())) {
+		pl_beep(); /* Puppy Mode leaves it out (Sniffer Preferences) */
+		return;
+	}
 	if (name.startsWith("force-quit ")) {
 		/* "force-quit APP-ID NAME", from the Apple menu: Mac OS's own
 		 * question first, as the menu bar can't ask it. */
@@ -304,6 +338,33 @@ void Finder::command(const QString &name) {
 		}
 	} else if (name.startsWith("open-path ")) {
 		openPath(name.mid(10));
+	} else if (name.startsWith("reveal-path ")) {
+		/* zacos9-finder-ctl: the folder it's in, opened, with it selected. */
+		const QFileInfo info(name.mid(12));
+		if (info.exists() || info.isSymLink()) {
+			FolderWindow::open(info.absolutePath())->selectByName(info.fileName());
+		}
+	} else if (name.startsWith("label-path ")) {
+		/* zacos9-finder-ctl: "label-path N<TAB>PATH". */
+		const QString rest = name.mid(11);
+		const int label = rest.section('\t', 0, 0).toInt();
+		const QString path = rest.section('\t', 1);
+		if (label >= 0 && label < PL_LABEL_COUNT && QFileInfo::exists(path) && writeLabel(path, label)) {
+			folderChanged(QFileInfo(path).absolutePath());
+		}
+	} else if (name.startsWith("comment-path ")) {
+		/* zacos9-finder-ctl: "comment-path PATH<TAB>TEXT" (Get Info's comment). */
+		const QString rest = name.mid(13);
+		const QByteArray path = QFile::encodeName(rest.section('\t', 0, 0));
+		const QByteArray text = rest.section('\t', 1).toUtf8();
+		if (QFileInfo::exists(QString::fromUtf8(path))) {
+			if (text.isEmpty()) {
+				removexattr(path.constData(), "user.xdg.comment");
+			} else {
+				setxattr(path.constData(), "user.xdg.comment", text.constData(), text.size(), 0);
+			}
+			folderChanged(QFileInfo(QString::fromUtf8(path)).absolutePath());
+		}
 	} else if (name.startsWith("path-menu ")) {
 		/* The folder-path menu's choice; the first is the window's own. */
 		const int i = name.mid(10).toInt();
@@ -398,7 +459,7 @@ void Finder::command(const QString &name) {
 		FindDialog::open(folder && !vfsIsVirtual(folder->folderPath()) ? folder->folderPath() : QString());
 	} else if (name == "search-internet") {
 		bool accepted = false;
-		const QStringList searchChannels = { "DuckDuckGo", "Google", "Bing" };
+		const QStringList searchChannels = webSearchChannels();
 		const QString channel = QInputDialog::getItem(nullptr, "Search Internet",
 			"Search the web with:", searchChannels, 0, false, &accepted);
 		if (!accepted) {
@@ -407,17 +468,7 @@ void Finder::command(const QString &name) {
 		const QString words = QInputDialog::getText(nullptr, "Search Internet",
 			"Search for:", QLineEdit::Normal, QString(), &accepted).trimmed();
 		if (accepted && !words.isEmpty()) {
-			const QString baseUrl = channel == "Google" ? "https://www.google.com/search"
-				: channel == "Bing" ? "https://www.bing.com/search"
-				: "https://duckduckgo.com/";
-			QUrl url(baseUrl);
-			QUrlQuery query;
-			query.addQueryItem("q", words);
-			url.setQuery(query);
-			if (!appOpenUrl(url.toString(QUrl::FullyEncoded))) {
-				Alert::ask("The web search could not be opened. Check that a web browser is available.",
-					"OK", QString());
-			}
+			openWebSearch(channel, words);
 		}
 	} else if (name == "find-similar") {
 		const std::vector<Item *> sel = front() ? front()->selectedItems() : std::vector<Item *>{};
@@ -601,6 +652,8 @@ void Finder::openItem(Item *item) {
 				item->kind == PL_ICON_TRASH_EMPTY || item->kind == PL_ICON_TRASH_FULL) {
 			QDir().mkpath(item->path);
 			FolderWindow::open(item->path);
+		} else if (item->kind == PL_ICON_DISK_IMAGE && isDiscImage(item->path) && !isMacDiskImage(item->path)) {
+			mountDiscImage(item->path);
 		} else if (item->kind == PL_ICON_DISK_IMAGE) {
 			mountMacImage(item->path);
 		} else if (item->kind == PL_ICON_WINDOWS) {
@@ -665,6 +718,27 @@ void Finder::mountMacImage(const QString &image) {
 			FolderWindow::open(path);
 		}
 	});
+}
+
+/* A CD or DVD image: a read-only loop device (UDisks; polkit lets the
+ * person at the computer), which the desktop then mounts like any disk. */
+void Finder::mountDiscImage(const QString &image) {
+	auto *p = new QProcess;
+	QObject::connect(p, &QProcess::finished, [p, image](int code, QProcess::ExitStatus status) {
+		p->deleteLater();
+		if (status != QProcess::NormalExit || code != 0) {
+			const QString why = QString::fromUtf8(p->readAllStandardError()).trimmed().section('\n', -1);
+			Alert::ask("“" + QFileInfo(image).fileName() + "” couldn't be mounted. " + why, "OK", QString());
+		}
+	});
+	QObject::connect(p, &QProcess::errorOccurred, [p, image](QProcess::ProcessError e) {
+		if (e == QProcess::FailedToStart) {
+			p->deleteLater();
+			Alert::ask("“" + QFileInfo(image).fileName() + "” couldn't be mounted: udisksctl isn't installed.",
+				"OK", QString());
+		}
+	});
+	p->start("udisksctl", { "loop-setup", "--read-only", "--no-user-interaction", "-f", image });
 }
 
 /* ---- archives ------------------------------------------------------------------------ */
@@ -799,7 +873,7 @@ void Finder::printWindow() {
 	const QString title = fw ? fw->windowTitle() : QStringLiteral("Desktop");
 	const QImage image = fw ? fw->printImage() : m_desktop->printImage();
 	if (image.isNull()) {
-		Alert::ask("There's nothing in “" + title + "” to print.", "OK", QString());
+		printProblem("There's nothing in “" + title + "” to print.");
 		return;
 	}
 	/* A PDF named for the window (the print job's name), gone once lp
@@ -807,12 +881,12 @@ void Finder::printWindow() {
 	QTemporaryDir dir;
 	const QString pdf = dir.path() + "/" + QString(title).replace('/', '-') + ".pdf";
 	if (!dir.isValid() || writeWindowPdf(title, image, loadPageSetup(), pdf) == 0) {
-		Alert::ask("“" + title + "” couldn't be prepared for printing.", "OK", QString());
+		printProblem("“" + title + "” couldn't be prepared for printing.");
 		return;
 	}
 	QString error;
 	if (printFiles(printer, { pdf }, &error).isEmpty()) {
-		Alert::ask("“" + title + "” couldn't be printed. " + error, "OK", QString());
+		printProblem("“" + title + "” couldn't be printed. " + error);
 	}
 }
 
@@ -896,12 +970,23 @@ void Finder::encryptSelection() {
 		return;
 	}
 	auto *progress = cryptoProgress("Encrypting “" + QFileInfo(source).fileName() + "”…");
-	encryptFile(source, destination, password, [progress, destination](bool ok, const QString &problem) {
+	encryptFile(source, destination, password, [progress, destination, password](bool ok,
+			const QString &problem) mutable {
 		progress->hide();
 		progress->deleteLater();
 		if (ok) {
-			Alert::ask("Encrypted copy saved to “" + QFileInfo(destination).fileName() + "”.",
-				"OK", QString());
+			/* Mac OS 9's "Add to keychain": Decrypt then needn't ask. */
+			if (Alert::ask("Encrypted copy saved to “" + QFileInfo(destination).fileName() +
+					"”. Add its passphrase to your keychain, so Decrypt can open it without asking?",
+					"Add to Keychain", "Don't Add")) {
+				keychainStorePassphrase(destination, password, [](bool stored) {
+					if (!stored) {
+						Alert::ask("The passphrase couldn't be added to your keychain. "
+							"Is the keychain unlocked?", "OK", QString());
+					}
+				});
+			}
+			password.fill(QChar('\0'));
 		} else {
 			Alert::ask("The file could not be encrypted. " + problem, "OK", QString());
 		}
@@ -929,22 +1014,27 @@ void Finder::decryptSelection() {
 		Alert::ask("The decrypted file must be saved as a different file.", "OK", QString());
 		return;
 	}
-	QString password = cryptoPassword(false);
-	if (password.isEmpty()) {
-		return;
-	}
-	auto *progress = cryptoProgress("Decrypting “" + QFileInfo(source).fileName() + "”…");
-	decryptFile(source, destination, password, [progress, destination](bool ok, const QString &problem) {
-		progress->hide();
-		progress->deleteLater();
-		if (ok) {
-			Alert::ask("Decrypted file saved to “" + QFileInfo(destination).fileName() + "”.",
-				"OK", QString());
-		} else {
-			Alert::ask("The file could not be decrypted. " + problem, "OK", QString());
+	/* The keychain's passphrase if it has one, else ask. */
+	keychainFindPassphrase(source, [source, destination](QString password) {
+		if (password.isEmpty()) {
+			password = cryptoPassword(false);
 		}
+		if (password.isEmpty()) {
+			return;
+		}
+		auto *progress = cryptoProgress("Decrypting “" + QFileInfo(source).fileName() + "”…");
+		decryptFile(source, destination, password, [progress, destination](bool ok, const QString &problem) {
+			progress->hide();
+			progress->deleteLater();
+			if (ok) {
+				Alert::ask("Decrypted file saved to “" + QFileInfo(destination).fileName() + "”.",
+					"OK", QString());
+			} else {
+				Alert::ask("The file could not be decrypted. " + problem, "OK", QString());
+			}
+		});
+		password.fill(QChar('\0'));
 	});
-	password.fill(QChar('\0'));
 }
 
 void Finder::printDocuments(const QStringList &files, const QString &queue) {
@@ -952,13 +1042,27 @@ void Finder::printDocuments(const QStringList &files, const QString &queue) {
 	if (printer.isEmpty()) {
 		return;
 	}
-	QStringList printable, others;
+	/* Office documents print through LibreOffice, to this printer and
+	 * without opening a window (--pt); others open in their program. */
+	const QString office = QStandardPaths::findExecutable("libreoffice");
+	const auto isOffice = [](const QString &f) {
+		const QString type = QMimeDatabase().mimeTypeForFile(f).name();
+		return type.startsWith("application/vnd.oasis.opendocument.") || type == "application/msword" ||
+			type.startsWith("application/vnd.openxmlformats-officedocument.") ||
+			type.startsWith("application/vnd.ms-") || type == "application/rtf" || type == "text/rtf";
+	};
+	QStringList printable, viaOffice, others;
 	for (const QString &f : files) {
-		(canPrintDirectly(f) ? printable : others) << f;
+		(canPrintDirectly(f) ? printable : !office.isEmpty() && isOffice(f) ? viaOffice : others) << f;
 	}
 	QString error;
 	if (!printable.isEmpty() && printFiles(printer, printable, &error).size() < printable.size()) {
-		Alert::ask("Not everything could be printed. " + error, "OK", QString());
+		printProblem("Not everything could be printed. " + error);
+	}
+	for (const QString &f : viaOffice) {
+		if (!QProcess::startDetached(office, { "--headless", "--pt", printer, f })) {
+			printProblem(QString::fromUtf8("“%1” couldn't be printed with LibreOffice.").arg(QFileInfo(f).fileName()));
+		}
 	}
 	QStringList failedToOpen;
 	for (const QString &file : others) {

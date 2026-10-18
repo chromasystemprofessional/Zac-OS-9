@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Speech
+Comment=The voice ZacOS speaks with, how fast, and Talking Alerts
+Exec=zacos9-controlpanel speech
+Categories=Settings;Accessibility;
+OnlyShowIn=ZacOS9;

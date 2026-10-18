@@ -35,6 +35,7 @@ extern "C" {
 #define MENU_RIGHT_PAD 12      /* clear pixels between widest ink and border */
 #define MENU_CMD_FROM_RIGHT 28 /* the ⌘ glyph's ink starts at W - 28 */
 #define MENU_KEY_AFTER_CMD 11  /* key character ink starts 11 px after ⌘ */
+#define MENU_SHIFT_BEFORE_CMD 11 /* ⇧ starts 11 px before ⌘ (not measured) */
 #define MENU_SHORTCUT_GAP 12   /* text ink to ⌘ (not in the HIG; assumed) */
 #define MENU_SHADOW 1          /* extra column and row painted for the shadow */
 #define MENU_ARROW_FROM_RIGHT 19 /* submenu arrow ink starts at W - 19 (fig 4-3) */
@@ -70,6 +71,7 @@ int mbar_title_at(const struct mbar_title *titles, int n, int x);
 struct menu_item {
 	const struct plat_text *label; /* NULL means a separator */
 	const struct plat_text *key;   /* ⌘ shortcut character, or NULL */
+	bool shift;                    /* ⇧ before the ⌘ (⇧⌘Q) */
 	bool enabled;
 	bool checked;
 	bool submenu; /* draws the hierarchical-menu arrow */

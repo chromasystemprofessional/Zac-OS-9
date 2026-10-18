@@ -1,0 +1,195 @@
+#!/bin/sh
+# zacos9-accounts-helper: the privileged half of the Users control panel's
+# computer-wide settings (gap plan 5.2, 5.3). It runs as root through
+# pkexec; polkit lets administrators at the computer use it
+# (org.zacos9.accounts).
+#
+#   zacos9-accounts-helper puppy USER on|off
+#                       Puppy Mode for USER, set by an administrator: the
+#                       Sniffer keeps only the essential commands, and USER
+#                       can't turn it off (lib/settings.c reads it)
+#   zacos9-accounts-helper guest on|off
+#                       the Guest account: "guest", no password; its home is
+#                       emptied at each login (session/zacos9-session)
+#   zacos9-accounts-helper welcome
+#                       the login window's welcome message, from stdin (at
+#                       most 200 characters; empty: the standard one)
+#   zacos9-accounts-helper locale NAME
+#                       make a locale the Numbers and Text panels chose
+#                       (one /usr/share/i18n/SUPPORTED lists): /etc/locale.gen,
+#                       then locale-gen
+#   zacos9-accounts-helper schedule
+#                       Nap Time's schedule, from stdin: "startup DAYS HH:MM" and
+#                       "shutdown DAYS HH:MM" lines (DAYS: daily, weekdays or
+#                       weekends; a line left out turns that off). Shut-down is a
+#                       systemd timer; start-up, the RTC wake alarm, set again at
+#                       every shut-down by zacos9-wakealarm.service
+#   zacos9-accounts-helper wakealarm
+#                       set the RTC wake alarm for the next scheduled start-up
+#   zacos9-accounts-helper status
+#                       "guest on|off", then "puppy USER" lines
+#
+# Everything lives in /etc/zacos9 (ZACOS9_ACCOUNTS_CONF, for tests), readable
+# by everyone: puppy/USER (empty files), welcome, guest-account (the guest's
+# user name, so only that account is ever emptied).
+set -eu
+
+CONF=${ZACOS9_ACCOUNTS_CONF:-/etc/zacos9}
+GUEST=guest
+
+die() {
+	echo "$*" >&2
+	exit 1
+}
+
+valid_user() {
+	case $1 in
+	'' | -* | *[!a-z0-9_-]*) return 1 ;;
+	esac
+	# Tests name accounts that only their stand-in accountsservice has
+	# (pkexec never passes ZACOS9_ACCOUNTS_CONF on).
+	[ -n "${ZACOS9_ACCOUNTS_CONF:-}" ] || getent passwd "$1" >/dev/null
+}
+
+cmd=${1:-}
+[ $# -gt 0 ] && shift
+case $cmd in
+puppy)
+	[ $# -eq 2 ] || die "usage: puppy USER on|off"
+	valid_user "$1" || die "There is no account named \"$1\"."
+	mkdir -p "$CONF/puppy"
+	chmod 755 "$CONF" "$CONF/puppy"
+	case $2 in
+	on) : >"$CONF/puppy/$1" && chmod 644 "$CONF/puppy/$1" ;;
+	off) rm -f "$CONF/puppy/$1" ;;
+	*) die "usage: puppy USER on|off" ;;
+	esac
+	;;
+guest)
+	[ $# -eq 1 ] || die "usage: guest on|off"
+	mkdir -p "$CONF"
+	case $1 in
+	on)
+		if ! getent passwd "$GUEST" >/dev/null; then
+			adduser --quiet --disabled-password --comment "Guest" "$GUEST" >&2 ||
+				die "The Guest account couldn't be made."
+		elif [ "$(cat "$CONF/guest-account" 2>/dev/null)" != "$GUEST" ]; then
+			die "There is already an account named \"$GUEST\" that isn't the Guest account."
+		fi
+		passwd -d "$GUEST" >/dev/null # no password
+		echo "$GUEST" >"$CONF/guest-account"
+		chmod 644 "$CONF/guest-account"
+		;;
+	off)
+		if [ "$(cat "$CONF/guest-account" 2>/dev/null)" = "$GUEST" ]; then
+			deluser --quiet --remove-home "$GUEST" >&2 || true
+		fi
+		rm -f "$CONF/guest-account"
+		;;
+	*) die "usage: guest on|off" ;;
+	esac
+	;;
+welcome)
+	mkdir -p "$CONF"
+	text=$(head -c 200 | tr -d '\000-\010\013-\037' | tr '\n' ' ' | sed 's/ *$//')
+	if [ -z "$text" ]; then
+		rm -f "$CONF/welcome"
+	else
+		printf '%s\n' "$text" >"$CONF/welcome"
+		chmod 644 "$CONF/welcome"
+	fi
+	;;
+locale)
+	# The Numbers and Text panels: a locale the system hasn't made yet,
+	# one /usr/share/i18n/SUPPORTED lists (e.g. fr_FR.UTF-8).
+	[ $# -eq 1 ] || die "usage: locale NAME"
+	case $1 in *[!A-Za-z0-9_.@-]* | '') die "No such language: \"$1\"." ;; esac
+	line=$(awk -v n="$1" '$1 == n { print; exit }' /usr/share/i18n/SUPPORTED)
+	[ -n "$line" ] || die "No such language: \"$1\"."
+	gen=${ZACOS9_LOCALE_GEN:-/etc/locale.gen}
+	if ! grep -qx "$line" "$gen" 2>/dev/null; then
+		if grep -qx "# *$line" "$gen" 2>/dev/null; then
+			sed -i "s|^# *$line\$|$line|" "$gen"
+		else
+			echo "$line" >>"$gen"
+		fi
+	fi
+	[ -n "${ZACOS9_LOCALE_GEN:-}" ] || locale-gen >/dev/null || die "The language couldn't be made."
+	;;
+schedule)
+	systemd=${ZACOS9_SYSTEMD_DIR:-/etc/systemd/system}
+	out=""
+	while read -r what days time; do
+		case $what in startup | shutdown) ;; *) continue ;; esac
+		case $days in daily | weekdays | weekends) ;; *) die "Unknown days: \"$days\"." ;; esac
+		case $time in [01][0-9]:[0-5][0-9] | 2[0-3]:[0-5][0-9]) ;; *) die "Unknown time: \"$time\"." ;; esac
+		out="$out$what $days $time
+"
+	done
+	mkdir -p "$CONF"
+	printf '%s' "$out" >"$CONF/schedule"
+	chmod 644 "$CONF/schedule"
+	shutdown=$(printf '%s' "$out" | awk '$1 == "shutdown" { print $2, $3 }')
+	if [ -n "$shutdown" ]; then
+		set -- $shutdown
+		case $1 in
+		daily) cal="*-*-* $2:00" ;;
+		weekdays) cal="Mon..Fri *-*-* $2:00" ;;
+		weekends) cal="Sat,Sun *-*-* $2:00" ;;
+		esac
+		mkdir -p "$systemd"
+		printf '%s\n' "[Unit]" "Description=ZacOS 9 scheduled shut-down (Nap Time)" "" \
+			"[Service]" "Type=oneshot" "ExecStart=/usr/bin/systemctl poweroff" >"$systemd/zacos9-shutdown.service"
+		printf '%s\n' "[Unit]" "Description=ZacOS 9 scheduled shut-down (Nap Time)" "" \
+			"[Timer]" "OnCalendar=$cal" "" "[Install]" "WantedBy=timers.target" >"$systemd/zacos9-shutdown.timer"
+		if [ -z "${ZACOS9_NO_SYSTEMCTL:-}" ]; then
+			systemctl daemon-reload
+			systemctl enable --now zacos9-shutdown.timer >/dev/null 2>&1 || die "The shut-down couldn't be scheduled."
+		fi
+	else
+		[ -n "${ZACOS9_NO_SYSTEMCTL:-}" ] || systemctl disable --now zacos9-shutdown.timer >/dev/null 2>&1 || true
+		rm -f "$systemd/zacos9-shutdown.service" "$systemd/zacos9-shutdown.timer"
+		[ -n "${ZACOS9_NO_SYSTEMCTL:-}" ] || systemctl daemon-reload
+	fi
+	if printf '%s' "$out" | grep -q '^startup '; then
+		[ -n "${ZACOS9_NO_SYSTEMCTL:-}" ] || systemctl enable --now zacos9-wakealarm.service >/dev/null 2>&1 || true
+	else
+		[ -n "${ZACOS9_NO_SYSTEMCTL:-}" ] || systemctl disable zacos9-wakealarm.service >/dev/null 2>&1 || true
+	fi
+	"$0" wakealarm
+	;;
+wakealarm)
+	rtc=${ZACOS9_RTC:-/sys/class/rtc/rtc0/wakealarm}
+	line=$(awk '$1 == "startup" { print $2, $3; exit }' "$CONF/schedule" 2>/dev/null || true)
+	next=""
+	if [ -n "$line" ]; then
+		set -- $line
+		now=$(date +%s)
+		i=0
+		while [ $i -le 7 ] && [ -z "$next" ]; do
+			day=$(date -d "+$i day" +%F)
+			dow=$(date -d "$day" +%u) # 1 = Monday
+			case $1 in
+			weekdays) [ "$dow" -le 5 ] || { i=$((i + 1)); continue; } ;;
+			weekends) [ "$dow" -ge 6 ] || { i=$((i + 1)); continue; } ;;
+			esac
+			t=$(date -d "$day $2" +%s)
+			[ "$t" -gt $((now + 120)) ] && next=$t
+			i=$((i + 1))
+		done
+	fi
+	# The alarm must be cleared before it can be set again.
+	[ -e "$rtc" ] || [ -n "${ZACOS9_RTC:-}" ] || exit 0
+	echo 0 >"$rtc"
+	[ -z "$next" ] || echo "$next" >"$rtc"
+	;;
+status)
+	if [ -s "$CONF/guest-account" ]; then echo "guest on"; else echo "guest off"; fi
+	for f in "$CONF"/puppy/*; do
+		[ -e "$f" ] && echo "puppy ${f##*/}"
+	done
+	;;
+*)
+	die "usage: zacos9-accounts-helper puppy|guest|welcome|status ..."
+	;;
+esac

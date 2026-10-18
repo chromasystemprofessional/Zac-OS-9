@@ -27,10 +27,22 @@ redraw_grub_logo() {
 		echo "zacos9: could not redraw the start-up picture." >&2
 }
 
+# Shared Documents (Mac OS 9's Multiple Users): one folder everyone on the
+# computer can put things in, sticky so only an item's owner can remove it.
+# The Sniffer shows it on the startup disk. Never changed once made.
+make_shared_documents() {
+	[ -e /home/Shared ] && return 0
+	mkdir -p /home/Shared && chmod 1777 /home/Shared ||
+		echo "zacos9: could not make the Shared Documents folder." >&2
+}
+
 case "$1" in
 	configure)
 		grant_rawio
 		redraw_grub_logo
+		make_shared_documents
+		# Software Update's daily check, for every account.
+		systemctl --global enable zacos9-update-check.timer >/dev/null 2>&1 || true
 		;;
 	triggered)
 		grant_rawio

@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Jigsaw Puzzle
+Comment=Put a picture back together
+Exec=zacos9-jigsaw
+Categories=Game;LogicGame;
+OnlyShowIn=ZacOS9;

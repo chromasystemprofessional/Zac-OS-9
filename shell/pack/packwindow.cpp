@@ -30,6 +30,8 @@ PackWindow::PackWindow()
 	setAttribute(Qt::WA_OpaquePaintEvent);
 	setAcceptDrops(true);
 	m_look.names = m_settings.value("names", true).toBool();
+	m_look.nameWidth = m_settings.value("name-width", 0).toInt();
+	setMouseTracking(true); /* the edge's resize pointer */
 	m_look.large = m_settings.value("large", false).toBool();
 	m_look.across = m_settings.value("across", false).toBool();
 	m_look.collapsed = m_settings.value("collapsed", false).toBool();
@@ -77,6 +79,7 @@ void PackWindow::save() {
 	m_settings.setValue("large", m_look.large);
 	m_settings.setValue("across", m_look.across);
 	m_settings.setValue("collapsed", m_look.collapsed);
+	m_settings.setValue("name-width", m_look.nameWidth);
 	m_settings.setValue("x", m_pos.x());
 	m_settings.setValue("y", m_pos.y());
 }
@@ -98,6 +101,9 @@ QSize PackWindow::tileSize() const {
 			nameW = std::max(nameW, t.inkWidth());
 		}
 		nameW = std::clamp(nameW + 2 * PAD, NAME_W_MIN, NAME_W_MAX);
+		if (m_look.nameWidth > 0) {
+			nameW = std::clamp(m_look.nameWidth, 24, 2 * NAME_W_MAX); /* names shorten to fit */
+		}
 	}
 	return QSize(PAD + icon + PAD + nameW, icon + 2 * PAD);
 }
@@ -228,9 +234,20 @@ void PackWindow::paintEvent(QPaintEvent *) {
 
 /* ---- mouse ----------------------------------------------------------------------- */
 
+/* Mac OS 9's Application Switcher: drag the right edge to set how wide
+ * the names are (down the side, with names). */
+bool PackWindow::onEdge(QPoint p) const {
+	return m_look.names && !m_look.across && !m_look.collapsed && p.y() >= BORDER + TITLE_H &&
+		p.x() >= width() - BORDER - 3;
+}
+
 void PackWindow::mousePressEvent(QMouseEvent *e) {
 	const QPoint pos = e->position().toPoint();
 	m_pressLocal = pos;
+	if (onEdge(pos)) {
+		m_sizing = true;
+		return;
+	}
 	/* ⌘-drag anywhere moves it (⌘ arrives as Control). */
 	if (e->modifiers() & Qt::ControlModifier) {
 		m_moving = true;
@@ -252,6 +269,16 @@ void PackWindow::mousePressEvent(QMouseEvent *e) {
 
 void PackWindow::mouseMoveEvent(QMouseEvent *e) {
 	const QPoint pos = e->position().toPoint();
+	if (m_sizing) {
+		/* The names take what's right of the icon. */
+		m_look.nameWidth = std::max(24, pos.x() + BORDER - (BORDER + PAD + iconSize() + PAD) - BORDER);
+		relayout();
+		update();
+		return;
+	}
+	if (!(e->buttons() & Qt::LeftButton)) {
+		setCursor(onEdge(pos) ? Qt::SizeHorCursor : Qt::ArrowCursor);
+	}
 	if (m_moving) {
 		/* The surface moves under the pointer: the press point stays put
 		 * in it. */
@@ -274,6 +301,11 @@ void PackWindow::mouseMoveEvent(QMouseEvent *e) {
 
 void PackWindow::mouseReleaseEvent(QMouseEvent *e) {
 	const Qt::KeyboardModifiers mods = e->modifiers();
+	if (m_sizing) {
+		m_sizing = false;
+		save();
+		return;
+	}
 	if (m_moving) {
 		m_moving = false;
 		return;

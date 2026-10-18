@@ -92,7 +92,7 @@ with tempfile.TemporaryDirectory(prefix="zacos9-switch-") as directory:
 
             have_grim = shutil.which("grim") is not None
 
-            def green():
+            def green(color=None):
                 path = root / "shot.ppm"
                 subprocess.run(["grim", "-t", "ppm", str(path)], env=env, check=True, timeout=10)
                 data = path.read_bytes()
@@ -106,7 +106,7 @@ with tempfile.TemporaryDirectory(prefix="zacos9-switch-") as directory:
                     fields.append(int(data[at:end]))
                     at = end
                 pixels = data[at + 1:]
-                return sum(tuple(pixels[i:i + 3]) == GREEN for i in range(0, len(pixels) - 2, 3 * 7))
+                return sum(tuple(pixels[i:i + 3]) == (color or GREEN) for i in range(0, len(pixels) - 2, 3 * 7))
 
             window("alpha")
             window("bravo")
@@ -222,6 +222,23 @@ with tempfile.TemporaryDirectory(prefix="zacos9-switch-") as directory:
                 wait_for("the desktop's icons back", lambda: corner() == shown)
                 conf.write_text(text)
                 print("ok: Show Desktop when in background, off, hides the desktop behind programs")
+
+            # Hint Bubbles: with Show Hint Bubbles on (unset), the item under the
+            # pointer in the Zac menu gets a pale yellow bubble; off, none.
+            if have_grim:
+                YELLOW = (0xFF, 0xFF, 0xCC)
+                def bubble(on):
+                    conf = root / "config" / "zacos9" / "desktop.conf"
+                    conf.parent.mkdir(parents=True, exist_ok=True)
+                    conf.write_text(f"[General]\nhint-bubbles={1 if on else 0}\n")
+                    vp("home", "move", "20", "10", "down", "move", "0", "20", "wait", "400")
+                    shown = green(YELLOW)
+                    vp("move", "600", "400", "up", "wait", "300")
+                    return shown
+                plain = green(YELLOW)
+                assert bubble(True) > plain + 50, "a hint bubble beside the menu"
+                assert bubble(False) <= plain, "no bubble with Show Hint Bubbles off"
+                print("ok: Hint Bubbles over the menu bar's menus follow Show Hint Bubbles")
 
             # Special > Log Out: the Sniffer asks; Return says Log Out; the
             # programs are asked to quit, and once they have, the session ends.

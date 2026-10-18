@@ -49,4 +49,5 @@ private:
 	std::vector<Button> m_buttons; /* default last (rightmost) */
 	int m_tracking = -1;           /* button held down */
 	bool m_inside = false;
+	QString m_message;             /* for Talking Alerts */
 };

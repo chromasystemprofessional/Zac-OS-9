@@ -331,18 +331,23 @@ DateTimePanel::DateTimePanel() {
 	}
 
 	m_zoneButton = PanelButton("Set Time Zone…", QRect(COL + 11, ROW1 + 36, 130, 20));
+	m_zoneButton.hint = "Chooses the time zone this computer is in.";
 	m_zoneButton.clicked = [this] { chooseTimeZone(); };
 
 	m_ntp = PanelCheckbox("Set automatically", QPoint(COL + 11, ROW2 + 13 + 5));
+	m_ntp.hint = "Keeps the clock right by asking a time server on the Internet.";
 	m_ntp.toggled = [this](bool on) {
 		run({ "set-ntp", on ? "true" : "false" });
 		refresh();
 	};
 
 	m_showClock = PanelCheckbox("Show the clock in the menu bar", QPoint(M + 11, ROW3 + 14));
+	m_showClock.hint = "Shows the time at the right of the menu bar.";
 	m_clock24 = PanelCheckbox("Use 24-hour time", QPoint(M + 11, ROW3 + 34));
 	m_weekday = PanelCheckbox("Show the day of the week", QPoint(M + 11, ROW3 + 54));
+	m_weekday.hint = "Shows the day of the week beside the time in the menu bar.";
 	m_hourChime = PanelCheckbox("Play a sound on the hour", QPoint(M + 11, ROW3 + 74));
+	m_hourChime.hint = "Plays a sound at the start of each hour.";
 	m_dateFormat.label = "Date format:";
 	m_dateFormat.rect = QRect(M + 112, ROW3 + 98, W - M - 112 - M - 2, PL_POPUP_H);
 	m_dateFormat.items = { PopupItem("Jan 5, 2026"), PopupItem("5 Jan 2026"),

@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Text
+Comment=The language programs use, and how lists are sorted
+Exec=zacos9-controlpanel text
+Categories=Settings;
+OnlyShowIn=ZacOS9;

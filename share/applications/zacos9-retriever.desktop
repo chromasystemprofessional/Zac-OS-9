@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Retriever
+Comment=Keep pairs of folders alike: the newest copy of each file wins
+Exec=zacos9-retriever
+Categories=Settings;Utility;
+OnlyShowIn=ZacOS9;

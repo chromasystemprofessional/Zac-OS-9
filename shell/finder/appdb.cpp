@@ -4,6 +4,7 @@
 #include <gio/gio.h>
 
 #include "appdb.h"
+#include "appfilter.h"
 #include "electronlaunch.h"
 #include "platinumshell.h"
 
@@ -400,6 +401,10 @@ void load() {
 		if (!g_app_info_should_show(info)) {
 			continue;
 		}
+		/* A Limited account sees only its programs. */
+		if (G_IS_DESKTOP_APP_INFO(info) && !pl_app_allowed(G_DESKTOP_APP_INFO(info))) {
+			continue;
+		}
 		const QString id = fromUtf8(g_app_info_get_id(info));
 		const QString name = finderName(fromUtf8(g_app_info_get_name(info)));
 		if (id.isEmpty() || name.isEmpty()) {
@@ -620,7 +625,23 @@ static GAppLaunchContext *launchContext(GAppInfo *info, uint32_t &cookie) {
 	return context;
 }
 
+static std::function<void(const QString &)> g_refused;
+
+void appOnRefused(std::function<void(const QString &)> f) {
+	g_refused = std::move(f);
+}
+
 static bool launchInfo(GAppInfo *info, GList *files, const QString &actionId = {}) {
+	if (G_IS_DESKTOP_APP_INFO(info) && !pl_app_allowed(G_DESKTOP_APP_INFO(info))) {
+		/* Handled: the person is told, rather than offered other programs. */
+		const QString name = fromUtf8(g_app_info_get_name(info));
+		if (g_refused) {
+			g_refused(name);
+		} else {
+			qWarning() << "Not allowed to use" << name;
+		}
+		return true;
+	}
 	uint32_t cookie;
 	GAppLaunchContext *context = launchContext(info, cookie);
 	GAppInfo *run = electronLaunchInfo(info);

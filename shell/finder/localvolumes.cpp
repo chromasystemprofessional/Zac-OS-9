@@ -4,6 +4,10 @@
 
 #include "localvolumes.h"
 
+#include <cstring>
+
+#include "settings.h"
+
 #include <QFileInfo>
 #include <QSet>
 #include <QCoreApplication>
@@ -440,6 +444,32 @@ static void mountIfNeeded(GVolume *v) {
 	g_volume_mount(v, G_MOUNT_MOUNT_NONE, nullptr, nullptr, onMounted, nullptr);
 }
 
+/* Mac OS 9's AutoPlay (Sniffer Preferences > Media, "media-autoplay", on
+ * unless "false"): an audio CD or a video DVD just inserted plays in the
+ * program that plays that kind of disc. Programs on a disc never start. */
+static void onMountAdded(GVolumeMonitor *, GMount *mount, gpointer) {
+	char v[16];
+	if (pl_setting("media-autoplay", v, sizeof(v)) && strcmp(v, "false") == 0) {
+		return;
+	}
+	char **types = g_mount_guess_content_type_sync(mount, FALSE, nullptr, nullptr);
+	for (char **t = types; t && *t; t++) {
+		if (strcmp(*t, "x-content/audio-cdda") != 0 && strcmp(*t, "x-content/video-dvd") != 0) {
+			continue;
+		}
+		GAppInfo *player = g_app_info_get_default_for_type(*t, FALSE);
+		if (player) {
+			GFile *root = g_mount_get_root(mount);
+			GList files = { root, nullptr, nullptr };
+			g_app_info_launch(player, &files, nullptr, nullptr);
+			g_object_unref(root);
+			g_object_unref(player);
+		}
+		break;
+	}
+	g_strfreev(types);
+}
+
 static void onVolumeAdded(GVolumeMonitor *, GVolume *v, gpointer) {
 	mountIfNeeded(v);
 }
@@ -486,6 +516,7 @@ void localVolumesMountAll() {
 	g_signal_connect(monitor, "volume-added", G_CALLBACK(onVolumeAdded), nullptr);
 	g_signal_connect(monitor, "volume-changed", G_CALLBACK(onVolumeAdded), nullptr);
 	g_signal_connect(monitor, "volume-removed", G_CALLBACK(onVolumeRemoved), nullptr);
+	g_signal_connect(monitor, "mount-added", G_CALLBACK(onMountAdded), nullptr);
 	GList *volumes = g_volume_monitor_get_volumes(monitor);
 	for (GList *l = volumes; l; l = l->next) {
 		mountIfNeeded(G_VOLUME(l->data));

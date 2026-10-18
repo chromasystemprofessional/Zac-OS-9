@@ -82,6 +82,11 @@ class LoginWindow : public QWidget {
 public:
 	LoginWindow() : m_accounts(accounts()) {
 		setWindowTitle("Log In");
+		const QByteArray conf = qgetenv("ZACOS9_ACCOUNTS_CONF");
+		QFile welcome((conf.isEmpty() ? QString("/etc/zacos9") : QString::fromUtf8(conf)) + "/welcome");
+		if (welcome.open(QIODevice::ReadOnly)) {
+			m_welcome = QString::fromUtf8(welcome.read(400)).simplified();
+		}
 
 		/* Under the welcome and the chosen person's picture. */
 		int y = PICTURE_Y + PICTURE + 8;
@@ -153,7 +158,13 @@ protected:
 		Pixels px(width(), height());
 		pl_canvas *c = &px.c;
 		pl_fill(c, 0, 0, width() - 1, height() - 1, GRAY(0xD));
-		panelText(c, "Welcome to ZacOS 9.", MARGIN, PICTURE_Y + PICTURE / 2 + 5);
+		/* The Users panel's welcome message, if an administrator set one. */
+		const QStringList welcome = panelWrap(m_welcome.isEmpty() ? QString("Welcome to ZacOS 9.")
+			: m_welcome, W - 2 * MARGIN - PICTURE - 8, PL_FONT_SYSTEM).mid(0, 3);
+		for (int i = 0; i < welcome.size(); i++) {
+			panelText(c, welcome[i], MARGIN,
+				PICTURE_Y + PICTURE / 2 + 5 + (i - (int(welcome.size()) - 1) / 2) * 16);
+		}
 		/* The chosen person's picture (Users control panel), as Mac OS 9's
 		 * Multiple Users showed it. */
 		if (const int row = m_list.state.selected; row >= 0) {
@@ -258,6 +269,7 @@ private:
 	}
 
 	std::vector<Account> m_accounts;
+	QString m_welcome;
 	Greetd m_greetd;
 	QString m_error;
 	bool m_safeMode = false;

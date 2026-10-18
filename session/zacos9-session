@@ -65,6 +65,33 @@ if [ -z "${WLR_RENDERER:-}" ]; then
 	$gpu || export WLR_RENDERER=pixman
 fi
 
+# The Numbers and Text control panels' choices (~/.config/locale.conf):
+# only the locale variables, only from KEY=VALUE lines.
+locale_conf="${XDG_CONFIG_HOME:-$HOME/.config}/locale.conf"
+if [ -r "$locale_conf" ]; then
+	while IFS='=' read -r key value; do
+		case $key in
+		LANG | LC_NUMERIC | LC_MONETARY | LC_TIME | LC_MEASUREMENT | LC_PAPER | LC_COLLATE)
+			case $value in
+			*[!A-Za-z0-9_.@-]* | '') ;;
+			*) export "$key=$value" ;;
+			esac
+			;;
+		esac
+	done <"$locale_conf"
+fi
+
+# The Guest account (Users control panel) starts each login afresh: its
+# home is emptied and filled from /etc/skel. Only the account the Users
+# panel made (named in /etc/zacos9/guest-account) is ever emptied.
+guest_account=$(cat "${ZACOS9_ACCOUNTS_CONF:-/etc/zacos9}/guest-account" 2>/dev/null || true)
+if [ -n "$guest_account" ] && [ "$(id -un)" = "$guest_account" ] && [ -z "${ZACOS9_GUEST_FRESH:-}" ] &&
+		[ -d "${HOME:-}" ] && [ "$(cd "$HOME" && pwd -P)" != / ]; then
+	find "$HOME" -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null || true
+	cp -a /etc/skel/. "$HOME"/ 2>/dev/null || true
+	export ZACOS9_GUEST_FRESH=1 # once, if the session starts again below
+fi
+
 # Apps want a D-Bus session bus. A systemd login has one in the runtime
 # folder; elsewhere, start one for the session.
 if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
@@ -85,7 +112,8 @@ startup=
 if command -v dbus-update-activation-environment >/dev/null; then
 	startup="dbus-update-activation-environment --systemd WAYLAND_DISPLAY DISPLAY \
 XDG_CURRENT_DESKTOP XDG_SESSION_TYPE XDG_CONFIG_DIRS XDG_DATA_DIRS QT_QPA_PLATFORM QT_USE_PORTAL \
-GTK_USE_PORTAL GTK_CSD GTK_THEME GTK_OVERLAY_SCROLLING GTK_MODULES UBUNTU_MENUPROXY QT_STYLE_OVERRIDE XCURSOR_THEME XCURSOR_PATH XCURSOR_SIZE"
+GTK_USE_PORTAL GTK_CSD GTK_THEME GTK_OVERLAY_SCROLLING GTK_MODULES UBUNTU_MENUPROXY QT_STYLE_OVERRIDE XCURSOR_THEME XCURSOR_PATH XCURSOR_SIZE \\
+LANG LC_NUMERIC LC_MONETARY LC_TIME LC_MEASUREMENT LC_PAPER LC_COLLATE"
 fi
 # The compositor runs its startup command after starting the Wayland backend,
 # setting WAYLAND_DISPLAY, and launching the desktop surfaces. Import the

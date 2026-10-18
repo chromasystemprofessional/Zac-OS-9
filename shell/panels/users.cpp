@@ -1,3 +1,5 @@
+/* GIO before Qt: its headers use the name `signals`. */
+#include "appfilter.h"
 #include "users.h"
 
 #include <QDBusConnection>
@@ -5,7 +7,9 @@
 #include <QDBusMessage>
 #include <QDBusMetaType>
 #include <QDBusObjectPath>
+#include <QDBusArgument>
 #include <QDBusPendingCallWatcher>
+#include <QDBusVariant>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QKeyEvent>
@@ -20,6 +24,7 @@
 #include "alert.h"
 #include "panelkit.h"
 #include "platinumshell.h"
+#include "sharingclient.h"
 
 namespace {
 
@@ -27,6 +32,9 @@ const QString SERVICE = QStringLiteral("org.freedesktop.Accounts");
 const QString ROOT = QStringLiteral("/org/freedesktop/Accounts");
 const QString IFACE = QStringLiteral("org.freedesktop.Accounts");
 const QString USER_IFACE = QStringLiteral("org.freedesktop.Accounts.User");
+/* malcontent's, which accountsservice serves for each person. */
+const QString MCT_IFACE = QStringLiteral("com.endlessm.ParentalControls.AppFilter");
+const QString PROPS = QStringLiteral("org.freedesktop.DBus.Properties");
 
 constexpr uint32_t FACE = GRAY(0xD);
 constexpr int PICTURE = 48;
@@ -179,6 +187,49 @@ void AccountsClient::callUser(const QString &path, const QString &method, const 
 	send(this, path, USER_IFACE, method, args, [done](const QDBusMessage &reply) { done(errorOf(reply)); });
 }
 
+void AccountsClient::appFilter(const QString &path,
+		std::function<void(bool, bool, const QStringList &)> done) {
+	send(this, path, PROPS, "Get", { MCT_IFACE, QStringLiteral("AppFilter") },
+			[done](const QDBusMessage &reply) {
+		if (reply.type() == QDBusMessage::ErrorMessage || reply.arguments().isEmpty()) {
+			done(false, false, {});
+			return;
+		}
+		const QVariant value = reply.arguments().first().value<QDBusVariant>().variant();
+		if (!value.canConvert<QDBusArgument>()) {
+			done(false, false, {});
+			return;
+		}
+		const QDBusArgument arg = value.value<QDBusArgument>();
+		bool allowlist = false;
+		QStringList entries;
+		arg.beginStructure();
+		arg >> allowlist >> entries;
+		arg.endStructure();
+		/* A blocklist is "everything but"; Limited is an allowlist. */
+		done(true, allowlist, allowlist ? entries : QStringList());
+	});
+}
+
+void AccountsClient::setAppFilter(const QString &path, bool limited, const QStringList &allowed,
+		Done done) {
+	/* Not limited: an empty blocklist, malcontent's "no filter". */
+	QDBusArgument arg;
+	arg.beginStructure();
+	arg << limited << (limited ? allowed : QStringList());
+	arg.endStructure();
+	send(this, path, PROPS, "Set",
+		{ MCT_IFACE, QStringLiteral("AppFilter"), QVariant::fromValue(QDBusVariant(QVariant::fromValue(arg))) },
+		[done](const QDBusMessage &reply) {
+			if (reply.type() == QDBusMessage::ErrorMessage &&
+					reply.errorName() == "org.freedesktop.DBus.Error.UnknownInterface") {
+				done("Limited accounts need malcontent, which isn't installed.");
+				return;
+			}
+			done(errorOf(reply));
+		});
+}
+
 /* ---- the Users window ---------------------------------------------------- */
 
 namespace {
@@ -189,7 +240,7 @@ constexpr int LIST_TOP = 34, LIST_BOTTOM = 214;
 struct UsersPanel::Parts {
 	PanelHost host;
 	PanelList list;
-	PanelButton add, open, remove;
+	PanelButton add, open, remove, options;
 	AccountsClient client;
 	QList<Account> accounts;
 	bool loaded = false;
@@ -202,15 +253,22 @@ UsersPanel::UsersPanel() : d(std::make_unique<Parts>(this)) {
 	setWindowTitle("Users");
 	setFixedSize(PW, PH);
 	d->list.frame = QRect(M, LIST_TOP, PW - 2 * M, LIST_BOTTOM - LIST_TOP);
+	d->host.hintAreas.push_back({ &d->list.frame, "The people who can use this computer. Double-click one to change it." });
 	d->list.picked = [this](int) { updateButtons(); };
 	const int y = PH - M - PL_BUTTON_H;
 	d->add = PanelButton("New User…", QRect(M, y, 96, PL_BUTTON_H));
+	d->add.hint = "Makes an account for a new person.";
 	d->add.clicked = [this] { newUser(); };
 	d->open = PanelButton("Open…", QRect(M + 104, y, 80, PL_BUTTON_H));
+	d->open.hint = "Changes the selected person's name, picture, password or kind of account.";
 	d->open.clicked = [this] { openSelected(); };
 	d->remove = PanelButton("Delete…", QRect(PW - M - 4 - 80, y, 80, PL_BUTTON_H));
+	d->remove.hint = "Deletes the selected person's account.";
 	d->remove.clicked = [this] { deleteSelected(false); };
-	d->host.buttons = { &d->add, &d->open, &d->remove };
+	d->options = PanelButton("Options…", QRect(M + 192, y, 84, PL_BUTTON_H));
+	d->options.hint = "Sets up the Guest account and the login window's welcome message.";
+	d->options.clicked = [this] { openOptions(); };
+	d->host.buttons = { &d->add, &d->open, &d->options, &d->remove };
 	updateButtons();
 	QTimer::singleShot(0, this, [this] { reload(); });
 }
@@ -307,6 +365,12 @@ AccountWindow *UsersPanel::openSelected() {
 	}
 	auto *w = new AccountWindow(this, &d->client, a);
 	d->windows << w;
+	w->show();
+	return w;
+}
+
+OptionsWindow *UsersPanel::openOptions() {
+	auto *w = new OptionsWindow(this);
 	w->show();
 	return w;
 }
@@ -428,7 +492,7 @@ void UsersPanel::changeEvent(QEvent *e) {
 /* ---- one account ---------------------------------------------------------- */
 
 namespace {
-constexpr int AW = 450, AH = 292, LABEL = 118, FIELD = 130;
+constexpr int AW = 450, AH = 340, LABEL = 118, FIELD = 130;
 }
 
 struct AccountWindow::Parts {
@@ -438,8 +502,16 @@ struct AccountWindow::Parts {
 	bool creating;
 	Account original;
 	PanelEdit realName, userName, password, verify;
-	PanelCheckbox admin, canLogIn;
-	PanelButton choose, cancel, save;
+	PanelCheckbox admin, canLogIn, limited, puppy;
+	bool puppyWas = false;
+	PanelButton choose, cancel, save, programs;
+	QStringList allowed; /* malcontent's entries, for a Limited account */
+	bool filterKnown = false;
+	void updateLimited() {
+		limited.enabled = filterKnown && !admin.on && admin.enabled;
+		programs.enabled = limited.enabled && limited.on;
+		puppy.enabled = !admin.on && admin.enabled;
+	}
 	QString picture; /* a new one chosen, to set on Save */
 	bool userNameTouched = false;
 	bool saving = false;
@@ -459,6 +531,7 @@ AccountWindow::AccountWindow(UsersPanel *panel, AccountsClient *client, const Ac
 	setFixedSize(AW, AH);
 	int y = 16;
 	d->realName.rect = QRect(FIELD, y, AW - FIELD - M, PL_EDIT_H);
+	d->realName.hint = "The person's full name, shown at login.";
 	d->realName.setText(d->original.realName);
 	d->realName.edited = [this] {
 		if (d->creating && !d->userNameTouched) {
@@ -468,6 +541,7 @@ AccountWindow::AccountWindow(UsersPanel *panel, AccountsClient *client, const Ac
 	};
 	y += 30;
 	d->userName.rect = QRect(FIELD, y, 160, PL_EDIT_H);
+	d->userName.hint = "The short name the system uses: lowercase letters, digits and - or _.";
 	d->userName.setText(d->original.userName);
 	d->userName.enabled = d->creating; /* a home folder and files are named after it */
 	d->userName.accepts = [](QChar c) {
@@ -480,6 +554,7 @@ AccountWindow::AccountWindow(UsersPanel *panel, AccountsClient *client, const Ac
 	y += 30 + PICTURE + 14;
 	d->choose = PanelButton("Choose…", QRect(FIELD + PICTURE + 12, 76 + (PICTURE - PL_BUTTON_H) / 2,
 		80, PL_BUTTON_H));
+	d->choose.hint = "Chooses the person's picture, shown at login.";
 	d->choose.clicked = [this] {
 		const QString file = QFileDialog::getOpenFileName(this, "Choose a Picture",
 			QDir::homePath() + "/Pictures", "Pictures (*.png *.jpg *.jpeg *.gif *.bmp)");
@@ -488,19 +563,61 @@ AccountWindow::AccountWindow(UsersPanel *panel, AccountsClient *client, const Ac
 		}
 	};
 	d->password.rect = QRect(FIELD, y, 160, PL_EDIT_H);
+	d->password.hint = "The person's login password.";
 	d->password.password = true;
 	y += 30;
 	d->verify.rect = QRect(FIELD, y, 160, PL_EDIT_H);
+	d->verify.hint = "Type the password again, to be sure it is right.";
 	d->verify.password = true;
 	y += 36;
 	d->admin = PanelCheckbox("Can administer this computer", QPoint(FIELD, y));
+	d->admin.hint = "Lets this person change system settings and install software.";
 	d->admin.on = d->original.admin;
 	/* Your own: you couldn't give it back. */
 	d->admin.enabled = !you;
 	y += 22;
 	d->canLogIn = PanelCheckbox("Can log in", QPoint(FIELD, y));
+	d->canLogIn.hint = "Lets this person log in. Off: the account stays, but can't be used.";
 	d->canLogIn.on = !d->original.locked;
 	d->canLogIn.enabled = !you;
+	y += 26;
+	d->limited = PanelCheckbox("Use only chosen programs", QPoint(FIELD, y));
+	d->limited.hint = "Limits this person to the programs you choose. Not a security boundary: "
+		"programs started some other way still run.";
+	d->limited.toggled = [this](bool) { d->updateLimited(); update(); };
+	d->programs = PanelButton("Programs…", QRect(AW - M - 4 - 96, y - 4, 96, PL_BUTTON_H));
+	d->programs.hint = "Chooses the programs this person can use.";
+	d->programs.clicked = [this] {
+		auto *w = new ProgramsWindow(this, d->realName.text.isEmpty() ? d->userName.text : d->realName.text,
+			d->allowed, [this](const QStringList &allowed) {
+				d->allowed = allowed;
+				update();
+			});
+		w->show();
+	};
+	y += 22;
+	d->puppy = PanelCheckbox("Puppy Mode", QPoint(FIELD, y));
+	d->puppy.hint = "Gives this person only the Sniffer's essential commands, which they can't "
+		"turn off. For children and people new to computers.";
+	d->puppy.on = d->puppyWas = !d->creating && QFile::exists(accountsConf("puppy/" + d->original.userName));
+	d->admin.toggled = [this](bool) { d->updateLimited(); update(); };
+	if (d->creating) {
+		d->filterKnown = true; /* without malcontent, saving says so */
+	} else {
+		QPointer<AccountWindow> self(this); /* it may close before the answer */
+		d->client->appFilter(d->original.path, [this, self](bool known, bool limited,
+				const QStringList &allowed) {
+			if (!self) {
+				return;
+			}
+			d->filterKnown = d->original.filterKnown = known;
+			d->limited.on = d->original.limited = limited;
+			d->allowed = d->original.allowed = allowed;
+			d->updateLimited();
+			update();
+		});
+	}
+	d->updateLimited();
 	const int by = AH - M - PL_BUTTON_H;
 	d->save = PanelButton(d->creating ? "Create" : "Save", QRect(AW - M - 4 - 72, by, 72, PL_BUTTON_H), true);
 	d->save.clicked = [this] {
@@ -512,8 +629,8 @@ AccountWindow::AccountWindow(UsersPanel *panel, AccountsClient *client, const Ac
 	d->cancel = PanelButton("Cancel", QRect(AW - M - 4 - 72 - 12 - 72, by, 72, PL_BUTTON_H));
 	d->cancel.clicked = [this] { close(); };
 	d->host.edits = { &d->realName, &d->userName, &d->password, &d->verify };
-	d->host.checks = { &d->admin, &d->canLogIn };
-	d->host.buttons = { &d->choose, &d->cancel, &d->save };
+	d->host.checks = { &d->admin, &d->canLogIn, &d->limited, &d->puppy };
+	d->host.buttons = { &d->choose, &d->cancel, &d->save, &d->programs };
 	d->host.defaultButton = &d->save;
 	d->host.cancelButton = &d->cancel;
 	d->host.setFocus(&d->realName);
@@ -549,6 +666,18 @@ void AccountWindow::setCanLogIn(bool can) {
 	if (d->canLogIn.enabled) {
 		d->canLogIn.on = can;
 	}
+}
+
+void AccountWindow::setLimited(bool limited, const QStringList &allowed) {
+	d->filterKnown = true;
+	d->limited.on = limited;
+	d->allowed = allowed;
+	d->updateLimited();
+}
+
+void AccountWindow::setPuppy(bool puppy) {
+	d->puppy.on = puppy;
+	d->updateLimited();
 }
 
 void AccountWindow::setPicture(const QString &file) {
@@ -598,6 +727,14 @@ bool AccountWindow::save(QString *why) {
 	if (d->canLogIn.enabled && d->canLogIn.on == d->original.locked && !(d->creating && d->canLogIn.on)) {
 		steps << "locked";
 	}
+	const bool limited = d->limited.on && !d->admin.on;
+	if ((d->puppy.on && !d->admin.on) != d->puppyWas) {
+		steps << "puppy";
+	}
+	if (d->filterKnown && (limited != d->original.limited ||
+			(limited && d->allowed != d->original.allowed))) {
+		steps << "limited";
+	}
 	d->saving = true;
 	if (d->creating) {
 		d->client->create(d->userName.text, d->realName.text.trimmed(), d->admin.on,
@@ -627,6 +764,29 @@ void AccountWindow::apply(const QString &path, QStringList steps) {
 		return;
 	}
 	const QString step = steps.takeFirst();
+	const auto next = [this, path, steps](const QString &error) {
+		if (!error.isEmpty()) {
+			d->saving = false;
+			if (d->panel) {
+				d->panel->showError(error);
+			}
+			return;
+		}
+		apply(path, steps);
+	};
+	if (step == "limited") {
+		d->client->setAppFilter(path, d->limited.on && !d->admin.on, d->allowed, next);
+		return;
+	}
+	if (step == "puppy") {
+		bool ok = false;
+		QString error;
+		const QString user = d->creating ? d->userName.text : d->original.userName;
+		runPrivilegedHelper("accounts", { "puppy", user, d->puppy.on && !d->admin.on ? "on" : "off" },
+			QByteArray(), &ok, &error);
+		next(ok ? QString() : error);
+		return;
+	}
 	QString method;
 	QVariantList args;
 	if (step == "name") {
@@ -653,16 +813,7 @@ void AccountWindow::apply(const QString &path, QStringList steps) {
 		method = "SetLocked";
 		args = { !d->canLogIn.on };
 	}
-	d->client->callUser(path, method, args, [this, path, steps](const QString &error) {
-		if (!error.isEmpty()) {
-			d->saving = false;
-			if (d->panel) {
-				d->panel->showError(error);
-			}
-			return;
-		}
-		apply(path, steps);
-	});
+	d->client->callUser(path, method, args, next);
 }
 
 void AccountWindow::paintEvent(QPaintEvent *) {
@@ -708,6 +859,305 @@ void AccountWindow::mouseReleaseEvent(QMouseEvent *e) {
 }
 
 void AccountWindow::keyPressEvent(QKeyEvent *e) {
+	if ((e->modifiers() & Qt::ControlModifier) && e->key() == Qt::Key_W) {
+		close();
+		return;
+	}
+	d->host.hostKey(e);
+	update();
+}
+
+/* ---- a Limited account's programs ----------------------------------------- */
+
+namespace {
+constexpr int RW = 340, RH = 340;
+}
+
+struct ProgramsWindow::Parts {
+	PanelHost host;
+	PanelList list;
+	PanelButton cancel, ok;
+	struct Program {
+		QString name, entry;
+	};
+	std::vector<Program> programs;
+	QSet<QString> on;
+	QStringList others; /* allowed entries no installed program has: kept */
+	QString who;
+	std::function<void(const QStringList &)> done;
+	explicit Parts(QWidget *w) : host(w) {}
+};
+
+ProgramsWindow::ProgramsWindow(QWidget *parent, const QString &who, const QStringList &allowed,
+		std::function<void(const QStringList &)> done)
+		: QWidget(parent, Qt::Dialog), d(std::make_unique<Parts>(this)) {
+	d->who = who;
+	d->done = std::move(done);
+	setWindowTitle("Programs");
+	setWindowModality(Qt::WindowModal);
+	setAttribute(Qt::WA_DeleteOnClose);
+	setFixedSize(RW, RH);
+	/* Installed programs (as the Sniffer's Applications folder lists them),
+	 * by name, one row per program; ZacOS's own are always allowed. */
+	GList *all = g_app_info_get_all();
+	QSet<QString> seen;
+	for (GList *l = all; l; l = l->next) {
+		auto *info = static_cast<GAppInfo *>(l->data);
+		if (!g_app_info_should_show(info) || !G_IS_DESKTOP_APP_INFO(info)) {
+			continue;
+		}
+		char *entry = pl_app_filter_entry(G_DESKTOP_APP_INFO(info));
+		const QString e = QString::fromUtf8(entry ? entry : "");
+		g_free(entry);
+		if (e.isEmpty() || seen.contains(e) || QFileInfo(e).fileName().startsWith("zacos9-")) {
+			continue;
+		}
+		seen.insert(e);
+		d->programs.push_back({ QString::fromUtf8(g_app_info_get_name(info)), e });
+	}
+	g_list_free_full(all, g_object_unref);
+	std::sort(d->programs.begin(), d->programs.end(), [](const auto &a, const auto &b) {
+		return a.name.compare(b.name, Qt::CaseInsensitive) < 0;
+	});
+	for (const QString &e : allowed) {
+		(seen.contains(e) ? d->on : (d->others << e, d->on)).insert(e);
+	}
+	QStringList names;
+	for (const auto &p : d->programs) {
+		names << p.name;
+	}
+	d->list.frame = QRect(12, 34, RW - 24, RH - 34 - 50);
+	d->list.setItems(names, {}, PL_CHECKBOX_SIZE + 6);
+	d->list.state.selected = -1;
+	d->host.hintAreas.push_back({ &d->list.frame, "Check the programs this person can use." });
+	const int by = RH - 12 - PL_BUTTON_H;
+	d->ok = PanelButton("OK", QRect(RW - 12 - 4 - 72, by, 72, PL_BUTTON_H), true);
+	d->ok.clicked = [this] { accept(); };
+	d->cancel = PanelButton("Cancel", QRect(RW - 12 - 4 - 72 - 12 - 72, by, 72, PL_BUTTON_H));
+	d->cancel.clicked = [this] { close(); };
+	d->host.buttons = { &d->cancel, &d->ok };
+	d->host.defaultButton = &d->ok;
+	d->host.cancelButton = &d->cancel;
+}
+
+ProgramsWindow::~ProgramsWindow() = default;
+
+QStringList ProgramsWindow::names() const {
+	QStringList out;
+	for (const auto &p : d->programs) {
+		out << p.name;
+	}
+	return out;
+}
+
+void ProgramsWindow::toggle(int row) {
+	if (row < 0 || row >= int(d->programs.size())) {
+		return;
+	}
+	const QString &e = d->programs[row].entry;
+	if (!d->on.remove(e)) {
+		d->on.insert(e);
+	}
+	update();
+}
+
+void ProgramsWindow::accept() {
+	QStringList allowed = d->others;
+	for (const auto &p : d->programs) {
+		if (d->on.contains(p.entry)) {
+			allowed << p.entry;
+		}
+	}
+	if (d->done) {
+		d->done(allowed);
+	}
+	close();
+}
+
+void ProgramsWindow::paintEvent(QPaintEvent *) {
+	Pixels px(RW, RH);
+	pl_canvas *c = &px.c;
+	pl_fill(c, 0, 0, RW - 1, RH - 1, FACE);
+	panelText(c, QStringLiteral("Programs %1 can use:").arg(d->who), 12, 24, PL_FONT_SYSTEM,
+		C_BLACK, RW - 24);
+	d->list.paint(c, true);
+	const int visible = pl_list_visible_rows(d->list.frame.top(), d->list.frame.bottom());
+	for (int r = 0; r < visible && d->list.state.top + r < int(d->programs.size()); r++) {
+		const int i = d->list.state.top + r;
+		pl_checkbox_paint(c, d->list.frame.left() + 3, d->list.frame.top() + 1 + r * PL_LIST_ROW_H + 2,
+			d->on.contains(d->programs[i].entry) ? PL_CHECK_ON : PL_CHECK_OFF, false, true, nullptr);
+	}
+	panelText(c, "ZacOS's own programs are always available.", 12, RH - 12 - PL_BUTTON_H - 6,
+		PL_FONT_VIEWS, GRAY(0x5));
+	d->host.paintControls(c, FACE);
+	QPainter p(this);
+	px.blit(p);
+}
+
+void ProgramsWindow::mousePressEvent(QMouseEvent *e) {
+	const QPoint pos = e->position().toPoint();
+	if (d->list.frame.contains(pos)) {
+		const int before = d->list.state.selected;
+		d->list.state.selected = -1;
+		d->list.press(pos);
+		const int row = d->list.state.selected;
+		if (row >= 0) {
+			toggle(row);
+		} else {
+			d->list.state.selected = before; /* the scroll bar */
+		}
+	} else {
+		d->host.hostPress(e);
+	}
+	update();
+}
+
+void ProgramsWindow::mouseMoveEvent(QMouseEvent *e) {
+	d->list.move(e->position().toPoint());
+	d->host.hostMove(e);
+	update();
+}
+
+void ProgramsWindow::mouseReleaseEvent(QMouseEvent *e) {
+	d->list.release();
+	d->host.hostRelease(e);
+	update();
+}
+
+void ProgramsWindow::wheelEvent(QWheelEvent *e) {
+	if (d->list.wheel(e->position().toPoint(), e->angleDelta().y())) {
+		update();
+	}
+}
+
+void ProgramsWindow::keyPressEvent(QKeyEvent *e) {
+	if (e->key() == Qt::Key_Space && d->list.state.selected >= 0) {
+		toggle(d->list.state.selected);
+	} else if (!d->list.key(e->key(), e->text())) {
+		d->host.hostKey(e);
+	}
+	update();
+}
+
+/* ---- Options: the Guest account and the welcome message ------------------- */
+
+QString accountsConf(const QString &name) {
+	const QString env = qEnvironmentVariable("ZACOS9_ACCOUNTS_CONF");
+	return (env.isEmpty() ? QString("/etc/zacos9") : env) + '/' + name;
+}
+
+namespace {
+constexpr int OW = 380, OH = 196;
+}
+
+struct OptionsWindow::Parts {
+	PanelHost host;
+	PanelCheckbox guest;
+	PanelEdit welcome;
+	PanelButton cancel, ok;
+	bool guestWas = false;
+	QString welcomeWas;
+	explicit Parts(QWidget *w) : host(w) {}
+};
+
+OptionsWindow::OptionsWindow(QWidget *parent)
+		: QWidget(parent, Qt::Dialog), d(std::make_unique<Parts>(this)) {
+	setWindowTitle("Users Options");
+	setAttribute(Qt::WA_DeleteOnClose);
+	setFixedSize(OW, OH);
+	d->guest = PanelCheckbox("Allow guests to log in", QPoint(12, 16));
+	d->guest.hint = "Adds a Guest account with no password. Its home folder is emptied each "
+		"time someone logs in as Guest.";
+	d->guest.on = d->guestWas = QFile::exists(accountsConf("guest-account"));
+	QFile welcome(accountsConf("welcome"));
+	if (welcome.open(QIODevice::ReadOnly)) {
+		d->welcomeWas = QString::fromUtf8(welcome.readAll()).trimmed();
+	}
+	d->welcome.rect = QRect(12, 74, OW - 24, 2 * PL_EDIT_H);
+	d->welcome.multiline = true;
+	d->welcome.maxLength = 200;
+	d->welcome.hint = "Shown in the login window instead of \"Welcome to ZacOS 9.\" Leave it "
+		"empty for the standard one.";
+	d->welcome.setText(d->welcomeWas);
+	const int by = OH - 12 - PL_BUTTON_H;
+	d->ok = PanelButton("OK", QRect(OW - 12 - 4 - 72, by, 72, PL_BUTTON_H), true);
+	d->ok.clicked = [this] {
+		QString error;
+		if (save(&error)) {
+			close();
+		} else if (qEnvironmentVariable("QT_QPA_PLATFORM") != "offscreen") {
+			Alert::ask(error, "OK", QString());
+		}
+	};
+	d->cancel = PanelButton("Cancel", QRect(OW - 12 - 4 - 72 - 12 - 72, by, 72, PL_BUTTON_H));
+	d->cancel.clicked = [this] { close(); };
+	d->host.checks = { &d->guest };
+	d->host.edits = { &d->welcome };
+	d->host.buttons = { &d->cancel, &d->ok };
+	d->host.defaultButton = &d->ok;
+	d->host.cancelButton = &d->cancel;
+	d->host.setFocus(&d->welcome);
+}
+
+OptionsWindow::~OptionsWindow() = default;
+
+void OptionsWindow::setGuest(bool on) {
+	d->guest.on = on;
+}
+
+void OptionsWindow::setWelcome(const QString &text) {
+	d->welcome.setText(text);
+}
+
+bool OptionsWindow::save(QString *error) {
+	bool ok = true;
+	QString why;
+	if (d->guest.on != d->guestWas) {
+		runPrivilegedHelper("accounts", { "guest", d->guest.on ? "on" : "off" }, QByteArray(), &ok, &why);
+		if (ok) {
+			d->guestWas = d->guest.on;
+		}
+	}
+	const QString text = d->welcome.text.simplified();
+	if (ok && text != d->welcomeWas) {
+		runPrivilegedHelper("accounts", { "welcome" }, text.toUtf8(), &ok, &why);
+		if (ok) {
+			d->welcomeWas = text;
+		}
+	}
+	if (error) {
+		*error = why;
+	}
+	return ok;
+}
+
+void OptionsWindow::paintEvent(QPaintEvent *) {
+	Pixels px(OW, OH);
+	pl_canvas *c = &px.c;
+	pl_fill(c, 0, 0, OW - 1, OH - 1, FACE);
+	panelText(c, "No password; nothing is kept between logins.", 32, 46, PL_FONT_VIEWS);
+	panelText(c, "Welcome message:", 12, 68);
+	d->host.paintControls(c, FACE);
+	QPainter p(this);
+	px.blit(p);
+}
+
+void OptionsWindow::mousePressEvent(QMouseEvent *e) {
+	d->host.hostPress(e);
+	update();
+}
+
+void OptionsWindow::mouseMoveEvent(QMouseEvent *e) {
+	d->host.hostMove(e);
+	update();
+}
+
+void OptionsWindow::mouseReleaseEvent(QMouseEvent *e) {
+	d->host.hostRelease(e);
+	update();
+}
+
+void OptionsWindow::keyPressEvent(QKeyEvent *e) {
 	if ((e->modifiers() & Qt::ControlModifier) && e->key() == Qt::Key_W) {
 		close();
 		return;

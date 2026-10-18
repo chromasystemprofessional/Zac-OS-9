@@ -312,6 +312,13 @@ bool holdJob(const QString &printer, int id, bool hold, QString *error) {
 	return r.ok;
 }
 
+bool urgentJob(const QString &printer, int id, QString *error) {
+	/* CUPS prints the highest priority first among waiting jobs. */
+	const Result r = run("lp", { "-i", printer + "-" + QString::number(id), "-q", "100" });
+	*error = r.err;
+	return r.ok;
+}
+
 bool setDefaultPrinter(const QString &printer, QString *error) {
 	const Result r = run("lpoptions", { "-d", printer });
 	*error = r.err;

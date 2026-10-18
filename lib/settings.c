@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <poll.h>
 #include <pthread.h>
+#include <pwd.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -637,6 +638,114 @@ bool pl_smart_scrolling(void) {
 	char v[16];
 	return pl_setting("smart-scrolling", v, sizeof(v)) &&
 		(strcmp(v, "true") == 0 || strcmp(v, "1") == 0);
+}
+
+int pl_speech_rate(void) {
+	char v[16];
+	if (!pl_setting("speech-rate", v, sizeof(v))) {
+		return 0;
+	}
+	const int rate = atoi(v);
+	return rate < -100 ? -100 : rate > 100 ? 100 : rate;
+}
+
+int pl_speech_args(const char **argv, char *buf, size_t size) {
+	int n = 0;
+	argv[n++] = "spd-say";
+	char voice[96];
+	size_t used = 0;
+	if (pl_setting("speech-voice", voice, sizeof(voice)) && voice[0] && strlen(voice) + 1 < size) {
+		argv[n++] = "-y";
+		memcpy(buf, voice, strlen(voice) + 1);
+		argv[n++] = buf;
+		used = strlen(voice) + 1;
+	}
+	const int rate = pl_speech_rate();
+	if (rate != 0 && used + 8 <= size) {
+		snprintf(buf + used, size - used, "%d", rate);
+		argv[n++] = "-r";
+		argv[n++] = buf + used;
+	}
+	argv[n++] = "--";
+	argv[n] = NULL;
+	return n;
+}
+
+void pl_speak(const char *text) {
+	if (!text || !*text) {
+		return;
+	}
+	const char *argv[10];
+	char buf[128];
+	int n = pl_speech_args(argv, buf, sizeof(buf));
+	argv[n++] = text;
+	argv[n] = NULL;
+	/* Detached (double fork), as the sounds are. */
+	pid_t pid = fork();
+	if (pid == 0) {
+		if (fork() == 0) {
+			setsid();
+			execvp("spd-say", (char *const *)argv);
+		}
+		_exit(0);
+	}
+	if (pid > 0) {
+		waitpid(pid, NULL, 0);
+	}
+}
+
+bool pl_talking_alerts(void) {
+	char v[16];
+	return pl_setting("talking-alerts", v, sizeof(v)) &&
+		(strcmp(v, "true") == 0 || strcmp(v, "1") == 0);
+}
+
+bool pl_puppy_locked(void) {
+	const char *conf = getenv("ZACOS9_ACCOUNTS_CONF");
+	const struct passwd *pw = getpwuid(getuid());
+	if (!pw) {
+		return false;
+	}
+	char path[512];
+	snprintf(path, sizeof(path), "%s/puppy/%s", conf && *conf ? conf : "/etc/zacos9", pw->pw_name);
+	return access(path, F_OK) == 0;
+}
+
+bool pl_puppy_mode(void) {
+	char v[16];
+	return pl_puppy_locked() || (pl_setting("puppy-mode", v, sizeof(v)) &&
+		(strcmp(v, "true") == 0 || strcmp(v, "1") == 0));
+}
+
+bool pl_puppy_allows(const char *command) {
+	/* What Simple Finder left out: Get Info, labels, aliases, printing,
+	 * finding more than names, view options, erasing, add-on commands.
+	 * New Folder, Open, Close Window, Put Away, Find, the views, Clean Up,
+	 * Arrange, Empty Trash, Eject and Log Out stay. */
+	static const char *const hidden[] = {
+		"duplicate", "make-alias", "get-info", "get-info-sharing", "move-to-trash", "encrypt",
+		"decrypt", "print", "print-window", "page-setup", "add-to-favorites", "search-internet",
+		"find-similar", "index-selection", "show-original", "erase-disk",
+		"show-hidden-applications", "view-window", "view-popup", "view-options", "reset-columns",
+		"open-folder-tricks",
+	};
+	static const char *const hidden_prefixes[] = {
+		"label ", "sort ", "attach-trick ", "remove-trick ", "contextual ",
+	};
+	if (!command || !pl_puppy_mode()) {
+		return true;
+	}
+	for (size_t i = 0; i < sizeof(hidden) / sizeof(hidden[0]); i++) {
+		if (strcmp(command, hidden[i]) == 0) {
+			return false;
+		}
+	}
+	for (size_t i = 0; i < sizeof(hidden_prefixes) / sizeof(hidden_prefixes[0]); i++) {
+		if (strncmp(command, hidden_prefixes[i], strlen(hidden_prefixes[i])) == 0) {
+			return false;
+		}
+	}
+	return true;
 }
 
 /* ---- labels ----------------------------------------------------------------- */

@@ -3,7 +3,54 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QElapsedTimer>
+#include <QPointer>
+#include <QProcess>
+#include <QRegularExpression>
 #include <QSaveFile>
+#include <vector>
+
+namespace {
+QString g_default;
+QElapsedTimer g_read;
+bool g_reading = false;
+std::vector<std::pair<QPointer<QObject>, std::function<void()>>> g_watchers;
+}
+
+QString desktopDefaultPrinter() {
+	if (!g_reading && (!g_read.isValid() || g_read.elapsed() > 10000)) {
+		g_reading = true;
+		g_read.start();
+		auto *p = new QProcess;
+		QObject::connect(p, &QProcess::finished, [p] {
+			const QRegularExpressionMatch m = QRegularExpression("destination: (\\S+)")
+				.match(QString::fromUtf8(p->readAllStandardOutput()));
+			const QString now = m.hasMatch() ? m.captured(1) : QString();
+			p->deleteLater();
+			g_reading = false;
+			if (now != g_default) {
+				g_default = now;
+				for (auto &[context, changed] : g_watchers) {
+					if (context) {
+						changed();
+					}
+				}
+			}
+		});
+		QObject::connect(p, &QProcess::errorOccurred, [p](QProcess::ProcessError e) {
+			if (e == QProcess::FailedToStart) {
+				g_reading = false;
+				p->deleteLater();
+			}
+		});
+		p->start("lpstat", { "-d" });
+	}
+	return g_default;
+}
+
+void watchDefaultPrinter(QObject *context, std::function<void()> changed) {
+	g_watchers.emplace_back(context, std::move(changed));
+}
 
 QString desktopPrinterQueue(const QString &path) {
 	if (QFileInfo(path).suffix() != DESKTOP_PRINTER_SUFFIX) {

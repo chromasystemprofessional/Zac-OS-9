@@ -286,10 +286,12 @@ private:
 		m_ownerBaseline = y + 13;
 		y += 24;
 		m_password.rect = QRect(FIELD_X, y, 150, PL_EDIT_H);
+		m_password.hint = "Your login password. Other computers use it to connect as you.";
 		m_password.password = true;
 		m_password.edited = [this] { m_passwordEdited = true; };
 		y += PL_EDIT_H + 6;
 		m_name.rect = QRect(FIELD_X, y, 220, PL_EDIT_H);
+		m_name.hint = "The name other computers see for this one.";
 		m_name.setText(m_settings.name);
 		m_name.accepts = [](QChar ch) { return !QString(";#[]=\\\"").contains(ch); };
 		y += PL_EDIT_H + 6;
@@ -307,6 +309,7 @@ private:
 		}
 		const int macInner = m_mac.top + 1 + PL_GROUP_MARGIN_TOP;
 		m_oldMacs = PanelCheckbox("Allow Mac OS 8.1 and earlier to connect", QPoint(BOX_L + IN, macInner + 46));
+		m_oldMacs.hint = "Lets older Macs connect over AppleTalk, with passwords sent less securely.";
 		m_oldMacs.on = m_settings.oldMacs;
 		m_oldMacs.toggled = [this](bool on) {
 			Settings s = m_settings;
@@ -325,6 +328,7 @@ private:
 		};
 		/* Older Macs' own password (afppasswd, through the helper). */
 		m_macPassword.rect = QRect(FIELD_X, macInner + 66, 80, PL_EDIT_H);
+		m_macPassword.hint = "A separate, shorter password for older Macs, which can't send a long one.";
 		m_macPassword.password = true;
 		m_macPassword.maxLength = 8;
 		m_macPassword.accepts = [](QChar ch) { return ch.unicode() >= 0x20 && ch.unicode() < 0x7F; };
@@ -475,13 +479,16 @@ private:
 		const int listTop = m_usersTop + 1 + PL_GROUP_MARGIN_TOP;
 		m_users.frame = QRect(QPoint(BOX_L + IN, listTop),
 			QPoint(BOX_R - IN - 100, listTop + 6 * PL_LIST_ROW_H + 1));
+		m_host.hintAreas.push_back({ &m_users.frame, "The people connected to this computer now." });
 		m_disconnect = PanelButton("Disconnect", QRect(BOX_R - IN - 86, listTop, 86, PL_BUTTON_H));
+		m_disconnect.hint = "Disconnects the selected person.";
 		m_disconnect.enabled = false;
 		m_usersBottom = m_users.frame.bottom() + PL_GROUP_MARGIN;
 		m_itemsTop = m_usersBottom + BOX_GAP;
 		const int itemsList = m_itemsTop + 1 + PL_GROUP_MARGIN_TOP;
 		m_items.frame = QRect(QPoint(BOX_L + IN, itemsList),
 			QPoint(BOX_R - IN, itemsList + 4 * PL_LIST_ROW_H + 1));
+		m_host.hintAreas.push_back({ &m_items.frame, "The folders and disks you share." });
 		m_itemsBottom = m_items.frame.bottom() + PL_GROUP_MARGIN;
 	}
 
@@ -551,11 +558,13 @@ private:
 		const int listTop = m_peopleTop + 1 + PL_GROUP_MARGIN_TOP;
 		m_people.frame = QRect(QPoint(BOX_L + IN, listTop),
 			QPoint(BOX_L + IN + 150, listTop + 8 * PL_LIST_ROW_H + 1));
+		m_host.hintAreas.push_back({ &m_people.frame, "The people who can connect to this computer." });
 		m_people.setItems({ QString("%1 (Owner)").arg(m_settings.owner), "Guest" });
 		m_people.select(0, false);
 		m_peopleBottom = m_people.frame.bottom() + PL_GROUP_MARGIN;
 		m_guests = PanelCheckbox("Allow guests to connect",
 			QPoint(m_people.frame.right() + 16, listTop + 4));
+		m_guests.hint = "Lets anyone connect without a password, to items shared with Everyone.";
 		m_guests.on = m_settings.guests;
 		m_guests.toggled = [this](bool on) {
 			Settings s = m_settings;

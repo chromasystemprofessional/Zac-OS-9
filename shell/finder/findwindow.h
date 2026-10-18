@@ -45,6 +45,7 @@ private:
 	QString m_folder;
 	PanelHost m_host{ this };
 	PanelPopup m_scope;
+	int m_internetFirst = 0; /* the scope's first Internet channel */
 	std::vector<std::unique_ptr<Row>> m_rows;
 	PanelButton m_more, m_fewer, m_saveSearch, m_savedSearches, m_find;
 	QString m_problem;

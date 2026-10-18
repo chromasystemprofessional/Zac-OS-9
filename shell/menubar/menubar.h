@@ -81,6 +81,12 @@ struct mb_menu;
 struct mb_item {
 	char *label;  /* NULL = separator */
 	char key;     /* ⌘ shortcut, or 0 */
+	bool shift;   /* with ⇧ (⇧⌘Q) */
+	/* The Zac menu's small icons, as Mac OS 9's Apple menu had: a program's
+	 * own (MENU_ICON square ARGB, cached, not owned), else one of ours
+	 * (pl_icon_kind + 1; 0 for none). */
+	const uint32_t *icon_px;
+	int icon_kind;
 	bool enabled, checked;
 	enum action action;
 	char *arg;
@@ -120,6 +126,11 @@ void menus_show_app_name(bool shown);
 /* The program's own icon for that title (appicon.c), MBAR_ICON_W x
  * MBAR_ICON_H straight-alpha ARGB, or NULL if it has none we can load. */
 const uint32_t *app_icon_title(const char *app_id);
+/* A menu item's icon (appicon.c): a desktop entry's, or a program's. */
+#define MENU_ICON 16
+/* Weak: tests link the menus without the icons (callers check first). */
+const uint32_t *menu_icon_for_desktop(const char *desktop_path) __attribute__((weak));
+const uint32_t *menu_icon_for_app(const char *app_id) __attribute__((weak));
 void menus_hourly_chime(void);
 /* Sticky Keys (platinum-shell-v1 sticky_keys): while it is on, the bar
  * shows the modifiers it holds, a locked one in brackets. */
@@ -267,5 +278,15 @@ void kbmenu_set(const char *layouts, uint32_t current);
 void kbmenu_abbrev(const char *code, const char *name, char *out, size_t size);
 /* Adds the keyboard menu, if more than one layout is in use. */
 void kbmenu_add(struct mb_menu *menus, int *n);
+
+/* hints.c: Hint Bubbles over the menu bar's menus. */
+#define HINT_TAIL_W 12 /* the tail's length */
+#define HINT_TAIL_H 6
+#define HINT_TIP_Y 6   /* the tail's tip, from the bubble's top */
+/* The item's hint, or NULL (programs' own menu items have none). */
+const char *hint_text(const struct mb_item *it, char *buf, size_t n);
+/* A bubble with the text wrapped in it, the tail's tip at (0, HINT_TIP_Y),
+ * or at the right edge if tail_right. Free with free(). */
+uint32_t *hint_paint(const char *text, bool tail_right, int *w, int *h);
 
 #endif

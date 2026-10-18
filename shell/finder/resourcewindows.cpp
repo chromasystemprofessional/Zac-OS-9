@@ -1,5 +1,6 @@
 #include "resourcewindows.h"
 
+#include <QInputDialog>
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QPainter>
@@ -14,6 +15,7 @@
 #include <QTimer>
 
 #include "alert.h"
+#include "tricksets.h"
 #include "autostart.h"
 #include "icons.h"
 #include "panelkit.h"
@@ -60,6 +62,11 @@ public:
 			m_run = PanelButton("Stop", QRect(430, 410, 150, 20));
 			m_run.clicked = [this] { runSelected(); };
 			m_list.picked = [this](int) { updateButtons(); };
+			/* Mac OS 9's Selected Set: named on/off choices, applied at once. */
+			m_set.rect = QRect(width() - 12 - 230, 13, 230, PL_POPUP_H);
+			m_set.label = "Set:";
+			m_set.chosen = [this](int row) { chooseSet(row); };
+			fillSets();
 			watchStartupSources();
 			loadCategory();
 		} else {
@@ -82,6 +89,7 @@ protected:
 		text(&pixels.c, m_explanation, 14, 57, width() - 28);
 		m_list.paint(&pixels.c, true);
 		if (m_page == Page::Extensions) {
+			m_set.paint(&pixels.c);
 			m_categories.paint(&pixels.c);
 			if (category() == Extensions) {
 				m_showAll.paint(&pixels.c);
@@ -137,6 +145,9 @@ private:
 	Category category() const { return Category(m_categories.selected); }
 
 	bool pressExtras(QPoint pos) {
+		if (m_set.press(this, pos)) {
+			return true;
+		}
 		bool hit = m_categories.press(pos);
 		if (category() == Extensions) {
 			return hit || m_showAll.press(pos);
@@ -485,6 +496,131 @@ private:
 	QStringList m_rows;
 	PanelList m_list;
 	PanelCheckbox m_showAll;
+	PanelPopup m_set;
+	QStringList m_setNames;
+
+	/* The sets, then Save Set… and Delete Set…; the current one shown. */
+	void fillSets() {
+		m_setNames = trickSetNames();
+		m_set.items.clear();
+		const QString current = currentTrickSet();
+		m_set.selected = -1;
+		for (const QString &name : m_setNames) {
+			if (name == current) {
+				m_set.selected = int(m_set.items.size());
+			}
+			m_set.items.emplace_back(name);
+		}
+		if (m_set.selected < 0) {
+			m_set.items.insert(m_set.items.begin(), PopupItem("(none chosen)", false));
+			m_setNames.prepend(QString());
+			m_set.selected = 0;
+		}
+		m_set.items.emplace_back("Save Set…");
+		m_set.items.emplace_back("Delete Set…", m_setNames.size() > 1 || !m_setNames.value(0).isEmpty());
+		update();
+	}
+
+	void chooseSet(int row) {
+		if (row == int(m_setNames.size())) {
+			saveSet();
+		} else if (row == int(m_setNames.size()) + 1) {
+			deleteSet();
+		} else if (row >= 0 && row < int(m_setNames.size()) && !m_setNames[row].isEmpty()) {
+			applySet(m_setNames[row]);
+		}
+		fillSets();
+	}
+
+	/* Login items now, then (once listed) user services: their on/off at login. */
+	void saveSet() {
+		bool ok = false;
+		const QString name = QInputDialog::getText(this, "Save Set", "Name of the set:",
+			QLineEdit::Normal, currentTrickSet(), &ok).trimmed();
+		if (!ok || name.isEmpty()) {
+			return;
+		}
+		auto set = std::make_shared<TrickSet>();
+		for (const AutostartEntry &e : autostartEntries()) {
+			if (e.enabled || e.reason == "Disabled") {
+				set->loginItems.insert(e.id, e.enabled);
+			}
+		}
+		userServicesAsync(this, [this, set, name](UserServiceQuery q) {
+			for (const UserService &u : q.services) {
+				if (u.manageable && (u.fileState == "enabled" || u.fileState == "disabled")) {
+					set->services.insert(u.unit, u.fileState == "enabled");
+				}
+			}
+			QString error;
+			if (saveTrickSet(name, *set, &error)) {
+				setCurrentTrickSet(name);
+			} else {
+				Alert::ask(error, "OK", QString());
+			}
+			fillSets();
+		});
+	}
+
+	void deleteSet() {
+		const QString name = currentTrickSet();
+		if (name.isEmpty() || !Alert::ask("Delete the set “" + name + "”? The items stay as they are.",
+				"Delete", "Cancel")) {
+			return;
+		}
+		deleteTrickSet(name);
+		setCurrentTrickSet(QString());
+	}
+
+	void applySet(const QString &name) {
+		TrickSet set;
+		if (!readTrickSet(name, &set)) {
+			return;
+		}
+		QStringList problems;
+		const AutostartContext context = autostartDefaultContext();
+		for (const AutostartEntry &e : autostartEntries()) {
+			const auto want = set.loginItems.constFind(e.id);
+			if (want != set.loginItems.cend() && *want != e.enabled && (e.enabled || e.reason == "Disabled")) {
+				QString error;
+				if (!autostartSetEnabled(context, e.id, *want, &error)) {
+					problems << error;
+				}
+			}
+		}
+		setCurrentTrickSet(name);
+		/* Services one after another, as each is a call to the user manager. */
+		userServicesAsync(this, [this, set, problems](UserServiceQuery q) mutable {
+			auto pending = std::make_shared<QList<std::pair<QString, bool>>>();
+			for (const UserService &u : q.services) {
+				const auto want = set.services.constFind(u.unit);
+				if (u.manageable && want != set.services.cend() && *want != (u.fileState == "enabled")) {
+					pending->append({ u.unit, *want });
+				}
+			}
+			applyServices(pending, std::make_shared<QStringList>(problems));
+		});
+	}
+
+	void applyServices(std::shared_ptr<QList<std::pair<QString, bool>>> pending,
+			std::shared_ptr<QStringList> errors) {
+		if (pending->isEmpty()) {
+			if (!errors->isEmpty()) {
+				Alert::ask("Some items couldn't be changed: " + errors->join(" "), "OK", QString());
+			}
+			m_serviceResultValid = false;
+			loadCategory();
+			return;
+		}
+		const auto [unit, on] = pending->takeFirst();
+		userServiceActAsync(this, unit, on ? UserServiceAction::EnableAtLogin : UserServiceAction::DisableAtLogin,
+			[this, pending, errors](bool ok, const QString &message) {
+				if (!ok) {
+					*errors << message;
+				}
+				applyServices(pending, errors);
+			});
+	}
 	std::vector<SystemResource> m_resources;
 };
 

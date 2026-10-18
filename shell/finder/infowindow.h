@@ -89,6 +89,7 @@ private:
 
 	QString m_path, m_name;
 	pl_icon_kind m_kind;
+	bool m_network = false;
 	QString m_kindText, m_where, m_created, m_modified, m_size, m_original;
 	QString m_available;
 	ResourceDetails m_resourceDetails;

@@ -8,7 +8,7 @@
 #include <QFontDatabase>
 #include <QInputDialog>
 #include <QMenuBar>
-#include <QPlainTextEdit>
+#include <QTextEdit>
 #include <QSettings>
 #include <QStandardPaths>
 #include <QTextBlock>
@@ -33,8 +33,9 @@ static QList<ScribbleWindow *> &windows() {
 
 ScribbleWindow::ScribbleWindow() {
 	setAttribute(Qt::WA_DeleteOnClose);
-	m_edit = new QPlainTextEdit(this);
+	m_edit = new QTextEdit(this);
 	m_edit->setFrameShape(QFrame::NoFrame);
+	m_edit->setAcceptRichText(false); /* pasted text takes the Style menu's styles, not the web's */
 	setCentralWidget(m_edit);
 	resize(480, 360);
 	buildMenus();
@@ -72,7 +73,7 @@ ScribbleWindow *ScribbleWindow::newWindow() {
 void ScribbleWindow::chooseAndOpen() {
 	const QString path = QFileDialog::getOpenFileName(nullptr, "Open",
 		QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation),
-		"Text documents (*.txt *.text *.md *.log *.conf *.ini *.csv README* *);;All files (*)");
+		"Text documents (*.txt *.text *.md *.log *.conf *.ini *.csv README* *);;Styled documents (*.html *.htm);;All files (*)");
 	if (path.isEmpty()) {
 		return;
 	}
@@ -94,7 +95,12 @@ bool ScribbleWindow::open(const QString &path) {
 	}
 	m_file = file;
 	m_path = QFileInfo(path).absoluteFilePath();
-	m_edit->setPlainText(file.text);
+	/* A styled document (Style menu) is kept as HTML. */
+	if (isStyledPath(m_path)) {
+		m_edit->setHtml(file.text);
+	} else {
+		m_edit->setPlainText(file.text);
+	}
 	m_edit->document()->setModified(false);
 	updateTitle();
 	return true;
@@ -104,11 +110,44 @@ void ScribbleWindow::updateTitle() {
 	setWindowTitle(m_path.isEmpty() ? QStringLiteral("untitled") : QFileInfo(m_path).fileName());
 }
 
+bool ScribbleWindow::isStyledPath(const QString &path) {
+	return path.endsWith(".html", Qt::CaseInsensitive) || path.endsWith(".htm", Qt::CaseInsensitive);
+}
+
+/* Any bold, italic or underlined text (the Style menu's). */
+bool ScribbleWindow::hasStyles() const {
+	for (QTextBlock b = m_edit->document()->begin(); b.isValid(); b = b.next()) {
+		for (auto it = b.begin(); !it.atEnd(); ++it) {
+			const QTextCharFormat f = it.fragment().charFormat();
+			if (f.fontWeight() > QFont::Normal || f.fontItalic() || f.fontUnderline()) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
 bool ScribbleWindow::save() {
 	if (m_path.isEmpty()) {
 		return saveAs();
 	}
-	m_file.text = m_edit->toPlainText();
+	if (!isStyledPath(m_path) && hasStyles()) {
+		/* SimpleText kept styles beside the text; a plain file can't. */
+		const QString styled = QFileInfo(m_path).path() + '/' + QFileInfo(m_path).completeBaseName() + ".html";
+		switch (Alert::choose(QString::fromUtf8("“%1” has styled text, which a plain text file can't keep. "
+				"Save it as a styled document, “%2”?").arg(QFileInfo(m_path).fileName(), QFileInfo(styled).fileName()),
+				"Save Styled", "Cancel", "Plain Text")) {
+		case Alert::Ok:
+			m_path = styled;
+			updateTitle();
+			break;
+		case Alert::Cancel:
+			return false;
+		case Alert::Other:
+			break;
+		}
+	}
+	m_file.text = isStyledPath(m_path) ? m_edit->toHtml() : m_edit->toPlainText();
 	QString error;
 	if (!writeTextFile(m_path, m_file, &error)) {
 		Alert::ask(QString::fromUtf8("“%1” could not be saved. %2").arg(QFileInfo(m_path).fileName(), error),
@@ -170,7 +209,15 @@ void ScribbleWindow::speakSelection() {
 		return;
 	}
 	m_speechStopped = false;
-	m_speech.start("spd-say", { "--wait", "--", text });
+	/* The Speech control panel's voice and rate. */
+	const char *argv[10];
+	char buf[128];
+	const int n = pl_speech_args(argv, buf, sizeof(buf));
+	QStringList args{ "--wait" };
+	for (int i = 1; i < n; i++) {
+		args << QString::fromUtf8(argv[i]);
+	}
+	m_speech.start("spd-say", args << text);
 }
 
 void ScribbleWindow::stopSpeaking() {
@@ -235,14 +282,14 @@ void ScribbleWindow::buildMenus() {
 	quit->setMenuRole(QAction::NoRole);
 
 	QMenu *edit = menuBar()->addMenu("Edit");
-	edit->addAction("Undo", QKeySequence::Undo, m_edit, &QPlainTextEdit::undo);
-	edit->addAction("Redo", QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Z), m_edit, &QPlainTextEdit::redo);
+	edit->addAction("Undo", QKeySequence::Undo, m_edit, &QTextEdit::undo);
+	edit->addAction("Redo", QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Z), m_edit, &QTextEdit::redo);
 	edit->addSeparator();
-	edit->addAction("Cut", QKeySequence::Cut, m_edit, &QPlainTextEdit::cut);
-	edit->addAction("Copy", QKeySequence::Copy, m_edit, &QPlainTextEdit::copy);
-	edit->addAction("Paste", QKeySequence::Paste, m_edit, &QPlainTextEdit::paste);
+	edit->addAction("Cut", QKeySequence::Cut, m_edit, &QTextEdit::cut);
+	edit->addAction("Copy", QKeySequence::Copy, m_edit, &QTextEdit::copy);
+	edit->addAction("Paste", QKeySequence::Paste, m_edit, &QTextEdit::paste);
 	edit->addAction("Clear", this, [this] { m_edit->textCursor().removeSelectedText(); });
-	edit->addAction("Select All", QKeySequence::SelectAll, m_edit, &QPlainTextEdit::selectAll);
+	edit->addAction("Select All", QKeySequence::SelectAll, m_edit, &QTextEdit::selectAll);
 	edit->addSeparator();
 	edit->addAction("Find...", QKeySequence::Find, this, [this] { find(false); });
 	edit->addAction("Find Again", QKeySequence(Qt::CTRL | Qt::Key_G), this, [this] { find(true); });
@@ -250,6 +297,33 @@ void ScribbleWindow::buildMenus() {
 	QMenu *speech = menuBar()->addMenu("Speech");
 	speech->addAction("Speak Selection", this, [this] { speakSelection(); });
 	speech->addAction("Stop Speaking", this, [this] { stopSpeaking(); });
+
+	/* SimpleText's Style menu, for the selection (or what's typed next). */
+	QMenu *style = menuBar()->addMenu("Style");
+	const auto restyle = [this](std::function<void(QTextCharFormat &, const QTextCharFormat &)> change) {
+		QTextCharFormat now = m_edit->currentCharFormat(), f;
+		change(f, now);
+		m_edit->mergeCurrentCharFormat(f);
+	};
+	style->addAction("Plain Text", QKeySequence(Qt::CTRL | Qt::Key_T), this, [restyle] {
+		restyle([](QTextCharFormat &f, const QTextCharFormat &) {
+			f.setFontWeight(QFont::Normal);
+			f.setFontItalic(false);
+			f.setFontUnderline(false);
+		});
+	});
+	style->addSeparator();
+	style->addAction("Bold", QKeySequence::Bold, this, [restyle] {
+		restyle([](QTextCharFormat &f, const QTextCharFormat &now) {
+			f.setFontWeight(now.fontWeight() > QFont::Normal ? QFont::Normal : QFont::Bold);
+		});
+	});
+	style->addAction("Italic", QKeySequence::Italic, this, [restyle] {
+		restyle([](QTextCharFormat &f, const QTextCharFormat &now) { f.setFontItalic(!now.fontItalic()); });
+	});
+	style->addAction("Underline", QKeySequence::Underline, this, [restyle] {
+		restyle([](QTextCharFormat &f, const QTextCharFormat &now) { f.setFontUnderline(!now.fontUnderline()); });
+	});
 
 	QMenu *fontMenu = menuBar()->addMenu("Font");
 	auto *fonts = new QActionGroup(fontMenu);

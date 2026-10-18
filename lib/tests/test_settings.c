@@ -63,6 +63,22 @@ int main(void) {
 	snprintf(wav, sizeof(wav), "%s/sounds/platinum.wav", pl_data_dir());
 	check(access(wav, R_OK) == 0, "the default alert sound is found");
 
+	/* The Speech panel's voice and rate, as spd-say takes them. */
+	const char *argv[10];
+	char buf[128];
+	int n = pl_speech_args(argv, buf, sizeof(buf));
+	check(n == 2 && strcmp(argv[0], "spd-say") == 0 && strcmp(argv[1], "--") == 0 && !argv[2],
+		"the default voice and rate add nothing");
+	pl_setting_set("speech-voice", "en-gb");
+	pl_setting_set("speech-rate", "250");
+	n = pl_speech_args(argv, buf, sizeof(buf));
+	check(n == 6 && strcmp(argv[1], "-y") == 0 && strcmp(argv[2], "en-gb") == 0 &&
+		strcmp(argv[3], "-r") == 0 && strcmp(argv[4], "100") == 0 && strcmp(argv[5], "--") == 0,
+		"a chosen voice and rate (kept within -100..100)");
+	check(!pl_talking_alerts(), "Talking Alerts are off by default");
+	pl_setting_set("talking-alerts", "true");
+	check(pl_talking_alerts(), "and on when chosen");
+
 	unlink(conf);
 	rmdir(sub);
 	rmdir(dir);

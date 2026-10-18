@@ -142,3 +142,57 @@ void decryptFile(const QString &source, const QString &destination, const QStrin
 		CryptoFileCompletion completion) {
 	transformFile(false, source, destination, QString(password), std::move(completion));
 }
+
+/* ---- the keychain ------------------------------------------------------- */
+
+static QString secretTool() {
+	const QString env = qEnvironmentVariable("ZACOS9_SECRET_TOOL");
+	return env.isEmpty() ? QStandardPaths::findExecutable("secret-tool") : env;
+}
+
+static QString keychainKey(const QString &file) {
+	const QString canonical = QFileInfo(file).canonicalFilePath();
+	return canonical.isEmpty() ? QFileInfo(file).absoluteFilePath() : canonical;
+}
+
+/* secret-tool, its answer handed to `done` (never waitForFinished: see
+ * CLAUDE.md). */
+static void runSecretTool(const QStringList &args, const QByteArray &input,
+		std::function<void(bool, const QByteArray &)> done) {
+	const QString tool = secretTool();
+	if (tool.isEmpty()) {
+		done(false, {});
+		return;
+	}
+	auto *p = new QProcess;
+	QObject::connect(p, &QProcess::finished, [p, done](int code, QProcess::ExitStatus status) {
+		done(status == QProcess::NormalExit && code == 0, p->readAllStandardOutput());
+		p->deleteLater();
+	});
+	QObject::connect(p, &QProcess::errorOccurred, [p, done](QProcess::ProcessError e) {
+		if (e == QProcess::FailedToStart) {
+			done(false, {});
+			p->deleteLater();
+		}
+	});
+	p->start(tool, args);
+	p->write(input);
+	p->closeWriteChannel();
+}
+
+void keychainStorePassphrase(const QString &file, const QString &password, std::function<void(bool)> done) {
+	runSecretTool({ "store", "--label", "Encrypted file “" + QFileInfo(file).fileName() + "”",
+			"zacos9-encrypted-file", keychainKey(file) }, password.toUtf8(),
+		[done](bool ok, const QByteArray &) { done(ok); });
+}
+
+void keychainFindPassphrase(const QString &file, std::function<void(const QString &)> done) {
+	runSecretTool({ "lookup", "zacos9-encrypted-file", keychainKey(file) }, QByteArray(),
+		[done](bool ok, const QByteArray &out) {
+			QByteArray secret = out;
+			if (secret.endsWith('\n')) {
+				secret.chop(1);
+			}
+			done(ok ? QString::fromUtf8(secret) : QString());
+		});
+}

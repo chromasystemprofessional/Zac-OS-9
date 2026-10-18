@@ -27,6 +27,7 @@ public:
 	/* Its look, kept between sessions. */
 	struct Look {
 		bool names = true, large = false, across = false, collapsed = false;
+		int nameWidth = 0; /* names' column, set by dragging the edge; 0: to fit */
 	};
 	const Look &look() const { return m_look; }
 
@@ -60,6 +61,8 @@ private:
 
 	/* Pointer tracking. */
 	bool m_moving = false;
+	bool m_sizing = false; /* dragging the right edge: the names' width */
+	bool onEdge(QPoint p) const;
 	QPoint m_pressLocal;
 	Box m_box = Box::None;
 	bool m_boxInside = false;

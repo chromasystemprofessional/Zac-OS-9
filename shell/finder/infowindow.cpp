@@ -1,4 +1,5 @@
 #include "infowindow.h"
+#include "netvolumes.h"
 #include "thumbnails.h"
 #include "fileassoc.h"
 #include "alias.h"
@@ -193,6 +194,10 @@ InfoWindow::InfoWindow(const QString &path, pl_icon_kind kind, const QString &na
 		const ResourceDetails *details)
 	: m_path(path), m_name(name), m_kind(kind),
 	  m_isResourceInfo(details != nullptr) {
+	/* A network volume shows as one (its kind stays a disk's). */
+	for (const NetVolume &v : netVolumes()) {
+		m_network = m_network || v.path == path;
+	}
 	setAttribute(Qt::WA_DeleteOnClose);
 	watchThumbnails(this);
 	watchFileAssociations(this);
@@ -394,7 +399,8 @@ void InfoWindow::paintHeader(pl_canvas *c) {
 			PL_ICON_LARGE, PL_ICON_LARGE, false);
 	} else {
 		pl_icon_paint(c, ICON_BOX_X + 3, ICON_BOX_Y + 3,
-			m_kind == PL_ICON_FOLDER && !m_sharedAs.isEmpty() ? PL_ICON_SHARED_FOLDER : m_kind,
+			m_kind == PL_ICON_FOLDER && !m_sharedAs.isEmpty() ? PL_ICON_SHARED_FOLDER
+				: m_kind == PL_ICON_DISK && m_network ? PL_ICON_NETWORK_DISK : m_kind,
 			PL_ICON_LARGE, false);
 	}
 	panelText(c, m_name, NAME_X, NAME_BASELINE, PL_FONT_SYSTEM, C_BLACK, INFO_W - NAME_X - 10);

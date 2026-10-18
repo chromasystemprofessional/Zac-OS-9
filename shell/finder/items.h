@@ -61,7 +61,9 @@ struct Item {
 	 * See shell/network/netvolumes.h. */
 	bool isNetworkVolume = false;
 	pl_icon_kind iconKind() const {
-		return shared && kind == PL_ICON_FOLDER ? PL_ICON_SHARED_FOLDER : kind;
+		/* Drawn so; the kind stays (a network volume opens as a disk does). */
+		return shared && kind == PL_ICON_FOLDER ? PL_ICON_SHARED_FOLDER
+			: isNetworkVolume && kind == PL_ICON_DISK ? PL_ICON_NETWORK_DISK : kind;
 	}
 
 	/* A virtual item: `path` names a node in the Macintosh view of this
@@ -112,6 +114,8 @@ pl_icon_kind iconKindFor(const QString &path);
 bool isSharedFolder(const QString &path);
 /* A Macintosh disk or CD image (HFS, HFS+ or partitioned): opening one
  * starts it in Classic. */
+/* A CD or DVD image (.iso, ISO 9660): Disk Copy mounts it read-only. */
+bool isDiscImage(const QString &path);
 bool isMacDiskImage(const QString &path);
 /* A Windows .exe or .msi: opening one runs it via Wine. */
 bool isWindowsExecutable(const QString &path);

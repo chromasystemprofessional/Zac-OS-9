@@ -16,6 +16,15 @@
 
 inline constexpr const char *DESKTOP_PRINTER_SUFFIX = "printer";
 
+#include <QObject>
+#include <functional>
+
+/* The default printer (lpstat -d), as last read: read again in the
+ * background at most every ten seconds; `changed` runs when it changes,
+ * while `context` lives. Desktop printers draw a bold outline for it. */
+QString desktopDefaultPrinter();
+void watchDefaultPrinter(QObject *context, std::function<void()> changed);
+
 /* The queue a desktop printer file names, or "" if it isn't one. */
 QString desktopPrinterQueue(const QString &path);
 /* Writes NAME.printer for a queue into a folder; its path, or "" (error set). */

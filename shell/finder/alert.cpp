@@ -2,6 +2,7 @@
 
 #include <QKeyEvent>
 #include <QMouseEvent>
+#include <QTimer>
 
 #include "settings.h"
 #include "platinumshell.h"
@@ -38,6 +39,7 @@ static std::vector<std::unique_ptr<Text>> wrap(const QString &message, int width
 Alert::Alert(const QString &message, const QString &okLabel, const QString &cancelLabel,
 		const QString &otherLabel) {
 	setWindowTitle(" "); /* stripes all the way across */
+	m_message = message;
 	m_lines = wrap(message, TEXT_W);
 
 	const int textBottom = MARGIN + static_cast<int>(m_lines.size()) * LINE_H;
@@ -92,6 +94,15 @@ void Alert::showEvent(QShowEvent *e) {
 	QDialog::showEvent(e);
 	pl_beep();
 	platinumSetFrameStyle(this, FrameStyle::MovableModal);
+	/* Talking Alerts (the Speech control panel): unanswered after a moment,
+	 * the alert says its message, as Mac OS 9's did. */
+	if (pl_talking_alerts()) {
+		QTimer::singleShot(2500, this, [this] {
+			if (isVisible()) {
+				pl_speak(m_message.toUtf8().constData());
+			}
+		});
+	}
 }
 
 void Alert::paintEvent(QPaintEvent *) {

@@ -24,6 +24,11 @@ inline bool isContextClick(const QMouseEvent *e) {
 		(e->button() == Qt::LeftButton && (e->modifiers() & Qt::ControlModifier));
 }
 
+/* File > Search Internet and the Find window's Internet channels: the
+ * words searched for on DuckDuckGo, Google or Bing, in the browser. */
+QStringList webSearchChannels();
+bool openWebSearch(const QString &channel, const QString &words);
+
 class FinderView {
 public:
 	virtual ~FinderView() = default;
@@ -149,6 +154,7 @@ public:
 	 * status dialog; what came out is then selected. */
 	void expandArchive(const QString &archive);
 	void mountMacImage(const QString &image);
+	void mountDiscImage(const QString &image);
 
 	/* Spring-loaded folders: hovering a drag over a folder opens it; the
 	 * windows that sprang open close again when the drag ends. Each view

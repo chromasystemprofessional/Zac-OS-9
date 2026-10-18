@@ -35,7 +35,7 @@ struct QueueWindow::Parts {
 	QList<PrintJob> jobs;
 	PanelHost host;
 	PanelList list;
-	PanelButton hold, remove, stop;
+	PanelButton hold, remove, next, stop;
 	QTimer timer;
 	bool busy = false;
 	explicit Parts(QWidget *w) : host(w) {}
@@ -55,7 +55,9 @@ QueueWindow::QueueWindow(const QString &printer) : d(std::make_unique<Parts>(thi
 	d->remove.clicked = [this] { removeJob(); };
 	d->stop = PanelButton("Stop Printing", QRect(W - M - 4 - 120, y, 120, PL_BUTTON_H));
 	d->stop.clicked = [this] { stopOrStart(); };
-	d->host.buttons = { &d->hold, &d->remove, &d->stop };
+	d->next = PanelButton("Print Next", QRect(M + 176, y, 92, PL_BUTTON_H));
+	d->next.clicked = [this] { printNext(); };
+	d->host.buttons = { &d->hold, &d->remove, &d->next, &d->stop };
 	d->timer.setInterval(2000);
 	d->timer.callOnTimeout(this, [this] { refresh(); });
 	d->timer.start();
@@ -151,13 +153,31 @@ void QueueWindow::updateButtons() {
 	*d->hold.label = Text(held ? "Resume" : "Hold", 80, PL_FONT_SYSTEM);
 	d->hold.enabled = job && (held || d->jobs[row].state == "pending");
 	d->remove.enabled = job;
+	d->next.enabled = job && d->jobs[row].state == "pending";
 	*d->stop.label = Text(d->printer.state == 5 ? "Start Printing" : "Stop Printing", 120, PL_FONT_SYSTEM);
 	d->stop.enabled = d->known;
 	update();
 }
 
+/* Not modal (Mac OS 9's print messages didn't stop you): the queue keeps
+ * updating behind it. */
 void QueueWindow::problem(const QString &what, const QString &error) {
-	Alert::ask(what + (error.isEmpty() ? QString() : " " + error), "OK", QString());
+	auto *alert = new Alert(what + (error.isEmpty() ? QString() : " " + error), "OK", QString());
+	alert->setAttribute(Qt::WA_DeleteOnClose);
+	alert->open();
+}
+
+void QueueWindow::printNext() {
+	const int row = d->list.state.selected;
+	if (row < 0 || row >= d->jobs.size()) {
+		return;
+	}
+	const PrintJob j = d->jobs[row];
+	QString error;
+	if (!urgentJob(d->queue, j.id, &error)) {
+		problem(QString("“%1” couldn't be moved ahead.").arg(j.title), error);
+	}
+	refresh();
 }
 
 void QueueWindow::holdOrResume() {

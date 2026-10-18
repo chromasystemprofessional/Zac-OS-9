@@ -174,7 +174,7 @@ pl_icon_kind iconKindFor(const QString &path) {
 		info.setFile(target);
 	}
 	const QString iconPath = info.absoluteFilePath();
-	if (isMacDiskImage(iconPath)) {
+	if (isMacDiskImage(iconPath) || isDiscImage(iconPath)) {
 		return PL_ICON_DISK_IMAGE;
 	}
 	if (info.isDir()) {
@@ -203,6 +203,16 @@ pl_icon_kind iconKindFor(const QString &path) {
 		return PL_ICON_APPLICATION;
 	}
 	return PL_ICON_DOCUMENT;
+}
+
+/* A CD or DVD image (ISO 9660, "CD001" in its first volume descriptor). */
+bool isDiscImage(const QString &path) {
+	const QFileInfo info(path);
+	if (!info.isFile() || info.size() < 34 * 1024 || info.suffix().compare("iso", Qt::CaseInsensitive) != 0) {
+		return false;
+	}
+	QFile f(path);
+	return f.open(QIODevice::ReadOnly) && f.seek(32769) && f.read(5) == "CD001";
 }
 
 bool isMacDiskImage(const QString &path) {
@@ -610,6 +620,15 @@ void paintIcon(pl_canvas *c, Item &item, int x, int y, int size, bool highlight)
 void paintIconItem(pl_canvas *c, Item &item, int x, int y, bool onDesktop, bool showLabel) {
 	const bool highlight = item.selected || item.dropTarget;
 	paintIcon(c, item, x, y, PL_ICON_LARGE, highlight);
+	/* Mac OS 9's default desktop printer: a bold outline round its icon. */
+	if (item.kind == PL_ICON_PRINTER) {
+		const QString def = desktopDefaultPrinter();
+		if (!def.isEmpty() && desktopPrinterQueue(item.path) == def) {
+			for (int i = 0; i < 2; i++) {
+				pl_outline(c, x - 3 + i, y - 3 + i, x + PL_ICON_LARGE + 2 - i, y + PL_ICON_LARGE + 2 - i, C_BLACK);
+			}
+		}
+	}
 	if (showLabel) {
 		paintIconLabel(c, item, x, y, onDesktop);
 	}

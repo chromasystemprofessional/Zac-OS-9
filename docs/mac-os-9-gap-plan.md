@@ -180,7 +180,7 @@ Section 3 lists every feature; section 5 is the plan.
 | **Toy Box** (buttons in categories, pages; Option-drag between pages) | p. 43 | ✅ | Control Panels ▸ Toy Box; System Folder ▸ Toy Box Items; bulleted folders are pages. |
 | Trash: Empty Trash…, warn-before-emptying option (the ellipsis disappears), locked items need Option | p. 46 | ✅ | Warn before emptying in the Trash's Get Info (`trash-warn`) ✅; without it Empty Trash has no ellipsis and doesn't ask, except before uninstalling applications. Locked items (can't be changed) stay, with their Put Away records, and Empty Trash says so even without the warning; Option-Empty Trash removes them too without asking. |
 | Put Away takes items out of the Trash back to where they were | p. 412 | ✅ | Restores files using the recorded Trash origin; `finder-selection` verifies the file and origin record are both restored/removed. |
-| **Encrypt** a file (password, optional Keychain) | p. 49, 412 | ✅ | File ▸ Encrypt… creates a separate GPG AES-256 encrypted copy after confirming a passphrase; Decrypt… verifies the passphrase and saves an owner-only output file. Original files are preserved. Keychain integration remains optional/not implemented. Tested by `finder-crypto`. |
+| **Encrypt** a file (password, optional Keychain) | p. 49, 412 | ✅ | File ▸ Encrypt… creates a separate GPG AES-256 encrypted copy after confirming a passphrase; Decrypt… verifies the passphrase and saves an owner-only output file. Original files are preserved. After encrypting, it offers to add the passphrase to the keychain (`secret-tool`, keyed by the encrypted file's path); Decrypt uses it without asking. Tested by `finder-crypto`. |
 | Rebuild the desktop (generic icons) | p. 51 | — | No desktop database; MIME cache refresh is automatic. |
 
 ### §3.3 Sniffer menus (Appendix A)
@@ -196,14 +196,14 @@ Section 3 lists every feature; section 5 is the plan.
 | File ▸ **Page Setup…**, **Print Window/Print Desktop…** | ✅ | Page Setup: paper (US Letter, US Legal, A4, A5, B5; Letter by default where US units are used), orientation, scale 50–200%, in `desktop.conf`. Print Window draws the whole window (every row or icon, not just what's scrolled into view; a list with its headings) on white with nothing selected; Print Desktop the desktop's icons, cut to where they are. Laid out on PDF pages with the name, date and page number, shrunk to the page's width if wider, sent to your printer with `lp`. No Print dialog (copies, page range): one copy of everything. |
 | Edit ▸ Undo, Cut, Copy, Paste, Clear, Select All | ◐ | Edit menu sends keys to apps ✅; Command-C in the Sniffer copies selected item names as newline-separated text. Undo, Cut and Paste remain application-specific or unimplemented in the Sniffer. |
 | Edit ▸ **Show Clipboard** | ✅ | `shell/finder/clippings.cpp`: a window that follows the clipboard (text or picture), "Clipboard contents: …" below. |
-| Edit ▸ **Preferences…** (General: Puppy Mode, spring-loaded, grid; Views: standard views; Labels) | ◐ | All but Puppy Mode (Simple Finder), which waits for account kinds (P3). **→ 5.2** |
+| Edit ▸ **Preferences…** (General: Puppy Mode, spring-loaded, grid; Views: standard views; Labels) | ✅ | General ▸ Puppy Mode ▸ Use Puppy Mode (`puppy-mode`). |
 | View ▸ as Icons/Buttons/List, Clean Up, Arrange | ✅ | |
 | View ▸ **as Window / as Pop-up Window** | ✅ | See §3.2. |
 | View ▸ **Sort List** (in list view), **Reset Column Positions**, **View Options…** | ✅ | Sort List, Reset Column Positions and View Options… ✅. |
-| Special ▸ Empty Trash…, Erase Disk…, Sleep, Restart, Shut Down | ✅ | Erase Disk: format choices (Mac OS Extended, DOS/FAT, exFAT) to verify. **→ 9.10** |
+| Special ▸ Empty Trash…, Erase Disk…, Sleep, Restart, Shut Down | ✅ | Erase Disk (USB disks) makes FAT32, and says so; other formats are in Disk Setup's Erase. |
 | Special ▸ **Eject** (⌘E) | ✅ | Every selected disk, local or network; replaces Disconnect Network Drive and Unmount Disk (0.1.54). |
 | Special ▸ **Log Out** (⇧⌘Q) | ✅ | Asks, quits the programs (each may offer to save), then ends the session; a program still open after 30 s cancels it (0.1.54). The menu doesn't show ⇧⌘Q yet (the painter has no ⇧ glyph). |
-| Help ▸ **Help Center**, **Show Hint Bubbles**, **ZacOS Help** | ◐ | Help Center and ZacOS Help (⌘-?) ✅; Qt tooltip styling and the persistent toggle are in place, but menu-bar and non-Qt balloon help remain. |
+| Help ▸ **Help Center**, **Show Hint Bubbles**, **ZacOS Help** | ✅ | Help Center and ZacOS Help (⌘-?); Hint Bubbles in Qt tooltips, the menu bar's own menus (`shell/menubar/hints.c`) and every ZacOS panel's controls. GTK programs keep their own tooltips. |
 
 ### §3.4 Contextual menus (ch. 4 p. 64)
 
@@ -223,16 +223,17 @@ Section 3 lists every feature; section 5 is the plan.
 | Feature | Status | Notes |
 |---|---|---|
 | About This Computer (system and memory summary) | ✅ | Reports processor, graphics, total and available memory, and swap when the system exposes those values; it does not attribute memory per application. |
+| Small icons before every item (Mac OS 9's Apple menu) | ✅ | A program's own (its desktop entry's Icon=, through the icon theme), else ZacOS's 16 px set: folders for submenus, a control panel's own kind in Control Panels, the generic application or document; a dimmed item's icon dimmed (`shell/menubar/appicon.c`, `launch.c`, `main.c`). Every control panel has its own original 16 px icon (`cp-*` in `assets/icons/platinum-icons.picon`; `build_icons.py` doubles a 16 px-only icon for 32 px). |
 | Items from a folder; aliases; folders sprout submenus | ✅ | Top-level and nested `.desktop` launchers are sorted into the Zac menu; symlink aliases to files/folders open in the Sniffer; real directories containing entries become submenus (depth limited to four). Broken links, symlinked directories with newline paths, and deeper nesting are not traversed. |
 | **Recent Applications / Recent Documents / Recent Servers** | ✅ | Programs whose windows appeared; `recently-used.xbel` (the Sniffer adds what it opens); servers Neighbourhood connected to, reconnected with `--connect` (0.1.54). |
 | **Favorites** submenu (and Add To Favorites) | ✅ | (0.1.54) |
 | **Zac Menu Options** panel: submenus on/off, how many recent items | ✅ | Per-category recent counts and the option to show items in submenus or directly (category-prefixed). |
-| Control Panels submenu | ✅ | |
+| Control Panels submenu | ✅ | Every ZacOS panel, Keychain Access, Walkies, Retriever, Speech, Numbers and Text among them. |
 | Printer Picker | ✅ | See 3.15. |
 | Notepad, Calculator, Dog Ears | ✅ | See 3.18. |
 | Stash | ✅ | See 3.18. |
 | Key Tags | ✅ | See 3.18. |
-| Jigsaw Puzzle, Plotter | ✗ | See 3.18. |
+| Jigsaw Puzzle, Plotter | ✅ | See 3.18. |
 | Bark Recorder | ✅ | See 3.18. |
 | Pedigree | ✅ | See 3.18. |
 | Neighbourhood | ✅ | |
@@ -295,28 +296,28 @@ A zram/swap switch in a Memory panel is a possible P3. **→ 8.7**
 | **The Collar** panel (show/hide, hot key, font) | ✅ | The Collar panel. |
 | **Date & Time**: date/time, time zone, network time, clock options | ✅ | Menu-bar date formats (month-day-year, day-month-year, ISO year-month-day) and optional hourly ZacOS sound are set in the Date & Time panel. |
 | DialAssist, Modem, Remote Access | — | |
-| **Nap Time**: sleep, display sleep | ✅ | **Scheduled start-up and shut-down** missing (`rtcwake` + a systemd timer, via a helper). P3 M **→ 4.4** |
-| **Tricks Manager** (sets, item information) | ◐ | Catalog exists (`lib/extensions.c`); on/off sets for autostart items and user services to plan. P3 M **→ 4.3** |
+| **Nap Time**: sleep, display sleep | ✅ | Schedule: Start up / Shut down, every day, weekdays or weekends at a time (`/etc/zacos9/schedule` through `zacos9-accounts-helper schedule`): shut-down is a generated systemd timer, start-up the RTC wake alarm, set again at every shut-down by `zacos9-wakealarm.service`. |
+| **Tricks Manager** (sets, item information) | ✅ | Login items and user services with item information and on/off; the Set pop-up saves the current choices as a named set (`~/.config/zacos9/Tricks Sets`), applies one, or deletes it. |
 | File Translator | ✅ | |
 | File Sharing | ✅ | |
-| **Retriever** (folder pairs) | ✗ | rsync two-way with newest-wins and a warning. P3 M **→ 5.8** |
+| **Retriever** (folder pairs) | ✅ | `zacos9-retriever`: folder pairs (`~/.config/zacos9/retriever.conf`), Synchronize Now copies newer files each way with rsync (newest wins, nothing deleted), and says so. Not automatic yet. |
 | **General Controls**: show desktop in background, Toy Box at startup, shut-down warning, insertion-point and menu blinking, Documents folder for Open/Save | ✅ | `zacos9-controlpanel general`. Show Desktop, Menu Blinking, Insertion Point Blinking and Documents done. Show Toy Box at system startup ✅; Shut Down Warning (fsck covers it) and Folder Protection (already dead in Mac OS 9) left out. |
 | **Internet** (email, web, default apps, downloads folder) | ✅ | `zacos9-controlpanel internet`: default browser and mail program (GIO, `mimeapps.list`), downloads folder (`user-dirs.dirs`). The Mac's personal details, news and home-page settings have no system-wide place on Linux. |
 | **Keyboard**: repeat rate/delay | ✅ | |
 | Keyboard ▸ **layouts** and the keyboard menu (flag at the right of the menu bar, ⌘-Space to switch) | ✅ | Up to four ticked in the Keyboard panel (xkb's group limit), else Debian's `/etc/default/keyboard`; an abbreviation (US, US-DV) instead of a flag; ⌘-Option-Space option. `compositor/src/kblayout.c`, `shell/menubar/kbmenu.c`. |
 | Keyboard ▸ **Function Keys** | ✅ | See §3.6. |
-| **Keychain Access** | ◐ | The Collar's Keychain module ✅; a control panel listing items, Lock/Unlock — use Seahorse or build one. P3 M **→ 5.6** |
+| **Keychain Access** | ✅ | `zacos9-keychain`: the keychains (Secret Service collections), Unlock/Lock, Make Default, and each one's items by name with Remove; The Collar's Keychain module opens it. Passwords aren't shown. |
 | **Toy Box** | ✅ | See §3.2. |
-| **Walkies** (snapshots of network, sound, time zone, printer, startup items) | ✗ | P3 L **→ 8.5** |
+| **Walkies** (snapshots of network, sound, time zone, printer, startup items) | ✅ | `zacos9-walkies`: places (`~/.config/zacos9/Walkies`) remembering the NetworkManager connection, sound output and volume, time zone, default printer and Tricks Manager set; Switch To restores them (nmcli, pactl, timedatectl, lpoptions, the set's login items and user services). |
 | Memory | — | |
-| **Monitors**: resolution, pixel size | ✅ | Several screens and arrangement still on the roadmap; colour depth — . |
+| **Monitors**: resolution, pixel size | ✅ | Several screens: Arrangement (drag the screens), the main display (menu bar and icons), each screen's resolution, Mirror Displays (`compositor/src/prefs.c`); the desktop's pattern on the others (`secondarydesktop.cpp`); pop-up tabs on their own screen. Colour depth — . |
 | **Mouse**: tracking, double-click | ✅ | Options: Mouse Tracks (`compositor/src/tracks.c`: six arrows behind the moving pointer, going 50 ms apart) and Thick I-Beam (a `text-thick` cursor zacos9-wm shows for programs that ask for "text" by cursor-shape-v1; Qt 6 programs ask that way and get it (checked with Scribble); ones that draw their own cursor, such as GTK 3, keep the thin one). |
 | **Users** | ✅ | See 3.14. |
-| **Numbers** / **Text** (number and sort formats, language) | ✗ | locale via `localectl`/`~/.config/locale.conf`. P3 S |
-| Media Settings (CD AutoPlay) | ✗ | Audio CD/media autoplay as a Sniffer setting. P3 S |
+| **Numbers** / **Text** (number and sort formats, language) | ✅ | `zacos9-controlpanel numbers` / `text`: the system's UTF-8 locales by their own names, with a live sample, kept in `~/.config/locale.conf` (read by `zacos9-session` at login); a locale not yet made is made by `zacos9-accounts-helper locale`. |
+| Media Settings (CD AutoPlay) | ✅ | Sniffer Preferences ▸ General ▸ Media: "Play audio CDs and video DVDs when inserted" (`media-autoplay`, on): the default player for the disc's content type opens it; programs on a disc never start. |
 | **Fetch Updates** | ✅ | Scheduled checks to verify. |
 | **Sound**: alert sounds, output volume, input source | ✅ | Alert sound, output selection, volume/mute, input-source selection, and left/right balance for stereo outputs. |
-| **Speech** (voice, talking alerts) | ◐ | Scribble reads selected text through speech-dispatcher; voice choice and Talking Alerts remain. See 3.16. |
+| **Speech** (voice, talking alerts) | ✅ | The Speech control panel (`zacos9-controlpanel speech`). See 3.16. |
 | **Startup Disk** | ✅ | `zacos9-controlpanel startupdisk`: GRUB's entries (other versions behind Show every version), the one it starts with selected; choosing one sets it through `zacos9-startupdisk-helper` (polkit; GRUB_DEFAULT=saved the first time), Look for Other Systems turns os-prober on, Restart. "Old Dog starts up with:" picks which of Old Dog's disks with a System Folder the Mac starts from (`~/.config/zacos9/classic.conf`, read by `zacos9-classic`). |
 | **TCP/IP** | ✅ | |
 | **Trackpad** (tap to click, drag, drag lock) | ✅ | `zacos9-controlpanel trackpad`: tracking and double-click speed (shared with Mouse), Use Trackpad for Clicking / Dragging / Drag Lock, set on libinput touchpads by zacos9-wm (`input.c`). |
@@ -329,15 +330,15 @@ A zram/swap switch in a Memory panel is a possible P3. **→ 8.7**
 |---|---|---|
 | Sound volume, Sound source | ✅ | Output and input selection, with stereo balance; tested by `sound-output`. |
 | Monitor resolution, brightness | ✅ | |
-| Bit depth, TV/Video Mirroring | — / ✗ | Mirroring on/off belongs with multi-monitor work (9.9). P3 **→ 7.7** |
+| Bit depth, TV/Video Mirroring | — / ✅ | Monitors ▸ Mirror Displays (`mirror`): every screen at the same place. |
 | Energy (sleep now), battery | ✅ | |
 | File Sharing (on/off, who's connected) | ✅ | `shell/collar/filesharing.cpp`: shown once File Sharing is set up; on/off through the sharing helper (the servers that were on come back); visitors by address from `ss` (no root needed, so no user names). |
 | Keychain | ✅ | |
-| Walkies | ✗ | With §3.10. **→ 8.5** |
+| Walkies | ✅ | See above. |
 | AppleTalk, Remote Access, AirPort | ◐ | Network module with Wi-Fi ✅; dial-up — (out of scope) |
 | CD audio (play, tracks, eject) | ✅ | As a media module over MPRIS (`shell/collar/media.cpp`): what's playing, Play/Pause, Next/Previous Track, Show the player, a choice of player when several run. Eject belongs to the Sniffer. |
 | Printer selector | ✅ | `shell/collar/printing.cpp`: shown once CUPS knows a printer; yours ticked, choosing another makes it yours; Open Print Queue, Open Printer Picker. |
-| Web Sharing | ✗ | With §3.10. **→ 5.7** |
+| Web Sharing | ✅ | See 5.7. |
 | Speakable Items | — | |
 | Option-drag to move The Collar and its modules; ⌘-Ctrl-S hot key | ✅ | |
 
@@ -348,7 +349,7 @@ A zram/swap switch in a Memory panel is a possible P3. **→ 8.7**
 | AppleScript recording and Script Editor | — | No equivalent language; don't imitate. |
 | **Folder Tricks** (run a script when items are added to a folder) | ✅ | Programs in System Folder ▸ Folder Tricks (`~/.config/zacos9/Folder Tricks`), attached from the contextual menu, run as `TRICK FOLDER ITEM...` in the folder whenever items arrive, once the folder has been quiet for a second; hidden files and partial downloads (.part, .crdownload…) count when renamed. Attachments in `folder-tricks.json`; the Sniffer watches (QFileSystemWatcher) while it runs. Only "items added" (not opening, closing or removing); a folder that doesn't exist when the Sniffer starts isn't watched until a trick is attached again. |
 | **Scripts in the Zac menu** (Automated Tasks) | ✅ | Executable regular files in `~/.config/zacos9/ZacOS 9 Menu Items/Automated Tasks` appear in an alphabetical submenu and run when chosen; non-executable files are omitted. |
-| Scriptable Sniffer (open, label, comments from scripts) | ◐ | The Sniffer socket protocol could get a documented CLI (`zacos9-finder-ctl label …`). P3 S |
+| Scriptable Sniffer (open, label, comments from scripts) | ✅ | `zacos9-finder-ctl open|reveal|label|comment|command …` (`--help`) over the Sniffer's socket. |
 
 ### §3.13 Search: Bloodhound (ch. 15)
 
@@ -368,23 +369,24 @@ A zram/swap switch in a Memory panel is a possible P3. **→ 8.7**
 | Login window with a user list and password | ✅ | `zacos9-login` (0.1.54); the chosen person's picture from the Users panel (accountsservice's icons folder), or a blank face with their initial. |
 | **Log Out** (Special menu), automatic logout or lock after idle | ✅ | Log Out ✅ (0.1.54); lock after idle ✅ (Screen Saver) |
 | **Users panel**: add/remove accounts, picture, can change password, can log in, can manage accounts | ✅ | `zacos9-controlpanel users` over accountsservice (D-Bus, its own polkit rules: your name and picture freely, the rest with an administrator's password through the session's polkit agent); passwords hashed in the panel by crypt(3). You can't delete, demote or lock yourself. |
-| Account kinds: Normal, **Limited** (chosen apps only), **Puppy Mode** (the simplified desktop for children) | ✗ | P3 L. Limited: allowed-apps list enforced by the Sniffer and menu bar (not a security boundary — say so). **→ 5.1, 5.2** |
-| Global options: welcome message, guest account, speak your name, alternate password | ◐ | Welcome message P3 S; guest account P3 M; voice login — . **→ 5.3** |
-| Shared Documents folder | ✗ | `/home/Shared` with a group. P3 S **→ 5.4** |
+| Account kinds: Normal, **Limited** (chosen apps only), **Puppy Mode** (the simplified desktop for children) | ✅ | Limited ✅: Users ▸ Open… ▸ "Use only chosen programs" and Programs…, kept as malcontent's app filter (an allowlist of program paths and Flatpak refs, in accountsservice, changed only by administrators); `lib/appfilter.c` reads it at login. The Sniffer's Applications folder and its launches (Open, Open With, aliases, Favorites, Toy Box) and the Zac menu's items and Recent Applications leave out or refuse other programs; ZacOS's own (`zacos9-*`) are always allowed. Not a security boundary, and said so. F-keys aren't filtered. Puppy Mode ◐: the Sniffer preference (Simple Finder): the menus and contextual menus keep New Folder, Open, Close Window, Put Away, Find, Edit, the views, Clean Up, Arrange, Empty Trash, Eject, Sleep, Restart, Shut Down, Log Out and Help (one list, `pl_puppy_allows` in `lib/settings.c`); other commands and their ⌘-keys beep. An administrator sets it for a person (Users ▸ Open… ▸ Puppy Mode; `/etc/zacos9/puppy/USER` through `zacos9-accounts-helper`), and then it's on whatever their own preference says. |
+| Global options: welcome message, guest account, speak your name, alternate password | ✅ | Users ▸ Options…: Allow guests to log in (a "guest" account with no password, its home emptied and refilled from /etc/skel at each login by `zacos9-session`) and the login window's welcome message (`/etc/zacos9/welcome`), through `zacos9-accounts-helper` (polkit `org.zacos9.accounts`). Voice login — . |
+| Shared Documents folder | ✅ | `/home/Shared`, made by the package (mode 1777: anyone adds, only an item's owner removes), shown on the startup disk as Shared Documents. |
 | Fast user switching | — | Mac OS 9 didn't have it. |
 
 ### §3.15 Disks, printing and fonts (ch. 18–19)
 
 | Feature | Status | Notes |
 |---|---|---|
-| Disks on the desktop, Put Away/eject, drag a disk to the Trash to eject | ◐ | Network volumes eject via the Trash (0.1.54); local disks to verify. P2 S **→ 9.10** |
-| Erase Disk with format choice | ◐ | Verify formats. **→ 9.10** |
-| **Disk Vet** (verify/repair) | ✗ | fsck of unmounted volumes through `zacos9-disk-helper`; SMART status. P3 M **→ 7.1** |
-| **Disk Setup** (partition, initialize) | ◐ | `diskinit.cpp` initializes; partitioning — P3 L **→ 7.6** |
-| Disk Copy (mount images) | ✅ | Mac disk images; ISO/IMG via udisks to verify. **→ 9.10** |
+| Network volumes drawn as such (AppleShare's look) | ✅ | The `network-disk` icon: a drive on a network line. |
+| Disks on the desktop, Put Away/eject, drag a disk to the Trash to eject | ✅ | Network volumes (0.1.54) and USB disks eject when dragged to the Trash. |
+| Erase Disk with format choice | ✅ | Erase Disk: FAT32 for USB disks; Disk Setup erases with a choice of ext4, FAT32, exFAT or NTFS. |
+| **Disk Vet** (verify/repair) | ✅ | Disk Setup's First Aid tab (`zacos9-disksetup`): the volumes UDisks2 can check, Verify (Filesystem.Check) and Repair (Filesystem.Repair) with polkit's password, refused while in use; the drive's SMART health (ATA and NVMe: passing or failing, temperature, hours). |
+| **Disk Setup** (partition, initialize) | ✅ | `zacos9-disksetup` Partition tab: a drive's layout (a bar and a list), New/Delete/Erase/Resize partitions (ext4, FAT32, exFAT, NTFS; resizing ext4 and NTFS) and New Table (GPT/MBR), queued until Apply, which says what it will erase; all through UDisks2 and polkit. Never the live medium's drive, a partition in use, the running system's drive as a whole or its EFI System partition (`shell/disksetup/plan.cpp`). The installer's Select Disk has Prepare Disk… (it opens here) and lists ext4 partitions as places to install. `diskinit.cpp` still initializes new disks. |
+| Disk Copy (mount images) | ✅ | Mac disk images, GPT/MBR images (zacos9-mac-mount), and CD/DVD images (`.iso`, ISO 9660): a read-only loop device through `udisksctl`, mounted on the desktop like any disk. |
 | **Printer Picker** (pick a printer; AppleShare servers) | ✅ | `zacos9-printerpicker`, in the Zac menu: the printers CUPS knows and finds (IPP Everywhere, `lpstat -e`), with model, location and status; clicking one makes it yours (`lpoptions -d`, no password); Create Desktop Printer, Print Queue, Settings… (system-config-printer). Servers stay in the Neighbourhood. |
-| **Desktop printer icons**: drag documents to print, queue window (pause, reorder, remove), default printer (bold outline) | ◐ | `NAME.printer` files on the desktop (`[Desktop Printer]` Queue=…) with a printer icon: documents dropped on one print there, opening one opens `zacos9-printqueue` (printer status, documents, Hold/Resume, Remove, Stop/Start Printing through cups-pk-helper and a polkit rule for administrators; drops print). Reordering jobs and the default's bold outline are still to do. **→ 7.4** |
-| Print Queue / non-modal print errors | ✗ | Notification-style messages (Mac OS 9's yellow box, p. 2). P3 S **→ 7.4** |
+| **Desktop printer icons**: drag documents to print, queue window (pause, reorder, remove), default printer (bold outline) | ◐ | `NAME.printer` files on the desktop (`[Desktop Printer]` Queue=…) with a printer icon: documents dropped on one print there, opening one opens `zacos9-printqueue` (printer status, documents, Hold/Resume, Remove, Stop/Start Printing through cups-pk-helper and a polkit rule for administrators; drops print). Print Next (CUPS priority 100) moves a waiting job ahead; the default printer's desktop icon has Mac OS 9's bold outline (`lpstat -d`, read in the background every 10 s). |
+| Print Queue / non-modal print errors | ✅ | Print errors (the Sniffer's and the queue window's) are alerts that don't stop you working. |
 | Page Setup / Print dialogs | ✅ | Apps use their own (GTK/Qt). |
 | Fonts folder (drop to install) | ✅ | Drop files into the backed `Fonts` folder; after successful copies the Sniffer runs `fc-cache -f` asynchronously, with a visible alert if the cache update fails. |
 | FontSync, ColorSync | — | |
@@ -397,7 +399,7 @@ A zram/swap switch in a Memory panel is a possible P3. **→ 8.7**
 | **Bark Recorder** (record/play) | ✅ | `zacos9-barkrecorder`: records to WAVE with `pw-record` and plays with `pw-play`; stopping and closing are asynchronous. Missing audio tools or backend errors are reported. |
 | QuickTime Player | ✅? | Any installed player opens movies; a Platinum player is not planned. |
 | Startup/Shutdown sounds (put a sound in Startup Items) | ✅ | Optional `startup` and `shutdown` samples from the selected sound theme; theme import supports both. |
-| **Text-to-speech**: voices, Talking Alerts, read selected text | ◐ | Scribble ▸ Speech ▸ Speak Selection uses `spd-say`; missing speech-dispatcher is reported. Voice choice and Talking Alerts remain. |
+| **Text-to-speech**: voices, Talking Alerts, read selected text | ✅ | Scribble ▸ Speech ▸ Speak Selection uses `spd-say` with the Speech panel's voice (the base voices in your language) and rate (`speech-voice`, `speech-rate`); Talking Alerts (`talking-alerts`) speak an alert's message when it's left unanswered for 2.5 s; Try Voice. |
 | Speech recognition (Speakable Items) | — | |
 
 ### §3.17 Help (Appendix A)
@@ -405,7 +407,7 @@ A zram/swap switch in a Memory panel is a possible P3. **→ 8.7**
 | Feature | Status | Notes |
 |---|---|---|
 | **Help Center** (browser-like, searchable HTML help) | ✅ | `zacos9-help` (`shell/help/`): Back, Forward, Help Center and a search field above the page; the Help Center lists every book in `share/zacos9/help` (a folder with an index.html); search ranks every page (title words count most) with the best sentence and a relevance bar. ZacOS Help: 14 pages (basics, the Sniffer, files, Find, Zac menu, programs, The Collar, Old Dog, control panels, accessibility, networks, shortcuts, troubleshooting). |
-| **Hint Bubbles** (Show Hint Bubbles) | ◐ | Qt tooltips use the Platinum bubble style, and the Sniffer Help menu toggles them persistently for Qt apps using ZacOS style. Menu-bar and non-Qt balloon help remain. |
+| **Hint Bubbles** (Show Hint Bubbles) | ✅ | Qt tooltips use the Platinum bubble style; the menu bar draws a bubble beside the item under the pointer in its own menus (Zac, Sniffer, Application, Help; programs' global menus have none), tail pointing into the item, on the menu's left when there's no room. Panels: every panelkit control has a `hint` (`hintAreas` for lists and the like), answered as the window's tooltip by `panelHintEvent`; all the ZacOS panels have their text. Help ▸ Show Hint Bubbles (`hint-bubbles`) turns them all on and off. Not measured. |
 | ZacOS Help from the Sniffer | ✅ | Help ▸ Help Center and ZacOS Help (⌘-?) when the Sniffer is in front. |
 
 ### §3.18 Desk accessories and utilities (ch. 5, 13)
@@ -419,7 +421,7 @@ A zram/swap switch in a Memory panel is a possible P3. **→ 8.7**
 | **Key Tags** | ✅ | `zacos9-keytags`, in the Zac menu: the main keys of an extended keyboard drawn with what each types in the layout in use (read from xkb with zacos9-wm's model and options), following ⌘-Space and the keyboard menu; Layout menu for the others in use. Holding Shift or Alt Gr, or clicking Shift or Option in the picture, shows their characters; dead keys are outlined. Typing or clicking keys fills a line to copy from. Option in the picture means xkb's third level (Alt Gr): Linux reads the left Option key as Alt. No Font menu. |
 | **Scribble** | ◐ | `zacos9-scribble`: plain text (UTF-8 or Latin-1; CR, CR LF or LF kept), New/Open/Save/Save As, Find/Find Again, Font and Size menus; Speech ▸ Speak Selection and Stop Speaking. Styled text remains. |
 | **Pedigree** | ✅ | `zacos9-pedigree`, in the Zac menu and behind the Sniffer's System Information: tabs System Profile (system, hardware, battery, displays, network) and Devices and Volumes (disks and their volumes, USB, PCI, Bluetooth, sound), outlines opened by their triangles; File > Save Report, Edit > Copy, View > Refresh/Open All/Close All. Read from /sys, /proc, os-release, dpkg and pci.ids/usb.ids, no password: memory slots and serials only root can read are left out. |
-| Plotter, Jigsaw Puzzle | ✗ | P3 — optional fun. **→ 8.6** |
+| Plotter, Jigsaw Puzzle | ✅ | `zacos9-plotter`: y = f(x) with functions, implied multiplication and zoom (`plotter/expr.cpp`, tested). `zacos9-jigsaw`: a picture (Happy Zac, or Open Picture…) in tabbed pieces, three sizes; pieces snap home. |
 | AppleCD Audio Player, DVD Player, Apple Video Player | — | Use regular media apps; The Collar's media module covers control. |
 | Disk Copy, Disk Vet, Disk Setup | see §3.15 | |
 
@@ -534,48 +536,48 @@ partial entries retain the remaining work described in the inventory above.
 |---|---|---|---|
 | 4.1 ✅ | **Shutdown Items** and startup/shutdown sounds | `session/`, System Folder | S |
 | 4.2 ✅ | **Shift held at login**: a session without startup items | `session/` | S |
-| 4.3 | **Tricks Manager sets**: on/off sets for startup items and user services | `lib/extensions.c`, panel | M |
-| 4.4 | **Nap Time** scheduled start-up and shut-down | `rtcwake` + systemd timer, polkit helper | M |
+| 4.3 ✅ | **Tricks Manager sets**: on/off sets for startup items and user services | `lib/extensions.c`, panel | M |
+| 4.4 ✅ | **Nap Time** scheduled start-up and shut-down | `rtcwake` + systemd timer, polkit helper | M |
 | 4.5 ✅ | **Date & Time** formats and hourly chimes | `controlpanel.cpp` | S + S |
-| 4.6 | **Numbers / Text** panels (locale) | `localectl`, `locale.conf` | S |
-| 4.7 ◐ | **Sound**: input source, speaker balance, record an alert sound; input source in The Collar | panels, `shell/collar/` | S each |
-| 4.8 | **CD/media autoplay** as a Sniffer setting | Sniffer | S |
+| 4.6 ✅ | **Numbers / Text** panels (locale) | `localectl`, `locale.conf` | S |
+| 4.7 ✅ | **Sound**: input source, speaker balance, record an alert sound (Appearance ▸ Sound ▸ Add Recording… ▸ Record…); input source in The Collar's Sound menu | panels, `shell/collar/` | S each |
+| 4.8 ✅ | **CD/media autoplay** as a Sniffer setting | Sniffer | S |
 
 ### Milestone 5 — Accounts, privacy and sharing (P3)
 
 | # | Work package | Components | Effort |
 |---|---|---|---|
-| 5.1 | **Limited accounts**: allowed programs enforced by the Sniffer and menu bar (not a security boundary; say so) | Users panel, Sniffer, menu bar | L |
-| 5.2 | **Puppy Mode** (Simple Finder) and its Sniffer preference | Sniffer | L |
-| 5.3 | **Guest account** and a welcome message | Users panel, login window | M + S |
-| 5.4 | **Shared Documents** (`/home/Shared` with a group) | `sharing/` | S |
-| 5.5 ◐ | **Encrypt / Decrypt**: GPG passphrase-protected copies ship; optional Secret Service integration remains | Sniffer | M |
-| 5.6 | **Keychain Access** panel: list items, Lock/Unlock | `shell/panels/` | M |
+| 5.1 ✅ | **Limited accounts**: allowed programs enforced by the Sniffer and menu bar (not a security boundary; say so) | Users panel, Sniffer, menu bar | L |
+| 5.2 ✅ | **Puppy Mode** (Simple Finder): the Sniffer preference, and set for a person by an administrator | Sniffer, Users panel, `accounts/` | L |
+| 5.3 ✅ | **Guest account** and a welcome message | Users panel, login window | M + S |
+| 5.4 ✅ | **Shared Documents** (`/home/Shared`, sticky) | `sharing/` | S |
+| 5.5 ✅ | **Encrypt / Decrypt**: GPG passphrase-protected copies, the passphrase kept in the keychain if wanted | Sniffer | M |
+| 5.6 ✅ | **Keychain Access** panel: list items, Lock/Unlock | `shell/panels/` | M |
 | 5.7 ✅ | **Web Sharing**: a static server for `~/Web Pages` behind a switch | `sharing/`, panel | S |
-| 5.8 | **Retriever** (folder pairs: two-way rsync, newest wins, with a warning) | new app | M |
+| 5.8 ✅ | **Retriever** (folder pairs: two-way rsync, newest wins, with a warning) | new app | M |
 
 ### Milestone 6 — Help, automation and speech (P3)
 
 | # | Work package | Components | Effort |
 |---|---|---|---|
-| 6.1 ◐ | **Hint Bubbles**: drawn by the menu bar over its menus, and by our panels from their tooltips | menu bar, panelkit | M |
+| 6.1 ✅ | **Hint Bubbles**: drawn by the menu bar over its menus, and by our panels from their tooltips | menu bar, panelkit | M |
 | 6.2 ✅ | **Folder Tricks**: inotify watcher, scripts, "Attach a Folder Trick" in the contextual menu | Sniffer | M |
 | 6.3 ✅ | **Automated Tasks** in the Zac menu | `Menu Items` | S |
-| 6.4 | **`zacos9-finder-ctl`**: a documented CLI over the Sniffer's socket | Sniffer | S |
-| 6.5 ◐ | **Text-to-speech**: Scribble reads selected text; voice selection and Talking Alerts remain | speech-dispatcher / espeak-ng | M |
-| 6.6 ◐ | **Search**: saved searches, several at once and File ▸ Search Internet ship; integrated Internet channels remain | `findwindow.cpp` | S + M + S |
+| 6.4 ✅ | **`zacos9-finder-ctl`**: a documented CLI over the Sniffer's socket | Sniffer | S |
+| 6.5 ✅ | **Text-to-speech**: Scribble reads selected text; voice and rate; Talking Alerts | speech-dispatcher / espeak-ng | M |
+| 6.6 ✅ | **Search**: saved searches, several at once, File ▸ Search Internet, and Internet channels in the Find window's "Find items" pop-up | `findwindow.cpp` | S + M + S |
 
 ### Milestone 7 — Disks, fonts and printing (P3)
 
 | # | Work package | Components | Effort |
 |---|---|---|---|
-| 7.1 | **Disk Vet**: fsck of unmounted volumes, SMART status | `zacos9-disk-helper` | M |
+| 7.1 ✅ | **Disk Vet**: fsck of unmounted volumes, SMART status | `zacos9-disk-helper` | M |
 | 7.2 ✅ | **Fonts folder**: drop to install (copy, `fc-cache`) | Sniffer | S |
 | 7.3 ✅ | **Print Window / Print Desktop** and Page Setup | Sniffer, `shell/print/` | M |
-| 7.4 | Printing leftovers: non-modal print errors, job reordering, the default printer's bold outline | `shell/print/` | S |
+| 7.4 ✅ | Printing leftovers: non-modal print errors, job reordering, the default printer's bold outline | `shell/print/` | S |
 | 7.5 ✅ | **Custom icons by pasting** in Get Info | Sniffer, gio metadata | M |
-| 7.6 | **Disk Setup** partitioning | disk helper | L |
-| 7.7 | Video mirroring on/off (after 9.9, several screens) | compositor | M |
+| 7.6 ✅ | **Disk Setup** partitioning | disk helper | L |
+| 7.7 ✅ | Video mirroring on/off (after 9.9, several screens) | compositor | M |
 
 ### Milestone 8 — Desk accessories and extras (P3)
 
@@ -585,8 +587,8 @@ partial entries retain the remaining work described in the inventory above.
 | 8.2 ✅ | **Key Tags** (current layout, modifier states) | S |
 | 8.3 ✅ | **Bark Recorder** (`pw-record`) | S |
 | 8.4 ✅ | **Stash** (pages of pictures and text) | M |
-| 8.5 | **Walkies** (snapshots of network, sound, time zone, printer, startup items) | L |
-| 8.6 | Plotter, Jigsaw Puzzle | optional |
+| 8.5 ✅ | **Walkies** (snapshots of network, sound, time zone, printer, startup items) | L |
+| 8.6 ✅ | Plotter, Jigsaw Puzzle | optional |
 | 8.7 | A Memory panel's zram/swap switch | optional |
 
 ### Milestone 9 — Leftovers and checks from Milestones 1–2 (P2)
@@ -599,13 +601,13 @@ alongside the others; most are small.
 | 9.1 ✅ | **Option-⌘-W** closes all of the program's windows (Option-click on the close box already does) | `compositor/src/input.c`, menu bar | S |
 | 9.2 ✅ | **Contextual Menu Items folder**: `.desktop` file-manager actions in `~/.local/share/zacos9/contextual`, offered in the Sniffer's contextual menus (shares a format with Folder Tricks, 6.2) | Sniffer, menu bar | S |
 | 9.3 ✅ | **Zac menu**: folders in Menu Items sprout submenus (verify), and Zac Menu Options' submenus on/off | `shell/menubar/launch.c`, `shell/panels/` | S |
-| 9.4 | **Appearance ▸ Fonts**: the Views font size and font smoothing, for Qt and GTK programs (the bitmap system fonts stay fixed) | `appearance.cpp`, Qt style, GTK settings | M |
+| 9.4 ✅ | **Appearance ▸ Fonts**: the Views font size and font smoothing, for Qt and GTK programs (the bitmap system fonts stay fixed) | `appearance.cpp`, Qt style, GTK settings | M |
 | 9.5 ✅ | **Find criteria**: comments, version, invisible, custom icon | `shell/finder/findcriteria.cpp` | S |
-| 9.6 ◐ | **Printing through programs**: File ▸ Print, and Print in an icon's contextual menu, open other documents in their program with its print action | Sniffer, `shell/print/` | M |
-| 9.7 | **Menu and Pack details**: a ⇧ glyph so Log Out shows ⇧⌘Q; dragging the Pack's edge sets its width | `lib/menudraw.c`, `shell/pack/` | S |
-| 9.8 | **Scribble**: styled text, and Speech (after 6.5) | `shell/scribble/` | M |
-| 9.9 | **Several screens**: arrangement in Monitors, the desktop and menu bar per screen, pop-up tabs on any screen; then video mirroring (7.7) | compositor, Monitors panel, Sniffer | L |
-| 9.10 | **Checks** (the inventory's "to verify"): ⌘-→/⌘-← on disclosure triangles; Edit ▸ Copy on icons copies their names; local disks eject when dragged to the Trash; Erase Disk's formats; desktop picture placement; scheduled update checks; ISO/IMG images in Disk Copy. Confirm each, fix what fails, update its row | various | S each |
+| 9.6 ✅ | **Printing through programs**: File ▸ Print, and Print in an icon's contextual menu, open other documents in their program with its print action | Sniffer, `shell/print/` | M |
+| 9.7 ✅ | **Menu and Pack details**: a ⇧ glyph so Log Out shows ⇧⌘Q; dragging the Pack's edge sets its width | `lib/menudraw.c`, `shell/pack/` | S |
+| 9.8 ✅ | **Scribble**: styled text, and Speech (after 6.5) | `shell/scribble/` | M |
+| 9.9 ✅ | **Several screens**: arrangement in Monitors, the desktop and menu bar per screen, pop-up tabs on any screen; then video mirroring (7.7) | compositor, Monitors panel, Sniffer | L |
+| 9.10 ✅ | **Checks** (the inventory's "to verify"): ⌘-→/⌘-← on disclosure triangles; Edit ▸ Copy on icons copies their names; local disks eject when dragged to the Trash; Erase Disk's formats; desktop picture placement; scheduled update checks; ISO/IMG images in Disk Copy. Confirm each, fix what fails, update its row | various | S each |
 
 ### Cross-cutting work
 
@@ -626,9 +628,5 @@ alongside the others; most are small.
 
 ### Suggested next three sessions
 
-1. **6.1 Hint Bubbles** — seen everywhere; the Help Center was left
-   waiting for it.
-2. **4.1 + 4.2 Shutdown Items and the Shift-at-login safe session** —
-   both small, both in `session/`.
-3. **5.1 Limited accounts** — the next large piece; it wants a short
-   plan first.
+1. **8.7 (optional):** a Memory panel's zram/swap switch.
+2. **Hardware checks** of what was built and only tested in VMs or headless: Disk Setup on a real disk, Nap Time's wake alarm, CD/DVD AutoPlay, recording an alert sound, several real screens.
