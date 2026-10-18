@@ -24,6 +24,11 @@ inline bool isContextClick(const QMouseEvent *e) {
 		(e->button() == Qt::LeftButton && (e->modifiers() & Qt::ControlModifier));
 }
 
+/* File > Search Internet and the Find window's Internet channels: the
+ * words searched for on DuckDuckGo, Google or Bing, in the browser. */
+QStringList webSearchChannels();
+bool openWebSearch(const QString &channel, const QString &words);
+
 class FinderView {
 public:
 	virtual ~FinderView() = default;

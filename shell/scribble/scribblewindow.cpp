@@ -170,7 +170,15 @@ void ScribbleWindow::speakSelection() {
 		return;
 	}
 	m_speechStopped = false;
-	m_speech.start("spd-say", { "--wait", "--", text });
+	/* The Speech control panel's voice and rate. */
+	const char *argv[10];
+	char buf[128];
+	const int n = pl_speech_args(argv, buf, sizeof(buf));
+	QStringList args{ "--wait" };
+	for (int i = 1; i < n; i++) {
+		args << QString::fromUtf8(argv[i]);
+	}
+	m_speech.start("spd-say", args << text);
 }
 
 void ScribbleWindow::stopSpeaking() {

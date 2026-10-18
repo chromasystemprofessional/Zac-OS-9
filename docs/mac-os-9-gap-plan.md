@@ -316,7 +316,7 @@ A zram/swap switch in a Memory panel is a possible P3. **→ 8.7**
 | Media Settings (CD AutoPlay) | ✗ | Audio CD/media autoplay as a Sniffer setting. P3 S |
 | **Fetch Updates** | ✅ | Scheduled checks to verify. |
 | **Sound**: alert sounds, output volume, input source | ✅ | Alert sound, output selection, volume/mute, input-source selection, and left/right balance for stereo outputs. |
-| **Speech** (voice, talking alerts) | ◐ | Scribble reads selected text through speech-dispatcher; voice choice and Talking Alerts remain. See 3.16. |
+| **Speech** (voice, talking alerts) | ✅ | The Speech control panel (`zacos9-controlpanel speech`). See 3.16. |
 | **Startup Disk** | ✅ | `zacos9-controlpanel startupdisk`: GRUB's entries (other versions behind Show every version), the one it starts with selected; choosing one sets it through `zacos9-startupdisk-helper` (polkit; GRUB_DEFAULT=saved the first time), Look for Other Systems turns os-prober on, Restart. "Old Dog starts up with:" picks which of Old Dog's disks with a System Folder the Mac starts from (`~/.config/zacos9/classic.conf`, read by `zacos9-classic`). |
 | **TCP/IP** | ✅ | |
 | **Trackpad** (tap to click, drag, drag lock) | ✅ | `zacos9-controlpanel trackpad`: tracking and double-click speed (shared with Mouse), Use Trackpad for Clicking / Dragging / Drag Lock, set on libinput touchpads by zacos9-wm (`input.c`). |
@@ -348,7 +348,7 @@ A zram/swap switch in a Memory panel is a possible P3. **→ 8.7**
 | AppleScript recording and Script Editor | — | No equivalent language; don't imitate. |
 | **Folder Tricks** (run a script when items are added to a folder) | ✅ | Programs in System Folder ▸ Folder Tricks (`~/.config/zacos9/Folder Tricks`), attached from the contextual menu, run as `TRICK FOLDER ITEM...` in the folder whenever items arrive, once the folder has been quiet for a second; hidden files and partial downloads (.part, .crdownload…) count when renamed. Attachments in `folder-tricks.json`; the Sniffer watches (QFileSystemWatcher) while it runs. Only "items added" (not opening, closing or removing); a folder that doesn't exist when the Sniffer starts isn't watched until a trick is attached again. |
 | **Scripts in the Zac menu** (Automated Tasks) | ✅ | Executable regular files in `~/.config/zacos9/ZacOS 9 Menu Items/Automated Tasks` appear in an alphabetical submenu and run when chosen; non-executable files are omitted. |
-| Scriptable Sniffer (open, label, comments from scripts) | ◐ | The Sniffer socket protocol could get a documented CLI (`zacos9-finder-ctl label …`). P3 S |
+| Scriptable Sniffer (open, label, comments from scripts) | ✅ | `zacos9-finder-ctl open|reveal|label|comment|command …` (`--help`) over the Sniffer's socket. |
 
 ### §3.13 Search: Bloodhound (ch. 15)
 
@@ -397,7 +397,7 @@ A zram/swap switch in a Memory panel is a possible P3. **→ 8.7**
 | **Bark Recorder** (record/play) | ✅ | `zacos9-barkrecorder`: records to WAVE with `pw-record` and plays with `pw-play`; stopping and closing are asynchronous. Missing audio tools or backend errors are reported. |
 | QuickTime Player | ✅? | Any installed player opens movies; a Platinum player is not planned. |
 | Startup/Shutdown sounds (put a sound in Startup Items) | ✅ | Optional `startup` and `shutdown` samples from the selected sound theme; theme import supports both. |
-| **Text-to-speech**: voices, Talking Alerts, read selected text | ◐ | Scribble ▸ Speech ▸ Speak Selection uses `spd-say`; missing speech-dispatcher is reported. Voice choice and Talking Alerts remain. |
+| **Text-to-speech**: voices, Talking Alerts, read selected text | ✅ | Scribble ▸ Speech ▸ Speak Selection uses `spd-say` with the Speech panel's voice (the base voices in your language) and rate (`speech-voice`, `speech-rate`); Talking Alerts (`talking-alerts`) speak an alert's message when it's left unanswered for 2.5 s; Try Voice. |
 | Speech recognition (Speakable Items) | — | |
 
 ### §3.17 Help (Appendix A)
@@ -561,9 +561,9 @@ partial entries retain the remaining work described in the inventory above.
 | 6.1 ✅ | **Hint Bubbles**: drawn by the menu bar over its menus, and by our panels from their tooltips | menu bar, panelkit | M |
 | 6.2 ✅ | **Folder Tricks**: inotify watcher, scripts, "Attach a Folder Trick" in the contextual menu | Sniffer | M |
 | 6.3 ✅ | **Automated Tasks** in the Zac menu | `Menu Items` | S |
-| 6.4 | **`zacos9-finder-ctl`**: a documented CLI over the Sniffer's socket | Sniffer | S |
-| 6.5 ◐ | **Text-to-speech**: Scribble reads selected text; voice selection and Talking Alerts remain | speech-dispatcher / espeak-ng | M |
-| 6.6 ◐ | **Search**: saved searches, several at once and File ▸ Search Internet ship; integrated Internet channels remain | `findwindow.cpp` | S + M + S |
+| 6.4 ✅ | **`zacos9-finder-ctl`**: a documented CLI over the Sniffer's socket | Sniffer | S |
+| 6.5 ✅ | **Text-to-speech**: Scribble reads selected text; voice and rate; Talking Alerts | speech-dispatcher / espeak-ng | M |
+| 6.6 ✅ | **Search**: saved searches, several at once, File ▸ Search Internet, and Internet channels in the Find window's "Find items" pop-up | `findwindow.cpp` | S + M + S |
 
 ### Milestone 7 — Disks, fonts and printing (P3)
 

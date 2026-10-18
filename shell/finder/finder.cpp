@@ -1,5 +1,7 @@
 #include "finder.h"
 
+#include <sys/xattr.h>
+
 #include "clippings.h"
 #include "cryptofiles.h"
 #include "desktopprinter.h"
@@ -53,6 +55,26 @@
 #include "viewoptionsdialog.h"
 #include "infowindow.h"
 #include "resourcewindows.h"
+
+QStringList webSearchChannels() {
+	return { "DuckDuckGo", "Google", "Bing" };
+}
+
+bool openWebSearch(const QString &channel, const QString &words) {
+	const QString baseUrl = channel == "Google" ? "https://www.google.com/search"
+		: channel == "Bing" ? "https://www.bing.com/search"
+		: "https://duckduckgo.com/";
+	QUrl url(baseUrl);
+	QUrlQuery query;
+	query.addQueryItem("q", words);
+	url.setQuery(query);
+	if (!appOpenUrl(url.toString(QUrl::FullyEncoded))) {
+		Alert::ask("The web search could not be opened. Check that a web browser is available.",
+			"OK", QString());
+		return false;
+	}
+	return true;
+}
 
 Finder &Finder::instance() {
 	static Finder finder;
@@ -308,6 +330,33 @@ void Finder::command(const QString &name) {
 		}
 	} else if (name.startsWith("open-path ")) {
 		openPath(name.mid(10));
+	} else if (name.startsWith("reveal-path ")) {
+		/* zacos9-finder-ctl: the folder it's in, opened, with it selected. */
+		const QFileInfo info(name.mid(12));
+		if (info.exists() || info.isSymLink()) {
+			FolderWindow::open(info.absolutePath())->selectByName(info.fileName());
+		}
+	} else if (name.startsWith("label-path ")) {
+		/* zacos9-finder-ctl: "label-path N<TAB>PATH". */
+		const QString rest = name.mid(11);
+		const int label = rest.section('\t', 0, 0).toInt();
+		const QString path = rest.section('\t', 1);
+		if (label >= 0 && label < PL_LABEL_COUNT && QFileInfo::exists(path) && writeLabel(path, label)) {
+			folderChanged(QFileInfo(path).absolutePath());
+		}
+	} else if (name.startsWith("comment-path ")) {
+		/* zacos9-finder-ctl: "comment-path PATH<TAB>TEXT" (Get Info's comment). */
+		const QString rest = name.mid(13);
+		const QByteArray path = QFile::encodeName(rest.section('\t', 0, 0));
+		const QByteArray text = rest.section('\t', 1).toUtf8();
+		if (QFileInfo::exists(QString::fromUtf8(path))) {
+			if (text.isEmpty()) {
+				removexattr(path.constData(), "user.xdg.comment");
+			} else {
+				setxattr(path.constData(), "user.xdg.comment", text.constData(), text.size(), 0);
+			}
+			folderChanged(QFileInfo(QString::fromUtf8(path)).absolutePath());
+		}
 	} else if (name.startsWith("path-menu ")) {
 		/* The folder-path menu's choice; the first is the window's own. */
 		const int i = name.mid(10).toInt();
@@ -402,7 +451,7 @@ void Finder::command(const QString &name) {
 		FindDialog::open(folder && !vfsIsVirtual(folder->folderPath()) ? folder->folderPath() : QString());
 	} else if (name == "search-internet") {
 		bool accepted = false;
-		const QStringList searchChannels = { "DuckDuckGo", "Google", "Bing" };
+		const QStringList searchChannels = webSearchChannels();
 		const QString channel = QInputDialog::getItem(nullptr, "Search Internet",
 			"Search the web with:", searchChannels, 0, false, &accepted);
 		if (!accepted) {
@@ -411,17 +460,7 @@ void Finder::command(const QString &name) {
 		const QString words = QInputDialog::getText(nullptr, "Search Internet",
 			"Search for:", QLineEdit::Normal, QString(), &accepted).trimmed();
 		if (accepted && !words.isEmpty()) {
-			const QString baseUrl = channel == "Google" ? "https://www.google.com/search"
-				: channel == "Bing" ? "https://www.bing.com/search"
-				: "https://duckduckgo.com/";
-			QUrl url(baseUrl);
-			QUrlQuery query;
-			query.addQueryItem("q", words);
-			url.setQuery(query);
-			if (!appOpenUrl(url.toString(QUrl::FullyEncoded))) {
-				Alert::ask("The web search could not be opened. Check that a web browser is available.",
-					"OK", QString());
-			}
+			openWebSearch(channel, words);
 		}
 	} else if (name == "find-similar") {
 		const std::vector<Item *> sel = front() ? front()->selectedItems() : std::vector<Item *>{};

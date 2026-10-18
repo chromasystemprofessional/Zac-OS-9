@@ -1,4 +1,6 @@
 #include "findwindow.h"
+
+#include "finder.h"
 #include "thumbnails.h"
 #include "fileassoc.h"
 
@@ -70,6 +72,11 @@ FindDialog::FindDialog(const QString &folder) : m_folder(folder) {
 	if (!folder.isEmpty() && QDir(folder) != QDir::home() && QDir(folder) != QDir::root()) {
 		m_scope.items.push_back(PopupItem(QString("in “%1”").arg(displayName(folder))));
 		m_scope.selected = 2;
+	}
+	/* Sherlock's Internet channels: the same words, searched on the web. */
+	m_internetFirst = int(m_scope.items.size());
+	for (const QString &channel : webSearchChannels()) {
+		m_scope.items.push_back(PopupItem("on the Internet with " + channel));
 	}
 	m_scope.chosen = [this](int i) { m_scope.selected = i; update(); };
 	// Sized here: a button lays out its label when it's made; relayout() moves them.
@@ -234,7 +241,8 @@ void FindDialog::relayout() {
 
 FindQuery FindDialog::query() const {
 	FindQuery q;
-	q.scope = m_scope.selected == 2 ? FindScope::Folder : m_scope.selected == 1 ? FindScope::Home : FindScope::AllDisks;
+	q.scope = m_scope.selected == 2 && m_internetFirst > 2 ? FindScope::Folder
+		: m_scope.selected == 1 ? FindScope::Home : FindScope::AllDisks;
 	q.folder = m_folder;
 	for (const auto &row : m_rows) {
 		FindCriterion c;
@@ -248,6 +256,23 @@ FindQuery FindDialog::query() const {
 }
 
 void FindDialog::find() {
+	if (m_scope.selected >= m_internetFirst) {
+		QStringList words;
+		for (const auto &row : m_rows) {
+			if (!row->edit.text.trimmed().isEmpty()) {
+				words << row->edit.text.trimmed();
+			}
+		}
+		if (words.isEmpty()) {
+			m_problem = "Type the words to search the Internet for.";
+			relayout();
+			return;
+		}
+		if (openWebSearch(webSearchChannels().value(m_scope.selected - m_internetFirst), words.join(' '))) {
+			close();
+		}
+		return;
+	}
 	FindQuery q = query();
 	QString why;
 	if (!q.ready(&why)) {

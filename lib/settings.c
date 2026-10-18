@@ -640,6 +640,66 @@ bool pl_smart_scrolling(void) {
 		(strcmp(v, "true") == 0 || strcmp(v, "1") == 0);
 }
 
+int pl_speech_rate(void) {
+	char v[16];
+	if (!pl_setting("speech-rate", v, sizeof(v))) {
+		return 0;
+	}
+	const int rate = atoi(v);
+	return rate < -100 ? -100 : rate > 100 ? 100 : rate;
+}
+
+int pl_speech_args(const char **argv, char *buf, size_t size) {
+	int n = 0;
+	argv[n++] = "spd-say";
+	char voice[96];
+	size_t used = 0;
+	if (pl_setting("speech-voice", voice, sizeof(voice)) && voice[0] && strlen(voice) + 1 < size) {
+		argv[n++] = "-y";
+		memcpy(buf, voice, strlen(voice) + 1);
+		argv[n++] = buf;
+		used = strlen(voice) + 1;
+	}
+	const int rate = pl_speech_rate();
+	if (rate != 0 && used + 8 <= size) {
+		snprintf(buf + used, size - used, "%d", rate);
+		argv[n++] = "-r";
+		argv[n++] = buf + used;
+	}
+	argv[n++] = "--";
+	argv[n] = NULL;
+	return n;
+}
+
+void pl_speak(const char *text) {
+	if (!text || !*text) {
+		return;
+	}
+	const char *argv[10];
+	char buf[128];
+	int n = pl_speech_args(argv, buf, sizeof(buf));
+	argv[n++] = text;
+	argv[n] = NULL;
+	/* Detached (double fork), as the sounds are. */
+	pid_t pid = fork();
+	if (pid == 0) {
+		if (fork() == 0) {
+			setsid();
+			execvp("spd-say", (char *const *)argv);
+		}
+		_exit(0);
+	}
+	if (pid > 0) {
+		waitpid(pid, NULL, 0);
+	}
+}
+
+bool pl_talking_alerts(void) {
+	char v[16];
+	return pl_setting("talking-alerts", v, sizeof(v)) &&
+		(strcmp(v, "true") == 0 || strcmp(v, "1") == 0);
+}
+
 bool pl_puppy_locked(void) {
 	const char *conf = getenv("ZACOS9_ACCOUNTS_CONF");
 	const struct passwd *pw = getpwuid(getuid());
