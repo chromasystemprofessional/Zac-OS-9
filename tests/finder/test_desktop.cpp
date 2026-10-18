@@ -235,6 +235,33 @@ int main(int argc, char **argv) {
 		Finder::instance().command(command);
 		check(explained, "disk commands refuse an invalid selection with an explicit dialog");
 	}
+	{
+		QLocalSocket transient;
+		transient.connectToServer(Finder::socketPath());
+		check(waitFor([&] { return transient.canReadLine(); }),
+			"a transient command client connects before opening a modal alert");
+		transient.readAll();
+		bool disconnectedDuringAlert = false;
+		QTimer disconnectClient;
+		disconnectClient.setInterval(5);
+		QObject::connect(&disconnectClient, &QTimer::timeout, [&] {
+			if (auto *alert = qobject_cast<QDialog *>(QApplication::activeModalWidget())) {
+				disconnectClient.stop();
+				transient.abort();
+				disconnectedDuringAlert = true;
+				QTimer::singleShot(50, alert, &QDialog::reject);
+			}
+		});
+		disconnectClient.start();
+		transient.write("cmd disconnect-network\n");
+		check(waitFor([&] { return disconnectedDuringAlert; }),
+			"a command client can disconnect while its alert runs a nested event loop");
+		settle();
+		QLocalSocket afterAlert;
+		afterAlert.connectToServer(Finder::socketPath());
+		check(waitFor([&] { return afterAlert.canReadLine(); }),
+			"Finder still accepts clients after the modal command's socket is deleted");
+	}
 	auto disconnectedDisk = std::make_unique<Item>();
 	disconnectedDisk->name = "adam's home";
 	disconnectedDisk->path = home.path() + "/network/adam's home";

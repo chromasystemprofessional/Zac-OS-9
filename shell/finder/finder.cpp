@@ -155,9 +155,12 @@ void Finder::start(Desktop *desktop) {
 	QObject::connect(&m_server, &QLocalServer::newConnection, [this] {
 		while (QLocalSocket *s = m_server.nextPendingConnection()) {
 			m_clients.push_back(s);
-			const auto receive = [this, s] {
-				while (s->canReadLine()) {
-					QString line = QString::fromUtf8(s->readLine()).trimmed();
+			const QPointer<QLocalSocket> client(s);
+			const auto receive = [this, client] {
+				// Disconnection can also destroy this callback during a modal command.
+				const QPointer<QLocalSocket> socket = client;
+				while (socket && socket->canReadLine()) {
+					QString line = QString::fromUtf8(socket->readLine()).trimmed();
 					if (line.startsWith("cmd ")) {
 						command(line.mid(4));
 					} else if (line.startsWith("afp-disconnected ")) {
@@ -184,7 +187,7 @@ void Finder::start(Desktop *desktop) {
 					}
 				}
 			};
-			QObject::connect(s, &QLocalSocket::readyRead, receive);
+			QObject::connect(s, &QLocalSocket::readyRead, s, receive);
 			QObject::connect(s, &QLocalSocket::disconnected, s, &QObject::deleteLater);
 			s->write((stateLine() + "\n").toUtf8());
 			receive();
