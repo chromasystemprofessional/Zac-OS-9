@@ -141,10 +141,14 @@ of the real short-lived-client/error-dialog scenario.
 
 Still required for release: a freshly built ISO's BIOS/UEFI boot menus and
 installer path, partition-preserving installation, actual Fonts drag/drop,
-audible output/input, and physical hardware coverage. The guest's optional
-`macipgw.service` failed with exit status 64; its configuration/support status
-needs separate triage. Do not interpret these VM results as a complete 1.0
-acceptance pass.
+audible output/input, and physical hardware coverage. Do not interpret these
+VM results as a complete 1.0 acceptance pass.
+
+The guest's `macipgw.service` failed with exit status 64. It comes with
+`atalkd` (a Recommends) and needs an IP network of its own, which Debian's
+`/etc/netatalk/macipgw.conf` leaves commented out. ZacOS doesn't use a MacIP
+gateway, so `sharing/macipgw.service.d/zacos9.conf` skips the service
+(`ExecCondition`) until `network =` is set there; it then starts as before.
 
 To install the packages on a Debian 13 machine:
 

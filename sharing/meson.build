@@ -6,3 +6,5 @@ install_data('org.zacos9.sharing.policy',
   install_dir: get_option('datadir') / 'polkit-1' / 'actions')
 install_data('50-zacos9-sharing.rules',
   install_dir: get_option('datadir') / 'polkit-1' / 'rules.d')
+install_data('macipgw.service.d/zacos9.conf',
+  install_dir: get_option('prefix') / 'lib' / 'systemd' / 'system' / 'macipgw.service.d')
