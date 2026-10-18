@@ -1,3 +1,14 @@
+zacos9 (0.2.1) trixie; urgency=medium
+
+  * The System Folder's Fonts view now lists available fonts with each name
+    drawn in its own font. Drag TrueType/OpenType files or collections in
+    to install, move user fonts out or to Trash to uninstall, and
+    Option-drag to copy without uninstalling. Includes protected system
+    fonts, collection confirmation, automatic cache refresh and
+    external-change monitoring.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Sun, 18 Oct 2026 01:30:49 -0400
+
 zacos9 (0.2.0) trixie; urgency=medium
 
   * A big update. Accounts: Limited accounts, Puppy Mode, a Guest account,
