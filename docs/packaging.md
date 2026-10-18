@@ -36,6 +36,65 @@ share gvfs, compositor and package-manager resources and must not contend
 with one another. Compilation remains parallel. Without the HIG figures
 (`tools/measure/figs`), the pixel tests are skipped.
 
+### Release test gate
+
+Run `scripts/build-debs.sh` without `DEB_BUILD_OPTIONS=nocheck` or a `nocheck`
+build profile. Its normal `dh_auto_test --no-parallel` step must succeed before
+the package is considered tested. A successful package build does not mean
+that every optional integration test ran: review the skip reasons as well.
+
+Verified on 2026-10-18: the normal Debian package build completed with **142
+tests passed, zero failed and four skipped** (146 total). `finder-vfs` now
+uses a temporary Shared Documents backing folder and tests both its presence
+and absence; the result no longer depends on the build host's `/home/Shared`.
+
+| Skipped test | Reason in the package build | Remaining verification |
+|---|---|---|
+| `menudraw` | HIG reference images are not included in the package source. | Run reference-image comparisons separately where the reference material is lawfully available; do not ship it. |
+| `widgets` | Same missing reference images. | Same separate visual-fidelity check. |
+| `decor` | Same missing reference images. | Same separate visual-fidelity check. |
+| `screen-sharing-session` | The sanitized package-test environment does not provide the required running PipeWire/portal session. | Run separately with installed portals, a running PipeWire session and a usable render node; negotiation has passed as described below. |
+
+The separate screen-sharing integration check now passes with
+`xdg-desktop-portal` 1.20.3. Inherited desktop-specific portal preferences had
+overridden the fixture's generic configuration, activating an unrelated
+FileChooser backend and a second frontend without the test application's
+desktop entry. The fixture now selects its own desktop and only the ScreenCast
+backend, gives D-Bus-activated services the private environment, verifies the
+owners of its portal services, and stops its document portal before removing
+the temporary runtime directory. No production capture code was changed.
+
+Run it through Meson, which provides a private D-Bus session:
+
+```sh
+meson test -C /path/to/meson-build --no-rebuild --print-errorlogs screen-sharing-session
+```
+
+Three consecutive runs passed registration, CreateSession, SelectSources,
+Start (exactly one nonzero stream node), OpenPipeWireRemote (a socket FD), and
+session cleanup. Only a private headless desktop is offered for capture, never
+the real desktop. This verifies negotiation, not frame delivery in a real
+screen-sharing application or hardware/driver acceptance.
+
+### Continuous integration
+
+`.github/workflows/debian.yml` runs on main and agent-branch pushes, pull
+requests, and manual dispatch. It uses a Debian 13 container, installs the
+build dependencies declared in `debian/control`, and runs normal
+`dpkg-buildpackage -b -us -uc` as an unprivileged user. Tests remain serial
+through `debian/rules`; neither `nocheck` option is allowed into the build.
+The manifest includes the AFP development libraries and the fonts, Wayland,
+screenshot, Xwayland and rsync tools needed by the tests.
+
+An additional gate rejects Meson skips outside the four documented above and
+lists skips in the workflow summary. Build/Meson logs are retained even on
+failure; successful jobs retain the tested amd64 packages and SHA-256 sums
+for 14 days. These are CI artifacts, not published releases. The conditional
+screen-sharing check still needs a suitable session outside this container.
+Workflow syntax and skip-audit cases have been checked locally; a successful
+hosted run must be confirmed after the branch is pushed. Configure the
+`package` job as a required branch-protection check before the 1.0 release.
+
 To install the packages on a Debian 13 machine:
 
 ```sh

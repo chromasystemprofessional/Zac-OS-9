@@ -470,13 +470,45 @@ int main(int argc, char **argv) {
 	vfsOffChange(flatpakWatch);
 
 	/* ---- the startup disk --------------------------------------------- */
+	const QString sharedDocuments = root + "/Shared";
+	QFile initialRegistry(vfsRegistryPath());
+	check(initialRegistry.open(QIODevice::ReadOnly), "read the startup disk fixture registry");
+	QJsonObject initialMapping = QJsonDocument::fromJson(initialRegistry.readAll()).object();
+	initialRegistry.close();
+	QJsonArray initialNodes = initialMapping.value("nodes").toArray();
+	for (int i = 0; i < initialNodes.size(); ++i) {
+		QJsonObject node = initialNodes[i].toObject();
+		if (node.value("id").toString() == "shared-documents") {
+			node.insert("backing", sharedDocuments);
+			initialNodes[i] = node;
+		}
+	}
+	initialMapping.insert("nodes", initialNodes);
+	QSaveFile fixtureRegistry(vfsRegistryPath());
+	const QByteArray mappingData = QJsonDocument(initialMapping).toJson();
+	check(fixtureRegistry.open(QIODevice::WriteOnly) &&
+		fixtureRegistry.write(mappingData) == mappingData.size() && fixtureRegistry.commit(),
+		"Shared Documents uses a private fixture, not the host's /home/Shared");
+	vfsRefresh();
+	const QStringList expectedStartupItems{ "System Folder", "Applications", "Home" };
 	QStringList volume = namesIn(vfsRoot());
 	check(volume.contains("System Folder"), "the startup disk holds a System Folder");
 	check(volume.contains("Applications"), "the startup disk holds Applications");
 	check(!volume.contains("Documents"), "Documents is gone: Home holds it");
 	check(volume.contains("Home"), "the startup disk holds the user's Home folder");
 	check(!volume.contains("Utilities"), "Utilities is off until the registry asks for it");
-	check(volume.size() == 3, "and nothing else: no Unix directories");
+	check(volume == expectedStartupItems,
+		"the startup disk lists exactly its curated items when Shared Documents is absent");
+	check(QDir().mkdir(sharedDocuments), "create the private Shared Documents folder");
+	vfsRefresh();
+	check(namesIn(vfsRoot()) == (expectedStartupItems + QStringList{ "Shared Documents" }),
+		"an existing Shared Documents folder appears exactly once on the startup disk");
+	check(vfsRealCounterpart(vfsPathFor("shared-documents")) == sharedDocuments,
+		"Shared Documents opens its configured real folder");
+	check(QDir().rmdir(sharedDocuments), "remove the private Shared Documents folder");
+	vfsRefresh();
+	check(namesIn(vfsRoot()) == expectedStartupItems,
+		"Shared Documents disappears when its backing folder is removed");
 	for (const QString unix_ : { "usr", "etc", "bin", "var", "lib", "proc", "sys", "home" }) {
 		check(!volume.contains(unix_), "the startup disk does not show /" + unix_);
 	}
@@ -745,7 +777,7 @@ int main(int argc, char **argv) {
 	check(vfsUnixVolumeShown(), "it can be turned on");
 	vfsRefresh();
 	check(vfsUnixVolumeShown(), "and that outlasts a reload");
-	check(namesIn(vfsRoot()).size() == 3,
+	check(namesIn(vfsRoot()) == expectedStartupItems,
 		"turning it on does not put Unix directories on the startup disk");
 	vfsSetUnixVolumeShown(false);
 	check(!vfsUnixVolumeShown(), "and off again");
