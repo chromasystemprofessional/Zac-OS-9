@@ -106,6 +106,46 @@ and uses a private runtime directory. Seven focused prerequisite/sound/GTK/boot
 tests pass locally under Xvfb. The hosted `package` result, not local success,
 is the gate to require before merging or releasing.
 
+### Installed-system acceptance (2026-10-18)
+
+PR #3 was merged after both hosted package checks passed (141 tests passed,
+zero failed, five documented skips); main requires the up-to-date `package`
+check. A separate QEMU/KVM test used UEFI firmware and a new, disposable
+24 GiB qcow2 disk, with no host disks passed through.
+
+The starting medium was the existing development image, initially carrying
+0.1.64. Its live guest was upgraded with the checksum-verified CI 0.2.1 package
+before running `/usr/libexec/zacos9/zacos9-install /dev/vda "Acceptance HD"`.
+This is **not** acceptance of a freshly built release ISO or its boot menu.
+The host ISO rebuild requires administrator access unavailable to this session.
+
+| Check | Result |
+|---|---|
+| Install to blank whole disk | All six steps completed; GPT, BIOS boot partition, ESP and ext4 root created; UEFI bootloader and fallback path installed. |
+| Boot without live media or external kernel/initramfs | Passed; installed root is `/dev/vda3` (ext4). |
+| First-run Setup Assistant | Account created through the six-page UI; temporary setup/live users removed and setup-pending marker cleared. |
+| Login and desktop | New account authenticated on a text console and automatically reached Finder after setup. |
+| Networking | DNS resolution and an HTTPS request to `https://deb.debian.org` returned HTTP 200. |
+| Fonts and audio-service prerequisites | Fontconfig enumerated 137 faces; PipeWire and WirePlumber were active. This does not verify font drag/drop or audible playback. |
+| Reboot | Changed boot ID confirmed; the installed desktop and account returned without setup repeating. |
+| Graceful shutdown | Live guest completed poweroff before the installed-disk boot. |
+
+Acceptance exposed a Finder crash when a short-lived command client disconnected
+while its error dialog ran a nested event loop. Its socket and the callback
+holding it could be deleted before the read loop resumed. The fix uses a
+stack-local guarded socket and a socket-bound connection; a regression in
+`finder-desktop` failed with SIGSEGV before the fix and passed five consecutive
+runs afterward. The fixed development executable was also copied only into
+the disposable guest, rebooted into normally, and survived five repetitions
+of the real short-lived-client/error-dialog scenario.
+
+Still required for release: a freshly built ISO's BIOS/UEFI boot menus and
+installer path, partition-preserving installation, actual Fonts drag/drop,
+audible output/input, and physical hardware coverage. The guest's optional
+`macipgw.service` failed with exit status 64; its configuration/support status
+needs separate triage. Do not interpret these VM results as a complete 1.0
+acceptance pass.
+
 To install the packages on a Debian 13 machine:
 
 ```sh
