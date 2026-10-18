@@ -38,7 +38,7 @@ jobs:
         run: |
           useradd --create-home builder
           mkdir -p /tmp/zacos9-debian/source
-          git archive HEAD | tar -x -C /tmp/zacos9-debian/source
+          git -c safe.directory="$GITHUB_WORKSPACE" archive HEAD | tar -x -C /tmp/zacos9-debian/source
           chown -R builder:builder /tmp/zacos9-debian
           cd /tmp/zacos9-debian/source
           status=0
