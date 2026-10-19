@@ -212,6 +212,17 @@ test('default-window-size',
   ),
 )
 
+test('xwayland-output',
+  executable('test-xwayland-output',
+    'tests/test_xwayland_output.c', 'src/xwayland_output.c',
+    protocol_headers,
+    include_directories: include_directories('src'),
+    dependencies: [decor_dep, wayland_server, wlroots, libdrm],
+    c_args: ['-ffunction-sections', '-fdata-sections'],
+    link_args: ['-Wl,--gc-sections'],
+  ),
+)
+
 test('snapshot-output-state',
   executable('test-snapshot-state', 'tests/test_snapshot.c', 'src/pixbuf.c',
     protocol_headers,

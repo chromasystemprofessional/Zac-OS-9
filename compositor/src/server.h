@@ -552,5 +552,9 @@ void xwayland_init(struct plat_server *server);
 int xwayland_surface_scale(struct wlr_surface *surface);
 /* xwayland_output.c: outputs as Xwayland sees them, in pixels. */
 void xwayland_output_init(struct plat_server *server);
+/* An output as Xwayland sees it: from its layout corner to its pixel corner
+ * at `scale`, so both 1x X11 windows (in layout units) and HiDPI ones (in
+ * pixels) on it are inside it. */
+void xwayland_output_box(const struct wlr_box *layout, int scale, struct wlr_box *x11);
 
 #endif
