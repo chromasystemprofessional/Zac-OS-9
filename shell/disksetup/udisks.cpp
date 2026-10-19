@@ -75,6 +75,7 @@ void parseUDisks(const UDisksObjects &objects, QList<VetVolume> *volumes, QMap<Q
 			v.device = bytes(b.value("Device"));
 		}
 		v.type = b.value("IdType").toString();
+		v.uuid = b.value("IdUUID").toString();
 		v.size = b.value("Size").toULongLong();
 		const QString label = b.value("IdLabel").toString();
 		v.name = label.isEmpty() ? v.device.section('/', -1) : label;

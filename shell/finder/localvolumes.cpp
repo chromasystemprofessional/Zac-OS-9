@@ -22,7 +22,14 @@
 #include <unistd.h>
 #include <cstdio>
 
+#include "mountpolicy.h"
 #include "netvolumes.h"
+
+#include <QDBusConnection>
+#include <QDBusMessage>
+#include <QDBusObjectPath>
+#include <QDBusPendingCallWatcher>
+#include <QDBusReply>
 
 /* Mount-point prefixes that are never user-browsable storage: kernel
  * pseudo-filesystems, container overlays, snap loops, etc. */
@@ -262,6 +269,7 @@ static void reportMacError(const QString &error) {
 /* ---- mounting ----------------------------------------------------------- */
 
 static QSet<QString> g_tried; /* volumes already mounted once, by device */
+static QSet<QString> g_retried; /* tried a second time after failing */
 static QSet<QString> g_mounting;
 static QSet<QString> g_erasing;
 static std::vector<std::function<void(const QString &)>> g_mountFailed;
@@ -280,6 +288,11 @@ static void macTool(const QStringList &arguments,
 		});
 	QObject::connect(process, &QProcess::finished, process,
 		[process, completed](int code, QProcess::ExitStatus status) {
+			/* Quitting kills a helper still running: what asked for it
+			 * (the Mac disk poll's timer) may already be gone. */
+			if (QCoreApplication::closingDown()) {
+				return;
+			}
 			const QString error = QString::fromUtf8(process->readAllStandardError()).trimmed();
 			completed(process->readAllStandardOutput(),
 				status == QProcess::NormalExit && code == 0 ? QString()
@@ -382,6 +395,59 @@ static QString volumeName(GVolume *v) {
 	return name;
 }
 
+static void mountIfNeeded(GVolume *v);
+
+static void reportMountFailed(const QString &device) {
+	for (auto &callback : g_mountFailed) {
+		callback(device);
+	}
+}
+
+/* The second try failed too: read-only, through UDisks (GIO can't ask for
+ * it). A volume a crash left marked in use (NTFS not closed cleanly)
+ * mounts so; Disk Setup's Repair clears the mark. Only if this fails too
+ * is the volume unreadable, which may offer to initialize it. */
+static void mountReadOnly(const QString &device, const QString &name) {
+	if (!QDBusConnection::systemBus().isConnected()) {
+		reportMountFailed(device); /* no UDisks to ask */
+		return;
+	}
+	const QString udisks = "org.freedesktop.UDisks2";
+	QDBusMessage resolve = QDBusMessage::createMethodCall(udisks, "/org/freedesktop/UDisks2/Manager",
+		"org.freedesktop.UDisks2.Manager", "ResolveDevice");
+	resolve.setArguments({ QVariantMap{ { "path", device } }, QVariantMap() });
+	auto *app = QCoreApplication::instance();
+	auto *found = new QDBusPendingCallWatcher(QDBusConnection::systemBus().asyncCall(resolve), app);
+	QObject::connect(found, &QDBusPendingCallWatcher::finished, app, [=] {
+		found->deleteLater();
+		const QDBusReply<QList<QDBusObjectPath>> objects = *found;
+		if (!objects.isValid() || objects.value().isEmpty()) {
+			reportMountFailed(device);
+			return;
+		}
+		QDBusMessage mount = QDBusMessage::createMethodCall(udisks, objects.value().front().path(),
+			"org.freedesktop.UDisks2.Filesystem", "Mount");
+		mount.setArguments({ QVariantMap{ { "options", "ro" } } });
+		mount.setInteractiveAuthorizationAllowed(true);
+		auto *mounted = new QDBusPendingCallWatcher(QDBusConnection::systemBus().asyncCall(mount), app);
+		QObject::connect(mounted, &QDBusPendingCallWatcher::finished, app, [=] {
+			mounted->deleteLater();
+			if (mounted->isError()) {
+				fprintf(stderr, "zacos9-finder: \"%s\" couldn't be mounted read-only either: %s\n",
+					qPrintable(name), qPrintable(mounted->error().message()));
+				reportMountFailed(device);
+				return;
+			}
+			const QString notice = QString("“%1” wasn't put away properly, so it has been opened "
+				"read-only. To use it normally again, open Disk Setup (System Folder ▸ Utilities) "
+				"and click Repair.").arg(name);
+			for (auto &callback : g_errors) {
+				callback(notice);
+			}
+		});
+	});
+}
+
 static void onMounted(GObject *src, GAsyncResult *res, gpointer) {
 	char *rawDevice = g_volume_get_identifier(G_VOLUME(src), G_VOLUME_IDENTIFIER_KIND_UNIX_DEVICE);
 	const QString mountedDevice = QString::fromUtf8(rawDevice ? rawDevice : "");
@@ -389,17 +455,24 @@ static void onMounted(GObject *src, GAsyncResult *res, gpointer) {
 	g_mounting.remove(mountedDevice);
 	GError *err = nullptr;
 	if (!g_volume_mount_finish(G_VOLUME(src), res, &err) && err) {
-		fprintf(stderr, "zacos9-finder: \"%s\" couldn't be mounted: %s\n",
-			qPrintable(volumeName(G_VOLUME(src))), err->message);
+		const QString name = volumeName(G_VOLUME(src));
+		fprintf(stderr, "zacos9-finder: \"%s\" couldn't be mounted: %s\n", qPrintable(name), err->message);
 		if (!g_error_matches(err, G_IO_ERROR, G_IO_ERROR_CANCELLED) &&
 				!g_error_matches(err, G_IO_ERROR, G_IO_ERROR_PERMISSION_DENIED) &&
-				!g_error_matches(err, G_IO_ERROR, G_IO_ERROR_FAILED_HANDLED)) {
-			char *device = g_volume_get_identifier(G_VOLUME(src), G_VOLUME_IDENTIFIER_KIND_UNIX_DEVICE);
-			if (device) {
-				for (auto &callback : g_mountFailed) {
-					callback(QString::fromUtf8(device));
-				}
-				g_free(device);
+				!g_error_matches(err, G_IO_ERROR, G_IO_ERROR_FAILED_HANDLED) &&
+				!mountedDevice.isEmpty()) {
+			/* At login a drive can fail while UDisks is still starting:
+			 * once more a moment later, then read-only. */
+			if (!g_retried.contains(mountedDevice)) {
+				g_retried.insert(mountedDevice);
+				GVolume *volume = G_VOLUME(g_object_ref(src));
+				QTimer::singleShot(3000, QCoreApplication::instance(), [volume, mountedDevice] {
+					g_tried.remove(mountedDevice);
+					mountIfNeeded(volume);
+					g_object_unref(volume);
+				});
+			} else {
+				mountReadOnly(mountedDevice, name);
 			}
 		}
 		g_error_free(err);
@@ -434,6 +507,13 @@ static void mountIfNeeded(GVolume *v) {
 		return;
 	}
 	if (!g_volume_can_mount(v)) {
+		return;
+	}
+	/* Disk Setup's "Mount automatically", off for this volume. */
+	char *uuid = g_volume_get_identifier(v, G_VOLUME_IDENTIFIER_KIND_UUID);
+	const bool automatic = volumeMountsAutomatically(QString::fromUtf8(uuid ? uuid : ""));
+	g_free(uuid);
+	if (!automatic) {
 		return;
 	}
 	if (g_tried.contains(key) || g_mounting.contains(key)) {
@@ -478,6 +558,7 @@ static void onVolumeRemoved(GVolumeMonitor *, GVolume *v, gpointer) {
 	char *device = g_volume_get_identifier(v, G_VOLUME_IDENTIFIER_KIND_UNIX_DEVICE);
 	if (device) {
 		g_tried.remove(QString::fromUtf8(device));
+		g_retried.remove(QString::fromUtf8(device));
 		g_free(device);
 	}
 }

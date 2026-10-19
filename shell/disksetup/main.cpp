@@ -27,6 +27,7 @@
 #include <climits>
 
 #include "alert.h"
+#include "mountpolicy.h"
 #include "panelkit.h"
 #include "plan.h"
 #include "platinumshell.h"
@@ -98,6 +99,26 @@ public:
 		m_repair = PanelButton("Repair", QRect(W - M - 12 - 90, by, 90, PL_BUTTON_H));
 		m_repair.hint = "Checks the volume and fixes what it can.";
 		m_repair.clicked = [this] { firstAid(true); };
+		m_automatic = PanelCheckbox("Mount automatically", QPoint(M + 8, by + 4));
+		m_automatic.hint = "Opens the volume by itself when you log in or connect its drive. "
+			"Off, it stays closed until you mount it.";
+		m_automatic.toggled = [this](bool on) {
+			if (const VetVolume *v = chosenVolume()) {
+				setVolumeMountsAutomatically(v->uuid, on);
+				log(QString("“%1” %2.").arg(v->name, on ? "will mount automatically"
+					: "won't mount automatically any more"));
+				if (on && v->mountPoints.isEmpty()) {
+					const QString name = v->name;
+					call(this, v->path, "org.freedesktop.UDisks2.Filesystem", "Mount", { QVariantMap() },
+							[this, name](const QDBusMessage &reply) {
+						if (!errorOf(reply).isEmpty()) {
+							log(QString("“%1” couldn't be opened: %2").arg(name, errorOf(reply)));
+						}
+						reload();
+					});
+				}
+			}
+		};
 		/* Partition. */
 		m_drivePopup.rect = QRect(M + 8 + 50, PANE + 12, W - 2 * M - 16 - 50, PL_POPUP_H);
 		m_drivePopup.chosen = [this](int row) { chooseDrive(row); };
@@ -203,6 +224,7 @@ private:
 	/* First Aid. */
 	PanelList m_volumeList;
 	PanelButton m_verify, m_repair;
+	PanelCheckbox m_automatic;
 	QList<VetVolume> m_volumes;
 	QMap<QString, VetDrive> m_health;
 
@@ -224,8 +246,10 @@ private:
 		m_tab = tab;
 		if (tab == 0) {
 			m_host.buttons = { &m_verify, &m_repair };
+			m_host.checks = { &m_automatic };
 			m_host.defaultButton = &m_repair;
 		} else {
+			m_host.checks = {};
 			m_host.buttons = { &m_actions[0], &m_actions[1], &m_actions[2], &m_actions[3], &m_actions[4],
 				&m_revert, &m_apply };
 			m_host.defaultButton = &m_apply;
@@ -263,6 +287,15 @@ private:
 		m_volumeList.paint(c, true);
 		const VetVolume *v = chosenVolume();
 		int y = m_volumeList.frame.bottom() + PL_BUTTON_H + 28;
+		if (v && v->readOnly && !v->mountPoints.contains("/")) {
+			const QString notice = QString("“%1” is open read-only: it wasn't put away properly. "
+				"Click Repair to fix it and open it normally.").arg(v->name);
+			for (const QString &line : panelWrap(notice, W - 2 * M - 16, PL_FONT_SYSTEM)) {
+				panelText(c, line, M + 8, y, PL_FONT_SYSTEM, RGB(0x99, 0, 0));
+				y += 15;
+			}
+			y += 4;
+		}
 		if (v && m_health.contains(v->drive)) {
 			const VetDrive &d = m_health.value(v->drive);
 			for (const QString &line : panelWrap(driveHealth(d), W - 2 * M - 16, PL_FONT_SYSTEM)) {
@@ -277,6 +310,10 @@ private:
 	void firstAid(bool repair) {
 		const VetVolume *v = chosenVolume();
 		if (!v || m_busy) {
+			return;
+		}
+		if (repair && v->readOnly && !v->mountPoints.contains("/")) {
+			repairReadOnly(*v);
 			return;
 		}
 		if (!v->mountPoints.isEmpty()) {
@@ -305,6 +342,50 @@ private:
 		});
 	}
 
+	/* A volume opened read-only because it wasn't put away properly (the
+	 * Sniffer does so, localvolumes.cpp): closed, repaired (for NTFS, the
+	 * mark of being in use cleared), and opened again normally. */
+	void repairReadOnly(const VetVolume &v) {
+		const QString name = v.name, path = v.path;
+		const auto failed = [this, name](const QString &step, const QDBusMessage &reply) {
+			m_busy = false;
+			log(QString("“%1” couldn't be %2: %3").arg(name, step, errorOf(reply)));
+			reload();
+		};
+		log(QString("Repairing “%1”…").arg(name));
+		m_busy = true;
+		updateButtons();
+		const QString fs = "org.freedesktop.UDisks2.Filesystem";
+		call(this, path, fs, "Unmount", { QVariantMap() }, [=](const QDBusMessage &closed) {
+			if (!errorOf(closed).isEmpty()) {
+				failed("closed to repair it (is a file on it open?)", closed);
+				return;
+			}
+			call(this, path, fs, "Repair", { QVariantMap() }, [=](const QDBusMessage &repaired) {
+				if (!errorOf(repaired).isEmpty() || !repaired.arguments().value(0).toBool()) {
+					/* Opened read-only again, so what's on it stays reachable. */
+					const QString why = errorOf(repaired).isEmpty()
+						? QString("it couldn't be fully repaired; copy what's on it elsewhere")
+						: errorOf(repaired);
+					call(this, path, fs, "Mount", { QVariantMap{ { "options", "ro" } } },
+							[=](const QDBusMessage &) {
+						m_busy = false;
+						log(QString("“%1” couldn't be repaired (%2). It's open read-only again.").arg(name, why));
+						reload();
+					});
+					return;
+				}
+				call(this, path, fs, "Mount", { QVariantMap() }, [=](const QDBusMessage &opened) {
+					m_busy = false;
+					log(errorOf(opened).isEmpty()
+						? QString("“%1” has been repaired and is open normally again.").arg(name)
+						: QString("“%1” was repaired, but couldn't be opened: %2").arg(name, errorOf(opened)));
+					reload();
+				});
+			});
+		});
+	}
+
 	/* ---- reading UDisks ---- */
 
 	void reload() {
@@ -324,6 +405,9 @@ private:
 			m_volumes.clear();
 			m_health.clear();
 			parseUDisks(objects, &m_volumes, &m_health);
+			for (VetVolume &v : m_volumes) {
+				v.readOnly = !v.mountPoints.isEmpty() && volumeMountedReadOnly(v.device);
+			}
 			QStringList rows;
 			int select = m_volumes.isEmpty() ? -1 : 0;
 			for (int i = 0; i < m_volumes.size(); i++) {
@@ -472,6 +556,9 @@ private:
 		const VetVolume *v = chosenVolume();
 		m_verify.enabled = !m_busy && v && v->canCheck;
 		m_repair.enabled = !m_busy && v && v->canRepair;
+		/* The startup disk always mounts. */
+		m_automatic.enabled = !m_busy && v && !v->uuid.isEmpty() && !v->mountPoints.contains("/");
+		m_automatic.on = v && volumeMountsAutomatically(v->uuid);
 		const Row *r = chosenRow();
 		const bool drive = !m_busy && m_drive >= 0 && !m_planned.live;
 		m_actions[0].enabled = drive && r && r->gap >= 0;

@@ -26,6 +26,8 @@ struct VetVolume {
 	QStringList mountPoints;
 	bool canCheck = false, canRepair = false;
 	QString drive;     /* the drive's object */
+	QString uuid;      /* its filesystem's, for "Mount automatically" */
+	bool readOnly = false; /* mounted read-only (mountpolicy.h), set by the caller */
 };
 
 struct VetDrive {
