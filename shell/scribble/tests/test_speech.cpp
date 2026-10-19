@@ -27,6 +27,9 @@ int main(int argc, char **argv) {
 	assert(root.isValid());
 	const QString bin = root.path() + "/bin";
 	assert(QDir().mkpath(bin));
+	/* Not this account's own Speech settings (a voice or rate adds arguments). */
+	qputenv("HOME", root.path().toUtf8());
+	qputenv("XDG_CONFIG_HOME", (root.path() + "/config").toUtf8());
 	const QString scriptPath = bin + "/spd-say";
 	QFile script(scriptPath);
 	assert(script.open(QIODevice::WriteOnly));
