@@ -405,6 +405,17 @@ int main(int argc, char **argv) {
 	check(desktop.m_disk && desktop.m_trash &&
 		desktop.m_disk->isVirtual && !desktop.m_trash->path.isEmpty(),
 		"startup disk and Trash remain separate from real Desktop files");
+	{
+		/* A long name wraps whole under its icon; the rows make room. */
+		const int rows = desktop.cellH();
+		const QString longName = "A desktop file with a rather long name that wraps";
+		write(path + "/" + longName);
+		check(waitFor([&] { return hasFile(desktop, longName); }) && desktop.cellH() > rows,
+			"a long name on the desktop wraps and its rows grow to fit");
+		QFile::remove(path + "/" + longName);
+		check(waitFor([&] { return !hasFile(desktop, longName); }) && desktop.cellH() == rows,
+			"and close up again when it goes");
+	}
 	/* The contextual menu's Print: offered for documents, not folders. */
 	const auto stateWith = [&](const QString &name) {
 		desktop.selectByName(name);
