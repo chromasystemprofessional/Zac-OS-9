@@ -1508,6 +1508,11 @@ void FolderWindow::showContextMenuAt(QPoint pos) {
 
 void FolderWindow::mousePressEvent(QMouseEvent *e) {
 	const QPoint pos = e->position().toPoint();
+	/* A selection rectangle whose release never came ends here, as on
+	 * the desktop. */
+	if (m_marquee) {
+		endMarquee();
+	}
 	const int barX = width() - SB_WIDTH + 1, barY = height() - SB_WIDTH + 1;
 	if (isContextClick(e)) {
 		/* In the icons' area: as a plain click selects, then the menu. */
