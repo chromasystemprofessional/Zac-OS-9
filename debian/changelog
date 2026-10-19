@@ -1,3 +1,16 @@
+zacos9 (1.0.5) trixie; urgency=medium
+
+  * Desktop icons no longer stay selected after clicking another one. Disk
+    Setup appears in System Folder > Utilities. The Fonts folder opens
+    quickly and shows a Mac OS 9-sized set of fonts (the rest under
+    Language Kits), with font files shown as suitcases with an A in their
+    own typeface. Drives that fail to mount at login (such as NTFS drives
+    left marked in use after a crash) are tried again and then opened
+    read-only, with Repair in Disk Setup; Disk Setup has a Mount
+    automatically checkbox for each drive.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Mon, 19 Oct 2026 19:52:31 -0400
+
 zacos9 (1.0.4) trixie; urgency=medium
 
   * Other programs can add modules to The Collar, and Software has an
