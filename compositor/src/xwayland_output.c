@@ -11,12 +11,35 @@
  * logical sizes, and a HiDPI X11 window lives in pixel coordinates
  * (xwayland.c), so on a 2x screen the root must be twice the layout's size.
  * Xwayland gets this xdg-output manager instead of wlroots' one; every
- * other client gets wlroots' one only. All outputs share one integer scale. */
+ * other client gets wlroots' one only. All outputs share one integer scale.
+ *
+ * A 1x X11 window, though, keeps layout coordinates (its X11 position is
+ * its place in the layout), and X11 keeps the pointer inside its outputs.
+ * With the outputs in pixels alone, a screen away from the layout's origin
+ * left its 1x windows outside every X11 output: the pointer could not reach
+ * them, and clicks on them (Adobe Reader's menu bar) went nowhere. So each
+ * output reaches from its layout corner to its pixel corner, covering both;
+ * X11 outputs may overlap. At scale 1 the two are the same. */
 
 #define XDG_OUTPUT_VERSION 3
 
 /* There is one compositor; resources lead back to their output only. */
 static struct plat_server *xw_server;
+
+void xwayland_output_box(const struct wlr_box *layout, int scale, struct wlr_box *x11) {
+	/* From the nearer of its layout and pixel corners to the further. */
+	const int x0 = layout->x < layout->x * scale ? layout->x : layout->x * scale;
+	const int y0 = layout->y < layout->y * scale ? layout->y : layout->y * scale;
+	const int x1 = (layout->x + layout->width) * scale;
+	const int y1 = (layout->y + layout->height) * scale;
+	const int lx1 = layout->x + layout->width, ly1 = layout->y + layout->height;
+	*x11 = (struct wlr_box){
+		.x = x0,
+		.y = y0,
+		.width = (x1 > lx1 ? x1 : lx1) - x0,
+		.height = (y1 > ly1 ? y1 : ly1) - y0,
+	};
+}
 
 static void send_details(struct wl_resource *resource, bool done) {
 	struct wl_resource *output_resource = wl_resource_get_user_data(resource);
@@ -31,8 +54,10 @@ static void send_details(struct wl_resource *resource, bool done) {
 		return;
 	}
 	int scale = output->scale > 1 ? (int)output->scale : 1;
-	zxdg_output_v1_send_logical_position(resource, box.x * scale, box.y * scale);
-	zxdg_output_v1_send_logical_size(resource, box.width * scale, box.height * scale);
+	struct wlr_box x11;
+	xwayland_output_box(&box, scale, &x11);
+	zxdg_output_v1_send_logical_position(resource, x11.x, x11.y);
+	zxdg_output_v1_send_logical_size(resource, x11.width, x11.height);
 	if (!done) {
 		return;
 	}

@@ -62,6 +62,8 @@ private:
 	bool iconsShown() const;
 	void placeIcons();
 	std::function<QPoint(int)> gridSlot(int *slotCount) const;
+	int cellH() const;
+	void placeSelection(QPoint delta, Qt::KeyboardModifiers modifiers);
 	void updateTrashIcon();
 	void loadPattern();
 

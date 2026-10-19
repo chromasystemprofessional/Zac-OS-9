@@ -302,6 +302,70 @@ int main(int argc, char **argv) {
 		w->columns() == std::vector<int>({ COL_NAME, COL_MODIFIED, COL_SIZE, COL_KIND }),
 		"Reset Column Positions puts them back");
 	check(!w->grab().isNull(), "the list draws its headers and button");
+	w->close();
+	settle();
+
+	/* Long names: whole, wrapped under their icons, the rows spaced to fit. */
+	const QString names = home.path() + "/Names";
+	QDir().mkpath(names);
+	const QString spaced = "Quarterly Report Final Version 2026.pdf";
+	const QString unbroken = "averyveryverylongfilenamewithoutanyspaces.txt";
+	for (const QString &n : { QString("short"), spaced, unbroken, QString("zed") }) {
+		write(names + "/" + n, 1);
+	}
+	w = FolderWindow::open(names);
+	w->resize(500, 400);
+	w->setViewMode(FolderWindow::ViewMode::Icons);
+	ViewOptions large = w->viewOptions();
+	large.icons = {};
+	w->setViewOptions(large);
+	const auto inkPixels = [](const plat_text *t) {
+		int n = 0;
+		for (int i = 0; t && i < t->stride * t->height; i++) {
+			n += t->mask[i] != 0;
+		}
+		return n;
+	};
+	for (const QString &n : { spaced, unbroken }) {
+		Item *item = named(w, n);
+		const Text whole(item ? item->visibleName() : n, 100000, PL_FONT_VIEWS);
+		check(item && item->label.lines > 1 && item->labelText().inkWidth() <= 72 &&
+				inkPixels(item->labelText().t) == inkPixels(whole.t),
+			"\"" + n + "\" wraps onto lines within the cell, every letter drawn");
+	}
+	check(named(w, "short")->label.lines == 1 &&
+			named(w, "short")->labelBoxHeight(named(w, "short")->label, 13) == 13,
+		"a short name keeps its one-line box");
+	check(w->iconGrid().cellH > 64, "the rows grow to fit the tallest name");
+	w->arrange(Arrange::Name);
+	bool apart = true;
+	for (auto &a : w->m_items) {
+		for (auto &b : w->m_items) {
+			if (a != b && w->itemRect(*a).intersects(w->itemRect(*b))) {
+				apart = false;
+			}
+		}
+	}
+	check(apart, "no name overlaps another icon or name");
+	pl_setting_set("grid-spacing", "tight");
+	FolderWindow::preferencesChanged();
+	check(named(w, spaced)->labelText().inkWidth() <= 56, "a tight grid wraps names narrower");
+	pl_setting_set("grid-spacing", nullptr);
+	FolderWindow::preferencesChanged();
+	large.icons.size = IconSize::Small;
+	w->setViewOptions(large);
+	w->arrange(Arrange::Name);
+	bool sideApart = true;
+	for (auto &a : w->m_items) {
+		for (auto &b : w->m_items) {
+			if (a != b && w->itemRect(*a).intersects(w->itemRect(*b))) {
+				sideApart = false;
+			}
+		}
+	}
+	check(sideApart && named(w, unbroken)->sideLabel.lines > 1,
+		"small icons' names wrap beside them, without overlapping");
+	check(!w->grab().isNull(), "wrapped names draw");
 
 	w->close();
 	settle();

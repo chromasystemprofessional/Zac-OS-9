@@ -30,11 +30,19 @@ struct Item {
 	/* Key for remembered positions; the name unless set (disk, Trash). */
 	QString stateKey;
 	const QString &key() const { return stateKey.isEmpty() ? name : stateKey; }
-	/* The name as drawn: `label` cut in the middle to fit a grid cell,
-	 * `fullLabel` whole (shown while selected). Reset both on a rename. */
-	std::unique_ptr<Text> label, fullLabel;
+	/* The name as drawn: `label` whole, wrapped onto lines to fit under a
+	 * large icon; `sideLabel` the same beside a small icon; `fullLabel` on
+	 * one line (list view). Each remembers the width it was wrapped to.
+	 * Reset all on a rename. */
+	struct WrappedLabel {
+		std::unique_ptr<Text> text;
+		int width = 0, lines = 1;
+	};
+	WrappedLabel label, sideLabel;
+	std::unique_ptr<Text> fullLabel;
 	void resetLabels() {
-		label.reset();
+		label = {};
+		sideLabel = {};
 		fullLabel.reset();
 	}
 
@@ -83,6 +91,7 @@ struct Item {
 	QString fontFile;
 	int fontFaceIndex = 0;
 	Text renderName(int maxWidth) const;
+	Text renderString(const QString &s, int maxWidth) const;
 
 	/* For list view. */
 	bool isDir = false;
@@ -98,12 +107,20 @@ struct Item {
 	/* A folder's contents added up (Calculate folder sizes); -1 until then. */
 	qint64 folderSize = -1;
 
-	/* Label below the icon, views font. As in Mac OS 8 and 9: a long name is
-	 * cut in the middle ("Mousepad…ferences") to fit its grid cell, and shown
-	 * whole while the icon is selected. */
+	/* Label below the icon, views font: the whole name, wrapped onto as many
+	 * lines as it needs to fit the grid's width (Preferences' grid spacing),
+	 * at spaces and hyphens where it can. The views' grids grow taller to
+	 * fit their tallest label, so names never overlap. */
 	const Text &labelText();
+	/* Beside a small icon, wrapped to `ink`. */
+	const Text &sideLabelText(int ink);
 	const Text &fullLabelText();
-	const Text &shownLabel() { return selected ? fullLabelText() : labelText(); }
+	const Text &shownLabel() { return labelText(); }
+	/* A label's box height and its baseline within the box: a plain one-line
+	 * name keeps the views font's fixed box; a wrapped one, or a font's name
+	 * in its own face, its text's. */
+	int labelBoxHeight(const WrappedLabel &l, int plainH) const;
+	int labelBaseline(const WrappedLabel &l, int plainBaseline) const;
 };
 
 /* Directory listing as Finder items, folders and files mixed, by name
@@ -163,7 +180,7 @@ void paintIcon(pl_canvas *c, Item &item, int x, int y, int size, bool highlight)
  * is drawn). Cached until the associations change. */
 const std::vector<uint32_t> *documentIcon(const QString &mimeType, int size);
 /* Is `p` on the label of the icon at (x, y)? */
-bool iconLabelContains(Item &item, int x, int y, QPoint p);
+bool iconLabelContains(Item &item, int x, int y, QPoint p, int limitW = 0);
 /* The label alone, again: called for the selected icons after everything
  * else, so a whole name lies over its neighbours rather than under them.
  * Kept inside the canvas. */
@@ -196,8 +213,8 @@ void arrangeIcons(std::vector<Item *> items, Arrange how,
 /* Can items be dropped into this one (folder, disk, Trash)? */
 bool acceptsDrops(const Item &item);
 /* Hit area of an icon item at (x, y): the icon square or its label. */
-bool iconItemContains(Item &item, int x, int y, QPoint p);
+bool iconItemContains(Item &item, int x, int y, QPoint p, int limitW = 0);
 /* The icon square and label together, for a selection rectangle. */
-QRect iconItemRect(Item &item, int x, int y);
+QRect iconItemRect(Item &item, int x, int y, int limitW = 0);
 /* The Finder's dotted gray selection rectangle. */
 void paintMarquee(pl_canvas *c, const QRect &r);

@@ -262,6 +262,24 @@ int main(int argc, char **argv) {
 		check(waitFor([&] { return afterAlert.canReadLine(); }),
 			"Finder still accepts clients after the modal command's socket is deleted");
 	}
+	{
+		/* zacos9-finder-ctl sends a command and hangs up at once. Refresh
+		 * serves GLib's main loop, which is Qt's: the hang-up must not
+		 * delete the socket while it is still delivering the command. */
+		for (int i = 0; i < 3; i++) {
+			QLocalSocket transient;
+			transient.connectToServer(Finder::socketPath());
+			waitFor([&] { return transient.canReadLine(); });
+			transient.write("cmd refresh\n");
+			transient.flush();
+			transient.abort();
+			settle();
+		}
+		QLocalSocket afterRefresh;
+		afterRefresh.connectToServer(Finder::socketPath());
+		check(waitFor([&] { return afterRefresh.canReadLine(); }),
+			"a client hanging up during Refresh leaves Finder running");
+	}
 	auto disconnectedDisk = std::make_unique<Item>();
 	disconnectedDisk->name = "adam's home";
 	disconnectedDisk->path = home.path() + "/network/adam's home";
@@ -405,6 +423,70 @@ int main(int argc, char **argv) {
 	check(desktop.m_disk && desktop.m_trash &&
 		desktop.m_disk->isVirtual && !desktop.m_trash->path.isEmpty(),
 		"startup disk and Trash remain separate from real Desktop files");
+	{
+		/* A long name wraps whole under its icon; the rows make room. */
+		const int rows = desktop.cellH();
+		const QString longName = "A desktop file with a rather long name that wraps";
+		write(path + "/" + longName);
+		check(waitFor([&] { return hasFile(desktop, longName); }) && desktop.cellH() > rows,
+			"a long name on the desktop wraps and its rows grow to fit");
+		QFile::remove(path + "/" + longName);
+		check(waitFor([&] { return !hasFile(desktop, longName); }) && desktop.cellH() == rows,
+			"and close up again when it goes");
+		/* The disk and the Trash move about the desktop and stay put, as on
+		 * a Mac; dragged anywhere else they carry nothing. */
+		const QPoint diskWas = desktop.m_disk->pos, trashWas = desktop.m_trash->pos;
+		desktop.selectByName(QString());
+		desktop.m_disk->selected = desktop.m_trash->selected = true;
+		desktop.placeSelection(QPoint(-200, 40), Qt::NoModifier);
+		check(desktop.m_disk->pos == diskWas + QPoint(-200, 40) &&
+				desktop.m_trash->pos.x() == trashWas.x() - 200,
+			"the startup disk and the Trash can be moved about the desktop");
+		const FolderState saved = FolderState::load(desktop.folderPath());
+		check(saved.icons.value("::disk") == desktop.m_disk->pos &&
+				saved.icons.value("::trash") == desktop.m_trash->pos,
+			"and stay where they were put");
+		const IconArrangement arranged = desktop.m_state.options.icons.arrangement;
+		desktop.m_state.options.icons.arrangement = IconArrangement::KeepArranged;
+		desktop.placeSelection(QPoint(0, 60), Qt::NoModifier);
+		check(desktop.m_disk->pos == diskWas + QPoint(-200, 100),
+			"disks move even while the files are kept arranged");
+		desktop.m_state.options.icons.arrangement = arranged;
+		const QPoint before = desktop.m_disk->pos;
+		QMimeData place;
+		place.setData(ICON_MOVE_MIME, QByteArray());
+		place.setData(PLACE_ONLY_MIME, QByteArray());
+		QDropEvent foreign(QPointF(10, 400), Qt::MoveAction, &place, Qt::LeftButton, Qt::NoModifier);
+		desktop.dropEvent(&foreign);
+		check(!foreign.isAccepted() && desktop.m_disk->pos == before,
+			"a disk-and-Trash drag is taken by nothing but its own desktop");
+		/* A place saved on a bigger screen (Monitors' scale turned back
+		 * up) is off this one: the icon takes a free spot instead, can be
+		 * clicked, and keeps its saved place for when the screen grows. */
+		Item *external = nullptr;
+		for (auto &item : desktop.m_files) {
+			if (item->name == "External file") {
+				external = item.get();
+			}
+		}
+		const QPoint offScreen(desktop.width() + 500, 60);
+		desktop.m_state.icons.insert("External file", offScreen);
+		desktop.placeIcons();
+		check(external && external->pos.x() >= 0 &&
+				external->pos.x() <= desktop.width() - PL_ICON_LARGE &&
+				desktop.itemAt(external->pos + QPoint(16, 16)) == external,
+			"an icon saved off the screen comes back onto it, and can be clicked");
+		check(desktop.m_state.icons.value("External file") == offScreen,
+			"and keeps its saved place for a bigger screen");
+		desktop.m_state.icons.remove("External file");
+		desktop.placeIcons();
+		desktop.m_disk->pos = diskWas;
+		desktop.m_trash->pos = trashWas;
+		desktop.m_state.icons.remove("::disk");
+		desktop.m_state.icons.remove("::trash");
+		desktop.m_state.save(desktop.folderPath());
+		desktop.selectByName(QString());
+	}
 	/* The contextual menu's Print: offered for documents, not folders. */
 	const auto stateWith = [&](const QString &name) {
 		desktop.selectByName(name);

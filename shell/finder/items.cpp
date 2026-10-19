@@ -13,6 +13,7 @@
 #include <QStandardPaths>
 #include <QFile>
 #include <QSet>
+#include <QTextBoundaryFinder>
 #include <algorithm>
 #include <cerrno>
 #include <cstring>
@@ -25,9 +26,9 @@
 #include "thumbnails.h"
 #include "fonts.h"
 #include "vfs.h"
+#include "settings.h"
 
-static constexpr int LABEL_SHORT_INK = 72; /* inside an 80-px grid cell, with room between */
-static constexpr int LABEL_MAX_INK = 400;   /* a whole name (Mac OS allowed 31 characters) */
+static constexpr int LABEL_MAX_INK = 400;   /* a whole name on one line (list view) */
 static constexpr int LABEL_GAP = 2;      /* icon bottom to label box top */
 static constexpr int LABEL_PAD_X = 2;    /* label box padding beside the ink */
 static constexpr int LABEL_H = 13;       /* label box height */
@@ -35,37 +36,132 @@ static constexpr int LABEL_BASELINE = 10;
 static constexpr const char *CUSTOM_ICON_ATTR = "user.zacos9.custom-icon";
 static constexpr ssize_t CUSTOM_ICON_MAX = 64 * 1024;
 
-/* `name` cut in the middle with an ellipsis so its ink fits `maxInk`, as
- * Mac OS 8 and 9 shortened long names in icon views: both the start and
- * the end (often a number or an extension) stay readable. */
-static QString middleTruncated(const QString &name, int maxInk, pl_font font) {
-	const auto fits = [&](const QString &s) { return Text(s, 100000, font).inkWidth() <= maxInk; };
-	if (fits(name)) {
-		return name;
-	}
-	const auto cut = [&](int keep) {
-		return name.left((keep + 1) / 2) + QStringLiteral("…") + name.right(keep / 2);
+/* A large icon's name wraps to its grid cell's width (Wide 80 px, Tight
+ * 64 px), less room between neighbours. */
+static int labelWrapInk() {
+	char v[16]; /* viewoptions.h's tightGrid(), which the file portal lacks */
+	return pl_setting("grid-spacing", v, sizeof(v)) && strcmp(v, "tight") == 0 ? 56 : 72;
+}
+
+/* `name` broken into lines whose ink (`ink`) fits `maxInk`: at spaces and
+ * after hyphens where it can (Unicode line breaks), else between characters
+ * for a word too long for a line. Spaces at a break are dropped. */
+static QStringList wrapName(const QString &name, int maxInk,
+		const std::function<int(const QString &)> &ink) {
+	const auto line = [&](int from, int to) {
+		while (to > from && name.at(to - 1).isSpace()) {
+			to--;
+		}
+		return name.mid(from, to - from);
 	};
-	int lo = 0, hi = static_cast<int>(name.size()) - 1;
-	while (lo < hi) { /* the most characters that still fit */
-		const int mid = (lo + hi + 1) / 2;
-		if (fits(cut(mid))) {
-			lo = mid;
-		} else {
-			hi = mid - 1;
+	QList<int> breaks;
+	QTextBoundaryFinder lineBreaks(QTextBoundaryFinder::Line, name);
+	for (int p = lineBreaks.toNextBoundary(); p > 0; p = lineBreaks.toNextBoundary()) {
+		breaks.push_back(p);
+	}
+	QStringList lines;
+	int start = 0;
+	while (start < name.size()) {
+		int end = -1;
+		for (int b : breaks) { /* the furthest break that still fits */
+			if (b <= start) {
+				continue;
+			}
+			if (ink(line(start, b)) > maxInk) {
+				break;
+			}
+			end = b;
+		}
+		if (end < 0) { /* one word wider than a line: as much of it as fits */
+			QTextBoundaryFinder chars(QTextBoundaryFinder::Grapheme, name);
+			chars.setPosition(start);
+			end = chars.toNextBoundary();
+			for (int p = chars.toNextBoundary(); p > 0 && ink(line(start, p)) <= maxInk;
+					p = chars.toNextBoundary()) {
+				end = p;
+			}
+		}
+		lines.push_back(line(start, end));
+		start = end;
+	}
+	if (lines.isEmpty()) {
+		lines.push_back(name);
+	}
+	return lines;
+}
+
+/* Lines drawn one under another, each centred (under an icon) or from the
+ * left (beside one), as one text: the label code draws and measures it as
+ * it would a single line. */
+static Text stacked(std::vector<Text> &lines, bool centred) {
+	int width = 0, pitch = 0;
+	for (const Text &l : lines) {
+		if (!l.t) {
+			return std::move(lines.front());
+		}
+		width = std::max(width, l.inkWidth());
+		pitch = std::max(pitch, l.t->height);
+	}
+	if (lines.size() == 1 || width == 0) {
+		return std::move(lines.front());
+	}
+	auto *t = static_cast<plat_text *>(calloc(1, sizeof(plat_text)));
+	t->width = t->stride = t->advance = width;
+	t->height = pitch * static_cast<int>(lines.size());
+	t->baseline = lines.front().t->baseline;
+	t->ink_l = 0;
+	t->ink_r = width - 1;
+	t->mask = static_cast<uint8_t *>(calloc(static_cast<size_t>(t->stride * t->height), 1));
+	for (size_t i = 0; i < lines.size(); i++) {
+		const plat_text *l = lines[i].t;
+		if (l->ink_l < 0) {
+			continue;
+		}
+		const int x0 = (centred ? (width - lines[i].inkWidth()) / 2 : 0) - l->ink_l;
+		const int y0 = pitch * static_cast<int>(i);
+		for (int y = 0; y < l->height; y++) {
+			for (int x = l->ink_l; x <= l->ink_r; x++) {
+				t->mask[(y0 + y) * t->stride + x0 + x] = l->mask[y * l->stride + x];
+			}
 		}
 	}
-	return cut(lo);
+	Text result;
+	result.t = t;
+	return result;
+}
+
+/* Fills `cache` with the name wrapped to `ink`, unless it already is. */
+static const Text &wrapped(const Item &item, Item::WrappedLabel &cache, int ink, bool centred) {
+	if (!cache.text || cache.width != ink) {
+		const QStringList parts = wrapName(item.visibleName(), ink,
+			[&](const QString &s) { return item.renderString(s, 100000).inkWidth(); });
+		std::vector<Text> lines;
+		for (const QString &part : parts) {
+			lines.push_back(item.renderString(part, 100000));
+		}
+		cache.width = ink;
+		cache.lines = static_cast<int>(lines.size());
+		cache.text = std::make_unique<Text>(stacked(lines, centred));
+	}
+	return *cache.text;
 }
 
 const Text &Item::labelText() {
-	if (!label) {
-		label = fontFile.isEmpty() ?
-			std::make_unique<Text>(middleTruncated(visibleName(), LABEL_SHORT_INK, nameFont()),
-				LABEL_SHORT_INK, nameFont()) :
-			std::make_unique<Text>(renderName(LABEL_SHORT_INK));
-	}
-	return *label;
+	return wrapped(*this, label, labelWrapInk(), true);
+}
+
+const Text &Item::sideLabelText(int ink) {
+	return wrapped(*this, sideLabel, ink, false);
+}
+
+int Item::labelBoxHeight(const WrappedLabel &l, int plainH) const {
+	const bool measured = l.text && l.text->t && (!fontFile.isEmpty() || l.lines > 1);
+	return measured ? l.text->t->height + 2 : plainH;
+}
+
+int Item::labelBaseline(const WrappedLabel &l, int plainBaseline) const {
+	const bool measured = l.text && l.text->t && (!fontFile.isEmpty() || l.lines > 1);
+	return measured ? l.text->t->baseline + 1 : plainBaseline;
 }
 
 const Text &Item::fullLabelText() {
@@ -76,11 +172,15 @@ const Text &Item::fullLabelText() {
 }
 
 Text Item::renderName(int maxWidth) const {
+	return renderString(visibleName(), maxWidth);
+}
+
+Text Item::renderString(const QString &s, int maxWidth) const {
 	if (fontFile.isEmpty()) {
-		return Text(visibleName(), maxWidth, nameFont());
+		return Text(s, maxWidth, nameFont());
 	}
 	Text result;
-	result.t = fontRenderName(visibleName(), maxWidth, fontFile, fontFaceIndex);
+	result.t = fontRenderName(s, maxWidth, fontFile, fontFaceIndex);
 	return result;
 }
 
@@ -434,8 +534,7 @@ static void labelBox(Item &item, int x, int y, int *l, int *t, int *r, int *b, i
 		*r += shift;
 	}
 	*t = y + PL_ICON_LARGE + LABEL_GAP;
-	const auto *text = item.shownLabel().t;
-	*b = *t + (item.fontFile.isEmpty() || !text ? LABEL_H : text->height + 2) - 1;
+	*b = *t + item.labelBoxHeight(item.label, LABEL_H) - 1;
 }
 
 int nearestFreeSlot(QPoint p, const std::function<QPoint(int)> &slot, int slotCount,
@@ -502,9 +601,9 @@ bool acceptsDrops(const Item &item) {
 		item.kind == PL_ICON_TRASH_EMPTY || item.kind == PL_ICON_TRASH_FULL || item.kind == PL_ICON_PRINTER;
 }
 
-bool iconLabelContains(Item &item, int x, int y, QPoint p) {
+bool iconLabelContains(Item &item, int x, int y, QPoint p, int limitW) {
 	int l, t, r, b;
-	labelBox(item, x, y, &l, &t, &r, &b);
+	labelBox(item, x, y, &l, &t, &r, &b, limitW);
 	return QRect(QPoint(l, t), QPoint(r, b)).contains(p);
 }
 
@@ -658,22 +757,21 @@ void paintIconLabel(pl_canvas *c, Item &item, int x, int y, bool onDesktop) {
 		pl_fill(c, l, t, r, b, C_WHITE);
 	}
 	const auto *text = item.shownLabel().t;
-	pl_text(c, text, l + LABEL_PAD_X,
-		t + (item.fontFile.isEmpty() || !text ? LABEL_BASELINE : text->baseline + 1), ink);
+	pl_text(c, text, l + LABEL_PAD_X, t + item.labelBaseline(item.label, LABEL_BASELINE), ink);
 }
 
-bool iconItemContains(Item &item, int x, int y, QPoint p) {
+bool iconItemContains(Item &item, int x, int y, QPoint p, int limitW) {
 	if (QRect(x, y, PL_ICON_LARGE, PL_ICON_LARGE).contains(p)) {
 		return true;
 	}
 	int l, t, r, b;
-	labelBox(item, x, y, &l, &t, &r, &b);
+	labelBox(item, x, y, &l, &t, &r, &b, limitW);
 	return QRect(QPoint(l, t), QPoint(r, b)).contains(p);
 }
 
-QRect iconItemRect(Item &item, int x, int y) {
+QRect iconItemRect(Item &item, int x, int y, int limitW) {
 	int l, t, r, b;
-	labelBox(item, x, y, &l, &t, &r, &b);
+	labelBox(item, x, y, &l, &t, &r, &b, limitW);
 	return QRect(x, y, PL_ICON_LARGE, PL_ICON_LARGE).united(QRect(QPoint(l, t), QPoint(r, b)));
 }
 

@@ -289,7 +289,13 @@ when it runs **under X11**. On Wayland it never does, on any desktop. So:
   its own `zxdg_output_manager_v1`, hidden from every other client, while
   wlroots' manager is hidden from Xwayland. Without it the X11 root stays at
   the layout's size and Xwayland would keep the pointer out of the right and
-  bottom of a scaled window.
+  bottom of a scaled window. Each output reaches from its layout corner to
+  its pixel corner, though, not just its pixels: ordinary (1x) X11 windows
+  keep layout coordinates, and with two screens at scale 2, one away from
+  the layout's origin, a 1x window there was outside every X11 output, so
+  X11 kept the pointer off it. Adobe Reader 9's menu bar ignored every
+  click until the scale was turned off. X11 outputs may overlap; at scale 1
+  nothing changes (test: `xwayland-output`).
 - **Not every "Electron" app has the exporter.** The ChatGPT desktop app
   (`/usr/lib/chatgpt`, checked 2026-10-10) reports Electron 42 but runs on
   OpenAI's own runtime ("owl", Chromium 155) without Electron's Linux
