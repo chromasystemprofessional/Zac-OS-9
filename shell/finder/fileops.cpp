@@ -644,7 +644,7 @@ QMimeData *itemDragMime(const std::vector<Item *> &items) {
 }
 
 void startItemDrag(QWidget *source, const std::vector<Item *> &items,
-		const std::vector<QPoint> &itemOrigins, QPoint pointer) {
+		const std::vector<QPoint> &itemOrigins, QPoint pointer, bool placeOnly) {
 	if (items.empty()) {
 		return;
 	}
@@ -669,6 +669,16 @@ void startItemDrag(QWidget *source, const std::vector<Item *> &items,
 	pixmap.setDevicePixelRatio(dpr);
 
 	auto *drag = new QDrag(source);
+	if (placeOnly) {
+		auto *mime = new QMimeData;
+		mime->setData(ICON_MOVE_MIME, QByteArray());
+		mime->setData(PLACE_ONLY_MIME, QByteArray());
+		drag->setMimeData(mime);
+		drag->setPixmap(pixmap);
+		drag->setHotSpot(pointer - bounds.topLeft());
+		drag->exec(Qt::MoveAction, Qt::MoveAction);
+		return;
+	}
 	drag->setMimeData(itemDragMime(items));
 	drag->setPixmap(pixmap);
 	drag->setHotSpot(pointer - bounds.topLeft());
