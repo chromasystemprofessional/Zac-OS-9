@@ -7,7 +7,8 @@
 #include "draw.h"
 
 struct CollarParts {
-	enum Kind { Volume, SoundSet, Network, Bluetooth, Resolution, Brightness, Power, Phone, Keychain, Media, FileSharing, Printer };
+	/* Extension: a module from another program (extensions.h), which draws its own icon. */
+	enum Kind { Volume, SoundSet, Network, Bluetooth, Resolution, Brightness, Power, Phone, Keychain, Media, FileSharing, Printer, Extension };
 	/* Measured from the reference: a 13 px close box and scroll buttons, 30 px
 	 * module cells, each followed by a 1 px black divider, and an 18 px grip
 	 * whose first column is the divider. Folded, only the grip shows. */

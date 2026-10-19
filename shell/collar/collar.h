@@ -7,6 +7,7 @@
 #include <vector>
 #include "collarart.h"
 #include "displaycontrols.h"
+#include "extensions.h"
 #include "filesharing.h"
 #include "kdeconnect.h"
 #include "keychain.h"
@@ -43,6 +44,7 @@ public:
 	MediaPlayers &media() { return m_media; }
 	SharingStatus &fileSharing() { return m_sharing; }
 	PrinterChoice &printerChoice() { return m_printers; }
+	CollarExtensions &extensions() { return m_extensions; }
 	void rebuildModules();
 	/* Shows or hides The Collar in hot-key mode (zacos9-collar --toggle). */
 	void toggle();
@@ -71,6 +73,7 @@ private:
 	MediaPlayers m_media;
 	SharingStatus m_sharing;
 	PrinterChoice m_printers;
+	CollarExtensions m_extensions;
 	QSettings m_settings;
 	Visibility m_visibility = Show;
 	QList<Module> m_modules;
@@ -78,6 +81,8 @@ private:
 	int m_wanted = 0, m_first = 0, m_focus = 0, m_pressed = -1;
 	Part m_part = None;
 	int m_bottom = 0, m_startBottom = 0, m_startVisible = 0;
+	/* The offset last painted, so the one the compositor shows now (pointerHeight()). */
+	int m_shownBottom = 0, m_startHeight = 0;
 	QPoint m_start, m_pressPoint;
 	QString m_soundError;
 	Part partAt(QPoint point) const;
@@ -91,7 +96,10 @@ private:
 	void addSharingItems(std::vector<PopupItem> &items, std::vector<std::function<void()>> &actions);
 	void addPrinterItems(std::vector<PopupItem> &items, std::vector<std::function<void()>> &actions, int &checked);
 	void addKeychainItems(std::vector<PopupItem> &items, std::vector<std::function<void()>> &actions, int &checked);
+	void addExtensionItems(const QString &key, std::vector<PopupItem> &items,
+		std::vector<std::function<void()>> &actions, int &checked);
 	void launch(const QString &program, const QStringList &args = {});
 	QString description(int index) const;
+	int pointerHeight(const QMouseEvent *event) const;
 	bool active(int index) const;
 };

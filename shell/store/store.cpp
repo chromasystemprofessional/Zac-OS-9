@@ -431,6 +431,8 @@ void StoreWindow::act() {
 	const QStringList packages = item->packages;
 	const QString id = item->id;
 	const QString source = item->source;
+	const QString start = item->extraStart;
+	const StoreItem chosen = *item;
 	const bool wasInstalled = m_installed;
 	m_busy = true;
 	m_actionButton.enabled = false;
@@ -446,6 +448,12 @@ void StoreWindow::act() {
 		runFlatpak(wasInstalled
 			? QStringList{ "uninstall", "--noninteractive", "--", packages.first() }
 			: QStringList{ "install", "--noninteractive", "flathub", packages.first() }, &ok, &err);
+	} else if (source == "extra" && !wasInstalled) {
+		ok = installExtra(chosen, &err);
+		/* Its package starts it at every login; this is the first one. */
+		if (ok && !start.isEmpty()) {
+			QProcess::startDetached(start, {});
+		}
 	} else {
 		runAppstoreHelper(QStringList{ wasInstalled ? "remove" : "install" } + packages, &ok, &err);
 	}
@@ -514,7 +522,8 @@ void StoreWindow::paintDetail(pl_canvas *c, uint32_t bg) const {
 	} else if (!m_status.isEmpty()) {
 		panelText(c, m_status, textX, barY + PL_PROGRESS_H - 1, PL_FONT_VIEWS, GRAY(0x5));
 	} else {
-		QString state = (item->source == "flathub" ? "Flathub: " : "Debian: ") +
+		QString state = (item->source == "flathub" ? "Flathub: " : item->source == "extra" ? "ZacOS Extras: "
+			: "Debian: ") +
 			QString(m_installed ? "Installed." : "Not installed.");
 		if (m_styleOn) {
 			state += " " + item->styleLabel + " is on.";

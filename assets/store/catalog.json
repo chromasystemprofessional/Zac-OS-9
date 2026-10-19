@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "categories": ["Featured", "Internet", "Graphics", "Productivity", "Multimedia", "Games", "Utilities"],
+  "categories": ["Featured", "Internet", "Graphics", "Productivity", "Multimedia", "Games", "Utilities", "Extras"],
   "items": [
     { "id": "firefox", "name": "Firefox", "category": "Internet", "featured": true,
       "blurb": "Browse the web.", "packages": ["firefox-esr"] },
@@ -50,6 +50,10 @@
     { "id": "archiveutility", "name": "Archive Utility", "category": "Utilities",
       "blurb": "Open and make Zip and other archives.", "packages": ["xarchiver"] },
     { "id": "calculator", "name": "Calculator", "category": "Utilities",
-      "blurb": "A desk calculator.", "packages": ["galculator"] }
+      "blurb": "A desk calculator.", "packages": ["galculator"] },
+
+    { "id": "extra-hue", "name": "Hue Lights", "category": "Extras",
+      "blurb": "Philips Hue lights in The Collar: turn the rooms you choose on and off, set their brightness and pick their scenes. Press the bridge's link button, then choose Connect from the Hue module.",
+      "packages": ["zacos9-extra-hue"], "extra": { "id": "hue", "start": "zacos9-collar-hue" } }
   ]
 }

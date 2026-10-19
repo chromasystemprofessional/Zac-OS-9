@@ -895,6 +895,44 @@ static void refresh_cursor_or_hide(struct plat_server *server) {
 	}
 }
 
+struct surface_find {
+	struct wlr_surface *surface;
+	bool found;
+	int x, y;
+};
+
+static void find_surface_buffer(struct wlr_scene_buffer *buffer, int sx, int sy, void *data) {
+	struct surface_find *find = data;
+	struct wlr_scene_surface *scene_surface = wlr_scene_surface_try_from_buffer(buffer);
+	if (!find->found && scene_surface && scene_surface->surface == find->surface) {
+		find->found = true;
+		find->x = sx;
+		find->y = sy;
+	}
+}
+
+/* Wayland's implicit grab: while a button pressed on a program's surface is
+ * down, that surface keeps the pointer, off its edge too, and gets the release.
+ * The Collar moves under the pointer when ⌘-dragged; without this a quick drag
+ * left it behind, so its move (and drag sound) never ended. Popup grabs and
+ * drag-and-drop have their own seat grabs and go on as before. */
+static bool implicit_grab_motion(struct plat_server *server, uint32_t time) {
+	struct wlr_seat_pointer_state *state = &server->seat->pointer_state;
+	if (state->button_count == 0 || !state->focused_surface || state->grab != state->default_grab) {
+		return false;
+	}
+	/* Where the surface is now: it may have moved since the press. */
+	struct surface_find find = { .surface = state->focused_surface };
+	wlr_scene_node_for_each_buffer(&server->scene->tree.node, find_surface_buffer, &find);
+	if (!find.found) {
+		return false;
+	}
+	int scale = xwayland_surface_scale(find.surface);
+	wlr_seat_pointer_notify_motion(server->seat, time,
+		(server->cursor->x - find.x) * scale, (server->cursor->y - find.y) * scale);
+	return true;
+}
+
 static void process_cursor_motion(struct plat_server *server, uint32_t time) {
 	tracks_moved(server);
 	if (access_zoom_factor() > 1.0) {
@@ -930,6 +968,10 @@ static void process_cursor_motion(struct plat_server *server, uint32_t time) {
 		} else {
 			wlr_seat_pointer_clear_focus(server->seat);
 		}
+		refresh_cursor_or_hide(server);
+		return;
+	}
+	if (implicit_grab_motion(server, time)) {
 		refresh_cursor_or_hide(server);
 		return;
 	}
