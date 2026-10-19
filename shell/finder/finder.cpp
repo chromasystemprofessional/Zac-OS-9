@@ -162,7 +162,12 @@ void Finder::start(Desktop *desktop) {
 				while (socket && socket->canReadLine()) {
 					QString line = QString::fromUtf8(socket->readLine()).trimmed();
 					if (line.startsWith("cmd ")) {
-						command(line.mid(4));
+						/* Run once the socket has finished delivering it: a
+						 * command that serves the event loop (Refresh, an
+						 * alert) would otherwise let a client that hangs up
+						 * at once (zacos9-finder-ctl) delete the socket
+						 * while Qt is still inside its readyRead. In order. */
+						QTimer::singleShot(0, &m_server, [this, name = line.mid(4)] { command(name); });
 					} else if (line.startsWith("afp-disconnected ")) {
 						const QByteArray encoded = line.mid(17).toLatin1();
 						const QByteArray bytes = QByteArray::fromHex(encoded);

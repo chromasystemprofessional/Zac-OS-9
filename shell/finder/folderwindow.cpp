@@ -37,6 +37,10 @@ static constexpr int HEADER_BASELINE = 13;
 static constexpr int ICONS_TOP = HEADER_H + 1; /* below a black separator */
 static constexpr int MARGIN = 8;
 static constexpr int SMALL_LABEL_X = PL_ICON_SMALL + 4; /* small icon's name */
+/* A small icon's name wraps to the rest of its cell. */
+static int sideLabelInk(int cellW) {
+	return std::max(8, cellW - SMALL_LABEL_X - 4);
+}
 
 /* Button view (Mac OS 8): a grid of small-bevel buttons, names below.
  * Not in the HIG; sizes are estimates. TODO: measure. Small buttons
@@ -738,19 +742,22 @@ void FolderWindow::scrollStep() {
 
 FolderWindow::IconGrid FolderWindow::iconGrid() const {
 	const bool tight = tightGrid();
-	int labelHeight = 13;
-	for (const auto &item : m_items) {
-		if (!item->fontFile.isEmpty()) {
-			const auto *text = item->fullLabelText().t;
-			labelHeight = std::max(labelHeight, text ? text->height + 2 : 13);
-		}
-	}
+	/* Rows grow by however much the tallest name needs beyond one line. */
+	int extra = 0;
 	if (smallIcons()) {
-		return tight ? IconGrid{ 104, std::max(20, labelHeight + 4), 0 } :
-			IconGrid{ 128, std::max(24, labelHeight + 4), 0 };
+		const int cellW = tight ? 104 : 128;
+		for (const auto &item : m_items) {
+			item->sideLabelText(sideLabelInk(cellW));
+			extra = std::max(extra, item->labelBoxHeight(item->sideLabel, 14) - 14);
+		}
+		return tight ? IconGrid{ cellW, 20 + extra, 0 } : IconGrid{ cellW, 24 + extra, 0 };
 	}
-	return tight ? IconGrid{ 64, std::max(56, 38 + labelHeight), (64 - PL_ICON_LARGE) / 2 } :
-		IconGrid{ 80, std::max(64, 38 + labelHeight), (80 - PL_ICON_LARGE) / 2 };
+	for (const auto &item : m_items) {
+		item->labelText();
+		extra = std::max(extra, item->labelBoxHeight(item->label, 13) - 13);
+	}
+	return tight ? IconGrid{ 64, 56 + extra, (64 - PL_ICON_LARGE) / 2 } :
+		IconGrid{ 80, 64 + extra, (80 - PL_ICON_LARGE) / 2 };
 }
 
 bool FolderWindow::smallIcons() const {
@@ -862,10 +869,9 @@ void FolderWindow::snapToGrid(const std::vector<Item *> &moved) {
 }
 
 QRect FolderWindow::smallLabelBox(Item &item) {
-	const int maxW = item.selected ? 1000 : iconGrid().cellW - SMALL_LABEL_X - 4;
-	Text t = item.renderName(std::max(8, maxW));
+	const Text &t = item.sideLabelText(sideLabelInk(iconGrid().cellW));
 	return QRect(item.pos.x() + SMALL_LABEL_X - 2, item.pos.y() + 1, t.inkWidth() + 4,
-		item.fontFile.isEmpty() || !t.t ? 14 : t.t->height + 2);
+		item.labelBoxHeight(item.sideLabel, 14));
 }
 
 QRect FolderWindow::itemRect(Item &item) {
@@ -905,15 +911,13 @@ void FolderWindow::paintItemLabel(pl_canvas *c, Item &item) {
 		return;
 	}
 	const QRect box = smallLabelBox(item);
-	const int maxW = item.selected ? 1000 : iconGrid().cellW - SMALL_LABEL_X - 4;
-	Text t = item.renderName(std::max(8, maxW));
+	const Text &t = *item.sideLabel.text;
 	uint32_t ink = C_BLACK;
 	if (item.selected) {
 		pl_fill(c, box.left(), box.top(), box.right(), box.bottom() - 1, C_BLACK);
 		ink = C_WHITE;
 	}
-	pl_text(c, t.t, box.left() + 2,
-		box.top() + (item.fontFile.isEmpty() || !t.t ? 10 : t.t->baseline + 1), ink);
+	pl_text(c, t.t, box.left() + 2, box.top() + item.labelBaseline(item.sideLabel, 10), ink);
 }
 
 void FolderWindow::itemRenamed(const QString &from, const QString &to) {
@@ -956,9 +960,8 @@ QSize FolderWindow::buttonCell() const {
 	const bool tight = tightGrid();
 	int labelHeight = 13;
 	for (const auto &item : m_items) {
-		if (!item->fontFile.isEmpty() && item->fullLabelText().t) {
-			labelHeight = std::max(labelHeight, item->fullLabelText().t->height + 2);
-		}
+		item->labelText();
+		labelHeight = std::max(labelHeight, item->labelBoxHeight(item->label, 13));
 	}
 	if (m_state.options.buttons.size == IconSize::Small) {
 		return tight ? QSize(64, std::max(42, SMALL_BUTTON + labelHeight + 4)) :
@@ -1012,14 +1015,13 @@ void FolderWindow::paintButtons(pl_canvas *content) {
 
 		const Text &label = item->shownLabel();
 		const int lx = b.center().x() - label.inkWidth() / 2, top = b.bottom() + 3;
-		const bool font = !item->fontFile.isEmpty() && label.t;
 		uint32_t ink = C_BLACK;
 		if (item->selected) {
 			pl_fill(content, lx - 2, top, lx + label.inkWidth() + 1,
-				top + (font ? label.t->height + 1 : 12), C_BLACK);
+				top + item->labelBoxHeight(item->label, 13) - 1, C_BLACK);
 			ink = C_WHITE;
 		}
-		pl_text(content, label.t, lx, top + (font ? label.t->baseline + 1 : 10), ink);
+		pl_text(content, label.t, lx, top + item->labelBaseline(item->label, 10), ink);
 	}
 }
 
@@ -1032,8 +1034,7 @@ Item *FolderWindow::buttonAt(QPoint p, bool *onButton) {
 			return item.get();
 		}
 		const int w = item->shownLabel().inkWidth();
-		const auto *text = item->shownLabel().t;
-		const int height = item->fontFile.isEmpty() || !text ? 13 : text->height + 2;
+		const int height = item->labelBoxHeight(item->label, 13);
 		if (QRect(b.center().x() - w / 2 - 2, b.bottom() + 3, w + 4, height).contains(p)) {
 			*onButton = false;
 			return item.get();
