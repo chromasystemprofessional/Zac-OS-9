@@ -410,8 +410,15 @@ void load() {
 		if (id.isEmpty() || name.isEmpty()) {
 			continue;
 		}
+		/* ZacOS 9's own programs are reached from the Zac menu and
+		 * Control Panels, except the ones it files in Utilities (Disk
+		 * Setup). */
 		if (id.startsWith(QLatin1String("zacos9-"))) {
-			continue;
+			const char *cats = G_IS_DESKTOP_APP_INFO(info)
+				? g_desktop_app_info_get_categories(G_DESKTOP_APP_INFO(info)) : nullptr;
+			if (!fromUtf8(cats).split(';').contains(QLatin1String("X-ZacOS9-Utility"))) {
+				continue;
+			}
 		}
 		/* Wine files a Windows program's Start-menu shortcuts as desktop
 		 * entries (~/.local/share/applications/wine/Programs/..., ids

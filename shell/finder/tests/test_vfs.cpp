@@ -232,6 +232,9 @@ int main(int argc, char **argv) {
 			entry(utility.first, "/bin/true", "Categories=" + utility.second + ";\n"));
 	}
 	writeEntry(appsDir, "zacos9-somepanel.desktop", entry("A ZacOS Panel"));
+	/* One of ZacOS 9's own that it files in Utilities (Disk Setup). */
+	writeEntry(appsDir, "zacos9-diskthing.desktop", entry("A ZacOS Disk Tool", "/bin/true",
+		"Categories=System;Utility;X-ZacOS9-Utility;\nOnlyShowIn=ZacOS9;\n"));
 	writeEntry(homeAppsDir + "/wine/Programs/Notepad Plus", "Notepad Plus.desktop",
 		entry("Notepad Plus", "env WINEPREFIX=/nonexistent wine C:\\\\np.exe"));
 	writeEntry(homeAppsDir + "/wine/Programs/Notepad Plus", "Uninstall Notepad Plus.desktop",
@@ -406,6 +409,10 @@ int main(int argc, char **argv) {
 	check(apps.contains("Only Ours"), "an entry for this desktop only is shown");
 	check(!apps.contains("Came With The System"), "an application the system came with is not shown");
 	check(!apps.contains("A ZacOS Panel"), "ZacOS 9's own entries are not shown");
+	check(!apps.contains("A ZacOS Disk Tool") &&
+			namesIn(vfsPathFor("system-folder/utilities")).contains("A ZacOS Disk Tool") &&
+			!namesIn(vfsPathFor("system-folder/utilities")).contains("A ZacOS Panel"),
+		"ZacOS 9's own utilities (Disk Setup) are in System Folder > Utilities");
 	check(apps.contains("Notepad Plus"), "a Windows program installed through Wine is shown");
 	check(!apps.contains("Uninstall Notepad Plus"), "its Wine uninstaller is not shown");
 	const int markWatch = vfsOnChange([] {});
