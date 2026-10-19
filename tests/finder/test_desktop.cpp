@@ -460,6 +460,38 @@ int main(int argc, char **argv) {
 		desktop.dropEvent(&foreign);
 		check(!foreign.isAccepted() && desktop.m_disk->pos == before,
 			"a disk-and-Trash drag is taken by nothing but its own desktop");
+		{
+			/* A selection rectangle let go of over another window never
+			 * sees its release. Pressing an icon after it selects that icon
+			 * alone, and moving it draws no rectangle on from the old start. */
+			const QPoint disk = desktop.m_disk->pos;
+			QPoint empty(-1, -1);
+			for (int dx = 8; dx < 200 && empty.x() < 0; dx += 8) {
+				if (!desktop.itemAt(disk + QPoint(-dx, 4))) {
+					empty = disk + QPoint(-dx, 4);
+				}
+			}
+			const QPoint trash = desktop.m_trash->pos + QPoint(PL_ICON_LARGE / 2, PL_ICON_LARGE / 2);
+			const auto mouse = [&](QEvent::Type type, QPoint at) {
+				QMouseEvent e(type, QPointF(at), QPointF(at), Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+				if (type == QEvent::MouseButtonPress) {
+					desktop.mousePressEvent(&e);
+				} else {
+					desktop.mouseMoveEvent(&e);
+				}
+			};
+			desktop.selectByName(QString());
+			mouse(QEvent::MouseButtonPress, empty);
+			mouse(QEvent::MouseMove, empty + QPoint(-4, -2));
+			mouse(QEvent::MouseButtonPress, trash);
+			mouse(QEvent::MouseMove, trash + QPoint(2, 1));
+			check(empty.x() >= 0 && desktop.itemAt(trash) == desktop.m_trash.get() &&
+					!desktop.m_marquee && desktop.m_trash->selected && !desktop.m_disk->selected &&
+					desktop.selectedItems().size() == 1,
+				"pressing an icon after a selection rectangle lost its release selects that icon alone");
+			desktop.mouseReleaseEvent(nullptr);
+			desktop.selectByName(QString());
+		}
 		/* A place saved on a bigger screen (Monitors' scale turned back
 		 * up) is off this one: the icon takes a free spot instead, can be
 		 * clicked, and keeps its saved place for when the screen grows. */
