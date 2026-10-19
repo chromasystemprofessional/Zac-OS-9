@@ -405,6 +405,41 @@ int main(int argc, char **argv) {
 	check(desktop.m_disk && desktop.m_trash &&
 		desktop.m_disk->isVirtual && !desktop.m_trash->path.isEmpty(),
 		"startup disk and Trash remain separate from real Desktop files");
+	{
+		/* The disk and the Trash move about the desktop and stay put, as on
+		 * a Mac; dragged anywhere else they carry nothing. */
+		const QPoint diskWas = desktop.m_disk->pos, trashWas = desktop.m_trash->pos;
+		desktop.selectByName(QString());
+		desktop.m_disk->selected = desktop.m_trash->selected = true;
+		desktop.placeSelection(QPoint(-200, 40), Qt::NoModifier);
+		check(desktop.m_disk->pos == diskWas + QPoint(-200, 40) &&
+				desktop.m_trash->pos.x() == trashWas.x() - 200,
+			"the startup disk and the Trash can be moved about the desktop");
+		const FolderState saved = FolderState::load(desktop.folderPath());
+		check(saved.icons.value("::disk") == desktop.m_disk->pos &&
+				saved.icons.value("::trash") == desktop.m_trash->pos,
+			"and stay where they were put");
+		const IconArrangement arranged = desktop.m_state.options.icons.arrangement;
+		desktop.m_state.options.icons.arrangement = IconArrangement::KeepArranged;
+		desktop.placeSelection(QPoint(0, 60), Qt::NoModifier);
+		check(desktop.m_disk->pos == diskWas + QPoint(-200, 100),
+			"disks move even while the files are kept arranged");
+		desktop.m_state.options.icons.arrangement = arranged;
+		const QPoint before = desktop.m_disk->pos;
+		QMimeData place;
+		place.setData(ICON_MOVE_MIME, QByteArray());
+		place.setData(PLACE_ONLY_MIME, QByteArray());
+		QDropEvent foreign(QPointF(10, 400), Qt::MoveAction, &place, Qt::LeftButton, Qt::NoModifier);
+		desktop.dropEvent(&foreign);
+		check(!foreign.isAccepted() && desktop.m_disk->pos == before,
+			"a disk-and-Trash drag is taken by nothing but its own desktop");
+		desktop.m_disk->pos = diskWas;
+		desktop.m_trash->pos = trashWas;
+		desktop.m_state.icons.remove("::disk");
+		desktop.m_state.icons.remove("::trash");
+		desktop.m_state.save(desktop.folderPath());
+		desktop.selectByName(QString());
+	}
 	/* The contextual menu's Print: offered for documents, not folders. */
 	const auto stateWith = [&](const QString &name) {
 		desktop.selectByName(name);

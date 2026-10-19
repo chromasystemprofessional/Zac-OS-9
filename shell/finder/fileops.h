@@ -36,10 +36,13 @@ inline constexpr char APPLICATION_ITEMS_MIME[] = "application/x-zacos9-applicati
 /* Startup Items being dragged out: a JSON array of desktop-file IDs. */
 inline constexpr char STARTUP_ITEMS_MIME[] = "application/x-zacos9-startup-items";
 inline constexpr char FONT_ITEMS_MIME[] = "application/x-zacos9-font-items";
+/* With ICON_MOVE_MIME: the desktop's disks and Trash being moved about it,
+ * which carry nothing anywhere else. */
+inline constexpr char PLACE_ONLY_MIME[] = "application/x-zacos9-place-only";
 /* Caller owns the file URLs or private virtual-item alias payload. */
 QMimeData *itemDragMime(const std::vector<Item *> &items);
 void startItemDrag(QWidget *source, const std::vector<Item *> &items,
-		const std::vector<QPoint> &itemOrigins, QPoint pointer);
+		const std::vector<QPoint> &itemOrigins, QPoint pointer, bool placeOnly = false);
 
 /* Paths carried by a Finder drag (or any file drag). */
 QStringList draggedPaths(const QMimeData *mime);

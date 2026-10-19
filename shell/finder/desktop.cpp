@@ -717,18 +717,20 @@ void Desktop::mouseMoveEvent(QMouseEvent *e) {
 	}
 	std::vector<Item *> items;
 	std::vector<QPoint> origins;
+	/* Every icon moves about the desktop, as on a Mac. The startup disk,
+	 * the Trash and the Unix volume go nowhere else: with any of them, the
+	 * drag only places icons (dropped in a window, it does nothing).
+	 * Other disks still eject when dragged to the Trash. */
+	bool placeOnly = false;
 	for (Item *item : selectedItems()) {
-		/* The disk and the Trash stay put. Dragging a disk (a USB one, or a
-		 * network volume) to the Trash ejects it on a Mac. */
-		if (!isFixed(item) || item->isNetworkVolume || item->isLocalVolume) {
-			items.push_back(item);
-			origins.push_back(item->pos);
-		}
+		items.push_back(item);
+		origins.push_back(item->pos);
+		placeOnly |= item == m_disk.get() || item == m_trash.get() || item == m_unix.get();
 	}
 	m_pressItem = nullptr;
 	m_renameTimer.stop();
 	m_dragStart = m_pressPos;
-	startItemDrag(this, items, origins, m_pressPos);
+	startItemDrag(this, items, origins, m_pressPos, placeOnly);
 	Finder::instance().dragEnded();
 }
 
@@ -755,6 +757,7 @@ void Desktop::clearDropTarget() {
 
 void Desktop::dragEnterEvent(QDragEnterEvent *e) {
 	if (iconsShown() && (e->mimeData()->hasUrls() || e->mimeData()->hasFormat(ALIAS_ITEMS_MIME) ||
+			(e->source() == this && e->mimeData()->hasFormat(PLACE_ONLY_MIME)) ||
 			(e->source() == nullptr && canMakeClipping(e->mimeData())) ||
 			e->mimeData()->hasFormat(APPLICATION_ITEMS_MIME) ||
 			e->mimeData()->hasFormat(STARTUP_ITEMS_MIME))) {
@@ -763,7 +766,8 @@ void Desktop::dragEnterEvent(QDragEnterEvent *e) {
 }
 
 void Desktop::dragMoveEvent(QDragMoveEvent *e) {
-	Item *target = dropTargetAt(e->position().toPoint(), draggedPaths(e->mimeData()));
+	Item *target = e->mimeData()->hasFormat(PLACE_ONLY_MIME) ? nullptr :
+		dropTargetAt(e->position().toPoint(), draggedPaths(e->mimeData()));
 	for (Item *item : allItems()) {
 		item->dropTarget = item == target;
 	}
@@ -779,7 +783,13 @@ void Desktop::dragLeaveEvent(QDragLeaveEvent *) {
 }
 
 void Desktop::dropEvent(QDropEvent *e) {
-	Item *target = dropTargetAt(e->position().toPoint(), draggedPaths(e->mimeData()));
+	const bool placeOnly = e->mimeData()->hasFormat(PLACE_ONLY_MIME);
+	if (placeOnly && e->source() != this) {
+		e->ignore();
+		return;
+	}
+	Item *target = placeOnly ? nullptr :
+		dropTargetAt(e->position().toPoint(), draggedPaths(e->mimeData()));
 	clearDropTarget();
 	/* A disk dragged to the Trash is ejected; anything else dropped
 	 * there goes in it, below. */
@@ -797,52 +807,8 @@ void Desktop::dropEvent(QDropEvent *e) {
 			return;
 		}
 	}
-	if (!target && e->source() == this && !(e->modifiers() & Qt::AltModifier)) {
-		/* Icons dragged about the desktop: they move there, and stay (on
-		 * the grid, if it snaps; kept arranged, they go back in line). */
-		const IconArrangement arrangement = m_state.options.icons.arrangement;
-		const QPoint delta = e->position().toPoint() - m_dragStart;
-		std::vector<Item *> moved;
-		for (Item *item : selectedItems()) {
-			if (isFixed(item) || arrangement == IconArrangement::KeepArranged) {
-				continue;
-			}
-			QPoint p = item->pos + delta;
-			p.setX(std::clamp(p.x(), 0, width() - PL_ICON_LARGE));
-			p.setY(std::clamp(p.y(), MBAR_HEIGHT, height() - PL_ICON_LARGE - 16));
-			item->pos = p;
-			moved.push_back(item);
-			m_state.icons.insert(item->key(), p);
-		}
-		/* ⌘-dragged (Ctrl, as zacos9-wm hands ⌘ on), they snap too. */
-		if ((arrangement == IconArrangement::SnapToGrid || (e->modifiers() & Qt::ControlModifier)) &&
-				!moved.empty()) {
-			int count = 0;
-			const auto slot = gridSlot(&count);
-			QSet<int> taken;
-			for (Item *item : allItems()) {
-				if (std::find(moved.begin(), moved.end(), item) != moved.end()) {
-					continue;
-				}
-				for (int s = 0; s < count; s++) {
-					if (slot(s) == item->pos) {
-						taken.insert(s);
-						break;
-					}
-				}
-			}
-			for (Item *item : moved) {
-				const int s = nearestFreeSlot(item->pos, slot, count, taken);
-				if (s >= 0) {
-					taken.insert(s);
-					item->pos = slot(s);
-					m_state.icons.insert(item->key(), item->pos);
-				}
-			}
-		}
-		m_state.save(folderPath());
-		placeIcons();
-		update();
+	if (e->source() == this && (placeOnly || (!target && !(e->modifiers() & Qt::AltModifier)))) {
+		placeSelection(e->position().toPoint() - m_dragStart, e->modifiers());
 		e->setDropAction(Qt::MoveAction);
 		e->accept();
 		return;
@@ -864,6 +830,55 @@ void Desktop::dropEvent(QDropEvent *e) {
 	}
 	dropItems(e, target, folderPath());
 	Finder::instance().dragEnded();
+}
+
+/* The selected icons moved by `delta` about the desktop, and kept there (on
+ * the grid, if it snaps; kept arranged, the files go back in line). */
+void Desktop::placeSelection(QPoint delta, Qt::KeyboardModifiers modifiers) {
+	const IconArrangement arrangement = m_state.options.icons.arrangement;
+	std::vector<Item *> moved;
+	for (Item *item : selectedItems()) {
+		/* Kept arranged, the files keep their order; disks and the
+		 * Trash, outside it, stay where they are put. */
+		if (!isFixed(item) && arrangement == IconArrangement::KeepArranged) {
+			continue;
+		}
+		QPoint p = item->pos + delta;
+		p.setX(std::clamp(p.x(), 0, width() - PL_ICON_LARGE));
+		p.setY(std::clamp(p.y(), MBAR_HEIGHT, height() - PL_ICON_LARGE - 16));
+		item->pos = p;
+		moved.push_back(item);
+		m_state.icons.insert(item->key(), p);
+	}
+	/* ⌘-dragged (Ctrl, as zacos9-wm hands ⌘ on), they snap too. */
+	if ((arrangement == IconArrangement::SnapToGrid || (modifiers & Qt::ControlModifier)) &&
+			!moved.empty()) {
+		int count = 0;
+		const auto slot = gridSlot(&count);
+		QSet<int> taken;
+		for (Item *item : allItems()) {
+			if (std::find(moved.begin(), moved.end(), item) != moved.end()) {
+				continue;
+			}
+			for (int s = 0; s < count; s++) {
+				if (slot(s) == item->pos) {
+					taken.insert(s);
+					break;
+				}
+			}
+		}
+		for (Item *item : moved) {
+			const int s = nearestFreeSlot(item->pos, slot, count, taken);
+			if (s >= 0) {
+				taken.insert(s);
+				item->pos = slot(s);
+				m_state.icons.insert(item->key(), item->pos);
+			}
+		}
+	}
+	m_state.save(folderPath());
+	placeIcons();
+	update();
 }
 
 void Desktop::keyPressEvent(QKeyEvent *e) {
