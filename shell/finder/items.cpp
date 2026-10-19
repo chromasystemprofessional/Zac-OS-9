@@ -691,6 +691,51 @@ const std::vector<uint32_t> *documentIcon(const QString &mimeType, int size) {
 	return icon.empty() ? nullptr : &icon;
 }
 
+/* "A" on a font's suitcase label (the white panel of
+ * assets/icons/platinum-icons.picon's "font" icon): in the font itself on
+ * the large icon; on the small one, five pixels square, the same for all. */
+static void paintFontSample(pl_canvas *c, const Item &item, int x, int y, int size) {
+	if (size < 32) {
+		static const char *const small[] = { "..0..", ".0.0.", ".000.", "0...0", "0...0" };
+		pl_grays(c, x + 5, y + 7, small, 5);
+		return;
+	}
+	const QRect panel(x + 9, y + 13, 14, 12);
+	const QRect label = panel.intersected(QRect(c->x, c->y, c->width, c->height));
+	if (label.isEmpty()) {
+		return;
+	}
+	Text sample;
+	sample.t = fontRenderSample(item.fontFile, item.fontFaceIndex, 15);
+	const plat_text *t = sample.t;
+	if (!t || t->ink_l < 0) {
+		return;
+	}
+	int top = -1, bottom = -1;
+	for (int row = 0; row < t->height; row++) {
+		for (int col = t->ink_l; col <= t->ink_r; col++) {
+			if (t->mask[row * t->stride + col]) {
+				top = top < 0 ? row : top;
+				bottom = row;
+				break;
+			}
+		}
+	}
+	if (top < 0) {
+		return;
+	}
+	/* Drawn on a canvas of just the label, so a wide glyph stays on it. */
+	pl_canvas onLabel = *c;
+	onLabel.px = c->px + (label.top() - c->y) * c->stride + (label.left() - c->x);
+	onLabel.x = label.left();
+	onLabel.y = label.top();
+	onLabel.width = label.width();
+	onLabel.height = label.height();
+	const int inkX = panel.left() + (panel.width() - (t->ink_r - t->ink_l + 1) + 1) / 2;
+	const int inkTop = panel.top() + (panel.height() - (bottom - top + 1) + 1) / 2;
+	pl_text(&onLabel, t, inkX, inkTop + (t->baseline - top), C_BLACK);
+}
+
 void paintIcon(pl_canvas *c, Item &item, int x, int y, int size, bool highlight) {
 	if (!item.thumbnailResolved) {
 		if (item.isVirtual || item.isDir || item.kind != PL_ICON_DOCUMENT ||
@@ -716,6 +761,9 @@ void paintIcon(pl_canvas *c, Item &item, int x, int y, int size, bool highlight)
 		pl_image_blend(c, x, y, custom->data(), size, size, highlight);
 	} else {
 		pl_icon_paint_label(c, x, y, item.iconKind(), size, highlight, item.labelColor());
+		if (item.kind == PL_ICON_FONT && !item.fontFile.isEmpty()) {
+			paintFontSample(c, item, x, y, size);
+		}
 		if (item.isUsbVolume && item.kind == PL_ICON_DISK) {
 			const int badgeSize = size >= 32 ? 16 : 8;
 			Pixels badge(PL_ICON_SMALL, PL_ICON_SMALL);
