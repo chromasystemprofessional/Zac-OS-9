@@ -375,6 +375,20 @@ void Desktop::placeIcons() {
 	const int right = width() - ICON_MARGIN_RIGHT - PL_ICON_LARGE;
 	const QPoint trashHome(right, height() - ICON_MARGIN_BOTTOM - PL_ICON_LARGE - 16);
 	QHash<QString, QPoint> placed = m_state.icons;
+	/* A place that is off the screen now (the screen got smaller: another
+	 * resolution, or Monitors' scale turned up) isn't used: the icon takes
+	 * a free spot instead, as on a Mac, and goes back there if the screen
+	 * grows again. Its label alone would show, and nothing could be
+	 * clicked. */
+	for (auto it = placed.begin(); it != placed.end();) {
+		const QPoint p = *it;
+		if (p.x() < 0 || p.x() > width() - PL_ICON_LARGE ||
+				p.y() < MBAR_HEIGHT || p.y() > height() - PL_ICON_LARGE) {
+			it = placed.erase(it);
+		} else {
+			++it;
+		}
+	}
 	if (!placed.contains(m_trash->key())) {
 		placed.insert(m_trash->key(), trashHome);
 	}
@@ -565,12 +579,12 @@ void Desktop::paintEvent(QPaintEvent *) {
 
 Item *Desktop::itemAt(QPoint pos) {
 	for (Item *item : fixedItems()) {
-		if (iconItemContains(*item, item->pos.x(), item->pos.y(), pos)) {
+		if (iconItemContains(*item, item->pos.x(), item->pos.y(), pos, width())) {
 			return item;
 		}
 	}
 	for (auto it = m_files.rbegin(); it != m_files.rend(); ++it) {
-		if (iconItemContains(**it, (*it)->pos.x(), (*it)->pos.y(), pos)) {
+		if (iconItemContains(**it, (*it)->pos.x(), (*it)->pos.y(), pos, width())) {
 			return it->get();
 		}
 	}
@@ -645,7 +659,7 @@ void Desktop::mousePressEvent(QMouseEvent *e) {
 	const bool extend = e->modifiers() & Qt::ShiftModifier;
 	m_renameTimer.stop();
 	if (renamable(hit) && hit->selected && !extend && selectedItems().size() == 1 &&
-			iconLabelContains(*hit, hit->pos.x(), hit->pos.y(), pos)) {
+			iconLabelContains(*hit, hit->pos.x(), hit->pos.y(), pos, width())) {
 		m_renameItem = hit;
 		m_renameTimer.start(QApplication::doubleClickInterval());
 	}
@@ -708,7 +722,7 @@ void Desktop::updateMarquee(QPoint pos) {
 	const QRect area = QRect(m_marqueeStart, m_marqueeEnd).normalized();
 	for (Item *item : allItems()) {
 		const bool base = m_marqueeBase.contains(item->path);
-		item->selected = iconItemRect(*item, item->pos.x(), item->pos.y()).intersects(area)
+		item->selected = iconItemRect(*item, item->pos.x(), item->pos.y(), width()).intersects(area)
 			? (!m_marqueeExtend || !base) : base;
 	}
 	update();

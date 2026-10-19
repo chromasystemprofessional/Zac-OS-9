@@ -180,7 +180,7 @@ void paintIcon(pl_canvas *c, Item &item, int x, int y, int size, bool highlight)
  * is drawn). Cached until the associations change. */
 const std::vector<uint32_t> *documentIcon(const QString &mimeType, int size);
 /* Is `p` on the label of the icon at (x, y)? */
-bool iconLabelContains(Item &item, int x, int y, QPoint p);
+bool iconLabelContains(Item &item, int x, int y, QPoint p, int limitW = 0);
 /* The label alone, again: called for the selected icons after everything
  * else, so a whole name lies over its neighbours rather than under them.
  * Kept inside the canvas. */
@@ -213,8 +213,8 @@ void arrangeIcons(std::vector<Item *> items, Arrange how,
 /* Can items be dropped into this one (folder, disk, Trash)? */
 bool acceptsDrops(const Item &item);
 /* Hit area of an icon item at (x, y): the icon square or its label. */
-bool iconItemContains(Item &item, int x, int y, QPoint p);
+bool iconItemContains(Item &item, int x, int y, QPoint p, int limitW = 0);
 /* The icon square and label together, for a selection rectangle. */
-QRect iconItemRect(Item &item, int x, int y);
+QRect iconItemRect(Item &item, int x, int y, int limitW = 0);
 /* The Finder's dotted gray selection rectangle. */
 void paintMarquee(pl_canvas *c, const QRect &r);
