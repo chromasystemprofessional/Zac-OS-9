@@ -45,7 +45,7 @@ static QString kdeConnectProgram(const QString &name) {
 /* ---- Behaviour -------------------------------------------------------------------- */
 
 Collar::Collar(bool monitor)
-	: m_sound(this), m_controls(this), m_displays(this), m_kdeConnect(this),
+	: m_sound(this), m_controls(this), m_displays(this), m_kdeConnect(this), m_extensions(this),
 	  m_settings(configPath(), QSettings::IniFormat) {
 	setWindowTitle("The Collar");
 	setAccessibleName("The Collar");
@@ -99,6 +99,8 @@ Collar::Collar(bool monitor)
 	m_sharing.failed = [](const QString &error) { Alert::ask(error, "OK", {}); };
 	m_printers.changed = [this] { rebuildModules(); };
 	m_printers.failed = [](const QString &error) { Alert::ask(error, "OK", {}); };
+	m_extensions.changed = [this] { rebuildModules(); };
+	m_extensions.failed = [](const QString &error) { Alert::ask(error, "OK", {}); };
 	// The Collar control panel writes desktop.conf; follow it as it changes.
 	QDir().mkpath(configDir());
 	auto *settingsWatcher = new QFileSystemWatcher(this);
@@ -121,6 +123,7 @@ Collar::Collar(bool monitor)
 			m_media.refresh();
 			m_sharing.refresh();
 			m_printers.refresh();
+			m_extensions.refresh();
 		});
 		timer->start(5000);
 		m_sound.refresh();
@@ -131,6 +134,7 @@ Collar::Collar(bool monitor)
 		m_media.refresh();
 		m_sharing.refresh();
 		m_printers.refresh();
+		m_extensions.refresh();
 	}
 }
 
@@ -160,6 +164,10 @@ void Collar::rebuildModules() {
 	// The keyring daemon's keychains, as Mac OS 9's Keychain Strip showed them.
 	if (m_keychains.available) {
 		modules.append(Module{ Keychain, QString() });
+	}
+	// Other programs' modules (extensions.h), such as the Hue lights in ZAC-OS-EXTRAS.
+	for (const ExtensionModule &m : m_extensions.modules) {
+		modules.append(Module{ Extension, m.key() });
 	}
 	for (const CollarDisplay &d : m_displays.displays) {
 		modules.append(Module{ Resolution, d.name });
@@ -302,6 +310,10 @@ bool Collar::active(int index) const {
 	case Media: return m_media.current() && m_media.current()->playing();
 	case FileSharing: return m_sharing.on();
 	case Printer: return !m_printers.current.isEmpty();
+	case Extension: {
+		const ExtensionModule *e = m_extensions.module(m.device);
+		return e && e->active;
+	}
 	}
 	return false;
 }
@@ -334,6 +346,12 @@ void Collar::paintEvent(QPaintEvent *) {
 			const int level = phone ? phone->charge : keychain ? !keychain->locked
 				: m.kind == FileSharing ? int(m_sharing.visitors.size()) : -1;
 			icon(c, m.kind, r.left() + 2, 4, on, level);
+			if (const ExtensionModule *e = m.kind == Extension ? m_extensions.module(m.device) : nullptr) {
+				if (!e->icon.isNull()) {
+					const QImage image = e->icon.convertToFormat(QImage::Format_ARGB32);
+					pl_image_blend(c, r.left() + 2, 4, reinterpret_cast<const uint32_t *>(image.constBits()), 16, 16, false);
+				}
+			}
 			menuArrow(c, r.left() + 22);
 			if (m.kind == Volume) {
 				for (const SoundOutput &output : m_sound.outputs) {
@@ -394,6 +412,11 @@ QString Collar::menuLabel(int index) const {
 		return "Media";
 	case FileSharing: return "File Sharing";
 	case Printer: return "Printer";
+	case Extension:
+		if (const ExtensionModule *e = m_extensions.module(m.device)) {
+			return e->label;
+		}
+		return "The Collar";
 	}
 	return "The Collar";
 }
@@ -494,6 +517,11 @@ QString Collar::description(int index) const {
 	case Printer:
 		return m_printers.current.isEmpty() ? QString("No printer chosen")
 			: "Printing on " + PrinterChoice::shownName(m_printers.current);
+	case Extension:
+		if (const ExtensionModule *e = m_extensions.module(m.device)) {
+			return e->description.isEmpty() ? e->label : e->description;
+		}
+		return "The Collar";
 	}
 	return "The Collar";
 }
@@ -776,6 +804,30 @@ void Collar::addKeychainItems(std::vector<PopupItem> &items, std::vector<std::fu
 	}
 }
 
+void Collar::addExtensionItems(const QString &key, std::vector<PopupItem> &items,
+		std::vector<std::function<void()>> &actions, int &checked) {
+	const ExtensionModule *e = m_extensions.module(key);
+	if (!e || e->menu.isEmpty()) {
+		items.emplace_back(e ? e->description : QString("Not responding"), false);
+		actions.emplace_back();
+		return;
+	}
+	for (const ExtensionItem &item : e->menu) {
+		if (item.flags & ExtensionItem::Separator) {
+			items.emplace_back(QString(), false, true);
+			actions.emplace_back();
+			continue;
+		}
+		if (item.flags & ExtensionItem::Checked) {
+			checked = static_cast<int>(items.size());
+		}
+		const bool enabled = item.flags & ExtensionItem::Enabled;
+		items.emplace_back(item.label, enabled);
+		actions.push_back(enabled ? std::function<void()>([this, key, id = item.id] { m_extensions.activate(key, id); })
+			: std::function<void()>());
+	}
+}
+
 void Collar::openModule(int index) {
 	if (index < 0 || index >= m_modules.size()) {
 		return;
@@ -936,6 +988,8 @@ void Collar::openModule(int index) {
 		addSharingItems(items, actions);
 	} else if (module.kind == Printer) {
 		addPrinterItems(items, actions, checked);
+	} else if (module.kind == Extension) {
+		addExtensionItems(module.device, items, actions, checked);
 	}
 	int room = INT_MAX, below = 0;
 	if (QScreen *screen = windowHandle()->screen()) {

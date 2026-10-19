@@ -1267,7 +1267,7 @@ executable('zacos9-controlpanel',
 collar_sources = [
   'collar/collar.cpp', 'collar/collarart.cpp', 'collar/systemcontrols.cpp',
   'collar/displaycontrols.cpp', 'collar/kdeconnect.cpp', 'collar/keychain.cpp', 'collar/media.cpp',
-  'collar/filesharing.cpp', 'collar/printing.cpp', 'print/printers.cpp', 'panels/sharingclient.cpp', 'panels/soundclient.cpp', 'finder/alert.cpp', 'finder/platinumshell.cpp',
+  'collar/filesharing.cpp', 'collar/printing.cpp', 'collar/extensions.cpp', 'print/printers.cpp', 'panels/sharingclient.cpp', 'panels/soundclient.cpp', 'finder/alert.cpp', 'finder/platinumshell.cpp',
   finder_protocol,
 ]
 collar_exe = executable('zacos9-collar', 'collar/main.cpp', collar_sources,
@@ -1289,7 +1289,8 @@ collar_test_env = ['ZACOS9_MPRIS_PREFIX=org.zacos9.test.NoMpris.', 'ZACOS9_SHARI
   'ZACOS9_CUPS_BIN=' + meson.current_source_dir() / 'collar/tests/no-printers']
 test('collar-ui', collar_ui_test,
   env: ['QT_QPA_PLATFORM=offscreen', 'ZACOS9_KDECONNECT_SERVICE=org.zacos9.test.NoKdeConnect',
-    'ZACOS9_SECRETS_SERVICE=org.zacos9.test.NoSecrets'] + collar_test_env, timeout: 30)
+    'ZACOS9_SECRETS_SERVICE=org.zacos9.test.NoSecrets',
+    'ZACOS9_COLLAR_EXTENSION_PREFIX=org.zacos9.test.NoExtensions'] + collar_test_env, timeout: 30)
 collar_kdeconnect_test = executable('test-collar-kdeconnect', 'collar/tests/test_kdeconnect.cpp',
   collar_sources,
   link_with: panelkit,
@@ -1321,6 +1322,16 @@ collar_media_test = executable('test-collar-media', 'collar/tests/test_media_sha
 )
 test('collar-media-sharing', find_program('dbus-run-session'),
   args: ['--', collar_media_test], env: ['QT_QPA_PLATFORM=offscreen'], timeout: 60,
+)
+collar_extensions_test = executable('test-collar-extensions', 'collar/tests/test_extensions.cpp',
+  collar_sources,
+  link_with: panelkit,
+  include_directories: include_directories('collar', 'finder', 'panels', 'print'),
+  dependencies: [platinum_dep, qt6, layershellqt, wayland_client],
+  cpp_args: ['-std=c++17'],
+)
+test('collar-extensions', find_program('dbus-run-session'),
+  args: ['--', collar_extensions_test], env: ['QT_QPA_PLATFORM=offscreen'] + collar_test_env, timeout: 60,
 )
 collar_controls_test = executable('test-collar-controls',
   'collar/tests/test_controls.cpp', 'collar/systemcontrols.cpp',

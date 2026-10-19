@@ -7,6 +7,7 @@
 #include <vector>
 #include "collarart.h"
 #include "displaycontrols.h"
+#include "extensions.h"
 #include "filesharing.h"
 #include "kdeconnect.h"
 #include "keychain.h"
@@ -43,6 +44,7 @@ public:
 	MediaPlayers &media() { return m_media; }
 	SharingStatus &fileSharing() { return m_sharing; }
 	PrinterChoice &printerChoice() { return m_printers; }
+	CollarExtensions &extensions() { return m_extensions; }
 	void rebuildModules();
 	/* Shows or hides The Collar in hot-key mode (zacos9-collar --toggle). */
 	void toggle();
@@ -71,6 +73,7 @@ private:
 	MediaPlayers m_media;
 	SharingStatus m_sharing;
 	PrinterChoice m_printers;
+	CollarExtensions m_extensions;
 	QSettings m_settings;
 	Visibility m_visibility = Show;
 	QList<Module> m_modules;
@@ -91,6 +94,8 @@ private:
 	void addSharingItems(std::vector<PopupItem> &items, std::vector<std::function<void()>> &actions);
 	void addPrinterItems(std::vector<PopupItem> &items, std::vector<std::function<void()>> &actions, int &checked);
 	void addKeychainItems(std::vector<PopupItem> &items, std::vector<std::function<void()>> &actions, int &checked);
+	void addExtensionItems(const QString &key, std::vector<PopupItem> &items,
+		std::vector<std::function<void()>> &actions, int &checked);
 	void launch(const QString &program, const QStringList &args = {});
 	QString description(int index) const;
 	bool active(int index) const;

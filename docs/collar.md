@@ -114,6 +114,35 @@ and prompt `Completed` signals. It updates 150 ms after the last one, and also
 every five seconds. `ZACOS9_SECRETS_SERVICE` overrides the service name, which
 tests use.
 
+### Extensions
+
+Other programs can add modules. ZacOS's extras (the `ZAC-OS-EXTRAS`
+tree, such as the Hue lights module) use this. A program that owns a
+session-bus name under `org.zacos9.CollarExtension.` (for example
+`org.zacos9.CollarExtension.Hue`) serves interface
+`org.zacos9.CollarExtension1` at `/org/zacos9/CollarExtension`:
+
+| Member | Signature | Meaning |
+|---|---|---|
+| `GetModules()` | `→ aa{sv}` | One dictionary per module, in order (below). |
+| `Activate(module, item)` | `ss →` | A menu item was chosen. A D-Bus error's message is shown in an alert. The reply may wait (up to 30 s) until the work is done. |
+| `Changed` | signal | Something changed; The Collar calls `GetModules` again. |
+
+Module dictionary keys:
+- `id` (s): stable within the program; required.
+- `label` (s): the menu's heading.
+- `description` (s): the tooltip.
+- `active` (b): drawn as in use.
+- `icon` (ay): 16 × 16 pixels, 1024 bytes of A, R, G, B with straight alpha,
+  rows top to bottom. The program draws its own disabled look.
+- `menu` (a(ssu)): items of (id, label, flags). Flags: 1 enabled, 2 checked,
+  4 separator. The Collar adds the heading and separator itself.
+
+Extension modules follow Keychain, ordered by bus name and then as listed.
+They appear when the name is taken and go when it's released. The Collar also
+rereads them every five seconds. `ZACOS9_COLLAR_EXTENSION_PREFIX` overrides the
+name prefix, which tests use. The client is `shell/collar/extensions.cpp`.
+
 ### Sound sets
 
 The Collar plays the active sound set for its own actions: `menu-open` and
@@ -202,10 +231,10 @@ focus. Its menus are xdg popups attached to that layer.
 ```sh
 scripts/build.sh shell/zacos9-collar shell/test-collar shell/test-collar-controls \
   shell/test-collar-displays shell/test-collar-kdeconnect shell/test-collar-keychain \
-  shell/test-collar-panel \
+  shell/test-collar-panel shell/test-collar-extensions \
   compositor/test-hotkey compositor/zacos9-wm shell/zacos9-capture shell/vptr
 meson test -C build --no-rebuild --num-processes 1 collar-ui collar-controls \
-  collar-displays collar-kdeconnect collar-keychain collar-panel collar-hotkey collar-native
+  collar-displays collar-kdeconnect collar-keychain collar-extensions collar-panel collar-hotkey collar-native
 ```
 
 - `collar-ui` checks:
@@ -231,6 +260,9 @@ meson test -C build --no-rebuild --num-processes 1 collar-ui collar-controls \
   covers the module appearing and disappearing, the keychain list without the
   session keyring, the padlock's pixels, Unlock through the service's prompt,
   choosing the default keychain and Lock All Keychains.
+- `collar-extensions` runs a fake extension on a private session bus. It
+  covers modules appearing in order and disappearing, labels, icon pixels,
+  Activate and its error alert, and rereading on `Changed`.
 - `collar-panel` checks the control panel's pixels against the measured
   layout, its settings, and the hot key recorder.
 - `collar-hotkey` checks how the compositor matches hot keys.
