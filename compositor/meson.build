@@ -172,6 +172,17 @@ test('virtual-pointer-output',
   ),
 )
 
+test('implicit-grab',
+  executable('test-implicit-grab',
+    'tests/test_implicit_grab.c',
+    protocol_headers,
+    include_directories: include_directories('src'),
+    dependencies: [decor_dep, wayland_server, wlroots, xkbcommon, libinput],
+    c_args: ['-ffunction-sections', '-fdata-sections'],
+    link_args: ['-Wl,--gc-sections'],
+  ),
+)
+
 test('access',
   executable('test-access',
     'tests/test_access.c',

@@ -319,6 +319,7 @@ bool Collar::active(int index) const {
 }
 
 void Collar::paintEvent(QPaintEvent *) {
+	m_shownBottom = m_bottom; // this paint's commit carries the margin applyGeometry() set
 	Pixels px(width(), Height);
 	auto *c = &px.c;
 	if (m_collapsed) {
@@ -1037,6 +1038,7 @@ void Collar::mousePressEvent(QMouseEvent *event) {
 	m_start = event->globalPosition().toPoint();
 	m_pressPoint = event->position().toPoint();
 	m_startBottom = m_bottom;
+	m_startHeight = pointerHeight(event);
 	m_startVisible = visibleModules();
 	m_dragged = false;
 	m_part = partAt(m_pressPoint);
@@ -1056,6 +1058,16 @@ void Collar::mousePressEvent(QMouseEvent *event) {
 		m_focus = m_pressed;
 		openModule(m_pressed);
 	}
+}
+
+/* How high the pointer is, for ⌘-dragging The Collar up and down. Qt doesn't know
+ * where a Wayland layer surface is (its global position never changes), so there
+ * it's measured from the offset the compositor shows: the one last painted. */
+int Collar::pointerHeight(const QMouseEvent *event) const {
+	if (QGuiApplication::platformName() == "wayland") {
+		return m_shownBottom + Height - qRound(event->position().y());
+	}
+	return -qRound(event->globalPosition().y());
 }
 
 void Collar::stopMoving(bool cancel) {
@@ -1087,7 +1099,7 @@ void Collar::mouseMoveEvent(QMouseEvent *event) {
 			pl_sound_loop_start("window-drag");
 		}
 		if (m_dragged) {
-			m_bottom = std::max(0, m_startBottom - delta.y());
+			m_bottom = std::max(0, m_startBottom + pointerHeight(event) - m_startHeight);
 			applyGeometry();
 		}
 		return;

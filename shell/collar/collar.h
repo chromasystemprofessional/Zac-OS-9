@@ -81,6 +81,8 @@ private:
 	int m_wanted = 0, m_first = 0, m_focus = 0, m_pressed = -1;
 	Part m_part = None;
 	int m_bottom = 0, m_startBottom = 0, m_startVisible = 0;
+	/* The offset last painted, so the one the compositor shows now (pointerHeight()). */
+	int m_shownBottom = 0, m_startHeight = 0;
 	QPoint m_start, m_pressPoint;
 	QString m_soundError;
 	Part partAt(QPoint point) const;
@@ -98,5 +100,6 @@ private:
 		std::vector<std::function<void()>> &actions, int &checked);
 	void launch(const QString &program, const QStringList &args = {});
 	QString description(int index) const;
+	int pointerHeight(const QMouseEvent *event) const;
 	bool active(int index) const;
 };
