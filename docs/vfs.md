@@ -388,13 +388,14 @@ the name it was installed with (`/etc/zacos9/disk-name`, written by
 
 ```json
 {
-  "version": 14,
+  "version": 15,
   "volume": {},
   "showUnixVolume": false,
   "nodes": [
     { "id": "system-folder", "name": "System Folder", "kind": "folder",
       "icon": "system-folder", "order": 0 },
     { "id": "system-folder/fonts", "name": "Fonts", "kind": "fonts" },
+    { "id": "system-folder/fonts/language-kits", "name": "Language Kits", "kind": "fonts" },
     { "id": "applications", "name": "Applications", "kind": "apps", "order": 1 },
     { "id": "utilities", "name": "Utilities", "kind": "apps", "visible": false,
       "categories": ["Utility", "System", "Settings"] }
@@ -409,7 +410,7 @@ A node's fields:
 |---|---|
 | `id` | Stable and unique. `/` separates it from its parent, so `system-folder/fonts` sits in `system-folder`. |
 | `name` | What the Finder shows. |
-| `kind` | `folder` (curated), `backed` (real directory), `apps`, `panels`, `fonts` (installed font catalog), `resource`, `launcher`, `unix`. |
+| `kind` | `folder` (curated), `backed` (real directory), `apps`, `panels`, `fonts` (installed font catalog: `system-folder/fonts` shows the free fonts that stand in for Mac OS 9's, once each, and the user's own; a `fonts` node whose id ends in `/language-kits` shows every other installed font; see `fontFolderFaces` in `shell/finder/fonts.h`), `resource`, `launcher`, `unix`. |
 | `backing` | For `backed`. `$HOME`, `$XDG_CONFIG_HOME`, `$XDG_DATA_HOME` and `$XDG_DOCUMENTS_DIR` are expanded. |
 | `provider` | For `resource`: fixed provider id (`sounds`, `startup-items`, …), never a command or arbitrary path. |
 | `action` | For built-in `launcher` rows: trusted internal actions (`system-information`, `extensions-manager`) only. |

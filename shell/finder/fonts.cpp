@@ -10,6 +10,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QFileSystemWatcher>
+#include <QHash>
 #include <QStandardPaths>
 #include <QTimer>
 #include <QTextBoundaryFinder>
@@ -27,7 +28,77 @@
 namespace {
 std::vector<FontFace> catalog;
 bool catalogValid = false;
-QCache<QString, Text> previews(512);
+/* Rendered names, by their bytes: a Fonts folder of thousands of faces
+ * keeps every label it has drawn. */
+QCache<QString, Text> previews(16 * 1024 * 1024);
+
+/* One FreeType library, and the faces last drawn with, kept open: wrapping
+ * one name measures it a piece at a time. */
+FT_Library library() {
+	static FT_Library lib = nullptr;
+	if (!lib && FT_Init_FreeType(&lib)) {
+		lib = nullptr;
+	}
+	return lib;
+}
+
+struct OpenFace {
+	FT_Face face = nullptr;
+	~OpenFace() {
+		if (face) {
+			FT_Done_Face(face);
+		}
+	}
+};
+QCache<QString, OpenFace> openFaces(16);
+int facesOpened = 0;
+
+FT_Face openFace(const QString &file, int index) {
+	const QString key = file + '\n' + QString::number(index);
+	if (OpenFace *open = openFaces.object(key)) {
+		return open->face;
+	}
+	FT_Face face = nullptr;
+	if (!library() || FT_New_Face(library(), QFile::encodeName(file).constData(), index, &face)) {
+		return nullptr;
+	}
+	++facesOpened;
+	auto *open = new OpenFace;
+	open->face = face;
+	openFaces.insert(key, open);
+	return face;
+}
+
+/* The free fonts that stand in for the ones Mac OS 9 came with, and for
+ * the web fonts its Internet Explorer brought, in their usual styles. */
+bool inMacSet(const FontFace &face) {
+	static const QStringList families = {
+		"Nimbus Sans",         /* Helvetica */
+		"Nimbus Roman",        /* Times */
+		"Nimbus Mono PS",      /* Courier */
+		"P052",                /* Palatino */
+		"C059",                /* New York */
+		"Standard Symbols PS", /* Symbol */
+		"Z003",                /* Apple Chancery */
+		"Linux Libertine O",   /* Hoefler Text */
+		"DejaVu Sans",         /* Geneva, Verdana */
+		"DejaVu Sans Mono",    /* Monaco */
+		"Liberation Sans",     /* Arial */
+		"Liberation Serif",    /* Times New Roman */
+		"Liberation Mono",     /* Courier New */
+		"Comic Neue",          /* Comic Sans MS */
+	};
+	static const QStringList styles = { "Regular", "Roman", "Book", "Bold", "Italic", "Oblique",
+		"Bold Italic", "Bold Oblique", "Medium Italic" };
+	return families.contains(face.family, Qt::CaseInsensitive) &&
+		styles.contains(face.style, Qt::CaseInsensitive);
+}
+
+/* OpenType and TrueType files before Type 1 copies of the same face. */
+int formatRank(const QString &file) {
+	const QString suffix = QFileInfo(file).suffix().toLower();
+	return suffix == "otf" || suffix == "ttf" || suffix == "ttc" ? 0 : 1;
+}
 
 plat_text *cloneText(const plat_text *source) {
 	auto *copy = static_cast<plat_text *>(std::malloc(sizeof(plat_text)));
@@ -189,9 +260,54 @@ const std::vector<FontFace> &fontCatalog() {
 	return catalog;
 }
 
+std::vector<FontFace> fontFolderFaces(bool languageKits) {
+	std::vector<FontFace> out;
+	QHash<QString, size_t> macByName;
+	QStringList roots;
+	for (const QString &root : userRoots()) {
+		const QString canonical = QFileInfo(root).canonicalFilePath();
+		if (!canonical.isEmpty()) {
+			roots << canonical;
+		}
+	}
+	for (const FontFace &face : fontCatalog()) {
+		const bool own = std::any_of(roots.cbegin(), roots.cend(),
+			[&](const QString &root) { return within(face.file, root); });
+		const bool mac = !own && inMacSet(face);
+		if (languageKits || own) {
+			if (languageKits != (own || mac)) {
+				out.push_back(face);
+			}
+			continue;
+		}
+		if (!mac) {
+			continue;
+		}
+		/* One of each face, though Debian installs some three ways. */
+		const auto seen = macByName.constFind(face.name);
+		if (seen == macByName.cend()) {
+			macByName.insert(face.name, out.size());
+			out.push_back(face);
+		} else if (std::make_pair(formatRank(face.file), face.file) <
+				std::make_pair(formatRank(out[*seen].file), out[*seen].file)) {
+			out[*seen] = face;
+		}
+	}
+	return out;
+}
+
+int fontFacesOpened() {
+	return facesOpened;
+}
+
+void fontRescan() {
+	catalogValid = false;
+}
+
 void fontInvalidate() {
 	catalogValid = false;
 	previews.clear();
+	openFaces.clear();
 }
 
 void fontWatchChanges(const std::function<void()> &changed) {
@@ -246,25 +362,36 @@ void fontWatchChanges(const std::function<void()> &changed) {
 	arm();
 }
 
-plat_text *fontRenderName(const QString &name, int maxWidth, const QString &file, int index) {
+plat_text *fontRenderSample(const QString &file, int index, int pixels) {
+	static QCache<QString, Text> samples(4096);
+	const QString key = file + '\n' + QString::number(index) + '\n' + QString::number(pixels);
+	if (const Text *cached = samples.object(key)) {
+		return cloneText(cached->t);
+	}
+	FT_Face face = openFace(file, index);
+	plat_text *sample = face && FT_Get_Char_Index(face, 'A')
+		? fontRenderName("A", 100, file, index, pixels)
+		: text_render_font("A", 100, PL_FONT_SYSTEM);
+	auto *cached = new Text;
+	cached->t = cloneText(sample);
+	samples.insert(key, cached);
+	return sample;
+}
+
+plat_text *fontRenderName(const QString &name, int maxWidth, const QString &file, int index,
+		int pixels) {
 	const QString cacheKey = file + '\n' + QString::number(index) + '\n' +
-		QString::number(maxWidth) + '\n' + name;
+		QString::number(maxWidth) + '\n' + QString::number(pixels) + '\n' + name;
 	if (const Text *cached = previews.object(cacheKey)) {
 		return cloneText(cached->t);
 	}
-	FT_Library library = nullptr;
-	FT_Face face = nullptr;
-	if (FT_Init_FreeType(&library) || FT_New_Face(library, QFile::encodeName(file).constData(), index, &face)) {
+	FT_Face face = openFace(file, index);
+	if (!face) {
 		qWarning() << "Cannot load font preview:" << file << index;
-		if (library) {
-			FT_Done_FreeType(library);
-		}
 		return text_render_font(name.toUtf8().constData(), maxWidth, PL_FONT_VIEWS);
 	}
-	if (FT_Set_Pixel_Sizes(face, 0, 12)) {
+	if (FT_Set_Pixel_Sizes(face, 0, pixels)) {
 		qWarning() << "Cannot set font preview size:" << file << index;
-		FT_Done_Face(face);
-		FT_Done_FreeType(library);
 		return text_render_font(name.toUtf8().constData(), maxWidth, PL_FONT_VIEWS);
 	}
 	hb_font_t *font = hb_ft_font_create_referenced(face);
@@ -394,10 +521,8 @@ plat_text *fontRenderName(const QString &name, int maxWidth, const QString &file
 		}
 	}
 	hb_font_destroy(font);
-	FT_Done_Face(face);
-	FT_Done_FreeType(library);
 	auto *cached = new Text;
 	cached->t = cloneText(result);
-	previews.insert(cacheKey, cached);
+	previews.insert(cacheKey, cached, std::max(1, result->stride * result->height));
 	return result;
 }

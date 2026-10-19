@@ -34,8 +34,9 @@
  * doesn't have take their default, and nodes it doesn't know about are
  * added, while the user's own nodes and overrides are kept.
  */
-/* 14: Fonts is a generated catalog, not a raw directory. */
-static constexpr int REGISTRY_VERSION = 14;
+/* 14: Fonts is a generated catalog, not a raw directory.
+ * 15: Fonts has a Language Kits folder. */
+static constexpr int REGISTRY_VERSION = 15;
 
 static const char *DEFAULT_REGISTRY = R"JSON({
   "version": 14,
@@ -77,6 +78,7 @@ static const char *DEFAULT_REGISTRY = R"JSON({
     { "id": "system-folder/extensions-manager", "name": "Tricks Manager",
       "kind": "launcher", "action": "extensions-manager" },
     { "id": "system-folder/fonts", "name": "Fonts", "kind": "fonts" },
+    { "id": "system-folder/fonts/language-kits", "name": "Language Kits", "kind": "fonts" },
     { "id": "system-folder/favorites", "name": "Favorites", "kind": "backed",
       "backing": "$XDG_CONFIG_HOME/zacos9/Favorites" },
     { "id": "system-folder/toy-box-items", "name": "Toy Box Items", "kind": "backed",
@@ -683,12 +685,13 @@ std::vector<std::unique_ptr<Item>> vfsList(const QString &path) {
 				++it;
 			}
 		}
-		for (const FontFace &face : fontCatalog()) {
+		const bool languageKits = parentId.endsWith(QLatin1String("/language-kits"));
+		for (const FontFace &face : fontFolderFaces(languageKits)) {
 			VNode node;
 			node.id = parentId + '/' + face.id();
 			node.name = face.name;
 			node.kind = VKind::Font;
-			node.icon = PL_ICON_DOCUMENT;
+			node.icon = PL_ICON_FONT;
 			node.backing = face.file;
 			node.fontFaceIndex = face.index;
 			addNode(node);
