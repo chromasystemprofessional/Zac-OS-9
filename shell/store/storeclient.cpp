@@ -1,12 +1,16 @@
 #include "storeclient.h"
 
 #include <QApplication>
+#include <QCryptographicHash>
 #include <QFile>
 #include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
 #include <QRegularExpression>
+#include <QTemporaryDir>
 #include <functional>
 #include <unistd.h>
 
@@ -56,6 +60,18 @@ std::vector<StoreItem> storeItems() {
 		item.styleBlurb = style.value("blurb").toString();
 		if (item.styleLabel.isEmpty() || item.styleReset.isEmpty()) {
 			item.styleId.clear(); /* an incomplete preset is no preset */
+		}
+		const QJsonObject extra = o.value("extra").toObject();
+		if (!extra.isEmpty()) {
+			item.source = "extra";
+			item.extra = extra.value("id").toString();
+			item.extraStart = extra.value("start").toString();
+			/* Both become parts of URLs, tags and a command line. */
+			static const QRegularExpression name("\\A[a-z0-9][a-z0-9.-]*\\z");
+			if (!name.match(item.extra).hasMatch() || item.packages.size() != 1 ||
+					(!item.extraStart.isEmpty() && !name.match(item.extraStart).hasMatch())) {
+				continue;
+			}
 		}
 		if (!item.id.isEmpty() && !item.name.isEmpty() && !item.packages.isEmpty()) {
 			out.push_back(std::move(item));
@@ -285,4 +301,116 @@ bool parseSoftwareCatalog(const QByteArray &json, const QString &source,
 	}
 	*items = std::move(next);
 	return true;
+}
+
+QString extrasReleasesUrl() {
+	const QString env = qEnvironmentVariable("ZACOS9_EXTRAS_URL");
+	return env.isEmpty() ? QStringLiteral("https://api.github.com/repos/chromasystemprofessional/ZacOS-Extras/releases")
+		: env;
+}
+
+ExtraRelease parseExtraReleases(const QByteArray &json, const QString &extra, const QString &package,
+		const QString &arch, bool allowFile) {
+	static const QRegularExpression versionRe("^[0-9][A-Za-z0-9.+~]*$");
+	const QString prefix = extra + "-v";
+	for (const QJsonValue &v : QJsonDocument::fromJson(json).array()) {
+		const QJsonObject o = v.toObject();
+		const QString tag = o.value("tag_name").toString();
+		const QString version = tag.mid(prefix.size());
+		if (!tag.startsWith(prefix) || !versionRe.match(version).hasMatch() ||
+				o.value("draft").toBool() || o.value("prerelease").toBool()) {
+			continue;
+		}
+		const QString wanted = package + "_" + version + "_" + arch + ".deb";
+		for (const QJsonValue &a : o.value("assets").toArray()) {
+			const QJsonObject asset = a.toObject();
+			const QString url = asset.value("browser_download_url").toString();
+			if (asset.value("name").toString() != wanted ||
+					!(url.startsWith("https://") || (allowFile && url.startsWith("file:")))) {
+				continue;
+			}
+			ExtraRelease r;
+			r.version = version;
+			r.debUrl = url;
+			const QString digest = asset.value("digest").toString();
+			if (digest.startsWith("sha256:")) {
+				r.sha256 = digest.mid(7).toLower();
+			}
+			r.valid = true;
+			return r;
+		}
+	}
+	return {};
+}
+
+/* One GET, run to the end while the windows stay drawn. */
+static QByteArray fetch(QNetworkAccessManager *net, const QString &url, QString *err) {
+	QNetworkRequest req{ QUrl(url) };
+	req.setRawHeader("Accept", "application/vnd.github+json");
+	req.setTransferTimeout(60000);
+	QNetworkReply *reply = net->get(req);
+	bool done = false;
+	QObject::connect(reply, &QNetworkReply::finished, [&done] { done = true; });
+	while (!done) {
+		QApplication::processEvents(QEventLoop::ExcludeUserInputEvents | QEventLoop::WaitForMoreEvents, 100);
+	}
+	QByteArray data;
+	if (reply->error() == QNetworkReply::NoError) {
+		data = reply->readAll();
+	} else {
+		*err = "ZacOS Extras couldn’t be reached: " + reply->errorString();
+	}
+	reply->deleteLater();
+	return data;
+}
+
+bool installExtra(const StoreItem &item, QString *err) {
+	if (item.source != "extra" || item.packages.size() != 1) {
+		*err = "That isn’t a ZacOS extra.";
+		return false;
+	}
+	const QString package = item.packages.first();
+	const bool testing = !qEnvironmentVariableIsEmpty("ZACOS9_EXTRAS_URL");
+	QNetworkAccessManager net;
+	const QByteArray list = fetch(&net, extrasReleasesUrl(), err);
+	if (list.isEmpty()) {
+		return false;
+	}
+	bool ok = false;
+	const QString arch = runWatched([](QProcess *p) { p->start("dpkg", { "--print-architecture" }); }, &ok, err)
+		.trimmed();
+	if (!ok) {
+		return false;
+	}
+	const ExtraRelease release = parseExtraReleases(list, item.extra, package, arch, testing);
+	if (!release.valid) {
+		*err = item.name + " hasn’t been released for this computer yet.";
+		return false;
+	}
+	const QByteArray deb = fetch(&net, release.debUrl, err);
+	if (deb.isEmpty()) {
+		return false;
+	}
+	if (!release.sha256.isEmpty() &&
+			QCryptographicHash::hash(deb, QCryptographicHash::Sha256).toHex() != release.sha256.toLatin1()) {
+		*err = "The download of " + item.name + " was damaged. Try again.";
+		return false;
+	}
+	QTemporaryDir dir;
+	const QString path = dir.filePath(package + ".deb");
+	QFile file(path);
+	if (!dir.isValid() || !file.open(QIODevice::WriteOnly) || file.write(deb) != deb.size()) {
+		*err = "The download of " + item.name + " couldn’t be saved.";
+		return false;
+	}
+	file.close();
+	/* The catalog says which package this is; the download must agree. */
+	const QString fields = runWatched([&](QProcess *p) { p->start("dpkg-deb", { "-f", path, "Package" }); },
+		&ok, err);
+	if (!ok || fields.trimmed() != package) {
+		*err = "The download of " + item.name + " isn’t the package it should be.";
+		return false;
+	}
+	runAppstoreHelper({ "install-deb", path }, &ok, err);
+	return ok;
 }

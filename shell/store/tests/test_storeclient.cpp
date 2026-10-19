@@ -107,6 +107,54 @@ int main(int argc, char **argv) {
 	check(storeItems().empty(), "and empty items");
 	qputenv("ZACOS9_STORE_CATALOG", path.toUtf8());
 
+	/* ---- ZacOS extras ---- */
+	writeCatalog(path, R"JSON({ "categories": ["Extras"], "items": [
+		{ "id": "x1", "name": "Lights", "category": "Extras", "packages": ["zacos9-extra-hue"],
+		  "extra": { "id": "hue", "start": "zacos9-collar-hue" } },
+		{ "id": "x2", "name": "Bad Name", "category": "Extras", "packages": ["p"], "extra": { "id": "../hue" } },
+		{ "id": "x3", "name": "Bad Start", "category": "Extras", "packages": ["p"],
+		  "extra": { "id": "ok", "start": "sh -c reboot" } },
+		{ "id": "x4", "name": "Two", "category": "Extras", "packages": ["p", "q"], "extra": { "id": "two" } }
+	] })JSON");
+	const std::vector<StoreItem> extras = storeItems();
+	check(extras.size() == 1 && extras[0].source == "extra" && extras[0].extra == "hue" &&
+		extras[0].extraStart == "zacos9-collar-hue", "an extra is read with its id and program");
+	check(extras.size() == 1, "an extra with a bad id or program, or two packages, is left out");
+	check(!qEnvironmentVariableIsSet("ZACOS9_EXTRAS_URL") &&
+		extrasReleasesUrl() == "https://api.github.com/repos/chromasystemprofessional/ZacOS-Extras/releases",
+		"extras come from the ZacOS-Extras repository");
+
+	const QByteArray releases = R"JSON([
+		{ "tag_name": "other-v9.0", "assets": [ { "name": "zacos9-extra-other_9.0_amd64.deb",
+			"browser_download_url": "https://example.com/other.deb" } ] },
+		{ "tag_name": "hue-v0.3.0", "draft": true, "assets": [ { "name": "zacos9-extra-hue_0.3.0_amd64.deb",
+			"browser_download_url": "https://example.com/draft.deb" } ] },
+		{ "tag_name": "hue-v0.2.0~rc1", "prerelease": true, "assets": [ { "name": "zacos9-extra-hue_0.2.0~rc1_amd64.deb",
+			"browser_download_url": "https://example.com/rc.deb" } ] },
+		{ "tag_name": "hue-v0.1.1", "assets": [
+			{ "name": "zacos9-extra-hue_0.1.1_arm64.deb", "browser_download_url": "https://example.com/arm.deb" },
+			{ "name": "zacos9-extra-hue_0.1.1_amd64.deb", "browser_download_url": "https://example.com/hue.deb",
+			  "digest": "sha256:ABCDEF" } ] },
+		{ "tag_name": "hue-v0.1.0", "assets": [ { "name": "zacos9-extra-hue_0.1.0_amd64.deb",
+			"browser_download_url": "https://example.com/old.deb" } ] }
+	])JSON";
+	const ExtraRelease hue = parseExtraReleases(releases, "hue", "zacos9-extra-hue", "amd64");
+	check(hue.valid && hue.version == "0.1.1" && hue.debUrl == "https://example.com/hue.deb",
+		"the newest release with the extra's tag, skipping drafts, pre-releases and other extras");
+	check(hue.sha256 == "abcdef", "with GitHub's digest");
+	check(!parseExtraReleases(releases, "hue", "zacos9-extra-hue", "riscv64").valid,
+		"no package for this architecture is no release");
+	check(!parseExtraReleases(releases, "hue", "zacos9-extra-lights", "amd64").valid,
+		"nor is a package with another name");
+	const QByteArray plain = R"JSON([ { "tag_name": "hue-v1.0", "assets": [
+		{ "name": "zacos9-extra-hue_1.0_amd64.deb", "browser_download_url": "http://example.com/hue.deb" },
+		{ "name": "zacos9-extra-hue_1.0_amd64.deb", "browser_download_url": "file:///tmp/hue.deb" } ] } ])JSON";
+	check(!parseExtraReleases(plain, "hue", "zacos9-extra-hue", "amd64").valid,
+		"a package not served over https is refused");
+	check(parseExtraReleases(plain, "hue", "zacos9-extra-hue", "amd64", true).debUrl == "file:///tmp/hue.deb",
+		"file: is only for tests");
+	check(!parseExtraReleases("not json", "hue", "zacos9-extra-hue", "amd64").valid, "a bad reply is no release");
+
 	/* ---- the helper's own validation, run directly, never through pkexec --- */
 	QString out;
 	check(runHelper({ "installed", "bash" }, &out) == 0 && out.contains("bash\tyes"),
