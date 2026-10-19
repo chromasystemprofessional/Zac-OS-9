@@ -1,3 +1,10 @@
+zacos9 (1.0.3) trixie; urgency=medium
+
+  * Desktop icons left off the edge of the screen after a change of
+    resolution or scale come back onto it, and can be clicked again.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Mon, 19 Oct 2026 07:28:02 -0400
+
 zacos9 (1.0.2) trixie; urgency=medium
 
   * Icon names are shown whole, wrapped onto lines under their icons
