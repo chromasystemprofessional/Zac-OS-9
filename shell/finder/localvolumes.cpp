@@ -288,6 +288,11 @@ static void macTool(const QStringList &arguments,
 		});
 	QObject::connect(process, &QProcess::finished, process,
 		[process, completed](int code, QProcess::ExitStatus status) {
+			/* Quitting kills a helper still running: what asked for it
+			 * (the Mac disk poll's timer) may already be gone. */
+			if (QCoreApplication::closingDown()) {
+				return;
+			}
 			const QString error = QString::fromUtf8(process->readAllStandardError()).trimmed();
 			completed(process->readAllStandardOutput(),
 				status == QProcess::NormalExit && code == 0 ? QString()
@@ -403,6 +408,10 @@ static void reportMountFailed(const QString &device) {
  * mounts so; Disk Setup's Repair clears the mark. Only if this fails too
  * is the volume unreadable, which may offer to initialize it. */
 static void mountReadOnly(const QString &device, const QString &name) {
+	if (!QDBusConnection::systemBus().isConnected()) {
+		reportMountFailed(device); /* no UDisks to ask */
+		return;
+	}
 	const QString udisks = "org.freedesktop.UDisks2";
 	QDBusMessage resolve = QDBusMessage::createMethodCall(udisks, "/org/freedesktop/UDisks2/Manager",
 		"org.freedesktop.UDisks2.Manager", "ResolveDevice");
