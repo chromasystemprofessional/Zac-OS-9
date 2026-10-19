@@ -335,6 +335,7 @@ const PanelDef PANELS[] = {
 	{ "General Controls", "zacos9-controlpanel", "general" },
 	{ "Internet", "zacos9-controlpanel", "internet" },
 	{ "Keyboard", "zacos9-controlpanel", "keyboard" },
+	{ "Memory", "zacos9-controlpanel", "memory" },
 	{ "Monitors", "zacos9-controlpanel", "monitors" },
 	{ "Mouse", "zacos9-controlpanel", "mouse" },
 	{ "Nap Time", "zacos9-controlpanel", "energysaver" },

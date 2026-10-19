@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Memory
+Comment=Virtual memory, the disk cache and a RAM Disk
+Exec=zacos9-controlpanel memory
+Categories=Settings;HardwareSettings;
+OnlyShowIn=ZacOS9;

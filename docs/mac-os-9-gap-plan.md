@@ -257,11 +257,18 @@ Section 3 lists every feature; section 5 is the plan.
 | "Application not found" → File Translator offers apps that can open the type | ✅ | File Translator panel and Open With. |
 | Type/creator codes | — | MIME types instead. |
 
-### §3.7 Memory (ch. 7) — out of scope
+### §3.7 Memory (ch. 7)
 
-Application memory sizes, virtual memory, the disk cache and RAM disks
-don't apply. **About This Computer** should keep showing honest memory use.
-A zram/swap switch in a Memory panel is a possible P3. **→ 8.7**
+Application memory sizes don't apply (Linux gives each program what it asks
+for), and **About This Computer** keeps showing honest memory use. The
+**Memory** control panel has the rest, as Linux has it; see `docs/memory.md`.
+
+| Feature | Status | Notes |
+|---|---|---|
+| Disk Cache | ✅ | Shown, not set: the system sizes it (Cached + Buffers − Shmem). |
+| Virtual Memory on/off and size | ✅ | `/swapfile` on the startup disk, sizes from 1 GB to what leaves 2 GB free; applies at once, not at restart. Turning it off is refused while memory has no room for what it holds. Other swap (a partition, zram) is listed and left alone. Plus a checkbox for the out-of-memory guard (earlyoom). |
+| RAM Disk with Save on Shut Down | ✅ | A tmpfs at `/run/zacos9-ramdisk`, up to half of memory, on the desktop as "RAM Disk"; `zacos9-ramdisk.service` makes it at startup and saves it at shut down. |
+| Application memory sizes (Get Info ▸ Memory) | — | Linux manages memory per program. |
 
 ### §3.8 Open and Save dialogs (ch. 8)
 
@@ -309,7 +316,7 @@ A zram/swap switch in a Memory panel is a possible P3. **→ 8.7**
 | **Keychain Access** | ✅ | `zacos9-keychain`: the keychains (Secret Service collections), Unlock/Lock, Make Default, and each one's items by name with Remove; The Collar's Keychain module opens it. Passwords aren't shown. |
 | **Toy Box** | ✅ | See §3.2. |
 | **Walkies** (snapshots of network, sound, time zone, printer, startup items) | ✅ | `zacos9-walkies`: places (`~/.config/zacos9/Walkies`) remembering the NetworkManager connection, sound output and volume, time zone, default printer and Tricks Manager set; Switch To restores them (nmcli, pactl, timedatectl, lpoptions, the set's login items and user services). |
-| Memory | — | |
+| **Memory** (disk cache, virtual memory, RAM Disk) | ✅ | See §3.7. |
 | **Monitors**: resolution, pixel size | ✅ | Several screens: Arrangement (drag the screens), the main display (menu bar and icons), each screen's resolution, Mirror Displays (`compositor/src/prefs.c`); the desktop's pattern on the others (`secondarydesktop.cpp`); pop-up tabs on their own screen. Colour depth — . |
 | **Mouse**: tracking, double-click | ✅ | Options: Mouse Tracks (`compositor/src/tracks.c`: six arrows behind the moving pointer, going 50 ms apart) and Thick I-Beam (a `text-thick` cursor zacos9-wm shows for programs that ask for "text" by cursor-shape-v1; Qt 6 programs ask that way and get it (checked with Scribble); ones that draw their own cursor, such as GTK 3, keep the thin one). |
 | **Users** | ✅ | See 3.14. |
@@ -440,8 +447,8 @@ A zram/swap switch in a Memory panel is a possible P3. **→ 8.7**
 
 ## 4. Out of scope (and why)
 
-- **Application memory sizes, virtual memory, disk cache, RAM disk** — Linux
-  manages memory.
+- **Application memory sizes** — Linux gives each program the memory it asks
+  for. (Virtual memory, the disk cache and a RAM Disk are in Memory: §3.7.)
 - **AppleTalk, LocalTalk, DialAssist, Modem, Remote Access (dial-up)** — no
   hardware or networks left that need them; AFP over TCP/IP is covered.
 - **Publish and Subscribe, type/creator codes, desktop database rebuild,
@@ -589,7 +596,7 @@ partial entries retain the remaining work described in the inventory above.
 | 8.4 ✅ | **Stash** (pages of pictures and text) | M |
 | 8.5 ✅ | **Walkies** (snapshots of network, sound, time zone, printer, startup items) | L |
 | 8.6 ✅ | Plotter, Jigsaw Puzzle | optional |
-| 8.7 | A Memory panel's zram/swap switch | optional |
+| 8.7 ✅ | **Memory**: virtual memory, the disk cache, a RAM Disk, the out-of-memory guard | optional |
 
 ### Milestone 9 — Leftovers and checks from Milestones 1–2 (P2)
 
@@ -628,5 +635,4 @@ alongside the others; most are small.
 
 ### Suggested next three sessions
 
-1. **8.7 (optional):** a Memory panel's zram/swap switch.
 2. **Hardware checks** of what was built and only tested in VMs or headless: Disk Setup on a real disk, Nap Time's wake alarm, CD/DVD AutoPlay, recording an alert sound, several real screens.
