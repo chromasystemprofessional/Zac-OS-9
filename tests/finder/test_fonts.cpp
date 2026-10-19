@@ -196,12 +196,12 @@ int main(int argc, char **argv) {
 	item->selected = true;
 	Pixels painted(500, 100);
 	paintIconLabel(&painted.c, *item, 100, 10, false);
-	const auto *label = item->fullLabelText().t;
+	const auto *label = item->labelText().t;
 	bool matchingInk = true;
 	for (int y = 0; y < label->height; ++y) {
 		for (int x = 0; x < label->width; ++x) {
 			if (label->mask[y * label->stride + x]) {
-				matchingInk &= painted.img.pixel(116 - item->fullLabelText().inkWidth() / 2 +
+				matchingInk &= painted.img.pixel(116 - item->labelText().inkWidth() / 2 +
 					x - label->ink_l, 45 + y) == C_WHITE;
 			}
 		}

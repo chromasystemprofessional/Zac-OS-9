@@ -48,8 +48,18 @@ static constexpr int ICON_MARGIN_BOTTOM = 32;
 static int cellW() {
 	return tightGrid() ? 64 : 80;
 }
-static int cellH() {
-	return tightGrid() ? 56 : 64;
+/* Rows grow by however much the tallest name needs beyond one line. */
+int Desktop::cellH() const {
+	int extra = 0;
+	std::vector<Item *> items = fixedItems();
+	for (const auto &item : m_files) {
+		items.push_back(item.get());
+	}
+	for (Item *item : items) {
+		item->labelText();
+		extra = std::max(extra, item->labelBoxHeight(item->label, 13) - 13);
+	}
+	return (tightGrid() ? 56 : 64) + extra;
 }
 
 /* The desktop pattern is chosen by id in ~/.config/zacos9/desktop.conf
