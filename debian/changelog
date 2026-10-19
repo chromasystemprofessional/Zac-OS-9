@@ -1,3 +1,15 @@
+zacos9 (1.0.2) trixie; urgency=medium
+
+  * Icon names are shown whole, wrapped onto lines under their icons
+    instead of cut short in the middle, and rows space themselves so names
+    never overlap. Disks and the Trash can be moved anywhere on the
+    desktop. On a scaled desktop with more than one screen, X11 programs
+    such as Adobe Reader take clicks everywhere again, including their
+    menus. Fixes a Sniffer crash when a script sent it a command and
+    disconnected straight away.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Sun, 18 Oct 2026 23:52:19 -0400
+
 zacos9 (1.0.0) trixie; urgency=medium
 
   * ZacOS 9 1.0. The installer has been tested from a freshly built ISO
