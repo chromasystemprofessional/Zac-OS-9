@@ -601,9 +601,9 @@ bool acceptsDrops(const Item &item) {
 		item.kind == PL_ICON_TRASH_EMPTY || item.kind == PL_ICON_TRASH_FULL || item.kind == PL_ICON_PRINTER;
 }
 
-bool iconLabelContains(Item &item, int x, int y, QPoint p) {
+bool iconLabelContains(Item &item, int x, int y, QPoint p, int limitW) {
 	int l, t, r, b;
-	labelBox(item, x, y, &l, &t, &r, &b);
+	labelBox(item, x, y, &l, &t, &r, &b, limitW);
 	return QRect(QPoint(l, t), QPoint(r, b)).contains(p);
 }
 
@@ -760,18 +760,18 @@ void paintIconLabel(pl_canvas *c, Item &item, int x, int y, bool onDesktop) {
 	pl_text(c, text, l + LABEL_PAD_X, t + item.labelBaseline(item.label, LABEL_BASELINE), ink);
 }
 
-bool iconItemContains(Item &item, int x, int y, QPoint p) {
+bool iconItemContains(Item &item, int x, int y, QPoint p, int limitW) {
 	if (QRect(x, y, PL_ICON_LARGE, PL_ICON_LARGE).contains(p)) {
 		return true;
 	}
 	int l, t, r, b;
-	labelBox(item, x, y, &l, &t, &r, &b);
+	labelBox(item, x, y, &l, &t, &r, &b, limitW);
 	return QRect(QPoint(l, t), QPoint(r, b)).contains(p);
 }
 
-QRect iconItemRect(Item &item, int x, int y) {
+QRect iconItemRect(Item &item, int x, int y, int limitW) {
 	int l, t, r, b;
-	labelBox(item, x, y, &l, &t, &r, &b);
+	labelBox(item, x, y, &l, &t, &r, &b, limitW);
 	return QRect(x, y, PL_ICON_LARGE, PL_ICON_LARGE).united(QRect(QPoint(l, t), QPoint(r, b)));
 }
 

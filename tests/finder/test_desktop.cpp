@@ -460,6 +460,26 @@ int main(int argc, char **argv) {
 		desktop.dropEvent(&foreign);
 		check(!foreign.isAccepted() && desktop.m_disk->pos == before,
 			"a disk-and-Trash drag is taken by nothing but its own desktop");
+		/* A place saved on a bigger screen (Monitors' scale turned back
+		 * up) is off this one: the icon takes a free spot instead, can be
+		 * clicked, and keeps its saved place for when the screen grows. */
+		Item *external = nullptr;
+		for (auto &item : desktop.m_files) {
+			if (item->name == "External file") {
+				external = item.get();
+			}
+		}
+		const QPoint offScreen(desktop.width() + 500, 60);
+		desktop.m_state.icons.insert("External file", offScreen);
+		desktop.placeIcons();
+		check(external && external->pos.x() >= 0 &&
+				external->pos.x() <= desktop.width() - PL_ICON_LARGE &&
+				desktop.itemAt(external->pos + QPoint(16, 16)) == external,
+			"an icon saved off the screen comes back onto it, and can be clicked");
+		check(desktop.m_state.icons.value("External file") == offScreen,
+			"and keeps its saved place for a bigger screen");
+		desktop.m_state.icons.remove("External file");
+		desktop.placeIcons();
 		desktop.m_disk->pos = diskWas;
 		desktop.m_trash->pos = trashWas;
 		desktop.m_state.icons.remove("::disk");
