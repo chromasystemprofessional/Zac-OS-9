@@ -152,7 +152,7 @@ void FolderWindow::reloadAll(const QString &folder) {
 
 FolderWindow::FolderWindow(const QString &path) : m_path(path) {
 	if (vfsIsFonts(path)) {
-		fontInvalidate();
+		fontRescan();
 	}
 	watchThumbnails(this);
 	watchFileAssociations(this);

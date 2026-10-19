@@ -134,6 +134,10 @@ int main(int argc, char **argv) {
 		check(QDir().mkpath(home + directory), "create isolated fixture directory");
 	}
 	writeFile(home + "/system/System.ttf", sans);
+	/* DejaVu Sans stands in for a Mac OS 9 font (Geneva); a second copy
+	 * of it shows once; DejaVu Serif stands in for none. */
+	writeFile(home + "/system/zz-duplicate.ttf", sans);
+	writeFile(home + "/system/Serif.ttf", serif);
 	writeFile(home + "/fonts.conf", ("<?xml version=\"1.0\"?><!DOCTYPE fontconfig SYSTEM \"urn:fontconfig:fonts.dtd\">"
 		"<fontconfig><dir>" + home + "/system</dir><dir>" + userFontsPath() +
 		"</dir><cachedir>" + home + "/cache/fontconfig</cachedir></fontconfig>").toUtf8());
@@ -156,6 +160,25 @@ int main(int argc, char **argv) {
 	check(fontItem(window, home + "/system/System.ttf") != nullptr,
 		"Fonts lists available system fonts, not just the writable directory");
 	check(!fontCanRemove(home + "/system/System.ttf"), "system fonts are protected");
+	{
+		const QString kits = vfsPathFor("system-folder/fonts/language-kits");
+		const auto backings = [](const QString &path) {
+			QStringList out;
+			for (const auto &listed : vfsList(path)) {
+				out << (listed->fontFile.isEmpty() ? listed->name : QFileInfo(listed->fontFile).fileName());
+			}
+			return out;
+		};
+		const QStringList top = backings(fontsPath), other = backings(kits);
+		check(top.contains("Language Kits") && vfsIsFonts(kits),
+			"Fonts has a Language Kits folder, added to an older registry");
+		check(top.contains("System.ttf") && !top.contains("zz-duplicate.ttf") &&
+				!top.contains("Serif.ttf"),
+			"Fonts shows the fonts that stand in for Mac OS 9's, one of each face");
+		check(other.contains("Serif.ttf") && !other.contains("System.ttf") &&
+				!other.contains("zz-duplicate.ttf"),
+			"every other font is in Language Kits");
+	}
 	QString error;
 	const QString incoming = home + "/input/unrelated-filename.ttf";
 	writeFile(incoming, sans);
@@ -191,6 +214,47 @@ int main(int argc, char **argv) {
 	Text exact;
 	exact.t = fontRenderName(item->visibleName(), 400, installed, 0);
 	check(sameMask(own.t, exact.t), "the label uses its exact file and face");
+	check(item->kind == PL_ICON_FONT && item->kindName() == "user font",
+		"a font has the suitcase icon");
+	{
+		/* "A" in the font itself, on the suitcase's label and nowhere else. */
+		Pixels plain(PL_ICON_LARGE, PL_ICON_LARGE), drawn(PL_ICON_LARGE, PL_ICON_LARGE);
+		pl_icon_paint(&plain.c, 0, 0, PL_ICON_FONT, PL_ICON_LARGE, false);
+		paintIcon(&drawn.c, *item, 0, 0, PL_ICON_LARGE, false);
+		const QRect panel(9, 13, 14, 12);
+		int inside = 0, outside = 0;
+		for (int y = 0; y < PL_ICON_LARGE; ++y) {
+			for (int x = 0; x < PL_ICON_LARGE; ++x) {
+				if (plain.img.pixel(x, y) != drawn.img.pixel(x, y)) {
+					++(panel.contains(x, y) ? inside : outside);
+				}
+			}
+		}
+		check(inside > 0 && outside == 0, "a font's suitcase has an A on its label");
+		Text sample, system("A", 100, PL_FONT_SYSTEM);
+		sample.t = fontRenderSample(installed, 0, 15);
+		check(!sameMask(sample.t, system.t), "the suitcase's A is drawn in the font itself");
+	}
+	{
+		/* Wrapping a name draws it a piece at a time: its file opens once,
+		 * and a Fonts window opening keeps what was drawn. */
+		fontInvalidate();
+		const int before = fontFacesOpened();
+		for (int width : { 400, 200, 120, 80, 40 }) {
+			Text drawn;
+			drawn.t = fontRenderName(item->visibleName(), width, installed, 0);
+		}
+		check(fontFacesOpened() == before + 1, "drawing a font's name many ways opens its file once");
+		FolderWindow *kits = FolderWindow::open(vfsPathFor("system-folder/fonts/language-kits"));
+		const int afterWindow = fontFacesOpened();
+		Text again;
+		again.t = fontRenderName(item->visibleName(), 400, installed, 0);
+		check(kits && fontFacesOpened() == afterWindow,
+			"opening a Fonts window keeps the names already drawn");
+		if (kits) {
+			kits->close();
+		}
+	}
 	Text narrow = item->renderName(40);
 	check(narrow.inkWidth() <= 40, "font labels respect the available label width");
 	item->selected = true;
