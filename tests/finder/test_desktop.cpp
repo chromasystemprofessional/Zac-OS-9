@@ -262,6 +262,24 @@ int main(int argc, char **argv) {
 		check(waitFor([&] { return afterAlert.canReadLine(); }),
 			"Finder still accepts clients after the modal command's socket is deleted");
 	}
+	{
+		/* zacos9-finder-ctl sends a command and hangs up at once. Refresh
+		 * serves GLib's main loop, which is Qt's: the hang-up must not
+		 * delete the socket while it is still delivering the command. */
+		for (int i = 0; i < 3; i++) {
+			QLocalSocket transient;
+			transient.connectToServer(Finder::socketPath());
+			waitFor([&] { return transient.canReadLine(); });
+			transient.write("cmd refresh\n");
+			transient.flush();
+			transient.abort();
+			settle();
+		}
+		QLocalSocket afterRefresh;
+		afterRefresh.connectToServer(Finder::socketPath());
+		check(waitFor([&] { return afterRefresh.canReadLine(); }),
+			"a client hanging up during Refresh leaves Finder running");
+	}
 	auto disconnectedDisk = std::make_unique<Item>();
 	disconnectedDisk->name = "adam's home";
 	disconnectedDisk->path = home.path() + "/network/adam's home";
