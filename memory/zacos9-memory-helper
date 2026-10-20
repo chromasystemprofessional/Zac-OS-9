@@ -246,6 +246,20 @@ def guard(on):
 
 # ---- the RAM Disk --------------------------------------------------------
 
+def contents_size(path):
+    """What the files in `path` take up. Counted, not the filesystem's own
+    figure: that is the RAM Disk's once mounted, but whatever `path` sits on
+    if it isn't (the tests' folder, a mount that went away)."""
+    total = 0
+    for top, dirs, files in os.walk(path):
+        for name in dirs + files:
+            try:
+                total += os.lstat(os.path.join(top, name)).st_blocks * 512
+            except OSError:
+                pass
+    return total
+
+
 def ramdisk_mount(megabytes, uid):
     os.makedirs(RAMDISK, mode=0o700, exist_ok=True)
     options = f"size={megabytes}M,uid={uid},gid={uid},mode=0700"
@@ -262,8 +276,7 @@ def ramdisk_on(megabytes, save):
     if megabytes * MB > total // 2:
         die(f"The RAM Disk can be at most half of memory ({total // 2 // MB} MB).")
     if mounted(RAMDISK):
-        usage = shutil.disk_usage(RAMDISK)
-        if usage.total - usage.free > megabytes * MB:
+        if contents_size(RAMDISK) > megabytes * MB:
             die("What's on the RAM Disk wouldn't fit in that size. Move some of it off first.")
     uid = caller_uid()
     ramdisk_mount(megabytes, uid)

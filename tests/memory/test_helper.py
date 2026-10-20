@@ -137,6 +137,14 @@ with tempfile.TemporaryDirectory() as d:
           "ramdisk-owner=1234" in conf, f"ramdisk 512 save mounts it for its owner and keeps the setting {err}")
     code, _, err, _ = run("ramdisk", "9000", "save")
     check(code == 1 and "half of memory" in err, "a RAM Disk over half of memory is refused")
+    # What's on it is counted from its files, not from whatever disk the
+    # tests' folder is on (CI's was fuller than 256 MB).
+    big = root / "run/zacos9-ramdisk/big"
+    with open(big, "wb") as f:
+        f.write(b"\1" * (20 * 1024 * 1024))
+    code, _, err, _ = run("ramdisk", "16", "save")
+    check(code == 1 and "wouldn't fit" in err, "a RAM Disk can't shrink below what's on it")
+    big.unlink()
     code, _, _, calls = run("ramdisk", "256", "save")
     check(code == 0 and "mount -o remount,size=256M" in calls, "resizing a mounted RAM Disk remounts it")
     code, _, _, calls = run("ramdisk", "stop")
