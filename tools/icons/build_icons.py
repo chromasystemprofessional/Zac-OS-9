@@ -27,7 +27,7 @@ KINDS = ["folder", "document", "application", "disk", "trash-empty", "trash-full
          "internet-location", "printer"] + [
     "cp-mouse", "cp-keyboard", "cp-trackpad", "cp-accessibility", "cp-general", "cp-numbers",
     "cp-text", "cp-datetime", "cp-zacmenu", "cp-appearance", "cp-screensaver", "cp-users",
-    "cp-keychain", "cp-collar", "cp-speech", "cp-retriever", "cp-filetranslator", "cp-walkies",
+    "cp-keychain", "cp-collar", "cp-speech", "cp-retriever", "cp-filetranslator", "cp-walkies", "cp-memory",
     "network-disk", "font"]
 
 

@@ -5,7 +5,7 @@
  *
  *   zacos9-controlpanel mouse | trackpad | tablet | keyboard | sound | monitors |
  *     energysaver | screensaver | zacmenu | general | internet | accessibility |
- *     startupdisk | users
+ *     startupdisk | users | memory
  *
  * Each writes ~/.config/zacos9/desktop.conf; zacos9-wm applies the
  * mouse, keyboard, screen and sleep settings as they change (compositor/
@@ -25,6 +25,7 @@
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QProcess>
+#include <QRegularExpression>
 #include <QStandardPaths>
 #include <QTimer>
 #include <QWheelEvent>
@@ -2459,6 +2460,211 @@ private:
 	}
 };
 
+/* ---- Memory ---------------------------------------------------------------------- */
+
+/* Mac OS 9's Memory panel, for what still applies (gap plan 8.7): the
+ * memory built in and how much is in use; Compressed Memory, a zram swap
+ * device holding rarely used memory compressed in RAM instead of on disk
+ * (systemd-zram-generator's /etc/systemd/zram-generator.conf, written by
+ * zacos9-memory-helper as root); and Virtual Memory, the swap on disk, as
+ * a report. */
+static QString memorySize(double bytes) {
+	static const char *const units[] = { "bytes", "KB", "MB", "GB", "TB" };
+	int u = 0;
+	while (bytes >= 1024 && u < 4) {
+		bytes /= 1024;
+		u++;
+	}
+	if (u == 0) {
+		return QString("%1 bytes").arg(qRound64(bytes));
+	}
+	const QString n = bytes < 10 ? QString::number(bytes, 'f', 1) : QString::number(qRound64(bytes));
+	return (n.endsWith(".0") ? n.chopped(2) : n) + " " + units[u];
+}
+
+static QString readSmall(const QString &path) {
+	QFile f(path);
+	return f.open(QIODevice::ReadOnly) ? QString::fromUtf8(f.read(4096)) : QString();
+}
+
+class MemoryPanel : public ControlPanel {
+	static constexpr int X = M + IN, TOP = 1 + PL_GROUP_MARGIN_TOP, LINE = 16;
+	static constexpr int REPORT_H = TOP + 2 * LINE + PL_GROUP_MARGIN - 4;
+	static constexpr int G0 = 12, G1 = G0 + REPORT_H + 20;
+	static constexpr int POPUP_Y = G1 + TOP + PL_RADIO_SIZE + 10;
+	static constexpr int STATUS_Y = POPUP_Y + PL_POPUP_H + 18; /* a baseline */
+	static constexpr int ZRAM_H = STATUS_Y + 6 + PL_GROUP_MARGIN - G1;
+	static constexpr int G2 = G1 + ZRAM_H + 20;
+	static constexpr int PANEL_H = G2 + REPORT_H + 12 + 3 * 12 + 8;
+	static constexpr int PERCENTS[] = { 25, 50, 75, 100 };
+
+public:
+	MemoryPanel() : ControlPanel("Memory", PANEL_H) {
+		m_groups = { { G0, G0 + REPORT_H, "Built-in Memory" }, { G1, G1 + ZRAM_H, "Compressed Memory" },
+			{ G2, G2 + REPORT_H, "Virtual Memory" } };
+		m_switch.add("On", QPoint(X, G1 + TOP));
+		m_switch.add("Off", QPoint(X + 56, G1 + TOP));
+		m_switch.changed = [this](int i) { apply(i == 0); };
+		m_radios.push_back(&m_switch);
+		m_size.label = "Use up to:";
+		m_size.rect = QRect(X + 70, POPUP_Y, 214, PL_POPUP_H);
+		m_size.items = { PopupItem("a quarter of memory"), PopupItem("half of memory"),
+			PopupItem("three quarters of memory"), PopupItem("all of memory") };
+		m_size.chosen = [this](int row) {
+			if (row == m_size.selected) {
+				return;
+			}
+			const int before = m_size.selected;
+			m_size.selected = row;
+			if (m_switch.selected == 0 && !apply(true)) {
+				m_size.selected = before;
+			}
+			update();
+		};
+		m_notes = { "Compressed Memory keeps memory that hasn't been used for a",
+			"while compressed in RAM, so there is room for more before the",
+			"computer slows down. Changes take effect at once." };
+		/* Hint Bubbles. */
+		m_switch.hint = "Turns Compressed Memory on or off, now and at startup. An administrator's password may be asked for.";
+		m_size.hint = "Sets how much of the computer's memory Compressed Memory may hold at most. It only takes what it needs.";
+		m_hintRects.push_back({ &m_size.rect, m_size.hint });
+
+		readSetting();
+		readUse();
+		m_refresh.callOnTimeout([this] {
+			readUse();
+			update();
+		});
+		m_refresh.start(2000);
+	}
+
+protected:
+	void paintExtra(pl_canvas *c) override {
+		const int width = W - 2 * M - 2 * IN;
+		panelText(c, m_installed, X, G0 + TOP + 9, PL_FONT_SYSTEM, C_BLACK, width);
+		panelText(c, m_inUse, X, G0 + TOP + 9 + LINE, PL_FONT_SYSTEM, C_BLACK, width);
+		m_size.enabled = m_switch.selected == 0;
+		m_size.paint(c);
+		panelText(c, m_status.isEmpty() ? m_zramUse : m_status, X, STATUS_Y, PL_FONT_VIEWS,
+			m_status.isEmpty() ? C_BLACK : GRAY(0x5), width);
+		panelText(c, m_swapState, X, G2 + TOP + 9, PL_FONT_SYSTEM, C_BLACK, width);
+		panelText(c, m_swapWhere, X, G2 + TOP + 9 + LINE, PL_FONT_VIEWS, GRAY(0x5), width);
+	}
+	bool pressExtra(QPoint pos, bool) override {
+		return m_size.press(this, pos);
+	}
+
+private:
+	PanelRadios m_switch;
+	PanelPopup m_size;
+	QTimer m_refresh;
+	QString m_installed, m_inUse, m_zramUse, m_status, m_swapState, m_swapWhere;
+
+	static QString confFile() {
+		return qEnvironmentVariable("ZACOS9_ZRAM_CONF", "/etc/systemd/zram-generator.conf");
+	}
+
+	/* The setting: a [zram0] section in zram-generator.conf, its size
+	 * "ram * N / 100" as the helper writes it (another size counts as half). */
+	void readSetting() {
+		const QString conf = readSmall(confFile());
+		const bool configured = conf.contains("[zram0]");
+		m_switch.selected = configured || zramActive() ? 0 : 1;
+		m_size.selected = 1;
+		static const QRegularExpression size("zram-size\\s*=\\s*ram\\s*\\*\\s*(\\d+)\\s*/\\s*100");
+		const QRegularExpressionMatch m = size.match(conf);
+		for (int i = 0; i < 4; i++) {
+			if (m.hasMatch() && m.captured(1).toInt() == PERCENTS[i]) {
+				m_size.selected = i;
+			}
+		}
+	}
+
+	static bool zramActive() {
+		for (const QString &line : readSmall("/proc/swaps").split('\n')) {
+			if (line.startsWith("/dev/zram")) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/* /proc/meminfo and /proc/swaps, in kB; zram0's compressed size from
+	 * /sys/block/zram0/mm_stat (orig_data_size compr_data_size ...). */
+	void readUse() {
+		double total = 0, available = 0;
+		for (const QString &line : readSmall("/proc/meminfo").split('\n')) {
+			const QStringList f = line.simplified().split(' ');
+			if (f.size() >= 2 && f[0] == "MemTotal:") {
+				total = f[1].toDouble() * 1024;
+			} else if (f.size() >= 2 && f[0] == "MemAvailable:") {
+				available = f[1].toDouble() * 1024;
+			}
+		}
+		m_installed = total > 0 ? QString("%1 installed").arg(memorySize(total)) : QString("Unknown");
+		m_inUse = total > 0 ? QString("%1 in use").arg(memorySize(total - available)) : QString();
+
+		double zramSize = 0, zramUsed = 0, diskSize = 0, diskUsed = 0;
+		QStringList disks;
+		for (const QString &line : readSmall("/proc/swaps").split('\n').mid(1)) {
+			const QStringList f = line.simplified().split(' ');
+			if (f.size() < 4) {
+				continue;
+			}
+			if (f[0].startsWith("/dev/zram")) {
+				zramSize += f[2].toDouble() * 1024;
+				zramUsed += f[3].toDouble() * 1024;
+			} else {
+				diskSize += f[2].toDouble() * 1024;
+				diskUsed += f[3].toDouble() * 1024;
+				disks << f[0];
+			}
+		}
+		if (zramSize > 0) {
+			const QStringList stat = readSmall("/sys/block/zram0/mm_stat").simplified().split(' ');
+			const double compressed = stat.size() >= 2 ? stat[1].toDouble() : 0;
+			m_zramUse = QString("%1 of compressed memory; %2").arg(memorySize(zramSize),
+				zramUsed > 0 ? QString("%1 in use").arg(memorySize(zramUsed)) : QString("none in use"));
+			if (zramUsed > 0 && compressed > 0) {
+				m_zramUse += QString(", kept in %1").arg(memorySize(compressed));
+			}
+			m_zramUse += '.';
+		} else {
+			m_zramUse = m_switch.selected == 0 ? "Set up, but not running." : "Off.";
+		}
+		if (diskSize > 0) {
+			m_swapState = QString("On: %1 available on disk, %2").arg(memorySize(diskSize),
+				diskUsed > 0 ? QString("%1 in use").arg(memorySize(diskUsed)) : QString("none in use"));
+			m_swapWhere = disks.join(", ");
+		} else {
+			m_swapState = "Off";
+			m_swapWhere = "No swap space on disk. Linux manages virtual memory itself.";
+		}
+	}
+
+	/* The helper, as root; false (with the reason shown) if it failed. */
+	bool apply(bool on) {
+		bool ok = false;
+		QString error;
+		QStringList args = { "zram", on ? "on" : "off" };
+		if (on) {
+			args << QString::number(PERCENTS[m_size.selected]);
+		}
+		m_status = on ? "Turning Compressed Memory on…" : "Turning Compressed Memory off…";
+		update();
+		runPrivilegedHelper("memory", args, QByteArray(), &ok, &error);
+		if (!ok) {
+			m_status = error;
+			readSetting();
+		} else {
+			m_status.clear();
+		}
+		readUse();
+		update();
+		return ok;
+	}
+};
+
 /* ---- main --------------------------------------------------------------------------- */
 
 int main(int argc, char *argv[]) {
@@ -2513,6 +2719,9 @@ int main(int argc, char *argv[]) {
 	} else if (which == "speech") {
 		QApplication::setApplicationName("Speech");
 		panel = std::make_unique<SpeechPanel>();
+	} else if (which == "memory") {
+		QApplication::setApplicationName("Memory");
+		panel = std::make_unique<MemoryPanel>();
 	} else if (which == "tablet") {
 		QApplication::setApplicationName("Tablet");
 		panel = std::make_unique<TabletPanel>();

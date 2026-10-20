@@ -10,9 +10,9 @@ QString sharingConfFile(const QString &name) {
 	return (env.isEmpty() ? QString("/etc/zacos9") : env) + '/' + name;
 }
 
-/* `kind` is "sharing" or "accounts": zacos9-KIND-helper, from its source
- * folder of that name in a build tree; ZACOS9_SHARING_HELPER or
- * ZACOS9_ACCOUNTS_HELPER stand in for tests. */
+/* `kind` is "sharing", "accounts" or "memory": zacos9-KIND-helper, from
+ * its source folder of that name in a build tree; ZACOS9_SHARING_HELPER,
+ * ZACOS9_ACCOUNTS_HELPER or ZACOS9_MEMORY_HELPER stand in for tests. */
 static QString helperPath(const QString &kind = "sharing") {
 	const QString env = qEnvironmentVariable(("ZACOS9_" + kind.toUpper() + "_HELPER").toUtf8().constData());
 	if (!env.isEmpty()) {

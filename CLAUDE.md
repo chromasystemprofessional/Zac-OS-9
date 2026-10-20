@@ -10,6 +10,7 @@
 | Menu bar (incl. Apple menu) | `shell/menubar/` | C++ / Qt6 |
 | Control panels (Bluetooth: `bluetooth.cpp`, see `docs/bluetooth.md`) | `shell/panels/` | C++ / Qt6 |
 | Screen saver, display and system sleep (Energy Saver and Screen Saver panels in `controlpanel.cpp`; the savers: `lib/savers.c`, `shell/screensaver/`; the lock: `compositor/src/lock.c`, `shell/lock/`; D-Bus keep-awake requests and logind: `shell/inhibit/`) | `compositor/src/idle.c`, `idle_policy.c` | C — see `docs/energy-saver.md` |
+| Memory panel (Compressed Memory, zram) | `shell/panels/controlpanel.cpp` (`MemoryPanel`), `memory/` (helper + polkit) | C++ / sh — see `docs/memory.md` |
 | Software window (app catalog over apt) | `shell/store/` | C++ / Qt6 — see `docs/appstore.md` |
 | Software Update (ZacOS releases from GitHub + Debian updates) | `shell/update/`, `scripts/release.sh` | C++ / Qt6 — see `docs/updates.md` |
 | Network Browser (connect to AFP/SMB servers) | `shell/network/` | C++ / Qt6 — see `docs/network.md` |

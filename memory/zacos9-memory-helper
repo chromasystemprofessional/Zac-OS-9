@@ -1,0 +1,78 @@
+#!/bin/sh
+# zacos9-memory-helper: the privileged half of the Memory control panel
+# (gap plan 8.7). It runs as root through pkexec; polkit lets
+# administrators at the computer use it (org.zacos9.memory).
+#
+#   zacos9-memory-helper zram on PERCENT
+#                       Compressed Memory on: a zram swap device holding up
+#                       to PERCENT (25, 50, 75 or 100) of the computer's
+#                       memory, compressed with zstd. systemd-zram-generator
+#                       makes it from /etc/systemd/zram-generator.conf at
+#                       every boot, and it is started at once
+#   zacos9-memory-helper zram off
+#                       Compressed Memory off: the device is emptied back
+#                       into memory and taken away, now and at boot
+#
+# The panel reads the setting from the same file (ZACOS9_ZRAM_CONF stands
+# in for tests; ZACOS9_NO_SYSTEMCTL leaves systemd alone), and what is in
+# use from /proc/swaps and /sys/block/zram0.
+set -eu
+
+CONF=${ZACOS9_ZRAM_CONF:-/etc/systemd/zram-generator.conf}
+SWAP_UNIT=dev-zram0.swap
+SETUP_UNIT=systemd-zram-setup@zram0.service
+
+die() {
+	echo "$*" >&2
+	exit 1
+}
+
+ctl() {
+	[ -n "${ZACOS9_NO_SYSTEMCTL:-}" ] || systemctl "$@"
+}
+
+cmd=${1:-}
+[ $# -gt 0 ] && shift
+case $cmd in
+zram)
+	case ${1:-} in
+	on)
+		[ $# -eq 2 ] || die "usage: zram on PERCENT"
+		case $2 in 25 | 50 | 75 | 100) ;; *) die "Compressed Memory can hold a quarter, half, three quarters or all of memory." ;; esac
+		[ -n "${ZACOS9_NO_SYSTEMCTL:-}" ] || [ -x /usr/lib/systemd/system-generators/zram-generator ] ||
+			die "Compressed Memory needs systemd-zram-generator, which isn't installed."
+		# A device already set up keeps its size until it is reset: stop it
+		# first, so a new size takes.
+		if [ -z "${ZACOS9_NO_SYSTEMCTL:-}" ] && systemctl is-active --quiet "$SWAP_UNIT"; then
+			systemctl stop "$SWAP_UNIT" "$SETUP_UNIT" >/dev/null 2>&1 ||
+				die "Compressed Memory couldn't be changed: too much of it is in use. Quit some programs and try again."
+		fi
+		mkdir -p "$(dirname "$CONF")"
+		printf '%s\n' "# Written by the Memory control panel (zacos9-memory-helper)." \
+			"[zram0]" "zram-size = ram * $2 / 100" "compression-algorithm = zstd" >"$CONF.tmp"
+		chmod 644 "$CONF.tmp"
+		mv "$CONF.tmp" "$CONF"
+		if [ -z "${ZACOS9_NO_SYSTEMCTL:-}" ]; then
+			modprobe zram >/dev/null 2>&1 || true
+			systemctl daemon-reload
+			systemctl start "$SWAP_UNIT" >/dev/null 2>&1 || die "Compressed Memory couldn't be turned on."
+		fi
+		;;
+	off)
+		[ $# -eq 1 ] || die "usage: zram off"
+		# swapoff moves what the device holds back into memory; it fails if
+		# there isn't room, and then everything is left as it was.
+		if [ -z "${ZACOS9_NO_SYSTEMCTL:-}" ] && systemctl is-active --quiet "$SWAP_UNIT"; then
+			systemctl stop "$SWAP_UNIT" "$SETUP_UNIT" >/dev/null 2>&1 ||
+				die "Compressed Memory couldn't be turned off: too much of it is in use. Quit some programs and try again."
+		fi
+		rm -f "$CONF"
+		ctl daemon-reload
+		;;
+	*) die "usage: zram on PERCENT | zram off" ;;
+	esac
+	;;
+*)
+	die "usage: zacos9-memory-helper zram on PERCENT | zram off"
+	;;
+esac

@@ -1,0 +1,9 @@
+// Administrators at the computer (in the sudo group, logged in on its
+// screen) may turn Compressed Memory on and off without a password, as
+// the other control panels' computer-wide settings go.
+polkit.addRule(function(action, subject) {
+	if (action.id == "org.zacos9.memory" &&
+			subject.local && subject.active && subject.isInGroup("sudo")) {
+		return polkit.Result.YES;
+	}
+});
