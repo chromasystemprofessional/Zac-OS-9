@@ -1,10 +1,12 @@
-/* Disk Vet's reading of UDisks2's objects (udisks.cpp), and which volumes
- * mount by themselves (mountpolicy.cpp). */
+/* Disk Vet's reading of UDisks2's objects (udisks.cpp), which volumes
+ * mount by themselves (mountpolicy.cpp), and the programs using one (inuse.cpp). */
 #include <QCoreApplication>
 #include <QFile>
+#include <QDir>
 #include <QTemporaryDir>
 #include <cstdio>
 
+#include "inuse.h"
 #include "mountpolicy.h"
 #include "udisks.h"
 
@@ -72,5 +74,64 @@ int main(int argc, char **argv) {
 	CHECK(volumeMountedReadOnly("/dev/nvme0n1p3", info));
 	CHECK(!volumeMountedReadOnly("/dev/sdz9", info) && !volumeMountedReadOnly(QString(), info));
 	std::puts("ok: volumes mounted read-only are told apart");
+
+	/* The programs using a volume: by working directory, open file or
+	 * mapped file, under the mount point itself (not a look-alike). */
+	const QString proc = home.path() + "/proc", mp = "/media/adam/Windows";
+	auto process = [&](const char *pid, const char *comm, const QString &cwd, const QString &fd3 = QString(),
+			const QString &mapped = QString(), const char *cgroup = "app-com.example.Finder-1.scope") {
+		const QString dir = proc + '/' + pid;
+		QDir().mkpath(dir + "/fd");
+		QFile g(dir + "/cgroup");
+		g.open(QIODevice::WriteOnly);
+		g.write("0::/user.slice/user-1001.slice/user@1001.service/app.slice/" + QByteArray(cgroup) + '\n');
+		g.close();
+		QFile c(dir + "/comm");
+		c.open(QIODevice::WriteOnly);
+		c.write(QByteArray(comm) + '\n');
+		c.close();
+		QFile::link(cwd, dir + "/cwd");
+		QFile::link("/", dir + "/root");
+		QFile::link("/usr/bin/" + QString(comm), dir + "/exe");
+		QFile::link("/dev/pts/0", dir + "/fd/0");
+		if (!fd3.isEmpty()) {
+			QFile::link(fd3, dir + "/fd/3");
+		}
+		QFile m(dir + "/maps");
+		m.open(QIODevice::WriteOnly);
+		m.write("7f00 r-xp 00000000 08:03 1234                     /usr/lib/libc.so.6\n");
+		if (!mapped.isEmpty()) {
+			m.write("7f10 r--p 00000000 103:03 99                      " + mapped.toUtf8() + "\n");
+		}
+		m.close();
+	};
+	process("4661", "bash", mp + "/Users/adame/web-app", mp + "/Users/adame/web-app/start.sh", QString(),
+		"chromasystem-lab.service");
+	process("4711", "php", mp + "/Users/adame/web-app", QString(), QString(), "chromasystem-lab.service");
+	process("4712", "php", mp + "/Users/adame/web-app", QString(), QString(), "chromasystem-lab.service");
+	process("5000", "finder", "/home/adam", "/home/adam/Desktop/note.txt");
+	process("5001", "cat", "/home/adam", mp + "-old/file"); /* a look-alike */
+	process("5002", "viewer", "/home/adam", QString(), mp + "/Pictures/a.jpg (deleted)");
+	process("5003", "sh", mp); /* the mount point itself */
+	QDir().mkpath(proc + "/self/fd");
+	QFile::link(mp, proc + "/self/cwd"); /* not a process */
+	QList<Holder> holders = programsUsing(mp, proc);
+	QStringList pids;
+	for (const Holder &h : holders) {
+		pids << QString::number(h.pid) + ':' + h.name;
+	}
+	pids.sort();
+	/* A user service's programs go by the service; a plain program by its name. */
+	CHECK(pids == QStringList({ "4661:chromasystem-lab", "4711:chromasystem-lab", "4712:chromasystem-lab",
+		"5002:viewer", "5003:sh" }));
+	CHECK(holders[0].unit == "chromasystem-lab.service" && holders[3].unit.isEmpty() && holders[4].unit.isEmpty());
+	CHECK(holderNames(holders) == "chromasystem-lab, viewer and sh");
+	CHECK(holderNames(holders.mid(3, 1)) == "viewer" && holderNames({}) == "");
+	CHECK(holderNames({ holders[1], holders[2] }) == "chromasystem-lab");
+	CHECK(holderNames({ holders[3], holders[4] }) == "viewer and sh");
+	CHECK(programsUsing(mp + '/', proc).size() == 5); /* a trailing slash is fine */
+	CHECK(programsUsing("/media/adam/Other", proc).isEmpty());
+	CHECK(programsUsing("/", proc).isEmpty() && programsUsing(QString(), proc).isEmpty());
+	std::puts("ok: the programs using a volume are found");
 	return 0;
 }
