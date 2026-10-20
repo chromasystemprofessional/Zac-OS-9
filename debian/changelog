@@ -1,3 +1,10 @@
+zacos9 (1.0.8) trixie; urgency=medium
+
+  * The Open and Save dialogs' list of disks and desktop folders shows
+    whole names on more than one line instead of cutting them short.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Tue, 20 Oct 2026 11:55:25 -0400
+
 zacos9 (1.0.7) trixie; urgency=medium
 
   * Disk Setup can verify and repair a volume that is open: it names the
