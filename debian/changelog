@@ -1,3 +1,14 @@
+zacos9 (1.0.9) trixie; urgency=medium
+
+  * Log Out now reaches the login window instead of freezing the screen.
+    The Guest account logs in, and the login window doesn't ask for a
+    password for it. Nap Time wakes the computer at the time it's set for
+    on computers whose clock keeps local time (as with Windows), not hours
+    late. The Control Panels folder shows every control panel, each with
+    its own icon.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Tue, 20 Oct 2026 17:59:21 -0400
+
 zacos9 (1.0.8) trixie; urgency=medium
 
   * The Open and Save dialogs' list of disks and desktop folders shows
