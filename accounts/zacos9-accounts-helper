@@ -185,6 +185,17 @@ wakealarm)
 			i=$((i + 1))
 		done
 	fi
+	# The kernel takes the alarm as seconds since 1970 on a clock in UTC. A
+	# clock kept in local time (LOCAL in /etc/adjtime, as Windows keeps it)
+	# would wake the computer hours off, so shift it by the time zone's
+	# offset then (summer time included).
+	if [ -n "$next" ] && [ "$(sed -n 3p "${ZACOS9_ADJTIME:-/etc/adjtime}" 2>/dev/null)" = LOCAL ]; then
+		z=$(date -d "@$next" +%z) # +HHMM or -HHMM
+		hhmm=${z#?}
+		hh=${hhmm%??} mm=${hhmm#??}
+		off=$((((1$hh - 100) * 60 + 1$mm - 100) * 60)) # 1 first: "08" isn't octal
+		case $z in -*) next=$((next - off)) ;; *) next=$((next + off)) ;; esac
+	fi
 	# The alarm must be cleared before it can be set again.
 	[ -e "$rtc" ] || [ -n "${ZACOS9_RTC:-}" ] || exit 0
 	echo 0 >"$rtc"
