@@ -77,6 +77,13 @@ guest)
 			die "There is already an account named \"$GUEST\" that isn't the Guest account."
 		fi
 		passwd -d "$GUEST" >/dev/null # no password
+		# The devices a session needs: without video, seatd won't give it
+		# the screen and the login ends at once. No administrator groups.
+		for g in audio video render input; do
+			if getent group "$g" >/dev/null; then
+				usermod -aG "$g" "$GUEST" || die "The Guest account couldn't be set up."
+			fi
+		done
 		echo "$GUEST" >"$CONF/guest-account"
 		chmod 644 "$CONF/guest-account"
 		;;
