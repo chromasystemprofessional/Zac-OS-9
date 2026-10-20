@@ -86,6 +86,9 @@ if python3.found()
     timeout: 60)
   test('fonts-current', python3,
     args: [meson.project_source_root() / 'tools/fonts/build_fonts.py', '--check'])
+  # The TrueType copies too (skipped without python3-fonttools).
+  test('fonts-ttf-current', python3,
+    args: [meson.project_source_root() / 'tools/fonts/build_ttf.py', '--check'])
 endif
 if python3.found()
   test('icons-current', python3,

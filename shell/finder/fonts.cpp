@@ -125,6 +125,8 @@ const QStringList &fontMacFamilies() {
 		"Liberation Serif",    /* Times New Roman */
 		"Liberation Mono",     /* Courier New */
 		"Comic Neue",          /* Comic Sans MS */
+		"ZacOS 9 System",      /* ZacOS 9's own, as TrueType (tools/fonts/build_ttf.py) */
+		"ZacOS 9 Views",
 	};
 	return families;
 }

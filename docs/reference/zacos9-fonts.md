@@ -57,6 +57,10 @@ Checked strings: "External" 39, "Internal" 37, "Promotion" 49, "Vacation" 39, "N
 
 Alias names use an italic that is synthesised, as QuickDraw did. Each row shifts right by one pixel for every two rows above the baseline, and left below it. The advance stays the same.
 
+## TrueType copies, for programs
+
+`tools/fonts/build_ttf.py` builds the same fonts as TrueType, `assets/fonts/ZacOS9System-Regular.ttf`, `ZacOS9Views-Regular.ttf` and `ZacOS9Views-Italic.ttf` (the synthesised italic above), committed and installed to `/usr/share/fonts/truetype/zacos9/`. Each pixel is a square of the outline, 100 units on a side, in an em of 100 units per pixel of the design size (1200 for System at 12 px, 900 for Views at 9 px); the ascent is the rows above the baseline row and the descent those below, so the line box is the bitmap's (16 and 15 px). Unhinted (`share/fontconfig/zacos9-fonts.conf` turns hinting off for them), every edge falls on a pixel boundary at the design size and Pango's rendering matches the bitmaps pixel for pixel; at other sizes they scale as pixel fonts do. The family names are `ZacOS 9 System` and `ZacOS 9 Views`; the Fonts folder lists them (`fontMacFamilies()`), and programs in a ZacOS session see them. Test `fonts-ttf-current` fails when the `.ttf` files are older than the `.pfont` sources (run the script again); it needs python3-fonttools.
+
 ## Coverage and fallback
 
 Both fonts cover:
