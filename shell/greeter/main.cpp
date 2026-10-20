@@ -87,6 +87,13 @@ public:
 		if (welcome.open(QIODevice::ReadOnly)) {
 			m_welcome = QString::fromUtf8(welcome.read(400)).simplified();
 		}
+		/* The Guest account has no password (zacos9-accounts-helper), and
+		 * we can't read /etc/shadow to see who else hasn't. */
+		QFile guest((conf.isEmpty() ? QString("/etc/zacos9") : QString::fromUtf8(conf)) +
+			"/guest-account");
+		if (guest.open(QIODevice::ReadOnly)) {
+			m_guest = QString::fromUtf8(guest.read(64)).trimmed();
+		}
 
 		/* Under the welcome and the chosen person's picture. */
 		int y = PICTURE_Y + PICTURE + 8;
@@ -240,10 +247,19 @@ protected:
 	}
 
 private:
+	/* The chosen person needs no password: the field is dimmed and empty. */
+	bool noPassword() const {
+		const int row = m_list.state.selected;
+		return row >= 0 && !m_guest.isEmpty() && m_accounts[static_cast<size_t>(row)].user == m_guest;
+	}
+
 	void updateEnabled() {
 		const bool idle = !m_greetd.busy();
 		m_logIn.enabled = idle && m_list.state.selected >= 0;
-		m_password.enabled = idle;
+		m_password.enabled = idle && !noPassword();
+		if (noPassword()) {
+			m_password.setText(QString());
+		}
 		m_shutDown.enabled = m_restart.enabled = idle;
 	}
 
@@ -270,6 +286,7 @@ private:
 
 	std::vector<Account> m_accounts;
 	QString m_welcome;
+	QString m_guest; /* the Guest account's user name, if it's on */
 	Greetd m_greetd;
 	QString m_error;
 	bool m_safeMode = false;

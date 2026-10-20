@@ -22,11 +22,17 @@
 #include <QLocale>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QProcess>
 #include <QTime>
+#include <QTimer>
 #include <QWheelEvent>
 #include <climits>
+#include <csignal>
+#include <cstring>
+#include <functional>
 
 #include "alert.h"
+#include "inuse.h"
 #include "mountpolicy.h"
 #include "panelkit.h"
 #include "plan.h"
@@ -312,77 +318,183 @@ private:
 		if (!v || m_busy) {
 			return;
 		}
-		if (repair && v->readOnly && !v->mountPoints.contains("/")) {
-			repairReadOnly(*v);
+		if (v->mountPoints.contains("/")) {
+			Alert::ask(QString("“%1” is the startup disk, so it can't be checked while ZacOS is running "
+				"from it. Start up from another disk (the install medium) and check it from there.").arg(v->name),
+				"OK", QString());
 			return;
 		}
-		if (!v->mountPoints.isEmpty()) {
-			Alert::ask(QString("“%1” is in use, so it can't be checked. %2").arg(v->name, v->mountPoints.contains("/")
-				? "It's the startup disk: check it while starting up from another disk."
-				: "Eject it first, then try again."), "OK", QString());
+		const QString verb = repair ? "repaired" : "verified";
+		if (v->mountPoints.isEmpty()) {
+			check(*v, repair, false);
 			return;
 		}
-		const QString name = v->name;
-		log(QString("%1 “%2”…").arg(repair ? "Repairing" : "Verifying", name));
+		/* Open: closed first, which the programs using it prevent. */
+		const QList<Holder> holders = programsUsing(v->mountPoints.first());
+		if (holders.isEmpty()) {
+			check(*v, repair, true);
+			return;
+		}
+		const QString names = holderNames(holders);
+		const QString them = names.contains(", ") || names.contains(" and ") ? "them" : "it";
+		if (!Alert::ask(QString("“%1” is in use by %2, so it can't be closed to be %3. Quit %4 now? "
+				"Unsaved changes in %4 will be lost.").arg(v->name, names, verb, them),
+				repair ? "Quit and Repair" : "Quit and Verify")) {
+			return;
+		}
+		const VetVolume volume = *v;
 		m_busy = true;
 		updateButtons();
-		call(this, v->path, "org.freedesktop.UDisks2.Filesystem", repair ? "Repair" : "Check", { QVariantMap() },
-				[this, name, repair](const QDBusMessage &reply) {
+		log(QString("Quitting %1…").arg(names));
+		const QStringList units = unitsOf(holders);
+		quit(holders, [this, volume, repair, units] {
+			const QList<Holder> still = programsUsing(volume.mountPoints.first());
+			if (!still.isEmpty()) {
+				m_busy = false;
+				log(QString("%1 wouldn't quit, so “%2” stays open.").arg(holderNames(still), volume.name));
+				updateButtons();
+				return;
+			}
+			check(volume, repair, true, units);
+		});
+	}
+
+	static QStringList unitsOf(const QList<Holder> &holders) {
+		QStringList units;
+		for (const Holder &h : holders) {
+			if (!h.unit.isEmpty() && !units.contains(h.unit)) {
+				units << h.unit;
+			}
+		}
+		return units;
+	}
+
+	/* systemctl --user `verb` `units`, not waited for (quit() watches the
+	 * programs themselves). */
+	void systemctl(const QString &verb, const QStringList &units) {
+		if (units.isEmpty()) {
+			return;
+		}
+		auto *p = new QProcess(this);
+		connect(p, &QProcess::finished, p, &QObject::deleteLater);
+		p->start("systemctl", QStringList{ "--user", verb } + units);
+	}
+
+	/* Asks `holders` to quit (their user services stopped, which would
+	 * otherwise start them again; the rest SIGTERM), then makes them
+	 * (SIGKILL) if they haven't within a few seconds; `done` once they're
+	 * gone or given up on. */
+	void quit(const QList<Holder> &holders, std::function<void()> done) {
+		systemctl("stop", unitsOf(holders));
+		for (const Holder &h : holders) {
+			if (h.unit.isEmpty()) {
+				::kill(h.pid, SIGTERM);
+			}
+		}
+		auto *timer = new QTimer(this);
+		auto *tries = new int(0);
+		connect(timer, &QTimer::timeout, this, [=] {
+			bool gone = true;
+			for (const Holder &h : holders) {
+				if (::kill(h.pid, 0) == 0) {
+					gone = false;
+				}
+			}
+			++*tries;
+			if (*tries == 20) { /* 5 s: it isn't listening */
+				for (const Holder &h : holders) {
+					::kill(h.pid, SIGKILL);
+				}
+			}
+			if (gone || *tries >= 28) {
+				timer->stop();
+				timer->deleteLater();
+				delete tries;
+				done();
+			}
+		});
+		timer->start(250);
+	}
+
+	/* Verifies or repairs `v`; `open` closes it first and opens it again
+	 * after: normally once repaired, else as it was (a volume a crash left
+	 * marked in use, as NTFS is, mounts read-only; the Sniffer does so,
+	 * localvolumes.cpp, and Repair clears the mark). The user services
+	 * stopped to close it, `restart`, are started again once it's open. */
+	void check(const VetVolume &v, bool repair, bool open, const QStringList &restart = QStringList()) {
+		const QString name = v.name, path = v.path, fs = "org.freedesktop.UDisks2.Filesystem";
+		const bool wasReadOnly = v.readOnly;
+		const auto failed = [this, name](const QString &step, const QDBusMessage &reply) {
 			m_busy = false;
+			log(QString("“%1” couldn't be %2: %3").arg(name, step, errorOf(reply)));
+			reload();
+			updateButtons();
+		};
+		const auto checked = [=](const QDBusMessage &reply) {
+			const bool ok = reply.arguments().value(0).toBool();
 			if (!errorOf(reply).isEmpty()) {
 				log(QString("“%1” couldn't be %2: %3").arg(name, repair ? "repaired" : "verified", errorOf(reply)));
-			} else if (reply.arguments().value(0).toBool()) {
+			} else if (ok) {
 				log(repair ? QString("“%1” has been repaired, or needed no repair.").arg(name)
 					: QString("“%1” appears to be OK.").arg(name));
 			} else {
 				log(repair ? QString("“%1” couldn't be fully repaired. Copy what's on it elsewhere.").arg(name)
 					: QString("“%1” has problems. Click Repair to fix them.").arg(name));
 			}
-			updateButtons();
-		});
-	}
-
-	/* A volume opened read-only because it wasn't put away properly (the
-	 * Sniffer does so, localvolumes.cpp): closed, repaired (for NTFS, the
-	 * mark of being in use cleared), and opened again normally. */
-	void repairReadOnly(const VetVolume &v) {
-		const QString name = v.name, path = v.path;
-		const auto failed = [this, name](const QString &step, const QDBusMessage &reply) {
-			m_busy = false;
-			log(QString("“%1” couldn't be %2: %3").arg(name, step, errorOf(reply)));
-			reload();
-		};
-		log(QString("Repairing “%1”…").arg(name));
-		m_busy = true;
-		updateButtons();
-		const QString fs = "org.freedesktop.UDisks2.Filesystem";
-		call(this, path, fs, "Unmount", { QVariantMap() }, [=](const QDBusMessage &closed) {
-			if (!errorOf(closed).isEmpty()) {
-				failed("closed to repair it (is a file on it open?)", closed);
+			if (!open) {
+				m_busy = false;
+				reload();
+				updateButtons();
 				return;
 			}
-			call(this, path, fs, "Repair", { QVariantMap() }, [=](const QDBusMessage &repaired) {
-				if (!errorOf(repaired).isEmpty() || !repaired.arguments().value(0).toBool()) {
-					/* Opened read-only again, so what's on it stays reachable. */
-					const QString why = errorOf(repaired).isEmpty()
-						? QString("it couldn't be fully repaired; copy what's on it elsewhere")
-						: errorOf(repaired);
+			/* Open again: normally once repaired, else as it was. */
+			const bool readOnly = wasReadOnly && !(repair && errorOf(reply).isEmpty() && ok);
+			const auto opened = [this, name, readOnly, restart](const QDBusMessage &mounted) {
+				m_busy = false;
+				log(errorOf(mounted).isEmpty()
+					? QString("“%1” is open %2again.").arg(name, readOnly ? "read-only " : "")
+					: QString("“%1” couldn't be opened again: %2").arg(name, errorOf(mounted)));
+				if (!restart.isEmpty()) {
+					systemctl("start", restart);
+					QStringList names;
+					for (const QString &unit : restart) {
+						names << unit.chopped(int(strlen(".service")));
+					}
+					log(QString("%1 started again.").arg(names.join(", ")));
+				}
+				reload();
+				updateButtons();
+			};
+			const QVariantMap options = readOnly ? QVariantMap{ { "options", "ro" } } : QVariantMap();
+			call(this, path, fs, "Mount", { options }, [=](const QDBusMessage &mounted) {
+				if (!errorOf(mounted).isEmpty() && !readOnly) {
+					/* Not even as it was: read-only, so what's on it stays reachable. */
 					call(this, path, fs, "Mount", { QVariantMap{ { "options", "ro" } } },
-							[=](const QDBusMessage &) {
-						m_busy = false;
-						log(QString("“%1” couldn't be repaired (%2). It's open read-only again.").arg(name, why));
-						reload();
+						[this, name, opened](const QDBusMessage &ro) {
+						opened(ro);
+						if (errorOf(ro).isEmpty()) {
+							log(QString("“%1” wouldn't open normally; Repair may fix it.").arg(name));
+						}
 					});
 					return;
 				}
-				call(this, path, fs, "Mount", { QVariantMap() }, [=](const QDBusMessage &opened) {
-					m_busy = false;
-					log(errorOf(opened).isEmpty()
-						? QString("“%1” has been repaired and is open normally again.").arg(name)
-						: QString("“%1” was repaired, but couldn't be opened: %2").arg(name, errorOf(opened)));
-					reload();
-				});
+				opened(mounted);
 			});
+		};
+		log(QString("%1 “%2”…").arg(repair ? "Repairing" : "Verifying", name));
+		m_busy = true;
+		updateButtons();
+		const QString method = repair ? "Repair" : "Check";
+		if (!open) {
+			call(this, path, fs, method, { QVariantMap() }, checked);
+			return;
+		}
+		call(this, path, fs, "Unmount", { QVariantMap() }, [=](const QDBusMessage &closed) {
+			if (!errorOf(closed).isEmpty()) {
+				failed(QString("closed to be %1 (a program is using it)").arg(repair ? "repaired" : "verified"), closed);
+				return;
+			}
+			call(this, path, fs, method, { QVariantMap() }, checked);
 		});
 	}
 

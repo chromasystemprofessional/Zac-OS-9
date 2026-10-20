@@ -1,3 +1,56 @@
+zacos9 (1.0.9) trixie; urgency=medium
+
+  * Log Out now reaches the login window instead of freezing the screen.
+    The Guest account logs in, and the login window doesn't ask for a
+    password for it. Nap Time wakes the computer at the time it's set for
+    on computers whose clock keeps local time (as with Windows), not hours
+    late. The Control Panels folder shows every control panel, each with
+    its own icon.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Tue, 20 Oct 2026 17:59:21 -0400
+
+zacos9 (1.0.8) trixie; urgency=medium
+
+  * The Open and Save dialogs' list of disks and desktop folders shows
+    whole names on more than one line instead of cutting them short.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Tue, 20 Oct 2026 11:55:25 -0400
+
+zacos9 (1.0.7) trixie; urgency=medium
+
+  * Disk Setup can verify and repair a volume that is open: it names the
+    programs using it, quits them (a user service is stopped and started
+    again), closes the volume, checks it and opens it again. ZacOS 9's own
+    fonts, ZacOS 9 System and ZacOS 9 Views, are TrueType files in the
+    Fonts folder that any program can use. Printing no longer goes through
+    cups-browsed, whose queues stopped with no destination: CUPS finds the
+    printers itself, and the leftover queues are removed.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Tue, 20 Oct 2026 10:13:25 -0400
+
+zacos9 (1.0.6) trixie; urgency=medium
+
+  * Programs see only the fonts in the Fonts folder: the free fonts that
+    stand in for Mac OS 9's, and the fonts you add there yourself. Every
+    other installed font is hidden from them in a ZacOS session; serif text
+    uses Nimbus Roman, Times's stand-in. ZacOS now installs Linux Libertine
+    and Comic Neue with the rest of that set.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Mon, 19 Oct 2026 22:39:31 -0400
+
+zacos9 (1.0.5) trixie; urgency=medium
+
+  * Desktop icons no longer stay selected after clicking another one. Disk
+    Setup appears in System Folder > Utilities. The Fonts folder opens
+    quickly and shows a Mac OS 9-sized set of fonts (the rest under
+    Language Kits), with font files shown as suitcases with an A in their
+    own typeface. Drives that fail to mount at login (such as NTFS drives
+    left marked in use after a crash) are tried again and then opened
+    read-only, with Repair in Disk Setup; Disk Setup has a Mount
+    automatically checkbox for each drive.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Mon, 19 Oct 2026 19:52:31 -0400
+
 zacos9 (1.0.4) trixie; urgency=medium
 
   * Other programs can add modules to The Collar, and Software has an

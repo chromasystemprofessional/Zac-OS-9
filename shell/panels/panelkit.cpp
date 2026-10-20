@@ -881,6 +881,10 @@ void PanelEdit::keepCaretVisible() {
 void PanelEdit::paint(pl_canvas *c, bool focused, bool caretOn) const {
 	const QRect r = rect;
 	pl_edit_frame_paint(c, r.left(), r.top(), r.right(), r.bottom());
+	if (!enabled) { /* dimmed: a gray outline, and never the focus ring */
+		pl_outline(c, r.left(), r.top(), r.right(), r.bottom(), GRAY(0x8));
+		focused = false;
+	}
 	if (focused) {
 		pl_focus_ring_paint(c, r.left(), r.top(), r.right(), r.bottom(), pl_accent_current(),
 			GRAY(0xD));

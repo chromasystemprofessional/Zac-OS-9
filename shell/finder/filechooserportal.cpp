@@ -360,12 +360,7 @@ public:
 		layout->addWidget(m_error);
 
 		m_locations = new QListWidget(this);
-		m_locations->setViewMode(QListView::IconMode);
-		m_locations->setMovement(QListView::Static);
-		m_locations->setResizeMode(QListView::Adjust);
-		m_locations->setIconSize(QSize(PL_ICON_LARGE, PL_ICON_LARGE));
-		m_locations->setGridSize(QSize(132, 108));
-		m_locations->setSpacing(8);
+		prepareLocationList(m_locations);
 		m_drives = fileChooserLocations();
 		for (int i = 0; i < m_drives.size(); i++) {
 			auto *item = new QListWidgetItem(
@@ -1164,6 +1159,19 @@ FileChooserLocation fileChooserStartupDisk(const QString &parent) {
 	disk.realRoots.removeDuplicates();
 	disk.path = QFileInfo(root).canonicalFilePath();
 	return disk;
+}
+
+void prepareLocationList(QListWidget *list) {
+	list->setViewMode(QListView::IconMode);
+	list->setMovement(QListView::Static);
+	list->setResizeMode(QListView::Adjust);
+	list->setIconSize(QSize(PL_ICON_LARGE, PL_ICON_LARGE));
+	list->setGridSize(QSize(132, 108));
+	list->setSpacing(8);
+	/* A name wider than its cell goes on as many lines as the cell holds
+	 * (three), rather than "Archive and …": two aliases named alike were
+	 * both "ChromaSyste…". */
+	list->setWordWrap(true);
 }
 
 void prepareFileChooserDialog(QFileDialog &dialog) {

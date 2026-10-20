@@ -11,6 +11,7 @@
 #include <QFileInfo>
 #include <QFileSystemWatcher>
 #include <QHash>
+#include <QSaveFile>
 #include <QStandardPaths>
 #include <QTimer>
 #include <QTextBoundaryFinder>
@@ -72,25 +73,9 @@ FT_Face openFace(const QString &file, int index) {
 /* The free fonts that stand in for the ones Mac OS 9 came with, and for
  * the web fonts its Internet Explorer brought, in their usual styles. */
 bool inMacSet(const FontFace &face) {
-	static const QStringList families = {
-		"Nimbus Sans",         /* Helvetica */
-		"Nimbus Roman",        /* Times */
-		"Nimbus Mono PS",      /* Courier */
-		"P052",                /* Palatino */
-		"C059",                /* New York */
-		"Standard Symbols PS", /* Symbol */
-		"Z003",                /* Apple Chancery */
-		"Linux Libertine O",   /* Hoefler Text */
-		"DejaVu Sans",         /* Geneva, Verdana */
-		"DejaVu Sans Mono",    /* Monaco */
-		"Liberation Sans",     /* Arial */
-		"Liberation Serif",    /* Times New Roman */
-		"Liberation Mono",     /* Courier New */
-		"Comic Neue",          /* Comic Sans MS */
-	};
 	static const QStringList styles = { "Regular", "Roman", "Book", "Bold", "Italic", "Oblique",
 		"Bold Italic", "Bold Oblique", "Medium Italic" };
-	return families.contains(face.family, Qt::CaseInsensitive) &&
+	return fontMacFamilies().contains(face.family, Qt::CaseInsensitive) &&
 		styles.contains(face.style, Qt::CaseInsensitive);
 }
 
@@ -122,6 +107,66 @@ QStringList userRoots() {
 bool within(const QString &path, const QString &root) {
 	return !root.isEmpty() && (path == root || path.startsWith(root + '/'));
 }
+}
+
+const QStringList &fontMacFamilies() {
+	static const QStringList families = {
+		"Nimbus Sans",         /* Helvetica */
+		"Nimbus Roman",        /* Times */
+		"Nimbus Mono PS",      /* Courier */
+		"P052",                /* Palatino */
+		"C059",                /* New York */
+		"Standard Symbols PS", /* Symbol */
+		"Z003",                /* Apple Chancery */
+		"Linux Libertine O",   /* Hoefler Text */
+		"DejaVu Sans",         /* Geneva, Verdana */
+		"DejaVu Sans Mono",    /* Monaco */
+		"Liberation Sans",     /* Arial */
+		"Liberation Serif",    /* Times New Roman */
+		"Liberation Mono",     /* Courier New */
+		"Comic Neue",          /* Comic Sans MS */
+		"ZacOS 9 System",      /* ZacOS 9's own, as TrueType (tools/fonts/build_ttf.py) */
+		"ZacOS 9 Views",
+	};
+	return families;
+}
+
+QString fontOwnAcceptsPath() {
+	return QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + "/zacos9/fonts-own.conf";
+}
+
+bool fontWriteOwnAccepts() {
+	QStringList files;
+	for (const QString &root : userRoots()) {
+		QDirIterator it(root, { "*.ttf", "*.otf", "*.ttc", "*.otc", "*.pfb", "*.pfa", "*.pcf", "*.pcf.gz",
+			"*.bdf", "*.woff", "*.woff2", "*.dfont" }, QDir::Files, QDirIterator::Subdirectories);
+		while (it.hasNext()) {
+			files << QDir::cleanPath(it.next());
+		}
+	}
+	files.sort();
+	files.removeDuplicates();
+	QString xml = "<?xml version=\"1.0\"?>\n<!DOCTYPE fontconfig SYSTEM \"urn:fontconfig:fonts.dtd\">\n"
+		"<!-- Written by the Sniffer: the user's own fonts, which programs may use\n"
+		"     besides Mac OS 9's (share/fontconfig/zacos9-fonts.conf). -->\n<fontconfig>\n";
+	if (!files.isEmpty()) {
+		xml += "  <selectfont>\n    <acceptfont>\n";
+		for (const QString &file : files) {
+			xml += "      <pattern><patelt name=\"file\"><string>" + file.toHtmlEscaped() +
+				"</string></patelt></pattern>\n";
+		}
+		xml += "    </acceptfont>\n  </selectfont>\n";
+	}
+	xml += "</fontconfig>\n";
+	const QString path = fontOwnAcceptsPath();
+	QFile current(path);
+	if (current.open(QIODevice::ReadOnly) && QString::fromUtf8(current.readAll()) == xml) {
+		return true; /* unchanged: leave it, so programs don't reload for nothing */
+	}
+	current.close();
+	QDir().mkpath(QFileInfo(path).path());
+	QSaveFile out(path);
+	return out.open(QIODevice::WriteOnly) && out.write(xml.toUtf8()) >= 0 && out.commit();
 }
 
 QString FontFace::id() const {

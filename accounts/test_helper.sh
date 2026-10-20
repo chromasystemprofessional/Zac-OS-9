@@ -24,10 +24,20 @@ printf '# fr_FR.UTF-8 UTF-8\nen_US.UTF-8 UTF-8\n' >"$T/locale.gen"
 ! "$helper" locale 'x;y' 2>/dev/null || fail "odd locale names refused"
 ! "$helper" locale xx_XX.UTF-8 2>/dev/null || fail "unsupported locales refused"
 export ZACOS9_SYSTEMD_DIR=$T/systemd ZACOS9_RTC=$T/wakealarm ZACOS9_NO_SYSTEMCTL=1
+export ZACOS9_ADJTIME=$T/adjtime # a hardware clock in UTC, whatever this computer's is
+printf '0.0 0 0.0\n0\nUTC\n' >"$T/adjtime"
 printf 'startup daily 07:30\nshutdown weekdays 23:00\n' | "$helper" schedule
 grep -qx "OnCalendar=Mon..Fri \*-\*-\* 23:00:00" "$T/systemd/zacos9-shutdown.timer" || fail "the shut-down timer"
 alarm=$(cat "$T/wakealarm")
 [ "$(date -d "@$alarm" +%H:%M)" = 07:30 ] && [ "$alarm" -gt "$(date +%s)" ] || fail "the wake alarm: $alarm"
+# A hardware clock in local time: the kernel reads the alarm as that clock's
+# own time, so 07:30 there is 07:30 "UTC", in summer and winter alike.
+printf '0.0 0 0.0\n0\nLOCAL\n' >"$T/adjtime"
+for zone in America/New_York Asia/Kolkata Australia/Sydney; do
+	TZ=$zone "$helper" wakealarm
+	alarm=$(cat "$T/wakealarm")
+	[ "$(date -u -d "@$alarm" +%H:%M)" = 07:30 ] || fail "the wake alarm on a local-time clock ($zone): $alarm"
+done
 printf '' | "$helper" schedule
 [ ! -e "$T/systemd/zacos9-shutdown.timer" ] && [ "$(cat "$T/wakealarm")" = 0 ] || fail "the schedule turned off"
 ! printf 'startup daily 25:00\n' | "$helper" schedule 2>/dev/null || fail "odd times refused"

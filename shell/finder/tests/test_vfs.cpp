@@ -533,6 +533,13 @@ int main(int argc, char **argv) {
 	QStringList panels = namesIn(vfsPathFor("system-folder/control-panels"));
 	check(panels.contains("Appearance") && panels.contains("File Sharing") &&
 		panels.contains("TCP/IP"), "Control Panels lists the control panels");
+	check(panels.contains("Bluetooth") && panels.contains("Users") && panels.contains("Walkies") &&
+		panels.contains("Keychain Access"), "Control Panels has every panel the Zac menu has");
+	const VNode *mouse = vfsNode(vfsPathFor("system-folder/control-panels/zacos9-controlpanel-mouse"));
+	const VNode *napTime =
+		vfsNode(vfsPathFor("system-folder/control-panels/zacos9-controlpanel-energysaver"));
+	check(mouse && mouse->icon == PL_ICON_CP_MOUSE && napTime && napTime->icon == PL_ICON_EXT_POWER,
+		"each control panel has its own icon, as in the Zac menu");
 
 	/* ---- an application appears as a direct launcher in Applications --- */
 	const VNode *launcher = vfsNode(vfsPathFor("applications/simpletext.desktop"));

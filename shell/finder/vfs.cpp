@@ -324,28 +324,39 @@ namespace {
 
 struct PanelDef {
 	const char *name, *program, *arg;
+	pl_icon_kind icon;
 };
-/* Alphabetical, as the Mac's Control Panels folder was. */
+/* Alphabetical, as the Mac's Control Panels folder was; each with the icon
+ * the Zac menu's Control Panels gives it (shell/menubar/launch.c). */
 const PanelDef PANELS[] = {
-	{ "Accessibility", "zacos9-controlpanel", "accessibility" },
-	{ "Appearance", "zacos9-appearance", nullptr },
-	{ "Date & Time", "zacos9-datetime", nullptr },
-	{ "File Sharing", "zacos9-filesharing", nullptr },
-	{ "File Translator", "zacos9-fileexchange", nullptr },
-	{ "General Controls", "zacos9-controlpanel", "general" },
-	{ "Internet", "zacos9-controlpanel", "internet" },
-	{ "Keyboard", "zacos9-controlpanel", "keyboard" },
-	{ "Memory", "zacos9-controlpanel", "memory" },
-	{ "Monitors", "zacos9-controlpanel", "monitors" },
-	{ "Mouse", "zacos9-controlpanel", "mouse" },
-	{ "Nap Time", "zacos9-controlpanel", "energysaver" },
-	{ "Screen Saver", "zacos9-controlpanel", "screensaver" },
-	{ "Sound", "zacos9-controlpanel", "sound" },
-	{ "Startup Disk", "zacos9-controlpanel", "startupdisk" },
-	{ "Tablet", "zacos9-controlpanel", "tablet" },
-	{ "TCP/IP", "zacos9-tcpip", nullptr },
-	{ "Trackpad", "zacos9-controlpanel", "trackpad" },
-	{ "Zac Menu Options", "zacos9-controlpanel", "zacmenu" },
+	{ "Accessibility", "zacos9-controlpanel", "accessibility", PL_ICON_CP_ACCESSIBILITY },
+	{ "Appearance", "zacos9-appearance", nullptr, PL_ICON_CP_APPEARANCE },
+	{ "Bluetooth", "zacos9-bluetooth", nullptr, PL_ICON_EXT_BLUETOOTH },
+	{ "Collar", "zacos9-collarpanel", nullptr, PL_ICON_CP_COLLAR },
+	{ "Date & Time", "zacos9-datetime", nullptr, PL_ICON_CP_DATETIME },
+	{ "File Sharing", "zacos9-filesharing", nullptr, PL_ICON_SHARED_FOLDER },
+	{ "File Translator", "zacos9-fileexchange", nullptr, PL_ICON_CP_FILETRANSLATOR },
+	{ "General Controls", "zacos9-controlpanel", "general", PL_ICON_CP_GENERAL },
+	{ "Internet", "zacos9-controlpanel", "internet", PL_ICON_INTERNET_LOCATION },
+	{ "Keyboard", "zacos9-controlpanel", "keyboard", PL_ICON_CP_KEYBOARD },
+	{ "Keychain Access", "zacos9-keychain", nullptr, PL_ICON_CP_KEYCHAIN },
+	{ "Memory", "zacos9-controlpanel", "memory", PL_ICON_EXT_CHIP },
+	{ "Monitors", "zacos9-controlpanel", "monitors", PL_ICON_EXT_DISPLAY },
+	{ "Mouse", "zacos9-controlpanel", "mouse", PL_ICON_CP_MOUSE },
+	{ "Nap Time", "zacos9-controlpanel", "energysaver", PL_ICON_EXT_POWER },
+	{ "Numbers", "zacos9-controlpanel", "numbers", PL_ICON_CP_NUMBERS },
+	{ "Retriever", "zacos9-retriever", nullptr, PL_ICON_CP_RETRIEVER },
+	{ "Screen Saver", "zacos9-controlpanel", "screensaver", PL_ICON_CP_SCREENSAVER },
+	{ "Sound", "zacos9-controlpanel", "sound", PL_ICON_EXT_AUDIO },
+	{ "Speech", "zacos9-controlpanel", "speech", PL_ICON_CP_SPEECH },
+	{ "Startup Disk", "zacos9-controlpanel", "startupdisk", PL_ICON_DISK },
+	{ "Tablet", "zacos9-controlpanel", "tablet", PL_ICON_EXT_INPUT },
+	{ "TCP/IP", "zacos9-tcpip", nullptr, PL_ICON_EXT_ETHERNET },
+	{ "Text", "zacos9-controlpanel", "text", PL_ICON_CP_TEXT },
+	{ "Trackpad", "zacos9-controlpanel", "trackpad", PL_ICON_CP_TRACKPAD },
+	{ "Users", "zacos9-controlpanel", "users", PL_ICON_CP_USERS },
+	{ "Walkies", "zacos9-walkies", nullptr, PL_ICON_CP_WALKIES },
+	{ "Zac Menu Options", "zacos9-controlpanel", "zacmenu", PL_ICON_CP_ZACMENU },
 };
 
 bool matchesCategories(const AppEntry &app, const VNode &node) {
@@ -402,7 +413,7 @@ void generatePanels(const VNode &parent) {
 			(panel.arg ? QString("-") + panel.arg : QString());
 		node.name = QString::fromUtf8(panel.name);
 		node.kind = VKind::Launcher;
-		node.icon = PL_ICON_APPLICATION;
+		node.icon = panel.icon;
 		node.program = QString::fromUtf8(panel.program);
 		if (panel.arg) {
 			node.args << QString::fromUtf8(panel.arg);
@@ -1124,6 +1135,7 @@ QString vfsFontFile(const QString &path) {
 
 void vfsFontsChanged() {
 	fontInvalidate();
+	fontWriteOwnAccepts();
 	notifyChanged();
 }
 
@@ -1312,7 +1324,12 @@ int vfsOnChange(std::function<void()> f) {
 			notifyChanged();
 		});
 		watchResourceSources();
-		fontWatchChanges([] { notifyChanged(); });
+		/* Programs see the user's own fonts too (fonts.h). */
+		fontWriteOwnAccepts();
+		fontWatchChanges([] {
+			fontWriteOwnAccepts();
+			notifyChanged();
+		});
 	}
 	return token;
 }
