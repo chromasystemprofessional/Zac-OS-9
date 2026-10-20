@@ -26,10 +26,11 @@ def check(ok, what):
 FAKES = {
     # Each logs its name and arguments; some keep a little state.
     "swapon": "", "swapoff": "", "mkswap": "", "dd": "", "btrfs": "",
-    "earlyoom": "",
+    "earlyoom": "", "modprobe": "",
     "fallocate": '/usr/bin/truncate -s "$2" "$3"',
     "findmnt": "echo ext4",
-    "systemctl": '[ "$1" = is-enabled ] && /usr/bin/cat "$STATE/enabled" 2>/dev/null; true',
+    "systemctl": '[ "$1" = stop ] && [ -e "$STATE/zram-full" ] && exit 1; '
+                 '[ "$1" = is-enabled ] && /usr/bin/cat "$STATE/enabled" 2>/dev/null; true',
     "mountpoint": '[ -e "$STATE/mounted" ]',
     "mount": '/usr/bin/touch "$STATE/mounted"',
     "umount": '[ -e "$STATE/busy" ] && exit 1; /usr/bin/rm -f "$STATE/mounted"',
@@ -58,6 +59,7 @@ with tempfile.TemporaryDirectory() as d:
 
     env = {"PATH": str(bin_), "LOG": str(log), "STATE": str(state),
            "ZACOS9_MEMORY_ROOT": str(root), "ZACOS9_MEMORY_PROC": str(proc),
+           "ZACOS9_MEMORY_SYS": str(base / "sys"),
            "ZACOS9_MEMORY_UID": "1234"}
 
     def run(*args):
@@ -75,13 +77,17 @@ with tempfile.TemporaryDirectory() as d:
         return found
 
     # ---- status
-    proc_files(swaps=[("/dev/zram0", 4096, 10)])
+    proc_files(swaps=[("/dev/sda2", 4096, 10), ("/dev/zram0", 2048, 20)])
     (state / "enabled").write_text("enabled\n")
+    (base / "sys/block/zram0").mkdir(parents=True)
+    (base / "sys/block/zram0/mm_stat").write_text(f"{20 * MB} {5 * MB} {6 * MB} 0 0 0 0\n")
     f = facts()
     check(f["memory"][0] == [str(16000000 * 1024), str(8000 * MB), str(2000000 * 1024)],
           "status reports memory, what's available and the disk cache")
-    check(f["swapfile"][0] == ["0", "0", "no"] and f["other-swap"][0] == ["/dev/zram0", str(4096 * MB), str(10 * MB)],
+    check(f["swapfile"][0] == ["0", "0", "no"] and f["other-swap"] == [["/dev/sda2", str(4096 * MB), str(10 * MB)]],
           "status tells no swap file from other swap it leaves alone")
+    check(f["zram"][0] == ["no", "no", "50", str(2048 * MB), str(20 * MB), str(5 * MB)],
+          "status reports Compressed Memory: not set up here, zram0 as it runs")
     check(f["guard"][0] == ["yes", "yes"] and f["ramdisk"][0][0] == "no",
           "status reports earlyoom and the RAM Disk")
 
@@ -93,13 +99,13 @@ with tempfile.TemporaryDirectory() as d:
           f"swap 1024 makes a 1 GB swap file and turns it on {err}")
     check(fstab.count("/swapfile none swap sw 0 0") == 1 and "UUID=1234 / ext4" in fstab,
           "the swap file gets one fstab line, other lines kept")
-    proc_files(swaps=[("/swapfile", 1024, 100), ("/dev/zram0", 4096, 10)])
+    proc_files(swaps=[("/swapfile", 1024, 100), ("/dev/sda2", 4096, 10)])
     code, _, _, calls = run("swap", "2048")
     check(code == 0 and f"swapoff {root}/swapfile" in calls and
           (root / "swapfile").stat().st_size == 2048 * MB and
           (root / "etc/fstab").read_text().count("/swapfile") == 1,
           "resizing takes the swap file back, remakes it and keeps one fstab line")
-    check("zram" not in calls, "other swap is never touched")
+    check("sda2" not in calls, "other swap is never touched")
 
     # ---- refusals
     proc_files(available_mb=300, swaps=[("/swapfile", 2048, 1500)])
@@ -127,6 +133,38 @@ with tempfile.TemporaryDirectory() as d:
     code, _, err, _ = run("guard", "on")
     check(code == 1 and "isn't installed" in err, "guard on says so when earlyoom isn't installed")
     (base / "earlyoom").rename(bin_ / "earlyoom")
+
+    # ---- Compressed Memory
+    zconf = root / "etc/systemd/zram-generator.conf"
+    code, _, err, _ = run("zram", "50")
+    check(code == 1 and "systemd-zram-generator" in err and not zconf.exists(),
+          "Compressed Memory says so when the generator isn't installed")
+    generator = root / "usr/lib/systemd/system-generators/zram-generator"
+    generator.parent.mkdir(parents=True)
+    generator.write_text("")
+    code, _, err, calls = run("zram", "50")
+    text = zconf.read_text()
+    check(code == 0 and "[zram0]" in text and "zram-size = ram * 50 / 100" in text and
+          "compression-algorithm = zstd" in text and "systemctl start dev-zram0.swap" in calls,
+          f"zram 50: half of memory, zstd, started at once {err}")
+    code, _, _, calls = run("zram", "100")
+    check(code == 0 and "zram-size = ram * 100 / 100" in zconf.read_text() and
+          calls.index("systemctl stop dev-zram0.swap") < calls.index("systemctl start dev-zram0.swap"),
+          "a new size stops the device first, so it takes")
+    check(facts()["zram"][0][:3] == ["yes", "yes", "100"], "status reads the setting back")
+    code, _, err, _ = run("zram", "30")
+    check(code == 1 and "quarter" in err and "* 100 / 100" in zconf.read_text(),
+          "other sizes are refused, the setting kept")
+    (state / "zram-full").write_text("")
+    code, _, err, _ = run("zram", "off")
+    check(code == 1 and "Quit some programs" in err and "[zram0]" in zconf.read_text(),
+          "Compressed Memory too full to empty stays on")
+    (state / "zram-full").unlink()
+    code, _, _, _ = run("zram", "off")
+    check(code == 0 and zconf.exists() and "[zram" not in zconf.read_text() and
+          facts()["zram"][0][1] == "no",
+          "zram off keeps a file with no device, hiding Debian's default")
+    check(not (zconf.parent / "zram-generator.conf.new").exists(), "no temporary file is left")
 
     # ---- the RAM Disk
     proc_files()

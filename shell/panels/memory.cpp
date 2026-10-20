@@ -14,8 +14,9 @@
 #include "panelkit.h"
 
 static constexpr uint32_t FACE = GRAY(0xD);
-static constexpr int W = 420, H = 480, M = 12;
-static constexpr int CACHE_Y = 18, VM_Y = 78, RAM_Y = 292, RAM_BOTTOM = 422;
+static constexpr int W = 420, H = 586, M = 12;
+static constexpr int CACHE_Y = 18, VM_Y = 78, ZRAM_Y = 292, RAM_Y = 398, RAM_BOTTOM = 528;
+static constexpr int ZRAM_PERCENTS[] = { 25, 50, 75, 100 };
 static constexpr int INSET = M + 16;
 static constexpr qint64 MB = 1024 * 1024;
 
@@ -38,6 +39,13 @@ MemoryStatus parseMemoryStatus(const QString &output) {
 			s.swapRoom = n(1);
 		} else if (f[0] == "other-swap") {
 			s.otherSwap << f.value(1) + ", " + memorySizeText(n(2));
+		} else if (f[0] == "zram") {
+			s.zramInstalled = yes(1);
+			s.zramOn = yes(2);
+			s.zramPercent = int(n(3));
+			s.zramSize = n(4);
+			s.zramUsed = n(5);
+			s.zramCompressed = n(6);
 		} else if (f[0] == "guard") {
 			s.guardInstalled = yes(1);
 			s.guardOn = yes(2);
@@ -135,7 +143,8 @@ static QString runHelper(const QStringList &args, bool privileged, bool *ok, QSt
 
 struct MemoryPanel::Parts {
 	PanelHost host;
-	PanelRadios vm, ramDisk;
+	PanelRadios vm, zram, ramDisk;
+	PanelPopup zramSize;
 	PanelSlider vmSize, ramDiskSize;
 	PanelCheckbox guard, save;
 	PanelButton defaults;
@@ -164,6 +173,25 @@ MemoryPanel::MemoryPanel() : d(std::make_unique<Parts>(this)) {
 	d->guard.hint = "When memory and virtual memory are nearly full, quits the program using the "
 		"most, instead of letting the computer stop responding (earlyoom).";
 	d->guard.toggled = [this](bool on) { setGuard(on); };
+	d->zram.add("On", QPoint(INSET, ZRAM_Y + 24));
+	d->zram.add("Off", QPoint(INSET + 64, ZRAM_Y + 24));
+	d->zram.hint = "Compressed Memory keeps memory that hasn't been used for a while compressed "
+		"in RAM, so there is room for more before anything goes to the disk.";
+	d->zram.changed = [this](int i) {
+		setCompressedMemory(i == 0 ? ZRAM_PERCENTS[std::clamp(d->zramSize.selected, 0, 3)] : 0);
+	};
+	d->zramSize.label = "Use up to:";
+	d->zramSize.rect = QRect(INSET + 70, ZRAM_Y + 48, 214, PL_POPUP_H);
+	d->zramSize.items = { PopupItem("a quarter of memory"), PopupItem("half of memory"),
+		PopupItem("three quarters of memory"), PopupItem("all of memory") };
+	d->zramSize.hint = "The most of the computer's memory Compressed Memory may hold. It only takes what it needs.";
+	d->zramSize.chosen = [this](int row) {
+		if (row != d->zramSize.selected && d->status.zramOn) {
+			setCompressedMemory(ZRAM_PERCENTS[std::clamp(row, 0, 3)]);
+		} else {
+			d->zramSize.selected = row;
+		}
+	};
 	d->ramDisk.add("On", QPoint(INSET, RAM_Y + 24));
 	d->ramDisk.add("Off", QPoint(INSET + 64, RAM_Y + 24));
 	d->ramDisk.hint = "A RAM Disk is a disk made of memory: very fast, and emptied when the "
@@ -177,11 +205,12 @@ MemoryPanel::MemoryPanel() : d(std::make_unique<Parts>(this)) {
 	d->save.hint = "Keeps what's on the RAM Disk when the computer shuts down, and puts it back at startup.";
 	d->save.toggled = [this](bool on) { setRamDiskSave(on); };
 	d->defaults = PanelButton("Use Defaults", QRect(M, H - M - PL_BUTTON_H, 110, PL_BUTTON_H));
-	d->defaults.hint = "Virtual memory on, the out-of-memory guard on, and no RAM Disk.";
+	d->defaults.hint = "Virtual memory on, the out-of-memory guard on, Compressed Memory off, and no RAM Disk.";
 	d->defaults.clicked = [this] { useDefaults(); };
 	d->host.buttons = { &d->defaults };
 	d->host.checks = { &d->guard, &d->save };
-	d->host.radios = { &d->vm, &d->ramDisk };
+	d->host.radios = { &d->vm, &d->zram, &d->ramDisk };
+	d->host.popups = { &d->zramSize };
 	d->vmArea = d->vmSize.hitRect();
 	d->ramDiskArea = d->ramDiskSize.hitRect();
 	d->host.hintAreas.push_back({ &d->vmArea, d->vmSize.hint });
@@ -224,6 +253,13 @@ void MemoryPanel::reload() {
 	if (!d->vmSteps.isEmpty()) {
 		d->vmSize.setLabels(memorySizeText(d->vmSteps.front() * MB), memorySizeText(d->vmSteps.back() * MB));
 	}
+	d->zram.selected = s.zramOn ? 0 : 1;
+	for (int i = 0; i < 4; i++) {
+		if (ZRAM_PERCENTS[i] == s.zramPercent) {
+			d->zramSize.selected = i;
+		}
+	}
+	d->zram.enabled = d->zramSize.enabled = !d->busy && s.valid && (s.zramInstalled || s.zramOn);
 	d->guard.on = s.guardOn;
 	d->guard.enabled = !d->busy && s.guardInstalled;
 	d->ramDisk.selected = s.ramDiskOn ? 0 : 1;
@@ -280,6 +316,10 @@ void MemoryPanel::setGuard(bool on) {
 	apply({ "guard", on ? "on" : "off" });
 }
 
+void MemoryPanel::setCompressedMemory(int percent) {
+	apply(percent > 0 ? QStringList{ "zram", QString::number(percent) } : QStringList{ "zram", "off" });
+}
+
 void MemoryPanel::setRamDisk(bool on) {
 	apply(on ? QStringList{ "ramdisk", QString::number(chosen(d->ramDiskSteps, d->ramDiskSize, 512)),
 			d->save.on ? "save" : "nosave" }
@@ -300,7 +340,8 @@ void MemoryPanel::setRamDiskSave(bool on) {
 }
 
 /* Mac OS 9's defaults, as far as they go here: virtual memory on (16 GB,
- * or as much as the disk allows), the guard on, no RAM Disk. */
+ * or as much as the disk allows), the guard on, no RAM Disk; and Compressed
+ * Memory off, as the package leaves it. */
 void MemoryPanel::useDefaults() {
 	const QList<int> sizes = memorySwapSteps(d->status.swapRoom, d->status.swapSize);
 	int size = 0;
@@ -314,6 +355,9 @@ void MemoryPanel::useDefaults() {
 		return;
 	}
 	if (d->status.guardInstalled && !d->status.guardOn && !apply({ "guard", "on" })) {
+		return;
+	}
+	if (d->status.zramOn && !apply({ "zram", "off" })) {
 		return;
 	}
 	if (d->status.ramDiskOn) {
@@ -332,7 +376,7 @@ void MemoryPanel::paintEvent(QPaintEvent *) {
 	panelText(c, "Recently used files kept in memory: " + memorySizeText(s.cache), INSET, CACHE_Y + 26);
 	panelText(c, "The system sizes the disk cache by itself.", INSET, CACHE_Y + 42, PL_FONT_VIEWS, GRAY(0x4));
 
-	panelGroup(c, M, VM_Y, W - M - 1, RAM_Y - 10, "Virtual Memory", FACE);
+	panelGroup(c, M, VM_Y, W - M - 1, ZRAM_Y - 10, "Virtual Memory", FACE);
 	panelText(c, "On the startup disk. Available on disk: " + memorySizeText(s.swapRoom), INSET, VM_Y + 58,
 		PL_FONT_SYSTEM, C_BLACK, text);
 	panelText(c, "Built-in memory: " + memorySizeText(s.total) + "   Available now: " +
@@ -350,6 +394,21 @@ void MemoryPanel::paintEvent(QPaintEvent *) {
 	} else if (!s.otherSwap.isEmpty()) {
 		panelText(c, "Also: " + s.otherSwap.join("; "), INSET, VM_Y + 192, PL_FONT_VIEWS, GRAY(0x6), text);
 	}
+
+	panelGroup(c, M, ZRAM_Y, W - M - 1, RAM_Y - 10, "Compressed Memory", FACE);
+	QString zramLine;
+	if (!s.zramInstalled && !s.zramOn) {
+		zramLine = "Needs systemd-zram-generator, which isn't installed.";
+	} else if (s.zramSize > 0) {
+		zramLine = "Compressed memory: " + memorySizeText(s.zramSize) + "   In use: " +
+			memorySizeText(s.zramUsed);
+		if (s.zramUsed > 0 && s.zramCompressed > 0) {
+			zramLine += ", kept in " + memorySizeText(s.zramCompressed);
+		}
+	} else {
+		zramLine = s.zramOn ? QString("Set up, but not running.") : QString("Compressed Memory is off.");
+	}
+	panelText(c, zramLine, INSET, ZRAM_Y + 88, PL_FONT_SYSTEM, C_BLACK, text);
 
 	panelGroup(c, M, RAM_Y, W - M - 1, RAM_BOTTOM, "RAM Disk", FACE);
 	const qint64 ramBytes = chosen(d->ramDiskSteps, d->ramDiskSize, 0) * MB;

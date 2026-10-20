@@ -2,7 +2,7 @@
 
 /*
  * Memory (Mac OS 9's control panel, Missing Manual ch. 7): the disk cache,
- * virtual memory and a RAM Disk, as Linux has them.
+ * virtual memory and a RAM Disk, as Linux has them, and Compressed Memory.
  *
  *   Disk Cache      what the system keeps of recently used files, which it
  *                   sizes by itself: shown, not set.
@@ -10,6 +10,10 @@
  *                   Its checkbox turns on the out-of-memory guard (earlyoom),
  *                   which quits the program using the most memory before the
  *                   computer runs out. Changes apply at once, not at restart.
+ *   Compressed Memory  a zram swap device: memory not used for a while is
+ *                   kept compressed in RAM, so there is room for more before
+ *                   anything goes to disk. On or off, and the most of memory
+ *                   it may hold (a quarter up to all).
  *   RAM Disk        a disk made of memory, on the desktop; saved at shut
  *                   down and put back at startup if asked.
  *
@@ -28,7 +32,10 @@ struct MemoryStatus {
 	qint64 total = 0, available = 0, cache = 0;
 	qint64 swapSize = 0, swapUsed = 0, swapRoom = 0;
 	bool swapOn = false;
-	QStringList otherSwap; /* "/dev/zram0, 4 GB", left alone */
+	QStringList otherSwap; /* "/dev/sda2, 4 GB", left alone */
+	bool zramInstalled = false, zramOn = false;
+	int zramPercent = 50;
+	qint64 zramSize = 0, zramUsed = 0, zramCompressed = 0;
 	bool guardInstalled = false, guardOn = false;
 	bool ramDiskOn = false, ramDiskSave = false;
 	qint64 ramDiskSize = 0, ramDiskUsed = 0;
@@ -56,6 +63,8 @@ public:
 	void setVirtualMemory(bool on);
 	void setVirtualMemorySize(int megabytes);
 	void setGuard(bool on);
+	/* 0 for off, else 25, 50, 75 or 100 (percent of memory). */
+	void setCompressedMemory(int percent);
 	void setRamDisk(bool on);
 	void setRamDiskSize(int megabytes);
 	void setRamDiskSave(bool on);

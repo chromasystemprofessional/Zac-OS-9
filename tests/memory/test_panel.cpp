@@ -36,6 +36,7 @@ int main(int argc, char **argv) {
 		"swapfile\t17179869184\t104857600\tyes\n"
 		"swapfile-room\t74000000000\n"
 		"other-swap\t/dev/zram0\t4294967296\t0\n"
+		"zram\tyes\tyes\t75\t2147483648\t104857600\t26214400\n"
 		"guard\tyes\tno\n"
 		"ramdisk\tno\t0\t0\tyes\t536870912\n");
 	check(s.valid && s.total == 33554432000 && s.cache == 14000000000 && s.swapOn &&
@@ -44,6 +45,9 @@ int main(int argc, char **argv) {
 	check(s.otherSwap == QStringList{ "/dev/zram0, 4 GB" } && s.guardInstalled && !s.guardOn &&
 			!s.ramDiskOn && s.ramDiskSave && s.ramDiskSize == 512 * MB,
 		"and other swap, the guard, and the RAM Disk as it's set though off");
+	check(s.zramInstalled && s.zramOn && s.zramPercent == 75 && s.zramSize == 2 * GB &&
+			s.zramUsed == 100 * MB && s.zramCompressed == 25 * MB,
+		"and Compressed Memory: set on, its share of memory, and what it holds");
 	check(!parseMemoryStatus("nonsense\n").valid, "status without memory figures isn't valid");
 	check(memorySizeText(16 * GB) == "16 GB" && memorySizeText(1536 * MB) == "1.5 GB" &&
 			memorySizeText(512 * MB) == "512 MB", "sizes read as Mac OS 9 would put them");
@@ -56,7 +60,7 @@ int main(int argc, char **argv) {
 	/* ---- the panel, with a fake helper */
 	QTemporaryDir dir;
 	const QString state = dir.path() + "/state", log = dir.path() + "/log", fail = dir.path() + "/fail";
-	write(state, "SWAP=8589934592\nSWAPON=yes\nGUARD=no\nRAM=no\nRAMSIZE=0\nSAVE=no\n");
+	write(state, "SWAP=8589934592\nSWAPON=yes\nGUARD=no\nRAM=no\nRAMSIZE=0\nSAVE=no\nZRAM=no\nZPCT=50\n");
 	const QString helper = dir.path() + "/helper";
 	write(helper, QString(
 		"#!/bin/sh\n"
@@ -66,6 +70,7 @@ int main(int argc, char **argv) {
 		"  printf 'memory\\t17179869184\\t12000000000\\t3000000000\\n'\n"
 		"  printf 'swapfile\\t%s\\t0\\t%s\\nswapfile-room\\t60000000000\\n' \"$SWAP\" \"$SWAPON\"\n"
 		"  printf 'guard\\tyes\\t%s\\n' \"$GUARD\"\n"
+		"  printf 'zram\\tyes\\t%s\\t%s\\t0\\t0\\t0\\n' \"$ZRAM\" \"$ZPCT\"\n"
 		"  printf 'ramdisk\\t%s\\t%s\\t0\\t%s\\t%s\\n' \"$RAM\" \"$RAMSIZE\" \"$SAVE\" \"$RAMSIZE\"\n"
 		"  exit 0\n"
 		"fi\n"
@@ -75,11 +80,13 @@ int main(int argc, char **argv) {
 		"  'swap off') SWAPON=no ;;\n"
 		"  swap*) SWAP=$(($2 * 1048576)); SWAPON=yes ;;\n"
 		"  'guard on') GUARD=yes ;; 'guard off') GUARD=no ;;\n"
+		"  'zram off') ZRAM=no ;;\n"
+		"  zram*) ZRAM=yes; ZPCT=$2 ;;\n"
 		"  'ramdisk off') RAM=no ;;\n"
 		"  ramdisk*) RAM=yes; RAMSIZE=$(($2 * 1048576)); [ \"$3\" = save ] && SAVE=yes || SAVE=no ;;\n"
 		"esac\n"
-		"printf 'SWAP=%s\\nSWAPON=%s\\nGUARD=%s\\nRAM=%s\\nRAMSIZE=%s\\nSAVE=%s\\n' "
-		"\"$SWAP\" \"$SWAPON\" \"$GUARD\" \"$RAM\" \"$RAMSIZE\" \"$SAVE\" > \"$STATE\"\n").arg(state, log, fail).toUtf8());
+		"printf 'SWAP=%s\\nSWAPON=%s\\nGUARD=%s\\nRAM=%s\\nRAMSIZE=%s\\nSAVE=%s\\nZRAM=%s\\nZPCT=%s\\n' "
+		"\"$SWAP\" \"$SWAPON\" \"$GUARD\" \"$RAM\" \"$RAMSIZE\" \"$SAVE\" \"$ZRAM\" \"$ZPCT\" > \"$STATE\"\n").arg(state, log, fail).toUtf8());
 	QFile::setPermissions(helper, QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
 	qputenv("ZACOS9_MEMORY_HELPER", helper.toUtf8());
 	QApplication app(argc, argv);
@@ -98,6 +105,11 @@ int main(int argc, char **argv) {
 		"On turns it on again at the size the slider shows");
 	panel.setGuard(true);
 	check(read(log).endsWith("guard on\n") && panel.status().guardOn, "the checkbox turns the out-of-memory guard on");
+	panel.setCompressedMemory(75);
+	check(read(log).endsWith("zram 75\n") && panel.status().zramOn && panel.status().zramPercent == 75,
+		"Compressed Memory turns on, holding up to three quarters of memory");
+	panel.setCompressedMemory(0);
+	check(read(log).endsWith("zram off\n") && !panel.status().zramOn, "and Off turns it off");
 	panel.setRamDisk(true);
 	check(read(log).endsWith("ramdisk 512 nosave\n") && panel.status().ramDiskOn &&
 			panel.status().ramDiskSize == 512 * MB, "On makes a 512 MB RAM Disk, not saved");
@@ -113,12 +125,13 @@ int main(int argc, char **argv) {
 		"a refusal is shown, and virtual memory is shown as still on");
 	QFile::remove(fail);
 
-	write(state, "SWAP=4294967296\nSWAPON=no\nGUARD=no\nRAM=yes\nRAMSIZE=536870912\nSAVE=no\n");
+	write(state, "SWAP=4294967296\nSWAPON=no\nGUARD=no\nRAM=yes\nRAMSIZE=536870912\nSAVE=no\nZRAM=yes\nZPCT=50\n");
 	write(log, "");
 	MemoryPanel fresh;
 	fresh.useDefaults();
-	check(read(log) == "swap 16384\nguard on\nramdisk off\n" && fresh.status().swapOn &&
-			fresh.status().guardOn && !fresh.status().ramDiskOn && fresh.problem().isEmpty(),
-		"Use Defaults: 16 GB of virtual memory, the guard on, no RAM Disk");
+	check(read(log) == "swap 16384\nguard on\nzram off\nramdisk off\n" && fresh.status().swapOn &&
+			fresh.status().guardOn && !fresh.status().zramOn && !fresh.status().ramDiskOn &&
+			fresh.problem().isEmpty(),
+		"Use Defaults: 16 GB of virtual memory, the guard on, Compressed Memory off, no RAM Disk");
 	return fails ? 1 : 0;
 }
