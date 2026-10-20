@@ -218,8 +218,8 @@ custom name, labels and remembered window/icon positions. Existing font files
 are not moved. The old Fonts node's `backing` field is replaced by the catalog;
 new installations use the user's standard XDG font directory.
 See
-[custom desktop patterns](../README.md#custom-desktop-patterns) and
-[desktop wallpaper](../README.md#desktop-wallpaper) for supported formats,
+[custom desktop patterns](user-guide.md#custom-desktop-patterns) and
+[desktop wallpaper](user-guide.md#desktop-wallpaper) for supported formats,
 placement choices and import limits.
 
 ## Fonts
