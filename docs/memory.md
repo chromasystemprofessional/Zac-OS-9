@@ -39,13 +39,16 @@ compression-algorithm = zstd
 ```
 
 then `systemctl daemon-reload` and `systemctl start dev-zram0.swap`.
-systemd-zram-generator (a dependency of the package; it ships no
-configuration of its own, so nothing is on until the panel says so)
-turns the file into `dev-zram0.swap` and `systemd-zram-setup@zram0.service`
+systemd-zram-generator (a dependency of the package) turns the file into `dev-zram0.swap` and `systemd-zram-setup@zram0.service`
 at every boot. A device already running keeps its size, so a new size
 stops it first. `zram off` stops both units (swapoff moves what the device
 holds back into memory; if there is no room, the helper fails and says so,
-and everything stays as it was), removes the file and reloads systemd.
+and everything stays as it was), rewrites the file with no `[zram0]`
+section and reloads systemd. The file is never removed: Debian's generator
+ships `/usr/lib/systemd/zram-generator.conf` with a `[zram0]` section of
+its own (half of memory, at most 4 GB), which a file of the same name in
+`/etc` hides. The package's postinst writes that empty file when there is
+none, so Compressed Memory is off until the panel turns it on.
 
 The panel reads the setting from the same file (`ZACOS9_ZRAM_CONF` stands
 in for tests), and treats a zram swap found in `/proc/swaps` as On even

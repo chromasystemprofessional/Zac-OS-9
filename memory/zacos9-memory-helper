@@ -11,7 +11,10 @@
 #                       every boot, and it is started at once
 #   zacos9-memory-helper zram off
 #                       Compressed Memory off: the device is emptied back
-#                       into memory and taken away, now and at boot
+#                       into memory and taken away, now and at boot. The
+#                       file stays, with no [zram0] section: Debian's
+#                       generator ships /usr/lib/systemd/zram-generator.conf
+#                       with one, which the file in /etc hides
 #
 # The panel reads the setting from the same file (ZACOS9_ZRAM_CONF stands
 # in for tests; ZACOS9_NO_SYSTEMCTL leaves systemd alone), and what is in
@@ -66,7 +69,12 @@ zram)
 			systemctl stop "$SWAP_UNIT" "$SETUP_UNIT" >/dev/null 2>&1 ||
 				die "Compressed Memory couldn't be turned off: too much of it is in use. Quit some programs and try again."
 		fi
-		rm -f "$CONF"
+		mkdir -p "$(dirname "$CONF")"
+		printf '%s\n' "# Written by the Memory control panel (zacos9-memory-helper)." \
+			"# Compressed Memory is off: with no device section here, the" \
+			"# generator's own default in /usr/lib/systemd is overridden." >"$CONF.tmp"
+		chmod 644 "$CONF.tmp"
+		mv "$CONF.tmp" "$CONF"
 		ctl daemon-reload
 		;;
 	*) die "usage: zram on PERCENT | zram off" ;;

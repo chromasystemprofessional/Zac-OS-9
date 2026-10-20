@@ -9,7 +9,7 @@
 #   /tmp/memory-2-on.png    after "On": the setting written, "half of memory"
 #   /tmp/memory-3-menu.png  the pop-up open
 #   /tmp/memory-4-all.png   after "all of memory": zram-size = ram * 100 / 100
-#   /tmp/memory-5-off.png   after "Off": the setting removed
+#   /tmp/memory-5-off.png   after "Off": the setting has no zram0 section
 # and "ok: ..." on stdout.
 set -eu
 cd "$(dirname "$0")/../.."
@@ -18,14 +18,17 @@ trap 'rm -rf "$T"' EXIT
 mkdir -p "$T/run" "$T/cfg/zacos9" "$T/bin"
 printf '#!/bin/sh\nexec "$@"\n' >"$T/bin/pkexec"
 chmod +x "$T/bin/pkexec"
-# The window's outer frame: the first row below the menu bar with a run of
-# 300 black pixels, and where it starts. The clicks are measured from it.
+# The window's outer frame: the first row with a run of 300 black pixels
+# that isn't the menu bar's full-width bottom line (a window can open right
+# under it, at y 20), and where it starts. The clicks are measured from it.
 cat >"$T/frame.py" <<'PY'
 import sys
 from PIL import Image
 im = Image.open(sys.argv[1]).convert("RGB")
 px = im.load()
-for y in range(21, im.height):
+for y in range(im.height):
+    if all(px[x, y] == (0, 0, 0) for x in range(im.width)):
+        continue
     run = 0
     for x in range(im.width):
         run = run + 1 if px[x, y] == (0, 0, 0) else 0
@@ -48,7 +51,7 @@ grim /tmp/memory-4-all.png
 cp "$T/zram.conf" "$T/after-all" 2>/dev/null || true
 build/shell/vptr home move \$((\$1 + 91)) \$((\$2 + 123)) click wait 1500         # Off
 grim /tmp/memory-5-off.png
-[ -e "$T/zram.conf" ] && touch "$T/still-on" || true
+grep -qF "[zram0]" "$T/zram.conf" && touch "$T/still-on" || true
 kill \$PPID
 SCRIPT
 env -u WAYLAND_DISPLAY -u DISPLAY PATH="$T/bin:$PATH" XDG_RUNTIME_DIR="$T/run" HOME="$T" \
@@ -61,5 +64,5 @@ env -u WAYLAND_DISPLAY -u DISPLAY PATH="$T/bin:$PATH" XDG_RUNTIME_DIR="$T/run" H
 fail() { echo "FAIL: $*" >&2; exit 1; }
 grep -qx "zram-size = ram \* 50 / 100" "$T/after-on" 2>/dev/null || fail "On writes half of memory"
 grep -qx "zram-size = ram \* 100 / 100" "$T/after-all" 2>/dev/null || fail "the pop-up changes the size"
-[ ! -e "$T/still-on" ] || fail "Off removes the setting"
+[ ! -e "$T/still-on" ] || fail "Off leaves no zram0 section"
 echo "ok: the Memory panel turns Compressed Memory on, resizes it and turns it off"

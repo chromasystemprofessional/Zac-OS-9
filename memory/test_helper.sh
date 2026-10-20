@@ -19,7 +19,8 @@ grep -qx "zram-size = ram \* 100 / 100" "$ZACOS9_ZRAM_CONF" || fail "all of memo
 ! "$helper" zram on 30 2>/dev/null || fail "odd sizes refused"
 ! "$helper" zram on 2>/dev/null || fail "a size is needed"
 "$helper" zram off
-[ ! -e "$ZACOS9_ZRAM_CONF" ] || fail "off removes the setting"
+[ -e "$ZACOS9_ZRAM_CONF" ] || fail "off keeps a file, to hide the generator's default"
+! grep -q "^\[zram" "$ZACOS9_ZRAM_CONF" || fail "off leaves no zram section: $(cat "$ZACOS9_ZRAM_CONF")"
 "$helper" zram off # off when already off is fine
 ! "$helper" zram sideways 2>/dev/null || fail "unknown commands refused"
 echo "ok: zacos9-memory-helper keeps Compressed Memory's setting"

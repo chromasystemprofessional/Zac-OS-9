@@ -49,12 +49,25 @@ remove_browsed_queues() {
 	done
 }
 
+# Compressed Memory is off until the Memory control panel turns it on, but
+# Debian's systemd-zram-generator turns a zram0 device on by default
+# (/usr/lib/systemd/zram-generator.conf). A file in /etc with no [zram0]
+# section overrides it; the panel's helper rewrites it from then on.
+zram_off_by_default() {
+	[ -e /etc/systemd/zram-generator.conf ] && return 0
+	mkdir -p /etc/systemd &&
+	printf '%s\n' "# Written by the zacos9 package: Compressed Memory is off." \
+		"# Turn it on in the Memory control panel." >/etc/systemd/zram-generator.conf ||
+		echo "zacos9: could not turn the default compressed memory off." >&2
+}
+
 case "$1" in
 	configure)
 		grant_rawio
 		redraw_grub_logo
 		make_shared_documents
 		remove_browsed_queues
+		zram_off_by_default
 		# Software Update's daily check, for every account.
 		systemctl --global enable zacos9-update-check.timer >/dev/null 2>&1 || true
 		;;
