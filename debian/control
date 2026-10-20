@@ -111,8 +111,13 @@ Depends: ${shlibs:Depends},
          wireplumber,
          xdg-desktop-portal,
          xdg-desktop-portal-wlr,
-         libdbusmenu-glib4
+         libdbusmenu-glib4,
+         cups-client,
+         cups-ipp-utils
 Recommends: balena-etcher,
+            cups,
+            ipp-usb,
+            system-config-printer,
             speech-dispatcher,
             xwayland,
             netatalk,
@@ -127,6 +132,11 @@ Recommends: balena-etcher,
             dbus-user-session,
             xdg-desktop-portal-gtk,
             foot
+# cups-browsed puts its own queues (implicitclass://) over the printers CUPS
+# finds by itself, and they stop with "No destination host name supplied by
+# cups-browsed" (seen on a Canon over Wi-Fi). CUPS 2.4 sets up IPP Everywhere
+# printers itself; the postinst removes cups-browsed's leftover queues.
+Conflicts: cups-browsed
 Suggests: zacos9-emulators,
           greetd,
           kdeconnect

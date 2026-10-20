@@ -36,11 +36,25 @@ make_shared_documents() {
 		echo "zacos9: could not make the Shared Documents folder." >&2
 }
 
+# Printers set up by cups-browsed (device-uri implicitclass://...) only
+# print while it runs, and the package conflicts with it: CUPS finds the
+# same printers by itself (IPP Everywhere) and sets them up as they're
+# used. Remove the leftovers, their stuck documents with them.
+remove_browsed_queues() {
+	command -v lpstat >/dev/null 2>&1 && command -v lpadmin >/dev/null 2>&1 || return 0
+	lpstat -v 2>/dev/null | sed -n 's/^device for \([^:]*\): implicitclass:.*/\1/p' |
+	while IFS= read -r queue; do
+		lpadmin -x "$queue" 2>/dev/null ||
+			echo "zacos9: could not remove cups-browsed's printer \"$queue\"." >&2
+	done
+}
+
 case "$1" in
 	configure)
 		grant_rawio
 		redraw_grub_logo
 		make_shared_documents
+		remove_browsed_queues
 		# Software Update's daily check, for every account.
 		systemctl --global enable zacos9-update-check.timer >/dev/null 2>&1 || true
 		;;
