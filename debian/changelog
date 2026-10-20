@@ -1,3 +1,13 @@
+zacos9 (1.0.6) trixie; urgency=medium
+
+  * Programs see only the fonts in the Fonts folder: the free fonts that
+    stand in for Mac OS 9's, and the fonts you add there yourself. Every
+    other installed font is hidden from them in a ZacOS session; serif text
+    uses Nimbus Roman, Times's stand-in. ZacOS now installs Linux Libertine
+    and Comic Neue with the rest of that set.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Mon, 19 Oct 2026 22:39:31 -0400
+
 zacos9 (1.0.5) trixie; urgency=medium
 
   * Desktop icons no longer stay selected after clicking another one. Disk
