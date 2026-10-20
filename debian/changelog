@@ -1,3 +1,15 @@
+zacos9 (1.0.7) trixie; urgency=medium
+
+  * Disk Setup can verify and repair a volume that is open: it names the
+    programs using it, quits them (a user service is stopped and started
+    again), closes the volume, checks it and opens it again. ZacOS 9's own
+    fonts, ZacOS 9 System and ZacOS 9 Views, are TrueType files in the
+    Fonts folder that any program can use. Printing no longer goes through
+    cups-browsed, whose queues stopped with no destination: CUPS finds the
+    printers itself, and the leftover queues are removed.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Tue, 20 Oct 2026 10:13:25 -0400
+
 zacos9 (1.0.6) trixie; urgency=medium
 
   * Programs see only the fonts in the Fonts folder: the free fonts that
