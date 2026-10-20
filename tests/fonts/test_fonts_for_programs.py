@@ -40,7 +40,9 @@ def fc(home, *args):
 
 
 def listed(home):
-    return {name for line in fc(home, "fc-list", ":", "family").splitlines() for name in line.split(",")}
+    """Each font's family: the first of its names (DejaVu's Condensed faces
+    are also called "DejaVu Sans Condensed")."""
+    return {line.split(",")[0] for line in fc(home, "fc-list", ":", "family").splitlines() if line}
 
 
 with tempfile.TemporaryDirectory() as d:

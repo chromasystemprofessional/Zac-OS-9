@@ -34,8 +34,10 @@ def wait_for(what, check, seconds=10):
 with tempfile.TemporaryDirectory(prefix="zacos9-kb-") as directory:
     root = Path(directory)
     (root / "config" / "zacos9").mkdir(parents=True)
+    # The clock off: a minute ticking over mid-test would keep the bar
+    # from ever looking as it did (it did once, in a package build).
     conf = root / "config" / "zacos9" / "desktop.conf"
-    conf.write_text("[General]\nkeyboard-layouts=us,us(dvorak)\n")
+    conf.write_text("[General]\nclock=off\nkeyboard-layouts=us,us(dvorak)\n")
     (root / "keyboard").write_text('XKBMODEL="pc105"\nXKBLAYOUT="us"\n')
     remembered = root / "state" / "zacos9" / "keyboard-layout"
     env = dict(os.environ, XDG_RUNTIME_DIR=directory, HOME=directory,
@@ -97,14 +99,14 @@ with tempfile.TemporaryDirectory(prefix="zacos9-kb-") as directory:
             print("ok: ⌘-Space steps through the layouts; the keyboard menu shows the one in use")
 
             # Three layouts, changed while running: ⇧⌘-Space goes backwards.
-            conf.write_text("[General]\nkeyboard-layouts=us,us(dvorak),gb\n")
+            conf.write_text("[General]\nclock=off\nkeyboard-layouts=us,us(dvorak),gb\n")
             time.sleep(0.5)
             vp("hold", "shift", "cmd", " ", "release", "shift", "wait", "300")
             wait_for("U.K., the last", lambda: layout() == "gb")
             print("ok: a change in the Keyboard panel applies at once; ⇧⌘-Space goes back")
 
             # ⌘-Option-Space instead: plain ⌘-Space is the program's.
-            conf.write_text("[General]\nkeyboard-layouts=us,us(dvorak),gb\nkeyboard-switch=option\n")
+            conf.write_text("[General]\nclock=off\nkeyboard-layouts=us,us(dvorak),gb\nkeyboard-switch=option\n")
             time.sleep(0.5)
             vp("cmd", " ", "wait", "400")
             assert layout() == "gb", "⌘-Space no longer switches"
@@ -113,7 +115,7 @@ with tempfile.TemporaryDirectory(prefix="zacos9-kb-") as directory:
             print("ok: the Keyboard panel can make it ⌘-Option-Space")
 
             # One layout: no keyboard menu, and ⌘-Space is left alone.
-            conf.write_text("[General]\nkeyboard-layouts=gb\n")
+            conf.write_text("[General]\nclock=off\nkeyboard-layouts=gb\n")
             wait_for("the keyboard menu to go", lambda: bar() not in (us, dvorak))
             single = settle()
             vp("hold", "option", "cmd", " ", "release", "option", "wait", "400")
