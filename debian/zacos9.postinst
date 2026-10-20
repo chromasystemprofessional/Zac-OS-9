@@ -49,9 +49,24 @@ remove_browsed_queues() {
 	done
 }
 
+# The login window (zacos9-greeter) runs a zacos9-wm as greetd's own user,
+# and seatd hands the screen only to the video group (seatd -g video), so
+# without it the window never gets the seat: Log Out left a frozen screen.
+# render for the GPU's render node, as the Setup Assistant's account has.
+greeter_seat() {
+	getent passwd _greetd >/dev/null 2>&1 || return 0
+	for g in video render; do
+		getent group "$g" >/dev/null 2>&1 || continue
+		usermod -aG "$g" _greetd ||
+			echo "zacos9: could not add the login window to the $g group;" \
+				"Log Out may leave a blank screen." >&2
+	done
+}
+
 case "$1" in
 	configure)
 		grant_rawio
+		greeter_seat
 		redraw_grub_logo
 		make_shared_documents
 		remove_browsed_queues
