@@ -40,6 +40,10 @@ export QT_STYLE_OVERRIDE=zacos9
 # ZacOS 9's defaults for other programs (share/xdg: Terminal's ⌘C/⌘V),
 # ahead of the system's; a user's own ~/.config files still win.
 export XDG_CONFIG_DIRS="/usr/share/zacos9/xdg:${XDG_CONFIG_DIRS:-/etc/xdg}"
+# Programs see only Mac OS 9's fonts (the Fonts folder) and the user's own.
+if [ -r /usr/share/zacos9/fontconfig/zacos9-fonts.conf ]; then
+	export FONTCONFIG_FILE=/usr/share/zacos9/fontconfig/zacos9-fonts.conf
+fi
 export XDG_DATA_DIRS="${XDG_DATA_HOME:-$HOME/.local/share}/flatpak/exports/share:/var/lib/flatpak/exports/share:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
 
 if ! zacos9-desktop-places; then

@@ -5,6 +5,8 @@
 #include "alert.h"
 
 #include <QApplication>
+#include <QDateTime>
+#include <QThread>
 #include <QDataStream>
 #include <QDir>
 #include <QDropEvent>
@@ -437,6 +439,22 @@ int main(int argc, char **argv) {
 		check(waitFor([&] { return alerts > 0; }), "font-cache failures are reported explicitly");
 	}
 	QFile::remove(home + "/cache-fail");
+
+	// Programs see the user's own fonts: accepted by file, rewritten only on a change.
+	check(fontWriteOwnAccepts(), "the user's fonts are written for programs");
+	QFile accepts(fontOwnAcceptsPath());
+	check(accepts.open(QIODevice::ReadOnly), "fonts-own.conf exists");
+	const QString written = QString::fromUtf8(accepts.readAll());
+	accepts.close();
+	check(written.contains("<patelt name=\"file\"><string>" + nestedFont + "</string>") &&
+		!written.contains(home + "/system/"), "each of the user's font files, and no system font");
+	const QDateTime before = QFileInfo(fontOwnAcceptsPath()).lastModified();
+	QThread::msleep(20);
+	check(fontWriteOwnAccepts() && QFileInfo(fontOwnAcceptsPath()).lastModified() == before,
+		"unchanged, it isn't written again (programs would reload)");
+	check(QFile::remove(nestedFont) && fontWriteOwnAccepts() &&
+		!QString::fromUtf8([&] { QFile f(fontOwnAcceptsPath()); f.open(QIODevice::ReadOnly); return f.readAll(); }())
+			.contains(nestedFont), "a removed font is taken off");
 	vfsOffChange(token);
 	window->close();
 	waitFor([] { return QCoreApplication::instance()->findChildren<QProcess *>().isEmpty(); });

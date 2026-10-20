@@ -1123,6 +1123,7 @@ QString vfsFontFile(const QString &path) {
 
 void vfsFontsChanged() {
 	fontInvalidate();
+	fontWriteOwnAccepts();
 	notifyChanged();
 }
 
@@ -1311,7 +1312,12 @@ int vfsOnChange(std::function<void()> f) {
 			notifyChanged();
 		});
 		watchResourceSources();
-		fontWatchChanges([] { notifyChanged(); });
+		/* Programs see the user's own fonts too (fonts.h). */
+		fontWriteOwnAccepts();
+		fontWatchChanges([] {
+			fontWriteOwnAccepts();
+			notifyChanged();
+		});
 	}
 	return token;
 }

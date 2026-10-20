@@ -6,3 +6,9 @@ subdir('polkit')
 install_data('pam.d/zacos9-lock', install_dir: get_option('sysconfdir') / 'pam.d')
 # The Help Center's books (zacos9-help).
 install_subdir('zacos9/help', install_dir: get_option('datadir') / 'zacos9')
+# The fonts programs see in a ZacOS session (zacos9-session sets FONTCONFIG_FILE).
+install_data('fontconfig/zacos9-fonts.conf', install_dir: get_option('datadir') / 'zacos9' / 'fontconfig')
+test('fonts-for-programs', find_program('python3'),
+  args: [files('../tests/fonts/test_fonts_for_programs.py'), files('fontconfig/zacos9-fonts.conf'),
+    files('../shell/finder/fonts.cpp')],
+  timeout: 180)
