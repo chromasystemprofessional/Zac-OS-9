@@ -31,6 +31,24 @@
 #include <QDBusPendingCallWatcher>
 #include <QDBusReply>
 
+/* Where the Memory control panel's RAM Disk is mounted (a tmpfs:
+ * memory/zacos9-memory-helper). */
+static const QString RAM_DISK = QStringLiteral("/run/zacos9-ramdisk");
+
+static bool ramDiskMounted() {
+	QFile table("/proc/self/mountinfo");
+	if (!table.open(QIODevice::ReadOnly)) {
+		return false;
+	}
+	for (const QByteArray &line : table.readAll().split('\n')) {
+		const QList<QByteArray> fields = line.split(' ');
+		if (fields.size() > 5 && QString::fromUtf8(fields[4]) == RAM_DISK) {
+			return true;
+		}
+	}
+	return false;
+}
+
 /* Mount-point prefixes that are never user-browsable storage: kernel
  * pseudo-filesystems, container overlays, snap loops, etc. */
 bool localVolumePathShown(const QString &path) {
@@ -174,6 +192,10 @@ std::vector<LocalVolume> localVolumes() {
 				mounted.insert(QString::fromUtf8(fields[4]));
 			}
 		}
+	}
+	/* The Memory control panel's RAM Disk, for the user it belongs to. */
+	if (mounted.contains(RAM_DISK) && QFileInfo(RAM_DISK).isReadable()) {
+		out.push_back({ "RAM Disk", RAM_DISK, false, QString() });
 	}
 	const QDir records("/run/media/zacos9-mac/" + QString::number(getuid()));
 	for (const QString &name : records.entryList({ "*.json" }, QDir::Files | QDir::NoSymLinks)) {
@@ -603,6 +625,20 @@ void localVolumesMountAll() {
 		mountIfNeeded(G_VOLUME(l->data));
 	}
 	g_list_free_full(volumes, g_object_unref);
+	/* The RAM Disk has no GVolume, so no mount-added: looked for. */
+	auto *ramPoll = new QTimer(QCoreApplication::instance());
+	ramPoll->setInterval(3000);
+	ramPoll->setProperty("mounted", ramDiskMounted());
+	QObject::connect(ramPoll, &QTimer::timeout, ramPoll, [ramPoll] {
+		const bool now = ramDiskMounted();
+		if (now != ramPoll->property("mounted").toBool()) {
+			ramPoll->setProperty("mounted", now);
+			for (auto &callback : g_cbs) {
+				callback();
+			}
+		}
+	});
+	ramPoll->start();
 	auto *macPoll = new QTimer(QCoreApplication::instance());
 	macPoll->setInterval(3000);
 	QObject::connect(macPoll, &QTimer::timeout, macPoll, [macPoll] {

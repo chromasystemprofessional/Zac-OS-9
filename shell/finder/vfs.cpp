@@ -340,6 +340,7 @@ const PanelDef PANELS[] = {
 	{ "Internet", "zacos9-controlpanel", "internet", PL_ICON_INTERNET_LOCATION },
 	{ "Keyboard", "zacos9-controlpanel", "keyboard", PL_ICON_CP_KEYBOARD },
 	{ "Keychain Access", "zacos9-keychain", nullptr, PL_ICON_CP_KEYCHAIN },
+	{ "Memory", "zacos9-controlpanel", "memory", PL_ICON_CP_MEMORY },
 	{ "Monitors", "zacos9-controlpanel", "monitors", PL_ICON_EXT_DISPLAY },
 	{ "Mouse", "zacos9-controlpanel", "mouse", PL_ICON_CP_MOUSE },
 	{ "Nap Time", "zacos9-controlpanel", "energysaver", PL_ICON_EXT_POWER },

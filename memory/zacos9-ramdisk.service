@@ -1,0 +1,13 @@
+[Unit]
+Description=The Memory control panel's RAM Disk: made at startup, saved at shut down
+After=local-fs.target
+Before=display-manager.service greetd.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/libexec/zacos9/zacos9-memory-helper ramdisk start
+ExecStop=/usr/libexec/zacos9/zacos9-memory-helper ramdisk stop
+
+[Install]
+WantedBy=multi-user.target

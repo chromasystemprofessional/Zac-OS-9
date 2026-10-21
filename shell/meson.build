@@ -1229,6 +1229,18 @@ test('key-tags',
 )
 
 startup_disk_sources = ['panels/startupdisk.cpp', 'finder/alert.cpp', 'finder/platinumshell.cpp', finder_protocol]
+memory_sources = ['panels/memory.cpp']
+# Memory with a fake helper (memory.cpp).
+test('memory-panel',
+  executable('test-memory-panel', '../tests/memory/test_panel.cpp', memory_sources,
+    link_with: panelkit,
+    include_directories: include_directories('finder', 'print', 'panels'),
+    dependencies: [platinum_dep, qt6],
+    cpp_args: ['-std=c++17'],
+  ),
+  env: ['QT_QPA_PLATFORM=offscreen'],
+  timeout: 30,
+)
 # Startup Disk with a fake helper (startupdisk.cpp).
 test('startupdisk-panel',
   executable('test-startupdisk-panel', '../tests/startupdisk/test_panel.cpp', startup_disk_sources,
@@ -1258,7 +1270,7 @@ executable('zacos9-controlpanel',
   'panels/soundclient.cpp',
   'finder/alert.cpp',
   users_sources,
-  xkb_layouts_sources, default_apps_sources, startup_disk_sources,
+  xkb_layouts_sources, default_apps_sources, startup_disk_sources, memory_sources,
   link_with: panelkit,
   include_directories: [include_directories('finder'), xkb_layouts_include],
   dependencies: [platinum_dep, qt6, xkbcommon_client, gio, gio_unix, wayland_client, crypt],
