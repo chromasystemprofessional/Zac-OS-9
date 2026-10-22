@@ -54,8 +54,11 @@ plymouth
 # The installer's boot loader (zacos9-install): GRUB for both UEFI and
 # BIOS computers. The -bin packages hold the boot images without
 # claiming the live system's own boot, so both kinds can be installed.
+# The signed GRUB and shim let an installed system start with Secure Boot on.
 grub2-common
 grub-efi-amd64-bin
+grub-efi-amd64-signed
+shim-signed
 grub-pc-bin
 efibootmgr
 

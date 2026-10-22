@@ -168,6 +168,14 @@ Notes:
 - The installer writes the removable-media fallback loader,
   `EFI/BOOT/BOOTX64.EFI`, only when the ESP has none, so another system's
   is never replaced (this disk had none, so ZacOS's was added).
+- GRUB for UEFI is Debian's signed one behind its signed shim
+  (`grub-install --uefi-secure-boot`), so the installed system starts with
+  Secure Boot on (under OVMF's Secure Boot firmware, unsigned GRUB is
+  refused with "Access Denied" and the firmware falls to its shell, as in
+  issue #22 on UTM). A whole-disk install also puts GRUB in the other boot
+  partition, BIOS or UEFI, so the disk starts whichever way the firmware is
+  set; before, a disk installed from a live session started with BIOS had
+  an empty ESP, and one started with UEFI had no BIOS GRUB.
 - Shutting the live system down waits at live-boot's "remove the
   installation medium" prompt, as on any Debian live medium.
 
