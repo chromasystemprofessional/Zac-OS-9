@@ -1,3 +1,16 @@
+zacos9 (1.0.11) trixie; urgency=medium
+
+  * Installed systems now start on computers and virtual machines with
+    Secure Boot turned on, such as UTM, instead of stopping at the UEFI
+    shell. Installing on a whole disk sets it up to start with both UEFI
+    and BIOS, so it still starts after switching the firmware's mode.
+    Password prompts from the keyring stay in front, with the keyboard,
+    until they're answered, instead of going behind the program that asked.
+    A program quitting or crashing no longer brings down the desktop and
+    logs you out.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Thu, 22 Oct 2026 18:25:49 -0400
+
 zacos9 (1.0.10) trixie; urgency=medium
 
   * New folder icons: Happy Zac on the System Folder, a bone on
