@@ -24,7 +24,9 @@ test('rdp-config', find_program('python3'),
 test('desktop-places', find_program('python3'),
   args: [files('../tests/finder/test_desktop_places.py'), files('zacos9-desktop-places')])
 test('desktop-gtk', find_program('python3'),
-  args: [files('../tests/finder/test_desktop_gtk.py'), files('zacos9-desktop-places')],
+  args: [files('../tests/finder/test_desktop_gtk.py'), compositor_exe.full_path(),
+    files('zacos9-desktop-places')],
+  depends: compositor_exe,
   timeout: 30)
 test('shutdown-items', find_program('python3'),
   args: [files('../tests/session/test_shutdown_items.py'), files('zacos9-shutdown-items')],
