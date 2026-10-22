@@ -124,6 +124,8 @@ def main(argv):
                 for n, v in enumerate(live[k], 1):
                     out(f"{k}[{n}]", v)
             out("IP4.GATEWAY", live["IP4.GATEWAY"])
+        if d["state"] == "connected" and "GENERAL.IP4-CONNECTIVITY" in live:
+            out("GENERAL.IP4-CONNECTIVITY", live["GENERAL.IP4-CONNECTIVITY"])
         out("CAPABILITIES.SPEED", live["CAPABILITIES.SPEED"])
     elif args[:3] == ["device", "wifi", "list"]:
         if s["wifi"]:
