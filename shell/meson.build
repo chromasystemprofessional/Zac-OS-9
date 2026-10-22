@@ -1574,6 +1574,12 @@ test('window-tricks', find_program('python3'),
     vptr_exe, close_app_client],
   timeout: 60,
 )
+# A keyring password prompt keeps the keyboard until answered (compositor/src/view.c).
+test('system-prompt', find_program('python3'),
+  args: [files('../compositor/tests/test_system_prompt.py'), compositor_exe, idle_client,
+    vptr_exe],
+  timeout: 60,
+)
 test('idle-inhibit', find_program('dbus-run-session'),
   args: ['--', find_program('python3').full_path(), files('../compositor/tests/test_inhibit.py'),
     compositor_exe, idle_client, inhibit_exe],

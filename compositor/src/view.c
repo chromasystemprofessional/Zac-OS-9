@@ -62,6 +62,9 @@ static bool view_resizable(struct plat_view *view) {
 }
 
 static struct wlr_scene_tree *view_window_layer(struct plat_view *view) {
+	if (view->system_prompt) {
+		return view->server->dialog_layer;
+	}
 	switch (view->frame->st.style) {
 	case DECOR_STYLE_MOVABLE_MODAL:
 		return view->server->dialog_layer;
@@ -206,7 +209,7 @@ void view_update_frame(struct plat_view *view) {
 	 * windows with a parent are dialogs (HIG: movable modal). */
 	int hint = platinum_shell_style_for(view->impl->get_surface(view));
 	bool dialog = hint >= 0 ? hint == DECOR_STYLE_MOVABLE_MODAL
-		: !view_resizable(view) && view->impl->has_parent(view);
+		: view->system_prompt || (!view_resizable(view) && view->impl->has_parent(view));
 	const bool popup = hint == DECOR_STYLE_POPUP;
 	frame_set_style(view->frame, popup ? DECOR_STYLE_POPUP
 		: dialog ? DECOR_STYLE_MOVABLE_MODAL : DECOR_STYLE_DOCUMENT);
@@ -240,9 +243,39 @@ void view_set_title(struct plat_view *view, const char *title) {
 	}
 }
 
+/* Programs that ask for a password on another program's behalf: the
+ * keyring's prompter (also behind pinentry-gnome3 and the ssh askpass) and
+ * the session's polkit agent. The program asking would otherwise come
+ * forward over the prompt while the password is being typed. */
+static bool is_system_prompt(const char *app_id) {
+	static const char *const prompts[] = {
+		"gcr-prompter", "org.gnome.keyring.SystemPrompter",
+		"org.gnome.keyring.PrivatePrompter", "gcr-ssh-askpass", "gcr4-ssh-askpass",
+		"lxqt-policykit-agent",
+	};
+	for (size_t i = 0; app_id && i < sizeof(prompts) / sizeof(prompts[0]); i++) {
+		if (strcmp(app_id, prompts[i]) == 0) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/* The front prompt on screen, which keeps the keyboard until answered. */
+static struct plat_view *system_prompt_shown(struct plat_server *server) {
+	struct plat_view *view;
+	wl_list_for_each(view, &server->views, link) {
+		if (view->system_prompt && view->mapped && !view->hidden) {
+			return view;
+		}
+	}
+	return NULL;
+}
+
 void view_set_app_id(struct plat_view *view, const char *app_id) {
 	free(view->app_id);
 	view->app_id = strdup(app_id ? app_id : "");
+	view->system_prompt = is_system_prompt(view->app_id);
 	if (view->toplevel_handle) {
 		wlr_foreign_toplevel_handle_v1_set_app_id(view->toplevel_handle, view->app_id);
 	}
@@ -403,7 +436,7 @@ static void focus_none(struct plat_server *server) {
 }
 
 void view_set_hidden(struct plat_view *view, bool hidden) {
-	if (view->hidden == hidden) {
+	if (view->hidden == hidden || (hidden && view->system_prompt)) {
 		return;
 	}
 	struct plat_server *server = view->server;
@@ -499,6 +532,13 @@ void view_focus(struct plat_view *view) {
 		return;
 	}
 	struct plat_server *server = view->server;
+	/* While a password prompt is up, nothing else comes in front of it:
+	 * a click elsewhere, a new window, or a program asking to come forward
+	 * leaves the prompt where it is, with the keyboard. */
+	struct plat_view *prompt = system_prompt_shown(server);
+	if (prompt && !view->system_prompt) {
+		view = prompt;
+	}
 	platinum_shell_launch_ready(view);
 	if (view->hidden) {
 		view_set_hidden(view, false);
