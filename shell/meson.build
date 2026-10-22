@@ -1487,6 +1487,12 @@ test('fullscreen-protocols', find_program('python3'),
   depends: compositor_exe,
   timeout: 30,
 )
+test('fullscreen-protocols-hidpi', find_program('python3'),
+  args: [files('../compositor/tests/test_fullscreen.py'),
+    meson.project_build_root() / 'compositor/zacos9-wm', fullscreen_client, '2'],
+  depends: compositor_exe,
+  timeout: 30,
+)
 
 vptr_protocol = []
 foreach kind : [['client-header', '@BASENAME@-client-protocol.h'], ['private-code', '@BASENAME@-protocol.c']]
