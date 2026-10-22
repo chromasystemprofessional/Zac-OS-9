@@ -28,7 +28,8 @@ KINDS = ["folder", "document", "application", "disk", "trash-empty", "trash-full
     "cp-mouse", "cp-keyboard", "cp-trackpad", "cp-accessibility", "cp-general", "cp-numbers",
     "cp-text", "cp-datetime", "cp-zacmenu", "cp-appearance", "cp-screensaver", "cp-users",
     "cp-keychain", "cp-collar", "cp-speech", "cp-retriever", "cp-filetranslator", "cp-walkies", "cp-memory",
-    "network-disk", "font"]
+    "network-disk", "font", "applications-folder", "home-folder",
+    "sf-appearance", "sf-extensions", "sf-sounds", "sf-startup-items", "sf-application-support", "sf-device-drivers", "sf-network", "sf-system-logs", "sf-software-components", "sf-fonts", "sf-favorites", "sf-toy-box-items", "sf-folder-tricks", "sf-contextual-menu-items", "sf-preferences", "sf-utilities"]
 
 
 def parse():

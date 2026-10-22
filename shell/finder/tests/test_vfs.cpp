@@ -529,6 +529,15 @@ int main(int argc, char **argv) {
 	const VNode *sysNode = vfsNode(vfsPathFor("system-folder"));
 	check(sysNode && sysNode->icon == PL_ICON_SYSTEM_FOLDER,
 		"the System Folder has its own icon");
+	const VNode *appsNode = vfsNode(vfsPathFor("applications"));
+	const VNode *homeNode = vfsNode(vfsPathFor("home"));
+	check(appsNode && appsNode->icon == PL_ICON_APPLICATIONS_FOLDER && homeNode &&
+		homeNode->icon == PL_ICON_HOME_FOLDER, "Applications and Home have their own icons");
+	const VNode *fontsNode = vfsNode(vfsPathFor("system-folder/fonts"));
+	const VNode *favNode = vfsNode(vfsPathFor("system-folder/favorites"));
+	const VNode *extNode = vfsNode(vfsPathFor("system-folder/extensions"));
+	check(fontsNode && fontsNode->icon == PL_ICON_SF_FONTS && favNode && favNode->icon == PL_ICON_SF_FAVORITES &&
+		extNode && extNode->icon == PL_ICON_SF_EXTENSIONS, "the System Folder's folders have their emblems");
 
 	QStringList panels = namesIn(vfsPathFor("system-folder/control-panels"));
 	check(panels.contains("Appearance") && panels.contains("File Sharing") &&
@@ -884,6 +893,26 @@ int main(int argc, char **argv) {
 	check(volume.contains("My Folder"), "migration keeps a node the user added");
 	check(volume.contains("System Folder") && volume.contains("Applications") &&
 		volume.contains("Home"), "and adds the ones this version expects");
+
+	/* Version 16: an older Applications and Home get their icons; one the
+	 * user chose stays. */
+	{
+		QJsonObject v15;
+		v15.insert("version", 15);
+		QJsonObject apps{ { "id", "applications" }, { "name", "Applications" }, { "kind", "apps" }, { "order", 1 } };
+		QJsonObject home{ { "id", "home" }, { "name", "Home" }, { "kind", "backed" }, { "backing", "$HOME" },
+			{ "order", 2 }, { "icon", "document" } };
+		v15.insert("nodes", QJsonArray{ apps, home });
+		if (reg.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+			reg.write(QJsonDocument(v15).toJson());
+			reg.close();
+		}
+		vfsRefresh();
+		const VNode *a = vfsNode(vfsPathFor("applications"));
+		const VNode *h = vfsNode(vfsPathFor("home"));
+		check(a && a->icon == PL_ICON_APPLICATIONS_FOLDER, "migration gives Applications its bone");
+		check(h && h->icon == PL_ICON_DOCUMENT, "and keeps an icon the user gave Home");
+	}
 	if (reg.open(QIODevice::ReadOnly)) {
 		check(QJsonDocument::fromJson(reg.readAll()).object().value("version").toInt() >= 1,
 			"and writes the new version back");

@@ -388,15 +388,16 @@ the name it was installed with (`/etc/zacos9/disk-name`, written by
 
 ```json
 {
-  "version": 15,
+  "version": 16,
   "volume": {},
   "showUnixVolume": false,
   "nodes": [
     { "id": "system-folder", "name": "System Folder", "kind": "folder",
       "icon": "system-folder", "order": 0 },
-    { "id": "system-folder/fonts", "name": "Fonts", "kind": "fonts" },
+    { "id": "system-folder/fonts", "name": "Fonts", "kind": "fonts", "icon": "sf-fonts" },
     { "id": "system-folder/fonts/language-kits", "name": "Language Kits", "kind": "fonts" },
-    { "id": "applications", "name": "Applications", "kind": "apps", "order": 1 },
+    { "id": "applications", "name": "Applications", "kind": "apps", "order": 1,
+      "icon": "applications-folder" },
     { "id": "utilities", "name": "Utilities", "kind": "apps", "visible": false,
       "categories": ["Utility", "System", "Settings"] }
   ],

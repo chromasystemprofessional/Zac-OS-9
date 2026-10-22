@@ -24,7 +24,7 @@ enum pl_icon_kind {
 	PL_ICON_CLASSIC,    /* a classic Mac OS application (runs in Classic) */
 	PL_ICON_WINDOWS,    /* a Windows application (runs in Wine) */
 	PL_ICON_SHARED_FOLDER, /* a folder shared from Get Info */
-	PL_ICON_SYSTEM_FOLDER, /* the System Folder, marked with the sparkle */
+	PL_ICON_SYSTEM_FOLDER, /* the System Folder, with Zac on it */
 	PL_ICON_CONTROL_PANELS, /* the Control Panels folder */
 	/* System extensions shown during the startup parade. */
 	PL_ICON_EXT_OPENTRANSPORT,
@@ -69,6 +69,25 @@ enum pl_icon_kind {
 	PL_ICON_CP_MEMORY,
 	PL_ICON_NETWORK_DISK, /* a network volume (AFP, SMB), as AppleShare's were */
 	PL_ICON_FONT,         /* a font: a suitcase, "A" drawn on it in the font */
+	PL_ICON_APPLICATIONS_FOLDER, /* Applications: a folder with a bone */
+	PL_ICON_HOME_FOLDER,         /* Home: Zac in his doghouse */
+	/* The System Folder's folders, each with its emblem. */
+	PL_ICON_SF_APPEARANCE,
+	PL_ICON_SF_EXTENSIONS,
+	PL_ICON_SF_SOUNDS,
+	PL_ICON_SF_STARTUP_ITEMS,
+	PL_ICON_SF_APPLICATION_SUPPORT,
+	PL_ICON_SF_DEVICE_DRIVERS,
+	PL_ICON_SF_NETWORK,
+	PL_ICON_SF_SYSTEM_LOGS,
+	PL_ICON_SF_SOFTWARE_COMPONENTS,
+	PL_ICON_SF_FONTS,
+	PL_ICON_SF_FAVORITES,
+	PL_ICON_SF_TOY_BOX_ITEMS,
+	PL_ICON_SF_FOLDER_TRICKS,
+	PL_ICON_SF_CONTEXTUAL_MENU_ITEMS,
+	PL_ICON_SF_PREFERENCES,
+	PL_ICON_SF_UTILITIES,
 	/* One extension's own icon each (tools/extension-icons). */
 #include "icons_custom.h"
 	PL_ICON_COUNT,

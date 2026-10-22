@@ -35,8 +35,10 @@
  * added, while the user's own nodes and overrides are kept.
  */
 /* 14: Fonts is a generated catalog, not a raw directory.
- * 15: Fonts has a Language Kits folder. */
-static constexpr int REGISTRY_VERSION = 15;
+ * 15: Fonts has a Language Kits folder.
+ * 16: Applications, Home and the System Folder's folders have their own
+ *     icons (a bone, Zac's doghouse, an emblem each). */
+static constexpr int REGISTRY_VERSION = 16;
 
 static const char *DEFAULT_REGISTRY = R"JSON({
   "version": 14,
@@ -45,7 +47,7 @@ static const char *DEFAULT_REGISTRY = R"JSON({
   "nodes": [
     { "id": "system-folder", "name": "System Folder", "kind": "folder",
       "icon": "system-folder", "order": 0 },
-    { "id": "system-folder/appearance", "name": "Appearance", "kind": "backed",
+    { "id": "system-folder/appearance", "icon": "sf-appearance", "name": "Appearance", "kind": "backed",
       "backing": "$XDG_DATA_HOME/zacos9/appearance" },
     { "id": "system-folder/appearance/desktop-patterns", "name": "Desktop Patterns",
       "kind": "backed", "backing": "$XDG_DATA_HOME/zacos9/appearance/Desktop Patterns" },
@@ -57,43 +59,44 @@ static const char *DEFAULT_REGISTRY = R"JSON({
       "backing": "$XDG_DATA_HOME/zacos9/appearance/Sound Themes" },
     { "id": "system-folder/control-panels", "name": "Control Panels",
       "kind": "panels", "icon": "control-panels" },
-    { "id": "system-folder/extensions", "name": "Extensions", "kind": "resource",
+    { "id": "system-folder/extensions", "icon": "sf-extensions", "name": "Extensions", "kind": "resource",
       "provider": "extensions" },
-    { "id": "system-folder/sounds", "name": "Sounds", "kind": "resource",
+    { "id": "system-folder/sounds", "icon": "sf-sounds", "name": "Sounds", "kind": "resource",
       "provider": "sounds" },
-    { "id": "system-folder/startup-items", "name": "Startup Items", "kind": "resource",
+    { "id": "system-folder/startup-items", "icon": "sf-startup-items", "name": "Startup Items", "kind": "resource",
       "provider": "startup-items" },
-    { "id": "system-folder/application-support", "name": "Application Support", "kind": "resource",
+    { "id": "system-folder/application-support", "icon": "sf-application-support", "name": "Application Support", "kind": "resource",
       "provider": "application-support" },
-    { "id": "system-folder/device-drivers", "name": "Device Drivers", "kind": "resource",
+    { "id": "system-folder/device-drivers", "icon": "sf-device-drivers", "name": "Device Drivers", "kind": "resource",
       "provider": "device-drivers" },
-    { "id": "system-folder/network", "name": "Network", "kind": "resource",
+    { "id": "system-folder/network", "icon": "sf-network", "name": "Network", "kind": "resource",
       "provider": "network" },
-    { "id": "system-folder/system-logs", "name": "System Logs", "kind": "resource",
+    { "id": "system-folder/system-logs", "icon": "sf-system-logs", "name": "System Logs", "kind": "resource",
       "provider": "system-logs" },
-    { "id": "system-folder/software-components", "name": "Software Components",
+    { "id": "system-folder/software-components", "icon": "sf-software-components", "name": "Software Components",
       "kind": "resource", "provider": "software-components" },
     { "id": "system-folder/system-information", "name": "System Information",
       "kind": "launcher", "action": "system-information" },
     { "id": "system-folder/extensions-manager", "name": "Tricks Manager",
       "kind": "launcher", "action": "extensions-manager" },
-    { "id": "system-folder/fonts", "name": "Fonts", "kind": "fonts" },
+    { "id": "system-folder/fonts", "icon": "sf-fonts", "name": "Fonts", "kind": "fonts" },
     { "id": "system-folder/fonts/language-kits", "name": "Language Kits", "kind": "fonts" },
-    { "id": "system-folder/favorites", "name": "Favorites", "kind": "backed",
+    { "id": "system-folder/favorites", "icon": "sf-favorites", "name": "Favorites", "kind": "backed",
       "backing": "$XDG_CONFIG_HOME/zacos9/Favorites" },
-    { "id": "system-folder/toy-box-items", "name": "Toy Box Items", "kind": "backed",
+    { "id": "system-folder/toy-box-items", "icon": "sf-toy-box-items", "name": "Toy Box Items", "kind": "backed",
       "backing": "$XDG_CONFIG_HOME/zacos9/Toy Box Items" },
-    { "id": "system-folder/folder-tricks", "name": "Folder Tricks", "kind": "backed",
+    { "id": "system-folder/folder-tricks", "icon": "sf-folder-tricks", "name": "Folder Tricks", "kind": "backed",
       "backing": "$XDG_CONFIG_HOME/zacos9/Folder Tricks" },
-    { "id": "system-folder/contextual-menu-items", "name": "Contextual Menu Items",
+    { "id": "system-folder/contextual-menu-items", "icon": "sf-contextual-menu-items", "name": "Contextual Menu Items",
       "kind": "backed", "backing": "$XDG_CONFIG_HOME/zacos9/Contextual Menu Items" },
-    { "id": "system-folder/preferences", "name": "Preferences", "kind": "backed",
+    { "id": "system-folder/preferences", "icon": "sf-preferences", "name": "Preferences", "kind": "backed",
       "backing": "$XDG_CONFIG_HOME" },
-    { "id": "system-folder/utilities", "name": "Utilities", "kind": "apps" },
+    { "id": "system-folder/utilities", "icon": "sf-utilities", "name": "Utilities", "kind": "apps" },
     { "id": "applications", "name": "Applications", "kind": "apps", "order": 1,
+      "icon": "applications-folder",
       "excludeCategories": ["X-ZacOS9-Utility"] },
     { "id": "home", "name": "Home", "kind": "backed",
-      "backing": "$HOME", "order": 2 },
+      "backing": "$HOME", "order": 2, "icon": "home-folder" },
     { "id": "shared-documents", "name": "Shared Documents", "kind": "backed",
       "backing": "/home/Shared", "order": 3 },
     { "id": "utilities", "name": "Utilities", "kind": "apps", "order": 4,
@@ -179,6 +182,27 @@ pl_icon_kind iconFromName(const QString &name, VKind kind) {
 	if (name == "control-panels") {
 		return PL_ICON_CONTROL_PANELS;
 	}
+	if (name == "applications-folder") {
+		return PL_ICON_APPLICATIONS_FOLDER;
+	}
+	/* The System Folder's folders: "sf-fonts" and so on. */
+	static const QHash<QString, pl_icon_kind> systemFolders = {
+		{ "sf-appearance", PL_ICON_SF_APPEARANCE }, { "sf-extensions", PL_ICON_SF_EXTENSIONS },
+		{ "sf-sounds", PL_ICON_SF_SOUNDS }, { "sf-startup-items", PL_ICON_SF_STARTUP_ITEMS },
+		{ "sf-application-support", PL_ICON_SF_APPLICATION_SUPPORT },
+		{ "sf-device-drivers", PL_ICON_SF_DEVICE_DRIVERS }, { "sf-network", PL_ICON_SF_NETWORK },
+		{ "sf-system-logs", PL_ICON_SF_SYSTEM_LOGS }, { "sf-software-components", PL_ICON_SF_SOFTWARE_COMPONENTS },
+		{ "sf-fonts", PL_ICON_SF_FONTS }, { "sf-favorites", PL_ICON_SF_FAVORITES },
+		{ "sf-toy-box-items", PL_ICON_SF_TOY_BOX_ITEMS }, { "sf-folder-tricks", PL_ICON_SF_FOLDER_TRICKS },
+		{ "sf-contextual-menu-items", PL_ICON_SF_CONTEXTUAL_MENU_ITEMS },
+		{ "sf-preferences", PL_ICON_SF_PREFERENCES }, { "sf-utilities", PL_ICON_SF_UTILITIES },
+	};
+	if (systemFolders.contains(name)) {
+		return systemFolders.value(name);
+	}
+	if (name == "home-folder") {
+		return PL_ICON_HOME_FOLDER;
+	}
 	if (name == "disk") {
 		return PL_ICON_DISK;
 	}
@@ -262,6 +286,23 @@ bool migrate(QJsonObject *root) {
 		if (n.value("id").toString() == QLatin1String("documents") &&
 				n.value("backing").toString() == QLatin1String("$XDG_DOCUMENTS_DIR")) {
 			nodes.removeAt(i);
+		}
+	}
+	/* Version 16: Applications, Home and the System Folder's folders get
+	 * their own icons, unless the user has given them one. */
+	QHash<QString, QString> icons;
+	for (const QJsonValue &v : fresh.value("nodes").toArray()) {
+		const QJsonObject n = v.toObject();
+		if (n.contains("icon")) {
+			icons.insert(n.value("id").toString(), n.value("icon").toString());
+		}
+	}
+	for (int i = 0; i < nodes.size(); i++) {
+		QJsonObject n = nodes.at(i).toObject();
+		const QString id = n.value("id").toString();
+		if (icons.contains(id) && !n.contains("icon")) {
+			n.insert("icon", icons.value(id));
+			nodes.replace(i, n);
 		}
 	}
 	/* Version 4: Applications > Utilities holds what ZacOS 9 ships as a
@@ -735,9 +776,9 @@ std::vector<std::unique_ptr<Item>> vfsList(const QString &path) {
 		 * where the user put it. */
 		item->stateKey = node->id;
 		item->isVirtual = true;
-		item->kind = node->kind == VKind::Backed ||
-			(node->kind == VKind::Resource && node->resourceDirectory) ?
-			PL_ICON_FOLDER : node->icon;
+		/* A folder is plain unless the registry gives it an icon (Home's
+		 * doghouse, the System Folder's emblems). */
+		item->kind = node->icon;
 		item->isDir = node->kind != VKind::Launcher && node->kind != VKind::Font &&
 			(node->kind != VKind::Resource || node->resourceDirectory);
 		item->labelIndex = vfsLabel(item->path);
