@@ -279,7 +279,18 @@ static void apply_layout(struct plat_server *server) {
 			}
 		}
 	}
+	/* The arrangement starts at the origin: a screen left alone at its
+	 * place beside one since unplugged moves there. X11 sees a scaled
+	 * screen at the origin as exactly its pixels (xwayland_output.c), so
+	 * a full-screen X11 window covers it as the program expects. */
+	int min_x = xs[0], min_y = ys[0];
+	for (int i = 1; i < n; i++) {
+		min_x = xs[i] < min_x ? xs[i] : min_x;
+		min_y = ys[i] < min_y ? ys[i] : min_y;
+	}
 	for (int i = 0; i < n; i++) {
+		xs[i] -= min_x;
+		ys[i] -= min_y;
 		wlr_output_layout_add(server->output_layout, outs[i], xs[i], ys[i]);
 	}
 	wl_list_for_each(output, &server->outputs, link) {

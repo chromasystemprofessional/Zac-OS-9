@@ -7,9 +7,17 @@ import time
 from pathlib import Path
 
 compositor, client = (str(Path(arg).resolve()) for arg in sys.argv[1:3])
+# At scale 2, X11 sees the screen in pixels: a 1x X11 window full screen must
+# fill it so (a game under Wine left full screen again at half that size).
+scale = int(sys.argv[3]) if len(sys.argv) > 3 else 1
 with tempfile.TemporaryDirectory(prefix="zacos9-fullscreen-") as directory:
+    if scale > 1:
+        (Path(directory) / "zacos9").mkdir()
+        (Path(directory) / "zacos9" / "desktop.conf").write_text(f"scale={scale}\n")
     env = dict(os.environ, XDG_RUNTIME_DIR=directory, XDG_CONFIG_HOME=directory,
-               WLR_BACKENDS="headless", WLR_RENDERER="pixman", WLR_HEADLESS_OUTPUTS="2",
+               WLR_BACKENDS="headless", WLR_RENDERER="pixman",
+               WLR_HEADLESS_OUTPUTS="2" if scale == 1 else "1",
+               QT_ENABLE_HIGHDPI_SCALING="0",
                ZACOS9_STARTUP="0", ZACOS9_MENUBAR="", ZACOS9_FINDER="",
                ZACOS9_COLLAR="",
                QT_QPA_PLATFORM="wayland", QT_STYLE_OVERRIDE="", QT_WAYLAND_DISABLE_WINDOWDECORATION="1")
