@@ -244,6 +244,7 @@ if [ "$dev_type" = "part" ]; then
 	[ -n "$parent_name" ] || fail "Could not find the disk that $device is on"
 	parent_disk="/dev/$parent_name"
 	grub_target="$parent_disk"
+	whole_disk=false
 
 	# The EFI System Partition on the same disk (GUID C12A7328-…), shared
 	# with whatever else starts from it. Only UEFI computers need one.
@@ -267,6 +268,7 @@ else
 	# Both boot partitions are made either way, so the disk can move.
 
 	grub_target="$device"
+	whole_disk=true
 
 	# Partition suffix: nvme/mmcblk use pN, others use N.
 	case $device in
@@ -418,8 +420,14 @@ touch "$TARGET/var/lib/zacos9/setup-pending"
 # ---------- step 5: install boot loader ----------
 step 5 "Installing boot loader..."
 # Output goes to stderr, which the installer window shows if this fails.
+# UEFI's is Debian's signed GRUB behind its signed shim, so it starts with
+# Secure Boot on (UTM, most PCs), however this session was started.
+efi() {
+	chroot "$TARGET" grub-install --target=x86_64-efi --efi-directory=/boot/efi \
+		--uefi-secure-boot "$@" >&2
+}
+bios() { chroot "$TARGET" grub-install --target=i386-pc "$grub_target" >&2; }
 if $uefi; then
-	efi() { chroot "$TARGET" grub-install --target=x86_64-efi --efi-directory=/boot/efi "$@" >&2; }
 	# A boot entry in the firmware; some (Macs among them) won't take one.
 	efi --bootloader-id=ZacOS9 || efi --bootloader-id=ZacOS9 --no-nvram
 	# The fallback path every UEFI firmware starts on its own, which is what
@@ -427,8 +435,17 @@ if $uefi; then
 	if [ ! -e "$TARGET/boot/efi/EFI/BOOT/BOOTX64.EFI" ]; then
 		efi --removable --no-nvram
 	fi
+	# A whole disk has both boot partitions: GRUB goes in each, so it also
+	# starts with the firmware switched to BIOS, or in another computer.
+	if $whole_disk; then
+		bios || echo "zacos9-install: no BIOS boot loader; the disk starts with UEFI only" >&2
+	fi
 else
-	chroot "$TARGET" grub-install --target=i386-pc "$grub_target" >&2
+	bios
+	if $whole_disk; then
+		efi --removable --no-nvram ||
+			echo "zacos9-install: no UEFI boot loader; the disk starts with BIOS only" >&2
+	fi
 fi
 chroot "$TARGET" update-grub >&2
 
