@@ -266,6 +266,9 @@ struct plat_view {
 	struct wlr_xdg_toplevel_decoration_v1 *decoration;
 
 	char *app_id;
+	/* A password prompt from the keyring or the system (view.c): it stays
+	 * in front, with the keyboard, until it is answered. */
+	bool system_prompt;
 	bool mapped;
 	bool hidden;    /* "Hide <app>" from the Application menu */
 	bool collapsed; /* a pop-up window: closed, only its tab shown */
