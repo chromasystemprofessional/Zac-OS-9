@@ -2,6 +2,7 @@
 
 #include <QProcess>
 #include <QStringList>
+#include <QTimer>
 #include <QWidget>
 
 #include "panelkit.h"
@@ -14,7 +15,9 @@
  * zacos9-install makes; zacos9-setup-helper (through pkexec) creates
  * the real account and ends that session.
  *
- * Pages: Introduction, Name, Password, Computer Name, Time Zone, Conclusion.
+ * Pages: Introduction, Name, Password, Computer Name, Time Zone, Internet,
+ * Conclusion. Internet opens the TCP/IP control panel (zacos9-tcpip) and
+ * says that's where the connection is set from now on.
  */
 class SetupWindow : public QWidget {
 public:
@@ -30,7 +33,7 @@ protected:
 	void closeEvent(QCloseEvent *) override;
 
 private:
-	enum Page { Intro, Name, Password, Computer, TimeZone, Conclusion, PageCount };
+	enum Page { Intro, Name, Password, Computer, TimeZone, Internet, Conclusion, PageCount };
 	enum class State { Asking, Working, Finished };
 
 	Page m_page = Intro;
@@ -45,6 +48,12 @@ private:
 	PanelList m_zones;
 	QStringList m_zoneIds;
 
+	PanelButton m_openTcpip;
+	QProcess *m_tcpip = nullptr;
+	QProcess *m_nmcli = nullptr;
+	QTimer m_netTimer;
+	QString m_netStatus; /* "Connected through Wi-Fi (“Home”)." and the like */
+
 	PanelButton m_back, m_next, m_goAhead;
 	PanelHost m_host{ this };
 	QProcess *m_helper = nullptr;
@@ -55,6 +64,8 @@ private:
 	QString problem(bool *blocked) const;
 	void updateButtons();
 	void goAhead();
+	void openTcpip();
+	void checkNetwork();
 	QString hostName() const;
 	QString zoneId() const;
 
