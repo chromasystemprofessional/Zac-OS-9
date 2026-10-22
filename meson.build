@@ -12,6 +12,14 @@ add_project_arguments(
   language: 'c',
 )
 
+# Tests must never draw on the desktop they are built from: a test that opened
+# windows on the live compositor once crashed it and logged the user out. Tests
+# that need a display start their own headless zacos9-wm and override these.
+add_test_setup('isolated',
+  env: {'WAYLAND_DISPLAY': 'zacos9-test-no-display', 'DISPLAY': ''},
+  is_default: true,
+)
+
 subdir('lib')
 subdir('compositor')
 subdir('shell')

@@ -1648,9 +1648,9 @@ gtk_appmenu_module = shared_module('zacos9-appmenu',
 )
 test('gtk-save-places', find_program('dbus-run-session'),
   args: ['--', find_program('python3').full_path(),
-    files('../tests/finder/test_desktop_gtk.py'),
+    files('../tests/finder/test_desktop_gtk.py'), compositor_exe.full_path(),
     files('../session/zacos9-desktop-places'), gtk_appmenu_module.full_path()],
-  depends: [gtk_appmenu_module],
+  depends: [gtk_appmenu_module, compositor_exe],
   timeout: 30,
 )
 test('gtk-theme-css',
