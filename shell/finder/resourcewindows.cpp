@@ -15,6 +15,8 @@
 #include <QTimer>
 
 #include "alert.h"
+#include "extensioncatalog.h"
+#include "modules.h"
 #include "tricksets.h"
 #include "autostart.h"
 #include "icons.h"
@@ -179,7 +181,8 @@ private:
 		return hit || m_toggle.release(pos) || (category() == Services && m_run.release(pos));
 	}
 
-	/* Rows come from the chosen category. Extensions stay view-only. */
+	/* Rows come from the chosen category. Extensions can be turned on or
+	 * off for start-up; login items and services can too. */
 	void loadCategory() {
 		const int keep = m_list.state.selected;
 		const QString keepKey = keep >= 0 && keep < int(m_resources.size()) ?
@@ -224,9 +227,19 @@ private:
 			});
 		m_explanation = m_showAll.on
 			? "Every loaded kernel module, by its technical name. For viewing only."
-			: "Extensions add features to this computer. For viewing only; they can't "
-				"be turned off here.";
+			: "Extensions add features to this computer. Turn one off to stop it loading "
+				"at start-up, or on to start it at every start-up. Changes take effect "
+				"after restart.";
 		m_state.assign(m_resources.size(), RowState());
+		if (!m_showAll.on) {
+			for (size_t i = 0; i < m_resources.size(); i++) {
+				const ExtensionEntry entry = extensionEntry(m_resources[i].key);
+				RowState st;
+				st.canToggle = !entry.key.isEmpty();
+				st.on = entry.startup;
+				m_state[i] = st;
+			}
+		}
 	}
 
 	void loadLoginItems() {
@@ -331,7 +344,7 @@ private:
 		details.location = category() == Extensions ? "System Folder:Extensions" :
 			category() == LoginItems ? "System Folder:Startup Items" : "Extensions Manager";
 		details.access = category() == Extensions ?
-			"Informational only; no kernel module is loaded or unloaded here." :
+			"Turn it on or off; the change takes effect after restart." :
 			category() == LoginItems ?
 				"Changes affect only your account and take effect at your next login." :
 				"Changes affect only your account's user services.";
@@ -348,6 +361,24 @@ private:
 		const bool turnOn = !m_state[size_t(row)].on;
 		const QString name = m_resources[size_t(row)].name;
 		const QString key = m_resources[size_t(row)].key;
+		if (category() == Extensions) {
+			const ExtensionEntry entry = extensionEntry(key);
+			QStringList modules = entry.modules;
+			if (modules.isEmpty()) {
+				modules << key;
+			}
+			m_serviceActionPending = true;
+			updateButtons();
+			setExtensionEnabledAsync(this, key, turnOn, modules,
+				[this](bool success, const QString &error) {
+					m_serviceActionPending = false;
+					if (!success) {
+						Alert::ask(error, "OK", QString());
+					}
+					loadCategory();
+				});
+			return;
+		}
 		if (!turnOn && !Alert::ask("Turn off “" + name + "”? It will no longer start when you log "
 				"in. This takes effect at your next login.", "Turn Off", "Cancel")) {
 			return;

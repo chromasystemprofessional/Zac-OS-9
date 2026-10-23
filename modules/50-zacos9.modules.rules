@@ -1,0 +1,8 @@
+// Administrators at the computer (in the sudo group, logged in on its
+// screen) may turn system extensions on or off without a password.
+polkit.addRule(function(action, subject) {
+	if (action.id == "org.zacos9.modules" &&
+			subject.local && subject.active && subject.isInGroup("sudo")) {
+		return polkit.Result.YES;
+	}
+});
