@@ -262,7 +262,7 @@ int main(int argc, char **argv) {
 	for (const QString name : { "Sounds", "Startup Items", "Shutdown Items",
 			"Application Support", "Device Drivers", "Network", "System Logs",
 			"Software Components", "Extensions", "Extensions (Disabled)",
-			"Zac Menu Items", "System Information", "Tricks Manager", "Favorites" }) {
+			"Zac Menu Items", "System Information", "Extensions Manager", "Favorites" }) {
 		check(systemNames.contains(name), "System Folder contains " + name);
 	}
 	check(vfsOpensAs(vfsPathFor("system-folder/shutdown-items")) ==
@@ -272,8 +272,8 @@ int main(int argc, char **argv) {
 			root + "/config/zacos9/ZacOS 9 Menu Items",
 		"Zac Menu Items stands for the folder the Zac menu reads");
 	check(pathNamed(vfsPathFor("system-folder/utilities"), "System Information") != QString() &&
-		pathNamed(vfsPathFor("system-folder/utilities"), "Tricks Manager") != QString(),
-		"the trusted System Information and Tricks Manager launchers are also in Utilities");
+		pathNamed(vfsPathFor("system-folder/utilities"), "Extensions Manager") != QString(),
+		"the trusted System Information and Extensions Manager launchers are also in Utilities");
 	const QString sounds = vfsPathFor("system-folder/sounds");
 	const QString userSounds = pathNamed(sounds, "User");
 	check(!userSounds.isEmpty() && !pathNamed(sounds, "Computer").isEmpty(),
@@ -934,6 +934,33 @@ int main(int argc, char **argv) {
 		check(QJsonDocument::fromJson(reg.readAll()).object().value("version").toInt() >= 1,
 			"and writes the new version back");
 		reg.close();
+	}
+
+	/* Version 18 restores the Extensions Manager's name unless the user
+	 * chose one of their own. */
+	{
+		QJsonObject v17;
+		v17.insert("version", 17);
+		QJsonObject manager{ { "id", "system-folder/extensions-manager" },
+			{ "name", "Tricks Manager" }, { "kind", "launcher" }, { "action", "extensions-manager" } };
+		v17.insert("nodes", QJsonArray{ manager });
+		if (reg.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+			reg.write(QJsonDocument(v17).toJson());
+			reg.close();
+		}
+		vfsRefresh();
+		check(vfsName(vfsPathFor("system-folder/extensions-manager")) == "Extensions Manager",
+			"migration restores the Extensions Manager's Mac OS 9 name");
+		QJsonObject custom = manager;
+		custom.insert("name", "My Extension Tool");
+		v17.insert("nodes", QJsonArray{ custom });
+		if (reg.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+			reg.write(QJsonDocument(v17).toJson());
+			reg.close();
+		}
+		vfsRefresh();
+		check(vfsName(vfsPathFor("system-folder/extensions-manager")) == "My Extension Tool",
+			"and keeps a name the user chose");
 	}
 
 	/* Version 6's Wallpaper node moves without losing user overrides. */

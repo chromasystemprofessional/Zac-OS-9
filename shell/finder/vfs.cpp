@@ -38,11 +38,12 @@
  * 15: Fonts has a Language Kits folder.
  * 16: Applications, Home and the System Folder's folders have their own
  *     icons (a bone, Zac's doghouse, an emblem each).
- * 17: Shutdown Items, Zac Menu Items and Extensions (Disabled). */
-static constexpr int REGISTRY_VERSION = 17;
+ * 17: Shutdown Items, Zac Menu Items and Extensions (Disabled).
+ * 18: Extensions Manager uses its Mac OS 9 name again. */
+static constexpr int REGISTRY_VERSION = 18;
 
 static const char *DEFAULT_REGISTRY = R"JSON({
-  "version": 17,
+  "version": 18,
   "volume": {},
   "showUnixVolume": false,
   "nodes": [
@@ -82,7 +83,7 @@ static const char *DEFAULT_REGISTRY = R"JSON({
       "kind": "resource", "provider": "software-components" },
     { "id": "system-folder/system-information", "name": "System Information",
       "kind": "launcher", "action": "system-information" },
-    { "id": "system-folder/extensions-manager", "name": "Tricks Manager",
+    { "id": "system-folder/extensions-manager", "name": "Extensions Manager",
       "kind": "launcher", "action": "extensions-manager" },
     { "id": "system-folder/fonts", "icon": "sf-fonts", "name": "Fonts", "kind": "fonts" },
     { "id": "system-folder/fonts/language-kits", "name": "Language Kits", "kind": "fonts" },
@@ -286,6 +287,14 @@ bool migrate(QJsonObject *root) {
 			}
 			nodes.replace(i, n);
 		}
+		/* It manages Extensions, as it did in Mac OS 9; the old renamed
+		 * title was confusing beside the Extensions folder. Only the old
+		 * default name is changed, never one the user chose. */
+		if (n.value("id").toString() == QLatin1String("system-folder/extensions-manager") &&
+				n.value("name").toString() == QLatin1String("Tricks Manager")) {
+			n.insert("name", "Extensions Manager");
+			nodes.replace(i, n);
+		}
 	}
 	/* Documents was the default before Home: Home holds it now. Only the
 	 * untouched default goes; one the user pointed elsewhere stays. */
@@ -483,9 +492,14 @@ void generatePanels(const VNode &parent) {
 void generateResourceLaunchers(const VNode &parent) {
 	for (const auto &entry : std::vector<std::pair<QString, QString>>{
 			{ "System Information", "system-information" },
-			{ "Tricks Manager", "extensions-manager" } }) {
+			{ "Extensions Manager", "extensions-manager" } }) {
 		VNode node;
 		node.id = parent.id + "/" + entry.second;
+		/* A registry node of the same id keeps its own name (the user may
+		 * have renamed it); these are only the generated Utilities entries. */
+		if (g_nodes.contains(node.id)) {
+			continue;
+		}
 		node.name = entry.first;
 		node.kind = VKind::Launcher;
 		node.icon = PL_ICON_APPLICATION;

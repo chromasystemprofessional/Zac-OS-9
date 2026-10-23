@@ -46,9 +46,9 @@ public:
 	explicit ResourceListWindow(Page page) : m_page(page) {
 		setAttribute(Qt::WA_DeleteOnClose);
 		setMouseTracking(true);
-		setWindowTitle(page == Page::System ? "System Information" : "Tricks Manager");
+		setWindowTitle(page == Page::System ? "System Information" : "Extensions Manager");
 		setFixedSize(page == Page::System ? QSize(520, 420) : QSize(600, 460));
-		m_title = page == Page::System ? "System Information" : "Tricks Manager";
+		m_title = page == Page::System ? "System Information" : "Extensions Manager";
 		m_list.frame = page == Page::System ? QRect(12, 78, 496, 326) :
 			QRect(12, 96, 240, 320);
 		if (page == Page::Extensions) {
@@ -329,7 +329,7 @@ private:
 		details.description = resource.description;
 		details.metadata = resource.metadata;
 		details.location = category() == Extensions ? "System Folder:Extensions" :
-			category() == LoginItems ? "System Folder:Startup Items" : "Tricks Manager";
+			category() == LoginItems ? "System Folder:Startup Items" : "Extensions Manager";
 		details.access = category() == Extensions ?
 			"Informational only; no kernel module is loaded or unloaded here." :
 			category() == LoginItems ?

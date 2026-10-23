@@ -553,7 +553,7 @@ ResourceDetails resourceDetails(const QString &provider, const QString &key) {
 			entry.key.isEmpty() ? safeDisplayName(key) : entry.name;
 		details.kind = key.isEmpty() ? "virtual collection" : "system extension";
 		details.description = entry.key.isEmpty() ?
-			"Familiar system extensions; open Tricks Manager and choose Show All "
+			"Familiar system extensions; open Extensions Manager and choose Show All "
 			"for every loaded kernel module." : entry.description;
 		return details;
 	}
@@ -563,7 +563,7 @@ ResourceDetails resourceDetails(const QString &provider, const QString &key) {
 			entry.key.isEmpty() ? safeDisplayName(key) : entry.name;
 		details.kind = key.isEmpty() ? "virtual collection" : "disabled system extension";
 		details.description = entry.key.isEmpty() ?
-			"Familiar extensions that are not loaded on this computer; open Tricks Manager "
+			"Familiar extensions that are not loaded on this computer; open Extensions Manager "
 			"and choose Show All for every kernel module." : entry.description;
 		details.access = "Informational only; kernel modules are not loaded or unloaded here.";
 		return details;

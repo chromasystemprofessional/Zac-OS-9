@@ -1,4 +1,4 @@
-/* Tricks Manager's sets (tricksets.cpp). */
+/* Extensions Manager's sets (tricksets.cpp). */
 #include <QCoreApplication>
 #include <QTemporaryDir>
 #include <cstdio>
@@ -26,6 +26,6 @@ int main(int argc, char **argv) {
 	setCurrentTrickSet("Base");
 	CHECK(currentTrickSet() == "Base");
 	CHECK(deleteTrickSet("Base") && trickSetNames() == QStringList({ "All On" }));
-	std::puts("ok: Tricks Manager's sets are saved, read and deleted");
+	std::puts("ok: Extensions Manager's sets are saved, read and deleted");
 	return 0;
 }

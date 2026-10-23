@@ -65,12 +65,15 @@ the `~/Classic` folder are unchanged):
 
 | Mac OS 9 name | ZacOS name |
 |---|---|
-| Extensions Manager | **Tricks Manager** |
 | File Exchange | **File Translator** |
 | Network Browser | **Neighbourhood** |
 | Classic | **Old Dog** (runs the old Mac software) |
 | Energy Saver | **Nap Time** |
 | Platinum (appearance) | **Silver Coat** |
+
+The Extensions Manager kept its Mac OS 9 name: 0.1.54 briefly showed it as
+Tricks Manager, but that was confusing beside the Extensions folder. Its sets
+still live in `~/.config/zacos9/Tricks Sets` for compatibility.
 
 The developer docs (`docs/*.md`, `CLAUDE.md`) still call them by their old
 names in places; the code and what users see use the new ones.
@@ -305,7 +308,7 @@ for), and **About This Computer** keeps showing honest memory use. The
 | **Date & Time**: date/time, time zone, network time, clock options | ✅ | Menu-bar date formats (month-day-year, day-month-year, ISO year-month-day) and optional hourly ZacOS sound are set in the Date & Time panel. |
 | DialAssist, Modem, Remote Access | — | |
 | **Nap Time**: sleep, display sleep | ✅ | Schedule: Start up / Shut down, every day, weekdays or weekends at a time (`/etc/zacos9/schedule` through `zacos9-accounts-helper schedule`): shut-down is a generated systemd timer, start-up the RTC wake alarm, set again at every shut-down by `zacos9-wakealarm.service`. |
-| **Tricks Manager** (sets, item information) | ✅ | Login items and user services with item information and on/off; the Set pop-up saves the current choices as a named set (`~/.config/zacos9/Tricks Sets`), applies one, or deletes it. |
+| **Extensions Manager** (sets, item information) | ✅ | Login items and user services with item information and on/off; the Set pop-up saves the current choices as a named set (`~/.config/zacos9/Tricks Sets`), applies one, or deletes it. |
 | File Translator | ✅ | |
 | File Sharing | ✅ | |
 | **Retriever** (folder pairs) | ✅ | `zacos9-retriever`: folder pairs (`~/.config/zacos9/retriever.conf`), Synchronize Now copies newer files each way with rsync (newest wins, nothing deleted), and says so. Not automatic yet. |
@@ -316,7 +319,7 @@ for), and **About This Computer** keeps showing honest memory use. The
 | Keyboard ▸ **Function Keys** | ✅ | See §3.6. |
 | **Keychain Access** | ✅ | `zacos9-keychain`: the keychains (Secret Service collections), Unlock/Lock, Make Default, and each one's items by name with Remove; The Collar's Keychain module opens it. Passwords aren't shown. |
 | **Toy Box** | ✅ | See §3.2. |
-| **Walkies** (snapshots of network, sound, time zone, printer, startup items) | ✅ | `zacos9-walkies`: places (`~/.config/zacos9/Walkies`) remembering the NetworkManager connection, sound output and volume, time zone, default printer and Tricks Manager set; Switch To restores them (nmcli, pactl, timedatectl, lpoptions, the set's login items and user services). |
+| **Walkies** (snapshots of network, sound, time zone, printer, startup items) | ✅ | `zacos9-walkies`: places (`~/.config/zacos9/Walkies`) remembering the NetworkManager connection, sound output and volume, time zone, default printer and Extensions Manager set; Switch To restores them (nmcli, pactl, timedatectl, lpoptions, the set's login items and user services). |
 | **Memory** (disk cache, virtual memory, Compressed Memory, RAM Disk) | ✅ | See §3.7. |
 | **Monitors**: resolution, pixel size | ✅ | Several screens: Arrangement (drag the screens), the main display (menu bar and icons), each screen's resolution, Mirror Displays (`compositor/src/prefs.c`); the desktop's pattern on the others (`secondarydesktop.cpp`); pop-up tabs on their own screen. Colour depth — . |
 | **Mouse**: tracking, double-click | ✅ | Options: Mouse Tracks (`compositor/src/tracks.c`: six arrows behind the moving pointer, going 50 ms apart) and Thick I-Beam (a `text-thick` cursor zacos9-wm shows for programs that ask for "text" by cursor-shape-v1; Qt 6 programs ask that way and get it (checked with Scribble); ones that draw their own cursor, such as GTK 3, keep the thin one). |
@@ -545,7 +548,7 @@ partial entries retain the remaining work described in the inventory above.
 |---|---|---|---|
 | 4.1 ✅ | **Shutdown Items** and startup/shutdown sounds | `session/`, System Folder | S |
 | 4.2 ✅ | **Shift held at login**: a session without startup items | `session/` | S |
-| 4.3 ✅ | **Tricks Manager sets**: on/off sets for startup items and user services | `lib/extensions.c`, panel | M |
+| 4.3 ✅ | **Extensions Manager sets**: on/off sets for startup items and user services | `lib/extensions.c`, panel | M |
 | 4.4 ✅ | **Nap Time** scheduled start-up and shut-down | `rtcwake` + systemd timer, polkit helper | M |
 | 4.5 ✅ | **Date & Time** formats and hourly chimes | `controlpanel.cpp` | S + S |
 | 4.6 ✅ | **Numbers / Text** panels (locale) | `localectl`, `locale.conf` | S |
