@@ -312,6 +312,7 @@ void prefs_apply(struct plat_server *server) {
 	}
 	apply_layout(server);
 	tablet_map(server); /* the Tablet panel's screen, or a new main display */
+	touch_map(server);
 	view_refresh_fullscreen(server);
 	prefs_write_outputs(server);
 	idle_update(server); /* the Energy Saver panel's timings */

@@ -148,6 +148,14 @@ struct plat_server {
 	struct wl_listener tablet_tool_proximity;
 	struct wl_listener tablet_tool_tip;
 	struct wl_listener tablet_tool_button;
+	/* Touchscreens (touch.c): touch to apps that take wl_touch, a mouse
+	 * to every other. */
+	struct wl_list touchscreens; /* touch.c plat_touch.link */
+	struct wl_listener touch_down;
+	struct wl_listener touch_up;
+	struct wl_listener touch_motion;
+	struct wl_listener touch_cancel;
+	struct wl_listener touch_frame;
 
 	/* Interactive grab state. */
 	enum plat_cursor_mode cursor_mode;
@@ -436,6 +444,8 @@ void input_pointer_motion(struct plat_server *server, uint32_t time);
 /* Mouse-down activation under the pointer. True if it hit a window frame,
  * the compositor's to track, not the client's. */
 bool input_press_focus(struct plat_server *server, uint32_t time_msec);
+/* Tell clients which devices the seat has (pointer, keyboard, touch). */
+void input_update_capabilities(struct plat_server *server);
 
 /* tablet.c: graphics tablets (Wacom and the like) */
 void tablet_init(struct plat_server *server);
@@ -445,6 +455,12 @@ void tablet_new(struct plat_server *server, struct wlr_input_device *device);
 void tablet_map(struct plat_server *server);
 /* "tablet NAME" lines for zacos9-outputs, one per tablet. */
 void tablet_write_status(struct plat_server *server, FILE *f);
+
+/* touch.c: touchscreens */
+void touch_init(struct plat_server *server);
+void touch_new(struct plat_server *server, struct wlr_input_device *device);
+/* Put each touchscreen on its screen; again whenever the screens change. */
+void touch_map(struct plat_server *server);
 
 /* view.c: window behaviour shared by every client type */
 void view_setup(struct plat_view *view, struct plat_server *server,

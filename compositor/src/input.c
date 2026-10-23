@@ -427,13 +427,22 @@ static void server_new_input(struct wl_listener *listener, void *data) {
 	case WLR_INPUT_DEVICE_TABLET:
 		tablet_new(server, device);
 		break;
+	case WLR_INPUT_DEVICE_TOUCH:
+		touch_new(server, device);
+		break;
 	default:
 		break;
 	}
+	input_update_capabilities(server);
+}
 
+void input_update_capabilities(struct plat_server *server) {
 	uint32_t caps = WL_SEAT_CAPABILITY_POINTER;
 	if (!wl_list_empty(&server->keyboards)) {
 		caps |= WL_SEAT_CAPABILITY_KEYBOARD;
+	}
+	if (!wl_list_empty(&server->touchscreens)) {
+		caps |= WL_SEAT_CAPABILITY_TOUCH;
 	}
 	wlr_seat_set_capabilities(server->seat, caps);
 }
@@ -452,8 +461,7 @@ static void new_virtual_keyboard(struct wl_listener *listener, void *data) {
 	struct plat_server *server = wl_container_of(listener, server, new_virtual_keyboard);
 	struct wlr_virtual_keyboard_v1 *vkbd = data;
 	new_keyboard(server, &vkbd->keyboard.base, true);
-	wlr_seat_set_capabilities(server->seat,
-		WL_SEAT_CAPABILITY_POINTER | WL_SEAT_CAPABILITY_KEYBOARD);
+	input_update_capabilities(server);
 }
 
 static bool option_held(struct plat_server *server) {
@@ -1242,8 +1250,13 @@ static void seat_request_set_selection(struct wl_listener *listener, void *data)
 static void seat_request_start_drag(struct wl_listener *listener, void *data) {
 	struct plat_server *server = wl_container_of(listener, server, request_start_drag);
 	struct wlr_seat_request_start_drag_event *event = data;
+	struct wlr_touch_point *point;
 	if (wlr_seat_validate_pointer_grab_serial(server->seat, event->origin, event->serial)) {
 		wlr_seat_start_pointer_drag(server->seat, event->drag, event->serial);
+	} else if (wlr_seat_validate_touch_grab_serial(server->seat, event->origin,
+			event->serial, &point)) {
+		/* A finger's drag in an app that takes touch (touch.c). */
+		wlr_seat_start_touch_drag(server->seat, event->drag, event->serial, point);
 	} else {
 		wlr_data_source_destroy(event->drag->source);
 	}
@@ -1350,6 +1363,7 @@ void input_init(struct plat_server *server) {
 
 	server->seat = wlr_seat_create(server->display, "seat0");
 	tablet_init(server);
+	touch_init(server);
 	server->request_cursor.notify = seat_request_cursor;
 	wl_signal_add(&server->seat->events.request_set_cursor, &server->request_cursor);
 	server->request_set_selection.notify = seat_request_set_selection;

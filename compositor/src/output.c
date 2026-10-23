@@ -124,6 +124,7 @@ static void output_destroy(struct wl_listener *listener, void *data) {
 	wl_list_remove(&output->link);
 	free(output);
 	tablet_map(server); /* off the screen that went */
+	touch_map(server);
 	idle_update(server);
 	struct plat_view *view;
 	wl_list_for_each(view, &server->views, link) {
