@@ -76,9 +76,16 @@ unmount_target() {
 	umount -R "$TARGET" 2>/dev/null || true
 	rmdir "$TARGET" 2>/dev/null || true
 }
+# Frees the disk or partition to be changed (unmounted, hidden from the
+# desktop), and puts that back at the end: zacos9-release-disk.
+release_disk=$(dirname "$0")/zacos9-release-disk
+released=false
 cleanup() {
 	status=$?
 	unmount_target
+	if $released; then
+		"$release_disk" --restore >/dev/null 2>&1 || true
+	fi
 	if [ "$status" != 0 ] && [ -z "$reported" ]; then
 		echo "error ${step_label%...} failed (exit $status)"
 	fi
@@ -255,8 +262,12 @@ if [ "$dev_type" = "part" ]; then
 		fail "No EFI System Partition on $parent_disk. Choose the whole disk instead."
 	fi
 
+	released=true
+	"$release_disk" "$device" || { reported=1; exit 1; }
+
 	step 2 "Formatting partition..."
-	mkfs.ext4 -F -L "$fs_label" "$device" >/dev/null 2>&1
+	mkfs.ext4 -F -L "$fs_label" "$device" >/dev/null 2>&1 ||
+		fail "$device couldn't be formatted: is it still in use?"
 
 	root_part="$device"
 
@@ -279,16 +290,32 @@ else
 	root_part="${device}${part_suffix}3"
 
 	step 1 "Partitioning disk..."
-	wipefs -a "$device" >/dev/null 2>&1 || true
+	# Unmounted, hidden from the desktop and its old signatures erased
+	# (issue #31: an earlier system's partitions, mounted, kept the
+	# kernel from reading the new table).
+	released=true
+	"$release_disk" "$device" || { reported=1; exit 1; }
 	parted -s "$device" mklabel gpt
 	parted -s "$device" mkpart BIOS 1MiB 2MiB
 	parted -s "$device" set 1 bios_grub on
 	parted -s "$device" mkpart ESP fat32 2MiB 514MiB
 	parted -s "$device" set 2 esp on
 	parted -s "$device" mkpart ZacOS ext4 514MiB 100%
-	# Let the kernel re-read the new partition table.
-	partprobe "$device" 2>/dev/null || true
+	# The kernel must read the new table: with the old one still in use,
+	# ${device}2 and 3 could be the old partitions, and formatting them
+	# would be wrong.
+	partprobe "$device" ||
+		fail "The disk's new partitions couldn't be read. Restart the computer and try again"
 	udevadm settle 2>/dev/null || sleep 1
+	for part in "$efi_part" "$root_part"; do
+		tries=0
+		while [ ! -b "$part" ]; do
+			tries=$((tries + 1))
+			[ "$tries" -le 20 ] ||
+				fail "The disk's new partitions didn't appear. Restart the computer and try again"
+			sleep 0.5
+		done
+	done
 
 	step 2 "Formatting partitions..."
 	mkfs.fat -F 32 -n "EFI" "$efi_part" >/dev/null

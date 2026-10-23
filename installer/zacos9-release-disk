@@ -1,0 +1,153 @@
+#!/bin/sh
+# zacos9-release-disk: free a disk or partition for zacos9-install to
+# change, and put things back afterwards.
+#
+#   zacos9-release-disk DEVICE     # before partitioning or formatting
+#   zacos9-release-disk --restore  # after, whether or not it worked
+#
+# A mounted partition can't be erased: wipefs finds it busy, and the kernel
+# won't read a new partition table while an old partition is mounted, so
+# the install stopped at "Partitioning disk..." (issue #31: the live
+# desktop had mounted a Surface Go 2's ChromeOS Flex partitions). So, for
+# DEVICE and everything on it (a whole disk's partitions, a volume opened
+# on one):
+#  1. refuse if the running system or the install medium is on it;
+#  2. hide it from UDisks until --restore (a udev rule, UDISKS_IGNORE), so
+#     nothing mounts the old partitions again, or the new ones mid-install;
+#  3. turn off swap on it, unmount it, close device-mapper volumes on it;
+#  4. for a whole disk, erase the old partitions' and table's signatures
+#     (a partition is formatted by zacos9-install itself).
+# On failure prints "error MESSAGE" (zacos9-install's protocol), exits 1.
+#
+# ZACOS9_UDEV_RULES_DIR and ZACOS9_PROC are for tests.
+set -eu
+
+rules_dir=${ZACOS9_UDEV_RULES_DIR:-/run/udev/rules.d}
+rule=$rules_dir/90-zacos9-install.rules
+proc=${ZACOS9_PROC:-/proc}
+
+fail() {
+	echo "error $*"
+	exit 1
+}
+
+udev_refresh() {
+	udevadm control --reload 2>/dev/null || true
+	udevadm trigger --action=change --subsystem-match=block 2>/dev/null || true
+	udevadm settle 2>/dev/null || true
+}
+
+if [ "${1:-}" = --restore ]; then
+	if [ -f "$rule" ]; then
+		rm -f "$rule"
+		udev_refresh
+	fi
+	exit 0
+fi
+
+[ "$#" = 1 ] || fail "usage: zacos9-release-disk DEVICE | --restore"
+device=$1
+kind=$(lsblk -dn -o TYPE "$device" 2>/dev/null | tr -d ' ')
+[ -n "$kind" ] || fail "Not a block device: $device"
+
+# The name people know a volume by: its label, else the device.
+label() {
+	l=$(lsblk -dn -o LABEL "$1" 2>/dev/null | head -1)
+	printf '%s' "${l:-${1#/dev/}}"
+}
+
+# The programs with a file, folder or the program itself under mount
+# point $1, by name ("bash, php").
+users_of() {
+	found=
+	for p in "$proc"/[0-9]*; do
+		[ "${p##*/}" != "$$" ] || continue
+		for link in "$p/cwd" "$p/root" "$p/exe" "$p"/fd/*; do
+			target=$(readlink "$link" 2>/dev/null) || continue
+			case $target in
+			"$1" | "$1"/*)
+				name=$(cat "$p/comm" 2>/dev/null) || break
+				case ", $found, " in
+				*", $name, "*) ;;
+				*) found=${found:+$found, }$name ;;
+				esac
+				break
+				;;
+			esac
+		done
+	done
+	printf '%s' "$found"
+}
+
+# DEVICE and everything on it, parents first: "PATH TYPE" lines.
+members=$(lsblk -ln -o PATH,TYPE "$device")
+
+# Where $1 is mounted, one a line (names may have spaces).
+mounts_of() {
+	findmnt -ln -o TARGET -S "$1" 2>/dev/null || true
+}
+
+# 1. Never the running system or the medium it started from.
+for m in $(printf '%s\n' "$members" | cut -d' ' -f1); do
+	while IFS= read -r where; do
+		case $where in
+		/ | /run/live/* | /lib/live/mount/* | /cdrom | /usr | /boot | /boot/efi)
+			fail "ZacOS is running from “$(label "$m")”, so it can't be erased."
+			;;
+		esac
+	done <<-EOF
+		$(mounts_of "$m")
+	EOF
+done
+
+# 2. Hidden from UDisks: the desktop shows and mounts nothing on it.
+mkdir -p "$rules_dir"
+{
+	echo "# zacos9-install is changing $device; zacos9-release-disk --restore removes this."
+	echo "SUBSYSTEM==\"block\", ENV{DEVNAME}==\"$device\", ENV{UDISKS_IGNORE}=\"1\""
+	if [ "$kind" = disk ]; then
+		case $device in
+		*[0-9]) parts=${device}p ;;
+		*) parts=$device ;;
+		esac
+		echo "SUBSYSTEM==\"block\", ENV{DEVNAME}==\"$parts[0-9]*\", ENV{UDISKS_IGNORE}=\"1\""
+	fi
+} >"$rule"
+udev_refresh
+
+# 3. Swap off, everything unmounted (the deepest mount first), then the
+# volumes opened on it closed (the last-listed, deepest, first).
+swaps=$(swapon --noheadings --raw --show=NAME 2>/dev/null || true)
+for m in $(printf '%s\n' "$members" | cut -d' ' -f1); do
+	if printf '%s\n' "$swaps" | grep -qx "$m"; then
+		swapoff "$m" || fail "“$(label "$m")” is in use as swap and couldn't be turned off."
+	fi
+	while IFS= read -r where; do
+		[ -n "$where" ] || continue
+		if ! umount "$where" 2>/dev/null; then
+			who=$(users_of "$where")
+			fail "“$(label "$m")” is in use${who:+ by $who}, so it can't be erased. Quit ${who:+that program}${who:-the programs using it} and try again."
+		fi
+	done <<-EOF
+		$(mounts_of "$m" | sort -r)
+	EOF
+done
+printf '%s\n' "$members" | tac | while read -r m type; do
+	case $type in
+	crypt | dm)
+		dmsetup remove "$m" 2>/dev/null ||
+			fail "“$(label "$m")” is open on this disk and couldn't be closed."
+		;;
+	lvm | raid* | md*)
+		fail "$device is part of a $type volume, which the installer can't take apart. Remove it from that volume first."
+		;;
+	esac
+done
+
+# 4. A whole disk: no old filesystem or partition table left to be found.
+if [ "$kind" = disk ]; then
+	for m in $(printf '%s\n' "$members" | awk '$2 == "part" { print $1 }'); do
+		wipefs -a -q "$m" 2>/dev/null || true
+	done
+	wipefs -a -q "$device" || fail "$device couldn't be erased: is it still in use?"
+fi

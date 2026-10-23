@@ -670,7 +670,8 @@ private:
 		m_repair.enabled = !m_busy && v && v->canRepair;
 		/* The startup disk always mounts. */
 		m_automatic.enabled = !m_busy && v && !v->uuid.isEmpty() && !v->mountPoints.contains("/");
-		m_automatic.on = v && volumeMountsAutomatically(v->uuid);
+		m_automatic.on = v && volumeMountsAutomatically(v->uuid,
+			m_health.contains(v->drive) && !m_health.value(v->drive).removable);
 		const Row *r = chosenRow();
 		const bool drive = !m_busy && m_drive >= 0 && !m_planned.live;
 		m_actions[0].enabled = drive && r && r->gap >= 0;

@@ -579,6 +579,20 @@ static void mountIfNeeded(GVolume *v) {
 			return;
 		}
 	}
+	/* The computer's own disks: not USB, not a card or disc. */
+	bool internal = false;
+	if (GDrive *drive = g_volume_get_drive(v)) {
+		internal = !g_drive_is_removable(drive) && !g_drive_is_media_removable(drive);
+		g_object_unref(drive);
+	}
+	char *uuid = g_volume_get_identifier(v, G_VOLUME_IDENTIFIER_KIND_UUID);
+	/* Disk Setup's "Mount automatically", off for this volume; and in the
+	 * live session, off for internal disks until turned on (mountpolicy.h). */
+	const bool automatic = volumeMountsAutomatically(QString::fromUtf8(uuid ? uuid : ""), internal);
+	g_free(uuid);
+	if (internal && !automatic && liveSession()) {
+		return;
+	}
 	if (macFilesystem(key)) {
 		// Image loops are mounted by their owning image operation.
 		if (!key.startsWith("/dev/loop")) {
@@ -589,10 +603,6 @@ static void mountIfNeeded(GVolume *v) {
 	if (!g_volume_can_mount(v)) {
 		return;
 	}
-	/* Disk Setup's "Mount automatically", off for this volume. */
-	char *uuid = g_volume_get_identifier(v, G_VOLUME_IDENTIFIER_KIND_UUID);
-	const bool automatic = volumeMountsAutomatically(QString::fromUtf8(uuid ? uuid : ""));
-	g_free(uuid);
 	if (!automatic) {
 		return;
 	}
