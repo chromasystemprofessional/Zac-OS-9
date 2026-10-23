@@ -285,6 +285,17 @@ when it runs **under X11**. On Wayland it never does, on any desktop. So:
   at 1/scale, and pointer positions are multiplied back. Other X11 windows
   (Classic, Wine, xterm) have scale 1 and are enlarged as before. Override-
   redirect menus follow their program (`_NET_WM_PID`, else the front window).
+  At 1.25x and 1.5x every X11 window, Electron apps included, has scale 1
+  and is enlarged (a little soft): the scaled path is whole-number only.
+- **1.25x and 1.5x** (Monitors' Pixel size; `scale=1.25` or `1.5` in
+  `desktop.conf`, `-S 1.5`). zacos9-wm offers `wp_fractional_scale_v1`, so
+  programs that take it (foot, Firefox, Chromium, GTK 4, Qt 6) draw at
+  exactly the scale and stay sharp; the rest are asked for 2x buffers
+  (`wl_output.scale` 2) and shown smaller. ZacOS's own programs (whose
+  executable is named `zacos9-…`) are never offered the protocol
+  (`global_filter`, `compositor/src/xwayland_output.c`): their pixel art
+  scaled by 1.5 would come out uneven, so it is drawn at 2x and shown
+  smaller, readable but slightly soft. Test: `fractional-scale`.
 - **Xwayland sees outputs in pixels** (`compositor/src/xwayland_output.c`):
   its own `zxdg_output_manager_v1`, hidden from every other client, while
   wlroots' manager is hidden from Xwayland. Without it the X11 root stays at

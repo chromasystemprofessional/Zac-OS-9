@@ -51,9 +51,14 @@ struct plat_server {
 	struct wlr_renderer *renderer;
 	struct wlr_allocator *allocator;
 	struct wlr_compositor *compositor;
-	int output_scale; /* integer HiDPI scale applied to every output */
-	int default_scale; /* from -S / ZACOS9_SCALE, until a panel picks one */
+	/* HiDPI scale applied to every output: 1, 1.25, 1.5, 2 or 3. At 1.25
+	 * and 1.5, programs that take wp_fractional_scale_v1 draw at it
+	 * exactly; the rest (ZacOS's own pixel art among them) draw at 2x and
+	 * are shown smaller. */
+	float output_scale;
+	float default_scale; /* from -S / ZACOS9_SCALE, until a panel picks one */
 	bool scale_explicit; /* -S or ZACOS9_SCALE given: no automatic 2x */
+	struct wlr_fractional_scale_manager_v1 *fractional_scale;
 	/* Mouse and Keyboard panel settings (prefs.c). */
 	double pointer_speed;
 	int double_click_ms;
@@ -446,6 +451,10 @@ void input_pointer_motion(struct plat_server *server, uint32_t time);
 bool input_press_focus(struct plat_server *server, uint32_t time_msec);
 /* Tell clients which devices the seat has (pointer, keyboard, touch). */
 void input_update_capabilities(struct plat_server *server);
+
+/* prefs.c: a scale as written in desktop.conf or given with -S ("1",
+ * "1.25", "1.5", "2", "3", "4"); `fallback` for anything else. */
+float prefs_parse_scale(const char *s, float fallback);
 
 /* tablet.c: graphics tablets (Wacom and the like) */
 void tablet_init(struct plat_server *server);

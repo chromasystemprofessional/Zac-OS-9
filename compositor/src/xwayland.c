@@ -56,11 +56,14 @@ static int cmdline_scale(pid_t pid) {
 }
 
 static int client_scale(struct plat_server *server, struct wlr_xwayland_surface *xsurface) {
-	if (server->output_scale <= 1) {
+	/* Only whole-number scales: at 1.25 and 1.5 every X11 window is drawn
+	 * at 1x and enlarged. */
+	const int scale = (int)server->output_scale;
+	if (scale <= 1 || (float)scale != server->output_scale) {
 		return 1;
 	}
 	if (xsurface->pid > 0) {
-		return cmdline_scale(xsurface->pid) == server->output_scale ? server->output_scale : 1;
+		return cmdline_scale(xsurface->pid) == scale ? scale : 1;
 	}
 	/* A menu without _NET_WM_PID belongs to the program in front. */
 	struct plat_view *front = server->focused_view;

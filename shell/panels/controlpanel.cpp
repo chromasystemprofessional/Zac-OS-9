@@ -852,13 +852,16 @@ private:
 struct Screen {
 	QString name;
 	QSize px;
-	int scale = 1;
+	double scale = 1;
 	bool nested = false;
 	QPoint pos;
 	bool main = false;
 	QList<QSize> modes;
 
-	QSize logical() const { return QSize(px.width() / std::max(scale, 1), px.height() / std::max(scale, 1)); }
+	QSize logical() const {
+		const double s = std::max(scale, 1.0);
+		return QSize(qRound(px.width() / s), qRound(px.height() / s));
+	}
 	QRect rect() const { return QRect(pos, logical()); }
 };
 
@@ -868,7 +871,8 @@ public:
 		readOutputs();
 		build();
 		/* Hint Bubbles. */
-		m_scale.hint = "Sets how big everything on the screen is drawn: each dot as one, two or three screen pixels.";
+		m_scale.hint = "Sets how big everything on the screen is drawn. ZacOS's own windows are "
+			"sharpest at Normal, 2× and 3×; at 1.25× and 1.5× they are a little soft.";
 		if (m_mirror) {
 			m_mirror->hint = "Shows the same picture on every screen.";
 		}
@@ -976,15 +980,24 @@ private:
 			refreshSoon();
 		};
 
-		/* Pixel size: whole-number scales only, so the pixel art stays sharp. */
+		/* Pixel size. At 1.25 and 1.5 programs that can draw at any size do
+		 * (wp_fractional_scale_v1); ZacOS's own pixel art is drawn at 2x and
+		 * shown smaller (compositor/src/prefs.c). */
+		static const struct { double scale; const char *value, *label; } scales[] = {
+			{ 1, "1", "Normal" }, { 1.25, "1.25", "1.25×" }, { 1.5, "1.5", "1.5×" },
+			{ 2, "2", "Large (2×)" }, { 3, "3", "Larger (3×)" },
+		};
 		m_scale = PanelRadios();
 		const int rx = M + IN + 190, ry = resTop + 1 + PL_GROUP_MARGIN_TOP + 18;
-		m_scale.add("Normal", QPoint(rx, ry));
-		m_scale.add("Large (2×)", QPoint(rx, ry + 20));
-		m_scale.add("Larger (3×)", QPoint(rx, ry + 40));
-		m_scale.selected = std::clamp(m_currentScale, 1, 3) - 1;
+		m_scale.selected = 0;
+		for (int i = 0; i < 5; i++) {
+			m_scale.add(scales[i].label, QPoint(rx, ry + 20 * i));
+			if (qAbs(scales[i].scale - m_currentScale) < 0.01) {
+				m_scale.selected = i;
+			}
+		}
 		m_scale.changed = [this](int i) {
-			setInt("scale", i + 1);
+			pl_setting_set("scale", scales[i].value);
 			refreshSoon();
 		};
 		m_radios.clear();
@@ -1249,7 +1262,7 @@ private:
 					d.name = QString::fromUtf8(w.value(1));
 					const QList<QByteArray> wh = w.value(2).split('x');
 					d.px = QSize(wh.value(0).toInt(), wh.value(1).toInt());
-					d.scale = w.value(4).toInt();
+					d.scale = w.value(4).toDouble(); /* 1, 1.25, 1.5, 2, 3 */
 					d.nested = w.value(6) == "1";
 					d.pos = QPoint(w.value(8).toInt(), w.value(10).toInt());
 					d.main = w.value(12) == "1";
@@ -1297,7 +1310,7 @@ private:
 	QList<Screen> m_displays;
 	QList<QSize> m_modes; /* with no screens published */
 	QSize m_size;
-	int m_currentScale = 1;
+	double m_currentScale = 1;
 	bool m_nested = false;
 	bool m_mirrored = false;
 	int m_sel = 0;

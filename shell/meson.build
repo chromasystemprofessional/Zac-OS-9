@@ -1568,6 +1568,15 @@ test('spring-space', find_program('python3'),
   args: [files('../compositor/tests/test_spring_space.py'), compositor_exe, menubar_exe, finder_exe, vptr_exe],
   timeout: 120,
 )
+# Monitors' 1.25x and 1.5x: wp_fractional_scale_v1, but not for ZacOS's own programs.
+globals_client = executable('test-globals-client',
+  '../compositor/tests/globals_client.c',
+  dependencies: [wayland_client],
+)
+test('fractional-scale', find_program('python3'),
+  args: [files('../compositor/tests/test_fractional_scale.py'), compositor_exe, globals_client],
+  timeout: 60,
+)
 # Keyboard layouts: ⌘-Space and the keyboard menu (input.c, kbmenu.c).
 test('keyboard-layout-switch', find_program('python3'),
   args: [files('../compositor/tests/test_keyboard_layouts.py'), compositor_exe, menubar_exe, vptr_exe],

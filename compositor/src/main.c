@@ -12,6 +12,7 @@
 #include <wlr/types/wlr_server_decoration.h>
 #include <wlr/types/wlr_subcompositor.h>
 #include <wlr/types/wlr_viewporter.h>
+#include <wlr/types/wlr_fractional_scale_v1.h>
 #include <wlr/types/wlr_xdg_output_v1.h>
 #include <wlr/util/log.h>
 
@@ -99,15 +100,10 @@ static void share_our_data(void) {
 	setenv("XDG_DATA_DIRS", dirs, 1);
 }
 
-static int parse_scale(const char *s) {
-	int scale = s ? atoi(s) : 1;
-	return scale >= 1 && scale <= 4 ? scale : 1;
-}
-
 int main(int argc, char *argv[]) {
 	enum wlr_log_importance log_level = WLR_ERROR;
 	char *startup_cmd = NULL;
-	int scale = parse_scale(getenv("ZACOS9_SCALE"));
+	float scale = prefs_parse_scale(getenv("ZACOS9_SCALE"), 1);
 	bool scale_explicit = getenv("ZACOS9_SCALE") != NULL;
 
 	int c;
@@ -117,7 +113,7 @@ int main(int argc, char *argv[]) {
 			log_level = WLR_DEBUG;
 			break;
 		case 'S':
-			scale = parse_scale(optarg);
+			scale = prefs_parse_scale(optarg, 1);
 			scale_explicit = true;
 			break;
 		case 's':
@@ -164,6 +160,9 @@ int main(int argc, char *argv[]) {
 	server.compositor = wlr_compositor_create(server.display, 6, server.renderer);
 	wlr_subcompositor_create(server.display);
 	wlr_viewporter_create(server.display);
+	/* 1.25 and 1.5: programs that take it draw at exactly the scale
+	 * (hidden from ZacOS's own, which draw at 2x: xwayland_output.c). */
+	server.fractional_scale = wlr_fractional_scale_manager_v1_create(server.display, 1);
 	wlr_data_device_manager_create(server.display);
 	/* wl-copy and wl-paste (Screen Snapshot puts its picture on the
 	 * clipboard) set and read the clipboard without a window of their own. */

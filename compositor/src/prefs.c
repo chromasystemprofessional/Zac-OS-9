@@ -7,6 +7,7 @@
  * For the Monitors panel we also publish each screen's state and modes
  * in $XDG_RUNTIME_DIR/zacos9-outputs-$WAYLAND_DISPLAY:
  *   output NAME WxH scale S nested 0|1 x X y Y main 0|1
+ * (S as a decimal: 1, 1.25, 1.5, 2, 3)
  *   mode WxH@mHz
  * and, once, "mirror 0|1", then "tablet NAME" for each tablet. X and Y are the screen's place in the layout
  * (logical pixels: the size divided by the scale).
@@ -16,6 +17,7 @@
  * size and place; "mirror=1" puts every screen at the same place.
  */
 #define _GNU_SOURCE
+#include <math.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -23,6 +25,7 @@
 #include <sys/inotify.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <wlr/types/wlr_fractional_scale_v1.h>
 #include <wlr/backend/wayland.h>
 #include <wlr/backend/x11.h>
 #include <wlr/types/wlr_keyboard.h>
@@ -55,6 +58,31 @@ static int setting_int(const char *key, int fallback, int min, int max) {
 	char *end;
 	long n = strtol(v, &end, 10);
 	return *end || n < min || n > max ? fallback : (int)n;
+}
+
+float prefs_parse_scale(const char *s, float fallback) {
+	static const float scales[] = { 1, 1.25f, 1.5f, 2, 3, 4 };
+	if (!s) {
+		return fallback;
+	}
+	char *end;
+	const double v = strtod(s, &end);
+	if (end == s || *end) {
+		return fallback;
+	}
+	for (size_t i = 0; i < sizeof(scales) / sizeof(scales[0]); i++) {
+		if (v == scales[i]) {
+			return scales[i];
+		}
+	}
+	return fallback;
+}
+
+/* The Monitors panel's scale; 4 is only for -S. */
+static float setting_scale(float fallback) {
+	char v[32];
+	const float scale = pl_setting("scale", v, sizeof(v)) ? prefs_parse_scale(v, fallback) : fallback;
+	return scale <= 3 ? scale : fallback;
 }
 
 int prefs_repeat_rate(void) {
@@ -121,8 +149,8 @@ void prefs_write_outputs(struct plat_server *server) {
 		struct wlr_output *o = output->wlr_output;
 		struct wlr_box box = { 0 };
 		wlr_output_layout_get_box(server->output_layout, o, &box);
-		fprintf(f, "output %s %dx%d scale %d nested %d x %d y %d main %d\n", o->name, o->width,
-			o->height, (int)o->scale, nested(o) ? 1 : 0, box.x, box.y, output == main ? 1 : 0);
+		fprintf(f, "output %s %dx%d scale %g nested %d x %d y %d main %d\n", o->name, o->width,
+			o->height, (double)o->scale, nested(o) ? 1 : 0, box.x, box.y, output == main ? 1 : 0);
 		struct wlr_output_mode *mode;
 		wl_list_for_each(mode, &o->modes, link) {
 			fprintf(f, "mode %dx%d@%d\n", mode->width, mode->height, mode->refresh);
@@ -134,23 +162,26 @@ void prefs_write_outputs(struct plat_server *server) {
 }
 
 static void prefer_scale(struct wlr_scene_buffer *buffer, int sx, int sy, void *data) {
+	const float scale = *(float *)data;
 	struct wlr_scene_surface *scene_surface = wlr_scene_surface_try_from_buffer(buffer);
 	if (scene_surface) {
-		wlr_surface_set_preferred_buffer_scale(scene_surface->surface, *(int *)data);
+		/* 1.5: 2x buffers for those without wp_fractional_scale_v1. */
+		wlr_surface_set_preferred_buffer_scale(scene_surface->surface, (int32_t)ceilf(scale));
+		wlr_fractional_scale_v1_notify_scale(scene_surface->surface, scale);
 	}
 }
 
 /* wlroots tells a surface its preferred buffer scale when it enters an
  * output, not when the output's scale changes; Qt then draws at the new
  * scale but labels its buffers with the old one. Tell everyone. */
-static void refresh_surface_scales(struct plat_server *server, int scale) {
+static void refresh_surface_scales(struct plat_server *server, float scale) {
 	wlr_scene_node_for_each_buffer(&server->scene->tree.node, prefer_scale, &scale);
 }
 
 /* A screen's scale until one is chosen: 2x when it is dense enough
  * (180 dpi and up, such as a Retina laptop) that 1x pixels would be too
  * small to use, so it shows a classic-sized desktop at double size. */
-static int automatic_scale(struct plat_server *server, struct wlr_output *o) {
+static float automatic_scale(struct plat_server *server, struct wlr_output *o) {
 	if (server->scale_explicit || nested(o) || o->phys_width <= 0) {
 		return server->default_scale;
 	}
@@ -165,8 +196,8 @@ static void apply_output(struct plat_server *server, struct plat_output *output)
 	wlr_output_state_init(&state);
 	bool changed = false;
 
-	const int scale = setting_int("scale", automatic_scale(server, o), 1, 3);
-	if ((int)o->scale != scale) {
+	const float scale = setting_scale(automatic_scale(server, o));
+	if (o->scale != scale) {
 		wlr_output_state_set_scale(&state, scale);
 		changed = true;
 	}
