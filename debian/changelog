@@ -1,3 +1,11 @@
+zacos9 (1.0.14) trixie; urgency=medium
+
+  * Monitors offers 1.25× and 1.5× pixel sizes: programs that can draw at
+    any size (Firefox, Chromium, GTK 4, Qt 6) stay sharp at them, while
+    ZacOS's own windows are drawn at 2× and shown smaller.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Fri, 23 Oct 2026 15:45:39 -0400
+
 zacos9 (1.0.13) trixie; urgency=medium
 
   * Extensions Manager turns curated extensions on or off for start-up;
