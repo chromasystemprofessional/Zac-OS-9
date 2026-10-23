@@ -259,11 +259,18 @@ int main(int argc, char **argv) {
 	QStringList apps = namesIn(vfsPathFor("applications"));
 	const QString systemFolder = vfsPathFor("system-folder");
 	const QStringList systemNames = namesIn(systemFolder);
-	for (const QString name : { "Sounds", "Startup Items", "Application Support",
-			"Device Drivers", "Network", "System Logs", "Software Components",
-			"Extensions", "System Information", "Tricks Manager", "Favorites" }) {
+	for (const QString name : { "Sounds", "Startup Items", "Shutdown Items",
+			"Application Support", "Device Drivers", "Network", "System Logs",
+			"Software Components", "Extensions", "Extensions (Disabled)",
+			"Zac Menu Items", "System Information", "Tricks Manager", "Favorites" }) {
 		check(systemNames.contains(name), "System Folder contains " + name);
 	}
+	check(vfsOpensAs(vfsPathFor("system-folder/shutdown-items")) ==
+			dataHome + "/zacos9/Shutdown Items",
+		"Shutdown Items stands for the folder zacos9-shutdown-items runs");
+	check(vfsOpensAs(vfsPathFor("system-folder/zac-menu-items")) ==
+			root + "/config/zacos9/ZacOS 9 Menu Items",
+		"Zac Menu Items stands for the folder the Zac menu reads");
 	check(pathNamed(vfsPathFor("system-folder/utilities"), "System Information") != QString() &&
 		pathNamed(vfsPathFor("system-folder/utilities"), "Tricks Manager") != QString(),
 		"the trusted System Information and Tricks Manager launchers are also in Utilities");
@@ -353,6 +360,9 @@ int main(int argc, char **argv) {
 		"System Information reports installed version and the required hardware/system fields");
 	check(!extensionInformation().isEmpty(),
 		"Extensions discovery reports loaded drivers or an explicit unavailable state");
+	const QString disabledExtensions = vfsPathFor("system-folder/extensions-disabled");
+	check(!namesIn(disabledExtensions).isEmpty(),
+		"Extensions (Disabled) always lists extensions or an explicit empty state");
 	check(vfsLaunch(vfsPathFor("system-folder/system-information")) &&
 		vfsLaunch(vfsPathFor("system-folder/extensions-manager")),
 		"the only built-in launch actions are the two trusted provider windows");
@@ -721,6 +731,13 @@ int main(int argc, char **argv) {
 		"Get Info on Home reads its real directory");
 	check(vfsRealCounterpart(vfsPathFor("system-folder")).isEmpty(),
 		"a curated folder stands for nothing on disk");
+	QStringList folderInfo;
+	QString folderKind, folderLocation, folderSource, folderAccess;
+	check(vfsResourceDetails(vfsPathFor("system-folder"), &folderInfo, &folderKind,
+			&folderLocation, &folderSource, &folderAccess) && folderKind == "system folder" &&
+			folderInfo.join('\n').contains("Version: 0.1.27-fixture") &&
+			folderInfo.join('\n').contains("Package ownership: ZacOS 9"),
+		"Get Info on the System Folder shows its version and origin");
 
 	/* ---- folders standing for real directories ------------------------ */
 	const QString documents = vfsOpensAs(vfsPathFor("home"));
@@ -1068,6 +1085,49 @@ int main(int argc, char **argv) {
 		check(enclosingFolder(home) == vfsRoot(), "the home folder's enclosing folder is the startup disk");
 		check(folderTitle(home + "/Desktop/Stuff") == "Stuff", "a real folder shows its name");
 		check(enclosingFolder("/").isEmpty(), "and Unix (/) is a disk's top");
+	}
+
+	/* ---- mounted ZacOS 9 disks ------------------------------------------ */
+	{
+		const QString external = root + "/external-hd";
+		QDir().mkpath(external + "/usr/share/applications");
+		QDir().mkpath(external + "/usr/lib");
+		QDir().mkpath(external + "/usr/bin");
+		QDir().mkpath(external + "/usr/share/fonts");
+		QDir().mkpath(external + "/etc/xdg/autostart");
+		QDir().mkpath(external + "/home/alice/Documents");
+		vfsSetZacosVolumes({ { external, "External HD", "0.1.70" } });
+		const QString disk = vfsZacosVolumeRoot(external);
+		check(!disk.isEmpty() && vfsIsZacosVolumeRoot(disk),
+			"a mounted ZacOS 9 disk has its own Macintosh root");
+		check(displayName(disk) == "External HD" && folderTitle(disk) == "External HD",
+			"the disk is named from its own disk-name");
+		check(namesIn(disk) == QStringList({ "System Folder", "Applications", "Home" }),
+			"the disk root shows Applications, System Folder and Home, not Unix");
+		check(!vfsCanRename(disk) && !vfsAcceptsDrops(disk) && !vfsSetLabel(disk, 2),
+			"the mounted disk's view is read-only");
+		const QString system = pathNamed(disk, "System Folder");
+		const QString extensions = pathNamed(system, "Extensions");
+		check(!system.isEmpty() && !extensions.isEmpty() &&
+			vfsOpensAs(extensions) == external + "/usr/lib",
+			"its System Folder maps Extensions onto that disk");
+		check(vfsOpensAs(pathNamed(disk, "Applications")) == external + "/usr/share/applications" &&
+			vfsOpensAs(pathNamed(disk, "Home")) == external + "/home/alice",
+			"Applications and Home open real folders on that disk");
+		check(enclosingFolder(disk).isEmpty() &&
+			folderChain(extensions) == QStringList({ extensions, system, disk }),
+			"the mounted disk is the top of its own folder chain");
+		check(vfsPathBacking(external + "/usr/lib") == extensions,
+			"a real folder on the disk goes back up through its Macintosh view");
+		QStringList info;
+		QString kind, location, source, access;
+		check(vfsResourceDetails(disk, &info, &kind, &location, &source, &access) &&
+			kind.contains("disk") && location == "Desktop" &&
+			info.join('\n').contains("Version: 0.1.70"),
+			"Get Info presents the mounted ZacOS disk and its version");
+		vfsSetZacosVolumes({});
+		check(vfsZacosVolumeRoot(external).isEmpty() && !vfsNode(disk),
+			"unmounting removes the disk's Macintosh view");
 	}
 
 	QTextStream(stdout) << (fails ? QString("%1 failed\n").arg(fails)

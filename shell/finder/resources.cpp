@@ -21,6 +21,7 @@ namespace {
 const QStringList providers = {
 	"sounds", "startup-items", "application-support", "device-drivers",
 	"network", "system-logs", "software-components", "extensions",
+	"extensions-disabled",
 };
 
 QString fixtureRoot() {
@@ -223,7 +224,7 @@ QString distroName() {
 	return QSysInfo::prettyProductName();
 }
 
-QString installedZacOSVersion() {
+QString detectZacOSVersion() {
 	QString statusPath = "/var/lib/dpkg/status";
 #ifdef ZACOS9_RESOURCE_TESTING
 	if (!fixtureRoot().isEmpty()) {
@@ -267,6 +268,10 @@ QString cpuName() {
 }
 
 } // namespace
+
+QString installedZacOSVersion() {
+	return detectZacOSVersion();
+}
 
 QString resourceTestFixtureRoot() {
 	return fixtureRoot();
@@ -382,6 +387,25 @@ std::vector<SystemResource> resourceChildren(const QString &provider, const QStr
 		if (out.empty()) {
 			add("none", "No extensions found", ResourceType::Information,
 				"information", "The kernel did not report any familiar extensions.");
+		}
+		return out;
+	}
+
+	if (provider == "extensions-disabled") {
+		for (const ExtensionEntry &entry : disabledExtensions(loadedModuleNames(),
+				moduleStartupNames())) {
+			add(entry.key, entry.name, ResourceType::Information,
+				"disabled system extension", entry.description,
+				{ "Status: not loaded",
+					"Starts: " + QString(entry.startup ?
+						"at next startup (modules-load.d)" :
+						"only when its hardware is found"),
+					"Kernel modules: " + entry.modules.join(", ") });
+			out.back().icon = entry.icon;
+		}
+		if (out.empty()) {
+			add("none", "No disabled extensions found", ResourceType::Information,
+				"information", "Every familiar extension in the catalog is loaded.");
 		}
 		return out;
 	}
@@ -533,6 +557,17 @@ ResourceDetails resourceDetails(const QString &provider, const QString &key) {
 			"for every loaded kernel module." : entry.description;
 		return details;
 	}
+	if (provider == "extensions-disabled") {
+		const ExtensionEntry entry = extensionEntry(key);
+		details.name = key.isEmpty() ? QStringLiteral("Extensions (Disabled)") :
+			entry.key.isEmpty() ? safeDisplayName(key) : entry.name;
+		details.kind = key.isEmpty() ? "virtual collection" : "disabled system extension";
+		details.description = entry.key.isEmpty() ?
+			"Familiar extensions that are not loaded on this computer; open Tricks Manager "
+			"and choose Show All for every kernel module." : entry.description;
+		details.access = "Informational only; kernel modules are not loaded or unloaded here.";
+		return details;
+	}
 	if (provider == "device-drivers") {
 		details.name = key.isEmpty() ? QStringLiteral("Device Drivers") : safeDisplayName(key);
 		details.kind = key.isEmpty() ? "virtual collection" : "loaded kernel module";
@@ -556,7 +591,7 @@ ResourceDetails resourceDetails(const QString &provider, const QString &key) {
 
 QStringList systemInformation() {
 	QStringList lines;
-	QString version = installedZacOSVersion();
+	QString version = detectZacOSVersion();
 	if (version.isEmpty()) {
 		version = boundedText("/etc/zacos9/version", 128).trimmed();
 	}

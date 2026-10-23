@@ -18,6 +18,7 @@
 #include "tricksets.h"
 #include "autostart.h"
 #include "icons.h"
+#include "infowindow.h"
 #include "panelkit.h"
 #include "pixels.h"
 #include "resources.h"
@@ -49,7 +50,7 @@ public:
 		setFixedSize(page == Page::System ? QSize(520, 420) : QSize(600, 460));
 		m_title = page == Page::System ? "System Information" : "Tricks Manager";
 		m_list.frame = page == Page::System ? QRect(12, 78, 496, 326) :
-			QRect(12, 96, 240, 352);
+			QRect(12, 96, 240, 320);
 		if (page == Page::Extensions) {
 			m_showAll = PanelCheckbox("Show All", QPoint(500, 73));
 			m_showAll.toggled = [this](bool) { loadCategory(); };
@@ -57,9 +58,11 @@ public:
 			m_categories.add("Login Items", QPoint(110, 73));
 			m_categories.add("Background Services", QPoint(214, 73));
 			m_categories.changed = [this](int) { loadCategory(); };
-			m_toggle = PanelButton("Turn Off", QRect(270, 410, 150, 20));
+			m_info = PanelButton("Item Information…", QRect(12, 424, 150, 20));
+			m_info.clicked = [this] { showSelectedInfo(); };
+			m_toggle = PanelButton("Turn Off", QRect(270, 424, 150, 20));
 			m_toggle.clicked = [this] { toggleSelected(); };
-			m_run = PanelButton("Stop", QRect(430, 410, 150, 20));
+			m_run = PanelButton("Stop", QRect(430, 424, 150, 20));
 			m_run.clicked = [this] { runSelected(); };
 			m_list.picked = [this](int) { updateButtons(); };
 			/* Mac OS 9's Selected Set: named on/off choices, applied at once. */
@@ -91,6 +94,7 @@ protected:
 		if (m_page == Page::Extensions) {
 			m_set.paint(&pixels.c);
 			m_categories.paint(&pixels.c);
+			m_info.paint(&pixels.c);
 			if (category() == Extensions) {
 				m_showAll.paint(&pixels.c);
 			} else {
@@ -108,6 +112,9 @@ protected:
 	void keyPressEvent(QKeyEvent *event) override {
 		if ((event->modifiers() & Qt::ControlModifier) && event->key() == Qt::Key_W) {
 			close();
+		} else if (m_page == Page::Extensions &&
+				(event->modifiers() & Qt::ControlModifier) && event->key() == Qt::Key_I) {
+			showSelectedInfo();
 		} else if (m_list.key(event->key(), event->text())) {
 			update();
 		}
@@ -149,6 +156,7 @@ private:
 			return true;
 		}
 		bool hit = m_categories.press(pos);
+		hit = hit || m_info.press(pos);
 		if (category() == Extensions) {
 			return hit || m_showAll.press(pos);
 		}
@@ -156,6 +164,7 @@ private:
 	}
 	bool moveExtras(QPoint pos) {
 		bool hit = m_categories.move(pos);
+		hit = hit || m_info.move(pos);
 		if (category() == Extensions) {
 			return hit || m_showAll.move(pos);
 		}
@@ -163,6 +172,7 @@ private:
 	}
 	bool releaseExtras(QPoint pos) {
 		bool hit = m_categories.release(pos);
+		hit = hit || m_info.release(pos);
 		if (category() == Extensions) {
 			return hit || m_showAll.release(pos);
 		}
@@ -226,6 +236,7 @@ private:
 			SystemResource r;
 			r.key = e.id;
 			r.name = e.enabled ? e.name : e.name + " (off)";
+			r.kind = "login item";
 			r.icon = PL_ICON_APPLICATION;
 			r.description = e.description.isEmpty() ? "A login item." : e.description;
 			r.metadata = { QString("Status: ") + (e.enabled ? "opens at login" :
@@ -266,6 +277,7 @@ private:
 			SystemResource r;
 			r.key = u.unit;
 			r.name = u.unit.chopped(8);
+			r.kind = "background service";
 			r.icon = PL_ICON_EXT_GENERIC;
 			r.description = u.description.isEmpty() ? "A background service." : u.description;
 			r.metadata = { "Running now: " + QString(u.activeState == "active" ? "yes" : "no"),
@@ -294,6 +306,7 @@ private:
 		const int row = m_list.state.selected;
 		const bool valid = row >= 0 && row < int(m_state.size());
 		const RowState st = valid ? m_state[size_t(row)] : RowState();
+		m_info.enabled = valid;
 		m_toggle.enabled = st.canToggle && !m_serviceActionPending;
 		m_toggle.label = std::make_unique<Text>(category() == Services ?
 			(st.on ? "Don't Start at Login" : "Start at Login") :
@@ -302,6 +315,29 @@ private:
 		m_run.label = std::make_unique<Text>(st.running ? "Stop Now" : "Start Now", 150,
 			PL_FONT_SYSTEM);
 		update();
+	}
+
+	void showSelectedInfo() {
+		const int row = m_list.state.selected;
+		if (row < 0 || row >= int(m_resources.size())) {
+			return;
+		}
+		const SystemResource &resource = m_resources[size_t(row)];
+		ResourceDetails details;
+		details.name = resource.name;
+		details.kind = resource.kind;
+		details.description = resource.description;
+		details.metadata = resource.metadata;
+		details.location = category() == Extensions ? "System Folder:Extensions" :
+			category() == LoginItems ? "System Folder:Startup Items" : "Tricks Manager";
+		details.access = category() == Extensions ?
+			"Informational only; no kernel module is loaded or unloaded here." :
+			category() == LoginItems ?
+				"Changes affect only your account and take effect at your next login." :
+				"Changes affect only your account's user services.";
+		const QString path = QStringLiteral("tricks-manager:") +
+			QString::number(int(category())) + ':' + resource.key;
+		InfoWindow::openVirtual(path, resource.icon, resource.name, details);
 	}
 
 	void toggleSelected() {
@@ -482,7 +518,7 @@ private:
 
 	Page m_page;
 	PanelRadios m_categories;
-	PanelButton m_toggle, m_run;
+	PanelButton m_info, m_toggle, m_run;
 	std::vector<RowState> m_state;
 	QFileSystemWatcher m_watcher;
 	QTimer m_reload;

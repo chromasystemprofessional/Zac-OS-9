@@ -84,6 +84,12 @@ static bool folderExists(const QString &path) {
 }
 
 FolderWindow *FolderWindow::open(const QString &path) {
+	/* A mounted ZacOS 9 disk opens as its Macintosh view, not its Unix
+	 * root, wherever the path came from. */
+	const QString mac = vfsZacosVolumeRoot(path);
+	if (!mac.isEmpty() && mac != path) {
+		return open(mac);
+	}
 	const QString key = windowKey(path);
 	FolderWindow *w = openWindows().value(key);
 	if (w) {

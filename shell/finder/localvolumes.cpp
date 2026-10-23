@@ -128,9 +128,61 @@ std::vector<LocalVolume> localVolumeMacNames(const QByteArray &record,
 		if (QFileInfo(path).absolutePath() != container || !mounted.contains(path) || label.isEmpty()) {
 			continue;
 		}
-		volumes.push_back({ label, path, true, info.value("device").toString() });
+		volumes.push_back({ label, path, true, info.value("device").toString(), false, QString() });
 	}
 	return volumes;
+}
+
+/* A small, bounded read from a mounted disk. The disk is untrusted: never
+ * read an unbounded file from it, and use only these two known paths. */
+static QString readMountedFile(const QString &path, qsizetype limit) {
+	QFile file(path);
+	if (!file.open(QIODevice::ReadOnly)) {
+		return {};
+	}
+	return QString::fromUtf8(file.read(limit));
+}
+
+bool localVolumeZacosInfo(const QString &mountPath, QString *name, QString *version) {
+	const QString root = QDir::cleanPath(mountPath);
+	const QString named = readMountedFile(root + "/etc/zacos9/disk-name", 512);
+	const QString candidate = named.section('\n', 0, 0).trimmed();
+	if (candidate.isEmpty()) {
+		return false;
+	}
+	/* The installer writes disk-name only after installing the zacos9
+	 * package, so it is the cheap marker. Confirm it with dpkg's own record
+	 * rather than trusting a name alone. */
+	const QString status = readMountedFile(root + "/var/lib/dpkg/status", 16 * 1024 * 1024);
+	QString package, state, packageVersion;
+	const auto installed = [&] {
+		return package == "zacos9" && state == "install ok installed" &&
+			!packageVersion.isEmpty();
+	};
+	for (const QString &line : status.split('\n')) {
+		if (line.startsWith("Package: ")) {
+			if (installed()) {
+				break;
+			}
+			package = line.mid(9).trimmed();
+			state.clear();
+			packageVersion.clear();
+		} else if (package == "zacos9" && line.startsWith("Version: ")) {
+			packageVersion = line.mid(9).trimmed();
+		} else if (package == "zacos9" && line.startsWith("Status: ")) {
+			state = line.mid(8).trimmed();
+		}
+	}
+	if (!installed()) {
+		return false;
+	}
+	if (name) {
+		*name = candidate.left(128);
+	}
+	if (version) {
+		*version = packageVersion;
+	}
+	return true;
 }
 
 std::vector<LocalVolume> localVolumes() {
@@ -177,6 +229,11 @@ std::vector<LocalVolume> localVolumes() {
 			: QFileInfo(path).fileName();
 		g_free(rawName);
 		v.ejectable = g_mount_can_eject(mount) || g_volume_can_eject(vol);
+		QString zacosName;
+		if (localVolumeZacosInfo(path, &zacosName, &v.zacosVersion)) {
+			v.zacos = true;
+			v.name = zacosName;
+		}
 		g_object_unref(vol);
 		out.push_back(std::move(v));
 	}
@@ -195,7 +252,7 @@ std::vector<LocalVolume> localVolumes() {
 	}
 	/* The Memory control panel's RAM Disk, for the user it belongs to. */
 	if (mounted.contains(RAM_DISK) && QFileInfo(RAM_DISK).isReadable()) {
-		out.push_back({ "RAM Disk", RAM_DISK, false, QString() });
+		out.push_back({ "RAM Disk", RAM_DISK, false, QString(), false, QString() });
 	}
 	const QDir records("/run/media/zacos9-mac/" + QString::number(getuid()));
 	for (const QString &name : records.entryList({ "*.json" }, QDir::Files | QDir::NoSymLinks)) {
@@ -243,7 +300,8 @@ std::vector<LocalVolume> localVolumes() {
 		}
 		if (!shown) {
 			const QString device = info.value("device").toString();
-			out.push_back({ "Mac Disk (" + QFileInfo(device).fileName() + ")", path, true, device });
+			out.push_back({ "Mac Disk (" + QFileInfo(device).fileName() + ")", path, true, device,
+				false, QString() });
 		}
 	}
 	return out;
