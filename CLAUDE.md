@@ -78,7 +78,7 @@ AFP_PASSWORD=macpass tests/sharing/afp-client.sh 127.0.0.1:5548 "Macintosh HD" "
 - Debug tracing: `ZACOS9_AFP_DEBUG=1 build/network/zacos9-afp mount ...`
 - **Never use `QProcess::waitForFinished()` in this codebase.** It deadlocked live in a Qt/Wayland GUI process even when the child process had already exited cleanly (confirmed from the server's own log). Use the `processEvents()`-loop pattern (`runSharingHelper`, `runAppstoreHelper`, `waitForProcess` in `shell/network/afpclient.cpp`) everywhere instead.
 - `zacos9-afp`'s own argument parser doesn't recognize `--` as an end-of-options marker — it reads it as an unknown flag and refuses. Don't add one when building its command line.
-- `avahi-browse` takes at most one service type per invocation (two args = "Too many arguments", browses nothing); use `-a` and filter client-side. Also needs `-k` or it substitutes a friendly name for the type even with `-p`.
+- `avahi-browse` takes at most one service type per invocation (two args = "Too many arguments", browses nothing). Start one process per service type with `-k -p -r -t`, in parallel. Avoid `-a`: it is slow enough to blow the scan budget and can leave only unusable `+` records (see `shell/network/discovery.cpp`).
 - `gio mount`'s exit code is 0 whether or not the mount worked; go by stderr.
 
 ## Agent / subagent policy
