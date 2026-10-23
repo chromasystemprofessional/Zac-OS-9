@@ -187,11 +187,6 @@ uint32_t *hint_paint(const char *text, bool tail_right, int *w, int *h) {
 			pl_hline(&c, b, x0, HINT_TIP_Y + k, yellow);
 		}
 	}
-	int ascent = lines[0]->baseline;
-	for (int i = 0; i < n; i++) {
-		pl_text(&c, lines[i], x0 + HINT_PAD + 1, HINT_PAD + ascent + i * HINT_LINE, black);
-		text_destroy(lines[i]);
-	}
 	if (tail_right) {
 		for (int y = 0; y < *h; y++) {
 			uint32_t *row = px + (size_t)y * *w;
@@ -201,6 +196,14 @@ uint32_t *hint_paint(const char *text, bool tail_right, int *w, int *h) {
 				row[b] = t;
 			}
 		}
+	}
+	/* Draw the text after mirroring: only the bubble turns around, the
+	 * text on the right-hand side stays readable. */
+	int ascent = lines[0]->baseline;
+	int text_x = (tail_right ? 0 : x0) + HINT_PAD + 1;
+	for (int i = 0; i < n; i++) {
+		pl_text(&c, lines[i], text_x, HINT_PAD + ascent + i * HINT_LINE, black);
+		text_destroy(lines[i]);
 	}
 	return px;
 }

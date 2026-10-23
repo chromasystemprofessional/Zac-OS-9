@@ -27,8 +27,19 @@ int main(void) {
 	assert(px[(h / 2) * w + w - 3] == RGB(0xFF, 0xFF, 0xCC)); /* inside */
 	assert(px[(h / 2) * w + w - 1] == GRAY(0));        /* the frame */
 	free(px);
-	px = hint_paint(text, true, &w, &h);
-	assert(px[HINT_TIP_Y * w + w - 1] == GRAY(0));     /* tail on the right */
-	free(px);
+	int lw, lh, rw, rh;
+	uint32_t *left = hint_paint(text, false, &lw, &lh);
+	uint32_t *right = hint_paint(text, true, &rw, &rh);
+	assert(left && right && lw == rw && lh == rh);
+	assert(right[HINT_TIP_Y * rw + rw - 1] == GRAY(0)); /* tail on the right */
+	/* Only the bubble turns around: the body is the same shifted by the
+	 * tail's width, and the text is not mirrored with it. */
+	for (int y = HINT_TIP_Y + HINT_TAIL_H + 1; y < lh; y++) {
+		for (int x = 0; x < lw - HINT_TAIL_W; x++) {
+			assert(right[y * rw + x] == left[y * lw + x + HINT_TAIL_W]);
+		}
+	}
+	free(left);
+	free(right);
 	return 0;
 }
