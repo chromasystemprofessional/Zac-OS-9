@@ -1,3 +1,11 @@
+zacos9 (1.0.12) trixie; urgency=medium
+
+  * Extensions Manager turns curated extensions on or off for start-up;
+    About This Computer shows GPU hardware with its driver; Finder shows
+    mounted ZacOS disks as Mac volumes.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Fri, 23 Oct 2026 11:43:18 -0400
+
 zacos9 (1.0.11) trixie; urgency=medium
 
   * Installed systems now start on computers and virtual machines with
