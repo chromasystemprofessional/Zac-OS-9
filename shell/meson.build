@@ -1623,6 +1623,11 @@ test('busy-cursor-protocols', find_program('python3'),
   depends: [compositor_exe, cursor_theme],
   timeout: 45,
 )
+test('ghost-frames', find_program('python3'),
+  args: [files('../compositor/tests/test_ghost_frames.py'), compositor_exe, busy_client],
+  depends: [compositor_exe],
+  timeout: 60,
+)
 
 # ZacOS 9 Qt style plugin: other Qt applications (Qt 6) drawn with the
 # Platinum controls. Selected with QT_STYLE_OVERRIDE=zacos9 (session/).

@@ -501,7 +501,12 @@ static void xwayland_ready(struct wl_listener *listener, void *data) {
 	struct plat_server *server = wl_container_of(listener, server, xwayland_ready);
 	wlr_xwayland_set_seat(server->xwayland, server->seat);
 
-	/* libxcb-cursor reads X resources, not XCURSOR_THEME (Qt's X11 backend). */
+	/* libxcb-cursor reads X resources, not XCURSOR_THEME (Qt's X11 backend).
+	 * Xft.dpi: X11 programs draw at 1x and are enlarged to the screen's
+	 * scale here (client_scale), so they must not scale themselves as well.
+	 * Without it Qt 5 and GTK work the DPI out from the screen's size in
+	 * millimetres and, on a dense screen, draw everything and their
+	 * pointer at 2x before we enlarge it again (issue #33). */
 	xcb_connection_t *connection = xcb_connect(server->xwayland->display_name, NULL);
 	if (xcb_connection_has_error(connection)) {
 		wlr_log(WLR_ERROR, "Could not set the Xwayland cursor theme");
@@ -510,7 +515,8 @@ static void xwayland_ready(struct wl_listener *listener, void *data) {
 		xcb_screen_t *screen = xcb_setup_roots_iterator(xcb_get_setup(connection)).data;
 		char resources[128];
 		int length = snprintf(resources, sizeof(resources),
-			"Xcursor.theme: %s\nXcursor.size: %d\n", ZACOS9_CURSOR_THEME, ZACOS9_CURSOR_SIZE);
+			"Xcursor.theme: %s\nXcursor.size: %d\nXft.dpi: 96\n",
+			ZACOS9_CURSOR_THEME, ZACOS9_CURSOR_SIZE);
 		xcb_void_cookie_t cookie = xcb_change_property_checked(connection,
 			XCB_PROP_MODE_REPLACE, screen->root, XCB_ATOM_RESOURCE_MANAGER,
 			XCB_ATOM_STRING, 8, length, resources);
