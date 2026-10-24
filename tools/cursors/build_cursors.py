@@ -3,8 +3,12 @@
 usage: build_cursors.py SOURCE OUTDIR [--sheet OUT.png]
 
 Writes OUTDIR/ZacOS9/index.theme and OUTDIR/ZacOS9/cursors/<name> for
-every cursor name and alias, each with 16 px (1x) and 32 px (2x) images.
-Pixel-art cursors are scaled nearest-neighbour; "spin" cursors (the busy
+every cursor name and alias, each with an image for every pixel size the
+Monitors panel offers: 16 px (1x), 20 (1.25x), 24 (1.5x), 32 (2x) and
+48 (3x). zacos9-wm shows the one for the screen's scale, so the pointer
+is the same size on the desktop as in programs that draw their own.
+Pixel-art cursors are scaled nearest-neighbour at whole-number scales and
+supersampled (a little soft) at 1.25x and 1.5x; "spin" cursors (the busy
 dog bone) are drawn from their SVG at each size and rotate clockwise.
 """
 import math
@@ -15,7 +19,7 @@ import sys
 import xml.etree.ElementTree as ET
 
 COLORS = {"K": 0xFF000000, "W": 0xFFFFFFFF, ".": 0}
-SCALES = (1, 2)
+SCALES = (1, 1.25, 1.5, 2, 3)
 SPIN_FRAMES = 24
 SPIN_MS = 60
 SVG = "{http://www.w3.org/2000/svg}"
@@ -67,9 +71,28 @@ def add_outline(rows):
 
 
 def pixel_art(rows, scale):
-    """Premultiplied ARGB pixels of 16x16 rows, scaled nearest-neighbour."""
-    size = 16 * scale
-    return [COLORS[rows[y // scale][x // scale]] for y in range(size) for x in range(size)]
+    """Premultiplied ARGB pixels of 16x16 rows at SCALE: nearest-neighbour at
+    whole numbers; at 1.25 and 1.5 each pixel averages a 4x4 grid of samples,
+    so edges come out evenly soft rather than unevenly stepped."""
+    size = pixels(scale)
+    if size == 16 * int(scale):
+        scale = int(scale)
+        return [COLORS[rows[y // scale][x // scale]] for y in range(size) for x in range(size)]
+    out = []
+    for y in range(size):
+        for x in range(size):
+            a = r = g = b = 0
+            for sy in range(4):
+                for sx in range(4):
+                    v = COLORS[rows[int((y + (sy + 0.5) / 4) / scale)][int((x + (sx + 0.5) / 4) / scale)]]
+                    a, r, g, b = a + (v >> 24), r + (v >> 16 & 255), g + (v >> 8 & 255), b + (v & 255)
+            out.append((a // 16) << 24 | (r // 16) << 16 | (g // 16) << 8 | b // 16)
+    return out
+
+
+def pixels(scale):
+    """The image size for SCALE: 16 px at 1x."""
+    return round(16 * scale)
 
 
 def load_svg(path):
@@ -182,7 +205,7 @@ def images(cursor):
     """{scale: [frame pixels]} and the frame delay for CURSOR."""
     if cursor["spin"]:
         shape = load_svg(cursor["spin"])
-        return {s: spin_frames(shape, 16 * s) for s in SCALES}, SPIN_MS
+        return {s: spin_frames(shape, pixels(s)) for s in SCALES}, SPIN_MS
     rows = add_outline(cursor["rows"]) if cursor["outline"] else cursor["rows"]
     return {s: [pixel_art(rows, s)] for s in SCALES}, 0
 
@@ -190,11 +213,11 @@ def images(cursor):
 def xcursor(frames, hot, delay):
     chunks = []
     for scale in SCALES:
-        size = 16 * scale
-        for pixels in frames[scale]:
+        size = pixels(scale)
+        for frame in frames[scale]:
             header = struct.pack("<9I", 36, 0xFFFD0002, size, 1, size, size,
-                                 hot[0] * scale, hot[1] * scale, delay)
-            chunks.append((size, header + struct.pack(f"<{len(pixels)}I", *pixels)))
+                                 round(hot[0] * scale), round(hot[1] * scale), delay)
+            chunks.append((size, header + struct.pack(f"<{len(frame)}I", *frame)))
     ntoc = len(chunks)
     out = bytearray(struct.pack("<4sIII", b"Xcur", 16, 0x10000, ntoc))
     pos = 16 + ntoc * 12

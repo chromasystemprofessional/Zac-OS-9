@@ -14,7 +14,7 @@ definitions = cursors.parse(source)
 bone = next(c for c in definitions if c["name"] == "watch")
 assert bone["spin"] and bone["hot"] == (8, 8)
 frames, delay = cursors.images(bone)
-assert delay == 60 and all(len(frames[s]) == 24 for s in (1, 2))
+assert delay == 60 and all(len(frames[s]) == 24 for s in cursors.SCALES)
 for scale, sequence in frames.items():
     assert len(set(map(tuple, sequence))) == 24
     for frame in sequence:
@@ -41,19 +41,19 @@ with tempfile.TemporaryDirectory(prefix="zacos9-cursors-") as directory:
     theme = Path(directory) / "ZacOS9" / "cursors"
     data = (theme / "watch").read_bytes()
     magic, header, version, count = struct.unpack_from("<4sIII", data)
-    assert (magic, header, version, count) == (b"Xcur", 16, 0x10000, 48)
+    assert (magic, header, version, count) == (b"Xcur", 16, 0x10000, 24 * len(cursors.SCALES))
     for name in bone["aliases"]:
         assert (theme / name).read_bytes() == data, name
     for i in range(count):
         kind, nominal, offset = struct.unpack_from("<III", data, 16 + 12 * i)
         image = struct.unpack_from("<9I", data, offset)
-        scale = 1 if i < 24 else 2
-        assert image == (36, kind, nominal, 1, 16 * scale, 16 * scale,
-                         8 * scale, 8 * scale, 60)
-        pixels = struct.unpack_from(f"<{256 * scale * scale}I", data, offset + 36)
+        scale = cursors.SCALES[i // 24]
+        size = cursors.pixels(scale)
+        assert image == (36, kind, nominal, 1, size, size, size // 2, size // 2, 60)
+        pixels = struct.unpack_from(f"<{size * size}I", data, offset + 36)
         assert list(pixels) == frames[scale][i % 24]
     arrow = (theme / "default").read_bytes()
-    assert struct.unpack_from("<I", arrow, 12)[0] == 2, "Normal pointer must remain static"
+    assert struct.unpack_from("<I", arrow, 12)[0] == len(cursors.SCALES), "Normal pointer must remain static"
 print("ok: dog bone spins clockwise; aliases, hotspots, timing and HiDPI pixels")
 
 # The Mouse panel's Thick I-Beam: the text cursor, twice as thick, with
