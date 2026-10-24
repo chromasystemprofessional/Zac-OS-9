@@ -1,3 +1,14 @@
+zacos9 (1.0.15) trixie; urgency=medium
+
+  * Windows hidden but not closed, such as Krita's splash screen, no longer
+    leave their title bar behind. The pointer is the same size on the
+    desktop as inside programs at every pixel size, including 1.25x, 1.5x
+    and 3x. Bangla and other scripts outside DejaVu now have fonts (Noto).
+    Installing over another system's partitions works: the installer frees
+    a disk the live session or another system left mounted.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Sat, 24 Oct 2026 18:17:05 -0400
+
 zacos9 (1.0.14) trixie; urgency=medium
 
   * Monitors offers 1.25× and 1.5× pixel sizes: programs that can draw at
