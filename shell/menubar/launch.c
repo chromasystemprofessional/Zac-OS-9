@@ -476,6 +476,7 @@ void launch_fill_logo_menu(struct mb_menu *menu, const struct app *apps, int n_a
 		{ "Numbers", "zacos9-controlpanel", " numbers", PL_ICON_CP_NUMBERS },
 		{ "Retriever", "zacos9-retriever", "", PL_ICON_CP_RETRIEVER },
 		{ "Screen Saver", "zacos9-controlpanel", " screensaver", PL_ICON_CP_SCREENSAVER },
+		{ "Screen Sharing", "zacos9-screensharing", "", PL_ICON_EXT_DISPLAY },
 		{ "Sound", "zacos9-controlpanel", " sound", PL_ICON_EXT_AUDIO },
 		{ "Speech", "zacos9-controlpanel", " speech", PL_ICON_CP_SPEECH },
 		{ "Startup Disk", "zacos9-controlpanel", " startupdisk", PL_ICON_DISK },

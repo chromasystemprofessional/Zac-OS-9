@@ -305,6 +305,7 @@ static void keyboard_destroy(struct wl_listener *listener, void *data) {
 	struct plat_keyboard *kb = wl_container_of(listener, kb, destroy);
 	struct plat_server *server = kb->server;
 	access_keyboard_gone(kb);
+	wl_list_remove(&kb->keymap.link);
 	wl_list_remove(&kb->modifiers.link);
 	wl_list_remove(&kb->key.link);
 	wl_list_remove(&kb->destroy.link);
@@ -322,6 +323,27 @@ static void keyboard_destroy(struct wl_listener *listener, void *data) {
 		}
 	}
 	free(kb);
+}
+
+/* A virtual keyboard's keymap came: the first keyboard of a session that
+ * had none (headless, or a screen-sharing host with no keyboard of its
+ * own, typed on through wayvnc) becomes the seat's keyboard now, and the
+ * window that has the focus is told so again: programs set up their
+ * keyboard when it appeared, before there was one to give them, and
+ * wlroots tells them of the focus only then. Otherwise their keys would
+ * go nowhere. */
+static void keyboard_keymap(struct wl_listener *listener, void *data) {
+	struct plat_keyboard *kb = wl_container_of(listener, kb, keymap);
+	struct plat_server *server = kb->server;
+	if (!kb->wlr_keyboard->keymap || wlr_seat_get_keyboard(server->seat)) {
+		return;
+	}
+	wlr_seat_set_keyboard(server->seat, kb->wlr_keyboard);
+	struct wlr_surface *focused = server->seat->keyboard_state.focused_surface;
+	if (focused) {
+		wlr_seat_keyboard_clear_focus(server->seat);
+		input_keyboard_enter(server, focused);
+	}
 }
 
 /* Virtual keyboards bring their own keymap; physical ones get the layouts. */
@@ -346,6 +368,11 @@ static void new_keyboard(struct plat_server *server, struct wlr_input_device *de
 	wl_signal_add(&wlr_keyboard->events.modifiers, &kb->modifiers);
 	kb->key.notify = keyboard_key;
 	wl_signal_add(&wlr_keyboard->events.key, &kb->key);
+	wl_list_init(&kb->keymap.link);
+	if (virtual) {
+		kb->keymap.notify = keyboard_keymap;
+		wl_signal_add(&wlr_keyboard->events.keymap, &kb->keymap);
+	}
 	kb->destroy.notify = keyboard_destroy;
 	wl_signal_add(&device->events.destroy, &kb->destroy);
 
@@ -1365,6 +1392,12 @@ void input_init(struct plat_server *server) {
 	server->seat = wlr_seat_create(server->display, "seat0");
 	tablet_init(server);
 	touch_init(server);
+	/* There is always the pointer, from the start: a session with no
+	 * mouse yet (headless, or one plugged in later) still offers one, so
+	 * programs started before it set theirs up. A virtual pointer doesn't
+	 * update the seat's capabilities; without this one, programs only
+	 * saw a pointer once a keyboard arrived. */
+	input_update_capabilities(server);
 	server->request_cursor.notify = seat_request_cursor;
 	wl_signal_add(&server->seat->events.request_set_cursor, &server->request_cursor);
 	server->request_set_selection.notify = seat_request_set_selection;

@@ -348,6 +348,7 @@ struct plat_keyboard {
 	bool is_virtual; /* scripted keyboards repeat on their own terms */
 	struct wl_listener modifiers;
 	struct wl_listener key;
+	struct wl_listener keymap; /* a virtual one's, when it comes (input.c) */
 	struct wl_listener destroy;
 };
 

@@ -13,6 +13,7 @@
 | Memory panel (Disk Cache, Virtual Memory, Compressed Memory, RAM Disk) | `shell/panels/memory.cpp`, `memory/` (helper, polkit, RAM Disk unit) | C++ / Python — see `docs/memory.md` |
 | Software window (app catalog over apt) | `shell/store/` | C++ / Qt6 — see `docs/appstore.md` |
 | Software Update (ZacOS releases from GitHub + Debian updates) | `shell/update/`, `scripts/release.sh` | C++ / Qt6 — see `docs/updates.md` |
+| Screen Sharing (ZacOS to ZacOS: panel, and the host behind it: wayvnc on a private socket, Allow/Deny, Bonjour `_rfb._tcp`; the viewer: full screen at the screen's own pixels, `rfb.cpp` VNC client) | `shell/panels/screensharing.cpp`, `shell/screenshare/` | C++ / Qt6 |
 | Network Browser (connect to AFP/SMB servers) | `shell/network/` | C++ / Qt6 — see `docs/network.md` |
 | Platinum look for other apps (GTK 3 theme, Qt 6 style; global menus next) | `share/themes/ZacOS9/`, `shell/qtstyle/` | CSS / C++ — see `docs/app-integration.md` |
 | Classic (SheepShaver) launcher | `shell/classic/` | sh |

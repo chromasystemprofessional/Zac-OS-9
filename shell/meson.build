@@ -858,6 +858,66 @@ executable('zacos9-filesharing',
   install: true,
 )
 
+# Screen Sharing: the panel, and the host it starts (wayvnc behind it).
+executable('zacos9-screensharing',
+  'panels/screensharing.cpp',
+  'screenshare/common.cpp',
+  'finder/alert.cpp',
+  'finder/platinumshell.cpp',
+  finder_protocol,
+  link_with: panelkit,
+  include_directories: include_directories('finder', 'panels', 'screenshare'),
+  dependencies: [platinum_dep, qt6, wayland_client],
+  cpp_args: ['-std=c++17'],
+  install: true,
+)
+
+screenshare_host = executable('zacos9-screenshare-host',
+  'screenshare/host.cpp',
+  'screenshare/common.cpp',
+  'finder/alert.cpp',
+  'finder/platinumshell.cpp',
+  finder_protocol,
+  link_with: panelkit,
+  include_directories: include_directories('finder', 'panels', 'screenshare'),
+  dependencies: [platinum_dep, qt6, wayland_client],
+  cpp_args: ['-std=c++17'],
+  install: true,
+)
+
+test('screenshare-host', find_program('python3'),
+  args: [files('../tests/screenshare/test_host.py'), screenshare_host],
+  timeout: 90,
+)
+
+# The other side: another computer's screen here, full screen, at this
+# screen's own pixels whatever its scale (screenshare/rfb.cpp, viewer.cpp).
+zlib = dependency('zlib')
+screenshare_viewer = executable('zacos9-screenshare-viewer',
+  'screenshare/viewer.cpp',
+  'screenshare/rfb.cpp',
+  'screenshare/common.cpp',
+  'network/logindialog.cpp',
+  'finder/alert.cpp',
+  'finder/platinumshell.cpp',
+  finder_protocol,
+  link_with: panelkit,
+  include_directories: include_directories('finder', 'panels', 'screenshare', 'network'),
+  dependencies: [platinum_dep, qt6, wayland_client, zlib],
+  cpp_args: ['-std=c++17'],
+  install: true,
+)
+test('screenshare-rfb',
+  executable('test-screenshare-rfb', '../tests/screenshare/test_rfb.cpp',
+    'screenshare/rfb.cpp', 'screenshare/common.cpp',
+    link_with: panelkit,
+    include_directories: include_directories('finder', 'panels', 'screenshare'),
+    dependencies: [platinum_dep, qt6, zlib],
+    cpp_args: ['-std=c++17'],
+  ),
+  env: ['QT_QPA_PLATFORM=offscreen'],
+)
+
 # Parsing avahi-browse and WS-Discovery replies, against recorded text
 # (see the test file for what could and couldn't be checked live).
 test('discovery',
@@ -1585,6 +1645,12 @@ test('spring-space', find_program('python3'),
 test('panel-scale', find_program('python3'),
   args: [files('../compositor/tests/test_panel_scale.py'), compositor_exe, controlpanel_exe,
     rawshot_exe],
+  timeout: 120,
+)
+# Screen Sharing's viewer against a real wayvnc, the guest at 1.5x.
+test('screenshare-viewer', find_program('python3'),
+  args: [files('../tests/screenshare/test_viewer.py'), compositor_exe, screenshare_viewer, idle_client,
+    vptr_exe, rawshot_exe],
   timeout: 120,
 )
 # Window frames at 1.25x, 1.5x and 1.75x: the screen's own pixels, even stripes.
