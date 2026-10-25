@@ -1,3 +1,14 @@
+zacos9 (1.0.17) trixie; urgency=medium
+
+  * Screen Sharing: a new control panel lets other ZacOS computers see and
+    use this screen (asking you first, with the owner's password), and its
+    Connect tab shows another ZacOS computer's screen full screen and
+    undistorted, whatever this monitor's pixel size. Shut Down and Restart
+    work again in the login window, and Restart in the installer (issue
+    #38).
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Sun, 25 Oct 2026 11:20:27 -0400
+
 zacos9 (1.0.16) trixie; urgency=medium
 
   * Each monitor can have its own pixel size, and the menu bar can appear
