@@ -304,6 +304,7 @@ void input_deliver_key(struct plat_keyboard *kb, uint32_t evdev_keycode,
 static void keyboard_destroy(struct wl_listener *listener, void *data) {
 	struct plat_keyboard *kb = wl_container_of(listener, kb, destroy);
 	struct plat_server *server = kb->server;
+	access_keyboard_gone(kb);
 	wl_list_remove(&kb->modifiers.link);
 	wl_list_remove(&kb->key.link);
 	wl_list_remove(&kb->destroy.link);

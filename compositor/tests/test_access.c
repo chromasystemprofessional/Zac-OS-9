@@ -1,10 +1,19 @@
 /* Easy Access's state machines (compositor/src/access.c): Sticky Keys'
- * latching and locking, Zoom's steps and the part of the screen it shows. */
+ * latching and locking, Zoom's steps and the part of the screen it shows,
+ * and a Slow Keys key held back that must not outlive its keyboard or the
+ * setting. */
 #include <assert.h>
 #include <math.h>
 
 #include "../src/access.c"
 #include "../src/output.c"
+
+/* input.c's, for Slow Keys: counts what it is given. */
+static int delivered;
+void input_deliver_key(struct plat_keyboard *kb, uint32_t keycode, enum wl_keyboard_key_state state,
+		uint32_t time_msec) {
+	delivered++;
+}
 
 static void tap(struct sticky *s, unsigned mod) {
 	sticky_event(s, mod, true);
@@ -76,8 +85,48 @@ static void test_zoom(void) {
 	assert(fabs(box.x + px / f - px) < 1e-9 && fabs(box.y + py / f - py) < 1e-9);
 }
 
+static void hold_back(struct plat_keyboard *kb) {
+	a.slow_on = true;
+	a.slow_kb = kb;
+	a.slow_key = 30;
+	a.slow_accepted = false;
+	wl_event_source_timer_update(a.slow_timer, 750);
+}
+
+static void test_slow_keys(void) {
+	struct wl_event_loop *loop = wl_event_loop_create();
+	a.slow_timer = wl_event_loop_add_timer(loop, slow_accept, NULL);
+	struct plat_keyboard kb = { 0 }, other = { 0 };
+
+	/* Held long enough: it goes through. */
+	hold_back(&kb);
+	slow_accept(NULL);
+	assert(delivered == 1 && a.slow_accepted);
+
+	/* Its keyboard gone first: nothing, and nothing left pointing at it. */
+	delivered = 0;
+	hold_back(&kb);
+	access_keyboard_gone(&other);
+	assert(a.slow_kb == &kb);
+	access_keyboard_gone(&kb);
+	assert(!a.slow_kb && !a.slow_key);
+	slow_accept(NULL);
+	assert(delivered == 0);
+
+	/* Slow Keys turned off with a key held back: the timer delivers nothing. */
+	hold_back(&kb);
+	a.slow_on = false;
+	slow_accept(NULL);
+	assert(delivered == 0);
+
+	wl_event_source_remove(a.slow_timer);
+	a.slow_timer = NULL;
+	wl_event_loop_destroy(loop);
+}
+
 int main(void) {
 	test_sticky();
 	test_zoom();
+	test_slow_keys();
 	return 0;
 }

@@ -9,6 +9,7 @@
 #include "vfs.h"
 
 #include <QApplication>
+#include <QPointer>
 #include <QDir>
 #include <QDragEnterEvent>
 #include <QHash>
@@ -277,8 +278,12 @@ void FolderWindow::setUpProxyIcon() {
 			}
 			/* The icon is above the window, in its title bar. */
 			const QPoint origin(width() / 2 - PL_ICON_LARGE / 2, -PL_ICON_LARGE);
+			const QPointer<FolderWindow> self(this);
 			startItemDrag(this, { item.get() }, { origin }, origin + QPoint(16, 24));
 			Finder::instance().dragEnded();
+			if (!self) {
+				return; /* closed during the drag's own event loop */
+			}
 			/* Moved away (into another folder, or the Trash): its window
 			 * goes, as for any folder that disappears from under it. */
 			if (!QFileInfo::exists(m_path)) {

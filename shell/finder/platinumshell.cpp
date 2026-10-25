@@ -92,12 +92,16 @@ static QHash<wl_surface *, std::function<void()>> &proxyDrags() {
 	return drags;
 }
 static void handle_proxy_drag(void *, platinum_shell_v1 *, wl_surface *surface) {
-	auto it = proxyDrags().find(surface);
-	if (it != proxyDrags().end() && it.value()) {
-		/* Not inside Wayland's event dispatch: the drag runs its own loop. */
-		std::function<void()> drag = it.value();
-		QTimer::singleShot(0, drag);
-	}
+	/* Not inside Wayland's event dispatch: the drag runs its own loop.
+	 * Looked up again then, as its window may have gone meanwhile (and
+	 * taken its entry with it). */
+	QTimer::singleShot(0, qApp, [surface] {
+		auto it = proxyDrags().find(surface);
+		if (it != proxyDrags().end() && it.value()) {
+			std::function<void()> drag = it.value();
+			drag();
+		}
+	});
 }
 static void handle_sticky_keys(void *, platinum_shell_v1 *, uint32_t, uint32_t, uint32_t) {
 }

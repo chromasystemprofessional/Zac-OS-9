@@ -15,9 +15,14 @@
  * - if zacos9-lock dies without unlocking, the screens stay locked and
  *   blank, and it is started again.
  *
+ * Only the zacos9-lock zacos9-wm started may lock (and so unlock): any
+ * other client asking is refused, so nothing else in the session can take
+ * the lock's place, while it starts or after it died, and unlock at will.
+ *
  * See docs/energy-saver.md.
  */
 #define _GNU_SOURCE
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/wait.h>
@@ -140,6 +145,11 @@ static void new_surface(struct wl_listener *listener, void *data) {
 	struct plat_server *server = wl_container_of(listener, server, lock_new_surface);
 	struct wlr_session_lock_surface_v1 *lock_surface = data;
 	struct lock_surface *ls = calloc(1, sizeof(*ls));
+	if (!ls) {
+		/* Still locked, and blank there: the safe way to fail. */
+		wlr_log(WLR_ERROR, "lock: out of memory for a lock surface");
+		return;
+	}
 	ls->server = server;
 	ls->lock_surface = lock_surface;
 	ls->tree = wlr_scene_subsurface_tree_create(server->lock_layer, lock_surface->surface);
@@ -189,11 +199,46 @@ static void lock_destroy(struct wl_listener *listener, void *data) {
 	}
 }
 
+/* Whether a client is the zacos9-lock start_client() started: that very
+ * process, or, when /bin/sh -c didn't exec it ($ZACOS9_LOCK), its child. */
+static bool is_our_lock(struct plat_server *server, struct wl_client *client) {
+	pid_t pid = 0;
+	wl_client_get_credentials(client, &pid, NULL, NULL);
+	if (server->lock_pid <= 0 || pid <= 0) {
+		return false;
+	}
+	if (pid == server->lock_pid) {
+		return true;
+	}
+	char path[64];
+	snprintf(path, sizeof(path), "/proc/%d/stat", (int)pid);
+	FILE *f = fopen(path, "r");
+	if (!f) {
+		return false;
+	}
+	char buf[512];
+	const size_t n = fread(buf, 1, sizeof(buf) - 1, f);
+	fclose(f);
+	buf[n] = '\0';
+	/* "pid (comm) state ppid ...": comm may hold spaces and parentheses. */
+	const char *end = strrchr(buf, ')');
+	int ppid = 0;
+	return end && sscanf(end + 1, " %*c %d", &ppid) == 1 && ppid == server->lock_pid;
+}
+
 static void new_lock(struct wl_listener *listener, void *data) {
 	struct plat_server *server = wl_container_of(listener, server, lock_new);
 	struct wlr_session_lock_v1 *lock = data;
 	if (server->lock) {
 		wlr_session_lock_v1_destroy(lock); /* one lock at a time */
+		return;
+	}
+	struct wl_client *client = wl_resource_get_client(lock->resource);
+	if (!is_our_lock(server, client)) {
+		pid_t pid = 0;
+		wl_client_get_credentials(client, &pid, NULL, NULL);
+		wlr_log(WLR_ERROR, "lock: refused a lock from process %d, not zacos9-lock", (int)pid);
+		wlr_session_lock_v1_destroy(lock);
 		return;
 	}
 	server->lock = lock;

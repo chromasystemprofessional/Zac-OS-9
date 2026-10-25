@@ -52,6 +52,7 @@ private:
 	Release m_release;       /* valid only if newer than m_current */
 	QString m_releaseError;  /* why GitHub couldn't be asked, if it couldn't */
 	std::vector<DebianUpdate> m_debian;
+	QString m_debianProblem; /* debianCheckProblem(): why "no updates" may be wrong */
 	int m_pendingChecks = 0;
 	bool m_zacosUpdated = false;
 	QString m_debPath;       /* the downloaded .deb */

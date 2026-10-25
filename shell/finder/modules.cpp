@@ -82,10 +82,10 @@ void setExtensionEnabledAsync(QObject *receiver, const QString &key, bool on,
 		}
 		QString error;
 		const bool success = runHelper(args, &error);
-		if (!guard) {
-			return;
-		}
-		QMetaObject::invokeMethod(guard.data(),
+		/* To the GUI thread through the application, which outlives this
+		 * thread; whether the receiver still exists is asked only there,
+		 * where it would be destroyed. */
+		QMetaObject::invokeMethod(qApp,
 			[guard, done = std::move(done), success, error]() mutable {
 				if (guard) {
 					done(success, error);

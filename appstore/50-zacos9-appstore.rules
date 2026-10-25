@@ -1,10 +1,21 @@
 // Administrators at the computer (in the sudo group, logged in on its
-// screen) may install or remove software without a password, as the
-// Software window has no way to ask for one (this desktop runs no
-// polkit authentication agent). Same reasoning as 50-zacos9-sharing.rules.
+// screen) may install, remove and update software from Debian's archive
+// without a password: apt checks those packages' signatures, and the
+// Software window and Software Update don't ask each time.
+//
+// A downloaded .deb (install-deb, for the App Installer) is different:
+// its setup scripts are whatever its maker wrote, run as root, so polkit
+// asks for an administrator's password (lxqt-policykit-agent, started by
+// zacos9-session). Any program in the session could otherwise install one
+// silently. Without pkexec's command line nothing is granted either.
 polkit.addRule(function(action, subject) {
-	if (action.id == "org.zacos9.appstore" &&
-			subject.local && subject.active && subject.isInGroup("sudo")) {
-		return polkit.Result.YES;
+	if (action.id != "org.zacos9.appstore" ||
+			!(subject.local && subject.active && subject.isInGroup("sudo"))) {
+		return;
 	}
+	var command = action.lookup("command_line");
+	if (typeof command != "string" || /(^| )install-deb( |$)/.test(command)) {
+		return;
+	}
+	return polkit.Result.YES;
 });

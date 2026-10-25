@@ -267,8 +267,25 @@ static bool mouse_key(uint32_t key, bool pressed, uint32_t time) {
 
 /* ---- Slow Keys ------------------------------------------------------------- */
 
+/* The key being held back, forgotten: Slow Keys was turned off, or its
+ * keyboard went away (a.slow_kb would dangle). */
+static void slow_cancel(void) {
+	if (a.slow_timer) {
+		wl_event_source_timer_update(a.slow_timer, 0);
+	}
+	a.slow_kb = NULL;
+	a.slow_key = 0;
+	a.slow_accepted = false;
+}
+
+void access_keyboard_gone(struct plat_keyboard *kb) {
+	if (a.slow_kb == kb) {
+		slow_cancel();
+	}
+}
+
 static int slow_accept(void *data) {
-	if (a.slow_kb && a.slow_key) {
+	if (a.slow_on && a.slow_kb && a.slow_key) {
 		a.slow_accepted = true;
 		input_deliver_key(a.slow_kb, a.slow_key, WL_KEYBOARD_KEY_STATE_PRESSED, now_ms());
 	}
@@ -403,6 +420,9 @@ void access_apply(struct plat_server *server) {
 		sticky_apply();
 	}
 	a.slow_on = flag("slow-keys");
+	if (!a.slow_on) {
+		slow_cancel();
+	}
 	a.slow_delay = number("slow-keys-delay", 750, 100, 3000);
 	a.mouse_on = flag("mouse-keys");
 	a.mouse_delay = number("mouse-keys-delay", 500, 0, 3000);

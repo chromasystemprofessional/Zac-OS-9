@@ -185,8 +185,15 @@ if [ "${1:-}" = --update ]; then
 
 	new_version=$(dpkg-deb -f "$(ls "$cache"/zacos9_*.deb | head -1)" Version)
 	step 4 "Installing ZacOS 9 $new_version..."
-	# shellcheck disable=SC2086
-	if ! in_target apt-get $apt_opts install /var/cache/zacos9-update/*.deb >&2; then
+	# The packages by their paths inside the disk, named one by one: a
+	# wildcard here would be expanded (or not) by this shell, against the
+	# live system's /var/cache, since chroot runs apt-get directly.
+	target_debs=
+	for f in $debs; do
+		target_debs="$target_debs /var/cache/zacos9-update/${f##*/}"
+	done
+	# shellcheck disable=SC2086 # a list of plain file paths
+	if ! in_target apt-get $apt_opts install $target_debs >&2; then
 		if $online; then
 			fail "ZacOS 9 $new_version couldn't be installed on the disk"
 		fi

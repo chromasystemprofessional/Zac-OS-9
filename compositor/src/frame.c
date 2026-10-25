@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <wlr/types/wlr_buffer.h>
+#include <wlr/util/log.h>
 
 #include "frame.h"
 #include "pixbuf.h"
@@ -18,6 +19,10 @@ static bool frame_accepts_input(struct wlr_scene_buffer *buffer,
 static struct wlr_scene_buffer *make_part(struct plat_frame *frame,
 		struct wlr_scene_tree *parent) {
 	struct wlr_scene_buffer *b = wlr_scene_buffer_create(parent, NULL);
+	if (!b) {
+		wlr_log(WLR_ERROR, "frame: out of memory");
+		abort(); /* every window needs its frame; say so rather than crash later */
+	}
 	b->node.data = frame;
 	b->point_accepts_input = frame_accepts_input;
 	/* Integer output scaling must stay pixel-exact. */
@@ -27,8 +32,11 @@ static struct wlr_scene_buffer *make_part(struct plat_frame *frame,
 
 struct plat_frame *frame_create(struct plat_view *view, struct wlr_scene_tree *parent) {
 	struct plat_frame *frame = calloc(1, sizeof(*frame));
+	if (!frame || !(frame->tree = wlr_scene_tree_create(parent))) {
+		wlr_log(WLR_ERROR, "frame: out of memory");
+		abort();
+	}
 	frame->view = view;
-	frame->tree = wlr_scene_tree_create(parent);
 	frame->top = make_part(frame, frame->tree);
 	frame->bottom = make_part(frame, frame->tree);
 	frame->left = make_part(frame, frame->tree);

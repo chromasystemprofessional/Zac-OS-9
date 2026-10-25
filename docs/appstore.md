@@ -68,7 +68,7 @@ updates can be applied separately with `flatpak --user update`.
 | The data | `assets/store/catalog.json` | Shipped, read-only; installed to `$datadir/zacos9/store/catalog.json`, found through `pl_data_dir()` (the same function the alert sounds use), so a build tree and an install both just work. |
 | Discovery | `appstore/zacos9-software-catalog` | Unprivileged JSON helper: distro AppStream desktop applications or the enabled user Flathub remote. Asynchronous GUI loading has a two-minute timeout and explicit error status. |
 | The privileged half | `appstore/zacos9-appstore-helper` | A root shell script behind pkexec; validates every package name before `apt-get` ever sees it. |
-| Authorization | `appstore/org.zacos9.appstore.policy`, `appstore/50-zacos9-appstore.rules` | Same pattern as `sharing/`: this desktop runs no polkit authentication agent, so a local administrator (the `sudo` group) is granted without a password rather than being asked for one nothing can show. |
+| Authorization | `appstore/org.zacos9.appstore.policy`, `appstore/50-zacos9-appstore.rules` | A local administrator (the `sudo` group, active at the computer) installs, removes and updates software from Debian's archive without a password. `install-deb` (a downloaded package, whose setup scripts run as root and that apt can't vouch for) is never granted by the rule: polkit asks for an administrator's password through `lxqt-policykit-agent`, started by `session/zacos9-session`. Tested by `tests/store/test_appstore_rule.py`. |
 
 Reused, not reinvented: `PanelList`, `PanelButton`, `panelText`,
 `panelWrap`, `panelGroup` (`shell/panels/panelkit.*`); `Alert::ask` for

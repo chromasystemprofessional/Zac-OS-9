@@ -55,6 +55,8 @@ void access_apply(struct plat_server *server);
  * or a Slow Keys key it is still holding back). */
 bool access_key(struct plat_keyboard *kb, uint32_t keycode, enum wl_keyboard_key_state state,
 	uint32_t time_msec);
+/* A keyboard is going away: nothing of Easy Access's may still point at it. */
+void access_keyboard_gone(struct plat_keyboard *kb);
 /* A key went on to the compositor or a client (Sticky Keys' bookkeeping). */
 void access_key_delivered(struct plat_keyboard *kb, uint32_t keycode, enum wl_keyboard_key_state state);
 /* Zoom's shortcuts; true if taken. */
