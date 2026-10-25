@@ -6,7 +6,10 @@
  * down moves the arrow there and holds the button, so window frames, the
  * desktop, the menu bar's press-drag-release menus, X11 apps and ZacOS's
  * own programs (made for the mouse: spring-loaded folders, icon drags)
- * work as they do with a mouse. Further fingers on those are ignored.
+ * work as they do with a mouse. Further fingers on those are ignored,
+ * but for a second finger tapped with the first: that is a right-click
+ * (touch_tap.c, which also has why the first finger's press waits a
+ * moment).
  *
  * A touchscreen covers one screen: the one its udev WL_OUTPUT names, else
  * the screen of its size (a touch monitor), else the built-in panel, else
@@ -14,6 +17,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <linux/input-event-codes.h>
 #include <wlr/types/wlr_cursor.h>
 #include <wlr/types/wlr_data_device.h>
@@ -22,6 +26,7 @@
 #include <wlr/util/log.h>
 
 #include "server.h"
+#include "touch_tap.h"
 
 #define MAX_POINTS 16
 
@@ -40,7 +45,8 @@ struct native_point {
 };
 
 static struct native_point points[MAX_POINTS];
-static int32_t mouse_id = -1;     /* the finger acting as the mouse */
+static struct tap_state tap;      /* the finger acting as the mouse */
+static struct wl_event_source *tap_timer;
 static int32_t swallowed_id = -1; /* the tap that only woke the screen */
 
 static struct native_point *point_find(int32_t id) {
@@ -60,6 +66,55 @@ static struct native_point *point_add(int32_t id) {
 		}
 	}
 	return NULL;
+}
+
+static uint32_t now_ms(void) {
+	struct timespec t;
+	clock_gettime(CLOCK_MONOTONIC, &t);
+	return (uint32_t)(t.tv_sec * 1000 + t.tv_nsec / 1000000);
+}
+
+static void button(struct plat_server *server, uint32_t ms, uint32_t code, bool down) {
+	input_pointer_button(server, ms, code,
+		down ? WL_POINTER_BUTTON_STATE_PRESSED : WL_POINTER_BUTTON_STATE_RELEASED);
+	wlr_seat_pointer_notify_frame(server->seat);
+}
+
+/* What the mouse finger amounts to. TAP_MOVE warps to (event's) x, y. */
+static void tap_do(struct plat_server *server, struct tap_actions actions, uint32_t ms,
+		struct wlr_touch *touch, double x, double y) {
+	if (tap.phase != TAP_WAITING) {
+		wl_event_source_timer_update(tap_timer, 0);
+	}
+	for (int i = 0; i < actions.n; i++) {
+		switch (actions.a[i]) {
+		case TAP_PRESS:
+			button(server, ms, BTN_LEFT, true);
+			break;
+		case TAP_RELEASE:
+			button(server, ms, BTN_LEFT, false);
+			break;
+		case TAP_RIGHT_CLICK:
+			button(server, ms, BTN_RIGHT, true);
+			button(server, ms, BTN_RIGHT, false);
+			break;
+		case TAP_MOVE:
+			if (touch) {
+				wlr_cursor_warp_absolute(server->cursor, &touch->base, x, y);
+				input_pointer_motion(server, ms);
+				wlr_seat_pointer_notify_frame(server->seat);
+			}
+			break;
+		case TAP_NONE:
+			break;
+		}
+	}
+}
+
+static int tap_wait_done(void *data) {
+	struct plat_server *server = data;
+	tap_do(server, tap_wait_over(&tap), now_ms(), NULL, 0, 0);
+	return 0;
 }
 
 /* Whether a finger here goes to the app as touch. */
@@ -82,8 +137,11 @@ static void touch_down(struct wl_listener *listener, void *data) {
 		swallowed_id = event->touch_id;
 		return;
 	}
-	if (mouse_id >= 0) {
-		return; /* one finger is the mouse; the others rest */
+	if (tap.phase != TAP_IDLE) {
+		/* One finger is the mouse; the others rest, but for a second
+		 * one with the first: a two-finger tap. */
+		tap_down_other(&tap, event->touch_id, event->time_msec);
+		return;
 	}
 
 	wlr_cursor_warp_absolute(server->cursor, &event->touch->base, event->x, event->y);
@@ -107,10 +165,11 @@ static void touch_down(struct wl_listener *listener, void *data) {
 		return;
 	}
 
-	mouse_id = event->touch_id;
+	/* The arrow there now; the press in a moment (touch_tap.h). */
+	tap_down_first(&tap, event->touch_id, event->time_msec, lx, ly);
 	input_pointer_motion(server, event->time_msec);
-	input_pointer_button(server, event->time_msec, BTN_LEFT, WL_POINTER_BUTTON_STATE_PRESSED);
 	wlr_seat_pointer_notify_frame(server->seat);
+	wl_event_source_timer_update(tap_timer, TAP_WAIT_MS);
 }
 
 static void touch_motion(struct wl_listener *listener, void *data) {
@@ -118,19 +177,18 @@ static void touch_motion(struct wl_listener *listener, void *data) {
 	struct wlr_touch_motion_event *event = data;
 	idle_input(server, IDLE_INPUT_MOTION);
 
-	if (event->touch_id == mouse_id) {
-		wlr_cursor_warp_absolute(server->cursor, &event->touch->base, event->x, event->y);
-		input_pointer_motion(server, event->time_msec);
-		wlr_seat_pointer_notify_frame(server->seat);
+	double lx, ly;
+	wlr_cursor_absolute_to_layout_coords(server->cursor, &event->touch->base,
+		event->x, event->y, &lx, &ly);
+	if (tap_owns(&tap, event->touch_id)) {
+		tap_do(server, tap_motion(&tap, event->touch_id, lx, ly), event->time_msec,
+			event->touch, event->x, event->y);
 		return;
 	}
 	struct native_point *point = point_find(event->touch_id);
 	if (!point) {
 		return;
 	}
-	double lx, ly;
-	wlr_cursor_absolute_to_layout_coords(server->cursor, &event->touch->base,
-		event->x, event->y, &lx, &ly);
 	if (server->seat->drag) {
 		/* The app's own drag (a tab, a link): over whatever is under the
 		 * finger now, the icon with it. */
@@ -161,11 +219,9 @@ static void touch_up(struct wl_listener *listener, void *data) {
 
 	if (event->touch_id == swallowed_id) {
 		swallowed_id = -1;
-	} else if (event->touch_id == mouse_id) {
-		mouse_id = -1;
-		input_pointer_button(server, event->time_msec, BTN_LEFT,
-			WL_POINTER_BUTTON_STATE_RELEASED);
-		wlr_seat_pointer_notify_frame(server->seat);
+	} else if (tap_owns(&tap, event->touch_id)) {
+		tap_do(server, tap_up(&tap, event->touch_id, event->time_msec), event->time_msec,
+			NULL, 0, 0);
 	} else {
 		struct native_point *point = point_find(event->touch_id);
 		if (point) {
@@ -181,11 +237,8 @@ static void touch_cancel(struct wl_listener *listener, void *data) {
 
 	if (event->touch_id == swallowed_id) {
 		swallowed_id = -1;
-	} else if (event->touch_id == mouse_id) {
-		mouse_id = -1;
-		input_pointer_button(server, event->time_msec, BTN_LEFT,
-			WL_POINTER_BUTTON_STATE_RELEASED);
-		wlr_seat_pointer_notify_frame(server->seat);
+	} else if (tap_owns(&tap, event->touch_id)) {
+		tap_do(server, tap_cancel(&tap), event->time_msec, NULL, 0, 0);
 	} else {
 		struct native_point *point = point_find(event->touch_id);
 		struct wlr_touch_point *wlr_point =
@@ -267,6 +320,8 @@ void touch_new(struct plat_server *server, struct wlr_input_device *device) {
 
 void touch_init(struct plat_server *server) {
 	wl_list_init(&server->touchscreens);
+	tap_timer = wl_event_loop_add_timer(wl_display_get_event_loop(server->display),
+		tap_wait_done, server);
 	server->touch_down.notify = touch_down;
 	wl_signal_add(&server->cursor->events.touch_down, &server->touch_down);
 	server->touch_up.notify = touch_up;

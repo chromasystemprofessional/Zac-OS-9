@@ -91,6 +91,7 @@ compositor_exe = executable('zacos9-wm',
   'src/access.c',
   'src/tablet.c',
   'src/touch.c',
+  'src/touch_tap.c',
   'src/window_sounds.c',
   'src/launch.c',
   'src/startup.c',
@@ -243,6 +244,14 @@ test('snapshot-output-state',
     dependencies: [decor_dep, wayland_server, wlroots, libdrm],
     link_args: ['-Wl,--wrap=wlr_output_from_resource',
       '-Wl,--wrap=wlr_output_layout_get_box'],
+  ),
+)
+
+# The touchscreen's tap and two-finger tap (a right-click).
+test('touch-tap',
+  executable('test-touch-tap',
+    'tests/test_touch_tap.c', 'src/touch_tap.c',
+    include_directories: include_directories('src'),
   ),
 )
 
