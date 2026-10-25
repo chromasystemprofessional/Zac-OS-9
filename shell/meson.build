@@ -169,6 +169,16 @@ saver_exe = executable('zacos9-screensaver',
   install: true,
 )
 
+# The on-screen keyboard, for a text field with no keyboard attached (compositor/src/osk.c).
+keyboard_exe = executable('zacos9-keyboard',
+  'keyboard/keyboard.c',
+  meson.project_source_root() / 'compositor/src/kblayout.c',
+  client_protocol_src,
+  include_directories: include_directories('../compositor/src'),
+  dependencies: [platinum_dep, wayland_client, xkbcommon_client],
+  install: true,
+)
+
 # Keeping screens awake for apps that ask over D-Bus (docs/energy-saver.md).
 inhibit_exe = executable('zacos9-inhibit',
   'inhibit/inhibit.c',
@@ -1604,6 +1614,22 @@ idle_client = executable('test-idle-client',
   '../compositor/tests/idle_client.cpp',
   dependencies: qt6,
   cpp_args: ['-std=c++17'],
+)
+# The same, saying where its focus is as ZacOS's own programs do.
+field_client = executable('test-field-client',
+  '../compositor/tests/idle_client.cpp',
+  'finder/platinumshell.cpp',
+  finder_protocol,
+  include_directories: include_directories('finder'),
+  dependencies: [qt6, wayland_client],
+  cpp_args: ['-std=c++17', '-DPLATINUM_FIELD'],
+)
+# The on-screen keyboard for a text field with no keyboard attached.
+test('onscreen-keyboard', find_program('python3'),
+  args: [files('../compositor/tests/test_onscreen_keyboard.py'), compositor_exe, idle_client, field_client,
+    vptr_exe, rawshot_exe],
+  depends: [keyboard_exe],
+  timeout: 120,
 )
 test('idle-sleep', find_program('python3'),
   args: [files('../compositor/tests/test_idle.py'), compositor_exe, idle_client, vptr_exe],

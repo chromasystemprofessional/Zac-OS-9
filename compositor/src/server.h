@@ -204,6 +204,16 @@ struct plat_server {
 	struct wl_list keep_awake; /* idle.c keep_awake.link: apps' D-Bus requests */
 	bool suspend_after_lock; /* system sleep waits for the lock */
 
+	/* The on-screen keyboard (osk.c) */
+	struct wlr_text_input_manager_v3 *text_input_manager;
+	struct wl_listener new_text_input;
+	struct wl_list text_inputs; /* osk.c plat_text_input.link */
+	struct wl_listener osk_focus_change;
+	struct wl_event_source *osk_hide_timer;
+	struct wl_event_source *osk_reap_timer;
+	bool osk_shown;
+	pid_t osk_pid; /* zacos9-keyboard, while it runs */
+
 	/* lock.c: ext-session-lock-v1. */
 	struct wlr_session_lock_manager_v1 *lock_mgr;
 	struct wl_listener lock_new;
@@ -346,6 +356,7 @@ struct plat_keyboard {
 	struct plat_server *server;
 	struct wlr_keyboard *wlr_keyboard;
 	bool is_virtual; /* scripted keyboards repeat on their own terms */
+	bool is_real;    /* one to type on: not virtual, with letter keys (osk.c) */
 	struct wl_listener modifiers;
 	struct wl_listener key;
 	struct wl_listener keymap; /* a virtual one's, when it comes (input.c) */
@@ -473,6 +484,15 @@ void tablet_map(struct plat_server *server);
 /* "tablet NAME" lines for zacos9-outputs, one per tablet. */
 void tablet_write_status(struct plat_server *server, FILE *f);
 
+/* osk.c: the on-screen keyboard, while a text field has the focus and
+ * no keyboard is attached */
+void osk_init(struct plat_server *server);
+/* Again: keyboards came or went, the lock, the setting. */
+void osk_update(struct plat_server *server);
+bool osk_real_keyboard(struct wlr_input_device *device);
+/* platinum_shell_v1.text_field from the program with the focus, or not. */
+void osk_text_field(struct plat_server *server, bool focused);
+
 /* touch.c: touchscreens */
 void touch_init(struct plat_server *server);
 void touch_new(struct plat_server *server, struct wlr_input_device *device);
@@ -540,6 +560,9 @@ void xdg_attach_popup(struct plat_server *server, struct wlr_xdg_popup *popup,
 void platinum_shell_init(struct plat_server *server);
 /* The hinted decor_style for a surface, or -1. */
 int platinum_shell_style_for(struct wlr_surface *surface);
+/* What one of Platinum's own programs last said of its focus
+ * (text_field): 1 a text field, 0 not, -1 never said. */
+int platinum_shell_text_field(struct wl_client *client);
 /* A pop-up window's remembered tab (layout x), if its program gave one. */
 bool platinum_shell_popup_tab_for(struct wlr_surface *surface, int *x);
 /* Tell the program its pop-up's tab moved, or that it was dragged up into
