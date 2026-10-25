@@ -39,11 +39,12 @@
  * 16: Applications, Home and the System Folder's folders have their own
  *     icons (a bone, Zac's doghouse, an emblem each).
  * 17: Shutdown Items, Zac Menu Items and Extensions (Disabled).
- * 18: Extensions Manager uses its Mac OS 9 name again. */
-static constexpr int REGISTRY_VERSION = 18;
+ * 18: Extensions Manager uses its Mac OS 9 name again.
+ * 19: Zac Menu Items (Disabled). */
+static constexpr int REGISTRY_VERSION = 19;
 
 static const char *DEFAULT_REGISTRY = R"JSON({
-  "version": 18,
+  "version": 19,
   "volume": {},
   "showUnixVolume": false,
   "nodes": [
@@ -97,6 +98,9 @@ static const char *DEFAULT_REGISTRY = R"JSON({
       "kind": "backed", "backing": "$XDG_CONFIG_HOME/zacos9/Contextual Menu Items" },
     { "id": "system-folder/zac-menu-items", "icon": "sf-contextual-menu-items", "name": "Zac Menu Items",
       "kind": "backed", "backing": "$XDG_CONFIG_HOME/zacos9/ZacOS 9 Menu Items" },
+    { "id": "system-folder/zac-menu-items-disabled", "icon": "sf-contextual-menu-items",
+      "name": "Zac Menu Items (Disabled)", "kind": "backed",
+      "backing": "$XDG_CONFIG_HOME/zacos9/ZacOS 9 Menu Items (Disabled)" },
     { "id": "system-folder/preferences", "icon": "sf-preferences", "name": "Preferences", "kind": "backed",
       "backing": "$XDG_CONFIG_HOME" },
     { "id": "system-folder/utilities", "icon": "sf-utilities", "name": "Utilities", "kind": "apps" },

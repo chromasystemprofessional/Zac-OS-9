@@ -805,6 +805,26 @@ executable('zacos9-jigsaw',
   install: true,
 )
 
+# Mouse Practice: Learn ZacOS's first lesson (mousepractice/practice.cpp
+# plays it; docs/tutorial.md).
+executable('zacos9-mousepractice',
+  'mousepractice/main.cpp', 'mousepractice/practice.cpp',
+  'finder/platinumshell.cpp',
+  finder_protocol,
+  include_directories: include_directories('finder', 'mousepractice'),
+  dependencies: [platinum_dep, qt6, wayland_client],
+  cpp_args: ['-std=c++17'],
+  install: true,
+)
+test('mouse-practice',
+  executable('test-mouse-practice', 'mousepractice/tests/test_practice.cpp', 'mousepractice/practice.cpp',
+    include_directories: include_directories('mousepractice'),
+    dependencies: [qt6],
+    cpp_args: ['-std=c++17'],
+  ),
+  timeout: 10,
+)
+
 # Plotter: graphs of y = f(x) (plotter/expr.cpp reads them).
 executable('zacos9-plotter',
   'plotter/main.cpp', 'plotter/expr.cpp',

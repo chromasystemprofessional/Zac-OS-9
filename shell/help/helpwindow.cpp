@@ -2,6 +2,7 @@
 
 #include <QApplication>
 #include <QDesktopServices>
+#include <QFile>
 #include <QFileInfo>
 #include <QKeyEvent>
 #include <QMenuBar>
@@ -47,6 +48,15 @@ public:
 				return searchResultsHtml(words, searchHelp(pages, words));
 			}
 			return helpCenterHtml(helpBooks(root));
+		}
+		if (url.isLocalFile() && type == QTextDocument::HtmlResource) {
+			// The tutorial's pages as the path chosen sees them; newcomers'
+			// wording when none is.
+			QFile f(url.toLocalFile());
+			if (f.open(QIODevice::ReadOnly)) {
+				const QString path = QUrlQuery(url).queryItemValue("for");
+				return tutorialHtml(QString::fromUtf8(f.readAll()), path.isEmpty() ? QStringLiteral("new") : path);
+			}
 		}
 		return QTextBrowser::loadResource(type, url);
 	}
@@ -218,7 +228,13 @@ void HelpWindow::forward() {
 }
 
 void HelpWindow::follow(const QUrl &link) {
-	const QUrl url = m_browser->source().resolved(link);
+	QUrl url = m_browser->source().resolved(link);
+	const QString path = QUrlQuery(m_browser->source()).queryItemValue("for");
+	if (url.isLocalFile() && !url.hasQuery() && !path.isEmpty()) {
+		QUrlQuery q; /* the tutorial's path goes on with it */
+		q.addQueryItem("for", path);
+		url.setQuery(q);
+	}
 	if (url.scheme() == "file" || url.scheme() == SCHEME) {
 		// A link to a place on this page, or another page of help.
 		if (url.adjusted(QUrl::RemoveFragment) == m_browser->source().adjusted(QUrl::RemoveFragment) &&

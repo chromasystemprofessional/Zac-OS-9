@@ -138,7 +138,7 @@ protected:
 		if (QLineF(piece.pos, piece.home).length() < 10) {
 			piece.pos = piece.home;
 			piece.placed = true;
-			pl_sound_event("menu-choose");
+			pl_sound_event("menu-command");
 		}
 		m_held = -1;
 		update();
