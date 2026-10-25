@@ -10,7 +10,25 @@ A help book, `share/zacos9/help/tutorial/`, shown by the Help Center
 | Puppy School | children | `kids` | to write |
 
 `index.html` asks where to start. Until the other two paths exist, it sends
-newcomers to ZacOS Help's Desktop basics.
+newcomers to Mouse Practice and then ZacOS Help's Desktop basics.
+
+The Help menu (the Sniffer's, `shell/menubar/menus.c`) has **Learn ZacOS**
+(`zacos9-help tutorial`) and **Mouse Practice** after ZacOS Help, where Mac
+OS 9 had its tutorials. Both stay in Puppy Mode.
+
+## Mouse Practice
+
+`zacos9-mousepractice` (`shell/mousepractice/`) has four steps: point at the
+bone (3 times), click it (5, smaller each time), double-click the doghouse
+(3), and drag the ball to Zac (3). Each try that misses says why. After three
+single clicks on the doghouse, it points to the Mouse control panel's
+double-click speed. The two wordings are the tutorial's `new` and `kids`.
+Puppy School (Practice ▸ Puppy School, on to begin with for a Puppy Mode
+account or with `--kids`) also keeps the targets big.
+
+`practice.cpp` is the game without a window. `main.cpp` feeds it the
+pointer's events and draws its state, so `mouse-practice` (the test) plays
+it through by hand.
 
 ## The lesson format
 
@@ -53,7 +71,7 @@ every path's words are found.
 
 ## Next steps (planned)
 
-1. Mouse practice: a small program, with a game mode for Puppy School.
+1. ~~Mouse practice~~ (done).
 2. The `new` and `kids` paths, with "Show me" links that do things through
    `zacos9-finder-ctl` (a `zacos9-do:` link scheme with an allowlist).
 3. Coach marks: a ring drawn around the real control (compositor overlay;

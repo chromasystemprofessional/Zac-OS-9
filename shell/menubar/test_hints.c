@@ -14,6 +14,8 @@ int main(void) {
 	assert(!hint_text(&it, buf, sizeof(buf)));
 	it = (struct mb_item){ .label = "Scribble", .action = ACT_ACTIVATE_APP };
 	assert(strstr(hint_text(&it, buf, sizeof(buf)), "Makes Scribble the active"));
+	it = (struct mb_item){ .label = "Mouse Practice", .action = ACT_LAUNCH };
+	assert(strstr(hint_text(&it, buf, sizeof(buf)), "double-clicking"));
 	it = (struct mb_item){ .label = "Something Unknown", .action = ACT_LAUNCH };
 	assert(!hint_text(&it, buf, sizeof(buf)));
 

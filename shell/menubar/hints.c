@@ -70,6 +70,8 @@ static const struct {
 	{ "Help Center", "Opens the Help Center, where you can read help for ZacOS and your programs." },
 	{ "Show Hint Bubbles", "Turns hint bubbles like this one on or off." },
 	{ "ZacOS Help", "Opens help for ZacOS." },
+	{ "Learn ZacOS", "Opens short lessons on using ZacOS, with a tour for people who used a Mac before." },
+	{ "Mouse Practice", "Opens Mouse Practice, a game for learning pointing, clicking, double-clicking and dragging." },
 	{ "Hide Others", "Hides the windows of every program except the active one." },
 	{ "Show All", "Shows the windows of every hidden program." },
 	{ "Quit", "Quits the active program." },
