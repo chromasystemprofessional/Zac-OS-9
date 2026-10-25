@@ -202,54 +202,10 @@ Updated: 2026-10-25
 remains is to confirm on real hardware what was only tested headless or in
 the VM; see "Next steps".
 
-**Earlier, kept for the record.** **RDP remote desktop** (0.1.44 published): Remmina 1.4.39 and its
-RDP plugin are installed and the client opens; FreeRDP 3.15.0 is available.
-The xrdp/WayVNC bridge is implemented; installed native development package
-`0.1.43+rdptest2` replaces the initial local test add-on and persists the compositor fix.
-WayVNC uses a private mode-0700 Unix socket; xrdp's VNC backend is isolated
-in a network namespace with an RFB 3.3-to-3.8 adapter running as the desktop
-user. The external proxy and xrdp run unprivileged, require TLS and PAM, and
-authorize only the sharing user's account. No VNC TCP port is exposed.
-Authentication logs live in a root-owned runtime directory, separate from
-the xrdp-writable transport socket and application log directory.
-Default xrdp services remain masked. Sharing is on demand, with no boot
-enablement. Testing used 127.0.0.1:3389; the host is now stopped, with no LAN
-or localhost RDP/VNC listener left open.
-Certificate-pinned RDP delivered real 3840x2160 desktop video and keyboard
-text to a synthetic GTK window. The disposable test account was removed.
-Mouse testing exposed ignored virtual-pointer output suggestions in the
-compositor. The root fix and C regression pass; a real two-output, scale-2
-headless capture/input probe verified correctly positioned clicks and typing.
-The live desktop needs a restart to activate the compositor change before
-the full live self-test or a second-computer session can be certified.
-Eleven RDP configuration/transport regressions pass. The native amd64 package
-passed 75 tests with four skipped and none failing. Clipboard, audio, drive redirection
-and automatic resizing are deliberately disabled. See `docs/rdp.md`.
-The 0.1.44 release package also passed 75 tests with four skipped and none
-failing. GitHub's latest release is v0.1.44; downloading its amd64 Debian
-asset produced an exact byte match with the tested package (SHA-256
-`2cd74c89cf60e9b27507a77b295ce37542dd0da4199796733c6698d78561b435`).
-The release is not automatically installed; restart the desktop after updating.
-Sunshine is stopped and its user-service autostart disabled; credentials and
-the separate RustDesk installation are retained.
-
-**Sunshine and Moonlight two-way sharing** (local setup, not released):
-Sunshine's checksum-verified Debian Trixie package and Moonlight 6.2.0 from
-the existing user Flathub remote are installed. Before the RDP pivot, Sunshine
-ran through its user service, initially with localhost-only access, UPnP off, a Desktop-only app list,
-KMS capture and software H.264 encoding. Its monitor/encoder probes succeed
-and local setup page returns HTTP 200; Moonlight opens. The uinput module was
-loaded through administrator authorization and the packaged active-seat rule
-grants the local user access without world-writable permissions.
-Credentials and client pairing are left to the user; a two-computer video/input
-session is not yet verified. Nouveau warns about cursor capture without atomic
-modesetting. RustDesk is retained but its incoming session showed a black
-screen. See `docs/sunshine-moonlight.md` for two-way setup and limitations.
-Follow-up: LAN hosting now listens on IPv4 interfaces, with the streaming
-endpoint verified at 192.168.2.110. Administration remains local-only and UPnP
-off. Credentials were subsequently created, but the setup page returned HTTP
-401 in the integrated browser. The user rejected this workflow; the Sunshine
-host is now stopped and its user-service autostart disabled.
+**Earlier, kept for the record.** The RDP bridge (xrdp and WayVNC, 0.1.44)
+and the Sunshine and Moonlight experiment were removed after 1.0.19: Screen
+Sharing replaced both. Their notes are `docs/rdp.md` and
+`docs/sunshine-moonlight.md` in git history.
 
 **RustDesk screen sharing** (initial integration, published in 0.1.43): integrate the official
 native application rather than writing a remote-desktop engine. ScreenCast
