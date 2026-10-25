@@ -262,7 +262,7 @@ int main(int argc, char **argv) {
 	for (const QString name : { "Sounds", "Startup Items", "Shutdown Items",
 			"Application Support", "Device Drivers", "Network", "System Logs",
 			"Software Components", "Extensions", "Extensions (Disabled)",
-			"Zac Menu Items", "System Information", "Extensions Manager", "Favorites" }) {
+			"Zac Menu Items", "Zac Menu Items (Disabled)", "System Information", "Extensions Manager", "Favorites" }) {
 		check(systemNames.contains(name), "System Folder contains " + name);
 	}
 	check(vfsOpensAs(vfsPathFor("system-folder/shutdown-items")) ==
@@ -271,6 +271,9 @@ int main(int argc, char **argv) {
 	check(vfsOpensAs(vfsPathFor("system-folder/zac-menu-items")) ==
 			root + "/config/zacos9/ZacOS 9 Menu Items",
 		"Zac Menu Items stands for the folder the Zac menu reads");
+	check(vfsOpensAs(vfsPathFor("system-folder/zac-menu-items-disabled")) ==
+			root + "/config/zacos9/ZacOS 9 Menu Items (Disabled)",
+		"Zac Menu Items (Disabled) is beside it, where the Zac menu doesn't look");
 	check(pathNamed(vfsPathFor("system-folder/utilities"), "System Information") != QString() &&
 		pathNamed(vfsPathFor("system-folder/utilities"), "Extensions Manager") != QString(),
 		"the trusted System Information and Extensions Manager launchers are also in Utilities");

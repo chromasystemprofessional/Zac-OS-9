@@ -510,7 +510,7 @@ std::unique_ptr<Item> makeItem(const QFileInfo &info) {
 	 * opens like the application. */
 	const QString target = item->isAlias ? info.canonicalFilePath() : QString();
 	if (target.endsWith(QLatin1String(".desktop"))) {
-		item->kind = PL_ICON_APPLICATION;
+		item->kind = pl_icon_for_program(target.toUtf8().constData()); /* ZacOS's own have theirs */
 		if (item->customIcon32.empty()) {
 			if (const AppEntry *app = appByFile(target)) {
 				item->customIcon32 = app->icon32;
