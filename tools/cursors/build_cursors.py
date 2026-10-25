@@ -3,13 +3,14 @@
 usage: build_cursors.py SOURCE OUTDIR [--sheet OUT.png]
 
 Writes OUTDIR/ZacOS9/index.theme and OUTDIR/ZacOS9/cursors/<name> for
-every cursor name and alias, each with 16 px (1x) and 32 px (2x) images,
-and 20, 24 and 28 px ones for 1.25x, 1.5x and 1.75x (zacos9-wm asks for
-16 x the screen's scale; without its own size it would be shrunk from 32,
-blurred). Pixel-art cursors are scaled nearest-neighbour, at the fractions
-each 1x pixel one or two whole pixels by lib/draw.c's pl_snap rounding;
-"spin" cursors (the busy dog bone) are drawn from their SVG at each size
-and rotate clockwise.
+every cursor name and alias, each with an image for every pixel size the
+Monitors panel offers: 16 px (1x), 20 (1.25x), 24 (1.5x), 28 (1.75x),
+32 (2x) and 48 (3x). zacos9-wm shows the one for the screen's scale, so
+the pointer is the same size on the desktop as in programs that draw
+their own. Pixel-art cursors are scaled nearest-neighbour, at the
+fractions each 1x pixel one or two whole pixels by lib/draw.c's pl_snap
+rounding (sharp, as the rest of the screen); "spin" cursors (the busy dog
+bone) are drawn from their SVG at each size and rotate clockwise.
 """
 import math
 import os
@@ -19,7 +20,7 @@ import sys
 import xml.etree.ElementTree as ET
 
 COLORS = {"K": 0xFF000000, "W": 0xFFFFFFFF, ".": 0}
-SCALES = (1, 1.25, 1.5, 1.75, 2)
+SCALES = (1, 1.25, 1.5, 1.75, 2, 3)
 SPIN_FRAMES = 24
 SPIN_MS = 60
 SVG = "{http://www.w3.org/2000/svg}"
@@ -80,9 +81,14 @@ def unsnap(d, scale):
     return -((-(4 * d + 2)) // round(scale * 4)) - 1
 
 
+def pixels(scale):
+    """The image size for SCALE: 16 px at 1x."""
+    return snap(16, scale)
+
+
 def pixel_art(rows, scale):
     """Premultiplied ARGB pixels of 16x16 rows, scaled nearest-neighbour."""
-    size = snap(16, scale)
+    size = pixels(scale)
     return [COLORS[rows[unsnap(y, scale)][unsnap(x, scale)]] for y in range(size) for x in range(size)]
 
 
@@ -196,7 +202,7 @@ def images(cursor):
     """{scale: [frame pixels]} and the frame delay for CURSOR."""
     if cursor["spin"]:
         shape = load_svg(cursor["spin"])
-        return {s: spin_frames(shape, snap(16, s)) for s in SCALES}, SPIN_MS
+        return {s: spin_frames(shape, pixels(s)) for s in SCALES}, SPIN_MS
     rows = add_outline(cursor["rows"]) if cursor["outline"] else cursor["rows"]
     return {s: [pixel_art(rows, s)] for s in SCALES}, 0
 
@@ -204,11 +210,11 @@ def images(cursor):
 def xcursor(frames, hot, delay):
     chunks = []
     for scale in SCALES:
-        size = snap(16, scale)
-        for pixels in frames[scale]:
+        size = pixels(scale)
+        for frame in frames[scale]:
             header = struct.pack("<9I", 36, 0xFFFD0002, size, 1, size, size,
                                  snap(hot[0], scale), snap(hot[1], scale), delay)
-            chunks.append((size, header + struct.pack(f"<{len(pixels)}I", *pixels)))
+            chunks.append((size, header + struct.pack(f"<{len(frame)}I", *frame)))
     ntoc = len(chunks)
     out = bytearray(struct.pack("<4sIII", b"Xcur", 16, 0x10000, ntoc))
     pos = 16 + ntoc * 12

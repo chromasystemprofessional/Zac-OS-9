@@ -37,6 +37,8 @@ static void volumeInterface(GVolumeIface *iface) {
 		return reinterpret_cast<TestVolume *>(volume)->ready;
 	};
 	iface->get_mount = [](GVolume *) -> GMount * { return nullptr; };
+	/* No drive: a volume without one counts as removable (mountIfNeeded). */
+	iface->get_drive = [](GVolume *) -> GDrive * { return nullptr; };
 	iface->mount_fn = [](GVolume *volume, GMountMountFlags, GMountOperation *,
 			GCancellable *cancel, GAsyncReadyCallback callback, gpointer data) {
 		auto *test = reinterpret_cast<TestVolume *>(volume);

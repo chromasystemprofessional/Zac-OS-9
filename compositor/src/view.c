@@ -944,6 +944,10 @@ void view_handle_unmap(struct plat_view *view) {
 		view_set_fullscreen(view, false, NULL);
 	}
 	view->mapped = false;
+	/* The frame goes with the window. A window hidden but not closed (a
+	 * splash screen once the program is up, a palette put away) kept its
+	 * title bar on screen until the program quit (issue #33). */
+	wlr_scene_node_set_enabled(&view->scene_tree->node, false);
 	destroy_toplevel_handle(view);
 	if (view == server->grabbed_view) {
 		input_cancel_grab(server);

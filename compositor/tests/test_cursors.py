@@ -14,7 +14,7 @@ definitions = cursors.parse(source)
 bone = next(c for c in definitions if c["name"] == "watch")
 assert bone["spin"] and bone["hot"] == (8, 8)
 frames, delay = cursors.images(bone)
-assert delay == 60 and all(len(frames[s]) == 24 for s in (1, 2))
+assert delay == 60 and all(len(frames[s]) == 24 for s in cursors.SCALES)
 for scale, sequence in frames.items():
     assert len(set(map(tuple, sequence))) == 24
     for frame in sequence:
@@ -48,16 +48,17 @@ with tempfile.TemporaryDirectory(prefix="zacos9-cursors-") as directory:
         kind, nominal, offset = struct.unpack_from("<III", data, 16 + 12 * i)
         image = struct.unpack_from("<9I", data, offset)
         scale = cursors.SCALES[i // 24]
-        size = cursors.snap(16, scale)
+        size = cursors.pixels(scale)
         assert image == (36, kind, nominal, 1, size, size,
                          cursors.snap(8, scale), cursors.snap(8, scale), 60)
         pixels = struct.unpack_from(f"<{size * size}I", data, offset + 36)
         assert list(pixels) == frames[scale][i % 24]
     arrow = (theme / "default").read_bytes()
     assert struct.unpack_from("<I", arrow, 12)[0] == len(cursors.SCALES), "Normal pointer must remain static"
-    # 1.25x, 1.5x, 1.75x: sizes of their own, each 1x pixel one or two whole ones.
+    # Every pixel size, 1.25x, 1.5x, 1.75x and 3x among them: each 1x pixel
+    # one or two whole ones (or three), sharp.
     sizes = [struct.unpack_from("<III", arrow, 16 + 12 * i)[1] for i in range(len(cursors.SCALES))]
-    assert sizes == [16, 20, 24, 28, 32], sizes
+    assert sizes == [16, 20, 24, 28, 32, 48], sizes
 print("ok: dog bone spins clockwise; aliases, hotspots, timing and HiDPI pixels")
 
 # The Mouse panel's Thick I-Beam: the text cursor, twice as thick, with
