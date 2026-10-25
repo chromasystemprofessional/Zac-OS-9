@@ -528,9 +528,11 @@ void launch_fill_logo_menu(struct mb_menu *menu, const struct app *apps, int n_a
 			{ "Calculator", "zacos9-calculator" },
 			{ "Dog Ears", "zacos9-dogears" },
 			{ "Bark Recorder", "zacos9-barkrecorder" },
+			{ "Jigsaw Puzzle", "zacos9-jigsaw" },
 			{ "Key Tags", "zacos9-keytags" },
 			{ "Notepad", "zacos9-notepad" },
 			{ "Pedigree", "zacos9-pedigree" },
+			{ "Plotter", "zacos9-plotter" },
 			{ "Stash", "zacos9-stash" },
 		};
 		for (size_t i = 0; i < sizeof(accessories) / sizeof(accessories[0]); i++) {
