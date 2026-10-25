@@ -5,8 +5,9 @@
  *
  *   Start/Stop        Network Identity (from File Sharing), and Screen
  *                     Sharing: Start/Stop, whether to ask first, whether
- *                     they may use the mouse and keyboard, and starting at
- *                     login; the certificate's fingerprint
+ *                     they may use the mouse and keyboard, whether they
+ *                     hear this computer's sound, and starting at login;
+ *                     the certificate's fingerprint
  *   Activity Monitor  the computers viewing this screen, with Disconnect
  *   Connect           other ZacOS computers sharing their screens (Bonjour),
  *                     or an address: Connect shows that screen here, full
@@ -243,6 +244,14 @@ private:
 			}
 			m_settings.control = on;
 			saveSettings(true);
+		};
+		y += 20;
+		m_sound = PanelCheckbox("Let them hear this computer’s sound", QPoint(BOX_L + IN, y));
+		m_sound.hint = "Plays what this computer plays on theirs too, while they view the screen.";
+		m_sound.on = m_settings.sound;
+		m_sound.toggled = [this](bool on) {
+			m_settings.sound = on;
+			saveSettings(false);
 		};
 		y += 20;
 		m_login = PanelCheckbox("Start Screen Sharing when I log in", QPoint(BOX_L + IN, y));
@@ -539,7 +548,7 @@ private:
 		m_browseTimer.stop();
 		if (tab == 0) {
 			m_host.buttons = { &m_button };
-			m_host.checks = { &m_ask, &m_control, &m_login };
+			m_host.checks = { &m_ask, &m_control, &m_sound, &m_login };
 		} else if (tab == 1) {
 			m_host.buttons = { &m_disconnect };
 			refreshActivity();
@@ -566,7 +575,7 @@ private:
 	QList<QStringList> m_connections;
 
 	PanelButton m_button;
-	PanelCheckbox m_ask, m_control, m_login;
+	PanelCheckbox m_ask, m_control, m_sound, m_login;
 	int m_identityTop = 0, m_identityBase = 0, m_identityBottom = 0;
 	int m_screenTop = 0, m_statusTop = 0, m_certBase = 0, m_screenBottom = 0;
 
