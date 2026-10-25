@@ -8,8 +8,15 @@
  * Pixel size (Monitors): one for one when it fits, else shrunk evenly to
  * fit, centred on black, never stretched (fitRect). The pointer and
  * clicks land where they show; keys go as they are (X keysyms), ⌘ too.
- * Control-Option-Escape switches between full screen and a window;
- * closing the window disconnects.
+ *
+ * The bar (ControlBar) switches between the two computers: Use My
+ * Desktop puts the other screen in a window, so this one's own desktop
+ * is there beside it; Full Screen goes back. Full screen, the bar shows
+ * for a few seconds at first, then whenever the pointer rests against
+ * the top of the screen; in a window it is along the window's top.
+ * Control-Option-Escape switches too. It also turns the other computer's
+ * sound on and off (sound.h), and disconnects; so does closing the
+ * window.
  *
  * The connection (rfb.h): the other computer's certificate is shown by
  * its fingerprint the first time, to check against its Screen Sharing
@@ -26,6 +33,8 @@
 #include <QPainter>
 #include <QPixmap>
 #include <QSaveFile>
+#include <QScreen>
+#include <QTimer>
 #include <QWheelEvent>
 #include <QWidget>
 #include <unistd.h>
@@ -33,8 +42,11 @@
 #include "alert.h"
 #include "common.h"
 #include "logindialog.h"
+#include "panelkit.h"
+#include "pixels.h"
 #include "platinumshell.h"
 #include "rfb.h"
+#include "sound.h"
 
 using namespace screenshare;
 
@@ -74,25 +86,154 @@ static QString shownFingerprint(const QString &print) {
 	return print.left(39) + "\n" + print.mid(40);
 }
 
+static constexpr int BAR_H = 32;          /* the bar, at 1x */
+static constexpr int BAR_W = 470;         /* full screen: a tab at the top */
+static constexpr int BAR_SHOW_MS = 4000;  /* shown this long when full screen begins */
+static constexpr int BAR_DWELL_MS = 400;  /* the pointer at the top this long shows it */
+static constexpr int BAR_LINGER_MS = 700; /* and gone from it this long hides it */
+static constexpr uint32_t FACE = GRAY(0xD);
+
+/* Use My Desktop (or Full Screen), Sound, Disconnect, and who it is. */
+class ControlBar : public QWidget {
+public:
+	explicit ControlBar(QWidget *parent) : QWidget(parent), m_panel(this) {
+		setMouseTracking(true);
+		setFocusPolicy(Qt::NoFocus);
+		setAttribute(Qt::WA_OpaquePaintEvent);
+		setCursor(Qt::ArrowCursor); /* this computer's pointer, not the other's */
+		m_switch = PanelButton("Use My Desktop", QRect(10, 6, 112, PL_BUTTON_H));
+		m_sound = PanelCheckbox("Sound", QPoint(134, 10));
+		m_sound.on = true;
+		m_disconnect = PanelButton("Disconnect", QRect(0, 6, 86, PL_BUTTON_H));
+		m_panel.buttons = { &m_switch, &m_disconnect };
+		m_panel.checks = { &m_sound };
+		m_disconnect.hint = "Stops showing the other computer’s screen here.";
+	}
+
+	PanelButton m_switch, m_disconnect;
+	PanelCheckbox m_sound;
+
+	/* Full screen: a tab; in a window: the window's top, full width. */
+	void setFullScreen(bool on) {
+		m_fullScreen = on;
+		m_switch.label = std::make_unique<Text>(on ? "Use My Desktop" : "Full Screen",
+			m_switch.rect.width() - 8, PL_FONT_SYSTEM);
+		m_switch.hint = on
+			? "Shows the other computer in a window, so you can use this one beside it "
+			  "(Control-Option-Escape)."
+			: "Shows the other computer full screen again (Control-Option-Escape).";
+		update();
+	}
+	void setNote(const QString &note) {
+		m_note = note;
+		update();
+	}
+	void setSoundHint(const QString &hint) { m_sound.hint = hint; }
+
+protected:
+	void paintEvent(QPaintEvent *) override {
+		const int w = width(), h = height();
+		m_disconnect.rect.moveLeft(w - 10 - m_disconnect.rect.width());
+		Pixels px(w, h);
+		pl_canvas *c = &px.c;
+		pl_fill(c, 0, 0, w - 1, h - 1, FACE);
+		/* Platinum's raised face: light at the top left, shadow below. */
+		pl_hline(c, 0, w - 1, 0, C_WHITE);
+		pl_vline(c, 0, 0, h - 1, C_WHITE);
+		pl_hline(c, 0, w - 1, h - 2, GRAY(0xA));
+		pl_hline(c, 0, w - 1, h - 1, C_BLACK);
+		if (m_fullScreen) {
+			pl_vline(c, w - 2, 0, h - 2, GRAY(0xA));
+			pl_vline(c, 0, 0, h - 1, C_BLACK);
+			pl_vline(c, w - 1, 0, h - 1, C_BLACK);
+		}
+		const int noteX = m_sound.hitRect().right() + 14;
+		panelText(c, m_note, noteX, 20, PL_FONT_SYSTEM, C_BLACK, m_disconnect.rect.left() - 10 - noteX);
+		m_panel.paintControls(c, FACE);
+		QPainter p(this);
+		px.blit(p);
+	}
+	void mousePressEvent(QMouseEvent *e) override { m_panel.hostPress(e); }
+	void mouseMoveEvent(QMouseEvent *e) override { m_panel.hostMove(e); }
+	void mouseReleaseEvent(QMouseEvent *e) override { m_panel.hostRelease(e); }
+	void mouseDoubleClickEvent(QMouseEvent *e) override { m_panel.hostPress(e); }
+
+private:
+	PanelHost m_panel;
+	bool m_fullScreen = true;
+	QString m_note;
+};
+
 class Viewer : public QWidget {
 public:
-	Viewer(const QString &host, quint16 port, const QString &name) : m_host(host), m_name(name) {
+	Viewer(const QString &host, quint16 port, const QString &name) : m_host(host), m_name(name), m_port(port) {
 		setWindowTitle(name.isEmpty() ? host : name);
 		setAttribute(Qt::WA_OpaquePaintEvent);
 		setMouseTracking(true);
 		setFocusPolicy(Qt::StrongFocus);
 		resize(800, 600);
+		m_bar = new ControlBar(this);
+		m_bar->setNote(name.isEmpty() ? host : name);
+		m_bar->m_switch.clicked = [this] { toggleFullScreen(); };
+		m_bar->m_disconnect.clicked = [this] { close(); };
+		m_bar->m_sound.toggled = [this](bool on) {
+			m_wantSound = on;
+			on ? openSound() : m_sound.close();
+		};
+		m_bar->setSoundHint("Plays the other computer’s sound here.");
+		m_barHide.setSingleShot(true);
+		m_barHide.callOnTimeout([this] {
+			if (isFullScreen() && !m_bar->underMouse()) {
+				m_bar->hide();
+			}
+		});
+		m_barDwell.setSingleShot(true);
+		m_barDwell.callOnTimeout([this] {
+			if (isFullScreen()) {
+				m_bar->show();
+				m_bar->raise();
+			}
+		});
+		m_sound.playing = [this] {
+			m_soundWhy.clear();
+			m_bar->setSoundHint("Plays the other computer’s sound here.");
+			showNote();
+		};
+		m_sound.stopped = [this](const QString &why) {
+			if (why.isEmpty()) {
+				return; /* turned off here */
+			}
+			/* Not to be had: say why, and leave the box for another try. */
+			m_soundWhy = why;
+			m_bar->m_sound.on = false;
+			m_wantSound = false;
+			m_bar->setSoundHint(why);
+			showNote();
+		};
 		m_rfb.checkCertificate = [this](const QString &print) { return trust(print); };
 		m_rfb.credentials = [this](QString *user, QString *password, const QString &error) {
 			const LoginDialog::Result r = LoginDialog::ask(this, m_name.isEmpty() ? m_host : m_name,
 				false, false, error, "computer");
 			*user = r.user;
 			*password = r.password;
+			/* Kept for the sound, which logs in the same way. */
+			m_user = r.user;
+			m_password = r.password;
 			return r.accepted;
 		};
 		m_rfb.connected = [this](const QString &serverName) {
 			if (m_name.isEmpty() && !serverName.isEmpty()) {
 				setWindowTitle(serverName);
+				m_serverName = serverName;
+				showNote();
+			}
+			if (m_wantSound) {
+				openSound();
+			}
+			if (isFullScreen()) {
+				m_bar->show();
+				m_bar->raise();
+				m_barHide.start(BAR_SHOW_MS);
 			}
 		};
 		m_rfb.resized = [this] { update(); };
@@ -135,9 +276,41 @@ protected:
 		}
 	}
 
-	void resizeEvent(QResizeEvent *) override { applyCursor(); }
+	void resizeEvent(QResizeEvent *) override {
+		placeBar();
+		applyCursor();
+	}
 
-	void mouseMoveEvent(QMouseEvent *e) override { sendPointer(e->position(), m_buttons); }
+	void changeEvent(QEvent *e) override {
+		QWidget::changeEvent(e);
+		if (e->type() == QEvent::WindowStateChange) {
+			placeBar();
+			if (isFullScreen()) {
+				/* Where the way back is: shown at first, then put away. */
+				m_bar->show();
+				m_bar->raise();
+				m_barHide.start(BAR_SHOW_MS);
+			}
+			update();
+			applyCursor();
+		}
+	}
+
+	void mouseMoveEvent(QMouseEvent *e) override {
+		if (isFullScreen()) {
+			/* Resting against the top: the bar. Away from it: hidden. */
+			const bool atTop = e->position().y() < 2;
+			if (atTop && !m_bar->isVisible() && !m_barDwell.isActive() && m_buttons == 0) {
+				m_barDwell.start(BAR_DWELL_MS);
+			} else if (!atTop) {
+				m_barDwell.stop();
+			}
+			if (m_bar->isVisible() && e->position().y() > BAR_H + 24 && !m_barHide.isActive()) {
+				m_barHide.start(BAR_LINGER_MS);
+			}
+		}
+		sendPointer(e->position(), m_buttons);
+	}
 	void mousePressEvent(QMouseEvent *e) override {
 		m_buttons |= button(e->button());
 		sendPointer(e->position(), m_buttons);
@@ -162,7 +335,7 @@ protected:
 		const auto mods = e->modifiers();
 		if (e->key() == Qt::Key_Escape && (mods & Qt::ControlModifier) && (mods & Qt::AltModifier)) {
 			/* The way out of full screen, and back. */
-			isFullScreen() ? showNormal() : showFullScreen();
+			toggleFullScreen();
 			return;
 		}
 		m_rfb.key(e->nativeVirtualKey(), true);
@@ -173,6 +346,7 @@ protected:
 	void focusOutEvent(QFocusEvent *) override { m_buttons = 0; }
 
 	void closeEvent(QCloseEvent *) override {
+		m_sound.close();
 		m_rfb.close();
 		qApp->quit();
 	}
@@ -180,15 +354,66 @@ protected:
 	bool focusNextPrevChild(bool) override { return false; } /* Tab goes over there too */
 
 private:
-	QSize devicePixels() const {
+	/* In a window, the bar takes the top; full screen, it floats over. */
+	int barSpace() const { return isFullScreen() ? 0 : BAR_H; }
+
+	/* Where the other screen may go, in this screen's pixels. */
+	QRect viewPixels() const {
 		const qreal dpr = devicePixelRatioF();
-		return QSize(qRound(width() * dpr), qRound(height() * dpr));
+		const int top = qRound(barSpace() * dpr);
+		return QRect(0, top, qRound(width() * dpr), qRound(height() * dpr) - top);
 	}
 
 	QRect screenRect() const {
-		const QSize s = devicePixels();
+		const QRect area = viewPixels();
 		const QImage &fb = m_rfb.framebuffer();
-		return fb.isNull() ? QRect(QPoint(), s) : fitRect(fb.width(), fb.height(), s.width(), s.height());
+		return fb.isNull() ? area
+			: fitRect(fb.width(), fb.height(), area.width(), area.height()).translated(area.topLeft());
+	}
+
+	void placeBar() {
+		m_bar->setFullScreen(isFullScreen());
+		if (isFullScreen()) {
+			const int w = std::min(BAR_W, width());
+			m_bar->setGeometry((width() - w) / 2, 0, w, BAR_H);
+		} else {
+			m_barHide.stop();
+			m_barDwell.stop();
+			m_bar->setGeometry(0, 0, width(), BAR_H);
+			m_bar->show();
+		}
+	}
+
+	/* Between full screen and a window, with this computer's own desktop
+	 * around it: big enough to see, small enough to leave room. */
+	void toggleFullScreen() {
+		if (!isFullScreen()) {
+			showFullScreen();
+			return;
+		}
+		showNormal();
+		if (!m_sized) {
+			m_sized = true;
+			const QRect avail = screen() ? screen()->availableGeometry() : QRect(0, 0, 1024, 768);
+			const QImage &fb = m_rfb.framebuffer();
+			const QSize room(avail.width() * 3 / 4, avail.height() * 3 / 4 - BAR_H);
+			QSize view = fb.isNull() ? room : QSize(fb.width(), fb.height()).scaled(room, Qt::KeepAspectRatio);
+			resize(view.width(), view.height() + BAR_H);
+		}
+	}
+
+	void showNote() {
+		const QString who = !m_name.isEmpty() ? m_name : !m_serverName.isEmpty() ? m_serverName : m_host;
+		/* Why not is the Sound box's hint: too long for here. */
+		m_bar->setNote(m_soundWhy.isEmpty() ? who : who + " · no sound");
+	}
+
+	void openSound() {
+		if (m_print.isEmpty()) {
+			m_sound.stopped("The connection isn’t secure enough for sound.");
+			return;
+		}
+		m_sound.open(m_host, static_cast<quint16>(m_port + AUDIO_PORT_OFFSET), m_print, m_user, m_password);
 	}
 
 	/* Framebuffer pixels to widget (logical) coordinates, for repainting. */
@@ -248,6 +473,7 @@ private:
 		const QString known = knownFingerprint(m_host);
 		const QString who = m_name.isEmpty() ? m_host : "“" + m_name + "”";
 		if (known == print) {
+			m_print = print;
 			return true;
 		}
 		if (known.isEmpty()) {
@@ -263,11 +489,21 @@ private:
 			return false;
 		}
 		rememberFingerprint(m_host, print);
+		m_print = print;
 		return true;
 	}
 
 	RfbClient m_rfb;
-	QString m_host, m_name;
+	SoundClient m_sound;
+	ControlBar *m_bar = nullptr;
+	QTimer m_barHide, m_barDwell;
+	QString m_host, m_name, m_serverName;
+	quint16 m_port;
+	QString m_print;           /* the certificate's, once trusted */
+	QString m_user, m_password; /* the login, for the sound's */
+	bool m_wantSound = true;
+	QString m_soundWhy;        /* why there's no sound, if there isn't */
+	bool m_sized = false;
 	int m_buttons = 0;
 	QImage m_cursor;
 	QPoint m_hotspot;

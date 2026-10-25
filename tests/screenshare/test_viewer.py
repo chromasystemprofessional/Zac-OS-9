@@ -11,7 +11,10 @@ programs' 1280 x 720 pixels are 853 x 480 logical), running the viewer:
   whatever the guest's Pixel size (no blur, no stretch), but for where
   each one's pointer is;
 - a click on the guest lands on the same pixel of the host's window;
-- a key typed on the guest reaches the host's window.
+- a key typed on the guest reaches the host's window;
+- the bar: shown at first, put away, back when the pointer rests at the
+  top; its Use My Desktop puts the host's screen in a window, and
+  Control-Option-Escape makes it full screen again.
 
 usage: test_viewer.py ZACOS9-WM VIEWER IDLE-CLIENT VPTR RAWSHOT
 """
@@ -30,6 +33,10 @@ if not shutil.which("wayvnc"):
     print("SKIP: wayvnc is not installed")
     sys.exit(77)
 GREEN = bytes((0x00, 0xAA, 0x00))
+FACE = bytes((0xDD, 0xDD, 0xDD))
+SCALE = 1.5
+# The bar, full screen: 470 x 32 logical, centred at the top (viewer.cpp).
+BAR_X = (round(1280 / SCALE) - 470) // 2
 
 
 def wait_for(what, check, seconds=15):
@@ -124,6 +131,18 @@ with tempfile.TemporaryDirectory(prefix="zacos9-viewer-") as directory:
         # The host's pointer and the guest's are each drawn where they are.
         hw, hh, host = shot(host_env, top / "host")
 
+        def bar_shown():
+            """The bar's face below its buttons, where the host has other pixels."""
+            gw, gh, guest = shot(guest_env, top / "guest")
+            y = round(29 * SCALE)
+            xs = [round((BAR_X + dx) * SCALE) for dx in (4, 235, 466)]
+            return gw == hw and all(at(guest, gw, x, y) == FACE and at(host, hw, x, y) != FACE for x in xs)
+        try:
+            wait_for("the bar", bar_shown, 15)
+            check(True, "full screen, the bar shows at first")
+        except AssertionError:
+            check(False, "full screen, the bar shows at first")
+
         def pointer(x, y):
             return 90 <= x < 130 and 90 <= y < 130 or 140 <= x < 200 and 140 <= y < 200
 
@@ -168,6 +187,51 @@ with tempfile.TemporaryDirectory(prefix="zacos9-viewer-") as directory:
             return "key k" in keys
         wait_for("the key on the host", typed, 20)
         check(True, "a key typed on the guest reaches the host's window")
+
+        # The pointer resting at the top brings the bar back.
+        middle = BAR_X + 235
+        subprocess.run([vptr, "home", "move", str(middle), "0", "wait", "1200"], env=guest_env, check=True,
+                       timeout=20)
+        try:
+            wait_for("the bar again", bar_shown, 5)
+            check(True, "the pointer resting at the top of the screen shows the bar")
+        except AssertionError:
+            check(False, "the pointer resting at the top of the screen shows the bar")
+
+        # Use My Desktop: the host's screen in a window, the guest's own around it.
+        subprocess.run([vptr, "move", str(BAR_X + 66 - middle), "16", "click", "wait", "500"], env=guest_env,
+                       check=True, timeout=20)
+
+        def windowed():
+            gw, gh, guest = shot(guest_env, top / "guest")
+            differ = sum(1 for y in range(0, hh, 8) for x in range(0, hw, 8)
+                         if at(guest, gw, x, y) != at(host, hw, x, y))
+            return differ > (hw // 8) * (hh // 8) // 5
+        try:
+            wait_for("a window", windowed, 10)
+            check(True, "Use My Desktop puts the host's screen in a window")
+        except AssertionError:
+            check(False, "Use My Desktop puts the host's screen in a window")
+
+        # Control-Option-Escape: full screen again, the host's pixels one for one.
+        # (The pointer then goes off the bar, which stays while it's there.)
+        subprocess.run([vptr, "hold", "control", "hold", "option", "key", "Escape", "release", "option",
+                        "release", "control", "wait", "300", "move", "0", "300"], env=guest_env, check=True,
+                       timeout=20)
+        def full_screen_again():
+            # Both pointers have moved: up to a pointer's worth each may differ.
+            hw2, hh2, host2 = shot(host_env, top / "host")
+            gw, gh, guest = shot(guest_env, top / "guest")
+            if (gw, gh) != (hw2, hh2):
+                return False
+            wrong = sum(1 for y in range(0, hh2, 2) for x in range(0, hw2, 2)
+                        if at(guest, gw, x, y) != at(host2, hw2, x, y))
+            return wrong < 300
+        try:
+            wait_for("full screen again", full_screen_again, 20)
+            check(True, "Control-Option-Escape makes it full screen again")
+        except AssertionError:
+            check(False, "Control-Option-Escape makes it full screen again")
     except Exception:
         for log in logs:
             log.seek(0)
