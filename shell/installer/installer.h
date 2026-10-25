@@ -67,6 +67,7 @@ private:
 	QProcess *m_installProcess = nullptr;
 	double m_progress = 0.0;
 	QString m_status;
+	QString m_restartError; /* why Restart couldn't, on the last screen */
 	QString m_lastOutput; /* last non-protocol line from the helper, shown on failure */
 	int m_step = 0;
 	bool m_updating = false; /* updating an installed system, not installing */

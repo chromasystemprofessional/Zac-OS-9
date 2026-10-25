@@ -1,4 +1,5 @@
 #include "installer.h"
+#include "power.h"
 
 #include <QCoreApplication>
 #include <QElapsedTimer>
@@ -423,6 +424,9 @@ void InstallerWindow::paintDone(pl_canvas *c) {
 		: "ZacOS 9 has been installed. Remove the installer disk "
 		  "and click Restart to start your new system.",
 		MARGIN, 166, W - 2 * MARGIN);
+	if (!m_restartError.isEmpty()) {
+		bodyText(c, m_restartError, MARGIN, BTN_Y - 36, W - 2 * MARGIN);
+	}
 
 	m_restart.paint(c);
 }
@@ -515,7 +519,9 @@ void InstallerWindow::mouseReleaseEvent(QMouseEvent *e) {
 		break;
 	case Screen::Done:
 		if (m_restart.release(pos)) {
-			QProcess::startDetached("reboot", {});
+			/* systemctl, not reboot: /usr/sbin isn't on a user's PATH (issue #38). */
+			m_restartError = systemPower(Power::Restart);
+			update();
 		}
 		break;
 	default:
