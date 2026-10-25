@@ -7,14 +7,16 @@
  * For the Monitors panel we also publish each screen's state and modes
  * in $XDG_RUNTIME_DIR/zacos9-outputs-$WAYLAND_DISPLAY:
  *   output NAME WxH scale S nested 0|1 x X y Y main 0|1
- * (S as a decimal: 1, 1.25, 1.5, 2, 3)
+ * (S as a decimal: 1, 1.25, 1.5, 1.75, 2, 3)
  *   mode WxH@mHz
  * and, once, "mirror 0|1", then "tablet NAME" for each tablet. X and Y are the screen's place in the layout
  * (logical pixels: the size divided by the scale).
  *
  * Several screens: "main-display=NAME" has the menu bar and desktop icons;
- * "display.NAME.resolution=WxH" and "display.NAME.x|y=N" set a screen's
- * size and place; "mirror=1" puts every screen at the same place.
+ * "display.NAME.resolution=WxH", "display.NAME.scale=S" and
+ * "display.NAME.x|y=N" set a screen's size, pixel size and place (each
+ * screen its own; "resolution" and "scale" alone are for screens without
+ * one); "mirror=1" puts every screen at the same place.
  */
 #define _GNU_SOURCE
 #include <math.h>
@@ -37,6 +39,7 @@
 
 #include "hotkey.h"
 #include "access.h"
+#include "frame.h"
 #include "server.h"
 #include "settings.h"
 
@@ -61,7 +64,7 @@ static int setting_int(const char *key, int fallback, int min, int max) {
 }
 
 float prefs_parse_scale(const char *s, float fallback) {
-	static const float scales[] = { 1, 1.25f, 1.5f, 2, 3, 4 };
+	static const float scales[] = { 1, 1.25f, 1.5f, 1.75f, 2, 3, 4 };
 	if (!s) {
 		return fallback;
 	}
@@ -78,10 +81,15 @@ float prefs_parse_scale(const char *s, float fallback) {
 	return fallback;
 }
 
-/* The Monitors panel's scale; 4 is only for -S. */
-static float setting_scale(float fallback) {
-	char v[32];
-	const float scale = pl_setting("scale", v, sizeof(v)) ? prefs_parse_scale(v, fallback) : fallback;
+/* The Monitors panel's scale for a screen, else for every screen; 4 is
+ * only for -S. */
+static float setting_scale(const struct wlr_output *o, float fallback) {
+	char v[32], key[96];
+	snprintf(key, sizeof(key), "display.%s.scale", o->name);
+	if (!pl_setting(key, v, sizeof(v)) && !pl_setting("scale", v, sizeof(v))) {
+		return fallback;
+	}
+	const float scale = prefs_parse_scale(v, fallback);
 	return scale <= 3 ? scale : fallback;
 }
 
@@ -162,9 +170,10 @@ void prefs_write_outputs(struct plat_server *server) {
 }
 
 static void prefer_scale(struct wlr_scene_buffer *buffer, int sx, int sy, void *data) {
-	const float scale = *(float *)data;
 	struct wlr_scene_surface *scene_surface = wlr_scene_surface_try_from_buffer(buffer);
-	if (scene_surface) {
+	/* Each surface the scale of the screen it is (mostly) on. */
+	if (scene_surface && buffer->primary_output) {
+		const float scale = buffer->primary_output->output->scale;
 		/* 1.5: 2x buffers for those without wp_fractional_scale_v1. */
 		wlr_surface_set_preferred_buffer_scale(scene_surface->surface, (int32_t)ceilf(scale));
 		wlr_fractional_scale_v1_notify_scale(scene_surface->surface, scale);
@@ -174,8 +183,8 @@ static void prefer_scale(struct wlr_scene_buffer *buffer, int sx, int sy, void *
 /* wlroots tells a surface its preferred buffer scale when it enters an
  * output, not when the output's scale changes; Qt then draws at the new
  * scale but labels its buffers with the old one. Tell everyone. */
-static void refresh_surface_scales(struct plat_server *server, float scale) {
-	wlr_scene_node_for_each_buffer(&server->scene->tree.node, prefer_scale, &scale);
+static void refresh_surface_scales(struct plat_server *server) {
+	wlr_scene_node_for_each_buffer(&server->scene->tree.node, prefer_scale, NULL);
 }
 
 /* A screen's scale until one is chosen: 2x when it is dense enough
@@ -190,13 +199,17 @@ static float automatic_scale(struct plat_server *server, struct wlr_output *o) {
 }
 
 /* Apply the chosen scale and resolution to one output. */
+float prefs_output_scale(struct plat_server *server, struct wlr_output *o) {
+	return setting_scale(o, automatic_scale(server, o));
+}
+
 static void apply_output(struct plat_server *server, struct plat_output *output) {
 	struct wlr_output *o = output->wlr_output;
 	struct wlr_output_state state;
 	wlr_output_state_init(&state);
 	bool changed = false;
 
-	const float scale = setting_scale(automatic_scale(server, o));
+	const float scale = prefs_output_scale(server, o);
 	if (o->scale != scale) {
 		wlr_output_state_set_scale(&state, scale);
 		changed = true;
@@ -223,10 +236,9 @@ static void apply_output(struct plat_server *server, struct plat_output *output)
 		}
 	}
 	if (changed && wlr_output_commit_state(o, &state)) {
-		server->output_scale = scale;
 		wlr_xcursor_manager_load(server->cursor_mgr, scale);
 		layers_arrange(output);
-		refresh_surface_scales(server, scale);
+		refresh_surface_scales(server);
 	}
 	wlr_output_state_finish(&state);
 }
@@ -342,6 +354,16 @@ void prefs_apply(struct plat_server *server) {
 		apply_output(server, output);
 	}
 	apply_layout(server);
+	/* X11 and the mouse tracks have one scale: the main screen's. */
+	struct plat_output *main = output_main(server);
+	if (main) {
+		server->output_scale = main->wlr_output->scale;
+	}
+	/* Window frames at a screen's new scale, or its new place. */
+	struct plat_view *view;
+	wl_list_for_each(view, &server->views, link) {
+		frame_commit(view->frame);
+	}
 	tablet_map(server); /* the Tablet panel's screen, or a new main display */
 	touch_map(server);
 	view_refresh_fullscreen(server);

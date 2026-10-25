@@ -2,9 +2,18 @@
  * zacos9-menubar: the Mac OS 8/9 menu bar for zacos9-wm.
  *
  * The bar is a wlr-layer-shell surface at the top of the screen with a
- * 20 px exclusive zone. While a menu is open, a transparent full-screen
- * overlay surface takes the pointer and keyboard (classic menus are modal);
- * the menu itself is a small subsurface of it, so redraws stay cheap.
+ * 20 px exclusive zone: on the main display (zacos9-wm keeps it there), or
+ * with "menubar-every-display=1" (the Monitors panel's Menu Bar on Every
+ * Display) one on each screen, each at that screen's scale. The bar last
+ * pointed at is the active one: its menus open on its screen. While a menu
+ * is open, a transparent full-screen overlay surface takes the pointer and
+ * keyboard (classic menus are modal); the menu itself is a small subsurface
+ * of it, so redraws stay cheap.
+ *
+ * At 1.25, 1.5 and 1.75 (wp_fractional_scale_v1) everything is drawn at
+ * the screen's own pixels, each 1x pixel one or two of them (pl_snap), and
+ * shown through a viewport at its logical size: sharp, where 2x shrunk by
+ * zacos9-wm would be soft.
  *
  * Tracking follows Mac OS 8: press a title and drag to an item; or click a
  * title and the menu stays open ("sticky") until the next click. An item
@@ -27,6 +36,7 @@
 #include <wayland-cursor.h>
 #include <xkbcommon/xkbcommon.h>
 
+#include "fractional-scale-v1-client-protocol.h"
 #include "icons.h"
 #include "menubar.h"
 #include "platinum-shell-v1-client-protocol.h"
@@ -43,36 +53,66 @@
 /* SIDE_CONTEXT: a contextual menu at the pointer, not from a title. */
 enum side { SIDE_LEFT, SIDE_RIGHT, SIDE_CONTEXT };
 
+/* A screen, as zacos9-wm announces it. */
+struct output {
+	struct wl_list link;
+	uint32_t global;
+	struct wl_output *wl;
+	int scale; /* wl_output.scale, if the compositor can't tell a surface its own */
+};
+
+/* A menu bar: the one on the main display (no output named), or one on
+ * each screen. */
+struct bar {
+	struct wl_list link;
+	struct output *output; /* NULL: wherever zacos9-wm puts it (the main display) */
+	struct wl_surface *surface;
+	struct zwlr_layer_surface_v1 *layer;
+	int width; /* logical screen width */
+	int scale;
+	int quarters; /* a fractional scale (5, 6, 7: 1.25, 1.5, 1.75), else 0 */
+	struct wp_viewport *viewport;
+	struct wp_fractional_scale_v1 *fractional;
+	bool configured;
+};
+
 static struct {
 	struct wl_display *display;
 	struct wl_compositor *compositor;
 	struct wl_subcompositor *subcompositor;
 	struct wl_shm *shm;
 	struct wl_seat *seat;
-	struct wl_output *output;
 	struct zwlr_layer_shell_v1 *layer_shell;
 	struct zwlr_foreign_toplevel_manager_v1 *toplevel_mgr;
 	struct wp_viewporter *viewporter;
+	struct wp_fractional_scale_manager_v1 *fractional;
 	struct zwp_virtual_keyboard_manager_v1 *vkbd_mgr;
 	struct platinum_shell_v1 *platinum_shell;
+	int compositor_version;
+
+	struct wl_list outputs; /* struct output */
+	struct wl_list bars;    /* struct bar */
+	bool every_display;     /* a bar on each screen */
+	/* The active bar, and what of it menus use: its screen's width and
+	 * scale, and the screen to open them on (NULL: the main display). */
+	struct bar *active;
+	int width;
 	int scale;
+	int quarters;
+	struct wl_output *output;
 
 	struct wl_pointer *pointer;
 	struct wl_keyboard *keyboard;
-	struct wl_cursor_theme *cursor_theme;
+	struct wl_cursor_theme *cursor_themes[4]; /* by scale, loaded when needed */
+	int cursor_px;
 	struct wl_surface *cursor_surface;
 	double px, py; /* pointer, in screen (= surface) coordinates */
-
-	/* The bar. */
-	struct wl_surface *bar_surface;
-	struct zwlr_layer_surface_v1 *bar_layer;
-	int width; /* logical screen width */
-	bool bar_configured;
 
 	/* The overlay that exists while a menu is open. */
 	struct wl_surface *overlay;
 	struct zwlr_layer_surface_v1 *overlay_layer;
 	struct wp_viewport *overlay_viewport;
+	struct wp_viewport *menu_viewport, *sub_viewport, *hint_viewport;
 	struct wl_surface *menu_surface;
 	struct wl_subsurface *menu_sub;
 	bool overlay_configured;
@@ -139,10 +179,18 @@ static void buffer_release(void *data, struct wl_buffer *wl_buffer) {
 
 static const struct wl_buffer_listener buffer_listener = { .release = buffer_release };
 
-/* Upscale a logical 1x ARGB image into a new shm buffer at the output
- * scale (nearest neighbour: pixel art stays crisp). */
-static struct wl_buffer *make_buffer(const uint32_t *src, int w, int h) {
-	int s = g.scale, bw = w * s, bh = h * s;
+/* Upscale a logical 1x ARGB canvas into a new shm buffer at a scale
+ * (nearest neighbour: pixel art stays crisp): s times, or at a fractional
+ * scale (quarters) to the screen's pixels for an image whose top left is
+ * (x, y) on the screen, its text in that scale's font. */
+static struct wl_buffer *make_buffer(const struct pl_canvas *c, int s, int quarters, int x, int y) {
+	const uint32_t *src = c->px;
+	const int w = c->width, h = c->height;
+	int bw = w * s, bh = h * s;
+	if (quarters) {
+		bw = pl_snap(x + w, quarters) - pl_snap(x, quarters);
+		bh = pl_snap(y + h, quarters) - pl_snap(y, quarters);
+	}
 	size_t size = (size_t)bw * bh * 4;
 	int fd = memfd_create("zacos9-menubar", MFD_CLOEXEC);
 	if (fd < 0 || ftruncate(fd, size) < 0) {
@@ -156,10 +204,14 @@ static struct wl_buffer *make_buffer(const uint32_t *src, int w, int h) {
 		close(fd);
 		return NULL;
 	}
-	for (int y = 0; y < bh; y++) {
-		const uint32_t *row = src + (y / s) * w;
-		for (int x = 0; x < bw; x++) {
-			dst[y * bw + x] = row[x / s];
+	if (quarters) {
+		pl_snap_scale_canvas(c, x, y, quarters, dst);
+	} else {
+		for (int j = 0; j < bh; j++) {
+			const uint32_t *row = src + (j / s) * w;
+			for (int i = 0; i < bw; i++) {
+				dst[j * bw + i] = row[i / s];
+			}
 		}
 	}
 	struct wl_shm_pool *pool = wl_shm_create_pool(g.shm, fd, size);
@@ -173,15 +225,37 @@ static struct wl_buffer *make_buffer(const uint32_t *src, int w, int h) {
 	return b->wl;
 }
 
-static void present(struct wl_surface *surface, const uint32_t *px, int w, int h) {
-	struct wl_buffer *buf = make_buffer(px, w, h);
+/* A canvas's image at (x, y) on the screen, its top left there. Frees
+ * its text log. */
+static void present_at(struct wl_surface *surface, struct wp_viewport *viewport,
+		struct pl_canvas *c, int x, int y, int scale, int quarters) {
+	quarters = viewport ? quarters : 0;
+	const int w = c->width, h = c->height;
+	struct wl_buffer *buf = make_buffer(c, scale, quarters, x, y);
+	pl_text_log_free(c->log);
+	c->log = NULL;
 	if (!buf) {
 		return;
 	}
-	wl_surface_set_buffer_scale(surface, g.scale);
+	wl_surface_set_buffer_scale(surface, quarters ? 1 : scale);
+	if (viewport) {
+		wp_viewport_set_destination(viewport, quarters ? w : -1, quarters ? h : -1);
+	}
 	wl_surface_attach(surface, buf, 0, 0);
 	wl_surface_damage_buffer(surface, 0, 0, INT32_MAX, INT32_MAX);
 	wl_surface_commit(surface);
+}
+
+/* Menus and the rest, at the active bar's scale. */
+static void present(struct wl_surface *surface, struct wp_viewport *viewport, struct pl_canvas *c,
+		int x, int y) {
+	present_at(surface, viewport, c, x, y, g.scale, g.quarters);
+}
+
+/* A canvas over w x h pixels, logging its text at a fractional scale. */
+static struct pl_canvas canvas_for(uint32_t *px, int w, int h, int quarters) {
+	return (struct pl_canvas){ .px = px, .stride = w, .width = w, .height = h,
+		.log = quarters ? pl_text_log_new(px, w) : NULL };
 }
 
 /* ---- drawing ------------------------------------------------------------- */
@@ -205,19 +279,32 @@ static struct mbar_title *open_title_ptr(void) {
 		: &g.model.right_titles[g.open_index];
 }
 
-static void draw_bar(void) {
-	if (!g.bar_configured || g.width <= 0) {
+/* One bar with a model laid out for its width; an open menu's title
+ * highlighted on the active bar only. */
+static void paint_bar(struct bar *b, const struct mb_bar *model) {
+	if (!b->configured || b->width <= 0) {
 		return;
 	}
-	uint32_t *px = calloc((size_t)g.width * MBAR_HEIGHT, sizeof(*px));
-	struct pl_canvas c = { .px = px, .stride = g.width, .width = g.width, .height = MBAR_HEIGHT };
-	mbar_paint_background(&c, g.width);
-	int hl = g.open_side == SIDE_LEFT ? g.open_index : -1;
-	int hr = g.open_side == SIDE_RIGHT ? g.open_index : -1;
-	mbar_paint_titles(&c, g.model.left_titles, g.model.n_left, hl, pl_accent_current());
-	mbar_paint_titles(&c, g.model.right_titles, g.model.n_right, hr, pl_accent_current());
-	present(g.bar_surface, px, g.width, MBAR_HEIGHT);
+	uint32_t *px = calloc((size_t)b->width * MBAR_HEIGHT, sizeof(*px));
+	if (!px) {
+		return;
+	}
+	struct pl_canvas c = canvas_for(px, b->width, MBAR_HEIGHT, b->quarters);
+	mbar_paint_background(&c, b->width);
+	const bool here = b == g.active;
+	int hl = here && g.open_side == SIDE_LEFT ? g.open_index : -1;
+	int hr = here && g.open_side == SIDE_RIGHT ? g.open_index : -1;
+	mbar_paint_titles(&c, model->left_titles, model->n_left, hl, pl_accent_current());
+	mbar_paint_titles(&c, model->right_titles, model->n_right, hr, pl_accent_current());
+	present_at(b->surface, b->viewport, &c, 0, 0, b->scale, b->quarters);
 	free(px);
+}
+
+/* The active bar (where menus open and highlight). */
+static void draw_bar(void) {
+	if (g.active) {
+		paint_bar(g.active, &g.model);
+	}
 }
 
 /* The Zac menu's icons: in a menu with any, every name moves over for one. */
@@ -309,12 +396,12 @@ static void draw_submenu(struct menu_item *parent_items, int parent_n) {
 
 	int w = g.sub_w + MENU_SHADOW, h = g.sub_h + MENU_SHADOW;
 	uint32_t *px = calloc((size_t)w * h, sizeof(*px));
-	struct pl_canvas c = { .px = px, .stride = w, .width = w, .height = h };
+	struct pl_canvas c = canvas_for(px, w, h, g.quarters);
 	int sel = g.blinks_left > 0 && g.chosen_in_sub && !g.blink_on ? -1 : g.sub_selected;
 	menu_paint(&c, items, s->n, g.sub_w, g.sub_h, sel, pl_accent_current());
 	paint_icons(&c, s, items);
 	wl_subsurface_set_position(g.sub_sub, g.sub_x, g.sub_y);
-	present(g.sub_surface, px, w, h);
+	present(g.sub_surface, g.sub_viewport, &c, g.sub_x, g.sub_y);
 	free(px);
 }
 
@@ -338,12 +425,15 @@ static void draw_hint(struct menu_item *parent_items, int parent_n) {
 	const char *text = it ? hint_text(it, buf, sizeof(buf)) : NULL;
 	int w, h;
 	uint32_t *px = NULL;
+	struct pl_text_log *log = NULL;
+	struct pl_text_log **logged = g.quarters ? &log : NULL;
 	bool left = false;
 	if (text) {
-		px = hint_paint(text, false, &w, &h);
+		px = hint_paint(text, false, &w, &h, logged);
 		if (px && mx + mw - 8 + w > g.width) {
 			free(px);
-			px = hint_paint(text, true, &w, &h);
+			pl_text_log_free(log);
+			px = hint_paint(text, true, &w, &h, logged);
 			left = true;
 		}
 	}
@@ -360,8 +450,10 @@ static void draw_hint(struct menu_item *parent_items, int parent_n) {
 	if (y < MBAR_HEIGHT) {
 		y = MBAR_HEIGHT;
 	}
-	wl_subsurface_set_position(g.hint_sub, x < 0 ? 0 : x, y);
-	present(g.hint_surface, px, w, h);
+	x = x < 0 ? 0 : x;
+	wl_subsurface_set_position(g.hint_sub, x, y);
+	struct pl_canvas c = { .px = px, .stride = w, .width = w, .height = h, .log = log };
+	present(g.hint_surface, g.hint_viewport, &c, x, y);
 	free(px);
 }
 
@@ -402,13 +494,13 @@ static void draw_menu(void) {
 
 	int w = g.menu_w + MENU_SHADOW, h = g.menu_h + MENU_SHADOW;
 	uint32_t *px = calloc((size_t)w * h, sizeof(*px));
-	struct pl_canvas c = { .px = px, .stride = w, .width = w, .height = h };
+	struct pl_canvas c = canvas_for(px, w, h, g.quarters);
 	int sel = g.blinks_left > 0 && !g.chosen_in_sub && !g.blink_on ? -1 : g.selected;
 	menu_paint(&c, items, m->n, g.menu_w, g.menu_h, sel, pl_accent_current());
 	paint_icons(&c, m, items);
 
 	wl_subsurface_set_position(g.menu_sub, g.menu_x, g.menu_y);
-	present(g.menu_surface, px, w, h);
+	present(g.menu_surface, g.menu_viewport, &c, g.menu_x, g.menu_y);
 	free(px);
 	draw_submenu(items, m->n);
 	draw_hint(items, m->n);
@@ -421,10 +513,11 @@ static void overlay_configure(void *data, struct zwlr_layer_surface_v1 *layer,
 		uint32_t serial, uint32_t w, uint32_t h) {
 	zwlr_layer_surface_v1_ack_configure(layer, serial);
 	/* A single transparent pixel, stretched over the screen, catches input. */
-	static const uint32_t clear = 0;
+	static uint32_t clear = 0;
 	wp_viewport_set_destination(g.overlay_viewport, (int)w, (int)h);
 	g.height = (int)h;
-	struct wl_buffer *buf = make_buffer(&clear, 1, 1);
+	const struct pl_canvas one = { .px = &clear, .stride = 1, .width = 1, .height = 1 };
+	struct wl_buffer *buf = make_buffer(&one, 1, 0, 0, 0);
 	wl_surface_set_buffer_scale(g.overlay, 1);
 	wl_surface_attach(g.overlay, buf, 0, 0);
 	wl_surface_damage_buffer(g.overlay, 0, 0, INT32_MAX, INT32_MAX);
@@ -459,16 +552,19 @@ static void create_overlay(void) {
 	zwlr_layer_surface_v1_add_listener(g.overlay_layer, &overlay_listener, NULL);
 
 	g.menu_surface = wl_compositor_create_surface(g.compositor);
+	g.menu_viewport = wp_viewporter_get_viewport(g.viewporter, g.menu_surface);
 	g.menu_sub = wl_subcompositor_get_subsurface(g.subcompositor, g.menu_surface, g.overlay);
 	wl_subsurface_set_desync(g.menu_sub);
 	/* Pointer events all go to the overlay, in screen coordinates. */
 	struct wl_region *none = wl_compositor_create_region(g.compositor);
 	wl_surface_set_input_region(g.menu_surface, none);
 	g.sub_surface = wl_compositor_create_surface(g.compositor);
+	g.sub_viewport = wp_viewporter_get_viewport(g.viewporter, g.sub_surface);
 	g.sub_sub = wl_subcompositor_get_subsurface(g.subcompositor, g.sub_surface, g.overlay);
 	wl_subsurface_set_desync(g.sub_sub);
 	wl_surface_set_input_region(g.sub_surface, none);
 	g.hint_surface = wl_compositor_create_surface(g.compositor);
+	g.hint_viewport = wp_viewporter_get_viewport(g.viewporter, g.hint_surface);
 	g.hint_sub = wl_subcompositor_get_subsurface(g.subcompositor, g.hint_surface, g.overlay);
 	wl_subsurface_set_desync(g.hint_sub);
 	wl_surface_set_input_region(g.hint_surface, none);
@@ -483,10 +579,13 @@ static void destroy_overlay(void) {
 		return;
 	}
 	wl_subsurface_destroy(g.hint_sub);
+	wp_viewport_destroy(g.hint_viewport);
 	wl_surface_destroy(g.hint_surface);
 	wl_subsurface_destroy(g.sub_sub);
+	wp_viewport_destroy(g.sub_viewport);
 	wl_surface_destroy(g.sub_surface);
 	wl_subsurface_destroy(g.menu_sub);
+	wp_viewport_destroy(g.menu_viewport);
 	wl_surface_destroy(g.menu_surface);
 	zwlr_layer_surface_v1_destroy(g.overlay_layer);
 	wp_viewport_destroy(g.overlay_viewport);
@@ -497,17 +596,59 @@ static void destroy_overlay(void) {
 
 /* ---- tracking ------------------------------------------------------------ */
 
+static bool any_configured(void) {
+	struct bar *b;
+	wl_list_for_each(b, &g.bars, link) {
+		if (b->configured) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/* Every bar again: the active one's model is kept (menus open from it);
+ * one on a screen of another width gets a model laid out for that. */
 static void rebuild(void) {
 	menus_rebuild(&g.model, g.width);
 	g.rebuild_pending = false;
+	struct bar *b;
+	wl_list_for_each(b, &g.bars, link) {
+		if (b == g.active || !b->configured) {
+			continue;
+		}
+		if (b->width == g.width) {
+			paint_bar(b, &g.model);
+		} else {
+			struct mb_bar other = { 0 };
+			menus_rebuild(&other, b->width);
+			paint_bar(b, &other);
+			menus_free(&other);
+		}
+	}
 	draw_bar();
+}
+
+/* The bar the pointer came to becomes the active one. */
+static void activate(struct bar *b) {
+	if (!b || g.open_index >= 0) {
+		return;
+	}
+	const bool relayout = !g.active || b->width != g.width;
+	g.active = b;
+	g.width = b->width;
+	g.scale = b->scale;
+	g.quarters = b->quarters;
+	g.output = b->output ? b->output->wl : NULL;
+	if (relayout && b->configured) {
+		menus_rebuild(&g.model, g.width);
+	}
 }
 
 void menubar_apps_changed(void) {
 	/* Never reshuffle menus under the user's pointer. */
 	if (g.open_index >= 0) {
 		g.rebuild_pending = true;
-	} else if (g.bar_configured) {
+	} else if (any_configured()) {
 		rebuild();
 	}
 }
@@ -840,7 +981,7 @@ static void pointer_released(void) {
 static void open_context(void);
 
 void menubar_context_menu(const char *kind) {
-	if (g.open_index >= 0 || !g.bar_configured) {
+	if (g.open_index >= 0 || !g.active || !g.active->configured) {
 		return;
 	}
 	menus_context(&g.context, kind);
@@ -850,7 +991,7 @@ void menubar_context_menu(const char *kind) {
 /* The Sniffer's folder-path menu (⌘-click on a window's title), also at
  * the pointer, with the button still down. */
 void menubar_path_menu(const char *names) {
-	if (g.open_index >= 0 || !g.bar_configured) {
+	if (g.open_index >= 0 || !g.active || !g.active->configured) {
 		return;
 	}
 	menus_path(&g.context, names);
@@ -874,13 +1015,35 @@ static void open_context(void) {
 
 /* ---- input --------------------------------------------------------------- */
 
+/* zacos9-wm sets XCURSOR_THEME/SIZE to its own cursor theme; each scale
+ * a screen has, its own size of it. */
+static struct wl_cursor_theme *cursor_theme(int scale) {
+	scale = scale < 1 ? 1 : scale > 3 ? 3 : scale;
+	if (!g.cursor_themes[scale]) {
+		g.cursor_themes[scale] = wl_cursor_theme_load(getenv("XCURSOR_THEME"),
+			g.cursor_px * scale, g.shm);
+	}
+	return g.cursor_themes[scale];
+}
+
+static struct bar *bar_of(struct wl_surface *surface) {
+	struct bar *b;
+	wl_list_for_each(b, &g.bars, link) {
+		if (b->surface == surface) {
+			return b;
+		}
+	}
+	return NULL;
+}
+
 static void set_cursor(uint32_t serial) {
-	if (!g.cursor_theme) {
+	struct wl_cursor_theme *theme = cursor_theme(g.scale);
+	if (!theme) {
 		return;
 	}
-	struct wl_cursor *cursor = wl_cursor_theme_get_cursor(g.cursor_theme, "left_ptr");
+	struct wl_cursor *cursor = wl_cursor_theme_get_cursor(theme, "left_ptr");
 	if (!cursor) {
-		cursor = wl_cursor_theme_get_cursor(g.cursor_theme, "default");
+		cursor = wl_cursor_theme_get_cursor(theme, "default");
 	}
 	if (!cursor) {
 		return;
@@ -898,6 +1061,7 @@ static void pointer_enter(void *data, struct wl_pointer *p, uint32_t serial,
 		struct wl_surface *surface, wl_fixed_t x, wl_fixed_t y) {
 	g.px = wl_fixed_to_double(x);
 	g.py = wl_fixed_to_double(y);
+	activate(bar_of(surface));
 	set_cursor(serial);
 	pointer_moved();
 }
@@ -908,7 +1072,7 @@ static void pointer_leave(void *data, struct wl_pointer *p, uint32_t serial,
 
 static void pointer_motion(void *data, struct wl_pointer *p, uint32_t time,
 		wl_fixed_t x, wl_fixed_t y) {
-	/* Both of our surfaces sit at the screen origin, so surface-local
+	/* Both of our surfaces sit at their screen's origin, so surface-local
 	 * coordinates are screen coordinates (even during implicit grabs). */
 	g.px = wl_fixed_to_double(x);
 	g.py = wl_fixed_to_double(y);
@@ -1047,11 +1211,11 @@ static void output_mode(void *data, struct wl_output *o, uint32_t flags,
 }
 
 static void output_done(void *data, struct wl_output *o) {
-	draw_bar();
 }
 
 static void output_scale(void *data, struct wl_output *o, int32_t factor) {
-	g.scale = factor > 0 ? factor : 1;
+	struct output *out = data;
+	out->scale = factor > 0 ? factor : 1;
 }
 
 static const struct wl_output_listener output_listener = {
@@ -1063,25 +1227,185 @@ static const struct wl_output_listener output_listener = {
 
 static void bar_configure(void *data, struct zwlr_layer_surface_v1 *layer,
 		uint32_t serial, uint32_t w, uint32_t h) {
+	struct bar *b = data;
 	zwlr_layer_surface_v1_ack_configure(layer, serial);
-	bool resized = (int)w != g.width;
-	g.width = (int)w;
-	g.bar_configured = true;
-	if (resized || !g.model.n_left) {
-		rebuild();
+	const bool resized = (int)w != b->width;
+	b->width = (int)w;
+	b->configured = true;
+	if (!g.active) {
+		activate(b);
+	}
+	if (b == g.active) {
+		g.width = b->width;
+	}
+	if (b != g.active || resized || !g.model.n_left) {
+		/* (A menu open meanwhile keeps its layout until it closes.) */
+		if (g.open_index >= 0) {
+			g.rebuild_pending = true;
+		} else {
+			rebuild();
+		}
 	} else {
 		draw_bar();
 	}
 }
 
+static void destroy_bar(struct bar *b);
+
 static void bar_closed(void *data, struct zwlr_layer_surface_v1 *layer) {
-	g.running = false;
+	struct bar *b = data;
+	if (!b->output) {
+		g.running = false; /* the only bar, and zacos9-wm took it away */
+	} else {
+		destroy_bar(b); /* its screen is gone */
+	}
 }
 
 static const struct zwlr_layer_surface_v1_listener bar_listener = {
 	.configure = bar_configure,
 	.closed = bar_closed,
 };
+
+/* zacos9-wm tells each bar the scale of the screen it is on. */
+static void bar_enter(void *data, struct wl_surface *surface, struct wl_output *output) {
+}
+
+static void bar_leave(void *data, struct wl_surface *surface, struct wl_output *output) {
+}
+
+static void bar_preferred_scale(void *data, struct wl_surface *surface, int32_t factor) {
+	struct bar *b = data;
+	factor = factor > 0 ? factor : 1;
+	if (factor == b->scale) {
+		return;
+	}
+	b->scale = factor;
+	if (b == g.active) {
+		g.scale = factor;
+	}
+	if (b->configured && g.open_index < 0) {
+		rebuild();
+	}
+}
+
+static void bar_preferred_transform(void *data, struct wl_surface *surface, uint32_t transform) {
+}
+
+/* 1.25, 1.5, 1.75: the screen's own pixels (scale in 120ths). */
+static void bar_fractional_scale(void *data, struct wp_fractional_scale_v1 *fractional,
+		uint32_t scale) {
+	struct bar *b = data;
+	const int quarters = (int)((scale + 15) / 30);
+	const int q = quarters % 4 ? quarters : 0;
+	if (q == b->quarters) {
+		return;
+	}
+	b->quarters = q;
+	if (b == g.active) {
+		g.quarters = q;
+	}
+	if (b->configured && g.open_index < 0) {
+		rebuild();
+	}
+}
+
+static const struct wp_fractional_scale_v1_listener bar_fractional_listener = {
+	.preferred_scale = bar_fractional_scale,
+};
+
+static const struct wl_surface_listener bar_surface_listener = {
+	.enter = bar_enter,
+	.leave = bar_leave,
+	.preferred_buffer_scale = bar_preferred_scale,
+	.preferred_buffer_transform = bar_preferred_transform,
+};
+
+static void create_bar(struct output *output) {
+	struct bar *b = calloc(1, sizeof(*b));
+	if (!b) {
+		return;
+	}
+	b->output = output;
+	/* Until zacos9-wm says (wl_surface v6), the screen's own scale. */
+	b->scale = output ? output->scale : 1;
+	if (!output && !wl_list_empty(&g.outputs)) {
+		struct output *first = wl_container_of(g.outputs.next, first, link);
+		b->scale = first->scale;
+	}
+	b->surface = wl_compositor_create_surface(g.compositor);
+	if (g.compositor_version >= 6) {
+		wl_surface_add_listener(b->surface, &bar_surface_listener, b);
+	}
+	b->viewport = wp_viewporter_get_viewport(g.viewporter, b->surface);
+	if (g.fractional) {
+		b->fractional = wp_fractional_scale_manager_v1_get_fractional_scale(g.fractional,
+			b->surface);
+		wp_fractional_scale_v1_add_listener(b->fractional, &bar_fractional_listener, b);
+	}
+	b->layer = zwlr_layer_shell_v1_get_layer_surface(g.layer_shell, b->surface,
+		output ? output->wl : NULL, ZWLR_LAYER_SHELL_V1_LAYER_TOP, "zacos9-menubar");
+	zwlr_layer_surface_v1_set_anchor(b->layer,
+		ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP | ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT |
+		ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT);
+	zwlr_layer_surface_v1_set_size(b->layer, 0, MBAR_HEIGHT);
+	zwlr_layer_surface_v1_set_exclusive_zone(b->layer, MBAR_HEIGHT);
+	zwlr_layer_surface_v1_add_listener(b->layer, &bar_listener, b);
+	wl_surface_commit(b->surface);
+	wl_list_insert(g.bars.prev, &b->link);
+}
+
+static void destroy_bar(struct bar *b) {
+	if (b == g.active) {
+		close_menu();
+		g.active = NULL;
+	}
+	wl_list_remove(&b->link);
+	zwlr_layer_surface_v1_destroy(b->layer);
+	if (b->fractional) {
+		wp_fractional_scale_v1_destroy(b->fractional);
+	}
+	wp_viewport_destroy(b->viewport);
+	wl_surface_destroy(b->surface);
+	free(b);
+	if (!g.active && !wl_list_empty(&g.bars)) {
+		activate(wl_container_of(g.bars.next, b, link));
+	}
+}
+
+static bool every_display_setting(void) {
+	char v[8];
+	return pl_setting("menubar-every-display", v, sizeof(v)) && strcmp(v, "1") == 0;
+}
+
+/* One bar on the main display, or one on each screen, as the Monitors
+ * panel says; bars for screens that came or went. */
+static void sync_bars(void) {
+	const bool every = every_display_setting();
+	struct bar *b, *tmp;
+	if (every != g.every_display) {
+		close_menu();
+		wl_list_for_each_safe(b, tmp, &g.bars, link) {
+			destroy_bar(b);
+		}
+		g.every_display = every;
+	}
+	if (!every) {
+		if (wl_list_empty(&g.bars)) {
+			create_bar(NULL);
+		}
+		return;
+	}
+	struct output *o;
+	wl_list_for_each(o, &g.outputs, link) {
+		bool has = false;
+		wl_list_for_each(b, &g.bars, link) {
+			has = has || b->output == o;
+		}
+		if (!has) {
+			create_bar(o);
+		}
+	}
+}
 
 /* ---- the front window's process (global menus) ---------------------------- */
 
@@ -1181,7 +1505,10 @@ void launch_feedback_cancel(uint32_t cookie) {
 static void registry_global(void *data, struct wl_registry *reg, uint32_t name,
 		const char *iface, uint32_t version) {
 	if (strcmp(iface, wl_compositor_interface.name) == 0) {
-		g.compositor = wl_registry_bind(reg, name, &wl_compositor_interface, 4);
+		/* 6: each bar told its own screen's scale. */
+		g.compositor_version = version < 6 ? (int)version : 6;
+		g.compositor = wl_registry_bind(reg, name, &wl_compositor_interface,
+			g.compositor_version);
 	} else if (strcmp(iface, wl_subcompositor_interface.name) == 0) {
 		g.subcompositor = wl_registry_bind(reg, name, &wl_subcompositor_interface, 1);
 	} else if (strcmp(iface, wl_shm_interface.name) == 0) {
@@ -1189,9 +1516,18 @@ static void registry_global(void *data, struct wl_registry *reg, uint32_t name,
 	} else if (strcmp(iface, wl_seat_interface.name) == 0 && !g.seat) {
 		g.seat = wl_registry_bind(reg, name, &wl_seat_interface, 5);
 		wl_seat_add_listener(g.seat, &seat_listener, NULL);
-	} else if (strcmp(iface, wl_output_interface.name) == 0 && !g.output) {
-		g.output = wl_registry_bind(reg, name, &wl_output_interface, 2);
-		wl_output_add_listener(g.output, &output_listener, NULL);
+	} else if (strcmp(iface, wl_output_interface.name) == 0) {
+		struct output *o = calloc(1, sizeof(*o));
+		if (o) {
+			o->global = name;
+			o->scale = 1;
+			o->wl = wl_registry_bind(reg, name, &wl_output_interface, 2);
+			wl_output_add_listener(o->wl, &output_listener, o);
+			wl_list_insert(g.outputs.prev, &o->link);
+			if (g.running) {
+				sync_bars(); /* a screen plugged in gets its bar */
+			}
+		}
 	} else if (strcmp(iface, zwlr_layer_shell_v1_interface.name) == 0) {
 		g.layer_shell = wl_registry_bind(reg, name, &zwlr_layer_shell_v1_interface, 4);
 	} else if (strcmp(iface, zwlr_foreign_toplevel_manager_v1_interface.name) == 0) {
@@ -1199,6 +1535,8 @@ static void registry_global(void *data, struct wl_registry *reg, uint32_t name,
 			&zwlr_foreign_toplevel_manager_v1_interface, 3);
 	} else if (strcmp(iface, wp_viewporter_interface.name) == 0) {
 		g.viewporter = wl_registry_bind(reg, name, &wp_viewporter_interface, 1);
+	} else if (strcmp(iface, wp_fractional_scale_manager_v1_interface.name) == 0) {
+		g.fractional = wl_registry_bind(reg, name, &wp_fractional_scale_manager_v1_interface, 1);
 	} else if (strcmp(iface, zwp_virtual_keyboard_manager_v1_interface.name) == 0) {
 		g.vkbd_mgr = wl_registry_bind(reg, name,
 			&zwp_virtual_keyboard_manager_v1_interface, 1);
@@ -1210,6 +1548,21 @@ static void registry_global(void *data, struct wl_registry *reg, uint32_t name,
 }
 
 static void registry_remove(void *data, struct wl_registry *reg, uint32_t name) {
+	struct output *o, *tmp;
+	wl_list_for_each_safe(o, tmp, &g.outputs, link) {
+		if (o->global != name) {
+			continue;
+		}
+		struct bar *b, *btmp;
+		wl_list_for_each_safe(b, btmp, &g.bars, link) {
+			if (b->output == o) {
+				destroy_bar(b);
+			}
+		}
+		wl_list_remove(&o->link);
+		wl_output_destroy(o->wl);
+		free(o);
+	}
 }
 
 static const struct wl_registry_listener registry_listener = {
@@ -1229,6 +1582,8 @@ static void arm_clock(void) {
 }
 
 int main(void) {
+	wl_list_init(&g.outputs);
+	wl_list_init(&g.bars);
 	g.display = wl_display_connect(NULL);
 	if (!g.display) {
 		fprintf(stderr, "zacos9-menubar: cannot connect to Wayland\n");
@@ -1259,23 +1614,12 @@ int main(void) {
 		sibling_program("zacos9-pack", command, sizeof(command));
 		launch(command);
 	}
-	/* zacos9-wm sets XCURSOR_THEME/SIZE to its own cursor theme. */
 	const char *cursor_size = getenv("XCURSOR_SIZE");
-	int cursor_px = cursor_size ? atoi(cursor_size) : 16;
-	g.cursor_theme = wl_cursor_theme_load(getenv("XCURSOR_THEME"),
-		(cursor_px > 0 ? cursor_px : 16) * g.scale, g.shm);
+	g.cursor_px = cursor_size && atoi(cursor_size) > 0 ? atoi(cursor_size) : 16;
 	g.cursor_surface = wl_compositor_create_surface(g.compositor);
 
-	g.bar_surface = wl_compositor_create_surface(g.compositor);
-	g.bar_layer = zwlr_layer_shell_v1_get_layer_surface(g.layer_shell, g.bar_surface,
-		g.output, ZWLR_LAYER_SHELL_V1_LAYER_TOP, "zacos9-menubar");
-	zwlr_layer_surface_v1_set_anchor(g.bar_layer,
-		ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP | ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT |
-		ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT);
-	zwlr_layer_surface_v1_set_size(g.bar_layer, 0, MBAR_HEIGHT);
-	zwlr_layer_surface_v1_set_exclusive_zone(g.bar_layer, MBAR_HEIGHT);
-	zwlr_layer_surface_v1_add_listener(g.bar_layer, &bar_listener, NULL);
-	wl_surface_commit(g.bar_surface);
+	g.running = true;
+	sync_bars();
 
 	g.clock_fd = timerfd_create(CLOCK_REALTIME, TFD_CLOEXEC | TFD_NONBLOCK);
 	g.blink_fd = timerfd_create(CLOCK_MONOTONIC, TFD_CLOEXEC | TFD_NONBLOCK);
@@ -1296,7 +1640,6 @@ int main(void) {
 		inotify_add_watch(settings_fd, dir, IN_CLOSE_WRITE | IN_MOVED_TO | IN_DELETE);
 	}
 
-	g.running = true;
 	while (g.running) {
 		while (wl_display_prepare_read(g.display) != 0) {
 			wl_display_dispatch_pending(g.display);
@@ -1344,9 +1687,13 @@ int main(void) {
 			blink_tick();
 		}
 		if (settings_fd >= 0 && (fds[4].revents & POLLIN)) {
-			/* desktop.conf changed: clock options, accent colour. */
+			/* desktop.conf changed: clock options, accent colour, a bar on
+			 * every screen or not. */
 			char events[4096];
 			while (read(settings_fd, events, sizeof(events)) > 0) {
+			}
+			if (every_display_setting() != g.every_display && g.open_index < 0) {
+				sync_bars();
 			}
 			menubar_apps_changed();
 		}

@@ -122,7 +122,7 @@ static void round_rect(struct pl_canvas *c, int x0, int y0, int x1, int y1, uint
 	}
 }
 
-uint32_t *hint_paint(const char *text, bool tail_right, int *w, int *h) {
+uint32_t *hint_paint(const char *text, bool tail_right, int *w, int *h, struct pl_text_log **log) {
 	struct plat_text *lines[HINT_MAX_LINES];
 	int n = 0, width = 0;
 	char line[512] = "";
@@ -174,6 +174,9 @@ uint32_t *hint_paint(const char *text, bool tail_right, int *w, int *h) {
 	*h = bh;
 	uint32_t *px = calloc((size_t)*w * *h, sizeof(*px));
 	struct pl_canvas c = { .px = px, .stride = *w, .width = *w, .height = *h };
+	if (log) {
+		*log = NULL;
+	}
 	const uint32_t black = GRAY(0), yellow = RGB(0xFF, 0xFF, 0xCC);
 	int x0 = HINT_TAIL_W;
 	round_rect(&c, x0, 0, *w - 1, bh - 1, black);
@@ -201,6 +204,9 @@ uint32_t *hint_paint(const char *text, bool tail_right, int *w, int *h) {
 	 * text on the right-hand side stays readable. */
 	int ascent = lines[0]->baseline;
 	int text_x = (tail_right ? 0 : x0) + HINT_PAD + 1;
+	if (log) {
+		c.log = *log = pl_text_log_new(px, *w);
+	}
 	for (int i = 0; i < n; i++) {
 		pl_text(&c, lines[i], text_x, HINT_PAD + ascent + i * HINT_LINE, black);
 		text_destroy(lines[i]);

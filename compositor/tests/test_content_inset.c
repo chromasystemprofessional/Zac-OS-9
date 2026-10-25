@@ -36,6 +36,11 @@ bool platinum_shell_popup_tab_for(struct wlr_surface *surface, int *x) {
 void platinum_shell_report_position(struct plat_view *view) {
 }
 
+/* No screens: frames are drawn at 1x. */
+struct plat_output *output_at(struct plat_server *server, double lx, double ly) {
+	return NULL;
+}
+
 struct wlr_box output_usable_area(struct plat_server *server, double lx, double ly) {
 	return (struct wlr_box){ 0 };
 }

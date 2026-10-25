@@ -1,8 +1,5 @@
-#include <limits.h>
 #include <stdio.h>
 #include <string.h>
-#include <unistd.h>
-#include <wlr/types/wlr_fractional_scale_v1.h>
 #include <wlr/types/wlr_output.h>
 #include <wlr/types/wlr_output_layout.h>
 #include <wlr/util/log.h>
@@ -138,29 +135,9 @@ static bool is_xwayland(struct plat_server *server, const struct wl_client *clie
 		server->xwayland->server->client == client;
 }
 
-/* One of ZacOS's own programs (zacos9-finder, zacos9-menubar, ...). */
-static bool zacos9_program(const struct wl_client *client) {
-	pid_t pid = 0;
-	wl_client_get_credentials((struct wl_client *)client, &pid, NULL, NULL);
-	char path[64], exe[PATH_MAX];
-	snprintf(path, sizeof(path), "/proc/%d/exe", (int)pid);
-	const ssize_t len = pid > 0 ? readlink(path, exe, sizeof(exe) - 1) : -1;
-	if (len <= 0) {
-		return false;
-	}
-	exe[len] = '\0';
-	const char *name = strrchr(exe, '/');
-	return strncmp(name ? name + 1 : exe, "zacos9-", 7) == 0;
-}
-
 static bool global_filter(const struct wl_client *client, const struct wl_global *global,
 		void *data) {
 	struct plat_server *server = data;
-	if (server->fractional_scale && global == server->fractional_scale->global) {
-		/* ZacOS's pixel art scaled by 1.25 or 1.5 comes out uneven: its
-		 * programs draw at 2x instead, shown smaller (prefs.c). */
-		return !zacos9_program(client);
-	}
 	if (global == server->xwayland_xdg_output) {
 		return is_xwayland(server, client);
 	}

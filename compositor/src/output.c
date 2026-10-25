@@ -138,8 +138,8 @@ static void output_destroy(struct wl_listener *listener, void *data) {
 		}
 	}
 	/* ZacOS 9's own shell (menu bar, desktop) moves to the display that is
-	 * main now; anyone else's shell surfaces live on one output and go
-	 * with it. */
+	 * main now; anyone else's shell surfaces, and a menu bar of the
+	 * screen's own, live on one output and go with it. */
 	layers_pin_to_main(server);
 	struct plat_layer_surface *ls, *tmp;
 	wl_list_for_each_safe(ls, tmp, &server->layer_surfaces, link) {
@@ -162,10 +162,11 @@ static void server_new_output(struct wl_listener *listener, void *data) {
 	if (mode) {
 		wlr_output_state_set_mode(&state, mode);
 	}
-	wlr_output_state_set_scale(&state, server->output_scale);
+	const float scale = prefs_output_scale(server, wlr_output);
+	wlr_output_state_set_scale(&state, scale);
 	wlr_output_commit_state(wlr_output, &state);
 	wlr_output_state_finish(&state);
-	wlr_xcursor_manager_load(server->cursor_mgr, server->output_scale);
+	wlr_xcursor_manager_load(server->cursor_mgr, scale);
 
 	struct plat_output *output = calloc(1, sizeof(*output));
 	output->wlr_output = wlr_output;

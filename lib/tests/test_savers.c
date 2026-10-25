@@ -21,7 +21,7 @@ enum { W = 320, H = 200 };
 /* A frame of saver `id` at `t` seconds (after drawing every 40 ms up to it). */
 static void frame(const char *id, unsigned seed, double t, uint32_t *px) {
 	struct pl_saver *s = pl_saver_new(pl_saver_find(id), W, H, seed);
-	struct pl_canvas c = { px, W, 0, 0, W, H };
+	struct pl_canvas c = { px, W, 0, 0, W, H, NULL };
 	for (double at = 0; at < t; at += 0.04) {
 		pl_saver_draw(s, &c, at);
 	}
@@ -83,7 +83,7 @@ int main(void) {
 
 	/* The logo bounces: after 30 s it is still wholly on screen. */
 	struct pl_saver *s = pl_saver_new(pl_saver_find("logo"), W, H, 3);
-	struct pl_canvas c = { a, W, 0, 0, W, H };
+	struct pl_canvas c = { a, W, 0, 0, W, H, NULL };
 	for (double t = 0; t < 30; t += 0.04) {
 		pl_saver_draw(s, &c, t);
 	}
@@ -107,7 +107,7 @@ int main(void) {
 	for (int i = 0; i < pl_saver_count(); i++) {
 		memset(big, 0x55, sizeof(big));
 		struct pl_saver *wide = pl_saver_new(i, W * 2, H * 2, 5);
-		struct pl_canvas inner = { big + 8 * (W + 16) + 8, W + 16, 0, 0, W, H };
+		struct pl_canvas inner = { big + 8 * (W + 16) + 8, W + 16, 0, 0, W, H, NULL };
 		for (double t = 0; t < 2; t += 0.1) {
 			pl_saver_draw(wide, &inner, t);
 		}

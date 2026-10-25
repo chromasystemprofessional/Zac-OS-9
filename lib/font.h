@@ -21,7 +21,7 @@ struct pl_bitmap_font {
 	int height, baseline; /* line box, and the baseline row within it */
 	const struct pl_glyph *glyphs; /* sorted by code point */
 	int n;
-	const uint16_t *rows; /* bit x set = ink in column x */
+	const uint32_t *rows; /* bit x set = ink in column x (up to 32 wide) */
 };
 
 #endif

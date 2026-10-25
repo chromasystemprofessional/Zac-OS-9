@@ -1356,13 +1356,13 @@ QImage FolderWindow::printImage() {
 		m_scrollX = sx;
 		const int w = std::min(viewW, W - sx);
 		if (list) {
-			pl_canvas header = { px.c.px + sx, px.c.stride, sx, 0, w, BAND_H };
+			pl_canvas header = { px.c.px + sx, px.c.stride, sx, 0, w, BAND_H, px.c.log };
 			paintColumnHeaders(&header);
 		}
 		for (int sy = 0; sy < H; sy += viewH) {
 			m_scrollY = sy;
 			pl_canvas tile = { px.c.px + (band + sy) * px.c.stride + sx, px.c.stride, sx, sy,
-				w, std::min(viewH, H - sy) };
+				w, std::min(viewH, H - sy), px.c.log };
 			if (list) {
 				paintList(&tile);
 			} else if (m_mode == ViewMode::Buttons) {
@@ -1403,7 +1403,7 @@ void FolderWindow::paintEvent(QPaintEvent *) {
 	const int top = contentTop();
 	pl_canvas content = {
 		c->px + top * c->stride, c->stride, m_scrollX, m_scrollY,
-		viewWidth(), std::max(0, viewHeight()),
+		viewWidth(), std::max(0, viewHeight()), c->log,
 	};
 	if (m_mode == ViewMode::Icons) {
 		pl_hline(c, 0, W - 1, HEADER_H, C_BLACK);
@@ -1412,7 +1412,7 @@ void FolderWindow::paintEvent(QPaintEvent *) {
 		pl_hline(c, 0, W - 1, HEADER_H, C_BLACK);
 		paintButtons(&content);
 	} else {
-		pl_canvas band = { c->px + HEADER_H * c->stride, c->stride, m_scrollX, 0, W, BAND_H };
+		pl_canvas band = { c->px + HEADER_H * c->stride, c->stride, m_scrollX, 0, W, BAND_H, c->log };
 		paintColumnHeaders(&band);
 		if (m_headerDrag == HeaderDrag::Move) {
 			/* The header being moved, following the pointer. */

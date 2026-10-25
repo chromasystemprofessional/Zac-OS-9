@@ -51,10 +51,11 @@ struct plat_server {
 	struct wlr_renderer *renderer;
 	struct wlr_allocator *allocator;
 	struct wlr_compositor *compositor;
-	/* HiDPI scale applied to every output: 1, 1.25, 1.5, 2 or 3. At 1.25
-	 * and 1.5, programs that take wp_fractional_scale_v1 draw at it
-	 * exactly; the rest (ZacOS's own pixel art among them) draw at 2x and
-	 * are shown smaller. */
+	/* Each output has its own HiDPI scale (prefs_output_scale): 1, 1.25,
+	 * 1.5, 1.75, 2 or 3. At the fractions, programs that take
+	 * wp_fractional_scale_v1 draw at it exactly; the rest (ZacOS's own
+	 * pixel art among them) draw at 2x and are shown smaller. This is the
+	 * main output's, for what has only one (X11's HiDPI windows). */
 	float output_scale;
 	float default_scale; /* from -S / ZACOS9_SCALE, until a panel picks one */
 	bool scale_explicit; /* -S or ZACOS9_SCALE given: no automatic 2x */
@@ -335,6 +336,9 @@ struct plat_layer_surface {
 	struct wl_listener new_popup;
 	struct wl_listener destroy;
 	bool mapped;
+	/* ZacOS's own, kept on the main display (layers.c): all but a menu bar
+	 * (and its menus) placed on a screen of its own choosing. */
+	bool on_main;
 };
 
 struct plat_keyboard {
@@ -453,8 +457,11 @@ bool input_press_focus(struct plat_server *server, uint32_t time_msec);
 void input_update_capabilities(struct plat_server *server);
 
 /* prefs.c: a scale as written in desktop.conf or given with -S ("1",
- * "1.25", "1.5", "2", "3", "4"); `fallback` for anything else. */
+ * "1.25", "1.5", "1.75", "2", "3", "4"); `fallback` for anything else. */
 float prefs_parse_scale(const char *s, float fallback);
+/* An output's scale: the Monitors panel's for it (display.NAME.scale, else
+ * scale), else 2x on a dense screen, else -S. */
+float prefs_output_scale(struct plat_server *server, struct wlr_output *o);
 
 /* tablet.c: graphics tablets (Wacom and the like) */
 void tablet_init(struct plat_server *server);

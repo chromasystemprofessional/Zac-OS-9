@@ -11,6 +11,7 @@ wl_protocol_dir = wayland_protos.get_variable('pkgdatadir')
 client_protocols = [
   wl_protocol_dir / 'stable/xdg-shell/xdg-shell.xml', # layer-shell popups
   wl_protocol_dir / 'stable/viewporter/viewporter.xml',
+  wl_protocol_dir / 'staging/fractional-scale/fractional-scale-v1.xml', # 1.25x, 1.5x, 1.75x
   meson.project_source_root() / 'protocols/wlr-layer-shell-unstable-v1.xml',
   meson.project_source_root() / 'protocols/wlr-foreign-toplevel-management-unstable-v1.xml',
   meson.project_source_root() / 'protocols/virtual-keyboard-unstable-v1.xml',
@@ -150,12 +151,12 @@ foreach kind : [['client-header', '@BASENAME@-client-protocol.h'], ['private-cod
 endforeach
 # libpam directly: Debian's pam.pc also needs libaudit's, for nothing here.
 pam = meson.get_compiler('c').find_library('pam', has_headers: ['security/pam_appl.h'])
-executable('zacos9-lock', 'lock/lock.c', lock_protocol,
+executable('zacos9-lock', 'lock/lock.c', lock_protocol, client_protocol_src,
   dependencies: [platinum_dep, wayland_client, xkbcommon_client, pam],
   install: true,
 )
 # The same, taking "sesame" instead of asking PAM: compositor/tests/test_lock.py.
-test_lock_exe = executable('test-lock', 'lock/lock.c', lock_protocol,
+test_lock_exe = executable('test-lock', 'lock/lock.c', lock_protocol, client_protocol_src,
   c_args: ['-DZACOS9_LOCK_TEST'],
   dependencies: [platinum_dep, wayland_client, xkbcommon_client],
 )
@@ -1274,7 +1275,7 @@ test('users-panel', find_program('dbus-run-session'),
     ).full_path(), files('../tests/users/fake_accounts.py')],
   timeout: 60,
 )
-executable('zacos9-controlpanel',
+controlpanel_exe = executable('zacos9-controlpanel',
   'panels/controlpanel.cpp',
   'panels/soundclient.cpp',
   'finder/alert.cpp',
@@ -1509,6 +1510,11 @@ vptr_exe = executable('vptr', meson.project_source_root() / 'tools/vptr/vptr.c',
   client_protocol_src,
   dependencies: [wayland_client, xkbcommon_client])
 
+# One screen's exact pixels for UI tests (grim resamples at 1.5x and 1.75x).
+rawshot_exe = executable('rawshot', meson.project_source_root() / 'tools/rawshot/rawshot.c',
+  snapshot_protocol,
+  dependencies: [wayland_client])
+
 # Screen saver, display and system sleep (compositor/src/idle.c).
 idle_client = executable('test-idle-client',
   '../compositor/tests/idle_client.cpp',
@@ -1522,6 +1528,12 @@ test('idle-sleep', find_program('python3'),
 test('idle-lock', find_program('dbus-run-session'),
   args: ['--', find_program('python3').full_path(), files('../compositor/tests/test_lock.py'),
     compositor_exe, idle_client, test_lock_exe, inhibit_exe, vptr_exe],
+  timeout: 90,
+)
+# The lock at 1.5x and 1.75x: the screen's own pixels, only its 1x colours.
+test('lock-scale', find_program('python3'),
+  args: [files('../compositor/tests/test_lock_scale.py'), compositor_exe, test_lock_exe, vptr_exe,
+    rawshot_exe],
   timeout: 90,
 )
 # ⌘-Tab, Option-click on the desktop, contextual menus and Log Out, with the
@@ -1568,7 +1580,31 @@ test('spring-space', find_program('python3'),
   args: [files('../compositor/tests/test_spring_space.py'), compositor_exe, menubar_exe, finder_exe, vptr_exe],
   timeout: 120,
 )
-# Monitors' 1.25x and 1.5x: wp_fractional_scale_v1, but not for ZacOS's own programs.
+# The Qt programs at 1.25x, 1.5x and 1.75x: a panel exactly its 1x picture,
+# each pixel whole screen pixels.
+test('panel-scale', find_program('python3'),
+  args: [files('../compositor/tests/test_panel_scale.py'), compositor_exe, controlpanel_exe,
+    rawshot_exe],
+  timeout: 120,
+)
+# Window frames at 1.25x, 1.5x and 1.75x: the screen's own pixels, even stripes.
+test('frame-scale', find_program('python3'),
+  args: [files('../compositor/tests/test_frame_scale.py'), compositor_exe, idle_client, vptr_exe,
+    rawshot_exe],
+  timeout: 120,
+)
+# The menu bar at 1.25x, 1.5x and 1.75x: the 1x one, each pixel whole screen pixels.
+test('menubar-scale', find_program('python3'),
+  args: [files('../compositor/tests/test_menubar_scale.py'), compositor_exe, menubar_exe, vptr_exe,
+    rawshot_exe],
+  timeout: 120,
+)
+# The menu bar on every screen, each at its own scale; menus open where clicked.
+test('menubar-displays', find_program('python3'),
+  args: [files('../compositor/tests/test_menubar_displays.py'), compositor_exe, menubar_exe, vptr_exe],
+  timeout: 90,
+)
+# Monitors' 1.25x, 1.5x and 1.75x, per screen: wp_fractional_scale_v1, but not for ZacOS's own programs.
 globals_client = executable('test-globals-client',
   '../compositor/tests/globals_client.c',
   dependencies: [wayland_client],

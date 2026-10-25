@@ -19,7 +19,7 @@ int main(void) {
 
 	const char *text = "Moves the selected items to the Trash. They are deleted when you empty it.";
 	int w, h;
-	uint32_t *px = hint_paint(text, false, &w, &h);
+	uint32_t *px = hint_paint(text, false, &w, &h, NULL);
 	assert(px && w > HINT_TAIL_W + 20 && w <= 180 + 2 * 5 + 2 + HINT_TAIL_W);
 	assert(h >= 2 * 12); /* wrapped onto more than one line */
 	assert(px[HINT_TIP_Y * w] == GRAY(0));             /* the tail's tip */
@@ -28,8 +28,8 @@ int main(void) {
 	assert(px[(h / 2) * w + w - 1] == GRAY(0));        /* the frame */
 	free(px);
 	int lw, lh, rw, rh;
-	uint32_t *left = hint_paint(text, false, &lw, &lh);
-	uint32_t *right = hint_paint(text, true, &rw, &rh);
+	uint32_t *left = hint_paint(text, false, &lw, &lh, NULL);
+	uint32_t *right = hint_paint(text, true, &rw, &rh, NULL);
 	assert(left && right && lw == rw && lh == rh);
 	assert(right[HINT_TIP_Y * rw + rw - 1] == GRAY(0)); /* tail on the right */
 	/* Only the bubble turns around: the body is the same shifted by the

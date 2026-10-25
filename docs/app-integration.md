@@ -285,17 +285,66 @@ when it runs **under X11**. On Wayland it never does, on any desktop. So:
   at 1/scale, and pointer positions are multiplied back. Other X11 windows
   (Classic, Wine, xterm) have scale 1 and are enlarged as before. Override-
   redirect menus follow their program (`_NET_WM_PID`, else the front window).
-  At 1.25x and 1.5x every X11 window, Electron apps included, has scale 1
-  and is enlarged (a little soft): the scaled path is whole-number only.
-- **1.25x and 1.5x** (Monitors' Pixel size; `scale=1.25` or `1.5` in
-  `desktop.conf`, `-S 1.5`). zacos9-wm offers `wp_fractional_scale_v1`, so
-  programs that take it (foot, Firefox, Chromium, GTK 4, Qt 6) draw at
-  exactly the scale and stay sharp; the rest are asked for 2x buffers
-  (`wl_output.scale` 2) and shown smaller. ZacOS's own programs (whose
-  executable is named `zacos9-…`) are never offered the protocol
-  (`global_filter`, `compositor/src/xwayland_output.c`): their pixel art
-  scaled by 1.5 would come out uneven, so it is drawn at 2x and shown
-  smaller, readable but slightly soft. Test: `fractional-scale`.
+  At 1.25x, 1.5x and 1.75x every X11 window, Electron apps included, has
+  scale 1 and is enlarged (a little soft): the scaled path is whole-number
+  only. X11 has one scale for every screen: the main display's.
+- **Each screen its own scale** (Monitors' Pixel size applies to the
+  selected display: `display.NAME.scale` in `desktop.conf`, else `scale`,
+  else 2x on a dense screen, else `-S`; `prefs_output_scale`,
+  `compositor/src/prefs.c`). A surface is told the scale of the screen it
+  is mostly on (`preferred_buffer_scale`, `wp_fractional_scale_v1`), also
+  when that screen's scale changes. Test: `fractional-scale`.
+- **The menu bar on every screen** (Monitors' Menu Bar on Every Display,
+  `menubar-every-display=1`): zacos9-menubar puts a bar on each screen,
+  naming its output, and zacos9-wm lets it (`may_choose_output`,
+  `compositor/src/layers.c`) where it keeps ZacOS's other shell surfaces on
+  the main display. Each bar has its screen's width and scale and reserves
+  20 px there; the bar last pointed at is the active one, and its menus
+  open on its screen. Contextual menus open on the active bar's screen.
+  Test: `menubar-displays`.
+- **1.25x, 1.5x and 1.75x** (Monitors' Pixel size; `scale=1.25`, `1.5` or
+  `1.75` in `desktop.conf`, `-S 1.5`). zacos9-wm offers
+  `wp_fractional_scale_v1` to every program, so those that take it (foot,
+  Firefox, Chromium, GTK 4, Qt 6) draw at exactly the scale; the rest are
+  asked for 2x buffers (`wl_output.scale` 2) and shown smaller.
+  ZacOS's own pixel art is drawn at the screen's own pixels: each 1x
+  pixel becomes one or two whole screen pixels, by one rounding everywhere
+  (`pl_snap`, `lib/draw.c`, the same as wlroots places buffers with), so
+  it stays sharp and every program's pixels and window frames line up.
+  The pattern repeats every 2 logical pixels at 1.5x and every 4 at 1.25x
+  and 1.75x, and a window's contents start where it does
+  (`snap_to_pixels`, `compositor/src/view.c`): windows move in steps of
+  2 or 4 there, and look the same wherever they are.
+  - Window frames (`frame.c`): drawn at the screen's pixels; the title
+    bar's stripes are drawn for the scale (`decor_paint_stripes_scaled`):
+    six even ridges, where scaled 1x stripes came out uneven.
+  - The menu bar, its menus, the lock and the screen saver (C programs):
+    `pl_snap_scale` into buffers of the screen's pixels, shown through a
+    viewport.
+  - Qt programs: Qt draws at the fractional scale itself; `blitPixels`
+    (`shell/finder/pixels.h`, also the Qt style's) makes each 1x image at
+    the window's pixels from its place in the window.
+  - The pointer: the cursor theme has 20, 24 and 28 px sizes made the same
+    way (`tools/cursors/build_cursors.py`).
+  - Text in ZacOS's own fonts is drawn in fonts made for each of these
+    sizes (`assets/fonts/platinum-system-12-125|150|175.pfont`, likewise
+    `platinum-views-9-…`): crisp, every stem one thickness, where enlarged
+    1x letters had some stems one pixel and some two. A canvas with a text
+    log (`pl_canvas.log`, `lib/draw.c`) remembers the text drawn on it;
+    `pl_snap_scale_canvas` enlarges the picture without the 1x letters and
+    draws each text again (`text_render_scaled`, `lib/text.c`) where its
+    pen and baseline fall. The fonts were drafted by
+    `tools/fonts/build_scaled_fonts.py` and are meant to be touched up by
+    hand (it won't overwrite them without `--force`); `build_fonts.py`
+    compiles them. `ZACOS9_SCALED_FONTS=0` draws enlarged 1x letters
+    instead (tests compare pictures that way).
+  - Text drawn by Qt's own fonts (plain Qt widgets) is drawn at the scale,
+    smoothly. Other pixel art can't be even at these scales (four 1x pixels
+    on five screen pixels at 1.25x): some dots are a pixel bigger than
+    others.
+  Tests: `fractional-scale`, `frame-scale`, `menubar-scale`, `lock-scale`,
+  `panel-scale` (screenshots by `tools/rawshot/rawshot.c`: grim resamples
+  at these scales).
 - **Xwayland sees outputs in pixels** (`compositor/src/xwayland_output.c`):
   its own `zxdg_output_manager_v1`, hidden from every other client, while
   wlroots' manager is hidden from Xwayland. Without it the X11 root stays at

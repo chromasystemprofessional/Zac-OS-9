@@ -160,8 +160,9 @@ int main(int argc, char *argv[]) {
 	server.compositor = wlr_compositor_create(server.display, 6, server.renderer);
 	wlr_subcompositor_create(server.display);
 	wlr_viewporter_create(server.display);
-	/* 1.25 and 1.5: programs that take it draw at exactly the scale
-	 * (hidden from ZacOS's own, which draw at 2x: xwayland_output.c). */
+	/* 1.25, 1.5, 1.75: programs that take it draw at exactly the scale;
+	 * ZacOS's own pixel art too, each 1x pixel one or two whole screen
+	 * pixels (lib/draw.c pl_snap; Qt's unsmoothed images likewise). */
 	server.fractional_scale = wlr_fractional_scale_manager_v1_create(server.display, 1);
 	wlr_data_device_manager_create(server.display);
 	/* wl-copy and wl-paste (Screen Snapshot puts its picture on the

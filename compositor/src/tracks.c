@@ -32,10 +32,16 @@ static struct {
 	int hot_x, hot_y, w, h;
 } t;
 
-/* The theme's arrow, at the outputs' scale, as a wlr_buffer for the trail. */
-static struct wlr_buffer *arrow(void) {
+/* The scale of the screen under (x, y): each may have its own. */
+static float scale_at(struct plat_server *server, double x, double y) {
+	struct plat_output *output = output_at(server, x, y);
+	const float scale = output ? output->wlr_output->scale : server->output_scale;
+	return scale > 0 ? scale : 1;
+}
+
+/* The theme's arrow, at a screen's scale, as a wlr_buffer for the trail. */
+static struct wlr_buffer *arrow(float scale) {
 	struct plat_server *server = t.server;
-	const float scale = server->output_scale > 0 ? server->output_scale : 1;
 	struct wlr_xcursor *cursor = wlr_xcursor_manager_get_xcursor(server->cursor_mgr, "default", scale);
 	if (!cursor || cursor->image_count == 0) {
 		return NULL;
@@ -110,9 +116,9 @@ void tracks_moved(struct plat_server *server) {
 	if (dx * dx + dy * dy < TRACK_GAP * TRACK_GAP) {
 		return;
 	}
-	const float scale = server->output_scale > 0 ? server->output_scale : 1;
+	const float scale = scale_at(server, x, y);
 	if (scale != t.scale || !t.arrows[0]->buffer) {
-		struct wlr_buffer *buf = arrow();
+		struct wlr_buffer *buf = arrow(scale);
 		if (!buf) {
 			return;
 		}
