@@ -19,6 +19,7 @@
 | Classic (SheepShaver) launcher | `shell/classic/` | sh |
 | Session entry | `session/` | sh |
 | Boot splash, extension parade, splash→desktop hand-off | `boot/` | Plymouth script + C + sh — see `docs/boot.md` |
+| Touchscreens (a finger as the mouse, two-finger tap right-click) and the on-screen keyboard | `compositor/src/touch.c`, `touch_tap.c`, `osk.c`, `shell/keyboard/` | C — see `docs/touch.md` |
 | Hardware quirks (Haswell HDMI audio, Mac ACPI interrupt storms) | `hardware/` | sh + modprobe.d + systemd — see `docs/hardware.md` |
 | AFP 2.x FUSE client (TCP/IP, and AppleTalk through ASP: `asp.c`) | `network/afp/` | C (libfuse3) — see `docs/network.md` |
 | File sharing helper + polkit | `sharing/` | sh + policy XML |

@@ -323,6 +323,7 @@ static void keyboard_destroy(struct wl_listener *listener, void *data) {
 		}
 	}
 	free(kb);
+	osk_update(server);
 }
 
 /* A virtual keyboard's keymap came: the first keyboard of a session that
@@ -355,6 +356,7 @@ static void new_keyboard(struct plat_server *server, struct wlr_input_device *de
 	kb->server = server;
 	kb->wlr_keyboard = wlr_keyboard;
 	kb->is_virtual = virtual;
+	kb->is_real = !virtual && osk_real_keyboard(device);
 
 	if (!virtual) {
 		input_apply_layouts(server);
@@ -385,6 +387,7 @@ static void new_keyboard(struct plat_server *server, struct wlr_input_device *de
 	if (!virtual) {
 		apply_group(server, kb);
 	}
+	osk_update(server);
 }
 
 /* ---- trackpads ---------------------------------------------------------- */
@@ -1392,6 +1395,7 @@ void input_init(struct plat_server *server) {
 	server->seat = wlr_seat_create(server->display, "seat0");
 	tablet_init(server);
 	touch_init(server);
+	osk_init(server);
 	/* There is always the pointer, from the start: a session with no
 	 * mouse yet (headless, or one plugged in later) still offers one, so
 	 * programs started before it set theirs up. A virtual pointer doesn't

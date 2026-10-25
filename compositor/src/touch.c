@@ -21,6 +21,7 @@
 #include <linux/input-event-codes.h>
 #include <wlr/types/wlr_cursor.h>
 #include <wlr/types/wlr_data_device.h>
+#include <wlr/types/wlr_layer_shell_v1.h>
 #include <wlr/types/wlr_seat.h>
 #include <wlr/types/wlr_touch.h>
 #include <wlr/util/log.h>
@@ -120,6 +121,13 @@ static int tap_wait_done(void *data) {
 /* Whether a finger here goes to the app as touch. */
 static bool app_takes_touch(struct plat_server *server, struct plat_view *view,
 		struct wlr_surface *surface) {
+	struct wlr_layer_surface_v1 *layer = surface && !view ?
+		wlr_layer_surface_v1_try_from_wlr_surface(surface) : NULL;
+	if (layer && layer->namespace && strcmp(layer->namespace, "zacos9-keyboard") == 0 &&
+			wlr_surface_accepts_touch(server->seat, surface)) {
+		/* The on-screen keyboard: every finger a key, at once. */
+		return true;
+	}
 	if (!view || !surface || !wlr_surface_accepts_touch(server->seat, surface)) {
 		/* The desktop and menu bar (shell surfaces), frames, and apps
 		 * without wl_touch: the mouse. */
@@ -304,6 +312,7 @@ static void touch_destroy(struct wl_listener *listener, void *data) {
 	wl_list_remove(&touch->link);
 	free(touch);
 	input_update_capabilities(server);
+	osk_update(server);
 }
 
 void touch_new(struct plat_server *server, struct wlr_input_device *device) {
@@ -315,6 +324,7 @@ void touch_new(struct plat_server *server, struct wlr_input_device *device) {
 	wl_list_insert(server->touchscreens.prev, &touch->link);
 	wlr_cursor_attach_input_device(server->cursor, device);
 	touch_map(server);
+	osk_update(server);
 	wlr_log(WLR_INFO, "Touchscreen: %s", device->name ? device->name : "(unnamed)");
 }
 
