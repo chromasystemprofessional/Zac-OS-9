@@ -48,6 +48,7 @@ Settings readSettings() {
 			const QString key = line.section('=', 0, 0), value = line.section('=', 1);
 			if (key == "ask") s.ask = value != "no";
 			else if (key == "control") s.control = value != "no";
+			else if (key == "sound") s.sound = value != "no";
 		}
 	}
 	return s;
@@ -59,8 +60,8 @@ bool writeSettings(const Settings &s) {
 	if (!f.open(QIODevice::WriteOnly)) {
 		return false;
 	}
-	f.write(QString("ask=%1\ncontrol=%2\n")
-		.arg(s.ask ? "yes" : "no", s.control ? "yes" : "no").toUtf8());
+	f.write(QString("ask=%1\ncontrol=%2\nsound=%3\n")
+		.arg(s.ask ? "yes" : "no", s.control ? "yes" : "no", s.sound ? "yes" : "no").toUtf8());
 	return f.commit();
 }
 

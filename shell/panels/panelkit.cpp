@@ -1150,6 +1150,10 @@ void PanelHost::setFocus(PanelEdit *e) {
 	if (e) {
 		e->selectAll();
 	}
+	/* A text field has the window's focus: for the on-screen keyboard
+	 * (platinumshell.cpp says so to zacos9-wm). */
+	m_widget->setAttribute(Qt::WA_InputMethodEnabled, e != nullptr);
+	m_widget->setProperty("zacos9TextField", e != nullptr);
 	m_caretOn = true;
 	m_widget->update();
 }

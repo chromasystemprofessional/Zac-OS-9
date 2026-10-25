@@ -169,6 +169,16 @@ saver_exe = executable('zacos9-screensaver',
   install: true,
 )
 
+# The on-screen keyboard, for a text field with no keyboard attached (compositor/src/osk.c).
+keyboard_exe = executable('zacos9-keyboard',
+  'keyboard/keyboard.c',
+  meson.project_source_root() / 'compositor/src/kblayout.c',
+  client_protocol_src,
+  include_directories: include_directories('../compositor/src'),
+  dependencies: [platinum_dep, wayland_client, xkbcommon_client],
+  install: true,
+)
+
 # Keeping screens awake for apps that ask over D-Bus (docs/energy-saver.md).
 inhibit_exe = executable('zacos9-inhibit',
   'inhibit/inhibit.c',
@@ -892,21 +902,34 @@ executable('zacos9-screensharing',
   install: true,
 )
 
-screenshare_host = executable('zacos9-screenshare-host',
-  'screenshare/host.cpp',
-  'screenshare/common.cpp',
-  'finder/alert.cpp',
-  'finder/platinumshell.cpp',
-  finder_protocol,
+screenshare_host_src = ['screenshare/host.cpp', 'screenshare/common.cpp', 'finder/alert.cpp',
+  'finder/platinumshell.cpp', finder_protocol]
+screenshare_host = executable('zacos9-screenshare-host', screenshare_host_src,
   link_with: panelkit,
   include_directories: include_directories('finder', 'panels', 'screenshare'),
-  dependencies: [platinum_dep, qt6, wayland_client],
+  dependencies: [platinum_dep, qt6, wayland_client, pam],
   cpp_args: ['-std=c++17'],
   install: true,
 )
+# The same, taking "sesame" instead of asking PAM, for the sound's login.
+test_screenshare_host = executable('test-screenshare-host', screenshare_host_src,
+  link_with: panelkit,
+  include_directories: include_directories('finder', 'panels', 'screenshare'),
+  dependencies: [platinum_dep, qt6, wayland_client, pam],
+  cpp_args: ['-std=c++17', '-DZACOS9_SCREENSHARE_TEST'],
+)
+
+# The viewer's side of the sound, on its own.
+test_screenshare_sound = executable('test-screenshare-sound', '../tests/screenshare/sound_client.cpp',
+  'screenshare/sound.cpp', 'screenshare/common.cpp',
+  link_with: panelkit,
+  include_directories: include_directories('finder', 'panels', 'screenshare'),
+  dependencies: [platinum_dep, qt6],
+  cpp_args: ['-std=c++17'],
+)
 
 test('screenshare-host', find_program('python3'),
-  args: [files('../tests/screenshare/test_host.py'), screenshare_host],
+  args: [files('../tests/screenshare/test_host.py'), test_screenshare_host, test_screenshare_sound],
   timeout: 90,
 )
 
@@ -916,6 +939,7 @@ zlib = dependency('zlib')
 screenshare_viewer = executable('zacos9-screenshare-viewer',
   'screenshare/viewer.cpp',
   'screenshare/rfb.cpp',
+  'screenshare/sound.cpp',
   'screenshare/common.cpp',
   'network/logindialog.cpp',
   'finder/alert.cpp',
@@ -1610,6 +1634,22 @@ idle_client = executable('test-idle-client',
   '../compositor/tests/idle_client.cpp',
   dependencies: qt6,
   cpp_args: ['-std=c++17'],
+)
+# The same, saying where its focus is as ZacOS's own programs do.
+field_client = executable('test-field-client',
+  '../compositor/tests/idle_client.cpp',
+  'finder/platinumshell.cpp',
+  finder_protocol,
+  include_directories: include_directories('finder'),
+  dependencies: [qt6, wayland_client],
+  cpp_args: ['-std=c++17', '-DPLATINUM_FIELD'],
+)
+# The on-screen keyboard for a text field with no keyboard attached.
+test('onscreen-keyboard', find_program('python3'),
+  args: [files('../compositor/tests/test_onscreen_keyboard.py'), compositor_exe, idle_client, field_client,
+    vptr_exe, rawshot_exe],
+  depends: [keyboard_exe],
+  timeout: 120,
 )
 test('idle-sleep', find_program('python3'),
   args: [files('../compositor/tests/test_idle.py'), compositor_exe, idle_client, vptr_exe],

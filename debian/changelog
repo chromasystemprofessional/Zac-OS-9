@@ -1,3 +1,13 @@
+zacos9 (1.0.18) trixie; urgency=medium
+
+  * Screen Sharing plays the other computer's sound, and a bar at the top
+    of the screen switches between it and your own desktop (Use My Desktop
+    / Full Screen, Sound, Disconnect). Touchscreens: a two-finger tap is a
+    right-click, and an on-screen keyboard appears for a text field when no
+    keyboard is attached.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Sun, 25 Oct 2026 14:43:48 -0400
+
 zacos9 (1.0.17) trixie; urgency=medium
 
   * Screen Sharing: a new control panel lets other ZacOS computers see and
