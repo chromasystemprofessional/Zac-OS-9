@@ -679,7 +679,9 @@ rm -f "$TARGET/etc/sudoers.d/live" "$TARGET/usr/share/polkit-1/rules.d/sudo_on_l
 chroot "$TARGET" useradd --create-home --home-dir /var/lib/zacos9-setup --shell /bin/sh \
 	--comment "ZacOS 9 Setup" zacos9-setup
 chroot "$TARGET" passwd --lock zacos9-setup >/dev/null
-for g in video audio render input; do
+# netdev: NetworkManager lets it save networks the Setup Assistant's
+# Internet page joins (system-wide, so the real account keeps them).
+for g in video audio render input netdev; do
 	if chroot "$TARGET" getent group "$g" >/dev/null; then
 		chroot "$TARGET" usermod -aG "$g" zacos9-setup
 	fi

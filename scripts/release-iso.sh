@@ -5,17 +5,18 @@
 #
 #   scripts/release-iso.sh SF_USER SF_PROJECT [--dry-run]
 #
-# SF_USER is your SourceForge username and SF_PROJECT the project's short
-# name (the "xyz" in sourceforge.net/projects/xyz). It uploads over ssh
-# (rsync), so add your public key at sourceforge.net/auth/ssh first; nothing
-# here asks for or stores a password. The files land in
+# SF_USER is your SourceForge username (the "name" in sourceforge.net/u/name,
+# not the display name) and SF_PROJECT the project's short name (the "xyz"
+# in sourceforge.net/projects/xyz). It uploads over ssh (rsync), so add
+# your public key at sourceforge.net/auth/shell_services first; nothing here
+# asks for or stores a password. The files land in
 # /home/frs/project/SF_PROJECT/VERSION/, which the project's Files page
 # shows. --dry-run only lists what would be sent.
 set -eu
 self=$(realpath "$0")
 cd "$(dirname "$self")/.."
 
-[ $# -ge 2 ] || { sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit 64; }
+[ $# -ge 2 ] || { sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 64; }
 user=$1
 project=$2
 dry=
@@ -34,8 +35,9 @@ ln "$iso" "$out/$name" 2>/dev/null || cp "$iso" "$out/$name"
 (cd "$out" && sha256sum "$name" > "$name.sha256")
 cat "$out/$name.sha256"
 
-# --mkpath makes the VERSION folder (rsync 3.2.3 and later).
-rsync -avP $dry --mkpath -e ssh "$out/$name" "$out/$name.sha256" \
+# rsync makes the VERSION folder itself, as the project folder already exists.
+# Not --mkpath: SourceForge's rsync (3.1.4) refuses it.
+rsync -avP $dry -e ssh "$out/$name" "$out/$name.sha256" \
 	"$user@frs.sourceforge.net:/home/frs/project/$project/$version/"
 
 echo
