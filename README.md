@@ -121,6 +121,20 @@ Log out and choose **ZacOS 9** at the login screen. Classic Mac emulation (the
 - [Hardware notes](docs/hardware.md) for Macs and other PCs
 - ZacOS Help, in the Help menu, from inside the system
 
+## Why ZacOS exists
+
+I built ZacOS for myself. I loved how Mac OS 9 felt to use, and I wanted that
+calm, simple desktop on a modern Linux system I use every day.
+
+Once it worked well enough to live in, I decided not to keep it to myself. If it
+makes someone else's computer a little more pleasant, that's the whole point.
+It's free, the source is all here, and it contains no Apple code, fonts, icons or
+sounds.
+
+I'm not selling anything and there's no catch. Bug reports, ideas and
+contributions are welcome, and if you'd rather build something different from
+it, the GPL lets you.
+
 ## Building from source
 
 ZacOS 9 is written in C and C++ (wlroots, Qt 6) and built with Meson. See
