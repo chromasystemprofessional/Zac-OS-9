@@ -29,15 +29,9 @@
 #include "settings.h"
 #include "viewporter-client-protocol.h"
 #include "wlr-layer-shell-unstable-v1-client-protocol.h"
+#include "wlclient.h"
 
 #define FRAME_NS (1000000000L / 25) /* 25 frames a second */
-
-struct buffer {
-	struct wl_buffer *wl;
-	uint32_t *px;
-	size_t size;
-	bool busy;
-};
 
 struct screen {
 	struct wl_list link;
@@ -56,7 +50,7 @@ struct screen {
 	int w, h; /* logical size, once configured */
 	struct pl_saver *saver;
 	uint32_t *logical; /* the frame at logical size, for scale > 1 or a fraction */
-	struct buffer buffers[2];
+	struct pl_shm_buffer buffers[2];
 	struct wl_callback *frame; /* the last frame not yet shown */
 };
 
@@ -80,44 +74,6 @@ static double now_seconds(void) {
 
 /* ---- buffers ------------------------------------------------------------------ */
 
-static void buffer_release(void *data, struct wl_buffer *wl_buffer) {
-	((struct buffer *)data)->busy = false;
-}
-
-static const struct wl_buffer_listener buffer_listener = { buffer_release };
-
-static void buffer_free(struct buffer *b) {
-	if (b->wl) {
-		wl_buffer_destroy(b->wl);
-		munmap(b->px, b->size);
-	}
-	memset(b, 0, sizeof(*b));
-}
-
-static bool buffer_make(struct buffer *b, int width, int height) {
-	const int stride = width * 4;
-	b->size = (size_t)stride * height;
-	const int fd = memfd_create("zacos9-screensaver", MFD_CLOEXEC);
-	if (fd < 0 || ftruncate(fd, (off_t)b->size) < 0) {
-		if (fd >= 0) {
-			close(fd);
-		}
-		return false;
-	}
-	b->px = mmap(NULL, b->size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-	if (b->px == MAP_FAILED) {
-		close(fd);
-		b->px = NULL;
-		return false;
-	}
-	struct wl_shm_pool *pool = wl_shm_create_pool(shm, fd, (int32_t)b->size);
-	b->wl = wl_shm_pool_create_buffer(pool, 0, width, height, stride, WL_SHM_FORMAT_XRGB8888);
-	wl_shm_pool_destroy(pool);
-	close(fd);
-	wl_buffer_add_listener(b->wl, &buffer_listener, b);
-	return true;
-}
-
 /* ---- drawing ------------------------------------------------------------------ */
 
 static void frame_done(void *data, struct wl_callback *callback, uint32_t time) {
@@ -133,7 +89,7 @@ static void draw(struct screen *s) {
 	if (!s->saver || s->frame) {
 		return;
 	}
-	struct buffer *b = !s->buffers[0].busy ? &s->buffers[0] : !s->buffers[1].busy ? &s->buffers[1] : NULL;
+	struct pl_shm_buffer *b = pl_shm_buffer_pick(s->buffers);
 	if (!b) {
 		return;
 	}
@@ -193,8 +149,8 @@ static void hide(struct screen *s) {
 	wl_surface_destroy(s->surface);
 	s->surface = NULL;
 	s->layer = NULL;
-	buffer_free(&s->buffers[0]);
-	buffer_free(&s->buffers[1]);
+	pl_shm_buffer_free(&s->buffers[0]);
+	pl_shm_buffer_free(&s->buffers[1]);
 	pl_saver_free(s->saver);
 	s->saver = NULL;
 	free(s->logical);
@@ -218,8 +174,8 @@ static void layer_configure(void *data, struct zwlr_layer_surface_v1 *layer, uin
 /* Buffers at the screen's scale (or its own pixels at a fraction) and a
  * new saver for its size. */
 static void start(struct screen *s) {
-	buffer_free(&s->buffers[0]);
-	buffer_free(&s->buffers[1]);
+	pl_shm_buffer_free(&s->buffers[0]);
+	pl_shm_buffer_free(&s->buffers[1]);
 	pl_saver_free(s->saver);
 	s->saver = NULL;
 	free(s->logical);
@@ -227,7 +183,7 @@ static void start(struct screen *s) {
 	const int bw = s->quarters ? pl_snap(s->w, s->quarters) : s->w * s->scale;
 	const int bh = s->quarters ? pl_snap(s->h, s->quarters) : s->h * s->scale;
 	s->logical = scaled ? malloc((size_t)s->w * s->h * 4) : NULL;
-	if (!buffer_make(&s->buffers[0], bw, bh) || !buffer_make(&s->buffers[1], bw, bh) ||
+	if (!pl_shm_buffer_make(&s->buffers[0], shm, "zacos9-screensaver", bw, bh, WL_SHM_FORMAT_XRGB8888) || !pl_shm_buffer_make(&s->buffers[1], shm, "zacos9-screensaver", bw, bh, WL_SHM_FORMAT_XRGB8888) ||
 			(scaled && !s->logical)) {
 		fprintf(stderr, "zacos9-screensaver: no memory for %s\n", s->name);
 		return;

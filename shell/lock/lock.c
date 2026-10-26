@@ -45,6 +45,7 @@
 #include "text.h"
 #include "viewporter-client-protocol.h"
 #include "widgets.h"
+#include "wlclient.h"
 
 #define DIALOG_W 360
 #define DIALOG_H 164
@@ -52,14 +53,6 @@
 #define MAX_PASSWORD 256
 
 struct screen;
-
-struct buffer {
-	struct wl_buffer *wl;
-	uint32_t *px;
-	size_t size;
-	bool busy;
-	struct screen *screen;
-};
 
 struct screen {
 	struct wl_list link;
@@ -73,7 +66,7 @@ struct screen {
 	struct wp_viewport *viewport;
 	struct wp_fractional_scale_v1 *fractional;
 	int w, h;
-	struct buffer buffers[2];
+	struct pl_shm_buffer buffers[2];
 	uint32_t *logical;
 	bool stale; /* a redraw waits for a buffer to come back */
 };
@@ -222,45 +215,13 @@ static void check_finished(void) {
 
 static void redraw(struct screen *s);
 
-static void buffer_release(void *data, struct wl_buffer *b) {
-	struct buffer *buffer = data;
-	buffer->busy = false;
-	if (buffer->screen && buffer->screen->stale) {
-		redraw(buffer->screen); /* what changed while both were on screen */
+/* A buffer back from the compositor: draw what changed while both
+ * were on screen. */
+static void buffer_released(struct pl_shm_buffer *b, void *data) {
+	struct screen *s = data;
+	if (s && s->stale) {
+		redraw(s);
 	}
-}
-
-static const struct wl_buffer_listener buffer_listener = { buffer_release };
-
-static void buffer_free(struct buffer *b) {
-	if (b->wl) {
-		wl_buffer_destroy(b->wl);
-		munmap(b->px, b->size);
-	}
-	memset(b, 0, sizeof(*b));
-}
-
-static bool buffer_make(struct buffer *b, int width, int height) {
-	b->size = (size_t)width * height * 4;
-	const int fd = memfd_create("zacos9-lock", MFD_CLOEXEC);
-	if (fd < 0 || ftruncate(fd, (off_t)b->size) < 0) {
-		if (fd >= 0) {
-			close(fd);
-		}
-		return false;
-	}
-	b->px = mmap(NULL, b->size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-	if (b->px == MAP_FAILED) {
-		close(fd);
-		b->px = NULL;
-		return false;
-	}
-	struct wl_shm_pool *pool = wl_shm_create_pool(shm, fd, (int32_t)b->size);
-	b->wl = wl_shm_pool_create_buffer(pool, 0, width, height, width * 4, WL_SHM_FORMAT_XRGB8888);
-	wl_shm_pool_destroy(pool);
-	close(fd);
-	wl_buffer_add_listener(b->wl, &buffer_listener, b);
-	return true;
 }
 
 static bool is_main(struct screen *s) {
@@ -367,13 +328,14 @@ static void redraw(struct screen *s) {
 	if (!s->surface || s->w <= 0) {
 		return;
 	}
-	struct buffer *b = !s->buffers[0].busy ? &s->buffers[0] : !s->buffers[1].busy ? &s->buffers[1] : NULL;
+	struct pl_shm_buffer *b = pl_shm_buffer_pick(s->buffers);
 	if (!b) {
 		s->stale = true; /* drawn when one comes back */
 		return;
 	}
 	s->stale = false;
-	b->screen = s;
+	b->released = buffer_released;
+	b->data = s;
 	const int k = s->scale;
 	uint32_t *drawn = k == 1 && !s->quarters ? b->px : s->logical;
 	struct pl_canvas c = { drawn, s->w, 0, 0, s->w, s->h,
@@ -423,14 +385,14 @@ static void redraw_all(void) {
 /* Buffers of the screen's size at its scale: s times the logical size,
  * or at a fractional scale its own pixels; a logical frame to draw in. */
 static bool make_buffers(struct screen *s) {
-	buffer_free(&s->buffers[0]);
-	buffer_free(&s->buffers[1]);
+	pl_shm_buffer_free(&s->buffers[0]);
+	pl_shm_buffer_free(&s->buffers[1]);
 	free(s->logical);
 	const bool fractional = s->quarters != 0;
 	const int bw = fractional ? pl_snap(s->w, s->quarters) : s->w * s->scale;
 	const int bh = fractional ? pl_snap(s->h, s->quarters) : s->h * s->scale;
 	s->logical = s->scale > 1 || fractional ? malloc((size_t)s->w * s->h * 4) : NULL;
-	if (!buffer_make(&s->buffers[0], bw, bh) || !buffer_make(&s->buffers[1], bw, bh) ||
+	if (!pl_shm_buffer_make(&s->buffers[0], shm, "zacos9-lock", bw, bh, WL_SHM_FORMAT_XRGB8888) || !pl_shm_buffer_make(&s->buffers[1], shm, "zacos9-lock", bw, bh, WL_SHM_FORMAT_XRGB8888) ||
 			((s->scale > 1 || fractional) && !s->logical)) {
 		s->w = 0;
 		return false;
@@ -711,8 +673,8 @@ static void global_remove(void *data, struct wl_registry *registry, uint32_t nam
 				}
 				wl_surface_destroy(s->surface);
 			}
-			buffer_free(&s->buffers[0]);
-			buffer_free(&s->buffers[1]);
+			pl_shm_buffer_free(&s->buffers[0]);
+			pl_shm_buffer_free(&s->buffers[1]);
 			free(s->logical);
 			wl_output_release(s->output);
 			wl_list_remove(&s->link);
