@@ -107,12 +107,22 @@ sudo_ chroot "$r" /bin/sh -c "
 		# Keep iso/config's versions of files the packages also bring.
 		apt-get install -y -qq -o Dpkg::Options::=--force-confold \$missing </dev/null >/dev/null
 	fi
-	# Our packages' own dependencies may be newer than the ISO build's
-	# system: if dpkg can't configure them, apt fetches what's missing.
-	if ! dpkg -i --force-confold /tmp/dev-boot/*.deb </dev/null >/dev/null; then
-		echo 'installing what our packages depend on'
+	# Our packages' own dependencies and conflicts may be newer than the
+	# ISO build's system (zacos9 conflicts with cups-browsed, which an older
+	# build has): if dpkg won't install them, apt does, fetching what's
+	# missing and removing what conflicts.
+	if ! dpkg -i --force-confold /tmp/dev-boot/*.deb </dev/null >/dev/null 2>&1; then
+		echo 'installing our packages with apt (dependencies or conflicts changed)'
 		apt-get update -qq
-		apt-get install -f -y -qq -o Dpkg::Options::=--force-confold </dev/null >/dev/null
+		apt-get install -y -qq --allow-downgrades -o Dpkg::Options::=--force-confold \
+			/tmp/dev-boot/*.deb </dev/null >/dev/null
+	fi
+	# Never boot an older ZacOS than this tree's without saying so.
+	want=\$(dpkg-deb -f /tmp/dev-boot/zacos9_*.deb Version)
+	have=\$(dpkg-query -W -f='\${Version}' zacos9)
+	if [ \"\$have\" != \"\$want\" ]; then
+		echo \"dev-boot.sh: zacos9 \$want didn't install (the system has \$have)\" >&2
+		exit 1
 	fi
 	for h in /tmp/dev-boot/*.hook.chroot; do sh \$h; done
 	# Dev boots only: a login on the serial port, for tests/vm/serial.py.
