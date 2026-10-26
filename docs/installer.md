@@ -123,6 +123,7 @@ BFS, APFS, HFS+) don't move.
 | `disksetup-partition-map` | Disk Setup against a stand-in UDisks (`tests/disksetup/fake_udisks.py`): drag Windows smaller, +, a name, Apply; the UDisks calls. |
 | `installer-beside` | The installer against stand-ins for UDisks, lsblk and `zacos9-install`: choose the disk, drag the line, Install; the `--beside` arguments. |
 | `release-disk` | `zacos9-release-disk`, `--keep` included, against stand-in tools. |
+| `grub-haiku` | `boot/31_zacos9_haiku` against stand-in tools, its output checked by `grub-script-check`: BIOS and UEFI entries, and nothing but entries on stdout. |
 
 `tests/disksetup/stage.py` starts the headless desktop and stand-in UDisks
 for the last three; `ZACOS9_TEST_SHOT=FILE` keeps the last screenshot when
