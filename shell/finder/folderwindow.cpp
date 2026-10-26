@@ -26,6 +26,7 @@
 #include "infowindow.h"
 #include "settings.h"
 #include "platinumshell.h"
+#include "programs.h"
 #include "panelkit.h"
 
 /* Item-count header: HIG figure 2-24. */

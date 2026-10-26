@@ -4,6 +4,7 @@
 #include "desktopprinter.h"
 #include "alias.h"
 #include "platinumshell.h"
+#include "programs.h"
 #include "settings.h"
 
 #include <QCoreApplication>
@@ -706,12 +707,6 @@ void startItemDrag(QWidget *source, const std::vector<Item *> &items,
 	}
 }
 
-/* A program installed next to the Finder (build tree), else on $PATH. */
-static QString sibling(const QString &program) {
-	const QString local = QCoreApplication::applicationDirPath() + "/" + program;
-	return QFileInfo(local).isExecutable() ? local : program;
-}
-
 /* Files dropped onto Applications: install them rather than move them.
  * Windows ones go to the Windows Installer, the rest to the App Installer,
  * which also says why it can't install any that aren't installers (an
@@ -722,13 +717,13 @@ static void installIntoApplications(const QStringList &paths) {
 	for (const QString &p : paths) {
 		const QString name = QFileInfo(p).fileName().toLower();
 		if (name.endsWith(".exe") || name.endsWith(".msi")) {
-			platinumStartApplication(sibling("zacos9-wininstall"), { p });
+			platinumStartApplication(siblingProgram("zacos9-wininstall"), { p });
 		} else {
 			rest << p;
 		}
 	}
 	if (!rest.isEmpty()) {
-		platinumStartApplication(sibling("zacos9-appinstall"), rest);
+		platinumStartApplication(siblingProgram("zacos9-appinstall"), rest);
 	}
 }
 

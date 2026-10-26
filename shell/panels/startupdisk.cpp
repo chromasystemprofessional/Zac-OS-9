@@ -1,4 +1,5 @@
 #include "startupdisk.h"
+#include "programs.h"
 
 #include <QApplication>
 #include <QCoreApplication>
@@ -148,13 +149,7 @@ static QString classicLauncher() {
 	if (!env.isEmpty()) {
 		return env;
 	}
-	const QString dir = QCoreApplication::applicationDirPath();
-	for (const QString &candidate : { dir + "/zacos9-classic", dir + "/../classic/zacos9-classic" }) {
-		if (QFileInfo(candidate).isExecutable()) {
-			return candidate;
-		}
-	}
-	return "zacos9-classic";
+	return siblingProgram("zacos9-classic");
 }
 
 /* The helper, as root: installed beside us, or the source tree's. */
@@ -165,7 +160,7 @@ static QString helperPath() {
 	}
 	const QString dir = QCoreApplication::applicationDirPath();
 	for (const QString &candidate : { dir + "/../libexec/zacos9/zacos9-startupdisk-helper",
-			dir + "/../../startupdisk/zacos9-startupdisk-helper" }) {
+			sourceTreePath("startupdisk/zacos9-startupdisk-helper") }) {
 		if (QFileInfo(candidate).isExecutable()) {
 			return QFileInfo(candidate).canonicalFilePath();
 		}

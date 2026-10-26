@@ -1,4 +1,5 @@
 #include "afpclient.h"
+#include "programs.h"
 
 #include <QCoreApplication>
 #include <QDir>
@@ -46,7 +47,7 @@ static QString afpClientPath() {
 	}
 	const QString dir = QCoreApplication::applicationDirPath();
 	for (const QString &candidate : { dir + "/../libexec/zacos9/zacos9-afp",
-			dir + "/../network/zacos9-afp" }) {
+			buildTreePath("network/zacos9-afp") }) {
 		if (QFileInfo(candidate).isExecutable()) {
 			return QFileInfo(candidate).canonicalFilePath();
 		}

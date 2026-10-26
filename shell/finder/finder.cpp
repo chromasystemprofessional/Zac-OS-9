@@ -10,6 +10,7 @@
 #include "printwindow.h"
 #include "findindex.h"
 #include "platinumshell.h"
+#include "programs.h"
 #include "settings.h"
 
 #include <QCoreApplication>
@@ -777,8 +778,7 @@ static bool isExpandable(const QString &path) {
 }
 
 void Finder::expandArchive(const QString &archive) {
-	/* Beside us: installed in the same bin directory, or the build tree's copy. */
-	const QString tool = QCoreApplication::applicationDirPath() + "/zacos9-expand";
+	const QString tool = siblingProgram("zacos9-expand");
 	auto *progress = new QProgressDialog("Expanding “" + QFileInfo(archive).fileName() + "”…",
 		QString(), 0, 0);
 	progress->setWindowTitle("Expanding");
@@ -843,17 +843,13 @@ void Finder::copySelectionNames() {
 }
 
 static QString classicLauncher() {
-	const QString local = QCoreApplication::applicationDirPath() + "/zacos9-classic";
-	return QFileInfo(local).isExecutable() ? local : QStringLiteral("zacos9-classic");
+	return siblingProgram("zacos9-classic");
 }
 
 /* Windows programs open in the Windows Installer (shell/wininstall), which
  * installs them, or runs one that needs no installing. */
 void Finder::launchWindows(const QString &exe) {
-	const QString local = QCoreApplication::applicationDirPath() + "/zacos9-wininstall";
-	if (!platinumStartApplication(
-			QFileInfo(local).isExecutable() ? local : QStringLiteral("zacos9-wininstall"),
-			QStringList{ exe })) {
+	if (!platinumStartApplication(siblingProgram("zacos9-wininstall"), QStringList{ exe })) {
 		Alert::ask("The Windows Installer could not be opened.", "OK", QString());
 	}
 }

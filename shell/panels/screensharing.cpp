@@ -30,6 +30,7 @@
 #include <QTimer>
 
 #include "alert.h"
+#include "programs.h"
 #include "common.h"
 #include "panelkit.h"
 #include "platinumshell.h"
@@ -84,13 +85,12 @@ static QString ipAddress() {
 	return first.isEmpty() ? QString("none (not connected)") : first;
 }
 
-/* Installed beside us, as in a build tree. */
 static QString hostProgram() {
-	return QCoreApplication::applicationDirPath() + "/zacos9-screenshare-host";
+	return siblingProgram("zacos9-screenshare-host");
 }
 
 static QString viewerProgram() {
-	return QCoreApplication::applicationDirPath() + "/zacos9-screenshare-viewer";
+	return siblingProgram("zacos9-screenshare-viewer");
 }
 
 static void waitFor(const std::function<bool()> &ready, int timeoutMs) {

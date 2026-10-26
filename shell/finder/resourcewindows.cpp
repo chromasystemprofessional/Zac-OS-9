@@ -26,6 +26,7 @@
 #include "resources.h"
 #include "userservices.h"
 #include "platinumshell.h"
+#include "programs.h"
 #include "vfs.h"
 
 namespace {

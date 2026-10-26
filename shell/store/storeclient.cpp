@@ -1,4 +1,5 @@
 #include "storeclient.h"
+#include "programs.h"
 
 #include <QApplication>
 #include <QCryptographicHash>
@@ -98,10 +99,10 @@ static QString helperPath() {
 		return env;
 	}
 	/* Installed beside us (prefix/libexec/zacos9), or, running from a
-	 * build tree (build/shell/...), the one in the sources. */
+	 * build tree, the one in the sources. */
 	const QString dir = QCoreApplication::applicationDirPath();
 	for (const QString &candidate : { dir + "/../libexec/zacos9/zacos9-appstore-helper",
-			dir + "/../../appstore/zacos9-appstore-helper" }) {
+			sourceTreePath("appstore/zacos9-appstore-helper") }) {
 		if (QFileInfo(candidate).isExecutable()) {
 			return QFileInfo(candidate).canonicalFilePath();
 		}
@@ -159,7 +160,7 @@ static QString styleHelperPath() {
 	}
 	const QString dir = QCoreApplication::applicationDirPath();
 	for (const QString &candidate : { dir + "/../libexec/zacos9/zacos9-appstyle",
-			dir + "/../../appstore/zacos9-appstyle" }) {
+			sourceTreePath("appstore/zacos9-appstyle") }) {
 		if (QFileInfo(candidate).isExecutable()) {
 			return QFileInfo(candidate).canonicalFilePath();
 		}
@@ -245,7 +246,7 @@ QString softwareCatalogHelper() {
 	}
 	const QString dir = QCoreApplication::applicationDirPath();
 	for (const QString &path : { dir + "/../libexec/zacos9/zacos9-software-catalog",
-			dir + "/../../appstore/zacos9-software-catalog" }) {
+			sourceTreePath("appstore/zacos9-software-catalog") }) {
 		if (QFileInfo(path).isExecutable()) {
 			return path;
 		}

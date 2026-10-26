@@ -3,6 +3,7 @@
 #include <gio/gio.h>
 
 #include "localvolumes.h"
+#include "programs.h"
 
 #include <cstring>
 
@@ -358,7 +359,6 @@ static bool belongsToDevice(const QString &path, const QString &device);
 static void macTool(const QStringList &arguments,
 		std::function<void(const QByteArray &, const QString &)> completed) {
 	auto *process = new QProcess(QCoreApplication::instance());
-	const QString local = QCoreApplication::applicationDirPath() + "/zacos9-mac-disks";
 	QObject::connect(process, &QProcess::errorOccurred, process,
 		[process, completed](QProcess::ProcessError error) {
 			if (error == QProcess::FailedToStart) {
@@ -379,7 +379,7 @@ static void macTool(const QStringList &arguments,
 					: error.isEmpty() ? "The Mac disk helper stopped." : error);
 			process->deleteLater();
 		});
-	process->start(QFileInfo(local).isExecutable() ? local : QStringLiteral("zacos9-mac-disks"), arguments);
+	process->start(siblingProgram("zacos9-mac-disks"), arguments);
 }
 
 void localVolumeMountMacImage(const QString &path,

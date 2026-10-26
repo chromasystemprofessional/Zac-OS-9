@@ -1,5 +1,6 @@
 #include "vfs.h"
 #include "platinumshell.h"
+#include "programs.h"
 #include "custompatterns.h"
 
 #include <QCoreApplication>
@@ -376,11 +377,6 @@ bool migrate(QJsonObject *root) {
 /* ---- generated nodes ---------------------------------------------------- */
 
 } // namespace
-
-QString siblingProgram(const QString &name) {
-	const QString local = QCoreApplication::applicationDirPath() + "/" + name;
-	return QFileInfo(local).isExecutable() ? local : name;
-}
 
 namespace {
 

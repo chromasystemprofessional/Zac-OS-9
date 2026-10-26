@@ -1,4 +1,5 @@
 #include "collar.h"
+#include "programs.h"
 
 #include <LayerShellQt/Window>
 #include <QApplication>
@@ -528,8 +529,7 @@ QString Collar::description(int index) const {
 }
 
 void Collar::launch(const QString &program, const QStringList &args) {
-	const QString local = QCoreApplication::applicationDirPath() + "/" + program;
-	if (!platinumStartApplication(QFile::exists(local) ? local : program, args)) {
+	if (!platinumStartApplication(siblingProgram(program), args)) {
 		Alert::ask("Couldn't open " + program + ".", "OK", {});
 	}
 }

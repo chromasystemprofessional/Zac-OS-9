@@ -1,4 +1,5 @@
 #include "sharingclient.h"
+#include "programs.h"
 
 #include <QApplication>
 #include <QFile>
@@ -20,10 +21,10 @@ static QString helperPath(const QString &kind = "sharing") {
 	}
 	const QString name = "zacos9-" + kind + "-helper";
 	/* Installed beside us (prefix/libexec/zacos9), or, running from a
-	 * build tree (build/shell/...), the one in the sources. */
+	 * build tree, the one in the sources. */
 	const QString dir = QCoreApplication::applicationDirPath();
 	for (const QString &candidate : { dir + "/../libexec/zacos9/" + name,
-			dir + "/../../" + kind + "/" + name }) {
+			sourceTreePath(kind + "/" + name) }) {
 		if (QFileInfo(candidate).isExecutable()) {
 			return QFileInfo(candidate).canonicalFilePath();
 		}
