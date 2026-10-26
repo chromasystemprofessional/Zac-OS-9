@@ -202,9 +202,10 @@ qt6 = dependency('qt6', modules: ['Core', 'Gui', 'Widgets', 'Network', 'DBus'],
 
 # libzacos9-shell: what nearly every desktop program uses, built once. The
 # window hints a program gives zacos9-wm (platinum-shell-v1: frame styles,
-# the proxy icon, pop-up windows...) and the Platinum alert box.
+# the proxy icon, pop-up windows...), the Platinum alert box, and Shut Down
+# and Restart from outside a session (the login window, the installer).
 shell_common = static_library('zacos9-shell',
-  'common/platinumshell.cpp', 'common/alert.cpp', finder_protocol,
+  'common/platinumshell.cpp', 'common/alert.cpp', 'common/power.cpp', finder_protocol,
   include_directories: include_directories('common'),
   dependencies: [platinum_dep, qt6, wayland_client],
 )
@@ -274,15 +275,16 @@ panelkit = static_library('panelkit', 'panels/panelkit.cpp', 'panels/sharingclie
 # libzacos9-files: the Sniffer's model of files, which the file chooser,
 # Disk Setup, Software, the printer windows and others share: items and their
 # icons, local and network volumes and when to mount them, the Macintosh view,
-# aliases, clippings, the Applications database and Trash, extensions,
-# desktop printers, file associations, thumbnails and resource forks.
+# aliases, clippings, the Applications database and Trash, extensions and
+# Extensions Manager sets, desktop printers, file associations, thumbnails
+# and resource forks.
 shell_files = static_library('zacos9-files',
   'files/alias.cpp', 'files/localvolumes.cpp', 'files/mountpolicy.cpp',
   'files/netvolumes.cpp', 'files/smbclient.cpp', 'files/vfs.cpp',
   'files/resources.cpp', 'files/autostart.cpp', 'files/extensioncatalog.cpp',
   'files/appdb.cpp', 'files/apptrash.cpp', 'files/items.cpp', 'files/clippings.cpp',
   'files/desktopprinter.cpp', 'files/printers.cpp', 'files/thumbnails.cpp',
-  'files/fileassoc.cpp',
+  'files/fileassoc.cpp', 'files/tricksets.cpp',
   include_directories: include_directories('files', 'panels'),
   dependencies: [shell_common_dep, platinum_dep, qt6, gio, gio_unix, wayland_client, finder_fonts_dep],
 )
@@ -395,7 +397,6 @@ finder_exe = executable('zacos9-finder',
   'finder/findwindow.cpp', 'finder/findcriteria.cpp', 'finder/findindex.cpp',
   'finder/folderstate.cpp',
   'finder/resourcewindows.cpp',
-  'files/tricksets.cpp',
   'finder/diskinit.cpp',
   'finder/filemanager1.cpp',
   link_with: panelkit,
@@ -428,7 +429,6 @@ finder_test_sources = [
   'finder/findwindow.cpp', 'finder/findcriteria.cpp', 'finder/findindex.cpp',
   'finder/folderstate.cpp',
   'finder/resourcewindows.cpp',
-  'files/tricksets.cpp',
   'finder/diskinit.cpp',
   'finder/filemanager1.cpp',
 ]
@@ -672,9 +672,8 @@ executable('zacos9-bluetooth',
 )
 
 test('tricks-sets',
-  executable('test-tricks-sets', 'finder/tests/test_tricksets.cpp', 'files/tricksets.cpp',
-    include_directories: include_directories('files'),
-    dependencies: [platinum_dep, qt6],
+  executable('test-tricks-sets', 'finder/tests/test_tricksets.cpp',
+    dependencies: [shell_files_dep, platinum_dep, qt6],
   ),
   timeout: 10,
 )
@@ -720,7 +719,6 @@ test('disksetup-udisks',
 # startup set (walkies/location.cpp).
 executable('zacos9-walkies',
   'walkies/main.cpp', 'walkies/location.cpp',
-  'files/tricksets.cpp',
   link_with: panelkit,
   include_directories: include_directories('finder', 'panels', 'walkies'),
   dependencies: [shell_files_dep, shell_common_dep, platinum_dep, qt6, wayland_client, gio, gio_unix],
@@ -906,7 +904,6 @@ executable('zacos9-netbrowser',
 executable('zacos9-login',
   'greeter/main.cpp',
   'greeter/greetd.cpp',
-  'common/power.cpp',
   link_with: panelkit,
   include_directories: include_directories('finder', 'print', 'panels', 'greeter'),
   dependencies: [shell_common_dep, platinum_dep, qt6, wayland_client],
@@ -1349,21 +1346,19 @@ test('sound-output',
 )
 
 test('system-power',
-  executable('test-system-power', '../tests/session/test_power.cpp', 'common/power.cpp',
-    include_directories: include_directories('common'),
-    dependencies: [qt6],
+  executable('test-system-power', '../tests/session/test_power.cpp',
+    dependencies: [shell_common_dep, qt6],
   ),
   env: ['QT_QPA_PLATFORM=offscreen'],
 )
 installer_exe = executable('zacos9-installer',
   'installer/main.cpp',
   'installer/installer.cpp',
-  'common/power.cpp',
   # Disk Setup's plan and partition map, for "next to what's on it".
   'disksetup/plan.cpp', 'disksetup/udisks.cpp', 'disksetup/diskmap.cpp',
   link_with: panelkit,
-  include_directories: include_directories('common', 'print', 'panels', 'disksetup'),
-  dependencies: [platinum_dep, qt6],
+  include_directories: include_directories('print', 'panels', 'disksetup'),
+  dependencies: [shell_common_dep, platinum_dep, qt6],
   install: true,
 )
 
