@@ -79,11 +79,6 @@ uint32_t partColor(const QString &type) {
 	return RGB(0xCC, 0x99, 0xCC);
 }
 
-QString formatName(const QString &type) {
-	return type == "vfat" ? "FAT32" : type == "exfat" ? "exFAT" : type == "ntfs" ? "NTFS"
-		: type == "ext4" ? "ZacOS (ext4)" : type.isEmpty() ? QString("unformatted") : type;
-}
-
 class DiskSetup : public QWidget {
 public:
 	explicit DiskSetup(int tab) : m_host(this) {
@@ -867,7 +862,7 @@ private:
 			break;
 		case DiskOp::Create:
 			call(this, d.block, "org.freedesktop.UDisks2.PartitionTable", "CreatePartitionAndFormat",
-				{ QVariant::fromValue(op.offset), QVariant::fromValue(op.size), QString(),
+				{ QVariant::fromValue(op.offset), QVariant::fromValue(op.size), op.partType,
 					d.table == "gpt" ? op.label : QString(), QVariantMap(), op.fsType,
 					QVariantMap{ { "label", op.label } } },
 				[next](const QDBusMessage &r) {
