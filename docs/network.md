@@ -344,5 +344,19 @@ it was manual and end-to-end rather than automated — screenshots and
 `findmnt`/`dpkg`-style checks against this project's own test server,
 not a script committed to the repo. A `tests/ui/` script scripting the
 full discover → connect → log in → choose a volume → mount → appear on
-the desktop → eject sequence (`scripts/snapshot.sh` itself works fine;
-see `PROJECT_STATUS.md`) is a reasonable follow-up.
+the desktop → eject sequence is a reasonable follow-up.
+
+### Trying the AFP client
+
+Against Netatalk on this machine, and against Mac OS 9 itself through Classic
+(which forwards the Mac's port 548 to `localhost:5548`):
+
+```sh
+AFP_PASSWORD=Sesame-42 tests/sharing/afp-client.sh 127.0.0.1 "platest's home" platest
+AFP_PASSWORD=macpass tests/sharing/afp-client.sh 127.0.0.1:5548 "Macintosh HD" "^Mac User"
+```
+
+Mac OS 9's server speaks AFP 1.1 to 2.1, with Cleartxt, Randnum and 2-Way
+Randnum logins. `ZACOS9_AFP_DEBUG=1 build/network/zacos9-afp mount …` traces
+every DSI message. Netatalk can't share a folder inside another shared one, so
+`zacos9-sharing-helper` vetoes shared sub-folders in its `[Homes]` share.

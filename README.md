@@ -137,9 +137,10 @@ it, the GPL lets you.
 
 ## Building from source
 
-ZacOS 9 is written in C and C++ (wlroots, Qt 6) and built with Meson. See
-[Developing ZacOS 9](docs/DEVELOPING.md) for the source layout, building and
-running it, and making packages and ISOs.
+ZacOS 9 is written in C and C++ (wlroots, Qt 6) and built with Meson on
+Debian 13. [Contributing](CONTRIBUTING.md) takes you from a fresh clone to a
+running desktop and a passing test; [How ZacOS 9 fits together](ARCHITECTURE.md)
+is the map of the code.
 
 Bug reports and ideas are welcome in
 [Issues](https://github.com/chromasystemprofessional/Zac-OS-9/issues).
