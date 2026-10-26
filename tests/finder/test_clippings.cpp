@@ -8,6 +8,7 @@
 #include <QDropEvent>
 #include <QElapsedTimer>
 #include <QFile>
+#include <QFileInfo>
 #include <QImage>
 #include <QLabel>
 #include <QMimeData>
@@ -164,6 +165,33 @@ int main(int argc, char **argv) {
 			"a picture clipping carries its picture");
 		check(l->text() == "https://example.com/page", "an Internet location carries its address");
 	}
+
+	// A link already where a clipping would go, even one to nothing, is
+	// stepped over, never written through: nothing is made outside.
+	const QString drop2 = home.path() + "/Drop";
+	QDir().mkpath(drop2);
+	QFile::link(home.path() + "/outside.txt", drop2 + "/hello clipping.txt");
+	QFile::link(home.path() + "/outside.png", drop2 + "/picture clipping.png");
+	QFile::link(home.path() + "/outside.url", drop2 + "/Example Page.url");
+	QString err;
+	QMimeData hello;
+	hello.setText("hello");
+	const QStringList madeText = makeClippings(&hello, drop2, &err);
+	QMimeData pic;
+	pic.setImageData(red);
+	const QStringList madePic = makeClippings(&pic, drop2, &err);
+	QMimeData url;
+	url.setUrls({ QUrl("https://example.com/page") });
+	url.setData("text/x-moz-url", QByteArray(reinterpret_cast<const char *>(moz.utf16()), moz.size() * 2));
+	const QStringList madeUrl = makeClippings(&url, drop2, &err);
+	check(madeText == QStringList{ drop2 + "/hello clipping 2.txt" } && read(madeText.value(0)) == "hello",
+		"a dangling link named like the text clipping: “hello clipping 2.txt” instead");
+	check(madePic == QStringList{ drop2 + "/picture clipping 2.png" } &&
+		QImage(madePic.value(0)).size() == QSize(8, 6), "and for a picture");
+	check(madeUrl == QStringList{ drop2 + "/Example Page 2.url" }, "and for an Internet location");
+	check(!QFile::exists(home.path() + "/outside.txt") && !QFile::exists(home.path() + "/outside.png") &&
+		!QFile::exists(home.path() + "/outside.url") && QFileInfo(drop2 + "/hello clipping.txt").isSymLink(),
+		"nothing is created through the links, which stay as they were");
 
 	// Opening a clipping shows it.
 	openClippingWindow(textPath);

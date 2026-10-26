@@ -1,0 +1,163 @@
+#!/bin/sh
+# zacos9-intel-graphics: the built-in screen on the Intel GPU of a dual-GPU
+# MacBook Pro (MacBookPro11,3), the NVIDIA GPU switched off. See
+# docs/hardware.md.
+#
+#   zacos9-intel-graphics status          which GPUs there are; which one drives the screen
+#   zacos9-intel-graphics enable [--once] (root) start up on the Intel GPU from now on
+#                                         (--once: the next start-up only, to try it)
+#   zacos9-intel-graphics disable         (root) back to the NVIDIA GPU, as before
+#   zacos9-intel-graphics switch          (root, at start-up) the screen over to Intel
+#
+# Apple's firmware hides the Intel GPU unless macOS is starting: setos.efi,
+# run by the firmware before GRUB, says it is. With both GPUs there, the
+# kernel's own gmux driver moves the screen between them (vga_switcheroo),
+# once nothing has the NVIDIA GPU open: zacos9-boot-handoff calls "switch"
+# when the boot splash has quit, before the login screen starts.
+set -eu
+
+label="ZacOS9 Intel graphics"
+conf=${ZACOS9_GPU_CONF:-/etc/zacos9/gpu}
+run=${ZACOS9_RUN_DIR:-/run/zacos9}
+switcheroo=${ZACOS9_SWITCHEROO:-/sys/kernel/debug/vgaswitcheroo/switch}
+drm=${ZACOS9_DRM_SYSFS:-/sys/class/drm}
+tries=${ZACOS9_SWITCH_TRIES:-30}
+efibootmgr=${ZACOS9_EFIBOOTMGR:-efibootmgr}
+here=$(cd "$(dirname "$0")" && pwd)
+setos=${ZACOS9_SETOS_EFI:-}
+for candidate in "$here/setos.efi" /usr/lib/zacos9/setos.efi; do
+	if [ -z "$setos" ] && [ -f "$candidate" ]; then
+		setos=$candidate
+	fi
+done
+
+die() { echo "zacos9-intel-graphics: $*" >&2; exit 1; }
+say() { echo "zacos9-intel-graphics: $*" >&2; }
+need_root() { [ "$(id -u)" = 0 ] || die "run it with sudo"; }
+
+# The firmware entry's number, if there is one.
+entry() {
+	# "Boot0003* ZacOS9 Intel graphics<TAB>HD(...)": the label ends at a tab or the line's end.
+	"$efibootmgr" | awk -v label="$label" '{
+		line = $0; sub(/\t.*/, "", line)
+		if (match(line, /^Boot[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][* ] /) && substr(line, 11) == label) {
+			print substr(line, 5, 4); exit
+		}
+	}'
+}
+
+# /dev/dri/cardN for the GPU a kernel driver runs, or nothing.
+card_of() {
+	for card in "$drm"/card[0-9] "$drm"/card[0-9][0-9]; do
+		[ -e "$card/device/driver" ] || continue
+		if [ "$(basename "$(readlink -f "$card/device/driver")")" = "$1" ]; then
+			echo "/dev/dri/$(basename "$card")"
+			return 0
+		fi
+	done
+	return 1
+}
+
+mode() { sed -n '1p' "$conf" 2>/dev/null || true; }
+
+status() {
+	if card_of i915 >/dev/null; then
+		echo "Intel GPU: visible ($(card_of i915))"
+	else
+		echo "Intel GPU: hidden by the firmware"
+	fi
+	for card in "$drm"/card[0-9]; do
+		[ -e "$card/device/driver" ] || continue
+		panel=no
+		for c in "$card"-eDP-* "$card"-LVDS-*; do
+			[ "$(cat "$c/status" 2>/dev/null)" = connected ] && panel=yes
+		done
+		echo "$(basename "$card"): $(basename "$(readlink -f "$card/device/driver")"), built-in screen: $panel"
+	done
+	echo "Mode: $(mode | grep . || echo nvidia)"
+	n=$(entry)
+	[ -n "$n" ] && echo "Firmware entry: Boot$n ($label)" || echo "Firmware entry: none"
+}
+
+# The screen to the Intel GPU, the NVIDIA one off: at start-up, when nothing has it open.
+switch() {
+	m=$(mode)
+	case $m in intel | intel-once) ;; *) return 0 ;; esac
+	# Tried once only: whatever happens now, the next start-up is the usual one.
+	[ "$m" = intel-once ] && rm -f "$conf"
+	grep -q ':IGD:' "$switcheroo" 2>/dev/null || { say "no Intel GPU to switch to (did setos.efi run?)"; return 1; }
+	intel=$(card_of i915) || { say "the Intel GPU has no driver"; return 1; }
+	# Asked again until it happens: the kernel refuses while the splash
+	# still has the NVIDIA GPU open, which it may for a moment after quitting.
+	i=0
+	until grep -q ':IGD:+:' "$switcheroo" 2>/dev/null; do
+		i=$((i + 1))
+		[ "$i" -le "$tries" ] || { say "the screen didn't move to the Intel GPU"; return 1; }
+		echo IGD >>"$switcheroo" 2>/dev/null || true
+		sleep 0.1
+	done
+	# The idle GPU off, the login screen and desktop told which one to use.
+	echo OFF >>"$switcheroo" 2>/dev/null || say "the NVIDIA GPU couldn't be switched off"
+	mkdir -p "$run"
+	echo "$intel" >"$run/drm-devices"
+	say "the screen is on the Intel GPU ($intel)"
+}
+
+esp() {
+	findmnt -n -o TARGET /boot/efi >/dev/null || die "/boot/efi isn't mounted"
+	dev=$(findmnt -n -o SOURCE /boot/efi)
+	disk=/dev/$(lsblk -n -o PKNAME "$dev" | head -n 1)
+	part=$(cat "/sys/class/block/$(basename "$dev")/partition")
+	[ -f /boot/efi/EFI/ZacOS9/shimx64.efi ] || die "no \\EFI\\ZacOS9\\shimx64.efi to start afterwards"
+}
+
+# setos.efi on the EFI partition, with a firmware entry of its own.
+install_setos() {
+	[ -n "$setos" ] && [ -f "$setos" ] || die "setos.efi isn't there (hardware/intel-graphics/build-setos.sh)"
+	esp
+	install -m 0644 "$setos" /boot/efi/EFI/ZacOS9/setos.efi
+	n=$(entry)
+	if [ -z "$n" ]; then
+		order=$("$efibootmgr" | sed -n 's/^BootOrder: //p')
+		"$efibootmgr" -q -c -d "$disk" -p "$part" -L "$label" -l '\EFI\ZacOS9\setos.efi'
+		n=$(entry)
+		# efibootmgr puts a new entry first: the usual order back for now.
+		[ -n "$order" ] && "$efibootmgr" -q -o "$order"
+	fi
+	[ -n "$n" ] || die "the firmware entry couldn't be made"
+}
+
+case ${1:-} in
+status) status ;;
+switch) [ -n "${ZACOS9_SWITCHEROO:-}" ] || need_root; switch ;;
+enable)
+	need_root
+	install_setos
+	mkdir -p "$(dirname "$conf")"
+	if [ "${2:-}" = --once ]; then
+		echo intel-once >"$conf"
+		"$efibootmgr" -q -n "$n"
+		echo "The next start-up only is on the Intel GPU; the one after is the usual one."
+	else
+		echo intel >"$conf"
+		# setos.efi first; ZacOS's own loader stays next, for if it fails.
+		order=$("$efibootmgr" | sed -n 's/^BootOrder: //p' | tr ',' '\n' | grep -vx "$n" | paste -sd, -)
+		"$efibootmgr" -q -o "$n${order:+,$order}"
+		echo "From the next start-up, the built-in screen is on the Intel GPU."
+	fi
+	;;
+disable)
+	need_root
+	rm -f "$conf"
+	n=$(entry)
+	[ -z "$n" ] || "$efibootmgr" -q -b "$n" -B
+	"$efibootmgr" -q -N 2>/dev/null || true
+	rm -f /boot/efi/EFI/ZacOS9/setos.efi
+	# The first test's entry, if it's still there.
+	label="ZacOS9 Intel test"
+	n=$(entry)
+	[ -z "$n" ] || "$efibootmgr" -q -b "$n" -B
+	echo "Back to the NVIDIA GPU from the next start-up."
+	;;
+*) sed -n 's/^#   //p' "$0"; exit 2 ;;
+esac

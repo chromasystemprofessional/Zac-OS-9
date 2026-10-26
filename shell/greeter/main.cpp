@@ -21,6 +21,7 @@
 #include <pwd.h>
 
 #include "greetd.h"
+#include "power.h"
 #include "panelkit.h"
 #include "pixels.h"
 #include "platinumshell.h"
@@ -115,8 +116,8 @@ public:
 		m_shutDown = PanelButton("Shut Down", QRect(MARGIN, by, 84, PL_BUTTON_H));
 		m_restart = PanelButton("Restart", QRect(MARGIN + 92, by, 72, PL_BUTTON_H));
 		m_logIn = PanelButton("Log In", QRect(W - MARGIN - 76, by, 76, PL_BUTTON_H), true);
-		m_shutDown.clicked = [] { QProcess::startDetached("systemctl", { "poweroff" }); };
-		m_restart.clicked = [] { QProcess::startDetached("systemctl", { "reboot" }); };
+		m_shutDown.clicked = [this] { power(Power::ShutDown); };
+		m_restart.clicked = [this] { power(Power::Restart); };
 		m_logIn.clicked = [this] { logIn(); };
 		m_list.picked = [this](int) {
 			m_error.clear();
@@ -289,6 +290,17 @@ private:
 	QString m_guest; /* the Guest account's user name, if it's on */
 	Greetd m_greetd;
 	QString m_error;
+
+	/* Shut Down, Restart: said here if it can't (issue #38). */
+	void power(Power what) {
+		m_error.clear();
+		const QString why = systemPower(what);
+		if (!why.isEmpty()) {
+			m_error = why;
+		}
+		updateEnabled();
+		update();
+	}
 	bool m_safeMode = false;
 	PanelList m_list;
 	PanelEdit m_password;

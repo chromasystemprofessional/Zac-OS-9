@@ -18,6 +18,8 @@
 #                                    # Setup and the installer (kept in the VM
 #                                    # folder as devboot-disk.qcow2; delete it to
 #                                    # start over)
+#   scripts/dev-boot.sh --uefi       # UEFI firmware (OVMF) instead of BIOS;
+#                                    # its settings in devboot-efivars.fd
 #
 # A login runs on the VM's serial port (user / live):
 #   python3 tests/vm/serial.py ~/.local/share/zacos9-vm/serial.sock 'command'
@@ -45,7 +47,8 @@ for arg in "$@"; do
 	--keep) keep=true ;;
 	--retina) gpu=virtio-vga,xres=2560,yres=1600 ;;
 	--disk) disk=true ;;
-	*) echo "usage: dev-boot.sh [--no-debs] [--record] [--retina] [--clean] [--disk]" >&2; exit 64 ;;
+	--uefi) uefi=true ;;
+	*) echo "usage: dev-boot.sh [--no-debs] [--record] [--retina] [--clean] [--disk] [--uefi]" >&2; exit 64 ;;
 	esac
 done
 
@@ -104,12 +107,22 @@ sudo_ chroot "$r" /bin/sh -c "
 		# Keep iso/config's versions of files the packages also bring.
 		apt-get install -y -qq -o Dpkg::Options::=--force-confold \$missing </dev/null >/dev/null
 	fi
-	# Our packages' own dependencies may be newer than the ISO build's
-	# system: if dpkg can't configure them, apt fetches what's missing.
-	if ! dpkg -i --force-confold /tmp/dev-boot/*.deb </dev/null >/dev/null; then
-		echo 'installing what our packages depend on'
+	# Our packages' own dependencies and conflicts may be newer than the
+	# ISO build's system (zacos9 conflicts with cups-browsed, which an older
+	# build has): if dpkg won't install them, apt does, fetching what's
+	# missing and removing what conflicts.
+	if ! dpkg -i --force-confold /tmp/dev-boot/*.deb </dev/null >/dev/null 2>&1; then
+		echo 'installing our packages with apt (dependencies or conflicts changed)'
 		apt-get update -qq
-		apt-get install -f -y -qq -o Dpkg::Options::=--force-confold </dev/null >/dev/null
+		apt-get install -y -qq --allow-downgrades -o Dpkg::Options::=--force-confold \
+			/tmp/dev-boot/*.deb </dev/null >/dev/null
+	fi
+	# Never boot an older ZacOS than this tree's without saying so.
+	want=\$(dpkg-deb -f /tmp/dev-boot/zacos9_*.deb Version)
+	have=\$(dpkg-query -W -f='\${Version}' zacos9)
+	if [ \"\$have\" != \"\$want\" ]; then
+		echo \"dev-boot.sh: zacos9 \$want didn't install (the system has \$have)\" >&2
+		exit 1
 	fi
 	for h in /tmp/dev-boot/*.hook.chroot; do sh \$h; done
 	# Dev boots only: a login on the serial port, for tests/vm/serial.py.
@@ -141,6 +154,11 @@ set -- -machine q35 -m 4096 -smp 4 -device "$gpu" \
 	-monitor "unix:$vm/monitor.sock,server,nowait" -serial "unix:$vm/serial.sock,server,nowait" \
 	-name "ZacOS 9 (dev boot)"
 [ -w /dev/kvm ] && set -- "$@" -enable-kvm -cpu host
+if ${uefi:-false}; then
+	cp -n /usr/share/OVMF/OVMF_VARS_4M.fd "$vm/devboot-efivars.fd"
+	set -- "$@" -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
+		-drive if=pflash,format=raw,file="$vm/devboot-efivars.fd"
+fi
 if ${disk:-false}; then
 	[ -e "$vm/devboot-disk.qcow2" ] || qemu-img create -q -f qcow2 "$vm/devboot-disk.qcow2" 20G
 	set -- "$@" -drive "file=$vm/devboot-disk.qcow2,format=qcow2,if=virtio"

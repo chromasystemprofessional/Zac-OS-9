@@ -327,7 +327,7 @@ int main(int argc, char **argv) {
 	}
 	settle();
 	const QString usbPath = home.path() + "/USB Disk";
-	fixtureVolumes.push_back({ "USB Disk", usbPath, true, {} });
+	fixtureVolumes.push_back({ "USB Disk", usbPath, true, {}, false, {} });
 	desktop.refreshLocalVolumes();
 	desktop.selectByName(QString());
 	desktop.m_localVolumes.back()->selected = true;

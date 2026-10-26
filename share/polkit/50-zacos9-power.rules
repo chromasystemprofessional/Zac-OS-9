@@ -1,0 +1,17 @@
+// The login window (zacos9-login, run by greetd as its own user _greetd)
+// may shut the computer down or restart it, as Mac OS's could, even with
+// someone's session still open (logged out, but its programs not yet
+// gone): logind otherwise allows that only from an active session at the
+// computer, which the login window's isn't always counted as, and it has
+// no way to ask for a password (issue #38). A program holding the
+// shutdown off (an update installing) is still waited for: no
+// *-ignore-inhibit here.
+polkit.addRule(function(action, subject) {
+	var power = ["org.freedesktop.login1.power-off",
+		"org.freedesktop.login1.power-off-multiple-sessions",
+		"org.freedesktop.login1.reboot",
+		"org.freedesktop.login1.reboot-multiple-sessions"];
+	if (power.indexOf(action.id) >= 0 && subject.user == "_greetd") {
+		return polkit.Result.YES;
+	}
+});

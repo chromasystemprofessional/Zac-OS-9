@@ -665,6 +665,14 @@ void Finder::openItem(Item *item) {
 		}
 		if (item->kind == PL_ICON_FOLDER || item->kind == PL_ICON_DISK ||
 				item->kind == PL_ICON_TRASH_EMPTY || item->kind == PL_ICON_TRASH_FULL) {
+			/* An installed ZacOS 9 disk opens in the Macintosh view, not
+			 * as its Unix root. */
+			const QString mac = item->isVirtual ? QString() :
+				vfsZacosVolumeRoot(item->path);
+			if (!mac.isEmpty()) {
+				FolderWindow::open(mac);
+				return;
+			}
 			QDir().mkpath(item->path);
 			FolderWindow::open(item->path);
 		} else if (item->kind == PL_ICON_DISK_IMAGE && isDiscImage(item->path) && !isMacDiskImage(item->path)) {
@@ -1660,8 +1668,8 @@ void Finder::getInfo(bool sharing) {
 		if (item->isVirtual) {
 			/* Get Info reads a file. Show the one the item stands for:
 			 * a folder's real directory, or an application's desktop
-			 * entry. The curated folders stand for nothing on disk.
-			 * TODO: a Get Info of their own. */
+			 * entry. Curated items have no single file, so they carry
+			 * their own virtual details. */
 			const QString real = vfsRealCounterpart(item->path);
 			const VNode *node = vfsNode(item->path);
 			if (!real.isEmpty() && !(node && node->kind == VKind::Launcher &&
@@ -1676,6 +1684,17 @@ void Finder::getInfo(bool sharing) {
 				details.metadata = metadata;
 				InfoWindow::openVirtual(item->path, item->kind, item->name, details);
 			}
+			continue;
+		}
+		const QString mac = vfsZacosVolumeRoot(item->path);
+		if (!mac.isEmpty()) {
+			QStringList metadata;
+			ResourceDetails details;
+			vfsResourceDetails(mac, &metadata, &details.kind, &details.location,
+				&details.sources, &details.access);
+			details.name = item->name;
+			details.metadata = metadata;
+			InfoWindow::openVirtual(mac, item->kind, item->name, details);
 			continue;
 		}
 		InfoWindow::open(item->path, item->kind, item->visibleName(), view);

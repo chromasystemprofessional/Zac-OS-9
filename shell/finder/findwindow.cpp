@@ -633,7 +633,7 @@ void FoundWindow::paintEvent(QPaintEvent *) {
 	pl_text(c, header.t, (W - header.inkWidth()) / 2, 13, C_BLACK);
 
 	/* Column titles, drawn like a folder window's unsorted columns. */
-	pl_canvas band = { c->px + HEADER_H * c->stride, c->stride, 0, 0, W, BAND_H };
+	pl_canvas band = { c->px + HEADER_H * c->stride, c->stride, 0, 0, W, BAND_H, c->log };
 	auto column = [&](int x0, int x1, const char *title, int textX) {
 		pl_hline(&band, x0, x1, 0, GRAY(0x6));
 		pl_hline(&band, x0 + 1, x1, 1, C_WHITE);
@@ -654,7 +654,7 @@ void FoundWindow::paintEvent(QPaintEvent *) {
 
 	/* Rows, clipped to the list area. */
 	const int top = listTop(), viewW = W - SB_WIDTH + 1;
-	pl_canvas list = { c->px + top * c->stride, c->stride, 0, m_scrollY, viewW, listHeight() };
+	pl_canvas list = { c->px + top * c->stride, c->stride, 0, m_scrollY, viewW, listHeight(), c->log };
 	const int first = m_scrollY / ROW_H;
 	const int last = std::min<int>(m_items.size() - 1, (m_scrollY + listHeight()) / ROW_H);
 	for (int r = first; r <= last; r++) {

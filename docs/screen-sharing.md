@@ -1,12 +1,62 @@
-# Screen Sharing with RustDesk
+# Screen Sharing
+
+## ZacOS to ZacOS
+
+The Screen Sharing control panel shares this screen with other ZacOS
+computers, and its Connect tab shows theirs (`shell/panels/screensharing.cpp`,
+`shell/screenshare/`). The host is `zacos9-screenshare-host`: wayvnc on a
+private socket, an Allow/Deny alert per computer, Bonjour `_rfb._tcp` with
+`zacos=1`. The viewer is `zacos9-screenshare-viewer`.
+
+### Switching between the two computers
+
+The viewer opens full screen. A bar at the top of the screen shows for a
+few seconds, then goes away. It comes back when you rest the pointer
+against the top edge of the screen. It has:
+
+- **Use My Desktop**: puts the other screen in a window, so your own
+  desktop is there beside it. In the window, the same bar sits along the
+  top, with **Full Screen** to go back.
+- **Sound**: plays the other computer's sound here, or stops it.
+- **Disconnect**.
+
+Control-Option-Escape also switches between full screen and the window.
+While the viewer is the active window, the mouse and keys go to the other
+computer. Click your own desktop or another window to use this one.
+
+### Sound
+
+The host's panel has **Let them hear this computer's sound** (on by
+default). The host records its default output (`parec`, the output's
+monitor) and sends it to the viewer, which plays it with `pacat`.
+The host's own speakers keep playing too.
+
+The screen's connection is TLS from end to end between the viewer and
+wayvnc, so the host can't add anything to it. The sound has its own
+connection, on the screen's port plus one (5901). It uses TLS with the
+same certificate, which the viewer checks against the screen's
+fingerprint. The viewer logs in with the same name and password as for
+the screen, and the host checks them with PAM (`/etc/pam.d/zacos9-screenshare`).
+The host answers only a computer that already has a live screen
+connection, which the owner has let in. When that connection goes, its
+sound goes too. The protocol is in `shell/screenshare/common.h`.
+
+The sound is 48 kHz, 16-bit stereo, uncompressed: about 1.5 Mbit/s,
+meant for a local network. The sender drops what it can't send in time,
+and so does the player, so the sound stays in step with the screen
+instead of falling behind.
+
+Tests: `screenshare-host` checks the sound's login, the samples, the
+viewer's `SoundClient`, and the sound going with its screen connection.
+`screenshare-viewer` checks the bar, Use My Desktop and
+Control-Option-Escape.
+
+## RustDesk (earlier)
 
 Incoming RustDesk sharing produced a black screen on the initial live system.
-The current direction is [RDP](rdp.md), with an opt-in current-desktop bridge.
-Local RDP video and keyboard work; the multi-monitor pointer fix needs a
-desktop restart before full live input testing.
-[Sunshine and Moonlight](sunshine-moonlight.md) describes the earlier streaming
-alternative, whose host is now stopped. The notes below describe the
-earlier experimental RustDesk integration, not verified working hosting.
+An RDP bridge and a Sunshine and Moonlight setup followed it, and both were
+removed once Screen Sharing worked. The notes below describe the earlier
+experimental RustDesk integration, not verified working hosting.
 
 ZacOS uses the existing [RustDesk](https://rustdesk.com/) application for
 cross-platform remote desktop, rather than maintaining a remote-desktop engine.

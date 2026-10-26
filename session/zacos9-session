@@ -50,6 +50,12 @@ if ! zacos9-desktop-places; then
 	echo "zacos9-session: Desktop save-location registration failed; see the error above." >&2
 fi
 
+# The GPU the built-in screen was moved to at start-up (zacos9-intel-graphics):
+# that one only, or the compositor would draw on the switched-off NVIDIA GPU.
+if [ -z "${WLR_DRM_DEVICES:-}" ] && [ -r /run/zacos9/drm-devices ]; then
+	read -r drm_devices </run/zacos9/drm-devices && [ -e "$drm_devices" ] && export WLR_DRM_DEVICES="$drm_devices"
+fi
+
 # No real GPU (a plain framebuffer, or a virtual machine's display, where
 # GL would be emulated on the CPU and shows stale frames): draw with
 # pixman. ZacOS 9 is light enough for it.

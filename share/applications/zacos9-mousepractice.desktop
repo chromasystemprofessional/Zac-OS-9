@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Mouse Practice
+Comment=Learn to point, click, double-click and drag
+Exec=zacos9-mousepractice
+Categories=Education;
+OnlyShowIn=ZacOS9;
