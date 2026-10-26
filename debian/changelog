@@ -1,3 +1,14 @@
+zacos9 (1.0.22) trixie; urgency=medium
+
+  * Fixes the Sniffer crashing after you looked in the Fonts folder: fonts
+    without the letter A (symbol, emoji and some Asian-language fonts)
+    damaged its memory each time their icons were drawn. Also fixes a
+    drawing tablet's pen landing in the wrong place in Krita and other X11
+    programs when a monitor you had arranged in Monitors isn't connected:
+    the screens now always start at the top left, as they're arranged.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Mon, 26 Oct 2026 12:22:14 -0400
+
 zacos9 (1.0.21) trixie; urgency=medium
 
   * ZacOS 9 can now be installed next to what's already on a disk, such as
