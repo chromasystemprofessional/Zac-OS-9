@@ -121,6 +121,7 @@ Depends: ${shlibs:Depends},
          xdg-desktop-portal,
          xdg-desktop-portal-wlr,
          libdbusmenu-glib4,
+         network-manager-config-connectivity-debian,
          cups-client,
          cups-ipp-utils
 Recommends: balena-etcher,

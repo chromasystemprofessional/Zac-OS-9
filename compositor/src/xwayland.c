@@ -138,7 +138,20 @@ static void xw_set_size(struct plat_view *view, int width, int height) {
 	wlr_xwayland_surface_configure(view->xsurface, x * s, y * s, width * s, height * s);
 }
 
+/* A full-screen window fills its screen as X11 sees it, which is in pixels:
+ * a 1x program (a game under Wine, say) that measures the screen and gets
+ * back a window half that size takes itself out of full screen again. So
+ * while full screen every window is shown at the screen's scale. */
 static void xw_set_fullscreen(struct plat_view *view, bool fullscreen) {
+	int scale = fullscreen && view->server->output_scale > 1 ? view->server->output_scale
+		: client_scale(view->server, view->xsurface);
+	if (scale != view->x11_scale) {
+		view->x11_scale = scale;
+		/* Back at 1x too: the buffers are not resized until the next commit. */
+		if (view->surface_tree) {
+			wlr_scene_node_for_each_buffer(&view->surface_tree->node, scale_buffer, &scale);
+		}
+	}
 	wlr_xwayland_surface_set_fullscreen(view->xsurface, fullscreen);
 }
 
