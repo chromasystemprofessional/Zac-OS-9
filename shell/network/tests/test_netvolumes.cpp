@@ -1,5 +1,5 @@
 /*
- * Names and mount points of AFP volumes (network/netvolumes.cpp): a volume
+ * Names and mount points of AFP volumes (files/netvolumes.cpp): a volume
  * goes by its shared folder's name, as on Mac OS 9, and always mounts in the
  * same place, so reconnecting never makes "NAME (2)", "NAME (3)", ...
  */

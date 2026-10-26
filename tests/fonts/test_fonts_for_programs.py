@@ -1,5 +1,5 @@
 """The fonts programs see in a ZacOS session (share/fontconfig/zacos9-fonts.conf):
-its families are the Fonts folder's (fontMacFamilies() in shell/finder/fonts.cpp);
+its families are the Fonts folder's (fontMacFamilies() in shell/files/fonts.cpp);
 through it fontconfig lists only those and the user's own fonts, which
 zacos9/fonts-own.conf accepts by file; Helvetica, Arial and serif find their
 stand-ins. Runs fc-list and fc-match against this computer's fonts.

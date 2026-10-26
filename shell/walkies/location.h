@@ -19,7 +19,7 @@ struct Location {
 	int volume = -1;   /* percent, -1: leave it */
 	QString timezone;  /* Europe/London */
 	QString printer;   /* a CUPS queue */
-	QString trickSet;  /* a Extensions Manager set (shell/finder/tricksets.h) */
+	QString trickSet;  /* a Extensions Manager set (shell/files/tricksets.h) */
 };
 
 QStringList locationNames();

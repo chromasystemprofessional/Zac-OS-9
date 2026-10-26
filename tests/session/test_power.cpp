@@ -1,4 +1,4 @@
-/* Shut Down and Restart outside a session (shell/finder/power.cpp, issue
+/* Shut Down and Restart outside a session (shell/common/power.cpp, issue
  * #38): systemctl poweroff|reboot found on a user's PATH (not
  * /usr/sbin/reboot), nothing said when logind takes it, and its reason
  * said when it doesn't, never silence. A stand-in systemctl first on PATH. */

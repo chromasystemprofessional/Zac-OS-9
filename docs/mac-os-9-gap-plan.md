@@ -115,10 +115,10 @@ Section 3 lists every feature; section 5 is the plan.
 | Mac OS 9 mechanism | ZacOS equivalent to use |
 |---|---|
 | Apple Menu Items folder | `ZacOS 9 Menu Items` (already feeds the Apple menu) |
-| Startup Items / Shutdown Items | XDG autostart (`shell/finder/autostart.cpp`); `zacos9-shutdown-items` runs the user's shutdown folder after apps close and before logout |
+| Startup Items / Shutdown Items | XDG autostart (`shell/files/autostart.cpp`); `zacos9-shutdown-items` runs the user's shutdown folder after apps close and before logout |
 | Control Strip modules | The Collar's modules (`shell/collar/`) |
 | Contextual Menu Items folder | System Folder ▸ Contextual Menu Items: plain `.desktop` application entries, filtered by `MimeType=` |
-| Desktop database, type/creator | MIME types (shared-mime-info) and desktop entries; `shell/finder/fileassoc.cpp` |
+| Desktop database, type/creator | MIME types (shared-mime-info) and desktop entries; `shell/files/fileassoc.cpp` |
 | Extensions / Extensions Manager | systemd user units, autostart entries and the extension catalog (`lib/extensions.c`) |
 | AppleScript / folder actions | D-Bus + shell/Python scripts; inotify for folder actions |
 | Sherlock index | localsearch/tracker3 or recoll (a package dependency), queried over D-Bus or its CLI |
@@ -198,7 +198,7 @@ Section 3 lists every feature; section 5 is the plan.
 | File ▸ **Search Internet…** (⌘H) | ✅ | Choose DuckDuckGo, Google or Bing, enter words, and open the URL-encoded query in the user's default browser. |
 | File ▸ **Page Setup…**, **Print Window/Print Desktop…** | ✅ | Page Setup: paper (US Letter, US Legal, A4, A5, B5; Letter by default where US units are used), orientation, scale 50–200%, in `desktop.conf`. Print Window draws the whole window (every row or icon, not just what's scrolled into view; a list with its headings) on white with nothing selected; Print Desktop the desktop's icons, cut to where they are. Laid out on PDF pages with the name, date and page number, shrunk to the page's width if wider, sent to your printer with `lp`. No Print dialog (copies, page range): one copy of everything. |
 | Edit ▸ Undo, Cut, Copy, Paste, Clear, Select All | ◐ | Edit menu sends keys to apps ✅; Command-C in the Sniffer copies selected item names as newline-separated text. Undo, Cut and Paste remain application-specific or unimplemented in the Sniffer. |
-| Edit ▸ **Show Clipboard** | ✅ | `shell/finder/clippings.cpp`: a window that follows the clipboard (text or picture), "Clipboard contents: …" below. |
+| Edit ▸ **Show Clipboard** | ✅ | `shell/files/clippings.cpp`: a window that follows the clipboard (text or picture), "Clipboard contents: …" below. |
 | Edit ▸ **Preferences…** (General: Puppy Mode, spring-loaded, grid; Views: standard views; Labels) | ✅ | General ▸ Puppy Mode ▸ Use Puppy Mode (`puppy-mode`). |
 | View ▸ as Icons/Buttons/List, Clean Up, Arrange | ✅ | |
 | View ▸ **as Window / as Pop-up Window** | ✅ | See §3.2. |
@@ -289,7 +289,7 @@ for), and **About This Computer** keeps showing honest memory use. The
 | Feature | Status | Notes |
 |---|---|---|
 | Cut/Copy/Paste, drag and drop between apps | ✅ | |
-| **Clipping files**: drag text or pictures to the desktop or a folder | ✅ | `shell/finder/clippings.cpp`. Text → "First words clipping.txt", a picture → "picture clipping.png", a link → an Internet location "Title.url" ([InternetShortcut]; opens in the browser). Ordinary files other programs open; they land where dropped, have their own icons and kinds, open in a viewer window, and dragged into a document carry their text or picture (an Internet location its address). |
+| **Clipping files**: drag text or pictures to the desktop or a folder | ✅ | `shell/files/clippings.cpp`. Text → "First words clipping.txt", a picture → "picture clipping.png", a link → an Internet location "Title.url" ([InternetShortcut]; opens in the browser). Ordinary files other programs open; they land where dropped, have their own icons and kinds, open in a viewer window, and dragged into a document carry their text or picture (an Internet location its address). |
 | Show Clipboard window | ✅ | See §3.3. |
 | Publish and Subscribe | — | |
 | Exchanging files with Windows (File Translator, PC disks) | ✅ | |
@@ -392,7 +392,7 @@ for), and **About This Computer** keeps showing honest memory use. The
 | Network volumes drawn as such (AppleShare's look) | ✅ | The `network-disk` icon: a drive on a network line. |
 | Disks on the desktop, Put Away/eject, drag a disk to the Trash to eject | ✅ | Network volumes (0.1.54) and USB disks eject when dragged to the Trash. |
 | Erase Disk with format choice | ✅ | Erase Disk: FAT32 for USB disks; Disk Setup erases with a choice of ext4, FAT32, exFAT or NTFS. |
-| **Disk Vet** (verify/repair) | ✅ | Disk Setup's First Aid tab (`zacos9-disksetup`): the volumes UDisks2 can check, Verify (Filesystem.Check) and Repair (Filesystem.Repair) with polkit's password; an open volume is closed first (the programs using it, from `/proc`, are named and quit if the user agrees: `inuse.cpp`) and opened again after, the startup disk excepted; the drive's SMART health (ATA and NVMe: passing or failing, temperature, hours). **Mount automatically** (a checkbox per volume, on unless turned off; `~/.config/zacos9/disks.conf` by UUID, `shell/finder/mountpolicy.h`): the Sniffer mounts such volumes at login and when connected, tries a failed one again 3 s later, then read-only through UDisks (a volume a crash left marked in use, as NTFS is), saying so; only then is it unreadable, which may offer Initialize. A volume open read-only shows a notice, and Repair closes it, repairs it (UDisks: `ntfsfix` for NTFS) and opens it normally. |
+| **Disk Vet** (verify/repair) | ✅ | Disk Setup's First Aid tab (`zacos9-disksetup`): the volumes UDisks2 can check, Verify (Filesystem.Check) and Repair (Filesystem.Repair) with polkit's password; an open volume is closed first (the programs using it, from `/proc`, are named and quit if the user agrees: `inuse.cpp`) and opened again after, the startup disk excepted; the drive's SMART health (ATA and NVMe: passing or failing, temperature, hours). **Mount automatically** (a checkbox per volume, on unless turned off; `~/.config/zacos9/disks.conf` by UUID, `shell/files/mountpolicy.h`): the Sniffer mounts such volumes at login and when connected, tries a failed one again 3 s later, then read-only through UDisks (a volume a crash left marked in use, as NTFS is), saying so; only then is it unreadable, which may offer Initialize. A volume open read-only shows a notice, and Repair closes it, repairs it (UDisks: `ntfsfix` for NTFS) and opens it normally. |
 | **Disk Setup** (partition, initialize) | ✅ | `zacos9-disksetup` Partition tab: a drive's layout (a bar and a list), New/Delete/Erase/Resize partitions (ext4, FAT32, exFAT, NTFS; resizing ext4 and NTFS) and New Table (GPT/MBR), queued until Apply, which says what it will erase; all through UDisks2 and polkit. Never the live medium's drive, a partition in use, the running system's drive as a whole or its EFI System partition (`shell/disksetup/plan.cpp`). The installer's Select Disk has Prepare Disk… (it opens here) and lists ext4 partitions as places to install. `diskinit.cpp` still initializes new disks. |
 | Disk Copy (mount images) | ✅ | Mac disk images, GPT/MBR images (zacos9-mac-mount), and CD/DVD images (`.iso`, ISO 9660): a read-only loop device through `udisksctl`, mounted on the desktop like any disk. |
 | **Printer Picker** (pick a printer; AppleShare servers) | ✅ | `zacos9-printerpicker`, in the Zac menu: the printers CUPS knows and finds by itself (IPP Everywhere, `lpstat -e`; cups-browsed is kept off the system, its queues broke), with model, location and status; clicking one makes it yours (`lpoptions -d`, no password); Create Desktop Printer, Print Queue, Settings… (system-config-printer). Servers stay in the Neighbourhood. |

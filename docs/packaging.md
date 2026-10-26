@@ -186,7 +186,7 @@ Notes:
   Now:
   - in the live session the computer's own disks aren't mounted unless
     Disk Setup's "Mount automatically" is turned on for one (USB drives and
-    discs still are; `liveSession()`, `shell/finder/mountpolicy.cpp`);
+    discs still are; `liveSession()`, `shell/files/mountpolicy.cpp`);
   - before changing a disk or partition, `zacos9-install` runs
     `zacos9-release-disk`: it refuses the running system's disk, hides the
     target from UDisks for the length of the install (a rule in

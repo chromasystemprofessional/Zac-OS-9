@@ -66,7 +66,7 @@ struct Item {
 	 * excludes every "fixed" item from dragging; the Mac let you drag a
 	 * disk to the Trash to eject it, a gap that predates this and isn't
 	 * closed here either — see its TODO in Desktop::mouseMoveEvent).
-	 * See shell/network/netvolumes.h. */
+	 * See shell/files/netvolumes.h. */
 	bool isNetworkVolume = false;
 	pl_icon_kind iconKind() const {
 		/* Drawn so; the kind stays (a network volume opens as a disk does). */

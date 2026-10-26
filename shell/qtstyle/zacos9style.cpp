@@ -20,7 +20,7 @@ extern "C" {
 #include "settings.h"
 #include "widgets.h"
 }
-#include "../finder/pixels.h" /* blitPixels */
+#include "../common/pixels.h" /* blitPixels */
 
 namespace {
 

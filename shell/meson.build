@@ -202,14 +202,15 @@ qt6 = dependency('qt6', modules: ['Core', 'Gui', 'Widgets', 'Network', 'DBus'],
 
 # libzacos9-shell: what nearly every desktop program uses, built once. The
 # window hints a program gives zacos9-wm (platinum-shell-v1: frame styles,
-# the proxy icon, pop-up windows...) and the Platinum alert box.
+# the proxy icon, pop-up windows...), the Platinum alert box, and Shut Down
+# and Restart from outside a session (the login window, the installer).
 shell_common = static_library('zacos9-shell',
-  'finder/platinumshell.cpp', 'finder/alert.cpp', finder_protocol,
-  include_directories: include_directories('finder'),
+  'common/platinumshell.cpp', 'common/alert.cpp', 'common/power.cpp', finder_protocol,
+  include_directories: include_directories('common'),
   dependencies: [platinum_dep, qt6, wayland_client],
 )
 shell_common_dep = declare_dependency(link_with: shell_common,
-  include_directories: include_directories('finder'),
+  include_directories: include_directories('common'),
   dependencies: [platinum_dep, qt6, wayland_client],
 )
 snapshot_protocol = []
@@ -253,11 +254,13 @@ layershellqt = dependency('LayerShellQt', method: 'cmake',
 # program that lists or launches applications through GIO uses both.
 gio_unix = [dependency('gio-unix-2.0'), appfilter_dep]
 
-finder_fonts = static_library('finder-fonts', 'finder/fonts.cpp',
+finder_fonts = static_library('finder-fonts', 'files/fonts.cpp',
+  include_directories: include_directories('common'),
   dependencies: [platinum_dep, qt6, dependency('fontconfig'),
     dependency('freetype2'), dependency('harfbuzz')],
 )
 finder_fonts_dep = declare_dependency(link_with: finder_fonts,
+  include_directories: include_directories('files'),
   dependencies: [platinum_dep, qt6])
 
 
@@ -265,27 +268,28 @@ finder_fonts_dep = declare_dependency(link_with: finder_fonts,
 panelkit = static_library('panelkit', 'panels/panelkit.cpp', 'panels/sharingclient.cpp',
   'panels/custompatterns.cpp',
   'panels/customthemes.cpp',
-  include_directories: include_directories('finder'),
+  include_directories: include_directories('common'),
   dependencies: [platinum_dep, qt6],
 )
 
 # libzacos9-files: the Sniffer's model of files, which the file chooser,
 # Disk Setup, Software, the printer windows and others share: items and their
 # icons, local and network volumes and when to mount them, the Macintosh view,
-# aliases, clippings, the Applications database and Trash, extensions,
-# desktop printers, file associations, thumbnails and resource forks.
+# aliases, clippings, the Applications database and Trash, extensions and
+# Extensions Manager sets, desktop printers, file associations, thumbnails
+# and resource forks.
 shell_files = static_library('zacos9-files',
-  'finder/alias.cpp', 'finder/localvolumes.cpp', 'finder/mountpolicy.cpp',
-  'network/netvolumes.cpp', 'network/smbclient.cpp', 'finder/vfs.cpp',
-  'finder/resources.cpp', 'finder/autostart.cpp', 'finder/extensioncatalog.cpp',
-  'finder/appdb.cpp', 'finder/apptrash.cpp', 'finder/items.cpp', 'finder/clippings.cpp',
-  'print/desktopprinter.cpp', 'print/printers.cpp', 'finder/thumbnails.cpp',
-  'finder/fileassoc.cpp',
-  include_directories: include_directories('finder', 'print', 'network', 'panels'),
+  'files/alias.cpp', 'files/localvolumes.cpp', 'files/mountpolicy.cpp',
+  'files/netvolumes.cpp', 'files/smbclient.cpp', 'files/vfs.cpp',
+  'files/resources.cpp', 'files/autostart.cpp', 'files/extensioncatalog.cpp',
+  'files/appdb.cpp', 'files/apptrash.cpp', 'files/items.cpp', 'files/clippings.cpp',
+  'files/desktopprinter.cpp', 'files/printers.cpp', 'files/thumbnails.cpp',
+  'files/fileassoc.cpp', 'files/tricksets.cpp',
+  include_directories: include_directories('files', 'panels'),
   dependencies: [shell_common_dep, platinum_dep, qt6, gio, gio_unix, wayland_client, finder_fonts_dep],
 )
 shell_files_dep = declare_dependency(link_with: [shell_files, panelkit],
-  include_directories: include_directories('finder', 'print', 'network', 'panels'),
+  include_directories: include_directories('files'),
   dependencies: [shell_common_dep, gio, gio_unix, finder_fonts_dep],
 )
 
@@ -350,7 +354,7 @@ test('sound-themes', find_program('python3'),
 test('custom-themes',
   executable('test-customthemes', '../tests/panels/test_customthemes.cpp', 'panels/appearance.cpp',
     link_with: panelkit,
-    include_directories: include_directories('panels', 'finder'),
+    include_directories: include_directories('panels', 'common'),
     dependencies: [platinum_dep, qt6],
   ),
   args: [meson.project_source_root() / 'assets/sounds/woodblock.wav'],
@@ -366,7 +370,7 @@ test('custom-patterns', find_program('python3'),
 test('custom-pattern-catalog',
   executable('test-custompatterns', '../tests/panels/test_custompatterns.cpp', 'panels/appearance.cpp',
     link_with: panelkit,
-    include_directories: include_directories('panels', 'finder'),
+    include_directories: include_directories('panels', 'common'),
     dependencies: [platinum_dep, qt6],
   ),
   env: ['QT_QPA_PLATFORM=offscreen'],
@@ -393,7 +397,6 @@ finder_exe = executable('zacos9-finder',
   'finder/findwindow.cpp', 'finder/findcriteria.cpp', 'finder/findindex.cpp',
   'finder/folderstate.cpp',
   'finder/resourcewindows.cpp',
-  'finder/tricksets.cpp',
   'finder/diskinit.cpp',
   'finder/filemanager1.cpp',
   link_with: panelkit,
@@ -426,7 +429,6 @@ finder_test_sources = [
   'finder/findwindow.cpp', 'finder/findcriteria.cpp', 'finder/findindex.cpp',
   'finder/folderstate.cpp',
   'finder/resourcewindows.cpp',
-  'finder/tricksets.cpp',
   'finder/diskinit.cpp',
   'finder/filemanager1.cpp',
 ]
@@ -547,14 +549,14 @@ test('finder-gpu-info',
 test('finder-vfs',
   executable('test-finder-vfs',
     'finder/tests/test_vfs.cpp',
-    'finder/vfs.cpp',
+    'files/vfs.cpp',
     'finder/folderpath.cpp',
-    'finder/resources.cpp',
-    'finder/autostart.cpp',
-    'finder/extensioncatalog.cpp',
-    'finder/appdb.cpp',
-    'finder/apptrash.cpp',
-    'finder/items.cpp', 'finder/clippings.cpp', 'print/desktopprinter.cpp', 'print/printers.cpp', 'finder/thumbnails.cpp', 'finder/fileassoc.cpp',
+    'files/resources.cpp',
+    'files/autostart.cpp',
+    'files/extensioncatalog.cpp',
+    'files/appdb.cpp',
+    'files/apptrash.cpp',
+    'files/items.cpp', 'files/clippings.cpp', 'files/desktopprinter.cpp', 'files/printers.cpp', 'files/thumbnails.cpp', 'files/fileassoc.cpp',
     link_with: panelkit,
     include_directories: include_directories('finder', 'print', 'panels'),
     dependencies: [shell_common_dep, platinum_dep, qt6, gio, gio_unix, wayland_client, finder_fonts_dep],
@@ -616,7 +618,7 @@ executable('zacos9-appearance',
   'panels/main.cpp',
   'panels/appearance.cpp',
   link_with: panelkit,
-  include_directories: include_directories('finder'), # pixels.h
+  include_directories: include_directories('common'), # pixels.h
   dependencies: [platinum_dep, qt6],
   install: true,
 )
@@ -670,9 +672,8 @@ executable('zacos9-bluetooth',
 )
 
 test('tricks-sets',
-  executable('test-tricks-sets', 'finder/tests/test_tricksets.cpp', 'finder/tricksets.cpp',
-    include_directories: include_directories('finder'),
-    dependencies: [platinum_dep, qt6],
+  executable('test-tricks-sets', 'finder/tests/test_tricksets.cpp',
+    dependencies: [shell_files_dep, platinum_dep, qt6],
   ),
   timeout: 10,
 )
@@ -718,7 +719,6 @@ test('disksetup-udisks',
 # startup set (walkies/location.cpp).
 executable('zacos9-walkies',
   'walkies/main.cpp', 'walkies/location.cpp',
-  'finder/tricksets.cpp',
   link_with: panelkit,
   include_directories: include_directories('finder', 'panels', 'walkies'),
   dependencies: [shell_files_dep, shell_common_dep, platinum_dep, qt6, wayland_client, gio, gio_unix],
@@ -877,7 +877,7 @@ test('discovery',
   timeout: 60,
 )
 
-# AFP volume names and mount points (network/netvolumes.cpp).
+# AFP volume names and mount points (files/netvolumes.cpp).
 test('netvolumes',
   executable('test-netvolumes',
     'network/tests/test_netvolumes.cpp',
@@ -904,7 +904,6 @@ executable('zacos9-netbrowser',
 executable('zacos9-login',
   'greeter/main.cpp',
   'greeter/greetd.cpp',
-  'finder/power.cpp',
   link_with: panelkit,
   include_directories: include_directories('finder', 'print', 'panels', 'greeter'),
   dependencies: [shell_common_dep, platinum_dep, qt6, wayland_client],
@@ -1081,7 +1080,7 @@ test('pedigree',
 # The Calculator desk accessory.
 executable('zacos9-calculator',
   'calculator/main.cpp', 'calculator/engine.cpp',
-  include_directories: include_directories('finder', 'print', 'calculator'),
+  include_directories: include_directories('common', 'print', 'calculator'),
   dependencies: [platinum_dep, qt6],
   install: true,
 )
@@ -1189,7 +1188,7 @@ memory_sources = ['panels/memory.cpp']
 test('memory-panel',
   executable('test-memory-panel', '../tests/memory/test_panel.cpp', memory_sources,
     link_with: panelkit,
-    include_directories: include_directories('finder', 'print', 'panels'),
+    include_directories: include_directories('common', 'print', 'panels'),
     dependencies: [platinum_dep, qt6],
   ),
   env: ['QT_QPA_PLATFORM=offscreen'],
@@ -1309,7 +1308,7 @@ test('collar-displays', find_program('dbus-run-session'),
 test('panel-hints',
   executable('test-panel-hints', 'panels/tests/test_hints.cpp',
     link_with: panelkit,
-    include_directories: include_directories('finder', 'panels'),
+    include_directories: include_directories('common', 'panels'),
     dependencies: [platinum_dep, qt6],
   ),
   env: ['QT_QPA_PLATFORM=offscreen'], timeout: 30,
@@ -1347,21 +1346,19 @@ test('sound-output',
 )
 
 test('system-power',
-  executable('test-system-power', '../tests/session/test_power.cpp', 'finder/power.cpp',
-    include_directories: include_directories('finder'),
-    dependencies: [qt6],
+  executable('test-system-power', '../tests/session/test_power.cpp',
+    dependencies: [shell_common_dep, qt6],
   ),
   env: ['QT_QPA_PLATFORM=offscreen'],
 )
 installer_exe = executable('zacos9-installer',
   'installer/main.cpp',
   'installer/installer.cpp',
-  'finder/power.cpp',
   # Disk Setup's plan and partition map, for "next to what's on it".
   'disksetup/plan.cpp', 'disksetup/udisks.cpp', 'disksetup/diskmap.cpp',
   link_with: panelkit,
-  include_directories: include_directories('finder', 'print', 'panels', 'disksetup'),
-  dependencies: [platinum_dep, qt6],
+  include_directories: include_directories('print', 'panels', 'disksetup'),
+  dependencies: [shell_common_dep, platinum_dep, qt6],
   install: true,
 )
 
@@ -1404,7 +1401,7 @@ executable('zacos9-setup',
   'setup/main.cpp',
   'setup/setup.cpp',
   link_with: panelkit,
-  include_directories: include_directories('finder', 'print', 'panels'),
+  include_directories: include_directories('common', 'print', 'panels'),
   dependencies: [platinum_dep, qt6],
   install: true,
 )

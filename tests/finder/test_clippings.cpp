@@ -1,4 +1,4 @@
-/* Clippings (shell/finder/clippings.cpp): text, a picture and a link dropped
+/* Clippings (shell/files/clippings.cpp): text, a picture and a link dropped
  * on a folder window from another program become clipping files where they
  * were dropped; dragged out again they carry what they hold; opened they
  * show it; Edit > Show Clipboard follows the clipboard. */

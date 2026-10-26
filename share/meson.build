@@ -18,5 +18,5 @@ install_data('../assets/fonts/ZacOS9System-Regular.ttf', '../assets/fonts/ZacOS9
 install_data('fontconfig/zacos9-fonts.conf', install_dir: get_option('datadir') / 'zacos9' / 'fontconfig')
 test('fonts-for-programs', find_program('python3'),
   args: [files('../tests/fonts/test_fonts_for_programs.py'), files('fontconfig/zacos9-fonts.conf'),
-    files('../shell/finder/fonts.cpp')],
+    files('../shell/files/fonts.cpp')],
   timeout: 180)
