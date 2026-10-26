@@ -1,3 +1,17 @@
+zacos9 (1.0.21) trixie; urgency=medium
+
+  * ZacOS 9 can now be installed next to what's already on a disk, such as
+    Windows or Haiku, instead of erasing it: the Installer offers Erase the
+    whole disk or Next to what's on it, shows the disk as a partition map,
+    and lets you drag the line to give ZacOS 9 more or less room. When
+    another system is on the computer, a menu lets you choose which one
+    starts. Disk Setup's Partition tab is now a partition map too: drag to
+    resize, + and − to add and delete. Also fixed: the desktop no longer
+    asks for an administrator's password when it opens another system's
+    disk by itself.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Mon, 26 Oct 2026 00:51:10 -0400
+
 zacos9 (1.0.20) trixie; urgency=medium
 
   * Fixes a crash that could log you out: opening a menu in some older X11
