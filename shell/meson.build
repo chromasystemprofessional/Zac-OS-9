@@ -1536,12 +1536,14 @@ test('system-power',
   ),
   env: ['QT_QPA_PLATFORM=offscreen'],
 )
-executable('zacos9-installer',
+installer_exe = executable('zacos9-installer',
   'installer/main.cpp',
   'installer/installer.cpp',
   'finder/power.cpp',
+  # Disk Setup's plan and partition map, for "next to what's on it".
+  'disksetup/plan.cpp', 'disksetup/udisks.cpp', 'disksetup/diskmap.cpp',
   link_with: panelkit,
-  include_directories: include_directories('finder', 'print', 'panels'),
+  include_directories: include_directories('finder', 'print', 'panels', 'disksetup'),
   dependencies: [platinum_dep, qt6],
   cpp_args: ['-std=c++17'],
   install: true,
@@ -1628,6 +1630,10 @@ vptr_exe = executable('vptr', meson.project_source_root() / 'tools/vptr/vptr.c',
   dependencies: [wayland_client, xkbcommon_client])
 test('disksetup-partition-map', find_program('python3'),
   args: [disksetup_map_test, compositor_exe.full_path(), disksetup_exe, vptr_exe],
+  depends: compositor_exe,
+  timeout: 90)
+test('installer-beside', find_program('python3'),
+  args: [files('../tests/installer/test_beside.py'), compositor_exe.full_path(), installer_exe, vptr_exe],
   depends: compositor_exe,
   timeout: 90)
 

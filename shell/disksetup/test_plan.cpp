@@ -220,6 +220,14 @@ int main(int argc, char **argv) {
 	/* ZacOS's end, against the EFI System partition: smaller only. */
 	CHECK(boundaryLimits(after2, 1).most == after2.parts[1].offset + after2.parts[1].size &&
 		boundaryLimits(after2, 1).least == after2.parts[1].offset + 8 * MiB);
+	/* As zacos9-install --beside's steps: shrink by device, then ZacOS, then EFI. */
+	const QStringList steps = besideSteps(gpt, moved);
+	CHECK(steps.size() == 9 && steps[0] == "shrink" && steps[1] == "/dev/sdb1" && steps[3] == "zacos" &&
+		steps[6] == "efi" && steps[4].toULongLong() == line - GiB);
+	/* Growing a partition is not a step it does. */
+	QList<DiskOp> grown = moved;
+	grown[0].size = gpt.parts[0].size + GiB;
+	CHECK(besideSteps(gpt, grown).isEmpty());
 	/* In free space the boot partition goes first, and ZacOS's end moves. */
 	DiskDrive roomy = d;
 	roomy.parts[1].mountPoints.clear();

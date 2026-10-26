@@ -25,7 +25,8 @@
 #   zacos OFFSET SIZE       ZacOS's partition: the install goes there
 #
 # --min-size prints (read-only) how small PARTITION could shrink round
-# its files:  min-size BYTES
+# its files:  min-size BYTES. It closes the volume first if the desktop
+# opened it (under /media).
 #
 # --detect looks (read-only) at every ext4 partition for an installed
 # ZacOS 9 and prints, for each:
@@ -153,7 +154,15 @@ partition_ok() {
 if [ "${1:-}" = --min-size ]; then
 	part=${2:-}
 	partition_ok "$part"
-	[ -z "$(lsblk -n -o MOUNTPOINTS "$part" 2>/dev/null | tr -d ' \n')" ] || fail "$part is in use. Eject it first"
+	# The live desktop opens a disk's volumes by itself; those may close
+	# (the install frees the disk anyway). Anything else in use stays.
+	lsblk -n -o MOUNTPOINTS "$part" 2>/dev/null | while IFS= read -r where; do
+		case $where in
+		'') ;;
+		/media/* | /run/media/*) umount "$where" 2>/dev/null || fail "$part is in use. Quit the programs using it and try again" ;;
+		*) fail "$part is in use by the system" ;;
+		esac
+	done || exit 1
 	case $(blkid -o value -s TYPE "$part" 2>/dev/null) in
 	ext2 | ext3 | ext4)
 		blocks=$(resize2fs -P "$part" 2>/dev/null | sed -n 's/^Estimated minimum size of the filesystem: *\([0-9]*\)$/\1/p')

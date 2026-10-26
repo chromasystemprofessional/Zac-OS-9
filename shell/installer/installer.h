@@ -6,7 +6,9 @@
 #include <memory>
 #include <vector>
 
+#include "diskmap.h"
 #include "panelkit.h"
+#include "plan.h"
 
 /*
  * ZacOS 9 Installer: a Mac OS 9-style single-window installer that asks
@@ -16,7 +18,10 @@
  *   Welcome  — logo, description, Continue button
  *   Select   — list of available disks, Install button; a disk that
  *              already has ZacOS 9 offers Update (keeps its accounts,
- *              files and settings) beside Erase & Install
+ *              files and settings) beside Erase & Install. Any other
+ *              disk: erase it all, or put ZacOS next to what's on it
+ *              (issue #42), shown in Disk Setup's partition map, where
+ *              the line above ZacOS drags to give it more or less room
  *   Install  — progress bar and status while zacos9-install runs
  *   Done     — completion message, Restart button
  */
@@ -55,6 +60,15 @@ private:
 	/* Select screen */
 	std::vector<DiskEntry> m_disks;
 	PanelList m_diskList;
+	PanelRadios m_where;      /* the whole disk, or next to what's on it */
+	DiskMap m_map;
+	QList<DiskDrive> m_drives; /* as UDisks shows them */
+	DiskDrive m_target;       /* the chosen disk: the desktop's volumes on it count as closed */
+	QList<DiskOp> m_ops;      /* ZacOS next to what's there (besidePlan) */
+	QString m_why;            /* why it can't go next to it, or "" */
+	QProcess *m_measure = nullptr; /* zacos9-install --min-size, one partition at a time */
+	QStringList m_toMeasure;
+	bool m_uefi = false;
 	PanelButton m_install;  /* Install, or Update / Reinstall for a ZacOS 9 disk */
 	PanelButton m_erase;    /* Erase & Install, beside Update */
 	PanelButton m_prepare;  /* Prepare Disk…: Disk Setup's Partition tab */
@@ -79,6 +93,15 @@ private:
 	void showSelect();
 	void showInstalling(const QStringList &args, bool updating);
 	void updateSelectButtons();
+	void readDrives();
+	void chooseTarget(bool chosen);
+	void measureNext();
+	void planBeside();
+	void dragLine(int part, qulonglong at);
+	bool beside() const;
+	int zacosPart(const DiskDrive &planned) const;
+	DiskDrive plannedTarget() const;
+	QString besideText() const;
 	void prepareDisk();
 	const DiskEntry *selectedDisk() const;
 	void showDone();

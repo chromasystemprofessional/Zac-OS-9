@@ -127,6 +127,12 @@ struct BesidePlan {
  * `name` is the new partition's. */
 BesidePlan besidePlan(const DiskDrive &drive, bool uefi, const QString &name);
 
+/* `ops` as zacos9-install --beside's steps ("shrink /dev/sda3 BYTES",
+ * "efi OFFSET BYTES", "biosboot ...", "zacos ..."), or empty if any step
+ * is one it doesn't do (only shrinking partitions already there, and
+ * making ZacOS's and boot partitions). */
+QStringList besideSteps(const DiskDrive &start, const QList<DiskOp> &ops);
+
 /* The layout bar: each piece's width, proportional but at least `least`
  * pixels, all of them filling `width`. */
 QList<int> barWidths(const QList<qulonglong> &sizes, int width, int least = 8);

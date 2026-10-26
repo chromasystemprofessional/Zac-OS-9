@@ -658,3 +658,24 @@ bool moveBoundary(const DiskDrive &start, QList<DiskOp> *ops, int part, qulonglo
 	*ops = changed;
 	return true;
 }
+
+QStringList besideSteps(const DiskDrive &start, const QList<DiskOp> &ops) {
+	QStringList steps;
+	DiskDrive d = start;
+	for (const DiskOp &op : ops) {
+		if (op.kind == DiskOp::Resize && op.part >= 0 && op.part < d.parts.size() &&
+				!d.parts[op.part].block.isEmpty() && op.size < d.parts[op.part].size) {
+			steps << "shrink" << d.parts[op.part].device << QString::number(op.size);
+		} else if (op.kind == DiskOp::Create && (op.partType == EfiType || op.partType == EfiTypeMbr)) {
+			steps << "efi" << QString::number(op.offset) << QString::number(op.size);
+		} else if (op.kind == DiskOp::Create && op.partType == BiosBootType) {
+			steps << "biosboot" << QString::number(op.offset) << QString::number(op.size);
+		} else if (op.kind == DiskOp::Create && op.partType.isEmpty() && op.fsType == "ext4") {
+			steps << "zacos" << QString::number(op.offset) << QString::number(op.size);
+		} else {
+			return {};
+		}
+		d = planned(d, op);
+	}
+	return steps;
+}
