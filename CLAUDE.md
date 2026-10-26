@@ -1,91 +1,40 @@
 # CLAUDE.md — ZacOS 9
 
-## Architectural map
+The project's own docs are the source of truth, for people and agents alike:
+building, running, testing, code style and the hard rules are in
+CONTRIBUTING.md; the map of the code is in ARCHITECTURE.md; each part has a
+page in `docs/`. Both are imported here:
 
-| Component | Path | Language |
-|---|---|---|
-| Wayland compositor | `compositor/` | C (wlroots 0.18) |
-| Finder (desktop + windows) | `shell/finder/` | C++ / Qt6 |
-| └ Macintosh view (startup disk, Applications) | `shell/finder/vfs.cpp`, `appdb.cpp` | C++ / GIO — see `docs/vfs.md` |
-| Menu bar (incl. Apple menu) | `shell/menubar/` | C++ / Qt6 |
-| Control panels (Bluetooth: `bluetooth.cpp`, see `docs/bluetooth.md`) | `shell/panels/` | C++ / Qt6 |
-| Screen saver, display and system sleep (Energy Saver and Screen Saver panels in `controlpanel.cpp`; the savers: `lib/savers.c`, `shell/screensaver/`; the lock: `compositor/src/lock.c`, `shell/lock/`; D-Bus keep-awake requests and logind: `shell/inhibit/`) | `compositor/src/idle.c`, `idle_policy.c` | C — see `docs/energy-saver.md` |
-| Memory panel (Disk Cache, Virtual Memory, Compressed Memory, RAM Disk) | `shell/panels/memory.cpp`, `memory/` (helper, polkit, RAM Disk unit) | C++ / Python — see `docs/memory.md` |
-| Software window (app catalog over apt) | `shell/store/` | C++ / Qt6 — see `docs/appstore.md` |
-| Software Update (ZacOS releases from GitHub + Debian updates) | `shell/update/`, `scripts/release.sh` | C++ / Qt6 — see `docs/updates.md` |
-| Screen Sharing (ZacOS to ZacOS: panel, and the host behind it: wayvnc on a private socket, Allow/Deny, Bonjour `_rfb._tcp`; the viewer: full screen at the screen's own pixels, `rfb.cpp` VNC client, the bar to switch to a window, the host's sound in `sound.cpp`) — see `docs/screen-sharing.md` | `shell/panels/screensharing.cpp`, `shell/screenshare/` | C++ / Qt6 |
-| Network Browser (connect to AFP/SMB servers) | `shell/network/` | C++ / Qt6 — see `docs/network.md` |
-| Platinum look for other apps (GTK 3 theme, Qt 6 style; global menus next) | `share/themes/ZacOS9/`, `shell/qtstyle/` | CSS / C++ — see `docs/app-integration.md` |
-| Installer and Disk Setup (partition map; installing next to another system, issue #42) | `shell/installer/`, `shell/disksetup/`, `installer/` | C++ / Qt6 + sh — see `docs/installer.md` |
-| Classic (SheepShaver) launcher | `shell/classic/` | sh |
-| Session entry | `session/` | sh |
-| Boot splash, extension parade, splash→desktop hand-off | `boot/` | Plymouth script + C + sh — see `docs/boot.md` |
-| Touchscreens (a finger as the mouse, two-finger tap right-click) and the on-screen keyboard | `compositor/src/touch.c`, `touch_tap.c`, `osk.c`, `shell/keyboard/` | C — see `docs/touch.md` |
-| Hardware quirks (Haswell HDMI audio, Mac ACPI interrupt storms) | `hardware/` | sh + modprobe.d + systemd — see `docs/hardware.md` |
-| AFP 2.x FUSE client (TCP/IP, and AppleTalk through ASP: `asp.c`) | `network/afp/` | C (libfuse3) — see `docs/network.md` |
-| File sharing helper + polkit | `sharing/` | sh + policy XML |
-| Software helper + polkit | `appstore/` | sh + policy XML |
-| Emulation integration | `emulation/` | sh + config |
-| Assets (fonts, icons, patterns) | `assets/` | PNG, binary |
-| Tests | `tests/` | sh, Python |
-| Build helpers | `scripts/` | sh |
-| Meson build | `meson.build` + per-dir `meson.build` | Meson |
+@CONTRIBUTING.md
+@ARCHITECTURE.md
 
-**Never read or edit:** `build/`, `emulation/SheepShaver/` (upstream), `uploads/`, `macos/` (Apple reference files — do not ship).
+What's below is only what's particular to working as an agent.
 
-## Build & test
+## Never read or edit
 
-```sh
-# Build only (run in WSL Debian):
-scripts/build.sh
-
-# Quick VM boot for interactive testing (no ISO rebuild):
-scripts/dev-boot.sh
-
-# Build the package and install it on this computer (one sudo prompt; then log out/in):
-scripts/install-live.sh            # --no-build installs build/packages as is
-
-# AFP client test (against Netatalk on localhost):
-AFP_PASSWORD=Sesame-42 tests/sharing/afp-client.sh 127.0.0.1 "platest's home" platest
-
-# AFP client test (against Mac OS 9 via Classic):
-AFP_PASSWORD=macpass tests/sharing/afp-client.sh 127.0.0.1:5548 "Macintosh HD" "^Mac User"
-```
-
-**Never rebuild the ISO after each code change.** Use `dev-boot.sh` for iteration; the ISO is a packaging step done only when explicitly requested.
+`build/`, `emulation/SheepShaver/` (upstream), `uploads/`, `upload assets/`,
+`macos/` and `tools/measure/figs/` (Apple reference material: never ship it).
 
 ## Workflow rules
 
-1. Identify the smallest set of relevant files before reading. Check this map first.
-2. Read only the needed sections of large files (`offset`/`limit` on the Read tool).
-3. Use `rg` (ripgrep) for symbol searches; exclude `build/`, `emulation/SheepShaver/`, `uploads/`, `macos/`, `tools/measure/figs/`.
+1. Find the smallest set of relevant files before reading: ARCHITECTURE.md's
+   "Where do I change…" table, then the part's page in `docs/`.
+2. Read only the needed sections of large files (`offset`/`limit`).
+3. Use `rg` for symbol searches, excluding the folders above.
 4. Redirect long build output: `ninja -C build >build/build.log 2>&1; tail -20 build/build.log`.
-5. One logical feature per session. No unrelated cleanup.
-6. For changes touching >3 files, write a short plan first, then implement.
-7. Run focused tests before broader ones.
-8. Update `PROJECT_STATUS.md` when finishing a task.
-
-## Key constraints
-
-- **No Apple assets.** No Happy Mac, no startup chime, no Apple fonts or icons.
-- **Happy Zac** (`assets/boot/happy-zac.png`) is the boot logo; the Welcome box shows `assets/boot/zacos-logo.png` (original assets, not the Apple logo). The 1984 Macintosh screenshot in `upload assets/` is a layout reference only: never ship or commit it.
-- `macos/` and `uploads/` are for measurement reference only; nothing from them ships.
-- Marks must not infringe Apple trademarks.
-
-## Network / AFP notes
-
-- Mac OS 9 AFP server: AFP 1.1–2.1, Cleartxt / Randnum / 2-Way Randnum auth.
-- Classic forwards Mac port 548 → localhost:5548 (`--redir tcp:5548::548`).
-- **Critical:** send each DSI message in a single `sendmsg()` with iovec. Mac OS 9's server misreads split messages.
-- Netatalk can't nest volumes: `[Homes]` must veto shared sub-folders (handled in `sharing/zacos9-sharing-helper`).
-- Debug tracing: `ZACOS9_AFP_DEBUG=1 build/network/zacos9-afp mount ...`
-- **Never use `QProcess::waitForFinished()` in this codebase.** It deadlocked live in a Qt/Wayland GUI process even when the child process had already exited cleanly (confirmed from the server's own log). Use the `processEvents()`-loop pattern (`runSharingHelper`, `runAppstoreHelper`, `waitForProcess` in `shell/network/afpclient.cpp`) everywhere instead.
-- `zacos9-afp`'s own argument parser doesn't recognize `--` as an end-of-options marker — it reads it as an unknown flag and refuses. Don't add one when building its command line.
-- `avahi-browse` takes at most one service type per invocation (two args = "Too many arguments", browses nothing). Start one process per service type with `-k -p -r -t`, in parallel. Avoid `-a`: it is slow enough to blow the scan budget and can leave only unusable `+` records (see `shell/network/discovery.cpp`).
-- `gio mount`'s exit code is 0 whether or not the mount worked; go by stderr.
+5. One logical change per session and per pull request. No unrelated cleanup.
+6. For changes touching more than 3 files, write a short plan first.
+7. Run focused tests before broader ones; the whole suite one at a time.
+8. When a task changes what's true about the project (something finished,
+   started, put on hold or found missing), update PROJECT_STATUS.md. It's the
+   current state, not a log: no "what I did" rows.
+9. **Never rebuild the ISO to test a change**: use `scripts/dev-boot.sh`. The
+   ISO is built only when asked for.
+10. Never run a nested or headless desktop on the user's own session bus or
+    home folder (tests/disksetup/stage.py shows how to isolate one).
 
 ## Agent / subagent policy
 
-- Spawn `Explore` for broad symbol searches spanning >3 directories.
+- Spawn `Explore` for broad symbol searches spanning more than 3 directories.
 - Spawn a background agent only for genuinely independent parallel work.
 - Do not spawn just to avoid reading a file yourself.
