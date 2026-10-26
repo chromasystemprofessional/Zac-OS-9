@@ -152,6 +152,11 @@ test('startup-displays',
   env: ['ZACOS9_STARTUP=1'],
 )
 
+# Screens start at the origin, a saved one not connected leaving no gap (Krita's tablet).
+test('display-origin', python3,
+  args: [files('tests/test_display_origin.py'), compositor_exe],
+  timeout: 60,
+)
 test('cursor-theme', python3,
   args: [files('tests/test_cursors.py'),
     meson.project_source_root() / 'tools/cursors/build_cursors.py',
