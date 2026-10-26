@@ -1,0 +1,50 @@
+#!/bin/sh
+# /etc/grub.d/31_zacos9_haiku: Haiku beside ZacOS 9 in GRUB's menu (issue #42).
+#
+# os-prober (30_os-prober) has a Haiku probe, but it never finds a Haiku of
+# today: it looks for haiku_loader and the kernel as files in /system, where
+# Haiku has kept them inside its packages since 2013, and it takes the
+# filesystem for "befs" when GRUB's own mounting calls it "bfs". So this
+# finds Haiku's partitions (BFS) itself, whenever other systems are looked
+# for (GRUB_DISABLE_OS_PROBER=false, which zacos9-install sets beside
+# another system, and Startup Disk's Look for Other Systems):
+#  - BIOS: Haiku's own boot sector, chainloaded;
+#  - UEFI: Haiku's EFI loader in an EFI System partition (EFI/HAIKU/, or
+#    EFI/BOOT/BOOTX64.EFI when that one is Haiku's).
+set -e
+[ "${GRUB_DISABLE_OS_PROBER:-true}" = false ] || exit 0
+. /usr/share/grub/grub-mkconfig_lib
+
+haiku=$(blkid -o device -t TYPE=befs 2>/dev/null || true)
+[ -n "$haiku" ] || exit 0
+
+# A menu entry reaching device $1 and starting Haiku with command $2.
+entry() {
+	echo "Found Haiku on $1" >&2
+	echo "menuentry 'Haiku' --class haiku --class os {"
+	prepare_grub_to_access_device "$1" | sed 's/^/\t/'
+	printf '\t%s\n}\n' "$2"
+}
+
+if [ ! -d /sys/firmware/efi ]; then
+	for part in $haiku; do
+		entry "$part" "chainloader +1"
+	done
+	exit 0
+fi
+
+# UEFI: Haiku's loader, in any EFI System partition.
+look=$(mktemp -d)
+trap 'umount "$look" 2>/dev/null || true; rmdir "$look"' EXIT
+lsblk -lnpo NAME,PARTTYPE | awk 'tolower($2) == "c12a7328-f81f-11d2-ba4b-00a0c93ec93b" || tolower($2) == "0xef" { print $1 }' |
+while read -r esp; do
+	mount -o ro "$esp" "$look" 2>/dev/null || continue
+	loader=$(cd "$look" && find . -ipath './efi/haiku/*.efi' 2>/dev/null | head -n 1)
+	if [ -z "$loader" ]; then
+		# The fallback loader, if Haiku put it there (anyboot images do).
+		loader=$(cd "$look" && find . -ipath './efi/boot/bootx64.efi' 2>/dev/null | head -n 1)
+		[ -n "$loader" ] && grep -qa "Welcome to the Haiku boot loader" "$look/$loader" || loader=
+	fi
+	umount "$look"
+	[ -z "$loader" ] || entry "$esp" "chainloader ${loader#.}"
+done
