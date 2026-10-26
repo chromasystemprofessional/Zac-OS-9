@@ -1,3 +1,12 @@
+zacos9 (1.0.20) trixie; urgency=medium
+
+  * Fixes a crash that could log you out: opening a menu in some older X11
+    programs (those built with Tk, such as the Extension Icons tool)
+    stopped the desktop. Windows that switch between ordinary and pop-up
+    after they're made are now handled properly.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Sun, 25 Oct 2026 20:16:17 -0400
+
 zacos9 (1.0.19) trixie; urgency=medium
 
   * Learn ZacOS: a new tutorial in the Help menu, starting with how the
