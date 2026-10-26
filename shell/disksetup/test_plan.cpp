@@ -191,8 +191,46 @@ int main(int argc, char **argv) {
 	for (const DiskOp &op : beside.ops) {
 		done = planned(done, op);
 	}
-	CHECK(done.parts.size() == 4 && done.parts[1].efi && done.parts[2].offset == beside.offset &&
-		done.parts[2].size >= ZacosLeast);
+	/* Windows, ZacOS right after it, then the EFI System partition. */
+	CHECK(done.parts.size() == 4 && done.parts[1].offset == beside.offset && done.parts[1].label == "Zacintosh HD" &&
+		done.parts[1].offset == done.parts[0].offset + done.parts[0].size && done.parts[2].efi &&
+		done.parts[1].size >= ZacosLeast);
+
+	/* The line between them moves both: Windows bigger, ZacOS smaller, and back. */
+	const qulonglong line = done.parts[0].offset + done.parts[0].size;
+	const qulonglong zacosEnd = done.parts[1].offset + done.parts[1].size;
+	const DiskSpan between = boundaryLimits(done, 0);
+	CHECK(between.least == MiB + 20 * GiB && between.most == zacosEnd - 8 * MiB);
+	QList<DiskOp> moved = beside.ops;
+	CHECK(moveBoundary(gpt, &moved, 0, line + 2 * GiB) && moved.size() == 3);
+	DiskDrive after2 = gpt;
+	for (const DiskOp &op : moved) {
+		after2 = planned(after2, op);
+	}
+	CHECK(after2.parts[0].offset + after2.parts[0].size == line + 2 * GiB &&
+		after2.parts[1].offset == line + 2 * GiB && after2.parts[1].offset + after2.parts[1].size == zacosEnd);
+	CHECK(moveBoundary(gpt, &moved, 0, line - GiB));
+	after2 = gpt;
+	for (const DiskOp &op : moved) {
+		after2 = planned(after2, op);
+	}
+	CHECK(after2.parts[0].size == line - GiB - MiB && after2.parts[1].offset == line - GiB);
+	/* Not past Windows's files. */
+	CHECK(!moveBoundary(gpt, &moved, 0, 10 * GiB));
+	/* ZacOS's end, against the EFI System partition: smaller only. */
+	CHECK(boundaryLimits(after2, 1).most == after2.parts[1].offset + after2.parts[1].size &&
+		boundaryLimits(after2, 1).least == after2.parts[1].offset + 8 * MiB);
+	/* In free space the boot partition goes first, and ZacOS's end moves. */
+	DiskDrive roomy = d;
+	roomy.parts[1].mountPoints.clear();
+	beside = besidePlan(roomy, true, "Z");
+	CHECK(beside.ops.size() == 2 && beside.ops[0].partType == EfiType && beside.ops[0].offset == 40 * GiB + MiB &&
+		beside.offset == 40 * GiB + MiB + 512 * MiB);
+	done = roomy;
+	for (const DiskOp &op : beside.ops) {
+		done = planned(done, op);
+	}
+	CHECK(boundaryLimits(done, 2).least < boundaryLimits(done, 2).most);
 	/* Files too big to make 16 GB: no room, and it says why. */
 	gpt.parts[0].minSize = 50 * GiB;
 	CHECK(besidePlan(gpt, true, "Z").why.contains("16 GB"));

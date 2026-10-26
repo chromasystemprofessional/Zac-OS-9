@@ -569,20 +569,91 @@ BesidePlan besidePlan(const DiskDrive &d, bool uefi, const QString &name) {
 		from = d.parts[shrink].offset + resize.size;
 		to = room;
 	}
-	if (needBoot) {
-		boot.offset = from;
-		plan.ops << boot;
-	}
+	const bool bootAfter = !plan.ops.isEmpty(); /* room taken from a partition */
 	DiskOp zacos{ DiskOp::Create };
-	zacos.offset = from + bootSize;
-	zacos.size = (to - zacos.offset) / MiB * MiB;
+	zacos.offset = bootAfter ? from : from + bootSize;
+	zacos.size = (to - from - bootSize) / MiB * MiB;
 	zacos.fsType = "ext4";
 	zacos.label = name;
+	if (needBoot) {
+		boot.offset = bootAfter ? zacos.offset + zacos.size : from;
+	}
+	if (needBoot && !bootAfter) {
+		plan.ops << boot;
+	}
 	plan.ops << zacos;
+	if (needBoot && bootAfter) {
+		plan.ops << boot;
+	}
 	plan.offset = zacos.offset;
 	if (!allowed(d, plan.ops)) {
 		plan.ops.clear();
 		plan.why = "There isn't room for ZacOS 9 on this drive. Free some space first, or erase the whole disk.";
 	}
 	return plan;
+}
+
+/* The new partition right after `part`, whose start moves with its line, or -1. */
+static int follower(const DiskDrive &d, int part) {
+	const int next = part + 1;
+	if (next >= d.parts.size()) {
+		return -1;
+	}
+	const DiskPart &p = d.parts[part], &n = d.parts[next];
+	return n.block.isEmpty() && !n.efi && !n.biosBoot && n.offset == p.offset + p.size ? next : -1;
+}
+
+DiskSpan boundaryLimits(const DiskDrive &d, int part) {
+	DiskSpan span = endLimits(d, part);
+	const int next = follower(d, part);
+	/* One that can't change itself holds the line where it is. */
+	if (next >= 0 && span.least < span.most) {
+		/* Bigger into the new one, keeping 8 MiB of it. */
+		const DiskPart &n = d.parts[next];
+		span.most = std::max(span.most, (n.offset + n.size - 8 * MiB) / MiB * MiB);
+	}
+	return span;
+}
+
+bool moveBoundary(const DiskDrive &start, QList<DiskOp> *ops, int part, qulonglong at) {
+	DiskDrive d = start;
+	for (const DiskOp &op : *ops) {
+		d = planned(d, op);
+	}
+	if (part < 0 || part >= d.parts.size()) {
+		return false;
+	}
+	const DiskPart p = d.parts[part];
+	const qulonglong end = p.offset + p.size;
+	if (at == end) {
+		return true;
+	}
+	if (at < p.offset + MiB) {
+		return false;
+	}
+	const int next = follower(d, part);
+	QList<DiskOp> changed = *ops;
+	if (next < 0) {
+		if (!reshape(start, &changed, part, p.offset, at - p.offset)) {
+			return false;
+		}
+	} else {
+		const DiskPart n = d.parts[next];
+		const qulonglong nextEnd = n.offset + n.size;
+		if (at + MiB > nextEnd) {
+			return false;
+		}
+		/* The one that makes room goes first, so no step overlaps the other. */
+		if (at > end) {
+			if (!reshape(start, &changed, next, at, nextEnd - at) ||
+					!reshape(start, &changed, part, p.offset, at - p.offset)) {
+				return false;
+			}
+		} else if (!reshape(start, &changed, part, p.offset, at - p.offset) ||
+				!reshape(start, &changed, next, at, nextEnd - at)) {
+			return false;
+		}
+	}
+	*ops = changed;
+	return true;
 }

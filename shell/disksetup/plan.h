@@ -99,6 +99,13 @@ DiskSpan endLimits(const DiskDrive &drive, int part);
  * size. False, with `ops` as it was, when the changes wouldn't all be
  * allowed then. */
 bool reshape(const DiskDrive &start, QList<DiskOp> *ops, int part, qulonglong offset, qulonglong size);
+/* The line under partition `part`, as the partition map drags it: where
+ * it may go (its end's limits, and when a new partition follows right
+ * after, that one's start too, keeping 8 MiB of it). */
+DiskSpan boundaryLimits(const DiskDrive &drive, int part);
+/* Moves that line to `at`: the partition's end, and a new partition's
+ * start right after it with it. False, `ops` unchanged, if not allowed. */
+bool moveBoundary(const DiskDrive &start, QList<DiskOp> *ops, int part, qulonglong at);
 /* True when every step of `ops` is allowed on the drive as the ones
  * before it leave it. */
 bool allowed(const DiskDrive &start, const QList<DiskOp> &ops);
@@ -112,9 +119,12 @@ struct BesidePlan {
 	QString why;       /* why there's no room, when ops is empty */
 };
 /* ZacOS in the drive's largest free space, or else in room taken from the
- * end of its last partition that can shrink, with the boot partition the
+ * end of the partition with the most to spare, with the boot partition the
  * computer needs that the drive hasn't (EFI System for `uefi`, else BIOS
- * boot on GPT). `name` is the new partition's. */
+ * boot on GPT). The boot partition goes at the far end from the line
+ * people will drag: before ZacOS in free space (ZacOS's own end moves),
+ * after it in room taken from a partition (the line between them moves).
+ * `name` is the new partition's. */
 BesidePlan besidePlan(const DiskDrive &drive, bool uefi, const QString &name);
 
 /* The layout bar: each piece's width, proportional but at least `least`
