@@ -11,6 +11,10 @@
 #  - BIOS: Haiku's own boot sector, chainloaded;
 #  - UEFI: Haiku's EFI loader in an EFI System partition (EFI/HAIKU/, or
 #    EFI/BOOT/BOOTX64.EFI when that one is Haiku's).
+#
+# Everything it prints goes into grub.cfg, and a line that isn't GRUB's
+# makes update-grub refuse the whole file (kernel updates too): only the
+# entries go to stdout, everything else to /dev/null or stderr.
 set -e
 [ "${GRUB_DISABLE_OS_PROBER:-true}" = false ] || exit 0
 . /usr/share/grub/grub-mkconfig_lib
@@ -26,25 +30,29 @@ entry() {
 	printf '\t%s\n}\n' "$2"
 }
 
-if [ ! -d /sys/firmware/efi ]; then
+# (ZACOS9_FIRMWARE_EFI is for tests, as in zacos9-install.)
+if [ ! -d "${ZACOS9_FIRMWARE_EFI:-/sys/firmware/efi}" ]; then
 	for part in $haiku; do
 		entry "$part" "chainloader +1"
 	done
 	exit 0
 fi
 
-# UEFI: Haiku's loader, in any EFI System partition.
+# UEFI: Haiku's loader, in any FAT partition (EFI System partitions are;
+# blkid reads the disks itself, as update-grub runs in a chroot during an
+# install, where lsblk has no udev to tell it partition types).
 look=$(mktemp -d)
-trap 'umount "$look" 2>/dev/null || true; rmdir "$look"' EXIT
-lsblk -lnpo NAME,PARTTYPE | awk 'tolower($2) == "c12a7328-f81f-11d2-ba4b-00a0c93ec93b" || tolower($2) == "0xef" { print $1 }' |
+trap 'umount "$look" >/dev/null 2>&1 || true; rmdir "$look" 2>/dev/null || true' EXIT
+blkid -o device -t TYPE=vfat 2>/dev/null |
 while read -r esp; do
-	mount -o ro "$esp" "$look" 2>/dev/null || continue
+	# (mount warns on stdout, of all places: "would change RO state")
+	mount -o ro "$esp" "$look" >/dev/null 2>&1 || continue
 	loader=$(cd "$look" && find . -ipath './efi/haiku/*.efi' 2>/dev/null | head -n 1)
 	if [ -z "$loader" ]; then
 		# The fallback loader, if Haiku put it there (anyboot images do).
 		loader=$(cd "$look" && find . -ipath './efi/boot/bootx64.efi' 2>/dev/null | head -n 1)
 		[ -n "$loader" ] && grep -qa "Welcome to the Haiku boot loader" "$look/$loader" || loader=
 	fi
-	umount "$look"
+	umount "$look" >/dev/null 2>&1 || true
 	[ -z "$loader" ] || entry "$esp" "chainloader ${loader#.}"
 done
