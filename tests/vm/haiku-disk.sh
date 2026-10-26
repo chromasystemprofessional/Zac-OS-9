@@ -5,15 +5,21 @@
 #
 #   tests/vm/haiku-disk.sh haiku-r1beta5-x86_64-anyboot.iso haiku-bios.qcow2 bios
 #   tests/vm/haiku-disk.sh haiku-r1beta5-x86_64-anyboot.iso haiku-uefi.qcow2 uefi [SIZE_GB]
+#   tests/vm/haiku-disk.sh ANYBOOT.iso windows.qcow2 uefi-windows [SIZE_GB]
 #
 # bios: an MBR disk, Haiku's partition at the very offset it has in the
 #       image (its boot block knows where it is) with the image's MBR code,
 #       so a BIOS starts Haiku from it as from the image.
 # uefi: a GPT disk, an EFI System partition copied from the image (Haiku's
-#       loader as EFI/BOOT/BOOTX64.EFI) and Haiku's partition after it.
+#       loader as EFI/BOOT/BOOTX64.EFI; only 2.8 MB, too small for GRUB)
+#       and Haiku's partition after it.
+# uefi-windows: the same, then an NTFS partition named Windows filling the
+#       rest, holding random test files whose SHA-256 sums go in
+#       OUT.sha256 (check them after an install with ntfscat): no free
+#       space, so the installer has to make some by shrinking it.
 # The disk is SIZE_GB (40) in all; what Haiku doesn't use is free space.
 set -eu
-[ "$#" -ge 3 ] || { echo "usage: haiku-disk.sh ANYBOOT.iso OUT.qcow2 bios|uefi [SIZE_GB]" >&2; exit 64; }
+[ "$#" -ge 3 ] || { echo "usage: haiku-disk.sh ANYBOOT.iso OUT.qcow2 bios|uefi|uefi-windows [SIZE_GB]" >&2; exit 64; }
 image=$1 out=$2 firmware=$3 size_gb=${4:-40}
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
@@ -44,7 +50,7 @@ bios)
 	dd if="$image" of="$raw" bs=512 skip="$bfs_start" seek="$bfs_start" count="$bfs_size" \
 		conv=notrunc status=none
 	;;
-uefi)
+uefi | uefi-windows)
 	set -- $(part ef)
 	[ "$#" = 2 ] || { echo "haiku-disk.sh: no EFI System partition (type ef) in $image" >&2; exit 1; }
 	esp_start=$1 esp_size=$2
@@ -54,9 +60,31 @@ uefi)
 		"$esp_size" "$haiku" "$bfs_size" | sfdisk -q --no-reread "$raw"
 	dd if="$image" of="$raw" bs=512 skip="$esp_start" seek=2048 count="$esp_size" conv=notrunc status=none
 	dd if="$image" of="$raw" bs=512 skip="$bfs_start" seek="$haiku" count="$bfs_size" conv=notrunc status=none
+	if [ "$firmware" = uefi-windows ]; then
+		ntfs=$(( (haiku + bfs_size + 2047) / 2048 * 2048 ))
+		total=$(( size_gb * 1024 * 1024 * 2 ))
+		ntfs_size=$(( total - 2048 - ntfs )) # GPT keeps the last MiB
+		printf 'start=%s, size=%s, type=EBD0A0A2-B9E5-4433-87C0-68B6B72699C7, name="Basic data partition"\n' \
+			"$ntfs" "$ntfs_size" | sfdisk -q --no-reread --append "$raw"
+		vol=$work/ntfs.img
+		truncate -s $((ntfs_size * 512)) "$vol"
+		mkntfs -q -F -Q -L Windows -p "$ntfs" "$vol" >/dev/null 2>&1
+		# Files to find again: some small, one big, all random.
+		: >"$out.sha256"
+		for i in 1 2 3 4 5 6 7 8; do
+			head -c $((i * 300000)) /dev/urandom >"$work/file$i.bin"
+		done
+		head -c 300000000 /dev/urandom >"$work/big.bin"
+		for f in "$work"/*.bin; do
+			ntfscp -q -f "$vol" "$f" "${f##*/}"
+			(cd "$work" && sha256sum "${f##*/}") >>"$out.sha256"
+		done
+		dd if="$vol" of="$raw" bs=1M seek=$((ntfs / 2048)) conv=notrunc,sparse status=none
+		cat "$out.sha256"
+	fi
 	;;
 *)
-	echo "haiku-disk.sh: bios or uefi, not $firmware" >&2
+	echo "haiku-disk.sh: bios, uefi or uefi-windows, not $firmware" >&2
 	exit 64
 	;;
 esac

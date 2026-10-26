@@ -113,6 +113,10 @@ bool allowed(const DiskDrive &start, const QList<DiskOp> &ops);
 /* Room for ZacOS 9 next to what's on a drive, for the installer. */
 static constexpr qulonglong ZacosLeast = 16000 * MiB;  /* about 16 GB */
 static constexpr qulonglong ZacosRoomy = 32000 * MiB;  /* what it's given when there's plenty */
+/* An EFI System partition smaller than this can't take GRUB and its shim as
+ * well as what's on it (Haiku's anyboot images make one of 2.8 MB): one is
+ * made, as on a drive with none. */
+static constexpr qulonglong EfiLeast = 64 * MiB;
 struct BesidePlan {
 	QList<DiskOp> ops; /* any shrinking, a boot partition it needs, then ZacOS's */
 	qulonglong offset = 0; /* where ZacOS's partition starts, once they're done */

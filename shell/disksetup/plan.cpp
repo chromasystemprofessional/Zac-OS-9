@@ -508,7 +508,9 @@ BesidePlan besidePlan(const DiskDrive &d, bool uefi, const QString &name) {
 	DiskOp boot{ DiskOp::Create };
 	bool needBoot = false;
 	if (uefi) {
-		needBoot = std::none_of(d.parts.begin(), d.parts.end(), [](const DiskPart &p) { return p.efi; });
+		needBoot = std::none_of(d.parts.begin(), d.parts.end(), [](const DiskPart &p) {
+			return p.efi && p.size >= EfiLeast;
+		});
 		boot.size = 512 * MiB;
 		boot.fsType = "vfat";
 		boot.label = "EFI";

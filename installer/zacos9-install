@@ -458,13 +458,28 @@ if [ "$dev_type" = "part" ]; then
 	grub_target="$parent_disk"
 	whole_disk=false
 
-	# The EFI System Partition on the same disk (GUID C12A7328-…), shared
-	# with whatever else starts from it. Only UEFI computers need one.
-	efi_part=$(lsblk -l -n -o NAME,PARTTYPE "$parent_disk" 2>/dev/null | awk '
-		tolower($2) == "c12a7328-f81f-11d2-ba4b-00a0c93ec93b" { print "/dev/" $1; exit }
-	')
+	# The EFI System Partition on the same disk (GUID C12A7328-…, 0xef on
+	# MBR), shared with whatever else starts from it; the largest, if there
+	# are several (one too small for GRUB may sit beside the one made for
+	# it, issue #42). Only UEFI computers need one.
+	efi_part=$(lsblk -l -n -b -o NAME,PARTTYPE,SIZE "$parent_disk" 2>/dev/null | awk '
+		tolower($2) == "c12a7328-f81f-11d2-ba4b-00a0c93ec93b" || tolower($2) == "0xef" { print $3, "/dev/" $1 }
+	' | sort -n | tail -n 1 | cut -d' ' -f2)
 	if $uefi && [ -z "$efi_part" ]; then
 		fail "No EFI System Partition on $parent_disk. Choose the whole disk instead."
+	fi
+	# Room in it for GRUB and its shim (a few MB, twice over with the
+	# fallback path), found out before anything is erased.
+	if $uefi; then
+		look=/mnt/zacos9-esp-check
+		mkdir -p "$look"
+		mount -o ro "$efi_part" "$look" 2>/dev/null ||
+			fail "The EFI System Partition ($efi_part) couldn't be opened. Check it with Disk First Aid"
+		free_kb=$(df -Pk "$look" | awk 'NR == 2 { print $4 }')
+		umount "$look"
+		rmdir "$look" 2>/dev/null || true
+		[ "$free_kb" -ge 16384 ] ||
+			fail "The EFI System Partition ($efi_part) has only $((free_kb / 1024)) MB free, and the boot loader needs 16 MB. Choose Next to What's There, which makes a bigger one, or erase the whole disk"
 	fi
 	# A BIOS computer starts GRUB from the disk's first sectors: on GPT from a
 	# BIOS boot partition, on MBR from the gap before the first partition.

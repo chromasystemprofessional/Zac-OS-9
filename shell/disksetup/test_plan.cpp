@@ -169,6 +169,22 @@ int main(int argc, char **argv) {
 	beside = besidePlan(mbr, true, "Zacintosh HD");
 	CHECK(beside.ops.size() == 2 && beside.ops[0].partType == EfiTypeMbr && beside.ops[0].size == 512 * MiB &&
 		beside.offset == 70 * GiB + 512 * MiB && allowed(mbr, beside.ops));
+	/* An EFI System partition too small for GRUB (Haiku's anyboot one): another is made. */
+	DiskPart tinyEsp = haiku;
+	tinyEsp.block = "/b/sdc9";
+	tinyEsp.offset = 40 * GiB;
+	tinyEsp.size = 3 * MiB;
+	tinyEsp.type = "vfat";
+	tinyEsp.label.clear();
+	tinyEsp.efi = true;
+	DiskDrive withTiny = mbr;
+	withTiny.containers.clear(); /* room in MBR's four for ZacOS and the new one */
+	withTiny.parts << tinyEsp;
+	beside = besidePlan(withTiny, true, "Z");
+	CHECK(beside.ops.size() == 2 && beside.ops[0].partType == EfiTypeMbr && beside.ops[0].size == 512 * MiB);
+	withTiny.parts.last().size = 100 * MiB; /* Windows's own size is enough */
+	beside = besidePlan(withTiny, true, "Z");
+	CHECK(beside.ops.size() == 1 && beside.ops[0].fsType == "ext4");
 	/* Four already: no room in the table. */
 	mbr.containers << DiskGap{ 80 * GiB, GiB } << DiskGap{ 90 * GiB, GiB } << DiskGap{ 95 * GiB, GiB };
 	CHECK(besidePlan(mbr, false, "Z").why.contains("as many partitions"));
