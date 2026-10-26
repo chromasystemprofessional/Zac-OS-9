@@ -6,9 +6,12 @@
  * its address (from a DHCP server, or set manually) and which name servers
  * and search domains to use. Wi-Fi adds a Network pop-up (signal bars,
  * padlocks for secured networks, Other Network…, Wi-Fi on and off) and
- * joining with a password. Options… covers IPv6, private Wi-Fi addresses
- * and connecting automatically; Info… shows the hardware address and the
- * addresses in use.
+ * joining with a password. Options… covers IPv6, private Wi-Fi addresses,
+ * connecting automatically and keeping a connection to its local network
+ * (never the way to the Internet); Info… shows the hardware address and
+ * the addresses in use. The status line says when a connection has no
+ * Internet, from NetworkManager's connectivity check (on with
+ * network-manager-config-connectivity-debian).
  *
  * As on the Mac, changes to the configuration are saved when the window
  * closes or another interface is chosen, after asking. Joining a network
@@ -165,6 +168,7 @@ struct Profile {
 	QStringList dns, search;
 	bool ignoreAutoDns = false;
 	bool autoconnect = true;
+	bool localOnly = false; /* ipv4/ipv6.never-default: never the default route */
 	QString ipv6 = "auto";
 	QString cloned; /* Wi-Fi: 802-11-wireless.cloned-mac-address */
 
@@ -172,7 +176,7 @@ struct Profile {
 		return uuid == o.uuid && method == o.method && address == o.address &&
 			gateway == o.gateway && prefix == o.prefix && dns == o.dns && search == o.search &&
 			ignoreAutoDns == o.ignoreAutoDns && autoconnect == o.autoconnect &&
-			ipv6 == o.ipv6 && cloned == o.cloned;
+			localOnly == o.localOnly && ipv6 == o.ipv6 && cloned == o.cloned;
 	}
 };
 
@@ -211,7 +215,7 @@ Profile load(const QString &uuid, bool wifi) {
 	Profile p;
 	p.uuid = uuid;
 	QStringList f = { "connection.id", "connection.autoconnect", "ipv4.method", "ipv4.addresses",
-		"ipv4.gateway", "ipv4.dns", "ipv4.dns-search", "ipv4.ignore-auto-dns", "ipv6.method" };
+		"ipv4.gateway", "ipv4.dns", "ipv4.dns-search", "ipv4.ignore-auto-dns", "ipv4.never-default", "ipv6.method" };
 	if (wifi) {
 		f << "802-11-wireless.cloned-mac-address";
 	}
@@ -226,6 +230,7 @@ Profile load(const QString &uuid, bool wifi) {
 	p.dns = commaList(m.value("ipv4.dns").join(','));
 	p.search = commaList(m.value("ipv4.dns-search").join(','));
 	p.ignoreAutoDns = first(m, "ipv4.ignore-auto-dns") == "yes";
+	p.localOnly = first(m, "ipv4.never-default") == "yes";
 	p.ipv6 = first(m, "ipv6.method");
 	if (p.ipv6.isEmpty()) {
 		p.ipv6 = "auto";
@@ -244,6 +249,8 @@ QStringList settingArgs(const Profile &p, bool wifi) {
 	}
 	a << "ipv4.dns" << p.dns.join(' ') << "ipv4.dns-search" << p.search.join(' ')
 	  << "ipv4.ignore-auto-dns" << (p.ignoreAutoDns ? "yes" : "no")
+	  << "ipv4.never-default" << (p.localOnly ? "yes" : "no")
+	  << "ipv6.never-default" << (p.localOnly ? "yes" : "no")
 	  << "ipv6.method" << p.ipv6 << "connection.autoconnect" << (p.autoconnect ? "yes" : "no");
 	if (wifi && !p.cloned.isEmpty()) {
 		a << "802-11-wireless.cloned-mac-address" << p.cloned;
@@ -255,6 +262,9 @@ QStringList settingArgs(const Profile &p, bool wifi) {
 struct Live {
 	QString hw, state, speed, gateway;
 	QStringList ip4, dns, ip6;
+	/* NetworkManager's connectivity, the better of IPv4's and IPv6's:
+	 * 0 unknown (no check), 1 none, 2 portal (sign in), 3 limited, 4 full. */
+	int connectivity = 0;
 };
 
 Live live(const QString &dev) {
@@ -267,6 +277,14 @@ Live live(const QString &dev) {
 	l.ip4 = m.value("IP4.ADDRESS");
 	l.dns = m.value("IP4.DNS");
 	l.ip6 = m.value("IP6.ADDRESS");
+	/* "3 (limited)"; "full" beats "portal" beats "limited" beats "none". */
+	static const int rank[] = { 0, 1, 3, 2, 4 };
+	for (const char *key : { "GENERAL.IP4-CONNECTIVITY", "GENERAL.IP6-CONNECTIVITY" }) {
+		const int c = first(m, key).section(' ', 0, 0).toInt();
+		if (c > 0 && c <= 4 && rank[c] > rank[l.connectivity]) {
+			l.connectivity = c;
+		}
+	}
 	return l;
 }
 
@@ -556,7 +574,7 @@ class OptionsDialog : public PanelDialog {
 public:
 	OptionsDialog(QWidget *parent, const nm::Profile &p, bool wifi)
 		: PanelDialog(parent, "Options"), m_profile(p) {
-		setFixedSize(360, wifi ? 196 : 148);
+		setFixedSize(360, wifi ? 220 : 172);
 		static const char *const methods[] = { "auto", "link-local", "disabled" };
 		m_ipv6.rect = QRect(112, 16, 200, PL_POPUP_H);
 		m_ipv6.hint = "Chooses how this computer gets an IPv6 address, or turns IPv6 off.";
@@ -582,7 +600,12 @@ public:
 		m_auto.hint = "Connects to this network whenever it is in range.";
 		m_auto.on = p.autoconnect;
 		m_auto.toggled = [this](bool on) { m_profile.autoconnect = on; };
-		m_host.checks = { &m_onlyDns, &m_auto };
+		m_local = PanelCheckbox("Local network only, not for the Internet", QPoint(20, y += 24));
+		m_local.hint = "For a network of nearby computers with no way to the Internet: "
+			"Internet traffic goes through your other connections instead.";
+		m_local.on = p.localOnly;
+		m_local.toggled = [this](bool on) { m_profile.localOnly = on; };
+		m_host.checks = { &m_onlyDns, &m_auto, &m_local };
 		if (wifi) {
 			m_private = PanelCheckbox("Private Wi-Fi address", QPoint(20, y += 24));
 			m_private.hint = "Uses a different hardware address on this network, so it is harder to track the computer.";
@@ -608,7 +631,7 @@ protected:
 private:
 	nm::Profile m_profile;
 	PanelPopup m_ipv6;
-	PanelCheckbox m_onlyDns, m_auto, m_private;
+	PanelCheckbox m_onlyDns, m_auto, m_local, m_private;
 	PanelButton m_cancel, m_ok;
 };
 
@@ -1221,6 +1244,16 @@ private:
 			return "Wi-Fi is off.";
 		}
 		if (state == "connected") {
+			const int c = m_live.connectivity;
+			if (c == 2) {
+				return "Connected. This network wants you to sign in: open a web page.";
+			}
+			if (m_profile.localOnly && m_hasProfile) {
+				return "Connected, for the local network only.";
+			}
+			if (c == 1 || c == 3) {
+				return "Connected, but no Internet here. Only for nearby computers? See Options…";
+			}
 			QString s = d.wifi() ? QString("Connected to “%1”").arg(d.connection) : "Connected";
 			if (!m_live.ip4.isEmpty()) {
 				s += QString(", with the address %1").arg(m_live.ip4[0].section('/', 0, 0));
