@@ -16,6 +16,8 @@ platinum_lib = static_library('platinum',
   'savers.c',
   'settings.c',
   'electron.c',
+  # Where the desktop's other programs are, installed or in a build tree.
+  'locate.c',
   # Shared-memory buffers for the C Wayland programs. Only their headers
   # here: the programs link libwayland-client themselves, and the
   # compositor, which never uses these, doesn't.
@@ -74,6 +76,7 @@ test('welcome', executable('test-welcome', 'tests/test_welcome.c', dependencies:
 test('settings', executable('test-settings', 'tests/test_settings.c', dependencies: [platinum_dep]))
 test('savers', executable('test-savers', 'tests/test_savers.c', dependencies: [platinum_dep]))
 test('electron', executable('test-electron', 'tests/test_electron.c', dependencies: [platinum_dep]))
+test('locate', executable('test-locate', 'tests/test_locate.c', dependencies: [platinum_dep]))
 test('widgets',
   executable('test-widgets', 'tests/test_widgets.c',
     dependencies: [figcompare_dep]),
