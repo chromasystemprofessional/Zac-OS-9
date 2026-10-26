@@ -592,7 +592,10 @@ int FoundWindow::listHeight() const {
 pl_scrollbar FoundWindow::bar() const {
 	const int content = static_cast<int>(m_items.size()) * ROW_H;
 	const int view = listHeight();
-	pl_scrollbar v = { true, view + 2, content > view, 0 };
+	pl_scrollbar v{};
+	v.vertical = true;
+	v.length = view + 2;
+	v.enabled = content > view;
 	sb_smart(&v, view, content);
 	if (v.enabled) {
 		v.thumb = static_cast<int>(static_cast<long long>(m_scrollY) *

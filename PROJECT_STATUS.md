@@ -34,11 +34,11 @@ request:
 | 3 | One way to run a program and wait for it | |
 | 4 | One reader for `key=value` settings files | |
 | 5 | One file per control panel | |
-| 6 | A small library for the C Wayland programs | |
+| 6 | A small library for the C Wayland programs | Done: shared-memory buffers (`lib/wlclient`) |
 | 7 | Small duplicates as "good first issue"s | |
 | 8 | Tests in `tests/<part>/`, with a shared harness | |
 | 9 | The root helpers under `system/` | |
-| 10 | No compiler warnings | |
+| 10 | No compiler warnings | In progress: one left, in `shell/finder/appdb.cpp`, for after phase 2 moves that file |
 
 **On hold until then:** fractional scaling and the Monitors panel, split
 from #23 into [#49](https://github.com/chromasystemprofessional/Zac-OS-9/issues/49)
