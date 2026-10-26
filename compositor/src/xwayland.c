@@ -19,9 +19,15 @@ struct plat_unmanaged {
 	struct wl_listener commit;
 	struct wl_listener set_geometry;
 	struct wl_listener request_configure;
+	struct wl_listener set_override_redirect;
 	struct wl_listener destroy;
 	int scale;
 };
+
+static void new_managed(struct plat_server *server, struct wlr_xwayland_surface *xsurface);
+static void new_unmanaged(struct plat_server *server, struct wlr_xwayland_surface *xsurface);
+static void um_associate(struct wl_listener *listener, void *data);
+static void um_map(struct wl_listener *listener, void *data);
 
 /* ---- HiDPI --------------------------------------------------------------
  * Most X11 programs draw at 1x, and are shown enlarged on a HiDPI screen. A
@@ -119,7 +125,8 @@ static void xw_get_geometry(struct plat_view *view, struct wlr_box *geo) {
 
 static void xw_set_activated(struct plat_view *view, bool activated) {
 	wlr_xwayland_surface_activate(view->xsurface, activated);
-	if (activated) {
+	/* wlroots aborts on restacking an override-redirect window. */
+	if (activated && !view->xsurface->override_redirect) {
 		wlr_xwayland_surface_restack(view->xsurface, NULL, XCB_STACK_MODE_ABOVE);
 	}
 }
@@ -323,8 +330,7 @@ static void handle_set_class(struct wl_listener *listener, void *data) {
 	view_set_app_id(view, view->xsurface->class);
 }
 
-static void handle_destroy(struct wl_listener *listener, void *data) {
-	struct plat_view *view = wl_container_of(listener, view, destroy);
+static void managed_destroy(struct plat_view *view) {
 	wl_list_remove(&view->map.link);
 	wl_list_remove(&view->unmap.link);
 	wl_list_remove(&view->commit.link);
@@ -339,8 +345,39 @@ static void handle_destroy(struct wl_listener *listener, void *data) {
 	wl_list_remove(&view->set_title.link);
 	wl_list_remove(&view->set_geometry.link);
 	wl_list_remove(&view->set_app_id.link);
+	wl_list_remove(&view->set_override_redirect.link);
 	wl_list_remove(&view->destroy.link);
 	view_handle_destroy(view);
+}
+
+static void handle_destroy(struct wl_listener *listener, void *data) {
+	struct plat_view *view = wl_container_of(listener, view, destroy);
+	managed_destroy(view);
+}
+
+/* Tk, among others, makes its menus as ordinary windows and turns them
+ * override-redirect before showing them: the window becomes unmanaged,
+ * kept as it is (its surface, and shown if it was). */
+static void handle_set_override_redirect(struct wl_listener *listener, void *data) {
+	struct plat_view *view = wl_container_of(listener, view, set_override_redirect);
+	struct plat_server *server = view->server;
+	struct wlr_xwayland_surface *xsurface = view->xsurface;
+	if (!xsurface->override_redirect) {
+		return;
+	}
+	if (view->mapped) {
+		view_handle_unmap(view);
+	}
+	handle_dissociate(&view->dissociate, NULL);
+	managed_destroy(view);
+	new_unmanaged(server, xsurface);
+	struct plat_unmanaged *um = xsurface->data;
+	if (xsurface->surface) {
+		um_associate(&um->associate, NULL);
+		if (xsurface->surface->mapped) {
+			um_map(&um->map, NULL);
+		}
+	}
 }
 
 static void new_managed(struct plat_server *server, struct wlr_xwayland_surface *xsurface) {
@@ -377,6 +414,8 @@ static void new_managed(struct plat_server *server, struct wlr_xwayland_surface 
 	wl_signal_add(&xsurface->events.set_title, &view->set_title);
 	view->set_app_id.notify = handle_set_class;
 	wl_signal_add(&xsurface->events.set_class, &view->set_app_id);
+	view->set_override_redirect.notify = handle_set_override_redirect;
+	wl_signal_add(&xsurface->events.set_override_redirect, &view->set_override_redirect);
 	view->destroy.notify = handle_destroy;
 	wl_signal_add(&xsurface->events.destroy, &view->destroy);
 }
@@ -445,8 +484,7 @@ static void um_dissociate(struct wl_listener *listener, void *data) {
 	}
 }
 
-static void um_destroy(struct wl_listener *listener, void *data) {
-	struct plat_unmanaged *um = wl_container_of(listener, um, destroy);
+static void unmanaged_destroy(struct plat_unmanaged *um) {
 	wl_list_remove(&um->map.link);
 	wl_list_remove(&um->unmap.link);
 	wl_list_remove(&um->commit.link);
@@ -454,12 +492,38 @@ static void um_destroy(struct wl_listener *listener, void *data) {
 	wl_list_remove(&um->dissociate.link);
 	wl_list_remove(&um->set_geometry.link);
 	wl_list_remove(&um->request_configure.link);
+	wl_list_remove(&um->set_override_redirect.link);
 	wl_list_remove(&um->destroy.link);
 	if (um->tree) {
 		wlr_scene_node_destroy(&um->tree->node);
 	}
 	um->xsurface->data = NULL;
 	free(um);
+}
+
+static void um_destroy(struct wl_listener *listener, void *data) {
+	struct plat_unmanaged *um = wl_container_of(listener, um, destroy);
+	unmanaged_destroy(um);
+}
+
+/* The other way round: an override-redirect window made ordinary gets a
+ * frame like any other. */
+static void um_set_override_redirect(struct wl_listener *listener, void *data) {
+	struct plat_unmanaged *um = wl_container_of(listener, um, set_override_redirect);
+	struct plat_server *server = um->server;
+	struct wlr_xwayland_surface *xsurface = um->xsurface;
+	if (xsurface->override_redirect) {
+		return;
+	}
+	unmanaged_destroy(um);
+	new_managed(server, xsurface);
+	struct plat_view *view = xsurface->data;
+	if (xsurface->surface) {
+		handle_associate(&view->associate, NULL);
+		if (xsurface->surface->mapped) {
+			handle_map(&view->map, NULL);
+		}
+	}
 }
 
 static void new_unmanaged(struct plat_server *server, struct wlr_xwayland_surface *xsurface) {
@@ -480,6 +544,8 @@ static void new_unmanaged(struct plat_server *server, struct wlr_xwayland_surfac
 	wl_signal_add(&xsurface->events.set_geometry, &um->set_geometry);
 	um->request_configure.notify = um_request_configure;
 	wl_signal_add(&xsurface->events.request_configure, &um->request_configure);
+	um->set_override_redirect.notify = um_set_override_redirect;
+	wl_signal_add(&xsurface->events.set_override_redirect, &um->set_override_redirect);
 	um->destroy.notify = um_destroy;
 	wl_signal_add(&xsurface->events.destroy, &um->destroy);
 }
@@ -489,7 +555,7 @@ static void new_unmanaged(struct plat_server *server, struct wlr_xwayland_surfac
 static void server_new_xwayland_surface(struct wl_listener *listener, void *data) {
 	struct plat_server *server = wl_container_of(listener, server, new_xwayland_surface);
 	struct wlr_xwayland_surface *xsurface = data;
-	/* TODO: a window can switch override-redirect after creation. */
+	/* A window can switch later: set_override_redirect moves it across. */
 	if (xsurface->override_redirect) {
 		new_unmanaged(server, xsurface);
 	} else {

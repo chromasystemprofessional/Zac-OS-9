@@ -332,6 +332,7 @@ struct plat_view {
 	struct wl_listener request_configure;
 	struct wl_listener set_geometry;
 	struct wl_listener request_activate;
+	struct wl_listener set_override_redirect;
 };
 
 struct plat_layer_surface {

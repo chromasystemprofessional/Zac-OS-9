@@ -238,6 +238,14 @@ test('xwayland-output',
   ),
 )
 
+# X11 windows switching override-redirect (Tk's menus) once aborted the compositor.
+test('override-redirect', find_program('python3'),
+  args: [files('tests/test_override_redirect.py'), compositor_exe,
+    executable('override-redirect-client', 'tests/override_redirect_client.c',
+      dependencies: xcb)],
+  timeout: 60,
+)
+
 test('snapshot-output-state',
   executable('test-snapshot-state', 'tests/test_snapshot.c', 'src/pixbuf.c',
     protocol_headers,
