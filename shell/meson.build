@@ -228,8 +228,12 @@ test('native-snapshot', find_program('python3'),
     files('snapshot/zacos9-snapshot'), snapshot_animation],
   timeout: 60,
 )
+# Only its headers and library: its CMake package also hands on Qt's own
+# release flags (-DQT_NO_DEBUG), which turned Qt's checks (bounds and the
+# like) off in just the programs that use it (the Sniffer, the Collar, Pack)
+# and made their copies of shared code differ from every other program's.
 layershellqt = dependency('LayerShellQt', method: 'cmake',
-  modules: ['LayerShellQt::Interface'])
+  modules: ['LayerShellQt::Interface']).partial_dependency(includes: true, links: true, link_args: true)
 # GIO reads and launches XDG desktop entries for the Applications folder,
 # so the desktop entry specification is followed rather than approximated.
 # With it, Limited accounts' program filter (lib/appfilter.c): every
