@@ -400,6 +400,22 @@ static void handle_close_app_window(struct wl_client *client, struct wl_resource
 	view_close_front_app_window(the_server, app_id);
 }
 
+/* Kept as the resource's user data: 0 unsaid, 1 no field, 2 a field. */
+static void handle_text_field(struct wl_client *client, struct wl_resource *resource, uint32_t focused) {
+	wl_resource_set_user_data(resource, (void *)(uintptr_t)(focused ? 2 : 1));
+	osk_text_field(the_server, focused != 0);
+}
+
+int platinum_shell_text_field(struct wl_client *client) {
+	struct wl_resource *resource;
+	wl_resource_for_each(resource, &resources) {
+		if (wl_resource_get_client(resource) == client && wl_resource_get_user_data(resource)) {
+			return (int)(uintptr_t)wl_resource_get_user_data(resource) - 1;
+		}
+	}
+	return -1;
+}
+
 /* ⌘-Tab: the menu bar (the one client that knows the programs' names)
  * picks the program and answers with activate_app. */
 void platinum_shell_switch_app(struct plat_server *server, int step) {
@@ -471,6 +487,7 @@ static const struct platinum_shell_v1_interface shell_impl = {
 	.force_quit = handle_force_quit,
 	.activate_app = handle_activate_app,
 	.close_app_window = handle_close_app_window,
+	.text_field = handle_text_field,
 	.set_standard_size = handle_set_standard_size,
 	.enable_title_menu = handle_enable_title_menu,
 	.set_keyboard_layout = handle_set_keyboard_layout,
@@ -501,5 +518,5 @@ void platinum_shell_init(struct plat_server *server) {
 	the_server = server;
 	wl_list_init(&hints);
 	wl_list_init(&resources);
-	wl_global_create(server->display, &platinum_shell_v1_interface, 16, NULL, bind_shell);
+	wl_global_create(server->display, &platinum_shell_v1_interface, 17, NULL, bind_shell);
 }

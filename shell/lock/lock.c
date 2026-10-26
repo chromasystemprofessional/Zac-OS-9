@@ -38,10 +38,12 @@
 
 #include "draw.h"
 #include "ext-session-lock-v1-client-protocol.h"
+#include "fractional-scale-v1-client-protocol.h"
 #include "logo.h"
 #include "patterns.h"
 #include "settings.h"
 #include "text.h"
+#include "viewporter-client-protocol.h"
 #include "widgets.h"
 
 #define DIALOG_W 360
@@ -65,8 +67,11 @@ struct screen {
 	struct wl_output *output;
 	char *name;
 	int scale;
+	int quarters; /* 1.25, 1.5, 1.75 (5, 6, 7): drawn at the screen's pixels; else 0 */
 	struct wl_surface *surface;
 	struct ext_session_lock_surface_v1 *lock_surface;
+	struct wp_viewport *viewport;
+	struct wp_fractional_scale_v1 *fractional;
 	int w, h;
 	struct buffer buffers[2];
 	uint32_t *logical;
@@ -76,6 +81,8 @@ struct screen {
 static struct wl_display *display;
 static struct wl_compositor *compositor;
 static struct wl_shm *shm;
+static struct wp_viewporter *viewporter;
+static struct wp_fractional_scale_manager_v1 *fractional_manager;
 static struct ext_session_lock_manager_v1 *lock_manager;
 static struct ext_session_lock_v1 *lock;
 static struct wl_list screens;
@@ -368,9 +375,16 @@ static void redraw(struct screen *s) {
 	s->stale = false;
 	b->screen = s;
 	const int k = s->scale;
-	struct pl_canvas c = { k == 1 ? b->px : s->logical, s->w, 0, 0, s->w, s->h };
+	uint32_t *drawn = k == 1 && !s->quarters ? b->px : s->logical;
+	struct pl_canvas c = { drawn, s->w, 0, 0, s->w, s->h,
+		s->quarters ? pl_text_log_new(drawn, s->w) : NULL };
 	paint(s, &c);
-	if (k > 1) {
+	if (s->quarters) {
+		/* Each logical pixel one or two of the screen's, the text in the
+		 * font for this scale: sharp. */
+		pl_snap_scale_canvas(&c, 0, 0, s->quarters, b->px);
+		pl_text_log_free(c.log);
+	} else if (k > 1) {
 		/* Each logical pixel k×k: sharp. */
 		for (int y = 0; y < s->h; y++) {
 			uint32_t *out = b->px + (size_t)y * k * s->w * k;
@@ -386,7 +400,10 @@ static void redraw(struct screen *s) {
 		}
 	}
 	b->busy = true;
-	wl_surface_set_buffer_scale(s->surface, k);
+	wl_surface_set_buffer_scale(s->surface, s->quarters ? 1 : k);
+	if (s->viewport) {
+		wp_viewport_set_destination(s->viewport, s->quarters ? s->w : -1, s->quarters ? s->h : -1);
+	}
 	wl_surface_attach(s->surface, b->wl, 0, 0);
 	wl_surface_damage_buffer(s->surface, 0, 0, INT32_MAX, INT32_MAX);
 	wl_surface_commit(s->surface);
@@ -403,6 +420,24 @@ static void redraw_all(void) {
 
 /* ---- the lock and its surfaces ---------------------------------------- */
 
+/* Buffers of the screen's size at its scale: s times the logical size,
+ * or at a fractional scale its own pixels; a logical frame to draw in. */
+static bool make_buffers(struct screen *s) {
+	buffer_free(&s->buffers[0]);
+	buffer_free(&s->buffers[1]);
+	free(s->logical);
+	const bool fractional = s->quarters != 0;
+	const int bw = fractional ? pl_snap(s->w, s->quarters) : s->w * s->scale;
+	const int bh = fractional ? pl_snap(s->h, s->quarters) : s->h * s->scale;
+	s->logical = s->scale > 1 || fractional ? malloc((size_t)s->w * s->h * 4) : NULL;
+	if (!buffer_make(&s->buffers[0], bw, bh) || !buffer_make(&s->buffers[1], bw, bh) ||
+			((s->scale > 1 || fractional) && !s->logical)) {
+		s->w = 0;
+		return false;
+	}
+	return true;
+}
+
 static void lock_surface_configure(void *data, struct ext_session_lock_surface_v1 *ls, uint32_t serial,
 		uint32_t w, uint32_t h) {
 	struct screen *s = data;
@@ -410,19 +445,28 @@ static void lock_surface_configure(void *data, struct ext_session_lock_surface_v
 	if ((int)w != s->w || (int)h != s->h || !s->buffers[0].wl) {
 		s->w = (int)w;
 		s->h = (int)h;
-		buffer_free(&s->buffers[0]);
-		buffer_free(&s->buffers[1]);
-		free(s->logical);
-		s->logical = s->scale > 1 ? malloc((size_t)s->w * s->h * 4) : NULL;
-		if (!buffer_make(&s->buffers[0], s->w * s->scale, s->h * s->scale) ||
-				!buffer_make(&s->buffers[1], s->w * s->scale, s->h * s->scale) ||
-				(s->scale > 1 && !s->logical)) {
-			s->w = 0;
+		if (!make_buffers(s)) {
 			return;
 		}
 	}
 	redraw(s);
 }
+
+/* 1.25, 1.5, 1.75 (in 120ths): the screen's own pixels from now on. */
+static void preferred_scale(void *data, struct wp_fractional_scale_v1 *fractional, uint32_t scale) {
+	struct screen *s = data;
+	const int quarters = (int)((scale + 15) / 30);
+	const int q = quarters % 4 ? quarters : 0;
+	if (q == s->quarters) {
+		return;
+	}
+	s->quarters = q;
+	if (s->w > 0 && make_buffers(s)) {
+		redraw(s);
+	}
+}
+
+static const struct wp_fractional_scale_v1_listener fractional_listener = { preferred_scale };
 
 static const struct ext_session_lock_surface_v1_listener lock_surface_listener = {
 	lock_surface_configure,
@@ -433,6 +477,12 @@ static void cover(struct screen *s) {
 		return;
 	}
 	s->surface = wl_compositor_create_surface(compositor);
+	if (viewporter && fractional_manager) {
+		s->viewport = wp_viewporter_get_viewport(viewporter, s->surface);
+		s->fractional = wp_fractional_scale_manager_v1_get_fractional_scale(fractional_manager,
+			s->surface);
+		wp_fractional_scale_v1_add_listener(s->fractional, &fractional_listener, s);
+	}
 	s->lock_surface = ext_session_lock_v1_get_lock_surface(lock, s->surface, s->output);
 	ext_session_lock_surface_v1_add_listener(s->lock_surface, &lock_surface_listener, s);
 }
@@ -625,6 +675,11 @@ static void global(void *data, struct wl_registry *registry, uint32_t name, cons
 		compositor = wl_registry_bind(registry, name, &wl_compositor_interface, 4);
 	} else if (strcmp(iface, wl_shm_interface.name) == 0) {
 		shm = wl_registry_bind(registry, name, &wl_shm_interface, 1);
+	} else if (strcmp(iface, wp_viewporter_interface.name) == 0) {
+		viewporter = wl_registry_bind(registry, name, &wp_viewporter_interface, 1);
+	} else if (strcmp(iface, wp_fractional_scale_manager_v1_interface.name) == 0) {
+		fractional_manager = wl_registry_bind(registry, name,
+			&wp_fractional_scale_manager_v1_interface, 1);
 	} else if (strcmp(iface, ext_session_lock_manager_v1_interface.name) == 0) {
 		lock_manager = wl_registry_bind(registry, name, &ext_session_lock_manager_v1_interface, 1);
 	} else if (strcmp(iface, wl_seat_interface.name) == 0) {
@@ -650,6 +705,10 @@ static void global_remove(void *data, struct wl_registry *registry, uint32_t nam
 			}
 			if (s->lock_surface) {
 				ext_session_lock_surface_v1_destroy(s->lock_surface);
+				if (s->fractional) {
+					wp_fractional_scale_v1_destroy(s->fractional);
+					wp_viewport_destroy(s->viewport);
+				}
 				wl_surface_destroy(s->surface);
 			}
 			buffer_free(&s->buffers[0]);

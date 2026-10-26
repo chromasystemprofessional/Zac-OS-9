@@ -15,6 +15,12 @@ export ZACOS9_LOGIN_WINDOW=1 ZACOS9_STARTUP=0
 export ZACOS9_MENUBAR= ZACOS9_FINDER= ZACOS9_COLLAR= ZACOS9_INHIBIT=
 export XDG_SESSION_TYPE=wayland QT_QPA_PLATFORM=wayland QT_STYLE_OVERRIDE=zacos9
 
+# The GPU the built-in screen was moved to at start-up (zacos9-intel-graphics):
+# that one only, or the compositor would draw on the switched-off NVIDIA GPU.
+if [ -z "${WLR_DRM_DEVICES:-}" ] && [ -r /run/zacos9/drm-devices ]; then
+	read -r drm_devices </run/zacos9/drm-devices && [ -e "$drm_devices" ] && export WLR_DRM_DEVICES="$drm_devices"
+fi
+
 # Drawing with pixman where zacos9-session does (see there for why).
 if [ -z "${WLR_RENDERER:-}" ]; then
 	gpu=false

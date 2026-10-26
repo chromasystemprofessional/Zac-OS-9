@@ -4,6 +4,7 @@
 #include <cstdio>
 
 #include "extensioncatalog.h"
+#include "extensions.h"
 
 static int failures = 0;
 
@@ -78,6 +79,22 @@ int main(int argc, char **argv) {
 	check(curatedExtensions({ "crc16", "libata", "snd" }).empty(),
 		"a machine with only helpers has no curated entries");
 	check(curatedExtensions({}).empty(), "nothing loaded, nothing listed");
+
+	/* The disabled view is the catalog's complement: no loaded module. */
+	const std::vector<ExtensionEntry> disabled = disabledExtensions({ "i915" });
+	check(find(disabled, "wifi") && find(disabled, "bluetooth") &&
+		!find(disabled, "intel-graphics"),
+		"disabled entries are the catalog entries without a loaded module");
+	check(disabled.size() == size_t(pl_n_extensions - 1),
+		"only Intel Graphics is loaded in this fixture");
+	check(disabledExtensions({}).size() == size_t(pl_n_extensions),
+		"an empty module list leaves every entry disabled");
+	const std::vector<ExtensionEntry> disabledStartup = disabledExtensions({}, { "appletalk" });
+	check(find(disabledStartup, "appletalk") && find(disabledStartup, "appletalk")->startup,
+		"a modules-load.d entry is marked as starting next time");
+	const ExtensionEntry *disabledWifi = find(disabled, "wifi");
+	check(disabledWifi && disabledWifi->modules.contains("iwlwifi"),
+		"a disabled entry still names the modules it covers");
 
 	check(extensionEntry("wifi").name == "Wi-Fi" && extensionEntry("nope").key.isEmpty(),
 		"entries can be looked up by key");

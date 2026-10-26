@@ -31,6 +31,7 @@
 
 enum class VKind {
 	Volume,     /* the startup disk itself */
+	ExternalVolume, /* a mounted ZacOS 9 disk, shown as a read-only disk */
 	Folder,     /* a curated folder; children come from the registry */
 	Backed,     /* stands for a real directory */
 	Apps,       /* generated: the installed applications */
@@ -51,6 +52,8 @@ struct VNode {
 	pl_icon_kind icon = PL_ICON_FOLDER;
 	bool visible = true;
 	bool user = false; /* made by the user on the startup disk */
+	bool readOnly = false; /* an external ZacOS 9 disk: presentation only */
+	QString externalMount, externalVolumeName, externalVersion;
 	int order = 0;   /* ties in the Finder's by-name order */
 	/* Apps: keep only these XDG categories (empty means all), then drop
 	 * anything in `excludeCategories`. */
@@ -161,6 +164,16 @@ bool vfsUnixVolumeShown();
 void vfsSetUnixVolumeShown(bool shown);
 /* The startup disk's name and icon, for the desktop. */
 QString vfsVolumeName();
+
+/* Mounted ZacOS 9 disks shown with the same Applications / System Folder /
+ * Home layout as the startup disk, read-only. The desktop registers what it
+ * finds; vfsZacosVolumeRoot returns the synthetic root path, or empty. */
+struct VfsZacosVolume {
+	QString mountPath, name, version;
+};
+void vfsSetZacosVolumes(const std::vector<VfsZacosVolume> &volumes);
+QString vfsZacosVolumeRoot(const QString &mountPath);
+bool vfsIsZacosVolumeRoot(const QString &path);
 
 /* Re-read the registry and the installed applications. */
 void vfsRefresh();

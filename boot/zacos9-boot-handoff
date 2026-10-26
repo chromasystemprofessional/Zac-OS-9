@@ -4,7 +4,8 @@
 # the screen going blank between them.
 #
 #   quit   in place of plymouth-quit.service's "plymouth quit": the splash
-#          stops drawing but leaves its last frame up, a note in
+#          stops drawing but leaves its last frame up (unless the screen is
+#          moving to the Intel GPU, which needs it gone), a note in
 #          /run/zacos9/handoff tells the compositor to carry on from it,
 #          and "watch" runs in the background to finish the job.
 #   wait   in place of plymouth-quit-wait's "plymouth --wait", which would
@@ -47,6 +48,15 @@ text_login() {
 case ${1:-} in
 quit)
 	"$plymouth" --ping 2>/dev/null || exit 0
+	# The built-in screen moving to the Intel GPU (zacos9-intel-graphics):
+	# the NVIDIA GPU has to be free first, so the splash goes completely.
+	case $(sed -n 1p "${ZACOS9_GPU_CONF:-/etc/zacos9/gpu}" 2>/dev/null) in
+	intel | intel-once)
+		"$plymouth" quit
+		"${ZACOS9_INTEL_GRAPHICS:-/usr/libexec/zacos9/zacos9-intel-graphics}" switch || true
+		exit 0
+		;;
+	esac
 	if ! "$plymouth" deactivate; then
 		exec "$plymouth" quit
 	fi

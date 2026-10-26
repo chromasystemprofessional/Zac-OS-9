@@ -12,12 +12,13 @@
 #include <QPlainTextEdit>
 #include <QPointer>
 #include <QRegularExpression>
-#include <QSaveFile>
 #include <QScrollArea>
 #include <QSettings>
 #include <QUrl>
 #include <QVBoxLayout>
 #include <QWidget>
+
+#include <functional>
 
 static const QRegularExpression ClippingName(
 	"^.* clipping( \\d+)?\\.(txt|png)$", QRegularExpression::CaseInsensitiveOption);
@@ -71,23 +72,40 @@ QString clippingBaseName(const QString &text) {
 	return name.isEmpty() ? QString("text") : name;
 }
 
-/* "base.ext", else "base 2.ext", ... */
-static QString freePath(const QString &folder, const QString &base, const QString &ext) {
+/* A new "base.ext", else "base 2.ext", ..., written by `write`. Each is
+ * created exclusively (O_CREAT|O_EXCL), so never through a symbolic link,
+ * dangling or not, nor over something put there meanwhile: what is made
+ * is always in `folder`. A failed write leaves nothing behind. */
+static QString create(const QString &folder, const QString &base, const QString &ext,
+		const std::function<bool(QFile &)> &write, QString *error) {
 	const QDir dir(folder);
-	QString name = base + ext;
-	for (int i = 2; dir.exists(name); i++) {
-		name = QString("%1 %2%3").arg(base).arg(i).arg(ext);
+	for (int i = 1; i < 10000; i++) {
+		const QString path = dir.filePath(i == 1 ? base + ext : QString("%1 %2%3").arg(base).arg(i).arg(ext));
+		QFile f(path);
+		if (!f.open(QIODevice::WriteOnly | QIODevice::NewOnly)) {
+			const QFileInfo there(path);
+			if (there.exists() || there.isSymLink()) {
+				continue;
+			}
+			*error = f.errorString();
+			return QString();
+		}
+		if (!write(f) || !f.flush()) {
+			*error = f.errorString();
+			f.close();
+			f.remove();
+			return QString();
+		}
+		f.close();
+		return path;
 	}
-	return dir.filePath(name);
+	*error = "There are too many clippings with that name.";
+	return QString();
 }
 
-static bool save(const QString &path, const QByteArray &data, QString *error) {
-	QSaveFile f(path);
-	if (!f.open(QIODevice::WriteOnly) || f.write(data) != data.size() || !f.commit()) {
-		*error = f.errorString();
-		return false;
-	}
-	return true;
+static QString save(const QString &folder, const QString &base, const QString &ext,
+		const QByteArray &data, QString *error) {
+	return create(folder, base, ext, [&data](QFile &f) { return f.write(data) == data.size(); }, error);
 }
 
 /* A browser's link title: text/x-moz-url is "address\ntitle" in UTF-16. */
@@ -118,9 +136,9 @@ QStringList makeClippings(const QMimeData *mime, const QString &folder, QString 
 			if (title.isEmpty()) {
 				title = "Internet location";
 			}
-			const QString path = freePath(folder, title, ".url");
 			const QByteArray body = "[InternetShortcut]\r\nURL=" + url.toString(QUrl::FullyEncoded).toUtf8() + "\r\n";
-			if (!save(path, body, error)) {
+			const QString path = save(folder, title, ".url", body, error);
+			if (path.isEmpty()) {
 				return made;
 			}
 			made << path;
@@ -129,16 +147,17 @@ QStringList makeClippings(const QMimeData *mime, const QString &folder, QString 
 	}
 	if (mime->hasImage()) {
 		const QImage image = qvariant_cast<QImage>(mime->imageData());
-		const QString path = freePath(folder, "picture clipping", ".png");
-		if (image.isNull() || !image.save(path, "PNG")) {
+		const QString path = image.isNull() ? QString() : create(folder, "picture clipping", ".png",
+			[&image](QFile &f) { return image.save(&f, "PNG"); }, error);
+		if (path.isEmpty()) {
 			*error = "The picture couldn't be saved.";
 			return made;
 		}
 		return { path };
 	}
 	const QString text = mime->text();
-	const QString path = freePath(folder, clippingBaseName(text) + " clipping", ".txt");
-	if (save(path, text.toUtf8(), error)) {
+	const QString path = save(folder, clippingBaseName(text) + " clipping", ".txt", text.toUtf8(), error);
+	if (!path.isEmpty()) {
 		made << path;
 	}
 	return made;

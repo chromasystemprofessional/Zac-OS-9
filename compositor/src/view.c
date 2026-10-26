@@ -62,6 +62,9 @@ static bool view_resizable(struct plat_view *view) {
 }
 
 static struct wlr_scene_tree *view_window_layer(struct plat_view *view) {
+	if (view->system_prompt) {
+		return view->server->dialog_layer;
+	}
 	switch (view->frame->st.style) {
 	case DECOR_STYLE_MOVABLE_MODAL:
 		return view->server->dialog_layer;
@@ -186,6 +189,8 @@ void view_min_frame_size(struct plat_view *view, int *w, int *h) {
 	*h = frame_outer_h(view->frame, min_h > VIEW_MIN_H ? min_h : VIEW_MIN_H);
 }
 
+static void snap_to_pixels(struct plat_view *view, int *x, int *y);
+
 /* Sync the frame to the client's current geometry. */
 void view_update_frame(struct plat_view *view) {
 	struct wlr_box geo;
@@ -206,7 +211,7 @@ void view_update_frame(struct plat_view *view) {
 	 * windows with a parent are dialogs (HIG: movable modal). */
 	int hint = platinum_shell_style_for(view->impl->get_surface(view));
 	bool dialog = hint >= 0 ? hint == DECOR_STYLE_MOVABLE_MODAL
-		: !view_resizable(view) && view->impl->has_parent(view);
+		: view->system_prompt || (!view_resizable(view) && view->impl->has_parent(view));
 	const bool popup = hint == DECOR_STYLE_POPUP;
 	frame_set_style(view->frame, popup ? DECOR_STYLE_POPUP
 		: dialog ? DECOR_STYLE_MOVABLE_MODAL : DECOR_STYLE_DOCUMENT);
@@ -226,6 +231,13 @@ void view_update_frame(struct plat_view *view) {
 	bool resizable = view_resizable(view);
 	frame_set_features(view->frame, resizable, resizable);
 	frame_set_size(view->frame, geo.width, geo.height);
+	/* Its contents' place in the frame known (or changed with its style):
+	 * onto the screen's pixel pattern, at a fractional scale. */
+	int x = view->scene_tree->node.x, y = view->scene_tree->node.y;
+	snap_to_pixels(view, &x, &y);
+	if (x != view->scene_tree->node.x || y != view->scene_tree->node.y) {
+		view_move_to(view, x, y);
+	}
 	frame_commit(view->frame);
 	view_popup_layout(view);
 }
@@ -240,9 +252,39 @@ void view_set_title(struct plat_view *view, const char *title) {
 	}
 }
 
+/* Programs that ask for a password on another program's behalf: the
+ * keyring's prompter (also behind pinentry-gnome3 and the ssh askpass) and
+ * the session's polkit agent. The program asking would otherwise come
+ * forward over the prompt while the password is being typed. */
+static bool is_system_prompt(const char *app_id) {
+	static const char *const prompts[] = {
+		"gcr-prompter", "org.gnome.keyring.SystemPrompter",
+		"org.gnome.keyring.PrivatePrompter", "gcr-ssh-askpass", "gcr4-ssh-askpass",
+		"lxqt-policykit-agent",
+	};
+	for (size_t i = 0; app_id && i < sizeof(prompts) / sizeof(prompts[0]); i++) {
+		if (strcmp(app_id, prompts[i]) == 0) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/* The front prompt on screen, which keeps the keyboard until answered. */
+static struct plat_view *system_prompt_shown(struct plat_server *server) {
+	struct plat_view *view;
+	wl_list_for_each(view, &server->views, link) {
+		if (view->system_prompt && view->mapped && !view->hidden) {
+			return view;
+		}
+	}
+	return NULL;
+}
+
 void view_set_app_id(struct plat_view *view, const char *app_id) {
 	free(view->app_id);
 	view->app_id = strdup(app_id ? app_id : "");
+	view->system_prompt = is_system_prompt(view->app_id);
 	if (view->toplevel_handle) {
 		wlr_foreign_toplevel_handle_v1_set_app_id(view->toplevel_handle, view->app_id);
 	}
@@ -403,7 +445,7 @@ static void focus_none(struct plat_server *server) {
 }
 
 void view_set_hidden(struct plat_view *view, bool hidden) {
-	if (view->hidden == hidden) {
+	if (view->hidden == hidden || (hidden && view->system_prompt)) {
 		return;
 	}
 	struct plat_server *server = view->server;
@@ -499,6 +541,13 @@ void view_focus(struct plat_view *view) {
 		return;
 	}
 	struct plat_server *server = view->server;
+	/* While a password prompt is up, nothing else comes in front of it:
+	 * a click elsewhere, a new window, or a program asking to come forward
+	 * leaves the prompt where it is, with the keyboard. */
+	struct plat_view *prompt = system_prompt_shown(server);
+	if (prompt && !view->system_prompt) {
+		view = prompt;
+	}
 	platinum_shell_launch_ready(view);
 	if (view->hidden) {
 		view_set_hidden(view, false);
@@ -579,8 +628,42 @@ enum decor_part view_part_at(struct plat_view *view, double lx, double ly) {
 		(int)lx - view->scene_tree->node.x, (int)ly - view->scene_tree->node.y);
 }
 
+/* The nearest place to v where the pattern starts again. */
+static int to_pattern(int v, int period) {
+	const int r = ((v % period) + period) % period;
+	return r <= period / 2 ? -r : period - r;
+}
+
+/* At 1.25, 1.5 or 1.75 a window's contents start where its screen's pixel
+ * pattern does (lib/draw.c pl_snap: every 4 / gcd(quarters, 4) logical
+ * pixels), so the window's own pixels and its frame's fall alike, and
+ * look the same wherever it is moved: it moves in steps of 2 or 4. */
+static void snap_to_pixels(struct plat_view *view, int *x, int *y) {
+	struct plat_server *server = view->server;
+	const struct wlr_box frame = view_frame_box(view);
+	struct plat_output *output = output_at(server, *x + frame.width / 2.0, *y + DECOR_TOP / 2.0);
+	if (!output || view->fullscreen) {
+		return;
+	}
+	const int q = (int)(output->wlr_output->scale * 4 + 0.5f);
+	if (q % 4 == 0) {
+		return;
+	}
+	const int period = q % 2 ? 4 : 2;
+	struct wlr_box box;
+	wlr_output_layout_get_box(server->output_layout, output->wlr_output, &box);
+	/* Where the client's buffer starts in the window (view_update_frame). */
+	struct wlr_box geo;
+	view->impl->get_geometry(view, &geo);
+	const struct decor_margins m = decor_margins(view->frame->st.style);
+	*x += to_pattern(*x + m.left - geo.x - box.x, period);
+	*y += to_pattern(*y + m.top - geo.y - box.y, period);
+}
+
 void view_move_to(struct plat_view *view, int x, int y) {
+	snap_to_pixels(view, &x, &y);
 	wlr_scene_node_set_position(&view->scene_tree->node, x, y);
+	frame_commit(view->frame); /* its pixels may fall differently there */
 	if (view->impl->moved) {
 		view->impl->moved(view);
 	}
@@ -588,7 +671,9 @@ void view_move_to(struct plat_view *view, int x, int y) {
 }
 
 void view_resize_frame(struct plat_view *view, struct wlr_box box) {
+	snap_to_pixels(view, &box.x, &box.y);
 	wlr_scene_node_set_position(&view->scene_tree->node, box.x, box.y);
+	frame_commit(view->frame);
 	platinum_shell_report_position(view);
 	struct decor_margins m = decor_margins(view->frame->st.style);
 	view->impl->set_size(view, box.width - m.left - m.right,
@@ -859,6 +944,10 @@ void view_handle_unmap(struct plat_view *view) {
 		view_set_fullscreen(view, false, NULL);
 	}
 	view->mapped = false;
+	/* The frame goes with the window. A window hidden but not closed (a
+	 * splash screen once the program is up, a palette put away) kept its
+	 * title bar on screen until the program quit (issue #33). */
+	wlr_scene_node_set_enabled(&view->scene_tree->node, false);
 	destroy_toplevel_handle(view);
 	if (view == server->grabbed_view) {
 		input_cancel_grab(server);

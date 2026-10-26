@@ -23,8 +23,11 @@
 #include <unistd.h>
 #include <wayland-client.h>
 
+#include "draw.h"
+#include "fractional-scale-v1-client-protocol.h"
 #include "savers.h"
 #include "settings.h"
+#include "viewporter-client-protocol.h"
 #include "wlr-layer-shell-unstable-v1-client-protocol.h"
 
 #define FRAME_NS (1000000000L / 25) /* 25 frames a second */
@@ -46,9 +49,13 @@ struct screen {
 	/* While shown: */
 	struct wl_surface *surface;
 	struct zwlr_layer_surface_v1 *layer;
+	/* 1.25, 1.5, 1.75 (5, 6, 7): drawn at the screen's own pixels; else 0. */
+	int quarters;
+	struct wp_viewport *viewport;
+	struct wp_fractional_scale_v1 *fractional;
 	int w, h; /* logical size, once configured */
 	struct pl_saver *saver;
-	uint32_t *logical; /* the frame at logical size, for scale > 1 */
+	uint32_t *logical; /* the frame at logical size, for scale > 1 or a fraction */
 	struct buffer buffers[2];
 	struct wl_callback *frame; /* the last frame not yet shown */
 };
@@ -56,6 +63,8 @@ struct screen {
 static struct wl_display *display;
 static struct wl_compositor *compositor;
 static struct wl_shm *shm;
+static struct wp_viewporter *viewporter;
+static struct wp_fractional_scale_manager_v1 *fractional_manager;
 static struct zwlr_layer_shell_v1 *layer_shell;
 static struct wl_pointer *pointer;
 static struct wl_list screens; /* screen.link */
@@ -129,12 +138,19 @@ static void draw(struct screen *s) {
 		return;
 	}
 	const int k = s->scale;
-	if (k == 1) {
-		struct pl_canvas c = { b->px, s->w, 0, 0, s->w, s->h };
+	if (s->quarters) {
+		/* Each logical pixel one or two of the screen's, any text in the
+		 * font for this scale: sharp. */
+		struct pl_canvas c = { s->logical, s->w, 0, 0, s->w, s->h, pl_text_log_new(s->logical, s->w) };
+		pl_saver_draw(s->saver, &c, now_seconds() - started);
+		pl_snap_scale_canvas(&c, 0, 0, s->quarters, b->px);
+		pl_text_log_free(c.log);
+	} else if (k == 1) {
+		struct pl_canvas c = { b->px, s->w, 0, 0, s->w, s->h, NULL };
 		pl_saver_draw(s->saver, &c, now_seconds() - started);
 	} else {
 		/* At logical size, then each pixel k×k: sharp, like the rest. */
-		struct pl_canvas c = { s->logical, s->w, 0, 0, s->w, s->h };
+		struct pl_canvas c = { s->logical, s->w, 0, 0, s->w, s->h, NULL };
 		pl_saver_draw(s->saver, &c, now_seconds() - started);
 		for (int y = 0; y < s->h; y++) {
 			uint32_t *out = b->px + (size_t)y * k * s->w * k;
@@ -168,6 +184,12 @@ static void hide(struct screen *s) {
 		s->frame = NULL;
 	}
 	zwlr_layer_surface_v1_destroy(s->layer);
+	if (s->fractional) {
+		wp_fractional_scale_v1_destroy(s->fractional);
+		wp_viewport_destroy(s->viewport);
+		s->fractional = NULL;
+		s->viewport = NULL;
+	}
 	wl_surface_destroy(s->surface);
 	s->surface = NULL;
 	s->layer = NULL;
@@ -179,6 +201,8 @@ static void hide(struct screen *s) {
 	s->logical = NULL;
 }
 
+static void start(struct screen *s);
+
 static void layer_configure(void *data, struct zwlr_layer_surface_v1 *layer, uint32_t serial,
 		uint32_t w, uint32_t h) {
 	struct screen *s = data;
@@ -188,22 +212,49 @@ static void layer_configure(void *data, struct zwlr_layer_surface_v1 *layer, uin
 	}
 	s->w = (int)w;
 	s->h = (int)h;
+	start(s);
+}
+
+/* Buffers at the screen's scale (or its own pixels at a fraction) and a
+ * new saver for its size. */
+static void start(struct screen *s) {
 	buffer_free(&s->buffers[0]);
 	buffer_free(&s->buffers[1]);
 	pl_saver_free(s->saver);
+	s->saver = NULL;
 	free(s->logical);
-	s->logical = s->scale > 1 ? malloc((size_t)s->w * s->h * 4) : NULL;
-	if (!buffer_make(&s->buffers[0], s->w * s->scale, s->h * s->scale) ||
-			!buffer_make(&s->buffers[1], s->w * s->scale, s->h * s->scale) ||
-			(s->scale > 1 && !s->logical)) {
+	const bool scaled = s->scale > 1 || s->quarters;
+	const int bw = s->quarters ? pl_snap(s->w, s->quarters) : s->w * s->scale;
+	const int bh = s->quarters ? pl_snap(s->h, s->quarters) : s->h * s->scale;
+	s->logical = scaled ? malloc((size_t)s->w * s->h * 4) : NULL;
+	if (!buffer_make(&s->buffers[0], bw, bh) || !buffer_make(&s->buffers[1], bw, bh) ||
+			(scaled && !s->logical)) {
 		fprintf(stderr, "zacos9-screensaver: no memory for %s\n", s->name);
-		s->saver = NULL;
 		return;
 	}
 	s->saver = pl_saver_new(saver_index, s->w, s->h, (unsigned)(now_seconds() * 1000) ^ s->global);
-	wl_surface_set_buffer_scale(s->surface, s->scale);
+	wl_surface_set_buffer_scale(s->surface, s->quarters ? 1 : s->scale);
+	if (s->viewport) {
+		wp_viewport_set_destination(s->viewport, s->quarters ? s->w : -1, s->quarters ? s->h : -1);
+	}
 	draw(s);
 }
+
+/* 1.25, 1.5, 1.75 (in 120ths): the screen's own pixels from now on. */
+static void preferred_scale(void *data, struct wp_fractional_scale_v1 *fractional, uint32_t scale) {
+	struct screen *s = data;
+	const int quarters = (int)((scale + 15) / 30);
+	const int q = quarters % 4 ? quarters : 0;
+	if (q == s->quarters) {
+		return;
+	}
+	s->quarters = q;
+	if (s->w > 0) {
+		start(s);
+	}
+}
+
+static const struct wp_fractional_scale_v1_listener fractional_listener = { preferred_scale };
 
 static void layer_closed(void *data, struct zwlr_layer_surface_v1 *layer) {
 	hide(data);
@@ -216,6 +267,13 @@ static void show(struct screen *s) {
 		return;
 	}
 	s->surface = wl_compositor_create_surface(compositor);
+	s->quarters = 0;
+	if (viewporter && fractional_manager) {
+		s->viewport = wp_viewporter_get_viewport(viewporter, s->surface);
+		s->fractional = wp_fractional_scale_manager_v1_get_fractional_scale(fractional_manager,
+			s->surface);
+		wp_fractional_scale_v1_add_listener(s->fractional, &fractional_listener, s);
+	}
 	s->layer = zwlr_layer_shell_v1_get_layer_surface(layer_shell, s->surface, s->output,
 		ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY, "screensaver");
 	zwlr_layer_surface_v1_add_listener(s->layer, &layer_listener, s);
@@ -337,6 +395,11 @@ static void global(void *data, struct wl_registry *registry, uint32_t name, cons
 		compositor = wl_registry_bind(registry, name, &wl_compositor_interface, 4);
 	} else if (strcmp(iface, wl_shm_interface.name) == 0) {
 		shm = wl_registry_bind(registry, name, &wl_shm_interface, 1);
+	} else if (strcmp(iface, wp_viewporter_interface.name) == 0) {
+		viewporter = wl_registry_bind(registry, name, &wp_viewporter_interface, 1);
+	} else if (strcmp(iface, wp_fractional_scale_manager_v1_interface.name) == 0) {
+		fractional_manager = wl_registry_bind(registry, name,
+			&wp_fractional_scale_manager_v1_interface, 1);
 	} else if (strcmp(iface, zwlr_layer_shell_v1_interface.name) == 0) {
 		layer_shell = wl_registry_bind(registry, name, &zwlr_layer_shell_v1_interface, 1);
 	} else if (strcmp(iface, wl_seat_interface.name) == 0) {

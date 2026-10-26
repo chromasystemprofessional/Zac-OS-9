@@ -47,6 +47,9 @@ jobs:
           tail -80 /tmp/zacos9-package.log
           exit "$status"
 
+      - name: Count compiler warnings
+        run: python3 tests/baseline/count_warnings.py /tmp/zacos9-package.log tests/baseline/warnings
+
       - name: Audit skipped tests
         run: |
           python3 - <<'PY'

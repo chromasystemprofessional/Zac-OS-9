@@ -3,14 +3,14 @@
  "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
 <policyconfig>
   <vendor>ZacOS 9</vendor>
-  <action id="org.zacos9.rdp">
-    <description>Share the current ZacOS desktop over RDP</description>
-    <message>Authentication is required to start or stop RDP desktop sharing</message>
+  <action id="org.zacos9.modules">
+    <description>Turn system extensions on or off for startup</description>
+    <message>Authentication is required to turn extensions on or off</message>
     <defaults>
       <allow_any>auth_admin</allow_any>
       <allow_inactive>auth_admin</allow_inactive>
       <allow_active>auth_admin_keep</allow_active>
     </defaults>
-    <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/zacos9/zacos9-rdp-helper</annotate>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/zacos9/zacos9-modules-helper</annotate>
   </action>
 </policyconfig>

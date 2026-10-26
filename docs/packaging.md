@@ -168,8 +168,36 @@ Notes:
 - The installer writes the removable-media fallback loader,
   `EFI/BOOT/BOOTX64.EFI`, only when the ESP has none, so another system's
   is never replaced (this disk had none, so ZacOS's was added).
+- GRUB for UEFI is Debian's signed one behind its signed shim
+  (`grub-install --uefi-secure-boot`), so the installed system starts with
+  Secure Boot on (under OVMF's Secure Boot firmware, unsigned GRUB is
+  refused with "Access Denied" and the firmware falls to its shell, as in
+  issue #22 on UTM). A whole-disk install also puts GRUB in the other boot
+  partition, BIOS or UEFI, so the disk starts whichever way the firmware is
+  set; before, a disk installed from a live session started with BIOS had
+  an empty ESP, and one started with UEFI had no BIOS GRUB.
 - Shutting the live system down waits at live-boot's "remove the
   installation medium" prompt, as on any Debian live medium.
+- **Disks with another system on them** (issue #31: a Surface Go 2 with
+  ChromeOS Flex's partitions). The live desktop used to mount every
+  partition it found, so Disk Setup showed them "in use" and wouldn't
+  delete them, and a whole-disk install failed at "Partitioning disk..."
+  (wipefs found the disk busy; the kernel wouldn't read the new table).
+  Now:
+  - in the live session the computer's own disks aren't mounted unless
+    Disk Setup's "Mount automatically" is turned on for one (USB drives and
+    discs still are; `liveSession()`, `shell/finder/mountpolicy.cpp`);
+  - before changing a disk or partition, `zacos9-install` runs
+    `zacos9-release-disk`: it refuses the running system's disk, hides the
+    target from UDisks for the length of the install (a rule in
+    `/run/udev/rules.d` setting `UDISKS_IGNORE`, removed at the end), turns
+    off swap on it, unmounts it (naming the program if one keeps it busy),
+    closes device-mapper volumes on it, and for a whole disk erases the old
+    partitions' and table's signatures. The install then stops if the
+    kernel can't read the new table, rather than formatting what may still
+    be the old partitions. Test: `release-disk` (stand-in commands).
+  Not yet run on real hardware or as root: the udev rule's effect is
+  untested outside the stand-ins.
 
 The guest's `macipgw.service` failed with exit status 64. It comes with
 `atalkd` (a Recommends) and needs an IP network of its own, which Debian's

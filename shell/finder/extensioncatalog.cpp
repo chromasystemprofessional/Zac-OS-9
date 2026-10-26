@@ -59,6 +59,41 @@ std::vector<ExtensionEntry> curatedExtensions(const QStringList &loaded,
 	return out;
 }
 
+std::vector<ExtensionEntry> disabledExtensions(const QStringList &loaded,
+		const QStringList &startup) {
+	QStringList loadedKeys;
+	for (const QString &raw : loaded) {
+		if (const pl_extension *entry = entryFor(normalize(raw))) {
+			loadedKeys << QString::fromLatin1(entry->key);
+		}
+	}
+	QStringList startupModules;
+	for (const QString &module : startup) {
+		startupModules << normalize(module);
+	}
+	std::vector<ExtensionEntry> out;
+	for (int i = 0; i < pl_n_extensions; i++) {
+		const pl_extension &catalog = pl_extensions[i];
+		const QString key = QString::fromLatin1(catalog.key);
+		if (loadedKeys.contains(key)) {
+			continue;
+		}
+		ExtensionEntry entry = fromCatalog(catalog);
+		for (const char *const *module = catalog.modules; *module; module++) {
+			entry.modules << QString::fromLatin1(*module);
+		}
+		entry.modules.sort();
+		for (const QString &module : entry.modules) {
+			entry.startup = entry.startup || startupModules.contains(module);
+		}
+		out.push_back(entry);
+	}
+	std::sort(out.begin(), out.end(), [](const ExtensionEntry &a, const ExtensionEntry &b) {
+		return a.name.compare(b.name, Qt::CaseInsensitive) < 0;
+	});
+	return out;
+}
+
 ExtensionEntry extensionEntry(const QString &key) {
 	const pl_extension *entry = pl_extension_find(key.toLatin1().constData());
 	return entry ? fromCatalog(*entry) : ExtensionEntry{};

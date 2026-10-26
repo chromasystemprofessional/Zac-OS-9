@@ -90,7 +90,12 @@ static void capture(struct wl_client *client, struct wl_resource *resource,
 		fail(frame, "Could not map screenshot storage.");
 		return;
 	}
-	struct wlr_texture *texture = wlr_texture_from_buffer(server->renderer, buffer);
+	/* A full-screen client's buffer shown directly (the lock, a game) has
+	 * only the texture it was uploaded to once the client let it go. */
+	struct wlr_client_buffer *client_buffer = wlr_client_buffer_get(buffer);
+	struct wlr_texture *own = client_buffer && client_buffer->texture ? NULL :
+		wlr_texture_from_buffer(server->renderer, buffer);
+	struct wlr_texture *texture = own ? own : client_buffer ? client_buffer->texture : NULL;
 	bool copied = false;
 	if (texture) {
 		copied = wlr_texture_read_pixels(texture,
@@ -99,7 +104,9 @@ static void capture(struct wl_client *client, struct wl_resource *resource,
 				.format = DRM_FORMAT_ARGB8888,
 				.stride = (uint32_t)stride,
 			});
-		wlr_texture_destroy(texture);
+		if (own) {
+			wlr_texture_destroy(own);
+		}
 	}
 	munmap(pixels, size);
 	if (!copied) {

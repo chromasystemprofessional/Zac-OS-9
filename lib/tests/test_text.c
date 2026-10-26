@@ -4,6 +4,7 @@
  * on Mac OS 8. Widths were measured with tools/measure/glyphs.py
  * (docs/reference/zacos9-fonts.md). Needs no figures.
  */
+#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -88,6 +89,59 @@ int main(void) {
 	printf("%s  fallback glyph for U+6587\n", ok ? "ok  " : "FAIL");
 	fails += !ok;
 	text_destroy(cjk);
+
+	/* The fonts for 1.25x, 1.5x and 1.75x screens: a plain stem ("|") is
+	 * one width on every row, top to bottom, in each of them, and taller
+	 * than at 1x. */
+	for (int q = 5; q <= 7; q++) {
+		for (enum pl_font f = PL_FONT_SYSTEM; f <= PL_FONT_VIEWS; f++) {
+			struct plat_text *one = text_render_font("|", 100, f);
+			struct plat_text *l = text_render_scaled(one, q);
+			int width = -1, rows = 0;
+			bool even = l != NULL;
+			for (int y = 0; l && y < l->height; y++) {
+				int n = 0;
+				for (int x = 0; x < l->width; x++) {
+					n += l->mask[y * l->stride + x] != 0;
+				}
+				if (n) {
+					rows++;
+					even = even && (width < 0 || n == width);
+					width = n;
+				}
+			}
+			int rows1 = 0;
+			for (int y = 0; y < one->height; y++) {
+				for (int x = 0; x < one->width; x++) {
+					if (one->mask[y * one->stride + x]) {
+						rows1++;
+						break;
+					}
+				}
+			}
+			ok = even && rows > rows1;
+			printf("%s  at %d/4 the %s font's | is %d px wide on all %d rows\n", ok ? "ok  " : "FAIL", q,
+				f == PL_FONT_SYSTEM ? "System" : "Views", width, rows);
+			fails += !ok;
+			text_destroy(l);
+			text_destroy(one);
+		}
+	}
+	struct plat_text *hi = text_render("Hi", 100);
+	ok = text_render_scaled(hi, 4) == NULL && text_render_scaled(hi, 8) == NULL;
+	printf("%s  no scaled font at whole-number scales\n", ok ? "ok  " : "FAIL");
+	fails += !ok;
+	/* Italic and truncated text keep what they show. */
+	struct plat_text *cut = text_render_font("A long name for a file", 40, PL_FONT_VIEWS_ITALIC);
+	struct plat_text *cut15 = text_render_scaled(cut, 6);
+	ok = cut->utf8 && strstr(cut->utf8, "\xe2\x80\xa6") && cut15 && strcmp(cut15->utf8, cut->utf8) == 0 &&
+		cut15->height > cut->height;
+	printf("%s  truncated italic text drawn again at 1.5x as shown (%s)\n", ok ? "ok  " : "FAIL",
+		cut->utf8 ? cut->utf8 : "?");
+	fails += !ok;
+	text_destroy(cut15);
+	text_destroy(cut);
+	text_destroy(hi);
 
 	printf("%d failure%s\n", fails, fails == 1 ? "" : "s");
 	return fails ? 1 : 0;

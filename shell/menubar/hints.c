@@ -70,6 +70,19 @@ static const struct {
 	{ "Help Center", "Opens the Help Center, where you can read help for ZacOS and your programs." },
 	{ "Show Hint Bubbles", "Turns hint bubbles like this one on or off." },
 	{ "ZacOS Help", "Opens help for ZacOS." },
+	{ "Bark Recorder", "Opens Bark Recorder, to record a sound and play it back." },
+	{ "Calculator", "Opens the Calculator, for adding, subtracting, multiplying and dividing." },
+	{ "Dog Ears", "Opens Dog Ears: notes that stay on your screen, saved as you type." },
+	{ "Jigsaw Puzzle", "Opens Jigsaw Puzzle, a picture in pieces to put back together." },
+	{ "Key Tags", "Opens Key Tags, which shows the character each key types with your keyboard layout." },
+	{ "Notepad", "Opens Notepad, eight pages for jotting things down." },
+	{ "Pedigree", "Opens Pedigree, which describes this computer: its hardware, disks and devices." },
+	{ "Plotter", "Opens Plotter, which draws the graph of an equation." },
+	{ "Stash", "Opens Stash, a place to keep pictures and text to use again." },
+	{ "Terminal", "Opens a terminal window, for typing commands." },
+	{ "XTerm", "Opens a terminal window, for typing commands." },
+	{ "Learn ZacOS","Opens short lessons on using ZacOS, with a tour for people who used a Mac before." },
+	{ "Mouse Practice", "Opens Mouse Practice, a game for learning pointing, clicking, double-clicking and dragging." },
 	{ "Hide Others", "Hides the windows of every program except the active one." },
 	{ "Show All", "Shows the windows of every hidden program." },
 	{ "Quit", "Quits the active program." },
@@ -122,7 +135,7 @@ static void round_rect(struct pl_canvas *c, int x0, int y0, int x1, int y1, uint
 	}
 }
 
-uint32_t *hint_paint(const char *text, bool tail_right, int *w, int *h) {
+uint32_t *hint_paint(const char *text, bool tail_right, int *w, int *h, struct pl_text_log **log) {
 	struct plat_text *lines[HINT_MAX_LINES];
 	int n = 0, width = 0;
 	char line[512] = "";
@@ -174,6 +187,9 @@ uint32_t *hint_paint(const char *text, bool tail_right, int *w, int *h) {
 	*h = bh;
 	uint32_t *px = calloc((size_t)*w * *h, sizeof(*px));
 	struct pl_canvas c = { .px = px, .stride = *w, .width = *w, .height = *h };
+	if (log) {
+		*log = NULL;
+	}
 	const uint32_t black = GRAY(0), yellow = RGB(0xFF, 0xFF, 0xCC);
 	int x0 = HINT_TAIL_W;
 	round_rect(&c, x0, 0, *w - 1, bh - 1, black);
@@ -187,11 +203,6 @@ uint32_t *hint_paint(const char *text, bool tail_right, int *w, int *h) {
 			pl_hline(&c, b, x0, HINT_TIP_Y + k, yellow);
 		}
 	}
-	int ascent = lines[0]->baseline;
-	for (int i = 0; i < n; i++) {
-		pl_text(&c, lines[i], x0 + HINT_PAD + 1, HINT_PAD + ascent + i * HINT_LINE, black);
-		text_destroy(lines[i]);
-	}
 	if (tail_right) {
 		for (int y = 0; y < *h; y++) {
 			uint32_t *row = px + (size_t)y * *w;
@@ -201,6 +212,17 @@ uint32_t *hint_paint(const char *text, bool tail_right, int *w, int *h) {
 				row[b] = t;
 			}
 		}
+	}
+	/* Draw the text after mirroring: only the bubble turns around, the
+	 * text on the right-hand side stays readable. */
+	int ascent = lines[0]->baseline;
+	int text_x = (tail_right ? 0 : x0) + HINT_PAD + 1;
+	if (log) {
+		c.log = *log = pl_text_log_new(px, *w);
+	}
+	for (int i = 0; i < n; i++) {
+		pl_text(&c, lines[i], text_x, HINT_PAD + ascent + i * HINT_LINE, black);
+		text_destroy(lines[i]);
 	}
 	return px;
 }

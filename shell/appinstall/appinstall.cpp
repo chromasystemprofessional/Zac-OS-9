@@ -333,6 +333,9 @@ void AppInstallWindow::installDeb() {
 		run("pkexec", { HELPER, "install-deb", m_file }, [this](int code) {
 			if (code == 0) {
 				succeed();
+			} else if (code == 126 || code == 127) {
+				/* pkexec: the password was refused, or the dialog cancelled. */
+				fail("installing it needs an administrator's password.");
 			} else {
 				fail(m_procErr.isEmpty() ? QString("apt couldn't install it.") : m_procErr);
 			}

@@ -40,6 +40,12 @@ QString htmlTitle(const QString &html);
 QString htmlText(const QString &html);
 QString htmlMeta(const QString &html, const QString &name);
 
+/* A page as one of the tutorial's paths sees it ("new", "kids", "mac"): an
+ * element whose class has for-… words shows only on those paths, so
+ * <p class="for-kids"> is left out for "new"; untagged ones show on all.
+ * See docs/tutorial.md. */
+QString tutorialHtml(const QString &html, const QString &path);
+
 /* Pages with every word of the query (or, failing that, any), best first:
  * words in the title count most. */
 QList<HelpHit> searchHelp(const QList<HelpPage> &pages, const QString &query);

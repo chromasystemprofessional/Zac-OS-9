@@ -306,17 +306,20 @@ int pl_screen_scale(void) {
 	if (!f) {
 		return 1;
 	}
-	/* "output NAME WxH scale N nested N x N y N main N", one per screen;
-	 * every screen has the same scale, but the main one is authoritative. */
+	/* "output NAME WxH scale S nested N x N y N main N", one per screen;
+	 * every screen has the same scale, but the main one is authoritative.
+	 * At 1.25 and 1.5 X11 programs are drawn at 1x and enlarged
+	 * (compositor/src/xwayland.c), so those count as 1. */
 	int scale = 1;
 	bool have_main = false;
 	char line[512];
 	while (fgets(line, sizeof(line), f)) {
 		char name[128];
-		int w, h, s, nested, x, y, main;
-		if (sscanf(line, "output %127s %dx%d scale %d nested %d x %d y %d main %d",
+		int w, h, nested, x, y, main;
+		double s;
+		if (sscanf(line, "output %127s %dx%d scale %lf nested %d x %d y %d main %d",
 				name, &w, &h, &s, &nested, &x, &y, &main) == 8 && s >= 1 && !have_main) {
-			scale = s;
+			scale = s == (int)s ? (int)s : 1;
 			have_main = main == 1;
 		}
 	}

@@ -88,6 +88,16 @@ enum pl_icon_kind {
 	PL_ICON_SF_CONTEXTUAL_MENU_ITEMS,
 	PL_ICON_SF_PREFERENCES,
 	PL_ICON_SF_UTILITIES,
+	/* The Zac menu's desk accessories. */
+	PL_ICON_APP_BARKRECORDER,
+	PL_ICON_APP_CALCULATOR,
+	PL_ICON_APP_DOGEARS,
+	PL_ICON_APP_JIGSAW,
+	PL_ICON_APP_KEYTAGS,
+	PL_ICON_APP_NOTEPAD,
+	PL_ICON_APP_PEDIGREE,
+	PL_ICON_APP_PLOTTER,
+	PL_ICON_APP_STASH,
 	/* One extension's own icon each (tools/extension-icons). */
 #include "icons_custom.h"
 	PL_ICON_COUNT,
@@ -98,6 +108,11 @@ enum pl_icon_kind {
 
 /* size x size ARGB pixels, alpha 0 or 255. size is 32 or 16. */
 const uint32_t *pl_icon(enum pl_icon_kind kind, int size);
+
+/* A ZacOS program's own icon, from its desktop file's name or path
+ * ("zacos9-calculator", ".../zacos9-calculator.desktop");
+ * PL_ICON_APPLICATION for any other. */
+enum pl_icon_kind pl_icon_for_program(const char *desktop_id);
 
 /* Draw an icon; selected icons are darkened, as the Finder does.
  * TODO: measure the exact selected transform. */

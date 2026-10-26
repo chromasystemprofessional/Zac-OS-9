@@ -48,4 +48,6 @@ bool resourceOpenPath(const QString &provider, const QString &key, QString *path
 ResourceDetails resourceDetails(const QString &provider, const QString &key);
 QStringList systemInformation();
 QStringList extensionInformation();
+/* The installed zacos9 package version, or empty when it is not installed. */
+QString installedZacOSVersion();
 QString resourceTestFixtureRoot();

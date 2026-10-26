@@ -19,13 +19,18 @@ struct ExtensionEntry {
 	QString name; /* e.g. "Bluetooth" */
 	pl_icon_kind icon = PL_ICON_EXT_GENERIC;
 	QString description;
-	QStringList modules; /* the entry's modules that are loaded */
+	QStringList modules; /* loaded modules, or the catalog's for a disabled entry */
 	bool startup = false; /* one of them is listed in modules-load.d */
 };
 
 /* The entries with at least one loaded module, sorted by name. Modules
  * may be given with '-' or '_'; the kernel treats them the same. */
 std::vector<ExtensionEntry> curatedExtensions(const QStringList &loaded,
+		const QStringList &startup = {});
+
+/* Catalog entries with no loaded module, sorted by name. Their modules are
+ * the catalog's patterns, for the Extensions (Disabled) view. */
+std::vector<ExtensionEntry> disabledExtensions(const QStringList &loaded,
 		const QStringList &startup = {});
 
 /* The catalog entry for a key, without any loaded modules; empty key if

@@ -4,8 +4,9 @@
  * The Help Center window: Back, Forward and Help Center buttons and a
  * search field above the page. Pages are the books' HTML; the Help
  * Center's front page and search results are made on the spot
- * (zacos9-help:center, zacos9-help:search?q=…). Links to the web open in
- * the browser.
+ * (zacos9-help:center, zacos9-help:search?q=…). A page opened with
+ * ?for=PATH is shown as that tutorial path sees it (tutorialHtml), and its
+ * links keep the path. Links to the web open in the browser.
  */
 
 #include <QMainWindow>

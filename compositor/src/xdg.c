@@ -143,6 +143,13 @@ static void handle_destroy(struct wl_listener *listener, void *data) {
 	wl_list_remove(&view->request_fullscreen.link);
 	wl_list_remove(&view->set_title.link);
 	wl_list_remove(&view->set_app_id.link);
+	/* A client that quits or crashes leaves its windows before their
+	 * decorations, which wlroots destroys after this; the decoration must
+	 * not reach back into the freed view then. */
+	if (view->decoration) {
+		struct plat_decoration *deco = view->decoration->data;
+		deco->view = NULL;
+	}
 	view_handle_destroy(view);
 }
 
@@ -293,6 +300,7 @@ static void server_new_xdg_decoration(struct wl_listener *listener, void *data) 
 	struct wlr_xdg_toplevel_decoration_v1 *wlr_decoration = data;
 	struct plat_decoration *deco = calloc(1, sizeof(*deco));
 	deco->wlr_decoration = wlr_decoration;
+	wlr_decoration->data = deco;
 	deco->view = view_from_toplevel(wlr_decoration->toplevel);
 	if (deco->view) {
 		deco->view->decoration = wlr_decoration;

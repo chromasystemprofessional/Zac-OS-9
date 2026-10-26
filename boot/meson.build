@@ -52,8 +52,10 @@ test('boot-handoff', find_program('python3'),
 
 install_data('zacos9-bootlogo',
   install_dir: get_option('libexecdir') / 'zacos9', install_mode: 'rwxr-xr-x')
-install_data('09_zacos9',
+install_data('09_zacos9', '31_zacos9_haiku',
   install_dir: get_option('sysconfdir') / 'grub.d', install_mode: 'rwxr-xr-x')
+test('grub-haiku', find_program('sh'),
+  args: [files('../tests/boot/test_grub_haiku.sh'), files('31_zacos9_haiku')])
 
 test('boot-splash-displays', find_program('python3'),
   args: [files('tests/test_splash.py'), files('plymouth/zacos9.script')])

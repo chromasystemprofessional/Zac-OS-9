@@ -2,6 +2,7 @@
 #include "netvolumes.h"
 #include "thumbnails.h"
 #include "fileassoc.h"
+#include "gpuinfo.h"
 #include "alias.h"
 #include "platinumshell.h"
 
@@ -871,40 +872,6 @@ static QString cpuName() {
 	return {};
 }
 
-static QString gpuName() {
-	/* NVIDIA: the nvidia driver exposes a "Model:" line per GPU. */
-	const QDir nvgpus("/proc/driver/nvidia/gpus");
-	if (nvgpus.exists()) {
-		for (const QString &gpu : nvgpus.entryList(QDir::Dirs | QDir::NoDotAndDotDot)) {
-			QFile info("/proc/driver/nvidia/gpus/" + gpu + "/information");
-			if (!info.open(QIODevice::ReadOnly)) { continue; }
-			for (const QByteArray &line : info.readAll().split('\n')) {
-				if (line.startsWith("Model:")) {
-					return QString::fromUtf8(line.mid(6)).trimmed();
-				}
-			}
-		}
-	}
-	/* Other drivers: probe DRM card nodes via sysfs uevent. */
-	static const QStringList virtualDrivers = {
-		"virtio_gpu", "virtio-pci", "bochs-drm", "qxl",
-		"cirrusfb", "simpledrm", "vboxvideo", "vmwgfx"
-	};
-	for (const char *card : {"card0", "card1"}) {
-		QFile ue(QStringLiteral("/sys/class/drm/") + card + "/device/uevent");
-		if (!ue.open(QIODevice::ReadOnly)) { continue; }
-		QString driver;
-		for (const QString &line : QString::fromUtf8(ue.readAll()).split('\n')) {
-			if (line.startsWith("DRIVER=")) { driver = line.mid(7); break; }
-		}
-		if (driver.isEmpty() || virtualDrivers.contains(driver)) { continue; }
-		if (driver == "i915" || driver == "xe") { return "Intel GPU"; }
-		if (driver == "amdgpu" || driver == "radeon") { return "AMD GPU"; }
-		return driver + " GPU";
-	}
-	return {};
-}
-
 static qint64 meminfoKB(const QString &key) {
 	QFile f("/proc/meminfo");
 	if (!f.open(QIODevice::ReadOnly)) {
@@ -930,7 +897,7 @@ AboutWindow::AboutWindow() {
 	setAttribute(Qt::WA_DeleteOnClose);
 	setWindowTitle("About This Computer");
 	const QString cpu = cpuName();
-	const QString gpu = gpuName();
+	const QString gpu = gpuDescription();
 	const QString version = systemInformation().value(0).section(": ", 1);
 	m_version = version.isEmpty() || version.startsWith("not reported", Qt::CaseInsensitive) ?
 		"System version not reported" : "Version " + version;
