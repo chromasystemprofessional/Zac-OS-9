@@ -16,6 +16,7 @@
 | Screen Sharing (ZacOS to ZacOS: panel, and the host behind it: wayvnc on a private socket, Allow/Deny, Bonjour `_rfb._tcp`; the viewer: full screen at the screen's own pixels, `rfb.cpp` VNC client, the bar to switch to a window, the host's sound in `sound.cpp`) — see `docs/screen-sharing.md` | `shell/panels/screensharing.cpp`, `shell/screenshare/` | C++ / Qt6 |
 | Network Browser (connect to AFP/SMB servers) | `shell/network/` | C++ / Qt6 — see `docs/network.md` |
 | Platinum look for other apps (GTK 3 theme, Qt 6 style; global menus next) | `share/themes/ZacOS9/`, `shell/qtstyle/` | CSS / C++ — see `docs/app-integration.md` |
+| Installer and Disk Setup (partition map; installing next to another system, issue #42) | `shell/installer/`, `shell/disksetup/`, `installer/` | C++ / Qt6 + sh — see `docs/installer.md` |
 | Classic (SheepShaver) launcher | `shell/classic/` | sh |
 | Session entry | `session/` | sh |
 | Boot splash, extension parade, splash→desktop hand-off | `boot/` | Plymouth script + C + sh — see `docs/boot.md` |
