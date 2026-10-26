@@ -45,6 +45,7 @@
 #include "virtual-keyboard-unstable-v1-client-protocol.h"
 #include "wlr-foreign-toplevel-management-unstable-v1-client-protocol.h"
 #include "wlr-layer-shell-unstable-v1-client-protocol.h"
+#include "wlclient.h"
 
 /* Chosen items blink before the menu closes (General Controls default).
  * TODO: verify count and timing on a real Mac. */
@@ -164,20 +165,11 @@ struct wl_seat *menubar_seat(void) {
 
 /* ---- shm buffers --------------------------------------------------------- */
 
-struct buffer {
-	struct wl_buffer *wl;
-	void *data;
-	size_t size;
-};
-
-static void buffer_release(void *data, struct wl_buffer *wl_buffer) {
-	struct buffer *b = data;
-	wl_buffer_destroy(b->wl);
-	munmap(b->data, b->size);
+/* Each buffer is drawn once: freed when the compositor is done with it. */
+static void buffer_done(struct pl_shm_buffer *b, void *data) {
+	pl_shm_buffer_free(b);
 	free(b);
 }
-
-static const struct wl_buffer_listener buffer_listener = { .release = buffer_release };
 
 /* Upscale a logical 1x ARGB canvas into a new shm buffer at a scale
  * (nearest neighbour: pixel art stays crisp): s times, or at a fractional
@@ -191,19 +183,13 @@ static struct wl_buffer *make_buffer(const struct pl_canvas *c, int s, int quart
 		bw = pl_snap(x + w, quarters) - pl_snap(x, quarters);
 		bh = pl_snap(y + h, quarters) - pl_snap(y, quarters);
 	}
-	size_t size = (size_t)bw * bh * 4;
-	int fd = memfd_create("zacos9-menubar", MFD_CLOEXEC);
-	if (fd < 0 || ftruncate(fd, size) < 0) {
-		if (fd >= 0) {
-			close(fd);
-		}
+	struct pl_shm_buffer *b = calloc(1, sizeof(*b));
+	if (!b || !pl_shm_buffer_make(b, g.shm, "zacos9-menubar", bw, bh, WL_SHM_FORMAT_ARGB8888)) {
+		free(b);
 		return NULL;
 	}
-	uint32_t *dst = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-	if (dst == MAP_FAILED) {
-		close(fd);
-		return NULL;
-	}
+	b->released = buffer_done;
+	uint32_t *dst = b->px;
 	if (quarters) {
 		pl_snap_scale_canvas(c, x, y, quarters, dst);
 	} else {
@@ -214,14 +200,6 @@ static struct wl_buffer *make_buffer(const struct pl_canvas *c, int s, int quart
 			}
 		}
 	}
-	struct wl_shm_pool *pool = wl_shm_create_pool(g.shm, fd, size);
-	struct buffer *b = calloc(1, sizeof(*b));
-	b->wl = wl_shm_pool_create_buffer(pool, 0, bw, bh, bw * 4, WL_SHM_FORMAT_ARGB8888);
-	b->data = dst;
-	b->size = size;
-	wl_shm_pool_destroy(pool);
-	close(fd);
-	wl_buffer_add_listener(b->wl, &buffer_listener, b);
 	return b->wl;
 }
 
