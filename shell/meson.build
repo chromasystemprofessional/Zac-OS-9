@@ -741,8 +741,9 @@ test('finder-ctl', find_program('python3'),
 
 # Disk Setup: First Aid (verify, repair, drive health) and partitioning,
 # all through UDisks2 (disksetup/); the installer opens it too.
-executable('zacos9-disksetup',
-  'disksetup/main.cpp', 'disksetup/udisks.cpp', 'disksetup/plan.cpp', 'disksetup/inuse.cpp',
+disksetup_exe = executable('zacos9-disksetup',
+  'disksetup/main.cpp', 'disksetup/diskmap.cpp', 'disksetup/udisks.cpp', 'disksetup/plan.cpp',
+  'disksetup/inuse.cpp',
   'finder/mountpolicy.cpp', 'finder/alert.cpp',
   'finder/platinumshell.cpp',
   finder_protocol,
@@ -760,6 +761,8 @@ test('disksetup-plan',
   ),
   env: ['LC_ALL=en_US.UTF-8'], timeout: 10,
 )
+# The partition map against a stand-in UDisks: drag, +, Apply (vptr is defined further down).
+disksetup_map_test = files('../tests/disksetup/test_partition_map.py')
 test('disksetup-udisks',
   executable('test-disksetup-udisks', 'disksetup/test_udisks.cpp', 'disksetup/udisks.cpp',
     'disksetup/inuse.cpp', 'finder/mountpolicy.cpp',
@@ -1623,6 +1626,10 @@ endforeach
 vptr_exe = executable('vptr', meson.project_source_root() / 'tools/vptr/vptr.c', vptr_protocol,
   client_protocol_src,
   dependencies: [wayland_client, xkbcommon_client])
+test('disksetup-partition-map', find_program('python3'),
+  args: [disksetup_map_test, compositor_exe.full_path(), disksetup_exe, vptr_exe],
+  depends: compositor_exe,
+  timeout: 90)
 
 # One screen's exact pixels for UI tests (grim resamples at 1.5x and 1.75x).
 rawshot_exe = executable('rawshot', meson.project_source_root() / 'tools/rawshot/rawshot.c',

@@ -4,9 +4,10 @@
  * administrator's password (polkit).
  *
  *   First Aid  verify and repair volumes; the drives' health (SMART).
- *   Partition  a drive's layout: new, delete, erase and resize partitions,
- *              a new partition table. Changes wait in a list until Apply,
- *              which first says what will be erased (plan.h for the rules).
+ *   Partition  a drive's layout in a partition map (diskmap.h): new, delete,
+ *              erase and resize partitions (drag the line under one), a new
+ *              partition table. Changes wait in a list until Apply, which
+ *              first says what will be erased (plan.h for the rules).
  *
  * `zacos9-disksetup --partition` opens on Partition (the installer's
  * Prepare Disk…).
@@ -17,7 +18,6 @@
 #include <QDBusMessage>
 #include <QDBusMetaType>
 #include <QDBusPendingCallWatcher>
-#include <QInputDialog>
 #include <QKeyEvent>
 #include <QLocale>
 #include <QMouseEvent>
@@ -32,6 +32,7 @@
 #include <functional>
 
 #include "alert.h"
+#include "diskmap.h"
 #include "inuse.h"
 #include "mountpolicy.h"
 #include "panelkit.h"
@@ -43,7 +44,9 @@
 
 namespace {
 
-constexpr int W = 520, H = 470, M = 12, TOP = 10, PANE = TOP + PL_TAB_H;
+constexpr int W = 520, H = 520, M = 12, TOP = 10, PANE = TOP + PL_TAB_H;
+/* Partition: the map on the left, the chosen partition's fields from RX. */
+constexpr int MAP_W = 200, MAP_H = 250, RX = M + 8 + MAP_W + 16;
 constexpr uint32_t FACE = GRAY(0xD), PANE_BG = GRAY(0xE);
 const QString UDisks = "org.freedesktop.UDisks2";
 
@@ -67,16 +70,7 @@ void call(QObject *context, const QString &path, const QString &iface, const QSt
 
 QString errorOf(const QDBusMessage &reply) {
 	return reply.type() == QDBusMessage::ErrorMessage
-		? (reply.errorMessage().isEmpty() ? reply.errorName() : reply.errorMessage()) : QString();
-}
-
-/* The colour of a partition in the layout bar, by its format. */
-uint32_t partColor(const QString &type) {
-	if (type == "ext4" || type == "ext3" || type == "ext2") return RGB(0x99, 0x99, 0xFF);
-	if (type == "ntfs") return RGB(0x66, 0xCC, 0xCC);
-	if (type == "vfat" || type == "exfat") return RGB(0xFF, 0xCC, 0x66);
-	if (type == "swap") return GRAY(0xA);
-	return RGB(0xCC, 0x99, 0xCC);
+		? (reply.errorMessage().isEmpty() ? reply.errorName() : reply.errorMessage().trimmed()) : QString();
 }
 
 class DiskSetup : public QWidget {
@@ -123,28 +117,43 @@ public:
 		/* Partition. */
 		m_drivePopup.rect = QRect(M + 8 + 50, PANE + 12, W - 2 * M - 16 - 50, PL_POPUP_H);
 		m_drivePopup.chosen = [this](int row) { chooseDrive(row); };
-		m_bar = QRect(M + 8, PANE + 44, W - 2 * M - 16, 34);
-		m_partList.frame = QRect(M + 8, m_bar.bottom() + 10, W - 2 * M - 16, 6 * PL_LIST_ROW_H + 2);
-		m_partList.picked = [this](int) { updateButtons(); update(); };
-		m_host.hintAreas.push_back({ &m_partList.frame, "The drive's partitions and free space, as they will be." });
-		const int py = m_partList.frame.bottom() + 8;
-		const char *labels[5] = { "New…", "Delete", "Erase…", "Resize…", "New Table…" };
-		const int widths[5] = { 70, 70, 74, 80, 104 };
-		int x = M + 8;
-		for (int i = 0; i < 5; i++) {
-			m_actions[i] = PanelButton(labels[i], QRect(x, py, widths[i], PL_BUTTON_H));
-			x += widths[i] + 8;
-		}
-		m_actions[0].hint = "Makes a partition in the chosen free space.";
-		m_actions[1].hint = "Deletes the chosen partition and everything on it.";
-		m_actions[2].hint = "Erases the chosen partition with a new format and name.";
-		m_actions[3].hint = "Makes the chosen partition bigger or smaller, keeping what's on it.";
-		m_actions[4].hint = "Erases the whole drive and gives it a new, empty partition table.";
-		m_actions[0].clicked = [this] { newPartition(); };
-		m_actions[1].clicked = [this] { deletePartition(); };
-		m_actions[2].clicked = [this] { erasePartition(); };
-		m_actions[3].clicked = [this] { resizePartition(); };
-		m_actions[4].clicked = [this] { newTable(); };
+		m_map.frame = QRect(M + 8, PANE + 44, MAP_W, MAP_H);
+		m_map.picked = [this](int) { fillFields(); updateButtons(); update(); };
+		m_map.dragged = [this](int part, qulonglong at) {
+			if (moveBoundary(currentDrive(), &m_ops, part, at)) {
+				refreshPlan();
+			}
+		};
+		m_host.hintAreas.push_back({ &m_map.frame, "The drive from start (top) to end: click a partition or free "
+			"space to choose it, or drag the line under a partition to make it bigger or smaller." });
+		const int my = m_map.frame.bottom() + 8;
+		m_add = PanelButton("+", QRect(M + 8, my, 28, PL_BUTTON_H));
+		m_add.hint = "Makes a partition in the chosen free space.";
+		m_add.clicked = [this] { addPartition(); };
+		m_remove = PanelButton("\u2212", QRect(M + 8 + 34, my, 28, PL_BUTTON_H));
+		m_remove.hint = "Deletes the chosen partition and everything on it.";
+		m_remove.clicked = [this] { removePartition(); };
+		/* The chosen partition, beside the map. */
+		const int rx = RX + 56, rw = W - M - 8 - rx;
+		m_name.rect = QRect(rx, PANE + 70, rw, PL_EDIT_H);
+		m_name.hint = "The partition's name, as the Finder shows it.";
+		m_name.accepts = [](QChar ch) { return ch.isPrint() && ch != ':' && ch != '/'; };
+		m_name.maxLength = 27;
+		m_name.edited = [this] { fieldsEdited(); };
+		m_format.rect = QRect(rx, PANE + 98, rw, PL_POPUP_H);
+		m_format.hint = "What the partition is formatted as: ZacOS for ZacOS 9, FAT32 or exFAT for any computer, NTFS for Windows.";
+		m_format.chosen = [this](int) { fieldsEdited(); };
+		m_size.rect = QRect(rx, PANE + 126, 80, PL_EDIT_H);
+		m_size.hint = "Its size in GB. Or drag the line under it in the map.";
+		m_size.accepts = [](QChar ch) { return ch.isDigit() || ch == '.' || ch == ','; };
+		m_size.maxLength = 9;
+		m_size.edited = [this] { sizeEdited(); };
+		m_erase = PanelButton("Erase", QRect(W - M - 8 - 80, PANE + 154, 80, PL_BUTTON_H));
+		m_erase.hint = "Erases the chosen partition with the name and format above, when you click Apply.";
+		m_erase.clicked = [this] { erasePartition(); };
+		m_newTable = PanelButton("New Table\u2026", QRect(W - M - 8 - 104, my, 104, PL_BUTTON_H));
+		m_newTable.hint = "Erases the whole drive and gives it a new, empty partition table.";
+		m_newTable.clicked = [this] { newTable(); };
 		m_revert = PanelButton("Revert", QRect(W - M - 12 - 182, H - M - 8 - PL_BUTTON_H, 86, PL_BUTTON_H));
 		m_revert.hint = "Forgets the changes not yet applied.";
 		m_revert.clicked = [this] { m_ops.clear(); refreshPlan(); };
@@ -177,9 +186,7 @@ protected:
 			showTab(tab);
 		} else if (m_tab == 0 && m_volumeList.press(pos)) {
 		} else if (m_tab == 1 && m_drivePopup.press(this, pos)) {
-		} else if (m_tab == 1 && m_partList.press(pos)) {
-		} else if (m_tab == 1 && m_bar.contains(pos)) {
-			selectAt(pos.x());
+		} else if (m_tab == 1 && m_map.press(pos)) {
 		} else {
 			m_host.hostPress(e);
 		}
@@ -187,18 +194,28 @@ protected:
 		update();
 	}
 	void mouseMoveEvent(QMouseEvent *e) override {
-		(m_tab == 0 ? m_volumeList : m_partList).move(e->position().toPoint());
+		const QPoint pos = e->position().toPoint();
+		if (m_tab == 0) {
+			m_volumeList.move(pos);
+		} else {
+			m_map.move(pos);
+			setCursor(m_map.onLine(pos) ? Qt::SizeVerCursor : Qt::ArrowCursor);
+		}
 		m_host.hostMove(e);
 		update();
 	}
 	void mouseReleaseEvent(QMouseEvent *e) override {
-		(m_tab == 0 ? m_volumeList : m_partList).release();
+		if (m_tab == 0) {
+			m_volumeList.release();
+		} else if (m_map.release()) {
+			fillFields();
+		}
 		m_host.hostRelease(e);
 		updateButtons();
 		update();
 	}
 	void wheelEvent(QWheelEvent *e) override {
-		if ((m_tab == 0 ? m_volumeList : m_partList).wheel(e->position().toPoint(), e->angleDelta().y())) {
+		if (m_tab == 0 && m_volumeList.wheel(e->position().toPoint(), e->angleDelta().y())) {
 			update();
 		}
 	}
@@ -207,7 +224,13 @@ protected:
 			close();
 			return;
 		}
-		if (!(m_tab == 0 ? m_volumeList : m_partList).key(e->key(), e->text())) {
+		/* Up and down choose in the list or the map; the rest are the fields'. */
+		const bool handled = m_tab == 0 ? m_volumeList.key(e->key(), e->text())
+			: !m_host.focus && m_map.key(e->key());
+		if (handled && m_tab == 1) {
+			fillFields();
+		}
+		if (!handled) {
 			m_host.hostKey(e);
 		}
 		updateButtons();
@@ -231,28 +254,34 @@ private:
 
 	/* Partition. */
 	PanelPopup m_drivePopup;
-	QRect m_bar;
-	PanelList m_partList;
-	PanelButton m_actions[5], m_revert, m_apply;
+	DiskMap m_map;
+	PanelButton m_add, m_remove, m_erase, m_newTable, m_revert, m_apply;
+	PanelEdit m_name, m_size;  /* the chosen partition's */
+	PanelPopup m_format;
+	QStringList m_formatTypes; /* m_format's items' formats */
 	QList<DiskDrive> m_drives;
 	int m_drive = -1;
 	QList<DiskOp> m_ops;
 	DiskDrive m_planned;       /* the chosen drive with m_ops done */
-	QList<DiskGap> m_gaps;
-	struct Row { int part = -1, gap = -1; };
-	QList<Row> m_rows;         /* the list's rows: a partition or free space */
-	QList<int> m_barWidths;    /* each row's width in the layout bar, as last drawn */
+	/* How small partitions can shrink: zacos9-install --min-size, as root. */
+	QProcess *m_measuring = nullptr;
+	QString m_measuringBlock;
+	QMap<QString, QString> m_measureProblem; /* by block: why it couldn't be measured */
 
 	void showTab(int tab) {
 		m_tab = tab;
 		if (tab == 0) {
+			m_host.edits = {};
+			m_host.popups = {};
+			m_host.setFocus(nullptr);
 			m_host.buttons = { &m_verify, &m_repair };
 			m_host.checks = { &m_automatic };
 			m_host.defaultButton = &m_repair;
 		} else {
 			m_host.checks = {};
-			m_host.buttons = { &m_actions[0], &m_actions[1], &m_actions[2], &m_actions[3], &m_actions[4],
-				&m_revert, &m_apply };
+			m_host.buttons = { &m_add, &m_remove, &m_erase, &m_newTable, &m_revert, &m_apply };
+			m_host.edits = { &m_name, &m_size };
+			m_host.popups = { &m_format };
 			m_host.defaultButton = &m_apply;
 		}
 		updateButtons();
@@ -564,93 +593,213 @@ private:
 		refreshPlan();
 	}
 
+	const DiskDrive &currentDrive() const {
+		static const DiskDrive none;
+		return m_drive >= 0 && m_drive < m_drives.size() ? m_drives[m_drive] : none;
+	}
+
 	void refreshPlan() {
-		m_planned = m_drive >= 0 && m_drive < m_drives.size() ? m_drives[m_drive] : DiskDrive();
+		m_planned = currentDrive();
 		for (const DiskOp &op : m_ops) {
 			m_planned = planned(m_planned, op);
 		}
-		m_gaps = freeGaps(m_planned);
-		/* Rows: partitions and free space, in order on the drive. */
-		m_rows.clear();
-		QStringList rows;
-		int g = 0;
-		for (int i = 0; i <= m_planned.parts.size(); i++) {
-			const qulonglong before = i < m_planned.parts.size() ? m_planned.parts[i].offset : ULLONG_MAX;
-			while (g < m_gaps.size() && m_gaps[g].offset < before) {
-				m_rows << Row{ -1, g };
-				rows << QString("Free space   %1").arg(sizeText(m_gaps[g].size));
-				g++;
-			}
-			if (i < m_planned.parts.size()) {
-				const DiskPart &p = m_planned.parts[i];
-				m_rows << Row{ i, -1 };
-				rows << QString("%1   %2%3   %4%5").arg(p.block.isEmpty() ? QString("(new)") : p.device.section('/', -1),
-					p.label.isEmpty() ? (p.efi ? QString("EFI System  ") : QString()) : "“" + p.label + "”  ",
-					formatName(p.type), sizeText(p.size),
-					p.inUse() ? QString("   in use") : QString());
-			}
+		const bool fresh = m_map.drive.block != m_planned.block;
+		m_map.set(m_planned);
+		if (fresh || m_map.selected < 0) {
+			m_map.select(m_map.rows.isEmpty() ? -1 : 0, false);
 		}
-		const int keep = m_partList.state.selected;
-		m_partList.setItems(rows);
-		m_partList.select(keep >= 0 && keep < rows.size() ? keep : (rows.isEmpty() ? -1 : 0), false);
+		if (!m_map.dragging()) {
+			fillFields();
+		}
 		updateButtons();
 		update();
 	}
 
-	const Row *chosenRow() const {
-		const int row = m_partList.state.selected;
-		return row >= 0 && row < m_rows.size() ? &m_rows[row] : nullptr;
+	const DiskPart *chosenPart() const {
+		const DiskMap::Row *r = m_map.chosen();
+		return r && r->part >= 0 ? &m_planned.parts[r->part] : nullptr;
 	}
 
-	void selectAt(int x) {
-		int left = m_bar.left() + 1;
-		for (int i = 0; i < m_rows.size() && i < m_barWidths.size(); i++) {
-			if (x >= left && x < left + m_barWidths[i]) {
-				m_partList.select(i, false);
-				m_partList.ensureVisible(i);
+	QString chosenFormat() const {
+		return m_formatTypes.value(m_format.selected);
+	}
+
+	static QString gbText(qulonglong bytes) {
+		return QLocale().toString(double(bytes) / 1e9, 'f', 1);
+	}
+
+	/* The fields show the chosen partition, as planned. */
+	void fillFields() {
+		const DiskPart *p = chosenPart();
+		m_name.setText(p ? p->label : QString());
+		/* The formats Disk Setup makes, and the one it has if that's another. */
+		m_formatTypes = diskFormats();
+		m_format.items.clear();
+		for (const QString &t : m_formatTypes) {
+			m_format.items.emplace_back(formatName(t) + (t == "ext4" ? QString("  \u2014 for ZacOS") : t == "vfat"
+				? QString("  \u2014 any computer, files under 4 GB") : t == "exfat" ? QString("  \u2014 any computer")
+				: QString("  \u2014 for Windows")));
+		}
+		if (p && !m_formatTypes.contains(p->type)) {
+			m_formatTypes << p->type;
+			m_format.items.emplace_back(formatName(p->type), false);
+		}
+		m_format.selected = p ? int(m_formatTypes.indexOf(p->type)) : 0;
+		m_size.setText(p ? gbText(p->size) : QString());
+		measureChosen();
+		updateButtons();
+	}
+
+	/* A new partition takes its name and format as they're typed; one already
+	 * on the drive waits for Erase. */
+	void fieldsEdited() {
+		const DiskMap::Row *r = m_map.chosen();
+		const DiskPart *p = chosenPart();
+		if (p && p->block.isEmpty() && !p->efi && !p->biosBoot) {
+			for (DiskOp &op : m_ops) {
+				if (op.kind == DiskOp::Create && op.offset == p->offset) {
+					op.label = m_name.text.trimmed();
+					op.fsType = chosenFormat();
+				}
 			}
-			left += m_barWidths[i];
+			const int keep = r ? m_map.selected : -1;
+			refreshPlan();
+			m_map.select(keep, false);
+		}
+		updateButtons();
+		update();
+	}
+
+	/* Its size as typed, once it's a size it can be. */
+	void sizeEdited() {
+		const DiskMap::Row *r = m_map.chosen();
+		if (!r || r->part < 0) {
+			return;
+		}
+		bool ok = false;
+		const double gb = QLocale().toDouble(m_size.text.trimmed(), &ok);
+		const double gb2 = ok ? gb : m_size.text.trimmed().replace(',', '.').toDouble(&ok);
+		if (!ok || gb2 <= 0) {
+			return;
+		}
+		const DiskPart &p = m_planned.parts[r->part];
+		const DiskSpan span = boundaryLimits(m_planned, r->part);
+		const qulonglong end = p.offset + qulonglong(gb2 * 1e9) / MiB * MiB;
+		if (end >= span.least && end <= span.most && moveBoundary(currentDrive(), &m_ops, r->part, end)) {
+			m_planned = currentDrive();
+			for (const DiskOp &op : m_ops) {
+				m_planned = planned(m_planned, op);
+			}
+			m_map.set(m_planned);
+			updateButtons();
+			update();
+		}
+	}
+
+	/* How small an ext4 or NTFS partition can be, once, when it's chosen. */
+	void measureChosen() {
+		const DiskPart *p = chosenPart();
+		if (!p || p->block.isEmpty() || p->minSize > 0 || !resizable(p->type) || p->inUse() || m_measuring ||
+				m_measureProblem.contains(p->block)) {
+			return;
+		}
+		m_measuring = new QProcess(this);
+		m_measuringBlock = p->block;
+		const QString test = qEnvironmentVariable("ZACOS9_INSTALL_HELPER");
+		const QStringList args = { "--min-size", p->device };
+		connect(m_measuring, &QProcess::finished, this, [this] {
+			const QString out = QString::fromUtf8(m_measuring->readAllStandardOutput());
+			m_measuring->deleteLater();
+			m_measuring = nullptr;
+			qulonglong bytes = 0;
+			QString problem = "It couldn't be measured, so it can only be made bigger.";
+			for (const QString &line : out.split('\n')) {
+				if (line.startsWith("min-size ")) {
+					bytes = line.mid(9).trimmed().toULongLong();
+				} else if (line.startsWith("error ")) {
+					problem = line.mid(6).trimmed() + ".";
+				}
+			}
+			for (DiskDrive &d : m_drives) {
+				for (DiskPart &x : d.parts) {
+					if (x.block == m_measuringBlock && bytes > 0) {
+						x.minSize = bytes;
+					}
+				}
+			}
+			if (bytes == 0) {
+				m_measureProblem[m_measuringBlock] = problem;
+			}
+			refreshPlan();
+		});
+		connect(m_measuring, &QProcess::errorOccurred, this, [this](QProcess::ProcessError e) {
+			if (e == QProcess::FailedToStart && m_measuring) {
+				m_measureProblem[m_measuringBlock] = "It couldn't be measured, so it can only be made bigger.";
+				m_measuring->deleteLater();
+				m_measuring = nullptr;
+				update();
+			}
+		});
+		if (!test.isEmpty()) {
+			m_measuring->start(test, args);
+		} else {
+			m_measuring->start("pkexec", QStringList{ "/usr/libexec/zacos9/zacos9-install" } + args);
 		}
 	}
 
 	void paintPartition(pl_canvas *c) {
 		panelText(c, "Drive:", M + 8, m_drivePopup.rect.y() + 15);
 		m_drivePopup.paint(c);
-		/* The layout bar: partitions in their formats' colours, free space white. */
-		pl_fill(c, m_bar.left(), m_bar.top(), m_bar.right(), m_bar.bottom(), C_WHITE);
-		const Row *chosen = chosenRow();
-		/* The list's rows, left to right, each wide enough to see and click. */
-		QList<qulonglong> sizes;
-		for (const Row &r : m_rows) {
-			sizes << (r.part >= 0 ? m_planned.parts[r.part].size : m_gaps[r.gap].size);
-		}
-		m_barWidths = barWidths(sizes, m_bar.width() - 2);
-		int x = m_bar.left() + 1;
-		for (int i = 0; i < m_rows.size(); i++) {
-			const Row &r = m_rows[i];
-			const int x1 = x + m_barWidths[i] - 1;
-			const uint32_t color = r.part >= 0 ? partColor(m_planned.parts[r.part].type) : C_WHITE;
-			pl_fill(c, x, m_bar.top() + 1, x1, m_bar.bottom() - 1, color);
-			if (x1 < m_bar.right() - 1) {
-				pl_vline(c, x1, m_bar.top(), m_bar.bottom(), C_BLACK);
+		m_map.paint(c);
+		/* The chosen partition or free space. */
+		const DiskMap::Row *r = m_map.chosen();
+		const DiskPart *p = chosenPart();
+		int y = PANE + 56;
+		const int tw = W - M - 8 - RX;
+		if (r && r->gap >= 0) {
+			panelText(c, "Free space, " + sizeText(m_map.gaps[r->gap].size), RX, y);
+			y += 18;
+			for (const QString &line : panelWrap("Click + to make a partition here.", tw, PL_FONT_VIEWS)) {
+				panelText(c, line, RX, y, PL_FONT_VIEWS);
+				y += 12;
 			}
-			if (chosen == &m_rows[i]) {
-				pl_outline(c, x, m_bar.top() + 1, x1 - 1, m_bar.bottom() - 1, C_BLACK);
-				pl_outline(c, x + 1, m_bar.top() + 2, x1 - 2, m_bar.bottom() - 2, C_BLACK);
+		} else if (p) {
+			const QString title = p->block.isEmpty() ? QString("New partition")
+				: p->device.section('/', -1) + (p->inUse() ? "  (in use)" : "");
+			panelText(c, title, RX, y);
+			panelLabel(c, "Name:", m_name.rect.left() - 6, m_name.rect.top() + 15);
+			panelLabel(c, "Format:", m_format.rect.left() - 6, m_format.rect.top() + 15);
+			panelLabel(c, "Size:", m_size.rect.left() - 6, m_size.rect.top() + 15);
+			panelText(c, "GB", m_size.rect.right() + 6, m_size.rect.top() + 15);
+			/* What its size can be, or why not. */
+			const DiskSpan span = r ? boundaryLimits(m_planned, r->part) : DiskSpan();
+			QString note;
+			if (p->efi || p->biosBoot) {
+				note = "A computer starts up from it. It stays as it is.";
+			} else if (p->inUse()) {
+				note = "Eject it to change it.";
+			} else if (!p->block.isEmpty() && !resizable(p->type)) {
+				note = formatName(p->type) + " partitions can't be resized here.";
+			} else if (!p->block.isEmpty() && p->minSize == 0 && m_measuring && m_measuringBlock == p->block) {
+				note = "Finding how small it can be…";
+			} else if (!p->block.isEmpty() && m_measureProblem.contains(p->block)) {
+				note = m_measureProblem.value(p->block);
+			} else if (span.least < span.most) {
+				note = QString("It can be %1 to %2 GB: drag the line under it, or type a size.")
+					.arg(gbText(span.least - p->offset), gbText(span.most - p->offset));
 			}
-			x = x1 + 1;
+			int ny = m_erase.rect.bottom() + 16;
+			for (const QString &line : panelWrap(note, tw, PL_FONT_VIEWS)) {
+				panelText(c, line, RX, ny, PL_FONT_VIEWS);
+				ny += 12;
+			}
 		}
-		pl_outline(c, m_bar.left(), m_bar.top(), m_bar.right(), m_bar.bottom(), C_BLACK);
-		if (m_planned.size > 0 && m_planned.table.isEmpty() && m_planned.parts.isEmpty()) {
-			panelText(c, "No partition table: choose New Table…", m_bar.left() + 8, m_bar.top() + 21, PL_FONT_VIEWS);
-		}
-		m_partList.paint(c, true);
 		/* The changes waiting for Apply. */
-		int y = m_actions[0].rect.bottom() + 20;
+		y = m_add.rect.bottom() + 20;
 		panelText(c, m_ops.isEmpty() ? QString("No changes waiting.") : QString("Changes to make when you click Apply:"),
 			M + 8, y, PL_FONT_SYSTEM);
 		y += 15;
-		DiskDrive d = m_drive >= 0 && m_drive < m_drives.size() ? m_drives[m_drive] : DiskDrive();
+		DiskDrive d = currentDrive();
 		for (const DiskOp &op : m_ops) {
 			panelText(c, "•  " + op.describe(d), M + 14, y, PL_FONT_VIEWS, C_BLACK, W - 2 * M - 30);
 			d = planned(d, op);
@@ -667,12 +816,21 @@ private:
 		m_automatic.enabled = !m_busy && v && !v->uuid.isEmpty() && !v->mountPoints.contains("/");
 		m_automatic.on = v && volumeMountsAutomatically(v->uuid,
 			m_health.contains(v->drive) && !m_health.value(v->drive).removable);
-		const Row *r = chosenRow();
+		const DiskMap::Row *r = m_map.chosen();
+		const DiskPart *p = chosenPart();
 		const bool drive = !m_busy && m_drive >= 0 && !m_planned.live;
-		m_actions[0].enabled = drive && r && r->gap >= 0;
-		m_actions[1].enabled = m_actions[2].enabled = drive && r && r->part >= 0;
-		m_actions[3].enabled = drive && r && r->part >= 0 && resizable(m_planned.parts[r->part].type);
-		m_actions[4].enabled = drive && !m_planned.system;
+		m_map.enabled = drive;
+		m_add.enabled = drive && r && r->gap >= 0;
+		m_remove.enabled = drive && p && !p->inUse();
+		const bool special = p && (p->efi || p->biosBoot);
+		const bool fresh = p && p->block.isEmpty();
+		m_name.enabled = m_format.enabled = drive && p && !special && !p->inUse();
+		const DiskSpan span = r && r->part >= 0 ? boundaryLimits(m_planned, r->part) : DiskSpan();
+		m_size.enabled = drive && p && span.least < span.most;
+		/* Erase: one already on the drive, with a new name or format typed. */
+		m_erase.enabled = drive && p && !fresh && !special && !p->inUse() &&
+			(m_name.text.trimmed() != p->label || chosenFormat() != p->type) && diskFormats().contains(chosenFormat());
+		m_newTable.enabled = drive && !m_planned.system;
 		m_revert.enabled = !m_busy && !m_ops.isEmpty();
 		m_apply.enabled = !m_busy && !m_ops.isEmpty();
 	}
@@ -688,52 +846,34 @@ private:
 		refreshPlan();
 	}
 
-	bool askFormat(QString *type, QString *label, const QString &title) {
-		const QStringList types = diskFormats();
-		QStringList names;
-		for (const QString &t : types) {
-			names << formatName(t) + (t == "ext4" ? "  — for ZacOS" : t == "vfat" ? "  — for any computer, files under 4 GB"
-				: t == "exfat" ? "  — for any computer" : "  — for Windows");
-		}
-		bool ok = false;
-		const QString chosen = QInputDialog::getItem(this, title, "Format:", names, 0, false, &ok);
-		if (!ok) {
-			return false;
-		}
-		*type = types.value(names.indexOf(chosen));
-		*label = QInputDialog::getText(this, title, "Name:", QLineEdit::Normal,
-			*type == "ext4" ? "Zacintosh HD" : "Untitled", &ok).trimmed();
-		return ok;
-	}
-
-	void newPartition() {
-		const Row *r = chosenRow();
+	/* +: a ZacOS partition filling the chosen free space; its name, format
+	 * and size are then the fields'. */
+	void addPartition() {
+		const DiskMap::Row *r = m_map.chosen();
 		if (!r || r->gap < 0) {
 			return;
 		}
-		const DiskGap g = m_gaps[r->gap];
+		const DiskGap g = m_map.gaps[r->gap];
 		DiskOp op{ DiskOp::Create };
-		if (!askFormat(&op.fsType, &op.label, "New Partition")) {
-			return;
-		}
-		bool ok = false;
-		const double most = double(g.size) / 1e9;
-		const double gb = QInputDialog::getDouble(this, "New Partition", QString("Size in GB (at most %1):")
-			.arg(QLocale().toString(most, 'f', 1)), most, 0.01, most, 2, &ok);
-		if (!ok) {
-			return;
-		}
 		op.offset = g.offset;
-		op.size = std::min(g.size, qulonglong(gb * 1e9) / MiB * MiB);
+		op.size = g.size;
+		op.fsType = "ext4";
+		op.label = "Untitled";
+		const int row = m_map.selected;
 		queue(op);
+		m_map.select(row, false);
+		fillFields();
+		m_host.setFocus(&m_name);
+		m_name.selectAll();
+		update();
 	}
 
-	void deletePartition() {
-		const Row *r = chosenRow();
+	/* −: a new partition's step forgotten, or one on the drive deleted. */
+	void removePartition() {
+		const DiskMap::Row *r = m_map.chosen();
 		if (!r || r->part < 0) {
 			return;
 		}
-		/* Only planned: drop the step that would make it. */
 		const DiskPart &p = m_planned.parts[r->part];
 		if (p.block.isEmpty()) {
 			for (int i = m_ops.size() - 1; i >= 0; i--) {
@@ -751,51 +891,23 @@ private:
 	}
 
 	void erasePartition() {
-		const Row *r = chosenRow();
+		const DiskMap::Row *r = m_map.chosen();
 		if (!r || r->part < 0) {
 			return;
 		}
 		DiskOp op{ DiskOp::Format };
 		op.part = r->part;
-		if (askFormat(&op.fsType, &op.label, "Erase Partition")) {
-			queue(op);
-		}
-	}
-
-	void resizePartition() {
-		const Row *r = chosenRow();
-		if (!r || r->part < 0) {
-			return;
-		}
-		const DiskPart &p = m_planned.parts[r->part];
-		qulonglong room = m_planned.size - MiB;
-		for (const DiskPart &x : m_planned.parts) {
-			if (x.offset > p.offset) {
-				room = std::min(room, x.offset);
-			}
-		}
-		bool ok = false;
-		const double most = double(room - p.offset) / 1e9;
-		const double gb = QInputDialog::getDouble(this, "Resize Partition",
-			QString("New size in GB (now %1, at most %2). Shrinking may take a while:")
-				.arg(sizeText(p.size), QLocale().toString(most, 'f', 1)),
-			double(p.size) / 1e9, 0.02, most, 2, &ok);
-		if (!ok) {
-			return;
-		}
-		DiskOp op{ DiskOp::Resize };
-		op.part = r->part;
-		op.size = std::min(room - p.offset, qulonglong(gb * 1e9) / MiB * MiB);
+		op.fsType = chosenFormat();
+		op.label = m_name.text.trimmed();
 		queue(op);
 	}
 
 	void newTable() {
-		bool ok = false;
-		const QStringList kinds = { "GPT  — for computers from the last fifteen years", "MBR  — for older computers" };
-		const QString chosen = QInputDialog::getItem(this, "New Partition Table", "Kind:", kinds, 0, false, &ok);
-		if (ok) {
-			queue(DiskOp{ DiskOp::NewTable, chosen.startsWith("GPT") ? "gpt" : "dos" });
-		}
+		const std::vector<PopupItem> kinds = { PopupItem("GPT  — for computers from the last fifteen years"),
+			PopupItem("MBR  — for older computers") };
+		panelMenuNear(this, kinds, -1, m_newTable.rect, m_newTable.rect.top(), PL_FONT_SYSTEM, [this](int i) {
+			queue(DiskOp{ DiskOp::NewTable, i == 0 ? "gpt" : "dos" });
+		});
 	}
 
 	/* ---- Apply ---- */

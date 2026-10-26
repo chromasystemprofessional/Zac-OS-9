@@ -417,7 +417,8 @@ DiskSpan endLimits(const DiskDrive &d, int part) {
 	span.most = (room.offset + room.size) / MiB * MiB;
 	/* Rounding up never puts the least past where it ends now. */
 	span.least = std::min(span.least, std::max(end, p.offset + 8 * MiB));
-	return span.least <= span.most ? span : fixed;
+	/* Less than a MiB to move in is alignment's slack, not room. */
+	return span.least + MiB <= span.most ? span : fixed;
 }
 
 bool allowed(const DiskDrive &start, const QList<DiskOp> &ops) {
