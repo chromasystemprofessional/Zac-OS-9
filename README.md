@@ -1,12 +1,125 @@
-# ZacOS 9
+<p align="center">
+  <img src="assets/boot/zacos-logo.png" alt="ZacOS 9 logo: a dog in a rainbow circle" width="160">
+</p>
 
-A strict, pixel-faithful replica of the Mac OS 8/9 "Platinum" desktop, built as a
-desktop environment for Debian Linux, with built-in support for running classic
-Mac software through emulation.
+<h1 align="center">ZacOS 9</h1>
 
-No Apple code, ROMs, fonts, icons or sounds are included. Every asset is original
-or freely licensed. To run classic Mac apps, you supply your own ROM and system
-software.
+<p align="center">
+  <b>The classic Platinum desktop, reborn for modern PCs.</b><br>
+  A complete desktop for Debian Linux in the style of Mac OS 8 and 9,
+  drawn pixel by pixel from scratch, with classic Mac software one click away.
+</p>
+
+<p align="center">
+  <a href="https://sourceforge.net/projects/zac-os-9/files/latest/download"><img alt="Download the ISO" src="https://img.shields.io/badge/download-ISO-4a6fd8?style=for-the-badge"></a>
+  <a href="https://github.com/chromasystemprofessional/Zac-OS-9/releases/latest"><img alt="Latest version" src="https://img.shields.io/github/v/release/chromasystemprofessional/Zac-OS-9?style=for-the-badge&label=version&color=6a6ac8"></a>
+  <a href="#get-zacos-9"><img alt="Debian 13" src="https://img.shields.io/badge/Debian-13-a80030?style=for-the-badge"></a>
+  <a href="#license"><img alt="License: GPL-3.0" src="https://img.shields.io/badge/license-GPL--3.0-555?style=for-the-badge"></a>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/desktop.png" alt="The ZacOS 9 desktop: the Zacintosh HD window, a Scribble document, the Calculator and the Appearance control panel over a lavender desktop pattern">
+</p>
+
+## Why ZacOS 9?
+
+Remember when a computer felt calm? One menu bar, windows that stayed where you
+put them, a desktop you could make your own. ZacOS 9 brings that back, on a
+system that runs today's web browsers, office suites and games.
+
+It isn't a skin over another desktop. The window manager, the Sniffer (the
+file browser), the menu bar and every control panel were written for ZacOS 9,
+so everything looks and behaves the same way, down to the scroll arrows.
+
+## What you get
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/zac-menu.png" alt="The Zac menu open, listing control panels, recent items and desk accessories"></td>
+    <td width="50%"><img src="docs/screenshots/control-panels.png" alt="The System Folder, Control Panels, General Controls and Date &amp; Time windows"></td>
+  </tr>
+  <tr>
+    <td><b>The Zac menu</b>: desk accessories (Calculator, Notepad, Stash, Dog Ears,
+      Key Tags, Bark Recorder), recent programs and documents, and Force Quit.</td>
+    <td><b>Real control panels</b>: Appearance, Sound, Monitors, Mouse, Date &amp; Time,
+      Energy Saver, Users, File Sharing, Startup Disk and more, each in its own window.</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/software.png" alt="The Software window, listing Firefox, GIMP, LibreOffice and VLC"></td>
+    <td><img src="docs/screenshots/about.png" alt="About This Computer, showing ZacOS 9 version 1.0.0"></td>
+  </tr>
+  <tr>
+    <td><b>Thousands of programs</b>: Firefox, LibreOffice, GIMP, VLC and the rest of
+      Debian, plus Flathub, from the Software window. Linux programs wear the
+      Platinum look too.</td>
+    <td><b>Stays up to date</b>: Software Update (Zac menu ▸ Fetch Updates) installs
+      new ZacOS releases and Debian's security fixes together.</td>
+  </tr>
+</table>
+
+- **The Sniffer**: spatial windows that remember their size and place, a
+  Zacintosh HD with a System Folder and Applications, labels, Get Info, Find,
+  spring-loaded folders, and `.zip`, `.7z` and StuffIt `.sit` archives opened
+  with a double-click.
+- **Classic Mac software**: **Old Dog** starts classic Mac OS in the
+  SheepShaver emulator. Bring your own ROM and Mac OS install disk.
+- **Talks to old Macs**: browse and mount AppleShare (AFP) and Windows (SMB)
+  servers in Neighbourhood, even AppleTalk-only Macs, and share your own folders
+  back to them with File Sharing. Mac HFS and HFS+ disks and disk images open
+  read-only.
+- **Windows programs** install through Wine with the Windows Installer.
+- **Make it yours**: accent colours, desktop patterns (including classic Mac
+  `ppat` resources), wallpaper, themes and sound sets.
+- **For the whole family**: separate accounts, Limited accounts and a Guest
+  account, Puppy Mode for a simpler Sniffer, a keychain, a screen saver and a
+  password-protected screen lock.
+
+<p align="center">
+  <img src="assets/boot/happy-zac.png" alt="Happy Zac: a smiling dog on a beige computer's screen" width="140"><br>
+  <i>And it starts up like a Mac should: Happy Zac, then the extensions marching along the bottom.</i>
+</p>
+
+## Get ZacOS 9
+
+### Try it, then install it (recommended)
+
+1. **Download the ISO** from
+   [SourceForge](https://sourceforge.net/projects/zac-os-9/files/latest/download)
+   (about 3 GB). A `.sha256` file beside it lets you check the download.
+2. **Write it to a USB stick** of 4 GB or more with
+   [balenaEtcher](https://etcher.balena.io/) (or `dd` on Linux). This erases the stick.
+3. **Start your computer from the stick.** ZacOS 9 opens straight to its desktop,
+   so you can try everything without changing your computer.
+4. **Install** with the Installer that opens on the desktop: onto a whole disk,
+   or onto one partition alongside Windows or another Linux, leaving the
+   others alone. On first start, the Setup Assistant asks for your name,
+   password and time zone.
+
+You need a 64-bit PC (x86-64) that can start from USB, with BIOS or UEFI
+firmware. Back up anything you care about before installing.
+
+The same ISO can also update an older ZacOS 9 on a computer without a network
+connection.
+
+### Already running Debian 13?
+
+Download `zacos9_1.0.0_amd64.deb` from the
+[latest release](https://github.com/chromasystemprofessional/Zac-OS-9/releases/latest), then:
+
+```sh
+sudo apt install ./zacos9_1.0.0_amd64.deb
+```
+
+Log out and choose **ZacOS 9** at the login screen. Classic Mac emulation (the
+`zacos9-emulators` package) comes on the ISO for now.
+
+## Learn more
+
+- [User guide](docs/user-guide.md): sound, fullscreen programs, the Sniffer, disks, desktop patterns and wallpaper
+- [Software and updates](docs/appstore.md) and [Software Update](docs/updates.md)
+- [Networking with Macs and Windows](docs/network.md) and [Mac disks](docs/mac-disks.md)
+- [Hardware notes](docs/hardware.md) for Macs and other PCs
+- ZacOS Help, in the Help menu, from inside the system
 
 ## Why ZacOS exists
 
@@ -22,263 +135,21 @@ I'm not selling anything and there's no catch. Bug reports, ideas and
 contributions are welcome, and if you'd rather build something different from
 it, the GPL lets you.
 
-## Layout
+## Building from source
 
-| Path | What |
-|---|---|
-| `compositor/` | `zacos9-wm`: Wayland compositor (C, wlroots 0.18). Draws window frames and handles input. |
-| `shell/` | Menu bar, Sniffer, Control Panels (Qt6). *Phase 2+* |
-| `style/` | Platinum QStyle plugin and GTK theme. *Phase 5* |
-| `emulation/` | SheepShaver / Basilisk II integration. *Phase 4* |
-| `assets/` | Original fonts, icons, desktop patterns, sounds. |
-| `docs/` | Roadmap, fidelity references, design notes. |
-| `scripts/` | Build and run helpers; package, ISO and VM scripts. |
-| `session/` | The login session: `zacos9-session` and its `wayland-sessions` entry. |
-| `hardware/` | Hardware quirks: Haswell HDMI audio, ACPI interrupt storms on Macs. |
-| `debian/`, `packaging/`, `iso/` | Debian packaging, the emulator package, the live-build configuration. |
+ZacOS 9 is written in C and C++ (wlroots, Qt 6) and built with Meson. See
+[Developing ZacOS 9](docs/DEVELOPING.md) for the source layout, building and
+running it, and making packages and ISOs.
 
-## Developing on Windows (WSL2 + WSLg)
-
-The source tree lives on the Windows drive. Everything builds and runs inside the
-`Debian` WSL distro, and WSLg shows the compositor as a normal window.
-
-To run it, double-click **`run.cmd`** in the project folder, or type `.\run` in a
-VS Code / PowerShell terminal opened in this folder.
-
-This builds the code and opens `zacos9-wm` with a terminal (`foot`) running
-inside it. **The window often opens behind other windows.** Look for
-"wlroots - WL-1 (Debian)" on the taskbar. To quit, press **Ctrl+Alt+Backspace**
-inside it or close the window.
-
-Options:
-- `-d` turns on debug logging.
-- `-S 2` scales everything 2× (crisp on 4K screens).
-- `-s CMD` runs CMD at startup.
-
-For example: `.\run -S 2 -s "foot & xterm"`.
-
-Both Wayland and X11 apps work. Under WSLg the run scripts give the compositor
-a private `/tmp/.X11-unix` (see `scripts/x11-namespace.sh`), because WSLg's copy
-is read-only.
-
-**If the window shows on the taskbar but draws nothing** (you see your desktop
-wallpaper through it), WSLg's display bridge has gone stale. This is common
-after sleep or monitor changes on multi-monitor setups. Run `wsl --shutdown` in
-PowerShell and launch again. `wsl --terminate Debian` is not enough, because it
-doesn't restart WSLg.
-
-Build only: `wsl -d Debian -- scripts/build.sh`
-
-## Packages, ISO and VM
-
-- `scripts/build-debs.sh` builds the `.deb` packages.
-- `scripts/build-iso.sh` builds a live and install ISO that boots straight into
-  ZacOS 9.
-- **`vm.cmd`** runs that ISO in a QEMU virtual machine, with a real boot, login
-  and screen.
-- `scripts/dev-boot.sh` tries system and boot changes in a VM in a few minutes,
-  without building the ISO.
-
-See [docs/packaging.md](docs/packaging.md).
-
-## Sound output
-
-Open **Apple menu > Control Panels > Sound**, then use **Sound Output** to
-choose built-in speakers, a connected HDMI/DisplayPort monitor, headphones,
-or another output exposed by PulseAudio/PipeWire. Monitor names are shown when
-the audio server provides them. Disconnected ports are omitted.
-
-The choice changes the system's default output and moves existing playback to
-it. Volume and Mute control that output; Alert Volume remains a separate setting.
-The panel refreshes every two seconds, including when a monitor is connected or
-removed, and follows the audio server's fallback output after disconnection.
-Audio-server errors are shown in the panel rather than silently ignored.
-Adjusting Volume previews the selected alert sound once the change succeeds:
-on release when dragging, or after a keyboard adjustment. The preview respects
-Mute, Alert Volume and the "None" alert-sound choice.
-
-On computers with Intel Haswell graphics, such as the iMac14,1, HDMI and
-DisplayPort sound needs a driver setting that ZacOS 9 applies by itself; it
-takes effect after a restart. See [Hardware quirks](docs/hardware.md).
-
-## Fullscreen applications
-
-Native Wayland and Xwayland applications can request true fullscreen, including
-Firefox's fullscreen button, F11 and a video player's fullscreen shortcut.
-The window's frame is hidden and its content fills the selected monitor,
-covering the menu bar while the fullscreen window is active. Leaving fullscreen
-restores its previous window size, position and zoom state. Other monitors keep
-their desktop layout; resolution changes and monitor removal update fullscreen
-placement.
-
-## Busy pointer
-
-An original rainbow dog bone (`assets/cursors/dog-bone.svg`) spins clockwise
-while applications launched from Sniffer or the application menu are starting. The normal pointer
-returns when the matching application opens or activates a window. Launch
-failures and launcher disconnection cancel feedback; applications that never
-show a window time out after 15 seconds. The pointer remains usable throughout.
-
-Applications requesting the standard wait/progress cursor also use the bone,
-on Wayland and Xwayland, through the ZacOS9 cursor theme. Apps drawing their own
-custom cursors or not reporting busy state cannot be detected automatically.
-Other cursor shapes, including text selection and resizing, are unchanged.
-
-## Software sources
-
-Software opens with the small curated **Featured** selection. Choose
-**All Applications** to browse Debian desktop apps and use **Search** to filter
-the current category. Refresh Debian metadata through Software Update after
-installing this feature; discovery uses repository AppStream data, not every
-APT package.
-
-For more apps, open **Additional Sources > Enable Flathub** and confirm.
-The optional **Flathub** category then offers user-scoped Flatpak apps,
-separate from Debian packages. Disabling Flathub keeps installed apps and data.
-No additional repository is enabled automatically.
-See [Software](docs/appstore.md) for details.
-
-## Sniffer
-
-**Sniffer** is ZacOS 9's desktop and spatial file browser (formerly Finder).
-The application menu, folder-opening entry and user-facing messages use Sniffer.
-Internal names such as `zacos9-finder`, its application ID, D-Bus interfaces and
-`shell/finder/` remain unchanged for compatibility.
-
-Select multiple items as in Mac OS: drag a dotted selection rectangle from blank
-space on the desktop or in an icon/list window, Shift-click to add or remove an
-item, Shift-drag to toggle the items covered, or choose **Edit > Select All**
-(Command-A). In list view, start a rectangle in a blank column; it selects rows
-whose icon or name it crosses and scrolls when dragged past the window edge.
-Drag any selected item to move the whole selection into another folder; hold
-Option while dropping to copy instead.
-
-Double-click `.zip`, `.7z`, `.sit`, or supported tar archives to extract them beside the
-archive. A single top-level item keeps its name; multiple items go into a folder
-named after the archive. Existing items are never overwritten, and the archive
-is kept. 7z support uses `python3-libarchive-c`; StuffIt (`.sit`) support uses
-`unar` and `lsar` (installed with ZacOS 9) and preserves resource forks as hidden
-`._` AppleDouble sidecars without recursively expanding nested archives.
-Unsafe StuffIt paths, links, and special entries are rejected before extraction.
-Password-protected archives are reported as unsupported rather than prompting.
-
-### USB disk initialization and erasing
-
-Sniffer automatically mounts newly inserted volumes once GIO reports them
-ready and displays mounted disks, including those under `/run/media`. A disk
-that Linux detects but cannot mount may need filesystem support or repair;
-discovery alone does not make unsupported formats readable.
-
-When an unformatted USB disk is detected, or an eligible USB disk cannot be
-mounted, Sniffer offers **Eject**, **Ignore**, and **Initialize** in a
-classic-style alert. Initialize asks again before erasing the **entire disk**,
-including every partition, then creates an MBR partition table with one
-**FAT32** volume with the name you enter (default **Untitled**). Cancel is the
-default on the erase confirmation; administrator authentication is required.
-
-To reformat a readable USB disk, select its disk icon on the desktop and choose
-**Special > Erase Disk…**. This erases the **whole physical USB disk**, including
-other partitions, and creates a named **FAT32** volume. Back up
-everything first and close files on every volume on that disk. Cancel is the
-default; administrator authorization is required. The helper unmounts the disk's
-volumes without force and stops if they are busy or the disk's identity changes.
-Before confirmation, a name dialog accepts 1-11 ASCII letters, numbers, spaces,
-hyphens or underscores. Names cannot start or end with spaces; `NO NAME` is
-reserved by FAT. Cancelling this dialog does not unmount or erase anything.
-Finder pauses automatic mounting for that disk during erasing and remounts it
-afterward. Only safe USB disks mounted beneath `/media` or `/run/media` are
-eligible; internal, system, encrypted and read-only disks are excluded.
-The helper owns the disk exclusively while writing its partition table and
-refreshes the kernel's partition view through that same descriptor. It does
-not force through a busy disk. A refresh failure stops before formatting;
-the error explicitly warns if the partition table has already been changed.
-
-Never initialize a disk containing files you need to recover. This is not a
-repair tool. Automatic initialization excludes mounted disks. Hardware that
-Linux cannot detect cannot be initialized this way.
-FAT32 limits individual files to less than 4 GiB; the formatter only accepts
-disk sizes compatible with its FAT32/MBR layout.
-
-### Screen Snapshot
-
-**Apple menu > Screen Snapshot** lets you drag a rectangle, saves it as
-**Picture 1.png**, **Picture 2.png**, etc. on the Desktop, and copies the PNG
-to the clipboard. Escape or a right click cancels selection.
-
-Capture uses ZacOS's native committed-frame reader instead of `grim` and the
-wlroots screencopy path, following a report of YouTube streams becoming stuck
-after screencopy captures. It reads the already-displayed image without changing
-the compositor's output-render or software-cursor locks. Multiple displays and
-HiDPI are supported; hardware cursors are excluded. Captures are limited to
-32 megapixels, with explicit errors for unavailable frames or save failures.
-
-Both the capture helper and compositor must be updated: **restart after
-installation**. On an older compositor, capture reports that a restart/update
-is needed; it does not silently fall back to the reported problematic path.
-Native capture is tested with animated software and GPU-rendered output in
-isolated sessions. Verification of YouTube playback on the affected system
-remains necessary; this is a replacement capture path, not a proven diagnosis
-of the server's earlier `403` responses.
-
-## Mac disks and disk images
-
-Sniffer mounts HFS/HFS+ and supported APFS volumes read-only, including Mac
-disk images opened with a double-click. See [Mac disks](docs/mac-disks.md)
-for supported containers, eject behavior, authentication and limitations.
-
-## Custom desktop patterns
-
-Appearance also supports saved appearance presets and interface sound sets.
-Use its **Themes** and **Sound Sets** tabs, with custom files under
-**System Folder > Appearance > Themes** or **Sound Themes**.
-See [Themes and sound sets](docs/themes.md) for formats and compatibility limits.
-
-Place your own or freely licensed tiles in **System Folder > Appearance >
-Desktop Patterns**, then choose them in **Control Panels > Appearance > Desktop**.
-The real folder is `$XDG_DATA_HOME/zacos9/appearance/Desktop Patterns`
-(normally `~/.local/share/zacos9/appearance/Desktop Patterns`). Files added,
-replaced or removed there are discovered automatically, without restarting.
-The preview and every monitor use the same tiled image.
-
-Supported inputs include PNG, JPEG, BMP, GIF and TIFF; raw `.ppat`/`.pat`;
-classic Mac resource-fork files containing `ppat`, `PAT `, `PAT#`, `ppt#` or
-`PICT` resources; MacBinary `.bin`; BinHex `.hqx`; and AppleDouble `._` sidecars
-(keep the sidecar beside its original file). Standalone PICT pictures are also
-supported through ImageMagick. BinHex checksums and resource offsets are
-validated; unsupported packed pattern layouts or PICT drawing operations
-produce an import error rather than an incorrect pattern.
-
-Original files are not modified. Import errors appear in the Desktop tab
-(hover for full details) and session log. A removed selected tile falls back
-to the built-in default, retaining its selection ID if the file returns.
-Limits are 16 MiB per source, 1 megapixel per tile, and 512 tiles/16 megapixels
-per catalog. No Apple artwork is included.
-
-## Desktop wallpaper
-
-Place photos or user-created PICT desktop pictures in **System Folder >
-Appearance > Wallpaper** (`$XDG_DATA_HOME/zacos9/appearance/Wallpaper`, normally
-`~/.local/share/zacos9/appearance/Wallpaper`). Existing wallpaper folders from
-older versions are moved here automatically without changing selection IDs.
-Open **Control Panels > Appearance >
-Wallpaper**, select a picture, and choose its placement:
-
-- **Fit**: show the whole photo, preserving proportions with dark margins.
-- **Fill**: cover the monitor, preserving proportions and cropping centrally.
-- **Stretch**: fill the monitor without preserving proportions.
-- **Center**: retain the picture's original size, with margins or clipping.
-
-Selecting a wallpaper activates photo mode; selecting a pattern on the Desktop
-tab switches back to tiled-pattern mode. Both selections and placement are
-remembered. Each monitor renders the picture independently at its own size,
-rather than spanning a combined desktop. Added or replaced files are refreshed
-automatically; removed selections fall back to the built-in default.
-
-PNG, JPEG, BMP, GIF, TIFF, standalone PICT and PICT resources in classic Mac
-containers are supported. Pattern resources belong in Desktop Patterns instead.
-Wallpaper limits are 64 MiB per source, 32 megapixels per picture and 128
-pictures/64 megapixels per catalog. Sources are not modified.
+Bug reports and ideas are welcome in
+[Issues](https://github.com/chromasystemprofessional/Zac-OS-9/issues).
 
 ## License
 
 GPL-3.0-or-later.
+
+ZacOS 9 is an independent project, not affiliated with, endorsed by or
+sponsored by Apple Inc. Apple, Mac, Mac OS and Macintosh are trademarks of
+Apple Inc. No Apple code, ROMs, fonts, icons or sounds are included: every
+asset is original or freely licensed. To run classic Mac software, you supply
+your own ROM and system software.
