@@ -182,7 +182,9 @@ sweep.
 ## Where things are
 
 [ARCHITECTURE.md](ARCHITECTURE.md) has the map: the processes, how they talk,
-and which folder to change for what. [`docs/`](docs/) has a page per part
+and which folder to change for what. Each of the desktop's programs has a
+folder in `shell/` whose `meson.build` builds it and its tests; code several
+programs share is in `shell/common/` and `shell/files/`. [`docs/`](docs/) has a page per part
 (the installer, networking, Screen Sharing, the Memory panel…), and
 [PROJECT_STATUS.md](PROJECT_STATUS.md) says what's being worked on now.
 

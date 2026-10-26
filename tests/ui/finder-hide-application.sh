@@ -24,7 +24,7 @@ $V home move 353 130 click                         # select (not open) an app fo
 sleep 1
 choose 50 60                                        # File > Move To Trash
 grim /tmp/hide1.png
-build/shell/zacos9-finder --open "file://${XDG_DATA_HOME:-$HOME/.local/share}/Trash/files"
+build/shell/finder/zacos9-finder --open "file://${XDG_DATA_HOME:-$HOME/.local/share}/Trash/files"
 sleep 1
 grim /tmp/hide2.png
 python3 - <<'PY'

@@ -13,7 +13,7 @@
 #   /tmp/ap4.png  Sound tab: the alert sounds, Chime selected
 # The window's content starts at (46, 42) on screen.
 V=build/shell/vptr
-build/shell/zacos9-appearance &
+build/shell/panels/zacos9-appearance &
 sleep 4
 grim /tmp/ap1.png
 $V home move 110 194 click wait 600                  # Accent: Ocean

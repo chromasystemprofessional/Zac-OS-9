@@ -14,7 +14,7 @@
 #   /tmp/datetime.log  "would run: timedatectl set-time ..." for the hour
 # The window's content starts at (46, 42) on screen.
 V=build/shell/vptr
-ZACOS9_DATETIME_DRYRUN=1 build/shell/zacos9-datetime 2>/tmp/datetime.log &
+ZACOS9_DATETIME_DRYRUN=1 build/shell/panels/zacos9-datetime 2>/tmp/datetime.log &
 sleep 4
 grim /tmp/dt1.png
 $V home move 84 162 click wait 300                  # the hour
