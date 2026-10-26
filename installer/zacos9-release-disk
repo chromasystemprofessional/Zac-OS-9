@@ -2,8 +2,9 @@
 # zacos9-release-disk: free a disk or partition for zacos9-install to
 # change, and put things back afterwards.
 #
-#   zacos9-release-disk DEVICE     # before partitioning or formatting
-#   zacos9-release-disk --restore  # after, whether or not it worked
+#   zacos9-release-disk DEVICE         # before partitioning or formatting
+#   zacos9-release-disk --keep DISK    # before making room on it (issue #42)
+#   zacos9-release-disk --restore      # after, whether or not it worked
 #
 # A mounted partition can't be erased: wipefs finds it busy, and the kernel
 # won't read a new partition table while an old partition is mounted, so
@@ -16,7 +17,8 @@
 #     nothing mounts the old partitions again, or the new ones mid-install;
 #  3. turn off swap on it, unmount it, close device-mapper volumes on it;
 #  4. for a whole disk, erase the old partitions' and table's signatures
-#     (a partition is formatted by zacos9-install itself).
+#     (a partition is formatted by zacos9-install itself). Not with
+#     --keep: ZacOS goes beside what's on the disk, which stays.
 # On failure prints "error MESSAGE" (zacos9-install's protocol), exits 1.
 #
 # ZACOS9_UDEV_RULES_DIR and ZACOS9_PROC are for tests.
@@ -45,8 +47,15 @@ if [ "${1:-}" = --restore ]; then
 	exit 0
 fi
 
-[ "$#" = 1 ] || fail "usage: zacos9-release-disk DEVICE | --restore"
+keep=false
+if [ "${1:-}" = --keep ]; then
+	keep=true
+	shift
+fi
+[ "$#" = 1 ] || fail "usage: zacos9-release-disk [--keep] DEVICE | --restore"
 device=$1
+# What would happen to it, for the messages.
+if $keep; then changed=changed; else changed=erased; fi
 kind=$(lsblk -dn -o TYPE "$device" 2>/dev/null | tr -d ' ')
 [ -n "$kind" ] || fail "Not a block device: $device"
 
@@ -92,7 +101,7 @@ for m in $(printf '%s\n' "$members" | cut -d' ' -f1); do
 	while IFS= read -r where; do
 		case $where in
 		/ | /run/live/* | /lib/live/mount/* | /cdrom | /usr | /boot | /boot/efi)
-			fail "ZacOS is running from “$(label "$m")”, so it can't be erased."
+			fail "ZacOS is running from “$(label "$m")”, so it can't be $changed."
 			;;
 		esac
 	done <<-EOF
@@ -126,7 +135,7 @@ for m in $(printf '%s\n' "$members" | cut -d' ' -f1); do
 		[ -n "$where" ] || continue
 		if ! umount "$where" 2>/dev/null; then
 			who=$(users_of "$where")
-			fail "“$(label "$m")” is in use${who:+ by $who}, so it can't be erased. Quit ${who:+that program}${who:-the programs using it} and try again."
+			fail "“$(label "$m")” is in use${who:+ by $who}, so it can't be $changed. Quit ${who:+that program}${who:-the programs using it} and try again."
 		fi
 	done <<-EOF
 		$(mounts_of "$m" | sort -r)
@@ -145,7 +154,7 @@ printf '%s\n' "$members" | tac | while read -r m type; do
 done
 
 # 4. A whole disk: no old filesystem or partition table left to be found.
-if [ "$kind" = disk ]; then
+if [ "$kind" = disk ] && ! $keep; then
 	for m in $(printf '%s\n' "$members" | awk '$2 == "part" { print $1 }'); do
 		wipefs -a -q "$m" 2>/dev/null || true
 	done

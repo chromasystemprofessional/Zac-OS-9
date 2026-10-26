@@ -3,7 +3,9 @@
 # partition, or update a ZacOS 9 already installed on one.
 #
 #   zacos9-install DEVICE [NAME]
+#   zacos9-install --beside DISK NAME STEP...
 #   zacos9-install --detect
+#   zacos9-install --min-size PARTITION
 #   zacos9-install --update PARTITION
 #
 # NAME is what the installed disk is called in the Finder (default
@@ -13,6 +15,17 @@
 # Whole disk: the disk is repartitioned (GPT + ESP + root) and erased.
 # Partition:  only the named partition is formatted (ext4); the existing
 #             EFI System Partition on the same disk is reused for grub.
+#
+# --beside makes room on DISK first and installs in it, keeping the rest
+# of the disk (issue #42): the installer's plan (besidePlan in Disk
+# Setup's plan.cpp), as steps done in order, all in bytes:
+#   shrink PARTITION SIZE   its files first (ext2/3/4, NTFS), then it
+#   efi OFFSET SIZE         a new EFI System partition (FAT32)
+#   biosboot OFFSET SIZE    a new BIOS boot partition, for GRUB (GPT)
+#   zacos OFFSET SIZE       ZacOS's partition: the install goes there
+#
+# --min-size prints (read-only) how small PARTITION could shrink round
+# its files:  min-size BYTES
 #
 # --detect looks (read-only) at every ext4 partition for an installed
 # ZacOS 9 and prints, for each:
@@ -129,6 +142,48 @@ if [ "${1:-}" = --detect ]; then
 	exit 0
 fi
 
+# ---------- --min-size: how far a partition could shrink, read-only ----------
+# The partition must be on a disk, not the live one, and not mounted.
+partition_ok() {
+	valid_device "$1" && [ "$(lsblk -n -o TYPE "$1" 2>/dev/null | head -1 | tr -d ' ')" = part ] ||
+		fail "Not a partition: $1"
+	pk=$(lsblk -n -o PKNAME "$1" 2>/dev/null | head -1 | tr -d ' ')
+	[ -n "$pk" ] && [ "$pk" != "$(live_disk)" ] || fail "$1 is on the disk ZacOS is running from"
+}
+if [ "${1:-}" = --min-size ]; then
+	part=${2:-}
+	partition_ok "$part"
+	[ -z "$(lsblk -n -o MOUNTPOINTS "$part" 2>/dev/null | tr -d ' \n')" ] || fail "$part is in use. Eject it first"
+	case $(blkid -o value -s TYPE "$part" 2>/dev/null) in
+	ext2 | ext3 | ext4)
+		blocks=$(resize2fs -P "$part" 2>/dev/null | sed -n 's/^Estimated minimum size of the filesystem: *\([0-9]*\)$/\1/p')
+		block_size=$(dumpe2fs -h "$part" 2>/dev/null | sed -n 's/^Block size: *\([0-9]*\)$/\1/p')
+		[ -n "$blocks" ] && [ -n "$block_size" ] ||
+			{ echo "error $part couldn't be measured. Check it with Disk First Aid first"; exit 1; }
+		echo "min-size $((blocks * block_size))"
+		;;
+	ntfs)
+		out=$(ntfsresize --info --force --no-progress-bar "$part" 2>&1) || {
+			case $out in
+			*hibernat* | *"unsafe state"*)
+				echo "error Windows didn't shut down fully (it hibernated, or Fast Startup is on). Start Windows and shut it down with Shift held, then try again" ;;
+			*)
+				echo "error $part couldn't be measured. Check it in Windows first" ;;
+			esac
+			exit 1
+		}
+		bytes=$(printf '%s\n' "$out" | sed -n 's/^You might resize at \([0-9]*\) bytes.*/\1/p')
+		[ -n "$bytes" ] || { echo "error $part couldn't be measured"; exit 1; }
+		echo "min-size $bytes"
+		;;
+	*)
+		echo "error Only ZacOS (ext4) and NTFS partitions can be made smaller"
+		exit 1
+		;;
+	esac
+	exit 0
+fi
+
 # ---------- --update: a newer ZacOS 9 into an installed system ----------
 if [ "${1:-}" = --update ]; then
 	part=${2:-}
@@ -218,6 +273,18 @@ if [ "${1:-}" = --update ]; then
 fi
 
 # ---------- install: validate the device ----------
+# --beside DISK NAME STEP...: DISK is the device; its steps wait for step 1.
+beside=false
+beside_steps=
+if [ "${1:-}" = --beside ]; then
+	[ "$#" -ge 6 ] || { echo "error usage: zacos9-install --beside DISK NAME STEP..."; exit 1; }
+	beside=true
+	beside_disk=$2
+	beside_name=$3
+	shift 3
+	beside_steps=$*
+	set -- "$beside_disk" "$beside_name"
+fi
 device=$1
 disk_name=${2:-Zacintosh HD}
 case $disk_name in
@@ -245,6 +312,128 @@ mkdir -p "$TARGET"
 # How this computer starts up decides the boot loader.
 if [ -d /sys/firmware/efi ]; then uefi=true; else uefi=false; fi
 
+# ---------- --beside: room made on the disk, everything on it kept ----------
+if $beside; then
+	step 1 "Making room..."
+	[ "$(lsblk -dn -o TYPE "$device" 2>/dev/null | tr -d ' ')" = disk ] || fail "Not a disk: $device"
+	[ "${device#/dev/}" != "$(live_disk)" ] || fail "ZacOS is running from $device, so it can't be installed on it"
+	table=$(lsblk -dn -o PTTYPE "$device" 2>/dev/null | tr -d ' ')
+	case $table in
+	gpt | dos) ;;
+	*) fail "$device has no partition table; choose Erase instead" ;;
+	esac
+	sector=$(lsblk -dn -o LOG-SEC "$device" | tr -d ' ')
+	disk_bytes=$(lsblk -bdn -o SIZE "$device" | tr -d ' ')
+	sysdisk=/sys/class/block/${device#/dev/}
+	released=true
+	"$release_disk" --keep "$device" || { reported=1; exit 1; }
+
+	# A whole number of MiB: what the installer plans in.
+	mib() {
+		case $1 in
+		'' | *[!0-9]*) fail "Not a size: $1" ;;
+		esac
+		[ $(($1 % 1048576)) = 0 ] && [ "$1" -gt 0 ] || fail "Not a whole number of MiB: $1"
+	}
+	# The kernel's view of the disk's partitions brought up to date.
+	reread() {
+		partx -u "$device" 2>/dev/null || partx -a "$device" 2>/dev/null || true
+		udevadm settle 2>/dev/null || sleep 1
+	}
+	# The partition of $device starting at byte $1, by its /dev name.
+	partition_at() {
+		for p in "$sysdisk"/"${device#/dev/}"*; do
+			[ -f "$p/start" ] || continue
+			if [ $(($(cat "$p/start") * 512)) = "$1" ]; then
+				echo "/dev/${p##*/}"
+				return
+			fi
+		done
+	}
+
+	shrink() {
+		part=$1 size=$2
+		mib "$size"
+		partition_ok "$part"
+		[ "$(lsblk -n -o PKNAME "$part" | head -1 | tr -d ' ')" = "${device#/dev/}" ] ||
+			fail "$part isn't on $device"
+		sys=/sys/class/block/${part#/dev/}
+		[ "$size" -lt $(($(cat "$sys/size") * 512)) ] || fail "$part is already that size or smaller"
+		# The files first: a partition smaller than its filesystem would lose them.
+		case $(blkid -o value -s TYPE "$part") in
+		ext2 | ext3 | ext4)
+			e2fsck -f -p "$part" >&2 || [ $? = 1 ] ||
+				fail "$part has errors to repair first. Check it with Disk First Aid"
+			resize2fs "$part" "$((size / 1024))K" >&2 || fail "$part couldn't be made smaller"
+			;;
+		ntfs)
+			# It asks to be sure; it is.
+			echo y | ntfsresize --force --no-progress-bar --size "$size" "$part" >&2 ||
+				fail "$part couldn't be made smaller. Check it in Windows (and shut Windows down fully), then try again"
+			;;
+		*)
+			fail "Only ZacOS (ext4) and NTFS partitions can be made smaller"
+			;;
+		esac
+		# Then the partition round them: start, type and name stay.
+		printf 'size=%s\n' $((size / sector)) |
+			sfdisk -q --no-reread --no-tell-kernel -N "$(cat "$sys/partition")" "$device" >&2 ||
+			fail "$part's files were made smaller, but the partition couldn't be"
+		reread
+		[ $(($(cat "$sys/size") * 512)) = "$size" ] ||
+			fail "$part's new size couldn't be read. Restart the computer and try again"
+	}
+
+	make_partition() {
+		kind=$1 offset=$2 size=$3
+		mib "$offset"
+		mib "$size"
+		[ $((offset + size)) -le $((disk_bytes - 1048576)) ] || fail "That doesn't fit on $device"
+		case $table:$kind in
+		gpt:efi) type=C12A7328-F81F-11D2-BA4B-00A0C93EC93B ;;
+		gpt:biosboot) type=21686148-6449-6E6F-744E-656564454649 ;;
+		gpt:zacos) type=0FC63DAF-8483-4772-8E79-3D69D8477DE4 ;;
+		dos:efi) type=ef ;;
+		dos:zacos) type=83 ;;
+		*) fail "A $kind partition can't go on a $table disk" ;;
+		esac
+		# sfdisk refuses to put it over another partition.
+		printf 'start=%s, size=%s, type=%s\n' $((offset / sector)) $((size / sector)) "$type" |
+			sfdisk -q --no-reread --no-tell-kernel --append "$device" >&2 ||
+			fail "There isn't room for the new partition there"
+		reread
+		tries=0
+		made=$(partition_at "$offset")
+		while [ -z "$made" ] || [ ! -b "$made" ]; do
+			tries=$((tries + 1))
+			[ "$tries" -le 20 ] || fail "The new partition didn't appear. Restart the computer and try again"
+			sleep 0.5
+			reread
+			made=$(partition_at "$offset")
+		done
+		case $kind in
+		efi) mkfs.fat -F 32 -n EFI "$made" >/dev/null || fail "The EFI System partition couldn't be formatted" ;;
+		biosboot) wipefs -a -q "$made" 2>/dev/null || true ;;
+		zacos) zacos_part=$made ;;
+		esac
+	}
+
+	zacos_part=
+	# shellcheck disable=SC2086 # words: a step's kind, a device or offset, a size
+	set -- $beside_steps
+	while [ "$#" -gt 0 ]; do
+		[ "$#" -ge 3 ] || fail "An unfinished step: $*"
+		case $1 in
+		shrink) shrink "$2" "$3" ;;
+		efi | biosboot | zacos) make_partition "$1" "$2" "$3" ;;
+		*) fail "Not a step: $1" ;;
+		esac
+		shift 3
+	done
+	[ -n "$zacos_part" ] || fail "There was no partition for ZacOS among the steps"
+	device=$zacos_part
+fi
+
 # ---------- detect partition vs whole disk ----------
 dev_type=$(lsblk -n -o TYPE "$device" 2>/dev/null | head -1 | tr -d ' ')
 
@@ -268,9 +457,29 @@ if [ "$dev_type" = "part" ]; then
 	if $uefi && [ -z "$efi_part" ]; then
 		fail "No EFI System Partition on $parent_disk. Choose the whole disk instead."
 	fi
+	# A BIOS computer starts GRUB from the disk's first sectors: on GPT from a
+	# BIOS boot partition, on MBR from the gap before the first partition.
+	if ! $uefi; then
+		case $(lsblk -dn -o PTTYPE "$parent_disk" 2>/dev/null | tr -d ' ') in
+		gpt)
+			lsblk -l -n -o PARTTYPE "$parent_disk" 2>/dev/null |
+				grep -qix 21686148-6449-6e6f-744e-656564454649 ||
+				fail "$parent_disk has no BIOS boot partition, which this computer needs to start ZacOS 9 from it. Choose Next to What's There, which makes one, or erase the whole disk"
+			;;
+		dos)
+			first=$(lsblk -l -n -o NAME,TYPE "$parent_disk" | awk '$2 == "part" { print $1 }' |
+				while read -r n; do cat "/sys/class/block/$n/start"; done | sort -n | head -1)
+			[ -z "$first" ] || [ "$first" -ge 2048 ] ||
+				fail "$parent_disk's first partition starts too near the beginning of the disk for the boot loader (GRUB) to fit before it"
+			;;
+		esac
+	fi
 
-	released=true
-	"$release_disk" "$device" || { reported=1; exit 1; }
+	# --beside released the whole disk already, keeping what's on it.
+	if ! $beside; then
+		released=true
+		"$release_disk" "$device" || { reported=1; exit 1; }
+	fi
 
 	step 2 "Formatting partition..."
 	mkfs.ext4 -F -L "$fs_label" "$device" >/dev/null 2>&1 ||
@@ -411,11 +620,26 @@ if [ $((screen_w * screen_h)) -le 9437184 ]; then
 else
 	grub_gfx="GRUB_GFXMODE=auto"
 fi
+# Beside another system (a partition install), GRUB looks for it
+# (os-prober), and if there is one shows its menu for 5 seconds at
+# start-up, ZacOS chosen; Startup Disk changes which. Alone on its disk,
+# ZacOS starts with no menu.
+grub_timeout=0
+grub_style=hidden
+grub_prober=
+if ! $whole_disk; then
+	grub_prober="GRUB_DISABLE_OS_PROBER=false"
+	if [ -n "$(chroot "$TARGET" os-prober 2>/dev/null)" ]; then
+		grub_timeout=5
+		grub_style=menu
+	fi
+fi
 cat > "$TARGET/etc/default/grub" << GRUB
 # Generated by zacos9-install. Hold Shift (BIOS) or Esc (UEFI) at start-up for the menu.
 GRUB_DEFAULT=0
-GRUB_TIMEOUT=0
-GRUB_TIMEOUT_STYLE=hidden
+GRUB_TIMEOUT=$grub_timeout
+GRUB_TIMEOUT_STYLE=$grub_style
+$grub_prober
 GRUB_DISTRIBUTOR="ZacOS 9"
 GRUB_CMDLINE_LINUX_DEFAULT="$kargs"
 GRUB_CMDLINE_LINUX=""
