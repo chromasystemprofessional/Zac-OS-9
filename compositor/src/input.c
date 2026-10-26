@@ -304,6 +304,8 @@ void input_deliver_key(struct plat_keyboard *kb, uint32_t evdev_keycode,
 static void keyboard_destroy(struct wl_listener *listener, void *data) {
 	struct plat_keyboard *kb = wl_container_of(listener, kb, destroy);
 	struct plat_server *server = kb->server;
+	access_keyboard_gone(kb);
+	wl_list_remove(&kb->keymap.link);
 	wl_list_remove(&kb->modifiers.link);
 	wl_list_remove(&kb->key.link);
 	wl_list_remove(&kb->destroy.link);
@@ -321,6 +323,28 @@ static void keyboard_destroy(struct wl_listener *listener, void *data) {
 		}
 	}
 	free(kb);
+	osk_update(server);
+}
+
+/* A virtual keyboard's keymap came: the first keyboard of a session that
+ * had none (headless, or a screen-sharing host with no keyboard of its
+ * own, typed on through wayvnc) becomes the seat's keyboard now, and the
+ * window that has the focus is told so again: programs set up their
+ * keyboard when it appeared, before there was one to give them, and
+ * wlroots tells them of the focus only then. Otherwise their keys would
+ * go nowhere. */
+static void keyboard_keymap(struct wl_listener *listener, void *data) {
+	struct plat_keyboard *kb = wl_container_of(listener, kb, keymap);
+	struct plat_server *server = kb->server;
+	if (!kb->wlr_keyboard->keymap || wlr_seat_get_keyboard(server->seat)) {
+		return;
+	}
+	wlr_seat_set_keyboard(server->seat, kb->wlr_keyboard);
+	struct wlr_surface *focused = server->seat->keyboard_state.focused_surface;
+	if (focused) {
+		wlr_seat_keyboard_clear_focus(server->seat);
+		input_keyboard_enter(server, focused);
+	}
 }
 
 /* Virtual keyboards bring their own keymap; physical ones get the layouts. */
@@ -332,6 +356,7 @@ static void new_keyboard(struct plat_server *server, struct wlr_input_device *de
 	kb->server = server;
 	kb->wlr_keyboard = wlr_keyboard;
 	kb->is_virtual = virtual;
+	kb->is_real = !virtual && osk_real_keyboard(device);
 
 	if (!virtual) {
 		input_apply_layouts(server);
@@ -345,6 +370,11 @@ static void new_keyboard(struct plat_server *server, struct wlr_input_device *de
 	wl_signal_add(&wlr_keyboard->events.modifiers, &kb->modifiers);
 	kb->key.notify = keyboard_key;
 	wl_signal_add(&wlr_keyboard->events.key, &kb->key);
+	wl_list_init(&kb->keymap.link);
+	if (virtual) {
+		kb->keymap.notify = keyboard_keymap;
+		wl_signal_add(&wlr_keyboard->events.keymap, &kb->keymap);
+	}
 	kb->destroy.notify = keyboard_destroy;
 	wl_signal_add(&device->events.destroy, &kb->destroy);
 
@@ -357,6 +387,7 @@ static void new_keyboard(struct plat_server *server, struct wlr_input_device *de
 	if (!virtual) {
 		apply_group(server, kb);
 	}
+	osk_update(server);
 }
 
 /* ---- trackpads ---------------------------------------------------------- */
@@ -427,13 +458,22 @@ static void server_new_input(struct wl_listener *listener, void *data) {
 	case WLR_INPUT_DEVICE_TABLET:
 		tablet_new(server, device);
 		break;
+	case WLR_INPUT_DEVICE_TOUCH:
+		touch_new(server, device);
+		break;
 	default:
 		break;
 	}
+	input_update_capabilities(server);
+}
 
+void input_update_capabilities(struct plat_server *server) {
 	uint32_t caps = WL_SEAT_CAPABILITY_POINTER;
 	if (!wl_list_empty(&server->keyboards)) {
 		caps |= WL_SEAT_CAPABILITY_KEYBOARD;
+	}
+	if (!wl_list_empty(&server->touchscreens)) {
+		caps |= WL_SEAT_CAPABILITY_TOUCH;
 	}
 	wlr_seat_set_capabilities(server->seat, caps);
 }
@@ -452,8 +492,7 @@ static void new_virtual_keyboard(struct wl_listener *listener, void *data) {
 	struct plat_server *server = wl_container_of(listener, server, new_virtual_keyboard);
 	struct wlr_virtual_keyboard_v1 *vkbd = data;
 	new_keyboard(server, &vkbd->keyboard.base, true);
-	wlr_seat_set_capabilities(server->seat,
-		WL_SEAT_CAPABILITY_POINTER | WL_SEAT_CAPABILITY_KEYBOARD);
+	input_update_capabilities(server);
 }
 
 static bool option_held(struct plat_server *server) {
@@ -895,6 +934,44 @@ static void refresh_cursor_or_hide(struct plat_server *server) {
 	}
 }
 
+struct surface_find {
+	struct wlr_surface *surface;
+	bool found;
+	int x, y;
+};
+
+static void find_surface_buffer(struct wlr_scene_buffer *buffer, int sx, int sy, void *data) {
+	struct surface_find *find = data;
+	struct wlr_scene_surface *scene_surface = wlr_scene_surface_try_from_buffer(buffer);
+	if (!find->found && scene_surface && scene_surface->surface == find->surface) {
+		find->found = true;
+		find->x = sx;
+		find->y = sy;
+	}
+}
+
+/* Wayland's implicit grab: while a button pressed on a program's surface is
+ * down, that surface keeps the pointer, off its edge too, and gets the release.
+ * The Collar moves under the pointer when ⌘-dragged; without this a quick drag
+ * left it behind, so its move (and drag sound) never ended. Popup grabs and
+ * drag-and-drop have their own seat grabs and go on as before. */
+static bool implicit_grab_motion(struct plat_server *server, uint32_t time) {
+	struct wlr_seat_pointer_state *state = &server->seat->pointer_state;
+	if (state->button_count == 0 || !state->focused_surface || state->grab != state->default_grab) {
+		return false;
+	}
+	/* Where the surface is now: it may have moved since the press. */
+	struct surface_find find = { .surface = state->focused_surface };
+	wlr_scene_node_for_each_buffer(&server->scene->tree.node, find_surface_buffer, &find);
+	if (!find.found) {
+		return false;
+	}
+	int scale = xwayland_surface_scale(find.surface);
+	wlr_seat_pointer_notify_motion(server->seat, time,
+		(server->cursor->x - find.x) * scale, (server->cursor->y - find.y) * scale);
+	return true;
+}
+
 static void process_cursor_motion(struct plat_server *server, uint32_t time) {
 	tracks_moved(server);
 	if (access_zoom_factor() > 1.0) {
@@ -930,6 +1007,10 @@ static void process_cursor_motion(struct plat_server *server, uint32_t time) {
 		} else {
 			wlr_seat_pointer_clear_focus(server->seat);
 		}
+		refresh_cursor_or_hide(server);
+		return;
+	}
+	if (implicit_grab_motion(server, time)) {
 		refresh_cursor_or_hide(server);
 		return;
 	}
@@ -1200,8 +1281,13 @@ static void seat_request_set_selection(struct wl_listener *listener, void *data)
 static void seat_request_start_drag(struct wl_listener *listener, void *data) {
 	struct plat_server *server = wl_container_of(listener, server, request_start_drag);
 	struct wlr_seat_request_start_drag_event *event = data;
+	struct wlr_touch_point *point;
 	if (wlr_seat_validate_pointer_grab_serial(server->seat, event->origin, event->serial)) {
 		wlr_seat_start_pointer_drag(server->seat, event->drag, event->serial);
+	} else if (wlr_seat_validate_touch_grab_serial(server->seat, event->origin,
+			event->serial, &point)) {
+		/* A finger's drag in an app that takes touch (touch.c). */
+		wlr_seat_start_touch_drag(server->seat, event->drag, event->serial, point);
 	} else {
 		wlr_data_source_destroy(event->drag->source);
 	}
@@ -1308,6 +1394,14 @@ void input_init(struct plat_server *server) {
 
 	server->seat = wlr_seat_create(server->display, "seat0");
 	tablet_init(server);
+	touch_init(server);
+	osk_init(server);
+	/* There is always the pointer, from the start: a session with no
+	 * mouse yet (headless, or one plugged in later) still offers one, so
+	 * programs started before it set theirs up. A virtual pointer doesn't
+	 * update the seat's capabilities; without this one, programs only
+	 * saw a pointer once a keyboard arrived. */
+	input_update_capabilities(server);
 	server->request_cursor.notify = seat_request_cursor;
 	wl_signal_add(&server->seat->events.request_set_cursor, &server->request_cursor);
 	server->request_set_selection.notify = seat_request_set_selection;

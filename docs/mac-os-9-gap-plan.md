@@ -65,12 +65,15 @@ the `~/Classic` folder are unchanged):
 
 | Mac OS 9 name | ZacOS name |
 |---|---|
-| Extensions Manager | **Tricks Manager** |
 | File Exchange | **File Translator** |
 | Network Browser | **Neighbourhood** |
 | Classic | **Old Dog** (runs the old Mac software) |
 | Energy Saver | **Nap Time** |
 | Platinum (appearance) | **Silver Coat** |
+
+The Extensions Manager kept its Mac OS 9 name: 0.1.54 briefly showed it as
+Tricks Manager, but that was confusing beside the Extensions folder. Its sets
+still live in `~/.config/zacos9/Tricks Sets` for compatibility.
 
 The developer docs (`docs/*.md`, `CLAUDE.md`) still call them by their old
 names in places; the code and what users see use the new ones.
@@ -257,11 +260,19 @@ Section 3 lists every feature; section 5 is the plan.
 | "Application not found" → File Translator offers apps that can open the type | ✅ | File Translator panel and Open With. |
 | Type/creator codes | — | MIME types instead. |
 
-### §3.7 Memory (ch. 7) — out of scope
+### §3.7 Memory (ch. 7)
 
-Application memory sizes, virtual memory, the disk cache and RAM disks
-don't apply. **About This Computer** should keep showing honest memory use.
-A zram/swap switch in a Memory panel is a possible P3. **→ 8.7**
+Application memory sizes don't apply (Linux gives each program what it asks
+for), and **About This Computer** keeps showing honest memory use. The
+**Memory** control panel has the rest, as Linux has it; see `docs/memory.md`.
+
+| Feature | Status | Notes |
+|---|---|---|
+| Disk Cache | ✅ | Shown, not set: the system sizes it (Cached + Buffers − Shmem). |
+| Virtual Memory on/off and size | ✅ | `/swapfile` on the startup disk, sizes from 1 GB to what leaves 2 GB free; applies at once, not at restart. Turning it off is refused while memory has no room for what it holds. Other swap (a partition) is listed and left alone. Plus a checkbox for the out-of-memory guard (earlyoom). |
+| Compressed Memory | ✅ | Not in Mac OS 9 (RAM Doubler's idea): a zram swap device, zstd-compressed, by systemd-zram-generator. On/Off and use up to a quarter, half, three quarters or all of memory; off until turned on. |
+| RAM Disk with Save on Shut Down | ✅ | A tmpfs at `/run/zacos9-ramdisk`, up to half of memory, on the desktop as "RAM Disk"; `zacos9-ramdisk.service` makes it at startup and saves it at shut down. |
+| Application memory sizes (Get Info ▸ Memory) | — | Linux manages memory per program. |
 
 ### §3.8 Open and Save dialogs (ch. 8)
 
@@ -297,7 +308,7 @@ A zram/swap switch in a Memory panel is a possible P3. **→ 8.7**
 | **Date & Time**: date/time, time zone, network time, clock options | ✅ | Menu-bar date formats (month-day-year, day-month-year, ISO year-month-day) and optional hourly ZacOS sound are set in the Date & Time panel. |
 | DialAssist, Modem, Remote Access | — | |
 | **Nap Time**: sleep, display sleep | ✅ | Schedule: Start up / Shut down, every day, weekdays or weekends at a time (`/etc/zacos9/schedule` through `zacos9-accounts-helper schedule`): shut-down is a generated systemd timer, start-up the RTC wake alarm, set again at every shut-down by `zacos9-wakealarm.service`. |
-| **Tricks Manager** (sets, item information) | ✅ | Login items and user services with item information and on/off; the Set pop-up saves the current choices as a named set (`~/.config/zacos9/Tricks Sets`), applies one, or deletes it. |
+| **Extensions Manager** (sets, item information) | ✅ | Login items, user services and curated extensions with item information and on/off; extension changes take effect after restart. The Set pop-up saves the current login-item/service choices as a named set (`~/.config/zacos9/Tricks Sets`), applies one, or deletes it. |
 | File Translator | ✅ | |
 | File Sharing | ✅ | |
 | **Retriever** (folder pairs) | ✅ | `zacos9-retriever`: folder pairs (`~/.config/zacos9/retriever.conf`), Synchronize Now copies newer files each way with rsync (newest wins, nothing deleted), and says so. Not automatic yet. |
@@ -308,9 +319,9 @@ A zram/swap switch in a Memory panel is a possible P3. **→ 8.7**
 | Keyboard ▸ **Function Keys** | ✅ | See §3.6. |
 | **Keychain Access** | ✅ | `zacos9-keychain`: the keychains (Secret Service collections), Unlock/Lock, Make Default, and each one's items by name with Remove; The Collar's Keychain module opens it. Passwords aren't shown. |
 | **Toy Box** | ✅ | See §3.2. |
-| **Walkies** (snapshots of network, sound, time zone, printer, startup items) | ✅ | `zacos9-walkies`: places (`~/.config/zacos9/Walkies`) remembering the NetworkManager connection, sound output and volume, time zone, default printer and Tricks Manager set; Switch To restores them (nmcli, pactl, timedatectl, lpoptions, the set's login items and user services). |
-| Memory | — | |
-| **Monitors**: resolution, pixel size | ✅ | Several screens: Arrangement (drag the screens), the main display (menu bar and icons), each screen's resolution, Mirror Displays (`compositor/src/prefs.c`); the desktop's pattern on the others (`secondarydesktop.cpp`); pop-up tabs on their own screen. Colour depth — . |
+| **Walkies** (snapshots of network, sound, time zone, printer, startup items) | ✅ | `zacos9-walkies`: places (`~/.config/zacos9/Walkies`) remembering the NetworkManager connection, sound output and volume, time zone, default printer and Extensions Manager set; Switch To restores them (nmcli, pactl, timedatectl, lpoptions, the set's login items and user services). |
+| **Memory** (disk cache, virtual memory, Compressed Memory, RAM Disk) | ✅ | See §3.7. |
+| **Monitors**: resolution, pixel size | ✅ | Several screens: Arrangement (drag the screens), the main display (menu bar and icons), each screen's resolution and pixel size, Mirror Displays, Menu Bar on Every Display (`compositor/src/prefs.c`); the desktop's pattern on the others (`secondarydesktop.cpp`); pop-up tabs on their own screen. Colour depth — . |
 | **Mouse**: tracking, double-click | ✅ | Options: Mouse Tracks (`compositor/src/tracks.c`: six arrows behind the moving pointer, going 50 ms apart) and Thick I-Beam (a `text-thick` cursor zacos9-wm shows for programs that ask for "text" by cursor-shape-v1; Qt 6 programs ask that way and get it (checked with Scribble); ones that draw their own cursor, such as GTK 3, keep the thin one). |
 | **Users** | ✅ | See 3.14. |
 | **Numbers** / **Text** (number and sort formats, language) | ✅ | `zacos9-controlpanel numbers` / `text`: the system's UTF-8 locales by their own names, with a live sample, kept in `~/.config/locale.conf` (read by `zacos9-session` at login); a locale not yet made is made by `zacos9-accounts-helper locale`. |
@@ -381,14 +392,14 @@ A zram/swap switch in a Memory panel is a possible P3. **→ 8.7**
 | Network volumes drawn as such (AppleShare's look) | ✅ | The `network-disk` icon: a drive on a network line. |
 | Disks on the desktop, Put Away/eject, drag a disk to the Trash to eject | ✅ | Network volumes (0.1.54) and USB disks eject when dragged to the Trash. |
 | Erase Disk with format choice | ✅ | Erase Disk: FAT32 for USB disks; Disk Setup erases with a choice of ext4, FAT32, exFAT or NTFS. |
-| **Disk Vet** (verify/repair) | ✅ | Disk Setup's First Aid tab (`zacos9-disksetup`): the volumes UDisks2 can check, Verify (Filesystem.Check) and Repair (Filesystem.Repair) with polkit's password, refused while in use; the drive's SMART health (ATA and NVMe: passing or failing, temperature, hours). |
+| **Disk Vet** (verify/repair) | ✅ | Disk Setup's First Aid tab (`zacos9-disksetup`): the volumes UDisks2 can check, Verify (Filesystem.Check) and Repair (Filesystem.Repair) with polkit's password; an open volume is closed first (the programs using it, from `/proc`, are named and quit if the user agrees: `inuse.cpp`) and opened again after, the startup disk excepted; the drive's SMART health (ATA and NVMe: passing or failing, temperature, hours). **Mount automatically** (a checkbox per volume, on unless turned off; `~/.config/zacos9/disks.conf` by UUID, `shell/finder/mountpolicy.h`): the Sniffer mounts such volumes at login and when connected, tries a failed one again 3 s later, then read-only through UDisks (a volume a crash left marked in use, as NTFS is), saying so; only then is it unreadable, which may offer Initialize. A volume open read-only shows a notice, and Repair closes it, repairs it (UDisks: `ntfsfix` for NTFS) and opens it normally. |
 | **Disk Setup** (partition, initialize) | ✅ | `zacos9-disksetup` Partition tab: a drive's layout (a bar and a list), New/Delete/Erase/Resize partitions (ext4, FAT32, exFAT, NTFS; resizing ext4 and NTFS) and New Table (GPT/MBR), queued until Apply, which says what it will erase; all through UDisks2 and polkit. Never the live medium's drive, a partition in use, the running system's drive as a whole or its EFI System partition (`shell/disksetup/plan.cpp`). The installer's Select Disk has Prepare Disk… (it opens here) and lists ext4 partitions as places to install. `diskinit.cpp` still initializes new disks. |
 | Disk Copy (mount images) | ✅ | Mac disk images, GPT/MBR images (zacos9-mac-mount), and CD/DVD images (`.iso`, ISO 9660): a read-only loop device through `udisksctl`, mounted on the desktop like any disk. |
-| **Printer Picker** (pick a printer; AppleShare servers) | ✅ | `zacos9-printerpicker`, in the Zac menu: the printers CUPS knows and finds (IPP Everywhere, `lpstat -e`), with model, location and status; clicking one makes it yours (`lpoptions -d`, no password); Create Desktop Printer, Print Queue, Settings… (system-config-printer). Servers stay in the Neighbourhood. |
+| **Printer Picker** (pick a printer; AppleShare servers) | ✅ | `zacos9-printerpicker`, in the Zac menu: the printers CUPS knows and finds by itself (IPP Everywhere, `lpstat -e`; cups-browsed is kept off the system, its queues broke), with model, location and status; clicking one makes it yours (`lpoptions -d`, no password); Create Desktop Printer, Print Queue, Settings… (system-config-printer). Servers stay in the Neighbourhood. |
 | **Desktop printer icons**: drag documents to print, queue window (pause, reorder, remove), default printer (bold outline) | ◐ | `NAME.printer` files on the desktop (`[Desktop Printer]` Queue=…) with a printer icon: documents dropped on one print there, opening one opens `zacos9-printqueue` (printer status, documents, Hold/Resume, Remove, Stop/Start Printing through cups-pk-helper and a polkit rule for administrators; drops print). Print Next (CUPS priority 100) moves a waiting job ahead; the default printer's desktop icon has Mac OS 9's bold outline (`lpstat -d`, read in the background every 10 s). |
 | Print Queue / non-modal print errors | ✅ | Print errors (the Sniffer's and the queue window's) are alerts that don't stop you working. |
 | Page Setup / Print dialogs | ✅ | Apps use their own (GTK/Qt). |
-| Fonts folder (drop to install) | ✅ | Drop files into the backed `Fonts` folder; after successful copies the Sniffer runs `fc-cache -f` asynchronously, with a visible alert if the cache update fails. |
+| Fonts folder (drop to install) | ✅ | Drop files into the backed `Fonts` folder; after successful copies the Sniffer runs `fc-cache -f` asynchronously, with a visible alert if the cache update fails. Like Mac OS 9's, it holds a few dozen fonts: the free ones that stand in for Mac OS 9's (Nimbus Sans for Helvetica, Nimbus Roman for Times, P052 for Palatino, C059 for New York, Z003 for Apple Chancery, Linux Libertine for Hoefler Text, DejaVu Sans for Geneva, DejaVu Sans Mono for Monaco, Liberation for the Internet Explorer fonts), once each, and the user's own; every other font is in its **Language Kits** folder. In a ZacOS session programs see only the Fonts folder's fonts and the user's own (`share/fontconfig/zacos9-fonts.conf`, set by `zacos9-session` as `FONTCONFIG_FILE`; the user's own accepted by file in `~/.config/zacos9/fonts-own.conf`, which the Sniffer keeps up to date). A font's icon is a suitcase with "A" on it in the font itself (at 32 px). |
 | FontSync, ColorSync | — | |
 
 ### §3.16 Sound, movies and speech (ch. 20–21)
@@ -440,8 +451,9 @@ A zram/swap switch in a Memory panel is a possible P3. **→ 8.7**
 
 ## 4. Out of scope (and why)
 
-- **Application memory sizes, virtual memory, disk cache, RAM disk** — Linux
-  manages memory.
+- **Application memory sizes** — Linux gives each program the memory it asks
+  for. (Virtual memory, the disk cache, Compressed Memory and a RAM Disk are
+  in Memory: §3.7.)
 - **AppleTalk, LocalTalk, DialAssist, Modem, Remote Access (dial-up)** — no
   hardware or networks left that need them; AFP over TCP/IP is covered.
 - **Publish and Subscribe, type/creator codes, desktop database rebuild,
@@ -536,7 +548,7 @@ partial entries retain the remaining work described in the inventory above.
 |---|---|---|---|
 | 4.1 ✅ | **Shutdown Items** and startup/shutdown sounds | `session/`, System Folder | S |
 | 4.2 ✅ | **Shift held at login**: a session without startup items | `session/` | S |
-| 4.3 ✅ | **Tricks Manager sets**: on/off sets for startup items and user services | `lib/extensions.c`, panel | M |
+| 4.3 ✅ | **Extensions Manager sets**: on/off sets for startup items and user services | `lib/extensions.c`, panel | M |
 | 4.4 ✅ | **Nap Time** scheduled start-up and shut-down | `rtcwake` + systemd timer, polkit helper | M |
 | 4.5 ✅ | **Date & Time** formats and hourly chimes | `controlpanel.cpp` | S + S |
 | 4.6 ✅ | **Numbers / Text** panels (locale) | `localectl`, `locale.conf` | S |
@@ -589,7 +601,7 @@ partial entries retain the remaining work described in the inventory above.
 | 8.4 ✅ | **Stash** (pages of pictures and text) | M |
 | 8.5 ✅ | **Walkies** (snapshots of network, sound, time zone, printer, startup items) | L |
 | 8.6 ✅ | Plotter, Jigsaw Puzzle | optional |
-| 8.7 | A Memory panel's zram/swap switch | optional |
+| 8.7 ✅ | **Memory**: virtual memory, the disk cache, Compressed Memory (zram), a RAM Disk, the out-of-memory guard | optional |
 
 ### Milestone 9 — Leftovers and checks from Milestones 1–2 (P2)
 
@@ -626,7 +638,6 @@ alongside the others; most are small.
 - **Trademarks.** Agree ZacOS names before shipping each feature (e.g. a
   dog-themed name for the search window, the Toy Box, Dog Ears).
 
-### Suggested next three sessions
+### Suggested next sessions
 
-1. **8.7 (optional):** a Memory panel's zram/swap switch.
-2. **Hardware checks** of what was built and only tested in VMs or headless: Disk Setup on a real disk, Nap Time's wake alarm, CD/DVD AutoPlay, recording an alert sound, several real screens.
+1. **Hardware checks** of what was built and only tested in VMs or headless: Disk Setup on a real disk, Nap Time's wake alarm, CD/DVD AutoPlay, recording an alert sound, several real screens.

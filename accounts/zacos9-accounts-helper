@@ -77,6 +77,13 @@ guest)
 			die "There is already an account named \"$GUEST\" that isn't the Guest account."
 		fi
 		passwd -d "$GUEST" >/dev/null # no password
+		# The devices a session needs: without video, seatd won't give it
+		# the screen and the login ends at once. No administrator groups.
+		for g in audio video render input; do
+			if getent group "$g" >/dev/null; then
+				usermod -aG "$g" "$GUEST" || die "The Guest account couldn't be set up."
+			fi
+		done
 		echo "$GUEST" >"$CONF/guest-account"
 		chmod 644 "$CONF/guest-account"
 		;;
@@ -177,6 +184,17 @@ wakealarm)
 			[ "$t" -gt $((now + 120)) ] && next=$t
 			i=$((i + 1))
 		done
+	fi
+	# The kernel takes the alarm as seconds since 1970 on a clock in UTC. A
+	# clock kept in local time (LOCAL in /etc/adjtime, as Windows keeps it)
+	# would wake the computer hours off, so shift it by the time zone's
+	# offset then (summer time included).
+	if [ -n "$next" ] && [ "$(sed -n 3p "${ZACOS9_ADJTIME:-/etc/adjtime}" 2>/dev/null)" = LOCAL ]; then
+		z=$(date -d "@$next" +%z) # +HHMM or -HHMM
+		hhmm=${z#?}
+		hh=${hhmm%??} mm=${hhmm#??}
+		off=$((((1$hh - 100) * 60 + 1$mm - 100) * 60)) # 1 first: "08" isn't octal
+		case $z in -*) next=$((next - off)) ;; *) next=$((next + off)) ;; esac
 	fi
 	# The alarm must be cleared before it can be set again.
 	[ -e "$rtc" ] || [ -n "${ZACOS9_RTC:-}" ] || exit 0

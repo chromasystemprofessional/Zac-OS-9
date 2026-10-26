@@ -13,9 +13,15 @@ static constexpr int MARGIN = 16;
 static constexpr int FIELD_X = MARGIN + 60;
 
 LoginDialog::LoginDialog(const QString &serverName, bool guestAllowed, bool needsShare,
-		const QString &error)
-	: m_error(error), m_needsShare(needsShare) {
-	setWindowTitle("Connect to the File Server");
+		const QString &error, const QString &what)
+	: m_error(error), m_what(what), m_needsShare(needsShare) {
+	QString title = "Connect to the " + what;
+	for (int i = 0; i < title.size(); i++) { /* "Connect to the File Server" */
+		if (i == 0 || title[i - 1] == ' ') {
+			title[i] = title[i].toUpper();
+		}
+	}
+	setWindowTitle(title);
 
 	/* Laid out top to bottom first, so the window is exactly as tall
 	 * as what ends up in it — not a guessed constant (an earlier,
@@ -82,8 +88,8 @@ void LoginDialog::updateEnabled() {
 }
 
 LoginDialog::Result LoginDialog::ask(QWidget *parent, const QString &serverName, bool guestAllowed,
-		bool needsShare, const QString &error) {
-	LoginDialog dialog(serverName, guestAllowed, needsShare, error);
+		bool needsShare, const QString &error, const QString &what) {
+	LoginDialog dialog(serverName, guestAllowed, needsShare, error, what);
 	dialog.setParent(parent, dialog.windowFlags());
 	Result r;
 	if (dialog.exec() != QDialog::Accepted) {
@@ -110,7 +116,7 @@ void LoginDialog::paintEvent(QPaintEvent *) {
 	Pixels px(width(), height());
 	pl_canvas *c = &px.c;
 	pl_fill(c, 0, 0, width() - 1, height() - 1, GRAY(0xD));
-	panelText(c, "Connect to the file server as:", MARGIN, 29);
+	panelText(c, "Connect to the " + m_what + " as:", MARGIN, 29);
 	panelLabel(c, "Name:", FIELD_X - 8, m_name.rect.top() + 15);
 	panelLabel(c, "Password:", FIELD_X - 8, m_password.rect.top() + 15);
 	if (m_needsShare) {

@@ -1,4 +1,6 @@
 #include "decor.h"
+
+#include <stddef.h>
 #include "icons.h"
 
 #define C_222 GRAY(0x2)
@@ -212,37 +214,98 @@ bool decor_proxy_hit(const struct decor_state *st, int x, int y) {
 		y <= PROXY_Y + PROXY_SIZE;
 }
 
-static void paint_title(struct pl_canvas *c, const struct decor_state *st) {
-	int x0, x1;
-	title_span(st, &x0, &x1);
-
+/* Where an active title bar's stripes go: one span, or two either side
+ * of the title (and proxy icon); x inclusive, as paint_stripes takes them. */
+static int title_stripes(const struct decor_state *st, int x0[2], int x1[2]) {
+	if (!st->active) {
+		return 0;
+	}
+	int a, b;
+	title_span(st, &a, &b);
 	const struct plat_text *t = st->title;
 	if ((!t || t->ink_l < 0) && !st->proxy) {
-		if (st->active) {
-			paint_stripes(c, x0, x1);
-		}
-		return;
+		x0[0] = a;
+		x1[0] = b;
+		return 1;
 	}
-
 	const int ink_w = title_ink_width(st);
 	int ink_l, proxy_x;
 	title_layout(st, ink_w, &ink_l, &proxy_x);
-	int ink_r = ink_l + ink_w - 1;
-	if (ink_w > 0) {
-		pl_text(c, t, ink_l, TITLE_BASELINE, st->active ? C_BLACK : C_666);
-	}
-	int left = ink_l;
+	int ink_r = ink_l + ink_w - 1, left = ink_l;
 	if (st->proxy) {
-		pl_icon_paint(c, proxy_x, PROXY_Y, (enum pl_icon_kind)(st->proxy - 1), PROXY_SIZE, false);
 		left = proxy_x;
 		if (ink_w == 0) {
 			ink_r = proxy_x + PROXY_SIZE - 1;
 		}
 	}
+	x0[0] = a;
+	x1[0] = left - STRIPE_TEXT_GAP - 1;
+	x0[1] = ink_r + STRIPE_TEXT_GAP + 1;
+	x1[1] = b;
+	return 2;
+}
 
-	if (st->active) {
-		paint_stripes(c, x0, left - STRIPE_TEXT_GAP - 1);
-		paint_stripes(c, ink_r + STRIPE_TEXT_GAP + 1, x1);
+static void paint_title(struct pl_canvas *c, const struct decor_state *st) {
+	const struct plat_text *t = st->title;
+	if ((t && t->ink_l >= 0) || st->proxy) {
+		const int ink_w = title_ink_width(st);
+		int ink_l, proxy_x;
+		title_layout(st, ink_w, &ink_l, &proxy_x);
+		if (ink_w > 0) {
+			pl_text(c, t, ink_l, TITLE_BASELINE, st->active ? C_BLACK : C_666);
+		}
+		if (st->proxy) {
+			pl_icon_paint(c, proxy_x, PROXY_Y, (enum pl_icon_kind)(st->proxy - 1), PROXY_SIZE, false);
+		}
+	}
+	int x0[2], x1[2];
+	const int n = title_stripes(st, x0, x1);
+	for (int i = 0; i < n; i++) {
+		paint_stripes(c, x0[i], x1[i]);
+	}
+}
+
+/* Fill [x0, x1) x [y0, y1) of a w x h buffer, clipped. */
+static void fill_px(uint32_t *px, int w, int h, int x0, int y0, int x1, int y1, uint32_t color) {
+	x0 = x0 < 0 ? 0 : x0;
+	y0 = y0 < 0 ? 0 : y0;
+	x1 = x1 > w ? w : x1;
+	y1 = y1 > h ? h : y1;
+	for (int y = y0; y < y1; y++) {
+		for (int x = x0; x < x1; x++) {
+			px[(size_t)y * w + x] = color;
+		}
+	}
+}
+
+void decor_paint_stripes_scaled(uint32_t *dst, int dw, int dh, const struct decor_state *st,
+		int px, int py, int ux, int uy, int quarters) {
+	int x0[2], x1[2];
+	const int n = title_stripes(st, x0, x1);
+	if (n == 0 || quarters % 4 == 0) {
+		return;
+	}
+	/* The part's screen origin, and the stripe band's rows, on screen. */
+	const int ox = pl_snap(ux + px, quarters), oy = pl_snap(uy + py, quarters);
+	const int top = pl_snap(uy + BOX_Y, quarters) - oy;
+	const int band = pl_snap(uy + BOX_Y + 12, quarters) - pl_snap(uy + BOX_Y, quarters);
+	/* Six ridges, each the same: as thick a white line as fits, the gray
+	 * one below it the rest; what is left over split above and below. */
+	const int period = band / 6, white = (period + 1) / 2, gray = period - white;
+	const int margin = (band - 6 * period) / 2;
+	for (int i = 0; i < n; i++) {
+		if (x1[i] - x0[i] < 1) {
+			continue;
+		}
+		const int wl = pl_snap(ux + x0[i], quarters) - ox, wr = pl_snap(ux + x1[i], quarters) - ox;
+		const int gl = pl_snap(ux + x0[i] + 1, quarters) - ox;
+		const int gr = pl_snap(ux + x1[i] + 1, quarters) - ox;
+		fill_px(dst, dw, dh, wl, top, gr, top + band, C_CCC);
+		for (int k = 0; k < 6; k++) {
+			const int y = top + margin + k * period;
+			fill_px(dst, dw, dh, wl, y, wr, y + white, C_WHITE);
+			fill_px(dst, dw, dh, gl, y + white, gr, y + white + gray, C_777);
+		}
 	}
 }
 

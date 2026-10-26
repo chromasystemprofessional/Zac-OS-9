@@ -8,6 +8,7 @@
 #include <QUrl>
 
 class QFileDialog;
+class QListWidget;
 
 struct FileChooserLocation {
 	QString name;
@@ -25,6 +26,9 @@ QList<FileChooserLocation> fileChooserLocations();
 QList<FileChooserLocation> fileChooserNetworkLocations(
 	const QByteArray &mountInfo, const QString &runtime);
 void prepareFileChooserDialog(QFileDialog &dialog);
+/* The Choose a Location list: large icons with their whole names wrapped
+ * under them (as on the desktop), not cut to one line. */
+void prepareLocationList(QListWidget *list);
 bool registerFileChooserPortal();
 /* The Finder desktop's disk icon, at 32x32 1x pixels. */
 QImage fileChooserDriveIcon(bool usb, bool selected);

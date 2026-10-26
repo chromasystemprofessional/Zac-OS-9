@@ -8,7 +8,8 @@ headless screens with 400 ms "minutes", under dbus-run-session:
 - woken, the lock shows and nothing of the session does (screenshots: a
   green window is nowhere), and keys typed reach only the lock;
 - a wrong password keeps it locked; if the lock program dies, the screens
-  stay locked and it comes back; the right password unlocks, the window
+  stay locked and it comes back, and another program can't take its place
+  meanwhile (it would unlock at will); the right password unlocks, the window
   shows again and has the keyboard back;
 - without the setting nothing locks; ScreenSaver.Lock locks regardless.
 """
@@ -178,10 +179,19 @@ with tempfile.TemporaryDirectory(prefix="zacos9-lock-") as directory:
             os.kill(pids[0], 9)
             time.sleep(0.3)
             assert locked(), "killing the lock program unlocked"
+            # Before it comes back, a lock program the compositor didn't start.
+            impostor = subprocess.Popen([lock], env=env, stdout=log, stderr=log)
+            processes.append(impostor)
+            wait_for("the impostor refused", lambda: "lock: refused a lock from process %d" % impostor.pid
+                     in (root / "compositor.log").read_text(), 3)
+            impostor.kill()
+            impostor.wait()
+            assert locked(), "another lock program's lock unlocked"
             if have_grim:
                 assert not green_anywhere(), "a window showed once the lock program died"
             wait_for("the lock program back", lambda: lock_pids() and lock_pids() != pids, 4)
-            print("ok: if the lock program dies, the screens stay locked and it comes back")
+            print("ok: if the lock program dies, the screens stay locked and it comes back; "
+                  "no other program may lock in its place")
 
             time.sleep(0.5)  # its surfaces up
             # No screen saver for a while: at 1 "minute" (400 ms) it came back

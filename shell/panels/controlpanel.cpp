@@ -5,7 +5,7 @@
  *
  *   zacos9-controlpanel mouse | trackpad | tablet | keyboard | sound | monitors |
  *     energysaver | screensaver | zacmenu | general | internet | accessibility |
- *     startupdisk | users
+ *     startupdisk | users | memory
  *
  * Each writes ~/.config/zacos9/desktop.conf; zacos9-wm applies the
  * mouse, keyboard, screen and sleep settings as they change (compositor/
@@ -38,6 +38,7 @@
 #include "savers.h"
 #include "settings.h"
 #include "soundclient.h"
+#include "memory.h"
 #include "startupdisk.h"
 #include "users.h"
 #include "platinumshell.h"
@@ -851,13 +852,16 @@ private:
 struct Screen {
 	QString name;
 	QSize px;
-	int scale = 1;
+	double scale = 1;
 	bool nested = false;
 	QPoint pos;
 	bool main = false;
 	QList<QSize> modes;
 
-	QSize logical() const { return QSize(px.width() / std::max(scale, 1), px.height() / std::max(scale, 1)); }
+	QSize logical() const {
+		const double s = std::max(scale, 1.0);
+		return QSize(qRound(px.width() / s), qRound(px.height() / s));
+	}
 	QRect rect() const { return QRect(pos, logical()); }
 };
 
@@ -867,7 +871,9 @@ public:
 		readOutputs();
 		build();
 		/* Hint Bubbles. */
-		m_scale.hint = "Sets how big everything on the screen is drawn: each dot as one, two or three screen pixels.";
+		m_scale.hint = "Sets how big everything on this screen is drawn; each screen has its own. "
+			"At 1.25×, 1.5× and 1.75× the pixel art stays sharp, but some of its dots are a screen "
+			"pixel bigger than others; at Normal, 2× and 3× every dot is the same.";
 		if (m_mirror) {
 			m_mirror->hint = "Shows the same picture on every screen.";
 		}
@@ -935,6 +941,10 @@ private:
 	enum class Drag { None, Display, Bar };
 
 	bool multiple() const { return m_displays.size() > 1; }
+	static bool everyBar() {
+		char v[8];
+		return pl_setting("menubar-every-display", v, sizeof(v)) && strcmp(v, "1") == 0;
+	}
 	const Screen *selected() const { return m_displays.isEmpty() ? nullptr : &m_displays[m_sel]; }
 
 	void build() {
@@ -956,6 +966,16 @@ private:
 				refreshSoon();
 			};
 			m_checks.push_back(m_mirror.get());
+			m_everyBar = std::make_unique<PanelCheckbox>("Menu Bar on Every Display",
+				QPoint(M + IN + 130, m_area.bottom() + 8));
+			m_everyBar->on = everyBar();
+			m_everyBar->hint = "Shows the menu bar at the top of every screen, not only the main one. "
+				"Its menus open on the screen whose menu bar you click.";
+			m_everyBar->toggled = [this](bool on) {
+				pl_setting_set("menubar-every-display", on ? "1" : "0");
+				update();
+			};
+			m_checks.push_back(m_everyBar.get());
 			resTop = arrBottom + 12;
 		}
 		m_resTop = resTop;
@@ -975,15 +995,27 @@ private:
 			refreshSoon();
 		};
 
-		/* Pixel size: whole-number scales only, so the pixel art stays sharp. */
+		/* Pixel size, of the selected screen. At 1.25, 1.5 and 1.75 programs
+		 * draw at exactly that (wp_fractional_scale_v1); ZacOS's own pixel
+		 * art too, each dot one or two whole screen pixels (lib/draw.c pl_snap). */
+		static const struct { double scale; const char *value, *label; } scales[] = {
+			{ 1, "1", "Normal" }, { 1.25, "1.25", "1.25×" }, { 1.5, "1.5", "1.5×" },
+			{ 1.75, "1.75", "1.75×" }, { 2, "2", "Large (2×)" }, { 3, "3", "Larger (3×)" },
+		};
 		m_scale = PanelRadios();
 		const int rx = M + IN + 190, ry = resTop + 1 + PL_GROUP_MARGIN_TOP + 18;
-		m_scale.add("Normal", QPoint(rx, ry));
-		m_scale.add("Large (2×)", QPoint(rx, ry + 20));
-		m_scale.add("Larger (3×)", QPoint(rx, ry + 40));
-		m_scale.selected = std::clamp(m_currentScale, 1, 3) - 1;
+		const double current = selected() ? selected()->scale : m_currentScale;
+		m_scale.selected = 0;
+		for (int i = 0; i < 6; i++) {
+			m_scale.add(scales[i].label, QPoint(rx, ry + 18 * i));
+			if (qAbs(scales[i].scale - current) < 0.01) {
+				m_scale.selected = i;
+			}
+		}
 		m_scale.changed = [this](int i) {
-			setInt("scale", i + 1);
+			const Screen *d = selected();
+			pl_setting_set(d ? ("display." + d->name.toUtf8() + ".scale").constData() : "scale",
+				scales[i].value);
 			refreshSoon();
 		};
 		m_radios.clear();
@@ -1091,7 +1123,7 @@ private:
 					pl_outline(c, r.left() + 2, r.top() + 2, r.right() - 2, r.bottom() - 2, accent.dark);
 				}
 				const bool moving = m_drag == Drag::Bar && m_displays[i].main;
-				if (m_displays[i].main && !moving) {
+				if ((m_displays[i].main && !moving) || (!m_displays[i].main && everyBar())) {
 					paintBar(c, barRect(i));
 				}
 				Text number(QString::number(i + 1), 40, PL_FONT_SYSTEM);
@@ -1248,7 +1280,7 @@ private:
 					d.name = QString::fromUtf8(w.value(1));
 					const QList<QByteArray> wh = w.value(2).split('x');
 					d.px = QSize(wh.value(0).toInt(), wh.value(1).toInt());
-					d.scale = w.value(4).toInt();
+					d.scale = w.value(4).toDouble(); /* 1, 1.25, 1.5, 1.75, 2, 3 */
 					d.nested = w.value(6) == "1";
 					d.pos = QPoint(w.value(8).toInt(), w.value(10).toInt());
 					d.main = w.value(12) == "1";
@@ -1296,7 +1328,7 @@ private:
 	QList<Screen> m_displays;
 	QList<QSize> m_modes; /* with no screens published */
 	QSize m_size;
-	int m_currentScale = 1;
+	double m_currentScale = 1;
 	bool m_nested = false;
 	bool m_mirrored = false;
 	int m_sel = 0;
@@ -1305,7 +1337,7 @@ private:
 	QRect m_area;
 	Drag m_drag = Drag::None;
 	QPoint m_dragNow, m_dragGrab, m_dragPos, m_dragSnap;
-	std::unique_ptr<PanelCheckbox> m_mirror;
+	std::unique_ptr<PanelCheckbox> m_mirror, m_everyBar;
 	PanelList m_list;
 	PanelRadios m_scale;
 };
@@ -1555,7 +1587,7 @@ protected:
 	void paintExtra(pl_canvas *c) override {
 		const QRect r = m_preview;
 		pl_outline(c, r.left() - 1, r.top() - 1, r.right() + 1, r.bottom() + 1, C_BLACK);
-		pl_canvas inner = { c->px + r.top() * c->stride + r.left(), c->stride, 0, 0, r.width(), r.height() };
+		pl_canvas inner = { c->px + r.top() * c->stride + r.left(), c->stride, 0, 0, r.width(), r.height(), c->log };
 		if (m_saver) {
 			pl_saver_draw(m_saver, &inner, m_clock.elapsed() / 1000.0);
 		} else {
@@ -2492,6 +2524,9 @@ int main(int argc, char *argv[]) {
 	} else if (which == "zacmenu") {
 		QApplication::setApplicationName("Zac Menu Options");
 		panel = std::make_unique<ZacMenuOptionsPanel>();
+	} else if (which == "memory") {
+		QApplication::setApplicationName("Memory");
+		panel = std::make_unique<MemoryPanel>();
 	} else if (which == "startupdisk") {
 		QApplication::setApplicationName("Startup Disk");
 		platinumShellInit(); /* for its alerts */

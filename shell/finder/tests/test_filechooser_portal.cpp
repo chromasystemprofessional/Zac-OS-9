@@ -12,6 +12,7 @@
 #include <QTemporaryDir>
 #include <QFileDialog>
 #include <QKeyEvent>
+#include <QListWidget>
 #include <QStandardPaths>
 #include <QSet>
 #include <QUrl>
@@ -147,6 +148,23 @@ int main(int argc, char **argv) {
 	for (const QString hidden : { "/proc", "/sys", "/dev", "/run" }) {
 		check(!paths.contains(hidden), "system pseudo-filesystems are not shown as disks");
 	}
+	QListWidget locationList;
+	prepareLocationList(&locationList);
+	check(locationList.viewMode() == QListView::IconMode && locationList.wordWrap(),
+		"the location list wraps long names under their icons instead of cutting them");
+	check(locationList.gridSize().height() - locationList.iconSize().height() >=
+		3 * locationList.fontMetrics().lineSpacing(),
+		"a location's cell has room for three lines of its name");
+	new QListWidgetItem("HD", &locationList);
+	new QListWidgetItem("ChromaSystem Website alias", &locationList);
+	locationList.resize(520, 300);
+	locationList.show();
+	QApplication::processEvents();
+	const int shortName = locationList.sizeHintForIndex(locationList.model()->index(0, 0)).height();
+	const int longName = locationList.sizeHintForIndex(locationList.model()->index(1, 0)).height();
+	check(longName >= shortName + locationList.fontMetrics().lineSpacing(),
+		"a long location name is laid out on more lines, not cut to one");
+	locationList.close();
 	QFileDialog dialog;
 	dialog.setSidebarUrls({ QUrl::fromLocalFile(QDir::homePath()) });
 	prepareFileChooserDialog(dialog);

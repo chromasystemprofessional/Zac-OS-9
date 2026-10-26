@@ -307,6 +307,8 @@ void icon(pl_canvas *c, CollarParts::Kind kind, int x, int y, bool on, int level
 			pl_outline(c, x + 6, y + 4, x + 9, y + 7, ink);
 		}
 		break;
+	case CollarParts::Extension:
+		break;
 	}
 }
 

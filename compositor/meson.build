@@ -90,6 +90,9 @@ compositor_exe = executable('zacos9-wm',
   'src/fkeys.c',
   'src/access.c',
   'src/tablet.c',
+  'src/touch.c',
+  'src/touch_tap.c',
+  'src/osk.c',
   'src/window_sounds.c',
   'src/launch.c',
   'src/startup.c',
@@ -110,7 +113,8 @@ compositor_exe = executable('zacos9-wm',
   'src/tracks.c',
   'src/pixbuf.c',
   protocol_headers,
-  dependencies: [decor_dep, wayland_server, wlroots, xkbcommon, libdrm, xcb_icccm, xcb, libinput],
+  dependencies: [decor_dep, wayland_server, wlroots, xkbcommon, libdrm, xcb_icccm, xcb, libinput,
+    meson.get_compiler('c').find_library('m')],
   link_depends: cursor_theme,
   install: true,
 )
@@ -148,6 +152,11 @@ test('startup-displays',
   env: ['ZACOS9_STARTUP=1'],
 )
 
+# Screens start at the origin, a saved one not connected leaving no gap (Krita's tablet).
+test('display-origin', python3,
+  args: [files('tests/test_display_origin.py'), compositor_exe],
+  timeout: 60,
+)
 test('cursor-theme', python3,
   args: [files('tests/test_cursors.py'),
     meson.project_source_root() / 'tools/cursors/build_cursors.py',
@@ -164,6 +173,17 @@ test('launch-feedback',
 test('virtual-pointer-output',
   executable('test-virtual-pointer',
     'tests/test_virtual_pointer.c',
+    protocol_headers,
+    include_directories: include_directories('src'),
+    dependencies: [decor_dep, wayland_server, wlroots, xkbcommon, libinput],
+    c_args: ['-ffunction-sections', '-fdata-sections'],
+    link_args: ['-Wl,--gc-sections'],
+  ),
+)
+
+test('implicit-grab',
+  executable('test-implicit-grab',
+    'tests/test_implicit_grab.c',
     protocol_headers,
     include_directories: include_directories('src'),
     dependencies: [decor_dep, wayland_server, wlroots, xkbcommon, libinput],
@@ -223,6 +243,14 @@ test('xwayland-output',
   ),
 )
 
+# X11 windows switching override-redirect (Tk's menus) once aborted the compositor.
+test('override-redirect', find_program('python3'),
+  args: [files('tests/test_override_redirect.py'), compositor_exe,
+    executable('override-redirect-client', 'tests/override_redirect_client.c',
+      dependencies: xcb)],
+  timeout: 60,
+)
+
 test('snapshot-output-state',
   executable('test-snapshot-state', 'tests/test_snapshot.c', 'src/pixbuf.c',
     protocol_headers,
@@ -230,6 +258,14 @@ test('snapshot-output-state',
     dependencies: [decor_dep, wayland_server, wlroots, libdrm],
     link_args: ['-Wl,--wrap=wlr_output_from_resource',
       '-Wl,--wrap=wlr_output_layout_get_box'],
+  ),
+)
+
+# The touchscreen's tap and two-finger tap (a right-click).
+test('touch-tap',
+  executable('test-touch-tap',
+    'tests/test_touch_tap.c', 'src/touch_tap.c',
+    include_directories: include_directories('src'),
   ),
 )
 

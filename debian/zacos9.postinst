@@ -36,11 +36,81 @@ make_shared_documents() {
 		echo "zacos9: could not make the Shared Documents folder." >&2
 }
 
+# Printers set up by cups-browsed (device-uri implicitclass://...) only
+# print while it runs, and the package conflicts with it: CUPS finds the
+# same printers by itself (IPP Everywhere) and sets them up as they're
+# used. Remove the leftovers, their stuck documents with them.
+remove_browsed_queues() {
+	command -v lpstat >/dev/null 2>&1 && command -v lpadmin >/dev/null 2>&1 || return 0
+	lpstat -v 2>/dev/null | sed -n 's/^device for \([^:]*\): implicitclass:.*/\1/p' |
+	while IFS= read -r queue; do
+		lpadmin -x "$queue" 2>/dev/null ||
+			echo "zacos9: could not remove cups-browsed's printer \"$queue\"." >&2
+	done
+}
+
+# The login window (zacos9-greeter) runs a zacos9-wm as greetd's own user,
+# and seatd hands the screen only to the video group (seatd -g video), so
+# without it the window never gets the seat: Log Out left a frozen screen.
+# render for the GPU's render node, as the Setup Assistant's account has.
+greeter_seat() {
+	getent passwd _greetd >/dev/null 2>&1 || return 0
+	for g in video render; do
+		getent group "$g" >/dev/null 2>&1 || continue
+		usermod -aG "$g" _greetd ||
+			echo "zacos9: could not add the login window to the $g group;" \
+				"Log Out may leave a blank screen." >&2
+	done
+}
+
+# A Guest account made before zacos9-accounts-helper gave it the session's
+# device groups couldn't log in (no seat); give them to it.
+guest_seat() {
+	guest=$(cat /etc/zacos9/guest-account 2>/dev/null) || return 0
+	[ -n "$guest" ] && getent passwd "$guest" >/dev/null 2>&1 || return 0
+	for g in audio video render input; do
+		getent group "$g" >/dev/null 2>&1 || continue
+		usermod -aG "$g" "$guest" ||
+			echo "zacos9: could not add the Guest account to the $g group." >&2
+	done
+}
+
+# Compressed Memory is off until the Memory control panel turns it on, but
+# Debian's systemd-zram-generator turns a zram0 device on by default
+# (/usr/lib/systemd/zram-generator.conf). A file in /etc with no [zram0]
+# section overrides it; the panel's helper rewrites it from then on.
+zram_off_by_default() {
+	[ -e /etc/systemd/zram-generator.conf ] && return 0
+	mkdir -p /etc/systemd &&
+	printf '%s\n' "# Written by the zacos9 package: Compressed Memory is off." \
+		"# Turn it on in the Memory control panel." >/etc/systemd/zram-generator.conf ||
+		echo "zacos9: could not turn the default compressed memory off." >&2
+}
+
+# The old RDP sharing (zacos9-screen-sharing, removed after 1.0.19) wrote
+# its services to /run/systemd/system and its keys and xrdp settings to
+# /etc/zacos9/rdp. Stop any still running and delete what it made.
+remove_rdp_sharing() {
+	for unit in zacos9-rdp-listener zacos9-rdp-bridge zacos9-rdp-auth; do
+		[ -e "/run/systemd/system/$unit.service" ] || continue
+		systemctl stop "$unit.service" >/dev/null 2>&1 || true
+		rm -f "/run/systemd/system/$unit.service"
+		reload=1
+	done
+	[ -z "${reload:-}" ] || systemctl daemon-reload >/dev/null 2>&1 || true
+	rm -rf /etc/zacos9/rdp /run/zacos9-rdp
+}
+
 case "$1" in
 	configure)
 		grant_rawio
+		greeter_seat
+		guest_seat
+		zram_off_by_default
 		redraw_grub_logo
 		make_shared_documents
+		remove_browsed_queues
+		remove_rdp_sharing
 		# Software Update's daily check, for every account.
 		systemctl --global enable zacos9-update-check.timer >/dev/null 2>&1 || true
 		;;

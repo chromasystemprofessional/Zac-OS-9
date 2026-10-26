@@ -9,7 +9,8 @@ It opens from Apple menu > **New Tricks**.
 
 ## What it's for
 
-A short, curated catalog remains the default. **All Applications** expands
+A short, curated catalog remains the default. Its **Extras** category
+holds ZacOS's own add-ons (below, "ZacOS Extras"). **All Applications** expands
 it with desktop applications described by the configured Debian repositories'
 AppStream metadata. Search filters names, descriptions and package identifiers.
 **Include Flathub applications** adds Flathub apps to the main categories and
@@ -67,7 +68,7 @@ updates can be applied separately with `flatpak --user update`.
 | The data | `assets/store/catalog.json` | Shipped, read-only; installed to `$datadir/zacos9/store/catalog.json`, found through `pl_data_dir()` (the same function the alert sounds use), so a build tree and an install both just work. |
 | Discovery | `appstore/zacos9-software-catalog` | Unprivileged JSON helper: distro AppStream desktop applications or the enabled user Flathub remote. Asynchronous GUI loading has a two-minute timeout and explicit error status. |
 | The privileged half | `appstore/zacos9-appstore-helper` | A root shell script behind pkexec; validates every package name before `apt-get` ever sees it. |
-| Authorization | `appstore/org.zacos9.appstore.policy`, `appstore/50-zacos9-appstore.rules` | Same pattern as `sharing/`: this desktop runs no polkit authentication agent, so a local administrator (the `sudo` group) is granted without a password rather than being asked for one nothing can show. |
+| Authorization | `appstore/org.zacos9.appstore.policy`, `appstore/50-zacos9-appstore.rules` | A local administrator (the `sudo` group, active at the computer) installs, removes and updates software from Debian's archive without a password. `install-deb` (a downloaded package, whose setup scripts run as root and that apt can't vouch for) is never granted by the rule: polkit asks for an administrator's password through `lxqt-policykit-agent`, started by `session/zacos9-session`. Tested by `tests/store/test_appstore_rule.py`. |
 
 Reused, not reinvented: `PanelList`, `PanelButton`, `panelText`,
 `panelWrap`, `panelGroup` (`shell/panels/panelkit.*`); `Alert::ask` for
@@ -211,6 +212,35 @@ disabled remotes, subprocess failures and timeouts using isolated mocks.
 expanded results, search, source confirmation, Flathub install/remove routing
 and visible errors. It uses private mock commands, never real installs or
 repository mutations.
+
+## ZacOS Extras
+
+The **Extras** category offers add-ons from the ZacOS Extras repository
+(`chromasystemprofessional/ZacOS-Extras` on GitHub, checked out beside this
+tree as `ZAC-OS-EXTRAS`), such as **Hue Lights** for The Collar. Each extra
+is released there on its own, tagged `EXTRA-vVERSION` (`hue-v0.1.0`), with
+a `PACKAGE_VERSION_ARCH.deb` attached. Its package puts its program in
+`/usr/bin` and starts it at login from `/etc/xdg/autostart`.
+
+A catalog item is an extra when it has an `"extra"` object:
+`{ "id": "hue", "start": "zacos9-collar-hue" }`, with exactly one package.
+Install:
+1. Lists the repository's releases (GitHub's API; `ZACOS9_EXTRAS_URL`
+   replaces the URL in tests) and takes the newest whose tag starts with
+   `ID-v`, skipping drafts and pre-releases. Its asset must be named for the
+   item's package and this machine's architecture, and be served over https.
+2. Downloads it, checks it against GitHub's SHA-256 digest when there is
+   one, and checks that `dpkg-deb -f` names the item's package.
+3. Installs it with the helper's `install-deb`, as the App Installer does,
+   so apt brings in its dependencies. Nothing new runs as root.
+4. Starts `start` (a plain program name) once, so it runs without logging
+   out.
+
+Remove is the helper's ordinary `remove`. An extra's package stops its
+program when removed. The status line reads "ZacOS Extras: Installed."
+
+Left out: Software Update doesn't look for new releases of installed
+extras yet. Removing and installing again picks up the newest one.
 
 ## Look-and-feel presets
 

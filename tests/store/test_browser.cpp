@@ -1,4 +1,5 @@
 #include <QApplication>
+#include <QCryptographicHash>
 #include <QDir>
 #include <QElapsedTimer>
 #include <QFile>
@@ -9,6 +10,7 @@
 #include <QTemporaryDir>
 #include <QThread>
 #include <QTimer>
+#include <QUrl>
 #include <QWidget>
 #include <cassert>
 #include <functional>
@@ -288,5 +290,74 @@ else:
 	assert(log.contains("--user install --noninteractive flathub org.example.Paint"));
 	assert(log.contains("--user uninstall --noninteractive -- org.example.Paint"));
 	assert(log.contains("https://dl.flathub.org/repo/flathub.flatpakrepo"));
+
+	/* ZacOS extras: the newest release's .deb, checked, through install-deb. */
+	const QString extrasCatalog = root.path() + "/extras.json";
+	writeFile(extrasCatalog, R"JSON({"categories":["Featured","Extras"],
+		"items":[{"id":"extra-hue","name":"Hue Lights","category":"Extras","blurb":"Lights",
+		"packages":["zacos9-extra-hue"],"extra":{"id":"hue","start":"zacos9-collar-hue"}}]})JSON");
+	qputenv("ZACOS9_STORE_CATALOG", extrasCatalog.toUtf8());
+	writeFile(apt, R"PY(#!/usr/bin/python3
+import os, pathlib, sys
+root = pathlib.Path(os.environ["TEST_STATE"])
+args = sys.argv[1:]
+with (root / "helper-calls").open("a") as log:
+    log.write(" ".join(args) + "\n")
+if args[0] == "installed":
+    for p in args[1:]:
+        print(p + "\t" + ("yes" if (root / ("inst-" + p)).exists() else "no"))
+elif args[0] == "install-deb":
+    assert os.path.isabs(args[1]) and pathlib.Path(args[1]).read_bytes() == b"pretend deb"
+    (root / "inst-zacos9-extra-hue").touch()
+elif args[0] == "remove":
+    (root / ("inst-" + args[1])).unlink()
+)PY", true);
+	/* As root, the helper runs through pkexec: here, without asking anyone. */
+	writeFile(root.path() + "/pkexec", "#!/bin/sh\nexec \"$@\"\n", true);
+	writeFile(root.path() + "/dpkg-deb", "#!/bin/sh\necho \"${TEST_PACKAGE:-zacos9-extra-hue}\"\n", true);
+	writeFile(root.path() + "/zacos9-collar-hue", "#!/bin/sh\ntouch \"$TEST_STATE/started\"\n", true);
+	writeFile(root.path() + "/hue.deb", "pretend deb");
+	const QString digest = QCryptographicHash::hash("pretend deb", QCryptographicHash::Sha256).toHex();
+	const QString arch = [] {
+		QProcess p;
+		p.start("dpkg", { "--print-architecture" });
+		waitFor([&] { return p.state() == QProcess::NotRunning; }); /* never waitForFinished: CLAUDE.md */
+		return QString::fromUtf8(p.readAllStandardOutput()).trimmed();
+	}();
+	auto releases = [&](const QString &sha) {
+		writeFile(root.path() + "/releases.json", QString(R"JSON([
+			{"tag_name":"other-v2.0","assets":[]},
+			{"tag_name":"hue-v0.2.0","assets":[{"name":"zacos9-extra-hue_0.2.0_%1.deb",
+			 "browser_download_url":"file://%2/hue.deb","digest":"sha256:%3"}]}])JSON")
+			.arg(arch, root.path(), sha).toUtf8());
+	};
+	qputenv("ZACOS9_EXTRAS_URL", QUrl::fromLocalFile(root.path() + "/releases.json").toString().toUtf8());
+	{
+		StoreWindow extras;
+		extras.m_categoryList.select(extras.m_categories.indexOf("Extras"), true);
+		assert(extras.m_shown.size() == 1 && extras.currentItem()->source == "extra");
+		assert(!extras.m_installed);
+		releases(QString(64, '0'));
+		extras.act();
+		assert(extras.m_status.contains("damaged") && !extras.m_installed);
+		releases(digest);
+		qputenv("TEST_PACKAGE", "something-else");
+		extras.act();
+		assert(extras.m_status.contains("isn’t the package") && !extras.m_installed);
+		qunsetenv("TEST_PACKAGE");
+		extras.act();
+		assert(extras.m_installed && extras.m_status.isEmpty());
+		assert(waitFor([&] { return QFile::exists(root.path() + "/started"); }));
+		confirm();
+		extras.act();
+		assert(!extras.m_installed);
+		writeFile(root.path() + "/releases.json", "[]");
+		extras.act();
+		assert(extras.m_status.contains("hasn’t been released") && !extras.m_installed);
+	}
+	QFile helperCalls(root.path() + "/helper-calls");
+	assert(helperCalls.open(QIODevice::ReadOnly));
+	const QByteArray helperLog = helperCalls.readAll();
+	assert(helperLog.count("install-deb ") == 1 && helperLog.contains("remove zacos9-extra-hue"));
 	return 0;
 }

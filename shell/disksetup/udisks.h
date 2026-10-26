@@ -26,11 +26,14 @@ struct VetVolume {
 	QStringList mountPoints;
 	bool canCheck = false, canRepair = false;
 	QString drive;     /* the drive's object */
+	QString uuid;      /* its filesystem's, for "Mount automatically" */
+	bool readOnly = false; /* mounted read-only (mountpolicy.h), set by the caller */
 };
 
 struct VetDrive {
 	QString model;
 	bool smart = false, failing = false;
+	bool removable = false; /* USB, a card or disc: not the computer's own */
 	double celsius = -1;   /* -1: unknown */
 	qint64 hours = -1;
 };

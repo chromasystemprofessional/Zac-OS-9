@@ -22,7 +22,32 @@
 #include <unistd.h>
 #include <cstdio>
 
+#include "mountpolicy.h"
 #include "netvolumes.h"
+
+#include <QDBusConnection>
+#include <QDBusMessage>
+#include <QDBusObjectPath>
+#include <QDBusPendingCallWatcher>
+#include <QDBusReply>
+
+/* Where the Memory control panel's RAM Disk is mounted (a tmpfs:
+ * memory/zacos9-memory-helper). */
+static const QString RAM_DISK = QStringLiteral("/run/zacos9-ramdisk");
+
+static bool ramDiskMounted() {
+	QFile table("/proc/self/mountinfo");
+	if (!table.open(QIODevice::ReadOnly)) {
+		return false;
+	}
+	for (const QByteArray &line : table.readAll().split('\n')) {
+		const QList<QByteArray> fields = line.split(' ');
+		if (fields.size() > 5 && QString::fromUtf8(fields[4]) == RAM_DISK) {
+			return true;
+		}
+	}
+	return false;
+}
 
 /* Mount-point prefixes that are never user-browsable storage: kernel
  * pseudo-filesystems, container overlays, snap loops, etc. */
@@ -103,9 +128,61 @@ std::vector<LocalVolume> localVolumeMacNames(const QByteArray &record,
 		if (QFileInfo(path).absolutePath() != container || !mounted.contains(path) || label.isEmpty()) {
 			continue;
 		}
-		volumes.push_back({ label, path, true, info.value("device").toString() });
+		volumes.push_back({ label, path, true, info.value("device").toString(), false, QString() });
 	}
 	return volumes;
+}
+
+/* A small, bounded read from a mounted disk. The disk is untrusted: never
+ * read an unbounded file from it, and use only these two known paths. */
+static QString readMountedFile(const QString &path, qsizetype limit) {
+	QFile file(path);
+	if (!file.open(QIODevice::ReadOnly)) {
+		return {};
+	}
+	return QString::fromUtf8(file.read(limit));
+}
+
+bool localVolumeZacosInfo(const QString &mountPath, QString *name, QString *version) {
+	const QString root = QDir::cleanPath(mountPath);
+	const QString named = readMountedFile(root + "/etc/zacos9/disk-name", 512);
+	const QString candidate = named.section('\n', 0, 0).trimmed();
+	if (candidate.isEmpty()) {
+		return false;
+	}
+	/* The installer writes disk-name only after installing the zacos9
+	 * package, so it is the cheap marker. Confirm it with dpkg's own record
+	 * rather than trusting a name alone. */
+	const QString status = readMountedFile(root + "/var/lib/dpkg/status", 16 * 1024 * 1024);
+	QString package, state, packageVersion;
+	const auto installed = [&] {
+		return package == "zacos9" && state == "install ok installed" &&
+			!packageVersion.isEmpty();
+	};
+	for (const QString &line : status.split('\n')) {
+		if (line.startsWith("Package: ")) {
+			if (installed()) {
+				break;
+			}
+			package = line.mid(9).trimmed();
+			state.clear();
+			packageVersion.clear();
+		} else if (package == "zacos9" && line.startsWith("Version: ")) {
+			packageVersion = line.mid(9).trimmed();
+		} else if (package == "zacos9" && line.startsWith("Status: ")) {
+			state = line.mid(8).trimmed();
+		}
+	}
+	if (!installed()) {
+		return false;
+	}
+	if (name) {
+		*name = candidate.left(128);
+	}
+	if (version) {
+		*version = packageVersion;
+	}
+	return true;
 }
 
 std::vector<LocalVolume> localVolumes() {
@@ -152,6 +229,11 @@ std::vector<LocalVolume> localVolumes() {
 			: QFileInfo(path).fileName();
 		g_free(rawName);
 		v.ejectable = g_mount_can_eject(mount) || g_volume_can_eject(vol);
+		QString zacosName;
+		if (localVolumeZacosInfo(path, &zacosName, &v.zacosVersion)) {
+			v.zacos = true;
+			v.name = zacosName;
+		}
 		g_object_unref(vol);
 		out.push_back(std::move(v));
 	}
@@ -167,6 +249,10 @@ std::vector<LocalVolume> localVolumes() {
 				mounted.insert(QString::fromUtf8(fields[4]));
 			}
 		}
+	}
+	/* The Memory control panel's RAM Disk, for the user it belongs to. */
+	if (mounted.contains(RAM_DISK) && QFileInfo(RAM_DISK).isReadable()) {
+		out.push_back({ "RAM Disk", RAM_DISK, false, QString(), false, QString() });
 	}
 	const QDir records("/run/media/zacos9-mac/" + QString::number(getuid()));
 	for (const QString &name : records.entryList({ "*.json" }, QDir::Files | QDir::NoSymLinks)) {
@@ -214,7 +300,8 @@ std::vector<LocalVolume> localVolumes() {
 		}
 		if (!shown) {
 			const QString device = info.value("device").toString();
-			out.push_back({ "Mac Disk (" + QFileInfo(device).fileName() + ")", path, true, device });
+			out.push_back({ "Mac Disk (" + QFileInfo(device).fileName() + ")", path, true, device,
+				false, QString() });
 		}
 	}
 	return out;
@@ -262,6 +349,7 @@ static void reportMacError(const QString &error) {
 /* ---- mounting ----------------------------------------------------------- */
 
 static QSet<QString> g_tried; /* volumes already mounted once, by device */
+static QSet<QString> g_retried; /* tried a second time after failing */
 static QSet<QString> g_mounting;
 static QSet<QString> g_erasing;
 static std::vector<std::function<void(const QString &)>> g_mountFailed;
@@ -280,6 +368,11 @@ static void macTool(const QStringList &arguments,
 		});
 	QObject::connect(process, &QProcess::finished, process,
 		[process, completed](int code, QProcess::ExitStatus status) {
+			/* Quitting kills a helper still running: what asked for it
+			 * (the Mac disk poll's timer) may already be gone. */
+			if (QCoreApplication::closingDown()) {
+				return;
+			}
 			const QString error = QString::fromUtf8(process->readAllStandardError()).trimmed();
 			completed(process->readAllStandardOutput(),
 				status == QProcess::NormalExit && code == 0 ? QString()
@@ -382,6 +475,62 @@ static QString volumeName(GVolume *v) {
 	return name;
 }
 
+static void mountIfNeeded(GVolume *v);
+
+static void reportMountFailed(const QString &device) {
+	for (auto &callback : g_mountFailed) {
+		callback(device);
+	}
+}
+
+/* The second try failed too: read-only, through UDisks (GIO can't ask for
+ * it). A volume a crash left marked in use (NTFS not closed cleanly)
+ * mounts so; Disk Setup's Repair clears the mark. Only if this fails too
+ * is the volume unreadable, which may offer to initialize it. */
+static void mountReadOnly(const QString &device, const QString &name) {
+	if (!QDBusConnection::systemBus().isConnected()) {
+		reportMountFailed(device); /* no UDisks to ask */
+		return;
+	}
+	const QString udisks = "org.freedesktop.UDisks2";
+	QDBusMessage resolve = QDBusMessage::createMethodCall(udisks, "/org/freedesktop/UDisks2/Manager",
+		"org.freedesktop.UDisks2.Manager", "ResolveDevice");
+	resolve.setArguments({ QVariantMap{ { "path", device } }, QVariantMap() });
+	auto *app = QCoreApplication::instance();
+	auto *found = new QDBusPendingCallWatcher(QDBusConnection::systemBus().asyncCall(resolve), app);
+	QObject::connect(found, &QDBusPendingCallWatcher::finished, app, [=] {
+		found->deleteLater();
+		const QDBusReply<QList<QDBusObjectPath>> objects = *found;
+		if (!objects.isValid() || objects.value().isEmpty()) {
+			reportMountFailed(device);
+			return;
+		}
+		QDBusMessage mount = QDBusMessage::createMethodCall(udisks, objects.value().front().path(),
+			"org.freedesktop.UDisks2.Filesystem", "Mount");
+		mount.setArguments({ QVariantMap{ { "options", "ro" } } });
+		/* Automatic, like the first try: never a password prompt, which at
+		 * login (or for a first-run account, not yet an administrator)
+		 * asked for root's password for another system's partition. */
+		mount.setInteractiveAuthorizationAllowed(false);
+		auto *mounted = new QDBusPendingCallWatcher(QDBusConnection::systemBus().asyncCall(mount), app);
+		QObject::connect(mounted, &QDBusPendingCallWatcher::finished, app, [=] {
+			mounted->deleteLater();
+			if (mounted->isError()) {
+				fprintf(stderr, "zacos9-finder: \"%s\" couldn't be mounted read-only either: %s\n",
+					qPrintable(name), qPrintable(mounted->error().message()));
+				reportMountFailed(device);
+				return;
+			}
+			const QString notice = QString("“%1” wasn't put away properly, so it has been opened "
+				"read-only. To use it normally again, open Disk Setup (System Folder ▸ Utilities) "
+				"and click Repair.").arg(name);
+			for (auto &callback : g_errors) {
+				callback(notice);
+			}
+		});
+	});
+}
+
 static void onMounted(GObject *src, GAsyncResult *res, gpointer) {
 	char *rawDevice = g_volume_get_identifier(G_VOLUME(src), G_VOLUME_IDENTIFIER_KIND_UNIX_DEVICE);
 	const QString mountedDevice = QString::fromUtf8(rawDevice ? rawDevice : "");
@@ -389,17 +538,27 @@ static void onMounted(GObject *src, GAsyncResult *res, gpointer) {
 	g_mounting.remove(mountedDevice);
 	GError *err = nullptr;
 	if (!g_volume_mount_finish(G_VOLUME(src), res, &err) && err) {
-		fprintf(stderr, "zacos9-finder: \"%s\" couldn't be mounted: %s\n",
-			qPrintable(volumeName(G_VOLUME(src))), err->message);
+		const QString name = volumeName(G_VOLUME(src));
+		fprintf(stderr, "zacos9-finder: \"%s\" couldn't be mounted: %s\n", qPrintable(name), err->message);
+		/* Not allowed (UDisks says so in words, through GIO): not a
+		 * damaged volume, so no read-only try. */
+		const bool refused = strstr(err->message, "Not authorized") || strstr(err->message, "not authorized");
 		if (!g_error_matches(err, G_IO_ERROR, G_IO_ERROR_CANCELLED) &&
 				!g_error_matches(err, G_IO_ERROR, G_IO_ERROR_PERMISSION_DENIED) &&
-				!g_error_matches(err, G_IO_ERROR, G_IO_ERROR_FAILED_HANDLED)) {
-			char *device = g_volume_get_identifier(G_VOLUME(src), G_VOLUME_IDENTIFIER_KIND_UNIX_DEVICE);
-			if (device) {
-				for (auto &callback : g_mountFailed) {
-					callback(QString::fromUtf8(device));
-				}
-				g_free(device);
+				!g_error_matches(err, G_IO_ERROR, G_IO_ERROR_FAILED_HANDLED) &&
+				!refused && !mountedDevice.isEmpty()) {
+			/* At login a drive can fail while UDisks is still starting:
+			 * once more a moment later, then read-only. */
+			if (!g_retried.contains(mountedDevice)) {
+				g_retried.insert(mountedDevice);
+				GVolume *volume = G_VOLUME(g_object_ref(src));
+				QTimer::singleShot(3000, QCoreApplication::instance(), [volume, mountedDevice] {
+					g_tried.remove(mountedDevice);
+					mountIfNeeded(volume);
+					g_object_unref(volume);
+				});
+			} else {
+				mountReadOnly(mountedDevice, name);
 			}
 		}
 		g_error_free(err);
@@ -426,6 +585,20 @@ static void mountIfNeeded(GVolume *v) {
 			return;
 		}
 	}
+	/* The computer's own disks: not USB, not a card or disc. */
+	bool internal = false;
+	if (GDrive *drive = g_volume_get_drive(v)) {
+		internal = !g_drive_is_removable(drive) && !g_drive_is_media_removable(drive);
+		g_object_unref(drive);
+	}
+	char *uuid = g_volume_get_identifier(v, G_VOLUME_IDENTIFIER_KIND_UUID);
+	/* Disk Setup's "Mount automatically", off for this volume; and in the
+	 * live session, off for internal disks until turned on (mountpolicy.h). */
+	const bool automatic = volumeMountsAutomatically(QString::fromUtf8(uuid ? uuid : ""), internal);
+	g_free(uuid);
+	if (internal && !automatic && liveSession()) {
+		return;
+	}
 	if (macFilesystem(key)) {
 		// Image loops are mounted by their owning image operation.
 		if (!key.startsWith("/dev/loop")) {
@@ -434,6 +607,9 @@ static void mountIfNeeded(GVolume *v) {
 		return;
 	}
 	if (!g_volume_can_mount(v)) {
+		return;
+	}
+	if (!automatic) {
 		return;
 	}
 	if (g_tried.contains(key) || g_mounting.contains(key)) {
@@ -478,6 +654,7 @@ static void onVolumeRemoved(GVolumeMonitor *, GVolume *v, gpointer) {
 	char *device = g_volume_get_identifier(v, G_VOLUME_IDENTIFIER_KIND_UNIX_DEVICE);
 	if (device) {
 		g_tried.remove(QString::fromUtf8(device));
+		g_retried.remove(QString::fromUtf8(device));
 		g_free(device);
 	}
 }
@@ -522,6 +699,20 @@ void localVolumesMountAll() {
 		mountIfNeeded(G_VOLUME(l->data));
 	}
 	g_list_free_full(volumes, g_object_unref);
+	/* The RAM Disk has no GVolume, so no mount-added: looked for. */
+	auto *ramPoll = new QTimer(QCoreApplication::instance());
+	ramPoll->setInterval(3000);
+	ramPoll->setProperty("mounted", ramDiskMounted());
+	QObject::connect(ramPoll, &QTimer::timeout, ramPoll, [ramPoll] {
+		const bool now = ramDiskMounted();
+		if (now != ramPoll->property("mounted").toBool()) {
+			ramPoll->setProperty("mounted", now);
+			for (auto &callback : g_cbs) {
+				callback();
+			}
+		}
+	});
+	ramPoll->start();
 	auto *macPoll = new QTimer(QCoreApplication::instance());
 	macPoll->setInterval(3000);
 	QObject::connect(macPoll, &QTimer::timeout, macPoll, [macPoll] {

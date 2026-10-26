@@ -40,6 +40,12 @@ struct DebianUpdate {
  * add have no "from"). */
 std::vector<DebianUpdate> parseAptSimulation(const QString &out);
 
+/* What the Debian half of a check says beside its updates: empty if
+ * both `apt-get update` (refreshCode) and the simulation (simulateCode,
+ * failing with `error` from apt) worked; otherwise why "no updates"
+ * can't be believed. -1 is "didn't start" or "was killed". */
+QString debianCheckProblem(int refreshCode, int simulateCode, const QString &error);
+
 /* Debian version order, by dpkg itself: true if a is newer than b. */
 bool versionNewer(const QString &a, const QString &b);
 /* The installed version of a package, or empty. */

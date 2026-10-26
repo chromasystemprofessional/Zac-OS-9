@@ -12,6 +12,25 @@ application list it draws on is in
 mounted: nothing outside the Finder needs this view, so nothing outside
 the Finder pays for it.
 
+## Mounted ZacOS 9 disks
+
+A disk containing an installed ZacOS 9 system is shown the same way when it is
+mounted from outside this computer. Detection is deliberately conservative:
+the disk must have `/etc/zacos9/disk-name`, and its
+`/var/lib/dpkg/status` must record `zacos9` as `install ok installed` with a
+version. Reads from the mounted disk are bounded because it is untrusted. The
+disk's name comes from its `disk-name`; the version comes from dpkg.
+
+The mounted disk's Finder root shows **System Folder**, **Applications** and
+**Home**, and not Debian's Unix hierarchy. Applications, System Folder and Home
+open folders on that disk; System Folder maps its familiar names onto `usr`,
+`usr/lib`, `usr/bin`, `usr/share`, `etc` and `etc/xdg/autostart`. Home prefers
+the same user name as the current session, else that disk's only home folder.
+The whole presentation is read-only: Finder never writes to the mounted disk,
+renames or moves its folders, or accepts drops there. Unmounting the disk
+removes its view. There is no FUSE mount; these are entries in the Finder's
+model.
+
 ## Desktop files and aliases
 
 The Desktop is **not** part of the virtual Macintosh hierarchy. It displays
@@ -388,14 +407,16 @@ the name it was installed with (`/etc/zacos9/disk-name`, written by
 
 ```json
 {
-  "version": 14,
+  "version": 16,
   "volume": {},
   "showUnixVolume": false,
   "nodes": [
     { "id": "system-folder", "name": "System Folder", "kind": "folder",
       "icon": "system-folder", "order": 0 },
-    { "id": "system-folder/fonts", "name": "Fonts", "kind": "fonts" },
-    { "id": "applications", "name": "Applications", "kind": "apps", "order": 1 },
+    { "id": "system-folder/fonts", "name": "Fonts", "kind": "fonts", "icon": "sf-fonts" },
+    { "id": "system-folder/fonts/language-kits", "name": "Language Kits", "kind": "fonts" },
+    { "id": "applications", "name": "Applications", "kind": "apps", "order": 1,
+      "icon": "applications-folder" },
     { "id": "utilities", "name": "Utilities", "kind": "apps", "visible": false,
       "categories": ["Utility", "System", "Settings"] }
   ],
@@ -409,7 +430,7 @@ A node's fields:
 |---|---|
 | `id` | Stable and unique. `/` separates it from its parent, so `system-folder/fonts` sits in `system-folder`. |
 | `name` | What the Finder shows. |
-| `kind` | `folder` (curated), `backed` (real directory), `apps`, `panels`, `fonts` (installed font catalog), `resource`, `launcher`, `unix`. |
+| `kind` | `folder` (curated), `backed` (real directory), `apps`, `panels`, `fonts` (installed font catalog: `system-folder/fonts` shows the free fonts that stand in for Mac OS 9's, once each, and the user's own; a `fonts` node whose id ends in `/language-kits` shows every other installed font; see `fontFolderFaces` in `shell/finder/fonts.h`), `resource`, `launcher`, `unix`. |
 | `backing` | For `backed`. `$HOME`, `$XDG_CONFIG_HOME`, `$XDG_DATA_HOME` and `$XDG_DOCUMENTS_DIR` are expanded. |
 | `provider` | For `resource`: fixed provider id (`sounds`, `startup-items`, …), never a command or arbitrary path. |
 | `action` | For built-in `launcher` rows: trusted internal actions (`system-information`, `extensions-manager`) only. |

@@ -11,3 +11,8 @@ test('printing-authorization', find_program('python3'),
   args: [files('test_mount_rule.py'), files('50-zacos9-printing.rules'),
     'org.opensuse.cupspkhelper.mechanism.printer-enable',
     'org.opensuse.cupspkhelper.mechanism.printer-set-default'])
+# The login window's Shut Down and Restart (issue #38: shell/finder/power.cpp).
+install_data('50-zacos9-power.rules',
+  install_dir: get_option('datadir') / 'polkit-1' / 'rules.d')
+test('power-authorization', find_program('python3'),
+  args: [files('test_power_rule.py'), files('50-zacos9-power.rules')])

@@ -1,0 +1,58 @@
+#!/bin/sh
+# /etc/grub.d/31_zacos9_haiku: Haiku beside ZacOS 9 in GRUB's menu (issue #42).
+#
+# os-prober (30_os-prober) has a Haiku probe, but it never finds a Haiku of
+# today: it looks for haiku_loader and the kernel as files in /system, where
+# Haiku has kept them inside its packages since 2013, and it takes the
+# filesystem for "befs" when GRUB's own mounting calls it "bfs". So this
+# finds Haiku's partitions (BFS) itself, whenever other systems are looked
+# for (GRUB_DISABLE_OS_PROBER=false, which zacos9-install sets beside
+# another system, and Startup Disk's Look for Other Systems):
+#  - BIOS: Haiku's own boot sector, chainloaded;
+#  - UEFI: Haiku's EFI loader in an EFI System partition (EFI/HAIKU/, or
+#    EFI/BOOT/BOOTX64.EFI when that one is Haiku's).
+#
+# Everything it prints goes into grub.cfg, and a line that isn't GRUB's
+# makes update-grub refuse the whole file (kernel updates too): only the
+# entries go to stdout, everything else to /dev/null or stderr.
+set -e
+[ "${GRUB_DISABLE_OS_PROBER:-true}" = false ] || exit 0
+. /usr/share/grub/grub-mkconfig_lib
+
+haiku=$(blkid -o device -t TYPE=befs 2>/dev/null || true)
+[ -n "$haiku" ] || exit 0
+
+# A menu entry reaching device $1 and starting Haiku with command $2.
+entry() {
+	echo "Found Haiku on $1" >&2
+	echo "menuentry 'Haiku' --class haiku --class os {"
+	prepare_grub_to_access_device "$1" | sed 's/^/\t/'
+	printf '\t%s\n}\n' "$2"
+}
+
+# (ZACOS9_FIRMWARE_EFI is for tests, as in zacos9-install.)
+if [ ! -d "${ZACOS9_FIRMWARE_EFI:-/sys/firmware/efi}" ]; then
+	for part in $haiku; do
+		entry "$part" "chainloader +1"
+	done
+	exit 0
+fi
+
+# UEFI: Haiku's loader, in any FAT partition (EFI System partitions are;
+# blkid reads the disks itself, as update-grub runs in a chroot during an
+# install, where lsblk has no udev to tell it partition types).
+look=$(mktemp -d)
+trap 'umount "$look" >/dev/null 2>&1 || true; rmdir "$look" 2>/dev/null || true' EXIT
+blkid -o device -t TYPE=vfat 2>/dev/null |
+while read -r esp; do
+	# (mount warns on stdout, of all places: "would change RO state")
+	mount -o ro "$esp" "$look" >/dev/null 2>&1 || continue
+	loader=$(cd "$look" && find . -ipath './efi/haiku/*.efi' 2>/dev/null | head -n 1)
+	if [ -z "$loader" ]; then
+		# The fallback loader, if Haiku put it there (anyboot images do).
+		loader=$(cd "$look" && find . -ipath './efi/boot/bootx64.efi' 2>/dev/null | head -n 1)
+		[ -n "$loader" ] && grep -qa "Welcome to the Haiku boot loader" "$look/$loader" || loader=
+	fi
+	umount "$look" >/dev/null 2>&1 || true
+	[ -z "$loader" ] || entry "$esp" "chainloader ${loader#.}"
+done

@@ -31,7 +31,8 @@ bool pl_code_settings_path(const char *program, char *out, size_t size);
  * wrote it. pl_electron_command calls these for every launch. */
 bool pl_code_use_native_title_bar(const char *settings);
 
-/* The screen's integer scale, from zacos9-wm's outputs file; 1 if unknown. */
+/* The screen's scale for X11 programs, from zacos9-wm's outputs file: the
+ * whole-number scale, 1 at 1.25 and 1.5 or if unknown. */
 int pl_screen_scale(void);
 
 /* For a command line (a desktop entry's Exec, or a shell command, either

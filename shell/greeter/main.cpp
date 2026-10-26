@@ -21,6 +21,7 @@
 #include <pwd.h>
 
 #include "greetd.h"
+#include "power.h"
 #include "panelkit.h"
 #include "pixels.h"
 #include "platinumshell.h"
@@ -87,6 +88,13 @@ public:
 		if (welcome.open(QIODevice::ReadOnly)) {
 			m_welcome = QString::fromUtf8(welcome.read(400)).simplified();
 		}
+		/* The Guest account has no password (zacos9-accounts-helper), and
+		 * we can't read /etc/shadow to see who else hasn't. */
+		QFile guest((conf.isEmpty() ? QString("/etc/zacos9") : QString::fromUtf8(conf)) +
+			"/guest-account");
+		if (guest.open(QIODevice::ReadOnly)) {
+			m_guest = QString::fromUtf8(guest.read(64)).trimmed();
+		}
 
 		/* Under the welcome and the chosen person's picture. */
 		int y = PICTURE_Y + PICTURE + 8;
@@ -108,8 +116,8 @@ public:
 		m_shutDown = PanelButton("Shut Down", QRect(MARGIN, by, 84, PL_BUTTON_H));
 		m_restart = PanelButton("Restart", QRect(MARGIN + 92, by, 72, PL_BUTTON_H));
 		m_logIn = PanelButton("Log In", QRect(W - MARGIN - 76, by, 76, PL_BUTTON_H), true);
-		m_shutDown.clicked = [] { QProcess::startDetached("systemctl", { "poweroff" }); };
-		m_restart.clicked = [] { QProcess::startDetached("systemctl", { "reboot" }); };
+		m_shutDown.clicked = [this] { power(Power::ShutDown); };
+		m_restart.clicked = [this] { power(Power::Restart); };
 		m_logIn.clicked = [this] { logIn(); };
 		m_list.picked = [this](int) {
 			m_error.clear();
@@ -240,10 +248,19 @@ protected:
 	}
 
 private:
+	/* The chosen person needs no password: the field is dimmed and empty. */
+	bool noPassword() const {
+		const int row = m_list.state.selected;
+		return row >= 0 && !m_guest.isEmpty() && m_accounts[static_cast<size_t>(row)].user == m_guest;
+	}
+
 	void updateEnabled() {
 		const bool idle = !m_greetd.busy();
 		m_logIn.enabled = idle && m_list.state.selected >= 0;
-		m_password.enabled = idle;
+		m_password.enabled = idle && !noPassword();
+		if (noPassword()) {
+			m_password.setText(QString());
+		}
 		m_shutDown.enabled = m_restart.enabled = idle;
 	}
 
@@ -270,8 +287,20 @@ private:
 
 	std::vector<Account> m_accounts;
 	QString m_welcome;
+	QString m_guest; /* the Guest account's user name, if it's on */
 	Greetd m_greetd;
 	QString m_error;
+
+	/* Shut Down, Restart: said here if it can't (issue #38). */
+	void power(Power what) {
+		m_error.clear();
+		const QString why = systemPower(what);
+		if (!why.isEmpty()) {
+			m_error = why;
+		}
+		updateEnabled();
+		update();
+	}
 	bool m_safeMode = false;
 	PanelList m_list;
 	PanelEdit m_password;

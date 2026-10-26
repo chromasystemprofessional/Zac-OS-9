@@ -20,6 +20,10 @@ struct plat_frame {
 	char *title_str;
 	int title_max;
 	bool dirty;
+	/* As drawn: at a fractional scale (in quarters; 0 at whole-number
+	 * scales) the frame's place on its screen, where its pattern repeats
+	 * (frame.c placement). */
+	int quarters, ux, uy;
 };
 
 /* Creates the frame nodes as children of parent. Call frame_raise_overlay()
@@ -41,6 +45,8 @@ void frame_set_style(struct plat_frame *frame, enum decor_style style);
 void frame_set_pressed(struct plat_frame *frame, enum decor_part part);
 /* A pop-up window's tab: its left edge, frame-local. */
 void frame_set_tab_x(struct plat_frame *frame, int tab_x);
+/* Draws what changed; also after a move, when the frame's screen pixels
+ * fall differently (a fractional scale) or it went to another screen. */
 void frame_commit(struct plat_frame *frame);
 
 /* Width and height of the frame (excluding shadow) for given content size. */

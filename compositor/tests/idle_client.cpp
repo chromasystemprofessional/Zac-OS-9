@@ -8,9 +8,18 @@
  *   idle_client --keys      an ordinary window that prints "shown", then
  *                           "key TEXT" for every key it gets, "press X Y" and
  *                           "release X Y" for every click
+ *   idle_client --field     a window with a text field, focused, and an Off
+ *                           button below it that takes the focus: prints
+ *                           "shown", then "text TEXT" as the field changes
+ *                           (test_onscreen_keyboard.py); built as
+ *                           test-field-client, it says so as ZacOS's own
+ *                           programs do (platinumShellInit)
  *   ... --app-id ID         with that Wayland app id (test_app_switch.py) */
 #include <QApplication>
 #include <QKeyEvent>
+#include <QLineEdit>
+#include <QPushButton>
+#include <QVBoxLayout>
 #include <QDBusInterface>
 #include <QDBusReply>
 #include <QMouseEvent>
@@ -20,6 +29,9 @@
 #include <QWindow>
 #include <cstdio>
 #include <cstring>
+#ifdef PLATINUM_FIELD
+#include "platinumshell.h"
+#endif
 
 /* Says which keys reach it. */
 class KeyWindow : public QWidget {
@@ -47,6 +59,32 @@ int main(int argc, char **argv) {
 	}
 	const bool dbus = argc > 1 && std::strcmp(argv[1], "--dbus") == 0;
 	const bool keys = argc > 1 && std::strcmp(argv[1], "--keys") == 0;
+	if (argc > 1 && std::strcmp(argv[1], "--field") == 0) {
+#ifdef PLATINUM_FIELD
+		platinumShellInit();
+#endif
+		QWidget form;
+		form.setWindowTitle("Field test");
+		auto *field = new QLineEdit(&form);
+		auto *off = new QPushButton("Off", &form);
+		off->setFocusPolicy(Qt::StrongFocus);
+		auto *column = new QVBoxLayout(&form);
+		column->addWidget(field);
+		column->addWidget(off);
+		QObject::connect(field, &QLineEdit::textChanged, [](const QString &text) {
+			std::printf("text %s\n", qPrintable(text));
+			std::fflush(stdout);
+		});
+		form.resize(320, 120);
+		form.show();
+		QTimer::singleShot(500, &form, [&] {
+			form.activateWindow();
+			field->setFocus();
+			std::printf("shown\n");
+			std::fflush(stdout);
+		});
+		return app.exec();
+	}
 	KeyWindow window;
 	window.setWindowTitle("Idle test film");
 	window.setAttribute(Qt::WA_StyledBackground, true); /* a subclass, so the style sheet paints */

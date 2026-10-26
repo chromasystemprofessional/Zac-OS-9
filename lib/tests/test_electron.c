@@ -120,6 +120,13 @@ int main(void) {
 		"output eDP-1 2880x1800 scale 2 nested 0 x 1920 y 0 main 1\n", f);
 	fclose(f);
 	check(pl_screen_scale() == 2, "the main screen's scale");
+	f = fopen(path, "w");
+	fputs("output eDP-1 2560x1600 scale 1.5 nested 0 x 0 y 0 main 1\n", f);
+	fclose(f);
+	check(pl_screen_scale() == 1, "1.5: X11 programs are drawn at 1x");
+	f = fopen(path, "w");
+	fputs("output eDP-1 2880x1800 scale 2 nested 0 x 0 y 0 main 1\n", f);
+	fclose(f);
 
 	/* Command lines. */
 	char command[1024], want[1024];

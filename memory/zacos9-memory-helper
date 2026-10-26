@@ -1,0 +1,456 @@
+#!/usr/bin/python3 -I
+"""The Memory control panel's helper: virtual memory, Compressed Memory, the
+RAM Disk and the out-of-memory guard. "status" needs no privileges; the rest run as root
+through pkexec.
+
+  zacos9-memory-helper status
+      one fact a line, tab-separated:
+        memory  TOTAL  AVAILABLE  CACHE      (bytes, from meminfo)
+        swapfile  SIZE  USED  ACTIVE         (/swapfile; SIZE 0 if none)
+        swapfile-room  BYTES                 (free on its file system)
+        other-swap  NAME  SIZE  USED         (swap this helper leaves alone)
+        zram  INSTALLED  ON  PERCENT  SIZE  USED  COMPRESSED
+                                             (Compressed Memory: the generator
+                                             installed, set on, its share of
+                                             memory; then zram0 as it runs)
+        guard  INSTALLED  ENABLED            (earlyoom: yes or no each)
+        ramdisk  MOUNTED  SIZE  USED  SAVE  CONFIGURED_SIZE
+  zacos9-memory-helper swap MEGABYTES   virtual memory on, that large
+  zacos9-memory-helper swap off         virtual memory off
+  zacos9-memory-helper guard on|off     earlyoom on or off
+  zacos9-memory-helper zram PERCENT     Compressed Memory on, holding up to
+                                        25, 50, 75 or 100% of memory
+  zacos9-memory-helper zram off         Compressed Memory off
+  zacos9-memory-helper ramdisk MEGABYTES save|nosave
+                                        the RAM Disk on (or resized)
+  zacos9-memory-helper ramdisk off      the RAM Disk off, its contents gone
+  zacos9-memory-helper ramdisk start    at startup: mounted as set, what
+                                        was saved put back (zacos9-ramdisk.service)
+  zacos9-memory-helper ramdisk stop     at shut down: saved, if it's to be
+
+Virtual memory is /swapfile and its /etc/fstab line; other swap (a
+partition) is reported and never touched. Compressed Memory is a zram swap
+device, zstd-compressed, that systemd-zram-generator makes at every boot
+from /etc/systemd/zram-generator.conf; off, that file has no [zram0]
+section, which hides Debian's default one in /usr/lib/systemd. The RAM Disk is a tmpfs at
+/run/zacos9-ramdisk owned by whoever turned it on, set in
+/etc/zacos9/memory.conf and saved to /var/lib/zacos9/ramdisk.tar.
+Problems go to stderr, exit 1.
+
+For tests (only when not run as root): ZACOS9_MEMORY_ROOT is the root the
+files above are under, ZACOS9_MEMORY_PROC the directory of meminfo and
+swaps, ZACOS9_MEMORY_SYS stands for /sys, ZACOS9_MEMORY_UID the caller's
+uid; the programs run (swapon, swapoff, mkswap, fallocate, systemctl,
+modprobe, mount, umount, mountpoint, tar) are found on PATH.
+"""
+import os
+import shutil
+import subprocess
+import sys
+
+MB = 1024 * 1024
+TESTING = os.geteuid() != 0
+
+
+def setting(name, default):
+    return os.environ.get(name, default) if TESTING else default
+
+
+ROOT = setting("ZACOS9_MEMORY_ROOT", "/")
+PROC = setting("ZACOS9_MEMORY_PROC", "/proc")
+SYS = setting("ZACOS9_MEMORY_SYS", "/sys")
+
+
+def at(path):
+    return os.path.join(ROOT, path.lstrip("/"))
+
+
+SWAPFILE = "/swapfile"
+FSTAB = at("/etc/fstab")
+CONF = at("/etc/zacos9/memory.conf")
+RAMDISK = at("/run/zacos9-ramdisk")
+SAVED = at("/var/lib/zacos9/ramdisk.tar")
+FSTAB_LINE = f"{SWAPFILE} none swap sw 0 0"
+ZRAM_CONF = at("/etc/systemd/zram-generator.conf")
+ZRAM_GENERATOR = at("/usr/lib/systemd/system-generators/zram-generator")
+ZRAM_PERCENTS = (25, 50, 75, 100)
+
+
+def die(message):
+    print(message, file=sys.stderr)
+    sys.exit(1)
+
+
+def run(*command, check=True):
+    try:
+        r = subprocess.run(list(command), capture_output=True, text=True)
+    except FileNotFoundError:
+        if check:
+            die(f"{command[0]} isn't installed.")
+        return None
+    if check and r.returncode != 0:
+        die((r.stderr.strip().splitlines() or [f"{command[0]} failed."])[-1])
+    return r
+
+
+def meminfo():
+    values = {}
+    with open(os.path.join(PROC, "meminfo"), encoding="ascii") as f:
+        for line in f:
+            key, _, rest = line.partition(":")
+            values[key] = int(rest.split()[0]) * 1024
+    return values
+
+
+def swaps():
+    """(name, size, used) for each active swap, from /proc/swaps."""
+    out = []
+    with open(os.path.join(PROC, "swaps"), encoding="utf-8") as f:
+        for line in f.readlines()[1:]:
+            fields = line.split()
+            if len(fields) >= 4:
+                out.append((fields[0], int(fields[2]) * 1024, int(fields[3]) * 1024))
+    return out
+
+
+def read_conf():
+    conf = {}
+    try:
+        with open(CONF, encoding="utf-8") as f:
+            for line in f:
+                key, sep, value = line.strip().partition("=")
+                if sep and not key.startswith("#"):
+                    conf[key.strip()] = value.strip()
+    except FileNotFoundError:
+        pass
+    return conf
+
+
+def write_conf(conf):
+    os.makedirs(os.path.dirname(CONF), exist_ok=True)
+    tmp = CONF + ".new"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write("# The Memory control panel's RAM Disk (zacos9-memory-helper).\n")
+        for key in sorted(conf):
+            f.write(f"{key}={conf[key]}\n")
+    os.replace(tmp, CONF)
+
+
+def mounted(path):
+    r = run("mountpoint", "-q", path, check=False)
+    return r is not None and r.returncode == 0
+
+
+def caller_uid():
+    if TESTING:
+        return int(os.environ.get("ZACOS9_MEMORY_UID", os.getuid()))
+    uid = os.environ.get("PKEXEC_UID")
+    if not uid:
+        die("Run this through pkexec, from the Memory control panel.")
+    return int(uid)
+
+
+# ---- status --------------------------------------------------------------
+
+def status():
+    info = meminfo()
+    cache = info.get("Cached", 0) + info.get("Buffers", 0) - info.get("Shmem", 0)
+    print(f"memory\t{info.get('MemTotal', 0)}\t{info.get('MemAvailable', 0)}\t{max(0, cache)}")
+    active = {name: (size, used) for name, size, used in swaps()}
+    file = at(SWAPFILE)
+    size = os.path.getsize(file) if os.path.isfile(file) else 0
+    size_on, used = active.get(SWAPFILE, (0, 0))
+    print(f"swapfile\t{size_on or size}\t{used}\t{'yes' if SWAPFILE in active else 'no'}")
+    usage = shutil.disk_usage(os.path.dirname(file) or "/")
+    print(f"swapfile-room\t{usage.free}")
+    for name, size, used in swaps():
+        if name != SWAPFILE and not name.startswith("/dev/zram"):
+            print(f"other-swap\t{name}\t{size}\t{used}")
+    zram_status()
+    installed = shutil.which("earlyoom") is not None or os.path.exists(at("/usr/bin/earlyoom"))
+    enabled = False
+    r = run("systemctl", "is-enabled", "earlyoom", check=False)
+    if r is not None:
+        enabled = r.stdout.strip() == "enabled"
+    print(f"guard\t{'yes' if installed else 'no'}\t{'yes' if enabled else 'no'}")
+    conf = read_conf()
+    is_mounted = mounted(RAMDISK)
+    total = free = 0
+    if is_mounted:
+        usage = shutil.disk_usage(RAMDISK)
+        total, free = usage.total, usage.free
+    configured = int(conf.get("ramdisk-mb", "0") or 0) * MB if conf.get("ramdisk") == "on" else 0
+    print(f"ramdisk\t{'yes' if is_mounted else 'no'}\t{total}\t{total - free}\t"
+          f"{'yes' if conf.get('ramdisk-save') == 'yes' else 'no'}\t{configured}")
+
+
+# ---- virtual memory ------------------------------------------------------
+
+def fstab_lines():
+    try:
+        with open(FSTAB, encoding="utf-8") as f:
+            return f.read().splitlines()
+    except FileNotFoundError:
+        return []
+
+
+def set_fstab(present):
+    lines = [l for l in fstab_lines() if not (l.split()[:1] == [SWAPFILE] and "swap" in l.split())]
+    if present:
+        lines.append(FSTAB_LINE)
+    tmp = FSTAB + ".new"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+    os.replace(tmp, FSTAB)
+
+
+def swap_off():
+    """Takes back what's in /swapfile, if there's room in memory for it."""
+    active = {name: used for name, _, used in swaps()}
+    if SWAPFILE in active:
+        used, room = active[SWAPFILE], meminfo().get("MemAvailable", 0)
+        if used + 256 * MB > room:
+            die(f"Virtual memory holds {used // MB} MB now, more than memory has free "
+                f"({room // MB} MB). Quit some programs, then try again.")
+        run("swapoff", at(SWAPFILE))
+
+
+def swap_on(megabytes):
+    if megabytes < 256:
+        die("Virtual memory can't be smaller than 256 MB.")
+    file = at(SWAPFILE)
+    old = os.path.getsize(file) if os.path.isfile(file) else 0
+    room = shutil.disk_usage(os.path.dirname(file) or "/").free + old
+    if megabytes * MB + 2048 * MB > room:
+        die(f"There isn't room on the disk for {megabytes} MB of virtual memory "
+            f"({room // MB - 2048} MB at most, keeping 2 GB free).")
+    swap_off()
+    if os.path.exists(file):
+        os.remove(file)
+    fs = run("findmnt", "-no", "FSTYPE", "--target", os.path.dirname(file) or "/", check=False)
+    if fs is not None and fs.stdout.strip() == "btrfs":
+        run("btrfs", "filesystem", "mkswapfile", "--size", f"{megabytes}m", file)
+    else:
+        made = run("fallocate", "-l", f"{megabytes}M", file, check=False)
+        if made is None or made.returncode != 0:
+            run("dd", "if=/dev/zero", f"of={file}", "bs=1M", f"count={megabytes}")
+        os.chmod(file, 0o600)
+        run("mkswap", file)
+    run("swapon", file)
+    set_fstab(True)
+
+
+def swap_remove():
+    swap_off()
+    set_fstab(False)
+    file = at(SWAPFILE)
+    if os.path.exists(file):
+        os.remove(file)
+
+
+# ---- Compressed Memory ---------------------------------------------------
+
+def zram_setting():
+    """(on, percent) as zram-generator.conf has it; a size this helper
+    didn't write counts as half."""
+    try:
+        with open(ZRAM_CONF, encoding="utf-8") as f:
+            text = f.read()
+    except FileNotFoundError:
+        return False, 50
+    percent = 50
+    for line in text.splitlines():
+        key, _, value = line.partition("=")
+        words = value.replace("*", " ").replace("/", " ").split()
+        if key.strip() == "zram-size" and len(words) == 3 and words[0] == "ram" and words[2] == "100":
+            if words[1].isdigit() and int(words[1]) in ZRAM_PERCENTS:
+                percent = int(words[1])
+    return "[zram0]" in text, percent
+
+
+def zram_status():
+    on, percent = zram_setting()
+    size = used = compressed = 0
+    for name, s, u in swaps():
+        if name.startswith("/dev/zram"):
+            size, used = size + s, used + u
+    try:
+        with open(os.path.join(SYS, "block/zram0/mm_stat"), encoding="ascii") as f:
+            compressed = int(f.read().split()[1])  # orig_data_size compr_data_size ...
+    except (OSError, IndexError, ValueError):
+        pass
+    installed = os.path.exists(ZRAM_GENERATOR)
+    print(f"zram\t{'yes' if installed else 'no'}\t{'yes' if on else 'no'}\t{percent}\t"
+          f"{size}\t{used}\t{compressed}")
+
+
+def zram_stop(why):
+    """Empties the device back into memory and takes it away. swapoff fails
+    if memory hasn't room for it, and then everything stays as it was."""
+    r = run("systemctl", "is-active", "--quiet", "dev-zram0.swap", check=False)
+    if r is not None and r.returncode == 0:
+        r = run("systemctl", "stop", "dev-zram0.swap", "systemd-zram-setup@zram0.service", check=False)
+        if r is None or r.returncode != 0:
+            die(f"Compressed Memory couldn't be {why}: too much of it is in use. "
+                "Quit some programs and try again.")
+
+
+def write_zram_conf(lines):
+    os.makedirs(os.path.dirname(ZRAM_CONF), exist_ok=True)
+    tmp = ZRAM_CONF + ".new"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write("\n".join(["# Written by the Memory control panel (zacos9-memory-helper)."] + lines) + "\n")
+    os.chmod(tmp, 0o644)
+    os.replace(tmp, ZRAM_CONF)
+
+
+def zram(percent):
+    if percent is None:
+        zram_stop("turned off")
+        write_zram_conf(["# Compressed Memory is off: with no device section here, the",
+                         "# generator's own default in /usr/lib/systemd is hidden."])
+        run("systemctl", "daemon-reload")
+        return
+    if percent not in ZRAM_PERCENTS:
+        die("Compressed Memory can hold a quarter, half, three quarters or all of memory.")
+    if not os.path.exists(ZRAM_GENERATOR):
+        die("Compressed Memory needs systemd-zram-generator, which isn't installed.")
+    # A device already set up keeps its size until it's reset.
+    zram_stop("changed")
+    write_zram_conf(["[zram0]", f"zram-size = ram * {percent} / 100", "compression-algorithm = zstd"])
+    run("modprobe", "zram", check=False)
+    run("systemctl", "daemon-reload")
+    r = run("systemctl", "start", "dev-zram0.swap", check=False)
+    if r is None or r.returncode != 0:
+        die("Compressed Memory couldn't be turned on.")
+
+
+# ---- the guard -----------------------------------------------------------
+
+def guard(on):
+    if shutil.which("earlyoom") is None and not os.path.exists(at("/usr/bin/earlyoom")):
+        die("earlyoom isn't installed.")
+    if on:
+        run("systemctl", "enable", "--now", "earlyoom")
+    else:
+        run("systemctl", "disable", "--now", "earlyoom")
+
+
+# ---- the RAM Disk --------------------------------------------------------
+
+def contents_size(path):
+    """What the files in `path` take up. Counted, not the filesystem's own
+    figure: that is the RAM Disk's once mounted, but whatever `path` sits on
+    if it isn't (the tests' folder, a mount that went away)."""
+    total = 0
+    for top, dirs, files in os.walk(path):
+        for name in dirs + files:
+            try:
+                total += os.lstat(os.path.join(top, name)).st_blocks * 512
+            except OSError:
+                pass
+    return total
+
+
+def ramdisk_mount(megabytes, uid):
+    os.makedirs(RAMDISK, mode=0o700, exist_ok=True)
+    options = f"size={megabytes}M,uid={uid},gid={uid},mode=0700"
+    if mounted(RAMDISK):
+        run("mount", "-o", f"remount,{options}", RAMDISK)
+    else:
+        run("mount", "-t", "tmpfs", "-o", options, "zacos9-ramdisk", RAMDISK)
+
+
+def ramdisk_on(megabytes, save):
+    total = meminfo().get("MemTotal", 0)
+    if megabytes < 16:
+        die("The RAM Disk can't be smaller than 16 MB.")
+    if megabytes * MB > total // 2:
+        die(f"The RAM Disk can be at most half of memory ({total // 2 // MB} MB).")
+    if mounted(RAMDISK):
+        if contents_size(RAMDISK) > megabytes * MB:
+            die("What's on the RAM Disk wouldn't fit in that size. Move some of it off first.")
+    uid = caller_uid()
+    ramdisk_mount(megabytes, uid)
+    conf = read_conf()
+    conf.update({"ramdisk": "on", "ramdisk-mb": str(megabytes),
+                 "ramdisk-save": "yes" if save else "no", "ramdisk-owner": str(uid)})
+    write_conf(conf)
+
+
+def ramdisk_off():
+    if mounted(RAMDISK):
+        r = run("umount", RAMDISK, check=False)
+        if r is None or r.returncode != 0:
+            die("The RAM Disk is in use: close what's open on it, then try again.")
+    conf = read_conf()
+    conf["ramdisk"] = "off"
+    write_conf(conf)
+    if os.path.exists(SAVED):
+        os.remove(SAVED)
+
+
+def ramdisk_start():
+    conf = read_conf()
+    if conf.get("ramdisk") != "on":
+        return
+    megabytes = int(conf.get("ramdisk-mb", "0") or 0)
+    if megabytes < 16:
+        return
+    ramdisk_mount(megabytes, int(conf.get("ramdisk-owner", "0") or 0))
+    if conf.get("ramdisk-save") == "yes" and os.path.exists(SAVED):
+        run("tar", "-xpf", SAVED, "-C", RAMDISK)
+
+
+def ramdisk_stop():
+    conf = read_conf()
+    if conf.get("ramdisk") != "on" or not mounted(RAMDISK):
+        return
+    if conf.get("ramdisk-save") == "yes":
+        os.makedirs(os.path.dirname(SAVED), mode=0o700, exist_ok=True)
+        tmp = SAVED + ".new"
+        run("tar", "-cpf", tmp, "-C", RAMDISK, ".")
+        os.replace(tmp, SAVED)
+    elif os.path.exists(SAVED):
+        os.remove(SAVED)
+
+
+# ---------------------------------------------------------------------------
+
+def number(text):
+    try:
+        value = int(text)
+    except ValueError:
+        die(f"“{text}” isn't a number of megabytes.")
+    return value
+
+
+def main(argv):
+    args = argv[1:]
+    if args == ["status"]:
+        status()
+    elif args == ["swap", "off"]:
+        swap_remove()
+    elif len(args) == 2 and args[0] == "swap":
+        swap_on(number(args[1]))
+    elif len(args) == 2 and args[0] == "guard" and args[1] in ("on", "off"):
+        guard(args[1] == "on")
+    elif args == ["zram", "off"]:
+        zram(None)
+    elif len(args) == 2 and args[0] == "zram":
+        zram(number(args[1]) if args[1].isdigit() else -1)
+    elif args == ["ramdisk", "off"]:
+        ramdisk_off()
+    elif args == ["ramdisk", "start"]:
+        ramdisk_start()
+    elif args == ["ramdisk", "stop"]:
+        ramdisk_stop()
+    elif len(args) == 3 and args[0] == "ramdisk" and args[2] in ("save", "nosave"):
+        ramdisk_on(number(args[1]), args[2] == "save")
+    else:
+        die("usage: zacos9-memory-helper status | swap MB|off | guard on|off | "
+            "zram PERCENT|off | ramdisk MB save|nosave | ramdisk off|start|stop")
+
+
+if __name__ == "__main__":
+    main(sys.argv)

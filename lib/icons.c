@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <string.h>
 
 #include "icons.h"
 
@@ -26,6 +27,35 @@ const uint32_t *pl_icon(enum pl_icon_kind kind, int size) {
 		cache[kind][s] = decode(icon_rows[kind][s], s == 0 ? 32 : 16);
 	}
 	return cache[kind][s];
+}
+
+enum pl_icon_kind pl_icon_for_program(const char *desktop_id) {
+	static const struct {
+		const char *id;
+		enum pl_icon_kind kind;
+	} programs[] = {
+		{ "zacos9-barkrecorder", PL_ICON_APP_BARKRECORDER },
+		{ "zacos9-calculator", PL_ICON_APP_CALCULATOR },
+		{ "zacos9-dogears", PL_ICON_APP_DOGEARS },
+		{ "zacos9-jigsaw", PL_ICON_APP_JIGSAW },
+		{ "zacos9-keytags", PL_ICON_APP_KEYTAGS },
+		{ "zacos9-notepad", PL_ICON_APP_NOTEPAD },
+		{ "zacos9-pedigree", PL_ICON_APP_PEDIGREE },
+		{ "zacos9-plotter", PL_ICON_APP_PLOTTER },
+		{ "zacos9-stash", PL_ICON_APP_STASH },
+	};
+	if (!desktop_id) {
+		return PL_ICON_APPLICATION;
+	}
+	const char *base = strrchr(desktop_id, '/');
+	base = base ? base + 1 : desktop_id;
+	const size_t len = strcspn(base, ".");
+	for (size_t i = 0; i < sizeof(programs) / sizeof(programs[0]); i++) {
+		if (strlen(programs[i].id) == len && strncmp(base, programs[i].id, len) == 0) {
+			return programs[i].kind;
+		}
+	}
+	return PL_ICON_APPLICATION;
 }
 
 const struct pl_label pl_labels[PL_LABEL_COUNT] = {

@@ -41,6 +41,7 @@ void parseUDisks(const UDisksObjects &objects, QList<VetVolume> *volumes, QMap<Q
 			const QVariantMap d = ifs.value("org.freedesktop.UDisks2.Drive");
 			VetDrive drive;
 			drive.model = (d.value("Vendor").toString() + ' ' + d.value("Model").toString()).trimmed();
+			drive.removable = d.value("Removable").toBool() || d.value("MediaRemovable").toBool();
 			if (ifs.contains("org.freedesktop.UDisks2.Drive.Ata")) {
 				const QVariantMap a = ifs.value("org.freedesktop.UDisks2.Drive.Ata");
 				drive.smart = a.value("SmartSupported").toBool() && a.value("SmartEnabled").toBool() &&
@@ -75,6 +76,7 @@ void parseUDisks(const UDisksObjects &objects, QList<VetVolume> *volumes, QMap<Q
 			v.device = bytes(b.value("Device"));
 		}
 		v.type = b.value("IdType").toString();
+		v.uuid = b.value("IdUUID").toString();
 		v.size = b.value("Size").toULongLong();
 		const QString label = b.value("IdLabel").toString();
 		v.name = label.isEmpty() ? v.device.section('/', -1) : label;

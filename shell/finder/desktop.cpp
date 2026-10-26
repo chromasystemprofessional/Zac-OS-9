@@ -232,6 +232,13 @@ void Desktop::networkDisconnected(const QString &path) {
 
 void Desktop::refreshLocalVolumes() {
 	const std::vector<LocalVolume> found = localVolumes();
+	std::vector<VfsZacosVolume> zacos;
+	for (const LocalVolume &volume : found) {
+		if (volume.zacos) {
+			zacos.push_back({ volume.path, volume.name, volume.zacosVersion });
+		}
+	}
+	vfsSetZacosVolumes(zacos);
 	/* Skip rebuild when nothing changed. */
 	if (found.size() == m_localVolumes.size()) {
 		bool same = true;
@@ -637,6 +644,10 @@ void Desktop::beginRename(Item *item) {
 
 void Desktop::mousePressEvent(QMouseEvent *e) {
 	const QPoint pos = e->position().toPoint();
+	/* A selection rectangle whose release never came (let go over another
+	 * window) ends here, or dragging the next icon would draw it on. */
+	m_marquee = false;
+	m_marqueeBase.clear();
 	if (Item *edited = m_editor.item()) {
 		if (m_editor.contains(edited->pos.x(), edited->pos.y(), pos)) {
 			return;

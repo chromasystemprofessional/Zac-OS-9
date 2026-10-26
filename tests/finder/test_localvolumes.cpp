@@ -1,7 +1,11 @@
 #include <gio/gio.h>
 
 #include <QCoreApplication>
+#include <QDir>
 #include <QElapsedTimer>
+#include <QFile>
+#include <QFileInfo>
+#include <QTemporaryDir>
 #include <QThread>
 #include <cassert>
 #include <functional>
@@ -33,6 +37,8 @@ static void volumeInterface(GVolumeIface *iface) {
 		return reinterpret_cast<TestVolume *>(volume)->ready;
 	};
 	iface->get_mount = [](GVolume *) -> GMount * { return nullptr; };
+	/* No drive: a volume without one counts as removable (mountIfNeeded). */
+	iface->get_drive = [](GVolume *) -> GDrive * { return nullptr; };
 	iface->mount_fn = [](GVolume *volume, GMountMountFlags, GMountOperation *,
 			GCancellable *cancel, GAsyncReadyCallback callback, gpointer data) {
 		auto *test = reinterpret_cast<TestVolume *>(volume);
@@ -75,10 +81,10 @@ extern "C" GVolumeMonitor *g_volume_monitor_get(void) {
 	return G_VOLUME_MONITOR(g_object_ref(monitor));
 }
 
-static bool waitFor(const std::function<bool()> &ready) {
+static bool waitFor(const std::function<bool()> &ready, int ms = 2000) {
 	QElapsedTimer elapsed;
 	elapsed.start();
-	while (!ready() && elapsed.elapsed() < 2000) {
+	while (!ready() && elapsed.elapsed() < ms) {
 		QCoreApplication::processEvents();
 		QThread::msleep(5);
 	}
@@ -100,6 +106,31 @@ int main(int argc, char **argv) {
 	assert(named[0].name == "Chromasystem SSD" && named[0].path == container + "/4");
 	assert(named[1].name == "Chromasystem SSD - Data" && named[1].path == container + "/6");
 	assert(named[0].macDevice == "/dev/sdb2" && named[0].ejectable);
+	/* An installed ZacOS 9 disk is recognized by its own marker, and only
+	 * when dpkg confirms the package. */
+	{
+		QTemporaryDir disk;
+		assert(disk.isValid());
+		const auto write = [&](const QString &relative, const QByteArray &body) {
+			const QString path = disk.path() + relative;
+			QDir().mkpath(QFileInfo(path).absolutePath());
+			QFile file(path);
+			assert(file.open(QIODevice::WriteOnly | QIODevice::Truncate));
+			file.write(body);
+		};
+		write("/etc/zacos9/disk-name", "External HD\n");
+		write("/var/lib/dpkg/status",
+			"Package: other\nStatus: install ok installed\nVersion: 1\n\n"
+			"Package: zacos9\nStatus: install ok installed\nVersion: 0.1.70\n\n");
+		QString name, version;
+		assert(localVolumeZacosInfo(disk.path(), &name, &version));
+		assert(name == "External HD" && version == "0.1.70");
+		write("/var/lib/dpkg/status",
+			"Package: zacos9\nStatus: deinstall ok config-files\nVersion: 0.1.70\n\n");
+		assert(!localVolumeZacosInfo(disk.path()));
+		write("/var/lib/dpkg/status", "Package: zacos9\nVersion: 0.1.70\n\n");
+		assert(!localVolumeZacosInfo(disk.path()));
+	}
 	assert(localVolumePathShown("/run/media/adam/Untitled"));
 	assert(localVolumePathShown("/media/adam/Untitled"));
 	assert(localVolumePathShown("/runner/files"));
@@ -133,18 +164,21 @@ int main(int argc, char **argv) {
 	volume->mounted = false;
 	volume->fail = true;
 	g_signal_emit_by_name(monitor, "volume-added", volume);
-	assert(waitFor([&] { return failures == 1; }));
-	assert(volume->attempts == 2);
+	/* A failure is tried once more a moment later, then read-only through
+	 * UDisks, which knows no /dev/sdz1: only then is it reported. */
+	assert(waitFor([] { return volume->attempts == 2; }) && failures == 0);
+	assert(waitFor([] { return volume->attempts == 3; }, 5000));
+	assert(waitFor([&] { return failures == 1; }, 5000));
 	g_signal_emit_by_name(monitor, "volume-changed", volume);
-	assert(volume->attempts == 2);
+	assert(volume->attempts == 3);
 	g_signal_emit_by_name(monitor, "volume-removed", volume);
 	volume->fail = false;
 	localVolumeInhibitMount("/dev/sdz", true);
 	g_signal_emit_by_name(monitor, "volume-added", volume);
 	localVolumeMountDevice("/dev/sdz");
-	assert(volume->attempts == 2);
+	assert(volume->attempts == 3);
 	localVolumeInhibitMount("/dev/sdz", false);
 	assert(waitFor([] { return volume->mounted; }));
-	assert(volume->attempts == 3);
+	assert(volume->attempts == 4);
 	return 0;
 }

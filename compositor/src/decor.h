@@ -93,6 +93,16 @@ bool decor_proxy_hit(const struct decor_state *st, int x, int y);
 /* Widest title ink that fits between the boxes, for text_render(). */
 int decor_title_max_width(const struct decor_state *st);
 
+/* An active title bar's stripes again, for a fractional scale (in
+ * quarters, as pl_snap): drawn straight onto the screen pixels of a frame
+ * part, dst (dw x dh) made by pl_snap_scale from decor_paint's 1x pixels.
+ * The part's top left is frame-local (px, py); the frame's is (ux, uy)
+ * logical pixels from the screen's origin. Scaled, the 1x stripes would
+ * come out uneven (lines one and two pixels thick by turns); these are six
+ * even ridges, each a whole number of pixels, in the same band. */
+void decor_paint_stripes_scaled(uint32_t *dst, int dw, int dh, const struct decor_state *st,
+	int px, int py, int ux, int uy, int quarters);
+
 /* Box origin (top-left of the 12x12 box) for a title-bar part. */
 void decor_box_origin(const struct decor_state *st, enum decor_part part,
 		int *bx, int *by);

@@ -21,6 +21,10 @@ struct plat_text {
 	int advance;      /* pen advance in pixels */
 	int stride;
 	uint8_t *mask;
+	/* What it shows (after any ellipsis) and in which enum pl_font, to
+	 * draw it again at another scale (text_render_scaled). */
+	char *utf8;
+	int font;
 };
 
 enum pl_font {
@@ -34,6 +38,11 @@ enum pl_font {
 struct plat_text *text_render_font(const char *utf8, int max_ink_width, enum pl_font font);
 /* The system font. */
 struct plat_text *text_render(const char *utf8, int max_ink_width);
+/* The same text in the font for a 1.25x, 1.5x or 1.75x screen (quarters
+ * 5, 6 or 7: assets/fonts/platinum-*-125|150|175.pfont), at the screen's
+ * pixels: its pen and baseline where the 1x text's fall on that screen
+ * (pl_snap), its letters even. NULL at other scales. */
+struct plat_text *text_render_scaled(const struct plat_text *text, int quarters);
 void text_destroy(struct plat_text *text);
 
 #ifdef __cplusplus

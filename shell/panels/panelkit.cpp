@@ -881,6 +881,10 @@ void PanelEdit::keepCaretVisible() {
 void PanelEdit::paint(pl_canvas *c, bool focused, bool caretOn) const {
 	const QRect r = rect;
 	pl_edit_frame_paint(c, r.left(), r.top(), r.right(), r.bottom());
+	if (!enabled) { /* dimmed: a gray outline, and never the focus ring */
+		pl_outline(c, r.left(), r.top(), r.right(), r.bottom(), GRAY(0x8));
+		focused = false;
+	}
 	if (focused) {
 		pl_focus_ring_paint(c, r.left(), r.top(), r.right(), r.bottom(), pl_accent_current(),
 			GRAY(0xD));
@@ -888,7 +892,7 @@ void PanelEdit::paint(pl_canvas *c, bool focused, bool caretOn) const {
 	/* Text and selection, clipped to the inside of the frame. */
 	const int cx0 = r.left() + 1, cy0 = r.top() + 1;
 	pl_canvas in = { c->px + (cy0 - c->y) * c->stride + (cx0 - c->x), c->stride, cx0, cy0,
-		r.width() - 2, r.height() - 2 };
+		r.width() - 2, r.height() - 2, c->log };
 	const int s0 = std::min(caret, anchor), s1 = std::max(caret, anchor);
 	const QStringList ls = lines();
 	int start = 0;
@@ -1146,6 +1150,10 @@ void PanelHost::setFocus(PanelEdit *e) {
 	if (e) {
 		e->selectAll();
 	}
+	/* A text field has the window's focus: for the on-screen keyboard
+	 * (platinumshell.cpp says so to zacos9-wm). */
+	m_widget->setAttribute(Qt::WA_InputMethodEnabled, e != nullptr);
+	m_widget->setProperty("zacos9TextField", e != nullptr);
 	m_caretOn = true;
 	m_widget->update();
 }

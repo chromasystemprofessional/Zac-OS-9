@@ -9,6 +9,7 @@
 #include "vfs.h"
 
 #include <QApplication>
+#include <QPointer>
 #include <QDir>
 #include <QDragEnterEvent>
 #include <QHash>
@@ -84,6 +85,12 @@ static bool folderExists(const QString &path) {
 }
 
 FolderWindow *FolderWindow::open(const QString &path) {
+	/* A mounted ZacOS 9 disk opens as its Macintosh view, not its Unix
+	 * root, wherever the path came from. */
+	const QString mac = vfsZacosVolumeRoot(path);
+	if (!mac.isEmpty() && mac != path) {
+		return open(mac);
+	}
 	const QString key = windowKey(path);
 	FolderWindow *w = openWindows().value(key);
 	if (w) {
@@ -152,7 +159,7 @@ void FolderWindow::reloadAll(const QString &folder) {
 
 FolderWindow::FolderWindow(const QString &path) : m_path(path) {
 	if (vfsIsFonts(path)) {
-		fontInvalidate();
+		fontRescan();
 	}
 	watchThumbnails(this);
 	watchFileAssociations(this);
@@ -271,8 +278,12 @@ void FolderWindow::setUpProxyIcon() {
 			}
 			/* The icon is above the window, in its title bar. */
 			const QPoint origin(width() / 2 - PL_ICON_LARGE / 2, -PL_ICON_LARGE);
+			const QPointer<FolderWindow> self(this);
 			startItemDrag(this, { item.get() }, { origin }, origin + QPoint(16, 24));
 			Finder::instance().dragEnded();
+			if (!self) {
+				return; /* closed during the drag's own event loop */
+			}
 			/* Moved away (into another folder, or the Trash): its window
 			 * goes, as for any folder that disappears from under it. */
 			if (!QFileInfo::exists(m_path)) {
@@ -1345,13 +1356,13 @@ QImage FolderWindow::printImage() {
 		m_scrollX = sx;
 		const int w = std::min(viewW, W - sx);
 		if (list) {
-			pl_canvas header = { px.c.px + sx, px.c.stride, sx, 0, w, BAND_H };
+			pl_canvas header = { px.c.px + sx, px.c.stride, sx, 0, w, BAND_H, px.c.log };
 			paintColumnHeaders(&header);
 		}
 		for (int sy = 0; sy < H; sy += viewH) {
 			m_scrollY = sy;
 			pl_canvas tile = { px.c.px + (band + sy) * px.c.stride + sx, px.c.stride, sx, sy,
-				w, std::min(viewH, H - sy) };
+				w, std::min(viewH, H - sy), px.c.log };
 			if (list) {
 				paintList(&tile);
 			} else if (m_mode == ViewMode::Buttons) {
@@ -1392,7 +1403,7 @@ void FolderWindow::paintEvent(QPaintEvent *) {
 	const int top = contentTop();
 	pl_canvas content = {
 		c->px + top * c->stride, c->stride, m_scrollX, m_scrollY,
-		viewWidth(), std::max(0, viewHeight()),
+		viewWidth(), std::max(0, viewHeight()), c->log,
 	};
 	if (m_mode == ViewMode::Icons) {
 		pl_hline(c, 0, W - 1, HEADER_H, C_BLACK);
@@ -1401,7 +1412,7 @@ void FolderWindow::paintEvent(QPaintEvent *) {
 		pl_hline(c, 0, W - 1, HEADER_H, C_BLACK);
 		paintButtons(&content);
 	} else {
-		pl_canvas band = { c->px + HEADER_H * c->stride, c->stride, m_scrollX, 0, W, BAND_H };
+		pl_canvas band = { c->px + HEADER_H * c->stride, c->stride, m_scrollX, 0, W, BAND_H, c->log };
 		paintColumnHeaders(&band);
 		if (m_headerDrag == HeaderDrag::Move) {
 			/* The header being moved, following the pointer. */
@@ -1508,6 +1519,11 @@ void FolderWindow::showContextMenuAt(QPoint pos) {
 
 void FolderWindow::mousePressEvent(QMouseEvent *e) {
 	const QPoint pos = e->position().toPoint();
+	/* A selection rectangle whose release never came ends here, as on
+	 * the desktop. */
+	if (m_marquee) {
+		endMarquee();
+	}
 	const int barX = width() - SB_WIDTH + 1, barY = height() - SB_WIDTH + 1;
 	if (isContextClick(e)) {
 		/* In the icons' area: as a plain click selects, then the menu. */

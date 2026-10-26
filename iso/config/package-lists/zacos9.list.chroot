@@ -40,14 +40,25 @@ wsdd2
 avahi-daemon
 pkexec
 
+# Printing: CUPS finds IPP Everywhere printers on the network by itself
+# (no cups-browsed: the zacos9 package conflicts with it), ipp-usb serves
+# USB printers the same way, system-config-printer is the Picker's
+# Settings… button.
+cups
+ipp-usb
+system-config-printer
+
 # The boot splash
 plymouth
 
 # The installer's boot loader (zacos9-install): GRUB for both UEFI and
 # BIOS computers. The -bin packages hold the boot images without
 # claiming the live system's own boot, so both kinds can be installed.
+# The signed GRUB and shim let an installed system start with Secure Boot on.
 grub2-common
 grub-efi-amd64-bin
+grub-efi-amd64-signed
+shim-signed
 grub-pc-bin
 efibootmgr
 
