@@ -54,6 +54,10 @@
 
     { "id": "extra-hue", "name": "Hue Lights", "category": "Extras",
       "blurb": "Philips Hue lights in The Collar: turn the rooms you choose on and off, set their brightness and pick their scenes. Press the bridge's link button, then choose Connect from the Hue module.",
-      "packages": ["zacos9-extra-hue"], "extra": { "id": "hue", "start": "zacos9-collar-hue" } }
+      "packages": ["zacos9-extra-hue"], "extra": { "id": "hue", "start": "zacos9-collar-hue" } },
+
+    { "id": "extra-turntable", "name": "Turntable", "category": "Extras",
+      "blurb": "Listen to a USB turntable through your speakers or TV, switched on and off from The Collar. Plug the turntable in, then choose On from the Turntable module. Left on, it plays again whenever the turntable is plugged in.",
+      "packages": ["zacos9-extra-turntable"], "extra": { "id": "turntable", "start": "zacos9-collar-turntable" } }
   ]
 }

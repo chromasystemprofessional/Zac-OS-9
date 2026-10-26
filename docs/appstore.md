@@ -217,7 +217,8 @@ repository mutations.
 
 The **Extras** category offers add-ons from the ZacOS Extras repository
 (`chromasystemprofessional/ZacOS-Extras` on GitHub, checked out beside this
-tree as `ZAC-OS-EXTRAS`), such as **Hue Lights** for The Collar. Each extra
+tree as `ZAC-OS-EXTRAS`), such as **Hue Lights** and **Turntable** (a USB
+turntable played through the sound output) for The Collar. Each extra
 is released there on its own, tagged `EXTRA-vVERSION` (`hue-v0.1.0`), with
 a `PACKAGE_VERSION_ARCH.deb` attached. Its package puts its program in
 `/usr/bin` and starts it at login from `/etc/xdg/autostart`.
