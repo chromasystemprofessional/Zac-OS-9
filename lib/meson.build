@@ -16,8 +16,13 @@ platinum_lib = static_library('platinum',
   'savers.c',
   'settings.c',
   'electron.c',
+  # Shared-memory buffers for the C Wayland programs. Only their headers
+  # here: the programs link libwayland-client themselves, and the
+  # compositor, which never uses these, doesn't.
+  'wlclient.c',
   include_directories: platinum_inc,
-  dependencies: [cairo, threads],
+  dependencies: [cairo, threads,
+    dependency('wayland-client').partial_dependency(compile_args: true, includes: true)],
   c_args: [
     '-DZACOS9_DATA_DIR="@0@"'.format(get_option('prefix') / get_option('datadir') / 'zacos9'),
     '-DZACOS9_SOURCE_DIR="@0@"'.format(meson.project_source_root()),

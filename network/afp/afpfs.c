@@ -322,9 +322,14 @@ static int fs_readdir(const char *path, void *buf, fuse_fill_dir_t fill, off_t o
 				continue; /* as the Finder hides them */
 			}
 			if (e->is_dir) {
+				/* Only if its path fits: cut short, it could be another
+				 * folder's. folder_id() looks up one not remembered. */
 				char child[PATH_MAX];
-				snprintf(child, sizeof(child), "%s/%s", strcmp(path, "/") ? path : "", e->name);
-				remember(child, e->id);
+				int len = snprintf(child, sizeof(child), "%s/%s",
+					strcmp(path, "/") ? path : "", e->name);
+				if (len >= 0 && (size_t)len < sizeof(child)) {
+					remember(child, e->id);
+				}
 			}
 			struct stat st;
 			fill_stat(e, &st);

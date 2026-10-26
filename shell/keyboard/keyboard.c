@@ -38,6 +38,7 @@
 #include "virtual-keyboard-unstable-v1-client-protocol.h"
 #include "widgets.h"
 #include "wlr-layer-shell-unstable-v1-client-protocol.h"
+#include "wlclient.h"
 
 #define FACE GRAY(0xC)
 #define MARGIN 6
@@ -204,13 +205,6 @@ static void key_release(struct key *k) {
 
 /* ---- drawing ------------------------------------------------------------------ */
 
-struct buffer {
-	struct wl_buffer *wl;
-	uint32_t *px;
-	size_t size;
-	bool busy;
-};
-
 static struct wl_compositor *compositor;
 static struct wl_shm *shm;
 static struct zwlr_layer_shell_v1 *layer_shell;
@@ -221,47 +215,9 @@ static struct zwlr_layer_surface_v1 *layer;
 static struct wp_viewport *viewport;
 static int w, h;        /* logical */
 static int scale120 = 120;
-static struct buffer buffers[2];
+static struct pl_shm_buffer buffers[2];
 static uint32_t *logical;
 static bool dirty;
-
-static void buffer_release(void *data, struct wl_buffer *wl_buffer) {
-	((struct buffer *)data)->busy = false;
-}
-
-static const struct wl_buffer_listener buffer_listener = { buffer_release };
-
-static void buffer_free(struct buffer *b) {
-	if (b->wl) {
-		wl_buffer_destroy(b->wl);
-		munmap(b->px, b->size);
-	}
-	memset(b, 0, sizeof(*b));
-}
-
-static bool buffer_make(struct buffer *b, int width, int height) {
-	const int stride = width * 4;
-	b->size = (size_t)stride * height;
-	const int fd = memfd_create("zacos9-keyboard", MFD_CLOEXEC);
-	if (fd < 0 || ftruncate(fd, (off_t)b->size) < 0) {
-		if (fd >= 0) {
-			close(fd);
-		}
-		return false;
-	}
-	b->px = mmap(NULL, b->size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-	if (b->px == MAP_FAILED) {
-		close(fd);
-		b->px = NULL;
-		return false;
-	}
-	struct wl_shm_pool *pool = wl_shm_create_pool(shm, fd, (int32_t)b->size);
-	b->wl = wl_shm_pool_create_buffer(pool, 0, width, height, stride, WL_SHM_FORMAT_XRGB8888);
-	wl_shm_pool_destroy(pool);
-	close(fd);
-	wl_buffer_add_listener(b->wl, &buffer_listener, b);
-	return true;
-}
 
 /* Whole-number scales draw each logical pixel k x k; 1.25, 1.5 and 1.75
  * (quarters 5, 6, 7) at the screen's own pixels, text in that scale's font. */
@@ -333,7 +289,7 @@ static void draw(void) {
 	if (!surface || w <= 0 || h <= 0) {
 		return;
 	}
-	struct buffer *b = !buffers[0].busy ? &buffers[0] : !buffers[1].busy ? &buffers[1] : NULL;
+	struct pl_shm_buffer *b = pl_shm_buffer_pick(buffers);
 	if (!b) {
 		dirty = true;
 		return;
@@ -370,13 +326,13 @@ static void draw(void) {
 }
 
 static void resize(void) {
-	buffer_free(&buffers[0]);
-	buffer_free(&buffers[1]);
+	pl_shm_buffer_free(&buffers[0]);
+	pl_shm_buffer_free(&buffers[1]);
 	free(logical);
 	const int k = whole(), q = quarters();
 	const int bw = q ? pl_snap(w, q) : w * k, bh = q ? pl_snap(h, q) : h * k;
 	logical = malloc((size_t)w * h * 4);
-	if (!logical || !buffer_make(&buffers[0], bw, bh) || !buffer_make(&buffers[1], bw, bh)) {
+	if (!logical || !pl_shm_buffer_make(&buffers[0], shm, "zacos9-keyboard", bw, bh, WL_SHM_FORMAT_XRGB8888) || !pl_shm_buffer_make(&buffers[1], shm, "zacos9-keyboard", bw, bh, WL_SHM_FORMAT_XRGB8888)) {
 		fprintf(stderr, "zacos9-keyboard: no memory\n");
 		quitting = true;
 		return;
