@@ -22,11 +22,12 @@ static constexpr int PAGE_W = W - MARGIN - X0; /* the page's width */
 static constexpr int RULE_Y = H - 46;          /* the line above the arrows */
 static constexpr int BTN_Y = H - MARGIN - PL_BUTTON_H;
 static constexpr int ARROW_W = 40;
+static constexpr int TCPIP_Y = 140; /* the Internet page's Open TCP/IP button */
 static constexpr uint32_t FACE = GRAY(0xD);
 static constexpr uint32_t RED = RGB(0x99, 0x00, 0x00);
 
 static const char *const TITLES[] = {
-	"Introduction", "Name", "Password", "Computer Name", "Time Zone", "Conclusion",
+	"Introduction", "Name", "Password", "Computer Name", "Time Zone", "Internet", "Conclusion",
 };
 
 static const QRegularExpression SHORT_NAME(QStringLiteral("^[a-z][a-z0-9_-]{0,31}$"));
@@ -128,6 +129,12 @@ SetupWindow::SetupWindow() {
 	m_zones.scrollTo(std::max(0, m_zones.state.selected - 5));
 	m_zones.picked = [this](int) { updateButtons(); };
 
+	m_openTcpip = PanelButton("Open TCP/IP…", QRect(X0, TCPIP_Y, 110, PL_BUTTON_H));
+	m_openTcpip.hint = "Opens the TCP/IP control panel, where you choose a Wi-Fi network.";
+	m_openTcpip.clicked = [this] { openTcpip(); };
+	m_netStatus = QStringLiteral("Checking…");
+	m_netTimer.callOnTimeout(this, [this] { checkNetwork(); });
+
 	m_back = PanelButton(QString(), QRect(W - MARGIN - 2 * ARROW_W - 10, BTN_Y, ARROW_W, PL_BUTTON_H));
 	m_next = PanelButton(QString(), QRect(W - MARGIN - ARROW_W, BTN_Y, ARROW_W, PL_BUTTON_H), true);
 	m_goAhead = PanelButton("Go Ahead", QRect(W - MARGIN - 90, BTN_Y, 90, PL_BUTTON_H), true);
@@ -165,6 +172,16 @@ void SetupWindow::showPage(Page p) {
 	m_back.rect.moveLeft(p == Conclusion ? W - MARGIN - 90 - 10 - ARROW_W
 	                                     : W - MARGIN - 2 * ARROW_W - 10);
 	m_host.buttons = { &m_back, p == Conclusion ? &m_goAhead : &m_next };
+	if (p == Internet) {
+		m_host.buttons.push_back(&m_openTcpip);
+	}
+	/* How the computer is connected, kept up to date while it's shown. */
+	if (p == Internet || p == Conclusion) {
+		checkNetwork();
+		m_netTimer.start(3000);
+	} else {
+		m_netTimer.stop();
+	}
 	m_host.defaultButton = p == Conclusion ? &m_goAhead : &m_next;
 	m_host.setFocus(m_host.edits.empty() ? nullptr : m_host.edits.front());
 	updateButtons();
@@ -302,6 +319,80 @@ void SetupWindow::goAhead() {
 	m_helper->closeWriteChannel();
 }
 
+/* The TCP/IP control panel, once at a time; its window opens over this one. */
+void SetupWindow::openTcpip() {
+	if (m_tcpip) {
+		return;
+	}
+	m_tcpip = new QProcess(this);
+	connect(m_tcpip, &QProcess::finished, this, [this] {
+		m_tcpip->deleteLater();
+		m_tcpip = nullptr;
+		checkNetwork();
+	});
+	connect(m_tcpip, &QProcess::errorOccurred, this, [this](QProcess::ProcessError e) {
+		if (e == QProcess::FailedToStart) {
+			m_netStatus = "TCP/IP couldn't be opened.";
+			m_tcpip->deleteLater();
+			m_tcpip = nullptr;
+			update();
+		}
+	});
+	m_tcpip->start("zacos9-tcpip", {});
+}
+
+/* nmcli's devices, read without waiting: the first wired or Wi-Fi one
+ * that's connected says how the computer reaches the Internet. */
+void SetupWindow::checkNetwork() {
+	if (m_nmcli) {
+		return;
+	}
+	m_nmcli = new QProcess(this);
+	connect(m_nmcli, &QProcess::finished, this, [this](int code, QProcess::ExitStatus) {
+		QString wired, wifi;
+		bool any = false;
+		for (const QByteArray &raw : m_nmcli->readAllStandardOutput().split('\n')) {
+			const QStringList f = QString::fromUtf8(raw).split(':');
+			if (f.size() < 3 || (f[0] != "ethernet" && f[0] != "wifi")) {
+				continue;
+			}
+			any = true;
+			if (f[1] != "connected") {
+				continue;
+			}
+			const QString name = f.mid(2).join(':').replace("\\:", ":");
+			if (f[0] == "ethernet" && wired.isEmpty()) {
+				wired = name;
+			} else if (f[0] == "wifi" && wifi.isEmpty()) {
+				wifi = name;
+			}
+		}
+		if (code != 0) {
+			m_netStatus = "Network settings aren't available.";
+		} else if (!wired.isEmpty()) {
+			m_netStatus = "Connected through Ethernet.";
+		} else if (!wifi.isEmpty()) {
+			m_netStatus = "Connected through Wi-Fi (“" + wifi + "”).";
+		} else if (any) {
+			m_netStatus = "Not connected.";
+		} else {
+			m_netStatus = "No network hardware found.";
+		}
+		m_nmcli->deleteLater();
+		m_nmcli = nullptr;
+		update();
+	});
+	connect(m_nmcli, &QProcess::errorOccurred, this, [this](QProcess::ProcessError e) {
+		if (e == QProcess::FailedToStart) {
+			m_netStatus = "Network settings aren't available.";
+			m_nmcli->deleteLater();
+			m_nmcli = nullptr;
+			update();
+		}
+	});
+	m_nmcli->start("nmcli", { "-t", "-f", "TYPE,STATE,CONNECTION", "device" });
+}
+
 /* ---- painting ---------------------------------------------------------------------- */
 
 static int wrapped(pl_canvas *c, const QString &s, int y, pl_font font = PL_FONT_SYSTEM,
@@ -327,8 +418,8 @@ void SetupWindow::paintPage(pl_canvas *c) {
 	case Intro: {
 		int y = wrapped(c, "Welcome to ZacOS 9.", 72);
 		y = wrapped(c, "This assistant asks a few questions to set up your computer: your name, "
-		               "a password, a name for the computer and your time zone. You can change "
-		               "them later.", y + 10);
+		               "a password, a name for the computer, your time zone and how it connects to "
+		               "the Internet. You can change them later.", y + 10);
 		wrapped(c, "Click the right arrow to begin.", y + 10);
 		break;
 	}
@@ -354,6 +445,15 @@ void SetupWindow::paintPage(pl_canvas *c) {
 		break;
 	}
 	case TimeZone: panelText(c, "What time zone are you in?", X0, 72); break;
+	case Internet: {
+		wrapped(c, "ZacOS 9 connects to the Internet through the TCP/IP control panel. "
+		           "Open it to choose a Wi-Fi network, or plug in a network cable. You can "
+		           "also skip this and connect later.", 72);
+		panelText(c, m_netStatus, X0, TCPIP_Y + 44, PL_FONT_VIEWS, GRAY(0x4));
+		wrapped(c, "From now on, you manage the Internet connection in TCP/IP: choose "
+		           "Control Panels ▸ TCP/IP from the Apple menu.", TCPIP_Y + 72);
+		break;
+	}
 	case Conclusion: {
 		panelText(c, "You're ready to set up ZacOS 9:", X0, 72);
 		const QString rows[][2] = {
@@ -361,6 +461,7 @@ void SetupWindow::paintPage(pl_canvas *c) {
 			{ "Short name:", m_shortName.text },
 			{ "Computer name:", m_computerName.text.trimmed() },
 			{ "Time zone:", QString(zoneId()).replace('_', ' ') },
+			{ "Internet:", m_netStatus },
 			{ "At startup:", m_autoLogin.on ? "Log in automatically" : "Ask for password" },
 		};
 		int y = 98;
