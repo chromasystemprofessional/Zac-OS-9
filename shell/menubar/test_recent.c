@@ -55,6 +55,13 @@ static void write_file(const char *path, const char *text) {
 	assert(g_file_set_contents(path, text, -1, NULL));
 }
 
+/* Sets when uri's bookmark was last changed, in seconds since 1970. */
+static void set_modified(GBookmarkFile *b, const char *uri, gint64 seconds) {
+	GDateTime *t = g_date_time_new_from_unix_utc(seconds);
+	g_bookmark_file_set_modified_date_time(b, uri, t);
+	g_date_time_unref(t);
+}
+
 int main(void) {
 	char *root = g_dir_make_tmp("zacos9-recent-XXXXXX", NULL);
 	char *state = g_build_filename(root, "state", NULL), *data = g_build_filename(root, "data", NULL),
@@ -85,9 +92,9 @@ int main(void) {
 	for (size_t i = 0; i < G_N_ELEMENTS(uris); i++) {
 		g_bookmark_file_add_application(b, uris[i], "test", "true %u");
 	}
-	g_bookmark_file_set_modified(b, u1, 1000);
-	g_bookmark_file_set_modified(b, u2, 2000);
-	g_bookmark_file_set_modified(b, "file:///nonexistent/gone.txt", 3000);
+	set_modified(b, u1, 1000);
+	set_modified(b, u2, 2000);
+	set_modified(b, "file:///nonexistent/gone.txt", 3000);
 	assert(g_bookmark_file_to_file(b, xbel, NULL));
 	g_bookmark_file_free(b);
 

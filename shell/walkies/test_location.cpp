@@ -21,7 +21,9 @@ int main(int argc, char **argv) {
 	home.name = "Home";
 	home.trickSet = "Base";
 	CHECK(saveLocation(home));
-	CHECK(!saveLocation(Location{ "a/b" }));
+	Location slash;
+	slash.name = "a/b";
+	CHECK(!saveLocation(slash));
 	Location read;
 	CHECK(locationNames() == QStringList({ "Home" }) && readLocation("Home", &read));
 	CHECK(read.network == home.network && read.volume == 70 && read.trickSet == "Base");

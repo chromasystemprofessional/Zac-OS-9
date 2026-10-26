@@ -105,8 +105,8 @@ int main(void) {
 	char *saved_path = strdup(getenv("PATH") ? getenv("PATH") : "/usr/bin:/bin");
 	setenv("PATH", root, 1);
 	snprintf(path, sizeof(path), "%s/linked", root);
-	symlink(app, path);
-	check(pl_electron_app("linked"), "a name on $PATH is followed through its symlink");
+	check(symlink(app, path) == 0 && pl_electron_app("linked"),
+		"a name on $PATH is followed through its symlink");
 
 	/* The scale: the main screen's, from the outputs file. */
 	setenv("XDG_RUNTIME_DIR", root, 1);
@@ -241,17 +241,16 @@ int main(void) {
 	snprintf(real, sizeof(real), "%s/dotfiles-settings.json", root);
 	snprintf(link, sizeof(link), "%s/Code/User/linked.json", root);
 	write_text(real, "{ \"a\": 1 }\n");
-	symlink(real, link);
 	char *through = NULL;
-	check(pl_code_use_native_title_bar(link) && lstat(link, &st) == 0 && S_ISLNK(st.st_mode) &&
+	check(symlink(real, link) == 0 && pl_code_use_native_title_bar(link) &&
+		lstat(link, &st) == 0 && S_ISLNK(st.st_mode) &&
 		(through = slurp(real, NULL)) && strstr(through, "\"window.titleBarStyle\": \"native\""),
 		"a symlinked settings file is changed through the link");
 	free(through);
 	snprintf(link, sizeof(link), "%s/Code/User/dangling.json", root);
 	snprintf(real, sizeof(real), "%s/nowhere.json", root);
-	symlink(real, link);
-	check(!pl_code_use_native_title_bar(link) && access(real, F_OK) != 0,
-		"a symlink to nothing is left alone");
+	check(symlink(real, link) == 0 && !pl_code_use_native_title_bar(link) &&
+		access(real, F_OK) != 0, "a symlink to nothing is left alone");
 	if (geteuid() != 0) {
 		write_text(want_path, "{ \"secret\": 1 }\n");
 		chmod(want_path, 0);

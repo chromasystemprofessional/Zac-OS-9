@@ -496,7 +496,9 @@ void AppearancePanel::paintColorTab(pl_canvas *c) {
 	Text sample("Sample", 200, PL_FONT_SYSTEM);
 	pl_group_box_paint(c, BOX_L, top, BOX_R, top + 1 + PL_GROUP_MARGIN_TOP + 16 + PL_GROUP_MARGIN,
 		sample.t, PANE);
-	pl_scrollbar sb = { false, 150, true, 0 };
+	pl_scrollbar sb{};
+	sb.length = 150;
+	sb.enabled = true;
 	sb_smart(&sb, 1, 3); /* a third of a page shows: Smart Scrolling's thumb */
 	sb.thumb = sb_thumb_span(&sb) / 3;
 	pl_scrollbar_paint(c, BOX_L + ITEM_INSET, top + 1 + PL_GROUP_MARGIN_TOP, &sb,
