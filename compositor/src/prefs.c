@@ -258,7 +258,11 @@ static void logical_size(struct wlr_output *o, int *w, int *h) {
 
 /* Where each screen sits: all at the origin when mirrored; else where the
  * Monitors panel put them, if that is a layout without overlaps; else side
- * by side, left to right, in the order they were connected. */
+ * by side, left to right, in the order they were connected. Either way the
+ * top-left screen starts at the origin: a saved screen that isn't connected
+ * leaves no empty strip before the others. An empty strip made X11's root
+ * wider than its screens, and X11 programs that map a tablet over the
+ * whole root (Krita) put the pen in the wrong place. */
 static void apply_layout(struct plat_server *server) {
 	struct plat_output *output;
 	struct wlr_output *outs[16];
@@ -322,8 +326,13 @@ static void apply_layout(struct plat_server *server) {
 			}
 		}
 	}
+	int left = xs[0], top = ys[0];
+	for (int i = 1; i < n; i++) {
+		left = xs[i] < left ? xs[i] : left;
+		top = ys[i] < top ? ys[i] : top;
+	}
 	for (int i = 0; i < n; i++) {
-		wlr_output_layout_add(server->output_layout, outs[i], xs[i], ys[i]);
+		wlr_output_layout_add(server->output_layout, outs[i], xs[i] - left, ys[i] - top);
 	}
 	wl_list_for_each(output, &server->outputs, link) {
 		layers_arrange(output);
