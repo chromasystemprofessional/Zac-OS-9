@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Contributing
+    url: https://github.com/chromasystemprofessional/Zac-OS-9/blob/main/CONTRIBUTING.md
+    about: Building ZacOS 9, running it, testing it, and sending a change.

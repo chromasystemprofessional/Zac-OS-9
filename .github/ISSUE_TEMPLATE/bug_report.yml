@@ -1,0 +1,39 @@
+name: Something's wrong
+description: A crash, something that doesn't work, or something that looks wrong.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected instead. A screenshot helps for anything that looks wrong.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to make it happen
+      description: The steps, as exactly as you can. If you can't make it happen again, say what you were doing.
+      placeholder: |
+        1. Open the Sniffer
+        2. …
+  - type: input
+    id: version
+    attributes:
+      label: ZacOS version
+      description: Zac menu ▸ About This Computer, or `dpkg -l zacos9` in a terminal.
+      placeholder: "1.0.22"
+    validations:
+      required: true
+  - type: input
+    id: computer
+    attributes:
+      label: Computer
+      description: The make and model, or the virtual machine; and the screens, if it's about displays.
+      placeholder: "ThinkPad T480, one 4K screen at 2x"
+  - type: textarea
+    id: log
+    attributes:
+      label: Session log
+      description: "If it's a crash or something didn't start: the end of `~/.local/state/zacos9/session.log`. It can contain file and network names, so look it over first."
+      render: text
