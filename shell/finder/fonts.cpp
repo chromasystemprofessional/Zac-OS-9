@@ -85,12 +85,17 @@ int formatRank(const QString &file) {
 	return suffix == "otf" || suffix == "ttf" || suffix == "ttc" ? 0 : 1;
 }
 
+/* A copy that owns all it points to: text_destroy frees utf8 as well as the
+ * mask, and a copy sharing the cached one's utf8 freed it under the cache,
+ * then again with every copy after (a font without an "A", drawn in the
+ * system font, crashed the Finder as its icon was painted). */
 plat_text *cloneText(const plat_text *source) {
 	auto *copy = static_cast<plat_text *>(std::malloc(sizeof(plat_text)));
 	*copy = *source;
 	const size_t size = source->stride * source->height;
 	copy->mask = static_cast<uint8_t *>(std::malloc(size));
 	std::memcpy(copy->mask, source->mask, size);
+	copy->utf8 = source->utf8 ? strdup(source->utf8) : nullptr;
 	return copy;
 }
 

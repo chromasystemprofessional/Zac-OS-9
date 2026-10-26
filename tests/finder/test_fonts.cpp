@@ -238,6 +238,19 @@ int main(int argc, char **argv) {
 		check(!sameMask(sample.t, system.t), "the suitcase's A is drawn in the font itself");
 	}
 	{
+		/* A font without an "A" (here a file that isn't one) gets the system
+		 * font's: drawn again and again, each copy owns all of itself. Its
+		 * text once shared the cached copy's, freed again with every repaint
+		 * (glibc aborts on the second free). */
+		const QString none = temporary.filePath("not-a-font.ttf");
+		for (int i = 0; i < 3; ++i) {
+			Text sample;
+			sample.t = fontRenderSample(none, 0, 15);
+			check(sample.t && sample.t->utf8 && QByteArray(sample.t->utf8) == "A",
+				"a sample in the system font is a whole copy, drawn again");
+		}
+	}
+	{
 		/* Wrapping a name draws it a piece at a time: its file opens once,
 		 * and a Fonts window opening keeps what was drawn. */
 		fontInvalidate();
