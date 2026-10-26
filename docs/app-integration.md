@@ -2,7 +2,7 @@
 
 How far third-party programs (GTK, Qt, Electron, ...) look and behave like
 Mac OS 9 Platinum, what is done, and what to do next. Written to resume
-from: read this, then `PROJECT_STATUS.md` for the latest entries.
+from: read this, then `git log -- shell/qtstyle share/themes` for the latest changes.
 
 ## The approach
 
@@ -438,4 +438,4 @@ a test calling `soffice.bin` directly must too.
   `build/shell/vptr` (use `V=build/shell/vptr` after `cd` to the repo; the
   path has spaces).
 - Real hardware differs: a 2007 iMac's Radeon locks up under GL, so the
-  session draws with pixman on the `radeon` driver (see PROJECT_STATUS.md).
+  session draws with pixman on the `radeon` driver.

@@ -1,0 +1,46 @@
+name: CONTRIBUTING.md works
+
+# CONTRIBUTING.md's "Set up", "Build" and "Test" steps, as written, on a clean
+# Debian 13: if they stop working for a newcomer, this fails. Keep the two in
+# step (run as root here, so without sudo).
+
+on:
+  push:
+    branches: [main, "agents/**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: contributing-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  first-build:
+    runs-on: ubuntu-24.04
+    container: debian:13-slim
+    timeout-minutes: 45
+    env:
+      DEBIAN_FRONTEND: noninteractive
+    steps:
+      - name: Set up
+        run: |
+          apt-get update
+          apt-get install -y git build-essential devscripts
+
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: apt build-dep ./
+        run: apt-get build-dep -y ./
+
+      - name: Build
+        run: scripts/build.sh
+
+      - name: Test
+        run: |
+          meson test -C build --list > /dev/null
+          meson test -C build disksetup-plan installed-files --print-errorlogs

@@ -1,0 +1,16 @@
+name: An idea
+description: Something ZacOS 9 could do, or do better.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What you'd like
+      description: What you want to do, and what gets in the way today.
+    validations:
+      required: true
+  - type: textarea
+    id: mac
+    attributes:
+      label: How Mac OS 8 or 9 did it
+      description: If it had this, how it worked there. ZacOS follows it where it can.
