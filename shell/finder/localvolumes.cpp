@@ -508,7 +508,10 @@ static void mountReadOnly(const QString &device, const QString &name) {
 		QDBusMessage mount = QDBusMessage::createMethodCall(udisks, objects.value().front().path(),
 			"org.freedesktop.UDisks2.Filesystem", "Mount");
 		mount.setArguments({ QVariantMap{ { "options", "ro" } } });
-		mount.setInteractiveAuthorizationAllowed(true);
+		/* Automatic, like the first try: never a password prompt, which at
+		 * login (or for a first-run account, not yet an administrator)
+		 * asked for root's password for another system's partition. */
+		mount.setInteractiveAuthorizationAllowed(false);
 		auto *mounted = new QDBusPendingCallWatcher(QDBusConnection::systemBus().asyncCall(mount), app);
 		QObject::connect(mounted, &QDBusPendingCallWatcher::finished, app, [=] {
 			mounted->deleteLater();
@@ -537,10 +540,13 @@ static void onMounted(GObject *src, GAsyncResult *res, gpointer) {
 	if (!g_volume_mount_finish(G_VOLUME(src), res, &err) && err) {
 		const QString name = volumeName(G_VOLUME(src));
 		fprintf(stderr, "zacos9-finder: \"%s\" couldn't be mounted: %s\n", qPrintable(name), err->message);
+		/* Not allowed (UDisks says so in words, through GIO): not a
+		 * damaged volume, so no read-only try. */
+		const bool refused = strstr(err->message, "Not authorized") || strstr(err->message, "not authorized");
 		if (!g_error_matches(err, G_IO_ERROR, G_IO_ERROR_CANCELLED) &&
 				!g_error_matches(err, G_IO_ERROR, G_IO_ERROR_PERMISSION_DENIED) &&
 				!g_error_matches(err, G_IO_ERROR, G_IO_ERROR_FAILED_HANDLED) &&
-				!mountedDevice.isEmpty()) {
+				!refused && !mountedDevice.isEmpty()) {
 			/* At login a drive can fail while UDisks is still starting:
 			 * once more a moment later, then read-only. */
 			if (!g_retried.contains(mountedDevice)) {
