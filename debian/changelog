@@ -1,3 +1,118 @@
+zacos9 (1.0.22) trixie; urgency=medium
+
+  * Fixes the Sniffer crashing after you looked in the Fonts folder: fonts
+    without the letter A (symbol, emoji and some Asian-language fonts)
+    damaged its memory each time their icons were drawn. Also fixes a
+    drawing tablet's pen landing in the wrong place in Krita and other X11
+    programs when a monitor you had arranged in Monitors isn't connected:
+    the screens now always start at the top left, as they're arranged.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Mon, 26 Oct 2026 12:22:14 -0400
+
+zacos9 (1.0.21) trixie; urgency=medium
+
+  * ZacOS 9 can now be installed next to what's already on a disk, such as
+    Windows or Haiku, instead of erasing it: the Installer offers Erase the
+    whole disk or Next to what's on it, shows the disk as a partition map,
+    and lets you drag the line to give ZacOS 9 more or less room. When
+    another system is on the computer, a menu lets you choose which one
+    starts. Disk Setup's Partition tab is now a partition map too: drag to
+    resize, + and − to add and delete. Also fixed: the desktop no longer
+    asks for an administrator's password when it opens another system's
+    disk by itself.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Mon, 26 Oct 2026 00:51:10 -0400
+
+zacos9 (1.0.20) trixie; urgency=medium
+
+  * Fixes a crash that could log you out: opening a menu in some older X11
+    programs (those built with Tk, such as the Extension Icons tool)
+    stopped the desktop. Windows that switch between ordinary and pop-up
+    after they're made are now handled properly.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Sun, 25 Oct 2026 20:16:17 -0400
+
+zacos9 (1.0.19) trixie; urgency=medium
+
+  * Learn ZacOS: a new tutorial in the Help menu, starting with how the
+    lessons work, a path for people who have used a Mac before, and Mouse
+    Practice. The Zac menu is now a folder you can arrange, with aliases to
+    the desk accessories, a Disabled folder and their own icons, and it now
+    includes Jigsaw Puzzle (with its sound) and Plotter.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Sun, 25 Oct 2026 19:09:26 -0400
+
+zacos9 (1.0.18) trixie; urgency=medium
+
+  * Screen Sharing plays the other computer's sound, and a bar at the top
+    of the screen switches between it and your own desktop (Use My Desktop
+    / Full Screen, Sound, Disconnect). Touchscreens: a two-finger tap is a
+    right-click, and an on-screen keyboard appears for a text field when no
+    keyboard is attached.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Sun, 25 Oct 2026 14:43:48 -0400
+
+zacos9 (1.0.17) trixie; urgency=medium
+
+  * Screen Sharing: a new control panel lets other ZacOS computers see and
+    use this screen (asking you first, with the owner's password), and its
+    Connect tab shows another ZacOS computer's screen full screen and
+    undistorted, whatever this monitor's pixel size. Shut Down and Restart
+    work again in the login window, and Restart in the installer (issue
+    #38).
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Sun, 25 Oct 2026 11:20:27 -0400
+
+zacos9 (1.0.16) trixie; urgency=medium
+
+  * Each monitor can have its own pixel size, and the menu bar can appear
+    on every monitor (Monitors: Menu Bar on Every Display). There is a new
+    1.75× size, and at 1.25×, 1.5× and 1.75× ZacOS's windows, title
+    bars, menus, pointer and text are drawn sharp at the screen's own
+    pixels, with fonts made for each size (issues #23, #34). Installing a
+    downloaded package now asks for an administrator's password, and fixes
+    from a security and reliability audit: clippings, updating an installed
+    disk from the installer, Software Update's checks, the lock screen and
+    Slow Keys.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Sun, 25 Oct 2026 00:06:41 -0400
+
+zacos9 (1.0.15) trixie; urgency=medium
+
+  * Windows hidden but not closed, such as Krita's splash screen, no longer
+    leave their title bar behind. The pointer is the same size on the
+    desktop as inside programs at every pixel size, including 1.25x, 1.5x
+    and 3x. Bangla and other scripts outside DejaVu now have fonts (Noto).
+    Installing over another system's partitions works: the installer frees
+    a disk the live session or another system left mounted.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Sat, 24 Oct 2026 18:17:05 -0400
+
+zacos9 (1.0.14) trixie; urgency=medium
+
+  * Monitors offers 1.25× and 1.5× pixel sizes: programs that can draw at
+    any size (Firefox, Chromium, GTK 4, Qt 6) stay sharp at them, while
+    ZacOS's own windows are drawn at 2× and shown smaller.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Fri, 23 Oct 2026 15:45:39 -0400
+
+zacos9 (1.0.13) trixie; urgency=medium
+
+  * Extensions Manager turns curated extensions on or off for start-up;
+    About This Computer shows GPU hardware with its driver; Finder shows
+    mounted ZacOS disks as Mac volumes; touchscreens work as touch in apps
+    that take wl_touch and as the mouse elsewhere.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Fri, 23 Oct 2026 12:02:38 -0400
+
+zacos9 (1.0.12) trixie; urgency=medium
+
+  * Extensions Manager turns curated extensions on or off for start-up;
+    About This Computer shows GPU hardware with its driver; Finder shows
+    mounted ZacOS disks as Mac volumes.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Fri, 23 Oct 2026 11:43:18 -0400
+
 zacos9 (1.0.11) trixie; urgency=medium
 
   * Installed systems now start on computers and virtual machines with

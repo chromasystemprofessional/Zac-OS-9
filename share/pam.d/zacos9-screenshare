@@ -1,0 +1,3 @@
+# ZacOS 9 Screen Sharing (zacos9-screenshare-host): the owner's own password
+# lets a computer already viewing the screen hear its sound.
+@include common-auth

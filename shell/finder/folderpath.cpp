@@ -9,6 +9,9 @@
 
 QString enclosingFolder(const QString &path) {
 	if (vfsIsVirtual(path)) {
+		if (vfsIsZacosVolumeRoot(path)) {
+			return QString(); /* a mounted ZacOS 9 disk is its own top */
+		}
 		const QString id = vfsIdOf(path);
 		if (id.isEmpty()) {
 			return QString(); /* the startup disk itself */

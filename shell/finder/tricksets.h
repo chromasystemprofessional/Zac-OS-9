@@ -1,7 +1,7 @@
 #pragma once
 
 /*
- * Tricks Manager's sets (Mac OS 9's Extensions Manager sets, gap plan 4.3):
+ * Extensions Manager's sets (Mac OS 9's Extensions Manager sets, gap plan 4.3):
  * named on/off choices for login items and user services, saved in
  * ~/.config/zacos9/Tricks Sets/NAME.set ("login<TAB>ID<TAB>on|off" and
  * "service<TAB>UNIT<TAB>on|off" lines). The set last chosen is

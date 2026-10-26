@@ -15,6 +15,13 @@ ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", ".."))
 FONTS = [
     ("system", "platinum-system-12.pfont"),
     ("views", "platinum-views-9.pfont"),
+    # For 1.25x, 1.5x and 1.75x screens (drafted by build_scaled_fonts.py).
+    ("system_125", "platinum-system-12-125.pfont"),
+    ("system_150", "platinum-system-12-150.pfont"),
+    ("system_175", "platinum-system-12-175.pfont"),
+    ("views_125", "platinum-views-9-125.pfont"),
+    ("views_150", "platinum-views-9-150.pfont"),
+    ("views_175", "platinum-views-9-175.pfont"),
 ]
 # Combining marks we can draw, by Unicode decomposition.
 MARKS = {
@@ -143,8 +150,8 @@ class Font:
         for g in self.glyphs.values():
             if g.top < -b or g.top + len(g.rows) - 1 > h - b - 1:
                 sys.exit(f"{self.path}: {chr(g.cp)!r} doesn't fit the {h} px line box")
-            if g.advance > 16:
-                sys.exit(f"{self.path}: {chr(g.cp)!r} is wider than 16 px")
+            if g.advance > 32:
+                sys.exit(f"{self.path}: {chr(g.cp)!r} is wider than 32 px")
 
 
 def emit(fonts, out):
@@ -161,9 +168,9 @@ def emit(fonts, out):
             for r in g.rows:
                 rows.append(sum(1 << i for i, c in enumerate(r) if c == "#"))
             glyphs.append(f"\t{{ 0x{cp:04X}, {g.top}, {g.advance}, {len(g.rows)}, {first} }},")
-        lines.append(f"static const uint16_t font_{key}_rows[] = {{")
-        for i in range(0, len(rows), 12):
-            lines.append("\t" + ", ".join(f"0x{v:04x}" for v in rows[i:i + 12]) + ",")
+        lines.append(f"static const uint32_t font_{key}_rows[] = {{")
+        for i in range(0, len(rows), 8):
+            lines.append("\t" + ", ".join(f"0x{v:08x}" for v in rows[i:i + 8]) + ",")
         lines.append("};")
         lines.append(f"static const struct pl_glyph font_{key}_glyphs[] = {{")
         lines.extend(glyphs)

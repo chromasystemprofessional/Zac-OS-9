@@ -166,7 +166,7 @@ static const uint32_t *pattern_tile(struct pl_saver *s, int index, int *tw, int 
 		if (!px) {
 			return NULL;
 		}
-		struct pl_canvas tile = { px, s->tile_w[index], 0, 0, s->tile_w[index], s->tile_h[index] };
+		struct pl_canvas tile = { px, s->tile_w[index], 0, 0, s->tile_w[index], s->tile_h[index], NULL };
 		pl_pattern_fill(&tile, index, 0, 0, s->tile_w[index] - 1, s->tile_h[index] - 1);
 		s->tiles[index] = px;
 	}

@@ -111,6 +111,19 @@ bool versionNewer(const QString &a, const QString &b) {
 	return code == 0;
 }
 
+QString debianCheckProblem(int refreshCode, int simulateCode, const QString &error) {
+	if (simulateCode != 0) {
+		return "Couldn’t look for Debian updates: " +
+			(error.isEmpty() ? QString("apt didn’t finish") : error) + ".";
+	}
+	if (refreshCode != 0) {
+		/* Not an administrator, offline, or a mirror down: the lists are
+		 * the last ones fetched, and may miss updates since. */
+		return "Debian’s list of updates couldn’t be fetched, so this is as of the last time it was.";
+	}
+	return QString();
+}
+
 QString installedVersion(const QString &package) {
 	int code = -1;
 	const QString out = runQuiet("dpkg-query", { "-W", "-f=${Status}\t${Version}", package }, &code);

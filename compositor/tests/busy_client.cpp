@@ -31,6 +31,8 @@ int main(int argc, char **argv) {
 			platinumCancelLaunch(cookie);
 		} else if (strcmp(command, "show\n") == 0) {
 			window.show();
+		} else if (strcmp(command, "hide\n") == 0) {
+			window.hide();
 		} else if (strcmp(command, "wait\n") == 0) {
 			window.setCursor(Qt::WaitCursor);
 		} else if (strcmp(command, "progress\n") == 0) {

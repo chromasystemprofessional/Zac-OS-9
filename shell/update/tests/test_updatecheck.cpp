@@ -63,6 +63,16 @@ int main(int argc, char *argv[]) {
 		"a new package has no old version");
 	check(parseAptSimulation("0 upgraded, 0 newly installed.\n").empty(), "nothing to do: no updates");
 
+	/* ---- whether "no Debian updates" can be believed ---- */
+	check(debianCheckProblem(0, 0, QString()).isEmpty(), "fresh lists and a simulation that worked: believed");
+	check(debianCheckProblem(1, 0, QString()).contains("last time"),
+		"lists that couldn't be fetched: as of the last time");
+	check(debianCheckProblem(0, 100, "E: Could not open lock file") ==
+		"Couldn’t look for Debian updates: E: Could not open lock file.",
+		"a simulation that failed: why, from apt");
+	check(debianCheckProblem(-1, -1, QString()) == "Couldn’t look for Debian updates: apt didn’t finish.",
+		"apt that didn't start: a failure, not an empty list");
+
 	/* ---- Debian version order ---- */
 	check(versionNewer("0.2.0", "0.0.1"), "0.2.0 is newer than 0.0.1");
 	check(!versionNewer("0.0.1", "0.0.1"), "the same version isn't newer");

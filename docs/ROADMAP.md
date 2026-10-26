@@ -19,7 +19,10 @@ scaling only, original behaviors and timings).
 - ✅ Zoom (Mac OS has no maximize).
 - ✅ Xwayland: X11 windows framed; menus and tooltips unframed.
 - ✅ Integer output scaling (`-S 2` / `ZACOS9_SCALE=2`) with nearest-neighbour
-  filtering for the frame.
+  filtering for the frame; 1.25x, 1.5x and 1.75x through
+  `wp_fractional_scale_v1`, ZacOS's own pixel art drawn at the screen's
+  own pixels (`pl_snap`); each screen its own scale, and the menu bar on
+  every screen if asked (issues #34, #23).
 - Deferred:
   - Window layering by application (needs app identity from Phase 2).
   - Measured box pressed states and drag-outline pattern.
@@ -116,7 +119,7 @@ scaling only, original behaviors and timings).
   - Mouse (tracking speed, double-click speed), Keyboard (key repeat rate
     and delay), Sound (input/output selection, volume and mute through pactl,
     alert volume) and
-    Monitors (resolution, 1x/2x/3x pixel size) panels in
+    Monitors (resolution, 1x/1.25x/1.5x/2x/3x pixel size) panels in
     zacos9-controlpanel. zacos9-wm applies the mouse, keyboard and
     screen settings live (compositor/src/prefs.c) and publishes the
     screen's modes for the Monitors panel.

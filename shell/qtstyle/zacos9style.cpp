@@ -20,6 +20,7 @@ extern "C" {
 #include "settings.h"
 #include "widgets.h"
 }
+#include "../finder/pixels.h" /* blitPixels */
 
 namespace {
 
@@ -31,14 +32,17 @@ struct Canvas {
 	Canvas(int w, int h)
 		: img(std::max(w, 1), std::max(h, 1), QImage::Format_ARGB32_Premultiplied) {
 		img.fill(Qt::transparent);
-		c = { reinterpret_cast<uint32_t *>(img.bits()), static_cast<int>(img.bytesPerLine() / 4),
-			0, 0, img.width(), img.height() };
+		uint32_t *px = reinterpret_cast<uint32_t *>(img.bits());
+		const int stride = static_cast<int>(img.bytesPerLine() / 4);
+		c = { px, stride, 0, 0, img.width(), img.height(), pl_text_log_new(px, stride) };
 	}
+	~Canvas() { pl_text_log_free(c.log); }
+	Canvas(const Canvas &) = delete;
+	Canvas &operator=(const Canvas &) = delete;
 
 	void blit(QPainter *p, const QPoint &at) const {
 		p->save();
-		p->setRenderHint(QPainter::SmoothPixmapTransform, false);
-		p->drawImage(at, img);
+		blitPixels(*p, img, at, &c);
 		p->restore();
 	}
 };

@@ -133,3 +133,43 @@ grep -H . /sys/firmware/acpi/interrupts/gpe*    # "masked" on the storming one
 
 `meson test -C build hardware-quirks` runs all three scripts against a fake
 `/sys` and `/proc` (`tests/hardware/test_quirks.py`).
+
+## The Intel GPU on dual-GPU MacBook Pros
+
+**Symptom.** A MacBookPro11,3 (and its dual-GPU kin) runs everything on the
+NVIDIA GeForce GT 750M through nouveau: warm, short on battery, and slow,
+since nouveau can't raise that chip's clocks. `lspci` shows no Intel
+graphics at all.
+
+**Cause.** Apple's firmware hides the Intel GPU unless macOS is starting,
+and leaves the built-in screen on the NVIDIA one. Linux's own EFI stub asks
+the firmware's "set OS" protocol too, but on this model too late: the
+kernel log's `apple-properties: device path parse error -19` is the
+firmware describing an Intel GPU (`0d26`) that isn't there.
+
+**Fix.** `zacos9-intel-graphics` (in `/usr/libexec/zacos9/`):
+
+- `setos.efi` (`hardware/intel-graphics/setos.c`, built with gnu-efi) has a
+  firmware entry of its own, first in the boot order. It tells the firmware
+  macOS is starting, then starts `\EFI\ZacOS9\shimx64.efi`; if it can't, the
+  firmware goes on to ZacOS's own entry, next in the order.
+- With both GPUs there, the kernel's gmux driver moves the screen between
+  them (vga_switcheroo), but only while nothing has the NVIDIA GPU open. At
+  start-up `zacos9-boot-handoff quit` ends the splash completely and runs
+  `zacos9-intel-graphics switch`: it asks for `IGD` until the screen has
+  moved, switches the NVIDIA GPU `OFF`, and writes the Intel GPU's card to
+  `/run/zacos9/drm-devices`, which the login screen and the session pass to
+  zacos9-wm as `WLR_DRM_DEVICES`.
+- The external ports are wired to the NVIDIA GPU: an external display needs
+  the usual (NVIDIA) start-up.
+
+```sh
+sudo /usr/libexec/zacos9/zacos9-intel-graphics enable --once   # the next start-up only
+sudo /usr/libexec/zacos9/zacos9-intel-graphics enable          # from now on
+sudo /usr/libexec/zacos9/zacos9-intel-graphics disable         # back to NVIDIA
+/usr/libexec/zacos9/zacos9-intel-graphics status
+journalctl -u plymouth-quit    # "the screen is on the Intel GPU (/dev/dri/card1)"
+```
+
+`--once` turns itself off during that start-up, so a start-up that went
+wrong is followed by a normal one. Test: `intel-graphics`, `boot-handoff`.

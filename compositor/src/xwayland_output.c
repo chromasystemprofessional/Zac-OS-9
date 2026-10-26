@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <string.h>
 #include <wlr/types/wlr_output.h>
 #include <wlr/types/wlr_output_layout.h>
@@ -11,7 +12,8 @@
  * logical sizes, and a HiDPI X11 window lives in pixel coordinates
  * (xwayland.c), so on a 2x screen the root must be twice the layout's size.
  * Xwayland gets this xdg-output manager instead of wlroots' one; every
- * other client gets wlroots' one only. All outputs share one integer scale.
+ * other client gets wlroots' one only. All outputs share one scale; at
+ * 1.25 and 1.5 X11 sees it as 1 (X11 windows are drawn at 1x, enlarged).
  *
  * A 1x X11 window, though, keeps layout coordinates (its X11 position is
  * its place in the layout), and X11 keeps the pointer inside its outputs.

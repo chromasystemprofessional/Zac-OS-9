@@ -244,6 +244,13 @@ static void add_finder_menus(struct mb_menu *menus, int *n) {
 	char book[PATH_MAX + 80];
 	snprintf(book, sizeof(book), "%s zacos9", help);
 	add(m, "ZacOS Help", '?', true, ACT_LAUNCH, book);
+	/* Where Mac OS 9 had its tutorials (docs/tutorial.md). */
+	char tutorial[PATH_MAX + 80], practice[PATH_MAX + 64];
+	snprintf(tutorial, sizeof(tutorial), "%s tutorial", help);
+	add(m, "Learn ZacOS", 0, true, ACT_LAUNCH, tutorial);
+	sibling_program("zacos9-mousepractice", practice, sizeof(practice));
+	add(m, "Mouse Practice", 0, true, ACT_LAUNCH, practice);
+	sep(m);
 	char hints[16];
 	struct mb_item *hint_bubbles = add(m, "Show Hint Bubbles", 0, true,
 		ACT_TOGGLE_SETTING, "hint-bubbles");

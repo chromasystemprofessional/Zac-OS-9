@@ -39,7 +39,12 @@ class Rig:
                         ZACOS9_HANDOFF_SYSTEMCTL=str(self.d / "systemctl"),
                         ZACOS9_HANDOFF_PROC=str(self.proc), ZACOS9_HANDOFF_FILE=str(self.marker),
                         ZACOS9_HANDOFF_UPTIME=str(self.d / "uptime"),
-                        ZACOS9_HANDOFF_SECONDS="2", ZACOS9_HANDOFF_SETTLE="0.1")
+                        ZACOS9_HANDOFF_SECONDS="2", ZACOS9_HANDOFF_SETTLE="0.1",
+                        ZACOS9_GPU_CONF=str(self.d / "gpu"),
+                        ZACOS9_INTEL_GRAPHICS=str(self.d / "intel-graphics"))
+        f = self.d / "intel-graphics"
+        f.write_text(f'#!/bin/sh\necho "intel-graphics $*" >> {self.log}\n')
+        f.chmod(0o755)
 
     def process(self, pid, comm, fds=()):
         p = self.proc / str(pid)
@@ -98,6 +103,14 @@ with tempfile.TemporaryDirectory() as d:
     r.run("wait")
     check(r.calls() == ["plymouth --wait"],
           "no handover: wait waits for the splash as usual")
+
+for mode in ("intel", "intel-once"):
+    with tempfile.TemporaryDirectory() as d:
+        r = Rig(d)
+        (r.d / "gpu").write_text(mode + "\n")
+        check(r.run("quit").returncode == 0 and r.calls() == ["plymouth quit", "intel-graphics switch"]
+              and not r.marker.exists(),
+              f"screen moving to the Intel GPU ({mode}): the splash goes, then the switch")
 
 for failing in ("no-deactivate", "no-systemctl"):
     with tempfile.TemporaryDirectory() as d:

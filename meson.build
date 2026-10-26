@@ -2,7 +2,7 @@ project('zacos9', 'c',
   version: '0.0.1',
   license: 'GPL-3.0-or-later',
   meson_version: '>=1.0.0',
-  default_options: ['c_std=c11', 'warning_level=2', 'werror=false'],
+  default_options: ['c_std=c11', 'cpp_std=c++17', 'warning_level=2', 'werror=false'],
 )
 
 add_project_arguments(
@@ -31,8 +31,15 @@ subdir('sharing')
 subdir('appstore')
 subdir('accounts')
 subdir('startupdisk')
+subdir('modules')
 subdir('memory')
 subdir('disks')
 subdir('installer')
 subdir('setup')
 subdir('network')
+
+# Everything the package installs, against tests/baseline/installed-files.txt
+# (the restructuring's safety net: a file that drops out of the package fails).
+test('installed-files', find_program('python3'),
+  args: [files('tests/baseline/test_installed_files.py'), meson.project_build_root(),
+    files('tests/baseline/installed-files.txt')])

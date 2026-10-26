@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Screen Sharing
+Comment=Let other ZacOS computers see and control this screen
+Exec=zacos9-screensharing
+Categories=Settings;Network;
+OnlyShowIn=ZacOS9;

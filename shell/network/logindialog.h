@@ -23,8 +23,10 @@ public:
 	/* `error`, non-empty, shows as a line under the fields: a previous
 	 * attempt's "wrong password" or similar, so the dialog can be shown
 	 * again without a separate alert interrupting the flow twice. */
+	/* `what`: what is being connected to, "file server" or (Screen
+	 * Sharing) "computer". */
 	static Result ask(QWidget *parent, const QString &serverName, bool guestAllowed,
-		bool needsShare, const QString &error = QString());
+		bool needsShare, const QString &error = QString(), const QString &what = QStringLiteral("file server"));
 
 protected:
 	void showEvent(QShowEvent *) override;
@@ -36,10 +38,10 @@ protected:
 
 private:
 	LoginDialog(const QString &serverName, bool guestAllowed, bool needsShare,
-		const QString &error);
+		const QString &error, const QString &what);
 	void updateEnabled();
 
-	QString m_error;
+	QString m_error, m_what;
 	bool m_needsShare = false;
 	PanelRadios m_who;
 	PanelEdit m_name, m_password, m_share;

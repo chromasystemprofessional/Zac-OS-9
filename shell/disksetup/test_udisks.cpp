@@ -43,11 +43,20 @@ int main(int argc, char **argv) {
 	CHECK(volumes[0].name == "Archive" && volumes[0].canCheck && volumes[0].mountPoints.isEmpty());
 	CHECK(volumes[0].uuid == "Archive-uuid" && !volumes[0].readOnly);
 	CHECK(volumes[1].name == "sdb2" && volumes[1].device == "/dev/sdb2" && volumes[1].canRepair);
-	CHECK(drives.contains(drive) && !drives[drive].failing);
+	CHECK(drives.contains(drive) && !drives[drive].failing && !drives[drive].removable);
 	CHECK(driveHealth(drives[drive]) == "WDC WD20: healthy, 30 °C, 12,598 hours powered on.");
 	drives[drive].failing = true;
 	CHECK(driveHealth(drives[drive]).contains("FAILING"));
 	std::puts("ok: Disk Vet reads volumes and drive health from UDisks");
+
+	/* A USB stick: removable, from the drive's own flag. */
+	const QString stick = "/org/freedesktop/UDisks2/drives/Stick";
+	objects[QDBusObjectPath(stick)] = {
+		{ "org.freedesktop.UDisks2.Drive", { { "Model", "Stick" }, { "Removable", true } } },
+	};
+	parseUDisks(objects, &volumes, &drives);
+	CHECK(drives.contains(stick) && drives[stick].removable && !drives[drive].removable);
+	std::puts("ok: USB drives are told apart from the computer's own");
 
 	/* Every volume mounts by itself until "Mount automatically" is off. */
 	CHECK(volumeMountsAutomatically("Archive-uuid") && volumeMountsAutomatically(QString()));
@@ -59,6 +68,21 @@ int main(int argc, char **argv) {
 	setVolumeMountsAutomatically(QString(), false);
 	CHECK(volumeMountsAutomatically(QString()));
 	std::puts("ok: volumes mount automatically unless that is turned off for them");
+
+	/* The live session (issue #31): internal disks stay closed until turned
+	 * on; USB drives still mount; an installed system mounts both. */
+	qputenv("ZACOS9_LIVE", "1");
+	CHECK(liveSession());
+	CHECK(!volumeMountsAutomatically("ROOT-A-uuid", true) && !volumeMountsAutomatically(QString(), true));
+	CHECK(volumeMountsAutomatically("Stick-uuid", false));
+	setVolumeMountsAutomatically("ROOT-A-uuid", true);
+	CHECK(volumeMountsAutomatically("ROOT-A-uuid", true));
+	setVolumeMountsAutomatically("Stick-uuid", false);
+	CHECK(!volumeMountsAutomatically("Stick-uuid", false)); /* off, as set, even on USB */
+	qputenv("ZACOS9_LIVE", "0");
+	CHECK(!liveSession() && volumeMountsAutomatically("H-STATE-uuid", true));
+	qunsetenv("ZACOS9_LIVE");
+	std::puts("ok: the live session leaves internal disks closed unless they're turned on");
 
 	/* Read-only, from either the mount's options or the superblock's. */
 	const QString info = home.path() + "/mountinfo";

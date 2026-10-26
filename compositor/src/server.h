@@ -51,9 +51,15 @@ struct plat_server {
 	struct wlr_renderer *renderer;
 	struct wlr_allocator *allocator;
 	struct wlr_compositor *compositor;
-	int output_scale; /* integer HiDPI scale applied to every output */
-	int default_scale; /* from -S / ZACOS9_SCALE, until a panel picks one */
+	/* Each output has its own HiDPI scale (prefs_output_scale): 1, 1.25,
+	 * 1.5, 1.75, 2 or 3. At the fractions, programs that take
+	 * wp_fractional_scale_v1 draw at it exactly; the rest (ZacOS's own
+	 * pixel art among them) draw at 2x and are shown smaller. This is the
+	 * main output's, for what has only one (X11's HiDPI windows). */
+	float output_scale;
+	float default_scale; /* from -S / ZACOS9_SCALE, until a panel picks one */
 	bool scale_explicit; /* -S or ZACOS9_SCALE given: no automatic 2x */
+	struct wlr_fractional_scale_manager_v1 *fractional_scale;
 	/* Mouse and Keyboard panel settings (prefs.c). */
 	double pointer_speed;
 	int double_click_ms;
@@ -148,6 +154,14 @@ struct plat_server {
 	struct wl_listener tablet_tool_proximity;
 	struct wl_listener tablet_tool_tip;
 	struct wl_listener tablet_tool_button;
+	/* Touchscreens (touch.c): touch to apps that take wl_touch, a mouse
+	 * to every other. */
+	struct wl_list touchscreens; /* touch.c plat_touch.link */
+	struct wl_listener touch_down;
+	struct wl_listener touch_up;
+	struct wl_listener touch_motion;
+	struct wl_listener touch_cancel;
+	struct wl_listener touch_frame;
 
 	/* Interactive grab state. */
 	enum plat_cursor_mode cursor_mode;
@@ -189,6 +203,16 @@ struct plat_server {
 	bool idle_refocus_pending; /* the pointer looked at again shortly */
 	struct wl_list keep_awake; /* idle.c keep_awake.link: apps' D-Bus requests */
 	bool suspend_after_lock; /* system sleep waits for the lock */
+
+	/* The on-screen keyboard (osk.c) */
+	struct wlr_text_input_manager_v3 *text_input_manager;
+	struct wl_listener new_text_input;
+	struct wl_list text_inputs; /* osk.c plat_text_input.link */
+	struct wl_listener osk_focus_change;
+	struct wl_event_source *osk_hide_timer;
+	struct wl_event_source *osk_reap_timer;
+	bool osk_shown;
+	pid_t osk_pid; /* zacos9-keyboard, while it runs */
 
 	/* lock.c: ext-session-lock-v1. */
 	struct wlr_session_lock_manager_v1 *lock_mgr;
@@ -308,6 +332,7 @@ struct plat_view {
 	struct wl_listener request_configure;
 	struct wl_listener set_geometry;
 	struct wl_listener request_activate;
+	struct wl_listener set_override_redirect;
 };
 
 struct plat_layer_surface {
@@ -322,6 +347,9 @@ struct plat_layer_surface {
 	struct wl_listener new_popup;
 	struct wl_listener destroy;
 	bool mapped;
+	/* ZacOS's own, kept on the main display (layers.c): all but a menu bar
+	 * (and its menus) placed on a screen of its own choosing. */
+	bool on_main;
 };
 
 struct plat_keyboard {
@@ -329,8 +357,10 @@ struct plat_keyboard {
 	struct plat_server *server;
 	struct wlr_keyboard *wlr_keyboard;
 	bool is_virtual; /* scripted keyboards repeat on their own terms */
+	bool is_real;    /* one to type on: not virtual, with letter keys (osk.c) */
 	struct wl_listener modifiers;
 	struct wl_listener key;
+	struct wl_listener keymap; /* a virtual one's, when it comes (input.c) */
 	struct wl_listener destroy;
 };
 
@@ -436,6 +466,15 @@ void input_pointer_motion(struct plat_server *server, uint32_t time);
 /* Mouse-down activation under the pointer. True if it hit a window frame,
  * the compositor's to track, not the client's. */
 bool input_press_focus(struct plat_server *server, uint32_t time_msec);
+/* Tell clients which devices the seat has (pointer, keyboard, touch). */
+void input_update_capabilities(struct plat_server *server);
+
+/* prefs.c: a scale as written in desktop.conf or given with -S ("1",
+ * "1.25", "1.5", "1.75", "2", "3", "4"); `fallback` for anything else. */
+float prefs_parse_scale(const char *s, float fallback);
+/* An output's scale: the Monitors panel's for it (display.NAME.scale, else
+ * scale), else 2x on a dense screen, else -S. */
+float prefs_output_scale(struct plat_server *server, struct wlr_output *o);
 
 /* tablet.c: graphics tablets (Wacom and the like) */
 void tablet_init(struct plat_server *server);
@@ -445,6 +484,21 @@ void tablet_new(struct plat_server *server, struct wlr_input_device *device);
 void tablet_map(struct plat_server *server);
 /* "tablet NAME" lines for zacos9-outputs, one per tablet. */
 void tablet_write_status(struct plat_server *server, FILE *f);
+
+/* osk.c: the on-screen keyboard, while a text field has the focus and
+ * no keyboard is attached */
+void osk_init(struct plat_server *server);
+/* Again: keyboards came or went, the lock, the setting. */
+void osk_update(struct plat_server *server);
+bool osk_real_keyboard(struct wlr_input_device *device);
+/* platinum_shell_v1.text_field from the program with the focus, or not. */
+void osk_text_field(struct plat_server *server, bool focused);
+
+/* touch.c: touchscreens */
+void touch_init(struct plat_server *server);
+void touch_new(struct plat_server *server, struct wlr_input_device *device);
+/* Put each touchscreen on its screen; again whenever the screens change. */
+void touch_map(struct plat_server *server);
 
 /* view.c: window behaviour shared by every client type */
 void view_setup(struct plat_view *view, struct plat_server *server,
@@ -507,6 +561,9 @@ void xdg_attach_popup(struct plat_server *server, struct wlr_xdg_popup *popup,
 void platinum_shell_init(struct plat_server *server);
 /* The hinted decor_style for a surface, or -1. */
 int platinum_shell_style_for(struct wlr_surface *surface);
+/* What one of Platinum's own programs last said of its focus
+ * (text_field): 1 a text field, 0 not, -1 never said. */
+int platinum_shell_text_field(struct wl_client *client);
 /* A pop-up window's remembered tab (layout x), if its program gave one. */
 bool platinum_shell_popup_tab_for(struct wlr_surface *surface, int *x);
 /* Tell the program its pop-up's tab moved, or that it was dragged up into

@@ -87,6 +87,20 @@ zram_off_by_default() {
 		echo "zacos9: could not turn the default compressed memory off." >&2
 }
 
+# The old RDP sharing (zacos9-screen-sharing, removed after 1.0.19) wrote
+# its services to /run/systemd/system and its keys and xrdp settings to
+# /etc/zacos9/rdp. Stop any still running and delete what it made.
+remove_rdp_sharing() {
+	for unit in zacos9-rdp-listener zacos9-rdp-bridge zacos9-rdp-auth; do
+		[ -e "/run/systemd/system/$unit.service" ] || continue
+		systemctl stop "$unit.service" >/dev/null 2>&1 || true
+		rm -f "/run/systemd/system/$unit.service"
+		reload=1
+	done
+	[ -z "${reload:-}" ] || systemctl daemon-reload >/dev/null 2>&1 || true
+	rm -rf /etc/zacos9/rdp /run/zacos9-rdp
+}
+
 case "$1" in
 	configure)
 		grant_rawio
@@ -96,6 +110,7 @@ case "$1" in
 		redraw_grub_logo
 		make_shared_documents
 		remove_browsed_queues
+		remove_rdp_sharing
 		# Software Update's daily check, for every account.
 		systemctl --global enable zacos9-update-check.timer >/dev/null 2>&1 || true
 		;;
