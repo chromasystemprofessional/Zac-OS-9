@@ -254,7 +254,10 @@ int main(int argc, char **argv) {
 	QApplication::sendEvent(&panel, &arrowsRelease);
 	assert(pl_setting("smart-scrolling", selected, sizeof(selected)) &&
 		QString::fromUtf8(selected) == "true");
-	pl_scrollbar bar{ false, 254, true, 40 };
+	pl_scrollbar bar{};
+	bar.length = 254;
+	bar.enabled = true;
+	bar.thumb = 40;
 	sb_smart(&bar, 1, 3);
 	assert(bar.together && bar.thumb_len > SB_THUMB);
 	assert(sb_hit(&bar, 230) == SB_DEC_ARROW && sb_hit(&bar, 245) == SB_INC_ARROW);

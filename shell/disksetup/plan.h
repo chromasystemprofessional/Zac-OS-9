@@ -58,13 +58,15 @@ QList<DiskDrive> parseDrives(const UDisksObjects &objects);
  * and last MiB to the partition table. */
 QList<DiskGap> freeGaps(const DiskDrive &drive);
 
+/* One step of the plan: DiskOp{ DiskOp::Resize }, then the members that
+ * kind uses. Every member has a default, for the steps that don't. */
 struct DiskOp {
 	enum Kind { NewTable, Delete, Create, Format, Resize } kind = Create;
-	QString tableType;     /* NewTable: gpt or dos */
-	int part = -1;         /* Delete, Format, Resize: the partition's index */
+	QString tableType = {};          /* NewTable: gpt or dos */
+	int part = -1;                   /* Delete, Format, Resize: the partition's index */
 	qulonglong offset = 0, size = 0; /* Create: where; Resize: the new size */
-	QString fsType, label; /* Create, Format */
-	QString partType;      /* Create: the partition's type, "" for its format's own (EfiType, BiosBootType) */
+	QString fsType = {}, label = {}; /* Create, Format */
+	QString partType = {};           /* Create: the partition's type, "" for its format's own (EfiType, BiosBootType) */
 	QString describe(const DiskDrive &drive) const;
 };
 
