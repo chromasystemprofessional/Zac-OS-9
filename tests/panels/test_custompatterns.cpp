@@ -90,7 +90,7 @@ int main(int argc, char **argv) {
 	}
 	assert(customPixels == 112 * 112);
 	uint32_t pixels[36] = {};
-	pl_canvas canvas = {pixels, 6, -1, -1, 6, 6};
+	pl_canvas canvas = {pixels, 6, -1, -1, 6, 6, nullptr};
 	desktopPatternFill(&canvas, index, -1, -1, 4, 4);
 	for (int y = -1; y <= 4; ++y) {
 		for (int x = -1; x <= 4; ++x) {
@@ -167,7 +167,7 @@ int main(int argc, char **argv) {
 		QString::fromUtf8(selected) == "fill");
 	for (const QString mode : { "fit", "fill", "stretch", "center", "tile" }) {
 		uint32_t background[64] = {};
-		pl_canvas screen = {background, 8, 0, 0, 8, 8};
+		pl_canvas screen = {background, 8, 0, 0, 8, 8, nullptr};
 		desktopWallpaperFill(&screen, 0, mode, 0, 0, 7, 7);
 		for (int y = 0; y < 8; ++y) {
 			for (int x = 0; x < 8; ++x) {
@@ -178,7 +178,7 @@ int main(int argc, char **argv) {
 		}
 	}
 	uint32_t widePixels[96] = {};
-	pl_canvas wide = {widePixels, 12, 0, 0, 12, 8};
+	pl_canvas wide = {widePixels, 12, 0, 0, 12, 8, nullptr};
 	assert(pl_setting_set("wallpaper-mode", "fit"));
 	desktopBackgroundFill(&wide, 12, 8);
 	for (int y = 0; y < 8; ++y) {
@@ -187,7 +187,7 @@ int main(int argc, char **argv) {
 	// A portrait monitor computes its own placement, rather than sharing
 	// the landscape monitor's crop or a combined-desktop image.
 	uint32_t tallPixels[96] = {};
-	pl_canvas tall = {tallPixels, 8, 0, 0, 8, 12};
+	pl_canvas tall = {tallPixels, 8, 0, 0, 8, 12, nullptr};
 	desktopBackgroundFill(&tall, 8, 12);
 	for (int y = 0; y < 12; ++y) {
 		assert(tallPixels[y * 8] == (y >= 4 && y < 8 ? qRgb(17, 91, 163) : GRAY(3)));
@@ -211,7 +211,7 @@ int main(int argc, char **argv) {
 	assert(striped.save(photoPath));
 	assert(waitFor([&] { return changed > beforeStripes; }));
 	uint32_t cropped[16] = {};
-	pl_canvas crop = {cropped, 4, 0, 0, 4, 4};
+	pl_canvas crop = {cropped, 4, 0, 0, 4, 4, nullptr};
 	desktopWallpaperFill(&crop, 0, "fill", 0, 0, 3, 3);
 	for (uint32_t pixel : cropped) {
 		assert(pixel == qRgb(0, 255, 0));

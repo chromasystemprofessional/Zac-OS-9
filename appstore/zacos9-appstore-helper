@@ -1,9 +1,9 @@
 #!/bin/sh
 # zacos9-appstore-helper: the privileged half of the Software window
 # (zacos9-store), reached from the Apple menu. It runs as root through
-# pkexec; polkit lets administrators at the computer use it without a
-# password, the same as zacos9-sharing-helper, because this desktop
-# runs no polkit authentication agent to prompt for one.
+# pkexec; polkit lets administrators at the computer install from Debian's
+# archive without a password, but asks for one for install-deb, whose
+# package's scripts nothing vouches for (50-zacos9-appstore.rules).
 #
 #   zacos9-appstore-helper install PACKAGE...
 #   zacos9-appstore-helper remove PACKAGE...

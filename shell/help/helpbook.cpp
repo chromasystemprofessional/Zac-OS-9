@@ -132,6 +132,45 @@ QString htmlText(const QString &html) {
 	return QTextDocumentFragment::fromHtml(body).toPlainText();
 }
 
+QString tutorialHtml(const QString &html, const QString &path) {
+	static const QRegularExpression open("<([a-z][a-z0-9]*)\\b[^>]*\\bclass=\"([^\"]*)\"[^>]*>",
+		QRegularExpression::CaseInsensitiveOption);
+	static const QStringList empty{ "br", "hr", "img", "input" };
+	QString out = html;
+	int at = 0;
+	for (QRegularExpressionMatch m = open.match(out); m.hasMatch(); m = open.match(out, at)) {
+		bool tagged = false, shown = false;
+		for (const QString &c : m.captured(2).split(' ', Qt::SkipEmptyParts)) {
+			if (c.startsWith("for-")) {
+				tagged = true;
+				shown |= c == "for-" + path;
+			}
+		}
+		if (!tagged || shown) {
+			at = m.capturedEnd();
+			continue;
+		}
+		// Out to its own closing tag, past any of the same kind inside it;
+		// an element left open loses only its tag.
+		const QString tag = m.captured(1).toLower();
+		int end = m.capturedEnd();
+		if (!empty.contains(tag) && !m.captured(0).endsWith("/>")) {
+			const QRegularExpression either("<(/?)" + tag + "\\b[^>]*>", QRegularExpression::CaseInsensitiveOption);
+			int depth = 1;
+			for (auto it = either.globalMatch(out, end); it.hasNext() && depth > 0;) {
+				const QRegularExpressionMatch t = it.next();
+				depth += t.captured(1).isEmpty() ? 1 : -1;
+				if (depth == 0) {
+					end = t.capturedEnd();
+				}
+			}
+		}
+		out.remove(m.capturedStart(), end - m.capturedStart());
+		at = m.capturedStart();
+	}
+	return out;
+}
+
 QList<HelpBook> helpBooks(const QString &root) {
 	QList<HelpBook> out;
 	for (const QString &id : QDir(root).entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {

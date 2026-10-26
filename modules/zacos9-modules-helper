@@ -1,0 +1,89 @@
+#!/bin/sh
+# zacos9-modules-helper: the privileged half of the Extensions Manager's
+# extension on/off switch. It runs as root through pkexec; polkit lets
+# administrators at the computer use it (org.zacos9.modules).
+#
+#   zacos9-modules-helper extension KEY on|off MODULE...
+#                       Turn one curated extension on or off for future
+#                       startups. "on" removes its modules from the
+#                       modprobe.d blacklist and lists them in
+#                       modules-load.d/zacos9-extensions.conf; "off"
+#                       blacklists them and removes them from that file.
+#                       $ZACOS9_MODULES_LOAD_CONF and
+#                       $ZACOS9_MODPROBE_CONF stand in for tests.
+set -eu
+
+LOAD_CONF=${ZACOS9_MODULES_LOAD_CONF:-/etc/modules-load.d/zacos9-extensions.conf}
+MODPROBE_CONF=${ZACOS9_MODPROBE_CONF:-/etc/modprobe.d/zacos9-extensions.conf}
+
+die() {
+	echo "$*" >&2
+	exit 1
+}
+
+valid_name() {
+	case $1 in
+	'' | -* | */* | *'*'* | *' '* | *[!A-Za-z0-9_.-]*) return 1 ;;
+	esac
+	return 0
+}
+
+has_line() {
+	# grep -x whole lines, ignoring a trailing newline.
+	[ -f "$1" ] || return 1
+	grep -qx -- "$2" "$1"
+}
+
+append_if_missing() {
+	file=$1; line=$2
+	[ -f "$file" ] || { mkdir -p "$(dirname "$file")"; : >"$file"; }
+	if ! has_line "$file" "$line"; then
+		printf '%s\n' "$line" >>"$file"
+	fi
+}
+
+remove_line() {
+	file=$1; line=$2
+	[ -f "$file" ] || return 0
+	tmp=$(mktemp) || die "Could not write a temporary file."
+	grep -vx -- "$line" "$file" >"$tmp" || true
+	if cmp -s "$file" "$tmp"; then
+		rm -f "$tmp"
+	else
+		cat "$tmp" >"$file"
+		rm -f "$tmp"
+	fi
+}
+
+cmd=${1:-}
+[ $# -gt 0 ] && shift
+case $cmd in
+	extension)
+		[ $# -ge 2 ] || die "usage: extension KEY on|off MODULE..."
+		key=$1; onoff=$2; shift 2
+		valid_name "$key" || die "Bad extension key: $key"
+		for m in "$@"; do
+			valid_name "$m" || die "Bad module name: $m"
+		done
+		case $onoff in
+			on)
+				for m in "$@"; do
+					remove_line "$MODPROBE_CONF" "blacklist $m"
+					append_if_missing "$LOAD_CONF" "$m"
+				done
+				;;
+			off)
+				for m in "$@"; do
+					remove_line "$LOAD_CONF" "$m"
+					append_if_missing "$MODPROBE_CONF" "blacklist $m"
+				done
+				;;
+			*)
+				die "usage: extension KEY on|off MODULE..."
+				;;
+		esac
+		;;
+	*)
+		die "usage: zacos9-modules-helper extension KEY on|off MODULE..."
+		;;
+esac

@@ -11,24 +11,27 @@ static QString disksConf() {
 		"/zacos9/disks.conf";
 }
 
-bool volumeMountsAutomatically(const QString &uuid) {
+bool liveSession() {
+	const QByteArray forced = qgetenv("ZACOS9_LIVE");
+	return forced.isEmpty() ? QFileInfo(QStringLiteral("/run/live")).isDir() : forced == "1";
+}
+
+bool volumeMountsAutomatically(const QString &uuid, bool internal) {
+	const bool fallback = !(internal && liveSession());
 	if (uuid.isEmpty()) {
-		return true;
+		return fallback;
 	}
 	QSettings settings(disksConf(), QSettings::IniFormat);
-	return settings.value("mount-automatically/" + uuid, true).toBool();
+	return settings.value("mount-automatically/" + uuid, fallback).toBool();
 }
 
 void setVolumeMountsAutomatically(const QString &uuid, bool on) {
 	if (uuid.isEmpty()) {
 		return;
 	}
+	/* On is kept too: in the live session an internal disk is off unless set. */
 	QSettings settings(disksConf(), QSettings::IniFormat);
-	if (on) {
-		settings.remove("mount-automatically/" + uuid);
-	} else {
-		settings.setValue("mount-automatically/" + uuid, false);
-	}
+	settings.setValue("mount-automatically/" + uuid, on);
 }
 
 /* mountinfo: "ID PARENT MAJ:MIN ROOT MOUNTPOINT OPTIONS [TAGS...] - TYPE

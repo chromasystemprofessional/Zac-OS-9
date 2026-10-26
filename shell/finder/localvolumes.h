@@ -20,9 +20,17 @@ struct LocalVolume {
 	QString path;      /* mount point */
 	bool ejectable;    /* can be ejected (USB, optical, SD) */
 	QString macDevice; /* read-only helper mounts, including APFS FUSE */
+	bool zacos = false; /* an installed ZacOS 9 system */
+	QString zacosVersion;
 };
 
 bool localVolumePathShown(const QString &path);
+
+/* Is this mount an installed ZacOS 9 system? Its Finder name comes from
+ * /etc/zacos9/disk-name on that disk; version comes from the disk's dpkg
+ * status. Both files are read with limits because the disk is untrusted. */
+bool localVolumeZacosInfo(const QString &mountPath, QString *name = nullptr,
+	QString *version = nullptr);
 
 /* Selected mounted volume's block device, only when backed by physical USB. */
 QString localVolumeUsbDevice(const QString &mountPath);

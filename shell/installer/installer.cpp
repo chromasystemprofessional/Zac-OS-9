@@ -1,7 +1,12 @@
 #include "installer.h"
+#include "power.h"
 
 #include <QCoreApplication>
+#include <QDBusConnection>
+#include <QDBusMessage>
+#include <QDBusMetaType>
 #include <QElapsedTimer>
+#include <QFileInfo>
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QPainter>
@@ -12,14 +17,17 @@
 #include "panelkit.h"
 #include "pixels.h"
 #include "settings.h"
+#include "udisks.h"
 
-static constexpr int W = 440, H = 310;
+static constexpr int W = 520, H = 440;
 static constexpr int MARGIN = 16;
 static constexpr int BTN_W = 80, BTN_H = 20;
 static constexpr int BTN_Y = H - MARGIN - BTN_H;
 static constexpr int BTN_R = W - MARGIN;    /* right edge of right button */
 static constexpr uint32_t FACE = GRAY(0xD); /* standard Platinum panel face */
 static constexpr int LINE_H = 14;           /* body text line height */
+/* Select: the disks, then the map of the chosen one, its words beside it. */
+static constexpr int MAP_TOP = 172, MAP_W = 190, RX = MARGIN + MAP_W + 16;
 
 /* ---- DiskEntry ------------------------------------------------------------ */
 
@@ -64,17 +72,35 @@ void InstallerWindow::showWelcome() {
 void InstallerWindow::showSelect() {
 	m_screen = Screen::Select;
 	/* Frame first: setItems() sizes each row's text to the frame width. */
-	m_diskList.frame = QRect(MARGIN, 68, W - 2 * MARGIN, 110);
+	m_diskList.frame = QRect(MARGIN, 52, W - 2 * MARGIN, 5 * PL_LIST_ROW_H + 2);
+	m_uefi = QFileInfo::exists(qEnvironmentVariable("ZACOS9_FIRMWARE_EFI", "/sys/firmware/efi"));
+	m_where = PanelRadios();
+	m_where.add("Erase the whole disk", QPoint(MARGIN, 144));
+	m_where.add("Next to what's on it", QPoint(MARGIN + 200, 144));
+	m_where.hint = "Erase the whole disk for ZacOS 9 alone, or keep what's on it (Windows, Haiku...) "
+		"and give ZacOS 9 room beside it.";
+	m_where.changed = [this](int) { chooseTarget(false); };
+	m_map.frame = QRect(MARGIN, MAP_TOP, MAP_W, BTN_Y - 14 - MAP_TOP);
+	m_map.dragged = [this](int part, qulonglong at) { dragLine(part, at); };
 	enumerateDisks();
-	m_diskList.picked = [this](int) { updateSelectButtons(); };
-	updateSelectButtons();
+	m_diskList.picked = [this](int) { chooseTarget(true); };
+	chooseTarget(true);
 	/* The name the installed disk goes by in the Finder (Mac OS allowed
 	 * 27 characters; ':' separated a Mac path's parts, '/' a Unix one's). */
-	m_diskName.rect = QRect(MARGIN + 82, 236, 220, PL_EDIT_H);
+	m_diskName.rect = QRect(RX + 78, BTN_Y - 14 - PL_EDIT_H, W - MARGIN - RX - 78, PL_EDIT_H);
 	m_diskName.accepts = [](QChar ch) { return ch.isPrint() && ch != ':' && ch != '/'; };
 	m_diskName.edited = [this] {
 		if (m_diskName.text.size() > 27) {
 			m_diskName.setText(m_diskName.text.left(27));
+		}
+		/* ZacOS's block in the map goes by it too. */
+		for (DiskOp &op : m_ops) {
+			if (op.kind == DiskOp::Create && op.fsType == "ext4") {
+				op.label = m_diskName.text.trimmed();
+			}
+		}
+		if (beside()) {
+			m_map.set(plannedTarget());
 		}
 		update();
 	};
@@ -87,6 +113,7 @@ void InstallerWindow::showSelect() {
 	m_prepare.clicked = [this] { prepareDisk(); };
 	m_host.edits = { &m_diskName };
 	m_host.buttons = { &m_prepare };
+	m_host.radios = { &m_where };
 	m_host.setFocus(&m_diskName);
 	m_diskName.selectAll();
 	update();
@@ -105,7 +132,204 @@ void InstallerWindow::updateSelectButtons() {
 	m_install = PanelButton(!has ? "Install" : d->zacosCmp == 0 ? "Reinstall" : "Update",
 		QRect(BTN_R - BTN_W, BTN_Y, BTN_W, BTN_H), true);
 	m_erase = PanelButton("Erase & Install", QRect(BTN_R - BTN_W - 12 - 112, BTN_Y, 112, BTN_H));
+	m_where.enabled = d && d->isDisk && !has;
 	update();
+}
+
+/* ---- next to what's on a disk (issue #42) ---- */
+
+bool InstallerWindow::beside() const {
+	const DiskEntry *d = selectedDisk();
+	return d && d->isDisk && d->zacosPart.isEmpty() && m_where.selected == 1;
+}
+
+DiskDrive InstallerWindow::plannedTarget() const {
+	DiskDrive d = m_target;
+	for (const DiskOp &op : m_ops) {
+		d = planned(d, op);
+	}
+	return d;
+}
+
+/* ZacOS's new partition in the drive as planned, or -1. */
+int InstallerWindow::zacosPart(const DiskDrive &d) const {
+	for (int i = 0; i < d.parts.size(); i++) {
+		if (d.parts[i].block.isEmpty() && d.parts[i].type == "ext4") {
+			return i;
+		}
+	}
+	return -1;
+}
+
+/* The drives as UDisks shows them; nothing needs a password to look. */
+void InstallerWindow::readDrives() {
+	qDBusRegisterMetaType<UDisksInterfaces>();
+	qDBusRegisterMetaType<UDisksObjects>();
+	QDBusMessage m = QDBusMessage::createMethodCall(qEnvironmentVariable("ZACOS9_UDISKS_SERVICE",
+		"org.freedesktop.UDisks2"), "/org/freedesktop/UDisks2", "org.freedesktop.DBus.ObjectManager", "GetManagedObjects");
+	const QDBusMessage reply = QDBusConnection::systemBus().call(m, QDBus::Block, 10000);
+	m_drives = reply.type() == QDBusMessage::ReplyMessage && !reply.arguments().isEmpty()
+		? parseDrives(qdbus_cast<UDisksObjects>(reply.arguments().first())) : QList<DiskDrive>();
+}
+
+/* The chosen disk in the map: as it is, or with ZacOS next to what's there.
+ * A disk just chosen starts at "next to what's on it" if anything is: an
+ * Install clicked in haste then keeps it. */
+void InstallerWindow::chooseTarget(bool chosen) {
+	const DiskEntry *d = selectedDisk();
+	m_target = DiskDrive();
+	m_ops.clear();
+	m_why.clear();
+	m_toMeasure.clear();
+	for (const DiskDrive &drive : m_drives) {
+		bool mine = d && drive.device == d->device;
+		for (const DiskPart &p : drive.parts) {
+			mine = mine || (d && !d->isDisk && p.device == d->device);
+		}
+		if (mine) {
+			m_target = drive;
+		}
+	}
+	/* The live desktop's own volumes on it close for the install. */
+	for (DiskPart &p : m_target.parts) {
+		QStringList kept;
+		for (const QString &where : p.mountPoints) {
+			if (!where.startsWith("/media/") && !where.startsWith("/run/media/")) {
+				kept << where;
+			}
+		}
+		p.mountPoints = kept;
+	}
+	if (chosen) {
+		m_where.selected = m_target.parts.isEmpty() ? 0 : 1;
+	}
+	m_map.enabled = false;
+	m_map.set(m_target);
+	m_map.select(-1, false);
+	if (d && !d->isDisk) {
+		/* A partition: that one's chosen in the map. */
+		for (int i = 0; i < m_target.parts.size(); i++) {
+			if (m_target.parts[i].device == d->device) {
+				m_map.select(m_map.rowOfPart(i), false);
+			}
+		}
+	}
+	if (beside()) {
+		if (m_target.block.isEmpty()) {
+			m_why = "This disk couldn't be read (UDisks isn't answering).";
+		} else {
+			/* How small each partition that can shrink can be, then the plan. */
+			for (const DiskPart &p : m_target.parts) {
+				if (!p.block.isEmpty() && resizable(p.type) && !p.inUse() && !p.logical) {
+					m_toMeasure << p.device;
+				}
+			}
+			measureNext();
+		}
+	}
+	updateSelectButtons();
+}
+
+void InstallerWindow::measureNext() {
+	if (m_measure) {
+		return;
+	}
+	if (m_toMeasure.isEmpty()) {
+		planBeside();
+		return;
+	}
+	const QString device = m_toMeasure.takeFirst();
+	m_measure = new QProcess(this);
+	connect(m_measure, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this, [this, device] {
+		for (const QString &line : QString::fromUtf8(m_measure->readAllStandardOutput()).split('\n')) {
+			for (DiskPart &p : m_target.parts) {
+				if (p.device == device && line.startsWith("min-size ")) {
+					p.minSize = line.mid(9).trimmed().toULongLong();
+				}
+			}
+			if (line.startsWith("error ") && m_why.isEmpty()) {
+				m_why = line.mid(6).trimmed() + "."; /* kept in case nothing else makes room */
+			}
+		}
+		m_measure->deleteLater();
+		m_measure = nullptr;
+		if (beside()) {
+			measureNext();
+		}
+	});
+	connect(m_measure, &QProcess::errorOccurred, this, [this](QProcess::ProcessError e) {
+		if (e == QProcess::FailedToStart) {
+			m_measure->deleteLater();
+			m_measure = nullptr;
+			m_toMeasure.clear();
+			planBeside();
+		}
+	});
+	startHelper(m_measure, { "--min-size", device });
+	update();
+}
+
+void InstallerWindow::planBeside() {
+	const QString measured = m_why;
+	const BesidePlan plan = besidePlan(m_target, m_uefi, m_diskName.text.trimmed());
+	m_ops = plan.ops;
+	/* A partition that couldn't be measured says why, if that's what's in the way. */
+	m_why = plan.why.isEmpty() ? QString() : measured.isEmpty() ? plan.why : plan.why + " " + measured;
+	const DiskDrive d = plannedTarget();
+	m_map.enabled = m_why.isEmpty();
+	m_map.set(d);
+	m_map.select(m_map.rowOfPart(zacosPart(d)), false);
+	updateSelectButtons();
+}
+
+/* A line dragged: anything but a partition already there made bigger
+ * (zacos9-install only shrinks), and ZacOS kept at 16 GB at least. */
+void InstallerWindow::dragLine(int part, qulonglong at) {
+	QList<DiskOp> ops = m_ops;
+	if (!moveBoundary(m_target, &ops, part, at) || besideSteps(m_target, ops).isEmpty()) {
+		return;
+	}
+	DiskDrive d = m_target;
+	for (const DiskOp &op : ops) {
+		d = planned(d, op);
+	}
+	const int z = zacosPart(d);
+	if (z < 0 || d.parts[z].size < ZacosLeast) {
+		return;
+	}
+	m_ops = ops;
+	m_map.set(d);
+	update();
+}
+
+/* What happens to the disk, in words, beside the map. */
+QString InstallerWindow::besideText() const {
+	if (m_measure || !m_toMeasure.isEmpty()) {
+		return "Looking at what's on the disk\u2026";
+	}
+	if (!m_why.isEmpty()) {
+		return m_why;
+	}
+	const DiskDrive d = plannedTarget();
+	const int z = zacosPart(d);
+	if (z < 0) {
+		return QString();
+	}
+	QString text = QString("ZacOS 9 gets %1 (the new partition). Drag the line above or below it for more or "
+		"less room; it needs 16 GB at least.").arg(sizeText(d.parts[z].size));
+	DiskDrive at = m_target;
+	for (const DiskOp &op : m_ops) {
+		if (op.kind == DiskOp::Resize) {
+			const DiskPart &p = at.parts[op.part];
+			text += QString(" %1 will be made smaller, %2 to %3: its files stay, but back up anything "
+				"important first.").arg(p.label.isEmpty() ? p.device.section('/', -1) : "\u201c" + p.label + "\u201d",
+				sizeText(p.size), sizeText(op.size));
+		} else if (op.kind == DiskOp::Create && !op.partType.isEmpty()) {
+			text += QString(" A %1 partition is made for starting up.").arg(sizeText(op.size));
+		}
+		at = planned(at, op);
+	}
+	return text;
 }
 
 /* Disk Setup's Partition tab, to make room for ZacOS 9 (a partition beside
@@ -119,7 +343,7 @@ void InstallerWindow::prepareDisk() {
 		m_diskSetup->deleteLater();
 		m_diskSetup = nullptr;
 		enumerateDisks();
-		updateSelectButtons();
+		chooseTarget(true);
 	});
 	connect(m_diskSetup, &QProcess::errorOccurred, this, [this](QProcess::ProcessError e) {
 		if (e == QProcess::FailedToStart) {
@@ -132,6 +356,7 @@ void InstallerWindow::prepareDisk() {
 
 void InstallerWindow::showInstalling(const QStringList &args, bool updating) {
 	m_screen = Screen::Installing;
+	setCursor(Qt::ArrowCursor); /* it may have been on a line in the map */
 	m_updating = updating;
 	m_progress = 0.0;
 	m_step = 0;
@@ -239,6 +464,7 @@ static QString liveMediumDisk() {
 
 void InstallerWindow::enumerateDisks() {
 	m_disks.clear();
+	readDrives();
 	const QString live = liveMediumDisk();
 	/* -P: machine-readable pairs; -e 1,7,11: leave out RAM disks (1), loop
 	 * devices (7) and optical drives (11) */
@@ -273,7 +499,8 @@ void InstallerWindow::enumerateDisks() {
 			models[name] = kv.value("MODEL").trimmed();
 		}
 		const bool part = type == "part" && kv.value("FSTYPE") == "ext4";
-		if (name.isEmpty() || (type != "disk" && !part) || name == live || kv.value("PKNAME") == live) continue;
+		if (name.isEmpty() || (type != "disk" && !part) ||
+				(!live.isEmpty() && (name == live || kv.value("PKNAME") == live))) continue;
 		DiskEntry d;
 		d.device = "/dev/" + name;
 		d.size   = kv.value("SIZE");
@@ -351,7 +578,8 @@ void InstallerWindow::paintWelcome(pl_canvas *c) {
 	bodyText(c,
 		"This will install ZacOS 9 on a hard disk, or update the ZacOS 9 "
 		"already on one, keeping its accounts, files and settings. "
-		"Installing on a new disk erases it: back up any files you want to keep.",
+		"ZacOS 9 can have a whole disk, or go next to what's already on one "
+		"(Windows, say). Either way, back up any files you want to keep first.",
 		MARGIN, 148, W - 2 * MARGIN);
 
 	m_continue.paint(c);
@@ -359,38 +587,52 @@ void InstallerWindow::paintWelcome(pl_canvas *c) {
 
 void InstallerWindow::paintSelect(pl_canvas *c) {
 	panelText(c, "Select a Destination", MARGIN, MARGIN + 13);
-	panelText(c, "Select the disk to install ZacOS 9 on.",
-		MARGIN, MARGIN + 13 + 18);
+	panelText(c, "Select the disk to install ZacOS 9 on.", MARGIN, MARGIN + 13 + 16, PL_FONT_VIEWS);
 
 	m_diskList.paint(c, true);
-
-	const int warn_y = m_diskList.frame.bottom() + 14;
-	panelLabel(c, "Disk name:", m_diskName.rect.left() - 8, m_diskName.rect.top() + 15);
-	m_host.paintControls(c, FACE);
-	if (m_disks.empty()) {
-		panelText(c, "No suitable disks were found.", MARGIN, warn_y);
-	} else {
-		const DiskEntry *d = selectedDisk();
-		if (d && !d->zacosPart.isEmpty()) {
-			const QString have = "This disk has ZacOS 9 " + d->zacosVersion + " (\xe2\x80\x9c" +
-				d->zacosName + "\xe2\x80\x9d). ";
-			bodyText(c, d->zacosCmp > 0
-				? have + "That is newer than this installer's " + m_liveVersion +
-				  "; Erase & Install would erase it and everything on the disk."
-				: have + (d->zacosCmp == 0 ? "Reinstall" : "Update") +
-				  " keeps its accounts, files and settings; Erase & Install erases everything on it.",
-				MARGIN, warn_y, W - 2 * MARGIN);
-		} else if (d) {
-			/* U+26A0 in UTF-8 */
-			panelText(c,
-				"\xe2\x9a\xa0 " + m_diskList.items.value(m_diskList.state.selected) +
-				" will be completely erased.", MARGIN, warn_y);
-		}
-	}
-
 	const DiskEntry *d = selectedDisk();
 	const bool has = d && !d->zacosPart.isEmpty();
-	m_install.enabled = d && (has ? d->zacosCmp <= 0 : !m_diskName.text.trimmed().isEmpty());
+	if (d && d->isDisk && !has) {
+		m_where.paint(c);
+	}
+	if (!m_target.block.isEmpty()) {
+		m_map.paint(c);
+	}
+
+	panelLabel(c, "Disk name:", m_diskName.rect.left() - 8, m_diskName.rect.top() + 15);
+	m_host.paintControls(c, FACE);
+	/* What happens, beside the map. */
+	const int tw = W - MARGIN - RX;
+	const int ty = MAP_TOP + 12;
+	if (m_disks.empty()) {
+		panelText(c, "No suitable disks were found.", RX, ty);
+	} else if (has) {
+		const QString have = "This disk has ZacOS 9 " + d->zacosVersion + " (\xe2\x80\x9c" +
+			d->zacosName + "\xe2\x80\x9d). ";
+		bodyText(c, d->zacosCmp > 0
+			? have + "That is newer than this installer's " + m_liveVersion +
+			  "; Erase & Install would erase it and everything on the disk."
+			: have + (d->zacosCmp == 0 ? "Reinstall" : "Update") +
+			  " keeps its accounts, files and settings; Erase & Install erases everything on it.",
+			RX, ty, tw);
+	} else if (beside()) {
+		bodyText(c, besideText(), RX, ty, tw);
+	} else if (d) {
+		/* U+26A0 in UTF-8 */
+		QStringList lost;
+		for (const DiskPart &p : m_target.parts) {
+			if (d->isDisk || p.device == d->device) {
+				lost << (p.label.isEmpty() ? (p.efi ? QString("EFI System") : p.device.section('/', -1))
+					: "\u201c" + p.label + "\u201d");
+			}
+		}
+		const QString what = d->isDisk ? m_diskList.items.value(m_diskList.state.selected) : d->label();
+		bodyText(c, "\xe2\x9a\xa0 " + what + " will be completely erased" +
+			(lost.isEmpty() ? QString(".") : ", with everything on " + lost.join(", ") + "."), RX, ty, tw);
+	}
+
+	const bool ready = !beside() || (!m_measure && m_toMeasure.isEmpty() && m_why.isEmpty() && !m_ops.isEmpty());
+	m_install.enabled = d && ready && (has ? d->zacosCmp <= 0 : !m_diskName.text.trimmed().isEmpty());
 	m_install.paint(c);
 	if (has) {
 		m_erase.enabled = !m_diskName.text.trimmed().isEmpty();
@@ -423,6 +665,9 @@ void InstallerWindow::paintDone(pl_canvas *c) {
 		: "ZacOS 9 has been installed. Remove the installer disk "
 		  "and click Restart to start your new system.",
 		MARGIN, 166, W - 2 * MARGIN);
+	if (!m_restartError.isEmpty()) {
+		bodyText(c, m_restartError, MARGIN, BTN_Y - 36, W - 2 * MARGIN);
+	}
 
 	m_restart.paint(c);
 }
@@ -456,6 +701,10 @@ void InstallerWindow::mousePressEvent(QMouseEvent *e) {
 		update();
 		break;
 	case Screen::Select:
+		if (m_map.press(pos)) {
+			update();
+			break;
+		}
 		m_diskList.press(pos);
 		m_install.press(pos);
 		if (selectedDisk() && !selectedDisk()->zacosPart.isEmpty()) {
@@ -474,8 +723,12 @@ void InstallerWindow::mousePressEvent(QMouseEvent *e) {
 }
 
 void InstallerWindow::mouseMoveEvent(QMouseEvent *e) {
+	const QPoint pos = e->position().toPoint();
+	if (m_screen == Screen::Select) {
+		setCursor(m_map.onLine(pos) ? Qt::SizeVerCursor : Qt::ArrowCursor);
+	}
 	if (m_screen == Screen::Select &&
-			(m_diskList.move(e->position().toPoint()) | m_host.hostMove(e))) {
+			(m_map.move(pos) | m_diskList.move(pos) | m_host.hostMove(e))) {
 		update();
 	}
 }
@@ -489,7 +742,7 @@ void InstallerWindow::wheelEvent(QWheelEvent *e) {
 
 void InstallerWindow::mouseReleaseEvent(QMouseEvent *e) {
 	const QPoint pos = e->position().toPoint();
-	if (m_diskList.release() | (m_screen == Screen::Select && m_host.hostRelease(e))) {
+	if (m_map.release() | m_diskList.release() | (m_screen == Screen::Select && m_host.hostRelease(e))) {
 		update();
 	}
 	switch (m_screen) {
@@ -505,6 +758,9 @@ void InstallerWindow::mouseReleaseEvent(QMouseEvent *e) {
 			if (m_install.release(pos) && m_install.enabled) {
 				if (has) {
 					showInstalling({ "--update", d->zacosPart }, true);
+				} else if (beside()) {
+					showInstalling(QStringList{ "--beside", d->device, m_diskName.text.trimmed() } +
+						besideSteps(m_target, m_ops), false);
 				} else {
 					showInstalling({ d->device, m_diskName.text.trimmed() }, false);
 				}
@@ -515,7 +771,9 @@ void InstallerWindow::mouseReleaseEvent(QMouseEvent *e) {
 		break;
 	case Screen::Done:
 		if (m_restart.release(pos)) {
-			QProcess::startDetached("reboot", {});
+			/* systemctl, not reboot: /usr/sbin isn't on a user's PATH (issue #38). */
+			m_restartError = systemPower(Power::Restart);
+			update();
 		}
 		break;
 	default:
@@ -528,6 +786,11 @@ void InstallerWindow::keyPressEvent(QKeyEvent *e) {
 		if (m_screen != Screen::Installing) {
 			close();
 		}
+		return;
+	}
+	/* Return is Continue's, the default button. */
+	if (m_screen == Screen::Welcome && (e->key() == Qt::Key_Return || e->key() == Qt::Key_Enter)) {
+		showSelect();
 		return;
 	}
 	if (m_screen == Screen::Select) {

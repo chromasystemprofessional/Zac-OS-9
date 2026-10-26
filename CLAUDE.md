@@ -13,11 +13,14 @@
 | Memory panel (Disk Cache, Virtual Memory, Compressed Memory, RAM Disk) | `shell/panels/memory.cpp`, `memory/` (helper, polkit, RAM Disk unit) | C++ / Python — see `docs/memory.md` |
 | Software window (app catalog over apt) | `shell/store/` | C++ / Qt6 — see `docs/appstore.md` |
 | Software Update (ZacOS releases from GitHub + Debian updates) | `shell/update/`, `scripts/release.sh` | C++ / Qt6 — see `docs/updates.md` |
+| Screen Sharing (ZacOS to ZacOS: panel, and the host behind it: wayvnc on a private socket, Allow/Deny, Bonjour `_rfb._tcp`; the viewer: full screen at the screen's own pixels, `rfb.cpp` VNC client, the bar to switch to a window, the host's sound in `sound.cpp`) — see `docs/screen-sharing.md` | `shell/panels/screensharing.cpp`, `shell/screenshare/` | C++ / Qt6 |
 | Network Browser (connect to AFP/SMB servers) | `shell/network/` | C++ / Qt6 — see `docs/network.md` |
 | Platinum look for other apps (GTK 3 theme, Qt 6 style; global menus next) | `share/themes/ZacOS9/`, `shell/qtstyle/` | CSS / C++ — see `docs/app-integration.md` |
+| Installer and Disk Setup (partition map; installing next to another system, issue #42) | `shell/installer/`, `shell/disksetup/`, `installer/` | C++ / Qt6 + sh — see `docs/installer.md` |
 | Classic (SheepShaver) launcher | `shell/classic/` | sh |
 | Session entry | `session/` | sh |
 | Boot splash, extension parade, splash→desktop hand-off | `boot/` | Plymouth script + C + sh — see `docs/boot.md` |
+| Touchscreens (a finger as the mouse, two-finger tap right-click) and the on-screen keyboard | `compositor/src/touch.c`, `touch_tap.c`, `osk.c`, `shell/keyboard/` | C — see `docs/touch.md` |
 | Hardware quirks (Haswell HDMI audio, Mac ACPI interrupt storms) | `hardware/` | sh + modprobe.d + systemd — see `docs/hardware.md` |
 | AFP 2.x FUSE client (TCP/IP, and AppleTalk through ASP: `asp.c`) | `network/afp/` | C (libfuse3) — see `docs/network.md` |
 | File sharing helper + polkit | `sharing/` | sh + policy XML |
@@ -78,7 +81,7 @@ AFP_PASSWORD=macpass tests/sharing/afp-client.sh 127.0.0.1:5548 "Macintosh HD" "
 - Debug tracing: `ZACOS9_AFP_DEBUG=1 build/network/zacos9-afp mount ...`
 - **Never use `QProcess::waitForFinished()` in this codebase.** It deadlocked live in a Qt/Wayland GUI process even when the child process had already exited cleanly (confirmed from the server's own log). Use the `processEvents()`-loop pattern (`runSharingHelper`, `runAppstoreHelper`, `waitForProcess` in `shell/network/afpclient.cpp`) everywhere instead.
 - `zacos9-afp`'s own argument parser doesn't recognize `--` as an end-of-options marker — it reads it as an unknown flag and refuses. Don't add one when building its command line.
-- `avahi-browse` takes at most one service type per invocation (two args = "Too many arguments", browses nothing); use `-a` and filter client-side. Also needs `-k` or it substitutes a friendly name for the type even with `-p`.
+- `avahi-browse` takes at most one service type per invocation (two args = "Too many arguments", browses nothing). Start one process per service type with `-k -p -r -t`, in parallel. Avoid `-a`: it is slow enough to blow the scan budget and can leave only unusable `+` records (see `shell/network/discovery.cpp`).
 - `gio mount`'s exit code is 0 whether or not the mount worked; go by stderr.
 
 ## Agent / subagent policy

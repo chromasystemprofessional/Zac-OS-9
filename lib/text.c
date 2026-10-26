@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "draw.h"
 #include "font.h"
 #include "text.h"
 
@@ -20,17 +21,41 @@ struct style {
 	/* Fallback TrueType face for missing characters. */
 	double fallback_px;
 	bool fallback_bold;
+	int quarters; /* a 1.25x, 1.5x or 1.75x screen's font (5, 6, 7); 0 at 1x */
 };
 
 static const struct style styles[] = {
-	[PL_FONT_SYSTEM] = { &font_system, false, 12.0, true },
-	[PL_FONT_VIEWS] = { &font_views, false, 11.0, false },
-	[PL_FONT_VIEWS_ITALIC] = { &font_views, true, 11.0, false },
+	[PL_FONT_SYSTEM] = { &font_system, false, 12.0, true, 0 },
+	[PL_FONT_VIEWS] = { &font_views, false, 11.0, false, 0 },
+	[PL_FONT_VIEWS_ITALIC] = { &font_views, true, 11.0, false, 0 },
+};
+
+/* The fonts for 1.25x, 1.5x and 1.75x screens, by quarters - 5. */
+static const struct style scaled_styles[3][3] = {
+	{
+		[PL_FONT_SYSTEM] = { &font_system_125, false, 15.0, true, 5 },
+		[PL_FONT_VIEWS] = { &font_views_125, false, 13.75, false, 5 },
+		[PL_FONT_VIEWS_ITALIC] = { &font_views_125, true, 13.75, false, 5 },
+	},
+	{
+		[PL_FONT_SYSTEM] = { &font_system_150, false, 18.0, true, 6 },
+		[PL_FONT_VIEWS] = { &font_views_150, false, 16.5, false, 6 },
+		[PL_FONT_VIEWS_ITALIC] = { &font_views_150, true, 16.5, false, 6 },
+	},
+	{
+		[PL_FONT_SYSTEM] = { &font_system_175, false, 21.0, true, 7 },
+		[PL_FONT_VIEWS] = { &font_views_175, false, 19.25, false, 7 },
+		[PL_FONT_VIEWS_ITALIC] = { &font_views_175, true, 19.25, false, 7 },
+	},
 };
 
 /* QuickDraw-style italic: rows shift right one pixel per two rows above
- * the baseline (and left below it). */
-static int italic_shift(int y) {
+ * the baseline (and left below it); on a scaled font's rows, as its 1x
+ * rows there shift, scaled. */
+static int italic_shift(int y, int quarters) {
+	if (quarters) {
+		return pl_snap(italic_shift(pl_unsnap(y, quarters), 0), quarters);
+	}
 	return y <= 0 ? (-y) / 2 : -((y + 1) / 2);
 }
 
@@ -174,6 +199,7 @@ static struct plat_text *render_exact(const char *utf8, const struct style *st) 
 	text->advance = advance;
 	text->stride = text->width;
 	text->mask = calloc((size_t)text->stride * text->height, 1);
+	text->utf8 = strdup(utf8);
 
 	int pen = 1;
 	for (const char *s = utf8; *s;) {
@@ -183,9 +209,9 @@ static struct plat_text *render_exact(const char *utf8, const struct style *st) 
 			for (int r = 0; r < g->rows; r++) {
 				const int y = g->top + r;
 				const int row = f->baseline + y;
-				const int dx = st->italic ? italic_shift(y) : 0;
-				const uint16_t bits = f->rows[g->first + r];
-				for (int x = 0; x < 16; x++) {
+				const int dx = st->italic ? italic_shift(y, st->quarters) : 0;
+				const uint32_t bits = f->rows[g->first + r];
+				for (int x = 0; x < 32; x++) {
 					const int col = pen + x + dx;
 					if ((bits >> x) & 1 && col >= 0 && col < text->width) {
 						text->mask[row * text->stride + col] = 255;
@@ -226,7 +252,28 @@ static int ink_width(const struct plat_text *t) {
 	return t->ink_l < 0 ? 0 : t->ink_r - t->ink_l + 1;
 }
 
+static struct plat_text *render(const char *utf8, int max_ink_width, enum pl_font font);
+
 struct plat_text *text_render_font(const char *utf8, int max_ink_width, enum pl_font font) {
+	struct plat_text *text = render(utf8, max_ink_width, font);
+	if (text) {
+		text->font = font;
+	}
+	return text;
+}
+
+struct plat_text *text_render_scaled(const struct plat_text *text, int quarters) {
+	if (!text || !text->utf8 || quarters < 5 || quarters > 7 || text->font < 0 || text->font > 2) {
+		return NULL;
+	}
+	struct plat_text *scaled = render_exact(text->utf8, &scaled_styles[quarters - 5][text->font]);
+	if (scaled) {
+		scaled->font = text->font;
+	}
+	return scaled;
+}
+
+static struct plat_text *render(const char *utf8, int max_ink_width, enum pl_font font) {
 	const struct style *st = &styles[font];
 	struct plat_text *text = render_exact(utf8, st);
 	if (ink_width(text) <= max_ink_width) {
@@ -264,6 +311,7 @@ struct plat_text *text_render(const char *utf8, int max_ink_width) {
 
 void text_destroy(struct plat_text *text) {
 	if (text) {
+		free(text->utf8);
 		free(text->mask);
 		free(text);
 	}

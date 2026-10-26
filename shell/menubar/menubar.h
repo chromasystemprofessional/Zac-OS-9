@@ -286,7 +286,9 @@ void kbmenu_add(struct mb_menu *menus, int *n);
 /* The item's hint, or NULL (programs' own menu items have none). */
 const char *hint_text(const struct mb_item *it, char *buf, size_t n);
 /* A bubble with the text wrapped in it, the tail's tip at (0, HINT_TIP_Y),
- * or at the right edge if tail_right. Free with free(). */
-uint32_t *hint_paint(const char *text, bool tail_right, int *w, int *h);
+ * or at the right edge if tail_right. Free with free(). With `log`, its
+ * text is also logged there (pl_text_log_free it), to be drawn again at a
+ * fractional scale. */
+uint32_t *hint_paint(const char *text, bool tail_right, int *w, int *h, struct pl_text_log **log);
 
 #endif

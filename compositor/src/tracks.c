@@ -3,6 +3,7 @@
  * the pointer moves, a short trail of arrows follows it, so it's easier
  * to see on a dim or slow screen. Each copy goes again a moment later.
  */
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include <wayland-server-core.h>
@@ -27,14 +28,20 @@ static struct {
 	bool resting; /* no trail: the next move starts one from where it is */
 	double last_x, last_y;
 	struct wl_event_source *fade;
-	int scale; /* of the arrow image made */
+	float scale; /* of the arrow image made */
 	int hot_x, hot_y, w, h;
 } t;
 
-/* The theme's arrow, at the outputs' scale, as a wlr_buffer for the trail. */
-static struct wlr_buffer *arrow(void) {
+/* The scale of the screen under (x, y): each may have its own. */
+static float scale_at(struct plat_server *server, double x, double y) {
+	struct plat_output *output = output_at(server, x, y);
+	const float scale = output ? output->wlr_output->scale : server->output_scale;
+	return scale > 0 ? scale : 1;
+}
+
+/* The theme's arrow, at a screen's scale, as a wlr_buffer for the trail. */
+static struct wlr_buffer *arrow(float scale) {
 	struct plat_server *server = t.server;
-	const int scale = server->output_scale > 0 ? server->output_scale : 1;
 	struct wlr_xcursor *cursor = wlr_xcursor_manager_get_xcursor(server->cursor_mgr, "default", scale);
 	if (!cursor || cursor->image_count == 0) {
 		return NULL;
@@ -46,10 +53,10 @@ static struct wlr_buffer *arrow(void) {
 	}
 	memcpy(buf->data, img->buffer, (size_t)img->width * img->height * 4);
 	t.scale = scale;
-	t.w = (int)img->width / scale;
-	t.h = (int)img->height / scale;
-	t.hot_x = (int)img->hotspot_x / scale;
-	t.hot_y = (int)img->hotspot_y / scale;
+	t.w = (int)lroundf((float)img->width / scale);
+	t.h = (int)lroundf((float)img->height / scale);
+	t.hot_x = (int)lroundf((float)img->hotspot_x / scale);
+	t.hot_y = (int)lroundf((float)img->hotspot_y / scale);
 	return &buf->base;
 }
 
@@ -109,9 +116,9 @@ void tracks_moved(struct plat_server *server) {
 	if (dx * dx + dy * dy < TRACK_GAP * TRACK_GAP) {
 		return;
 	}
-	const int scale = server->output_scale > 0 ? server->output_scale : 1;
+	const float scale = scale_at(server, x, y);
 	if (scale != t.scale || !t.arrows[0]->buffer) {
-		struct wlr_buffer *buf = arrow();
+		struct wlr_buffer *buf = arrow(scale);
 		if (!buf) {
 			return;
 		}

@@ -33,6 +33,7 @@ struct VetVolume {
 struct VetDrive {
 	QString model;
 	bool smart = false, failing = false;
+	bool removable = false; /* USB, a card or disc: not the computer's own */
 	double celsius = -1;   /* -1: unknown */
 	qint64 hours = -1;
 };

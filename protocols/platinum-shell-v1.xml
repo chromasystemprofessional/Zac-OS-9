@@ -10,7 +10,7 @@
     when the generic rule (fixed size with a parent window) can't apply.
   </description>
 
-  <interface name="platinum_shell_v1" version="16">
+  <interface name="platinum_shell_v1" version="17">
     <enum name="style">
       <entry name="document" value="0" summary="standard document window"/>
       <entry name="movable_modal" value="1"
@@ -276,6 +276,16 @@
         quitting its application. Used by the Sniffer's Option-double-click.
       </description>
       <arg name="app_id" type="string"/>
+    </request>
+    <request name="text_field" since="17">
+      <description summary="whether a text field has this program's focus">
+        Sent by Platinum's own programs whenever their focus moves:
+        whether what has it now takes typing (a text field). The
+        on-screen keyboard follows it for this client's windows, over
+        text-input-v3, which Qt disables only when the focus leaves a
+        window, not when it moves from a field to a button within one.
+      </description>
+      <arg name="focused" type="uint"/>
     </request>
   </interface>
 

@@ -164,6 +164,7 @@ void UpdateWindow::check() {
 	m_release = Release();
 	m_releaseError.clear();
 	m_debian.clear();
+	m_debianProblem.clear();
 	m_current = installedVersion(PACKAGE);
 	setText("Checking for updates…", "Looking for a new version of ZacOS 9 and for updates "
 		"to the Debian software it runs on.");
@@ -206,9 +207,12 @@ void UpdateWindow::checkGitHub() {
 void UpdateWindow::checkDebian() {
 	/* apt-get update needs root; without it (not an administrator) the
 	 * simulation still reads the lists from the last time. */
-	run(QString(), { "refresh" }, [this](int) {
+	run(QString(), { "refresh" }, [this](int refreshed) {
 		run("apt-get", { "-s", "-o", "Debug::NoLocking=1", "--with-new-pkgs", "upgrade" },
-			[this](int) { checkDone(); },
+			[this, refreshed](int code) {
+				m_debianProblem = debianCheckProblem(refreshed, code, m_procErr);
+				checkDone();
+			},
 			[this](const QString &l) {
 				for (const DebianUpdate &u : parseAptSimulation(l)) {
 					m_debian.push_back(u);
@@ -242,7 +246,10 @@ void UpdateWindow::showResults() {
 			.arg(names.join(", ")).arg(n > 4 ? ", …" : "");
 	}
 	if (!m_releaseError.isEmpty()) {
-		detail += "Couldn’t look for a new ZacOS 9: " + m_releaseError + ".";
+		detail += "Couldn’t look for a new ZacOS 9: " + m_releaseError + ". ";
+	}
+	if (!m_debianProblem.isEmpty()) {
+		detail += m_debianProblem;
 	}
 	if (zacos || n > 0) {
 		m_state = State::Available;
@@ -257,9 +264,11 @@ void UpdateWindow::showResults() {
 			qApp->quit(); /* nothing to install: nothing to say */
 			return;
 		}
+		/* Up to date only if both checks really worked. */
+		const bool sure = m_releaseError.isEmpty() && m_debianProblem.isEmpty();
 		m_state = State::UpToDate;
-		setText(m_releaseError.isEmpty() ? "Your software is up to date." : "No updates were found.",
-			m_releaseError.isEmpty()
+		setText(sure ? "Your software is up to date." : "No updates were found.",
+			sure
 				? "ZacOS 9 " + m_current + " is the newest version, and Debian has no updates for it."
 				: detail.trimmed());
 		setButtons("OK", QString());

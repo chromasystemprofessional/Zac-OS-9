@@ -3,7 +3,7 @@
 /*
  * Walkies (Mac OS 9's Location Manager, gap plan 8.5): named places, each
  * remembering the network connection, sound output and its volume, time
- * zone, default printer and Tricks Manager set, so one choice switches them
+ * zone, default printer and Extensions Manager set, so one choice switches them
  * all. Kept in ~/.config/zacos9/Walkies/NAME.location (key=value lines);
  * the place last switched to is "walkies-location" in desktop.conf.
  */
@@ -19,7 +19,7 @@ struct Location {
 	int volume = -1;   /* percent, -1: leave it */
 	QString timezone;  /* Europe/London */
 	QString printer;   /* a CUPS queue */
-	QString trickSet;  /* a Tricks Manager set (shell/finder/tricksets.h) */
+	QString trickSet;  /* a Extensions Manager set (shell/finder/tricksets.h) */
 };
 
 QStringList locationNames();
@@ -36,7 +36,7 @@ struct WalkiesStep {
 	QStringList args;
 };
 
-/* What switching to `location` runs, in order (the Tricks Manager set's
+/* What switching to `location` runs, in order (the Extensions Manager set's
  * login items are switched apart, in the process). */
 QList<WalkiesStep> applySteps(const Location &location, const QMap<QString, bool> &services);
 /* What capturing the current settings runs, and how each answer is read. */

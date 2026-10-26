@@ -1,6 +1,7 @@
 #include "platinumshell.h"
 
 #include <QGuiApplication>
+#include <QInputMethodQueryEvent>
 #include <QHash>
 #include <QList>
 #include <QPointer>
@@ -92,12 +93,16 @@ static QHash<wl_surface *, std::function<void()>> &proxyDrags() {
 	return drags;
 }
 static void handle_proxy_drag(void *, platinum_shell_v1 *, wl_surface *surface) {
-	auto it = proxyDrags().find(surface);
-	if (it != proxyDrags().end() && it.value()) {
-		/* Not inside Wayland's event dispatch: the drag runs its own loop. */
-		std::function<void()> drag = it.value();
-		QTimer::singleShot(0, drag);
-	}
+	/* Not inside Wayland's event dispatch: the drag runs its own loop.
+	 * Looked up again then, as its window may have gone meanwhile (and
+	 * taken its entry with it). */
+	QTimer::singleShot(0, qApp, [surface] {
+		auto it = proxyDrags().find(surface);
+		if (it != proxyDrags().end() && it.value()) {
+			std::function<void()> drag = it.value();
+			drag();
+		}
+	});
 }
 static void handle_sticky_keys(void *, platinum_shell_v1 *, uint32_t, uint32_t, uint32_t) {
 }
@@ -142,7 +147,7 @@ static void global(void *, wl_registry *reg, uint32_t name, const char *iface, u
 	if (std::strcmp(iface, platinum_shell_v1_interface.name) == 0) {
 		shell = static_cast<platinum_shell_v1 *>(
 			wl_registry_bind(reg, name, &platinum_shell_v1_interface,
-				std::min(version, 16u)));
+				std::min(version, 17u)));
 		platinum_shell_v1_add_listener(shell, &shell_listener, nullptr);
 	}
 }
@@ -151,6 +156,57 @@ static void global_remove(void *, wl_registry *, uint32_t) {
 }
 
 static const wl_registry_listener registry_listener = { global, global_remove };
+
+/* Whether what has the focus takes typing, as Qt itself works it out
+ * (Qt::ImEnabled, else the WA_InputMethodEnabled a PanelEdit's host sets). */
+static bool focusTakesText() {
+	QObject *focus = QGuiApplication::focusObject();
+	if (!focus) {
+		return false;
+	}
+	QInputMethodQueryEvent query(Qt::ImEnabled);
+	QCoreApplication::sendEvent(focus, &query);
+	return query.value(Qt::ImEnabled).toBool();
+}
+
+static void sayTextField() {
+	if (!shell || wl_proxy_get_version(reinterpret_cast<wl_proxy *>(shell)) <
+			PLATINUM_SHELL_V1_TEXT_FIELD_SINCE_VERSION) {
+		return;
+	}
+	static int said = -1;
+	const int now = focusTakesText() ? 1 : 0;
+	if (now != said) {
+		said = now;
+		platinum_shell_v1_text_field(shell, static_cast<uint32_t>(now));
+		wl_display_flush(display);
+	}
+}
+
+/* For the on-screen keyboard (compositor/src/osk.c): Qt's text-input says
+ * when the focus leaves a window, not when it goes from a field to a
+ * button inside one, so we say it too. A PanelEdit taking or losing a
+ * panel's focus doesn't move Qt's: panelkit sets "zacos9TextField". */
+class TextFieldWatcher : public QObject {
+protected:
+	bool eventFilter(QObject *, QEvent *e) override {
+		if (e->type() == QEvent::DynamicPropertyChange &&
+				static_cast<QDynamicPropertyChangeEvent *>(e)->propertyName() == "zacos9TextField") {
+			QTimer::singleShot(0, this, [] { sayTextField(); });
+		}
+		return false;
+	}
+};
+
+static void watchTextFields() {
+	static TextFieldWatcher *watcher = nullptr;
+	if (watcher || !shell) {
+		return;
+	}
+	watcher = new TextFieldWatcher;
+	qApp->installEventFilter(watcher);
+	QObject::connect(qGuiApp, &QGuiApplication::focusObjectChanged, watcher, [] { sayTextField(); });
+}
 
 void platinumShellInit() {
 	static bool initialized = false;
@@ -178,6 +234,7 @@ void platinumShellInit() {
 		wl_proxy_set_queue(reinterpret_cast<wl_proxy *>(shell), nullptr);
 	}
 	wl_event_queue_destroy(queue);
+	watchTextFields();
 }
 
 static void flushLaunch() {
