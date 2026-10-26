@@ -30,7 +30,7 @@ request:
 |---|---|---|
 | 0 | Baselines (installed files, warnings) and one C++ standard | Done |
 | 1 | This page, CONTRIBUTING.md, ARCHITECTURE.md, templates | Done |
-| 2 | Shared code out of the Sniffer's folder into libraries; a `meson.build` per program | In progress: the libraries (libzacos9-shell, libzacos9-files) |
+| 2 | Shared code out of the Sniffer's folder into libraries; a `meson.build` per program | In progress: shared code in `shell/common/` (libzacos9-shell) and `shell/files/` (libzacos9-files); next, a `meson.build` per program |
 | 3 | One way to run a program and wait for it | |
 | 4 | One reader for `key=value` settings files | |
 | 5 | One file per control panel | |

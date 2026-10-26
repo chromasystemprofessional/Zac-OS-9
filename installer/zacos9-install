@@ -690,7 +690,7 @@ greetd="$TARGET/etc/greetd/config.toml"
 sed -i '/^\[initial_session\]/,$d' "$greetd"
 printf '\n[initial_session]\ncommand = "zacos9-session"\nuser = "zacos9-setup"\n' >> "$greetd"
 mkdir -p "$TARGET/var/lib/zacos9"
-# The name chosen for the disk, for the Finder (shell/finder/vfs.cpp).
+# The name chosen for the disk, for the Finder (shell/files/vfs.cpp).
 mkdir -p "$TARGET/etc/zacos9"
 printf '%s\n' "$disk_name" > "$TARGET/etc/zacos9/disk-name"
 touch "$TARGET/var/lib/zacos9/setup-pending"

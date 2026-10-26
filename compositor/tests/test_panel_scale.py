@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """ZacOS's Qt programs at 1.25x, 1.5x and 1.75x (wp_fractional_scale_v1,
-now offered to them too; shell/finder/pixels.h draws 1x images unsmoothed):
+now offered to them too; shell/common/pixels.h draws 1x images unsmoothed):
 a control panel and its frame are exactly the 1x picture with each pixel
 made one or two whole screen pixels (its text too, drawn as enlarged 1x
 letters: ZACOS9_SCALED_FONTS=0; with the fonts for those scales its text

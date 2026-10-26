@@ -6,9 +6,9 @@ achieve that: `/usr`, `/etc`, `/bin`, `/var`, `/lib`, `/proc` and `/sys`
 are exactly where the system put them, and every other program sees them
 as it always did. What changes is only what the Finder draws.
 
-The model lives in [`shell/finder/vfs.h`](../shell/finder/vfs.h); the
+The model lives in [`shell/files/vfs.h`](../shell/files/vfs.h); the
 application list it draws on is in
-[`shell/finder/appdb.h`](../shell/finder/appdb.h). No FUSE filesystem is
+[`shell/files/appdb.h`](../shell/files/appdb.h). No FUSE filesystem is
 mounted: nothing outside the Finder needs this view, so nothing outside
 the Finder pays for it.
 
@@ -59,7 +59,7 @@ alias go into its target directory; applications receive real target paths.
 Unavailable or replaced originals report an error instead of opening Home.
 Aliases stay ordinary symbolic links, so existing ones keep working. Beside
 each alias, `<folder>/.alias/<name>` (hidden) records the original's filesystem
-ID, device, inode, name and parent folder (`shell/finder/alias.cpp`). The
+ID, device, inode, name and parent folder (`shell/files/alias.cpp`). The
 filesystem ID, rather than Linux's transient device number, identifies the
 disk across reboots and remounts. Older records gain it on use; a changed
 device number alone is accepted only when the inode and recorded canonical
@@ -106,7 +106,7 @@ enlarged, framed in black on white, and follows a camera photo's recorded
 orientation. Files larger than 256 MB and unreadable pictures keep the
 document icon.
 
-Previews are decoded on two worker threads (`shell/finder/thumbnails.cpp`),
+Previews are decoded on two worker threads (`shell/files/thumbnails.cpp`),
 never while painting: the document icon shows until the preview is ready,
 then the window repaints. The 128-pixel previews are stored in the shared
 [freedesktop thumbnail cache](https://specifications.freedesktop.org/thumbnail-spec/latest/)
@@ -134,7 +134,7 @@ Picture previews take precedence. A type with no application, or whose
 application has no icon, keeps the plain document icon. Aliases show their
 original's.
 
-There is no association table of ZacOS 9's own (`shell/finder/fileassoc.cpp`).
+There is no association table of ZacOS 9's own (`shell/files/fileassoc.cpp`).
 A file's type is its MIME type (`QMimeDatabase`). The application for it is
 the [freedesktop default](https://specifications.freedesktop.org/mime-apps-spec/latest/)
 that GIO resolves from the `mimeapps.list` files (the user's, then
@@ -295,8 +295,8 @@ The standard file chooser still exposes Fonts as the real writable user font
 directory, not as Finder's generated face items. It does not install fonts
 merely by browsing them.
 
-Implementation: [`fonts.cpp`](../shell/finder/fonts.cpp),
-[`vfs.cpp`](../shell/finder/vfs.cpp), [`items.cpp`](../shell/finder/items.cpp)
+Implementation: [`fonts.cpp`](../shell/files/fonts.cpp),
+[`vfs.cpp`](../shell/files/vfs.cpp), [`items.cpp`](../shell/files/items.cpp)
 and [`fileops.cpp`](../shell/finder/fileops.cpp). Build dependencies include
 Fontconfig, FreeType and HarfBuzz; the runtime cache tool is `fontconfig`'s
 `fc-cache`. The `finder-fonts` test uses temporary directories, redistributable
@@ -430,7 +430,7 @@ A node's fields:
 |---|---|
 | `id` | Stable and unique. `/` separates it from its parent, so `system-folder/fonts` sits in `system-folder`. |
 | `name` | What the Finder shows. |
-| `kind` | `folder` (curated), `backed` (real directory), `apps`, `panels`, `fonts` (installed font catalog: `system-folder/fonts` shows the free fonts that stand in for Mac OS 9's, once each, and the user's own; a `fonts` node whose id ends in `/language-kits` shows every other installed font; see `fontFolderFaces` in `shell/finder/fonts.h`), `resource`, `launcher`, `unix`. |
+| `kind` | `folder` (curated), `backed` (real directory), `apps`, `panels`, `fonts` (installed font catalog: `system-folder/fonts` shows the free fonts that stand in for Mac OS 9's, once each, and the user's own; a `fonts` node whose id ends in `/language-kits` shows every other installed font; see `fontFolderFaces` in `shell/files/fonts.h`), `resource`, `launcher`, `unix`. |
 | `backing` | For `backed`. `$HOME`, `$XDG_CONFIG_HOME`, `$XDG_DATA_HOME` and `$XDG_DOCUMENTS_DIR` are expanded. |
 | `provider` | For `resource`: fixed provider id (`sounds`, `startup-items`, …), never a command or arbitrary path. |
 | `action` | For built-in `launcher` rows: trusted internal actions (`system-information`, `extensions-manager`) only. |
@@ -519,7 +519,7 @@ Current providers:
 - **Sounds**: user and system sound roots (`$XDG_DATA_HOME/sounds`,
   `/usr/share/sounds`) as read-only aliases.
 - **Startup Items**: enabled autostart desktop entries, resolved per the
-  FreeDesktop Autostart spec (`shell/finder/autostart.cpp`, GKeyFile): the user
+  FreeDesktop Autostart spec (`shell/files/autostart.cpp`, GKeyFile): the user
   directory overrides `XDG_CONFIG_DIRS` entries by desktop-file ID,
   `Hidden=true` and
   `X-GNOME-Autostart-enabled=false` disable, `OnlyShowIn`/`NotShowIn` are checked
@@ -556,7 +556,7 @@ Current providers:
 - **Device Drivers**: every loaded kernel module, with startup-module metadata,
   informational only.
 - **Extensions**: a curated view of the same modules
-  (`shell/finder/extensioncatalog.cpp`). Each entry gives a friendly name, an
+  (`shell/files/extensioncatalog.cpp`). Each entry gives a friendly name, an
   icon and a one-line description, and groups the modules behind it (for
   example "HDMI Sound" covers `snd_hda_codec_hdmi`). Only entries with a loaded
   module appear. Helper libraries and plumbing modules are left out on purpose;

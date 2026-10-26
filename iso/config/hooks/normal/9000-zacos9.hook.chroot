@@ -12,7 +12,7 @@ systemctl disable netatalk.service smbd.service nmbd.service wsdd2.service 2>/de
 update-initramfs -u
 # The applications the system comes with (desktop file IDs: path under
 # applications/ with / as -). The Finder's Applications folder shows only
-# what is installed later (shell/finder/appdb.cpp).
+# what is installed later (shell/files/appdb.cpp).
 mkdir -p /usr/share/zacos9
 find /usr/share/applications /usr/local/share/applications -name '*.desktop' 2>/dev/null |
 	sed -e 's|^/usr/local/share/applications/||' -e 's|^/usr/share/applications/||' -e 's|/|-|g' |

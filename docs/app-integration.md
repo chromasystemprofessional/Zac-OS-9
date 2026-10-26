@@ -274,7 +274,7 @@ when it runs **under X11**. On Wayland it never does, on any desktop. So:
   `--ozone-platform=x11 --force-device-scale-factor=N` after the program,
   N being the screen's scale from zacos9-wm's outputs file. The Finder
   (`appdb.cpp`), Login Items (`autostart.cpp`, both through
-  `finder/electronlaunch.h`) and the Apple menu (`menubar/launch.c`) do
+  `files/electronlaunch.h`) and the Apple menu (`menubar/launch.c`) do
   this. Started from a terminal, an Electron app picks Wayland as before.
 - **The package depends on `libdbusmenu-glib4`**; without it Electron
   silently keeps its menus.
@@ -322,7 +322,7 @@ when it runs **under X11**. On Wayland it never does, on any desktop. So:
     `pl_snap_scale` into buffers of the screen's pixels, shown through a
     viewport.
   - Qt programs: Qt draws at the fractional scale itself; `blitPixels`
-    (`shell/finder/pixels.h`, also the Qt style's) makes each 1x image at
+    (`shell/common/pixels.h`, also the Qt style's) makes each 1x image at
     the window's pixels from its place in the window.
   - The pointer: the cursor theme has 20, 24 and 28 px sizes made the same
     way (`tools/cursors/build_cursors.py`).
