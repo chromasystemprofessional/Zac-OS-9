@@ -877,7 +877,7 @@ test('discovery',
   timeout: 60,
 )
 
-# AFP volume names and mount points (network/netvolumes.cpp).
+# AFP volume names and mount points (files/netvolumes.cpp).
 test('netvolumes',
   executable('test-netvolumes',
     'network/tests/test_netvolumes.cpp',
