@@ -741,8 +741,9 @@ test('finder-ctl', find_program('python3'),
 
 # Disk Setup: First Aid (verify, repair, drive health) and partitioning,
 # all through UDisks2 (disksetup/); the installer opens it too.
-executable('zacos9-disksetup',
-  'disksetup/main.cpp', 'disksetup/udisks.cpp', 'disksetup/plan.cpp', 'disksetup/inuse.cpp',
+disksetup_exe = executable('zacos9-disksetup',
+  'disksetup/main.cpp', 'disksetup/diskmap.cpp', 'disksetup/udisks.cpp', 'disksetup/plan.cpp',
+  'disksetup/inuse.cpp',
   'finder/mountpolicy.cpp', 'finder/alert.cpp',
   'finder/platinumshell.cpp',
   finder_protocol,
@@ -760,6 +761,8 @@ test('disksetup-plan',
   ),
   env: ['LC_ALL=en_US.UTF-8'], timeout: 10,
 )
+# The partition map against a stand-in UDisks: drag, +, Apply (vptr is defined further down).
+disksetup_map_test = files('../tests/disksetup/test_partition_map.py')
 test('disksetup-udisks',
   executable('test-disksetup-udisks', 'disksetup/test_udisks.cpp', 'disksetup/udisks.cpp',
     'disksetup/inuse.cpp', 'finder/mountpolicy.cpp',
@@ -1533,12 +1536,14 @@ test('system-power',
   ),
   env: ['QT_QPA_PLATFORM=offscreen'],
 )
-executable('zacos9-installer',
+installer_exe = executable('zacos9-installer',
   'installer/main.cpp',
   'installer/installer.cpp',
   'finder/power.cpp',
+  # Disk Setup's plan and partition map, for "next to what's on it".
+  'disksetup/plan.cpp', 'disksetup/udisks.cpp', 'disksetup/diskmap.cpp',
   link_with: panelkit,
-  include_directories: include_directories('finder', 'print', 'panels'),
+  include_directories: include_directories('finder', 'print', 'panels', 'disksetup'),
   dependencies: [platinum_dep, qt6],
   cpp_args: ['-std=c++17'],
   install: true,
@@ -1623,6 +1628,14 @@ endforeach
 vptr_exe = executable('vptr', meson.project_source_root() / 'tools/vptr/vptr.c', vptr_protocol,
   client_protocol_src,
   dependencies: [wayland_client, xkbcommon_client])
+test('disksetup-partition-map', find_program('python3'),
+  args: [disksetup_map_test, compositor_exe.full_path(), disksetup_exe, vptr_exe],
+  depends: compositor_exe,
+  timeout: 90)
+test('installer-beside', find_program('python3'),
+  args: [files('../tests/installer/test_beside.py'), compositor_exe.full_path(), installer_exe, vptr_exe],
+  depends: compositor_exe,
+  timeout: 90)
 
 # One screen's exact pixels for UI tests (grim resamples at 1.5x and 1.75x).
 rawshot_exe = executable('rawshot', meson.project_source_root() / 'tools/rawshot/rawshot.c',

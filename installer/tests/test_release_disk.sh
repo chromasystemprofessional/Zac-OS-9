@@ -92,6 +92,22 @@ run --restore
 check '[ ! -e "$work/rules/90-zacos9-install.rules" ] && [ "$(grep -c "udevadm control --reload" "$fake/log")" = 2 ]' \
 	"--restore shows the disk to UDisks again"
 
+# --keep (installing beside what's on the disk): released, nothing erased.
+reset
+echo disk >"$fake/type"
+printf '%s disk\n%s part\n%s part\n' "$d" "${p}1" "${p}2" >"$fake/members"
+printf '%s Haiku\n' "${p}1" >"$fake/labels"
+printf '%s\t/media/live/Haiku\n' "${p}1" >"$fake/mounts"
+run --keep "$d"
+status=$?
+check '[ "$status" = 0 ] && logged "umount /media/live/Haiku"' "--keep unmounts the disk's partitions"
+check '! grep -q "^wipefs" "$fake/log"' "--keep erases nothing on the disk"
+check 'grep -qF "ENV{DEVNAME}==\"${p}[0-9]*\", ENV{UDISKS_IGNORE}=\"1\"" "$work/rules/90-zacos9-install.rules"' \
+	"--keep hides the disk from UDisks too"
+echo /media/live/Haiku >"$fake/busy"
+run --keep "$d"
+check 'grep -q "^error “Haiku” is in use, so it can.t be changed" "$work/out"' "--keep says changed, not erased"
+
 # The running system: refused before anything is changed.
 reset
 echo disk >"$fake/type"
