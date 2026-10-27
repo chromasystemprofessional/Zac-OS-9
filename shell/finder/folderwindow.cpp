@@ -2074,6 +2074,8 @@ void FolderWindow::dragEnterEvent(QDragEnterEvent *e) {
 			/* Control panels dragged between the two Control Panels
 			 * folders. */
 			(e->source() != this && acceptsPanelDrops() && mime->hasFormat(PANEL_ITEMS_MIME)) ||
+			/* Extensions dragged between the two Extensions folders. */
+			(e->source() != this && acceptsModuleDrops() && mime->hasFormat(MODULE_ITEMS_MIME)) ||
 			e->mimeData()->hasUrls() ||
 			(e->source() == nullptr && canMakeClipping(mime) && !vfsIsVirtual(m_path)) ||
 			(e->mimeData()->hasFormat(ALIAS_ITEMS_MIME) &&
@@ -2092,6 +2094,18 @@ bool FolderWindow::acceptsPanelDrops() {
 	bool found = false;
 	forEachItem([&](Item *item) {
 		found = found || vfsIsControlPanels(item->path) || vfsIsControlPanelsDisabled(item->path);
+	});
+	return found;
+}
+
+/* Extensions, Extensions (Disabled), or a window showing one of them. */
+bool FolderWindow::acceptsModuleDrops() {
+	if (vfsIsExtensions(m_path) || vfsIsExtensionsDisabled(m_path)) {
+		return true;
+	}
+	bool found = false;
+	forEachItem([&](Item *item) {
+		found = found || vfsIsExtensions(item->path) || vfsIsExtensionsDisabled(item->path);
 	});
 	return found;
 }
@@ -2115,9 +2129,11 @@ void FolderWindow::dragMoveEvent(QDragMoveEvent *e) {
 	}
 	Item *target = dropTargetAt(e->position().toPoint(), draggedPaths(e->mimeData()));
 	/* Only the folders that take a virtual item show as its target:
-	 * Startup Items, and the two Control Panels folders. */
+	 * Startup Items, and the two Control Panels and two Extensions
+	 * folders. */
 	const bool takesIconMove = target && (vfsIsStartupItems(target->path) ||
-		vfsIsControlPanels(target->path) || vfsIsControlPanelsDisabled(target->path));
+		vfsIsControlPanels(target->path) || vfsIsControlPanelsDisabled(target->path) ||
+		vfsIsExtensions(target->path) || vfsIsExtensionsDisabled(target->path));
 	if (target && vfsIsVirtual(m_path) && e->mimeData()->hasFormat(ICON_MOVE_MIME) &&
 			!takesIconMove) {
 		target = nullptr;
@@ -2142,10 +2158,11 @@ void FolderWindow::dropEvent(QDropEvent *e) {
 	if (e->source() != this && !e->mimeData()->hasFormat(STARTUP_ITEMS_MIME)) {
 		Item *on = dropTargetAt(e->position().toPoint(), {});
 		const QString destination = on ? on->path : m_path;
-		/* Startup Items, and the Control Panels folders, take items the
-		 * rest of a virtual window only arranges. */
+		/* Startup Items, and the Control Panels and Extensions folders,
+		 * take items the rest of a virtual window only arranges. */
 		if (vfsIsStartupItems(destination) || vfsIsControlPanels(destination) ||
-				vfsIsControlPanelsDisabled(destination)) {
+				vfsIsControlPanelsDisabled(destination) || vfsIsExtensions(destination) ||
+				vfsIsExtensionsDisabled(destination)) {
 			dropItems(e, on, m_path);
 			Finder::instance().dragEnded();
 			return;

@@ -38,6 +38,9 @@ inline constexpr char STARTUP_ITEMS_MIME[] = "application/x-zacos9-startup-items
 /* Control panels being dragged between Control Panels and its (Disabled)
  * folder: a JSON array of their desktop entries' IDs. */
 inline constexpr char PANEL_ITEMS_MIME[] = "application/x-zacos9-panel-items";
+/* Extensions being dragged between Extensions and its (Disabled) folder:
+ * a JSON array of their catalog keys. */
+inline constexpr char MODULE_ITEMS_MIME[] = "application/x-zacos9-module-items";
 inline constexpr char FONT_ITEMS_MIME[] = "application/x-zacos9-font-items";
 /* With ICON_MOVE_MIME: the desktop's disks and Trash being moved about it,
  * which carry nothing anywhere else. */

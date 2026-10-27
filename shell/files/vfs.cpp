@@ -1363,7 +1363,8 @@ bool vfsAcceptsDrops(const QString &path) {
 		node->kind == VKind::Unix || node->kind == VKind::Fonts ||
 		(node->kind == VKind::Apps && !node->id.startsWith("system-folder/")) ||
 		vfsIsStartupItems(path) || vfsIsControlPanels(path) ||
-		vfsIsControlPanelsDisabled(path));
+		vfsIsControlPanelsDisabled(path) || vfsIsExtensions(path) ||
+		vfsIsExtensionsDisabled(path));
 }
 
 bool vfsIsFonts(const QString &path) {
@@ -1422,6 +1423,29 @@ bool vfsIsControlPanelsDisabled(const QString &path) {
 QString vfsPanelId(const QString &path) {
 	const VNode *node = vfsNode(path);
 	return node && node->kind == VKind::Launcher ? node->panelId : QString();
+}
+
+static bool extensionsFolder(const QString &path, const char *provider) {
+	const VNode *node = vfsNode(path);
+	return node && node->kind == VKind::Resource &&
+		node->resourceProvider == QLatin1String(provider) && node->resourceKey.isEmpty();
+}
+
+bool vfsIsExtensions(const QString &path) {
+	return extensionsFolder(path, "extensions");
+}
+
+bool vfsIsExtensionsDisabled(const QString &path) {
+	return extensionsFolder(path, "extensions-disabled");
+}
+
+QString vfsModuleKey(const QString &path) {
+	const VNode *node = vfsNode(path);
+	if (!node || node->kind != VKind::Resource || node->resourceKey.isEmpty()) {
+		return QString();
+	}
+	return node->resourceProvider == "extensions" ||
+		node->resourceProvider == "extensions-disabled" ? node->resourceKey : QString();
 }
 
 bool vfsRename(const QString &path, const QString &newName) {

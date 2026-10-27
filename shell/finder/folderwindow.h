@@ -180,6 +180,7 @@ private:
 	void clearDropTarget();
 	bool acceptsStartupDrops();
 	bool acceptsPanelDrops();
+	bool acceptsModuleDrops();
 
 	QString m_path;
 	/* Remembered between sessions; written shortly after each change. */

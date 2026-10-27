@@ -145,8 +145,9 @@ bool vfsHideApplication(const QString &path);
 /* Brings back every application hidden this way. */
 void vfsShowAllHidden();
 /* Can items be dropped into this virtual folder? A Backed one, Fonts,
- * Applications (where a dropped install file is installed) and Startup
- * Items (where a dropped application is set to open at login). */
+ * Applications (where a dropped install file is installed), Startup Items
+ * (where a dropped application is set to open at login) and the two
+ * Control Panels and Extensions folders (which turn an item on or off). */
 bool vfsAcceptsDrops(const QString &path);
 /* Startup Items: the folder itself, the desktop-file ID one of its items
  * stands for ("" for anything else), and where the folder is. */
@@ -161,6 +162,12 @@ bool vfsIsControlPanelsDisabled(const QString &path);
 /* The desktop entry a control panel item stands for ("" for anything else):
  * "zacos9-mouse.desktop". */
 QString vfsPanelId(const QString &path);
+/* Extensions, and the (Disabled) folder the ones turned off go to. */
+bool vfsIsExtensions(const QString &path);
+bool vfsIsExtensionsDisabled(const QString &path);
+/* The catalog key an extension item stands for ("" for anything else):
+ * "bluetooth". */
+QString vfsModuleKey(const QString &path);
 bool vfsIsFonts(const QString &path);
 QString vfsFontFile(const QString &path);
 void vfsFontsChanged();
