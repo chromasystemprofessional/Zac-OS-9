@@ -37,7 +37,8 @@ with tempfile.TemporaryDirectory(prefix="zacos9-pack-") as directory:
     processes = []
     with (root / "compositor.log").open("w+") as log:
         try:
-            server = subprocess.Popen([compositor], env=env, stdout=log, stderr=log)
+            # -d: when launch feedback ends is logged (launch.c).
+            server = subprocess.Popen([compositor, "-d"], env=env, stdout=log, stderr=log)
             processes.append(server)
             sockets = wait_for("the compositor", lambda: server.poll() is None and [
                 p for p in root.glob("wayland-*") if not p.name.endswith(".lock")])
@@ -85,6 +86,14 @@ with tempfile.TemporaryDirectory(prefix="zacos9-pack-") as directory:
             vp("home", "move", *tile(0), "click", "wait", "600")
             assert typed("a") == "alpha", "a click on Alpha's tile brings Alpha forward"
             print("ok: a click on a tile brings its program forward")
+
+            # The Pack is a layer surface, not a view: the compositor ends
+            # its launch feedback as it maps (layers.c). Left to the timeout,
+            # the watch cursor would keep spinning for 15 s.
+            launch = (root / "compositor.log").read_text()
+            assert "Launch feedback ended for" in launch, "the launch feedback ends"
+            assert "Launch feedback timed out" not in launch, "...before its timeout"
+            print("ok: the Pack ends the launch feedback as it maps")
 
             vp("home", "move", *tile(1), "hold", "option", "click", "release", "option", "wait", "600")
             assert typed("b") == "bravo", "Option-click brings Bravo forward..."

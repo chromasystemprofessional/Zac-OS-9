@@ -246,6 +246,7 @@ static void handle_update_launch(struct wl_client *client, struct wl_resource *r
 				platinum_shell_launch_ready(view);
 			}
 		}
+		launch_ready_layers(the_server);
 	}
 }
 

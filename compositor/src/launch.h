@@ -12,6 +12,9 @@ void launch_update(struct plat_server *server, void *owner, uint32_t cookie, uin
 void launch_cancel(struct plat_server *server, void *owner, uint32_t cookie);
 void launch_cancel_owner(struct plat_server *server, void *owner);
 void launch_ready(struct plat_server *server, uint32_t pid, const char *app_id);
+/* Programs that are layer surfaces (the Pack, a menu bar) never become
+ * views, so their launch feedback ends here instead. */
+void launch_ready_layers(struct plat_server *server);
 bool launch_pending(struct plat_server *server);
 
 #endif
