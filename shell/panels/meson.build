@@ -163,6 +163,10 @@ test('users-panel', find_program('dbus-run-session'),
 )
 controlpanel_exe = executable('zacos9-controlpanel',
   'controlpanel.cpp',
+  # The panels, each registering itself (panelregistry.h).
+  'mouse.cpp', 'trackpad.cpp', 'tablet.cpp', 'keyboard.cpp', 'sound.cpp',
+  'monitors.cpp', 'energysaver.cpp', 'screensaver.cpp', 'zacmenu.cpp',
+  'general.cpp', 'internet.cpp', 'accessibility.cpp', 'locale.cpp', 'speech.cpp',
   'soundclient.cpp',
   users_sources,
   xkb_layouts_sources, default_apps_sources, startup_disk_sources, memory_sources,

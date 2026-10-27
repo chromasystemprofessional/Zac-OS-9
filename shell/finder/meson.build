@@ -14,56 +14,6 @@ test('mac-disks', find_program('python3'),
   args: [files('../../tests/finder/test_mac_disks.py'), files('zacos9-mac-disks'),
     files('../../disks/zacos9-mac-mount')])
 
-executable('zacos9-autostart',
-  'autostart_main.cpp',
-  dependencies: [shell_files_dep, qt6, gio, gio_unix, platinum_dep],
-  install: true,
-)
-
-# The chooser shows the startup disk through the Finder's Macintosh view.
-file_chooser_sources = [
-  'filechooserportal.cpp',
-]
-file_chooser_deps = [platinum_dep, qt6, gio, gio_unix, wayland_client, finder_fonts_dep]
-
-file_portal = executable('zacos9-file-portal',
-  'filechooserportal_main.cpp',
-  file_chooser_sources,
-  link_with: panelkit,
-  include_directories: include_directories('../print', '../network', '../panels'),
-  dependencies: [shell_files_dep, shell_common_dep, file_chooser_deps],
-  install: true,
-)
-
-test('filechooser-locations',
-  executable('test-filechooser-portal',
-    'tests/test_filechooser_portal.cpp',
-    file_chooser_sources,
-    link_with: panelkit,
-    include_directories: include_directories('../print', '../network', '../panels'),
-    dependencies: [shell_files_dep, shell_common_dep, file_chooser_deps],
-  ),
-  env: ['QT_QPA_PLATFORM=offscreen'],
-)
-
-test('filechooser-requests', find_program('dbus-run-session'),
-  args: [executable('test-filechooser-requests',
-    'tests/test_filechooser_requests.cpp', file_chooser_sources,
-    link_with: panelkit,
-    include_directories: include_directories('../print', '../network', '../panels'),
-    dependencies: [shell_files_dep, shell_common_dep, file_chooser_deps],
-  )],
-  env: ['QT_QPA_PLATFORM=offscreen'],
-  timeout: 45,
-)
-
-test('filechooser-lifecycle', find_program('dbus-run-session'),
-  args: ['--', find_program('python3').full_path(),
-    files('../../tests/finder/test_filechooser_lifecycle.py'), file_portal.full_path()],
-  depends: [file_portal],
-  timeout: 30,
-)
-
 # The Finder: Qt6 for windows, input and files; all drawing through lib/.
 finder_exe = executable('zacos9-finder',
   'main.cpp',
@@ -305,10 +255,10 @@ test('tricks-sets',
 test('finder-desktop',
   executable('test-finder-desktop',
     '../../tests/finder/test_desktop.cpp', finder_test_sources,
-    'filechooserportal.cpp',
+    '../fileportal/filechooserportal.cpp',
     '../qtstyle/zacos9style.cpp', qtstyle_moc,
     link_with: panelkit,
-    include_directories: include_directories('../print', '../panels', '../network', '../qtstyle'),
+    include_directories: include_directories('../print', '../panels', '../network', '../qtstyle', '../fileportal'),
     dependencies: [shell_files_dep, shell_common_dep, platinum_dep, qt6, layershellqt, wayland_client, gio, gio_unix, finder_fonts_dep],
   ),
   env: ['QT_QPA_PLATFORM=offscreen'],

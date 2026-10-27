@@ -1,4 +1,5 @@
 #include "memory.h"
+#include "panelregistry.h"
 #include "programs.h"
 
 #include <QApplication>
@@ -481,3 +482,5 @@ void MemoryPanel::keyPressEvent(QKeyEvent *e) {
 	d->host.hostKey(e);
 	update();
 }
+
+PANEL("memory", "Memory", false, MemoryPanel);
