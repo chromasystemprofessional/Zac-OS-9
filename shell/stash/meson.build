@@ -5,7 +5,7 @@ executable('zacos9-stash',
   install: true,
 )
 test('stash',
-  executable('test-stash', 'test_stash.cpp', 'stash.cpp', 'stashwindow.cpp',
+  executable('test-stash', '../../tests/stash/test_stash.cpp', 'stash.cpp', 'stashwindow.cpp',
     dependencies: [qt6],
   ),
   env: ['QT_QPA_PLATFORM=offscreen'],

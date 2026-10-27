@@ -13,7 +13,7 @@ executable('zacos9-printqueue', 'queue_main.cpp', 'queuewindow.cpp', print_sourc
   install: true,
 )
 test('printing',
-  executable('test-printing', 'tests/test_printing.cpp', 'pickerwindow.cpp',
+  executable('test-printing', '../../tests/print/test_printing.cpp', 'pickerwindow.cpp',
     'queuewindow.cpp', print_sources,
     link_with: panelkit,
     include_directories: include_directories('../finder', '../panels'),

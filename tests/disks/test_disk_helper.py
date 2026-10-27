@@ -21,7 +21,7 @@ import xml.etree.ElementTree as ET
 
 
 helper_path = (sys.argv.pop(1) if len(sys.argv) > 1 else
-               str(Path(__file__).with_name("zacos9-disk-helper")))
+               str(Path(__file__).resolve().parents[2] / "system/disks/zacos9-disk-helper"))
 loader = importlib.machinery.SourceFileLoader("disk_helper", helper_path)
 spec = importlib.util.spec_from_loader(loader.name, loader)
 helper = importlib.util.module_from_spec(spec)

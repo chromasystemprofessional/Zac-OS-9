@@ -109,7 +109,7 @@ the detail status. Search applies to the current category, including Featured.
   item with `"featured": true`, from any category.
 - An item missing a name or with no packages is left out rather than
   shown broken (`storeItems()` filters it silently; see
-  `shell/store/tests/test_storeclient.cpp`).
+  `tests/store/test_storeclient.cpp`).
 
 No icon is given in the shipped Debian catalog. Before installing those
 apps, there is nothing on disk to resolve one from, and the project doesn't ship third-party
@@ -191,7 +191,7 @@ privileged operation) and is never run through pkexec.
 
 ## Tests
 
-`shell/store/tests/test_storeclient.cpp` (`meson test store-client`)
+`tests/store/test_storeclient.cpp` (`meson test store-client`)
 checks catalog parsing (category order, Featured's synthesis, an entry
 with no name or no packages being dropped rather than shown broken, a
 missing catalog file reading as empty rather than crashing), and runs the

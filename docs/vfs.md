@@ -710,7 +710,7 @@ desktop-specific list. It runs in a private XDG tree.
 regeneration after an edit, orientation, framing, unreadable files, aliases,
 window repaints and the Finder icon painter.
 
-`shell/finder/tests/test_vfs.cpp` (`meson test finder-vfs`) builds a
+`tests/finder/test_vfs.cpp` (`meson test finder-vfs`) builds a
 private XDG environment in a temporary directory and checks discovery,
 precedence, hidden entries, duplicate names, Desktop Actions, launching,
 installing and uninstalling, renames and labels surviving a reload,
@@ -721,7 +721,7 @@ that every writable folder is inside the user's own directories. It runs
 as a `QGuiApplication` on the offscreen QPA platform so icon rendering
 is exercised for real, not skipped.
 
-`lib/tests/test_draw.c` (`meson test draw`) checks the alpha-blend math
+`tests/lib/test_draw.c` (`meson test draw`) checks the alpha-blend math
 `pl_image_blend` uses to draw a resolved icon's real alpha, separately
 from the icon set's plain on/off transparency.
 

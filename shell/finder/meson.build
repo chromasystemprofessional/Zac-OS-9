@@ -183,7 +183,7 @@ test('finder-gpu-info',
 # private XDG environment, so it reads only its own desktop entries.
 test('finder-vfs',
   executable('test-finder-vfs',
-    'tests/test_vfs.cpp',
+    '../../tests/finder/test_vfs.cpp',
     '../files/vfs.cpp',
     'folderpath.cpp',
     '../files/resources.cpp',
@@ -203,25 +203,25 @@ test('finder-vfs',
 )
 
 test('autostart',
-  executable('test-autostart', 'tests/test_autostart.cpp',
+  executable('test-autostart', '../../tests/finder/test_autostart.cpp',
     dependencies: [shell_files_dep, qt6, gio, gio_unix, platinum_dep],
   ),
 )
 
 test('alias',
-  executable('test-alias', 'tests/test_alias.cpp',
+  executable('test-alias', '../../tests/finder/test_alias.cpp',
     dependencies: [shell_files_dep, qt6],
   ),
 )
 
 test('userservices',
-  executable('test-userservices', 'tests/test_userservices.cpp', 'userservices.cpp',
+  executable('test-userservices', '../../tests/finder/test_userservices.cpp', 'userservices.cpp',
     dependencies: [shell_common_dep, qt6],
   ),
 )
 
 test('extension-catalog',
-  executable('test-extension-catalog', 'tests/test_extensioncatalog.cpp',
+  executable('test-extension-catalog', '../../tests/finder/test_extensioncatalog.cpp',
     dependencies: [shell_files_dep, platinum_dep, qt6],
   ),
 )
@@ -247,7 +247,7 @@ test('local-volume-hotplug',
 )
 
 test('tricks-sets',
-  executable('test-tricks-sets', 'tests/test_tricksets.cpp',
+  executable('test-tricks-sets', '../../tests/finder/test_tricksets.cpp',
     dependencies: [shell_files_dep, platinum_dep, qt6],
   ),
   timeout: 10,

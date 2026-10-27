@@ -5,7 +5,7 @@ executable('zacos9-barkrecorder',
   install: true,
 )
 test('bark-recorder',
-  executable('test-bark-recorder', 'test_barkrecorder.cpp',
+  executable('test-bark-recorder', '../../tests/barkrecorder/test_barkrecorder.cpp',
     'barkrecorder.cpp',
     dependencies: [qt6],
   ),

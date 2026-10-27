@@ -106,7 +106,7 @@ rather than reimplementing them.
 
 | Folder | What |
 |---|---|
-| `tests/` | Tests that aren't next to their code yet, the shared headless harness (`tests/disksetup/stage.py`), VM tests (`tests/vm/`) and the build's baselines (`tests/baseline/`). |
+| `tests/` | Every test, a folder per part (`tests/finder/`, `tests/compositor/`…), the Python tests' shared helpers (`tests/harness/`), a headless desktop to test in (`tests/disksetup/stage.py`), VM tests (`tests/vm/`) and the build's baselines (`tests/baseline/`). |
 | `system/` | The root helpers, each with its polkit policy and rules. |
 | `scripts/` | Build, run, package, ISO, VM and release scripts. |
 | `tools/` | Developer tools: icon and font builders, a scripted pointer for tests (`vptr`), screenshot helpers. |

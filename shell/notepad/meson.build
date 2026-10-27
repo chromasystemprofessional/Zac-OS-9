@@ -5,7 +5,7 @@ executable('zacos9-notepad',
   install: true,
 )
 test('notepad',
-  executable('test-notepad', 'test_notepad.cpp', 'notepadwindow.cpp',
+  executable('test-notepad', '../../tests/notepad/test_notepad.cpp', 'notepadwindow.cpp',
     dependencies: [qt6],
   ),
   env: ['QT_QPA_PLATFORM=offscreen'],

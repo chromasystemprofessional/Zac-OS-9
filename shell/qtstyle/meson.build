@@ -11,7 +11,7 @@ shared_module('zacos9style',
   install_dir: get_option('libdir') / 'qt6' / 'plugins' / 'styles',
 )
 test('qtstyle-tooltips',
-  executable('test-qtstyle-tooltips', 'test_tooltips.cpp',
+  executable('test-qtstyle-tooltips', '../../tests/qtstyle/test_tooltips.cpp',
     'zacos9style.cpp', qtstyle_moc,
     dependencies: [platinum_dep, qt6],
   ),

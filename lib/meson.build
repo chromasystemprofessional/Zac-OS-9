@@ -57,7 +57,7 @@ appfilter_lib = static_library('appfilter', 'appfilter.c',
 appfilter_dep = declare_dependency(link_with: appfilter_lib,
   include_directories: include_directories('.'),
   dependencies: dependency('gio-unix-2.0'))
-test('appfilter', executable('test-appfilter', 'tests/test_appfilter.c',
+test('appfilter', executable('test-appfilter', '../tests/lib/test_appfilter.c',
   dependencies: [appfilter_dep]))
 # The control panels, from their desktop entries: the Control Panels folder
 # and the Zac menu's (lib/controlpanels.h).
@@ -66,28 +66,28 @@ controlpanels_lib = static_library('controlpanels', 'controlpanels.c',
 controlpanels_dep = declare_dependency(link_with: controlpanels_lib,
   include_directories: include_directories('.'),
   dependencies: [platinum_dep, dependency('glib-2.0')])
-test('control-panels', executable('test-control-panels', 'tests/test_controlpanels.c',
+test('control-panels', executable('test-control-panels', '../tests/lib/test_controlpanels.c',
   dependencies: [controlpanels_dep]))
 
 figcompare_dep = declare_dependency(
-  sources: 'tests/figcompare.c',
-  include_directories: include_directories('tests'),
+  sources: '../tests/lib/figcompare.c',
+  include_directories: include_directories('../tests/lib'),
   dependencies: [platinum_dep],
 )
 test('menudraw',
-  executable('test-menudraw', 'tests/test_menudraw.c',
+  executable('test-menudraw', '../tests/lib/test_menudraw.c',
     dependencies: [figcompare_dep]),
   args: [figs_dir],
 )
-test('text', executable('test-text', 'tests/test_text.c', dependencies: [platinum_dep]))
-test('draw', executable('test-draw', 'tests/test_draw.c', dependencies: [platinum_dep]))
-test('welcome', executable('test-welcome', 'tests/test_welcome.c', dependencies: [platinum_dep]))
-test('settings', executable('test-settings', 'tests/test_settings.c', dependencies: [platinum_dep]))
-test('savers', executable('test-savers', 'tests/test_savers.c', dependencies: [platinum_dep]))
-test('electron', executable('test-electron', 'tests/test_electron.c', dependencies: [platinum_dep]))
-test('locate', executable('test-locate', 'tests/test_locate.c', dependencies: [platinum_dep]))
+test('text', executable('test-text', '../tests/lib/test_text.c', dependencies: [platinum_dep]))
+test('draw', executable('test-draw', '../tests/lib/test_draw.c', dependencies: [platinum_dep]))
+test('welcome', executable('test-welcome', '../tests/lib/test_welcome.c', dependencies: [platinum_dep]))
+test('settings', executable('test-settings', '../tests/lib/test_settings.c', dependencies: [platinum_dep]))
+test('savers', executable('test-savers', '../tests/lib/test_savers.c', dependencies: [platinum_dep]))
+test('electron', executable('test-electron', '../tests/lib/test_electron.c', dependencies: [platinum_dep]))
+test('locate', executable('test-locate', '../tests/lib/test_locate.c', dependencies: [platinum_dep]))
 test('widgets',
-  executable('test-widgets', 'tests/test_widgets.c',
+  executable('test-widgets', '../tests/lib/test_widgets.c',
     dependencies: [figcompare_dep]),
   args: [figs_dir],
 )
@@ -95,10 +95,10 @@ test('widgets',
 # The compiled font table must match the .pfont sources.
 python3 = find_program('python3', required: false)
 if python3.found()
-  sound_driver = executable('test-sound-driver', 'tests/sound_driver.c',
+  sound_driver = executable('test-sound-driver', '../tests/lib/sound_driver.c',
     dependencies: [platinum_dep])
   test('sound-playback', python3,
-    args: [files('tests/test_sound.py'), sound_driver,
+    args: [files('../tests/lib/test_sound.py'), sound_driver,
       meson.project_source_root() / 'assets'],
     timeout: 60)
   test('fonts-current', python3,

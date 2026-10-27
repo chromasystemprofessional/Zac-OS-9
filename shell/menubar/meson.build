@@ -1,7 +1,7 @@
 wayland_cursor = dependency('wayland-cursor')
 
 test('erase-disk-menu',
-  executable('test-erase-menu', 'test_erase_menu.c',
+  executable('test-erase-menu', '../../tests/menubar/test_erase_menu.c',
     dependencies: [platinum_dep, wayland_client],
     c_args: ['-ffunction-sections', '-fdata-sections'],
     link_args: ['-Wl,--gc-sections']))
@@ -28,7 +28,7 @@ menubar_exe = executable('zacos9-menubar',
 
 # Hint Bubbles over the menu bar's menus (menubar/hints.c).
 test('menu-hints',
-  executable('test-hints', 'test_hints.c', 'hints.c',
+  executable('test-hints', '../../tests/menubar/test_hints.c', 'hints.c',
     dependencies: [platinum_dep, wayland_client],
   ),
   timeout: 10,
@@ -36,7 +36,7 @@ test('menu-hints',
 
 # The Zac menu's recent items (menubar/recent.c).
 test('menu-recent',
-  executable('test-recent', 'test_recent.c', 'recent.c',
+  executable('test-recent', '../../tests/menubar/test_recent.c', 'recent.c',
     dependencies: [platinum_dep, gio],
   ),
   timeout: 10,
@@ -44,7 +44,7 @@ test('menu-recent',
 
 # The keyboard menu (menubar/kbmenu.c).
 test('menu-keyboard',
-  executable('test-kbmenu', 'test_kbmenu.c', 'kbmenu.c',
+  executable('test-kbmenu', '../../tests/menubar/test_kbmenu.c', 'kbmenu.c',
     dependencies: [platinum_dep, wayland_client],
   ),
   timeout: 10,
@@ -53,7 +53,7 @@ test('menu-keyboard',
 # ⌘-Tab's choice of program (menubar/toplevels.c).
 test('menu-app-switch',
   executable('test-app-switch',
-    'test_app_switch.c', 'toplevels.c', client_protocol_src,
+    '../../tests/menubar/test_app_switch.c', 'toplevels.c', client_protocol_src,
     dependencies: [platinum_dep, wayland_client],
   ),
   timeout: 10,
@@ -61,7 +61,7 @@ test('menu-app-switch',
 
 test('menu-launch-feedback',
   executable('test-menu-launch',
-    'test_launch.c', 'launch.c',
+    '../../tests/menubar/test_launch.c', 'launch.c',
     dependencies: [platinum_dep, wayland_client, gio, appfilter_dep, controlpanels_dep],
   ),
   timeout: 10,
@@ -71,6 +71,6 @@ gtk_menu_observer = executable('gtk-menu-observer',
   dependencies: [platinum_dep, wayland_client, gio],
 )
 test('gtk-appmenu', find_program('dbus-run-session'),
-  args: [executable('test-appmenu-gtk', 'test_appmenu_gtk.c',
+  args: [executable('test-appmenu-gtk', '../../tests/menubar/test_appmenu_gtk.c',
     dependencies: [platinum_dep, wayland_client, gio])],
   env: ['G_DEBUG=fatal-warnings'], timeout: 15)

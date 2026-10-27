@@ -5,7 +5,7 @@
 # and Debian version order (dpkg's own); no network, nothing installed.
 test('update-check',
   executable('test-update-check',
-    'tests/test_updatecheck.cpp',
+    '../../tests/update/test_updatecheck.cpp',
     'updatecheck.cpp',
     dependencies: [shell_common_dep, qt6],
   ),

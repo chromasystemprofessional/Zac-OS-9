@@ -7,7 +7,7 @@ executable('zacos9-pedigree', 'main.cpp', pedigree_sources,
   install: true,
 )
 test('pedigree',
-  executable('test-pedigree', 'tests/test_pedigree.cpp', pedigree_sources,
+  executable('test-pedigree', '../../tests/pedigree/test_pedigree.cpp', pedigree_sources,
     link_with: panelkit,
     include_directories: include_directories('../finder', '../print', '../panels'),
     dependencies: [shell_common_dep, platinum_dep, qt6, wayland_client],

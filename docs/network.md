@@ -332,7 +332,7 @@ Away) is the way to eject one for now.
 
 ## Tests
 
-`shell/network/tests/test_discovery.cpp` (`meson test discovery`) checks
+`tests/network/test_discovery.cpp` (`meson test discovery`) checks
 `avahi-browse` line parsing against real captured output (including the
 friendly-name substitution bug above, so a regression there fails a
 test) and WS-Discovery `ComputerName` extraction, without needing a live

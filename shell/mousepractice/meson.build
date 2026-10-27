@@ -7,7 +7,7 @@ executable('zacos9-mousepractice',
   install: true,
 )
 test('mouse-practice',
-  executable('test-mouse-practice', 'tests/test_practice.cpp', 'practice.cpp',
+  executable('test-mouse-practice', '../../tests/mousepractice/test_practice.cpp', 'practice.cpp',
     dependencies: [qt6],
   ),
   timeout: 10,

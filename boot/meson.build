@@ -36,7 +36,7 @@ parade = executable('zacos9-parade', 'zacos9-parade.c', dependencies: [platinum_
 install_data('zacos9-parade.service',
   install_dir: get_option('prefix') / 'lib' / 'systemd' / 'system')
 test('boot-parade', find_program('python3'),
-  args: [files('tests/test_parade.py'), parade, files('../lib/extensions.c')])
+  args: [files('../tests/boot/test_parade.py'), parade, files('../lib/extensions.c')])
 
 # Handing the startup screen from the splash to the compositor.
 install_data('zacos9-boot-handoff',
@@ -48,7 +48,7 @@ install_data('plymouth-quit.service.d/zacos9.conf',
 install_data('plymouth-quit-wait.service.d/zacos9.conf',
   install_dir: get_option('prefix') / 'lib' / 'systemd' / 'system' / 'plymouth-quit-wait.service.d')
 test('boot-handoff', find_program('python3'),
-  args: [files('tests/test_handoff.py'), files('zacos9-boot-handoff')])
+  args: [files('../tests/boot/test_handoff.py'), files('zacos9-boot-handoff')])
 
 install_data('zacos9-bootlogo',
   install_dir: get_option('libexecdir') / 'zacos9', install_mode: 'rwxr-xr-x')
@@ -58,6 +58,6 @@ test('grub-haiku', find_program('sh'),
   args: [files('../tests/boot/test_grub_haiku.sh'), files('31_zacos9_haiku')])
 
 test('boot-splash-displays', find_program('python3'),
-  args: [files('tests/test_splash.py'), files('plymouth/zacos9.script')])
+  args: [files('../tests/boot/test_splash.py'), files('plymouth/zacos9.script')])
 test('boot-splash-welcome', find_program('python3'),
-  args: [files('tests/test_splash.py'), files('plymouth/zacos9.script'), 'boot'])
+  args: [files('../tests/boot/test_splash.py'), files('plymouth/zacos9.script'), 'boot'])
