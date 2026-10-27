@@ -87,7 +87,7 @@ xkb_layouts_include = include_directories('../compositor/src')
 
 # vptr: scripted pointer (press/drag/release) for UI tests.
 fullscreen_client = executable('test-fullscreen-client',
-  '../compositor/tests/fullscreen_client.cpp',
+  '../tests/compositor/fullscreen_client.cpp',
   dependencies: qt6,
 )
 
@@ -110,17 +110,17 @@ rawshot_exe = executable('rawshot', meson.project_source_root() / 'tools/rawshot
 
 # Screen saver, display and system sleep (compositor/src/idle.c).
 idle_client = executable('test-idle-client',
-  '../compositor/tests/idle_client.cpp',
+  '../tests/compositor/idle_client.cpp',
   dependencies: qt6,
 )
 # Monitors' 1.25x, 1.5x and 1.75x, per screen: wp_fractional_scale_v1, but not for ZacOS's own programs.
 globals_client = executable('test-globals-client',
-  '../compositor/tests/globals_client.c',
+  '../tests/compositor/globals_client.c',
   dependencies: [wayland_client],
 )
 # Option-click on the close and collapse boxes, ⌘-drag behind (input.c).
 close_app_client = executable('test-close-app-client',
-  '../compositor/tests/close_app_client.c', finder_protocol,
+  '../tests/compositor/close_app_client.c', finder_protocol,
   dependencies: [wayland_client],
 )
 gtk3 = dependency('gtk+-3.0')
@@ -171,154 +171,154 @@ subdir('qtstyle')
 subdir('finder')
 subdir('gtkmenu')
 test('fullscreen-protocols', find_program('python3'),
-  args: [files('../compositor/tests/test_fullscreen.py'),
+  args: [files('../tests/compositor/test_fullscreen.py'),
     meson.project_build_root() / 'compositor/zacos9-wm', fullscreen_client],
   depends: compositor_exe,
   timeout: 30,
 )
 test('fullscreen-protocols-hidpi', find_program('python3'),
-  args: [files('../compositor/tests/test_fullscreen.py'),
+  args: [files('../tests/compositor/test_fullscreen.py'),
     meson.project_build_root() / 'compositor/zacos9-wm', fullscreen_client, '2'],
   depends: compositor_exe,
   timeout: 30,
 )
 # The same, saying where its focus is as ZacOS's own programs do.
 field_client = executable('test-field-client',
-  '../compositor/tests/idle_client.cpp',
+  '../tests/compositor/idle_client.cpp',
   include_directories: include_directories('finder'),
   dependencies: [shell_common_dep, qt6, wayland_client],
   cpp_args: ['-DPLATINUM_FIELD'],
 )
 # The on-screen keyboard for a text field with no keyboard attached.
 test('onscreen-keyboard', find_program('python3'),
-  args: [files('../compositor/tests/test_onscreen_keyboard.py'), compositor_exe, idle_client, field_client,
+  args: [files('../tests/compositor/test_onscreen_keyboard.py'), compositor_exe, idle_client, field_client,
     vptr_exe, rawshot_exe],
   depends: [keyboard_exe],
   timeout: 120,
 )
 test('idle-sleep', find_program('python3'),
-  args: [files('../compositor/tests/test_idle.py'), compositor_exe, idle_client, vptr_exe],
+  args: [files('../tests/compositor/test_idle.py'), compositor_exe, idle_client, vptr_exe],
   timeout: 60,
 )
 test('idle-lock', find_program('dbus-run-session'),
-  args: ['--', find_program('python3').full_path(), files('../compositor/tests/test_lock.py'),
+  args: ['--', find_program('python3').full_path(), files('../tests/compositor/test_lock.py'),
     compositor_exe, idle_client, test_lock_exe, inhibit_exe, vptr_exe],
   timeout: 90,
 )
 # The lock at 1.5x and 1.75x: the screen's own pixels, only its 1x colours.
 test('lock-scale', find_program('python3'),
-  args: [files('../compositor/tests/test_lock_scale.py'), compositor_exe, test_lock_exe, vptr_exe,
+  args: [files('../tests/compositor/test_lock_scale.py'), compositor_exe, test_lock_exe, vptr_exe,
     rawshot_exe],
   timeout: 90,
 )
 # ⌘-Tab, Option-click on the desktop, contextual menus and Log Out, with the
 # real menu bar and Sniffer.
 test('session-ui', find_program('dbus-run-session'),
-  args: ['--', find_program('python3').full_path(), files('../compositor/tests/test_session_ui.py'),
+  args: ['--', find_program('python3').full_path(), files('../tests/compositor/test_session_ui.py'),
     compositor_exe, menubar_exe, finder_exe, idle_client, vptr_exe],
   timeout: 90,
 )
 # The Pack: torn off the Application menu (menubar/main.c, pack/).
 test('pack-session', find_program('python3'),
-  args: [files('../compositor/tests/test_pack.py'), compositor_exe, menubar_exe, idle_client, vptr_exe],
+  args: [files('../tests/compositor/test_pack.py'), compositor_exe, menubar_exe, idle_client, vptr_exe],
   depends: [pack_exe],
   timeout: 60,
 )
 # Function keys that open things (fkeys.c, input.c).
 test('function-keys-session', find_program('python3'),
-  args: [files('../compositor/tests/test_function_keys.py'), compositor_exe, idle_client, vptr_exe],
+  args: [files('../tests/compositor/test_function_keys.py'), compositor_exe, idle_client, vptr_exe],
   timeout: 60,
 )
 # Sticky Keys, Mouse Keys and Zoom (access.c, input.c, output.c).
 test('accessibility-session', find_program('python3'),
-  args: [files('../compositor/tests/test_access.py'), compositor_exe, idle_client, vptr_exe],
+  args: [files('../tests/compositor/test_access.py'), compositor_exe, idle_client, vptr_exe],
   timeout: 90,
 )
 # Proxy icons and spring-open collapsed windows (decor.c, input.c, folderwindow.cpp).
 test('proxy-icon', find_program('python3'),
-  args: [files('../compositor/tests/test_proxy_icon.py'), compositor_exe, menubar_exe, finder_exe, vptr_exe],
+  args: [files('../tests/compositor/test_proxy_icon.py'), compositor_exe, menubar_exe, finder_exe, vptr_exe],
   timeout: 90,
 )
 # Pop-up windows: tabs at the bottom of the screen (decor.c, view.c, input.c, folderwindow.cpp).
 test('popup-windows', find_program('python3'),
-  args: [files('../compositor/tests/test_popup_windows.py'), compositor_exe, menubar_exe, finder_exe, vptr_exe],
+  args: [files('../tests/compositor/test_popup_windows.py'), compositor_exe, menubar_exe, finder_exe, vptr_exe],
   timeout: 120,
 )
 # Mouse Tracks: a trail behind the moving pointer (compositor/src/tracks.c).
 test('mouse-tracks', find_program('python3'),
-  args: [files('../compositor/tests/test_mouse_tracks.py'), compositor_exe, vptr_exe,
+  args: [files('../tests/compositor/test_mouse_tracks.py'), compositor_exe, vptr_exe,
     scribble_exe],
   timeout: 60,
 )
 # Spring-loaded folders: Space during a drag opens one at once (drag_spring).
 test('spring-space', find_program('python3'),
-  args: [files('../compositor/tests/test_spring_space.py'), compositor_exe, menubar_exe, finder_exe, vptr_exe],
+  args: [files('../tests/compositor/test_spring_space.py'), compositor_exe, menubar_exe, finder_exe, vptr_exe],
   timeout: 120,
 )
 # The Qt programs at 1.25x, 1.5x and 1.75x: a panel exactly its 1x picture,
 # each pixel whole screen pixels.
 test('panel-scale', find_program('python3'),
-  args: [files('../compositor/tests/test_panel_scale.py'), compositor_exe, controlpanel_exe,
+  args: [files('../tests/compositor/test_panel_scale.py'), compositor_exe, controlpanel_exe,
     rawshot_exe],
   timeout: 120,
 )
 # Window frames at 1.25x, 1.5x and 1.75x: the screen's own pixels, even stripes.
 test('frame-scale', find_program('python3'),
-  args: [files('../compositor/tests/test_frame_scale.py'), compositor_exe, idle_client, vptr_exe,
+  args: [files('../tests/compositor/test_frame_scale.py'), compositor_exe, idle_client, vptr_exe,
     rawshot_exe],
   timeout: 120,
 )
 # The menu bar at 1.25x, 1.5x and 1.75x: the 1x one, each pixel whole screen pixels.
 test('menubar-scale', find_program('python3'),
-  args: [files('../compositor/tests/test_menubar_scale.py'), compositor_exe, menubar_exe, vptr_exe,
+  args: [files('../tests/compositor/test_menubar_scale.py'), compositor_exe, menubar_exe, vptr_exe,
     rawshot_exe],
   timeout: 120,
 )
 # The menu bar on every screen, each at its own scale; menus open where clicked.
 test('menubar-displays', find_program('python3'),
-  args: [files('../compositor/tests/test_menubar_displays.py'), compositor_exe, menubar_exe, vptr_exe],
+  args: [files('../tests/compositor/test_menubar_displays.py'), compositor_exe, menubar_exe, vptr_exe],
   timeout: 90,
 )
 test('fractional-scale', find_program('python3'),
-  args: [files('../compositor/tests/test_fractional_scale.py'), compositor_exe, globals_client],
+  args: [files('../tests/compositor/test_fractional_scale.py'), compositor_exe, globals_client],
   timeout: 60,
 )
 # Keyboard layouts: ⌘-Space and the keyboard menu (input.c, kbmenu.c).
 test('keyboard-layout-switch', find_program('python3'),
-  args: [files('../compositor/tests/test_keyboard_layouts.py'), compositor_exe, menubar_exe, vptr_exe],
+  args: [files('../tests/compositor/test_keyboard_layouts.py'), compositor_exe, menubar_exe, vptr_exe],
   timeout: 60,
 )
 test('window-tricks', find_program('python3'),
-  args: [files('../compositor/tests/test_window_tricks.py'), compositor_exe, idle_client,
+  args: [files('../tests/compositor/test_window_tricks.py'), compositor_exe, idle_client,
     vptr_exe, close_app_client],
   timeout: 60,
 )
 # A keyring password prompt keeps the keyboard until answered (compositor/src/view.c).
 test('system-prompt', find_program('python3'),
-  args: [files('../compositor/tests/test_system_prompt.py'), compositor_exe, idle_client,
+  args: [files('../tests/compositor/test_system_prompt.py'), compositor_exe, idle_client,
     vptr_exe],
   timeout: 60,
 )
 test('idle-inhibit', find_program('dbus-run-session'),
-  args: ['--', find_program('python3').full_path(), files('../compositor/tests/test_inhibit.py'),
+  args: ['--', find_program('python3').full_path(), files('../tests/compositor/test_inhibit.py'),
     compositor_exe, idle_client, inhibit_exe],
   timeout: 60,
 )
 
 busy_client = executable('test-busy-client',
-  '../compositor/tests/busy_client.cpp',
+  '../tests/compositor/busy_client.cpp',
   include_directories: include_directories('finder'),
   dependencies: [shell_common_dep, qt6, wayland_client],
 )
 test('busy-cursor-protocols', find_program('python3'),
-  args: [files('../compositor/tests/test_busy_cursor.py'), compositor_exe, busy_client, vptr_exe,
+  args: [files('../tests/compositor/test_busy_cursor.py'), compositor_exe, busy_client, vptr_exe,
     meson.project_source_root() / 'tools/cursors/build_cursors.py',
     meson.project_source_root() / 'assets/cursors/platinum-cursors.pcur'],
   depends: [compositor_exe, cursor_theme],
   timeout: 45,
 )
 test('ghost-frames', find_program('python3'),
-  args: [files('../compositor/tests/test_ghost_frames.py'), compositor_exe, busy_client],
+  args: [files('../tests/compositor/test_ghost_frames.py'), compositor_exe, busy_client],
   depends: [compositor_exe],
   timeout: 60,
 )

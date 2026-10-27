@@ -5,8 +5,8 @@
 #include <unistd.h>
 #include <wlr/render/pixman.h>
 
-#include "../src/pixbuf.h"
-#include "../src/snapshot.c"
+#include "../../compositor/src/pixbuf.h"
+#include "../../compositor/src/snapshot.c"
 
 static struct wlr_output test_output;
 

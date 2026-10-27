@@ -1,6 +1,6 @@
 #include <assert.h>
 
-#include "../src/input.c"
+#include "../../compositor/src/input.c"
 
 static struct wlr_cursor *attached_cursor;
 static struct wlr_input_device *attached_device;

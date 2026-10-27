@@ -1,6 +1,6 @@
 #include <assert.h>
 
-#include "../src/input.c"
+#include "../../compositor/src/input.c"
 
 /* The pressed surface moves while the button is held, as The Collar does when
  * ⌘-dragged; the pointer stays with it, in its new surface-local coordinates. */

@@ -10,7 +10,7 @@
  * exits. If it dies instead, zacos9-wm keeps the screens locked and starts
  * it again.
  *
- * Built with -DZACOS9_LOCK_TEST (test-lock, for compositor/tests/
+ * Built with -DZACOS9_LOCK_TEST (test-lock, for tests/compositor/
  * test_lock.py) it takes "sesame" instead of asking PAM, and says on
  * stdout when it locks, rejects a password and unlocks. See
  * docs/energy-saver.md.
