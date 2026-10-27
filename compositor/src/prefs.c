@@ -14,9 +14,11 @@
  *
  * Several screens: "main-display=NAME" has the menu bar and desktop icons;
  * "display.NAME.resolution=WxH", "display.NAME.scale=S" and
- * "display.NAME.x|y=N" set a screen's size, pixel size and place (each
- * screen its own; "resolution" and "scale" alone are for screens without
- * one); "mirror=1" puts every screen at the same place.
+ * "display.NAME.x|y=N" set a screen's size, pixel size and place.
+ * "resolution" and "scale" alone are the Monitors panel's setting for one
+ * screen: that one when it is alone, or the main one when there are
+ * several (the others keep their own, picked from their density).
+ * "mirror=1" puts every screen at the same place.
  */
 #define _GNU_SOURCE
 #include <math.h>
@@ -81,12 +83,27 @@ float prefs_parse_scale(const char *s, float fallback) {
 	return fallback;
 }
 
-/* The Monitors panel's scale for a screen, else for every screen; 4 is
- * only for -S. */
-static float setting_scale(const struct wlr_output *o, float fallback) {
-	char v[32], key[96];
-	snprintf(key, sizeof(key), "display.%s.scale", o->name);
-	if (!pl_setting(key, v, sizeof(v)) && !pl_setting("scale", v, sizeof(v))) {
+/* A screen's own setting ("display.NAME.KEY"), else the Monitors panel's
+ * one for a single screen. That one belongs to the main screen when there
+ * are several; the others keep their own size and scale. */
+static bool display_setting(struct plat_server *server, const struct wlr_output *o,
+		const char *key, char *value, size_t len) {
+	char name[96];
+	snprintf(name, sizeof(name), "display.%s.%s", o->name, key);
+	if (pl_setting(name, value, len)) {
+		return true;
+	}
+	/* A screen still being set up is not on the list yet: it is the only
+	 * one, so the main one. */
+	const struct plat_output *main_output = output_main(server);
+	return (!main_output || main_output->wlr_output == o) && pl_setting(key, value, len);
+}
+
+/* The Monitors panel's scale for a screen; 4 is only for -S. */
+static float setting_scale(struct plat_server *server, const struct wlr_output *o,
+		float fallback) {
+	char v[32];
+	if (!display_setting(server, o, "scale", v, sizeof(v))) {
 		return fallback;
 	}
 	const float scale = prefs_parse_scale(v, fallback);
@@ -200,7 +217,7 @@ static float automatic_scale(struct plat_server *server, struct wlr_output *o) {
 
 /* Apply the chosen scale and resolution to one output. */
 float prefs_output_scale(struct plat_server *server, struct wlr_output *o) {
-	return setting_scale(o, automatic_scale(server, o));
+	return setting_scale(server, o, automatic_scale(server, o));
 }
 
 static void apply_output(struct plat_server *server, struct plat_output *output) {
@@ -214,10 +231,10 @@ static void apply_output(struct plat_server *server, struct plat_output *output)
 		wlr_output_state_set_scale(&state, scale);
 		changed = true;
 	}
-	char res[32], key[96];
+	char res[32];
 	int w, h;
-	snprintf(key, sizeof(key), "display.%s.resolution", o->name);
-	if ((pl_setting(key, res, sizeof(res)) || pl_setting("resolution", res, sizeof(res))) && sscanf(res, "%dx%d", &w, &h) == 2 &&
+	if (display_setting(server, o, "resolution", res, sizeof(res)) &&
+			sscanf(res, "%dx%d", &w, &h) == 2 &&
 			w >= 640 && h >= 480 && (w != o->width || h != o->height)) {
 		struct wlr_output_mode *mode, *best = NULL;
 		wl_list_for_each(mode, &o->modes, link) {

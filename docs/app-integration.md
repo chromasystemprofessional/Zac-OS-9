@@ -289,8 +289,9 @@ when it runs **under X11**. On Wayland it never does, on any desktop. So:
   scale 1 and is enlarged (a little soft): the scaled path is whole-number
   only. X11 has one scale for every screen: the main display's.
 - **Each screen its own scale** (Monitors' Pixel size applies to the
-  selected display: `display.NAME.scale` in `desktop.conf`, else `scale`,
-  else 2x on a dense screen, else `-S`; `prefs_output_scale`,
+  selected display: `display.NAME.scale` in `desktop.conf`, else `scale` on
+  the main screen — the panel writes `scale` alone while it shows one
+  screen — else 2x on a dense screen, else `-S`; `prefs_output_scale`,
   `compositor/src/prefs.c`). A surface is told the scale of the screen it
   is mostly on (`preferred_buffer_scale`, `wp_fractional_scale_v1`), also
   when that screen's scale changes. Test: `fractional-scale`.

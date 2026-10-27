@@ -160,6 +160,11 @@ test('display-origin', python3,
   args: [files('../tests/compositor/test_display_origin.py'), compositor_exe],
   timeout: 60,
 )
+# The Monitors panel's one-screen scale stays on the screen it was chosen on.
+test('display-scale', python3,
+  args: [files('../tests/compositor/test_display_scale.py'), compositor_exe],
+  timeout: 60,
+)
 # The card with the largest connected screen renders (onboard HDMI makes the
 # integrated GPU the boot VGA device, and wlroots renders on that).
 test('primary-gpu',
