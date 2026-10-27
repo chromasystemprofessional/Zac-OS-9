@@ -56,6 +56,16 @@ int main(int argc, char **argv) {
 	write(badRecording, "not a wave file");
 	assert(!importAlertSound(badRecording, &customAlert, &importError) && !importError.isEmpty());
 	assert(!importAlertSound(recording, &customAlert, &importError) && importError.contains("already exists"));
+	/* One list for the panels, the Sounds folder and the Appearance
+	 * panel: the built-in Chime, the sounds on this computer, the user's
+	 * own, and None at the end. */
+	const QStringList sounds = alertSoundIds();
+	assert(!sounds.isEmpty() && sounds.first() == "platinum" &&
+		sounds.last() == "none");
+	assert(sounds.contains("Recorded_Chime"));
+	assert(sounds.count("platinum") == 1 && sounds.count("none") == 1);
+	assert(alertSoundDisplayName("platinum") == "Chime" &&
+		alertSoundDisplayName("Recorded_Chime") == "Recorded_Chime");
 	QObject owner;
 	int changes = 0;
 	watchCustomThemes(&owner, [&] { ++changes; });

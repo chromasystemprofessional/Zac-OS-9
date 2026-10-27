@@ -293,6 +293,12 @@ int main(int argc, char **argv) {
 	const QString sound = pathNamed(pack, "chime.wav");
 	check(!pack.isEmpty() && !sound.isEmpty(),
 		"allowlisted sound descendants retain virtual identities");
+	check(vfsIsSounds(sounds) && vfsIsSounds(userSounds) &&
+		!vfsIsSounds(pathNamed(sounds, "Computer")),
+		"Sounds and its User collection are where a dragged alert sound goes");
+	check(vfsAcceptsDrops(sounds) && vfsAcceptsDrops(userSounds) &&
+		!vfsAcceptsDrops(pathNamed(sounds, "Computer")) && !vfsAcceptsDrops(pack),
+		"they take a dragged sound; the installed set and a subfolder do not");
 	check(pathNamed(userSounds, "alias.wav") != QString(),
 		"a symlink resolving inside an allowlisted source remains browsable");
 	check(pathNamed(userSounds, "escape").isEmpty() &&
