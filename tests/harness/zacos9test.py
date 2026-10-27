@@ -2,7 +2,7 @@
 tests/harness on PYTHONPATH (the root meson.build's test setup), so a test
 says `from zacos9test import wait_for`. Run by hand, add it first:
 
-    PYTHONPATH=tests/harness python3 compositor/tests/test_idle.py ...
+    PYTHONPATH=tests/harness python3 tests/compositor/test_idle.py ...
 """
 import socket
 import time

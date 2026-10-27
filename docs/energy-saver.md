@@ -160,7 +160,7 @@ output eDP-1 saver
 States are `awake`, `saver` and `asleep`. `$ZACOS9_IDLE_MINUTE_MS` makes a
 "minute" shorter, and `$ZACOS9_SUSPEND_COMMAND` replaces
 `systemctl suspend` (and allows it without a real session; empty disables
-it). `compositor/tests/test_idle.py` uses both: two headless screens with
+it). `tests/compositor/test_idle.py` uses both: two headless screens with
 400 ms minutes; `test_inhibit.py` does the same for the D-Bus requests,
 under `dbus-run-session`, and `test_lock.py` for the lock, with
 `test-lock` (the same program built with `-DZACOS9_LOCK_TEST`, taking

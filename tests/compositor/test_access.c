@@ -5,8 +5,8 @@
 #include <assert.h>
 #include <math.h>
 
-#include "../src/access.c"
-#include "../src/output.c"
+#include "../../compositor/src/access.c"
+#include "../../compositor/src/output.c"
 
 /* input.c's, for Slow Keys: counts what it is given. */
 static int delivered;

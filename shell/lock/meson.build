@@ -11,7 +11,7 @@ executable('zacos9-lock', 'lock.c', lock_protocol, client_protocol_src,
   dependencies: [platinum_dep, wayland_client, xkbcommon_client, pam],
   install: true,
 )
-# The same, taking "sesame" instead of asking PAM: compositor/tests/test_lock.py.
+# The same, taking "sesame" instead of asking PAM: tests/compositor/test_lock.py.
 test_lock_exe = executable('test-lock', 'lock.c', lock_protocol, client_protocol_src,
   c_args: ['-DZACOS9_LOCK_TEST'],
   dependencies: [platinum_dep, wayland_client, xkbcommon_client],
