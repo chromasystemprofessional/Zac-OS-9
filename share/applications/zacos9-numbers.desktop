@@ -3,5 +3,5 @@ Type=Application
 Name=Numbers
 Comment=How numbers, money, dates and measurements are written
 Exec=zacos9-controlpanel numbers
-Categories=Settings;
+Categories=Settings;X-ZacOS9-ControlPanel;
 OnlyShowIn=ZacOS9;

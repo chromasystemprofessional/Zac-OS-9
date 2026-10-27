@@ -126,6 +126,13 @@ int main(int argc, char **argv) {
 	const QString resourceRoot = root + "/resource-fixtures";
 	setenv("ZACOS9_RESOURCE_TEST_ROOT", resourceRoot.toUtf8().constData(), 1);
 	QDir().mkpath(appsDir);
+	/* The control panels, as installed: Control Panels lists them. */
+	for (const QFileInfo &entry : QDir(ZACOS9_DESKTOP_ENTRIES).entryInfoList({ "*.desktop" })) {
+		QFile file(entry.filePath());
+		if (file.open(QIODevice::ReadOnly) && file.readAll().contains("X-ZacOS9-ControlPanel")) {
+			QFile::copy(entry.filePath(), appsDir + "/" + entry.fileName());
+		}
+	}
 	QDir().mkpath(homeAppsDir);
 	QDir().mkpath(resourceRoot + "/sounds/user/pack");
 	QDir().mkpath(resourceRoot + "/sounds/system");

@@ -3,5 +3,5 @@ Type=Application
 Name=Keychain Access
 Comment=See your keychains and what they keep; lock, unlock and remove
 Exec=zacos9-keychain
-Categories=Settings;Security;
+Categories=Settings;Security;X-ZacOS9-ControlPanel;
 OnlyShowIn=ZacOS9;

@@ -189,7 +189,7 @@ Zacintosh HD
 │   │   ├── Wallpaper     → ~/.local/share/zacos9/appearance/Wallpaper
 │   │   ├── Themes        → compatible appearance preset JSON files
 │   │   └── Sound Themes  → custom WAV themes and classic resource-fork sound sets
-│   ├── Control Panels      (generated: ZacOS 9's control panels)
+│   ├── Control Panels      (generated: the desktop entries marked X-ZacOS9-ControlPanel)
 │   ├── Extensions         (generated, read-only driver/module status)
 │   ├── Sounds             (generated, read-only aliases to user/system sounds)
 │   ├── Startup Items      (generated: enabled autostart entries; drop apps in, drag to Trash)

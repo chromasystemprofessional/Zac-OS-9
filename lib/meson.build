@@ -59,6 +59,15 @@ appfilter_dep = declare_dependency(link_with: appfilter_lib,
   dependencies: dependency('gio-unix-2.0'))
 test('appfilter', executable('test-appfilter', 'tests/test_appfilter.c',
   dependencies: [appfilter_dep]))
+# The control panels, from their desktop entries: the Control Panels folder
+# and the Zac menu's (lib/controlpanels.h).
+controlpanels_lib = static_library('controlpanels', 'controlpanels.c',
+  dependencies: [platinum_dep, dependency('gio-unix-2.0')])
+controlpanels_dep = declare_dependency(link_with: controlpanels_lib,
+  include_directories: include_directories('.'),
+  dependencies: [platinum_dep, dependency('gio-unix-2.0')])
+test('control-panels', executable('test-control-panels', 'tests/test_controlpanels.c',
+  dependencies: [controlpanels_dep]))
 
 figcompare_dep = declare_dependency(
   sources: 'tests/figcompare.c',

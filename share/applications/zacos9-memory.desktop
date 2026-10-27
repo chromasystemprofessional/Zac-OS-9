@@ -3,5 +3,5 @@ Type=Application
 Name=Memory
 Comment=Virtual memory, Compressed Memory, the disk cache and a RAM Disk
 Exec=zacos9-controlpanel memory
-Categories=Settings;HardwareSettings;
+Categories=Settings;HardwareSettings;X-ZacOS9-ControlPanel;
 OnlyShowIn=ZacOS9;

@@ -3,5 +3,5 @@ Type=Application
 Name=Tablet
 Comment=Which screen a graphics tablet covers
 Exec=zacos9-controlpanel tablet
-Categories=Settings;HardwareSettings;
+Categories=Settings;HardwareSettings;X-ZacOS9-ControlPanel;
 OnlyShowIn=ZacOS9;

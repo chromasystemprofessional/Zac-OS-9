@@ -3,5 +3,5 @@ Type=Application
 Name=Speech
 Comment=The voice ZacOS speaks with, how fast, and Talking Alerts
 Exec=zacos9-controlpanel speech
-Categories=Settings;Accessibility;
+Categories=Settings;Accessibility;X-ZacOS9-ControlPanel;
 OnlyShowIn=ZacOS9;

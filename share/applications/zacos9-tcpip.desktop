@@ -3,5 +3,5 @@ Type=Application
 Name=TCP/IP
 Comment=Network interfaces, Wi-Fi, addresses and name servers
 Exec=zacos9-tcpip
-Categories=Settings;HardwareSettings;
+Categories=Settings;HardwareSettings;X-ZacOS9-ControlPanel;
 OnlyShowIn=ZacOS9;
