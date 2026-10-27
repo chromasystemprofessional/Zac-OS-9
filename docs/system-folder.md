@@ -15,7 +15,7 @@ default layout is in `shell/files/vfs.cpp`.
 S a day or so, M a few days, L more. Mac OS versions are when an item
 first appeared in Apple's System Folder, to the nearest release.
 
-Of 31 items: 13 working, 6 partial, 2 view only, 10 missing.
+Of 31 items: 14 working, 6 partial, 2 view only, 9 missing.
 
 ## The System Folder's own files
 
@@ -33,7 +33,7 @@ Of 31 items: 13 working, 6 partial, 2 view only, 10 missing.
 |---|---|---|---|---|---|
 | Apple Menu Items (7.0) | Whatever was in it appeared in the Apple menu. | Working: Zac Menu Items, with a (Disabled) twin | `shell/menubar/launch.c` | – | – |
 | Control Panels (7.0) | One file per panel. | Working: the panels' desktop entries | `lib/controlpanels`, `shell/panels/panelregistry.h` | – | – |
-| Control Panels (Disabled) (7.5) | Extensions Manager moved panels here to turn them off. | Missing; the reader already leaves out a panel the user marked `NoDisplay` | `lib/controlpanels`, `shell/files/vfs.cpp` | Dragging a panel in writes the user's `NoDisplay=true` copy of its entry; dragging it back removes that copy. | S |
+| Control Panels (Disabled) (7.5) | Extensions Manager moved panels here to turn them off. | Working: drag a panel in to turn it off, back to turn it on | `lib/controlpanels`, `shell/files/vfs.cpp`, `shell/finder/fileops.cpp` | – | – |
 | Startup Items (7.0) | Opened everything in it at startup. | Working: XDG autostart | `shell/files/autostart.cpp`, `shell/autostart/` | – | – |
 | Shutdown Items (7.5) | Opened everything in it when shutting down. | Working | `session/` (`zacos9-shutdown-items`) | – | – |
 | Launcher Items (7.5) | The Launcher's buttons. | Working: Toy Box Items | `shell/finder/toybox.cpp` | – | – |

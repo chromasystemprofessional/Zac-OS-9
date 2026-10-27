@@ -17,6 +17,7 @@
 #include <QTemporaryDir>
 #include <QTextStream>
 #include <QThread>
+#include <QUrl>
 
 #include "fileops.h"
 #include "items.h"
@@ -88,6 +89,10 @@ int main(int argc, char **argv) {
 	writeEntry(appsDir, "zacos9-mouse.desktop",
 		"[Desktop Entry]\nType=Application\nName=Mouse\n"
 		"Exec=zacos9-controlpanel mouse\nCategories=Settings;X-ZacOS9-ControlPanel;\n");
+	writeEntry(appsDir, "zacos9-sound.desktop",
+		"[Desktop Entry]\nType=Application\nName=Sound\n"
+		"Exec=zacos9-controlpanel sound\nCategories=Settings;X-ZacOS9-ControlPanel;\n");
+	const QString soundEntry = dataHome + "/applications/zacos9-sound.desktop";
 	const QString ownEntry = dataHome + "/applications/zacos9-mouse.desktop";
 
 	QApplication app(argc, argv);
@@ -139,6 +144,35 @@ int main(int argc, char **argv) {
 		check(itemNamed(panels, "Mouse") != nullptr, "the panel is in Control Panels again");
 		check(itemNamed(off, "Mouse") == nullptr, "and gone from Control Panels (Disabled)");
 	}
+
+	/* Two panels dragged at once are both turned off. */
+	Item *backMouse = itemNamed(panels, "Mouse");
+	Item *sound = itemNamed(panels, "Sound");
+	std::unique_ptr<QMimeData> both(backMouse && sound ?
+		itemDragMime({ backMouse, sound }) : nullptr);
+	check(both != nullptr, "two panels can be dragged together");
+	if (both) {
+		QDropEvent pair(QPointF(460, 320), Qt::MoveAction, both.get(), Qt::LeftButton, Qt::NoModifier);
+		off->dropEvent(&pair);
+		settle();
+		check(pair.isAccepted(), "and both go into Control Panels (Disabled)");
+		check(itemNamed(off, "Mouse") != nullptr && itemNamed(off, "Sound") != nullptr,
+			"which lists the two of them");
+		check(itemNamed(panels, "Mouse") == nullptr && itemNamed(panels, "Sound") == nullptr,
+			"and Control Panels lists neither");
+		check(read(ownEntry).contains("NoDisplay=true") &&
+			read(soundEntry).contains("NoDisplay=true"), "both entries turned off");
+	}
+
+	/* A file dropped in is refused, and nothing is written for it. */
+	writeEntry(root.path(), "stray.txt", "not a panel");
+	QMimeData fileMime;
+	fileMime.setUrls({ QUrl::fromLocalFile(root.path() + "/stray.txt") });
+	QDropEvent stray(QPointF(460, 320), Qt::CopyAction, &fileMime, Qt::LeftButton, Qt::NoModifier);
+	off->dropEvent(&stray);
+	settle();
+	check(!stray.isAccepted() && !QFile::exists(dataHome + "/applications/stray.txt"),
+		"a file dropped in is refused, and writes nothing");
 
 	return fails ? 1 : 0;
 }
