@@ -13,6 +13,7 @@
 #include <QWindow>
 #include <algorithm>
 
+#include "menudraw.h"
 #include "pixels.h"
 #include "platinumshell.h"
 #include "settings.h"
@@ -22,6 +23,12 @@
  * boxes, and the tiles. Not measured from a Mac; TODO: measure. */
 static constexpr int TITLE_H = 13, BOX = 9, BORDER = 1, PAD = 3;
 static constexpr int NAME_W_MIN = 80, NAME_W_MAX = 180;
+
+/* Where the pointer holds the title bar when the palette is torn off: clear
+ * of the close box, in the title bar's middle; and how far below the palette
+ * it stays when the palette opens above it instead. */
+static constexpr int DROP_X = BORDER + 3 + BOX + 4, DROP_Y = BORDER + TITLE_H / 2;
+static constexpr int DROP_GAP = 6;
 
 PackWindow::PackWindow()
 	: m_settings(QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) +
@@ -43,6 +50,9 @@ PackWindow::PackWindow()
 	Toplevels::start([this] { m_refresh.start(); });
 	refresh();
 	becomeLayerSurface();
+	/* An older version could save a place off the screen (a tear-off near
+	 * the bottom); come back on it. */
+	moveTo(m_pos);
 }
 
 /* Above the windows (the Mac's palettes floated), placed by its margins
@@ -58,20 +68,45 @@ void PackWindow::becomeLayerSurface() {
 		 * with the keyboard); a tile's program then takes it. */
 		lw->setKeyboardInteractivity(LayerShellQt::Window::KeyboardInteractivityOnDemand);
 		lw->setScope("zacos9-pack");
-		lw->setMargins(QMargins(m_pos.x(), m_pos.y(), 0, 0));
+		applyMargins();
+	}
+}
+
+/* The margins are measured from what the menu bar leaves (a layer surface
+ * with no exclusive zone of its own is placed in the usable area), not from
+ * the screen: m_pos is where the palette is on the screen. */
+void PackWindow::applyMargins() {
+	if (auto *lw = LayerShellQt::Window::get(windowHandle())) {
+		lw->setMargins(QMargins(m_pos.x(), m_pos.y() - MBAR_HEIGHT, 0, 0));
 	}
 }
 
 void PackWindow::moveTo(QPoint topLeft) {
+	/* The whole palette has to stay between the menu bar and the screen's
+	 * edges: torn off near either, its own corner would otherwise be out of
+	 * reach. */
 	const QSize screen = QGuiApplication::primaryScreen() ?
 		QGuiApplication::primaryScreen()->size() : QSize(1280, 720);
-	m_pos = QPoint(std::clamp(topLeft.x(), 0, std::max(0, screen.width() - 40)),
-		std::clamp(topLeft.y(), 20, std::max(20, screen.height() - TITLE_H)));
-	if (auto *lw = LayerShellQt::Window::get(windowHandle())) {
-		lw->setMargins(QMargins(m_pos.x(), m_pos.y(), 0, 0));
-	}
+	const int w = std::max(width(), 40), h = std::max(height(), TITLE_H);
+	m_pos = QPoint(std::clamp(topLeft.x(), 0, std::max(0, screen.width() - w)),
+		std::clamp(topLeft.y(), MBAR_HEIGHT, std::max(MBAR_HEIGHT, screen.height() - h)));
+	applyMargins();
 	update(); /* the new place takes effect with the next frame */
 	save();
+}
+
+/* The tear-off: the pointer let go at (x, y), and takes the title bar with
+ * it, as Mac OS 9's did — right of the close box, so a click there does not
+ * put the palette away; above the pointer when it would not fit below, as a
+ * menu opens. */
+void PackWindow::dropAt(QPoint pointer) {
+	const QSize screen = QGuiApplication::primaryScreen() ?
+		QGuiApplication::primaryScreen()->size() : QSize(1280, 720);
+	QPoint topLeft(pointer.x() - DROP_X, pointer.y() - DROP_Y);
+	if (topLeft.y() + height() > screen.height()) {
+		topLeft.setY(pointer.y() - DROP_GAP - height());
+	}
+	moveTo(topLeft);
 }
 
 void PackWindow::save() {
@@ -119,8 +154,9 @@ void PackWindow::relayout() {
 	/* Grown past the screen's edge (across, large icons): back on it. */
 	const QSize screen = QGuiApplication::primaryScreen() ?
 		QGuiApplication::primaryScreen()->size() : QSize(1280, 720);
-	if (m_pos.x() + width() > screen.width() && windowHandle()) {
-		moveTo(QPoint(screen.width() - width(), m_pos.y()));
+	if (windowHandle() && (m_pos.x() + width() > screen.width() ||
+			m_pos.y() + height() > screen.height())) {
+		moveTo(m_pos);
 	}
 }
 

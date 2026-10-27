@@ -77,10 +77,13 @@ with tempfile.TemporaryDirectory(prefix="zacos9-pack-") as directory:
             assert "pack-open=true" in conf.read_text(), "it will be open again next time"
             print("ok: the Application menu tears off into the Pack")
 
-            # Tiles: Alpha, Bravo, Sniffer, 22 px each below a 13 px title
-            # bar, the palette's top left where the pointer let go (less
-            # 10, 6), the menu bar's 20 px above it.
-            x0, y0 = 1000 - 10, 409 - 6 + 20
+            # The palette's title bar lands under the pointer, as Mac OS 9's
+            # tear-off did: the release at (1000, 409) less (17, 7), right of
+            # the close box. Tiles: 22 px each below a 13 px title bar.
+            saved = dict(line.split("=", 1) for line in pack_ini.read_text().split()
+                         if "=" in line)
+            x0, y0 = int(saved["x"]), int(saved["y"])
+            assert (x0, y0) == (1000 - 17, 409 - 7), "its title bar is under the pointer"
             tile = lambda i: (str(x0 + 40), str(y0 + 1 + 13 + 22 * i + 11))
             vp("home", "move", *tile(0), "click", "wait", "600")
             assert typed("a") == "alpha", "a click on Alpha's tile brings Alpha forward"
@@ -100,6 +103,22 @@ with tempfile.TemporaryDirectory(prefix="zacos9-pack-") as directory:
             vp("home", "move", str(x0 + 1 + 3 + 4), str(y0 + 1 + 6), "click", "wait", "800")
             wait_for("the Pack to close", lambda: "pack-open" not in conf.read_text(), 5)
             print("ok: the close box puts it away")
+
+            # Torn off with a long drag down, the palette used to be placed
+            # below the screen: out of sight, and out of reach for good.
+            pack_ini.unlink()
+            vp("key", "Escape", "wait", "200", "home", "move", "1250", "9", "down", "wait", "300",
+               "move", "0", "700", "wait", "300", "up")
+            wait_for("the Pack again", pack_ini.exists, 15)
+            time.sleep(1)
+            saved = dict(line.split("=", 1) for line in pack_ini.read_text().split()
+                         if "=" in line)
+            left, top = int(saved["x"]), int(saved["y"])
+            assert top + 1 + 13 + 22 * 3 + 1 <= 9 + 700, "above the pointer, which would not fit below"
+            assert top >= 20, "and below the menu bar"
+            vp("home", "move", str(left + 40), str(top + 1 + 13 + 11), "click", "wait", "600")
+            assert typed("e") == "alpha", "and its tiles are where they are drawn"
+            print("ok: a long drag down leaves the Pack on the screen")
         finally:
             subprocess.run(["pkill", "-f", f"^{Path(menubar).parent}/zacos9-pack"], check=False)
             for p in reversed(processes):

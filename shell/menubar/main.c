@@ -882,8 +882,8 @@ static void pointer_pressed(void) {
 }
 
 /* Mac OS 9's tear-off: the Application menu dragged down past its bottom
- * and let go there becomes the Pack (the Application palette), where the
- * pointer is. */
+ * and let go there becomes the Pack (the Application palette), with its
+ * title bar under the pointer, where it was let go. */
 static bool tear_off_pack(void) {
 	if (g.open_side != SIDE_RIGHT || g.open_index != g.model.n_right - 1 ||
 			g.py < g.menu_y + g.menu_h + 8) {
@@ -893,7 +893,7 @@ static bool tear_off_pack(void) {
 	char command[PATH_MAX + 96];
 	sibling_program("zacos9-pack", command, sizeof(command));
 	char at[48];
-	snprintf(at, sizeof(at), " --at %d,%d", (int)g.px - 10, (int)g.py - 6);
+	snprintf(at, sizeof(at), " --at %d,%d", (int)g.px, (int)g.py);
 	strncat(command, at, sizeof(command) - strlen(command) - 1);
 	launch(command);
 	return true;
