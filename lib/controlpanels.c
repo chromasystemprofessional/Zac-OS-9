@@ -1,19 +1,47 @@
 #include "controlpanels.h"
 
-#include <gio/gdesktopappinfo.h>
+#include <glib.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 
-static bool is_panel(GDesktopAppInfo *info) {
-	const char *categories = g_desktop_app_info_get_categories(info);
-	if (!categories || g_desktop_app_info_get_nodisplay(info)) {
-		return false;
-	}
-	char **each = g_strsplit(categories, ";", -1);
-	const bool found = g_strv_contains((const char *const *)each, "X-ZacOS9-ControlPanel");
-	g_strfreev(each);
+static bool has_category(GKeyFile *file) {
+	gsize n = 0;
+	char **categories = g_key_file_get_string_list(file, G_KEY_FILE_DESKTOP_GROUP,
+		G_KEY_FILE_DESKTOP_KEY_CATEGORIES, &n, NULL);
+	const bool found = categories &&
+		g_strv_contains((const char *const *)categories, "X-ZacOS9-ControlPanel");
+	g_strfreev(categories);
 	return found;
+}
+
+/* The panel in `path`, unless it's hidden or not a panel: false then. */
+static bool read_panel(const char *path, const char *id, struct pl_control_panel *panel) {
+	GKeyFile *file = g_key_file_new();
+	bool ok = g_key_file_load_from_file(file, path, G_KEY_FILE_NONE, NULL) &&
+		!g_key_file_get_boolean(file, G_KEY_FILE_DESKTOP_GROUP, G_KEY_FILE_DESKTOP_KEY_HIDDEN, NULL) &&
+		!g_key_file_get_boolean(file, G_KEY_FILE_DESKTOP_GROUP, G_KEY_FILE_DESKTOP_KEY_NO_DISPLAY, NULL) &&
+		has_category(file);
+	char *name = ok ? g_key_file_get_locale_string(file, G_KEY_FILE_DESKTOP_GROUP,
+		G_KEY_FILE_DESKTOP_KEY_NAME, NULL, NULL) : NULL;
+	char *exec = ok ? g_key_file_get_string(file, G_KEY_FILE_DESKTOP_GROUP,
+		G_KEY_FILE_DESKTOP_KEY_EXEC, NULL) : NULL;
+	g_key_file_free(file);
+	ok = name && *name && exec && *exec;
+	if (ok) {
+		const size_t program = strcspn(exec, " ");
+		*panel = (struct pl_control_panel){
+			.id = g_strdup(id),
+			.name = name,
+			.program = g_strndup(exec, program),
+			.args = g_strdup(exec + program),
+			.icon = pl_icon_for_program(id),
+		};
+		name = NULL;
+	}
+	g_free(name);
+	g_free(exec);
+	return ok;
 }
 
 static int by_name(const void *a, const void *b) {
@@ -23,29 +51,33 @@ static int by_name(const void *a, const void *b) {
 
 struct pl_control_panel *pl_control_panels(size_t *count) {
 	GArray *panels = g_array_new(FALSE, TRUE, sizeof(struct pl_control_panel));
-	/* XDG data directory precedence; Hidden entries already dropped. */
-	GList *all = g_app_info_get_all();
-	for (GList *l = all; l; l = l->next) {
-		if (!G_IS_DESKTOP_APP_INFO(l->data) || !is_panel(G_DESKTOP_APP_INFO(l->data))) {
-			continue;
+	/* The user's data folder, then the system's, in order: the first entry
+	 * of an id is the one that counts, even one that hides the panel. Read
+	 * here rather than through GIO, which leaves out an entry whose program
+	 * isn't installed: a build tree's panels, run from there. */
+	GHashTable *seen = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
+	const char *const *system = g_get_system_data_dirs();
+	for (int i = -1; i < 0 || system[i]; i++) {
+		char *dir = g_build_filename(i < 0 ? g_get_user_data_dir() : system[i], "applications", NULL);
+		GDir *listing = g_dir_open(dir, 0, NULL);
+		for (const char *id; listing && (id = g_dir_read_name(listing));) {
+			if (!g_str_has_suffix(id, ".desktop") || g_hash_table_contains(seen, id)) {
+				continue;
+			}
+			g_hash_table_add(seen, g_strdup(id));
+			char *path = g_build_filename(dir, id, NULL);
+			struct pl_control_panel panel;
+			if (read_panel(path, id, &panel)) {
+				g_array_append_val(panels, panel);
+			}
+			g_free(path);
 		}
-		GAppInfo *info = l->data;
-		const char *line = g_app_info_get_commandline(info);
-		const char *id = g_app_info_get_id(info);
-		if (!line || !*line || !id) {
-			continue;
+		if (listing) {
+			g_dir_close(listing);
 		}
-		const size_t program = strcspn(line, " ");
-		struct pl_control_panel panel = {
-			.id = g_strdup(id),
-			.name = g_strdup(g_app_info_get_name(info)),
-			.program = g_strndup(line, program),
-			.args = g_strdup(line + program),
-			.icon = pl_icon_for_program(id),
-		};
-		g_array_append_val(panels, panel);
+		g_free(dir);
 	}
-	g_list_free_full(all, g_object_unref);
+	g_hash_table_destroy(seen);
 	qsort(panels->data, panels->len, sizeof(struct pl_control_panel), by_name);
 	*count = panels->len;
 	return (struct pl_control_panel *)g_array_free(panels, FALSE);

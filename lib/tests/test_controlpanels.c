@@ -40,6 +40,9 @@ int main(void) {
 	snprintf(dir, sizeof(dir), "%s/home", root);
 	mkdir(dir, 0700);
 	setenv("XDG_DATA_HOME", dir, 1);
+	/* None of the programs installed, as in a build tree or CI: an
+	 * entry is listed whether or not its program is on $PATH. */
+	setenv("PATH", root, 1);
 
 	entry("system", "zacos9-mouse.desktop",
 		"Name=Mouse\nExec=zacos9-controlpanel mouse\nCategories=Settings;X-ZacOS9-ControlPanel;\n");
@@ -53,13 +56,16 @@ int main(void) {
 		"Name=Tablet\nExec=zacos9-controlpanel tablet\nNoDisplay=true\nCategories=Settings;X-ZacOS9-ControlPanel;\n");
 	entry("system", "zacos9-text.desktop",
 		"Name=Text\nExec=zacos9-controlpanel text\nCategories=Settings;X-ZacOS9-ControlPanel;\n");
-	/* The user's own copy, renamed. */
+	entry("system", "zacos9-speech.desktop",
+		"Name=Speech\nExec=zacos9-controlpanel speech\nCategories=Settings;X-ZacOS9-ControlPanel;\n");
+	/* The user's own copies: one hiding a panel, one renaming it. */
+	entry("home", "zacos9-speech.desktop", "Name=Speech\nHidden=true\n");
 	entry("home", "zacos9-text.desktop",
 		"Name=Writing\nExec=zacos9-controlpanel text\nCategories=Settings;X-ZacOS9-ControlPanel;\n");
 
 	size_t n = 0;
 	struct pl_control_panel *p = pl_control_panels(&n);
-	check(n == 4, "four panels: not the calculator, nor the NoDisplay one");
+	check(n == 4, "four panels: not the calculator, the NoDisplay one, or one the user hid");
 	check(n == 4 && strcmp(p[0].name, "Appearance") == 0 && strcmp(p[1].name, "Mouse") == 0 &&
 		strcmp(p[2].name, "TCP/IP") == 0 && strcmp(p[3].name, "Writing") == 0,
 		"by name, ignoring case, the user's copy winning");
@@ -72,7 +78,7 @@ int main(void) {
 	pl_control_panels_free(p, n);
 
 	char cleanup[600];
-	snprintf(cleanup, sizeof(cleanup), "rm -rf '%s'", root);
+	snprintf(cleanup, sizeof(cleanup), "/bin/rm -rf '%s'", root);
 	if (system(cleanup) != 0) {
 		fails++;
 	}
