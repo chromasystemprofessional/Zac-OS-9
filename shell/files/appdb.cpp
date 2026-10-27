@@ -4,6 +4,7 @@
 #include <gio/gio.h>
 
 #include "appdb.h"
+#include "process.h"
 #include "appfilter.h"
 #include "electronlaunch.h"
 #include "platinumshell.h"
@@ -158,19 +159,8 @@ QHash<QString, PackageInfo> &packageCache() {
 }
 
 bool finishPackageQuery(QProcess &process) {
-	QElapsedTimer timer;
-	timer.start();
-	while (process.state() != QProcess::NotRunning && timer.elapsed() < 3000) {
-		QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
-		QThread::msleep(1);
-	}
-	if (process.state() != QProcess::NotRunning) {
+	if (!waitForProcess(&process, 3000)) {
 		qWarning() << "Package query timed out:" << process.program() << process.arguments();
-		process.kill();
-		while (process.state() != QProcess::NotRunning) {
-			QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
-			QThread::msleep(1);
-		}
 		return false;
 	}
 	if (process.error() == QProcess::FailedToStart || process.exitStatus() != QProcess::NormalExit) {

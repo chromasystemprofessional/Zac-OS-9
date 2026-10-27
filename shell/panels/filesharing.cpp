@@ -33,6 +33,7 @@
 #include <unistd.h>
 
 #include "alert.h"
+#include "process.h"
 #include "panelkit.h"
 #include "platinumshell.h"
 #include "settings.h"
@@ -53,8 +54,8 @@ static constexpr int BOX_GAP = 20;              /* box to box, with the title */
 static bool serviceActive(const char *unit) {
 	QProcess p;
 	p.start("systemctl", { "is-active", "--quiet", unit });
-	p.waitForFinished(3000);
-	return p.exitStatus() == QProcess::NormalExit && p.exitCode() == 0;
+	waitForProcess(&p, 3000);
+	return processSucceeded(p);
 }
 
 /* The owner: this account (ZACOS9_SHARING_OWNER for tests). */
@@ -76,8 +77,8 @@ static bool loginPassword(const QString &user, const QString &password) {
 			p.start(path, { user, "nullok" });
 			p.write(password.toUtf8() + '\0');
 			p.closeWriteChannel();
-			p.waitForFinished(10000);
-			return p.exitStatus() == QProcess::NormalExit && p.exitCode() == 0;
+			waitForProcess(&p, 10000);
+			return processSucceeded(p); /* one that can't run checks nothing: no */
 		}
 	}
 	return true; /* nothing to check with: let Samba have it */

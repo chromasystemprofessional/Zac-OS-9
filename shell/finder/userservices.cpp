@@ -1,4 +1,5 @@
 #include "userservices.h"
+#include "process.h"
 
 #include <QCoreApplication>
 #include <QDir>
@@ -30,43 +31,26 @@ bool runSystemctl(const QStringList &args, QString *out, QString *err, int timeo
 		}
 		return false;
 	}
-	QProcess p;
-	p.start(exe, QStringList{ "--user", "--no-pager", "--no-ask-password" } + args);
-	QElapsedTimer clock;
-	clock.start();
-	while (p.state() == QProcess::Starting && clock.elapsed() < 3000) {
-		QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents |
-			QEventLoop::WaitForMoreEvents, 100);
-	}
-	if (p.state() == QProcess::NotRunning && p.error() == QProcess::FailedToStart) {
+	const ProcessResult r = runProcess(exe, QStringList{ "--user", "--no-pager", "--no-ask-password" } + args,
+		{ {}, timeoutMs });
+	if (!r.started) {
 		if (err) {
-			*err = "systemctl --user could not be started: " + p.errorString();
+			*err = "systemctl --user could not be started: " + r.error;
 		}
 		return false;
 	}
-	clock.restart();
-	while (p.state() != QProcess::NotRunning && clock.elapsed() < timeoutMs) {
-		QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents |
-			QEventLoop::WaitForMoreEvents, 100);
-	}
-	if (p.state() != QProcess::NotRunning) {
-		p.kill();
-		clock.restart();
-		while (p.state() != QProcess::NotRunning && clock.elapsed() < 1000) {
-			QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents |
-				QEventLoop::WaitForMoreEvents, 100);
-		}
+	if (r.timedOut) {
 		if (err) {
 			*err = "systemd did not answer.";
 		}
 		return false;
 	}
 	if (out) {
-		*out = QString::fromUtf8(p.readAllStandardOutput());
+		*out = QString::fromUtf8(r.out);
 	}
-	if (p.exitStatus() != QProcess::NormalExit || p.exitCode() != 0) {
+	if (!r.ok()) {
 		if (err) {
-			*err = QString::fromUtf8(p.readAllStandardError()).trimmed();
+			*err = QString::fromUtf8(r.err).trimmed();
 			if (err->isEmpty()) {
 				*err = "The request was not accepted.";
 			}

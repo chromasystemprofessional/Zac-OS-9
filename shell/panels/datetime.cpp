@@ -1,4 +1,5 @@
 #include "datetime.h"
+#include "process.h"
 
 #include <QFile>
 #include <QKeyEvent>
@@ -413,7 +414,7 @@ bool DateTimePanel::run(const QStringList &args, QString *out, bool quiet) {
 	}
 	QProcess p;
 	p.start("timedatectl", args);
-	if (!p.waitForFinished(10000) || p.exitStatus() != QProcess::NormalExit || p.exitCode() != 0) {
+	if (!waitForProcess(&p, 10000) || !processSucceeded(p)) {
 		if (!quiet) {
 			QString why = QString::fromUtf8(p.readAllStandardError()).trimmed();
 			Alert::ask(why.isEmpty() ? "The date and time couldn't be changed." : why, "OK",

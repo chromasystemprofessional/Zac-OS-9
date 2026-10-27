@@ -216,7 +216,7 @@ test('alias',
 
 test('userservices',
   executable('test-userservices', 'tests/test_userservices.cpp', 'userservices.cpp',
-    dependencies: [qt6],
+    dependencies: [shell_common_dep, qt6],
   ),
 )
 

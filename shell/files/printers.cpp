@@ -1,4 +1,5 @@
 #include "printers.h"
+#include "process.h"
 
 #include <QCoreApplication>
 #include <QDBusConnection>
@@ -58,22 +59,9 @@ Result run(const QString &name, const QStringList &args, int timeoutMs = 20000) 
 	QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
 	env.insert("LC_ALL", "C");
 	p.setProcessEnvironment(env);
-	bool done = false;
-	QObject::connect(&p, &QProcess::finished, [&done] { done = true; });
-	QObject::connect(&p, &QProcess::errorOccurred, [&done](QProcess::ProcessError e) {
-		if (e == QProcess::FailedToStart) {
-			done = true;
-		}
-	});
 	p.start(program(name), args);
-	QElapsedTimer t;
-	t.start();
-	while (!done && t.elapsed() < timeoutMs) {
-		QCoreApplication::processEvents(QEventLoop::WaitForMoreEvents, 50);
-	}
 	Result r;
-	if (!done) {
-		p.kill();
+	if (!waitForProcess(&p, timeoutMs)) {
 		r.err = name + " didn't answer.";
 		return r;
 	}
@@ -335,9 +323,7 @@ bool setPrinterEnabled(const QString &printer, bool enabled, QString *error) {
 		"org.opensuse.CupsPkHelper.Mechanism", "PrinterSetEnabled");
 	call << printer << enabled;
 	QDBusPendingCallWatcher watcher(QDBusConnection::systemBus().asyncCall(call, 30000));
-	while (!watcher.isFinished()) {
-		QCoreApplication::processEvents(QEventLoop::WaitForMoreEvents, 50);
-	}
+	waitUntil([&watcher] { return watcher.isFinished(); }, -1);
 	QDBusPendingReply<QString> reply = watcher;
 	if (reply.isError()) {
 		*error = reply.error().name().contains("NotPrivileged") || reply.error().name().contains("NotAuthorized")

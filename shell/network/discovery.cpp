@@ -1,4 +1,5 @@
 #include "discovery.h"
+#include "process.h"
 #include "programs.h"
 
 #include <QCoreApplication>
@@ -94,28 +95,16 @@ std::vector<DiscoveredServer> bonjourServers(int timeoutMs) {
 			"-k", "-p", "-r", "-t", serviceTypes[i]
 		});
 	}
-	QElapsedTimer clock;
-	clock.start();
-	auto running = [&] {
-		return std::any_of(processes.begin(), processes.end(), [](QProcess *p) {
+	const auto finished = [&] {
+		return std::none_of(processes.begin(), processes.end(), [](QProcess *p) {
 			return p->state() != QProcess::NotRunning;
 		});
 	};
-	while (running() && clock.elapsed() < timeoutMs) {
-		QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents |
-			QEventLoop::WaitForMoreEvents, 50);
-	}
-	if (running()) {
+	if (!waitUntil(finished, timeoutMs)) {
 		for (QProcess *p : processes) {
-			if (p->state() != QProcess::NotRunning) {
-				p->kill();
-			}
+			p->kill();
 		}
-		clock.restart();
-		while (running() && clock.elapsed() < 1000) {
-			QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents |
-				QEventLoop::WaitForMoreEvents, 50);
-		}
+		waitUntil(finished, 1000);
 	}
 	QString output;
 	for (QProcess *p : processes) {
@@ -426,20 +415,7 @@ std::vector<DiscoveredServer> discoverServers(int timeoutMs) {
 	appleTalk.start(afpClient(), { "appletalk-servers" });
 	const std::vector<DiscoveredServer> bonjour = bonjourServers(timeoutMs);
 	const std::vector<DiscoveredServer> windows = wsDiscoveryServers(timeoutMs);
-	QElapsedTimer waited;
-	waited.start();
-	while (appleTalk.state() != QProcess::NotRunning && waited.elapsed() < 3000) {
-		QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents |
-			QEventLoop::WaitForMoreEvents, 50);
-	}
-	if (appleTalk.state() != QProcess::NotRunning) {
-		appleTalk.kill();
-		waited.restart();
-		while (appleTalk.state() != QProcess::NotRunning && waited.elapsed() < 1000) {
-			QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents |
-				QEventLoop::WaitForMoreEvents, 50);
-		}
-	}
+	waitForProcess(&appleTalk, 3000);
 	const bool answered = appleTalk.exitStatus() == QProcess::NormalExit && appleTalk.exitCode() == 0;
 	/* This computer's own servers aren't offered (Bonjour on lo and
 	 * the LAN, WS-Discovery, and AppleTalk by File Sharing's name). */
@@ -466,20 +442,7 @@ std::vector<DiscoveredServer> discoverServers(int timeoutMs) {
 	 * answer keep their address. */
 	QProcess resolve;
 	resolve.start("avahi-resolve", QStringList{ "-a" } + nameless);
-	QElapsedTimer clock;
-	clock.start();
-	while (resolve.state() != QProcess::NotRunning && clock.elapsed() < 1000) {
-		QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents |
-			QEventLoop::WaitForMoreEvents, 50);
-	}
-	if (resolve.state() != QProcess::NotRunning) {
-		resolve.kill();
-		clock.restart();
-		while (resolve.state() != QProcess::NotRunning && clock.elapsed() < 1000) {
-			QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents |
-				QEventLoop::WaitForMoreEvents, 50);
-		}
-	}
+	waitForProcess(&resolve, 1000);
 	const QHash<QString, QString> hosts = parseAvahiResolve(QString::fromUtf8(resolve.readAllStandardOutput()));
 	for (DiscoveredServer &s : servers) {
 		if (s.name == s.address && hosts.contains(s.address)) {

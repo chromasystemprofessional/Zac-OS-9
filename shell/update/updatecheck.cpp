@@ -1,4 +1,5 @@
 #include "updatecheck.h"
+#include "process.h"
 
 #include <QCoreApplication>
 #include <QJsonArray>
@@ -78,25 +79,11 @@ std::vector<DebianUpdate> parseAptSimulation(const QString &out) {
  * keeps going: never QProcess::waitForFinished(), which has deadlocked in
  * this desktop's Qt/Wayland programs (see CLAUDE.md). */
 static QString runQuiet(const QString &program, const QStringList &args, int *code = nullptr) {
-	QProcess p;
-	bool done = false;
-	QObject::connect(&p, &QProcess::finished, [&done] { done = true; });
-	QObject::connect(&p, &QProcess::errorOccurred, [&done](QProcess::ProcessError e) {
-		if (e == QProcess::FailedToStart) {
-			done = true;
-		}
-	});
-	p.start(program, args);
-	p.closeWriteChannel();
-	while (!done) {
-		QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents | QEventLoop::WaitForMoreEvents,
-			100);
-	}
+	const ProcessResult r = runProcess(program, args);
 	if (code) {
-		*code = p.error() != QProcess::FailedToStart && p.exitStatus() == QProcess::NormalExit
-			? p.exitCode() : -1;
+		*code = r.started && !r.crashed ? r.exitCode : -1;
 	}
-	return QString::fromUtf8(p.readAllStandardOutput()).trimmed();
+	return QString::fromUtf8(r.out).trimmed();
 }
 
 bool versionNewer(const QString &a, const QString &b) {
