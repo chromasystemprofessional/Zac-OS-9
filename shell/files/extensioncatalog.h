@@ -39,3 +39,13 @@ ExtensionEntry extensionEntry(const QString &key);
 
 /* The icon for one module: its catalog entry's, or the generic piece. */
 pl_icon_kind extensionModuleIcon(const QString &module);
+
+/* The modprobe.d file the helper blacklists a turned-off extension's
+ * modules in: $ZACOS9_MODPROBE_CONF (tests), else
+ * /etc/modprobe.d/zacos9-extensions.conf. */
+QString blacklistPath();
+
+/* The modules a `blacklist <module>` file names, '-' and '_' the same,
+ * once each and sorted. An absent file turns nothing off. A path given
+ * overrides blacklistPath(), for tests. */
+QStringList blacklistedModules(const QString &path = {});

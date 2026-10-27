@@ -2,6 +2,9 @@
 
 #include <algorithm>
 
+#include <QFile>
+#include <QTextStream>
+
 #include "extensions.h"
 
 namespace {
@@ -102,4 +105,35 @@ ExtensionEntry extensionEntry(const QString &key) {
 pl_icon_kind extensionModuleIcon(const QString &module) {
 	const pl_extension *entry = entryFor(normalize(module));
 	return entry ? entry->icon : PL_ICON_EXT_GENERIC;
+}
+
+QString blacklistPath() {
+	const QString path = qEnvironmentVariable("ZACOS9_MODPROBE_CONF");
+	return path.isEmpty() ? QStringLiteral("/etc/modprobe.d/zacos9-extensions.conf") : path;
+}
+
+QStringList blacklistedModules(const QString &path) {
+	QFile file(path.isEmpty() ? blacklistPath() : path);
+	if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+		return {};
+	}
+	QStringList out;
+	QTextStream in(&file);
+	while (!in.atEnd()) {
+		QString line = in.readLine();
+		const int comment = line.indexOf(QLatin1Char('#'));
+		if (comment >= 0) {
+			line.truncate(comment);
+		}
+		const QStringList words = line.simplified().split(QLatin1Char(' '), Qt::SkipEmptyParts);
+		if (words.size() < 2 || words.first() != QLatin1String("blacklist")) {
+			continue;
+		}
+		const QString module = normalize(words[1]);
+		if (!out.contains(module)) {
+			out << module;
+		}
+	}
+	out.sort();
+	return out;
 }

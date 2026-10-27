@@ -1,6 +1,8 @@
 /* The Extensions Manager's curated catalog, on fixed module lists. */
 
 #include <QCoreApplication>
+#include <QFile>
+#include <QTemporaryDir>
 #include <cstdio>
 
 #include "extensioncatalog.h"
@@ -101,6 +103,33 @@ int main(int argc, char **argv) {
 	check(extensionModuleIcon("btusb") == PL_ICON_EXT_BLUETOOTH &&
 		extensionModuleIcon("crc16") == PL_ICON_EXT_GENERIC,
 		"Show All rows get their feature's icon, or the generic piece");
+
+	/* The modprobe.d file the helper writes when an extension is off. */
+	QTemporaryDir scratch;
+	const QString blacklistFile = scratch.path() + "/zacos9-extensions.conf";
+	check(blacklistedModules(blacklistFile).isEmpty(),
+		"no blacklist file turns nothing off");
+	{
+		QFile file(blacklistFile);
+		check(file.open(QIODevice::WriteOnly | QIODevice::Truncate),
+			"the blacklist file can be written");
+		file.write("# turned off in the Extensions Manager\n"
+			"blacklist btusb\n"
+			"  blacklist  snd-hda-intel  \n"
+			"options snd_hda_intel power_save=1\n"
+			"blacklist btusb\n"
+			"blacklist\n");
+	}
+	check(blacklistedModules(blacklistFile) == QStringList({ "btusb", "snd_hda_intel" }),
+		"the blacklist names each module once, dashes as underscores, sorted");
+	check(blacklistedModules("") == blacklistedModules(blacklistPath()),
+		"an empty path reads the helper's own file");
+
+	qputenv("ZACOS9_MODPROBE_CONF", blacklistFile.toUtf8());
+	check(blacklistPath() == blacklistFile, "the blacklist path can be pointed at a test file");
+	qunsetenv("ZACOS9_MODPROBE_CONF");
+	check(blacklistPath() == "/etc/modprobe.d/zacos9-extensions.conf",
+		"and is the helper's file otherwise");
 
 	if (failures) {
 		std::fprintf(stderr, "%d failure(s)\n", failures);
