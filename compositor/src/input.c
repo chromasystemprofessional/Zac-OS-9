@@ -19,10 +19,13 @@
 #include <wlr/types/wlr_input_device.h>
 #include <wlr/types/wlr_keyboard.h>
 #include <wlr/types/wlr_pointer.h>
+#include <wlr/types/wlr_pointer_constraints_v1.h>
+#include <wlr/types/wlr_relative_pointer_v1.h>
 #include <wlr/types/wlr_virtual_keyboard_v1.h>
 #include <wlr/types/wlr_virtual_pointer_v1.h>
 #include <wlr/util/edges.h>
 #include <wlr/util/log.h>
+#include <wlr/util/region.h>
 #include <xkbcommon/xkbcommon.h>
 
 #include "frame.h"
@@ -1037,13 +1040,45 @@ void input_pointer_refocus(struct plat_server *server) {
 	process_cursor_motion(server, (uint32_t)(now.tv_sec * 1000 + now.tv_nsec / 1000000));
 }
 
+/* Holds a locked pointer still and keeps a confined one inside its
+ * region. Returns false when the cursor must not move at all. */
+static bool constrain_motion(struct plat_server *server, double *dx, double *dy) {
+	struct wlr_pointer_constraint_v1 *constraint = server->active_constraint;
+	if (!constraint || server->cursor_mode != PLAT_CURSOR_PASSTHROUGH) {
+		return true;
+	}
+	if (constraint->type == WLR_POINTER_CONSTRAINT_V1_LOCKED) {
+		return false;
+	}
+	/* Active means the constrained surface has the pointer, so the seat's
+	 * position is local to it. Outside the region (it shrank, or the
+	 * pointer never got in) the pointer moves freely until it enters. */
+	double sx = server->seat->pointer_state.sx, sy = server->seat->pointer_state.sy;
+	double cx, cy;
+	if (wlr_region_confine(&constraint->region, sx, sy, sx + *dx, sy + *dy, &cx, &cy)) {
+		*dx = cx - sx;
+		*dy = cy - sy;
+	}
+	return true;
+}
+
 static void cursor_motion(struct wl_listener *listener, void *data) {
 	struct plat_server *server = wl_container_of(listener, server, cursor_motion);
 	struct wlr_pointer_motion_event *event = data;
 	/* Mouse tracking speed (the Mouse control panel). */
-	wlr_cursor_move(server->cursor, &event->pointer->base,
-		event->delta_x * server->pointer_speed, event->delta_y * server->pointer_speed);
+	double dx = event->delta_x * server->pointer_speed;
+	double dy = event->delta_y * server->pointer_speed;
+	/* Games read these deltas, not the cursor: without them XWayland's
+	 * XInput2 raw motion falls back to absolute positions, which SDL 2
+	 * turns into reversed mouse movement. */
+	wlr_relative_pointer_manager_v1_send_relative_motion(server->relative_pointer_mgr,
+		server->seat, (uint64_t)event->time_msec * 1000, dx, dy,
+		event->unaccel_dx, event->unaccel_dy);
 	idle_input(server, IDLE_INPUT_MOTION);
+	if (!constrain_motion(server, &dx, &dy)) {
+		return;
+	}
+	wlr_cursor_move(server->cursor, &event->pointer->base, dx, dy);
 	process_cursor_motion(server, event->time_msec);
 }
 
@@ -1323,6 +1358,77 @@ static void seat_start_drag(struct wl_listener *listener, void *data) {
 	input_refresh_cursor(server);
 }
 
+/* ---- pointer constraints (games) ---------------------------------------- */
+
+static void constraint_end(struct plat_server *server) {
+	struct wlr_pointer_constraint_v1 *constraint = server->active_constraint;
+	server->active_constraint = NULL;
+	wl_list_remove(&server->constraint_destroy.link);
+	/* An unlocked pointer reappears where the game last drew it (XWayland
+	 * hints the spot an X client warped to). */
+	struct wlr_seat *seat = server->seat;
+	if (constraint->type == WLR_POINTER_CONSTRAINT_V1_LOCKED &&
+			constraint->current.cursor_hint.enabled &&
+			seat->pointer_state.focused_surface == constraint->surface) {
+		double hx = constraint->current.cursor_hint.x;
+		double hy = constraint->current.cursor_hint.y;
+		wlr_cursor_warp(server->cursor, NULL,
+			server->cursor->x - seat->pointer_state.sx + hx,
+			server->cursor->y - seat->pointer_state.sy + hy);
+		wlr_seat_pointer_warp(seat, hx, hy);
+	}
+}
+
+static void constraint_destroy(struct wl_listener *listener, void *data) {
+	struct plat_server *server = wl_container_of(listener, server, constraint_destroy);
+	constraint_end(server);
+}
+
+/* A lock or confinement holds only while its surface has the pointer
+ * and its program has the keyboard: a game in the background never
+ * traps the mouse, and switching to another program frees it. (The
+ * program, not the surface: XWayland's override-redirect windows, which
+ * some games play in, never take the keyboard themselves.) */
+static void constraint_update(struct plat_server *server) {
+	struct wlr_surface *surface = server->seat->pointer_state.focused_surface;
+	struct wlr_surface *typing = server->seat->keyboard_state.focused_surface;
+	struct wlr_pointer_constraint_v1 *constraint = NULL;
+	if (surface && typing && wl_resource_get_client(surface->resource) ==
+			wl_resource_get_client(typing->resource)) {
+		constraint = wlr_pointer_constraints_v1_constraint_for_surface(
+			server->pointer_constraints, surface, server->seat);
+	}
+	if (constraint == server->active_constraint) {
+		return;
+	}
+	if (server->active_constraint) {
+		struct wlr_pointer_constraint_v1 *old = server->active_constraint;
+		constraint_end(server);
+		wlr_pointer_constraint_v1_send_deactivated(old); /* may destroy it */
+	}
+	if (constraint) {
+		server->active_constraint = constraint;
+		server->constraint_destroy.notify = constraint_destroy;
+		wl_signal_add(&constraint->events.destroy, &server->constraint_destroy);
+		wlr_pointer_constraint_v1_send_activated(constraint);
+	}
+}
+
+static void new_constraint(struct wl_listener *listener, void *data) {
+	struct plat_server *server = wl_container_of(listener, server, new_constraint);
+	constraint_update(server);
+}
+
+static void pointer_focus_change(struct wl_listener *listener, void *data) {
+	struct plat_server *server = wl_container_of(listener, server, pointer_focus_change);
+	constraint_update(server);
+}
+
+static void keyboard_focus_change(struct wl_listener *listener, void *data) {
+	struct plat_server *server = wl_container_of(listener, server, keyboard_focus_change);
+	constraint_update(server);
+}
+
 /* The ZacOS9 cursor theme (assets/cursors) sits next to our binary in
  * the build tree, or under share/icons when installed. Point Xcursor at
  * it for us and, through the environment, for every client we start. */
@@ -1411,4 +1517,16 @@ void input_init(struct plat_server *server) {
 	wl_signal_add(&server->seat->events.request_start_drag, &server->request_start_drag);
 	server->start_drag.notify = seat_start_drag;
 	wl_signal_add(&server->seat->events.start_drag, &server->start_drag);
+
+	server->relative_pointer_mgr = wlr_relative_pointer_manager_v1_create(server->display);
+	server->pointer_constraints = wlr_pointer_constraints_v1_create(server->display);
+	server->new_constraint.notify = new_constraint;
+	wl_signal_add(&server->pointer_constraints->events.new_constraint,
+		&server->new_constraint);
+	server->pointer_focus_change.notify = pointer_focus_change;
+	wl_signal_add(&server->seat->pointer_state.events.focus_change,
+		&server->pointer_focus_change);
+	server->keyboard_focus_change.notify = keyboard_focus_change;
+	wl_signal_add(&server->seat->keyboard_state.events.focus_change,
+		&server->keyboard_focus_change);
 }

@@ -19,6 +19,7 @@ protocols = [
   wl_protocol_dir / 'staging/cursor-shape/cursor-shape-v1.xml',
   wl_protocol_dir / 'unstable/xdg-output/xdg-output-unstable-v1.xml',
   wl_protocol_dir / 'stable/tablet/tablet-v2.xml',
+  wl_protocol_dir / 'unstable/pointer-constraints/pointer-constraints-unstable-v1.xml',
   meson.project_source_root() / 'protocols/wlr-layer-shell-unstable-v1.xml',
   meson.project_source_root() / 'protocols/platinum-shell-v1.xml',
   meson.project_source_root() / 'protocols/zacos-snapshot-v1.xml',
