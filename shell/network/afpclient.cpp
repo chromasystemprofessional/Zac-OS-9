@@ -1,4 +1,5 @@
 #include "afpclient.h"
+#include "process.h"
 #include "programs.h"
 
 #include <QCoreApplication>
@@ -8,37 +9,6 @@
 #include <QProcess>
 #include <sys/wait.h>
 #include <unistd.h>
-
-/* QProcess::waitForFinished() was tried first here and, in this Wayland
- * session, deadlocked: zacos9-afp completed its exchange with the
- * server in full (confirmed from Netatalk's own log: login, then a
- * clean "AFP logout" a moment later) and exited, but waitForFinished()
- * never returned. The rest of this project already avoids
- * waitForFinished() for exactly this reason (see runSharingHelper and
- * runAppstoreHelper); this file didn't, until it hit the same problem. */
-/* True if the process finished on its own; false (and killed) if
- * `timeoutMs` ran out first. */
-static bool waitForProcess(QProcess *p, int timeoutMs) {
-	bool done = false;
-	QObject::connect(p, &QProcess::finished, [&done] { done = true; });
-	QObject::connect(p, &QProcess::errorOccurred, [&done](QProcess::ProcessError e) {
-		if (e == QProcess::FailedToStart) {
-			done = true;
-		}
-	});
-	QElapsedTimer clock;
-	clock.start();
-	while (!done && clock.elapsed() < timeoutMs) {
-		QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents |
-			QEventLoop::WaitForMoreEvents, 100);
-	}
-	if (!done) {
-		p->kill();
-		p->waitForFinished(1000);
-		return false;
-	}
-	return true;
-}
 
 static QString afpClientPath() {
 	const QString env = qEnvironmentVariable("ZACOS9_AFP_CLIENT");

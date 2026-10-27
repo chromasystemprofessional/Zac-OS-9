@@ -51,6 +51,7 @@
 #include <unistd.h>
 
 #include "alert.h"
+#include "process.h"
 #include "common.h"
 #include "platinumshell.h"
 
@@ -69,34 +70,6 @@ static void dieWithParent(QProcess *p) {
 	p->setChildProcessModifier([] { prctl(PR_SET_PDEATHSIG, SIGTERM); });
 }
 
-/* As afpclient.cpp's: QProcess::waitForFinished() deadlocks here. */
-static bool waitForProcess(QProcess *p, int timeoutMs) {
-	bool done = false;
-	QObject::connect(p, &QProcess::finished, [&done] { done = true; });
-	QObject::connect(p, &QProcess::errorOccurred, [&done](QProcess::ProcessError e) {
-		if (e == QProcess::FailedToStart) {
-			done = true;
-		}
-	});
-	QElapsedTimer clock;
-	clock.start();
-	while (!done && clock.elapsed() < timeoutMs) {
-		QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents | QEventLoop::WaitForMoreEvents, 100);
-	}
-	if (!done) {
-		p->kill();
-	}
-	return done && p->exitStatus() == QProcess::NormalExit && p->exitCode() == 0;
-}
-
-static void waitFor(const std::function<bool()> &ready, int timeoutMs) {
-	QElapsedTimer clock;
-	clock.start();
-	while (!ready() && clock.elapsed() < timeoutMs) {
-		QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents | QEventLoop::WaitForMoreEvents, 100);
-	}
-}
-
 /* A self-signed certificate, made once; the panel shows its fingerprint
  * so the other computer can check it's talking to this one. */
 static bool ensureCertificate() {
@@ -111,7 +84,7 @@ static bool ensureCertificate() {
 	p.start("openssl", { "req", "-x509", "-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:prime256v1",
 		"-nodes", "-days", "3650", "-subj", "/CN=" + computerName(),
 		"-keyout", keyFile(), "-out", certFile() });
-	if (!waitForProcess(&p, 20000)) {
+	if (!waitForProcess(&p, 20000) || !processSucceeded(p)) {
 		QFile::remove(keyFile());
 		QFile::remove(certFile());
 		return false;
@@ -204,7 +177,7 @@ static QString peerAddress(const QAbstractSocket *s) {
 static QString peerName(const QString &address) {
 	QProcess p;
 	p.start("avahi-resolve", { "-a", address });
-	if (!waitForProcess(&p, 2000)) {
+	if (!waitForProcess(&p, 2000) || !processSucceeded(p)) {
 		return QString();
 	}
 	QString name = QString::fromUtf8(p.readAllStandardOutput()).trimmed().section('\t', 1);
@@ -347,7 +320,7 @@ private:
 		m_stopping = false;
 		QObject::disconnect(&m_wayvnc, &QProcess::finished, this, nullptr);
 		m_wayvnc.start(program, args);
-		waitFor([&] { return QFile::exists(vnc) || m_wayvnc.state() == QProcess::NotRunning; }, 8000);
+		waitUntil([&] { return QFile::exists(vnc) || m_wayvnc.state() == QProcess::NotRunning; }, 8000);
 		if (!QFile::exists(vnc)) {
 			*error = m_wayvnc.error() == QProcess::FailedToStart
 				? QString("wayvnc isn’t installed.")
@@ -383,10 +356,10 @@ private:
 		}
 		if (p->state() != QProcess::NotRunning) {
 			p->terminate();
-			waitFor([p] { return p->state() == QProcess::NotRunning; }, 3000);
+			waitUntil([p] { return p->state() == QProcess::NotRunning; }, 3000);
 			if (p->state() != QProcess::NotRunning) {
 				p->kill();
-				waitFor([p] { return p->state() == QProcess::NotRunning; }, 1000);
+				waitUntil([p] { return p->state() == QProcess::NotRunning; }, 1000);
 			}
 		}
 	}
@@ -415,7 +388,7 @@ private:
 
 	void stopSound() {
 		/* A password being checked: its thread mustn't outlive us. */
-		waitFor([this] { return m_checks == 0; }, 10000);
+		waitUntil([this] { return m_checks == 0; }, 10000);
 		while (!m_listeners.empty()) {
 			dropListener(m_listeners.begin()->first);
 		}
