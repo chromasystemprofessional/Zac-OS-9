@@ -1,4 +1,5 @@
 #include "sharingclient.h"
+#include "conf.h"
 #include "process.h"
 #include "programs.h"
 
@@ -53,17 +54,7 @@ QList<SharedFolder> sharedFolders() {
 }
 
 QString sharingSetting(const QString &key) {
-	QFile f(sharingConfFile("sharing.conf"));
-	if (!f.open(QIODevice::ReadOnly)) {
-		return QString();
-	}
-	const QByteArray prefix = key.toUtf8() + '=';
-	for (const QByteArray &line : f.readAll().split('\n')) {
-		if (line.startsWith(prefix)) {
-			return QString::fromUtf8(line.mid(prefix.size()));
-		}
-	}
-	return QString();
+	return KeyValueFile::read(sharingConfFile("sharing.conf")).value(key);
 }
 
 bool sharingOn() {

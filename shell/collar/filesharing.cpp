@@ -1,4 +1,5 @@
 #include "filesharing.h"
+#include "conf.h"
 
 #include <QFile>
 #include <QProcess>
@@ -7,41 +8,16 @@
 #include "sharingclient.h"
 
 void parseSharingConf(const QByteArray &conf, bool *afp, bool *smb) {
-	*afp = *smb = false;
-	for (const QByteArray &line : conf.split('\n')) {
-		if (line.startsWith("afp=")) {
-			*afp = line.mid(4).trimmed() == "yes";
-		} else if (line.startsWith("smb=")) {
-			*smb = line.mid(4).trimmed() == "yes";
-		}
-	}
+	const KeyValueFile file = KeyValueFile::parse(conf);
+	*afp = file.yes("afp");
+	*smb = file.yes("smb");
 }
 
 QByteArray sharingConfWith(const QByteArray &conf, bool afp, bool smb) {
-	QByteArray out;
-	bool sawAfp = false, sawSmb = false;
-	for (const QByteArray &line : conf.split('\n')) {
-		if (line.isEmpty()) {
-			continue;
-		}
-		if (line.startsWith("afp=")) {
-			out += QByteArray("afp=") + (afp ? "yes" : "no");
-			sawAfp = true;
-		} else if (line.startsWith("smb=")) {
-			out += QByteArray("smb=") + (smb ? "yes" : "no");
-			sawSmb = true;
-		} else {
-			out += line;
-		}
-		out += '\n';
-	}
-	if (!sawAfp) {
-		out += QByteArray("afp=") + (afp ? "yes\n" : "no\n");
-	}
-	if (!sawSmb) {
-		out += QByteArray("smb=") + (smb ? "yes\n" : "no\n");
-	}
-	return out;
+	KeyValueFile file = KeyValueFile::parse(conf);
+	file.setYes("afp", afp);
+	file.setYes("smb", smb);
+	return file.text();
 }
 
 /* "[::ffff:192.168.1.5]:51234" or "192.168.1.5:51234" -> 192.168.1.5 */

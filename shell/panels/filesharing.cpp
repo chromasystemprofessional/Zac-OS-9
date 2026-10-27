@@ -33,6 +33,7 @@
 #include <unistd.h>
 
 #include "alert.h"
+#include "conf.h"
 #include "process.h"
 #include "panelkit.h"
 #include "platinumshell.h"
@@ -92,17 +93,13 @@ struct Settings {
 static Settings readSettings() {
 	Settings s;
 	s.owner = ownerName();
-	QFile f("/etc/zacos9/sharing.conf");
-	if (f.open(QIODevice::ReadOnly)) {
-		for (const QByteArray &raw : f.readAll().split('\n')) {
-			const QString line = QString::fromUtf8(raw);
-			const QString key = line.section('=', 0, 0), value = line.section('=', 1);
-			if (key == "name") s.name = value;
-			else if (key == "afp") s.afp = value == "yes";
-			else if (key == "smb") s.smb = value == "yes";
-			else if (key == "guests") s.guests = value == "yes";
-			else if (key == "oldmacs" || key == "cleartext") s.oldMacs = value == "yes";
-		}
+	const KeyValueFile conf = KeyValueFile::read(sharingConfFile("sharing.conf"));
+	if (conf.exists()) {
+		s.name = conf.value("name");
+		s.afp = conf.yes("afp");
+		s.smb = conf.yes("smb");
+		s.guests = conf.yes("guests");
+		s.oldMacs = conf.yes("oldmacs") || conf.yes("cleartext");
 	}
 	if (s.name.isEmpty()) {
 		/* Mac OS 9's default: "Owner's Computer". */
