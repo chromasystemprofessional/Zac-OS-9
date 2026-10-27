@@ -1,5 +1,6 @@
 #include "memory.h"
 #include "panelregistry.h"
+#include "process.h"
 #include "programs.h"
 
 #include <QApplication>
@@ -95,52 +96,10 @@ QList<int> memoryRamDiskSteps(qint64 totalBytes, qint64 currentBytes) {
 	return steps({ 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384 }, totalBytes / 2, currentBytes);
 }
 
-/* The helper: installed beside us, or the source tree's. */
-static QString helperPath() {
-	const QString env = qEnvironmentVariable("ZACOS9_MEMORY_HELPER");
-	if (!env.isEmpty()) {
-		return env;
-	}
-	const QString dir = QCoreApplication::applicationDirPath();
-	for (const QString &candidate : { dir + "/../libexec/zacos9/zacos9-memory-helper",
-			sourceTreePath("memory/zacos9-memory-helper") }) {
-		if (QFileInfo(candidate).isExecutable()) {
-			return QFileInfo(candidate).canonicalFilePath();
-		}
-	}
-	return "/usr/libexec/zacos9/zacos9-memory-helper";
-}
-
-/* Runs the helper to the end, keeping the window drawn (pkexec may be
- * asking for a password; making a swap file takes a moment). No
- * waitForFinished(): see CLAUDE.md. */
-static QString runHelper(const QStringList &args, bool privileged, bool *ok, QString *err) {
-	QString program = helperPath();
-	QStringList arguments = args;
-	if (privileged && geteuid() != 0 && qEnvironmentVariableIsEmpty("ZACOS9_MEMORY_HELPER")) {
-		arguments.prepend(program);
-		program = "pkexec";
-	}
-	QProcess p;
-	bool done = false;
-	QObject::connect(&p, &QProcess::finished, [&done] { done = true; });
-	QObject::connect(&p, &QProcess::errorOccurred, [&done](QProcess::ProcessError e) {
-		if (e == QProcess::FailedToStart) {
-			done = true;
-		}
-	});
-	p.start(program, arguments);
-	while (!done) {
-		QApplication::processEvents(QEventLoop::ExcludeUserInputEvents | QEventLoop::WaitForMoreEvents, 100);
-	}
-	const bool started = p.error() != QProcess::FailedToStart;
-	*ok = started && p.exitStatus() == QProcess::NormalExit && p.exitCode() == 0;
-	*err = QString::fromUtf8(p.readAllStandardError()).trimmed().section('\n', -1);
-	if (!*ok && err->isEmpty()) {
-		*err = started ? QString("The memory helper stopped with status %1.").arg(p.exitCode())
-			: QString("The memory helper couldn't be run.");
-	}
-	return QString::fromUtf8(p.readAllStandardOutput());
+/* zacos9-memory-helper: as root for changes (privileged), as this user
+ * for its status. */
+static QString memoryHelper(const QStringList &args, bool privileged, bool *ok, QString *err) {
+	return runHelper("memory", "memory", "memory", args, ok, err, { {}, privileged });
 }
 
 struct MemoryPanel::Parts {
@@ -234,7 +193,7 @@ QString MemoryPanel::problem() const {
 void MemoryPanel::reload() {
 	bool ok = false;
 	QString err;
-	const QString out = runHelper({ "status" }, false, &ok, &err);
+	const QString out = memoryHelper({ "status" }, false, &ok, &err);
 	d->status = ok ? parseMemoryStatus(out) : MemoryStatus();
 	if (!ok || !d->status.valid) {
 		d->problem = ok ? QString("The memory settings couldn't be read.") : err;
@@ -292,7 +251,7 @@ bool MemoryPanel::apply(const QStringList &args) {
 	repaint();
 	bool ok = false;
 	QString err;
-	runHelper(args, true, &ok, &err);
+	memoryHelper(args, true, &ok, &err);
 	d->busy = false;
 	if (!ok) {
 		d->problem = err;

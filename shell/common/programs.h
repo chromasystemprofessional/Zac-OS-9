@@ -7,6 +7,8 @@
  */
 
 #include <QByteArray>
+#include <QCoreApplication>
+#include <QFileInfo>
 #include <QString>
 #include <climits>
 
@@ -34,4 +36,24 @@ inline QString buildTreePath(const QString &relative) {
 	char path[PATH_MAX];
 	return pl_build_path(relative.toUtf8().constData(), path, sizeof(path))
 		? QString::fromUtf8(path) : QString();
+}
+
+/* A root helper, zacos9-NAME-helper: $ZACOS9_NAME_HELPER for a test's
+ * stand-in, else installed beside this program's prefix (libexec/zacos9),
+ * else, from a build tree, the source tree's SOURCEDIR/zacos9-NAME-helper,
+ * else /usr/libexec/zacos9's. A path pkexec can run. */
+inline QString rootHelperPath(const QString &name, const QString &sourceDir) {
+	const QString env = qEnvironmentVariable(("ZACOS9_" + name.toUpper() + "_HELPER").toUtf8().constData());
+	if (!env.isEmpty()) {
+		return env;
+	}
+	const QString file = "zacos9-" + name + "-helper";
+	const QString dir = QCoreApplication::applicationDirPath();
+	for (const QString &candidate : { dir + "/../libexec/zacos9/" + file,
+			sourceTreePath(sourceDir + "/" + file) }) {
+		if (!candidate.isEmpty() && QFileInfo(candidate).isExecutable()) {
+			return QFileInfo(candidate).canonicalFilePath();
+		}
+	}
+	return "/usr/libexec/zacos9/" + file;
 }

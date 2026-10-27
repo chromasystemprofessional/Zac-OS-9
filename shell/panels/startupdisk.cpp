@@ -1,5 +1,6 @@
 #include "startupdisk.h"
 #include "panelregistry.h"
+#include "process.h"
 #include "programs.h"
 
 #include <QApplication>
@@ -153,54 +154,23 @@ static QString classicLauncher() {
 	return siblingProgram("zacos9-classic");
 }
 
-/* The helper, as root: installed beside us, or the source tree's. */
-static QString helperPath() {
-	const QString env = qEnvironmentVariable("ZACOS9_STARTUPDISK_HELPER");
-	if (!env.isEmpty()) {
-		return env;
-	}
-	const QString dir = QCoreApplication::applicationDirPath();
-	for (const QString &candidate : { dir + "/../libexec/zacos9/zacos9-startupdisk-helper",
-			sourceTreePath("startupdisk/zacos9-startupdisk-helper") }) {
-		if (QFileInfo(candidate).isExecutable()) {
-			return QFileInfo(candidate).canonicalFilePath();
-		}
-	}
-	return "/usr/libexec/zacos9/zacos9-startupdisk-helper";
-}
-
-/* Runs a program to the end, keeping the window drawn (pkexec may be
- * asking for a password; regenerating grub.cfg takes a few seconds). No
- * waitForFinished(): see CLAUDE.md. */
+/* `program` run to the end: its stdout; *err its last line of stderr,
+ * else what went wrong, about `what`. */
 static QString runProgram(const QString &what, const QString &program, const QStringList &args, bool *ok,
 		QString *err) {
-	QProcess p;
-	bool done = false;
-	QObject::connect(&p, &QProcess::finished, [&done] { done = true; });
-	QObject::connect(&p, &QProcess::errorOccurred, [&done](QProcess::ProcessError e) {
-		if (e == QProcess::FailedToStart) {
-			done = true;
-		}
-	});
-	p.start(program, args);
-	while (!done) {
-		QApplication::processEvents(QEventLoop::ExcludeUserInputEvents | QEventLoop::WaitForMoreEvents, 100);
-	}
-	const bool started = p.error() != QProcess::FailedToStart;
-	*ok = started && p.exitStatus() == QProcess::NormalExit && p.exitCode() == 0;
-	*err = QString::fromUtf8(p.readAllStandardError()).trimmed().section('\n', -1);
+	const ProcessResult r = runProcess(program, args);
+	*ok = r.ok();
+	*err = QString::fromUtf8(r.err).trimmed().section('\n', -1);
 	if (!*ok && err->isEmpty()) {
-		*err = started ? QString("%1 stopped with status %2.").arg(what).arg(p.exitCode())
+		*err = r.started ? QString("%1 stopped with status %2.").arg(what).arg(r.exitCode)
 			: QString("%1 couldn't be run.").arg(what);
 	}
-	return QString::fromUtf8(p.readAllStandardOutput());
+	return QString::fromUtf8(r.out);
 }
 
-static QString runHelper(const QStringList &args, bool *ok, QString *err) {
-	if (geteuid() == 0 || !qEnvironmentVariableIsEmpty("ZACOS9_STARTUPDISK_HELPER")) {
-		return runProgram("The startup disk helper", helperPath(), args, ok, err);
-	}
-	return runProgram("The startup disk helper", "pkexec", QStringList{ helperPath() } + args, ok, err);
+/* zacos9-startupdisk-helper, as root. */
+static QString startupDiskHelper(const QStringList &args, bool *ok, QString *err) {
+	return runHelper("startupdisk", "startupdisk", "startup disk", args, ok, err);
 }
 
 struct StartupDiskPanel::Parts {
@@ -351,7 +321,7 @@ void StartupDiskPanel::reload() {
 	update();
 	bool ok;
 	QString err;
-	const QString out = runHelper({ "list" }, &ok, &err);
+	const QString out = startupDiskHelper({ "list" }, &ok, &err);
 	d->busy = false;
 	d->problem = ok ? QString() : err;
 	d->entries = ok ? parseStartupEntries(out, &d->current) : QList<StartupEntry>();
@@ -398,7 +368,7 @@ void StartupDiskPanel::choose(int row) {
 	update();
 	bool ok;
 	QString err;
-	runHelper({ "set", e.id }, &ok, &err);
+	startupDiskHelper({ "set", e.id }, &ok, &err);
 	d->busy = false;
 	if (!ok) {
 		Alert::ask("The startup system couldn't be changed. " + err, "OK", QString());
@@ -427,7 +397,7 @@ void StartupDiskPanel::lookForOthers() {
 	update();
 	bool ok;
 	QString err;
-	runHelper({ "detect" }, &ok, &err);
+	startupDiskHelper({ "detect" }, &ok, &err);
 	d->busy = false;
 	if (!ok) {
 		Alert::ask("Other systems couldn't be looked for. " + err, "OK", QString());
