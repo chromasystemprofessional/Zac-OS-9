@@ -311,11 +311,18 @@ std::vector<SystemResource> resourceChildren(const QString &provider, const QStr
 					continue;
 				}
 				const QString rootKey = QString(i == 0 ? "user:" : "system:");
-				add(rootKey, i == 0 ? "User" : "Computer", ResourceType::Collection,
-					"folder", QStringLiteral("A read-only view of allowlisted ") +
-						(provider == "sounds" ? "alert sounds." : "appearance support files."),
-					{ "Source: " + QFileInfo(root).canonicalFilePath(),
-						"Access: read-only; files are not copied." }, root, true);
+				const bool mine = i == 0;
+				add(rootKey, mine ? "User" : "Computer", ResourceType::Collection,
+					"folder", provider == "sounds" ?
+						(mine ? QStringLiteral("The alert sounds you have added.") :
+							QStringLiteral("The alert sounds that came with the system.")) :
+						QStringLiteral("A read-only view of allowlisted ") +
+							"appearance support files.",
+					provider == "sounds" && mine ?
+						QStringList{ "Source: " + QFileInfo(root).canonicalFilePath(),
+							"Access: drop a WAVE recording here to add it." } :
+						QStringList{ "Source: " + QFileInfo(root).canonicalFilePath(),
+							"Access: read-only; files are not copied." }, root, true);
 			}
 			if (out.empty()) {
 				add("unavailable", provider == "sounds" ? "No sound folders found" :
@@ -527,18 +534,27 @@ ResourceDetails resourceDetails(const QString &provider, const QString &key) {
 	if (provider == "sounds" || provider == "application-support") {
 		QString source;
 		if (resourceOpenPath(provider, key, &source)) {
+			const bool mine = provider == "sounds" && key == QLatin1String("user:");
 			details.name = QFileInfo(source).fileName();
-			details.kind = QFileInfo(source).isDir() ? "read-only folder alias" :
+			details.kind = QFileInfo(source).isDir() ?
+				(mine ? "folder" : "read-only folder alias") :
 				"read-only file alias";
 			details.location = provider == "sounds" ? "System Folder:Sounds" :
 				"System Folder:Application Support";
 			details.sources = QFileInfo(source).canonicalFilePath();
-			details.description = "A real filesystem alias. The original is not copied.";
-			details.access = "Read-only in Finder; source permissions remain in force.";
+			details.description = mine ?
+				"The alert sounds you have added. A sound dropped here is installed." :
+				"A real filesystem alias. The original is not copied.";
+			details.access = mine ?
+				"Drop a WAVE recording here to add it; files are not moved." :
+				"Read-only in Finder; source permissions remain in force.";
 		} else if (key.isEmpty()) {
 			details.name = provider == "sounds" ? "Sounds" : "Application Support";
 			details.kind = "virtual collection";
-			details.description = "A collection of allowlisted, lazily discovered sources.";
+			details.description = provider == "sounds" ?
+				"The alert sounds on this computer and the ones you have added. Drop a WAVE "
+					"recording here to add it." :
+				"A collection of allowlisted, lazily discovered sources.";
 		}
 		return details;
 	}

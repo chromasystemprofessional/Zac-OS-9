@@ -45,6 +45,7 @@
 #include "autostart.h"
 #include "fileassoc.h"
 #include "transferdialog.h"
+#include "customthemes.h"
 #include "fonts.h"
 
 static bool sameDisk(const QString &a, const QString &b) {
@@ -990,6 +991,43 @@ void removeFromStartupItems(const QStringList &ids) {
 	}
 }
 
+/* A recording dragged into Sounds (or its User collection) becomes an alert
+ * sound, installed the way the Appearance panel's Add Recording does it.
+ * Each refusal says why: a drop that quietly did nothing would look like a
+ * bug, and the reasons ("already exists", "not a RIFF WAVE recording") are
+ * the ones the person needs. */
+static void dropAlertSounds(QDropEvent *e, const QStringList &paths) {
+	e->setDropAction(Qt::CopyAction);
+	e->accept();
+	const QString mine = QFileInfo(userAlertSoundsFolder()).canonicalFilePath();
+	QStringList errors;
+	bool installed = false;
+	for (const QString &path : paths) {
+		const QFileInfo file(path);
+		/* Already here: an icon dragged about inside the folder. */
+		if (!mine.isEmpty() && file.canonicalFilePath().section('/', 0, -2) == mine) {
+			continue;
+		}
+		QString id, error;
+		if (importAlertSound(path, &id, &error)) {
+			installed = true;
+		} else {
+			errors << file.fileName() + ": " + error;
+		}
+	}
+	if (installed) {
+		vfsRefresh();
+		Finder::instance().folderChanged(vfsPathFor("system-folder/sounds"));
+		Finder::instance().folderChanged(vfsPathFor("system-folder/sounds/user:"));
+	}
+	if (!errors.isEmpty()) {
+		const QString message = errors.join('\n');
+		QTimer::singleShot(0, QCoreApplication::instance(), [message] {
+			Alert::ask(message, "OK", QString());
+		});
+	}
+}
+
 bool isClippingDrop(const QDropEvent *e) {
 	return e->source() == nullptr && canMakeClipping(e->mimeData());
 }
@@ -1262,6 +1300,10 @@ void dropItems(QDropEvent *e, const Item *target, const QString &folder) {
 		return;
 	}
 	QString dest = target ? target->path : folder;
+	if (vfsIsSounds(dest)) {
+		dropAlertSounds(e, paths);
+		return;
+	}
 	if (vfsIsFonts(dest)) {
 		dest = userFontsPath();
 		if (dest.isEmpty() || !QDir().mkpath(dest) || !fontUserDirectory(dest)) {

@@ -2155,6 +2155,19 @@ void FolderWindow::dropEvent(QDropEvent *e) {
 	Item *target = iconMove ? nullptr
 		: dropTargetAt(e->position().toPoint(), draggedPaths(e->mimeData()));
 	clearDropTarget();
+	if (!target && !iconMove && e->source() != this) {
+		/* Over a curated folder that takes no drops (a read-only
+		 * collection, say): refuse, rather than dropping into the window
+		 * behind its icon. A file's own icon is only a spot in the
+		 * window, and keeps taking the drop into the folder. */
+		Item *over = itemAt(e->position().toPoint());
+		if (over && over->isVirtual && over->kind == PL_ICON_FOLDER &&
+				!acceptsDrops(*over)) {
+			e->ignore();
+			Finder::instance().dragEnded();
+			return;
+		}
+	}
 	if (e->source() != this && !e->mimeData()->hasFormat(STARTUP_ITEMS_MIME)) {
 		Item *on = dropTargetAt(e->position().toPoint(), {});
 		const QString destination = on ? on->path : m_path;
