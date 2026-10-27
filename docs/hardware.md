@@ -201,5 +201,7 @@ own) is left alone, as is a nested session.
 zacos9-wm -d 2>&1 | grep WLR_DRM_DEVICES   # card1:card0, the 4K screen first
 ```
 
-Test: `primary-gpu`.
+The same log keeps one `Failed to pick cursor plane format` line and then
+`previous message repeated N more times` rather than a line per motion
+(`compositor/src/logfilter.c`). Test: `primary-gpu`, `log-filter`.
 

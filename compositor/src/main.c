@@ -17,6 +17,7 @@
 #include <wlr/util/log.h>
 
 #include "locate.h"
+#include "logfilter.h"
 #include "primarygpu.h"
 #include "startup.h"
 #include "access.h"
@@ -117,7 +118,7 @@ int main(int argc, char *argv[]) {
 		usage(argv[0]);
 		return 0;
 	}
-	wlr_log_init(log_level, NULL);
+	logfilter_init(log_level);
 
 	struct plat_server server = {0};
 	server.output_scale = scale;
