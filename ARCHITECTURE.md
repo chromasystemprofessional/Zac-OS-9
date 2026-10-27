@@ -83,7 +83,8 @@ rather than reimplementing them.
 | X11 programs (XWayland) | `compositor/src/xwayland.c`, `xwayland_output.c` | |
 | The menu bar and Apple-style menus | `shell/menubar/` (C) | |
 | The Collar (the control strip) | `shell/collar/` | [The Collar](docs/collar.md) |
-| The Sniffer, the desktop, Get Info, the file dialogs | `shell/finder/` | [The Macintosh view](docs/vfs.md) |
+| The Sniffer, the desktop, Get Info | `shell/finder/` | [The Macintosh view](docs/vfs.md) |
+| The Open and Save dialogs other programs get (xdg-desktop-portal) | `shell/fileportal/` | |
 | Files as the Sniffer shows them, which other programs share: items and their icons, volumes and when to mount them, the Macintosh view, aliases, the Applications database, file associations, thumbnails, desktop printers | `shell/files/` (`libzacos9-files`) | [The Macintosh view](docs/vfs.md) |
 | What nearly every desktop program uses: window hints to `zacos9-wm` (`platinumshell`), the alert box, drawing Platinum images in Qt (`pixels.h`), Shut Down and Restart (`power`) | `shell/common/` (`libzacos9-shell`) | |
 | A control panel | `shell/panels/` (most in `controlpanel.cpp`) | e.g. [Bluetooth](docs/bluetooth.md), [Memory](docs/memory.md) |
