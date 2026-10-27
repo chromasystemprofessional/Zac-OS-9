@@ -551,7 +551,7 @@ QFileSystemWatcher *watcher() {
 			}
 		});
 		QObject::connect(w, &QFileSystemWatcher::directoryChanged,
-			[w, settle](const QString &) {
+			[settle](const QString &) {
 				watchDirs(w);
 				settle->start();
 			});
