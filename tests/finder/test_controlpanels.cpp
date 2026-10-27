@@ -125,12 +125,20 @@ int main(int argc, char **argv) {
 	check(itemNamed(off, "Mouse") != nullptr, "the panel appears in Control Panels (Disabled)");
 	check(itemNamed(panels, "Mouse") == nullptr, "and is gone from Control Panels");
 
-	/* Dropped on Control Panels, where it already is, nothing happens. */
-	QDropEvent back(QPointF(460, 320), Qt::MoveAction, mime.get(), Qt::LeftButton, Qt::NoModifier);
-	panels->dropEvent(&back);
-	settle();
-	check(itemNamed(panels, "Mouse") == nullptr && read(ownEntry).contains("NoDisplay=true"),
-		"and dropping it back on Control Panels changes nothing yet");
+	/* Dragged back into Control Panels, it is turned on again: the user's
+	 * copy of the entry goes and the system's is the panel. */
+	Item *offMouse = itemNamed(off, "Mouse");
+	std::unique_ptr<QMimeData> back(offMouse ? itemDragMime({ offMouse }) : nullptr);
+	check(offMouse && back, "the panel can be dragged back out of (Disabled)");
+	if (back) {
+		QDropEvent on(QPointF(460, 320), Qt::MoveAction, back.get(), Qt::LeftButton, Qt::NoModifier);
+		panels->dropEvent(&on);
+		settle();
+		check(on.isAccepted(), "which Control Panels takes");
+		check(!QFile::exists(ownEntry), "removing the user's copy of its entry");
+		check(itemNamed(panels, "Mouse") != nullptr, "the panel is in Control Panels again");
+		check(itemNamed(off, "Mouse") == nullptr, "and gone from Control Panels (Disabled)");
+	}
 
 	return fails ? 1 : 0;
 }

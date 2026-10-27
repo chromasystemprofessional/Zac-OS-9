@@ -1004,10 +1004,14 @@ void dropItems(QDropEvent *e, const Item *target, const QString &folder) {
 		return;
 	}
 	if (e->mimeData()->hasFormat(PANEL_ITEMS_MIME)) {
-		/* Only into Control Panels (Disabled): the way back into Control
-		 * Panels is the next change. */
-		if (vfsIsControlPanelsDisabled(target ? target->path : folder)) {
+		/* Into Control Panels (Disabled) turns a panel off; back into
+		 * Control Panels turns it on again. Nowhere else has any use for
+		 * one. */
+		const QString destination = target ? target->path : folder;
+		if (vfsIsControlPanelsDisabled(destination)) {
 			setPanelsEnabled(e, false);
+		} else if (vfsIsControlPanels(destination)) {
+			setPanelsEnabled(e, true);
 		} else {
 			e->ignore();
 		}
