@@ -175,37 +175,6 @@ QStringList loadedModuleLines() {
 	return splitLines(boundedText("/proc/modules", 2 * 1024 * 1024));
 }
 
-QStringList loadedModuleNames() {
-	QStringList names;
-	for (const QString &line : loadedModuleLines()) {
-		const QString name = line.section(' ', 0, 0).trimmed();
-		if (!name.isEmpty()) {
-			names << name;
-		}
-	}
-	return names;
-}
-
-QStringList moduleStartupNames() {
-	QStringList dirs = { "/etc/modules-load.d", "/usr/local/lib/modules-load.d",
-		"/usr/lib/modules-load.d", "/lib/modules-load.d" };
-	QStringList out;
-	for (const QString &dir : dirs) {
-		QDir d(dir);
-		for (const QFileInfo &file : d.entryInfoList({ "*.conf" },
-				QDir::Files | QDir::Readable, QDir::Name)) {
-			for (QString line : splitLines(boundedText(file.absoluteFilePath(), 64 * 1024))) {
-				line = line.section('#', 0, 0).trimmed();
-				if (!line.isEmpty() && QRegularExpression("^[A-Za-z0-9_-]+$").match(line).hasMatch()) {
-					out << line;
-				}
-			}
-		}
-	}
-	out.removeDuplicates();
-	return out;
-}
-
 QString moduleDescription(const QString &module) {
 	return boundedText("/sys/module/" + module + "/description", 4096).trimmed();
 }
@@ -268,6 +237,37 @@ QString cpuName() {
 }
 
 } // namespace
+
+QStringList loadedModuleNames() {
+	QStringList names;
+	for (const QString &line : loadedModuleLines()) {
+		const QString name = line.section(' ', 0, 0).trimmed();
+		if (!name.isEmpty()) {
+			names << name;
+		}
+	}
+	return names;
+}
+
+QStringList moduleStartupNames() {
+	QStringList dirs = { "/etc/modules-load.d", "/usr/local/lib/modules-load.d",
+		"/usr/lib/modules-load.d", "/lib/modules-load.d" };
+	QStringList out;
+	for (const QString &dir : dirs) {
+		QDir d(dir);
+		for (const QFileInfo &file : d.entryInfoList({ "*.conf" },
+				QDir::Files | QDir::Readable, QDir::Name)) {
+			for (QString line : splitLines(boundedText(file.absoluteFilePath(), 64 * 1024))) {
+				line = line.section('#', 0, 0).trimmed();
+				if (!line.isEmpty() && QRegularExpression("^[A-Za-z0-9_-]+$").match(line).hasMatch()) {
+					out << line;
+				}
+			}
+		}
+	}
+	out.removeDuplicates();
+	return out;
+}
 
 QString installedZacOSVersion() {
 	return detectZacOSVersion();
@@ -375,37 +375,41 @@ std::vector<SystemResource> resourceChildren(const QString &provider, const QStr
 
 	if (provider == "extensions") {
 		for (const ExtensionEntry &entry : curatedExtensions(loadedModuleNames(),
-				moduleStartupNames())) {
+				moduleStartupNames(), blacklistedModules())) {
 			add(entry.key, entry.name, ResourceType::Information, "system extension",
 				entry.description,
-				{ "Status: on",
+				{ entry.modules.isEmpty() ? QStringLiteral("Status: not on this computer") :
+						QStringLiteral("Status: on"),
 					"Starts: " + QString(entry.startup ? "at every startup (modules-load.d)" :
 						"automatically when its hardware is found"),
-					"Kernel modules: " + entry.modules.join(", ") });
+					"Kernel modules: " + (entry.modules.isEmpty() ? QStringLiteral("none loaded") :
+						entry.modules.join(", ")) });
 			out.back().icon = entry.icon;
 		}
 		if (out.empty()) {
 			add("none", "No extensions found", ResourceType::Information,
-				"information", "The kernel did not report any familiar extensions.");
+				"information", "The Extensions Manager has no extensions to list.");
 		}
 		return out;
 	}
 
 	if (provider == "extensions-disabled") {
 		for (const ExtensionEntry &entry : disabledExtensions(loadedModuleNames(),
-				moduleStartupNames())) {
+				moduleStartupNames(), blacklistedModules())) {
+			/* The helper only writes the blacklist; nothing is unloaded,
+			 * so a turned-off extension keeps working until the restart. */
+			const bool running = !entry.modules.isEmpty();
 			add(entry.key, entry.name, ResourceType::Information,
 				"disabled system extension", entry.description,
-				{ "Status: not loaded",
-					"Starts: " + QString(entry.startup ?
-						"at next startup (modules-load.d)" :
-						"only when its hardware is found"),
+				{ "Status: off",
+					"Still running: " + QString(running ?
+						"yes; it stops at the next restart" : "no"),
 					"Kernel modules: " + entry.modules.join(", ") });
 			out.back().icon = entry.icon;
 		}
 		if (out.empty()) {
 			add("none", "No disabled extensions found", ResourceType::Information,
-				"information", "Every familiar extension in the catalog is loaded.");
+				"information", "Every extension is on; dragging one here would turn it off.");
 		}
 		return out;
 	}
@@ -563,9 +567,10 @@ ResourceDetails resourceDetails(const QString &provider, const QString &key) {
 			entry.key.isEmpty() ? safeDisplayName(key) : entry.name;
 		details.kind = key.isEmpty() ? "virtual collection" : "disabled system extension";
 		details.description = entry.key.isEmpty() ?
-			"Familiar extensions that are not loaded on this computer; open Extensions Manager "
-			"and choose Show All for every kernel module." : entry.description;
-		details.access = "Informational only; kernel modules are not loaded or unloaded here.";
+			"Extensions you turned off. They stop loading at the next restart; drag one "
+			"back to Extensions to turn it on." : entry.description;
+		details.access = "Takes effect at the next restart; a running extension keeps working "
+			"until then.";
 		return details;
 	}
 	if (provider == "device-drivers") {

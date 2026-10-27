@@ -219,9 +219,19 @@ private:
 		update();
 	}
 
-	/* The curated entries, or under Show All every loaded module. */
+	/* The curated entries — turned-off ones too, so they can be turned back
+	 * on — or under Show All every loaded module. */
 	void loadExtensions() {
 		m_resources = resourceChildren(m_showAll.on ? "device-drivers" : "extensions");
+		if (!m_showAll.on) {
+			const std::vector<SystemResource> off = resourceChildren("extensions-disabled");
+			for (const SystemResource &resource : off) {
+				/* "none" stands for an empty folder, not an extension. */
+				if (resource.key != "none") {
+					m_resources.push_back(resource);
+				}
+			}
+		}
 		std::stable_sort(m_resources.begin(), m_resources.end(),
 			[](const SystemResource &a, const SystemResource &b) {
 				return a.name.compare(b.name, Qt::CaseInsensitive) < 0;
@@ -237,7 +247,7 @@ private:
 				const ExtensionEntry entry = extensionEntry(m_resources[i].key);
 				RowState st;
 				st.canToggle = !entry.key.isEmpty();
-				st.on = entry.startup;
+				st.on = m_resources[i].kind != "disabled system extension";
 				m_state[i] = st;
 			}
 		}
@@ -363,11 +373,10 @@ private:
 		const QString name = m_resources[size_t(row)].name;
 		const QString key = m_resources[size_t(row)].key;
 		if (category() == Extensions) {
-			const ExtensionEntry entry = extensionEntry(key);
-			QStringList modules = entry.modules;
-			if (modules.isEmpty()) {
-				modules << key;
-			}
+			/* What the helper names: the modules on this computer, so a
+			 * turned-off extension's blacklist is what a turn-on removes. */
+			const QStringList modules = extensionToggleModules(key, turnOn,
+				loadedModuleNames(), blacklistedModules());
 			m_serviceActionPending = true;
 			updateButtons();
 			setExtensionEnabledAsync(this, key, turnOn, modules,

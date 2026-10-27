@@ -64,7 +64,8 @@ int main(int argc, char **argv) {
 		check(!entry.name.contains('_') && !entry.description.isEmpty(),
 			"every entry has a friendly name and a description");
 	}
-	check(entries.size() == 14, "one entry per feature, not per module");
+	check(entries.size() == size_t(pl_n_extensions),
+		"every catalog entry is an extension, not only the loaded ones");
 	for (size_t i = 1; i < entries.size(); i++) {
 		check(entries[i - 1].name.compare(entries[i].name, Qt::CaseInsensitive) < 0,
 			"entries are sorted by name");
@@ -74,29 +75,68 @@ int main(int argc, char **argv) {
 	check(appletalk && appletalk->startup, "a modules-load.d module marks its entry as startup");
 	check(sound && !sound->startup, "hardware-detected modules are not startup entries");
 
-	check(curatedExtensions({ "snd-usb-audio" }).size() == 1 &&
-		curatedExtensions({ "snd-usb-audio" })[0].key == "usb-sound",
+	const std::vector<ExtensionEntry> usb = curatedExtensions({ "snd-usb-audio" });
+	const ExtensionEntry *usbSound = find(usb, "usb-sound");
+	check(usbSound && usbSound->modules == QStringList({ "snd_usb_audio" }),
 		"dashes and underscores in module names are the same");
-	check(curatedExtensions({ "rtw88_8822be" }).size() == 1, "prefix patterns match");
-	check(curatedExtensions({ "crc16", "libata", "snd" }).empty(),
-		"a machine with only helpers has no curated entries");
-	check(curatedExtensions({}).empty(), "nothing loaded, nothing listed");
+	const std::vector<ExtensionEntry> rtwEntries = curatedExtensions({ "rtw88_8822be" });
+	const ExtensionEntry *rtw = find(rtwEntries, "wifi");
+	check(rtw && rtw->modules.contains("rtw88_8822be"), "prefix patterns match");
+	bool anyModules = false;
+	for (const ExtensionEntry &entry : curatedExtensions({ "crc16", "libata", "snd" })) {
+		anyModules = anyModules || !entry.modules.isEmpty();
+	}
+	check(!anyModules, "a machine with only helpers has no extension modules");
+	for (const ExtensionEntry &entry : curatedExtensions({})) {
+		check(entry.modules.isEmpty(), "nothing loaded, no entry names a module");
+	}
 
-	/* The disabled view is the catalog's complement: no loaded module. */
-	const std::vector<ExtensionEntry> disabled = disabledExtensions({ "i915" });
-	check(find(disabled, "wifi") && find(disabled, "bluetooth") &&
-		!find(disabled, "intel-graphics"),
-		"disabled entries are the catalog entries without a loaded module");
-	check(disabled.size() == size_t(pl_n_extensions - 1),
-		"only Intel Graphics is loaded in this fixture");
-	check(disabledExtensions({}).size() == size_t(pl_n_extensions),
-		"an empty module list leaves every entry disabled");
-	const std::vector<ExtensionEntry> disabledStartup = disabledExtensions({}, { "appletalk" });
-	check(find(disabledStartup, "appletalk") && find(disabledStartup, "appletalk")->startup,
+	/* What is turned off is a blacklist, not what the kernel has loaded:
+	 * the folders follow the configuration, and a running module keeps
+	 * working until the restart. */
+	const QStringList bluetoothModules = { "bluetooth", "btusb" };
+	const std::vector<ExtensionEntry> disabledRunning =
+		disabledExtensions(bluetoothModules, {}, bluetoothModules);
+	const ExtensionEntry *offBluetooth = find(disabledRunning, "bluetooth");
+	check(offBluetooth && offBluetooth->modules == QStringList({ "bluetooth", "btusb" }),
+		"a blacklisted extension is in Extensions (Disabled), still running");
+	const std::vector<ExtensionEntry> onWithBlacklist =
+		curatedExtensions(bluetoothModules, {}, bluetoothModules);
+	check(!find(onWithBlacklist, "bluetooth"), "and no longer in Extensions");
+	const std::vector<ExtensionEntry> disabledStopped = disabledExtensions({}, {}, bluetoothModules);
+	check(find(disabledStopped, "bluetooth"), "a blacklisted extension stays off after a restart");
+	const std::vector<ExtensionEntry> halfBlacklisted =
+		disabledExtensions({ "btusb", "bluetooth" }, {}, { "bluetooth" });
+	check(!find(halfBlacklisted, "bluetooth"), "half a blacklist is not turned off");
+	const std::vector<ExtensionEntry> halfOn =
+		curatedExtensions({ "btusb", "bluetooth" }, {}, { "bluetooth" });
+	check(find(halfOn, "bluetooth"), "so the extension is still in Extensions");
+	const std::vector<ExtensionEntry> patternOff =
+		disabledExtensions({ "rtw88_8822be" }, {}, { "rtw88-8822be" });
+	const ExtensionEntry *wildcard = find(patternOff, "wifi");
+	check(wildcard && wildcard->modules == QStringList({ "rtw88_8822be" }),
+		"a blacklisted module of a pattern entry turns that entry off");
+	const std::vector<ExtensionEntry> bare = curatedExtensions({});
+	check(find(bare, "wifi"), "hardware this computer lacks is not turned off");
+	check(disabledExtensions({}).empty(), "with nothing blacklisted, nothing is disabled");
+	const std::vector<ExtensionEntry> disabledStartupEntries =
+		disabledExtensions({}, { "appletalk" }, { "appletalk" });
+	const ExtensionEntry *disabledStartup = find(disabledStartupEntries, "appletalk");
+	check(disabledStartup && disabledStartup->startup,
 		"a modules-load.d entry is marked as starting next time");
-	const ExtensionEntry *disabledWifi = find(disabled, "wifi");
-	check(disabledWifi && disabledWifi->modules.contains("iwlwifi"),
-		"a disabled entry still names the modules it covers");
+
+	/* The modules the helper is asked to turn an extension off with. */
+	check(extensionToggleModules("bluetooth", false, { "btusb" }) ==
+		QStringList({ "bluetooth", "btusb", "hci_uart" }),
+		"turning off names the loaded modules and the catalog's plain names");
+	const QStringList wifiOff = extensionToggleModules("wifi", false, {});
+	check(wifiOff.contains("iwlwifi") && !wifiOff.join(' ').contains('*'),
+		"a pattern is never passed to the helper as a module name");
+	check(extensionToggleModules("bluetooth", true, { "btusb" }, { "bluetooth", "btusb" }) ==
+		QStringList({ "bluetooth", "btusb" }),
+		"turning on names the blacklisted modules, so their lines go");
+	check(extensionToggleModules("nope", false, {}).isEmpty(),
+		"an unknown key names nothing");
 
 	check(extensionEntry("wifi").name == "Wi-Fi" && extensionEntry("nope").key.isEmpty(),
 		"entries can be looked up by key");
