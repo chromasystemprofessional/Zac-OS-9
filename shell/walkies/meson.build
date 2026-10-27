@@ -9,7 +9,7 @@ executable('zacos9-walkies',
 )
 test('walkies-locations',
   executable('test-walkies-locations', 'test_location.cpp', 'location.cpp',
-    dependencies: [platinum_dep, qt6],
+    dependencies: [shell_common_dep, platinum_dep, qt6],
   ),
   timeout: 10,
 )

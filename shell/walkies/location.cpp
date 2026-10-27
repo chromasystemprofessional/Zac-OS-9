@@ -1,4 +1,5 @@
 #include "location.h"
+#include "conf.h"
 
 #include <QDir>
 #include <QFile>
@@ -32,15 +33,15 @@ bool readLocation(const QString &name, Location *l) {
 	}
 	*l = Location();
 	l->name = name;
-	for (const QString &line : QString::fromUtf8(f.readAll()).split('\n')) {
-		const QString key = line.section('=', 0, 0), value = line.section('=', 1);
-		if (key == "network") l->network = value;
-		else if (key == "sink") l->sink = value;
-		else if (key == "volume") l->volume = value.toInt();
-		else if (key == "timezone") l->timezone = value;
-		else if (key == "printer") l->printer = value;
-		else if (key == "tricks-set") l->trickSet = value;
+	const KeyValueFile file = KeyValueFile::parse(f.readAll());
+	l->network = file.value("network");
+	l->sink = file.value("sink");
+	if (file.contains("volume")) {
+		l->volume = file.value("volume").toInt();
 	}
+	l->timezone = file.value("timezone");
+	l->printer = file.value("printer");
+	l->trickSet = file.value("tricks-set");
 	return true;
 }
 
@@ -52,11 +53,10 @@ bool saveLocation(const Location &l, QString *error) {
 		return false;
 	}
 	QDir().mkpath(dir());
-	QSaveFile f(dir() + '/' + l.name.trimmed() + ".location");
-	QStringList lines;
+	KeyValueFile file;
 	auto put = [&](const char *key, const QString &value) {
 		if (!value.isEmpty() && !value.contains('\n')) {
-			lines << QString(key) + '=' + value;
+			file.set(key, value);
 		}
 	};
 	put("network", l.network);
@@ -65,7 +65,7 @@ bool saveLocation(const Location &l, QString *error) {
 	put("timezone", l.timezone);
 	put("printer", l.printer);
 	put("tricks-set", l.trickSet);
-	if (!f.open(QIODevice::WriteOnly) || f.write((lines.join('\n') + '\n').toUtf8()) < 0 || !f.commit()) {
+	if (!file.save(dir() + '/' + l.name.trimmed() + ".location")) {
 		if (error) {
 			*error = "The location couldn't be saved.";
 		}
