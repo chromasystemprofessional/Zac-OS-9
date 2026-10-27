@@ -93,8 +93,6 @@ QString vfsOpensAs(const QString &path);
 QString vfsName(const QString &path);
 /* Starts the application or control panel a Launcher node names. */
 bool vfsLaunch(const QString &path);
-/* A program of ours, from next to this binary in a build tree, else $PATH. */
-QString siblingProgram(const QString &name);
 /* The real file or directory this item stands for, for Get Info: a
  * Backed node's directory, or an application's desktop entry. Empty for
  * the curated and generated folders, which stand for nothing on disk. */

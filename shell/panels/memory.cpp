@@ -1,4 +1,5 @@
 #include "memory.h"
+#include "programs.h"
 
 #include <QApplication>
 #include <QCoreApplication>
@@ -101,7 +102,7 @@ static QString helperPath() {
 	}
 	const QString dir = QCoreApplication::applicationDirPath();
 	for (const QString &candidate : { dir + "/../libexec/zacos9/zacos9-memory-helper",
-			dir + "/../../memory/zacos9-memory-helper" }) {
+			sourceTreePath("memory/zacos9-memory-helper") }) {
 		if (QFileInfo(candidate).isExecutable()) {
 			return QFileInfo(candidate).canonicalFilePath();
 		}

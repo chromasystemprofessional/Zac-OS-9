@@ -16,6 +16,7 @@
 #include <wlr/types/wlr_xdg_output_v1.h>
 #include <wlr/util/log.h>
 
+#include "locate.h"
 #include "startup.h"
 #include "access.h"
 #include "server.h"
@@ -41,7 +42,7 @@ pid_t spawn(const char *command) {
 
 /* Start a shell component (menu bar, Finder): $env_var if set (empty
  * disables it), else next to our own binary (installed) or in the build
- * tree's shell/ directory, else from $PATH. `args` (may be empty) are
+ * tree (pl_sibling_program()), else from $PATH. `args` (may be empty) are
  * appended to its command line as they are. A NULL env_var always runs
  * our own program. */
 pid_t spawn_component(const char *env_var, const char *program, const char *args) {
@@ -54,24 +55,11 @@ pid_t spawn_component(const char *env_var, const char *program, const char *args
 		}
 		return -1;
 	}
-	char exe[PATH_MAX];
-	ssize_t len = readlink("/proc/self/exe", exe, sizeof(exe) - 1);
-	if (len > 0) {
-		exe[len] = '\0';
-		char *slash = strrchr(exe, '/');
-		if (slash) {
-			*slash = '\0';
-			const char *candidates[] = { "%s/%s", "%s/../shell/%s" };
-			for (size_t i = 0; i < sizeof(candidates) / sizeof(candidates[0]); i++) {
-				char path[PATH_MAX + 64];
-				snprintf(path, sizeof(path), candidates[i], exe, program);
-				if (access(path, X_OK) == 0) {
-					char quoted[PATH_MAX + 80];
-					snprintf(quoted, sizeof(quoted), "exec '%s'%s", path, args);
-					return spawn(quoted);
-				}
-			}
-		}
+	char path[PATH_MAX];
+	if (pl_sibling_program(program, path, sizeof(path))) {
+		char quoted[PATH_MAX + 80];
+		snprintf(quoted, sizeof(quoted), "exec '%s'%s", path, args);
+		return spawn(quoted);
 	}
 	char cmd[256];
 	snprintf(cmd, sizeof(cmd), "exec %s%s", program, args);

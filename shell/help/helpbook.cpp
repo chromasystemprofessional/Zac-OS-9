@@ -1,4 +1,5 @@
 #include "helpbook.h"
+#include "programs.h"
 
 #include <QCoreApplication>
 #include <QDir>
@@ -98,11 +99,11 @@ QString helpRoot() {
 	if (!env.isEmpty()) {
 		return env;
 	}
-	// build/shell/zacos9-help -> share/zacos9/help in the source tree;
-	// installed, bin/ -> share/zacos9/help.
+	// From a build tree, the source tree's share/zacos9/help; installed,
+	// bin/ -> share/zacos9/help.
 	const QString dir = QCoreApplication::applicationDirPath();
-	for (const QString &candidate : { dir + "/../../share/zacos9/help", dir + "/../share/zacos9/help" }) {
-		if (QFileInfo(candidate + "/zacos9/index.html").exists()) {
+	for (const QString &candidate : { sourceTreePath("share/zacos9/help"), dir + "/../share/zacos9/help" }) {
+		if (!candidate.isEmpty() && QFileInfo(candidate + "/zacos9/index.html").exists()) {
 			return QFileInfo(candidate).canonicalFilePath();
 		}
 	}

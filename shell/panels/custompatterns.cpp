@@ -1,4 +1,5 @@
 #include "custompatterns.h"
+#include "programs.h"
 
 #include <QCoreApplication>
 #include <QCache>
@@ -140,9 +141,7 @@ public:
 		}
 		fingerprint = current;
 		loaded = true;
-		const QString local = QCoreApplication::applicationDirPath() + "/zacos9-patterns";
-		const QString helper = QFileInfo::exists(local) ? local :
-			QStandardPaths::findExecutable("zacos9-patterns");
+		const QString helper = QStandardPaths::findExecutable(siblingProgram("zacos9-patterns"));
 		if (helper.isEmpty()) {
 			errors = { "Desktop pattern importer isn't installed." };
 			qWarning().noquote() << errors.first();

@@ -1,4 +1,5 @@
 #include "modules.h"
+#include "programs.h"
 
 #include <QApplication>
 #include <QCoreApplication>
@@ -22,7 +23,7 @@ QString helperPath() {
 	const QString dir = QCoreApplication::applicationDirPath();
 	for (const QString &candidate : {
 			dir + "/../libexec/zacos9/" + name,
-			dir + "/../../modules/" + name,
+			sourceTreePath("modules/" + name),
 		}) {
 		if (QFileInfo(candidate).isExecutable()) {
 			return QFileInfo(candidate).canonicalFilePath();

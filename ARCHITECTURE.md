@@ -43,14 +43,17 @@ needed.
 with Qt 6, but they draw themselves pixel by pixel with ZacOS's own drawing
 library (`lib/`) rather than Qt's widgets, which is how they look exactly like
 Mac OS 9. The menu bar, lock screen, screen saver and on-screen keyboard are
-plain C.
+plain C. A program starts another from beside itself when installed, from
+the build tree when it runs from one, else from `$PATH`
+(`siblingProgram()` in `shell/common/programs.h`; `lib/locate.h` for C).
 
 **Root helpers** (`accounts/`, `appstore/`, `disks/`, `installer/`,
 `memory/`, `modules/`, `setup/`, `sharing/`, `startupdisk/`) are small scripts
 installed in `/usr/libexec/zacos9`. A program runs one with `pkexec`, and its
 polkit policy decides who may (usually an administrator, sometimes without a
 password). Each checks its arguments itself: it trusts nothing from the
-program that ran it.
+program that ran it. A program run from a build tree uses the source tree's
+copy instead (`sourceTreePath()`).
 
 **Everything else** is Debian: UDisks2 for disks, NetworkManager, BlueZ,
 accountsservice, CUPS, logind, apt. ZacOS programs talk to them over D-Bus

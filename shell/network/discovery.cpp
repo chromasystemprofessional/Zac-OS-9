@@ -1,4 +1,5 @@
 #include "discovery.h"
+#include "programs.h"
 
 #include <QCoreApplication>
 #include <QElapsedTimer>
@@ -272,7 +273,7 @@ static QString afpClient() {
 	}
 	const QString dir = QCoreApplication::applicationDirPath();
 	for (const QString &candidate : { dir + "/../libexec/zacos9/zacos9-afp",
-			dir + "/../network/zacos9-afp" }) {
+			buildTreePath("network/zacos9-afp") }) {
 		if (QFileInfo(candidate).isExecutable()) {
 			return QFileInfo(candidate).canonicalFilePath();
 		}

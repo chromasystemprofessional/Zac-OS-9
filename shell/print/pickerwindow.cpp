@@ -11,18 +11,13 @@
 #include "icons.h"
 #include "panelkit.h"
 #include "platinumshell.h"
+#include "programs.h"
 
 namespace {
 
 constexpr uint32_t FACE = GRAY(0xD);
 constexpr int W = 460, H = 340, M = 12;
 constexpr int LIST_TOP = 34, LIST_BOTTOM = 214;
-
-/* One of ours, from beside this program in a build tree, else $PATH. */
-QString sibling(const QString &name) {
-	const QString local = QCoreApplication::applicationDirPath() + "/" + name;
-	return QFileInfo(local).isExecutable() ? local : name;
-}
 
 QString settingsProgram() {
 	const QString env = qEnvironmentVariable("ZACOS9_PRINTER_SETTINGS");
@@ -162,7 +157,7 @@ QString PickerWindow::createDesktopPrinterForSelected() {
 void PickerWindow::openQueue() {
 	const int row = d->list.state.selected;
 	if (row >= 0 && row < d->printers.size()) {
-		platinumStartApplication(sibling("zacos9-printqueue"), { d->printers[row].name });
+		platinumStartApplication(siblingProgram("zacos9-printqueue"), { d->printers[row].name });
 	}
 }
 

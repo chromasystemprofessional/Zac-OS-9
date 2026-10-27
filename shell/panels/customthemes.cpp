@@ -1,4 +1,5 @@
 #include "customthemes.h"
+#include "programs.h"
 
 #include <QCoreApplication>
 #include <QCryptographicHash>
@@ -286,9 +287,7 @@ public:
 				errors << file.fileName() + ": invalid appearance preset.";
 			}
 		}
-		const QString local = QCoreApplication::applicationDirPath() + "/zacos9-soundthemes";
-		process.start(QFileInfo(local).isExecutable() ? local : "zacos9-soundthemes",
-			{ soundThemesFolder(), cacheFolder() });
+		process.start(siblingProgram("zacos9-soundthemes"), { soundThemesFolder(), cacheFolder() });
 		timeout.start();
 		notify();
 	}

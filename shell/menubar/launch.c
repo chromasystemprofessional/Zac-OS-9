@@ -12,6 +12,7 @@
 #include "appfilter.h"
 #include "icons.h"
 #include "electron.h"
+#include "locate.h"
 #include "menubar.h"
 
 static void detach_session(void *data) {
@@ -46,23 +47,13 @@ void launch(const char *command) {
 	free(electron);
 }
 
-/* A shell command running `program` from next to this binary (build tree
- * or install), else from $PATH. */
+/* A shell command running `program` from next to this binary (installed)
+ * or from the build tree (pl_sibling_program()), else from $PATH. */
 void sibling_program(const char *program, char *out, size_t size) {
-	char exe[PATH_MAX];
-	ssize_t len = readlink("/proc/self/exe", exe, sizeof(exe) - 1);
-	if (len > 0) {
-		exe[len] = '\0';
-		char *slash = strrchr(exe, '/');
-		if (slash) {
-			*slash = '\0';
-			char path[PATH_MAX + 64];
-			snprintf(path, sizeof(path), "%s/%s", exe, program);
-			if (access(path, X_OK) == 0) {
-				snprintf(out, size, "exec '%s'", path);
-				return;
-			}
-		}
+	char path[PATH_MAX];
+	if (pl_sibling_program(program, path, sizeof(path))) {
+		snprintf(out, size, "exec '%s'", path);
+		return;
 	}
 	snprintf(out, size, "exec %s", program);
 }
