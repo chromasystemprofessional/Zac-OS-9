@@ -1,6 +1,6 @@
 # Project status
 
-Updated: 2026-10-26. Latest release: **1.0.22**
+Updated: 2026-10-27. Latest release: **1.1.0**
 ([releases](https://github.com/chromasystemprofessional/Zac-OS-9/releases),
 [ISO](https://sourceforge.net/projects/zac-os-9/files/)).
 
@@ -19,12 +19,18 @@ This page is what's true now and what's next. What changed and when is in
   BIOS and UEFI, next to Haiku and a Windows partition.
 - **1.0.22** fixed the Sniffer crashing after the Fonts folder, and a
   tablet's pen landing in the wrong place in Krita.
+- **1.1.0** is the restructuring below, with the fixes it turned up (File
+  Sharing's password check, the last `waitForFinished()` calls).
 
 ## Being worked on
 
-**Making the project easier to work on** for people joining it, without
-changing what ZacOS does. It goes in eleven small phases, each its own pull
-request:
+**The System Folder**, made to work the way Mac OS 7 to 9's did, item by
+item: [`docs/system-folder.md`](docs/system-folder.md) has every item, what
+ZacOS has for it, and the order. First: Control Panels (Disabled).
+
+**Making the project easier to work on**: ten of the eleven phases are done,
+each its own pull request, and released as 1.1.0. Phase 7's four starter tasks
+are drafted, to be posted as "good first issue"s:
 
 | Phase | What | State |
 |---|---|---|
@@ -35,12 +41,12 @@ request:
 | 4 | One reader for `key=value` settings files | Done: `shell/common/conf.h` |
 | 5 | One file per control panel | Done: each registers itself (`shell/panels/panelregistry.h`) |
 | 6 | A small library for the C Wayland programs | Done: shared-memory buffers (`lib/wlclient`) |
-| 7 | Small duplicates as "good first issue"s | |
+| 7 | Small duplicates as "good first issue"s | Drafted: four issues, to be posted |
 | 8 | Tests in `tests/<part>/`, with a shared harness | Done: every test under `tests/`; `tests/harness/zacos9test.py` |
 | 9 | The root helpers under `system/` | Done |
 | 10 | No compiler warnings | Done: CI fails if a change adds one |
 
-**On hold until then:** fractional scaling and the Monitors panel, split
+**On hold:** fractional scaling and the Monitors panel, split
 from #23 into [#49](https://github.com/chromasystemprofessional/Zac-OS-9/issues/49)
 (sharp text and art at 1.25x–1.75x),
 [#50](https://github.com/chromasystemprofessional/Zac-OS-9/issues/50),
