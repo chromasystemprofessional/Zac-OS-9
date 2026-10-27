@@ -26,7 +26,7 @@ This page is what's true now and what's next. What changed and when is in
 
 **The System Folder**, made to work the way Mac OS 7 to 9's did, item by
 item: [`docs/system-folder.md`](docs/system-folder.md) has every item, what
-ZacOS has for it, and the order. Next: Sounds you can drop in.
+ZacOS has for it, and the order. Next: Collar Modules as a folder.
 
 **Making the project easier to work on**: ten of the eleven phases are done,
 each its own pull request, and released as 1.1.0. Phase 7's four starter tasks

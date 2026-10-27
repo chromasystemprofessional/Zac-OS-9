@@ -15,7 +15,7 @@ default layout is in `shell/files/vfs.cpp`.
 S a day or so, M a few days, L more. Mac OS versions are when an item
 first appeared in Apple's System Folder, to the nearest release.
 
-Of 31 items: 15 working, 6 partial, 1 view only, 9 missing.
+Of 31 items: 16 working, 6 partial, 0 view only, 9 missing.
 
 ## The System Folder's own files
 
@@ -55,7 +55,7 @@ Of 31 items: 15 working, 6 partial, 1 view only, 9 missing.
 |---|---|---|---|---|---|
 | Appearance (8.0) | Desktop Pictures, Sound Sets, Theme Files. | Working | `shell/panels/appearance.cpp`, `customthemes.cpp` | – | – |
 | Fonts (7.1) | Drop a font in to install it. | Working | `shell/files/fonts.cpp` | – | – |
-| Alert sounds (in System, 7.0) | Drag a sound in and the Sound panel offered it. | View only: Sounds | `lib/settings.c`, `shell/panels/sound.cpp` | Drop a WAV into Sounds and the Sound panel offers it as an alert sound. | S |
+| Alert sounds (in System, 7.0) | Drag a sound in and the Sound panel offered it. | Working: drop a WAVE recording into Sounds | `lib/settings.c`, `shell/panels/sound.cpp`, `shell/files/resources.cpp`, `shell/finder/fileops.cpp` | – | – |
 | Keyboard layouts (in System, 7.0) | Each layout a resource in the System file. | Missing | `shell/panels/xkblayouts.cpp` | A read-only *Keyboard Layouts* folder; opening one opens the Keyboard panel with it chosen. | S |
 | Language & Region Support, Text Encodings (8.5–9) | The scripts and encodings the system could show and type. | Partial: Language Kits, the Numbers and Text panels | `shell/panels/locale.cpp`, `system/accounts/` | A folder of installed locales; adding one goes through the accounts helper. | M |
 | Help (7.5, 8.5) | Help books; drop one in and Help listed it. | Missing | `shell/help/`, `share/zacos9/help/` | A *Help* folder listing the books; one dropped in appears in the Help Center. | S |

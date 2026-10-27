@@ -161,6 +161,18 @@ test('users-panel', find_program('dbus-run-session'),
     ).full_path(), files('../../tests/users/fake_accounts.py')],
   timeout: 60,
 )
+# The Sound panel's Alert Sound menu, with the panel as it is built.
+test('sound-panel',
+  executable('test-sound-panel', '../../tests/panels/test_soundpanel.cpp',
+    'soundclient.cpp',
+    link_with: panelkit,
+    include_directories: include_directories('.', '../finder', '../common'),
+    dependencies: [shell_common_dep, platinum_dep, qt6, wayland_client, gio_unix],
+  ),
+  args: [meson.project_source_root() / 'assets/sounds/woodblock.wav'],
+  env: ['QT_QPA_PLATFORM=offscreen'],
+  timeout: 60,
+)
 controlpanel_exe = executable('zacos9-controlpanel',
   'controlpanel.cpp',
   # The panels, each registering itself (panelregistry.h).
