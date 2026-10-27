@@ -1,4 +1,5 @@
 #include "customthemes.h"
+#include "conf.h"
 #include "programs.h"
 
 #include <QCoreApplication>
@@ -47,43 +48,28 @@ bool writeSettings(const QMap<QString, QString> &values, QString *error) {
 		return false;
 	}
 	const QString path = folder + "/desktop.conf";
-	QFile input(path);
-	QStringList lines;
-	if (input.exists()) {
-		if (!input.open(QIODevice::ReadOnly)) {
-			*error = input.errorString();
+	if (QFile::exists(path) && !QFile(path).open(QIODevice::ReadOnly)) {
+		*error = "Could not read " + path + ".";
+		return false;
+	}
+	KeyValueFile conf = QFile::exists(path) ? KeyValueFile::read(path) : KeyValueFile::parse("[General]");
+	for (auto it = values.cbegin(); it != values.cend(); ++it) {
+		if (it.value().isEmpty()) {
+			conf.remove(it.key());
+			continue;
+		}
+		const QString line = it.key() + "=" + it.value();
+		if (line.toUtf8().size() >= 255 || line.contains('\n') || line.contains('\r')) {
+			*error = "Theme preference is too long or contains a line break.";
 			return false;
 		}
-		lines = QString::fromUtf8(input.readAll()).split('\n', Qt::SkipEmptyParts);
-	} else {
-		lines << "[General]";
+		conf.set(it.key(), it.value());
 	}
-	for (auto it = values.cbegin(); it != values.cend(); ++it) {
-		for (int i = lines.size() - 1; i >= 0; --i) {
-			if (lines[i].section('=', 0, 0).trimmed() == it.key()) {
-				lines.removeAt(i);
-			}
-		}
-		if (!it.value().isEmpty()) {
-			const QString line = it.key() + "=" + it.value();
-			if (line.toUtf8().size() >= 255 || line.contains('\n') || line.contains('\r')) {
-				*error = "Theme preference is too long or contains a line break.";
-				return false;
-			}
-			lines << line;
-		}
-	}
-	if (lines.size() > 64) {
+	if (conf.text().count('\n') > 64) {
 		*error = "Too many appearance preferences.";
 		return false;
 	}
-	QSaveFile output(path);
-	const QByteArray bytes = (lines.join('\n') + '\n').toUtf8();
-	if (!output.open(QIODevice::WriteOnly) || output.write(bytes) != bytes.size() || !output.commit()) {
-		*error = output.errorString();
-		return false;
-	}
-	return true;
+	return conf.save(path, error);
 }
 
 QString cacheFolder() {

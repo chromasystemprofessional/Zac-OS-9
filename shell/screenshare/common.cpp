@@ -43,28 +43,20 @@ static QString settingsFile() { return configDir() + "/screensharing.conf"; }
 
 Settings readSettings() {
 	Settings s;
-	QFile f(settingsFile());
-	if (f.open(QIODevice::ReadOnly)) {
-		for (const QByteArray &raw : f.readAll().split('\n')) {
-			const QString line = QString::fromUtf8(raw).trimmed();
-			const QString key = line.section('=', 0, 0), value = line.section('=', 1);
-			if (key == "ask") s.ask = value != "no";
-			else if (key == "control") s.control = value != "no";
-			else if (key == "sound") s.sound = value != "no";
-		}
-	}
+	const KeyValueFile f = KeyValueFile::read(settingsFile());
+	s.ask = f.value("ask") != "no";
+	s.control = f.value("control") != "no";
+	s.sound = f.value("sound") != "no";
 	return s;
 }
 
 bool writeSettings(const Settings &s) {
 	QDir().mkpath(configDir());
-	QSaveFile f(settingsFile());
-	if (!f.open(QIODevice::WriteOnly)) {
-		return false;
-	}
-	f.write(QString("ask=%1\ncontrol=%2\nsound=%3\n")
-		.arg(s.ask ? "yes" : "no", s.control ? "yes" : "no", s.sound ? "yes" : "no").toUtf8());
-	return f.commit();
+	KeyValueFile f;
+	f.setYes("ask", s.ask);
+	f.setYes("control", s.control);
+	f.setYes("sound", s.sound);
+	return f.save(settingsFile());
 }
 
 QString ownerName() {
