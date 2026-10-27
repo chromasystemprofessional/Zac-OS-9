@@ -50,3 +50,17 @@ struct ProcessOptions {
 /* Runs `program` with `args` to the end (or the timeout), as waitForProcess() waits. */
 ProcessResult runProcess(const QString &program, const QStringList &args,
 	const ProcessOptions &options = {});
+
+struct HelperOptions {
+	QByteArray input;  /* written to its stdin */
+	bool asRoot = true;/* false: run as this user (a helper's read-only commands) */
+};
+
+/* Runs zacos9-NAME-helper (rootHelperPath(), its source in the folder
+ * SOURCEDIR) with `args`: as root through pkexec, which may ask for an
+ * administrator's password, unless this program is root already; waiting
+ * as waitForProcess() does. Its stdout; *ok if it ran and exited 0; *err
+ * its last line of stderr, else "The WHAT helper stopped with status N."
+ * or "The WHAT helper couldn't be run (why)." */
+QString runHelper(const QString &name, const QString &sourceDir, const QString &what,
+	const QStringList &args, bool *ok, QString *err, const HelperOptions &options = {});

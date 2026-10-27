@@ -3,6 +3,7 @@
  * versions until asked, and choosing one asks the helper to set it. With a
  * fake Classic launcher: Old Dog's disks with a System Folder (HFS, HFS+,
  * in a partition map), the chosen one, and choosing another. */
+#include <QFileInfo>
 #include <QApplication>
 #include <QDir>
 #include <QElapsedTimer>
@@ -84,6 +85,15 @@ int main(int argc, char **argv) {
 	h.close();
 	h.setPermissions(h.permissions() | QFileDevice::ExeOwner);
 	qputenv("ZACOS9_STARTUPDISK_HELPER", helper.toUtf8());
+	/* A stand-in pkexec that just runs the helper, as for the other helpers' tests. */
+	const QString bin = QFileInfo(helper).absolutePath() + "/bin";
+	QDir().mkpath(bin);
+	QFile pkexec(bin + "/pkexec");
+	pkexec.open(QIODevice::WriteOnly);
+	pkexec.write("#!/bin/sh\nexec \"$@\"\n");
+	pkexec.close();
+	pkexec.setPermissions(QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
+	qputenv("PATH", (bin + ":" + qgetenv("PATH")).toUtf8());
 
 	// Old Dog's disks: an installed one, a CD, one partitioned, a blank one.
 	const QString hd = dir.path() + "/Macintosh HD.dsk", cd = dir.path() + "/macos_90.iso",

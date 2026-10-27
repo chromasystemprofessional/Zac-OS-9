@@ -94,21 +94,9 @@ std::vector<const StoreItem *> storeItemsIn(const QStringList &category,
 	return out;
 }
 
+/* zacos9-appstore-helper: rootHelperPath() in process.h. */
 static QString helperPath() {
-	const QString env = qEnvironmentVariable("ZACOS9_APPSTORE_HELPER");
-	if (!env.isEmpty()) {
-		return env;
-	}
-	/* Installed beside us (prefix/libexec/zacos9), or, running from a
-	 * build tree, the one in the sources. */
-	const QString dir = QCoreApplication::applicationDirPath();
-	for (const QString &candidate : { dir + "/../libexec/zacos9/zacos9-appstore-helper",
-			sourceTreePath("appstore/zacos9-appstore-helper") }) {
-		if (QFileInfo(candidate).isExecutable()) {
-			return QFileInfo(candidate).canonicalFilePath();
-		}
-	}
-	return "/usr/libexec/zacos9/zacos9-appstore-helper";
+	return rootHelperPath("appstore", "appstore");
 }
 
 void appstoreHelperCommand(QProcess *p, const QStringList &args) {
@@ -141,7 +129,7 @@ static QString runWatched(const std::function<void(QProcess *)> &start, bool *ok
 }
 
 QString runAppstoreHelper(const QStringList &args, bool *ok, QString *err) {
-	return runWatched([&](QProcess *p) { appstoreHelperCommand(p, args); }, ok, err);
+	return runHelper("appstore", "appstore", "software", args, ok, err);
 }
 
 static QString styleHelperPath() {

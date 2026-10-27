@@ -75,12 +75,13 @@ layershellqt = dependency('LayerShellQt', method: 'cmake',
 gio_unix = [dependency('gio-unix-2.0'), appfilter_dep]
 
 
+# libzacos9-shell first: panelkit runs helpers through it (sharingclient.cpp).
+subdir('common')
 # Control panels (the Finder's Get Info uses their controls too).
 panelkit = static_library('panelkit', 'panels/panelkit.cpp', 'panels/sharingclient.cpp',
   'panels/custompatterns.cpp',
   'panels/customthemes.cpp',
-  include_directories: include_directories('common'),
-  dependencies: [platinum_dep, qt6],
+  dependencies: [shell_common_dep, platinum_dep, qt6],
 )
 xkb_layouts_include = include_directories('../compositor/src')
 
@@ -132,7 +133,6 @@ subdir('lock')
 subdir('screensaver')
 subdir('keyboard')
 subdir('inhibit')
-subdir('common')
 subdir('snapshot')
 subdir('files')
 subdir('autostart')

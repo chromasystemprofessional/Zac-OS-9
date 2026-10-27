@@ -2,6 +2,8 @@
  * status it shows, the sizes its sliders offer, each control asking the
  * helper for its change, Use Defaults, and a refusal shown as a problem
  * with the controls left as the system really is. */
+#include <QFileInfo>
+#include <QDir>
 #include <QApplication>
 #include <QFile>
 #include <QTemporaryDir>
@@ -89,6 +91,15 @@ int main(int argc, char **argv) {
 		"\"$SWAP\" \"$SWAPON\" \"$GUARD\" \"$RAM\" \"$RAMSIZE\" \"$SAVE\" \"$ZRAM\" \"$ZPCT\" > \"$STATE\"\n").arg(state, log, fail).toUtf8());
 	QFile::setPermissions(helper, QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
 	qputenv("ZACOS9_MEMORY_HELPER", helper.toUtf8());
+	/* A stand-in pkexec that just runs the helper, as for the other helpers' tests. */
+	const QString bin = QFileInfo(helper).absolutePath() + "/bin";
+	QDir().mkpath(bin);
+	QFile pkexec(bin + "/pkexec");
+	pkexec.open(QIODevice::WriteOnly);
+	pkexec.write("#!/bin/sh\nexec \"$@\"\n");
+	pkexec.close();
+	pkexec.setPermissions(QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
+	qputenv("PATH", (bin + ":" + qgetenv("PATH")).toUtf8());
 	QApplication app(argc, argv);
 	MemoryPanel panel;
 	check(panel.status().valid && panel.status().swapOn && panel.status().swapSize == 8 * GB &&

@@ -1,8 +1,10 @@
 #include "process.h"
+#include "programs.h"
 
 #include <QCoreApplication>
 #include <QElapsedTimer>
 #include <QEventLoop>
+#include <unistd.h>
 
 /* One turn of the event loop: windows drawn, the compositor answered, no
  * clicks or keys taken; back at once if something happens, else in 100 ms. */
@@ -55,4 +57,25 @@ ProcessResult runProcess(const QString &program, const QStringList &args, const 
 	result.out = process.readAllStandardOutput();
 	result.err = process.readAllStandardError();
 	return result;
+}
+
+QString runHelper(const QString &name, const QString &sourceDir, const QString &what,
+		const QStringList &args, bool *ok, QString *err, const HelperOptions &options) {
+	QString program = rootHelperPath(name, sourceDir);
+	QStringList arguments = args;
+	if (options.asRoot && geteuid() != 0) {
+		arguments.prepend(program);
+		program = "pkexec";
+	}
+	const ProcessResult r = runProcess(program, arguments, { options.input, -1 });
+	*ok = r.ok();
+	if (err) {
+		*err = QString::fromUtf8(r.err).trimmed().section('\n', -1);
+		if (!*ok && err->isEmpty()) {
+			*err = r.started && !r.crashed
+				? QString("The %1 helper stopped with status %2.").arg(what).arg(r.exitCode)
+				: QString("The %1 helper couldn’t be run (%2).").arg(what, r.started ? QString("it crashed") : r.error);
+		}
+	}
+	return QString::fromUtf8(r.out);
 }
