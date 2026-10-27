@@ -111,7 +111,7 @@ works for it:
   controls. Scroll bar geometry is in `subControlRect` (arrows at both ends,
   fixed 17-px thumb). Checked with `build/qtdemo.cpp` (thumb drag and arrows
   work); prompts are covered by an offscreen palette regression check.
-  To try it from a build tree: copy `build/shell/zacos9style.so` into
+  To try it from a build tree: copy `build/shell/qtstyle/zacos9style.so` into
   `<dir>/styles/` and set `QT_PLUGIN_PATH=<dir> QT_STYLE_OVERRIDE=zacos9`.
 - **X11 frame re-fit** (`compositor/src/xwayland.c`, `set_geometry`): for
   VS Code's resize glitch (the frame kept the old size after an outline

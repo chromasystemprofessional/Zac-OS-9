@@ -1,0 +1,315 @@
+# Expanding archives on a double-click (the Finder runs it from beside itself).
+configure_file(input: 'zacos9-expand', output: 'zacos9-expand', copy: true)
+install_data('zacos9-expand', install_dir: get_option('bindir'),
+  install_mode: 'rwxr-xr-x')
+test('expand', find_program('python3'),
+  args: [files('../../tests/finder/test_expand.py'), files('zacos9-expand')],
+  # About 9 s on an idle machine; a busy package build needs more.
+  timeout: 120)
+
+configure_file(input: 'zacos9-mac-disks', output: 'zacos9-mac-disks', copy: true)
+install_data('zacos9-mac-disks', install_dir: get_option('bindir'),
+  install_mode: 'rwxr-xr-x')
+test('mac-disks', find_program('python3'),
+  args: [files('../../tests/finder/test_mac_disks.py'), files('zacos9-mac-disks'),
+    files('../../disks/zacos9-mac-mount')])
+
+executable('zacos9-autostart',
+  'autostart_main.cpp',
+  dependencies: [shell_files_dep, qt6, gio, gio_unix, platinum_dep],
+  install: true,
+)
+
+# The chooser shows the startup disk through the Finder's Macintosh view.
+file_chooser_sources = [
+  'filechooserportal.cpp',
+]
+file_chooser_deps = [platinum_dep, qt6, gio, gio_unix, wayland_client, finder_fonts_dep]
+
+file_portal = executable('zacos9-file-portal',
+  'filechooserportal_main.cpp',
+  file_chooser_sources,
+  link_with: panelkit,
+  include_directories: include_directories('../print', '../network', '../panels'),
+  dependencies: [shell_files_dep, shell_common_dep, file_chooser_deps],
+  install: true,
+)
+
+test('filechooser-locations',
+  executable('test-filechooser-portal',
+    'tests/test_filechooser_portal.cpp',
+    file_chooser_sources,
+    link_with: panelkit,
+    include_directories: include_directories('../print', '../network', '../panels'),
+    dependencies: [shell_files_dep, shell_common_dep, file_chooser_deps],
+  ),
+  env: ['QT_QPA_PLATFORM=offscreen'],
+)
+
+test('filechooser-requests', find_program('dbus-run-session'),
+  args: [executable('test-filechooser-requests',
+    'tests/test_filechooser_requests.cpp', file_chooser_sources,
+    link_with: panelkit,
+    include_directories: include_directories('../print', '../network', '../panels'),
+    dependencies: [shell_files_dep, shell_common_dep, file_chooser_deps],
+  )],
+  env: ['QT_QPA_PLATFORM=offscreen'],
+  timeout: 45,
+)
+
+test('filechooser-lifecycle', find_program('dbus-run-session'),
+  args: ['--', find_program('python3').full_path(),
+    files('../../tests/finder/test_filechooser_lifecycle.py'), file_portal.full_path()],
+  depends: [file_portal],
+  timeout: 30,
+)
+
+# The Finder: Qt6 for windows, input and files; all drawing through lib/.
+finder_exe = executable('zacos9-finder',
+  'main.cpp',
+  'desktop.cpp',
+  'secondarydesktop.cpp',
+  'folderwindow.cpp',
+  'viewoptions.cpp',
+  'viewoptionsdialog.cpp',
+  'tinyicons.cpp',
+  'toybox.cpp',
+  'finder.cpp', 'folderpath.cpp', 'cryptofiles.cpp',
+  'foldertricks.cpp', 'contextitems.cpp', 'printwindow.cpp',
+  '../store/storeclient.cpp',
+  'fileops.cpp',
+  'userservices.cpp',
+  'transferdialog.cpp',
+  'labeleditor.cpp',
+  'infowindow.cpp', 'gpuinfo.cpp', 'modules.cpp',
+  'findwindow.cpp', 'findcriteria.cpp', 'findindex.cpp',
+  'folderstate.cpp',
+  'resourcewindows.cpp',
+  'diskinit.cpp',
+  'filemanager1.cpp',
+  link_with: panelkit,
+  include_directories: include_directories('../print', '../panels', '../network'),
+  dependencies: [shell_files_dep, shell_common_dep, platinum_dep, qt6, layershellqt, wayland_client, gio, gio_unix, finder_fonts_dep],
+  cpp_args: ['-DZACOS9_DISK_HELPER="@0@"'.format(
+    get_option('prefix') / get_option('libexecdir') / 'zacos9' / 'zacos9-disk-helper')],
+  install: true,
+)
+
+finder_test_sources = [
+  'desktop.cpp',
+  'secondarydesktop.cpp',
+  'folderwindow.cpp',
+  'viewoptions.cpp',
+  'viewoptionsdialog.cpp',
+  'tinyicons.cpp',
+  'toybox.cpp',
+  'finder.cpp', 'folderpath.cpp', 'cryptofiles.cpp',
+  'foldertricks.cpp', 'contextitems.cpp', 'printwindow.cpp',
+  '../store/storeclient.cpp',
+  'fileops.cpp',
+  'userservices.cpp',
+  'transferdialog.cpp',
+  'labeleditor.cpp',
+  'infowindow.cpp', 'gpuinfo.cpp', 'modules.cpp',
+  'findwindow.cpp', 'findcriteria.cpp', 'findindex.cpp',
+  'folderstate.cpp',
+  'resourcewindows.cpp',
+  'diskinit.cpp',
+  'filemanager1.cpp',
+]
+test('finder-selection',
+  executable('test-finder-selection', '../../tests/finder/test_selection.cpp', finder_test_sources,
+    link_with: panelkit,
+    include_directories: include_directories('../print', '../panels', '../network'),
+    dependencies: [shell_files_dep, shell_common_dep, platinum_dep, qt6, layershellqt, wayland_client, gio, gio_unix, finder_fonts_dep],
+  ),
+  env: ['QT_QPA_PLATFORM=offscreen'],
+  timeout: 60,
+)
+test('finder-fonts',
+  executable('test-finder-fonts', '../../tests/finder/test_fonts.cpp', finder_test_sources,
+    link_with: panelkit,
+    include_directories: include_directories('../print', '../panels', '../network'),
+    dependencies: [shell_files_dep, shell_common_dep, platinum_dep, qt6, layershellqt, wayland_client, gio, gio_unix, finder_fonts_dep],
+  ),
+  env: ['QT_QPA_PLATFORM=offscreen'],
+  timeout: 60,
+)
+test('finder-folder-tricks',
+  executable('test-finder-folder-tricks', '../../tests/finder/test_foldertricks.cpp',
+    'foldertricks.cpp', 'contextitems.cpp',
+    dependencies: [qt6, gio, gio_unix],
+  ),
+  timeout: 60,
+)
+test('finder-print-window',
+  executable('test-finder-print-window', '../../tests/finder/test_printwindow.cpp',
+    'printwindow.cpp',
+    link_with: panelkit,
+    include_directories: include_directories('../panels'),
+    dependencies: [shell_common_dep, platinum_dep, qt6, wayland_client],
+  ),
+  env: ['QT_QPA_PLATFORM=offscreen'],
+  timeout: 30,
+)
+test('finder-crypto',
+  executable('test-finder-crypto', '../../tests/finder/test_crypto.cpp',
+    'cryptofiles.cpp',
+    dependencies: [qt6],
+  ),
+  timeout: 30,
+)
+# Find: criteria, the search index, Items Found (findcriteria.cpp, findindex.cpp, findwindow.cpp).
+test('finder-find',
+  executable('test-finder-find', '../../tests/finder/test_find.cpp', finder_test_sources,
+    link_with: panelkit,
+    include_directories: include_directories('../print', '../panels', '../network'),
+    dependencies: [shell_files_dep, shell_common_dep, platinum_dep, qt6, layershellqt, wayland_client, gio, gio_unix, finder_fonts_dep],
+  ),
+  env: ['QT_QPA_PLATFORM=offscreen'],
+  timeout: 60,
+)
+# Clippings, Internet locations and Show Clipboard (clippings.cpp).
+test('finder-clippings',
+  executable('test-finder-clippings', '../../tests/finder/test_clippings.cpp', finder_test_sources,
+    link_with: panelkit,
+    include_directories: include_directories('../print', '../panels', '../network'),
+    dependencies: [shell_files_dep, shell_common_dep, platinum_dep, qt6, layershellqt, wayland_client, gio, gio_unix, finder_fonts_dep],
+  ),
+  env: ['QT_QPA_PLATFORM=offscreen'],
+  timeout: 60,
+)
+# The Toy Box (toybox.cpp).
+test('finder-toy-box',
+  executable('test-finder-toy-box', '../../tests/finder/test_toybox.cpp',
+    finder_test_sources,
+    link_with: panelkit,
+    include_directories: include_directories('../print', '../panels', '../network'),
+    dependencies: [shell_files_dep, shell_common_dep, platinum_dep, qt6, layershellqt, wayland_client, gio, gio_unix, finder_fonts_dep],
+  ),
+  env: ['QT_QPA_PLATFORM=offscreen'],
+  timeout: 60,
+)
+# View Options and Preferences (viewoptions.cpp, folderwindow.cpp).
+test('finder-view-options',
+  executable('test-finder-view-options', '../../tests/finder/test_view_options.cpp',
+    finder_test_sources,
+    link_with: panelkit,
+    include_directories: include_directories('../print', '../panels', '../network'),
+    dependencies: [shell_files_dep, shell_common_dep, platinum_dep, qt6, layershellqt, wayland_client, gio, gio_unix, finder_fonts_dep],
+  ),
+  env: ['QT_QPA_PLATFORM=offscreen'],
+  timeout: 60,
+)
+test('finder-thumbnails',
+  executable('test-finder-thumbnails', '../../tests/finder/test_thumbnails.cpp',
+    finder_test_sources,
+    link_with: panelkit,
+    include_directories: include_directories('../print', '../panels', '../network'),
+    dependencies: [shell_files_dep, shell_common_dep, platinum_dep, qt6, layershellqt, wayland_client, gio, gio_unix, finder_fonts_dep],
+  ),
+  env: ['QT_QPA_PLATFORM=offscreen'],
+  timeout: 60,
+)
+test('finder-fileassoc',
+  executable('test-finder-fileassoc', '../../tests/finder/test_fileassoc.cpp',
+    finder_test_sources,
+    link_with: panelkit,
+    include_directories: include_directories('../print', '../panels', '../network'),
+    dependencies: [shell_files_dep, shell_common_dep, platinum_dep, qt6, layershellqt, wayland_client, gio, gio_unix, finder_fonts_dep],
+  ),
+  env: ['QT_QPA_PLATFORM=offscreen'],
+  timeout: 60,
+)
+test('finder-gpu-info',
+  executable('test-finder-gpu-info', '../../tests/finder/test_gpuinfo.cpp',
+    'gpuinfo.cpp',
+    dependencies: [qt6],
+  ),
+  timeout: 30,
+)
+# The Macintosh view of this computer: the curated hierarchy, and the
+# Applications folder built from XDG desktop entries. The test builds a
+# private XDG environment, so it reads only its own desktop entries.
+test('finder-vfs',
+  executable('test-finder-vfs',
+    'tests/test_vfs.cpp',
+    '../files/vfs.cpp',
+    'folderpath.cpp',
+    '../files/resources.cpp',
+    '../files/autostart.cpp',
+    '../files/extensioncatalog.cpp',
+    '../files/appdb.cpp',
+    '../files/apptrash.cpp',
+    '../files/items.cpp', '../files/clippings.cpp', '../files/desktopprinter.cpp', '../files/printers.cpp', '../files/thumbnails.cpp', '../files/fileassoc.cpp',
+    link_with: panelkit,
+    include_directories: include_directories('../print', '../panels'),
+    dependencies: [shell_common_dep, platinum_dep, qt6, gio, gio_unix, wayland_client, finder_fonts_dep],
+    cpp_args: ['-DZACOS9_RESOURCE_TESTING'],
+  ),
+  env: ['QT_QPA_PLATFORM=offscreen'],
+  timeout: 180,
+)
+
+test('autostart',
+  executable('test-autostart', 'tests/test_autostart.cpp',
+    dependencies: [shell_files_dep, qt6, gio, gio_unix, platinum_dep],
+  ),
+)
+
+test('alias',
+  executable('test-alias', 'tests/test_alias.cpp',
+    dependencies: [shell_files_dep, qt6],
+  ),
+)
+
+test('userservices',
+  executable('test-userservices', 'tests/test_userservices.cpp', 'userservices.cpp',
+    dependencies: [qt6],
+  ),
+)
+
+test('extension-catalog',
+  executable('test-extension-catalog', 'tests/test_extensioncatalog.cpp',
+    dependencies: [shell_files_dep, platinum_dep, qt6],
+  ),
+)
+
+test('disk-initialization-ui',
+  executable('test-diskinit', '../../tests/finder/test_diskinit.cpp',
+    'diskinit.cpp',
+    dependencies: [shell_files_dep, shell_common_dep, platinum_dep, qt6, gio, wayland_client],
+    include_directories: include_directories('../print', '../network', '../panels'),
+    link_with: panelkit,
+  ),
+  env: ['QT_QPA_PLATFORM=offscreen'],
+  timeout: 60,
+)
+
+test('local-volume-hotplug',
+  executable('test-localvolumes', '../../tests/finder/test_localvolumes.cpp',
+    dependencies: [shell_files_dep, platinum_dep, qt6, gio],
+    include_directories: include_directories('../print', '../network'),
+  ),
+  env: ['QT_NO_GLIB=1'],
+  timeout: 10,
+)
+
+test('tricks-sets',
+  executable('test-tricks-sets', 'tests/test_tricksets.cpp',
+    dependencies: [shell_files_dep, platinum_dep, qt6],
+  ),
+  timeout: 10,
+)
+test('finder-desktop',
+  executable('test-finder-desktop',
+    '../../tests/finder/test_desktop.cpp', finder_test_sources,
+    'filechooserportal.cpp',
+    '../qtstyle/zacos9style.cpp', qtstyle_moc,
+    link_with: panelkit,
+    include_directories: include_directories('../print', '../panels', '../network', '../qtstyle'),
+    dependencies: [shell_files_dep, shell_common_dep, platinum_dep, qt6, layershellqt, wayland_client, gio, gio_unix, finder_fonts_dep],
+  ),
+  env: ['QT_QPA_PLATFORM=offscreen'],
+  timeout: 60,
+)

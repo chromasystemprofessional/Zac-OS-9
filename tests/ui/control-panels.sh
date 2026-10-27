@@ -14,7 +14,7 @@
 #   /tmp/cp-large.png     after "Large (2x)": everything drawn at 2x
 # Clicks are relative to the panel's content, found in a screenshot.
 V=build/shell/vptr
-P=build/shell/zacos9-controlpanel
+P=build/shell/panels/zacos9-controlpanel
 click_in() { # click_in X Y: at (X, Y) in the panel's content
 	grim /tmp/cp-where.png
 	set -- $(python3 tests/ui/content-origin.py /tmp/cp-where.png) "$1" "$2"

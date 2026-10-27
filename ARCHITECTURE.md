@@ -39,13 +39,14 @@ through XWayland. It starts the menu bar, the Sniffer and the Collar, and
 starts the lock screen, screen saver and on-screen keyboard when they're
 needed.
 
-**The desktop's programs** (`shell/`) are separate processes. Most are C++
-with Qt 6, but they draw themselves pixel by pixel with ZacOS's own drawing
-library (`lib/`) rather than Qt's widgets, which is how they look exactly like
-Mac OS 9. The menu bar, lock screen, screen saver and on-screen keyboard are
-plain C. A program starts another from beside itself when installed, from
-the build tree when it runs from one, else from `$PATH`
-(`siblingProgram()` in `shell/common/programs.h`; `lib/locate.h` for C).
+**The desktop's programs** (`shell/`, a folder and a `meson.build` each) are
+separate processes. Most are C++ with Qt 6, but they draw themselves pixel by
+pixel with ZacOS's own drawing library (`lib/`) rather than Qt's widgets,
+which is how they look exactly like Mac OS 9. The menu bar, lock screen,
+screen saver and on-screen keyboard are plain C. A program starts another
+from beside itself when installed, from the build tree when it runs from one,
+else from `$PATH` (`siblingProgram()` in `shell/common/programs.h`;
+`lib/locate.h` for C).
 
 **Root helpers** (`accounts/`, `appstore/`, `disks/`, `installer/`,
 `memory/`, `modules/`, `setup/`, `sharing/`, `startupdisk/`) are small scripts
