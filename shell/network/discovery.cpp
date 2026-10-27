@@ -1,4 +1,5 @@
 #include "discovery.h"
+#include "conf.h"
 #include "process.h"
 #include "programs.h"
 
@@ -375,13 +376,10 @@ QStringList thisComputer() {
 	if (!host.isEmpty()) {
 		self << host << host + ".local";
 	}
-	QFile conf(qEnvironmentVariable("ZACOS9_SHARING_CONF", "/etc/zacos9") + "/sharing.conf");
-	if (conf.open(QIODevice::ReadOnly)) {
-		for (const QByteArray &line : conf.readAll().split('\n')) {
-			if (line.startsWith("name=") && line.size() > 5) {
-				self << "appletalk:" + QString::fromUtf8(line.mid(5)).trimmed().toLower();
-			}
-		}
+	const QString name = KeyValueFile::read(qEnvironmentVariable("ZACOS9_SHARING_CONF", "/etc/zacos9") +
+		"/sharing.conf").value("name");
+	if (!name.isEmpty()) {
+		self << "appletalk:" + name.toLower();
 	}
 	self.removeDuplicates();
 	return self;

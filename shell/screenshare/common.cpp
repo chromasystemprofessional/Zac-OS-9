@@ -1,4 +1,5 @@
 #include "common.h"
+#include "conf.h"
 #include "process.h"
 
 #include <QCoreApplication>
@@ -77,14 +78,9 @@ QString ownerName() {
 
 /* As the File Sharing panel reads it (shell/panels/filesharing.cpp). */
 QString computerName() {
-	QFile f(sharingConfFile("sharing.conf"));
-	if (f.open(QIODevice::ReadOnly)) {
-		for (const QByteArray &raw : f.readAll().split('\n')) {
-			const QString line = QString::fromUtf8(raw);
-			if (line.section('=', 0, 0) == "name" && !line.section('=', 1).isEmpty()) {
-				return line.section('=', 1);
-			}
-		}
+	const QString name = KeyValueFile::read(sharingConfFile("sharing.conf")).value("name");
+	if (!name.isEmpty()) {
+		return name;
 	}
 	const QString owner = ownerName();
 	const passwd *pw = getpwnam(owner.toLocal8Bit().constData());
