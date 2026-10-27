@@ -30,6 +30,7 @@
 #include <QTimer>
 
 #include "alert.h"
+#include "process.h"
 #include "programs.h"
 #include "common.h"
 #include "panelkit.h"
@@ -91,14 +92,6 @@ static QString hostProgram() {
 
 static QString viewerProgram() {
 	return siblingProgram("zacos9-screenshare-viewer");
-}
-
-static void waitFor(const std::function<bool()> &ready, int timeoutMs) {
-	QElapsedTimer clock;
-	clock.start();
-	while (!ready() && clock.elapsed() < timeoutMs) {
-		QApplication::processEvents(QEventLoop::ExcludeUserInputEvents | QEventLoop::WaitForMoreEvents, 100);
-	}
 }
 
 class ScreenSharingPanel : public QWidget {
@@ -349,13 +342,13 @@ private:
 		repaint();
 		if (m_on) {
 			hostRequest("quit", nullptr);
-			waitFor([] { return !hostRequest("status", nullptr, 500); }, 8000);
+			waitUntil([] { return !hostRequest("status", nullptr, 500); }, 8000);
 		} else {
 			QFile::remove(runtimeDir() + "/error");
 			if (!QProcess::startDetached(hostProgram(), {})) {
 				m_error = "Screen Sharing’s server isn’t installed.";
 			} else {
-				waitFor([this] { return hostRequest("status", nullptr, 500) || !lastError().isEmpty(); }, 15000);
+				waitUntil([this] { return hostRequest("status", nullptr, 500) || !lastError().isEmpty(); }, 15000);
 				if (!hostRequest("status", nullptr, 500)) {
 					m_error = lastError().isEmpty() ? QString("It didn’t start.") : lastError();
 				}

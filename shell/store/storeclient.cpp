@@ -1,4 +1,5 @@
 #include "storeclient.h"
+#include "process.h"
 #include "programs.h"
 
 #include <QApplication>
@@ -119,23 +120,13 @@ void appstoreHelperCommand(QProcess *p, const QStringList &args) {
 }
 
 /* Starts a process through `start`, waits for it keeping the windows
- * drawn (never QProcess::waitForFinished: see CLAUDE.md), and reports
+ * drawn (process.h), and reports
  * as runAppstoreHelper does. */
 static QString runWatched(const std::function<void(QProcess *)> &start, bool *ok, QString *err) {
 	QProcess p;
-	bool done = false;
-	QObject::connect(&p, &QProcess::finished, [&done] { done = true; });
-	QObject::connect(&p, &QProcess::errorOccurred, [&done](QProcess::ProcessError e) {
-		if (e == QProcess::FailedToStart) {
-			done = true;
-		}
-	});
 	start(&p);
 	p.closeWriteChannel();
-	while (!done) {
-		QApplication::processEvents(QEventLoop::ExcludeUserInputEvents | QEventLoop::WaitForMoreEvents,
-			100);
-	}
+	waitForProcess(&p);
 	const bool started = p.error() != QProcess::FailedToStart;
 	*ok = started && p.exitStatus() == QProcess::NormalExit && p.exitCode() == 0;
 	if (err) {

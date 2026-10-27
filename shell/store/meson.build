@@ -28,8 +28,8 @@ test('store-client',
   executable('test-store-client',
     'tests/test_storeclient.cpp',
     'storeclient.cpp',
-    include_directories: include_directories('../finder', '../print', '../common'), # settings.h, storeclient.h, programs.h
-    dependencies: [platinum_dep, qt6],
+    include_directories: include_directories('../finder', '../print'), # settings.h
+    dependencies: [shell_common_dep, platinum_dep, qt6],
   ),
   timeout: 60,
 )
