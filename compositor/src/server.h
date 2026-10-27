@@ -127,6 +127,15 @@ struct plat_server {
 	const char *client_cursor_name;
 	int cursor_hotspot_x, cursor_hotspot_y;
 	struct wl_listener request_cursor_shape;
+	/* Games: raw mouse deltas, and the lock or confinement XWayland
+	 * asks for while an X client grabs or warps the pointer. */
+	struct wlr_relative_pointer_manager_v1 *relative_pointer_mgr;
+	struct wlr_pointer_constraints_v1 *pointer_constraints;
+	struct wlr_pointer_constraint_v1 *active_constraint;
+	struct wl_listener new_constraint;
+	struct wl_listener constraint_destroy;
+	struct wl_listener pointer_focus_change;
+	struct wl_listener keyboard_focus_change;
 
 	struct wlr_seat *seat;
 	struct wl_listener new_input;

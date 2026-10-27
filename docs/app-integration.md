@@ -356,6 +356,18 @@ when it runs **under X11**. On Wayland it never does, on any desktop. So:
   X11 kept the pointer off it. Adobe Reader 9's menu bar ignored every
   click until the scale was turned off. X11 outputs may overlap; at scale 1
   nothing changes (test: `xwayland-output`).
+- **Games get raw mouse motion and pointer lock** (`compositor/src/input.c`):
+  zacos9-wm offers `zwp_relative_pointer_manager_v1` and
+  `zwp_pointer_constraints_v1`. Without the first, Xwayland's XInput2 raw
+  motion comes from its absolute `xwayland-pointer`, and SDL 2 (2.30.6,
+  linked into Steam's DOSBox for Lost Eden) turns absolute raw values into
+  deltas as previous − current: the mouse moved backwards. With it the raw
+  motion comes from `xwayland-relative-pointer`. Xwayland confines the
+  pointer for a grab and locks it to emulate a warp while the cursor is
+  hidden. A constraint holds only while its surface has the pointer and its
+  program has the keyboard (comparing programs, because Xwayland's
+  override-redirect windows never take the keyboard), so ⌘-Tab frees the
+  mouse; on unlock the cursor goes to the program's position hint.
 - **Not every "Electron" app has the exporter.** The ChatGPT desktop app
   (`/usr/lib/chatgpt`, checked 2026-10-10) reports Electron 42 but runs on
   OpenAI's own runtime ("owl", Chromium 155) without Electron's Linux
