@@ -195,6 +195,12 @@ kernel registers the boot VGA card first, which decides equal screens. A
 `WLR_DRM_DEVICES` already set (the Mac's graphics switch, or a session's
 own) is left alone, as is a nested session.
 
+A screen wlroots cannot commit frames to at all (a card that finds no
+swapchain format for it, say) used to be retried on every frame: the log
+grew by a hundred megabytes in a few seconds and the session looked hung.
+`compositor/src/output.c` now turns such a screen off once, with one line
+saying so, and the session goes on drawing on its other screens.
+
 **Check:**
 
 ```sh

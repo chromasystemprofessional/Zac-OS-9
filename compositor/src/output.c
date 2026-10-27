@@ -13,6 +13,10 @@
 #include "startup.h"
 #include "snapshot.h"
 
+/* Frames a screen may fail to show in a row before it is turned off. One
+ * failed commit is the shape of a screen that can't be shown at all. */
+#define OUTPUT_FAILURES_MAX 3
+
 static void output_snapshot_commit(struct wl_listener *listener, void *data) {
 	struct plat_output *output = wl_container_of(listener, output, snapshot_commit);
 	const struct wlr_output_event_commit *event = data;
@@ -34,14 +38,35 @@ void output_zoom_box(int width, int height, double px, double py, double factor,
 	box->y = py * (1 - 1 / factor);
 }
 
+/* A screen whose frames can't be committed at all: one whose card can't get
+ * a swapchain format, say (see "Two GPUs" in docs/hardware.md). Retried on
+ * every frame, it filled the session log with a hundred megabytes in a few
+ * seconds and the session looked hung. Turn it off once instead, with one
+ * line, and leave it; the other screens keep drawing. */
+static void output_stop(struct plat_output *output) {
+	struct wlr_output *wlr_output = output->wlr_output;
+	wlr_log(WLR_ERROR, "turning off '%s': wlroots can't commit frames to it",
+		wlr_output->name);
+	output->off = true;
+	wl_list_remove(&output->frame.link);
+	wl_list_init(&output->frame.link);
+	struct wlr_output_state state;
+	wlr_output_state_init(&state);
+	wlr_output_state_set_enabled(&state, false);
+	wlr_output_commit_state(wlr_output, &state);
+	wlr_output_state_finish(&state);
+	/* ZacOS 9's own shell belongs on a screen that can show it. */
+	layers_pin_to_main(output->server);
+}
+
 /* Zoom (the Accessibility panel): the frame the scene drew, magnified
- * about the pointer into another of the output's buffers. False to commit
- * as usual. */
-static bool output_commit_zoomed(struct plat_output *output, struct wlr_scene_output *scene_output) {
+ * about the pointer into another of the output's buffers. 0 to commit as
+ * usual, 1 when this drew the frame and -1 when it couldn't. */
+static int output_commit_zoomed(struct plat_output *output, struct wlr_scene_output *scene_output) {
 	const double factor = access_zoom_factor();
 	struct wlr_output *wlr_output = output->wlr_output;
 	if (factor <= 1.0 || wlr_output->transform != WL_OUTPUT_TRANSFORM_NORMAL) {
-		return false;
+		return 0;
 	}
 	struct plat_server *server = output->server;
 	/* Everything moves at once: draw it all. */
@@ -78,11 +103,11 @@ static bool output_commit_zoomed(struct plat_output *output, struct wlr_scene_ou
 	if (texture) {
 		wlr_texture_destroy(texture);
 	}
-	if (ok) {
-		wlr_output_commit_state(wlr_output, &state);
-	}
+	const bool committed = ok && wlr_output_commit_state(wlr_output, &state);
 	wlr_output_state_finish(&state);
-	return true;
+	/* Nothing to say when there was no frame to build; the commit is what
+	 * counts. */
+	return (ok && !committed) ? -1 : 1;
 }
 
 static void output_frame(struct wl_listener *listener, void *data) {
@@ -91,10 +116,16 @@ static void output_frame(struct wl_listener *listener, void *data) {
 			output->server->scene, output->wlr_output);
 
 	startup_output_frame(output, true);
-	if (!output_commit_zoomed(output, scene_output)) {
-		wlr_scene_output_commit(scene_output, NULL);
+	int shown = output_commit_zoomed(output, scene_output);
+	if (shown == 0) {
+		shown = wlr_scene_output_commit(scene_output, NULL) ? 1 : -1;
 	}
 	startup_output_frame(output, false);
+	if (shown > 0) {
+		output->failed_frames = 0;
+	} else if (++output->failed_frames >= OUTPUT_FAILURES_MAX) {
+		output_stop(output);
+	}
 
 	struct timespec now;
 	clock_gettime(CLOCK_MONOTONIC, &now);
@@ -164,8 +195,20 @@ static void server_new_output(struct wl_listener *listener, void *data) {
 	}
 	const float scale = prefs_output_scale(server, wlr_output);
 	wlr_output_state_set_scale(&state, scale);
-	wlr_output_commit_state(wlr_output, &state);
+	const bool shown = wlr_output_commit_state(wlr_output, &state);
 	wlr_output_state_finish(&state);
+	if (!shown) {
+		/* A screen on a second card wlroots has no swapchain format for,
+		 * say: leaving it on means retrying on every frame for ever (see
+		 * output_stop). Turn it off and go on with the others. */
+		wlr_log(WLR_ERROR, "leaving '%s' off: wlroots can't commit frames to it",
+			wlr_output->name);
+		wlr_output_state_init(&state);
+		wlr_output_state_set_enabled(&state, false);
+		wlr_output_commit_state(wlr_output, &state);
+		wlr_output_state_finish(&state);
+		return;
+	}
 	wlr_xcursor_manager_load(server->cursor_mgr, scale);
 
 	struct plat_output *output = calloc(1, sizeof(*output));
@@ -201,6 +244,9 @@ struct plat_output *output_main(struct plat_server *server) {
 	const bool chosen = pl_setting("main-display", name, sizeof(name));
 	/* The list has the newest output first: the first one connected is last. */
 	wl_list_for_each(output, &server->outputs, link) {
+		if (output->off) {
+			continue;
+		}
 		first = output;
 		if (chosen && strcmp(output->wlr_output->name, name) == 0) {
 			return output;
