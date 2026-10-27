@@ -1,7 +1,8 @@
 /*
  * zacos9-pack: the Pack, Mac OS 9's Application palette (packwindow.h).
- * zacos9-pack --at X,Y puts it there (the menu bar's tear-off, where the
- * pointer let go); one Pack at a time: another run moves the first.
+ * zacos9-pack --at X,Y: the pointer let go there (the menu bar's tear-off),
+ * so the palette's title bar goes under it; without --at it comes back where
+ * it was. One Pack at a time: another run moves the first.
  */
 #include <QApplication>
 #include <QIcon>
@@ -61,14 +62,14 @@ int main(int argc, char *argv[]) {
 	platinumShellInit();
 	PackWindow pack;
 	if (placed) {
-		pack.moveTo(at);
+		pack.dropAt(at);
 	}
 	QObject::connect(&server, &QLocalServer::newConnection, [&server, &pack] {
 		QLocalSocket *s = server.nextPendingConnection();
 		QObject::connect(s, &QLocalSocket::readyRead, [s, &pack] {
 			const QStringList w = QString::fromUtf8(s->readAll()).simplified().split(' ');
 			if (w.size() == 3 && w[0] == "at") {
-				pack.moveTo(QPoint(w[1].toInt(), w[2].toInt()));
+				pack.dropAt(QPoint(w[1].toInt(), w[2].toInt()));
 			}
 		});
 		QObject::connect(s, &QLocalSocket::disconnected, s, &QObject::deleteLater);
