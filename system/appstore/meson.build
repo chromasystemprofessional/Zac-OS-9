@@ -9,14 +9,14 @@ install_data('zacos9-appstore-helper',
 install_data('zacos9-appstyle',
   install_dir: get_option('libexecdir') / 'zacos9', install_mode: 'rwxr-xr-x')
 test('appstyle', find_program('python3'),
-  args: [files('../tests/store/test_appstyle.py'), files('zacos9-appstyle')])
+  args: [files('../../tests/store/test_appstyle.py'), files('zacos9-appstyle')])
 install_data('zacos9-software-catalog',
   install_dir: get_option('libexecdir') / 'zacos9', install_mode: 'rwxr-xr-x')
 test('software-catalog', find_program('python3'),
-  args: [files('../tests/store/test_software_catalog.py'), files('zacos9-software-catalog')])
+  args: [files('../../tests/store/test_software_catalog.py'), files('zacos9-software-catalog')])
 install_data('org.zacos9.appstore.policy',
   install_dir: get_option('datadir') / 'polkit-1' / 'actions')
 install_data('50-zacos9-appstore.rules',
   install_dir: get_option('datadir') / 'polkit-1' / 'rules.d')
 test('appstore-authorization', find_program('python3'),
-  args: [files('../tests/store/test_appstore_rule.py'), files('50-zacos9-appstore.rules')])
+  args: [files('../../tests/store/test_appstore_rule.py'), files('50-zacos9-appstore.rules')])

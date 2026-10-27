@@ -202,7 +202,7 @@ Notes:
 The guest's `macipgw.service` failed with exit status 64. It comes with
 `atalkd` (a Recommends) and needs an IP network of its own, which Debian's
 `/etc/netatalk/macipgw.conf` leaves commented out. ZacOS doesn't use a MacIP
-gateway, so `sharing/macipgw.service.d/zacos9.conf` skips the service
+gateway, so `system/sharing/macipgw.service.d/zacos9.conf` skips the service
 (`ExecCondition`) until `network =` is set there; it then starts as before.
 
 To install the packages on a Debian 13 machine:

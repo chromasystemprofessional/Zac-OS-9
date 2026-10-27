@@ -84,7 +84,7 @@ int main(int argc, char **argv) {
 	QDir().mkpath(conf);
 	qputenv("ZACOS9_ACCOUNTS_CONF", conf.toUtf8());
 	qputenv("ZACOS9_ACCOUNTS_HELPER", (QFileInfo(QString::fromLocal8Bit(argv[1])).absolutePath() +
-		"/../../accounts/zacos9-accounts-helper").toUtf8());
+		"/../../system/accounts/zacos9-accounts-helper").toUtf8());
 	QFile pkexec(dir.filePath("pkexec"));
 	pkexec.open(QIODevice::WriteOnly);
 	pkexec.write("#!/bin/sh\nexec \"$@\"\n");

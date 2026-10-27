@@ -16,7 +16,7 @@ from unittest.mock import Mock, call, patch
 
 
 helper_path = (sys.argv.pop(1) if len(sys.argv) > 1 else
-               str(Path(__file__).resolve().parents[2] / "appstore/zacos9-software-catalog"))
+               str(Path(__file__).resolve().parents[2] / "system/appstore/zacos9-software-catalog"))
 loader = importlib.machinery.SourceFileLoader("software_catalog", helper_path)
 spec = importlib.util.spec_from_loader(loader.name, loader)
 catalog = importlib.util.module_from_spec(spec)

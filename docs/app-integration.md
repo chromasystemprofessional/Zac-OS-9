@@ -427,7 +427,7 @@ a test calling `soffice.bin` directly must too.
 - **Qt 5 programs**: the style plugin is Qt 6 only (Debian 13 still has some
   Qt 5 applications). The same source should build against Qt 5.
 - **GIMP** keeps its own dark theme until Preferences > Theme is "System";
-  the GIMP preset (`appstore/zacos9-appstyle`) could set that.
+  the GIMP preset (`system/appstore/zacos9-appstyle`) could set that.
 - **Accent colour**: the GTK theme's lavender is fixed; the Qt style reads
   the Appearance panel's accent at start-up only.
 

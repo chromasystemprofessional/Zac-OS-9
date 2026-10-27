@@ -36,7 +36,7 @@ static QString helperScript() {
 	if (!env.isEmpty()) {
 		return env;
 	}
-	return sourceTreePath("appstore/zacos9-appstore-helper");
+	return sourceTreePath("system/appstore/zacos9-appstore-helper");
 }
 
 static int runHelper(const QStringList &args, QString *out = nullptr) {

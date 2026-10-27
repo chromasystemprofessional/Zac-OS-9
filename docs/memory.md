@@ -76,7 +76,7 @@ guard on, Compressed Memory off, and no RAM Disk.
 
 ## The helper
 
-`memory/zacos9-memory-helper` does the work. `status` needs no privileges,
+`system/memory/zacos9-memory-helper` does the work. `status` needs no privileges,
 so the panel opens without a password; every change runs as root through
 `pkexec`, under the polkit action `org.zacos9.memory` (administrators at the
 computer need no password, as with Startup Disk).
