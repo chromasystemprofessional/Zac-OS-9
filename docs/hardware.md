@@ -188,10 +188,23 @@ only from a card that is copied to (wlroots can't give it a hardware cursor),
 so every pointer motion on it redraws the whole scanout and the menu
 follows late.
 
-**Fix.** `compositor/src/primarygpu.c`: before wlroots opens the cards,
-zacos9-wm puts the one with the largest connected screen first in
-`WLR_DRM_DEVICES`, so the copy goes to the smaller screens instead. The
-kernel registers the boot VGA card first, which decides equal screens. A
+**Fix.** By default zacos9-wm leaves the cards in the firmware's order, the
+copy direction this hardware is known to take, and the log keeps one
+`Failed to pick cursor plane format` line followed by `previous message
+repeated N more times` rather than a line per motion
+(`compositor/src/logfilter.c`).
+
+`render-gpu=largest` in `~/.config/zacos9/desktop.conf` (or
+`ZACOS9_RENDER_GPU=largest`) renders on the card with the largest connected
+screen instead, so the copy goes to the smaller screens — of two the same
+size, the card that is not the firmware's own, which is the one a display
+was added to. `compositor/src/primarygpu.c` puts that card first in
+`WLR_DRM_DEVICES`, and main.c turns off EGL format modifiers with it. Only
+linear buffers can be imported by another card's renderer — the tiled and
+block-linear layouts each driver prefers are its own — so with modifiers on
+one direction of such a pair finds no format in common, and the screen
+copied to gets no swapchain at all: that is the start-up hang below. With no
+modifiers every buffer is linear, which both cards can import. A
 `WLR_DRM_DEVICES` already set (the Mac's graphics switch, or a session's
 own) is left alone, as is a nested session.
 
@@ -204,10 +217,11 @@ saying so, and the session goes on drawing on its other screens.
 **Check:**
 
 ```sh
-zacos9-wm -d 2>&1 | grep WLR_DRM_DEVICES   # card1:card0, the 4K screen first
+zacos9-wm -d 2>&1 | grep WLR_DRM_DEVICES   # render-gpu=largest: card1:card0, the 4K screen first
 ```
 
-The same log keeps one `Failed to pick cursor plane format` line and then
-`previous message repeated N more times` rather than a line per motion
-(`compositor/src/logfilter.c`). Test: `primary-gpu`, `log-filter`.
+The session log's `zacos9-wm: rendering on /dev/dri/card1` line says which
+card renders, whichever setting is in use.
+
+Test: `primary-gpu`, `log-filter`.
 

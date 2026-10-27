@@ -1,14 +1,19 @@
 /*
  * The card with the largest connected screen renders (primarygpu.h).
  *
+ * Only when asked: the firmware's order is the one known to work on cards
+ * whose renderers can't import each other's buffers, and rendering on the
+ * wrong card for those means a screen that can't be shown at all.
+ *
  * Two cards are only worth reordering when both are there. WLR_DRM_DEVICES,
  * WLR_BACKENDS and a nested session already say which cards to use, and the
  * Mac's graphics switch writes WLR_DRM_DEVICES on purpose, so those are left
  * alone.
  *
- * The kernel registers the boot VGA card first, so equal screens keep the
- * firmware's order; the card with the largest screen goes first, and the
- * cross-GPU copy then goes to the smaller screens.
+ * The card with the largest screen goes first, and the cross-GPU copy then
+ * goes to the smaller screens. With two screens of the same size, the card
+ * that is not the firmware's VGA device goes first: that is the card a
+ * display was added to. Otherwise the kernel's order stays.
  */
 #define _GNU_SOURCE
 #include <dirent.h>
@@ -27,6 +32,7 @@ struct gpu {
 	char card[NAME_MAX + 1];
 	char node[2 * PATH_MAX];
 	long long area; /* pixels of its largest connected mode, 0 when none */
+	bool boot_vga; /* the firmware's own VGA device */
 };
 
 static const char *env_or(const char *name, const char *fallback) {
@@ -99,8 +105,35 @@ static long long card_area(const char *root, const char *card) {
 	return best;
 }
 
-char *primary_gpu_devices(void) {
-	if (getenv("WLR_DRM_DEVICES") || getenv("WLR_BACKENDS") ||
+/* Whether this is the firmware's own VGA device. With two screens of the
+ * same size the copy goes to it instead: the other card is the one a display
+ * was added to, and rendering there is what render-gpu=largest is for. */
+static bool card_boot_vga(const char *root, const char *card) {
+	char path[2 * PATH_MAX], line[8] = "";
+	snprintf(path, sizeof(path), "%s/%s/device/boot_vga", root, card);
+	FILE *f = fopen(path, "r");
+	if (!f) {
+		return false;
+	}
+	const bool vga = fgets(line, sizeof(line), f) && line[0] == '1';
+	fclose(f);
+	return vga;
+}
+
+/* Larger screen first; of equal screens the firmware's VGA card last; else
+ * the kernel's own order. */
+static bool comes_first(const struct gpu *a, const struct gpu *b) {
+	if (a->area != b->area) {
+		return a->area > b->area;
+	}
+	if (a->boot_vga != b->boot_vga) {
+		return !a->boot_vga;
+	}
+	return strcmp(a->card, b->card) < 0;
+}
+
+char *primary_gpu_devices(bool largest) {
+	if (!largest || getenv("WLR_DRM_DEVICES") || getenv("WLR_BACKENDS") ||
 			getenv("WAYLAND_DISPLAY") || getenv("WAYLAND_SOCKET")) {
 		return NULL;
 	}
@@ -120,6 +153,7 @@ char *primary_gpu_devices(void) {
 		snprintf(gpus[n].card, sizeof(gpus[n].card), "%s", entry->d_name);
 		snprintf(gpus[n].node, sizeof(gpus[n].node), "%s/%s", nodes, entry->d_name);
 		gpus[n].area = card_area(root, entry->d_name);
+		gpus[n].boot_vga = card_boot_vga(root, entry->d_name);
 		n++;
 	}
 	closedir(dir);
@@ -130,8 +164,7 @@ char *primary_gpu_devices(void) {
 	for (int i = 1; i < n; i++) {
 		struct gpu g = gpus[i];
 		int j = i - 1;
-		while (j >= 0 && (gpus[j].area < g.area ||
-				(gpus[j].area == g.area && strcmp(gpus[j].card, g.card) > 0))) {
+		while (j >= 0 && comes_first(&g, &gpus[j])) {
 			gpus[j + 1] = gpus[j];
 			j--;
 		}
