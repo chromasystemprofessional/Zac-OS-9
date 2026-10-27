@@ -14,7 +14,7 @@
 #   then: /etc/zacos9/shared-folders lists /root/Projects, which is 754.
 V=build/shell/vptr
 # The Finder that zacos9-wm starts finds the helper in the sources.
-ZACOS9_SHARING_HELPER="$PWD/sharing/zacos9-sharing-helper"
+ZACOS9_SHARING_HELPER="$PWD/system/sharing/zacos9-sharing-helper"
 rm -rf /root/Projects
 mkdir -p /root/Projects
 chmod 700 /root/Projects

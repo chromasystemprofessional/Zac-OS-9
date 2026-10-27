@@ -11,7 +11,7 @@
 #                 desktop has the shared-folder icon
 V=build/shell/vptr
 # The Finder that zacos9-wm starts finds the helper in the sources.
-ZACOS9_SHARING_HELPER="$PWD/sharing/zacos9-sharing-helper"
+ZACOS9_SHARING_HELPER="$PWD/system/sharing/zacos9-sharing-helper"
 sh "$ZACOS9_SHARING_HELPER" unshare "$HOME/Desktop/Kinds" 2>/dev/null
 
 click_in() { # x y in the front window's content

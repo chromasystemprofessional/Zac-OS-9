@@ -57,7 +57,7 @@ struct HelperOptions {
 };
 
 /* Runs zacos9-NAME-helper (rootHelperPath(), its source in the folder
- * SOURCEDIR) with `args`: as root through pkexec, which may ask for an
+ * system/SOURCEDIR) with `args`: as root through pkexec, which may ask for an
  * administrator's password, unless this program is root already; waiting
  * as waitForProcess() does. Its stdout; *ok if it ran and exited 0; *err
  * its last line of stderr, else "The WHAT helper stopped with status N."

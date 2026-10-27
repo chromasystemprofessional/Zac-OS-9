@@ -1,7 +1,7 @@
 # Installer and Disk Setup's partition map
 
 The ZacOS 9 Installer (`shell/installer/`) puts ZacOS on a hard disk from the
-live session; the work is done as root by `installer/zacos9-install`, run
+live session; the work is done as root by `system/installer/zacos9-install`, run
 through pkexec. Disk Setup (`shell/disksetup/`) partitions drives through
 UDisks2. Both draw a drive with the same partition map and plan changes with
 the same model.
@@ -12,8 +12,8 @@ the same model.
 | The partition map (drawing, choosing, dragging) | `shell/disksetup/diskmap.{h,cpp}` |
 | Disk Setup's window (First Aid, Partition) | `shell/disksetup/main.cpp` |
 | The installer's window | `shell/installer/installer.cpp` |
-| Installing, as root | `installer/zacos9-install` |
-| Freeing a disk the desktop has open | `installer/zacos9-release-disk` |
+| Installing, as root | `system/installer/zacos9-install` |
+| Freeing a disk the desktop has open | `system/installer/zacos9-release-disk` |
 
 ## Where ZacOS can go
 

@@ -33,7 +33,7 @@
 #include <QDBusReply>
 
 /* Where the Memory control panel's RAM Disk is mounted (a tmpfs:
- * memory/zacos9-memory-helper). */
+ * system/memory/zacos9-memory-helper). */
 static const QString RAM_DISK = QStringLiteral("/run/zacos9-ramdisk");
 
 static bool ramDiskMounted() {

@@ -560,12 +560,12 @@ partial entries retain the remaining work described in the inventory above.
 | # | Work package | Components | Effort |
 |---|---|---|---|
 | 5.1 ✅ | **Limited accounts**: allowed programs enforced by the Sniffer and menu bar (not a security boundary; say so) | Users panel, Sniffer, menu bar | L |
-| 5.2 ✅ | **Puppy Mode** (Simple Finder): the Sniffer preference, and set for a person by an administrator | Sniffer, Users panel, `accounts/` | L |
+| 5.2 ✅ | **Puppy Mode** (Simple Finder): the Sniffer preference, and set for a person by an administrator | Sniffer, Users panel, `system/accounts/` | L |
 | 5.3 ✅ | **Guest account** and a welcome message | Users panel, login window | M + S |
-| 5.4 ✅ | **Shared Documents** (`/home/Shared`, sticky) | `sharing/` | S |
+| 5.4 ✅ | **Shared Documents** (`/home/Shared`, sticky) | `system/sharing/` | S |
 | 5.5 ✅ | **Encrypt / Decrypt**: GPG passphrase-protected copies, the passphrase kept in the keychain if wanted | Sniffer | M |
 | 5.6 ✅ | **Keychain Access** panel: list items, Lock/Unlock | `shell/panels/` | M |
-| 5.7 ✅ | **Web Sharing**: a static server for `~/Web Pages` behind a switch | `sharing/`, panel | S |
+| 5.7 ✅ | **Web Sharing**: a static server for `~/Web Pages` behind a switch | `system/sharing/`, panel | S |
 | 5.8 ✅ | **Retriever** (folder pairs: two-way rsync, newest wins, with a warning) | new app | M |
 
 ### Milestone 6 — Help, automation and speech (P3)

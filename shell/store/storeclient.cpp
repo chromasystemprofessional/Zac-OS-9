@@ -139,7 +139,7 @@ static QString styleHelperPath() {
 	}
 	const QString dir = QCoreApplication::applicationDirPath();
 	for (const QString &candidate : { dir + "/../libexec/zacos9/zacos9-appstyle",
-			sourceTreePath("appstore/zacos9-appstyle") }) {
+			sourceTreePath("system/appstore/zacos9-appstyle") }) {
 		if (QFileInfo(candidate).isExecutable()) {
 			return QFileInfo(candidate).canonicalFilePath();
 		}
@@ -225,7 +225,7 @@ QString softwareCatalogHelper() {
 	}
 	const QString dir = QCoreApplication::applicationDirPath();
 	for (const QString &path : { dir + "/../libexec/zacos9/zacos9-software-catalog",
-			sourceTreePath("appstore/zacos9-software-catalog") }) {
+			sourceTreePath("system/appstore/zacos9-software-catalog") }) {
 		if (QFileInfo(path).isExecutable()) {
 			return path;
 		}

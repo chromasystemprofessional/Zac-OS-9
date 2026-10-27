@@ -68,7 +68,7 @@ could not be confirmed the same way: `smbd` crashed on startup in the
 container this was built in (`core-dump`, `abrt`; not investigated
 further, as it is unrelated to this feature — see the AFP work in an
 earlier session for `smbd`'s general status), so
-`sharing/zacos9-sharing-helper` still writes an explicit
+`system/sharing/zacos9-sharing-helper` still writes an explicit
 `_smb._tcp` avahi service file of its own when SMB sharing is on,
 kept rather than assumed redundant.
 
