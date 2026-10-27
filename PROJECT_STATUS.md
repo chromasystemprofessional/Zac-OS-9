@@ -33,7 +33,7 @@ request:
 | 2 | Shared code out of the Sniffer's folder into libraries; a `meson.build` per program | Done: shared code in `shell/common/` (libzacos9-shell) and `shell/files/` (libzacos9-files), a `meson.build` per program |
 | 3 | One way to run a program and wait for it | In progress: one way to find the desktop's programs and helpers (`lib/locate`, `shell/common/programs.h`) |
 | 4 | One reader for `key=value` settings files | |
-| 5 | One file per control panel | |
+| 5 | One file per control panel | Done: each registers itself (`shell/panels/panelregistry.h`) |
 | 6 | A small library for the C Wayland programs | Done: shared-memory buffers (`lib/wlclient`) |
 | 7 | Small duplicates as "good first issue"s | |
 | 8 | Tests in `tests/<part>/`, with a shared harness | |

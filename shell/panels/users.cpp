@@ -1,6 +1,7 @@
 /* GIO before Qt: its headers use the name `signals`. */
 #include "appfilter.h"
 #include "users.h"
+#include "panelregistry.h"
 
 #include <QDBusConnection>
 #include <QDir>
@@ -1165,3 +1166,5 @@ void OptionsWindow::keyPressEvent(QKeyEvent *e) {
 	d->host.hostKey(e);
 	update();
 }
+
+PANEL("users", "Users", true, UsersPanel);

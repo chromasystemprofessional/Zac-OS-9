@@ -1,4 +1,5 @@
 #include "startupdisk.h"
+#include "panelregistry.h"
 #include "programs.h"
 
 #include <QApplication>
@@ -521,3 +522,5 @@ void StartupDiskPanel::keyPressEvent(QKeyEvent *e) {
 	d->host.hostKey(e);
 	update();
 }
+
+PANEL("startupdisk", "Startup Disk", true, StartupDiskPanel);
