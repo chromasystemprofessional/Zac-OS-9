@@ -2071,6 +2071,9 @@ void FolderWindow::dragEnterEvent(QDragEnterEvent *e) {
 			/* Applications dragged to Startup Items, or to its folder. */
 			(e->source() != this && acceptsStartupDrops() &&
 				(mime->hasFormat(APPLICATION_ITEMS_MIME) || mime->hasFormat(ALIAS_ITEMS_MIME))) ||
+			/* Control panels dragged between the two Control Panels
+			 * folders. */
+			(e->source() != this && acceptsPanelDrops() && mime->hasFormat(PANEL_ITEMS_MIME)) ||
 			e->mimeData()->hasUrls() ||
 			(e->source() == nullptr && canMakeClipping(mime) && !vfsIsVirtual(m_path)) ||
 			(e->mimeData()->hasFormat(ALIAS_ITEMS_MIME) &&
@@ -2078,6 +2081,19 @@ void FolderWindow::dragEnterEvent(QDragEnterEvent *e) {
 			(e->mimeData()->hasFormat(ICON_MOVE_MIME) && e->source() == this)) {
 		e->acceptProposedAction();
 	}
+}
+
+/* Control Panels, Control Panels (Disabled), or a window showing one of
+ * them: the System Folder's, for instance, where both are icons. */
+bool FolderWindow::acceptsPanelDrops() {
+	if (vfsIsControlPanels(m_path) || vfsIsControlPanelsDisabled(m_path)) {
+		return true;
+	}
+	bool found = false;
+	forEachItem([&](Item *item) {
+		found = found || vfsIsControlPanels(item->path) || vfsIsControlPanelsDisabled(item->path);
+	});
+	return found;
 }
 
 /* Startup Items itself, or a window showing its folder. */
@@ -2092,14 +2108,19 @@ bool FolderWindow::acceptsStartupDrops() {
 
 void FolderWindow::dragMoveEvent(QDragMoveEvent *e) {
 	if (e->mimeData()->hasFormat(ICON_MOVE_MIME) &&
-			(e->source() == this || !e->mimeData()->hasFormat(ALIAS_ITEMS_MIME))) {
+			(e->source() == this || !e->mimeData()->hasFormat(ALIAS_ITEMS_MIME)) &&
+			!e->mimeData()->hasFormat(PANEL_ITEMS_MIME)) {
 		e->acceptProposedAction(); /* nothing to drop them into */
 		return;
 	}
 	Item *target = dropTargetAt(e->position().toPoint(), draggedPaths(e->mimeData()));
+	/* Only the folders that take a virtual item show as its target:
+	 * Startup Items, and the two Control Panels folders. */
+	const bool takesIconMove = target && (vfsIsStartupItems(target->path) ||
+		vfsIsControlPanels(target->path) || vfsIsControlPanelsDisabled(target->path));
 	if (target && vfsIsVirtual(m_path) && e->mimeData()->hasFormat(ICON_MOVE_MIME) &&
-			!vfsIsStartupItems(target->path)) {
-		target = nullptr; /* only Startup Items takes these here */
+			!takesIconMove) {
+		target = nullptr;
 	}
 	forEachItem([&](Item *item) { item->dropTarget = item == target; });
 	update();
@@ -2120,7 +2141,11 @@ void FolderWindow::dropEvent(QDropEvent *e) {
 	clearDropTarget();
 	if (e->source() != this && !e->mimeData()->hasFormat(STARTUP_ITEMS_MIME)) {
 		Item *on = dropTargetAt(e->position().toPoint(), {});
-		if (vfsIsStartupItems(on ? on->path : m_path)) {
+		const QString destination = on ? on->path : m_path;
+		/* Startup Items, and the Control Panels folders, take items the
+		 * rest of a virtual window only arranges. */
+		if (vfsIsStartupItems(destination) || vfsIsControlPanels(destination) ||
+				vfsIsControlPanelsDisabled(destination)) {
 			dropItems(e, on, m_path);
 			Finder::instance().dragEnded();
 			return;

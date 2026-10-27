@@ -35,6 +35,9 @@ inline constexpr char ALIAS_ITEMS_MIME[] = "application/x-zacos9-alias-items";
 inline constexpr char APPLICATION_ITEMS_MIME[] = "application/x-zacos9-application-items";
 /* Startup Items being dragged out: a JSON array of desktop-file IDs. */
 inline constexpr char STARTUP_ITEMS_MIME[] = "application/x-zacos9-startup-items";
+/* Control panels being dragged between Control Panels and its (Disabled)
+ * folder: a JSON array of their desktop entries' IDs. */
+inline constexpr char PANEL_ITEMS_MIME[] = "application/x-zacos9-panel-items";
 inline constexpr char FONT_ITEMS_MIME[] = "application/x-zacos9-font-items";
 /* With ICON_MOVE_MIME: the desktop's disks and Trash being moved about it,
  * which carry nothing anywhere else. */

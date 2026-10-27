@@ -1357,10 +1357,13 @@ void vfsShowAllHidden() {
 
 bool vfsAcceptsDrops(const QString &path) {
 	const VNode *node = vfsNode(path);
+	/* The Control Panels folders take a control panel dragged in, and
+	 * nothing else; the drop itself decides which. */
 	return node && !node->readOnly && (node->kind == VKind::Backed ||
 		node->kind == VKind::Unix || node->kind == VKind::Fonts ||
 		(node->kind == VKind::Apps && !node->id.startsWith("system-folder/")) ||
-		vfsIsStartupItems(path));
+		vfsIsStartupItems(path) || vfsIsControlPanels(path) ||
+		vfsIsControlPanelsDisabled(path));
 }
 
 bool vfsIsFonts(const QString &path) {
@@ -1414,6 +1417,11 @@ bool vfsIsControlPanels(const QString &path) {
 bool vfsIsControlPanelsDisabled(const QString &path) {
 	const VNode *node = vfsNode(path);
 	return node && node->kind == VKind::PanelsDisabled;
+}
+
+QString vfsPanelId(const QString &path) {
+	const VNode *node = vfsNode(path);
+	return node && node->kind == VKind::Launcher ? node->panelId : QString();
 }
 
 bool vfsRename(const QString &path, const QString &newName) {

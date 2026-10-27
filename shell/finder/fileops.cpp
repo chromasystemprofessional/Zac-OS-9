@@ -37,6 +37,7 @@
 #include "vfs.h"
 #include "apptrash.h"
 #include "appdb.h"
+#include "controlpanels.h"
 #include "autostart.h"
 #include "fileassoc.h"
 #include "transferdialog.h"
@@ -598,6 +599,7 @@ QMimeData *itemDragMime(const std::vector<Item *> &items) {
 			applications.append(vfsNode(item->path)->appId);
 		}
 		QJsonArray startup;
+		QJsonArray panels;
 		for (const Item *item : items) {
 			const QString id = item->isVirtual ? vfsStartupItemId(item->path) : QString();
 			if (id.isEmpty()) {
@@ -608,6 +610,17 @@ QMimeData *itemDragMime(const std::vector<Item *> &items) {
 		}
 		if (!startup.isEmpty()) {
 			mime->setData(STARTUP_ITEMS_MIME, QJsonDocument(startup).toJson(QJsonDocument::Compact));
+		}
+		for (const Item *item : items) {
+			const QString id = item->isVirtual ? vfsPanelId(item->path) : QString();
+			if (id.isEmpty()) {
+				panels = {};
+				break;
+			}
+			panels.append(id);
+		}
+		if (!panels.isEmpty()) {
+			mime->setData(PANEL_ITEMS_MIME, QJsonDocument(panels).toJson(QJsonDocument::Compact));
 		}
 		if (!applications.isEmpty()) {
 			mime->setData(APPLICATION_ITEMS_MIME,
@@ -810,6 +823,49 @@ static void dropIntoStartupItems(QDropEvent *e) {
 	e->accept();
 }
 
+/* A control panel dragged into Control Panels (Disabled): the entry it
+ * stands for is turned off there, as the Mac's Extensions Manager did, and
+ * the panel leaves Control Panels. The entries are the drag's own ids, so
+ * nothing outside the two folders can be turned off this way. */
+static void setPanelsEnabled(QDropEvent *e, bool enabled) {
+	const auto document = QJsonDocument::fromJson(e->mimeData()->data(PANEL_ITEMS_MIME));
+	QStringList ids;
+	bool valid = document.isArray() && !document.array().isEmpty() &&
+		document.array().size() <= 256;
+	for (const auto &value : document.array()) {
+		const QString id = value.toString();
+		if (valid && value.isString() && !id.isEmpty()) {
+			ids << id;
+		} else {
+			valid = false;
+		}
+	}
+	if (!valid) {
+		Alert::ask("The dragged control panel information is invalid.", "OK", QString());
+		e->ignore();
+		return;
+	}
+	QStringList refused;
+	for (const QString &id : ids) {
+		if (!pl_control_panel_set_enabled(id.toUtf8().constData(), enabled)) {
+			refused << id;
+		}
+	}
+	/* Accepted first, so the drag ends and the windows can be reloaded
+	 * while it does. */
+	e->setDropAction(Qt::MoveAction);
+	e->accept();
+	QTimer::singleShot(0, QCoreApplication::instance(), [enabled, refused] {
+		vfsRefresh();
+		Finder::instance().folderChanged(vfsPathFor("system-folder/control-panels"));
+		Finder::instance().folderChanged(vfsPathFor("system-folder/control-panels-disabled"));
+		if (!refused.isEmpty()) {
+			Alert::ask(enabled ? "That control panel could not be turned back on." :
+				"That control panel could not be turned off.", "OK", QString());
+		}
+	});
+}
+
 static void removeStartupItems(QDropEvent *e) {
 	const auto document = QJsonDocument::fromJson(e->mimeData()->data(STARTUP_ITEMS_MIME));
 	if (!document.isArray() || document.array().isEmpty() || document.array().size() > 256) {
@@ -945,6 +1001,20 @@ void dropItems(QDropEvent *e, const Item *target, const QString &folder) {
 		} else {
 			e->ignore();
 		}
+		return;
+	}
+	if (e->mimeData()->hasFormat(PANEL_ITEMS_MIME)) {
+		/* Only into Control Panels (Disabled): the way back into Control
+		 * Panels is the next change. */
+		if (vfsIsControlPanelsDisabled(target ? target->path : folder)) {
+			setPanelsEnabled(e, false);
+		} else {
+			e->ignore();
+		}
+		return;
+	}
+	if (vfsIsControlPanelsDisabled(target ? target->path : folder)) {
+		e->ignore(); /* nothing but a control panel goes in there */
 		return;
 	}
 	if (toTrash && e->mimeData()->hasFormat(APPLICATION_ITEMS_MIME)) {

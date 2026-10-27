@@ -158,6 +158,9 @@ bool vfsIsApplications(const QString &path);
 /* Control Panels, and the (Disabled) folder the ones turned off go to. */
 bool vfsIsControlPanels(const QString &path);
 bool vfsIsControlPanelsDisabled(const QString &path);
+/* The desktop entry a control panel item stands for ("" for anything else):
+ * "zacos9-mouse.desktop". */
+QString vfsPanelId(const QString &path);
 bool vfsIsFonts(const QString &path);
 QString vfsFontFile(const QString &path);
 void vfsFontsChanged();
