@@ -36,7 +36,7 @@ so everything looks and behaves the same way, down to the scroll arrows.
 <table>
   <tr>
     <td width="50%"><img src="docs/screenshots/zac-menu.png" alt="The Zac menu open, listing control panels, recent items and desk accessories"></td>
-    <td width="50%"><img src="docs/screenshots/control-panels.png" alt="The System Folder, Control Panels, General Controls and Date &amp; Time windows"></td>
+    <td width="50%"><img src="docs/screenshots/control-panels.png" alt="The System Folder, the Control Panels folder with its 30 panels, General Controls and Date &amp; Time"></td>
   </tr>
   <tr>
     <td><b>The Zac menu</b>: desk accessories (Calculator, Notepad, Stash, Dog Ears,
@@ -46,7 +46,7 @@ so everything looks and behaves the same way, down to the scroll arrows.
   </tr>
   <tr>
     <td><img src="docs/screenshots/software.png" alt="The Software window, listing Firefox, GIMP, LibreOffice and VLC"></td>
-    <td><img src="docs/screenshots/about.png" alt="About This Computer, showing ZacOS 9 version 1.0.0"></td>
+    <td><img src="docs/screenshots/about.png" alt="About This Computer, showing ZacOS 9 version 1.1.0"></td>
   </tr>
   <tr>
     <td><b>Thousands of programs</b>: Firefox, LibreOffice, GIMP, VLC and the rest of
