@@ -98,6 +98,7 @@ compositor_exe = executable('zacos9-wm',
   'src/launch.c',
   'src/startup.c',
   'src/prefs.c',
+  'src/primarygpu.c',
   'src/idle.c',
   'src/lock.c',
   'src/idle_policy.c',
@@ -157,6 +158,14 @@ test('startup-displays',
 test('display-origin', python3,
   args: [files('../tests/compositor/test_display_origin.py'), compositor_exe],
   timeout: 60,
+)
+# The card with the largest connected screen renders (onboard HDMI makes the
+# integrated GPU the boot VGA device, and wlroots renders on that).
+test('primary-gpu',
+  executable('test-primarygpu',
+    '../tests/compositor/test_primarygpu.c', 'src/primarygpu.c',
+    include_directories: include_directories('src'),
+  ),
 )
 test('cursor-theme', python3,
   args: [files('../tests/compositor/test_cursors.py'),

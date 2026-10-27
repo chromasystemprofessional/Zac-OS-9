@@ -17,6 +17,7 @@
 #include <wlr/util/log.h>
 
 #include "locate.h"
+#include "primarygpu.h"
 #include "startup.h"
 #include "access.h"
 #include "server.h"
@@ -122,6 +123,16 @@ int main(int argc, char *argv[]) {
 	server.output_scale = scale;
 	server.scale_explicit = scale_explicit;
 	server.display = wl_display_create();
+
+	/* Which card renders: with a display on the motherboard's HDMI port the
+	 * firmware makes the integrated GPU the boot VGA device, and wlroots
+	 * would render on it and copy every frame to the other card. */
+	char *gpus = primary_gpu_devices();
+	if (gpus) {
+		setenv("WLR_DRM_DEVICES", gpus, 1);
+		wlr_log(WLR_INFO, "WLR_DRM_DEVICES=%s", gpus);
+		free(gpus);
+	}
 
 	server.backend = wlr_backend_autocreate(
 			wl_display_get_event_loop(server.display), &server.session);
