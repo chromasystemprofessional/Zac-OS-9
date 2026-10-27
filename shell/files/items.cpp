@@ -591,8 +591,9 @@ void placeIcons(const std::vector<Item *> &items, const QHash<QString, QPoint> &
 }
 
 bool acceptsDrops(const Item &item) {
-	/* A curated folder has nowhere to put a file; only the ones standing
-	 * for a real directory take drops. */
+	/* Most curated folders have nowhere to put a file; only the ones
+	 * standing for a real directory, and the few vfsAcceptsDrops() names
+	 * as taking a particular kind of drop, do. */
 	if (item.isVirtual) {
 		return vfsAcceptsDrops(item.path);
 	}

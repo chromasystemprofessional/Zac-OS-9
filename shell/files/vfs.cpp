@@ -1364,7 +1364,13 @@ bool vfsAcceptsDrops(const QString &path) {
 		(node->kind == VKind::Apps && !node->id.startsWith("system-folder/")) ||
 		vfsIsStartupItems(path) || vfsIsControlPanels(path) ||
 		vfsIsControlPanelsDisabled(path) || vfsIsExtensions(path) ||
-		vfsIsExtensionsDisabled(path));
+		vfsIsExtensionsDisabled(path) || vfsIsSounds(path));
+}
+
+bool vfsIsSounds(const QString &path) {
+	const VNode *node = vfsNode(path);
+	return node && node->kind == VKind::Resource && node->resourceProvider == "sounds" &&
+		(node->resourceKey.isEmpty() || node->resourceKey == "user:");
 }
 
 bool vfsIsFonts(const QString &path) {

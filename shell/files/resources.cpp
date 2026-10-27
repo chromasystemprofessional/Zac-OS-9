@@ -14,7 +14,9 @@
 #include <unistd.h>
 
 #include "appdb.h"
+#include "customthemes.h"
 #include "extensioncatalog.h"
+#include "settings.h"
 
 namespace {
 
@@ -62,7 +64,9 @@ QStringList aliasRoots(const QString &provider) {
 	}
 #endif
 	if (provider == "sounds") {
-		return { userData("sounds"), "/usr/share/sounds" };
+		/* The alert sounds the panels play: the user's own (where
+		 * importAlertSound() puts a dropped one) and the installed set. */
+		return { userAlertSoundsFolder(), QString::fromUtf8(pl_data_dir()) + "/sounds" };
 	}
 	if (provider == "application-support") {
 		return { userData("zacos9/appearance"), "/usr/share/zacos9" };
@@ -83,6 +87,10 @@ bool rootAllowed(const QString &provider, int index, const QString &root) {
 #endif
 	if (index == 0) {
 		base = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation);
+	} else if (provider == "sounds") {
+		/* /usr/share/zacos9/sounds installed, or the source tree's
+		 * assets/sounds in a development build. */
+		base = QString::fromUtf8(pl_data_dir());
 	} else {
 		base = "/usr/share";
 	}
@@ -305,7 +313,7 @@ std::vector<SystemResource> resourceChildren(const QString &provider, const QStr
 				const QString rootKey = QString(i == 0 ? "user:" : "system:");
 				add(rootKey, i == 0 ? "User" : "Computer", ResourceType::Collection,
 					"folder", QStringLiteral("A read-only view of allowlisted ") +
-						(provider == "sounds" ? "sound resources." : "appearance support files."),
+						(provider == "sounds" ? "alert sounds." : "appearance support files."),
 					{ "Source: " + QFileInfo(root).canonicalFilePath(),
 						"Access: read-only; files are not copied." }, root, true);
 			}
