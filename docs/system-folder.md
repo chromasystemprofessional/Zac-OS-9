@@ -15,7 +15,7 @@ default layout is in `shell/files/vfs.cpp`.
 S a day or so, M a few days, L more. Mac OS versions are when an item
 first appeared in Apple's System Folder, to the nearest release.
 
-Of 31 items: 14 working, 6 partial, 2 view only, 9 missing.
+Of 31 items: 15 working, 6 partial, 1 view only, 9 missing.
 
 ## The System Folder's own files
 
@@ -46,7 +46,7 @@ Of 31 items: 14 working, 6 partial, 2 view only, 9 missing.
 
 | Mac OS item | What it did | ZacOS today | Its home | Idea | Size |
 |---|---|---|---|---|---|
-| Extensions, Extensions (Disabled) (7.0, 7.5) | Loaded at startup; drag to (Disabled) to turn one off at the next restart. | View only: both list kernel modules and services | `system/modules/`, `shell/files/extensioncatalog.cpp`, `shell/finder/modules.cpp` | Dragging between them turns an extension on or off through `zacos9-modules-helper`, run with `runHelper()`. | M |
+| Extensions, Extensions (Disabled) (7.0, 7.5) | Loaded at startup; drag to (Disabled) to turn one off at the next restart. | Working: drag one in to turn it off, back to turn it on | `system/modules/`, `shell/files/extensioncatalog.cpp`, `shell/finder/modules.cpp`, `shell/finder/fileops.cpp` | – | – |
 | Extensions Manager sets (7.5) | Named on/off combinations. | Working: Tricks Sets | `shell/files/tricksets.cpp` | List them in Preferences ▸ Extensions Manager. | S |
 
 ## Look, sound and language
