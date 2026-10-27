@@ -23,6 +23,8 @@ import threading
 import time
 from pathlib import Path
 
+from zacos9test import wait_for
+
 compositor, client, field_client, vptr, rawshot = (str(Path(a).resolve()) for a in sys.argv[1:6])
 FACE = bytes((0xCC, 0xCC, 0xCC))
 
@@ -48,16 +50,6 @@ def check(ok, what):
     print(("ok: " if ok else "FAIL: ") + what)
     if not ok:
         failures.append(what)
-
-
-def wait_for(what, cond, seconds=15):
-    deadline = time.monotonic() + seconds
-    while time.monotonic() < deadline:
-        value = cond()
-        if value:
-            return value
-        time.sleep(0.1)
-    raise AssertionError(f"timed out waiting for {what}")
 
 
 def running():

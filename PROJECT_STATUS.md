@@ -36,7 +36,7 @@ request:
 | 5 | One file per control panel | Done: each registers itself (`shell/panels/panelregistry.h`) |
 | 6 | A small library for the C Wayland programs | Done: shared-memory buffers (`lib/wlclient`) |
 | 7 | Small duplicates as "good first issue"s | |
-| 8 | Tests in `tests/<part>/`, with a shared harness | |
+| 8 | Tests in `tests/<part>/`, with a shared harness | In progress: the shared harness (`tests/harness/zacos9test.py`) |
 | 9 | The root helpers under `system/` | Done |
 | 10 | No compiler warnings | Done: CI fails if a change adds one |
 

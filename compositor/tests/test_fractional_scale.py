@@ -18,18 +18,10 @@ import tempfile
 import time
 from pathlib import Path
 
+from zacos9test import wait_for
+
 compositor, probe = (str(Path(a).resolve()) for a in sys.argv[1:3])
 FRACTIONAL = "wp_fractional_scale_manager_v1"
-
-
-def wait_for(what, check, seconds=10):
-    deadline = time.monotonic() + seconds
-    while time.monotonic() < deadline:
-        value = check()
-        if value:
-            return value
-        time.sleep(0.05)
-    raise AssertionError(f"timed out waiting for {what}")
 
 
 def session(scale, conf="", screens=1):

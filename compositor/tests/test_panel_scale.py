@@ -18,6 +18,8 @@ import tempfile
 import time
 from pathlib import Path
 
+from zacos9test import wait_for
+
 compositor, panel, rawshot = (str(Path(a).resolve()) for a in sys.argv[1:4])
 POINTER = (98, 98)  # where zacos9-wm puts it, logical, with a pixel to spare
 
@@ -28,16 +30,6 @@ def snap(u, q):
 
 def unsnap(d, q):
     return -((-(4 * d + 2)) // q) - 1
-
-
-def wait_for(what, check, seconds=15):
-    deadline = time.monotonic() + seconds
-    while time.monotonic() < deadline:
-        value = check()
-        if value:
-            return value
-        time.sleep(0.1)
-    raise AssertionError(f"timed out waiting for {what}")
 
 
 def session(scale, fonts=False):

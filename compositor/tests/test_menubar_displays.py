@@ -21,6 +21,8 @@ import tempfile
 import time
 from pathlib import Path
 
+from zacos9test import wait_for
+
 compositor, menubar, vptr = (str(Path(a).resolve()) for a in sys.argv[1:4])
 if not shutil.which("grim"):
     print("SKIP: grim is not installed")
@@ -28,16 +30,6 @@ if not shutil.which("grim"):
 GRAY_DDD, GRAY_999, BLACK = (0xDD,) * 3, (0x99,) * 3, (0, 0, 0)
 BASE = ("main-display=HEADLESS-1\ndisplay.HEADLESS-1.x=0\ndisplay.HEADLESS-1.y=0\n"
         "display.HEADLESS-2.x=1280\ndisplay.HEADLESS-2.y=0\ndisplay.HEADLESS-2.scale=2\n")
-
-
-def wait_for(what, check, seconds=10):
-    deadline = time.monotonic() + seconds
-    while time.monotonic() < deadline:
-        value = check()
-        if value:
-            return value
-        time.sleep(0.1)
-    raise AssertionError(f"timed out waiting for {what}")
 
 
 failures = []

@@ -15,21 +15,13 @@ import tempfile
 import time
 from pathlib import Path
 
+from zacos9test import wait_for
+
 compositor, vptr, scribble = (str(Path(a).resolve()) for a in sys.argv[1:4])
 if not shutil.which("grim"):
     print("SKIP: grim is not installed")
     sys.exit(77)
 AREA = (250, 250, 600, 350)  # where the pointer moves, on a 1280x720 screen
-
-
-def wait_for(what, check, seconds=10):
-    deadline = time.monotonic() + seconds
-    while time.monotonic() < deadline:
-        value = check()
-        if value:
-            return value
-        time.sleep(0.05)
-    raise AssertionError(f"timed out waiting for {what}")
 
 
 def black_after_moving(tracks):

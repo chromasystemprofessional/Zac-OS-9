@@ -16,19 +16,11 @@ from pathlib import Path
 
 from gi.repository import Gio, GLib
 
+from zacos9test import wait_for
+
 compositor, client, helper = (str(Path(arg).resolve()) for arg in sys.argv[1:4])
 MINUTE = 400
 SAVER = "org.freedesktop.ScreenSaver"
-
-
-def wait_for(what, check, seconds=5):
-    deadline = time.monotonic() + seconds
-    while time.monotonic() < deadline:
-        value = check()
-        if value:
-            return value
-        time.sleep(0.02)
-    raise AssertionError(f"timed out waiting for {what}")
 
 
 bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)

@@ -16,22 +16,14 @@ import threading
 import time
 from pathlib import Path
 
+from zacos9test import wait_for
+
 compositor, client, vptr, close_app_client = (str(Path(a).resolve()) for a in sys.argv[1:5])
 GREEN = (0x00, 0xAA, 0x00)
 # Other programs' windows open at the same place on a 1280 x 720 screen with
 # no menu bar: the frame's top-left is (97, 32); its boxes sit on the title
 # bar's row, y = 42.
 CLOSE, COLLAPSE, TITLE = (106, 42), (1172, 42), (640, 42)
-
-
-def wait_for(what, check, seconds=10):
-    deadline = time.monotonic() + seconds
-    while time.monotonic() < deadline:
-        value = check()
-        if value:
-            return value
-        time.sleep(0.05)
-    raise AssertionError(f"timed out waiting for {what}")
 
 
 with tempfile.TemporaryDirectory(prefix="zacos9-tricks-") as directory:

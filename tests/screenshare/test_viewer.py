@@ -28,6 +28,8 @@ import threading
 import time
 from pathlib import Path
 
+from zacos9test import free_port, wait_for
+
 compositor, viewer, client, vptr, rawshot = (str(Path(a).resolve()) for a in sys.argv[1:6])
 if not shutil.which("wayvnc"):
     print("SKIP: wayvnc is not installed")
@@ -37,22 +39,6 @@ FACE = bytes((0xDD, 0xDD, 0xDD))
 SCALE = 1.5
 # The bar, full screen: 470 x 32 logical, centred at the top (viewer.cpp).
 BAR_X = (round(1280 / SCALE) - 470) // 2
-
-
-def wait_for(what, check, seconds=15):
-    deadline = time.monotonic() + seconds
-    while time.monotonic() < deadline:
-        value = check()
-        if value:
-            return value
-        time.sleep(0.1)
-    raise AssertionError(f"timed out waiting for {what}")
-
-
-def free_port():
-    with socket.socket() as s:
-        s.bind(("127.0.0.1", 0))
-        return s.getsockname()[1]
 
 
 failures = []

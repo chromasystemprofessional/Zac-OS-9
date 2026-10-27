@@ -20,18 +20,10 @@ import threading
 import time
 from pathlib import Path
 
+from zacos9test import wait_for
+
 compositor, menubar, finder, client, vptr = (str(Path(a).resolve()) for a in sys.argv[1:6])
 GREEN = (0x00, 0xAA, 0x00)
-
-
-def wait_for(what, check, seconds=10):
-    deadline = time.monotonic() + seconds
-    while time.monotonic() < deadline:
-        value = check()
-        if value:
-            return value
-        time.sleep(0.05)
-    raise AssertionError(f"timed out waiting for {what}")
 
 
 with tempfile.TemporaryDirectory(prefix="zacos9-switch-") as directory:
