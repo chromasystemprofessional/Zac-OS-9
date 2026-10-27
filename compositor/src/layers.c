@@ -2,8 +2,9 @@
 #include <string.h>
 #include <wlr/types/wlr_output.h>
 
-#include "startup.h"
+#include "launch.h"
 #include "server.h"
+#include "startup.h"
 
 #define LAYER_SHELL_VERSION 4
 
@@ -120,6 +121,9 @@ static void handle_map(struct wl_listener *listener, void *data) {
 	startup_surface_mapped(ls->layer_surface->namespace);
 	arrange_for(ls);
 	idle_show_savers(ls->server); /* a screen saver mapping just as its screen woke */
+	/* A layer surface is never a view: the Pack, torn off the menu bar,
+	 * ends its launch feedback here rather than in view.c. */
+	launch_ready_layers(ls->server);
 	if (ls->layer_surface->current.keyboard_interactive ==
 			ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_EXCLUSIVE) {
 		layers_focus(ls);

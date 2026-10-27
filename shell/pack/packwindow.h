@@ -22,6 +22,10 @@ public:
 	PackWindow();
 	/* Moves it so (x, y) is its top-left on the screen. */
 	void moveTo(QPoint topLeft);
+	/* The tear-off: the pointer let go at (x, y) on the screen, so its
+	 * title bar goes under the pointer, or above it when it would not fit
+	 * below. */
+	void dropAt(QPoint pointer);
 	void refresh();
 
 	/* Its look, kept between sessions. */
@@ -44,6 +48,7 @@ protected:
 private:
 	enum class Box { None, Close, Zoom, Collapse };
 	void becomeLayerSurface();
+	void applyMargins();
 	void relayout();
 	void save();
 	int iconSize() const { return m_look.large ? 32 : 16; }
