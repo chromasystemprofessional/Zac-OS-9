@@ -1,5 +1,6 @@
 /* The Numbers and Text control panel (zacos9-controlpanel numbers | text). */
 #include "controlpanel.h"
+#include "conf.h"
 
 /* Mac OS 9's Numbers and Text control panels, over the locale: Numbers sets
  * how numbers, money, dates and measurements are written (LC_NUMERIC,
@@ -129,14 +130,10 @@ private:
 
 	/* This panel's locale: locale.conf's, else the session's. */
 	QString currentLocale() const {
-		QFile f(confPath());
 		const QString key = keys().first();
-		if (f.open(QIODevice::ReadOnly)) {
-			for (const QByteArray &line : f.readAll().split('\n')) {
-				if (line.startsWith(key.toLatin1() + '=')) {
-					return QString::fromLatin1(line.mid(key.size() + 1)).remove('"');
-				}
-			}
+		const KeyValueFile f = KeyValueFile::read(confPath());
+		if (f.contains(key)) {
+			return f.value(key).remove('"');
 		}
 		const QString env = qEnvironmentVariable(key.toLatin1().constData());
 		return env.isEmpty() ? qEnvironmentVariable("LANG") : env;
@@ -160,22 +157,12 @@ private:
 			}
 		}
 		/* Rewrite this panel's lines, keeping the other panel's. */
-		QStringList lines;
-		QFile f(confPath());
-		if (f.open(QIODevice::ReadOnly)) {
-			for (const QString &line : QString::fromUtf8(f.readAll()).split('\n')) {
-				if (!line.isEmpty() && !keys().contains(line.section('=', 0, 0))) {
-					lines << line;
-				}
-			}
-			f.close();
-		}
+		KeyValueFile conf = KeyValueFile::read(confPath());
 		for (const QString &key : keys()) {
-			lines << key + "=" + code;
+			conf.set(key, code);
 		}
 		QDir().mkpath(QFileInfo(confPath()).path());
-		QSaveFile out(confPath());
-		if (!out.open(QIODevice::WriteOnly) || out.write((lines.join('\n') + '\n').toUtf8()) < 0 || !out.commit()) {
+		if (!conf.save(confPath())) {
 			m_error = "Your choice couldn't be saved.";
 		}
 		update();
