@@ -32,6 +32,26 @@ bool launch_pending(struct plat_server *server) {
 	return !wl_list_empty(&server->pending_launches);
 }
 
+/* The program behind a surface, as view_pid() gives it for a view. */
+static uint32_t surface_pid(struct wlr_surface *surface) {
+	if (!surface || !surface->resource) {
+		return 0;
+	}
+	pid_t pid = 0;
+	wl_client_get_credentials(wl_resource_get_client(surface->resource), &pid, NULL, NULL);
+	return pid > 0 ? (uint32_t)pid : 0;
+}
+
+void launch_ready_layers(struct plat_server *server) {
+	struct plat_layer_surface *ls;
+	wl_list_for_each(ls, &server->layer_surfaces, link) {
+		uint32_t pid = surface_pid(ls->layer_surface->surface);
+		if (pid) {
+			launch_ready(server, pid, "");
+		}
+	}
+}
+
 static int expire(void *data) {
 	struct plat_server *server = data;
 	struct pending_launch *launch, *tmp;
@@ -164,6 +184,8 @@ void launch_ready(struct plat_server *server, uint32_t pid, const char *app_id) 
 	struct pending_launch *launch, *tmp;
 	wl_list_for_each_safe(launch, tmp, &server->pending_launches, link) {
 		if (same_app(launch->app_id, app_id) || descendant(pid, launch->pid)) {
+			wlr_log(WLR_DEBUG, "Launch feedback ended for %s (pid %u)",
+				launch->app_id, pid);
 			remove_launch(launch);
 		}
 	}
