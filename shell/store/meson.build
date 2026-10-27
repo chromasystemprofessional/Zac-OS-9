@@ -26,7 +26,7 @@ test('store-browser',
 # remove anything).
 test('store-client',
   executable('test-store-client',
-    'tests/test_storeclient.cpp',
+    '../../tests/store/test_storeclient.cpp',
     'storeclient.cpp',
     include_directories: include_directories('../finder', '../print'), # settings.h
     dependencies: [shell_common_dep, platinum_dep, qt6],

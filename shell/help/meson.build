@@ -7,7 +7,7 @@ executable('zacos9-help', 'main.cpp', help_sources,
   install: true,
 )
 test('help-center',
-  executable('test-help-center', 'tests/test_help.cpp', help_sources,
+  executable('test-help-center', '../../tests/help/test_help.cpp', help_sources,
     link_with: panelkit,
     include_directories: include_directories('../finder', '../print', '../panels'),
     dependencies: [shell_common_dep, platinum_dep, qt6, wayland_client],

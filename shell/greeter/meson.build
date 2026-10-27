@@ -12,7 +12,7 @@ executable('zacos9-login',
 # Talking to greetd, against a stand-in for its socket.
 test('greetd-client',
   executable('test-greetd',
-    'tests/test_greetd.cpp',
+    '../../tests/greeter/test_greetd.cpp',
     'greetd.cpp',
     dependencies: [qt6],
   ),

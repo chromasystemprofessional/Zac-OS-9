@@ -4,5 +4,5 @@ finderctl_exe = executable('zacos9-finder-ctl', 'main.c',
   install: true,
 )
 test('finder-ctl', find_program('python3'),
-  args: [files('test_finderctl.py'), finderctl_exe.full_path()],
+  args: [files('../../tests/finderctl/test_finderctl.py'), finderctl_exe.full_path()],
   depends: finderctl_exe, timeout: 20)

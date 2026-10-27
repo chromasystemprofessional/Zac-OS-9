@@ -6,7 +6,7 @@ executable('zacos9-keytags',
   install: true,
 )
 test('key-tags',
-  executable('test-key-tags', 'test_keytags.cpp', 'keytags.cpp',
+  executable('test-key-tags', '../../tests/keytags/test_keytags.cpp', 'keytags.cpp',
     'keytagswindow.cpp', xkb_layouts_sources,
     include_directories: [include_directories('../panels'), xkb_layouts_include],
     dependencies: [platinum_dep, qt6, xkbcommon_client],

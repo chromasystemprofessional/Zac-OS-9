@@ -7,4 +7,4 @@ install_data('50-zacos9-installer.rules',
 
 # Freeing a disk the live desktop has mounted, for the installer (issue #31).
 test('release-disk', find_program('sh'),
-  args: [files('tests/test_release_disk.sh'), files('zacos9-release-disk')])
+  args: [files('../../tests/installer/test_release_disk.sh'), files('zacos9-release-disk')])

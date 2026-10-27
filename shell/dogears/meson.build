@@ -6,7 +6,7 @@ executable('zacos9-dogears',
   install: true,
 )
 test('dog-ears-notes',
-  executable('test-dog-ears-notes', 'tests/test_notes.cpp', 'notes.cpp',
+  executable('test-dog-ears-notes', '../../tests/dogears/test_notes.cpp', 'notes.cpp',
     dependencies: [qt6],
   ),
 )

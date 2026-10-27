@@ -7,7 +7,7 @@ ZacOS 9 draws all of its text with two original bitmap fonts:
 
 The letter shapes are drawn from scratch. Only the metrics come from the Mac OS 8 fonts. Those metrics are cap height, x-height, stroke weight and per-letter spacing, and they were measured from the HIG figures. Text therefore takes up the same room as on Mac OS 8, so menus, titles and lists lay out exactly as in the figures.
 
-`tools/measure/glyphs.py` measured the spacing. It splits a line of text in a figure into letters and reports each letter's ink width and the distance to the next letter. `lib/tests/test_text.c` checks the ink width of every measured string.
+`tools/measure/glyphs.py` measured the spacing. It splits a line of text in a figure into letters and reports each letter's ink width and the distance to the next letter. `tests/lib/test_text.c` checks the ink width of every measured string.
 
 ## System font (Charcoal 12 metrics)
 

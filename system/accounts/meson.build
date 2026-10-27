@@ -9,6 +9,6 @@ install_data('50-zacos9-accounts.rules',
   install_dir: get_option('datadir') / 'polkit-1' / 'rules.d')
 
 test('accounts-helper', find_program('sh'),
-  args: [files('test_helper.sh'), meson.current_source_dir() / 'zacos9-accounts-helper'])
+  args: [files('../../tests/accounts/test_helper.sh'), meson.current_source_dir() / 'zacos9-accounts-helper'])
 install_data('zacos9-wakealarm.service',
   install_dir: get_option('prefix') / 'lib' / 'systemd' / 'system')

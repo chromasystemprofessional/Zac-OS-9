@@ -8,7 +8,7 @@ scribble_exe = executable('zacos9-scribble',
 )
 test('scribble-speech',
   executable('test-scribble-speech',
-    'tests/test_speech.cpp', 'scribblewindow.cpp', 'textfile.cpp',
+    '../../tests/scribble/test_speech.cpp', 'scribblewindow.cpp', 'textfile.cpp',
     link_with: panelkit,
     include_directories: include_directories('../finder', '../print', '../panels'),
     dependencies: [shell_common_dep, platinum_dep, qt6, wayland_client],
@@ -17,7 +17,7 @@ test('scribble-speech',
   timeout: 30,
 )
 test('scribble-files',
-  executable('test-scribble-files', 'tests/test_textfile.cpp', 'textfile.cpp',
+  executable('test-scribble-files', '../../tests/scribble/test_textfile.cpp', 'textfile.cpp',
     dependencies: [qt6],
   ),
 )

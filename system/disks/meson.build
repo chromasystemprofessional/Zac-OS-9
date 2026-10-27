@@ -6,7 +6,7 @@ configure_file(input: 'org.zacos9.disks.policy.in',
   output: 'org.zacos9.disks.policy', configuration: disk_policy,
   install_dir: get_option('datadir') / 'polkit-1' / 'actions')
 test('disk-helper', find_program('python3'),
-  args: [files('test_disk_helper.py'), files('zacos9-disk-helper')])
+  args: [files('../../tests/disks/test_disk_helper.py'), files('zacos9-disk-helper')])
 
 install_data('zacos9-mac-mount',
   install_dir: get_option('libexecdir') / 'zacos9', install_mode: 'rwxr-xr-x')

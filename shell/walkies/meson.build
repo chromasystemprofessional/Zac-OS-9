@@ -8,7 +8,7 @@ executable('zacos9-walkies',
   install: true,
 )
 test('walkies-locations',
-  executable('test-walkies-locations', 'test_location.cpp', 'location.cpp',
+  executable('test-walkies-locations', '../../tests/walkies/test_location.cpp', 'location.cpp',
     dependencies: [shell_common_dep, platinum_dep, qt6],
   ),
   timeout: 10,

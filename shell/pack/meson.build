@@ -7,7 +7,7 @@ pack_exe = executable('zacos9-pack',
   install: true,
 )
 test('pack-apps',
-  executable('test-pack-apps', 'tests/test_apps.cpp', 'apps.cpp',
+  executable('test-pack-apps', '../../tests/pack/test_apps.cpp', 'apps.cpp',
     dependencies: [platinum_dep, qt6, gio, gio_unix],
   ),
 )

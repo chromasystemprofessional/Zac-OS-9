@@ -2,7 +2,7 @@
 # (see the test file for what could and couldn't be checked live).
 test('discovery',
   executable('test-discovery',
-    'tests/test_discovery.cpp',
+    '../../tests/network/test_discovery.cpp',
     'discovery.cpp',
     include_directories: include_directories('../common'),
     dependencies: [shell_common_dep, platinum_dep, qt6],
@@ -13,7 +13,7 @@ test('discovery',
 # AFP volume names and mount points (files/netvolumes.cpp).
 test('netvolumes',
   executable('test-netvolumes',
-    'tests/test_netvolumes.cpp',
+    '../../tests/network/test_netvolumes.cpp',
     dependencies: [shell_files_dep, qt6],
   ),
 )
