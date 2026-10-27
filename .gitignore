@@ -4,6 +4,9 @@ compile_commands.json
 *.o
 *.so
 
+# Editors' own settings, which name this machine's paths.
+.vscode/
+
 # User-supplied Apple files: never commit.
 emulation/roms/
 emulation/disks/
