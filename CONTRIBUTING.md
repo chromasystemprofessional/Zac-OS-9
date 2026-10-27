@@ -105,6 +105,9 @@ meson test -C build --num-processes 1                   # all of them
   own headless compositor, on a private D-Bus and in a temporary home folder.
   `tests/disksetup/stage.py` does this for you if you're writing one.
 - A new test file does nothing until it's registered in a `meson.build`.
+- Python tests share `tests/harness/zacos9test.py` (`wait_for()`, `free_port()`):
+  `meson test` puts it on `PYTHONPATH`; to run one by hand, start with
+  `PYTHONPATH=tests/harness`.
 - Five tests may skip, and only these: `menudraw`, `widgets` and `decor`
   compare against Apple reference figures that are never committed
   (`tools/measure/figs/`), and `screen-sharing-session` and `afp-disconnect`

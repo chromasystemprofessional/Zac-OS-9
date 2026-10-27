@@ -13,18 +13,10 @@ import tempfile
 import time
 from pathlib import Path
 
+from zacos9test import wait_for
+
 compositor, client, vptr = (str(Path(arg).resolve()) for arg in sys.argv[1:4])
 MINUTE = 400
-
-
-def wait_for(what, check, seconds=5):
-    deadline = time.monotonic() + seconds
-    while time.monotonic() < deadline:
-        value = check()
-        if value:
-            return value
-        time.sleep(0.02)
-    raise AssertionError(f"timed out waiting for {what}")
 
 
 with tempfile.TemporaryDirectory(prefix="zacos9-idle-") as directory:

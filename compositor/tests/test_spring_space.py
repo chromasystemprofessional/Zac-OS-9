@@ -19,22 +19,14 @@ import tempfile
 import time
 from pathlib import Path
 
+from zacos9test import wait_for
+
 compositor, menubar, finder, vptr = (str(Path(a).resolve()) for a in sys.argv[1:5])
 if not shutil.which("grim"):
     print("SKIP: grim is not installed")
     sys.exit(77)
 DOCS = (94, 108)      # Other's icons, its window at the top left
 MEMO = (174, 108)
-
-
-def wait_for(what, check, seconds=10):
-    deadline = time.monotonic() + seconds
-    while time.monotonic() < deadline:
-        value = check()
-        if value:
-            return value
-        time.sleep(0.1)
-    raise AssertionError(f"timed out waiting for {what}")
 
 
 with tempfile.TemporaryDirectory(prefix="zacos9-spring-") as directory:

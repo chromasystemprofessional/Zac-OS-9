@@ -17,6 +17,8 @@ import sys
 import tempfile
 import time
 
+from zacos9test import free_port
+
 host = Path(sys.argv[1]).resolve()
 sound_client = Path(sys.argv[2]).resolve()
 
@@ -59,12 +61,6 @@ with open(os.environ["TEST_PACAT_OUT"], "ab", buffering=0) as out:
     while data := sys.stdin.buffer.read1(65536):
         out.write(data)
 '''
-
-
-def free_port():
-    with socket.socket() as s:
-        s.bind(("127.0.0.1", 0))
-        return s.getsockname()[1]
 
 
 def request(sock_path, line):

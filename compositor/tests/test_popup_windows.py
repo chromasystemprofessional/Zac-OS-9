@@ -18,6 +18,8 @@ import tempfile
 import time
 from pathlib import Path
 
+from zacos9test import wait_for
+
 compositor, menubar, finder, vptr = (str(Path(a).resolve()) for a in sys.argv[1:5])
 if not shutil.which("grim"):
     print("SKIP: grim is not installed")
@@ -26,16 +28,6 @@ FACE = (204, 204, 204)   # an active tab's face
 WHITE = (255, 255, 255)  # a folder window's background
 TAB_Y = 710              # inside a closed tab, on a 1280x720 screen
 BODY = (100, 600)        # inside an open pop-up's body (420x280 by default)
-
-
-def wait_for(what, check, seconds=10):
-    deadline = time.monotonic() + seconds
-    while time.monotonic() < deadline:
-        value = check()
-        if value:
-            return value
-        time.sleep(0.1)
-    raise AssertionError(f"timed out waiting for {what}")
 
 
 with tempfile.TemporaryDirectory(prefix="zacos9-popup-") as directory:

@@ -16,7 +16,9 @@ add_project_arguments(
 # windows on the live compositor once crashed it and logged the user out. Tests
 # that need a display start their own headless zacos9-wm and override these.
 add_test_setup('isolated',
-  env: {'WAYLAND_DISPLAY': 'zacos9-test-no-display', 'DISPLAY': ''},
+  env: {'WAYLAND_DISPLAY': 'zacos9-test-no-display', 'DISPLAY': '',
+    # The Python tests' shared helpers (tests/harness/zacos9test.py).
+    'PYTHONPATH': meson.project_source_root() / 'tests/harness'},
   is_default: true,
 )
 

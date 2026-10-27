@@ -13,17 +13,9 @@ import threading
 import time
 from pathlib import Path
 
+from zacos9test import wait_for
+
 compositor, client, vptr = (str(Path(a).resolve()) for a in sys.argv[1:4])
-
-
-def wait_for(what, check, seconds=10):
-    deadline = time.monotonic() + seconds
-    while time.monotonic() < deadline:
-        value = check()
-        if value:
-            return value
-        time.sleep(0.05)
-    raise AssertionError(f"timed out waiting for {what}")
 
 
 with tempfile.TemporaryDirectory(prefix="zacos9-fkeys-") as directory:
