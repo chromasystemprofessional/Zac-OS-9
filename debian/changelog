@@ -1,3 +1,16 @@
+zacos9 (1.1.0) trixie; urgency=medium
+
+  * Fixes the File Sharing panel accepting any password when the system's
+    password checker couldn't be run. Fixes rare freezes while a window
+    waited for a helper program, and Date & Time leaving a stuck clock
+    change running. The printer windows no longer take clicks while waiting
+    for the printer system. Underneath, ZacOS 9's code has been reorganised
+    so it's easier for people to help build it: each kind of shared code,
+    setting and test now has one home, and Control Panels and the Zac
+    menu's Control Panels list the panels from what's installed.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Tue, 27 Oct 2026 12:51:12 -0400
+
 zacos9 (1.0.22) trixie; urgency=medium
 
   * Fixes the Sniffer crashing after you looked in the Fonts folder: fonts
