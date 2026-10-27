@@ -7,7 +7,7 @@ test('update-check',
   executable('test-update-check',
     'tests/test_updatecheck.cpp',
     'updatecheck.cpp',
-    dependencies: [qt6],
+    dependencies: [shell_common_dep, qt6],
   ),
   timeout: 60,
 )

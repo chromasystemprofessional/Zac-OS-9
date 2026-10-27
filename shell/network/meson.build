@@ -5,7 +5,7 @@ test('discovery',
     'tests/test_discovery.cpp',
     'discovery.cpp',
     include_directories: include_directories('../common'),
-    dependencies: [platinum_dep, qt6],
+    dependencies: [shell_common_dep, platinum_dep, qt6],
   ),
   timeout: 60,
 )

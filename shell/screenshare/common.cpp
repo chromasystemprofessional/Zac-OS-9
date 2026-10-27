@@ -1,4 +1,5 @@
 #include "common.h"
+#include "process.h"
 
 #include <QCoreApplication>
 #include <algorithm>
@@ -151,19 +152,17 @@ bool hostRequest(const QString &command, QStringList *reply, int timeoutMs) {
 	s.connectToServer(hostSocket());
 	QElapsedTimer clock;
 	clock.start();
-	while (s.state() == QLocalSocket::ConnectingState && clock.elapsed() < timeoutMs) {
-		QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents | QEventLoop::WaitForMoreEvents, 50);
-	}
+	waitUntil([&s] { return s.state() != QLocalSocket::ConnectingState; }, timeoutMs);
 	if (s.state() != QLocalSocket::ConnectedState) {
 		return false;
 	}
 	s.write(command.toUtf8() + '\n');
 	QByteArray answer;
 	/* The host closes the connection after its answer. */
-	while (s.state() == QLocalSocket::ConnectedState && clock.elapsed() < timeoutMs) {
-		QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents | QEventLoop::WaitForMoreEvents, 50);
+	waitUntil([&] {
 		answer += s.readAll();
-	}
+		return s.state() != QLocalSocket::ConnectedState;
+	}, std::max<int>(0, timeoutMs - int(clock.elapsed())));
 	answer += s.readAll();
 	if (reply) {
 		*reply = QString::fromUtf8(answer).split('\n', Qt::SkipEmptyParts);

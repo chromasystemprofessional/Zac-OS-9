@@ -1,4 +1,5 @@
 #include "installer.h"
+#include "process.h"
 #include "power.h"
 
 #include <QCoreApplication>
@@ -422,38 +423,18 @@ void InstallerWindow::showDone() {
 
 /* ---- disk enumeration ---------------------------------------------------- */
 
-/* True if the process finished; false (and killed) on timeout. */
-static bool waitSync(QProcess *p, int ms) {
-	bool done = false;
-	QObject::connect(p, &QProcess::finished,
-		[&done] { done = true; });
-	QObject::connect(p, &QProcess::errorOccurred,
-		[&done](QProcess::ProcessError e) {
-			if (e == QProcess::FailedToStart) { done = true; }
-		});
-	QElapsedTimer t;
-	t.start();
-	while (!done && t.elapsed() < ms) {
-		QCoreApplication::processEvents(
-			QEventLoop::ExcludeUserInputEvents |
-			QEventLoop::WaitForMoreEvents, 100);
-	}
-	if (!done) { p->kill(); p->waitForFinished(500); return false; }
-	return true;
-}
-
 /* The drive ZacOS 9 is running from (the installer USB stick or disc), by name
  * ("sdb"), or nothing: it is not somewhere to install to. */
 static QString liveMediumDisk() {
 	for (const char *where : { "/run/live/medium", "/lib/live/mount/medium", "/cdrom" }) {
 		QProcess find;
 		find.start("findmnt", { "-n", "-o", "SOURCE", where });
-		if (!waitSync(&find, 3000)) continue;
+		if (!waitForProcess(&find, 3000)) continue;
 		const QString source = QString::fromUtf8(find.readAllStandardOutput()).trimmed();
 		if (!source.startsWith("/dev/")) continue;
 		QProcess parent;
 		parent.start("lsblk", { "-n", "-o", "PKNAME", source });
-		if (!waitSync(&parent, 3000)) continue;
+		if (!waitForProcess(&parent, 3000)) continue;
 		const QString name = QString::fromUtf8(parent.readAllStandardOutput()).split('\n').value(0).trimmed();
 		/* A partition names its disk; a whole disk (a disc, or an image written
 		 * straight to a stick) is its own. */
@@ -471,7 +452,7 @@ void InstallerWindow::enumerateDisks() {
 	QProcess p;
 	p.start("lsblk", { "-P", "-n", "-e", "1,7,11", "-o", "NAME,TYPE,SIZE,FSTYPE,MODEL,PKNAME,LABEL" });
 	QMap<QString, QString> models; /* each disk's, for its partitions */
-	waitSync(&p, 5000);
+	waitForProcess(&p, 5000);
 	for (const QByteArray &raw : p.readAllStandardOutput().split('\n')) {
 		const QString line = QString::fromUtf8(raw).trimmed();
 		if (line.isEmpty()) continue;
@@ -513,11 +494,11 @@ void InstallerWindow::enumerateDisks() {
 	 * to open a disk). */
 	QProcess version;
 	version.start("dpkg-query", { "-W", "-f=${Version}", "zacos9" });
-	waitSync(&version, 3000);
+	waitForProcess(&version, 3000);
 	m_liveVersion = QString::fromUtf8(version.readAllStandardOutput()).trimmed();
 	QProcess detect;
 	startHelper(&detect, { "--detect" });
-	waitSync(&detect, 30000);
+	waitForProcess(&detect, 30000);
 	for (const QByteArray &raw : detect.readAllStandardOutput().split('\n')) {
 		const QStringList f = QString::fromUtf8(raw).trimmed().split(' ');
 		if (f.size() < 5 || f[0] != "zacos9") continue;
@@ -529,7 +510,7 @@ void InstallerWindow::enumerateDisks() {
 				for (int cmp : { -1, 1 }) {
 					QProcess v;
 					v.start("dpkg", { "--compare-versions", d.zacosVersion, cmp < 0 ? "lt" : "gt", m_liveVersion });
-					if (waitSync(&v, 3000) && v.exitCode() == 0) d.zacosCmp = cmp;
+					if (waitForProcess(&v, 3000) && v.exitCode() == 0) d.zacosCmp = cmp;
 				}
 			}
 		}

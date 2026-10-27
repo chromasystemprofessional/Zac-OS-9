@@ -1,4 +1,5 @@
 #include "netvolumes.h"
+#include "process.h"
 
 #include <QDir>
 #include <QFile>
@@ -162,19 +163,7 @@ int afpMountAmong(const std::vector<NetVolume> &live, const QString &path, const
 /* Runs a short command to the end without blocking the GUI (never
  * QProcess::waitForFinished; see CLAUDE.md). */
 static bool runBriefly(const QString &program, const QStringList &args) {
-	QProcess p;
-	p.start(program, args);
-	QElapsedTimer timer;
-	timer.start();
-	while (p.state() != QProcess::NotRunning && timer.elapsed() < 5000) {
-		QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents, 10);
-		QThread::msleep(1);
-	}
-	if (p.state() != QProcess::NotRunning) {
-		p.kill();
-		return false;
-	}
-	return p.exitStatus() == QProcess::NormalExit && p.exitCode() == 0;
+	return runProcess(program, args, { {}, 5000 }).ok();
 }
 
 /* Empty folders under DIR, down to where volumes mount (SERVER/ID/NAME),
@@ -235,16 +224,7 @@ bool netVolumeEject(const NetVolume &v, QString *error) {
 	if (v.kind == NetVolume::AFP) {
 		QProcess p;
 		p.start("fusermount3", { "-u", v.path });
-		QElapsedTimer timer;
-		timer.start();
-		while (p.state() != QProcess::NotRunning && timer.elapsed() < 10000) {
-			QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents, 10);
-			QThread::msleep(1);
-		}
-		const bool timedOut = p.state() != QProcess::NotRunning;
-		if (timedOut) {
-			p.kill();
-		}
+		const bool timedOut = !waitForProcess(&p, 10000);
 		if (timedOut || p.error() == QProcess::FailedToStart || p.exitStatus() != QProcess::NormalExit ||
 				p.exitCode() != 0) {
 			*error = QString::fromUtf8(p.readAllStandardError()).trimmed();

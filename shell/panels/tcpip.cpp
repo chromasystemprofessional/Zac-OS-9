@@ -33,6 +33,7 @@
 #include <QTimer>
 
 #include "alert.h"
+#include "process.h"
 #include "panelkit.h"
 #include "platinumshell.h"
 #include "settings.h"
@@ -70,20 +71,7 @@ static bool run(const QStringList &args, QString *out = nullptr, QString *err = 
 		return false;
 	}
 	p.closeWriteChannel();
-	/* Not QProcess::waitForFinished(): it deadlocked in this Qt/Wayland process
-	 * (see CLAUDE.md). Events are served while waiting, except the user's, so
-	 * the panel keeps drawing and nothing is clicked half way. */
-	bool done = false;
-	QObject::connect(&p, &QProcess::finished, [&done] { done = true; });
-	QElapsedTimer clock;
-	clock.start();
-	while (!done && p.state() != QProcess::NotRunning && clock.elapsed() < ms) {
-		QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents |
-			QEventLoop::WaitForMoreEvents, 100);
-	}
-	if (p.state() != QProcess::NotRunning) {
-		p.kill();
-		p.waitForFinished(1000);
+	if (!waitForProcess(&p, ms)) {
 		if (err) {
 			*err = "nmcli didn't answer.";
 		}

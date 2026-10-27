@@ -329,11 +329,7 @@ static QByteArray fetch(QNetworkAccessManager *net, const QString &url, QString 
 	req.setRawHeader("Accept", "application/vnd.github+json");
 	req.setTransferTimeout(60000);
 	QNetworkReply *reply = net->get(req);
-	bool done = false;
-	QObject::connect(reply, &QNetworkReply::finished, [&done] { done = true; });
-	while (!done) {
-		QApplication::processEvents(QEventLoop::ExcludeUserInputEvents | QEventLoop::WaitForMoreEvents, 100);
-	}
+	waitUntil([reply] { return reply->isFinished(); }, -1);
 	QByteArray data;
 	if (reply->error() == QNetworkReply::NoError) {
 		data = reply->readAll();

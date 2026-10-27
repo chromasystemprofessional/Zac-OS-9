@@ -18,7 +18,7 @@ test_screenshare_sound = executable('test-screenshare-sound', '../../tests/scree
   'sound.cpp', 'common.cpp',
   link_with: panelkit,
   include_directories: include_directories('../finder', '../panels'),
-  dependencies: [platinum_dep, qt6],
+  dependencies: [shell_common_dep, platinum_dep, qt6],
 )
 
 test('screenshare-host', find_program('python3'),
@@ -45,7 +45,7 @@ test('screenshare-rfb',
     'rfb.cpp', 'common.cpp',
     link_with: panelkit,
     include_directories: include_directories('../finder', '../panels'),
-    dependencies: [platinum_dep, qt6, zlib],
+    dependencies: [shell_common_dep, platinum_dep, qt6, zlib],
   ),
   env: ['QT_QPA_PLATFORM=offscreen'],
 )

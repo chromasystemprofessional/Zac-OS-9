@@ -1,4 +1,5 @@
 #include "appearance.h"
+#include "process.h"
 
 #include <QApplication>
 #include <QDir>
@@ -761,14 +762,7 @@ QString AppearancePanel::recordAlertSound() {
 	QTimer::singleShot(10000, &stop, [&stop] { stop.accept(); }); /* ten seconds at most */
 	stop.exec();
 	recorder.terminate(); /* pw-record finishes the file on SIGTERM */
-	bool done = recorder.state() == QProcess::NotRunning;
-	QObject::connect(&recorder, &QProcess::finished, [&done] { done = true; });
-	for (int waited = 0; !done && waited < 3000; waited += 50) {
-		QApplication::processEvents(QEventLoop::ExcludeUserInputEvents | QEventLoop::WaitForMoreEvents, 50);
-	}
-	if (!done) {
-		recorder.kill();
-	}
+	waitForProcess(&recorder, 3000); /* killed if it hasn't finished by then */
 	if (QFileInfo(raw).size() <= 44) { /* a WAV header and nothing else */
 		m_themeError = "Nothing was recorded. Check the sound input in the Sound control panel.";
 		update();
