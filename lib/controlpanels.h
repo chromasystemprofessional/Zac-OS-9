@@ -5,6 +5,7 @@
 extern "C" {
 #endif
 
+#include <stdbool.h>
 #include <stddef.h>
 
 #include "icons.h"
@@ -29,6 +30,19 @@ struct pl_control_panel {
  * pl_control_panels_free(). */
 struct pl_control_panel *pl_control_panels(size_t *count);
 void pl_control_panels_free(struct pl_control_panel *panels, size_t count);
+
+/* The panels the user has turned off: the system installed the panel, and
+ * the user's own copy of its entry hides it (NoDisplay=true, as turning one
+ * off below writes, or Hidden=true by hand). By name too, with the name,
+ * program and icon the panel has when it is on. */
+struct pl_control_panel *pl_control_panels_disabled(size_t *count);
+
+/* Turns a panel off or on, as dragging it into or out of Control Panels
+ * (Disabled) did: off copies the system's entry into the user's data folder
+ * marked NoDisplay=true, which the reader above leaves out; on removes that
+ * copy again. False if the system doesn't install that panel, or the copy
+ * can't be written. */
+bool pl_control_panel_set_enabled(const char *id, bool enabled);
 
 #ifdef __cplusplus
 }
