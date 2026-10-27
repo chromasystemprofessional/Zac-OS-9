@@ -216,7 +216,10 @@ public:
 			return;
 		}
 		QByteArray mark;
-		for (const QString &folder : { soundThemesFolder(), appearanceThemesFolder() }) {
+		/* The alert-sound folders too: a recording dropped into the System
+		 * Folder's Sounds is a change the panels showing it must see. */
+		for (const QString &folder : { soundThemesFolder(), appearanceThemesFolder(),
+				userAlertSoundsFolder() }) {
 			const auto entries = QDir(folder).entryInfoList(QDir::AllEntries | QDir::NoDotAndDotDot | QDir::Hidden,
 				QDir::Name);
 			for (const QFileInfo &entry : entries) {

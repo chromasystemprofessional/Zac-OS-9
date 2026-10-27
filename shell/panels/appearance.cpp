@@ -338,7 +338,11 @@ AppearancePanel::AppearancePanel() {
 		update();
 	};
 	loadThemes();
-	watchCustomThemes(this, [this] { loadThemes(); update(); });
+	watchCustomThemes(this, [this] {
+		loadThemes();
+		loadAlertSounds();
+		update();
+	});
 	m_focus = &m_accents;
 }
 
