@@ -28,6 +28,7 @@
 
 #include "appdb.h"
 #include "apptrash.h"
+#include "controlpanels.h"
 #include "items.h"
 #include "resources.h"
 #include "folderpath.h"
@@ -569,6 +570,61 @@ int main(int argc, char **argv) {
 		vfsNode(vfsPathFor("system-folder/control-panels/zacos9-controlpanel-energysaver"));
 	check(mouse && mouse->icon == PL_ICON_CP_MOUSE && napTime && napTime->icon == PL_ICON_EXT_POWER,
 		"each control panel has its own icon, as in the Zac menu");
+
+	/* Control Panels (Disabled): the panels the user turned off, still
+	 * their own entries, for dragging back as Mac OS 9's Extensions
+	 * Manager did. */
+	const QString controlPanels = vfsPathFor("system-folder/control-panels");
+	const QString disabledPanels = vfsPathFor("system-folder/control-panels-disabled");
+	check(namesIn(vfsPathFor("system-folder")).contains("Control Panels (Disabled)"),
+		"the System Folder holds Control Panels (Disabled)");
+	check(vfsIsControlPanels(controlPanels) && vfsIsControlPanelsDisabled(disabledPanels),
+		"the two control-panel folders know themselves");
+	const VNode *disabledNode = vfsNode(disabledPanels);
+	check(disabledNode && disabledNode->icon == PL_ICON_CONTROL_PANELS &&
+		disabledNode->kind == VKind::PanelsDisabled,
+		"the (Disabled) folder has Control Panels' icon");
+	check(namesIn(disabledPanels).isEmpty(), "and is empty while every panel is on");
+
+	/* One turned off moves there, keeping its icon, its place and its
+	 * entry's id; the panel itself is still there to open. */
+	check(pl_control_panel_set_enabled("zacos9-mouse.desktop", false), "a panel can be turned off");
+	vfsRefresh();
+	check(namesIn(disabledPanels) == QStringList{ "Mouse" },
+		"which moves it to Control Panels (Disabled)");
+	check(!namesIn(controlPanels).contains("Mouse"), "and out of Control Panels");
+	const VNode *offMouse = vfsNode(disabledPanels + "/zacos9-controlpanel-mouse");
+	check(offMouse && offMouse->kind == VKind::Launcher && offMouse->icon == PL_ICON_CP_MOUSE &&
+		offMouse->panelId == "zacos9-mouse.desktop",
+		"keeping its icon, its place and its entry's id");
+	check(offMouse && offMouse->program == "zacos9-controlpanel" && offMouse->args == QStringList{ "mouse" },
+		"and still a control panel, to open from there too");
+	check(pl_control_panel_set_enabled("zacos9-mouse.desktop", true), "turned back on");
+	vfsRefresh();
+	check(namesIn(disabledPanels).isEmpty() && namesIn(controlPanels).contains("Mouse"),
+		"which puts it back in Control Panels, and leaves (Disabled) empty");
+
+	/* A registry written before the folder existed gains it, keeping what
+	 * the user set. */
+	QFile olderRegistry(vfsRegistryPath());
+	QJsonObject older = olderRegistry.open(QIODevice::ReadOnly) ?
+		QJsonDocument::fromJson(olderRegistry.readAll()).object() : QJsonObject();
+	olderRegistry.close();
+	QJsonArray olderNodes;
+	for (const QJsonValue &value : older.value("nodes").toArray()) {
+		if (value.toObject().value("id").toString() != "system-folder/control-panels-disabled") {
+			olderNodes.append(value);
+		}
+	}
+	older.insert("nodes", olderNodes);
+	older.insert("version", 19);
+	if (olderRegistry.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+		olderRegistry.write(QJsonDocument(older).toJson());
+		olderRegistry.close();
+	}
+	vfsRefresh();
+	check(namesIn(vfsPathFor("system-folder")).contains("Control Panels (Disabled)"),
+		"a registry written before the folder existed gains it");
 
 	/* ---- an application appears as a direct launcher in Applications --- */
 	const VNode *launcher = vfsNode(vfsPathFor("applications/simpletext.desktop"));

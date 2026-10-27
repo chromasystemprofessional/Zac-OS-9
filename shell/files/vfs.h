@@ -36,6 +36,7 @@ enum class VKind {
 	Backed,     /* stands for a real directory */
 	Apps,       /* generated: the installed applications */
 	Panels,     /* generated: ZacOS 9's control panels */
+	PanelsDisabled, /* generated: the control panels the user turned off */
 	AppFolder,  /* generated: one application's folder */
 	Launcher,   /* generated: starts an application or a control panel */
 	Unix,       /* the real filesystem root, for inspecting Debian */
@@ -62,6 +63,8 @@ struct VNode {
 	 * if this is one; or a program of ours to run, with its arguments. */
 	QString appId, actionId, program;
 	QStringList args;
+	/* A control panel's desktop entry ID, for turning it off and on. */
+	QString panelId;
 	/* Resource: a fixed provider id and provider-generated item key.
 	 * These are never source paths or commands from the registry. */
 	QString resourceProvider, resourceKey;
@@ -152,6 +155,9 @@ QString vfsStartupItemId(const QString &path);
 QString vfsStartupItemsPath();
 /* Is this the Applications folder? */
 bool vfsIsApplications(const QString &path);
+/* Control Panels, and the (Disabled) folder the ones turned off go to. */
+bool vfsIsControlPanels(const QString &path);
+bool vfsIsControlPanelsDisabled(const QString &path);
 bool vfsIsFonts(const QString &path);
 QString vfsFontFile(const QString &path);
 void vfsFontsChanged();

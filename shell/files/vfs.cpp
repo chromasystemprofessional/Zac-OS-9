@@ -42,11 +42,12 @@
  *     icons (a bone, Zac's doghouse, an emblem each).
  * 17: Shutdown Items, Zac Menu Items and Extensions (Disabled).
  * 18: Extensions Manager uses its Mac OS 9 name again.
- * 19: Zac Menu Items (Disabled). */
-static constexpr int REGISTRY_VERSION = 19;
+ * 19: Zac Menu Items (Disabled).
+ * 20: Control Panels (Disabled). */
+static constexpr int REGISTRY_VERSION = 20;
 
 static const char *DEFAULT_REGISTRY = R"JSON({
-  "version": 19,
+  "version": 20,
   "volume": {},
   "showUnixVolume": false,
   "nodes": [
@@ -64,6 +65,8 @@ static const char *DEFAULT_REGISTRY = R"JSON({
       "backing": "$XDG_DATA_HOME/zacos9/appearance/Sound Themes" },
     { "id": "system-folder/control-panels", "name": "Control Panels",
       "kind": "panels", "icon": "control-panels" },
+    { "id": "system-folder/control-panels-disabled", "name": "Control Panels (Disabled)",
+      "kind": "panels-disabled", "icon": "control-panels" },
     { "id": "system-folder/extensions", "icon": "sf-extensions", "name": "Extensions", "kind": "resource",
       "provider": "extensions" },
     { "id": "system-folder/extensions-disabled", "icon": "sf-extensions",
@@ -178,6 +181,9 @@ VKind kindFromName(const QString &name) {
 	if (name == "panels") {
 		return VKind::Panels;
 	}
+	if (name == "panels-disabled") {
+		return VKind::PanelsDisabled;
+	}
 	if (name == "unix") {
 		return VKind::Unix;
 	}
@@ -227,7 +233,8 @@ pl_icon_kind iconFromName(const QString &name, VKind kind) {
 	if (name == "document") {
 		return PL_ICON_DOCUMENT;
 	}
-	return kind == VKind::Panels ? PL_ICON_CONTROL_PANELS : PL_ICON_FOLDER;
+	return kind == VKind::Panels || kind == VKind::PanelsDisabled ?
+		PL_ICON_CONTROL_PANELS : PL_ICON_FOLDER;
 }
 
 QStringList stringList(const QJsonValue &v) {
@@ -428,23 +435,29 @@ void generateApps(const VNode &parent) {
 	}
 }
 
+/* One panel's item. An id from the program and its argument, as the
+ * folder's items always had, so the places and labels given to them stay
+ * theirs; the entry's own id rides along, to turn it off and on again. */
+void addPanel(const VNode &parent, const pl_control_panel &panel) {
+	const QString program = QString::fromUtf8(panel.program);
+	const QStringList args = QString::fromUtf8(panel.args).split(' ', Qt::SkipEmptyParts);
+	VNode node;
+	node.id = parent.id + "/" + program + (args.isEmpty() ? QString() : "-" + args.join('-'));
+	node.name = QString::fromUtf8(panel.name);
+	node.kind = VKind::Launcher;
+	node.icon = panel.icon;
+	node.program = program;
+	node.args = args;
+	node.panelId = QString::fromUtf8(panel.id);
+	addNode(node);
+}
+
 void generatePanels(const VNode &parent) {
-	/* The installed control panels (lib/controlpanels.h). An id from the
-	 * program and its argument, as the folder's items always had, so the
-	 * places and labels given to them stay theirs. */
+	/* The installed control panels (lib/controlpanels.h). */
 	size_t count = 0;
 	pl_control_panel *panels = pl_control_panels(&count);
 	for (size_t i = 0; i < count; i++) {
-		const QString program = QString::fromUtf8(panels[i].program);
-		const QStringList args = QString::fromUtf8(panels[i].args).split(' ', Qt::SkipEmptyParts);
-		VNode node;
-		node.id = parent.id + "/" + program + (args.isEmpty() ? QString() : "-" + args.join('-'));
-		node.name = QString::fromUtf8(panels[i].name);
-		node.kind = VKind::Launcher;
-		node.icon = panels[i].icon;
-		node.program = program;
-		node.args = args;
-		addNode(node);
+		addPanel(parent, panels[i]);
 	}
 	pl_control_panels_free(panels, count);
 	/* The Toy Box is the Sniffer's own window, listed here as the Mac
@@ -456,6 +469,18 @@ void generatePanels(const VNode &parent) {
 	toyBox.icon = PL_ICON_APPLICATION;
 	toyBox.builtinAction = QStringLiteral("toy-box");
 	addNode(toyBox);
+}
+
+/* The panels the user turned off. The same items, so a panel keeps its
+ * place and its label while it goes into and out of the folder; the Toy
+ * Box is not a panel file, so it stays in Control Panels. */
+void generateDisabledPanels(const VNode &parent) {
+	size_t count = 0;
+	pl_control_panel *panels = pl_control_panels_disabled(&count);
+	for (size_t i = 0; i < count; i++) {
+		addPanel(parent, panels[i]);
+	}
+	pl_control_panels_free(panels, count);
 }
 
 void generateResourceLaunchers(const VNode &parent) {
@@ -670,7 +695,8 @@ void load() {
 			node.builtinAction.clear();
 		}
 		addNode(node);
-		if (node.kind == VKind::Apps || node.kind == VKind::Panels) {
+		if (node.kind == VKind::Apps || node.kind == VKind::Panels ||
+				node.kind == VKind::PanelsDisabled) {
 			generators.push_back(node);
 		}
 	}
@@ -682,6 +708,8 @@ void load() {
 			if (node.id == "system-folder/utilities") {
 				generateResourceLaunchers(node);
 			}
+		} else if (node.kind == VKind::PanelsDisabled) {
+			generateDisabledPanels(node);
 		} else {
 			generatePanels(node);
 		}
@@ -1096,6 +1124,7 @@ bool vfsResourceDetails(const QString &path, QStringList *details, QString *kind
 		info.kind = node->kind == VKind::Launcher ? "application launcher" :
 			node->kind == VKind::Apps ? "virtual application collection" :
 			node->kind == VKind::Panels ? "virtual control-panel collection" :
+			node->kind == VKind::PanelsDisabled ? "virtual control-panel collection" :
 			node->kind == VKind::Volume ? "startup disk" :
 			node->kind == VKind::ExternalVolume ? "disk" :
 			node->kind == VKind::Backed ? "folder" : "curated folder";
@@ -1375,6 +1404,16 @@ QString vfsStartupItemsPath() {
 bool vfsIsApplications(const QString &path) {
 	const VNode *node = vfsNode(path);
 	return node && node->kind == VKind::Apps && !node->id.startsWith("system-folder/");
+}
+
+bool vfsIsControlPanels(const QString &path) {
+	const VNode *node = vfsNode(path);
+	return node && node->kind == VKind::Panels;
+}
+
+bool vfsIsControlPanelsDisabled(const QString &path) {
+	const VNode *node = vfsNode(path);
+	return node && node->kind == VKind::PanelsDisabled;
 }
 
 bool vfsRename(const QString &path, const QString &newName) {
