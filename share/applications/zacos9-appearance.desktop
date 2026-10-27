@@ -3,5 +3,5 @@ Type=Application
 Name=Appearance
 Comment=Accent colour, highlight colour, desktop pattern and alert sound
 Exec=zacos9-appearance
-Categories=Settings;DesktopSettings;
+Categories=Settings;DesktopSettings;X-ZacOS9-ControlPanel;
 OnlyShowIn=ZacOS9;

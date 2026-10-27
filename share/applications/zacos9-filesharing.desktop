@@ -3,5 +3,5 @@ Type=Application
 Name=File Sharing
 Comment=Share this computer's files with Macs (AFP) and Windows computers (SMB)
 Exec=zacos9-filesharing
-Categories=Settings;Network;
+Categories=Settings;Network;X-ZacOS9-ControlPanel;
 OnlyShowIn=ZacOS9;

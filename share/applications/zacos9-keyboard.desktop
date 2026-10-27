@@ -3,5 +3,5 @@ Type=Application
 Name=Keyboard
 Comment=Key repeat rate and delay
 Exec=zacos9-controlpanel keyboard
-Categories=Settings;HardwareSettings;
+Categories=Settings;HardwareSettings;X-ZacOS9-ControlPanel;
 OnlyShowIn=ZacOS9;

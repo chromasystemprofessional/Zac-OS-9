@@ -10,6 +10,7 @@
 #include <glib.h>
 
 #include "appfilter.h"
+#include "controlpanels.h"
 #include "icons.h"
 #include "electron.h"
 #include "locate.h"
@@ -552,44 +553,14 @@ void launch_fill_logo_menu(struct mb_menu *menu, const struct app *apps, int n_a
 	with_kind(add_item(menu, "Control Panels", true, ACT_NONE, NULL), PL_ICON_CONTROL_PANELS);
 	struct mb_menu *panels = calloc(1, sizeof(*panels));
 	menu->items[menu->n - 1].submenu = panels;
-	/* Alphabetical, as in the Mac's Control Panels folder. */
-	/* Each with an icon from ZacOS's own set (lib/icons.h). */
-	const struct { const char *name, *program, *arg; enum pl_icon_kind icon; } panel_list[] = {
-		{ "Accessibility", "zacos9-controlpanel", " accessibility", PL_ICON_CP_ACCESSIBILITY },
-		{ "Appearance", "zacos9-appearance", "", PL_ICON_CP_APPEARANCE },
-		{ "Bluetooth", "zacos9-bluetooth", "", PL_ICON_EXT_BLUETOOTH },
-		{ "Collar", "zacos9-collarpanel", "", PL_ICON_CP_COLLAR },
-		{ "Date & Time", "zacos9-datetime", "", PL_ICON_CP_DATETIME },
-		{ "File Sharing", "zacos9-filesharing", "", PL_ICON_SHARED_FOLDER },
-		{ "File Translator", "zacos9-fileexchange", "", PL_ICON_CP_FILETRANSLATOR },
-		{ "General Controls", "zacos9-controlpanel", " general", PL_ICON_CP_GENERAL },
-		{ "Internet", "zacos9-controlpanel", " internet", PL_ICON_INTERNET_LOCATION },
-		{ "Keyboard", "zacos9-controlpanel", " keyboard", PL_ICON_CP_KEYBOARD },
-		{ "Keychain Access", "zacos9-keychain", "", PL_ICON_CP_KEYCHAIN },
-		{ "Memory", "zacos9-controlpanel", " memory", PL_ICON_CP_MEMORY },
-		{ "Monitors", "zacos9-controlpanel", " monitors", PL_ICON_EXT_DISPLAY },
-		{ "Mouse", "zacos9-controlpanel", " mouse", PL_ICON_CP_MOUSE },
-		{ "Nap Time", "zacos9-controlpanel", " energysaver", PL_ICON_EXT_POWER },
-		{ "Numbers", "zacos9-controlpanel", " numbers", PL_ICON_CP_NUMBERS },
-		{ "Retriever", "zacos9-retriever", "", PL_ICON_CP_RETRIEVER },
-		{ "Screen Saver", "zacos9-controlpanel", " screensaver", PL_ICON_CP_SCREENSAVER },
-		{ "Screen Sharing", "zacos9-screensharing", "", PL_ICON_EXT_DISPLAY },
-		{ "Sound", "zacos9-controlpanel", " sound", PL_ICON_EXT_AUDIO },
-		{ "Speech", "zacos9-controlpanel", " speech", PL_ICON_CP_SPEECH },
-		{ "Startup Disk", "zacos9-controlpanel", " startupdisk", PL_ICON_DISK },
-		{ "Tablet", "zacos9-controlpanel", " tablet", PL_ICON_EXT_INPUT },
-		{ "TCP/IP", "zacos9-tcpip", "", PL_ICON_EXT_ETHERNET },
-		{ "Text", "zacos9-controlpanel", " text", PL_ICON_CP_TEXT },
-		{ "Trackpad", "zacos9-controlpanel", " trackpad", PL_ICON_CP_TRACKPAD },
-		{ "Users", "zacos9-controlpanel", " users", PL_ICON_CP_USERS },
-		{ "Walkies", "zacos9-walkies", "", PL_ICON_CP_WALKIES },
-		{ "Zac Menu Options", "zacos9-controlpanel", " zacmenu", PL_ICON_CP_ZACMENU },
-	};
+	/* The installed control panels, by name (lib/controlpanels.h). */
+	size_t count = 0;
+	struct pl_control_panel *panel_list = pl_control_panels(&count);
 	bool toy_box_added = false;
-	for (size_t i = 0; i < sizeof(panel_list) / sizeof(panel_list[0]); i++) {
+	for (size_t i = 0; i < count; i++) {
 		char command[PATH_MAX + 64];
 		sibling_program(panel_list[i].program, command, sizeof(command));
-		strncat(command, panel_list[i].arg, sizeof(command) - strlen(command) - 1);
+		strncat(command, panel_list[i].args, sizeof(command) - strlen(command) - 1);
 		/* The Toy Box (the Sniffer's own window) goes in its place by name. */
 		if (!toy_box_added && strcmp(panel_list[i].name, "Toy Box") > 0) {
 			with_kind(add_item(panels, "Toy Box", true, ACT_FINDER, "toy-box"), PL_ICON_FOLDER);
@@ -597,6 +568,7 @@ void launch_fill_logo_menu(struct mb_menu *menu, const struct app *apps, int n_a
 		}
 		with_kind(add_item(panels, panel_list[i].name, true, ACT_LAUNCH, command), panel_list[i].icon);
 	}
+	pl_control_panels_free(panel_list, count);
 	add_favorites(menu);
 	recent_fill_menu(menu);
 

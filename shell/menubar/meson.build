@@ -22,7 +22,7 @@ menubar_exe = executable('zacos9-menubar',
   client_protocol_src,
   finder_protocol,
   dependencies: [platinum_dep, wayland_client, wayland_cursor, xkbcommon_client, gio,
-    dependency('gdk-pixbuf-2.0'), appfilter_dep],
+    dependency('gdk-pixbuf-2.0'), appfilter_dep, controlpanels_dep],
   install: true,
 )
 
@@ -62,7 +62,7 @@ test('menu-app-switch',
 test('menu-launch-feedback',
   executable('test-menu-launch',
     'test_launch.c', 'launch.c',
-    dependencies: [platinum_dep, wayland_client, gio, appfilter_dep],
+    dependencies: [platinum_dep, wayland_client, gio, appfilter_dep, controlpanels_dep],
   ),
   timeout: 10,
 )

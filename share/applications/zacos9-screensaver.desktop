@@ -3,5 +3,5 @@ Type=Application
 Name=Screen Saver
 Comment=Which screen saver, and when it starts
 Exec=zacos9-controlpanel screensaver
-Categories=Settings;DesktopSettings;
+Categories=Settings;DesktopSettings;X-ZacOS9-ControlPanel;
 OnlyShowIn=ZacOS9;

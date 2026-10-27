@@ -3,5 +3,5 @@ Type=Application
 Name=File Translator
 Comment=Choose the application that opens each kind of document
 Exec=zacos9-fileexchange
-Categories=Settings;DesktopSettings;
+Categories=Settings;DesktopSettings;X-ZacOS9-ControlPanel;
 OnlyShowIn=ZacOS9;
