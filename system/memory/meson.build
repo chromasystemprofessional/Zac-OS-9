@@ -12,4 +12,4 @@ install_data('zacos9-ramdisk.service',
   install_dir: get_option('prefix') / 'lib' / 'systemd' / 'system')
 
 test('memory-helper', find_program('python3'),
-  args: [files('../tests/memory/test_helper.py'), files('zacos9-memory-helper')])
+  args: [files('../../tests/memory/test_helper.py'), files('zacos9-memory-helper')])

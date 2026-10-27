@@ -1,7 +1,7 @@
-"""Tests for appstore/zacos9-appstyle with a made-up preset (a zip built here,
+"""Tests for system/appstore/zacos9-appstyle with a made-up preset (a zip built here,
 fetched through a file:// URL), in a private HOME.
 
-    python3 tests/store/test_appstyle.py appstore/zacos9-appstyle
+    python3 tests/store/test_appstyle.py system/appstore/zacos9-appstyle
 """
 import hashlib
 import importlib.machinery

@@ -48,7 +48,7 @@ from beside itself when installed, from the build tree when it runs from one,
 else from `$PATH` (`siblingProgram()` in `shell/common/programs.h`;
 `lib/locate.h` for C).
 
-**Root helpers** (`accounts/`, `appstore/`, `disks/`, `installer/`,
+**Root helpers** (`system/`: `accounts/`, `appstore/`, `disks/`, `installer/`,
 `memory/`, `modules/`, `setup/`, `sharing/`, `startupdisk/`) are small scripts
 installed in `/usr/libexec/zacos9`. A program runs one with `pkexec`, and its
 polkit policy decides who may (usually an administrator, sometimes without a
@@ -89,9 +89,9 @@ rather than reimplementing them.
 | What nearly every desktop program uses: window hints to `zacos9-wm` (`platinumshell`), the alert box, drawing Platinum images in Qt (`pixels.h`), Shut Down and Restart (`power`) | `shell/common/` (`libzacos9-shell`) | |
 | A control panel | `shell/panels/`, a file each (`mouse.cpp`, `sound.cpp`…; `panelregistry.h` says how to add one) | e.g. [Bluetooth](docs/bluetooth.md), [Memory](docs/memory.md) |
 | Appearance: themes, desktop patterns, sound sets | `shell/panels/appearance.cpp` | [Themes and sound sets](docs/themes.md) |
-| Software (installing programs), Software Update | `shell/store/`, `shell/update/`; `appstore/` | [Software](docs/appstore.md), [Updates](docs/updates.md) |
-| The installer, Disk Setup | `shell/installer/`, `shell/disksetup/`; `installer/` | [Installer](docs/installer.md) |
-| File sharing, networking with Macs and Windows | `shell/network/`, `network/afp/`; `sharing/` | [Networking](docs/network.md) |
+| Software (installing programs), Software Update | `shell/store/`, `shell/update/`; `system/appstore/` | [Software](docs/appstore.md), [Updates](docs/updates.md) |
+| The installer, Disk Setup | `shell/installer/`, `shell/disksetup/`; `system/installer/` | [Installer](docs/installer.md) |
+| File sharing, networking with Macs and Windows | `shell/network/`, `network/afp/`; `system/sharing/` | [Networking](docs/network.md) |
 | Screen Sharing | `shell/screenshare/`, `shell/panels/screensharing.cpp` | [Screen Sharing](docs/screen-sharing.md) |
 | Classic Mac programs (SheepShaver) | `shell/classic/`, `emulation/` | [Classic](docs/classic-seamless.md) |
 | How other programs look (GTK theme, Qt style) | `share/themes/ZacOS9/`, `shell/qtstyle/` | [Other programs](docs/app-integration.md) |
@@ -107,6 +107,7 @@ rather than reimplementing them.
 | Folder | What |
 |---|---|
 | `tests/` | Tests that aren't next to their code yet, the shared headless harness (`tests/disksetup/stage.py`), VM tests (`tests/vm/`) and the build's baselines (`tests/baseline/`). |
+| `system/` | The root helpers, each with its polkit policy and rules. |
 | `scripts/` | Build, run, package, ISO, VM and release scripts. |
 | `tools/` | Developer tools: icon and font builders, a scripted pointer for tests (`vptr`), screenshot helpers. |
 | `docs/` | A page per part, and the [roadmap](docs/ROADMAP.md). |

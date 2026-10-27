@@ -12,7 +12,7 @@ install_data('zacos9-mac-disks', install_dir: get_option('bindir'),
   install_mode: 'rwxr-xr-x')
 test('mac-disks', find_program('python3'),
   args: [files('../../tests/finder/test_mac_disks.py'), files('zacos9-mac-disks'),
-    files('../../disks/zacos9-mac-mount')])
+    files('../../system/disks/zacos9-mac-mount')])
 
 # The Finder: Qt6 for windows, input and files; all drawing through lib/.
 finder_exe = executable('zacos9-finder',
