@@ -630,6 +630,8 @@ void Finder::openItem(Item *item) {
 					openExtensionsManager();
 				} else if (action == "toy-box") {
 					ToyBox::open();
+				} else if (action == "clipboard") {
+					showClipboardWindow();
 				} else if (!vfsLaunch(item->path)) {
 					Alert::ask(item->visibleName() + " could not be opened. Its "
 						"application may have been removed.", "OK", QString());

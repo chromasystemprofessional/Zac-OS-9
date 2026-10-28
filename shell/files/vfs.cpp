@@ -111,6 +111,12 @@ static const char *DEFAULT_REGISTRY = R"JSON({
       "backing": "$XDG_CONFIG_HOME/zacos9/Favorites" },
     { "id": "system-folder/toy-box-items", "icon": "sf-toy-box-items", "name": "Toy Box Items", "kind": "backed",
       "backing": "$XDG_CONFIG_HOME/zacos9/Toy Box Items" },
+    { "id": "system-folder/clipboard", "icon": "clipboard", "name": "Clipboard", "kind": "launcher",
+      "action": "clipboard" },
+    { "id": "system-folder/stash", "icon": "stash", "name": "Stash", "kind": "launcher",
+      "appId": "zacos9-stash" },
+    { "id": "system-folder/notepad", "icon": "notepad", "name": "Notepad", "kind": "launcher",
+      "appId": "zacos9-notepad" },
     { "id": "system-folder/folder-tricks", "icon": "sf-folder-tricks", "name": "Folder Tricks", "kind": "backed",
       "backing": "$XDG_CONFIG_HOME/zacos9/Folder Tricks" },
     { "id": "system-folder/contextual-menu-items", "icon": "sf-contextual-menu-items", "name": "Contextual Menu Items",
@@ -249,6 +255,15 @@ pl_icon_kind iconFromName(const QString &name, VKind kind) {
 	}
 	if (name == "keychain") {
 		return PL_ICON_CP_KEYCHAIN;
+	}
+	if (name == "clipboard") {
+		return PL_ICON_CLIPPING;
+	}
+	if (name == "stash") {
+		return PL_ICON_APP_STASH;
+	}
+	if (name == "notepad") {
+		return PL_ICON_APP_NOTEPAD;
 	}
 	if (name == "applications-folder") {
 		return PL_ICON_APPLICATIONS_FOLDER;
@@ -881,7 +896,9 @@ void load() {
 		node.builtinAction = o.value("action").toString();
 		if (node.kind == VKind::Launcher && !node.builtinAction.isEmpty() &&
 				node.builtinAction != "system-information" &&
-				node.builtinAction != "extensions-manager") {
+				node.builtinAction != "extensions-manager" &&
+				node.builtinAction != "clipboard" &&
+				node.builtinAction != "toy-box") {
 			node.builtinAction.clear();
 		}
 		addNode(node);
@@ -1229,7 +1246,8 @@ bool vfsLaunch(const QString &path) {
 		return false;
 	}
 	if (node->builtinAction == "system-information" ||
-			node->builtinAction == "extensions-manager" || node->builtinAction == "toy-box") {
+			node->builtinAction == "extensions-manager" || node->builtinAction == "toy-box" ||
+			node->builtinAction == "clipboard") {
 		return true;
 	}
 	if (node->builtinAction == "speak-sample") {
