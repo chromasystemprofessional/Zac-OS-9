@@ -1,6 +1,13 @@
 /* The Monitors control panel (zacos9-controlpanel monitors). */
 #include "controlpanel.h"
 
+#include <QApplication>
+#include <QGuiApplication>
+#include <QScreen>
+#include <QPainter>
+#include <QFont>
+#include <QVBoxLayout>
+
 /* One screen, as zacos9-wm publishes it. Positions and sizes of the screens in the
  * layout are in logical pixels (the screen's pixels divided by the pixel size). */
 struct Screen {
@@ -19,6 +26,37 @@ struct Screen {
 	QRect rect() const { return QRect(pos, logical()); }
 };
 
+/* A large number shown on a screen while the Monitors panel is open, so
+ * the person can tell which screen is which. */
+class ScreenNumberOverlay : public QWidget {
+public:
+	ScreenNumberOverlay(int number, QScreen *screen)
+		: QWidget(nullptr), m_number(number) {
+		setWindowFlags(Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint |
+			Qt::Tool | Qt::WindowTransparentForInput);
+		setAttribute(Qt::WA_TranslucentBackground);
+		setAttribute(Qt::WA_ShowWithoutActivating);
+		if (screen) {
+			setGeometry(screen->geometry());
+		}
+	}
+protected:
+	void paintEvent(QPaintEvent *) override {
+		QPainter p(this);
+		p.setRenderHint(QPainter::Antialiasing);
+		const QRect r = rect();
+		/* A large, semi-transparent number centred on the screen. */
+		QFont f = p.font();
+		f.setPointSize(r.height() / 4);
+		f.setBold(true);
+		p.setFont(f);
+		p.setPen(QColor(0, 0, 0, 120));
+		p.drawText(r, Qt::AlignCenter, QString::number(m_number));
+	}
+private:
+	int m_number;
+};
+
 class MonitorsPanel : public ControlPanel {
 public:
 	MonitorsPanel() : ControlPanel("Monitors", 236) {
@@ -35,6 +73,16 @@ public:
 	}
 
 protected:
+	void showEvent(QShowEvent *e) override {
+		ControlPanel::showEvent(e);
+		showScreenNumbers();
+	}
+
+	void hideEvent(QHideEvent *e) override {
+		hideScreenNumbers();
+		ControlPanel::hideEvent(e);
+	}
+
 	void paintExtra(pl_canvas *c) override {
 		m_list.paint(c, true);
 		Text pixels("Pixel size:", 200, PL_FONT_SYSTEM);
@@ -93,6 +141,29 @@ protected:
 
 private:
 	enum class Drag { None, Display, Bar };
+
+	QList<ScreenNumberOverlay *> m_overlays;
+
+	void showScreenNumbers() {
+		if (!multiple()) {
+			return;
+		}
+		hideScreenNumbers();
+		const QList<QScreen *> screens = QGuiApplication::screens();
+		for (int i = 0; i < m_displays.size() && i < screens.size(); i++) {
+			auto *overlay = new ScreenNumberOverlay(i + 1, screens.value(i));
+			m_overlays.append(overlay);
+			overlay->show();
+		}
+	}
+
+	void hideScreenNumbers() {
+		for (auto *overlay : m_overlays) {
+			overlay->hide();
+			overlay->deleteLater();
+		}
+		m_overlays.clear();
+	}
 
 	bool multiple() const { return m_displays.size() > 1; }
 	static bool everyBar() {
