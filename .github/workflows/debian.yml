@@ -116,15 +116,13 @@ jobs:
 
       - name: Publish release assets
         if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ci-artifacts/zacos9_*.deb
+            ci-artifacts/SHA256SUMS
+          tag_name: ${{ github.ref_name }}
+          name: "ZacOS 9 ${{ github.ref_name }}"
+          body: "See the changelog."
         env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          tag="${GITHUB_REF#refs/tags/}"
-          gh release view "$tag" >/dev/null 2>&1 || \
-            gh release create "$tag" --title "ZacOS 9 $tag" --notes "See the changelog."
-          cd ci-artifacts
-          for deb in zacos9_*.deb; do
-            [ -e "$deb" ] || continue
-            gh release upload "$tag" "$deb" --clobber
-          done
-          gh release upload "$tag" SHA256SUMS --clobber
+          GITHUB_TOKEN: ${{ github.token }}
