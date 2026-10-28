@@ -4,6 +4,8 @@
 #include "controlpanels.h"
 #include "collarmodules.h"
 #include "custompatterns.h"
+#include "../panels/xkblayouts.h"
+#include "../../lib/settings.h"
 
 #include <QCoreApplication>
 #include <QDir>
@@ -11,6 +13,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QFileSystemWatcher>
+#include <QTextDocumentFragment>
 #include <QTimer>
 #include <QHash>
 #include <QJsonArray>
@@ -72,6 +75,12 @@ static const char *DEFAULT_REGISTRY = R"JSON({
       "kind": "collar-modules", "icon": "control-strip" },
     { "id": "system-folder/collar-modules-disabled", "name": "Collar Modules (Disabled)",
       "kind": "collar-modules-disabled", "icon": "control-strip" },
+    { "id": "system-folder/help", "icon": "help", "name": "Help", "kind": "help-books" },
+    { "id": "system-folder/voices", "icon": "speech", "name": "Voices", "kind": "voices" },
+    { "id": "system-folder/keyboard-layouts", "icon": "keyboard", "name": "Keyboard Layouts",
+      "kind": "keyboard-layouts" },
+    { "id": "system-folder/keychains", "icon": "keychain", "name": "Keychains",
+      "kind": "keychains" },
     { "id": "system-folder/extensions", "icon": "sf-extensions", "name": "Extensions", "kind": "resource",
       "provider": "extensions" },
     { "id": "system-folder/extensions-disabled", "icon": "sf-extensions",
@@ -195,6 +204,18 @@ VKind kindFromName(const QString &name) {
 	if (name == "collar-modules-disabled") {
 		return VKind::CollarModulesDisabled;
 	}
+	if (name == "help-books") {
+		return VKind::HelpBooks;
+	}
+	if (name == "voices") {
+		return VKind::Voices;
+	}
+	if (name == "keyboard-layouts") {
+		return VKind::KeyboardLayouts;
+	}
+	if (name == "keychains") {
+		return VKind::Keychains;
+	}
 	if (name == "unix") {
 		return VKind::Unix;
 	}
@@ -216,6 +237,18 @@ pl_icon_kind iconFromName(const QString &name, VKind kind) {
 	}
 	if (name == "control-strip") {
 		return PL_ICON_CP_COLLAR;
+	}
+	if (name == "help") {
+		return PL_ICON_FOLDER;
+	}
+	if (name == "speech") {
+		return PL_ICON_CP_SPEECH;
+	}
+	if (name == "keyboard") {
+		return PL_ICON_CP_KEYBOARD;
+	}
+	if (name == "keychain") {
+		return PL_ICON_CP_KEYCHAIN;
 	}
 	if (name == "applications-folder") {
 		return PL_ICON_APPLICATIONS_FOLDER;
@@ -529,6 +562,117 @@ void generateDisabledCollarModules(const VNode &parent) {
 	pl_collar_modules_free(modules, count);
 }
 
+static QString helpRootPath() {
+	const QString env = qEnvironmentVariable("ZACOS9_HELP_DIR");
+	if (!env.isEmpty()) {
+		return env;
+	}
+	const QString dir = QCoreApplication::applicationDirPath();
+	for (const QString &candidate : { QString(sourceTreePath("share/zacos9/help")), dir + "/../share/zacos9/help" }) {
+		if (!candidate.isEmpty() && QFileInfo(candidate + "/zacos9/index.html").exists()) {
+			return QFileInfo(candidate).canonicalFilePath();
+		}
+	}
+	return "/usr/share/zacos9/help";
+}
+
+static void addHelpBook(const VNode &parent, const QString &bookId, const QString &title) {
+	VNode node;
+	node.id = parent.id + "/" + bookId;
+	node.name = title.isEmpty() ? bookId : title;
+	node.kind = VKind::Launcher;
+	node.icon = PL_ICON_DOCUMENT;
+	node.program = QStringLiteral("zacos9-help");
+	node.args = { bookId };
+	addNode(node);
+}
+
+void generateHelpBooks(const VNode &parent) {
+	const QString root = helpRootPath();
+	QDir dir(root);
+	bool any = false;
+	for (const QFileInfo &entry : dir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
+		const QString index = entry.filePath() + "/index.html";
+		if (!QFileInfo(index).isFile()) {
+			continue;
+		}
+		QFile file(index);
+		QString title = entry.fileName();
+		if (file.open(QIODevice::ReadOnly)) {
+			const QString html = QString::fromUtf8(file.read(64 * 1024));
+			const QRegularExpressionMatch m =
+				QRegularExpression("<title>(.*?)</title>", QRegularExpression::CaseInsensitiveOption |
+					QRegularExpression::DotMatchesEverythingOption).match(html);
+			if (m.hasMatch()) {
+				title = QTextDocumentFragment::fromHtml(m.captured(1)).toPlainText().simplified();
+			}
+		}
+		addHelpBook(parent, entry.fileName(), title);
+		any = true;
+	}
+	if (!any) {
+		VNode none;
+		none.id = parent.id + "/none";
+		none.name = QStringLiteral("No help books found");
+		none.kind = VKind::Launcher;
+		none.icon = PL_ICON_DOCUMENT;
+		none.readOnly = true;
+		addNode(none);
+	}
+}
+
+void generateVoices(const VNode &parent) {
+	/* The voices come from speech-dispatcher asynchronously (shell/panels/
+	 * speech.cpp). Until they are known, the folder lists opening the
+	 * Speech panel, where voices can be chosen and tried. */
+	VNode open;
+	open.id = parent.id + "/speech-panel";
+	open.name = QStringLiteral("Open the Speech panel");
+	open.kind = VKind::Launcher;
+	open.icon = PL_ICON_CP_SPEECH;
+	open.appId = QStringLiteral("zacos9-speech");
+	addNode(open);
+}
+
+static void addKeyboardLayout(const VNode &parent, const XkbLayout &layout) {
+	VNode node;
+	node.id = parent.id + "/" + layout.code;
+	node.name = layout.name;
+	node.kind = VKind::Launcher;
+	node.icon = PL_ICON_CP_KEYBOARD;
+	node.builtinAction = QStringLiteral("keyboard-layout");
+	node.panelId = layout.code;
+	addNode(node);
+}
+
+void generateKeyboardLayouts(const VNode &parent) {
+	for (const XkbLayout &layout : xkbLayouts()) {
+		addKeyboardLayout(parent, layout);
+	}
+	if (xkbLayouts().isEmpty()) {
+		VNode none;
+		none.id = parent.id + "/none";
+		none.name = QStringLiteral("No keyboard layouts found");
+		none.kind = VKind::Launcher;
+		none.icon = PL_ICON_CP_KEYBOARD;
+		none.readOnly = true;
+		addNode(none);
+	}
+}
+
+void generateKeychains(const VNode &parent) {
+	/* Keychains come from the Secret Service asynchronously (shell/collar/
+	 * keychain.cpp). Until they are known, the folder lists opening Keychain
+	 * Access, where keychains can be managed. */
+	VNode open;
+	open.id = parent.id + "/keychain-access";
+	open.name = QStringLiteral("Open Keychain Access");
+	open.kind = VKind::Launcher;
+	open.icon = PL_ICON_CP_KEYCHAIN;
+	open.appId = QStringLiteral("zacos9-keychain");
+	addNode(open);
+}
+
 void generateResourceLaunchers(const VNode &parent) {
 	for (const auto &entry : std::vector<std::pair<QString, QString>>{
 			{ "System Information", "system-information" },
@@ -743,7 +887,9 @@ void load() {
 		addNode(node);
 		if (node.kind == VKind::Apps || node.kind == VKind::Panels ||
 				node.kind == VKind::PanelsDisabled || node.kind == VKind::CollarModules ||
-				node.kind == VKind::CollarModulesDisabled) {
+				node.kind == VKind::CollarModulesDisabled || node.kind == VKind::HelpBooks ||
+				node.kind == VKind::Voices || node.kind == VKind::KeyboardLayouts ||
+				node.kind == VKind::Keychains) {
 			generators.push_back(node);
 		}
 	}
@@ -761,6 +907,14 @@ void load() {
 			generateCollarModules(node);
 		} else if (node.kind == VKind::CollarModulesDisabled) {
 			generateDisabledCollarModules(node);
+		} else if (node.kind == VKind::HelpBooks) {
+			generateHelpBooks(node);
+		} else if (node.kind == VKind::Voices) {
+			generateVoices(node);
+		} else if (node.kind == VKind::KeyboardLayouts) {
+			generateKeyboardLayouts(node);
+		} else if (node.kind == VKind::Keychains) {
+			generateKeychains(node);
 		} else {
 			generatePanels(node);
 		}
@@ -1077,6 +1231,18 @@ bool vfsLaunch(const QString &path) {
 	if (node->builtinAction == "system-information" ||
 			node->builtinAction == "extensions-manager" || node->builtinAction == "toy-box") {
 		return true;
+	}
+	if (node->builtinAction == "speak-sample") {
+		pl_speak(node->panelId.isEmpty()
+				? "Hello. This is how I sound."
+				: ("Hello. This is " + node->panelId + ".").toUtf8().constData());
+		return true;
+	}
+	if (node->builtinAction == "keyboard-layout" ||
+			node->builtinAction == "keychain") {
+		const QString program = node->builtinAction == "keyboard-layout"
+			? QStringLiteral("zacos9-keyboard") : QStringLiteral("zacos9-keychain");
+		return platinumStartApplication(siblingProgram(program), {});
 	}
 	if (!node->appId.isEmpty()) {
 		return appLaunch(node->appId, node->actionId);

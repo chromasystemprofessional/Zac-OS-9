@@ -39,6 +39,10 @@ enum class VKind {
 	PanelsDisabled, /* generated: the control panels the user turned off */
 	CollarModules,     /* generated: The Collar's modules */
 	CollarModulesDisabled, /* generated: The Collar's modules the user turned off */
+	HelpBooks,     /* generated: the Help Center's books */
+	Voices,        /* generated: speech-dispatcher's voices */
+	KeyboardLayouts, /* generated: X keyboard layouts */
+	Keychains,     /* generated: Secret Service keychains */
 	AppFolder,  /* generated: one application's folder */
 	Launcher,   /* generated: starts an application or a control panel */
 	Unix,       /* the real filesystem root, for inspecting Debian */
