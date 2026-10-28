@@ -13,8 +13,9 @@
 #include "startup.h"
 #include "snapshot.h"
 
-/* Frames a screen may fail to show in a row before it is turned off. One
- * failed commit is the shape of a screen that can't be shown at all. */
+/* Frames in a row a screen may fail to get a buffer before it is turned off.
+ * Transient commit failures (a "Device or resource busy" with a buffer in
+ * hand) do not count: the screen comes back by itself. */
 #define OUTPUT_FAILURES_MAX 3
 
 static void output_snapshot_commit(struct wl_listener *listener, void *data) {
@@ -123,7 +124,14 @@ static void output_frame(struct wl_listener *listener, void *data) {
 	startup_output_frame(output, false);
 	if (shown > 0) {
 		output->failed_frames = 0;
-	} else if (++output->failed_frames >= OUTPUT_FAILURES_MAX) {
+	} else if (output->wlr_output->swapchain == NULL &&
+			++output->failed_frames >= OUTPUT_FAILURES_MAX) {
+		/* Only a screen that cannot get a buffer at all — no swapchain
+		 * format, the "Two GPUs" case — is turned off and left off. A
+		 * commit that fails with the buffer in hand ("Device or resource
+		 * busy", a Haswell HDMI hiccup) is transient: leave the output
+		 * on so it comes back on the next frame instead of staying dark
+		 * until reboot. */
 		output_stop(output);
 	}
 
