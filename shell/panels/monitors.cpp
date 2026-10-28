@@ -6,6 +6,7 @@
 #include <QScreen>
 #include <QPainter>
 #include <QFont>
+#include <QTimer>
 #include <QVBoxLayout>
 
 /* One screen, as zacos9-wm publishes it. Positions and sizes of the screens in the
@@ -37,6 +38,7 @@ public:
 		setAttribute(Qt::WA_TranslucentBackground);
 		setAttribute(Qt::WA_ShowWithoutActivating);
 		if (screen) {
+			setScreen(screen);
 			setGeometry(screen->geometry());
 		}
 	}
@@ -73,13 +75,12 @@ public:
 	}
 
 protected:
-	void showEvent(QShowEvent *e) override {
-		ControlPanel::showEvent(e);
-		showScreenNumbers();
-	}
-
 	void hideEvent(QHideEvent *e) override {
-		hideScreenNumbers();
+		if (m_flashOverlay) {
+			m_flashOverlay->hide();
+			m_flashOverlay->deleteLater();
+			m_flashOverlay = nullptr;
+		}
 		ControlPanel::hideEvent(e);
 	}
 
@@ -142,81 +143,80 @@ protected:
 private:
 	enum class Drag { None, Display, Bar };
 
-	QList<ScreenNumberOverlay *> m_overlays;
-	QList<ScreenNumberOverlay *> m_flashOverlays;
+	ScreenNumberOverlay *m_flashOverlay = nullptr;
 
-	/* Find the physical QScreen for a display index. Match by name first,
-	 * fall back to index. */
-	QScreen *screenForDisplay(int index) const {
-		if (index < 0 || index >= m_displays.size()) {
-			return nullptr;
+	void flashScreenNumber(int displayIndex) {
+		if (!multiple() || displayIndex < 0 || displayIndex >= m_displays.size()) {
+			return;
 		}
-		const QString name = m_displays[index].name;
+		if (m_flashOverlay) {
+			m_flashOverlay->hide();
+			m_flashOverlay->deleteLater();
+			m_flashOverlay = nullptr;
+		}
+		/* Match the screen by its output name first, then by geometry
+		 * (the compositor publishes each screen's position and size in
+		 * logical pixels), then by index. This ensures the flash appears
+		 * on the correct physical screen, not always the primary one. */
+		QScreen *screen = nullptr;
+		const Screen &d = m_displays[displayIndex];
+
+		/* 1. Match by name. */
 		for (QScreen *s : QGuiApplication::screens()) {
-			if (s->name() == name) {
-				return s;
+			if (s->name() == d.name) {
+				screen = s;
+				break;
 			}
 		}
-		/* Fall back to index. */
-		const QList<QScreen *> screens = QGuiApplication::screens();
-		if (index < screens.size()) {
-			return screens.value(index);
-		}
-		return QGuiApplication::primaryScreen();
-	}
 
-	void showScreenNumbers() {
-		if (!multiple()) {
+		/* 2. Match by geometry: the compositor's pos/size should match
+		 * the QScreen's geometry (possibly scaled). */
+		if (!screen) {
+			for (QScreen *s : QGuiApplication::screens()) {
+				const QRect g = s->geometry();
+				/* Compare logical positions (compositor uses logical pixels). */
+				if (g.x() == d.pos.x() && g.y() == d.pos.y()) {
+					screen = s;
+					break;
+				}
+			}
+		}
+
+		/* 3. Match by size (logical). */
+		if (!screen) {
+			for (QScreen *s : QGuiApplication::screens()) {
+				const QSize logSize = d.logical();
+				if (s->size() == logSize || s->size() == d.px) {
+					screen = s;
+					break;
+				}
+			}
+		}
+
+		/* 4. Fall back to index. */
+		if (!screen) {
+			const QList<QScreen *> screens = QGuiApplication::screens();
+			if (displayIndex < screens.size()) {
+				screen = screens.value(displayIndex);
+			}
+		}
+
+		/* 5. Last resort: primary screen. */
+		if (!screen) {
+			screen = QGuiApplication::primaryScreen();
+		}
+
+		if (!screen) {
 			return;
 		}
-		hideScreenNumbers();
-		for (int i = 0; i < m_displays.size(); i++) {
-			QScreen *screen = screenForDisplay(i);
-			if (!screen) continue;
-			auto *overlay = new ScreenNumberOverlay(i + 1, screen);
-			m_overlays.append(overlay);
-			overlay->show();
-		}
-	}
-
-	void hideScreenNumbers() {
-		for (auto *overlay : m_overlays) {
-			overlay->hide();
-			overlay->deleteLater();
-		}
-		m_overlays.clear();
-		for (auto *overlay : m_flashOverlays) {
-			overlay->hide();
-			overlay->deleteLater();
-		}
-		m_flashOverlays.clear();
-	}
-
-	/* Flash a large number on a single screen (the one clicked), so the
-	 * person can identify which physical screen it is. */
-	void flashScreenNumber(int displayIndex) {
-		if (displayIndex < 0 || displayIndex >= m_displays.size()) {
-			return;
-		}
-		/* Clear any previous flash. */
-		for (auto *overlay : m_flashOverlays) {
-			overlay->hide();
-			overlay->deleteLater();
-		}
-		m_flashOverlays.clear();
-
-		QScreen *screen = screenForDisplay(displayIndex);
-		if (!screen) return;
-
-		auto *overlay = new ScreenNumberOverlay(displayIndex + 1, screen);
-		m_flashOverlays.append(overlay);
-		overlay->show();
-
-		/* Hide after 3 seconds. */
-		QTimer::singleShot(3000, this, [this, overlay] {
-			overlay->hide();
-			overlay->deleteLater();
-			m_flashOverlays.removeAll(overlay);
+		m_flashOverlay = new ScreenNumberOverlay(displayIndex + 1, screen);
+		m_flashOverlay->show();
+		QTimer::singleShot(1400, this, [this]() {
+			if (m_flashOverlay) {
+				m_flashOverlay->hide();
+				m_flashOverlay->deleteLater();
+				m_flashOverlay = nullptr;
+			}
 		});
 	}
 
@@ -436,9 +436,6 @@ private:
 		if (hit < 0) {
 			return false;
 		}
-		/* Flash the clicked screen's number on that screen so the person can
-		 * identify which physical screen it is. */
-		flashScreenNumber(hit);
 		/* The menu bar is picked up by its strip; a screen by anywhere else. */
 		if (m_displays[hit].main && barRect(hit).adjusted(0, -1, 0, 2).contains(p)) {
 			m_drag = Drag::Bar;
@@ -454,6 +451,7 @@ private:
 			build();
 		}
 		m_dragNow = p;
+		flashScreenNumber(hit);
 		return true;
 	}
 

@@ -173,3 +173,55 @@ journalctl -u plymouth-quit    # "the screen is on the Intel GPU (/dev/dri/card1
 
 `--once` turns itself off during that start-up, so a start-up that went
 wrong is followed by a normal one. Test: `intel-graphics`, `boot-handoff`.
+
+## Two GPUs: which one renders
+
+**Symptom.** With a second display on the motherboard's HDMI port, menus on
+the big screen flicker while the pointer moves, and the session log has
+`Failed to pick cursor plane format` once per motion.
+
+**Cause.** The BIOS exposes the integrated GPU only when something is
+plugged into that port, and then makes it the boot VGA device. wlroots
+renders on the boot VGA device, whatever it is, and feeds every other card
+by copying each frame across GPUs with a second renderer; that message comes
+only from a card that is copied to (wlroots can't give it a hardware cursor),
+so every pointer motion on it redraws the whole scanout and the menu
+follows late.
+
+**Fix.** By default zacos9-wm leaves the cards in the firmware's order, the
+copy direction this hardware is known to take, and the log keeps one
+`Failed to pick cursor plane format` line followed by `previous message
+repeated N more times` rather than a line per motion
+(`compositor/src/logfilter.c`).
+
+`render-gpu=largest` in `~/.config/zacos9/desktop.conf` (or
+`ZACOS9_RENDER_GPU=largest`) renders on the card with the largest connected
+screen instead, so the copy goes to the smaller screens — of two the same
+size, the card that is not the firmware's own, which is the one a display
+was added to. `compositor/src/primarygpu.c` puts that card first in
+`WLR_DRM_DEVICES`, and main.c turns off EGL format modifiers with it. Only
+linear buffers can be imported by another card's renderer — the tiled and
+block-linear layouts each driver prefers are its own — so with modifiers on
+one direction of such a pair finds no format in common, and the screen
+copied to gets no swapchain at all: that is the start-up hang below. With no
+modifiers every buffer is linear, which both cards can import. A
+`WLR_DRM_DEVICES` already set (the Mac's graphics switch, or a session's
+own) is left alone, as is a nested session.
+
+A screen wlroots cannot commit frames to at all (a card that finds no
+swapchain format for it, say) used to be retried on every frame: the log
+grew by a hundred megabytes in a few seconds and the session looked hung.
+`compositor/src/output.c` now turns such a screen off once, with one line
+saying so, and the session goes on drawing on its other screens.
+
+**Check:**
+
+```sh
+zacos9-wm -d 2>&1 | grep WLR_DRM_DEVICES   # render-gpu=largest: card1:card0, the 4K screen first
+```
+
+The session log's `zacos9-wm: rendering on /dev/dri/card1` line says which
+card renders, whichever setting is in use.
+
+Test: `primary-gpu`, `log-filter`.
+

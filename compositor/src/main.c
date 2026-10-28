@@ -17,6 +17,8 @@
 #include <wlr/util/log.h>
 
 #include "locate.h"
+#include "logfilter.h"
+#include "primarygpu.h"
 #include "startup.h"
 #include "access.h"
 #include "server.h"
@@ -116,12 +118,32 @@ int main(int argc, char *argv[]) {
 		usage(argv[0]);
 		return 0;
 	}
-	wlr_log_init(log_level, NULL);
+	logfilter_init(log_level);
 
 	struct plat_server server = {0};
 	server.output_scale = scale;
 	server.scale_explicit = scale_explicit;
 	server.display = wl_display_create();
+
+	/* Which card renders. The firmware's order (the boot VGA card, usually
+	 * the one with a display plugged in at power-on) is left alone unless
+	 * render-gpu=largest in the settings or ZACOS9_RENDER_GPU=largest. */
+	char render_gpu[32];
+	const char *choice = getenv("ZACOS9_RENDER_GPU");
+	if (!choice || !*choice) {
+		choice = pl_setting("render-gpu", render_gpu, sizeof(render_gpu)) ?
+			render_gpu : "";
+	}
+	char *gpus = primary_gpu_devices(strcmp(choice, "largest") == 0);
+	if (gpus) {
+		/* Tiled and block-linear buffers can't be imported by another
+		 * card's renderer; linear ones can, so the frames cross GPUs
+		 * whichever way render-gpu puts them. */
+		setenv("WLR_EGL_NO_MODIFIERS", "1", 0);
+		setenv("WLR_DRM_DEVICES", gpus, 1);
+		wlr_log(WLR_INFO, "WLR_DRM_DEVICES=%s", gpus);
+		free(gpus);
+	}
 
 	server.backend = wlr_backend_autocreate(
 			wl_display_get_event_loop(server.display), &server.session);
@@ -141,6 +163,20 @@ int main(int argc, char *argv[]) {
 	if (!server.allocator) {
 		wlr_log(WLR_ERROR, "failed to create wlr_allocator");
 		return 1;
+	}
+
+	/* Which card that is, at any log level: the first card in
+	 * WLR_DRM_DEVICES, or the firmware's own order. A screen that stays
+	 * dark is usually about this (docs/hardware.md). */
+	if (server.session) {
+		const int fd = wlr_backend_get_drm_fd(server.backend);
+		char link[64], node[PATH_MAX];
+		snprintf(link, sizeof(link), "/proc/self/fd/%d", fd);
+		const ssize_t len = fd < 0 ? -1 : readlink(link, node, sizeof(node) - 1);
+		if (len > 0) {
+			node[len] = '\0';
+			fprintf(stderr, "zacos9-wm: rendering on %s\n", node);
+		}
 	}
 
 	/* Version 6: clients follow wl_surface.preferred_buffer_scale, which we

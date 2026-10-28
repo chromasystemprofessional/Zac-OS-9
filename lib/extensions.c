@@ -26,7 +26,7 @@ const struct pl_extension pl_extensions[] = {
 	{ "graphics-switching", "Graphics Switching", PL_ICON_EXT_DISPLAY,
 		"Switches between built-in and discrete graphics on computers that have "
 		"both.", (const char *const[]){ "apple_gmux", NULL } },
-	{ "display-brightness", "Display Brightness", PL_ICON_EXT_DISPLAY,
+	{ "display-brightness", "Display Brightness", PL_ICON_EXT_CUSTOM_DISPLAY_BRIGHTNESS,
 		"Lets the brightness keys and Monitors control the built-in screen's "
 		"backlight.", (const char *const[]){ "video", "apple_bl", NULL } },
 
@@ -61,7 +61,7 @@ const struct pl_extension pl_extensions[] = {
 	{ "bluetooth", "Bluetooth", PL_ICON_EXT_BLUETOOTH,
 		"Connects wireless keyboards, mice, trackpads, headphones and other "
 		"Bluetooth devices.", (const char *const[]){ "bluetooth", "btusb", "hci_uart", NULL } },
-	{ "appletalk", "AppleTalk", PL_ICON_EXT_APPLETALK,
+	{ "appletalk", "AppleTalk", PL_ICON_EXT_CUSTOM_APPLETALK,
 		"Talks to classic Macintosh computers and printers over AppleTalk.",
 		(const char *const[]){ "appletalk", NULL } },
 	{ "firewall", "Firewall", PL_ICON_EXT_SECURITY,

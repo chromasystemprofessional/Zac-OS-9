@@ -243,6 +243,12 @@ struct plat_output {
 	struct wl_list link;
 	struct plat_server *server;
 	struct wlr_output *wlr_output;
+	/* Frames in a row this screen could not show (output.c turns it off
+	 * after a few, rather than trying on every frame for ever). */
+	int failed_frames;
+	/* Turned off because wlroots can't commit frames to it at all: not the
+	 * main screen any more, even if the settings name it. */
+	bool off;
 	/* Layout-coordinate area left for windows after shell surfaces (the
 	 * menu bar) reserve their exclusive zones. */
 	struct wlr_box usable_area;

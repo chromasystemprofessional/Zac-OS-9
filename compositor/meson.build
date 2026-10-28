@@ -98,6 +98,8 @@ compositor_exe = executable('zacos9-wm',
   'src/launch.c',
   'src/startup.c',
   'src/prefs.c',
+  'src/primarygpu.c',
+  'src/logfilter.c',
   'src/idle.c',
   'src/lock.c',
   'src/idle_policy.c',
@@ -157,6 +159,27 @@ test('startup-displays',
 test('display-origin', python3,
   args: [files('../tests/compositor/test_display_origin.py'), compositor_exe],
   timeout: 60,
+)
+# The Monitors panel's one-screen scale stays on the screen it was chosen on.
+test('display-scale', python3,
+  args: [files('../tests/compositor/test_display_scale.py'), compositor_exe],
+  timeout: 60,
+)
+# The card with the largest connected screen renders (onboard HDMI makes the
+# integrated GPU the boot VGA device, and wlroots renders on that).
+test('primary-gpu',
+  executable('test-primarygpu',
+    '../tests/compositor/test_primarygpu.c', 'src/primarygpu.c',
+    include_directories: include_directories('src'),
+  ),
+)
+# One "Failed to pick cursor plane format" per pointer motion, printed once.
+test('log-filter',
+  executable('test-logfilter',
+    '../tests/compositor/test_logfilter.c', 'src/logfilter.c',
+    include_directories: include_directories('src'),
+    dependencies: [wlroots],
+  ),
 )
 test('cursor-theme', python3,
   args: [files('../tests/compositor/test_cursors.py'),
