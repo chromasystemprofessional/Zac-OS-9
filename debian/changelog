@@ -1,3 +1,18 @@
+zacos9 (1.3.5) trixie; urgency=medium
+
+  * Photo Booth: a new Apple menu application that shows a live picture
+    from the built-in camera or a connected webcam and takes a photo,
+    saved as "Photo N.png" in the Pictures folder (GStreamer).
+  * Collar Modules folder now actually lists the Collar's modules: their
+    desktop entries are installed (they were missing from the build).
+  * Multi-GPU: `render-gpu=discrete` renders on the add-in card so its
+    display is native; it falls back to the firmware order when that
+    card has no screen attached.
+  * Installer: the live installer medium is removed from apt's sources
+    on install and update, so fetching updates no longer fails.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Wed, 28 Oct 2026 23:00:00 -0400
+
 zacos9 (1.3.4) trixie; urgency=medium
 
   * Monitors: the number flashed when a screen is clicked now appears on
