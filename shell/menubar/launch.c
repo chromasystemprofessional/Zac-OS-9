@@ -424,7 +424,7 @@ static char *find_desktop_file(const char *id) {
  * which defaults were offered (SEEDED), so nothing taken out comes back;
  * an item new in a later version has a higher `since` and is offered
  * then. */
-#define SEEDED 1
+#define SEEDED 2
 static void seed_menu_items(const char *items_dir) {
 	static const struct {
 		const char *name;
@@ -438,6 +438,7 @@ static void seed_menu_items(const char *items_dir) {
 		{ "Key Tags", { "zacos9-keytags.desktop" }, 1 },
 		{ "Notepad", { "zacos9-notepad.desktop" }, 1 },
 		{ "Pedigree", { "zacos9-pedigree.desktop" }, 1 },
+		{ "Photo Booth", { "zacos9-photobooth.desktop" }, 2 },
 		{ "Plotter", { "zacos9-plotter.desktop" }, 1 },
 		{ "Stash", { "zacos9-stash.desktop" }, 1 },
 		{ "Terminal", { "foot.desktop", "org.codeberg.dnkl.foot.desktop" }, 1 },

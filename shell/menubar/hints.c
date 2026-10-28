@@ -77,6 +77,7 @@ static const struct {
 	{ "Key Tags", "Opens Key Tags, which shows the character each key types with your keyboard layout." },
 	{ "Notepad", "Opens Notepad, eight pages for jotting things down." },
 	{ "Pedigree", "Opens Pedigree, which describes this computer: its hardware, disks and devices." },
+	{ "Photo Booth", "Opens Photo Booth, to take a photo with the built-in camera or a connected webcam." },
 	{ "Plotter", "Opens Plotter, which draws the graph of an equation." },
 	{ "Stash", "Opens Stash, a place to keep pictures and text to use again." },
 	{ "Terminal", "Opens a terminal window, for typing commands." },

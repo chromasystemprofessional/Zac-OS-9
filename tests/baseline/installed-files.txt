@@ -36,6 +36,7 @@
 {prefix}/bin/zacos9-pack
 {prefix}/bin/zacos9-patterns
 {prefix}/bin/zacos9-pedigree
+{prefix}/bin/zacos9-photobooth
 {prefix}/bin/zacos9-picture
 {prefix}/bin/zacos9-plotter
 {prefix}/bin/zacos9-printerpicker
@@ -135,6 +136,7 @@
 {prefix}/share/applications/zacos9-numbers.desktop
 {prefix}/share/applications/zacos9-pedigree.desktop
 {prefix}/share/applications/zacos9-phone-collar.desktop
+{prefix}/share/applications/zacos9-photobooth.desktop
 {prefix}/share/applications/zacos9-picture.desktop
 {prefix}/share/applications/zacos9-plotter.desktop
 {prefix}/share/applications/zacos9-power-collar.desktop

@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Photo Booth
+Comment=Take photos with the built-in camera or a connected webcam
+Exec=zacos9-photobooth
+Terminal=false
+Categories=Graphics;
+OnlyShowIn=ZacOS9;
