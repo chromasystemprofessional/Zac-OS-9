@@ -1103,6 +1103,47 @@ int main(int argc, char **argv) {
 		check(isMacDiskImage(image.fileName()), "APFS and GPT raw images are recognized");
 	}
 
+	/* ---- console ROM recognition --------------------------------------- */
+	{
+		const auto make = [&](const QString &name, const QByteArray &bytes = QByteArray()) {
+			QFile f(root + "/" + name);
+			f.open(QIODevice::WriteOnly);
+			f.write(bytes);
+			f.close();
+			return f.fileName();
+		};
+		check(romIconKind(make("game.nes", QByteArray("NES\x1A", 4))) == PL_ICON_ROM_NES &&
+			iconKindFor(root + "/game.nes") == PL_ICON_ROM_NES,
+			"a NES ROM gets its own icon");
+		check(romIconKind(make("not.nes", "x")) == PL_ICON_DOCUMENT,
+			"a .nes without the header is an ordinary document");
+		check(romIconKind(make("game.sfc")) == PL_ICON_ROM_SNES &&
+			romIconKind(make("game.smc")) == PL_ICON_ROM_SNES, "Super NES ROMs are recognized");
+		check(romIconKind(make("game.n64")) == PL_ICON_ROM_N64 &&
+			romIconKind(make("game.z64")) == PL_ICON_ROM_N64 &&
+			romIconKind(make("game.v64")) == PL_ICON_ROM_N64, "Nintendo 64 ROMs are recognized");
+		check(romIconKind(make("game.gen")) == PL_ICON_ROM_SEGA &&
+			romIconKind(make("game.smd")) == PL_ICON_ROM_SEGA &&
+			romIconKind(make("game.sms")) == PL_ICON_ROM_SEGA, "Sega ROMs are recognized");
+		check(romIconKind(make("readme.md", "a small markdown file")) == PL_ICON_DOCUMENT,
+			"a .md document is not a Sega cartridge");
+		{
+			QByteArray rom(128 * 1024, '\0');
+			rom.replace(0x100, 4, "SEGA");
+			check(romIconKind(make("sonic.md", rom)) == PL_ICON_ROM_SEGA,
+				"a .md with the Genesis header is a Sega cartridge");
+		}
+		check(romIconKind(make("game.gb")) == PL_ICON_ROM_GAMEBOY &&
+			romIconKind(make("game.gbc")) == PL_ICON_ROM_GAMEBOY &&
+			romIconKind(make("game.gba")) == PL_ICON_ROM_GAMEBOY, "Game Boy games are recognized");
+		check(romIconKind(make("game.cue")) == PL_ICON_ROM_PS1 &&
+			iconKindFor(root + "/game.cue") == PL_ICON_ROM_PS1, "a PlayStation cue sheet is a disc");
+		check(romIconKind(make("game.bin")) == PL_ICON_ROM_PS1,
+			"a disc track beside its cue sheet is a PlayStation disc");
+		check(romIconKind(make("alone.bin")) == PL_ICON_DOCUMENT,
+			"a bare .bin with no cue sheet is an ordinary document");
+	}
+
 	/* ---- unprivileged -------------------------------------------------- */
 	check(!namesIn(vfsRoot()).isEmpty(), "browsing needs no privileges");
 	/* Every directory the Finder may write into through this hierarchy

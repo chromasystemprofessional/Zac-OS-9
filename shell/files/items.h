@@ -130,6 +130,10 @@ class QFileInfo;
 std::unique_ptr<Item> makeItem(const QFileInfo &info);
 
 pl_icon_kind iconKindFor(const QString &path);
+/* A console game's file (a cartridge or disc), recognized by extension and,
+ * where an extension is shared with other files, by the file's own bytes;
+ * PL_ICON_DOCUMENT when it is not one. Game Player opens these. */
+pl_icon_kind romIconKind(const QString &path);
 /* Is this folder shared (Get Info > Sharing)? */
 bool isSharedFolder(const QString &path);
 /* A Macintosh disk or CD image (HFS, HFS+ or partitioned): opening one

@@ -98,6 +98,13 @@ enum pl_icon_kind {
 	PL_ICON_APP_PEDIGREE,
 	PL_ICON_APP_PLOTTER,
 	PL_ICON_APP_STASH,
+	/* A console game's own file: a cartridge or disc (Game Player). */
+	PL_ICON_ROM_NES,
+	PL_ICON_ROM_SNES,
+	PL_ICON_ROM_PS1,
+	PL_ICON_ROM_N64,
+	PL_ICON_ROM_SEGA,
+	PL_ICON_ROM_GAMEBOY,
 	/* One extension's own icon each (tools/extension-icons). */
 #include "icons_custom.h"
 	PL_ICON_COUNT,

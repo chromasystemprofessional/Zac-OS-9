@@ -202,6 +202,18 @@ const QString &Item::kindName() {
 			kindText = "Internet location";
 		} else if (kind == PL_ICON_PRINTER) {
 			kindText = "desktop printer";
+		} else if (kind == PL_ICON_ROM_NES) {
+			kindText = "NES game";
+		} else if (kind == PL_ICON_ROM_SNES) {
+			kindText = "Super NES game";
+		} else if (kind == PL_ICON_ROM_PS1) {
+			kindText = "PlayStation disc";
+		} else if (kind == PL_ICON_ROM_N64) {
+			kindText = "Nintendo 64 game";
+		} else if (kind == PL_ICON_ROM_SEGA) {
+			kindText = "Sega game";
+		} else if (kind == PL_ICON_ROM_GAMEBOY) {
+			kindText = "Game Boy game";
 		} else {
 			static QMimeDatabase db;
 			kindText = db.mimeTypeForFile(path).comment();
@@ -307,12 +319,89 @@ pl_icon_kind iconKindFor(const QString &path) {
 	if (isClassicApplication(iconPath)) {
 		return PL_ICON_CLASSIC;
 	}
+	const pl_icon_kind rom = romIconKind(iconPath);
+	if (rom != PL_ICON_DOCUMENT) {
+		return rom;
+	}
 	static QMimeDatabase db;
 	const QString mime = db.mimeTypeForFile(info).name();
 	if (mime == "application/x-executable" || mime == "application/x-sharedlib" ||
 			mime == "application/x-pie-executable" ||
 			mime == "application/x-desktop") {
 		return PL_ICON_APPLICATION;
+	}
+	return PL_ICON_DOCUMENT;
+}
+
+/* The first `length` bytes at `offset`, or fewer if the file is short or
+ * cannot be opened. */
+static QByteArray fileHeader(const QString &path, qint64 offset, int length) {
+	QFile f(path);
+	if (!f.open(QIODevice::ReadOnly) || !f.seek(offset)) {
+		return QByteArray();
+	}
+	return f.read(length);
+}
+
+/* Does a .cue sheet sit beside this disc track (same directory and stem)?
+ * A PlayStation game is usually a .cue naming one or more .bin tracks; the
+ * cue carries the disc's layout, so the cue itself is the disc. */
+static bool hasSiblingCue(const QFileInfo &info) {
+	const QString cue = info.completeBaseName() + ".cue";
+	const QDir dir = info.absoluteDir();
+	const QStringList names = dir.entryList(QDir::Files, QDir::Name);
+	for (const QString &name : names) {
+		if (name.compare(cue, Qt::CaseInsensitive) == 0) {
+			return true;
+		}
+	}
+	return false;
+}
+
+pl_icon_kind romIconKind(const QString &path) {
+	const QFileInfo info(path);
+	const QString suffix = info.suffix().toLower();
+	/* Cheap suffix gate: only a handful of extensions are ROMs, so every other
+	 * file (the common case) returns here without a stat() call. */
+	if (suffix != "nes" && suffix != "sfc" && suffix != "smc" && suffix != "n64" &&
+			suffix != "z64" && suffix != "v64" && suffix != "gen" && suffix != "smd" &&
+			suffix != "sms" && suffix != "md" && suffix != "gb" && suffix != "gbc" &&
+			suffix != "gba" && suffix != "cue" && suffix != "bin") {
+		return PL_ICON_DOCUMENT;
+	}
+	if (!info.isFile()) {
+		return PL_ICON_DOCUMENT;
+	}
+	/* NES: the four-byte "NES\x1a" header names it. */
+	if (suffix == "nes") {
+		return fileHeader(path, 0, 4) == QByteArray("NES\x1A", 4) ? PL_ICON_ROM_NES
+			: PL_ICON_DOCUMENT;
+	}
+	if (suffix == "sfc" || suffix == "smc") {
+		return PL_ICON_ROM_SNES;
+	}
+	if (suffix == "n64" || suffix == "z64" || suffix == "v64") {
+		return PL_ICON_ROM_N64;
+	}
+	if (suffix == "gen" || suffix == "smd" || suffix == "sms") {
+		return PL_ICON_ROM_SEGA;
+	}
+	/* .md is Mega Drive, but also Markdown: a cartridge is large and carries
+	 * the "SEGA" header at 0x100; a document is neither. */
+	if (suffix == "md") {
+		return info.size() >= 128 * 1024 && fileHeader(path, 0x100, 4) == QByteArray("SEGA", 4)
+			? PL_ICON_ROM_SEGA : PL_ICON_DOCUMENT;
+	}
+	if (suffix == "gb" || suffix == "gbc" || suffix == "gba") {
+		return PL_ICON_ROM_GAMEBOY;
+	}
+	/* PlayStation: a .cue sheet, or a disc track that has one beside it
+	 * (so a bare .bin stays an ordinary document). */
+	if (suffix == "cue") {
+		return PL_ICON_ROM_PS1;
+	}
+	if (suffix == "bin") {
+		return hasSiblingCue(info) ? PL_ICON_ROM_PS1 : PL_ICON_DOCUMENT;
 	}
 	return PL_ICON_DOCUMENT;
 }
