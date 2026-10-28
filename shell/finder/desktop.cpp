@@ -132,6 +132,17 @@ Desktop::Desktop() {
 			w->update();
 		}
 	});
+	/* The scale or resolution may have changed (Monitors panel): redraw so
+	 * the desktop picture fills the new size instead of the old one. */
+	const QString outputsFile = qEnvironmentVariable("XDG_RUNTIME_DIR") + "/zacos9-outputs-" +
+		qEnvironmentVariable("WAYLAND_DISPLAY");
+	if (QFileInfo::exists(outputsFile)) {
+		m_settingsWatcher.addPath(outputsFile);
+		QObject::connect(&m_settingsWatcher, &QFileSystemWatcher::fileChanged, [this] {
+			placeIcons();
+			update();
+		});
+	}
 	loadPattern();
 
 	QDir().mkpath(folderPath());
@@ -494,6 +505,7 @@ void Desktop::itemRenamed(const QString &from, const QString &to) {
 
 void Desktop::resizeEvent(QResizeEvent *) {
 	placeIcons();
+	update();
 }
 
 /* General Controls' "Show Desktop when in background", off: while another
