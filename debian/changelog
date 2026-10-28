@@ -1,5 +1,14 @@
 zacos9 (1.3.1) trixie; urgency=medium
 
+  * Monitors panel: clicking a monitor now flashes its number on the
+    correct physical screen (the previous version always flashed on one
+    screen). Screen matching uses name, geometry, size and index, with
+    setScreen() to place the overlay on the right display.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Wed, 28 Oct 2026 18:00:00 -0400
+
+zacos9 (1.3.1) trixie; urgency=medium
+
   * Monitors: clicking a monitor in the arrangement panel now flashes that
     monitor's number on the corresponding screen, matched by output name.
   * Multi-monitor/multi-GPU: rendering now runs on the card with the largest
