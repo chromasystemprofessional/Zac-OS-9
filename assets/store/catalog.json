@@ -58,6 +58,10 @@
 
     { "id": "extra-turntable", "name": "Turntable", "category": "Extras",
       "blurb": "Listen to a USB turntable through your speakers or TV, switched on and off from The Collar. Plug the turntable in, then choose On from the Turntable module. Left on, it plays again whenever the turntable is plugged in.",
-      "packages": ["zacos9-extra-turntable"], "extra": { "id": "turntable", "start": "zacos9-collar-turntable" } }
+      "packages": ["zacos9-extra-turntable"], "extra": { "id": "turntable", "start": "zacos9-collar-turntable" } },
+
+    { "id": "extra-phone", "name": "Phone", "category": "Extras",
+      "blurb": "KDE Connect and Syncthing for your phone: notifications, file sharing, clipboard and photo sync. Installs KDE Connect and Syncthing; Syncthing's web interface opens the first time to pair the phone.",
+      "packages": ["zacos9-extra-phone"], "extra": { "id": "phone", "start": "zacos9-extra-phone" } }
   ]
 }
