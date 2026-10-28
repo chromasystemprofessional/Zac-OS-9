@@ -251,7 +251,7 @@ private:
 		m_checks.clear();
 		if (multiple()) {
 			m_area = QRect(M + IN, g0 + 1 + PL_GROUP_MARGIN_TOP, W - 2 * M - 2 * IN - 2, 92);
-			const int arrBottom = m_area.bottom() + 8 + 14 + PL_GROUP_MARGIN;
+			const int arrBottom = m_area.bottom() + 8 + 18 + 14 + PL_GROUP_MARGIN;
 			m_groups.push_back({ g0, arrBottom, "Arrangement" });
 			m_mirror = std::make_unique<PanelCheckbox>("Mirror Displays",
 				QPoint(M + IN, m_area.bottom() + 8));
@@ -271,6 +271,25 @@ private:
 				update();
 			};
 			m_checks.push_back(m_everyBar.get());
+			m_mainDisplay = std::make_unique<PanelCheckbox>("Main Display",
+				QPoint(M + IN, m_area.bottom() + 8 + 18));
+			m_mainDisplay->on = selected() ? selected()->main : false;
+			m_mainDisplay->hint = "Where the desktop icons live. The menu bar's home is here too.";
+			m_mainDisplay->toggled = [this](bool on) {
+				if (on) {
+					for (Screen &d : m_displays) {
+						d.main = false;
+					}
+					if (m_sel < m_displays.size()) {
+						m_displays[m_sel].main = true;
+					}
+					saveArrangement();
+				}
+				/* There is always one main display; keep the box truthful. */
+				m_mainDisplay->on = m_sel < m_displays.size() && m_displays[m_sel].main;
+				update();
+			};
+			m_checks.push_back(m_mainDisplay.get());
 			resTop = arrBottom + 12;
 		}
 		m_resTop = resTop;
@@ -419,7 +438,7 @@ private:
 				}
 				const bool moving = m_drag == Drag::Bar && m_displays[i].main;
 				if ((m_displays[i].main && !moving) || (!m_displays[i].main && everyBar())) {
-					paintBar(c, barRect(i));
+					paintBar(c, barRect(i), m_displays[i].main);
 				}
 				Text number(QString::number(i + 1), 40, PL_FONT_SYSTEM);
 				if (number.t && number.t->ink_l >= 0) {
@@ -436,12 +455,14 @@ private:
 			pl_outline(c, r.left() + 1, r.top() + 1, r.right() - 1, r.bottom() - 1, GRAY(0x8));
 		}
 		if (m_drag == Drag::Bar) {
-			paintBar(c, QRect(m_dragNow.x() - 14, m_dragNow.y() - 2, 28, 4));
+			paintBar(c, QRect(m_dragNow.x() - 14, m_dragNow.y() - 2, 28, 4), true);
 		}
 	}
 
-	static void paintBar(pl_canvas *c, QRect r) {
-		pl_fill(c, r.left(), r.top(), r.right(), r.bottom(), GRAY(0xD));
+	static void paintBar(pl_canvas *c, QRect r, bool main) {
+		/* The main display's bar is solid; the "every display" bars are
+		 * ghosted, so it is clear which screen is the main one. */
+		pl_fill(c, r.left(), r.top(), r.right(), r.bottom(), main ? C_BLACK : GRAY(0xD));
 		pl_hline(c, r.left(), r.right(), r.bottom(), C_BLACK);
 		pl_hline(c, r.left(), r.right(), r.top(), C_BLACK);
 	}
@@ -574,6 +595,9 @@ private:
 			}
 			if (m_everyBar) {
 				m_everyBar->on = everyBar();
+			}
+			if (m_mainDisplay) {
+				m_mainDisplay->on = selected() ? selected()->main : false;
 			}
 			fillModes();
 			update();
@@ -747,7 +771,7 @@ private:
 	QRect m_area;
 	Drag m_drag = Drag::None;
 	QPoint m_dragNow, m_dragGrab, m_dragPos, m_dragSnap;
-	std::unique_ptr<PanelCheckbox> m_mirror, m_everyBar;
+	std::unique_ptr<PanelCheckbox> m_mirror, m_everyBar, m_mainDisplay;
 	PanelList m_list;
 	PanelRadios m_scale;
 };
