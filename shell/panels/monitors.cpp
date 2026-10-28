@@ -38,19 +38,23 @@ public:
 		setWindowFlags(Qt::FramelessWindowHint | Qt::Tool);
 		setAttribute(Qt::WA_TranslucentBackground);
 		setAttribute(Qt::WA_ShowWithoutActivating);
-		if (screen) {
-			setScreen(screen);
-		}
+		/* The same dance as the secondary desktops (secondarydesktop.cpp):
+		 * create the native window, put it on the screen, then make it a
+		 * layer surface. The scope is deliberately not "zacos9-…", so the
+		 * compositor leaves the surface where it was put instead of pinning
+		 * it to the main display. */
 		winId();
+		if (screen) {
+			windowHandle()->setScreen(screen);
+		}
 		if (auto *layer = LayerShellQt::Window::get(windowHandle())) {
-			layer->setScope("zacos9-monitors-number");
+			layer->setScope("monitors-number");
 			layer->setLayer(LayerShellQt::Window::LayerOverlay);
 			layer->setAnchors(LayerShellQt::Window::Anchors(
 				LayerShellQt::Window::AnchorTop | LayerShellQt::Window::AnchorBottom |
 				LayerShellQt::Window::AnchorLeft | LayerShellQt::Window::AnchorRight));
 			layer->setExclusiveZone(0);
 			layer->setKeyboardInteractivity(LayerShellQt::Window::KeyboardInteractivityNone);
-			layer->setScreenConfiguration(LayerShellQt::Window::ScreenFromQWindow);
 		}
 	}
 protected:

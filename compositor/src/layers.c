@@ -46,12 +46,10 @@ static bool is_ours(const struct wlr_layer_surface_v1 *s) {
 }
 
 /* But with "Show the menu bar on every display", zacos9-menubar puts a bar
- * (and opens its menus) on each screen itself, naming the output. The
- * Monitors panel's number overlay does the same for the screen clicked. */
+ * (and opens its menus) on each screen itself, naming the output. */
 static bool may_choose_output(const struct wlr_layer_surface_v1 *s) {
 	return s->output && s->namespace && (strcmp(s->namespace, "zacos9-menubar") == 0 ||
-		strcmp(s->namespace, "zacos9-menu") == 0 ||
-		strcmp(s->namespace, "zacos9-monitors-number") == 0);
+		strcmp(s->namespace, "zacos9-menu") == 0);
 }
 
 void layers_pin_to_main(struct plat_server *server) {
