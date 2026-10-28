@@ -16,5 +16,6 @@
  * linear buffers with it (see docs/hardware.md).
  */
 char *primary_gpu_devices(bool largest);
+char *primary_gpu_devices_discrete(void);
 
 #endif

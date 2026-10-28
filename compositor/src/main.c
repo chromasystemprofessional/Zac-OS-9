@@ -134,7 +134,12 @@ int main(int argc, char *argv[]) {
 		choice = pl_setting("render-gpu", render_gpu, sizeof(render_gpu)) ?
 			render_gpu : "";
 	}
-	char *gpus = primary_gpu_devices(strcmp(choice, "largest") == 0);
+	char *gpus = NULL;
+	if (strcmp(choice, "largest") == 0) {
+		gpus = primary_gpu_devices(true);
+	} else if (strcmp(choice, "discrete") == 0) {
+		gpus = primary_gpu_devices_discrete();
+	}
 	if (gpus) {
 		/* Tiled and block-linear buffers can't be imported by another
 		 * card's renderer; linear ones can, so the frames cross GPUs

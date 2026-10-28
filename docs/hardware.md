@@ -208,6 +208,12 @@ modifiers every buffer is linear, which both cards can import. A
 `WLR_DRM_DEVICES` already set (the Mac's graphics switch, or a session's
 own) is left alone, as is a nested session.
 
+`render-gpu=discrete` renders on the add-in (non-boot-VGA) card instead, so
+that card's own display is drawn natively and the copy goes to the
+motherboard's. Use it when the discrete card's screen is the one that
+glitches with `largest` (or with the firmware's order). `primary_gpu_devices_discrete()`
+puts that card first in `WLR_DRM_DEVICES`.
+
 A screen wlroots cannot commit frames to at all (a card that finds no
 swapchain format for it, say) used to be retried on every frame: the log
 grew by a hundred megabytes in a few seconds and the session looked hung.

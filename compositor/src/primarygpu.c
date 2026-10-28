@@ -138,8 +138,20 @@ static bool comes_first(const struct gpu *a, const struct gpu *b) {
 	return strcmp(a->card, b->card) < 0;
 }
 
-char *primary_gpu_devices(bool largest) {
-	if (!largest || getenv("WLR_DRM_DEVICES") || getenv("WLR_BACKENDS") ||
+/* The discrete (non-boot-VGA) card first, then the firmware's; the kernel's
+ * order of cards that are the same kind. */
+static bool comes_first_discrete(const struct gpu *a, const struct gpu *b) {
+	if (a->boot_vga != b->boot_vga) {
+		return !a->boot_vga;
+	}
+	return strcmp(a->card, b->card) < 0;
+}
+
+char *primary_gpu_devices_impl(bool largest, bool discrete) {
+	if (!largest && !discrete) {
+		return NULL;
+	}
+	if (getenv("WLR_DRM_DEVICES") || getenv("WLR_BACKENDS") ||
 			getenv("WAYLAND_DISPLAY") || getenv("WAYLAND_SOCKET")) {
 		return NULL;
 	}
@@ -170,7 +182,7 @@ char *primary_gpu_devices(bool largest) {
 	for (int i = 1; i < n; i++) {
 		struct gpu g = gpus[i];
 		int j = i - 1;
-		while (j >= 0 && comes_first(&g, &gpus[j])) {
+		while (j >= 0 && (discrete ? comes_first_discrete(&g, &gpus[j]) : comes_first(&g, &gpus[j]))) {
 			gpus[j + 1] = gpus[j];
 			j--;
 		}
@@ -192,4 +204,13 @@ char *primary_gpu_devices(bool largest) {
 		strcat(list, gpus[i].node);
 	}
 	return list;
+}
+
+
+char *primary_gpu_devices(bool largest) {
+	return primary_gpu_devices_impl(largest, false);
+}
+
+char *primary_gpu_devices_discrete(void) {
+	return primary_gpu_devices_impl(false, true);
 }
