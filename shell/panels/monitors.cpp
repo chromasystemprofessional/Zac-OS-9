@@ -485,7 +485,26 @@ private:
 					m_sel = i;
 				}
 			}
-			build();
+			/* Update the scale radio selection without rebuilding the whole
+			 * panel: rebuilding (setFixedSize) while the window is visible
+			 * can make the compositor restart it, leaving duplicate windows. */
+			if (m_scale.buttons.size() == 6) {
+				const double current = selected() ? selected()->scale : m_currentScale;
+				m_scale.selected = 0;
+				for (int i = 0; i < 6; i++) {
+					static const double scales[] = { 1, 1.25, 1.5, 1.75, 2, 3 };
+					if (qAbs(scales[i] - current) < 0.01) {
+						m_scale.selected = i;
+					}
+				}
+			}
+			if (m_mirror) {
+				m_mirror->on = m_mirrored;
+			}
+			if (m_everyBar) {
+				m_everyBar->on = everyBar();
+			}
+			fillModes();
 			update();
 		});
 	}
