@@ -1,3 +1,13 @@
+zacos9 (1.3.3) trixie; urgency=medium
+
+  * Compositor: a screen is no longer turned off for good when a frame
+    commit fails transiently ("Device or resource busy" on Haswell HDMI).
+    Only a screen with no buffer format at all is left off, so a monitor
+    that glitches comes back on the next frame instead of staying dark
+    until reboot.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Wed, 28 Oct 2026 21:00:00 -0400
+
 zacos9 (1.3.2) trixie; urgency=medium
 
   * Monitors panel: the number overlay is now a layer surface that the
