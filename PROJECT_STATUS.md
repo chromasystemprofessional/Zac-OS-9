@@ -1,6 +1,6 @@
 # Project status
 
-Updated: 2026-10-28. Latest release: **1.3.3**
+Updated: 2026-10-28. Latest release: **1.3.4**
 ([releases](https://github.com/chromasystemprofessional/Zac-OS-9/releases),
 [ISO](https://sourceforge.net/projects/zac-os-9/files/)).
 
