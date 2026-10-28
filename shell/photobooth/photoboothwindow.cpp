@@ -228,7 +228,7 @@ void PhotoBoothWindow::pullFrame() {
 		}
 		gst_message_unref(msg);
 	}
-	if (!m_sink) {
+	if (!m_sink || !m_bus) {
 		return;
 	}
 	GstSample *sample = gst_app_sink_try_pull_sample(GST_APP_SINK(m_sink), 0);
@@ -236,7 +236,13 @@ void PhotoBoothWindow::pullFrame() {
 		return;
 	}
 	GstBuffer *buffer = gst_sample_get_buffer(sample);
+	GstCaps *caps = gst_sample_get_caps(sample);
 	GstVideoInfo info;
+	gst_video_info_init(&info);
+	if (!gst_video_info_from_caps(&info, caps)) {
+		gst_sample_unref(sample);
+		return;
+	}
 	GstVideoFrame frame;
 	if (gst_video_frame_map(&frame, &info, buffer, GST_MAP_READ)) {
 		const QImage img(reinterpret_cast<const uchar *>(GST_VIDEO_FRAME_PLANE_DATA(&frame, 0)),
