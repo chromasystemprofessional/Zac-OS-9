@@ -66,6 +66,17 @@ int main(int argc, char *argv[]) {
 	};
 	Desktop *desktop = makeDesktop();
 	Finder::instance().start(desktop);
+	/* If the screen goes away and comes back, the desktop's layer-surface
+	 * role is lost; re-apply it so the icons and background return. */
+	QObject::connect(qApp, &QGuiApplication::screenAdded, desktop, [desktop] {
+		desktop->becomeLayerSurface();
+		desktop->show();
+		desktop->update();
+	});
+	QObject::connect(qApp, &QGuiApplication::screenRemoved, desktop, [desktop] {
+		desktop->becomeLayerSurface();
+		desktop->update();
+	});
 	/* General Controls' "Show Toy Box at system startup". */
 	char toyBox[16];
 	if (pl_setting("toy-box-at-startup", toyBox, sizeof(toyBox)) && strcmp(toyBox, "true") == 0) {

@@ -73,8 +73,21 @@ Collar::Collar(bool monitor)
 		layer->setKeyboardInteractivity(LayerShellQt::Window::KeyboardInteractivityOnDemand);
 	}
 	applyGeometry();
-	connect(qApp, &QGuiApplication::screenAdded, this, [this] { applyGeometry(); });
-	connect(qApp, &QGuiApplication::screenRemoved, this, [this] { applyGeometry(); });
+	auto reapplyLayer = [this] {
+		winId();
+		if (auto *layer = LayerShellQt::Window::get(windowHandle())) {
+			layer->setScope("zacos9-collar");
+			layer->setLayer(LayerShellQt::Window::LayerTop);
+			layer->setAnchors(LayerShellQt::Window::Anchors(
+				LayerShellQt::Window::AnchorLeft | LayerShellQt::Window::AnchorBottom));
+			layer->setScreenConfiguration(LayerShellQt::Window::ScreenFromCompositor);
+			layer->setExclusiveZone(0);
+			layer->setKeyboardInteractivity(LayerShellQt::Window::KeyboardInteractivityOnDemand);
+		}
+		applyGeometry();
+	};
+	connect(qApp, &QGuiApplication::screenAdded, this, reapplyLayer);
+	connect(qApp, &QGuiApplication::screenRemoved, this, reapplyLayer);
 	if (windowHandle()->screen()) {
 		connect(windowHandle()->screen(), &QScreen::geometryChanged, this, [this] { applyGeometry(); });
 	}
