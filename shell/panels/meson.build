@@ -184,7 +184,7 @@ controlpanel_exe = executable('zacos9-controlpanel',
   xkb_layouts_sources, default_apps_sources, startup_disk_sources, memory_sources,
   link_with: panelkit,
   include_directories: [include_directories('../finder'), xkb_layouts_include],
-  dependencies: [shell_common_dep, platinum_dep, qt6, xkbcommon_client, gio, gio_unix, wayland_client, crypt],
+  dependencies: [shell_common_dep, platinum_dep, qt6, xkbcommon_client, gio, gio_unix, wayland_client, crypt, layershellqt],
   install: true,
 )
 

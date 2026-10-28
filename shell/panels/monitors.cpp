@@ -8,6 +8,7 @@
 #include <QFont>
 #include <QTimer>
 #include <QVBoxLayout>
+#include <LayerShellQt/Window>
 
 /* One screen, as zacos9-wm publishes it. Positions and sizes of the screens in the
  * layout are in logical pixels (the screen's pixels divided by the pixel size). */
@@ -28,18 +29,28 @@ struct Screen {
 };
 
 /* A large number shown on a screen while the Monitors panel is open, so
- * the person can tell which screen is which. */
+ * the person can tell which screen is which. Uses a layer surface so the
+ * compositor places it on the correct screen. */
 class ScreenNumberOverlay : public QWidget {
 public:
 	ScreenNumberOverlay(int number, QScreen *screen)
 		: QWidget(nullptr), m_number(number) {
-		setWindowFlags(Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint |
-			Qt::Tool | Qt::WindowTransparentForInput);
+		setWindowFlags(Qt::FramelessWindowHint | Qt::Tool);
 		setAttribute(Qt::WA_TranslucentBackground);
 		setAttribute(Qt::WA_ShowWithoutActivating);
 		if (screen) {
 			setScreen(screen);
-			setGeometry(screen->geometry());
+		}
+		winId();
+		if (auto *layer = LayerShellQt::Window::get(windowHandle())) {
+			layer->setScope("zacos9-monitors-number");
+			layer->setLayer(LayerShellQt::Window::LayerOverlay);
+			layer->setAnchors(LayerShellQt::Window::Anchors(
+				LayerShellQt::Window::AnchorTop | LayerShellQt::Window::AnchorBottom |
+				LayerShellQt::Window::AnchorLeft | LayerShellQt::Window::AnchorRight));
+			layer->setExclusiveZone(0);
+			layer->setKeyboardInteractivity(LayerShellQt::Window::KeyboardInteractivityNone);
+			layer->setScreenConfiguration(LayerShellQt::Window::ScreenFromQWindow);
 		}
 	}
 protected:
@@ -49,10 +60,10 @@ protected:
 		const QRect r = rect();
 		/* A large, semi-transparent number centred on the screen. */
 		QFont f = p.font();
-		f.setPointSize(r.height() / 4);
+		f.setPointSize(std::max(r.height() / 4, 48));
 		f.setBold(true);
 		p.setFont(f);
-		p.setPen(QColor(0, 0, 0, 120));
+		p.setPen(QColor(0, 0, 0, 180));
 		p.drawText(r, Qt::AlignCenter, QString::number(m_number));
 	}
 private:
