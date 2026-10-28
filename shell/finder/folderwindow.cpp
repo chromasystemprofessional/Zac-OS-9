@@ -7,6 +7,7 @@
 #include "fonts.h"
 
 #include "vfs.h"
+#include "collarmodules.h"
 
 #include <QApplication>
 #include <QPointer>
@@ -2071,6 +2072,13 @@ void FolderWindow::dragEnterEvent(QDragEnterEvent *e) {
 			/* Applications dragged to Startup Items, or to its folder. */
 			(e->source() != this && acceptsStartupDrops() &&
 				(mime->hasFormat(APPLICATION_ITEMS_MIME) || mime->hasFormat(ALIAS_ITEMS_MIME))) ||
+			/* Control panels dragged between the two Control Panels
+			 * folders. */
+			(e->source() != this && acceptsPanelDrops() && mime->hasFormat(PANEL_ITEMS_MIME)) ||
+			/* Collar modules dragged between the two folders. */
+			(e->source() != this && acceptsCollarModuleDrops() && mime->hasFormat(COLLAR_MODULE_ITEMS_MIME)) ||
+			/* Extensions dragged between the two Extensions folders. */
+			(e->source() != this && acceptsModuleDrops() && mime->hasFormat(MODULE_ITEMS_MIME)) ||
 			e->mimeData()->hasUrls() ||
 			(e->source() == nullptr && canMakeClipping(mime) && !vfsIsVirtual(m_path)) ||
 			(e->mimeData()->hasFormat(ALIAS_ITEMS_MIME) &&
@@ -2078,6 +2086,42 @@ void FolderWindow::dragEnterEvent(QDragEnterEvent *e) {
 			(e->mimeData()->hasFormat(ICON_MOVE_MIME) && e->source() == this)) {
 		e->acceptProposedAction();
 	}
+}
+
+/* Control Panels, Control Panels (Disabled), or a window showing one of
+ * them: the System Folder's, for instance, where both are icons. */
+bool FolderWindow::acceptsPanelDrops() {
+	if (vfsIsControlPanels(m_path) || vfsIsControlPanelsDisabled(m_path)) {
+		return true;
+	}
+	bool found = false;
+	forEachItem([&](Item *item) {
+		found = found || vfsIsControlPanels(item->path) || vfsIsControlPanelsDisabled(item->path);
+	});
+	return found;
+}
+
+bool FolderWindow::acceptsCollarModuleDrops() {
+	if (vfsIsCollarModules(m_path) || vfsIsCollarModulesDisabled(m_path)) {
+		return true;
+	}
+	bool found = false;
+	forEachItem([&](Item *item) {
+		found = found || vfsIsCollarModules(item->path) || vfsIsCollarModulesDisabled(item->path);
+	});
+	return found;
+}
+
+/* Extensions, Extensions (Disabled), or a window showing one of them. */
+bool FolderWindow::acceptsModuleDrops() {
+	if (vfsIsExtensions(m_path) || vfsIsExtensionsDisabled(m_path)) {
+		return true;
+	}
+	bool found = false;
+	forEachItem([&](Item *item) {
+		found = found || vfsIsExtensions(item->path) || vfsIsExtensionsDisabled(item->path);
+	});
+	return found;
 }
 
 /* Startup Items itself, or a window showing its folder. */
@@ -2092,14 +2136,22 @@ bool FolderWindow::acceptsStartupDrops() {
 
 void FolderWindow::dragMoveEvent(QDragMoveEvent *e) {
 	if (e->mimeData()->hasFormat(ICON_MOVE_MIME) &&
-			(e->source() == this || !e->mimeData()->hasFormat(ALIAS_ITEMS_MIME))) {
+			(e->source() == this || !e->mimeData()->hasFormat(ALIAS_ITEMS_MIME)) &&
+			!e->mimeData()->hasFormat(PANEL_ITEMS_MIME) &&
+			!e->mimeData()->hasFormat(COLLAR_MODULE_ITEMS_MIME)) {
 		e->acceptProposedAction(); /* nothing to drop them into */
 		return;
 	}
 	Item *target = dropTargetAt(e->position().toPoint(), draggedPaths(e->mimeData()));
+	/* Only the folders that take a virtual item show as its target:
+	 * Startup Items, and the two Control Panels and two Extensions
+	 * folders. */
+	const bool takesIconMove = target && (vfsIsStartupItems(target->path) ||
+		vfsIsControlPanels(target->path) || vfsIsControlPanelsDisabled(target->path) ||
+		vfsIsExtensions(target->path) || vfsIsExtensionsDisabled(target->path));
 	if (target && vfsIsVirtual(m_path) && e->mimeData()->hasFormat(ICON_MOVE_MIME) &&
-			!vfsIsStartupItems(target->path)) {
-		target = nullptr; /* only Startup Items takes these here */
+			!takesIconMove) {
+		target = nullptr;
 	}
 	forEachItem([&](Item *item) { item->dropTarget = item == target; });
 	update();
@@ -2118,9 +2170,28 @@ void FolderWindow::dropEvent(QDropEvent *e) {
 	Item *target = iconMove ? nullptr
 		: dropTargetAt(e->position().toPoint(), draggedPaths(e->mimeData()));
 	clearDropTarget();
+	if (!target && !iconMove && e->source() != this) {
+		/* Over a curated folder that takes no drops (a read-only
+		 * collection, say): refuse, rather than dropping into the window
+		 * behind its icon. A file's own icon is only a spot in the
+		 * window, and keeps taking the drop into the folder. */
+		Item *over = itemAt(e->position().toPoint());
+		if (over && over->isVirtual && over->kind == PL_ICON_FOLDER &&
+				!acceptsDrops(*over)) {
+			e->ignore();
+			Finder::instance().dragEnded();
+			return;
+		}
+	}
 	if (e->source() != this && !e->mimeData()->hasFormat(STARTUP_ITEMS_MIME)) {
 		Item *on = dropTargetAt(e->position().toPoint(), {});
-		if (vfsIsStartupItems(on ? on->path : m_path)) {
+		const QString destination = on ? on->path : m_path;
+		/* Startup Items, and the Control Panels and Extensions folders,
+		 * take items the rest of a virtual window only arranges. */
+		if (vfsIsStartupItems(destination) || vfsIsControlPanels(destination) ||
+				vfsIsControlPanelsDisabled(destination) || vfsIsCollarModules(destination) ||
+				vfsIsCollarModulesDisabled(destination) || vfsIsExtensions(destination) ||
+				vfsIsExtensionsDisabled(destination)) {
 			dropItems(e, on, m_path);
 			Finder::instance().dragEnded();
 			return;

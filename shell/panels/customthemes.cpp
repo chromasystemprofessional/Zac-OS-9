@@ -216,7 +216,10 @@ public:
 			return;
 		}
 		QByteArray mark;
-		for (const QString &folder : { soundThemesFolder(), appearanceThemesFolder() }) {
+		/* The alert-sound folders too: a recording dropped into the System
+		 * Folder's Sounds is a change the panels showing it must see. */
+		for (const QString &folder : { soundThemesFolder(), appearanceThemesFolder(),
+				userAlertSoundsFolder() }) {
 			const auto entries = QDir(folder).entryInfoList(QDir::AllEntries | QDir::NoDotAndDotDot | QDir::Hidden,
 				QDir::Name);
 			for (const QFileInfo &entry : entries) {
@@ -287,6 +290,35 @@ Catalog &catalog() {
 	return *instance;
 }
 } // namespace
+
+QStringList alertSoundIds() {
+	QStringList ids = { "platinum" };
+	for (const QString &folder : { QString::fromUtf8(pl_data_dir()) + "/sounds",
+			userAlertSoundsFolder() }) {
+		const QDir dir(folder);
+		for (const QString &file : dir.entryList({ "*.wav" }, QDir::Files, QDir::Name)) {
+			const QFileInfo info(dir.filePath(file));
+			const QString id = info.completeBaseName();
+			if (!info.isSymLink() && info.isFile() && !ids.contains(id) &&
+					QRegularExpression("\\A[A-Za-z0-9_-]{1,48}\\z").match(id).hasMatch()) {
+				ids << id;
+			}
+		}
+	}
+	ids << "none";
+	return ids;
+}
+
+QString alertSoundDisplayName(const QString &id) {
+	if (id == "platinum") {
+		return "Chime";
+	}
+	QString name = id;
+	if (!name.isEmpty()) {
+		name[0] = name[0].toUpper();
+	}
+	return name;
+}
 
 QString soundThemesFolder() {
 	return QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + "/zacos9/appearance/Sound Themes";

@@ -15,7 +15,7 @@ default layout is in `shell/files/vfs.cpp`.
 S a day or so, M a few days, L more. Mac OS versions are when an item
 first appeared in Apple's System Folder, to the nearest release.
 
-Of 31 items: 13 working, 6 partial, 2 view only, 10 missing.
+Of 31 items: 16 working, 6 partial, 0 view only, 9 missing.
 
 ## The System Folder's own files
 
@@ -33,7 +33,7 @@ Of 31 items: 13 working, 6 partial, 2 view only, 10 missing.
 |---|---|---|---|---|---|
 | Apple Menu Items (7.0) | Whatever was in it appeared in the Apple menu. | Working: Zac Menu Items, with a (Disabled) twin | `shell/menubar/launch.c` | – | – |
 | Control Panels (7.0) | One file per panel. | Working: the panels' desktop entries | `lib/controlpanels`, `shell/panels/panelregistry.h` | – | – |
-| Control Panels (Disabled) (7.5) | Extensions Manager moved panels here to turn them off. | Missing; the reader already leaves out a panel the user marked `NoDisplay` | `lib/controlpanels`, `shell/files/vfs.cpp` | Dragging a panel in writes the user's `NoDisplay=true` copy of its entry; dragging it back removes that copy. | S |
+| Control Panels (Disabled) (7.5) | Extensions Manager moved panels here to turn them off. | Working: drag a panel in to turn it off, back to turn it on | `lib/controlpanels`, `shell/files/vfs.cpp`, `shell/finder/fileops.cpp` | – | – |
 | Startup Items (7.0) | Opened everything in it at startup. | Working: XDG autostart | `shell/files/autostart.cpp`, `shell/autostart/` | – | – |
 | Shutdown Items (7.5) | Opened everything in it when shutting down. | Working | `session/` (`zacos9-shutdown-items`) | – | – |
 | Launcher Items (7.5) | The Launcher's buttons. | Working: Toy Box Items | `shell/finder/toybox.cpp` | – | – |
@@ -46,7 +46,7 @@ Of 31 items: 13 working, 6 partial, 2 view only, 10 missing.
 
 | Mac OS item | What it did | ZacOS today | Its home | Idea | Size |
 |---|---|---|---|---|---|
-| Extensions, Extensions (Disabled) (7.0, 7.5) | Loaded at startup; drag to (Disabled) to turn one off at the next restart. | View only: both list kernel modules and services | `system/modules/`, `shell/files/extensioncatalog.cpp`, `shell/finder/modules.cpp` | Dragging between them turns an extension on or off through `zacos9-modules-helper`, run with `runHelper()`. | M |
+| Extensions, Extensions (Disabled) (7.0, 7.5) | Loaded at startup; drag to (Disabled) to turn one off at the next restart. | Working: drag one in to turn it off, back to turn it on | `system/modules/`, `shell/files/extensioncatalog.cpp`, `shell/finder/modules.cpp`, `shell/finder/fileops.cpp` | – | – |
 | Extensions Manager sets (7.5) | Named on/off combinations. | Working: Tricks Sets | `shell/files/tricksets.cpp` | List them in Preferences ▸ Extensions Manager. | S |
 
 ## Look, sound and language
@@ -55,7 +55,7 @@ Of 31 items: 13 working, 6 partial, 2 view only, 10 missing.
 |---|---|---|---|---|---|
 | Appearance (8.0) | Desktop Pictures, Sound Sets, Theme Files. | Working | `shell/panels/appearance.cpp`, `customthemes.cpp` | – | – |
 | Fonts (7.1) | Drop a font in to install it. | Working | `shell/files/fonts.cpp` | – | – |
-| Alert sounds (in System, 7.0) | Drag a sound in and the Sound panel offered it. | View only: Sounds | `lib/settings.c`, `shell/panels/sound.cpp` | Drop a WAV into Sounds and the Sound panel offers it as an alert sound. | S |
+| Alert sounds (in System, 7.0) | Drag a sound in and the Sound panel offered it. | Working: drop a WAVE recording into Sounds | `lib/settings.c`, `shell/panels/sound.cpp`, `shell/files/resources.cpp`, `shell/finder/fileops.cpp` | – | – |
 | Keyboard layouts (in System, 7.0) | Each layout a resource in the System file. | Missing | `shell/panels/xkblayouts.cpp` | A read-only *Keyboard Layouts* folder; opening one opens the Keyboard panel with it chosen. | S |
 | Language & Region Support, Text Encodings (8.5–9) | The scripts and encodings the system could show and type. | Partial: Language Kits, the Numbers and Text panels | `shell/panels/locale.cpp`, `system/accounts/` | A folder of installed locales; adding one goes through the accounts helper. | M |
 | Help (7.5, 8.5) | Help books; drop one in and Help listed it. | Missing | `shell/help/`, `share/zacos9/help/` | A *Help* folder listing the books; one dropped in appears in the Help Center. | S |

@@ -14,7 +14,9 @@
 #include <unistd.h>
 
 #include "appdb.h"
+#include "customthemes.h"
 #include "extensioncatalog.h"
+#include "settings.h"
 
 namespace {
 
@@ -62,7 +64,9 @@ QStringList aliasRoots(const QString &provider) {
 	}
 #endif
 	if (provider == "sounds") {
-		return { userData("sounds"), "/usr/share/sounds" };
+		/* The alert sounds the panels play: the user's own (where
+		 * importAlertSound() puts a dropped one) and the installed set. */
+		return { userAlertSoundsFolder(), QString::fromUtf8(pl_data_dir()) + "/sounds" };
 	}
 	if (provider == "application-support") {
 		return { userData("zacos9/appearance"), "/usr/share/zacos9" };
@@ -83,6 +87,10 @@ bool rootAllowed(const QString &provider, int index, const QString &root) {
 #endif
 	if (index == 0) {
 		base = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation);
+	} else if (provider == "sounds") {
+		/* /usr/share/zacos9/sounds installed, or the source tree's
+		 * assets/sounds in a development build. */
+		base = QString::fromUtf8(pl_data_dir());
 	} else {
 		base = "/usr/share";
 	}
@@ -175,37 +183,6 @@ QStringList loadedModuleLines() {
 	return splitLines(boundedText("/proc/modules", 2 * 1024 * 1024));
 }
 
-QStringList loadedModuleNames() {
-	QStringList names;
-	for (const QString &line : loadedModuleLines()) {
-		const QString name = line.section(' ', 0, 0).trimmed();
-		if (!name.isEmpty()) {
-			names << name;
-		}
-	}
-	return names;
-}
-
-QStringList moduleStartupNames() {
-	QStringList dirs = { "/etc/modules-load.d", "/usr/local/lib/modules-load.d",
-		"/usr/lib/modules-load.d", "/lib/modules-load.d" };
-	QStringList out;
-	for (const QString &dir : dirs) {
-		QDir d(dir);
-		for (const QFileInfo &file : d.entryInfoList({ "*.conf" },
-				QDir::Files | QDir::Readable, QDir::Name)) {
-			for (QString line : splitLines(boundedText(file.absoluteFilePath(), 64 * 1024))) {
-				line = line.section('#', 0, 0).trimmed();
-				if (!line.isEmpty() && QRegularExpression("^[A-Za-z0-9_-]+$").match(line).hasMatch()) {
-					out << line;
-				}
-			}
-		}
-	}
-	out.removeDuplicates();
-	return out;
-}
-
 QString moduleDescription(const QString &module) {
 	return boundedText("/sys/module/" + module + "/description", 4096).trimmed();
 }
@@ -269,6 +246,37 @@ QString cpuName() {
 
 } // namespace
 
+QStringList loadedModuleNames() {
+	QStringList names;
+	for (const QString &line : loadedModuleLines()) {
+		const QString name = line.section(' ', 0, 0).trimmed();
+		if (!name.isEmpty()) {
+			names << name;
+		}
+	}
+	return names;
+}
+
+QStringList moduleStartupNames() {
+	QStringList dirs = { "/etc/modules-load.d", "/usr/local/lib/modules-load.d",
+		"/usr/lib/modules-load.d", "/lib/modules-load.d" };
+	QStringList out;
+	for (const QString &dir : dirs) {
+		QDir d(dir);
+		for (const QFileInfo &file : d.entryInfoList({ "*.conf" },
+				QDir::Files | QDir::Readable, QDir::Name)) {
+			for (QString line : splitLines(boundedText(file.absoluteFilePath(), 64 * 1024))) {
+				line = line.section('#', 0, 0).trimmed();
+				if (!line.isEmpty() && QRegularExpression("^[A-Za-z0-9_-]+$").match(line).hasMatch()) {
+					out << line;
+				}
+			}
+		}
+	}
+	out.removeDuplicates();
+	return out;
+}
+
 QString installedZacOSVersion() {
 	return detectZacOSVersion();
 }
@@ -303,11 +311,18 @@ std::vector<SystemResource> resourceChildren(const QString &provider, const QStr
 					continue;
 				}
 				const QString rootKey = QString(i == 0 ? "user:" : "system:");
-				add(rootKey, i == 0 ? "User" : "Computer", ResourceType::Collection,
-					"folder", QStringLiteral("A read-only view of allowlisted ") +
-						(provider == "sounds" ? "sound resources." : "appearance support files."),
-					{ "Source: " + QFileInfo(root).canonicalFilePath(),
-						"Access: read-only; files are not copied." }, root, true);
+				const bool mine = i == 0;
+				add(rootKey, mine ? "User" : "Computer", ResourceType::Collection,
+					"folder", provider == "sounds" ?
+						(mine ? QStringLiteral("The alert sounds you have added.") :
+							QStringLiteral("The alert sounds that came with the system.")) :
+						QStringLiteral("A read-only view of allowlisted ") +
+							"appearance support files.",
+					provider == "sounds" && mine ?
+						QStringList{ "Source: " + QFileInfo(root).canonicalFilePath(),
+							"Access: drop a WAVE recording here to add it." } :
+						QStringList{ "Source: " + QFileInfo(root).canonicalFilePath(),
+							"Access: read-only; files are not copied." }, root, true);
 			}
 			if (out.empty()) {
 				add("unavailable", provider == "sounds" ? "No sound folders found" :
@@ -375,37 +390,41 @@ std::vector<SystemResource> resourceChildren(const QString &provider, const QStr
 
 	if (provider == "extensions") {
 		for (const ExtensionEntry &entry : curatedExtensions(loadedModuleNames(),
-				moduleStartupNames())) {
+				moduleStartupNames(), blacklistedModules())) {
 			add(entry.key, entry.name, ResourceType::Information, "system extension",
 				entry.description,
-				{ "Status: on",
+				{ entry.modules.isEmpty() ? QStringLiteral("Status: not on this computer") :
+						QStringLiteral("Status: on"),
 					"Starts: " + QString(entry.startup ? "at every startup (modules-load.d)" :
 						"automatically when its hardware is found"),
-					"Kernel modules: " + entry.modules.join(", ") });
+					"Kernel modules: " + (entry.modules.isEmpty() ? QStringLiteral("none loaded") :
+						entry.modules.join(", ")) });
 			out.back().icon = entry.icon;
 		}
 		if (out.empty()) {
 			add("none", "No extensions found", ResourceType::Information,
-				"information", "The kernel did not report any familiar extensions.");
+				"information", "The Extensions Manager has no extensions to list.");
 		}
 		return out;
 	}
 
 	if (provider == "extensions-disabled") {
 		for (const ExtensionEntry &entry : disabledExtensions(loadedModuleNames(),
-				moduleStartupNames())) {
+				moduleStartupNames(), blacklistedModules())) {
+			/* The helper only writes the blacklist; nothing is unloaded,
+			 * so a turned-off extension keeps working until the restart. */
+			const bool running = !entry.modules.isEmpty();
 			add(entry.key, entry.name, ResourceType::Information,
 				"disabled system extension", entry.description,
-				{ "Status: not loaded",
-					"Starts: " + QString(entry.startup ?
-						"at next startup (modules-load.d)" :
-						"only when its hardware is found"),
+				{ "Status: off",
+					"Still running: " + QString(running ?
+						"yes; it stops at the next restart" : "no"),
 					"Kernel modules: " + entry.modules.join(", ") });
 			out.back().icon = entry.icon;
 		}
 		if (out.empty()) {
 			add("none", "No disabled extensions found", ResourceType::Information,
-				"information", "Every familiar extension in the catalog is loaded.");
+				"information", "Every extension is on; dragging one here would turn it off.");
 		}
 		return out;
 	}
@@ -515,18 +534,27 @@ ResourceDetails resourceDetails(const QString &provider, const QString &key) {
 	if (provider == "sounds" || provider == "application-support") {
 		QString source;
 		if (resourceOpenPath(provider, key, &source)) {
+			const bool mine = provider == "sounds" && key == QLatin1String("user:");
 			details.name = QFileInfo(source).fileName();
-			details.kind = QFileInfo(source).isDir() ? "read-only folder alias" :
+			details.kind = QFileInfo(source).isDir() ?
+				(mine ? "folder" : "read-only folder alias") :
 				"read-only file alias";
 			details.location = provider == "sounds" ? "System Folder:Sounds" :
 				"System Folder:Application Support";
 			details.sources = QFileInfo(source).canonicalFilePath();
-			details.description = "A real filesystem alias. The original is not copied.";
-			details.access = "Read-only in Finder; source permissions remain in force.";
+			details.description = mine ?
+				"The alert sounds you have added. A sound dropped here is installed." :
+				"A real filesystem alias. The original is not copied.";
+			details.access = mine ?
+				"Drop a WAVE recording here to add it; files are not moved." :
+				"Read-only in Finder; source permissions remain in force.";
 		} else if (key.isEmpty()) {
 			details.name = provider == "sounds" ? "Sounds" : "Application Support";
 			details.kind = "virtual collection";
-			details.description = "A collection of allowlisted, lazily discovered sources.";
+			details.description = provider == "sounds" ?
+				"The alert sounds on this computer and the ones you have added. Drop a WAVE "
+					"recording here to add it." :
+				"A collection of allowlisted, lazily discovered sources.";
 		}
 		return details;
 	}
@@ -563,9 +591,10 @@ ResourceDetails resourceDetails(const QString &provider, const QString &key) {
 			entry.key.isEmpty() ? safeDisplayName(key) : entry.name;
 		details.kind = key.isEmpty() ? "virtual collection" : "disabled system extension";
 		details.description = entry.key.isEmpty() ?
-			"Familiar extensions that are not loaded on this computer; open Extensions Manager "
-			"and choose Show All for every kernel module." : entry.description;
-		details.access = "Informational only; kernel modules are not loaded or unloaded here.";
+			"Extensions you turned off. They stop loading at the next restart; drag one "
+			"back to Extensions to turn it on." : entry.description;
+		details.access = "Takes effect at the next restart; a running extension keeps working "
+			"until then.";
 		return details;
 	}
 	if (provider == "device-drivers") {

@@ -3,6 +3,7 @@
 #include "clippings.h"
 #include "desktopprinter.h"
 #include "alias.h"
+#include "collarmodules.h"
 #include "platinumshell.h"
 #include "programs.h"
 #include "settings.h"
@@ -28,6 +29,7 @@
 #include <QSet>
 #include <QTemporaryDir>
 #include <algorithm>
+#include <memory>
 #include <mutex>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -37,9 +39,14 @@
 #include "vfs.h"
 #include "apptrash.h"
 #include "appdb.h"
+#include "controlpanels.h"
+#include "extensioncatalog.h"
+#include "modules.h"
+#include "resources.h"
 #include "autostart.h"
 #include "fileassoc.h"
 #include "transferdialog.h"
+#include "customthemes.h"
 #include "fonts.h"
 
 static bool sameDisk(const QString &a, const QString &b) {
@@ -598,6 +605,7 @@ QMimeData *itemDragMime(const std::vector<Item *> &items) {
 			applications.append(vfsNode(item->path)->appId);
 		}
 		QJsonArray startup;
+		QJsonArray panels;
 		for (const Item *item : items) {
 			const QString id = item->isVirtual ? vfsStartupItemId(item->path) : QString();
 			if (id.isEmpty()) {
@@ -608,6 +616,41 @@ QMimeData *itemDragMime(const std::vector<Item *> &items) {
 		}
 		if (!startup.isEmpty()) {
 			mime->setData(STARTUP_ITEMS_MIME, QJsonDocument(startup).toJson(QJsonDocument::Compact));
+		}
+		for (const Item *item : items) {
+			const QString id = item->isVirtual ? vfsPanelId(item->path) : QString();
+			if (id.isEmpty()) {
+				panels = {};
+				break;
+			}
+			panels.append(id);
+		}
+		if (!panels.isEmpty()) {
+			mime->setData(PANEL_ITEMS_MIME, QJsonDocument(panels).toJson(QJsonDocument::Compact));
+		}
+		QJsonArray collarModules;
+		for (const Item *item : items) {
+			const QString id = item->isVirtual ? vfsCollarModuleId(item->path) : QString();
+			if (id.isEmpty()) {
+				collarModules = {};
+				break;
+			}
+			collarModules.append(id);
+		}
+		if (!collarModules.isEmpty()) {
+			mime->setData(COLLAR_MODULE_ITEMS_MIME, QJsonDocument(collarModules).toJson(QJsonDocument::Compact));
+		}
+		QJsonArray modules;
+		for (const Item *item : items) {
+			const QString key = item->isVirtual ? vfsModuleKey(item->path) : QString();
+			if (key.isEmpty()) {
+				modules = {};
+				break;
+			}
+			modules.append(key);
+		}
+		if (!modules.isEmpty()) {
+			mime->setData(MODULE_ITEMS_MIME, QJsonDocument(modules).toJson(QJsonDocument::Compact));
 		}
 		if (!applications.isEmpty()) {
 			mime->setData(APPLICATION_ITEMS_MIME,
@@ -810,6 +853,160 @@ static void dropIntoStartupItems(QDropEvent *e) {
 	e->accept();
 }
 
+/* A control panel dragged into Control Panels (Disabled): the entry it
+ * stands for is turned off there, as the Mac's Extensions Manager did, and
+ * the panel leaves Control Panels. The entries are the drag's own ids, so
+ * nothing outside the two folders can be turned off this way. */
+static void setPanelsEnabled(QDropEvent *e, bool enabled) {
+	const auto document = QJsonDocument::fromJson(e->mimeData()->data(PANEL_ITEMS_MIME));
+	QStringList ids;
+	bool valid = document.isArray() && !document.array().isEmpty() &&
+		document.array().size() <= 256;
+	for (const auto &value : document.array()) {
+		const QString id = value.toString();
+		if (valid && value.isString() && !id.isEmpty()) {
+			ids << id;
+		} else {
+			valid = false;
+		}
+	}
+	if (!valid) {
+		Alert::ask("The dragged control panel information is invalid.", "OK", QString());
+		e->ignore();
+		return;
+	}
+	QStringList refused;
+	for (const QString &id : ids) {
+		if (!pl_control_panel_set_enabled(id.toUtf8().constData(), enabled)) {
+			refused << id;
+		}
+	}
+	/* Accepted first, so the drag ends and the windows can be reloaded
+	 * while it does. */
+	e->setDropAction(Qt::MoveAction);
+	e->accept();
+	QTimer::singleShot(0, QCoreApplication::instance(), [enabled, refused] {
+		vfsRefresh();
+		Finder::instance().folderChanged(vfsPathFor("system-folder/control-panels"));
+		Finder::instance().folderChanged(vfsPathFor("system-folder/control-panels-disabled"));
+		if (!refused.isEmpty()) {
+			Alert::ask(enabled ? "That control panel could not be turned back on." :
+				"That control panel could not be turned off.", "OK", QString());
+		}
+	});
+}
+
+static void setCollarModulesEnabled(QDropEvent *e, bool enabled) {
+	const auto document = QJsonDocument::fromJson(e->mimeData()->data(COLLAR_MODULE_ITEMS_MIME));
+	QStringList ids;
+	bool valid = document.isArray() && !document.array().isEmpty() &&
+		document.array().size() <= 256;
+	for (const auto &value : document.array()) {
+		const QString id = value.toString();
+		if (valid && value.isString() && !id.isEmpty()) {
+			ids << id;
+		} else {
+			valid = false;
+		}
+	}
+	if (!valid) {
+		Alert::ask("The dragged module information is invalid.", "OK", QString());
+		e->ignore();
+		return;
+	}
+	QStringList refused;
+	for (const QString &id : ids) {
+		if (!pl_collar_module_set_enabled(id.toUtf8().constData(), enabled)) {
+			refused << id;
+		}
+	}
+	e->setDropAction(Qt::MoveAction);
+	e->accept();
+	QTimer::singleShot(0, QCoreApplication::instance(), [enabled, refused] {
+		vfsRefresh();
+		Finder::instance().folderChanged(vfsPathFor("system-folder/collar-modules"));
+		Finder::instance().folderChanged(vfsPathFor("system-folder/collar-modules-disabled"));
+		if (!refused.isEmpty()) {
+			Alert::ask(enabled ? "That module could not be turned back on." :
+				"That module could not be turned off.", "OK", QString());
+		}
+	});
+}
+
+/* The helper for each extension, one after another (one authentication,
+ * then the next), and the two folders reloaded when the last is done. */
+static void runExtensionToggles(const QList<QPair<QString, QStringList>> &work, int index,
+		bool enabled, const std::shared_ptr<QString> &failed) {
+	if (index >= work.size()) {
+		vfsRefresh();
+		Finder::instance().folderChanged(vfsPathFor("system-folder/extensions"));
+		Finder::instance().folderChanged(vfsPathFor("system-folder/extensions-disabled"));
+		if (!failed->isEmpty()) {
+			Alert::ask(*failed, "OK", QString());
+		}
+		return;
+	}
+	setExtensionEnabledAsync(QCoreApplication::instance(), work[index].first, enabled,
+		work[index].second,
+		[work, index, enabled, failed](bool ok, const QString &error) {
+			if (!ok && failed->isEmpty()) {
+				/* What the helper or pkexec said: "Not authorized…", or
+				 * that it stopped. A drop that does nothing must say so. */
+				*failed = error.isEmpty() ? (enabled ?
+					QString("That extension could not be turned on.") :
+					QString("That extension could not be turned off.")) : error;
+			}
+			runExtensionToggles(work, index + 1, enabled, failed);
+		});
+}
+
+/* An extension dragged into Extensions (Disabled) is turned off for the
+ * next startup; dragged back, it is turned on again. Unlike a control
+ * panel this is a privileged write, so it finishes after the drag does —
+ * and a refused one says why instead of quietly leaving the icon where it
+ * was. */
+static void setExtensionsEnabled(QDropEvent *e, bool enabled) {
+	const auto document = QJsonDocument::fromJson(e->mimeData()->data(MODULE_ITEMS_MIME));
+	QStringList keys;
+	bool valid = document.isArray() && !document.array().isEmpty() &&
+		document.array().size() <= 256;
+	for (const auto &value : document.array()) {
+		const QString key = value.toString();
+		if (valid && value.isString() && !key.isEmpty()) {
+			keys << key;
+		} else {
+			valid = false;
+		}
+	}
+	if (!valid) {
+		Alert::ask("The dragged extension information is invalid.", "OK", QString());
+		e->ignore();
+		return;
+	}
+	/* Worked out before the blacklist changes: what the helper must name
+	 * is what is on this computer now. */
+	const QStringList loaded = loadedModuleNames();
+	const QStringList blacklisted = blacklistedModules();
+	QList<QPair<QString, QStringList>> work;
+	for (const QString &key : keys) {
+		const QStringList modules = extensionToggleModules(key, enabled, loaded, blacklisted);
+		if (!extensionEntry(key).key.isEmpty()) {
+			work.append({ key, modules });
+		}
+	}
+	if (work.isEmpty()) {
+		Alert::ask("That is not an extension the Extensions Manager knows.", "OK", QString());
+		e->ignore();
+		return;
+	}
+	e->setDropAction(Qt::MoveAction);
+	e->accept();
+	const auto failed = std::make_shared<QString>();
+	QTimer::singleShot(0, QCoreApplication::instance(), [work, enabled, failed] {
+		runExtensionToggles(work, 0, enabled, failed);
+	});
+}
+
 static void removeStartupItems(QDropEvent *e) {
 	const auto document = QJsonDocument::fromJson(e->mimeData()->data(STARTUP_ITEMS_MIME));
 	if (!document.isArray() || document.array().isEmpty() || document.array().size() > 256) {
@@ -841,6 +1038,43 @@ void removeFromStartupItems(const QStringList &ids) {
 	Finder::instance().folderChanged(trashFilesPath());
 	if (removed) {
 		pl_sound_event("trash-move");
+	}
+}
+
+/* A recording dragged into Sounds (or its User collection) becomes an alert
+ * sound, installed the way the Appearance panel's Add Recording does it.
+ * Each refusal says why: a drop that quietly did nothing would look like a
+ * bug, and the reasons ("already exists", "not a RIFF WAVE recording") are
+ * the ones the person needs. */
+static void dropAlertSounds(QDropEvent *e, const QStringList &paths) {
+	e->setDropAction(Qt::CopyAction);
+	e->accept();
+	const QString mine = QFileInfo(userAlertSoundsFolder()).canonicalFilePath();
+	QStringList errors;
+	bool installed = false;
+	for (const QString &path : paths) {
+		const QFileInfo file(path);
+		/* Already here: an icon dragged about inside the folder. */
+		if (!mine.isEmpty() && file.canonicalFilePath().section('/', 0, -2) == mine) {
+			continue;
+		}
+		QString id, error;
+		if (importAlertSound(path, &id, &error)) {
+			installed = true;
+		} else {
+			errors << file.fileName() + ": " + error;
+		}
+	}
+	if (installed) {
+		vfsRefresh();
+		Finder::instance().folderChanged(vfsPathFor("system-folder/sounds"));
+		Finder::instance().folderChanged(vfsPathFor("system-folder/sounds/user:"));
+	}
+	if (!errors.isEmpty()) {
+		const QString message = errors.join('\n');
+		QTimer::singleShot(0, QCoreApplication::instance(), [message] {
+			Alert::ask(message, "OK", QString());
+		});
 	}
 }
 
@@ -945,6 +1179,56 @@ void dropItems(QDropEvent *e, const Item *target, const QString &folder) {
 		} else {
 			e->ignore();
 		}
+		return;
+	}
+	if (e->mimeData()->hasFormat(PANEL_ITEMS_MIME)) {
+		/* Into Control Panels (Disabled) turns a panel off; back into
+		 * Control Panels turns it on again. Nowhere else has any use for
+		 * one. */
+		const QString destination = target ? target->path : folder;
+		if (vfsIsControlPanelsDisabled(destination)) {
+			setPanelsEnabled(e, false);
+		} else if (vfsIsControlPanels(destination)) {
+			setPanelsEnabled(e, true);
+		} else {
+			e->ignore();
+		}
+		return;
+	}
+	if (e->mimeData()->hasFormat(COLLAR_MODULE_ITEMS_MIME)) {
+		const QString destination = target ? target->path : folder;
+		if (vfsIsCollarModulesDisabled(destination)) {
+			setCollarModulesEnabled(e, false);
+		} else if (vfsIsCollarModules(destination)) {
+			setCollarModulesEnabled(e, true);
+		} else {
+			e->ignore();
+		}
+		return;
+	}
+	if (vfsIsControlPanelsDisabled(target ? target->path : folder)) {
+		e->ignore(); /* nothing but a control panel goes in there */
+		return;
+	}
+	if (vfsIsCollarModulesDisabled(target ? target->path : folder)) {
+		e->ignore();
+		return;
+	}
+	if (e->mimeData()->hasFormat(MODULE_ITEMS_MIME)) {
+		/* Into Extensions (Disabled) turns an extension off; back into
+		 * Extensions turns it on again. */
+		const QString destination = target ? target->path : folder;
+		if (vfsIsExtensionsDisabled(destination)) {
+			setExtensionsEnabled(e, false);
+		} else if (vfsIsExtensions(destination)) {
+			setExtensionsEnabled(e, true);
+		} else {
+			e->ignore();
+		}
+		return;
+	}
+	if (vfsIsExtensionsDisabled(target ? target->path : folder)) {
+		e->ignore(); /* nothing but an extension goes in there */
 		return;
 	}
 	if (toTrash && e->mimeData()->hasFormat(APPLICATION_ITEMS_MIME)) {
@@ -1081,6 +1365,10 @@ void dropItems(QDropEvent *e, const Item *target, const QString &folder) {
 		return;
 	}
 	QString dest = target ? target->path : folder;
+	if (vfsIsSounds(dest)) {
+		dropAlertSounds(e, paths);
+		return;
+	}
 	if (vfsIsFonts(dest)) {
 		dest = userFontsPath();
 		if (dest.isEmpty() || !QDir().mkpath(dest) || !fontUserDirectory(dest)) {

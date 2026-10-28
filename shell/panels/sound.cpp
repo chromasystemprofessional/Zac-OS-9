@@ -1,6 +1,19 @@
 /* The Sound control panel (zacos9-controlpanel sound). */
 #include "controlpanel.h"
 
+#include "customthemes.h"
+
+/* The alert sound, stored as the Appearance panel stores it: the built-in
+ * Chime is no setting at all. */
+static QString alertSoundSetting() {
+	char value[64];
+	return pl_setting("alert-sound", value, sizeof(value)) ? QString::fromUtf8(value) : QString();
+}
+
+static void setAlertSoundSetting(const QString &id) {
+	pl_setting_set("alert-sound", id == "platinum" ? nullptr : id.toUtf8().constData());
+}
+
 /* PulseAudio or PipeWire's pulse server: output and input selection, volume
  * and mute, plus the independent alert volume. */
 class SoundPanel : public ControlPanel {
@@ -9,10 +22,12 @@ public:
 		const int g0 = 26, g1 = g0 + OUTPUT_GROUP_H + 12 + 16;
 		const int g2 = g1 + VOLUME_GROUP_H + 12 + 16 + 20;
 		const int g3 = g2 + SLIDER_GROUP_H + 12 + 16;
+		const int g4 = g3 + ALERT_SOUND_GROUP_H + 12 + 16;
 		m_groups = { { g0, g0 + OUTPUT_GROUP_H, "Sound Devices" },
 			{ g1, g1 + VOLUME_GROUP_H, "Volume" },
 			{ g2, g2 + SLIDER_GROUP_H, "Alert Volume" },
-			{ g3, g3 + INPUT_GROUP_H, "Sound Input" } };
+			{ g3, g3 + ALERT_SOUND_GROUP_H, "Alert Sound" },
+			{ g4, g4 + INPUT_GROUP_H, "Sound Input" } };
 		m_output.rect = QRect(M + IN + 80, g0 + 1 + PL_GROUP_MARGIN_TOP,
 			W - 2 * M - 2 * IN - 84, PL_POPUP_H);
 		m_output.label = "Output:";
@@ -73,6 +88,25 @@ public:
 		m_alert.changed = [](int v) {
 			setInt("alert-volume", v);
 		};
+
+		/* Which sound an alert plays: Chime, the sounds on this computer,
+		 * the ones added, and None -- the same list the Appearance panel
+		 * shows. It is read again whenever the menu opens, so a recording
+		 * dropped into the System Folder's Sounds is offered without
+		 * reopening the panel. */
+		m_alertSound.rect = QRect(M + IN + 80, g3 + 1 + PL_GROUP_MARGIN_TOP,
+			W - 2 * M - 2 * IN - 84, PL_POPUP_H);
+		m_alertSound.label = "Sound:";
+		loadAlertSounds();
+		m_alertSound.chosen = [this](int row) {
+			if (row < 0 || row >= m_alertIds.size()) {
+				return;
+			}
+			const QString id = m_alertIds[row];
+			setAlertSoundSetting(id);
+			pl_sound_play(id.toUtf8().constData());
+			update();
+		};
 		m_sound.changed = [this] { syncOutputs(); };
 		m_sound.failed = [this](const QString &error) {
 			m_error = error;
@@ -85,6 +119,8 @@ public:
 		m_volume.hint = "Sets how loud the computer plays sound.";
 		m_balance.hint = "Sets how much sound comes from the left and right speakers.";
 		m_alert.hint = "Sets how loud alert sounds are, compared with other sound.";
+		m_hintRects.push_back({ &m_alertSound.rect,
+			"Chooses the sound the computer plays for an alert." });
 		m_mute.hint = "Turns all sound off. Click again to turn it back on.";
 		m_hintRects.push_back({ &m_output.rect, "Chooses the speakers or headphones that play sound." });
 		m_hintRects.push_back({ &m_input.rect, "Chooses the microphone or line input that records sound." });
@@ -94,11 +130,15 @@ protected:
 	void paintExtra(pl_canvas *c) override {
 		m_output.paint(c);
 		m_input.paint(c);
+		m_alertSound.paint(c);
 	}
 
 	bool pressExtra(QPoint p, bool) override {
 		m_focus = nullptr;
-		return m_output.press(this, p) || m_input.press(this, p);
+		/* Before the menu opens: the Sounds folder may have gained or
+		 * lost a recording since the panel was opened. */
+		loadAlertSounds();
+		return m_output.press(this, p) || m_input.press(this, p) || m_alertSound.press(this, p);
 	}
 
 	void mouseReleaseEvent(QMouseEvent *e) override {
@@ -112,6 +152,20 @@ protected:
 	}
 
 private:
+	void loadAlertSounds() {
+		const QString stored = alertSoundSetting();
+		const QString chosen = stored.isEmpty() ? QStringLiteral("platinum") : stored;
+		m_alertIds = alertSoundIds();
+		m_alertSound.items.clear();
+		m_alertSound.selected = 0;
+		for (int i = 0; i < m_alertIds.size(); i++) {
+			m_alertSound.items.emplace_back(alertSoundDisplayName(m_alertIds[i]));
+			if (m_alertIds[i] == chosen) {
+				m_alertSound.selected = i;
+			}
+		}
+	}
+
 	void syncOutputs() {
 		m_output.items.clear();
 		int selected = -1;
@@ -177,6 +231,8 @@ private:
 	SoundClient m_sound;
 	QTimer m_refresh;
 	PanelPopup m_output, m_input;
+	PanelPopup m_alertSound;
+	QStringList m_alertIds;
 	QString m_currentSink, m_error;
 	bool m_volumeFeedbackReady = false;
 	PanelSlider m_volume, m_balance, m_alert;
@@ -189,7 +245,10 @@ private:
 	static constexpr int VOLUME_GROUP_H = 2 * SLIDER_GROUP_H + 20;
 	static constexpr int G2 = G1 + VOLUME_GROUP_H + 12 + 16 + 20;
 	static constexpr int G3 = G2 + SLIDER_GROUP_H + 12 + 16;
-	static constexpr int PANEL_H = G3 + INPUT_GROUP_H + 12 + 3 * 12 + 8;
+	static constexpr int ALERT_SOUND_GROUP_H = 1 + PL_GROUP_MARGIN_TOP + PL_POPUP_H +
+		PL_GROUP_MARGIN;
+	static constexpr int G4 = G3 + ALERT_SOUND_GROUP_H + 12 + 16;
+	static constexpr int PANEL_H = G4 + INPUT_GROUP_H + 12 + 3 * 12 + 8;
 };
 
 PANEL("sound", "Sound", false, SoundPanel);

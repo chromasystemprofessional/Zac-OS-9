@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Bluetooth
+Comment=Bluetooth
+Exec=zacos9-collarmodule bluetooth
+Categories=X-ZacOS9-CollarModule;
+OnlyShowIn=ZacOS9;

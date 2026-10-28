@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Power
+Comment=Power management
+Exec=zacos9-collarmodule power
+Categories=X-ZacOS9-CollarModule;
+OnlyShowIn=ZacOS9;

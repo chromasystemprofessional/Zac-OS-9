@@ -14,8 +14,6 @@
 #include <QStringList>
 #include <functional>
 
-QStringList extensionModules(const QString &key);
-
 /* Runs zacos9-modules-helper as root (pkexec unless already root) and waits
  * for it, keeping windows drawn. *ok and *err on its behalf. */
 QString runModulesHelper(const QStringList &args, bool *ok, QString *err = nullptr);

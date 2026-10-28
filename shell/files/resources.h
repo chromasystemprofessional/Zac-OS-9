@@ -48,6 +48,10 @@ bool resourceOpenPath(const QString &provider, const QString &key, QString *path
 ResourceDetails resourceDetails(const QString &provider, const QString &key);
 QStringList systemInformation();
 QStringList extensionInformation();
+/* The kernel modules loaded now, as /proc/modules names them, and the ones
+ * modules-load.d asks for at startup. */
+QStringList loadedModuleNames();
+QStringList moduleStartupNames();
 /* The installed zacos9 package version, or empty when it is not installed. */
 QString installedZacOSVersion();
 QString resourceTestFixtureRoot();

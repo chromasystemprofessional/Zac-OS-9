@@ -56,6 +56,16 @@ int main(int argc, char **argv) {
 	write(badRecording, "not a wave file");
 	assert(!importAlertSound(badRecording, &customAlert, &importError) && !importError.isEmpty());
 	assert(!importAlertSound(recording, &customAlert, &importError) && importError.contains("already exists"));
+	/* One list for the panels, the Sounds folder and the Appearance
+	 * panel: the built-in Chime, the sounds on this computer, the user's
+	 * own, and None at the end. */
+	const QStringList sounds = alertSoundIds();
+	assert(!sounds.isEmpty() && sounds.first() == "platinum" &&
+		sounds.last() == "none");
+	assert(sounds.contains("Recorded_Chime"));
+	assert(sounds.count("platinum") == 1 && sounds.count("none") == 1);
+	assert(alertSoundDisplayName("platinum") == "Chime" &&
+		alertSoundDisplayName("Recorded_Chime") == "Recorded_Chime");
 	QObject owner;
 	int changes = 0;
 	watchCustomThemes(&owner, [&] { ++changes; });
@@ -75,6 +85,15 @@ int main(int argc, char **argv) {
 	QKeyEvent selectAlert(QEvent::KeyPress, Qt::Key_R, Qt::NoModifier, "Recorded_Chime");
 	QApplication::sendEvent(&panel, &selectAlert);
 	assert(preference("alert-sound") == "Recorded_Chime");
+	/* A recording dropped into the System Folder's Sounds while the panel
+	 * is open is offered without reopening it: the panel follows the
+	 * folder. The watcher says when the change has been taken in. */
+	const int before = changes;
+	assert(QFile::copy(QString::fromUtf8(argv[1]), userAlertSoundsFolder() + "/Later_Chime.wav"));
+	assert(waitFor([&] { return changes > before; }));
+	QKeyEvent selectLater(QEvent::KeyPress, Qt::Key_L, Qt::NoModifier, "Later_Chime");
+	QApplication::sendEvent(&panel, &selectLater);
+	assert(preference("alert-sound") == "Later_Chime");
 	panel.showTab(5);
 	panel.show();
 	QKeyEvent selectSound(QEvent::KeyPress, Qt::Key_O, Qt::NoModifier, "Original Test");

@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Media
+Comment=Media player controls
+Exec=zacos9-collarmodule media
+Categories=X-ZacOS9-CollarModule;
+OnlyShowIn=ZacOS9;

@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Keychain
+Comment=Keychain access
+Exec=zacos9-collarmodule keychain
+Categories=X-ZacOS9-CollarModule;
+OnlyShowIn=ZacOS9;

@@ -179,6 +179,9 @@ private:
 	Item *dropTargetAt(QPoint windowPos, const QStringList &dragged);
 	void clearDropTarget();
 	bool acceptsStartupDrops();
+	bool acceptsPanelDrops();
+	bool acceptsCollarModuleDrops();
+	bool acceptsModuleDrops();
 
 	QString m_path;
 	/* Remembered between sessions; written shortly after each change. */

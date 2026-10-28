@@ -11,8 +11,6 @@
 #include <QThread>
 #include <unistd.h>
 
-#include "extensioncatalog.h"
-
 namespace {
 
 /* zacos9-modules-helper, as root: whether it worked, and why not. */
@@ -23,10 +21,6 @@ bool modulesHelper(const QStringList &args, QString *error) {
 }
 
 } // namespace
-
-QStringList extensionModules(const QString &key) {
-	return extensionEntry(key).modules;
-}
 
 QString runModulesHelper(const QStringList &args, bool *ok, QString *err) {
 	QString error;
