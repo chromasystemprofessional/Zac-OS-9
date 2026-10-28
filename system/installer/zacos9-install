@@ -243,6 +243,13 @@ if [ "${1:-}" = --update ]; then
 	in_target() { chroot "$TARGET" env DEBIAN_FRONTEND=noninteractive "$@"; }
 	apt_opts="-y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold -o Dpkg::Progress-Fancy=0"
 
+	# A live installer's medium can be left in apt's sources; it isn't
+	# reachable on the installed system, so drop it before refreshing.
+	for f in "$TARGET/etc/apt/sources.list" "$TARGET/etc/apt/sources.list.d"/*; do
+		[ -f "$f" ] || continue
+		sed -i -E '/(run\/live\/medium|lib\/live\/mount\/medium|\/cdrom)/d' "$f"
+	done
+
 	step 3 "Getting the latest software lists..."
 	online=true
 	in_target apt-get -q update >&2 || online=false
@@ -587,6 +594,13 @@ rsync -aX \
 	/ "$TARGET/" 2>/dev/null || true
 mkdir -p "$TARGET/proc" "$TARGET/sys" "$TARGET/dev" "$TARGET/run" \
          "$TARGET/tmp" "$TARGET/media" "$TARGET/mnt"
+
+# The live installer medium is not a usable source on the installed
+# system, so remove it from apt's lists before anything refreshes them.
+for f in "$TARGET/etc/apt/sources.list" "$TARGET/etc/apt/sources.list.d"/*; do
+	[ -f "$f" ] || continue
+	sed -i -E '/(run\/live\/medium|lib\/live\/mount\/medium|\/cdrom)/d' "$f"
+done
 
 # ---------- step 4: configure for hard-disk boot ----------
 step 4 "Configuring system..."
