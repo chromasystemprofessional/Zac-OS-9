@@ -6,6 +6,7 @@
 #include <QScreen>
 #include <QPainter>
 #include <QFont>
+#include <QTimer>
 #include <QVBoxLayout>
 
 /* One screen, as zacos9-wm publishes it. Positions and sizes of the screens in the
@@ -73,13 +74,12 @@ public:
 	}
 
 protected:
-	void showEvent(QShowEvent *e) override {
-		ControlPanel::showEvent(e);
-		showScreenNumbers();
-	}
-
 	void hideEvent(QHideEvent *e) override {
-		hideScreenNumbers();
+		if (m_flashOverlay) {
+			m_flashOverlay->hide();
+			m_flashOverlay->deleteLater();
+			m_flashOverlay = nullptr;
+		}
 		ControlPanel::hideEvent(e);
 	}
 
@@ -142,27 +142,42 @@ protected:
 private:
 	enum class Drag { None, Display, Bar };
 
-	QList<ScreenNumberOverlay *> m_overlays;
+	ScreenNumberOverlay *m_flashOverlay = nullptr;
 
-	void showScreenNumbers() {
-		if (!multiple()) {
+	void flashScreenNumber(int displayIndex) {
+		if (!multiple() || displayIndex < 0 || displayIndex >= m_displays.size()) {
 			return;
 		}
-		hideScreenNumbers();
-		const QList<QScreen *> screens = QGuiApplication::screens();
-		for (int i = 0; i < m_displays.size() && i < screens.size(); i++) {
-			auto *overlay = new ScreenNumberOverlay(i + 1, screens.value(i));
-			m_overlays.append(overlay);
-			overlay->show();
+		if (m_flashOverlay) {
+			m_flashOverlay->hide();
+			m_flashOverlay->deleteLater();
+			m_flashOverlay = nullptr;
 		}
-	}
-
-	void hideScreenNumbers() {
-		for (auto *overlay : m_overlays) {
-			overlay->hide();
-			overlay->deleteLater();
+		/* Match the screen by its output name, not by list index: the panel
+		 * numbers screens in arrangement order, while Qt lists them in its
+		 * own (firmware) order. */
+		QScreen *screen = nullptr;
+		for (QScreen *s : QGuiApplication::screens()) {
+			if (s->name() == m_displays[displayIndex].name) {
+				screen = s;
+				break;
+			}
 		}
-		m_overlays.clear();
+		if (!screen && displayIndex < QGuiApplication::screens().size()) {
+			screen = QGuiApplication::screens().value(displayIndex);
+		}
+		if (!screen) {
+			return;
+		}
+		m_flashOverlay = new ScreenNumberOverlay(displayIndex + 1, screen);
+		m_flashOverlay->show();
+		QTimer::singleShot(1400, this, [this]() {
+			if (m_flashOverlay) {
+				m_flashOverlay->hide();
+				m_flashOverlay->deleteLater();
+				m_flashOverlay = nullptr;
+			}
+		});
 	}
 
 	bool multiple() const { return m_displays.size() > 1; }
@@ -396,6 +411,7 @@ private:
 			build();
 		}
 		m_dragNow = p;
+		flashScreenNumber(hit);
 		return true;
 	}
 
