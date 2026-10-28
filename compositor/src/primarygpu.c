@@ -178,6 +178,21 @@ char *primary_gpu_devices_impl(bool largest, bool discrete) {
 	if (n < 2) {
 		return NULL;
 	}
+	/* Rendering on a card with no screen attached gives a session with no
+	 * outputs at all, so a discrete card is only worth using when one of
+	 * its screens is actually plugged in. */
+	if (discrete) {
+		bool hasScreen = false;
+		for (int i = 0; i < n; i++) {
+			if (!gpus[i].boot_vga && gpus[i].area > 0) {
+				hasScreen = true;
+				break;
+			}
+		}
+		if (!hasScreen) {
+			return NULL;
+		}
+	}
 
 	for (int i = 1; i < n; i++) {
 		struct gpu g = gpus[i];
