@@ -1,3 +1,14 @@
+zacos9 (1.3.1) trixie; urgency=medium
+
+  * Monitors: clicking a monitor in the arrangement panel now flashes that
+    monitor's number on the corresponding screen, matched by output name.
+  * Multi-monitor/multi-GPU: rendering now runs on the card with the largest
+    screen, fixing onboard-HDMI plus discrete-GPU setups; screens that cannot
+    be shown are turned off once instead of retried every frame; cursor-plane
+    errors are reported once; the Monitors panel uses the main screen's scale.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Wed, 28 Oct 2026 18:00:00 -0400
+
 zacos9 (1.3.0) trixie; urgency=medium
 
   * Monitors control panel now shows a large number on each screen, so
