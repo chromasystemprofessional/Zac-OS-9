@@ -56,6 +56,9 @@ static bool is_card(const char *name) {
 /* The largest mode of a connector, 0 when nothing is plugged into it. */
 static long long connector_area(const char *dir) {
 	char path[2 * PATH_MAX], line[128];
+	if (strlen(dir) + 8 > sizeof(path)) {
+		return 0;
+	}
 	snprintf(path, sizeof(path), "%s/status", dir);
 	FILE *f = fopen(path, "r");
 	if (!f) {
@@ -64,6 +67,9 @@ static long long connector_area(const char *dir) {
 	const bool connected = fgets(line, sizeof(line), f) && strncmp(line, "connected", 9) == 0;
 	fclose(f);
 	if (!connected) {
+		return 0;
+	}
+	if (strlen(dir) + 7 > sizeof(path)) {
 		return 0;
 	}
 	snprintf(path, sizeof(path), "%s/modes", dir);
