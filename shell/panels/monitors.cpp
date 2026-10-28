@@ -478,6 +478,7 @@ private:
 			}
 			const QString keep = selected() ? selected()->name : QString();
 			readOutputs();
+			packScreens();
 			m_sel = 0;
 			for (int i = 0; i < m_displays.size(); i++) {
 				if (m_displays[i].name == keep) {
@@ -487,6 +488,100 @@ private:
 			build();
 			update();
 		});
+	}
+
+	/* After a scale or resolution change a screen's size changes but its
+	 * saved place doesn't, leaving gaps. Pack the screens so neighbours
+	 * still touch, in their existing order. */
+	void packScreens() {
+		if (m_displays.size() < 2) {
+			return;
+		}
+		/* Try to close gaps: for each screen, if it doesn't touch any other,
+		 * move it to touch the nearest neighbour. */
+		bool changed = true;
+		int iterations = 0;
+		while (changed && iterations < 10) {
+			changed = false;
+			iterations++;
+			for (int i = 0; i < m_displays.size(); i++) {
+				/* Check if screen i touches any other screen. */
+				bool touches = false;
+				for (int j = 0; j < m_displays.size(); j++) {
+					if (i == j) continue;
+					const QRect ri = m_displays[i].rect();
+					const QRect rj = m_displays[j].rect();
+					/* Touching means adjacent (right+1 == left or bottom+1 == top). */
+					if (ri.right() + 1 == rj.left() || rj.right() + 1 == ri.left() ||
+						ri.bottom() + 1 == rj.top() || rj.bottom() + 1 == ri.top()) {
+						touches = true;
+						break;
+					}
+				}
+				if (touches) continue;
+
+				/* Find nearest neighbour and snap to it. */
+				int bestJ = -1;
+				long bestDist = -1;
+				for (int j = 0; j < m_displays.size(); j++) {
+					if (i == j) continue;
+					const QRect ri = m_displays[i].rect();
+					const QRect rj = m_displays[j].rect();
+					const long dx = ri.center().x() - rj.center().x();
+					const long dy = ri.center().y() - rj.center().y();
+					const long dist = dx * dx + dy * dy;
+					if (bestDist < 0 || dist < bestDist) {
+						bestDist = dist;
+						bestJ = j;
+					}
+				}
+				if (bestJ < 0) continue;
+
+				/* Snap screen i to touch screen bestJ. */
+				const QSize sz = m_displays[i].logical();
+				const QRect o = m_displays[bestJ].rect();
+				/* Try all four sides. */
+				QPoint candidates[] = {
+					QPoint(o.right() + 1, m_displays[i].pos.y()),
+					QPoint(o.x() - sz.width(), m_displays[i].pos.y()),
+					QPoint(m_displays[i].pos.x(), o.bottom() + 1),
+					QPoint(m_displays[i].pos.x(), o.y() - sz.height()),
+				};
+				long bestCandDist = -1;
+				QPoint bestCand = m_displays[i].pos;
+				for (const QPoint &cand : candidates) {
+					/* Check no overlap. */
+					QRect me(cand, sz);
+					bool overlap = false;
+					for (int k = 0; k < m_displays.size(); k++) {
+						if (k == i) continue;
+						if (me.intersects(m_displays[k].rect())) {
+							overlap = true;
+							break;
+						}
+					}
+					if (overlap) continue;
+					const long dx = cand.x() - m_displays[i].pos.x();
+					const long dy = cand.y() - m_displays[i].pos.y();
+					const long dist = dx * dx + dy * dy;
+					if (bestCandDist < 0 || dist < bestCandDist) {
+						bestCandDist = dist;
+						bestCand = cand;
+					}
+				}
+				if (bestCand != m_displays[i].pos) {
+					m_displays[i].pos = bestCand;
+					changed = true;
+				}
+			}
+		}
+		/* Save the new arrangement. */
+		if (changed) {
+			for (Screen &d : m_displays) {
+				setInt(("display." + d.name.toUtf8() + ".x").constData(), d.pos.x());
+				setInt(("display." + d.name.toUtf8() + ".y").constData(), d.pos.y());
+			}
+		}
 	}
 
 	/* zacos9-wm publishes the screens and their modes. */
