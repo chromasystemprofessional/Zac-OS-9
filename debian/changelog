@@ -1,3 +1,14 @@
+zacos9 (1.2.0) trixie; urgency=medium
+
+  * System Folder now works the way Mac OS 7-9's did, item by item:
+    Control Panels (Disabled) to turn panels off and on, Extensions and
+    Extensions (Disabled) likewise, Sounds you can drop a WAVE recording
+    into, Collar Modules and Collar Modules (Disabled), read-only Help,
+    Voices, Keyboard Layouts and Keychains folders, and Clipboard, Stash
+    and Notepad files in the System Folder.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Tue, 27 Oct 2026 14:00:00 -0400
+
 zacos9 (1.1.0) trixie; urgency=medium
 
   * Fixes the File Sharing panel accepting any password when the system's
