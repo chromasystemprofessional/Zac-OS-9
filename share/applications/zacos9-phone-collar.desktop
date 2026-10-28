@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Phone
+Comment=Phone or tablet
+Exec=zacos9-collarmodule phone
+Categories=X-ZacOS9-CollarModule;
+OnlyShowIn=ZacOS9;

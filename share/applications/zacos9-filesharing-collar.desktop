@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=File Sharing
+Comment=File Sharing status
+Exec=zacos9-collarmodule file-sharing
+Categories=X-ZacOS9-CollarModule;
+OnlyShowIn=ZacOS9;

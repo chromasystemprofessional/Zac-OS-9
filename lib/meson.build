@@ -69,6 +69,13 @@ controlpanels_dep = declare_dependency(link_with: controlpanels_lib,
 test('control-panels', executable('test-control-panels', '../tests/lib/test_controlpanels.c',
   dependencies: [controlpanels_dep]))
 
+# The Collar modules, from their desktop entries: the Collar Modules folder.
+collarmodules_lib = static_library('collarmodules', 'collarmodules.c',
+  dependencies: [platinum_dep, dependency('glib-2.0')])
+collarmodules_dep = declare_dependency(link_with: collarmodules_lib,
+  include_directories: include_directories('.'),
+  dependencies: [platinum_dep, dependency('glib-2.0')])
+
 figcompare_dep = declare_dependency(
   sources: '../tests/lib/figcompare.c',
   include_directories: include_directories('../tests/lib'),

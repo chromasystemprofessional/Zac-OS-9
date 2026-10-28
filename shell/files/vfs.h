@@ -37,6 +37,8 @@ enum class VKind {
 	Apps,       /* generated: the installed applications */
 	Panels,     /* generated: ZacOS 9's control panels */
 	PanelsDisabled, /* generated: the control panels the user turned off */
+	CollarModules,     /* generated: The Collar's modules */
+	CollarModulesDisabled, /* generated: The Collar's modules the user turned off */
 	AppFolder,  /* generated: one application's folder */
 	Launcher,   /* generated: starts an application or a control panel */
 	Unix,       /* the real filesystem root, for inspecting Debian */
@@ -163,6 +165,9 @@ bool vfsIsControlPanelsDisabled(const QString &path);
 /* The desktop entry a control panel item stands for ("" for anything else):
  * "zacos9-mouse.desktop". */
 QString vfsPanelId(const QString &path);
+bool vfsIsCollarModules(const QString &path);
+bool vfsIsCollarModulesDisabled(const QString &path);
+QString vfsCollarModuleId(const QString &path);
 /* Extensions, and the (Disabled) folder the ones turned off go to. */
 bool vfsIsExtensions(const QString &path);
 bool vfsIsExtensionsDisabled(const QString &path);

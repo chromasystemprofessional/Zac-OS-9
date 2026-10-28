@@ -3,6 +3,7 @@
 #include "clippings.h"
 #include "desktopprinter.h"
 #include "alias.h"
+#include "collarmodules.h"
 #include "platinumshell.h"
 #include "programs.h"
 #include "settings.h"
@@ -627,6 +628,18 @@ QMimeData *itemDragMime(const std::vector<Item *> &items) {
 		if (!panels.isEmpty()) {
 			mime->setData(PANEL_ITEMS_MIME, QJsonDocument(panels).toJson(QJsonDocument::Compact));
 		}
+		QJsonArray collarModules;
+		for (const Item *item : items) {
+			const QString id = item->isVirtual ? vfsCollarModuleId(item->path) : QString();
+			if (id.isEmpty()) {
+				collarModules = {};
+				break;
+			}
+			collarModules.append(id);
+		}
+		if (!collarModules.isEmpty()) {
+			mime->setData(COLLAR_MODULE_ITEMS_MIME, QJsonDocument(collarModules).toJson(QJsonDocument::Compact));
+		}
 		QJsonArray modules;
 		for (const Item *item : items) {
 			const QString key = item->isVirtual ? vfsModuleKey(item->path) : QString();
@@ -879,6 +892,43 @@ static void setPanelsEnabled(QDropEvent *e, bool enabled) {
 		if (!refused.isEmpty()) {
 			Alert::ask(enabled ? "That control panel could not be turned back on." :
 				"That control panel could not be turned off.", "OK", QString());
+		}
+	});
+}
+
+static void setCollarModulesEnabled(QDropEvent *e, bool enabled) {
+	const auto document = QJsonDocument::fromJson(e->mimeData()->data(COLLAR_MODULE_ITEMS_MIME));
+	QStringList ids;
+	bool valid = document.isArray() && !document.array().isEmpty() &&
+		document.array().size() <= 256;
+	for (const auto &value : document.array()) {
+		const QString id = value.toString();
+		if (valid && value.isString() && !id.isEmpty()) {
+			ids << id;
+		} else {
+			valid = false;
+		}
+	}
+	if (!valid) {
+		Alert::ask("The dragged module information is invalid.", "OK", QString());
+		e->ignore();
+		return;
+	}
+	QStringList refused;
+	for (const QString &id : ids) {
+		if (!pl_collar_module_set_enabled(id.toUtf8().constData(), enabled)) {
+			refused << id;
+		}
+	}
+	e->setDropAction(Qt::MoveAction);
+	e->accept();
+	QTimer::singleShot(0, QCoreApplication::instance(), [enabled, refused] {
+		vfsRefresh();
+		Finder::instance().folderChanged(vfsPathFor("system-folder/collar-modules"));
+		Finder::instance().folderChanged(vfsPathFor("system-folder/collar-modules-disabled"));
+		if (!refused.isEmpty()) {
+			Alert::ask(enabled ? "That module could not be turned back on." :
+				"That module could not be turned off.", "OK", QString());
 		}
 	});
 }
@@ -1145,8 +1195,23 @@ void dropItems(QDropEvent *e, const Item *target, const QString &folder) {
 		}
 		return;
 	}
+	if (e->mimeData()->hasFormat(COLLAR_MODULE_ITEMS_MIME)) {
+		const QString destination = target ? target->path : folder;
+		if (vfsIsCollarModulesDisabled(destination)) {
+			setCollarModulesEnabled(e, false);
+		} else if (vfsIsCollarModules(destination)) {
+			setCollarModulesEnabled(e, true);
+		} else {
+			e->ignore();
+		}
+		return;
+	}
 	if (vfsIsControlPanelsDisabled(target ? target->path : folder)) {
 		e->ignore(); /* nothing but a control panel goes in there */
+		return;
+	}
+	if (vfsIsCollarModulesDisabled(target ? target->path : folder)) {
+		e->ignore();
 		return;
 	}
 	if (e->mimeData()->hasFormat(MODULE_ITEMS_MIME)) {

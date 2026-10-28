@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Volume
+Comment=Volume and sound output
+Exec=zacos9-collarmodule volume
+Categories=X-ZacOS9-CollarModule;
+OnlyShowIn=ZacOS9;

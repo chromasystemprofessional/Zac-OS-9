@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Printer
+Comment=Printer selector
+Exec=zacos9-collarmodule printer
+Categories=X-ZacOS9-CollarModule;
+OnlyShowIn=ZacOS9;

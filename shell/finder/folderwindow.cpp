@@ -7,6 +7,7 @@
 #include "fonts.h"
 
 #include "vfs.h"
+#include "collarmodules.h"
 
 #include <QApplication>
 #include <QPointer>
@@ -2074,6 +2075,8 @@ void FolderWindow::dragEnterEvent(QDragEnterEvent *e) {
 			/* Control panels dragged between the two Control Panels
 			 * folders. */
 			(e->source() != this && acceptsPanelDrops() && mime->hasFormat(PANEL_ITEMS_MIME)) ||
+			/* Collar modules dragged between the two folders. */
+			(e->source() != this && acceptsCollarModuleDrops() && mime->hasFormat(COLLAR_MODULE_ITEMS_MIME)) ||
 			/* Extensions dragged between the two Extensions folders. */
 			(e->source() != this && acceptsModuleDrops() && mime->hasFormat(MODULE_ITEMS_MIME)) ||
 			e->mimeData()->hasUrls() ||
@@ -2094,6 +2097,17 @@ bool FolderWindow::acceptsPanelDrops() {
 	bool found = false;
 	forEachItem([&](Item *item) {
 		found = found || vfsIsControlPanels(item->path) || vfsIsControlPanelsDisabled(item->path);
+	});
+	return found;
+}
+
+bool FolderWindow::acceptsCollarModuleDrops() {
+	if (vfsIsCollarModules(m_path) || vfsIsCollarModulesDisabled(m_path)) {
+		return true;
+	}
+	bool found = false;
+	forEachItem([&](Item *item) {
+		found = found || vfsIsCollarModules(item->path) || vfsIsCollarModulesDisabled(item->path);
 	});
 	return found;
 }
@@ -2123,7 +2137,8 @@ bool FolderWindow::acceptsStartupDrops() {
 void FolderWindow::dragMoveEvent(QDragMoveEvent *e) {
 	if (e->mimeData()->hasFormat(ICON_MOVE_MIME) &&
 			(e->source() == this || !e->mimeData()->hasFormat(ALIAS_ITEMS_MIME)) &&
-			!e->mimeData()->hasFormat(PANEL_ITEMS_MIME)) {
+			!e->mimeData()->hasFormat(PANEL_ITEMS_MIME) &&
+			!e->mimeData()->hasFormat(COLLAR_MODULE_ITEMS_MIME)) {
 		e->acceptProposedAction(); /* nothing to drop them into */
 		return;
 	}
@@ -2174,7 +2189,8 @@ void FolderWindow::dropEvent(QDropEvent *e) {
 		/* Startup Items, and the Control Panels and Extensions folders,
 		 * take items the rest of a virtual window only arranges. */
 		if (vfsIsStartupItems(destination) || vfsIsControlPanels(destination) ||
-				vfsIsControlPanelsDisabled(destination) || vfsIsExtensions(destination) ||
+				vfsIsControlPanelsDisabled(destination) || vfsIsCollarModules(destination) ||
+				vfsIsCollarModulesDisabled(destination) || vfsIsExtensions(destination) ||
 				vfsIsExtensionsDisabled(destination)) {
 			dropItems(e, on, m_path);
 			Finder::instance().dragEnded();

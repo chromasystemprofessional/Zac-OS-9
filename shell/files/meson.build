@@ -21,9 +21,9 @@ shell_files = static_library('zacos9-files',
   'desktopprinter.cpp', 'printers.cpp', 'thumbnails.cpp',
   'fileassoc.cpp', 'tricksets.cpp',
   include_directories: include_directories('../panels'),
-  dependencies: [shell_common_dep, platinum_dep, qt6, gio, gio_unix, wayland_client, finder_fonts_dep, controlpanels_dep],
+  dependencies: [shell_common_dep, platinum_dep, qt6, gio, gio_unix, wayland_client, finder_fonts_dep, controlpanels_dep, collarmodules_dep],
 )
 shell_files_dep = declare_dependency(link_with: [shell_files, panelkit],
   include_directories: include_directories('.'),
-  dependencies: [shell_common_dep, gio, gio_unix, finder_fonts_dep, controlpanels_dep],
+  dependencies: [shell_common_dep, gio, gio_unix, finder_fonts_dep, controlpanels_dep, collarmodules_dep],
 )

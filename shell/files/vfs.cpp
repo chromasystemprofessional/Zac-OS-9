@@ -2,6 +2,7 @@
 #include "platinumshell.h"
 #include "programs.h"
 #include "controlpanels.h"
+#include "collarmodules.h"
 #include "custompatterns.h"
 
 #include <QCoreApplication>
@@ -67,6 +68,10 @@ static const char *DEFAULT_REGISTRY = R"JSON({
       "kind": "panels", "icon": "control-panels" },
     { "id": "system-folder/control-panels-disabled", "name": "Control Panels (Disabled)",
       "kind": "panels-disabled", "icon": "control-panels" },
+    { "id": "system-folder/collar-modules", "name": "Collar Modules",
+      "kind": "collar-modules", "icon": "control-strip" },
+    { "id": "system-folder/collar-modules-disabled", "name": "Collar Modules (Disabled)",
+      "kind": "collar-modules-disabled", "icon": "control-strip" },
     { "id": "system-folder/extensions", "icon": "sf-extensions", "name": "Extensions", "kind": "resource",
       "provider": "extensions" },
     { "id": "system-folder/extensions-disabled", "icon": "sf-extensions",
@@ -184,6 +189,12 @@ VKind kindFromName(const QString &name) {
 	if (name == "panels-disabled") {
 		return VKind::PanelsDisabled;
 	}
+	if (name == "collar-modules") {
+		return VKind::CollarModules;
+	}
+	if (name == "collar-modules-disabled") {
+		return VKind::CollarModulesDisabled;
+	}
 	if (name == "unix") {
 		return VKind::Unix;
 	}
@@ -202,6 +213,9 @@ pl_icon_kind iconFromName(const QString &name, VKind kind) {
 	}
 	if (name == "control-panels") {
 		return PL_ICON_CONTROL_PANELS;
+	}
+	if (name == "control-strip") {
+		return PL_ICON_CP_COLLAR;
 	}
 	if (name == "applications-folder") {
 		return PL_ICON_APPLICATIONS_FOLDER;
@@ -483,6 +497,38 @@ void generateDisabledPanels(const VNode &parent) {
 	pl_control_panels_free(panels, count);
 }
 
+static void addCollarModule(const VNode &parent, const pl_collar_module &module) {
+	const QString program = QString::fromUtf8(module.program);
+	const QStringList args = QString::fromUtf8(module.args).split(' ', Qt::SkipEmptyParts);
+	VNode node;
+	node.id = parent.id + "/" + program + (args.isEmpty() ? QString() : "-" + args.join('-'));
+	node.name = QString::fromUtf8(module.name);
+	node.kind = VKind::Launcher;
+	node.icon = module.icon;
+	node.program = program;
+	node.args = args;
+	node.panelId = QString::fromUtf8(module.id); /* reuse panelId field for module id */
+	addNode(node);
+}
+
+void generateCollarModules(const VNode &parent) {
+	size_t count = 0;
+	pl_collar_module *modules = pl_collar_modules(&count);
+	for (size_t i = 0; i < count; i++) {
+		addCollarModule(parent, modules[i]);
+	}
+	pl_collar_modules_free(modules, count);
+}
+
+void generateDisabledCollarModules(const VNode &parent) {
+	size_t count = 0;
+	pl_collar_module *modules = pl_collar_modules_disabled(&count);
+	for (size_t i = 0; i < count; i++) {
+		addCollarModule(parent, modules[i]);
+	}
+	pl_collar_modules_free(modules, count);
+}
+
 void generateResourceLaunchers(const VNode &parent) {
 	for (const auto &entry : std::vector<std::pair<QString, QString>>{
 			{ "System Information", "system-information" },
@@ -696,7 +742,8 @@ void load() {
 		}
 		addNode(node);
 		if (node.kind == VKind::Apps || node.kind == VKind::Panels ||
-				node.kind == VKind::PanelsDisabled) {
+				node.kind == VKind::PanelsDisabled || node.kind == VKind::CollarModules ||
+				node.kind == VKind::CollarModulesDisabled) {
 			generators.push_back(node);
 		}
 	}
@@ -710,6 +757,10 @@ void load() {
 			}
 		} else if (node.kind == VKind::PanelsDisabled) {
 			generateDisabledPanels(node);
+		} else if (node.kind == VKind::CollarModules) {
+			generateCollarModules(node);
+		} else if (node.kind == VKind::CollarModulesDisabled) {
+			generateDisabledCollarModules(node);
 		} else {
 			generatePanels(node);
 		}
@@ -1363,7 +1414,8 @@ bool vfsAcceptsDrops(const QString &path) {
 		node->kind == VKind::Unix || node->kind == VKind::Fonts ||
 		(node->kind == VKind::Apps && !node->id.startsWith("system-folder/")) ||
 		vfsIsStartupItems(path) || vfsIsControlPanels(path) ||
-		vfsIsControlPanelsDisabled(path) || vfsIsExtensions(path) ||
+		vfsIsControlPanelsDisabled(path) || vfsIsCollarModules(path) ||
+		vfsIsCollarModulesDisabled(path) || vfsIsExtensions(path) ||
 		vfsIsExtensionsDisabled(path) || vfsIsSounds(path));
 }
 
@@ -1426,7 +1478,22 @@ bool vfsIsControlPanelsDisabled(const QString &path) {
 	return node && node->kind == VKind::PanelsDisabled;
 }
 
+bool vfsIsCollarModules(const QString &path) {
+	const VNode *node = vfsNode(path);
+	return node && node->kind == VKind::CollarModules;
+}
+
+bool vfsIsCollarModulesDisabled(const QString &path) {
+	const VNode *node = vfsNode(path);
+	return node && node->kind == VKind::CollarModulesDisabled;
+}
+
 QString vfsPanelId(const QString &path) {
+	const VNode *node = vfsNode(path);
+	return node && node->kind == VKind::Launcher ? node->panelId : QString();
+}
+
+QString vfsCollarModuleId(const QString &path) {
 	const VNode *node = vfsNode(path);
 	return node && node->kind == VKind::Launcher ? node->panelId : QString();
 }

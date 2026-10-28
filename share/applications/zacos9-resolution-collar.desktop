@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Monitors
+Comment=Display resolution
+Exec=zacos9-collarmodule monitors
+Categories=X-ZacOS9-CollarModule;
+OnlyShowIn=ZacOS9;
