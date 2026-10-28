@@ -111,6 +111,10 @@ static const char *DEFAULT_REGISTRY = R"JSON({
       "backing": "$XDG_CONFIG_HOME/zacos9/Favorites" },
     { "id": "system-folder/toy-box-items", "icon": "sf-toy-box-items", "name": "Toy Box Items", "kind": "backed",
       "backing": "$XDG_CONFIG_HOME/zacos9/Toy Box Items" },
+    { "id": "system-folder/system", "icon": "system-folder", "name": "System", "kind": "launcher",
+      "action": "system" },
+    { "id": "system-folder/sniffer", "icon": "applications-folder", "name": "Sniffer", "kind": "launcher",
+      "action": "sniffer" },
     { "id": "system-folder/clipboard", "icon": "clipboard", "name": "Clipboard", "kind": "launcher",
       "action": "clipboard" },
     { "id": "system-folder/stash", "icon": "stash", "name": "Stash", "kind": "launcher",
@@ -898,7 +902,9 @@ void load() {
 				node.builtinAction != "system-information" &&
 				node.builtinAction != "extensions-manager" &&
 				node.builtinAction != "clipboard" &&
-				node.builtinAction != "toy-box") {
+				node.builtinAction != "toy-box" &&
+				node.builtinAction != "system" &&
+				node.builtinAction != "sniffer") {
 			node.builtinAction.clear();
 		}
 		addNode(node);
@@ -1247,7 +1253,8 @@ bool vfsLaunch(const QString &path) {
 	}
 	if (node->builtinAction == "system-information" ||
 			node->builtinAction == "extensions-manager" || node->builtinAction == "toy-box" ||
-			node->builtinAction == "clipboard") {
+			node->builtinAction == "clipboard" || node->builtinAction == "system" ||
+			node->builtinAction == "sniffer") {
 		return true;
 	}
 	if (node->builtinAction == "speak-sample") {

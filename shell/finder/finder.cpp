@@ -632,6 +632,19 @@ void Finder::openItem(Item *item) {
 					ToyBox::open();
 				} else if (action == "clipboard") {
 					showClipboardWindow();
+				} else if (action == "system") {
+					openSystemInformation();
+				} else if (action == "sniffer") {
+					/* Mac OS 9: double-clicking the Finder in the System
+					 * Folder while it's running restarts it. */
+					if (Alert::ask("Restart the Sniffer?", "Restart", "Cancel")) {
+						/* Kill the current Finder; the compositor's
+						 * spawn is gone, so relaunch it ourselves. */
+						QProcess::startDetached("pkill", { "-x", "zacos9-finder" });
+						QTimer::singleShot(2000, [] {
+							platinumStartApplication(siblingProgram("zacos9-finder"), {});
+						});
+					}
 				} else if (!vfsLaunch(item->path)) {
 					Alert::ask(item->visibleName() + " could not be opened. Its "
 						"application may have been removed.", "OK", QString());
