@@ -62,6 +62,10 @@
 
     { "id": "extra-phone", "name": "Phone", "category": "Extras",
       "blurb": "KDE Connect and Syncthing for your phone: notifications, file sharing, clipboard and photo sync. Installs KDE Connect and Syncthing; Syncthing's web interface opens the first time to pair the phone.",
-      "packages": ["zacos9-extra-phone"], "extra": { "id": "phone", "start": "zacos9-extra-phone" } }
+      "packages": ["zacos9-extra-phone"], "extra": { "id": "phone", "start": "zacos9-extra-phone" } },
+
+    { "id": "extra-nightmode", "name": "Night Mode", "category": "Extras",
+      "blurb": "Warmer screen colour for the evening, switched on and off from The Collar. Uses gammastep to set the monitor's colour temperature.",
+      "packages": ["zacos9-extra-nightmode"], "extra": { "id": "nightmode", "start": "zacos9-collar-nightmode" } }
   ]
 }
