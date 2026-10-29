@@ -65,7 +65,7 @@ Collar::Collar(bool monitor)
 	winId();
 	if (auto *layer = LayerShellQt::Window::get(windowHandle())) {
 		layer->setScope("zacos9-collar");
-		layer->setLayer(LayerShellQt::Window::LayerTop);
+		layer->setLayer(LayerShellQt::Window::LayerOverlay);
 		layer->setAnchors(LayerShellQt::Window::Anchors(
 			LayerShellQt::Window::AnchorLeft | LayerShellQt::Window::AnchorBottom));
 		layer->setScreenConfiguration(LayerShellQt::Window::ScreenFromCompositor);
@@ -77,7 +77,7 @@ Collar::Collar(bool monitor)
 		winId();
 		if (auto *layer = LayerShellQt::Window::get(windowHandle())) {
 			layer->setScope("zacos9-collar");
-			layer->setLayer(LayerShellQt::Window::LayerTop);
+			layer->setLayer(LayerShellQt::Window::LayerOverlay);
 			layer->setAnchors(LayerShellQt::Window::Anchors(
 				LayerShellQt::Window::AnchorLeft | LayerShellQt::Window::AnchorBottom));
 			layer->setScreenConfiguration(LayerShellQt::Window::ScreenFromCompositor);
