@@ -1,3 +1,12 @@
+zacos9 (1.4.3) trixie; urgency=medium
+
+  * Applications, the System Folder, control panels and the other items in
+    the Macintosh view can now be made into aliases with Make Alias or by
+    dragging them to the Desktop; opening an alias opens the item. The
+    AppleTalk extension has a redrawn icon.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Thu, 29 Oct 2026 18:11:10 -0400
+
 zacos9 (1.4.2) trixie; urgency=medium
 
   * Collar: uses the overlay layer so it stays reachable above full-screen
