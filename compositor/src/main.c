@@ -234,6 +234,7 @@ int main(int argc, char *argv[]) {
 	server.overlay_layer = wlr_scene_tree_create(root);
 	server.lock_layer = wlr_scene_tree_create(root);
 	server.saver_layer = wlr_scene_tree_create(root);
+	server.night_layer = wlr_scene_tree_create(root);
 	outline_init(&server.outline, server.overlay_layer);
 	tracks_init(&server);
 

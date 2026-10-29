@@ -82,6 +82,8 @@ struct plat_server {
 	struct wlr_scene_tree *overlay_layer;   /* drag outlines */
 	struct wlr_scene_tree *lock_layer;  /* lock.c: the lock, over black */
 	struct wlr_scene_tree *saver_layer; /* zacos9-screensaver, even over the lock */
+	struct wlr_scene_tree *night_layer; /* Night Mode's warm tint, over everything */
+	struct wlr_scene_rect *night_rect;
 	struct plat_outline outline;
 
 	struct wlr_layer_shell_v1 *layer_shell;
@@ -387,6 +389,7 @@ struct plat_keyboard {
 /* prefs.c: control panel settings the compositor applies */
 void prefs_init(struct plat_server *server);
 void prefs_apply(struct plat_server *server);
+void night_mode_apply(struct plat_server *server);
 void prefs_write_outputs(struct plat_server *server);
 int prefs_repeat_rate(void);
 int prefs_repeat_delay(void);

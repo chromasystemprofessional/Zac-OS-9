@@ -357,6 +357,37 @@ static void apply_layout(struct plat_server *server) {
 	layers_pin_to_main(server);
 }
 
+/* Night Mode: a warm tint over the whole desktop, from "night-mode=1" in
+ * desktop.conf. One scene rectangle covers every screen's layout, so it
+ * tints the desktop, windows and The Collar alike, seamlessly across
+ * monitors, and takes no input of its own. */
+void night_mode_apply(struct plat_server *server) {
+	char v[8];
+	const bool on = pl_setting("night-mode", v, sizeof(v)) && strcmp(v, "1") == 0;
+	if (!on) {
+		if (server->night_rect) {
+			wlr_scene_node_destroy(&server->night_rect->node);
+			server->night_rect = NULL;
+		}
+		return;
+	}
+	struct wlr_box box;
+	wlr_output_layout_get_box(server->output_layout, NULL, &box);
+	if (box.width <= 0 || box.height <= 0) {
+		return;
+	}
+	if (!server->night_rect) {
+		/* Premultiplied: warm amber at about 28% opacity. */
+		const float color[4] = { 0.28f, 0.13f, 0.0f, 0.28f };
+		server->night_rect = wlr_scene_rect_create(server->night_layer, box.width,
+			box.height, color);
+	} else {
+		wlr_scene_rect_set_size(server->night_rect, box.width, box.height);
+	}
+	wlr_scene_node_set_position(&server->night_rect->node, box.x, box.y);
+	wlr_scene_node_raise_to_top(&server->night_rect->node);
+}
+
 void prefs_apply(struct plat_server *server) {
 	server->pointer_speed = tracking[setting_int("mouse-speed", TRACKING_DEFAULT, 0, 6)];
 	server->double_click_ms = setting_int("double-click", PLAT_DOUBLE_CLICK_MS, 150, 2000);
@@ -380,6 +411,7 @@ void prefs_apply(struct plat_server *server) {
 		apply_output(server, output);
 	}
 	apply_layout(server);
+	night_mode_apply(server);
 	/* X11 and the mouse tracks have one scale: the main screen's. */
 	struct plat_output *main = output_main(server);
 	if (main) {
