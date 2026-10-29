@@ -233,6 +233,13 @@ static bool handle_keybinding(struct plat_server *server, uint32_t mods,
 	if (handle_layout_switch(server, mods, sym)) {
 		return true;
 	}
+	/* Exit a full-screen window: F12, so the user can reach The Collar and
+	 * the rest of the desktop when a game has grabbed the pointer. */
+	if (sym == XKB_KEY_F12 && !mods && server->focused_view &&
+			server->focused_view->fullscreen) {
+		view_set_fullscreen(server->focused_view, false, NULL);
+		return true;
+	}
 	/* Zoom: ⌘-Option-K, ⌘-Option-Up and Down. */
 	if (access_keybinding(server, mods, sym)) {
 		return true;
