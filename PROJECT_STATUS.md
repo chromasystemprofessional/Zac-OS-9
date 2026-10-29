@@ -1,6 +1,6 @@
 # Project status
 
-Updated: 2026-10-28. Latest release: **1.3.6**
+Updated: 2026-10-28. Latest release: **1.4.0**
 ([releases](https://github.com/chromasystemprofessional/Zac-OS-9/releases),
 [ISO](https://sourceforge.net/projects/zac-os-9/files/)).
 
@@ -21,6 +21,10 @@ This page is what's true now and what's next. What changed and when is in
   tablet's pen landing in the wrong place in Krita.
 - **1.1.0** is the restructuring below, with the fixes it turned up (File
   Sharing's password check, the last `waitForFinished()` calls).
+- **1.4.0** adds console game support: the Sniffer recognises NES, Super NES,
+  PlayStation, Nintendo 64, Sega and Game Boy cartridges and discs (their own
+  icons and kind names), and the Game Player extra (in ZacOS Extras) runs them
+  through RetroArch, mednafen and mupen64plus.
 
 ## Being worked on
 

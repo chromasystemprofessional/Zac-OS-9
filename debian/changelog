@@ -1,3 +1,14 @@
+zacos9 (1.4.0) trixie; urgency=medium
+
+  * Sniffer: console game files (NES, Super NES, PlayStation, Nintendo 64,
+    Sega, Game Boy) get their own cartridge and disc icons and kind names,
+    recognised by extension and (where an extension is shared) by the file's
+    own bytes.
+  * Software: the Game Player extra is offered under Extras; it plays those
+    game files in ZacOS 9 through RetroArch, mednafen and mupen64plus.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Wed, 28 Oct 2026 21:35:00 -0400
+
 zacos9 (1.3.6) trixie; urgency=medium
 
   * Compositor: wlr-gamma-control-v1 support, so monitor colour temperature
