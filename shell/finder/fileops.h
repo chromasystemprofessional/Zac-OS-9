@@ -24,6 +24,11 @@ QStringList transferItems(const QStringList &paths, const QString &destDir, bool
 /* `suffix` follows the name (Make Alias: " alias"; Favorites: none). */
 QString createAlias(const QString &target, const QString &destDir, const QString &name,
 	const QString &suffix = QStringLiteral(" alias"));
+/* An alias of one of the Finder's own items (`vfs:/applications`), which
+ * has no file to point at. It opens that item and shows in italics like
+ * any alias, but has no identity record to reconnect. */
+QString createVirtualAlias(const QString &vfsPath, const QString &destDir, const QString &name,
+	const QString &suffix = QStringLiteral(" alias"));
 
 /* Start dragging `items`, shown as dotted outlines (Mac OS 8 dragged
  * outlines, not pictures). `itemOrigins` are the items' icon positions in

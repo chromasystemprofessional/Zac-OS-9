@@ -240,5 +240,18 @@ int main(int argc, char **argv) {
 	check(!aliasMoveRecord(r + "/aliases/other", "/proc/zacos9-alias-test", true),
 		"record preservation failure is reported to the caller");
 
+	/* One of the Finder's own items: the link names a virtual path and has
+	 * no identity record to reconnect. */
+	const QString virtualAlias = r + "/aliases/Applications alias";
+	QString virtualTarget;
+	check(QFile::link(aliasVirtualLinkTarget("vfs:/applications"), virtualAlias),
+		"create a virtual alias link");
+	check(aliasVirtualTarget(virtualAlias, &virtualTarget) &&
+		virtualTarget == "vfs:/applications", "virtual alias reads back its path");
+	check(aliasResolve(virtualAlias).state == AliasState::Ok &&
+		aliasResolve(virtualAlias).target == "vfs:/applications",
+		"virtual alias resolves to its virtual path");
+	check(!aliasVirtualTarget(alias, &virtualTarget), "a file alias is not virtual");
+
 	return failures ? 1 : 0;
 }

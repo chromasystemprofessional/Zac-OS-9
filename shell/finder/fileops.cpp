@@ -343,6 +343,28 @@ QString createAlias(const QString &target, const QString &destDir, const QString
 	return candidate;
 }
 
+QString createVirtualAlias(const QString &vfsPath, const QString &destDir, const QString &name,
+		const QString &suffix) {
+	if (!vfsNode(vfsPath) || name.isEmpty() || name.contains('/') || name == "." || name == ".." ||
+			!QFileInfo(destDir).isDir()) {
+		Alert::ask("The alias cannot be made because its original or destination is unavailable.",
+			"OK", QString());
+		return {};
+	}
+	QDir destination(destDir);
+	QString candidate = name + suffix;
+	for (int i = 2; QFileInfo(destination.filePath(candidate)).exists() ||
+			QFileInfo(destination.filePath(candidate)).isSymLink(); i++) {
+		candidate = name + suffix + " " + QString::number(i);
+	}
+	if (!QFile::link(aliasVirtualLinkTarget(vfsPath), destination.filePath(candidate))) {
+		Alert::ask("The alias could not be created in " + destDir + ". Check folder permissions.",
+			"OK", QString());
+		return {};
+	}
+	return candidate;
+}
+
 /* "Report copy", "Report copy 2", ... (Mac OS 8 naming). */
 static QString copyName(const QDir &dir, const QString &name, const QSet<QString> &reserved) {
 	QString base = name + " copy";
@@ -658,17 +680,17 @@ QMimeData *itemDragMime(const std::vector<Item *> &items) {
 		}
 		QJsonArray aliases;
 		for (const Item *item : items) {
-			const VNode *node = item->isVirtual ? vfsNode(item->path) : nullptr;
-			if (node && !node->actionId.isEmpty()) {
-				aliases = {};
-				break;
-			}
 			const QString target = item->isVirtual ? vfsRealCounterpart(item->path) : item->path;
-			if (target.isEmpty()) {
+			if (!target.isEmpty()) {
+				aliases.append(QJsonObject{{"name", item->name}, {"target", target}});
+			} else if (item->isVirtual && item->path != vfsRoot() && vfsNode(item->path)) {
+				/* One of the Finder's own items: its alias names the
+				 * virtual path, not a file. The startup disk stays fixed. */
+				aliases.append(QJsonObject{{"name", item->name}, {"vfs", item->path}});
+			} else {
 				aliases = {};
 				break;
 			}
-			aliases.append(QJsonObject{{"name", item->name}, {"target", target}});
 		}
 		if (!aliases.isEmpty()) {
 			mime->setData(ALIAS_ITEMS_MIME, QJsonDocument(aliases).toJson(QJsonDocument::Compact));
@@ -1300,8 +1322,11 @@ void dropItems(QDropEvent *e, const Item *target, const QString &folder) {
 			aliases = document.array();
 			for (const auto &value : aliases) {
 				const auto item = value.toObject();
-				if (!value.isObject() || !item["name"].isString() || !item["target"].isString() ||
-						!QDir::isAbsolutePath(item["target"].toString())) {
+				const QString target = item["target"].toString();
+				const QString vfs = item["vfs"].toString();
+				if (!value.isObject() || !item["name"].isString() ||
+						(target.isEmpty() ? !vfs.startsWith(QLatin1String("vfs:/"))
+							: !QDir::isAbsolutePath(target))) {
 					Alert::ask("The dragged alias information is invalid.", "OK", QString());
 					e->ignore();
 					return;
@@ -1315,8 +1340,12 @@ void dropItems(QDropEvent *e, const Item *target, const QString &folder) {
 		bool made = false;
 		for (const auto &value : aliases) {
 			const auto item = value.toObject();
-			made = !createAlias(item["target"].toString(), destination,
-				item["name"].toString()).isEmpty() || made;
+			const QString target = item["target"].toString();
+			const QString name = item["name"].toString();
+			const QString created = target.isEmpty()
+				? createVirtualAlias(item["vfs"].toString(), destination, name)
+				: createAlias(target, destination, name);
+			made = !created.isEmpty() || made;
 		}
 		if (made) {
 			Finder::instance().folderChanged(destination);

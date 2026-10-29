@@ -138,7 +138,7 @@ FolderWindow *FolderWindow::open(const QString &path) {
 }
 
 bool FolderWindow::isOpen(const QString &path) {
-	return openWindows().contains(QDir(path).absolutePath());
+	return openWindows().contains(windowKey(path));
 }
 
 void FolderWindow::closeAll() {

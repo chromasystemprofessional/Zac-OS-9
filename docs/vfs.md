@@ -39,9 +39,15 @@ disk, mounted disks and Trash icons. Files saved there by other applications
 appear automatically; New Folder, renaming, copying and moving work on the
 same files.
 
-File > Make Alias creates a filesystem symbolic link. Drag an application
-or a backed folder from the Macintosh view to Desktop to create an alias
-without moving its package or original directory. For ordinary files and
+File > Make Alias creates a filesystem symbolic link. Drag an application,
+a backed folder, or one of the Finder's own items from the Macintosh view to
+Desktop to create an alias without moving its package or original directory.
+Applications, the System Folder, control panels and the contents of the
+Finder's own folders can be aliased too: their link names the virtual path
+(`zacos9-vfs:vfs:/applications`) instead of a file, since there is no file to
+point at. Such an alias opens that item, Show Original reveals it in its own
+folder, and Get Info names it; it has no identity record to reconnect, so if
+the item is gone the alias simply reports that. For ordinary files and
 folders, Command-Option-drag creates an alias; Option-drag copies. Aliases can
 also be moved between real folders and Desktop. Copying an alias preserves
 the link, and moving it to Trash does not delete the original.

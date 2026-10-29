@@ -26,6 +26,13 @@ struct AliasResolution {
 
 /* Records the identity of `target` for the link at `aliasPath`. */
 bool aliasRecord(const QString &aliasPath, const QString &target);
+/* The Finder's own items (Applications, the System Folder, a control
+ * panel, a sound) have no file to link to. Their aliases name the
+ * virtual path in the link itself instead: "zacos9-vfs:vfs:/applications".
+ * aliasVirtualTarget reads it back; such aliases have no identity record
+ * and never reconnect. */
+QString aliasVirtualLinkTarget(const QString &vfsPath);
+bool aliasVirtualTarget(const QString &aliasPath, QString *target);
 /* Resolves; with `reconnect`, repairs the link when the identity is found. */
 AliasResolution aliasResolve(const QString &aliasPath, bool reconnect = true);
 /* User-assisted: points the alias at an item the user chose (or confirmed).

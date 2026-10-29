@@ -28,6 +28,7 @@ struct Identity {
 constexpr int kMaxHops = 32;
 constexpr int kMaxVisited = 4000;
 constexpr int kMaxDepth = 3;
+constexpr const char *VFS_LINK_PREFIX = "zacos9-vfs:";
 
 QString recordPath(const QString &aliasPath) {
 	const QFileInfo info(aliasPath);
@@ -237,9 +238,42 @@ bool aliasRecord(const QString &aliasPath, const QString &target) {
 	return id.valid && writeRecord(aliasPath, id);
 }
 
+QString aliasVirtualLinkTarget(const QString &vfsPath) {
+	if (vfsPath.isEmpty()) {
+		return {};
+	}
+	return QString::fromLatin1(VFS_LINK_PREFIX) + vfsPath;
+}
+
+bool aliasVirtualTarget(const QString &aliasPath, QString *target) {
+	QByteArray buffer(4096, '\0');
+	const ssize_t length = readlink(QFile::encodeName(aliasPath).constData(),
+		buffer.data(), buffer.size() - 1);
+	if (length <= 0) {
+		return false;
+	}
+	buffer.resize(static_cast<int>(length));
+	const QByteArray prefix(VFS_LINK_PREFIX);
+	if (!buffer.startsWith(prefix)) {
+		return false;
+	}
+	if (target) {
+		*target = QString::fromUtf8(buffer.mid(prefix.size()));
+	}
+	return true;
+}
+
 AliasResolution aliasResolve(const QString &aliasPath, bool reconnect) {
 	AliasResolution out;
 	if (!QFileInfo(aliasPath).isSymLink()) {
+		return out;
+	}
+	/* A virtual alias names a node rather than a file. There is no
+	 * identity to search for; the caller checks the node when it opens. */
+	QString virtualTarget;
+	if (aliasVirtualTarget(aliasPath, &virtualTarget)) {
+		out.state = AliasState::Ok;
+		out.target = virtualTarget;
 		return out;
 	}
 	QString final;

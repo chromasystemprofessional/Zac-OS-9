@@ -20,6 +20,7 @@
 #include <sys/xattr.h>
 
 #include "appdb.h"
+#include "alias.h"
 #include "fileassoc.h"
 #include "apptrash.h"
 #include "sharingclient.h"
@@ -597,6 +598,7 @@ std::unique_ptr<Item> makeItem(const QFileInfo &info) {
 	}
 	/* An application's alias: a link to its desktop file. It looks and
 	 * opens like the application. */
+	QString virtualTarget;
 	const QString target = item->isAlias ? info.canonicalFilePath() : QString();
 	if (target.endsWith(QLatin1String(".desktop"))) {
 		item->kind = pl_icon_for_program(target.toUtf8().constData()); /* ZacOS's own have theirs */
@@ -604,6 +606,21 @@ std::unique_ptr<Item> makeItem(const QFileInfo &info) {
 			if (const AppEntry *app = appByFile(target)) {
 				item->customIcon32 = app->icon32;
 				item->customIcon16 = app->icon16;
+			}
+		}
+	} else if (item->isAlias && aliasVirtualTarget(item->path, &virtualTarget)) {
+		/* An alias of one of the Finder's own items names a virtual
+		 * path; give it that item's icon and folder behaviour. */
+		if (const VNode *node = vfsNode(virtualTarget)) {
+			item->kind = node->icon;
+			item->isDir = node->kind != VKind::Launcher && node->kind != VKind::Font &&
+				(node->kind != VKind::Resource || node->resourceDirectory);
+			if (node->kind == VKind::Launcher && node->actionId.isEmpty() &&
+					!node->appId.isEmpty()) {
+				if (const AppEntry *app = appById(node->appId)) {
+					item->customIcon32 = app->icon32;
+					item->customIcon16 = app->icon16;
+				}
 			}
 		}
 	}

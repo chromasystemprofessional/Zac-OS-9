@@ -254,10 +254,15 @@ InfoWindow::InfoWindow(const QString &path, pl_icon_kind kind, const QString &na
 	if (info.isSymLink()) {
 		m_kindText = "alias";
 		const AliasResolution r = aliasResolve(path, false);
-		m_original = r.state == AliasState::Ok ? r.target :
-			r.state == AliasState::Changed ? r.target + " (replaced)" :
-			r.state == AliasState::Loop ? QStringLiteral("(alias loop)") :
-			QStringLiteral("(missing)");
+		QString virtualTarget;
+		if (r.state == AliasState::Ok && aliasVirtualTarget(path, &virtualTarget)) {
+			m_original = vfsNode(virtualTarget) ? vfsName(virtualTarget) : QStringLiteral("(missing)");
+		} else {
+			m_original = r.state == AliasState::Ok ? r.target :
+				r.state == AliasState::Changed ? r.target + " (replaced)" :
+				r.state == AliasState::Loop ? QStringLiteral("(alias loop)") :
+				QStringLiteral("(missing)");
+		}
 	}
 
 	/* Show: folders can be shared; files, aliases and disks can't. */

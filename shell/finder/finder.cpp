@@ -586,6 +586,23 @@ static void resolveAliasForUser(const QString &aliasPath,
 
 void Finder::openItem(Item *item) {
 	if (!item->isVirtual && item->isAlias) {
+		/* An alias of the Finder's own item names a virtual path. */
+		QString virtualTarget;
+		if (aliasVirtualTarget(item->path, &virtualTarget)) {
+			const VNode *node = vfsNode(virtualTarget);
+			if (!node) {
+				Alert::ask("“" + item->visibleName() + "” could not be opened. Its original is gone.",
+					"OK", QString());
+				return;
+			}
+			Item resolved;
+			resolved.name = node->name;
+			resolved.path = virtualTarget;
+			resolved.kind = node->icon;
+			resolved.isVirtual = true;
+			openItem(&resolved);
+			return;
+		}
 		const QString aliasPath = item->path;
 		const QString name = item->visibleName();
 		resolveAliasForUser(aliasPath, [name](const QFileInfo &target) {
@@ -1236,16 +1253,19 @@ void Finder::makeAlias() {
 			 * as the Mac did when it couldn't write an alias beside its
 			 * original - the alias goes on the desktop. An application's
 			 * links to its desktop file; a folder standing for a real one,
-			 * to that folder. */
+			 * to that folder; the Finder's own items (Applications, the
+			 * System Folder, a control panel) name their virtual path. */
 			const VNode *node = vfsNode(item->path);
 			const QString target = node && node->actionId.isEmpty()
 				? vfsRealCounterpart(item->path) : QString();
-			if (target.isEmpty()) {
-				Alert::ask("An alias of “" + item->visibleName() + "” can't be made.", "OK", QString());
-				continue;
-			}
+			QString name;
 			QDir().mkpath(desktopDir);
-			if (!createAlias(target, desktopDir, item->name).isEmpty()) {
+			if (!target.isEmpty()) {
+				name = createAlias(target, desktopDir, item->name);
+			} else if (node) {
+				name = createVirtualAlias(item->path, desktopDir, item->name);
+			}
+			if (!name.isEmpty()) {
 				folderChanged(desktopDir);
 				onDesktop = true;
 			}
@@ -1643,6 +1663,18 @@ void Finder::showOriginal() {
 			continue;
 		}
 		const QString path = item->path;
+		/* The Finder's own item: reveal the node in the folder holding
+		 * it, rather than looking for a file. */
+		QString virtualTarget;
+		if (aliasVirtualTarget(path, &virtualTarget)) {
+			const VNode *node = vfsNode(virtualTarget);
+			if (node) {
+				FolderWindow *w = FolderWindow::open(vfsPathFor(node->parentId()));
+				w->selectByName(node->name);
+				Finder::instance().notifyState();
+			}
+			return;
+		}
 		resolveAliasForUser(path, [](const QFileInfo &target) {
 			if (target.filePath().isEmpty()) {
 				return;
