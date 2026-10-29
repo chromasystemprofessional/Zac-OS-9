@@ -221,6 +221,7 @@ static void server_new_output(struct wl_listener *listener, void *data) {
 	struct wlr_output *wlr_output = data;
 
 	wlr_output_init_render(wlr_output, server->allocator, server->renderer);
+	wlr_log(WLR_INFO, "%s: gamma_size=%zu", wlr_output->name, wlr_output_get_gamma_size(wlr_output));
 
 	struct wlr_output_state state;
 	wlr_output_state_init(&state);
