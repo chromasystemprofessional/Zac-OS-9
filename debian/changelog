@@ -1,3 +1,11 @@
+zacos9 (1.4.2) trixie; urgency=medium
+
+  * Collar: uses the overlay layer so it stays reachable above full-screen
+    windows (games and others).
+  * debian: skip dh_dwz, which fails on some binaries in this tree.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Thu, 29 Oct 2026 16:30:00 -0400
+
 zacos9 (1.4.1) trixie; urgency=medium
 
   * Utilities now lives under Applications and lists only balenaEtcher,
