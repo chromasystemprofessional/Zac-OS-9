@@ -142,6 +142,15 @@ that GIO resolves from the `mimeapps.list` files (the user's, then
 `MimeType=` keys. Opening a document asks GIO for the same default, so the
 icon always shows what opens it.
 
+A few document kinds are ZacOS's own rather than a MIME association: Mac
+disk images, Windows executables and classic applications each get their own
+icon and "kind" name, and so do console game files — cartridges and discs —
+recognized by `romIconKind` in `shell/files/items.cpp` (extension, plus the
+file's own bytes where an extension is shared: a `.md` Markdown file is never
+a Sega cartridge, and a bare `.bin` is never a disc). Opening one still goes
+through GIO: Game Player (a ZacOS extra) declares the ROM MIME types, so
+double-clicking a cartridge plays it.
+
 The **File Exchange** control panel (`zacos9-fileexchange`, in Control Panels
 and the Apple menu) lists every kind of document an installed application
 can open, with its extensions and the application that opens it now. Change…
