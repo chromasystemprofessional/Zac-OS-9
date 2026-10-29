@@ -493,6 +493,10 @@ bool migrate(QJsonObject *root) {
 
 } // namespace
 
+/* Defined below, beside vfsList; load() brings an open resource folder's
+ * children back after rebuilding the nodes. */
+static void refreshResourceChildren(const VNode &parent);
+
 namespace {
 
 bool matchesCategories(const AppEntry &app, const VNode &node) {
@@ -871,6 +875,21 @@ static void addExternalVolume(const VfsZacosVolume &volume) {
 /* ---- loading ------------------------------------------------------------ */
 
 void load() {
+	/* Resource folders only get their children when something lists
+	 * them (vfsList), so a refresh would otherwise drop a window open on
+	 * one before the window above it has listed its parent again. Keep
+	 * what was open: they are few, and each is one directory read, not a
+	 * recursive scan. */
+	QStringList openResourceDirs;
+	for (const VNode &node : g_nodes) {
+		if (node.kind == VKind::Resource && node.resourceDirectory) {
+			openResourceDirs << node.id;
+		}
+	}
+	std::sort(openResourceDirs.begin(), openResourceDirs.end(),
+		[](const QString &a, const QString &b) {
+			return a.count('/') < b.count('/');
+		});
 	g_nodes.clear();
 	g_overrides.clear();
 
@@ -989,6 +1008,18 @@ void load() {
 	VNode systemFolder;
 	systemFolder.id = "system-folder";
 	generateResourceLaunchers(systemFolder);
+
+	/* Bring back the resource folders that were open before the refresh,
+	 * parents before children (openResourceDirs is ordered so). */
+	for (const QString &id : openResourceDirs) {
+		auto it = g_nodes.find(id);
+		if (it == g_nodes.end() || it->kind != VKind::Resource ||
+				!it->resourceDirectory) {
+			continue;
+		}
+		const VNode parent = *it;
+		refreshResourceChildren(parent);
+	}
 
 	/* Renames and labels are applied last: they override everything. */
 	for (auto it = g_overrides.begin(); it != g_overrides.end(); ++it) {
