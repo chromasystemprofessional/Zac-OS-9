@@ -19,6 +19,8 @@
 #include "locate.h"
 #include "logfilter.h"
 #include "primarygpu.h"
+#include <wlr/types/wlr_gamma_control_v1.h>
+void output_set_gamma(struct wl_listener *, void *);
 #include "startup.h"
 #include "access.h"
 #include "server.h"
@@ -124,6 +126,11 @@ int main(int argc, char *argv[]) {
 	server.output_scale = scale;
 	server.scale_explicit = scale_explicit;
 	server.display = wl_display_create();
+	server.gamma_manager = wlr_gamma_control_manager_v1_create(server.display);
+	if (server.gamma_manager) {
+		server.set_gamma.notify = output_set_gamma;
+		wl_signal_add(&server.gamma_manager->events.set_gamma, &server.set_gamma);
+	}
 
 	/* Which card renders. The firmware's order (the boot VGA card, usually
 	 * the one with a display plugged in at power-on) is left alone unless

@@ -91,6 +91,8 @@ struct plat_server {
 	struct plat_layer_surface *focused_layer;
 
 	struct wlr_foreign_toplevel_manager_v1 *foreign_toplevel_mgr;
+	struct wlr_gamma_control_manager_v1 *gamma_manager;
+	struct wl_listener set_gamma;
 
 	struct wlr_xdg_shell *xdg_shell;
 	struct wl_listener new_xdg_toplevel;
@@ -243,6 +245,9 @@ struct plat_output {
 	struct wl_list link;
 	struct plat_server *server;
 	struct wlr_output *wlr_output;
+	/* Gamma control (wlr-gamma-control-v1): the client adjusting this
+	 * output's colour temperature, if any. */
+	struct wlr_gamma_control_v1 *gamma_control;
 	/* Frames in a row this screen could not show (output.c turns it off
 	 * after a few, rather than trying on every frame for ever). */
 	int failed_frames;

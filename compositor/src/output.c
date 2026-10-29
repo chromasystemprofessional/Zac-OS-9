@@ -3,6 +3,7 @@
 #include <time.h>
 #include <wlr/render/swapchain.h>
 #include <wlr/types/wlr_cursor.h>
+#include <wlr/types/wlr_gamma_control_v1.h>
 #include <wlr/types/wlr_output.h>
 #include <wlr/types/wlr_output_layout.h>
 #include <wlr/util/log.h>
@@ -104,11 +105,26 @@ static int output_commit_zoomed(struct plat_output *output, struct wlr_scene_out
 	if (texture) {
 		wlr_texture_destroy(texture);
 	}
+	if (ok && output->gamma_control) {
+		wlr_gamma_control_v1_apply(output->gamma_control, &state);
+	}
 	const bool committed = ok && wlr_output_commit_state(wlr_output, &state);
 	wlr_output_state_finish(&state);
 	/* Nothing to say when there was no frame to build; the commit is what
 	 * counts. */
 	return (ok && !committed) ? -1 : 1;
+}
+
+void output_set_gamma(struct wl_listener *listener, void *data) {
+	struct plat_server *server = wl_container_of(listener, server, set_gamma);
+	const struct wlr_gamma_control_manager_v1_set_gamma_event *event = data;
+	struct plat_output *output;
+	wl_list_for_each(output, &server->outputs, link) {
+		if (output->wlr_output == event->output) {
+			output->gamma_control = event->control;
+			break;
+		}
+	}
 }
 
 static void output_frame(struct wl_listener *listener, void *data) {
@@ -119,7 +135,19 @@ static void output_frame(struct wl_listener *listener, void *data) {
 	startup_output_frame(output, true);
 	int shown = output_commit_zoomed(output, scene_output);
 	if (shown == 0) {
-		shown = wlr_scene_output_commit(scene_output, NULL) ? 1 : -1;
+		struct wlr_output_state state;
+		wlr_output_state_init(&state);
+		bool ok = wlr_scene_output_build_state(scene_output, &state, NULL) &&
+			(state.committed & WLR_OUTPUT_STATE_BUFFER) && state.buffer;
+		if (ok && output->gamma_control) {
+			wlr_gamma_control_v1_apply(output->gamma_control, &state);
+		}
+		if (ok) {
+			shown = wlr_output_commit_state(output->wlr_output, &state) ? 1 : -1;
+		} else {
+			shown = -1;
+		}
+		wlr_output_state_finish(&state);
 	}
 	startup_output_frame(output, false);
 	if (shown > 0) {
