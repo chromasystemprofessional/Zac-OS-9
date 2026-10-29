@@ -16,8 +16,9 @@
  * Exec field codes, Path, Terminal and DBusActivatable. Flatpak and Snap
  * applications appear because they install desktop entries like any other.
  * Left out: ZacOS 9's own entries ("zacos9-*") and Wine's "Uninstall …".
- * System tools remain discoverable but belong in System Folder. Applications
- * excludes the installation baseline and automatically installed Debian apps.
+ * Applications excludes the installation baseline and automatically installed
+ * Debian apps, and system tools; shipped utilities and the user's own
+ * utilities belong in Applications > Utilities.
  *
  * An application's identity is its desktop file ID ("firefox.desktop",
  * "org.gnome.Nautilus.desktop"), never its display name: names are
@@ -41,6 +42,10 @@ struct AppEntry {
 	QString commandLine;/* Exec=, shown in Get Info; never run as shell text */
 	QStringList categories; /* Categories=, split on ';' */
 	bool systemUtility = false;
+	/* Shown in Applications > Utilities: what ZacOS 9 ships as a utility
+	 * (Disk Setup, balenaEtcher, marked X-ZacOS9-Utility), and a
+	 * Utility-category application the user installed themselves. */
+	bool inUtilities = false;
 	bool userInstalled = true;
 	bool terminal = false;
 	std::vector<AppAction> actions;

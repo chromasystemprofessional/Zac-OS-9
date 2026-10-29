@@ -33,7 +33,7 @@
 /*
  * The default mapping. Written to the registry the first time the Finder
  * runs, then owned by the user: edit it to rename the disk, add folders,
- * point Home somewhere else, or show Utilities.
+ * point Home somewhere else, or move Utilities.
  * Folders the user makes on the startup disk are nodes with "user": true.
  *
  * Changing REGISTRY_VERSION migrates an older file: fields the old file
@@ -47,11 +47,14 @@
  * 17: Shutdown Items, Zac Menu Items and Extensions (Disabled).
  * 18: Extensions Manager uses its Mac OS 9 name again.
  * 19: Zac Menu Items (Disabled).
- * 20: Control Panels (Disabled). */
-static constexpr int REGISTRY_VERSION = 20;
+ * 20: Control Panels (Disabled).
+ * 21: Utilities moves from the System Folder into Applications, and holds
+ *     only shipped utilities and the user's own; the old optional root
+ *     Utilities folder is gone. */
+static constexpr int REGISTRY_VERSION = 21;
 
 static const char *DEFAULT_REGISTRY = R"JSON({
-  "version": 20,
+  "version": 21,
   "volume": {},
   "showUnixVolume": false,
   "nodes": [
@@ -132,17 +135,15 @@ static const char *DEFAULT_REGISTRY = R"JSON({
       "backing": "$XDG_CONFIG_HOME/zacos9/ZacOS 9 Menu Items (Disabled)" },
     { "id": "system-folder/preferences", "icon": "sf-preferences", "name": "Preferences", "kind": "backed",
       "backing": "$XDG_CONFIG_HOME" },
-    { "id": "system-folder/utilities", "icon": "sf-utilities", "name": "Utilities", "kind": "apps" },
     { "id": "applications", "name": "Applications", "kind": "apps", "order": 1,
       "icon": "applications-folder",
       "excludeCategories": ["X-ZacOS9-Utility"] },
+    { "id": "applications/utilities", "icon": "sf-utilities", "name": "Utilities",
+      "kind": "apps", "order": -1 },
     { "id": "home", "name": "Home", "kind": "backed",
       "backing": "$HOME", "order": 2, "icon": "home-folder" },
     { "id": "shared-documents", "name": "Shared Documents", "kind": "backed",
-      "backing": "/home/Shared", "order": 3 },
-    { "id": "utilities", "name": "Utilities", "kind": "apps", "order": 4,
-      "visible": false,
-      "categories": ["Utility", "System", "Settings"] }
+      "backing": "/home/Shared", "order": 3 }
   ],
   "overrides": {}
 })JSON";
@@ -352,7 +353,8 @@ bool migrate(QJsonObject *root) {
 			n.remove("backing");
 			nodes.replace(i, n);
 		}
-		if (n.value("id").toString() == QLatin1String("applications/utilities")) {
+		if (version < 9 &&
+				n.value("id").toString() == QLatin1String("applications/utilities")) {
 			n.insert("id", "system-folder/utilities");
 			if (n.value("categories").toArray() == QJsonArray{ "X-ZacOS9-Utility" }) {
 				n.remove("categories");
@@ -373,6 +375,36 @@ bool migrate(QJsonObject *root) {
 				n.value("name").toString() == QLatin1String("Tricks Manager")) {
 			n.insert("name", "Extensions Manager");
 			nodes.replace(i, n);
+		}
+	}
+	/* Version 21: Utilities returns to Applications, with the tools ZacOS
+	 * 9 ships and the user's own. The old optional root Utilities folder
+	 * is replaced by it. */
+	bool haveUtilities = false;
+	for (const QJsonValue &v : nodes) {
+		haveUtilities |= v.toObject().value("id").toString() ==
+			QLatin1String("applications/utilities");
+	}
+	for (int i = nodes.size() - 1; i >= 0; i--) {
+		const QJsonObject n = nodes.at(i).toObject();
+		const QString id = n.value("id").toString();
+		if (id == QLatin1String("utilities")) {
+			nodes.removeAt(i);
+			continue;
+		}
+		if (id == QLatin1String("system-folder/utilities")) {
+			if (haveUtilities) {
+				nodes.removeAt(i);
+				continue;
+			}
+			QJsonObject moved = n;
+			moved.insert("id", "applications/utilities");
+			moved.insert("order", -1);
+			if (!moved.contains("icon")) {
+				moved.insert("icon", "sf-utilities");
+			}
+			nodes.replace(i, moved);
+			haveUtilities = true;
 		}
 	}
 	/* Documents was the default before Home: Home holds it now. Only the
@@ -428,16 +460,25 @@ bool migrate(QJsonObject *root) {
 	const QStringList keys = overrides.keys();
 	for (const QString &key : keys) {
 		QString destination;
-		if (key == "applications/utilities") {
-			destination = "system-folder/utilities";
-		} else if (key.startsWith("applications/")) {
+		if (key == "system-folder/utilities") {
+			destination = "applications/utilities";
+		} else if (key.startsWith(QLatin1String("system-folder/utilities/"))) {
+			destination = "applications/" + key.mid(static_cast<int>(
+				QLatin1String("system-folder/").size()));
+		} else if (key.startsWith(QLatin1String("applications/"))) {
 			const AppEntry *app = appById(key.section('/', -1));
-			if (app && app->systemUtility) {
-				destination = "system-folder/utilities/" + app->id;
+			if (app && app->inUtilities) {
+				destination = "applications/utilities/" + app->id;
 			}
 		}
 		if (!destination.isEmpty() && !overrides.contains(destination)) {
 			overrides.insert(destination, overrides.take(key));
+		}
+	}
+	/* The optional root Utilities folder is gone with version 21. */
+	for (const QString &key : overrides.keys()) {
+		if (key == QLatin1String("utilities") || key.startsWith(QLatin1String("utilities/"))) {
+			overrides.remove(key);
 		}
 	}
 	root->insert("overrides", overrides);
@@ -484,8 +525,13 @@ void generateApps(const VNode &parent) {
 		qWarning().noquote() << error;
 	}
 	for (const AppEntry &app : appList()) {
-		const bool systemFolder = parent.id.startsWith("system-folder/");
-		if ((systemFolder ? !app.systemUtility : (app.systemUtility || !app.userInstalled)) ||
+		/* Utilities holds only what belongs there; Applications holds
+		 * the rest, and neither repeats an app. System tools (settings,
+		 * file managers) are reached from Control Panels instead. */
+		const bool utilities = parent.id == QLatin1String("applications/utilities");
+		const bool shown = utilities ? app.inUtilities
+			: (app.userInstalled && !app.systemUtility && !app.inUtilities);
+		if (!shown ||
 				!matchesCategories(app, parent) ||
 				std::any_of(queued.begin(), queued.end(),
 					[&app](const TrashedApplication &entry) { return entry.id == app.id; })) {
@@ -699,7 +745,8 @@ void generateResourceLaunchers(const VNode &parent) {
 		VNode node;
 		node.id = parent.id + "/" + entry.second;
 		/* A registry node of the same id keeps its own name (the user may
-		 * have renamed it); these are only the generated Utilities entries. */
+		 * have renamed it); these are only the generated System Folder
+		 * entries. */
 		if (g_nodes.contains(node.id)) {
 			continue;
 		}
@@ -921,9 +968,6 @@ void load() {
 	for (const VNode &node : generators) {
 		if (node.kind == VKind::Apps) {
 			generateApps(node);
-			if (node.id == "system-folder/utilities") {
-				generateResourceLaunchers(node);
-			}
 		} else if (node.kind == VKind::PanelsDisabled) {
 			generateDisabledPanels(node);
 		} else if (node.kind == VKind::CollarModules) {

@@ -210,17 +210,16 @@ Zacintosh HD
 │   ├── System Information (generated launcher, read-only status window)
 │   ├── Extensions Manager (generated launcher, read-only status window)
 │   ├── Fonts               (generated: available font faces; drop in to install, move out to uninstall)
-│   ├── Preferences       → ~/.config
-│   └── Utilities           (generated: settings, file managers and system tools,
-│                            including shipped tools such as balenaEtcher)
+│   └── Preferences       → ~/.config
 ├── Applications            (generated: user-installed applications)
+│   ├── Utilities           (generated: shipped tools such as balenaEtcher and
+│   │                        Disk Setup, and utilities the user installed)
 │   └── Mousepad
 │       ├── Mousepad        launches it
 │       └── Preferences     one of its Desktop Actions
 ├── Home                  → ~ (Documents, Downloads, Desktop, everything of the user's)
-├── (folders you make: File > New Folder in the disk's window; each is a real
-│    directory under ~/.local/share/zacos9/finder/folders; Trash removes an empty one)
-└── Utilities               (generated, off by default)
+└── (folders you make: File > New Folder in the disk's window; each is a real
+     directory under ~/.local/share/zacos9/finder/folders; Trash removes an empty one)
 ```
 
 A folder with an arrow stands for a real directory. Opening one opens
@@ -245,6 +244,9 @@ Version 14 turns Fonts into a generated font catalog, preserving its folder ID,
 custom name, labels and remembered window/icon positions. Existing font files
 are not moved. The old Fonts node's `backing` field is replaced by the catalog;
 new installations use the user's standard XDG font directory.
+Version 21 moves Utilities back into Applications, where it lists only the
+tools ZacOS 9 ships and the utilities the user installed themselves; the
+off-by-default root Utilities folder is removed in favour of it.
 See
 [custom desktop patterns](user-guide.md#custom-desktop-patterns) and
 [desktop wallpaper](user-guide.md#desktop-wallpaper) for supported formats,
@@ -358,12 +360,15 @@ Explicitly installed Debian apps, user-local launchers, Wine shortcuts and
 Flatpak exports remain eligible. Changes to apt's automatic/manual marks
 refresh the view without requiring a new launcher file or a login restart.
 
-Entries with `System`, `Settings`, `FileManager` or `X-ZacOS9-Utility`
-categories appear only in **System Folder > Utilities**, even when explicitly
-installed, present on the original image or installed as dependencies. This
-includes qps, PCManFM, desktop/screen-saver settings, print settings and shipped
-tools such as balenaEtcher. The ordinary `Utility` category alone does not move
-an application: calculators and other user utilities stay in Applications.
+**Applications > Utilities** lists the tools ZacOS 9 ships (`X-ZacOS9-Utility`,
+such as Disk Setup and balenaEtcher) and Utility-category applications the user
+installed themselves. It is a folder inside Applications, pinned first, and
+none of these appear loose in Applications too. Entries with `System`,
+`Settings` or `FileManager` categories (qps, PCManFM, desktop/screen-saver
+settings, print settings) are system parts rather than user applications: they
+are left out of both folders and stay reachable from Control Panels and the Zac
+menu. The ordinary `Utility` category alone is not enough for a packaged
+baseline application; an app the user installed as a utility is filed there.
 ZacOS's own control panels remain in Control Panels.
 
 This uses installation metadata, not a historical record of user intent:
@@ -371,7 +376,7 @@ This uses installation metadata, not a historical record of user intent:
 marked manual by another installer are indistinguishable from explicit user
 installs. A dependency can provide several launchers; the filter applies to
 its package, not to a translated application name. No packages are removed,
-and system tools remain launchable from their new virtual folder.
+and system tools remain launchable from Control Panels and the Zac menu.
 
 ### Icon
 
@@ -416,7 +421,7 @@ the name it was installed with (`/etc/zacos9/disk-name`, written by
 
 ```json
 {
-  "version": 16,
+  "version": 21,
   "volume": {},
   "showUnixVolume": false,
   "nodes": [
@@ -426,12 +431,16 @@ the name it was installed with (`/etc/zacos9/disk-name`, written by
     { "id": "system-folder/fonts/language-kits", "name": "Language Kits", "kind": "fonts" },
     { "id": "applications", "name": "Applications", "kind": "apps", "order": 1,
       "icon": "applications-folder" },
-    { "id": "utilities", "name": "Utilities", "kind": "apps", "visible": false,
-      "categories": ["Utility", "System", "Settings"] }
+    { "id": "applications/utilities", "name": "Utilities", "kind": "apps",
+      "icon": "sf-utilities", "order": -1 }
   ],
   "overrides": {}
 }
 ```
+
+`applications/utilities` is a generated folder like Applications itself: the
+registry supplies its place and name, and the Finder fills it with the shipped
+and user-installed utilities.
 
 A node's fields:
 
@@ -458,9 +467,8 @@ scatter your desktop.
 
 - **Rename the disk**: `"volume": { "name": "Work HD" }`.
 - **Point Documents elsewhere**: change that node's `backing`.
-- **Show Utilities**: set its `visible` to `true`. To keep the same
-  application out of both, give `applications` the matching
-  `"excludeCategories": ["Utility", "System", "Settings"]`.
+- **Move Utilities**: change `applications/utilities`'s `order`, or give it
+  another parent; `applications` still leaves its contents out.
 - **Add a folder of your own**: add a node with a new `id`; migration
   keeps it.
 
@@ -674,8 +682,8 @@ dependents, so removal may remove those as well. System-wide Flatpak apps and
 unsupported/unowned apps are not queued; Finder reports how to remove them
 instead.
 System utilities and automatically installed dependencies cannot be queued
-for uninstall through Finder. System Folder > Utilities also does not accept
-application-installation drops.
+for uninstall through Finder. Applications > Utilities accepts
+application-installation drops like Applications itself.
 
 Failed uninstalls leave their records in Trash for retry or Put Away, and stop
 emptying before ordinary files are deleted. Completed removals are not undone

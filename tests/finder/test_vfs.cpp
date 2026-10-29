@@ -222,7 +222,7 @@ int main(int argc, char **argv) {
 	 * when the ISO is built), ZacOS 9's own pieces, Wine's uninstallers. */
 	writeEntry(dataDirs + "/zacos9", "base-applications",
 		"builtin.desktop\nfoot.desktop\nflasher.desktop\nxscreensaver-settings.desktop\n");
-	/* A utility ZacOS 9 ships (System Folder > Utilities), though the
+	/* A utility ZacOS 9 ships (Applications > Utilities), though the
 	 * system came with it. */
 	writeEntry(appsDir, "flasher.desktop",
 		entry("Disk Flasher", "/bin/true", "Categories=Utility;X-ZacOS9-Utility;\n"));
@@ -282,9 +282,9 @@ int main(int argc, char **argv) {
 	check(vfsOpensAs(vfsPathFor("system-folder/zac-menu-items-disabled")) ==
 			root + "/config/zacos9/ZacOS 9 Menu Items (Disabled)",
 		"Zac Menu Items (Disabled) is beside it, where the Zac menu doesn't look");
-	check(pathNamed(vfsPathFor("system-folder/utilities"), "System Information") != QString() &&
-		pathNamed(vfsPathFor("system-folder/utilities"), "Extensions Manager") != QString(),
-		"the trusted System Information and Extensions Manager launchers are also in Utilities");
+	check(!namesIn(vfsPathFor("applications/utilities")).contains("System Information") &&
+		!namesIn(vfsPathFor("applications/utilities")).contains("Extensions Manager"),
+		"the trusted System Information and Extensions Manager launchers stay in the System Folder");
 	const QString sounds = vfsPathFor("system-folder/sounds");
 	const QString userSounds = pathNamed(sounds, "User");
 	check(!userSounds.isEmpty() && !pathNamed(sounds, "Computer").isEmpty(),
@@ -401,45 +401,54 @@ int main(int argc, char **argv) {
 	QFile::link(resourceRoot + "/sounds/user", resourceRoot + "/sounds/user/loop");
 
 	check(apps.contains("SimpleText"), "an installed application appears in Applications");
-	check(namesIn(vfsPathFor("system-folder/utilities")).contains("SimpleText"),
-		"the same name in a different destination does not rename either app");
-	check(apps.contains("Calculator"), "a second application appears too");
+	check(vfsName(vfsPathFor("applications/simpletext.desktop")) == "SimpleText",
+		"a hidden system tool of the same name does not rename it");
+	check(!apps.contains("Calculator"),
+		"an application the user installed as a utility is not loose in Applications");
+	check(namesIn(vfsPathFor("applications/utilities")).contains("Calculator"),
+		"it is in Applications > Utilities instead");
 	check(!apps.contains("Hidden One"), "Hidden=true is not shown");
 	check(!apps.contains("NoDisplay One"), "NoDisplay=true is not shown");
 	check(!apps.contains("Only Elsewhere"), "OnlyShowIn for another desktop is not shown");
 	check(!apps.contains("Not Here"), "NotShowIn for this desktop is not shown");
 	check(!apps.contains("Missing Binary"), "a failing TryExec is not shown");
-	check(!apps.contains("Utilities"), "shipped Utilities is no longer inside Applications");
+	check(apps.contains("Utilities"), "Utilities is a folder in Applications");
+	check(!apps.isEmpty() && apps.first() == "Utilities",
+		"Utilities is pinned first, to be easy to find");
 	check(!apps.contains("Disk Flasher"), "a shipped utility is not loose in Applications");
-	check(namesIn(vfsPathFor("system-folder/utilities")).contains("Disk Flasher"),
-		"shipped tools are accessible in System Folder > Utilities");
-	check(!namesIn(vfsPathFor("system-folder/utilities")).contains("Calculator"),
-		"an ordinary Utility-category application stays in Applications");
+	check(namesIn(vfsPathFor("applications/utilities")).contains("Disk Flasher"),
+		"shipped tools are accessible in Applications > Utilities");
+	check(!namesIn(vfsPathFor("applications/utilities")).contains("SimpleText"),
+		"an ordinary application stays in Applications");
 	check(!apps.contains("Automatic Dependency") && apps.contains("Explicitly Installed"),
 		"automatic Debian dependencies stay out, explicit Debian installs stay in Applications");
 	check(appById("automatic.desktop") &&
 		appById("automatic.desktop")->origin == "dpkg:finder-auto-demo",
 		"architecture-qualified desktop ownership keeps a supported package uninstall identity");
-	for (const QString name : { "qps", "pcmanfm-qt", "pcmanfm-qt-desktop-pref",
+	for (const QString name : { "qps", "pcmanfm-qt-desktop-pref",
 			"xscreensaver-settings", "system-config-printer" }) {
-		check(!apps.contains(name) && namesIn(vfsPathFor("system-folder/utilities")).contains(name),
-			"system utility is routed away from Applications: " + name);
+		check(!apps.contains(name) &&
+				!namesIn(vfsPathFor("applications/utilities")).contains(name),
+			"a system tool is in neither Applications nor Utilities: " + name);
 	}
+	check(!apps.contains("pcmanfm-qt") &&
+			namesIn(vfsPathFor("applications/utilities")).contains("pcmanfm-qt"),
+		"a file manager the user installed as a utility is in Utilities");
 	QString trashError;
 	check(!appTrashQueue("qps.desktop", &trashError) && !trashError.isEmpty(),
 		"system tools cannot be queued for uninstall");
 	check(!appTrashQueue("automatic.desktop", &trashError) && !trashError.isEmpty(),
 		"automatic dependencies cannot be queued for uninstall");
-	check(!vfsAcceptsDrops(vfsPathFor("system-folder/utilities")) &&
-		!vfsIsApplications(vfsPathFor("system-folder/utilities")),
-		"system Utilities is not an app installation drop target");
+	check(vfsAcceptsDrops(vfsPathFor("applications/utilities")) &&
+		vfsIsApplications(vfsPathFor("applications/utilities")),
+		"Utilities is an application-installation drop target, as part of Applications");
 	check(apps.contains("Only Ours"), "an entry for this desktop only is shown");
 	check(!apps.contains("Came With The System"), "an application the system came with is not shown");
 	check(!apps.contains("A ZacOS Panel"), "ZacOS 9's own entries are not shown");
 	check(!apps.contains("A ZacOS Disk Tool") &&
-			namesIn(vfsPathFor("system-folder/utilities")).contains("A ZacOS Disk Tool") &&
-			!namesIn(vfsPathFor("system-folder/utilities")).contains("A ZacOS Panel"),
-		"ZacOS 9's own utilities (Disk Setup) are in System Folder > Utilities");
+			namesIn(vfsPathFor("applications/utilities")).contains("A ZacOS Disk Tool") &&
+			!namesIn(vfsPathFor("applications/utilities")).contains("A ZacOS Panel"),
+		"ZacOS 9's own utilities (Disk Setup) are in Applications > Utilities");
 	check(apps.contains("Notepad Plus"), "a Windows program installed through Wine is shown");
 	check(!apps.contains("Uninstall Notepad Plus"), "its Wine uninstaller is not shown");
 	const int markWatch = vfsOnChange([] {});
@@ -530,7 +539,7 @@ int main(int argc, char **argv) {
 	check(volume.contains("Applications"), "the startup disk holds Applications");
 	check(!volume.contains("Documents"), "Documents is gone: Home holds it");
 	check(volume.contains("Home"), "the startup disk holds the user's Home folder");
-	check(!volume.contains("Utilities"), "Utilities is off until the registry asks for it");
+	check(!volume.contains("Utilities"), "Utilities lives inside Applications, not on the startup disk");
 	check(volume == expectedStartupItems,
 		"the startup disk lists exactly its curated items when Shared Documents is absent");
 	check(QDir().mkdir(sharedDocuments), "create the private Shared Documents folder");
@@ -869,9 +878,12 @@ int main(int argc, char **argv) {
 	settle();
 	apps = namesIn(vfsPathFor("applications"));
 	check(!apps.contains("Calculator"), "an uninstalled application goes away");
+	check(!namesIn(vfsPathFor("applications/utilities")).contains("Calculator"),
+		"and out of Utilities");
 	check(apps.contains("Web Browser") && apps.contains("SimpleText Override"),
 		"and the others stay");
-	check(vfsNode(appFolder("calculator.desktop")) == nullptr,
+	check(vfsNode(appFolder("calculator.desktop")) == nullptr &&
+		vfsNode(vfsPathFor("applications/utilities/calculator.desktop")) == nullptr,
 		"its node goes with it");
 	check(vfsName(appPath) == "Web Browser" && apps.contains("Web Browser"),
 		"a rename persists across the uninstall of another application");
@@ -901,15 +913,16 @@ int main(int argc, char **argv) {
 	reg.close();
 	check(registry.value("version").toInt() >= 1, "it records its version");
 	check(registry.value("nodes").toArray().size() >= 8, "it lists the mapping");
-	/* Show Utilities and rename the disk, as a user editing it would. */
+	/* Rename the disk and the Utilities folder, as a user editing it
+	 * would. */
 	QJsonObject volumeObj;
 	volumeObj.insert("name", "Work HD");
 	registry.insert("volume", volumeObj);
 	QJsonArray nodes = registry.value("nodes").toArray();
 	for (int i = 0; i < nodes.size(); i++) {
 		QJsonObject node = nodes[i].toObject();
-		if (node.value("id").toString() == "utilities") {
-			node.insert("visible", true);
+		if (node.value("id").toString() == "applications/utilities") {
+			node.insert("name", "My Tools");
 			nodes[i] = node;
 		}
 	}
@@ -921,46 +934,54 @@ int main(int argc, char **argv) {
 	vfsRefresh();
 	check(vfsVolumeName() == "Work HD", "the disk can be renamed in the registry");
 	volume = namesIn(vfsRoot());
-	check(volume.contains("Utilities"), "Utilities can be switched on in the registry");
+	check(!volume.contains("Utilities"), "Utilities is not on the startup disk");
+	check(vfsName(vfsPathFor("applications/utilities")) == "My Tools" &&
+		namesIn(vfsPathFor("applications")).contains("My Tools"),
+		"the Utilities folder can be renamed in the registry");
 
-	/* Utilities keeps only the categories it names. */
+	/* Utilities holds the tools the user installed as utilities, not
+	 * everything with a category to its name. */
 	writeEntry(appsDir, "wrench.desktop",
 		entry("Wrench", "/bin/true", "Categories=Utility;\n"));
 	writeEntry(appsDir, "game.desktop",
 		entry("Game", "/bin/true", "Categories=Game;\n"));
 	settle();
-	QStringList utilities = namesIn(vfsPathFor("utilities"));
-	check(utilities.contains("Wrench"), "a Utility-category application is in Utilities");
-	check(!utilities.contains("Game"), "one in another category is not");
+	QStringList tools = namesIn(vfsPathFor("applications/utilities"));
+	check(tools.contains("Wrench"), "a Utility-category application is in Utilities");
+	check(!tools.contains("Game"), "one in another category is not");
 
-	/* Version 8 moves shipped utilities and their overrides into System Folder. */
-	registry.insert("version", 8);
+	/* Version 21 moves the System Folder's Utilities back into
+	 * Applications, keeping a custom folder name and its launchers'
+	 * overrides; the old optional root Utilities folder goes. */
+	registry.insert("version", 20);
 	nodes = registry.value("nodes").toArray();
 	for (int i = 0; i < nodes.size(); ++i) {
 		QJsonObject node = nodes[i].toObject();
-		if (node.value("id").toString() == "system-folder/utilities") {
-			node.insert("id", "applications/utilities");
-			node.insert("name", "My Tools");
-			node.insert("categories", QJsonArray{ "X-ZacOS9-Utility" });
+		if (node.value("id").toString() == "applications/utilities") {
+			node.insert("id", "system-folder/utilities");
 			nodes[i] = node;
 		}
 	}
+	nodes.append(QJsonObject{ { "id", "utilities" }, { "name", "Utilities" },
+		{ "kind", "apps" }, { "visible", true } });
 	registry.insert("nodes", nodes);
 	QJsonObject oldOverrides = registry.value("overrides").toObject();
-	oldOverrides.insert("applications/qps.desktop",
-		QJsonObject{ { "name", "Process Viewer" }, { "label", 4 } });
+	oldOverrides.insert("system-folder/utilities/wrench.desktop",
+		QJsonObject{ { "name", "Spanner" }, { "label", 4 } });
+	oldOverrides.insert("utilities", QJsonObject{ { "name", "Old Utilities" } });
 	registry.insert("overrides", oldOverrides);
 	if (reg.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
 		reg.write(QJsonDocument(registry).toJson());
 		reg.close();
 	}
 	vfsRefresh();
-	check(vfsName(vfsPathFor("system-folder/utilities")) == "My Tools" &&
-		!namesIn(vfsPathFor("applications")).contains("My Tools"),
-		"version 9 moves the Utilities node while preserving a custom folder name");
-	check(vfsName(vfsPathFor("system-folder/utilities/qps.desktop")) == "Process Viewer" &&
-		vfsLabel(vfsPathFor("system-folder/utilities/qps.desktop")) == 4,
-		"migrated system launchers retain their renamed title and label");
+	check(vfsName(vfsPathFor("applications/utilities")) == "My Tools" &&
+		!namesIn(vfsPathFor("system-folder")).contains("My Tools") &&
+		!namesIn(vfsRoot()).contains("Old Utilities"),
+		"version 21 moves the Utilities node while preserving a custom folder name");
+	check(vfsName(vfsPathFor("applications/utilities/wrench.desktop")) == "Spanner" &&
+		vfsLabel(vfsPathFor("applications/utilities/wrench.desktop")) == 4,
+		"migrated Utilities launchers retain their renamed title and label");
 
 	/* ---- migration ----------------------------------------------------- */
 	/* An older registry keeps the user's own nodes and gains ours. */

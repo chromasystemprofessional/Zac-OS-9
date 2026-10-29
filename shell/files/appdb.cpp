@@ -318,16 +318,22 @@ void resolveOrigin(GDesktopAppInfo *desktop, AppEntry *entry) {
  * application folder has a name of its own. */
 void disambiguate(std::vector<AppEntry> &apps) {
 	QHash<QString, int> count;
+	/* Only entries the Finder shows count: an app in Utilities does not
+	 * share a folder with one in Applications, and a system tool is in
+	 * neither. */
+	const auto shown = [](const AppEntry &app) {
+		return app.inUtilities || (app.userInstalled && !app.systemUtility);
+	};
 	const auto key = [](const AppEntry &app) {
-		return (app.systemUtility ? "system:" : "applications:") + app.name.toCaseFolded();
+		return (app.inUtilities ? "utilities:" : "applications:") + app.name.toCaseFolded();
 	};
 	for (const AppEntry &a : apps) {
-		if (a.systemUtility || a.userInstalled) {
+		if (shown(a)) {
 			count[key(a)]++;
 		}
 	}
 	for (AppEntry &a : apps) {
-		if ((a.systemUtility || a.userInstalled) && count.value(key(a)) > 1) {
+		if (shown(a) && count.value(key(a)) > 1) {
 			QString stem = a.id;
 			if (stem.endsWith(".desktop")) {
 				stem.chop(8);
@@ -444,6 +450,13 @@ void load() {
 				}
 			}
 			g_free(flatpak);
+			/* Utilities: the tools ZacOS 9 ships, and what the user
+			 * installed as a utility themselves. Settings, file
+			 * managers and other system tools stay out. */
+			entry.inUtilities =
+				entry.categories.contains(QLatin1String("X-ZacOS9-Utility"), Qt::CaseInsensitive) ||
+				(entry.userInstalled &&
+					entry.categories.contains(QLatin1String("Utility"), Qt::CaseInsensitive));
 			readActions(desktop, &entry);
 			resolveOrigin(desktop, &entry);
 		}

@@ -522,7 +522,7 @@ static void mountReadOnly(const QString &device, const QString &name) {
 				return;
 			}
 			const QString notice = QString("“%1” wasn't put away properly, so it has been opened "
-				"read-only. To use it normally again, open Disk Setup (System Folder ▸ Utilities) "
+				"read-only. To use it normally again, open Disk Setup (Applications ▸ Utilities) "
 				"and click Repair.").arg(name);
 			for (auto &callback : g_errors) {
 				callback(notice);
