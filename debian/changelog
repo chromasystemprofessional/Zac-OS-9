@@ -1,3 +1,12 @@
+zacos9 (1.4.1) trixie; urgency=medium
+
+  * Utilities now lives under Applications and lists only balenaEtcher,
+    Disk Setup and other utilities you install yourself, instead of system
+    tools. Open resource windows such as Sounds > User stay open when they
+    refresh. Also includes 1.4.0's console game files and Game Player extra.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Thu, 29 Oct 2026 12:36:24 -0400
+
 zacos9 (1.4.0) trixie; urgency=medium
 
   * Sniffer: console game files (NES, Super NES, PlayStation, Nintendo 64,
