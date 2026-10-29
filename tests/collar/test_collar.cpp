@@ -126,12 +126,12 @@ int main(int argc, char **argv) {
 		collar.mask().contains(QPoint(collar.width() - 1, 10)), "grip's angled corner is outside the input region");
 
 	auto *layer = LayerShellQt::Window::get(collar.windowHandle());
-	check(layer && layer->scope() == "zacos9-collar" && layer->layer() == LayerShellQt::Window::LayerTop &&
+	check(layer && layer->scope() == "zacos9-collar" && layer->layer() == LayerShellQt::Window::LayerOverlay &&
 		layer->exclusionZone() == 0 && layer->margins().bottom() == 0 &&
 		layer->anchors() == LayerShellQt::Window::Anchors(LayerShellQt::Window::AnchorLeft |
 			LayerShellQt::Window::AnchorBottom) &&
 		layer->keyboardInteractivity() == LayerShellQt::Window::KeyboardInteractivityOnDemand,
-		"flush bottom-left, nonexclusive top layer; keyboard focus only on demand");
+		"flush bottom-left, nonexclusive overlay layer; keyboard focus only on demand");
 
 	click(collar, QPoint(7, 12));
 	check(collar.collapsed() && collar.size() == QSize(Collar::Closed, 24), "close box folds to the 18 px grip");
