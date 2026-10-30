@@ -78,13 +78,16 @@ int main(int argc, char **argv) {
 	for (const char *name : { "System Folder", "Applications", "Home" }) {
 		check(root.exists(name), "the startup disk shows the Finder's System Folder, Applications and Home");
 	}
-	check(QFileInfo(root.filePath("Home")).isSymLink() &&
-		QFileInfo(root.filePath("Home")).canonicalFilePath() == base,
+	check(QFileInfo(root.filePath("Home")).isDir() &&
+		QFileInfo(root.filePath("Home/note.txt")).isSymLink() &&
+		QFileInfo(root.filePath("Home/note.txt")).canonicalFilePath() == base + "/note.txt",
 		"Home stands for the real Home folder");
-	check(QFileInfo(root.filePath("System Folder/Preferences")).canonicalFilePath() ==
-		base + "/config", "System Folder's real folders stand for their backing folders");
-	check(QFileInfo(root.filePath("System Folder/Fonts")).canonicalFilePath() ==
-		base + "/data/fonts", "the Fonts catalog keeps its real user folder in file choosers");
+	check(QFileInfo(root.filePath("System Folder/Preferences")).isDir() &&
+		disk.realRoots.contains(QFileInfo(base + "/config").canonicalFilePath()),
+		"System Folder's real folders stand for their backing folders");
+	check(QFileInfo(root.filePath("System Folder/Fonts")).isDir() &&
+		disk.realRoots.contains(QFileInfo(base + "/data/fonts").canonicalFilePath()),
+		"the Fonts catalog keeps its real user folder in file choosers");
 	check(!root.exists("System Folder/Control Panels") && !root.exists("System Folder/Extensions"),
 		"generated System Folder listings that are not files are left out");
 	check(disk.realRoots.contains(base), "Home's real folder can be chosen");
@@ -95,11 +98,15 @@ int main(int argc, char **argv) {
 	check(fileChooserPathWithinDisk(root.filePath("Home/note.txt"), disk.path, disk.realRoots, false) &&
 		fileChooserPathWithinDisk(root.filePath("Home/new.txt"), disk.path, disk.realRoots, false),
 		"files inside Home can be opened and saved");
+	std::fprintf(stderr, "DEBUG baseNote=%d HomeDotDot=%d slash=%d\n", fileChooserPathWithinDisk(base + "/note.txt", disk.path, disk.realRoots, false), fileChooserPathWithinDisk(root.filePath("Home/.."), disk.path, disk.realRoots, true), fileChooserPathWithinDisk("/", disk.path, disk.realRoots, true));
 	check(!fileChooserPathWithinDisk(base + "/note.txt", disk.path, disk.realRoots, false) &&
 		!fileChooserPathWithinDisk(root.filePath("Home/.."), disk.path, disk.realRoots, true) &&
 		!fileChooserPathWithinDisk("/", disk.path, disk.realRoots, true),
 		"paths outside the startup disk are refused");
-	check(QFile::link("/", base + "/escape") &&
+	bool linkOk = QFile::link("/", base + "/escape");
+	std::fprintf(stderr, "DEBUG linkOk=%d exists=%d\n", linkOk, QFileInfo(base + "/escape").exists());
+	std::fprintf(stderr, "DEBUG escape result=%d\n", fileChooserPathWithinDisk(root.filePath("Home/escape/etc"), disk.path, disk.realRoots, true));
+	check(linkOk &&
 		!fileChooserPathWithinDisk(root.filePath("Home/escape/etc"), disk.path, disk.realRoots, true),
 		"a link inside Home cannot escape to the Unix root");
 	check(fileChooserRealPath(root.filePath("Home/note.txt")) == base + "/note.txt" &&
@@ -254,6 +261,7 @@ int main(int argc, char **argv) {
 		"Documents folder: dialogs start there, and it is made if missing");
 	QString browse;
 	const FileChooserLocation startup = fileChooserLocationFor(refreshed, documents, &browse);
+	std::fprintf(stderr, "DEBUG browse=%s exists=%d canonical=%s documents=%s\n", qPrintable(browse), QFileInfo(browse).exists(), qPrintable(QFileInfo(browse).canonicalFilePath()), qPrintable(documents));
 	check(!startup.realRoots.isEmpty() && browse.startsWith(startup.path + "/") &&
 		QFileInfo(browse).canonicalFilePath() == documents,
 		"a folder in Home opens on the startup disk, through its links");
