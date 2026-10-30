@@ -48,7 +48,7 @@ static bool bundleHasTheme(const QString &name) {
 }
 
 /* Run the extractor and wait with processEvents() (never waitForFinished). */
-static bool runExtractor(const QString &source, const QString &name, QString *error) {
+static bool runExtractor(const QString &file, const QString &name, QString *error) {
 	const QString tool = extractorPath();
 	if (!QFileInfo(tool).isFile()) {
 		*error = "The theme extractor couldn't be found.";
@@ -56,7 +56,7 @@ static bool runExtractor(const QString &source, const QString &name, QString *er
 	}
 	QProcess process;
 	process.setProgram("python3");
-	process.setArguments({ tool, "--source", source, "--output", outputDir(name), "--name", name,
+	process.setArguments({ tool, "--file", file, "--output", outputDir(name), "--name", name,
 		"--auto-colours" });
 	process.start();
 	/* Qt/Wayland deadlocks on waitForFinished(): pump events until it exits. */
@@ -77,6 +77,41 @@ static bool runExtractor(const QString &source, const QString &name, QString *er
 		return false;
 	}
 	return true;
+}
+
+/* The resource fork for a theme file: the file itself when it is one, else
+ * the AppleDouble companion (._NAME) or the Netatalk .rsrc/NAME. */
+static QString resolveResourceFork(const QString &file) {
+	if (QFileInfo(file).size() >= 16) {
+		QFile f(file);
+		if (f.open(QIODevice::ReadOnly)) {
+			const QByteArray head = f.read(4);
+			if (head == QByteArray("\x00\x00\x01\x00", 4) ||
+					head == QByteArray("\x00\x05\x16\x07", 4)) {
+				return file;
+			}
+		}
+	}
+	const QFileInfo info(file);
+	const QString dir = info.absolutePath();
+	const QString base = info.fileName();
+	for (const QString &candidate : {
+			dir + "/._" + base,
+			dir + "/.rsrc/" + base,
+			QDir::homePath() + "/.rsrc/" + base,
+			QDir::homePath() + "/._" + base }) {
+		if (QFileInfo::exists(candidate)) {
+			return candidate;
+		}
+	}
+	return file;
+}
+
+/* The theme name from a file: the basename without extension or " copy". */
+static QString nameFromFile(const QString &file) {
+	QString base = QFileInfo(file).completeBaseName();
+	base.replace(QRegularExpression(" copy$", QRegularExpression::CaseInsensitiveOption), "");
+	return base.trimmed();
 }
 
 /* The Appearance control panel lists JSON presets from this folder. */
@@ -175,47 +210,45 @@ int main(int argc, char *argv[]) {
 	QApplication::setApplicationName("Theme Installer");
 	QGuiApplication::setDesktopFileName("zacos9-themeinstaller");
 
-	/* Non-interactive (and testable): --source DIR --name NAME. */
-	QString source, name;
+	/* Non-interactive (and testable): --file PATH [--name NAME]. */
+	QString file, name;
 	bool batch = false;
-	QStringList args;
 	for (int i = 1; i < argc; i++) {
 		const QString a = QString::fromLocal8Bit(argv[i]);
-		if (a == "--source" && i + 1 < argc) { source = QString::fromLocal8Bit(argv[++i]); batch = true; }
+		if (a == "--file" && i + 1 < argc) { file = QString::fromLocal8Bit(argv[++i]); batch = true; }
 		else if (a == "--name" && i + 1 < argc) { name = QString::fromLocal8Bit(argv[++i]); batch = true; }
-		else if (!a.startsWith("--")) { source = a; }
+		else if (!a.startsWith("--")) { file = a; }
 	}
 
-	if (source.isEmpty()) {
-		source = QDir::homePath() + "/Classic";
-	}
-	if (!QFileInfo::exists(source) || !QFileInfo(source).isDir()) {
-		if (batch) {
-			fprintf(stderr, "zacos9-themeinstaller: no such Mac OS 9 folder: %s\n", qPrintable(source));
-			return 2;
-		}
+	if (file.isEmpty()) {
 		QMessageBox::information(nullptr, "Theme Installer",
-			"Set up Old Dog first: put your Mac OS 9 install in your Classic folder.\n"
-			"Then choose that folder.");
-		source = QFileDialog::getExistingDirectory(nullptr, "Choose the Mac OS 9 folder",
+			"Choose the Mac OS 9 theme file you copied out of Mac OS 9.\n\n"
+			"In Old Dog, copy the theme from Appearance ▸ Theme Files to your\n"
+			"home folder, then pick it here. The theme's name comes from the file.");
+		file = QFileDialog::getOpenFileName(nullptr, "Choose the Mac OS 9 theme file",
 			QDir::homePath());
-		if (source.isEmpty()) {
+		if (file.isEmpty()) {
 			return 0;
 		}
+	}
+	if (!QFileInfo::exists(file)) {
+		if (batch) {
+			fprintf(stderr, "zacos9-themeinstaller: no such theme file: %s\n", qPrintable(file));
+			return 2;
+		}
+		QMessageBox::critical(nullptr, "Theme Installer",
+			"That file doesn't exist. Copy the theme out of Mac OS 9 first.");
+		return 1;
 	}
 
 	if (name.isEmpty()) {
-		bool ok = false;
-		name = QInputDialog::getText(nullptr, "Theme Installer",
-			"Name for the theme:", QLineEdit::Normal, "Mac OS 9", &ok);
-		if (!ok || name.trimmed().isEmpty()) {
-			return 0;
-		}
+		name = nameFromFile(file);
 	}
 	name = name.trimmed();
+	const QString fork = resolveResourceFork(file);
 
 	QString error;
-	if (!runExtractor(source, name, &error)) {
+	if (!runExtractor(fork, name, &error)) {
 		if (batch) {
 			fprintf(stderr, "zacos9-themeinstaller: %s\n", qPrintable(error));
 			return 2;
@@ -224,18 +257,16 @@ int main(int argc, char *argv[]) {
 		return 2;
 	}
 	if (!bundleHasTheme(name)) {
-		/* The source held no resource forks — a disk image, not an
-		 * extracted System Folder. Tell the user how to get one. */
+		/* The file held no resource fork — it was the empty data fork. Tell
+		 * the user to copy the theme out of Mac OS 9 properly. */
 		const QString message =
-			"ZacOS found no Mac OS 9 artwork in that folder.\n\n"
-			"The folder must hold an extracted Mac OS 9 System Folder (with its\n"
-			"resource forks), not a disk image or installer disc. To get one:\n\n"
-			"  • In Old Dog, copy the System Folder — or the theme file from\n"
-			"    Appearance ▸ Theme Files — to your home folder. Copying out of\n"
-			"    Mac OS 9 materialises the resource forks as .rsrc/.finf files.\n\n"
-			"Then run Theme Installer again and choose that copied folder.";
+			"ZacOS found no Mac OS 9 artwork in that file.\n\n"
+			"The file must be the theme's resource fork. Copy the theme from\n"
+			"Appearance ▸ Theme Files in Mac OS 9 (Old Dog) to your home folder,\n"
+			"which materialises its resource fork as a .rsrc/.finf companion.\n"
+			"Then choose the file again.";
 		if (batch) {
-			fprintf(stderr, "zacos9-themeinstaller: no Mac OS 9 artwork found in %s\n", qPrintable(source));
+			fprintf(stderr, "zacos9-themeinstaller: no Mac OS 9 artwork in %s\n", qPrintable(file));
 			return 2;
 		}
 		QMessageBox::warning(nullptr, "Theme Installer", message);

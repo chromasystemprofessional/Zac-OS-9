@@ -29,11 +29,11 @@ def build_fork(resources):
         for _, body in resources:
             if _ != rtype:
                 continue
-            type_list += struct.pack(">H", 0)  # res id
-            type_list += struct.pack(">H", 0xFFFF)  # no name
-            type_list += bytes([0])  # attrs
-            type_list += struct.pack(">I", 0)[1:]  # data offset (3 bytes)
-            type_list += struct.pack(">I", 0)  # reserved
+            type_list += struct.pack(">H", 0)
+            type_list += struct.pack(">H", 0xFFFF)
+            type_list += bytes([0])
+            type_list += struct.pack(">I", 0)[1:]
+            type_list += struct.pack(">I", 0)
     map_offset = 256 + len(data)
     map_size = 28 + len(type_list)
     header = struct.pack(">IIII", 256, map_offset, len(data), map_size)
@@ -41,26 +41,25 @@ def build_fork(resources):
         + struct.pack(">HH", 28, 28 + len(type_list)) + type_list)
 
 
-def make_theme_source():
-    src = tempfile.mkdtemp()
-    # 32x32 8-bit icon (all index 0), a gray clut, and a mask.
+def make_theme_file(directory):
     icl8 = b"\x00" * 1024
     icn = b"\xff" * 128 + b"\xff" * 128
     clut = struct.pack(">I", 0) + struct.pack(">HH", 0, 0)
     for i in range(1):
         clut += struct.pack(">HHHH", i, i * 255, i * 255, i * 255)
     fork = build_fork([(b"icl8", icl8), (b"ICN#", icn), (b"clut", clut)])
-    with open(os.path.join(src, "Apple platinum"), "wb") as f:
+    path = os.path.join(directory, "Apple platinum copy")
+    with open(path, "wb") as f:
         f.write(fork)
-    return src
+    return path
 
 
-def run(binary, src, name, env):
-    return subprocess.run([binary, "--source", src, "--name", name],
+def run(binary, file, name, env):
+    return subprocess.run([binary, "--file", file, "--name", name],
                           env=env, capture_output=True, text=True, timeout=60)
 
 
-# 1. A source with no Mac OS 9 artwork: the installer says so.
+# 1. A file with no Mac OS 9 artwork: the installer says so.
 empty = tempfile.mkdtemp()
 with open(os.path.join(empty, "a.png"), "wb") as f:
     f.write(b"png")
@@ -68,24 +67,27 @@ env = dict(os.environ)
 env["XDG_CONFIG_HOME"] = tempfile.mkdtemp()
 env["XDG_DATA_HOME"] = tempfile.mkdtemp()
 env["QT_QPA_PLATFORM"] = "offscreen"
-r = run(binary, empty, "Test", env)
-assert r.returncode != 0, "an artless source is refused"
+r = run(binary, os.path.join(empty, "a.png"), "Test", env)
+assert r.returncode != 0, "an artless file is refused"
 assert "no Mac OS 9 artwork" in r.stderr, "the message names the cause"
-print("ok    artless source is refused with instructions")
+print("ok    artless file is refused with instructions")
 
-# 2. A source with a theme's resource fork: the installer succeeds.
-src = make_theme_source()
+# 2. A theme file's resource fork: the installer succeeds and names it.
+src = tempfile.mkdtemp()
+theme = make_theme_file(src)
 env2 = dict(os.environ)
 config = tempfile.mkdtemp()
 data = tempfile.mkdtemp()
 env2["XDG_CONFIG_HOME"] = config
 env2["XDG_DATA_HOME"] = data
 env2["QT_QPA_PLATFORM"] = "offscreen"
-r = run(binary, src, "Test", env2)
+# No --name: the name is inherited from the file ("Apple platinum").
+r = subprocess.run([binary, "--file", theme], env=env2,
+                   capture_output=True, text=True, timeout=60)
 assert r.returncode == 0, r.stderr
-out = os.path.join(config, "zacos9", "themes", "Test")
+out = os.path.join(config, "zacos9", "themes", "Apple platinum")
 assert os.path.isfile(os.path.join(out, "menu-icon.png")), "menu icon written"
 assert os.path.isfile(os.path.join(out, "theme.conf")), "theme.conf written"
-print("ok    themed source installs and writes the menu icon")
+print("ok    theme file installs and inherits its name")
 
 print("OK")
