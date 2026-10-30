@@ -140,6 +140,9 @@ def main():
 	parser.add_argument("--source", help="Mac OS 9 tree (defaults to ~/Classic)")
 	parser.add_argument("--output", required=True, help="Destination theme bundle directory")
 	parser.add_argument("--name", help="Theme name (defaults to the source folder's name)")
+	parser.add_argument("--accent", help="Accent colour id (lavender, graphite, gold, bronze, ivy, ocean, rose, plum)")
+	parser.add_argument("--highlight", help="Text highlight colour as RRGGBB")
+	parser.add_argument("--pattern", help="Desktop pattern id")
 	args = parser.parse_args()
 
 	src = args.source
@@ -192,6 +195,12 @@ def main():
 	with open(os.path.join(out, "theme.conf"), "w") as f:
 		f.write("name=%s\n" % name)
 		f.write("source=%s\n" % src)
+		if args.accent:
+			f.write("accent=%s\n" % args.accent)
+		if args.highlight:
+			f.write("highlight=%s\n" % args.highlight)
+		if args.pattern:
+			f.write("pattern=%s\n" % args.pattern)
 
 	print("Created theme bundle: " + out)
 	print("  icons:    %d" % counts["icons"])

@@ -19,6 +19,7 @@
 
 #include "programs.h"
 #include "settings.h"
+#include "theme.h"
 
 static QString extractorPath() {
 	/* From a build tree, the source tree's copy; installed, under data dir. */
@@ -120,6 +121,7 @@ int main(int argc, char *argv[]) {
 		return 2;
 	}
 	pl_setting_set("appearance-theme", name.toUtf8().constData());
+	zac_theme_apply();
 	if (batch) {
 		printf("installed %s\n", qPrintable(outputDir(name)));
 		return 0;

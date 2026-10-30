@@ -82,13 +82,32 @@ int main(void) {
 	snprintf(confpath, sizeof(confpath), "%s/zacos9/desktop.conf", cfg);
 	FILE *cf = fopen(confpath, "w");
 	assert(cf); fputs("appearance-theme=Test\n", cf); fclose(cf);
+	char themeconf[256];
+	snprintf(themeconf, sizeof(themeconf), "%s/zacos9/themes/Test/theme.conf", cfg);
+	FILE *tf = fopen(themeconf, "w");
+	assert(tf); fputs("name=Test\naccent=ocean\nhighlight=46A0FA\n", tf); fclose(tf);
 
 	char resolved[256];
 	assert(zac_theme_asset("menu-icon.png", resolved, sizeof(resolved)) == true);
 	assert(strstr(resolved, "/Test/menu-icon.png") != NULL);
 	assert(zac_theme_asset("boot/missing.png", resolved, sizeof(resolved)) == false);
 
+	/* zac_theme_apply: the theme's appearance settings reach desktop.conf. */
+	assert(zac_theme_apply() == 2);
+	{
+		char buf[256];
+		FILE *d = fopen(confpath, "r");
+		assert(d);
+		buf[0] = '\0';
+		while (fgets(buf, sizeof(buf), d)) {
+			if (strstr(buf, "accent=ocean")) break;
+		}
+		fclose(d);
+		assert(strstr(buf, "accent=ocean") != NULL);
+	}
+
 	unlink(iconpath);
+	unlink(themeconf);
 	unlink(confpath);
 	rmdir(bundle);
 	rmdir(themeroot);

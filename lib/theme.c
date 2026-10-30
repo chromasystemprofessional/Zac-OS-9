@@ -78,8 +78,8 @@ int zac_theme_list(const char *root, char ***out_dirs) {
 	return i;
 }
 
-bool zac_theme_asset(const char *relative, char *out, size_t size) {
-	if (!relative || !out || size == 0) return false;
+/* The active theme bundle's directory (from "appearance-theme"), or false. */
+static bool active_theme_dir(char *out, size_t size) {
 	char id[256];
 	if (!pl_setting("appearance-theme", id, sizeof(id)) || !id[0]) {
 		return false;
@@ -87,7 +87,7 @@ bool zac_theme_asset(const char *relative, char *out, size_t size) {
 	const char *home = getenv("HOME");
 	const char *cfg = getenv("XDG_CONFIG_HOME");
 	char base[4096];
-	const char *dirs[2];
+	const char *dirs[3];
 	int n = 0;
 	if (cfg && *cfg) {
 		snprintf(base, sizeof(base), "%s/zacos9/themes/%s", cfg, id);
@@ -100,12 +100,63 @@ bool zac_theme_asset(const char *relative, char *out, size_t size) {
 	snprintf(sysbase, sizeof(sysbase), "%s/themes/%s", pl_data_dir(), id);
 	dirs[n++] = sysbase;
 	for (int i = 0; i < n; i++) {
-		char path[4096];
-		snprintf(path, sizeof(path), "%s/%s", dirs[i], relative);
-		if (access(path, R_OK) == 0) {
-			snprintf(out, size, "%s", path);
+		struct stat st;
+		if (stat(dirs[i], &st) == 0 && S_ISDIR(st.st_mode)) {
+			snprintf(out, size, "%s", dirs[i]);
 			return true;
 		}
 	}
 	return false;
+}
+
+bool zac_theme_asset(const char *relative, char *out, size_t size) {
+	if (!relative || !out || size == 0) return false;
+	char dir[4096];
+	if (!active_theme_dir(dir, sizeof(dir))) {
+		return false;
+	}
+	char path[8192];
+	snprintf(path, sizeof(path), "%s/%s", dir, relative);
+	if (access(path, R_OK) == 0) {
+		snprintf(out, size, "%s", path);
+		return true;
+	}
+	return false;
+}
+
+int zac_theme_apply(void) {
+	char dir[4096];
+	if (!active_theme_dir(dir, sizeof(dir))) {
+		return 0;
+	}
+	char path[8192];
+	snprintf(path, sizeof(path), "%s/theme.conf", dir);
+	FILE *f = fopen(path, "r");
+	if (!f) {
+		return 0;
+	}
+	int applied = 0;
+	char line[1024];
+	while (fgets(line, sizeof(line), f)) {
+		char *nl = strchr(line, '\n');
+		if (nl) *nl = '\0';
+		char *eq = strchr(line, '=');
+		if (!eq) {
+			continue;
+		}
+		*eq = '\0';
+		const char *key = line;
+		const char *value = eq + 1;
+		static const char *const keys[] = { "accent", "highlight", "pattern",
+			"alert-sound", "background", "wallpaper-mode" };
+		for (size_t i = 0; i < sizeof(keys) / sizeof(keys[0]); i++) {
+			if (strcmp(key, keys[i]) == 0) {
+				pl_setting_set(key, value);
+				applied++;
+				break;
+			}
+		}
+	}
+	fclose(f);
+	return applied;
 }

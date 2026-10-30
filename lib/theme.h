@@ -9,6 +9,10 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct {
 	char *name;            /* theme name */
 	char *directory;       /* absolute path to the bundle */
@@ -29,3 +33,12 @@ int zac_theme_list(const char *root, char ***out_dirs);
  * `relative` is the path inside the bundle (e.g. "boot/happy-zac-1x.png" or
  * "menu-icon.png"). Returns false when no active theme has that file. */
 bool zac_theme_asset(const char *relative, char *out, size_t size);
+
+/* Apply the active theme bundle's appearance settings (accent, highlight,
+ * pattern, alert-sound, background, wallpaper-mode) from its theme.conf to
+ * the desktop settings. Returns how many were applied. */
+int zac_theme_apply(void);
+
+#ifdef __cplusplus
+}
+#endif
