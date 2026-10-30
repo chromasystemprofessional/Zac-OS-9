@@ -41,6 +41,12 @@ static QString outputDir(const QString &name) {
 		"/zacos9/themes/" + name;
 }
 
+/* Whether the extraction produced a theme at all (menu icon written only
+ * when the source's resource forks actually held icon resources). */
+static bool bundleHasTheme(const QString &name) {
+	return QFileInfo::exists(outputDir(name) + "/menu-icon.png");
+}
+
 /* Run the extractor and wait with processEvents() (never waitForFinished). */
 static bool runExtractor(const QString &source, const QString &name, QString *error) {
 	const QString tool = extractorPath();
@@ -216,6 +222,24 @@ int main(int argc, char *argv[]) {
 		}
 		QMessageBox::critical(nullptr, "Theme Installer", error);
 		return 2;
+	}
+	if (!bundleHasTheme(name)) {
+		/* The source held no resource forks — a disk image, not an
+		 * extracted System Folder. Tell the user how to get one. */
+		const QString message =
+			"ZacOS found no Mac OS 9 artwork in that folder.\n\n"
+			"The folder must hold an extracted Mac OS 9 System Folder (with its\n"
+			"resource forks), not a disk image or installer disc. To get one:\n\n"
+			"  • In Old Dog, copy the System Folder — or the theme file from\n"
+			"    Appearance ▸ Theme Files — to your home folder. Copying out of\n"
+			"    Mac OS 9 materialises the resource forks as .rsrc/.finf files.\n\n"
+			"Then run Theme Installer again and choose that copied folder.";
+		if (batch) {
+			fprintf(stderr, "zacos9-themeinstaller: no Mac OS 9 artwork found in %s\n", qPrintable(source));
+			return 2;
+		}
+		QMessageBox::warning(nullptr, "Theme Installer", message);
+		return 1;
 	}
 	QString wallpaper, pattern, alert;
 	installThemeAssets(name, &wallpaper, &pattern, &alert);
