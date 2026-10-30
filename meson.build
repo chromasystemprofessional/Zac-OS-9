@@ -46,3 +46,8 @@ test('theme-extractor', find_program('python3'),
 # The extractor the Theme Installer runs (installed beside the desktop).
 install_data('tools/extract-macos9-theme.py',
   install_dir: get_option('datadir') / 'zacos9' / 'tools')
+
+# Mac OS 9 icon decoder (theming, phase A).
+test('macicons', find_program('python3'),
+  args: [files('tests/tools/test_macicons.py'),
+    meson.project_source_root() / 'tools' / 'macicons.py'])
