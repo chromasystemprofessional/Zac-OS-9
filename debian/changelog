@@ -1,3 +1,9 @@
+zacos9 (1.4.5) trixie; urgency=medium
+
+  * Offer the Android Mirror (Scrcpy) and Steam extras in Software.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Fri, 30 Oct 2026 08:02:24 -0400
+
 zacos9 (1.4.4) trixie; urgency=medium
 
   * Get Info: drop an image file onto the icon to set it as a custom icon
