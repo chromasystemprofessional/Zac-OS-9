@@ -80,7 +80,7 @@ def test_end_to_end():
     src = tempfile.mkdtemp()
     with open(os.path.join(src, "a.png"), "wb") as f:
         f.write(b"png")
-    fork = build_resource_fork([(b"icns", 128, b"iconbytes")])
+    fork = build_resource_fork([(b"icns", 128, b"iconbytes"), (b"thme", 1, b"thmedata")])
     with open(os.path.join(src, "Finder"), "wb") as f:
         f.write(fork)
     out = tempfile.mkdtemp() + "/theme"
@@ -92,6 +92,8 @@ def test_end_to_end():
     assert os.path.isfile(os.path.join(out, "icons", "a.png"))
     assert any(fn.startswith("icns_128") for fn in os.listdir(os.path.join(out, "icons"))), \
         "resource-fork icon extracted"
+    assert any(fn.startswith("thme_1") for fn in os.listdir(os.path.join(out, "theme"))), \
+        "resource-fork theme extracted"
     print("ok    end-to-end bundle build")
 
 

@@ -25,9 +25,10 @@ ASSET_EXTS = {".icns", ".png", ".jpg", ".jpeg", ".wav", ".aiff", ".aif", ".pat"}
 
 # Resource-fork types and where they land.
 ICON_TYPES = {b"ICN#", b"icl8", b"icl4", b"ics#", b"ics8", b"ics4", b"icns", b"ICON"}
-PATTERN_TYPES = {b"PAT ", b"PAT#"}
+PATTERN_TYPES = {b"PAT ", b"PAT#", b"ppat"}
 SOUND_TYPES = {b"snd "}
 PICT_TYPES = {b"PICT"}
+THEME_TYPES = {b"thme", b"clut", b"pltt", b"WIND"}
 
 
 def parse_resource_fork(data):
@@ -123,6 +124,8 @@ def bucket_for(rtype):
 		return "patterns"
 	if rtype in SOUND_TYPES:
 		return "sounds"
+	if rtype in THEME_TYPES:
+		return "theme"
 	return None
 
 
@@ -155,11 +158,11 @@ def main():
 	src = os.path.abspath(src)
 
 	out = os.path.abspath(args.output)
-	for sub in ("icons", "patterns", "sounds"):
+	for sub in ("icons", "patterns", "sounds", "theme"):
 		os.makedirs(os.path.join(out, sub), exist_ok=True)
 
 	name = args.name or os.path.basename(src.rstrip(os.sep)) or "Mac OS 9 Theme"
-	counts = {"icons": 0, "patterns": 0, "sounds": 0}
+	counts = {"icons": 0, "patterns": 0, "sounds": 0, "theme": 0}
 
 	for root, _dirs, files in os.walk(src):
 		for fn in files:
@@ -206,6 +209,11 @@ def main():
 	print("  icons:    %d" % counts["icons"])
 	print("  patterns: %d" % counts["patterns"])
 	print("  sounds:   %d" % counts["sounds"])
+	print("  theme:    %d" % counts["theme"])
+	print("Note: Appearance theme (thme/clut/pltt) resources are saved raw under")
+	print("theme/ for analysis; pass --accent/--highlight/--pattern to set")
+	print("window chrome colours. Resource-fork assets must be extracted first")
+	print("(e.g. with `macunpack` from the macutils package).")
 	return 0
 
 
