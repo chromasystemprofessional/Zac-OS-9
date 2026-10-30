@@ -1,3 +1,9 @@
+zacos9 (1.4.6) trixie; urgency=medium
+
+  * Offer the Android Mirror (Scrcpy) and Steam extras in Software.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Fri, 30 Oct 2026 08:04:41 -0400
+
 zacos9 (1.4.5) trixie; urgency=medium
 
   * Offer the Android Mirror (Scrcpy) and Steam extras in Software.
