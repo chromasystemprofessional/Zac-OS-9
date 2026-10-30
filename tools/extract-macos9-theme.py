@@ -73,12 +73,10 @@ def parse_resource_fork(data):
 			num_res = struct.unpack(">H", data[pos + 4:pos + 6])[0] + 1
 			ref_list_off = struct.unpack(">H", data[pos + 6:pos + 8])[0]
 			pos += 8
-			rl = tl + ref_list_off
-			if rl + 2 > len(data):
-				continue
-			rnum = struct.unpack(">H", data[rl:rl + 2])[0] + 1
-			rp = rl + 2
-			for _ in range(rnum):
+			# The reference list is just `num_res` 12-byte entries (no
+			# leading count): offset points straight at the first entry.
+			rp = tl + ref_list_off
+			for _ in range(num_res):
 				if rp + 12 > len(data):
 					break
 				res_id = struct.unpack(">h", data[rp:rp + 2])[0]

@@ -34,25 +34,21 @@ def build_resource_fork(resources):
     # (offset relative to the start of the type list).
     header_size = 2 + 8 * len(type_counts)
     cursor = header_size
-    entries = {}
     type_list = struct.pack(">H", len(type_counts) - 1)
     for rtype, count in type_counts.items():
-        entries[rtype] = cursor
         type_list += struct.pack(">4sHH", rtype, count - 1, cursor)
-        cursor += 2 + 12 * count
+        cursor += 12 * count
 
-    # Reference lists.
+    # Reference lists (no leading count: each is `count` 12-byte entries).
     for rtype, count in type_counts.items():
-        ref_list = struct.pack(">H", count - 1)
         for rt, rid, off in offsets:
             if rt != rtype:
                 continue
-            ref_list += struct.pack(">h", rid)
-            ref_list += struct.pack(">H", 0xFFFF)  # no name
-            ref_list += bytes([0])                 # attributes
-            ref_list += struct.pack(">I", off)[1:] # 3-byte data offset
-            ref_list += struct.pack(">I", 0)       # reserved
-        type_list += ref_list
+            type_list += struct.pack(">h", rid)
+            type_list += struct.pack(">H", 0xFFFF)  # no name
+            type_list += bytes([0])                 # attributes
+            type_list += struct.pack(">I", off)[1:] # 3-byte data offset
+            type_list += struct.pack(">I", 0)       # reserved
 
     map_size = 28 + len(type_list)
     name_list_offset = 28 + len(type_list)
