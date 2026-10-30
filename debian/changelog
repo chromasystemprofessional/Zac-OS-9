@@ -1,3 +1,10 @@
+zacos9 (1.5.0) trixie; urgency=medium
+
+  * Add the theming feature: theme bundles, a Mac OS 9 theme extractor and
+    installer, and window chrome theming.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Fri, 30 Oct 2026 10:33:18 -0400
+
 zacos9 (1.4.6) trixie; urgency=medium
 
   * Offer the Android Mirror (Scrcpy) and Steam extras in Software.
