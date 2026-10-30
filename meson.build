@@ -56,3 +56,8 @@ test('macicons', find_program('python3'),
 test('macpict', find_program('python3'),
   args: [files('tests/tools/test_macpict.py'),
     meson.project_source_root() / 'tools' / 'macpict.py'])
+
+# Mac OS 9 sound decoder (theming, phase A).
+test('macsnd', find_program('python3'),
+  args: [files('tests/tools/test_macsnd.py'),
+    meson.project_source_root() / 'tools' / 'macsnd.py'])
