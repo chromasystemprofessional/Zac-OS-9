@@ -55,6 +55,7 @@
 {prefix}/bin/zacos9-stash
 {prefix}/bin/zacos9-store
 {prefix}/bin/zacos9-tcpip
+{prefix}/bin/zacos9-themeinstaller
 {prefix}/bin/zacos9-update
 {prefix}/bin/zacos9-walkies
 {prefix}/bin/zacos9-web-sharing
@@ -158,6 +159,7 @@
 {prefix}/share/applications/zacos9-tablet.desktop
 {prefix}/share/applications/zacos9-tcpip.desktop
 {prefix}/share/applications/zacos9-text.desktop
+{prefix}/share/applications/zacos9-themeinstaller.desktop
 {prefix}/share/applications/zacos9-trackpad.desktop
 {prefix}/share/applications/zacos9-update.desktop
 {prefix}/share/applications/zacos9-users.desktop
@@ -228,6 +230,8 @@
 {prefix}/share/zacos9/sounds/pluck.wav
 {prefix}/share/zacos9/sounds/woodblock.wav
 {prefix}/share/zacos9/store/catalog.json
+{prefix}/share/zacos9/themes/Default/theme.conf
+{prefix}/share/zacos9/tools/extract-macos9-theme.py
 {prefix}/share/zacos9/xdg/foot/foot.ini
 {prefix}/share/zacos9/xdg/xdg-desktop-portal/zacos9-portals.conf
 {prefix}/share/zacos9/xdg/zacos9-mimeapps.list

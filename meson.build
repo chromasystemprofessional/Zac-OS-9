@@ -42,3 +42,7 @@ test('installed-files', find_program('python3'),
 test('theme-extractor', find_program('python3'),
   args: [files('tests/tools/test_extract_macos9.py'),
     meson.project_source_root() / 'tools' / 'extract-macos9-theme.py'])
+
+# The extractor the Theme Installer runs (installed beside the desktop).
+install_data('tools/extract-macos9-theme.py',
+  install_dir: get_option('datadir') / 'zacos9' / 'tools')

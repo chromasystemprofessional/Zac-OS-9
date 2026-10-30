@@ -171,6 +171,7 @@ subdir('setup')
 subdir('qtstyle')
 subdir('finder')
 subdir('gtkmenu')
+subdir('themeinstaller')
 test('fullscreen-protocols', find_program('python3'),
   args: [files('../tests/compositor/test_fullscreen.py'),
     meson.project_build_root() / 'compositor/zacos9-wm', fullscreen_client],

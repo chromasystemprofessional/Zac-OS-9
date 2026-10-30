@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Theme Installer
+Comment=Build a ZacOS theme from a Mac OS 9 install
+Exec=zacos9-themeinstaller
+Terminal=false
+Categories=Utility;
+OnlyShowIn=ZacOS9;
