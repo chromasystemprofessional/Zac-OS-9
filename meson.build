@@ -51,3 +51,8 @@ install_data('tools/extract-macos9-theme.py',
 test('macicons', find_program('python3'),
   args: [files('tests/tools/test_macicons.py'),
     meson.project_source_root() / 'tools' / 'macicons.py'])
+
+# Mac OS 9 PICT decoder (theming, phase A).
+test('macpict', find_program('python3'),
+  args: [files('tests/tools/test_macpict.py'),
+    meson.project_source_root() / 'tools' / 'macpict.py'])
