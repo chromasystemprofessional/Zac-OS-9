@@ -71,9 +71,6 @@
     { "id": "extra-gameplayer", "name": "Game Player", "category": "Extras",
       "blurb": "Play NES, Super NES, Sega, Game Boy, Game Boy Advance, PlayStation and Nintendo 64 cartridges and discs in ZacOS 9: double-click a game file in the Sniffer and it runs in a Platinum-framed window, with a Game Player module in The Collar to quit it. The engines are RetroArch, mednafen and mupen64plus; PlayStation needs a Sony BIOS and Nintendo 64 needs firmware, which you supply.",
       "packages": ["zacos9-extra-gameplayer"], "extra": { "id": "gameplayer", "start": "zacos9-gameplayer" } },
-    { "id": "extra-scrcpy", "name": "Android Mirror (Scrcpy)", "category": "Extras",
-      "blurb": "Mirror and control an Android device's screen from The Collar, over USB or Wi-Fi.",
-      "packages": ["zacos9-extra-scrcpy"], "extra": { "id": "scrcpy", "start": "zacos9-scrcpy" } },
     { "id": "extra-steam", "name": "Steam", "category": "Extras",
       "blurb": "List and launch your installed Steam games from The Collar. Installs Steam if it is not already present.",
       "packages": ["zacos9-extra-steam"], "extra": { "id": "steam", "start": "zacos9-steam" } }
