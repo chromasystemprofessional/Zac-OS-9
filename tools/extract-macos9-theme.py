@@ -20,6 +20,12 @@ import shutil
 import struct
 import sys
 
+# Find the decoder modules beside this script (source tree or installed).
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+import macicons
+import pngwrite
+
 # Loose files are copied straight across.
 ASSET_EXTS = {".icns", ".png", ".jpg", ".jpeg", ".wav", ".aiff", ".aif", ".pat"}
 
@@ -170,7 +176,7 @@ def parse_clut(body):
     return colours
 
 
-def process_resource_fork(data, out, counts, cluts):
+def process_resource_fork(data, out, counts, cluts, icons):
 	for rtype, res_id, body in parse_resource_fork(data):
 		bucket = bucket_for(rtype)
 		if not bucket:
@@ -181,6 +187,56 @@ def process_resource_fork(data, out, counts, cluts):
 			cols = parse_clut(body)
 			if cols:
 				cluts.append((res_id, cols))
+		if rtype in (b"icl8", b"icl4", b"ICN#"):
+			icons.setdefault(rtype, []).append(body)
+
+
+def write_theme_art(icons, cluts, out):
+	"""Write menu-icon.png and boot/*.png from the theme's icon resources."""
+	color = None
+	mask = None
+	# Prefer icl8 (32x32 colour); fall back to icl4.
+	if icons.get(b"icl8"):
+		color = icons[b"icl8"][0]
+	elif icons.get(b"icl4"):
+		color = icons[b"icl4"][0]
+	if not color:
+		return
+	if icons.get(b"ICN#"):
+		mask = icons[b"ICN#"][0]
+
+	# Pick a clut: the first gray ramp, else the first available.
+	palette = None
+	for res_id, cols in cluts:
+		if cols and cols[0][1][0] == cols[0][1][1] == cols[0][1][2]:
+			palette = cols
+			break
+	if palette is None and cluts:
+		palette = cluts[0][1]
+
+	rows = macicons.decode_icl8(color, palette) if len(color) == 1024 else \
+		macicons.decode_icl4(color, palette) if len(color) == 512 else None
+	if rows is None:
+		return
+	if mask:
+		_, mask_rows = macicons.decode_icn1(mask)
+		rows = macicons.combine_icon(rows, mask_rows)
+
+	# Menu icon: 20 x 15.
+	pngwrite.write_png(os.path.join(out, "menu-icon.png"), 20, 15,
+		pngwrite.fit_scale(rows, 32, 32, 20, 15))
+	# Boot art: 32 * scale, scale 1..6.
+	for scale in range(1, 7):
+		size = 32 * scale
+		scaled = macicons.decode_icl8(color, palette) if len(color) == 1024 else \
+			macicons.decode_icl4(color, palette)
+		if mask:
+			scaled = macicons.combine_icon(scaled, mask_rows)
+		boot = pngwrite.nearest_scale(scaled, 32, 32, size, size)
+		pngwrite.write_png(os.path.join(out, "boot", "happy-zac-%dx.png" % scale),
+			size, size, boot)
+		pngwrite.write_png(os.path.join(out, "boot", "zacos-logo-%dx.png" % scale),
+			size, size, boot)
 
 
 def main():
@@ -205,12 +261,13 @@ def main():
 	src = os.path.abspath(src)
 
 	out = os.path.abspath(args.output)
-	for sub in ("icons", "patterns", "sounds", "theme"):
+	for sub in ("icons", "patterns", "sounds", "theme", "boot"):
 		os.makedirs(os.path.join(out, sub), exist_ok=True)
 
 	name = args.name or os.path.basename(src.rstrip(os.sep)) or "Mac OS 9 Theme"
 	counts = {"icons": 0, "patterns": 0, "sounds": 0, "theme": 0}
 	cluts = []
+	icons = {}
 
 	for root, _dirs, files in os.walk(src):
 		for fn in files:
@@ -223,13 +280,13 @@ def main():
 			if fn.startswith("._"):
 				fork = extract_apple_double(raw)
 				if fork:
-					process_resource_fork(fork, out, counts, cluts)
+					process_resource_fork(fork, out, counts, cluts, icons)
 					continue
 				# Not AppleDouble after all: fall through.
 
 			# A raw resource fork (not an AppleDouble) when the tail maps back.
 			if looks_like_resource_fork(raw) and not fn.startswith("._"):
-				process_resource_fork(raw, out, counts, cluts)
+				process_resource_fork(raw, out, counts, cluts, icons)
 				continue
 
 			# Loose asset files.
@@ -253,7 +310,10 @@ def main():
 			with open(full, "rb") as f:
 				raw = f.read()
 			if looks_like_resource_fork(raw):
-				process_resource_fork(raw, out, counts, cluts)
+				process_resource_fork(raw, out, counts, cluts, icons)
+
+	# Turn the theme's icon into the menu icon and boot art.
+	write_theme_art(icons, cluts, out)
 
 	if args.list_cluts:
 		for res_id, cols in cluts:
