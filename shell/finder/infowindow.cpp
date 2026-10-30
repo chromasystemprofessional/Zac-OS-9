@@ -23,6 +23,10 @@
 #include <QStorageInfo>
 #include <QMouseEvent>
 #include <QCloseEvent>
+#include <QDrag>
+#include <QDragEnterEvent>
+#include <QDropEvent>
+#include <QMimeData>
 #include <grp.h>
 #include <pwd.h>
 #include <sys/stat.h>
@@ -200,6 +204,7 @@ InfoWindow::InfoWindow(const QString &path, pl_icon_kind kind, const QString &na
 		m_network = m_network || v.path == path;
 	}
 	setAttribute(Qt::WA_DeleteOnClose);
+	setAcceptDrops(true);
 	watchThumbnails(this);
 	watchFileAssociations(this);
 	setWindowTitle(name + " Info");
@@ -769,6 +774,7 @@ void InfoWindow::mousePressEvent(QMouseEvent *e) {
 	if (!m_isResourceInfo && !m_isVolumeInfo &&
 			QRect(ICON_BOX_X, ICON_BOX_Y, 38, 38).contains(e->position().toPoint())) {
 		m_iconFocused = true;
+		m_iconPressPos = e->position().toPoint();
 		m_editingComment = false;
 		m_caretTimer.stop();
 		setFocus(Qt::MouseFocusReason);
@@ -787,10 +793,96 @@ void InfoWindow::mousePressEvent(QMouseEvent *e) {
 
 void InfoWindow::mouseMoveEvent(QMouseEvent *e) {
 	m_host.hostMove(e);
+	/* Dragging the icon copies it to another Get Info window, as on a Mac. */
+	if (m_iconFocused && (e->buttons() & Qt::LeftButton) && !m_isResourceInfo &&
+			!m_isVolumeInfo && !m_isTrash) {
+		const int dist = (e->position().toPoint() - m_iconPressPos).manhattanLength();
+		if (dist >= QApplication::startDragDistance()) {
+			const QImage icon = grab(QRect(ICON_BOX_X + 3, ICON_BOX_Y + 3,
+				PL_ICON_LARGE, PL_ICON_LARGE)).toImage();
+			if (!icon.isNull()) {
+				QMimeData *mime = new QMimeData;
+				mime->setImageData(icon);
+				QDrag *drag = new QDrag(this);
+				drag->setMimeData(mime);
+				drag->setPixmap(QPixmap::fromImage(icon.scaled(32, 32)));
+				drag->exec(Qt::CopyAction);
+				m_iconFocused = false;
+				update();
+			}
+		}
+	}
 }
 
 void InfoWindow::mouseReleaseEvent(QMouseEvent *e) {
 	m_host.hostRelease(e);
+}
+
+void InfoWindow::dragEnterEvent(QDragEnterEvent *e) {
+	if (m_isResourceInfo || m_isVolumeInfo || m_isTrash) {
+		return;
+	}
+	if (!QRect(ICON_BOX_X, ICON_BOX_Y, 38, 38).contains(e->position().toPoint())) {
+		return;
+	}
+	const QMimeData *mime = e->mimeData();
+	if (mime->hasImage()) {
+		e->acceptProposedAction();
+		return;
+	}
+	if (mime->hasUrls()) {
+		for (const QUrl &url : mime->urls()) {
+			if (url.isLocalFile()) {
+				const QString suffix = QFileInfo(url.toLocalFile()).suffix().toLower();
+				if (suffix == "png" || suffix == "jpg" || suffix == "jpeg" ||
+						suffix == "gif" || suffix == "bmp" || suffix == "tiff" ||
+						suffix == "tif" || suffix == "webp" || suffix == "ico") {
+					e->acceptProposedAction();
+					return;
+				}
+			}
+		}
+	}
+}
+
+void InfoWindow::dropEvent(QDropEvent *e) {
+	if (m_isResourceInfo || m_isVolumeInfo || m_isTrash) {
+		return;
+	}
+	if (!QRect(ICON_BOX_X, ICON_BOX_Y, 38, 38).contains(e->position().toPoint())) {
+		return;
+	}
+	const QMimeData *mime = e->mimeData();
+	QImage image;
+	if (mime->hasImage()) {
+		image = qvariant_cast<QImage>(mime->imageData());
+	} else if (mime->hasUrls()) {
+		for (const QUrl &url : mime->urls()) {
+			if (url.isLocalFile()) {
+				const QString path = url.toLocalFile();
+				const QString suffix = QFileInfo(path).suffix().toLower();
+				if (suffix == "png" || suffix == "jpg" || suffix == "jpeg" ||
+						suffix == "gif" || suffix == "bmp" || suffix == "tiff" ||
+						suffix == "tif" || suffix == "webp" || suffix == "ico") {
+					image = QImage(path);
+					if (!image.isNull()) {
+						break;
+					}
+				}
+			}
+		}
+	}
+	if (image.isNull()) {
+		return;
+	}
+	if (!writeCustomIconImage(m_path, image)) {
+		Alert::ask("This item's icon couldn't be changed. The file system may not "
+			"support custom icons, or the picture may be too large.", "OK", "");
+	} else {
+		update();
+		Finder::instance().folderChanged(QFileInfo(m_path).absolutePath());
+	}
+	e->acceptProposedAction();
 }
 
 void InfoWindow::keyPressEvent(QKeyEvent *e) {

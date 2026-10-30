@@ -40,6 +40,8 @@ protected:
 	void mousePressEvent(QMouseEvent *) override;
 	void mouseMoveEvent(QMouseEvent *) override;
 	void mouseReleaseEvent(QMouseEvent *) override;
+	void dragEnterEvent(QDragEnterEvent *) override;
+	void dropEvent(QDropEvent *) override;
 	void closeEvent(QCloseEvent *) override;
 
 private:
@@ -83,6 +85,7 @@ private:
 	QString m_comment;
 	bool m_editingComment = false;
 	bool m_iconFocused = false;
+	QPoint m_iconPressPos;
 	bool m_caretOn = true;
 	QRect m_commentBox;
 	QTimer m_caretTimer;
