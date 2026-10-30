@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 int main(void) {
 	char dir[] = "/tmp/zacthemeXXXXXX";
@@ -30,6 +32,27 @@ int main(void) {
 	assert(zac_theme_load(&t2, dir2) == 0);
 	assert(t2.name != NULL);
 	zac_theme_free(&t2);
+
+	/* zac_theme_list */
+	char root[] = "/tmp/zacthemesXXXXXX";
+	assert(mkdtemp(root) != NULL);
+	char sub[4096];
+	snprintf(sub, sizeof(sub), "%s/Alpha", root);
+	mkdir(sub, 0755);
+	snprintf(conf, sizeof(conf), "%s/theme.conf", sub);
+	f = fopen(conf, "w");
+	assert(f); fputs("name=Alpha\n", f); fclose(f);
+	char **dirs = NULL;
+	int n = zac_theme_list(root, &dirs);
+	assert(n == 1);
+	assert(dirs && dirs[0]);
+	free(dirs[0]);
+	free(dirs);
+	/* cleanup */
+	snprintf(conf, sizeof(conf), "%s/theme.conf", sub);
+	unlink(conf);
+	rmdir(sub);
+	rmdir(root);
 
 	rmdir(dir);
 	rmdir(dir2);

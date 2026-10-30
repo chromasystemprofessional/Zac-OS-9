@@ -18,3 +18,7 @@ int zac_theme_load(ZacTheme *theme, const char *directory);
 
 /* Free a loaded theme. */
 void zac_theme_free(ZacTheme *theme);
+
+/* List theme bundle directories under `root` (one level). Caller frees the
+ * returned array and each string. Returns count (0 if none). */
+int zac_theme_list(const char *root, char ***out_dirs);
