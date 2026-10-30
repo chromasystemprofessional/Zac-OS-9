@@ -275,6 +275,7 @@ def write_theme_art(icons, cluts, out):
 def main():
 	parser = argparse.ArgumentParser(description=__doc__)
 	parser.add_argument("--source", help="Mac OS 9 tree (defaults to ~/Classic)")
+	parser.add_argument("--file", help="A single theme file (resource fork or AppleDouble)")
 	parser.add_argument("--output", required=True, help="Destination theme bundle directory")
 	parser.add_argument("--name", help="Theme name (defaults to the source folder's name)")
 	parser.add_argument("--accent", help="Accent colour id (lavender, graphite, gold, bronze, ivy, ocean, rose, plum)")
@@ -284,67 +285,87 @@ def main():
 	parser.add_argument("--auto-colours", action="store_true", help="Heuristically pick chrome colours from the clut resources")
 	args = parser.parse_args()
 
-	src = args.source
-	if not src:
-		src = os.path.expanduser("~/Classic")
-	if not os.path.isdir(src):
-		print("source is not a directory: " + src, file=sys.stderr)
-		print("Hint: set up Old Dog first (put your Mac OS 9 install in ~/Classic).", file=sys.stderr)
-		return 2
-	src = os.path.abspath(src)
-
 	out = os.path.abspath(args.output)
 	for sub in ("icons", "patterns", "sounds", "theme", "boot", "wallpapers"):
 		os.makedirs(os.path.join(out, sub), exist_ok=True)
 
-	name = args.name or os.path.basename(src.rstrip(os.sep)) or "Mac OS 9 Theme"
 	counts = {"icons": 0, "patterns": 0, "sounds": 0, "theme": 0}
 	cluts = []
 	icons = {}
 	assets = {}
 
-	for root, _dirs, files in os.walk(src):
-		for fn in files:
-			full = os.path.join(root, fn)
-			ext = os.path.splitext(fn)[1].lower()
-			with open(full, "rb") as f:
-				raw = f.read()
+	if args.file:
+		# A single theme file the user copied out of Mac OS 9.
+		filepath = os.path.abspath(args.file)
+		if not os.path.isfile(filepath):
+			print("file not found: " + filepath, file=sys.stderr)
+			return 2
+		base = os.path.splitext(os.path.basename(filepath))[0]
+		name = args.name or base.replace(" copy", "").replace(" Copy", "").strip() or "Mac OS 9 Theme"
+		src = filepath
+		with open(filepath, "rb") as f:
+			raw = f.read()
+		# AppleDouble files carry the resource fork; a raw resource fork is
+		# used as-is.
+		if filepath.endswith("._") or raw[:4] == b"\x00\x05\x16\x07":
+			fork = extract_apple_double(raw)
+		else:
+			fork = raw
+		if fork and looks_like_resource_fork(fork):
+			process_resource_fork(fork, out, counts, cluts, icons, assets)
+	else:
+		src = args.source
+		if not src:
+			src = os.path.expanduser("~/Classic")
+		if not os.path.isdir(src):
+			print("source is not a directory: " + src, file=sys.stderr)
+			print("Hint: set up Old Dog first (put your Mac OS 9 install in ~/Classic).", file=sys.stderr)
+			return 2
+		src = os.path.abspath(src)
+		name = args.name or os.path.basename(src.rstrip(os.sep)) or "Mac OS 9 Theme"
 
-			# AppleDouble files carry the resource fork.
-			if fn.startswith("._"):
-				fork = extract_apple_double(raw)
-				if fork:
-					process_resource_fork(fork, out, counts, cluts, icons, assets)
+		for root, _dirs, files in os.walk(src):
+			for fn in files:
+				full = os.path.join(root, fn)
+				ext = os.path.splitext(fn)[1].lower()
+				with open(full, "rb") as f:
+					raw = f.read()
+
+				# AppleDouble files carry the resource fork.
+				if fn.startswith("._"):
+					fork = extract_apple_double(raw)
+					if fork:
+						process_resource_fork(fork, out, counts, cluts, icons, assets)
+						continue
+					# Not AppleDouble after all: fall through.
+
+				# A raw resource fork (not an AppleDouble) when the tail maps back.
+				if looks_like_resource_fork(raw) and not fn.startswith("._"):
+					process_resource_fork(raw, out, counts, cluts, icons, assets)
 					continue
-				# Not AppleDouble after all: fall through.
 
-			# A raw resource fork (not an AppleDouble) when the tail maps back.
-			if looks_like_resource_fork(raw) and not fn.startswith("._"):
-				process_resource_fork(raw, out, counts, cluts, icons, assets)
+				# Loose asset files.
+				if ext in ASSET_EXTS:
+					if ext in (".icns", ".png", ".jpg", ".jpeg"):
+						bucket = "icons"
+					elif ext == ".pat":
+						bucket = "patterns"
+					else:
+						bucket = "sounds"
+					write_unique(os.path.join(out, bucket), fn, raw)
+					counts[bucket] += 1
+
+		# Netatalk / AFP AppleDouble convention: resource forks live in a
+		# `.rsrc` directory, finder info in `.finf`, next to the data forks.
+		for root, _dirs, files in os.walk(src):
+			if os.path.basename(root) != ".rsrc":
 				continue
-
-			# Loose asset files.
-			if ext in ASSET_EXTS:
-				if ext in (".icns", ".png", ".jpg", ".jpeg"):
-					bucket = "icons"
-				elif ext == ".pat":
-					bucket = "patterns"
-				else:
-					bucket = "sounds"
-				write_unique(os.path.join(out, bucket), fn, raw)
-				counts[bucket] += 1
-
-	# Netatalk / AFP AppleDouble convention: resource forks live in a
-	# `.rsrc` directory, finder info in `.finf`, next to the data forks.
-	for root, _dirs, files in os.walk(src):
-		if os.path.basename(root) != ".rsrc":
-			continue
-		for fn in files:
-			full = os.path.join(root, fn)
-			with open(full, "rb") as f:
-				raw = f.read()
-			if looks_like_resource_fork(raw):
-				process_resource_fork(raw, out, counts, cluts, icons, assets)
+			for fn in files:
+				full = os.path.join(root, fn)
+				with open(full, "rb") as f:
+					raw = f.read()
+				if looks_like_resource_fork(raw):
+					process_resource_fork(raw, out, counts, cluts, icons, assets)
 
 	# Turn the theme's icon into the menu icon and boot art.
 	write_theme_art(icons, cluts, out)
