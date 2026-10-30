@@ -1,3 +1,11 @@
+zacos9 (1.4.4) trixie; urgency=medium
+
+  * Get Info: drop an image file onto the icon to set it as a custom icon
+    (PNG, JPEG, GIF, BMP, TIFF, WebP, ICO), and drag an icon to copy it to
+    another Get Info window. Copy and Paste of icons already worked.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Thu, 29 Oct 2026 17:30:00 -0400
+
 zacos9 (1.4.3) trixie; urgency=medium
 
   * Applications, the System Folder, control panels and the other items in
