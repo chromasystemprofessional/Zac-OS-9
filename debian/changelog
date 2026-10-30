@@ -1,3 +1,9 @@
+zacos9 (1.6.1) trixie; urgency=medium
+
+  * Theme Installer asks for the theme file and inherits its name.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Fri, 30 Oct 2026 15:39:28 -0400
+
 zacos9 (1.6.0) trixie; urgency=medium
 
   * Mac OS 9 theming: Theme Installer extracts the menu icon, boot art,
