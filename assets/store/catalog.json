@@ -73,6 +73,9 @@
       "packages": ["zacos9-extra-gameplayer"], "extra": { "id": "gameplayer", "start": "zacos9-gameplayer" } },
     { "id": "extra-scrcpy", "name": "Android Mirror (Scrcpy)", "category": "Extras",
       "blurb": "Mirror and control an Android device's screen from The Collar, over USB or Wi-Fi.",
-      "packages": ["zacos9-extra-scrcpy"], "extra": { "id": "scrcpy", "start": "zacos9-scrcpy" } }
+      "packages": ["zacos9-extra-scrcpy"], "extra": { "id": "scrcpy", "start": "zacos9-scrcpy" } },
+    { "id": "extra-steam", "name": "Steam", "category": "Extras",
+      "blurb": "List and launch your installed Steam games from The Collar. Installs Steam if it is not already present.",
+      "packages": ["zacos9-extra-steam"], "extra": { "id": "steam", "start": "zacos9-steam" } }
   ]
 }
