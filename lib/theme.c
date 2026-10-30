@@ -6,6 +6,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <time.h>
 
 #include "settings.h"
 
@@ -119,6 +120,79 @@ bool zac_theme_asset(const char *relative, char *out, size_t size) {
 	snprintf(path, sizeof(path), "%s/%s", dir, relative);
 	if (access(path, R_OK) == 0) {
 		snprintf(out, size, "%s", path);
+		return true;
+	}
+	return false;
+}
+
+/* The active theme's theme.conf lines, cached until the file changes. */
+static struct {
+	struct timespec mtime;
+	bool loaded;
+	int n;
+	char lines[64][256];
+} confcache;
+
+static void conf_load(void) {
+	char dir[4096];
+	if (!active_theme_dir(dir, sizeof(dir))) {
+		confcache.loaded = true;
+		confcache.n = 0;
+		confcache.mtime = (struct timespec){ 0 };
+		return;
+	}
+	char path[8192];
+	snprintf(path, sizeof(path), "%s/theme.conf", dir);
+	struct stat st;
+	if (stat(path, &st) != 0) {
+		confcache.loaded = true;
+		confcache.n = 0;
+		confcache.mtime = (struct timespec){ 0 };
+		return;
+	}
+	if (confcache.loaded && confcache.mtime.tv_sec == st.st_mtim.tv_sec &&
+			confcache.mtime.tv_nsec == st.st_mtim.tv_nsec) {
+		return;
+	}
+	confcache.loaded = true;
+	confcache.mtime = st.st_mtim;
+	confcache.n = 0;
+	FILE *f = fopen(path, "r");
+	if (!f) {
+		return;
+	}
+	while (confcache.n < 64 && fgets(confcache.lines[confcache.n], sizeof(confcache.lines[0]), f)) {
+		confcache.lines[confcache.n][strcspn(confcache.lines[confcache.n], "\r\n")] = '\0';
+		confcache.n++;
+	}
+	fclose(f);
+}
+
+bool zac_theme_color(const char *key, uint32_t *out) {
+	if (!key || !out) return false;
+	conf_load();
+	for (int i = 0; i < confcache.n; i++) {
+		const char *eq = strchr(confcache.lines[i], '=');
+		if (!eq || (size_t)(eq - confcache.lines[i]) != strlen(key)) {
+			continue;
+		}
+		if (strncmp(confcache.lines[i], key, strlen(key)) != 0) {
+			continue;
+		}
+		const char *v = eq + 1;
+		if (strlen(v) != 6) {
+			return false;
+		}
+		unsigned long rgb = 0;
+		for (const char *p = v; *p; p++) {
+			int d;
+			if (*p >= '0' && *p <= '9') d = *p - '0';
+			else if (*p >= 'a' && *p <= 'f') d = *p - 'a' + 10;
+			else if (*p >= 'A' && *p <= 'F') d = *p - 'A' + 10;
+			else return false;
+			rgb = rgb * 16 + d;
+		}
+		*out = 0xFF000000u | (uint32_t)rgb;
 		return true;
 	}
 	return false;

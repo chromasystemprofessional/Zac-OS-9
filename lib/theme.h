@@ -8,6 +8,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -38,6 +39,10 @@ bool zac_theme_asset(const char *relative, char *out, size_t size);
  * pattern, alert-sound, background, wallpaper-mode) from its theme.conf to
  * the desktop settings. Returns how many were applied. */
 int zac_theme_apply(void);
+
+/* Read a colour from the active theme's theme.conf ("key=RRGGBB"). Returns
+ * false (leaving *out untouched) when the key is unset or malformed. */
+bool zac_theme_color(const char *key, uint32_t *out);
 
 #ifdef __cplusplus
 }

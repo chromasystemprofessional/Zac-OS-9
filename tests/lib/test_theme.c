@@ -92,6 +92,22 @@ int main(void) {
 	assert(strstr(resolved, "/Test/menu-icon.png") != NULL);
 	assert(zac_theme_asset("boot/missing.png", resolved, sizeof(resolved)) == false);
 
+	/* zac_theme_color: reads RRGGBB colour keys from the active theme. */
+	{
+		char tc[256];
+		snprintf(tc, sizeof(tc), "%s/zacos9/themes/Test/theme.conf", cfg);
+		FILE *tcf = fopen(tc, "a");
+		assert(tcf);
+		fputs("title-base=FF0000\nframe-light=00FF00\n", tcf);
+		fclose(tcf);
+		uint32_t v = 0;
+		assert(zac_theme_color("title-base", &v) == true);
+		assert(v == 0xFFFF0000u);
+		assert(zac_theme_color("frame-light", &v) == true);
+		assert(v == 0xFF00FF00u);
+		assert(zac_theme_color("no-such-key", &v) == false);
+	}
+
 	/* zac_theme_apply: the theme's appearance settings reach desktop.conf. */
 	assert(zac_theme_apply() == 2);
 	{

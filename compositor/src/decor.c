@@ -2,6 +2,7 @@
 
 #include <stddef.h>
 #include "icons.h"
+#include "theme.h"
 
 #define C_222 GRAY(0x2)
 #define C_555 GRAY(0x5)
@@ -12,6 +13,13 @@
 #define C_AAA GRAY(0xA)
 #define C_CCC GRAY(0xC)
 #define C_DDD GRAY(0xD)
+
+/* A window-chrome colour, overridable by the active theme's theme.conf
+ * ("key=RRGGBB"); otherwise the Platinum default. */
+static uint32_t chrome(const char *key, uint32_t fallback) {
+	uint32_t v;
+	return zac_theme_color(key, &v) ? v : fallback;
+}
 
 /* Title-bar boxes: 12x12 at y=4, 1 px emboss right and below. */
 #define BOX_Y 4
@@ -129,9 +137,11 @@ static void paint_stripes(struct pl_canvas *c, int x0, int x1) {
 	if (x1 - x0 < 1) {
 		return;
 	}
+	const uint32_t light = chrome("title-stripe-light", C_WHITE);
+	const uint32_t dark = chrome("title-stripe-dark", C_777);
 	for (int k = 0; k < 6; k++) {
-		pl_hline(c, x0, x1 - 1, BOX_Y + 2 * k, C_WHITE);
-		pl_hline(c, x0 + 1, x1, BOX_Y + 2 * k + 1, C_777);
+		pl_hline(c, x0, x1 - 1, BOX_Y + 2 * k, light);
+		pl_hline(c, x0 + 1, x1, BOX_Y + 2 * k + 1, dark);
 	}
 }
 
@@ -300,11 +310,13 @@ void decor_paint_stripes_scaled(uint32_t *dst, int dw, int dh, const struct deco
 		const int wl = pl_snap(ux + x0[i], quarters) - ox, wr = pl_snap(ux + x1[i], quarters) - ox;
 		const int gl = pl_snap(ux + x0[i] + 1, quarters) - ox;
 		const int gr = pl_snap(ux + x1[i] + 1, quarters) - ox;
-		fill_px(dst, dw, dh, wl, top, gr, top + band, C_CCC);
+		fill_px(dst, dw, dh, wl, top, gr, top + band, chrome("title-base", C_CCC));
+		const uint32_t ridge_light = chrome("title-stripe-light", C_WHITE);
+		const uint32_t ridge_dark = chrome("title-stripe-dark", C_777);
 		for (int k = 0; k < 6; k++) {
 			const int y = top + margin + k * period;
-			fill_px(dst, dw, dh, wl, y, wr, y + white, C_WHITE);
-			fill_px(dst, dw, dh, gl, y + white, gr, y + white + gray, C_777);
+			fill_px(dst, dw, dh, wl, y, wr, y + white, ridge_light);
+			fill_px(dst, dw, dh, gl, y + white, gr, y + white + gray, ridge_dark);
 		}
 	}
 }
@@ -327,8 +339,8 @@ static void paint_grow(struct pl_canvas *c, const struct decor_state *st) {
 static void paint_modal(struct pl_canvas *c, const struct decor_state *st) {
 	const int W = st->width, H = st->height;
 	const bool act = st->active;
-	const uint32_t border = act ? C_BLACK : C_555;
-	const uint32_t face = act ? C_CCC : C_DDD;
+	const uint32_t border = act ? chrome("frame-border", C_BLACK) : chrome("frame-border-inactive", C_555);
+	const uint32_t face = act ? chrome("frame-face", C_CCC) : chrome("frame-face-inactive", C_DDD);
 
 	/* Title bar: rows 0..21, as a collapsed document window's. */
 	pl_fill(c, 0, 0, W - 1, 21, face);
@@ -338,12 +350,14 @@ static void paint_modal(struct pl_canvas *c, const struct decor_state *st) {
 	pl_fill(c, 0, 22, W - 1, 23, C_DDD);
 	pl_fill(c, 0, H - 3, W - 1, H - 1, C_DDD);
 
+	const uint32_t m_light = chrome("frame-light", C_WHITE);
+	const uint32_t m_shadow = chrome("frame-dark", C_999);
 	pl_outline(c, 0, 0, W - 1, H - 1, border);
 	if (act) {
-		pl_hline(c, 1, W - 3, 1, C_WHITE);
-		pl_vline(c, 1, 1, 19, C_WHITE);
-		pl_vline(c, W - 2, 2, 20, C_999);
-		pl_hline(c, 2, W - 2, 20, C_999);
+		pl_hline(c, 1, W - 3, 1, m_light);
+		pl_vline(c, 1, 1, 19, m_light);
+		pl_vline(c, W - 2, 2, 20, m_shadow);
+		pl_hline(c, 2, W - 2, 20, m_shadow);
 	}
 	pl_hline(c, 0, W - 1, 21, border);
 
@@ -373,8 +387,8 @@ int decor_tab_width(const struct decor_state *st) {
 static void paint_popup(struct pl_canvas *c, const struct decor_state *st) {
 	const int W = st->width, H = frame_height(st);
 	const bool act = st->active;
-	const uint32_t border = act ? C_BLACK : C_555;
-	const uint32_t face = act ? C_CCC : C_DDD;
+	const uint32_t border = act ? chrome("frame-border", C_BLACK) : chrome("frame-border-inactive", C_555);
+	const uint32_t face = act ? chrome("frame-face", C_CCC) : chrome("frame-face-inactive", C_DDD);
 	const int x0 = st->tab_x, x1 = st->tab_x + decor_tab_width(st) - 1;
 	const int y0 = DECOR_TAB_H; /* the body's top row */
 
@@ -383,19 +397,21 @@ static void paint_popup(struct pl_canvas *c, const struct decor_state *st) {
 		pl_fill(c, 0, H - DECOR_BOTTOM, W - 1, H - 1, face);
 		pl_fill(c, 0, y0, DECOR_LEFT - 1, H - 1, face);
 		pl_fill(c, W - DECOR_RIGHT, y0, W - 1, H - 1, face);
+		const uint32_t p_light = chrome("frame-light", C_WHITE);
+		const uint32_t p_shadow = chrome("frame-dark", C_999);
 		pl_outline(c, 0, y0, W - 1, H - 1, border);
 		if (act) {
-			pl_hline(c, 1, W - 3, y0 + 1, C_WHITE);
-			pl_vline(c, 1, y0 + 1, H - 3, C_WHITE);
-			pl_vline(c, W - 2, y0 + 2, H - 2, C_999);
-			pl_hline(c, 2, W - 2, H - 2, C_999);
-			pl_hline(c, 4, W - 6, y0 + 4, C_999);
-			pl_vline(c, 4, y0 + 4, H - 6, C_999);
+			pl_hline(c, 1, W - 3, y0 + 1, p_light);
+			pl_vline(c, 1, y0 + 1, H - 3, p_light);
+			pl_vline(c, W - 2, y0 + 2, H - 2, p_shadow);
+			pl_hline(c, 2, W - 2, H - 2, p_shadow);
+			pl_hline(c, 4, W - 6, y0 + 4, p_shadow);
+			pl_vline(c, 4, y0 + 4, H - 6, p_shadow);
 		}
 		pl_outline(c, 5, y0 + 5, W - 6, H - 6, border);
 		if (act) {
-			pl_vline(c, W - 5, y0 + 5, H - 5, C_WHITE);
-			pl_hline(c, 4, W - 5, H - 5, C_WHITE);
+			pl_vline(c, W - 5, y0 + 5, H - 5, p_light);
+			pl_hline(c, 4, W - 5, H - 5, p_light);
 		}
 		/* The resizing corners, marked off on the top edge. */
 		pl_vline(c, DECOR_POPUP_CORNER, y0 + 1, y0 + 4, C_888);
@@ -415,9 +431,11 @@ static void paint_popup(struct pl_canvas *c, const struct decor_state *st) {
 	pl_vline(c, x0, 2, y0 - 1, tab_border);
 	pl_vline(c, x1, 2, y0 - 1, tab_border);
 	if (tab_act) {
-		pl_hline(c, x0 + 2, x1 - 2, 1, C_WHITE);
-		pl_vline(c, x0 + 1, 2, st->collapsed ? y0 - 1 : y0 + 1, C_WHITE);
-		pl_vline(c, x1 - 1, 2, st->collapsed ? y0 - 1 : y0 + 1, C_999);
+		const uint32_t tl = chrome("frame-light", C_WHITE);
+		const uint32_t td = chrome("frame-dark", C_999);
+		pl_hline(c, x0 + 2, x1 - 2, 1, tl);
+		pl_vline(c, x0 + 1, 2, st->collapsed ? y0 - 1 : y0 + 1, tl);
+		pl_vline(c, x1 - 1, 2, st->collapsed ? y0 - 1 : y0 + 1, td);
 	}
 	if (!st->collapsed) {
 		/* Open: the tab's sides run on into the body's edge. */
@@ -444,8 +462,8 @@ void decor_paint(struct pl_canvas *c, const struct decor_state *st) {
 	}
 	const int W = st->width, H = frame_height(st);
 	const bool act = st->active;
-	const uint32_t border = act ? C_BLACK : C_555;
-	const uint32_t face = act ? C_CCC : C_DDD;
+	const uint32_t border = act ? chrome("frame-border", C_BLACK) : chrome("frame-border-inactive", C_555);
+	const uint32_t face = act ? chrome("frame-face", C_CCC) : chrome("frame-face-inactive", C_DDD);
 
 	/* Frame fill, never touching the client area. */
 	if (st->collapsed) {
@@ -457,12 +475,14 @@ void decor_paint(struct pl_canvas *c, const struct decor_state *st) {
 		pl_fill(c, W - DECOR_RIGHT, DECOR_TOP, W - 1, H - DECOR_BOTTOM - 1, face);
 	}
 
+	const uint32_t highlight = chrome("frame-light", C_WHITE);
+	const uint32_t shadow = chrome("frame-dark", C_999);
 	pl_outline(c, 0, 0, W - 1, H - 1, border);
 	if (act) {
-		pl_hline(c, 1, W - 3, 1, C_WHITE);
-		pl_vline(c, 1, 1, H - 3, C_WHITE);
-		pl_vline(c, W - 2, 2, H - 2, C_999);
-		pl_hline(c, 2, W - 2, H - 2, C_999);
+		pl_hline(c, 1, W - 3, 1, highlight);
+		pl_vline(c, 1, 1, H - 3, highlight);
+		pl_vline(c, W - 2, 2, H - 2, shadow);
+		pl_hline(c, 2, W - 2, H - 2, shadow);
 	}
 
 	/* Drop shadow: 1 px, offset 2 px in from the corners. */
@@ -471,13 +491,13 @@ void decor_paint(struct pl_canvas *c, const struct decor_state *st) {
 
 	if (!st->collapsed) {
 		if (act) {
-			pl_hline(c, 4, W - 6, 20, C_999);
-			pl_vline(c, 4, 20, H - 6, C_999);
+			pl_hline(c, 4, W - 6, 20, shadow);
+			pl_vline(c, 4, 20, H - 6, shadow);
 		}
 		pl_outline(c, 5, 21, W - 6, H - 6, border);
 		if (act) {
-			pl_vline(c, W - 5, 21, H - 5, C_WHITE);
-			pl_hline(c, 4, W - 5, H - 5, C_WHITE);
+			pl_vline(c, W - 5, 21, H - 5, highlight);
+			pl_hline(c, 4, W - 5, H - 5, highlight);
 		}
 		if (st->has_grow) {
 			paint_grow(c, st);
