@@ -37,7 +37,7 @@ ICON_TYPES = {b"ICN#", b"icl8", b"icl4", b"ics#", b"ics8", b"ics4", b"icns", b"I
 PATTERN_TYPES = {b"PAT ", b"PAT#", b"ppat"}
 SOUND_TYPES = {b"snd "}
 PICT_TYPES = {b"PICT"}
-THEME_TYPES = {b"thme", b"clut", b"pltt", b"WIND"}
+THEME_TYPES = {b"thme", b"clut", b"pltt", b"WIND", b"scen"}
 
 
 def parse_resource_fork(data):
@@ -218,7 +218,63 @@ def parse_clut(body):
     return colours
 
 
-def process_resource_fork(data, out, counts, cluts, icons, assets):
+def decode_scen_collection(data):
+	"""Decode a flattened Appearance Manager collection (a 'scen' resource).
+
+	The collection flattens to: version (0x00010000), default attributes
+	(0x40000000), an item count, then one 16-byte header per item (tag, id,
+	attributes, value offset), then the value pool. Each header's last word
+	is the value's offset into the pool. Returns a tag -> typed value dict."""
+	tags = {}
+	if len(data) < 12:
+		return tags
+	try:
+		ver, _attrs, count = struct.unpack(">III", data[:12])
+	except struct.error:
+		return tags
+	if ver != 0x00010000 or count <= 0 or count > 1000:
+		return tags
+	pos = 12
+	items = []
+	for _ in range(count):
+		if pos + 16 > len(data):
+			return tags
+		tag, _iid, _attrs, off = struct.unpack(">4sIII", data[pos:pos + 16])
+		items.append((tag.decode("latin1"), off))
+		pos += 16
+	if pos + 4 > len(data):
+		return tags
+	total = struct.unpack(">I", data[pos:pos + 4])[0]
+	pool = pos + 4
+	if pool + total > len(data) + 4:
+		return tags
+	strings = ("name", "varn", "dpnm", "hcnm", "lgsf", "smsf", "sndt", "vfnt", "patn")
+	for tag, off in items:
+		p = pool + off
+		if p >= len(data):
+			continue
+		if tag in strings:
+			ln = data[p]
+			tags[tag] = data[p + 1:p + 1 + ln].decode("latin1", "replace")
+		elif tag in ("coll", "smoo", "snds", "user"):
+			tags[tag] = bool(data[p])
+		elif tag in ("epic", "vfsz"):
+			if p + 2 <= len(data):
+				tags[tag] = struct.unpack(">h", data[p:p + 2])[0]
+		elif tag == "smos":
+			if p + 2 <= len(data):
+				tags[tag] = struct.unpack(">H", data[p:p + 2])[0]
+		elif tag == "smsk":
+			if p + 4 <= len(data):
+				tags[tag] = struct.unpack(">I", data[p:p + 4])[0]
+		elif tag == "hcol":
+			if p + 6 <= len(data):
+				r, g, b = struct.unpack(">HHH", data[p:p + 6])
+				tags[tag] = (r, g, b)
+	return tags
+
+
+def process_resource_fork(data, out, counts, cluts, icons, assets, scen_tags):
 	for rtype, res_id, body in parse_resource_fork(data):
 		bucket = bucket_for(rtype)
 		if not bucket:
@@ -229,6 +285,10 @@ def process_resource_fork(data, out, counts, cluts, icons, assets):
 			cols = parse_clut(body)
 			if cols:
 				cluts.append((res_id, cols))
+		if rtype == b"scen":
+			for tag, value in decode_scen_collection(body).items():
+				if tag not in scen_tags:
+					scen_tags[tag] = value
 		if rtype in (b"icl8", b"icl4", b"ICN#"):
 			icons.setdefault(rtype, []).append(body)
 		if rtype == b"PICT":
@@ -332,6 +392,7 @@ def main():
 	cluts = []
 	icons = {}
 	assets = {}
+	scen_tags = {}
 
 	if args.file:
 		# A single theme file the user copied out of Mac OS 9.
@@ -351,7 +412,7 @@ def main():
 		else:
 			fork = raw
 		if fork and looks_like_resource_fork(fork):
-			process_resource_fork(fork, out, counts, cluts, icons, assets)
+			process_resource_fork(fork, out, counts, cluts, icons, assets, scen_tags)
 	else:
 		src = args.source
 		if not src:
@@ -374,13 +435,13 @@ def main():
 				if fn.startswith("._"):
 					fork = extract_apple_double(raw)
 					if fork:
-						process_resource_fork(fork, out, counts, cluts, icons, assets)
+						process_resource_fork(fork, out, counts, cluts, icons, assets, scen_tags)
 						continue
 					# Not AppleDouble after all: fall through.
 
 				# A raw resource fork (not an AppleDouble) when the tail maps back.
 				if looks_like_resource_fork(raw) and not fn.startswith("._"):
-					process_resource_fork(raw, out, counts, cluts, icons, assets)
+					process_resource_fork(raw, out, counts, cluts, icons, assets, scen_tags)
 					continue
 
 				# Loose asset files.
@@ -404,7 +465,7 @@ def main():
 				with open(full, "rb") as f:
 					raw = f.read()
 				if looks_like_resource_fork(raw):
-					process_resource_fork(raw, out, counts, cluts, icons, assets)
+					process_resource_fork(raw, out, counts, cluts, icons, assets, scen_tags)
 
 	# Turn the theme's icon into the menu icon and boot art.
 	write_theme_art(icons, cluts, out)
@@ -452,11 +513,17 @@ def main():
 					auto_highlight = "%02x%02x%02x" % mid
 					auto_highlight_b = cols[0][1][2]
 
+	scen_name = scen_tags.get("name")
+	scen_highlight = None
+	if "hcol" in scen_tags:
+		r, g, b = scen_tags["hcol"]
+		scen_highlight = "%02x%02x%02x" % (r >> 8, g >> 8, b >> 8)
+
 	with open(os.path.join(out, "theme.conf"), "w") as f:
-		f.write("name=%s\n" % name)
+		f.write("name=%s\n" % (name or scen_name or "Mac OS 9 Theme"))
 		f.write("source=%s\n" % src)
 		accent = args.accent or auto_accent
-		highlight = args.highlight or auto_highlight
+		highlight = args.highlight or scen_highlight or auto_highlight
 		pattern = args.pattern
 		title_base = auto_title_base
 		title_stripe_light = auto_title_stripe_light
@@ -465,6 +532,28 @@ def main():
 		frame_dark = auto_frame_dark
 		frame_border = auto_frame_border
 		frame_face = auto_frame_face
+		if scen_tags.get("varn"):
+			f.write("variant=%s\n" % scen_tags["varn"])
+		if scen_tags.get("lgsf"):
+			f.write("system-font=%s\n" % scen_tags["lgsf"])
+		if scen_tags.get("smsf"):
+			f.write("small-system-font=%s\n" % scen_tags["smsf"])
+		if scen_tags.get("vfnt"):
+			f.write("views-font=%s\n" % scen_tags["vfnt"])
+		if "vfsz" in scen_tags:
+			f.write("views-font-size=%d\n" % scen_tags["vfsz"])
+		if "coll" in scen_tags:
+			f.write("double-click-collapse=%d\n" % (1 if scen_tags["coll"] else 0))
+		if "smoo" in scen_tags:
+			f.write("smooth-fonts=%d\n" % (1 if scen_tags["smoo"] else 0))
+		if "smos" in scen_tags:
+			f.write("smooth-font-min-size=%d\n" % scen_tags["smos"])
+		if scen_tags.get("dpnm"):
+			f.write("desktop-picture=%s\n" % scen_tags["dpnm"])
+		if scen_tags.get("patn"):
+			f.write("pattern-name=%s\n" % scen_tags["patn"])
+		if scen_tags.get("hcnm"):
+			f.write("highlight-name=%s\n" % scen_tags["hcnm"])
 		if accent:
 			f.write("accent=%s\n" % accent)
 		if highlight:

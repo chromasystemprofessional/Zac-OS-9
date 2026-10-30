@@ -41,7 +41,13 @@ reads the Appearance theme's resource fork and produces a **theme bundle** in
 - `theme.conf` — the accent, highlight, desktop pattern and the window-chrome
   colours (`title-base`, `title-stripe-light`, `title-stripe-dark`,
   `frame-light`, `frame-dark`, `frame-border`, `frame-face`), each an RRGGBB
-  hex value.
+  hex value. The extractor also decodes the theme's `scen` collection (a
+  flattened Appearance Manager collection) and writes its font and behaviour
+  settings: `system-font`, `small-system-font`, `views-font`,
+  `views-font-size`, `double-click-collapse`, `smooth-fonts`,
+  `smooth-font-min-size`, `desktop-picture`, `pattern-name`,
+  `highlight-name` and `variant`. The raw `scen` resources are kept under
+  `theme/` for later decoding of scroll-bar geometry.
 - `menu-icon.png` — 20×15, replaces the Zac menu icon.
 - `boot/happy-zac-1x..6x.png` and `boot/zacos-logo-1x..6x.png` — replace the
   boot and Welcome artwork.

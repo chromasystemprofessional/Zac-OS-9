@@ -93,6 +93,40 @@ def test_end_to_end():
     print("ok    end-to-end bundle build")
 
 
+def build_scen(items):
+    """Build a flattened Appearance collection from [(tag, value_bytes)]."""
+    import struct as _s
+    header = _s.pack(">III", 0x00010000, 0x40000000, len(items))
+    headers = b""
+    pool = b""
+    offs = []
+    for tag, value in items:
+        offs.append(len(pool))
+        headers += _s.pack(">4sIII", tag, 0, 0x40000000, len(pool))
+        pool += value
+    return header + headers + _s.pack(">I", len(pool)) + pool
+
+
+def test_scen():
+    data = build_scen([
+        (b"name", b"\x0bConvergence"),
+        (b"coll", b"\x00"),
+        (b"smoo", b"\x01"),
+        (b"vfsz", struct.pack(">h", 10)),
+        (b"smos", struct.pack(">H", 12)),
+        (b"hcol", struct.pack(">HHH", 0x9999, 0xCCCC, 0xFFFF)),
+    ])
+    tags = tool.decode_scen_collection(data)
+    assert tags["name"] == "Convergence", tags
+    assert tags["coll"] is False, tags
+    assert tags["smoo"] is True, tags
+    assert tags["vfsz"] == 10, tags
+    assert tags["smos"] == 12, tags
+    assert tags["hcol"] == (0x9999, 0xCCCC, 0xFFFF), tags
+    print("ok    scen collection decoded")
+
+
 test_parse()
 test_end_to_end()
+test_scen()
 print("OK")
