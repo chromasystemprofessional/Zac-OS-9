@@ -15,6 +15,7 @@ platinum_lib = static_library('platinum',
   'patterns.c',
   'savers.c',
   'settings.c',
+  'theme.c',
   'electron.c',
   # Where the desktop's other programs are, installed or in a build tree.
   'locate.c',
@@ -42,6 +43,10 @@ install_data(
 # The Software window's catalog (shell/store).
 install_data('../assets/store/catalog.json',
   install_dir: get_option('datadir') / 'zacos9' / 'store',
+)
+# Default theme bundle.
+install_data('../share/zacos9/themes/Default/theme.conf',
+  install_dir: get_option('datadir') / 'zacos9' / 'themes' / 'Default',
 )
 platinum_dep = declare_dependency(
   link_with: platinum_lib,
@@ -90,6 +95,7 @@ test('text', executable('test-text', '../tests/lib/test_text.c', dependencies: [
 test('draw', executable('test-draw', '../tests/lib/test_draw.c', dependencies: [platinum_dep]))
 test('welcome', executable('test-welcome', '../tests/lib/test_welcome.c', dependencies: [platinum_dep]))
 test('settings', executable('test-settings', '../tests/lib/test_settings.c', dependencies: [platinum_dep]))
+test('theme', executable('test-theme', '../tests/lib/test_theme.c', dependencies: [platinum_dep]))
 test('savers', executable('test-savers', '../tests/lib/test_savers.c', dependencies: [platinum_dep]))
 test('electron', executable('test-electron', '../tests/lib/test_electron.c', dependencies: [platinum_dep]))
 test('locate', executable('test-locate', '../tests/lib/test_locate.c', dependencies: [platinum_dep]))
