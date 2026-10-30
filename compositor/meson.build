@@ -130,6 +130,13 @@ test('decor',
   args: [meson.project_source_root() / 'tools/measure/figs'],
 )
 
+test('decor-geometry',
+  executable('test-decor-geometry',
+    '../tests/compositor/test_decor_geometry.c',
+    dependencies: [decor_dep],
+  ),
+)
+
 test('function-keys',
   executable('test-fkeys',
     '../tests/compositor/test_fkeys.c', 'src/fkeys.c',
