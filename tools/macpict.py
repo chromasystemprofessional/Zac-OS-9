@@ -47,6 +47,79 @@ def _bits_to_rows(pixels, width, height, rowbytes):
     return rows
 
 
+def decode_pixmap(body, clut=None):
+    """Decode a colour PixMap (opcode 0x009A body) into rows of RGBA.
+
+    Handles 32-bit and 24-bit direct, 16-bit 5-5-5, and 8-bit indexed with a
+    colour table; both PackBits and unpacked rows."""
+    if len(body) < 50:
+        raise ValueError("PixMap is too short")
+    # After the opcode: baseAddr(4), rowBytes(2), bounds(8), pmVersion(2),
+    # packType(2), packSize(4), hRes(4), vRes(4), pixelType(2), pixelSize(2),
+    # cmpCount(2), cmpSize(2), planeBytes(4), pmTable(4), pmReserved(4).
+    rowbytes = struct.unpack(">H", body[4:6])[0] & 0x3FFF
+    bounds = struct.unpack(">hhhh", body[6:14])
+    width = bounds[3] - bounds[1]  # right - left
+    height = bounds[2] - bounds[0]  # bottom - top
+    pack_type = struct.unpack(">H", body[16:18])[0]
+    pixel_size = struct.unpack(">H", body[32:34])[0]
+    off = 50
+    local_clut = None
+    if pixel_size in (1, 2, 4, 8):
+        if off + 8 <= len(body):
+            ct_size = struct.unpack(">H", body[off + 6:off + 8])[0]
+            colours = []
+            p = off + 8
+            for i in range(ct_size + 1):
+                idx = struct.unpack(">H", body[p:p + 2])[0]
+                r = struct.unpack(">H", body[p + 2:p + 4])[0] >> 8
+                g = struct.unpack(">H", body[p + 4:p + 6])[0] >> 8
+                b = struct.unpack(">H", body[p + 6:p + 8])[0] >> 8
+                colours.append((idx, (r, g, b)))
+                p += 8
+            local_clut = colours
+            off = p
+    lookup = local_clut or clut
+    raw = body[off:]
+    expected = rowbytes * height
+    if pack_type == 1:
+        pixels = packbits_decode(raw, expected)
+    else:
+        pixels = raw[:expected]
+    return _pixmap_to_rows(pixels, width, height, rowbytes, pixel_size, lookup)
+
+
+def _pixmap_to_rows(pixels, width, height, rowbytes, pixel_size, lookup):
+    rows = []
+    for y in range(height):
+        row = []
+        base = y * rowbytes
+        for x in range(width):
+            if pixel_size == 32:
+                # xRGB or ARGB, big-endian; alpha is usually 0 -> opaque.
+                r, g, b, a = pixels[base + x * 4:base + x * 4 + 4]
+                if a == 0:
+                    a = 255
+                row.append((r, g, b, a))
+            elif pixel_size == 24:
+                r, g, b = pixels[base + x * 3:base + x * 3 + 3]
+                row.append((r, g, b, 255))
+            elif pixel_size == 16:
+                v = struct.unpack(">H", pixels[base + x * 2:base + x * 2 + 2])[0]
+                r = (v >> 10) & 0x1F
+                g = (v >> 5) & 0x1F
+                b = v & 0x1F
+                row.append((r * 255 // 31, g * 255 // 31, b * 255 // 31, 255))
+            elif pixel_size == 8:
+                idx = pixels[base + x]
+                rgb = lookup[idx][1] if lookup and idx < len(lookup) else (idx, idx, idx)
+                row.append((rgb[0], rgb[1], rgb[2], 255))
+            else:
+                raise ValueError("unsupported pixel size %d" % pixel_size)
+        rows.append(row)
+    return rows
+
+
 def decode_pict(data):
     """Decode a PICT to (width, height, rows of (r,g,b,a))."""
     if len(data) < 522:
@@ -57,7 +130,6 @@ def decode_pict(data):
     if width <= 0 or height <= 0:
         raise ValueError("PICT bounding box is invalid")
 
-    # Opcodes begin after the 512-byte header.
     off = 512
     end = len(data)
     while off + 2 <= end:
@@ -69,8 +141,8 @@ def decode_pict(data):
             if rowbytes & 0x8000:
                 raise ValueError("PICT PixMap variant is not yet supported")
             bounds = struct.unpack(">hhhh", data[off + 4:off + 12])
-            bw = bounds[3] - bounds[1]  # right - left
-            bh = bounds[2] - bounds[0]  # bottom - top
+            bw = bounds[3] - bounds[1]
+            bh = bounds[2] - bounds[0]
             packed = (op == 0x0098)
             body = data[off + 12:]
             if packed:
@@ -78,8 +150,10 @@ def decode_pict(data):
             else:
                 pixels = body[:rowbytes * bh]
             return bw, bh, _bits_to_rows(pixels, bw, bh, rowbytes)
-        if op == 0x009A:  # direct PixMap (colour) — follow-up
-            raise ValueError("PICT colour PixMap is not yet supported")
+        if op == 0x009A:  # direct PixMap (colour)
+            body = data[off + 2:]
+            rows = decode_pixmap(body)
+            return len(rows[0]), len(rows), rows
         # Unknown opcode: stop — the common cases come first.
         break
     raise ValueError("PICT has no decodable bitmap")

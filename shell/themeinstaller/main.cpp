@@ -18,6 +18,7 @@
 #include <QCryptographicHash>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QRegularExpression>
 #include <QSaveFile>
 #include <QTextStream>
 #include <cstdio>
@@ -98,7 +99,8 @@ static QString themeConfValue(const QString &name, const QString &key) {
 
 /* Write the appearance preset JSON that the Appearance panel's Themes list
  * shows, so the extracted theme appears there and applies its settings. */
-static QString writeAppearancePreset(const QString &name, QString *error) {
+static QString writeAppearancePreset(const QString &name, const QString &wallpaper,
+		const QString &pattern, const QString &alert, QString *error) {
 	const QString folder = appearanceThemesFolder();
 	if (!QDir().mkpath(folder)) {
 		*error = "Couldn't create the appearance Themes folder.";
@@ -115,7 +117,9 @@ static QString writeAppearancePreset(const QString &name, QString *error) {
 	};
 	put("accent", themeConfValue(name, "accent"));
 	put("highlight", themeConfValue(name, "highlight"));
-	put("pattern", themeConfValue(name, "pattern"));
+	put("pattern", pattern);
+	put("wallpaper", wallpaper);
+	put("alert-sound", alert);
 	put("theme-bundle", name);
 	QSaveFile output(path);
 	const QByteArray bytes = QJsonDocument(QJsonObject{
@@ -126,6 +130,37 @@ static QString writeAppearancePreset(const QString &name, QString *error) {
 	}
 	return "theme:" + QString::fromLatin1(QCryptographicHash::hash(
 		filename.toUtf8(), QCryptographicHash::Sha256).toHex().left(24));
+}
+
+/* Copy the decoded wallpapers, pattern tiles and sounds into the Appearance
+ * folders, and return the first of each by id ("" when none). */
+static void installThemeAssets(const QString &name, QString *wallpaper,
+		QString *pattern, QString *alert) {
+	const QString base = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + "/zacos9";
+	const struct { const char *sub; const char *dest; } folders[] = {
+		{ "wallpapers", "appearance/Wallpaper" },
+		{ "patterns", "appearance/Desktop Patterns" },
+		{ "sounds", "sounds" },
+	};
+	QString prefix = name;
+	prefix.replace(QRegularExpression("[^A-Za-z0-9_-]"), "_");
+	prefix = prefix.left(24);
+	for (const auto &f : folders) {
+		const QString src = outputDir(name) + "/" + f.sub;
+		const QString dest = base + "/" + f.dest;
+		QDir().mkpath(dest);
+		const QFileInfoList files = QDir(src).entryInfoList(QDir::Files, QDir::Name);
+		for (const QFileInfo &file : files) {
+			const QString id = prefix + "-" + file.completeBaseName();
+			QFile::copy(file.filePath(), dest + "/" + id + "." + file.suffix());
+		}
+		if (!files.isEmpty()) {
+			const QString id = prefix + "-" + files.first().completeBaseName();
+			if (f.sub == QStringLiteral("wallpapers")) *wallpaper = id;
+			else if (f.sub == QStringLiteral("patterns")) *pattern = id;
+			else *alert = id;
+		}
+	}
 }
 
 int main(int argc, char *argv[]) {
@@ -182,7 +217,9 @@ int main(int argc, char *argv[]) {
 		QMessageBox::critical(nullptr, "Theme Installer", error);
 		return 2;
 	}
-	const QString presetId = writeAppearancePreset(name, &error);
+	QString wallpaper, pattern, alert;
+	installThemeAssets(name, &wallpaper, &pattern, &alert);
+	const QString presetId = writeAppearancePreset(name, wallpaper, pattern, alert, &error);
 	if (presetId.isEmpty()) {
 		if (batch) {
 			fprintf(stderr, "zacos9-themeinstaller: %s\n", qPrintable(error));

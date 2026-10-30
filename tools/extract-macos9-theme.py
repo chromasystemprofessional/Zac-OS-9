@@ -24,6 +24,9 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import macicons
+import macpat
+import macpict
+import macsnd
 import pngwrite
 
 # Loose files are copied straight across.
@@ -176,7 +179,7 @@ def parse_clut(body):
     return colours
 
 
-def process_resource_fork(data, out, counts, cluts, icons):
+def process_resource_fork(data, out, counts, cluts, icons, assets):
 	for rtype, res_id, body in parse_resource_fork(data):
 		bucket = bucket_for(rtype)
 		if not bucket:
@@ -189,6 +192,36 @@ def process_resource_fork(data, out, counts, cluts, icons):
 				cluts.append((res_id, cols))
 		if rtype in (b"icl8", b"icl4", b"ICN#"):
 			icons.setdefault(rtype, []).append(body)
+		if rtype == b"PICT":
+			assets.setdefault("pict", []).append(body)
+		if rtype in (b"PAT ", b"PAT#"):
+			assets.setdefault("pat", []).append(body)
+		if rtype == b"snd ":
+			assets.setdefault("snd", []).append(body)
+
+
+def write_assets(assets, out):
+	"""Decode PICT/PAT/snd resources into wallpapers, patterns and sounds."""
+	# Wallpapers from PICT.
+	for i, body in enumerate(assets.get("pict", [])):
+		try:
+			w, h, rows = macpict.decode_pict(body)
+			pngwrite.write_png(os.path.join(out, "wallpapers", "picture-%d.png" % (i + 1)), w, h, rows)
+		except (ValueError, IndexError, struct.error):
+			continue
+	# Desktop pattern tiles from PAT.
+	for i, body in enumerate(assets.get("pat", [])):
+		try:
+			rows = macpat.decode_pat(body)
+			pngwrite.write_png(os.path.join(out, "patterns", "pattern-%d.png" % (i + 1)), 8, 8, rows)
+		except (ValueError, IndexError):
+			continue
+	# Alert sounds from snd.
+	for i, body in enumerate(assets.get("snd", [])):
+		try:
+			macsnd.snd_to_wav(body, os.path.join(out, "sounds", "sound-%d.wav" % (i + 1)))
+		except (ValueError, struct.error):
+			continue
 
 
 def write_theme_art(icons, cluts, out):
@@ -261,13 +294,14 @@ def main():
 	src = os.path.abspath(src)
 
 	out = os.path.abspath(args.output)
-	for sub in ("icons", "patterns", "sounds", "theme", "boot"):
+	for sub in ("icons", "patterns", "sounds", "theme", "boot", "wallpapers"):
 		os.makedirs(os.path.join(out, sub), exist_ok=True)
 
 	name = args.name or os.path.basename(src.rstrip(os.sep)) or "Mac OS 9 Theme"
 	counts = {"icons": 0, "patterns": 0, "sounds": 0, "theme": 0}
 	cluts = []
 	icons = {}
+	assets = {}
 
 	for root, _dirs, files in os.walk(src):
 		for fn in files:
@@ -280,13 +314,13 @@ def main():
 			if fn.startswith("._"):
 				fork = extract_apple_double(raw)
 				if fork:
-					process_resource_fork(fork, out, counts, cluts, icons)
+					process_resource_fork(fork, out, counts, cluts, icons, assets)
 					continue
 				# Not AppleDouble after all: fall through.
 
 			# A raw resource fork (not an AppleDouble) when the tail maps back.
 			if looks_like_resource_fork(raw) and not fn.startswith("._"):
-				process_resource_fork(raw, out, counts, cluts, icons)
+				process_resource_fork(raw, out, counts, cluts, icons, assets)
 				continue
 
 			# Loose asset files.
@@ -310,10 +344,12 @@ def main():
 			with open(full, "rb") as f:
 				raw = f.read()
 			if looks_like_resource_fork(raw):
-				process_resource_fork(raw, out, counts, cluts, icons)
+				process_resource_fork(raw, out, counts, cluts, icons, assets)
 
 	# Turn the theme's icon into the menu icon and boot art.
 	write_theme_art(icons, cluts, out)
+	# Decode wallpapers, patterns and sounds.
+	write_assets(assets, out)
 
 	if args.list_cluts:
 		for res_id, cols in cluts:

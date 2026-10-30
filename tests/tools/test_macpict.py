@@ -43,7 +43,33 @@ def test_packbitsrect():
     print("ok    packbitsrect")
 
 
+def test_pixmap_24bit():
+    # 2x1 24-bit direct pixmap.
+    body = bytearray()
+    body += struct.pack(">I", 0)  # baseAddr
+    body += struct.pack(">H", 0x8000 | 6)  # rowBytes, pixmap flag
+    body += struct.pack(">hhhh", 0, 0, 1, 2)  # bounds
+    body += struct.pack(">H", 0)  # pmVersion
+    body += struct.pack(">H", 0)  # packType (unpacked)
+    body += struct.pack(">I", 0)  # packSize
+    body += struct.pack(">II", 0, 0)  # hRes, vRes
+    body += struct.pack(">H", 0)  # pixelType (chunky)
+    body += struct.pack(">H", 24)  # pixelSize
+    body += struct.pack(">H", 3)  # cmpCount
+    body += struct.pack(">H", 8)  # cmpSize
+    body += struct.pack(">I", 0)  # planeBytes
+    body += struct.pack(">I", 0)  # pmTable
+    body += struct.pack(">I", 0)  # pmReserved
+    body += bytes((255, 0, 0, 0, 0, 255))  # two pixels: red, blue
+    rows = macpict.decode_pixmap(bytes(body))
+    assert len(rows) == 1 and len(rows[0]) == 2
+    assert rows[0][0] == (255, 0, 0, 255)
+    assert rows[0][1] == (0, 0, 255, 255)
+    print("ok    pixmap 24-bit")
+
+
 test_packbits()
 test_bitsrect()
 test_packbitsrect()
+test_pixmap_24bit()
 print("OK")
