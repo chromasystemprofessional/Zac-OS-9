@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include <cairo.h>
 
@@ -112,15 +113,23 @@ const uint32_t *logo_pixels_hq(void) {
 /* Load the active theme's menu-icon.png (20×15) if it has one. */
 const uint32_t *logo_pixels_themed(void) {
 	static uint32_t *cache = NULL;
-	static bool tried = false;
-	if (tried) {
-		return cache ? cache : logo16_data;
-	}
-	tried = true;
+	static char *last_path = NULL;
 	char path[4096];
 	if (!zac_theme_asset("menu-icon.png", path, sizeof(path))) {
+		/* No theme icon: drop any previous theme icon. */
+		free(cache);
+		cache = NULL;
+		free(last_path);
+		last_path = NULL;
 		return logo16_data;
 	}
+	if (cache && last_path && strcmp(last_path, path) == 0) {
+		return cache;
+	}
+	free(cache);
+	free(last_path);
+	cache = NULL;
+	last_path = strdup(path);
 	cairo_surface_t *s = cairo_image_surface_create_from_png(path);
 	if (cairo_surface_status(s) != CAIRO_STATUS_SUCCESS ||
 			cairo_image_surface_get_width(s) != PL_LOGO_W ||

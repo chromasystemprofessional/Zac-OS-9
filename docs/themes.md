@@ -31,6 +31,35 @@ applied. Presets are settings combinations, not arbitrary window/control skins.
 Full classic Mac appearance skin resources are explicitly reported as
 unsupported; no executable resources are loaded or run.
 
+## Mac OS 9 themes
+
+ZacOS never ships Apple's artwork, but the **Theme Installer**
+(`zacos9-themeinstaller`) builds a theme from your own Mac OS 9 install. It
+reads the Appearance theme's resource fork and produces a **theme bundle** in
+`~/.config/zacos9/themes/<name>`:
+
+- `theme.conf` — the accent, highlight, desktop pattern and the window-chrome
+  colours (`title-base`, `title-stripe-light`, `title-stripe-dark`,
+  `frame-light`, `frame-dark`, `frame-border`, `frame-face`), each an RRGGBB
+  hex value.
+- `menu-icon.png` — 20×15, replaces the Zac menu icon.
+- `boot/happy-zac-1x..6x.png` and `boot/zacos-logo-1x..6x.png` — replace the
+  boot and Welcome artwork.
+- `wallpapers/`, `patterns/` and `sounds/` — decoded desktop pictures, pattern
+  tiles and alert sounds, copied into the Appearance folders when the theme is
+  installed.
+
+The extractor (`tools/extract-macos9-theme.py`) decodes the classic icon,
+PICT, pattern and sound resources; `--list-cluts` prints the colour tables and
+`--auto-colours` (or `--accent`/`--highlight`/`--pattern`) set the chrome
+colours. Window geometry (title-bar height, close/zoom/collapse positions,
+margins) is never changed — only colours and artwork.
+
+To install: put your Mac OS 9 System Folder in `~/Classic` (Old Dog), pick the
+look in Mac OS 9's Appearance control panel, then run **Theme Installer** from
+the Zac menu. It writes a preset into Appearance > Themes and applies it. The
+menu icon, boot art and colours change at the next menu-bar rebuild and boot.
+
 ## Sound sets
 
 **Sound Sets** chooses None, the original ZacOS sounds, or a custom set.
