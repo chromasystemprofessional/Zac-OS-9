@@ -12,71 +12,56 @@ spec.loader.exec_module(tool)
 
 
 def build_resource_fork(resources):
-    """Build a minimal valid resource fork from [(type, id, body)].
+    """Build a valid resource fork from [(type, id, body)].
 
-    Format: 16-byte header (data_off=256, map_off, data_len, map_len),
-    then 256 bytes of padding (header area), then resource data (each body
-    prefixed by 4-byte length), then the resource map.
-    """
-    # Build resource data (each prefixed by 4-byte length)
+    Header (data_off, map_off, data_len, map_len), then the data section
+    (each resource prefixed by a 4-byte length), then the resource map whose
+    reference entries carry each resource's real data offset."""
+    data_offset = 256
     data = b""
+    offsets = []
     for rtype, res_id, body in resources:
+        offsets.append((rtype, res_id, len(data)))
         data += struct.pack(">I", len(body)) + body
 
-    # Type list
     from collections import OrderedDict
     type_counts = OrderedDict()
     for rtype, res_id, body in resources:
         type_counts.setdefault(rtype, 0)
         type_counts[rtype] += 1
 
-    type_list = struct.pack(">H", len(type_counts) - 1)
+    # Type list: num types, then per type: type(4), num-1(2), ref-list offset(2)
+    # (offset relative to the start of the type list).
     header_size = 2 + 8 * len(type_counts)
     cursor = header_size
-    ref_blobs = {}
+    entries = {}
+    type_list = struct.pack(">H", len(type_counts) - 1)
     for rtype, count in type_counts.items():
-        ref_off = cursor
-        type_list += struct.pack(">4sH H", rtype, count - 1, ref_off)
-        cursor += 2 + 12 * count  # count field + entries
+        entries[rtype] = cursor
+        type_list += struct.pack(">4sHH", rtype, count - 1, cursor)
+        cursor += 2 + 12 * count
+
+    # Reference lists.
     for rtype, count in type_counts.items():
         ref_list = struct.pack(">H", count - 1)
-        # Need resource IDs; use sequential indices
-        idx = 0
-        for r, rid, body in resources:
-            if r == rtype:
-                ref_list += struct.pack(">H", rid)  # res_id
-                ref_list += struct.pack(">H", 0xFFFF)  # no name
-                ref_list += bytes([0])  # attrs
-                # data offset (3 bytes, relative to data section start)
-                # We need to compute the offset. For simplicity, use 0.
-                ref_list += struct.pack(">I", 0)[1:]  # 3 bytes
-                ref_list += struct.pack(">I", 0)  # reserved
-                idx += 1
+        for rt, rid, off in offsets:
+            if rt != rtype:
+                continue
+            ref_list += struct.pack(">h", rid)
+            ref_list += struct.pack(">H", 0xFFFF)  # no name
+            ref_list += bytes([0])                 # attributes
+            ref_list += struct.pack(">I", off)[1:] # 3-byte data offset
+            ref_list += struct.pack(">I", 0)       # reserved
         type_list += ref_list
 
-    # Resource map
-    data_section_start = 256
-    data_section = b"\x00" * (256 - len(data) % 256) + data if len(data) < 256 else data
-    # Actually, let's just place data at offset 256
-    data_section = b"\x00" * 256 + data
-    map_offset = len(data_section)
     map_size = 28 + len(type_list)
-    map_header = struct.pack(">IIII", data_section_start, map_offset, len(data), map_size)
-    map_info = struct.pack(">I H H", 0, 0, 0)  # next map, file ref, attrs
     name_list_offset = 28 + len(type_list)
-    map_ = (map_header + map_info
-            + struct.pack(">HH", 28, name_list_offset)
-            + type_list)
+    map_header = struct.pack(">IIII", data_offset, data_offset + len(data), len(data), map_size)
+    map_info = struct.pack(">IHH", 0, 0, 0)       # next map, file ref, attrs
+    map_ = map_header + map_info + struct.pack(">HH", 28, name_list_offset) + type_list
 
-    # The data offsets in reference entries need to be correct.
-    # Let me recompute them properly.
-    # Actually, the sequential parsing in parse_resource_fork doesn't use
-    # the reference list offsets — it walks the data section sequentially.
-    # So the reference list offsets don't matter for our parser.
-    # But the data section must start at data_offset (256).
-
-    # full file: 16-byte header + 240 bytes padding + data + map
-    return map_header + b"\x00" * 240 + data + map_
+    return struct.pack(">IIII", data_offset, data_offset + len(data), len(data), map_size) \
+        + b"\x00" * (data_offset - 16) + data + map_
 
 
 def test_parse():
@@ -105,8 +90,10 @@ def test_end_to_end():
     assert os.path.isfile(os.path.join(out, "icons", "a.png"))
     assert any(fn.startswith("icns_") for fn in os.listdir(os.path.join(out, "icons"))), \
         "resource-fork icon extracted"
-    assert any(fn.startswith("thme_") for fn in os.listdir(os.path.join(out, "theme"))), \
-        "resource-fork theme extracted"
+    thme_files = [fn for fn in os.listdir(os.path.join(out, "theme")) if fn.startswith("thme_")]
+    assert thme_files, "resource-fork theme extracted"
+    with open(os.path.join(out, "theme", thme_files[0]), "rb") as f:
+        assert f.read() == b"thmedata", "theme body is the full resource"
     print("ok    end-to-end bundle build")
 
 

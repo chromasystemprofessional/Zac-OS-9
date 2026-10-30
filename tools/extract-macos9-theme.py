@@ -44,60 +44,101 @@ def parse_resource_fork(data):
 	"""Yield (type, id, bytes) for each resource in a raw resource fork.
 
 	The Mac OS 9 resource-fork format: a 16-byte header (data offset, map
-	offset, data length, map length), then resource data (each prefixed by a
-	4-byte length), then the resource map.  The map's type list gives the
-	types and counts; resources appear in the same order in the data section.
-	Returns a list of (type, id, body) tuples."""
-	items = []
+	offset, data length, map length), then the resource data section (each
+	resource prefixed by a 4-byte length), then the resource map. The map
+	names each resource's type, id and offset, so we read each body from its
+	offset; where a fork's map is missing or odd, we fall back to reading the
+	data section in order, matching the map's type counts. Returns a list of
+	(type, id, body) tuples."""
 	if len(data) < 16:
-		return items
+		return []
 	data_offset, map_offset, data_length, map_length = struct.unpack(">IIII", data[:16])
-	if not (0 < map_offset < len(data) and 0 < data_length and 0 < map_length):
-		# Fallback: some variants store the map offset at the end.
-		map_offset = struct.unpack(">I", data[-4:])[0]
-		if not (0 < map_offset + 28 <= len(data)):
-			return items
-		data_offset = 0
-		data_length = map_offset
-	if data_offset + data_length > len(data):
+
+	def from_map():
+		if not (0 < map_offset + 28 <= len(data) and data_offset + data_length <= len(data)):
+			return []
+		if map_offset + 28 > len(data):
+			return []
+		type_list_off, _name_list_off = struct.unpack(">HH", data[map_offset + 24:map_offset + 28])
+		tl = map_offset + type_list_off
+		if tl + 2 > len(data):
+			return []
+		items = []
+		num_types = struct.unpack(">H", data[tl:tl + 2])[0] + 1
+		pos = tl + 2
+		for _ in range(num_types):
+			if pos + 8 > len(data):
+				break
+			rtype = data[pos:pos + 4]
+			num_res = struct.unpack(">H", data[pos + 4:pos + 6])[0] + 1
+			ref_list_off = struct.unpack(">H", data[pos + 6:pos + 8])[0]
+			pos += 8
+			rl = tl + ref_list_off
+			if rl + 2 > len(data):
+				continue
+			rnum = struct.unpack(">H", data[rl:rl + 2])[0] + 1
+			rp = rl + 2
+			for _ in range(rnum):
+				if rp + 12 > len(data):
+					break
+				res_id = struct.unpack(">h", data[rp:rp + 2])[0]
+				abs_data_off = data_offset + int.from_bytes(data[rp + 5:rp + 8], "big")
+				rp += 12
+				if abs_data_off + 4 > len(data):
+					continue
+				length = struct.unpack(">I", data[abs_data_off:abs_data_off + 4])[0]
+				if length == 0 or length > 100000 or abs_data_off + 4 + length > len(data):
+					continue
+				items.append((rtype, res_id, data[abs_data_off + 4:abs_data_off + 4 + length]))
 		return items
-	# Parse type list: types and counts.
-	tl = map_offset + 28
-	if tl + 2 > len(data):
+
+	def sequential():
+		if not (0 < map_offset < len(data) and 0 < data_length and 0 < map_length):
+			map_offset2 = struct.unpack(">I", data[-4:])[0]
+			if not (0 < map_offset2 + 28 <= len(data)):
+				return []
+			data_offset2 = 0
+			data_length2 = map_offset2
+			tl = map_offset2 + 28
+		else:
+			data_offset2 = data_offset
+			data_length2 = data_length
+			tl = map_offset + 28
+		if tl + 2 > len(data):
+			return []
+		num_types = struct.unpack(">H", data[tl:tl + 2])[0] + 1
+		types = []
+		pos = tl + 2
+		for _ in range(num_types):
+			if pos + 8 > len(data):
+				break
+			rtype = data[pos:pos + 4]
+			num_res = struct.unpack(">H", data[pos + 4:pos + 6])[0] + 1
+			types.append((rtype, num_res))
+			pos += 8
+		items = []
+		data_pos = data_offset2
+		data_end = data_offset2 + data_length2
+		type_idx = 0
+		res_count_in_type = 0
+		while data_pos < data_end:
+			if data_pos + 4 > len(data):
+				break
+			length = struct.unpack(">I", data[data_pos:data_pos + 4])[0]
+			if length == 0 or length > 100000 or data_pos + 4 + length > len(data):
+				break
+			body = data[data_pos + 4:data_pos + 4 + length]
+			while type_idx < len(types) and res_count_in_type >= types[type_idx][1]:
+				type_idx += 1
+				res_count_in_type = 0
+			if type_idx < len(types):
+				items.append((types[type_idx][0], res_count_in_type, body))
+				res_count_in_type += 1
+			data_pos += 4 + length
 		return items
-	num_types = struct.unpack(">H", data[tl:tl + 2])[0] + 1
-	types = []
-	pos = tl + 2
-	for _ in range(num_types):
-		if pos + 8 > len(data):
-			break
-		rtype = data[pos:pos + 4]
-		num_res = struct.unpack(">H", data[pos + 4:pos + 6])[0] + 1
-		types.append((rtype, num_res))
-		pos += 8
-	# Walk the data section sequentially; match types by counts.
-	data_pos = data_offset
-	data_end = map_offset  # map follows the data
-	res_idx = 0
-	type_idx = 0
-	res_count_in_type = 0
-	while data_pos < data_end:
-		if data_pos + 4 > len(data):
-			break
-		length = struct.unpack(">I", data[data_pos:data_pos + 4])[0]
-		if length == 0 or length > 100000 or data_pos + 4 + length > len(data):
-			break
-		body = data[data_pos + 4:data_pos + 4 + length]
-		# Advance type pointer if needed.
-		while type_idx < len(types) and res_count_in_type >= types[type_idx][1]:
-			type_idx += 1
-			res_count_in_type = 0
-		if type_idx < len(types):
-			rtype = types[type_idx][0]
-			items.append((rtype, res_count_in_type, body))
-			res_count_in_type += 1
-		data_pos += 4 + length
-	return items
+
+	items = from_map()
+	return items if items else sequential()
 
 
 def extract_apple_double(data):
