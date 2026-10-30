@@ -79,10 +79,10 @@ int zac_theme_list(const char *root, char ***out_dirs) {
 	return i;
 }
 
-/* The active theme bundle's directory (from "appearance-theme"), or false. */
+/* The active theme bundle's directory (from "theme-bundle"), or false. */
 static bool active_theme_dir(char *out, size_t size) {
 	char id[256];
-	if (!pl_setting("appearance-theme", id, sizeof(id)) || !id[0]) {
+	if (!pl_setting("theme-bundle", id, sizeof(id)) || !id[0]) {
 		return false;
 	}
 	const char *home = getenv("HOME");

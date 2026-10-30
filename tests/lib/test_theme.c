@@ -81,7 +81,7 @@ int main(void) {
 	char confpath[256];
 	snprintf(confpath, sizeof(confpath), "%s/zacos9/desktop.conf", cfg);
 	FILE *cf = fopen(confpath, "w");
-	assert(cf); fputs("appearance-theme=Test\n", cf); fclose(cf);
+	assert(cf); fputs("theme-bundle=Test\n", cf); fclose(cf);
 	char themeconf[256];
 	snprintf(themeconf, sizeof(themeconf), "%s/zacos9/themes/Test/theme.conf", cfg);
 	FILE *tf = fopen(themeconf, "w");

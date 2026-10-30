@@ -15,6 +15,11 @@
 #include <QMessageBox>
 #include <QProcess>
 #include <QStandardPaths>
+#include <QCryptographicHash>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QSaveFile>
+#include <QTextStream>
 #include <cstdio>
 
 #include "programs.h"
@@ -44,7 +49,8 @@ static bool runExtractor(const QString &source, const QString &name, QString *er
 	}
 	QProcess process;
 	process.setProgram("python3");
-	process.setArguments({ tool, "--source", source, "--output", outputDir(name), "--name", name });
+	process.setArguments({ tool, "--source", source, "--output", outputDir(name), "--name", name,
+		"--auto-colours" });
 	process.start();
 	/* Qt/Wayland deadlocks on waitForFinished(): pump events until it exits. */
 	QEventLoop loop;
@@ -64,6 +70,62 @@ static bool runExtractor(const QString &source, const QString &name, QString *er
 		return false;
 	}
 	return true;
+}
+
+/* The Appearance control panel lists JSON presets from this folder. */
+static QString appearanceThemesFolder() {
+	return QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) +
+		"/zacos9/appearance/Themes";
+}
+
+/* Read a key=value from the extracted theme.conf ("" when unset). */
+static QString themeConfValue(const QString &name, const QString &key) {
+	QFile f(outputDir(name) + "/theme.conf");
+	if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) {
+		return QString();
+	}
+	QString value;
+	QTextStream in(&f);
+	QString line;
+	while (in.readLineInto(&line)) {
+		const int eq = line.indexOf('=');
+		if (eq > 0 && line.left(eq).trimmed() == key) {
+			value = line.mid(eq + 1).trimmed();
+		}
+	}
+	return value;
+}
+
+/* Write the appearance preset JSON that the Appearance panel's Themes list
+ * shows, so the extracted theme appears there and applies its settings. */
+static QString writeAppearancePreset(const QString &name, QString *error) {
+	const QString folder = appearanceThemesFolder();
+	if (!QDir().mkpath(folder)) {
+		*error = "Couldn't create the appearance Themes folder.";
+		return QString();
+	}
+	const QString filename = QString::fromLatin1(QCryptographicHash::hash(
+		name.toUtf8(), QCryptographicHash::Sha256).toHex().left(24)) + ".json";
+	const QString path = folder + "/" + filename;
+	QJsonObject settings;
+	auto put = [&](const char *key, const QString &value) {
+		if (!value.isEmpty()) {
+			settings.insert(key, value);
+		}
+	};
+	put("accent", themeConfValue(name, "accent"));
+	put("highlight", themeConfValue(name, "highlight"));
+	put("pattern", themeConfValue(name, "pattern"));
+	put("theme-bundle", name);
+	QSaveFile output(path);
+	const QByteArray bytes = QJsonDocument(QJsonObject{
+		{ "version", 1 }, { "name", name }, { "settings", settings } }).toJson();
+	if (!output.open(QIODevice::WriteOnly) || output.write(bytes) != bytes.size() || !output.commit()) {
+		*error = output.errorString();
+		return QString();
+	}
+	return "theme:" + QString::fromLatin1(QCryptographicHash::hash(
+		filename.toUtf8(), QCryptographicHash::Sha256).toHex().left(24));
 }
 
 int main(int argc, char *argv[]) {
@@ -120,7 +182,17 @@ int main(int argc, char *argv[]) {
 		QMessageBox::critical(nullptr, "Theme Installer", error);
 		return 2;
 	}
-	pl_setting_set("appearance-theme", name.toUtf8().constData());
+	const QString presetId = writeAppearancePreset(name, &error);
+	if (presetId.isEmpty()) {
+		if (batch) {
+			fprintf(stderr, "zacos9-themeinstaller: %s\n", qPrintable(error));
+			return 2;
+		}
+		QMessageBox::critical(nullptr, "Theme Installer", error);
+		return 2;
+	}
+	pl_setting_set("appearance-theme", presetId.toUtf8().constData());
+	pl_setting_set("theme-bundle", name.toUtf8().constData());
 	zac_theme_apply();
 	if (batch) {
 		printf("installed %s\n", qPrintable(outputDir(name)));

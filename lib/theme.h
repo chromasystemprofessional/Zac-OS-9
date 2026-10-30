@@ -29,10 +29,10 @@ void zac_theme_free(ZacTheme *theme);
  * returned array and each string. Returns count (0 if none). */
 int zac_theme_list(const char *root, char ***out_dirs);
 
-/* Resolve a theme-provided asset to an absolute path when the active
- * appearance theme ("appearance-theme" in desktop.conf) supplies it.
- * `relative` is the path inside the bundle (e.g. "boot/happy-zac-1x.png" or
- * "menu-icon.png"). Returns false when no active theme has that file. */
+/* Resolve a theme-provided asset to an absolute path when the active theme
+ * bundle ("theme-bundle" in desktop.conf) supplies it. `relative` is the
+ * path inside the bundle (e.g. "boot/happy-zac-1x.png" or "menu-icon.png").
+ * Returns false when no active theme has that file. */
 bool zac_theme_asset(const char *relative, char *out, size_t size);
 
 /* Apply the active theme bundle's appearance settings (accent, highlight,

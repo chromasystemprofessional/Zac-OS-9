@@ -243,6 +243,18 @@ def main():
 				write_unique(os.path.join(out, bucket), fn, raw)
 				counts[bucket] += 1
 
+	# Netatalk / AFP AppleDouble convention: resource forks live in a
+	# `.rsrc` directory, finder info in `.finf`, next to the data forks.
+	for root, _dirs, files in os.walk(src):
+		if os.path.basename(root) != ".rsrc":
+			continue
+		for fn in files:
+			full = os.path.join(root, fn)
+			with open(full, "rb") as f:
+				raw = f.read()
+			if looks_like_resource_fork(raw):
+				process_resource_fork(raw, out, counts, cluts)
+
 	if args.list_cluts:
 		for res_id, cols in cluts:
 			print("clut %d (%d colours):" % (res_id, len(cols)))

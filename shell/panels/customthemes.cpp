@@ -257,7 +257,7 @@ public:
 			}
 			const QJsonObject obj = QJsonDocument::fromJson(input.readAll()).object();
 			const QStringList keys{ "accent", "highlight", "pattern", "background", "wallpaper",
-				"wallpaper-mode", "alert-sound", "sound-theme" };
+				"wallpaper-mode", "alert-sound", "sound-theme", "theme-bundle" };
 			Theme preset{ "theme:" + QString::fromLatin1(QCryptographicHash::hash(
 				file.fileName().toUtf8(), QCryptographicHash::Sha256).toHex().left(24)),
 				obj.value("name").toString(), {} };
