@@ -11,7 +11,7 @@
 int main(void) {
 	char dir[] = "/tmp/zacthemeXXXXXX";
 	assert(mkdtemp(dir) != NULL);
-	char conf[4096];
+	char conf[8192];
 	snprintf(conf, sizeof(conf), "%s/theme.conf", dir);
 	FILE *f = fopen(conf, "w");
 	assert(f);
