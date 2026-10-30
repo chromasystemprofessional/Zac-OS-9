@@ -37,3 +37,8 @@ subdir('network')
 test('installed-files', find_program('python3'),
   args: [files('tests/baseline/test_installed_files.py'), meson.project_build_root(),
     files('tests/baseline/installed-files.txt')])
+
+# The Mac OS 9 theme extractor (theming step 3).
+test('theme-extractor', find_program('python3'),
+  args: [files('tests/tools/test_extract_macos9.py'),
+    meson.project_source_root() / 'tools' / 'extract-macos9-theme.py'])
