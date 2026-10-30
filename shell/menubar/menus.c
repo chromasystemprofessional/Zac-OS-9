@@ -443,7 +443,7 @@ void menus_rebuild(struct mb_bar *bar, int screen_w) {
 	struct mb_menu *logo = new_menu(bar->left, &bar->n_left, NULL);
 	_Static_assert(PL_LOGO_W == MBAR_ICON_W && PL_LOGO_H == MBAR_ICON_H,
 		"the logo fills the menu bar's icon slot");
-	logo->icon = logo_pixels();
+	logo->icon = logo_pixels_themed();
 	launch_fill_logo_menu(logo, apps, n_apps);
 	if (finder_front) {
 		add_finder_menus(bar->left, &bar->n_left);

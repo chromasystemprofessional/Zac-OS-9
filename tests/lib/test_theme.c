@@ -9,9 +9,10 @@
 #include <sys/types.h>
 
 int main(void) {
-	char dir[] = "/tmp/zacthemeXXXXXX";
+	char dir[64];
+	strcpy(dir, "/tmp/zacthemeXXXXXX");
 	assert(mkdtemp(dir) != NULL);
-	char conf[4096];
+	char conf[128];
 	snprintf(conf, sizeof(conf), "%s/theme.conf", dir);
 	FILE *f = fopen(conf, "w");
 	assert(f);
@@ -26,7 +27,8 @@ int main(void) {
 	assert(t.name == NULL && t.directory == NULL);
 
 	/* Missing theme.conf: still loads with a default name. */
-	char dir2[] = "/tmp/zacthemeXXXXXX";
+	char dir2[64];
+	strcpy(dir2, "/tmp/zacthemeXXXXXX");
 	assert(mkdtemp(dir2) != NULL);
 	ZacTheme t2;
 	assert(zac_theme_load(&t2, dir2) == 0);
@@ -34,12 +36,13 @@ int main(void) {
 	zac_theme_free(&t2);
 
 	/* zac_theme_list */
-	char root[] = "/tmp/zacthemesXXXXXX";
+	char root[64];
+	strcpy(root, "/tmp/zacthemesXXXXXX");
 	assert(mkdtemp(root) != NULL);
-	char sub[4096];
+	char sub[128];
 	snprintf(sub, sizeof(sub), "%s/Alpha", root);
 	mkdir(sub, 0755);
-	snprintf(conf, sizeof(conf), "%s/theme.conf", sub);
+	snprintf(conf, sizeof(conf), "%s/Alpha/theme.conf", root);
 	f = fopen(conf, "w");
 	assert(f); fputs("name=Alpha\n", f); fclose(f);
 	char **dirs = NULL;
@@ -49,10 +52,47 @@ int main(void) {
 	free(dirs[0]);
 	free(dirs);
 	/* cleanup */
-	snprintf(conf, sizeof(conf), "%s/theme.conf", sub);
+	snprintf(conf, sizeof(conf), "%s/Alpha/theme.conf", root);
 	unlink(conf);
 	rmdir(sub);
 	rmdir(root);
+
+	/* zac_theme_asset: resolve from the active appearance theme. */
+	char cfg[64];
+	strcpy(cfg, "/tmp/zaccfgXXXXXX");
+	assert(mkdtemp(cfg) != NULL);
+	setenv("XDG_CONFIG_HOME", cfg, 1);
+	setenv("HOME", cfg, 1);
+	char themeroot[256];
+	snprintf(themeroot, sizeof(themeroot), "%s/zacos9/themes", cfg);
+	char bundle[256];
+	snprintf(bundle, sizeof(bundle), "%s/zacos9/themes/Test", cfg);
+	/* mkdir -p */
+	{
+		char tmp[256];
+		snprintf(tmp, sizeof(tmp), "%s", bundle);
+		for (char *p = tmp + 1; *p; p++) if (*p == '/') { *p = '\0'; mkdir(tmp, 0755); *p = '/'; }
+		mkdir(tmp, 0755);
+	}
+	char iconpath[256];
+	snprintf(iconpath, sizeof(iconpath), "%s/zacos9/themes/Test/menu-icon.png", cfg);
+	FILE *ic = fopen(iconpath, "w");
+	assert(ic); fputs("png", ic); fclose(ic);
+	char confpath[256];
+	snprintf(confpath, sizeof(confpath), "%s/zacos9/desktop.conf", cfg);
+	FILE *cf = fopen(confpath, "w");
+	assert(cf); fputs("appearance-theme=Test\n", cf); fclose(cf);
+
+	char resolved[256];
+	assert(zac_theme_asset("menu-icon.png", resolved, sizeof(resolved)) == true);
+	assert(strstr(resolved, "/Test/menu-icon.png") != NULL);
+	assert(zac_theme_asset("boot/missing.png", resolved, sizeof(resolved)) == false);
+
+	unlink(iconpath);
+	unlink(confpath);
+	rmdir(bundle);
+	rmdir(themeroot);
+	rmdir(cfg);
 
 	rmdir(dir);
 	rmdir(dir2);

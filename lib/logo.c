@@ -7,9 +7,14 @@
  */
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+#include <cairo.h>
 
 #include "draw.h"
 #include "logo.h"
+#include "theme.h"
 
 static const uint32_t logo16_data[PL_LOGO_W * PL_LOGO_H] = {
     0x00000000, 0x00000000, 0x00000000, 0x01000000, 0x02007F7F, 0x02007F7F, 0x01000000, 0x02000000, 0x04000000, 0x00010100, 0x00020100, 0x00000000, 0x0200007F, 0x4E3E3710, 0xAA332704, 0xC6694A01, 0x93A16405, 0x19FFAD1E, 0x00000000, 0x027F7F00,
@@ -102,4 +107,49 @@ const uint32_t *logo_pixels(void) {
 
 const uint32_t *logo_pixels_hq(void) {
     return logo64_data;
+}
+
+/* Load the active theme's menu-icon.png (20×15) if it has one. */
+const uint32_t *logo_pixels_themed(void) {
+	static uint32_t *cache = NULL;
+	static bool tried = false;
+	if (tried) {
+		return cache ? cache : logo16_data;
+	}
+	tried = true;
+	char path[4096];
+	if (!zac_theme_asset("menu-icon.png", path, sizeof(path))) {
+		return logo16_data;
+	}
+	cairo_surface_t *s = cairo_image_surface_create_from_png(path);
+	if (cairo_surface_status(s) != CAIRO_STATUS_SUCCESS ||
+			cairo_image_surface_get_width(s) != PL_LOGO_W ||
+			cairo_image_surface_get_height(s) != PL_LOGO_H) {
+		cairo_surface_destroy(s);
+		return logo16_data;
+	}
+	cairo_surface_flush(s);
+	const uint32_t *in = (const uint32_t *)cairo_image_surface_get_data(s);
+	const int stride = cairo_image_surface_get_stride(s) / 4;
+	const cairo_format_t format = cairo_image_surface_get_format(s);
+	cache = malloc(sizeof(uint32_t) * PL_LOGO_W * PL_LOGO_H);
+	for (int y = 0; y < PL_LOGO_H; y++) {
+		for (int x = 0; x < PL_LOGO_W; x++) {
+			uint32_t v = in[y * stride + x];
+			if (format != CAIRO_FORMAT_ARGB32) {
+				v |= 0xFF000000u;
+			}
+			const uint32_t a = v >> 24;
+			if (a && a < 255) {
+				const uint32_t r = (((v >> 16) & 0xFF) * 255 + a / 2) / a;
+				const uint32_t g = (((v >> 8) & 0xFF) * 255 + a / 2) / a;
+				const uint32_t b = ((v & 0xFF) * 255 + a / 2) / a;
+				v = a << 24 | (r > 255 ? 255 : r) << 16 | (g > 255 ? 255 : g) << 8 |
+					(b > 255 ? 255 : b);
+			}
+			cache[y * PL_LOGO_W + x] = v;
+		}
+	}
+	cairo_surface_destroy(s);
+	return cache;
 }

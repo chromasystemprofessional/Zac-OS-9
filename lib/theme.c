@@ -5,6 +5,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <unistd.h>
+
+#include "settings.h"
 
 int zac_theme_load(ZacTheme *theme, const char *directory) {
 	if (!theme || !directory) return -1;
@@ -73,4 +76,36 @@ int zac_theme_list(const char *root, char ***out_dirs) {
 	closedir(d);
 	*out_dirs = dirs;
 	return i;
+}
+
+bool zac_theme_asset(const char *relative, char *out, size_t size) {
+	if (!relative || !out || size == 0) return false;
+	char id[256];
+	if (!pl_setting("appearance-theme", id, sizeof(id)) || !id[0]) {
+		return false;
+	}
+	const char *home = getenv("HOME");
+	const char *cfg = getenv("XDG_CONFIG_HOME");
+	char base[4096];
+	const char *dirs[2];
+	int n = 0;
+	if (cfg && *cfg) {
+		snprintf(base, sizeof(base), "%s/zacos9/themes/%s", cfg, id);
+		dirs[n++] = base;
+	} else if (home && *home) {
+		snprintf(base, sizeof(base), "%s/.config/zacos9/themes/%s", home, id);
+		dirs[n++] = base;
+	}
+	char sysbase[4096];
+	snprintf(sysbase, sizeof(sysbase), "%s/themes/%s", pl_data_dir(), id);
+	dirs[n++] = sysbase;
+	for (int i = 0; i < n; i++) {
+		char path[4096];
+		snprintf(path, sizeof(path), "%s/%s", dirs[i], relative);
+		if (access(path, R_OK) == 0) {
+			snprintf(out, size, "%s", path);
+			return true;
+		}
+	}
+	return false;
 }

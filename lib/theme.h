@@ -6,6 +6,7 @@
  * the bundle format and a reader; no theme ships yet.
  */
 
+#include <stdbool.h>
 #include <stddef.h>
 
 typedef struct {
@@ -22,3 +23,9 @@ void zac_theme_free(ZacTheme *theme);
 /* List theme bundle directories under `root` (one level). Caller frees the
  * returned array and each string. Returns count (0 if none). */
 int zac_theme_list(const char *root, char ***out_dirs);
+
+/* Resolve a theme-provided asset to an absolute path when the active
+ * appearance theme ("appearance-theme" in desktop.conf) supplies it.
+ * `relative` is the path inside the bundle (e.g. "boot/happy-zac-1x.png" or
+ * "menu-icon.png"). Returns false when no active theme has that file. */
+bool zac_theme_asset(const char *relative, char *out, size_t size);
