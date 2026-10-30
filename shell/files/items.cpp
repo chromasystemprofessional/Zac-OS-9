@@ -5,11 +5,13 @@
 
 #include <QDir>
 #include <QBuffer>
+#include <QCryptographicHash>
 #include <QFileInfo>
 #include <QImage>
 #include <QImageReader>
 #include <QMimeDatabase>
 #include <QPainter>
+#include <QSaveFile>
 #include <QStandardPaths>
 #include <QFile>
 #include <QSet>
@@ -467,18 +469,12 @@ bool writeLabel(const QString &path, int label) {
 	return lsetxattr(name.constData(), LABEL_ATTR, value.constData(), value.size(), 0) == 0;
 }
 
-QImage customIconImage(const QString &path) {
-	const QByteArray name = QFile::encodeName(path);
-	const ssize_t size = lgetxattr(name.constData(), CUSTOM_ICON_ATTR, nullptr, 0);
-	if (size <= 0 || size > CUSTOM_ICON_MAX) {
+static QImage decodeCustomIconPng(const QByteArray &encoded) {
+	if (encoded.isEmpty() || encoded.size() > CUSTOM_ICON_MAX) {
 		return {};
 	}
-	QByteArray encoded(static_cast<int>(size), Qt::Uninitialized);
-	if (lgetxattr(name.constData(), CUSTOM_ICON_ATTR, encoded.data(),
-			static_cast<size_t>(encoded.size())) != size) {
-		return {};
-	}
-	QBuffer buffer(&encoded);
+	QBuffer buffer;
+	buffer.setData(encoded);
 	if (!buffer.open(QIODevice::ReadOnly)) {
 		return {};
 	}
@@ -491,6 +487,112 @@ QImage customIconImage(const QString &path) {
 		return {};
 	}
 	return image.convertToFormat(QImage::Format_ARGB32);
+}
+
+/* A stable key for an item whose custom icon cannot live in a user.*
+ * extended attribute on the file itself (symbolic links, which the Linux
+ * VFS forbids user.* xattrs on; virtual Macintosh-view items; and system
+ * .desktop entries owned by root). An application in Applications and its
+ * .desktop file share the same key so changing either changes both; an
+ * alias has its own key so it can be given an icon of its own. */
+static QString customIconKey(const QString &path) {
+	if (vfsIsVirtual(path)) {
+		if (const VNode *node = vfsNode(path);
+				node && node->actionId.isEmpty() && !node->appId.isEmpty()) {
+			return QStringLiteral("app:") + node->appId;
+		}
+		return QStringLiteral("vfs:") + path;
+	}
+	const QFileInfo info(path);
+	if (info.isSymLink()) {
+		return QStringLiteral("link:") + info.absoluteFilePath();
+	}
+	const QString canonical = info.canonicalFilePath();
+	const QString resolved = canonical.isEmpty() ? info.absoluteFilePath() : canonical;
+	if (resolved.endsWith(QLatin1String(".desktop"), Qt::CaseInsensitive)) {
+		if (const AppEntry *app = appByFile(resolved)) {
+			return QStringLiteral("app:") + app->id;
+		}
+		return QStringLiteral("app:") + QFileInfo(resolved).fileName();
+	}
+	return QStringLiteral("file:") + resolved;
+}
+
+static QString customIconStorePath(const QString &key) {
+	const QByteArray hash = QCryptographicHash::hash(key.toUtf8(),
+		QCryptographicHash::Sha256).toHex();
+	return QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) +
+		"/zacos9/custom-icons/" + QString::fromLatin1(hash) + ".png";
+}
+
+static QImage directCustomIconImage(const QString &path) {
+	if (!vfsIsVirtual(path) && !QFileInfo(path).isSymLink()) {
+		const QByteArray name = QFile::encodeName(path);
+		const ssize_t size = lgetxattr(name.constData(), CUSTOM_ICON_ATTR, nullptr, 0);
+		if (size > 0 && size <= CUSTOM_ICON_MAX) {
+			QByteArray encoded(static_cast<int>(size), Qt::Uninitialized);
+			if (lgetxattr(name.constData(), CUSTOM_ICON_ATTR, encoded.data(),
+					static_cast<size_t>(encoded.size())) == size) {
+				const QImage img = decodeCustomIconPng(encoded);
+				if (!img.isNull()) {
+					return img;
+				}
+			}
+		}
+	}
+	const QString store = customIconStorePath(customIconKey(path));
+	QFile f(store);
+	if (f.exists() && f.size() > 0 && f.size() <= CUSTOM_ICON_MAX && f.open(QIODevice::ReadOnly)) {
+		return decodeCustomIconPng(f.readAll());
+	}
+	return {};
+}
+
+QImage customIconImage(const QString &path) {
+	const QImage direct = directCustomIconImage(path);
+	if (!direct.isNull()) {
+		return direct;
+	}
+	/* Resolve aliases to their target. */
+	const QFileInfo info(path);
+	QString target = path;
+	if (info.isSymLink()) {
+		QString virtualTarget;
+		if (aliasVirtualTarget(path, &virtualTarget)) {
+			target = virtualTarget;
+		} else {
+			const QString canonical = info.canonicalFilePath();
+			if (!canonical.isEmpty() && canonical != info.absoluteFilePath()) {
+				target = canonical;
+			}
+		}
+	}
+	/* An application's own icon (ZacOS's pieces and installed apps) is
+	 * shown for the app and any alias to it, the way Mac OS showed an
+	 * application's icon for its documents. */
+	const QString resolved = target.endsWith(QLatin1String(".desktop"), Qt::CaseInsensitive)
+		? target : QString();
+	if (!resolved.isEmpty()) {
+		if (const AppEntry *app = appByFile(resolved)) {
+			if (!app->icon32.empty()) {
+				QImage icon(PL_ICON_LARGE, PL_ICON_LARGE, QImage::Format_ARGB32);
+				icon.fill(Qt::transparent);
+				for (int y = 0; y < PL_ICON_LARGE; y++) {
+					memcpy(icon.scanLine(y), app->icon32.data() + y * PL_ICON_LARGE,
+						PL_ICON_LARGE * sizeof(uint32_t));
+				}
+				return icon;
+			}
+		}
+	}
+	/* An alias without a custom icon of its own inherits its original's. */
+	if (target != path) {
+		const QImage inherited = directCustomIconImage(target);
+		if (!inherited.isNull()) {
+			return inherited;
+		}
+	}
+	return {};
 }
 
 bool writeCustomIconImage(const QString &path, const QImage &source) {
@@ -506,6 +608,7 @@ bool writeCustomIconImage(const QString &path, const QImage &source) {
 	QPainter painter(&image);
 	painter.drawImage((PL_ICON_LARGE - scaled.width()) / 2,
 		(PL_ICON_LARGE - scaled.height()) / 2, scaled);
+	painter.end();
 	QByteArray encoded;
 	QBuffer buffer(&encoded);
 	if (!buffer.open(QIODevice::WriteOnly) || !image.save(&buffer, "PNG") ||
@@ -513,14 +616,42 @@ bool writeCustomIconImage(const QString &path, const QImage &source) {
 		errno = EFBIG;
 		return false;
 	}
-	const QByteArray name = QFile::encodeName(path);
-	return lsetxattr(name.constData(), CUSTOM_ICON_ATTR, encoded.constData(),
-		static_cast<size_t>(encoded.size()), 0) == 0;
+	const QFileInfo info(path);
+	if (!vfsIsVirtual(path) && !info.isSymLink()) {
+		const QByteArray name = QFile::encodeName(path);
+		if (lsetxattr(name.constData(), CUSTOM_ICON_ATTR, encoded.constData(),
+				static_cast<size_t>(encoded.size()), 0) == 0) {
+			QFile::remove(customIconStorePath(customIconKey(path)));
+			return true;
+		}
+		if (!info.exists() || (errno != EACCES && errno != EPERM && errno != EROFS &&
+				errno != ENOTSUP && errno != EOPNOTSUPP)) {
+			return false;
+		}
+	}
+	const QString store = customIconStorePath(customIconKey(path));
+	if (!QDir().mkpath(QFileInfo(store).absolutePath())) {
+		return false;
+	}
+	QSaveFile f(store);
+	return f.open(QIODevice::WriteOnly) && f.write(encoded) == encoded.size() && f.commit();
 }
 
 bool clearCustomIconImage(const QString &path) {
-	const QByteArray name = QFile::encodeName(path);
-	return lremovexattr(name.constData(), CUSTOM_ICON_ATTR) == 0 || errno == ENODATA;
+	bool ok = true;
+	if (!vfsIsVirtual(path) && !QFileInfo(path).isSymLink()) {
+		const QByteArray name = QFile::encodeName(path);
+		if (lremovexattr(name.constData(), CUSTOM_ICON_ATTR) != 0 && errno != ENODATA &&
+				errno != EACCES && errno != EPERM && errno != EROFS &&
+				errno != ENOTSUP && errno != EOPNOTSUPP) {
+			ok = false;
+		}
+	}
+	const QString store = customIconStorePath(customIconKey(path));
+	if (QFile::exists(store) && !QFile::remove(store)) {
+		ok = false;
+	}
+	return ok;
 }
 
 /* Folders a classic Mac makes on any file server it writes to, and hides
@@ -620,6 +751,27 @@ std::unique_ptr<Item> makeItem(const QFileInfo &info) {
 				if (const AppEntry *app = appById(node->appId)) {
 					item->customIcon32 = app->icon32;
 					item->customIcon16 = app->icon16;
+				}
+			}
+		}
+	} else if (item->isAlias) {
+		/* An alias of an ordinary file: take the target's custom icon,
+		 * so Get Info and the Sniffer show what the original shows. */
+		const QString resolved = info.canonicalFilePath();
+		if (!resolved.isEmpty() && resolved != item->path && item->customIcon32.empty()) {
+			const QImage inherited = customIconImage(resolved);
+			if (!inherited.isNull()) {
+				const QImage small = inherited.scaled(PL_ICON_SMALL, PL_ICON_SMALL,
+					Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+				item->customIcon32.resize(PL_ICON_LARGE * PL_ICON_LARGE);
+				item->customIcon16.resize(PL_ICON_SMALL * PL_ICON_SMALL);
+				for (int y = 0; y < PL_ICON_LARGE; y++) {
+					memcpy(item->customIcon32.data() + y * PL_ICON_LARGE, inherited.constScanLine(y),
+						PL_ICON_LARGE * sizeof(uint32_t));
+				}
+				for (int y = 0; y < PL_ICON_SMALL; y++) {
+					memcpy(item->customIcon16.data() + y * PL_ICON_SMALL, small.constScanLine(y),
+						PL_ICON_SMALL * sizeof(uint32_t));
 				}
 			}
 		}
