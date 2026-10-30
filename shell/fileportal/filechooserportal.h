@@ -20,6 +20,7 @@ struct FileChooserLocation {
 	QStringList realRoots;
 	bool folderAlias = false;
 	QString error = {};
+	bool file = false;
 };
 
 QList<FileChooserLocation> fileChooserLocations();

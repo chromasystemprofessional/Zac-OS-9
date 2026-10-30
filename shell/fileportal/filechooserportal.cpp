@@ -67,6 +67,8 @@ namespace {
  * while waiting stops waiting at once. */
 bool g_warming = false;
 
+QHash<QString, QString> g_backedDirs;
+
 void whenReady(QObject *context, std::function<bool()> abandoned, std::function<void()> work) {
 	QTimer::singleShot(g_warming ? 50 : 0, context, [context, abandoned, work]() {
 		if (g_warming && !abandoned()) {
@@ -115,6 +117,18 @@ QString droppedPath(const QMimeData *mime) {
 	const QList<QUrl> urls = mime ? mime->urls() : QList<QUrl>{};
 	return urls.size() == 1 && urls[0].isLocalFile() && QFileInfo::exists(urls[0].toLocalFile()) ?
 		QDir::cleanPath(urls[0].toLocalFile()) : QString();
+}
+
+static bool fileChooserPathHasIntermediateSymlink(const QString &path) {
+	QStringList parts = path.split(QLatin1Char('/'), Qt::SkipEmptyParts);
+	QString current;
+	for (int i = 0; i + 1 < parts.size(); ++i) {
+		current += QLatin1Char('/') + parts.at(i);
+		if (QFileInfo(current).isSymLink()) {
+			return true;
+		}
+	}
+	return false;
 }
 
 class DriveFileDialog : public QFileDialog {
@@ -179,9 +193,23 @@ public:
 			}
 		}
 		connect(this, &QFileDialog::directoryEntered, this, [this](const QString &path) {
-			if (!fileChooserPathWithinDisk(path, m_root, m_realRoots, true)) {
+			QString targetPath = path;
+			if (fileChooserPathHasIntermediateSymlink(path)) {
+				const QString real = fileChooserRealPath(path);
+				if (!real.isEmpty() && real != path &&
+						fileChooserPathWithinDisk(real, m_root, m_realRoots, true)) {
+					targetPath = real;
+				}
+			}
+			if (!fileChooserPathWithinDisk(targetPath, m_root, m_realRoots, true)) {
 				setDirectory(m_root);
 				m_error->setText("Choose a folder inside this location. Cancel to choose another location.");
+				updateLocation();
+				return;
+			}
+			if (targetPath != path) {
+				setDirectory(targetPath);
+				return;
 			}
 			updateLocation();
 		});
@@ -325,12 +353,17 @@ QImage fileChooserDriveIcon(bool usb, bool selected) {
 namespace {
 
 /* Pixel art is scaled whole-number with nearest-neighbour, as on the desktop. */
-QIcon driveIcon(bool usb, bool folderAlias) {
+QIcon driveIcon(bool usb, bool folderAlias, bool file = false) {
 	QIcon icon;
 	for (int scale = 1; scale <= 3; scale++) {
 		for (bool selected : { false, true }) {
 			QImage image;
-			if (folderAlias) {
+			if (file) {
+				Pixels document(PL_ICON_LARGE, PL_ICON_LARGE);
+				pl_icon_paint_label(&document.c, 0, 0, PL_ICON_DOCUMENT, PL_ICON_LARGE,
+					selected, pl_labels[0].color);
+				image = document.img;
+			} else if (folderAlias) {
 				Pixels folder(PL_ICON_LARGE, PL_ICON_LARGE);
 				pl_icon_paint_label(&folder.c, 0, 0, PL_ICON_FOLDER, PL_ICON_LARGE,
 					selected, pl_labels[0].color);
@@ -364,7 +397,7 @@ public:
 		m_drives = fileChooserLocations();
 		for (int i = 0; i < m_drives.size(); i++) {
 			auto *item = new QListWidgetItem(
-				driveIcon(m_drives[i].usb, m_drives[i].folderAlias), m_drives[i].name, m_locations);
+				driveIcon(m_drives[i].usb, m_drives[i].folderAlias, m_drives[i].file), m_drives[i].name, m_locations);
 			if (m_drives[i].folderAlias) {
 				QFont font = item->font();
 				font.setItalic(true);
@@ -402,6 +435,11 @@ public:
 protected:
 	void accept() override {
 		FileChooserLocation location = selectedDrive();
+		if (location.file) {
+			m_drives[m_locations->currentItem()->data(Qt::UserRole).toInt()] = location;
+			QDialog::accept();
+			return;
+		}
 		if (location.folderAlias) {
 			const AliasResolution resolved = aliasResolve(location.path);
 			if (!resolved.error.isEmpty() ||
@@ -527,6 +565,11 @@ private:
 				}
 				if (start.path.isEmpty()) {
 					return {};
+				}
+				if (start.file) {
+					fileChooserRememberFolder(appId, fileChooserRealPath(start.path));
+					fileChooserRememberRecentFolder(fileChooserRealPath(start.path));
+					return { start.path };
 				}
 			}
 			DriveFileDialog dialog(parent, title, start, !folder.isEmpty());
@@ -799,6 +842,11 @@ private:
 } // namespace
 
 static QString canonicalTarget(const QString &path) {
+	for (const QString &part : path.split(QLatin1Char('/'))) {
+		if (part == QStringLiteral("..")) {
+			return QString();
+		}
+	}
 	const QFileInfo info(path);
 	QString target = info.canonicalFilePath();
 	if (target.isEmpty() && !info.exists() && !info.isSymLink()) {
@@ -806,6 +854,28 @@ static QString canonicalTarget(const QString &path) {
 		if (!parent.isEmpty()) {
 			target = QDir(parent).filePath(info.fileName());
 		}
+	}
+	if (target.isEmpty()) {
+		target = QDir::cleanPath(QFileInfo(path).absoluteFilePath());
+	}
+	QString bestKey;
+	for (auto it = g_backedDirs.cbegin(); it != g_backedDirs.cend(); ++it) {
+		if (target == it.key() || target.startsWith(it.key() + QLatin1Char('/'))) {
+			if (it.key().size() > bestKey.size()) {
+				bestKey = it.key();
+			}
+		}
+	}
+	if (!bestKey.isEmpty()) {
+		QString mapped = g_backedDirs.value(bestKey) + target.mid(bestKey.size());
+		const QFileInfo mappedInfo(mapped);
+		if (mappedInfo.exists() || mappedInfo.isSymLink()) {
+			const QString canonical = mappedInfo.canonicalFilePath();
+			if (!canonical.isEmpty()) {
+				mapped = canonical;
+			}
+		}
+		target = mapped;
 	}
 	return target;
 }
@@ -995,6 +1065,26 @@ void fileChooserRememberFolder(const QString &appId, const QString &folder) {
 	}
 }
 
+/* Make sure a backed folder contains links for entries created after the
+ * chooser tree was built (e.g. a Documents folder made on first use). */
+static void populateBackedDir(const QString &virtualDir, const QString &realDir) {
+	QFile::setPermissions(virtualDir, QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
+	const QDir real(realDir);
+	for (const QFileInfo &child : real.entryInfoList(
+			QDir::AllEntries | QDir::Hidden | QDir::System | QDir::NoDotAndDotDot)) {
+		const QString childName = child.fileName();
+		if (childName.isEmpty() || childName == "." || childName == "..") {
+			continue;
+		}
+		const QString childEntry = QDir(virtualDir).filePath(childName);
+		if (QFileInfo(childEntry).exists() || QFileInfo(childEntry).isSymLink()) {
+			continue;
+		}
+		QFile::link(child.absoluteFilePath(), childEntry);
+	}
+	QFile::setPermissions(virtualDir, QFile::ReadOwner | QFile::ExeOwner);
+}
+
 /* The startup disk's link that reaches deepest toward `real`. */
 static void findLink(const QString &dir, const QString &real, int depth, QString *best,
 		qsizetype *bestLength) {
@@ -1003,14 +1093,21 @@ static void findLink(const QString &dir, const QString &real, int depth, QString
 	}
 	for (const QFileInfo &entry : QDir(dir).entryInfoList(
 			QDir::AllEntries | QDir::Hidden | QDir::System | QDir::NoDotAndDotDot)) {
-		if (entry.isSymLink()) {
-			const QString target = entry.canonicalFilePath();
+		QString target;
+		if (g_backedDirs.contains(entry.absoluteFilePath())) {
+			populateBackedDir(entry.absoluteFilePath(),
+				g_backedDirs.value(entry.absoluteFilePath()));
+			target = g_backedDirs.value(entry.absoluteFilePath());
+		} else if (entry.isSymLink()) {
+			target = entry.canonicalFilePath();
+		}
+		if (!target.isEmpty()) {
 			if (under(real, target) && target.size() > *bestLength) {
 				*bestLength = target.size();
 				*best = QDir::cleanPath(QDir(entry.absoluteFilePath()).filePath(
 					QDir(target).relativeFilePath(real)));
 			}
-		} else if (entry.isDir()) {
+		} else if (entry.isDir() && !g_backedDirs.contains(entry.absoluteFilePath())) {
 			findLink(entry.absoluteFilePath(), real, depth + 1, best, bestLength);
 		}
 	}
@@ -1117,10 +1214,30 @@ static void addStartupDiskItems(const QString &virtualPath, const QString &folde
 		const QString entry = QDir(folder).filePath(name);
 		const bool application = node->kind == VKind::Launcher && !node->appId.isEmpty() &&
 			node->actionId.isEmpty();
-		if (node->kind == VKind::Backed || node->kind == VKind::Fonts || application) {
+		if (application) {
 			const QString real = QFileInfo(vfsRealCounterpart(item->path)).canonicalFilePath();
 			if (!real.isEmpty() && real != "/" && QFile::link(real, entry)) {
 				*realRoots << real;
+			}
+		} else if (node->kind == VKind::Backed || node->kind == VKind::Fonts) {
+			const QString real = QFileInfo(vfsRealCounterpart(item->path)).canonicalFilePath();
+			if (!real.isEmpty() && real != "/" && QDir().mkdir(entry)) {
+				*realRoots << real;
+				*readOnly << entry;
+				g_backedDirs.insert(entry, real);
+				const QDir realDir(real);
+				for (const QFileInfo &child : realDir.entryInfoList(
+						QDir::AllEntries | QDir::Hidden | QDir::System | QDir::NoDotAndDotDot)) {
+					const QString childName = child.fileName();
+					if (childName.isEmpty() || childName == "." || childName == "..") {
+						continue;
+					}
+					const QString childEntry = QDir(entry).filePath(childName);
+					if (QFileInfo(childEntry).exists() || QFileInfo(childEntry).isSymLink()) {
+						continue;
+					}
+					QFile::link(child.absoluteFilePath(), childEntry);
+				}
 			}
 		} else if (node->kind == VKind::Folder || node->kind == VKind::Apps ||
 				node->kind == VKind::AppFolder) {
@@ -1140,6 +1257,7 @@ void fileChooserWarmUp() {
 
 FileChooserLocation fileChooserStartupDisk(const QString &parent) {
 	removeChooserTree(parent);
+	g_backedDirs.clear();
 	FileChooserLocation disk;
 	disk.name = vfsVolumeName();
 	disk.name.replace('/', ':');
@@ -1357,6 +1475,18 @@ QList<FileChooserLocation> fileChooserLocations() {
 			}
 			locations << alias;
 		}
+	}
+	/* Regular files on the desktop. */
+	for (const QFileInfo &entry : QDir(QStandardPaths::writableLocation(QStandardPaths::DesktopLocation)).entryInfoList(
+			QDir::Files | QDir::NoDotAndDotDot, QDir::Name | QDir::IgnoreCase)) {
+		if (entry.isSymLink()) {
+			continue;
+		}
+		FileChooserLocation fileLocation;
+		fileLocation.name = entry.fileName();
+		fileLocation.path = entry.absoluteFilePath();
+		fileLocation.file = true;
+		locations << fileLocation;
 	}
 	locations[0].realRoots.removeDuplicates();
 	return locations;
