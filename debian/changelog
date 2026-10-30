@@ -1,3 +1,10 @@
+zacos9 (1.5.2) trixie; urgency=medium
+
+  * Theme Installer installs into Appearance > Themes and applies the
+    theme's colours.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Fri, 30 Oct 2026 12:55:21 -0400
+
 zacos9 (1.5.1) trixie; urgency=medium
 
   * Seed the Theme Installer into the Zac menu for existing users.
