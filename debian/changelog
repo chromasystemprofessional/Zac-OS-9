@@ -1,3 +1,10 @@
+zacos9 (1.6.2) trixie; urgency=medium
+
+  * Store: fetch all ZacOS Extras releases so Turntable, Hue and Phone are
+    offered.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Fri, 30 Oct 2026 20:12:31 -0400
+
 zacos9 (1.6.1) trixie; urgency=medium
 
   * Theme Installer asks for the theme file and inherits its name.
