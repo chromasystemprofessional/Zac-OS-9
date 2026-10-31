@@ -117,6 +117,15 @@ def test_clut_positional():
     print("ok    positional clut lookup")
 
 
+def test_wctb():
+    w = struct.pack(">6sH", b"\x00" * 6, 1) + struct.pack(">HHHH", 1, 0xFFFF, 0xCCCC, 0x9999) \
+        + struct.pack(">HHHH", 7, 0xEEEE, 0xEEEE, 0xEEEE)
+    out = tool.decode_wctb(w)
+    assert out["window-frame"] == "ffcc99", out
+    assert out["window-titlebar-light"] == "eeeeee", out
+    print("ok    window colour table decoded")
+
+
 def test_scen():
     data = build_scen([
         (b"name", b"\x0bConvergence"),
@@ -143,5 +152,6 @@ def test_scen():
 test_parse()
 test_end_to_end()
 test_clut_positional()
+test_wctb()
 test_scen()
 print("OK")

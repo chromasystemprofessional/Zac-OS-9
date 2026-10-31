@@ -39,7 +39,7 @@ ICON_TYPES = {b"ICN#", b"icl8", b"icl4", b"ics#", b"ics8", b"ics4", b"icns", b"I
 PATTERN_TYPES = {b"PAT ", b"PAT#", b"ppat"}
 SOUND_TYPES = {b"snd "}
 PICT_TYPES = {b"PICT"}
-THEME_TYPES = {b"thme", b"clut", b"pltt", b"WIND", b"scen"}
+THEME_TYPES = {b"thme", b"clut", b"pltt", b"WIND", b"scen", b"cicn", b"crsr", b"CURS", b"wctb"}
 
 
 def parse_resource_fork(data):
@@ -279,7 +279,35 @@ def decode_scen_collection(data):
 	return tags
 
 
-def process_resource_fork(data, out, counts, cluts, icons, assets, scen_tags, apple_menu):
+WCTB_PARTS = {
+	0: "window-content", 1: "window-frame", 2: "window-text", 3: "window-hilite",
+	4: "window-titlebar", 5: "window-hilite-light", 6: "window-hilite-dark",
+	7: "window-titlebar-light", 8: "window-titlebar-dark", 9: "window-dialog-light",
+	10: "window-dialog-dark", 11: "window-tinge-light", 12: "window-tinge-dark",
+}
+
+
+def decode_wctb(data):
+	"""Decode a window colour table ('wctb') to {part-name: "#rrggbb"}.
+
+	Format: 6 unused bytes, then a u16 count-minus-one, then (count) records
+	of {part id (u16), r (u16), g (u16), b (u16)}."""
+	if len(data) < 8:
+		return {}
+	count = struct.unpack(">H", data[6:8])[0] + 1
+	out = {}
+	pos = 8
+	for _ in range(count):
+		if pos + 8 > len(data):
+			break
+		part, r, g, b = struct.unpack(">HHHH", data[pos:pos + 8])
+		name = WCTB_PARTS.get(part, "window-part-%d" % part)
+		out[name] = "%02x%02x%02x" % (r >> 8, g >> 8, b >> 8)
+		pos += 8
+	return out
+
+
+def process_resource_fork(data, out, counts, cluts, icons, assets, scen_tags, apple_menu, wctb):
 	for rtype, res_id, body in parse_resource_fork(data):
 		bucket = bucket_for(rtype)
 		if not bucket:
@@ -298,6 +326,8 @@ def process_resource_fork(data, out, counts, cluts, icons, assets, scen_tags, ap
 			icons.setdefault(rtype, []).append(body)
 		if rtype in (b"ics8", b"ics4", b"ics#") and res_id == -16386:
 			apple_menu.setdefault(rtype, []).append(body)
+		if rtype == b"wctb" and res_id == 0 and not wctb:
+			wctb.update(decode_wctb(body))
 		if rtype == b"PICT":
 			assets.setdefault("pict", []).append(body)
 		if rtype in (b"PAT ", b"PAT#"):
@@ -456,6 +486,7 @@ def main():
 	assets = {}
 	scen_tags = {}
 	apple_menu = {}
+	wctb = {}
 
 	if args.file:
 		# A single theme file the user copied out of Mac OS 9.
@@ -475,7 +506,7 @@ def main():
 		else:
 			fork = raw
 		if fork and looks_like_resource_fork(fork):
-			process_resource_fork(fork, out, counts, cluts, icons, assets, scen_tags, apple_menu)
+			process_resource_fork(fork, out, counts, cluts, icons, assets, scen_tags, apple_menu, wctb)
 	else:
 		src = args.source
 		if not src:
@@ -502,13 +533,13 @@ def main():
 					if fn.startswith("._"):
 						fork = extract_apple_double(raw)
 						if fork:
-							process_resource_fork(fork, out, counts, cluts, icons, assets, scen_tags, apple_menu)
+							process_resource_fork(fork, out, counts, cluts, icons, assets, scen_tags, apple_menu, wctb)
 							continue
 						# Not AppleDouble after all: fall through.
 
 					# A raw resource fork (not an AppleDouble) when the tail maps back.
 					if looks_like_resource_fork(raw) and not fn.startswith("._"):
-						process_resource_fork(raw, out, counts, cluts, icons, assets, scen_tags, apple_menu)
+						process_resource_fork(raw, out, counts, cluts, icons, assets, scen_tags, apple_menu, wctb)
 						continue
 
 					# Loose asset files.
@@ -532,7 +563,7 @@ def main():
 					with open(full, "rb") as f:
 						raw = f.read()
 					if looks_like_resource_fork(raw):
-						process_resource_fork(raw, out, counts, cluts, icons, assets, scen_tags, apple_menu)
+						process_resource_fork(raw, out, counts, cluts, icons, assets, scen_tags, apple_menu, wctb)
 
 		for s in [src] + expand_archives(src):
 			walk_tree(s)
@@ -633,6 +664,10 @@ def main():
 		if "sbth" in scen_tags:
 			f.write("scroll-bar-thumb=%s\n" %
 				("proportional" if scen_tags["sbth"] == 1 else "normal"))
+		for key in ("window-frame", "window-text", "window-titlebar-light",
+				"window-titlebar-dark", "window-dialog-light", "window-dialog-dark"):
+			if key in wctb:
+				f.write("%s=%s\n" % (key, wctb[key]))
 		if accent:
 			f.write("accent=%s\n" % accent)
 		if highlight:
