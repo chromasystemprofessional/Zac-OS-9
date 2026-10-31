@@ -397,6 +397,62 @@ def write_icon_dump(raw_icons, cluts, out):
 	print("Wrote icons-dump.txt (%d resources decoded)" % len(lines))
 
 
+# The System's wristwatch busy cursor: a 7-frame animation in 'CURS' resources.
+BUSY_CURSOR_IDS = range(-20721, -20714)
+BUSY_CURSOR_NAMES = ("watch", "wait")
+BUSY_CURSOR_SIZES = (16, 32, 48)  # 1x, 2x, 3x; scaled nearest-neighbour from 16 px
+BUSY_CURSOR_DELAY_MS = 100
+
+
+def write_xcursor(path, frames, hot, delay, sizes):
+	"""Write an Xcursor file: each frame at each nominal size, in order."""
+	chunks = []
+	toc = []
+	pos = 16 + 12 * len(sizes) * len(frames)
+	for size in sizes:
+		k = size // 16
+		for rows in frames:
+			pixels = bytearray()
+			for y in range(size):
+				for x in range(size):
+					r, g, b, a = rows[y // k][x // k]
+					pixels += struct.pack("<I", (a << 24) | (r << 16) | (g << 8) | b if a else 0)
+			header = struct.pack("<IIIIIIIII", 36, 0xFFFD0002, size, 1, size, size,
+				hot[0] * k, hot[1] * k, delay)
+			toc.append((0xFFFD0002, size, pos))
+			chunks.append(header + bytes(pixels))
+			pos += len(header) + len(pixels)
+	out = b"Xcur" + struct.pack("<III", 16, 0x10000, len(toc))
+	for typ, subtype, offset in toc:
+		out += struct.pack("<III", typ, subtype, offset)
+	with open(path, "wb") as f:
+		f.write(out + b"".join(chunks))
+
+
+def write_busy_cursor(raw_icons, out):
+	"""Write the bundle's busy cursor (cursors/watch) and index.theme.
+
+	The theme inherits everything else from ZacOS9, so only the busy cursor
+	changes. Its directory name is the theme name the compositor uses."""
+	curs = raw_icons.get(b"CURS", {})
+	if not all(i in curs for i in BUSY_CURSOR_IDS):
+		return False
+	frames = []
+	hot = None
+	for cid in BUSY_CURSOR_IDS:
+		rows, spot = macicons.decode_curs(curs[cid])
+		frames.append(rows)
+		hot = hot or spot
+	dir_ = os.path.join(out, "cursors")
+	os.makedirs(dir_, exist_ok=True)
+	for name in BUSY_CURSOR_NAMES:
+		write_xcursor(os.path.join(dir_, name), frames, hot,
+			BUSY_CURSOR_DELAY_MS, BUSY_CURSOR_SIZES)
+	with open(os.path.join(out, "index.theme"), "w") as f:
+		f.write("[Icon Theme]\nName=%s\nInherits=ZacOS9\n" % os.path.basename(out.rstrip("/")))
+	return True
+
+
 def write_assets(assets, out):
 	"""Decode PICT/PAT/snd resources into wallpapers, patterns and sounds."""
 	# Wallpapers from PICT.
@@ -609,6 +665,8 @@ def main():
 	# The System file's Apple menu icon (ics8/ics4 id -16386), for themes
 	# the user builds from their own Mac OS 9 install.
 	write_apple_menu(apple_menu, cluts, out)
+	# The busy cursor is the one cursor a theme may change (see docs/themes.md).
+	write_busy_cursor(raw_icons, out)
 	if args.dump_icons:
 		write_icon_dump(raw_icons, cluts, out)
 	# Decode wallpapers, patterns and sounds.

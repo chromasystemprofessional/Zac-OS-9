@@ -147,6 +147,38 @@ def test_cicn():
     print("ok    cicn decoded")
 
 
+def test_busy_cursor():
+    import importlib.util as _iu
+    import tempfile as _tf
+    spec = _iu.spec_from_file_location("macicons", os.path.join(os.path.dirname(sys.argv[1]), "macicons.py"))
+    mi = _iu.module_from_spec(spec); spec.loader.exec_module(mi)
+    # A 'CURS': 16 rows of data, 16 rows of mask, hot spot (v, h) = (3, 5).
+    # Row 0: pixel 0 is black (data+mask), pixel 1 white (mask only).
+    data = bytearray(68)
+    data[0] = 0x80          # pixel 0 data bit set: black
+    data[32] = 0xC0         # pixels 0 and 1 opaque
+    struct.pack_into(">hh", data, 64, 3, 5)
+    rows, hot = mi.decode_curs(bytes(data))
+    assert hot == (5, 3), hot
+    assert rows[0][0] == (0, 0, 0, 255), rows[0][0]
+    assert rows[0][1] == (255, 255, 255, 255), rows[0][1]
+    assert rows[0][2][3] == 0, "unmasked pixel is transparent"
+    ids = range(-20721, -20714)
+    raw = {b"CURS": {i: bytes(data) for i in ids}}
+    with _tf.TemporaryDirectory() as out:
+        assert tool.write_busy_cursor(raw, out)
+        with open(os.path.join(out, "cursors", "watch"), "rb") as f:
+            blob = f.read()
+        assert blob[:4] == b"Xcur"
+        ntoc = struct.unpack("<I", blob[12:16])[0]
+        assert ntoc == 7 * 3, ntoc  # 7 frames at 16, 32 and 48 px
+        assert os.path.isfile(os.path.join(out, "cursors", "wait"))
+        with open(os.path.join(out, "index.theme")) as f:
+            assert "Inherits=ZacOS9" in f.read()
+    assert not tool.write_busy_cursor({b"CURS": {}}, tempfile.mkdtemp()), "no busy frames"
+    print("ok    busy cursor written")
+
+
 def test_scen():
     data = build_scen([
         (b"name", b"\x0bConvergence"),
@@ -176,4 +208,5 @@ test_clut_positional()
 test_wctb()
 test_cicn()
 test_scen()
+test_busy_cursor()
 print("OK")

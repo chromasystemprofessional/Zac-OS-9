@@ -234,6 +234,32 @@ def decode_crsr(data, clut=None, cluts=None):
 	return rows, (hot_x, hot_y)
 
 
+def decode_curs(data):
+	"""Decode a black-and-white 'CURS' to (rows, hot_spot).
+
+	Layout: 16 rows of 16 bits (data), 16 rows of 16 bits (mask), then the
+	hot spot as vertical then horizontal int16. A set mask bit with a set data
+	bit is black, with a clear data bit white; a clear mask bit is transparent.
+	"""
+	if len(data) < 68:
+		raise ValueError("CURS too short")
+	hot_y, hot_x = struct.unpack(">hh", data[64:68])
+	rows = []
+	for y in range(16):
+		row = []
+		for x in range(16):
+			byte = y * 2 + x // 8
+			bit = 0x80 >> (x % 8)
+			if not (data[32 + byte] & bit):
+				row.append((0, 0, 0, 0))
+			elif data[byte] & bit:
+				row.append((0, 0, 0, 255))
+			else:
+				row.append((255, 255, 255, 255))
+		rows.append(row)
+	return rows, (hot_x, hot_y)
+
+
 def combine_icon(color_rows, mask, black=(0, 0, 0)):
     """Combine colour rows with a 1-bit mask into rows of (r, g, b, a)."""
     size = len(mask)
