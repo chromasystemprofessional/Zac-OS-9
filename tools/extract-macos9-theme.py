@@ -18,7 +18,9 @@ import argparse
 import os
 import shutil
 import struct
+import subprocess
 import sys
+import tempfile
 
 # Find the decoder modules beside this script (source tree or installed).
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -400,6 +402,34 @@ def write_theme_art(icons, cluts, out):
 			size, size, boot)
 
 
+ARCHIVE_EXTS = {".sit", ".hqx", ".sea", ".cpt"}
+
+
+def expand_archives(src):
+	"""Expand StuffIt/BinHex archives under `src` with The Unarchiver.
+
+	`unar -forks hidden` writes each resource fork as a "._Name" AppleDouble
+	file beside its data fork, which the walker below reads. Returns the list
+	of temp directories holding the expanded files (the caller does not need
+	to clean them up: they live in the system temp area)."""
+	extras = []
+	for root, _dirs, files in os.walk(src):
+		if "/.finf" in root or "/.rsrc" in root:
+			continue
+		for fn in files:
+			if os.path.splitext(fn)[1].lower() not in ARCHIVE_EXTS:
+				continue
+			full = os.path.join(root, fn)
+			dest = tempfile.mkdtemp(prefix="zacos9-theme-")
+			r = subprocess.run(["unar", "-forks", "hidden", "-o", dest, full],
+				capture_output=True)
+			if r.returncode == 0:
+				extras.append(dest)
+			else:
+				print("unar couldn't expand %s: %s" % (full, r.stderr.decode("utf-8", "replace").strip()), file=sys.stderr)
+	return extras
+
+
 def main():
 	parser = argparse.ArgumentParser(description=__doc__)
 	parser.add_argument("--source", help="Mac OS 9 tree (defaults to ~/Classic)")
@@ -454,48 +484,55 @@ def main():
 		src = os.path.abspath(src)
 		name = args.name or os.path.basename(src.rstrip(os.sep)) or "Mac OS 9 Theme"
 
-		for root, _dirs, files in os.walk(src):
-			for fn in files:
-				full = os.path.join(root, fn)
-				ext = os.path.splitext(fn)[1].lower()
-				with open(full, "rb") as f:
-					raw = f.read()
-
-				# AppleDouble files carry the resource fork.
-				if fn.startswith("._"):
-					fork = extract_apple_double(raw)
-					if fork:
-						process_resource_fork(fork, out, counts, cluts, icons, assets, scen_tags, apple_menu)
+		def walk_tree(base):
+			for root, _dirs, files in os.walk(base):
+				for fn in files:
+					full = os.path.join(root, fn)
+					ext = os.path.splitext(fn)[1].lower()
+					# Disk images and ROMs are far larger than any theme asset; skip them.
+					if os.path.getsize(full) > 64 * 1024 * 1024:
 						continue
-					# Not AppleDouble after all: fall through.
+					with open(full, "rb") as f:
+						raw = f.read()
 
-				# A raw resource fork (not an AppleDouble) when the tail maps back.
-				if looks_like_resource_fork(raw) and not fn.startswith("._"):
-					process_resource_fork(raw, out, counts, cluts, icons, assets, scen_tags, apple_menu)
+					# AppleDouble files carry the resource fork.
+					if fn.startswith("._"):
+						fork = extract_apple_double(raw)
+						if fork:
+							process_resource_fork(fork, out, counts, cluts, icons, assets, scen_tags, apple_menu)
+							continue
+						# Not AppleDouble after all: fall through.
+
+					# A raw resource fork (not an AppleDouble) when the tail maps back.
+					if looks_like_resource_fork(raw) and not fn.startswith("._"):
+						process_resource_fork(raw, out, counts, cluts, icons, assets, scen_tags, apple_menu)
+						continue
+
+					# Loose asset files.
+					if ext in ASSET_EXTS:
+						if ext in (".icns", ".png", ".jpg", ".jpeg"):
+							bucket = "icons"
+						elif ext == ".pat":
+							bucket = "patterns"
+						else:
+							bucket = "sounds"
+						write_unique(os.path.join(out, bucket), fn, raw)
+						counts[bucket] += 1
+
+			# Netatalk / AFP AppleDouble convention: resource forks live in a
+			# `.rsrc` directory, finder info in `.finf`, next to the data forks.
+			for root, _dirs, files in os.walk(base):
+				if os.path.basename(root) != ".rsrc":
 					continue
+				for fn in files:
+					full = os.path.join(root, fn)
+					with open(full, "rb") as f:
+						raw = f.read()
+					if looks_like_resource_fork(raw):
+						process_resource_fork(raw, out, counts, cluts, icons, assets, scen_tags, apple_menu)
 
-				# Loose asset files.
-				if ext in ASSET_EXTS:
-					if ext in (".icns", ".png", ".jpg", ".jpeg"):
-						bucket = "icons"
-					elif ext == ".pat":
-						bucket = "patterns"
-					else:
-						bucket = "sounds"
-					write_unique(os.path.join(out, bucket), fn, raw)
-					counts[bucket] += 1
-
-		# Netatalk / AFP AppleDouble convention: resource forks live in a
-		# `.rsrc` directory, finder info in `.finf`, next to the data forks.
-		for root, _dirs, files in os.walk(src):
-			if os.path.basename(root) != ".rsrc":
-				continue
-			for fn in files:
-				full = os.path.join(root, fn)
-				with open(full, "rb") as f:
-					raw = f.read()
-				if looks_like_resource_fork(raw):
-					process_resource_fork(raw, out, counts, cluts, icons, assets, scen_tags, apple_menu)
+		for s in [src] + expand_archives(src):
+			walk_tree(s)
 
 	# Turn the theme's icon into the menu icon and boot art.
 	write_theme_art(icons, cluts, out)
