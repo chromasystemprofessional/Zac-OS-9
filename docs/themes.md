@@ -89,8 +89,10 @@ reads the Appearance theme's resource fork and produces a **theme bundle** in
   patterns (`document window top/bottom/left/right`, `Modal Top/...`,
   `document window tab center`, each with an `inactive` variant where the
   theme ships one). The compositor tiles them over title bars and borders;
-  close/zoom/collapse boxes, title text and hit-testing stay ZacOS's, and
-  missing files fall back to the Platinum drawing.
+  the menu bar, dropdown menus and the selected item use the `menu
+  background` / `menu highlight` skins. Close/zoom/collapse boxes, title
+  text and hit-testing stay ZacOS's, and missing files fall back to the
+  Platinum drawing.
 - `sounds/` — alert sounds. `system-sound-N.wav` are the System file's own
   `snd` resources, decoded from sampled sounds only; synthesized and compressed
   sounds are skipped. Theme-file sounds sit beside them. The installer never

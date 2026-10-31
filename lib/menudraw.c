@@ -1,5 +1,7 @@
 #include "menudraw.h"
 
+#include "chrome.h"
+
 #define C_222 GRAY(0x2)
 #define C_888 GRAY(0x8)
 #define C_999 GRAY(0x9)
@@ -101,6 +103,13 @@ void mbar_layout_right(struct mbar_title *titles, int n, int screen_w) {
 
 void mbar_paint_background(struct pl_canvas *c, int screen_w) {
 	const int W = screen_w;
+	int mw, mh;
+	if (chrome_file("chrome/menu-background.png", &mw, &mh)) {
+		chrome_tile(c, chrome_file("chrome/menu-background.png", &mw, &mh),
+			mw, mh, 0, 0, W - 1, MBAR_HEIGHT - 1);
+		pl_hline(c, 0, W - 1, MBAR_HEIGHT - 1, C_BLACK);
+		return;
+	}
 	pl_hline(c, 0, W - 1, 0, C_WHITE);
 	pl_fill(c, 0, 1, W - 1, MBAR_HEIGHT - 3, C_DDD);
 	pl_hline(c, 0, W - 1, MBAR_HEIGHT - 2, C_999);
@@ -215,7 +224,7 @@ void menu_paint(struct pl_canvas *c, const struct menu_item *items, int n,
 		int width, int height, int selected, struct pl_accent accent) {
 	const int W = width, H = height;
 
-	pl_fill(c, 1, 1, W - 2, H - 2, C_DDD);
+	chrome_fill(c, 1, 1, W - 2, H - 2, "chrome/menu-background.png", C_DDD);
 	pl_outline(c, 0, 0, W - 1, H - 1, C_BLACK);
 	pl_hline(c, 1, W - 3, 1, C_WHITE);
 	pl_vline(c, 1, 1, H - 3, C_WHITE);
@@ -237,10 +246,16 @@ void menu_paint(struct pl_canvas *c, const struct menu_item *items, int n,
 		 * top and left, shaded down its right side; white text. */
 		bool sel = i == selected && it->enabled;
 		if (sel) {
-			pl_fill(c, 1, y, W - 2, y + MENU_ITEM_H - 1, accent.shadow);
-			pl_hline(c, 1, W - 3, y, accent.dark);
-			pl_vline(c, 1, y, y + MENU_ITEM_H - 1, accent.dark);
-			pl_vline(c, W - 2, y + 1, y + MENU_ITEM_H - 1, accent.deep);
+			int hw, hh;
+			const uint32_t *hp = chrome_file("chrome/menu-highlight.png", &hw, &hh);
+			if (hp) {
+				chrome_tile(c, hp, hw, hh, 1, y, W - 2, y + MENU_ITEM_H - 1);
+			} else {
+				pl_fill(c, 1, y, W - 2, y + MENU_ITEM_H - 1, accent.shadow);
+				pl_hline(c, 1, W - 3, y, accent.dark);
+				pl_vline(c, 1, y, y + MENU_ITEM_H - 1, accent.dark);
+				pl_vline(c, W - 2, y + 1, y + MENU_ITEM_H - 1, accent.deep);
+			}
 		}
 		uint32_t color = sel ? C_WHITE : it->enabled ? C_BLACK : C_888;
 		int tx = MENU_TEXT_X + it->indent;

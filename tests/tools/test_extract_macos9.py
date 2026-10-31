@@ -147,7 +147,9 @@ def test_chrome_slots():
     assert tool.chrome_slot("Modal Bottom") == "modal-bottom"
     assert tool.chrome_slot("document window tab center") == "popup-tab"
     assert tool.chrome_slot("horz thumb grippy") is None
-    assert tool.chrome_slot("Menu background") is None
+    assert tool.chrome_slot("Menu Bar Pressed") is None
+    assert tool.chrome_slot("Menu background") == "menu-background"
+    assert tool.chrome_slot("Menu Highlight") == "menu-highlight"
     print("ok    chrome slot mapping")
 
 

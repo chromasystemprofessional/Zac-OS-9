@@ -330,6 +330,9 @@ CHROME_PARTS = {
 	"modal-left": ("modal left",),
 	"modal-right": ("modal right",),
 	"popup-tab": ("document window tab center",),
+	"menu-background": ("menu background", "menu bar background",
+		"list & menu background"),
+	"menu-highlight": ("menu highlight", "menu(selected)"),
 }
 
 

@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+#include "chrome.h"
 #include "icons.h"
 #include "theme.h"
 
@@ -24,10 +25,9 @@ static uint32_t chrome(const char *key, uint32_t fallback) {
 	return zac_theme_color(key, &v) ? v : fallback;
 }
 
-/* Theme window-chrome skins (the bundle's chrome PNG files): tiled over
- * the title bar and borders, missing files keeping the Platinum drawing.
- * Slots are per frame part; an inactive window uses the -inactive skin when
- * the theme ships one, else its active skin. */
+/* Window-frame skins: the bundle files per frame part, active and
+ * inactive. An inactive window uses the -inactive skin when the theme ships
+ * one, else its active skin; missing files keep the Platinum drawing. */
 enum chrome_slot {
 	CHROME_DOC_TOP, CHROME_DOC_BOTTOM, CHROME_DOC_LEFT, CHROME_DOC_RIGHT,
 	CHROME_MODAL_TOP, CHROME_MODAL_BOTTOM, CHROME_MODAL_LEFT, CHROME_MODAL_RIGHT,
@@ -47,122 +47,10 @@ static const char *const chrome_files[CHROME_SLOTS][2] = {
 	[CHROME_POPUP_TAB] = { "chrome/popup-tab.png", "chrome/popup-tab-inactive.png" },
 };
 
-struct chrome_skin { uint32_t *px; int w, h; bool tried; };
-
-static char *chrome_bundle; /* theme.conf path the skins below were read from */
-static struct chrome_skin chrome_cache[CHROME_SLOTS][2];
-
-static void chrome_clear(void) {
-	free(chrome_bundle);
-	chrome_bundle = NULL;
-	for (int i = 0; i < CHROME_SLOTS; i++) {
-		for (int v = 0; v < 2; v++) {
-			free(chrome_cache[i][v].px);
-			chrome_cache[i][v] = (struct chrome_skin){ 0 };
-		}
-	}
-}
-
-/* The active theme changed when its theme.conf path did; drop the skins. */
-static void chrome_maybe_reload(void) {
-	char conf[4096];
-	if (!zac_theme_asset("theme.conf", conf, sizeof(conf))) {
-		if (chrome_bundle) {
-			chrome_clear();
-		}
-		return;
-	}
-	if (chrome_bundle && strcmp(chrome_bundle, conf) == 0) {
-		return;
-	}
-	chrome_clear();
-	chrome_bundle = strdup(conf);
-}
-
-/* The pixels of one shipped skin file, loaded once per theme. */
-static const uint32_t *chrome_load(enum chrome_slot slot, int variant, int *w, int *h) {
-	if (!chrome_files[slot][variant] || chrome_cache[slot][variant].tried) {
-		goto out;
-	}
-	chrome_cache[slot][variant].tried = true;
-	{
-		char path[4096];
-		if (!zac_theme_asset(chrome_files[slot][variant], path, sizeof(path))) {
-			goto out;
-		}
-		cairo_surface_t *s = cairo_image_surface_create_from_png(path);
-		if (cairo_surface_status(s) != CAIRO_STATUS_SUCCESS) {
-			cairo_surface_destroy(s);
-			goto out;
-		}
-		int sw = cairo_image_surface_get_width(s);
-		int sh = cairo_image_surface_get_height(s);
-		if (sw > 0 && sh > 0) {
-			cairo_surface_flush(s);
-			const uint32_t *in = (const uint32_t *)cairo_image_surface_get_data(s);
-			int stride = cairo_image_surface_get_stride(s) / 4;
-			uint32_t *px = malloc(sizeof(uint32_t) * sw * sh);
-			for (int y = 0; y < sh; y++) {
-				for (int x = 0; x < sw; x++) {
-					px[y * sw + x] = (in[y * stride + x] | 0xFF000000u);
-				}
-			}
-			chrome_cache[slot][variant].px = px;
-			chrome_cache[slot][variant].w = sw;
-			chrome_cache[slot][variant].h = sh;
-		}
-		cairo_surface_destroy(s);
-	}
-out:
-	if (!chrome_cache[slot][variant].px) {
-		return NULL;
-	}
-	*w = chrome_cache[slot][variant].w;
-	*h = chrome_cache[slot][variant].h;
-	return chrome_cache[slot][variant].px;
-}
-
-static const uint32_t *chrome_px(enum chrome_slot slot, bool active, int *w, int *h) {
-	chrome_maybe_reload();
-	if (!chrome_bundle) {
-		return NULL;
-	}
-	if (!active && chrome_files[slot][1]) {
-		/* An inactive window uses the inactive skin; a shipped but
-		 * unloadable file falls back to the flat fill, not the active skin. */
-		int iw, ih;
-		const uint32_t *in = chrome_load(slot, 1, &iw, &ih);
-		if (in || chrome_cache[slot][1].tried) {
-			if (in) {
-				*w = iw;
-				*h = ih;
-			}
-			return in;
-		}
-	}
-	return chrome_load(slot, 0, w, h);
-}
-
-/* Tile a skin over a rectangle, wrapping in both directions. Pure. */
-static void chrome_tile(struct pl_canvas *c, const uint32_t *px, int sw, int sh,
-		int x0, int y0, int x1, int y1) {
-	for (int y = y0; y <= y1; y++) {
-		for (int x = x0; x <= x1; x++) {
-			pl_put(c, x, y, px[((y - y0) % sh) * sw + ((x - x0) % sw)]);
-		}
-	}
-}
-
-/* Fill a rectangle with a skin when the theme has one, else a flat colour. */
-static void chrome_fill(struct pl_canvas *c, int x0, int y0, int x1, int y1,
+static void chrome_fill_slot(struct pl_canvas *c, int x0, int y0, int x1, int y1,
 		enum chrome_slot slot, bool active, uint32_t fallback) {
-	int w, h;
-	const uint32_t *px = chrome_px(slot, active, &w, &h);
-	if (px) {
-		chrome_tile(c, px, w, h, x0, y0, x1, y1);
-	} else {
-		pl_fill(c, x0, y0, x1, y1, fallback);
-	}
+	const char *path = chrome_files[slot][!active && chrome_files[slot][1] ? 1 : 0];
+	chrome_fill(c, x0, y0, x1, y1, path, fallback);
 }
 
 /* Title-bar boxes: 12x12 at y=4, 1 px emboss right and below. */
@@ -487,12 +375,12 @@ static void paint_modal(struct pl_canvas *c, const struct decor_state *st) {
 	const uint32_t face = act ? chrome("frame-face", C_CCC) : chrome("frame-face-inactive", C_DDD);
 
 	/* Title bar: rows 0..21, as a collapsed document window's. */
-	chrome_fill(c, 0, 0, W - 1, 21, CHROME_MODAL_TOP, act, face);
+	chrome_fill_slot(c, 0, 0, W - 1, 21, CHROME_MODAL_TOP, act, face);
 	/* Body edges (the client paints the interior). */
-	chrome_fill(c, 0, 22, 2, H - 1, CHROME_MODAL_LEFT, act, C_DDD);
-	chrome_fill(c, W - 3, 22, W - 1, H - 1, CHROME_MODAL_RIGHT, act, C_DDD);
-	chrome_fill(c, 0, 22, W - 1, 23, CHROME_MODAL_BOTTOM, act, C_DDD);
-	chrome_fill(c, 0, H - 3, W - 1, H - 1, CHROME_MODAL_BOTTOM, act, C_DDD);
+	chrome_fill_slot(c, 0, 22, 2, H - 1, CHROME_MODAL_LEFT, act, C_DDD);
+	chrome_fill_slot(c, W - 3, 22, W - 1, H - 1, CHROME_MODAL_RIGHT, act, C_DDD);
+	chrome_fill_slot(c, 0, 22, W - 1, 23, CHROME_MODAL_BOTTOM, act, C_DDD);
+	chrome_fill_slot(c, 0, H - 3, W - 1, H - 1, CHROME_MODAL_BOTTOM, act, C_DDD);
 
 	const uint32_t m_light = chrome("frame-light", C_WHITE);
 	const uint32_t m_shadow = chrome("frame-dark", C_999);
@@ -568,7 +456,7 @@ static void paint_popup(struct pl_canvas *c, const struct decor_state *st) {
 	const bool tab_act = act || st->collapsed;
 	const uint32_t tab_border = tab_act ? C_BLACK : C_555;
 	const uint32_t tab_face = tab_act ? C_CCC : C_DDD;
-	chrome_fill(c, x0 + 1, 1, x1 - 1, H > y0 ? y0 : H - 1, CHROME_POPUP_TAB, tab_act, tab_face);
+	chrome_fill_slot(c, x0 + 1, 1, x1 - 1, H > y0 ? y0 : H - 1, CHROME_POPUP_TAB, tab_act, tab_face);
 	pl_hline(c, x0 + 2, x1 - 2, 0, tab_border);
 	pl_put(c, x0 + 1, 1, tab_border);
 	pl_put(c, x1 - 1, 1, tab_border);
@@ -611,12 +499,12 @@ void decor_paint(struct pl_canvas *c, const struct decor_state *st) {
 
 	/* Frame fill, never touching the client area. */
 	if (st->collapsed) {
-		chrome_fill(c, 0, 0, W - 1, H - 1, CHROME_DOC_TOP, act, face);
+		chrome_fill_slot(c, 0, 0, W - 1, H - 1, CHROME_DOC_TOP, act, face);
 	} else {
-		chrome_fill(c, 0, 0, W - 1, DECOR_TOP - 1, CHROME_DOC_TOP, act, face);
-		chrome_fill(c, 0, H - DECOR_BOTTOM, W - 1, H - 1, CHROME_DOC_BOTTOM, act, face);
-		chrome_fill(c, 0, DECOR_TOP, DECOR_LEFT - 1, H - DECOR_BOTTOM - 1, CHROME_DOC_LEFT, act, face);
-		chrome_fill(c, W - DECOR_RIGHT, DECOR_TOP, W - 1, H - DECOR_BOTTOM - 1, CHROME_DOC_RIGHT, act, face);
+		chrome_fill_slot(c, 0, 0, W - 1, DECOR_TOP - 1, CHROME_DOC_TOP, act, face);
+		chrome_fill_slot(c, 0, H - DECOR_BOTTOM, W - 1, H - 1, CHROME_DOC_BOTTOM, act, face);
+		chrome_fill_slot(c, 0, DECOR_TOP, DECOR_LEFT - 1, H - DECOR_BOTTOM - 1, CHROME_DOC_LEFT, act, face);
+		chrome_fill_slot(c, W - DECOR_RIGHT, DECOR_TOP, W - 1, H - DECOR_BOTTOM - 1, CHROME_DOC_RIGHT, act, face);
 	}
 
 	const uint32_t highlight = chrome("frame-light", C_WHITE);
