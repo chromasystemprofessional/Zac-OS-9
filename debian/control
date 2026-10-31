@@ -148,11 +148,11 @@ Recommends: balena-etcher,
             dbus-user-session,
             xdg-desktop-portal-gtk,
             foot
-# cups-browsed puts its own queues (implicitclass://) over the printers CUPS
-# finds by itself, and they stop with "No destination host name supplied by
-# cups-browsed" (seen on a Canon over Wi-Fi). CUPS 2.4 sets up IPP Everywhere
-# printers itself; the postinst removes cups-browsed's leftover queues.
-Conflicts: cups-browsed
+# No Conflicts with cups-browsed (issue #111): cups-daemon recommends it,
+# so most Debian systems have it. Printer Picker skips its implicitclass://
+# queues instead: they stop with "No destination host name supplied by
+# cups-browsed" (seen on a Canon over Wi-Fi) unless it keeps running, and
+# CUPS 2.4 sets up IPP Everywhere printers itself.
 Suggests: zacos9-emulators,
           greetd,
           kdeconnect

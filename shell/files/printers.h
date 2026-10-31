@@ -51,6 +51,9 @@ QString parseDefaultPrinter(const QString &lpstatD);
 /* lpoptions -p: key=value pairs, values quoted as a shell would. */
 QMap<QString, QString> parseOptions(const QString &lpoptions);
 Printer printerFrom(const QString &name, const QMap<QString, QString> &options);
+/* A queue cups-browsed made (device-uri implicitclass://...): Printer Picker
+ * skips it (issue #111), as CUPS finds the same printer itself. */
+bool isBrowsedQueue(const QString &deviceUri);
 /* ipptool -c with our Get-Jobs request: a header, then a job a line. */
 QList<PrintJob> parseJobs(const QString &csv);
 /* lp: "request id is NAME-12 (1 file(s))" -> 12, or 0. */

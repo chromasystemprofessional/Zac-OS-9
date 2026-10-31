@@ -59,12 +59,14 @@ int main(int argc, char **argv) {
 	put(st + "/jobs", "7,pending,\"Letter, \\\\\\\"draft\\\\\\\"\",adam,12,0,1792026828\n"
 		"8,pending-held,Photo.png,adam,300,0,1792026900\n");
 	const QString sh = "#!/bin/sh\nS='" + st + "'\necho \"$(basename $0) $*\" >> '" + log + "'\n";
-	put(bin + "/lpstat", sh + "case $1 in -e) printf 'Inkjet\\nLaser\\n' ;; -d) "
+	put(bin + "/lpstat", sh + "case $1 in -e) printf 'Inkjet\\nLaser\\nBrowsed\\n' ;; -d) "
 		"printf 'system default destination: %s\\n' \"$(cat $S/default)\" ;; esac\n", true);
 	put(bin + "/lpoptions", sh + "case $1 in\n"
 		"-d) printf %s \"$2\" > $S/default ;;\n"
 		"-p) if [ \"$2\" = Laser ]; then echo \"printer-info='Office Laser' printer-location='Back room' "
 		"printer-make-and-model='Laser Co L1' printer-state=$(cat $S/Laser.state) printer-is-accepting-jobs=true "
+		"printer-state-reasons=none\"; elif [ \"$2\" = Browsed ]; then echo \"printer-info='Old Queue' "
+		"device-uri=implicitclass://Canon/ printer-state=3 printer-is-accepting-jobs=true "
 		"printer-state-reasons=none\"; else echo \"printer-info='Inkjet' printer-state=3 printer-is-temporary=true "
 		"printer-state-reasons=media-empty-error\"; fi ;;\nesac\n", true);
 	put(bin + "/ipptool", sh + "echo job-id,job-state,job-name,job-originating-user-name,job-k-octets,"
@@ -112,6 +114,8 @@ int main(int argc, char **argv) {
 		jobs[0].owner == "adam" && jobs[0].created == 1792026828 && jobs[1].status() == "Printing page 3",
 		"ipptool's jobs: quoting undone, states in words");
 	check(parseJobId("request id is Laser-12 (1 file(s))\n") == 12 && parseJobId("nonsense") == 0, "lp's job id");
+	check(isBrowsedQueue("implicitclass://Canon/") && !isBrowsedQueue("ipp://printer/ipp/print") &&
+		!isBrowsedQueue(""), "cups-browsed's queues by their device-uri");
 	check(parsePrinterNames("Inkjet\nLaser\n") == QStringList({ "Inkjet", "Laser" }) &&
 		parseDefaultPrinter("system default destination: Laser\n") == "Laser" &&
 		parseDefaultPrinter("no system default destination\n").isEmpty(), "lpstat's printers and default");
@@ -138,6 +142,11 @@ int main(int argc, char **argv) {
 	const QList<Printer> printers = listPrinters();
 	check(printers.size() == 2 && printers[1].name == "Laser" && printers[1].isDefault && !printers[0].isDefault &&
 		printers[0].temporary && printers[1].location == "Back room", "the printers, the default marked");
+	bool browsedShown = false;
+	for (const Printer &q : printers) {
+		browsedShown = browsedShown || q.name == "Browsed";
+	}
+	check(!browsedShown, "cups-browsed's implicitclass queue is skipped");
 
 	PickerWindow picker;
 	picker.show();

@@ -253,11 +253,24 @@ QString defaultPrinter() {
 	return parseDefaultPrinter(run("lpstat", { "-d" }).out);
 }
 
+/* A queue cups-browsed set up (device-uri implicitclass://...): it only
+ * prints while cups-browsed runs, stopping with "No destination host name
+ * supplied by cups-browsed" (seen on a Canon over Wi-Fi). CUPS 2.4 finds
+ * the same printers by itself (IPP Everywhere), so listPrinters skips
+ * these queues instead of offering a printer that may not print. Not a
+ * package conflict: zacos9 installs next to cups-browsed (issue #111). */
+bool isBrowsedQueue(const QString &deviceUri) {
+	return deviceUri.startsWith("implicitclass://");
+}
+
 QList<Printer> listPrinters() {
 	QList<Printer> out;
 	const QString def = defaultPrinter();
 	for (const QString &name : parsePrinterNames(run("lpstat", { "-e" }).out)) {
 		Printer p = printerFrom(name, parseOptions(run("lpoptions", { "-p", name }).out));
+		if (isBrowsedQueue(p.uri)) {
+			continue;
+		}
 		p.isDefault = name == def;
 		out << p;
 	}

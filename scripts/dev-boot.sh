@@ -107,12 +107,11 @@ sudo_ chroot "$r" /bin/sh -c "
 		# Keep iso/config's versions of files the packages also bring.
 		apt-get install -y -qq -o Dpkg::Options::=--force-confold \$missing </dev/null >/dev/null
 	fi
-	# Our packages' own dependencies and conflicts may be newer than the
-	# ISO build's system (zacos9 conflicts with cups-browsed, which an older
-	# build has): if dpkg won't install them, apt does, fetching what's
-	# missing and removing what conflicts.
+	# Our packages' own dependencies may be newer than the ISO build's
+	# system (an older build may lack a new dependency): if dpkg won't
+	# install them, apt does, fetching what's missing.
 	if ! dpkg -i --force-confold /tmp/dev-boot/*.deb </dev/null >/dev/null 2>&1; then
-		echo 'installing our packages with apt (dependencies or conflicts changed)'
+		echo 'installing our packages with apt (dependencies changed)'
 		apt-get update -qq
 		apt-get install -y -qq --allow-downgrades -o Dpkg::Options::=--force-confold \
 			/tmp/dev-boot/*.deb </dev/null >/dev/null
