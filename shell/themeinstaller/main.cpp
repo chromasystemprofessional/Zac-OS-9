@@ -201,11 +201,16 @@ static void installThemeAssets(const QString &name, QString *wallpaper,
 			const QString id = prefix + "-" + file.completeBaseName();
 			QFile::copy(file.filePath(), dest + "/" + id + "." + file.suffix());
 		}
-		if (!files.isEmpty()) {
-			const QString id = prefix + "-" + files.first().completeBaseName();
+		/* The System's own alert sounds are offered, never chosen as the theme's. */
+		for (const QFileInfo &file : files) {
+			if (f.sub == QStringLiteral("sounds") && file.fileName().startsWith("system-")) {
+				continue;
+			}
+			const QString id = prefix + "-" + file.completeBaseName();
 			if (f.sub == QStringLiteral("wallpapers")) *wallpaper = id;
 			else if (f.sub == QStringLiteral("patterns")) *pattern = id;
 			else *alert = id;
+			break;
 		}
 	}
 }

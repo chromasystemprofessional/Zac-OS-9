@@ -192,6 +192,23 @@ def test_pointers():
     print("ok    pointers written")
 
 
+def test_system_sounds():
+    import wave
+    # A format 1 snd: one buffer command, a standard header, then 4 samples.
+    head = struct.pack(">HHHI", 1, 1, 5, 0) + struct.pack(">H", 1)
+    head += struct.pack(">HHI", 0x8051, 0, len(head) + 8)
+    header = struct.pack(">IIIII", 0, 4, 22050 << 16, 0, 0) + struct.pack(">BB", 0, 60)
+    snd = head + header + bytes((128, 200, 56, 128))
+    with tempfile.TemporaryDirectory() as out:
+        os.makedirs(os.path.join(out, "sounds"))
+        tool.write_system_sounds({"snd ": {2: snd, 1: snd}}, out)
+        names = sorted(os.listdir(os.path.join(out, "sounds")))
+        assert names == ["system-sound-1.wav", "system-sound-2.wav"], names
+        with wave.open(os.path.join(out, "sounds", "system-sound-1.wav")) as reader:
+            assert reader.getnframes() == 4 and reader.getsampwidth() == 1
+    print("ok    system sounds written")
+
+
 def test_scen():
     data = build_scen([
         (b"name", b"\x0bConvergence"),
@@ -222,4 +239,5 @@ test_wctb()
 test_cicn()
 test_scen()
 test_pointers()
+test_system_sounds()
 print("OK")

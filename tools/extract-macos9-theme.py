@@ -456,6 +456,16 @@ def decode_pointer(kind, body, cluts):
 	return macicons.decode_crsr(body, cluts=cluts)
 
 
+def write_system_sounds(system_raw, out):
+	"""Write the System file's alert sounds as sounds/system-sound-N.wav, in
+	resource ID order. The installer never picks these as the default alert."""
+	for i, (_rid, body) in enumerate(sorted(system_raw.get("snd ", {}).items())):
+		try:
+			macsnd.snd_to_wav(body, os.path.join(out, "sounds", "system-sound-%d.wav" % (i + 1)))
+		except (ValueError, struct.error):
+			continue
+
+
 def write_pointers(theme_raw, theme_cluts, system_raw, system_cluts, out):
 	"""Write cursors/<name> for every pointer the two sources supply, and an
 	index.theme that inherits everything else from ZacOS9. Returns False when
@@ -735,6 +745,7 @@ def main():
 		theme_cluts.setdefault(len(cols), cols)
 	system_raw, system_cluts = pointer_resources(args.system) if args.system else ({}, {})
 	write_pointers(theme_raw, theme_cluts, system_raw, system_cluts, out)
+	write_system_sounds(system_raw, out)
 	if args.dump_icons:
 		write_icon_dump(raw_icons, cluts, out)
 	# Decode wallpapers, patterns and sounds.
