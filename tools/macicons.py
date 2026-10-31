@@ -169,24 +169,43 @@ def _pick_clut(cluts, pixel_size):
 	return clut_lookup(best)
 
 
+def _read_bitmap(data, off):
+	"""Read a BitMap/PixMap header at `off`, returning (rowBytes, w, h, isPixmap)."""
+	base = struct.unpack(">I", data[off:off + 4])[0]
+	row_bytes = struct.unpack(">H", data[off + 4:off + 6])[0]
+	top, left, bottom, right = struct.unpack(">hhhh", data[off + 6:off + 14])
+	is_pixmap = bool(row_bytes & 0x8000)
+	row_bytes &= 0x3FFF
+	return row_bytes, (right - left, bottom - top), is_pixmap
+
+
 def decode_cicn(data, clut=None, cluts=None):
 	"""Decode a 'cicn' colour icon to RGBA rows.
 
-	Layout: PixMap(50) + ColorTable + indexed pixel data + 1-bit mask."""
-	row_bytes, (w, h), pixel_size, _cmp, _pmTable = _pixmap_fields(data)
-	lookup, pos = _read_ctab(data, 50)
+	Layout (ResForge): PixMap(50) + mask BitMap(14) + bitmap BitMap(14) +
+	a 4-byte handle + the mask data + the bitmap data (skipped) + the
+	ColorTable + the colour pixel data."""
+	row_bytes, (w, h), is_pixmap = _read_bitmap(data, 0)
+	if not is_pixmap:
+		raise ValueError("cicn has no PixMap")
+	pixel_size = struct.unpack(">H", data[32:34])[0]
+	# mask BitMap (14 bytes) follows the 50-byte PixMap, then the bitmap BitMap.
+	mask_rb, (_mw, _mh), _ = _read_bitmap(data, 50)
+	bit_rb, (_bw, _bh), _ = _read_bitmap(data, 64)
+	mask_off = 82
+	mask_len = mask_rb * h
+	bit_off = mask_off + mask_len
+	bit_len = bit_rb * h
+	ctab_off = bit_off + bit_len
+	lookup, pix_off = _read_ctab(data, ctab_off)
 	if cluts:
 		lookup = _pick_clut(cluts, pixel_size)
 	elif clut:
 		lookup = clut_lookup(clut)
-	rows = _indexed_rows(data, pos, w, h, pixel_size, lookup)
-	# 1-bit mask follows the pixel data (word-aligned rows).
-	px_bytes = (w * pixel_size + 7) // 8 * h
-	mask_off = pos + px_bytes
-	mrb = ((w + 15) // 16) * 2
+	rows = _indexed_rows(data, pix_off, w, h, pixel_size, lookup)
 	for y in range(h):
 		for x in range(w):
-			b = data[mask_off + y * mrb + x // 8]
+			b = data[mask_off + y * mask_rb + x // 8]
 			if not (b & (0x80 >> (x % 8))):
 				rows[y][x] = (rows[y][x][0], rows[y][x][1], rows[y][x][2], 0)
 	return rows
