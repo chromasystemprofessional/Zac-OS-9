@@ -22,6 +22,7 @@
 #include <QStringList>
 #include <QSaveFile>
 #include <QTextStream>
+#include <algorithm>
 #include <cstdio>
 
 #include "programs.h"
@@ -62,6 +63,10 @@ static bool runExtractor(const QString &file, const QString &name, const QString
 		"--auto-colours" };
 	if (!system.isEmpty()) {
 		args << "--system" << system;
+	}
+	const QString pictures = QDir::homePath() + "/Classic/System Folder/Appearance/Desktop Pictures";
+	if (QFileInfo::exists(pictures)) {
+		args << "--pictures" << pictures;
 	}
 	if (!fonts.isEmpty()) {
 		args << "--fonts" << fonts;
@@ -207,7 +212,33 @@ static void installThemeAssets(const QString &name, QString *wallpaper,
 		const QString src = outputDir(name) + "/" + f.sub;
 		const QString dest = base + "/" + f.dest;
 		QDir().mkpath(dest);
-		const QFileInfoList files = QDir(src).entryInfoList(QDir::Files, QDir::Name);
+		QFileInfoList files = QDir(src).entryInfoList(QDir::Files, QDir::Name);
+		if (f.sub == QStringLiteral("patterns")) {
+			// Only the desktop pattern (scen patt) and mono PAT tiles are
+			// desktop art; the colour-pattern files are widget skins.
+			QFileInfoList kept;
+			for (const QFileInfo &file : files) {
+				if (file.fileName() == "desktop-pattern.png" ||
+						file.fileName().startsWith("pattern-")) {
+					kept << file;
+				}
+			}
+			files = kept;
+			// Prefer the theme's own desktop pattern.
+			std::sort(files.begin(), files.end(), [](const QFileInfo &a, const QFileInfo &b) {
+				const bool ad = a.fileName() == "desktop-pattern.png";
+				const bool bd = b.fileName() == "desktop-pattern.png";
+				return ad != bd ? ad : a.fileName() < b.fileName();
+			});
+		}
+		if (f.sub == QStringLiteral("wallpapers")) {
+			// Prefer the dpnm desktop wallpaper over stray pictures.
+			std::sort(files.begin(), files.end(), [](const QFileInfo &a, const QFileInfo &b) {
+				const bool ad = a.fileName().startsWith("desktop-wallpaper.");
+				const bool bd = b.fileName().startsWith("desktop-wallpaper.");
+				return ad != bd ? ad : a.fileName() < b.fileName();
+			});
+		}
 		for (const QFileInfo &file : files) {
 			const QString id = prefix + "-" + file.completeBaseName();
 			QFile::copy(file.filePath(), dest + "/" + id + "." + file.suffix());
@@ -223,6 +254,32 @@ static void installThemeAssets(const QString &name, QString *wallpaper,
 			else if (f.sub == QStringLiteral("patterns")) *pattern = catalogId("user", copied);
 			else *alert = id;
 			break;
+		}
+	}
+}
+
+/* Set a key=value line in the bundle's theme.conf, adding it when absent. */
+static void setThemeConfValue(const QString &name, const char *key, const QString &value) {
+	const QString path = outputDir(name) + "/theme.conf";
+	QFile f(path);
+	QStringList lines;
+	if (f.open(QIODevice::ReadOnly | QIODevice::Text)) {
+		QTextStream in(&f);
+		QString line;
+		while (in.readLineInto(&line)) {
+			if (!line.startsWith(QString::fromLatin1(key) + "=")) {
+				lines << line;
+			}
+		}
+		f.close();
+	}
+	if (!value.isEmpty()) {
+		lines << QString::fromLatin1(key) + "=" + value;
+	}
+	if (f.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate)) {
+		QTextStream out(&f);
+		for (const QString &l : lines) {
+			out << l << "\n";
 		}
 	}
 }
@@ -376,6 +433,23 @@ int main(int argc, char *argv[]) {
 		}
 		QMessageBox::critical(nullptr, "Theme Installer", error);
 		return 2;
+	}
+	// The preset named the desktop art; apply it now, not just when the user
+	// re-clicks the theme in Appearance. Wallpaper wins over pattern.
+	setThemeConfValue(name, "pattern", pattern);
+	setThemeConfValue(name, "wallpaper", wallpaper);
+	setThemeConfValue(name, "background", !wallpaper.isEmpty() ? "wallpaper" :
+		!pattern.isEmpty() ? "pattern" : "");
+	setThemeConfValue(name, "alert-sound", alert);
+	if (!pattern.isEmpty()) {
+		pl_setting_set("pattern", pattern.toUtf8().constData());
+	}
+	if (!wallpaper.isEmpty()) {
+		pl_setting_set("wallpaper", wallpaper.toUtf8().constData());
+	}
+	pl_setting_set("background", !wallpaper.isEmpty() ? "wallpaper" : "pattern");
+	if (!alert.isEmpty()) {
+		pl_setting_set("alert-sound", alert.toUtf8().constData());
 	}
 	pl_setting_set("appearance-theme", presetId.toUtf8().constData());
 	pl_setting_set("theme-bundle", name.toUtf8().constData());
