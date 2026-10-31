@@ -312,8 +312,8 @@ def process_resource_fork(data, out, counts, cluts, icons, assets, scen_tags, ap
 		bucket = bucket_for(rtype)
 		if not bucket:
 			continue
-		if bucket != "sounds":
-			# Sounds are written as decoded WAVs by write_assets, never as raw .bin.
+		if bucket not in ("sounds", "patterns"):
+			# Sounds and patterns are written decoded by write_assets, never as raw .bin.
 			write_unique(os.path.join(out, bucket), "%s_%d.bin" % (rtype.decode("latin1"), res_id), body)
 		counts[bucket] += 1
 		if rtype == b"clut":
