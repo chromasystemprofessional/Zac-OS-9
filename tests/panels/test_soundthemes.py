@@ -21,6 +21,8 @@ loader = importlib.machinery.SourceFileLoader("soundthemes", str(TOOL))
 spec = importlib.util.spec_from_loader(loader.name, loader)
 sounds = importlib.util.module_from_spec(spec)
 loader.exec_module(sounds)
+# These tests check raw decoding of tiny clips; the edge fade has its own test.
+sounds.FADE_MS = 0
 
 
 def resource_file(items):
@@ -217,6 +219,24 @@ class SoundTests(unittest.TestCase):
             sounds.decode_sound(b"")
         rate = cmp_snd(b"twos", b"\0\0", 1, rate=2476)
         self.assertEqual(wave.open(io.BytesIO(sounds.decode_sound(rate))).getframerate(), 2476)
+
+    def test_fade_edges(self):
+        saved = sounds.FADE_MS
+        sounds.FADE_MS = 4
+        try:
+            loud8 = bytes([255]) * 1000
+            out = sounds.fade_edges(1, 1, 44100, 1000, loud8)
+            self.assertEqual(out[0], 128)
+            self.assertEqual(out[-1], 128)
+            self.assertEqual(out[500], 255)
+            loud16 = struct.pack("<h", 1000) * 1000
+            out = sounds.fade_edges(1, 2, 44100, 1000, loud16)
+            self.assertEqual(struct.unpack("<h", out[:2])[0], 0)
+            self.assertEqual(struct.unpack("<h", out[1000:1002])[0], 1000)
+            short = bytes([255]) * 3
+            self.assertEqual(sounds.fade_edges(1, 1, 44100, 3, short)[1], 255)
+        finally:
+            sounds.FADE_MS = saved
 
     def test_leading_null_commands(self):
         data = bytearray(snd())

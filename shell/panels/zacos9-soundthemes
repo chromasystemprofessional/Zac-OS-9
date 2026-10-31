@@ -178,6 +178,32 @@ def classic_mapping(records):
     return selected
 
 
+FADE_MS = 4
+
+
+def fade_edges(channels, width, rate, frames, samples):
+    """Ramp the first and last few milliseconds up from and down to silence.
+    A clip that starts or stops mid-wave clicks, and a looping clip (such as
+    window-drag) clicks each time it repeats."""
+    span = min(frames // 2, rate * FADE_MS // 1000)
+    if span < 1 or len(samples) != frames * channels * width:
+        return samples
+    out = bytearray(samples)
+    silence = 128 if width == 1 else 0
+    for i in range(span):
+        gain = i / span
+        for position in (i, frames - 1 - i):
+            for c in range(channels):
+                at = (position * channels + c) * width
+                if width == 1:
+                    value = out[at] - silence
+                    out[at] = round(value * gain) + silence
+                else:
+                    value = int.from_bytes(out[at:at + 2], "little", signed=True)
+                    out[at:at + 2] = round(value * gain).to_bytes(2, "little", signed=True)
+    return bytes(out)
+
+
 def pcm_wav(channels, width, rate, frames, samples):
     if channels not in (1, 2) or width not in (1, 2) or not MIN_RATE <= rate <= MAX_RATE:
         raise ValueError("only mono/stereo 8/16-bit PCM at 1–96 kHz is supported")
@@ -339,7 +365,7 @@ def decode_sound(data):
         raise ValueError("unsupported sound header encoding")
     if len(samples) > MAX_WAV:
         raise ValueError("PCM output exceeds the size limit")
-    return pcm_wav(channels, width, rate, frames, samples)
+    return pcm_wav(channels, width, rate, frames, fade_edges(channels, width, rate, frames, samples))
 
 
 def decode_wav(data):
