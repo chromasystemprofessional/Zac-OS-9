@@ -155,8 +155,10 @@ def _u16(data, pos):
     return struct.unpack(">H", data[pos:pos + 2])[0]
 
 
-def _skip_opcode(op, data, pos):
-    """Return the position after one version 2 opcode's data."""
+def _skip_opcode(op, data, pos, v1=False):
+    """Return the position after one opcode's data (version 2 unless v1)."""
+    if v1 and op in (0x04, 0x11):  # one-byte TxFace and version
+        return pos + 1
     if op == 0x0C00:  # header
         return pos + 24
     if op in V2_FIXED:
@@ -220,17 +222,26 @@ def _v2_bitmap(data, pos):
 
 
 def _v2_bitmap_body(op, data, pos):
-    """Decode a BitsRect/BitsRgn (1-bit) or DirectBitsRect/Rgn (PixMap) body."""
-    if op in (0x009A, 0x009B):
-        pixmap = data[pos:pos + 50]
-        if len(pixmap) < 50:
+    """Decode a BitsRect/BitsRgn (1-bit) or DirectBitsRect/Rgn (PixMap) body.
+    A bitmap opcode whose row-bytes word has the high bit set carries a PixMap."""
+    pixmap_form = op in (0x009A, 0x009B) or (
+        op in (0x0090, 0x0091, 0x0098, 0x0099) and _u16(data, pos) & 0x8000)
+    if pixmap_form:
+        # DirectBits carry a 4-byte base address (usually 0x000000FF); the
+        # BitsRect and PackBitsRect PixMap forms omit it.
+        has_base = op in (0x009A, 0x009B)
+        size = 50 if has_base else 46
+        pixmap = data[pos:pos + size]
+        if len(pixmap) < size:
             raise ValueError("PixMap is truncated")
+        if not has_base:
+            pixmap = bytes(4) + pixmap
         rowbytes = struct.unpack(">H", pixmap[4:6])[0] & 0x3FFF
         top, left, bottom, right = struct.unpack(">hhhh", pixmap[6:14])
         pack_type = struct.unpack(">H", pixmap[16:18])[0]
         pixel_size = struct.unpack(">H", pixmap[32:34])[0]
         width, height = right - left, bottom - top
-        pos += 50
+        pos += size
         lookup = None
         if pixel_size <= 8:
             lookup, pos = _colour_table(data, pos)
@@ -245,10 +256,12 @@ def _v2_bitmap_body(op, data, pos):
         raise ValueError("PICT bitmap size is invalid")
     if op in (0x009B, 0x0091, 0x0099):
         pos += _u16(data, pos)  # region
-    if op in (0x009A, 0x009B):
+    if pixmap_form:
         packed = pack_type != 1
         # Pixel rows pack whole 16- or 32-bit pixels (packType 3 and 4).
-        unit = 2 if pixel_size == 16 and pack_type == 3 else 4 if pixel_size == 32 and pack_type == 4 else 1
+        if pixel_size == 32 and pack_type == 4:
+            raise ValueError("component-packed 32-bit PICT rows are not supported")
+        unit = 2 if pixel_size == 16 and pack_type == 3 else 1
     else:
         packed = op in (0x0098, 0x0099)
         unit = 1
@@ -269,50 +282,31 @@ def _decode_v2(data):
 def decode_pict(data):
     """Decode a PICT to (width, height, rows of (r,g,b,a)).
 
-    Accepts a resource (PICT body) or a file with its 512-byte header."""
+    Accepts a resource (PICT body) or a file with its 512-byte header. Version
+    2 pictures use two-byte opcodes; version 1 pictures use one-byte opcodes."""
     if len(data) > 512 and data[:512] == bytes(512):
         data = data[512:]
-    if len(data) >= 14 and data[10:12] == b"\x00\x11" and data[12:14] == b"\x02\xff":
-        width, height, rows = _decode_v2(data)
-        return width, height, rows
-    return _decode_v1(data)
+    if len(data) >= 16 and data[10:12] == b"\x00\x11" and data[12:14] == b"\x02\xff":
+        return _decode_v2(data)
+    if len(data) >= 12 and data[10] == 0x11:
+        return _decode_v1(data)
+    raise ValueError("PICT has no version opcode")
 
 
 def _decode_v1(data):
-    if len(data) < 522:
-        raise ValueError("PICT is too short for its header")
+    """Walk the one-byte opcodes of a version 1 picture to its first bitmap."""
     top, left, bottom, right = struct.unpack(">hhhh", data[2:10])
-    width = right - left
-    height = bottom - top
-    if width <= 0 or height <= 0:
+    if right - left <= 0 or bottom - top <= 0:
         raise ValueError("PICT bounding box is invalid")
-
-    off = 512
-    end = len(data)
-    while off + 2 <= end:
-        op = struct.unpack(">H", data[off:off + 2])[0]
-        if op == 0x00FF:  # end of picture
+    pos = 12  # size, bounds, then the version opcode and its one-byte version
+    while pos < len(data):
+        op = data[pos]
+        pos += 1
+        if op == 0xFF:
             break
-        if op in (0x0090, 0x0098):  # BitsRect / PackBitsRect, 1-bit
-            rowbytes = struct.unpack(">H", data[off + 2:off + 4])[0]
-            if rowbytes & 0x8000:
-                raise ValueError("PICT PixMap variant is not yet supported")
-            bounds = struct.unpack(">hhhh", data[off + 4:off + 12])
-            bw = bounds[3] - bounds[1]
-            bh = bounds[2] - bounds[0]
-            packed = (op == 0x0098)
-            body = data[off + 12:]
-            if packed:
-                pixels = packbits_decode(body, rowbytes * bh)
-            else:
-                pixels = body[:rowbytes * bh]
-            return bw, bh, _bits_to_rows(pixels, bw, bh, rowbytes)
-        if op == 0x009A:  # direct PixMap (colour)
-            body = data[off + 2:]
-            rows = decode_pixmap(body)
-            return len(rows[0]), len(rows), rows
-        # Unknown opcode: stop — the common cases come first.
-        break
+        if op in (0x90, 0x91, 0x98, 0x99):
+            return _v2_bitmap_body(op, data, pos)
+        pos = _skip_opcode(op, data, pos, v1=True)
     raise ValueError("PICT has no decodable bitmap")
 
 

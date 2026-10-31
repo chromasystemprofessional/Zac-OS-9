@@ -48,12 +48,14 @@ def decode_ppat(data):
     top, left, bottom, right = struct.unpack(">hhhh", data[pixmap + 6:pixmap + 14])
     depth = struct.unpack(">H", data[pixmap + 32:pixmap + 34])[0]
     table = struct.unpack(">I", data[pixmap + 42:pixmap + 46])[0]
-    if depth not in (1, 2, 4, 8) or row_bytes == 0:
+    if depth not in (1, 2, 4, 8, 16, 32) or row_bytes == 0:
         raise ValueError("unsupported ppat depth %d" % depth)
     width = min(right - left, row_bytes * 8 // depth)
     height = bottom - top
     if height <= 0 or pixels + row_bytes * height > len(data):
         raise ValueError("ppat pixel data is outside the resource")
+    if depth in (16, 32):
+        return width, height, _direct_rows(data, pixels, width, height, row_bytes, depth)
     palette = _colour_table(data, table)
     mask = (1 << depth) - 1
     rows = []
@@ -66,6 +68,24 @@ def decode_ppat(data):
             row.append((r, g, b, 255))
         rows.append(row)
     return width, height, rows
+
+
+def _direct_rows(data, pixels, width, height, row_bytes, depth):
+    """Rows of a direct-colour pixel pattern: 5-5-5 for 16-bit, xRGB for 32-bit.
+    Direct pixel rows are stored unpacked."""
+    rows = []
+    for y in range(height):
+        base = pixels + y * row_bytes
+        row = []
+        for x in range(width):
+            if depth == 16:
+                v = struct.unpack(">H", data[base + 2 * x:base + 2 * x + 2])[0]
+                rgb = tuple(((v >> shift) & 31) * 255 // 31 for shift in (10, 5, 0))
+            else:
+                rgb = tuple(data[base + 4 * x + k] for k in (1, 2, 3))
+            row.append(rgb + (255,))
+        rows.append(row)
+    return rows
 
 
 def _colour_table(data, off):
