@@ -98,5 +98,16 @@ def test_packbits_16bit_units():
     print("ok    16-bit packbits units")
 
 
+def test_component_packed_32bit():
+    # Two pixels, red first then green then blue: (255,0,0) and (0,255,0).
+    # The scan line is one PackBits stream of six plane bytes: a literal of 6.
+    line = bytes((5, 255, 0, 0, 255, 0, 0))
+    data = bytes((len(line),)) + line
+    row = macpict._component_rows(data, 0, 1, 8, 2, 3)[0]
+    assert row[:8] == bytes((0, 255, 0, 0, 0, 0, 255, 0)), row[:8].hex()
+    print("ok    component-packed 32-bit row")
+
+
 test_packbits_16bit_units()
+test_component_packed_32bit()
 print("OK")

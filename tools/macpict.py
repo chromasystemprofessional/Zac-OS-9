@@ -111,8 +111,8 @@ def _pixmap_to_rows(pixels, width, height, rowbytes, pixel_size, lookup):
         base = y * rowbytes
         for x in range(width):
             if pixel_size == 32:
-                # xRGB or ARGB, big-endian; alpha is usually 0 -> opaque.
-                r, g, b, a = pixels[base + x * 4:base + x * 4 + 4]
+                # ARGB (the first byte is alpha, or a pad byte that is usually 0).
+                a, r, g, b = pixels[base + x * 4:base + x * 4 + 4]
                 if a == 0:
                     a = 255
                 row.append((r, g, b, a))
@@ -195,6 +195,32 @@ def _packed_rows(data, pos, height, rowbytes, packed, unit=1):
     return bytes(pixels), pos
 
 
+def _component_rows(data, pos, height, rowbytes, width, components):
+    """Rows of 32-bit pixels packed one component at a time (packType 4): each
+    scan line is one PackBits stream holding the planes in order, red first
+    (alpha first when there are four components). Returns (pixels, position)."""
+    if components not in (3, 4):
+        raise ValueError("unsupported component count %d" % components)
+    pixels = bytearray()
+    for _ in range(height):
+        if rowbytes > 250:
+            count = _u16(data, pos)
+            pos += 2
+        else:
+            count = data[pos]
+            pos += 1
+        planes = packbits_decode(data[pos:pos + count], width * components)
+        pos += count
+        row = bytearray(rowbytes)
+        for x in range(width):
+            pixel = [planes[c * width + x] for c in range(components)]
+            if components == 3:
+                pixel = [0] + pixel
+            row[4 * x:4 * x + 4] = bytes(pixel)
+        pixels += row
+    return bytes(pixels), pos
+
+
 def _colour_table(data, pos):
     """Read an inline colour table; returns (lookup, next position)."""
     size = _u16(data, pos + 6)
@@ -240,6 +266,7 @@ def _v2_bitmap_body(op, data, pos):
         top, left, bottom, right = struct.unpack(">hhhh", pixmap[6:14])
         pack_type = struct.unpack(">H", pixmap[16:18])[0]
         pixel_size = struct.unpack(">H", pixmap[32:34])[0]
+        components = struct.unpack(">H", pixmap[34:36])[0]
         width, height = right - left, bottom - top
         pos += size
         lookup = None
@@ -259,13 +286,14 @@ def _v2_bitmap_body(op, data, pos):
     if pixmap_form:
         packed = pack_type != 1
         # Pixel rows pack whole 16- or 32-bit pixels (packType 3 and 4).
-        if pixel_size == 32 and pack_type == 4:
-            raise ValueError("component-packed 32-bit PICT rows are not supported")
         unit = 2 if pixel_size == 16 and pack_type == 3 else 1
     else:
         packed = op in (0x0098, 0x0099)
         unit = 1
-    pixels, _ = _packed_rows(data, pos, height, rowbytes, packed, unit)
+    if pixmap_form and pixel_size == 32 and pack_type == 4:
+        pixels, _ = _component_rows(data, pos, height, rowbytes, width, components)
+    else:
+        pixels, _ = _packed_rows(data, pos, height, rowbytes, packed, unit)
     if pixel_size == 1:
         return width, height, _bits_to_rows(pixels, width, height, rowbytes)
     return width, height, _pixmap_to_rows(pixels, width, height, rowbytes, pixel_size, lookup)
