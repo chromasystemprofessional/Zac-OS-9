@@ -69,7 +69,12 @@ def strikes(res, name):
 
 def strike_glyphs(body):
     """Decode an NFNT strike: {code: (advance, top_offset, rows)} with rows as
-    lists of 0/1 per column, top relative to the baseline (negative = above)."""
+    lists of 0/1 per column, top relative to the baseline (negative = above).
+
+    The offset/width table gives each glyph's pen advance (low byte) and its
+    left bearing (high byte, columns of blank space before the ink). Rows are
+    advance-wide: bearing blanks, then ink, then trailing blanks. A glyph with
+    no ink (space) is all blank; a missing glyph (ow 0xFFFF) is skipped."""
     (_ftype, first, last, _wmax, _kmax, _ndesc, _frw, frh, owt, ascent,
      _descent, _leading, row_words) = struct.unpack(">13H", body[:26])
     strike_bytes = row_words * 2 * frh
@@ -82,23 +87,26 @@ def strike_glyphs(body):
     glyphs = {}
     for k in range(count - 1):
         code = first + k
-        if code > last:
+        if code > last or code > 255:
             break
         if ow[k] == 0xFFFF:
             continue  # no glyph for this code
+        advance = ow[k] & 0xFF
+        if advance <= 0 or advance > 32:
+            continue
+        bearing = min((ow[k] >> 8) & 0xFF, advance)
         x0, x1 = loc[k], loc[k + 1]
-        if x1 <= x0 or x1 - x0 > 32:
+        if x1 < x0:
             continue
         rows = []
         for y in range(frh):
-            row_start = y * row_words * 16
-            bits = []
-            for x in range(x0, x1):
+            bits = [0] * advance
+            for x in range(x0, min(x1, x0 + advance - bearing)):
                 word = image[(y * row_words * 2) + (x // 16) * 2:(y * row_words * 2) + (x // 16) * 2 + 2]
                 v = struct.unpack(">H", word)[0] if len(word) == 2 else 0
-                bits.append((v >> (15 - (x % 16))) & 1)
+                bits[bearing + (x - x0)] = (v >> (15 - (x % 16))) & 1
             rows.append(bits)
-        glyphs[code] = (x1 - x0, -ascent, rows)
+        glyphs[code] = (advance, -ascent, rows)
     return glyphs
 
 
