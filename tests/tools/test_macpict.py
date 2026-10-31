@@ -72,4 +72,18 @@ test_packbits()
 test_bitsrect()
 test_packbitsrect()
 test_pixmap_24bit()
+
+
+def test_packbits_16bit_units():
+    # Runs count 16-bit pixels: 0x81 repeats the next pixel 128 times, and
+    # 0xCE repeats the one after it 51 times (358 bytes, one 179-pixel row).
+    data = bytes((0x81, 0x00, 0x00, 0xCE, 0x00, 0x00))
+    out = macpict.packbits_decode(data, 358, unit=2)
+    assert len(out) == 358 and out == bytes(358), len(out)
+    lit = macpict.packbits_decode(bytes((0x01, 0x12, 0x34, 0x56, 0x78)), 4, unit=2)
+    assert lit == b"\x12\x34\x56\x78", lit
+    print("ok    16-bit packbits units")
+
+
+test_packbits_16bit_units()
 print("OK")
