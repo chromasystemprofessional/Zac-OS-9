@@ -85,6 +85,12 @@ reads the Appearance theme's resource fork and produces a **theme bundle** in
   keeps its own fonts at 1.25x, 1.5x and 1.75x. Families not on your Mac
   (Tecton, Osaka...) keep ZacOS's fonts. TrueType glyphs are rasterised
   without Mac hinting, one bit per pixel.
+ - `chrome/*.png` — the window-frame skins, from the theme's named frame
+  patterns (`document window top/bottom/left/right`, `Modal Top/...`,
+  `document window tab center`, each with an `inactive` variant where the
+  theme ships one). The compositor tiles them over title bars and borders;
+  close/zoom/collapse boxes, title text and hit-testing stay ZacOS's, and
+  missing files fall back to the Platinum drawing.
 - `sounds/` — alert sounds. `system-sound-N.wav` are the System file's own
   `snd` resources, decoded from sampled sounds only; synthesized and compressed
   sounds are skipped. Theme-file sounds sit beside them. The installer never

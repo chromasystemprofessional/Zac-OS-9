@@ -318,6 +318,33 @@ def decode_wctb(data):
 	return out
 
 
+# Window-chrome skins: theme ppat names (any capitalisation) to bundle files.
+# Only frame strips are used; buttons, scroll bars and menus keep ZacOS's drawing.
+CHROME_PARTS = {
+	"document-top": ("document window top", "window title", "doc window top"),
+	"document-bottom": ("document window bottom", "window bottom", "doc window bottom"),
+	"document-left": ("document window left", "window left", "doc window left"),
+	"document-right": ("document window right", "window right", "doc window right"),
+	"modal-top": ("modal top",),
+	"modal-bottom": ("modal bottom",),
+	"modal-left": ("modal left",),
+	"modal-right": ("modal right",),
+	"popup-tab": ("document window tab center",),
+}
+
+
+def chrome_slot(name):
+	"""The chrome file for a ppat resource name, or None (with -inactive)."""
+	lower = name.lower()
+	inactive = lower.endswith(" inactive")
+	if inactive:
+		lower = lower[:-len(" inactive")]
+	for slot, names in CHROME_PARTS.items():
+		if lower in names:
+			return slot + ("-inactive" if inactive else "")
+	return None
+
+
 def process_resource_fork(data, out, counts, cluts, icons, assets, scen_tags, apple_menu, wctb, raw_icons, epics):
 	for rtype, res_id, body in parse_resource_fork(data):
 		bucket = bucket_for(rtype)
@@ -354,6 +381,18 @@ def process_resource_fork(data, out, counts, cluts, icons, assets, scen_tags, ap
 			assets.setdefault("pat", []).append(body)
 		if rtype == b"ppat":
 			assets.setdefault("ppat", []).append(body)
+			if "chrome" not in assets:
+				# The ppat names live in the resource map, which
+				# parse_resource_fork drops; read them here instead.
+				assets["chrome"] = {}
+				try:
+					named = macfont.resources(data).get("ppat", {})
+				except (ValueError, struct.error, IndexError):
+					named = {}
+				for _rid, (pname, pbody) in named.items():
+					slot = chrome_slot(pname)
+					if slot and slot not in assets["chrome"]:
+						assets["chrome"][slot] = pbody
 		if rtype == b"snd ":
 			assets.setdefault("snd", []).append(body)
 
@@ -667,6 +706,13 @@ def write_assets(assets, epics, out):
 			pngwrite.write_png(os.path.join(out, "patterns", "pattern-%d.png" % (i + 1)), 8, 8, rows)
 		except (ValueError, IndexError):
 			continue
+	# Window-chrome frame strips from the named ppat skins.
+	for slot, body in sorted(assets.get("chrome", {}).items()):
+		try:
+			w, h, rows = macpat.decode_ppat(body)
+			pngwrite.write_png(os.path.join(out, "chrome", "%s.png" % slot), w, h, rows)
+		except (ValueError, IndexError, struct.error):
+			continue
 	# Colour pattern tiles from ppat.
 	for i, body in enumerate(assets.get("ppat", [])):
 		try:
@@ -776,7 +822,7 @@ def main():
 	args = parser.parse_args()
 
 	out = os.path.abspath(args.output)
-	for sub in ("icons", "patterns", "sounds", "theme", "boot", "wallpapers", "cursors"):
+	for sub in ("icons", "patterns", "sounds", "theme", "boot", "wallpapers", "cursors", "chrome"):
 		os.makedirs(os.path.join(out, sub), exist_ok=True)
 
 	counts = {"icons": 0, "patterns": 0, "sounds": 0, "theme": 0}

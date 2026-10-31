@@ -140,6 +140,17 @@ def test_scen_patt_epic():
     print("ok    scen patt, epic exclusion and dpnm captured")
 
 
+def test_chrome_slots():
+    assert tool.chrome_slot("document window top") == "document-top"
+    assert tool.chrome_slot("Document Window Top Inactive") == "document-top-inactive"
+    assert tool.chrome_slot("WINDOW TITLE") == "document-top"
+    assert tool.chrome_slot("Modal Bottom") == "modal-bottom"
+    assert tool.chrome_slot("document window tab center") == "popup-tab"
+    assert tool.chrome_slot("horz thumb grippy") is None
+    assert tool.chrome_slot("Menu background") is None
+    print("ok    chrome slot mapping")
+
+
 def test_clut_positional():
     import importlib.util as _iu
     spec = _iu.spec_from_file_location("macicons", os.path.join(os.path.dirname(sys.argv[1]), "macicons.py"))
@@ -283,6 +294,7 @@ test_end_to_end()
 test_clut_positional()
 test_wctb()
 test_cicn()
+test_chrome_slots()
 test_scen()
 test_pointers()
 test_system_sounds()
