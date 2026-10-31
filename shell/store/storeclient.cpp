@@ -285,7 +285,7 @@ bool parseSoftwareCatalog(const QByteArray &json, const QString &source,
 
 QString extrasReleasesUrl() {
 	const QString env = qEnvironmentVariable("ZACOS9_EXTRAS_URL");
-	return env.isEmpty() ? QStringLiteral("https://api.github.com/repos/chromasystemprofessional/ZacOS-Extras/releases")
+	return env.isEmpty() ? QStringLiteral("https://api.github.com/repos/chromasystemprofessional/ZacOS-Extras/releases?per_page=100")
 		: env;
 }
 

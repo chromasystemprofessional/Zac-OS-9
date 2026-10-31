@@ -122,7 +122,7 @@ int main(int argc, char **argv) {
 		extras[0].extraStart == "zacos9-collar-hue", "an extra is read with its id and program");
 	check(extras.size() == 1, "an extra with a bad id or program, or two packages, is left out");
 	check(!qEnvironmentVariableIsSet("ZACOS9_EXTRAS_URL") &&
-		extrasReleasesUrl() == "https://api.github.com/repos/chromasystemprofessional/ZacOS-Extras/releases",
+		extrasReleasesUrl() == "https://api.github.com/repos/chromasystemprofessional/ZacOS-Extras/releases?per_page=100",
 		"extras come from the ZacOS-Extras repository");
 
 	const QByteArray releases = R"JSON([
