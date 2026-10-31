@@ -19,10 +19,16 @@ import struct
 
 
 def clut_lookup(clut):
-    """Turn a list of (index, (r, g, b)) into a list indexed by position."""
+    """Turn a list of (index, (r, g, b)) into a list indexed by position.
+
+    The ctEntry value field normally carries the index, but some tables
+    (notably the System file's default 8-bit table) leave it 0 and rely on
+    entry order, so fall back to positional order when every index is 0."""
     if not clut:
         return None
-    # Sort by the ctEntry index field, then take the rgb in that order.
+    indices = [idx for idx, _rgb in clut]
+    if len(indices) > 2 and all(i == 0 for i in indices):
+        return [rgb for _idx, rgb in clut]
     table = {}
     for idx, rgb in clut:
         table[idx] = rgb

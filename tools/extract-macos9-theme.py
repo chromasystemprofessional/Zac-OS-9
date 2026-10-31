@@ -274,7 +274,7 @@ def decode_scen_collection(data):
 	return tags
 
 
-def process_resource_fork(data, out, counts, cluts, icons, assets, scen_tags):
+def process_resource_fork(data, out, counts, cluts, icons, assets, scen_tags, apple_menu):
 	for rtype, res_id, body in parse_resource_fork(data):
 		bucket = bucket_for(rtype)
 		if not bucket:
@@ -291,12 +291,41 @@ def process_resource_fork(data, out, counts, cluts, icons, assets, scen_tags):
 					scen_tags[tag] = value
 		if rtype in (b"icl8", b"icl4", b"ICN#"):
 			icons.setdefault(rtype, []).append(body)
+		if rtype in (b"ics8", b"ics4", b"ics#") and res_id == -16386:
+			apple_menu.setdefault(rtype, []).append(body)
 		if rtype == b"PICT":
 			assets.setdefault("pict", []).append(body)
 		if rtype in (b"PAT ", b"PAT#"):
 			assets.setdefault("pat", []).append(body)
 		if rtype == b"snd ":
 			assets.setdefault("snd", []).append(body)
+
+
+def write_apple_menu(apple_menu, cluts, out):
+	"""Write apple-menu.png from the System file's 16x16 menu-bar Apple."""
+	color = None
+	mask = None
+	if apple_menu.get(b"ics8"):
+		color = apple_menu[b"ics8"][0]
+	elif apple_menu.get(b"ics4"):
+		color = apple_menu[b"ics4"][0]
+	if not color:
+		return
+	if apple_menu.get(b"ics#"):
+		_, mask_rows = macicons.decode_icn1(apple_menu[b"ics#"][0], size=16)
+		mask = mask_rows
+	# The 8-bit icons index the System's default 256-entry colour table:
+	# use the largest clut in the file.
+	palette = None
+	for _res_id, cols in cluts:
+		if cols and (palette is None or len(cols) > len(palette)):
+			palette = cols
+	rows = macicons.decode_icl8(color, palette, size=16) if len(color) == 256 else 		macicons.decode_icl4(color, palette, size=16) if len(color) == 128 else None
+	if rows is None:
+		return
+	if mask:
+		rows = macicons.combine_icon(rows, mask)
+	pngwrite.write_png(os.path.join(out, "apple-menu.png"), 16, 16, rows)
 
 
 def write_assets(assets, out):
@@ -393,6 +422,7 @@ def main():
 	icons = {}
 	assets = {}
 	scen_tags = {}
+	apple_menu = {}
 
 	if args.file:
 		# A single theme file the user copied out of Mac OS 9.
@@ -412,7 +442,7 @@ def main():
 		else:
 			fork = raw
 		if fork and looks_like_resource_fork(fork):
-			process_resource_fork(fork, out, counts, cluts, icons, assets, scen_tags)
+			process_resource_fork(fork, out, counts, cluts, icons, assets, scen_tags, apple_menu)
 	else:
 		src = args.source
 		if not src:
@@ -435,13 +465,13 @@ def main():
 				if fn.startswith("._"):
 					fork = extract_apple_double(raw)
 					if fork:
-						process_resource_fork(fork, out, counts, cluts, icons, assets, scen_tags)
+						process_resource_fork(fork, out, counts, cluts, icons, assets, scen_tags, apple_menu)
 						continue
 					# Not AppleDouble after all: fall through.
 
 				# A raw resource fork (not an AppleDouble) when the tail maps back.
 				if looks_like_resource_fork(raw) and not fn.startswith("._"):
-					process_resource_fork(raw, out, counts, cluts, icons, assets, scen_tags)
+					process_resource_fork(raw, out, counts, cluts, icons, assets, scen_tags, apple_menu)
 					continue
 
 				# Loose asset files.
@@ -465,10 +495,13 @@ def main():
 				with open(full, "rb") as f:
 					raw = f.read()
 				if looks_like_resource_fork(raw):
-					process_resource_fork(raw, out, counts, cluts, icons, assets, scen_tags)
+					process_resource_fork(raw, out, counts, cluts, icons, assets, scen_tags, apple_menu)
 
 	# Turn the theme's icon into the menu icon and boot art.
 	write_theme_art(icons, cluts, out)
+	# The System file's Apple menu icon (ics8/ics4 id -16386), for themes
+	# the user builds from their own Mac OS 9 install.
+	write_apple_menu(apple_menu, cluts, out)
 	# Decode wallpapers, patterns and sounds.
 	write_assets(assets, out)
 

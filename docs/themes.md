@@ -49,6 +49,9 @@ reads the Appearance theme's resource fork and produces a **theme bundle** in
   `highlight-name` and `variant`. The raw `scen` resources are kept under
   `theme/` for later decoding of scroll-bar geometry.
 - `menu-icon.png` — 20×15, replaces the Zac menu icon.
+- `apple-menu.png` — 16×16, the System file's menu-bar Apple icon
+  (`ics8`/`ics4` id -16386), decoded when the user's own Mac OS 9 System
+  file is present; kept separate so a theme can use it explicitly.
 - `boot/happy-zac-1x..6x.png` and `boot/zacos-logo-1x..6x.png` — replace the
   boot and Welcome artwork.
 - `wallpapers/`, `patterns/` and `sounds/` — decoded desktop pictures, pattern

@@ -107,6 +107,16 @@ def build_scen(items):
     return header + headers + _s.pack(">I", len(pool)) + pool
 
 
+def test_clut_positional():
+    import importlib.util as _iu
+    spec = _iu.spec_from_file_location("macicons", os.path.join(os.path.dirname(sys.argv[1]), "macicons.py"))
+    mi = _iu.module_from_spec(spec); spec.loader.exec_module(mi)
+    # System-file colour tables leave the ctEntry index 0 and use order.
+    lookup = mi.clut_lookup([(0, (255, 0, 0)), (0, (0, 255, 0)), (0, (0, 0, 255))])
+    assert lookup == [(255, 0, 0), (0, 255, 0), (0, 0, 255)], lookup
+    print("ok    positional clut lookup")
+
+
 def test_scen():
     data = build_scen([
         (b"name", b"\x0bConvergence"),
@@ -128,5 +138,6 @@ def test_scen():
 
 test_parse()
 test_end_to_end()
+test_clut_positional()
 test_scen()
 print("OK")
