@@ -336,6 +336,8 @@ def process_resource_fork(data, out, counts, cluts, icons, assets, scen_tags, ap
 			assets.setdefault("pict", []).append(body)
 		if rtype in (b"PAT ", b"PAT#"):
 			assets.setdefault("pat", []).append(body)
+		if rtype == b"ppat":
+			assets.setdefault("ppat", []).append(body)
 		if rtype == b"snd ":
 			assets.setdefault("snd", []).append(body)
 
@@ -521,6 +523,13 @@ def write_assets(assets, out):
 			rows = macpat.decode_pat(body)
 			pngwrite.write_png(os.path.join(out, "patterns", "pattern-%d.png" % (i + 1)), 8, 8, rows)
 		except (ValueError, IndexError):
+			continue
+	# Colour pattern tiles from ppat.
+	for i, body in enumerate(assets.get("ppat", [])):
+		try:
+			w, h, rows = macpat.decode_ppat(body)
+			pngwrite.write_png(os.path.join(out, "patterns", "colour-pattern-%d.png" % (i + 1)), w, h, rows)
+		except (ValueError, IndexError, struct.error):
 			continue
 	# Alert sounds from snd.
 	for i, body in enumerate(assets.get("snd", [])):
