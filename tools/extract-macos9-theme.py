@@ -458,10 +458,11 @@ def decode_pointer(kind, body, cluts):
 
 
 def write_theme_fonts(scen_tags, system_path, fonts_dir, out):
-	"""Write the bitmap fonts the theme asks for: fonts/views.pfont (its views
-	font at its views size) and fonts/system.pfont (its system font at 12
-	points). Families found only as TrueType, or not found, are left to
-	ZacOS's own fonts. Family names come from the System file and the Fonts
+	"""Write the fonts the theme asks for: fonts/views.pfont (its views font at
+	its views size) and fonts/system.pfont (its system font at 12 points). A
+	bitmap strike is used when there is one for that size; otherwise the
+	family's TrueType font is rasterised at that size. Families not found are
+	left to ZacOS's own fonts. Family names come from the System file and the Fonts
 	folder's resource forks (<Fonts>/.rsrc/<name>)."""
 	sources = []
 	if system_path:
@@ -490,18 +491,23 @@ def write_theme_fonts(scen_tags, system_path, fonts_dir, out):
 	for filename, family, size in wants:
 		if not family or family not in families:
 			continue
-		body = None
+		text = None
 		for res in families[family]:
-			body = macfont.strikes(res, family).get((size, 0))
-			if body is not None:
+			strike = macfont.strikes(res, family).get((size, 0))
+			try:
+				if strike is not None:
+					text = macfont.pfont_text(family, size, strike)
+				else:
+					sfnt = macfont.scalable(res, family)
+					if sfnt is not None:
+						text = macfont.pfont_from_sfnt(family, size, sfnt)
+			except (ValueError, IndexError, struct.error, OSError):
+				text = None
+			if text is not None:
 				break
-		if body is None:
+		if text is None:
 			continue
 		os.makedirs(os.path.join(out, "fonts"), exist_ok=True)
-		try:
-			text = macfont.pfont_text(family, size, body)
-		except (ValueError, IndexError, struct.error):
-			continue
 		with open(os.path.join(out, "fonts", filename), "w", encoding="utf-8") as f:
 			f.write(text)
 

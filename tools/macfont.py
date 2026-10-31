@@ -117,3 +117,44 @@ def pfont_text(name, size, body):
             lines.append("".join("#" if bit else "." for bit in row))
         lines.append("")
     return "\n".join(lines) + "\n"
+
+
+def scalable(res, name):
+    """The TrueType (sfnt) body a family links at size 0, or None."""
+    for rid, (fname, body) in res.get("FOND", {}).items():
+        if fname != name:
+            continue
+        count = struct.unpack(">H", body[52:54])[0] + 1
+        for k in range(count):
+            size, style, sid = struct.unpack(">HHh", body[54 + 6 * k:60 + 6 * k])
+            if size == 0 and style == 0 and sid in res.get("sfnt", {}):
+                return res["sfnt"][sid][1]
+    return None
+
+
+def pfont_from_sfnt(name, size, sfnt):
+    """Rasterise a TrueType font at `size` pixels into .pfont text, one bit per
+    pixel, the baseline at the font's ascent. Codes 32-126 and 128-255 (Mac
+    Roman) become glyphs; an advance wider than 32 pixels is skipped."""
+    import io
+    from PIL import Image, ImageDraw, ImageFont
+
+    font = ImageFont.truetype(io.BytesIO(sfnt), size, layout_engine=ImageFont.Layout.BASIC)
+    ascent, descent = font.getmetrics()
+    height = ascent + descent
+    lines = ["; Rasterised from the Mac OS 9 TrueType font %s, %d pixels." % (name, size),
+             "font %s" % name, "height %d" % height, "baseline %d" % ascent, ""]
+    for code in list(range(32, 127)) + list(range(128, 256)):
+        char = bytes((code,)).decode("mac_roman", "replace")
+        if len(char) != 1:
+            continue
+        advance = max(1, round(font.getlength(char)))
+        if advance > 32:
+            continue
+        image = Image.new("1", (advance, height), 0)
+        ImageDraw.Draw(image).text((0, ascent), char, font=font, fill=1, anchor="ls")
+        lines.append("char U+%04X %d %d" % (ord(char), advance, -ascent))
+        for y in range(height):
+            lines.append("".join("#" if image.getpixel((x, y)) else "." for x in range(advance)))
+        lines.append("")
+    return "\n".join(lines) + "\n"
