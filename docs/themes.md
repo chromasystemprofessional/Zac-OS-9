@@ -89,9 +89,11 @@ reads the Appearance theme's resource fork and produces a **theme bundle** in
   `snd` resources, decoded from sampled sounds only; synthesized and compressed
   sounds are skipped. Theme-file sounds sit beside them. The installer never
   picks a `system-` sound as the theme's default alert.
-- The installer copies the desktop wallpaper, the desktop pattern and the
+ - The installer copies the desktop wallpaper, the desktop pattern and the
   sounds into the Appearance folders. It also copies every set in
-  `Appearance add-ons/Sound Sets` into Sound Themes. Those sound-set clips
+  `Appearance add-ons/Sound Sets` into Sound Themes, and selects the theme's
+  own set (`scen` `sndt`, e.g. Aqua's Platinum Sounds) when it is installed;
+  otherwise no sound theme is chosen. Those sound-set clips
   get a 4 ms fade in and out; the System alert sounds don't yet.
 - The installer applies the theme at once: it writes the pattern, wallpaper,
   background (`wallpaper` when a wallpaper was installed, else `pattern`)

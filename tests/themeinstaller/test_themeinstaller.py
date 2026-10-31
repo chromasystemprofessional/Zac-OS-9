@@ -107,6 +107,7 @@ desktop = conf_dict(os.path.join(config, "zacos9", "desktop.conf"))
 assert desktop.get("theme-bundle") == "Apple platinum", desktop
 assert desktop.get("background") == "pattern", desktop
 assert "background" not in conf, conf  # no desktop art in this theme
+assert "sound-theme" not in desktop, desktop  # its sound set is not installed
 print("ok    installed theme is applied to theme.conf and desktop.conf")
 
 # The preset names pattern and wallpaper by the Appearance panel's catalog ids:

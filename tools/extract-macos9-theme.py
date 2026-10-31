@@ -978,6 +978,8 @@ def main():
 			f.write("pattern-name=%s\n" % scen_tags["patn"])
 		if scen_tags.get("hcnm"):
 			f.write("highlight-name=%s\n" % scen_tags["hcnm"])
+		if scen_tags.get("sndt"):
+			f.write("sound-set=%s\n" % scen_tags["sndt"])
 		if "sbar" in scen_tags:
 			f.write("scroll-bar-arrows=%s\n" %
 				("double-lower-right" if scen_tags["sbar"] == 1 else "single"))

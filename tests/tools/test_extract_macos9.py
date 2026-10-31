@@ -112,7 +112,8 @@ def test_scen_patt_epic():
     import struct as _s
     patt = bytes(28)  # type-1 header stub; decode failure is fine, capture matters
     scen = build_scen([(b"patt", patt), (b"epic", _s.pack(">h", 2011)),
-                       (b"dpnm", bytes((5,)) + b"Beach")])
+                       (b"dpnm", bytes((5,)) + b"Beach"),
+                       (b"sndt", bytes((5,)) + b"Waves")])
     # A minimal version-1 8x1 BitsRect PICT (kept: not epic, not splash).
     pict = (_s.pack(">H", 0) + _s.pack(">hhhh", 0, 0, 1, 8) + b"\x11\x01" + bytes((0x90,))
             + _s.pack(">H", 1) + _s.pack(">hhhh", 0, 0, 1, 8)
@@ -135,6 +136,7 @@ def test_scen_patt_epic():
         with open(os.path.join(out, "theme.conf")) as f:
             conf = f.read()
         assert "desktop-picture=Beach" in conf, conf
+        assert "sound-set=Waves" in conf, conf
     print("ok    scen patt, epic exclusion and dpnm captured")
 
 

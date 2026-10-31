@@ -155,7 +155,8 @@ static QString themeConfValue(const QString &name, const QString &key) {
 /* Write the appearance preset JSON that the Appearance panel's Themes list
  * shows, so the extracted theme appears there and applies its settings. */
 static QString writeAppearancePreset(const QString &name, const QString &wallpaper,
-		const QString &pattern, const QString &alert, QString *error) {
+		const QString &pattern, const QString &alert, const QString &soundTheme,
+		QString *error) {
 	const QString folder = appearanceThemesFolder();
 	if (!QDir().mkpath(folder)) {
 		*error = "Couldn't create the appearance Themes folder.";
@@ -175,6 +176,7 @@ static QString writeAppearancePreset(const QString &name, const QString &wallpap
 	put("pattern", pattern);
 	put("wallpaper", wallpaper);
 	put("alert-sound", alert);
+	put("sound-theme", soundTheme);
 	put("theme-bundle", name);
 	QSaveFile output(path);
 	const QByteArray bytes = QJsonDocument(QJsonObject{
@@ -256,6 +258,48 @@ static void installThemeAssets(const QString &name, QString *wallpaper,
 			break;
 		}
 	}
+}
+
+/* The sound-theme catalog id for a Mac sound set name (its sndt): the set's
+ * path in Sound Themes, with any AppleDouble leaf resolved, hashed the way
+ * shell/panels/zacos9-soundthemes does ("user:" + SHA-256, first 32 hex).
+ * "" when the set isn't installed. */
+static QString soundThemeId(const QString &soundThemes, const QString &setName) {
+	if (setName.isEmpty()) {
+		return QString();
+	}
+	const QDir base(soundThemes);
+	for (const QFileInfo &top : base.entryInfoList(
+			QDir::Files | QDir::Dirs | QDir::Hidden | QDir::NoDotAndDotDot, QDir::Name)) {
+		if (top.fileName() == ".DS_Store") {
+			continue;
+		}
+		if (top.isDir()) {
+			for (const QFileInfo &child : QDir(top.filePath()).entryInfoList(QDir::Files, QDir::Name)) {
+				QString leaf = child.fileName();
+				if (leaf.startsWith("._")) {
+					leaf = leaf.mid(2);
+				}
+				if (leaf != setName) {
+					continue;
+				}
+				const QString identity = top.fileName() + "/" + leaf;
+				return "user:" + QString::fromLatin1(QCryptographicHash::hash(
+					identity.toUtf8(), QCryptographicHash::Sha256).toHex().left(32));
+			}
+			continue;
+		}
+		QString leaf = top.fileName();
+		if (leaf.startsWith("._")) {
+			leaf = leaf.mid(2);
+		}
+		if (leaf != setName) {
+			continue;
+		}
+		return "user:" + QString::fromLatin1(QCryptographicHash::hash(
+			leaf.toUtf8(), QCryptographicHash::Sha256).toHex().left(32));
+	}
+	return QString();
 }
 
 /* Set a key=value line in the bundle's theme.conf, adding it when absent. */
@@ -425,7 +469,8 @@ int main(int argc, char *argv[]) {
 		"/zacos9/appearance/Sound Themes";
 	const int soundSets = copyMacSoundSets(
 		QDir::homePath() + "/Classic/Appearance add-ons/Sound Sets", soundThemes);
-	const QString presetId = writeAppearancePreset(name, wallpaper, pattern, alert, &error);
+	const QString soundId = soundThemeId(soundThemes, themeConfValue(name, "sound-set"));
+	const QString presetId = writeAppearancePreset(name, wallpaper, pattern, alert, soundId, &error);
 	if (presetId.isEmpty()) {
 		if (batch) {
 			fprintf(stderr, "zacos9-themeinstaller: %s\n", qPrintable(error));
@@ -441,6 +486,10 @@ int main(int argc, char *argv[]) {
 	setThemeConfValue(name, "background", !wallpaper.isEmpty() ? "wallpaper" :
 		!pattern.isEmpty() ? "pattern" : "");
 	setThemeConfValue(name, "alert-sound", alert);
+	setThemeConfValue(name, "sound-theme", soundId);
+	if (!soundId.isEmpty()) {
+		pl_setting_set("sound-theme", soundId.toUtf8().constData());
+	}
 	if (!pattern.isEmpty()) {
 		pl_setting_set("pattern", pattern.toUtf8().constData());
 	}
