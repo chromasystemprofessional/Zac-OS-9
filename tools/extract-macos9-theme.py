@@ -307,7 +307,7 @@ def decode_wctb(data):
 	return out
 
 
-def process_resource_fork(data, out, counts, cluts, icons, assets, scen_tags, apple_menu, wctb):
+def process_resource_fork(data, out, counts, cluts, icons, assets, scen_tags, apple_menu, wctb, raw_icons):
 	for rtype, res_id, body in parse_resource_fork(data):
 		bucket = bucket_for(rtype)
 		if not bucket:
@@ -328,6 +328,8 @@ def process_resource_fork(data, out, counts, cluts, icons, assets, scen_tags, ap
 			apple_menu.setdefault(rtype, []).append(body)
 		if rtype == b"wctb" and res_id == 0 and not wctb:
 			wctb.update(decode_wctb(body))
+		if rtype in (b"cicn", b"crsr", b"CURS"):
+			raw_icons.setdefault(rtype, {})[res_id] = body
 		if rtype == b"PICT":
 			assets.setdefault("pict", []).append(body)
 		if rtype in (b"PAT ", b"PAT#"):
@@ -361,6 +363,39 @@ def write_apple_menu(apple_menu, cluts, out):
 	if mask:
 		rows = macicons.combine_icon(rows, mask)
 	pngwrite.write_png(os.path.join(out, "apple-menu.png"), 16, 16, rows)
+
+
+def write_icon_dump(raw_icons, cluts, out):
+	"""Decode cicn/crsr/CURS resources for visual checking (--dump-icons)."""
+	# The largest clut in the file is the System's default 256-entry table.
+	palette = None
+	for _rid, cols in cluts:
+		if cols and (palette is None or len(cols) > len(palette)):
+			palette = cols
+	system_pal = [rgb for _idx, rgb in palette] if palette else None
+	lines = []
+	for rtype in (b"cicn", b"crsr", b"CURS"):
+		for res_id, body in sorted(raw_icons.get(rtype, {}).items()):
+			tag = rtype.decode("latin1")
+			try:
+				if rtype == b"cicn":
+					rows = macicons.decode_cicn(body, clut=palette)
+					sub = "icons"
+					name = "cicn_%d.png" % res_id
+				elif rtype == b"crsr":
+					rows, hot = macicons.decode_crsr(body, clut=palette)
+					sub = "cursors"
+					name = "crsr_%d.png" % res_id
+					lines.append("%s %d hotspot=%d,%d" % (tag, res_id, hot[0], hot[1]))
+				else:
+					continue
+				pngwrite.write_png(os.path.join(out, sub, name), len(rows[0]), len(rows), rows)
+				lines.append("%s %d -> %s/%s" % (tag, res_id, sub, name))
+			except (ValueError, IndexError, struct.error) as e:
+				lines.append("%s %d skipped: %s" % (tag, res_id, e))
+	with open(os.path.join(out, "icons-dump.txt"), "w") as f:
+		f.write("\n".join(lines) + "\n")
+	print("Wrote icons-dump.txt (%d resources decoded)" % len(lines))
 
 
 def write_assets(assets, out):
@@ -474,10 +509,11 @@ def main():
 	parser.add_argument("--pattern", help="Desktop pattern id")
 	parser.add_argument("--list-cluts", action="store_true", help="Print colour tables from clut resources and exit")
 	parser.add_argument("--auto-colours", action="store_true", help="Heuristically pick chrome colours from the clut resources")
+	parser.add_argument("--dump-icons", action="store_true", help="Decode cicn/crsr/CURS resources to PNG and a text dump")
 	args = parser.parse_args()
 
 	out = os.path.abspath(args.output)
-	for sub in ("icons", "patterns", "sounds", "theme", "boot", "wallpapers"):
+	for sub in ("icons", "patterns", "sounds", "theme", "boot", "wallpapers", "cursors"):
 		os.makedirs(os.path.join(out, sub), exist_ok=True)
 
 	counts = {"icons": 0, "patterns": 0, "sounds": 0, "theme": 0}
@@ -487,6 +523,7 @@ def main():
 	scen_tags = {}
 	apple_menu = {}
 	wctb = {}
+	raw_icons = {}
 
 	if args.file:
 		# A single theme file the user copied out of Mac OS 9.
@@ -506,7 +543,7 @@ def main():
 		else:
 			fork = raw
 		if fork and looks_like_resource_fork(fork):
-			process_resource_fork(fork, out, counts, cluts, icons, assets, scen_tags, apple_menu, wctb)
+			process_resource_fork(fork, out, counts, cluts, icons, assets, scen_tags, apple_menu, wctb, raw_icons)
 	else:
 		src = args.source
 		if not src:
@@ -533,13 +570,13 @@ def main():
 					if fn.startswith("._"):
 						fork = extract_apple_double(raw)
 						if fork:
-							process_resource_fork(fork, out, counts, cluts, icons, assets, scen_tags, apple_menu, wctb)
+							process_resource_fork(fork, out, counts, cluts, icons, assets, scen_tags, apple_menu, wctb, raw_icons)
 							continue
 						# Not AppleDouble after all: fall through.
 
 					# A raw resource fork (not an AppleDouble) when the tail maps back.
 					if looks_like_resource_fork(raw) and not fn.startswith("._"):
-						process_resource_fork(raw, out, counts, cluts, icons, assets, scen_tags, apple_menu, wctb)
+						process_resource_fork(raw, out, counts, cluts, icons, assets, scen_tags, apple_menu, wctb, raw_icons)
 						continue
 
 					# Loose asset files.
@@ -563,7 +600,7 @@ def main():
 					with open(full, "rb") as f:
 						raw = f.read()
 					if looks_like_resource_fork(raw):
-						process_resource_fork(raw, out, counts, cluts, icons, assets, scen_tags, apple_menu, wctb)
+						process_resource_fork(raw, out, counts, cluts, icons, assets, scen_tags, apple_menu, wctb, raw_icons)
 
 		for s in [src] + expand_archives(src):
 			walk_tree(s)
@@ -573,6 +610,8 @@ def main():
 	# The System file's Apple menu icon (ics8/ics4 id -16386), for themes
 	# the user builds from their own Mac OS 9 install.
 	write_apple_menu(apple_menu, cluts, out)
+	if args.dump_icons:
+		write_icon_dump(raw_icons, cluts, out)
 	# Decode wallpapers, patterns and sounds.
 	write_assets(assets, out)
 

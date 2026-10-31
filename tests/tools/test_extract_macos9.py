@@ -126,6 +126,23 @@ def test_wctb():
     print("ok    window colour table decoded")
 
 
+def test_cicn():
+    import importlib.util as _iu
+    spec = _iu.spec_from_file_location("macicons", os.path.join(os.path.dirname(sys.argv[1]), "macicons.py"))
+    mi = _iu.module_from_spec(spec); spec.loader.exec_module(mi)
+    # 16x16 4-bit icon, 2-entry table (black/white), fully-opaque mask.
+    pixmap = struct.pack(">IHhhhhHHIIIHHHHIII", 0, 0x8008, 0, 0, 16, 16,
+                         0, 0, 0, 72 << 16, 72 << 16, 0, 4, 1, 4, 0, 0, 0)
+    ctab = struct.pack(">IHH", 0, 0, 1) + struct.pack(">HHHH", 0, 0, 0, 0) \
+        + struct.pack(">HHHH", 1, 0xFFFF, 0xFFFF, 0xFFFF)
+    pixel = b"\x11" * 128          # index 1 (white)
+    mask = b"\xff" * 32            # 2 bytes/row * 16 = 32, all opaque
+    rows = mi.decode_cicn(pixmap + ctab + pixel + mask)
+    assert len(rows) == 16 and len(rows[0]) == 16, "16x16 rows"
+    assert rows[0][0] == (255, 255, 255, 255), rows[0][0]
+    print("ok    cicn decoded")
+
+
 def test_scen():
     data = build_scen([
         (b"name", b"\x0bConvergence"),
@@ -153,5 +170,6 @@ test_parse()
 test_end_to_end()
 test_clut_positional()
 test_wctb()
+test_cicn()
 test_scen()
 print("OK")

@@ -109,6 +109,95 @@ def decode_icn1(data, size=32):
     return bitmap, mask
 
 
+def _pixmap_fields(data, off=0):
+	"""Parse a 50-byte PixMap, returning (rowBytes, bounds, pixelSize, cmpCount, pmTable)."""
+	if off + 50 > len(data):
+		raise ValueError("PixMap too short")
+	rowBytes = struct.unpack(">H", data[off + 4:off + 6])[0] & 0x3FFF
+	top, left, bottom, right = struct.unpack(">hhhh", data[off + 6:off + 14])
+	pixelSize = struct.unpack(">H", data[off + 32:off + 34])[0]
+	cmpCount = struct.unpack(">H", data[off + 34:off + 36])[0]
+	pmTable = struct.unpack(">I", data[off + 42:off + 46])[0]
+	return rowBytes, (right - left, bottom - top), pixelSize, cmpCount, pmTable
+
+
+def _read_ctab(data, off):
+	"""Read a ColorTable; return (lookup, next_offset)."""
+	ctSeed, ctFlags, ctSize = struct.unpack(">IHH", data[off:off + 8])
+	pos = off + 8
+	entries = []
+	for _ in range(ctSize + 1):
+		val, r, g, b = struct.unpack(">HHHH", data[pos:pos + 8])
+		entries.append((val, (r >> 8, g >> 8, b >> 8)))
+		pos += 8
+	lookup = clut_lookup(entries)
+	return lookup, pos
+
+
+def _indexed_rows(data, off, w, h, pixel_size, lookup):
+	"""Decode an indexed bitmap (1/2/4/8-bit) to RGBA rows."""
+	row_bytes = (w * pixel_size + 7) // 8
+	need = 1 << pixel_size
+	if lookup is None or len(lookup) < need:
+		ramp = gray_ramp(need)
+		if lookup:
+			ramp[:len(lookup)] = lookup
+		lookup = ramp
+	rows = []
+	for y in range(h):
+		row = []
+		for x in range(w):
+			byte = data[off + y * row_bytes + (x * pixel_size) // 8]
+			shift = 8 - pixel_size - ((x * pixel_size) % 8)
+			idx = (byte >> shift) & ((1 << pixel_size) - 1)
+			r, g, b = lookup[idx]
+			row.append((r, g, b, 255))
+		rows.append(row)
+	return rows
+
+
+def decode_cicn(data, clut=None):
+	"""Decode a 'cicn' colour icon to RGBA rows.
+
+	Layout: PixMap(50) + ColorTable + indexed pixel data + 1-bit mask."""
+	row_bytes, (w, h), pixel_size, _cmp, _pmTable = _pixmap_fields(data)
+	lookup, pos = _read_ctab(data, 50)
+	if clut:
+		lookup = clut_lookup(clut)
+	rows = _indexed_rows(data, pos, w, h, pixel_size, lookup)
+	# 1-bit mask follows the pixel data (word-aligned rows).
+	px_bytes = (w * pixel_size + 7) // 8 * h
+	mask_off = pos + px_bytes
+	mrb = ((w + 15) // 16) * 2
+	for y in range(h):
+		for x in range(w):
+			b = data[mask_off + y * mrb + x // 8]
+			if not (b & (0x80 >> (x % 8))):
+				rows[y][x] = (rows[y][x][0], rows[y][x][1], rows[y][x][2], 0)
+	return rows
+
+
+def decode_crsr(data, clut=None):
+	"""Decode a 'crsr' colour cursor to (rows, hot_spot).
+
+	Layout (QDCCrsr): a 96-byte header, then the PixMap, then the colour
+	table (at the PixMap's pmTable offset) and pixel data."""
+	if len(data) < 96:
+		raise ValueError("crsr too short")
+	crsr_type = struct.unpack(">H", data[0:2])[0]
+	if crsr_type != 0x8001:
+		raise ValueError("not a colour cursor")
+	crsr_map = struct.unpack(">I", data[2:6])[0]
+	crsr_data = struct.unpack(">I", data[6:10])[0]
+	hot_y, hot_x = struct.unpack(">hh", data[84:88])
+	row_bytes, (w, h), pixel_size, _cmp, pmTable = _pixmap_fields(data, crsr_map)
+	lookup, _ = _read_ctab(data, pmTable)
+	if clut:
+		lookup = clut_lookup(clut)
+	rows = _indexed_rows(data, crsr_data, w, h, pixel_size, lookup)
+	return rows, (hot_x, hot_y)
+
+
 def combine_icon(color_rows, mask, black=(0, 0, 0)):
     """Combine colour rows with a 1-bit mask into rows of (r, g, b, a)."""
     size = len(mask)
