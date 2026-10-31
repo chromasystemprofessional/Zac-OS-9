@@ -367,23 +367,22 @@ def write_apple_menu(apple_menu, cluts, out):
 
 def write_icon_dump(raw_icons, cluts, out):
 	"""Decode cicn/crsr/CURS resources for visual checking (--dump-icons)."""
-	# The largest clut in the file is the System's default 256-entry table.
-	palette = None
+	# Indexed icons pick their palette by depth: 4-bit uses the 16-entry
+	# system table, 8-bit the 256-entry table.
+	cluts_by_size = {}
 	for _rid, cols in cluts:
-		if cols and (palette is None or len(cols) > len(palette)):
-			palette = cols
-	system_pal = [rgb for _idx, rgb in palette] if palette else None
+		cluts_by_size.setdefault(len(cols), cols)
 	lines = []
 	for rtype in (b"cicn", b"crsr", b"CURS"):
 		for res_id, body in sorted(raw_icons.get(rtype, {}).items()):
 			tag = rtype.decode("latin1")
 			try:
 				if rtype == b"cicn":
-					rows = macicons.decode_cicn(body, clut=palette)
+					rows = macicons.decode_cicn(body, cluts=cluts_by_size)
 					sub = "icons"
 					name = "cicn_%d.png" % res_id
 				elif rtype == b"crsr":
-					rows, hot = macicons.decode_crsr(body, clut=palette)
+					rows, hot = macicons.decode_crsr(body, cluts=cluts_by_size)
 					sub = "cursors"
 					name = "crsr_%d.png" % res_id
 					lines.append("%s %d hotspot=%d,%d" % (tag, res_id, hot[0], hot[1]))

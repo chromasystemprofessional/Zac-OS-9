@@ -156,13 +156,28 @@ def _indexed_rows(data, off, w, h, pixel_size, lookup):
 	return rows
 
 
-def decode_cicn(data, clut=None):
+def _pick_clut(cluts, pixel_size):
+	"""Choose a palette for an indexed icon: exact depth first, then a
+	larger table, then None."""
+	if not cluts:
+		return None
+	need = 1 << pixel_size
+	best = None
+	for size, cols in cluts.items():
+		if len(cols) >= need and (best is None or len(cols) < len(best)):
+			best = cols
+	return clut_lookup(best)
+
+
+def decode_cicn(data, clut=None, cluts=None):
 	"""Decode a 'cicn' colour icon to RGBA rows.
 
 	Layout: PixMap(50) + ColorTable + indexed pixel data + 1-bit mask."""
 	row_bytes, (w, h), pixel_size, _cmp, _pmTable = _pixmap_fields(data)
 	lookup, pos = _read_ctab(data, 50)
-	if clut:
+	if cluts:
+		lookup = _pick_clut(cluts, pixel_size)
+	elif clut:
 		lookup = clut_lookup(clut)
 	rows = _indexed_rows(data, pos, w, h, pixel_size, lookup)
 	# 1-bit mask follows the pixel data (word-aligned rows).
@@ -177,7 +192,7 @@ def decode_cicn(data, clut=None):
 	return rows
 
 
-def decode_crsr(data, clut=None):
+def decode_crsr(data, clut=None, cluts=None):
 	"""Decode a 'crsr' colour cursor to (rows, hot_spot).
 
 	Layout (QDCCrsr): a 96-byte header, then the PixMap, then the colour
@@ -192,7 +207,9 @@ def decode_crsr(data, clut=None):
 	hot_y, hot_x = struct.unpack(">hh", data[84:88])
 	row_bytes, (w, h), pixel_size, _cmp, pmTable = _pixmap_fields(data, crsr_map)
 	lookup, _ = _read_ctab(data, pmTable)
-	if clut:
+	if cluts:
+		lookup = _pick_clut(cluts, pixel_size)
+	elif clut:
 		lookup = clut_lookup(clut)
 	rows = _indexed_rows(data, crsr_data, w, h, pixel_size, lookup)
 	return rows, (hot_x, hot_y)
