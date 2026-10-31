@@ -68,6 +68,11 @@ test('macsnd', find_program('python3'),
   args: [files('tests/tools/test_macsnd.py'),
     meson.project_source_root() / 'tools' / 'macsnd.py'])
 
+# Mac OS 9 bitmap font reader (theming, fonts).
+test('macfont', find_program('python3'),
+  args: [files('tests/tools/test_macfont.py'),
+    meson.project_source_root() / 'tools' / 'macfont.py'])
+
 # Mac OS 9 pattern decoder (theming, phase A).
 test('macpat', find_program('python3'),
   args: [files('tests/tools/test_macpat.py'),
