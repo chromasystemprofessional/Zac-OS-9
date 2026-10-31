@@ -211,6 +211,8 @@ const QString &Item::kindName() {
 			kindText = "Super NES game";
 		} else if (kind == PL_ICON_ROM_PS1) {
 			kindText = "PlayStation disc";
+		} else if (kind == PL_ICON_ROM_PS2) {
+			kindText = "PlayStation 2 disc";
 		} else if (kind == PL_ICON_ROM_N64) {
 			kindText = "Nintendo 64 game";
 		} else if (kind == PL_ICON_ROM_SEGA) {
@@ -301,6 +303,12 @@ pl_icon_kind iconKindFor(const QString &path) {
 		info.setFile(target);
 	}
 	const QString iconPath = info.absoluteFilePath();
+	/* A console game disc (PlayStation 2 .iso/.mdf) takes priority over a
+	 * generic mountable disc image. */
+	const pl_icon_kind rom = romIconKind(iconPath);
+	if (rom != PL_ICON_DOCUMENT) {
+		return rom;
+	}
 	if (isMacDiskImage(iconPath) || isDiscImage(iconPath)) {
 		return PL_ICON_DISK_IMAGE;
 	}
@@ -321,10 +329,6 @@ pl_icon_kind iconKindFor(const QString &path) {
 	}
 	if (isClassicApplication(iconPath)) {
 		return PL_ICON_CLASSIC;
-	}
-	const pl_icon_kind rom = romIconKind(iconPath);
-	if (rom != PL_ICON_DOCUMENT) {
-		return rom;
 	}
 	static QMimeDatabase db;
 	const QString mime = db.mimeTypeForFile(info).name();
@@ -369,7 +373,8 @@ pl_icon_kind romIconKind(const QString &path) {
 	if (suffix != "nes" && suffix != "sfc" && suffix != "smc" && suffix != "n64" &&
 			suffix != "z64" && suffix != "v64" && suffix != "gen" && suffix != "smd" &&
 			suffix != "sms" && suffix != "md" && suffix != "gb" && suffix != "gbc" &&
-			suffix != "gba" && suffix != "cue" && suffix != "bin") {
+			suffix != "gba" && suffix != "cue" && suffix != "bin" &&
+			suffix != "iso" && suffix != "mdf") {
 		return PL_ICON_DOCUMENT;
 	}
 	if (!info.isFile()) {
@@ -405,6 +410,10 @@ pl_icon_kind romIconKind(const QString &path) {
 	}
 	if (suffix == "bin") {
 		return hasSiblingCue(info) ? PL_ICON_ROM_PS1 : PL_ICON_DOCUMENT;
+	}
+	/* PlayStation 2: a DVD/CD disc image. */
+	if (suffix == "iso" || suffix == "mdf") {
+		return PL_ICON_ROM_PS2;
 	}
 	return PL_ICON_DOCUMENT;
 }
