@@ -7,37 +7,66 @@ macsnd = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(macsnd)
 
 
-def test_square_wave():
-    data = struct.pack(">h", 1) + b"\x00" * 8
-    rate, width, frames = macsnd.decode_snd(data)
-    assert rate == 22050 and width == 8
-    assert len(frames) == rate // 2
-    print("ok    square wave")
+def sampled_snd(samples, version=1, encode=0, channels=1, bits=8, rate=22050):
+    """A snd resource with one buffer command pointing at a sound header."""
+    if version == 1:
+        head = struct.pack(">HHHI", 1, 1, 5, 0)  # format 1, one synth
+    else:
+        head = struct.pack(">HH", 2, 0)  # format 2, reserved
+    head += struct.pack(">H", 1)  # one command
+    header_at = len(head) + 8
+    head += struct.pack(">HHI", 0x8051, 0, header_at)
+    if encode == 0:
+        header = struct.pack(">IIIII", 0, len(samples), rate << 16, 0, 0)
+        header += struct.pack(">BB", 0, 60)
+    else:
+        header = struct.pack(">IIIII", 0, channels, rate << 16, 0, 0)
+        header += struct.pack(">BB", encode, 60)
+        header += struct.pack(">I", len(samples) // channels // (bits // 8))
+        header += bytes(22)  # AIFF rate, marker, instrument and recording fields
+        header += struct.pack(">H", bits)  # sample size at 48
+        header += bytes(64 - len(header))  # reserved, up to the sample area
+    return head + header + samples
 
 
-def test_sampled_pcm():
-    header = struct.pack(">hhIhIh", 2, 1, 4, 16, 22050 << 16, 1)
-    header += struct.pack(">h", 1)  # numCommands again
-    cmd = struct.pack(">h", 1) + struct.pack(">h", 0) + struct.pack(">I", 0)
-    samples = struct.pack(">hhhh", 0, 1000, -1000, 0)
-    rate, width, frames = macsnd.decode_snd(header + cmd + samples)
-    assert rate == 22050 and width == 16
-    assert len(frames) == 8
-    print("ok    sampled pcm")
+def test_standard_8bit():
+    rate_info = macsnd.decode_snd(sampled_snd(bytes((128, 255, 0))))
+    channels, rate, bits, frames = rate_info
+    assert (channels, rate, bits) == (1, 22050, 8), rate_info
+    assert frames == bytes((128, 255, 0))
+    print("ok    standard 8-bit sampled sound")
 
 
-def test_sampled_8bit():
-    header = struct.pack(">hhIhIh", 2, 1, 2, 8, 22050 << 16, 1)
-    header += struct.pack(">h", 1)
-    cmd = struct.pack(">h", 1) + struct.pack(">h", 0) + struct.pack(">I", 0)
-    samples = bytes((128, 255))
-    rate, width, frames = macsnd.decode_snd(header + cmd + samples)
-    assert width == 16
-    assert struct.unpack("<hh", frames) == (0, 127 * 256)
-    print("ok    sampled 8-bit")
+def test_format_2():
+    channels, rate, bits, frames = macsnd.decode_snd(sampled_snd(bytes((200, 56)), version=2))
+    assert (channels, bits, frames) == (1, 8, bytes((200, 56)))
+    print("ok    format 2 sampled sound")
 
 
-test_square_wave()
-test_sampled_pcm()
-test_sampled_8bit()
+def test_extended_16bit_stereo():
+    big = struct.pack(">hhhh", 1000, -1000, 2000, -2000)
+    channels, rate, bits, frames = macsnd.decode_snd(
+        sampled_snd(big, encode=255, channels=2, bits=16))
+    assert (channels, bits) == (2, 16)
+    assert frames == struct.pack("<hhhh", 1000, -1000, 2000, -2000)
+    print("ok    extended 16-bit stereo, byte-swapped")
+
+
+def test_rejects_unsupported():
+    for data, why in (
+        (struct.pack(">HHHI", 1, 1, 5, 0) + struct.pack(">H", 0), "no sample command"),
+        (sampled_snd(b"\x00\x00", encode=254, channels=1, bits=16), "compressed"),
+    ):
+        try:
+            macsnd.decode_snd(data)
+        except ValueError:
+            continue
+        raise AssertionError("accepted " + why)
+    print("ok    synthesized and compressed sounds are rejected")
+
+
+test_standard_8bit()
+test_format_2()
+test_extended_16bit_stereo()
+test_rejects_unsupported()
 print("OK")

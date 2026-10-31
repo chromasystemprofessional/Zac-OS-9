@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Decode Mac OS 9 `snd ` resources to WAV.
 
-A `snd ` resource is a Sound Manager 'snd ' — either a square-wave tone
-(type 1) or sampled sound (type 2). This handles the uncompressed sampled
-cases ('twos' / 'NONE') and square waves; MACE/ima4 and other compressed
-formats are a follow-up.
+A `snd ` resource (format 1 or 2) names a sampled sound through its first
+sound command, which points at a sound header. This reads uncompressed
+8- and 16-bit PCM (standard and extended headers), mono or stereo, the way
+the shell's classic sound decoder does (shell/panels/zacos9-soundthemes).
+Synthesized sounds, external sample pointers and compressed encodings raise
+ValueError: such a sound is skipped rather than replaced with a made-up tone.
 
 Nothing from Apple ships: this only decodes the user's own extracted
 resources on their machine.
@@ -13,54 +15,71 @@ resources on their machine.
 import struct
 import wave
 
+SAMPLE_COMMANDS = (0x8050, 0x8051)  # bufferCmd, sndDoBuffer
+
 
 def decode_snd(data):
-    """Return (sample_rate, sample_width, frames: bytes) for a snd resource."""
-    if len(data) < 2:
+    """Return (channels, rate, bits, frames: bytes) for a sampled snd resource.
+
+    Frames are unsigned 8-bit or little-endian signed 16-bit PCM."""
+    if len(data) < 6:
         raise ValueError("snd is too short")
-    snd_type = struct.unpack(">h", data[0:2])[0]
-    if snd_type == 1:
-        # Square-wave tone: count, synth, mode, then a fixed tone.
-        # Synthesize 0.5 s of a 440 Hz square wave at 22 kHz, 8-bit.
-        rate = 22050
-        frames = bytearray(rate // 2)
-        for i in range(len(frames)):
-            frames[i] = 0x7F if (i * 440 // rate) % 2 == 0 else 0x81
-        return rate, 8, bytes(frames)
-    if snd_type != 2:
-        raise ValueError("unknown snd type %d" % snd_type)
-    if len(data) < 18:
-        raise ValueError("sampled snd is too short")
-    num_channels = struct.unpack(">h", data[2:4])[0]
-    num_frames = struct.unpack(">I", data[4:8])[0]
-    sample_size = struct.unpack(">h", data[8:10])[0]
-    sample_rate = struct.unpack(">I", data[10:14])[0] >> 16  # Fixed 16.16
-    num_commands = struct.unpack(">h", data[14:16])[0]
-    off = 18
-    for _ in range(num_commands):
-        cmd = struct.unpack(">h", data[off:off + 2])[0]
-        if cmd == 1:  # buffer command holds the samples
-            off += 2 + 2 + 4
-            break
-        off += 8
-    if sample_size not in (8, 16):
-        raise ValueError("unsupported sample size %d" % sample_size)
-    frames = data[off:off + num_frames * num_channels * (sample_size // 8)]
-    if sample_size == 8:
-        signed = bytearray(len(frames) * 2)
-        for i, b in enumerate(frames):
-            struct.pack_into("<h", signed, i * 2, (b - 128) * 256)
-        frames = bytes(signed)
-        sample_size = 16
-    return sample_rate, sample_size, frames
+    version = struct.unpack(">H", data[:2])[0]
+    if version == 1:
+        synths = struct.unpack(">H", data[2:4])[0]
+        if synths > 1:
+            raise ValueError("unsupported sound synthesizer")
+        offset = 4 + 6 * synths
+    elif version == 2:
+        offset = 4
+    else:
+        raise ValueError("unsupported snd format %d" % version)
+    count = struct.unpack(">H", data[offset:offset + 2])[0]
+    header = None
+    for i in range(count):
+        command, _, param = struct.unpack(">HHI", data[offset + 2 + 8 * i:offset + 10 + 8 * i])
+        if command == 0:
+            continue
+        if command not in SAMPLE_COMMANDS:
+            raise ValueError("unsupported sound command")
+        header = param
+        break
+    if header is None:
+        raise ValueError("sound has no sample command")
+    if header < offset + 2 + 8 * count:
+        raise ValueError("invalid sample header offset")
+    pointer, length, fixed_rate = struct.unpack(">III", data[header:header + 12])
+    if pointer:
+        raise ValueError("external sample pointers are unsupported")
+    rate = (fixed_rate + 32768) >> 16
+    encode = data[header + 20]
+    if encode == 0:
+        channels, bits = 1, 8
+        frames = length
+        samples = data[header + 22:header + 22 + frames]
+    elif encode == 255:
+        channels = length
+        frames = struct.unpack(">I", data[header + 22:header + 26])[0]
+        bits = struct.unpack(">H", data[header + 48:header + 50])[0]
+        size = frames * channels * bits // 8
+        samples = bytearray(data[header + 64:header + 64 + size])
+        if bits == 16:
+            samples[::2], samples[1::2] = samples[1::2], samples[::2]
+    else:
+        raise ValueError("unsupported or compressed sound encoding")
+    if channels not in (1, 2) or bits not in (8, 16) or frames <= 0:
+        raise ValueError("unsupported sample layout")
+    if len(samples) != frames * channels * bits // 8:
+        raise ValueError("sample data is truncated")
+    return channels, rate, bits, bytes(samples)
 
 
 def snd_to_wav(data, path):
     """Decode a snd resource and write it as a WAV file."""
-    rate, width, frames = decode_snd(data)
+    channels, rate, bits, frames = decode_snd(data)
     with wave.open(path, "wb") as w:
-        w.setnchannels(1)
-        w.setsampwidth(width // 8)
+        w.setnchannels(channels)
+        w.setsampwidth(bits // 8)
         w.setframerate(rate)
         w.writeframes(frames)
     return path
