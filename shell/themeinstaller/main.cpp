@@ -210,6 +210,62 @@ static void installThemeAssets(const QString &name, QString *wallpaper,
 	}
 }
 
+/* Copy a folder tree, keeping its AppleDouble (._) companions. */
+static bool copyTree(const QString &src, const QString &dst) {
+	if (!QDir().mkpath(dst)) {
+		return false;
+	}
+	bool ok = true;
+	const QFileInfoList entries = QDir(src).entryInfoList(
+		QDir::Files | QDir::Dirs | QDir::Hidden | QDir::NoDotAndDotDot | QDir::System, QDir::Name);
+	for (const QFileInfo &e : entries) {
+		if (e.fileName() == ".DS_Store") {
+			continue;
+		}
+		const QString target = dst + "/" + e.fileName();
+		if (e.isDir()) {
+			ok = copyTree(e.filePath(), target) && ok;
+		} else {
+			QFile::remove(target);
+			ok = QFile::copy(e.filePath(), target) && ok;
+		}
+	}
+	return ok;
+}
+
+/* Copy every Mac OS 9 sound set (file or folder, with its ._ companion) from
+ * the Sound Sets folder into Sound Themes. The shell then applies each set
+ * through its own sdid/snd# mapping, as Mac OS 9 does. Returns the count. */
+static int copyMacSoundSets(const QString &src, const QString &dst) {
+	int count = 0;
+	const QFileInfoList entries = QDir(src).entryInfoList(
+		QDir::Files | QDir::Dirs | QDir::Hidden | QDir::NoDotAndDotDot | QDir::System, QDir::Name);
+	for (const QFileInfo &e : entries) {
+		const QString name = e.fileName();
+		if (name == ".DS_Store" || name.startsWith("._")) {
+			continue;
+		}
+		bool ok;
+		if (e.isDir()) {
+			ok = copyTree(e.filePath(), dst + "/" + name);
+		} else {
+			QDir().mkpath(dst);
+			QFile::remove(dst + "/" + name);
+			ok = QFile::copy(e.filePath(), dst + "/" + name);
+		}
+		if (!ok) {
+			continue;
+		}
+		count++;
+		const QString companion = "._" + name;
+		if (QFileInfo::exists(src + "/" + companion)) {
+			QFile::remove(dst + "/" + companion);
+			QFile::copy(src + "/" + companion, dst + "/" + companion);
+		}
+	}
+	return count;
+}
+
 int main(int argc, char *argv[]) {
 	qputenv("QT_WAYLAND_DISABLE_WINDOWDECORATION", "1");
 	QApplication app(argc, argv);
@@ -289,6 +345,10 @@ int main(int argc, char *argv[]) {
 	}
 	QString wallpaper, pattern, alert;
 	installThemeAssets(name, &wallpaper, &pattern, &alert);
+	const QString soundThemes = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) +
+		"/zacos9/appearance/Sound Themes";
+	const int soundSets = copyMacSoundSets(
+		QDir::homePath() + "/Classic/Appearance add-ons/Sound Sets", soundThemes);
 	const QString presetId = writeAppearancePreset(name, wallpaper, pattern, alert, &error);
 	if (presetId.isEmpty()) {
 		if (batch) {
@@ -302,7 +362,7 @@ int main(int argc, char *argv[]) {
 	pl_setting_set("theme-bundle", name.toUtf8().constData());
 	zac_theme_apply();
 	if (batch) {
-		printf("installed %s\n", qPrintable(outputDir(name)));
+		printf("installed %s (%d sound sets)\n", qPrintable(outputDir(name)), soundSets);
 		return 0;
 	}
 	QMessageBox::information(nullptr, "Theme Installer",

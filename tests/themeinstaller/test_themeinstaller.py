@@ -66,6 +66,7 @@ with open(os.path.join(empty, "a.png"), "wb") as f:
 env = dict(os.environ)
 env["XDG_CONFIG_HOME"] = tempfile.mkdtemp()
 env["XDG_DATA_HOME"] = tempfile.mkdtemp()
+env["HOME"] = tempfile.mkdtemp()
 env["QT_QPA_PLATFORM"] = "offscreen"
 r = run(binary, os.path.join(empty, "a.png"), "Test", env)
 assert r.returncode != 0, "an artless file is refused"
@@ -80,6 +81,7 @@ config = tempfile.mkdtemp()
 data = tempfile.mkdtemp()
 env2["XDG_CONFIG_HOME"] = config
 env2["XDG_DATA_HOME"] = data
+env2["HOME"] = tempfile.mkdtemp()
 env2["QT_QPA_PLATFORM"] = "offscreen"
 # No --name: the name is inherited from the file ("Apple platinum").
 r = subprocess.run([binary, "--file", theme], env=env2,
