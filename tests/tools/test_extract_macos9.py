@@ -107,6 +107,37 @@ def build_scen(items):
     return header + headers + _s.pack(">I", len(pool)) + pool
 
 
+def test_scen_patt_epic():
+    # scen with a patt blob (desktop pattern), an epic id and a dpnm name.
+    import struct as _s
+    patt = bytes(28)  # type-1 header stub; decode failure is fine, capture matters
+    scen = build_scen([(b"patt", patt), (b"epic", _s.pack(">h", 2011)),
+                       (b"dpnm", bytes((5,)) + b"Beach")])
+    # A minimal version-1 8x1 BitsRect PICT (kept: not epic, not splash).
+    pict = (_s.pack(">H", 0) + _s.pack(">hhhh", 0, 0, 1, 8) + b"\x11\x01" + bytes((0x90,))
+            + _s.pack(">H", 1) + _s.pack(">hhhh", 0, 0, 1, 8)
+            + _s.pack(">hhhh", 0, 0, 1, 8) * 2 + _s.pack(">H", 0) + b"\x80" + b"\xff")
+    fork = build_resource_fork([(b"scen", 128, scen), (b"PICT", 2011, b"preview"),
+                                (b"PICT", 128, b"splash"), (b"PICT", 129, pict)])
+    with tempfile.TemporaryDirectory() as src:
+        path = os.path.join(src, "T")
+        with open(path, "wb") as f:
+            f.write(fork)
+        out = os.path.join(src, "out")
+        r = subprocess.run([sys.executable, sys.argv[1], "--file", path,
+                            "--output", out, "--name", "T"],
+                           capture_output=True, text=True)
+        assert r.returncode == 0, r.stderr
+        # epic 2011 and splash 128 are skipped; other PICTs are kept.
+        walls = os.listdir(os.path.join(out, "wallpapers"))
+        assert not any("2011" in w or w == "picture-128.png" for w in walls), walls
+        assert any("129" in w for w in walls), walls
+        with open(os.path.join(out, "theme.conf")) as f:
+            conf = f.read()
+        assert "desktop-picture=Beach" in conf, conf
+    print("ok    scen patt, epic exclusion and dpnm captured")
+
+
 def test_clut_positional():
     import importlib.util as _iu
     spec = _iu.spec_from_file_location("macicons", os.path.join(os.path.dirname(sys.argv[1]), "macicons.py"))
@@ -254,4 +285,5 @@ test_scen()
 test_pointers()
 test_system_sounds()
 test_apple_menu()
+test_scen_patt_epic()
 print("OK")

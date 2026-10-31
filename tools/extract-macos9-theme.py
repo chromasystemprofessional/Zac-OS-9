@@ -251,6 +251,16 @@ def decode_scen_collection(data):
 	pool = pos + 4
 	if pool + total > len(data) + 4:
 		return tags
+	# Item lengths come from the next item's offset (the last runs to total).
+	lengths = {}
+	for tag, off in items:
+		nxt = min([o for _, o in items if o > off] + [total])
+		lengths.setdefault((tag, off), max(0, nxt - off))
+	patt = [(off, lengths[(tag, off)]) for tag, off in items if tag == "patt"]
+	if patt:
+		off, ln = patt[0]
+		if pool + off + ln <= len(data):
+			tags["patt"] = data[pool + off:pool + off + ln]
 	strings = ("name", "varn", "dpnm", "hcnm", "lgsf", "smsf", "sndt", "vfnt", "patn")
 	for tag, off in items:
 		p = pool + off
@@ -308,7 +318,7 @@ def decode_wctb(data):
 	return out
 
 
-def process_resource_fork(data, out, counts, cluts, icons, assets, scen_tags, apple_menu, wctb, raw_icons):
+def process_resource_fork(data, out, counts, cluts, icons, assets, scen_tags, apple_menu, wctb, raw_icons, epics):
 	for rtype, res_id, body in parse_resource_fork(data):
 		bucket = bucket_for(rtype)
 		if not bucket:
@@ -322,8 +332,13 @@ def process_resource_fork(data, out, counts, cluts, icons, assets, scen_tags, ap
 			if cols:
 				cluts.append((res_id, cols))
 		if rtype == b"scen":
-			for tag, value in decode_scen_collection(body).items():
-				if tag not in scen_tags:
+			collection = decode_scen_collection(body)
+			if "epic" in collection:
+				epics.add(collection["epic"])
+			if "patt" in collection and "patt" not in assets:
+				assets["patt"] = collection["patt"]
+			for tag, value in collection.items():
+				if tag not in scen_tags and tag != "patt":
 					scen_tags[tag] = value
 		if rtype in (b"icl8", b"icl4", b"ICN#"):
 			icons.setdefault(rtype, []).append(body)
@@ -334,7 +349,7 @@ def process_resource_fork(data, out, counts, cluts, icons, assets, scen_tags, ap
 		if rtype in (b"cicn", b"crsr", b"CURS"):
 			raw_icons.setdefault(rtype, {})[res_id] = body
 		if rtype == b"PICT":
-			assets.setdefault("pict", []).append(body)
+			assets.setdefault("pict", []).append((res_id, body))
 		if rtype in (b"PAT ", b"PAT#"):
 			assets.setdefault("pat", []).append(body)
 		if rtype == b"ppat":
@@ -574,15 +589,77 @@ def pointer_resources(path):
 	return res, cluts
 
 
-def write_assets(assets, out):
+def write_desktop_wallpaper(scen_tags, pictures_dir, out):
+	"""The desktop picture a theme names (scen dpnm): find it under the Desktop
+	Pictures folder and write wallpapers/desktop-wallpaper.<ext>. A JPEG/PNG
+	data fork is copied as-is; otherwise the .rsrc companion's PICT is decoded."""
+	name = scen_tags.get("dpnm")
+	if not name or not pictures_dir or not os.path.isdir(pictures_dir):
+		return False
+	found = None
+	for root, _dirs, files in os.walk(pictures_dir):
+		if os.path.basename(root) in (".finf", ".rsrc"):
+			continue
+		if name in files:
+			found = os.path.join(root, name)
+			break
+	if not found:
+		return False
+	try:
+		with open(found, "rb") as f:
+			data = f.read()
+	except OSError:
+		return False
+	os.makedirs(os.path.join(out, "wallpapers"), exist_ok=True)
+	if data[:2] == b"\xff\xd8":
+		with open(os.path.join(out, "wallpapers", "desktop-wallpaper.jpg"), "wb") as f:
+			f.write(data)
+		return True
+	if data[:8] == b"\x89PNG\r\n\x1a\n":
+		with open(os.path.join(out, "wallpapers", "desktop-wallpaper.png"), "wb") as f:
+			f.write(data)
+		return True
+	rsrc = os.path.join(os.path.dirname(found), ".rsrc", name)
+	try:
+		with open(rsrc, "rb") as f:
+			fork = f.read()
+	except OSError:
+		return False
+	try:
+		items = parse_resource_fork(fork)
+	except (ValueError, struct.error, IndexError):
+		return False
+	picts = [b for t, _i, b in items if t == b"PICT"]
+	if not picts:
+		return False
+	try:
+		w, h, rows = macpict.decode_pict(picts[0])
+	except (ValueError, IndexError, struct.error):
+		return False
+	pngwrite.write_png(os.path.join(out, "wallpapers", "desktop-wallpaper.png"), w, h, rows)
+	return True
+
+
+def write_assets(assets, epics, out):
 	"""Decode PICT/PAT/snd resources into wallpapers, patterns and sounds."""
-	# Wallpapers from PICT.
-	for i, body in enumerate(assets.get("pict", [])):
+	# Other PICTs in a theme file are its credit splash (id 128) and the Appearance
+	# panel's preview thumbnails (the scen epic ids), never desktop wallpapers.
+	for res_id, body in assets.get("pict", []):
+		if res_id == 128 or res_id in epics:
+			continue
 		try:
 			w, h, rows = macpict.decode_pict(body)
-			pngwrite.write_png(os.path.join(out, "wallpapers", "picture-%d.png" % (i + 1)), w, h, rows)
+			pngwrite.write_png(os.path.join(out, "wallpapers", "picture-%d.png" % res_id), w, h, rows)
 		except (ValueError, IndexError, struct.error):
 			continue
+	# The desktop pattern lives inside the scen collection ('patt'), not in the
+	# theme's widget-skin ppat resources.
+	if assets.get("patt"):
+		try:
+			w, h, rows = macpat.decode_ppat(assets["patt"])
+			pngwrite.write_png(os.path.join(out, "patterns", "desktop-pattern.png"), w, h, rows)
+		except (ValueError, IndexError, struct.error):
+			pass
 	# Desktop pattern tiles from PAT.
 	for i, body in enumerate(assets.get("pat", [])):
 		try:
@@ -694,6 +771,7 @@ def main():
 	parser.add_argument("--auto-colours", action="store_true", help="Heuristically pick chrome colours from the clut resources")
 	parser.add_argument("--fonts", help="The Fonts folder (its .rsrc folder holds the font resource forks)")
 	parser.add_argument("--system", help="The System file, for its busy, resize, move and hand pointers")
+	parser.add_argument("--pictures", help="Desktop Pictures folder, for the theme's dpnm wallpaper")
 	parser.add_argument("--dump-icons", action="store_true", help="Decode cicn/crsr/CURS resources to PNG and a text dump")
 	args = parser.parse_args()
 
@@ -706,6 +784,7 @@ def main():
 	icons = {}
 	assets = {}
 	scen_tags = {}
+	epics = set()
 	apple_menu = {}
 	wctb = {}
 	raw_icons = {}
@@ -728,7 +807,7 @@ def main():
 		else:
 			fork = raw
 		if fork and looks_like_resource_fork(fork):
-			process_resource_fork(fork, out, counts, cluts, icons, assets, scen_tags, apple_menu, wctb, raw_icons)
+			process_resource_fork(fork, out, counts, cluts, icons, assets, scen_tags, apple_menu, wctb, raw_icons, epics)
 	else:
 		src = args.source
 		if not src:
@@ -755,13 +834,13 @@ def main():
 					if fn.startswith("._"):
 						fork = extract_apple_double(raw)
 						if fork:
-							process_resource_fork(fork, out, counts, cluts, icons, assets, scen_tags, apple_menu, wctb, raw_icons)
+							process_resource_fork(fork, out, counts, cluts, icons, assets, scen_tags, apple_menu, wctb, raw_icons, epics)
 							continue
 						# Not AppleDouble after all: fall through.
 
 					# A raw resource fork (not an AppleDouble) when the tail maps back.
 					if looks_like_resource_fork(raw) and not fn.startswith("._"):
-						process_resource_fork(raw, out, counts, cluts, icons, assets, scen_tags, apple_menu, wctb, raw_icons)
+						process_resource_fork(raw, out, counts, cluts, icons, assets, scen_tags, apple_menu, wctb, raw_icons, epics)
 						continue
 
 					# Loose asset files.
@@ -785,7 +864,7 @@ def main():
 					with open(full, "rb") as f:
 						raw = f.read()
 					if looks_like_resource_fork(raw):
-						process_resource_fork(raw, out, counts, cluts, icons, assets, scen_tags, apple_menu, wctb, raw_icons)
+						process_resource_fork(raw, out, counts, cluts, icons, assets, scen_tags, apple_menu, wctb, raw_icons, epics)
 
 		for s in [src] + expand_archives(src):
 			walk_tree(s)
@@ -814,7 +893,8 @@ def main():
 	if args.dump_icons:
 		write_icon_dump(raw_icons, cluts, out)
 	# Decode wallpapers, patterns and sounds.
-	write_assets(assets, out)
+	write_assets(assets, epics, out)
+	write_desktop_wallpaper(scen_tags, args.pictures, out)
 
 	if args.list_cluts:
 		for res_id, cols in cluts:
