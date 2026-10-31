@@ -125,6 +125,8 @@ def test_scen():
         (b"vfsz", struct.pack(">h", 10)),
         (b"smos", struct.pack(">H", 12)),
         (b"hcol", struct.pack(">HHH", 0x9999, 0xCCCC, 0xFFFF)),
+        (b"sbar", struct.pack(">H", 1)),
+        (b"sbth", struct.pack(">H", 0)),
     ])
     tags = tool.decode_scen_collection(data)
     assert tags["name"] == "Convergence", tags
@@ -133,6 +135,8 @@ def test_scen():
     assert tags["vfsz"] == 10, tags
     assert tags["smos"] == 12, tags
     assert tags["hcol"] == (0x9999, 0xCCCC, 0xFFFF), tags
+    assert tags["sbar"] == 1, tags
+    assert tags["sbth"] == 0, tags
     print("ok    scen collection decoded")
 
 

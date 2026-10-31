@@ -46,7 +46,8 @@ reads the Appearance theme's resource fork and produces a **theme bundle** in
   settings: `system-font`, `small-system-font`, `views-font`,
   `views-font-size`, `double-click-collapse`, `smooth-fonts`,
   `smooth-font-min-size`, `desktop-picture`, `pattern-name`,
-  `highlight-name` and `variant`. The raw `scen` resources are kept under
+  `highlight-name`, `variant`, `scroll-bar-arrows` (single or
+  double-lower-right) and `scroll-bar-thumb` (normal or proportional). The raw `scen` resources are kept under
   `theme/` for later decoding of scroll-bar geometry.
 - `menu-icon.png` — 20×15, replaces the Zac menu icon.
 - `apple-menu.png` — 16×16, the System file's menu-bar Apple icon

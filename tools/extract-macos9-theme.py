@@ -269,6 +269,9 @@ def decode_scen_collection(data):
 		elif tag == "smsk":
 			if p + 4 <= len(data):
 				tags[tag] = struct.unpack(">I", data[p:p + 4])[0]
+		elif tag in ("sbar", "sbth"):
+			if p + 2 <= len(data):
+				tags[tag] = struct.unpack(">H", data[p:p + 2])[0]
 		elif tag == "hcol":
 			if p + 6 <= len(data):
 				r, g, b = struct.unpack(">HHH", data[p:p + 6])
@@ -624,6 +627,12 @@ def main():
 			f.write("pattern-name=%s\n" % scen_tags["patn"])
 		if scen_tags.get("hcnm"):
 			f.write("highlight-name=%s\n" % scen_tags["hcnm"])
+		if "sbar" in scen_tags:
+			f.write("scroll-bar-arrows=%s\n" %
+				("double-lower-right" if scen_tags["sbar"] == 1 else "single"))
+		if "sbth" in scen_tags:
+			f.write("scroll-bar-thumb=%s\n" %
+				("proportional" if scen_tags["sbth"] == 1 else "normal"))
 		if accent:
 			f.write("accent=%s\n" % accent)
 		if highlight:
