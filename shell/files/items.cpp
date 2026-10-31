@@ -411,9 +411,13 @@ pl_icon_kind romIconKind(const QString &path) {
 	if (suffix == "bin") {
 		return hasSiblingCue(info) ? PL_ICON_ROM_PS1 : PL_ICON_DOCUMENT;
 	}
-	/* PlayStation 2: a DVD/CD disc image. */
+	/* PlayStation 2: a DVD/CD disc image — but only inside the Games folder,
+	 * so a generic .iso elsewhere (a Linux install disc, say) stays a
+	 * mountable image rather than a game. */
 	if (suffix == "iso" || suffix == "mdf") {
-		return PL_ICON_ROM_PS2;
+		const QString games = QDir::homePath() + "/Games";
+		return info.absoluteFilePath().startsWith(games + "/") ? PL_ICON_ROM_PS2
+			: PL_ICON_DOCUMENT;
 	}
 	return PL_ICON_DOCUMENT;
 }

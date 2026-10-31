@@ -1163,10 +1163,19 @@ int main(int argc, char **argv) {
 			"a disc track beside its cue sheet is a PlayStation disc");
 		check(romIconKind(make("alone.bin")) == PL_ICON_DOCUMENT,
 			"a bare .bin with no cue sheet is an ordinary document");
-		check(romIconKind(make("game.iso")) == PL_ICON_ROM_PS2 &&
-			romIconKind(make("game.mdf")) == PL_ICON_ROM_PS2 &&
-			iconKindFor(root + "/game.iso") == PL_ICON_ROM_PS2,
-			"a PlayStation 2 disc image gets its own icon");
+		QDir().mkpath(root + "/Games");
+		const auto makeGame = [&](const QString &name) {
+			QFile f(root + "/Games/" + name);
+			f.open(QIODevice::WriteOnly);
+			f.close();
+			return f.fileName();
+		};
+		check(romIconKind(makeGame("game.iso")) == PL_ICON_ROM_PS2 &&
+			romIconKind(makeGame("game.mdf")) == PL_ICON_ROM_PS2 &&
+			iconKindFor(root + "/Games/game.iso") == PL_ICON_ROM_PS2,
+			"a PlayStation 2 disc image in the Games folder gets its own icon");
+		check(romIconKind(make("outside.iso")) == PL_ICON_DOCUMENT,
+			"an .iso outside the Games folder is not a game");
 	}
 
 	/* ---- unprivileged -------------------------------------------------- */
