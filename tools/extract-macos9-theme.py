@@ -397,11 +397,28 @@ def write_icon_dump(raw_icons, cluts, out):
 	print("Wrote icons-dump.txt (%d resources decoded)" % len(lines))
 
 
-# The System's wristwatch busy cursor: a 7-frame animation in 'CURS' resources.
-BUSY_CURSOR_IDS = range(-20721, -20714)
-BUSY_CURSOR_NAMES = ("watch", "wait")
-BUSY_CURSOR_SIZES = (16, 32, 48)  # 1x, 2x, 3x; scaled nearest-neighbour from 16 px
-BUSY_CURSOR_DELAY_MS = 100
+# Pointer roles. The System file supplies the busy, resize, move, hand and
+# crosshair pointers; a theme file supplies the arrow family (its colour
+# 'crsr' 128-131). Every name listed is written as the same cursor file.
+SYSTEM_POINTERS = (
+	("CURS", range(-20721, -20714), ("watch", "wait")),        # busy: wristwatch
+	("CURS", range(-20708, -20700), ("progress",)),           # busy: spinning wheel
+	("CURS", (-20852,), ("left_side", "w-resize")),
+	("CURS", (-20851,), ("right_side", "e-resize")),
+	("CURS", (-20850,), ("fleur", "move")),
+	("CURS", (3,), ("crosshair", "cross")),
+	("CURS", (-5760,), ("not-allowed", "no-drop")),
+	("crsr", (-20877,), ("pointer", "hand2")),
+	("crsr", (-20876,), ("grabbing",)),
+)
+THEME_POINTERS = (
+	(128, ("default", "left_ptr", "arrow")),
+	(129, ("copy", "dnd-copy")),
+	(130, ("alias", "link", "dnd-link")),
+	(131, ("context-menu",)),
+)
+POINTER_SIZES = (16, 32, 48)  # 1x, 2x, 3x; scaled nearest-neighbour from 16 px
+POINTER_FRAME_MS = 100
 
 
 def write_xcursor(path, frames, hot, delay, sizes):
@@ -429,28 +446,62 @@ def write_xcursor(path, frames, hot, delay, sizes):
 		f.write(out + b"".join(chunks))
 
 
-def write_busy_cursor(raw_icons, out):
-	"""Write the bundle's busy cursor (cursors/watch) and index.theme.
+def decode_pointer(kind, body, cluts):
+	if kind == "CURS":
+		return macicons.decode_curs(body)
+	return macicons.decode_crsr(body, cluts=cluts)
 
-	The theme inherits everything else from ZacOS9, so only the busy cursor
-	changes. Its directory name is the theme name the compositor uses."""
-	curs = raw_icons.get(b"CURS", {})
-	if not all(i in curs for i in BUSY_CURSOR_IDS):
+
+def write_pointers(theme_raw, theme_cluts, system_raw, system_cluts, out):
+	"""Write cursors/<name> for every pointer the two sources supply, and an
+	index.theme that inherits everything else from ZacOS9. Returns False when
+	neither source has a pointer (the bundle then keeps ZacOS9's cursors).
+
+	The theme directory's name is the Xcursor theme name the compositor uses."""
+	entries = [(system_raw, system_cluts, kind, ids, names) for kind, ids, names in SYSTEM_POINTERS]
+	entries += [(theme_raw, theme_cluts, "crsr", (rid,), names) for rid, names in THEME_POINTERS]
+	cursor_dir = os.path.join(out, "cursors")
+	written = 0
+	for raw, cluts, kind, ids, names in entries:
+		bodies = raw.get(kind, {})
+		if not all(i in bodies for i in ids):
+			continue
+		frames = []
+		hot = None
+		try:
+			for i in ids:
+				rows, spot = decode_pointer(kind, bodies[i], cluts)
+				frames.append(rows)
+				hot = hot or spot
+		except (ValueError, IndexError, struct.error):
+			continue
+		os.makedirs(cursor_dir, exist_ok=True)
+		delay = POINTER_FRAME_MS if len(frames) > 1 else 0
+		for name in names:
+			write_xcursor(os.path.join(cursor_dir, name), frames, hot, delay, POINTER_SIZES)
+		written += 1
+	if not written:
 		return False
-	frames = []
-	hot = None
-	for cid in BUSY_CURSOR_IDS:
-		rows, spot = macicons.decode_curs(curs[cid])
-		frames.append(rows)
-		hot = hot or spot
-	dir_ = os.path.join(out, "cursors")
-	os.makedirs(dir_, exist_ok=True)
-	for name in BUSY_CURSOR_NAMES:
-		write_xcursor(os.path.join(dir_, name), frames, hot,
-			BUSY_CURSOR_DELAY_MS, BUSY_CURSOR_SIZES)
 	with open(os.path.join(out, "index.theme"), "w") as f:
 		f.write("[Icon Theme]\nName=%s\nInherits=ZacOS9\n" % os.path.basename(out.rstrip("/")))
 	return True
+
+
+def pointer_resources(path):
+	"""The pointer resources and colour tables of a System or theme file,
+	as ({type: {id: body}}, {colour count: colours})."""
+	with open(path, "rb") as f:
+		raw = f.read()
+	fork = extract_apple_double(raw) if path.endswith("._") or raw[:4] == b"\x00\x05\x16\x07" else raw
+	items = parse_resource_fork(fork)
+	res = {}
+	cluts = {}
+	for rtype, rid, body in items:
+		res.setdefault(rtype.decode("latin1"), {})[rid] = body
+		if rtype == b"clut":
+			cols = parse_clut(body)
+			cluts.setdefault(len(cols), cols)
+	return res, cluts
 
 
 def write_assets(assets, out):
@@ -564,6 +615,7 @@ def main():
 	parser.add_argument("--pattern", help="Desktop pattern id")
 	parser.add_argument("--list-cluts", action="store_true", help="Print colour tables from clut resources and exit")
 	parser.add_argument("--auto-colours", action="store_true", help="Heuristically pick chrome colours from the clut resources")
+	parser.add_argument("--system", help="The System file, for its busy, resize, move and hand pointers")
 	parser.add_argument("--dump-icons", action="store_true", help="Decode cicn/crsr/CURS resources to PNG and a text dump")
 	args = parser.parse_args()
 
@@ -665,8 +717,13 @@ def main():
 	# The System file's Apple menu icon (ics8/ics4 id -16386), for themes
 	# the user builds from their own Mac OS 9 install.
 	write_apple_menu(apple_menu, cluts, out)
-	# The busy cursor is the one cursor a theme may change (see docs/themes.md).
-	write_busy_cursor(raw_icons, out)
+	# Pointers: the arrow family from the theme file, the rest from the System file.
+	theme_raw = {k.decode("latin1"): v for k, v in raw_icons.items()}
+	theme_cluts = {}
+	for _rid, cols in cluts:
+		theme_cluts.setdefault(len(cols), cols)
+	system_raw, system_cluts = pointer_resources(args.system) if args.system else ({}, {})
+	write_pointers(theme_raw, theme_cluts, system_raw, system_cluts, out)
 	if args.dump_icons:
 		write_icon_dump(raw_icons, cluts, out)
 	# Decode wallpapers, patterns and sounds.

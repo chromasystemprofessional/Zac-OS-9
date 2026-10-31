@@ -19,6 +19,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QRegularExpression>
+#include <QStringList>
 #include <QSaveFile>
 #include <QTextStream>
 #include <cstdio>
@@ -48,7 +49,8 @@ static bool bundleHasTheme(const QString &name) {
 }
 
 /* Run the extractor and wait with processEvents() (never waitForFinished). */
-static bool runExtractor(const QString &file, const QString &name, QString *error) {
+static bool runExtractor(const QString &file, const QString &name, const QString &system,
+		QString *error) {
 	const QString tool = extractorPath();
 	if (!QFileInfo(tool).isFile()) {
 		*error = "The theme extractor couldn't be found.";
@@ -56,8 +58,12 @@ static bool runExtractor(const QString &file, const QString &name, QString *erro
 	}
 	QProcess process;
 	process.setProgram("python3");
-	process.setArguments({ tool, "--file", file, "--output", outputDir(name), "--name", name,
-		"--auto-colours" });
+	QStringList args { tool, "--file", file, "--output", outputDir(name), "--name", name,
+		"--auto-colours" };
+	if (!system.isEmpty()) {
+		args << "--system" << system;
+	}
+	process.setArguments(args);
 	process.start();
 	/* Qt/Wayland deadlocks on waitForFinished(): pump events until it exits. */
 	QEventLoop loop;
@@ -211,12 +217,13 @@ int main(int argc, char *argv[]) {
 	QGuiApplication::setDesktopFileName("zacos9-themeinstaller");
 
 	/* Non-interactive (and testable): --file PATH [--name NAME]. */
-	QString file, name;
+	QString file, name, system;
 	bool batch = false;
 	for (int i = 1; i < argc; i++) {
 		const QString a = QString::fromLocal8Bit(argv[i]);
 		if (a == "--file" && i + 1 < argc) { file = QString::fromLocal8Bit(argv[++i]); batch = true; }
 		else if (a == "--name" && i + 1 < argc) { name = QString::fromLocal8Bit(argv[++i]); batch = true; }
+		else if (a == "--system" && i + 1 < argc) { system = QString::fromLocal8Bit(argv[++i]); }
 		else if (!a.startsWith("--")) { file = a; }
 	}
 
@@ -246,9 +253,17 @@ int main(int argc, char *argv[]) {
 	}
 	name = name.trimmed();
 	const QString fork = resolveResourceFork(file);
+	/* The System file supplies the busy, resize, move and hand pointers. */
+	if (system.isEmpty()) {
+		const QString home = QDir::homePath() + "/Classic/System/System";
+		if (QFileInfo::exists(home)) {
+			system = home;
+		}
+	}
+	const QString systemFork = system.isEmpty() ? QString() : resolveResourceFork(system);
 
 	QString error;
-	if (!runExtractor(fork, name, &error)) {
+	if (!runExtractor(fork, name, systemFork, &error)) {
 		if (batch) {
 			fprintf(stderr, "zacos9-themeinstaller: %s\n", qPrintable(error));
 			return 2;

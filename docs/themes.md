@@ -53,13 +53,15 @@ reads the Appearance theme's resource fork and produces a **theme bundle** in
 - `apple-menu.png` — 16×16, the System file's menu-bar Apple icon
   (`ics8`/`ics4` id -16386), decoded when the user's own Mac OS 9 System
   file is present; kept separate so a theme can use it explicitly.
-- `index.theme` and `cursors/watch` (`cursors/wait` is the same file) — the
-  busy cursor, from the seven-frame wristwatch in the System file's `CURS`
-  resources (-20721 to -20715), at 1×, 2× and 3×. The bundle is an Xcursor
-  theme named after its folder; `index.theme` inherits every other cursor
-  from ZacOS9, so only the busy cursor changes. The compositor reads it at
-  start-up, so the change applies the next time the desktop starts. Regular pointers, the
-  I-beam and the other cursors are never replaced.
+- `index.theme` and `cursors/` — the pointers, as an Xcursor theme named after
+  the bundle folder. `index.theme` inherits everything else from ZacOS9, so a
+  pointer the bundle doesn't supply keeps ZacOS's. The arrow family (`default`,
+  `copy`, `alias`, `context-menu`) comes from the theme file's colour cursors
+  (`crsr` 128–131). The busy, resize, move, pointing and grabbing hands,
+  crosshair, progress and not-allowed pointers come from the System file
+  (`--system`, or `~/Classic/System/System` in the Theme Installer). Each is
+  written at 1×, 2× and 3×. The compositor reads the bundle at start-up, so
+  changes apply the next time the desktop starts.
 - `boot/happy-zac-1x..6x.png` and `boot/zacos-logo-1x..6x.png` — replace the
   boot and Welcome artwork.
 - `wallpapers/`, `patterns/` and `sounds/` — decoded desktop pictures, pattern

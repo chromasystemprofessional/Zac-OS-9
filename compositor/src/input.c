@@ -1462,25 +1462,23 @@ static void use_zacos9_cursors(void) {
 	setenv("XCURSOR_SIZE", size, 1);
 }
 
-/* A theme bundle may replace the busy cursor: its cursors/watch file names
- * the bundle directory as an Xcursor theme (index.theme inherits the rest
- * from ZacOS9). Returns the theme name and puts its parent directory on
- * XCURSOR_PATH; false when the active theme has no busy cursor. */
-static bool bundle_busy_cursor(char *theme, size_t theme_size) {
+/* A theme bundle may replace the pointers: its index.theme makes the bundle
+ * folder an Xcursor theme (cursors/ holds the pointers) that inherits the
+ * rest from ZacOS9. Returns the theme name and puts the folder's parent on
+ * XCURSOR_PATH; false when the active theme has no pointers. */
+static bool bundle_cursor_theme(char *theme, size_t theme_size) {
 	char path[8192];
-	if (!zac_theme_asset("cursors/watch", path, sizeof(path))) {
+	if (!zac_theme_asset("index.theme", path, sizeof(path))) {
 		return false;
 	}
-	/* .../<bundle>/cursors/watch -> theme "<bundle>", parent ".../" */
-	for (int i = 0; i < 2; i++) {
-		char *slash = strrchr(path, '/');
-		if (!slash) return false;
-		*slash = '\0';
-	}
+	/* .../<bundle>/index.theme -> theme "<bundle>", parent "...". */
 	char *slash = strrchr(path, '/');
 	if (!slash) return false;
-	snprintf(theme, theme_size, "%s", slash + 1);
 	*slash = '\0';
+	char *base = strrchr(path, '/');
+	if (!base) return false;
+	snprintf(theme, theme_size, "%s", base + 1);
+	*base = '\0';
 	const char *old = getenv("XCURSOR_PATH");
 	char search[2 * sizeof(path)];
 	snprintf(search, sizeof(search), "%s%s%s", path, old ? ":" : "", old ? old : "");
@@ -1493,7 +1491,7 @@ void input_init(struct plat_server *server) {
 	wlr_cursor_attach_output_layout(server->cursor, server->output_layout);
 	use_zacos9_cursors();
 	char bundle[NAME_MAX + 1];
-	const char *theme = bundle_busy_cursor(bundle, sizeof(bundle)) ? bundle : ZACOS9_CURSOR_THEME;
+	const char *theme = bundle_cursor_theme(bundle, sizeof(bundle)) ? bundle : ZACOS9_CURSOR_THEME;
 	server->cursor_mgr = wlr_xcursor_manager_create(theme, ZACOS9_CURSOR_SIZE);
 	server->cursor_mode = PLAT_CURSOR_PASSTHROUGH;
 	wl_list_init(&server->pointers);

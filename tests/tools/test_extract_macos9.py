@@ -147,36 +147,49 @@ def test_cicn():
     print("ok    cicn decoded")
 
 
-def test_busy_cursor():
+def test_pointers():
     import importlib.util as _iu
     import tempfile as _tf
     spec = _iu.spec_from_file_location("macicons", os.path.join(os.path.dirname(sys.argv[1]), "macicons.py"))
     mi = _iu.module_from_spec(spec); spec.loader.exec_module(mi)
     # A 'CURS': 16 rows of data, 16 rows of mask, hot spot (v, h) = (3, 5).
-    # Row 0: pixel 0 is black (data+mask), pixel 1 white (mask only).
-    data = bytearray(68)
-    data[0] = 0x80          # pixel 0 data bit set: black
-    data[32] = 0xC0         # pixels 0 and 1 opaque
-    struct.pack_into(">hh", data, 64, 3, 5)
-    rows, hot = mi.decode_curs(bytes(data))
+    # Pixel 0 is black (data and mask), pixel 1 is white (mask only).
+    curs = bytearray(68)
+    curs[0] = 0x80
+    curs[32] = 0xC0
+    struct.pack_into(">hh", curs, 64, 3, 5)
+    rows, hot = mi.decode_curs(bytes(curs))
     assert hot == (5, 3), hot
     assert rows[0][0] == (0, 0, 0, 255), rows[0][0]
     assert rows[0][1] == (255, 255, 255, 255), rows[0][1]
     assert rows[0][2][3] == 0, "unmasked pixel is transparent"
-    ids = range(-20721, -20714)
-    raw = {b"CURS": {i: bytes(data) for i in ids}}
+    # A 'crsr' (16x16, 4-bit, embedded two-entry colour table): all pixels index 1, white.
+    crsr = bytearray(298)
+    struct.pack_into(">HII", crsr, 0, 0x8001, 96, 170)
+    struct.pack_into(">IHhhhhHHIIIHHHHIII", crsr, 96, 0, 0x8008, 0, 0, 16, 16,
+                     0, 0, 0, 72 << 16, 72 << 16, 0, 4, 1, 4, 0, 0, 0)
+    struct.pack_into(">IHH", crsr, 146, 0, 0, 1)
+    struct.pack_into(">HHHH", crsr, 154, 0, 0, 0, 0)
+    struct.pack_into(">HHHH", crsr, 162, 1, 0xFFFF, 0xFFFF, 0xFFFF)
+    crsr[170:298] = b"\x11" * 128
+    struct.pack_into(">hh", crsr, 84, 3, 5)
+    theme_raw = {"crsr": {128: bytes(crsr)}}
+    system_raw = {"CURS": {i: bytes(curs) for i in range(-20721, -20714)}}
     with _tf.TemporaryDirectory() as out:
-        assert tool.write_busy_cursor(raw, out)
-        with open(os.path.join(out, "cursors", "watch"), "rb") as f:
+        assert tool.write_pointers(theme_raw, {}, system_raw, {}, out)
+        cursors = os.path.join(out, "cursors")
+        with open(os.path.join(cursors, "watch"), "rb") as f:
             blob = f.read()
         assert blob[:4] == b"Xcur"
-        ntoc = struct.unpack("<I", blob[12:16])[0]
-        assert ntoc == 7 * 3, ntoc  # 7 frames at 16, 32 and 48 px
-        assert os.path.isfile(os.path.join(out, "cursors", "wait"))
+        assert struct.unpack("<I", blob[12:16])[0] == 7 * 3, "7 frames at 16, 32 and 48 px"
+        assert os.path.isfile(os.path.join(cursors, "wait"))
+        assert os.path.isfile(os.path.join(cursors, "default")), "arrow from the theme's crsr 128"
+        assert not os.path.exists(os.path.join(cursors, "left_side")), "no CURS -20852 supplied"
         with open(os.path.join(out, "index.theme")) as f:
             assert "Inherits=ZacOS9" in f.read()
-    assert not tool.write_busy_cursor({b"CURS": {}}, tempfile.mkdtemp()), "no busy frames"
-    print("ok    busy cursor written")
+    with _tf.TemporaryDirectory() as out:
+        assert not tool.write_pointers({}, {}, {}, {}, out), "no pointers"
+    print("ok    pointers written")
 
 
 def test_scen():
@@ -208,5 +221,5 @@ test_clut_positional()
 test_wctb()
 test_cicn()
 test_scen()
-test_busy_cursor()
+test_pointers()
 print("OK")
