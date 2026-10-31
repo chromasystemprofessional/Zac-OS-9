@@ -1,6 +1,7 @@
 #include <string.h>
 
 #include "widgets.h"
+#include "chrome.h"
 #include "settings.h"
 
 /* Push-button art: left columns, one stretchable column, right columns. */
@@ -67,6 +68,24 @@ void pl_button_paint(struct pl_canvas *c, int x, int y, int w,
 			pressed ? &button_default_pressed : &button_default);
 	} else {
 		paint_nine(c, x, y, w, pressed ? &button_standard_pressed : &button_standard);
+	}
+	{
+		/* A theme button face over the nine-slice's flat middle; the
+		 * rounded border ring stays Platinum. */
+		const char *skin = NULL;
+		if (pressed) {
+			skin = "chrome/button-pressed.png";
+		} else if (flags & PL_BUTTON_DISABLED) {
+			skin = "chrome/button-inactive.png";
+		}
+		int bw, bh;
+		const uint32_t *bp = skin ? chrome_file(skin, &bw, &bh) : NULL;
+		if (!bp) {
+			bp = chrome_file("chrome/button.png", &bw, &bh);
+		}
+		if (bp) {
+			chrome_tile(c, bp, bw, bh, x + 4, y + 5, x + w - 5, y + PL_BUTTON_H - 4);
+		}
 	}
 	if (label && label->ink_l >= 0) {
 		int ink_w = label->ink_r - label->ink_l + 1;
@@ -685,7 +704,11 @@ void pl_progress_paint(struct pl_canvas *c, int x, int y, int w, double fraction
 		ac.dark, ac.body, ac.light, ac.grip_hi, ac.grip_hi,
 		ac.grip_hi, ac.light, ac.body, ac.dark, ac.shadow,
 	};
-	for (int i = 0; i < fill; i++) {
+	int pw, ph;
+	const uint32_t *pp = chrome_file("chrome/progress-fill.png", &pw, &ph);
+	if (pp && fill > 0) {
+		chrome_tile(c, pp, pw, ph, x + 1, y + 1, x + fill, y + 10);
+	} else for (int i = 0; i < fill; i++) {
 		const int cx = x + 1 + i;
 		for (int r = 0; r < 10; r++) {
 			uint32_t v = profile[r];
@@ -845,12 +868,37 @@ static void sb_arrow_box(struct sb_ctx *s, int box_a, int dir, bool enabled) {
 
 /* Recessed track, with the shadow cast by whatever precedes `shade_a`. */
 static void sb_track(struct sb_ctx *s, int a0, int a1) {
+	int tw, th;
+	const uint32_t *tp = chrome_file(s->vertical ?
+		"chrome/scroll-track-vert.png" : "chrome/scroll-track-horz.png", &tw, &th);
+	if (tp) {
+		if (s->vertical) {
+			chrome_tile(s->c, tp, tw, th, s->x + 1, s->y + a0, s->x + SB_WIDTH - 2, s->y + a1);
+		} else {
+			chrome_tile(s->c, tp, tw, th, s->x + a0, s->y + 1, s->x + a1, s->y + SB_WIDTH - 2);
+		}
+		return;
+	}
 	for (int a = a0; a <= a1; a++) {
 		sbp(s, a, 1, C_777);
 		sbp(s, a, 2, C_888);
 		sb_col(s, a, 3, 12, C_AAA);
 		sbp(s, a, 13, C_BBB);
 		sbp(s, a, 14, C_CCC);
+	}
+}
+
+/* Tile a thumb part (cap or stretch) over an along-extent, full width. */
+static void sb_thumb_skin(struct sb_ctx *s, int a0, int a1, const char *path) {
+	int w, h;
+	const uint32_t *px = chrome_file(path, &w, &h);
+	if (!px) {
+		return;
+	}
+	if (s->vertical) {
+		chrome_tile(s->c, px, w, h, s->x, s->y + a0, s->x + SB_WIDTH - 1, s->y + a1);
+	} else {
+		chrome_tile(s->c, px, w, h, s->x + a0, s->y, s->x + a1, s->y + SB_WIDTH - 1);
 	}
 }
 
@@ -868,6 +916,28 @@ static void sb_thumb(struct sb_ctx *s, int line_a, int len, struct pl_accent ac)
 	sb_col(s, line_a, 1, SB_ARROW, C_BLACK);
 	sb_col(s, line_a + len + 1, 1, SB_ARROW, C_BLACK);
 
+	/* A themed thumb: end caps with the stretch between, or the stretch
+	 * alone when too short for caps. The grip ridges draw over it. */
+	{
+		const char *cap0 = s->vertical ? "chrome/scroll-thumb-vert-top.png"
+			: "chrome/scroll-thumb-horz-left.png";
+		const char *mid = s->vertical ? "chrome/scroll-thumb-vert-stretch.png"
+			: "chrome/scroll-thumb-horz-stretch.png";
+		const char *cap1 = s->vertical ? "chrome/scroll-thumb-vert-bottom.png"
+			: "chrome/scroll-thumb-horz-right.png";
+		int sw, sh, cw, ch;
+		if (chrome_file(mid, &sw, &sh)) {
+			if (len >= 20 && chrome_file(cap0, &cw, &ch) &&
+					chrome_file(cap1, &cw, &ch)) {
+				sb_thumb_skin(s, t0, t0 + 7, cap0);
+				sb_thumb_skin(s, t0 + 8, t1 - 8, mid);
+				sb_thumb_skin(s, t1 - 7, t1, cap1);
+			} else {
+				sb_thumb_skin(s, t0, t1, mid);
+			}
+			goto grip;
+		}
+	}
 	sbp(s, t0, 1, ac.corner);
 	sb_run(s, t0 + 1, t1 - 1, 1, ac.light);
 	sbp(s, t1, 1, ac.body);
@@ -879,6 +949,7 @@ static void sb_thumb(struct sb_ctx *s, int line_a, int len, struct pl_accent ac)
 	sbp(s, t0, SB_ARROW, ac.body);
 	sb_run(s, t0 + 1, t1, SB_ARROW, ac.dark);
 
+grip:
 	/* Grip: four ridges in the middle (offsets 3..10 of the usual
 	 * thumb), rows 4..11. */
 	for (int r = 0; r < 4; r++) {

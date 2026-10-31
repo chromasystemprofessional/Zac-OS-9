@@ -150,6 +150,10 @@ def test_chrome_slots():
     assert tool.chrome_slot("Menu Bar Pressed") is None
     assert tool.chrome_slot("Menu background") == "menu-background"
     assert tool.chrome_slot("Menu Highlight") == "menu-highlight"
+    assert tool.chrome_slot("Horz Thumb Stretch") == "scroll-thumb-horz-stretch"
+    assert tool.chrome_slot("V Scroll Track") == "scroll-track-vert"
+    assert tool.chrome_slot("Progress Bar Innards Active") == "progress-fill"
+    assert tool.chrome_slot("Button Pressed") == "button-pressed"
     print("ok    chrome slot mapping")
 
 

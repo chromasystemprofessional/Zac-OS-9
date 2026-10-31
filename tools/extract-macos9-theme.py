@@ -333,6 +333,21 @@ CHROME_PARTS = {
 	"menu-background": ("menu background", "menu bar background",
 		"list & menu background"),
 	"menu-highlight": ("menu highlight", "menu(selected)"),
+	"button": ("button",),
+	"button-inactive": ("button inactive",),
+	"button-pressed": ("button pressed",),
+	"scroll-track-vert": ("vertical scroll track", "v scroll track",
+		"vert scroll track"),
+	"scroll-track-horz": ("horizontal scroll track", "h scroll track",
+		"horz scroll track"),
+	"scroll-thumb-horz-left": ("horz thumb left", "h thumb left"),
+	"scroll-thumb-horz-stretch": ("horz thumb stretch", "h thumb stretch"),
+	"scroll-thumb-horz-right": ("horz thumb right", "h thumb right"),
+	"scroll-thumb-vert-top": ("vert thumb top", "v thumb top"),
+	"scroll-thumb-vert-stretch": ("vert thumb stretch", "v thumb stretch"),
+	"scroll-thumb-vert-bottom": ("vert thumb bottom", "v thumb bottom"),
+	"progress-fill": ("progress bar innards", "progress bar innards active"),
+	"progress-fill-inactive": ("progress bar innards inactive",),
 }
 
 
@@ -387,15 +402,26 @@ def process_resource_fork(data, out, counts, cluts, icons, assets, scen_tags, ap
 			if "chrome" not in assets:
 				# The ppat names live in the resource map, which
 				# parse_resource_fork drops; read them here instead.
+				# Several resources can match one slot (full-size and
+				# "small" variants); the first alias listed wins.
 				assets["chrome"] = {}
 				try:
 					named = macfont.resources(data).get("ppat", {})
 				except (ValueError, struct.error, IndexError):
 					named = {}
+				lowered = {}
 				for _rid, (pname, pbody) in named.items():
-					slot = chrome_slot(pname)
-					if slot and slot not in assets["chrome"]:
-						assets["chrome"][slot] = pbody
+					lowered.setdefault(pname.lower(), pbody)
+				for slot, names in CHROME_PARTS.items():
+					for alt in names:
+						if alt in lowered:
+							assets["chrome"][slot] = lowered[alt]
+							break
+					if slot + "-inactive" not in assets["chrome"]:
+						for alt in names:
+							if alt + " inactive" in lowered:
+								assets["chrome"][slot + "-inactive"] = lowered[alt + " inactive"]
+								break
 		if rtype == b"snd ":
 			assets.setdefault("snd", []).append(body)
 

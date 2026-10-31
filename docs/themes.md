@@ -91,8 +91,13 @@ reads the Appearance theme's resource fork and produces a **theme bundle** in
   theme ships one). The compositor tiles them over title bars and borders;
   the menu bar, dropdown menus and the selected item use the `menu
   background` / `menu highlight` skins. Close/zoom/collapse boxes, title
-  text and hit-testing stay ZacOS's, and missing files fall back to the
-  Platinum drawing.
+  text and hit-testing stay ZacOS's. Scrollbars tile the `scroll-track-*`
+  and three-part `scroll-thumb-*` skins (caps with the stretch between,
+  stretch alone when short); the arrows and disabled state stay procedural.
+  Buttons tile the `button` face inside their rounded border
+  (`-inactive`/`-pressed` variants when the theme ships them). The
+  determinate progress fill uses `progress-fill`. Missing files fall back
+  to the Platinum drawing.
 - `sounds/` — alert sounds. `system-sound-N.wav` are the System file's own
   `snd` resources, decoded from sampled sounds only; synthesized and compressed
   sounds are skipped. Theme-file sounds sit beside them. The installer never
