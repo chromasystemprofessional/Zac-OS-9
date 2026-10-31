@@ -110,12 +110,14 @@ const uint32_t *logo_pixels_hq(void) {
     return logo64_data;
 }
 
-/* Load the active theme's menu-icon.png (20×15) if it has one. */
+/* Load the active theme's menu-bar icon: its apple-menu.png (the Mac OS 9 Apple,
+ * 16×16, centred in the 20×15 slot) if it has one, else menu-icon.png (20×15). */
 const uint32_t *logo_pixels_themed(void) {
 	static uint32_t *cache = NULL;
 	static char *last_path = NULL;
 	char path[4096];
-	if (!zac_theme_asset("menu-icon.png", path, sizeof(path))) {
+	if (!zac_theme_asset("apple-menu.png", path, sizeof(path)) &&
+			!zac_theme_asset("menu-icon.png", path, sizeof(path))) {
 		/* No theme icon: drop any previous theme icon. */
 		free(cache);
 		cache = NULL;
@@ -131,9 +133,10 @@ const uint32_t *logo_pixels_themed(void) {
 	cache = NULL;
 	last_path = strdup(path);
 	cairo_surface_t *s = cairo_image_surface_create_from_png(path);
-	if (cairo_surface_status(s) != CAIRO_STATUS_SUCCESS ||
-			cairo_image_surface_get_width(s) != PL_LOGO_W ||
-			cairo_image_surface_get_height(s) != PL_LOGO_H) {
+	const int sw = cairo_image_surface_get_width(s);
+	const int sh = cairo_image_surface_get_height(s);
+	const bool fits = (sw == PL_LOGO_W && sh == PL_LOGO_H) || (sw == 16 && sh == 16);
+	if (cairo_surface_status(s) != CAIRO_STATUS_SUCCESS || !fits) {
 		cairo_surface_destroy(s);
 		return logo16_data;
 	}
@@ -141,9 +144,11 @@ const uint32_t *logo_pixels_themed(void) {
 	const uint32_t *in = (const uint32_t *)cairo_image_surface_get_data(s);
 	const int stride = cairo_image_surface_get_stride(s) / 4;
 	const cairo_format_t format = cairo_image_surface_get_format(s);
-	cache = malloc(sizeof(uint32_t) * PL_LOGO_W * PL_LOGO_H);
-	for (int y = 0; y < PL_LOGO_H; y++) {
-		for (int x = 0; x < PL_LOGO_W; x++) {
+	const int ox = (PL_LOGO_W - sw) / 2;
+	const int oy = (PL_LOGO_H - sh) / 2;
+	cache = calloc(PL_LOGO_W * PL_LOGO_H, sizeof(uint32_t));
+	for (int y = 0; y < sh && y + oy < PL_LOGO_H; y++) {
+		for (int x = 0; x < sw && x + ox < PL_LOGO_W; x++) {
 			uint32_t v = in[y * stride + x];
 			if (format != CAIRO_FORMAT_ARGB32) {
 				v |= 0xFF000000u;
@@ -156,7 +161,7 @@ const uint32_t *logo_pixels_themed(void) {
 				v = a << 24 | (r > 255 ? 255 : r) << 16 | (g > 255 ? 255 : g) << 8 |
 					(b > 255 ? 255 : b);
 			}
-			cache[y * PL_LOGO_W + x] = v;
+			cache[(y + oy) * PL_LOGO_W + x + ox] = v;
 		}
 	}
 	cairo_surface_destroy(s);

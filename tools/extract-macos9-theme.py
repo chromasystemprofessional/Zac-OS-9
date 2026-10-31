@@ -746,6 +746,13 @@ def main():
 	system_raw, system_cluts = pointer_resources(args.system) if args.system else ({}, {})
 	write_pointers(theme_raw, theme_cluts, system_raw, system_cluts, out)
 	write_system_sounds(system_raw, out)
+	# The menu-bar Apple comes from the System file, where it lives.
+	system_apple = {}
+	for kind in ("ics8", "ics4", "ics#"):
+		body = system_raw.get(kind, {}).get(-16386)
+		if body:
+			system_apple[kind.encode("latin1")] = [body]
+	write_apple_menu(system_apple, [(n, cols) for n, cols in system_cluts.items()], out)
 	if args.dump_icons:
 		write_icon_dump(raw_icons, cluts, out)
 	# Decode wallpapers, patterns and sounds.

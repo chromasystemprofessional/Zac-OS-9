@@ -209,6 +209,19 @@ def test_system_sounds():
     print("ok    system sounds written")
 
 
+def test_apple_menu():
+    # A 16x16 8-bit icon whose every pixel is index 1, and a 256-entry palette.
+    palette = [(i, (i, 0, 0)) for i in range(256)]
+    with tempfile.TemporaryDirectory() as out:
+        tool.write_apple_menu({b"ics8": [bytes([1]) * 256]}, [(9, palette)], out)
+        path = os.path.join(out, "apple-menu.png")
+        assert os.path.isfile(path), "apple-menu.png written"
+        with open(path, "rb") as f:
+            head = f.read(24)
+        assert struct.unpack(">II", head[16:24]) == (16, 16)
+    print("ok    apple menu icon written")
+
+
 def test_scen():
     data = build_scen([
         (b"name", b"\x0bConvergence"),
@@ -240,4 +253,5 @@ test_cicn()
 test_scen()
 test_pointers()
 test_system_sounds()
+test_apple_menu()
 print("OK")
