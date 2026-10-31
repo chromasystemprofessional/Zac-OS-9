@@ -179,6 +179,14 @@ static QString writeAppearancePreset(const QString &name, const QString &wallpap
 		filename.toUtf8(), QCryptographicHash::Sha256).toHex().left(24));
 }
 
+/* The id the Appearance panel gives a PNG in the Desktop Patterns (user) or
+ * Wallpaper folder: the prefix, the SHA-256 of the file name, then "image"
+ * (see shell/panels/zacos9-patterns). */
+static QString catalogId(const char *prefix, const QString &fileName) {
+	const QByteArray digest = QCryptographicHash::hash(fileName.toUtf8(), QCryptographicHash::Sha256);
+	return QString::fromLatin1(prefix) + ":" + QString::fromLatin1(digest.toHex()) + ":image";
+}
+
 /* Copy the decoded wallpapers, pattern tiles and sounds into the Appearance
  * folders, and return the first of each by id ("" when none). */
 static void installThemeAssets(const QString &name, QString *wallpaper,
@@ -207,8 +215,9 @@ static void installThemeAssets(const QString &name, QString *wallpaper,
 				continue;
 			}
 			const QString id = prefix + "-" + file.completeBaseName();
-			if (f.sub == QStringLiteral("wallpapers")) *wallpaper = id;
-			else if (f.sub == QStringLiteral("patterns")) *pattern = id;
+			const QString copied = id + "." + file.suffix();
+			if (f.sub == QStringLiteral("wallpapers")) *wallpaper = catalogId("wallpaper", copied);
+			else if (f.sub == QStringLiteral("patterns")) *pattern = catalogId("user", copied);
 			else *alert = id;
 			break;
 		}

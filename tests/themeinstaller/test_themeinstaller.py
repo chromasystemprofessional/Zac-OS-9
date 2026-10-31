@@ -92,4 +92,16 @@ assert os.path.isfile(os.path.join(out, "menu-icon.png")), "menu icon written"
 assert os.path.isfile(os.path.join(out, "theme.conf")), "theme.conf written"
 print("ok    theme file installs and inherits its name")
 
+# The preset names pattern and wallpaper by the Appearance panel's catalog ids:
+# the prefix, the SHA-256 of the file name, then ":image".
+import glob, json, re
+presets = [json.load(open(f)) for f in glob.glob(os.path.join(data, "zacos9", "appearance", "Themes", "*.json"))]
+themed = [p["settings"] for p in presets if p["settings"].get("theme-bundle") == "Apple platinum"]
+assert themed, "a preset for the theme"
+catalog = re.compile(r"\A(user|wallpaper):[0-9a-f]{64}:image\Z")
+for key in ("pattern", "wallpaper"):
+    if key in themed[0]:
+        assert catalog.match(themed[0][key]), (key, themed[0][key])
+print("ok    preset names pattern and wallpaper by catalog id")
+
 print("OK")
