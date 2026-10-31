@@ -1,3 +1,11 @@
+zacos9 (1.6.3) trixie; urgency=medium
+
+  * Installs next to cups-browsed instead of conflicting with it (issue
+    #111): Printer Picker skips its implicitclass queues, which stopped
+    with no destination, as CUPS finds the same printers itself.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Sat, 31 Oct 2026 19:50:06 -0400
+
 zacos9 (1.6.2) trixie; urgency=medium
 
   * Store: fetch all ZacOS Extras releases so Turntable, Hue and Phone are
