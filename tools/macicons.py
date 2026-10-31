@@ -198,10 +198,10 @@ def decode_cicn(data, clut=None, cluts=None):
 	bit_len = bit_rb * h
 	ctab_off = bit_off + bit_len
 	lookup, pix_off = _read_ctab(data, ctab_off)
-	if cluts:
-		lookup = _pick_clut(cluts, pixel_size)
-	elif clut:
+	if clut:
 		lookup = clut_lookup(clut)
+	elif cluts and struct.unpack(">H", data[ctab_off + 6:ctab_off + 8])[0] < 1:
+		lookup = _pick_clut(cluts, pixel_size)
 	rows = _indexed_rows(data, pix_off, w, h, pixel_size, lookup)
 	for y in range(h):
 		for x in range(w):
@@ -226,10 +226,10 @@ def decode_crsr(data, clut=None, cluts=None):
 	hot_y, hot_x = struct.unpack(">hh", data[84:88])
 	row_bytes, (w, h), pixel_size, _cmp, pmTable = _pixmap_fields(data, crsr_map)
 	lookup, _ = _read_ctab(data, pmTable)
-	if cluts:
-		lookup = _pick_clut(cluts, pixel_size)
-	elif clut:
+	if clut:
 		lookup = clut_lookup(clut)
+	elif cluts and struct.unpack(">H", data[pmTable + 6:pmTable + 8])[0] < 1:
+		lookup = _pick_clut(cluts, pixel_size)
 	rows = _indexed_rows(data, crsr_data, w, h, pixel_size, lookup)
 	return rows, (hot_x, hot_y)
 
