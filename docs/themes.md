@@ -64,12 +64,24 @@ reads the Appearance theme's resource fork and produces a **theme bundle** in
   changes apply the next time the desktop starts.
 - `boot/happy-zac-1x..6x.png` and `boot/zacos-logo-1x..6x.png` — replace the
   boot and Welcome artwork.
-- `wallpapers/`, `patterns/` and `sounds/` — decoded desktop pictures, pattern
-  tiles and alert sounds, copied into the Appearance folders when the theme is
-  installed.
+- `wallpapers/` — the theme's `PICT` pictures as PNG (version 1 and 2,
+  including component-packed 32-bit rows). Compressed QuickTime pictures
+  (opcode `0x8200`) are skipped.
+- `patterns/` — the theme's pixel patterns (`ppat`, 1-bit to 32-bit) as PNG
+  tiles, named `colour-pattern-N.png`, plus the monochrome `PAT` tiles. Tiles
+  keep their own size; some are strips. Patterns with no decodable pixel data
+  are skipped.
+- `sounds/` — alert sounds. `system-sound-N.wav` are the System file's own
+  `snd` resources, decoded from sampled sounds only; synthesized and compressed
+  sounds are skipped. Theme-file sounds sit beside them. The installer never
+  picks a `system-` sound as the theme's default alert.
+- The installer copies `wallpapers/`, `patterns/` and `sounds/` into the
+  Appearance folders. It also copies every set in `Appearance add-ons/Sound
+  Sets` into Sound Themes. Those sound-set clips get a 4 ms fade in and out;
+  the System alert sounds don't yet.
 
 The extractor (`tools/extract-macos9-theme.py`) decodes the classic icon,
-PICT, pattern and sound resources; `--list-cluts` prints the colour tables and
+PICT, pattern and sound resources (`macpict.py`, `macpat.py`, `macsnd.py`); `--list-cluts` prints the colour tables and
 `--auto-colours` (or `--accent`/`--highlight`/`--pattern`) set the chrome
 colours. Window geometry (title-bar height, close/zoom/collapse positions,
 margins) is never changed — only colours and artwork.
