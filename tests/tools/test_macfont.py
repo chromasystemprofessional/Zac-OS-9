@@ -27,5 +27,14 @@ def test_strike_glyph():
     print("ok    strike glyph")
 
 
+def test_pfont_text():
+    image = struct.pack(">HH", 0x8000, 0x8000)
+    text = macfont.pfont_text("Test", 12, strike(65, 65, 2, 1, 1, image, [0, 1, 2], [0x0000, 0xFFFF, 0xFFFF]))
+    assert "font Test\nheight 2\nbaseline 1" in text, text
+    assert "char U+0041 1 -1\n#\n#\n" in text, text
+    print("ok    pfont text")
+
+
 test_strike_glyph()
+test_pfont_text()
 print("OK")

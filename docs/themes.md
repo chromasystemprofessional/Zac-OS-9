@@ -71,6 +71,12 @@ reads the Appearance theme's resource fork and produces a **theme bundle** in
   tiles, named `colour-pattern-N.png`, plus the monochrome `PAT` tiles. Tiles
   keep their own size; some are strips. Patterns with no decodable pixel data
   are skipped.
+- `fonts/views.pfont` and `fonts/system.pfont` — the theme's bitmap fonts,
+  converted from the Mac OS 9 bitmap strikes (NFNT) in your System file and
+  Fonts folder: the views font at the theme's views size, and the system font
+  at 12 points. ZacOS loads them at 1x and keeps its own fonts at 1.25x, 1.5x
+  and 1.75x. TrueType fonts (Charcoal, Arial, Verdana...) and families not on
+  your Mac (Tecton, Osaka...) are not converted, so ZacOS's fonts stay.
 - `sounds/` — alert sounds. `system-sound-N.wav` are the System file's own
   `snd` resources, decoded from sampled sounds only; synthesized and compressed
   sounds are skipped. Theme-file sounds sit beside them. The installer never

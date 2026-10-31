@@ -1,10 +1,13 @@
+#include <stdbool.h>
 #include <cairo.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "draw.h"
 #include "font.h"
+#include "pfont.h"
 #include "text.h"
+#include "theme.h"
 
 #include "fonts_data.h"
 
@@ -24,7 +27,7 @@ struct style {
 	int quarters; /* a 1.25x, 1.5x or 1.75x screen's font (5, 6, 7); 0 at 1x */
 };
 
-static const struct style styles[] = {
+static struct style styles[] = {
 	[PL_FONT_SYSTEM] = { &font_system, false, 12.0, true, 0 },
 	[PL_FONT_VIEWS] = { &font_views, false, 11.0, false, 0 },
 	[PL_FONT_VIEWS_ITALIC] = { &font_views, true, 11.0, false, 0 },
@@ -273,7 +276,33 @@ struct plat_text *text_render_scaled(const struct plat_text *text, int quarters)
 	return scaled;
 }
 
+/* The active theme's own system and views fonts (its fonts folder's .pfont files)
+ * replace ZacOS's at 1x, loaded once per program; a missing or malformed file
+ * keeps ZacOS's font. The scaled fonts stay ZacOS's. */
+static void theme_fonts_once(void) {
+	static bool done = false;
+	if (done) {
+		return;
+	}
+	done = true;
+	char path[4096];
+	if (zac_theme_asset("fonts/system.pfont", path, sizeof(path))) {
+		struct pl_bitmap_font *f = pfont_load(path);
+		if (f) {
+			styles[PL_FONT_SYSTEM].font = f;
+		}
+	}
+	if (zac_theme_asset("fonts/views.pfont", path, sizeof(path))) {
+		struct pl_bitmap_font *f = pfont_load(path);
+		if (f) {
+			styles[PL_FONT_VIEWS].font = f;
+			styles[PL_FONT_VIEWS_ITALIC].font = f;
+		}
+	}
+}
+
 static struct plat_text *render(const char *utf8, int max_ink_width, enum pl_font font) {
+	theme_fonts_once();
 	const struct style *st = &styles[font];
 	struct plat_text *text = render_exact(utf8, st);
 	if (ink_width(text) <= max_ink_width) {

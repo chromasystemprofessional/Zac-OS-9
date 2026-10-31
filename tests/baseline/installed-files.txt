@@ -236,6 +236,7 @@
 {prefix}/share/zacos9/tools/macpat.py
 {prefix}/share/zacos9/tools/macpict.py
 {prefix}/share/zacos9/tools/macsnd.py
+{prefix}/share/zacos9/tools/macfont.py
 {prefix}/share/zacos9/tools/pngwrite.py
 {prefix}/share/zacos9/xdg/foot/foot.ini
 {prefix}/share/zacos9/xdg/xdg-desktop-portal/zacos9-portals.conf

@@ -50,7 +50,7 @@ static bool bundleHasTheme(const QString &name) {
 
 /* Run the extractor and wait with processEvents() (never waitForFinished). */
 static bool runExtractor(const QString &file, const QString &name, const QString &system,
-		QString *error) {
+		const QString &fonts, QString *error) {
 	const QString tool = extractorPath();
 	if (!QFileInfo(tool).isFile()) {
 		*error = "The theme extractor couldn't be found.";
@@ -62,6 +62,9 @@ static bool runExtractor(const QString &file, const QString &name, const QString
 		"--auto-colours" };
 	if (!system.isEmpty()) {
 		args << "--system" << system;
+	}
+	if (!fonts.isEmpty()) {
+		args << "--fonts" << fonts;
 	}
 	process.setArguments(args);
 	process.start();
@@ -332,8 +335,10 @@ int main(int argc, char *argv[]) {
 	}
 	const QString systemFork = system.isEmpty() ? QString() : resolveResourceFork(system);
 
+	/* The Fonts folder supplies the theme's bitmap fonts (Geneva, Chicago...). */
+	const QString fonts = QDir::homePath() + "/Classic/System Folder/Fonts";
 	QString error;
-	if (!runExtractor(fork, name, systemFork, &error)) {
+	if (!runExtractor(fork, name, systemFork, QFileInfo::exists(fonts) ? fonts : QString(), &error)) {
 		if (batch) {
 			fprintf(stderr, "zacos9-themeinstaller: %s\n", qPrintable(error));
 			return 2;

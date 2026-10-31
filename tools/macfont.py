@@ -100,3 +100,20 @@ def strike_glyphs(body):
             rows.append(bits)
         glyphs[code] = (x1 - x0, -ascent, rows)
     return glyphs
+
+
+def pfont_text(name, size, body):
+    """A strike as a .pfont file (tools/fonts/build_fonts.py's format)."""
+    (_ftype, _first, _last, _wmax, _kmax, _ndesc, _frw, frh, _owt, ascent,
+     _descent, _leading, _row_words) = struct.unpack(">13H", body[:26])
+    lines = ["; Converted from the Mac OS 9 font %s, %d point." % (name, size),
+             "font %s" % name, "height %d" % frh, "baseline %d" % ascent, ""]
+    for code, (advance, top, rows) in sorted(strike_glyphs(body).items()):
+        char = bytes((code,)).decode("mac_roman", "replace")
+        if len(char) != 1 or ord(char) < 32:
+            continue
+        lines.append("char U+%04X %d %d" % (ord(char), advance, top))
+        for row in rows:
+            lines.append("".join("#" if bit else "." for bit in row))
+        lines.append("")
+    return "\n".join(lines) + "\n"

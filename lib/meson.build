@@ -6,6 +6,7 @@ platinum_inc = include_directories('.')
 platinum_lib = static_library('platinum',
   'draw.c',
   'text.c',
+  'pfont.c',
   'menudraw.c',
   'widgets.c',
   'icons.c',
@@ -96,6 +97,7 @@ test('draw', executable('test-draw', '../tests/lib/test_draw.c', dependencies: [
 test('welcome', executable('test-welcome', '../tests/lib/test_welcome.c', dependencies: [platinum_dep]))
 test('settings', executable('test-settings', '../tests/lib/test_settings.c', dependencies: [platinum_dep]))
 test('theme', executable('test-theme', '../tests/lib/test_theme.c', dependencies: [platinum_dep]))
+test('pfont', executable('test-pfont', '../tests/lib/test_pfont.c', dependencies: [platinum_dep]))
 test('savers', executable('test-savers', '../tests/lib/test_savers.c', dependencies: [platinum_dep]))
 test('electron', executable('test-electron', '../tests/lib/test_electron.c', dependencies: [platinum_dep]))
 test('locate', executable('test-locate', '../tests/lib/test_locate.c', dependencies: [platinum_dep]))

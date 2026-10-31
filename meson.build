@@ -50,6 +50,7 @@ install_data(
   'tools/macpict.py',
   'tools/macsnd.py',
   'tools/macpat.py',
+  'tools/macfont.py',
   'tools/pngwrite.py',
   install_dir: get_option('datadir') / 'zacos9' / 'tools')
 

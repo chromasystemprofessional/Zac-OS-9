@@ -25,6 +25,7 @@ import tempfile
 # Find the decoder modules beside this script (source tree or installed).
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import macfont
 import macicons
 import macpat
 import macpict
@@ -456,6 +457,55 @@ def decode_pointer(kind, body, cluts):
 	return macicons.decode_crsr(body, cluts=cluts)
 
 
+def write_theme_fonts(scen_tags, system_path, fonts_dir, out):
+	"""Write the bitmap fonts the theme asks for: fonts/views.pfont (its views
+	font at its views size) and fonts/system.pfont (its system font at 12
+	points). Families found only as TrueType, or not found, are left to
+	ZacOS's own fonts. Family names come from the System file and the Fonts
+	folder's resource forks (<Fonts>/.rsrc/<name>)."""
+	sources = []
+	if system_path:
+		with open(system_path, "rb") as f:
+			raw = f.read()
+		fork = extract_apple_double(raw) if system_path.endswith("._") or raw[:4] == b"\x00\x05\x16\x07" else raw
+		sources.append(fork)
+	rsrc = os.path.join(fonts_dir, ".rsrc") if fonts_dir else None
+	if rsrc and os.path.isdir(rsrc):
+		for name in sorted(os.listdir(rsrc)):
+			try:
+				with open(os.path.join(rsrc, name), "rb") as f:
+					sources.append(f.read())
+			except OSError:
+				continue
+	families = {}  # family name -> every resource map that holds it
+	for fork in sources:
+		try:
+			res = macfont.resources(fork)
+		except (ValueError, struct.error, IndexError):
+			continue
+		for family in macfont.families(res):
+			families.setdefault(family, []).append(res)
+	wants = (("views.pfont", scen_tags.get("vfnt"), scen_tags.get("vfsz", 10)),
+		("system.pfont", scen_tags.get("lgsf"), 12))
+	for filename, family, size in wants:
+		if not family or family not in families:
+			continue
+		body = None
+		for res in families[family]:
+			body = macfont.strikes(res, family).get((size, 0))
+			if body is not None:
+				break
+		if body is None:
+			continue
+		os.makedirs(os.path.join(out, "fonts"), exist_ok=True)
+		try:
+			text = macfont.pfont_text(family, size, body)
+		except (ValueError, IndexError, struct.error):
+			continue
+		with open(os.path.join(out, "fonts", filename), "w", encoding="utf-8") as f:
+			f.write(text)
+
+
 def write_system_sounds(system_raw, out):
 	"""Write the System file's alert sounds as sounds/system-sound-N.wav, in
 	resource ID order. The installer never picks these as the default alert."""
@@ -636,6 +686,7 @@ def main():
 	parser.add_argument("--pattern", help="Desktop pattern id")
 	parser.add_argument("--list-cluts", action="store_true", help="Print colour tables from clut resources and exit")
 	parser.add_argument("--auto-colours", action="store_true", help="Heuristically pick chrome colours from the clut resources")
+	parser.add_argument("--fonts", help="The Fonts folder (its .rsrc folder holds the font resource forks)")
 	parser.add_argument("--system", help="The System file, for its busy, resize, move and hand pointers")
 	parser.add_argument("--dump-icons", action="store_true", help="Decode cicn/crsr/CURS resources to PNG and a text dump")
 	args = parser.parse_args()
@@ -746,6 +797,7 @@ def main():
 	system_raw, system_cluts = pointer_resources(args.system) if args.system else ({}, {})
 	write_pointers(theme_raw, theme_cluts, system_raw, system_cluts, out)
 	write_system_sounds(system_raw, out)
+	write_theme_fonts(scen_tags, args.system, args.fonts, out)
 	# The menu-bar Apple comes from the System file, where it lives.
 	system_apple = {}
 	for kind in ("ics8", "ics4", "ics#"):
