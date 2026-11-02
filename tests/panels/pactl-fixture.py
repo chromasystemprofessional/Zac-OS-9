@@ -29,6 +29,8 @@ elif args == ["--format=json", "list", "sources"]:
     print(json.dumps(state["sources"]))
 elif args == ["--format=json", "list", "sink-inputs"]:
     print(json.dumps(state["inputs"]))
+elif args == ["--format=json", "list", "cards"]:
+    print(json.dumps(state.get("cards", [])))
 elif args[0] == "set-default-sink":
     state["default"] = args[1]
 elif args[0] == "set-default-source":
@@ -36,6 +38,11 @@ elif args[0] == "set-default-source":
 elif args[0] == "set-sink-port":
     sink = next(s for s in state["sinks"] if s["name"] == args[1])
     sink["active_port"] = args[2]
+elif args[0] == "set-card-profile":
+    card = next(c for c in state.get("cards", []) if c["name"] == args[1])
+    card["active_profile"] = args[2]
+    if args[2] in state.get("sinks_by_profile", {}):
+        state["sinks"] = state["sinks_by_profile"][args[2]]
 elif args[0] == "move-sink-input":
     stream = next(s for s in state["inputs"] if str(s["index"]) == args[1])
     stream["target"] = args[2]

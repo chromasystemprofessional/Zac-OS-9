@@ -76,7 +76,7 @@ int main(int argc, char **argv) {
 	}
 	QVector<SoundOutput> outputs;
 	QString error;
-	check(parseSoundOutputs(sinks, "built-in", outputs, error), "parse built-in, monitor and Bluetooth outputs");
+	check(parseSoundOutputs(sinks, "built-in", "[]", outputs, error), "parse built-in, monitor and Bluetooth outputs");
 	check(outputs.size() == 3, "exclude disconnected headphones, keep unknown availability and portless outputs");
 	check(outputs.size() == 3 && outputs[0].current && outputs[0].volume == 40 && !outputs[0].muted,
 		"read default built-in output, average volume and mute");
@@ -86,13 +86,38 @@ int main(int argc, char **argv) {
 		"identify monitor by its name");
 	check(outputs.size() == 3 && outputs[1].stereo && !outputs[2].stereo,
 		"enable balance only for stereo outputs");
-	check(parseSoundOutputs(sinks, "monitor", outputs, error) && outputs[1].current && !outputs[0].current,
+	check(parseSoundOutputs(sinks, "monitor", "[]", outputs, error) && outputs[1].current && !outputs[0].current,
 		"select the monitor's active port when it is default");
-	check(!parseSoundOutputs("not json", "built-in", outputs, error) && outputs.isEmpty() && !error.isEmpty(),
+	check(!parseSoundOutputs("not json", "built-in", "[]", outputs, error) && outputs.isEmpty() && !error.isEmpty(),
 		"report malformed server data");
-	check(!parseSoundOutputs(R"([{"name":"broken"}])", "broken", outputs, error) && !error.isEmpty(),
+	check(!parseSoundOutputs(R"([{"name":"broken"}])", "broken", "[]", outputs, error) && !error.isEmpty(),
 		"report incomplete output data");
-	check(parseSoundOutputs("[]", "", outputs, error) && outputs.isEmpty(), "handle a server with no outputs");
+	check(parseSoundOutputs("[]", "", "[]", outputs, error) && outputs.isEmpty(), "handle a server with no outputs");
+	static const QByteArray profileSinks = R"JSON([
+ {"name":"alsa_output.pci-0000_01_00.1.hdmi-stereo","description":"TU104 HD Audio Controller Digital Stereo (HDMI)","mute":false,
+  "volume":{"front-left":{"value":43909},"front-right":{"value":43909}},
+  "properties":{"device.profile.name":"hdmi-stereo","device.name":"alsa_card.pci-0000_01_00.1","alsa.name":"27MU67"},
+  "active_port":"hdmi-output-0","ports":[
+   {"name":"hdmi-output-0","description":"HDMI / DisplayPort","availability":"available"}]}
+])JSON";
+	static const QByteArray profileCards = R"JSON([
+ {"name":"alsa_card.pci-0000_01_00.1","active_profile":"output:hdmi-stereo",
+  "properties":{"device.description":"TU104 HD Audio Controller"},
+  "ports":{
+   "hdmi-output-0":{"description":"HDMI / DisplayPort","availability":"available",
+    "properties":{"device.product.name":"27MU67"},"profiles":["output:hdmi-stereo"]},
+   "hdmi-output-1":{"description":"HDMI / DisplayPort 2","availability":"available",
+    "properties":{"device.product.name":"SONY TV"},"profiles":["output:hdmi-stereo-extra1","output:hdmi-surround-extra1"]},
+   "iec958-stereo-input":{"description":"Digital Input (S/PDIF)","availability":"available",
+    "properties":{"device.product.name":"27MU67"},"profiles":["input:iec958-stereo"]}}}
+])JSON";
+	check(parseSoundOutputs(profileSinks, "alsa_output.pci-0000_01_00.1.hdmi-stereo", profileCards, outputs, error)
+		&& outputs.size() == 2 && outputs[0].current && outputs[1].label.contains("SONY TV"),
+		"offer an HDMI port hidden on an inactive card profile");
+	check(outputs.size() == 2 && outputs[1].sink.isEmpty() && outputs[1].port == "hdmi-output-1"
+		&& outputs[1].card == "alsa_card.pci-0000_01_00.1"
+		&& outputs[1].profile == "output:hdmi-stereo-extra1" && !outputs[1].current,
+		"an inactive HDMI port carries the card profile that reveals it");
 	QVector<SoundInput> inputs;
 	check(parseSoundInputs(sources, "microphone", inputs, error) && inputs.size() == 2
 		&& inputs[0].current && inputs[1].label == "USB Microphone",
@@ -231,6 +256,81 @@ int main(int argc, char **argv) {
 	check(until([&] { return !client.switching && client.outputs.size() == 4
 			&& client.outputs[1].current; }),
 		"switch between speaker and headphone ports on the same sink");
+
+	const QJsonObject resumeState = state;
+	static const QByteArray tvSinks = R"JSON([
+ {"name":"alsa_output.pci-0000_01_00.1.hdmi-stereo-extra1","description":"TU104 HD Audio Controller Digital Stereo (HDMI 2)","mute":false,
+  "volume":{"front-left":{"value":43909},"front-right":{"value":43909}},
+  "properties":{"device.profile.name":"hdmi-stereo-extra1","device.name":"alsa_card.pci-0000_01_00.1","alsa.name":"SONY TV"},
+  "active_port":"hdmi-output-1","ports":[
+   {"name":"hdmi-output-1","description":"HDMI / DisplayPort 2","availability":"available"}]}
+])JSON";
+	QJsonObject profileState{
+		{ "default", "alsa_output.pci-0000_01_00.1.hdmi-stereo" },
+		{ "default_source", "microphone" },
+		{ "sinks", QJsonDocument::fromJson(profileSinks).array() },
+		{ "sources", QJsonDocument::fromJson(sources).array() },
+		{ "inputs", QJsonArray{ QJsonObject{ { "index", 12 } }, QJsonObject{ { "index", 34 } } } },
+		{ "cards", QJsonDocument::fromJson(profileCards).array() },
+		{ "sinks_by_profile", QJsonObject{
+			{ "output:hdmi-stereo", QJsonDocument::fromJson(profileSinks).array() },
+			{ "output:hdmi-stereo-extra1", QJsonDocument::fromJson(tvSinks).array() } } }
+	};
+	check(save(path, profileState), "present a TV on an inactive HDMI profile");
+	updates = 0;
+	client.refresh();
+	check(until([&] { return !client.switching && client.outputs.size() == 2; }) && error.isEmpty()
+		&& !client.outputs[1].current && !client.outputs[1].profile.isEmpty(),
+		"list the TV beside the live HDMI output");
+	int tv = -1;
+	for (int i = 0; i < client.outputs.size(); i++) {
+		if (!client.outputs[i].profile.isEmpty()) {
+			tv = i;
+		}
+	}
+	check(tv >= 0 && client.outputs[tv].label.contains("SONY TV"), "identify the TV on its inactive profile");
+	updates = 0;
+	client.selectOutput(client.outputs[tv]);
+	auto tvLive = [&] {
+		if (client.switching) {
+			return false;
+		}
+		for (const SoundOutput &o : client.outputs) {
+			if (o.current && o.port == "hdmi-output-1"
+				&& o.sink == "alsa_output.pci-0000_01_00.1.hdmi-stereo-extra1") {
+				return true;
+			}
+		}
+		return false;
+	};
+	check(until(tvLive) && error.isEmpty(), "switch card profile and land on the TV's own sink");
+	QFile log(dir.path() + "/state.log");
+	check(log.open(QIODevice::ReadOnly), "read sound server call log");
+	bool profiled = false, ported = false, defaulted = false;
+	while (!log.atEnd()) {
+		const QJsonArray call = QJsonDocument::fromJson(log.readLine()).array();
+		if (call.size() == 3 && call[0].toString() == "set-card-profile"
+			&& call[1].toString() == "alsa_card.pci-0000_01_00.1"
+			&& call[2].toString() == "output:hdmi-stereo-extra1") {
+			profiled = true;
+		}
+		if (call.size() == 3 && call[0].toString() == "set-sink-port"
+			&& call[1].toString() == "alsa_output.pci-0000_01_00.1.hdmi-stereo-extra1") {
+			ported = true;
+		}
+		if (call.size() == 2 && call[0].toString() == "set-default-sink"
+			&& call[1].toString() == "alsa_output.pci-0000_01_00.1.hdmi-stereo-extra1") {
+			defaulted = true;
+		}
+	}
+	log.close();
+	check(profiled && ported && defaulted,
+		"activate the TV's card profile before its sink exists");
+	check(save(path, resumeState), "restore the sound server fixture");
+	updates = 0;
+	client.refresh();
+	check(until([&] { return !client.switching && client.outputs.size() == 4; }),
+		"resume polling after the profile excursion");
 
 	error.clear();
 	qputenv("SOUND_TEST_FAIL", "set-default-sink");
