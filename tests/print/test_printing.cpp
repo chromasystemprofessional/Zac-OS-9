@@ -63,6 +63,7 @@ int main(int argc, char **argv) {
 	const QString sh = "#!/bin/sh\nS='" + st + "'\necho \"$(basename $0) $*\" >> '" + log + "'\n";
 	put(bin + "/lpstat", sh + "case $1 in -e) if [ -f \"$S/down\" ]; then "
 		"echo 'lpstat: Unable to connect to server' >&2; exit 1; fi; "
+		"if [ -f \"$S/none\" ]; then echo 'lpstat: No destinations added.' >&2; exit 1; fi; "
 		"printf 'Inkjet\\nLaser\\nBrowsed\\nGhost\\n' ;; -p) "
 		"printf 'printer Inkjet is idle. enabled since Mon\\nprinter Laser is stopped. enabled since Mon\\n' ;; -d) "
 		"printf 'system default destination: %s\\n' \"$(cat $S/default)\" ;; esac\n", true);
@@ -227,5 +228,9 @@ int main(int argc, char **argv) {
 	put(st + "/down", "1");
 	check(listPrinters().isEmpty() && cupsProblem().contains("isn't running"),
 		"a printing service that isn't running is said plainly");
+	QFile::remove(st + "/down");
+	put(st + "/none", "1");
+	check(listPrinters().isEmpty() && cupsProblem().isEmpty(),
+		"CUPS with no printers is not a failure");
 	return fails ? 1 : 0;
 }

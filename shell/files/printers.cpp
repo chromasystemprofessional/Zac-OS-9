@@ -324,6 +324,9 @@ QString cupsProblem() {
 
 /* The reason CUPS can't be asked, in words when it's a known one. */
 static QString cupsProblemFrom(const QString &error) {
+	if (error.contains("No destinations added", Qt::CaseInsensitive)) {
+		return QString(); /* CUPS is fine; there are simply no printers */
+	}
 	if (error.contains("isn't installed")) {
 		return "The printing service (CUPS) isn't installed.";
 	}
