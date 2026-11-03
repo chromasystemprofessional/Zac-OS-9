@@ -4,9 +4,14 @@
  * on Mac OS 8. Widths were measured with tools/measure/glyphs.py
  * (docs/reference/zacos9-fonts.md). Needs no figures.
  */
+#include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #include "text.h"
 
@@ -142,6 +147,109 @@ int main(void) {
 	text_destroy(cut15);
 	text_destroy(cut);
 	text_destroy(hi);
+
+	/* A theme bundle's rasterized faces replace the built-ins while it is
+	 * active; a broken file falls back to them. */
+	{
+		char cfg[] = "/tmp/zactextXXXXXX";
+		assert(mkdtemp(cfg) != NULL);
+		char bundle[256], fonts[256], conf[256], desk[256];
+		snprintf(bundle, sizeof(bundle), "%s/zacos9/themes/Wide", cfg);
+		snprintf(fonts, sizeof(fonts), "%s/fonts", bundle);
+		{
+			char tmp[256];
+			snprintf(tmp, sizeof(tmp), "%s", fonts);
+			for (char *p = tmp + 1; *p; p++) {
+				if (*p == '/') {
+					*p = '\0';
+					mkdir(tmp, 0755);
+					*p = '/';
+				}
+			}
+			mkdir(tmp, 0755);
+		}
+		snprintf(conf, sizeof(conf), "%s/theme.conf", bundle);
+		FILE *cf = fopen(conf, "w");
+		assert(cf);
+		fputs("name=Wide\n", cf);
+		fclose(cf);
+		/* Every letter 10 px wide and fully inked: "File" is 40 wide. */
+		snprintf(conf, sizeof(conf), "%s/theme-system-12.pfont", fonts);
+		FILE *pf = fopen(conf, "w");
+		assert(pf);
+		fputs("font Wide\nheight 16\nbaseline 12\n\n", pf);
+		for (const char *g = "File"; *g; g++) {
+			fprintf(pf, "char %c 10 -8\n", *g);
+			for (int r = 0; r < 9; r++) {
+				fputs("##########\n", pf);
+			}
+			fputs("\n", pf);
+		}
+		fputs("char space 10 0\n\n", pf);
+		fclose(pf);
+		snprintf(desk, sizeof(desk), "%s/zacos9/desktop.conf", cfg);
+		FILE *df = fopen(desk, "w");
+		assert(df);
+		fputs("theme-bundle=Wide\n", df);
+		fclose(df);
+		const char *old_cfg = getenv("XDG_CONFIG_HOME");
+		const char *old_home = getenv("HOME");
+		char *save_cfg = old_cfg ? strdup(old_cfg) : NULL;
+		char *save_home = old_home ? strdup(old_home) : NULL;
+		setenv("XDG_CONFIG_HOME", cfg, 1);
+		setenv("HOME", cfg, 1);
+
+		struct plat_text *wide = text_render_font("File", 10000, PL_FONT_SYSTEM);
+		ok = wide && wide->advance == 40 && wide->ink_r - wide->ink_l + 1 == 40 &&
+			wide->height == 16 && wide->baseline == 12;
+		printf("%s  theme window font replaces the built-in (adv %d)\n", ok ? "ok  " : "FAIL",
+			wide ? wide->advance : -1);
+		fails += !ok;
+		text_destroy(wide);
+		/* Views has no theme file here: still the built-in. */
+		struct plat_text *views = text_render_font("External", 10000, PL_FONT_VIEWS);
+		ok = views && views->ink_r - views->ink_l + 1 == 39;
+		printf("%s  fonts the theme lacks stay built-in\n", ok ? "ok  " : "FAIL");
+		fails += !ok;
+		text_destroy(views);
+
+		/* A broken theme font falls back instead of breaking text. */
+		snprintf(conf, sizeof(conf), "%s/theme-system-12.pfont", fonts);
+		pf = fopen(conf, "w");
+		assert(pf);
+		fputs("not a font\n", pf);
+		fclose(pf);
+		struct plat_text *plain = text_render_font("File", 10000, PL_FONT_SYSTEM);
+		ok = plain && plain->advance == 23;
+		printf("%s  broken theme font falls back to built-in\n", ok ? "ok  " : "FAIL");
+		fails += !ok;
+		text_destroy(plain);
+
+		if (save_cfg) {
+			setenv("XDG_CONFIG_HOME", save_cfg, 1);
+		} else {
+			unsetenv("XDG_CONFIG_HOME");
+		}
+		if (save_home) {
+			setenv("HOME", save_home, 1);
+		} else {
+			unsetenv("HOME");
+		}
+		free(save_cfg);
+		free(save_home);
+		snprintf(conf, sizeof(conf), "%s/theme-system-12.pfont", fonts);
+		unlink(conf);
+		snprintf(conf, sizeof(conf), "%s/theme.conf", bundle);
+		unlink(conf);
+		rmdir(fonts);
+		rmdir(bundle);
+		snprintf(conf, sizeof(conf), "%s/zacos9/themes", cfg);
+		rmdir(conf);
+		snprintf(conf, sizeof(conf), "%s/zacos9", cfg);
+		unlink(desk);
+		rmdir(conf);
+		rmdir(cfg);
+	}
 
 	printf("%d failure%s\n", fails, fails == 1 ? "" : "s");
 	return fails ? 1 : 0;

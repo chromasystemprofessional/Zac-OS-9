@@ -64,10 +64,13 @@ int main(int argc, char **argv) {
 	const QString id = desktopPatternId(index);
 	assert(id.startsWith("user:") && id.size() < 120);
 	assert(desktopPatternFind(id) == index);
+	assert(desktopPatternFind("My Pattern") == index);
+	assert(desktopPatternAvailable(id) && desktopPatternAvailable("My Pattern"));
+	assert(!desktopPatternAvailable("No Such Pattern"));
 	assert(desktopPatternName(index).contains("My Pattern"));
 	assert(desktopPatternErrors().isEmpty());
 	AppearancePanel panel;
-	panel.showTab(1);
+	panel.showTab(3);
 	QKeyEvent select(QEvent::KeyPress, Qt::Key_M, Qt::NoModifier, "My Pattern");
 	QApplication::sendEvent(&panel, &select);
 	char selected[128];
@@ -132,7 +135,9 @@ int main(int argc, char **argv) {
 	const QString photoId = desktopWallpaperId(0);
 	assert(photoId.startsWith("wallpaper:"));
 	assert(desktopWallpaperFind(photoId) == 0);
-	panel.showTab(2);
+	panel.showTab(3);
+	QKeyEvent tabToWallpaper(QEvent::KeyPress, Qt::Key_Tab, Qt::NoModifier);
+	QApplication::sendEvent(&panel, &tabToWallpaper);
 	QKeyEvent choosePhoto(QEvent::KeyPress, Qt::Key_P, Qt::NoModifier, "Photo");
 	QApplication::sendEvent(&panel, &choosePhoto);
 	assert(pl_setting("wallpaper", selected, sizeof(selected)) && QString::fromUtf8(selected) == photoId);
@@ -150,9 +155,10 @@ int main(int argc, char **argv) {
 	}
 	assert(photoPixels == 112 * 56);
 	panel.show();
-	const int popupX = 10 + 3 + PL_GROUP_MARGIN + 80 + 10;
+	/* Desktop tab: Pictures list on the right, Placement below it. */
+	const int popupX = (23 + 615) / 2 + 20 + 20;
 	const int itemTop = 10 + PL_TAB_H + 3 + 16 + 1 + PL_GROUP_MARGIN_TOP;
-	const int popupY = itemTop + 6 * PL_LIST_ROW_H + 1 + 16 + 8;
+	const int popupY = itemTop + 6 * PL_LIST_ROW_H + 1 + 12 + 10;
 	const QPointF position(popupX, popupY);
 	QMouseEvent openPlacement(QEvent::MouseButtonPress, position, panel.mapToGlobal(position.toPoint()),
 		Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
@@ -193,7 +199,7 @@ int main(int argc, char **argv) {
 		assert(tallPixels[y * 8] == (y >= 4 && y < 8 ? qRgb(17, 91, 163) : GRAY(3)));
 	}
 	AppearancePanel reopened;
-	reopened.showTab(2);
+	reopened.showTab(3);
 	assert(pl_setting("wallpaper", selected, sizeof(selected)) && QString::fromUtf8(selected) == photoId);
 	photo.fill(qRgb(91, 17, 163));
 	const int beforePhotoChange = changed;
@@ -225,12 +231,12 @@ int main(int argc, char **argv) {
 	assert(waitFor([] { return desktopWallpaperCount() == 0; }));
 	assert(desktopWallpaperFind(photoId) == -1);
 	// Switching back to a built-in pattern remembers the wallpaper choice.
-	panel.showTab(1);
+	panel.showTab(3);
 	QKeyEvent choosePattern(QEvent::KeyPress, Qt::Key_P, Qt::NoModifier, "Pewter");
 	QApplication::sendEvent(&panel, &choosePattern);
 	assert(pl_setting("background", selected, sizeof(selected)) && QString::fromUtf8(selected) == "pattern");
 	assert(pl_setting("wallpaper", selected, sizeof(selected)) && QString::fromUtf8(selected) == photoId);
-	panel.showTab(6);
+	panel.showTab(5);
 	assert(!pl_setting("title-collapse", selected, sizeof(selected)));
 	const QPointF optionPosition(36, 65);
 	QMouseEvent optionPress(QEvent::MouseButtonPress, optionPosition,

@@ -5,6 +5,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QProcess>
+#include <QSet>
 #include <QTimer>
 #include <QVariant>
 #include <algorithm>
@@ -20,8 +21,10 @@ static bool jsonArray(const QByteArray &json, QJsonArray &array, QString &error)
 	return true;
 }
 
+static void mergeInactivePorts(QVector<SoundOutput> &outputs, const QByteArray &cardsJson);
+
 bool parseSoundOutputs(const QByteArray &json, const QString &defaultSink,
-		QVector<SoundOutput> &outputs, QString &error) {
+		const QByteArray &cardsJson, QVector<SoundOutput> &outputs, QString &error) {
 	outputs.clear();
 	error.clear();
 	QJsonArray sinks;
@@ -80,9 +83,10 @@ bool parseSoundOutputs(const QByteArray &json, const QString &defaultSink,
 		const int balance = stereo && left + right > 0
 			? static_cast<int>(right * 100 / (left + right) + 0.5) : 50;
 		const QString active = sink.value("active_port").toString();
+		const QString card = properties.value("device.name").toString();
 		const QJsonArray ports = sink.value("ports").toArray();
 		if (ports.isEmpty()) {
-			outputs.push_back({ name, {}, description, percent, balance,
+			outputs.push_back({ name, {}, description, card, {}, percent, balance,
 				sink.value("mute").toBool(), name == defaultSink, stereo });
 		} else {
 			for (const QJsonValue &p : ports) {
@@ -97,13 +101,88 @@ bool parseSoundOutputs(const QByteArray &json, const QString &defaultSink,
 					return false;
 				}
 				const QString label = port.value("description").toString(portName);
-				outputs.push_back({ name, portName, description + " - " + label,
+				outputs.push_back({ name, portName, description + " - " + label, card, {},
 					percent, balance, sink.value("mute").toBool(),
 					name == defaultSink && portName == active, stereo });
 			}
 		}
 	}
+	mergeInactivePorts(outputs, cardsJson);
 	return true;
+}
+
+/* Ports on an inactive card profile have no sink, so the sink list hides
+ * them (a second HDMI display, say). Offer them anyway: selecting one
+ * activates its profile first, which makes its sink appear. */
+static void mergeInactivePorts(QVector<SoundOutput> &outputs, const QByteArray &cardsJson) {
+	if (cardsJson.isEmpty()) {
+		return;
+	}
+	QJsonArray cards;
+	QString error;
+	if (!jsonArray(cardsJson, cards, error)) {
+		return;
+	}
+	QSet<QString> covered;
+	for (const SoundOutput &o : outputs) {
+		if (!o.card.isEmpty() && !o.port.isEmpty()) {
+			covered.insert(o.card + '\n' + o.port);
+		}
+	}
+	for (const QJsonValue &value : cards) {
+		const QJsonObject card = value.toObject();
+		const QString cardName = card.value("name").toString();
+		if (cardName.isEmpty()) {
+			continue;
+		}
+		const QString active = card.value("active_profile").toString();
+		const QString cardDesc = card.value("properties").toObject().value("device.description").toString();
+		const QJsonObject ports = card.value("ports").toObject();
+		for (auto it = ports.constBegin(); it != ports.constEnd(); ++it) {
+			const QString portName = it.key();
+			const QJsonObject port = it.value().toObject();
+			if (port.value("availability").toString() == "not available") {
+				continue;
+			}
+			if (portName.contains("input", Qt::CaseInsensitive)) {
+				continue; /* A recording source, not something to play on. */
+			}
+			if (covered.contains(cardName + '\n' + portName)) {
+				continue;
+			}
+			/* Prefer plain stereo over surround mixes of the same port. */
+			QString chosen;
+			const QJsonArray profiles = port.value("profiles").toArray();
+			for (const QJsonValue &p : profiles) {
+				const QString name = p.toString();
+				if (name.startsWith("output:") && name.contains("stereo")) {
+					chosen = name;
+					break;
+				}
+			}
+			if (chosen.isEmpty()) {
+				for (const QJsonValue &p : profiles) {
+					const QString name = p.toString();
+					if (name.startsWith("output:")) {
+						chosen = name;
+						break;
+					}
+				}
+			}
+			if (chosen.isEmpty() || chosen == active) {
+				continue;
+			}
+			const QJsonObject portProps = port.value("properties").toObject();
+			QString product = portProps.value("device.product.name").toString();
+			if (product.isEmpty()) {
+				product = cardDesc;
+			}
+			const QString portLabel = port.value("description").toString(portName);
+			const QString label = product.isEmpty() ? portLabel : product + " - " + portLabel;
+			outputs.push_back({ {}, portName, label, cardName, chosen,
+				0, 50, false, false, false });
+		}
+	}
 }
 
 bool parseSoundInputs(const QByteArray &json, const QString &defaultSource,
@@ -180,7 +259,13 @@ void SoundClient::report(const QString &error, bool command) {
 }
 
 void SoundClient::refresh() {
-	if (m_refreshing || switching) {
+	if (switching) {
+		return;
+	}
+	if (m_refreshing) {
+		/* Another refresh is asking: ask again after it, instead of
+		 * losing this one (a muted output would look stuck). */
+		m_refreshPending = true;
 		return;
 	}
 	m_refreshing = true;
@@ -194,35 +279,62 @@ void SoundClient::refresh() {
 		if (!error.isEmpty()) {
 			m_refreshing = false;
 			if (!switching) {
+				if (!m_refreshTimedOut && error.contains("did not respond in time")) {
+					/* A loaded machine can miss one command timeout;
+					 * ask again instead of blanking the panel. */
+					m_refreshTimedOut = true;
+					refresh();
+					return;
+				}
+				m_refreshTimedOut = false;
 				outputs.clear();
 				report(error);
 				if (changed) {
 					changed();
 				}
 				refreshInputs();
+				if (m_refreshPending) {
+					m_refreshPending = false;
+					refresh();
+				}
 			}
 			return;
 		}
 		const QString sink = QString::fromUtf8(out).trimmed();
 		run({ "--format=json", "list", "sinks" }, [this, sink, generation](const QByteArray &json, const QString &error) {
-			m_refreshing = false;
-			if (switching || generation != m_generation) {
+			if (generation != m_generation) {
+				m_refreshing = false;
 				refresh();
 				return;
 			}
-			QString problem = error;
-			QVector<SoundOutput> fresh;
-			if (problem.isEmpty()) {
-				parseSoundOutputs(json, sink, fresh, problem);
-			}
-			outputs = fresh;
-			if (!problem.isEmpty()) {
-				report(problem);
-			}
-			if (changed) {
-				changed();
-			}
-			refreshInputs();
+			run({ "--format=json", "list", "cards" }, [this, sink, generation, json, error](const QByteArray &cards, const QString &cardError) {
+				m_refreshing = false;
+				if (switching || generation != m_generation) {
+					refresh();
+					return;
+				}
+				QString problem = error;
+				QVector<SoundOutput> fresh;
+				if (problem.isEmpty()) {
+					parseSoundOutputs(json, sink, cardError.isEmpty() ? cards : QByteArray(), fresh, problem);
+					if (problem.isEmpty() && !cardError.isEmpty()) {
+						problem = cardError;
+					}
+				}
+				outputs = fresh;
+				m_refreshTimedOut = false;
+				if (!problem.isEmpty()) {
+					report(problem);
+				}
+				if (changed) {
+					changed();
+				}
+				refreshInputs();
+				if (m_refreshPending) {
+					m_refreshPending = false;
+					refresh();
+				}
+			});
 		});
 	});
 }
@@ -274,6 +386,8 @@ void SoundClient::refreshInputs() {
 
 void SoundClient::finishSwitch(const QString &error) {
 	switching = false;
+	m_pendingCard.clear();
+	m_pendingPort.clear();
 	if (!error.isEmpty()) {
 		report(error, true);
 	}
@@ -334,7 +448,7 @@ void SoundClient::selectOutput(const SoundOutput &output) {
 		report("An output change is already in progress.", true);
 		return;
 	}
-	if (output.sink.isEmpty()) {
+	if (output.sink.isEmpty() && output.profile.isEmpty()) {
 		report("No sound output was selected.", true);
 		return;
 	}
@@ -343,6 +457,26 @@ void SoundClient::selectOutput(const SoundOutput &output) {
 	if (changed) {
 		changed();
 	}
+	if (!output.profile.isEmpty()) {
+		/* The port lives on an inactive card profile and has no sink
+		 * yet: activate the profile, then finish the switch once its
+		 * sink appears. */
+		m_pendingCard = output.card;
+		m_pendingPort = output.port;
+		run({ "set-card-profile", output.card, output.profile },
+			[this](const QByteArray &, const QString &error) {
+				if (!error.isEmpty()) {
+					finishSwitch(error);
+					return;
+				}
+				completeProfileSwitch();
+			});
+		return;
+	}
+	activateSink(output);
+}
+
+void SoundClient::activateSink(const SoundOutput &output) {
 	if (output.port.isEmpty()) {
 		makeDefault(output.sink);
 	} else {
@@ -355,6 +489,43 @@ void SoundClient::selectOutput(const SoundOutput &output) {
 				}
 			});
 	}
+}
+
+void SoundClient::completeProfileSwitch() {
+	/* switching stays true throughout: the poll refresh stands aside. */
+	run({ "get-default-sink" }, [this](const QByteArray &out, const QString &error) {
+		const QString sink = error.isEmpty() ? QString::fromUtf8(out).trimmed() : QString();
+		run({ "--format=json", "list", "sinks" }, [this, sink](const QByteArray &json, const QString &error) {
+			run({ "--format=json", "list", "cards" }, [this, sink, json, error](const QByteArray &cards, const QString &cardError) {
+				QString problem = error;
+				QVector<SoundOutput> fresh;
+				if (problem.isEmpty()) {
+					parseSoundOutputs(json, sink, cardError.isEmpty() ? cards : QByteArray(), fresh, problem);
+				}
+				outputs = fresh;
+				if (!problem.isEmpty()) {
+					finishSwitch(problem);
+					return;
+				}
+				auto it = std::find_if(outputs.cbegin(), outputs.cend(),
+					[this](const SoundOutput &candidate) {
+						return candidate.profile.isEmpty() && !candidate.sink.isEmpty() &&
+							candidate.card == m_pendingCard && candidate.port == m_pendingPort;
+					});
+				if (it == outputs.cend()) {
+					finishSwitch("The sound output changed, but the new output did not appear.");
+					return;
+				}
+				const SoundOutput target = *it;
+				m_pendingCard.clear();
+				m_pendingPort.clear();
+				if (changed) {
+					changed();
+				}
+				activateSink(target);
+			});
+		});
+	});
 }
 
 void SoundClient::selectInput(const SoundInput &input) {

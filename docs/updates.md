@@ -40,11 +40,27 @@ administrators at the computer do this without a password, the same as the
 Software window. Other users can still check; apt-get update and the install
 fail for them with a message.
 
+**What's New.** When the newest release is newer than what's installed,
+the update window also offers **What's New…**, which shows the release's
+notes (the release text GitHub returns, already fetched for the check)
+in a scrolling window.
+
+**After restarting.** A system autostart entry runs
+`zacos9-update --whatsnew` at every login. It compares the installed
+`zacos9` version with `~/.config/zacos9/whatsnew-seen` and, when the
+installed version is newer *and* the package ships notes for it
+(`/usr/share/zacos9/whatsnew/<version>.txt`), shows them once — with
+buttons that open Theme Files and the Appearance panel — then records
+the version as seen. Turning the "What's New in ZacOS 9" entry off in
+Startup Items turns the popup off.
+
 Settings for tests and forks:
 
 - `ZACOS9_UPDATE_REPO` sets the repository (`owner/name`).
 - `ZACOS9_UPDATE_URL` sets the whole release URL. A `file://` URL works for
   trying the window without the network.
+- `ZACOS9_WHATSNEW_DIR` sets where `--whatsnew` looks for `<version>.txt`
+  notes, for tests.
 
 ## Updating from the installer
 
@@ -86,6 +102,12 @@ gh auth login                     # once
 scripts/release.sh 0.2.0 "What's new, in a sentence or two."
 ```
 
+The second argument becomes the release's notes on GitHub, which Software
+Update shows under **What's New…**. Keep it in sync with the matching
+`shell/update/whatsnew/<version>.txt` file in the package (that file is
+what users see after restarting); both should say what changed and, for a
+feature like theme drops, how to do it.
+
 The script only runs on a clean `main` branch that matches `origin/main`.
 It does the following:
 
@@ -117,7 +139,6 @@ Installing has only been tried by hand.
 
 - **No automatic checks.** It only checks when it is opened from the Apple
   menu.
-- **No release notes in the window.** The release text is read but not shown.
 - **No per-package choice.** Everything found is installed together.
 - **No `full-upgrade`.** An update that needs a package removed is held back,
   as `apt-get upgrade` does.

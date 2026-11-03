@@ -17,6 +17,9 @@ int main(int argc, char *argv[]) {
 	QGuiApplication::setDesktopFileName("zacos9-update");
 	platinumShellInit();
 
+	if (app.arguments().contains("--whatsnew")) {
+		return whatsnewRun();
+	}
 	UpdateWindow w;
 	if (app.arguments().contains("--background")) {
 		char v[16];

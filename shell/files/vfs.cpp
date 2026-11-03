@@ -51,7 +51,7 @@
  * 21: Utilities moves from the System Folder into Applications, and holds
  *     only shipped utilities and the user's own; the old optional root
  *     Utilities folder is gone. */
-static constexpr int REGISTRY_VERSION = 21;
+static constexpr int REGISTRY_VERSION = 22;
 
 static const char *DEFAULT_REGISTRY = R"JSON({
   "version": 21,
@@ -66,8 +66,8 @@ static const char *DEFAULT_REGISTRY = R"JSON({
       "kind": "backed", "backing": "$XDG_DATA_HOME/zacos9/appearance/Desktop Patterns" },
     { "id": "system-folder/appearance/wallpaper", "name": "Wallpaper", "kind": "backed",
       "backing": "$XDG_DATA_HOME/zacos9/appearance/Wallpaper" },
-    { "id": "system-folder/appearance/themes", "name": "Themes", "kind": "backed",
-      "backing": "$XDG_DATA_HOME/zacos9/appearance/Themes" },
+    { "id": "system-folder/appearance/theme-files", "name": "Theme Files", "kind": "backed",
+      "backing": "$XDG_DATA_HOME/zacos9/appearance/Theme Files" },
     { "id": "system-folder/appearance/sound-themes", "name": "Sound Themes", "kind": "backed",
       "backing": "$XDG_DATA_HOME/zacos9/appearance/Sound Themes" },
     { "id": "system-folder/control-panels", "name": "Control Panels",
@@ -358,6 +358,20 @@ bool migrate(QJsonObject *root) {
 			n.insert("id", "system-folder/utilities");
 			if (n.value("categories").toArray() == QJsonArray{ "X-ZacOS9-Utility" }) {
 				n.remove("categories");
+			}
+			nodes.replace(i, n);
+		}
+		/* Version 22: Appearance's Themes folder is Theme Files, as in
+		 * Mac OS 9. Only the old default name is changed, never one
+		 * the user chose. */
+		if (n.value("id").toString() == QLatin1String("system-folder/appearance/themes")) {
+			n.insert("id", "system-folder/appearance/theme-files");
+			if (n.value("name").toString() == QLatin1String("Themes")) {
+				n.insert("name", "Theme Files");
+			}
+			if (n.value("backing").toString() ==
+					QLatin1String("$XDG_DATA_HOME/zacos9/appearance/Themes")) {
+				n.insert("backing", "$XDG_DATA_HOME/zacos9/appearance/Theme Files");
 			}
 			nodes.replace(i, n);
 		}
@@ -1675,14 +1689,21 @@ void vfsShowAllHidden() {
 bool vfsAcceptsDrops(const QString &path) {
 	const VNode *node = vfsNode(path);
 	/* The Control Panels folders take a control panel dragged in, and
-	 * nothing else; the drop itself decides which. */
+	 * nothing else; the drop itself decides which. The System Folder
+	 * takes drops so theme files can be routed to Theme Files. */
 	return node && !node->readOnly && (node->kind == VKind::Backed ||
 		node->kind == VKind::Unix || node->kind == VKind::Fonts ||
 		(node->kind == VKind::Apps && !node->id.startsWith("system-folder/")) ||
+		vfsIsSystemFolder(path) ||
 		vfsIsStartupItems(path) || vfsIsControlPanels(path) ||
 		vfsIsControlPanelsDisabled(path) || vfsIsCollarModules(path) ||
 		vfsIsCollarModulesDisabled(path) || vfsIsExtensions(path) ||
 		vfsIsExtensionsDisabled(path) || vfsIsSounds(path));
+}
+
+bool vfsIsSystemFolder(const QString &path) {
+	const VNode *node = vfsNode(path);
+	return node && !node->readOnly && node->id == "system-folder";
 }
 
 bool vfsIsSounds(const QString &path) {

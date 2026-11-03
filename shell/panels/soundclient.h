@@ -7,6 +7,10 @@
 
 struct SoundOutput {
 	QString sink, port, label;
+	/* The card and profile behind a port on an inactive card profile.
+	 * Such a port has no sink yet; selecting it activates the profile
+	 * first, which makes its sink appear. Empty when the port is live. */
+	QString card, profile;
 	int volume = 0;
 	int balance = 50;
 	bool muted = false;
@@ -20,7 +24,7 @@ struct SoundInput {
 };
 
 bool parseSoundOutputs(const QByteArray &json, const QString &defaultSink,
-	QVector<SoundOutput> &outputs, QString &error);
+	const QByteArray &cardsJson, QVector<SoundOutput> &outputs, QString &error);
 bool parseSoundInputs(const QByteArray &json, const QString &defaultSource,
 	QVector<SoundInput> &inputs, QString &error);
 
@@ -47,6 +51,8 @@ public:
 private:
 	using Done = std::function<void(const QByteArray &, const QString &)>;
 	bool m_refreshing = false;
+	bool m_refreshPending = false;
+	bool m_refreshTimedOut = false;
 	bool m_inputRefreshing = false;
 	unsigned m_generation = 0;
 	unsigned m_inputGeneration = 0;
@@ -58,4 +64,7 @@ private:
 	void finishSwitch(const QString &error);
 	void movePlayback(const QString &sink, QStringList inputs);
 	void makeDefault(const QString &sink);
+	void activateSink(const SoundOutput &output);
+	void completeProfileSwitch();
+	QString m_pendingCard, m_pendingPort;
 };

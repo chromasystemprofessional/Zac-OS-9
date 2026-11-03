@@ -101,11 +101,15 @@ Zacos9Style::Zacos9Style() : QProxyStyle(QStyleFactory::create(QStringLiteral("F
 void Zacos9Style::polish(QApplication *app) {
 	QProxyStyle::polish(app);
 	QApplication::setCursorFlashTime(pl_caret_blink_ms());
-	/* Appearance > Options > Fonts: the size and smoothing of programs' text. */
+	/* Appearance > Options > Fonts: the size, typeface and smoothing of programs' text. */
 	char v[16];
 	QFont font = QApplication::font();
 	if (pl_setting("app-font-size", v, sizeof(v)) && atoi(v) >= 6 && atoi(v) <= 32) {
 		font.setPointSize(atoi(v));
+	}
+	char family[128];
+	if (pl_setting("font-family", family, sizeof(family)) && family[0]) {
+		font.setFamily(QString::fromUtf8(family));
 	}
 	if (pl_setting("font-smoothing", v, sizeof(v)) && strcmp(v, "false") == 0) {
 		font.setStyleStrategy(QFont::NoAntialias);

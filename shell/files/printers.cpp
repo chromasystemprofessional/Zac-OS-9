@@ -12,6 +12,7 @@
 #include <QMimeDatabase>
 #include <QProcess>
 #include <QRegularExpression>
+#include <QSet>
 #include <QTemporaryFile>
 #include <QUrl>
 
@@ -156,6 +157,24 @@ QStringList parsePrinterNames(const QString &lpstatE) {
 	return out;
 }
 
+/* Queues CUPS itself knows: `lpstat -p` names each one
+ * ("printer <name> is idle. ..."). Anything `lpstat -e` advertises
+ * beyond these is a ghost — typically a temporary network queue whose
+ * driver never materialised, which accepts no documents. */
+QSet<QString> parseKnownPrinters(const QString &lpstatP) {
+	QSet<QString> out;
+	for (const QString &line : lpstatP.split('\n', Qt::SkipEmptyParts)) {
+		if (!line.startsWith("printer ")) {
+			continue;
+		}
+		const QString name = line.section(' ', 1, 1);
+		if (!name.isEmpty()) {
+			out.insert(name);
+		}
+	}
+	return out;
+}
+
 QString parseDefaultPrinter(const QString &lpstatD) {
 	const QRegularExpressionMatch m = QRegularExpression("destination: (\\S+)").match(lpstatD);
 	return m.hasMatch() ? m.captured(1) : QString();
@@ -266,7 +285,12 @@ bool isBrowsedQueue(const QString &deviceUri) {
 QList<Printer> listPrinters() {
 	QList<Printer> out;
 	const QString def = defaultPrinter();
+	const Result known = run("lpstat", { "-p" });
+	const QSet<QString> real = known.ok ? parseKnownPrinters(known.out) : QSet<QString>();
 	for (const QString &name : parsePrinterNames(run("lpstat", { "-e" }).out)) {
+		if (known.ok && !real.contains(name)) {
+			continue; /* advertised but not set up: nothing can print there */
+		}
 		Printer p = printerFrom(name, parseOptions(run("lpoptions", { "-p", name }).out));
 		if (isBrowsedQueue(p.uri)) {
 			continue;

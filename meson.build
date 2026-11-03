@@ -17,6 +17,9 @@ add_project_arguments(
 # that need a display start their own headless zacos9-wm and override these.
 add_test_setup('isolated',
   env: {'WAYLAND_DISPLAY': 'zacos9-test-no-display', 'DISPLAY': '',
+    # No live desktop state: with a theme installed, window text renders
+    # in the theme's faces, so metric assertions need the built-ins.
+    'XDG_CONFIG_HOME': meson.project_build_root() / 'test-home',
     # The Python tests' shared helpers (tests/harness/zacos9test.py).
     'PYTHONPATH': meson.project_source_root() / 'tests/harness'},
   is_default: true,
@@ -47,6 +50,8 @@ test('theme-extractor', find_program('python3'),
 install_data(
   'tools/extract-macos9-theme.py',
   'tools/macicons.py',
+  'tools/cursors/build_cursors.py',
+  'tools/macfont.py',
   'tools/macpict.py',
   'tools/macsnd.py',
   'tools/macpat.py',
@@ -78,6 +83,11 @@ test('macfont', find_program('python3'),
 test('macpat', find_program('python3'),
   args: [files('tests/tools/test_macpat.py'),
     meson.project_source_root() / 'tools' / 'macpat.py'])
+
+# Mac OS 9 font decoder (theming, phase D).
+test('macfont', find_program('python3'),
+  args: [files('tests/tools/test_macfont.py'),
+    meson.project_source_root() / 'tools' / 'macfont.py'])
 
 # PNG writer and scaling used by the theme extractor.
 test('pngwrite', find_program('python3'),

@@ -81,6 +81,14 @@ int main(int argc, char *argv[]) {
 	check(versionNewer("0.1", ""), "anything is newer than not installed");
 	check(!versionNewer("", "0.1"), "nothing is never newer");
 
+	/* ---- What's New, once per version ---- */
+	check(whatsnewShouldShow("1.7.0", ""), "a version with nothing seen shows");
+	check(whatsnewShouldShow("1.7.0", "1.6.3"), "a newer version shows");
+	check(!whatsnewShouldShow("1.6.3", "1.6.3"), "the seen version doesn't show again");
+	check(!whatsnewShouldShow("1.6.3", "1.7.0"), "an older install than seen doesn't show");
+	check(!whatsnewShouldShow("", ""), "nothing installed never shows");
+	check(whatsnewNotesFile("1.7.0").endsWith("/1.7.0.txt"), "the notes file is named for the version");
+
 	QTextStream(stdout) << (fails ? "FAILED\n" : "all passed\n");
 	return fails ? 1 : 0;
 }

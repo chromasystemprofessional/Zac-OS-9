@@ -3,6 +3,8 @@
  * lpstat, lpoptions, lp, cancel, ipptool, cupsenable and cupsdisable that
  * keep their state in files (ZACOS9_CUPS_BIN). Nothing reaches a real
  * printer. */
+#include <algorithm>
+
 #include <QApplication>
 #include <QDialog>
 #include <QDir>
@@ -59,7 +61,8 @@ int main(int argc, char **argv) {
 	put(st + "/jobs", "7,pending,\"Letter, \\\\\\\"draft\\\\\\\"\",adam,12,0,1792026828\n"
 		"8,pending-held,Photo.png,adam,300,0,1792026900\n");
 	const QString sh = "#!/bin/sh\nS='" + st + "'\necho \"$(basename $0) $*\" >> '" + log + "'\n";
-	put(bin + "/lpstat", sh + "case $1 in -e) printf 'Inkjet\\nLaser\\nBrowsed\\n' ;; -d) "
+	put(bin + "/lpstat", sh + "case $1 in -e) printf 'Inkjet\\nLaser\\nBrowsed\\nGhost\\n' ;; -p) "
+		"printf 'printer Inkjet is idle. enabled since Mon\\nprinter Laser is stopped. enabled since Mon\\n' ;; -d) "
 		"printf 'system default destination: %s\\n' \"$(cat $S/default)\" ;; esac\n", true);
 	put(bin + "/lpoptions", sh + "case $1 in\n"
 		"-d) printf %s \"$2\" > $S/default ;;\n"
@@ -119,6 +122,10 @@ int main(int argc, char **argv) {
 	check(parsePrinterNames("Inkjet\nLaser\n") == QStringList({ "Inkjet", "Laser" }) &&
 		parseDefaultPrinter("system default destination: Laser\n") == "Laser" &&
 		parseDefaultPrinter("no system default destination\n").isEmpty(), "lpstat's printers and default");
+	check(parseKnownPrinters("printer Inkjet is idle. enabled since Mon\n"
+			"scheduler is running\n"
+			"printer Laser is stopped. enabled since Mon\n") == QSet<QString>({ "Inkjet", "Laser" }),
+		"lpstat -p names the queues CUPS itself knows");
 
 	// ---- desktop printers
 	const QString desk = dir.path() + "/Desktop";
@@ -147,6 +154,9 @@ int main(int argc, char **argv) {
 		browsedShown = browsedShown || q.name == "Browsed";
 	}
 	check(!browsedShown, "cups-browsed's implicitclass queue is skipped");
+	check(std::none_of(printers.cbegin(), printers.cend(),
+		[](const Printer &p) { return p.name == "Ghost"; }),
+		"an advertised queue lpstat -p doesn't know is left out");
 
 	PickerWindow picker;
 	picker.show();

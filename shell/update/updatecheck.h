@@ -52,3 +52,13 @@ bool versionNewer(const QString &a, const QString &b);
 QString installedVersion(const QString &package);
 /* dpkg's architecture name ("amd64"). */
 QString debArchitecture();
+
+/* Post-restart What's New: shown once per version, from
+ * <notes dir>/<installed version>.txt. ZACOS9_WHATSNEW_DIR overrides the
+ * notes directory, for tests. */
+QString whatsnewNotesDir();
+QString whatsnewNotesFile(const QString &version);
+QString whatsnewSeenFile();
+/* True when `installed` is newer than `seen` (empty `seen` counts as
+ * older; empty `installed` never shows). */
+bool whatsnewShouldShow(const QString &installed, const QString &seen);

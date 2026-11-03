@@ -24,8 +24,8 @@ void setGtkSmartScrolling(bool on);
 class AppearancePanel : public QWidget {
 public:
 	AppearancePanel();
-	/* 0 Color, 1 Desktop patterns, 2 Wallpaper, 3 Alert Sound,
-	 * 4 Appearance Themes, 5 Sound Sets, 6 Options. */
+	/* Mac OS 9's order: 0 Themes, 1 Appearance, 2 Fonts, 3 Desktop,
+	 * 4 Sound, 5 Options. */
 	void showTab(int tab);
 
 protected:
@@ -38,28 +38,30 @@ protected:
 
 private:
 	std::vector<PanelList *> visibleLists();
-	void paintColorTab(pl_canvas *c);
+	void paintThemesTab(pl_canvas *c);
+	void paintAppearanceTab(pl_canvas *c);
+	void paintFontsTab(pl_canvas *c);
 	void paintDesktopTab(pl_canvas *c);
 	void paintSoundTab(pl_canvas *c);
 	void loadPatterns();
 	void loadWallpapers();
 	void loadAlertSounds();
 	QString recordAlertSound();
-	void paintWallpaperTab(pl_canvas *c);
 	void loadThemes();
-	void paintThemesTab(pl_canvas *c);
-	void paintSoundThemesTab(pl_canvas *c);
+	void paintOptionsTab(pl_canvas *c);
 	/* Options: Mac OS 9's "Double-click title bar to collapse windows"
 	 * (title-collapse, read by zacos9-wm) and Smart Scrolling
 	 * (smart-scrolling: lib/widgets' scroll bars and the Qt style read it;
 	 * GTK 3 programs from a block in ~/.config/gtk-3.0/gtk.css). */
-	void paintOptionsTab(pl_canvas *c);
 	void applyProgramFonts();
 	PanelCheckbox m_titleCollapse, m_smartScrolling;
 	int m_scrollGroupTop = 0;
 	int m_fontGroupTop = 0;
-	PanelPopup m_fontSize;   /* Options: programs' text size */
+	PanelPopup m_fontSize;   /* Fonts: programs' text size */
+	PanelPopup m_fontFamily; /* Fonts: programs' typeface */
+	QStringList m_fontFamilyIds;
 	PanelCheckbox m_smoothFonts;
+	void loadFontFamilies();
 
 	int m_tab = 0;
 	std::vector<std::unique_ptr<Text>> m_tabLabels;
@@ -73,4 +75,9 @@ private:
 	PanelList *m_focus = nullptr;
 	QStringList m_soundIds;
 	std::vector<uint32_t> m_highlightColors;
+	/* Themes gallery: first visible card and horizontal scroll bar. */
+	int m_themeFirst = 0;
+	pl_scrollbar m_themeBar{};
+	QRect m_galleryRect;
+	QRect m_galleryBarRect;
 };

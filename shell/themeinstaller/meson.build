@@ -1,8 +1,8 @@
 # The Theme Installer: builds a ZacOS theme from a Mac OS 9 install.
 themeinstaller_exe = executable('zacos9-themeinstaller',
   'main.cpp',
-  include_directories: include_directories('../common'),
-  dependencies: [platinum_dep, qt6],
+  include_directories: include_directories('../common', '../files'),
+  dependencies: [shell_files_dep, platinum_dep, qt6],
   install: true,
 )
 

@@ -205,7 +205,35 @@ int desktopPatternFind(const QString &id) {
 			return i;
 		}
 	}
+	/* Theme presets name the installed file ("Aqua_v2_0-pattern-1");
+	 * the catalog keys the same file by hash. Match its stem too. */
+	for (int i = pl_pattern_count(); i < desktopPatternCount(); ++i) {
+		if (desktopPatternName(i).startsWith(id + ".")) {
+			return i;
+		}
+	}
 	return 0;
+}
+
+bool desktopPatternAvailable(const QString &id) {
+	for (int i = 0; i < desktopPatternCount(); ++i) {
+		if (desktopPatternId(i) == id) {
+			return true;
+		}
+	}
+	for (int i = pl_pattern_count(); i < desktopPatternCount(); ++i) {
+		if (desktopPatternName(i).startsWith(id + ".")) {
+			return true;
+		}
+	}
+	/* A freshly-installed theme's patterns reach the folder before the
+	 * catalog's next poll: the file on disk is authority enough. */
+	for (const QString &file : QDir(desktopPatternsFolder()).entryList({ id + ".*" }, QDir::Files)) {
+		if (!file.isEmpty()) {
+			return true;
+		}
+	}
+	return false;
 }
 
 void desktopPatternFill(pl_canvas *canvas, int index, int x0, int y0, int x1, int y1) {
@@ -266,7 +294,26 @@ int desktopWallpaperFind(const QString &id) {
 			return i;
 		}
 	}
+	for (int i = 0; i < desktopWallpaperCount(); ++i) {
+		if (desktopWallpaperName(i).startsWith(id + ".")) {
+			return i;
+		}
+	}
 	return -1;
+}
+
+bool desktopWallpaperAvailable(const QString &id) {
+	for (int i = 0; i < desktopWallpaperCount(); ++i) {
+		if (desktopWallpaperId(i) == id || desktopWallpaperName(i).startsWith(id + ".")) {
+			return true;
+		}
+	}
+	for (const QString &file : QDir(desktopWallpaperFolder()).entryList({ id + ".*" }, QDir::Files)) {
+		if (!file.isEmpty()) {
+			return true;
+		}
+	}
+	return false;
 }
 
 QStringList desktopWallpaperErrors() {

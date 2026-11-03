@@ -125,9 +125,35 @@ bool zac_theme_asset(const char *relative, char *out, size_t size) {
 	return false;
 }
 
-/* The active theme's theme.conf lines, cached until the file changes. */
+/* The Xcursor theme the active bundle ships (cursors/Macintosh/ with an
+ * index.theme): its name for XCURSOR_THEME and its directory for
+ * XCURSOR_PATH. False when the bundle has none: keep ZacOS9's. */
+bool zac_cursor_theme(char *name, size_t nsize, char *dir, size_t dsize) {
+	if (!name || nsize == 0 || !dir || dsize == 0) {
+		return false;
+	}
+	char bundle[4096];
+	if (!active_theme_dir(bundle, sizeof(bundle))) {
+		return false;
+	}
+	char index[8192];
+	snprintf(index, sizeof(index), "%s/cursors/Macintosh/index.theme", bundle);
+	struct stat st;
+	if (stat(index, &st) != 0 || !S_ISREG(st.st_mode)) {
+		return false;
+	}
+	snprintf(name, nsize, "Macintosh");
+	snprintf(dir, dsize, "%s/cursors", bundle);
+	return true;
+}
+
+/* The active theme's theme.conf lines, cached until the file changes.
+ * The path and size join the timestamp: a reimported bundle can land
+ * inside one timestamp tick, and another bundle's file can share it. */
 static struct {
 	struct timespec mtime;
+	off_t size;
+	char path[8192];
 	bool loaded;
 	int n;
 	char lines[64][256];
@@ -139,6 +165,8 @@ static void conf_load(void) {
 		confcache.loaded = true;
 		confcache.n = 0;
 		confcache.mtime = (struct timespec){ 0 };
+		confcache.size = -1;
+		confcache.path[0] = '\0';
 		return;
 	}
 	char path[8192];
@@ -148,14 +176,19 @@ static void conf_load(void) {
 		confcache.loaded = true;
 		confcache.n = 0;
 		confcache.mtime = (struct timespec){ 0 };
+		confcache.size = -1;
+		confcache.path[0] = '\0';
 		return;
 	}
 	if (confcache.loaded && confcache.mtime.tv_sec == st.st_mtim.tv_sec &&
-			confcache.mtime.tv_nsec == st.st_mtim.tv_nsec) {
+			confcache.mtime.tv_nsec == st.st_mtim.tv_nsec &&
+			confcache.size == st.st_size && strcmp(confcache.path, path) == 0) {
 		return;
 	}
 	confcache.loaded = true;
 	confcache.mtime = st.st_mtim;
+	confcache.size = st.st_size;
+	snprintf(confcache.path, sizeof(confcache.path), "%s", path);
 	confcache.n = 0;
 	FILE *f = fopen(path, "r");
 	if (!f) {
@@ -166,6 +199,29 @@ static void conf_load(void) {
 		confcache.n++;
 	}
 	fclose(f);
+}
+
+/* Read a raw string value from the active theme's theme.conf. Returns
+ * false (leaving out untouched) when the key is unset or too long. */
+bool zac_theme_string(const char *key, char *out, size_t size) {
+	if (!key || !out || size == 0) return false;
+	conf_load();
+	for (int i = 0; i < confcache.n; i++) {
+		const char *eq = strchr(confcache.lines[i], '=');
+		if (!eq || (size_t)(eq - confcache.lines[i]) != strlen(key)) {
+			continue;
+		}
+		if (strncmp(confcache.lines[i], key, strlen(key)) != 0) {
+			continue;
+		}
+		const char *v = eq + 1;
+		if (strlen(v) == 0 || strlen(v) >= size) {
+			return false;
+		}
+		memcpy(out, v, strlen(v) + 1);
+		return true;
+	}
+	return false;
 }
 
 bool zac_theme_color(const char *key, uint32_t *out) {

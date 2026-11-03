@@ -114,7 +114,9 @@ enum pl_icon_kind {
 #define PL_ICON_LARGE 32
 #define PL_ICON_SMALL 16
 
-/* size x size ARGB pixels, alpha 0 or 255. size is 32 or 16. */
+/* size x size ARGB pixels, alpha 0 or 255. size is 32 or 16. A bundle
+ * overrides the desktop icons it ships; custom folders keep their
+ * built-in emblems over the bundle's folder. */
 const uint32_t *pl_icon(enum pl_icon_kind kind, int size);
 
 /* A ZacOS program's own icon, from its desktop file's name or path

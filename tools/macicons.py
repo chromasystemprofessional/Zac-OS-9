@@ -40,6 +40,53 @@ def gray_ramp(n):
     return [(int(255 * i / max(1, n - 1)),) * 3 for i in range(n)]
 
 
+# Screenshot-calibrated system palette entries: index -> (r, g, b).
+# Mac icons index the ROM's default 8-bit system table, which survives in
+# no resource fork; the file cluts are theme or photo tables that get some
+# indices wrong (gray folders instead of periwinkle). Entries marked sampled
+# were matched pixel-against-pixel with a running Mac OS 9 desktop and must
+# keep working: the extractor's tests cover the folder, the caution sign
+# and the Apple icon. The rest are the Mac's own certain whites and grays,
+# or keep the lavender family's relative order (estimated).
+CALIBRATED_SYSTEM_COLORS = {
+    42: (204, 204, 255),  # sampled: desktop folder fill
+    23: (255, 255, 0),  # sampled: caution-sign yellow
+    5: (255, 255, 0),  # sampled: caution-sign dither pair
+    245: (255, 255, 255),  # documents are white
+    253: (221, 221, 221),  # trash body and other light-gray parts
+    248: (192, 192, 192),  # trash and drive shading
+    84: (153, 153, 221),  # folder back panel and side
+    170: (170, 170, 238),  # folder edge detail
+    213: (119, 119, 187),  # folder edge lines
+}
+
+
+def resolve_palette(cluts, calibrate=True):
+    """The icon palette: the largest file clut, with calibrated system
+    colours applied. Used for icons decoded from the user's own Mac OS 9
+    install (never for the theme file's own icon, which keeps its gray
+    ramp rule). Pass calibrate=False for art from a third-party theme
+    file: Apple's samples describe Apple's icons, not its.
+    """
+    best = None
+    for _res_id, cols in cluts:
+        if cols and (best is None or len(cols) > len(best)):
+            best = cols
+    lookup = clut_lookup(best)
+    if lookup is None:
+        lookup = list(gray_ramp(256))
+    else:
+        lookup = list(lookup)
+        while len(lookup) < 256:
+            lookup.append(lookup[-1] if lookup else (0, 0, 0))
+    if calibrate:
+        for index, rgb in CALIBRATED_SYSTEM_COLORS.items():
+            if 0 <= index < len(lookup):
+                lookup[index] = rgb
+    # As (index, rgb) pairs, so the decoders' clut_lookup keeps them.
+    return list(enumerate(lookup))
+
+
 def decode_icl8(data, clut=None, size=32):
     """Decode an 8-bit indexed icon to a list of rows of (r, g, b, a)."""
     lookup = clut_lookup(clut)
@@ -274,6 +321,79 @@ def combine_icon(color_rows, mask, black=(0, 0, 0)):
                 row.append((black[0], black[1], black[2], 0))
         rows.append(row)
     return rows
+
+
+def _unpack_icns_rgb(data, npixels):
+    """Unpack an il32/is32 24-bit RLE stream into `npixels` (r, g, b) tuples."""
+    if len(data) == npixels * 4:
+        return [(data[i * 4 + 1], data[i * 4 + 2], data[i * 4 + 3]) for i in range(npixels)]
+    pos = 4 if len(data) >= 4 and data[:4] == b"\x00\x00\x00\x00" else 0
+    channels = [bytearray(), bytearray(), bytearray()]
+    for ch in range(3):
+        out = channels[ch]
+        while len(out) < npixels and pos < len(data):
+            b = data[pos]
+            pos += 1
+            if b & 0x80:
+                run = b - 125
+                if pos < len(data):
+                    out.extend([data[pos]] * run)
+                    pos += 1
+            else:
+                run = b + 1
+                out.extend(data[pos:pos + run])
+                pos += run
+        if len(out) < npixels:
+            out.extend([0] * (npixels - len(out)))
+    return list(zip(channels[0][:npixels], channels[1][:npixels], channels[2][:npixels]))
+
+
+def decode_icns(data, clut=None, size=32):
+    """Decode a Mac OS 8.5+ 'icns' resource at `size` (32 or 16) to RGBA rows."""
+    import struct
+    if len(data) < 8 or data[:4] != b"icns":
+        raise ValueError("not an icns resource")
+    pos = 8
+    chunks = {}
+    while pos + 8 <= len(data):
+        ctype = data[pos:pos + 4]
+        clen = struct.unpack(">I", data[pos + 4:pos + 8])[0]
+        if clen < 8 or pos + clen > len(data):
+            break
+        chunks[ctype] = data[pos + 8:pos + clen]
+        pos += clen
+    rgb_tag = b"il32" if size == 32 else b"is32"
+    mk8_tag = b"l8mk" if size == 32 else b"s8mk"
+    c8_tag = b"icl8" if size == 32 else b"ics8"
+    c4_tag = b"icl4" if size == 32 else b"ics4"
+    m1_tag = b"ICN#" if size == 32 else b"ics#"
+    npixels = size * size
+    alpha = None
+    if mk8_tag in chunks and len(chunks[mk8_tag]) >= npixels:
+        alpha = chunks[mk8_tag][:npixels]
+    elif m1_tag in chunks:
+        _, mrows = decode_icn1(chunks[m1_tag], size=size)
+        alpha = bytes(255 if mrows[y][x] else 0 for y in range(size) for x in range(size))
+    if rgb_tag in chunks and alpha is not None:
+        rgb = _unpack_icns_rgb(chunks[rgb_tag], npixels)
+        rows = []
+        for y in range(size):
+            row = []
+            for x in range(size):
+                r, g, b = rgb[y * size + x]
+                a = alpha[y * size + x]
+                row.append((r, g, b, a) if a else (0, 0, 0, 0))
+            rows.append(row)
+        return rows
+    if c8_tag in chunks and m1_tag in chunks:
+        crows = decode_icl8(chunks[c8_tag], clut, size=size)
+        _, mrows = decode_icn1(chunks[m1_tag], size=size)
+        return combine_icon(crows, mrows)
+    if c4_tag in chunks and m1_tag in chunks:
+        crows = decode_icl4(chunks[c4_tag], clut, size=size)
+        _, mrows = decode_icn1(chunks[m1_tag], size=size)
+        return combine_icon(crows, mrows)
+    raise ValueError("icns has no decodable %dx%d representation" % (size, size))
 
 
 def rgba_bytes(rows):
