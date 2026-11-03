@@ -264,8 +264,10 @@ int main(int argc, char **argv) {
 		w->m_rows[2].item->name },
 		"a list rectangle from a blank column selects the rows whose names it crosses");
 	mouse(w, QEvent::MouseButtonPress, nameFirst, Qt::LeftButton);
-	mouse(w, QEvent::MouseButtonRelease, nameFirst, Qt::NoButton);
 	check(selectedNames(w).size() == 3, "pressing a selected name keeps all of them for a drag");
+	mouse(w, QEvent::MouseButtonRelease, nameFirst, Qt::NoButton);
+	check(selectedNames(w) == QSet<QString>{ w->m_rows[0].item->name },
+		"releasing without a drag selects only the clicked name");
 
 	for (int i = 0; i < 40; i++) {
 		touch(folder + QString("/More %1").arg(i, 2, 10, QLatin1Char('0')));

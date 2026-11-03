@@ -515,6 +515,27 @@ int main(int argc, char **argv) {
 			desktop.mouseReleaseEvent(nullptr);
 			desktop.selectByName(QString());
 		}
+		{
+			/* A click (press and release, no drag) on one of several
+			 * selected icons selects only it, as Mac OS 9 did; the press
+			 * alone keeps them so a drag moves them all. */
+			desktop.selectByName(QString());
+			desktop.m_disk->selected = true;
+			desktop.m_trash->selected = true;
+			const QPoint centre = desktop.m_disk->pos + QPoint(PL_ICON_LARGE / 2, PL_ICON_LARGE / 2);
+			QMouseEvent press(QEvent::MouseButtonPress, QPointF(centre), QPointF(centre),
+				Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+			desktop.mousePressEvent(&press);
+			check(desktop.m_disk->selected && desktop.m_trash->selected,
+				"pressing one of several selected desktop icons keeps them for a drag");
+			QMouseEvent release(QEvent::MouseButtonRelease, QPointF(centre), QPointF(centre),
+				Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+			desktop.mouseReleaseEvent(&release);
+			check(desktop.m_disk->selected && !desktop.m_trash->selected &&
+					desktop.selectedItems().size() == 1,
+				"releasing without a drag selects only the clicked desktop icon");
+			desktop.selectByName(QString());
+		}
 		/* A place saved on a bigger screen (Monitors' scale turned back
 		 * up) is off this one: the icon takes a free spot instead, can be
 		 * clicked, and keeps its saved place for when the screen grows. */
