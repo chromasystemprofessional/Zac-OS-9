@@ -313,7 +313,9 @@ the public Carbon HIToolbox Appearance Manager interface. Playback repeats the
 complete decoded sample; the idle-drag variant, embedded loop regions and
 random sound sequences are not supported.
 
-Samples may be 8- or 16-bit PCM, μ-law, IMA 4:1 or `twos`, at 1–96 kHz. MACE
+Each imported sound is padded with a short silence at both ends: the
+player starts and stops on every event, and a drag sound loops, so a
+boundary on the audio itself is heard as a click or scratch. Samples may be 8- or 16-bit PCM, μ-law, IMA 4:1 or `twos`, at 1–96 kHz. MACE
 is not decoded and is reported. Leading null sound commands are skipped, and
 an empty sound resource silences its event without an error. There is no
 verified classic mapping for `trash-move`; WAV themes can supply it explicitly.
