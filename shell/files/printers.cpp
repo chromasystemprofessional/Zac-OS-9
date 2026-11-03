@@ -191,9 +191,8 @@ QStringList parsePrinterNames(const QString &lpstatE) {
 }
 
 /* Queues CUPS itself knows: `lpstat -p` names each one
- * ("printer <name> is idle. ..."). Anything `lpstat -e` advertises
- * beyond these is a ghost — typically a temporary network queue whose
- * driver never materialised, which accepts no documents. */
+ * ("printer <name> is idle. ..."). A printer found on the network is
+ * advertised by `lpstat -e` before it is here; see listPrinters(). */
 QSet<QString> parseKnownPrinters(const QString &lpstatP) {
 	QSet<QString> out;
 	for (const QString &line : lpstatP.split('\n', Qt::SkipEmptyParts)) {
@@ -354,12 +353,21 @@ QList<Printer> listPrinters() {
 	}
 	const QSet<QString> real = parseKnownPrinters(known.out);
 	for (const QString &name : parsePrinterNames(advertised.out)) {
-		if (!real.contains(name)) {
-			continue; /* advertised but not set up: nothing can print there */
-		}
-		Printer p = printerFrom(name, parseOptions(run("lpoptions", { "-p", name }).out));
+		const QMap<QString, QString> options = parseOptions(run("lpoptions", { "-p", name }).out);
+		Printer p = printerFrom(name, options);
 		if (isBrowsedQueue(p.uri)) {
 			continue;
+		}
+		if (!real.contains(name)) {
+			/* `lpstat -p` leaves out a printer found on the network until
+			 * CUPS makes its temporary queue on the first print. It has a
+			 * device URI but no state yet, and printing to it works — the
+			 * default printer is often one of these. An entry with no
+			 * device behind it is a ghost that accepts nothing. */
+			if (p.uri.isEmpty()) {
+				continue;
+			}
+			p.temporary = true;
 		}
 		p.isDefault = name == def;
 		out << p;

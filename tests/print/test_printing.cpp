@@ -64,7 +64,7 @@ int main(int argc, char **argv) {
 	put(bin + "/lpstat", sh + "case $1 in -e) if [ -f \"$S/down\" ]; then "
 		"echo 'lpstat: Unable to connect to server' >&2; exit 1; fi; "
 		"if [ -f \"$S/none\" ]; then echo 'lpstat: No destinations added.' >&2; exit 1; fi; "
-		"printf 'Inkjet\\nLaser\\nBrowsed\\nGhost\\n' ;; -p) "
+		"printf 'Inkjet\\nLaser\\nBrowsed\\nGhost\\nWiFi\\n' ;; -p) "
 		"printf 'printer Inkjet is idle. enabled since Mon\\nprinter Laser is stopped. enabled since Mon\\n' ;; -d) "
 		"printf 'system default destination: %s\\n' \"$(cat $S/default)\" ;; esac\n", true);
 	put(bin + "/lpoptions", sh + "case $1 in\n"
@@ -73,7 +73,9 @@ int main(int argc, char **argv) {
 		"printer-make-and-model='Laser Co L1' printer-state=$(cat $S/Laser.state) printer-is-accepting-jobs=true "
 		"printer-state-reasons=none\"; elif [ \"$2\" = Browsed ]; then echo \"printer-info='Old Queue' "
 		"device-uri=implicitclass://Canon/ printer-state=3 printer-is-accepting-jobs=true "
-		"printer-state-reasons=none\"; else echo \"printer-info='Inkjet' printer-state=3 printer-is-temporary=true "
+		"printer-state-reasons=none\"; elif [ \"$2\" = WiFi ]; then echo \"printer-info='Canon TS8300 (Wi-Fi)' "
+		"printer-make-and-model='Canon TS8300 series' device-uri=ipps://Canon._ipps._tcp.local/\"; "
+		"else echo \"printer-info='Inkjet' printer-state=3 printer-is-temporary=true "
 		"printer-state-reasons=media-empty-error\"; fi ;;\nesac\n", true);
 	put(bin + "/ipptool", sh + "echo job-id,job-state,job-name,job-originating-user-name,job-k-octets,"
 		"job-impressions-completed,time-at-creation,job-state-reasons\ncat $S/jobs\n", true);
@@ -166,8 +168,11 @@ int main(int argc, char **argv) {
 
 	// ---- asking CUPS (the stand-ins)
 	const QList<Printer> printers = listPrinters();
-	check(printers.size() == 2 && printers[1].name == "Laser" && printers[1].isDefault && !printers[0].isDefault &&
+	check(printers.size() == 3 && printers[1].name == "Laser" && printers[1].isDefault && !printers[0].isDefault &&
 		printers[0].temporary && printers[1].location == "Back room", "the printers, the default marked");
+	check(printers[2].name == "WiFi" && printers[2].temporary &&
+		printers[2].shownName() == "Canon TS8300 (Wi-Fi)" && printers[2].uri.startsWith("ipps://"),
+		"a printer CUPS found on the network is listed");
 	bool browsedShown = false;
 	for (const Printer &q : printers) {
 		browsedShown = browsedShown || q.name == "Browsed";
@@ -180,8 +185,8 @@ int main(int argc, char **argv) {
 	PickerWindow picker;
 	picker.show();
 	settle();
-	check(picker.rows() == QStringList({ "Inkjet", "Office Laser" }) && picker.selectedRow() == 1,
-		"Printer Picker lists them, your printer selected");
+	check(picker.rows() == QStringList({ "Inkjet", "Office Laser", "Canon TS8300 (Wi-Fi)" }) &&
+		picker.selectedRow() == 1, "Printer Picker lists them, your printer selected");
 	check(picker.details().contains("Location: Back room") && picker.details().contains("Status: Idle"),
 		"and says where and how it is");
 	picker.pick(0);
@@ -192,6 +197,12 @@ int main(int argc, char **argv) {
 	const QString deskPrinter = picker.createDesktopPrinterForSelected();
 	check(deskPrinter == desk + "/Inkjet.printer" && desktopPrinterQueue(deskPrinter) == "Inkjet",
 		"Create Desktop Printer puts it on the desktop");
+	picker.pick(2);
+	settle();
+	check(read(st + "/default") == "WiFi" && picker.selectedRow() == 2 &&
+		picker.details().contains("Found on the network") &&
+		picker.details().contains("Model: Canon TS8300 series"),
+		"a printer found on the network can be chosen, and says it will be set up on first print");
 
 	QueueWindow queue("Laser");
 	queue.show();
