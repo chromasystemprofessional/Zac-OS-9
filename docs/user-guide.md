@@ -76,6 +76,9 @@ whose icon or name it crosses and scrolls when dragged past the window edge.
 Drag any selected item to move the whole selection into another folder; hold
 Option while dropping to copy instead.
 
+As in Mac OS 9, a disk's desktop icon is dimmed while its folder window is
+open, and comes back to full strength when the window closes.
+
 Double-click `.zip`, `.7z`, `.sit`, or supported tar archives to extract them beside the
 archive. A single top-level item keeps its name; multiple items go into a folder
 named after the archive. Existing items are never overwritten, and the archive

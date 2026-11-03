@@ -164,6 +164,28 @@ int main(int argc, char **argv) {
 	}
 	check(usbBadgeDiffers && diskRemainsVisible,
 		"USB volume icon overlays a USB badge on the drive without replacing it");
+	{
+		/* Mac OS 9 dims an open volume's desktop icon: at half strength
+		 * the pattern shows through until its window closes. */
+		Pixels solid(48, 48), dim(48, 48);
+		pl_fill(&solid.c, 0, 0, 47, 47, 0xFF808080u);
+		pl_fill(&dim.c, 0, 0, 47, 47, 0xFF808080u);
+		paintIconItem(&solid.c, regularDisk, 8, 8, true, false, false);
+		paintIconItem(&dim.c, regularDisk, 8, 8, true, false, true);
+		int solidFromBackground = 0, dimFromBackground = 0;
+		for (int y = 8; y < 8 + PL_ICON_LARGE; y++) {
+			for (int x = 8; x < 8 + PL_ICON_LARGE; x++) {
+				const QRgb s = solid.img.pixel(x, y);
+				const QRgb d = dim.img.pixel(x, y);
+				solidFromBackground += qAbs(qRed(s) - 0x80) + qAbs(qGreen(s) - 0x80) +
+					qAbs(qBlue(s) - 0x80);
+				dimFromBackground += qAbs(qRed(d) - 0x80) + qAbs(qGreen(d) - 0x80) +
+					qAbs(qBlue(d) - 0x80);
+			}
+		}
+		check(dimFromBackground < solidFromBackground,
+			"an open volume's desktop icon is drawn at half strength");
+	}
 	for (bool selected : { false, true }) {
 		Pixels desktopDisk(PL_ICON_LARGE, PL_ICON_LARGE);
 		Pixels desktopUsb(PL_ICON_LARGE, PL_ICON_LARGE);

@@ -1049,9 +1049,46 @@ void paintIcon(pl_canvas *c, Item &item, int x, int y, int size, bool highlight)
 	}
 }
 
-void paintIconItem(pl_canvas *c, Item &item, int x, int y, bool onDesktop, bool showLabel) {
+/* One canvas pixel, or `fallback` outside it. */
+static uint32_t canvas_pixel(pl_canvas *c, int x, int y, uint32_t fallback) {
+	const int cx = x + c->x;
+	const int cy = y + c->y;
+	if (cx < 0 || cy < 0 || cx >= c->width || cy >= c->height) {
+		return fallback;
+	}
+	return c->px[cy * c->stride + cx];
+}
+
+void paintIconItem(pl_canvas *c, Item &item, int x, int y, bool onDesktop,
+		bool showLabel, bool dimmed) {
 	const bool highlight = item.selected || item.dropTarget;
-	paintIcon(c, item, x, y, PL_ICON_LARGE, highlight);
+	if (dimmed) {
+		/* Mac OS 9 dims an open volume's desktop icon: the pattern shows
+		 * through it until its window closes. Save what is underneath,
+		 * paint the icon, then mix the two equally; transparent icon
+		 * pixels keep the background unchanged. */
+		const int n = PL_ICON_LARGE;
+		std::vector<uint32_t> under(static_cast<size_t>(n) * n);
+		for (int yy = 0; yy < n; yy++) {
+			for (int xx = 0; xx < n; xx++) {
+				under[static_cast<size_t>(yy) * n + xx] = canvas_pixel(c, x + xx, y + yy, 0);
+			}
+		}
+		paintIcon(c, item, x, y, PL_ICON_LARGE, highlight);
+		for (int yy = 0; yy < n; yy++) {
+			for (int xx = 0; xx < n; xx++) {
+				const uint32_t a = under[static_cast<size_t>(yy) * n + xx];
+				const uint32_t b = canvas_pixel(c, x + xx, y + yy, a);
+				const uint32_t mix = 0xFF000000u |
+					((((a >> 16) & 0xFF) + ((b >> 16) & 0xFF)) / 2) << 16 |
+					((((a >> 8) & 0xFF) + ((b >> 8) & 0xFF)) / 2) << 8 |
+					((((a) & 0xFF) + ((b) & 0xFF)) / 2);
+				pl_put(c, x + xx, y + yy, mix);
+			}
+		}
+	} else {
+		paintIcon(c, item, x, y, PL_ICON_LARGE, highlight);
+	}
 	/* Mac OS 9's default desktop printer: a bold outline round its icon. */
 	if (item.kind == PL_ICON_PRINTER) {
 		const QString def = desktopDefaultPrinter();

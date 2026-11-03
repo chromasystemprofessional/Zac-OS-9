@@ -103,6 +103,7 @@ FolderWindow *FolderWindow::open(const QString &path) {
 		/* Spatial: the window comes back with its old size, view and place. */
 		w = new FolderWindow(key);
 		openWindows().insert(key, w);
+		Finder::instance().desktopIconsChanged();
 		w->resize(w->m_state.size);
 		w->show();
 		pl_sound_event("window-open");
@@ -208,6 +209,7 @@ FolderWindow::~FolderWindow() {
 		m_state.save(m_path);
 	}
 	openWindows().remove(m_path);
+	Finder::instance().desktopIconsChanged();
 	Finder::instance().viewClosed(this);
 }
 

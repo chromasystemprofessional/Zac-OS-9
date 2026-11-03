@@ -170,6 +170,9 @@ public:
 	void folderChanged(const QString &folder);
 	/* Selection or front view changed: tell the menu bar. */
 	void notifyState();
+	/* A folder window opened or closed: a volume's desktop icon is dimmed
+	 * while its window is open (Mac OS 9), so the desktop repaints. */
+	void desktopIconsChanged();
 	/* Put Away a disk; the desktop's Trash also ejects network volumes. */
 	void ejectVolume(QString path, QString name, bool network);
 
