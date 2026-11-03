@@ -72,8 +72,8 @@ THEME_ICON_MAP = [
     ("trash-empty", b"icl8", -3993),
     ("trash-full", b"icl8", -3984),
     ("document", b"icl8", -4000),
-    ("disk", b"icl8", 400),
-    ("network-disk", b"icl8", -20725),
+    ("disk", b"icl8", -3995),
+    ("network-disk", b"icl8", -3972),
     ("disk-image", b"icl8", -3998),
     ("caution", b"icl8", 7202),
 ]
@@ -600,7 +600,7 @@ def process_resource_fork(data, out, counts, cluts, icons, assets, scen_tags, ap
 			layo[res_id] = body
 		if plut is not None and rtype == b"plut":
 			plut[res_id] = body
-		if rtype in (b"ics8", b"ics4", b"ics#") and res_id == -16386:
+		if rtype in (b"icns", b"ics8", b"ics4", b"ics#") and res_id == -16386:
 			apple_menu.setdefault(rtype, []).append(body)
 		if rtype == b"wctb" and res_id == 0 and not wctb:
 			wctb.update(decode_wctb(body))
@@ -723,7 +723,7 @@ def collect_helper_fork(path, cluts, apple_menu, theme_icons, cursors):
 	except OSError:
 		return
 	for rtype, res_id, body in parse_resource_fork(data):
-		if rtype in (b"ics8", b"ics4", b"ics#") and res_id == -16386:
+		if rtype in (b"icns", b"ics8", b"ics4", b"ics#") and res_id == -16386:
 			apple_menu.setdefault(rtype, []).append(body)
 		elif rtype == b"clut":
 			try:
@@ -743,6 +743,24 @@ def write_apple_menu(apple_menu, cluts, out, theme_apple=None, theme_cluts=()):
 
 	Whoever supplies the icon, it decodes against the System tables
 	(the largest wins: a gray ramp would flatten the rainbow stripes)."""
+	# The icon decodes against the System tables even when the theme
+	# file supplies it (a scheme's own tables describe its chrome).
+	# The rainbow stripes need the fullest table: gray ramps flatten them.
+	helpers = cluts[len(theme_cluts):] or cluts
+	palette = None
+	for _res_id, cols in helpers:
+		if cols and (palette is None or len(cols) > len(palette)):
+			palette = cols
+	# A Mac OS 9 theme carries its own Apple menu icon as an icon suite
+	# (icns, id -16386); the System supplies the low-depth ics8/ics4.
+	# The theme's own art wins, as it does for every other icon.
+	if apple_menu.get(b"icns"):
+		try:
+			rows = macicons.decode_icns(apple_menu[b"icns"][0], palette, size=16)
+			pngwrite.write_png(os.path.join(out, "apple-menu.png"), 16, 16, rows)
+			return rows
+		except (ValueError, IndexError, struct.error):
+			pass
 	color = None
 	mask = None
 	if apple_menu.get(b"ics8"):
@@ -754,14 +772,6 @@ def write_apple_menu(apple_menu, cluts, out, theme_apple=None, theme_cluts=()):
 	if apple_menu.get(b"ics#"):
 		_, mask_rows = macicons.decode_icn1(apple_menu[b"ics#"][0], size=16)
 		mask = mask_rows
-	# The icon decodes against the System tables even when the theme
-	# file supplies it (a scheme's own tables describe its chrome).
-	# The rainbow stripes need the fullest table: gray ramps flatten them.
-	helpers = cluts[len(theme_cluts):] or cluts
-	palette = None
-	for _res_id, cols in helpers:
-		if cols and (palette is None or len(cols) > len(palette)):
-			palette = cols
 	rows = macicons.decode_icl8(color, palette, size=16) if len(color) == 256 else 		macicons.decode_icl4(color, palette, size=16) if len(color) == 128 else None
 	if rows is None:
 		return
@@ -1286,6 +1296,29 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None):
 		pngwrite.write_argb(os.path.join(chrome_dir, key + ".argb"), rows)
 		keys[key] = "chrome/" + key + ".argb"
 
+	def save_bar(key, rows, height):
+		"""Save a title-bar tile cropped to the bar band.
+
+		The frame layout's end caps and middle come from different
+		resources, and a cap can carry transparent rows above the bar (or
+		the window frame below it). Drawn from row 0, such a cap looks
+		shorter than the middle. Start every tile at the first row that
+		has ink and keep the middle's height, repeating the last row when
+		the art is shorter."""
+		if not rows or not rows[0]:
+			return
+		top = 0
+		for y, row in enumerate(rows):
+			if any(px[3] for px in row):
+				top = y
+				break
+		rows = rows[top:top + height]
+		if not rows:
+			return
+		while len(rows) < height:
+			rows.append(list(rows[-1]))
+		save_tile(key, rows)
+
 	# 1. Universal Kaleidoscope title-bar buttons (200 close, 210 collapse, 220 zoom).
 	has_any_btn = any(pid in pxm for pid in (200, 210, 220))
 	if has_any_btn and (layo or name in THEME_CHROME):
@@ -1340,9 +1373,10 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None):
 					(r for r in recs[2:] if r[0] == b"pxm#" and (r[1] & 0xFFFF) in (6178, 6134, 6278)),
 					recs[2]))
 			right_rows = resolve_rec(right_rec[0], right_rec[1], layer)
-			save_tile("bar-left" + suffix, left_rows)
-			save_tile("bar-middle" + suffix, mid_rows)
-			save_tile("bar-right" + suffix, right_rows)
+			bar_h = len(mid_rows)
+			save_bar("bar-left" + suffix, left_rows, bar_h)
+			save_bar("bar-middle" + suffix, mid_rows, bar_h)
+			save_bar("bar-right" + suffix, right_rows, bar_h)
 			mids_by_suffix[suffix] = mid_rows
 
 		# 2b. Two-part bars: the title group rides a pinstripe patch on
@@ -1443,9 +1477,10 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None):
 			right_rows = resolve_rec(right_rec[0], right_rec[1], layer) if right_rec else None
 			if not right_rows:
 				right_rows = dialog_side(recs, layer, True)
-			save_tile("bar-dialog-left" + suffix, left_rows)
-			save_tile("bar-dialog-middle" + suffix, mid_rows)
-			save_tile("bar-dialog-right" + suffix, right_rows)
+			bar_h = len(mid_rows)
+			save_bar("bar-dialog-left" + suffix, left_rows, bar_h)
+			save_bar("bar-dialog-middle" + suffix, mid_rows, bar_h)
+			save_bar("bar-dialog-right" + suffix, right_rows, bar_h)
 
 		for short, pid in (("dialog-close", 6185), ("dialog-zoom", 211), ("dialog-grow", 221)):
 			bodies = pxm.get(pid)

@@ -274,6 +274,27 @@ def test_apple_menu():
     print("ok    apple menu icon written")
 
 
+def test_standard_icon_ids():
+    # Apple's Icons.h: kGenericHardDiskIconResource -3995 and
+    # kGenericFileServerIconResource -3972. -3970 is the Suitcase.
+    kinds = {kind: rid for kind, _rtype, rid in tool.THEME_ICON_MAP}
+    assert kinds["disk"] == -3995, "the hard disk is Apple's standard icon"
+    assert kinds["network-disk"] == -3972, "the file server is Apple's standard icon"
+    print("ok    hard disk and file server use Apple's standard icon ids")
+
+
+def test_apple_menu_reads_icon_suite():
+    # A Mac OS 9 theme ships its Apple menu icon as an icon suite (icns);
+    # the collector must keep it so the theme's own Apple wins.
+    path = tempfile.mkdtemp() + "/Focus"
+    with open(path, "wb") as f:
+        f.write(build_resource_fork([(b"icns", -16386, b"\x00" * 32)]))
+    apple, icons, cursors, cluts = {}, {}, {}, []
+    tool.collect_helper_fork(path, cluts, apple, icons, cursors)
+    assert apple.get(b"icns"), "a theme's Apple icon suite is collected"
+    print("ok    the Apple menu reads a theme's icon suite")
+
+
 def test_wallpaper_size_filter():
     def pict_resource(w, h):
         # A version-1 BitsRect PICT the decoder accepts (main's fixture
@@ -896,6 +917,31 @@ def test_theme_chrome_decodes():
     print("ok    lined-up window art decodes into chrome/")
 
 
+def test_bar_tiles_align():
+    # A cap resource can carry rows above the bar (or the frame below it):
+    # every bar tile is saved at the middle's height from its first inked
+    # row, so the ends are not shorter than the middle.
+    pxm = {pid: [_pxm_body()] for pid in (200, 210, 220)}
+    pxm[6176] = [_pxm_body(13, 22)]  # left cap: 13 rows, 22 columns
+    pxm[6173] = [_pxm_body(13, 22)]  # right cap
+    pxm[6170] = [_pxm_body(6, 22)]   # middle: 6 rows
+    layo = {128: _layo_body([
+        (b"pxm#", 6176, 256, 0),
+        (b"pxm#", 6170, 256, 0),
+        (b"pxm#", 6173, 256, 0),
+        (b"pxm#", 200, 0, 10), (b"pxm#", 210, 10, 10), (b"pxm#", 220, 20, 10),
+    ])}
+    out = tempfile.mkdtemp() + "/theme"
+    tool.write_theme_chrome("Bar", pxm, [], out, layo=layo)
+    heights = {}
+    for key in ("bar-left", "bar-middle", "bar-right"):
+        with open(os.path.join(out, "chrome", key + ".png"), "rb") as f:
+            head = f.read(24)
+        heights[key] = struct.unpack(">I", head[20:24])[0]
+    assert heights == {"bar-left": 6, "bar-middle": 6, "bar-right": 6}, heights
+    print("ok    bar caps are aligned to the middle's height")
+
+
 def _layo_body(entries):
     # entries: [(tag, rid, group, lead)]; one 40-byte record each.
     out = b"\x00" * 20
@@ -994,6 +1040,8 @@ test_scen()
 test_pointers()
 test_system_sounds()
 test_apple_menu()
+test_standard_icon_ids()
+test_apple_menu_reads_icon_suite()
 test_scen_patt_epic()
 test_wallpaper_size_filter()
 test_theme_icons_share_system_palette()
@@ -1010,6 +1058,7 @@ test_theme_system_folder()
 test_file_icon_decodes()
 test_theme_chrome_decodes()
 test_theme_chrome_twopart()
+test_bar_tiles_align()
 
 
 def test_resource_map_bounds():

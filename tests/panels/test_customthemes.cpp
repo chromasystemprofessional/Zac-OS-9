@@ -5,6 +5,7 @@
 #include <QFile>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QImage>
 #include <QKeyEvent>
 #include <QTemporaryDir>
 #include <QThread>
@@ -12,6 +13,7 @@
 #include <functional>
 
 #include "customthemes.h"
+#include "custompatterns.h"
 #include "appearance.h"
 #include "settings.h"
 
@@ -396,6 +398,46 @@ int main(int argc, char **argv) {
 	assert(preference("sound-theme") == id);
 	assert(preference("sound.button-click").isEmpty());
 	assert(!applySoundTheme(2, &error));
+
+	/* A preset from before the catalog names its pattern by the installed
+	 * file ("Old-pattern-1"), which the compositor cannot resolve: applying
+	 * it must store the catalog id instead, or the theme seems to do
+	 * nothing and cannot really be selected. */
+	{
+		const QString folder = desktopPatternsFolder();
+		assert(QDir().mkpath(folder));
+		QImage tile(2, 2, QImage::Format_ARGB32);
+		tile.fill(QColor(0x40, 0x80, 0xc0));
+		assert(tile.save(folder + "/Old-pattern-1.png", "PNG"));
+		const QString path = appearanceThemesFolder() + "/old-pattern.json";
+		write(path, R"JSON({"version":1,"name":"Old Pattern","settings":{"pattern":"Old-pattern-1"}})JSON");
+		assert(waitFor([&] {
+			for (int i = 0; i < appearanceThemeCount(); ++i) {
+				if (appearanceThemeName(i) == "Old Pattern") {
+					return true;
+				}
+			}
+			return false;
+		}));
+		int oldPattern = -1;
+		for (int i = 0; i < appearanceThemeCount(); ++i) {
+			if (appearanceThemeName(i) == "Old Pattern") {
+				oldPattern = i;
+			}
+		}
+		assert(oldPattern >= 0 && applyAppearanceTheme(oldPattern, &error));
+		const QString resolved = preference("pattern");
+		assert(resolved.startsWith("user:") && resolved.endsWith(":image"));
+		assert(QFile::remove(path));
+		/* Let the catalogue notice the removal and its helper finish
+		 * before the test ends. */
+		QElapsedTimer settle;
+		settle.start();
+		while (settle.elapsed() < 800) {
+			QApplication::processEvents();
+			QThread::msleep(20);
+		}
+	}
 
 	/* Smart Scrolling for GTK 3: a marked block in the user's gtk.css,
 	 * added and taken out without touching what else is there. */
