@@ -939,12 +939,35 @@ int main(int argc, char *argv[]) {
 	/* The desktop background and alert sound live in the preset, not
 	 * theme.conf: apply them here so installing a theme repaints the
 	 * desktop, not just its window chrome. */
+	/* What the theme asked for but the user's Mac OS 9 install did not
+	 * supply, so a partial import says so instead of looking broken. */
+	QStringList missing;
+	if (!QFileInfo::exists(outputDir(name) + "/apple-menu.png")) {
+		missing << "Apple menu icon";
+	}
+	if (wallpaper.isEmpty()) {
+		missing << "desktop picture";
+	}
+	if (!QFileInfo::exists(outputDir(name) + "/icons/disk-32.png")) {
+		missing << "hard disk icon";
+	}
+	if (QDir(outputDir(name) + "/fonts").entryList({ "*.ttf" }, QDir::Files).isEmpty()) {
+		missing << "fonts";
+	}
 	zac_theme_apply();
 	if (batch) {
-		printf("installed %s (%d sound sets)\n", qPrintable(outputDir(name)), soundSets);
+		printf("installed %s (%d sound sets", qPrintable(outputDir(name)), soundSets);
+		if (!missing.isEmpty()) {
+			printf("; not found: %s", qPrintable(missing.join(", ")));
+		}
+		printf(")\n");
 		return 0;
 	}
-	QMessageBox::information(nullptr, "Theme Installer",
-		"Theme \"" + name + "\" was installed from your Mac OS 9 folder.");
+	QString message = "Theme \"" + name + "\" was installed from your Mac OS 9 folder.";
+	if (!missing.isEmpty()) {
+		message += "\n\nYour Mac OS 9 System Folder did not supply its " +
+			missing.join(", ") + "; the theme keeps ZacOS's own.";
+	}
+	QMessageBox::information(nullptr, "Theme Installer", message);
 	return 0;
 }

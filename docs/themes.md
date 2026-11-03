@@ -146,13 +146,19 @@ reads the Appearance theme's resource fork and produces a **theme bundle** in
   catalog sheets) and a flat `.argb` dump (u32le width and height, then
   straight RGBA) that the compositor reads directly. Close/zoom/collapse
   boxes, title text and hit-testing stay ZacOS's. Missing files fall back
-  to the Platinum drawing.
+  to the Platinum drawing. Every title-bar tile (left, middle, right;
+  document and dialog, active and inactive) is written at the bar's own
+  height, starting at its first inked row, so end caps whose resources
+  carried padding above the bar still compose into one band.
 - `sounds/` — alert sounds. `system-sound-N.wav` are the System file's own
   `snd` resources, decoded from sampled sounds only; synthesized and compressed
   sounds are skipped. Theme-file sounds sit beside them. The installer never
   picks a `system-` sound as the theme's default alert.
 - `icons/<kind>-32.png` and `icons/<kind>-16.png` — the desktop's icons,
-  decoded at both sizes against the user's System palette: a theme
+  decoded at both sizes against the user's System palette, through one
+  resolver: the theme's icon suite (`icns`) first, then the colour family
+  (`icl8`/`ics8`), then 4-bit, each with its 1-bit mask; the Apple menu
+  icon uses the same order. A theme
   file's own art wins where it supplies a family (Kaleidoscope schemes
   draw against the palette they display through), and the System and
   Finder files fill the kinds it lacks: folder, the System Folder,
@@ -211,6 +217,11 @@ the same from a terminal. Old Dog must not be running from that disk while
 it is copied. Finder metadata (type and creator) is not carried over: the
 copy is for ZacOS to read, not to start up from.
 
+A theme whose sound set, program font, desktop picture or alert sound
+cannot be found still applies: that one choice is left out and the
+Appearance panel says what was missing. A theme is never unselectable
+because one of its optional pieces did not import.
+
 A bundle records the extractor that built it, so when a ZacOS
 update learns to decode more, the Appearance panel rebuilds the bundles
 from the copies in Theme Files rather than leaving the old, partial ones.
@@ -226,8 +237,9 @@ the `theme-*.pfont` bitmaps rasterized from those same faces.
 ## Sound sets
 
 **Sound Sets** chooses None, the original ZacOS sounds, or a custom set.
-**Interface Volume** is separate from Alert Volume. **Preview** plays an example
-from the selected set. Sounds play through the system's default output and its
+**Interface Volume** is separate from Alert Volume. **Preview** plays the set's window-open sound
+(or its menu sound), not its button-click, so a set of clicks does not
+preview as a click. Sounds play through the system's default output and its
 mute state. The existing alert-sound choice and volume-adjustment feedback are
 unchanged. ZacOS control buttons, checkboxes, menu commands, Sniffer windows and
 Trash operations emit discrete events; third-party application controls are
@@ -302,7 +314,9 @@ the public Carbon HIToolbox Appearance Manager interface. Playback repeats the
 complete decoded sample; the idle-drag variant, embedded loop regions and
 random sound sequences are not supported.
 
-Samples may be 8- or 16-bit PCM, μ-law, IMA 4:1 or `twos`, at 1–96 kHz. MACE
+Each imported sound is padded with a short silence at both ends: the
+player starts and stops on every event, and a drag sound loops, so a
+boundary on the audio itself is heard as a click or scratch. Samples may be 8- or 16-bit PCM, μ-law, IMA 4:1 or `twos`, at 1–96 kHz. MACE
 is not decoded and is reported. Leading null sound commands are skipped, and
 an empty sound resource silences its event without an error. There is no
 verified classic mapping for `trash-move`; WAV themes can supply it explicitly.

@@ -114,6 +114,41 @@ THEME_ICON_IDS = frozenset(
 )
 
 
+def decode_standard_icon(theme_icons, palette, rid, size):
+	"""One standard icon at `size` (16 or 32) from whatever the file holds.
+
+	A Mac OS 9 file may carry an icon suite (icns) or any of the colour
+	families (icl8/icl4, ics8/ics4) for the same id; the maps name one
+	type, but the art can be in another. Same order everywhere: suite,
+	then the colour family, then 4-bit, each with its 1-bit mask."""
+	if (b"icns", rid) in theme_icons:
+		try:
+			return macicons.decode_icns(theme_icons[(b"icns", rid)][0], palette, size=size)
+		except (ValueError, IndexError, struct.error):
+			pass
+	if size >= 32:
+		families = ((b"icl8", 1024, macicons.decode_icl8), (b"icl4", 512, macicons.decode_icl4))
+	else:
+		families = ((b"ics8", 256, macicons.decode_icl8), (b"ics4", 128, macicons.decode_icl4))
+	for rtype, expect, decode in families:
+		bodies = theme_icons.get((rtype, rid))
+		if not bodies or len(bodies[0]) != expect:
+			continue
+		try:
+			rows = decode(bodies[0], palette, size=size)
+		except (ValueError, IndexError):
+			continue
+		mask = theme_icons.get((ICON_MASKS[rtype], rid))
+		if mask:
+			try:
+				_, mask_rows = macicons.decode_icn1(mask[0], size=size)
+				rows = macicons.combine_icon(rows, mask_rows)
+			except (ValueError, IndexError):
+				pass
+		return rows
+	return None
+
+
 def decode_theme_icon(theme_icons, palette, color_type, rid, size, expect, prefer_icns=True):
 	"""Decode one mapped icon family to rows of RGBA, or None."""
 	if prefer_icns:
@@ -189,22 +224,12 @@ def write_theme_icons(theme_icons, cluts, out, theme_keys=frozenset(), theme_clu
 	"""
 	sys_palette = macicons.resolve_palette(cluts[len(theme_cluts):] or cluts)
 	icons_dir = os.path.join(out, "icons")
-	for kind, rtype, rid in THEME_ICON_MAP:
-		has_theme_icns = (b"icns", rid) in theme_keys
-		has_theme_big = (rtype, rid) in theme_keys
-		# A helper's icns family can be its 1-bit art: only prefer icns
-		# when the theme file itself supplied one for this id.
-		big = decode_theme_icon(theme_icons, sys_palette, rtype, rid, 32,
-			1024 if rtype == b"icl8" else 512,
-			prefer_icns=has_theme_icns)
+	for kind, _rtype, rid in THEME_ICON_MAP:
+		big = decode_standard_icon(theme_icons, sys_palette, rid, 32)
 		if big is None:
 			continue
 		pngwrite.write_png(os.path.join(icons_dir, kind + "-32.png"), 32, 32, big)
-		small_type = b"ics8" if rtype == b"icl8" else b"ics4"
-		has_theme_small = (small_type, rid) in theme_keys
-		small = decode_theme_icon(theme_icons, sys_palette, small_type, rid, 16,
-			256 if small_type == b"ics8" else 128,
-			prefer_icns=has_theme_icns)
+		small = decode_standard_icon(theme_icons, sys_palette, rid, 16)
 		if small is None:
 			small = pngwrite.nearest_scale(big, 32, 32, 16, 16)
 		pngwrite.write_png(os.path.join(icons_dir, kind + "-16.png"), 16, 16, small)
@@ -751,32 +776,13 @@ def write_apple_menu(apple_menu, cluts, out, theme_apple=None, theme_cluts=()):
 	for _res_id, cols in helpers:
 		if cols and (palette is None or len(cols) > len(palette)):
 			palette = cols
-	# A Mac OS 9 theme carries its own Apple menu icon as an icon suite
-	# (icns, id -16386); the System supplies the low-depth ics8/ics4.
-	# The theme's own art wins, as it does for every other icon.
-	if apple_menu.get(b"icns"):
-		try:
-			rows = macicons.decode_icns(apple_menu[b"icns"][0], palette, size=16)
-			pngwrite.write_png(os.path.join(out, "apple-menu.png"), 16, 16, rows)
-			return rows
-		except (ValueError, IndexError, struct.error):
-			pass
-	color = None
-	mask = None
-	if apple_menu.get(b"ics8"):
-		color = apple_menu[b"ics8"][0]
-	elif apple_menu.get(b"ics4"):
-		color = apple_menu[b"ics4"][0]
-	if not color:
-		return
-	if apple_menu.get(b"ics#"):
-		_, mask_rows = macicons.decode_icn1(apple_menu[b"ics#"][0], size=16)
-		mask = mask_rows
-	rows = macicons.decode_icl8(color, palette, size=16) if len(color) == 256 else 		macicons.decode_icl4(color, palette, size=16) if len(color) == 128 else None
+	# The theme's own Apple menu icon (an icon suite, usually) wins, as it
+	# does for every other standard icon; the System's low-depth ics8/ics4
+	# is the fallback. One resolver for both.
+	icons = {(rtype, -16386): bodies for rtype, bodies in apple_menu.items()}
+	rows = decode_standard_icon(icons, palette, -16386, 16)
 	if rows is None:
 		return
-	if mask:
-		rows = macicons.combine_icon(rows, mask)
 	pngwrite.write_png(os.path.join(out, "apple-menu.png"), 16, 16, rows)
 	return rows
 

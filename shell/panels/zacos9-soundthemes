@@ -220,6 +220,25 @@ def pcm_wav(channels, width, rate, frames, samples):
     return out.getvalue()
 
 
+PAD_MS = 25
+
+
+def pad_wav(data):
+    """Put a short silence around a sound.
+
+    Each event starts and stops its own player; the stream's start and stop
+    land on the audio itself, and a loop restarts the sample immediately.
+    Both are heard as a click or scratch on many sound devices. A few
+    milliseconds of silence move the boundary away from the audio."""
+    with wave.open(io.BytesIO(data)) as reader:
+        channels, width, rate = reader.getnchannels(), reader.getsampwidth(), reader.getframerate()
+        frames = reader.getnframes()
+        samples = reader.readframes(frames)
+    pad = max(1, rate * PAD_MS // 1000)
+    silence = bytes([128 if width == 1 else 0]) * (pad * channels * width)
+    return pcm_wav(channels, width, rate, frames + 2 * pad, silence + samples + silence)
+
+
 class EmptySound(ValueError):
     """A deliberately empty snd resource: the set silences that event."""
 
@@ -550,6 +569,7 @@ def scan(source, cache):
                 name = leaf
                 if not events:
                     raise ValueError("no supported sound events")
+            events = {event: pad_wav(data) for event, data in events.items()}
             size = sum(map(len, events.values()))
             if len(result["themes"]) >= MAX_THEMES or total + size > MAX_OUTPUT:
                 result["errors"].append(f"catalog exceeds {MAX_THEMES} themes or {MAX_OUTPUT >> 20} MiB PCM output")
