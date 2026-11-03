@@ -10,6 +10,7 @@
 #include <QDir>
 #include <QElapsedTimer>
 #include <QFileInfo>
+#include <QHash>
 #include <QMimeDatabase>
 #include <QProcess>
 #include <QRegularExpression>
@@ -368,11 +369,116 @@ QList<Printer> listPrinters() {
 				continue;
 			}
 			p.temporary = true;
+			p.discovered = true;
 		}
 		p.isDefault = name == def;
 		out << p;
 	}
 	return out;
+}
+
+/* A printer's model without CUPS's driver list: "Canon TS8300 series,
+ * driverless, cups-filters 1.28.17" is the same printer either way. */
+static QString modelKey(const Printer &p) {
+	const QString key = p.model.section(',', 0, 0).simplified().toCaseFolded();
+	/* Generic drivers say nothing about which printer this is. */
+	if (key == "unknown" || key == "local raw printer" || key == "raw printer" || key.startsWith("generic ")) {
+		return QString();
+	}
+	return key;
+}
+
+/* What a printer is called without the connection in brackets:
+ * "Canon PIXMA TS8300 (USB)" and "Canon PIXMA TS8300" are one printer. */
+static QString baseKey(const Printer &p) {
+	QString name = p.shownName();
+	name.remove(QRegularExpression("\\s*\\([^)]*\\)\\s*$"));
+	return name.simplified().toCaseFolded();
+}
+
+/* `a` is the better connection for its printer than `b`. */
+static bool betterConnection(const Printer &a, const Printer &b) {
+	if (a.isDefault != b.isDefault) {
+		return a.isDefault; /* where printing already goes */
+	}
+	const bool aStopped = a.state == 5, bStopped = b.state == 5;
+	if (aStopped != bStopped) {
+		return !aStopped; /* a stopped queue can't print; another may */
+	}
+	if (a.discovered != b.discovered) {
+		return !a.discovered; /* a queue CUPS set up beats one it found */
+	}
+	if (a.temporary != b.temporary) {
+		return !a.temporary; /* a permanent queue beats a temporary one */
+	}
+	const auto secure = [](const Printer &p) { return p.uri.startsWith("ipps://"); };
+	if (secure(a) != secure(b)) {
+		return secure(a);
+	}
+	const auto usbService = [](const Printer &p) {
+		return p.shownName().contains("(USB)", Qt::CaseInsensitive);
+	};
+	if (usbService(a) != usbService(b)) {
+		return !usbService(a); /* the printer's own service, not its USB twin */
+	}
+	return false;
+}
+
+QList<QList<Printer>> printerGroups(const QList<Printer> &printers) {
+	/* Only a model with one set-up queue is safe to match discovered
+	 * printers against: with two of the same model, either could be
+	 * either, so they stay apart. */
+	QHash<QString, int> queueCount;
+	for (const Printer &p : printers) {
+		const QString key = modelKey(p);
+		if (!p.discovered && !key.isEmpty()) {
+			queueCount[key]++;
+		}
+	}
+	QList<QList<Printer>> groups;
+	QHash<QString, int> groupOfModel;
+	for (const Printer &p : printers) {
+		if (p.discovered) {
+			continue;
+		}
+		groups << QList<Printer>{ p };
+		const QString key = modelKey(p);
+		if (!key.isEmpty() && queueCount.value(key) == 1) {
+			groupOfModel.insert(key, groups.size() - 1);
+		}
+	}
+	for (const Printer &p : printers) {
+		if (!p.discovered) {
+			continue;
+		}
+		const QString key = modelKey(p);
+		int at = key.isEmpty() ? -1 : groupOfModel.value(key, -1);
+		if (at < 0) {
+			const QString base = baseKey(p);
+			for (int i = 0; i < groups.size() && at < 0 && !base.isEmpty(); ++i) {
+				if (groups[i].first().discovered && baseKey(groups[i].first()) == base) {
+					at = i;
+				}
+			}
+		}
+		if (at < 0) {
+			groups << QList<Printer>{ p };
+		} else {
+			groups[at] << p;
+		}
+	}
+	for (QList<Printer> &group : groups) {
+		int best = 0;
+		for (int i = 1; i < group.size(); ++i) {
+			if (betterConnection(group[i], group[best])) {
+				best = i;
+			}
+		}
+		if (best > 0) {
+			group.move(best, 0);
+		}
+	}
+	return groups;
 }
 
 QList<PrintJob> listJobs(const QString &printer) {

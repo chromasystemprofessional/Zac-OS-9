@@ -16,7 +16,7 @@
 namespace {
 
 constexpr uint32_t FACE = GRAY(0xD);
-constexpr int W = 460, H = 340, M = 12;
+constexpr int W = 460, H = 360, M = 12;
 constexpr int LIST_TOP = 34, LIST_BOTTOM = 214;
 
 QString settingsProgram() {
@@ -38,7 +38,8 @@ struct PickerWindow::Parts {
 	PanelHost host;
 	PanelList list;
 	PanelButton desktop, queue, settings;
-	QList<Printer> printers;
+	QList<QList<Printer>> groups; /* one row per printer, its connections */
+	QList<Printer> printers;      /* each group's connection to use */
 	bool loading = true;
 	explicit Parts(QWidget *w) : host(w) {}
 };
@@ -68,7 +69,11 @@ PickerWindow::PickerWindow() : d(std::make_unique<Parts>(this)) {
 PickerWindow::~PickerWindow() = default;
 
 void PickerWindow::reload() {
-	d->printers = listPrinters();
+	d->groups = printerGroups(listPrinters());
+	d->printers.clear();
+	for (const QList<Printer> &group : d->groups) {
+		d->printers << group.first();
+	}
 	d->loading = false;
 	QStringList rows;
 	std::vector<int> icons;
@@ -112,6 +117,7 @@ QString PickerWindow::details() const {
 	if (row < 0 || row >= d->printers.size()) {
 		return "Click a printer to print with it.";
 	}
+	const QList<Printer> group = d->groups.value(row);
 	const Printer &p = d->printers[row];
 	QStringList lines;
 	lines << "Documents you print go to this printer.";
@@ -124,6 +130,13 @@ QString PickerWindow::details() const {
 	lines << "Status: " + p.status();
 	if (p.temporary) {
 		lines << "Found on the network; it's set up the first time you print.";
+	}
+	if (group.size() > 1) {
+		QStringList others;
+		for (int i = 1; i < group.size(); ++i) {
+			others << group[i].shownName();
+		}
+		lines << "Also available: " + others.join(", ") + ".";
 	}
 	return lines.join('\n');
 }

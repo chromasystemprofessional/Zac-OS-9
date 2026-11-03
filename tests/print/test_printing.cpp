@@ -64,7 +64,7 @@ int main(int argc, char **argv) {
 	put(bin + "/lpstat", sh + "case $1 in -e) if [ -f \"$S/down\" ]; then "
 		"echo 'lpstat: Unable to connect to server' >&2; exit 1; fi; "
 		"if [ -f \"$S/none\" ]; then echo 'lpstat: No destinations added.' >&2; exit 1; fi; "
-		"printf 'Inkjet\\nLaser\\nBrowsed\\nGhost\\nWiFi\\n' ;; -p) "
+		"printf 'Inkjet\\nLaser\\nBrowsed\\nGhost\\nWiFi\\nWiFiUsb\\n' ;; -p) "
 		"printf 'printer Inkjet is idle. enabled since Mon\\nprinter Laser is stopped. enabled since Mon\\n' ;; -d) "
 		"printf 'system default destination: %s\\n' \"$(cat $S/default)\" ;; esac\n", true);
 	put(bin + "/lpoptions", sh + "case $1 in\n"
@@ -75,6 +75,8 @@ int main(int argc, char **argv) {
 		"device-uri=implicitclass://Canon/ printer-state=3 printer-is-accepting-jobs=true "
 		"printer-state-reasons=none\"; elif [ \"$2\" = WiFi ]; then echo \"printer-info='Canon TS8300 (Wi-Fi)' "
 		"printer-make-and-model='Canon TS8300 series' device-uri=ipps://Canon._ipps._tcp.local/\"; "
+		"elif [ \"$2\" = WiFiUsb ]; then echo \"printer-info='Canon TS8300 (USB)' "
+		"printer-make-and-model='Canon TS8300 series' device-uri=ipp://Canon._ipp._tcp.local/\"; "
 		"else echo \"printer-info='Inkjet' printer-state=3 printer-is-temporary=true "
 		"printer-state-reasons=media-empty-error\"; fi ;;\nesac\n", true);
 	put(bin + "/ipptool", sh + "echo job-id,job-state,job-name,job-originating-user-name,job-k-octets,"
@@ -131,6 +133,58 @@ int main(int argc, char **argv) {
 	check(parseJobId("request id is Laser-12 (1 file(s))\n") == 12 && parseJobId("nonsense") == 0, "lp's job id");
 	check(isBrowsedQueue("implicitclass://Canon/") && !isBrowsedQueue("ipp://printer/ipp/print") &&
 		!isBrowsedQueue(""), "cups-browsed's queues by their device-uri");
+
+	// ---- one printer over several connections
+	const auto connection = [](const QString &name, const QString &info, const QString &model,
+		const QString &uri, bool temporary, bool discovered) {
+		Printer p;
+		p.name = name;
+		p.info = info;
+		p.model = model;
+		p.uri = uri;
+		p.temporary = temporary;
+		p.discovered = discovered;
+		return p;
+	};
+	Printer usb = connection("Usb", "Office Laser", "Laser Co L1, driverless, cups-filters 1.28.17",
+		"usb://Laser/1", false, false);
+	Printer wifi = connection("Wifi", "Office Laser", "Laser Co L1",
+		"ipps://laser._ipps._tcp.local/", true, true);
+	Printer wifiUsb = connection("WifiUsb", "Office Laser (USB)", "Laser Co L1",
+		"ipp://laser._ipp._tcp.local/", true, true);
+	Printer other = connection("Other", "Other Printer", "Other Co", "usb://Other/1", false, false);
+	{
+		const QList<QList<Printer>> groups = printerGroups({ usb, wifi, wifiUsb, other });
+		check(groups.size() == 2 && groups[0].size() == 3 && groups[0][0].name == "Usb" &&
+			groups[1].size() == 1 && groups[1][0].name == "Other",
+			"one entry per printer, with its set-up connection first");
+		wifi.isDefault = true;
+		const QList<QList<Printer>> chosen = printerGroups({ usb, wifi, wifiUsb });
+		check(chosen.size() == 1 && chosen[0][0].name == "Wifi",
+			"the connection already chosen is kept");
+		wifi.isDefault = false;
+		usb.state = 5;
+		const QList<QList<Printer>> stopped = printerGroups({ usb, wifi, wifiUsb });
+		check(stopped.size() == 1 && stopped[0][0].name == "Wifi",
+			"a stopped connection gives way to one that answers");
+		usb.state = 3;
+		const Printer usb2 = connection("Usb2", "Office Laser 2", "Laser Co L1",
+			"usb://Laser/2", false, false);
+		const QList<QList<Printer>> sameModel = printerGroups({ usb, usb2, wifi, wifiUsb });
+		check(sameModel.size() == 3, "two printers of one model don't swallow each other's connections");
+	}
+	{
+		const Printer plain = connection("One", "Printer", "", "ipps://one._ipps._tcp.local/", true, true);
+		const Printer twin = connection("OneUsb", "Printer (USB)", "", "ipp://one._ipp._tcp.local/", true, true);
+		const QList<QList<Printer>> groups = printerGroups({ twin, plain });
+		check(groups.size() == 1 && groups[0][0].name == "One",
+			"connections with no model are matched by their name");
+	}
+	{
+		const Printer raw = connection("Raw", "Raw Printer", "Local Raw Printer", "usb://Raw/1", false, false);
+		const Printer found = connection("Found", "Raw Printer", "Local Raw Printer", "ipp://raw/ipp/print", true, true);
+		check(printerGroups({ raw, found }).size() == 2, "a generic model doesn't merge printers");
+	}
 	check(parsePrinterNames("Inkjet\nLaser\n") == QStringList({ "Inkjet", "Laser" }) &&
 		parseDefaultPrinter("system default destination: Laser\n") == "Laser" &&
 		parseDefaultPrinter("no system default destination\n").isEmpty(), "lpstat's printers and default");
@@ -168,7 +222,7 @@ int main(int argc, char **argv) {
 
 	// ---- asking CUPS (the stand-ins)
 	const QList<Printer> printers = listPrinters();
-	check(printers.size() == 3 && printers[1].name == "Laser" && printers[1].isDefault && !printers[0].isDefault &&
+	check(printers.size() == 4 && printers[1].name == "Laser" && printers[1].isDefault && !printers[0].isDefault &&
 		printers[0].temporary && printers[1].location == "Back room", "the printers, the default marked");
 	check(printers[2].name == "WiFi" && printers[2].temporary &&
 		printers[2].shownName() == "Canon TS8300 (Wi-Fi)" && printers[2].uri.startsWith("ipps://"),
@@ -203,6 +257,8 @@ int main(int argc, char **argv) {
 		picker.details().contains("Found on the network") &&
 		picker.details().contains("Model: Canon TS8300 series"),
 		"a printer found on the network can be chosen, and says it will be set up on first print");
+	check(picker.rows().size() == 3 && picker.details().contains("Also available: Canon TS8300 (USB)."),
+		"its USB connection is one row, named in the details");
 
 	QueueWindow queue("Laser");
 	queue.show();

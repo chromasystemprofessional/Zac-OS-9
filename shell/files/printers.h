@@ -26,9 +26,12 @@ struct Printer {
 	bool accepting = true;
 	QString reasons;  /* printer-state-reasons, "none" when all is well */
 	bool isDefault = false;
-	bool temporary = false; /* found on the network, not set up yet */
+	bool temporary = false; /* a temporary queue, or found on the network */
+	bool discovered = false; /* found on the network: no queue of its own yet */
 
-	QString shownName() const { return info.isEmpty() ? QString(name).replace('_', ' ') : info; }
+	QString shownName() const {
+		return (info.isEmpty() ? QString(name).replace('_', ' ') : info).simplified();
+	}
 	/* "Idle", "Printing", "Stopped", with a reason if there is one. */
 	QString status() const;
 };
@@ -69,6 +72,10 @@ int parseJobId(const QString &lpOut);
  * like, for the windows to show instead of "no printer chosen". */
 QString cupsProblem();
 QList<Printer> listPrinters();
+/* One entry per printer, even when it answers over more than one
+ * connection (USB and the network): each group's first printer is the
+ * one to use, the rest are the same printer's other connections. */
+QList<QList<Printer>> printerGroups(const QList<Printer> &printers);
 QString defaultPrinter();
 QList<PrintJob> listJobs(const QString &printer);
 /* Prints each file; the job ids, or an error. */
