@@ -1,3 +1,15 @@
+zacos9 (1.7.1) trixie; urgency=medium
+
+  * Theme Installer: it now uses your Mac OS 9 System Folder, and can copy
+    it out of Old Dog's disk for you, so a theme brings its Apple menu
+    icon, desktop picture, alert sounds and fonts. Desktop pictures in any
+    format install (converted to PNG), hard disks and network disks get the
+    theme's icons, themes made by older versions rebuild themselves, and
+    nothing from the previous theme is left underneath. Also: a disk's
+    desktop icon dims while its window is open, as in Mac OS 9.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Tue, 03 Nov 2026 15:52:53 -0500
+
 zacos9 (1.7.0) trixie; urgency=medium
 
   * Mac OS 9 themes go straight into the System Folder now: drop a theme

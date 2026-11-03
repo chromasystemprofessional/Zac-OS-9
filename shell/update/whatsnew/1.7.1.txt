@@ -1,0 +1,16 @@
+The Theme Installer now uses your Mac OS 9 System Folder, and can copy it
+out of Old Dog for you.
+
+Choose a Mac OS 9 theme file in the Theme Installer, or drop it onto the
+System Folder. If ZacOS can't find your Mac OS 9 System Folder, it offers
+to copy it from Old Dog's disk (quit Old Dog first). From it the theme
+gets its Apple menu icon, its desktop picture, its alert sounds and its
+fonts.
+
+Themes installed before this release rebuild themselves the next time the
+Appearance panel is opened: they gain the icons, pictures and sounds an
+older ZacOS could not decode. Desktop pictures in any format work: a
+PICT, JPEG, GIF, TIFF or BMP becomes a PNG for the desktop.
+
+A disk's icon on the desktop now dims while its folder is open, as Mac OS 9
+drew it.
