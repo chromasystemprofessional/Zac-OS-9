@@ -10,6 +10,7 @@
 #include <QCoreApplication>
 #include <QDebug>
 #include <QDir>
+#include <QDirIterator>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QImage>
@@ -18,6 +19,7 @@
 #include <QProcess>
 #include <QStandardPaths>
 #include <QCryptographicHash>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QRegularExpression>
@@ -69,6 +71,226 @@ static QString macSystemFolder() {
 		}
 	}
 	return QString();
+}
+
+/* zacos9-mac-disks: the Finder's read-only Mac volume mounter (installed
+ * in bindir, or its copy in the tree this program was built from). */
+static QString macDisksTool() {
+	const QString installed = QStandardPaths::findExecutable("zacos9-mac-disks");
+	if (!installed.isEmpty()) {
+		return installed;
+	}
+	for (const QString &candidate : { sourceTreePath("shell/finder/zacos9-mac-disks"),
+			buildTreePath("shell/finder/zacos9-mac-disks") }) {
+		if (!candidate.isEmpty() && QFileInfo(candidate).isExecutable()) {
+			return candidate;
+		}
+	}
+	return QString();
+}
+
+/* Run a program to completion with processEvents() (never waitForFinished). */
+static bool runTool(const QString &program, const QStringList &arguments,
+		QByteArray *output, QString *error) {
+	QProcess process;
+	process.setProgram(program);
+	process.setArguments(arguments);
+	process.start();
+	QEventLoop loop;
+	QObject::connect(&process, &QProcess::finished, &loop, &QEventLoop::quit);
+	QObject::connect(&process, &QProcess::errorOccurred, [&](QProcess::ProcessError e) {
+		if (e == QProcess::FailedToStart) {
+			*error = "Couldn't start " + QFileInfo(program).fileName() + ".";
+			loop.quit();
+		}
+	});
+	loop.exec();
+	if (output) {
+		*output = process.readAllStandardOutput();
+	}
+	if (process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0) {
+		const QString why = QString::fromUtf8(process.readAllStandardError()).trimmed();
+		if (error->isEmpty()) {
+			*error = why.isEmpty() ? "The Mac disk tool failed." : why;
+		}
+		return false;
+	}
+	return true;
+}
+
+/* Old Dog's startup disk: classic.conf's startup-disk entry, else the
+ * first Mac HFS/HFS+ image in the Classic folder. */
+static QString oldDogImage() {
+	const QString conf = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) +
+		"/zacos9/classic.conf";
+	QFile file(conf);
+	if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+		QTextStream in(&file);
+		QString line;
+		while (in.readLineInto(&line)) {
+			if (line.startsWith("startup-disk=")) {
+				const QString path = line.mid(13).trimmed();
+				if (QFileInfo(path).isFile()) {
+					return path;
+				}
+			}
+		}
+	}
+	QString dir = qEnvironmentVariable("ZACOS9_CLASSIC_DIR");
+	if (dir.isEmpty()) {
+		dir = QDir::homePath() + "/Classic";
+	}
+	QDirIterator it(dir, QDir::Files, QDirIterator::Subdirectories);
+	for (int seen = 0; it.hasNext() && seen < 200; seen++) {
+		const QString path = it.next();
+		QFile image(path);
+		if (!image.open(QIODevice::ReadOnly)) {
+			continue;
+		}
+		const QByteArray head = image.read(1026);
+		if (head.size() < 1026) {
+			continue;
+		}
+		/* HFS at 1024 ('BD'), HFS+ ('H+'), HFSX ('HX'), or a partition
+		 * map's driver descriptor ('ER' in block zero). */
+		const QByteArray signature = head.mid(1024, 2);
+		if (signature == "BD" || signature == "H+" || signature == "HX" ||
+				head.left(2) == "ER") {
+			return path;
+		}
+	}
+	return QString();
+}
+
+/* Copy a Mac folder tree, keeping each file's resource fork as the
+ * .rsrc/NAME companion the extractor reads. The kernel's hfs driver puts
+ * a file's fork at NAME/rsrc; a SheepShaver extfs copy keeps .rsrc/. */
+static bool copyMacTree(const QString &source, const QString &destination, QString *error) {
+	if (!QDir().mkpath(destination)) {
+		*error = "Couldn't create " + destination + ".";
+		return false;
+	}
+	const QFileInfoList entries = QDir(source).entryInfoList(
+		QDir::Files | QDir::Dirs | QDir::Hidden | QDir::System | QDir::NoDotAndDotDot,
+		QDir::Name);
+	for (const QFileInfo &entry : entries) {
+		const QString name = entry.fileName();
+		if (name == ".rsrc" || name == ".finf" || name == ".DS_Store") {
+			continue;
+		}
+		const QString target = destination + "/" + name;
+		if (entry.isDir()) {
+			if (!copyMacTree(entry.filePath(), target, error)) {
+				return false;
+			}
+			continue;
+		}
+		QFile::remove(target);
+		if (!QFile::copy(entry.filePath(), target)) {
+			*error = "Couldn't copy " + name + " out of the Mac disk.";
+			return false;
+		}
+	}
+	/* Resource forks beside the data fork (the kernel's hfs driver). */
+	const QFileInfoList files = QDir(source).entryInfoList(
+		QDir::Files | QDir::Hidden | QDir::System | QDir::NoDotAndDotDot, QDir::Name);
+	for (const QFileInfo &file : files) {
+		const QString fork = file.filePath() + "/rsrc";
+		if (!QFileInfo(fork).isFile()) {
+			continue;
+		}
+		QDir().mkpath(destination + "/.rsrc");
+		const QString target = destination + "/.rsrc/" + file.fileName();
+		QFile::remove(target);
+		if (!QFile::copy(fork, target)) {
+			*error = "Couldn't copy " + file.fileName() + "'s resource fork.";
+			return false;
+		}
+	}
+	/* Or in a .rsrc folder (a copy made through Old Dog's Unix volume). */
+	const QDir forks(source + "/.rsrc");
+	if (forks.exists()) {
+		QDir().mkpath(destination + "/.rsrc");
+		for (const QFileInfo &fork : forks.entryInfoList(QDir::Files | QDir::Hidden, QDir::Name)) {
+			const QString target = destination + "/.rsrc/" + fork.fileName();
+			QFile::remove(target);
+			if (!QFile::copy(fork.filePath(), target)) {
+				*error = "Couldn't copy " + fork.fileName() + "'s resource fork.";
+				return false;
+			}
+		}
+	}
+	return true;
+}
+
+/* Mount Old Dog's disk read-only (zacos9-mac-disks) and copy its System
+ * Folder into ~/Classic, where the Theme Installer looks for it. */
+static bool importSystemFolder(QString *copiedTo, QString *error) {
+	const QString tool = macDisksTool();
+	if (tool.isEmpty()) {
+		*error = "The Mac disk tool (zacos9-mac-disks) isn't installed.";
+		return false;
+	}
+	const QString image = oldDogImage();
+	if (image.isEmpty()) {
+		*error = "Old Dog's startup disk wasn't found. Choose it in the "
+			"Startup Disk control panel first.";
+		return false;
+	}
+	QByteArray output;
+	if (!runTool(tool, { "mount", image }, &output, error)) {
+		return false;
+	}
+	const QJsonObject mounted = QJsonDocument::fromJson(output).object();
+	const QJsonArray paths = mounted.value("paths").toArray();
+	const QJsonArray devices = mounted.value("devices").toArray();
+	const auto release = [&] {
+		for (const QJsonValue &device : devices) {
+			QByteArray ignored;
+			QString why;
+			runTool(tool, { "unmount", device.toString() }, &ignored, &why);
+		}
+	};
+	QString folder;
+	for (const QJsonValue &path : paths) {
+		const QFileInfoList entries = QDir(path.toString()).entryInfoList(
+			QDir::Dirs | QDir::Hidden | QDir::System | QDir::NoDotAndDotDot, QDir::Name);
+		for (const QFileInfo &entry : entries) {
+			if (entry.fileName().compare("System Folder", Qt::CaseInsensitive) == 0) {
+				folder = entry.filePath();
+				break;
+			}
+		}
+		if (!folder.isEmpty()) {
+			break;
+		}
+	}
+	if (folder.isEmpty()) {
+		*error = "The Mac disk has no System Folder on it.";
+		release();
+		return false;
+	}
+	/* Build the new copy beside the old one, so a failure cannot leave a
+	 * half-copied System Folder where ZacOS will read it. */
+	const QString destination = QDir::homePath() + "/Classic/System Folder";
+	const QString staging = destination + ".new";
+	QDir(staging).removeRecursively();
+	bool ok = copyMacTree(folder, staging, error);
+	if (ok) {
+		QDir(destination).removeRecursively();
+		ok = QDir().rename(staging, destination);
+		if (!ok) {
+			*error = "Couldn't move the copied System Folder into place.";
+		}
+	}
+	if (!ok) {
+		QDir(staging).removeRecursively();
+	}
+	release();
+	if (ok) {
+		*copiedTo = destination;
+	}
+	return ok;
 }
 
 /* Run the extractor and wait with processEvents() (never waitForFinished). */
@@ -537,12 +759,25 @@ int main(int argc, char *argv[]) {
 	/* Non-interactive (and testable): --file PATH [--name NAME]. */
 	QString file, name, system;
 	bool batch = false;
+	bool copyFolder = false;
 	for (int i = 1; i < argc; i++) {
 		const QString a = QString::fromLocal8Bit(argv[i]);
 		if (a == "--file" && i + 1 < argc) { file = QString::fromLocal8Bit(argv[++i]); batch = true; }
 		else if (a == "--name" && i + 1 < argc) { name = QString::fromLocal8Bit(argv[++i]); batch = true; }
 		else if (a == "--system" && i + 1 < argc) { system = QString::fromLocal8Bit(argv[++i]); }
+		else if (a == "--copy-system-folder") { copyFolder = true; batch = true; }
 		else if (!a.startsWith("--")) { file = a; }
+	}
+
+	/* Copy Old Dog's System Folder and stop: no theme file needed. */
+	if (copyFolder && file.isEmpty()) {
+		QString copied, why;
+		if (!importSystemFolder(&copied, &why)) {
+			fprintf(stderr, "zacos9-themeinstaller: %s\n", qPrintable(why));
+			return 2;
+		}
+		printf("%s\n", qPrintable(copied));
+		return 0;
 	}
 
 	if (file.isEmpty()) {
@@ -579,6 +814,34 @@ int main(int argc, char *argv[]) {
 	QString systemFolder;
 	if (system.isEmpty()) {
 		systemFolder = macSystemFolder();
+		if (systemFolder.isEmpty()) {
+			/* Offer to copy it out of Old Dog's disk, which is the only
+			 * lossless source of the resource forks themes need. */
+			bool want = copyFolder;
+			if (!batch) {
+				want = QMessageBox::question(nullptr, "Theme Installer",
+					"Old Dog's Mac OS 9 System Folder wasn't found.\n\n"
+					"Copy it from Old Dog's disk into your Classic folder? The theme\n"
+					"uses its Apple menu icon, desktop pictures, sounds and fonts.\n"
+					"The disk is mounted read-only; you may be asked for an\n"
+					"administrator's password.",
+					QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes) ==
+					QMessageBox::Yes;
+			}
+			if (want) {
+				QString copied, why;
+				if (importSystemFolder(&copied, &why)) {
+					systemFolder = macSystemFolder();
+				} else if (batch) {
+					fprintf(stderr, "zacos9-themeinstaller: %s\n", qPrintable(why));
+				} else {
+					QMessageBox::warning(nullptr, "Theme Installer",
+						"The System Folder couldn't be copied:\n\n" + why +
+						"\n\nThe theme installs without its Apple menu icon, "
+						"pictures, sounds and fonts.");
+				}
+			}
+		}
 		if (!systemFolder.isEmpty()) {
 			for (const QString &candidate : { systemFolder + "/System",
 					systemFolder + "/.rsrc/System", systemFolder + "/._System" }) {
