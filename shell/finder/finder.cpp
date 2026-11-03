@@ -904,10 +904,19 @@ void Finder::launchWindows(const QString &exe) {
  * and offers Printer Picker. */
 static QString printerFor(const QString &queue) {
 	const QString printer = queue.isEmpty() ? defaultPrinter() : queue;
-	if (printer.isEmpty() &&
-			Alert::ask("No printer has been chosen. Choose one in Printer Picker, then print again.",
+	if (printer.isEmpty()) {
+		/* No default: ask CUPS once more, which also tells us whether it is
+		 * the printing service that is missing rather than the choice. */
+		listPrinters();
+		const QString problem = cupsProblem();
+		if (!problem.isEmpty()) {
+			Alert::ask(problem, "OK", QString());
+			return QString();
+		}
+		if (Alert::ask("No printer has been chosen. Choose one in Printer Picker, then print again.",
 				"Printer Picker", "Cancel")) {
-		platinumStartApplication(siblingProgram("zacos9-printerpicker"), {});
+			platinumStartApplication(siblingProgram("zacos9-printerpicker"), {});
+		}
 	}
 	return printer;
 }

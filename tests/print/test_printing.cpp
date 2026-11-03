@@ -58,10 +58,12 @@ int main(int argc, char **argv) {
 	// Two printers: Laser (stopped once cupsdisable runs) and Inkjet.
 	put(st + "/default", "Laser");
 	put(st + "/Laser.state", "3");
-	put(st + "/jobs", "7,pending,\"Letter, \\\\\\\"draft\\\\\\\"\",adam,12,0,1792026828\n"
-		"8,pending-held,Photo.png,adam,300,0,1792026900\n");
+	put(st + "/jobs", "7,pending,\"Letter, \\\\\\\"draft\\\\\\\"\",adam,12,0,1792026828,none\n"
+		"8,pending-held,Photo.png,adam,300,0,1792026900,job-hold-until-specified\n");
 	const QString sh = "#!/bin/sh\nS='" + st + "'\necho \"$(basename $0) $*\" >> '" + log + "'\n";
-	put(bin + "/lpstat", sh + "case $1 in -e) printf 'Inkjet\\nLaser\\nBrowsed\\nGhost\\n' ;; -p) "
+	put(bin + "/lpstat", sh + "case $1 in -e) if [ -f \"$S/down\" ]; then "
+		"echo 'lpstat: Unable to connect to server' >&2; exit 1; fi; "
+		"printf 'Inkjet\\nLaser\\nBrowsed\\nGhost\\n' ;; -p) "
 		"printf 'printer Inkjet is idle. enabled since Mon\\nprinter Laser is stopped. enabled since Mon\\n' ;; -d) "
 		"printf 'system default destination: %s\\n' \"$(cat $S/default)\" ;; esac\n", true);
 	put(bin + "/lpoptions", sh + "case $1 in\n"
@@ -73,8 +75,11 @@ int main(int argc, char **argv) {
 		"printer-state-reasons=none\"; else echo \"printer-info='Inkjet' printer-state=3 printer-is-temporary=true "
 		"printer-state-reasons=media-empty-error\"; fi ;;\nesac\n", true);
 	put(bin + "/ipptool", sh + "echo job-id,job-state,job-name,job-originating-user-name,job-k-octets,"
-		"job-impressions-completed,time-at-creation\ncat $S/jobs\n", true);
-	put(bin + "/lp", sh + "if [ \"$1\" = -i ]; then id=${2##*-}; "
+		"job-impressions-completed,time-at-creation,job-state-reasons\ncat $S/jobs\n", true);
+	put(bin + "/lp", sh + "case \"$*\" in *bad.pdf*) "
+		"echo 'lp: Error - The printer is not responding.' >&2; "
+		"echo 'lp: Check the printer connection.' >&2; exit 1;; esac\n"
+		"if [ \"$1\" = -i ]; then id=${2##*-}; "
 		"if [ \"$4\" = resume ]; then sed -i \"s/^$id,pending-held,/$id,pending,/\" $S/jobs; "
 		"else sed -i \"s/^$id,pending,/$id,pending-held,/\" $S/jobs; fi; exit 0; fi\n"
 		"echo \"request id is $2-42 (1 file(s))\"\n", true);
@@ -116,6 +121,10 @@ int main(int argc, char **argv) {
 	check(jobs.size() == 2 && jobs[0].title == "Test, \"quoted\" job" && jobs[0].held() &&
 		jobs[0].owner == "adam" && jobs[0].created == 1792026828 && jobs[1].status() == "Printing page 3",
 		"ipptool's jobs: quoting undone, states in words");
+	const QList<PrintJob> stoppedJobs = parseJobs(
+		"job-id,job-state,job-state-reasons\n5,processing-stopped,media-needed-error\n");
+	check(stoppedJobs.size() == 1 && stoppedJobs[0].status() == "Stopped (media needed)",
+		"a stopped document says why");
 	check(parseJobId("request id is Laser-12 (1 file(s))\n") == 12 && parseJobId("nonsense") == 0, "lp's job id");
 	check(isBrowsedQueue("implicitclass://Canon/") && !isBrowsedQueue("ipp://printer/ipp/print") &&
 		!isBrowsedQueue(""), "cups-browsed's queues by their device-uri");
@@ -144,6 +153,15 @@ int main(int argc, char **argv) {
 	put(dir.path() + "/c.odt", "PK\x03\x04");
 	check(canPrintDirectly(dir.path() + "/a.pdf") && canPrintDirectly(dir.path() + "/b.txt") &&
 		!canPrintDirectly(dir.path() + "/c.odt"), "PDF and text print directly; office documents don't");
+	{
+		put(dir.path() + "/bad.pdf", "%PDF-1.4\n");
+		QString partialError;
+		const QList<int> partial = printFiles("Laser",
+			{ dir.path() + "/a.pdf", dir.path() + "/bad.pdf" }, &partialError);
+		check(partial.size() == 1 && partialError.contains("bad.pdf") &&
+			partialError.contains("Check the printer connection"),
+			"one document failing doesn't stop the rest, and the error names it");
+	}
 
 	// ---- asking CUPS (the stand-ins)
 	const QList<Printer> printers = listPrinters();
@@ -206,5 +224,8 @@ int main(int argc, char **argv) {
 	check(read(log).contains("lp -d Laser -t a.pdf -- " + dir.path() + "/a.pdf") &&
 		!read(log).contains("c.odt") && alerts == before + 1,
 		"dropped documents print there; one that can't is explained");
+	put(st + "/down", "1");
+	check(listPrinters().isEmpty() && cupsProblem().contains("isn't running"),
+		"a printing service that isn't running is said plainly");
 	return fails ? 1 : 0;
 }

@@ -39,6 +39,7 @@ struct PrintJob {
 	QString state; /* pending, pending-held, processing, processing-stopped, ... */
 	int kilobytes = 0, pagesDone = 0;
 	qint64 created = 0; /* seconds since 1970 */
+	QString reasons; /* job-state-reasons, "none" when all is well */
 
 	bool held() const { return state == "pending-held"; }
 	QString status() const; /* "Waiting", "On hold", "Printing", ... */
@@ -63,6 +64,10 @@ QList<PrintJob> parseJobs(const QString &csv);
 int parseJobId(const QString &lpOut);
 
 /* ---- asking CUPS ---- */
+/* Why CUPS couldn't be asked, after listPrinters() found none ("" when
+ * it answered): "The printing service (CUPS) isn't running." and the
+ * like, for the windows to show instead of "no printer chosen". */
+QString cupsProblem();
 QList<Printer> listPrinters();
 QString defaultPrinter();
 QList<PrintJob> listJobs(const QString &printer);

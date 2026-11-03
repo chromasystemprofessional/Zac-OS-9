@@ -111,7 +111,8 @@ QStringList QueueWindow::rows() const {
 
 QString QueueWindow::printerStatus() const {
 	if (!d->known) {
-		return "This printer isn't set up on this computer any more.";
+		const QString problem = cupsProblem();
+		return problem.isEmpty() ? "This printer isn't set up on this computer any more." : problem;
 	}
 	QString s = d->printer.status();
 	if (d->jobs.isEmpty()) {
