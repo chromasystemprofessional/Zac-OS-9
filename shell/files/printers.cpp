@@ -2,6 +2,7 @@
 #include "process.h"
 
 #include <QCoreApplication>
+#include <QDebug>
 #include <QDBusConnection>
 #include <QDBusMessage>
 #include <QDBusPendingCallWatcher>
@@ -28,7 +29,7 @@ const char *const JOBS_TEST = R"({
 	ATTR uri printer-uri $uri
 	ATTR name requesting-user-name $user
 	ATTR keyword which-jobs not-completed
-	ATTR keyword requested-attributes job-id,job-state,job-name,job-originating-user-name,job-k-octets,job-impressions-completed,time-at-creation
+	ATTR keyword requested-attributes job-id,job-state,job-name,job-originating-user-name,job-k-octets,job-impressions-completed,time-at-creation,job-state-reasons
 	STATUS successful-ok
 	DISPLAY job-id
 	DISPLAY job-state
@@ -37,6 +38,7 @@ const char *const JOBS_TEST = R"({
 	DISPLAY job-k-octets
 	DISPLAY job-impressions-completed
 	DISPLAY time-at-creation
+	DISPLAY job-state-reasons
 }
 )";
 
@@ -52,6 +54,12 @@ struct Result {
 	bool ok = false;
 	QString out, err;
 };
+
+/* Print failures also go to the session log: an alert is gone once it is
+ * dismissed, and a user's report needs something to read. */
+void logFailure(const QString &what, const QString &error) {
+	qWarning().noquote() << "Printing:" << what + ":" << error;
+}
 
 /* Runs it to the end in the C locale, keeping the window drawn. No
  * waitForFinished(): see CLAUDE.md. */
@@ -72,8 +80,17 @@ Result run(const QString &name, const QStringList &args, int timeoutMs = 20000) 
 	if (!r.ok && r.err.isEmpty()) {
 		r.err = p.error() == QProcess::FailedToStart ? name + " isn't installed." : name + " failed.";
 	}
-	// "lp: Error - ..." reads better without the program's name.
-	r.err = r.err.section('\n', -1).remove(QRegularExpression("^\\S+: (Error - )?"));
+	// "lp: Error - ..." reads better without the program's name; keep the
+	// lines after it (CUPS often says why on the next line).
+	QStringList lines;
+	for (const QString &line : r.err.split('\n')) {
+		QString l = line;
+		l.remove(QRegularExpression("^\\S+: (Error - )?"));
+		if (!l.trimmed().isEmpty()) {
+			lines << l.trimmed();
+		}
+	}
+	r.err = lines.join('\n');
 	if (!r.err.isEmpty() && r.err[0].isLower()) {
 		r.err[0] = r.err[0].toUpper();
 	}
@@ -136,14 +153,30 @@ QString Printer::status() const {
 }
 
 QString PrintJob::status() const {
-	if (state == "pending") return "Waiting";
-	if (state == "pending-held") return "On hold";
-	if (state == "processing") return pagesDone > 0 ? QString("Printing page %1").arg(pagesDone + 1) : "Printing";
-	if (state == "processing-stopped") return "Stopped";
-	if (state == "canceled") return "Cancelled";
-	if (state == "aborted") return "Failed";
-	if (state == "completed") return "Done";
-	return state;
+	QString s;
+	if (state == "pending") s = "Waiting";
+	else if (state == "pending-held") s = "On hold";
+	else if (state == "processing") s = pagesDone > 0 ? QString("Printing page %1").arg(pagesDone + 1) : "Printing";
+	else if (state == "processing-stopped") s = "Stopped";
+	else if (state == "canceled") s = "Cancelled";
+	else if (state == "aborted") s = "Failed";
+	else if (state == "completed") s = "Done";
+	else s = state;
+	/* Why a job stopped or failed, in words: out of paper, held for an
+	 * administrator's password... A plain hold says nothing new. */
+	QStringList shown;
+	for (QString r : reasons.split(',', Qt::SkipEmptyParts)) {
+		r = r.trimmed();
+		if (r.isEmpty() || r == "none" || r == "job-hold-until-specified") {
+			continue;
+		}
+		r.remove(QRegularExpression("-(error|warning)$"));
+		shown << r.replace('-', ' ');
+	}
+	if (!shown.isEmpty()) {
+		s += " (" + shown.join(", ") + ")";
+	}
+	return s;
 }
 
 QStringList parsePrinterNames(const QString &lpstatE) {
@@ -258,6 +291,7 @@ QList<PrintJob> parseJobs(const QString &csv) {
 		j.kilobytes = col(f, "job-k-octets").toInt();
 		j.pagesDone = col(f, "job-impressions-completed").toInt();
 		j.created = col(f, "time-at-creation").toLongLong();
+		j.reasons = col(f, "job-state-reasons");
 		out << j;
 	}
 	return out;
@@ -282,13 +316,45 @@ bool isBrowsedQueue(const QString &deviceUri) {
 	return deviceUri.startsWith("implicitclass://");
 }
 
+static QString g_problem;
+
+QString cupsProblem() {
+	return g_problem;
+}
+
+/* The reason CUPS can't be asked, in words when it's a known one. */
+static QString cupsProblemFrom(const QString &error) {
+	if (error.contains("No destinations added", Qt::CaseInsensitive)) {
+		return QString(); /* CUPS is fine; there are simply no printers */
+	}
+	if (error.contains("isn't installed")) {
+		return "The printing service (CUPS) isn't installed.";
+	}
+	if (error.contains("scheduler is not running", Qt::CaseInsensitive) ||
+			error.contains("unable to connect", Qt::CaseInsensitive) ||
+			error.contains("connection refused", Qt::CaseInsensitive)) {
+		return "The printing service (CUPS) isn't running.";
+	}
+	return error;
+}
+
 QList<Printer> listPrinters() {
 	QList<Printer> out;
+	g_problem.clear();
+	const Result advertised = run("lpstat", { "-e" });
+	if (!advertised.ok) {
+		g_problem = cupsProblemFrom(advertised.err);
+		return out;
+	}
 	const QString def = defaultPrinter();
 	const Result known = run("lpstat", { "-p" });
-	const QSet<QString> real = known.ok ? parseKnownPrinters(known.out) : QSet<QString>();
-	for (const QString &name : parsePrinterNames(run("lpstat", { "-e" }).out)) {
-		if (known.ok && !real.contains(name)) {
+	if (!known.ok) {
+		g_problem = cupsProblemFrom(known.err);
+		return out;
+	}
+	const QSet<QString> real = parseKnownPrinters(known.out);
+	for (const QString &name : parsePrinterNames(advertised.out)) {
+		if (!real.contains(name)) {
 			continue; /* advertised but not set up: nothing can print there */
 		}
 		Printer p = printerFrom(name, parseOptions(run("lpoptions", { "-p", name }).out));
@@ -314,13 +380,28 @@ QList<PrintJob> listJobs(const QString &printer) {
 
 QList<int> printFiles(const QString &printer, const QStringList &files, QString *error) {
 	QList<int> ids;
+	QStringList problems;
 	for (const QString &file : files) {
 		const Result r = run("lp", { "-d", printer, "-t", QFileInfo(file).fileName(), "--", file });
 		if (!r.ok) {
-			*error = r.err;
-			return ids;
+			/* One bad document must not stop the others, and the answer
+			 * must name it: "Not everything could be printed" alone
+			 * leaves the user guessing which. */
+			problems << QFileInfo(file).fileName() + ": " + r.err;
+			logFailure("Could not print " + QFileInfo(file).fileName(), r.err);
+			continue;
 		}
-		ids << parseJobId(r.out);
+		const int id = parseJobId(r.out);
+		if (id > 0) {
+			ids << id;
+		} else {
+			const QString why = "the printer didn't accept it.";
+			problems << QFileInfo(file).fileName() + ": " + why;
+			logFailure("Could not print " + QFileInfo(file).fileName(), why);
+		}
+	}
+	if (!problems.isEmpty()) {
+		*error = problems.join('\n');
 	}
 	return ids;
 }
@@ -328,12 +409,18 @@ QList<int> printFiles(const QString &printer, const QStringList &files, QString 
 bool cancelJob(const QString &printer, int id, QString *error) {
 	const Result r = run("cancel", { printer + "-" + QString::number(id) });
 	*error = r.err;
+	if (!r.ok) {
+		logFailure(QString("Could not cancel %1-%2").arg(printer).arg(id), r.err);
+	}
 	return r.ok;
 }
 
 bool holdJob(const QString &printer, int id, bool hold, QString *error) {
 	const Result r = run("lp", { "-i", printer + "-" + QString::number(id), "-H", hold ? "hold" : "resume" });
 	*error = r.err;
+	if (!r.ok) {
+		logFailure(QString("Could not %1 %2-%3").arg(hold ? "hold" : "resume").arg(printer).arg(id), r.err);
+	}
 	return r.ok;
 }
 
@@ -363,9 +450,15 @@ bool setPrinterEnabled(const QString &printer, bool enabled, QString *error) {
 	waitUntil([&watcher] { return watcher.isFinished(); }, -1);
 	QDBusPendingReply<QString> reply = watcher;
 	if (reply.isError()) {
-		*error = reply.error().name().contains("NotPrivileged") || reply.error().name().contains("NotAuthorized")
-			? QString("Only an administrator can stop or start a printer.")
-			: reply.error().message();
+		if (reply.error().name() == "org.freedesktop.DBus.Error.ServiceUnknown") {
+			*error = "Stopping or starting a printer needs the cups-pk-helper package.";
+		} else if (reply.error().name().contains("NotPrivileged") ||
+				reply.error().name().contains("NotAuthorized")) {
+			*error = "Only an administrator can stop or start a printer.";
+		} else {
+			*error = reply.error().message();
+		}
+		logFailure(enabled ? "Could not start " + printer : "Could not stop " + printer, *error);
 		return false;
 	}
 	*error = reply.value(); /* cups-pk-helper's own error, if any */

@@ -127,7 +127,8 @@ Depends: ${shlibs:Depends},
          gstreamer1.0-plugins-good,
          network-manager-config-connectivity-debian,
          cups-client,
-         cups-ipp-utils
+         cups-ipp-utils,
+         cups-pk-helper
 Recommends: balena-etcher,
             cups,
             ipp-usb,

@@ -101,6 +101,10 @@ QString PickerWindow::details() const {
 		return "Looking for printers…";
 	}
 	if (d->printers.isEmpty()) {
+		const QString problem = cupsProblem();
+		if (!problem.isEmpty()) {
+			return problem;
+		}
 		return "No printers were found. Turn your printer on and connect it to this computer or its "
 			"network; Settings adds one by hand.";
 	}
