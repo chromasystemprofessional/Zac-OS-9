@@ -155,7 +155,7 @@ int main(void) {
 		assert(mkdtemp(cfg) != NULL);
 		char bundle[256], fonts[256], conf[256], desk[256];
 		snprintf(bundle, sizeof(bundle), "%s/zacos9/themes/Wide", cfg);
-		snprintf(fonts, sizeof(fonts), "%s/fonts", bundle);
+		snprintf(fonts, sizeof(fonts), "%s/zacos9/themes/Wide/fonts", cfg);
 		{
 			char tmp[256];
 			snprintf(tmp, sizeof(tmp), "%s", fonts);
@@ -168,13 +168,13 @@ int main(void) {
 			}
 			mkdir(tmp, 0755);
 		}
-		snprintf(conf, sizeof(conf), "%s/theme.conf", bundle);
+		snprintf(conf, sizeof(conf), "%s/zacos9/themes/Wide/theme.conf", cfg);
 		FILE *cf = fopen(conf, "w");
 		assert(cf);
 		fputs("name=Wide\n", cf);
 		fclose(cf);
 		/* Every letter 10 px wide and fully inked: "File" is 40 wide. */
-		snprintf(conf, sizeof(conf), "%s/theme-system-12.pfont", fonts);
+		snprintf(conf, sizeof(conf), "%s/zacos9/themes/Wide/fonts/theme-system-12.pfont", cfg);
 		FILE *pf = fopen(conf, "w");
 		assert(pf);
 		fputs("font Wide\nheight 16\nbaseline 12\n\n", pf);
@@ -214,7 +214,7 @@ int main(void) {
 		text_destroy(views);
 
 		/* A broken theme font falls back instead of breaking text. */
-		snprintf(conf, sizeof(conf), "%s/theme-system-12.pfont", fonts);
+		snprintf(conf, sizeof(conf), "%s/zacos9/themes/Wide/fonts/theme-system-12.pfont", cfg);
 		pf = fopen(conf, "w");
 		assert(pf);
 		fputs("not a font\n", pf);
@@ -237,9 +237,9 @@ int main(void) {
 		}
 		free(save_cfg);
 		free(save_home);
-		snprintf(conf, sizeof(conf), "%s/theme-system-12.pfont", fonts);
+		snprintf(conf, sizeof(conf), "%s/zacos9/themes/Wide/fonts/theme-system-12.pfont", cfg);
 		unlink(conf);
-		snprintf(conf, sizeof(conf), "%s/theme.conf", bundle);
+		snprintf(conf, sizeof(conf), "%s/zacos9/themes/Wide/theme.conf", cfg);
 		unlink(conf);
 		rmdir(fonts);
 		rmdir(bundle);

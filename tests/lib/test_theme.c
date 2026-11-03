@@ -216,7 +216,7 @@ int main(void) {
 	};
 	static const int emblem_count = sizeof(emblem_kinds) / sizeof(emblem_kinds[0]);
 	char plainbundle[256];
-	snprintf(plainbundle, sizeof(plainbundle), "%s/NoFolder", themeroot);
+	snprintf(plainbundle, sizeof(plainbundle), "%s/zacos9/themes/NoFolder", cfg);
 	mkdir(plainbundle, 0755);
 	char plainconf[320];
 	snprintf(plainconf, sizeof(plainconf), "%s/theme.conf", plainbundle);
@@ -279,18 +279,18 @@ int main(void) {
 	/* A theme's own System Folder art (-3983) is used as-is, like the
 	 * other mapped desktop icons. */
 	char sysbundle[256];
-	snprintf(sysbundle, sizeof(sysbundle), "%s/SysFolder", themeroot);
+	snprintf(sysbundle, sizeof(sysbundle), "%s/zacos9/themes/SysFolder", cfg);
 	mkdir(sysbundle, 0755);
 	char sysconf[320];
-	snprintf(sysconf, sizeof(sysconf), "%s/theme.conf", sysbundle);
+	snprintf(sysconf, sizeof(sysconf), "%s/zacos9/themes/SysFolder/theme.conf", cfg);
 	FILE *sf = fopen(sysconf, "w");
 	assert(sf); fputs("name=Sys\n", sf); fclose(sf);
 	char sysicons[300];
-	snprintf(sysicons, sizeof(sysicons), "%s/icons", sysbundle);
+	snprintf(sysicons, sizeof(sysicons), "%s/zacos9/themes/SysFolder/icons", cfg);
 	mkdir(sysicons, 0755);
 	char sys32[320], sys16[320];
-	snprintf(sys32, sizeof(sys32), "%s/system-folder-32.png", sysicons);
-	snprintf(sys16, sizeof(sys16), "%s/system-folder-16.png", sysicons);
+	snprintf(sys32, sizeof(sys32), "%s/zacos9/themes/SysFolder/icons/system-folder-32.png", cfg);
+	snprintf(sys16, sizeof(sys16), "%s/zacos9/themes/SysFolder/icons/system-folder-16.png", cfg);
 	write_flat_png(sys32, 32, 0xFF0000FFu);
 	write_flat_png(sys16, 16, 0xFF00FF00u);
 	df = fopen(confpath, "w");

@@ -1452,7 +1452,7 @@ static void cursor_theme_pick(char *theme, size_t theme_size, char *dir, size_t 
 		return;
 	}
 	if (bundle_cursor_theme(bundle, bundle_size)) {
-		snprintf(theme, theme_size, "%s", bundle);
+		snprintf(theme, theme_size, "%.*s", (int)theme_size - 1, bundle);
 		return;
 	}
 	snprintf(theme, theme_size, "%s", ZACOS9_CURSOR_THEME);
