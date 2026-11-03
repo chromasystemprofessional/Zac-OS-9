@@ -274,6 +274,27 @@ def test_apple_menu():
     print("ok    apple menu icon written")
 
 
+def test_standard_icon_ids():
+    # Apple's Icons.h: kGenericHardDiskIconResource -3995 and
+    # kGenericFileServerIconResource -3972. -3970 is the Suitcase.
+    kinds = {kind: rid for kind, _rtype, rid in tool.THEME_ICON_MAP}
+    assert kinds["disk"] == -3995, "the hard disk is Apple's standard icon"
+    assert kinds["network-disk"] == -3972, "the file server is Apple's standard icon"
+    print("ok    hard disk and file server use Apple's standard icon ids")
+
+
+def test_apple_menu_reads_icon_suite():
+    # A Mac OS 9 theme ships its Apple menu icon as an icon suite (icns);
+    # the collector must keep it so the theme's own Apple wins.
+    path = tempfile.mkdtemp() + "/Focus"
+    with open(path, "wb") as f:
+        f.write(build_resource_fork([(b"icns", -16386, b"\x00" * 32)]))
+    apple, icons, cursors, cluts = {}, {}, {}, []
+    tool.collect_helper_fork(path, cluts, apple, icons, cursors)
+    assert apple.get(b"icns"), "a theme's Apple icon suite is collected"
+    print("ok    the Apple menu reads a theme's icon suite")
+
+
 def test_wallpaper_size_filter():
     def pict_resource(w, h):
         # A version-1 BitsRect PICT the decoder accepts (main's fixture
@@ -994,6 +1015,8 @@ test_scen()
 test_pointers()
 test_system_sounds()
 test_apple_menu()
+test_standard_icon_ids()
+test_apple_menu_reads_icon_suite()
 test_scen_patt_epic()
 test_wallpaper_size_filter()
 test_theme_icons_share_system_palette()

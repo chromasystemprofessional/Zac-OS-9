@@ -5,6 +5,8 @@
 #include <QCoreApplication>
 #include <QCryptographicHash>
 #include <QDir>
+#include <QElapsedTimer>
+#include <QEventLoop>
 #include <QDateTime>
 #include <QFile>
 #include <QFileInfo>
@@ -478,6 +480,18 @@ static void sweepCompanionBundles() {
 
 class Catalog : public QObject {
 public:
+	~Catalog() override {
+		/* Closing the Appearance panel while the catalogue helper runs
+		 * would otherwise destroy a running QProcess. */
+		if (process.state() != QProcess::NotRunning) {
+			process.kill();
+			QElapsedTimer timer;
+			timer.start();
+			while (process.state() != QProcess::NotRunning && timer.elapsed() < 1000) {
+				QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents, 10);
+			}
+		}
+	}
 	QList<Theme> sounds{{ "none", "None", {} }, { "original", "ZacOS Original", {} }};
 	QList<Theme> presets{{ "platinum", "Silver Coat", {
 		{ "accent", "" }, { "highlight", "" }, { "pattern", "" },
@@ -1098,6 +1112,51 @@ void previewSoundTheme(int index) {
 	}
 }
 
+/* The catalog's id for an installed picture: the prefix, the SHA-256 of
+ * the file's name, then "image" (see zacos9-patterns). */
+static QString catalogImageId(const char *prefix, const QString &fileName) {
+	return QString::fromLatin1(prefix) + ":" + QString::fromLatin1(
+		QCryptographicHash::hash(fileName.toUtf8(), QCryptographicHash::Sha256).toHex()) + ":image";
+}
+
+/* A preset may name a pattern or picture by its installed file stem
+ * ("Paper-pattern-1"), as presets made before the catalog did. The
+ * compositor resolves only catalog ids, so choosing such a theme changed
+ * nothing on the desktop and it looked unselectable. */
+static QString resolvedPatternId(const QString &id) {
+	for (int i = 0; i < desktopPatternCount(); ++i) {
+		if (desktopPatternId(i) == id) {
+			return id;
+		}
+	}
+	for (int i = 0; i < desktopPatternCount(); ++i) {
+		if (desktopPatternName(i).startsWith(id + ".")) {
+			return desktopPatternId(i);
+		}
+	}
+	for (const QString &file : QDir(desktopPatternsFolder()).entryList({ id + ".*" }, QDir::Files)) {
+		return catalogImageId("user", file);
+	}
+	return id;
+}
+
+static QString resolvedWallpaperId(const QString &id) {
+	for (int i = 0; i < desktopWallpaperCount(); ++i) {
+		if (desktopWallpaperId(i) == id) {
+			return id;
+		}
+	}
+	for (int i = 0; i < desktopWallpaperCount(); ++i) {
+		if (desktopWallpaperName(i).startsWith(id + ".")) {
+			return desktopWallpaperId(i);
+		}
+	}
+	for (const QString &file : QDir(desktopWallpaperFolder()).entryList({ id + ".*" }, QDir::Files)) {
+		return catalogImageId("wallpaper", file);
+	}
+	return id;
+}
+
 bool applyAppearanceTheme(int index, QString *error) {
 	if (index < 0 || index >= catalog().presets.size()) {
 		*error = "The appearance theme is no longer available.";
@@ -1133,13 +1192,19 @@ bool applyAppearanceTheme(int index, QString *error) {
 		*error = "The theme specifies an unknown wallpaper placement.";
 		return false;
 	}
-	if (!values.value("pattern").isEmpty() && !desktopPatternAvailable(values["pattern"])) {
-		*error = "The preset's desktop pattern is missing.";
-		return false;
+	if (!values.value("pattern").isEmpty()) {
+		if (!desktopPatternAvailable(values["pattern"])) {
+			*error = "The preset's desktop pattern is missing.";
+			return false;
+		}
+		values["pattern"] = resolvedPatternId(values["pattern"]);
 	}
-	if (!values.value("wallpaper").isEmpty() && !desktopWallpaperAvailable(values["wallpaper"])) {
-		*error = "The preset's wallpaper is missing.";
-		return false;
+	if (!values.value("wallpaper").isEmpty()) {
+		if (!desktopWallpaperAvailable(values["wallpaper"])) {
+			*error = "The preset's wallpaper is missing.";
+			return false;
+		}
+		values["wallpaper"] = resolvedWallpaperId(values["wallpaper"]);
 	}
 	if (values.contains("alert-sound") && !values["alert-sound"].isEmpty() && values["alert-sound"] != "none") {
 		const QString id = values["alert-sound"];

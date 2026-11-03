@@ -72,8 +72,8 @@ THEME_ICON_MAP = [
     ("trash-empty", b"icl8", -3993),
     ("trash-full", b"icl8", -3984),
     ("document", b"icl8", -4000),
-    ("disk", b"icl8", 400),
-    ("network-disk", b"icl8", -20725),
+    ("disk", b"icl8", -3995),
+    ("network-disk", b"icl8", -3972),
     ("disk-image", b"icl8", -3998),
     ("caution", b"icl8", 7202),
 ]
@@ -600,7 +600,7 @@ def process_resource_fork(data, out, counts, cluts, icons, assets, scen_tags, ap
 			layo[res_id] = body
 		if plut is not None and rtype == b"plut":
 			plut[res_id] = body
-		if rtype in (b"ics8", b"ics4", b"ics#") and res_id == -16386:
+		if rtype in (b"icns", b"ics8", b"ics4", b"ics#") and res_id == -16386:
 			apple_menu.setdefault(rtype, []).append(body)
 		if rtype == b"wctb" and res_id == 0 and not wctb:
 			wctb.update(decode_wctb(body))
@@ -723,7 +723,7 @@ def collect_helper_fork(path, cluts, apple_menu, theme_icons, cursors):
 	except OSError:
 		return
 	for rtype, res_id, body in parse_resource_fork(data):
-		if rtype in (b"ics8", b"ics4", b"ics#") and res_id == -16386:
+		if rtype in (b"icns", b"ics8", b"ics4", b"ics#") and res_id == -16386:
 			apple_menu.setdefault(rtype, []).append(body)
 		elif rtype == b"clut":
 			try:
@@ -743,6 +743,24 @@ def write_apple_menu(apple_menu, cluts, out, theme_apple=None, theme_cluts=()):
 
 	Whoever supplies the icon, it decodes against the System tables
 	(the largest wins: a gray ramp would flatten the rainbow stripes)."""
+	# The icon decodes against the System tables even when the theme
+	# file supplies it (a scheme's own tables describe its chrome).
+	# The rainbow stripes need the fullest table: gray ramps flatten them.
+	helpers = cluts[len(theme_cluts):] or cluts
+	palette = None
+	for _res_id, cols in helpers:
+		if cols and (palette is None or len(cols) > len(palette)):
+			palette = cols
+	# A Mac OS 9 theme carries its own Apple menu icon as an icon suite
+	# (icns, id -16386); the System supplies the low-depth ics8/ics4.
+	# The theme's own art wins, as it does for every other icon.
+	if apple_menu.get(b"icns"):
+		try:
+			rows = macicons.decode_icns(apple_menu[b"icns"][0], palette, size=16)
+			pngwrite.write_png(os.path.join(out, "apple-menu.png"), 16, 16, rows)
+			return rows
+		except (ValueError, IndexError, struct.error):
+			pass
 	color = None
 	mask = None
 	if apple_menu.get(b"ics8"):
@@ -754,14 +772,6 @@ def write_apple_menu(apple_menu, cluts, out, theme_apple=None, theme_cluts=()):
 	if apple_menu.get(b"ics#"):
 		_, mask_rows = macicons.decode_icn1(apple_menu[b"ics#"][0], size=16)
 		mask = mask_rows
-	# The icon decodes against the System tables even when the theme
-	# file supplies it (a scheme's own tables describe its chrome).
-	# The rainbow stripes need the fullest table: gray ramps flatten them.
-	helpers = cluts[len(theme_cluts):] or cluts
-	palette = None
-	for _res_id, cols in helpers:
-		if cols and (palette is None or len(cols) > len(palette)):
-			palette = cols
 	rows = macicons.decode_icl8(color, palette, size=16) if len(color) == 256 else 		macicons.decode_icl4(color, palette, size=16) if len(color) == 128 else None
 	if rows is None:
 		return
