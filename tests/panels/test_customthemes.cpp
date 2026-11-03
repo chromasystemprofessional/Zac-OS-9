@@ -323,7 +323,20 @@ int main(int argc, char **argv) {
 	write(legacy + "/Old", makeThemeFork());
 	const QString oldBundle = root.path() + "/config/zacos9/themes/Old";
 	assert(QDir().mkpath(oldBundle));
-	write(oldBundle + "/theme.conf", QByteArray("source=" + legacy.toUtf8() + "/Old\nname=Old\n"));
+	/* The old bundle records the extractor that built it; the panel only
+	 * rebuilds a bundle that an older extractor made. */
+	QByteArray extractor;
+	QFile aquaConf(bundle + "/theme.conf");
+	if (aquaConf.open(QIODevice::ReadOnly | QIODevice::Text)) {
+		for (const QByteArray &line : aquaConf.readAll().split('\n')) {
+			if (line.startsWith("extractor-sha256=")) {
+				extractor = line + "\n";
+			}
+		}
+	}
+	assert(!extractor.isEmpty());
+	write(oldBundle + "/theme.conf",
+		QByteArray("source=" + legacy.toUtf8() + "/Old\nname=Old\n") + extractor);
 	write(legacy + "/oldpreset.json",
 		R"JSON({"version":1,"name":"OldSaved","settings":{"theme-bundle":"Old"}})JSON");
 	const QString oldFolder = appearanceThemesFolder() + "/Old";

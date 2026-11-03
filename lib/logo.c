@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #include <cairo.h>
 
@@ -115,6 +116,8 @@ const uint32_t *logo_pixels_hq(void) {
 const uint32_t *logo_pixels_themed(void) {
 	static uint32_t *cache = NULL;
 	static char *last_path = NULL;
+	static struct timespec last_mtime;
+	static off_t last_size;
 	char path[4096];
 	if (!zac_theme_asset("apple-menu.png", path, sizeof(path)) &&
 			!zac_theme_asset("menu-icon.png", path, sizeof(path))) {
@@ -125,13 +128,24 @@ const uint32_t *logo_pixels_themed(void) {
 		last_path = NULL;
 		return logo16_data;
 	}
-	if (cache && last_path && strcmp(last_path, path) == 0) {
+	/* A rebuilt bundle keeps its path: the file's own timestamp and size
+	 * decide whether the pixels are still current. */
+	struct stat st;
+	const bool known = stat(path, &st) == 0;
+	if (cache && last_path && strcmp(last_path, path) == 0 && known &&
+			st.st_mtim.tv_sec == last_mtime.tv_sec &&
+			st.st_mtim.tv_nsec == last_mtime.tv_nsec &&
+			st.st_size == last_size) {
 		return cache;
 	}
 	free(cache);
 	free(last_path);
 	cache = NULL;
 	last_path = strdup(path);
+	if (known) {
+		last_mtime = st.st_mtim;
+		last_size = st.st_size;
+	}
 	cairo_surface_t *s = cairo_image_surface_create_from_png(path);
 	const int sw = cairo_image_surface_get_width(s);
 	const int sh = cairo_image_surface_get_height(s);

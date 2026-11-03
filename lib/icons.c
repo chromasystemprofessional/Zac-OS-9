@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <time.h>
 
 #include <cairo.h>
 
@@ -22,6 +24,7 @@ static const char *icon_bundle_name(enum pl_icon_kind kind) {
 	case PL_ICON_TRASH_FULL: return "trash-full";
 	case PL_ICON_DOCUMENT: return "document";
 	case PL_ICON_SHARED_FOLDER: return "shared-folder";
+	case PL_ICON_DISK: return "disk";
 	case PL_ICON_NETWORK_DISK: return "network-disk";
 	case PL_ICON_DISK_IMAGE: return "disk-image";
 	case PL_ICON_CAUTION: return "caution";
@@ -30,10 +33,13 @@ static const char *icon_bundle_name(enum pl_icon_kind kind) {
 }
 
 /* The bundle's icons/<name>-<size>.png when the active theme supplies it,
- * else NULL. Reloads when the file moves (a theme installed or removed). */
+ * else NULL. Reloads when the file moves (a theme installed or removed) or
+ * is rebuilt in place (a reimport). */
 static uint32_t *load_themed(int kind, int slot, int size) {
 	static uint32_t *cache[PL_ICON_COUNT][2];
 	static char *last_path[PL_ICON_COUNT][2];
+	static struct timespec last_mtime[PL_ICON_COUNT][2];
+	static off_t last_size[PL_ICON_COUNT][2];
 	char relative[64];
 	snprintf(relative, sizeof(relative), "icons/%s-%d.png", icon_bundle_name(kind), size);
 	char path[4096];
@@ -44,13 +50,23 @@ static uint32_t *load_themed(int kind, int slot, int size) {
 		last_path[kind][slot] = NULL;
 		return NULL;
 	}
-	if (cache[kind][slot] && last_path[kind][slot] && strcmp(last_path[kind][slot], path) == 0) {
+	struct stat st;
+	const bool known = stat(path, &st) == 0;
+	if (cache[kind][slot] && last_path[kind][slot] && known &&
+			strcmp(last_path[kind][slot], path) == 0 &&
+			st.st_mtim.tv_sec == last_mtime[kind][slot].tv_sec &&
+			st.st_mtim.tv_nsec == last_mtime[kind][slot].tv_nsec &&
+			st.st_size == last_size[kind][slot]) {
 		return cache[kind][slot];
 	}
 	free(cache[kind][slot]);
 	cache[kind][slot] = NULL;
 	free(last_path[kind][slot]);
 	last_path[kind][slot] = NULL;
+	if (known) {
+		last_mtime[kind][slot] = st.st_mtim;
+		last_size[kind][slot] = st.st_size;
+	}
 	cairo_surface_t *s = cairo_image_surface_create_from_png(path);
 	if (cairo_surface_status(s) != CAIRO_STATUS_SUCCESS ||
 			cairo_image_surface_get_width(s) != size ||

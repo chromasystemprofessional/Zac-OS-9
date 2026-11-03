@@ -12,6 +12,7 @@
 #include <QDir>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QImage>
 #include <QInputDialog>
 #include <QMessageBox>
 #include <QProcess>
@@ -33,11 +34,7 @@
 
 static QString extractorPath() {
 	/* From a build tree, the source tree's copy; installed, under data dir. */
-	const QString src = sourceTreePath("tools/extract-macos9-theme.py");
-	if (!src.isEmpty() && QFileInfo(src).isFile()) {
-		return src;
-	}
-	return QString::fromUtf8(pl_data_dir()) + "/tools/extract-macos9-theme.py";
+	return themeExtractorPath();
 }
 
 static QString outputDir(const QString &name) {
@@ -51,9 +48,32 @@ static bool bundleHasTheme(const QString &name) {
 	return QFileInfo::exists(outputDir(name) + "/menu-icon.png");
 }
 
+/* The Mac OS 9 System Folder the user copied out of Old Dog. Old Dog
+ * shares the home folder as the Mac's "Unix" volume, so a copy dragged
+ * onto it lands at ~/System Folder; the launcher keeps its Mac files in
+ * ~/Classic, and older installs used ~/Classic/System. The Theme
+ * Installer reads the System file, Desktop Pictures and Fonts from it. */
+static QString macSystemFolder() {
+	const QString home = QDir::homePath();
+	const QString classic = qEnvironmentVariable("ZACOS9_CLASSIC_DIR");
+	QStringList candidates { home + "/Classic/System Folder" };
+	if (!classic.isEmpty()) {
+		candidates << classic + "/System Folder";
+	}
+	candidates << home + "/System Folder" << home + "/Classic/System";
+	for (const QString &dir : candidates) {
+		if (QFileInfo(dir + "/System").isFile() ||
+				QFileInfo(dir + "/.rsrc/System").isFile() ||
+				QFileInfo(dir + "/._System").isFile()) {
+			return dir;
+		}
+	}
+	return QString();
+}
+
 /* Run the extractor and wait with processEvents() (never waitForFinished). */
-static bool runExtractor(const QString &file, const QString &name, const QString &system,
-		const QString &fonts, QString *error) {
+static bool runExtractor(const QString &file, const QString &name, const QString &systemFile,
+		const QString &systemFolder, QString *error) {
 	const QString tool = extractorPath();
 	if (!QFileInfo(tool).isFile()) {
 		*error = "The theme extractor couldn't be found.";
@@ -63,15 +83,21 @@ static bool runExtractor(const QString &file, const QString &name, const QString
 	process.setProgram("python3");
 	QStringList args { tool, "--file", file, "--output", outputDir(name), "--name", name,
 		"--auto-colours" };
-	if (!system.isEmpty()) {
-		args << "--system" << system;
+	if (!systemFile.isEmpty()) {
+		args << "--system" << systemFile;
 	}
-	const QString pictures = QDir::homePath() + "/Classic/System Folder/Appearance/Desktop Pictures";
-	if (QFileInfo::exists(pictures)) {
-		args << "--pictures" << pictures;
-	}
-	if (!fonts.isEmpty()) {
-		args << "--fonts" << fonts;
+	if (!systemFolder.isEmpty()) {
+		/* Everything the theme takes from the user's own Mac OS 9
+		 * install: the Apple menu icon, the busy pointers, the alert
+		 * sounds, the desktop pictures and the fonts. */
+		const QString pictures = systemFolder + "/Appearance/Desktop Pictures";
+		if (QDir(pictures).exists()) {
+			args << "--pictures" << pictures;
+		}
+		const QString fonts = systemFolder + "/Fonts";
+		if (QDir(fonts).exists()) {
+			args << "--fonts" << fonts;
+		}
 	}
 	process.setArguments(args);
 	process.start();
@@ -187,9 +213,12 @@ static QString writeAppearancePreset(const QString &file, const QString &name, c
 	};
 	put("accent", themeConfValue(name, "accent"));
 	put("highlight", themeConfValue(name, "highlight"));
-	put("pattern", pattern);
-	put("wallpaper", wallpaper);
-	put("alert-sound", alert);
+	/* Always, even empty: applying the preset has to drop a previous
+	 * theme's wallpaper and pattern instead of leaving them underneath. */
+	settings.insert("pattern", pattern);
+	settings.insert("wallpaper", wallpaper);
+	settings.insert("background", !wallpaper.isEmpty() ? "wallpaper" : "pattern");
+	settings.insert("alert-sound", alert);
 	put("font-family", fontFamily);
 	put("sound-theme", soundTheme);
 	put("theme-bundle", name);
@@ -277,9 +306,14 @@ static void installThemeAssets(const QString &name, QString *wallpaper,
 		QFileInfoList all = QDir(src).entryInfoList(QDir::Files, QDir::Name);
 		/* Only the decoded assets install: the bundle keeps the raw
 		 * resource dumps (*.bin) alongside for reference, and a preset
-		 * pointing at one fails to apply ("pattern is missing"). */
+		 * pointing at one fails to apply ("pattern is missing"). A
+		 * desktop picture stays whatever the extractor wrote: a PICT is
+		 * decoded to PNG, while a JPEG data fork is copied as it is. */
 		const QStringList keptExt = (f.sub == QStringLiteral("sounds"))
-			? QStringList{ "wav" } : QStringList{ "png" };
+			? QStringList{ "wav" }
+			: (f.sub == QStringLiteral("wallpapers"))
+			? QStringList{ "png", "jpg", "jpeg", "gif", "tif", "tiff", "bmp" }
+			: QStringList{ "png" };
 		QFileInfoList files;
 		for (const QFileInfo &file : all) {
 			if (keptExt.contains(file.suffix(), Qt::CaseInsensitive)) {
@@ -312,17 +346,48 @@ static void installThemeAssets(const QString &name, QString *wallpaper,
 				return ad != bd ? ad : a.fileName() < b.fileName();
 			});
 		}
+		QStringList installed;
 		for (const QFileInfo &file : files) {
 			const QString id = prefix + "-" + file.completeBaseName();
-			QFile::copy(file.filePath(), dest + "/" + id + "." + file.suffix());
+			QString name = id + "." + file.suffix();
+			bool converted = false;
+			if (f.sub == QStringLiteral("wallpapers") &&
+					file.suffix().compare("png", Qt::CaseInsensitive) != 0) {
+				/* The desktop loads a wallpaper as PNG (cairo): convert
+				 * whatever Mac OS 9 held (JPEG, GIF, TIFF, BMP) with
+				 * Qt, so a picture is not skipped for its format. */
+				QImage image(file.filePath());
+				if (!image.isNull()) {
+					const QString png = id + ".png";
+					QFile::remove(dest + "/" + png);
+					if (image.save(dest + "/" + png, "PNG")) {
+						name = png;
+						converted = true;
+					}
+				}
+			}
+			if (!converted) {
+				QFile::remove(dest + "/" + name);
+				QFile::copy(file.filePath(), dest + "/" + name);
+			}
+			/* A previous import may have left the same picture under
+			 * another extension. */
+			for (const char *other : { "png", "jpg", "jpeg", "gif", "tif", "tiff", "bmp" }) {
+				const QString candidate = id + "." + other;
+				if (candidate != name) {
+					QFile::remove(dest + "/" + candidate);
+				}
+			}
+			installed << name;
 		}
 		/* The System's own alert sounds are offered, never chosen as the theme's. */
-		for (const QFileInfo &file : files) {
-			if (f.sub == QStringLiteral("sounds") && file.fileName().startsWith("system-")) {
+		for (int i = 0; i < files.size(); i++) {
+			if (f.sub == QStringLiteral("sounds") &&
+					files[i].fileName().startsWith("system-")) {
 				continue;
 			}
-			const QString id = prefix + "-" + file.completeBaseName();
-			const QString copied = id + "." + file.suffix();
+			const QString copied = installed[i];
+			const QString id = QFileInfo(copied).completeBaseName();
 			if (f.sub == QStringLiteral("wallpapers")) *wallpaper = catalogId("wallpaper", copied);
 			else if (f.sub == QStringLiteral("patterns")) *pattern = catalogId("user", copied);
 			else *alert = id;
@@ -506,19 +571,29 @@ int main(int argc, char *argv[]) {
 	}
 	name = name.trimmed();
 	const QString fork = resolveResourceFork(file);
-	/* The System file supplies the busy, resize, move and hand pointers. */
+	/* The user's own Mac OS 9 System Folder supplies the Apple menu icon,
+	 * the busy pointers, the alert sounds, the desktop pictures and the
+	 * fonts. Old Dog keeps it at ~/Classic/System Folder; a copy dragged
+	 * onto the Mac's Unix volume (the home folder) lands at
+	 * ~/System Folder. --system names a System file directly. */
+	QString systemFolder;
 	if (system.isEmpty()) {
-		const QString home = QDir::homePath() + "/Classic/System/System";
-		if (QFileInfo::exists(home)) {
-			system = home;
+		systemFolder = macSystemFolder();
+		if (!systemFolder.isEmpty()) {
+			for (const QString &candidate : { systemFolder + "/System",
+					systemFolder + "/.rsrc/System", systemFolder + "/._System" }) {
+				if (QFileInfo(candidate).isFile()) {
+					system = candidate;
+					break;
+				}
+			}
 		}
+	} else {
+		systemFolder = QFileInfo(system).absolutePath();
 	}
 	const QString systemFork = system.isEmpty() ? QString() : resolveResourceFork(system);
-
-	/* The Fonts folder supplies the theme's bitmap fonts (Geneva, Chicago...). */
-	const QString fonts = QDir::homePath() + "/Classic/System Folder/Fonts";
 	QString error;
-	if (!runExtractor(fork, name, systemFork, QFileInfo::exists(fonts) ? fonts : QString(), &error)) {
+	if (!runExtractor(fork, name, systemFork, systemFolder, &error)) {
 		if (batch) {
 			fprintf(stderr, "zacos9-themeinstaller: %s\n", qPrintable(error));
 			return 2;
@@ -546,8 +621,11 @@ int main(int argc, char *argv[]) {
 	installThemeAssets(name, &wallpaper, &pattern, &alert);
 	const QString soundThemes = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) +
 		"/zacos9/appearance/Sound Themes";
-	const int soundSets = copyMacSoundSets(
-		QDir::homePath() + "/Classic/Appearance add-ons/Sound Sets", soundThemes);
+	QString soundSetFolder = systemFolder + "/Appearance/Sound Sets";
+	if (!QDir(soundSetFolder).exists()) {
+		soundSetFolder = QDir::homePath() + "/Classic/Appearance add-ons/Sound Sets";
+	}
+	const int soundSets = copyMacSoundSets(soundSetFolder, soundThemes);
 	const QString soundId = soundThemeId(soundThemes, themeConfValue(name, "sound-set"));
 	const QString fontFamily = installThemeFonts(name);
 	const QString presetId = writeAppearancePreset(file, name, wallpaper, pattern, alert, fontFamily, soundId, &error);
@@ -567,19 +645,21 @@ int main(int argc, char *argv[]) {
 		!pattern.isEmpty() ? "pattern" : "");
 	setThemeConfValue(name, "alert-sound", alert);
 	setThemeConfValue(name, "sound-theme", soundId);
+	/* Drop whatever the previous theme put here when this one supplies
+	 * nothing, so a theme with no desktop picture does not keep the last
+	 * one's wallpaper and pattern underneath its chrome. */
+	const QByteArray patternBytes = pattern.toUtf8();
+	const QByteArray wallpaperBytes = wallpaper.toUtf8();
+	const QByteArray alertBytes = alert.toUtf8();
+	/* A theme's own sound set is applied when it names one; without one,
+	 * the interface sound set the user chose stays. */
 	if (!soundId.isEmpty()) {
 		pl_setting_set("sound-theme", soundId.toUtf8().constData());
 	}
-	if (!pattern.isEmpty()) {
-		pl_setting_set("pattern", pattern.toUtf8().constData());
-	}
-	if (!wallpaper.isEmpty()) {
-		pl_setting_set("wallpaper", wallpaper.toUtf8().constData());
-	}
+	pl_setting_set("pattern", patternBytes.isEmpty() ? nullptr : patternBytes.constData());
+	pl_setting_set("wallpaper", wallpaperBytes.isEmpty() ? nullptr : wallpaperBytes.constData());
 	pl_setting_set("background", !wallpaper.isEmpty() ? "wallpaper" : "pattern");
-	if (!alert.isEmpty()) {
-		pl_setting_set("alert-sound", alert.toUtf8().constData());
-	}
+	pl_setting_set("alert-sound", alertBytes.isEmpty() ? nullptr : alertBytes.constData());
 	pl_setting_set("appearance-theme", presetId.toUtf8().constData());
 	pl_setting_set("theme-bundle", name.toUtf8().constData());
 	stampThemeFileIcon(file, name);

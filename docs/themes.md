@@ -98,7 +98,9 @@ reads the Appearance theme's resource fork and produces a **theme bundle** in
   splash (id 128) and the Appearance panel's preview thumbnails (the `scen`
   `epic` ids), never wallpapers, so they are skipped. Only screen-sized
   PICTs (128 px or more on each side) become wallpapers; smaller
-  icon-sized pictures are left out.
+  icon-sized pictures are left out. The installer accepts PNG, JPEG, GIF,
+  TIFF and BMP pictures and converts them to PNG, because the desktop
+  loads wallpapers as PNG.
 - `patterns/desktop-pattern.png` — the desktop pattern, stored inside the
   `scen` collection (`patt` tag), plus the monochrome `PAT` tiles as
   `pattern-N.png`. The theme file's colour `ppat` resources are scroll-bar,
@@ -154,7 +156,7 @@ reads the Appearance theme's resource fork and produces a **theme bundle** in
   file's own art wins where it supplies a family (Kaleidoscope schemes
   draw against the palette they display through), and the System and
   Finder files fill the kinds it lacks: folder, the System Folder,
-  trash empty and full, document, shared folder, network disk, disk
+  trash empty and full, document, hard disk, network disk, disk
   image and the caution sign. The Sniffer and
   the alert box use them while the theme is active; every other icon
   keeps ZacOS's own art. Custom folders (System Folder, Applications,
@@ -191,6 +193,16 @@ the dropped file, its resource fork and the generated preset), builds the
 theme from it and applies it. Dropping another copy of an installed theme does
 nothing; a changed file imports again. (The import runs `zacos9-themeinstaller`
 behind the scenes; its `--file` batch mode does the same from a terminal.)
+
+The Theme Installer finds the System Folder at `~/Classic/System Folder`
+(where Old Dog keeps it), at `~/System Folder` (where a copy dragged onto
+Old Dog's Unix volume lands) or at `$ZACOS9_CLASSIC_DIR/System Folder`. It
+reads the Apple menu icon, the busy pointers, the alert sounds, the desktop
+pictures and the fonts from it; without one, the theme still installs but
+keeps ZacOS's Apple, pointers, sounds and fonts, and takes no desktop
+picture. A bundle records the extractor that built it, so when a ZacOS
+update learns to decode more, the Appearance panel rebuilds the bundles
+from the copies in Theme Files rather than leaving the old, partial ones.
 The dropped file wears the theme's own Finder icon (its mini window art) where
 one exists; files without one keep the generic document icon. The menu icon,
 boot art and colours change at the next menu-bar rebuild and boot. Decoded TrueType faces install to `~/.local/share/fonts/zacos9/` (registered
