@@ -749,6 +749,13 @@ static void stampThemeFileIcon(const QString &file, const QString &name) {
 	if (!writeCustomIconImage(target, icon)) {
 		qWarning() << "Could not stamp the theme file's icon onto" << target;
 	}
+	/* The folder the theme was filed into wears the same icon, so the
+	 * theme is recognisable before its file is opened. */
+	const QString folder = QFileInfo(target).absolutePath();
+	if (folder.startsWith(appearanceThemesFolder() + "/") &&
+			!writeCustomIconImage(folder, icon)) {
+		qWarning() << "Could not stamp the theme's icon onto" << folder;
+	}
 }
 int main(int argc, char *argv[]) {
 	qputenv("QT_WAYLAND_DISABLE_WINDOWDECORATION", "1");
