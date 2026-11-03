@@ -917,6 +917,31 @@ def test_theme_chrome_decodes():
     print("ok    lined-up window art decodes into chrome/")
 
 
+def test_bar_tiles_align():
+    # A cap resource can carry rows above the bar (or the frame below it):
+    # every bar tile is saved at the middle's height from its first inked
+    # row, so the ends are not shorter than the middle.
+    pxm = {pid: [_pxm_body()] for pid in (200, 210, 220)}
+    pxm[6176] = [_pxm_body(22, 13)]  # left cap, 13 rows
+    pxm[6173] = [_pxm_body(22, 13)]  # right cap
+    pxm[6170] = [_pxm_body(22, 6)]   # middle, 6 rows
+    layo = {128: _layo_body([
+        (b"pxm#", 6176, 256, 0),
+        (b"pxm#", 6170, 256, 0),
+        (b"pxm#", 6173, 256, 0),
+        (b"pxm#", 200, 0, 10), (b"pxm#", 210, 10, 10), (b"pxm#", 220, 20, 10),
+    ])}
+    out = tempfile.mkdtemp() + "/theme"
+    tool.write_theme_chrome("Bar", pxm, [], out, layo=layo)
+    heights = {}
+    for key in ("bar-left", "bar-middle", "bar-right"):
+        with open(os.path.join(out, "chrome", key + ".png"), "rb") as f:
+            head = f.read(24)
+        heights[key] = struct.unpack(">I", head[20:24])[0]
+    assert heights == {"bar-left": 6, "bar-middle": 6, "bar-right": 6}, heights
+    print("ok    bar caps are aligned to the middle's height")
+
+
 def _layo_body(entries):
     # entries: [(tag, rid, group, lead)]; one 40-byte record each.
     out = b"\x00" * 20
@@ -1033,6 +1058,7 @@ test_theme_system_folder()
 test_file_icon_decodes()
 test_theme_chrome_decodes()
 test_theme_chrome_twopart()
+test_bar_tiles_align()
 
 
 def test_resource_map_bounds():
