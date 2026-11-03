@@ -1107,7 +1107,20 @@ void previewSoundTheme(int index) {
 		const QString path = QString::fromUtf8(pl_data_dir()) + "/sounds/woodblock.wav";
 		pl_sound_preview(path.toUtf8().constData(), level);
 	} else if (!theme.values.isEmpty()) {
-		const QString path = cacheFolder() + "/" + theme.values.first();
+		/* The first key alphabetically is button-click, so previewing a
+		 * set played a click and sounded broken. Use an event that says
+		 * what the set is like. */
+		QString file = theme.values.value("sound.window-open");
+		if (file.isEmpty()) {
+			file = theme.values.value("sound.menu-command");
+		}
+		if (file.isEmpty()) {
+			file = theme.values.value("sound.startup");
+		}
+		if (file.isEmpty()) {
+			file = theme.values.first();
+		}
+		const QString path = cacheFolder() + "/" + file;
 		pl_sound_preview(path.toUtf8().constData(), level);
 	}
 }
@@ -1192,34 +1205,39 @@ bool applyAppearanceTheme(int index, QString *error) {
 		*error = "The theme specifies an unknown wallpaper placement.";
 		return false;
 	}
+	/* A theme is more than any one optional piece of art. When a sound
+	 * set, font, alert or desktop picture cannot be found, leave that
+	 * choice out and say so, rather than refusing the whole theme: an
+	 * undecodable sound set used to make the theme unselectable. */
+	QStringList missing;
 	if (!values.value("pattern").isEmpty()) {
-		if (!desktopPatternAvailable(values["pattern"])) {
-			*error = "The preset's desktop pattern is missing.";
-			return false;
+		if (desktopPatternAvailable(values["pattern"])) {
+			values["pattern"] = resolvedPatternId(values["pattern"]);
+		} else {
+			missing << "desktop pattern";
+			values["pattern"] = "";
 		}
-		values["pattern"] = resolvedPatternId(values["pattern"]);
 	}
 	if (!values.value("wallpaper").isEmpty()) {
-		if (!desktopWallpaperAvailable(values["wallpaper"])) {
-			*error = "The preset's wallpaper is missing.";
-			return false;
+		if (desktopWallpaperAvailable(values["wallpaper"])) {
+			values["wallpaper"] = resolvedWallpaperId(values["wallpaper"]);
+		} else {
+			missing << "desktop picture";
+			values["wallpaper"] = "";
 		}
-		values["wallpaper"] = resolvedWallpaperId(values["wallpaper"]);
 	}
-	if (values.contains("alert-sound") && !values["alert-sound"].isEmpty() && values["alert-sound"] != "none") {
-		const QString id = values["alert-sound"];
-		if (!alertSoundAvailable(id)) {
-			*error = "The preset's alert sound is missing.";
-			return false;
-		}
+	if (values.contains("alert-sound") && !values["alert-sound"].isEmpty() && values["alert-sound"] != "none" &&
+			!alertSoundAvailable(values["alert-sound"])) {
+		missing << "alert sound";
+		values["alert-sound"] = "";
 	}
 	if (!values.value("font-family").isEmpty() &&
 			!QFontDatabase::families().contains(values["font-family"]) &&
 			!themeFontFamilies().contains(values["font-family"])) {
-		*error = "The preset's program font is missing.";
-		return false;
+		missing << "program font " + values["font-family"];
+		values["font-family"] = "";
 	}
-	if (values.contains("sound-theme")) {
+	if (values.contains("sound-theme") && !values["sound-theme"].isEmpty()) {
 		int sound = -1;
 		for (int i = 0; i < soundThemeCount(); ++i) {
 			if (soundThemeId(i) == values["sound-theme"]) {
@@ -1228,18 +1246,25 @@ bool applyAppearanceTheme(int index, QString *error) {
 			}
 		}
 		if (sound < 0) {
-			*error = "The preset's sound theme is missing.";
-			return false;
-		}
-		for (const QString &event : events) {
-			values.insert("sound." + event, "");
-		}
-		for (auto it = catalog().sounds[sound].values.cbegin(); it != catalog().sounds[sound].values.cend(); ++it) {
-			values.insert(it.key(), it.value());
+			missing << "sound set";
+			values["sound-theme"] = "";
+		} else {
+			for (const QString &event : events) {
+				values.insert("sound." + event, "");
+			}
+			for (auto it = catalog().sounds[sound].values.cbegin(); it != catalog().sounds[sound].values.cend(); ++it) {
+				values.insert(it.key(), it.value());
+			}
 		}
 	}
 	values.insert("appearance-theme", preset.id);
-	return writeSettings(values, error);
+	if (!writeSettings(values, error)) {
+		return false;
+	}
+	if (!missing.isEmpty()) {
+		*error = "Applied " + preset.name + " without its " + missing.join(", ") + ".";
+	}
+	return true;
 }
 
 bool saveAppearanceTheme(const QString &name, QString *error) {
