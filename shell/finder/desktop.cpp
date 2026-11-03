@@ -559,15 +559,20 @@ void Desktop::paintEvent(QPaintEvent *) {
 		px.blit(p);
 		return;
 	}
-	paintIconItem(c, *m_disk, m_disk->pos.x(), m_disk->pos.y(), true);
+	/* An open volume's icon is dimmed until its window closes, as Mac
+	 * OS 9's Finder did. */
+	const auto openWindow = [](const std::unique_ptr<Item> &item) {
+		return item && FolderWindow::isOpen(item->path);
+	};
+	paintIconItem(c, *m_disk, m_disk->pos.x(), m_disk->pos.y(), true, true, openWindow(m_disk));
 	if (m_unix) {
-		paintIconItem(c, *m_unix, m_unix->pos.x(), m_unix->pos.y(), true);
+		paintIconItem(c, *m_unix, m_unix->pos.x(), m_unix->pos.y(), true, true, openWindow(m_unix));
 	}
 	for (auto &item : m_localVolumes) {
-		paintIconItem(c, *item, item->pos.x(), item->pos.y(), true);
+		paintIconItem(c, *item, item->pos.x(), item->pos.y(), true, true, openWindow(item));
 	}
 	for (auto &item : m_netVolumes) {
-		paintIconItem(c, *item, item->pos.x(), item->pos.y(), true);
+		paintIconItem(c, *item, item->pos.x(), item->pos.y(), true, true, openWindow(item));
 	}
 	for (auto &item : m_files) {
 		const bool editing = m_editor.editing(item.get());

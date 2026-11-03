@@ -169,9 +169,10 @@ QString favoritesPath();
 QString toyBoxPath();
 
 /* Paint an icon with its label; `onDesktop` labels get a white box when
- * unselected (desktop pattern behind them). TODO: measure label metrics. */
+ * unselected (desktop pattern behind them). `dimmed` draws the icon at
+ * half strength, as Mac OS 9 did for an open volume's desktop icon. */
 void paintIconItem(pl_canvas *c, Item &item, int x, int y, bool onDesktop,
-		bool showLabel = true);
+		bool showLabel = true, bool dimmed = false);
 /* The icon alone, at `size` (32 or 16): an application's own icon if one
  * was resolved, a picture file's preview once it is ready, a document
  * bearing the icon of the application that opens it, else the compiled

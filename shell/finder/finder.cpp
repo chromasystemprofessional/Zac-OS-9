@@ -306,6 +306,12 @@ void Finder::notifyState() {
 	}
 }
 
+void Finder::desktopIconsChanged() {
+	if (m_desktop) {
+		m_desktop->update();
+	}
+}
+
 void Finder::command(const QString &name) {
 	if (!pl_puppy_allows(name.toUtf8().constData())) {
 		pl_beep(); /* Puppy Mode leaves it out (Sniffer Preferences) */
