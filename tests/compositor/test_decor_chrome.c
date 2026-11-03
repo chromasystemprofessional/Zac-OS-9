@@ -60,8 +60,8 @@ int main(void) {
 	snprintf(cfg, sizeof(cfg), "%s/config", home);
 	snprintf(dir, sizeof(dir), "%s/config/zacos9", home);
 	snprintf(bundle, sizeof(bundle), "%s/config/zacos9/themes/Aqua", home);
-	snprintf(chrome, sizeof(chrome), "%s/chrome", bundle);
-	snprintf(conf, sizeof(conf), "%s/theme.conf", bundle);
+	snprintf(chrome, sizeof(chrome), "%s/config/zacos9/themes/Aqua/chrome", home);
+	snprintf(conf, sizeof(conf), "%s/config/zacos9/themes/Aqua/theme.conf", home);
 	snprintf(desk, sizeof(desk), "%s/config/zacos9/desktop.conf", home);
 	assert(mkdir(cfg, 0755) == 0);
 	assert(mkdir(dir, 0755) == 0);
@@ -128,8 +128,8 @@ int main(void) {
 	 * boxes move left after the title. */
 	char bundle2[4096], chrome2[4096], conf2[4096];
 	snprintf(bundle2, sizeof(bundle2), "%s/config/zacos9/themes/TwoPart", home);
-	snprintf(chrome2, sizeof(chrome2), "%s/chrome", bundle2);
-	snprintf(conf2, sizeof(conf2), "%s/theme.conf", bundle2);
+	snprintf(chrome2, sizeof(chrome2), "%s/config/zacos9/themes/TwoPart/chrome", home);
+	snprintf(conf2, sizeof(conf2), "%s/config/zacos9/themes/TwoPart/theme.conf", home);
 	assert(mkdir(bundle2, 0755) == 0);
 	assert(mkdir(chrome2, 0755) == 0);
 	snprintf(path, sizeof(path), "%s/bar-middle.argb", chrome2);
@@ -181,8 +181,8 @@ int main(void) {
 	 * Platinum dialogs show none. */
 	char bundle3[4096], chrome3[4096], conf3[4096];
 	snprintf(bundle3, sizeof(bundle3), "%s/config/zacos9/themes/Dialog", home);
-	snprintf(chrome3, sizeof(chrome3), "%s/chrome", bundle3);
-	snprintf(conf3, sizeof(conf3), "%s/theme.conf", bundle3);
+	snprintf(chrome3, sizeof(chrome3), "%s/config/zacos9/themes/Dialog/chrome", home);
+	snprintf(conf3, sizeof(conf3), "%s/config/zacos9/themes/Dialog/theme.conf", home);
 	assert(mkdir(bundle3, 0755) == 0);
 	assert(mkdir(chrome3, 0755) == 0);
 	snprintf(path, sizeof(path), "%s/bar-dialog-middle.argb", chrome3);

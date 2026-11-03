@@ -827,7 +827,7 @@ public:
 		fingerprint = mark;
 		errors.clear();
 		presets = { presets.first() };
-		/* Presets live beside their theme (Theme Files/<name>/*.json);
+		/* Presets live beside their theme (one preset per theme folder);
 		 * older ones sit in the root itself. */
 		const QDir themeRoot(appearanceThemesFolder());
 		QFileInfoList presetFiles;

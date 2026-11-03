@@ -1442,16 +1442,20 @@ static void keyboard_focus_change(struct wl_listener *listener, void *data) {
  * hand-placed art the resources alone cannot supply, like the ROM-only
  * arrow), then a bundle-named theme, else ZacOS9's. */
 static bool bundle_cursor_theme(char *theme, size_t theme_size);
-static const char *cursor_theme_pick(char *mac, size_t mac_size, char *dir, size_t dir_size,
+static void cursor_theme_pick(char *theme, size_t theme_size, char *dir, size_t dir_size,
 		char *bundle, size_t bundle_size) {
-	if (zac_cursor_theme(mac, mac_size, dir, dir_size)) {
+	if (zac_cursor_theme(theme, theme_size, dir, dir_size)) {
 		const char *old = getenv("XCURSOR_PATH");
 		char path[2 * 4096 + 256];
 		snprintf(path, sizeof(path), "%s%s%s", dir, old ? ":" : "", old ? old : "");
 		setenv("XCURSOR_PATH", path, 1);
-		return mac;
+		return;
 	}
-	return bundle_cursor_theme(bundle, bundle_size) ? bundle : ZACOS9_CURSOR_THEME;
+	if (bundle_cursor_theme(bundle, bundle_size)) {
+		snprintf(theme, theme_size, "%.*s", (int)theme_size - 1, bundle);
+		return;
+	}
+	snprintf(theme, theme_size, "%s", ZACOS9_CURSOR_THEME);
 }
 
 /* The ZacOS9 cursor theme (assets/cursors) sits next to our binary in
@@ -1507,8 +1511,8 @@ void input_init(struct plat_server *server) {
 	server->cursor = wlr_cursor_create();
 	wlr_cursor_attach_output_layout(server->cursor, server->output_layout);
 	char theme[64], dir[4096], bundle[NAME_MAX + 1];
-	use_zacos9_cursors(cursor_theme_pick(theme, sizeof(theme), dir, sizeof(dir),
-		bundle, sizeof(bundle)));
+	cursor_theme_pick(theme, sizeof(theme), dir, sizeof(dir), bundle, sizeof(bundle));
+	use_zacos9_cursors(theme);
 	server->cursor_mgr = wlr_xcursor_manager_create(theme, ZACOS9_CURSOR_SIZE);
 	server->cursor_mode = PLAT_CURSOR_PASSTHROUGH;
 	wl_list_init(&server->pointers);
