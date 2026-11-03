@@ -1,7 +1,10 @@
 #include <stdbool.h>
 #include <cairo.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <time.h>
 
 #include "draw.h"
 #include "font.h"
@@ -52,6 +55,459 @@ static const struct style scaled_styles[3][3] = {
 	},
 };
 
+/* ---- theme window-chrome fonts ---------------------------------------------- */
+
+/* The extractor rasterizes the theme's own faces (fonts/theme-*.pfont)
+ * from its TrueType at the text sizes, each at 1x and the fractional
+ * scales; while a theme is active the chrome uses them instead of the
+ * built-in bitmaps. A file they lack (or a broken one) falls back per
+ * glyph at draw time, so partial coverage stays readable. */
+static const int theme_sizes[2][4] = {
+	{ 12, 15, 18, 21 }, /* system */
+	{ 11, 14, 17, 19 }, /* views */
+};
+static const char *theme_roles[2] = { "system", "views" };
+
+struct theme_pfont {
+	char *path; /* resolved file, or NULL when absent/broken */
+	struct timespec mtime;
+	off_t size;
+	struct pl_bitmap_font *font; /* NULL when the slot holds nothing usable */
+};
+
+static struct theme_pfont theme_pfonts[2][4];
+
+static void theme_pfont_free(struct pl_bitmap_font *f) {
+	if (!f) {
+		return;
+	}
+	free((void *)f->glyphs);
+	free((void *)f->rows);
+	free((void *)f->name);
+	free(f);
+}
+
+static void theme_slot_clear(int family, int scale) {
+	free(theme_pfonts[family][scale].path);
+	theme_pfonts[family][scale].path = NULL;
+	theme_pfonts[family][scale].mtime = (struct timespec){ 0 };
+	theme_pfonts[family][scale].size = 0;
+	theme_pfont_free(theme_pfonts[family][scale].font);
+	theme_pfonts[family][scale].font = NULL;
+}
+
+/* First code point of a NUL-terminated token; -1 unless it is exactly one. */
+static uint32_t next_cp(const char **s);
+static int token_cp(const char *token) {
+	const char *s = token;
+	uint32_t cp = next_cp(&s);
+	if (cp == 0xFFFD && strcmp(token, "\xEF\xBF\xBD") != 0) {
+		return -1;
+	}
+	return *s ? -1 : (int)cp;
+}
+
+static int glyph_cmp(const void *a, const void *b) {
+	const struct pl_glyph *ga = a, *gb = b;
+	return ga->cp < gb->cp ? -1 : ga->cp > gb->cp;
+}
+
+/* Parse a .pfont file (assets/fonts format) into a heap font. NULL on any
+ * failure; a file with some bad glyphs still loads the good ones. */
+static struct pl_bitmap_font *parse_pfont(const char *path) {
+	FILE *f = fopen(path, "r");
+	if (!f) {
+		return NULL;
+	}
+	fseek(f, 0, SEEK_END);
+	long size = ftell(f);
+	rewind(f);
+	if (size <= 0 || size > 1024 * 1024) {
+		fclose(f);
+		return NULL;
+	}
+	char *text = malloc((size_t)size + 1);
+	if (!text) {
+		fclose(f);
+		return NULL;
+	}
+	if (fread(text, 1, (size_t)size, f) != (size_t)size) {
+		free(text);
+		fclose(f);
+		return NULL;
+	}
+	text[size] = '\0';
+	fclose(f);
+
+	int height = 0, baseline = -1;
+	char *name = NULL;
+	struct pl_glyph *glyphs = NULL;
+	int nglyphs = 0, capglyphs = 0;
+	char **rowstrings = NULL;
+	int nrows = 0, caprows = 0;
+	/* Pending glyph (or mark, when pending_mark) its rows belong to. */
+	bool pending = false, pending_mark = false;
+	uint32_t pending_cp = 0;
+	int pending_adv = 0, pending_top = 0;
+	int pending_first = 0; /* index into rowstrings of its first row */
+
+	struct pl_bitmap_font *fail = NULL;
+#define PFONT_FAIL() do { \
+		free(text); free(name); free(glyphs); \
+		if (rowstrings) { for (int _i = 0; _i < nrows; _i++) free(rowstrings[_i]); free(rowstrings); } \
+		return fail; \
+	} while (0)
+
+	char *lsave = NULL;
+	for (char *line = strtok_r(text, "\n", &lsave); line;
+			line = strtok_r(NULL, "\n", &lsave)) {
+		size_t len = strlen(line);
+		while (len && (line[len - 1] == '\r')) {
+			line[--len] = '\0';
+		}
+		char *stripped = line;
+		while (*stripped == ' ' || *stripped == '\t') {
+			stripped++;
+		}
+		if (!*stripped || *stripped == ';') {
+			continue;
+		}
+		bool is_row = true;
+		for (const char *p = stripped; *p; p++) {
+			if (*p != '#' && *p != '.') {
+				is_row = false;
+				break;
+			}
+		}
+		if (is_row) {
+			if (!pending || pending_mark) {
+				continue;
+			}
+			if (nrows >= caprows) {
+				int ncap = caprows ? caprows * 2 : 64;
+				char **nr = realloc(rowstrings, sizeof(*nr) * (size_t)ncap);
+				if (!nr) {
+					PFONT_FAIL();
+				}
+				rowstrings = nr;
+				caprows = ncap;
+			}
+			rowstrings[nrows] = strdup(stripped);
+			if (!rowstrings[nrows]) {
+				PFONT_FAIL();
+			}
+			nrows++;
+			continue;
+		}
+		/* A new directive ends the pending glyph: keep it when its shape
+		 * is sane (advance, row count, no duplicate). Whether it fits
+		 * the line box is checked at the end, so the header may come
+		 * in any order. */
+		if (pending && !pending_mark) {
+			int count = nrows - pending_first;
+			bool ok = pending_adv > 0 && pending_adv <= 32 && count > 0 && count <= 255 &&
+				pending_top >= -128 && pending_top <= 127;
+			if (ok) {
+				for (int i = 0; i < nglyphs; i++) {
+					if (glyphs[i].cp == pending_cp) {
+						ok = false;
+						break;
+					}
+				}
+			}
+			if (ok) {
+				if (nglyphs >= capglyphs) {
+					int ncap = capglyphs ? capglyphs * 2 : 64;
+					struct pl_glyph *ng = realloc(glyphs, sizeof(*ng) * (size_t)ncap);
+					if (!ng) {
+						PFONT_FAIL();
+					}
+					glyphs = ng;
+					capglyphs = ncap;
+				}
+				glyphs[nglyphs].cp = pending_cp;
+				glyphs[nglyphs].top = (int8_t)pending_top;
+				glyphs[nglyphs].advance = (uint8_t)pending_adv;
+				glyphs[nglyphs].rows = (uint8_t)count;
+				glyphs[nglyphs].first = (uint16_t)pending_first;
+				nglyphs++;
+			} else {
+				for (int i = pending_first; i < nrows; i++) {
+					free(rowstrings[i]);
+				}
+				nrows = pending_first;
+			}
+		}
+		pending = false;
+		pending_mark = false;
+
+		char *words[5];
+		int nwords = 0;
+		char *wsave = NULL;
+		for (char *w = strtok_r(stripped, " \t", &wsave); w && nwords < 5;
+				w = strtok_r(NULL, " \t", &wsave)) {
+			words[nwords++] = w;
+		}
+		/* NB: strtok_r on `stripped` has its own save pointer, so the
+		 * outer line loop above is unaffected. */
+		if (nwords == 0) {
+			continue;
+		}
+		if (strcmp(words[0], "char") == 0) {
+			if (nwords != 4) {
+				continue;
+			}
+			uint32_t cp;
+			if (strcmp(words[1], "space") == 0) {
+				cp = 32;
+			} else if (strncmp(words[1], "U+", 2) == 0) {
+				char *end = NULL;
+				unsigned long v = strtoul(words[1] + 2, &end, 16);
+				if (!end || *end || v == 0 || v > 0x10FFFF) {
+					continue;
+				}
+				cp = (uint32_t)v;
+			} else {
+				int v = token_cp(words[1]);
+				if (v < 0) {
+					continue;
+				}
+				cp = (uint32_t)v;
+			}
+			pending = true;
+			pending_cp = cp;
+			pending_adv = atoi(words[2]);
+			pending_top = atoi(words[3]);
+			pending_first = nrows;
+		} else if (strcmp(words[0], "mark") == 0) {
+			pending = true;
+			pending_mark = true;
+			pending_first = nrows;
+		} else if (strcmp(words[0], "font") == 0) {
+			/* Name runs to end of line; strtok ate spaces, so rejoined
+			 * with single spaces (good enough for debugging). */
+			free(name);
+			size_t nlen = 0;
+			for (int i = 1; i < nwords; i++) {
+				nlen += strlen(words[i]) + 1;
+			}
+			name = malloc(nlen + 1);
+			if (!name) {
+				PFONT_FAIL();
+			}
+			name[0] = '\0';
+			for (int i = 1; i < nwords; i++) {
+				if (i > 1) {
+					strcat(name, " ");
+				}
+				strcat(name, words[i]);
+			}
+		} else if (nwords == 2) {
+			int v = atoi(words[1]);
+			if (strcmp(words[0], "height") == 0) {
+				height = v;
+			} else if (strcmp(words[0], "baseline") == 0) {
+				baseline = v;
+			}
+		}
+	}
+	/* Flush a trailing glyph (same shape checks as above). */
+	if (pending && !pending_mark) {
+		int count = nrows - pending_first;
+		bool ok = pending_adv > 0 && pending_adv <= 32 && count > 0 && count <= 255 &&
+			pending_top >= -128 && pending_top <= 127;
+		if (ok) {
+			for (int i = 0; i < nglyphs; i++) {
+				if (glyphs[i].cp == pending_cp) {
+					ok = false;
+					break;
+				}
+			}
+		}
+		if (ok) {
+			if (nglyphs >= capglyphs) {
+				int ncap = capglyphs ? capglyphs * 2 : 64;
+				struct pl_glyph *ng = realloc(glyphs, sizeof(*ng) * (size_t)ncap);
+				if (!ng) {
+					PFONT_FAIL();
+				}
+				glyphs = ng;
+				capglyphs = ncap;
+			}
+			glyphs[nglyphs].cp = pending_cp;
+			glyphs[nglyphs].top = (int8_t)pending_top;
+			glyphs[nglyphs].advance = (uint8_t)pending_adv;
+			glyphs[nglyphs].rows = (uint8_t)count;
+			glyphs[nglyphs].first = (uint16_t)pending_first;
+			nglyphs++;
+		} else {
+			for (int i = pending_first; i < nrows; i++) {
+				free(rowstrings[i]);
+			}
+			nrows = pending_first;
+		}
+	} else if (pending && pending_mark) {
+		for (int i = pending_first; i < nrows; i++) {
+			free(rowstrings[i]);
+		}
+		nrows = pending_first;
+	}
+	free(text);
+
+	if (height <= 0 || height > 256 || baseline < 0 || baseline >= height || nglyphs == 0) {
+		free(name);
+		free(glyphs);
+		for (int i = 0; i < nrows; i++) {
+			free(rowstrings[i]);
+		}
+		free(rowstrings);
+		return NULL;
+	}
+	qsort(glyphs, (size_t)nglyphs, sizeof(*glyphs), glyph_cmp);
+	uint32_t *rows = calloc((size_t)nrows, sizeof(*rows));
+	if (!rows) {
+		free(name);
+		free(glyphs);
+		for (int i = 0; i < nrows; i++) {
+			free(rowstrings[i]);
+		}
+		free(rowstrings);
+		return NULL;
+	}
+	/* Rows were stored per glyph in file order; repack in sorted order,
+	 * dropping glyphs outside the line box (an accent above the ascent:
+	 * the fallback face covers them, as build_fonts.py does). */
+	uint32_t *packed = calloc((size_t)nrows, sizeof(*packed));
+	uint16_t *remap = malloc(sizeof(*remap) * (size_t)nglyphs);
+	if (!packed || !remap) {
+		free(name);
+		free(glyphs);
+		free(rows);
+		free(packed);
+		free(remap);
+		for (int i = 0; i < nrows; i++) {
+			free(rowstrings[i]);
+		}
+		free(rowstrings);
+		return NULL;
+	}
+	int at = 0, kept = 0;
+	for (int i = 0; i < nglyphs; i++) {
+		int top = glyphs[i].top, count = glyphs[i].rows;
+		if (top < -baseline || top + count - 1 > height - baseline - 1) {
+			continue;
+		}
+		if (kept != i) {
+			glyphs[kept] = glyphs[i];
+		}
+		remap[kept] = (uint16_t)at;
+		int first = glyphs[kept].first;
+		for (int r = 0; r < count; r++) {
+			const char *s = rowstrings[first + r];
+			uint32_t bits = 0;
+			for (int x = 0; x < glyphs[kept].advance && s[x]; x++) {
+				if (s[x] == '#') {
+					bits |= 1u << x;
+				}
+			}
+			packed[at++] = bits;
+		}
+		kept++;
+	}
+	if (kept == 0) {
+		free(name);
+		free(glyphs);
+		free(rows);
+		free(packed);
+		free(remap);
+		for (int i = 0; i < nrows; i++) {
+			free(rowstrings[i]);
+		}
+		free(rowstrings);
+		return NULL;
+	}
+	nglyphs = kept;
+	for (int i = 0; i < nglyphs; i++) {
+		glyphs[i].first = remap[i];
+	}
+	free(remap);
+	for (int i = 0; i < nrows; i++) {
+		free(rowstrings[i]);
+	}
+	free(rowstrings);
+	free(rows);
+
+	struct pl_bitmap_font *font = malloc(sizeof(*font));
+	if (!font) {
+		free(name);
+		free(glyphs);
+		free(packed);
+		return NULL;
+	}
+	font->name = name ? name : strdup("theme");
+	font->height = height;
+	font->baseline = baseline;
+	font->glyphs = glyphs;
+	font->n = nglyphs;
+	font->rows = packed;
+	return font;
+#undef PFONT_FAIL
+}
+
+/* The theme's font for a family/scale, or NULL (built-in holds). Reloads
+ * when the bundle changes or the file is replaced. */
+static const struct pl_bitmap_font *theme_font(int family, int scale) {
+	char relative[64];
+	snprintf(relative, sizeof(relative), "fonts/theme-%s-%d.pfont",
+		theme_roles[family], theme_sizes[family][scale]);
+	char path[4096];
+	if (!zac_theme_asset(relative, path, sizeof(path))) {
+		theme_slot_clear(family, scale);
+		return NULL;
+	}
+	struct stat st;
+	if (stat(path, &st) != 0) {
+		theme_slot_clear(family, scale);
+		return NULL;
+	}
+	struct theme_pfont *slot = &theme_pfonts[family][scale];
+	if (slot->path && strcmp(slot->path, path) == 0 &&
+			slot->mtime.tv_sec == st.st_mtim.tv_sec &&
+			slot->mtime.tv_nsec == st.st_mtim.tv_nsec && slot->size == st.st_size) {
+		return slot->font;
+	}
+	theme_slot_clear(family, scale);
+	slot->font = parse_pfont(path);
+	slot->path = strdup(path);
+	if (!slot->path) {
+		theme_pfont_free(slot->font);
+		slot->font = NULL;
+		return NULL;
+	}
+	slot->mtime = st.st_mtim;
+	slot->size = st.st_size;
+	return slot->font;
+}
+
+/* The effective style: the built-in metrics with the theme's bitmap
+ * swapped in when the bundle supplies one. */
+static void style_for(enum pl_font font, int quarters, struct style *out) {
+	const struct style *base;
+	int scale;
+	if (quarters >= 5 && quarters <= 7) {
+		base = &scaled_styles[quarters - 5][font];
+		scale = quarters - 4;
+	} else {
+		base = &styles[font];
+		scale = 0;
+	}
+	*out = *base;
+	int family = font == PL_FONT_SYSTEM ? 0 : 1;
+	const struct pl_bitmap_font *themed = theme_font(family, scale);
+	if (themed) {
+		out->font = themed;
+	}
+}
 /* QuickDraw-style italic: rows shift right one pixel per two rows above
  * the baseline (and left below it); on a scaled font's rows, as its 1x
  * rows there shift, scaled. */
@@ -269,7 +725,9 @@ struct plat_text *text_render_scaled(const struct plat_text *text, int quarters)
 	if (!text || !text->utf8 || quarters < 5 || quarters > 7 || text->font < 0 || text->font > 2) {
 		return NULL;
 	}
-	struct plat_text *scaled = render_exact(text->utf8, &scaled_styles[quarters - 5][text->font]);
+	struct style st;
+	style_for(text->font, quarters, &st);
+	struct plat_text *scaled = render_exact(text->utf8, &st);
 	if (scaled) {
 		scaled->font = text->font;
 	}
@@ -303,7 +761,9 @@ static void theme_fonts_once(void) {
 
 static struct plat_text *render(const char *utf8, int max_ink_width, enum pl_font font) {
 	theme_fonts_once();
-	const struct style *st = &styles[font];
+	struct style storage;
+	style_for(font, 0, &storage);
+	const struct style *st = &storage;
 	struct plat_text *text = render_exact(utf8, st);
 	if (ink_width(text) <= max_ink_width) {
 		return text;

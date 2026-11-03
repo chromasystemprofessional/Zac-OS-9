@@ -15,6 +15,7 @@ Usage:
 """
 
 import argparse
+import hashlib
 import os
 import shutil
 import struct
@@ -27,6 +28,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import macfont
 import macicons
+import macfont
 import macpat
 import macpict
 import macsnd
@@ -39,8 +41,171 @@ ASSET_EXTS = {".icns", ".png", ".jpg", ".jpeg", ".wav", ".aiff", ".aif", ".pat"}
 ICON_TYPES = {b"ICN#", b"icl8", b"icl4", b"ics#", b"ics8", b"ics4", b"icns", b"ICON"}
 PATTERN_TYPES = {b"PAT ", b"PAT#", b"ppat"}
 SOUND_TYPES = {b"snd "}
+FONT_TYPES = {b"sfnt", b"FOND", b"nfnt"}
+CURSOR_TYPES = {b"CURS", b"crsr"}
 PICT_TYPES = {b"PICT"}
-THEME_TYPES = {b"thme", b"clut", b"pltt", b"WIND", b"scen", b"cicn", b"crsr", b"CURS", b"wctb"}
+THEME_TYPES = {b"thme", b"clut", b"pltt", b"WIND", b"scen", b"pxm#", b"layo", b"plut",
+	b"cicn", b"crsr", b"CURS", b"wctb"}
+
+# Mac OS 9 pointer shapes that become the desktop's cursors, as
+# (bundle name, file, resource type, id). 16x16 1-bit with a hotspot,
+# verified against a running Mac OS 9 desktop. The arrow pointer lives
+# only in the Mac ROM, so it is captured from a boot screenshot instead
+# (like the Happy Mac); everything else decodes here.
+CURSOR_MAP = [
+    ("xterm", "System", b"CURS", 1),
+    ("crosshair", "System", b"CURS", 2),
+    ("move", "System", b"CURS", 3),
+    ("watch", "System", b"CURS", 4),
+    ("hand1", "Finder", b"CURS", 6603),
+    ("hand2", "Finder", b"CURS", 6604),
+]
+CURSOR_IDS = frozenset((rtype, rid) for _kind, _src, rtype, rid in CURSOR_MAP)
+
+# Mac OS 9 icon families that become the desktop's icons, as
+# (bundle kind name, colour type, id). Decoded at 32 and 16 px from the
+# System file (and the Finder file, for alerts) in both modes; every entry
+# was verified against a running Mac OS 9 desktop (docs/themes.md).
+THEME_ICON_MAP = [
+    ("folder", b"icl8", -3999),
+    ("system-folder", b"icl8", -3983),
+    ("trash-empty", b"icl8", -3993),
+    ("trash-full", b"icl8", -3984),
+    ("document", b"icl8", -4000),
+    ("shared-folder", b"icl8", -3973),
+    ("network-disk", b"icl8", -3970),
+    ("disk-image", b"icl8", -3998),
+    ("caution", b"icl8", 7202),
+]
+# Mask resource for each colour icon type.
+ICON_MASKS = {b"icl8": b"ICN#", b"icl4": b"ICN#", b"ics8": b"ics#", b"ics4": b"ics#"}
+
+# Window chrome lined up per theme from the catalog sheets (verified
+# renders): ppat ids for the title-bar tiles, pxm# ids for the buttons.
+# Keys are bundle names as derived from the file (Qt's completeBaseName
+# strips the dotted tail, so "Aqua v2.0" arrives as "Aqua v2"). Only
+# listed themes get art; everything else keeps flat chrome colours.
+# Bar middles stretch edge to edge (caps are optional and currently
+# unmapped); buttons are 16-bit pxm# layers, layer 1 normal, layer 0 pressed.
+THEME_CHROME = {
+	"Aqua v2": {
+		"bar-middle": 3102,
+		"bar-middle-inactive": 20609,
+		"button-close": 200, "button-close-pressed": 200,
+		"button-zoom": 210, "button-zoom-pressed": 210,
+		"button-grow": 220, "button-grow-pressed": 220,
+	},
+	"Aqua  v2.0": {
+		"bar-middle": 3102,
+		"bar-middle-inactive": 20609,
+		"button-close": 200, "button-close-pressed": 200,
+		"button-zoom": 210, "button-zoom-pressed": 210,
+		"button-grow": 220, "button-grow-pressed": 220,
+	},
+}
+
+THEME_ICON_IDS = frozenset(
+    [(rtype, rid) for _kind, rtype, rid in THEME_ICON_MAP] +
+    [(ICON_MASKS[rtype], rid) for _kind, rtype, rid in THEME_ICON_MAP] +
+    [(b"icns", rid) for _kind, _rtype, rid in THEME_ICON_MAP] +
+    [(b"ics8", rid) for _kind, _rtype, rid in THEME_ICON_MAP] +
+    [(b"ics4", rid) for _kind, _rtype, rid in THEME_ICON_MAP] +
+    [(b"ics#", rid) for _kind, _rtype, rid in THEME_ICON_MAP]
+)
+
+
+def decode_theme_icon(theme_icons, palette, color_type, rid, size, expect, prefer_icns=True):
+	"""Decode one mapped icon family to rows of RGBA, or None."""
+	if prefer_icns:
+		icns_bodies = theme_icons.get((b"icns", rid))
+		if icns_bodies:
+			try:
+				return macicons.decode_icns(icns_bodies[0], palette, size=size)
+			except (ValueError, IndexError, struct.error):
+				pass
+	bodies = theme_icons.get((color_type, rid))
+	if not bodies or len(bodies[0]) != expect:
+		return None
+	try:
+		if len(bodies[0]) in (1024, 256):
+			rows = macicons.decode_icl8(bodies[0], palette, size=size)
+		else:
+			rows = macicons.decode_icl4(bodies[0], palette, size=size)
+	except (ValueError, IndexError):
+		return None
+	mask = theme_icons.get((ICON_MASKS[color_type], rid))
+	if mask:
+		try:
+			_, mask_rows = macicons.decode_icn1(mask[0], size=size)
+			rows = macicons.combine_icon(rows, mask_rows)
+		except (ValueError, IndexError):
+			return None
+	return rows
+
+
+def write_file_icon(file_icon, cluts, theme_cluts, out):
+	"""Decode the theme file's own Finder icon (family 1024, the mini
+	window art Mac OS 9 shows for the file) into the bundle's
+	file-icon.png. The Sniffer stamps it onto the dropped file so the
+	theme sits in Theme Files wearing its own art. Missing silently
+	when the file carries none (Aqua, Liquid); the generic document
+	icon stays."""
+	sys_palette = macicons.resolve_palette(cluts[len(theme_cluts):] or cluts)
+	icns_bodies = file_icon.get(b"icns")
+	if icns_bodies:
+		try:
+			rows = macicons.decode_icns(icns_bodies[0], sys_palette, size=32)
+			pngwrite.write_png(os.path.join(out, "file-icon.png"), 32, 32, rows)
+			return rows
+		except (ValueError, IndexError, struct.error):
+			pass
+	bodies = file_icon.get(b"icl8")
+	if not bodies or len(bodies[0]) != 1024:
+		return None
+	try:
+		rows = macicons.decode_icl8(bodies[0], sys_palette, size=32)
+	except (ValueError, IndexError):
+		return None
+	mask = file_icon.get(b"ICN#")
+	if mask:
+		try:
+			_, mask_rows = macicons.decode_icn1(mask[0], size=32)
+			rows = macicons.combine_icon(rows, mask_rows)
+		except (ValueError, IndexError):
+			return None
+	pngwrite.write_png(os.path.join(out, "file-icon.png"), 32, 32, rows)
+	return rows
+
+
+def write_theme_icons(theme_icons, cluts, out, theme_keys=frozenset(), theme_cluts=()):
+	"""Decode the mapped Mac icon families into the bundle's icons/.
+
+	All icon art — a Kaleidoscope scheme's own as well as the System
+	and Finder kinds — decodes against the System palette (calibrated):
+	Mac icon families are authored against the palette they display
+	through, and a scheme file's own colour tables describe its window
+	chrome, not its icons (using one dyed Aqua's folder brown).
+	Without a System file the theme's own tables stand in, uncalibrated.
+	"""
+	sys_palette = macicons.resolve_palette(cluts[len(theme_cluts):] or cluts)
+	icons_dir = os.path.join(out, "icons")
+	for kind, rtype, rid in THEME_ICON_MAP:
+		has_theme_icns = (b"icns", rid) in theme_keys
+		has_theme_big = (rtype, rid) in theme_keys
+		big = decode_theme_icon(theme_icons, sys_palette, rtype, rid, 32,
+			1024 if rtype == b"icl8" else 512,
+			prefer_icns=has_theme_icns or not has_theme_big)
+		if big is None:
+			continue
+		pngwrite.write_png(os.path.join(icons_dir, kind + "-32.png"), 32, 32, big)
+		small_type = b"ics8" if rtype == b"icl8" else b"ics4"
+		has_theme_small = (small_type, rid) in theme_keys
+		small = decode_theme_icon(theme_icons, sys_palette, small_type, rid, 16,
+			256 if small_type == b"ics8" else 128,
+			prefer_icns=has_theme_icns or not has_theme_small)
+		if small is None:
+			small = pngwrite.nearest_scale(big, 32, 32, 16, 16)
+		pngwrite.write_png(os.path.join(icons_dir, kind + "-16.png"), 16, 16, small)
 
 
 def parse_resource_fork(data):
@@ -177,11 +342,21 @@ def looks_like_resource_fork(data):
 
 
 def write_unique(out_dir, fn, blob):
+	"""Write blob to out_dir/fn, uniquifying the name when taken.
+
+	Re-importing the same theme reuses the file when the bytes match, so
+	repeated imports do not pile up _1, _2 duplicates."""
 	os.makedirs(out_dir, exist_ok=True)
 	dest = os.path.join(out_dir, fn)
 	base, ext = os.path.splitext(fn)
 	n = 1
 	while os.path.exists(dest):
+		try:
+			with open(dest, "rb") as f:
+				if f.read() == blob:
+					return dest
+		except OSError:
+			pass
 		dest = os.path.join(out_dir, "%s_%d%s" % (base, n, ext))
 		n += 1
 	with open(dest, "wb") as f:
@@ -198,6 +373,10 @@ def bucket_for(rtype):
 		return "sounds"
 	if rtype in THEME_TYPES:
 		return "theme"
+	if rtype in FONT_TYPES:
+		return "fonts"
+	if rtype in CURSOR_TYPES:
+		return "cursors"
 	return None
 
 
@@ -363,14 +542,16 @@ def chrome_slot(name):
 	return None
 
 
-def process_resource_fork(data, out, counts, cluts, icons, assets, scen_tags, apple_menu, wctb, raw_icons, epics):
+def process_resource_fork(data, out, counts, cluts, icons, assets, scen_tags, apple_menu, wctb, raw_icons, epics,
+		theme_icons=None, system_file=False, cursors=None, file_icon=None, pxm=None,
+		layo=None, plut=None):
 	for rtype, res_id, body in parse_resource_fork(data):
 		bucket = bucket_for(rtype)
 		if not bucket:
 			continue
-		if bucket not in ("sounds", "patterns"):
-			# Sounds and patterns are written decoded by write_assets, never as raw .bin.
-			write_unique(os.path.join(out, bucket), "%s_%d.bin" % (rtype.decode("latin1"), res_id), body)
+		# The raw resource stays in the bundle for reference beside the
+		# decoded files write_assets makes from it.
+		write_unique(os.path.join(out, bucket), "%s_%d.bin" % (rtype.decode("latin1"), res_id), body)
 		counts[bucket] += 1
 		if rtype == b"clut":
 			cols = parse_clut(body)
@@ -385,8 +566,21 @@ def process_resource_fork(data, out, counts, cluts, icons, assets, scen_tags, ap
 			for tag, value in collection.items():
 				if tag not in scen_tags and tag != "patt":
 					scen_tags[tag] = value
-		if rtype in (b"icl8", b"icl4", b"ICN#"):
-			icons.setdefault(rtype, []).append(body)
+		if rtype in (b"icl8", b"icl4", b"ICN#", b"icns"):
+			if rtype != b"icns":
+				icons.setdefault(rtype, []).append(body)
+			# The theme file's own Finder icon (family 1024, the mini
+			# window art): recorded only on the theme file's own pass,
+			# never from the helpers.
+			if file_icon is not None and res_id == 1024:
+				file_icon.setdefault(rtype, []).append(body)
+		# Kaleidoscope window art, same pass rule: the helpers carry none.
+		if pxm is not None and rtype == b"pxm#":
+			pxm.setdefault(res_id, []).append(body)
+		if layo is not None and rtype == b"layo":
+			layo[res_id] = body
+		if plut is not None and rtype == b"plut":
+			plut[res_id] = body
 		if rtype in (b"ics8", b"ics4", b"ics#") and res_id == -16386:
 			apple_menu.setdefault(rtype, []).append(body)
 		if rtype == b"wctb" and res_id == 0 and not wctb:
@@ -398,7 +592,7 @@ def process_resource_fork(data, out, counts, cluts, icons, assets, scen_tags, ap
 		if rtype in (b"PAT ", b"PAT#"):
 			assets.setdefault("pat", []).append(body)
 		if rtype == b"ppat":
-			assets.setdefault("ppat", []).append(body)
+			assets.setdefault("ppat", []).append((res_id, body))
 			if "chrome" not in assets:
 				# The ppat names live in the resource map, which
 				# parse_resource_fork drops; read them here instead.
@@ -424,10 +618,112 @@ def process_resource_fork(data, out, counts, cluts, icons, assets, scen_tags, ap
 								break
 		if rtype == b"snd ":
 			assets.setdefault("snd", []).append(body)
+		if rtype in FONT_TYPES:
+			assets.setdefault("font", []).append(body)
+		# Theme icon families come from the System and Finder files only:
+		# other files' same-numbered icons are unrelated.
+		if system_file and theme_icons is not None and (rtype, res_id) in THEME_ICON_IDS:
+			theme_icons.setdefault((rtype, res_id), []).append(body)
+		if system_file and cursors is not None and (rtype, res_id) in CURSOR_IDS:
+			cursors.setdefault((rtype, res_id), []).append(body)
 
 
-def write_apple_menu(apple_menu, cluts, out):
-	"""Write apple-menu.png from the System file's 16x16 menu-bar Apple."""
+def find_mac_file(fork_path, name):
+	"""Locate a Mac OS 9 System Folder file (System, Finder, ...) for a
+	theme file's fork.
+
+	Climbs from the theme file to a folder holding `name` (raw or Netatalk
+	`.rsrc`), else falls back to ~/Classic. Returns the fork's path, or
+	None."""
+	seen = set()
+	d = os.path.abspath(os.path.dirname(fork_path))
+	for _ in range(10):
+		if d in seen:
+			break
+		seen.add(d)
+		for candidate in (os.path.join(d, name), os.path.join(d, ".rsrc", name)):
+			try:
+				with open(candidate, "rb") as f:
+					head = f.read(16)
+			except OSError:
+				continue
+			if looks_like_resource_fork(open(candidate, "rb").read()):
+				return candidate
+		parent = os.path.dirname(d)
+		if parent == d:
+			break
+		d = parent
+	for candidate in (os.path.expanduser("~/Classic/System Folder/" + name),
+			os.path.expanduser("~/Classic/System Folder/.rsrc/" + name)):
+		try:
+			if looks_like_resource_fork(open(candidate, "rb").read()):
+				return candidate
+		except OSError:
+			continue
+	return None
+
+
+def fonts_dir_for(system_fork):
+	"""The System Folder's Fonts folder next to a System fork, or None."""
+	d = os.path.dirname(os.path.abspath(system_fork))
+	if os.path.basename(d) == ".rsrc":
+		d = os.path.dirname(d)
+	candidate = os.path.join(d, "Fonts")
+	return candidate if os.path.isdir(candidate) else None
+
+
+def collect_fonts_dir(fonts_dir, assets):
+	"""Add a Fonts folder's sfnt/FOND/nfnt resources, for --file mode."""
+	def take(data):
+		for rtype, res_id, body in parse_resource_fork(data):
+			if rtype in FONT_TYPES:
+				assets.setdefault("font", []).append(body)
+	for root, _dirs, files in os.walk(fonts_dir):
+		for fn in files:
+			full = os.path.join(root, fn)
+			try:
+				with open(full, "rb") as f:
+					raw = f.read()
+			except OSError:
+				continue
+			if fn.startswith("._"):
+				fork = extract_apple_double(raw)
+				if fork:
+					take(fork)
+			elif looks_like_resource_fork(raw):
+				take(raw)
+
+
+def collect_helper_fork(path, cluts, apple_menu, theme_icons, cursors):
+	"""Add a System/Finder file's Apple menu icon (ics -16386), colour
+	tables, theme icon families and pointer shapes, for --file mode which
+	otherwise never sees them."""
+	try:
+		with open(path, "rb") as f:
+			data = f.read()
+	except OSError:
+		return
+	for rtype, res_id, body in parse_resource_fork(data):
+		if rtype in (b"ics8", b"ics4", b"ics#") and res_id == -16386:
+			apple_menu.setdefault(rtype, []).append(body)
+		elif rtype == b"clut":
+			try:
+				cols = parse_clut(body)
+			except (ValueError, IndexError, struct.error):
+				continue
+			if cols:
+				cluts.append((res_id, cols))
+		elif (rtype, res_id) in THEME_ICON_IDS:
+			theme_icons.setdefault((rtype, res_id), []).append(body)
+		elif (rtype, res_id) in CURSOR_IDS:
+			cursors.setdefault((rtype, res_id), []).append(body)
+
+
+def write_apple_menu(apple_menu, cluts, out, theme_apple=None, theme_cluts=()):
+	"""Write apple-menu.png from the menu-bar Apple icon (id -16386).
+
+	Whoever supplies the icon, it decodes against the System tables
+	(the largest wins: a gray ramp would flatten the rainbow stripes)."""
 	color = None
 	mask = None
 	if apple_menu.get(b"ics8"):
@@ -439,10 +735,12 @@ def write_apple_menu(apple_menu, cluts, out):
 	if apple_menu.get(b"ics#"):
 		_, mask_rows = macicons.decode_icn1(apple_menu[b"ics#"][0], size=16)
 		mask = mask_rows
-	# The 8-bit icons index the System's default 256-entry colour table:
-	# use the largest clut in the file.
+	# The icon decodes against the System tables even when the theme
+	# file supplies it (a scheme's own tables describe its chrome).
+	# The rainbow stripes need the fullest table: gray ramps flatten them.
+	helpers = cluts[len(theme_cluts):] or cluts
 	palette = None
-	for _res_id, cols in cluts:
+	for _res_id, cols in helpers:
 		if cols and (palette is None or len(cols) > len(palette)):
 			palette = cols
 	rows = macicons.decode_icl8(color, palette, size=16) if len(color) == 256 else 		macicons.decode_icl4(color, palette, size=16) if len(color) == 128 else None
@@ -451,6 +749,13 @@ def write_apple_menu(apple_menu, cluts, out):
 	if mask:
 		rows = macicons.combine_icon(rows, mask)
 	pngwrite.write_png(os.path.join(out, "apple-menu.png"), 16, 16, rows)
+	return rows
+
+
+# Desktop pictures are screen-sized; icon-sized PICTs (window art, logo
+# pictures, thumbnails) are not wallpapers and stay out of the Wallpaper
+# folder. The raw resources are still saved under icons/ for reference.
+WALLPAPER_MIN_SIDE = 128
 
 
 def write_icon_dump(raw_icons, cluts, out):
@@ -717,6 +1022,8 @@ def write_assets(assets, epics, out):
 			continue
 		try:
 			w, h, rows = macpict.decode_pict(body)
+			if w < WALLPAPER_MIN_SIDE or h < WALLPAPER_MIN_SIDE:
+				continue
 			pngwrite.write_png(os.path.join(out, "wallpapers", "picture-%d.png" % res_id), w, h, rows)
 		except (ValueError, IndexError, struct.error):
 			continue
@@ -743,10 +1050,20 @@ def write_assets(assets, epics, out):
 		except (ValueError, IndexError, struct.error):
 			continue
 	# Colour pattern tiles from ppat.
-	for i, body in enumerate(assets.get("ppat", [])):
+	for i, (_pid, body) in enumerate(assets.get("ppat", [])):
 		try:
 			w, h, rows = macpat.decode_ppat(body)
 			pngwrite.write_png(os.path.join(out, "patterns", "colour-pattern-%d.png" % (i + 1)), w, h, rows)
+		except (ValueError, IndexError, struct.error):
+			continue
+	# Pixel patterns from ppat (Kaleidoscope colour tiles, same format
+	# as the System file's own desktop ppats), numbered on after PATs.
+	base = len(assets.get("pat", []))
+	for j, (_pid, body) in enumerate(assets.get("ppat", [])):
+		try:
+			w, h, rows = macpat.decode_ppat(body)
+			pngwrite.write_png(os.path.join(out, "patterns", "pattern-%d.png" % (base + j + 1)),
+				w, h, rows)
 		except (ValueError, IndexError, struct.error):
 			continue
 	# Alert sounds from snd.
@@ -755,10 +1072,574 @@ def write_assets(assets, epics, out):
 			macsnd.snd_to_wav(body, os.path.join(out, "sounds", "sound-%d.wav" % (i + 1)))
 		except (ValueError, struct.error):
 			continue
+	# TrueType faces from sfnt, named by the font itself (FOND/nfnt-only
+	# suitcases stay raw under fonts/ for reference). Suitcases repeat
+	# the same face, so identical bodies install once. Returns the sorted
+	# family names, recorded in theme.conf.
+	taken = set()
+	seen = set()
+	families = set()
+	files = {}
+	font_dir = os.path.join(out, "fonts")
+	for body in assets.get("font", []):
+		try:
+			# Shaper-safe bytes: Apple's AAT layout tables break HarfBuzz
+			# shaping, so programs would get no text at all. Names survive.
+			blob = macfont.sanitize_sfnt(body)
+			digest = hashlib.sha256(blob).digest()
+			if digest in seen:
+				continue
+			seen.add(digest)
+			family, subfamily = macfont.parse_sfnt_names(blob)
+			dest = write_unique(font_dir, macfont.ttf_filename(family, subfamily, taken), blob)
+			families.add(family)
+			files.setdefault(family, dest)
+		except (ValueError, struct.error, UnicodeDecodeError):
+			continue
+	return sorted(families), files
 
 
-def write_theme_art(icons, cluts, out):
-	"""Write menu-icon.png and boot/*.png from the theme's icon resources."""
+def decode_pxm(body, layer=0, cluts=None):
+	"""Decode one layer of a Kaleidoscope pxm# tile to RGBA rows.
+
+	Layout: a 24-byte header (version, mask count, QuickDraw bounds
+	top/left/bottom/right, bit depth 2/4/8/16, flags, 0, clut id, layer
+	count), then `masks` 1-bit masks (16-bit word-aligned rows), then
+	`layerCount` pixel layers (16-bit word-aligned rows)."""
+	if len(body) < 24:
+		raise ValueError("pxm# is too short")
+	_ver, nmask, top, left, bot, right, bpp, _fl, _z0, _z1, cid, nl = struct.unpack(">12H", body[:24])
+	h = bot - top
+	w = right - left
+	if w <= 0 or h <= 0 or layer < 0 or layer >= nl or bpp not in (2, 4, 8, 16):
+		raise ValueError("pxm# has invalid geometry or layer")
+	masks = nl if nmask == 0 else nmask
+	mask_rb = ((w + 15) // 16) * 2
+	pix_rb = ((w * bpp + 15) // 16) * 2
+	mlayer = min(layer, max(0, masks - 1))
+	moff = 24 + mlayer * mask_rb * h
+	poff = 24 + masks * mask_rb * h + layer * pix_rb * h
+	if len(body) < poff + pix_rb * h:
+		raise ValueError("pxm# layer is too short")
+	pal = (cluts or {}).get(cid, {})
+	rows = []
+	for y in range(h):
+		row = []
+		mbase = moff + y * mask_rb
+		pbase = poff + y * pix_rb
+		for x in range(w):
+			if not (body[mbase + (x // 8)] & (0x80 >> (x % 8))):
+				row.append((0, 0, 0, 0))
+				continue
+			if bpp == 16:
+				v = struct.unpack(">H", body[pbase + x * 2:pbase + x * 2 + 2])[0]
+				rgb = (((v >> 10) & 31) * 255 // 31,
+					((v >> 5) & 31) * 255 // 31, (v & 31) * 255 // 31)
+			elif bpp == 8:
+				idx = body[pbase + x]
+				rgb = pal.get(idx, (idx, idx, idx))
+			elif bpp == 4:
+				byte = body[pbase + (x // 2)]
+				idx = (byte >> 4) if (x % 2 == 0) else (byte & 0xF)
+				rgb = pal.get(idx, (idx * 17,) * 3)
+			else:
+				byte = body[pbase + (x // 4)]
+				idx = (byte >> (6 - 2 * (x % 4))) & 3
+				rgb = pal.get(idx, (idx * 85,) * 3)
+			row.append(rgb + (255,))
+		rows.append(row)
+	return rows
+
+
+def _parse_layo_records(body):
+	"""Return the sequence of ('pxm#'|'plut', signed_id) records from a layo body."""
+	first = -1
+	for off in range(len(body) - 4):
+		if body[off:off + 4] in (b"pxm#", b"plut", b"NULL", b"ppat"):
+			first = off
+			break
+	if first < 20:
+		return []
+	recs = []
+	off = first - 20
+	while off + 40 <= len(body):
+		tag = body[off + 20:off + 24]
+		rid = struct.unpack(">h", body[off + 24:off + 26])[0]
+		if tag in (b"pxm#", b"plut"):
+			recs.append((tag, rid))
+		off += 40
+	return recs
+
+
+def _parse_layo_records_ex(body):
+	"""Like _parse_layo_records, but keeping each record's group word
+	(pre[1]: the frame layout's active/inactive selector) and lead word
+	(pre[4]: the title buttons' zone — 38 follows the title group)."""
+	first = -1
+	for off in range(len(body) - 4):
+		if body[off:off + 4] in (b"pxm#", b"plut", b"NULL", b"ppat"):
+			first = off
+			break
+	if first < 20:
+		return []
+	recs = []
+	off = first - 20
+	while off + 40 <= len(body):
+		pre = struct.unpack(">10h", body[off:off + 20])
+		tag = body[off + 20:off + 24]
+		rid = struct.unpack(">h", body[off + 24:off + 26])[0]
+		if tag in (b"pxm#", b"plut"):
+			recs.append((tag, rid, pre[1], pre[4]))
+		off += 40
+	return recs
+
+
+def _title_buttons_follow_group(layo_body):
+	"""Whether the theme's zoom/grow boxes ride with the title group
+	(left cluster) rather than pinning to the bar's right edge: every
+	zoom/grow record in layo 128 sits in the title group's zone (38).
+	Mixed zones keep the Platinum right-hand boxes."""
+	recs = _parse_layo_records_ex(layo_body)
+	zones = set()
+	for tag, rid, group, lead in recs:
+		if tag == b"pxm#" and (rid & 0xFFFF) in (210, 220):
+			zones.add(lead)
+	return bool(zones) and zones == {38}
+
+
+def _parse_plut_entries(body):
+	"""Return [(ppat_id, (r, g, b)), ...] from a plut 387 resource."""
+	if not body or len(body) < 8:
+		return []
+	n = struct.unpack(">H", body[6:8])[0]
+	out = []
+	for k in range(n):
+		off = 8 + k * 8
+		if off + 8 > len(body):
+			break
+		pid, r, g, b = struct.unpack(">HHHH", body[off:off + 8])
+		out.append((pid, (r >> 8, g >> 8, b >> 8)))
+	return out
+
+
+def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None):
+	"""Decode the theme's own window art into the bundle's chrome/.
+
+	Every Kaleidoscope scheme carrying standard window resources gets its
+	buttons (pxm# 200 close, 210 collapse/grow, 220 zoom: layer 0 normal,
+	layer 1 pressed) and its title-bar tiles from layo 128 (active, layer
+	0) and layo 129 (inactive, layer 1) + plut 387. Synthetic fixtures
+	without layo fall back to THEME_CHROME[name]."""
+	patterns = dict(ppats)
+	clut_map = {cid: dict(cols) for cid, cols in cluts}
+	chrome_dir = os.path.join(out, "chrome")
+	keys = {}
+
+	def save_tile(key, rows):
+		if not rows or not rows[0]:
+			return
+		os.makedirs(chrome_dir, exist_ok=True)
+		fn = key + ".png"
+		pngwrite.write_png(os.path.join(chrome_dir, fn), len(rows[0]), len(rows), rows)
+		pngwrite.write_argb(os.path.join(chrome_dir, key + ".argb"), rows)
+		keys[key] = "chrome/" + key + ".argb"
+
+	# 1. Universal Kaleidoscope title-bar buttons (200 close, 210 collapse, 220 zoom).
+	has_any_btn = any(pid in pxm for pid in (200, 210, 220))
+	if has_any_btn and (layo or name in THEME_CHROME):
+		for short, pid in (("close", 200), ("grow", 210), ("zoom", 220)):
+			bodies = pxm.get(pid)
+			if not bodies:
+				continue
+			for layer, suffix in ((0, ""), (1, "-pressed")):
+				try:
+					rows = decode_pxm(bodies[0], layer, clut_map)
+				except (ValueError, IndexError, struct.error):
+					continue
+				save_tile("button-" + short + suffix, rows)
+
+	# 2. Generic layo 128 (active) and layo 129 (inactive) title-bar assembly.
+	if layo and 128 in layo:
+		plut_entries = _parse_plut_entries((plut or {}).get(387))
+		mids_by_suffix = {}
+
+		def resolve_rec(tag, rid, layer):
+			if tag == b"pxm#":
+				bodies = pxm.get(rid & 0xFFFF)
+				if not bodies:
+					return None
+				try:
+					return decode_pxm(bodies[0], layer, clut_map)
+				except (ValueError, IndexError, struct.error):
+					return None
+			idx = ~rid
+			if 0 <= idx < len(plut_entries):
+				pid, rgb = plut_entries[idx]
+				if pid and pid in patterns:
+					try:
+						_, _, rows = macpat.decode_ppat(patterns[pid])
+						return rows
+					except (ValueError, IndexError, struct.error):
+						pass
+				return [[rgb + (255,)] * 8 for _ in range(22)]
+			return None
+
+		for lid, layer, suffix in ((128, 0, ""), (129, 1, "-inactive")):
+			if lid not in layo:
+				continue
+			recs = _parse_layo_records(layo[lid])
+			if len(recs) < 3:
+				continue
+			left_rows = resolve_rec(recs[0][0], recs[0][1], layer)
+			mid_rows = resolve_rec(recs[1][0], recs[1][1], layer)
+			right_rec = next(
+				(r for r in recs[2:] if r[0] == b"pxm#" and (r[1] & 0xFFFF) == 6173),
+				next(
+					(r for r in recs[2:] if r[0] == b"pxm#" and (r[1] & 0xFFFF) in (6178, 6134, 6278)),
+					recs[2]))
+			right_rows = resolve_rec(right_rec[0], right_rec[1], layer)
+			save_tile("bar-left" + suffix, left_rows)
+			save_tile("bar-middle" + suffix, mid_rows)
+			save_tile("bar-right" + suffix, right_rows)
+			mids_by_suffix[suffix] = mid_rows
+
+		# 2b. Two-part bars: the title group rides a pinstripe patch on
+		# the left while a span fills the rest of the bar. The span is
+		# the wide pattern in the window-frame layout (layo 430,
+		# group 1 active / group 0 inactive); the patch stays the
+		# layo 128 middle. Gated on the left-cluster rule so themes
+		# whose buttons pin right keep their single-span bar.
+		def frame_span(layer):
+			body = (layo or {}).get(430)
+			if not body:
+				return None
+			best = None
+			for tag, rid, group, lead in _parse_layo_records_ex(body):
+				if tag != b"plut" or (group != layer and group != 256):
+					continue
+				idx = ~rid
+				if 0 <= idx < len(plut_entries):
+					pid, rgb = plut_entries[idx]
+					if pid and pid in patterns:
+						try:
+							_, _, rows = macpat.decode_ppat(patterns[pid])
+						except (ValueError, IndexError, struct.error):
+							continue
+						if len(rows[0]) >= 48 and len(rows) <= 32:
+							if best is None or len(rows[0]) > len(best[0]):
+								best = rows
+			return best
+
+		if 128 in (layo or {}) and _title_buttons_follow_group(layo[128]):
+			keys["title-cluster"] = "left"
+			for layer, suffix in ((1, ""), (0, "-inactive")):
+				span_rows = frame_span(layer)
+				mid_key = "bar-middle" + suffix
+				if span_rows and keys.get(mid_key) and span_rows != mids_by_suffix.get(suffix):
+					save_tile("bar-span" + suffix, span_rows)
+
+		# 2c. Movable-modal dialogs (layo 134 active, 135 inactive):
+		# pinstripe bars with their own close box (pxm# 6185) and small
+		# zoom/grow boxes (pxm# 211/221). Caps and middle follow the
+		# same roles as documents: first full-height side, first wide
+		# middle, same right-cap ids.
+		def dialog_middle(records, layer):
+			for i, (tag, rid) in enumerate(records):
+				if i == 0:
+					continue
+				if tag == b"pxm#":
+					bodies = pxm.get(rid & 0xFFFF)
+					if not bodies:
+						continue
+					try:
+						rows = decode_pxm(bodies[0], layer, clut_map)
+					except (ValueError, IndexError, struct.error):
+						continue
+					if len(rows[0]) >= 48:
+						return rows
+				else:
+					rows = resolve_rec(tag, rid, layer)
+					if rows and len(rows[0]) >= 48 and len(rows) >= 16:
+						return rows
+			if len(records) > 1:
+				return resolve_rec(records[1][0], records[1][1], layer)
+			return None
+
+		def dialog_side(records, layer, last):
+			cands = []
+			for i, (tag, rid) in enumerate(records):
+				if tag != b"pxm#" or (rid & 0xFFFF) in (200, 210, 220, 6185, 201, 211, 221):
+					continue
+				bodies = pxm.get(rid & 0xFFFF)
+				if not bodies:
+					continue
+				try:
+					rows = decode_pxm(bodies[0], layer, clut_map)
+				except (ValueError, IndexError, struct.error):
+					continue
+				cands.append(rows)
+				if i > 2:
+					break
+			full = [r for r in cands if len(r) >= 16]
+			if not full:
+				return None
+			return full[-1] if last else full[0]
+
+		for lid, layer, suffix in ((134, 0, ""), (135, 1, "-inactive")):
+			if lid not in (layo or {}):
+				continue
+			recs = _parse_layo_records(layo[lid])
+			if len(recs) < 2:
+				continue
+			left_rows = dialog_side(recs, layer, False)
+			mid_rows = dialog_middle(recs, layer)
+			right_rec = next(
+				(r for r in recs[2:] if r[0] == b"pxm#" and (r[1] & 0xFFFF) == 6173),
+				next(
+					(r for r in recs[2:] if r[0] == b"pxm#" and (r[1] & 0xFFFF) in (6178, 6134, 6278)),
+					None))
+			right_rows = resolve_rec(right_rec[0], right_rec[1], layer) if right_rec else None
+			if not right_rows:
+				right_rows = dialog_side(recs, layer, True)
+			save_tile("bar-dialog-left" + suffix, left_rows)
+			save_tile("bar-dialog-middle" + suffix, mid_rows)
+			save_tile("bar-dialog-right" + suffix, right_rows)
+
+		for short, pid in (("dialog-close", 6185), ("dialog-zoom", 211), ("dialog-grow", 221)):
+			bodies = pxm.get(pid)
+			if not bodies:
+				continue
+			for layer, suffix in ((0, ""), (1, "-pressed")):
+				try:
+					rows = decode_pxm(bodies[0], layer, clut_map)
+				except (ValueError, IndexError, struct.error):
+					continue
+				save_tile("button-" + short + suffix, rows)
+		return keys
+
+	# 3. Fallback for synthetic unit-test fixtures without layo.
+	mapping = THEME_CHROME.get(name)
+	if not mapping:
+		return keys
+	for key, pid in mapping.items():
+		if key.startswith("button-"):
+			continue
+		body = patterns.get(pid)
+		if body is None:
+			continue
+		try:
+			_, _, rows = macpat.decode_ppat(body)
+		except (ValueError, IndexError, struct.error):
+			continue
+		save_tile(key, rows)
+	return keys
+
+
+def decode_cursor(body):
+	"""Decode a 16-bit CURS resource into (rows of RGBA, (hotx, hoty)).
+
+	Layout: 32 bytes of image, 32 of mask, then the hot spot point
+	(v, h as big-endian words). Black where the image is set, white
+	where only the mask is, transparent elsewhere."""
+	if len(body) < 68:
+		raise ValueError("CURS is too short")
+	image, mask = body[:32], body[32:64]
+	hot_y, hot_x = struct.unpack(">HH", body[64:68])
+	rows = []
+	for y in range(16):
+		row = []
+		for x in range(16):
+			bit = 0x80 >> (x % 8)
+			if image[y * 2 + x // 8] & bit:
+				row.append((0, 0, 0, 255))
+			elif mask[y * 2 + x // 8] & bit:
+				row.append((255, 255, 255, 255))
+			else:
+				row.append((0, 0, 0, 0))
+		rows.append(row)
+	return rows, (hot_x, hot_y)
+
+
+def write_theme_cursors(cursors, out):
+	"""Decode the mapped pointer shapes into the bundle's cursors/.
+
+	Hand-placed entries already in cursors.json (the ROM-only arrow) are
+	kept: decoded faces overwrite their own names only."""
+	import json
+	cursors_dir = os.path.join(out, "cursors")
+	meta = {}
+	try:
+		with open(os.path.join(cursors_dir, "cursors.json")) as _f:
+			for _key, _value in json.load(_f).items():
+				if isinstance(_value, dict) and _value.get("file"):
+					meta[_key] = _value
+	except (OSError, ValueError):
+		pass
+	for kind, _src, rtype, rid in CURSOR_MAP:
+		bodies = cursors.get((rtype, rid))
+		if not bodies:
+			continue
+		try:
+			rows, hot = decode_cursor(bodies[0])
+		except (ValueError, IndexError):
+			continue
+		os.makedirs(cursors_dir, exist_ok=True)
+		pngwrite.write_png(os.path.join(cursors_dir, kind + "-16.png"), 16, 16, rows)
+		meta[kind] = {"file": kind + "-16.png", "hot": list(hot)}
+	if meta:
+		with open(os.path.join(cursors_dir, "cursors.json"), "w") as f:
+			json.dump(meta, f, indent=2, sort_keys=True)
+			f.write("\n")
+
+
+# Xcursor names each decoded pointer stands in for (aliases from
+# assets/cursors/platinum-cursors.pcur, which stays the source of truth).
+CURSOR_ALIASES = {
+    "arrow": ["default", "left_ptr", "arrow", "top_left_arrow"],
+    "xterm": ["text", "vertical-text", "ibeam", "xterm"],
+    "crosshair": ["crosshair", "cross", "tcross", "cell", "plus"],
+    "move": ["move", "fleur", "all-scroll", "size_all"],
+    "watch": ["watch", "wait", "half-busy", "progress",
+              "0426c94ea35c87780ff01dc239897213",
+              "3ecb610c1fb204f4440ff48c40d99"],
+    "hand1": ["hand1", "grab", "grabbing", "hand", "openhand"],
+    "hand2": ["pointer", "hand2", "pointing_hand", "link"],
+}
+
+
+def _cursor_builder():
+    """The Xcursor writer beside this script: flat beside it when
+    installed, under cursors/ in the source tree."""
+    import importlib.util
+    base = os.path.dirname(os.path.abspath(__file__))
+    for rel in ("build_cursors.py", os.path.join("cursors", "build_cursors.py")):
+        path = os.path.join(base, rel)
+        if os.path.isfile(path):
+            spec = importlib.util.spec_from_file_location("zacos9_build_cursors", path)
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            return mod
+    raise ImportError("no Xcursor writer beside " + base)
+
+
+def _read_png_rgba(path):
+    """Read an 8-bit RGBA PNG to rows (hand-placed art included).
+
+    The extractor's own writer emits filter 0, but files from other tools
+    use the remaining filter types, so unfilter them all here."""
+    import struct as _s
+    import zlib
+    with open(path, "rb") as f:
+        blob = f.read()
+    assert blob[:8] == b"\x89PNG\r\n\x1a\n", "not a PNG"
+    pos, width, height, raw = 8, None, None, b""
+    while pos + 8 <= len(blob):
+        (length,) = _s.unpack(">I", blob[pos:pos + 4])
+        typ = blob[pos + 4:pos + 8]
+        data = blob[pos + 8:pos + 8 + length]
+        if typ == b"IHDR":
+            width, height = _s.unpack(">II", data[:8])
+            assert data[8] == 8 and data[9] == 6, "8-bit RGBA expected"
+        elif typ == b"IDAT":
+            raw += data
+        elif typ == b"IEND":
+            break
+        pos += 12 + length
+    px = zlib.decompress(raw)
+    rows, stride = [], width * 4 + 1
+    prev = bytearray(width * 4)
+    for y in range(height):
+        line = bytearray(px[y * stride + 1:y * stride + 1 + width * 4])
+        kind = px[y * stride]
+        if kind == 1:  # Sub: each byte adds its left neighbour.
+            for x in range(4, len(line)):
+                line[x] = (line[x] + line[x - 4]) & 0xFF
+        elif kind == 2:  # Up: each byte adds the row above.
+            for x in range(len(line)):
+                line[x] = (line[x] + prev[x]) & 0xFF
+        elif kind == 3:  # Average: the mean of left and above.
+            for x in range(len(line)):
+                a = line[x - 4] if x >= 4 else 0
+                line[x] = (line[x] + ((a + prev[x]) >> 1)) & 0xFF
+        elif kind == 4:  # Paeth: the nearest of left, above, upper-left.
+            for x in range(len(line)):
+                a = line[x - 4] if x >= 4 else 0
+                b, c = prev[x], prev[x - 4] if x >= 4 else 0
+                p = a + b - c
+                pa, pb, pc = abs(p - a), abs(p - b), abs(p - c)
+                pr = a if pa <= pb and pa <= pc else b if pb <= pc else c
+                line[x] = (line[x] + pr) & 0xFF
+        else:
+            assert kind == 0, "unknown filter %d" % kind
+        rows.append([tuple(line[x:x + 4]) for x in range(0, len(line), 4)])
+        prev = line
+    return rows
+
+
+def write_xcursor_theme(out):
+    """Build an Xcursor theme from the bundle's pointers (decoded plus
+    hand-placed): cursors/Macintosh/ with index.theme inheriting ZacOS9,
+    so unmapped cursors keep the desktop's own art."""
+    meta_path = os.path.join(out, "cursors", "cursors.json")
+    try:
+        with open(meta_path) as f:
+            import json as _json
+            meta = _json.load(f)
+    except (OSError, ValueError):
+        return
+    if not meta:
+        return
+    try:
+        builder = _cursor_builder()
+    except (OSError, ImportError):
+        return
+    theme_dir = os.path.join(out, "cursors", "Macintosh")
+    os.makedirs(os.path.join(theme_dir, "cursors"), exist_ok=True)
+    for kind, entry in sorted(meta.items()):
+        png = os.path.join(out, "cursors", entry.get("file", ""))
+        hot = entry.get("hot", [0, 0])
+        if not os.path.isfile(png):
+            continue
+        try:
+            rows = _read_png_rgba(png)
+        except (OSError, AssertionError, ValueError):
+            continue
+        size = len(rows)
+        frames = {}
+        for scale in builder.SCALES:
+            dst = builder.pixels(scale)
+            frame = []
+            for y in range(dst):
+                sy = min(size - 1, y * size // dst)
+                for x in range(dst):
+                    sx = min(size - 1, x * size // dst)
+                    r, g, b, a = rows[sy][sx]
+                    frame.append(a << 24 | r << 16 | g << 8 | b)
+            frames[scale] = [frame]
+        data = builder.xcursor(frames, (int(hot[0]), int(hot[1])), 0)
+        for name in [kind] + CURSOR_ALIASES.get(kind, []):
+            with open(os.path.join(theme_dir, "cursors", name), "wb") as f:
+                f.write(data)
+    with open(os.path.join(theme_dir, "index.theme"), "w") as f:
+        f.write("[Icon Theme]\nName=Macintosh\nInherits=ZacOS9\n")
+
+
+def write_theme_art(icons, apple_rows, cluts, out, theme_cluts=()):
+	"""Write menu-icon.png for the Zac menu slot.
+
+	The slot shows Mac OS 9's Apple menu icon when the user's System file
+	supplied one (`apple_rows`, 16x16), else the theme file's own icon.
+	Neither is startup art: Happy Zac and the Welcome logo keep their
+	built-ins until a real Happy Mac / logo source from the user's own
+	install is wired up (no Happy Mac ships with ZacOS). Hand-placed
+	bundle files (boot/happy-zac-Nx.png, boot/zacos-logo-Nx.png) still
+	override them. The fallback icon decodes against the System palette
+	like every other icon; without a System file the theme's own tables
+	stand in."""
+	if apple_rows is not None:
+		pngwrite.write_png(os.path.join(out, "menu-icon.png"), 20, 15,
+			pngwrite.fit_scale(apple_rows, 16, 16, 20, 15))
+		return
 	color = None
 	mask = None
 	# Prefer icl8 (32x32 colour); fall back to icl4.
@@ -771,14 +1652,7 @@ def write_theme_art(icons, cluts, out):
 	if icons.get(b"ICN#"):
 		mask = icons[b"ICN#"][0]
 
-	# Pick a clut: the first gray ramp, else the first available.
-	palette = None
-	for res_id, cols in cluts:
-		if cols and cols[0][1][0] == cols[0][1][1] == cols[0][1][2]:
-			palette = cols
-			break
-	if palette is None and cluts:
-		palette = cluts[0][1]
+	palette = macicons.resolve_palette(cluts[len(theme_cluts):] or cluts)
 
 	rows = macicons.decode_icl8(color, palette) if len(color) == 1024 else \
 		macicons.decode_icl4(color, palette) if len(color) == 512 else None
@@ -791,18 +1665,74 @@ def write_theme_art(icons, cluts, out):
 	# Menu icon: 20 x 15.
 	pngwrite.write_png(os.path.join(out, "menu-icon.png"), 20, 15,
 		pngwrite.fit_scale(rows, 32, 32, 20, 15))
-	# Boot art: 32 * scale, scale 1..6.
-	for scale in range(1, 7):
-		size = 32 * scale
-		scaled = macicons.decode_icl8(color, palette) if len(color) == 1024 else \
-			macicons.decode_icl4(color, palette)
-		if mask:
-			scaled = macicons.combine_icon(scaled, mask_rows)
-		boot = pngwrite.nearest_scale(scaled, 32, 32, size, size)
-		pngwrite.write_png(os.path.join(out, "boot", "happy-zac-%dx.png" % scale),
-			size, size, boot)
-		pngwrite.write_png(os.path.join(out, "boot", "zacos-logo-%dx.png" % scale),
-			size, size, boot)
+
+
+def pattern_average_chrome(out):
+	"""Approximate window-chrome colours from the theme's own desktop
+	tile (its largest decoded pattern): the average ink, mixed toward
+	white so titles stay readable on it.
+
+	Kaleidoscope schemes store no flat chrome colours (their bars are
+	composed artwork, which ZacOS does not skin), so this stands in where
+	no true gray ramp exists. Returns {} when there is nothing to read.
+	"""
+	import glob as _glob
+	try:
+		from PIL import Image as _Image
+	except ImportError:
+		return {}
+	files = [p for p in _glob.glob(os.path.join(out, "patterns", "pattern-*.png"))
+		if os.path.isfile(p)]
+	if not files:
+		return {}
+	biggest, area = None, 0
+	for path in files:
+		try:
+			with _Image.open(path) as im:
+				im = im.convert("RGB")
+				a = im.width * im.height
+				if a > area:
+					biggest, area = list(im.getdata()), a
+		except (OSError, ValueError):
+			continue
+	if not biggest:
+		return {}
+
+	def mix(rgb, other, amount):
+		return "%02x%02x%02x" % tuple(
+			max(0, min(255, round(c + (o - c) * amount))) for c, o in zip(rgb, other))
+
+	n = len(biggest)
+	avg = tuple(sum(px[i] for px in biggest) // n for i in range(3))
+	base = mix(avg, (255, 255, 255), 0.5)
+	face = mix(avg, (255, 255, 255), 0.25)
+	dark = mix(avg, (0, 0, 0), 0.3)
+	return {"title-base": base, "frame-face": face,
+		"title-stripe-dark": dark, "frame-dark": dark}
+
+
+def write_theme_pfonts(out, scen_tags, font_files):
+	"""Rasterize the theme's window-chrome bitmap fonts from its own
+	TrueType faces: the system font at text sizes, the views font at
+	list sizes, each at 1x and the fractional scales. A face that will
+	not rasterize is skipped, leaving the built-in bitmaps in place.
+	Returns how many .pfont files were written."""
+	written = 0
+	for role, scen_key, sizes in (("system", "lgsf", (12, 15, 18, 21)),
+			("views", "vfnt", (11, 14, 17, 19))):
+		face = scen_tags.get(scen_key, "")
+		path = font_files.get(face) if face else None
+		if not path:
+			continue
+		for size in sizes:
+			try:
+				text = macfont.rasterize_pfont(path, size)
+			except (ValueError, OSError):
+				continue
+			with open(os.path.join(out, "fonts", "theme-%s-%d.pfont" % (role, size)), "w") as f:
+				f.write(text)
+			written += 1
+	return written
 
 
 ARCHIVE_EXTS = {".sit", ".hqx", ".sea", ".cpt"}
@@ -842,6 +1772,9 @@ def main():
 	parser.add_argument("--accent", help="Accent colour id (lavender, graphite, gold, bronze, ivy, ocean, rose, plum)")
 	parser.add_argument("--highlight", help="Text highlight colour as RRGGBB")
 	parser.add_argument("--pattern", help="Desktop pattern id")
+	for key in ("title-base", "title-stripe-light", "title-stripe-dark", "frame-light",
+			"frame-dark", "frame-border", "frame-face"):
+		parser.add_argument("--" + key, help="Window chrome colour as RRGGBB (else the theme's own)")
 	parser.add_argument("--list-cluts", action="store_true", help="Print colour tables from clut resources and exit")
 	parser.add_argument("--auto-colours", action="store_true", help="Heuristically pick chrome colours from the clut resources")
 	parser.add_argument("--fonts", help="The Fonts folder (its .rsrc folder holds the font resource forks)")
@@ -851,10 +1784,11 @@ def main():
 	args = parser.parse_args()
 
 	out = os.path.abspath(args.output)
-	for sub in ("icons", "patterns", "sounds", "theme", "boot", "wallpapers", "cursors", "chrome"):
+	for sub in ("icons", "patterns", "sounds", "theme", "boot", "wallpapers", "fonts", "cursors",
+		"chrome"):
 		os.makedirs(os.path.join(out, sub), exist_ok=True)
 
-	counts = {"icons": 0, "patterns": 0, "sounds": 0, "theme": 0}
+	counts = {"icons": 0, "patterns": 0, "sounds": 0, "theme": 0, "fonts": 0, "cursors": 0}
 	cluts = []
 	icons = {}
 	assets = {}
@@ -863,6 +1797,18 @@ def main():
 	apple_menu = {}
 	wctb = {}
 	raw_icons = {}
+	theme_icons = {}
+	cursors = {}
+	# What the theme file itself supplied in --file mode (its families
+	# and tables stay first and win); the helpers append after them.
+	# --source mode leaves these empty: everything comes from the tree.
+	theme_keys = set()
+	theme_cluts = []
+	theme_apple = {}
+	file_icon = {}
+	pxm = {}
+	layo = {}
+	plut = {}
 
 	if args.file:
 		# A single theme file the user copied out of Mac OS 9.
@@ -870,7 +1816,13 @@ def main():
 		if not os.path.isfile(filepath):
 			print("file not found: " + filepath, file=sys.stderr)
 			return 2
-		base = os.path.splitext(os.path.basename(filepath))[0]
+		base = os.path.basename(filepath)
+		if base.startswith("._"):
+			base = base[2:]
+		for ext in (".rsrc", ".bin", ".theme"):
+			if base.lower().endswith(ext):
+				base = base[:-len(ext)]
+				break
 		name = args.name or base.replace(" copy", "").replace(" Copy", "").strip() or "Mac OS 9 Theme"
 		src = filepath
 		with open(filepath, "rb") as f:
@@ -882,7 +1834,30 @@ def main():
 		else:
 			fork = raw
 		if fork and looks_like_resource_fork(fork):
-			process_resource_fork(fork, out, counts, cluts, icons, assets, scen_tags, apple_menu, wctb, raw_icons, epics)
+			# The theme file's own desktop icons and menu icon win over
+			# the System/Finder helpers' (a Kaleidoscope scheme ships
+			# its own art); the helpers fill the kinds it lacks.
+			process_resource_fork(fork, out, counts, cluts, icons, assets, scen_tags, apple_menu, wctb, raw_icons, epics,
+				theme_icons, True, cursors, file_icon, pxm, layo, plut)
+			theme_keys = set(theme_icons.keys())
+			theme_cluts = list(cluts)
+			theme_apple = {key: len(bodies) for key, bodies in apple_menu.items()}
+		if any(counts.values()):
+			# Single-file mode never walks the tree, so fetch the Apple
+			# menu icon and desktop icons from the user's System and
+			# Finder files when they are around. Only when the chosen
+			# file held artwork itself: an artless file stays refused
+			# even with a System file present. The theme file's own
+			# entries, if any, stay first and win.
+			system = find_mac_file(filepath, "System")
+			if system:
+				collect_helper_fork(system, cluts, apple_menu, theme_icons, cursors)
+				fonts = fonts_dir_for(system)
+				if fonts:
+					collect_fonts_dir(fonts, assets)
+			finder = find_mac_file(filepath, "Finder")
+			if finder:
+				collect_helper_fork(finder, cluts, apple_menu, theme_icons, cursors)
 	else:
 		src = args.source
 		if not src:
@@ -909,13 +1884,20 @@ def main():
 					if fn.startswith("._"):
 						fork = extract_apple_double(raw)
 						if fork:
-							process_resource_fork(fork, out, counts, cluts, icons, assets, scen_tags, apple_menu, wctb, raw_icons, epics)
+							base = fn[2:]
+							helper = base in ("System", "Finder")
+							process_resource_fork(fork, out, counts, cluts, icons, assets, scen_tags, apple_menu, wctb, raw_icons, epics,
+								theme_icons, helper, cursors if helper else None, file_icon, pxm, layo, plut)
 							continue
+						with open(full, "rb") as f:
+							raw = f.read()
 						# Not AppleDouble after all: fall through.
 
 					# A raw resource fork (not an AppleDouble) when the tail maps back.
 					if looks_like_resource_fork(raw) and not fn.startswith("._"):
-						process_resource_fork(raw, out, counts, cluts, icons, assets, scen_tags, apple_menu, wctb, raw_icons, epics)
+						helper = fn in ("System", "Finder")
+						process_resource_fork(raw, out, counts, cluts, icons, assets, scen_tags, apple_menu, wctb, raw_icons, epics,
+							theme_icons, helper, cursors if helper else None, file_icon, pxm, layo, plut)
 						continue
 
 					# Loose asset files.
@@ -939,36 +1921,39 @@ def main():
 					with open(full, "rb") as f:
 						raw = f.read()
 					if looks_like_resource_fork(raw):
-						process_resource_fork(raw, out, counts, cluts, icons, assets, scen_tags, apple_menu, wctb, raw_icons, epics)
+						helper = fn in ("System", "Finder")
+						process_resource_fork(raw, out, counts, cluts, icons, assets, scen_tags, apple_menu, wctb, raw_icons, epics,
+							theme_icons, helper, cursors if helper else None, file_icon, pxm, layo, plut)
 
 		for s in [src] + expand_archives(src):
 			walk_tree(s)
 
-	# Turn the theme's icon into the menu icon and boot art.
-	write_theme_art(icons, cluts, out)
+	
 	# The System file's Apple menu icon (ics8/ics4 id -16386), for themes
-	# the user builds from their own Mac OS 9 install.
-	write_apple_menu(apple_menu, cluts, out)
+	# the user builds from their own Mac OS 9 install: it becomes both
+	# apple-menu.png and the Zac menu icon. Without one, the theme file's
+	# own icon fills the Zac menu slot instead.
+	apple_rows = write_apple_menu(apple_menu, cluts, out, theme_apple, theme_cluts)
+	write_theme_art(icons, apple_rows, cluts, out, theme_cluts)
+	write_theme_icons(theme_icons, cluts, out, theme_keys, theme_cluts)
+	write_file_icon(file_icon, cluts, theme_cluts, out)
+	write_theme_cursors(cursors, out)
+	write_xcursor_theme(out)
 	# Pointers: the arrow family from the theme file, the rest from the System file.
 	theme_raw = {k.decode("latin1"): v for k, v in raw_icons.items()}
-	theme_cluts = {}
+	pointer_cluts = {}
 	for _rid, cols in cluts:
-		theme_cluts.setdefault(len(cols), cols)
+		pointer_cluts.setdefault(len(cols), cols)
 	system_raw, system_cluts = pointer_resources(args.system) if args.system else ({}, {})
-	write_pointers(theme_raw, theme_cluts, system_raw, system_cluts, out)
+	write_pointers(theme_raw, pointer_cluts, system_raw, system_cluts, out)
 	write_system_sounds(system_raw, out)
 	write_theme_fonts(scen_tags, args.system, args.fonts, out)
-	# The menu-bar Apple comes from the System file, where it lives.
-	system_apple = {}
-	for kind in ("ics8", "ics4", "ics#"):
-		body = system_raw.get(kind, {}).get(-16386)
-		if body:
-			system_apple[kind.encode("latin1")] = [body]
-	write_apple_menu(system_apple, [(n, cols) for n, cols in system_cluts.items()], out)
 	if args.dump_icons:
 		write_icon_dump(raw_icons, cluts, out)
 	# Decode wallpapers, patterns and sounds.
-	write_assets(assets, epics, out)
+	font_families, font_files = write_assets(assets, epics, out)
+	chrome_keys = write_theme_chrome(name, pxm, assets.get("ppat", []), out,
+		theme_cluts or cluts, layo, plut)
 	write_desktop_wallpaper(scen_tags, args.pictures, out)
 
 	if args.list_cluts:
@@ -996,7 +1981,10 @@ def main():
 			if len(cols) != 8:
 				continue
 			r0, g0, b0 = cols[0][1]
-			if r0 == g0 == b0:
+			# A real gray ramp, not a tinted one: entry 0 alone being
+			# gray is not enough (a blue ramp starts light gray too and
+			# dyes the whole chrome blue).
+			if r0 == g0 == b0 and all(v[0] == v[1] == v[2] for _, v in cols):
 				# Gray ramp: Platinum window chrome.
 				if auto_title_base is None:
 					auto_title_base = "%02x%02x%02x" % (r0, g0, b0)
@@ -1024,13 +2012,19 @@ def main():
 		accent = args.accent or auto_accent
 		highlight = args.highlight or scen_highlight or auto_highlight
 		pattern = args.pattern
-		title_base = auto_title_base
-		title_stripe_light = auto_title_stripe_light
-		title_stripe_dark = auto_title_stripe_dark
-		frame_light = auto_frame_light
-		frame_dark = auto_frame_dark
-		frame_border = auto_frame_border
-		frame_face = auto_frame_face
+		approx = pattern_average_chrome(out)
+		def chrome(key, auto):
+			explicit = getattr(args, key.replace("-", "_"), None)
+			if explicit:
+				return explicit
+			return auto or approx.get(key)
+		title_base = chrome("title-base", auto_title_base)
+		title_stripe_light = chrome("title-stripe-light", auto_title_stripe_light)
+		title_stripe_dark = chrome("title-stripe-dark", auto_title_stripe_dark)
+		frame_light = chrome("frame-light", auto_frame_light)
+		frame_dark = chrome("frame-dark", auto_frame_dark)
+		frame_border = chrome("frame-border", auto_frame_border)
+		frame_face = chrome("frame-face", auto_frame_face)
 		if scen_tags.get("varn"):
 			f.write("variant=%s\n" % scen_tags["varn"])
 		if scen_tags.get("lgsf"):
@@ -1047,6 +2041,8 @@ def main():
 			f.write("smooth-fonts=%d\n" % (1 if scen_tags["smoo"] else 0))
 		if "smos" in scen_tags:
 			f.write("smooth-font-min-size=%d\n" % scen_tags["smos"])
+		if font_families:
+			f.write("font-families=%s\n" % ",".join(font_families))
 		if scen_tags.get("dpnm"):
 			f.write("desktop-picture=%s\n" % scen_tags["dpnm"])
 		if scen_tags.get("patn"):
@@ -1085,12 +2081,30 @@ def main():
 			f.write("frame-border=%s\n" % frame_border)
 		if frame_face:
 			f.write("frame-face=%s\n" % frame_face)
+		for key in ("bar-left", "bar-middle", "bar-right", "bar-span",
+				"bar-left-inactive", "bar-middle-inactive", "bar-right-inactive",
+				"bar-span-inactive", "bar-dialog-left", "bar-dialog-middle",
+				"bar-dialog-right", "bar-dialog-left-inactive",
+				"bar-dialog-middle-inactive", "bar-dialog-right-inactive",
+				"button-close", "button-close-pressed",
+				"button-zoom", "button-zoom-pressed",
+				"button-grow", "button-grow-pressed",
+				"button-dialog-close", "button-dialog-close-pressed",
+				"button-dialog-zoom", "button-dialog-zoom-pressed",
+				"button-dialog-grow", "button-dialog-grow-pressed"):
+			if chrome_keys.get(key):
+				f.write("%s=%s\n" % (key, chrome_keys[key]))
+		if chrome_keys.get("title-cluster"):
+			f.write("title-cluster=%s\n" % chrome_keys["title-cluster"])
+
+	write_theme_pfonts(out, scen_tags, font_files)
 
 	print("Created theme bundle: " + out)
 	print("  icons:    %d" % counts["icons"])
 	print("  patterns: %d" % counts["patterns"])
 	print("  sounds:   %d" % counts["sounds"])
 	print("  theme:    %d" % counts["theme"])
+	print("  fonts:    %d" % counts["fonts"])
 	print("Note: Appearance theme (thme/clut/pltt) resources are saved raw under")
 	print("theme/ for analysis; pass --accent/--highlight/--pattern to set")
 	print("window chrome colours. Resource-fork assets must be extracted first")

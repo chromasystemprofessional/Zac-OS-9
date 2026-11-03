@@ -441,7 +441,6 @@ static void seed_menu_items(const char *items_dir) {
 		{ "Photo Booth", { "zacos9-photobooth.desktop" }, 2 },
 		{ "Plotter", { "zacos9-plotter.desktop" }, 1 },
 		{ "Stash", { "zacos9-stash.desktop" }, 1 },
-		{ "Theme Installer", { "zacos9-themeinstaller.desktop" }, 3 },
 		{ "Terminal", { "foot.desktop", "org.codeberg.dnkl.foot.desktop" }, 1 },
 		{ "XTerm", { "debian-xterm.desktop", "xterm.desktop" }, 1 },
 	};

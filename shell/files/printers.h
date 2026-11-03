@@ -14,6 +14,7 @@
 
 #include <QList>
 #include <QMap>
+#include <QSet>
 #include <QString>
 #include <QStringList>
 
@@ -46,6 +47,8 @@ struct PrintJob {
 /* ---- reading CUPS's answers (pure, for tests) ---- */
 /* lpstat -e: one name a line. */
 QStringList parsePrinterNames(const QString &lpstatE);
+/* lpstat -p: the queues CUPS itself knows ("printer <name> is ..."). */
+QSet<QString> parseKnownPrinters(const QString &lpstatP);
 /* lpstat -d: the default's name, or "". */
 QString parseDefaultPrinter(const QString &lpstatD);
 /* lpoptions -p: key=value pairs, values quoted as a shell would. */

@@ -77,8 +77,10 @@ public:
 				piece.col = c;
 				piece.row = r;
 				piece.home = origin + QPointF(c * cw, r * ch);
-				const int top = r == 0 ? 0 : down[r][c], bottom = r == m_rows - 1 ? 0 : down[r + 1][c];
-				const int left = c == 0 ? 0 : across[r][c], right = c == m_cols - 1 ? 0 : across[r][c + 1];
+				/* Neighbours share an edge with opposite signs: a tab (+1)
+			 * on one side is a blank (-1) on the other, so the knobs mate. */
+				const int top = r == 0 ? 0 : -down[r][c], bottom = r == m_rows - 1 ? 0 : down[r + 1][c];
+				const int left = c == 0 ? 0 : -across[r][c], right = c == m_cols - 1 ? 0 : across[r][c + 1];
 				piece.shape = shapeFor(cw, ch, top, right, bottom, left);
 				/* Scattered over the board, loosely. */
 				piece.pos = QPointF(rng->bounded(BOARD_W - cw), rng->bounded(BOARD_H - ch));

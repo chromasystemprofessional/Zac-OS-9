@@ -44,6 +44,17 @@ def flat_rgba(rows):
     return bytes(out)
 
 
+def write_argb(path, rows):
+    """Write rows of (r, g, b, a) as a flat compositor tile: little-endian
+    width and height words, then straight RGBA bytes."""
+    with open(path, "wb") as f:
+        f.write(struct.pack("<II", len(rows[0]), len(rows)))
+        for row in rows:
+            for r, g, b, a in row:
+                f.write(bytes((r, g, b, a)))
+    return path
+
+
 def nearest_scale(rows, sw, sh, dw, dh):
     """Nearest-neighbour scale rows from sw x sh to dw x dh."""
     out = []

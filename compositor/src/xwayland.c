@@ -5,6 +5,7 @@
 #include <wlr/util/log.h>
 
 #include "server.h"
+#include "theme.h"
 
 /* X11 override-redirect windows (menus, tooltips, drag icons): no frame,
  * placed exactly where the client asks. */
@@ -593,9 +594,18 @@ static void xwayland_ready(struct wl_listener *listener, void *data) {
 	} else {
 		xcb_screen_t *screen = xcb_setup_roots_iterator(xcb_get_setup(connection)).data;
 		char resources[128];
+		char theme[64];
+		snprintf(theme, sizeof(theme), "%s", ZACOS9_CURSOR_THEME);
+		{
+			char bundle_theme[64], bundle_dir[4096];
+			if (zac_cursor_theme(bundle_theme, sizeof(bundle_theme),
+					bundle_dir, sizeof(bundle_dir))) {
+				snprintf(theme, sizeof(theme), "%s", bundle_theme);
+			}
+		}
 		int length = snprintf(resources, sizeof(resources),
 			"Xcursor.theme: %s\nXcursor.size: %d\nXft.dpi: 96\n",
-			ZACOS9_CURSOR_THEME, ZACOS9_CURSOR_SIZE);
+			theme, ZACOS9_CURSOR_SIZE);
 		xcb_void_cookie_t cookie = xcb_change_property_checked(connection,
 			XCB_PROP_MODE_REPLACE, screen->root, XCB_ATOM_RESOURCE_MANAGER,
 			XCB_ATOM_STRING, 8, length, resources);

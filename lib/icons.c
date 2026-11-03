@@ -1,11 +1,120 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "icons.h"
+#include <cairo.h>
 
-/* The icon set: assets/icons/platinum-icons.picon, compiled by
+#include "icons.h"
+#include "theme.h"
+
+/* The set: assets/icons/platinum-icons.picon, compiled by
  * tools/icons/build_icons.py. */
 #include "icons_data.h"
+
+/* Theme bundle overrides (icons/<name>-<size>.png), by kind. Only kinds
+ * the extractor maps from the user's own Mac OS 9 install are listed;
+ * everything else always uses the built-in art. */
+static const char *icon_bundle_name(enum pl_icon_kind kind) {
+	switch (kind) {
+	case PL_ICON_FOLDER: return "folder";
+	case PL_ICON_SYSTEM_FOLDER: return "system-folder";
+	case PL_ICON_TRASH_EMPTY: return "trash-empty";
+	case PL_ICON_TRASH_FULL: return "trash-full";
+	case PL_ICON_DOCUMENT: return "document";
+	case PL_ICON_SHARED_FOLDER: return "shared-folder";
+	case PL_ICON_NETWORK_DISK: return "network-disk";
+	case PL_ICON_DISK_IMAGE: return "disk-image";
+	case PL_ICON_CAUTION: return "caution";
+	default: return NULL;
+	}
+}
+
+/* The bundle's icons/<name>-<size>.png when the active theme supplies it,
+ * else NULL. Reloads when the file moves (a theme installed or removed). */
+static uint32_t *load_themed(int kind, int slot, int size) {
+	static uint32_t *cache[PL_ICON_COUNT][2];
+	static char *last_path[PL_ICON_COUNT][2];
+	char relative[64];
+	snprintf(relative, sizeof(relative), "icons/%s-%d.png", icon_bundle_name(kind), size);
+	char path[4096];
+	if (!zac_theme_asset(relative, path, sizeof(path))) {
+		free(cache[kind][slot]);
+		cache[kind][slot] = NULL;
+		free(last_path[kind][slot]);
+		last_path[kind][slot] = NULL;
+		return NULL;
+	}
+	if (cache[kind][slot] && last_path[kind][slot] && strcmp(last_path[kind][slot], path) == 0) {
+		return cache[kind][slot];
+	}
+	free(cache[kind][slot]);
+	cache[kind][slot] = NULL;
+	free(last_path[kind][slot]);
+	last_path[kind][slot] = NULL;
+	cairo_surface_t *s = cairo_image_surface_create_from_png(path);
+	if (cairo_surface_status(s) != CAIRO_STATUS_SUCCESS ||
+			cairo_image_surface_get_width(s) != size ||
+			cairo_image_surface_get_height(s) != size) {
+		cairo_surface_destroy(s);
+		return NULL;
+	}
+	cairo_surface_flush(s);
+	const uint32_t *in = (const uint32_t *)cairo_image_surface_get_data(s);
+	const int stride = cairo_image_surface_get_stride(s) / 4;
+	const cairo_format_t format = cairo_image_surface_get_format(s);
+	uint32_t *px = malloc(sizeof(uint32_t) * size * size);
+	for (int y = 0; y < size; y++) {
+		for (int x = 0; x < size; x++) {
+			uint32_t v = in[y * stride + x];
+			if (format != CAIRO_FORMAT_ARGB32) {
+				v |= 0xFF000000u;
+			}
+			const uint32_t a = v >> 24;
+			if (a && a < 255) {
+				const uint32_t r = (((v >> 16) & 0xFF) * 255 + a / 2) / a;
+				const uint32_t g = (((v >> 8) & 0xFF) * 255 + a / 2) / a;
+				const uint32_t b = ((v & 0xFF) * 255 + a / 2) / a;
+				v = a << 24 | (r > 255 ? 255 : r) << 16 | (g > 255 ? 255 : g) << 8 |
+					(b > 255 ? 255 : b);
+			}
+			px[y * size + x] = v;
+		}
+	}
+	cairo_surface_destroy(s);
+	cache[kind][slot] = px;
+	last_path[kind][slot] = strdup(path);
+	return px;
+}
+
+/* Custom folders keep their center symbols over a themed folder: kinds
+ * whose built-in art is the plain folder plus an emblem. */
+static bool has_emblem(enum pl_icon_kind kind) {
+	switch (kind) {
+	case PL_ICON_SYSTEM_FOLDER:
+	case PL_ICON_APPLICATIONS_FOLDER:
+	case PL_ICON_HOME_FOLDER:
+	case PL_ICON_CONTROL_PANELS:
+	case PL_ICON_SF_APPEARANCE:
+	case PL_ICON_SF_EXTENSIONS:
+	case PL_ICON_SF_SOUNDS:
+	case PL_ICON_SF_STARTUP_ITEMS:
+	case PL_ICON_SF_APPLICATION_SUPPORT:
+	case PL_ICON_SF_DEVICE_DRIVERS:
+	case PL_ICON_SF_NETWORK:
+	case PL_ICON_SF_SYSTEM_LOGS:
+	case PL_ICON_SF_SOFTWARE_COMPONENTS:
+	case PL_ICON_SF_FONTS:
+	case PL_ICON_SF_FAVORITES:
+	case PL_ICON_SF_TOY_BOX_ITEMS:
+	case PL_ICON_SF_FOLDER_TRICKS:
+	case PL_ICON_SF_CONTEXTUAL_MENU_ITEMS:
+	case PL_ICON_SF_PREFERENCES:
+	case PL_ICON_SF_UTILITIES:
+		return true;
+	default:
+		return false;
+	}
+}
 
 static uint32_t *decode(const char *const *rows, int size) {
 	uint32_t *px = calloc((size_t)size * size, sizeof(*px));
@@ -22,6 +131,64 @@ const uint32_t *pl_icon(enum pl_icon_kind kind, int size) {
 	int s = size >= 32 ? 0 : 1;
 	if (kind < 0 || kind >= PL_ICON_COUNT) {
 		kind = PL_ICON_DOCUMENT;
+	}
+	if (icon_bundle_name(kind)) {
+		uint32_t *themed = load_themed(kind, s, s == 0 ? 32 : 16);
+		if (themed) {
+			return themed;
+		}
+	}
+	/* A themed folder under a built-in emblem: the emblem is the pixels
+	 * where the custom art differs from the plain folder. */
+	static uint32_t *composed[PL_ICON_COUNT][2];
+	static char *composed_path[PL_ICON_COUNT][2];
+	if (has_emblem(kind)) {
+		char relative[64];
+		snprintf(relative, sizeof(relative), "icons/folder-%d.png", s == 0 ? 32 : 16);
+		char path[4096];
+		if (zac_theme_asset(relative, path, sizeof(path))) {
+			if (composed[kind][s] && composed_path[kind][s] &&
+					strcmp(composed_path[kind][s], path) == 0) {
+				return composed[kind][s];
+			}
+			free(composed[kind][s]);
+			composed[kind][s] = NULL;
+			free(composed_path[kind][s]);
+			composed_path[kind][s] = NULL;
+			uint32_t *themed = load_themed(PL_ICON_FOLDER, s, s == 0 ? 32 : 16);
+			if (themed) {
+				const int px = s == 0 ? 32 : 16;
+				uint32_t *out = malloc(sizeof(uint32_t) * (size_t)px * px);
+				if (out) {
+					memcpy(out, themed, sizeof(uint32_t) * (size_t)px * px);
+					if (!cache[PL_ICON_FOLDER][s]) {
+						cache[PL_ICON_FOLDER][s] = decode(icon_rows[PL_ICON_FOLDER][s], px);
+					}
+					if (!cache[kind][s]) {
+						cache[kind][s] = decode(icon_rows[kind][s], px);
+					}
+					const uint32_t *plain = cache[PL_ICON_FOLDER][s];
+					const uint32_t *custom = cache[kind][s];
+					for (int i = 0; i < px * px; i++) {
+						if (custom[i] != plain[i]) {
+							out[i] = custom[i];
+						}
+					}
+					composed[kind][s] = out;
+					composed_path[kind][s] = strdup(path);
+					if (composed_path[kind][s]) {
+						return out;
+					}
+					free(out);
+					composed[kind][s] = NULL;
+				}
+			}
+		} else {
+			free(composed[kind][s]);
+			composed[kind][s] = NULL;
+			free(composed_path[kind][s]);
+			composed_path[kind][s] = NULL;
+		}
 	}
 	if (!cache[kind][s]) {
 		cache[kind][s] = decode(icon_rows[kind][s], s == 0 ? 32 : 16);

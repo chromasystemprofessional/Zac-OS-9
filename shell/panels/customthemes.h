@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QMap>
 #include <QStringList>
 #include <functional>
 
@@ -15,6 +16,11 @@ QStringList alertSoundIds();
  * the first letter capitalized. */
 QString alertSoundDisplayName(const QString &id);
 QString appearanceThemesFolder();
+QStringList themeFontFamilies();
+/* One preset's stored settings (accent, highlight, pattern, wallpaper,
+ * wallpaper-mode, alert-sound, sound-theme, theme-bundle, font-family),
+ * for the Appearance panel's visual theme cards. */
+QMap<QString, QString> appearanceThemeValues(int index);
 void watchCustomThemes(QObject *owner, std::function<void()> changed);
 int soundThemeCount();
 QString soundThemeId(int index);

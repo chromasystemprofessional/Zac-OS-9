@@ -783,7 +783,7 @@ int main(int argc, char **argv) {
 	check(vfsAcceptsDrops(appsPath), "Applications takes drops (it installs install files)");
 	check(vfsIsApplications(appsPath), "and is known as Applications");
 	check(!vfsIsApplications(vfsPathFor("home")), "Home isn't Applications");
-	check(!vfsAcceptsDrops(vfsPathFor("system-folder")), "the System Folder takes no drops");
+	check(vfsAcceptsDrops(vfsPathFor("system-folder")), "the System Folder takes drops (it routes theme files to Theme Files)");
 	check(vfsAcceptsDrops(vfsPathFor("home")), "Home takes drops");
 	check(vfsCanRename(appPath), "an application can be renamed");
 
@@ -834,9 +834,9 @@ int main(int argc, char **argv) {
 		"Appearance contains a writable Wallpaper folder");
 	check(!namesIn(vfsPathFor("system-folder")).contains("Wallpaper"),
 		"Wallpaper is not directly inside System Folder");
-	check(vfsOpensAs(vfsPathFor("system-folder/appearance/themes")) ==
-		dataHome + "/zacos9/appearance/Themes",
-		"Appearance contains a custom preset Themes folder");
+	check(vfsOpensAs(vfsPathFor("system-folder/appearance/theme-files")) ==
+		dataHome + "/zacos9/appearance/Theme Files",
+		"Appearance contains a custom preset Theme Files folder");
 	check(vfsOpensAs(vfsPathFor("system-folder/appearance/sound-themes")) ==
 		dataHome + "/zacos9/appearance/Sound Themes",
 		"Appearance contains a custom Sound Themes folder");
@@ -1163,6 +1163,19 @@ int main(int argc, char **argv) {
 			"a disc track beside its cue sheet is a PlayStation disc");
 		check(romIconKind(make("alone.bin")) == PL_ICON_DOCUMENT,
 			"a bare .bin with no cue sheet is an ordinary document");
+		QDir().mkpath(root + "/Games");
+		const auto makeGame = [&](const QString &name) {
+			QFile f(root + "/Games/" + name);
+			f.open(QIODevice::WriteOnly);
+			f.close();
+			return f.fileName();
+		};
+		check(romIconKind(makeGame("game.iso")) == PL_ICON_ROM_PS2 &&
+			romIconKind(makeGame("game.mdf")) == PL_ICON_ROM_PS2 &&
+			iconKindFor(root + "/Games/game.iso") == PL_ICON_ROM_PS2,
+			"a PlayStation 2 disc image in the Games folder gets its own icon");
+		check(romIconKind(make("outside.iso")) == PL_ICON_DOCUMENT,
+			"an .iso outside the Games folder is not a game");
 	}
 
 	/* ---- unprivileged -------------------------------------------------- */

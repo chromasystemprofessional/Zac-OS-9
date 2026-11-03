@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=What's New in ZacOS 9
+Comment=Shows what changed after a ZacOS 9 update, once per version
+Exec=/usr/bin/zacos9-update --whatsnew
+OnlyShowIn=ZacOS9;
+NoDisplay=true

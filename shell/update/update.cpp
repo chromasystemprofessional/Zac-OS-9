@@ -5,6 +5,7 @@
 
 #include <QCloseEvent>
 #include <QCryptographicHash>
+#include <QDialog>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -26,6 +27,133 @@ static constexpr int TEXT_X = 60, TEXT_W = W - TEXT_X - 14;
 static constexpr int BUTTON_W = 80;
 static constexpr uint32_t FACE = GRAY(0xD);
 static const QString PACKAGE = QStringLiteral("zacos9");
+
+/* What's New: the release notes in a scrolling list, Platinum style.
+ * `actions` adds the post-restart buttons that open Theme Files and the
+ * Appearance panel's Themes tab. */
+class NotesDialog : public QDialog {
+public:
+	NotesDialog(QWidget *parent, const QString &title, const QString &notes, bool actions)
+		: QDialog(parent), m_title(title) {
+		setWindowTitle(title);
+		setFixedSize(NW, NH);
+		m_list.frame = QRect(14, 36, NW - 28, 13 * PL_LIST_ROW_H + 2);
+		m_host.hintAreas.push_back({ &m_list.frame, "What changed in this version. Arrow keys scroll." });
+		m_list.setItems(panelWrap(notes.trimmed(), NW - 28 - SB_WIDTH - 8, PL_FONT_VIEWS));
+		m_list.state.selected = -1;
+		const int by = NH - 14 - PL_BUTTON_H;
+		m_ok = PanelButton("OK", QRect(NW - 14 - BUTTON_W, by, BUTTON_W, PL_BUTTON_H), true);
+		m_ok.hint = "Closes this window.";
+		m_ok.clicked = [this] { accept(); };
+		m_host.buttons.push_back(&m_ok);
+		m_host.defaultButton = &m_ok;
+		m_host.cancelButton = &m_ok;
+		if (actions) {
+			m_files = PanelButton("Open Theme Files",
+				QRect(NW - 14 - BUTTON_W - 12 - 130, by, 130, PL_BUTTON_H));
+			m_files.hint = "Opens Appearance's Theme Files folder in the Sniffer.";
+			m_files.clicked = [] {
+				QProcess::startDetached("zacos9-finder", { "--open", appearanceThemesDir() });
+			};
+			m_appearance = PanelButton("Appearance…",
+				QRect(NW - 14 - BUTTON_W - 12 - 130 - 12 - 110, by, 110, PL_BUTTON_H));
+			m_appearance.hint = "Opens the Appearance control panel on its Themes tab.";
+			m_appearance.clicked = [] {
+				QProcess::startDetached("zacos9-appearance", { "themes" });
+			};
+			m_host.buttons.push_back(&m_files);
+			m_host.buttons.push_back(&m_appearance);
+		}
+	}
+
+	static QString appearanceThemesDir() {
+		return QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) +
+			"/zacos9/appearance/Theme Files";
+	}
+
+protected:
+	void showEvent(QShowEvent *e) override {
+		QDialog::showEvent(e);
+		platinumSetFrameStyle(this, FrameStyle::MovableModal);
+	}
+	void paintEvent(QPaintEvent *) override {
+		Pixels px(NW, NH);
+		pl_canvas *c = &px.c;
+		pl_fill(c, 0, 0, NW - 1, NH - 1, FACE);
+		panelText(c, m_title, 14, 26, PL_FONT_SYSTEM, C_BLACK, NW - 28);
+		m_list.paint(c, true);
+		m_host.paintControls(c, FACE);
+		QPainter p(this);
+		px.blit(p);
+	}
+	void mousePressEvent(QMouseEvent *e) override {
+		if (!m_list.press(e->position().toPoint())) {
+			m_host.hostPress(e);
+		}
+		update();
+	}
+	void mouseMoveEvent(QMouseEvent *e) override {
+		m_list.move(e->position().toPoint());
+		m_host.hostMove(e);
+		update();
+	}
+	void mouseReleaseEvent(QMouseEvent *e) override {
+		m_list.release();
+		m_host.hostRelease(e);
+		update();
+	}
+	void wheelEvent(QWheelEvent *e) override {
+		m_list.wheel(e->position().toPoint(), e->angleDelta().y());
+		update();
+	}
+	void keyPressEvent(QKeyEvent *e) override {
+		if (!m_list.key(e->key(), e->text()) && !m_host.hostKey(e)) {
+			QDialog::keyPressEvent(e);
+		}
+		update();
+	}
+
+private:
+	QString m_title;
+	static constexpr int NW = 480, NH = 320;
+	PanelList m_list;
+	PanelButton m_ok, m_files, m_appearance;
+	PanelHost m_host{ this };
+
+public:
+	static void show(QWidget *parent, const QString &title, const QString &notes, bool actions) {
+		NotesDialog dlg(parent, title, notes, actions);
+		dlg.exec();
+	}
+};
+
+void showWhatsNew(QWidget *parent, const QString &version, const QString &notes) {
+	NotesDialog::show(parent, "What's New in ZacOS 9 " + version, notes, true);
+}
+
+/* zacos9-update --whatsnew: the post-restart window, once per version.
+ * The notes ship in the package (/usr/share/zacos9/whatsnew/<version>.txt);
+ * the seen version lives in ~/.config/zacos9/whatsnew-seen. */
+int whatsnewRun() {
+	const QString installed = installedVersion(PACKAGE);
+	QString seen;
+	QFile seenFile(whatsnewSeenFile());
+	if (seenFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+		seen = QString::fromUtf8(seenFile.readAll()).trimmed();
+	}
+	if (!whatsnewShouldShow(installed, seen)) {
+		return 0;
+	}
+	QFile notes(whatsnewNotesFile(installed));
+	if (notes.open(QIODevice::ReadOnly | QIODevice::Text)) {
+		showWhatsNew(nullptr, installed, QString::fromUtf8(notes.readAll()));
+	}
+	QDir().mkpath(QFileInfo(whatsnewSeenFile()).absolutePath());
+	if (seenFile.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate)) {
+		seenFile.write(installed.toUtf8());
+	}
+	return 0;
+}
 
 UpdateWindow::UpdateWindow() {
 	setWindowTitle("Software Update");
@@ -73,6 +201,13 @@ void UpdateWindow::setButtons(const QString &primary, const QString &secondary) 
 		m_host.cancelButton = &m_secondary;
 	}
 	update();
+}
+
+void UpdateWindow::showNotes() {
+	if (!m_release.valid || m_release.notes.trimmed().isEmpty()) {
+		return;
+	}
+	NotesDialog::show(this, "What's New in ZacOS 9 " + m_release.version, m_release.notes, false);
 }
 
 /* ---- running the helper and dpkg ----------------------------------------------------- */
@@ -255,6 +390,14 @@ void UpdateWindow::showResults() {
 		m_state = State::Available;
 		setText("Updates are available for this computer.", detail.trimmed());
 		setButtons("Update", "Later");
+		if (zacos && !m_release.notes.trimmed().isEmpty()) {
+			const int y = H - 14 - PL_BUTTON_H;
+			m_notes = PanelButton("What's New…", QRect(14, y, 110, PL_BUTTON_H));
+			m_notes.hint = "Shows what changed in ZacOS 9 " + m_release.version + ".";
+			m_notes.clicked = [this] { showNotes(); };
+			m_host.buttons.push_back(&m_notes);
+			update();
+		}
 		if (background && !isVisible()) {
 			show();
 			platinumSetFrameStyle(this, FrameStyle::MovableModal);

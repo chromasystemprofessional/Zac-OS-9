@@ -16,6 +16,15 @@ test('update-check',
 install_data('zacos9-update-check.service', 'zacos9-update-check.timer',
   install_dir: get_option('prefix') / 'lib' / 'systemd' / 'user')
 
+# What's New after a restart: shown once per version at login (a system
+# autostart entry; turning it off in Startup Items turns the popup off).
+# The notes for each version ship in the package; the seen version is
+# remembered in ~/.config/zacos9/whatsnew-seen.
+install_data('zacos9-whatsnew.desktop',
+  install_dir: get_option('sysconfdir') / 'xdg' / 'autostart')
+install_data('whatsnew/1.7.0.txt',
+  install_dir: get_option('datadir') / 'zacos9' / 'whatsnew')
+
 executable('zacos9-update',
   'main.cpp',
   'update.cpp',

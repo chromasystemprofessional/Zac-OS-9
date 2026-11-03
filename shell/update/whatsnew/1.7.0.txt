@@ -1,0 +1,14 @@
+Mac OS 9 themes go straight into the System Folder now.
+
+Copy a Mac OS 9 theme file out of Mac OS 9 first: in Old Dog, copy the
+theme from Appearance > Theme Files to your home folder, which brings
+its resource fork along.
+
+Then drop the theme file onto the System Folder icon — or anywhere
+inside the System Folder, even the wrong folder. ZacOS notices it is a
+theme and asks to put it where it belongs; click OK and it files itself
+into System Folder > Appearance > Theme Files and installs itself.
+
+To see it, open the Appearance control panel's Themes tab and click the
+new preview card. The card shows the theme's own window chrome, folder
+icon and desktop pattern.

@@ -137,6 +137,13 @@ test('decor-geometry',
   ),
 )
 
+test('decor-chrome',
+  executable('test-decor-chrome',
+    '../tests/compositor/test_decor_chrome.c',
+    dependencies: [decor_dep],
+  ),
+)
+
 test('function-keys',
   executable('test-fkeys',
     '../tests/compositor/test_fkeys.c', 'src/fkeys.c',

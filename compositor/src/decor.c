@@ -2,6 +2,8 @@
 
 #include <cairo.h>
 #include <stddef.h>
+#include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "chrome.h"
@@ -64,11 +66,382 @@ static void chrome_fill_slot(struct pl_canvas *c, int x0, int y0, int x1, int y1
 #define TITLE_BASELINE 14
 /* The proxy icon: a small icon, then a gap, then the title; the two
  * centred together. TODO: measure against a Mac OS 9 Finder window. */
+/* Title-bar art the extractor decodes from the theme's own resources
+ * (theme.conf keys naming bundle-relative .argb tiles: u32le width and
+ * height, then straight RGBA). Cached per resolved path; reloading when
+ * the active theme changes. Missing art falls back to Platinum drawing. */
+enum {
+	CHROME_BAR_LEFT, CHROME_BAR_MIDDLE, CHROME_BAR_RIGHT,
+	CHROME_BAR_LEFT_INACTIVE, CHROME_BAR_MIDDLE_INACTIVE, CHROME_BAR_RIGHT_INACTIVE,
+	CHROME_BUTTON_CLOSE, CHROME_BUTTON_CLOSE_PRESSED,
+	CHROME_BUTTON_ZOOM, CHROME_BUTTON_ZOOM_PRESSED,
+	CHROME_BUTTON_GROW, CHROME_BUTTON_GROW_PRESSED,
+	CHROME_BAR_SPAN, CHROME_BAR_SPAN_INACTIVE,
+	CHROME_BAR_DIALOG_LEFT, CHROME_BAR_DIALOG_MIDDLE, CHROME_BAR_DIALOG_RIGHT,
+	CHROME_BAR_DIALOG_LEFT_INACTIVE, CHROME_BAR_DIALOG_MIDDLE_INACTIVE, CHROME_BAR_DIALOG_RIGHT_INACTIVE,
+	CHROME_BUTTON_DIALOG_CLOSE, CHROME_BUTTON_DIALOG_CLOSE_PRESSED,
+	CHROME_BUTTON_DIALOG_ZOOM, CHROME_BUTTON_DIALOG_ZOOM_PRESSED,
+	CHROME_BUTTON_DIALOG_GROW, CHROME_BUTTON_DIALOG_GROW_PRESSED,
+	CHROME_COUNT
+};
+
+static const char *const chrome_keys[CHROME_COUNT] = {
+	"bar-left", "bar-middle", "bar-right",
+	"bar-left-inactive", "bar-middle-inactive", "bar-right-inactive",
+	"button-close", "button-close-pressed",
+	"button-zoom", "button-zoom-pressed",
+	"button-grow", "button-grow-pressed",
+	"bar-span", "bar-span-inactive",
+	"bar-dialog-left", "bar-dialog-middle", "bar-dialog-right",
+	"bar-dialog-left-inactive", "bar-dialog-middle-inactive", "bar-dialog-right-inactive",
+	"button-dialog-close", "button-dialog-close-pressed",
+	"button-dialog-zoom", "button-dialog-zoom-pressed",
+	"button-dialog-grow", "button-dialog-grow-pressed",
+};
+
+struct chrome_tile {
+	int w, h;
+	uint32_t *px;
+	char path[4096];
+};
+
+static struct chrome_tile chrome_cache[CHROME_COUNT];
+
+static void chrome_tile_drop(int id) {
+	free(chrome_cache[id].px);
+	chrome_cache[id].px = NULL;
+	chrome_cache[id].w = chrome_cache[id].h = 0;
+	chrome_cache[id].path[0] = '\0';
+}
+
+/* The tile for a chrome key, or NULL when the theme supplies none.
+ * Inactive bar parts fall back to the active art. */
+static const struct chrome_tile *chrome_tile_get(int id) {
+	char rel[256];
+	if (!zac_theme_string(chrome_keys[id], rel, sizeof(rel))) {
+		chrome_tile_drop(id);
+		return NULL;
+	}
+	char path[4096];
+	if (!zac_theme_asset(rel, path, sizeof(path))) {
+		chrome_tile_drop(id);
+		return NULL;
+	}
+	struct chrome_tile *t = &chrome_cache[id];
+	if (t->px && strcmp(t->path, path) == 0) {
+		return t;
+	}
+	chrome_tile_drop(id);
+	FILE *f = fopen(path, "rb");
+	if (!f) {
+		return NULL;
+	}
+	uint32_t w = 0, h = 0;
+	unsigned char head[8];
+	if (fread(head, 1, sizeof(head), f) != sizeof(head)) {
+		fclose(f);
+		return NULL;
+	}
+	w = (uint32_t)head[0] | (uint32_t)head[1] << 8 | (uint32_t)head[2] << 16 | (uint32_t)head[3] << 24;
+	h = (uint32_t)head[4] | (uint32_t)head[5] << 8 | (uint32_t)head[6] << 16 | (uint32_t)head[7] << 24;
+	if (w == 0 || h == 0 || w > 4096 || h > 4096) {
+		fclose(f);
+		return NULL;
+	}
+	uint32_t *px = malloc(sizeof(uint32_t) * (size_t)w * h);
+	if (!px) {
+		fclose(f);
+		return NULL;
+	}
+	for (uint32_t i = 0; i < w * h; i++) {
+		unsigned char b[4];
+		if (fread(b, 1, sizeof(b), f) != sizeof(b)) {
+			free(px);
+			fclose(f);
+			return NULL;
+		}
+		px[i] = (uint32_t)b[3] << 24 | (uint32_t)b[0] << 16 | (uint32_t)b[1] << 8 | b[2];
+	}
+	fclose(f);
+	t->px = px;
+	t->w = (int)w;
+	t->h = (int)h;
+	snprintf(t->path, sizeof(t->path), "%s", path);
+	return t;
+}
+
+/* Blit a tile rectangle, nearest-neighbour scaled to (dw, dh), clipped
+ * to the canvas like pl_image_blend. */
+static void chrome_blit(struct pl_canvas *c, const struct chrome_tile *t,
+		int sx, int sy, int sw, int sh, int dx, int dy, int dw, int dh) {
+	if (!t || !t->px || sw <= 0 || sh <= 0 || dw <= 0 || dh <= 0) {
+		return;
+	}
+	for (int y = 0; y < dh; y++) {
+		int v = dy + y;
+		if (v < c->y || v >= c->y + c->height) {
+			continue;
+		}
+		int ty = sy + y * sh / dh;
+		for (int x = 0; x < dw; x++) {
+			int u = dx + x;
+			if (u < c->x || u >= c->x + c->width) {
+				continue;
+			}
+			int tx = sx + x * sw / dw;
+			uint32_t p = t->px[(size_t)ty * t->w + tx];
+			unsigned a = p >> 24;
+			if (!a) {
+				continue;
+			}
+			uint32_t *dst = &c->px[(size_t)(v - c->y) * c->stride + (u - c->x)];
+			if (a == 255) {
+				*dst = p;
+			} else {
+				uint32_t bg = *dst;
+				unsigned r = ((((p >> 16) & 0xFF) * a + ((bg >> 16) & 0xFF) * (255 - a)) / 255);
+				unsigned g = ((((p >> 8) & 0xFF) * a + ((bg >> 8) & 0xFF) * (255 - a)) / 255);
+				unsigned b = (((p & 0xFF) * a + (bg & 0xFF) * (255 - a)) / 255);
+				*dst = 0xFF000000u | r << 16 | g << 8 | b;
+			}
+		}
+	}
+}
+
+
 #define PROXY_SIZE 16
 #define PROXY_GAP 4
 #define PROXY_Y 3
 #define NO_BOX_STRIPE_X 5
 #define TITLE_BAR_LAST_ROW 19
+
+#define TITLE_BAR_H (TITLE_BAR_LAST_ROW + 1)
+
+/* Whether the theme supplies a full bar set (inactive falls back to
+ * the active art). */
+static bool themed_bar_available(bool act) {
+	int m = act ? CHROME_BAR_MIDDLE : CHROME_BAR_MIDDLE_INACTIVE;
+	const struct chrome_tile *tm = chrome_tile_get(m);
+	if (!tm) {
+		tm = chrome_tile_get(CHROME_BAR_MIDDLE);
+	}
+	return tm != NULL;
+}
+
+/* The theme's full-width bar background (Kaleidoscope's Aqua blue):
+ * inactive art falls back to the active span. */
+static bool title_cluster_left(const struct decor_state *st);
+static int title_group_end(const struct decor_state *st);
+static bool themed_dialog_available(bool act);
+
+static const struct chrome_tile *span_tile_get(bool act) {
+	int m = act ? CHROME_BAR_SPAN : CHROME_BAR_SPAN_INACTIVE;
+	const struct chrome_tile *tm = chrome_tile_get(m);
+	if (!tm && !act) {
+		tm = chrome_tile_get(CHROME_BAR_SPAN);
+	}
+	if (!tm && act) {
+		tm = chrome_tile_get(CHROME_BAR_SPAN_INACTIVE);
+	}
+	return tm;
+}
+
+/* The window frame's top band below the title row (Kaleidoscope's
+ * Aqua blue): the span tile's own height. Zero without a span. */
+static int themed_band_h(bool act) {
+	const struct chrome_tile *span = span_tile_get(act);
+	if (!span) {
+		span = span_tile_get(!act);
+	}
+	return span ? span->h : 0;
+}
+
+static int themed_band_max(void) {
+	int a = themed_band_h(true);
+	int b = themed_band_h(false);
+	return a > b ? a : b;
+}
+
+/* The title bar with the theme's own art: end caps at 1:1 pixel scale
+ * at each end, the middle tiled horizontally across the title row, and
+ * (left-clustered themes) the span tiled full-width across the band
+ * below it. Tiny synthetic test tiles (< 8 px tall) stretch vertically.
+ * Returns false when the theme supplies no bar. */
+static bool paint_themed_bar(struct pl_canvas *c, const struct decor_state *st,
+		int w, bool act) {
+	const bool dialog = st->style == DECOR_STYLE_MOVABLE_MODAL;
+	if (dialog ? !themed_dialog_available(act) : !themed_bar_available(act)) {
+		return false;
+	}
+	int l = act ? CHROME_BAR_LEFT : CHROME_BAR_LEFT_INACTIVE;
+	int m = act ? CHROME_BAR_MIDDLE : CHROME_BAR_MIDDLE_INACTIVE;
+	int r = act ? CHROME_BAR_RIGHT : CHROME_BAR_RIGHT_INACTIVE;
+	if (dialog) {
+		l = act ? CHROME_BAR_DIALOG_LEFT : CHROME_BAR_DIALOG_LEFT_INACTIVE;
+		m = act ? CHROME_BAR_DIALOG_MIDDLE : CHROME_BAR_DIALOG_MIDDLE_INACTIVE;
+		r = act ? CHROME_BAR_DIALOG_RIGHT : CHROME_BAR_DIALOG_RIGHT_INACTIVE;
+	}
+	const struct chrome_tile *tl = chrome_tile_get(l);
+	const struct chrome_tile *tm = chrome_tile_get(m);
+	const struct chrome_tile *tr = chrome_tile_get(r);
+	if (dialog) {
+		if (!tl) {
+			tl = chrome_tile_get(act ? CHROME_BAR_LEFT : CHROME_BAR_LEFT_INACTIVE);
+		}
+		if (!tm) {
+			tm = chrome_tile_get(act ? CHROME_BAR_MIDDLE : CHROME_BAR_MIDDLE_INACTIVE);
+		}
+		if (!tr) {
+			tr = chrome_tile_get(act ? CHROME_BAR_RIGHT : CHROME_BAR_RIGHT_INACTIVE);
+		}
+	}
+	if (!tl) {
+		tl = chrome_tile_get(CHROME_BAR_LEFT);
+	}
+	if (!tm) {
+		tm = chrome_tile_get(CHROME_BAR_MIDDLE);
+	}
+	if (!tr) {
+		tr = chrome_tile_get(CHROME_BAR_RIGHT);
+	}
+	if (!tm) {
+		return false;
+	}
+	int lw = tl ? tl->w : 0;
+	int rw = tr ? tr->w : 0;
+	const struct chrome_tile *span = span_tile_get(act);
+	if (span && !dialog && title_cluster_left(st)) {
+		/* The title group sits in a raised pinstripe tab at the top-left
+		 * (end caps hugging the cluster, transparent to the right of the
+		 * tab above the 7 px window rim), and the blue band spans the
+		 * window below the title row inside the frame borders. */
+		int patchW = title_group_end(st) + (rw >= 12 ? 3 : rw);
+		if (patchW < lw + rw) {
+			patchW = lw + rw;
+		}
+		if (patchW > w) {
+			patchW = w;
+		}
+		if (lw > 0) {
+			int sh = tl->h < DECOR_TOP ? tl->h : DECOR_TOP;
+			int dh = tl->h < 8 ? DECOR_TOP : sh;
+			chrome_blit(c, tl, 0, 0, tl->w, sh, 0, 0, lw, dh);
+		}
+		int msh = tm->h < DECOR_TOP ? tm->h : DECOR_TOP;
+		int mdh = tm->h < 8 ? DECOR_TOP : msh;
+		for (int x = lw; x < patchW - rw; x += tm->w) {
+			int tilew = patchW - rw - x < tm->w ? patchW - rw - x : tm->w;
+			chrome_blit(c, tm, 0, 0, tilew, msh, x, 0, tilew, mdh);
+		}
+		if (rw > 0) {
+			int sh = tr->h < DECOR_TOP ? tr->h : DECOR_TOP;
+			int dh = tr->h < 8 ? DECOR_TOP : sh;
+			chrome_blit(c, tr, 0, 0, tr->w, sh, patchW - rw, 0, rw, dh);
+		}
+		if (patchW < w) {
+			const uint32_t rim_border = act ? 0xFF525252u : 0xFF737373u;
+			const uint32_t rim_hi = act ? 0xFFF6F6F6u : 0xFFDEDEDEu;
+			const uint32_t rim_fill = act ? 0xFFDADADAu : 0xFFDEDEDEu;
+			pl_hline(c, patchW, w - 2, DECOR_TOP - 7, rim_border);
+			pl_hline(c, patchW, w - 3, DECOR_TOP - 6, rim_hi);
+			pl_fill(c, patchW, DECOR_TOP - 5, w - 2, DECOR_TOP - 1, rim_fill);
+			pl_vline(c, w - 1, DECOR_TOP - 7, DECOR_TOP - 1, rim_border);
+		}
+		if (st->collapsed) {
+			pl_hline(c, 0, w - 1, DECOR_TOP - 1, act ? 0xFF525252u : 0xFF737373u);
+			return true;
+		}
+		const int bandH = span->h;
+		const int bx0 = DECOR_LEFT, bx1 = w - DECOR_RIGHT;
+		for (int x = bx0; x < bx1; x += span->w) {
+			int spanw = bx1 - x < span->w ? bx1 - x : span->w;
+			chrome_blit(c, span, 0, 0, spanw, span->h < bandH ? span->h : bandH,
+				x, DECOR_TOP, spanw, bandH);
+		}
+		return true;
+	}
+	if (lw > 0) {
+		int sh = tl->h < DECOR_TOP ? tl->h : DECOR_TOP;
+		int dh = tl->h < 8 ? DECOR_TOP : sh;
+		chrome_blit(c, tl, 0, 0, tl->w, sh, 0, 0, lw, dh);
+	}
+	int msh = tm->h < DECOR_TOP ? tm->h : DECOR_TOP;
+	int mdh = tm->h < 8 ? DECOR_TOP : msh;
+	for (int x = lw; x < w - rw; x += tm->w) {
+		int spanw = w - rw - x < tm->w ? w - rw - x : tm->w;
+		chrome_blit(c, tm, 0, 0, spanw, msh, x, 0, spanw, mdh);
+	}
+	if (rw > 0) {
+		int sh = tr->h < DECOR_TOP ? tr->h : DECOR_TOP;
+		int dh = tr->h < 8 ? DECOR_TOP : sh;
+		chrome_blit(c, tr, 0, 0, tr->w, sh, w - rw, 0, rw, dh);
+	}
+	return true;
+}
+
+/* A themed title-bar button (13 px art over the 12 px box origin keeps
+ * the existing hit testing). Pressed art while held. Dialogs prefer
+ * their own smaller art, falling back to the document buttons. */
+static bool paint_themed_box(struct pl_canvas *c, const struct decor_state *st,
+		enum decor_part part, int bx, int by, bool pressed) {
+	if (st->style == DECOR_STYLE_MOVABLE_MODAL) {
+		int id = -1, pid = -1;
+		switch (part) {
+		case DECOR_PART_CLOSE:
+			id = CHROME_BUTTON_DIALOG_CLOSE;
+			pid = CHROME_BUTTON_DIALOG_CLOSE_PRESSED;
+			break;
+		case DECOR_PART_ZOOM:
+			id = CHROME_BUTTON_DIALOG_ZOOM;
+			pid = CHROME_BUTTON_DIALOG_ZOOM_PRESSED;
+			break;
+		case DECOR_PART_COLLAPSE:
+			id = CHROME_BUTTON_DIALOG_GROW;
+			pid = CHROME_BUTTON_DIALOG_GROW_PRESSED;
+			break;
+		default:
+			break;
+		}
+		if (id >= 0) {
+			const struct chrome_tile *t = chrome_tile_get(pressed ? pid : id);
+			if (!t) {
+				t = chrome_tile_get(id);
+			}
+			if (t) {
+				chrome_blit(c, t, 0, 0, t->w, t->h, bx + (BOX_SIZE + 1 - t->w) / 2,
+					by + (BOX_SIZE + 1 - t->h) / 2, t->w, t->h);
+				return true;
+			}
+		}
+	}
+	int id = -1, pid = -1;
+	switch (part) {
+	case DECOR_PART_CLOSE:
+		id = CHROME_BUTTON_CLOSE;
+		pid = CHROME_BUTTON_CLOSE_PRESSED;
+		break;
+	case DECOR_PART_ZOOM:
+		id = CHROME_BUTTON_ZOOM;
+		pid = CHROME_BUTTON_ZOOM_PRESSED;
+		break;
+	case DECOR_PART_COLLAPSE:
+		id = CHROME_BUTTON_GROW;
+		pid = CHROME_BUTTON_GROW_PRESSED;
+		break;
+	default:
+		return false;
+	}
+	const struct chrome_tile *t = chrome_tile_get(pressed ? pid : id);
+	if (!t) {
+		t = chrome_tile_get(id);
+	}
+	if (!t) {
+		return false;
+	}
+	chrome_blit(c, t, 0, 0, t->w, t->h, bx + (BOX_SIZE + 1 - t->w) / 2,
+		by + (BOX_SIZE + 1 - t->h) / 2, t->w, t->h);
+	return true;
+}
 
 /* Active resize box, 20x20 from (W-21, H-21) to (W-2, H-2), measured from
  * HIG figure 5-1. Hex digit = gray level. */
@@ -110,12 +483,121 @@ int decor_frame_height(const struct decor_state *st) {
 	return frame_height(st);
 }
 
+/* Title groups that ride the theme's patch (Kaleidoscope's own Aqua):
+ * close, title/proxy, zoom, grow clustered at the bar's left, the span
+ * filling the rest. Other themes keep the Platinum box positions. */
+static int title_ink_width(const struct decor_state *st);
+
+static bool title_cluster_left(const struct decor_state *st) {
+	char v[16];
+	return st && st->style == DECOR_STYLE_DOCUMENT &&
+		zac_theme_string("title-cluster", v, sizeof(v)) && strcmp(v, "left") == 0;
+}
+
+/* The close box's left edge in a left cluster: real tab caps (pxm#
+ * 6176, 20 px wide) carry an 8 px shoulder outside the tab; synthetic
+ * test tiles do not. */
+static int cluster_close_x(const struct decor_state *st) {
+	const struct chrome_tile *tl = chrome_tile_get(
+		st->active ? CHROME_BAR_LEFT : CHROME_BAR_LEFT_INACTIVE);
+	if (!tl) {
+		tl = chrome_tile_get(CHROME_BAR_LEFT);
+	}
+	return tl && tl->w >= 16 ? CLOSE_X + 8 : CLOSE_X;
+}
+
+/* The title block's start in a left cluster: after the close box. */
+static int cluster_title_x(const struct decor_state *st) {
+	int x = cluster_close_x(st);
+	if (st->has_close) {
+		x += BOX_SIZE + 4;
+	}
+	return x;
+}
+
+/* A clustered box's left edge: close first, then zoom and grow after the
+ * title block. -1 when the window has no such box. */
+static int cluster_box_x(const struct decor_state *st, enum decor_part part) {
+	if (part == DECOR_PART_CLOSE) {
+		return st->has_close ? cluster_close_x(st) : -1;
+	}
+	int x = cluster_title_x(st);
+	if (st->proxy) {
+		x += PROXY_SIZE + PROXY_GAP;
+	}
+	x += title_ink_width(st);
+	if (part == DECOR_PART_ZOOM) {
+		return st->has_zoom ? x + 4 : -1;
+	}
+	if (st->has_zoom) {
+		x += 4 + BOX_SIZE;
+	}
+	if (part == DECOR_PART_COLLAPSE) {
+		return st->has_collapse ? x + 4 : -1;
+	}
+	return -1;
+}
+
+/* Whether the bar paints from theme art: documents use the title bar
+ * tiles, movable-modals their dialog tiles. */
+static bool bar_themed(const struct decor_state *st, bool act) {
+	if (themed_bar_available(act)) {
+		return true;
+	}
+	return st->style == DECOR_STYLE_MOVABLE_MODAL && themed_dialog_available(act);
+}
+
+/* The title group's right end in a left cluster: after the last box. */
+static int title_group_end(const struct decor_state *st) {
+	int x = cluster_title_x(st);
+	if (st->proxy) {
+		x += PROXY_SIZE + PROXY_GAP;
+	}
+	x += title_ink_width(st);
+	if (st->has_zoom) {
+		x += 4 + BOX_SIZE;
+	}
+	if (st->has_collapse) {
+		x += 4 + BOX_SIZE;
+	}
+	return x + 4;
+}
+
+/* A movable-modal close box the theme draws itself (its dialog-close
+ * art): Platinum dialogs show none, themed ones do. Zoom/grow stay
+ * with the window's own flags (always off for dialogs). */
+static bool dialog_close_box(const struct decor_state *st) {
+	if (st->has_close || st->style != DECOR_STYLE_MOVABLE_MODAL) {
+		return st->has_close;
+	}
+	return chrome_tile_get(CHROME_BUTTON_DIALOG_CLOSE) != NULL ||
+		chrome_tile_get(CHROME_BUTTON_DIALOG_CLOSE_PRESSED) != NULL;
+}
+
+/* The dialog bar's own art (movable-modal windows): pinstripe, with a
+ * close box but no patch/span split. Falls back to the document bar. */
+static bool themed_dialog_available(bool act) {
+	int m = act ? CHROME_BAR_DIALOG_MIDDLE : CHROME_BAR_DIALOG_MIDDLE_INACTIVE;
+	const struct chrome_tile *tm = chrome_tile_get(m);
+	if (!tm) {
+		tm = chrome_tile_get(CHROME_BAR_DIALOG_MIDDLE);
+	}
+	return tm != NULL;
+}
+
 void decor_box_origin(const struct decor_state *st, enum decor_part part,
 		int *bx, int *by) {
 	*by = BOX_Y;
+	if (title_cluster_left(st)) {
+		*bx = cluster_box_x(st, part);
+		if (*bx < 0) {
+			*bx = *by = -1;
+		}
+		return;
+	}
 	switch (part) {
 	case DECOR_PART_CLOSE:
-		*bx = CLOSE_X;
+		*bx = dialog_close_box(st) ? CLOSE_X : -1;
 		break;
 	case DECOR_PART_ZOOM:
 		*bx = st->width - ZOOM_X_FROM_RIGHT;
@@ -201,7 +683,9 @@ struct decor_margins decor_margins(enum decor_style style) {
 		return (struct decor_margins){ .left = 3, .right = 3, .top = 24, .bottom = 3 };
 	}
 	return (struct decor_margins){
-		.left = DECOR_LEFT, .right = DECOR_RIGHT, .top = DECOR_TOP, .bottom = DECOR_BOTTOM,
+		.left = DECOR_LEFT, .right = DECOR_RIGHT,
+		.top = DECOR_TOP + (style == DECOR_STYLE_DOCUMENT ? themed_band_max() : 0),
+		.bottom = DECOR_BOTTOM,
 	};
 }
 
@@ -222,8 +706,15 @@ int decor_title_max_width(const struct decor_state *st) {
 }
 
 /* Where the title's ink starts, and the proxy icon's left (if any): the
- * icon and the title are centred as one. */
+ * icon and the title are centred as one. Left clusters start the group
+ * after the close box instead. */
 static void title_layout(const struct decor_state *st, int ink_w, int *ink_l, int *proxy_x) {
+	if (title_cluster_left(st)) {
+		const int x = cluster_title_x(st);
+		*proxy_x = x;
+		*ink_l = st->proxy ? x + PROXY_SIZE + PROXY_GAP : x;
+		return;
+	}
 	const int group = ink_w + (st->proxy ? PROXY_SIZE + PROXY_GAP : 0);
 	const int left = (st->width - 1) / 2 - (group - 1) / 2;
 	*proxy_x = left;
@@ -288,6 +779,7 @@ static int title_stripes(const struct decor_state *st, int x0[2], int x1[2]) {
 }
 
 static void paint_title(struct pl_canvas *c, const struct decor_state *st) {
+	const bool themed = bar_themed(st, st->active);
 	const struct plat_text *t = st->title;
 	if ((t && t->ink_l >= 0) || st->proxy) {
 		const int ink_w = title_ink_width(st);
@@ -301,6 +793,9 @@ static void paint_title(struct pl_canvas *c, const struct decor_state *st) {
 		}
 	}
 	int x0[2], x1[2];
+	if (themed) {
+		return; /* the theme draws its own bar: no platinum stripes */
+	}
 	const int n = title_stripes(st, x0, x1);
 	for (int i = 0; i < n; i++) {
 		paint_stripes(c, x0[i], x1[i]);
@@ -323,6 +818,9 @@ static void fill_px(uint32_t *px, int w, int h, int x0, int y0, int x1, int y1, 
 void decor_paint_stripes_scaled(uint32_t *dst, int dw, int dh, const struct decor_state *st,
 		int px, int py, int ux, int uy, int quarters) {
 	int x0[2], x1[2];
+	if (bar_themed(st, st->active)) {
+		return; /* the theme draws its own bar: no platinum stripes */
+	}
 	const int n = title_stripes(st, x0, x1);
 	if (n == 0 || quarters % 4 == 0) {
 		return;
@@ -368,6 +866,18 @@ static void paint_grow(struct pl_canvas *c, const struct decor_state *st) {
 
 /* Movable modal dialog (HIG figure 3-2): a document-style title bar
  * without boxes over a body edged by a 2 px bevel. Margins 3/3/24/3. */
+/* Which boxes a themed movable-modal shows: close whenever its own
+ * art exists (Platinum shows none); zoom and grow likewise, so an
+ * About-style window keeps its whole candy row. */
+static bool dialog_box_on(const struct decor_state *st, enum decor_part part, bool act) {
+	if (part == DECOR_PART_CLOSE) {
+		return dialog_close_box(st);
+	}
+	int id = part == DECOR_PART_ZOOM ? CHROME_BUTTON_DIALOG_ZOOM : CHROME_BUTTON_DIALOG_GROW;
+	return act && themed_dialog_available(act) &&
+		(chrome_tile_get(id) != NULL || chrome_tile_get(id + 1) != NULL);
+}
+
 static void paint_modal(struct pl_canvas *c, const struct decor_state *st) {
 	const int W = st->width, H = st->height;
 	const bool act = st->active;
@@ -376,6 +886,7 @@ static void paint_modal(struct pl_canvas *c, const struct decor_state *st) {
 
 	/* Title bar: rows 0..21, as a collapsed document window's. */
 	chrome_fill_slot(c, 0, 0, W - 1, 21, CHROME_MODAL_TOP, act, face);
+	const bool themed = st->style == DECOR_STYLE_MOVABLE_MODAL && themed_dialog_available(act);
 	/* Body edges (the client paints the interior). */
 	chrome_fill_slot(c, 0, 22, 2, H - 1, CHROME_MODAL_LEFT, act, C_DDD);
 	chrome_fill_slot(c, W - 3, 22, W - 1, H - 1, CHROME_MODAL_RIGHT, act, C_DDD);
@@ -404,6 +915,29 @@ static void paint_modal(struct pl_canvas *c, const struct decor_state *st) {
 
 	pl_vline(c, W, 2, H, border);
 	pl_hline(c, 2, W, H, border);
+	if (themed) {
+		paint_themed_bar(c, st, W, act);
+		if (act) {
+			/* Kaleidoscope skins every movable-modal box, even where
+			 * Platinum shows none. */
+			const enum decor_part parts[] = { DECOR_PART_CLOSE,
+				DECOR_PART_ZOOM, DECOR_PART_COLLAPSE };
+			for (int i = 0; i < 3; i++) {
+				if (!dialog_box_on(st, parts[i], act)) {
+					continue;
+				}
+				int bx, by;
+				decor_box_origin(st, parts[i], &bx, &by);
+				if (bx < 0) {
+					continue;
+				}
+				if (!paint_themed_box(c, st, parts[i], bx, by,
+						st->pressed == parts[i])) {
+					break; /* plain art missing: keep Platinum's bare bar */
+				}
+			}
+		}
+	}
 	paint_title(c, st);
 }
 
@@ -497,11 +1031,17 @@ void decor_paint(struct pl_canvas *c, const struct decor_state *st) {
 	const uint32_t border = act ? chrome("frame-border", C_BLACK) : chrome("frame-border-inactive", C_555);
 	const uint32_t face = act ? chrome("frame-face", C_CCC) : chrome("frame-face-inactive", C_DDD);
 
+	const bool has_bar = bar_themed(st, act);
 	/* Frame fill, never touching the client area. */
 	if (st->collapsed) {
 		chrome_fill_slot(c, 0, 0, W - 1, H - 1, CHROME_DOC_TOP, act, face);
 	} else {
-		chrome_fill_slot(c, 0, 0, W - 1, DECOR_TOP - 1, CHROME_DOC_TOP, act, face);
+		/* The title row is the themed bar's own canvas when one is
+		 * installed (its tab stays transparent past its end caps);
+		 * otherwise the frame skin fills it. */
+		if (!has_bar) {
+			chrome_fill_slot(c, 0, 0, W - 1, DECOR_TOP - 1, CHROME_DOC_TOP, act, face);
+		}
 		chrome_fill_slot(c, 0, H - DECOR_BOTTOM, W - 1, H - 1, CHROME_DOC_BOTTOM, act, face);
 		chrome_fill_slot(c, 0, DECOR_TOP, DECOR_LEFT - 1, H - DECOR_BOTTOM - 1, CHROME_DOC_LEFT, act, face);
 		chrome_fill_slot(c, W - DECOR_RIGHT, DECOR_TOP, W - 1, H - DECOR_BOTTOM - 1, CHROME_DOC_RIGHT, act, face);
@@ -509,22 +1049,39 @@ void decor_paint(struct pl_canvas *c, const struct decor_state *st) {
 
 	const uint32_t highlight = chrome("frame-light", C_WHITE);
 	const uint32_t shadow = chrome("frame-dark", C_999);
-	pl_outline(c, 0, 0, W - 1, H - 1, border);
-	if (act) {
-		pl_hline(c, 1, W - 3, 1, highlight);
-		pl_vline(c, 1, 1, H - 3, highlight);
-		pl_vline(c, W - 2, 2, H - 2, shadow);
-		pl_hline(c, 2, W - 2, H - 2, shadow);
+	if (has_bar) {
+		if (!st->collapsed) {
+			pl_vline(c, 0, DECOR_TOP, H - 1, border);
+			pl_vline(c, W - 1, DECOR_TOP, H - 1, border);
+			pl_hline(c, 0, W - 1, H - 1, border);
+			if (act) {
+				pl_vline(c, 1, DECOR_TOP, H - 3, highlight);
+				pl_vline(c, W - 2, DECOR_TOP, H - 2, shadow);
+				pl_hline(c, 2, W - 2, H - 2, shadow);
+			}
+		}
+	} else {
+		pl_outline(c, 0, 0, W - 1, H - 1, border);
+		if (act) {
+			pl_hline(c, 1, W - 3, 1, highlight);
+			pl_vline(c, 1, 1, H - 3, highlight);
+			pl_vline(c, W - 2, 2, H - 2, shadow);
+			pl_hline(c, 2, W - 2, H - 2, shadow);
+		}
 	}
 
 	/* Drop shadow: 1 px, offset 2 px in from the corners. */
-	pl_vline(c, W, 2, H, border);
+	const int shadow_top = (has_bar && title_cluster_left(st) && span_tile_get(act))
+		? DECOR_TOP - 5 : 2;
+	pl_vline(c, W, shadow_top, H, border);
 	pl_hline(c, 2, W, H, border);
 
 	if (!st->collapsed) {
-		if (act) {
+		if (act && !has_bar) {
 			pl_hline(c, 4, W - 6, 20, shadow);
 			pl_vline(c, 4, 20, H - 6, shadow);
+		} else if (act) {
+			pl_vline(c, 4, DECOR_TOP, H - 6, shadow);
 		}
 		pl_outline(c, 5, 21, W - 6, H - 6, border);
 		if (act) {
@@ -535,17 +1092,22 @@ void decor_paint(struct pl_canvas *c, const struct decor_state *st) {
 			paint_grow(c, st);
 		}
 	}
+	if (has_bar) {
+		paint_themed_bar(c, st, W, act);
+	}
 
 	if (act) {
 		int bx, by;
 		const enum decor_part boxes[] = {
 			DECOR_PART_CLOSE, DECOR_PART_ZOOM, DECOR_PART_COLLAPSE,
 		};
-		const bool present[] = { st->has_close, st->has_zoom, st->has_collapse };
+		const bool present[] = { dialog_close_box(st), st->has_zoom, st->has_collapse };
 		for (int i = 0; i < 3; i++) {
 			if (present[i]) {
 				decor_box_origin(st, boxes[i], &bx, &by);
-				paint_box(c, bx, by, boxes[i], st->pressed == boxes[i]);
+				if (!paint_themed_box(c, st, boxes[i], bx, by, st->pressed == boxes[i])) {
+					paint_box(c, bx, by, boxes[i], st->pressed == boxes[i]);
+				}
 			}
 		}
 	}
@@ -586,9 +1148,21 @@ enum decor_part decor_hit(const struct decor_state *st, int x, int y) {
 		return DECOR_PART_BORDER;
 	}
 	if (st->style == DECOR_STYLE_MOVABLE_MODAL) {
-		/* Dialogs move by their title bar only. */
+		/* Dialogs move by their title bar, except for themed boxes. */
 		const struct decor_margins m = decor_margins(st->style);
 		if (y < 22) {
+			if (st->active) {
+				const enum decor_part boxes[] = { DECOR_PART_CLOSE,
+					DECOR_PART_ZOOM, DECOR_PART_COLLAPSE };
+				for (int i = 0; i < 3; i++) {
+					if (!dialog_box_on(st, boxes[i], st->active)) {
+						continue;
+					}
+					if (in_box(st, boxes[i], x, y)) {
+						return boxes[i];
+					}
+				}
+			}
 			return DECOR_PART_DRAG;
 		}
 		if (x >= m.left && x < W - m.right && y >= m.top && y < H - m.bottom) {
@@ -613,8 +1187,9 @@ enum decor_part decor_hit(const struct decor_state *st, int x, int y) {
 	if (st->has_grow && x >= W - DECOR_GROW_INSET && y >= H - DECOR_GROW_INSET) {
 		return DECOR_PART_GROW;
 	}
+	const struct decor_margins dm = decor_margins(st->style);
 	if (x >= DECOR_LEFT && x < W - DECOR_RIGHT &&
-			y >= DECOR_TOP && y < H - DECOR_BOTTOM) {
+			y >= dm.top && y < H - DECOR_BOTTOM) {
 		return DECOR_PART_CLIENT;
 	}
 	return DECOR_PART_DRAG;

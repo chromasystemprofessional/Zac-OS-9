@@ -417,10 +417,16 @@ void prefs_apply(struct plat_server *server) {
 	if (main) {
 		server->output_scale = main->wlr_output->scale;
 	}
-	/* Window frames at a screen's new scale, or its new place. */
+	/* Window frames at a screen's new scale, its new place, or a new
+	 * theme's chrome, margins and title font. */
 	struct plat_view *view;
 	wl_list_for_each(view, &server->views, link) {
-		frame_commit(view->frame);
+		if (!view->mapped) {
+			continue;
+		}
+		view->frame->title_max = -1;
+		view->frame->dirty = true;
+		view_update_frame(view);
 	}
 	tablet_map(server); /* the Tablet panel's screen, or a new main display */
 	touch_map(server);

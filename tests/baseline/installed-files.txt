@@ -231,13 +231,16 @@
 {prefix}/share/zacos9/sounds/woodblock.wav
 {prefix}/share/zacos9/store/catalog.json
 {prefix}/share/zacos9/themes/Default/theme.conf
+{prefix}/share/zacos9/tools/build_cursors.py
 {prefix}/share/zacos9/tools/extract-macos9-theme.py
+{prefix}/share/zacos9/tools/macfont.py
 {prefix}/share/zacos9/tools/macicons.py
 {prefix}/share/zacos9/tools/macpat.py
 {prefix}/share/zacos9/tools/macpict.py
 {prefix}/share/zacos9/tools/macsnd.py
 {prefix}/share/zacos9/tools/macfont.py
 {prefix}/share/zacos9/tools/pngwrite.py
+{prefix}/share/zacos9/whatsnew/1.7.0.txt
 {prefix}/share/zacos9/xdg/foot/foot.ini
 {prefix}/share/zacos9/xdg/xdg-desktop-portal/zacos9-portals.conf
 {prefix}/share/zacos9/xdg/zacos9-mimeapps.list
@@ -245,3 +248,4 @@
 {sysconfdir}/grub.d/31_zacos9_haiku
 {sysconfdir}/pam.d/zacos9-lock
 {sysconfdir}/pam.d/zacos9-screenshare
+{sysconfdir}/xdg/autostart/zacos9-whatsnew.desktop

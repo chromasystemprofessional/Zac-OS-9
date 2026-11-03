@@ -153,7 +153,7 @@ for supported containers, eject behavior, authentication and limitations.
 
 Appearance also supports saved appearance presets and interface sound sets.
 Use its **Themes** and **Sound Sets** tabs, with custom files under
-**System Folder > Appearance > Themes** or **Sound Themes**.
+**System Folder > Appearance > Theme Files** or **Sound Themes**.
 See [Themes and sound sets](themes.md) for formats and compatibility limits.
 
 Place your own or freely licensed tiles in **System Folder > Appearance >

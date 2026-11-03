@@ -1,9 +1,11 @@
 /*
  * zacos9-appearance: the Appearance control panel.
  *
- *   zacos9-appearance [color | desktop | wallpaper | sound | themes | sound-themes | options]
+ *   zacos9-appearance [themes | appearance | fonts | desktop | sound | options]
  *
- * The argument picks the tab it opens on.
+ * The argument picks the tab it opens on (Mac OS 9's order). Older names
+ * still work: color means appearance, wallpaper means desktop, and
+ * sound-themes means sound.
  */
 #include <QApplication>
 
@@ -18,8 +20,9 @@ int main(int argc, char *argv[]) {
 
 	AppearancePanel panel;
 	const QString tab = argc > 1 ? QString::fromUtf8(argv[1]) : QString();
-	panel.showTab(tab == "desktop" ? 1 : tab == "wallpaper" ? 2 : tab == "sound" ? 3
-		: tab == "themes" ? 4 : tab == "sound-themes" ? 5 : tab == "options" ? 6 : 0);
+	panel.showTab(tab == "appearance" || tab == "color" ? 1 : tab == "fonts" ? 2
+		: tab == "desktop" || tab == "wallpaper" ? 3 : tab == "sound" || tab == "sound-themes" ? 4
+		: tab == "options" ? 5 : 0);
 	panel.show();
 	return app.exec();
 }

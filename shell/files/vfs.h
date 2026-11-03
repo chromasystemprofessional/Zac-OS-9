@@ -153,9 +153,13 @@ void vfsShowAllHidden();
 /* Can items be dropped into this virtual folder? A Backed one, Fonts,
  * Applications (where a dropped install file is installed), Startup Items
  * (where a dropped application is set to open at login), Sounds (where a
- * dropped recording becomes an alert sound) and the two Control Panels and
+ * dropped recording becomes an alert sound), the System Folder itself
+ * (theme files are routed to Theme Files) and the two Control Panels and
  * Extensions folders (which turn an item on or off). */
 bool vfsAcceptsDrops(const QString &path);
+/* The System Folder itself: drops onto it are routed (theme files go to
+ * Appearance > Theme Files with Mac OS 9's message). */
+bool vfsIsSystemFolder(const QString &path);
 /* Startup Items: the folder itself, the desktop-file ID one of its items
  * stands for ("" for anything else), and where the folder is. */
 bool vfsIsStartupItems(const QString &path);

@@ -443,7 +443,16 @@ QStringList transferItems(const QStringList &paths, const QString &destDir, bool
 			continue;
 		}
 		const QString target = dest.filePath(name);
-		const QString resource = info.absolutePath() + "/._" + info.fileName();
+		QString resource = info.absolutePath() + "/._" + info.fileName();
+		if (!QFileInfo::exists(resource)) {
+			/* SheepShaver's shared folders keep the fork in .rsrc/<name>
+			 * (with .finf/<name> beside it), not in an AppleDouble file:
+			 * carry it along as ._<name> at the destination. */
+			const QString rsrc = info.absolutePath() + "/.rsrc/" + info.fileName();
+			if (QFileInfo::exists(rsrc)) {
+				resource = rsrc;
+			}
+		}
 		const QString resourceTarget = dest.filePath("._" + name);
 		if (reserved.contains(target)) {
 			Alert::ask("More than one selected item has the same destination name: “" + name +
@@ -575,6 +584,79 @@ QStringList draggedPaths(const QMimeData *mime) {
 		}
 	}
 	return paths;
+}
+
+/* A Mac OS 9 theme file by content, mirroring customthemes' own check: a
+ * 16-byte header naming data and map sections that exactly fill the file,
+ * else a tail map offset pointing back into it. AppleDouble files carry
+ * the fork instead (magic 0x00051607). */
+static bool themeLooksLikeFork(const QString &path) {
+	QFile f(path);
+	if (!f.open(QIODevice::ReadOnly) || f.size() < 16) {
+		return false;
+	}
+	const QByteArray head = f.read(16);
+	auto u32 = [&head](int i) {
+		return (quint32)(uchar)head[i] << 24 | (quint32)(uchar)head[i + 1] << 16 |
+			(quint32)(uchar)head[i + 2] << 8 | (quint32)(uchar)head[i + 3];
+	};
+	const quint64 size = (quint64)f.size();
+	if (head.left(4) == QByteArray("\x00\x05\x16\x07", 4)) {
+		return true;
+	}
+	if (u32(0) + (quint64)u32(8) + u32(12) == size && u32(4) > 0 &&
+			u32(4) < size && u32(8) > 0 && u32(12) > 0) {
+		return true;
+	}
+	if (!f.seek(size - 4)) {
+		return false;
+	}
+	const QByteArray tail = f.read(4);
+	const quint32 map = (quint32)(uchar)tail[0] << 24 | (quint32)(uchar)tail[1] << 16 |
+		(quint32)(uchar)tail[2] << 8 | (quint32)(uchar)tail[3];
+	return 0 < map + 28 && map + 28 <= size;
+}
+
+static bool isMacThemeFile(const QString &path) {
+	const QFileInfo info(path);
+	if (!info.exists() || info.isDir() || info.isSymLink()) {
+		return false;
+	}
+	if (info.fileName().startsWith("._")) {
+		return themeLooksLikeFork(path);
+	}
+	if (themeLooksLikeFork(path)) {
+		return true;
+	}
+	const QString dir = info.absolutePath(), base = info.fileName();
+	for (const QString &cand : { dir + "/._" + base, dir + "/.rsrc/" + base }) {
+		if (QFileInfo::exists(cand) && !QFileInfo(cand).isDir() && themeLooksLikeFork(cand)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+static QString appearanceBaseFolder() {
+	return QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) +
+		"/zacos9/appearance";
+}
+
+static bool isInsideAppearanceFolder(const QString &realPath) {
+	if (realPath.isEmpty()) {
+		return false;
+	}
+	const QString base = QDir(appearanceBaseFolder()).absolutePath();
+	const QString abs = QDir(realPath).absolutePath();
+	return abs == base || abs.startsWith(base + "/");
+}
+
+static bool isThemeFilesFolderReal(const QString &realPath) {
+	if (realPath.isEmpty()) {
+		return false;
+	}
+	return QDir(realPath).absolutePath() ==
+		QDir(appearanceThemesFolder()).absolutePath();
 }
 
 /* Gray dotted outline of an icon's silhouette and its label box. */
@@ -1432,12 +1514,172 @@ void dropItems(QDropEvent *e, const Item *target, const QString &folder) {
 		return;
 	}
 	if (vfsIsVirtual(dest)) {
+		/* Mac OS 9 theme files dropped anywhere in the System Folder
+		 * (or onto the System Folder itself) belong in Appearance >
+		 * Theme Files: offer to put them there, as Mac OS 9 did. */
+		const QString destVfs = dest;
+		const QString destId = vfsIdOf(destVfs);
+		const QString destReal = vfsOpensAs(destVfs);
+		const bool isThemeFilesVfs = destId == "system-folder/appearance/theme-files";
+		const bool isThemeFiles = isThemeFilesVfs || isThemeFilesFolderReal(destReal);
+		if (!isThemeFiles) {
+			const bool toSystemFolder = vfsIsSystemFolder(destVfs);
+			const bool insideSystemVfs = !destId.isEmpty() &&
+				(destId == "system-folder" || destId.startsWith("system-folder/"));
+			const bool insideAppearance = isInsideAppearanceFolder(destReal);
+			if (toSystemFolder || insideSystemVfs || insideAppearance) {
+				QStringList themes, rest;
+				for (const QString &path : paths) {
+					if (isMacThemeFile(path)) {
+						themes << path;
+					} else {
+						rest << path;
+					}
+				}
+				if (!themes.isEmpty()) {
+					const QString message = themes.size() == 1
+						? "This item needs to be stored in the Theme Files folder "
+						  "(in the Appearance folder) in order to be available to "
+						  "the computer. Put it there now?"
+						: "These items need to be stored in the Theme Files folder "
+						  "(in the Appearance folder) in order to be available to "
+						  "the computer. Put them there now?";
+					const QString themeDest = appearanceThemesFolder();
+					QDir().mkpath(themeDest);
+					const bool themeOption = (e->modifiers() & Qt::AltModifier) != 0;
+					const bool themeCopied = themeOption || std::any_of(themes.begin(), themes.end(),
+						[&themeDest](const QString &path) { return !sameDisk(path, themeDest); });
+					if (e->source()) {
+						/* Release the drag grab before the modal question. */
+						e->setDropAction(themeCopied ? Qt::CopyAction : Qt::MoveAction);
+						e->accept();
+						QTimer::singleShot(0, QCoreApplication::instance(),
+							[themes, rest, destReal, message, themeDest, themeOption] {
+							if (!Alert::ask(message, "OK", "Cancel")) {
+								return;
+							}
+							const QStringList changed = transferItems(themes, themeDest, themeOption);
+							for (const auto &folder : changed) {
+								Finder::instance().folderChanged(folder);
+							}
+							if (!rest.isEmpty() && !destReal.isEmpty()) {
+								const QStringList restChanged = transferItems(rest, destReal, themeOption);
+								for (const auto &folder : restChanged) {
+									Finder::instance().folderChanged(folder);
+								}
+							}
+						});
+						return;
+					}
+					if (!Alert::ask(message, "OK", "Cancel")) {
+						e->ignore();
+						return;
+					}
+					const QStringList changed = transferItems(themes, themeDest, themeOption);
+					for (const QString &d : changed) {
+						finder.folderChanged(d);
+					}
+					if (!rest.isEmpty()) {
+						if (destReal.isEmpty()) {
+							Alert::ask("The other items do not belong in the System Folder itself. "
+								"Put each where it belongs, inside one of its folders.",
+								"OK", QString());
+						} else {
+							bool restFinished = false;
+							const QStringList restChanged = transferItems(rest, destReal,
+								themeOption, &restFinished);
+							for (const QString &d : restChanged) {
+								finder.folderChanged(d);
+							}
+						}
+					}
+					e->setDropAction(themeCopied ? Qt::CopyAction : Qt::MoveAction);
+					e->accept();
+					return;
+				}
+				if (toSystemFolder) {
+					Alert::ask("Items in the System Folder belong in one of the folders "
+						"inside it (such as Appearance, Extensions or Fonts).",
+						"OK", QString());
+					e->ignore();
+					return;
+				}
+			}
+		}
 		/* Documents and the other folders standing for real directories
 		 * take files; the curated ones have nowhere to put them. */
-		dest = vfsOpensAs(dest);
+		dest = destReal;
 		if (dest.isEmpty()) {
 			e->ignore();
 			return;
+		}
+	} else {
+		/* A real folder inside Appearance (the open Appearance window or
+		 * one of its folders) takes theme files to Theme Files instead,
+		 * as dropping them in the wrong folder did on Mac OS 9. */
+		if (!isThemeFilesFolderReal(dest) && isInsideAppearanceFolder(dest)) {
+			QStringList themes, rest;
+			for (const QString &path : paths) {
+				if (isMacThemeFile(path)) {
+					themes << path;
+				} else {
+					rest << path;
+				}
+			}
+			if (!themes.isEmpty()) {
+				const QString message = themes.size() == 1
+					? "This item needs to be stored in the Theme Files folder "
+					  "(in the Appearance folder) in order to be available to "
+					  "the computer. Put it there now?"
+					: "These items need to be stored in the Theme Files folder "
+					  "(in the Appearance folder) in order to be available to "
+					  "the computer. Put them there now?";
+				const QString themeDest = appearanceThemesFolder();
+				QDir().mkpath(themeDest);
+				const bool themeOption = (e->modifiers() & Qt::AltModifier) != 0;
+				const bool themeCopied = themeOption || std::any_of(themes.begin(), themes.end(),
+					[&themeDest](const QString &path) { return !sameDisk(path, themeDest); });
+				if (e->source()) {
+					e->setDropAction(themeCopied ? Qt::CopyAction : Qt::MoveAction);
+					e->accept();
+					QTimer::singleShot(0, QCoreApplication::instance(),
+						[themes, rest, dest, message, themeDest, themeOption] {
+						if (!Alert::ask(message, "OK", "Cancel")) {
+							return;
+						}
+						const QStringList changed = transferItems(themes, themeDest, themeOption);
+						for (const auto &folder : changed) {
+							Finder::instance().folderChanged(folder);
+						}
+						if (!rest.isEmpty()) {
+							const QStringList restChanged = transferItems(rest, dest, themeOption);
+							for (const auto &folder : restChanged) {
+								Finder::instance().folderChanged(folder);
+							}
+						}
+					});
+					return;
+				}
+				if (!Alert::ask(message, "OK", "Cancel")) {
+					e->ignore();
+					return;
+				}
+				const QStringList changed = transferItems(themes, themeDest, themeOption);
+				for (const QString &d : changed) {
+					finder.folderChanged(d);
+				}
+				if (!rest.isEmpty()) {
+					bool restFinished = false;
+					const QStringList restChanged = transferItems(rest, dest,
+						themeOption, &restFinished);
+					for (const QString &d : restChanged) {
+						finder.folderChanged(d);
+					}
+				}
+				e->setDropAction(themeCopied ? Qt::CopyAction : Qt::MoveAction);
+				e->accept();
+				return;
+			}
 		}
 	}
 	const bool option = (e->modifiers() & Qt::AltModifier) ||

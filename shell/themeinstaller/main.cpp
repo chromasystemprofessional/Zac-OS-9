@@ -8,6 +8,7 @@
 
 #include <QApplication>
 #include <QCoreApplication>
+#include <QDebug>
 #include <QDir>
 #include <QFileDialog>
 #include <QFileInfo>
@@ -28,6 +29,7 @@
 #include "programs.h"
 #include "settings.h"
 #include "theme.h"
+#include "items.h"
 
 static QString extractorPath() {
 	/* From a build tree, the source tree's copy; installed, under data dir. */
@@ -121,9 +123,15 @@ static QString resolveResourceFork(const QString &file) {
 	return file;
 }
 
-/* The theme name from a file: the basename without extension or " copy". */
+/* The theme name from a file: the basename without AppleDouble prefix,
+ * known file extension, or " copy" (preserving version numbers like 1.0.2). */
 static QString nameFromFile(const QString &file) {
-	QString base = QFileInfo(file).completeBaseName();
+	QString base = QFileInfo(file).fileName();
+	if (base.startsWith("._")) {
+		base = base.mid(2);
+	}
+	base.replace(QRegularExpression("\\.(rsrc|bin|theme)$",
+		QRegularExpression::CaseInsensitiveOption), "");
 	base.replace(QRegularExpression(" copy$", QRegularExpression::CaseInsensitiveOption), "");
 	return base.trimmed();
 }
@@ -131,7 +139,7 @@ static QString nameFromFile(const QString &file) {
 /* The Appearance control panel lists JSON presets from this folder. */
 static QString appearanceThemesFolder() {
 	return QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) +
-		"/zacos9/appearance/Themes";
+		"/zacos9/appearance/Theme Files";
 }
 
 /* Read a key=value from the extracted theme.conf ("" when unset). */
@@ -153,13 +161,19 @@ static QString themeConfValue(const QString &name, const QString &key) {
 }
 
 /* Write the appearance preset JSON that the Appearance panel's Themes list
- * shows, so the extracted theme appears there and applies its settings. */
-static QString writeAppearancePreset(const QString &name, const QString &wallpaper,
-		const QString &pattern, const QString &alert, const QString &soundTheme,
-		QString *error) {
-	const QString folder = appearanceThemesFolder();
+ * shows, so the extracted theme appears there and applies its settings.
+ * It lives beside the source file when that sits in Theme Files (each
+ * theme keeps its paperwork in its own folder); a file picked from
+ * elsewhere lands its preset in Theme Files itself. */
+static QString writeAppearancePreset(const QString &file, const QString &name, const QString &wallpaper,
+		const QString &pattern, const QString &alert, const QString &fontFamily,
+		const QString &soundTheme, QString *error) {
+	QString folder = QFileInfo(file).absolutePath();
+	if (!folder.startsWith(appearanceThemesFolder())) {
+		folder = appearanceThemesFolder();
+	}
 	if (!QDir().mkpath(folder)) {
-		*error = "Couldn't create the appearance Themes folder.";
+		*error = "Couldn't create the appearance Theme Files folder.";
 		return QString();
 	}
 	const QString filename = QString::fromLatin1(QCryptographicHash::hash(
@@ -176,6 +190,7 @@ static QString writeAppearancePreset(const QString &name, const QString &wallpap
 	put("pattern", pattern);
 	put("wallpaper", wallpaper);
 	put("alert-sound", alert);
+	put("font-family", fontFamily);
 	put("sound-theme", soundTheme);
 	put("theme-bundle", name);
 	QSaveFile output(path);
@@ -185,8 +200,53 @@ static QString writeAppearancePreset(const QString &name, const QString &wallpap
 		*error = output.errorString();
 		return QString();
 	}
+	/* The id the Appearance panel lists it under: the path relative to
+	 * Theme Files, so same-named presets in different folders stay
+	 * distinct (a root preset's id is unchanged). */
+	const QString rel = QDir(appearanceThemesFolder()).relativeFilePath(path);
 	return "theme:" + QString::fromLatin1(QCryptographicHash::hash(
-		filename.toUtf8(), QCryptographicHash::Sha256).toHex().left(24));
+		rel.toUtf8(), QCryptographicHash::Sha256).toHex().left(24));
+}
+
+/* Copy the decoded TrueType faces into the user's fonts and register
+ * them, returning the theme's preferred program font: its system font
+ * when decoded, else its views font (""). */
+static QString installThemeFonts(const QString &name) {
+	const QString src = outputDir(name) + "/fonts";
+	const QFileInfoList files = QDir(src).entryInfoList({ "*.ttf", "*.TTF" }, QDir::Files, QDir::Name);
+	if (files.isEmpty()) {
+		return QString();
+	}
+	const QString dest = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) +
+		"/fonts/zacos9";
+	QDir().mkpath(dest);
+	for (const QFileInfo &file : files) {
+		QFile::remove(dest + "/" + file.fileName());
+		QFile::copy(file.filePath(), dest + "/" + file.fileName());
+	}
+	/* Never waitForFinished(): pump events until fc-cache exits. */
+	QProcess process;
+	process.setProgram("fc-cache");
+	process.setArguments({ "-f", dest });
+	process.start();
+	QEventLoop loop;
+	QObject::connect(&process, &QProcess::finished, &loop, &QEventLoop::quit);
+	QObject::connect(&process, &QProcess::errorOccurred, [&](QProcess::ProcessError e) {
+		if (e == QProcess::FailedToStart) {
+			loop.quit();
+		}
+	});
+	loop.exec();
+	const QStringList families = themeConfValue(name, "font-families").split(',', Qt::SkipEmptyParts);
+	const QString system = themeConfValue(name, "system-font").trimmed();
+	if (!system.isEmpty() && families.contains(system)) {
+		return system;
+	}
+	const QString views = themeConfValue(name, "views-font").trimmed();
+	if (!views.isEmpty() && families.contains(views)) {
+		return views;
+	}
+	return QString();
 }
 
 /* The id the Appearance panel gives a PNG in the Desktop Patterns (user) or
@@ -214,7 +274,18 @@ static void installThemeAssets(const QString &name, QString *wallpaper,
 		const QString src = outputDir(name) + "/" + f.sub;
 		const QString dest = base + "/" + f.dest;
 		QDir().mkpath(dest);
-		QFileInfoList files = QDir(src).entryInfoList(QDir::Files, QDir::Name);
+		QFileInfoList all = QDir(src).entryInfoList(QDir::Files, QDir::Name);
+		/* Only the decoded assets install: the bundle keeps the raw
+		 * resource dumps (*.bin) alongside for reference, and a preset
+		 * pointing at one fails to apply ("pattern is missing"). */
+		const QStringList keptExt = (f.sub == QStringLiteral("sounds"))
+			? QStringList{ "wav" } : QStringList{ "png" };
+		QFileInfoList files;
+		for (const QFileInfo &file : all) {
+			if (keptExt.contains(file.suffix(), Qt::CaseInsensitive)) {
+				files << file;
+			}
+		}
 		if (f.sub == QStringLiteral("patterns")) {
 			// Only the desktop pattern (scen patt) and mono PAT tiles are
 			// desktop art; the colour-pattern files are widget skins.
@@ -260,10 +331,6 @@ static void installThemeAssets(const QString &name, QString *wallpaper,
 	}
 }
 
-/* The sound-theme catalog id for a Mac sound set name (its sndt): the set's
- * path in Sound Themes, with any AppleDouble leaf resolved, hashed the way
- * shell/panels/zacos9-soundthemes does ("user:" + SHA-256, first 32 hex).
- * "" when the set isn't installed. */
 static QString soundThemeId(const QString &soundThemes, const QString &setName) {
 	if (setName.isEmpty()) {
 		return QString();
@@ -302,7 +369,6 @@ static QString soundThemeId(const QString &soundThemes, const QString &setName) 
 	return QString();
 }
 
-/* Set a key=value line in the bundle's theme.conf, adding it when absent. */
 static void setThemeConfValue(const QString &name, const char *key, const QString &value) {
 	const QString path = outputDir(name) + "/theme.conf";
 	QFile f(path);
@@ -328,7 +394,6 @@ static void setThemeConfValue(const QString &name, const char *key, const QStrin
 	}
 }
 
-/* Copy a folder tree, keeping its AppleDouble (._) companions. */
 static bool copyTree(const QString &src, const QString &dst) {
 	if (!QDir().mkpath(dst)) {
 		return false;
@@ -351,9 +416,6 @@ static bool copyTree(const QString &src, const QString &dst) {
 	return ok;
 }
 
-/* Copy every Mac OS 9 sound set (file or folder, with its ._ companion) from
- * the Sound Sets folder into Sound Themes. The shell then applies each set
- * through its own sdid/snd# mapping, as Mac OS 9 does. Returns the count. */
 static int copyMacSoundSets(const QString &src, const QString &dst) {
 	int count = 0;
 	const QFileInfoList entries = QDir(src).entryInfoList(
@@ -384,6 +446,23 @@ static int copyMacSoundSets(const QString &src, const QString &dst) {
 	return count;
 }
 
+static void stampThemeFileIcon(const QString &file, const QString &name) {
+	const QImage icon(outputDir(name) + "/file-icon.png");
+	if (icon.isNull()) {
+		return;
+	}
+	QString target = file;
+	const QString base = QFileInfo(file).fileName();
+	if (base.startsWith("._")) {
+		const QString sibling = QFileInfo(file).absolutePath() + "/" + base.mid(2);
+		if (QFileInfo::exists(sibling)) {
+			target = sibling;
+		}
+	}
+	if (!writeCustomIconImage(target, icon)) {
+		qWarning() << "Could not stamp the theme file's icon onto" << target;
+	}
+}
 int main(int argc, char *argv[]) {
 	qputenv("QT_WAYLAND_DISABLE_WINDOWDECORATION", "1");
 	QApplication app(argc, argv);
@@ -470,7 +549,8 @@ int main(int argc, char *argv[]) {
 	const int soundSets = copyMacSoundSets(
 		QDir::homePath() + "/Classic/Appearance add-ons/Sound Sets", soundThemes);
 	const QString soundId = soundThemeId(soundThemes, themeConfValue(name, "sound-set"));
-	const QString presetId = writeAppearancePreset(name, wallpaper, pattern, alert, soundId, &error);
+	const QString fontFamily = installThemeFonts(name);
+	const QString presetId = writeAppearancePreset(file, name, wallpaper, pattern, alert, fontFamily, soundId, &error);
 	if (presetId.isEmpty()) {
 		if (batch) {
 			fprintf(stderr, "zacos9-themeinstaller: %s\n", qPrintable(error));
@@ -502,6 +582,13 @@ int main(int argc, char *argv[]) {
 	}
 	pl_setting_set("appearance-theme", presetId.toUtf8().constData());
 	pl_setting_set("theme-bundle", name.toUtf8().constData());
+	stampThemeFileIcon(file, name);
+	if (!fontFamily.isEmpty()) {
+		pl_setting_set("font-family", fontFamily.toUtf8().constData());
+	}
+	/* The desktop background and alert sound live in the preset, not
+	 * theme.conf: apply them here so installing a theme repaints the
+	 * desktop, not just its window chrome. */
 	zac_theme_apply();
 	if (batch) {
 		printf("installed %s (%d sound sets)\n", qPrintable(outputDir(name)), soundSets);
