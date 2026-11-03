@@ -922,9 +922,9 @@ def test_bar_tiles_align():
     # every bar tile is saved at the middle's height from its first inked
     # row, so the ends are not shorter than the middle.
     pxm = {pid: [_pxm_body()] for pid in (200, 210, 220)}
-    pxm[6176] = [_pxm_body(22, 13)]  # left cap, 13 rows
-    pxm[6173] = [_pxm_body(22, 13)]  # right cap
-    pxm[6170] = [_pxm_body(22, 6)]   # middle, 6 rows
+    pxm[6176] = [_pxm_body(13, 22)]  # left cap: 13 rows, 22 columns
+    pxm[6173] = [_pxm_body(13, 22)]  # right cap
+    pxm[6170] = [_pxm_body(6, 22)]   # middle: 6 rows
     layo = {128: _layo_body([
         (b"pxm#", 6176, 256, 0),
         (b"pxm#", 6170, 256, 0),
