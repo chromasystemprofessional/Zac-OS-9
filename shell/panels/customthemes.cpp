@@ -85,6 +85,17 @@ static bool themeCompanionExists(const QFileInfo &file) {
  * and its folder still holds a preset: an installed theme is never
  * imported twice, while a re-dropped folder whose preset was deleted
  * regenerates it. */
+/* The extractor's own SHA-256: a bundle records it when it is built, so a
+ * ZacOS update that can decode more than the old one rebuilds the bundle
+ * instead of keeping what the old extractor could not fill in. */
+static QString extractorHash() {
+	QFile f(themeExtractorPath());
+	if (!f.open(QIODevice::ReadOnly)) {
+		return QString();
+	}
+	return QString::fromLatin1(QCryptographicHash::hash(f.readAll(), QCryptographicHash::Sha256).toHex());
+}
+
 static bool themeSourceImported(const QString &fork) {
 	if (fork.isEmpty()) {
 		return false;
@@ -93,6 +104,7 @@ static bool themeSourceImported(const QString &fork) {
 	if (QDir(forkDir).entryInfoList(QStringList("*.json"), QDir::Files).isEmpty()) {
 		return false;
 	}
+	const QString want = extractorHash();
 	const QString root = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) +
 		"/zacos9/themes";
 	for (const QFileInfo &bundle : QDir(root).entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot)) {
@@ -101,12 +113,21 @@ static bool themeSourceImported(const QString &fork) {
 			continue;
 		}
 		QTextStream in(&conf);
-		QString line;
+		QString line, source, hash;
 		while (in.readLineInto(&line)) {
-			if (line == "source=" + fork) {
-				return true;
+			if (line.startsWith("source=")) {
+				source = line.mid(7);
+			} else if (line.startsWith("extractor-sha256=")) {
+				hash = line.mid(17);
 			}
 		}
+		if (source != fork) {
+			continue;
+		}
+		if (!want.isEmpty() && hash != want) {
+			continue; /* built by an older extractor: import again */
+		}
+		return true;
 	}
 	return false;
 }

@@ -72,8 +72,8 @@ THEME_ICON_MAP = [
     ("trash-empty", b"icl8", -3993),
     ("trash-full", b"icl8", -3984),
     ("document", b"icl8", -4000),
-    ("shared-folder", b"icl8", -3973),
-    ("network-disk", b"icl8", -3970),
+    ("disk", b"icl8", 400),
+    ("network-disk", b"icl8", -20725),
     ("disk-image", b"icl8", -3998),
     ("caution", b"icl8", 7202),
 ]
@@ -192,9 +192,11 @@ def write_theme_icons(theme_icons, cluts, out, theme_keys=frozenset(), theme_clu
 	for kind, rtype, rid in THEME_ICON_MAP:
 		has_theme_icns = (b"icns", rid) in theme_keys
 		has_theme_big = (rtype, rid) in theme_keys
+		# A helper's icns family can be its 1-bit art: only prefer icns
+		# when the theme file itself supplied one for this id.
 		big = decode_theme_icon(theme_icons, sys_palette, rtype, rid, 32,
 			1024 if rtype == b"icl8" else 512,
-			prefer_icns=has_theme_icns or not has_theme_big)
+			prefer_icns=has_theme_icns)
 		if big is None:
 			continue
 		pngwrite.write_png(os.path.join(icons_dir, kind + "-32.png"), 32, 32, big)
@@ -202,7 +204,7 @@ def write_theme_icons(theme_icons, cluts, out, theme_keys=frozenset(), theme_clu
 		has_theme_small = (small_type, rid) in theme_keys
 		small = decode_theme_icon(theme_icons, sys_palette, small_type, rid, 16,
 			256 if small_type == b"ics8" else 128,
-			prefer_icns=has_theme_icns or not has_theme_small)
+			prefer_icns=has_theme_icns)
 		if small is None:
 			small = pngwrite.nearest_scale(big, 32, 32, 16, 16)
 		pngwrite.write_png(os.path.join(icons_dir, kind + "-16.png"), 16, 16, small)
@@ -218,6 +220,9 @@ def parse_resource_fork(data):
 	offset; where a fork's map is missing or odd, we fall back to reading the
 	data section in order, matching the map's type counts. Returns a list of
 	(type, id, body) tuples."""
+	MAX_MAP_TYPES = 4096
+	MAX_MAP_RESOURCES = 20000
+	MAX_MAP_BYTES = 64 * 1024 * 1024
 	if len(data) < 16:
 		return []
 	data_offset, map_offset, data_length, map_length = struct.unpack(">IIII", data[:16])
@@ -232,7 +237,15 @@ def parse_resource_fork(data):
 		if tl + 2 > len(data):
 			return []
 		items = []
+		total = 0
 		num_types = struct.unpack(">H", data[tl:tl + 2])[0] + 1
+		# A file that is not a resource fork (an AppleDouble header, say)
+		# can still satisfy the offsets above and then name tens of
+		# thousands of types whose reference list reads the same bytes.
+		# Real forks hold far fewer: stop before copying the same body
+		# until the memory runs out.
+		if num_types > MAX_MAP_TYPES:
+			return []
 		pos = tl + 2
 		for _ in range(num_types):
 			if pos + 8 > len(data):
@@ -242,10 +255,13 @@ def parse_resource_fork(data):
 			ref_list_off = struct.unpack(">H", data[pos + 6:pos + 8])[0]
 			pos += 8
 			# The reference list is just `num_res` 12-byte entries (no
-			# leading count): offset points straight at the first entry.
+			# leading count): offset points straight at the first entry,
+			# and it must lie inside the map section.
 			rp = tl + ref_list_off
+			if num_res > MAX_MAP_RESOURCES or rp + 12 * num_res > map_offset + map_length:
+				continue
 			for _ in range(num_res):
-				if rp + 12 > len(data):
+				if rp + 12 > len(data) or len(items) >= MAX_MAP_RESOURCES:
 					break
 				res_id = struct.unpack(">h", data[rp:rp + 2])[0]
 				abs_data_off = data_offset + int.from_bytes(data[rp + 5:rp + 8], "big")
@@ -255,7 +271,10 @@ def parse_resource_fork(data):
 				length = struct.unpack(">I", data[abs_data_off:abs_data_off + 4])[0]
 				if length == 0 or length > 100000 or abs_data_off + 4 + length > len(data):
 					continue
+				if total + length > MAX_MAP_BYTES:
+					return items
 				items.append((rtype, res_id, data[abs_data_off + 4:abs_data_off + 4 + length]))
+				total += length
 		return items
 
 	def sequential():
@@ -984,14 +1003,37 @@ def write_desktop_wallpaper(scen_tags, pictures_dir, out):
 	except OSError:
 		return False
 	os.makedirs(os.path.join(out, "wallpapers"), exist_ok=True)
+	# Recognise the picture formats a Mac OS 9 Desktop Pictures folder can
+	# hold. Anything but PNG is converted by the Theme Installer when it
+	# installs: the desktop loads wallpapers as PNG.
 	if data[:2] == b"\xff\xd8":
-		with open(os.path.join(out, "wallpapers", "desktop-wallpaper.jpg"), "wb") as f:
+		ext = "jpg"
+	elif data[:8] == b"\x89PNG\r\n\x1a\n":
+		ext = "png"
+	elif data[:6] in (b"GIF87a", b"GIF89a"):
+		ext = "gif"
+	elif data[:4] in (b"II*\x00", b"MM\x00*"):
+		ext = "tif"
+	elif data[:2] == b"BM":
+		ext = "bmp"
+	else:
+		ext = None
+	if ext:
+		with open(os.path.join(out, "wallpapers", "desktop-wallpaper." + ext), "wb") as f:
 			f.write(data)
 		return True
-	if data[:8] == b"\x89PNG\r\n\x1a\n":
-		with open(os.path.join(out, "wallpapers", "desktop-wallpaper.png"), "wb") as f:
-			f.write(data)
-		return True
+	# A PICT whose picture is the data fork (no .rsrc companion): the
+	# 512-byte PICT file header precedes the same opcodes a resource body
+	# holds, so try the body with and without it.
+	for body in ([data[512:]] if len(data) > 512 else []) + [data]:
+		try:
+			w, h, rows = macpict.decode_pict(body)
+		except (ValueError, IndexError, struct.error):
+			continue
+		if w >= WALLPAPER_MIN_SIDE and h >= WALLPAPER_MIN_SIDE:
+			pngwrite.write_png(os.path.join(out, "wallpapers", "desktop-wallpaper.png"),
+				w, h, rows)
+			return True
 	rsrc = os.path.join(os.path.dirname(found), ".rsrc", name)
 	try:
 		with open(rsrc, "rb") as f:
@@ -1849,13 +1891,17 @@ def main():
 			# file held artwork itself: an artless file stays refused
 			# even with a System file present. The theme file's own
 			# entries, if any, stay first and win.
-			system = find_mac_file(filepath, "System")
+			system = args.system or find_mac_file(filepath, "System")
 			if system:
 				collect_helper_fork(system, cluts, apple_menu, theme_icons, cursors)
 				fonts = fonts_dir_for(system)
 				if fonts:
 					collect_fonts_dir(fonts, assets)
-			finder = find_mac_file(filepath, "Finder")
+			# The Finder sits beside the System file, at the same level
+			# (or under the same .rsrc folder); it holds the desktop's
+			# volume icons.
+			finder = (find_mac_file(system, "Finder") if system else None) or \
+				find_mac_file(filepath, "Finder")
 			if finder:
 				collect_helper_fork(finder, cluts, apple_menu, theme_icons, cursors)
 	else:
@@ -2009,6 +2055,14 @@ def main():
 	with open(os.path.join(out, "theme.conf"), "w") as f:
 		f.write("name=%s\n" % (name or scen_name or "Mac OS 9 Theme"))
 		f.write("source=%s\n" % src)
+		# The Appearance panel rebuilds a bundle whose extractor has
+		# changed, so an updated ZacOS fills in assets an older one
+		# could not decode.
+		try:
+			with open(os.path.abspath(__file__), "rb") as _self:
+				f.write("extractor-sha256=%s\n" % hashlib.sha256(_self.read()).hexdigest())
+		except OSError:
+			pass
 		accent = args.accent or auto_accent
 		highlight = args.highlight or scen_highlight or auto_highlight
 		pattern = args.pattern
