@@ -165,6 +165,24 @@ int main(int argc, char **argv) {
 	check(usbBadgeDiffers && diskRemainsVisible,
 		"USB volume icon overlays a USB badge on the drive without replacing it");
 	{
+		/* Archives are packages of files, not blank documents. */
+		const std::vector<uint32_t> *zip = documentIcon("application/zip", PL_ICON_LARGE);
+		const std::vector<uint32_t> *sit = documentIcon("application/x-stuffit", PL_ICON_LARGE);
+		Pixels page(PL_ICON_LARGE, PL_ICON_LARGE);
+		pl_icon_paint(&page.c, 0, 0, PL_ICON_DOCUMENT, PL_ICON_LARGE, false);
+		bool differs = false;
+		if (zip && zip->size() == PL_ICON_LARGE * PL_ICON_LARGE) {
+			for (int y = 0; y < PL_ICON_LARGE && !differs; y++) {
+				for (int x = 0; x < PL_ICON_LARGE && !differs; x++) {
+					differs = (*zip)[static_cast<size_t>(y) * PL_ICON_LARGE + x] !=
+						page.img.pixel(x, y);
+				}
+			}
+		}
+		check(zip && sit && zip->size() == PL_ICON_LARGE * PL_ICON_LARGE && zip == sit &&
+				differs, "archives get their own zipped-page icon");
+	}
+	{
 		/* Mac OS 9 dims an open volume's desktop icon: at half strength
 		 * the pattern shows through until its window closes. */
 		Pixels solid(48, 48), dim(48, 48);

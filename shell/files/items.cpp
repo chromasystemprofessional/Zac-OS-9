@@ -538,9 +538,31 @@ static QString customIconStorePath(const QString &key) {
 		"/zacos9/custom-icons/" + QString::fromLatin1(hash) + ".png";
 }
 
+/* A file inside a backed VFS folder (Theme Files, Applications) has a
+ * virtual path with a real file behind it; the Theme Installer stamps
+ * its icon on the real file, so look there. */
+static QString vfsItemBacking(const QString &path) {
+	const int slash = path.lastIndexOf('/');
+	if (slash <= 0) {
+		return QString();
+	}
+	const VNode *parent = vfsNode(path.left(slash));
+	if (!parent || parent->kind != VKind::Backed || parent->backing.isEmpty()) {
+		return QString();
+	}
+	return parent->backing + "/" + path.mid(slash + 1);
+}
+
 static QImage directCustomIconImage(const QString &path) {
-	if (!vfsIsVirtual(path) && !QFileInfo(path).isSymLink()) {
-		const QByteArray name = QFile::encodeName(path);
+	QString real = path;
+	if (vfsIsVirtual(path)) {
+		const QString backing = vfsItemBacking(path);
+		if (!backing.isEmpty()) {
+			real = backing;
+		}
+	}
+	if (!vfsIsVirtual(real) && !QFileInfo(real).isSymLink()) {
+		const QByteArray name = QFile::encodeName(real);
 		const ssize_t size = lgetxattr(name.constData(), CUSTOM_ICON_ATTR, nullptr, 0);
 		if (size > 0 && size <= CUSTOM_ICON_MAX) {
 			QByteArray encoded(static_cast<int>(size), Qt::Uninitialized);
@@ -553,7 +575,7 @@ static QImage directCustomIconImage(const QString &path) {
 			}
 		}
 	}
-	const QString store = customIconStorePath(customIconKey(path));
+	const QString store = customIconStorePath(customIconKey(real));
 	QFile f(store);
 	if (f.exists() && f.size() > 0 && f.size() <= CUSTOM_ICON_MAX && f.open(QIODevice::ReadOnly)) {
 		return decodeCustomIconPng(f.readAll());
@@ -922,6 +944,42 @@ std::vector<uint32_t> composeDocument(const std::vector<uint32_t> &appIcon16, in
 	return out;
 }
 
+/* MIME types that are packaging formats: zip, 7z, rar, tar and the
+ * compression formats; StuffIt's .sit included. */
+bool isArchiveMime(const QString &mime) {
+	static const QSet<QString> archives{
+		"application/zip", "application/x-zip-compressed",
+		"application/x-7z-compressed", "application/vnd.rar",
+		"application/x-rar-compressed", "application/x-tar",
+		"application/gzip", "application/x-gzip", "application/x-bzip2",
+		"application/x-xz", "application/x-stuffit", "application/x-sit",
+		"application/x-sitx", "application/x-compress", "application/x-lzip",
+		"application/zstd", "application/x-lz4", "application/x-zstd",
+	};
+	return archives.contains(mime);
+}
+
+/* A document page with a zipper down it: an archive (zip, stuffit, 7z)
+ * is a package of files, and the zipper says so even at 16 px. */
+std::vector<uint32_t> composeArchive(int size) {
+	Pixels page(size, size);
+	pl_icon_paint(&page.c, 0, 0, PL_ICON_DOCUMENT, size, false);
+	const bool large = size >= 32;
+	const int x = size / 2 - (large ? 1 : 0);
+	const int top = large ? 8 : 5, bottom = large ? 28 : 13;
+	for (int y = top; y <= bottom; y++) {
+		const bool left = ((y - top) / (large ? 2 : 1)) % 2 == 0;
+		pl_put(&page.c, x + (left ? 0 : 1), y, 0xFF3A3A3Au);
+		pl_put(&page.c, x + (left ? 1 : 0), y, 0xFFA8A8A8u);
+	}
+	std::vector<uint32_t> out(static_cast<size_t>(size) * size);
+	for (int y = 0; y < size; y++) {
+		memcpy(out.data() + static_cast<size_t>(y) * size, page.img.constScanLine(y),
+			static_cast<size_t>(size) * sizeof(uint32_t));
+	}
+	return out;
+}
+
 } // namespace
 
 const std::vector<uint32_t> *documentIcon(const QString &mimeType, int size) {
@@ -943,6 +1001,14 @@ const std::vector<uint32_t> *documentIcon(const QString &mimeType, int size) {
 	}
 	if (mimeType.isEmpty()) {
 		return nullptr;
+	}
+	if (isArchiveMime(mimeType)) {
+		static std::vector<uint32_t> archiveLarge, archiveSmall;
+		if (archiveLarge.empty()) {
+			archiveLarge = composeArchive(PL_ICON_LARGE);
+			archiveSmall = composeArchive(PL_ICON_SMALL);
+		}
+		return size >= 32 ? &archiveLarge : &archiveSmall;
 	}
 	auto it = cache.find(mimeType);
 	if (it == cache.end()) {
