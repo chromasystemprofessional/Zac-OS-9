@@ -262,11 +262,11 @@ static int themed_band_max(void) {
 	return a > b ? a : b;
 }
 
-/* The title bar with the theme's own art: end caps at 1:1 pixel scale
- * at each end, the middle tiled horizontally across the title row, and
- * (left-clustered themes) the span tiled full-width across the band
- * below it. Tiny synthetic test tiles (< 8 px tall) stretch vertically.
- * Returns false when the theme supplies no bar. */
+/* The title bar with the theme's own art: end caps at each end and the
+ * middle tiled horizontally, the band filling the title row (scaled when
+ * the theme's bar has another height), and (left-clustered themes) the
+ * span tiled full-width across the band below it. Returns false when the
+ * theme supplies no bar. */
 static bool paint_themed_bar(struct pl_canvas *c, const struct decor_state *st,
 		int w, bool act) {
 	const bool dialog = st->style == DECOR_STYLE_MOVABLE_MODAL;
@@ -323,20 +323,14 @@ static bool paint_themed_bar(struct pl_canvas *c, const struct decor_state *st,
 			patchW = w;
 		}
 		if (lw > 0) {
-			int sh = tl->h < DECOR_TOP ? tl->h : DECOR_TOP;
-			int dh = tl->h < 8 ? DECOR_TOP : sh;
-			chrome_blit(c, tl, 0, 0, tl->w, sh, 0, 0, lw, dh);
+			chrome_blit(c, tl, 0, 0, tl->w, tl->h, 0, 0, lw, DECOR_TOP);
 		}
-		int msh = tm->h < DECOR_TOP ? tm->h : DECOR_TOP;
-		int mdh = tm->h < 8 ? DECOR_TOP : msh;
 		for (int x = lw; x < patchW - rw; x += tm->w) {
 			int tilew = patchW - rw - x < tm->w ? patchW - rw - x : tm->w;
-			chrome_blit(c, tm, 0, 0, tilew, msh, x, 0, tilew, mdh);
+			chrome_blit(c, tm, 0, 0, tilew, tm->h, x, 0, tilew, DECOR_TOP);
 		}
 		if (rw > 0) {
-			int sh = tr->h < DECOR_TOP ? tr->h : DECOR_TOP;
-			int dh = tr->h < 8 ? DECOR_TOP : sh;
-			chrome_blit(c, tr, 0, 0, tr->w, sh, patchW - rw, 0, rw, dh);
+			chrome_blit(c, tr, 0, 0, tr->w, tr->h, patchW - rw, 0, rw, DECOR_TOP);
 		}
 		if (patchW < w) {
 			const uint32_t rim_border = act ? 0xFF525252u : 0xFF737373u;
@@ -360,21 +354,18 @@ static bool paint_themed_bar(struct pl_canvas *c, const struct decor_state *st,
 		}
 		return true;
 	}
+	/* The bar band fills the title row: the extractor writes every tile
+	 * at the bar's own height, so a taller or shorter theme bar is scaled
+	 * rather than cropped. */
 	if (lw > 0) {
-		int sh = tl->h < DECOR_TOP ? tl->h : DECOR_TOP;
-		int dh = tl->h < 8 ? DECOR_TOP : sh;
-		chrome_blit(c, tl, 0, 0, tl->w, sh, 0, 0, lw, dh);
+		chrome_blit(c, tl, 0, 0, tl->w, tl->h, 0, 0, lw, DECOR_TOP);
 	}
-	int msh = tm->h < DECOR_TOP ? tm->h : DECOR_TOP;
-	int mdh = tm->h < 8 ? DECOR_TOP : msh;
 	for (int x = lw; x < w - rw; x += tm->w) {
 		int spanw = w - rw - x < tm->w ? w - rw - x : tm->w;
-		chrome_blit(c, tm, 0, 0, spanw, msh, x, 0, spanw, mdh);
+		chrome_blit(c, tm, 0, 0, spanw, tm->h, x, 0, spanw, DECOR_TOP);
 	}
 	if (rw > 0) {
-		int sh = tr->h < DECOR_TOP ? tr->h : DECOR_TOP;
-		int dh = tr->h < 8 ? DECOR_TOP : sh;
-		chrome_blit(c, tr, 0, 0, tr->w, sh, w - rw, 0, rw, dh);
+		chrome_blit(c, tr, 0, 0, tr->w, tr->h, w - rw, 0, rw, DECOR_TOP);
 	}
 	return true;
 }

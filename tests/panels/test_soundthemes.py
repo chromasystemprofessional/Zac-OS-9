@@ -137,7 +137,7 @@ class SoundTests(unittest.TestCase):
         cached = Path(theme["events"]["button-click"])
         self.assertTrue(cached.is_absolute())
         self.assertEqual(cached.parent, self.cache)
-        self.assertEqual(cached.read_bytes(), wav_data())
+        self.assertEqual(cached.read_bytes(), sounds.pad_wav(wav_data()))
         self.assertEqual(before, {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
                                   for p in folder.iterdir()})
         again = sounds.scan(self.source, self.cache)
@@ -148,7 +148,7 @@ class SoundTests(unittest.TestCase):
         self.assertNotEqual(theme["events"], changed["events"])
         shutil.rmtree(folder)
         self.assertEqual(sounds.scan(self.source, self.cache)["themes"], [])
-        self.assertEqual(cached.read_bytes(), wav_data())
+        self.assertEqual(cached.read_bytes(), sounds.pad_wav(wav_data()))
 
     def test_all_folder_events_and_nested_pcm(self):
         folder = self.theme({event: "nested/stereo.wav" for event in sounds.EVENTS})
@@ -301,6 +301,7 @@ class SoundTests(unittest.TestCase):
         self.assertEqual(set(result["themes"][0]["events"]), set(expected))
         for path in result["themes"][0]["events"].values():
             with wave.open(path) as reader:
+                reader.setpos(reader.getframerate() * sounds.PAD_MS // 1000)
                 self.assertEqual(reader.readframes(3), b"\0\x80\xff")
 
     def test_containers_and_silent_missing_events(self):
