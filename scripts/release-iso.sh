@@ -27,6 +27,10 @@ iso=$(ls -t build/iso/*.iso 2>/dev/null | head -1)
 [ -n "$iso" ] || { echo "No ISO in build/iso: run scripts/build-iso.sh first." >&2; exit 2; }
 version=$(dpkg-parsechangelog -S Version)
 name=zacos9-$version-amd64.iso
+# SourceForge's release folders are v-prefixed (v1.1.0, v1.7.0). Its
+# "latest download" picker ignores a folder named without it, leaving the
+# project's Download button on an older ISO.
+release=v$version
 
 out=build/release
 mkdir -p "$out"
@@ -38,9 +42,9 @@ cat "$out/$name.sha256"
 # rsync makes the VERSION folder itself, as the project folder already exists.
 # Not --mkpath: SourceForge's rsync (3.1.4) refuses it.
 rsync -avP $dry -e ssh "$out/$name" "$out/$name.sha256" \
-	"$user@frs.sourceforge.net:/home/frs/project/$project/$version/"
+	"$user@frs.sourceforge.net:/home/frs/project/$project/$release/"
 
 echo
-echo "Done. Download page: https://sourceforge.net/projects/$project/files/$version/"
+echo "Done. Download page: https://sourceforge.net/projects/$project/files/$release/"
 echo "Mark $name as the default download for all platforms on that Files page"
 echo "(the (i) button next to it) so the project's green Download button gets it."
