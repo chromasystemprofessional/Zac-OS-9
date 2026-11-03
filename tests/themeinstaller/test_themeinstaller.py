@@ -376,4 +376,44 @@ with open(os.path.join(config3, "zacos9", "desktop.conf")) as f:
 assert "background=wallpaper" in conf, conf
 print("ok    a desktop picture in any format installs as PNG")
 
+# Old Dog's System Folder can be copied out of its disk image: the installer
+# mounts it read-only through zacos9-mac-disks and keeps the resource forks
+# as the .rsrc companions the extractor reads.
+mount = tempfile.mkdtemp()
+macsf = os.path.join(mount, "System Folder")
+os.makedirs(os.path.join(macsf, ".rsrc"))
+with open(os.path.join(macsf, "System"), "wb") as f:
+    f.write(b"data fork")
+with open(os.path.join(macsf, ".rsrc", "System"), "wb") as f:
+    f.write(b"resource fork")
+pics = os.path.join(macsf, "Appearance", "Desktop Pictures")
+os.makedirs(pics)
+with open(os.path.join(pics, "Picture"), "wb") as f:
+    f.write(b"picture")
+home6 = tempfile.mkdtemp()
+os.makedirs(os.path.join(home6, "Classic"))
+with open(os.path.join(home6, "Classic", "Macintosh HD.dsk"), "wb") as f:
+    f.write(b"\x00" * 1024 + b"BD" + b"\x00" * 2048)
+fakebin = tempfile.mkdtemp()
+tool = os.path.join(fakebin, "zacos9-mac-disks")
+with open(tool, "w") as f:
+    f.write('#!/bin/sh\nif [ "$1" = mount ]; then\n'
+            '  printf \'{"paths":["%s"],"devices":["fake0"]}\\n\' "$FAKE_MOUNT"\nfi\nexit 0\n')
+os.chmod(tool, 0o755)
+env6 = dict(os.environ)
+env6["HOME"] = home6
+env6["PATH"] = fakebin + ":" + env6["PATH"]
+env6["FAKE_MOUNT"] = mount
+env6["QT_QPA_PLATFORM"] = "offscreen"
+r = subprocess.run([binary, "--copy-system-folder"], env=env6,
+                   capture_output=True, text=True, timeout=120)
+assert r.returncode == 0, r.stderr
+copied = os.path.join(home6, "Classic", "System Folder")
+with open(os.path.join(copied, "System"), "rb") as f:
+    assert f.read() == b"data fork", "the data fork is copied"
+with open(os.path.join(copied, ".rsrc", "System"), "rb") as f:
+    assert f.read() == b"resource fork", "the resource fork lands in .rsrc"
+assert os.path.isfile(os.path.join(copied, "Appearance", "Desktop Pictures", "Picture"))
+print("ok    Old Dog's System Folder copies out of its disk with its forks")
+
 print("OK")

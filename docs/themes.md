@@ -200,7 +200,18 @@ Old Dog's Unix volume lands) or at `$ZACOS9_CLASSIC_DIR/System Folder`. It
 reads the Apple menu icon, the busy pointers, the alert sounds, the desktop
 pictures and the fonts from it; without one, the theme still installs but
 keeps ZacOS's Apple, pointers, sounds and fonts, and takes no desktop
-picture. A bundle records the extractor that built it, so when a ZacOS
+picture.
+
+When there is none, the installer offers to copy it out of Old Dog's startup
+disk: it mounts the disk read-only (`zacos9-mac-disks`, which may ask for an
+administrator's password), copies `System Folder` to `~/Classic/System
+Folder` keeping every file's resource fork as its `.rsrc` companion, and
+goes on with the import. `zacos9-themeinstaller --copy-system-folder` does
+the same from a terminal. Old Dog must not be running from that disk while
+it is copied. Finder metadata (type and creator) is not carried over: the
+copy is for ZacOS to read, not to start up from.
+
+A bundle records the extractor that built it, so when a ZacOS
 update learns to decode more, the Appearance panel rebuilds the bundles
 from the copies in Theme Files rather than leaving the old, partial ones.
 The dropped file wears the theme's own Finder icon (its mini window art) where
