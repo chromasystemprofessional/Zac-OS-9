@@ -1,3 +1,17 @@
+zacos9 (1.7.0) trixie; urgency=medium
+
+  * Mac OS 9 themes go straight into the System Folder now: drop a theme
+    file onto the System Folder and it files itself into Appearance > Theme
+    Files. The Appearance panel uses Mac OS 9's own six tabs, with a visual
+    gallery of theme previews. Software Update explains itself with release
+    notes, and a one-time What's New window teaches the theme drop after
+    restarting. PlayStation 2 disc images get their own icon, and
+    PlayStation 2 games in the Games folder open in Game Player. Also
+    fixed: the System 12 capital S, Jigsaw's mating pieces and the busy
+    pointer when no theme is installed.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Tue, 03 Nov 2026 11:33:42 -0500
+
 zacos9 (1.6.3) trixie; urgency=medium
 
   * Installs next to cups-browsed instead of conflicting with it (issue
