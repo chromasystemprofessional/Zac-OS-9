@@ -701,7 +701,10 @@ void Desktop::mousePressEvent(QMouseEvent *e) {
 			item->selected = item == hit;
 		}
 	}
-	m_pressItem = hit && hit->selected ? hit : nullptr;
+	/* Pressing a selected icon keeps the selection, to drag them all; a
+	 * plain click that never drags collapses it on release (below). A
+	 * Shift-click is building a selection, so it is never collapsed. */
+	m_pressItem = !extend && hit && hit->selected ? hit : nullptr;
 	m_pressPos = e->position().toPoint();
 	if (!hit && e->button() == Qt::LeftButton) {
 		m_marquee = true;
@@ -787,7 +790,17 @@ void Desktop::mouseMoveEvent(QMouseEvent *e) {
 }
 
 void Desktop::mouseReleaseEvent(QMouseEvent *) {
-	m_pressItem = nullptr;
+	if (m_pressItem) {
+		/* A click without a drag on one of several selected icons selects
+		 * only it, as the Mac did; a drag (which clears m_pressItem)
+		 * moves them all. */
+		for (Item *item : allItems()) {
+			item->selected = item == m_pressItem;
+		}
+		m_pressItem = nullptr;
+		update();
+		Finder::instance().notifyState();
+	}
 	if (m_marquee) {
 		m_marquee = false;
 		m_marqueeBase.clear();
