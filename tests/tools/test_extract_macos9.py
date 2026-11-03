@@ -1010,4 +1010,31 @@ test_theme_system_folder()
 test_file_icon_decodes()
 test_theme_chrome_decodes()
 test_theme_chrome_twopart()
+
+
+def test_resource_map_bounds():
+    # A corrupt map can name thousands of types that all read the same
+    # 100 KB body: without a byte budget the parser copies it until memory
+    # runs out (an AppleDouble header once did this on a 365 KB file).
+    body = struct.pack(">I", 100000) + b"\x00" * 100000
+    data_offset = 256
+    data_length = len(body)
+    map_offset = data_offset + data_length
+    types = 3000
+    type_list = struct.pack(">H", types - 1)
+    shared_ref = 2 + types * 8
+    for _ in range(types):
+        type_list += struct.pack(">4sHH", b"icl8", 0, shared_ref)
+    type_list += struct.pack(">hH", 0, 0xFFFF) + b"\x00" + struct.pack(">I", 0)[1:] + struct.pack(">I", 0)
+    map_length = 28 + len(type_list)
+    data = struct.pack(">IIII", data_offset, map_offset, data_length, map_length)
+    data += b"\x00" * (data_offset - 16) + body
+    data += struct.pack(">IHH", 0, 0, 0) + struct.pack(">HH", 28, 0) + type_list
+    items = tool.parse_resource_fork(data)
+    assert len(items) < types, "the map was not followed to the end"
+    assert sum(len(b) for _t, _i, b in items) <= 64 * 1024 * 1024, "byte budget enforced"
+    print("ok    a corrupt resource map cannot copy one body without bound")
+
+
+test_resource_map_bounds()
 print("OK")

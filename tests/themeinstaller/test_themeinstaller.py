@@ -281,7 +281,8 @@ with open(_glob.glob(os.path.join(data4, "zacos9", "appearance", "Theme Files", 
     settings4 = _json.load(f)["settings"]
 assert re.fullmatch(r"user:[0-9a-f]{64}:image", settings4.get("pattern", "") or ""), \
     f"preset references the decoded tile by catalog id: {settings4}"
-assert "alert-sound" not in settings4, "no alert without a decodable sound"
+assert settings4.get("alert-sound", "") == "", \
+    "the preset names no alert without a decodable sound (and clears an older one)"
 with open(os.path.join(config4, "zacos9", "desktop.conf")) as f:
     desktop = {}
     for line in f:
@@ -318,8 +319,61 @@ themed = [p["settings"] for p in presets if p["settings"].get("theme-bundle") ==
 assert themed, "a preset for the theme"
 catalog = re.compile(r"\A(user|wallpaper):[0-9a-f]{64}:image\Z")
 for key in ("pattern", "wallpaper"):
-    if key in themed[0]:
+    if themed[0].get(key):
         assert catalog.match(themed[0][key]), (key, themed[0][key])
 print("ok    preset names pattern and wallpaper by catalog id")
+
+# The bundle records the extractor that built it, so a ZacOS update that can
+# decode more rebuilds it instead of keeping the old, partial bundle.
+with open(os.path.join(bundle, "theme.conf")) as f:
+    assert "extractor-sha256=" in f.read(), "bundle records the extractor"
+print("ok    the bundle records the extractor that built it")
+
+# Installing a theme with no desktop picture drops the previous one instead
+# of leaving it underneath the new chrome.
+with open(os.path.join(config3, "zacos9", "desktop.conf"), "a") as f:
+    f.write("wallpaper=wallpaper:old:image\npattern=old-pattern\nbackground=wallpaper\n")
+r = subprocess.run([binary, "--file", aquapath], env=env3,
+                   capture_output=True, text=True, timeout=120)
+assert r.returncode == 0, r.stderr
+with open(os.path.join(config3, "zacos9", "desktop.conf")) as f:
+    conf = f.read()
+assert "wallpaper=" not in conf, conf
+assert "old-pattern" not in conf, conf
+assert "background=pattern" in conf, conf
+print("ok    a theme with no desktop picture drops the previous one")
+
+# A desktop picture in any format the Desktop Pictures folder holds installs
+# as PNG: the desktop loads wallpapers as PNG only, so JPEG, GIF, TIFF and
+# BMP are converted on the way in.
+pics = os.path.join(root, "System Folder", "Appearance", "Desktop Pictures")
+os.makedirs(pics, exist_ok=True)
+def bmp_2x2():
+    header = struct.pack("<2sIHHI", b"BM", 54 + 16, 0, 0, 54)
+    info = struct.pack("<IiiHHIIiiII", 40, 2, 2, 1, 24, 0, 16, 2835, 2835, 0, 0)
+    pixels = b"\x00\x00\xff" * 2 + b"\x00\x00" + b"\xff\x00\x00" * 2 + b"\x00\x00"
+    return header + info + pixels
+with open(os.path.join(pics, "Test Picture"), "wb") as f:
+    f.write(bmp_2x2())
+scen6 = build_scen([(b"name", b"\x0cTest Picture"),
+                    (b"dpnm", b"\x0cTest Picture")])
+fork6 = build_fork([
+    (b"icl8", 1024, b"\x00" * 1024),
+    (b"ICN#", 1024, b"\xff" * 128 + b"\xff" * 128),
+    (b"clut", 200, struct.pack(">I", 0) + struct.pack(">HH", 0, 0) + struct.pack(">HHHH", 0, 0, 0, 0)),
+    (b"scen", 2000, scen6),
+])
+picture = os.path.join(src, "Picture Theme")
+with open(picture, "wb") as f:
+    f.write(fork6)
+r = subprocess.run([binary, "--file", picture], env=env3,
+                   capture_output=True, text=True, timeout=120)
+assert r.returncode == 0, r.stderr
+wallpapers = _glob.glob(os.path.join(data3, "zacos9", "appearance", "Wallpaper", "*.png"))
+assert wallpapers, "the BMP desktop picture installed as PNG"
+with open(os.path.join(config3, "zacos9", "desktop.conf")) as f:
+    conf = f.read()
+assert "background=wallpaper" in conf, conf
+print("ok    a desktop picture in any format installs as PNG")
 
 print("OK")

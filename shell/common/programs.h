@@ -13,6 +13,7 @@
 #include <climits>
 
 #include "locate.h"
+#include "settings.h"
 
 /* Another of the desktop's programs, to run: its path, or `name` alone,
  * for $PATH, when neither beside this program nor in its build tree. */
@@ -36,6 +37,16 @@ inline QString buildTreePath(const QString &relative) {
 	char path[PATH_MAX];
 	return pl_build_path(relative.toUtf8().constData(), path, sizeof(path))
 		? QString::fromUtf8(path) : QString();
+}
+
+/* tools/extract-macos9-theme.py: the source tree's copy while this program
+ * runs from its build tree, else the installed one. */
+inline QString themeExtractorPath() {
+	const QString src = sourceTreePath("tools/extract-macos9-theme.py");
+	if (!src.isEmpty() && QFileInfo(src).isFile()) {
+		return src;
+	}
+	return QString::fromUtf8(pl_data_dir()) + "/tools/extract-macos9-theme.py";
 }
 
 /* A root helper, zacos9-NAME-helper: $ZACOS9_NAME_HELPER for a test's
