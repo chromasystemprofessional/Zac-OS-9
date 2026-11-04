@@ -39,14 +39,26 @@ inline QString buildTreePath(const QString &relative) {
 		? QString::fromUtf8(path) : QString();
 }
 
-/* tools/extract-macos9-theme.py: the source tree's copy while this program
- * runs from its build tree, else the installed one. */
-inline QString themeExtractorPath() {
-	const QString src = sourceTreePath("tools/extract-macos9-theme.py");
+/* A tools/ script: the source tree's copy while this program runs from its
+ * build tree, else the installed one. */
+inline QString themeToolPath(const char *file) {
+	const QString src = sourceTreePath(QString("tools/") + file);
 	if (!src.isEmpty() && QFileInfo(src).isFile()) {
 		return src;
 	}
-	return QString::fromUtf8(pl_data_dir()) + "/tools/extract-macos9-theme.py";
+	return QString::fromUtf8(pl_data_dir()) + "/tools/" + file;
+}
+
+/* tools/extract-macos9-theme.py: the source tree's copy while this program
+ * runs from its build tree, else the installed one. */
+inline QString themeExtractorPath() {
+	return themeToolPath("extract-macos9-theme.py");
+}
+
+/* tools/mac-hfs.py: copies a folder out of an HFS/HFS+ image with both
+ * forks, which a kernel-mounted image cannot supply. */
+inline QString macHfsToolPath() {
+	return themeToolPath("mac-hfs.py");
 }
 
 /* A root helper, zacos9-NAME-helper: $ZACOS9_NAME_HELPER for a test's

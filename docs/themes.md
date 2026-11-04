@@ -210,18 +210,21 @@ alert sounds, the desktop pictures and the fonts from it; without one, the
 theme still installs but keeps ZacOS's Apple, pointers, sounds and fonts,
 and takes no desktop picture.
 
-When there is none, the installer copies it out of Old Dog's startup disk:
-it mounts the disk read-only (`zacos9-mac-disks`, which may ask for an
-administrator's password), copies `System Folder` to `~/Classic/System
-Folder` keeping every file's resource fork as its `.rsrc` companion, and
-goes on with the import. The desktop's automatic drop import and
-`zacos9-themeinstaller --file` batch mode do this without a question, so a
-theme dropped on any computer with Old Dog's disk gets the same Apple menu
-icon, desktop pictures, sounds and fonts as one installed from the window.
-`zacos9-themeinstaller --copy-system-folder` copies it alone from a
-terminal. Old Dog must not be running from that disk while it is copied.
-Finder metadata (type and creator) is not carried over: the copy is for
-ZacOS to read, not to start up from.
+When there is none, the installer copies it out of Old Dog's startup disk.
+It reads the disk image directly (`tools/mac-hfs.py`) and keeps every file's
+resource fork as its `.rsrc` companion; the kernel's HFS driver exposes only
+data forks, so a mounted copy would lose the System file's Apple menu icon
+and its standard folder, disk, Trash and document icons. If the image is not
+one the small reader handles, it falls back to mounting
+the disk read-only (`zacos9-mac-disks`, which may ask for an administrator's
+password) and copies the data forks it can. The desktop's automatic drop
+import and `zacos9-themeinstaller --file` batch mode do this without a
+question, so a theme dropped on any computer with Old Dog's disk gets the
+same Apple menu icon, desktop pictures, sounds and fonts as one installed
+from the window. `zacos9-themeinstaller --copy-system-folder` copies it
+alone from a terminal. Old Dog must not be running from that disk while it
+is copied. Finder metadata (type and creator) is not carried over: the copy
+is for ZacOS to read, not to start up from.
 
 A theme whose sound set, program font, desktop picture or alert sound
 cannot be found still applies: that one choice is left out and the

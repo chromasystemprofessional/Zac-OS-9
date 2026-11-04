@@ -233,6 +233,7 @@
 {prefix}/share/zacos9/themes/Default/theme.conf
 {prefix}/share/zacos9/tools/build_cursors.py
 {prefix}/share/zacos9/tools/extract-macos9-theme.py
+{prefix}/share/zacos9/tools/mac-hfs.py
 {prefix}/share/zacos9/tools/macfont.py
 {prefix}/share/zacos9/tools/macicons.py
 {prefix}/share/zacos9/tools/macpat.py

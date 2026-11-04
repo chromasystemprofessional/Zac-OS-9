@@ -6,6 +6,9 @@ import subprocess
 import sys
 import tempfile
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tools"))
+from hfs_fixture import make_hfs_image
+
 binary = sys.argv[1]
 
 # A valid HFS resource fork: 16-byte header, the resource data section
@@ -489,5 +492,26 @@ bundle7b = os.path.join(env7b["XDG_CONFIG_HOME"], "zacos9", "themes", "Apple pla
 assert not os.path.isfile(os.path.join(bundle7b, "apple-menu.png")), \
     "without a usable System file the theme keeps its own icon"
 print("ok    a batch import leaves a partial System Folder alone")
+
+# 8. The System Folder copy reads the image directly, so it keeps both
+# forks without mounting the disk (the kernel's HFS driver drops them).
+home8 = tempfile.mkdtemp()
+os.makedirs(os.path.join(home8, "Classic"))
+with open(os.path.join(home8, "Classic", "Test.dsk"), "wb") as f:
+    f.write(make_hfs_image())
+env8 = dict(os.environ)
+env8["HOME"] = home8
+env8["XDG_CONFIG_HOME"] = tempfile.mkdtemp()
+env8["XDG_DATA_HOME"] = tempfile.mkdtemp()
+env8["QT_QPA_PLATFORM"] = "offscreen"
+r = subprocess.run([binary, "--copy-system-folder"], env=env8,
+                   capture_output=True, text=True, timeout=120)
+assert r.returncode == 0, r.stderr
+copied8 = os.path.join(home8, "Classic", "System Folder")
+with open(os.path.join(copied8, "System"), "rb") as f:
+    assert f.read() == b"DATA", "the System data fork is copied"
+with open(os.path.join(copied8, ".rsrc", "System"), "rb") as f:
+    assert f.read() == b"RSRC", "the System resource fork is copied"
+print("ok    the System Folder copy keeps resource forks from the image")
 
 print("OK")

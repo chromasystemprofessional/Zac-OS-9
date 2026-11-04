@@ -46,9 +46,15 @@ test('theme-extractor', find_program('python3'),
   args: [files('tests/tools/test_extract_macos9.py'),
     meson.project_source_root() / 'tools' / 'extract-macos9-theme.py'])
 
+# The HFS/HFS+ reader behind the Theme Installer's System Folder copy.
+test('mac-hfs', find_program('python3'),
+  args: [files('tests/tools/test_mac_hfs.py'),
+    meson.project_source_root() / 'tools' / 'mac-hfs.py'])
+
 # The extractor the Theme Installer runs, and its decoder modules.
 install_data(
   'tools/extract-macos9-theme.py',
+  'tools/mac-hfs.py',
   'tools/macicons.py',
   'tools/cursors/build_cursors.py',
   'tools/macfont.py',

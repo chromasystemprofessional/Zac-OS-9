@@ -50,10 +50,23 @@ static bool bundleHasTheme(const QString &name) {
 	return QFileInfo::exists(outputDir(name) + "/menu-icon.png");
 }
 
-/* A folder holding a System file in any copy layout: raw, Netatalk
- * `.rsrc`, AppleDouble, or the kernel HFS/Old Dog Unix volume's NAME/rsrc. */
+/* A resource fork, not a System file's data fork: the Apple menu icon and
+ * every other theme asset live in the fork. */
+static bool isResourceFork(const QString &path) {
+	QFile file(path);
+	if (!file.open(QIODevice::ReadOnly)) {
+		return false;
+	}
+	const QByteArray head = file.read(4);
+	return head == QByteArray("\x00\x00\x01\x00", 4) ||
+		head == QByteArray("\x00\x05\x16\x07", 4);
+}
+
+/* A folder holding a usable System resource fork in any copy layout: raw,
+ * Netatalk `.rsrc`, AppleDouble, or the kernel HFS/Old Dog Unix volume's
+ * NAME/rsrc. A data-only System copy is incomplete and needs its forks. */
 static bool hasSystemFile(const QString &dir) {
-	return QFileInfo(dir + "/System").isFile() ||
+	return isResourceFork(dir + "/System") ||
 		QFileInfo(dir + "/.rsrc/System").isFile() ||
 		QFileInfo(dir + "/._System").isFile() ||
 		QFileInfo(dir + "/System/rsrc").isFile();
@@ -236,24 +249,58 @@ static bool copyMacTree(const QString &source, const QString &destination, QStri
 	return true;
 }
 
-/* Mount Old Dog's disk read-only (zacos9-mac-disks) and copy its System
- * Folder into ~/Classic, where the Theme Installer looks for it. */
+/* Copy Old Dog's System Folder into ~/Classic, where the Theme Installer
+ * looks for it. The image is read directly first, because the kernel's HFS
+ * driver drops resource forks and the System file's Apple menu icon lives
+ * only in its resource fork. A mounted copy is the fallback for images the
+ * small reader cannot handle. */
 static bool importSystemFolder(QString *copiedTo, QString *error, bool replaceExisting = true) {
 	const QString destination = QDir::homePath() + "/Classic/System Folder";
-	if (!replaceExisting && QFileInfo::exists(destination)) {
-		*error = destination + " already exists but has no readable System file; "
-			"leaving it alone.";
-		return false;
-	}
-	const QString tool = macDisksTool();
-	if (tool.isEmpty()) {
-		*error = "The Mac disk tool (zacos9-mac-disks) isn't installed.";
-		return false;
-	}
 	const QString image = oldDogImage();
 	if (image.isEmpty()) {
 		*error = "Old Dog's startup disk wasn't found. Choose it in the "
 			"Startup Disk control panel first.";
+		return false;
+	}
+	QByteArray ignored;
+	if (QFileInfo::exists(destination)) {
+		/* An older copy has data forks only: add or repair every resource
+		 * fork in place, keeping the user's data. */
+		QString repairError;
+		if (runTool("python3", { macHfsToolPath(), "--image", image,
+				"--source", "System Folder", "--destination", destination,
+				"--merge" }, &ignored, &repairError)) {
+			*copiedTo = destination;
+			return true;
+		}
+		if (!replaceExisting) {
+			*error = destination + " already exists but has no readable System file; "
+				"leaving it alone.";
+			return false;
+		}
+	}
+	/* Build the new copy beside the old one, so a failure cannot leave a
+	 * half-copied System Folder where ZacOS will read it. */
+	const QString staging = destination + ".new";
+	QDir(staging).removeRecursively();
+	QString readerError;
+	if (runTool("python3", { macHfsToolPath(), "--image", image,
+			"--source", "System Folder", "--destination", staging },
+			&ignored, &readerError)) {
+		QDir(destination).removeRecursively();
+		if (QDir().rename(staging, destination)) {
+			*copiedTo = destination;
+			return true;
+		}
+		*error = "Couldn't move the copied System Folder into place.";
+		QDir(staging).removeRecursively();
+		return false;
+	}
+	QDir(staging).removeRecursively();
+
+	const QString tool = macDisksTool();
+	if (tool.isEmpty()) {
+		*error = "The Mac disk tool (zacos9-mac-disks) isn't installed.";
 		return false;
 	}
 	QByteArray output;
@@ -289,10 +336,6 @@ static bool importSystemFolder(QString *copiedTo, QString *error, bool replaceEx
 		release();
 		return false;
 	}
-	/* Build the new copy beside the old one, so a failure cannot leave a
-	 * half-copied System Folder where ZacOS will read it. */
-	const QString staging = destination + ".new";
-	QDir(staging).removeRecursively();
 	bool ok = copyMacTree(folder, staging, error);
 	if (ok) {
 		QDir(destination).removeRecursively();

@@ -737,6 +737,9 @@ def _existing_fork(path):
 	return fork if fork and looks_like_resource_fork(fork) else None
 
 
+# The Theme Installer supplies --system from tools/mac-hfs.py, which reads
+# the disk image directly: the kernel's HFS driver exposes only data forks,
+# so a mounted System Folder has no Apple menu icon or standard icons.
 def find_mac_file(fork_path, name):
 	"""Locate a Mac OS 9 System Folder file (System, Finder, ...) for a
 	theme file's fork.
