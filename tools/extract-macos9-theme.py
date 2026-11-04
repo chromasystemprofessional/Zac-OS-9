@@ -698,6 +698,24 @@ def process_resource_fork(data, out, counts, cluts, icons, assets, scen_tags, ap
 			cursors.setdefault((rtype, res_id), []).append(body)
 
 
+def _is_appledouble_path(path):
+	"""Whether `path` names an AppleDouble companion (a `._Name` file)."""
+	return os.path.basename(path).startswith("._")
+
+
+def _fork_from_path(path):
+	"""Read `path` and return its resource fork, unpacking AppleDouble.
+
+	A `._Name` companion normally holds AppleDouble; a raw fork kept
+	under such a name (as the tests do) is used as-is."""
+	with open(path, "rb") as f:
+		raw = f.read()
+	if _is_appledouble_path(path) or raw[:4] == b"\x00\x05\x16\x07":
+		fork = extract_apple_double(raw)
+		return fork if fork else raw
+	return raw
+
+
 def find_mac_file(fork_path, name):
 	"""Locate a Mac OS 9 System Folder file (System, Finder, ...) for a
 	theme file's fork.
@@ -711,25 +729,37 @@ def find_mac_file(fork_path, name):
 		if d in seen:
 			break
 		seen.add(d)
-		for candidate in (os.path.join(d, name), os.path.join(d, ".rsrc", name)):
+		for candidate in (os.path.join(d, name), os.path.join(d, "._" + name),
+				os.path.join(d, ".rsrc", name)):
 			try:
-				with open(candidate, "rb") as f:
-					head = f.read(16)
+				raw = open(candidate, "rb").read()
 			except OSError:
 				continue
-			if looks_like_resource_fork(open(candidate, "rb").read()):
+			if os.path.basename(candidate).startswith("._") or raw[:4] == b"\x00\x05\x16\x07":
+				fork = extract_apple_double(raw) or raw
+			else:
+				fork = raw
+			if fork and looks_like_resource_fork(fork):
 				return candidate
 		parent = os.path.dirname(d)
 		if parent == d:
 			break
 		d = parent
 	for candidate in (os.path.expanduser("~/Classic/System Folder/" + name),
-			os.path.expanduser("~/Classic/System Folder/.rsrc/" + name)):
+			os.path.expanduser("~/Classic/System Folder/._" + name),
+			os.path.expanduser("~/Classic/System Folder/.rsrc/" + name),
+			os.path.expanduser("~/Classic/System/" + name),
+			os.path.expanduser("~/Classic/System/._" + name)):
 		try:
-			if looks_like_resource_fork(open(candidate, "rb").read()):
-				return candidate
+			raw = open(candidate, "rb").read()
 		except OSError:
 			continue
+		if os.path.basename(candidate).startswith("._") or raw[:4] == b"\x00\x05\x16\x07":
+			fork = extract_apple_double(raw) or raw
+		else:
+			fork = raw
+		if fork and looks_like_resource_fork(fork):
+			return candidate
 	return None
 
 
@@ -769,11 +799,12 @@ def collect_helper_fork(path, cluts, apple_menu, theme_icons, cursors):
 	tables, theme icon families and pointer shapes, for --file mode which
 	otherwise never sees them."""
 	try:
-		with open(path, "rb") as f:
-			data = f.read()
+		fork = _fork_from_path(path)
 	except OSError:
 		return
-	for rtype, res_id, body in parse_resource_fork(data):
+	if not fork:
+		return
+	for rtype, res_id, body in parse_resource_fork(fork):
 		if rtype in (b"icns", b"ics8", b"ics4", b"ics#") and res_id == -16386:
 			apple_menu.setdefault(rtype, []).append(body)
 		elif rtype == b"clut":
@@ -915,9 +946,7 @@ def write_theme_fonts(scen_tags, system_path, fonts_dir, out):
 	folder's resource forks (<Fonts>/.rsrc/<name>)."""
 	sources = []
 	if system_path:
-		with open(system_path, "rb") as f:
-			raw = f.read()
-		fork = extract_apple_double(raw) if system_path.endswith("._") or raw[:4] == b"\x00\x05\x16\x07" else raw
+		fork = _fork_from_path(system_path)
 		sources.append(fork)
 	rsrc = os.path.join(fonts_dir, ".rsrc") if fonts_dir else None
 	if rsrc and os.path.isdir(rsrc):
@@ -1009,9 +1038,7 @@ def write_pointers(theme_raw, theme_cluts, system_raw, system_cluts, out):
 def pointer_resources(path):
 	"""The pointer resources and colour tables of a System or theme file,
 	as ({type: {id: body}}, {colour count: colours})."""
-	with open(path, "rb") as f:
-		raw = f.read()
-	fork = extract_apple_double(raw) if path.endswith("._") or raw[:4] == b"\x00\x05\x16\x07" else raw
+	fork = _fork_from_path(path)
 	items = parse_resource_fork(fork)
 	res = {}
 	cluts = {}
@@ -1938,8 +1965,8 @@ def main():
 			raw = f.read()
 		# AppleDouble files carry the resource fork; a raw resource fork is
 		# used as-is.
-		if filepath.endswith("._") or raw[:4] == b"\x00\x05\x16\x07":
-			fork = extract_apple_double(raw)
+		if _is_appledouble_path(filepath) or raw[:4] == b"\x00\x05\x16\x07":
+			fork = extract_apple_double(raw) or raw
 		else:
 			fork = raw
 		if fork and looks_like_resource_fork(fork):
