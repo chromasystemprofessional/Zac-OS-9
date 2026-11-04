@@ -1,3 +1,16 @@
+zacos9 (1.7.2) trixie; urgency=medium
+
+  * Printing now says what went wrong: a failed document is named and the
+    rest still print, queues give a job's reason, a stopped CUPS is said
+    plainly, network printers appear before their first print, and one
+    printer over USB and Wi-Fi is one row. Themes load completely, older
+    presets work, theme files and folders wear the theme's icon, archives
+    get a zipped-page icon, title bars scale and sounds no longer clip.
+    Also: a click on one of several selected icons selects only it, Night
+    Mode is gone from Extras, and Fetch Updates now includes ZacOS Extras.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Tue, 03 Nov 2026 19:49:56 -0500
+
 zacos9 (1.7.1) trixie; urgency=medium
 
   * Theme Installer: it now uses your Mac OS 9 System Folder, and can copy
