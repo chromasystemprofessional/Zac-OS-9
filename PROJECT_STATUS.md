@@ -1,6 +1,6 @@
 # Project status
 
-Updated: 2026-10-29. Latest release: **1.4.4**
+Updated: 2026-11-04. Latest release: **1.7.5**
 ([releases](https://github.com/chromasystemprofessional/Zac-OS-9/releases),
 [ISO](https://sourceforge.net/projects/zac-os-9/files/)).
 
@@ -25,12 +25,23 @@ This page is what's true now and what's next. What changed and when is in
   PlayStation, Nintendo 64, Sega and Game Boy cartridges and discs (their own
   icons and kind names), and the Game Player extra (in ZacOS Extras) runs them
   through RetroArch, mednafen and mupen64plus.
+- **1.5 to 1.7 add Mac OS 9 theming.** The Theme Installer builds a theme from
+  your own Mac OS 9 System Folder (Apple menu icon, window chrome, desktop
+  picture, alert sounds, fonts), a theme file dropped on the System Folder
+  files itself into Appearance ▸ Theme Files, and the Appearance panel wears
+  Mac OS 9's six tabs with a gallery of previews. A one-time What's New window
+  explains the drop after an update.
+- **1.7.2 to 1.7.5 make printing and themes reliable.** A failed document is
+  named while the rest still print, queues give a job's reason, network
+  printers appear before their first job, one printer over USB and Wi-Fi is one
+  row, and a theme dropped on the desktop now copies the System Folder it needs
+  so it gets its Apple menu icon.
 
 ## Being worked on
 
 **The System Folder**, made to work the way Mac OS 7 to 9's did, item by
 item: [`docs/system-folder.md`](docs/system-folder.md) has every item, what
-ZacOS has for it, and the order. Next: (none - System Folder items 1-6 complete).
+ZacOS has for it, and the order. All six items are done.
 
 **Making the project easier to work on**: ten of the eleven phases are done,
 each its own pull request, and released as 1.1.0. Phase 7's four starter tasks
@@ -90,9 +101,7 @@ Besides the five above:
 2. **SMB**: a server to test against, then the share-list dialog.
 3. **Classic seamless windows** ([Classic](docs/classic-seamless.md)): the
    capture experiment the feasibility gate is waiting on.
-4. **Software Update says what an update brings** (`shell/update/`): a
-   ZacOS release's notes, and which Debian packages and why.
-5. **From the [roadmap](docs/ROADMAP.md)**: a Platinum boot menu (on Esc),
+4. **From the [roadmap](docs/ROADMAP.md)**: a Platinum boot menu (on Esc),
    manual pages, trying it in Hyper-V.
 
 ## Test servers

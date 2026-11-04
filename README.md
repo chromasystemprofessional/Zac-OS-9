@@ -6,8 +6,8 @@
 
 <p align="center">
   <b>The classic Platinum desktop, reborn for modern PCs.</b><br>
-  A complete desktop for Debian Linux in the style of Mac OS 8 and 9,
-  drawn pixel by pixel from scratch, with classic Mac software one click away.
+  A complete desktop for Debian Linux in the style of Mac OS 8 and 9,<br>
+  written from scratch, with your classic Mac software one click away.
 </p>
 
 <p align="center">
@@ -31,6 +31,21 @@ It isn't a skin over another desktop. The window manager, the Sniffer (the
 file browser), the menu bar and every control panel were written for ZacOS 9,
 so everything looks and behaves the same way, down to the scroll arrows.
 
+## New in 1.7
+
+- **Themes that are really yours.** Drop a Mac OS 9 theme file on the System
+  Folder and the Theme Installer reads it, plus your own copy of Mac OS 9, to
+  build a theme with the real Apple menu icon, window chrome, desktop picture,
+  alert sounds and fonts. Apple Platinum and the other classic themes work;
+  no Apple artwork is shipped.
+- **Appearance as Mac OS 9 had it.** The panel wears the classic six tabs and
+  shows a gallery of theme previews with each theme's own wallpaper.
+- **A What's New window** after an update, saying what changed and teaching the
+  theme drop.
+- **Printing and theming fixes**: a failed document is named while the rest
+  still print, network printers appear before their first job, and themes
+  rebuild completely instead of leaving old art underneath.
+
 ## What you get
 
 <table>
@@ -44,17 +59,6 @@ so everything looks and behaves the same way, down to the scroll arrows.
     <td><b>Real control panels</b>: Appearance, Sound, Monitors, Mouse, Date &amp; Time,
       Energy Saver, Users, File Sharing, Startup Disk and more, each in its own window.</td>
   </tr>
-  <tr>
-    <td><img src="docs/screenshots/software.png" alt="The Software window, listing Firefox, GIMP, LibreOffice and VLC"></td>
-    <td><img src="docs/screenshots/about.png" alt="About This Computer, showing ZacOS 9 version 1.1.0"></td>
-  </tr>
-  <tr>
-    <td><b>Thousands of programs</b>: Firefox, LibreOffice, GIMP, VLC and the rest of
-      Debian, plus Flathub, from the Software window. Linux programs wear the
-      Platinum look too.</td>
-    <td><b>Stays up to date</b>: Software Update (Zac menu ▸ Fetch Updates) installs
-      new ZacOS releases and Debian's security fixes together.</td>
-  </tr>
 </table>
 
 - **The Sniffer**: spatial windows that remember their size and place, a
@@ -63,16 +67,34 @@ so everything looks and behaves the same way, down to the scroll arrows.
   with a double-click.
 - **Classic Mac software**: **Old Dog** starts classic Mac OS in the
   SheepShaver emulator. Bring your own ROM and Mac OS install disk.
+- **Games**: console cartridges and discs wear their own icons, and the Game
+  Player extra runs NES, Super NES, Sega, Game Boy, Game Boy Advance,
+  PlayStation and Nintendo 64 games in a Platinum-framed window.
 - **Talks to old Macs**: browse and mount AppleShare (AFP) and Windows (SMB)
   servers in Neighbourhood, even AppleTalk-only Macs, and share your own folders
   back to them with File Sharing. Mac HFS and HFS+ disks and disk images open
   read-only.
 - **Windows programs** install through Wine with the Windows Installer.
+- **Printing** through CUPS: a Printer Picker and Print Queue in the Platinum
+  look, USB and network printers, and honest reasons when a job fails.
+- **The Collar**: Mac OS 9's control strip, with modules for volume,
+  resolution, power, media, brightness, Bluetooth, printers, the keychain and
+  your phone.
 - **Make it yours**: accent colours, desktop patterns (including classic Mac
-  `ppat` resources), wallpaper, themes and sound sets.
+  `ppat` resources), wallpaper, Mac OS 9 themes and sound sets.
 - **For the whole family**: separate accounts, Limited accounts and a Guest
-  account, Puppy Mode for a simpler Sniffer, a keychain, a screen saver and a
-  password-protected screen lock.
+  account, Puppy Mode for a simpler Sniffer, a keychain, a screen saver, a
+  password-protected screen lock and screen sharing between ZacOS 9 computers.
+
+<p align="center">
+  <img src="docs/screenshots/software.png" alt="The Software window, listing Firefox, GIMP, LibreOffice and VLC"><br>
+  <i>The Software window: Debian's archive and Flathub, plus ZacOS Extras such as Steam,
+  Game Player, Hue Lights and Turntable.</i>
+</p>
+
+Thousands of programs are a click away, and they wear the Platinum look too.
+**Software Update** (Zac menu ▸ Fetch Updates) installs new ZacOS releases,
+Debian's security fixes and ZacOS Extras together.
 
 <p align="center">
   <img src="assets/boot/happy-zac.png" alt="Happy Zac: a smiling dog on a beige computer's screen" width="140"><br>
@@ -101,24 +123,33 @@ firmware. Back up anything you care about before installing.
 The same ISO can also update an older ZacOS 9 on a computer without a network
 connection.
 
+### Already running ZacOS 9?
+
+Open **Zac menu ▸ Fetch Updates**. It brings the newest ZacOS 9 release, the
+ZacOS Extras and Debian's security fixes; no new ISO is needed.
+
 ### Already running Debian 13?
 
-Download `zacos9_1.0.0_amd64.deb` from the
-[latest release](https://github.com/chromasystemprofessional/Zac-OS-9/releases/latest), then:
+Download `zacos9_1.7.5_amd64.deb` from the
+[latest release](https://github.com/chromasystemprofessional/Zac-OS-9/releases/latest),
+then install the file you downloaded:
 
 ```sh
-sudo apt install ./zacos9_1.0.0_amd64.deb
+sudo apt install ./zacos9_1.7.5_amd64.deb
 ```
 
 Log out and choose **ZacOS 9** at the login screen. Classic Mac emulation (the
-`zacos9-emulators` package) comes on the ISO for now.
+`zacos9-emulators` package) comes on the ISO for now; without it, everything
+else works, and Old Dog says the emulator isn't installed.
 
 ## Learn more
 
 - [User guide](docs/user-guide.md): sound, fullscreen programs, the Sniffer, disks, desktop patterns and wallpaper
+- [Themes and sound sets](docs/themes.md): what the Theme Installer reads from your Mac OS 9 System Folder
 - [Software and updates](docs/appstore.md) and [Software Update](docs/updates.md)
 - [Networking with Macs and Windows](docs/network.md) and [Mac disks](docs/mac-disks.md)
 - [Hardware notes](docs/hardware.md) for Macs and other PCs
+- [Project status](PROJECT_STATUS.md): what works now and what's next
 - ZacOS Help, in the Help menu, from inside the system
 
 ## Why ZacOS exists
