@@ -1,8 +1,8 @@
 The hard disk and Apple menu icons now come out right in Mac OS 9
 themes.
 
-The desktop's grey hard disk now comes from the Finder's own icon, not
-the System's small pop-up icon, so it is grey instead of purple and red.
+A theme that does not supply its own hard disk art now keeps ZacOS's
+grey disk, instead of showing an icon an older extraction left behind.
 Rebuilding a theme also clears icons it no longer supplies.
 
 The menu-bar Apple is drawn from the theme's fitted 20x15 icon when it
