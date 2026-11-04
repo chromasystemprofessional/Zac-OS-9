@@ -72,9 +72,9 @@ THEME_ICON_MAP = [
     ("trash-empty", b"icl8", -3993),
     ("trash-full", b"icl8", -3984),
     ("document", b"icl8", -4000),
-    # Apple's generic hard disk. Finder family 400 is the desktop
-    # *printer*; the Finder's own desktop drive is family 29010, used
-    # when the theme supplies no -3995 art of its own.
+    # Apple's generic hard disk. Finder 400 is the desktop printer; a
+    # theme without its own -3995 art uses this System icon, whose 4-bit
+    # small member needs the 16-grey table.
     ("disk", b"icl8", -3995),
     ("network-disk", b"icl8", -3972),
     ("disk-image", b"icl8", -3998),
@@ -113,14 +113,11 @@ THEME_ICON_IDS = frozenset(
     [(b"icns", rid) for _kind, _rtype, rid in THEME_ICON_MAP] +
     [(b"ics8", rid) for _kind, _rtype, rid in THEME_ICON_MAP] +
     [(b"ics4", rid) for _kind, _rtype, rid in THEME_ICON_MAP] +
-    [(b"ics#", rid) for _kind, _rtype, rid in THEME_ICON_MAP] +
-    # The Finder's desktop drive family (hard disk 29010, floppy 29011,
-    # CD 29012, locked 29013), not in THEME_ICON_MAP.
-    [(t, 29010) for t in (b"icl8", b"icl4", b"icns", b"ics8", b"ics4", b"ics#", b"ICN#")]
+    [(b"ics#", rid) for _kind, _rtype, rid in THEME_ICON_MAP]
 )
 
 
-def decode_standard_icon(theme_icons, palette, rid, size):
+def decode_standard_icon(theme_icons, palette, rid, size, grey16=False):
 	"""One standard icon at `size` (16 or 32) from whatever the file holds.
 
 	A Mac OS 9 file may carry an icon suite (icns) or any of the colour
@@ -141,7 +138,13 @@ def decode_standard_icon(theme_icons, palette, rid, size):
 		if not bodies or len(bodies[0]) != expect:
 			continue
 		try:
-			rows = decode(bodies[0], palette, size=size)
+			# The System's generic hard disk has only its 4-bit small
+			# member. Decode that on the 16-grey table; the 256-colour
+			# icon table turns it purple and red.
+			use = palette
+			if grey16 and rtype in (b"icl4", b"ics4"):
+				use = list(enumerate(macicons.gray_ramp(16)))
+			rows = decode(bodies[0], use, size=size)
 		except (ValueError, IndexError):
 			continue
 		mask = theme_icons.get((ICON_MASKS[rtype], rid))
@@ -240,23 +243,19 @@ def write_theme_icons(theme_icons, cluts, out, theme_keys=frozenset(), theme_clu
 			except FileNotFoundError:
 				pass
 	for kind, _rtype, rid in THEME_ICON_MAP:
-		use = rid
-		if kind == "disk":
-			# A theme's own hard disk art (family -3995) wins. Without it,
-			# use the Finder's desktop drive family 29010: the 3D drive
-			# Old Dog shows on the desktop, not the desktop printer (400)
-			# or the flat pop-up icon (-3995).
-			theme_disk = any((t, rid) in theme_keys for t in
-				(b"icns", b"icl8", b"icl4", b"ics8", b"ics4", b"ics#"))
-			finder_disk = any((t, 29010) in theme_icons for t in
-				(b"icns", b"icl8", b"icl4", b"ics8", b"ics4", b"ics#"))
-			if not theme_disk and finder_disk:
-				use = 29010
-		big = decode_standard_icon(theme_icons, sys_palette, use, 32)
+		big = decode_standard_icon(theme_icons, sys_palette, rid, 32)
+		if big is None and kind == "disk":
+			# Old Dog's System file supplies only the 16px generic hard
+			# disk; give it the desktop's 32px size from that small art,
+			# decoded on the 16-grey table (the icon table is purple).
+			small = decode_standard_icon(theme_icons, sys_palette, rid, 16, grey16=True)
+			if small is not None:
+				big = pngwrite.nearest_scale(small, 16, 16, 32, 32)
 		if big is None:
 			continue
 		pngwrite.write_png(os.path.join(icons_dir, kind + "-32.png"), 32, 32, big)
-		small = decode_standard_icon(theme_icons, sys_palette, use, 16)
+		small = decode_standard_icon(theme_icons, sys_palette, rid, 16,
+			grey16=(kind == "disk"))
 		if small is None:
 			small = pngwrite.nearest_scale(big, 32, 32, 16, 16)
 		pngwrite.write_png(os.path.join(icons_dir, kind + "-16.png"), 16, 16, small)
