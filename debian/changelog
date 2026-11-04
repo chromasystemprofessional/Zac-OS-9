@@ -1,3 +1,19 @@
+zacos9 (1.7.6) trixie; urgency=medium
+
+  * Themes show Mac OS 9's standard icons again: the Apple menu icon, and
+    the standard folder, disk, Trash and document icons.
+    
+    The System Folder copied from Old Dog's startup disk lost its resource
+    forks, because the kernel's HFS driver exposes only data forks. The copy
+    now reads the disk image directly and keeps every resource fork, and
+    older copies are repaired in place. Apple Platinum and the themes that
+    share its artwork no longer keep the theme file's document icon.
+    
+    Themes already installed rebuild themselves the next time the
+    Appearance panel is opened.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Wed, 04 Nov 2026 10:58:32 -0500
+
 zacos9 (1.7.5) trixie; urgency=medium
 
   * Theme Installer: a theme dropped on the desktop now copies Old Dog's
