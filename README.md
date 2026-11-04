@@ -89,7 +89,7 @@ so everything looks and behaves the same way, down to the scroll arrows.
 <table>
   <tr>
     <td width="55%"><img src="docs/screenshots/software.png" alt="The Software window: a search field, Include Flathub, categories from Featured to Extras, and Firefox, GIMP, LibreOffice and VLC"></td>
-    <td width="45%"><img src="docs/screenshots/about.png" alt="About This Computer: ZacOS 9, Version 1.7.5, with the processor, graphics and memory"></td>
+    <td width="45%"><img src="docs/screenshots/about.png" alt="About This Computer: ZacOS 9, Version 1.7.6, with the processor, graphics and memory"></td>
   </tr>
   <tr>
     <td><b>Thousands of programs</b>, from Debian's archive and Flathub, plus the
