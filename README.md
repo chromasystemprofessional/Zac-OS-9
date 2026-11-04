@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/desktop.png" alt="The ZacOS 9 desktop: the Zacintosh HD window, a Scribble document, the Calculator and the Appearance control panel over a lavender desktop pattern">
+  <img src="docs/screenshots/desktop.png" alt="The ZacOS 9 desktop: the Zacintosh HD window, a Read Me document in Scribble, the Calculator and the Appearance control panel over a blue desktop pattern">
 </p>
 
 ## Why ZacOS 9?
@@ -51,7 +51,7 @@ so everything looks and behaves the same way, down to the scroll arrows.
 <table>
   <tr>
     <td width="50%"><img src="docs/screenshots/zac-menu.png" alt="The Zac menu open, listing control panels, recent items and desk accessories"></td>
-    <td width="50%"><img src="docs/screenshots/control-panels.png" alt="The System Folder, the Control Panels folder with its 30 panels, General Controls and Date &amp; Time"></td>
+    <td width="50%"><img src="docs/screenshots/control-panels.png" alt="The System Folder and the Control Panels folder, with its 30 control panels: Appearance, Bluetooth, Date &amp; Time, Monitors, Mouse, Sound, Users and the rest"></td>
   </tr>
   <tr>
     <td><b>The Zac menu</b>: desk accessories (Calculator, Notepad, Stash, Dog Ears,
@@ -86,15 +86,20 @@ so everything looks and behaves the same way, down to the scroll arrows.
   account, Puppy Mode for a simpler Sniffer, a keychain, a screen saver, a
   password-protected screen lock and screen sharing between ZacOS 9 computers.
 
-<p align="center">
-  <img src="docs/screenshots/software.png" alt="The Software window, listing Firefox, GIMP, LibreOffice and VLC"><br>
-  <i>The Software window: Debian's archive and Flathub, plus ZacOS Extras such as Steam,
-  Game Player, Hue Lights and Turntable.</i>
-</p>
-
-Thousands of programs are a click away, and they wear the Platinum look too.
-**Software Update** (Zac menu ▸ Fetch Updates) installs new ZacOS releases,
-Debian's security fixes and ZacOS Extras together.
+<table>
+  <tr>
+    <td width="55%"><img src="docs/screenshots/software.png" alt="The Software window: a search field, Include Flathub, categories from Featured to Extras, and Firefox, GIMP, LibreOffice and VLC"></td>
+    <td width="45%"><img src="docs/screenshots/about.png" alt="About This Computer: ZacOS 9, Version 1.7.5, with the processor, graphics and memory"></td>
+  </tr>
+  <tr>
+    <td><b>Thousands of programs</b>, from Debian's archive and Flathub, plus the
+      ZacOS Extras: Steam, Game Player, Hue Lights, Turntable and Phone. They
+      wear the Platinum look too.</td>
+    <td><b>About This Computer</b> says which version you run, and Software
+      Update (Zac menu ▸ Fetch Updates) installs new ZacOS releases, Debian's
+      security fixes and the extras together.</td>
+  </tr>
+</table>
 
 <p align="center">
   <img src="assets/boot/happy-zac.png" alt="Happy Zac: a smiling dog on a beige computer's screen" width="140"><br>
