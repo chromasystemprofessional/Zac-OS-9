@@ -277,10 +277,10 @@ def test_apple_menu():
 def test_standard_icon_ids():
     # Apple's Icons.h: kGenericHardDiskIconResource -3995 and
     # kGenericFileServerIconResource -3972. -3970 is the Suitcase.
-    # The Finder's family 400 is the desktop printer; the Finder's own
-    # desktop drive is 29010. A theme's own -3995 art wins.
+    # Finder family 400 is the desktop printer; the disk is -3995. Its
+    # 4-bit small member is decoded on the 16-grey table.
     kinds = {kind: rid for kind, _rtype, rid in tool.THEME_ICON_MAP}
-    assert kinds["disk"] == -3995, "the theme's own hard disk is -3995"
+    assert kinds["disk"] == -3995, "the hard disk is Apple's generic icon"
     assert kinds["network-disk"] == -3972, "the file server is Apple's standard icon"
     print("ok    hard disk and file server use Apple's standard icon ids")
 
@@ -1074,14 +1074,12 @@ def test_theme_icons_scale_and_clear_stale():
     tool.write_theme_icons({}, [(9, palette)], out)
     assert not os.path.exists(stale), "a stale icon is removed when the source lacks it"
     assert not os.path.exists(os.path.join(icons, "disk-16.png"))
-    tool.write_theme_icons({
-        (b"icl8", 29010): [bytes([1]) * 1024], (b"ICN#", 29010): [b"\xff" * 256],
-        (b"ics8", 29010): [bytes([1]) * 256], (b"ics#", 29010): [b"\xff" * 64],
-    }, [(9, palette)], out, theme_keys=set())
+    tool.write_theme_icons({(b"ics4", -3995): [bytes([1]) * 128],
+                            (b"ics#", -3995): [b"\xff" * 64]}, [(9, palette)], out)
     assert _png_size(os.path.join(icons, "disk-16.png")) == (16, 16)
     assert _png_size(os.path.join(icons, "disk-32.png")) == (32, 32), \
-        "the Finder's desktop drive fills the disk kind"
-    print("ok    the Finder's desktop drive fills the hard disk and stale icons clear")
+        "the System's small hard disk scales to the desktop"
+    print("ok    the System file's 16px hard disk fills both sizes and stale icons clear")
 
 
 def test_resource_map_bounds():
