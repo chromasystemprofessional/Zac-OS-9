@@ -1,0 +1,8 @@
+Themes dropped on the desktop now bring their Apple menu icon with
+them.
+
+A theme dropped on the desktop is imported without questions, so it had
+been skipping the copy of Old Dog's Mac OS 9 System Folder. Themes such
+as Apple Platinum kept the theme file's document icon instead of their
+Apple menu icon. The drop now copies the System Folder it needs, and
+finds a System file in every layout Old Dog uses.
