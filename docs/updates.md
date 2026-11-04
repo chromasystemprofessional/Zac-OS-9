@@ -1,13 +1,17 @@
 # Software Update
 
 **Software Update** (Apple menu > **Fetch Updates**; `zacos9-update`, `shell/update/`) keeps
-an installed ZacOS 9 current. It covers two things in one window:
+an installed ZacOS 9 current. It covers three things in one window:
 
 - **New ZacOS 9 releases.** These are GitHub releases of
   `chromasystemprofessional/Zac-OS-9` with the `zacos9_VERSION_ARCH.deb`
   attached.
 - **Debian's own updates.** These are security fixes, Firefox and anything
   else apt knows about, including third-party apt sources such as VS Code's.
+- **New versions of ZacOS Extras.** Extras you installed from Software's
+  Extras page (Steam, Game Player, Hue Lights and the rest) are GitHub
+  releases of `chromasystemprofessional/ZacOS-Extras`, tagged
+  `EXTRA-vVERSION`.
 
 ## What it does
 
@@ -18,27 +22,36 @@ an installed ZacOS 9 current. It covers two things in one window:
      The installed `zacos9` is compared with it using `dpkg --compare-versions`.
    - A repository with no releases yet (GitHub answers 404) counts as up to
      date.
+   - It asks the extras repository for its releases once, and compares each
+     installed extra's `dpkg` version with the newest release the catalog
+     still offers. An extra removed from the catalog is not updated.
    - Meanwhile it runs `zacos9-appstore-helper refresh` (`apt-get update`, as
      root) and then `apt-get -s --with-new-pkgs upgrade` as the user. The
      second is a simulation whose `Inst` lines are the Debian updates.
 2. **Show.** The window says "Updates are available" and lists the ZacOS
-   version and the Debian package count, or says the software is up to date.
+   version, the extras and their versions, and the Debian package count, or
+   says the software is up to date.
 3. **Update.**
    - It downloads the `.deb` into `~/.cache/zacos9/updates` and checks it:
      - the SHA-256 against the asset's `digest`, when GitHub gives one;
      - that its `Package` is `zacos9` and its `Version` is the release's.
-   - It installs the `.deb` with the helper's `install-deb`, then Debian's
-     updates with `upgrade`. That command is `apt-get upgrade --with-new-pkgs`
-     with `--force-confdef --force-confold`: it never removes packages and
-     keeps configuration files the user changed.
+   - It installs the `.deb` with the helper's `install-deb`. Each updated
+     extra's `.deb` is downloaded the same way (checksum and package/version
+     checked) and installed with `install-deb`; the extra's program is then
+     stopped and started again so it uses the new version.
+   - Then it installs Debian's updates with `upgrade`. That command is
+     `apt-get upgrade --with-new-pkgs` with `--force-confdef --force-confold`:
+     it never removes packages and keeps configuration files the user changed.
    - The progress bar follows apt's `APT::Status-Fd` lines.
 4. **Finish.** After a ZacOS update it offers **Restart**, because the running
    desktop keeps the old programs until then.
 
 The helper runs through `pkexec`. Polkit's `50-zacos9-appstore.rules` lets
-administrators at the computer do this without a password, the same as the
-Software window. Other users can still check; apt-get update and the install
-fail for them with a message.
+administrators at the computer run apt (refresh and upgrade) without a
+password, the same as the Software window. Installing a downloaded `.deb`
+— ZacOS or an extra — asks for one, because its setup scripts run as root.
+Other users can still check; apt-get update and the install fail for them
+with a message.
 
 **What's New.** When the newest release is newer than what's installed,
 the update window also offers **What's New…**, which shows the release's
@@ -59,6 +72,8 @@ Settings for tests and forks:
 - `ZACOS9_UPDATE_REPO` sets the repository (`owner/name`).
 - `ZACOS9_UPDATE_URL` sets the whole release URL. A `file://` URL works for
   trying the window without the network.
+- `ZACOS9_EXTRAS_URL` sets the extras releases URL; a `file://` URL works
+  for trying extras updates without the network.
 - `ZACOS9_WHATSNEW_DIR` sets where `--whatsnew` looks for `<version>.txt`
   notes, for tests.
 

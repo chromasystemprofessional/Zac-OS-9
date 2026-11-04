@@ -73,6 +73,18 @@ int main(int argc, char *argv[]) {
 	check(debianCheckProblem(-1, -1, QString()) == "Couldn’t look for Debian updates: apt didn’t finish.",
 		"apt that didn't start: a failure, not an empty list");
 
+	/* ---- installed ZacOS extras ---- */
+	const auto extras = parseInstalledExtras(
+		"zacos9-extra-steam\tinstall ok installed\t0.1.1\n"
+		"zacos9-extra-nightmode\tdeinstall ok config-files\t0.1.6\n"
+		"zacos9\tinstall ok installed\t1.7.1\n"
+		"zacos9-extra-hue\tinstall ok installed\t0.1.2\n");
+	check(extras.size() == 2 && extras[0].package == "zacos9-extra-steam" &&
+		extras[0].extra == "steam" && extras[0].version == "0.1.1" &&
+		extras[1].extra == "hue" && extras[1].version == "0.1.2",
+		"only installed ZacOS extras are updated, with their versions");
+	check(parseInstalledExtras("").empty(), "no extras: nothing to update");
+
 	/* ---- Debian version order ---- */
 	check(versionNewer("0.2.0", "0.0.1"), "0.2.0 is newer than 0.0.1");
 	check(!versionNewer("0.0.1", "0.0.1"), "the same version isn't newer");
