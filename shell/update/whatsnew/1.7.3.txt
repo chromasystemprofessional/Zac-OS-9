@@ -1,8 +1,8 @@
 The hard disk and Apple menu icons now come out right in Mac OS 9
 themes.
 
-A theme that does not supply its own hard disk art now keeps ZacOS's
-grey disk, instead of showing an icon an older extraction left behind.
+The desktop's hard disk now comes from Old Dog's Mac OS 9 Finder drive,
+not the desktop printer or the flat pop-up icon an older extraction used.
 Rebuilding a theme also clears icons it no longer supplies.
 
 The menu-bar Apple is drawn from the theme's fitted 20x15 icon when it
