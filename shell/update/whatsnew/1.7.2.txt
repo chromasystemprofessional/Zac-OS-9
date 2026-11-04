@@ -1,0 +1,30 @@
+Printing now tells you what went wrong. A failed document is named
+in the message, and the rest of the batch still prints. A queue says
+why a document is waiting or stopped: out of paper, held for an
+administrator, or the printer stopped. If the printing service (CUPS)
+isn't running, ZacOS tells you, instead of claiming no printer is
+chosen.
+
+Printer Picker now lists printers found on your network even before
+you first print to them, including a Wi-Fi printer that may already
+be your default. A printer that answers over both USB and Wi-Fi is
+one row: the connection you chose is kept, and its other connections
+are named in the details. The Collar's Printer menu still lists every
+connection if you want a different one.
+
+Themes now load completely. The Apple menu icon, disk icons, desktop
+picture, alert sounds and fonts all come from the theme, and a missing
+piece no longer stops the rest. Themes made for older versions of
+ZacOS are recognised again. Theme files and the folder they are filed
+into wear the theme's own icon; archives such as zip, 7z and StuffIt
+files have a zipped-page icon.
+
+Title-bar art now scales with the theme, and imported sound sets are
+padded so they no longer clip. In the Sniffer, clicking one of several
+selected icons selects only that icon.
+
+Night Mode has been removed from Extras: it never worked properly.
+Fetch Updates now checks for new versions of the ZacOS Extras you have
+installed, as well as ZacOS 9 and Debian, and installs them with the
+rest. The Steam extra now finds Steam installed from Flathub, lists
+its games and starts them.
