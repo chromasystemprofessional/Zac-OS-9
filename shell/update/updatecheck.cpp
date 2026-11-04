@@ -128,7 +128,7 @@ std::vector<InstalledExtra> parseInstalledExtras(const QString &dpkgQuery) {
 
 std::vector<InstalledExtra> installedExtras() {
 	return parseInstalledExtras(runQuiet("dpkg-query",
-		{ "-W", "-f=${Package}\\t${Status}\\t${Version}\\n" }));
+		{ "-W", "-f=${Package}\\t${Status}\\t${Version}\\n", "zacos9-extra-*" }));
 }
 
 QString installedVersion(const QString &package) {
