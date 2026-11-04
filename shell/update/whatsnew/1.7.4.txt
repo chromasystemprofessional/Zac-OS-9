@@ -1,0 +1,7 @@
+The Apple menu icon now comes from your Mac OS 9 System file even when
+it is kept as an AppleDouble copy.
+
+Themes such as Apple Platinum that do not carry their own Apple menu
+icon were falling back to the theme's thumbnail because the extractor
+did not read a ._System copy (or a System file in ~/Classic/System).
+It does now.
