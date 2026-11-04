@@ -247,6 +247,7 @@
 {prefix}/share/zacos9/whatsnew/1.7.3.txt
 {prefix}/share/zacos9/whatsnew/1.7.4.txt
 {prefix}/share/zacos9/whatsnew/1.7.5.txt
+{prefix}/share/zacos9/whatsnew/1.7.6.txt
 {prefix}/share/zacos9/xdg/foot/foot.ini
 {prefix}/share/zacos9/xdg/xdg-desktop-portal/zacos9-portals.conf
 {prefix}/share/zacos9/xdg/zacos9-mimeapps.list
