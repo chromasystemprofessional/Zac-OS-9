@@ -33,17 +33,18 @@ GitHub](https://github.com/chromasystemprofessional/Zac-OS-9/releases/latest)
 and install the file you downloaded:
 
 ```sh
-sudo apt install ./zacos9_1.7.5_amd64.deb
+sudo apt install ./zacos9_1.7.6_amd64.deb
 ```
 
 Classic Mac emulation (the `zacos9-emulators` package) comes on the ISO for
 now.
 
-## What's new in 1.7.5
+## What's new in 1.7.6
 
-A theme dropped on the desktop now copies the Mac OS 9 System Folder it needs,
-without replacing a partial one, so themes such as Apple Platinum get their
-Apple menu icon instead of the theme file's document icon.
+Themes show Mac OS 9's standard icons again: the folder, disk, Trash and
+document icons, and the Apple menu icon. The System Folder copied from Old
+Dog's startup disk now keeps its resource forks, and themes already installed
+rebuild the next time the Appearance panel is opened.
 
 Every release since 1.0 has its notes at
 https://github.com/chromasystemprofessional/Zac-OS-9/releases, and the current
