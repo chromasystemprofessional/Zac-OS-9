@@ -11,6 +11,17 @@
 #include "panelkit.h"
 #include "updatecheck.h"
 
+/* An installed ZacOS Extra with a newer release, from its catalog entry
+ * and the extras repository's releases. */
+struct ExtraUpdate {
+	QString package; /* zacos9-extra-steam */
+	QString extra;   /* steam */
+	QString name;    /* "Steam" from the catalog */
+	QString start;   /* the program to start again after updating */
+	QString from, to;/* installed and available versions */
+	QString debName, debUrl, sha256;
+};
+
 class QNetworkReply;
 
 class UpdateWindow;
@@ -61,9 +72,18 @@ private:
 	QString m_releaseError;  /* why GitHub couldn't be asked, if it couldn't */
 	std::vector<DebianUpdate> m_debian;
 	QString m_debianProblem; /* debianCheckProblem(): why "no updates" may be wrong */
+	std::vector<InstalledExtra> m_installedExtras;
+	std::vector<ExtraUpdate> m_extras;
+	QString m_extrasError;
 	int m_pendingChecks = 0;
 	bool m_zacosUpdated = false;
 	QString m_debPath;       /* the downloaded .deb */
+	QString m_extraPath;     /* the extra being installed */
+	int m_extraIndex = 0;
+	/* The phases' shares of the progress bar (ZacOS, extras, Debian). */
+	double m_zacosFrom = 0, m_zacosSpan = 1;
+	double m_extrasFrom = 0, m_extrasSpan = 1;
+	double m_debianFrom = 0;
 
 	PanelButton m_primary, m_secondary, m_notes;
 	PanelCheckbox m_daily; /* "update-check": daily, unless "never" */
@@ -71,11 +91,13 @@ private:
 	QTimer m_sweep;
 	QNetworkAccessManager m_net;
 	QNetworkReply *m_reply = nullptr;
+	QNetworkReply *m_extrasReply = nullptr;
 	QProcess *m_proc = nullptr;
 	QString m_procErr;
 
 	void check();
 	void checkGitHub();
+	void checkExtras();
 	void checkDebian();
 	void checkDone();
 	void showResults();
@@ -83,6 +105,10 @@ private:
 	void install();
 	void downloadDeb();
 	void installDeb();
+	void installExtras();
+	void installNextExtra();
+	void afterZacos();
+	void restartExtras();
 	void upgradeDebian();
 	void finished();
 	void failed(const QString &why);

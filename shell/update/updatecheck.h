@@ -36,6 +36,13 @@ struct DebianUpdate {
 	QString package, from, to;
 };
 
+/* A ZacOS Extra installed on this computer, from dpkg's record. */
+struct InstalledExtra {
+	QString package; /* zacos9-extra-steam */
+	QString extra;   /* steam */
+	QString version; /* what dpkg says is installed */
+};
+
 /* `apt-get -s upgrade` output: its "Inst" lines (new packages it would
  * add have no "from"). */
 std::vector<DebianUpdate> parseAptSimulation(const QString &out);
@@ -45,6 +52,13 @@ std::vector<DebianUpdate> parseAptSimulation(const QString &out);
  * failing with `error` from apt) worked; otherwise why "no updates"
  * can't be believed. -1 is "didn't start" or "was killed". */
 QString debianCheckProblem(int refreshCode, int simulateCode, const QString &error);
+
+/* `dpkg-query -W -f='${Package}\t${Status}\t${Version}\n'` output: the
+ * ZacOS extras that are installed, not those removed with config files
+ * left, with their versions. */
+std::vector<InstalledExtra> parseInstalledExtras(const QString &dpkgQuery);
+/* The same, asked of dpkg. */
+std::vector<InstalledExtra> installedExtras();
 
 /* Debian version order, by dpkg itself: true if a is newer than b. */
 bool versionNewer(const QString &a, const QString &b);

@@ -9,6 +9,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QJsonDocument>
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QNetworkReply>
@@ -300,13 +301,22 @@ void UpdateWindow::check() {
 	m_releaseError.clear();
 	m_debian.clear();
 	m_debianProblem.clear();
+	m_installedExtras = installedExtras();
+	m_extras.clear();
+	m_extrasError.clear();
 	m_current = installedVersion(PACKAGE);
-	setText("Checking for updates…", "Looking for a new version of ZacOS 9 and for updates "
-		"to the Debian software it runs on.");
+	QString looking = "Looking for a new version of ZacOS 9 and for updates to the Debian software it runs on.";
+	if (!m_installedExtras.empty()) {
+		looking += " It also looks for new versions of your ZacOS Extras.";
+	}
+	setText("Checking for updates…", looking);
 	setButtons(QString(), "Cancel");
-	m_pendingChecks = 2;
+	m_pendingChecks = 2 + (m_installedExtras.empty() ? 0 : 1);
 	checkGitHub();
 	checkDebian();
+	if (!m_installedExtras.empty()) {
+		checkExtras();
+	}
 }
 
 void UpdateWindow::checkGitHub() {
@@ -333,6 +343,70 @@ void UpdateWindow::checkGitHub() {
 				m_releaseError = "the newest release has no ZacOS 9 package for this computer";
 			} else if (versionNewer(r.version, m_current)) {
 				m_release = r;
+			}
+		}
+		checkDone();
+	});
+}
+
+void UpdateWindow::checkExtras() {
+	QNetworkRequest req{ QUrl(extrasReleasesUrl()) };
+	req.setRawHeader("Accept", "application/vnd.github+json");
+	req.setRawHeader("User-Agent", "zacos9-update");
+	req.setTransferTimeout(20000);
+	m_extrasReply = m_net.get(req);
+	QNetworkReply *reply = m_extrasReply;
+	connect(reply, &QNetworkReply::finished, this, [this, reply] {
+		reply->deleteLater();
+		if (m_extrasReply != reply) {
+			return; /* cancelled */
+		}
+		m_extrasReply = nullptr;
+		const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+		if (status == 404) {
+			/* The extras repository has no releases: nothing to update. */
+		} else if (reply->error() != QNetworkReply::NoError) {
+			m_extrasError = reply->errorString();
+		} else {
+			const QByteArray json = reply->readAll();
+			if (!QJsonDocument::fromJson(json).isArray()) {
+				m_extrasError = "the list of releases couldn’t be read";
+			} else {
+				/* Only extras the catalog still offers are updated: one
+				 * removed from it (Night Mode) is left alone. */
+				const bool testing = !qEnvironmentVariableIsEmpty("ZACOS9_EXTRAS_URL");
+				const QString arch = debArchitecture();
+				const std::vector<StoreItem> catalog = storeItems();
+				for (const StoreItem &item : catalog) {
+					if (item.source != "extra" || item.packages.size() != 1) {
+						continue;
+					}
+					const QString package = item.packages.first();
+					QString from;
+					for (const InstalledExtra &installed : m_installedExtras) {
+						if (installed.package == package) {
+							from = installed.version;
+						}
+					}
+					if (from.isEmpty()) {
+						continue;
+					}
+					const ExtraRelease release = parseExtraReleases(json, item.extra, package, arch, testing);
+					if (!release.valid || !versionNewer(release.version, from)) {
+						continue;
+					}
+					ExtraUpdate u;
+					u.package = package;
+					u.extra = item.extra;
+					u.name = item.name;
+					u.start = item.extraStart;
+					u.from = from;
+					u.to = release.version;
+					u.debName = QFileInfo(QUrl(release.debUrl).path()).fileName();
+					u.debUrl = release.debUrl;
+					u.sha256 = release.sha256;
+					m_extras.push_back(u);
+				}
 			}
 		}
 		checkDone();
@@ -366,11 +440,21 @@ void UpdateWindow::checkDone() {
 
 void UpdateWindow::showResults() {
 	const bool zacos = m_release.valid;
+	const bool extras = !m_extras.empty();
 	const int n = static_cast<int>(m_debian.size());
 	QString detail;
 	if (zacos) {
 		detail += "ZacOS 9 " + m_release.version + " is available (this computer has " +
 			(m_current.isEmpty() ? QString("an unknown version") : m_current) + "). ";
+	}
+	if (extras) {
+		QStringList names;
+		const int count = static_cast<int>(m_extras.size());
+		for (int i = 0; i < count && i < 4; i++) {
+			names << m_extras[i].name + " " + m_extras[i].to;
+		}
+		detail += QString("%1 ZacOS Extra update%2: %3%4. ").arg(count).arg(count == 1 ? "" : "s")
+			.arg(names.join(", ")).arg(count > 4 ? ", …" : "");
 	}
 	if (n > 0) {
 		QStringList names;
@@ -383,10 +467,13 @@ void UpdateWindow::showResults() {
 	if (!m_releaseError.isEmpty()) {
 		detail += "Couldn’t look for a new ZacOS 9: " + m_releaseError + ". ";
 	}
+	if (!m_extrasError.isEmpty()) {
+		detail += "Couldn’t look for ZacOS Extras updates: " + m_extrasError + ". ";
+	}
 	if (!m_debianProblem.isEmpty()) {
 		detail += m_debianProblem;
 	}
-	if (zacos || n > 0) {
+	if (zacos || extras || n > 0) {
 		m_state = State::Available;
 		setText("Updates are available for this computer.", detail.trimmed());
 		setButtons("Update", "Later");
@@ -407,13 +494,15 @@ void UpdateWindow::showResults() {
 			qApp->quit(); /* nothing to install: nothing to say */
 			return;
 		}
-		/* Up to date only if both checks really worked. */
-		const bool sure = m_releaseError.isEmpty() && m_debianProblem.isEmpty();
+		/* Up to date only if every check really worked. */
+		const bool sure = m_releaseError.isEmpty() && m_extrasError.isEmpty() && m_debianProblem.isEmpty();
+		QString upToDate = "ZacOS 9 " + m_current + " is the newest version, and Debian has no updates for it.";
+		if (!m_installedExtras.empty()) {
+			upToDate += " Your ZacOS Extras are up to date.";
+		}
 		m_state = State::UpToDate;
 		setText(sure ? "Your software is up to date." : "No updates were found.",
-			sure
-				? "ZacOS 9 " + m_current + " is the newest version, and Debian has no updates for it."
-				: detail.trimmed());
+			sure ? upToDate : detail.trimmed());
 		setButtons("OK", QString());
 	}
 }
@@ -426,20 +515,34 @@ void UpdateWindow::install() {
 	m_zacosUpdated = false;
 	setText("Installing updates…", QString());
 	setButtons(QString(), QString());
+	/* Each part gets an equal share of the bar: the new ZacOS 9, the
+	 * extras, then Debian's updates. */
+	const int phases = (m_release.valid ? 1 : 0) + (m_extras.empty() ? 0 : 1) +
+		(m_debian.empty() ? 0 : 1);
+	const double span = phases > 0 ? 1.0 / phases : 1.0;
+	int at = 0;
+	m_zacosFrom = at * span;
+	m_zacosSpan = span;
+	if (m_release.valid) {
+		at++;
+	}
+	m_extrasFrom = at * span;
+	m_extrasSpan = span;
+	if (!m_extras.empty()) {
+		at++;
+	}
+	m_debianFrom = at * span;
 	if (m_release.valid) {
 		downloadDeb();
+	} else if (!m_extras.empty()) {
+		installExtras();
 	} else {
 		upgradeDebian();
 	}
 }
 
-/* The ZacOS 9 share of the bar: all of it unless Debian updates follow. */
-static double zacosShare(bool debianToo) {
-	return debianToo ? 0.5 : 1.0;
-}
-
 void UpdateWindow::downloadDeb() {
-	const double share = zacosShare(!m_debian.empty());
+	const double share = m_zacosSpan;
 	const QString dir =
 		QStandardPaths::writableLocation(QStandardPaths::GenericCacheLocation) + "/zacos9/updates";
 	QDir().mkpath(dir);
@@ -452,7 +555,7 @@ void UpdateWindow::downloadDeb() {
 	QNetworkReply *reply = m_reply;
 	connect(reply, &QNetworkReply::downloadProgress, this, [this, share](qint64 got, qint64 total) {
 		if (total > 0) {
-			m_progress = share * 0.4 * got / total;
+			m_progress = m_zacosFrom + share * 0.4 * got / total;
 			update();
 		}
 	});
@@ -483,10 +586,9 @@ void UpdateWindow::downloadDeb() {
 }
 
 void UpdateWindow::installDeb() {
-	const double share = zacosShare(!m_debian.empty());
 	/* It must really be the release we offered, not some other package. */
 	auto fields = std::make_shared<QStringList>();
-	run("dpkg-deb", { "-f", m_debPath, "Package", "Version" }, [this, fields, share](int code) {
+	run("dpkg-deb", { "-f", m_debPath, "Package", "Version" }, [this, fields](int code) {
 		QString pkg, version;
 		for (const QString &l : *fields) {
 			if (l.startsWith("Package:")) {
@@ -509,17 +611,134 @@ void UpdateWindow::installDeb() {
 			}
 			QFile::remove(m_debPath);
 			m_zacosUpdated = true;
-			if (m_debian.empty()) {
-				finished();
-			} else {
-				upgradeDebian();
-			}
-		}, aptProgress(share * 0.4, share));
+			afterZacos();
+		}, aptProgress(m_zacosFrom + m_zacosSpan * 0.4, m_zacosFrom + m_zacosSpan));
 	}, [fields](const QString &l) { *fields << l; });
 }
 
+void UpdateWindow::installExtras() {
+	m_extraIndex = 0;
+	installNextExtra();
+}
+
+void UpdateWindow::installNextExtra() {
+	if (m_extraIndex >= static_cast<int>(m_extras.size())) {
+		restartExtras();
+		if (m_debian.empty()) {
+			finished();
+		} else {
+			upgradeDebian();
+		}
+		return;
+	}
+	const ExtraUpdate u = m_extras[m_extraIndex];
+	const double per = m_extrasSpan / m_extras.size();
+	const double from = m_extrasFrom + per * m_extraIndex;
+	const QString dir = QStandardPaths::writableLocation(QStandardPaths::GenericCacheLocation) +
+		"/zacos9/updates";
+	QDir().mkpath(dir);
+	m_extraPath = dir + "/" + QFileInfo(u.debName).fileName();
+	m_doing = "Downloading " + u.name + " " + u.to;
+	update();
+	QNetworkRequest req{ QUrl(u.debUrl) };
+	req.setRawHeader("User-Agent", "zacos9-update");
+	req.setTransferTimeout(60000);
+	m_reply = m_net.get(req);
+	QNetworkReply *reply = m_reply;
+	connect(reply, &QNetworkReply::downloadProgress, this, [this, from, per](qint64 got, qint64 total) {
+		if (total > 0) {
+			m_progress = from + per * 0.4 * got / total;
+			update();
+		}
+	});
+	connect(reply, &QNetworkReply::finished, this, [this, reply, u, from, per] {
+		reply->deleteLater();
+		if (m_reply != reply) {
+			return;
+		}
+		m_reply = nullptr;
+		if (reply->error() != QNetworkReply::NoError) {
+			failed("“" + u.name + "” " + u.to + " couldn’t be downloaded: " + reply->errorString() + ".");
+			return;
+		}
+		const QByteArray data = reply->readAll();
+		if (!u.sha256.isEmpty() &&
+				QCryptographicHash::hash(data, QCryptographicHash::Sha256).toHex() != u.sha256.toLatin1()) {
+			failed("The download of “" + u.name + "” is damaged (its checksum doesn’t match). "
+				"Nothing was installed.");
+			return;
+		}
+		QFile f(m_extraPath);
+		if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate) || f.write(data) != data.size()) {
+			failed("The download of “" + u.name + "” couldn’t be saved in " +
+				QFileInfo(m_extraPath).path() + ".");
+			return;
+		}
+		f.close();
+		auto fields = std::make_shared<QStringList>();
+		run("dpkg-deb", { "-f", m_extraPath, "Package", "Version" }, [this, fields, u, from, per](int code) {
+			QString pkg, version;
+			for (const QString &l : *fields) {
+				if (l.startsWith("Package:")) {
+					pkg = l.section(':', 1).trimmed();
+				} else if (l.startsWith("Version:")) {
+					version = l.section(':', 1).trimmed();
+				}
+			}
+			if (code != 0 || pkg != u.package || version != u.to) {
+				failed("The downloaded file isn’t “" + u.name + "” " + u.to + ". Nothing was installed.");
+				return;
+			}
+			m_doing = "Installing " + u.name + " " + u.to;
+			update();
+			run(QString(), { "install-deb", m_extraPath }, [this, u](int code) {
+				if (code != 0) {
+					failed("“" + u.name + "” " + u.to + " couldn’t be installed" +
+						(m_procErr.isEmpty() ? QString(".") : ": " + m_procErr));
+					return;
+				}
+				QFile::remove(m_extraPath);
+				m_extraIndex++;
+				installNextExtra();
+			}, aptProgress(from + per * 0.4, from + per));
+		}, [fields](const QString &l) { *fields << l; });
+	});
+}
+
+void UpdateWindow::afterZacos() {
+	if (!m_extras.empty()) {
+		installExtras();
+	} else if (!m_debian.empty()) {
+		upgradeDebian();
+	} else {
+		finished();
+	}
+}
+
+/* An extra's package can't restart a program that an update replaces
+ * (its prerm only stops it on removal), so stop the old copy and start
+ * the installed one after a moment. */
+void UpdateWindow::restartExtras() {
+	QStringList starts;
+	for (const ExtraUpdate &u : m_extras) {
+		if (!u.start.isEmpty() && !starts.contains(u.start)) {
+			starts << u.start;
+		}
+	}
+	if (starts.isEmpty()) {
+		return;
+	}
+	for (const QString &start : starts) {
+		QProcess::startDetached("pkill", QStringList() << "-x" << "-f" << ("(/usr/bin/)?" + start));
+	}
+	QTimer::singleShot(500, this, [starts] {
+		for (const QString &start : starts) {
+			QProcess::startDetached(start, QStringList());
+		}
+	});
+}
+
 void UpdateWindow::upgradeDebian() {
-	const double from = m_release.valid ? zacosShare(true) : 0;
 	m_doing = "Installing Debian updates";
 	update();
 	run(QString(), { "upgrade" }, [this](int code) {
@@ -530,7 +749,7 @@ void UpdateWindow::upgradeDebian() {
 			return;
 		}
 		finished();
-	}, aptProgress(from, 1.0));
+	}, aptProgress(m_debianFrom, 1.0));
 }
 
 void UpdateWindow::finished() {
@@ -542,8 +761,16 @@ void UpdateWindow::finished() {
 			"old version until then.");
 		setButtons("Restart", "Later");
 	} else {
-		setText("The updates are installed.", "Some programs may need to be quit and opened "
-			"again before they use the new versions.");
+		QString detail = "Some programs may need to be quit and opened again before they use "
+			"the new versions.";
+		bool restarted = false;
+		for (const ExtraUpdate &u : m_extras) {
+			restarted = restarted || !u.start.isEmpty();
+		}
+		if (restarted) {
+			detail = "Your ZacOS Extras were restarted so they use their new versions. " + detail;
+		}
+		setText("The updates are installed.", detail);
 		setButtons("OK", QString());
 	}
 }
@@ -646,6 +873,11 @@ void UpdateWindow::closeEvent(QCloseEvent *e) {
 	if (m_reply) {
 		QNetworkReply *r = m_reply;
 		m_reply = nullptr;
+		r->abort();
+	}
+	if (m_extrasReply) {
+		QNetworkReply *r = m_extrasReply;
+		m_extrasReply = nullptr;
 		r->abort();
 	}
 	if (m_proc) {

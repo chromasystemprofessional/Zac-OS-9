@@ -112,6 +112,25 @@ QString debianCheckProblem(int refreshCode, int simulateCode, const QString &err
 	return QString();
 }
 
+std::vector<InstalledExtra> parseInstalledExtras(const QString &dpkgQuery) {
+	static const QString prefix = QStringLiteral("zacos9-extra-");
+	std::vector<InstalledExtra> out;
+	for (const QString &line : dpkgQuery.split('\n')) {
+		const QStringList fields = line.split('\t');
+		if (fields.size() < 3 || fields[1] != "install ok installed" ||
+				!fields[0].startsWith(prefix) || fields[0].size() == prefix.size()) {
+			continue;
+		}
+		out.push_back({ fields[0], fields[0].mid(prefix.size()), fields[2] });
+	}
+	return out;
+}
+
+std::vector<InstalledExtra> installedExtras() {
+	return parseInstalledExtras(runQuiet("dpkg-query",
+		{ "-W", "-f=${Package}\\t${Status}\\t${Version}\\n" }));
+}
+
 QString installedVersion(const QString &package) {
 	int code = -1;
 	const QString out = runQuiet("dpkg-query", { "-W", "-f=${Status}\t${Version}", package }, &code);
