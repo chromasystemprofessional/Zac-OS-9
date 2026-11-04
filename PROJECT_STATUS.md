@@ -1,6 +1,6 @@
 # Project status
 
-Updated: 2026-11-04. Latest release: **1.7.5**
+Updated: 2026-11-04. Latest release: **1.7.6**
 ([releases](https://github.com/chromasystemprofessional/Zac-OS-9/releases),
 [ISO](https://sourceforge.net/projects/zac-os-9/files/)).
 
@@ -36,6 +36,9 @@ This page is what's true now and what's next. What changed and when is in
   printers appear before their first job, one printer over USB and Wi-Fi is one
   row, and a theme dropped on the desktop now copies the System Folder it needs
   so it gets its Apple menu icon.
+- **1.7.6 keeps the System Folder's resource forks** when copying it from Old
+  Dog's disk, so Apple Platinum and the themes that share its artwork show
+  their Apple menu and standard folder, disk, Trash and document icons.
 
 ## Being worked on
 
