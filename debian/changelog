@@ -1,3 +1,13 @@
+zacos9 (1.7.5) trixie; urgency=medium
+
+  * Theme Installer: a theme dropped on the desktop now copies Old Dog's
+    Mac OS 9 System Folder when needed, without replacing a partial one,
+    and finds a System file in every copy layout; themes such as Apple
+    Platinum now get their Apple menu icon instead of the theme file's
+    document icon.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Wed, 04 Nov 2026 09:37:34 -0500
+
 zacos9 (1.7.4) trixie; urgency=medium
 
   * Theme Extractor: the Apple menu icon is read from a System file kept as
