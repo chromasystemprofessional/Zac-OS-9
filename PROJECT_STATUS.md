@@ -1,6 +1,6 @@
 # Project status
 
-Updated: 2026-11-04. Latest release: **1.7.5**
+Updated: 2026-11-04. Latest release: **1.7.6**
 ([releases](https://github.com/chromasystemprofessional/Zac-OS-9/releases),
 [ISO](https://sourceforge.net/projects/zac-os-9/files/)).
 
@@ -36,6 +36,11 @@ This page is what's true now and what's next. What changed and when is in
   printers appear before their first job, one printer over USB and Wi-Fi is one
   row, and a theme dropped on the desktop now copies the System Folder it needs
   so it gets its Apple menu icon.
+- **1.7.6 repairs the System Folder copied from Old Dog's disk.** A
+  kernel-mounted HFS volume exposes only data forks, so the copy had no
+  resource fork and themes showed the theme file's document icon. The copy is
+  now read from the image itself, every resource fork kept, and older copies
+  are repaired in place; themes rebuild when Appearance opens.
 
 ## Being worked on
 
