@@ -19,9 +19,9 @@ ZacOS are recognised again. Theme files and the folder they are filed
 into wear the theme's own icon; archives such as zip, 7z and StuffIt
 files have a zipped-page icon.
 
-Title-bar art now scales with the theme, and imported sound sets are
-padded so they no longer clip. In the Sniffer, clicking one of several
-selected icons selects only that icon.
+Title-bar art now scales and lines up with the theme, and imported
+sound sets are padded so they no longer clip. In the Sniffer,
+clicking one of several selected icons selects only that icon.
 
 Night Mode has been removed from Extras: it never worked properly.
 Fetch Updates now checks for new versions of the ZacOS Extras you have
