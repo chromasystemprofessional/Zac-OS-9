@@ -1,9 +1,9 @@
 The hard disk and Apple menu icons now come out right in Mac OS 9
 themes.
 
-A theme whose Mac OS 9 System file has only the small hard disk icon now
-gets both sizes, instead of keeping an icon an older extraction left
-behind. Rebuilding a theme also clears icons it no longer supplies.
+The desktop's grey hard disk now comes from the Finder's own icon, not
+the System's small pop-up icon, so it is grey instead of purple and red.
+Rebuilding a theme also clears icons it no longer supplies.
 
 The menu-bar Apple is drawn from the theme's fitted 20x15 icon when it
 has one, so its bottom row is no longer clipped.

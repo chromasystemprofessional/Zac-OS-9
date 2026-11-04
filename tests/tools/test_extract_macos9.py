@@ -277,8 +277,10 @@ def test_apple_menu():
 def test_standard_icon_ids():
     # Apple's Icons.h: kGenericHardDiskIconResource -3995 and
     # kGenericFileServerIconResource -3972. -3970 is the Suitcase.
+    # A theme's own -3995 art wins; without it, write_theme_icons uses
+    # the Finder's family 400, the grey desktop disk.
     kinds = {kind: rid for kind, _rtype, rid in tool.THEME_ICON_MAP}
-    assert kinds["disk"] == -3995, "the hard disk is Apple's standard icon"
+    assert kinds["disk"] == -3995, "the theme's own hard disk art is the standard icon"
     assert kinds["network-disk"] == -3972, "the file server is Apple's standard icon"
     print("ok    hard disk and file server use Apple's standard icon ids")
 
@@ -462,6 +464,11 @@ def test_file_mode_finds_apple_menu():
     finder = build_resource_fork([
         (b"icl8", 7202, b"\x17" * 1024),
         (b"ICN#", 7202, b"\xff" * 256),
+        # The Finder's desktop hard disk family 400, the grey disk.
+        (b"icl8", 400, b"\x2a" * 1024),
+        (b"ics8", 400, b"\x2a" * 256),
+        (b"ICN#", 400, b"\xff" * 256),
+        (b"ics#", 400, b"\xff" * 64),
         (b"CURS", 6604, b"\x00" * 32 + b"\xff" * 16 + b"\x00" * 16 + b"\x00\x02\x00\x02"),
     ])
     with open(os.path.join(sys_dir, "Finder"), "wb") as f:
@@ -487,6 +494,9 @@ def test_file_mode_finds_apple_menu():
         "the Zac menu slot shows the Apple icon, not the theme file icon"
     assert _png_size(os.path.join(out, "icons", "folder-32.png")) == (32, 32)
     assert _png_size(os.path.join(out, "icons", "folder-16.png")) == (16, 16)
+    assert _png_size(os.path.join(out, "icons", "disk-32.png")) == (32, 32)
+    assert _png_size(os.path.join(out, "icons", "disk-16.png")) == (16, 16), \
+        "the Finder's desktop hard disk fills the disk kind"
     assert _png_size(os.path.join(out, "icons", "caution-32.png")) == (32, 32)
     assert _png_size(os.path.join(out, "icons", "caution-16.png")) == (16, 16), \
         "mapped desktop icons decode at both sizes, caution from the Finder file"
@@ -1077,6 +1087,18 @@ def test_theme_icons_scale_and_clear_stale():
     assert _png_size(os.path.join(icons, "disk-16.png")) == (16, 16)
     assert _png_size(os.path.join(icons, "disk-32.png")) == (32, 32), \
         "a 16px-only hard disk is scaled for the desktop"
+    # Without the theme's own -3995, the Finder's family 400 is the
+    # desktop's grey disk.
+    out2 = tempfile.mkdtemp() + "/theme"
+    icons2 = os.path.join(out2, "icons")
+    os.makedirs(icons2)
+    tool.write_theme_icons({
+        (b"icl8", 400): [bytes([1]) * 1024], (b"ICN#", 400): [b"\xff" * 256],
+        (b"ics8", 400): [bytes([1]) * 256], (b"ics#", 400): [b"\xff" * 64],
+    }, [(9, palette)], out2, theme_keys=set())
+    assert _png_size(os.path.join(icons2, "disk-16.png")) == (16, 16)
+    assert _png_size(os.path.join(icons2, "disk-32.png")) == (32, 32), \
+        "the Finder's desktop hard disk is used when the theme has none"
     print("ok    a 16px-only disk icon is scaled and stale icons are cleared")
 
 
