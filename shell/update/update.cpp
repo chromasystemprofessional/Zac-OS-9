@@ -15,6 +15,7 @@
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QPainter>
+#include <QRegularExpression>
 #include <QStandardPaths>
 #include <memory>
 
@@ -623,12 +624,13 @@ void UpdateWindow::installExtras() {
 
 void UpdateWindow::installNextExtra() {
 	if (m_extraIndex >= static_cast<int>(m_extras.size())) {
-		restartExtras();
-		if (m_debian.empty()) {
-			finished();
-		} else {
-			upgradeDebian();
-		}
+		restartExtras([this] {
+			if (m_debian.empty()) {
+				finished();
+			} else {
+				upgradeDebian();
+			}
+		});
 		return;
 	}
 	const ExtraUpdate u = m_extras[m_extraIndex];
@@ -716,9 +718,9 @@ void UpdateWindow::afterZacos() {
 }
 
 /* An extra's package can't restart a program that an update replaces
- * (its prerm only stops it on removal), so stop the old copy and start
- * the installed one after a moment. */
-void UpdateWindow::restartExtras() {
+ * (its prerm only stops it on removal), so stop the old copies and start
+ * the installed ones once pkill has finished. */
+void UpdateWindow::restartExtras(std::function<void()> done) {
 	QStringList starts;
 	for (const ExtraUpdate &u : m_extras) {
 		if (!u.start.isEmpty() && !starts.contains(u.start)) {
@@ -726,15 +728,21 @@ void UpdateWindow::restartExtras() {
 		}
 	}
 	if (starts.isEmpty()) {
+		done();
 		return;
 	}
+	QString pattern;
 	for (const QString &start : starts) {
-		QProcess::startDetached("pkill", QStringList() << "-x" << "-f" << ("(/usr/bin/)?" + start));
+		if (!pattern.isEmpty()) {
+			pattern += '|';
+		}
+		pattern += "(/usr/bin/)?" + QRegularExpression::escape(start);
 	}
-	QTimer::singleShot(500, this, [starts] {
+	run("pkill", { "-x", "-f", pattern }, [starts, done](int) {
 		for (const QString &start : starts) {
 			QProcess::startDetached(start, QStringList());
 		}
+		done();
 	});
 }
 

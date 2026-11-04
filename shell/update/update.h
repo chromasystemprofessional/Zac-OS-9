@@ -108,7 +108,7 @@ private:
 	void installExtras();
 	void installNextExtra();
 	void afterZacos();
-	void restartExtras();
+	void restartExtras(std::function<void()> done);
 	void upgradeDebian();
 	void finished();
 	void failed(const QString &why);
