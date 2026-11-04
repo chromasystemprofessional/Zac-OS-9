@@ -72,6 +72,9 @@ THEME_ICON_MAP = [
     ("trash-empty", b"icl8", -3993),
     ("trash-full", b"icl8", -3984),
     ("document", b"icl8", -4000),
+    # Apple's generic hard disk. Finder family 400 is the desktop
+    # *printer*; the Finder's own desktop drive is family 29010, used
+    # when the theme supplies no -3995 art of its own.
     ("disk", b"icl8", -3995),
     ("network-disk", b"icl8", -3972),
     ("disk-image", b"icl8", -3998),
@@ -110,7 +113,10 @@ THEME_ICON_IDS = frozenset(
     [(b"icns", rid) for _kind, _rtype, rid in THEME_ICON_MAP] +
     [(b"ics8", rid) for _kind, _rtype, rid in THEME_ICON_MAP] +
     [(b"ics4", rid) for _kind, _rtype, rid in THEME_ICON_MAP] +
-    [(b"ics#", rid) for _kind, _rtype, rid in THEME_ICON_MAP]
+    [(b"ics#", rid) for _kind, _rtype, rid in THEME_ICON_MAP] +
+    # The Finder's desktop drive family (hard disk 29010, floppy 29011,
+    # CD 29012, locked 29013), not in THEME_ICON_MAP.
+    [(t, 29010) for t in (b"icl8", b"icl4", b"icns", b"ics8", b"ics4", b"ics#", b"ICN#")]
 )
 
 
@@ -224,12 +230,33 @@ def write_theme_icons(theme_icons, cluts, out, theme_keys=frozenset(), theme_clu
 	"""
 	sys_palette = macicons.resolve_palette(cluts[len(theme_cluts):] or cluts)
 	icons_dir = os.path.join(out, "icons")
+	# A rebuild must not keep an old extractor's icon when this one cannot
+	# find that kind: the desktop would show the wrong art forever.
+	for kind, _rtype, _rid in THEME_ICON_MAP:
+		for size in (16, 32):
+			stale = os.path.join(icons_dir, "%s-%d.png" % (kind, size))
+			try:
+				os.remove(stale)
+			except FileNotFoundError:
+				pass
 	for kind, _rtype, rid in THEME_ICON_MAP:
-		big = decode_standard_icon(theme_icons, sys_palette, rid, 32)
+		use = rid
+		if kind == "disk":
+			# A theme's own hard disk art (family -3995) wins. Without it,
+			# use the Finder's desktop drive family 29010: the 3D drive
+			# Old Dog shows on the desktop, not the desktop printer (400)
+			# or the flat pop-up icon (-3995).
+			theme_disk = any((t, rid) in theme_keys for t in
+				(b"icns", b"icl8", b"icl4", b"ics8", b"ics4", b"ics#"))
+			finder_disk = any((t, 29010) in theme_icons for t in
+				(b"icns", b"icl8", b"icl4", b"ics8", b"ics4", b"ics#"))
+			if not theme_disk and finder_disk:
+				use = 29010
+		big = decode_standard_icon(theme_icons, sys_palette, use, 32)
 		if big is None:
 			continue
 		pngwrite.write_png(os.path.join(icons_dir, kind + "-32.png"), 32, 32, big)
-		small = decode_standard_icon(theme_icons, sys_palette, rid, 16)
+		small = decode_standard_icon(theme_icons, sys_palette, use, 16)
 		if small is None:
 			small = pngwrite.nearest_scale(big, 32, 32, 16, 16)
 		pngwrite.write_png(os.path.join(icons_dir, kind + "-16.png"), 16, 16, small)
@@ -2020,6 +2047,13 @@ def main():
 	# the user builds from their own Mac OS 9 install: it becomes both
 	# apple-menu.png and the Zac menu icon. Without one, the theme file's
 	# own icon fills the Zac menu slot instead.
+	# A rebuild with a source that has lost an asset must not leave the
+	# previous extraction's file in place.
+	for stale in ("apple-menu.png", "menu-icon.png", "file-icon.png"):
+		try:
+			os.remove(os.path.join(out, stale))
+		except FileNotFoundError:
+			pass
 	apple_rows = write_apple_menu(apple_menu, cluts, out, theme_apple, theme_cluts)
 	write_theme_art(icons, apple_rows, cluts, out, theme_cluts)
 	write_theme_icons(theme_icons, cluts, out, theme_keys, theme_cluts)
