@@ -224,14 +224,27 @@ def write_theme_icons(theme_icons, cluts, out, theme_keys=frozenset(), theme_clu
 	"""
 	sys_palette = macicons.resolve_palette(cluts[len(theme_cluts):] or cluts)
 	icons_dir = os.path.join(out, "icons")
+	# A rebuild must not keep an old extractor's icon when this one cannot
+	# find that kind: the desktop would show the wrong art forever.
+	for kind, _rtype, _rid in THEME_ICON_MAP:
+		for size in (16, 32):
+			stale = os.path.join(icons_dir, "%s-%d.png" % (kind, size))
+			try:
+				os.remove(stale)
+			except FileNotFoundError:
+				pass
 	for kind, _rtype, rid in THEME_ICON_MAP:
+		# Some System files carry only the 16px member (the hard disk is
+		# one); make the 32px one from it instead of skipping the kind.
+		small = decode_standard_icon(theme_icons, sys_palette, rid, 16)
 		big = decode_standard_icon(theme_icons, sys_palette, rid, 32)
-		if big is None:
+		if big is None and small is not None:
+			big = pngwrite.nearest_scale(small, 16, 16, 32, 32)
+		if small is None and big is not None:
+			small = pngwrite.nearest_scale(big, 32, 32, 16, 16)
+		if big is None or small is None:
 			continue
 		pngwrite.write_png(os.path.join(icons_dir, kind + "-32.png"), 32, 32, big)
-		small = decode_standard_icon(theme_icons, sys_palette, rid, 16)
-		if small is None:
-			small = pngwrite.nearest_scale(big, 32, 32, 16, 16)
 		pngwrite.write_png(os.path.join(icons_dir, kind + "-16.png"), 16, 16, small)
 
 
@@ -2020,6 +2033,13 @@ def main():
 	# the user builds from their own Mac OS 9 install: it becomes both
 	# apple-menu.png and the Zac menu icon. Without one, the theme file's
 	# own icon fills the Zac menu slot instead.
+	# A rebuild with a source that has lost an asset must not leave the
+	# previous extraction's file in place.
+	for stale in ("apple-menu.png", "menu-icon.png", "file-icon.png"):
+		try:
+			os.remove(os.path.join(out, stale))
+		except FileNotFoundError:
+			pass
 	apple_rows = write_apple_menu(apple_menu, cluts, out, theme_apple, theme_cluts)
 	write_theme_art(icons, apple_rows, cluts, out, theme_cluts)
 	write_theme_icons(theme_icons, cluts, out, theme_keys, theme_cluts)

@@ -1061,6 +1061,25 @@ test_theme_chrome_twopart()
 test_bar_tiles_align()
 
 
+def test_theme_icons_scale_and_clear_stale():
+    palette = [(i, (i, i, i)) for i in range(256)]
+    out = tempfile.mkdtemp() + "/theme"
+    icons = os.path.join(out, "icons")
+    os.makedirs(icons)
+    stale = os.path.join(icons, "disk-32.png")
+    with open(stale, "wb") as f:
+        f.write(b"old")
+    tool.write_theme_icons({}, [(9, palette)], out)
+    assert not os.path.exists(stale), "a stale icon is removed when the source lacks it"
+    assert not os.path.exists(os.path.join(icons, "disk-16.png"))
+    tool.write_theme_icons({(b"ics8", -3995): [bytes([1]) * 256],
+                            (b"ics#", -3995): [b"\xff" * 64]}, [(9, palette)], out)
+    assert _png_size(os.path.join(icons, "disk-16.png")) == (16, 16)
+    assert _png_size(os.path.join(icons, "disk-32.png")) == (32, 32), \
+        "a 16px-only hard disk is scaled for the desktop"
+    print("ok    a 16px-only disk icon is scaled and stale icons are cleared")
+
+
 def test_resource_map_bounds():
     # A corrupt map can name thousands of types that all read the same
     # 100 KB body: without a byte budget the parser copies it until memory
@@ -1085,5 +1104,6 @@ def test_resource_map_bounds():
     print("ok    a corrupt resource map cannot copy one body without bound")
 
 
+test_theme_icons_scale_and_clear_stale()
 test_resource_map_bounds()
 print("OK")
