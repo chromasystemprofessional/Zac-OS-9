@@ -1,3 +1,12 @@
+zacos9 (1.7.4) trixie; urgency=medium
+
+  * Theme Extractor: the Apple menu icon is read from a System file kept as
+    an AppleDouble ._System (or in ~/Classic/System), so a single-file
+    theme without its own Apple icon, such as Apple Platinum, no longer
+    falls back to the theme thumbnail.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Wed, 04 Nov 2026 08:25:07 -0500
+
 zacos9 (1.7.3) trixie; urgency=medium
 
   * Themes: the desktop hard disk is Old Dog's System-file hard disk icon,
