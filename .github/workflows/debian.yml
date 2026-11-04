@@ -114,6 +114,16 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Prepare release notes
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          if [ -f "shell/update/whatsnew/$version.txt" ]; then
+            cp "shell/update/whatsnew/$version.txt" release-notes.txt
+          else
+            echo "See the changelog." > release-notes.txt
+          fi
+
       - name: Publish release assets
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
@@ -123,6 +133,6 @@ jobs:
             ci-artifacts/SHA256SUMS
           tag_name: ${{ github.ref_name }}
           name: "ZacOS 9 ${{ github.ref_name }}"
-          body: "See the changelog."
+          body_path: release-notes.txt
         env:
           GITHUB_TOKEN: ${{ github.token }}
