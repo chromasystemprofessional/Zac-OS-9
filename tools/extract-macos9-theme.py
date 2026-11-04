@@ -716,57 +716,69 @@ def _fork_from_path(path):
 	return raw
 
 
+def _mac_file_candidates(directory, name):
+	"""Where a Mac file's resource fork may be, in every copy layout:
+	a raw fork or data file, an AppleDouble companion, a Netatalk
+	`.rsrc` folder, or the kernel HFS/Old Dog Unix volume's NAME/rsrc."""
+	for candidate in (os.path.join(directory, name),
+			os.path.join(directory, "._" + name),
+			os.path.join(directory, ".rsrc", name),
+			os.path.join(directory, name, "rsrc")):
+		yield candidate
+
+
+def _existing_fork(path):
+	"""Read `path` as a resource fork, or return None when it is absent
+	or is a plain data fork (an empty System file, for example)."""
+	try:
+		fork = _fork_from_path(path)
+	except OSError:
+		return None
+	return fork if fork and looks_like_resource_fork(fork) else None
+
+
 def find_mac_file(fork_path, name):
 	"""Locate a Mac OS 9 System Folder file (System, Finder, ...) for a
 	theme file's fork.
 
-	Climbs from the theme file to a folder holding `name` (raw or Netatalk
-	`.rsrc`), else falls back to ~/Classic. Returns the fork's path, or
-	None."""
+	Climbs from the theme file to a folder holding `name`, then falls back
+	to the places Old Dog keeps a Mac OS 9 install: ~/Classic/System
+	Folder, ~/System Folder, ~/Classic/System and ~/Classic itself, plus
+	$ZACOS9_CLASSIC_DIR. Every copy layout is accepted (raw, AppleDouble,
+	Netatalk `.rsrc`, and NAME/rsrc). Returns the fork's path, or None."""
 	seen = set()
 	d = os.path.abspath(os.path.dirname(fork_path))
 	for _ in range(10):
 		if d in seen:
 			break
 		seen.add(d)
-		for candidate in (os.path.join(d, name), os.path.join(d, "._" + name),
-				os.path.join(d, ".rsrc", name)):
-			try:
-				raw = open(candidate, "rb").read()
-			except OSError:
-				continue
-			if os.path.basename(candidate).startswith("._") or raw[:4] == b"\x00\x05\x16\x07":
-				fork = extract_apple_double(raw) or raw
-			else:
-				fork = raw
-			if fork and looks_like_resource_fork(fork):
+		for candidate in _mac_file_candidates(d, name):
+			if _existing_fork(candidate):
 				return candidate
 		parent = os.path.dirname(d)
 		if parent == d:
 			break
 		d = parent
-	for candidate in (os.path.expanduser("~/Classic/System Folder/" + name),
-			os.path.expanduser("~/Classic/System Folder/._" + name),
-			os.path.expanduser("~/Classic/System Folder/.rsrc/" + name),
-			os.path.expanduser("~/Classic/System/" + name),
-			os.path.expanduser("~/Classic/System/._" + name)):
-		try:
-			raw = open(candidate, "rb").read()
-		except OSError:
+	home = os.path.expanduser("~")
+	classic = os.environ.get("ZACOS9_CLASSIC_DIR") or os.path.join(home, "Classic")
+	roots = [os.path.join(classic, "System Folder"),
+		os.path.join(home, "System Folder"),
+		os.path.join(classic, "System"),
+		classic]
+	for directory in roots:
+		if directory in seen:
 			continue
-		if os.path.basename(candidate).startswith("._") or raw[:4] == b"\x00\x05\x16\x07":
-			fork = extract_apple_double(raw) or raw
-		else:
-			fork = raw
-		if fork and looks_like_resource_fork(fork):
-			return candidate
+		seen.add(directory)
+		for candidate in _mac_file_candidates(directory, name):
+			if _existing_fork(candidate):
+				return candidate
 	return None
 
 
 def fonts_dir_for(system_fork):
 	"""The System Folder's Fonts folder next to a System fork, or None."""
 	d = os.path.dirname(os.path.abspath(system_fork))
-	if os.path.basename(d) == ".rsrc":
+	if os.path.basename(d) == ".rsrc" or os.path.basename(system_fork) == "rsrc":
 		d = os.path.dirname(d)
 	candidate = os.path.join(d, "Fonts")
 	return candidate if os.path.isdir(candidate) else None

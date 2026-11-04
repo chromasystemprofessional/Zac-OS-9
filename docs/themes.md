@@ -203,19 +203,25 @@ behind the scenes; its `--file` batch mode does the same from a terminal.)
 The Theme Installer finds the System Folder at `~/Classic/System Folder`
 (where Old Dog keeps it), at `~/System Folder` (where a copy dragged onto
 Old Dog's Unix volume lands) or at `$ZACOS9_CLASSIC_DIR/System Folder`. It
-reads the Apple menu icon, the busy pointers, the alert sounds, the desktop
-pictures and the fonts from it; without one, the theme still installs but
-keeps ZacOS's Apple, pointers, sounds and fonts, and takes no desktop
-picture.
+also accepts `~/Classic/System` and a `System` or `._System` file directly
+in `~/Classic`, and reads a copy whose fork is kept as `System/rsrc` by Old
+Dog's Unix volume. It reads the Apple menu icon, the busy pointers, the
+alert sounds, the desktop pictures and the fonts from it; without one, the
+theme still installs but keeps ZacOS's Apple, pointers, sounds and fonts,
+and takes no desktop picture.
 
-When there is none, the installer offers to copy it out of Old Dog's startup
-disk: it mounts the disk read-only (`zacos9-mac-disks`, which may ask for an
+When there is none, the installer copies it out of Old Dog's startup disk:
+it mounts the disk read-only (`zacos9-mac-disks`, which may ask for an
 administrator's password), copies `System Folder` to `~/Classic/System
 Folder` keeping every file's resource fork as its `.rsrc` companion, and
-goes on with the import. `zacos9-themeinstaller --copy-system-folder` does
-the same from a terminal. Old Dog must not be running from that disk while
-it is copied. Finder metadata (type and creator) is not carried over: the
-copy is for ZacOS to read, not to start up from.
+goes on with the import. The desktop's automatic drop import and
+`zacos9-themeinstaller --file` batch mode do this without a question, so a
+theme dropped on any computer with Old Dog's disk gets the same Apple menu
+icon, desktop pictures, sounds and fonts as one installed from the window.
+`zacos9-themeinstaller --copy-system-folder` copies it alone from a
+terminal. Old Dog must not be running from that disk while it is copied.
+Finder metadata (type and creator) is not carried over: the copy is for
+ZacOS to read, not to start up from.
 
 A theme whose sound set, program font, desktop picture or alert sound
 cannot be found still applies: that one choice is left out and the

@@ -513,6 +513,43 @@ def test_file_mode_finds_apple_menu():
     print("ok    --file mode finds the System file's Apple menu icon")
 
 
+def test_file_mode_finds_system_fallback_layouts():
+    # A theme file outside the Mac OS 9 tree still finds the System file in
+    # every place a copy may land: ~/System Folder, ~/Classic, a direct
+    # ._System companion, and a NAME/rsrc fork from Old Dog's Unix volume.
+    root = tempfile.mkdtemp()
+    old_home = os.environ.get("HOME")
+    os.environ["HOME"] = root
+    try:
+        themes = os.path.join(root, "themes")
+        os.makedirs(themes)
+        theme_path = os.path.join(themes, "Theme")
+        with open(theme_path, "wb") as f:
+            f.write(b"theme")
+        fork = build_resource_fork([
+            (b"ics8", -16386, b"\x07" * 256),
+            (b"ics#", -16386, b"\x00" * 64),
+        ])
+        cases = [
+            os.path.join(root, "System Folder", ".rsrc", "System"),
+            os.path.join(root, "Classic", "System Folder", "System", "rsrc"),
+            os.path.join(root, "Classic", "._System"),
+            os.path.join(root, "Classic", "System"),
+        ]
+        for path in cases:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "wb") as f:
+                f.write(fork)
+            assert tool.find_mac_file(theme_path, "System") == path, path
+            os.remove(path)
+        print("ok    --file mode finds System outside the theme's tree")
+    finally:
+        if old_home is None:
+            os.environ.pop("HOME", None)
+        else:
+            os.environ["HOME"] = old_home
+
+
 def test_write_theme_pfonts():
     import importlib.util as _iu
     root = os.path.join(os.path.dirname(sys.argv[1]), "fonts", "build_fonts.py")
@@ -1050,6 +1087,7 @@ test_theme_icons_share_system_palette()
 test_theme_art_writes_no_boot()
 test_sfnt_to_ttf()
 test_file_mode_finds_apple_menu()
+test_file_mode_finds_system_fallback_layouts()
 test_write_theme_pfonts()
 test_filtered_png_reads()
 test_theme_own_icons_win()

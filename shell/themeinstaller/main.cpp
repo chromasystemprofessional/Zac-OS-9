@@ -50,6 +50,15 @@ static bool bundleHasTheme(const QString &name) {
 	return QFileInfo::exists(outputDir(name) + "/menu-icon.png");
 }
 
+/* A folder holding a System file in any copy layout: raw, Netatalk
+ * `.rsrc`, AppleDouble, or the kernel HFS/Old Dog Unix volume's NAME/rsrc. */
+static bool hasSystemFile(const QString &dir) {
+	return QFileInfo(dir + "/System").isFile() ||
+		QFileInfo(dir + "/.rsrc/System").isFile() ||
+		QFileInfo(dir + "/._System").isFile() ||
+		QFileInfo(dir + "/System/rsrc").isFile();
+}
+
 /* The Mac OS 9 System Folder the user copied out of Old Dog. Old Dog
  * shares the home folder as the Mac's "Unix" volume, so a copy dragged
  * onto it lands at ~/System Folder; the launcher keeps its Mac files in
@@ -63,10 +72,14 @@ static QString macSystemFolder() {
 		candidates << classic + "/System Folder";
 	}
 	candidates << home + "/System Folder" << home + "/Classic/System";
+	/* A System file copied straight into Classic, or kept as its
+	 * AppleDouble companion, is found as well. */
+	candidates << home + "/Classic";
+	if (!classic.isEmpty() && classic != home + "/Classic") {
+		candidates << classic;
+	}
 	for (const QString &dir : candidates) {
-		if (QFileInfo(dir + "/System").isFile() ||
-				QFileInfo(dir + "/.rsrc/System").isFile() ||
-				QFileInfo(dir + "/._System").isFile()) {
+		if (hasSystemFile(dir)) {
 			return dir;
 		}
 	}
@@ -225,7 +238,13 @@ static bool copyMacTree(const QString &source, const QString &destination, QStri
 
 /* Mount Old Dog's disk read-only (zacos9-mac-disks) and copy its System
  * Folder into ~/Classic, where the Theme Installer looks for it. */
-static bool importSystemFolder(QString *copiedTo, QString *error) {
+static bool importSystemFolder(QString *copiedTo, QString *error, bool replaceExisting = true) {
+	const QString destination = QDir::homePath() + "/Classic/System Folder";
+	if (!replaceExisting && QFileInfo::exists(destination)) {
+		*error = destination + " already exists but has no readable System file; "
+			"leaving it alone.";
+		return false;
+	}
 	const QString tool = macDisksTool();
 	if (tool.isEmpty()) {
 		*error = "The Mac disk tool (zacos9-mac-disks) isn't installed.";
@@ -272,7 +291,6 @@ static bool importSystemFolder(QString *copiedTo, QString *error) {
 	}
 	/* Build the new copy beside the old one, so a failure cannot leave a
 	 * half-copied System Folder where ZacOS will read it. */
-	const QString destination = QDir::homePath() + "/Classic/System Folder";
 	const QString staging = destination + ".new";
 	QDir(staging).removeRecursively();
 	bool ok = copyMacTree(folder, staging, error);
@@ -822,9 +840,13 @@ int main(int argc, char *argv[]) {
 	if (system.isEmpty()) {
 		systemFolder = macSystemFolder();
 		if (systemFolder.isEmpty()) {
-			/* Offer to copy it out of Old Dog's disk, which is the only
-			 * lossless source of the resource forks themes need. */
-			bool want = copyFolder;
+			/* Copy it out of Old Dog's disk, which is the only lossless
+			 * source of the resource forks themes need. The desktop's
+			 * drop import is a batch run, so it must do this without a
+			 * question; otherwise themes such as Apple Platinum silently
+			 * lose their Apple menu icon. A terminal batch import behaves
+			 * the same as the interactive installer. */
+			bool want = copyFolder || batch;
 			if (!batch) {
 				want = QMessageBox::question(nullptr, "Theme Installer",
 					"Old Dog's Mac OS 9 System Folder wasn't found.\n\n"
@@ -837,7 +859,10 @@ int main(int argc, char *argv[]) {
 			}
 			if (want) {
 				QString copied, why;
-				if (importSystemFolder(&copied, &why)) {
+				/* A batch import must not replace a partial System Folder
+				 * the user may be filling in; only an explicit copy or the
+				 * interactive Yes may do that. */
+				if (importSystemFolder(&copied, &why, copyFolder || !batch)) {
 					systemFolder = macSystemFolder();
 				} else if (batch) {
 					fprintf(stderr, "zacos9-themeinstaller: %s\n", qPrintable(why));
@@ -851,7 +876,8 @@ int main(int argc, char *argv[]) {
 		}
 		if (!systemFolder.isEmpty()) {
 			for (const QString &candidate : { systemFolder + "/System",
-					systemFolder + "/.rsrc/System", systemFolder + "/._System" }) {
+					systemFolder + "/.rsrc/System", systemFolder + "/._System",
+					systemFolder + "/System/rsrc" }) {
 				if (QFileInfo(candidate).isFile()) {
 					system = candidate;
 					break;

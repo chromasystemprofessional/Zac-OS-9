@@ -416,4 +416,78 @@ with open(os.path.join(copied, ".rsrc", "System"), "rb") as f:
 assert os.path.isfile(os.path.join(copied, "Appearance", "Desktop Pictures", "Picture"))
 print("ok    Old Dog's System Folder copies out of its disk with its forks")
 
+# 7. A batch import (the desktop's drop path) with no System Folder copies
+# one from Old Dog's disk first, so a theme such as Apple Platinum still
+# gets its Apple menu icon instead of the theme's own document icon.
+mount7 = tempfile.mkdtemp()
+macsf7 = os.path.join(mount7, "System Folder")
+os.makedirs(os.path.join(macsf7, ".rsrc"))
+with open(os.path.join(macsf7, "System"), "wb") as f:
+    f.write(b"data fork")
+clut7 = struct.pack(">I", 0) + struct.pack(">HH", 0, 0)
+for i in range(256):
+    clut7 += struct.pack(">HHHH", i, i, i, i)
+apple7 = build_fork([
+    (b"ics8", -16386, b"\x07" * 256),
+    (b"ics#", -16386, b"\x00" * 64),
+    (b"clut", 9, clut7),
+])
+with open(os.path.join(macsf7, ".rsrc", "System"), "wb") as f:
+    f.write(apple7)
+home7 = tempfile.mkdtemp()
+os.makedirs(os.path.join(home7, "Classic"))
+with open(os.path.join(home7, "Classic", "Macintosh HD.dsk"), "wb") as f:
+    f.write(b"\x00" * 1024 + b"BD" + b"\x00" * 2048)
+fakebin7 = tempfile.mkdtemp()
+tool7 = os.path.join(fakebin7, "zacos9-mac-disks")
+with open(tool7, "w") as f:
+    f.write('#!/bin/sh\nif [ "$1" = mount ]; then\n'
+            '  printf \'{"paths":["%s"],"devices":["fake0"]}\\n\' "$FAKE_MOUNT"\nfi\nexit 0\n')
+os.chmod(tool7, 0o755)
+env7 = dict(os.environ)
+config7 = tempfile.mkdtemp()
+data7 = tempfile.mkdtemp()
+env7["HOME"] = home7
+env7["XDG_CONFIG_HOME"] = config7
+env7["XDG_DATA_HOME"] = data7
+env7["PATH"] = fakebin7 + ":" + env7["PATH"]
+env7["FAKE_MOUNT"] = mount7
+env7["QT_QPA_PLATFORM"] = "offscreen"
+theme7 = make_theme_file(tempfile.mkdtemp())
+r = subprocess.run([binary, "--file", theme7], env=env7,
+                   capture_output=True, text=True, timeout=120)
+assert r.returncode == 0, r.stderr
+copied7 = os.path.join(home7, "Classic", "System Folder")
+assert os.path.isfile(os.path.join(copied7, ".rsrc", "System")), \
+    "the batch import copied the System Folder"
+bundle7 = os.path.join(config7, "zacos9", "themes", "Apple platinum")
+assert os.path.isfile(os.path.join(bundle7, "apple-menu.png")), \
+    "the Apple menu icon came from the copied System file"
+assert os.path.isfile(os.path.join(bundle7, "menu-icon.png")), "menu icon written"
+print("ok    a batch drop import copies the System Folder and keeps the Apple")
+
+# 7b. A partial System Folder of the user's own is never replaced by the
+# automatic batch copy; it is left alone and the theme still installs.
+home7b = tempfile.mkdtemp()
+partial = os.path.join(home7b, "Classic", "System Folder")
+os.makedirs(partial)
+with open(os.path.join(partial, "Keep Me"), "wb") as f:
+    f.write(b"user data")
+with open(os.path.join(home7b, "Classic", "Macintosh HD.dsk"), "wb") as f:
+    f.write(b"\x00" * 1024 + b"BD" + b"\x00" * 2048)
+env7b = dict(env7)
+env7b["HOME"] = home7b
+env7b["XDG_CONFIG_HOME"] = tempfile.mkdtemp()
+env7b["XDG_DATA_HOME"] = tempfile.mkdtemp()
+r = subprocess.run([binary, "--file", theme7], env=env7b,
+                   capture_output=True, text=True, timeout=120)
+assert r.returncode == 0, r.stderr
+assert os.path.isfile(os.path.join(partial, "Keep Me")), \
+    "the batch copy did not replace the user's partial System Folder"
+assert not os.path.isfile(os.path.join(partial, ".rsrc", "System"))
+bundle7b = os.path.join(env7b["XDG_CONFIG_HOME"], "zacos9", "themes", "Apple platinum")
+assert not os.path.isfile(os.path.join(bundle7b, "apple-menu.png")), \
+    "without a usable System file the theme keeps its own icon"
+print("ok    a batch import leaves a partial System Folder alone")
+
 print("OK")
