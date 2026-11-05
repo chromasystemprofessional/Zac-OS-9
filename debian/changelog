@@ -1,3 +1,11 @@
+zacos9 (1.9.1) trixie; urgency=medium
+
+  * Spanish now draws its inverted question and exclamation marks (¿ and
+    ¡) in the same bitmap faces as the rest of the interface, so they no
+    longer fall back to DejaVu Sans.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Thu, 05 Nov 2026 12:47:49 -0500
+
 zacos9 (1.9.0) trixie; urgency=medium
 
   * Russian, Spanish and Brazilian Portuguese are complete: applications,
