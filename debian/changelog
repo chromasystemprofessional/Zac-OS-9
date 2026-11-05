@@ -1,3 +1,10 @@
+zacos9 (1.9.6) trixie; urgency=medium
+
+  * The memory helper's test now uses its temporary root even when package
+    tests run as root, so the ISO build no longer stops at memory-helper.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Thu, 05 Nov 2026 16:04:25 -0500
+
 zacos9 (1.9.5) trixie; urgency=medium
 
   * The installer's Language screen now asks for help translating ZacOS 9
