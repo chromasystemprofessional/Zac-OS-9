@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Phone
+Name[fr_CA]=Téléphone
+Name[fr_FR]=Téléphone
 Name[pt]=Telefone
 Name[es]=Teléfono
 Name[ru]=Телефон

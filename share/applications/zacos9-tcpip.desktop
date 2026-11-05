@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=TCP/IP
+Name[fr_CA]=TCP/IP
+Name[fr_FR]=TCP/IP
 Name[it]=TCP/IP
 Comment=Network interfaces, Wi-Fi, addresses and name servers
 Exec=zacos9-tcpip

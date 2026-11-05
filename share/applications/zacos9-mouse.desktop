@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Mouse
+Name[fr_CA]=Souris
+Name[fr_FR]=Souris
 Name[pt]=Mouse
 Name[es]=Ratón
 Name[ru]=Мышь

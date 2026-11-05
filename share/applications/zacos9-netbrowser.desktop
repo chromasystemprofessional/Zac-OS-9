@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Neighbourhood
+Name[fr_CA]=Voisinage
+Name[fr_FR]=Voisinage
 Name[pt]=Vizinhança
 Name[es]=Vecindario
 Name[ru]=Соседство

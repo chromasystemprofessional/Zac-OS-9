@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Retriever
+Name[fr_CA]=Retriever
+Name[fr_FR]=Retriever
 Name[it]=Retriever
 Comment=Keep pairs of folders alike: the newest copy of each file wins
 Exec=zacos9-retriever

@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Disk Setup
+Name[fr_CA]=Configuration de disque
+Name[fr_FR]=Configuration de disque
 Name[pt]=Configuração de disco
 Name[es]=Configuración de disco
 Name[ru]=Настройка диска

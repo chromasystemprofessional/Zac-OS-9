@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Plotter
+Name[fr_CA]=Plotter
+Name[fr_FR]=Plotter
 Comment=Draw the graph of a function
 Exec=zacos9-plotter
 Categories=Education;Math;

@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Text
+Name[fr_CA]=Texte
+Name[fr_FR]=Texte
 Name[pt]=Texto
 Name[es]=Texto
 Name[ru]=Текст

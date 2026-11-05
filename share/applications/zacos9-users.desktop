@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Users
+Name[fr_CA]=Utilisateurs
+Name[fr_FR]=Utilisateurs
 Name[pt]=Usuários
 Name[es]=Usuarios
 Name[ru]=Пользователи

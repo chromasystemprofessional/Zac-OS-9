@@ -130,6 +130,18 @@ def main():
         if result.stdout.splitlines() != ["Mouse", "Velocidade do clique duplo"]:
             sys.exit(f"test_i18n: Portuguese catalog gave {result.stdout!r}")
 
+        # Canadian and European French are separate catalogs, chosen by the
+        # region that LANGUAGE keeps.
+        for lang in ("fr_CA", "fr_FR"):
+            french = tmp / f"locale-{lang}" / lang / "LC_MESSAGES" / "zacos9.mo"
+            french.parent.mkdir(parents=True)
+            run(["msgfmt", "--check", "-o", str(french), str(ROOT / "po" / f"{lang}.po")])
+            env["LANGUAGE"] = lang
+            env["ZACOS9_LOCALEDIR"] = str(tmp / f"locale-{lang}")
+            result = run([str(BINARY)], env=env)
+            if result.stdout.splitlines() != ["Souris", "Vitesse du double-clic"]:
+                sys.exit(f"test_i18n: {lang} catalog gave {result.stdout!r}")
+
 
 if __name__ == "__main__":
     main()

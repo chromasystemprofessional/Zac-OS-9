@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Notepad
+Name[fr_CA]=Bloc-notes
+Name[fr_FR]=Bloc-notes
 Name[pt]=Bloco de notas
 Name[es]=Bloc de notas
 Name[ru]=Блокнот

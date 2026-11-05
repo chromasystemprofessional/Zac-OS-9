@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Startup Disk
+Name[fr_CA]=Disque de démarrage
+Name[fr_FR]=Disque de démarrage
 Name[pt]=Disco de inicialização
 Name[es]=Disco de arranque
 Name[ru]=Загрузочный диск

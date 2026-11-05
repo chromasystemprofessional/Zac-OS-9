@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Trackpad
+Name[fr_CA]=Trackpad
+Name[fr_FR]=Trackpad
 Name[pt]=Trackpad
 Name[es]=Trackpad
 Name[ru]=Трекпад

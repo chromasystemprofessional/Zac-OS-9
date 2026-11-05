@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Installer
+Name[fr_CA]=Installateur
+Name[fr_FR]=Installateur
 Name[pt]=Instalador do ZacOS
 Name[es]=Instalador de ZacOS
 Name[ru]=Установщик ZacOS

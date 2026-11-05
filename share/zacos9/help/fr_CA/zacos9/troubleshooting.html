@@ -1,0 +1,28 @@
+<html><head><meta charset="utf-8"><title>En cas de problème</title>
+<meta name="description" content="Un programme ne répond plus, l'écran se fige, l'ordinateur démarre sur le mauvais système, un document ne s'imprime pas, ou vous devez signaler un problème."></head>
+<body>
+<h1>En cas de problème</h1>
+<h2>Un programme ne répond plus</h2>
+<p>Choisissez <b>menu Zac ▸ Forcer à quitter</b>, puis le programme. Le reste de ZacOS continue de fonctionner.</p>
+<h2>Rien ne répond</h2>
+<p>Appuyez sur <b>Contrôle-Option-Retour arrière</b> pour terminer la session et revenir à la fenêtre de connexion, puis reconnectez-vous. Tout ce qui n'est pas enregistré est perdu. Si cela ne fonctionne pas non plus, maintenez le bouton d'alimentation enfoncé jusqu'à ce que l'ordinateur s'éteigne.</p>
+<h2>L'ordinateur démarre sur le mauvais système</h2>
+<p>Ouvrez <b>Panneaux de contrôle ▸ Disque de démarrage</b>, sélectionnez le système souhaité et cliquez sur Redémarrer. Si un système que vous avez installé n'est pas répertorié, cliquez sur Rechercher d'autres systèmes.</p>
+<h2>Disques et volumes réseau</h2>
+<ul>
+<li>Un disque branché n'apparaît pas : essayez un autre port, puis cherchez-le dans Périphériques et volumes de Pedigree.</li>
+<li>Un volume réseau ne répond plus : choisissez Spécial ▸ Éjecter dessus, puis reconnectez-vous depuis Voisinage ou Serveurs récents.</li>
+</ul>
+<h2>Impression</h2>
+<ul>
+<li>Aucune imprimante n'est choisie : ouvrez le <b>Sélecteur d'imprimante</b> depuis le menu Zac et cliquez sur une imprimante.</li>
+<li>Le Sélecteur d'imprimante indique que le service d'impression (CUPS) n'est pas en cours d'exécution : démarrez-le avec <b>sudo systemctl start cups</b>, puis réessayez.</li>
+<li>Un document reste en attente ou échoue : sa file d'attente indique pourquoi, par exemple « Arrêté (support nécessaire) ». Chargez du papier ou vérifiez l'imprimante, puis cliquez sur Reprendre.</li>
+<li>Un document d'un lot ne s'imprime pas : le message le nomme et les autres s'impriment quand même. Le journal de la session (ci-dessous) contient les détails.</li>
+</ul>
+<h2>Obtenir des informations sur votre ordinateur</h2>
+<p><b>Pedigree</b> (dans le menu Zac, ou le dossier Système ▸ Informations système) répertorie le modèle, le processeur, la mémoire, les écrans, les disques, le réseau et les périphériques de votre ordinateur. Son Fichier ▸ Enregistrer le rapport crée un fichier texte que vous pouvez envoyer à la personne qui vous aide.</p>
+<h2>Signaler un problème</h2>
+<p>Notez ce que vous avez fait et ce qui s'est passé. ZacOS conserve un journal de la session dans le dossier masqué .local/state/zacos9 de votre dossier personnel (session.log) ; joignez-le, avec le rapport de Pedigree, à votre description.</p>
+<p><a href="index.html">Aide de ZacOS</a></p>
+</body></html>

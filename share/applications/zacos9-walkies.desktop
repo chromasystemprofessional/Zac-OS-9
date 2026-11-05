@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Walkies
+Name[fr_CA]=Walkies
+Name[fr_FR]=Walkies
 Name[it]=Walkies
 Comment=Switch the network, sound, time zone and printer for the place you are
 Exec=zacos9-walkies

@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Numbers
+Name[fr_CA]=Nombres
+Name[fr_FR]=Nombres
 Name[pt]=Números
 Name[es]=Números
 Name[ru]=Числа

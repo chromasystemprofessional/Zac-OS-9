@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Volume
+Name[fr_CA]=Volume
+Name[fr_FR]=Volume
 Name[pt]=Volume
 Name[es]=Volumen
 Name[ru]=Громкость

@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Power
+Name[fr_CA]=Alimentation
+Name[fr_FR]=Alimentation
 Name[pt]=Energia
 Name[es]=Energía
 Name[ru]=Питание

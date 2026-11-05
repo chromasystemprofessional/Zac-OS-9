@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Calculator
+Name[fr_CA]=Calculatrice
+Name[fr_FR]=Calculatrice
 Name[pt]=Calculadora
 Name[es]=Calculadora
 Name[ru]=Калькулятор

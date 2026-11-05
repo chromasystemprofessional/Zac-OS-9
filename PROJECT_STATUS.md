@@ -91,6 +91,14 @@ application names, installer and Setup Assistant. All 20 help pages are
 under `share/zacos9/help/pt/`; a native speaker's review is next
 ([Languages](docs/i18n.md)).
 
+**French**: `po/fr_CA.po` and `po/fr_FR.po` are complete at 817 strings
+each, installed as `fr_CA` and `fr_FR`; `Name[fr_CA]` and `Name[fr_FR]` are
+in 67 desktop entries, and all 20 help pages are under
+`share/zacos9/help/fr_CA/` and `share/zacos9/help/fr_FR/`. English (Canada)
+and English (United Kingdom) are selectable English locales. The installer
+and Text panel show country flags. Native speakers should review the French
+terms and help books ([Languages](docs/i18n.md)).
+
 **Making the project easier to work on**: ten of the eleven phases are done,
 each its own pull request, and released as 1.1.0. Phase 7's four starter tasks
 are drafted, to be posted as "good first issue"s:

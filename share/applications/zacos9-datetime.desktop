@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Date & Time
+Name[fr_CA]=Date et heure
+Name[fr_FR]=Date et heure
 Name[pt]=Data e hora
 Name[es]=Fecha y hora
 Name[ru]=Дата и время

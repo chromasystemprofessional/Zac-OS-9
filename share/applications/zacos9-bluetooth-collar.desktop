@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Bluetooth
+Name[fr_CA]=Bluetooth
+Name[fr_FR]=Bluetooth
 Comment=Bluetooth
 Exec=zacos9-collarmodule bluetooth
 Categories=X-ZacOS9-CollarModule;

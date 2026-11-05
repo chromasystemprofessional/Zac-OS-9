@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=File Translator
+Name[fr_CA]=Traducteur de fichiers
+Name[fr_FR]=Traducteur de fichiers
 Name[pt]=Tradutor de arquivos
 Name[es]=Traductor de archivos
 Name[ru]=Переводчик файлов

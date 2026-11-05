@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Network
+Name[fr_CA]=Réseau
+Name[fr_FR]=Réseau
 Name[pt]=Rede
 Name[es]=Red
 Name[ru]=Сеть

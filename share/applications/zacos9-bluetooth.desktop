@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Bluetooth
+Name[fr_CA]=Bluetooth
+Name[fr_FR]=Bluetooth
 Name[it]=Bluetooth
 Comment=Pair and connect Bluetooth devices; play sound through headphones and speakers
 Exec=zacos9-bluetooth

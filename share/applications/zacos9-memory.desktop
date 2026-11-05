@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Memory
+Name[fr_CA]=Mémoire
+Name[fr_FR]=Mémoire
 Name[pt]=Memória
 Name[es]=Memoria
 Name[ru]=Память

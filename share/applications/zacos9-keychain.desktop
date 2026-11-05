@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Keychain Access
+Name[fr_CA]=Trousseau d’accès
+Name[fr_FR]=Trousseau d’accès
 Name[pt]=Acesso às chaves
 Name[es]=Acceso a llaveros
 Name[ru]=Связка ключей

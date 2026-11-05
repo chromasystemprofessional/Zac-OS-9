@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Print Queue
+Name[fr_CA]=File d'impression
+Name[fr_FR]=File d'impression
 Name[pt]=Fila de impressão
 Name[es]=Cola de impresión
 Name[ru]=Очередь печати

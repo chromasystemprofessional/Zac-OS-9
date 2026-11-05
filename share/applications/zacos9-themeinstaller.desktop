@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Theme Installer
+Name[fr_CA]=Installateur de thèmes
+Name[fr_FR]=Installateur de thèmes
 Name[pt]=Instalador de temas
 Name[es]=Instalador de temas
 Name[ru]=Установщик тем

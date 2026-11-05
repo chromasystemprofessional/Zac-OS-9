@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Keyboard
+Name[fr_CA]=Clavier
+Name[fr_FR]=Clavier
 Name[pt]=Teclado
 Name[es]=Teclado
 Name[ru]=Клавиатура

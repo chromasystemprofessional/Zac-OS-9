@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Collar
+Name[fr_CA]=Collar
+Name[fr_FR]=Collar
 Name[it]=Collar
 Comment=Show or hide the Collar, its hot key and its menu font
 Exec=zacos9-collarpanel

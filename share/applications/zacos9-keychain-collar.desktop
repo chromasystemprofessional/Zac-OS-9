@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Keychain
+Name[fr_CA]=Trousseau
+Name[fr_FR]=Trousseau
 Name[pt]=Chaves
 Name[es]=Llavero
 Name[ru]=Связка ключей

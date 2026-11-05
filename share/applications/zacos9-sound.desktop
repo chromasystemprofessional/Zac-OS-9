@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Sound
+Name[fr_CA]=Son
+Name[fr_FR]=Son
 Name[pt]=Som
 Name[es]=Sonido
 Name[ru]=Звук

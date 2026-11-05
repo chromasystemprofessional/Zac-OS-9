@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Scribble
+Name[fr_CA]=Scribble
+Name[fr_FR]=Scribble
 Comment=Read and write plain text documents
 Exec=zacos9-scribble %F
 Terminal=false

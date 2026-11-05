@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Setup Assistant
+Name[fr_CA]=Assistant de configuration
+Name[fr_FR]=Assistant de configuration
 Name[pt]=Assistente de configuração
 Name[es]=Asistente de configuración
 Name[ru]=Помощник настройки

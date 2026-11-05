@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Brightness
+Name[fr_CA]=Luminosité
+Name[fr_FR]=Luminosité
 Name[pt]=Brilho
 Name[es]=Brillo
 Name[ru]=Яркость

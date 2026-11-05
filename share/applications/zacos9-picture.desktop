@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Picture Viewer
+Name[fr_CA]=Visionneuse d'images
+Name[fr_FR]=Visionneuse d'images
 Name[pt]=Visualizador de imagens
 Name[es]=Visor de imágenes
 Name[ru]=Просмотр изображений
