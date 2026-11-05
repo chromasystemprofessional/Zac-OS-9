@@ -1,3 +1,11 @@
+zacos9 (1.9.7) trixie; urgency=medium
+
+  * The Startup Disk helper's test now uses its temporary grub
+    configuration even when package tests run as root, so the ISO build no
+    longer stops at startupdisk-helper.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Thu, 05 Nov 2026 16:46:32 -0500
+
 zacos9 (1.9.6) trixie; urgency=medium
 
   * The memory helper's test now uses its temporary root even when package
