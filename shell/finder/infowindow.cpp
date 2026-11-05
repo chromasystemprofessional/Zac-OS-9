@@ -607,7 +607,9 @@ void InfoWindow::loadSharing() {
 		m_share = on;
 		update();
 	};
-	m_copy = PanelButton(tr9("Copy"), QRect(254, 324, 60, PL_BUTTON_H));
+	const int copyW = std::max(60, Text(tr9("Copy"), 200, PL_FONT_SYSTEM).inkWidth() + 16);
+	m_copy = PanelButton(tr9("Copy"),
+		QRect(PRIV_X1 - 7 - copyW, 324, copyW, PL_BUTTON_H));
 	m_copy.clicked = [this] {
 		applyPrivileges(true);
 		layoutSharing();

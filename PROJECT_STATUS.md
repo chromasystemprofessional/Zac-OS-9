@@ -74,12 +74,10 @@ Mouse desktop entry. Input is not supported:
 ZacOS's own text fields have no IME preedit, so the language is not
 advertised as usable yet ([Languages](docs/i18n.md)).
 
-**Russian**: `po/ru.po` translates the control panels, the
-menu bar and its Hint Bubbles, the application names, the installer and the
-Setup Assistant; all 20 help pages are under `share/zacos9/help/ru/`.
-Cyrillic uses the existing DejaVu Sans fallback and needs no input method;
-a native speaker's review and the rest of the catalog are next
-([Languages](docs/i18n.md)).
+**Russian**: `po/ru.po` is complete at 817 strings, including the Finder's
+dialogs; all 20 help pages are under `share/zacos9/help/ru/`. Cyrillic uses
+the existing DejaVu Sans fallback and needs no input method; a native
+speaker's review is next ([Languages](docs/i18n.md)).
 
 **Making the project easier to work on**: ten of the eleven phases are done,
 each its own pull request, and released as 1.1.0. Phase 7's four starter tasks

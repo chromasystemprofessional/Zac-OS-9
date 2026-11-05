@@ -1,7 +1,7 @@
 # Russian translation of ZacOS 9.
-# The control panels, the menu bar and its Hint Bubbles, the standard alert
-# buttons, the application names, the installer and the Setup Assistant.
-# The help book is content under share/zacos9/help/ru/.
+# Complete: the Finder, control panels, menu bar and Hint Bubbles, alert
+# buttons, application names, installer and Setup Assistant. The help book is
+# content under share/zacos9/help/ru/.
 # Needs a native speaker's review before it is advertised as complete.
 #
 # This file is distributed under the same license as the zacos9 package.
@@ -39,97 +39,97 @@ msgstr "Регистратор"
 
 #: shell/barkrecorder/barkrecorder.cpp:21
 msgid "Choose Record to make a sound recording."
-msgstr ""
+msgstr "Выберите «Записать», чтобы создать звукозапись."
 
 #: shell/barkrecorder/barkrecorder.cpp:25
 msgid "Record…"
-msgstr ""
+msgstr "Записать…"
 
 #: shell/barkrecorder/barkrecorder.cpp:27 shell/finder/resourcewindows.cpp:69
 #: shell/finder/resourcewindows.cpp:429 shell/finder/transferdialog.cpp:89
 msgid "Stop"
-msgstr ""
+msgstr "Остановить"
 
 #: shell/barkrecorder/barkrecorder.cpp:30
 msgid "Play"
-msgstr ""
+msgstr "Воспроизвести"
 
 #: shell/barkrecorder/barkrecorder.cpp:33
 msgid "Open…"
-msgstr ""
+msgstr "Открыть…"
 
 #: shell/barkrecorder/barkrecorder.cpp:53
 msgid "Recording to %1…"
-msgstr ""
+msgstr "Запись в %1…"
 
 #: shell/barkrecorder/barkrecorder.cpp:78
 msgid "Recording saved to %1."
-msgstr ""
+msgstr "Запись сохранена в %1."
 
 #: shell/barkrecorder/barkrecorder.cpp:89
 msgid "Playing %1…"
-msgstr ""
+msgstr "Воспроизведение %1…"
 
 #: shell/barkrecorder/barkrecorder.cpp:115
 msgid "Playback stopped."
-msgstr ""
+msgstr "Воспроизведение остановлено."
 
 #: shell/barkrecorder/barkrecorder.cpp:117
 msgid "Ready. Recording: %1"
-msgstr ""
+msgstr "Готово. Запись: %1"
 
 #: shell/barkrecorder/barkrecorder.cpp:136
 msgid "Starting recording…"
-msgstr ""
+msgstr "Запуск записи…"
 
 #: shell/barkrecorder/barkrecorder.cpp:162
 msgid "Starting playback…"
-msgstr ""
+msgstr "Запуск воспроизведения…"
 
 #: shell/barkrecorder/barkrecorder.cpp:185
 msgid "Record a Sound"
-msgstr ""
+msgstr "Записать звук"
 
 #: shell/barkrecorder/barkrecorder.cpp:186
 #: shell/barkrecorder/barkrecorder.cpp:196
 msgid "WAVE audio (*.wav)"
-msgstr ""
+msgstr "Аудио WAVE (*.wav)"
 
 #: shell/barkrecorder/barkrecorder.cpp:189
 msgid "Choose a .wav file, and stop playback before recording."
-msgstr ""
+msgstr "Выберите файл .wav и остановите воспроизведение перед записью."
 
 #: shell/barkrecorder/barkrecorder.cpp:194
 msgid "Open a Sound Recording"
-msgstr ""
+msgstr "Открыть звукозапись"
 
 #: shell/barkrecorder/barkrecorder.cpp:199
 msgid "Choose a readable .wav file, and stop recording before playback."
-msgstr ""
+msgstr "Выберите читаемый файл .wav и остановите запись перед воспроизведением."
 
 #: shell/barkrecorder/barkrecorder.cpp:206
 msgid "The audio command exited with status %1."
-msgstr ""
+msgstr "Аудиокоманда завершилась с кодом %1."
 
 #: shell/barkrecorder/barkrecorder.cpp:208
 msgid "start recording"
-msgstr ""
+msgstr "начать запись"
 
 #: shell/barkrecorder/barkrecorder.cpp:209
 msgid "finish recording"
-msgstr ""
+msgstr "завершить запись"
 
 #: shell/barkrecorder/barkrecorder.cpp:210
 msgid "play recording"
-msgstr ""
+msgstr "воспроизвести запись"
 
 #: shell/barkrecorder/barkrecorder.cpp:211
 msgid "Could not %1. %2%3"
-msgstr ""
+msgstr "Не удалось %1. %2%3"
 
 #: shell/barkrecorder/barkrecorder.cpp:218
 msgid "Stop the recording and close Bark Recorder?"
-msgstr ""
+msgstr "Остановить запись и закрыть «Регистратор»?"
 
 #: shell/calculator/main.cpp:47 shell/calculator/main.cpp:155
 #: shell/menubar/hints.c:75
@@ -170,19 +170,19 @@ msgstr "Настройка диска"
 
 #: shell/disksetup/plan.cpp:156
 msgid "ZacOS (ext4)"
-msgstr ""
+msgstr "ZacOS (ext4)"
 
 #: shell/disksetup/plan.cpp:156
 msgid "Haiku (BFS)"
-msgstr ""
+msgstr "Haiku (BFS)"
 
 #: shell/disksetup/plan.cpp:157
 msgid "Mac OS Extended"
-msgstr ""
+msgstr "Mac OS Extended"
 
 #: shell/disksetup/plan.cpp:158
 msgid "unformatted"
-msgstr ""
+msgstr "неформатированный"
 
 #: shell/disksetup/plan.cpp:162 shell/installer/installer.cpp:51
 #: shell/installer/installer.cpp:447 shell/installer/installer.cpp:746
@@ -191,504 +191,504 @@ msgstr "«%1»"
 
 #: shell/disksetup/plan.cpp:162
 msgid "the EFI System partition"
-msgstr ""
+msgstr "системный раздел EFI"
 
 #: shell/disksetup/plan.cpp:163
 msgid "the BIOS boot partition"
-msgstr ""
+msgstr "загрузочный раздел BIOS"
 
 #: shell/disksetup/plan.cpp:164
 msgid "the new partition"
-msgstr ""
+msgstr "новый раздел"
 
 #: shell/disksetup/plan.cpp:171
 msgid "Erase %1 and give it a new %2 partition table"
-msgstr ""
+msgstr "Стереть %1 и создать новую таблицу разделов %2"
 
 #: shell/disksetup/plan.cpp:173
 msgid "Delete %1 (%2)"
-msgstr ""
+msgstr "Удалить %1 (%2)"
 
 #: shell/disksetup/plan.cpp:176
 msgid "Make a %1 BIOS boot partition, for starting up with GRUB"
-msgstr ""
+msgstr "Создать загрузочный раздел BIOS размером %1 для запуска с GRUB"
 
 #: shell/disksetup/plan.cpp:179
 msgid "Make a %1 EFI System partition, for starting up"
-msgstr ""
+msgstr "Создать системный раздел EFI размером %1 для загрузки"
 
 #: shell/disksetup/plan.cpp:181
 msgid "Make a %1 %2 partition%3"
-msgstr ""
+msgstr "Создать раздел %2 размером %1%3"
 
 #: shell/disksetup/plan.cpp:182
 msgid " named “%1”"
-msgstr ""
+msgstr " с именем «%1»"
 
 #: shell/disksetup/plan.cpp:184
 msgid "Erase %1 as %2%3"
-msgstr ""
+msgstr "Стереть %1 и отформатировать как %2%3"
 
 #: shell/disksetup/plan.cpp:185
 msgid ", named “%1”"
-msgstr ""
+msgstr ", с именем «%1»"
 
 #: shell/disksetup/plan.cpp:187
 msgid "Resize %1 to %2"
-msgstr ""
+msgstr "Изменить размер %1 на %2"
 
 #: shell/disksetup/plan.cpp:203
 msgid "ZacOS is running from this drive, so it can't be changed."
-msgstr ""
+msgstr "ZacOS запущена с этого диска, поэтому его нельзя изменить."
 
 #: shell/disksetup/plan.cpp:209
 msgid "The running system is on this drive, so it can't be erased."
-msgstr ""
+msgstr "Запущенная система находится на этом диске, поэтому его нельзя стереть."
 
 #: shell/disksetup/plan.cpp:213 shell/disksetup/plan.cpp:227
 msgid "%1 is in use. Eject it first."
-msgstr ""
+msgstr "%1 используется. Сначала извлеките его."
 
 #: shell/disksetup/plan.cpp:216
 msgid "Choose GPT or MBR."
-msgstr ""
+msgstr "Выберите GPT или MBR."
 
 #: shell/disksetup/plan.cpp:221
 msgid "Choose a partition."
-msgstr ""
+msgstr "Выберите раздел."
 
 #: shell/disksetup/plan.cpp:224
 msgid "Apply the changes so far first."
-msgstr ""
+msgstr "Сначала примените уже сделанные изменения."
 
 #: shell/disksetup/plan.cpp:230
 msgid "The running system starts up from the EFI System partition, so it can't be deleted or erased."
-msgstr ""
+msgstr "Запущенная система загружается с системного раздела EFI, поэтому его нельзя удалить или стереть."
 
 #: shell/disksetup/plan.cpp:233 shell/disksetup/plan.cpp:255
 msgid "Choose a format."
-msgstr ""
+msgstr "Выберите формат."
 
 #: shell/disksetup/plan.cpp:237
 msgid "%1 can't be resized: only ZacOS (ext4) and NTFS partitions can."
-msgstr ""
+msgstr "Размер %1 изменить нельзя: это возможно только для разделов ZacOS (ext4) и NTFS."
 
 #: shell/disksetup/plan.cpp:242
 msgid "Choose a size between 16 MB and %1."
-msgstr ""
+msgstr "Выберите размер от 16 МБ до %1."
 
 #: shell/disksetup/plan.cpp:245
 msgid "%1 can't be made smaller than %2: its files need that much."
-msgstr ""
+msgstr "%1 нельзя уменьшить меньше %2: его файлам нужно столько места."
 
 #: shell/disksetup/plan.cpp:252
 msgid "Give the drive a partition table first."
-msgstr ""
+msgstr "Сначала создайте на диске таблицу разделов."
 
 #: shell/disksetup/plan.cpp:259
 msgid "That kind of partition can't go on this drive."
-msgstr ""
+msgstr "Раздел такого типа нельзя разместить на этом диске."
 
 #: shell/disksetup/plan.cpp:262
 msgid "An MBR drive holds four partitions at most."
-msgstr ""
+msgstr "Диск MBR может содержать не более четырех разделов."
 
 #: shell/disksetup/plan.cpp:269
 msgid "There isn't room for that partition there."
-msgstr ""
+msgstr "Там недостаточно места для этого раздела."
 
 #: shell/finder/desktop.cpp:118 shell/finder/viewoptionsdialog.cpp:438
 msgid "Trash"
-msgstr ""
+msgstr "Корзина"
 
 #: shell/finder/diskinit.cpp:453
 msgid "The disk has been initialized as FAT32 with the name you entered. It will appear on the desktop when mounted."
-msgstr ""
+msgstr "Диск инициализирован как FAT32 с введенным именем. Он появится на рабочем столе после подключения."
 
 #: shell/finder/diskinit.cpp:474
 msgid "Select a mounted USB disk to erase. Internal and system disks cannot be erased here."
-msgstr ""
+msgstr "Выберите подключенный USB-диск для стирания. Внутренние диски и диски с системой здесь стереть нельзя."
 
 #: shell/finder/fileops.cpp:88
 msgid "The font files changed, but the font cache could not be updated for %1. %2"
-msgstr ""
+msgstr "Файлы шрифтов изменились, но не удалось обновить кэш шрифтов для %1. %2"
 
 #: shell/finder/fileops.cpp:98
 msgid "The font files changed, but fc-cache could not be started."
-msgstr ""
+msgstr "Файлы шрифтов изменились, но запустить fc-cache не удалось."
 
 #: shell/finder/fileops.cpp:113
 msgid "This font cannot be removed: %1. Only your own installed fonts can be moved out or put in Trash. Option-drag to export a copy instead."
-msgstr ""
+msgstr "Этот шрифт нельзя удалить: %1. Перемещать или отправлять в Корзину можно только установленные вами шрифты. Чтобы экспортировать копию, перетащите его с Option."
 
 #: shell/finder/fileops.cpp:127
 msgid "Moving a font collection removes every font face in that file. Continue?"
-msgstr ""
+msgstr "Перемещение коллекции шрифтов удалит все начертания из этого файла. Продолжить?"
 
 #: shell/finder/fileops.cpp:150
 msgid "The font could not be moved to Trash: %1"
-msgstr ""
+msgstr "Не удалось переместить шрифт в Корзину: %1"
 
 #: shell/finder/fileops.cpp:323 shell/finder/fileops.cpp:351
 msgid "The alias cannot be made because its original or destination is unavailable."
-msgstr ""
+msgstr "Не удалось создать псевдоним: оригинал или место назначения недоступны."
 
 #: shell/finder/fileops.cpp:334 shell/finder/fileops.cpp:362
 msgid "The alias could not be created in %1. Check folder permissions."
-msgstr ""
+msgstr "Не удалось создать псевдоним в %1. Проверьте разрешения папки."
 
 #: shell/finder/fileops.cpp:340
 msgid "The alias was not created because its identity record could not be saved."
-msgstr ""
+msgstr "Псевдоним не создан: не удалось сохранить запись его идентификатора."
 
 #: shell/finder/fileops.cpp:392
 msgid "Another file transfer is in progress. Finish or stop it first."
-msgstr ""
+msgstr "Уже выполняется другое копирование файлов. Сначала завершите или остановите его."
 
 #: shell/finder/fileops.cpp:403
 msgid "The destination folder is unavailable. Nothing was transferred."
-msgstr ""
+msgstr "Папка назначения недоступна. Ничего не было перенесено."
 
 #: shell/finder/fileops.cpp:417
 msgid "Queued applications cannot be copied or moved as files. Use Put Away or drag back to Applications to cancel removal."
-msgstr ""
+msgstr "Приложения, ожидающие удаления, нельзя копировать или перемещать как файлы. Выберите «Убрать» или перетащите обратно в «Программы», чтобы отменить удаление."
 
 #: shell/finder/fileops.cpp:427
 msgid "A folder cannot be transferred into itself, including through an alias."
-msgstr ""
+msgstr "Папку нельзя переместить в нее саму, в том числе через псевдоним."
 
 #: shell/finder/fileops.cpp:441
 msgid "“%1” already exists in the destination and was not replaced."
-msgstr ""
+msgstr "«%1» уже существует в месте назначения и не был заменен."
 
 #: shell/finder/fileops.cpp:459
 msgid "More than one selected item has the same destination name: “%1”. The duplicate was not transferred."
-msgstr ""
+msgstr "Несколько выбранных элементов имеют одинаковое имя в месте назначения: «%1». Дубликат не был перенесен."
 
 #: shell/finder/fileops.cpp:468
 msgid "The resource fork for “%1” cannot be transferred safely; the file has not been moved."
-msgstr ""
+msgstr "Ресурсную ветвь «%1» нельзя безопасно перенести; файл не был перемещен."
 
 #: shell/finder/fileops.cpp:846
 msgid "“%1” stays in the Applications folder. To remove an application, select it and choose Move To Trash."
-msgstr ""
+msgstr "«%1» останется в папке «Программы». Чтобы удалить приложение, выберите его и выберите «Переместить в Корзину»."
 
 #: shell/finder/fileops.cpp:849
 msgid "To stop “%1” opening at login, drag it to the Trash."
-msgstr ""
+msgstr "Чтобы «%1» больше не открывался при входе, перетащите его в Корзину."
 
 #: shell/finder/fileops.cpp:852
 msgid "“%1” is part of this computer and can't be moved out of its window."
-msgstr ""
+msgstr "«%1» является частью этого компьютера и не может быть перемещен из своего окна."
 
 #: shell/finder/fileops.cpp:951
 msgid "“%1” isn't an application. Only applications can be startup items."
-msgstr ""
+msgstr "«%1» не является приложением. Элементами запуска могут быть только приложения."
 
 #: shell/finder/fileops.cpp:979
 msgid "The dragged control panel information is invalid."
-msgstr ""
+msgstr "Сведения о перетащенной панели управления неверны."
 
 #: shell/finder/fileops.cpp:1018
 msgid "The dragged module information is invalid."
-msgstr ""
+msgstr "Сведения о перетащенном модуле неверны."
 
 #: shell/finder/fileops.cpp:1087
 msgid "The dragged extension information is invalid."
-msgstr ""
+msgstr "Сведения о перетащенном расширении неверны."
 
 #: shell/finder/fileops.cpp:1103
 msgid "That is not an extension the Extensions Manager knows."
-msgstr ""
+msgstr "Это расширение не известно менеджеру расширений."
 
 #: shell/finder/fileops.cpp:1207
 msgid "The clipping couldn't be made. %1"
-msgstr ""
+msgstr "Не удалось создать фрагмент. %1"
 
 #: shell/finder/fileops.cpp:1231
 msgid "The dragged font information is invalid."
-msgstr ""
+msgstr "Сведения о перетащенном шрифте неверны."
 
 #: shell/finder/fileops.cpp:1342
 msgid "The dragged application information is invalid."
-msgstr ""
+msgstr "Сведения о перетащенном приложении неверны."
 
 #: shell/finder/fileops.cpp:1349
 msgid "The dragged application is no longer available."
-msgstr ""
+msgstr "Перетащенное приложение больше недоступно."
 
 #: shell/finder/fileops.cpp:1382
 msgid "This drag source does not support aliases. Use File > Make Alias instead."
-msgstr ""
+msgstr "Этот источник перетаскивания не поддерживает псевдонимы. Используйте «Файл > Создать псевдоним»."
 
 #: shell/finder/fileops.cpp:1393
 msgid "Aliases must be placed in a real folder or on the Desktop."
-msgstr ""
+msgstr "Псевдонимы нужно помещать в настоящую папку или на рабочий стол."
 
 #: shell/finder/fileops.cpp:1401 shell/finder/fileops.cpp:1413
 msgid "The dragged alias information is invalid."
-msgstr ""
+msgstr "Сведения о перетащенном псевдониме неверны."
 
 #: shell/finder/fileops.cpp:1487
 msgid "The user Fonts folder could not be created: %1"
-msgstr ""
+msgstr "Не удалось создать папку шрифтов пользователя: %1"
 
 #: shell/finder/fileops.cpp:1585
 msgid "The other items do not belong in the System Folder itself. Put each where it belongs, inside one of its folders."
-msgstr ""
+msgstr "Остальные элементы не должны лежать прямо в системной папке. Поместите каждый туда, где ему место, в одну из ее папок."
 
 #: shell/finder/fileops.cpp:1602
 msgid "Items in the System Folder belong in one of the folders inside it (such as Appearance, Extensions or Fonts)."
-msgstr ""
+msgstr "Элементы системной папки должны находиться в одной из папок внутри нее (например, «Внешний вид», «Расширения» или «Шрифты»)."
 
 #: shell/finder/findcriteria.cpp:77
 msgid "Nothing to look for."
-msgstr ""
+msgstr "Нечего искать."
 
 #: shell/finder/findcriteria.cpp:84
 msgid "Type what to look for."
-msgstr ""
+msgstr "Введите, что искать."
 
 #: shell/finder/findcriteria.cpp:87
 msgid "Type the date as year-month-day, such as 2026-10-14."
-msgstr ""
+msgstr "Введите дату в формате год-месяц-день, например 2026-10-14."
 
 #: shell/finder/findcriteria.cpp:92
 msgid "Type the size as a number of K."
-msgstr ""
+msgstr "Введите размер числом в КБ."
 
 #: shell/finder/findcriteria.cpp:96
 msgid "The folder to look in isn't there any more."
-msgstr ""
+msgstr "Папки для поиска больше нет."
 
 #: shell/finder/findcriteria.cpp:110
 msgid " “%1”"
-msgstr ""
+msgstr " «%1»"
 
 #: shell/finder/findcriteria.cpp:117
 msgid " and "
-msgstr ""
+msgstr " и "
 
 #: shell/finder/findcriteria.cpp:146
 msgid "contains"
-msgstr ""
+msgstr "содержит"
 
 #: shell/finder/findcriteria.cpp:147
 msgid "starts with"
-msgstr ""
+msgstr "начинается с"
 
 #: shell/finder/findcriteria.cpp:148
 msgid "ends with"
-msgstr ""
+msgstr "заканчивается на"
 
 #: shell/finder/findcriteria.cpp:149
 msgid "is"
-msgstr ""
+msgstr "совпадает"
 
 #: shell/finder/findcriteria.cpp:150
 msgid "is not"
-msgstr ""
+msgstr "не совпадает"
 
 #: shell/finder/findcriteria.cpp:151
 msgid "doesn't contain"
-msgstr ""
+msgstr "не содержит"
 
 #: shell/finder/findcriteria.cpp:152
 msgid "is today"
-msgstr ""
+msgstr "сегодня"
 
 #: shell/finder/findcriteria.cpp:153
 msgid "is within the past week"
-msgstr ""
+msgstr "за последнюю неделю"
 
 #: shell/finder/findcriteria.cpp:154
 msgid "is within the past month"
-msgstr ""
+msgstr "за последний месяц"
 
 #: shell/finder/findcriteria.cpp:155
 msgid "is before"
-msgstr ""
+msgstr "до"
 
 #: shell/finder/findcriteria.cpp:156
 msgid "is after"
-msgstr ""
+msgstr "после"
 
 #: shell/finder/findcriteria.cpp:157
 msgid "is larger than"
-msgstr ""
+msgstr "больше"
 
 #: shell/finder/findcriteria.cpp:158
 msgid "is smaller than"
-msgstr ""
+msgstr "меньше"
 
 #: shell/finder/findcriteria.cpp:159
 msgid "is locked"
-msgstr ""
+msgstr "заблокирован"
 
 #: shell/finder/findcriteria.cpp:160
 msgid "is unlocked"
-msgstr ""
+msgstr "разблокирован"
 
 #: shell/finder/findcriteria.cpp:161
 msgid "is empty"
-msgstr ""
+msgstr "пустая"
 
 #: shell/finder/findcriteria.cpp:162
 msgid "is shared"
-msgstr ""
+msgstr "общая"
 
 #: shell/finder/findcriteria.cpp:163
 msgid "include"
-msgstr ""
+msgstr "включают"
 
 #: shell/finder/findcriteria.cpp:170
 msgid "name"
-msgstr ""
+msgstr "имя"
 
 #: shell/finder/findcriteria.cpp:171
 msgid "contents"
-msgstr ""
+msgstr "содержимое"
 
 #: shell/finder/findcriteria.cpp:172
 msgid "date modified"
-msgstr ""
+msgstr "дата изменения"
 
 #: shell/finder/findcriteria.cpp:173
 msgid "date created"
-msgstr ""
+msgstr "дата создания"
 
 #: shell/finder/findcriteria.cpp:174
 msgid "size"
-msgstr ""
+msgstr "размер"
 
 #: shell/finder/findcriteria.cpp:175
 msgid "kind"
-msgstr ""
+msgstr "тип"
 
 #: shell/finder/findcriteria.cpp:176
 msgid "label"
-msgstr ""
+msgstr "метка"
 
 #: shell/finder/findcriteria.cpp:177
 msgid "lock"
-msgstr ""
+msgstr "блокировка"
 
 #: shell/finder/findcriteria.cpp:178 shell/finder/findcriteria.cpp:201
 #: shell/finder/infowindow.cpp:251
 msgid "folder"
-msgstr ""
+msgstr "папка"
 
 #: shell/finder/findcriteria.cpp:179
 msgid "custom icon"
-msgstr ""
+msgstr "особый значок"
 
 #: shell/finder/findcriteria.cpp:180
 msgid "comments"
-msgstr ""
+msgstr "комментарии"
 
 #: shell/finder/findcriteria.cpp:181
 msgid "invisible"
-msgstr ""
+msgstr "невидимый"
 
 #: shell/finder/findcriteria.cpp:182
 msgid "version"
-msgstr ""
+msgstr "версия"
 
 #: shell/finder/findcriteria.cpp:201
 msgid "document"
-msgstr ""
+msgstr "документ"
 
 #: shell/finder/findcriteria.cpp:201
 msgid "application"
-msgstr ""
+msgstr "приложение"
 
 #: shell/finder/findcriteria.cpp:201 shell/finder/infowindow.cpp:261
 msgid "alias"
-msgstr ""
+msgstr "псевдоним"
 
 #: shell/finder/findcriteria.cpp:201
 msgid "picture"
-msgstr ""
+msgstr "изображение"
 
 #: shell/finder/findcriteria.cpp:202
 msgid "music"
-msgstr ""
+msgstr "музыка"
 
 #: shell/finder/findcriteria.cpp:202
 msgid "movie"
-msgstr ""
+msgstr "фильм"
 
 #: shell/finder/findcriteria.cpp:202
 msgid "text document"
-msgstr ""
+msgstr "текстовый документ"
 
 #: shell/finder/findcriteria.cpp:202
 msgid "clipping"
-msgstr ""
+msgstr "фрагмент"
 
 #: shell/finder/findcriteria.cpp:203
 msgid "Internet location"
-msgstr ""
+msgstr "интернет-адрес"
 
 #: shell/finder/findcriteria.cpp:203
 msgid "archive"
-msgstr ""
+msgstr "архив"
 
 #: shell/finder/findcriteria.cpp:203
 msgid "disk image"
-msgstr ""
+msgstr "образ диска"
 
 #: shell/finder/findcriteria.cpp:398
 msgid "Could not read saved searches: %1"
-msgstr ""
+msgstr "Не удалось прочитать сохраненные поиски: %1"
 
 #: shell/finder/findcriteria.cpp:406 shell/finder/findcriteria.cpp:442
 msgid "Saved searches are damaged or use an unsupported format."
-msgstr ""
+msgstr "Сохраненные поиски повреждены или используют неподдерживаемый формат."
 
 #: shell/finder/findcriteria.cpp:416
 msgid "Could not create the saved searches folder."
-msgstr ""
+msgstr "Не удалось создать папку сохраненных поисков."
 
 #: shell/finder/findcriteria.cpp:421
 msgid "Could not write saved searches: %1"
-msgstr ""
+msgstr "Не удалось записать сохраненные поиски: %1"
 
 #: shell/finder/findcriteria.cpp:426
 msgid "Could not save Find searches: %1"
-msgstr ""
+msgstr "Не удалось сохранить поиски: %1"
 
 #: shell/finder/findcriteria.cpp:456
 msgid "Enter a saved-search name of 1 to 80 characters."
-msgstr ""
+msgstr "Введите имя сохраненного поиска от 1 до 80 символов."
 
 #: shell/finder/findcriteria.cpp:493
 msgid "No query destination was provided."
-msgstr ""
+msgstr "Не указано место для сохранения поиска."
 
 #: shell/finder/findcriteria.cpp:547
 msgid "The saved search has invalid criteria: %1"
-msgstr ""
+msgstr "Сохраненный поиск содержит неверные условия: %1"
 
 #: shell/finder/findcriteria.cpp:553
 msgid "The saved search could not be found or has invalid criteria."
-msgstr ""
+msgstr "Сохраненный поиск не найден или содержит неверные условия."
 
 #: shell/finder/finder.cpp:75
 msgid "The web search could not be opened. Check that a web browser is available."
-msgstr ""
+msgstr "Не удалось открыть поиск в интернете. Проверьте, доступен ли браузер."
 
 #: shell/finder/finder.cpp:185
 msgid "The server disk \"%1\" has been disconnected. Connect to the server again to use it. Unsaved changes may have been lost."
-msgstr ""
+msgstr "Серверный диск \"%1\" отключен. Подключитесь к серверу снова, чтобы использовать его. Несохраненные изменения могли быть потеряны."
 
 #: shell/finder/finder.cpp:190
 msgid "Server Disconnected"
-msgstr ""
+msgstr "Сервер отключен"
 
 #: shell/finder/finder.cpp:326
 msgid "Force “%1” to quit? Any unsaved changes in it will be lost."
-msgstr ""
+msgstr "Принудительно завершить «%1»? Несохраненные изменения будут потеряны."
 
 #: shell/finder/finder.cpp:327 shell/menubar/hints.c:20
 #: shell/menubar/launch.c:523
@@ -697,63 +697,63 @@ msgstr "Принудительное завершение"
 
 #: shell/finder/finder.cpp:329
 msgid "“%1” couldn't be forced to quit."
-msgstr ""
+msgstr "Не удалось принудительно завершить «%1»."
 
 #: shell/finder/finder.cpp:337
 msgid "“%1” couldn't be attached to “%2”."
-msgstr ""
+msgstr "Не удалось прикрепить «%1» к «%2»."
 
 #: shell/finder/finder.cpp:398
 msgid "Log Out was cancelled because a program didn't quit."
-msgstr ""
+msgstr "Выход отменен, потому что программа не завершилась."
 
 #: shell/finder/finder.cpp:412
 msgid "Select one USB disk on the desktop to erase."
-msgstr ""
+msgstr "Выберите один USB-диск на рабочем столе для стирания."
 
 #: shell/finder/finder.cpp:478 shell/finder/finder.cpp:483
 msgid "Search Internet"
-msgstr ""
+msgstr "Искать в интернете"
 
 #: shell/finder/finder.cpp:479
 msgid "Search the web with:"
-msgstr ""
+msgstr "Искать в интернете с помощью:"
 
 #: shell/finder/finder.cpp:484
 msgid "Search for:"
-msgstr ""
+msgstr "Искать:"
 
 #: shell/finder/finder.cpp:493
 msgid "Select one document to find items similar to it."
-msgstr ""
+msgstr "Выберите документ, чтобы найти похожие элементы."
 
 #: shell/finder/finder.cpp:572
 msgid "New folders can't be made here. Home, and the folders inside it, hold your own files."
-msgstr ""
+msgstr "Здесь нельзя создавать новые папки. Домашняя папка и папки внутри нее содержат ваши файлы."
 
 #: shell/finder/finder.cpp:578
 msgid "untitled folder"
-msgstr ""
+msgstr "папка без имени"
 
 #: shell/finder/finder.cpp:584
 msgid "The folder could not be created in %1. Check folder permissions."
-msgstr ""
+msgstr "Не удалось создать папку в %1. Проверьте разрешения папки."
 
 #: shell/finder/finder.cpp:600
 msgid "“%1” could not be opened. Its original is gone."
-msgstr ""
+msgstr "Не удалось открыть «%1». Оригинал исчез."
 
 #: shell/finder/finder.cpp:621
 msgid "“%1” could not be opened. Its application may have been removed."
-msgstr ""
+msgstr "Не удалось открыть «%1». Возможно, его приложение было удалено."
 
 #: shell/finder/finder.cpp:634
 msgid "This application is queued for uninstall when Trash is emptied. Choose Put Away to cancel removal and return it to Applications."
-msgstr ""
+msgstr "Это приложение будет удалено при очистке Корзины. Выберите «Убрать», чтобы отменить удаление и вернуть его в «Программы»."
 
 #: shell/finder/finder.cpp:663
 msgid "Restart the Sniffer?"
-msgstr ""
+msgstr "Перезапустить Sniffer?"
 
 #: shell/finder/finder.cpp:663 shell/greeter/main.cpp:144
 #: shell/installer/installer.cpp:544 shell/menubar/hints.c:68
@@ -763,35 +763,35 @@ msgstr "Перезагрузить"
 
 #: shell/finder/finder.cpp:786
 msgid "The disk image could not be mounted. %1"
-msgstr ""
+msgstr "Не удалось подключить образ диска. %1"
 
 #: shell/finder/finder.cpp:801
 msgid "“%1” couldn't be mounted. %2"
-msgstr ""
+msgstr "Не удалось подключить «%1». %2"
 
 #: shell/finder/finder.cpp:807
 msgid "“%1” couldn't be mounted: udisksctl isn't installed."
-msgstr ""
+msgstr "Не удалось подключить «%1»: udisksctl не установлен."
 
 #: shell/finder/finder.cpp:846
 msgid "“%1” couldn’t be expanded. %2"
-msgstr ""
+msgstr "Не удалось распаковать «%1». %2"
 
 #: shell/finder/finder.cpp:847
 msgid "The expanding tool stopped."
-msgstr ""
+msgstr "Инструмент распаковки остановился."
 
 #: shell/finder/finder.cpp:864
 msgid "“%1” couldn’t be expanded: zacos9-expand isn't installed."
-msgstr ""
+msgstr "Не удалось распаковать «%1»: zacos9-expand не установлен."
 
 #: shell/finder/finder.cpp:899
 msgid "The Windows Installer could not be opened."
-msgstr ""
+msgstr "Не удалось открыть «Установщик Windows»."
 
 #: shell/finder/finder.cpp:916
 msgid "No printer has been chosen. Choose one in Printer Picker, then print again."
-msgstr ""
+msgstr "Принтер не выбран. Выберите его в «Выборе принтера» и повторите печать."
 
 #: shell/finder/finder.cpp:917 shell/menubar/launch.c:553
 #: shell/print/picker_main.cpp:17 shell/print/pickerwindow.cpp:49
@@ -800,244 +800,244 @@ msgstr "Выбор принтера"
 
 #: shell/finder/finder.cpp:974
 msgid "Select one regular file."
-msgstr ""
+msgstr "Выберите один обычный файл."
 
 #: shell/finder/finder.cpp:979
 msgid "The selected file is not readable."
-msgstr ""
+msgstr "Выбранный файл не читается."
 
 #: shell/finder/finder.cpp:987 shell/finder/finder.cpp:1002
 msgid "Encrypt File"
-msgstr ""
+msgstr "Зашифровать файл"
 
 #: shell/finder/finder.cpp:987 shell/finder/finder.cpp:1082
 msgid "Decrypt File"
-msgstr ""
+msgstr "Расшифровать файл"
 
 #: shell/finder/finder.cpp:988
 msgid "Enter a passphrase (at least 8 characters):"
-msgstr ""
+msgstr "Введите парольную фразу (не менее 8 символов):"
 
 #: shell/finder/finder.cpp:988
 msgid "Enter the passphrase:"
-msgstr ""
+msgstr "Введите парольную фразу:"
 
 #: shell/finder/finder.cpp:996
 msgid "Use a passphrase of at least 8 characters without line breaks."
-msgstr ""
+msgstr "Используйте парольную фразу не короче 8 символов без переносов строки."
 
 #: shell/finder/finder.cpp:997
 msgid "The passphrase cannot contain a line break."
-msgstr ""
+msgstr "Парольная фраза не может содержать перенос строки."
 
 #: shell/finder/finder.cpp:1002
 msgid "Re-enter the passphrase:"
-msgstr ""
+msgstr "Повторите парольную фразу:"
 
 #: shell/finder/finder.cpp:1008
 msgid "The passphrases did not match."
-msgstr ""
+msgstr "Парольные фразы не совпадают."
 
 #: shell/finder/finder.cpp:1019
 msgid "File Encryption"
-msgstr ""
+msgstr "Шифрование файла"
 
 #: shell/finder/finder.cpp:1039
 msgid "The encrypted copy must be saved as a different file."
-msgstr ""
+msgstr "Зашифрованную копию нужно сохранить как другой файл."
 
 #: shell/finder/finder.cpp:1046
 msgid "Encrypting “%1”…"
-msgstr ""
+msgstr "Шифрование «%1»…"
 
 #: shell/finder/finder.cpp:1053
 msgid "Encrypted copy saved to “%1”. Add its passphrase to your keychain, so Decrypt can open it without asking?"
-msgstr ""
+msgstr "Зашифрованная копия сохранена в «%1». Добавить ее парольную фразу в связку ключей, чтобы «Расшифровать» могла открыть ее без запроса?"
 
 #: shell/finder/finder.cpp:1055
 msgid "Add to Keychain"
-msgstr ""
+msgstr "Добавить в связку ключей"
 
 #: shell/finder/finder.cpp:1055
 msgid "Don't Add"
-msgstr ""
+msgstr "Не добавлять"
 
 #: shell/finder/finder.cpp:1058
 msgid "The passphrase couldn't be added to your keychain. Is the keychain unlocked?"
-msgstr ""
+msgstr "Не удалось добавить парольную фразу в связку ключей. Связка ключей разблокирована?"
 
 #: shell/finder/finder.cpp:1065
 msgid "The file could not be encrypted. %1"
-msgstr ""
+msgstr "Не удалось зашифровать файл. %1"
 
 #: shell/finder/finder.cpp:1088
 msgid "The decrypted file must be saved as a different file."
-msgstr ""
+msgstr "Расшифрованный файл нужно сохранить как другой файл."
 
 #: shell/finder/finder.cpp:1099
 msgid "Decrypting “%1”…"
-msgstr ""
+msgstr "Расшифровка «%1»…"
 
 #: shell/finder/finder.cpp:1104
 msgid "Decrypted file saved to “%1”."
-msgstr ""
+msgstr "Расшифрованный файл сохранен в «%1»."
 
 #: shell/finder/finder.cpp:1107
 msgid "The file could not be decrypted. %1"
-msgstr ""
+msgstr "Не удалось расшифровать файл. %1"
 
 #: shell/finder/finder.cpp:1149
 msgid "“%1” is open in its application. Choose Print there to print it."
-msgstr ""
+msgstr "«%1» открыт в своем приложении. Выберите там «Печать», чтобы напечатать его."
 
 #: shell/finder/finder.cpp:1151
 msgid "%1 documents are open in their applications. Choose Print in each application to print them."
-msgstr ""
+msgstr "%1 документов открыты в своих приложениях. Выберите «Печать» в каждом приложении, чтобы напечатать их."
 
 #: shell/finder/finder.cpp:1154
 msgid "Some documents could not be opened in their applications: %1.%2"
-msgstr ""
+msgstr "Некоторые документы не удалось открыть в их приложениях: %1.%2"
 
 #: shell/finder/finder.cpp:1157
 msgid " The others were opened; choose Print in their applications."
-msgstr ""
+msgstr " Остальные открыты; выберите «Печать» в их приложениях."
 
 #: shell/finder/finder.cpp:1165
 msgid "The print queue couldn't be opened."
-msgstr ""
+msgstr "Не удалось открыть очередь печати."
 
 #: shell/finder/finder.cpp:1185
 msgid "Old Dog could not be started: %1"
-msgstr ""
+msgstr "Не удалось запустить Old Dog: %1"
 
 #: shell/finder/finder.cpp:1201
 msgid "Old Dog could not be started."
-msgstr ""
+msgstr "Не удалось запустить Old Dog."
 
 #: shell/finder/finder.cpp:1246
 msgid "Labels aren't available for this read-only system resource."
-msgstr ""
+msgstr "Метки недоступны для этого системного ресурса, доступного только для чтения."
 
 #: shell/finder/finder.cpp:1320
 msgid "The disk \"%1\" could not be unmounted. It may no longer be mounted."
-msgstr ""
+msgstr "Не удалось отключить диск \"%1\". Возможно, он уже не подключен."
 
 #: shell/finder/finder.cpp:1339
 msgid "The disk \"%1\" is no longer mounted."
-msgstr ""
+msgstr "Диск \"%1\" больше не подключен."
 
 #: shell/finder/finder.cpp:1470
 msgid "“%1” can't be added to Favorites."
-msgstr ""
+msgstr "«%1» нельзя добавить в «Избранное»."
 
 #: shell/finder/finder.cpp:1491
 msgid "Select a folder or disk to index."
-msgstr ""
+msgstr "Выберите папку или диск для индексирования."
 
 #: shell/finder/finder.cpp:1515
 msgid "“%1” could not be found."
-msgstr ""
+msgstr "Не удалось найти «%1»."
 
 #: shell/finder/finder.cpp:1536
 msgid "Select a disk on the desktop to eject."
-msgstr ""
+msgstr "Выберите диск на рабочем столе для извлечения."
 
 #: shell/finder/finder.cpp:1545
 msgid "Are you sure you want to quit all programs and log out now?"
-msgstr ""
+msgstr "Вы уверены, что хотите завершить все программы и выйти сейчас?"
 
 #: shell/finder/finder.cpp:1545
 msgid "Log Out"
-msgstr ""
+msgstr "Выйти"
 
 #: shell/finder/finder.cpp:1560
 msgid "Select one network disk on the desktop to disconnect."
-msgstr ""
+msgstr "Выберите один сетевой диск на рабочем столе для отключения."
 
 #: shell/finder/finder.cpp:1561
 msgid "Select one mounted disk on the desktop to unmount."
-msgstr ""
+msgstr "Выберите один подключенный диск на рабочем столе для отключения."
 
 #: shell/finder/finder.cpp:1639
 msgid "The original for “%1” has been replaced by a different item. Use the new item?"
-msgstr ""
+msgstr "Оригинал «%1» был заменен другим элементом. Использовать новый элемент?"
 
 #: shell/finder/finder.cpp:1640
 msgid "Use New Item"
-msgstr ""
+msgstr "Использовать новый элемент"
 
 #: shell/finder/finder.cpp:1915
 msgid "The Trash contains 1 item, which uses %1 of disk space. Are you sure you want to permanently remove it?"
-msgstr ""
+msgstr "В Корзине 1 элемент, занимающий %1 места на диске. Вы уверены, что хотите удалить его безвозвратно?"
 
 #: shell/finder/finder.cpp:1917
 msgid "The Trash contains %1 items, which use %2 of disk space. Are you sure you want to permanently remove them?"
-msgstr ""
+msgstr "В Корзине %1 элементов, занимающих %2 места на диске. Вы уверены, что хотите удалить их безвозвратно?"
 
 #: shell/finder/finder.cpp:1924
 msgid ""
 "\n"
 "\n"
 "This will uninstall: %1. Personal application data is kept. Debian removal may also remove dependent packages."
-msgstr ""
+msgstr "\n\nБудет удалено: %1. Личные данные приложений сохраняются. При удалении из Debian также могут быть удалены зависимые пакеты."
 
 #: shell/finder/finder.cpp:1931
 msgid ""
 "\n"
 "\n"
 "1 locked item will stay in the Trash. To remove it too, hold down Option while you choose Empty Trash."
-msgstr ""
+msgstr "\n\n1 заблокированный элемент останется в Корзине. Чтобы удалить и его, удерживайте Option, выбирая «Очистить Корзину»."
 
 #: shell/finder/finder.cpp:1933
 msgid ""
 "\n"
 "\n"
 "%1 locked items will stay in the Trash. To remove them too, hold down Option while you choose Empty Trash."
-msgstr ""
+msgstr "\n\n%1 заблокированных элементов останутся в Корзине. Чтобы удалить и их, удерживайте Option, выбирая «Очистить Корзину»."
 
 #: shell/finder/finder.cpp:2043
 msgid "The Trash could not be completely emptied."
-msgstr ""
+msgstr "Корзину не удалось очистить полностью."
 
 #: shell/finder/findwindow.cpp:70 shell/finder/findwindow.cpp:96
 msgid "Find"
-msgstr ""
+msgstr "Найти"
 
 #: shell/finder/findwindow.cpp:71
 msgid "Find items"
-msgstr ""
+msgstr "Искать элементы"
 
 #: shell/finder/findwindow.cpp:72
 msgid "on all disks"
-msgstr ""
+msgstr "на всех дисках"
 
 #: shell/finder/findwindow.cpp:72
 msgid "in my Home folder"
-msgstr ""
+msgstr "в моей домашней папке"
 
 #: shell/finder/findwindow.cpp:74
 msgid "in “%1”"
-msgstr ""
+msgstr "в «%1»"
 
 #: shell/finder/findwindow.cpp:80
 msgid "on the Internet with %1"
-msgstr ""
+msgstr "в интернете с помощью %1"
 
 #: shell/finder/findwindow.cpp:84
 msgid "More Choices"
-msgstr ""
+msgstr "Больше условий"
 
 #: shell/finder/findwindow.cpp:89
 msgid "Fewer Choices"
-msgstr ""
+msgstr "Меньше условий"
 
 #: shell/finder/findwindow.cpp:98
 msgid "Save Search…"
-msgstr ""
+msgstr "Сохранить поиск…"
 
 #: shell/finder/findwindow.cpp:101
 msgid "Save Find Search"
-msgstr ""
+msgstr "Сохранить поиск"
 
 #: shell/finder/findwindow.cpp:102 shell/network/logindialog.cpp:122
 #: shell/setup/setup.cpp:462
@@ -1046,51 +1046,51 @@ msgstr "Имя:"
 
 #: shell/finder/findwindow.cpp:115
 msgid "Saved Searches…"
-msgstr ""
+msgstr "Сохраненные поиски…"
 
 #: shell/finder/findwindow.cpp:125
 msgid "No saved Find searches yet."
-msgstr ""
+msgstr "Сохраненных поисков пока нет."
 
 #: shell/finder/findwindow.cpp:268
 msgid "Type the words to search the Internet for."
-msgstr ""
+msgstr "Введите слова для поиска в интернете."
 
 #: shell/finder/findwindow.cpp:293
 msgid "whose"
-msgstr ""
+msgstr "у которых"
 
 #: shell/finder/findwindow.cpp:301
 msgid "Contents are searched in indexed folders; File ▸ Index Selection adds one."
-msgstr ""
+msgstr "Содержимое ищется в проиндексированных папках; «Файл ▸ Индексировать выделенное» добавляет папку."
 
 #: shell/finder/findwindow.cpp:403
 msgid "similar to “%1”"
-msgstr ""
+msgstr "похожи на «%1»"
 
 #: shell/finder/findwindow.cpp:540
 msgid "Items Found: %1"
-msgstr ""
+msgstr "Найденные элементы: %1"
 
 #: shell/finder/findwindow.cpp:633
 msgid "1 item"
-msgstr ""
+msgstr "1 элемент"
 
 #: shell/finder/findwindow.cpp:634
 msgid "%1 items"
-msgstr ""
+msgstr "%1 элементов"
 
 #: shell/finder/findwindow.cpp:635
 msgid "1 item found %1"
-msgstr ""
+msgstr "Найден 1 элемент %1"
 
 #: shell/finder/findwindow.cpp:636
 msgid "%1 items found %2"
-msgstr ""
+msgstr "Найдено элементов: %1 %2"
 
 #: shell/finder/findwindow.cpp:637
 msgid "Searching…  %1"
-msgstr ""
+msgstr "Поиск…  %1"
 
 #: shell/finder/findwindow.cpp:657 shell/finder/infowindow.cpp:694
 #: shell/setup/setup.cpp:31
@@ -1099,46 +1099,46 @@ msgstr "Имя"
 
 #: shell/finder/findwindow.cpp:658
 msgid "Date Modified"
-msgstr ""
+msgstr "Дата изменения"
 
 #: shell/finder/findwindow.cpp:659
 msgid "Kind"
-msgstr ""
+msgstr "Тип"
 
 #: shell/finder/infowindow.cpp:103
 msgid "Read & Write"
-msgstr ""
+msgstr "Чтение и запись"
 
 #: shell/finder/infowindow.cpp:103
 msgid "Read only"
-msgstr ""
+msgstr "Только чтение"
 
 #: shell/finder/infowindow.cpp:103
 msgid "Write only (Drop Box)"
-msgstr ""
+msgstr "Только запись (Drop Box)"
 
 #: shell/finder/infowindow.cpp:103 shell/finder/viewoptionsdialog.cpp:98
 msgid "None"
-msgstr ""
+msgstr "Нет"
 
 #: shell/finder/infowindow.cpp:211
 msgid "Info for %1"
-msgstr ""
+msgstr "Сведения: %1"
 
 #: shell/finder/infowindow.cpp:219
 msgid "startup disk"
-msgstr ""
+msgstr "загрузочный диск"
 
 #: shell/finder/infowindow.cpp:220 shell/finder/infowindow.cpp:259
 #: shell/finder/viewoptionsdialog.cpp:226
 msgid "Desktop"
-msgstr ""
+msgstr "Рабочий стол"
 
 #: shell/finder/infowindow.cpp:227 shell/finder/infowindow.cpp:229
 #: shell/finder/infowindow.cpp:231 shell/finder/infowindow.cpp:1004
 #: shell/finder/infowindow.cpp:1005
 msgid "Not reported"
-msgstr ""
+msgstr "Не определено"
 
 #: shell/finder/infowindow.cpp:235 shell/finder/infowindow.cpp:277
 #: shell/menubar/menus.c:171
@@ -1147,112 +1147,112 @@ msgstr "Общая информация"
 
 #: shell/finder/infowindow.cpp:235 shell/finder/infowindow.cpp:277
 msgid "Sharing"
-msgstr ""
+msgstr "Общий доступ"
 
 #: shell/finder/infowindow.cpp:244
 msgid "trash"
-msgstr ""
+msgstr "корзина"
 
 #: shell/finder/infowindow.cpp:245
 msgid "Warn before emptying"
-msgstr ""
+msgstr "Предупреждать перед очисткой"
 
 #: shell/finder/infowindow.cpp:249
 msgid "disk"
-msgstr ""
+msgstr "диск"
 
 #: shell/finder/infowindow.cpp:256
 msgid "application program"
-msgstr ""
+msgstr "приложение"
 
 #: shell/finder/infowindow.cpp:265 shell/finder/infowindow.cpp:270
 msgid "(missing)"
-msgstr ""
+msgstr "(отсутствует)"
 
 #: shell/finder/infowindow.cpp:268
 msgid " (replaced)"
-msgstr ""
+msgstr " (заменено)"
 
 #: shell/finder/infowindow.cpp:269
 msgid "(alias loop)"
-msgstr ""
+msgstr "(цикл псевдонимов)"
 
 #: shell/finder/infowindow.cpp:298
 msgid "%1 on disk (%2 bytes)"
-msgstr ""
+msgstr "%1 на диске (%2 байт)"
 
 #: shell/finder/infowindow.cpp:302
 msgid "calculating…"
-msgstr ""
+msgstr "вычисление…"
 
 #: shell/finder/infowindow.cpp:317
 msgid "%1 on disk, for 1 item"
-msgstr ""
+msgstr "%1 на диске, для 1 элемента"
 
 #: shell/finder/infowindow.cpp:318
 msgid "%1 on disk, for %2 items"
-msgstr ""
+msgstr "%1 на диске, для %2 элементов"
 
 #: shell/finder/infowindow.cpp:341
 msgid "Folders cannot be shared until file sharing is turned on using the File Sharing control panel. Do you want the control panel opened now?"
-msgstr ""
+msgstr "Папки нельзя сделать общими, пока не включен общий доступ к файлам в панели «Общий доступ к файлам». Открыть панель сейчас?"
 
 #: shell/finder/infowindow.cpp:423
 msgid "Show:"
-msgstr ""
+msgstr "Вид:"
 
 #: shell/finder/infowindow.cpp:434 shell/finder/infowindow.cpp:474
 msgid "Kind:"
-msgstr ""
+msgstr "Тип:"
 
 #: shell/finder/infowindow.cpp:435 shell/finder/infowindow.cpp:476
 #: shell/finder/infowindow.cpp:680
 msgid "Where:"
-msgstr ""
+msgstr "Где:"
 
 #: shell/finder/infowindow.cpp:437 shell/finder/infowindow.cpp:475
 msgid "Size:"
-msgstr ""
+msgstr "Размер:"
 
 #: shell/finder/infowindow.cpp:438
 msgid "Available:"
-msgstr ""
+msgstr "Доступно:"
 
 #: shell/finder/infowindow.cpp:452
 msgid "Source:"
-msgstr ""
+msgstr "Источник:"
 
 #: shell/finder/infowindow.cpp:453
 msgid "None (virtual; no physical equivalent)"
-msgstr ""
+msgstr "Нет (виртуальный; физического эквивалента нет)"
 
 #: shell/finder/infowindow.cpp:454
 msgid "Access:"
-msgstr ""
+msgstr "Доступ:"
 
 #: shell/finder/infowindow.cpp:458
 msgid "Description: %1"
-msgstr ""
+msgstr "Описание: %1"
 
 #: shell/finder/infowindow.cpp:477
 msgid "Created:"
-msgstr ""
+msgstr "Создан:"
 
 #: shell/finder/infowindow.cpp:478
 msgid "Modified:"
-msgstr ""
+msgstr "Изменен:"
 
 #: shell/finder/infowindow.cpp:480
 msgid "Original:"
-msgstr ""
+msgstr "Оригинал:"
 
 #: shell/finder/infowindow.cpp:485
 msgid "Comments:"
-msgstr ""
+msgstr "Комментарии:"
 
 #: shell/finder/infowindow.cpp:605
 msgid "Share this item and its contents"
-msgstr ""
+msgstr "Общий доступ с содержимым"
 
 #: shell/finder/infowindow.cpp:610 shell/help/helpwindow.cpp:172
 #: shell/menubar/hints.c:47 shell/menubar/menus.c:54
@@ -1261,127 +1261,127 @@ msgstr "Копировать"
 
 #: shell/finder/infowindow.cpp:660
 msgid "Only %1, the owner, can change these."
-msgstr ""
+msgstr "Только %1, владелец, может изменить их."
 
 #: shell/finder/infowindow.cpp:663
 msgid "This folder can’t be shared, because the folder “%1” inside it is shared."
-msgstr ""
+msgstr "Этой папке нельзя открыть общий доступ, потому что папка «%1» внутри нее уже общая."
 
 #: shell/finder/infowindow.cpp:667
 msgid "File Sharing is off. Turn it on in the File Sharing control panel so others can connect."
-msgstr ""
+msgstr "Общий доступ к файлам выключен. Включите его в панели «Общий доступ к файлам», чтобы другие могли подключаться."
 
 #: shell/finder/infowindow.cpp:671
 msgid "Shared on the network as “%1”."
-msgstr ""
+msgstr "Общий доступ в сети как «%1»."
 
 #: shell/finder/infowindow.cpp:674
 msgid "This folder will be shared when you close this window."
-msgstr ""
+msgstr "Общий доступ к этой папке откроется после закрытия окна."
 
 #: shell/finder/infowindow.cpp:684
 msgid "Shared as part of “%1”."
-msgstr ""
+msgstr "Общий доступ как часть «%1»."
 
 #: shell/finder/infowindow.cpp:695
 msgid "Privilege"
-msgstr ""
+msgstr "Права"
 
 #: shell/finder/infowindow.cpp:697
 msgid "Owner:"
-msgstr ""
+msgstr "Владелец:"
 
 #: shell/finder/infowindow.cpp:698
 msgid "User/Group:"
-msgstr ""
+msgstr "Польз./гр."
 
 #: shell/finder/infowindow.cpp:699
 msgid "Everyone"
-msgstr ""
+msgstr "Все"
 
 #: shell/finder/infowindow.cpp:702
 msgid "Copy these privileges to all enclosed folders"
-msgstr ""
+msgstr "Копировать права в подпапки"
 
 #: shell/finder/infowindow.cpp:718
 msgid "The privileges of “%1” couldn’t be changed. %2"
-msgstr ""
+msgstr "Не удалось изменить права «%1». %2"
 
 #: shell/finder/infowindow.cpp:746
 msgid "“%1” couldn’t be shared. %2"
-msgstr ""
+msgstr "Не удалось открыть общий доступ к «%1». %2"
 
 #: shell/finder/infowindow.cpp:747
 msgid "“%1” couldn’t be unshared. %2"
-msgstr ""
+msgstr "Не удалось закрыть общий доступ к «%1». %2"
 
 #: shell/finder/infowindow.cpp:882
 msgid "This item's icon couldn't be changed. The file system may not support custom icons, or the picture may be too large."
-msgstr ""
+msgstr "Не удалось изменить значок этого элемента. Файловая система может не поддерживать особые значки, или изображение слишком велико."
 
 #: shell/finder/infowindow.cpp:905
 msgid "The Clipboard doesn’t contain a picture to use as an icon."
-msgstr ""
+msgstr "В буфере обмена нет изображения для значка."
 
 #: shell/finder/infowindow.cpp:907
 msgid "This item’s icon couldn’t be changed. The file system may not support custom icons, or the picture may be too large."
-msgstr ""
+msgstr "Не удалось изменить значок этого элемента. Файловая система может не поддерживать особые значки, или изображение слишком велико."
 
 #: shell/finder/infowindow.cpp:918
 msgid "This item’s custom icon couldn’t be removed."
-msgstr ""
+msgstr "Не удалось удалить особый значок этого элемента."
 
 #: shell/finder/infowindow.cpp:998
 msgid "About This Computer"
-msgstr ""
+msgstr "Об этом компьютере"
 
 #: shell/finder/infowindow.cpp:1003
 msgid "System version not reported"
-msgstr ""
+msgstr "Версия системы не определена"
 
 #: shell/finder/infowindow.cpp:1003
 msgid "Version %1"
-msgstr ""
+msgstr "Версия %1"
 
 #: shell/finder/infowindow.cpp:1004
 msgid "Processor:"
-msgstr ""
+msgstr "Процессор:"
 
 #: shell/finder/infowindow.cpp:1005
 msgid "Graphics:"
-msgstr ""
+msgstr "Графика:"
 
 #: shell/finder/infowindow.cpp:1007
 msgid "Memory:"
-msgstr ""
+msgstr "Память:"
 
 #: shell/finder/infowindow.cpp:1008
 msgid "Virtual Memory:"
-msgstr ""
+msgstr "Виртуальная память:"
 
 #: shell/finder/infowindow.cpp:1009
 msgid "%1 allocated on disk"
-msgstr ""
+msgstr "%1 выделено на диске"
 
 #: shell/finder/infowindow.cpp:1009
 msgid "None configured"
-msgstr ""
+msgstr "Не настроена"
 
 #: shell/finder/infowindow.cpp:1010
 msgid "Available Memory:"
-msgstr ""
+msgstr "Доступная память:"
 
 #: shell/finder/labeleditor.cpp:35
 msgid "This system resource is read-only and can't be renamed or labelled."
-msgstr ""
+msgstr "Этот системный ресурс доступен только для чтения; его нельзя переименовать или назначить ему метку."
 
 #: shell/finder/labeleditor.cpp:200 shell/finder/labeleditor.cpp:218
 msgid "That name is already taken. Please use a different name."
-msgstr ""
+msgstr "Это имя уже занято. Выберите другое имя."
 
 #: shell/finder/labeleditor.cpp:205
 msgid "The item “%1” can't be renamed."
-msgstr ""
+msgstr "Элемент «%1» нельзя переименовать."
 
 #: shell/finder/main.cpp:44 shell/menubar/menus.c:474 shell/menubar/menus.c:490
 msgid "Sniffer"
@@ -1389,15 +1389,15 @@ msgstr "Sniffer"
 
 #: shell/finder/main.cpp:52
 msgid "You don't have permission to use \"%1\". Ask the computer's administrator to add it to your programs."
-msgstr ""
+msgstr "У вас нет разрешения использовать «%1». Попросите администратора компьютера добавить это в ваши программы."
 
 #: shell/finder/resourcewindows.cpp:53 shell/finder/resourcewindows.cpp:55
 msgid "System Information"
-msgstr ""
+msgstr "Сведения о системе"
 
 #: shell/finder/resourcewindows.cpp:53 shell/finder/resourcewindows.cpp:55
 msgid "Extensions Manager"
-msgstr ""
+msgstr "Менеджер расширений"
 
 #: shell/finder/resourcewindows.cpp:59 shell/menubar/hints.c:89
 #: shell/menubar/menus.c:487
@@ -1406,260 +1406,260 @@ msgstr "Показать все"
 
 #: shell/finder/resourcewindows.cpp:61
 msgid "Extensions"
-msgstr ""
+msgstr "Расширения"
 
 #: shell/finder/resourcewindows.cpp:62
 msgid "Login Items"
-msgstr ""
+msgstr "Элементы входа"
 
 #: shell/finder/resourcewindows.cpp:63
 msgid "Background Services"
-msgstr ""
+msgstr "Фоновые службы"
 
 #: shell/finder/resourcewindows.cpp:65
 msgid "Item Information…"
-msgstr ""
+msgstr "Сведения об элементе…"
 
 #: shell/finder/resourcewindows.cpp:67 shell/finder/resourcewindows.cpp:338
 #: shell/finder/resourcewindows.cpp:394
 msgid "Turn Off"
-msgstr ""
+msgstr "Отключить"
 
 #: shell/finder/resourcewindows.cpp:74
 msgid "Set:"
-msgstr ""
+msgstr "Набор:"
 
 #: shell/finder/resourcewindows.cpp:80
 msgid "Current system details; viewing does not change this computer."
-msgstr ""
+msgstr "Текущие сведения о системе; просмотр не изменяет компьютер."
 
 #: shell/finder/resourcewindows.cpp:241
 msgid "Every loaded kernel module, by its technical name. For viewing only."
-msgstr ""
+msgstr "Все загруженные модули ядра, по техническому имени. Только для просмотра."
 
 #: shell/finder/resourcewindows.cpp:242
 msgid "Extensions add features to this computer. Turn one off to stop it loading at start-up, or on to start it at every start-up. Changes take effect after restart."
-msgstr ""
+msgstr "Расширения добавляют компьютеру возможности. Отключите расширение, чтобы оно не загружалось при запуске, или включите, чтобы оно загружалось при каждом запуске. Изменения вступят в силу после перезагрузки."
 
 #: shell/finder/resourcewindows.cpp:258
 msgid "Applications that open when you log in. Changes affect only your account and take effect at your next login."
-msgstr ""
+msgstr "Программы, которые открываются при входе. Изменения касаются только вашей учетной записи и вступят в силу при следующем входе."
 
 #: shell/finder/resourcewindows.cpp:263
 msgid " (off)"
-msgstr ""
+msgstr " (выкл.)"
 
 #: shell/finder/resourcewindows.cpp:264
 msgid "login item"
-msgstr ""
+msgstr "элемент входа"
 
 #: shell/finder/resourcewindows.cpp:266
 msgid "A login item."
-msgstr ""
+msgstr "Элемент входа."
 
 #: shell/finder/resourcewindows.cpp:267
 msgid "Status: %1"
-msgstr ""
+msgstr "Состояние: %1"
 
 #: shell/finder/resourcewindows.cpp:267
 msgid "opens at login"
-msgstr ""
+msgstr "открывается при входе"
 
 #: shell/finder/resourcewindows.cpp:268
 msgid "off"
-msgstr ""
+msgstr "выкл."
 
 #: shell/finder/resourcewindows.cpp:269
 msgid "Source: %1"
-msgstr ""
+msgstr "Источник: %1"
 
 #: shell/finder/resourcewindows.cpp:269
 msgid "your settings (overrides a system item)"
-msgstr ""
+msgstr "ваши настройки (заменяют системный элемент)"
 
 #: shell/finder/resourcewindows.cpp:270
 msgid "your account"
-msgstr ""
+msgstr "ваша учетная запись"
 
 #: shell/finder/resourcewindows.cpp:270
 msgid "this computer (shared by all users)"
-msgstr ""
+msgstr "этот компьютер (общий для всех пользователей)"
 
 #: shell/finder/resourcewindows.cpp:271
 msgid "Takes effect: at your next login"
-msgstr ""
+msgstr "Вступит в силу: при следующем входе"
 
 #: shell/finder/resourcewindows.cpp:276 shell/finder/resourcewindows.cpp:320
 msgid "Read-only: %1"
-msgstr ""
+msgstr "Только чтение: %1"
 
 #: shell/finder/resourcewindows.cpp:282
 msgid "No login items were found."
-msgstr ""
+msgstr "Элементы входа не найдены."
 
 #: shell/finder/resourcewindows.cpp:288
 msgid "Checking your account's background services…"
-msgstr ""
+msgstr "Проверка фоновых служб вашей учетной записи…"
 
 #: shell/finder/resourcewindows.cpp:289
 msgid "Background service status is not available."
-msgstr ""
+msgstr "Состояние фоновых служб недоступно."
 
 #: shell/finder/resourcewindows.cpp:296
 msgid "Background services could not be listed: %1"
-msgstr ""
+msgstr "Не удалось перечислить фоновые службы: %1"
 
 #: shell/finder/resourcewindows.cpp:299
 msgid "Background services of your own account. Essential services are shown but can't be changed here."
-msgstr ""
+msgstr "Фоновые службы вашей учетной записи. Основные службы показаны, но изменить их здесь нельзя."
 
 #: shell/finder/resourcewindows.cpp:305
 msgid "background service"
-msgstr ""
+msgstr "фоновая служба"
 
 #: shell/finder/resourcewindows.cpp:307
 msgid "A background service."
-msgstr ""
+msgstr "Фоновая служба."
 
 #: shell/finder/resourcewindows.cpp:308
 msgid "Running now: %1"
-msgstr ""
+msgstr "Сейчас выполняется: %1"
 
 #: shell/finder/resourcewindows.cpp:308 shell/finder/resourcewindows.cpp:309
 msgid "yes"
-msgstr ""
+msgstr "да"
 
 #: shell/finder/resourcewindows.cpp:308 shell/finder/resourcewindows.cpp:310
 msgid "no"
-msgstr ""
+msgstr "нет"
 
 #: shell/finder/resourcewindows.cpp:309
 msgid "Starts at login: %1"
-msgstr ""
+msgstr "Запускается при входе: %1"
 
 #: shell/finder/resourcewindows.cpp:310
 msgid "set by the system"
-msgstr ""
+msgstr "задано системой"
 
 #: shell/finder/resourcewindows.cpp:317
 msgid "Login changes take effect: at your next login"
-msgstr ""
+msgstr "Изменения входа вступят в силу: при следующем входе"
 
 #: shell/finder/resourcewindows.cpp:318
 msgid "Start and Stop take effect: immediately"
-msgstr ""
+msgstr "Запуск и остановка вступают в силу: немедленно"
 
 #: shell/finder/resourcewindows.cpp:326
 msgid "No user services are available."
-msgstr ""
+msgstr "Пользовательские службы недоступны."
 
 #: shell/finder/resourcewindows.cpp:337
 msgid "Don't Start at Login"
-msgstr ""
+msgstr "Не запускать при входе"
 
 #: shell/finder/resourcewindows.cpp:337
 msgid "Start at Login"
-msgstr ""
+msgstr "Запускать при входе"
 
 #: shell/finder/resourcewindows.cpp:338
 msgid "Turn On"
-msgstr ""
+msgstr "Включить"
 
 #: shell/finder/resourcewindows.cpp:340
 msgid "Stop Now"
-msgstr ""
+msgstr "Остановить сейчас"
 
 #: shell/finder/resourcewindows.cpp:340
 msgid "Start Now"
-msgstr ""
+msgstr "Запустить сейчас"
 
 #: shell/finder/resourcewindows.cpp:359
 msgid "Turn it on or off; the change takes effect after restart."
-msgstr ""
+msgstr "Включите или отключите; изменение вступит в силу после перезагрузки."
 
 #: shell/finder/resourcewindows.cpp:361
 msgid "Changes affect only your account and take effect at your next login."
-msgstr ""
+msgstr "Изменения касаются только вашей учетной записи и вступят в силу при следующем входе."
 
 #: shell/finder/resourcewindows.cpp:362
 msgid "Changes affect only your account's user services."
-msgstr ""
+msgstr "Изменения касаются только пользовательских служб вашей учетной записи."
 
 #: shell/finder/resourcewindows.cpp:393
 msgid "Turn off “%1”? It will no longer start when you log in. This takes effect at your next login."
-msgstr ""
+msgstr "Отключить «%1»? Он больше не будет запускаться при входе. Изменение вступит в силу при следующем входе."
 
 #: shell/finder/resourcewindows.cpp:428
 msgid "Stop “%1” now? Programs that depend on it may stop working until it is started again."
-msgstr ""
+msgstr "Остановить «%1» сейчас? Программы, зависящие от него, могут перестать работать, пока он не будет запущен снова."
 
 #: shell/finder/resourcewindows.cpp:593
 msgid "(none chosen)"
-msgstr ""
+msgstr "(не выбрано)"
 
 #: shell/finder/resourcewindows.cpp:597
 msgid "Save Set…"
-msgstr ""
+msgstr "Сохранить набор…"
 
 #: shell/finder/resourcewindows.cpp:598
 msgid "Delete Set…"
-msgstr ""
+msgstr "Удалить набор…"
 
 #: shell/finder/resourcewindows.cpp:616
 msgid "Save Set"
-msgstr ""
+msgstr "Сохранить набор"
 
 #: shell/finder/resourcewindows.cpp:616
 msgid "Name of the set:"
-msgstr ""
+msgstr "Имя набора:"
 
 #: shell/finder/resourcewindows.cpp:645
 msgid "Delete the set “%1”? The items stay as they are."
-msgstr ""
+msgstr "Удалить набор «%1»? Элементы останутся как есть."
 
 #: shell/finder/resourcewindows.cpp:646
 msgid "Delete"
-msgstr ""
+msgstr "Удалить"
 
 #: shell/finder/resourcewindows.cpp:687
 msgid "Some items couldn't be changed: %1"
-msgstr ""
+msgstr "Некоторые элементы не удалось изменить: %1"
 
 #: shell/finder/transferdialog.cpp:14
 msgid "Copying Files"
-msgstr ""
+msgstr "Копирование файлов"
 
 #: shell/finder/transferdialog.cpp:21
 msgid "Copying"
-msgstr ""
+msgstr "Копирование"
 
 #: shell/finder/transferdialog.cpp:22
 msgid "Moving"
-msgstr ""
+msgstr "Перемещение"
 
 #: shell/finder/transferdialog.cpp:28
 msgid "%1 Files"
-msgstr ""
+msgstr "Файлы (%1)"
 
 #: shell/finder/transferdialog.cpp:78
 msgid "Stopping…"
-msgstr ""
+msgstr "Остановка…"
 
 #: shell/finder/transferdialog.cpp:78
 msgid "Preparing to transfer files…"
-msgstr ""
+msgstr "Подготовка к переносу файлов…"
 
 #: shell/finder/transferdialog.cpp:80
 msgid "To: %1"
-msgstr ""
+msgstr "В: %1"
 
 #: shell/finder/transferdialog.cpp:85
 msgid "Counting files…"
-msgstr ""
+msgstr "Подсчет файлов…"
 
 #: shell/finder/transferdialog.cpp:86
 msgid "%1% complete"
-msgstr ""
+msgstr "Готово: %1%"
 
 #: shell/finder/viewoptionsdialog.cpp:37 shell/menubar/menus.c:90
 #: shell/menubar/menus.c:102
@@ -1693,7 +1693,7 @@ msgstr "по метке"
 
 #: shell/finder/viewoptionsdialog.cpp:67
 msgid "Show Columns"
-msgstr ""
+msgstr "Показывать столбцы"
 
 #: shell/finder/viewoptionsdialog.cpp:79 shell/panels/mouse.cpp:11
 msgid "Options"
@@ -1701,212 +1701,212 @@ msgstr "Параметры"
 
 #: shell/finder/viewoptionsdialog.cpp:80
 msgid "Use relative date"
-msgstr ""
+msgstr "Использовать относительную дату"
 
 #: shell/finder/viewoptionsdialog.cpp:85
 msgid "Calculate folder sizes"
-msgstr ""
+msgstr "Вычислять размеры папок"
 
 #: shell/finder/viewoptionsdialog.cpp:95
 msgid "Icon Arrangement"
-msgstr ""
+msgstr "Расположение значков"
 
 #: shell/finder/viewoptionsdialog.cpp:99
 msgid "Always snap to grid"
-msgstr ""
+msgstr "Всегда выравнивать по сетке"
 
 #: shell/finder/viewoptionsdialog.cpp:100
 #: shell/finder/viewoptionsdialog.cpp:190
 msgid "Keep arranged:"
-msgstr ""
+msgstr "Сохранять упорядоченным:"
 
 #: shell/finder/viewoptionsdialog.cpp:119
 msgid "Icon Size"
-msgstr ""
+msgstr "Размер значков"
 
 #: shell/finder/viewoptionsdialog.cpp:120
 msgid "Standard"
-msgstr ""
+msgstr "Стандартный"
 
 #: shell/finder/viewoptionsdialog.cpp:121
 msgid "Small"
-msgstr ""
+msgstr "Маленький"
 
 #: shell/finder/viewoptionsdialog.cpp:123
 msgid "Tiny"
-msgstr ""
+msgstr "Крошечный"
 
 #: shell/finder/viewoptionsdialog.cpp:227
 msgid "View Options"
-msgstr ""
+msgstr "Параметры вида"
 
 #: shell/finder/viewoptionsdialog.cpp:233
 msgid "Set to Standard Views"
-msgstr ""
+msgstr "Сбросить виды"
 
 #: shell/finder/viewoptionsdialog.cpp:302
 msgid "White"
-msgstr ""
+msgstr "Белый"
 
 #: shell/finder/viewoptionsdialog.cpp:302
 msgid "Yellow"
-msgstr ""
+msgstr "Желтый"
 
 #: shell/finder/viewoptionsdialog.cpp:302
 msgid "Orange"
-msgstr ""
+msgstr "Оранжевый"
 
 #: shell/finder/viewoptionsdialog.cpp:302
 msgid "Red"
-msgstr ""
+msgstr "Красный"
 
 #: shell/finder/viewoptionsdialog.cpp:303
 msgid "Magenta"
-msgstr ""
+msgstr "Пурпурный"
 
 #: shell/finder/viewoptionsdialog.cpp:303
 msgid "Purple"
-msgstr ""
+msgstr "Фиолетовый"
 
 #: shell/finder/viewoptionsdialog.cpp:303
 msgid "Blue"
-msgstr ""
+msgstr "Синий"
 
 #: shell/finder/viewoptionsdialog.cpp:303
 msgid "Cyan"
-msgstr ""
+msgstr "Голубой"
 
 #: shell/finder/viewoptionsdialog.cpp:303
 msgid "Green"
-msgstr ""
+msgstr "Зеленый"
 
 #: shell/finder/viewoptionsdialog.cpp:303
 msgid "Dark Green"
-msgstr ""
+msgstr "Темно-зеленый"
 
 #: shell/finder/viewoptionsdialog.cpp:303
 msgid "Brown"
-msgstr ""
+msgstr "Коричневый"
 
 #: shell/finder/viewoptionsdialog.cpp:303
 msgid "Tan"
-msgstr ""
+msgstr "Бежевый"
 
 #: shell/finder/viewoptionsdialog.cpp:303
 msgid "Light Gray"
-msgstr ""
+msgstr "Светло-серый"
 
 #: shell/finder/viewoptionsdialog.cpp:304
 msgid "Medium Gray"
-msgstr ""
+msgstr "Серый"
 
 #: shell/finder/viewoptionsdialog.cpp:304
 msgid "Dark Gray"
-msgstr ""
+msgstr "Темно-серый"
 
 #: shell/finder/viewoptionsdialog.cpp:304
 msgid "Black"
-msgstr ""
+msgstr "Черный"
 
 #: shell/finder/viewoptionsdialog.cpp:324
 msgid "Preferences"
-msgstr ""
+msgstr "Настройки"
 
 #: shell/finder/viewoptionsdialog.cpp:327
 msgid "General"
-msgstr ""
+msgstr "Общие"
 
 #: shell/finder/viewoptionsdialog.cpp:327
 msgid "Views"
-msgstr ""
+msgstr "Виды"
 
 #: shell/finder/viewoptionsdialog.cpp:327
 msgid "Labels"
-msgstr ""
+msgstr "Метки"
 
 #: shell/finder/viewoptionsdialog.cpp:335
 msgid "Spring-loaded folders"
-msgstr ""
+msgstr "Папки с автоматическим раскрытием"
 
 #: shell/finder/viewoptionsdialog.cpp:350
 msgid "Short"
-msgstr ""
+msgstr "Короткая"
 
 #: shell/finder/viewoptionsdialog.cpp:350
 msgid "Long"
-msgstr ""
+msgstr "Длинная"
 
 #: shell/finder/viewoptionsdialog.cpp:357
 msgid "Tight (more items)"
-msgstr ""
+msgstr "Плотная (больше элементов)"
 
 #: shell/finder/viewoptionsdialog.cpp:358
 msgid "Wide (neater arrangement)"
-msgstr ""
+msgstr "Широкая (аккуратнее)"
 
 #: shell/finder/viewoptionsdialog.cpp:362
 msgid "Warn before emptying Trash"
-msgstr ""
+msgstr "Предупреждать перед очисткой"
 
 #: shell/finder/viewoptionsdialog.cpp:372
 msgid "Use Puppy Mode"
-msgstr ""
+msgstr "Использовать режим щенка"
 
 #: shell/finder/viewoptionsdialog.cpp:375
 msgid "Shows only the essential commands in the Sniffer's menus, for children and people new to computers."
-msgstr ""
+msgstr "Показывает только основные команды в меню Sniffer для детей и тех, кто только знакомится с компьютером."
 
 #: shell/finder/viewoptionsdialog.cpp:379
 msgid "Play audio CDs and video DVDs when inserted"
-msgstr ""
+msgstr "Воспроизводить CD и DVD при вставке"
 
 #: shell/finder/viewoptionsdialog.cpp:383
 msgid "Starts the program that plays the disc. Programs on a disc never start by themselves."
-msgstr ""
+msgstr "Запускает программу для воспроизведения диска. Программы с диска никогда не запускаются сами."
 
 #: shell/finder/viewoptionsdialog.cpp:388
 msgid "Icon"
-msgstr ""
+msgstr "Значок"
 
 #: shell/finder/viewoptionsdialog.cpp:388
 msgid "Button"
-msgstr ""
+msgstr "Кнопка"
 
 #: shell/finder/viewoptionsdialog.cpp:388
 msgid "List"
-msgstr ""
+msgstr "Список"
 
 #: shell/finder/viewoptionsdialog.cpp:430
 msgid "Spring-loaded Folders"
-msgstr ""
+msgstr "Папки с автоматическим раскрытием"
 
 #: shell/finder/viewoptionsdialog.cpp:431
 msgid "Delay before opening:"
-msgstr ""
+msgstr "Задержка открытия:"
 
 #: shell/finder/viewoptionsdialog.cpp:435
 msgid "Grid Spacing"
-msgstr ""
+msgstr "Шаг сетки"
 
 #: shell/finder/viewoptionsdialog.cpp:441
 msgid "Puppy Mode"
-msgstr ""
+msgstr "Режим щенка"
 
 #: shell/finder/viewoptionsdialog.cpp:442
 msgid "Only the essential commands and features."
-msgstr ""
+msgstr "Только основные команды и функции."
 
 #: shell/finder/viewoptionsdialog.cpp:445
 msgid "Media"
-msgstr ""
+msgstr "Медиа"
 
 #: shell/finder/viewoptionsdialog.cpp:447
 msgid "Standard View Options for:"
-msgstr ""
+msgstr "Стандартные параметры вида для:"
 
 #: shell/finder/viewoptionsdialog.cpp:455
 msgid "Click a colour to change it."
-msgstr ""
+msgstr "Щелкните цвет, чтобы изменить его."
 
 #: shell/greeter/main.cpp:112 shell/greeter/main.cpp:145
 #: shell/greeter/main.cpp:344
@@ -1920,7 +1920,7 @@ msgstr "Выключить"
 
 #: shell/greeter/main.cpp:173
 msgid "There are no accounts to log in to."
-msgstr ""
+msgstr "Нет учетных записей для входа."
 
 #: shell/greeter/main.cpp:197 shell/setup/setup.cpp:421
 msgid "Welcome to ZacOS 9."
@@ -1933,11 +1933,11 @@ msgstr "Пароль:"
 
 #: shell/greeter/main.cpp:212
 msgid "Logging in…"
-msgstr ""
+msgstr "Вход…"
 
 #: shell/greeter/main.cpp:213
 msgid "Safe mode: Startup Items will not run."
-msgstr ""
+msgstr "Безопасный режим: элементы запуска не будут выполняться."
 
 #: shell/help/helpbook.cpp:292 shell/help/helpbook.cpp:293
 #: shell/help/helpwindow.cpp:79 shell/help/helpwindow.cpp:141
@@ -1948,47 +1948,47 @@ msgstr "Центр справки"
 
 #: shell/help/helpbook.cpp:294
 msgid "Choose a book, or type words in the search field above and click Search."
-msgstr ""
+msgstr "Выберите книгу или введите слова в поле поиска выше и нажмите «Найти»."
 
 #: shell/help/helpbook.cpp:296
 msgid "No help is installed."
-msgstr ""
+msgstr "Справка не установлена."
 
 #: shell/help/helpbook.cpp:310
 msgid "Search Results"
-msgstr ""
+msgstr "Результаты поиска"
 
 #: shell/help/helpbook.cpp:312
 msgid "No topics found"
-msgstr ""
+msgstr "Темы не найдены"
 
 #: shell/help/helpbook.cpp:313
 msgid "Nothing in the help mentions “%1”. Try fewer or other words."
-msgstr ""
+msgstr "В справке нет упоминаний «%1». Попробуйте меньше слов или другие слова."
 
 #: shell/help/helpbook.cpp:315
 msgid "1 topic found"
-msgstr ""
+msgstr "Найдена 1 тема"
 
 #: shell/help/helpbook.cpp:315
 msgid "%1 topics found"
-msgstr ""
+msgstr "Найдено тем: %1"
 
 #: shell/help/helpbook.cpp:317
 msgid "For “%1”, the best match first."
-msgstr ""
+msgstr "Для «%1» сначала лучшие совпадения."
 
 #: shell/help/helpwindow.cpp:75 shell/help/helpwindow.cpp:181
 msgid "Back"
-msgstr ""
+msgstr "Назад"
 
 #: shell/help/helpwindow.cpp:77 shell/help/helpwindow.cpp:182
 msgid "Forward"
-msgstr ""
+msgstr "Вперед"
 
 #: shell/help/helpwindow.cpp:83
 msgid "Search"
-msgstr ""
+msgstr "Найти"
 
 #: shell/help/helpwindow.cpp:167 shell/menubar/menus.c:157
 #: shell/menubar/menus.c:272
@@ -1997,7 +1997,7 @@ msgstr "Файл"
 
 #: shell/help/helpwindow.cpp:168
 msgid "Close"
-msgstr ""
+msgstr "Закрыть"
 
 #: shell/help/helpwindow.cpp:171 shell/menubar/menus.c:50
 msgid "Edit"
@@ -2010,11 +2010,11 @@ msgstr "Выбрать все"
 
 #: shell/help/helpwindow.cpp:175
 msgid "Find in Help…"
-msgstr ""
+msgstr "Найти в справке…"
 
 #: shell/help/helpwindow.cpp:180
 msgid "Go"
-msgstr ""
+msgstr "Перейти"
 
 #: shell/help/helpwindow.cpp:185 shell/menubar/hints.c:73
 #: shell/menubar/menus.c:247
@@ -2848,111 +2848,111 @@ msgstr "Открыть папку действий папок"
 
 #: shell/network/connectdialog.cpp:16
 msgid "Connect to Server"
-msgstr ""
+msgstr "Подключиться к серверу"
 
 #: shell/network/connectdialog.cpp:19
 msgid "A classic Mac (AFP)"
-msgstr ""
+msgstr "Классический Mac (AFP)"
 
 #: shell/network/connectdialog.cpp:20
 msgid "A Windows computer (SMB)"
-msgstr ""
+msgstr "Компьютер Windows (SMB)"
 
 #: shell/network/connectdialog.cpp:24 shell/network/logindialog.cpp:59
 msgid "Connect"
-msgstr ""
+msgstr "Соединить"
 
 #: shell/network/connectdialog.cpp:69
 msgid "Server address:"
-msgstr ""
+msgstr "Адрес сервера:"
 
 #: shell/network/logindialog.cpp:19
 msgid "Connect to the computer"
-msgstr ""
+msgstr "Подключение к компьютеру"
 
 #: shell/network/logindialog.cpp:20
 msgid "Connect to the file server"
-msgstr ""
+msgstr "Подключение к файловому серверу"
 
 #: shell/network/logindialog.cpp:33
 msgid "Guest"
-msgstr ""
+msgstr "Гость"
 
 #: shell/network/logindialog.cpp:34
 msgid "Registered User"
-msgstr ""
+msgstr "Зарегистрированный пользователь"
 
 #: shell/network/logindialog.cpp:121
 msgid "Connect to the computer as:"
-msgstr ""
+msgstr "Подключиться к компьютеру как:"
 
 #: shell/network/logindialog.cpp:121
 msgid "Connect to the file server as:"
-msgstr ""
+msgstr "Подключиться к файловому серверу как:"
 
 #: shell/network/logindialog.cpp:125
 msgid "Share:"
-msgstr ""
+msgstr "Ресурс:"
 
 #: shell/network/netbrowser.cpp:37
 msgid "Scan Again"
-msgstr ""
+msgstr "Сканировать снова"
 
 #: shell/network/netbrowser.cpp:38
 msgid "Connect to Server…"
-msgstr ""
+msgstr "Подключиться к серверу…"
 
 #: shell/network/netbrowser.cpp:53
 msgid "Looking for computers…"
-msgstr ""
+msgstr "Поиск компьютеров…"
 
 #: shell/network/netbrowser.cpp:73
 msgid "No computers were found announcing themselves. Use Connect to Server for one that doesn’t."
-msgstr ""
+msgstr "Не найдено компьютеров, объявляющих о себе. Для остальных используйте «Подключиться к серверу»."
 
 #: shell/network/netbrowser.cpp:115
 msgid "“%1” is this computer. Its shared folders are already here: open them in the Sniffer."
-msgstr ""
+msgstr "«%1» — это этот компьютер. Его общие папки уже здесь: откройте их в Sniffer."
 
 #: shell/network/netbrowser.cpp:127
 msgid "The share could not be mounted."
-msgstr ""
+msgstr "Не удалось подключить общий ресурс."
 
 #: shell/network/netbrowser.cpp:148
 msgid "“%1” can only accept an unencrypted password. Send it anyway?"
-msgstr ""
+msgstr "«%1» принимает только незашифрованный пароль. Отправить его все равно?"
 
 #: shell/network/netbrowser.cpp:149
 msgid "Send"
-msgstr ""
+msgstr "Отправить"
 
 #: shell/network/netbrowser.cpp:165
 msgid "“%1” can’t be connected: a different disk is already connected in its place."
-msgstr ""
+msgstr "Не удалось подключить «%1»: на его месте уже подключен другой диск."
 
 #: shell/network/volumedialog.cpp:17
 msgid "Select a Volume"
-msgstr ""
+msgstr "Выберите том"
 
 #: shell/network/volumedialog.cpp:32
 msgid "Mount"
-msgstr ""
+msgstr "Подключить"
 
 #: shell/network/volumedialog.cpp:66
 msgid "This server has no volumes to open."
-msgstr ""
+msgstr "На этом сервере нет томов для открытия."
 
 #: shell/network/volumedialog.cpp:66
 msgid "Select a volume:"
-msgstr ""
+msgstr "Выберите том:"
 
 #: shell/notepad/notepadwindow.cpp:104
 msgid "Notepad - Page %1 of %2"
-msgstr ""
+msgstr "Блокнот — страница %1 из %2"
 
 #: shell/pack/packwindow.cpp:37
 msgid "Applications"
-msgstr ""
+msgstr "Программы"
 
 #: shell/panels/accessibility.cpp:10 shell/panels/accessibility.cpp:127
 msgid "Accessibility"
@@ -2964,15 +2964,15 @@ msgstr "Внешний вид"
 
 #: shell/panels/collarpanel.cpp:108
 msgid "Define Hot Key"
-msgstr ""
+msgstr "Назначить горячую клавишу"
 
 #: shell/panels/collarpanel.cpp:203 shell/panels/collarpanel_main.cpp:16
 msgid "Collar"
-msgstr ""
+msgstr "Collar"
 
 #: shell/panels/datetime.cpp:228
 msgid "Set Time Zone"
-msgstr ""
+msgstr "Установить часовой пояс"
 
 #: shell/panels/datetime.cpp:317 shell/panels/datetime_main.cpp:15
 msgid "Date & Time"
@@ -2984,7 +2984,7 @@ msgstr "Экономия энергии"
 
 #: shell/panels/fileexchange.cpp:20
 msgid "Open With"
-msgstr ""
+msgstr "Открыть с помощью"
 
 #: shell/panels/fileexchange.cpp:108 shell/panels/fileexchange_main.cpp:15
 msgid "File Translator"
@@ -3106,7 +3106,7 @@ msgstr "Речь"
 
 #: shell/panels/startupdisk.cpp:193 shell/panels/startupdisk.cpp:497
 msgid "Startup Disk"
-msgstr ""
+msgstr "Загрузочный диск"
 
 #: shell/panels/tablet.cpp:59 shell/panels/tablet.cpp:138
 msgid "Tablet"
@@ -3122,15 +3122,15 @@ msgstr "Пользователи"
 
 #: shell/panels/users.cpp:532
 msgid "New User"
-msgstr ""
+msgstr "Новый пользователь"
 
 #: shell/panels/users.cpp:898
 msgid "Programs"
-msgstr ""
+msgstr "Программы"
 
 #: shell/panels/users.cpp:1067
 msgid "Users Options"
-msgstr ""
+msgstr "Параметры пользователей"
 
 #: shell/panels/zacmenu.cpp:10 shell/panels/zacmenu.cpp:78
 msgid "Zac Menu Options"
