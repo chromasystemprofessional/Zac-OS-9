@@ -94,6 +94,7 @@ The RAM Disk's settings are in `/etc/zacos9/memory.conf`.
 
 - `memory-helper` (`tests/memory/test_helper.py`): every command against
   stand-ins for the programs it runs, a temporary root and made-up
-  `/proc` files.
+  `/proc` files. It sets `ZACOS9_MEMORY_TEST=1`, so the same fake root is
+  used when the package build runs its tests as root (the ISO build does).
 - `memory-panel` (`tests/memory/test_panel.cpp`): the panel with a fake
   helper: what it shows, each control, Use Defaults, and a refusal.
