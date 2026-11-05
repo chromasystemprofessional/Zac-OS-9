@@ -178,7 +178,7 @@ int main(int argc, char **argv) {
 	}
 	/* A translated book keeps the same structure: its pages fall back to
 	 * English one at a time, so each tree must stand on its own. */
-	for (const QString &lang : { QStringLiteral("it"), QStringLiteral("ru"), QStringLiteral("es"), QStringLiteral("pt"), QStringLiteral("fr_CA"), QStringLiteral("fr_FR") }) {
+	for (const QString &lang : { QStringLiteral("it"), QStringLiteral("ru"), QStringLiteral("es"), QStringLiteral("pt"), QStringLiteral("fr_CA"), QStringLiteral("fr_FR"), QStringLiteral("ar") }) {
 		for (const QString &book : { QStringLiteral("zacos9"), QStringLiteral("tutorial") }) {
 			checkBook(source + "/" + lang + "/" + book, lang + "/" + book, book == "zacos9" ? 10 : 5);
 		}

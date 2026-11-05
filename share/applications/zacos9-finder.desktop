@@ -1,6 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=Sniffer
+Name[ar]=Sniffer
 Name[fr_CA]=Sniffer
 Name[fr_FR]=Sniffer
 Comment=Opens folders in Sniffer

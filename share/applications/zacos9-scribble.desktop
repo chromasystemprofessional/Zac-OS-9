@@ -1,6 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=Scribble
+Name[ar]=Scribble
 Name[fr_CA]=Scribble
 Name[fr_FR]=Scribble
 Comment=Read and write plain text documents

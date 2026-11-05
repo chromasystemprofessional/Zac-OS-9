@@ -74,12 +74,12 @@ Mouse desktop entry. Input is not supported:
 ZacOS's own text fields have no IME preedit, so the language is not
 advertised as usable yet ([Languages](docs/i18n.md)).
 
-**Arabic (display pilot)**: strings with Arabic are shaped by HarfBuzz and
-ordered with FriBidi, using Noto Sans Arabic; lists right-align Arabic rows.
-`po/ar.po` translates the Mouse panel, every control panel's name and title,
-and the Mouse desktop entry, with the rest falling back to English. The full
-catalog, the 20 help pages, typing tests and a native speaker's review are
-still to come ([Languages](docs/i18n.md)).
+**Arabic**: `po/ar.po` is complete at 817 strings, including the Finder,
+menu bar, application names, installer and Setup Assistant; `Name[ar]` is in
+67 desktop entries, and all 20 help pages are under
+`share/zacos9/help/ar/`. HarfBuzz shapes Arabic, FriBidi orders it, and
+Arabic lists and labels right-align. A native speaker's review and text-input
+testing are next ([Languages](docs/i18n.md)).
 
 **Russian**: `po/ru.po` is complete at 817 strings, including the Finder's
 dialogs; all 20 help pages are under `share/zacos9/help/ru/`. Cyrillic uses

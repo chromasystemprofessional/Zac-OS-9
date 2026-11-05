@@ -72,6 +72,11 @@ Both fonts cover:
 
 Accented Latin letters are composed by `tools/fonts/build_fonts.py` from the base letter and the font's accent marks (grave, acute, circumflex, tilde, diaeresis, ring, cedilla). Any other character falls back to DejaVu Sans, unantialiased, on the same baseline.
 
+Arabic is not in the bitmap faces: `lib/shaping.c` shapes it with HarfBuzz,
+rasterises Noto Sans Arabic through FreeType, and uses FriBidi for the
+paragraph direction. Mixed Latin runs use DejaVu Sans. The session font list
+accepts Noto Sans Arabic; see [Languages](../i18n.md).
+
 ## Editing
 
 Edit the `.pfont` files, then run `python3 tools/fonts/build_fonts.py`. That regenerates `lib/fonts_data.h`, and `--specimen out.png` also renders a 3× specimen. The `fonts-current` test fails if `lib/fonts_data.h` is out of date.
