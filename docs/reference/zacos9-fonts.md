@@ -67,6 +67,7 @@ Both fonts cover:
 - ASCII;
 - typographic quotes, dashes, ellipsis and bullet;
 - ° © ® ™;
+- the Spanish inverted marks ¿ and ¡;
 - ⌫, for menu shortcuts.
 
 Accented Latin letters are composed by `tools/fonts/build_fonts.py` from the base letter and the font's accent marks (grave, acute, circumflex, tilde, diaeresis, ring, cedilla). Any other character falls back to DejaVu Sans, unantialiased, on the same baseline.

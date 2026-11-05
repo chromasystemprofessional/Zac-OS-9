@@ -87,6 +87,39 @@ static int ink_top(const struct plat_text *t) {
 	return -1;
 }
 
+/* The last row with ink. */
+static int ink_bottom(const struct plat_text *t) {
+	for (int y = t->height - 1; y >= 0; y--) {
+		for (int x = 0; x < t->width; x++) {
+			if (t->mask[y * t->stride + x]) {
+				return y;
+			}
+		}
+	}
+	return -1;
+}
+
+/* One glyph's ink is the other's, rows reversed: Spanish's inverted marks
+ * are drawn by the bitmap face rather than left to the outline fallback. */
+static bool mirrored_ink(const struct plat_text *upright, const struct plat_text *inverted) {
+	if (!upright || !inverted || upright->width != inverted->width) {
+		return false;
+	}
+	const int ut = ink_top(upright), ub = ink_bottom(upright);
+	const int it = ink_top(inverted), ib = ink_bottom(inverted);
+	if (ut < 0 || it < 0 || ub - ut != ib - it) {
+		return false;
+	}
+	for (int y = 0; y <= ub - ut; y++) {
+		if (memcmp(upright->mask + (size_t)(ut + y) * upright->stride,
+				inverted->mask + (size_t)(ib - y) * inverted->stride,
+				(size_t)upright->width) != 0) {
+			return false;
+		}
+	}
+	return true;
+}
+
 int main(void) {
 	int fails = 0;
 	for (size_t i = 0; i < sizeof(samples) / sizeof(samples[0]); i++) {
@@ -111,6 +144,22 @@ int main(void) {
 		printf("%s  cap height %d (want %d)\n", ok ? "ok  " : "FAIL", cap, caps[i].cap);
 		fails += !ok;
 		text_destroy(t);
+	}
+
+	/* Spanish inverted punctuation is part of the bitmap faces, so it
+	 * matches the upright mark instead of using DejaVu's outline. */
+	for (enum pl_font f = PL_FONT_SYSTEM; f <= PL_FONT_VIEWS; f++) {
+		struct plat_text *question = text_render_font("?", 100, f);
+		struct plat_text *questiondown = text_render_font("\xc2\xbf", 100, f);
+		struct plat_text *exclaim = text_render_font("!", 100, f);
+		struct plat_text *exclaimdown = text_render_font("\xc2\xa1", 100, f);
+		bool ok = mirrored_ink(question, questiondown) && mirrored_ink(exclaim, exclaimdown);
+		printf("%s  inverted Spanish marks are drawn by the bitmap face\n", ok ? "ok  " : "FAIL");
+		fails += !ok;
+		text_destroy(question);
+		text_destroy(questiondown);
+		text_destroy(exclaim);
+		text_destroy(exclaimdown);
 	}
 
 	/* Italic keeps the advance and slants right above the baseline. */

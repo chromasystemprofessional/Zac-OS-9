@@ -81,9 +81,9 @@ speaker's review is next ([Languages](docs/i18n.md)).
 
 **Spanish**: `po/es.po` is complete at 817 strings, including the Finder,
 menu bar, application names, installer and Setup Assistant. The Spanish
-glyphs render through the bitmap face and the DejaVu fallback for `¿` and
-`¡`; all 20 help pages are under `share/zacos9/help/es/`. A native speaker's
-review is next ([Languages](docs/i18n.md)).
+glyphs, including `¿` and `¡`, are in the bitmap faces; all 20 help pages
+are under `share/zacos9/help/es/`. A native speaker's review is next
+([Languages](docs/i18n.md)).
 
 **Brazilian Portuguese**: `po/pt.po`, installed as `pt` for
 `pt_BR.UTF-8`, is complete at 817 strings, including the Finder, menu bar,
