@@ -1,5 +1,6 @@
 /* The Numbers and Text control panel (zacos9-controlpanel numbers | text). */
 #include "controlpanel.h"
+#include "flags.h"
 #include "conf.h"
 
 /* Mac OS 9's Numbers and Text control panels, over the locale: Numbers sets
@@ -53,7 +54,11 @@ public:
 		}
 		m_codes = codes;
 		m_names = names;
-		m_list.setItems(m_names);
+		std::vector<int> flags;
+		for (const QString &code : m_codes) {
+			flags.push_back(pl_flag_for_locale(code.toUtf8().constData()));
+		}
+		m_list.setItems(m_names, {}, -1, flags);
 		const QString current = currentLocale().section('.', 0, 0);
 		for (int i = 0; i < m_codes.size(); i++) {
 			if (m_codes[i].section('.', 0, 0) == current) {

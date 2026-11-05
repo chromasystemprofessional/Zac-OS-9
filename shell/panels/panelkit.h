@@ -31,14 +31,17 @@ struct PanelList {
 	QStringList items;
 	std::vector<std::unique_ptr<Text>> texts;
 	std::vector<int> icons;
+	std::vector<int> flags; /* enum pl_flag per row; text starts after it */
 	pl_list state{};
 	/* Called with the new row when the user picks one. */
 	std::function<void(int)> picked;
 
 	/* Icons, if given, are one pl_icon_kind per row, drawn small before
 	 * each row's text. `indent` leaves room for something else drawn there
-	 * (the Keyboard panel's checkboxes). */
-	void setItems(const QStringList &items, const std::vector<int> &icons = {}, int indent = -1);
+	 * (the Keyboard panel's checkboxes). Flags are one enum pl_flag per
+	 * row and reserve their own width instead. */
+	void setItems(const QStringList &items, const std::vector<int> &icons = {}, int indent = -1,
+		const std::vector<int> &flags = {});
 	void select(int row, bool notify);
 	void scrollTo(int top);
 	void ensureVisible(int row);

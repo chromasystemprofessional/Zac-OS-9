@@ -14,15 +14,19 @@
 #include <climits>
 
 #include "icons.h"
+#include "flags.h"
 #include "menudraw.h"
 #include "settings.h"
 
 /* ---- list boxes ------------------------------------------------------------ */
 
-void PanelList::setItems(const QStringList &list, const std::vector<int> &rowIcons, int indent) {
+void PanelList::setItems(const QStringList &list, const std::vector<int> &rowIcons, int indent,
+		const std::vector<int> &rowFlags) {
 	items = list;
 	icons = rowIcons.size() == static_cast<size_t>(list.size()) ? rowIcons : std::vector<int>{};
-	state.indent = indent >= 0 ? indent : icons.empty() ? 0 : PL_ICON_SMALL + 4;
+	flags = rowFlags.size() == static_cast<size_t>(list.size()) ? rowFlags : std::vector<int>{};
+	state.indent = !flags.empty() ? PL_FLAG_W + 4
+		: indent >= 0 ? indent : icons.empty() ? 0 : PL_ICON_SMALL + 4;
 	texts.clear();
 	for (const QString &s : list) {
 		texts.push_back(std::make_unique<Text>(s, frame.width() - SB_WIDTH - 8 - state.indent,
@@ -49,6 +53,11 @@ void PanelList::paint(pl_canvas *c, bool focused) const {
 	pl_list_paint(c, frame.left(), frame.top(), frame.right(), frame.bottom(), &v,
 		pl_accent_current(), pl_highlight_current());
 	const int visible = pl_list_visible_rows(frame.top(), frame.bottom());
+	for (int r = 0; r < visible && !flags.empty() && v.top + r < v.n; r++) {
+		const int i = v.top + r;
+		pl_flag_paint(c, frame.left() + 3, frame.top() + 2 + r * PL_LIST_ROW_H,
+			static_cast<enum pl_flag>(flags[static_cast<size_t>(i)]));
+	}
 	for (int r = 0; r < visible && !icons.empty() && v.top + r < v.n; r++) {
 		const int i = v.top + r;
 		pl_icon_paint(c, frame.left() + 2, frame.top() + 1 + r * PL_LIST_ROW_H,

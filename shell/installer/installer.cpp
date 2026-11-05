@@ -20,6 +20,7 @@
 #include <numeric>
 
 #include "logo.h"
+#include "flags.h"
 #include "panelkit.h"
 #include "pixels.h"
 #include "settings.h"
@@ -118,7 +119,11 @@ void InstallerWindow::showLanguage() {
 	}
 	m_localeCodes = codes;
 	m_languageList.frame = QRect(MARGIN, 64, W - 2 * MARGIN, 10 * PL_LIST_ROW_H + 2);
-	m_languageList.setItems(sorted);
+	std::vector<int> flags;
+	for (const QString &code : m_localeCodes) {
+		flags.push_back(pl_flag_for_locale(code.toUtf8().constData()));
+	}
+	m_languageList.setItems(sorted, {}, -1, flags);
 	/* The current system language, else English: a first screen that is
 	 * readable to whoever downloaded the image. */
 	QString current = qEnvironmentVariable("LANG");

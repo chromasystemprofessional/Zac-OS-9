@@ -12,6 +12,7 @@ platinum_lib = static_library('platinum',
   'menudraw.c',
   'widgets.c',
   'icons.c',
+  'flags.c',
   'logo.c',
   'welcome.c',
   'extensions.c',
@@ -103,6 +104,7 @@ test('welcome', executable('test-welcome', '../tests/lib/test_welcome.c', depend
 test('settings', executable('test-settings', '../tests/lib/test_settings.c', dependencies: [platinum_dep]))
 test('theme', executable('test-theme', '../tests/lib/test_theme.c', dependencies: [platinum_dep]))
 test('pfont', executable('test-pfont', '../tests/lib/test_pfont.c', dependencies: [platinum_dep]))
+test('flags', executable('test-flags', '../tests/lib/test_flags.c', dependencies: [platinum_dep]))
 test('savers', executable('test-savers', '../tests/lib/test_savers.c', dependencies: [platinum_dep]))
 test('electron', executable('test-electron', '../tests/lib/test_electron.c', dependencies: [platinum_dep]))
 test('locate', executable('test-locate', '../tests/lib/test_locate.c', dependencies: [platinum_dep]))
