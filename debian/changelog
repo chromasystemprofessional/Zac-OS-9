@@ -1,3 +1,12 @@
+zacos9 (1.9.3) trixie; urgency=medium
+
+  * Canadian French and European French are now available, each with a
+    complete catalog and all 20 help pages. English (Canada) and English
+    (United Kingdom) are selectable locales, and the installer and Text
+    panel show a country flag beside every language.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Thu, 05 Nov 2026 14:03:54 -0500
+
 zacos9 (1.9.2) trixie; urgency=medium
 
   * The Theme Installer no longer appears in the application catalog or the
