@@ -136,23 +136,22 @@ int main(int argc, char **argv) {
 
 	// The books as shipped: ZacOS Help and Learn ZacOS.
 	const QString source = qEnvironmentVariable("ZACOS9_HELP_SOURCE");
-	QStringList problems;
 	const QRegularExpression href("href=\"([^\"]+)\"");
-	for (const QString &book : { QStringLiteral("zacos9"), QStringLiteral("tutorial") }) {
-		const QString bookDir = source + "/" + book;
+	const auto checkBook = [&](const QString &bookDir, const QString &label, int minPages) {
+		QStringList problems;
 		const QStringList files = QDir(bookDir).entryList({ "*.html" }, QDir::Files);
-		check(files.size() >= (book == "zacos9" ? 10 : 5), QString("%1 has its pages (%2)").arg(book).arg(files.size()));
+		check(files.size() >= minPages, QString("%1 has its pages (%2)").arg(label).arg(files.size()));
 		QSet<QString> linked;
 		for (const QString &name : files) {
 			const QString html = read(bookDir + "/" + name);
 			if (htmlTitle(html).isEmpty()) {
-				problems << book + "/" + name + ": no title";
+				problems << label + "/" + name + ": no title";
 			}
 			if (htmlMeta(html, "description").isEmpty()) {
-				problems << book + "/" + name + ": no description";
+				problems << label + "/" + name + ": no description";
 			}
 			if (name != "index.html" && !html.contains("href=\"index.html\"")) {
-				problems << book + "/" + name + ": no way back to the index";
+				problems << label + "/" + name + ": no way back to the index";
 			}
 			for (auto it = href.globalMatch(html); it.hasNext();) {
 				const QString target = it.next().captured(1);
@@ -161,19 +160,29 @@ int main(int argc, char **argv) {
 				}
 				const QString file = target.section('#', 0, 0).section('?', 0, 0);
 				if (!QFile::exists(bookDir + "/" + file)) {
-					problems << book + "/" + name + ": link to missing " + target;
+					problems << label + "/" + name + ": link to missing " + target;
 				}
 				linked << file;
 			}
 		}
 		for (const QString &name : files) {
 			if (name != "index.html" && !linked.contains(name)) {
-				problems << book + "/" + name + ": nothing links to it";
+				problems << label + "/" + name + ": nothing links to it";
 			}
 		}
+		check(problems.isEmpty(), label + ": every page titled, described and linked; every link goes somewhere" +
+			(problems.isEmpty() ? QString() : ": " + problems.join("; ")));
+	};
+	for (const QString &book : { QStringLiteral("zacos9"), QStringLiteral("tutorial") }) {
+		checkBook(source + "/" + book, book, book == "zacos9" ? 10 : 5);
 	}
-	check(problems.isEmpty(), "every page titled, described and linked; every link goes somewhere" +
-		(problems.isEmpty() ? QString() : ": " + problems.join("; ")));
+	/* A translated book keeps the same structure: its pages fall back to
+	 * English one at a time, so each tree must stand on its own. */
+	for (const QString &lang : { QStringLiteral("it"), QStringLiteral("ru"), QStringLiteral("es"), QStringLiteral("pt") }) {
+		for (const QString &book : { QStringLiteral("zacos9"), QStringLiteral("tutorial") }) {
+			checkBook(source + "/" + lang + "/" + book, lang + "/" + book, book == "zacos9" ? 10 : 5);
+		}
+	}
 	const QList<HelpPage> shipped = helpPages(source);
 	const auto top = [&](const QString &words) {
 		const QList<HelpHit> h = searchHelp(shipped, words);
