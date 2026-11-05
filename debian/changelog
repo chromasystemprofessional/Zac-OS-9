@@ -1,3 +1,12 @@
+zacos9 (1.9.5) trixie; urgency=medium
+
+  * The installer's Language screen now asks for help translating ZacOS 9
+    and points language problems at the issue tracker, translated into
+    every completed language. The installer also restarts with the chosen
+    LANG as well as LANGUAGE.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Thu, 05 Nov 2026 15:18:39 -0500
+
 zacos9 (1.9.4) trixie; urgency=medium
 
   * Arabic is now available: a complete 817-string Modern Standard Arabic
