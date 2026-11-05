@@ -23,6 +23,7 @@
 #include <QUrl>
 #include <QWidget>
 #include <algorithm>
+#include <cstdio>
 #include <map>
 #include <unistd.h>
 
@@ -498,34 +499,38 @@ int main(int argc, char **argv) {
 	check(linkLength == 6 && link.left(linkLength) == "Nested",
 		"recursive copy keeps relative alias target relative to copied folder");
 	const QString broken = transferSource + "/Cannot copy";
-	QDir().mkpath(broken + "/A completed folder");
-	touch(broken + "/A completed folder/Data");
-	touch(broken + "/Z unreadable");
-	QFile::setPermissions(broken + "/A completed folder",
-		QFileDevice::ReadOwner | QFileDevice::ExeOwner);
-	QFile::setPermissions(broken + "/Z unreadable", {});
-	int errorAlerts = 0;
-	QTimer dismissErrors;
-	dismissErrors.setInterval(1);
-	QObject::connect(&dismissErrors, &QTimer::timeout, [&] {
-		for (QWidget *widget : QApplication::topLevelWidgets()) {
-			if (auto *alert = dynamic_cast<Alert *>(widget); alert && alert->isVisible()) {
-				errorAlerts++;
-				alert->accept();
+	if (geteuid() != 0) {
+		QDir().mkpath(broken + "/A completed folder");
+		touch(broken + "/A completed folder/Data");
+		touch(broken + "/Z unreadable");
+		QFile::setPermissions(broken + "/A completed folder",
+			QFileDevice::ReadOwner | QFileDevice::ExeOwner);
+		QFile::setPermissions(broken + "/Z unreadable", {});
+		int errorAlerts = 0;
+		QTimer dismissErrors;
+		dismissErrors.setInterval(1);
+		QObject::connect(&dismissErrors, &QTimer::timeout, [&] {
+			for (QWidget *widget : QApplication::topLevelWidgets()) {
+				if (auto *alert = dynamic_cast<Alert *>(widget); alert && alert->isVisible()) {
+					errorAlerts++;
+					alert->accept();
+				}
 			}
-		}
-	});
-	dismissErrors.start();
-	bool errorFinished = true;
-	const auto failed = transferItems({broken}, transferTarget, true, &errorFinished);
-	dismissErrors.stop();
-	check(!errorFinished && failed.isEmpty() && errorAlerts > 0 &&
-		!QFile::exists(transferTarget + "/Cannot copy") &&
-		QFile::exists(broken + "/A completed folder/Data"),
-		"read failure reports error and rolls back partial tree including read-only copied folders");
-	QFile::setPermissions(broken + "/A completed folder",
-		QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner);
-	QFile::setPermissions(broken + "/Z unreadable", QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+		});
+		dismissErrors.start();
+		bool errorFinished = true;
+		const auto failed = transferItems({broken}, transferTarget, true, &errorFinished);
+		dismissErrors.stop();
+		check(!errorFinished && failed.isEmpty() && errorAlerts > 0 &&
+			!QFile::exists(transferTarget + "/Cannot copy") &&
+			QFile::exists(broken + "/A completed folder/Data"),
+			"read failure reports error and rolls back partial tree including read-only copied folders");
+		QFile::setPermissions(broken + "/A completed folder",
+			QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner);
+		QFile::setPermissions(broken + "/Z unreadable", QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+	} else {
+		std::printf("skip  read failure rollback (permission denial is bypassed as root)\n");
+	}
 
 	const QString anotherFolder = home.path() + "/Another";
 	QDir().mkpath(anotherFolder);

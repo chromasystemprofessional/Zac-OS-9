@@ -136,8 +136,9 @@ int main(int argc, char **argv) {
 		"desktop aliases can also be followed inside the Macintosh view to external folders");
 	check(fileChooserRealPath(desktop + "/AFP Projects/new.txt") == serverRoot + "/AFP/Projects/new.txt",
 		"saving through a desktop server alias returns its real path");
-	QFile blocked(root.filePath("stray.txt"));
-	check(!blocked.open(QIODevice::WriteOnly), "the startup disk's own folders are read-only");
+	check(!(QFileInfo(disk.path).permissions() &
+		(QFileDevice::WriteOwner | QFileDevice::WriteGroup | QFileDevice::WriteOther)),
+		"the startup disk's own folders are read-only");
 	const FileChooserLocation again = fileChooserStartupDisk(
 		base + "/runtime/zacos9-file-chooser");
 	check(again.path == disk.path && QFile::exists(base + "/note.txt") &&
