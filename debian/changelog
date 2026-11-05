@@ -1,3 +1,12 @@
+zacos9 (1.9.8) trixie; urgency=medium
+
+  * The Finder's permission-specific tests now account for running as root,
+    so the ISO build's package tests complete. The startup disk's read-only
+    state is checked by mode, and locked-Trash and unreadable-file
+    scenarios skip under root.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Thu, 05 Nov 2026 18:04:33 -0500
+
 zacos9 (1.9.7) trixie; urgency=medium
 
   * The Startup Disk helper's test now uses its temporary grub
