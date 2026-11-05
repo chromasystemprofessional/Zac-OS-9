@@ -1,3 +1,13 @@
+zacos9 (1.9.4) trixie; urgency=medium
+
+  * Arabic is now available: a complete 817-string Modern Standard Arabic
+    catalog, a 20-page right-to-left help book, HarfBuzz shaping and
+    FriBidi ordering, right-aligned Arabic text, and Arabic application
+    names. The Speech panel also gains Classic, Modern and Neural voice
+    lists.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Thu, 05 Nov 2026 14:56:42 -0500
+
 zacos9 (1.9.3) trixie; urgency=medium
 
   * Canadian French and European French are now available, each with a
