@@ -28,7 +28,8 @@ with tempfile.TemporaryDirectory() as d:
     grubenv.write_text("# GRUB Environment Block\n")
     env = dict(os.environ, ZACOS9_GRUB_CFG=cfg, ZACOS9_GRUB_DEFAULTS=str(defaults),
                ZACOS9_GRUBENV=str(grubenv), ZACOS9_UPDATE_GRUB=f"touch {updated}",
-               ZACOS9_GRUB_SET_DEFAULT=f"sh -c 'printf \"saved_entry=%s\\n\" \"$0\" > {grubenv}'")
+               ZACOS9_GRUB_SET_DEFAULT=f"sh -c 'printf \"saved_entry=%s\\n\" \"$0\" > {grubenv}'",
+               ZACOS9_STARTUPDISK_TEST="1")
 
     def run(*args):
         r = subprocess.run([helper, *args], env=env, capture_output=True, text=True, timeout=20)

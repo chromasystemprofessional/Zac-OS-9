@@ -13,8 +13,9 @@ which system the computer starts up with, as GRUB's default entry.
 GRUB only remembers a choice with GRUB_DEFAULT=saved; the first "set"
 makes it so and regenerates grub.cfg. Problems go to stderr, exit 1.
 
-For tests (only when not run as root): ZACOS9_GRUB_CFG, ZACOS9_GRUB_DEFAULTS,
-ZACOS9_GRUBENV, ZACOS9_UPDATE_GRUB and ZACOS9_GRUB_SET_DEFAULT stand in for
+For tests (only when not run as root, or when ZACOS9_STARTUPDISK_TEST=1):
+ZACOS9_GRUB_CFG, ZACOS9_GRUB_DEFAULTS, ZACOS9_GRUBENV,
+ZACOS9_UPDATE_GRUB and ZACOS9_GRUB_SET_DEFAULT stand in for
 /boot/grub/grub.cfg, /etc/default/grub, /boot/grub/grubenv, update-grub and
 grub-set-default.
 """
@@ -26,7 +27,7 @@ import sys
 
 
 def setting(name, default):
-    if os.geteuid() != 0:
+    if os.environ.get("ZACOS9_STARTUPDISK_TEST") == "1" or os.geteuid() != 0:
         return os.environ.get(name, default)
     return default
 
