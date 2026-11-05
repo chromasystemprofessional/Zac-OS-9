@@ -649,16 +649,55 @@ int pl_speech_rate(void) {
 	return rate < -100 ? -100 : rate > 100 ? 100 : rate;
 }
 
+bool pl_speech_modern(void) {
+	char v[16];
+	return pl_setting("speech-kind", v, sizeof(v)) && strcmp(v, "modern") == 0;
+}
+
+bool pl_speech_neural(void) {
+	char v[16];
+	return pl_setting("speech-kind", v, sizeof(v)) && strcmp(v, "neural") == 0;
+}
+
+/* The voice for the list in use: that list's own key, else the previous
+ * single "speech-voice" for Classic, else none (speech-dispatcher's own).
+ * Routing is by voice name alone (no -o), except Neural: the panel's own
+ * "piper" module speaks there. The Classic names are espeak-ng's languages
+ * and language+variant pairs, the Modern ones RHVoice speakers, and none
+ * of the three collide. */
+static bool speech_voice(char *out, size_t size) {
+	const char *key = pl_speech_neural() ? "speech-voice-neural"
+		: pl_speech_modern() ? "speech-voice-modern" : "speech-voice-classic";
+	if (pl_setting(key, out, size)) {
+		return true;
+	}
+	if (!pl_speech_modern() && !pl_speech_neural() && pl_setting("speech-voice", out, size)) {
+		return true;
+	}
+	if (size > 0) {
+		out[0] = '\0';
+	}
+	return false;
+}
+
 int pl_speech_args(const char **argv, char *buf, size_t size) {
 	int n = 0;
 	argv[n++] = "spd-say";
-	char voice[96];
+	const bool neural = pl_speech_neural();
 	size_t used = 0;
-	if (pl_setting("speech-voice", voice, sizeof(voice)) && voice[0] && strlen(voice) + 1 < size) {
+	if (neural && used + 8 <= size) {
+		/* -o piper (6 with its NUL): the panel's own output module. */
+		memcpy(buf + used, "piper", 6);
+		argv[n++] = "-o";
+		argv[n++] = buf + used;
+		used += 6;
+	}
+	char voice[96];
+	if (speech_voice(voice, sizeof(voice)) && voice[0] && used + strlen(voice) + 1 < size) {
 		argv[n++] = "-y";
-		memcpy(buf, voice, strlen(voice) + 1);
-		argv[n++] = buf;
-		used = strlen(voice) + 1;
+		memcpy(buf + used, voice, strlen(voice) + 1);
+		argv[n++] = buf + used;
+		used += strlen(voice) + 1;
 	}
 	const int rate = pl_speech_rate();
 	if (rate != 0 && used + 8 <= size) {

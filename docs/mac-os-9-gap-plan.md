@@ -410,7 +410,7 @@ for), and **About This Computer** keeps showing honest memory use. The
 | **Bark Recorder** (record/play) | ✅ | `zacos9-barkrecorder`: records to WAVE with `pw-record` and plays with `pw-play`; stopping and closing are asynchronous. Missing audio tools or backend errors are reported. |
 | QuickTime Player | ✅? | Any installed player opens movies; a Platinum player is not planned. |
 | Startup/Shutdown sounds (put a sound in Startup Items) | ✅ | Optional `startup` and `shutdown` samples from the selected sound theme; theme import supports both. |
-| **Text-to-speech**: voices, Talking Alerts, read selected text | ✅ | Scribble ▸ Speech ▸ Speak Selection uses `spd-say` with the Speech panel's voice (the base voices in your language) and rate (`speech-voice`, `speech-rate`); Talking Alerts (`talking-alerts`) speak an alert's message when it's left unanswered for 2.5 s; Try Voice. |
+| **Text-to-speech**: voices, Talking Alerts, read selected text | ✅ | Scribble ▸ Speech ▸ Speak Selection uses `spd-say` with the Speech panel's voice (Classic: the base voices in your language plus feminine variants; Modern: RHVoice speakers; Neural: Piper's Amy and Ryan, fetched on demand with the panel's own `piper` module) and rate (`speech-voice-classic`, `speech-voice-modern`, `speech-voice-neural`, `speech-kind`, `speech-rate`); Talking Alerts (`talking-alerts`) speak an alert's message when it's left unanswered for 2.5 s; Try Voice. |
 | Speech recognition (Speakable Items) | — | |
 
 ### §3.17 Help (Appendix A)

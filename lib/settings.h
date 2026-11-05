@@ -88,10 +88,17 @@ int pl_caret_blink_ms(void);
  * shows. */
 bool pl_smart_scrolling(void);
 
-/* The Speech control panel's choices: the voice ("speech-voice", a name
- * `spd-say -L` lists; empty for the default) and rate ("speech-rate",
- * -100..100). pl_speech_args fills argv with spd-say and them, ready for
- * the text: returns the count (at most 7), the strings in buf. */
+/* The Speech control panel's choices: which list speaks ("speech-kind",
+ * "modern" for the Modern list, "neural" for the Neural one, anything else
+ * for Classic), the voice in each list ("speech-voice-classic",
+ * "speech-voice-modern" and "speech-voice-neural", names `spd-say -L`
+ * lists; empty for the default) and rate ("speech-rate", -100..100).
+ * "speech-voice" is the previous single voice, kept as the Classic
+ * fallback. pl_speech_args fills argv with spd-say and them, ready for the
+ * text: returns the count (at most 9), the strings in buf. The Neural list
+ * speaks through the panel's own "piper" output module (-o). */
+bool pl_speech_modern(void);
+bool pl_speech_neural(void);
 int pl_speech_rate(void);
 int pl_speech_args(const char **argv, char *buf, size_t size);
 /* Says `text` in the background (speech-dispatcher's spd-say); nothing if

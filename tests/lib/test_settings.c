@@ -75,6 +75,28 @@ int main(void) {
 	check(n == 6 && strcmp(argv[1], "-y") == 0 && strcmp(argv[2], "en-gb") == 0 &&
 		strcmp(argv[3], "-r") == 0 && strcmp(argv[4], "100") == 0 && strcmp(argv[5], "--") == 0,
 		"a chosen voice and rate (kept within -100..100)");
+	check(!pl_speech_modern(), "Classic speech by default");
+	pl_setting_set("speech-voice-classic", "en-gb-x-rp");
+	n = pl_speech_args(argv, buf, sizeof(buf));
+	check(n == 6 && strcmp(argv[2], "en-gb-x-rp") == 0,
+		"the Classic key wins over the previous single voice");
+	pl_setting_set("speech-kind", "modern");
+	pl_setting_set("speech-voice-modern", "slt");
+	n = pl_speech_args(argv, buf, sizeof(buf));
+	check(pl_speech_modern() && n == 6 && strcmp(argv[2], "slt") == 0,
+		"the Modern list speaks its own voice when chosen");
+	pl_setting_set("speech-kind", NULL);
+	n = pl_speech_args(argv, buf, sizeof(buf));
+	check(!pl_speech_modern() && strcmp(argv[2], "en-gb-x-rp") == 0,
+		"back to Classic afterwards");
+	check(!pl_speech_neural(), "not Neural by default");
+	pl_setting_set("speech-kind", "neural");
+	pl_setting_set("speech-voice-neural", "en_US-amy-medium");
+	n = pl_speech_args(argv, buf, sizeof(buf));
+	check(pl_speech_neural() && n == 8 && strcmp(argv[1], "-o") == 0 &&
+		strcmp(argv[2], "piper") == 0 && strcmp(argv[3], "-y") == 0 &&
+		strcmp(argv[4], "en_US-amy-medium") == 0 && strcmp(argv[7], "--") == 0,
+		"the Neural list speaks through the piper module");
 	check(!pl_talking_alerts(), "Talking Alerts are off by default");
 	pl_setting_set("talking-alerts", "true");
 	check(pl_talking_alerts(), "and on when chosen");

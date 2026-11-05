@@ -188,6 +188,7 @@ controlpanel_exe = executable('zacos9-controlpanel',
   'mouse.cpp', 'trackpad.cpp', 'tablet.cpp', 'keyboard.cpp', 'sound.cpp',
   'monitors.cpp', 'energysaver.cpp', 'screensaver.cpp', 'zacmenu.cpp',
   'general.cpp', 'internet.cpp', 'accessibility.cpp', 'locale.cpp', 'speech.cpp',
+  'speechpiper.cpp',
   'soundclient.cpp',
   users_sources,
   xkb_layouts_sources, default_apps_sources, startup_disk_sources, memory_sources,
@@ -233,6 +234,14 @@ test('keyboard-layout-list',
     include_directories: [xkb_layouts_include],
     dependencies: [platinum_dep, qt6, xkbcommon_client],
   ),
+)
+
+# The Neural list's downloads and speech-dispatcher text, with a fake home.
+test('piper-panel',
+  executable('test-piper-panel', '../../tests/panels/test_piper.cpp', 'speechpiper.cpp',
+    dependencies: [platinum_dep, qt6],
+  ),
+  env: ['QT_QPA_PLATFORM=offscreen'], timeout: 30,
 )
 
 test('sound-output',
