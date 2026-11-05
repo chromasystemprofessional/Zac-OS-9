@@ -175,6 +175,7 @@
 {prefix}/share/locale/es/LC_MESSAGES/zacos9.mo
 {prefix}/share/locale/it/LC_MESSAGES/zacos9.mo
 {prefix}/share/locale/ja/LC_MESSAGES/zacos9.mo
+{prefix}/share/locale/pt/LC_MESSAGES/zacos9.mo
 {prefix}/share/locale/ru/LC_MESSAGES/zacos9.mo
 {prefix}/share/plymouth/themes/zacos9/parade.png
 {prefix}/share/plymouth/themes/zacos9/pattern.png

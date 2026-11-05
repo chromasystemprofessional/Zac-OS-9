@@ -120,6 +120,16 @@ def main():
         if result.stdout.splitlines() != ["Ratón", "Velocidad del doble clic"]:
             sys.exit(f"test_i18n: Spanish catalog gave {result.stdout!r}")
 
+        # Brazilian Portuguese, installed as "pt".
+        portuguese = tmp / "locale-pt" / "pt" / "LC_MESSAGES" / "zacos9.mo"
+        portuguese.parent.mkdir(parents=True)
+        run(["msgfmt", "--check", "-o", str(portuguese), str(ROOT / "po" / "pt.po")])
+        env["LANGUAGE"] = "pt"
+        env["ZACOS9_LOCALEDIR"] = str(tmp / "locale-pt")
+        result = run([str(BINARY)], env=env)
+        if result.stdout.splitlines() != ["Mouse", "Velocidade do clique duplo"]:
+            sys.exit(f"test_i18n: Portuguese catalog gave {result.stdout!r}")
+
 
 if __name__ == "__main__":
     main()
