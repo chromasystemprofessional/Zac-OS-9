@@ -187,6 +187,9 @@ void InstallerWindow::chooseLanguage() {
 	 * set, so the Welcome screen and everything after it are translated. */
 	QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
 	env.insert("LANGUAGE", language);
+	/* The installer's own numbers and dates, and gettext's fallback when a
+	 * regional catalog is missing, should follow the chosen locale too. */
+	env.insert("LANG", m_locale);
 	QProcess child;
 	child.setProcessEnvironment(env);
 	if (!child.startDetached(QCoreApplication::applicationFilePath(),
