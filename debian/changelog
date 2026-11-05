@@ -1,3 +1,12 @@
+zacos9 (1.9.2) trixie; urgency=medium
+
+  * The Theme Installer no longer appears in the application catalog or the
+    Zac menu. Themes install only by dropping the theme file into System
+    Folder > Appearance > Theme Files; existing profiles have the old menu
+    alias removed once.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Thu, 05 Nov 2026 13:09:32 -0500
+
 zacos9 (1.9.1) trixie; urgency=medium
 
   * Spanish now draws its inverted question and exclamation marks (¿ and
