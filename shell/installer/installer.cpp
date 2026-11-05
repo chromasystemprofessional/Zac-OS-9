@@ -172,10 +172,12 @@ void InstallerWindow::chooseLanguage() {
 		return;
 	}
 	m_locale = m_localeCodes[row];
-	QString language = m_locale.section('.', 0, 0).section('_', 0, 0);
-	QString current = QString::fromUtf8(qgetenv("LANGUAGE")).section(':', 0, 0);
+	/* Keep the region for regional catalogs (fr_CA, fr_FR); gettext falls
+	 * back to fr when a region has no catalog. */
+	QString language = m_locale.section('.', 0, 0);
+	QString current = QString::fromUtf8(qgetenv("LANGUAGE")).section(':', 0, 0).section('.', 0, 0);
 	if (current.isEmpty()) {
-		current = QString::fromUtf8(qgetenv("LANG")).section('.', 0, 0).section('_', 0, 0);
+		current = QString::fromUtf8(qgetenv("LANG")).section('.', 0, 0);
 	}
 	if (language == current) {
 		showWelcome();
