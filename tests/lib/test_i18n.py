@@ -110,6 +110,16 @@ def main():
         if result.stdout.splitlines() != ["Мышь", "Скорость двойного щелчка"]:
             sys.exit(f"test_i18n: Russian catalog gave {result.stdout!r}")
 
+        # Spanish: the same first slice, with its accents.
+        spanish = tmp / "locale-es" / "es" / "LC_MESSAGES" / "zacos9.mo"
+        spanish.parent.mkdir(parents=True)
+        run(["msgfmt", "--check", "-o", str(spanish), str(ROOT / "po" / "es.po")])
+        env["LANGUAGE"] = "es"
+        env["ZACOS9_LOCALEDIR"] = str(tmp / "locale-es")
+        result = run([str(BINARY)], env=env)
+        if result.stdout.splitlines() != ["Ratón", "Velocidad del doble clic"]:
+            sys.exit(f"test_i18n: Spanish catalog gave {result.stdout!r}")
+
 
 if __name__ == "__main__":
     main()

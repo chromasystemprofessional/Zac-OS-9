@@ -1,10 +1,12 @@
 [Desktop Entry]
 Type=Application
 Name=Mouse
+Name[es]=Ratón
 Name[ru]=Мышь
 Name[ja]=マウス
 Name[it]=Mouse
 Comment=Mouse tracking and double-click speed
+Comment[es]=Seguimiento del ratón y velocidad del doble clic
 Comment[ru]=Отслеживание мыши и скорость двойного щелчка
 Comment[ja]=マウスの追跡とダブルクリックの速さ
 Exec=zacos9-controlpanel mouse

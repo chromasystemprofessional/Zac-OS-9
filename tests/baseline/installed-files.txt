@@ -172,6 +172,7 @@
 {prefix}/share/fonts/truetype/zacos9/ZacOS9Views-Italic.ttf
 {prefix}/share/fonts/truetype/zacos9/ZacOS9Views-Regular.ttf
 {prefix}/share/icons/ZacOS9
+{prefix}/share/locale/es/LC_MESSAGES/zacos9.mo
 {prefix}/share/locale/it/LC_MESSAGES/zacos9.mo
 {prefix}/share/locale/ja/LC_MESSAGES/zacos9.mo
 {prefix}/share/locale/ru/LC_MESSAGES/zacos9.mo
