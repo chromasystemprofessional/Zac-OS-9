@@ -1,6 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=Software
+Name[es]=Software
 Name[ru]=Программы
 Comment=Install and remove applications
 Exec=zacos9-store

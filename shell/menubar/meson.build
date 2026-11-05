@@ -43,6 +43,12 @@ test('menu-hints-ru', find_program('python3'),
     meson.project_source_root(), hints_test],
   timeout: 60,
 )
+# And in Spanish.
+test('menu-hints-es', find_program('python3'),
+  args: [files('../../tests/menubar/test_hints_es.py'),
+    meson.project_source_root(), hints_test],
+  timeout: 60,
+)
 
 # The Zac menu's recent items (menubar/recent.c).
 test('menu-recent',

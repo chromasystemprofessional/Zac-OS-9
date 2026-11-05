@@ -1,6 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=Network
+Name[es]=Red
 Name[ru]=Сеть
 Name[it]=Rete
 Comment=Network status

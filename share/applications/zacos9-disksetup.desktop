@@ -1,6 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=Disk Setup
+Name[es]=Configuración de disco
 Name[ru]=Настройка диска
 Name[it]=Setup disco
 Comment=Verify and repair disks, see their health, and partition and erase drives

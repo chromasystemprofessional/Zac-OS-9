@@ -79,11 +79,11 @@ dialogs; all 20 help pages are under `share/zacos9/help/ru/`. Cyrillic uses
 the existing DejaVu Sans fallback and needs no input method; a native
 speaker's review is next ([Languages](docs/i18n.md)).
 
-**Spanish (first slice)**: `po/es.po` translates the Mouse panel, every
-control panel's name and title, and the standard alert buttons; the Spanish
+**Spanish**: `po/es.po` is complete at 817 strings, including the Finder,
+menu bar, application names, installer and Setup Assistant. The Spanish
 glyphs render through the bitmap face and the DejaVu fallback for `¿` and
-`¡`. A native speaker's review and the rest of the catalog are next
-([Languages](docs/i18n.md)).
+`¡`; the 20 help pages are still English. A native speaker's review and the
+help book are next ([Languages](docs/i18n.md)).
 
 **Making the project easier to work on**: ten of the eleven phases are done,
 each its own pull request, and released as 1.1.0. Phase 7's four starter tasks

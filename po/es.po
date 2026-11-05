@@ -1,7 +1,7 @@
 # Spanish translation of ZacOS 9.
-# A first slice: the Mouse control panel, every control panel's name and
-# title, and the standard alert buttons, so the Spanish layout and the
-# accented glyphs can be judged before the rest is translated.
+# Complete: the Finder, control panels, menu bar and Hint Bubbles, application
+# names, installer and Setup Assistant. The help book is still English and is
+# content under share/zacos9/help/.
 # Needs a native speaker's review before it is advertised as complete.
 #
 # This file is distributed under the same license as the zacos9 package.
@@ -23,11 +23,11 @@ msgstr ""
 
 #: shell/appinstall/appinstall.cpp:179 shell/installer/installer.cpp:263
 msgid "Install"
-msgstr ""
+msgstr "Instalar"
 
 #: shell/appinstall/main.cpp:16 shell/installer/main.cpp:19
 msgid "Installer"
-msgstr ""
+msgstr "Instalador"
 
 #: shell/barkrecorder/barkrecorder.cpp:17
 #: shell/barkrecorder/barkrecorder.cpp:188
@@ -36,106 +36,106 @@ msgstr ""
 #: shell/barkrecorder/barkrecorder.cpp:217 shell/barkrecorder/main.cpp:12
 #: shell/menubar/hints.c:74
 msgid "Bark Recorder"
-msgstr ""
+msgstr "Grabadora"
 
 #: shell/barkrecorder/barkrecorder.cpp:21
 msgid "Choose Record to make a sound recording."
-msgstr ""
+msgstr "Elige Grabar para crear una grabación de sonido."
 
 #: shell/barkrecorder/barkrecorder.cpp:25
 msgid "Record…"
-msgstr ""
+msgstr "Grabar…"
 
 #: shell/barkrecorder/barkrecorder.cpp:27 shell/finder/resourcewindows.cpp:69
 #: shell/finder/resourcewindows.cpp:429 shell/finder/transferdialog.cpp:89
 msgid "Stop"
-msgstr ""
+msgstr "Detener"
 
 #: shell/barkrecorder/barkrecorder.cpp:30
 msgid "Play"
-msgstr ""
+msgstr "Reproducir"
 
 #: shell/barkrecorder/barkrecorder.cpp:33
 msgid "Open…"
-msgstr ""
+msgstr "Abrir…"
 
 #: shell/barkrecorder/barkrecorder.cpp:53
 msgid "Recording to %1…"
-msgstr ""
+msgstr "Grabando en %1…"
 
 #: shell/barkrecorder/barkrecorder.cpp:78
 msgid "Recording saved to %1."
-msgstr ""
+msgstr "Grabación guardada en %1."
 
 #: shell/barkrecorder/barkrecorder.cpp:89
 msgid "Playing %1…"
-msgstr ""
+msgstr "Reproduciendo %1…"
 
 #: shell/barkrecorder/barkrecorder.cpp:115
 msgid "Playback stopped."
-msgstr ""
+msgstr "Reproducción detenida."
 
 #: shell/barkrecorder/barkrecorder.cpp:117
 msgid "Ready. Recording: %1"
-msgstr ""
+msgstr "Listo. Grabación: %1"
 
 #: shell/barkrecorder/barkrecorder.cpp:136
 msgid "Starting recording…"
-msgstr ""
+msgstr "Iniciando la grabación…"
 
 #: shell/barkrecorder/barkrecorder.cpp:162
 msgid "Starting playback…"
-msgstr ""
+msgstr "Iniciando la reproducción…"
 
 #: shell/barkrecorder/barkrecorder.cpp:185
 msgid "Record a Sound"
-msgstr ""
+msgstr "Grabar un sonido"
 
 #: shell/barkrecorder/barkrecorder.cpp:186
 #: shell/barkrecorder/barkrecorder.cpp:196
 msgid "WAVE audio (*.wav)"
-msgstr ""
+msgstr "Audio WAVE (*.wav)"
 
 #: shell/barkrecorder/barkrecorder.cpp:189
 msgid "Choose a .wav file, and stop playback before recording."
-msgstr ""
+msgstr "Elige un archivo .wav y detén la reproducción antes de grabar."
 
 #: shell/barkrecorder/barkrecorder.cpp:194
 msgid "Open a Sound Recording"
-msgstr ""
+msgstr "Abrir una grabación de sonido"
 
 #: shell/barkrecorder/barkrecorder.cpp:199
 msgid "Choose a readable .wav file, and stop recording before playback."
-msgstr ""
+msgstr "Elige un archivo .wav legible y detén la grabación antes de reproducir."
 
 #: shell/barkrecorder/barkrecorder.cpp:206
 msgid "The audio command exited with status %1."
-msgstr ""
+msgstr "El comando de audio terminó con estado %1."
 
 #: shell/barkrecorder/barkrecorder.cpp:208
 msgid "start recording"
-msgstr ""
+msgstr "iniciar la grabación"
 
 #: shell/barkrecorder/barkrecorder.cpp:209
 msgid "finish recording"
-msgstr ""
+msgstr "terminar la grabación"
 
 #: shell/barkrecorder/barkrecorder.cpp:210
 msgid "play recording"
-msgstr ""
+msgstr "reproducir la grabación"
 
 #: shell/barkrecorder/barkrecorder.cpp:211
 msgid "Could not %1. %2%3"
-msgstr ""
+msgstr "No se pudo %1. %2%3"
 
 #: shell/barkrecorder/barkrecorder.cpp:218
 msgid "Stop the recording and close Bark Recorder?"
-msgstr ""
+msgstr "¿Detener la grabación y cerrar Grabadora?"
 
 #: shell/calculator/main.cpp:47 shell/calculator/main.cpp:155
 #: shell/menubar/hints.c:75
 msgid "Calculator"
-msgstr ""
+msgstr "Calculadora"
 
 #: shell/common/alert.cpp:24 shell/finder/viewoptionsdialog.cpp:249
 msgid "OK"
@@ -168,857 +168,857 @@ msgstr "Salir"
 
 #: shell/disksetup/main.cpp:80 shell/disksetup/main.cpp:1027
 msgid "Disk Setup"
-msgstr ""
+msgstr "Configuración de disco"
 
 #: shell/disksetup/plan.cpp:156
 msgid "ZacOS (ext4)"
-msgstr ""
+msgstr "ZacOS (ext4)"
 
 #: shell/disksetup/plan.cpp:156
 msgid "Haiku (BFS)"
-msgstr ""
+msgstr "Haiku (BFS)"
 
 #: shell/disksetup/plan.cpp:157
 msgid "Mac OS Extended"
-msgstr ""
+msgstr "Mac OS Extended"
 
 #: shell/disksetup/plan.cpp:158
 msgid "unformatted"
-msgstr ""
+msgstr "sin formatear"
 
 #: shell/disksetup/plan.cpp:162 shell/installer/installer.cpp:57
 #: shell/installer/installer.cpp:460 shell/installer/installer.cpp:760
 msgid "“%1”"
-msgstr ""
+msgstr "«%1»"
 
 #: shell/disksetup/plan.cpp:162
 msgid "the EFI System partition"
-msgstr ""
+msgstr "la partición del sistema EFI"
 
 #: shell/disksetup/plan.cpp:163
 msgid "the BIOS boot partition"
-msgstr ""
+msgstr "la partición de arranque BIOS"
 
 #: shell/disksetup/plan.cpp:164
 msgid "the new partition"
-msgstr ""
+msgstr "la nueva partición"
 
 #: shell/disksetup/plan.cpp:171
 msgid "Erase %1 and give it a new %2 partition table"
-msgstr ""
+msgstr "Borrar %1 y crear una tabla de particiones %2 nueva"
 
 #: shell/disksetup/plan.cpp:173
 msgid "Delete %1 (%2)"
-msgstr ""
+msgstr "Eliminar %1 (%2)"
 
 #: shell/disksetup/plan.cpp:176
 msgid "Make a %1 BIOS boot partition, for starting up with GRUB"
-msgstr ""
+msgstr "Crear una partición de arranque BIOS de %1 para arrancar con GRUB"
 
 #: shell/disksetup/plan.cpp:179
 msgid "Make a %1 EFI System partition, for starting up"
-msgstr ""
+msgstr "Crear una partición del sistema EFI de %1 para arrancar"
 
 #: shell/disksetup/plan.cpp:181
 msgid "Make a %1 %2 partition%3"
-msgstr ""
+msgstr "Crear una partición %2 de %1%3"
 
 #: shell/disksetup/plan.cpp:182
 msgid " named “%1”"
-msgstr ""
+msgstr " llamada «%1»"
 
 #: shell/disksetup/plan.cpp:184
 msgid "Erase %1 as %2%3"
-msgstr ""
+msgstr "Borrar %1 como %2%3"
 
 #: shell/disksetup/plan.cpp:185
 msgid ", named “%1”"
-msgstr ""
+msgstr ", llamada «%1»"
 
 #: shell/disksetup/plan.cpp:187
 msgid "Resize %1 to %2"
-msgstr ""
+msgstr "Cambiar el tamaño de %1 a %2"
 
 #: shell/disksetup/plan.cpp:203
 msgid "ZacOS is running from this drive, so it can't be changed."
-msgstr ""
+msgstr "ZacOS se ejecuta desde este disco, así que no se puede cambiar."
 
 #: shell/disksetup/plan.cpp:209
 msgid "The running system is on this drive, so it can't be erased."
-msgstr ""
+msgstr "El sistema en ejecución está en este disco, así que no se puede borrar."
 
 #: shell/disksetup/plan.cpp:213 shell/disksetup/plan.cpp:227
 msgid "%1 is in use. Eject it first."
-msgstr ""
+msgstr "%1 está en uso. Expúlsalo primero."
 
 #: shell/disksetup/plan.cpp:216
 msgid "Choose GPT or MBR."
-msgstr ""
+msgstr "Elige GPT o MBR."
 
 #: shell/disksetup/plan.cpp:221
 msgid "Choose a partition."
-msgstr ""
+msgstr "Elige una partición."
 
 #: shell/disksetup/plan.cpp:224
 msgid "Apply the changes so far first."
-msgstr ""
+msgstr "Aplica primero los cambios ya hechos."
 
 #: shell/disksetup/plan.cpp:230
 msgid ""
 "The running system starts up from the EFI System partition, so it can't be "
 "deleted or erased."
-msgstr ""
+msgstr "El sistema en ejecución arranca desde la partición del sistema EFI, así que no se puede eliminar ni borrar."
 
 #: shell/disksetup/plan.cpp:233 shell/disksetup/plan.cpp:255
 msgid "Choose a format."
-msgstr ""
+msgstr "Elige un formato."
 
 #: shell/disksetup/plan.cpp:237
 msgid "%1 can't be resized: only ZacOS (ext4) and NTFS partitions can."
-msgstr ""
+msgstr "No se puede cambiar el tamaño de %1: solo las particiones ZacOS (ext4) y NTFS."
 
 #: shell/disksetup/plan.cpp:242
 msgid "Choose a size between 16 MB and %1."
-msgstr ""
+msgstr "Elige un tamaño entre 16 MB y %1."
 
 #: shell/disksetup/plan.cpp:245
 msgid "%1 can't be made smaller than %2: its files need that much."
-msgstr ""
+msgstr "%1 no se puede reducir por debajo de %2: sus archivos necesitan ese espacio."
 
 #: shell/disksetup/plan.cpp:252
 msgid "Give the drive a partition table first."
-msgstr ""
+msgstr "Primero asigna una tabla de particiones al disco."
 
 #: shell/disksetup/plan.cpp:259
 msgid "That kind of partition can't go on this drive."
-msgstr ""
+msgstr "Ese tipo de partición no puede ir en este disco."
 
 #: shell/disksetup/plan.cpp:262
 msgid "An MBR drive holds four partitions at most."
-msgstr ""
+msgstr "Un disco MBR admite como máximo cuatro particiones."
 
 #: shell/disksetup/plan.cpp:269
 msgid "There isn't room for that partition there."
-msgstr ""
+msgstr "No hay espacio para esa partición ahí."
 
 #: shell/finder/desktop.cpp:118 shell/finder/viewoptionsdialog.cpp:438
 msgid "Trash"
-msgstr ""
+msgstr "Papelera"
 
 #: shell/finder/diskinit.cpp:453
 msgid ""
 "The disk has been initialized as FAT32 with the name you entered. It will "
 "appear on the desktop when mounted."
-msgstr ""
+msgstr "El disco se ha inicializado como FAT32 con el nombre introducido. Aparecerá en el escritorio cuando se monte."
 
 #: shell/finder/diskinit.cpp:474
 msgid ""
 "Select a mounted USB disk to erase. Internal and system disks cannot be "
 "erased here."
-msgstr ""
+msgstr "Selecciona un disco USB montado para borrarlo. Los discos internos y del sistema no se pueden borrar aquí."
 
 #: shell/finder/fileops.cpp:88
 msgid ""
 "The font files changed, but the font cache could not be updated for %1. %2"
-msgstr ""
+msgstr "Los archivos de fuentes cambiaron, pero no se pudo actualizar la caché de fuentes para %1. %2"
 
 #: shell/finder/fileops.cpp:98
 msgid "The font files changed, but fc-cache could not be started."
-msgstr ""
+msgstr "Los archivos de fuentes cambiaron, pero no se pudo iniciar fc-cache."
 
 #: shell/finder/fileops.cpp:113
 msgid ""
 "This font cannot be removed: %1. Only your own installed fonts can be moved "
 "out or put in Trash. Option-drag to export a copy instead."
-msgstr ""
+msgstr "No se puede quitar esta fuente: %1. Solo las fuentes que instalaste tú pueden moverse fuera o a la Papelera. Arrastra con Opción para exportar una copia."
 
 #: shell/finder/fileops.cpp:127
 msgid ""
 "Moving a font collection removes every font face in that file. Continue?"
-msgstr ""
+msgstr "Mover una colección de fuentes elimina todos los estilos de ese archivo. ¿Continuar?"
 
 #: shell/finder/fileops.cpp:150
 msgid "The font could not be moved to Trash: %1"
-msgstr ""
+msgstr "No se pudo mover la fuente a la Papelera: %1"
 
 #: shell/finder/fileops.cpp:323 shell/finder/fileops.cpp:351
 msgid ""
 "The alias cannot be made because its original or destination is unavailable."
-msgstr ""
+msgstr "No se puede crear el alias porque el original o el destino no están disponibles."
 
 #: shell/finder/fileops.cpp:334 shell/finder/fileops.cpp:362
 msgid "The alias could not be created in %1. Check folder permissions."
-msgstr ""
+msgstr "No se pudo crear el alias en %1. Comprueba los permisos de la carpeta."
 
 #: shell/finder/fileops.cpp:340
 msgid ""
 "The alias was not created because its identity record could not be saved."
-msgstr ""
+msgstr "El alias no se creó porque no se pudo guardar su registro de identidad."
 
 #: shell/finder/fileops.cpp:392
 msgid "Another file transfer is in progress. Finish or stop it first."
-msgstr ""
+msgstr "Ya hay otra transferencia de archivos en curso. Termínala o detenla primero."
 
 #: shell/finder/fileops.cpp:403
 msgid "The destination folder is unavailable. Nothing was transferred."
-msgstr ""
+msgstr "La carpeta de destino no está disponible. No se transfirió nada."
 
 #: shell/finder/fileops.cpp:417
 msgid ""
 "Queued applications cannot be copied or moved as files. Use Put Away or drag "
 "back to Applications to cancel removal."
-msgstr ""
+msgstr "Las aplicaciones en cola no se pueden copiar ni mover como archivos. Usa Retirar o arrástralas de vuelta a Aplicaciones para cancelar la eliminación."
 
 #: shell/finder/fileops.cpp:427
 msgid "A folder cannot be transferred into itself, including through an alias."
-msgstr ""
+msgstr "Una carpeta no se puede transferir dentro de sí misma, ni siquiera mediante un alias."
 
 #: shell/finder/fileops.cpp:441
 msgid "“%1” already exists in the destination and was not replaced."
-msgstr ""
+msgstr "«%1» ya existe en el destino y no se reemplazó."
 
 #: shell/finder/fileops.cpp:459
 msgid ""
 "More than one selected item has the same destination name: “%1”. The "
 "duplicate was not transferred."
-msgstr ""
+msgstr "Más de un elemento seleccionado tiene el mismo nombre de destino: «%1». El duplicado no se transfirió."
 
 #: shell/finder/fileops.cpp:468
 msgid ""
 "The resource fork for “%1” cannot be transferred safely; the file has not "
 "been moved."
-msgstr ""
+msgstr "La rama de recursos de «%1» no se puede transferir de forma segura; el archivo no se ha movido."
 
 #: shell/finder/fileops.cpp:846
 msgid ""
 "“%1” stays in the Applications folder. To remove an application, select it "
 "and choose Move To Trash."
-msgstr ""
+msgstr "«%1» permanece en la carpeta Aplicaciones. Para eliminar una aplicación, selecciónala y elige Mover a la Papelera."
 
 #: shell/finder/fileops.cpp:849
 msgid "To stop “%1” opening at login, drag it to the Trash."
-msgstr ""
+msgstr "Para evitar que «%1» se abra al iniciar sesión, arrástralo a la Papelera."
 
 #: shell/finder/fileops.cpp:852
 msgid "“%1” is part of this computer and can't be moved out of its window."
-msgstr ""
+msgstr "«%1» forma parte de este ordenador y no se puede mover fuera de su ventana."
 
 #: shell/finder/fileops.cpp:951
 msgid "“%1” isn't an application. Only applications can be startup items."
-msgstr ""
+msgstr "«%1» no es una aplicación. Solo las aplicaciones pueden ser elementos de inicio."
 
 #: shell/finder/fileops.cpp:979
 msgid "The dragged control panel information is invalid."
-msgstr ""
+msgstr "La información del panel de control arrastrado no es válida."
 
 #: shell/finder/fileops.cpp:1018
 msgid "The dragged module information is invalid."
-msgstr ""
+msgstr "La información del módulo arrastrado no es válida."
 
 #: shell/finder/fileops.cpp:1087
 msgid "The dragged extension information is invalid."
-msgstr ""
+msgstr "La información de la extensión arrastrada no es válida."
 
 #: shell/finder/fileops.cpp:1103
 msgid "That is not an extension the Extensions Manager knows."
-msgstr ""
+msgstr "El Gestor de extensiones no conoce esa extensión."
 
 #: shell/finder/fileops.cpp:1207
 msgid "The clipping couldn't be made. %1"
-msgstr ""
+msgstr "No se pudo crear el recorte. %1"
 
 #: shell/finder/fileops.cpp:1231
 msgid "The dragged font information is invalid."
-msgstr ""
+msgstr "La información de la fuente arrastrada no es válida."
 
 #: shell/finder/fileops.cpp:1342
 msgid "The dragged application information is invalid."
-msgstr ""
+msgstr "La información de la aplicación arrastrada no es válida."
 
 #: shell/finder/fileops.cpp:1349
 msgid "The dragged application is no longer available."
-msgstr ""
+msgstr "La aplicación arrastrada ya no está disponible."
 
 #: shell/finder/fileops.cpp:1382
 msgid ""
 "This drag source does not support aliases. Use File > Make Alias instead."
-msgstr ""
+msgstr "Este origen de arrastre no admite alias. Usa Archivo > Crear alias."
 
 #: shell/finder/fileops.cpp:1393
 msgid "Aliases must be placed in a real folder or on the Desktop."
-msgstr ""
+msgstr "Los alias deben colocarse en una carpeta real o en el escritorio."
 
 #: shell/finder/fileops.cpp:1401 shell/finder/fileops.cpp:1413
 msgid "The dragged alias information is invalid."
-msgstr ""
+msgstr "La información del alias arrastrado no es válida."
 
 #: shell/finder/fileops.cpp:1487
 msgid "The user Fonts folder could not be created: %1"
-msgstr ""
+msgstr "No se pudo crear la carpeta de fuentes del usuario: %1"
 
 #: shell/finder/fileops.cpp:1585
 msgid ""
 "The other items do not belong in the System Folder itself. Put each where it "
 "belongs, inside one of its folders."
-msgstr ""
+msgstr "Los demás elementos no pertenecen directamente a la Carpeta Sistema. Coloca cada uno donde corresponde, dentro de una de sus carpetas."
 
 #: shell/finder/fileops.cpp:1602
 msgid ""
 "Items in the System Folder belong in one of the folders inside it (such as "
 "Appearance, Extensions or Fonts)."
-msgstr ""
+msgstr "Los elementos de la Carpeta Sistema deben ir en una de las carpetas que contiene (como Apariencia, Extensiones o Fuentes)."
 
 #: shell/finder/findcriteria.cpp:77
 msgid "Nothing to look for."
-msgstr ""
+msgstr "No hay nada que buscar."
 
 #: shell/finder/findcriteria.cpp:84
 msgid "Type what to look for."
-msgstr ""
+msgstr "Escribe lo que quieres buscar."
 
 #: shell/finder/findcriteria.cpp:87
 msgid "Type the date as year-month-day, such as 2026-10-14."
-msgstr ""
+msgstr "Escribe la fecha como año-mes-día, por ejemplo 2026-10-14."
 
 #: shell/finder/findcriteria.cpp:92
 msgid "Type the size as a number of K."
-msgstr ""
+msgstr "Escribe el tamaño como número de K."
 
 #: shell/finder/findcriteria.cpp:96
 msgid "The folder to look in isn't there any more."
-msgstr ""
+msgstr "La carpeta donde buscar ya no existe."
 
 #: shell/finder/findcriteria.cpp:110
 msgid " “%1”"
-msgstr ""
+msgstr " «%1»"
 
 #: shell/finder/findcriteria.cpp:117
 msgid " and "
-msgstr ""
+msgstr " y "
 
 #: shell/finder/findcriteria.cpp:146
 msgid "contains"
-msgstr ""
+msgstr "contiene"
 
 #: shell/finder/findcriteria.cpp:147
 msgid "starts with"
-msgstr ""
+msgstr "empieza por"
 
 #: shell/finder/findcriteria.cpp:148
 msgid "ends with"
-msgstr ""
+msgstr "termina en"
 
 #: shell/finder/findcriteria.cpp:149
 msgid "is"
-msgstr ""
+msgstr "es"
 
 #: shell/finder/findcriteria.cpp:150
 msgid "is not"
-msgstr ""
+msgstr "no es"
 
 #: shell/finder/findcriteria.cpp:151
 msgid "doesn't contain"
-msgstr ""
+msgstr "no contiene"
 
 #: shell/finder/findcriteria.cpp:152
 msgid "is today"
-msgstr ""
+msgstr "es hoy"
 
 #: shell/finder/findcriteria.cpp:153
 msgid "is within the past week"
-msgstr ""
+msgstr "es de la última semana"
 
 #: shell/finder/findcriteria.cpp:154
 msgid "is within the past month"
-msgstr ""
+msgstr "es del último mes"
 
 #: shell/finder/findcriteria.cpp:155
 msgid "is before"
-msgstr ""
+msgstr "es anterior a"
 
 #: shell/finder/findcriteria.cpp:156
 msgid "is after"
-msgstr ""
+msgstr "es posterior a"
 
 #: shell/finder/findcriteria.cpp:157
 msgid "is larger than"
-msgstr ""
+msgstr "es mayor que"
 
 #: shell/finder/findcriteria.cpp:158
 msgid "is smaller than"
-msgstr ""
+msgstr "es menor que"
 
 #: shell/finder/findcriteria.cpp:159
 msgid "is locked"
-msgstr ""
+msgstr "está bloqueado"
 
 #: shell/finder/findcriteria.cpp:160
 msgid "is unlocked"
-msgstr ""
+msgstr "está desbloqueado"
 
 #: shell/finder/findcriteria.cpp:161
 msgid "is empty"
-msgstr ""
+msgstr "está vacía"
 
 #: shell/finder/findcriteria.cpp:162
 msgid "is shared"
-msgstr ""
+msgstr "es compartida"
 
 #: shell/finder/findcriteria.cpp:163
 msgid "include"
-msgstr ""
+msgstr "incluyen"
 
 #: shell/finder/findcriteria.cpp:170
 msgid "name"
-msgstr ""
+msgstr "nombre"
 
 #: shell/finder/findcriteria.cpp:171
 msgid "contents"
-msgstr ""
+msgstr "contenido"
 
 #: shell/finder/findcriteria.cpp:172
 msgid "date modified"
-msgstr ""
+msgstr "fecha de modificación"
 
 #: shell/finder/findcriteria.cpp:173
 msgid "date created"
-msgstr ""
+msgstr "fecha de creación"
 
 #: shell/finder/findcriteria.cpp:174
 msgid "size"
-msgstr ""
+msgstr "tamaño"
 
 #: shell/finder/findcriteria.cpp:175
 msgid "kind"
-msgstr ""
+msgstr "tipo"
 
 #: shell/finder/findcriteria.cpp:176
 msgid "label"
-msgstr ""
+msgstr "etiqueta"
 
 #: shell/finder/findcriteria.cpp:177
 msgid "lock"
-msgstr ""
+msgstr "bloqueo"
 
 #: shell/finder/findcriteria.cpp:178 shell/finder/findcriteria.cpp:201
 #: shell/finder/infowindow.cpp:251
 msgid "folder"
-msgstr ""
+msgstr "carpeta"
 
 #: shell/finder/findcriteria.cpp:179
 msgid "custom icon"
-msgstr ""
+msgstr "icono personalizado"
 
 #: shell/finder/findcriteria.cpp:180
 msgid "comments"
-msgstr ""
+msgstr "comentarios"
 
 #: shell/finder/findcriteria.cpp:181
 msgid "invisible"
-msgstr ""
+msgstr "invisible"
 
 #: shell/finder/findcriteria.cpp:182
 msgid "version"
-msgstr ""
+msgstr "versión"
 
 #: shell/finder/findcriteria.cpp:201
 msgid "document"
-msgstr ""
+msgstr "documento"
 
 #: shell/finder/findcriteria.cpp:201
 msgid "application"
-msgstr ""
+msgstr "aplicación"
 
 #: shell/finder/findcriteria.cpp:201 shell/finder/infowindow.cpp:261
 msgid "alias"
-msgstr ""
+msgstr "alias"
 
 #: shell/finder/findcriteria.cpp:201
 msgid "picture"
-msgstr ""
+msgstr "imagen"
 
 #: shell/finder/findcriteria.cpp:202
 msgid "music"
-msgstr ""
+msgstr "música"
 
 #: shell/finder/findcriteria.cpp:202
 msgid "movie"
-msgstr ""
+msgstr "película"
 
 #: shell/finder/findcriteria.cpp:202
 msgid "text document"
-msgstr ""
+msgstr "documento de texto"
 
 #: shell/finder/findcriteria.cpp:202
 msgid "clipping"
-msgstr ""
+msgstr "recorte"
 
 #: shell/finder/findcriteria.cpp:203
 msgid "Internet location"
-msgstr ""
+msgstr "ubicación de Internet"
 
 #: shell/finder/findcriteria.cpp:203
 msgid "archive"
-msgstr ""
+msgstr "archivo comprimido"
 
 #: shell/finder/findcriteria.cpp:203
 msgid "disk image"
-msgstr ""
+msgstr "imagen de disco"
 
 #: shell/finder/findcriteria.cpp:398
 msgid "Could not read saved searches: %1"
-msgstr ""
+msgstr "No se pudieron leer las búsquedas guardadas: %1"
 
 #: shell/finder/findcriteria.cpp:406 shell/finder/findcriteria.cpp:442
 msgid "Saved searches are damaged or use an unsupported format."
-msgstr ""
+msgstr "Las búsquedas guardadas están dañadas o usan un formato no compatible."
 
 #: shell/finder/findcriteria.cpp:416
 msgid "Could not create the saved searches folder."
-msgstr ""
+msgstr "No se pudo crear la carpeta de búsquedas guardadas."
 
 #: shell/finder/findcriteria.cpp:421
 msgid "Could not write saved searches: %1"
-msgstr ""
+msgstr "No se pudieron escribir las búsquedas guardadas: %1"
 
 #: shell/finder/findcriteria.cpp:426
 msgid "Could not save Find searches: %1"
-msgstr ""
+msgstr "No se pudieron guardar las búsquedas: %1"
 
 #: shell/finder/findcriteria.cpp:456
 msgid "Enter a saved-search name of 1 to 80 characters."
-msgstr ""
+msgstr "Escribe un nombre de búsqueda guardada de 1 a 80 caracteres."
 
 #: shell/finder/findcriteria.cpp:493
 msgid "No query destination was provided."
-msgstr ""
+msgstr "No se indicó dónde guardar la búsqueda."
 
 #: shell/finder/findcriteria.cpp:547
 msgid "The saved search has invalid criteria: %1"
-msgstr ""
+msgstr "La búsqueda guardada tiene criterios no válidos: %1"
 
 #: shell/finder/findcriteria.cpp:553
 msgid "The saved search could not be found or has invalid criteria."
-msgstr ""
+msgstr "No se encontró la búsqueda guardada o tiene criterios no válidos."
 
 #: shell/finder/finder.cpp:75
 msgid ""
 "The web search could not be opened. Check that a web browser is available."
-msgstr ""
+msgstr "No se pudo abrir la búsqueda web. Comprueba que haya un navegador disponible."
 
 #: shell/finder/finder.cpp:185
 msgid ""
 "The server disk \"%1\" has been disconnected. Connect to the server again to "
 "use it. Unsaved changes may have been lost."
-msgstr ""
+msgstr "El disco del servidor \"%1\" se ha desconectado. Vuelve a conectarte al servidor para usarlo. Es posible que se hayan perdido cambios sin guardar."
 
 #: shell/finder/finder.cpp:190
 msgid "Server Disconnected"
-msgstr ""
+msgstr "Servidor desconectado"
 
 #: shell/finder/finder.cpp:326
 msgid "Force “%1” to quit? Any unsaved changes in it will be lost."
-msgstr ""
+msgstr "¿Forzar la salida de «%1»? Se perderán los cambios sin guardar."
 
 #: shell/finder/finder.cpp:327 shell/menubar/hints.c:20
 #: shell/menubar/launch.c:523
 msgid "Force Quit"
-msgstr ""
+msgstr "Forzar salida"
 
 #: shell/finder/finder.cpp:329
 msgid "“%1” couldn't be forced to quit."
-msgstr ""
+msgstr "No se pudo forzar la salida de «%1»."
 
 #: shell/finder/finder.cpp:337
 msgid "“%1” couldn't be attached to “%2”."
-msgstr ""
+msgstr "No se pudo asociar «%1» a «%2»."
 
 #: shell/finder/finder.cpp:398
 msgid "Log Out was cancelled because a program didn't quit."
-msgstr ""
+msgstr "Se canceló el cierre de sesión porque un programa no se cerró."
 
 #: shell/finder/finder.cpp:412
 msgid "Select one USB disk on the desktop to erase."
-msgstr ""
+msgstr "Selecciona un disco USB del escritorio para borrarlo."
 
 #: shell/finder/finder.cpp:478 shell/finder/finder.cpp:483
 msgid "Search Internet"
-msgstr ""
+msgstr "Buscar en Internet"
 
 #: shell/finder/finder.cpp:479
 msgid "Search the web with:"
-msgstr ""
+msgstr "Buscar en la web con:"
 
 #: shell/finder/finder.cpp:484
 msgid "Search for:"
-msgstr ""
+msgstr "Buscar:"
 
 #: shell/finder/finder.cpp:493
 msgid "Select one document to find items similar to it."
-msgstr ""
+msgstr "Selecciona un documento para buscar elementos similares."
 
 #: shell/finder/finder.cpp:572
 msgid ""
 "New folders can't be made here. Home, and the folders inside it, hold your "
 "own files."
-msgstr ""
+msgstr "Aquí no se pueden crear carpetas nuevas. La carpeta de inicio y las que contiene guardan tus archivos."
 
 #: shell/finder/finder.cpp:578
 msgid "untitled folder"
-msgstr ""
+msgstr "carpeta sin título"
 
 #: shell/finder/finder.cpp:584
 msgid "The folder could not be created in %1. Check folder permissions."
-msgstr ""
+msgstr "No se pudo crear la carpeta en %1. Comprueba los permisos de la carpeta."
 
 #: shell/finder/finder.cpp:600
 msgid "“%1” could not be opened. Its original is gone."
-msgstr ""
+msgstr "No se pudo abrir «%1». Su original ya no existe."
 
 #: shell/finder/finder.cpp:621
 msgid "“%1” could not be opened. Its application may have been removed."
-msgstr ""
+msgstr "No se pudo abrir «%1». Es posible que su aplicación se haya eliminado."
 
 #: shell/finder/finder.cpp:634
 msgid ""
 "This application is queued for uninstall when Trash is emptied. Choose Put "
 "Away to cancel removal and return it to Applications."
-msgstr ""
+msgstr "Esta aplicación se desinstalará al vaciar la Papelera. Elige Retirar para cancelar la eliminación y devolverla a Aplicaciones."
 
 #: shell/finder/finder.cpp:663
 msgid "Restart the Sniffer?"
-msgstr ""
+msgstr "¿Reiniciar Sniffer?"
 
 #: shell/finder/finder.cpp:663 shell/greeter/main.cpp:144
 #: shell/installer/installer.cpp:557 shell/installer/installer.cpp:558
 #: shell/menubar/hints.c:68 shell/menubar/menus.c:232
 msgid "Restart"
-msgstr ""
+msgstr "Reiniciar"
 
 #: shell/finder/finder.cpp:786
 msgid "The disk image could not be mounted. %1"
-msgstr ""
+msgstr "No se pudo montar la imagen de disco. %1"
 
 #: shell/finder/finder.cpp:801
 msgid "“%1” couldn't be mounted. %2"
-msgstr ""
+msgstr "No se pudo montar «%1». %2"
 
 #: shell/finder/finder.cpp:807
 msgid "“%1” couldn't be mounted: udisksctl isn't installed."
-msgstr ""
+msgstr "No se pudo montar «%1»: udisksctl no está instalado."
 
 #: shell/finder/finder.cpp:846
 msgid "“%1” couldn’t be expanded. %2"
-msgstr ""
+msgstr "No se pudo expandir «%1». %2"
 
 #: shell/finder/finder.cpp:847
 msgid "The expanding tool stopped."
-msgstr ""
+msgstr "La herramienta de expansión se detuvo."
 
 #: shell/finder/finder.cpp:864
 msgid "“%1” couldn’t be expanded: zacos9-expand isn't installed."
-msgstr ""
+msgstr "No se pudo expandir «%1»: zacos9-expand no está instalado."
 
 #: shell/finder/finder.cpp:899
 msgid "The Windows Installer could not be opened."
-msgstr ""
+msgstr "No se pudo abrir el Instalador de Windows."
 
 #: shell/finder/finder.cpp:916
 msgid ""
 "No printer has been chosen. Choose one in Printer Picker, then print again."
-msgstr ""
+msgstr "No se ha elegido una impresora. Elige una en el Selector de impresora y vuelve a imprimir."
 
 #: shell/finder/finder.cpp:917 shell/menubar/launch.c:553
 #: shell/print/picker_main.cpp:17 shell/print/pickerwindow.cpp:49
 msgid "Printer Picker"
-msgstr ""
+msgstr "Selector de impresora"
 
 #: shell/finder/finder.cpp:974
 msgid "Select one regular file."
-msgstr ""
+msgstr "Selecciona un archivo normal."
 
 #: shell/finder/finder.cpp:979
 msgid "The selected file is not readable."
-msgstr ""
+msgstr "El archivo seleccionado no se puede leer."
 
 #: shell/finder/finder.cpp:987 shell/finder/finder.cpp:1002
 msgid "Encrypt File"
-msgstr ""
+msgstr "Cifrar archivo"
 
 #: shell/finder/finder.cpp:987 shell/finder/finder.cpp:1082
 msgid "Decrypt File"
-msgstr ""
+msgstr "Descifrar archivo"
 
 #: shell/finder/finder.cpp:988
 msgid "Enter a passphrase (at least 8 characters):"
-msgstr ""
+msgstr "Introduce una frase de contraseña (al menos 8 caracteres):"
 
 #: shell/finder/finder.cpp:988
 msgid "Enter the passphrase:"
-msgstr ""
+msgstr "Introduce la frase de contraseña:"
 
 #: shell/finder/finder.cpp:996
 msgid "Use a passphrase of at least 8 characters without line breaks."
-msgstr ""
+msgstr "Usa una frase de contraseña de al menos 8 caracteres sin saltos de línea."
 
 #: shell/finder/finder.cpp:997
 msgid "The passphrase cannot contain a line break."
-msgstr ""
+msgstr "La frase de contraseña no puede contener saltos de línea."
 
 #: shell/finder/finder.cpp:1002
 msgid "Re-enter the passphrase:"
-msgstr ""
+msgstr "Vuelve a introducir la frase de contraseña:"
 
 #: shell/finder/finder.cpp:1008
 msgid "The passphrases did not match."
-msgstr ""
+msgstr "Las frases de contraseña no coinciden."
 
 #: shell/finder/finder.cpp:1019
 msgid "File Encryption"
-msgstr ""
+msgstr "Cifrado de archivos"
 
 #: shell/finder/finder.cpp:1039
 msgid "The encrypted copy must be saved as a different file."
-msgstr ""
+msgstr "La copia cifrada debe guardarse como un archivo diferente."
 
 #: shell/finder/finder.cpp:1046
 msgid "Encrypting “%1”…"
-msgstr ""
+msgstr "Cifrando «%1»…"
 
 #: shell/finder/finder.cpp:1053
 msgid ""
 "Encrypted copy saved to “%1”. Add its passphrase to your keychain, so "
 "Decrypt can open it without asking?"
-msgstr ""
+msgstr "Copia cifrada guardada en «%1». ¿Añadir su frase de contraseña al llavero para que Descifrar pueda abrirla sin preguntar?"
 
 #: shell/finder/finder.cpp:1055
 msgid "Add to Keychain"
-msgstr ""
+msgstr "Añadir al llavero"
 
 #: shell/finder/finder.cpp:1055
 msgid "Don't Add"
-msgstr ""
+msgstr "No añadir"
 
 #: shell/finder/finder.cpp:1058
 msgid ""
 "The passphrase couldn't be added to your keychain. Is the keychain unlocked?"
-msgstr ""
+msgstr "No se pudo añadir la frase de contraseña al llavero. ¿Está desbloqueado el llavero?"
 
 #: shell/finder/finder.cpp:1065
 msgid "The file could not be encrypted. %1"
-msgstr ""
+msgstr "No se pudo cifrar el archivo. %1"
 
 #: shell/finder/finder.cpp:1088
 msgid "The decrypted file must be saved as a different file."
-msgstr ""
+msgstr "El archivo descifrado debe guardarse como un archivo diferente."
 
 #: shell/finder/finder.cpp:1099
 msgid "Decrypting “%1”…"
-msgstr ""
+msgstr "Descifrando «%1»…"
 
 #: shell/finder/finder.cpp:1104
 msgid "Decrypted file saved to “%1”."
-msgstr ""
+msgstr "Archivo descifrado guardado en «%1»."
 
 #: shell/finder/finder.cpp:1107
 msgid "The file could not be decrypted. %1"
-msgstr ""
+msgstr "No se pudo descifrar el archivo. %1"
 
 #: shell/finder/finder.cpp:1149
 msgid "“%1” is open in its application. Choose Print there to print it."
-msgstr ""
+msgstr "«%1» está abierto en su aplicación. Elige Imprimir allí para imprimirlo."
 
 #: shell/finder/finder.cpp:1151
 msgid ""
 "%1 documents are open in their applications. Choose Print in each "
 "application to print them."
-msgstr ""
+msgstr "%1 documentos están abiertos en sus aplicaciones. Elige Imprimir en cada aplicación para imprimirlos."
 
 #: shell/finder/finder.cpp:1154
 msgid "Some documents could not be opened in their applications: %1.%2"
-msgstr ""
+msgstr "No se pudieron abrir algunos documentos en sus aplicaciones: %1.%2"
 
 #: shell/finder/finder.cpp:1157
 msgid " The others were opened; choose Print in their applications."
-msgstr ""
+msgstr " Los demás se abrieron; elige Imprimir en sus aplicaciones."
 
 #: shell/finder/finder.cpp:1165
 msgid "The print queue couldn't be opened."
-msgstr ""
+msgstr "No se pudo abrir la cola de impresión."
 
 #: shell/finder/finder.cpp:1185
 msgid "Old Dog could not be started: %1"
-msgstr ""
+msgstr "No se pudo iniciar Old Dog: %1"
 
 #: shell/finder/finder.cpp:1201
 msgid "Old Dog could not be started."
-msgstr ""
+msgstr "No se pudo iniciar Old Dog."
 
 #: shell/finder/finder.cpp:1246
 msgid "Labels aren't available for this read-only system resource."
-msgstr ""
+msgstr "Las etiquetas no están disponibles para este recurso del sistema de solo lectura."
 
 #: shell/finder/finder.cpp:1320
 msgid "The disk \"%1\" could not be unmounted. It may no longer be mounted."
-msgstr ""
+msgstr "No se pudo desmontar el disco \"%1\". Es posible que ya no esté montado."
 
 #: shell/finder/finder.cpp:1339
 msgid "The disk \"%1\" is no longer mounted."
-msgstr ""
+msgstr "El disco \"%1\" ya no está montado."
 
 #: shell/finder/finder.cpp:1470
 msgid "“%1” can't be added to Favorites."
-msgstr ""
+msgstr "No se puede añadir «%1» a Favoritos."
 
 #: shell/finder/finder.cpp:1491
 msgid "Select a folder or disk to index."
-msgstr ""
+msgstr "Selecciona una carpeta o un disco para indexar."
 
 #: shell/finder/finder.cpp:1515
 msgid "“%1” could not be found."
-msgstr ""
+msgstr "No se pudo encontrar «%1»."
 
 #: shell/finder/finder.cpp:1536
 msgid "Select a disk on the desktop to eject."
-msgstr ""
+msgstr "Selecciona un disco del escritorio para expulsarlo."
 
 #: shell/finder/finder.cpp:1545
 msgid "Are you sure you want to quit all programs and log out now?"
-msgstr ""
+msgstr "¿Seguro que quieres cerrar todos los programas y cerrar la sesión ahora?"
 
 #: shell/finder/finder.cpp:1545
 msgid "Log Out"
-msgstr ""
+msgstr "Cerrar sesión"
 
 #: shell/finder/finder.cpp:1560
 msgid "Select one network disk on the desktop to disconnect."
-msgstr ""
+msgstr "Selecciona un disco de red del escritorio para desconectarlo."
 
 #: shell/finder/finder.cpp:1561
 msgid "Select one mounted disk on the desktop to unmount."
-msgstr ""
+msgstr "Selecciona un disco montado del escritorio para desmontarlo."
 
 #: shell/finder/finder.cpp:1639
 msgid ""
 "The original for “%1” has been replaced by a different item. Use the new "
 "item?"
-msgstr ""
+msgstr "El original de «%1» se ha sustituido por otro elemento. ¿Usar el nuevo elemento?"
 
 #: shell/finder/finder.cpp:1640
 msgid "Use New Item"
-msgstr ""
+msgstr "Usar el nuevo elemento"
 
 #: shell/finder/finder.cpp:1915
 msgid ""
 "The Trash contains 1 item, which uses %1 of disk space. Are you sure you "
 "want to permanently remove it?"
-msgstr ""
+msgstr "La Papelera contiene 1 elemento que ocupa %1 de espacio en disco. ¿Seguro que quieres eliminarlo definitivamente?"
 
 #: shell/finder/finder.cpp:1917
 msgid ""
 "The Trash contains %1 items, which use %2 of disk space. Are you sure you "
 "want to permanently remove them?"
-msgstr ""
+msgstr "La Papelera contiene %1 elementos que ocupan %2 de espacio en disco. ¿Seguro que quieres eliminarlos definitivamente?"
 
 #: shell/finder/finder.cpp:1924
 msgid ""
@@ -1026,7 +1026,7 @@ msgid ""
 "\n"
 "This will uninstall: %1. Personal application data is kept. Debian removal "
 "may also remove dependent packages."
-msgstr ""
+msgstr "\n\nSe desinstalará: %1. Los datos personales de las aplicaciones se conservan. La eliminación de Debian también puede quitar paquetes dependientes."
 
 #: shell/finder/finder.cpp:1931
 msgid ""
@@ -1034,7 +1034,7 @@ msgid ""
 "\n"
 "1 locked item will stay in the Trash. To remove it too, hold down Option "
 "while you choose Empty Trash."
-msgstr ""
+msgstr "\n\n1 elemento bloqueado permanecerá en la Papelera. Para quitarlo también, mantén pulsada la tecla Opción al elegir Vaciar la Papelera."
 
 #: shell/finder/finder.cpp:1933
 msgid ""
@@ -1042,731 +1042,731 @@ msgid ""
 "\n"
 "%1 locked items will stay in the Trash. To remove them too, hold down Option "
 "while you choose Empty Trash."
-msgstr ""
+msgstr "\n\n%1 elementos bloqueados permanecerán en la Papelera. Para quitarlos también, mantén pulsada la tecla Opción al elegir Vaciar la Papelera."
 
 #: shell/finder/finder.cpp:2043
 msgid "The Trash could not be completely emptied."
-msgstr ""
+msgstr "No se pudo vaciar la Papelera por completo."
 
 #: shell/finder/findwindow.cpp:70 shell/finder/findwindow.cpp:96
 msgid "Find"
-msgstr ""
+msgstr "Buscar"
 
 #: shell/finder/findwindow.cpp:71
 msgid "Find items"
-msgstr ""
+msgstr "Buscar elementos"
 
 #: shell/finder/findwindow.cpp:72
 msgid "on all disks"
-msgstr ""
+msgstr "en todos los discos"
 
 #: shell/finder/findwindow.cpp:72
 msgid "in my Home folder"
-msgstr ""
+msgstr "en mi carpeta de inicio"
 
 #: shell/finder/findwindow.cpp:74
 msgid "in “%1”"
-msgstr ""
+msgstr "en «%1»"
 
 #: shell/finder/findwindow.cpp:80
 msgid "on the Internet with %1"
-msgstr ""
+msgstr "en Internet con %1"
 
 #: shell/finder/findwindow.cpp:84
 msgid "More Choices"
-msgstr ""
+msgstr "Más opciones"
 
 #: shell/finder/findwindow.cpp:89
 msgid "Fewer Choices"
-msgstr ""
+msgstr "Menos opciones"
 
 #: shell/finder/findwindow.cpp:98
 msgid "Save Search…"
-msgstr ""
+msgstr "Guardar búsqueda…"
 
 #: shell/finder/findwindow.cpp:101
 msgid "Save Find Search"
-msgstr ""
+msgstr "Guardar búsqueda"
 
 #: shell/finder/findwindow.cpp:102 shell/network/logindialog.cpp:122
 #: shell/setup/setup.cpp:470
 msgid "Name:"
-msgstr ""
+msgstr "Nombre:"
 
 #: shell/finder/findwindow.cpp:115
 msgid "Saved Searches…"
-msgstr ""
+msgstr "Búsquedas guardadas…"
 
 #: shell/finder/findwindow.cpp:125
 msgid "No saved Find searches yet."
-msgstr ""
+msgstr "Aún no hay búsquedas guardadas."
 
 #: shell/finder/findwindow.cpp:268
 msgid "Type the words to search the Internet for."
-msgstr ""
+msgstr "Escribe las palabras que quieras buscar en Internet."
 
 #: shell/finder/findwindow.cpp:293
 msgid "whose"
-msgstr ""
+msgstr "cuyos"
 
 #: shell/finder/findwindow.cpp:301
 msgid ""
 "Contents are searched in indexed folders; File ▸ Index Selection adds one."
-msgstr ""
+msgstr "El contenido se busca en carpetas indexadas; Archivo ▸ Indexar selección añade una."
 
 #: shell/finder/findwindow.cpp:403
 msgid "similar to “%1”"
-msgstr ""
+msgstr "similares a «%1»"
 
 #: shell/finder/findwindow.cpp:540
 msgid "Items Found: %1"
-msgstr ""
+msgstr "Elementos encontrados: %1"
 
 #: shell/finder/findwindow.cpp:633
 msgid "1 item"
-msgstr ""
+msgstr "1 elemento"
 
 #: shell/finder/findwindow.cpp:634
 msgid "%1 items"
-msgstr ""
+msgstr "%1 elementos"
 
 #: shell/finder/findwindow.cpp:635
 msgid "1 item found %1"
-msgstr ""
+msgstr "Se encontró 1 elemento %1"
 
 #: shell/finder/findwindow.cpp:636
 msgid "%1 items found %2"
-msgstr ""
+msgstr "Se encontraron %1 elementos %2"
 
 #: shell/finder/findwindow.cpp:637
 msgid "Searching…  %1"
-msgstr ""
+msgstr "Buscando…  %1"
 
 #: shell/finder/findwindow.cpp:657 shell/finder/infowindow.cpp:696
 #: shell/setup/setup.cpp:36
 msgid "Name"
-msgstr ""
+msgstr "Nombre"
 
 #: shell/finder/findwindow.cpp:658
 msgid "Date Modified"
-msgstr ""
+msgstr "Fecha de modificación"
 
 #: shell/finder/findwindow.cpp:659
 msgid "Kind"
-msgstr ""
+msgstr "Tipo"
 
 #: shell/finder/infowindow.cpp:103
 msgid "Read & Write"
-msgstr ""
+msgstr "Lectura y escritura"
 
 #: shell/finder/infowindow.cpp:103
 msgid "Read only"
-msgstr ""
+msgstr "Solo lectura"
 
 #: shell/finder/infowindow.cpp:103
 msgid "Write only (Drop Box)"
-msgstr ""
+msgstr "Solo escritura (Drop Box)"
 
 #: shell/finder/infowindow.cpp:103 shell/finder/viewoptionsdialog.cpp:98
 msgid "None"
-msgstr ""
+msgstr "Ninguno"
 
 #: shell/finder/infowindow.cpp:211
 msgid "Info for %1"
-msgstr ""
+msgstr "Información de %1"
 
 #: shell/finder/infowindow.cpp:219
 msgid "startup disk"
-msgstr ""
+msgstr "disco de arranque"
 
 #: shell/finder/infowindow.cpp:220 shell/finder/infowindow.cpp:259
 #: shell/finder/viewoptionsdialog.cpp:226
 msgid "Desktop"
-msgstr ""
+msgstr "Escritorio"
 
 #: shell/finder/infowindow.cpp:227 shell/finder/infowindow.cpp:229
 #: shell/finder/infowindow.cpp:231 shell/finder/infowindow.cpp:1006
 #: shell/finder/infowindow.cpp:1007
 msgid "Not reported"
-msgstr ""
+msgstr "No disponible"
 
 #: shell/finder/infowindow.cpp:235 shell/finder/infowindow.cpp:277
 #: shell/menubar/menus.c:171
 msgid "General Information"
-msgstr ""
+msgstr "Información general"
 
 #: shell/finder/infowindow.cpp:235 shell/finder/infowindow.cpp:277
 msgid "Sharing"
-msgstr ""
+msgstr "Compartir"
 
 #: shell/finder/infowindow.cpp:244
 msgid "trash"
-msgstr ""
+msgstr "papelera"
 
 #: shell/finder/infowindow.cpp:245
 msgid "Warn before emptying"
-msgstr ""
+msgstr "Avisar antes de vaciar"
 
 #: shell/finder/infowindow.cpp:249
 msgid "disk"
-msgstr ""
+msgstr "disco"
 
 #: shell/finder/infowindow.cpp:256
 msgid "application program"
-msgstr ""
+msgstr "aplicación"
 
 #: shell/finder/infowindow.cpp:265 shell/finder/infowindow.cpp:270
 msgid "(missing)"
-msgstr ""
+msgstr "(falta)"
 
 #: shell/finder/infowindow.cpp:268
 msgid " (replaced)"
-msgstr ""
+msgstr " (reemplazado)"
 
 #: shell/finder/infowindow.cpp:269
 msgid "(alias loop)"
-msgstr ""
+msgstr "(bucle de alias)"
 
 #: shell/finder/infowindow.cpp:298
 msgid "%1 on disk (%2 bytes)"
-msgstr ""
+msgstr "%1 en disco (%2 bytes)"
 
 #: shell/finder/infowindow.cpp:302
 msgid "calculating…"
-msgstr ""
+msgstr "calculando…"
 
 #: shell/finder/infowindow.cpp:317
 msgid "%1 on disk, for 1 item"
-msgstr ""
+msgstr "%1 en disco, para 1 elemento"
 
 #: shell/finder/infowindow.cpp:318
 msgid "%1 on disk, for %2 items"
-msgstr ""
+msgstr "%1 en disco, para %2 elementos"
 
 #: shell/finder/infowindow.cpp:341
 msgid ""
 "Folders cannot be shared until file sharing is turned on using the File "
 "Sharing control panel. Do you want the control panel opened now?"
-msgstr ""
+msgstr "Las carpetas no se pueden compartir hasta que se active Compartir archivos en el panel Compartir archivos. ¿Quieres abrir el panel ahora?"
 
 #: shell/finder/infowindow.cpp:423
 msgid "Show:"
-msgstr ""
+msgstr "Mostrar:"
 
 #: shell/finder/infowindow.cpp:434 shell/finder/infowindow.cpp:474
 msgid "Kind:"
-msgstr ""
+msgstr "Tipo:"
 
 #: shell/finder/infowindow.cpp:435 shell/finder/infowindow.cpp:476
 #: shell/finder/infowindow.cpp:682
 msgid "Where:"
-msgstr ""
+msgstr "Dónde:"
 
 #: shell/finder/infowindow.cpp:437 shell/finder/infowindow.cpp:475
 msgid "Size:"
-msgstr ""
+msgstr "Tamaño:"
 
 #: shell/finder/infowindow.cpp:438
 msgid "Available:"
-msgstr ""
+msgstr "Disponible:"
 
 #: shell/finder/infowindow.cpp:452
 msgid "Source:"
-msgstr ""
+msgstr "Origen:"
 
 #: shell/finder/infowindow.cpp:453
 msgid "None (virtual; no physical equivalent)"
-msgstr ""
+msgstr "Ninguno (virtual; sin equivalente físico)"
 
 #: shell/finder/infowindow.cpp:454
 msgid "Access:"
-msgstr ""
+msgstr "Acceso:"
 
 #: shell/finder/infowindow.cpp:458
 msgid "Description: %1"
-msgstr ""
+msgstr "Descripción: %1"
 
 #: shell/finder/infowindow.cpp:477
 msgid "Created:"
-msgstr ""
+msgstr "Creado:"
 
 #: shell/finder/infowindow.cpp:478
 msgid "Modified:"
-msgstr ""
+msgstr "Modificado:"
 
 #: shell/finder/infowindow.cpp:480
 msgid "Original:"
-msgstr ""
+msgstr "Original:"
 
 #: shell/finder/infowindow.cpp:485
 msgid "Comments:"
-msgstr ""
+msgstr "Comentarios:"
 
 #: shell/finder/infowindow.cpp:605
 msgid "Share this item and its contents"
-msgstr ""
+msgstr "Compartir este elemento y su contenido"
 
 #: shell/finder/infowindow.cpp:610 shell/finder/infowindow.cpp:611
 #: shell/help/helpwindow.cpp:172 shell/menubar/hints.c:47
 #: shell/menubar/menus.c:54
 msgid "Copy"
-msgstr ""
+msgstr "Copiar"
 
 #: shell/finder/infowindow.cpp:662
 msgid "Only %1, the owner, can change these."
-msgstr ""
+msgstr "Solo %1, el propietario, puede cambiarlos."
 
 #: shell/finder/infowindow.cpp:665
 msgid ""
 "This folder can’t be shared, because the folder “%1” inside it is shared."
-msgstr ""
+msgstr "Esta carpeta no se puede compartir porque la carpeta «%1» que contiene ya se comparte."
 
 #: shell/finder/infowindow.cpp:669
 msgid ""
 "File Sharing is off. Turn it on in the File Sharing control panel so others "
 "can connect."
-msgstr ""
+msgstr "Compartir archivos está desactivado. Actívalo en el panel Compartir archivos para que otros puedan conectarse."
 
 #: shell/finder/infowindow.cpp:673
 msgid "Shared on the network as “%1”."
-msgstr ""
+msgstr "Compartida en la red como «%1»."
 
 #: shell/finder/infowindow.cpp:676
 msgid "This folder will be shared when you close this window."
-msgstr ""
+msgstr "Esta carpeta se compartirá al cerrar esta ventana."
 
 #: shell/finder/infowindow.cpp:686
 msgid "Shared as part of “%1”."
-msgstr ""
+msgstr "Compartida como parte de «%1»."
 
 #: shell/finder/infowindow.cpp:697
 msgid "Privilege"
-msgstr ""
+msgstr "Permiso"
 
 #: shell/finder/infowindow.cpp:699
 msgid "Owner:"
-msgstr ""
+msgstr "Propietario:"
 
 #: shell/finder/infowindow.cpp:700
 msgid "User/Group:"
-msgstr ""
+msgstr "Usr./grupo:"
 
 #: shell/finder/infowindow.cpp:701
 msgid "Everyone"
-msgstr ""
+msgstr "Todos"
 
 #: shell/finder/infowindow.cpp:704
 msgid "Copy these privileges to all enclosed folders"
-msgstr ""
+msgstr "Copiar permisos a subcarpetas"
 
 #: shell/finder/infowindow.cpp:720
 msgid "The privileges of “%1” couldn’t be changed. %2"
-msgstr ""
+msgstr "No se pudieron cambiar los permisos de «%1». %2"
 
 #: shell/finder/infowindow.cpp:748
 msgid "“%1” couldn’t be shared. %2"
-msgstr ""
+msgstr "No se pudo compartir «%1». %2"
 
 #: shell/finder/infowindow.cpp:749
 msgid "“%1” couldn’t be unshared. %2"
-msgstr ""
+msgstr "No se pudo dejar de compartir «%1». %2"
 
 #: shell/finder/infowindow.cpp:884
 msgid ""
 "This item's icon couldn't be changed. The file system may not support custom "
 "icons, or the picture may be too large."
-msgstr ""
+msgstr "No se pudo cambiar el icono de este elemento. Es posible que el sistema de archivos no admita iconos personalizados o que la imagen sea demasiado grande."
 
 #: shell/finder/infowindow.cpp:907
 msgid "The Clipboard doesn’t contain a picture to use as an icon."
-msgstr ""
+msgstr "El portapapeles no contiene una imagen para usar como icono."
 
 #: shell/finder/infowindow.cpp:909
 msgid ""
 "This item’s icon couldn’t be changed. The file system may not support custom "
 "icons, or the picture may be too large."
-msgstr ""
+msgstr "No se pudo cambiar el icono de este elemento. Es posible que el sistema de archivos no admita iconos personalizados o que la imagen sea demasiado grande."
 
 #: shell/finder/infowindow.cpp:920
 msgid "This item’s custom icon couldn’t be removed."
-msgstr ""
+msgstr "No se pudo quitar el icono personalizado de este elemento."
 
 #: shell/finder/infowindow.cpp:1000
 msgid "About This Computer"
-msgstr ""
+msgstr "Acerca de este ordenador"
 
 #: shell/finder/infowindow.cpp:1005
 msgid "System version not reported"
-msgstr ""
+msgstr "Versión del sistema no disponible"
 
 #: shell/finder/infowindow.cpp:1005
 msgid "Version %1"
-msgstr ""
+msgstr "Versión %1"
 
 #: shell/finder/infowindow.cpp:1006
 msgid "Processor:"
-msgstr ""
+msgstr "Procesador:"
 
 #: shell/finder/infowindow.cpp:1007
 msgid "Graphics:"
-msgstr ""
+msgstr "Gráficos:"
 
 #: shell/finder/infowindow.cpp:1009
 msgid "Memory:"
-msgstr ""
+msgstr "Memoria:"
 
 #: shell/finder/infowindow.cpp:1010
 msgid "Virtual Memory:"
-msgstr ""
+msgstr "Memoria virtual:"
 
 #: shell/finder/infowindow.cpp:1011
 msgid "%1 allocated on disk"
-msgstr ""
+msgstr "%1 asignados en disco"
 
 #: shell/finder/infowindow.cpp:1011
 msgid "None configured"
-msgstr ""
+msgstr "No configurada"
 
 #: shell/finder/infowindow.cpp:1012
 msgid "Available Memory:"
-msgstr ""
+msgstr "Memoria disponible:"
 
 #: shell/finder/labeleditor.cpp:35
 msgid "This system resource is read-only and can't be renamed or labelled."
-msgstr ""
+msgstr "Este recurso del sistema es de solo lectura y no se puede renombrar ni etiquetar."
 
 #: shell/finder/labeleditor.cpp:200 shell/finder/labeleditor.cpp:218
 msgid "That name is already taken. Please use a different name."
-msgstr ""
+msgstr "Ese nombre ya está en uso. Usa otro nombre."
 
 #: shell/finder/labeleditor.cpp:205
 msgid "The item “%1” can't be renamed."
-msgstr ""
+msgstr "No se puede renombrar «%1»."
 
 #: shell/finder/main.cpp:44 shell/menubar/menus.c:474 shell/menubar/menus.c:490
 msgid "Sniffer"
-msgstr ""
+msgstr "Sniffer"
 
 #: shell/finder/main.cpp:52
 msgid ""
 "You don't have permission to use \"%1\". Ask the computer's administrator to "
 "add it to your programs."
-msgstr ""
+msgstr "No tienes permiso para usar «%1». Pide al administrador del ordenador que lo añada a tus programas."
 
 #: shell/finder/resourcewindows.cpp:53 shell/finder/resourcewindows.cpp:55
 msgid "System Information"
-msgstr ""
+msgstr "Información del sistema"
 
 #: shell/finder/resourcewindows.cpp:53 shell/finder/resourcewindows.cpp:55
 msgid "Extensions Manager"
-msgstr ""
+msgstr "Gestor de extensiones"
 
 #: shell/finder/resourcewindows.cpp:59 shell/menubar/hints.c:89
 #: shell/menubar/menus.c:487
 msgid "Show All"
-msgstr ""
+msgstr "Mostrar todo"
 
 #: shell/finder/resourcewindows.cpp:61
 msgid "Extensions"
-msgstr ""
+msgstr "Extensiones"
 
 #: shell/finder/resourcewindows.cpp:62
 msgid "Login Items"
-msgstr ""
+msgstr "Elementos de inicio de sesión"
 
 #: shell/finder/resourcewindows.cpp:63
 msgid "Background Services"
-msgstr ""
+msgstr "Servicios en segundo plano"
 
 #: shell/finder/resourcewindows.cpp:65
 msgid "Item Information…"
-msgstr ""
+msgstr "Información del elemento…"
 
 #: shell/finder/resourcewindows.cpp:67 shell/finder/resourcewindows.cpp:338
 #: shell/finder/resourcewindows.cpp:394
 msgid "Turn Off"
-msgstr ""
+msgstr "Desactivar"
 
 #: shell/finder/resourcewindows.cpp:74
 msgid "Set:"
-msgstr ""
+msgstr "Conjunto:"
 
 #: shell/finder/resourcewindows.cpp:80
 msgid "Current system details; viewing does not change this computer."
-msgstr ""
+msgstr "Detalles actuales del sistema; verlos no cambia este ordenador."
 
 #: shell/finder/resourcewindows.cpp:241
 msgid "Every loaded kernel module, by its technical name. For viewing only."
-msgstr ""
+msgstr "Cada módulo del núcleo cargado, por su nombre técnico. Solo para ver."
 
 #: shell/finder/resourcewindows.cpp:242
 msgid ""
 "Extensions add features to this computer. Turn one off to stop it loading at "
 "start-up, or on to start it at every start-up. Changes take effect after "
 "restart."
-msgstr ""
+msgstr "Las extensiones añaden funciones al ordenador. Desactiva una para que no se cargue al arrancar, o actívala para que se cargue en cada arranque. Los cambios se aplican tras reiniciar."
 
 #: shell/finder/resourcewindows.cpp:258
 msgid ""
 "Applications that open when you log in. Changes affect only your account and "
 "take effect at your next login."
-msgstr ""
+msgstr "Aplicaciones que se abren al iniciar sesión. Los cambios afectan solo a tu cuenta y se aplican en el próximo inicio de sesión."
 
 #: shell/finder/resourcewindows.cpp:263
 msgid " (off)"
-msgstr ""
+msgstr " (desactivada)"
 
 #: shell/finder/resourcewindows.cpp:264
 msgid "login item"
-msgstr ""
+msgstr "elemento de inicio de sesión"
 
 #: shell/finder/resourcewindows.cpp:266
 msgid "A login item."
-msgstr ""
+msgstr "Un elemento de inicio de sesión."
 
 #: shell/finder/resourcewindows.cpp:267
 msgid "Status: %1"
-msgstr ""
+msgstr "Estado: %1"
 
 #: shell/finder/resourcewindows.cpp:267
 msgid "opens at login"
-msgstr ""
+msgstr "se abre al iniciar sesión"
 
 #: shell/finder/resourcewindows.cpp:268
 msgid "off"
-msgstr ""
+msgstr "desactivado"
 
 #: shell/finder/resourcewindows.cpp:269
 msgid "Source: %1"
-msgstr ""
+msgstr "Origen: %1"
 
 #: shell/finder/resourcewindows.cpp:269
 msgid "your settings (overrides a system item)"
-msgstr ""
+msgstr "tu configuración (sustituye a un elemento del sistema)"
 
 #: shell/finder/resourcewindows.cpp:270
 msgid "your account"
-msgstr ""
+msgstr "tu cuenta"
 
 #: shell/finder/resourcewindows.cpp:270
 msgid "this computer (shared by all users)"
-msgstr ""
+msgstr "este ordenador (compartido por todos los usuarios)"
 
 #: shell/finder/resourcewindows.cpp:271
 msgid "Takes effect: at your next login"
-msgstr ""
+msgstr "Se aplica: en tu próximo inicio de sesión"
 
 #: shell/finder/resourcewindows.cpp:276 shell/finder/resourcewindows.cpp:320
 msgid "Read-only: %1"
-msgstr ""
+msgstr "Solo lectura: %1"
 
 #: shell/finder/resourcewindows.cpp:282
 msgid "No login items were found."
-msgstr ""
+msgstr "No se encontraron elementos de inicio de sesión."
 
 #: shell/finder/resourcewindows.cpp:288
 msgid "Checking your account's background services…"
-msgstr ""
+msgstr "Comprobando los servicios en segundo plano de tu cuenta…"
 
 #: shell/finder/resourcewindows.cpp:289
 msgid "Background service status is not available."
-msgstr ""
+msgstr "El estado de los servicios en segundo plano no está disponible."
 
 #: shell/finder/resourcewindows.cpp:296
 msgid "Background services could not be listed: %1"
-msgstr ""
+msgstr "No se pudieron listar los servicios en segundo plano: %1"
 
 #: shell/finder/resourcewindows.cpp:299
 msgid ""
 "Background services of your own account. Essential services are shown but "
 "can't be changed here."
-msgstr ""
+msgstr "Servicios en segundo plano de tu cuenta. Los servicios esenciales se muestran pero no se pueden cambiar aquí."
 
 #: shell/finder/resourcewindows.cpp:305
 msgid "background service"
-msgstr ""
+msgstr "servicio en segundo plano"
 
 #: shell/finder/resourcewindows.cpp:307
 msgid "A background service."
-msgstr ""
+msgstr "Un servicio en segundo plano."
 
 #: shell/finder/resourcewindows.cpp:308
 msgid "Running now: %1"
-msgstr ""
+msgstr "En ejecución: %1"
 
 #: shell/finder/resourcewindows.cpp:308 shell/finder/resourcewindows.cpp:309
 msgid "yes"
-msgstr ""
+msgstr "sí"
 
 #: shell/finder/resourcewindows.cpp:308 shell/finder/resourcewindows.cpp:310
 msgid "no"
-msgstr ""
+msgstr "no"
 
 #: shell/finder/resourcewindows.cpp:309
 msgid "Starts at login: %1"
-msgstr ""
+msgstr "Se inicia al iniciar sesión: %1"
 
 #: shell/finder/resourcewindows.cpp:310
 msgid "set by the system"
-msgstr ""
+msgstr "definido por el sistema"
 
 #: shell/finder/resourcewindows.cpp:317
 msgid "Login changes take effect: at your next login"
-msgstr ""
+msgstr "Los cambios de inicio de sesión se aplican: en tu próximo inicio de sesión"
 
 #: shell/finder/resourcewindows.cpp:318
 msgid "Start and Stop take effect: immediately"
-msgstr ""
+msgstr "Iniciar y detener se aplican: inmediatamente"
 
 #: shell/finder/resourcewindows.cpp:326
 msgid "No user services are available."
-msgstr ""
+msgstr "No hay servicios de usuario disponibles."
 
 #: shell/finder/resourcewindows.cpp:337
 msgid "Don't Start at Login"
-msgstr ""
+msgstr "No iniciar al iniciar sesión"
 
 #: shell/finder/resourcewindows.cpp:337
 msgid "Start at Login"
-msgstr ""
+msgstr "Iniciar al iniciar sesión"
 
 #: shell/finder/resourcewindows.cpp:338
 msgid "Turn On"
-msgstr ""
+msgstr "Activar"
 
 #: shell/finder/resourcewindows.cpp:340
 msgid "Stop Now"
-msgstr ""
+msgstr "Detener ahora"
 
 #: shell/finder/resourcewindows.cpp:340
 msgid "Start Now"
-msgstr ""
+msgstr "Iniciar ahora"
 
 #: shell/finder/resourcewindows.cpp:359
 msgid "Turn it on or off; the change takes effect after restart."
-msgstr ""
+msgstr "Actívala o desactívala; el cambio se aplica tras reiniciar."
 
 #: shell/finder/resourcewindows.cpp:361
 msgid "Changes affect only your account and take effect at your next login."
-msgstr ""
+msgstr "Los cambios afectan solo a tu cuenta y se aplican en tu próximo inicio de sesión."
 
 #: shell/finder/resourcewindows.cpp:362
 msgid "Changes affect only your account's user services."
-msgstr ""
+msgstr "Los cambios afectan solo a los servicios de usuario de tu cuenta."
 
 #: shell/finder/resourcewindows.cpp:393
 msgid ""
 "Turn off “%1”? It will no longer start when you log in. This takes effect at "
 "your next login."
-msgstr ""
+msgstr "¿Desactivar «%1»? Ya no se iniciará al iniciar sesión. Se aplica en tu próximo inicio de sesión."
 
 #: shell/finder/resourcewindows.cpp:428
 msgid ""
 "Stop “%1” now? Programs that depend on it may stop working until it is "
 "started again."
-msgstr ""
+msgstr "¿Detener «%1» ahora? Los programas que dependen de él pueden dejar de funcionar hasta que se inicie de nuevo."
 
 #: shell/finder/resourcewindows.cpp:593
 msgid "(none chosen)"
-msgstr ""
+msgstr "(ninguno elegido)"
 
 #: shell/finder/resourcewindows.cpp:597
 msgid "Save Set…"
-msgstr ""
+msgstr "Guardar conjunto…"
 
 #: shell/finder/resourcewindows.cpp:598
 msgid "Delete Set…"
-msgstr ""
+msgstr "Eliminar conjunto…"
 
 #: shell/finder/resourcewindows.cpp:616
 msgid "Save Set"
-msgstr ""
+msgstr "Guardar conjunto"
 
 #: shell/finder/resourcewindows.cpp:616
 msgid "Name of the set:"
-msgstr ""
+msgstr "Nombre del conjunto:"
 
 #: shell/finder/resourcewindows.cpp:645
 msgid "Delete the set “%1”? The items stay as they are."
-msgstr ""
+msgstr "¿Eliminar el conjunto «%1»? Los elementos permanecen como están."
 
 #: shell/finder/resourcewindows.cpp:646
 msgid "Delete"
-msgstr ""
+msgstr "Eliminar"
 
 #: shell/finder/resourcewindows.cpp:687
 msgid "Some items couldn't be changed: %1"
-msgstr ""
+msgstr "No se pudieron cambiar algunos elementos: %1"
 
 #: shell/finder/transferdialog.cpp:14
 msgid "Copying Files"
-msgstr ""
+msgstr "Copiando archivos"
 
 #: shell/finder/transferdialog.cpp:21
 msgid "Copying"
-msgstr ""
+msgstr "Copiando"
 
 #: shell/finder/transferdialog.cpp:22
 msgid "Moving"
-msgstr ""
+msgstr "Moviendo"
 
 #: shell/finder/transferdialog.cpp:28
 msgid "%1 Files"
-msgstr ""
+msgstr "Archivos (%1)"
 
 #: shell/finder/transferdialog.cpp:78
 msgid "Stopping…"
-msgstr ""
+msgstr "Deteniendo…"
 
 #: shell/finder/transferdialog.cpp:78
 msgid "Preparing to transfer files…"
-msgstr ""
+msgstr "Preparando la transferencia de archivos…"
 
 #: shell/finder/transferdialog.cpp:80
 msgid "To: %1"
-msgstr ""
+msgstr "A: %1"
 
 #: shell/finder/transferdialog.cpp:85
 msgid "Counting files…"
-msgstr ""
+msgstr "Contando archivos…"
 
 #: shell/finder/transferdialog.cpp:86
 msgid "%1% complete"
-msgstr ""
+msgstr "%1% completado"
 
 #: shell/finder/viewoptionsdialog.cpp:37 shell/menubar/menus.c:90
 #: shell/menubar/menus.c:102
 msgid "by Name"
-msgstr ""
+msgstr "por nombre"
 
 #: shell/finder/viewoptionsdialog.cpp:37 shell/menubar/menus.c:91
 #: shell/menubar/menus.c:102
 msgid "by Date Modified"
-msgstr ""
+msgstr "por fecha de modificación"
 
 #: shell/finder/viewoptionsdialog.cpp:37 shell/menubar/menus.c:92
 #: shell/menubar/menus.c:103
 msgid "by Date Created"
-msgstr ""
+msgstr "por fecha de creación"
 
 #: shell/finder/viewoptionsdialog.cpp:37 shell/menubar/menus.c:93
 #: shell/menubar/menus.c:103
 msgid "by Size"
-msgstr ""
+msgstr "por tamaño"
 
 #: shell/finder/viewoptionsdialog.cpp:38 shell/menubar/menus.c:94
 #: shell/menubar/menus.c:103
 msgid "by Kind"
-msgstr ""
+msgstr "por tipo"
 
 #: shell/finder/viewoptionsdialog.cpp:38 shell/menubar/menus.c:95
 #: shell/menubar/menus.c:104
 msgid "by Label"
-msgstr ""
+msgstr "por etiqueta"
 
 #: shell/finder/viewoptionsdialog.cpp:67
 msgid "Show Columns"
-msgstr ""
+msgstr "Mostrar columnas"
 
 #: shell/finder/viewoptionsdialog.cpp:79 shell/panels/mouse.cpp:11
 msgid "Options"
@@ -1774,440 +1774,440 @@ msgstr "Opciones"
 
 #: shell/finder/viewoptionsdialog.cpp:80
 msgid "Use relative date"
-msgstr ""
+msgstr "Usar fecha relativa"
 
 #: shell/finder/viewoptionsdialog.cpp:85
 msgid "Calculate folder sizes"
-msgstr ""
+msgstr "Calcular tamaños de carpetas"
 
 #: shell/finder/viewoptionsdialog.cpp:95
 msgid "Icon Arrangement"
-msgstr ""
+msgstr "Disposición de iconos"
 
 #: shell/finder/viewoptionsdialog.cpp:99
 msgid "Always snap to grid"
-msgstr ""
+msgstr "Ajustar siempre a la cuadrícula"
 
 #: shell/finder/viewoptionsdialog.cpp:100
 #: shell/finder/viewoptionsdialog.cpp:190
 msgid "Keep arranged:"
-msgstr ""
+msgstr "Mantener ordenados:"
 
 #: shell/finder/viewoptionsdialog.cpp:119
 msgid "Icon Size"
-msgstr ""
+msgstr "Tamaño de icono"
 
 #: shell/finder/viewoptionsdialog.cpp:120
 msgid "Standard"
-msgstr ""
+msgstr "Estándar"
 
 #: shell/finder/viewoptionsdialog.cpp:121
 msgid "Small"
-msgstr ""
+msgstr "Pequeño"
 
 #: shell/finder/viewoptionsdialog.cpp:123
 msgid "Tiny"
-msgstr ""
+msgstr "Diminuto"
 
 #: shell/finder/viewoptionsdialog.cpp:227
 msgid "View Options"
-msgstr ""
+msgstr "Opciones de visualización"
 
 #: shell/finder/viewoptionsdialog.cpp:233
 msgid "Set to Standard Views"
-msgstr ""
+msgstr "Restablecer vistas"
 
 #: shell/finder/viewoptionsdialog.cpp:302
 msgid "White"
-msgstr ""
+msgstr "Blanco"
 
 #: shell/finder/viewoptionsdialog.cpp:302
 msgid "Yellow"
-msgstr ""
+msgstr "Amarillo"
 
 #: shell/finder/viewoptionsdialog.cpp:302
 msgid "Orange"
-msgstr ""
+msgstr "Naranja"
 
 #: shell/finder/viewoptionsdialog.cpp:302
 msgid "Red"
-msgstr ""
+msgstr "Rojo"
 
 #: shell/finder/viewoptionsdialog.cpp:303
 msgid "Magenta"
-msgstr ""
+msgstr "Magenta"
 
 #: shell/finder/viewoptionsdialog.cpp:303
 msgid "Purple"
-msgstr ""
+msgstr "Púrpura"
 
 #: shell/finder/viewoptionsdialog.cpp:303
 msgid "Blue"
-msgstr ""
+msgstr "Azul"
 
 #: shell/finder/viewoptionsdialog.cpp:303
 msgid "Cyan"
-msgstr ""
+msgstr "Cian"
 
 #: shell/finder/viewoptionsdialog.cpp:303
 msgid "Green"
-msgstr ""
+msgstr "Verde"
 
 #: shell/finder/viewoptionsdialog.cpp:303
 msgid "Dark Green"
-msgstr ""
+msgstr "Verde oscuro"
 
 #: shell/finder/viewoptionsdialog.cpp:303
 msgid "Brown"
-msgstr ""
+msgstr "Marrón"
 
 #: shell/finder/viewoptionsdialog.cpp:303
 msgid "Tan"
-msgstr ""
+msgstr "Beige"
 
 #: shell/finder/viewoptionsdialog.cpp:303
 msgid "Light Gray"
-msgstr ""
+msgstr "Gris claro"
 
 #: shell/finder/viewoptionsdialog.cpp:304
 msgid "Medium Gray"
-msgstr ""
+msgstr "Gris medio"
 
 #: shell/finder/viewoptionsdialog.cpp:304
 msgid "Dark Gray"
-msgstr ""
+msgstr "Gris oscuro"
 
 #: shell/finder/viewoptionsdialog.cpp:304
 msgid "Black"
-msgstr ""
+msgstr "Negro"
 
 #: shell/finder/viewoptionsdialog.cpp:324
 msgid "Preferences"
-msgstr ""
+msgstr "Preferencias"
 
 #: shell/finder/viewoptionsdialog.cpp:327
 msgid "General"
-msgstr ""
+msgstr "General"
 
 #: shell/finder/viewoptionsdialog.cpp:327
 msgid "Views"
-msgstr ""
+msgstr "Vistas"
 
 #: shell/finder/viewoptionsdialog.cpp:327
 msgid "Labels"
-msgstr ""
+msgstr "Etiquetas"
 
 #: shell/finder/viewoptionsdialog.cpp:335
 msgid "Spring-loaded folders"
-msgstr ""
+msgstr "Carpetas con apertura automática"
 
 #: shell/finder/viewoptionsdialog.cpp:350
 msgid "Short"
-msgstr ""
+msgstr "Corta"
 
 #: shell/finder/viewoptionsdialog.cpp:350
 msgid "Long"
-msgstr ""
+msgstr "Larga"
 
 #: shell/finder/viewoptionsdialog.cpp:357
 msgid "Tight (more items)"
-msgstr ""
+msgstr "Compacta (más elementos)"
 
 #: shell/finder/viewoptionsdialog.cpp:358
 msgid "Wide (neater arrangement)"
-msgstr ""
+msgstr "Ancha (disposición más ordenada)"
 
 #: shell/finder/viewoptionsdialog.cpp:362
 msgid "Warn before emptying Trash"
-msgstr ""
+msgstr "Avisar antes de vaciar la Papelera"
 
 #: shell/finder/viewoptionsdialog.cpp:372
 msgid "Use Puppy Mode"
-msgstr ""
+msgstr "Usar modo cachorro"
 
 #: shell/finder/viewoptionsdialog.cpp:375
 msgid ""
 "Shows only the essential commands in the Sniffer's menus, for children and "
 "people new to computers."
-msgstr ""
+msgstr "Muestra solo los comandos esenciales en los menús de Sniffer, para niños y personas nuevas en la informática."
 
 #: shell/finder/viewoptionsdialog.cpp:379
 msgid "Play audio CDs and video DVDs when inserted"
-msgstr ""
+msgstr "Reproducir CD y DVD al insertarlos"
 
 #: shell/finder/viewoptionsdialog.cpp:383
 msgid ""
 "Starts the program that plays the disc. Programs on a disc never start by "
 "themselves."
-msgstr ""
+msgstr "Inicia el programa que reproduce el disco. Los programas de un disco nunca se inician solos."
 
 #: shell/finder/viewoptionsdialog.cpp:388
 msgid "Icon"
-msgstr ""
+msgstr "Icono"
 
 #: shell/finder/viewoptionsdialog.cpp:388
 msgid "Button"
-msgstr ""
+msgstr "Botón"
 
 #: shell/finder/viewoptionsdialog.cpp:388
 msgid "List"
-msgstr ""
+msgstr "Lista"
 
 #: shell/finder/viewoptionsdialog.cpp:430
 msgid "Spring-loaded Folders"
-msgstr ""
+msgstr "Carpetas con apertura automática"
 
 #: shell/finder/viewoptionsdialog.cpp:431
 msgid "Delay before opening:"
-msgstr ""
+msgstr "Retardo al abrir:"
 
 #: shell/finder/viewoptionsdialog.cpp:435
 msgid "Grid Spacing"
-msgstr ""
+msgstr "Espaciado de la cuadrícula"
 
 #: shell/finder/viewoptionsdialog.cpp:441
 msgid "Puppy Mode"
-msgstr ""
+msgstr "Modo cachorro"
 
 #: shell/finder/viewoptionsdialog.cpp:442
 msgid "Only the essential commands and features."
-msgstr ""
+msgstr "Solo los comandos y funciones esenciales."
 
 #: shell/finder/viewoptionsdialog.cpp:445
 msgid "Media"
-msgstr ""
+msgstr "Medios"
 
 #: shell/finder/viewoptionsdialog.cpp:447
 msgid "Standard View Options for:"
-msgstr ""
+msgstr "Opciones de visualización estándar para:"
 
 #: shell/finder/viewoptionsdialog.cpp:455
 msgid "Click a colour to change it."
-msgstr ""
+msgstr "Haz clic en un color para cambiarlo."
 
 #: shell/greeter/main.cpp:112 shell/greeter/main.cpp:145
 #: shell/greeter/main.cpp:344
 msgid "Log In"
-msgstr ""
+msgstr "Iniciar sesión"
 
 #: shell/greeter/main.cpp:143 shell/menubar/hints.c:69
 #: shell/menubar/menus.c:233
 msgid "Shut Down"
-msgstr ""
+msgstr "Apagar"
 
 #: shell/greeter/main.cpp:173
 msgid "There are no accounts to log in to."
-msgstr ""
+msgstr "No hay cuentas con las que iniciar sesión."
 
 #: shell/greeter/main.cpp:197 shell/setup/setup.cpp:429
 msgid "Welcome to ZacOS 9."
-msgstr ""
+msgstr "Bienvenido a ZacOS 9."
 
 #: shell/greeter/main.cpp:211 shell/network/logindialog.cpp:123
 #: shell/setup/setup.cpp:443
 msgid "Password:"
-msgstr ""
+msgstr "Contraseña:"
 
 #: shell/greeter/main.cpp:212
 msgid "Logging in…"
-msgstr ""
+msgstr "Iniciando sesión…"
 
 #: shell/greeter/main.cpp:213
 msgid "Safe mode: Startup Items will not run."
-msgstr ""
+msgstr "Modo seguro: los elementos de inicio no se ejecutarán."
 
 #: shell/help/helpbook.cpp:292 shell/help/helpbook.cpp:293
 #: shell/help/helpwindow.cpp:79 shell/help/helpwindow.cpp:141
 #: shell/help/helpwindow.cpp:184 shell/help/helpwindow.cpp:255
 #: shell/help/main.cpp:21 shell/menubar/hints.c:71 shell/menubar/menus.c:243
 msgid "Help Center"
-msgstr ""
+msgstr "Centro de ayuda"
 
 #: shell/help/helpbook.cpp:294
 msgid ""
 "Choose a book, or type words in the search field above and click Search."
-msgstr ""
+msgstr "Elige un libro o escribe palabras en el campo de búsqueda de arriba y haz clic en Buscar."
 
 #: shell/help/helpbook.cpp:296
 msgid "No help is installed."
-msgstr ""
+msgstr "No hay ayuda instalada."
 
 #: shell/help/helpbook.cpp:310
 msgid "Search Results"
-msgstr ""
+msgstr "Resultados de la búsqueda"
 
 #: shell/help/helpbook.cpp:312
 msgid "No topics found"
-msgstr ""
+msgstr "No se encontraron temas"
 
 #: shell/help/helpbook.cpp:313
 msgid "Nothing in the help mentions “%1”. Try fewer or other words."
-msgstr ""
+msgstr "Nada en la ayuda menciona «%1». Prueba con menos palabras o con otras."
 
 #: shell/help/helpbook.cpp:315
 msgid "1 topic found"
-msgstr ""
+msgstr "Se encontró 1 tema"
 
 #: shell/help/helpbook.cpp:315
 msgid "%1 topics found"
-msgstr ""
+msgstr "Se encontraron %1 temas"
 
 #: shell/help/helpbook.cpp:317
 msgid "For “%1”, the best match first."
-msgstr ""
+msgstr "Para «%1», primero las mejores coincidencias."
 
 #: shell/help/helpwindow.cpp:75 shell/help/helpwindow.cpp:181
 msgid "Back"
-msgstr ""
+msgstr "Atrás"
 
 #: shell/help/helpwindow.cpp:77 shell/help/helpwindow.cpp:182
 msgid "Forward"
-msgstr ""
+msgstr "Adelante"
 
 #: shell/help/helpwindow.cpp:83
 msgid "Search"
-msgstr ""
+msgstr "Buscar"
 
 #: shell/help/helpwindow.cpp:167 shell/menubar/menus.c:157
 #: shell/menubar/menus.c:272
 msgid "File"
-msgstr ""
+msgstr "Archivo"
 
 #: shell/help/helpwindow.cpp:168
 msgid "Close"
-msgstr ""
+msgstr "Cerrar"
 
 #: shell/help/helpwindow.cpp:171 shell/menubar/menus.c:50
 msgid "Edit"
-msgstr ""
+msgstr "Edición"
 
 #: shell/help/helpwindow.cpp:173 shell/menubar/hints.c:50
 #: shell/menubar/menus.c:57
 msgid "Select All"
-msgstr ""
+msgstr "Seleccionar todo"
 
 #: shell/help/helpwindow.cpp:175
 msgid "Find in Help…"
-msgstr ""
+msgstr "Buscar en la ayuda…"
 
 #: shell/help/helpwindow.cpp:180
 msgid "Go"
-msgstr ""
+msgstr "Ir"
 
 #: shell/help/helpwindow.cpp:185 shell/menubar/hints.c:73
 #: shell/menubar/menus.c:247
 msgid "ZacOS Help"
-msgstr ""
+msgstr "Ayuda de ZacOS"
 
 #: shell/installer/installer.cpp:50
 msgid "Hard Disk"
-msgstr ""
+msgstr "Disco rígido"
 
 #: shell/installer/installer.cpp:56
 msgid "Partition %1"
-msgstr ""
+msgstr "Partición %1"
 
 #: shell/installer/installer.cpp:58
 msgid "%1 on %2"
-msgstr ""
+msgstr "%1 en %2"
 
 #: shell/installer/installer.cpp:75 shell/installer/installer.cpp:708
 msgid "ZacOS 9 Installer"
-msgstr ""
+msgstr "Instalador de ZacOS 9"
 
 #: shell/installer/installer.cpp:165
 msgid "Choose a language first."
-msgstr ""
+msgstr "Elige primero un idioma."
 
 #: shell/installer/installer.cpp:187
 msgid "The installer couldn't restart in that language."
-msgstr ""
+msgstr "El instalador no pudo reiniciarse en ese idioma."
 
 #: shell/installer/installer.cpp:208
 msgid "Erase the whole disk"
-msgstr ""
+msgstr "Borrar todo el disco"
 
 #: shell/installer/installer.cpp:209
 msgid "Next to what's on it"
-msgstr ""
+msgstr "Junto a lo que ya hay"
 
 #: shell/installer/installer.cpp:210
 msgid ""
 "Erase the whole disk for ZacOS 9 alone, or keep what's on it (Windows, "
 "Haiku...) and give ZacOS 9 room beside it."
-msgstr ""
+msgstr "Borra todo el disco para ZacOS 9 solo, o conserva lo que ya hay (Windows, Haiku...) y deja espacio para ZacOS 9 al lado."
 
 #: shell/installer/installer.cpp:240 shell/installer/installer.cpp:241
 msgid "Prepare Disk…"
-msgstr ""
+msgstr "Preparar disco…"
 
 #: shell/installer/installer.cpp:242
 msgid ""
 "Opens Disk Setup to partition or erase a disk first: to keep Windows beside "
 "ZacOS 9, make a ZacOS (ext4) partition there, then choose it here."
-msgstr ""
+msgstr "Abre Configuración de disco para particionar o borrar un disco primero: para conservar Windows junto a ZacOS 9, crea allí una partición ZacOS (ext4) y elígela aquí."
 
 #: shell/installer/installer.cpp:263 shell/installer/installer.cpp:750
 msgid "Reinstall"
-msgstr ""
+msgstr "Reinstalar"
 
 #: shell/installer/installer.cpp:264 shell/installer/installer.cpp:750
 msgid "Update"
-msgstr ""
+msgstr "Actualizar"
 
 #: shell/installer/installer.cpp:267 shell/installer/installer.cpp:268
 msgid "Erase & Install"
-msgstr ""
+msgstr "Borrar e instalar"
 
 #: shell/installer/installer.cpp:354
 msgid "This disk couldn't be read (UDisks isn't answering)."
-msgstr ""
+msgstr "No se pudo leer este disco (UDisks no responde)."
 
 #: shell/installer/installer.cpp:443
 msgid "Looking at what's on the disk…"
-msgstr ""
+msgstr "Examinando el contenido del disco…"
 
 #: shell/installer/installer.cpp:453
 msgid ""
 "ZacOS 9 gets %1 (the new partition). Drag the line above or below it for "
 "more or less room; it needs 16 GB at least."
-msgstr ""
+msgstr "ZacOS 9 recibe %1 (la nueva partición). Arrastra la línea de arriba o de abajo para darle más o menos espacio; necesita al menos 16 GB."
 
 #: shell/installer/installer.cpp:459
 msgid ""
 " %1 will be made smaller, %2 to %3: its files stay, but back up anything "
 "important first."
-msgstr ""
+msgstr " %1 se reducirá de %2 a %3: sus archivos se conservan, pero haz una copia de seguridad de lo importante primero."
 
 #: shell/installer/installer.cpp:463
 msgid " A %1 partition is made for starting up."
-msgstr ""
+msgstr " Se crea una partición %1 para el arranque."
 
 #: shell/installer/installer.cpp:499
 msgid "Preparing..."
-msgstr ""
+msgstr "Preparando..."
 
 #: shell/installer/installer.cpp:529
 msgid "Error: %1"
-msgstr ""
+msgstr "Error: %1"
 
 #: shell/installer/installer.cpp:542
 msgid "Installation failed (exit %1)"
-msgstr ""
+msgstr "La instalación falló (código %1)"
 
 #: shell/installer/installer.cpp:691
 msgid "Language"
-msgstr ""
+msgstr "Idioma"
 
 #: shell/installer/installer.cpp:692
 msgid "Choose the language for the installed system."
-msgstr ""
+msgstr "Elige el idioma del sistema que se instalará."
 
 #: shell/installer/installer.cpp:695
 msgid ""
 "The installed system, its login window and its own programs use this "
 "language. Debian programs get theirs from Debian's language packages."
-msgstr ""
+msgstr "El sistema instalado, su ventana de inicio de sesión y sus propios programas usan este idioma. Los programas de Debian lo obtienen de sus paquetes de idioma."
 
 #: shell/installer/installer.cpp:713
 msgid ""
@@ -2215,879 +2215,879 @@ msgid ""
 "one, keeping its accounts, files and settings. ZacOS 9 can have a whole "
 "disk, or go next to what's already on one (Windows, say). Either way, back "
 "up any files you want to keep first."
-msgstr ""
+msgstr "Esto instalará ZacOS 9 en un disco rígido o actualizará el ZacOS 9 que ya haya, conservando sus cuentas, archivos y ajustes. ZacOS 9 puede ocupar un disco entero o ir junto a lo que ya hay (Windows, por ejemplo). En cualquier caso, haz primero una copia de seguridad de los archivos que quieras conservar."
 
 #: shell/installer/installer.cpp:723
 msgid "Select a Destination"
-msgstr ""
+msgstr "Seleccionar un destino"
 
 #: shell/installer/installer.cpp:724
 msgid "Select the disk to install ZacOS 9 on."
-msgstr ""
+msgstr "Selecciona el disco donde instalar ZacOS 9."
 
 #: shell/installer/installer.cpp:736
 msgid "Disk name:"
-msgstr ""
+msgstr "Nombre del disco:"
 
 #: shell/installer/installer.cpp:742
 msgid "No suitable disks were found."
-msgstr ""
+msgstr "No se encontraron discos adecuados."
 
 #: shell/installer/installer.cpp:744
 msgid "This disk has ZacOS 9 %1 (“%2”). "
-msgstr ""
+msgstr "Este disco tiene ZacOS 9 %1 («%2»). "
 
 #: shell/installer/installer.cpp:747
 msgid ""
 "That is newer than this installer's %1; Erase & Install would erase it and "
 "everything on the disk."
-msgstr ""
+msgstr "Es más reciente que la versión %1 de este instalador; «Borrar e instalar» lo borraría junto con todo el disco."
 
 #: shell/installer/installer.cpp:749
 msgid ""
 "%1 keeps its accounts, files and settings; Erase & Install erases everything "
 "on it."
-msgstr ""
+msgstr "%1 conserva sus cuentas, archivos y ajustes; «Borrar e instalar» borra todo lo que hay en él."
 
 #: shell/installer/installer.cpp:759
 msgid "EFI System"
-msgstr ""
+msgstr "Sistema EFI"
 
 #: shell/installer/installer.cpp:764
 msgid "⚠ %1 will be completely erased"
-msgstr ""
+msgstr "⚠ %1 se borrará por completo"
 
 #: shell/installer/installer.cpp:765
 msgid ", with everything on %1."
-msgstr ""
+msgstr ", con todo lo que hay en %1."
 
 #: shell/installer/installer.cpp:779
 msgid "Updating ZacOS 9…"
-msgstr ""
+msgstr "Actualizando ZacOS 9…"
 
 #: shell/installer/installer.cpp:779
 msgid "Installing ZacOS 9…"
-msgstr ""
+msgstr "Instalando ZacOS 9…"
 
 #: shell/installer/installer.cpp:793
 msgid "Update Complete"
-msgstr ""
+msgstr "Actualización completada"
 
 #: shell/installer/installer.cpp:793
 msgid "Installation Complete"
-msgstr ""
+msgstr "Instalación completada"
 
 #: shell/installer/installer.cpp:798
 msgid ""
 "ZacOS 9 has been updated; your accounts, files and settings are as they "
 "were. Remove the installer disk and click Restart."
-msgstr ""
+msgstr "ZacOS 9 se ha actualizado; tus cuentas, archivos y ajustes siguen como estaban. Retira el disco de instalación y haz clic en Reiniciar."
 
 #: shell/installer/installer.cpp:800
 msgid ""
 "ZacOS 9 has been installed. Remove the installer disk and click Restart to "
 "start your new system."
-msgstr ""
+msgstr "ZacOS 9 se ha instalado. Retira el disco de instalación y haz clic en Reiniciar para iniciar el nuevo sistema."
 
 #: shell/jigsaw/main.cpp:200 shell/jigsaw/main.cpp:226 shell/menubar/hints.c:77
 msgid "Jigsaw Puzzle"
-msgstr ""
+msgstr "Rompecabezas"
 
 #: shell/keytags/keytagswindow.cpp:146 shell/keytags/main.cpp:18
 #: shell/menubar/hints.c:78
 msgid "Key Tags"
-msgstr ""
+msgstr "Teclas"
 
 #: shell/menubar/appmenu.c:883
 msgid "Application"
-msgstr ""
+msgstr "Aplicación"
 
 #: shell/menubar/hints.c:19 shell/menubar/launch.c:492
 msgid "About This Computer…"
-msgstr ""
+msgstr "Acerca de este ordenador…"
 
 #: shell/menubar/hints.c:19
 msgid "Shows how much memory this computer has and what it is running."
-msgstr ""
+msgstr "Muestra cuánta memoria tiene este ordenador y qué está ejecutando."
 
 #: shell/menubar/hints.c:20
 msgid ""
 "Quits a program that has stopped responding. Unsaved changes in it are lost."
-msgstr ""
+msgstr "Cierra un programa que ha dejado de responder. Los cambios sin guardar se perderán."
 
 #: shell/menubar/hints.c:21 shell/menubar/launch.c:556
 msgid "Control Panels"
-msgstr ""
+msgstr "Paneles de control"
 
 #: shell/menubar/hints.c:21
 msgid "Opens a control panel, to change how this computer works."
-msgstr ""
+msgstr "Abre un panel de control para cambiar el funcionamiento del ordenador."
 
 #: shell/menubar/hints.c:22 shell/menubar/launch.c:334
 msgid "Favorites"
-msgstr ""
+msgstr "Favoritos"
 
 #: shell/menubar/hints.c:22
 msgid ""
 "Opens one of your favourite items. Add one with File ▸ Add To Favorites."
-msgstr ""
+msgstr "Abre uno de tus elementos favoritos. Añade uno con Archivo ▸ Añadir a Favoritos."
 
 #: shell/menubar/hints.c:23 shell/menubar/recent.c:134
 msgid "Recent Applications"
-msgstr ""
+msgstr "Aplicaciones recientes"
 
 #: shell/menubar/hints.c:23
 msgid "Opens one of the programs you used most recently."
-msgstr ""
+msgstr "Abre uno de los programas que usaste recientemente."
 
 #: shell/menubar/hints.c:24 shell/menubar/recent.c:171
 msgid "Recent Documents"
-msgstr ""
+msgstr "Documentos recientes"
 
 #: shell/menubar/hints.c:24
 msgid "Opens one of the documents you opened most recently."
-msgstr ""
+msgstr "Abre uno de los documentos que abriste recientemente."
 
 #: shell/menubar/hints.c:25 shell/menubar/recent.c:218
 msgid "Recent Servers"
-msgstr ""
+msgstr "Servidores recientes"
 
 #: shell/menubar/hints.c:25
 msgid "Connects again to one of the servers you used most recently."
-msgstr ""
+msgstr "Se vuelve a conectar a uno de los servidores que usaste recientemente."
 
 #: shell/menubar/hints.c:26 shell/menubar/menus.c:159 shell/menubar/menus.c:730
 #: shell/menubar/menus.c:750
 msgid "New Folder"
-msgstr ""
+msgstr "Nueva carpeta"
 
 #: shell/menubar/hints.c:26
 msgid "Makes a new, empty folder in the active window."
-msgstr ""
+msgstr "Crea una carpeta vacía nueva en la ventana activa."
 
 #: shell/menubar/hints.c:27 shell/menubar/menus.c:160 shell/menubar/menus.c:692
 #: shell/menubar/menus.c:707 shell/menubar/menus.c:725
 msgid "Open"
-msgstr ""
+msgstr "Abrir"
 
 #: shell/menubar/hints.c:27
 msgid "Opens the selected items."
-msgstr ""
+msgstr "Abre los elementos seleccionados."
 
 #: shell/menubar/hints.c:28 shell/menubar/menus.c:161 shell/menubar/menus.c:695
 msgid "Print"
-msgstr ""
+msgstr "Imprimir"
 
 #: shell/menubar/hints.c:28
 msgid "Prints the selected documents."
-msgstr ""
+msgstr "Imprime los documentos seleccionados."
 
 #: shell/menubar/hints.c:29 shell/menubar/menus.c:164 shell/menubar/menus.c:697
 msgid "Move To Trash"
-msgstr ""
+msgstr "Mover a la Papelera"
 
 #: shell/menubar/hints.c:29
 msgid ""
 "Moves the selected items to the Trash. They are deleted when you empty it."
-msgstr ""
+msgstr "Mueve los elementos seleccionados a la Papelera. Se eliminan al vaciarla."
 
 #: shell/menubar/hints.c:30 shell/menubar/menus.c:165 shell/menubar/menus.c:273
 #: shell/menubar/menus.c:746
 msgid "Close Window"
-msgstr ""
+msgstr "Cerrar ventana"
 
 #: shell/menubar/hints.c:30
 msgid "Closes the active window."
-msgstr ""
+msgstr "Cierra la ventana activa."
 
 #: shell/menubar/hints.c:31 shell/menubar/menus.c:169 shell/menubar/menus.c:699
 #: shell/menubar/menus.c:708 shell/menubar/menus.c:745
 msgid "Get Info"
-msgstr ""
+msgstr "Obtener información"
 
 #: shell/menubar/hints.c:31
 msgid ""
 "Shows information about the selected item, such as its size, where it is and "
 "its comments."
-msgstr ""
+msgstr "Muestra información del elemento seleccionado, como su tamaño, ubicación y comentarios."
 
 #: shell/menubar/hints.c:32 shell/menubar/menus.c:71
 msgid "Label"
-msgstr ""
+msgstr "Etiqueta"
 
 #: shell/menubar/hints.c:32
 msgid "Gives the selected items a label, which colours their icons."
-msgstr ""
+msgstr "Asigna una etiqueta a los elementos seleccionados, que colorea sus iconos."
 
 #: shell/menubar/hints.c:33 shell/menubar/menus.c:174 shell/menubar/menus.c:701
 msgid "Duplicate"
-msgstr ""
+msgstr "Duplicar"
 
 #: shell/menubar/hints.c:33
 msgid "Makes a copy of the selected items in the same folder."
-msgstr ""
+msgstr "Crea una copia de los elementos seleccionados en la misma carpeta."
 
 #: shell/menubar/hints.c:34 shell/menubar/menus.c:175 shell/menubar/menus.c:702
 msgid "Make Alias"
-msgstr ""
+msgstr "Crear alias"
 
 #: shell/menubar/hints.c:34
 msgid ""
 "Makes an alias of the selected item: a small file that opens the original."
-msgstr ""
+msgstr "Crea un alias del elemento seleccionado: un archivo pequeño que abre el original."
 
 #: shell/menubar/hints.c:35 shell/menubar/menus.c:177
 msgid "Put Away"
-msgstr ""
+msgstr "Retirar"
 
 #: shell/menubar/hints.c:35
 msgid ""
 "Returns the selected items to where they came from: out of the Trash, or a "
 "disk off the desktop."
-msgstr ""
+msgstr "Devuelve los elementos seleccionados a su origen: desde la Papelera o desde un disco del escritorio."
 
 #: shell/menubar/hints.c:36 shell/menubar/menus.c:176 shell/menubar/menus.c:703
 #: shell/menubar/menus.c:712
 msgid "Add To Favorites"
-msgstr ""
+msgstr "Añadir a Favoritos"
 
 #: shell/menubar/hints.c:36
 msgid ""
 "Adds the selected item to Favorites in the Zac menu and in Open and Save "
 "dialogs."
-msgstr ""
+msgstr "Añade el elemento seleccionado a Favoritos en el menú Zac y en los diálogos Abrir y Guardar."
 
 #: shell/menubar/hints.c:37 shell/menubar/menus.c:180
 msgid "Find…"
-msgstr ""
+msgstr "Buscar…"
 
 #: shell/menubar/hints.c:37
 msgid "Finds files and folders by name, date, kind and more."
-msgstr ""
+msgstr "Busca archivos y carpetas por nombre, fecha, tipo y más."
 
 #: shell/menubar/hints.c:38 shell/menubar/menus.c:181
 msgid "Find Similar Items"
-msgstr ""
+msgstr "Buscar elementos similares"
 
 #: shell/menubar/hints.c:38
 msgid "Finds items like the selected one."
-msgstr ""
+msgstr "Busca elementos parecidos al seleccionado."
 
 #: shell/menubar/hints.c:39 shell/menubar/menus.c:182
 msgid "Index Selection"
-msgstr ""
+msgstr "Indexar selección"
 
 #: shell/menubar/hints.c:39
 msgid ""
 "Indexes the selected folders, so Find can search what is in their files."
-msgstr ""
+msgstr "Indexa las carpetas seleccionadas para que Buscar pueda buscar dentro de sus archivos."
 
 #: shell/menubar/hints.c:40 shell/menubar/menus.c:179
 msgid "Search Internet…"
-msgstr ""
+msgstr "Buscar en Internet…"
 
 #: shell/menubar/hints.c:40
 msgid "Searches the web with the search site you choose."
-msgstr ""
+msgstr "Busca en la web con el sitio de búsqueda que elijas."
 
 #: shell/menubar/hints.c:41 shell/menubar/menus.c:183
 msgid "Show Original"
-msgstr ""
+msgstr "Mostrar original"
 
 #: shell/menubar/hints.c:41
 msgid "Finds the original item of the selected alias."
-msgstr ""
+msgstr "Encuentra el elemento original del alias seleccionado."
 
 #: shell/menubar/hints.c:42 shell/menubar/menus.c:162
 msgid "Encrypt…"
-msgstr ""
+msgstr "Cifrar…"
 
 #: shell/menubar/hints.c:42
 msgid "Makes a password-protected copy of the selected file."
-msgstr ""
+msgstr "Crea una copia protegida con contraseña del archivo seleccionado."
 
 #: shell/menubar/hints.c:43 shell/menubar/menus.c:163
 msgid "Decrypt…"
-msgstr ""
+msgstr "Descifrar…"
 
 #: shell/menubar/hints.c:43
 msgid ""
 "Makes an ordinary copy of the selected encrypted file, after asking for its "
 "password."
-msgstr ""
+msgstr "Crea una copia normal del archivo cifrado seleccionado tras pedir su contraseña."
 
 #: shell/menubar/hints.c:44 shell/menubar/menus.c:185
 msgid "Page Setup…"
-msgstr ""
+msgstr "Configurar página…"
 
 #: shell/menubar/hints.c:44
 msgid "Sets the paper size, orientation and scale for printing a window."
-msgstr ""
+msgstr "Ajusta el tamaño del papel, la orientación y la escala para imprimir una ventana."
 
 #: shell/menubar/hints.c:45 shell/menubar/menus.c:51
 msgid "Undo"
-msgstr ""
+msgstr "Deshacer"
 
 #: shell/menubar/hints.c:45
 msgid "Undoes your last action."
-msgstr ""
+msgstr "Deshace tu última acción."
 
 #: shell/menubar/hints.c:46 shell/menubar/menus.c:53
 msgid "Cut"
-msgstr ""
+msgstr "Cortar"
 
 #: shell/menubar/hints.c:46
 msgid "Removes the selection and places it on the Clipboard."
-msgstr ""
+msgstr "Elimina la selección y la coloca en el portapapeles."
 
 #: shell/menubar/hints.c:47
 msgid "Copies the selection to the Clipboard."
-msgstr ""
+msgstr "Copia la selección al portapapeles."
 
 #: shell/menubar/hints.c:48 shell/menubar/menus.c:55
 msgid "Paste"
-msgstr ""
+msgstr "Pegar"
 
 #: shell/menubar/hints.c:48
 msgid "Inserts the contents of the Clipboard."
-msgstr ""
+msgstr "Inserta el contenido del portapapeles."
 
 #: shell/menubar/hints.c:49 shell/menubar/menus.c:56
 msgid "Clear"
-msgstr ""
+msgstr "Borrar"
 
 #: shell/menubar/hints.c:49
 msgid "Removes the selection without placing it on the Clipboard."
-msgstr ""
+msgstr "Elimina la selección sin colocarla en el portapapeles."
 
 #: shell/menubar/hints.c:50
 msgid "Selects everything in the active window."
-msgstr ""
+msgstr "Selecciona todo en la ventana activa."
 
 #: shell/menubar/hints.c:51 shell/menubar/menus.c:196
 msgid "Show Clipboard"
-msgstr ""
+msgstr "Mostrar portapapeles"
 
 #: shell/menubar/hints.c:51
 msgid "Shows what is on the Clipboard."
-msgstr ""
+msgstr "Muestra el contenido del portapapeles."
 
 #: shell/menubar/hints.c:52 shell/menubar/menus.c:201 shell/menubar/menus.c:734
 msgid "as Icons"
-msgstr ""
+msgstr "como iconos"
 
 #: shell/menubar/hints.c:52
 msgid "Shows the active window's items as icons."
-msgstr ""
+msgstr "Muestra los elementos de la ventana activa como iconos."
 
 #: shell/menubar/hints.c:53 shell/menubar/menus.c:203 shell/menubar/menus.c:735
 msgid "as Buttons"
-msgstr ""
+msgstr "como botones"
 
 #: shell/menubar/hints.c:53
 msgid "Shows the active window's items as buttons, which open with one click."
-msgstr ""
+msgstr "Muestra los elementos de la ventana activa como botones que se abren con un clic."
 
 #: shell/menubar/hints.c:54 shell/menubar/menus.c:205 shell/menubar/menus.c:736
 msgid "as List"
-msgstr ""
+msgstr "como lista"
 
 #: shell/menubar/hints.c:54
 msgid "Shows the active window's items in a list."
-msgstr ""
+msgstr "Muestra los elementos de la ventana activa en una lista."
 
 #: shell/menubar/hints.c:55 shell/menubar/menus.c:209
 msgid "as Window"
-msgstr ""
+msgstr "como ventana"
 
 #: shell/menubar/hints.c:55
 msgid "Makes the active pop-up window an ordinary window."
-msgstr ""
+msgstr "Convierte la ventana emergente activa en una ventana normal."
 
 #: shell/menubar/hints.c:56 shell/menubar/menus.c:211
 msgid "as Pop-up Window"
-msgstr ""
+msgstr "como ventana emergente"
 
 #: shell/menubar/hints.c:56
 msgid ""
 "Makes the active window a pop-up window, with a tab at the bottom of the "
 "screen."
-msgstr ""
+msgstr "Convierte la ventana activa en una ventana emergente con una pestaña en la parte inferior de la pantalla."
 
 #: shell/menubar/hints.c:57 shell/menubar/menus.c:217 shell/menubar/menus.c:738
 #: shell/menubar/menus.c:752
 msgid "Clean Up"
-msgstr ""
+msgstr "Alinear"
 
 #: shell/menubar/hints.c:57
 msgid "Lines up the icons in the active window."
-msgstr ""
+msgstr "Alinea los iconos de la ventana activa."
 
 #: shell/menubar/hints.c:58 shell/menubar/menus.c:88
 msgid "Arrange"
-msgstr ""
+msgstr "Organizar"
 
 #: shell/menubar/hints.c:58
 msgid "Puts the icons in order, by name, date, size, kind or label."
-msgstr ""
+msgstr "Ordena los iconos por nombre, fecha, tamaño, tipo o etiqueta."
 
 #: shell/menubar/hints.c:59 shell/menubar/menus.c:106
 msgid "Sort List"
-msgstr ""
+msgstr "Ordenar lista"
 
 #: shell/menubar/hints.c:59
 msgid "Sorts the list by one of its columns."
-msgstr ""
+msgstr "Ordena la lista por una de sus columnas."
 
 #: shell/menubar/hints.c:60 shell/menubar/menus.c:220
 msgid "Reset Column Positions"
-msgstr ""
+msgstr "Restablecer posiciones de columnas"
 
 #: shell/menubar/hints.c:60
 msgid "Puts the list's columns back in their standard order and widths."
-msgstr ""
+msgstr "Devuelve las columnas de la lista a su orden y anchura estándar."
 
 #: shell/menubar/hints.c:61 shell/menubar/menus.c:223 shell/menubar/menus.c:743
 #: shell/menubar/menus.c:754
 msgid "View Options…"
-msgstr ""
+msgstr "Opciones de visualización…"
 
 #: shell/menubar/hints.c:61
 msgid "Sets how the active window shows its items."
-msgstr ""
+msgstr "Ajusta cómo muestra sus elementos la ventana activa."
 
 #: shell/menubar/hints.c:62 shell/menubar/menus.c:65
 msgid "Empty Trash…"
-msgstr ""
+msgstr "Vaciar la Papelera…"
 
 #: shell/menubar/hints.c:62 shell/menubar/hints.c:63
 msgid "Deletes the items in the Trash for good."
-msgstr ""
+msgstr "Elimina definitivamente los elementos de la Papelera."
 
 #: shell/menubar/hints.c:63 shell/menubar/menus.c:65
 msgid "Empty Trash"
-msgstr ""
+msgstr "Vaciar la Papelera"
 
 #: shell/menubar/hints.c:64 shell/menubar/menus.c:226 shell/menubar/menus.c:718
 msgid "Eject"
-msgstr ""
+msgstr "Expulsar"
 
 #: shell/menubar/hints.c:64
 msgid "Ejects the selected disks, or disconnects from the selected servers."
-msgstr ""
+msgstr "Expulsa los discos seleccionados o se desconecta de los servidores seleccionados."
 
 #: shell/menubar/hints.c:65 shell/menubar/menus.c:227 shell/menubar/menus.c:721
 msgid "Erase Disk…"
-msgstr ""
+msgstr "Borrar disco…"
 
 #: shell/menubar/hints.c:65
 msgid "Erases everything on the selected disk."
-msgstr ""
+msgstr "Borra todo el disco seleccionado."
 
 #: shell/menubar/hints.c:66 shell/menubar/menus.c:229
 msgid "Show All Applications"
-msgstr ""
+msgstr "Mostrar todas las aplicaciones"
 
 #: shell/menubar/hints.c:66
 msgid "Shows the applications you have hidden from the Applications folder."
-msgstr ""
+msgstr "Muestra las aplicaciones que has ocultado de la carpeta Aplicaciones."
 
 #: shell/menubar/hints.c:67 shell/menubar/menus.c:231
 msgid "Sleep"
-msgstr ""
+msgstr "Reposo"
 
 #: shell/menubar/hints.c:67
 msgid "Puts the computer to sleep. Press a key or move the mouse to wake it."
-msgstr ""
+msgstr "Pone el ordenador en reposo. Pulsa una tecla o mueve el ratón para despertarlo."
 
 #: shell/menubar/hints.c:68
 msgid "Quits your programs and starts the computer again."
-msgstr ""
+msgstr "Cierra tus programas y reinicia el ordenador."
 
 #: shell/menubar/hints.c:69
 msgid "Quits your programs and turns the computer off."
-msgstr ""
+msgstr "Cierra tus programas y apaga el ordenador."
 
 #: shell/menubar/hints.c:70 shell/menubar/menus.c:235
 msgid "Log Out…"
-msgstr ""
+msgstr "Cerrar sesión…"
 
 #: shell/menubar/hints.c:70
 msgid "Quits your programs and returns to the login window."
-msgstr ""
+msgstr "Cierra tus programas y vuelve a la ventana de inicio de sesión."
 
 #: shell/menubar/hints.c:71
 msgid ""
 "Opens the Help Center, where you can read help for ZacOS and your programs."
-msgstr ""
+msgstr "Abre el Centro de ayuda, donde puedes leer la ayuda de ZacOS y de tus programas."
 
 #: shell/menubar/hints.c:72 shell/menubar/menus.c:256
 msgid "Show Hint Bubbles"
-msgstr ""
+msgstr "Mostrar globos de ayuda"
 
 #: shell/menubar/hints.c:72
 msgid "Turns hint bubbles like this one on or off."
-msgstr ""
+msgstr "Activa o desactiva los globos de ayuda como este."
 
 #: shell/menubar/hints.c:73
 msgid "Opens help for ZacOS."
-msgstr ""
+msgstr "Abre la ayuda de ZacOS."
 
 #: shell/menubar/hints.c:74
 msgid "Opens Bark Recorder, to record a sound and play it back."
-msgstr ""
+msgstr "Abre Grabadora para grabar un sonido y reproducirlo."
 
 #: shell/menubar/hints.c:75
 msgid ""
 "Opens the Calculator, for adding, subtracting, multiplying and dividing."
-msgstr ""
+msgstr "Abre la Calculadora para sumar, restar, multiplicar y dividir."
 
 #: shell/menubar/hints.c:76
 msgid "Dog Ears"
-msgstr ""
+msgstr "Dog Ears"
 
 #: shell/menubar/hints.c:76
 msgid "Opens Dog Ears: notes that stay on your screen, saved as you type."
-msgstr ""
+msgstr "Abre Dog Ears: notas que permanecen en la pantalla y se guardan mientras escribes."
 
 #: shell/menubar/hints.c:77
 msgid "Opens Jigsaw Puzzle, a picture in pieces to put back together."
-msgstr ""
+msgstr "Abre Rompecabezas, una imagen en piezas para recomponer."
 
 #: shell/menubar/hints.c:78
 msgid ""
 "Opens Key Tags, which shows the character each key types with your keyboard "
 "layout."
-msgstr ""
+msgstr "Abre Teclas, que muestra el carácter que escribe cada tecla con tu distribución de teclado."
 
 #: shell/menubar/hints.c:79 shell/notepad/main.cpp:13
 msgid "Notepad"
-msgstr ""
+msgstr "Bloc de notas"
 
 #: shell/menubar/hints.c:79
 msgid "Opens Notepad, eight pages for jotting things down."
-msgstr ""
+msgstr "Abre Bloc de notas, ocho páginas para anotar cosas."
 
 #: shell/menubar/hints.c:80
 msgid "Pedigree"
-msgstr ""
+msgstr "Pedigree"
 
 #: shell/menubar/hints.c:80
 msgid ""
 "Opens Pedigree, which describes this computer: its hardware, disks and "
 "devices."
-msgstr ""
+msgstr "Abre Pedigree, que describe este ordenador: su hardware, discos y dispositivos."
 
 #: shell/menubar/hints.c:81
 msgid "Photo Booth"
-msgstr ""
+msgstr "Photo Booth"
 
 #: shell/menubar/hints.c:81
 msgid ""
 "Opens Photo Booth, to take a photo with the built-in camera or a connected "
 "webcam."
-msgstr ""
+msgstr "Abre Photo Booth para hacer una foto con la cámara integrada o una webcam conectada."
 
 #: shell/menubar/hints.c:82
 msgid "Plotter"
-msgstr ""
+msgstr "Plotter"
 
 #: shell/menubar/hints.c:82
 msgid "Opens Plotter, which draws the graph of an equation."
-msgstr ""
+msgstr "Abre Plotter, que dibuja la gráfica de una ecuación."
 
 #: shell/menubar/hints.c:83
 msgid "Stash"
-msgstr ""
+msgstr "Stash"
 
 #: shell/menubar/hints.c:83
 msgid "Opens Stash, a place to keep pictures and text to use again."
-msgstr ""
+msgstr "Abre Stash, un lugar para guardar imágenes y texto y volver a usarlos."
 
 #: shell/menubar/hints.c:84
 msgid "Terminal"
-msgstr ""
+msgstr "Terminal"
 
 #: shell/menubar/hints.c:84 shell/menubar/hints.c:85
 msgid "Opens a terminal window, for typing commands."
-msgstr ""
+msgstr "Abre una ventana de terminal para escribir comandos."
 
 #: shell/menubar/hints.c:85
 msgid "XTerm"
-msgstr ""
+msgstr "XTerm"
 
 #: shell/menubar/hints.c:86 shell/menubar/menus.c:251
 msgid "Learn ZacOS"
-msgstr ""
+msgstr "Aprender ZacOS"
 
 #: shell/menubar/hints.c:86
 msgid ""
 "Opens short lessons on using ZacOS, with a tour for people who used a Mac "
 "before."
-msgstr ""
+msgstr "Abre lecciones breves sobre ZacOS, con un recorrido para quienes usaron un Mac antes."
 
 #: shell/menubar/hints.c:87 shell/menubar/menus.c:253
 #: shell/mousepractice/main.cpp:251 shell/mousepractice/main.cpp:271
 msgid "Mouse Practice"
-msgstr ""
+msgstr "Práctica con el ratón"
 
 #: shell/menubar/hints.c:87
 msgid ""
 "Opens Mouse Practice, a game for learning pointing, clicking, double-"
 "clicking and dragging."
-msgstr ""
+msgstr "Abre Práctica con el ratón, un juego para aprender a señalar, hacer clic, doble clic y arrastrar."
 
 #: shell/menubar/hints.c:88 shell/menubar/menus.c:485
 msgid "Hide Others"
-msgstr ""
+msgstr "Ocultar otras"
 
 #: shell/menubar/hints.c:88
 msgid "Hides the windows of every program except the active one."
-msgstr ""
+msgstr "Oculta las ventanas de todos los programas excepto la aplicación activa."
 
 #: shell/menubar/hints.c:89
 msgid "Shows the windows of every hidden program."
-msgstr ""
+msgstr "Muestra las ventanas de todos los programas ocultos."
 
 #: shell/menubar/hints.c:90
 msgid "Quits the active program."
-msgstr ""
+msgstr "Cierra la aplicación activa."
 
 #: shell/menubar/hints.c:91 shell/menubar/menus.c:759
 msgid "Change Desktop Background…"
-msgstr ""
+msgstr "Cambiar el fondo del escritorio…"
 
 #: shell/menubar/hints.c:91
 msgid ""
 "Opens the Appearance control panel to choose a desktop picture or pattern."
-msgstr ""
+msgstr "Abre el panel Apariencia para elegir una imagen o un motivo para el escritorio."
 
 #: shell/menubar/hints.c:92 shell/menubar/menus.c:635
 msgid "Attach a Folder Trick"
-msgstr ""
+msgstr "Añadir acción de carpeta"
 
 #: shell/menubar/hints.c:92
 msgid "Attaches a script that runs when items are added to the folder."
-msgstr ""
+msgstr "Añade un script que se ejecuta cuando se añaden elementos a la carpeta."
 
 #: shell/menubar/hints.c:93 shell/menubar/menus.c:657
 msgid "Remove a Folder Trick"
-msgstr ""
+msgstr "Quitar acción de carpeta"
 
 #: shell/menubar/hints.c:93
 msgid "Removes a script attached to the folder."
-msgstr ""
+msgstr "Quita un script asociado a la carpeta."
 
 #: shell/menubar/hints.c:101
 #, c-format
 msgid "Makes %s the active program, bringing its windows forward."
-msgstr ""
+msgstr "Hace que %s sea la aplicación activa y trae sus ventanas al frente."
 
 #: shell/menubar/hints.c:106
 msgid ""
 "Hides the active program's windows. Choose it again from this menu to show "
 "them."
-msgstr ""
+msgstr "Oculta las ventanas de la aplicación activa. Elige esta opción de nuevo para mostrarlas."
 
 #: shell/menubar/hints.c:109
 msgid "Types with this keyboard layout. Press ⌘-Space to switch layouts."
-msgstr ""
+msgstr "Escribe con esta distribución de teclado. Pulsa ⌘-Espacio para cambiar de distribución."
 
 #: shell/menubar/launch.c:383
 msgid "Automated Tasks"
-msgstr ""
+msgstr "Tareas automáticas"
 
 #: shell/menubar/launch.c:497
 msgid "New Tricks"
-msgstr ""
+msgstr "Nuevos trucos"
 
 #: shell/menubar/launch.c:503
 msgid "Fetch Updates"
-msgstr ""
+msgstr "Buscar actualizaciones"
 
 #: shell/menubar/launch.c:528
 msgid "Old Dog"
-msgstr ""
+msgstr "Old Dog"
 
 #: shell/menubar/launch.c:534
 msgid "Screen Snapshot"
-msgstr ""
+msgstr "Captura de pantalla"
 
 #: shell/menubar/launch.c:540 shell/wininstall/main.cpp:12
 #: shell/wininstall/wininstall.cpp:158
 msgid "Windows Installer"
-msgstr ""
+msgstr "Instalador de Windows"
 
 #: shell/menubar/launch.c:547 shell/network/main.cpp:17
 #: shell/network/netbrowser.cpp:32
 msgid "Neighbourhood"
-msgstr ""
+msgstr "Vecindario"
 
 #: shell/menubar/launch.c:569
 msgid "Toy Box"
-msgstr ""
+msgstr "Toy Box"
 
 #: shell/menubar/menus.c:104
 msgid "by Comments"
-msgstr ""
+msgstr "por comentarios"
 
 #: shell/menubar/menus.c:104
 msgid "by Version"
-msgstr ""
+msgstr "por versión"
 
 #: shell/menubar/menus.c:172
 msgid "Sharing…"
-msgstr ""
+msgstr "Compartir…"
 
 #: shell/menubar/menus.c:186
 msgid "Print Window…"
-msgstr ""
+msgstr "Imprimir ventana…"
 
 #: shell/menubar/menus.c:186
 msgid "Print Desktop…"
-msgstr ""
+msgstr "Imprimir escritorio…"
 
 #: shell/menubar/menus.c:198
 msgid "Preferences…"
-msgstr ""
+msgstr "Preferencias…"
 
 #: shell/menubar/menus.c:199 shell/menubar/menus.c:732
 msgid "View"
-msgstr ""
+msgstr "Visualización"
 
 #: shell/menubar/menus.c:224
 msgid "Special"
-msgstr ""
+msgstr "Especial"
 
 #: shell/menubar/menus.c:240
 msgid "Help"
-msgstr ""
+msgstr "Ayuda"
 
 #: shell/menubar/menus.c:480
 #, c-format
 msgid "Hide %s"
-msgstr ""
+msgstr "Ocultar %s"
 
 #: shell/menubar/menus.c:483
 msgid "Hide Sniffer"
-msgstr ""
+msgstr "Ocultar Sniffer"
 
 #: shell/menubar/menus.c:655
 msgid "Open Folder Tricks Folder"
-msgstr ""
+msgstr "Abrir la carpeta de acciones de carpeta"
 
 #: shell/network/connectdialog.cpp:16
 msgid "Connect to Server"
-msgstr ""
+msgstr "Conectar al servidor"
 
 #: shell/network/connectdialog.cpp:19
 msgid "A classic Mac (AFP)"
-msgstr ""
+msgstr "Un Mac clásico (AFP)"
 
 #: shell/network/connectdialog.cpp:20
 msgid "A Windows computer (SMB)"
-msgstr ""
+msgstr "Un ordenador Windows (SMB)"
 
 #: shell/network/connectdialog.cpp:24 shell/network/logindialog.cpp:59
 msgid "Connect"
-msgstr ""
+msgstr "Conectar"
 
 #: shell/network/connectdialog.cpp:69
 msgid "Server address:"
-msgstr ""
+msgstr "Dirección del servidor:"
 
 #: shell/network/logindialog.cpp:19
 msgid "Connect to the computer"
-msgstr ""
+msgstr "Conectar al ordenador"
 
 #: shell/network/logindialog.cpp:20
 msgid "Connect to the file server"
-msgstr ""
+msgstr "Conectar al servidor de archivos"
 
 #: shell/network/logindialog.cpp:33
 msgid "Guest"
-msgstr ""
+msgstr "Invitado"
 
 #: shell/network/logindialog.cpp:34
 msgid "Registered User"
-msgstr ""
+msgstr "Usuario registrado"
 
 #: shell/network/logindialog.cpp:121
 msgid "Connect to the computer as:"
-msgstr ""
+msgstr "Conectar al ordenador como:"
 
 #: shell/network/logindialog.cpp:121
 msgid "Connect to the file server as:"
-msgstr ""
+msgstr "Conectar al servidor de archivos como:"
 
 #: shell/network/logindialog.cpp:125
 msgid "Share:"
-msgstr ""
+msgstr "Recurso:"
 
 #: shell/network/netbrowser.cpp:37
 msgid "Scan Again"
-msgstr ""
+msgstr "Volver a buscar"
 
 #: shell/network/netbrowser.cpp:38
 msgid "Connect to Server…"
-msgstr ""
+msgstr "Conectar al servidor…"
 
 #: shell/network/netbrowser.cpp:53
 msgid "Looking for computers…"
-msgstr ""
+msgstr "Buscando ordenadores…"
 
 #: shell/network/netbrowser.cpp:73
 msgid ""
 "No computers were found announcing themselves. Use Connect to Server for one "
 "that doesn’t."
-msgstr ""
+msgstr "No se encontraron ordenadores que se anuncien. Usa Conectar al servidor para uno que no lo haga."
 
 #: shell/network/netbrowser.cpp:115
 msgid ""
 "“%1” is this computer. Its shared folders are already here: open them in the "
 "Sniffer."
-msgstr ""
+msgstr "«%1» es este ordenador. Sus carpetas compartidas ya están aquí: ábrelas en Sniffer."
 
 #: shell/network/netbrowser.cpp:127
 msgid "The share could not be mounted."
-msgstr ""
+msgstr "No se pudo montar el recurso compartido."
 
 #: shell/network/netbrowser.cpp:148
 msgid "“%1” can only accept an unencrypted password. Send it anyway?"
-msgstr ""
+msgstr "«%1» solo acepta una contraseña sin cifrar. ¿Enviarla de todos modos?"
 
 #: shell/network/netbrowser.cpp:149
 msgid "Send"
-msgstr ""
+msgstr "Enviar"
 
 #: shell/network/netbrowser.cpp:165
 msgid ""
 "“%1” can’t be connected: a different disk is already connected in its place."
-msgstr ""
+msgstr "No se puede conectar «%1»: ya hay otro disco conectado en su lugar."
 
 #: shell/network/volumedialog.cpp:17
 msgid "Select a Volume"
-msgstr ""
+msgstr "Seleccionar un volumen"
 
 #: shell/network/volumedialog.cpp:32
 msgid "Mount"
-msgstr ""
+msgstr "Montar"
 
 #: shell/network/volumedialog.cpp:66
 msgid "This server has no volumes to open."
-msgstr ""
+msgstr "Este servidor no tiene volúmenes que abrir."
 
 #: shell/network/volumedialog.cpp:66
 msgid "Select a volume:"
-msgstr ""
+msgstr "Selecciona un volumen:"
 
 #: shell/notepad/notepadwindow.cpp:104
 msgid "Notepad - Page %1 of %2"
-msgstr ""
+msgstr "Bloc de notas - Página %1 de %2"
 
 #: shell/pack/packwindow.cpp:37
 msgid "Applications"
-msgstr ""
+msgstr "Aplicaciones"
 
 #: shell/panels/accessibility.cpp:10 shell/panels/accessibility.cpp:127
 msgid "Accessibility"
@@ -3099,15 +3099,15 @@ msgstr "Apariencia"
 
 #: shell/panels/collarpanel.cpp:108
 msgid "Define Hot Key"
-msgstr ""
+msgstr "Definir tecla rápida"
 
 #: shell/panels/collarpanel.cpp:203 shell/panels/collarpanel_main.cpp:16
 msgid "Collar"
-msgstr ""
+msgstr "Collar"
 
 #: shell/panels/datetime.cpp:228
 msgid "Set Time Zone"
-msgstr ""
+msgstr "Establecer zona horaria"
 
 #: shell/panels/datetime.cpp:317 shell/panels/datetime_main.cpp:15
 msgid "Date & Time"
@@ -3119,7 +3119,7 @@ msgstr "Ahorro de energía"
 
 #: shell/panels/fileexchange.cpp:20
 msgid "Open With"
-msgstr ""
+msgstr "Abrir con"
 
 #: shell/panels/fileexchange.cpp:108 shell/panels/fileexchange_main.cpp:15
 msgid "File Translator"
@@ -3241,7 +3241,7 @@ msgstr "Voz"
 
 #: shell/panels/startupdisk.cpp:193 shell/panels/startupdisk.cpp:497
 msgid "Startup Disk"
-msgstr ""
+msgstr "Disco de arranque"
 
 #: shell/panels/tablet.cpp:59 shell/panels/tablet.cpp:138
 msgid "Tablet"
@@ -3257,15 +3257,15 @@ msgstr "Usuarios"
 
 #: shell/panels/users.cpp:532
 msgid "New User"
-msgstr ""
+msgstr "Usuario nuevo"
 
 #: shell/panels/users.cpp:898
 msgid "Programs"
-msgstr ""
+msgstr "Programas"
 
 #: shell/panels/users.cpp:1067
 msgid "Users Options"
-msgstr ""
+msgstr "Opciones de usuarios"
 
 #: shell/panels/zacmenu.cpp:10 shell/panels/zacmenu.cpp:78
 msgid "Zac Menu Options"
@@ -3273,234 +3273,234 @@ msgstr "Opciones del menú Zac"
 
 #: shell/picture/main.cpp:21 shell/picture/picturewindow.cpp:94
 msgid "Picture Viewer"
-msgstr ""
+msgstr "Visor de imágenes"
 
 #: shell/print/queue_main.cpp:24
 msgid "Print Queue"
-msgstr ""
+msgstr "Cola de impresión"
 
 #: shell/setup/main.cpp:12
 msgid "Setup Assistant"
-msgstr ""
+msgstr "Asistente de configuración"
 
 #: shell/setup/setup.cpp:36
 msgid "Introduction"
-msgstr ""
+msgstr "Introducción"
 
 #: shell/setup/setup.cpp:36
 msgid "Password"
-msgstr ""
+msgstr "Contraseña"
 
 #: shell/setup/setup.cpp:36
 msgid "Computer Name"
-msgstr ""
+msgstr "Nombre del ordenador"
 
 #: shell/setup/setup.cpp:36
 msgid "Time Zone"
-msgstr ""
+msgstr "Zona horaria"
 
 #: shell/setup/setup.cpp:37
 msgid "Conclusion"
-msgstr ""
+msgstr "Conclusión"
 
 #: shell/setup/setup.cpp:92
 msgid "ZacOS Setup Assistant"
-msgstr ""
+msgstr "Asistente de configuración de ZacOS"
 
 #: shell/setup/setup.cpp:118
 msgid "Log in automatically when the computer starts up"
-msgstr ""
+msgstr "Iniciar sesión automáticamente al encender el ordenador"
 
 #: shell/setup/setup.cpp:139 shell/setup/setup.cpp:140
 msgid "Open TCP/IP…"
-msgstr ""
+msgstr "Abrir TCP/IP…"
 
 #: shell/setup/setup.cpp:141
 msgid "Opens the TCP/IP control panel, where you choose a Wi-Fi network."
-msgstr ""
+msgstr "Abre el panel TCP/IP, donde eliges una red Wi-Fi."
 
 #: shell/setup/setup.cpp:143
 msgid "Checking…"
-msgstr ""
+msgstr "Comprobando…"
 
 #: shell/setup/setup.cpp:148 shell/setup/setup.cpp:149
 msgid "Go Ahead"
-msgstr ""
+msgstr "Continuar"
 
 #: shell/setup/setup.cpp:166
 msgid "ZacOS 9"
-msgstr ""
+msgstr "ZacOS 9"
 
 #: shell/setup/setup.cpp:167
 msgid "%1's ZacOS 9"
-msgstr ""
+msgstr "ZacOS 9 de %1"
 
 #: shell/setup/setup.cpp:214
 msgid "The short name must start with a letter, then a-z, 0-9, - or _."
-msgstr ""
+msgstr "El nombre corto debe empezar por una letra y luego solo puede tener a-z, 0-9, - o _."
 
 #: shell/setup/setup.cpp:218
 msgid "There is already an account named “%1”. Try another short name."
-msgstr ""
+msgstr "Ya existe una cuenta llamada «%1». Prueba otro nombre corto."
 
 #: shell/setup/setup.cpp:225
 msgid "The two passwords don't match."
-msgstr ""
+msgstr "Las dos contraseñas no coinciden."
 
 #: shell/setup/setup.cpp:320
 msgid "Setup didn't finish (exit %1)."
-msgstr ""
+msgstr "La configuración no terminó (código %1)."
 
 #: shell/setup/setup.cpp:345
 msgid "TCP/IP couldn't be opened."
-msgstr ""
+msgstr "No se pudo abrir TCP/IP."
 
 #: shell/setup/setup.cpp:381 shell/setup/setup.cpp:397
 msgid "Network settings aren't available."
-msgstr ""
+msgstr "Los ajustes de red no están disponibles."
 
 #: shell/setup/setup.cpp:383
 msgid "Connected through Ethernet."
-msgstr ""
+msgstr "Conectado por Ethernet."
 
 #: shell/setup/setup.cpp:385
 msgid "Connected through Wi-Fi (“%1”)."
-msgstr ""
+msgstr "Conectado por Wi-Fi («%1»)."
 
 #: shell/setup/setup.cpp:387
 msgid "Not connected."
-msgstr ""
+msgstr "No conectado."
 
 #: shell/setup/setup.cpp:389
 msgid "No network hardware found."
-msgstr ""
+msgstr "No se encontró hardware de red."
 
 #: shell/setup/setup.cpp:430
 msgid ""
 "This assistant asks a few questions to set up your computer: your name, a "
 "password, a name for the computer, your time zone and how it connects to the "
 "Internet. You can change them later."
-msgstr ""
+msgstr "Este asistente hace algunas preguntas para configurar el ordenador: tu nombre, una contraseña, un nombre para el ordenador, tu zona horaria y cómo se conecta a Internet. Puedes cambiarlas más tarde."
 
 #: shell/setup/setup.cpp:433
 msgid "Click the right arrow to begin."
-msgstr ""
+msgstr "Haz clic en la flecha derecha para empezar."
 
 #: shell/setup/setup.cpp:437
 msgid "What is your name?"
-msgstr ""
+msgstr "¿Cómo te llamas?"
 
 #: shell/setup/setup.cpp:438
 msgid "Short name, for logging in and your Home folder:"
-msgstr ""
+msgstr "Nombre corto, para iniciar sesión y tu carpeta de inicio:"
 
 #: shell/setup/setup.cpp:441
 msgid ""
 "Choose a password for your account. You'll need it to install software and "
 "change settings."
-msgstr ""
+msgstr "Elige una contraseña para tu cuenta. La necesitarás para instalar software y cambiar ajustes."
 
 #: shell/setup/setup.cpp:444
 msgid "Verify:"
-msgstr ""
+msgstr "Verificar:"
 
 #: shell/setup/setup.cpp:446
 msgid "ZacOS 9 will start up straight to your desktop."
-msgstr ""
+msgstr "ZacOS 9 se iniciará directamente en el escritorio."
 
 #: shell/setup/setup.cpp:447
 msgid "ZacOS 9 will ask for your short name and password when it starts up."
-msgstr ""
+msgstr "ZacOS 9 pedirá tu nombre corto y contraseña al iniciarse."
 
 #: shell/setup/setup.cpp:451
 msgid "What name would you like for this computer?"
-msgstr ""
+msgstr "¿Qué nombre quieres darle a este ordenador?"
 
 #: shell/setup/setup.cpp:452
 msgid ""
 "Other computers on your network see this name, for example when you share "
 "files."
-msgstr ""
+msgstr "Otros ordenadores de tu red ven este nombre, por ejemplo cuando compartes archivos."
 
 #: shell/setup/setup.cpp:454
 msgid "Network name: %1"
-msgstr ""
+msgstr "Nombre de red: %1"
 
 #: shell/setup/setup.cpp:457
 msgid "What time zone are you in?"
-msgstr ""
+msgstr "¿En qué zona horaria estás?"
 
 #: shell/setup/setup.cpp:459
 msgid ""
 "ZacOS 9 connects to the Internet through the TCP/IP control panel. Open it "
 "to choose a Wi-Fi network, or plug in a network cable. You can also skip "
 "this and connect later."
-msgstr ""
+msgstr "ZacOS 9 se conecta a Internet mediante el panel TCP/IP. Ábrelo para elegir una red Wi-Fi o conecta un cable de red. También puedes saltarte este paso y conectarte más tarde."
 
 #: shell/setup/setup.cpp:463
 msgid ""
 "From now on, you manage the Internet connection in TCP/IP: choose Control "
 "Panels ▸ TCP/IP from the Apple menu."
-msgstr ""
+msgstr "A partir de ahora, la conexión a Internet se gestiona en TCP/IP: elige Paneles de control ▸ TCP/IP en el menú Apple."
 
 #: shell/setup/setup.cpp:468
 msgid "You're ready to set up ZacOS 9:"
-msgstr ""
+msgstr "Ya puedes configurar ZacOS 9:"
 
 #: shell/setup/setup.cpp:471
 msgid "Short name:"
-msgstr ""
+msgstr "Nombre corto:"
 
 #: shell/setup/setup.cpp:472
 msgid "Computer name:"
-msgstr ""
+msgstr "Nombre del ordenador:"
 
 #: shell/setup/setup.cpp:473
 msgid "Time zone:"
-msgstr ""
+msgstr "Zona horaria:"
 
 #: shell/setup/setup.cpp:474
 msgid "Internet:"
-msgstr ""
+msgstr "Internet:"
 
 #: shell/setup/setup.cpp:475
 msgid "At startup:"
-msgstr ""
+msgstr "Al iniciar:"
 
 #: shell/setup/setup.cpp:475
 msgid "Log in automatically"
-msgstr ""
+msgstr "Iniciar sesión automáticamente"
 
 #: shell/setup/setup.cpp:475
 msgid "Ask for password"
-msgstr ""
+msgstr "Pedir contraseña"
 
 #: shell/setup/setup.cpp:486
 msgid ""
 "Click Go Ahead to set up your computer, or the left arrow to change your "
 "answers."
-msgstr ""
+msgstr "Haz clic en Continuar para configurar el ordenador, o en la flecha izquierda para cambiar tus respuestas."
 
 #: shell/setup/setup.cpp:489
 msgid "Setting up your computer…"
-msgstr ""
+msgstr "Configurando el ordenador…"
 
 #: shell/setup/setup.cpp:491
 msgid "All set. Starting ZacOS 9 for %1…"
-msgstr ""
+msgstr "Todo listo. Iniciando ZacOS 9 para %1…"
 
 #: shell/setup/setup.cpp:529
 msgid "Step %1 of %2"
-msgstr ""
+msgstr "Paso %1 de %2"
 
 #: shell/store/main.cpp:16 shell/store/store.cpp:46
 msgid "Software"
-msgstr ""
+msgstr "Software"
 
 #: shell/themeinstaller/main.cpp:826
 msgid "Theme Installer"
-msgstr ""
+msgstr "Instalador de temas"
 
 #: shell/update/main.cpp:18 shell/update/update.cpp:162
 msgid "Software Update"
-msgstr ""
+msgstr "Actualización de software"

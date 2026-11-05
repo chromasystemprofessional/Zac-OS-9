@@ -1,6 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=Printer Picker
+Name[es]=Selector de impresora
 Name[ru]=Выбор принтера
 Name[it]=Selettore stampante
 Comment=Choose the printer your documents go to

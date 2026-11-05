@@ -1,6 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=Windows Installer
+Name[es]=Instalador de Windows
 Name[ru]=Установщик Windows
 Name[it]=Installer Windows
 Comment=Install a Windows program through Wine

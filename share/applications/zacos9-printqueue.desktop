@@ -1,6 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=Print Queue
+Name[es]=Cola de impresión
 Name[ru]=Очередь печати
 Name[it]=Coda di stampa
 Comment=A printer's waiting documents

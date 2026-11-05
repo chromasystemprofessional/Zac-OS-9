@@ -1,6 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=Printer
+Name[es]=Impresora
 Name[ru]=Принтер
 Name[it]=Stampante
 Comment=Printer selector

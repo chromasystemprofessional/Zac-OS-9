@@ -1,6 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=Keychain
+Name[es]=Llavero
 Name[ru]=Связка ключей
 Name[it]=Portachiavi
 Comment=Keychain access

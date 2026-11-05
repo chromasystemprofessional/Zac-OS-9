@@ -1,6 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=Theme Installer
+Name[es]=Instalador de temas
 Name[ru]=Установщик тем
 Name[it]=Installer temi
 Comment=Build a ZacOS theme from a Mac OS 9 install

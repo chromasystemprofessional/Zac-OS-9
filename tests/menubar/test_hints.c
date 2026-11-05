@@ -27,6 +27,14 @@ int main(int argc, char **argv) {
 		printf("%s\n", hint ? hint : "NULL");
 		return hint && strstr(hint, "Корзину") ? 0 : 1;
 	}
+	if (argc > 1 && strcmp(argv[1], "es") == 0) {
+		/* The same pairing in Spanish. */
+		zacos9_i18n_init();
+		struct mb_item item = { .label = "Mover a la Papelera", .action = ACT_FINDER };
+		const char *hint = hint_text(&item, buf, sizeof(buf));
+		printf("%s\n", hint ? hint : "NULL");
+		return hint && strstr(hint, "Papelera") ? 0 : 1;
+	}
 	struct mb_item it = { .label = "Move To Trash", .action = ACT_FINDER };
 	assert(strstr(hint_text(&it, buf, sizeof(buf)), "Trash"));
 	it.action = ACT_DBUSMENU; /* a program's own menu: no hint */
