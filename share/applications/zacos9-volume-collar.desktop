@@ -1,6 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=Volume
+Name[pt]=Volume
 Name[es]=Volumen
 Name[ru]=Громкость
 Comment=Volume and sound output

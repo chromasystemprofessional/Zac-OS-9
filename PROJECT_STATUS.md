@@ -85,10 +85,10 @@ glyphs render through the bitmap face and the DejaVu fallback for `¿` and
 `¡`; the 20 help pages are still English. A native speaker's review and the
 help book are next ([Languages](docs/i18n.md)).
 
-**Brazilian Portuguese (first slice)**: `po/pt.po`, installed as `pt` for
-`pt_BR.UTF-8`, translates the Mouse panel, every control panel's name and
-title, and the standard alert buttons; `Name[pt]` is in 24 desktop entries.
-A native speaker's review and the rest of the catalog are next
+**Brazilian Portuguese**: `po/pt.po`, installed as `pt` for
+`pt_BR.UTF-8`, is complete at 817 strings, including the Finder, menu bar,
+application names, installer and Setup Assistant. The 20 help pages are
+still English; a native speaker's review and the help book are next
 ([Languages](docs/i18n.md)).
 
 **Making the project easier to work on**: ten of the eleven phases are done,

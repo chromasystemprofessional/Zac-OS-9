@@ -35,6 +35,14 @@ int main(int argc, char **argv) {
 		printf("%s\n", hint ? hint : "NULL");
 		return hint && strstr(hint, "Papelera") ? 0 : 1;
 	}
+	if (argc > 1 && strcmp(argv[1], "pt") == 0) {
+		/* The same pairing in Brazilian Portuguese. */
+		zacos9_i18n_init();
+		struct mb_item item = { .label = "Mover para o Lixo", .action = ACT_FINDER };
+		const char *hint = hint_text(&item, buf, sizeof(buf));
+		printf("%s\n", hint ? hint : "NULL");
+		return hint && strstr(hint, "Lixo") ? 0 : 1;
+	}
 	struct mb_item it = { .label = "Move To Trash", .action = ACT_FINDER };
 	assert(strstr(hint_text(&it, buf, sizeof(buf)), "Trash"));
 	it.action = ACT_DBUSMENU; /* a program's own menu: no hint */

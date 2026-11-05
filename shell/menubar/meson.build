@@ -49,6 +49,12 @@ test('menu-hints-es', find_program('python3'),
     meson.project_source_root(), hints_test],
   timeout: 60,
 )
+# And in Brazilian Portuguese.
+test('menu-hints-pt', find_program('python3'),
+  args: [files('../../tests/menubar/test_hints_pt.py'),
+    meson.project_source_root(), hints_test],
+  timeout: 60,
+)
 
 # The Zac menu's recent items (menubar/recent.c).
 test('menu-recent',

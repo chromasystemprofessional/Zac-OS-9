@@ -1,6 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=Installer
+Name[pt]=Instalador do ZacOS
 Name[es]=Instalador de ZacOS
 Name[ru]=Установщик ZacOS
 Comment=Install ZacOS 9 on a hard disk
