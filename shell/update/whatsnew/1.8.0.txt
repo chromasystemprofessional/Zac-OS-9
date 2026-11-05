@@ -1,0 +1,16 @@
+ZacOS 9 now speaks Italian, Japanese and Russian.
+
+Italian is the first full catalog: control panels, menus and Hint Bubbles,
+Finder dialogs, the installer and Setup Assistant, the everyday
+applications, and the whole ZacOS Help book and tutorial. Japanese and
+Russian are previews: Russian covers the control panels, menu bar,
+applications, installer and Setup Assistant, with its help book; Japanese
+covers the control panels and displays Japanese correctly, including line
+breaking. Japanese input is not included yet.
+
+Each screen can now be rotated by 90, 180 or 270 degrees in the Monitors
+panel, for a tablet or a monitor used on its side. The layout follows the
+rotated shape, and each screen remembers its own rotation.
+
+Help pages fall back to English page by page until a page is translated.
+A native speaker's review of the catalogs is still to come.
