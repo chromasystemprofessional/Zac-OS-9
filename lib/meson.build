@@ -2,6 +2,9 @@
 cairo = dependency('cairo')
 fontconfig = dependency('fontconfig')
 threads = dependency('threads')
+harfbuzz = dependency('harfbuzz')
+freetype = dependency('freetype2')
+fribidi = dependency('fribidi')
 
 platinum_inc = include_directories('.')
 platinum_lib = static_library('platinum',
@@ -13,6 +16,7 @@ platinum_lib = static_library('platinum',
   'widgets.c',
   'icons.c',
   'flags.c',
+  'shaping.c',
   'logo.c',
   'welcome.c',
   'extensions.c',
@@ -30,7 +34,7 @@ platinum_lib = static_library('platinum',
   # compositor, which never uses these, doesn't.
   'wlclient.c',
   include_directories: platinum_inc,
-  dependencies: [cairo, fontconfig, threads,
+  dependencies: [cairo, fontconfig, threads, harfbuzz, freetype, fribidi,
     dependency('wayland-client').partial_dependency(compile_args: true, includes: true)],
   c_args: [
     '-DZACOS9_DATA_DIR="@0@"'.format(get_option('prefix') / get_option('datadir') / 'zacos9'),
@@ -58,7 +62,7 @@ install_data('../share/zacos9/themes/Default/theme.conf',
 platinum_dep = declare_dependency(
   link_with: platinum_lib,
   include_directories: platinum_inc,
-  dependencies: [cairo, fontconfig, threads],
+  dependencies: [cairo, fontconfig, threads, harfbuzz, freetype, fribidi],
 )
 
 # Pixel tests against the Apple HIG figures (tools/measure/fetch.sh).
@@ -105,6 +109,8 @@ test('settings', executable('test-settings', '../tests/lib/test_settings.c', dep
 test('theme', executable('test-theme', '../tests/lib/test_theme.c', dependencies: [platinum_dep]))
 test('pfont', executable('test-pfont', '../tests/lib/test_pfont.c', dependencies: [platinum_dep]))
 test('flags', executable('test-flags', '../tests/lib/test_flags.c', dependencies: [platinum_dep]))
+test('arabic', executable('test-arabic', '../tests/lib/test_arabic.c', dependencies: [platinum_dep]),
+  env: ['FONTCONFIG_FILE=' + meson.project_source_root() / 'share/fontconfig/zacos9-fonts.conf'])
 test('savers', executable('test-savers', '../tests/lib/test_savers.c', dependencies: [platinum_dep]))
 test('electron', executable('test-electron', '../tests/lib/test_electron.c', dependencies: [platinum_dep]))
 test('locate', executable('test-locate', '../tests/lib/test_locate.c', dependencies: [platinum_dep]))

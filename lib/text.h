@@ -22,6 +22,7 @@ struct plat_text {
 	int ink_l, ink_r; /* first/last columns containing ink; -1 if blank */
 	int advance;      /* pen advance in pixels */
 	int stride;
+	bool rtl;         /* the line's base direction is right-to-left */
 	uint8_t *mask;
 	/* What it shows (after any ellipsis) and in which enum pl_font, to
 	 * draw it again at another scale (text_render_scaled). */

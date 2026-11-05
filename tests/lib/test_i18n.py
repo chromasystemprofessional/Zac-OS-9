@@ -142,6 +142,17 @@ def main():
             if result.stdout.splitlines() != ["Souris", "Vitesse du double-clic"]:
                 sys.exit(f"test_i18n: {lang} catalog gave {result.stdout!r}")
 
+        # Arabic is a display pilot: the Mouse panel and the control panel
+        # names, with the rest falling back to English.
+        arabic = tmp / "locale-ar" / "ar" / "LC_MESSAGES" / "zacos9.mo"
+        arabic.parent.mkdir(parents=True)
+        run(["msgfmt", "--check", "-o", str(arabic), str(ROOT / "po" / "ar.po")])
+        env["LANGUAGE"] = "ar"
+        env["ZACOS9_LOCALEDIR"] = str(tmp / "locale-ar")
+        result = run([str(BINARY)], env=env)
+        if result.stdout.splitlines() != ["الفأرة", "سرعة النقر المزدوج"]:
+            sys.exit(f"test_i18n: Arabic catalog gave {result.stdout!r}")
+
 
 if __name__ == "__main__":
     main()

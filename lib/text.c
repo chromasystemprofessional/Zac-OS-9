@@ -12,6 +12,7 @@
 #include "pfont.h"
 #include "text.h"
 #include "theme.h"
+#include "shaping.h"
 
 #include "fonts_data.h"
 
@@ -594,6 +595,14 @@ static bool cjk_cp(uint32_t cp) {
 		(cp >= 0x20000 && cp <= 0x2FA1F) || (cp >= 0x30000 && cp <= 0x3FFFF);
 }
 
+/* Arabic and its supplement/extended blocks: ask Fontconfig for an Arabic
+ * face if the shaper could not load one. */
+static bool arabic_cp(uint32_t cp) {
+	return (cp >= 0x0600 && cp <= 0x06FF) || (cp >= 0x0750 && cp <= 0x077F) ||
+		(cp >= 0x08A0 && cp <= 0x08FF) || (cp >= 0xFB50 && cp <= 0xFDFF) ||
+		(cp >= 0xFE70 && cp <= 0xFEFF);
+}
+
 static void remember_face(const char *family, FcCharSet *charset, bool bold) {
 	if (!charset || fallback_face_count >= FALLBACK_FACES_MAX) {
 		if (charset) {
@@ -636,7 +645,7 @@ static void remember_family(const char *family, bool bold) {
  * character asks for a Japanese face first, then for any face at all, so a
  * Chinese or Korean font is better than a box. */
 static const struct fallback_face *find_face(uint32_t cp, bool bold) {
-	const char *langs[] = { cjk_cp(cp) ? "ja" : NULL, NULL };
+	const char *langs[] = { cjk_cp(cp) ? "ja" : arabic_cp(cp) ? "ar" : NULL, NULL };
 	for (size_t i = 0; i < sizeof(langs) / sizeof(langs[0]); i++) {
 		if (i > 0 && !langs[0]) {
 			break; /* not CJK: one query, without a language */
@@ -770,6 +779,16 @@ static struct fallback render_fallback(uint32_t cp, const struct style *st,
 
 static struct plat_text *render_exact(const char *utf8, const struct style *st) {
 	const struct pl_bitmap_font *f = st->font;
+
+	/* Arabic joins and reads right-to-left; the bitmap path below draws one
+	 * isolated glyph per codepoint, so hand the whole line to the shaper. */
+	if (pl_has_arabic(utf8)) {
+		struct plat_text *shaped = pl_shape_arabic(utf8, f->height, f->baseline,
+			(int)(st->fallback_px + 0.5), st->fallback_bold);
+		if (shaped) {
+			return shaped;
+		}
+	}
 
 	/* Measure: the pen starts at column 1, as callers expect. */
 	int advance = 0;
