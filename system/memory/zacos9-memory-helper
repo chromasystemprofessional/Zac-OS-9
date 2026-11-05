@@ -37,7 +37,7 @@ section, which hides Debian's default one in /usr/lib/systemd. The RAM Disk is a
 /etc/zacos9/memory.conf and saved to /var/lib/zacos9/ramdisk.tar.
 Problems go to stderr, exit 1.
 
-For tests (only when not run as root): ZACOS9_MEMORY_ROOT is the root the
+For tests (only when not run as root, or when ZACOS9_MEMORY_TEST=1): ZACOS9_MEMORY_ROOT is the root the
 files above are under, ZACOS9_MEMORY_PROC the directory of meminfo and
 swaps, ZACOS9_MEMORY_SYS stands for /sys, ZACOS9_MEMORY_UID the caller's
 uid; the programs run (swapon, swapoff, mkswap, fallocate, systemctl,
@@ -49,7 +49,7 @@ import subprocess
 import sys
 
 MB = 1024 * 1024
-TESTING = os.geteuid() != 0
+TESTING = os.environ.get("ZACOS9_MEMORY_TEST") == "1" or os.geteuid() != 0
 
 
 def setting(name, default):

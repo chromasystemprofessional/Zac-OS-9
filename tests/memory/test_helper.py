@@ -60,7 +60,7 @@ with tempfile.TemporaryDirectory() as d:
     env = {"PATH": str(bin_), "LOG": str(log), "STATE": str(state),
            "ZACOS9_MEMORY_ROOT": str(root), "ZACOS9_MEMORY_PROC": str(proc),
            "ZACOS9_MEMORY_SYS": str(base / "sys"),
-           "ZACOS9_MEMORY_UID": "1234"}
+           "ZACOS9_MEMORY_UID": "1234", "ZACOS9_MEMORY_TEST": "1"}
 
     def run(*args):
         log.write_text("")
