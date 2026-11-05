@@ -3367,3 +3367,7 @@ msgstr "Aggiornamento software"
 
 #~ msgid "file server"
 #~ msgstr "server file"
+
+#: shell/installer/installer.cpp
+msgid "ZacOS 9 needs help translating its interface and help. If you can help, or find a language problem, report it at github.com/chromasystemprofessional/Zac-OS-9/issues."
+msgstr "ZacOS 9 ha bisogno di aiuto per tradurre l'interfaccia e la guida. Se puoi aiutare, o trovi un problema di lingua, segnalalo su github.com/chromasystemprofessional/Zac-OS-9/issues."

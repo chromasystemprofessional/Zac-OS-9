@@ -125,6 +125,16 @@ Two checks look after the build itself (see
   with the command the test prints, and the change shows in your pull request.
 - **CI counts compiler warnings** and fails if a change adds one.
 
+## Translations
+
+ZacOS 9 needs translators and reviewers for its interface and help books.
+The catalogs are ordinary gettext files under `po/`; [`docs/i18n.md`](docs/i18n.md)
+explains `LINGUAS`, the template, the glossary and the help pages. If a
+translation is wrong, missing, clipped or unreadable, open a **Language or
+translation problem** issue; the template asks for the language, the window,
+the wording and the ZacOS version. The installer's Language screen points
+here too.
+
 ## Making a change
 
 1. **Start from an issue**, or open one first for anything large, so the

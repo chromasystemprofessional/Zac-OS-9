@@ -74,31 +74,31 @@ Mouse desktop entry. Input is not supported:
 ZacOS's own text fields have no IME preedit, so the language is not
 advertised as usable yet ([Languages](docs/i18n.md)).
 
-**Arabic**: `po/ar.po` is complete at 817 strings, including the Finder,
+**Arabic**: `po/ar.po` is complete at 818 strings, including the Finder,
 menu bar, application names, installer and Setup Assistant; `Name[ar]` is in
 67 desktop entries, and all 20 help pages are under
 `share/zacos9/help/ar/`. HarfBuzz shapes Arabic, FriBidi orders it, and
 Arabic lists and labels right-align. A native speaker's review and text-input
 testing are next ([Languages](docs/i18n.md)).
 
-**Russian**: `po/ru.po` is complete at 817 strings, including the Finder's
+**Russian**: `po/ru.po` is complete at 818 strings, including the Finder's
 dialogs; all 20 help pages are under `share/zacos9/help/ru/`. Cyrillic uses
 the existing DejaVu Sans fallback and needs no input method; a native
 speaker's review is next ([Languages](docs/i18n.md)).
 
-**Spanish**: `po/es.po` is complete at 817 strings, including the Finder,
+**Spanish**: `po/es.po` is complete at 818 strings, including the Finder,
 menu bar, application names, installer and Setup Assistant. The Spanish
 glyphs, including `¿` and `¡`, are in the bitmap faces; all 20 help pages
 are under `share/zacos9/help/es/`. A native speaker's review is next
 ([Languages](docs/i18n.md)).
 
 **Brazilian Portuguese**: `po/pt.po`, installed as `pt` for
-`pt_BR.UTF-8`, is complete at 817 strings, including the Finder, menu bar,
+`pt_BR.UTF-8`, is complete at 818 strings, including the Finder, menu bar,
 application names, installer and Setup Assistant. All 20 help pages are
 under `share/zacos9/help/pt/`; a native speaker's review is next
 ([Languages](docs/i18n.md)).
 
-**French**: `po/fr_CA.po` and `po/fr_FR.po` are complete at 817 strings
+**French**: `po/fr_CA.po` and `po/fr_FR.po` are complete at 818 strings
 each, installed as `fr_CA` and `fr_FR`; `Name[fr_CA]` and `Name[fr_FR]` are
 in 67 desktop entries, and all 20 help pages are under
 `share/zacos9/help/fr_CA/` and `share/zacos9/help/fr_FR/`. English (Canada)

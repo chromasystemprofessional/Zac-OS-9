@@ -1,0 +1,62 @@
+name: Language or translation problem
+description: A wrong, missing, awkward or unreadable translation, or a language that needs help.
+title: "[Language] "
+labels: [translation]
+body:
+  - type: dropdown
+    id: language
+    attributes:
+      label: Language
+      options:
+        - Arabic
+        - Brazilian Portuguese
+        - French (Canada)
+        - French (France)
+        - Italian
+        - Japanese
+        - Russian
+        - Spanish
+        - English
+        - Another language
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where
+      options:
+        - Installer
+        - Text control panel
+        - Control panel
+        - Finder or Sniffer
+        - Menu bar or Hint Bubble
+        - ZacOS Help
+        - Setup Assistant or login window
+        - Another window
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What is wrong
+      description: The English text and the translation, or the missing text. A screenshot helps with clipping, right-to-left layout and unreadable glyphs.
+    validations:
+      required: true
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested wording
+      description: If you know the language, the wording you would use instead.
+  - type: input
+    id: version
+    attributes:
+      label: ZacOS version
+      description: Zac menu ▸ About This Computer, or `dpkg -l zacos9` in a terminal.
+      placeholder: "1.9.4"
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else
+      description: The locale (`LANG` and `LANGUAGE`), and whether you can help review this language.

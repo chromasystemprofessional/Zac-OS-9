@@ -3504,3 +3504,7 @@ msgstr "Instalador de temas"
 #: shell/update/main.cpp:18 shell/update/update.cpp:162
 msgid "Software Update"
 msgstr "Actualización de software"
+
+#: shell/installer/installer.cpp
+msgid "ZacOS 9 needs help translating its interface and help. If you can help, or find a language problem, report it at github.com/chromasystemprofessional/Zac-OS-9/issues."
+msgstr "ZacOS 9 necesita ayuda para traducir su interfaz y su ayuda. Si puedes ayudar, o encuentras un problema de idioma, infórmalo en github.com/chromasystemprofessional/Zac-OS-9/issues."

@@ -698,10 +698,14 @@ void InstallerWindow::paintLanguage(pl_canvas *c) {
 	panelText(c, tr9("Language"), MARGIN, MARGIN + 13);
 	panelText(c, tr9("Choose the language for the installed system."), MARGIN, MARGIN + 29, PL_FONT_VIEWS);
 	m_languageList.paint(c, true);
-	bodyText(c,
+	int y = bodyText(c,
 		tr9("The installed system, its login window and its own programs use this language. "
 			"Debian programs get theirs from Debian's language packages."),
 		MARGIN, m_languageList.frame.bottom() + 14, W - 2 * MARGIN);
+	bodyText(c,
+		tr9("ZacOS 9 needs help translating its interface and help. If you can help, or find "
+			"a language problem, report it at github.com/chromasystemprofessional/Zac-OS-9/issues."),
+		MARGIN, y + 8, W - 2 * MARGIN);
 	if (!m_languageError.isEmpty()) {
 		panelText(c, m_languageError, MARGIN, BTN_Y - 20, PL_FONT_VIEWS, RGB(0x99, 0, 0), W - 2 * MARGIN);
 	}

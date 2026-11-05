@@ -86,6 +86,15 @@ so everything looks and behaves the same way, down to the scroll arrows.
   account, Puppy Mode for a simpler Sniffer, a keychain, a screen saver, a
   password-protected screen lock and screen sharing between ZacOS 9 computers.
 
+## Languages
+
+ZacOS 9 speaks English, Italian, Russian, Spanish, Brazilian Portuguese,
+French (Canada and France) and Arabic, with translated help books. Canadian
+English and UK English are available as English locales. More languages need
+translators and reviewers: see [`docs/i18n.md`](docs/i18n.md), and report a
+wrong or missing translation with the **Language or translation problem**
+issue template.
+
 <table>
   <tr>
     <td width="55%"><img src="docs/screenshots/software.png" alt="The Software window: a search field, Include Flathub, categories from Featured to Extras, and Firefox, GIMP, LibreOffice and VLC"></td>

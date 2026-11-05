@@ -3355,3 +3355,7 @@ msgstr "مثبّت السمات"
 #: shell/update/main.cpp:18 shell/update/update.cpp:162
 msgid "Software Update"
 msgstr "تحديث البرامج"
+
+#: shell/installer/installer.cpp
+msgid "ZacOS 9 needs help translating its interface and help. If you can help, or find a language problem, report it at github.com/chromasystemprofessional/Zac-OS-9/issues."
+msgstr "يحتاج ZacOS 9 إلى مساعدة في ترجمة واجهته ومساعدته. إذا كان بإمكانك المساعدة، أو وجدت مشكلة في اللغة، فأبلغ عنها على github.com/chromasystemprofessional/Zac-OS-9/issues."
