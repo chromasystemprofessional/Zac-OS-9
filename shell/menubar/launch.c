@@ -425,7 +425,37 @@ static char *find_desktop_file(const char *id) {
  * which defaults were offered (SEEDED), so nothing taken out comes back;
  * an item new in a later version has a higher `since` and is offered
  * then. */
-#define SEEDED 3
+/* 1.5.1 seeded the Theme Installer, before themes became drop-only imports.
+ * Find that alias by what it points at, since its name was localized when it
+ * was made, and remove it. A user's own file with the same name is left
+ * alone. */
+static void remove_seeded_theme_installer(const char *items_dir) {
+	char *desktop = find_desktop_file("zacos9-themeinstaller.desktop");
+	char *target = desktop ? realpath(desktop, NULL) : NULL;
+	g_free(desktop);
+	if (!target) {
+		return;
+	}
+	GDir *dir = g_dir_open(items_dir, 0, NULL);
+	if (!dir) {
+		free(target);
+		return;
+	}
+	const char *name;
+	while ((name = g_dir_read_name(dir))) {
+		char *path = g_build_filename(items_dir, name, NULL);
+		char *resolved = realpath(path, NULL);
+		if (resolved && strcmp(resolved, target) == 0) {
+			unlink(path);
+		}
+		free(resolved);
+		g_free(path);
+	}
+	g_dir_close(dir);
+	free(target);
+}
+
+#define SEEDED 4
 static void seed_menu_items(const char *items_dir) {
 	static const struct {
 		const char *name;
@@ -449,6 +479,9 @@ static void seed_menu_items(const char *items_dir) {
 	char *text = NULL;
 	const int seeded = g_file_get_contents(marker, &text, NULL, NULL) ? atoi(text) : 0;
 	g_free(text);
+	if (seeded < SEEDED) {
+		remove_seeded_theme_installer(items_dir);
+	}
 	if (seeded >= SEEDED || g_mkdir_with_parents(items_dir, 0700) != 0) {
 		g_free(marker);
 		return;

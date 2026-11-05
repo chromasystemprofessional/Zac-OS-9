@@ -12,4 +12,4 @@ Categories=Utility;
 OnlyShowIn=ZacOS9;
 # No menu entry: themes install by dropping the theme file into
 # System Folder > Appearance > Theme Files (the catalog runs this tool).
-NoDisplay=true;
+NoDisplay=true

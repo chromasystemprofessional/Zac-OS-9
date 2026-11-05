@@ -199,6 +199,7 @@ the dropped file, its resource fork and the generated preset), builds the
 theme from it and applies it. Dropping another copy of an installed theme does
 nothing; a changed file imports again. (The import runs `zacos9-themeinstaller`
 behind the scenes; its `--file` batch mode does the same from a terminal.)
+There is no menu entry: dropping the theme file is the way in.
 
 The Theme Installer finds the System Folder at `~/Classic/System Folder`
 (where Old Dog keeps it), at `~/System Folder` (where a copy dragged onto

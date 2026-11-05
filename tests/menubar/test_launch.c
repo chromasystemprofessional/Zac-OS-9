@@ -61,14 +61,16 @@ int main(int argc, char **argv) {
 	assert(setenv("XDG_CONFIG_HOME", config, 1) == 0);
 	/* The desk accessories' desktop files, as a package installs them:
 	 * Calculator and Plotter only. */
-	char data[640], apps[700], calc_desktop[800], plot_desktop[800];
+	char data[640], apps[700], calc_desktop[800], plot_desktop[800], theme_desktop[800];
 	snprintf(data, sizeof(data), "%s/data", config);
 	snprintf(apps, sizeof(apps), "%s/applications", data);
 	assert(g_mkdir_with_parents(apps, 0700) == 0);
 	snprintf(calc_desktop, sizeof(calc_desktop), "%s/zacos9-calculator.desktop", apps);
 	snprintf(plot_desktop, sizeof(plot_desktop), "%s/zacos9-plotter.desktop", apps);
+	snprintf(theme_desktop, sizeof(theme_desktop), "%s/zacos9-themeinstaller.desktop", apps);
 	assert(g_file_set_contents(calc_desktop, "[Desktop Entry]\nName=Calculator\nExec=zacos9-calculator\n", -1, NULL));
 	assert(g_file_set_contents(plot_desktop, "[Desktop Entry]\nName=Plotter\nExec=zacos9-plotter\n", -1, NULL));
+	assert(g_file_set_contents(theme_desktop, "[Desktop Entry]\nName=Theme Installer\nExec=zacos9-themeinstaller\nNoDisplay=true\n", -1, NULL));
 	assert(setenv("XDG_DATA_DIRS", data, 1) == 0);
 	assert(setenv("XDG_DATA_HOME", data, 1) == 0);
 	/* Plotter was put in the Disabled folder: it isn't offered again. */
@@ -166,6 +168,23 @@ int main(int argc, char **argv) {
 	assert(!item_named(&again, "Calculator") && item_named(&again, "Top app"));
 	assert(access(calc_alias, F_OK) != 0);
 	puts("ok: the Zac menu folder starts with the accessories' aliases; taken out, they stay out");
+
+	/* 1.5.1 seeded the Theme Installer; 1.7.0 stopped offering it. An
+	 * existing profile keeps that old, localized alias until the migration
+	 * finds it by its target and removes it. */
+	char marker[640], theme_alias[700], *marker_text = NULL;
+	snprintf(marker, sizeof(marker), "%s/.zacos9-defaults", items);
+	assert(g_file_set_contents(marker, "3\n", -1, NULL));
+	snprintf(theme_alias, sizeof(theme_alias), "%s/Theme Installer", items);
+	assert(symlink(theme_desktop, theme_alias) == 0);
+	struct mb_menu migrated = { 0 };
+	launch_fill_logo_menu(&migrated, NULL, 0);
+	assert(access(theme_alias, F_OK) != 0);
+	assert(!contains_item(&migrated, "Theme Installer"));
+	assert(g_file_get_contents(marker, &marker_text, NULL, NULL));
+	assert(strcmp(marker_text, "4\n") == 0);
+	g_free(marker_text);
+	puts("ok: the old Theme Installer alias is removed once");
 	assert(contains_item(&menu, "At limit app"));
 	assert(!contains_item(&menu, "Too deep app"));
 	char parent[512];
@@ -176,6 +195,7 @@ int main(int argc, char **argv) {
 	unlink(linked);
 	unlink(doc_alias);
 	unlink(doc);
+	unlink(theme_desktop);
 	unlink(at_limit);
 	unlink(too_deep);
 	for (int i = 4; i >= 0; i--) {
