@@ -1,6 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=Bluetooth
+Name[it]=Bluetooth
 Comment=Pair and connect Bluetooth devices; play sound through headphones and speakers
 Exec=zacos9-bluetooth
 Categories=Settings;HardwareSettings;X-ZacOS9-ControlPanel;

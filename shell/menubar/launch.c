@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include <glib.h>
 
+#include "i18n.h"
 #include "appfilter.h"
 #include "controlpanels.h"
 #include "icons.h"
@@ -330,7 +331,7 @@ static void add_favorites(struct mb_menu *menu) {
 		closedir(dir);
 	}
 	qsort(names, n, sizeof(names[0]), by_label);
-	with_kind(add_item(menu, "Favorites", n > 0, ACT_NONE, NULL), PL_ICON_FOLDER);
+	with_kind(add_item(menu, _("Favorites"), n > 0, ACT_NONE, NULL), PL_ICON_FOLDER);
 	struct mb_menu *favorites = calloc(1, sizeof(*favorites));
 	menu->items[menu->n - 1].submenu = favorites;
 	for (int i = 0; i < n; i++) {
@@ -379,7 +380,7 @@ static void add_automated_tasks(struct mb_menu *menu) {
 		}
 		return;
 	}
-	with_kind(add_item(menu, "Automated Tasks", n > 0, ACT_NONE, NULL), PL_ICON_FOLDER);
+	with_kind(add_item(menu, _("Automated Tasks"), n > 0, ACT_NONE, NULL), PL_ICON_FOLDER);
 	struct mb_item *item = &menu->items[menu->n - 1];
 	item->submenu = calloc(1, sizeof(*item->submenu));
 	for (int i = 0; i < n; i++) {
@@ -457,8 +458,9 @@ static void seed_menu_items(const char *items_dir) {
 		if (defaults[i].since <= seeded) {
 			continue;
 		}
-		char *alias = g_build_filename(items_dir, defaults[i].name, NULL);
-		char *off = g_build_filename(disabled, defaults[i].name, NULL);
+		const char *name = _(defaults[i].name);
+		char *alias = g_build_filename(items_dir, name, NULL);
+		char *off = g_build_filename(disabled, name, NULL);
 		struct stat st;
 		if (lstat(alias, &st) != 0 && lstat(off, &st) != 0) {
 			for (int k = 0; k < 2 && defaults[i].ids[k]; k++) {
@@ -468,7 +470,7 @@ static void seed_menu_items(const char *items_dir) {
 				g_free(found);
 				if (target) {
 					if (symlink(target, alias) != 0) {
-						fprintf(stderr, "Could not add %s to the Zac menu\n", defaults[i].name);
+						fprintf(stderr, "Could not add %s to the Zac menu\n", name);
 					}
 					free(target);
 					break;
@@ -487,18 +489,18 @@ static void seed_menu_items(const char *items_dir) {
 
 void launch_fill_logo_menu(struct mb_menu *menu, const struct app *apps, int n_apps) {
 	/* About and software tools are the top group in the Apple menu. */
-	with_kind(add_item(menu, "About This Computer…", true, ACT_ABOUT, NULL), PL_ICON_EXT_CHIP);
+	with_kind(add_item(menu, _("About This Computer…"), true, ACT_ABOUT, NULL), PL_ICON_EXT_CHIP);
 	/* The app catalog over apt. */
 	{
 		char command[PATH_MAX + 64];
 		sibling_program("zacos9-store", command, sizeof(command));
-		with_kind(add_item(menu, "New Tricks", true, ACT_LAUNCH, command), PL_ICON_APPLICATION);
+		with_kind(add_item(menu, _("New Tricks"), true, ACT_LAUNCH, command), PL_ICON_APPLICATION);
 	}
 	/* New ZacOS 9 releases and Debian's own updates. */
 	{
 		char command[PATH_MAX + 64];
 		sibling_program("zacos9-update", command, sizeof(command));
-		with_kind(add_item(menu, "Fetch Updates", true, ACT_LAUNCH, command), PL_ICON_EXT_OPENTRANSPORT);
+		with_kind(add_item(menu, _("Fetch Updates"), true, ACT_LAUNCH, command), PL_ICON_EXT_OPENTRANSPORT);
 	}
 	/* Force Quit: the open applications, front-most first; the Finder
 	 * asks first, then has zacos9-wm end the one chosen. */
@@ -518,40 +520,40 @@ void launch_fill_logo_menu(struct mb_menu *menu, const struct app *apps, int n_a
 				with_kind(it, PL_ICON_APPLICATION);
 			}
 		}
-		with_kind(add_item(menu, "Force Quit", quit->n > 0, ACT_NONE, NULL), PL_ICON_CAUTION);
+		with_kind(add_item(menu, _("Force Quit"), quit->n > 0, ACT_NONE, NULL), PL_ICON_CAUTION);
 		menu->items[menu->n - 1].submenu = quit;
 	}
 	add_item(menu, NULL, false, ACT_NONE, NULL);
 	/* Classic Mac OS in an emulator; the Finder explains what's missing. */
-	with_kind(add_item(menu, "Old Dog", true, ACT_FINDER, "classic"), PL_ICON_CLASSIC);
+	with_kind(add_item(menu, _("Old Dog"), true, ACT_FINDER, "classic"), PL_ICON_CLASSIC);
 	/* Screen Snapshot: drag out part of the screen; it goes on the Desktop
 	 * as "Picture N.png" and on the clipboard. */
 	{
 		char command[PATH_MAX + 64];
 		sibling_program("zacos9-snapshot", command, sizeof(command));
-		with_kind(add_item(menu, "Screen Snapshot", true, ACT_LAUNCH, command), PL_ICON_EXT_CAMERA);
+		with_kind(add_item(menu, _("Screen Snapshot"), true, ACT_LAUNCH, command), PL_ICON_EXT_CAMERA);
 	}
 	/* Windows programs, installed through Wine. */
 	{
 		char command[PATH_MAX + 64];
 		sibling_program("zacos9-wininstall", command, sizeof(command));
-		with_kind(add_item(menu, "Windows Installer", true, ACT_LAUNCH, command), PL_ICON_WINDOWS);
+		with_kind(add_item(menu, _("Windows Installer"), true, ACT_LAUNCH, command), PL_ICON_WINDOWS);
 	}
 	/* The Network Browser: connecting to other computers, as Mac OS 9's
 	 * own Apple Menu Item of the same name did. */
 	{
 		char command[PATH_MAX + 64];
 		sibling_program("zacos9-netbrowser", command, sizeof(command));
-		with_kind(add_item(menu, "Neighbourhood", true, ACT_LAUNCH, command), PL_ICON_EXT_APPLETALK);
+		with_kind(add_item(menu, _("Neighbourhood"), true, ACT_LAUNCH, command), PL_ICON_EXT_APPLETALK);
 	}
 	/* Printer Picker: Mac OS 9's Chooser, which was here too. */
 	{
 		char command[PATH_MAX + 64];
 		sibling_program("zacos9-printerpicker", command, sizeof(command));
-		with_kind(add_item(menu, "Printer Picker", true, ACT_LAUNCH, command), PL_ICON_EXT_PRINTMONITOR);
+		with_kind(add_item(menu, _("Printer Picker"), true, ACT_LAUNCH, command), PL_ICON_EXT_PRINTMONITOR);
 	}
 	/* Control Panels, as a hierarchical menu. */
-	with_kind(add_item(menu, "Control Panels", true, ACT_NONE, NULL), PL_ICON_CONTROL_PANELS);
+	with_kind(add_item(menu, _("Control Panels"), true, ACT_NONE, NULL), PL_ICON_CONTROL_PANELS);
 	struct mb_menu *panels = calloc(1, sizeof(*panels));
 	menu->items[menu->n - 1].submenu = panels;
 	/* The installed control panels, by name (lib/controlpanels.h). */
@@ -564,7 +566,7 @@ void launch_fill_logo_menu(struct mb_menu *menu, const struct app *apps, int n_a
 		strncat(command, panel_list[i].args, sizeof(command) - strlen(command) - 1);
 		/* The Toy Box (the Sniffer's own window) goes in its place by name. */
 		if (!toy_box_added && strcmp(panel_list[i].name, "Toy Box") > 0) {
-			with_kind(add_item(panels, "Toy Box", true, ACT_FINDER, "toy-box"), PL_ICON_FOLDER);
+			with_kind(add_item(panels, _("Toy Box"), true, ACT_FINDER, "toy-box"), PL_ICON_FOLDER);
 			toy_box_added = true;
 		}
 		with_kind(add_item(panels, panel_list[i].name, true, ACT_LAUNCH, command), panel_list[i].icon);

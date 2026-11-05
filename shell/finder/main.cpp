@@ -17,6 +17,7 @@
 #include "platinumshell.h"
 #include "secondarydesktop.h"
 #include "settings.h"
+#include "tr.h"
 #include "toybox.h"
 
 #include <cstring>
@@ -39,7 +40,8 @@ int main(int argc, char *argv[]) {
 	qputenv("QT_WAYLAND_DISABLE_WINDOWDECORATION", "1");
 
 	QApplication app(argc, argv);
-	QApplication::setApplicationName("Sniffer");
+	zacos9_i18n_init();
+	QApplication::setApplicationName(tr9("Sniffer"));
 	QGuiApplication::setDesktopFileName("zacos9-finder"); /* Wayland app_id */
 	QApplication::setDoubleClickInterval(pl_double_click_ms()); /* the Mouse panel's */
 	QApplication::setQuitOnLastWindowClosed(false);
@@ -47,8 +49,7 @@ int main(int argc, char *argv[]) {
 	diskInitializationStart([] { Finder::instance().notifyState(); });
 	/* A Limited account opening a program it may not use. */
 	appOnRefused([](const QString &name) {
-		const QString message = QStringLiteral(
-			"You don't have permission to use \"%1\". "
+		const QString message = tr9("You don't have permission to use \"%1\". "
 			"Ask the computer's administrator to add it to your programs.").arg(name);
 		auto *alert = new Alert(message, "OK", QString());
 		alert->setAttribute(Qt::WA_DeleteOnClose);

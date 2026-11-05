@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Sound Set
+Name[ru]=Набор звуков
+Name[it]=Set suoni
 Comment=Choose the system sound set
 Exec=zacos9-collarmodule sound-set
 Categories=X-ZacOS9-CollarModule;

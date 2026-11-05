@@ -1,5 +1,6 @@
 # Pure drawing code shared by the compositor, the shell and the tests.
 cairo = dependency('cairo')
+fontconfig = dependency('fontconfig')
 threads = dependency('threads')
 
 platinum_inc = include_directories('.')
@@ -21,16 +22,19 @@ platinum_lib = static_library('platinum',
   'electron.c',
   # Where the desktop's other programs are, installed or in a build tree.
   'locate.c',
+  # Message catalogs (po/, docs/i18n.md).
+  'i18n.c',
   # Shared-memory buffers for the C Wayland programs. Only their headers
   # here: the programs link libwayland-client themselves, and the
   # compositor, which never uses these, doesn't.
   'wlclient.c',
   include_directories: platinum_inc,
-  dependencies: [cairo, threads,
+  dependencies: [cairo, fontconfig, threads,
     dependency('wayland-client').partial_dependency(compile_args: true, includes: true)],
   c_args: [
     '-DZACOS9_DATA_DIR="@0@"'.format(get_option('prefix') / get_option('datadir') / 'zacos9'),
     '-DZACOS9_SOURCE_DIR="@0@"'.format(meson.project_source_root()),
+    '-DZACOS9_LOCALEDIR="@0@"'.format(get_option('prefix') / get_option('datadir') / 'locale'),
   ],
 )
 
@@ -53,7 +57,7 @@ install_data('../share/zacos9/themes/Default/theme.conf',
 platinum_dep = declare_dependency(
   link_with: platinum_lib,
   include_directories: platinum_inc,
-  dependencies: [cairo, threads],
+  dependencies: [cairo, fontconfig, threads],
 )
 
 # Pixel tests against the Apple HIG figures (tools/measure/fetch.sh).
@@ -122,6 +126,13 @@ if python3.found()
   # The TrueType copies too (skipped without python3-fonttools).
   test('fonts-ttf-current', python3,
     args: [meson.project_source_root() / 'tools/fonts/build_ttf.py', '--check'])
+  # The gettext pipeline, end to end: a pseudo-locale from the strings
+  # marked in po/POTFILES.in, then the strict text-fit warning.
+  i18n_test = executable('test-i18n', '../tests/lib/test_i18n.c',
+    dependencies: [platinum_dep])
+  test('i18n', python3,
+    args: [files('../tests/lib/test_i18n.py'), meson.project_source_root(), i18n_test],
+    timeout: 60)
 endif
 if python3.found()
   test('icons-current', python3,

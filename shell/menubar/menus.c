@@ -4,6 +4,7 @@
 #include <string.h>
 #include <time.h>
 
+#include "i18n.h"
 #include "icons.h"
 #include "menubar.h"
 #include "settings.h"
@@ -46,14 +47,14 @@ static struct mb_menu *new_menu(struct mb_menu *menus, int *n, const char *title
  * closed. We can't know what the app can undo or paste, so with an app in
  * front they are all enabled. */
 static void add_edit_menu(struct mb_menu *menus, int *n, bool enabled) {
-	struct mb_menu *m = new_menu(menus, n, "Edit");
-	add(m, "Undo", 'Z', enabled, ACT_EDIT_COMMAND, NULL);
+	struct mb_menu *m = new_menu(menus, n, _("Edit"));
+	add(m, _("Undo"), 'Z', enabled, ACT_EDIT_COMMAND, NULL);
 	sep(m);
-	add(m, "Cut", 'X', enabled, ACT_EDIT_COMMAND, NULL);
-	add(m, "Copy", 'C', enabled, ACT_EDIT_COMMAND, NULL);
-	add(m, "Paste", 'V', enabled, ACT_EDIT_COMMAND, NULL);
-	add(m, "Clear", 0, enabled, ACT_EDIT_CLEAR, NULL);
-	add(m, "Select All", 'A', enabled, ACT_EDIT_COMMAND, NULL);
+	add(m, _("Cut"), 'X', enabled, ACT_EDIT_COMMAND, NULL);
+	add(m, _("Copy"), 'C', enabled, ACT_EDIT_COMMAND, NULL);
+	add(m, _("Paste"), 'V', enabled, ACT_EDIT_COMMAND, NULL);
+	add(m, _("Clear"), 0, enabled, ACT_EDIT_CLEAR, NULL);
+	add(m, _("Select All"), 'A', enabled, ACT_EDIT_COMMAND, NULL);
 }
 
 /* Special > Empty Trash: "…" while it asks first (the Trash's Get Info,
@@ -61,13 +62,13 @@ static void add_edit_menu(struct mb_menu *menus, int *n, bool enabled) {
 static const char *empty_trash_title(void) {
 	char v[16];
 	const bool warns = !(pl_setting("trash-warn", v, sizeof(v)) && strcmp(v, "false") == 0);
-	return warns ? "Empty Trash…" : "Empty Trash";
+	return warns ? _("Empty Trash…") : _("Empty Trash");
 }
 
 /* File > Label and its contextual twin: the seven labels, the selection's
  * checked. */
 static void add_label_submenu(struct mb_menu *m, bool enabled, int current) {
-	struct mb_item *label = add(m, "Label", 0, enabled, ACT_NONE, NULL);
+	struct mb_item *label = add(m, _("Label"), 0, enabled, ACT_NONE, NULL);
 	label->submenu = calloc(1, sizeof(*label->submenu));
 	for (int i = 0; i < PL_LABEL_COUNT; i++) {
 		char command[16];
@@ -84,25 +85,25 @@ static void add_label_submenu(struct mb_menu *m, bool enabled, int current) {
 
 /* View > Arrange and its contextual twin. */
 static void add_arrange_submenu(struct mb_menu *m, bool enabled) {
-	struct mb_item *arrange = add(m, "Arrange", 0, enabled, ACT_NONE, NULL);
+	struct mb_item *arrange = add(m, _("Arrange"), 0, enabled, ACT_NONE, NULL);
 	arrange->submenu = calloc(1, sizeof(*arrange->submenu));
-	add(arrange->submenu, "by Name", 0, enabled, ACT_FINDER, "arrange name");
-	add(arrange->submenu, "by Date Modified", 0, enabled, ACT_FINDER, "arrange modified");
-	add(arrange->submenu, "by Date Created", 0, enabled, ACT_FINDER, "arrange created");
-	add(arrange->submenu, "by Size", 0, enabled, ACT_FINDER, "arrange size");
-	add(arrange->submenu, "by Kind", 0, enabled, ACT_FINDER, "arrange kind");
-	add(arrange->submenu, "by Label", 0, enabled, ACT_FINDER, "arrange label");
+	add(arrange->submenu, _("by Name"), 0, enabled, ACT_FINDER, "arrange name");
+	add(arrange->submenu, _("by Date Modified"), 0, enabled, ACT_FINDER, "arrange modified");
+	add(arrange->submenu, _("by Date Created"), 0, enabled, ACT_FINDER, "arrange created");
+	add(arrange->submenu, _("by Size"), 0, enabled, ACT_FINDER, "arrange size");
+	add(arrange->submenu, _("by Kind"), 0, enabled, ACT_FINDER, "arrange kind");
+	add(arrange->submenu, _("by Label"), 0, enabled, ACT_FINDER, "arrange label");
 }
 
 /* View > Sort List: the list's columns shown, left to right (the
  * Sniffer's viewoptions.h ids), the one sorted by checked. */
 static void add_sort_submenu(struct mb_menu *m, bool enabled, const struct finder_state *fs) {
 	static const struct { int id; const char *name, *key; } columns[] = {
-		{ 0, "by Name", "name" }, { 1, "by Date Modified", "modified" },
-		{ 4, "by Date Created", "created" }, { 2, "by Size", "size" }, { 3, "by Kind", "kind" },
-		{ 5, "by Label", "label" }, { 6, "by Comments", "comments" }, { 7, "by Version", "version" },
+		{ 0, N_("by Name"), "name" }, { 1, N_("by Date Modified"), "modified" },
+		{ 4, N_("by Date Created"), "created" }, { 2, N_("by Size"), "size" }, { 3, N_("by Kind"), "kind" },
+		{ 5, N_("by Label"), "label" }, { 6, N_("by Comments"), "comments" }, { 7, N_("by Version"), "version" },
 	};
-	struct mb_item *sort = add(m, "Sort List", 0, enabled, ACT_NONE, NULL);
+	struct mb_item *sort = add(m, _("Sort List"), 0, enabled, ACT_NONE, NULL);
 	sort->submenu = calloc(1, sizeof(*sort->submenu));
 	for (size_t i = 0; i < sizeof(columns) / sizeof(columns[0]); i++) {
 		if (columns[i].id != 0 && !(fs->columns & (1u << columns[i].id))) {
@@ -110,7 +111,7 @@ static void add_sort_submenu(struct mb_menu *m, bool enabled, const struct finde
 		}
 		char command[32];
 		snprintf(command, sizeof(command), "sort %s", columns[i].key);
-		struct mb_item *it = add(sort->submenu, columns[i].name, 0, enabled, ACT_FINDER, command);
+		struct mb_item *it = add(sort->submenu, _(columns[i].name), 0, enabled, ACT_FINDER, command);
 		it->checked = enabled && fs->sort == columns[i].id;
 	}
 }
@@ -153,36 +154,36 @@ static void add_finder_menus(struct mb_menu *menus, int *n) {
 	const struct finder_state *fs = finder_state();
 	const bool up = fs->connected, sel = up && fs->selection > 0;
 
-	struct mb_menu *m = new_menu(menus, n, "File");
+	struct mb_menu *m = new_menu(menus, n, _("File"));
 	struct mb_menu *const first = m;
-	add(m, "New Folder", 'N', up, ACT_FINDER, "new-folder");
-	add(m, "Open", 'O', sel, ACT_FINDER, "open");
-	add(m, "Print", 'P', sel, ACT_FINDER, "print");
-	add(m, "Encrypt…", 0, sel, ACT_FINDER, "encrypt");
-	add(m, "Decrypt…", 0, sel, ACT_FINDER, "decrypt");
-	add(m, "Move To Trash", KEY_DELETE_GLYPH, sel, ACT_FINDER, "move-to-trash");
-	add(m, "Close Window", 'W', up && fs->window, ACT_FINDER, "close-window");
+	add(m, _("New Folder"), 'N', up, ACT_FINDER, "new-folder");
+	add(m, _("Open"), 'O', sel, ACT_FINDER, "open");
+	add(m, _("Print"), 'P', sel, ACT_FINDER, "print");
+	add(m, _("Encrypt…"), 0, sel, ACT_FINDER, "encrypt");
+	add(m, _("Decrypt…"), 0, sel, ACT_FINDER, "decrypt");
+	add(m, _("Move To Trash"), KEY_DELETE_GLYPH, sel, ACT_FINDER, "move-to-trash");
+	add(m, _("Close Window"), 'W', up && fs->window, ACT_FINDER, "close-window");
 	sep(m);
 	/* Mac OS 9: Get Info > General Information, Sharing… */
 	const bool info = sel || (up && fs->window);
-	struct mb_item *get_info = add(m, "Get Info", 0, info, ACT_NONE, NULL);
+	struct mb_item *get_info = add(m, _("Get Info"), 0, info, ACT_NONE, NULL);
 	get_info->submenu = calloc(1, sizeof(*get_info->submenu));
-	add(get_info->submenu, "General Information", 'I', info, ACT_FINDER, "get-info");
-	add(get_info->submenu, "Sharing…", 0, info, ACT_FINDER, "get-info-sharing");
+	add(get_info->submenu, _("General Information"), 'I', info, ACT_FINDER, "get-info");
+	add(get_info->submenu, _("Sharing…"), 0, info, ACT_FINDER, "get-info-sharing");
 	add_label_submenu(m, sel, fs->label);
-	add(m, "Duplicate", 'D', sel, ACT_FINDER, "duplicate");
-	add(m, "Make Alias", 'M', sel, ACT_FINDER, "make-alias");
-	add(m, "Add To Favorites", 0, sel, ACT_FINDER, "add-to-favorites");
-	add(m, "Put Away", 'Y', sel, ACT_FINDER, "put-away");
+	add(m, _("Duplicate"), 'D', sel, ACT_FINDER, "duplicate");
+	add(m, _("Make Alias"), 'M', sel, ACT_FINDER, "make-alias");
+	add(m, _("Add To Favorites"), 0, sel, ACT_FINDER, "add-to-favorites");
+	add(m, _("Put Away"), 'Y', sel, ACT_FINDER, "put-away");
 	sep(m);
-	add(m, "Search Internet…", 'H', up, ACT_FINDER, "search-internet");
-	add(m, "Find…", 'F', up, ACT_FINDER, "find");
-	add(m, "Find Similar Items", 0, sel, ACT_FINDER, "find-similar");
-	add(m, "Index Selection", 0, up, ACT_FINDER, "index-selection");
-	add(m, "Show Original", 'R', sel, ACT_FINDER, "show-original");
+	add(m, _("Search Internet…"), 'H', up, ACT_FINDER, "search-internet");
+	add(m, _("Find…"), 'F', up, ACT_FINDER, "find");
+	add(m, _("Find Similar Items"), 0, sel, ACT_FINDER, "find-similar");
+	add(m, _("Index Selection"), 0, up, ACT_FINDER, "index-selection");
+	add(m, _("Show Original"), 'R', sel, ACT_FINDER, "show-original");
 	sep(m);
-	add(m, "Page Setup…", 0, up, ACT_FINDER, "page-setup");
-	add(m, up && fs->window ? "Print Window…" : "Print Desktop…", 0, up, ACT_FINDER,
+	add(m, _("Page Setup…"), 0, up, ACT_FINDER, "page-setup");
+	add(m, up && fs->window ? _("Print Window…") : _("Print Desktop…"), 0, up, ACT_FINDER,
 		"print-window");
 	/* Sniffer has no undoable edits or clipboard yet; it can select. */
 	add_edit_menu(menus, n, false);
@@ -192,67 +193,67 @@ static void add_finder_menus(struct mb_menu *menus, int *n) {
 	select_all->action = ACT_FINDER;
 	select_all->arg = strdup("select-all");
 	sep(edit);
-	add(edit, "Show Clipboard", 0, up, ACT_FINDER, "show-clipboard");
+	add(edit, _("Show Clipboard"), 0, up, ACT_FINDER, "show-clipboard");
 	sep(edit);
-	add(edit, "Preferences…", 0, up, ACT_FINDER, "preferences");
-	m = new_menu(menus, n, "View");
+	add(edit, _("Preferences…"), 0, up, ACT_FINDER, "preferences");
+	m = new_menu(menus, n, _("View"));
 	const bool win = up && fs->window;
-	struct mb_item *icons = add(m, "as Icons", 0, win, ACT_FINDER, "view-icons");
+	struct mb_item *icons = add(m, _("as Icons"), 0, win, ACT_FINDER, "view-icons");
 	icons->checked = win && fs->view == 0;
-	struct mb_item *buttons = add(m, "as Buttons", 0, win, ACT_FINDER, "view-buttons");
+	struct mb_item *buttons = add(m, _("as Buttons"), 0, win, ACT_FINDER, "view-buttons");
 	buttons->checked = win && fs->view == 2;
-	struct mb_item *list = add(m, "as List", 0, win, ACT_FINDER, "view-list");
+	struct mb_item *list = add(m, _("as List"), 0, win, ACT_FINDER, "view-list");
 	list->checked = win && fs->view == 1;
 	sep(m);
 	/* Mac OS 8/9: a window, or a pop-up window's tab at the screen's bottom. */
-	struct mb_item *as_window = add(m, "as Window", 0, win && fs->popups, ACT_FINDER, "view-window");
+	struct mb_item *as_window = add(m, _("as Window"), 0, win && fs->popups, ACT_FINDER, "view-window");
 	as_window->checked = win && !fs->popup;
-	struct mb_item *as_popup = add(m, "as Pop-up Window", 0, win && fs->popups, ACT_FINDER,
+	struct mb_item *as_popup = add(m, _("as Pop-up Window"), 0, win && fs->popups, ACT_FINDER,
 		"view-popup");
 	as_popup->checked = win && fs->popup;
 	sep(m);
 	/* Mac OS 9: for an icon view, or the desktop when no window is in front. */
 	const bool iconView = up && (!fs->window || fs->view == 0);
-	add(m, "Clean Up", 0, iconView, ACT_FINDER, "clean-up");
+	add(m, _("Clean Up"), 0, iconView, ACT_FINDER, "clean-up");
 	add_arrange_submenu(m, iconView);
 	add_sort_submenu(m, win && fs->view == 1, fs);
-	add(m, "Reset Column Positions", 0, win && fs->view == 1 && fs->custom, ACT_FINDER,
+	add(m, _("Reset Column Positions"), 0, win && fs->view == 1 && fs->custom, ACT_FINDER,
 		"reset-columns");
 	sep(m);
-	add(m, "View Options…", 0, up, ACT_FINDER, "view-options");
-	m = new_menu(menus, n, "Special");
+	add(m, _("View Options…"), 0, up, ACT_FINDER, "view-options");
+	m = new_menu(menus, n, _("Special"));
 	add(m, empty_trash_title(), 0, up && fs->trash, ACT_FINDER, "empty-trash");
-	add(m, "Eject", 'E', up && (fs->network || fs->unmount), ACT_FINDER, "eject");
-	add(m, "Erase Disk…", 0, up && fs->erase && fs->selection == 1, ACT_FINDER, "erase-disk");
+	add(m, _("Eject"), 'E', up && (fs->network || fs->unmount), ACT_FINDER, "eject");
+	add(m, _("Erase Disk…"), 0, up && fs->erase && fs->selection == 1, ACT_FINDER, "erase-disk");
 	/* Restore legacy hidden overrides, not applications queued in Trash. */
-	add(m, "Show All Applications", 0, up, ACT_FINDER, "show-hidden-applications");
+	add(m, _("Show All Applications"), 0, up, ACT_FINDER, "show-hidden-applications");
 	sep(m);
-	add(m, "Sleep",     0, true, ACT_LAUNCH, "systemctl suspend");
-	add(m, "Restart",   0, true, ACT_LAUNCH, "systemctl reboot");
-	add(m, "Shut Down", 0, true, ACT_LAUNCH, "systemctl poweroff");
+	add(m, _("Sleep"),     0, true, ACT_LAUNCH, "systemctl suspend");
+	add(m, _("Restart"),   0, true, ACT_LAUNCH, "systemctl reboot");
+	add(m, _("Shut Down"), 0, true, ACT_LAUNCH, "systemctl poweroff");
 	sep(m);
-	struct mb_item *log_out = add(m, "Log Out…", 'Q', up, ACT_FINDER, "log-out");
+	struct mb_item *log_out = add(m, _("Log Out…"), 'Q', up, ACT_FINDER, "log-out");
 	if (log_out) {
 		log_out->shift = true; /* ⇧⌘Q */
 	}
 	/* Mac OS 9's Help menu: Help Center, then the Finder's own book. */
-	m = new_menu(menus, n, "Help");
+	m = new_menu(menus, n, _("Help"));
 	char help[PATH_MAX + 64];
 	sibling_program("zacos9-help", help, sizeof(help));
-	add(m, "Help Center", 0, true, ACT_LAUNCH, help);
+	add(m, _("Help Center"), 0, true, ACT_LAUNCH, help);
 	sep(m);
 	char book[PATH_MAX + 80];
 	snprintf(book, sizeof(book), "%s zacos9", help);
-	add(m, "ZacOS Help", '?', true, ACT_LAUNCH, book);
+	add(m, _("ZacOS Help"), '?', true, ACT_LAUNCH, book);
 	/* Where Mac OS 9 had its tutorials (docs/tutorial.md). */
 	char tutorial[PATH_MAX + 80], practice[PATH_MAX + 64];
 	snprintf(tutorial, sizeof(tutorial), "%s tutorial", help);
-	add(m, "Learn ZacOS", 0, true, ACT_LAUNCH, tutorial);
+	add(m, _("Learn ZacOS"), 0, true, ACT_LAUNCH, tutorial);
 	sibling_program("zacos9-mousepractice", practice, sizeof(practice));
-	add(m, "Mouse Practice", 0, true, ACT_LAUNCH, practice);
+	add(m, _("Mouse Practice"), 0, true, ACT_LAUNCH, practice);
 	sep(m);
 	char hints[16];
-	struct mb_item *hint_bubbles = add(m, "Show Hint Bubbles", 0, true,
+	struct mb_item *hint_bubbles = add(m, _("Show Hint Bubbles"), 0, true,
 		ACT_TOGGLE_SETTING, "hint-bubbles");
 	hint_bubbles->checked = !pl_setting("hint-bubbles", hints, sizeof(hints)) ||
 		(strcmp(hints, "0") != 0 && strcmp(hints, "false") != 0);
@@ -268,10 +269,10 @@ struct mb_menu *menus_new_menu(struct mb_menu *menus, int *n, const char *title)
 }
 
 static void add_app_menus(struct mb_menu *menus, int *n, const char *app_id) {
-	struct mb_menu *m = new_menu(menus, n, "File");
-	add(m, "Close Window", 'W', true, ACT_CLOSE_WINDOW, app_id);
+	struct mb_menu *m = new_menu(menus, n, _("File"));
+	add(m, _("Close Window"), 'W', true, ACT_CLOSE_WINDOW, app_id);
 	sep(m);
-	add(m, "Quit", 'Q', true, ACT_QUIT_APP, app_id);
+	add(m, _("Quit"), 'Q', true, ACT_QUIT_APP, app_id);
 	add_edit_menu(menus, n, keys_available());
 }
 
@@ -470,23 +471,23 @@ void menus_rebuild(struct mb_bar *bar, int screen_w) {
 
 	const bool named = app_name_shown();
 	struct mb_menu *am = new_menu(bar->right, &bar->n_right,
-		!named ? NULL : front ? front->name : "Sniffer");
+		!named ? NULL : front ? front->name : _("Sniffer"));
 	const uint32_t *own = named ? NULL : app_icon_title(front ? front->app_id : FINDER_APP_ID);
 	am->icon = named ? NULL : own ? own : app_menu_icon();
 	am->handle = true;
 	if (front) {
 		char label[256];
-		snprintf(label, sizeof(label), "Hide %s", front->name);
+		snprintf(label, sizeof(label), _("Hide %s"), front->name);
 		add(am, label, 0, true, ACT_HIDE_APP, front->app_id);
 	} else {
-		add(am, "Hide Sniffer", 0, false, ACT_NONE, NULL);
+		add(am, _("Hide Sniffer"), 0, false, ACT_NONE, NULL);
 	}
-	add(am, "Hide Others", 0, n_apps > 1 || (n_apps == 1 && !front), ACT_HIDE_OTHERS,
+	add(am, _("Hide Others"), 0, n_apps > 1 || (n_apps == 1 && !front), ACT_HIDE_OTHERS,
 		front ? front->app_id : "");
-	add(am, "Show All", 0, n_apps > 0, ACT_SHOW_ALL, NULL);
+	add(am, _("Show All"), 0, n_apps > 0, ACT_SHOW_ALL, NULL);
 	sep(am);
 	if (n_apps == 0) {
-		struct mb_item *it = add(am, "Sniffer", 0, true, ACT_NONE, NULL);
+		struct mb_item *it = add(am, _("Sniffer"), 0, true, ACT_NONE, NULL);
 		it->checked = true;
 	}
 	for (int i = 0; i < n_apps; i++) {
@@ -631,7 +632,7 @@ static void add_trick_items(struct mb_menu *m) {
 		return;
 	}
 	sep(m);
-	struct mb_item *attach = add(m, "Attach a Folder Trick", 0, true, ACT_NONE, NULL);
+	struct mb_item *attach = add(m, _("Attach a Folder Trick"), 0, true, ACT_NONE, NULL);
 	if (!attach) {
 		return;
 	}
@@ -651,9 +652,9 @@ static void add_trick_items(struct mb_menu *m) {
 	if (x->n_available) {
 		sep(attach->submenu);
 	}
-	add(attach->submenu, "Open Folder Tricks Folder", 0, true, ACT_FINDER, "open-folder-tricks");
+	add(attach->submenu, _("Open Folder Tricks Folder"), 0, true, ACT_FINDER, "open-folder-tricks");
 	if (x->n_attached) {
-		struct mb_item *remove = add(m, "Remove a Folder Trick", 0, true, ACT_NONE, NULL);
+		struct mb_item *remove = add(m, _("Remove a Folder Trick"), 0, true, ACT_NONE, NULL);
 		if (remove) {
 			remove->submenu = calloc(1, sizeof(*remove->submenu));
 			for (int i = 0; i < x->n_attached; i++) {
@@ -688,74 +689,74 @@ void menus_context(struct mb_menu *m, const char *kind) {
 	}
 	const bool sel = fs->selection > 0;
 	if (strcmp(kind, "icon") == 0 && sel) {
-		add(m, "Open", 0, true, ACT_FINDER, "open");
+		add(m, _("Open"), 0, true, ACT_FINDER, "open");
 		/* As the File menu: Print after Open, when there's a document. */
 		if (fs->documents) {
-			add(m, "Print", 0, true, ACT_FINDER, "print");
+			add(m, _("Print"), 0, true, ACT_FINDER, "print");
 		}
-		add(m, "Move To Trash", 0, true, ACT_FINDER, "move-to-trash");
+		add(m, _("Move To Trash"), 0, true, ACT_FINDER, "move-to-trash");
 		sep(m);
-		add(m, "Get Info", 0, true, ACT_FINDER, "get-info");
+		add(m, _("Get Info"), 0, true, ACT_FINDER, "get-info");
 		add_label_submenu(m, true, fs->label);
-		add(m, "Duplicate", 0, true, ACT_FINDER, "duplicate");
-		add(m, "Make Alias", 0, true, ACT_FINDER, "make-alias");
-		add(m, "Add To Favorites", 0, true, ACT_FINDER, "add-to-favorites");
+		add(m, _("Duplicate"), 0, true, ACT_FINDER, "duplicate");
+		add(m, _("Make Alias"), 0, true, ACT_FINDER, "make-alias");
+		add(m, _("Add To Favorites"), 0, true, ACT_FINDER, "add-to-favorites");
 		add_trick_items(m);
 		add_context_commands(m);
 	} else if (strcmp(kind, "disk") == 0 && sel) {
-		add(m, "Open", 0, true, ACT_FINDER, "open");
-		add(m, "Get Info", 0, true, ACT_FINDER, "get-info");
+		add(m, _("Open"), 0, true, ACT_FINDER, "open");
+		add(m, _("Get Info"), 0, true, ACT_FINDER, "get-info");
 		add_label_submenu(m, true, fs->label);
 		if (fs->network || fs->unmount) {
 			/* A real disk; the startup disk is the Macintosh view. */
-			add(m, "Add To Favorites", 0, true, ACT_FINDER, "add-to-favorites");
+			add(m, _("Add To Favorites"), 0, true, ACT_FINDER, "add-to-favorites");
 		}
 		if (fs->network || fs->unmount || (fs->erase && fs->selection == 1)) {
 			sep(m);
 		}
 		if (fs->network || fs->unmount) {
-			add(m, "Eject", 0, true, ACT_FINDER, "eject");
+			add(m, _("Eject"), 0, true, ACT_FINDER, "eject");
 		}
 		if (fs->erase && fs->selection == 1) {
-			add(m, "Erase Disk…", 0, true, ACT_FINDER, "erase-disk");
+			add(m, _("Erase Disk…"), 0, true, ACT_FINDER, "erase-disk");
 		}
 		add_context_commands(m);
 	} else if (strcmp(kind, "trash") == 0 && sel) {
-		add(m, "Open", 0, true, ACT_FINDER, "open");
+		add(m, _("Open"), 0, true, ACT_FINDER, "open");
 		if (fs->trash) {
 			add(m, empty_trash_title(), 0, true, ACT_FINDER, "empty-trash");
 		}
 	} else if (strcmp(kind, "window") == 0 && fs->window) {
-		add(m, "New Folder", 0, true, ACT_FINDER, "new-folder");
+		add(m, _("New Folder"), 0, true, ACT_FINDER, "new-folder");
 		sep(m);
-		struct mb_item *view = add(m, "View", 0, true, ACT_NONE, NULL);
+		struct mb_item *view = add(m, _("View"), 0, true, ACT_NONE, NULL);
 		view->submenu = calloc(1, sizeof(*view->submenu));
-		add(view->submenu, "as Icons", 0, true, ACT_FINDER, "view-icons")->checked = fs->view == 0;
-		add(view->submenu, "as Buttons", 0, true, ACT_FINDER, "view-buttons")->checked = fs->view == 2;
-		add(view->submenu, "as List", 0, true, ACT_FINDER, "view-list")->checked = fs->view == 1;
+		add(view->submenu, _("as Icons"), 0, true, ACT_FINDER, "view-icons")->checked = fs->view == 0;
+		add(view->submenu, _("as Buttons"), 0, true, ACT_FINDER, "view-buttons")->checked = fs->view == 2;
+		add(view->submenu, _("as List"), 0, true, ACT_FINDER, "view-list")->checked = fs->view == 1;
 		if (fs->view == 0) {
-			add(m, "Clean Up", 0, true, ACT_FINDER, "clean-up");
+			add(m, _("Clean Up"), 0, true, ACT_FINDER, "clean-up");
 			add_arrange_submenu(m, true);
 		} else if (fs->view == 1) {
 			add_sort_submenu(m, true, fs);
 		}
-		add(m, "View Options…", 0, true, ACT_FINDER, "view-options");
+		add(m, _("View Options…"), 0, true, ACT_FINDER, "view-options");
 		sep(m);
-		add(m, "Get Info", 0, true, ACT_FINDER, "get-info");
-		add(m, "Close Window", 0, true, ACT_FINDER, "close-window");
+		add(m, _("Get Info"), 0, true, ACT_FINDER, "get-info");
+		add(m, _("Close Window"), 0, true, ACT_FINDER, "close-window");
 		add_trick_items(m);
 		add_context_commands(m);
 	} else if (strcmp(kind, "desktop") == 0) {
-		add(m, "New Folder", 0, true, ACT_FINDER, "new-folder");
+		add(m, _("New Folder"), 0, true, ACT_FINDER, "new-folder");
 		sep(m);
-		add(m, "Clean Up", 0, true, ACT_FINDER, "clean-up");
+		add(m, _("Clean Up"), 0, true, ACT_FINDER, "clean-up");
 		add_arrange_submenu(m, true);
-		add(m, "View Options…", 0, true, ACT_FINDER, "view-options");
+		add(m, _("View Options…"), 0, true, ACT_FINDER, "view-options");
 		sep(m);
 		char command[PATH_MAX + 64];
 		sibling_program("zacos9-appearance", command, sizeof(command));
 		strncat(command, " desktop", sizeof(command) - strlen(command) - 1);
-		add(m, "Change Desktop Background…", 0, true, ACT_LAUNCH, command);
+		add(m, _("Change Desktop Background…"), 0, true, ACT_LAUNCH, command);
 		add_trick_items(m);
 		add_context_commands(m);
 	}

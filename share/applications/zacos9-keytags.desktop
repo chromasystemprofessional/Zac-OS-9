@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Key Tags
+Name[ru]=Клавиши
+Name[it]=Etichette tasti
 Comment=See which character each key types
 Exec=zacos9-keytags
 Terminal=false

@@ -9,7 +9,7 @@ class SpeechPanel : public ControlPanel {
 	static constexpr int PANEL_H = G2 + 1 + PL_GROUP_MARGIN_TOP + PL_CHECKBOX_SIZE + PL_GROUP_MARGIN + 16;
 
 public:
-	SpeechPanel() : ControlPanel("Speech", PANEL_H) {
+	SpeechPanel() : ControlPanel(_("Speech"), PANEL_H) {
 		m_groups = { { G0, G0 + VOICE_H, "Voice" }, { G1, G1 + SLIDER_GROUP_H, "Rate" },
 			{ G2, G2 + 1 + PL_GROUP_MARGIN_TOP + PL_CHECKBOX_SIZE + PL_GROUP_MARGIN, "Talking Alerts" } };
 		m_voice.rect = QRect(M + IN, G0 + 1 + PL_GROUP_MARGIN_TOP, W - 2 * M - 2 * IN - 4, PL_POPUP_H);
@@ -126,4 +126,4 @@ private:
 	}
 };
 
-PANEL("speech", "Speech", false, SpeechPanel);
+PANEL("speech", N_("Speech"), false, SpeechPanel);

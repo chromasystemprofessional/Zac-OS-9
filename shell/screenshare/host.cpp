@@ -54,6 +54,7 @@
 #include "process.h"
 #include "common.h"
 #include "platinumshell.h"
+#include "tr.h"
 
 using namespace screenshare;
 
@@ -676,7 +677,8 @@ static void quitOnSignal(int) {
 int main(int argc, char *argv[]) {
 	qputenv("QT_WAYLAND_DISABLE_WINDOWDECORATION", "1");
 	QApplication app(argc, argv);
-	QApplication::setApplicationName("Screen Sharing");
+	zacos9_i18n_init();
+	QApplication::setApplicationName(tr9("Screen Sharing"));
 	QApplication::setQuitOnLastWindowClosed(false);
 	QGuiApplication::setDesktopFileName("zacos9-screenshare-host");
 	platinumShellInit();

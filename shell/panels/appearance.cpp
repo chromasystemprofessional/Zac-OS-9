@@ -1,4 +1,5 @@
 #include "appearance.h"
+#include "tr.h"
 #include "process.h"
 
 #include <QApplication>
@@ -99,7 +100,7 @@ void setGtkSmartScrolling(bool on) {
 /* ---- the panel ---------------------------------------------------------------- */
 
 AppearancePanel::AppearancePanel() {
-	setWindowTitle("Appearance");
+	setWindowTitle(_("Appearance"));
 	setFixedSize(W, H);
 	for (const char *label : { "Themes", "Appearance", "Fonts", "Desktop", "Sound",
 			"Options" }) {

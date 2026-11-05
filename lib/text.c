@@ -1,5 +1,6 @@
 #include <stdbool.h>
 #include <cairo.h>
+#include <fontconfig/fontconfig.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,9 +17,11 @@
 
 /*
  * Text is drawn with our own bitmap fonts (assets/fonts), which carry the
- * measured Mac OS 8 metrics. A character they don't have (CJK in a file
- * name, say) falls back to a non-antialiased DejaVu Sans glyph, sized to
- * sit on the same baseline.
+ * measured Mac OS 8 metrics. A character they don't have (an accented letter
+ * outside Latin-1, a Greek or Cyrillic name, Japanese kana and kanji) falls
+ * back to a non-antialiased outline glyph, sized to sit on the same baseline.
+ * Fontconfig finds the face: DejaVu Sans for European scripts, a Japanese
+ * face (fonts-noto-cjk) for CJK. docs/i18n.md has the rules.
  */
 
 struct style {
@@ -568,13 +571,143 @@ static uint32_t next_cp(const char **s) {
 
 /* ---- fallback glyphs ------------------------------------------------------ */
 
+/* A fallback face, and the characters it says it has. DejaVu Sans is asked
+ * for first, so European letters keep their old look; a code point it lacks
+ * is looked up in Fontconfig, which on a Japanese system finds Noto Sans CJK
+ * JP. The charsets let later characters skip the Fontconfig query. */
+struct fallback_face {
+	char *family;
+	FcCharSet *charset;
+	bool bold;
+};
+
+#define FALLBACK_FACES_MAX 8
+static struct fallback_face fallback_faces[FALLBACK_FACES_MAX];
+static int fallback_face_count;
+static bool fallback_faces_ready;
+
+/* Kana, Han, CJK punctuation and full-width forms: scripts for which a
+ * Japanese face is the right default. */
+static bool cjk_cp(uint32_t cp) {
+	return (cp >= 0x2E80 && cp <= 0x9FFF) || (cp >= 0xF900 && cp <= 0xFAFF) ||
+		(cp >= 0xFE30 && cp <= 0xFE4F) || (cp >= 0xFF00 && cp <= 0xFFEF) ||
+		(cp >= 0x20000 && cp <= 0x2FA1F) || (cp >= 0x30000 && cp <= 0x3FFFF);
+}
+
+static void remember_face(const char *family, FcCharSet *charset, bool bold) {
+	if (!charset || fallback_face_count >= FALLBACK_FACES_MAX) {
+		if (charset) {
+			FcCharSetDestroy(charset);
+		}
+		return;
+	}
+	struct fallback_face *face = &fallback_faces[fallback_face_count++];
+	face->family = strdup(family);
+	face->charset = charset;
+	face->bold = bold;
+}
+
+/* Ask Fontconfig for a named face and remember what it actually matched. */
+static void remember_family(const char *family, bool bold) {
+	FcPattern *pat = FcPatternCreate();
+	FcPatternAddString(pat, FC_FAMILY, (const FcChar8 *)family);
+	FcPatternAddInteger(pat, FC_WEIGHT, bold ? FC_WEIGHT_BOLD : FC_WEIGHT_REGULAR);
+	FcPatternAddBool(pat, FC_SCALABLE, FcTrue);
+	FcConfigSubstitute(NULL, pat, FcMatchPattern);
+	FcDefaultSubstitute(pat);
+	FcResult result;
+	FcPattern *match = FcFontMatch(NULL, pat, &result);
+	FcPatternDestroy(pat);
+	if (!match) {
+		return;
+	}
+	FcCharSet *charset = NULL;
+	FcChar8 *matched = NULL;
+	if (FcPatternGetCharSet(match, FC_CHARSET, 0, &charset) == FcResultMatch &&
+			FcPatternGetString(match, FC_FAMILY, 0, &matched) == FcResultMatch && matched) {
+		remember_face((const char *)matched, FcCharSetCopy(charset), bold);
+	}
+	FcPatternDestroy(match);
+}
+
+/* Ask Fontconfig for a face that covers `cp`. FcFontMatch can return the
+ * default face even when it lacks the character, so the sorted list is
+ * searched for the first face whose charset really covers it. A CJK
+ * character asks for a Japanese face first, then for any face at all, so a
+ * Chinese or Korean font is better than a box. */
+static const struct fallback_face *find_face(uint32_t cp, bool bold) {
+	const char *langs[] = { cjk_cp(cp) ? "ja" : NULL, NULL };
+	for (size_t i = 0; i < sizeof(langs) / sizeof(langs[0]); i++) {
+		if (i > 0 && !langs[0]) {
+			break; /* not CJK: one query, without a language */
+		}
+		FcPattern *pat = FcPatternCreate();
+		FcPatternAddInteger(pat, FC_WEIGHT, bold ? FC_WEIGHT_BOLD : FC_WEIGHT_REGULAR);
+		FcPatternAddBool(pat, FC_SCALABLE, FcTrue);
+		if (langs[i]) {
+			FcPatternAddString(pat, FC_LANG, (const FcChar8 *)langs[i]);
+		}
+		FcConfigSubstitute(NULL, pat, FcMatchPattern);
+		FcDefaultSubstitute(pat);
+		FcResult result;
+		FcFontSet *set = FcFontSort(NULL, pat, FcFalse, NULL, &result);
+		FcPatternDestroy(pat);
+		if (!set) {
+			continue;
+		}
+		for (int f = 0; f < set->nfont; f++) {
+			FcPattern *font = set->fonts[f];
+			FcCharSet *charset = NULL;
+			FcChar8 *family = NULL;
+			if (FcPatternGetCharSet(font, FC_CHARSET, 0, &charset) != FcResultMatch ||
+					!FcCharSetHasChar(charset, cp) ||
+					FcPatternGetString(font, FC_FAMILY, 0, &family) != FcResultMatch ||
+					!family) {
+				continue;
+			}
+			const int before = fallback_face_count;
+			remember_face((const char *)family, FcCharSetCopy(charset), bold);
+			FcFontSetDestroy(set);
+			return fallback_face_count > before ? &fallback_faces[before] : NULL;
+		}
+		FcFontSetDestroy(set);
+	}
+	return NULL;
+}
+
+static const struct fallback_face *fallback_face_for(uint32_t cp, bool bold) {
+	if (!fallback_faces_ready) {
+		fallback_faces_ready = true;
+		remember_family("DejaVu Sans", false);
+		remember_family("DejaVu Sans", true);
+	}
+	for (int i = 0; i < fallback_face_count; i++) {
+		if (fallback_faces[i].bold == bold && fallback_faces[i].charset &&
+				FcCharSetHasChar(fallback_faces[i].charset, cp)) {
+			return &fallback_faces[i];
+		}
+	}
+	const struct fallback_face *found = find_face(cp, bold);
+	if (found) {
+		return found;
+	}
+	/* Nothing covers it: DejaVu draws its .notdef box, as it always did. */
+	for (int i = 0; i < fallback_face_count; i++) {
+		if (fallback_faces[i].bold == bold) {
+			return &fallback_faces[i];
+		}
+	}
+	return fallback_face_count ? &fallback_faces[0] : NULL;
+}
+
 struct fallback {
 	int width, advance;
 	uint8_t *mask; /* the line box's height, `width` wide; pen at column 0 */
 };
 
-static void fallback_font(cairo_t *cr, const struct style *st) {
-	cairo_select_font_face(cr, "DejaVu Sans", CAIRO_FONT_SLANT_NORMAL,
+static void fallback_font(cairo_t *cr, const struct style *st,
+		const struct fallback_face *face) {
+	cairo_select_font_face(cr, face ? face->family : "DejaVu Sans", CAIRO_FONT_SLANT_NORMAL,
 		st->fallback_bold ? CAIRO_FONT_WEIGHT_BOLD : CAIRO_FONT_WEIGHT_NORMAL);
 	cairo_set_font_size(cr, st->fallback_px);
 	cairo_font_options_t *opts = cairo_font_options_create();
@@ -585,7 +718,8 @@ static void fallback_font(cairo_t *cr, const struct style *st) {
 	cairo_font_options_destroy(opts);
 }
 
-static struct fallback render_fallback(uint32_t cp, const struct style *st) {
+static struct fallback render_fallback(uint32_t cp, const struct style *st,
+		const struct fallback_face *face) {
 	char utf8[5] = { 0 };
 	if (cp < 0x80) {
 		utf8[0] = (char)cp;
@@ -605,7 +739,7 @@ static struct fallback render_fallback(uint32_t cp, const struct style *st) {
 	const int h = st->font->height;
 	cairo_surface_t *scratch = cairo_image_surface_create(CAIRO_FORMAT_A8, 1, 1);
 	cairo_t *cr = cairo_create(scratch);
-	fallback_font(cr, st);
+	fallback_font(cr, st, face);
 	cairo_text_extents_t ext;
 	cairo_text_extents(cr, utf8, &ext);
 	cairo_destroy(cr);
@@ -615,7 +749,7 @@ static struct fallback render_fallback(uint32_t cp, const struct style *st) {
 	fb.width = fb.advance + 2;
 	cairo_surface_t *surf = cairo_image_surface_create(CAIRO_FORMAT_A8, fb.width, h);
 	cr = cairo_create(surf);
-	fallback_font(cr, st);
+	fallback_font(cr, st, face);
 	cairo_move_to(cr, 0, st->font->baseline);
 	cairo_show_text(cr, utf8);
 	cairo_destroy(cr);
@@ -645,7 +779,8 @@ static struct plat_text *render_exact(const char *utf8, const struct style *st) 
 		if (g) {
 			advance += g->advance;
 		} else {
-			struct fallback fb = render_fallback(cp, st);
+			const struct fallback_face *face = fallback_face_for(cp, st->fallback_bold);
+			struct fallback fb = render_fallback(cp, st, face);
 			advance += fb.advance;
 			free(fb.mask);
 		}
@@ -680,7 +815,8 @@ static struct plat_text *render_exact(const char *utf8, const struct style *st) 
 			pen += g->advance;
 			continue;
 		}
-		struct fallback fb = render_fallback(cp, st);
+		const struct fallback_face *face = fallback_face_for(cp, st->fallback_bold);
+		struct fallback fb = render_fallback(cp, st, face);
 		for (int y = 0; y < f->height; y++) {
 			for (int x = 0; x < fb.width && pen + x < text->width; x++) {
 				if (fb.mask[y * fb.width + x]) {
@@ -759,6 +895,13 @@ static void theme_fonts_once(void) {
 	}
 }
 
+/* The pseudo-locale check (docs/i18n.md) sets this: a string that had to be
+ * cut is a translation that no longer fits, and this names the string to fix. */
+static bool text_strict(void) {
+	const char *v = getenv("ZACOS9_TEXT_STRICT");
+	return v && *v && strcmp(v, "0") != 0;
+}
+
 static struct plat_text *render(const char *utf8, int max_ink_width, enum pl_font font) {
 	theme_fonts_once();
 	struct style storage;
@@ -767,6 +910,9 @@ static struct plat_text *render(const char *utf8, int max_ink_width, enum pl_fon
 	struct plat_text *text = render_exact(utf8, st);
 	if (ink_width(text) <= max_ink_width) {
 		return text;
+	}
+	if (text_strict()) {
+		fprintf(stderr, "zacos9: text truncated to %d px: \"%s\"\n", max_ink_width, utf8);
 	}
 	text_destroy(text);
 

@@ -1,7 +1,12 @@
 [Desktop Entry]
 Type=Application
 Name=Mouse
+Name[ru]=Мышь
+Name[ja]=マウス
+Name[it]=Mouse
 Comment=Mouse tracking and double-click speed
+Comment[ru]=Отслеживание мыши и скорость двойного щелчка
+Comment[ja]=マウスの追跡とダブルクリックの速さ
 Exec=zacos9-controlpanel mouse
 Categories=Settings;HardwareSettings;X-ZacOS9-ControlPanel;
 OnlyShowIn=ZacOS9;

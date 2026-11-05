@@ -27,11 +27,21 @@ menubar_exe = executable('zacos9-menubar',
 )
 
 # Hint Bubbles over the menu bar's menus (menubar/hints.c).
-test('menu-hints',
-  executable('test-hints', '../../tests/menubar/test_hints.c', 'hints.c',
-    dependencies: [platinum_dep, wayland_client],
-  ),
-  timeout: 10,
+hints_test = executable('test-hints', '../../tests/menubar/test_hints.c', 'hints.c',
+  dependencies: [platinum_dep, wayland_client],
+)
+test('menu-hints', hints_test, timeout: 10)
+# The same, with the Italian catalog: labels and hints translated together.
+test('menu-hints-it', find_program('python3'),
+  args: [files('../../tests/menubar/test_hints_it.py'),
+    meson.project_source_root(), hints_test],
+  timeout: 60,
+)
+# And in Russian.
+test('menu-hints-ru', find_program('python3'),
+  args: [files('../../tests/menubar/test_hints_ru.py'),
+    meson.project_source_root(), hints_test],
+  timeout: 60,
 )
 
 # The Zac menu's recent items (menubar/recent.c).
@@ -54,7 +64,7 @@ test('menu-keyboard',
 test('menu-app-switch',
   executable('test-app-switch',
     '../../tests/menubar/test_app_switch.c', 'toplevels.c', client_protocol_src,
-    dependencies: [platinum_dep, wayland_client],
+    dependencies: [platinum_dep, wayland_client, gio],
   ),
   timeout: 10,
 )

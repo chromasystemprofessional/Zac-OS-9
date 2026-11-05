@@ -1,6 +1,9 @@
 [Desktop Entry]
 Type=Application
 Name=Text
+Name[ru]=Текст
+Name[ja]=テキスト
+Name[it]=Testo
 Comment=The language programs use, and how lists are sorted
 Exec=zacos9-controlpanel text
 Categories=Settings;X-ZacOS9-ControlPanel;

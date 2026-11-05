@@ -30,6 +30,7 @@
 #include "panelkit.h"
 #include "sharingclient.h"
 #include "alert.h"
+#include "tr.h"
 #include "savers.h"
 #include "settings.h"
 #include "soundclient.h"

@@ -2,11 +2,15 @@
 # zacos9-install: install ZacOS 9 from a live session to a hard disk or
 # partition, or update a ZacOS 9 already installed on one.
 #
-#   zacos9-install DEVICE [NAME]
-#   zacos9-install --beside DISK NAME STEP...
+#   zacos9-install [--locale LOCALE] DEVICE [NAME]
+#   zacos9-install [--locale LOCALE] --beside DISK NAME STEP...
 #   zacos9-install --detect
 #   zacos9-install --min-size PARTITION
-#   zacos9-install --update PARTITION
+#   zacos9-install [--locale LOCALE] --update PARTITION
+#
+# LOCALE (e.g. it_IT.UTF-8) is the installed system's language: it is
+# written to /etc/default/locale and /etc/locale.conf and generated in
+# /etc/locale.gen. Without it the live system's language is kept.
 #
 # NAME is what the installed disk is called in the Finder (default
 # Zacintosh HD); it is also the filesystem's label, cut to ext4's 16 bytes.
@@ -48,6 +52,20 @@ set -eu
 
 TARGET=/mnt/zacos9-install-target
 
+# The installed system's language comes first, so the positional forms below
+# (DEVICE NAME, --beside DISK NAME STEP...) keep their meaning.
+locale=
+if [ "${1:-}" = --locale ]; then
+	[ "$#" -ge 3 ] || { echo 'error usage: zacos9-install --locale LOCALE ...'; exit 1; }
+	locale=$2
+	case $locale in
+	*[!A-Za-z0-9_.@-]* | '') echo "error No such language: \"$locale\"."; exit 1 ;;
+	esac
+	awk -v n="$locale" '$1 == n { found = 1 } END { exit !found }' /usr/share/i18n/SUPPORTED ||
+		{ echo "error No such language: \"$locale\"."; exit 1; }
+	shift 2
+fi
+
 # Whole disks first, then partitions (sdaN, sdaNN, nvme0n1pN, mmcblk0pN).
 # No comments inside the pattern list: a "\" continuation would swallow them.
 valid_device() {
@@ -78,6 +96,21 @@ reported=
 resolv_saved=
 step() { step_label=$2; echo "step $1 $2"; }
 fail() { echo "error $*"; reported=1; exit 1; }
+
+# The chosen language on the installed system, after its root is mounted.
+apply_locale() {
+	[ -n "$locale" ] || return 0
+	lang=${locale%%.*}
+	lang=${lang%%@*}
+	language=${lang%%_*}
+	mkdir -p "$TARGET/etc/default"
+	printf 'LANG=%s\nLANGUAGE=%s\n' "$locale" "$language" >"$TARGET/etc/default/locale"
+	printf 'LANG=%s\nLANGUAGE=%s\n' "$locale" "$language" >"$TARGET/etc/locale.conf"
+	gen="$TARGET/etc/locale.gen"
+	touch "$gen"
+	grep -qxF "$locale UTF-8" "$gen" || printf '%s UTF-8\n' "$locale" >>"$gen"
+	chroot "$TARGET" locale-gen >&2 || fail "The language couldn't be made on the installed system"
+}
 # Never rm -r the mount point: if an unmount failed, that would delete the
 # disk's own files (for an update, the user's whole system). rmdir only
 # removes it empty.
@@ -280,6 +313,7 @@ if [ "${1:-}" = --update ]; then
 
 	step 6 "Finishing..."
 	in_target update-grub >&2 || true
+	apply_locale
 	rm -rf "$cache"
 	sync
 	unmount_target
@@ -620,6 +654,8 @@ dpkg -l live-boot live-boot-initramfs-tools live-config live-config-systemd 2>/d
 
 # Regenerate initramfs without live hooks.
 chroot "$TARGET" update-initramfs -u >/dev/null 2>&1 || true
+
+apply_locale
 
 # fstab from the real UUIDs of the new partitions.
 root_uuid=$(blkid -s UUID -o value "$root_part")

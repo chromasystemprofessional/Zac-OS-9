@@ -6,7 +6,7 @@
  * shows the keyboard menu), then key repeat. */
 class KeyboardPanel : public ControlPanel {
 public:
-	KeyboardPanel() : ControlPanel("Keyboard", PANEL_H) {
+	KeyboardPanel() : ControlPanel(_("Keyboard"), PANEL_H) {
 		m_groups = { { G0, G0 + LAYOUTS_H, "Keyboard Layouts" },
 			{ G1, G1 + SLIDER_GROUP_H, "Key Repeat Rate" },
 			{ G2, G2 + SLIDER_GROUP_H, "Delay Until Repeat" } };
@@ -179,4 +179,4 @@ private:
 	bool m_caretOn = true;
 };
 
-PANEL("keyboard", "Keyboard", false, KeyboardPanel);
+PANEL("keyboard", N_("Keyboard"), false, KeyboardPanel);

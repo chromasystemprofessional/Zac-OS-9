@@ -1,6 +1,9 @@
 [Desktop Entry]
 Type=Application
 Name=Users
+Name[ru]=Пользователи
+Name[ja]=ユーザ
+Name[it]=Utenti
 Comment=Add, change and remove the accounts of the people who use this computer
 Exec=zacos9-controlpanel users
 Categories=Settings;System;X-ZacOS9-ControlPanel;

@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Calculator
+Name[ru]=Калькулятор
+Name[it]=Calcolatrice
 Comment=Add, subtract, multiply and divide
 Exec=zacos9-calculator
 Terminal=false

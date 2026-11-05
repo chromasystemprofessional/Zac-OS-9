@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Network
+Name[ru]=Сеть
+Name[it]=Rete
 Comment=Network status
 Exec=zacos9-collarmodule network
 Categories=X-ZacOS9-CollarModule;

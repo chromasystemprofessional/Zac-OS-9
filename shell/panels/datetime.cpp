@@ -1,4 +1,5 @@
 #include "datetime.h"
+#include "tr.h"
 #include "process.h"
 
 #include <QFile>
@@ -224,7 +225,7 @@ bool ClockField::key(int key, const QString &text) {
 static constexpr int TZ_W = 300, TZ_H = 270;
 
 TimeZoneDialog::TimeZoneDialog(const QStringList &zones, const QString &current) {
-	setWindowTitle("Set Time Zone");
+	setWindowTitle(_("Set Time Zone"));
 	setFixedSize(TZ_W, TZ_H);
 	m_list.frame = QRect(QPoint(13, 33), QPoint(TZ_W - 14, 33 + 11 * PL_LIST_ROW_H + 1));
 	QStringList names;
@@ -313,7 +314,7 @@ static constexpr int ROW1 = 26, ROW2 = 98; /* group boxes' top lines */
 static constexpr int ROW3 = 170;
 
 DateTimePanel::DateTimePanel() {
-	setWindowTitle("Date & Time");
+	setWindowTitle(_("Date & Time"));
 
 	m_date.kind = ClockField::Kind::Date;
 	m_date.pos = QPoint(M + 11, ROW1 + 13);

@@ -1,6 +1,9 @@
 [Desktop Entry]
 Type=Application
 Name=Keychain Access
+Name[ru]=Связка ключей
+Name[ja]=キーチェーンアクセス
+Name[it]=Accesso portachiavi
 Comment=See your keychains and what they keep; lock, unlock and remove
 Exec=zacos9-keychain
 Categories=Settings;Security;X-ZacOS9-ControlPanel;

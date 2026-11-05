@@ -1,6 +1,9 @@
 [Desktop Entry]
 Type=Application
 Name=File Sharing
+Name[ru]=Общий доступ к файлам
+Name[ja]=ファイル共有
+Name[it]=Condivisione file
 Comment=Share this computer's files with Macs (AFP) and Windows computers (SMB)
 Exec=zacos9-filesharing
 Categories=Settings;Network;X-ZacOS9-ControlPanel;

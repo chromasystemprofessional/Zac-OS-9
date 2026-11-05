@@ -4,6 +4,7 @@
  * Settings. The preview is our own Collar artwork.
  */
 #include "collarpanel.h"
+#include "tr.h"
 
 #include <QPainter>
 #include <QShowEvent>
@@ -104,7 +105,7 @@ static constexpr int HK_W = 300, HK_H = 128;
 static constexpr int HK_BOX_Y = 46;
 
 HotKeyDialog::HotKeyDialog(const QString &current) : m_hotkey(current) {
-	setWindowTitle("Define Hot Key");
+	setWindowTitle(_("Define Hot Key"));
 	setFixedSize(HK_W, HK_H);
 	m_ok = PanelButton("OK", QRect(HK_W - 13 - 58 - 3, HK_H - 13 - 20 - 3, 58, 20), true);
 	m_ok.clicked = [this] { accept(); };
@@ -199,7 +200,7 @@ static void group(pl_canvas *c, int x0, int y0, int x1, int y1, const char *titl
 }
 
 CollarPanel::CollarPanel() : m_host(this) {
-	setWindowTitle("Collar");
+	setWindowTitle(_("Collar"));
 	setFixedSize(W, H);
 
 	m_visibility.add("Show Collar", QPoint(RADIO_X, RADIO_Y));

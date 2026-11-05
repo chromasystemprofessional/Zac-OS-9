@@ -12,6 +12,7 @@
 #include "packwindow.h"
 #include "platinumshell.h"
 #include "settings.h"
+#include "tr.h"
 
 /* In the session's runtime folder: one Pack per session, whatever its
  * display is called. */
@@ -37,6 +38,7 @@ static bool parseAt(const QStringList &args, QPoint *at) {
 int main(int argc, char *argv[]) {
 	qputenv("QT_WAYLAND_DISABLE_WINDOWDECORATION", "1");
 	QApplication app(argc, argv);
+	zacos9_i18n_init();
 	QApplication::setApplicationName("Pack");
 	QGuiApplication::setDesktopFileName("zacos9-pack");
 	if (QIcon::themeName().isEmpty()) {

@@ -48,6 +48,7 @@
 #include "vfs.h"
 
 #include "alert.h"
+#include "tr.h"
 #include "desktop.h"
 #include "findwindow.h"
 #include "folderpath.h"
@@ -71,7 +72,7 @@ bool openWebSearch(const QString &channel, const QString &words) {
 	query.addQueryItem("q", words);
 	url.setQuery(query);
 	if (!appOpenUrl(url.toString(QUrl::FullyEncoded))) {
-		Alert::ask("The web search could not be opened. Check that a web browser is available.",
+		Alert::ask(tr9("The web search could not be opened. Check that a web browser is available."),
 			"OK", QString());
 		return false;
 	}
@@ -181,13 +182,12 @@ void Finder::start(Desktop *desktop) {
 						if (m_desktop) {
 							m_desktop->networkDisconnected(path);
 						}
-						const QString message = QStringLiteral(
-							"The server disk \"%1\" has been disconnected. "
+						const QString message = tr9("The server disk \"%1\" has been disconnected. "
 							"Connect to the server again to use it. "
 							"Unsaved changes may have been lost.").arg(QFileInfo(path).fileName());
 						auto *alert = new Alert(message, "OK", QString());
 						alert->setAttribute(Qt::WA_DeleteOnClose);
-						alert->setWindowTitle("Server Disconnected");
+						alert->setWindowTitle(tr9("Server Disconnected"));
 						alert->setAccessibleDescription(message);
 						alert->open();
 					}
@@ -323,10 +323,10 @@ void Finder::command(const QString &name) {
 		const QString rest = name.mid(11);
 		const QString appId = rest.section(' ', 0, 0);
 		const QString app = rest.section(' ', 1).trimmed();
-		if (!appId.isEmpty() && Alert::ask("Force “" + (app.isEmpty() ? appId : app) +
-				"” to quit? Any unsaved changes in it will be lost.", "Force Quit")) {
+		if (!appId.isEmpty() && Alert::ask(tr9("Force “%1” to quit? Any unsaved changes in it will be lost.")
+				.arg(app.isEmpty() ? appId : app), tr9("Force Quit"))) {
 			if (!platinumForceQuit(appId)) {
-				Alert::ask("“" + app + "” couldn't be forced to quit.", "OK", QString());
+				Alert::ask(tr9("“%1” couldn't be forced to quit.").arg(app), "OK", QString());
 			}
 		}
 	} else if (name == "add-to-favorites") {
@@ -334,8 +334,8 @@ void Finder::command(const QString &name) {
 	} else if (name.startsWith("attach-trick ")) {
 		const QString trick = name.mid(13);
 		if (m_trickFolder.isEmpty() || !FolderTricks::instance().attach(m_trickFolder, trick)) {
-			Alert::ask("“" + trick + "” couldn't be attached to “" +
-				displayName(m_trickFolder) + "”.", "OK", QString());
+			Alert::ask(tr9("“%1” couldn't be attached to “%2”.").arg(trick, displayName(m_trickFolder)),
+				"OK", QString());
 		}
 	} else if (name.startsWith("remove-trick ")) {
 		FolderTricks::instance().remove(m_trickFolder, name.mid(13));
@@ -395,7 +395,7 @@ void Finder::command(const QString &name) {
 	} else if (name == "log-out") {
 		logOut();
 	} else if (name == "log-out-cancelled") {
-		Alert::ask("Log Out was cancelled because a program didn't quit.", "OK", QString());
+		Alert::ask(tr9("Log Out was cancelled because a program didn't quit."), "OK", QString());
 	} else if (name == "new-folder") {
 		newFolder();
 	} else if (name == "open") {
@@ -409,7 +409,7 @@ void Finder::command(const QString &name) {
 	} else if (name == "erase-disk") {
 		const auto items = front() ? front()->selectedItems() : std::vector<Item *>{};
 		if (items.size() != 1 || !items[0]->isLocalVolume) {
-			Alert::ask("Select one USB disk on the desktop to erase.", "OK", QString());
+			Alert::ask(tr9("Select one USB disk on the desktop to erase."), "OK", QString());
 		} else {
 			diskEraseVolume(items[0]->path, items[0]->name);
 		}
@@ -475,13 +475,13 @@ void Finder::command(const QString &name) {
 	} else if (name == "search-internet") {
 		bool accepted = false;
 		const QStringList searchChannels = webSearchChannels();
-		const QString channel = QInputDialog::getItem(nullptr, "Search Internet",
-			"Search the web with:", searchChannels, 0, false, &accepted);
+		const QString channel = QInputDialog::getItem(nullptr, tr9("Search Internet"),
+			tr9("Search the web with:"), searchChannels, 0, false, &accepted);
 		if (!accepted) {
 			return;
 		}
-		const QString words = QInputDialog::getText(nullptr, "Search Internet",
-			"Search for:", QLineEdit::Normal, QString(), &accepted).trimmed();
+		const QString words = QInputDialog::getText(nullptr, tr9("Search Internet"),
+			tr9("Search for:"), QLineEdit::Normal, QString(), &accepted).trimmed();
 		if (accepted && !words.isEmpty()) {
 			openWebSearch(channel, words);
 		}
@@ -490,7 +490,7 @@ void Finder::command(const QString &name) {
 		if (sel.size() == 1 && !sel[0]->isVirtual && !sel[0]->isDir) {
 			FoundWindow::similarTo(sel[0]->path);
 		} else {
-			Alert::ask("Select one document to find items similar to it.", "OK", QString());
+			Alert::ask(tr9("Select one document to find items similar to it."), "OK", QString());
 		}
 	} else if (name == "index-selection") {
 		indexSelection();
@@ -569,20 +569,20 @@ void Finder::newFolder() {
 		return;
 	}
 	if (vfsIsVirtual(v->folderPath())) {
-		Alert::ask("New folders can't be made here. Home, and the "
-			"folders inside it, hold your own files.", "OK", QString());
+		Alert::ask(tr9("New folders can't be made here. Home, and the "
+			"folders inside it, hold your own files."), "OK", QString());
 		return;
 	}
 	QDir dir(v->folderPath());
 	dir.mkpath(".");
-	QString name = uniqueName(dir, "untitled folder");
+	QString name = uniqueName(dir, tr9("untitled folder"));
 	if (dir.mkdir(name)) {
 		folderChanged(dir.absolutePath());
 		v->selectByName(name);
 		notifyState();
 	} else {
-		Alert::ask("The folder could not be created in " + dir.absolutePath() +
-			". Check folder permissions.", "OK", QString());
+		Alert::ask(tr9("The folder could not be created in %1. Check folder permissions.")
+			.arg(dir.absolutePath()), "OK", QString());
 	}
 }
 
@@ -597,7 +597,7 @@ void Finder::openItem(Item *item) {
 		if (aliasVirtualTarget(item->path, &virtualTarget)) {
 			const VNode *node = vfsNode(virtualTarget);
 			if (!node) {
-				Alert::ask("“" + item->visibleName() + "” could not be opened. Its original is gone.",
+				Alert::ask(tr9("“%1” could not be opened. Its original is gone.").arg(item->visibleName()),
 					"OK", QString());
 				return;
 			}
@@ -618,7 +618,7 @@ void Finder::openItem(Item *item) {
 			const QString path = target.absoluteFilePath();
 			if (path.endsWith(QLatin1String(".desktop"))) {
 				if (!appLaunchFile(path)) {
-					Alert::ask("“" + name + "” could not be opened. Its application may have been removed.",
+					Alert::ask(tr9("“%1” could not be opened. Its application may have been removed.").arg(name),
 						"OK", QString());
 				}
 				return;
@@ -631,8 +631,8 @@ void Finder::openItem(Item *item) {
 		return;
 	}
 	if (appTrashMarker(item->path)) {
-		Alert::ask("This application is queued for uninstall when Trash is emptied. "
-			"Choose Put Away to cancel removal and return it to Applications.", "OK", QString());
+		Alert::ask(tr9("This application is queued for uninstall when Trash is emptied. "
+			"Choose Put Away to cancel removal and return it to Applications."), "OK", QString());
 		return;
 	}
 	{
@@ -660,7 +660,7 @@ void Finder::openItem(Item *item) {
 				} else if (action == "sniffer") {
 					/* Mac OS 9: double-clicking the Finder in the System
 					 * Folder while it's running restarts it. */
-					if (Alert::ask("Restart the Sniffer?", "Restart", "Cancel")) {
+					if (Alert::ask(tr9("Restart the Sniffer?"), tr9("Restart"), "Cancel")) {
 						/* Kill the current Finder; the compositor's
 						 * spawn is gone, so relaunch it ourselves. */
 						QProcess::startDetached("pkill", { "-x", "zacos9-finder" });
@@ -783,7 +783,7 @@ void Finder::mountMacImage(const QString &image) {
 		progress->hide();
 		progress->deleteLater();
 		if (!error.isEmpty()) {
-			Alert::ask("The disk image could not be mounted. " + error, "OK", QString());
+			Alert::ask(tr9("The disk image could not be mounted. %1").arg(error), "OK", QString());
 		} else {
 			FolderWindow::open(path);
 		}
@@ -798,14 +798,14 @@ void Finder::mountDiscImage(const QString &image) {
 		p->deleteLater();
 		if (status != QProcess::NormalExit || code != 0) {
 			const QString why = QString::fromUtf8(p->readAllStandardError()).trimmed().section('\n', -1);
-			Alert::ask("“" + QFileInfo(image).fileName() + "” couldn't be mounted. " + why, "OK", QString());
+			Alert::ask(tr9("“%1” couldn't be mounted. %2").arg(QFileInfo(image).fileName(), why), "OK", QString());
 		}
 	});
 	QObject::connect(p, &QProcess::errorOccurred, [p, image](QProcess::ProcessError e) {
 		if (e == QProcess::FailedToStart) {
 			p->deleteLater();
-			Alert::ask("“" + QFileInfo(image).fileName() + "” couldn't be mounted: udisksctl isn't installed.",
-				"OK", QString());
+			Alert::ask(tr9("“%1” couldn't be mounted: udisksctl isn't installed.")
+				.arg(QFileInfo(image).fileName()), "OK", QString());
 		}
 	});
 	p->start("udisksctl", { "loop-setup", "--read-only", "--no-user-interaction", "-f", image });
@@ -843,8 +843,8 @@ void Finder::expandArchive(const QString &archive) {
 		const QString out = QString::fromUtf8(p->readAllStandardOutput()).trimmed();
 		const QString why = QString::fromUtf8(p->readAllStandardError()).trimmed().section('\n', -1);
 		if (status != QProcess::NormalExit || code != 0 || out.isEmpty()) {
-			Alert::ask("“" + QFileInfo(archive).fileName() + "” couldn’t be expanded. " +
-				(why.isEmpty() ? QString("The expanding tool stopped.") : why), "OK", QString());
+			Alert::ask(tr9("“%1” couldn’t be expanded. %2").arg(QFileInfo(archive).fileName(),
+				why.isEmpty() ? tr9("The expanding tool stopped.") : why), "OK", QString());
 			return;
 		}
 		const QFileInfo result(out);
@@ -861,8 +861,8 @@ void Finder::expandArchive(const QString &archive) {
 			progress->hide();
 			progress->deleteLater();
 			p->deleteLater();
-			Alert::ask("“" + QFileInfo(archive).fileName() + "” couldn’t be expanded: zacos9-expand "
-				"isn't installed.", "OK", QString());
+			Alert::ask(tr9("“%1” couldn’t be expanded: zacos9-expand isn't installed.")
+				.arg(QFileInfo(archive).fileName()), "OK", QString());
 		}
 	});
 	p->start(tool, { archive });
@@ -896,7 +896,7 @@ static QString classicLauncher() {
  * installs them, or runs one that needs no installing. */
 void Finder::launchWindows(const QString &exe) {
 	if (!platinumStartApplication(siblingProgram("zacos9-wininstall"), QStringList{ exe })) {
-		Alert::ask("The Windows Installer could not be opened.", "OK", QString());
+		Alert::ask(tr9("The Windows Installer could not be opened."), "OK", QString());
 	}
 }
 
@@ -913,8 +913,8 @@ static QString printerFor(const QString &queue) {
 			Alert::ask(problem, "OK", QString());
 			return QString();
 		}
-		if (Alert::ask("No printer has been chosen. Choose one in Printer Picker, then print again.",
-				"Printer Picker", "Cancel")) {
+		if (Alert::ask(tr9("No printer has been chosen. Choose one in Printer Picker, then print again."),
+				tr9("Printer Picker"), "Cancel")) {
 			platinumStartApplication(siblingProgram("zacos9-printerpicker"), {});
 		}
 	}
@@ -971,12 +971,12 @@ static QString cryptoSelectionPath(FinderView *view) {
 	const std::vector<Item *> selected = view->selectedItems();
 	if (selected.size() != 1 || selected.front()->isVirtual || selected.front()->isDir ||
 			selected.front()->kind == PL_ICON_DISK || selected.front()->kind == PL_ICON_PRINTER) {
-		Alert::ask("Select one regular file.", "OK", QString());
+		Alert::ask(tr9("Select one regular file."), "OK", QString());
 		return {};
 	}
 	const QString path = QFileInfo(selected.front()->path).canonicalFilePath();
 	if (path.isEmpty() || !QFileInfo(path).isFile() || !QFileInfo(path).isReadable()) {
-		Alert::ask("The selected file is not readable.", "OK", QString());
+		Alert::ask(tr9("The selected file is not readable."), "OK", QString());
 		return {};
 	}
 	return path;
@@ -984,8 +984,8 @@ static QString cryptoSelectionPath(FinderView *view) {
 
 static QString cryptoPassword(bool confirm) {
 	bool accepted = false;
-	QString password = QInputDialog::getText(nullptr, confirm ? "Encrypt File" : "Decrypt File",
-		confirm ? "Enter a passphrase (at least 8 characters):" : "Enter the passphrase:",
+	QString password = QInputDialog::getText(nullptr, confirm ? tr9("Encrypt File") : tr9("Decrypt File"),
+		confirm ? tr9("Enter a passphrase (at least 8 characters):") : tr9("Enter the passphrase:"),
 		QLineEdit::Password, QString(), &accepted);
 	if (!accepted) {
 		return {};
@@ -993,19 +993,19 @@ static QString cryptoPassword(bool confirm) {
 	if (password.contains('\n') || password.contains('\r') ||
 			(confirm && password.size() < 8)) {
 		Alert::ask(confirm
-			? "Use a passphrase of at least 8 characters without line breaks."
-			: "The passphrase cannot contain a line break.", "OK", QString());
+			? tr9("Use a passphrase of at least 8 characters without line breaks.")
+			: tr9("The passphrase cannot contain a line break."), "OK", QString());
 		password.fill(QChar('\0'));
 		return {};
 	}
 	if (confirm) {
-		QString repeated = QInputDialog::getText(nullptr, "Encrypt File", "Re-enter the passphrase:",
+		QString repeated = QInputDialog::getText(nullptr, tr9("Encrypt File"), tr9("Re-enter the passphrase:"),
 			QLineEdit::Password, QString(), &accepted);
 		if (!accepted || repeated != password) {
 			password.fill(QChar('\0'));
 			repeated.fill(QChar('\0'));
 			if (accepted) {
-				Alert::ask("The passphrases did not match.", "OK", QString());
+				Alert::ask(tr9("The passphrases did not match."), "OK", QString());
 			}
 			return {};
 		}
@@ -1016,7 +1016,7 @@ static QString cryptoPassword(bool confirm) {
 
 static QProgressDialog *cryptoProgress(const QString &text) {
 	auto *progress = new QProgressDialog(text, QString(), 0, 0);
-	progress->setWindowTitle("File Encryption");
+	progress->setWindowTitle(tr9("File Encryption"));
 	progress->setCancelButton(nullptr);
 	progress->setWindowModality(Qt::ApplicationModal);
 	progress->setMinimumDuration(0);
@@ -1036,33 +1036,33 @@ void Finder::encryptSelection() {
 		return;
 	}
 	if (QFileInfo(destination).absoluteFilePath() == source) {
-		Alert::ask("The encrypted copy must be saved as a different file.", "OK", QString());
+		Alert::ask(tr9("The encrypted copy must be saved as a different file."), "OK", QString());
 		return;
 	}
 	QString password = cryptoPassword(true);
 	if (password.isEmpty()) {
 		return;
 	}
-	auto *progress = cryptoProgress("Encrypting “" + QFileInfo(source).fileName() + "”…");
+	auto *progress = cryptoProgress(tr9("Encrypting “%1”…").arg(QFileInfo(source).fileName()));
 	encryptFile(source, destination, password, [progress, destination, password](bool ok,
 			const QString &problem) mutable {
 		progress->hide();
 		progress->deleteLater();
 		if (ok) {
 			/* Mac OS 9's "Add to keychain": Decrypt then needn't ask. */
-			if (Alert::ask("Encrypted copy saved to “" + QFileInfo(destination).fileName() +
-					"”. Add its passphrase to your keychain, so Decrypt can open it without asking?",
-					"Add to Keychain", "Don't Add")) {
+			if (Alert::ask(tr9("Encrypted copy saved to “%1”. Add its passphrase to your keychain, "
+					"so Decrypt can open it without asking?").arg(QFileInfo(destination).fileName()),
+					tr9("Add to Keychain"), tr9("Don't Add"))) {
 				keychainStorePassphrase(destination, password, [](bool stored) {
 					if (!stored) {
-						Alert::ask("The passphrase couldn't be added to your keychain. "
-							"Is the keychain unlocked?", "OK", QString());
+						Alert::ask(tr9("The passphrase couldn't be added to your keychain. "
+							"Is the keychain unlocked?"), "OK", QString());
 					}
 				});
 			}
 			password.fill(QChar('\0'));
 		} else {
-			Alert::ask("The file could not be encrypted. " + problem, "OK", QString());
+			Alert::ask(tr9("The file could not be encrypted. %1").arg(problem), "OK", QString());
 		}
 	});
 	password.fill(QChar('\0'));
@@ -1079,13 +1079,13 @@ void Finder::decryptSelection() {
 	} else {
 		suggested += ".decrypted";
 	}
-	const QString destination = QFileDialog::getSaveFileName(nullptr, "Decrypt File",
+	const QString destination = QFileDialog::getSaveFileName(nullptr, tr9("Decrypt File"),
 		suggested, "All files (*)");
 	if (destination.isEmpty()) {
 		return;
 	}
 	if (QFileInfo(destination).absoluteFilePath() == source) {
-		Alert::ask("The decrypted file must be saved as a different file.", "OK", QString());
+		Alert::ask(tr9("The decrypted file must be saved as a different file."), "OK", QString());
 		return;
 	}
 	/* The keychain's passphrase if it has one, else ask. */
@@ -1096,15 +1096,15 @@ void Finder::decryptSelection() {
 		if (password.isEmpty()) {
 			return;
 		}
-		auto *progress = cryptoProgress("Decrypting “" + QFileInfo(source).fileName() + "”…");
+		auto *progress = cryptoProgress(tr9("Decrypting “%1”…").arg(QFileInfo(source).fileName()));
 		decryptFile(source, destination, password, [progress, destination](bool ok, const QString &problem) {
 			progress->hide();
 			progress->deleteLater();
 			if (ok) {
-				Alert::ask("Decrypted file saved to “" + QFileInfo(destination).fileName() + "”.",
+				Alert::ask(tr9("Decrypted file saved to “%1”.").arg(QFileInfo(destination).fileName()),
 					"OK", QString());
 			} else {
-				Alert::ask("The file could not be decrypted. " + problem, "OK", QString());
+				Alert::ask(tr9("The file could not be decrypted. %1").arg(problem), "OK", QString());
 			}
 		});
 		password.fill(QChar('\0'));
@@ -1146,14 +1146,15 @@ void Finder::printDocuments(const QStringList &files, const QString &queue) {
 	}
 	if (!others.isEmpty() && failedToOpen.isEmpty()) {
 		Alert::ask(others.size() == 1
-			? QString::fromUtf8("“%1” is open in its application. Choose Print there to print it.")
+			? tr9("“%1” is open in its application. Choose Print there to print it.")
 				.arg(QFileInfo(others.first()).fileName())
-			: QString("%1 documents are open in their applications. Choose Print in each application to print them.")
+			: tr9("%1 documents are open in their applications. Choose Print in each application to print them.")
 				.arg(others.size()), "OK", QString());
 	} else if (!failedToOpen.isEmpty()) {
-		Alert::ask("Some documents could not be opened in their applications: " +
-			failedToOpen.join(", ") + ". " + (others.size() > failedToOpen.size()
-				? "The others were opened; choose Print in their applications." : ""),
+		Alert::ask(tr9("Some documents could not be opened in their applications: %1.%2")
+			.arg(failedToOpen.join(", "),
+				others.size() > failedToOpen.size()
+					? tr9(" The others were opened; choose Print in their applications.") : QString()),
 			"OK", QString());
 	}
 }
@@ -1161,7 +1162,7 @@ void Finder::printDocuments(const QStringList &files, const QString &queue) {
 void Finder::openPrintQueue(const QString &queue) {
 	if (!platinumStartApplication(siblingProgram("zacos9-printqueue"), queue.isEmpty() ? QStringList()
 			: QStringList{ queue })) {
-		Alert::ask("The print queue couldn't be opened.", "OK", QString());
+		Alert::ask(tr9("The print queue couldn't be opened."), "OK", QString());
 	}
 }
 
@@ -1181,7 +1182,7 @@ void Finder::launchClassic(const QStringList &disks) {
 	QObject::connect(check, &QProcess::errorOccurred, check, [check, cookie](QProcess::ProcessError error) {
 		if (error == QProcess::FailedToStart) {
 			platinumCancelLaunch(cookie);
-			Alert::ask("Old Dog could not be started: " + check->errorString(), "OK", QString());
+			Alert::ask(tr9("Old Dog could not be started: %1").arg(check->errorString()), "OK", QString());
 			check->deleteLater();
 		}
 	});
@@ -1197,7 +1198,7 @@ void Finder::launchClassic(const QStringList &disks) {
 				}
 				Alert::ask(why, "OK", QString());
 			} else if (!platinumStartApplication(classicLauncher(), args)) {
-				Alert::ask("Old Dog could not be started.", "OK", QString());
+				Alert::ask(tr9("Old Dog could not be started."), "OK", QString());
 			}
 			check->deleteLater();
 		});
@@ -1242,7 +1243,7 @@ void Finder::setLabel(int label) {
 		if (item->isVirtual) {
 			/* Kept as metadata, so it survives package upgrades. */
 			if (!vfsSetLabel(item->path, label)) {
-				Alert::ask("Labels aren't available for this read-only system resource.",
+				Alert::ask(tr9("Labels aren't available for this read-only system resource."),
 					"OK", QString());
 			}
 			continue;
@@ -1316,8 +1317,8 @@ void Finder::ejectVolume(QString path, QString name, bool network) {
 		for (const LocalVolume &volume : localVolumes()) {
 			if (volume.path == path) {
 				if (!localVolumeEject(volume)) {
-					Alert::ask("The disk \"" + name + "\" could not be unmounted. "
-						"It may no longer be mounted.", "OK", QString());
+					Alert::ask(tr9("The disk \"%1\" could not be unmounted. "
+						"It may no longer be mounted.").arg(name), "OK", QString());
 				}
 				return;
 			}
@@ -1335,7 +1336,7 @@ void Finder::ejectVolume(QString path, QString name, bool network) {
 			}
 		}
 	}
-	Alert::ask("The disk \"" + name + "\" is no longer mounted.", "OK", QString());
+	Alert::ask(tr9("The disk \"%1\" is no longer mounted.").arg(name), "OK", QString());
 }
 
 void Finder::showContextMenu(FinderView *view, Item *hit) {
@@ -1466,7 +1467,7 @@ void Finder::addToFavorites() {
 			target = QFileInfo(item->path).symLinkTarget();
 		}
 		if (target.isEmpty()) {
-			Alert::ask("“" + item->visibleName() + "” can't be added to Favorites.", "OK", QString());
+			Alert::ask(tr9("“%1” can't be added to Favorites.").arg(item->visibleName()), "OK", QString());
 			continue;
 		}
 		createAlias(target, favorites, item->visibleName(), QString());
@@ -1487,7 +1488,7 @@ void Finder::indexSelection() {
 		folders << front()->folderPath();
 	}
 	if (folders.isEmpty()) {
-		Alert::ask("Select a folder or disk to index.", "OK", QString());
+		Alert::ask(tr9("Select a folder or disk to index."), "OK", QString());
 		return;
 	}
 	auto left = std::make_shared<int>(folders.size());
@@ -1511,7 +1512,7 @@ void Finder::indexSelection() {
 void Finder::openPath(const QString &path) {
 	const QFileInfo info(path);
 	if (!info.exists() && !info.isSymLink()) {
-		Alert::ask("“" + info.fileName() + "” could not be found.", "OK", QString());
+		Alert::ask(tr9("“%1” could not be found.").arg(info.fileName()), "OK", QString());
 		return;
 	}
 	auto item = makeItem(info);
@@ -1532,7 +1533,7 @@ void Finder::ejectSelection() {
 		}
 	}
 	if (disks.isEmpty()) {
-		Alert::ask("Select a disk on the desktop to eject.", "OK", QString());
+		Alert::ask(tr9("Select a disk on the desktop to eject."), "OK", QString());
 		return;
 	}
 	for (const Disk &disk : disks) {
@@ -1541,7 +1542,7 @@ void Finder::ejectSelection() {
 }
 
 void Finder::logOut() {
-	if (!Alert::ask("Are you sure you want to quit all programs and log out now?", "Log Out")) {
+	if (!Alert::ask(tr9("Are you sure you want to quit all programs and log out now?"), tr9("Log Out"))) {
 		return;
 	}
 	/* The menu bar sees every program's windows: it asks them to close
@@ -1556,8 +1557,8 @@ void Finder::logOut() {
 void Finder::unmountSelection(bool network) {
 	const auto items = front() ? front()->selectedItems() : std::vector<Item *>{};
 	if (items.size() != 1 || (network ? !items[0]->isNetworkVolume : !items[0]->isLocalVolume)) {
-		Alert::ask(network ? "Select one network disk on the desktop to disconnect." :
-			"Select one mounted disk on the desktop to unmount.", "OK", QString());
+		Alert::ask(network ? tr9("Select one network disk on the desktop to disconnect.") :
+			tr9("Select one mounted disk on the desktop to unmount."), "OK", QString());
 		return;
 	}
 	ejectVolume(items[0]->path, items[0]->name, network);
@@ -1635,8 +1636,8 @@ static QFileInfo resolveAliasChoice(const QString &aliasPath, const AliasResolut
 		return QFileInfo(r.target);
 	}
 	if (r.state == AliasState::Changed) {
-		if (Alert::ask("The original for “" + name + "” has been replaced by a different item. "
-				"Use the new item?", "Use New Item", "Cancel")) {
+		if (Alert::ask(tr9("The original for “%1” has been replaced by a different item. "
+				"Use the new item?").arg(name), tr9("Use New Item"), "Cancel")) {
 			QString error;
 			if (aliasReconnect(aliasPath, r.target, &error)) {
 				return QFileInfo(r.target);
@@ -1910,25 +1911,27 @@ void Finder::emptyTrash(bool option) {
 		return;
 	}
 	/* The Mac asks first. */
-	QString message = QStringLiteral(
-		"The Trash contains %1 %2, which %3 %4 of disk space. Are you sure you "
-		"want to permanently remove %5?")
-		.arg(count).arg(count == 1 ? "item" : "items").arg(count == 1 ? "uses" : "use")
-		.arg(finderSize(bytes)).arg(count == 1 ? "this item" : "these items");
+	QString message = count == 1
+		? tr9("The Trash contains 1 item, which uses %1 of disk space. Are you sure you "
+			"want to permanently remove it?").arg(finderSize(bytes))
+		: tr9("The Trash contains %1 items, which use %2 of disk space. Are you sure you "
+			"want to permanently remove them?").arg(count).arg(finderSize(bytes));
 	if (!applications.empty()) {
 		QStringList names;
 		for (const auto &entry : applications) {
 			names << entry.name + " (" + entry.origin + ")";
 		}
-		message += "\n\nThis will uninstall: " + names.join(", ") +
-			". Personal application data is kept. Debian removal may also remove dependent packages.";
+		message += tr9("\n\nThis will uninstall: %1. Personal application data is kept. "
+			"Debian removal may also remove dependent packages.").arg(names.join(", "));
 	}
 	/* Locked items stay, and the Mac says so even without the warning. */
 	const bool keepLocked = locked > 0 && !option;
 	if (keepLocked) {
-		message += QStringLiteral("\n\n%1 locked %2 will stay in the Trash. To remove %3 too, "
-			"hold down Option while you choose Empty Trash.")
-			.arg(locked).arg(locked == 1 ? "item" : "items").arg(locked == 1 ? "it" : "them");
+		message += locked == 1
+			? tr9("\n\n1 locked item will stay in the Trash. To remove it too, "
+				"hold down Option while you choose Empty Trash.")
+			: tr9("\n\n%1 locked items will stay in the Trash. To remove them too, "
+				"hold down Option while you choose Empty Trash.").arg(locked);
 	}
 	/* Without the warning (the Trash's Get Info), or with Option, it
 	 * empties at once; uninstalling applications still asks. */
@@ -2037,7 +2040,7 @@ void Finder::emptyTrash(bool option) {
 	if (all) {
 		QDir(info).removeRecursively();
 	} else if (!keepLocked) {
-		Alert::ask("The Trash could not be completely emptied.", "OK", QString());
+		Alert::ask(tr9("The Trash could not be completely emptied."), "OK", QString());
 		folderChanged(files);
 		return;
 	}

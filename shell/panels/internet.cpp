@@ -7,7 +7,7 @@
  * browser or mail program, or for the downloads folder, follow them. */
 class InternetPanel : public ControlPanel {
 public:
-	InternetPanel() : ControlPanel("Internet", PANEL_H) {
+	InternetPanel() : ControlPanel(_("Internet"), PANEL_H) {
 		m_groups = { { G1, G1 + WEB_H, "Web" }, { G2, G2 + MAIL_H, "E-mail" } };
 		setUp(m_browser, "Web Browser:", G1 + 1 + PL_GROUP_MARGIN_TOP, AppRole::WebBrowser);
 		setUp(m_mail, "E-mail Program:", G2 + 1 + PL_GROUP_MARGIN_TOP, AppRole::Mail);
@@ -152,4 +152,4 @@ private:
 	bool m_webCommandStatus = true;
 };
 
-PANEL("internet", "Internet", false, InternetPanel);
+PANEL("internet", N_("Internet"), false, InternetPanel);

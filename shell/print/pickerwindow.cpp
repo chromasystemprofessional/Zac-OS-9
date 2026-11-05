@@ -12,6 +12,7 @@
 #include "panelkit.h"
 #include "platinumshell.h"
 #include "programs.h"
+#include "tr.h"
 
 namespace {
 
@@ -45,7 +46,7 @@ struct PickerWindow::Parts {
 };
 
 PickerWindow::PickerWindow() : d(std::make_unique<Parts>(this)) {
-	setWindowTitle("Printer Picker");
+	setWindowTitle(_("Printer Picker"));
 	setFixedSize(W, H);
 	d->list.frame = QRect(M, LIST_TOP, W - 2 * M, LIST_BOTTOM - LIST_TOP);
 	d->list.picked = [this](int row) { choose(row); };

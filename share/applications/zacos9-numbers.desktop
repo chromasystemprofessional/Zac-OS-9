@@ -1,6 +1,9 @@
 [Desktop Entry]
 Type=Application
 Name=Numbers
+Name[ru]=Числа
+Name[ja]=数値
+Name[it]=Numeri
 Comment=How numbers, money, dates and measurements are written
 Exec=zacos9-controlpanel numbers
 Categories=Settings;X-ZacOS9-ControlPanel;

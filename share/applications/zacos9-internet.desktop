@@ -1,6 +1,9 @@
 [Desktop Entry]
 Type=Application
 Name=Internet
+Name[ru]=Интернет
+Name[ja]=インターネット
+Name[it]=Internet
 Comment=The default web browser and e-mail program, and where downloads go
 Exec=zacos9-controlpanel internet
 Categories=Settings;DesktopSettings;X-ZacOS9-ControlPanel;

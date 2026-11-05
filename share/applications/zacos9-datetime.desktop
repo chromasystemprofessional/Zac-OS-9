@@ -1,6 +1,9 @@
 [Desktop Entry]
 Type=Application
 Name=Date & Time
+Name[ru]=Дата и время
+Name[ja]=日付と時刻
+Name[it]=Data e ora
 Comment=Date, time, time zone and the menu bar clock
 Exec=zacos9-datetime
 Categories=Settings;DesktopSettings;X-ZacOS9-ControlPanel;

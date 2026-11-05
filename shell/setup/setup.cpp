@@ -14,6 +14,7 @@
 #include "logo.h"
 #include "pixels.h"
 #include "settings.h"
+#include "tr.h"
 
 static constexpr int W = 520, H = 340;
 static constexpr int MARGIN = 16;
@@ -26,8 +27,14 @@ static constexpr int TCPIP_Y = 140; /* the Internet page's Open TCP/IP button */
 static constexpr uint32_t FACE = GRAY(0xD);
 static constexpr uint32_t RED = RGB(0x99, 0x00, 0x00);
 
+/* Buttons must fit their labels in every language. */
+static int buttonWidth(const QString &label, int minimum) {
+	return std::max(minimum, Text(label, 300, PL_FONT_SYSTEM).inkWidth() + 24);
+}
+
 static const char *const TITLES[] = {
-	"Introduction", "Name", "Password", "Computer Name", "Time Zone", "Internet", "Conclusion",
+	N_("Introduction"), N_("Name"), N_("Password"), N_("Computer Name"), N_("Time Zone"),
+	N_("Internet"), N_("Conclusion"),
 };
 
 static const QRegularExpression SHORT_NAME(QStringLiteral("^[a-z][a-z0-9_-]{0,31}$"));
@@ -82,7 +89,7 @@ static QStringList timeZones() {
 /* ---- construction ------------------------------------------------------------------ */
 
 SetupWindow::SetupWindow() {
-	setWindowTitle("ZacOS Setup Assistant");
+	setWindowTitle(_("ZacOS Setup Assistant"));
 	setFixedSize(W, H);
 
 	m_fullName.rect = QRect(X0, 82, 300, PL_EDIT_H);
@@ -108,7 +115,7 @@ SetupWindow::SetupWindow() {
 	m_verify.rect = QRect(X0 + 92, 132, 200, PL_EDIT_H);
 	m_verify.password = true;
 	m_verify.edited = [this] { updateButtons(); };
-	m_autoLogin = PanelCheckbox("Log in automatically when the computer starts up",
+	m_autoLogin = PanelCheckbox(tr9("Log in automatically when the computer starts up"),
 		QPoint(X0, 172));
 	m_autoLogin.on = true;
 
@@ -129,15 +136,18 @@ SetupWindow::SetupWindow() {
 	m_zones.scrollTo(std::max(0, m_zones.state.selected - 5));
 	m_zones.picked = [this](int) { updateButtons(); };
 
-	m_openTcpip = PanelButton("Open TCP/IP…", QRect(X0, TCPIP_Y, 110, PL_BUTTON_H));
-	m_openTcpip.hint = "Opens the TCP/IP control panel, where you choose a Wi-Fi network.";
+	const int tcpipW = buttonWidth(tr9("Open TCP/IP…"), 110);
+	m_openTcpip = PanelButton(tr9("Open TCP/IP…"), QRect(X0, TCPIP_Y, tcpipW, PL_BUTTON_H));
+	m_openTcpip.hint = tr9("Opens the TCP/IP control panel, where you choose a Wi-Fi network.");
 	m_openTcpip.clicked = [this] { openTcpip(); };
-	m_netStatus = QStringLiteral("Checking…");
+	m_netStatus = tr9("Checking…");
 	m_netTimer.callOnTimeout(this, [this] { checkNetwork(); });
 
 	m_back = PanelButton(QString(), QRect(W - MARGIN - 2 * ARROW_W - 10, BTN_Y, ARROW_W, PL_BUTTON_H));
 	m_next = PanelButton(QString(), QRect(W - MARGIN - ARROW_W, BTN_Y, ARROW_W, PL_BUTTON_H), true);
-	m_goAhead = PanelButton("Go Ahead", QRect(W - MARGIN - 90, BTN_Y, 90, PL_BUTTON_H), true);
+	const int goAheadW = buttonWidth(tr9("Go Ahead"), 90);
+	m_goAhead = PanelButton(tr9("Go Ahead"),
+		QRect(W - MARGIN - goAheadW, BTN_Y, goAheadW, PL_BUTTON_H), true);
 	m_back.clicked = [this] { showPage(static_cast<Page>(m_page - 1)); };
 	m_next.clicked = [this] { showPage(static_cast<Page>(m_page + 1)); };
 	m_goAhead.clicked = [this] { goAhead(); };
@@ -153,8 +163,8 @@ void SetupWindow::showPage(Page p) {
 	m_error.clear();
 	if (p == Computer && m_computerName.text.isEmpty()) {
 		const QString first = m_fullName.text.trimmed().section(' ', 0, 0);
-		m_computerName.setText(first.isEmpty() ? QStringLiteral("ZacOS 9")
-		                                       : first + QStringLiteral("'s ZacOS 9"));
+		m_computerName.setText(first.isEmpty() ? tr9("ZacOS 9")
+		                                       : tr9("%1's ZacOS 9").arg(first));
 		m_computerName.selectAll();
 	}
 
@@ -169,7 +179,7 @@ void SetupWindow::showPage(Page p) {
 	case Computer: m_host.edits = { &m_computerName }; break;
 	default: break;
 	}
-	m_back.rect.moveLeft(p == Conclusion ? W - MARGIN - 90 - 10 - ARROW_W
+	m_back.rect.moveLeft(p == Conclusion ? W - MARGIN - m_goAhead.rect.width() - 10 - ARROW_W
 	                                     : W - MARGIN - 2 * ARROW_W - 10);
 	m_host.buttons = { &m_back, p == Conclusion ? &m_goAhead : &m_next };
 	if (p == Internet) {
@@ -201,18 +211,18 @@ QString SetupWindow::problem(bool *blocked) const {
 		}
 		if (!SHORT_NAME.match(s).hasMatch()) {
 			*blocked = true;
-			return "The short name must start with a letter, then a-z, 0-9, - or _.";
+			return tr9("The short name must start with a letter, then a-z, 0-9, - or _.");
 		}
 		if (s == "root" || s == "zacos9-setup" || accountExists(s)) {
 			*blocked = true;
-			return "There is already an account named “" + s + "”. Try another short name.";
+			return tr9("There is already an account named “%1”. Try another short name.").arg(s);
 		}
 		return QString();
 	}
 	case Password:
 		*blocked = m_password.text.isEmpty() || m_password.text != m_verify.text;
 		if (!m_verify.text.isEmpty() && m_password.text != m_verify.text) {
-			return "The two passwords don't match.";
+			return tr9("The two passwords don't match.");
 		}
 		return QString();
 	case Computer: *blocked = m_computerName.text.trimmed().isEmpty(); return QString();
@@ -307,7 +317,7 @@ void SetupWindow::goAhead() {
 			if (m_error.isEmpty()) {
 				m_error = !stderrLast->isEmpty()
 					? *stderrLast
-					: "Setup didn't finish (exit " + QString::number(code) + ").";
+					: tr9("Setup didn't finish (exit %1).").arg(code);
 			}
 		}
 		updateButtons();
@@ -332,7 +342,7 @@ void SetupWindow::openTcpip() {
 	});
 	connect(m_tcpip, &QProcess::errorOccurred, this, [this](QProcess::ProcessError e) {
 		if (e == QProcess::FailedToStart) {
-			m_netStatus = "TCP/IP couldn't be opened.";
+			m_netStatus = tr9("TCP/IP couldn't be opened.");
 			m_tcpip->deleteLater();
 			m_tcpip = nullptr;
 			update();
@@ -368,15 +378,15 @@ void SetupWindow::checkNetwork() {
 			}
 		}
 		if (code != 0) {
-			m_netStatus = "Network settings aren't available.";
+			m_netStatus = tr9("Network settings aren't available.");
 		} else if (!wired.isEmpty()) {
-			m_netStatus = "Connected through Ethernet.";
+			m_netStatus = tr9("Connected through Ethernet.");
 		} else if (!wifi.isEmpty()) {
-			m_netStatus = "Connected through Wi-Fi (“" + wifi + "”).";
+			m_netStatus = tr9("Connected through Wi-Fi (“%1”).").arg(wifi);
 		} else if (any) {
-			m_netStatus = "Not connected.";
+			m_netStatus = tr9("Not connected.");
 		} else {
-			m_netStatus = "No network hardware found.";
+			m_netStatus = tr9("No network hardware found.");
 		}
 		m_nmcli->deleteLater();
 		m_nmcli = nullptr;
@@ -384,7 +394,7 @@ void SetupWindow::checkNetwork() {
 	});
 	connect(m_nmcli, &QProcess::errorOccurred, this, [this](QProcess::ProcessError e) {
 		if (e == QProcess::FailedToStart) {
-			m_netStatus = "Network settings aren't available.";
+			m_netStatus = tr9("Network settings aren't available.");
 			m_nmcli->deleteLater();
 			m_nmcli = nullptr;
 			update();
@@ -416,53 +426,53 @@ void SetupWindow::paintArrow(pl_canvas *c, const PanelButton &b, bool right) con
 void SetupWindow::paintPage(pl_canvas *c) {
 	switch (m_page) {
 	case Intro: {
-		int y = wrapped(c, "Welcome to ZacOS 9.", 72);
-		y = wrapped(c, "This assistant asks a few questions to set up your computer: your name, "
-		               "a password, a name for the computer, your time zone and how it connects to "
-		               "the Internet. You can change them later.", y + 10);
-		wrapped(c, "Click the right arrow to begin.", y + 10);
+		int y = wrapped(c, tr9("Welcome to ZacOS 9."), 72);
+		y = wrapped(c, tr9("This assistant asks a few questions to set up your computer: your name, "
+			"a password, a name for the computer, your time zone and how it connects to "
+			"the Internet. You can change them later."), y + 10);
+		wrapped(c, tr9("Click the right arrow to begin."), y + 10);
 		break;
 	}
 	case Name:
-		panelText(c, "What is your name?", X0, 72);
-		panelText(c, "Short name, for logging in and your Home folder:", X0, 130);
+		panelText(c, tr9("What is your name?"), X0, 72);
+		panelText(c, tr9("Short name, for logging in and your Home folder:"), X0, 130);
 		break;
 	case Password:
-		wrapped(c, "Choose a password for your account. You'll need it to install software "
-		           "and change settings.", 72);
-		panelLabel(c, "Password:", X0 + 84, m_password.rect.top() + 15);
-		panelLabel(c, "Verify:", X0 + 84, m_verify.rect.top() + 15);
+		wrapped(c, tr9("Choose a password for your account. You'll need it to install software "
+			"and change settings."), 72);
+		panelLabel(c, tr9("Password:"), X0 + 84, m_password.rect.top() + 15);
+		panelLabel(c, tr9("Verify:"), X0 + 84, m_verify.rect.top() + 15);
 		wrapped(c, m_autoLogin.on
-				? "ZacOS 9 will start up straight to your desktop."
-				: "ZacOS 9 will ask for your short name and password when it starts up.",
+				? tr9("ZacOS 9 will start up straight to your desktop.")
+				: tr9("ZacOS 9 will ask for your short name and password when it starts up."),
 			m_autoLogin.pos.y() + 40, PL_FONT_VIEWS, GRAY(0x4));
 		break;
 	case Computer: {
-		panelText(c, "What name would you like for this computer?", X0, 72);
-		const int y = wrapped(c, "Other computers on your network see this name, for example "
-		                         "when you share files.", 130);
-		panelText(c, "Network name: " + hostName(), X0, y + 8, PL_FONT_VIEWS, GRAY(0x4));
+		panelText(c, tr9("What name would you like for this computer?"), X0, 72);
+		const int y = wrapped(c, tr9("Other computers on your network see this name, for example "
+			"when you share files."), 130);
+		panelText(c, tr9("Network name: %1").arg(hostName()), X0, y + 8, PL_FONT_VIEWS, GRAY(0x4));
 		break;
 	}
-	case TimeZone: panelText(c, "What time zone are you in?", X0, 72); break;
+	case TimeZone: panelText(c, tr9("What time zone are you in?"), X0, 72); break;
 	case Internet: {
-		wrapped(c, "ZacOS 9 connects to the Internet through the TCP/IP control panel. "
-		           "Open it to choose a Wi-Fi network, or plug in a network cable. You can "
-		           "also skip this and connect later.", 72);
+		wrapped(c, tr9("ZacOS 9 connects to the Internet through the TCP/IP control panel. "
+			"Open it to choose a Wi-Fi network, or plug in a network cable. You can "
+			"also skip this and connect later."), 72);
 		panelText(c, m_netStatus, X0, TCPIP_Y + 44, PL_FONT_VIEWS, GRAY(0x4));
-		wrapped(c, "From now on, you manage the Internet connection in TCP/IP: choose "
-		           "Control Panels ▸ TCP/IP from the Apple menu.", TCPIP_Y + 72);
+		wrapped(c, tr9("From now on, you manage the Internet connection in TCP/IP: choose "
+			"Control Panels ▸ TCP/IP from the Apple menu."), TCPIP_Y + 72);
 		break;
 	}
 	case Conclusion: {
-		panelText(c, "You're ready to set up ZacOS 9:", X0, 72);
+		panelText(c, tr9("You're ready to set up ZacOS 9:"), X0, 72);
 		const QString rows[][2] = {
-			{ "Name:", m_fullName.text.trimmed() },
-			{ "Short name:", m_shortName.text },
-			{ "Computer name:", m_computerName.text.trimmed() },
-			{ "Time zone:", QString(zoneId()).replace('_', ' ') },
-			{ "Internet:", m_netStatus },
-			{ "At startup:", m_autoLogin.on ? "Log in automatically" : "Ask for password" },
+			{ tr9("Name:"), m_fullName.text.trimmed() },
+			{ tr9("Short name:"), m_shortName.text },
+			{ tr9("Computer name:"), m_computerName.text.trimmed() },
+			{ tr9("Time zone:"), QString(zoneId()).replace('_', ' ') },
+			{ tr9("Internet:"), m_netStatus },
+			{ tr9("At startup:"), m_autoLogin.on ? tr9("Log in automatically") : tr9("Ask for password") },
 		};
 		int y = 98;
 		for (const auto &r : rows) {
@@ -473,13 +483,13 @@ void SetupWindow::paintPage(pl_canvas *c) {
 		y += 10;
 		switch (m_state) {
 		case State::Asking:
-			y = wrapped(c, "Click Go Ahead to set up your computer, or the left arrow to change "
-			               "your answers.", y);
+			y = wrapped(c, tr9("Click Go Ahead to set up your computer, or the left arrow to change "
+				"your answers."), y);
 			break;
-		case State::Working: y = wrapped(c, "Setting up your computer…", y); break;
+		case State::Working: y = wrapped(c, tr9("Setting up your computer…"), y); break;
 		case State::Finished:
-			y = wrapped(c, "All set. Starting ZacOS 9 for " +
-				m_fullName.text.trimmed().section(' ', 0, 0) + "…", y);
+			y = wrapped(c, tr9("All set. Starting ZacOS 9 for %1…")
+				.arg(m_fullName.text.trimmed().section(' ', 0, 0)), y);
 			break;
 		}
 		if (!m_error.isEmpty()) {
@@ -500,7 +510,7 @@ void SetupWindow::paintEvent(QPaintEvent *) {
 	const int s = PL_LOGO_SIZE_HQ;
 	pl_image_blend(c, (X0 - s) / 2, 56, logo_pixels_hq(), s, s, false);
 
-	panelText(c, TITLES[m_page], X0, 36);
+	panelText(c, tr9(TITLES[m_page]), X0, 36);
 	pl_hline(c, X0, W - MARGIN, 44, GRAY(0x8));
 	pl_hline(c, X0, W - MARGIN, 45, C_WHITE);
 
@@ -516,7 +526,7 @@ void SetupWindow::paintEvent(QPaintEvent *) {
 
 	pl_hline(c, 0, W - 1, RULE_Y, GRAY(0x8));
 	pl_hline(c, 0, W - 1, RULE_Y + 1, C_WHITE);
-	panelText(c, QString("Step %1 of %2").arg(m_page + 1).arg(int(PageCount)), MARGIN, BTN_Y + 14,
+	panelText(c, tr9("Step %1 of %2").arg(m_page + 1).arg(int(PageCount)), MARGIN, BTN_Y + 14,
 		PL_FONT_VIEWS, GRAY(0x4));
 
 	m_host.paintControls(c, FACE);

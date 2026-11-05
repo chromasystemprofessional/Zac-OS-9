@@ -15,6 +15,7 @@
 #include <QTimer>
 
 #include "alert.h"
+#include "tr.h"
 #include "extensioncatalog.h"
 #include "modules.h"
 #include "tricksets.h"
@@ -49,34 +50,34 @@ public:
 	explicit ResourceListWindow(Page page) : m_page(page) {
 		setAttribute(Qt::WA_DeleteOnClose);
 		setMouseTracking(true);
-		setWindowTitle(page == Page::System ? "System Information" : "Extensions Manager");
+		setWindowTitle(page == Page::System ? tr9("System Information") : tr9("Extensions Manager"));
 		setFixedSize(page == Page::System ? QSize(520, 420) : QSize(600, 460));
-		m_title = page == Page::System ? "System Information" : "Extensions Manager";
+		m_title = page == Page::System ? tr9("System Information") : tr9("Extensions Manager");
 		m_list.frame = page == Page::System ? QRect(12, 78, 496, 326) :
 			QRect(12, 96, 240, 320);
 		if (page == Page::Extensions) {
-			m_showAll = PanelCheckbox("Show All", QPoint(500, 73));
+			m_showAll = PanelCheckbox(tr9("Show All"), QPoint(500, 73));
 			m_showAll.toggled = [this](bool) { loadCategory(); };
-			m_categories.add("Extensions", QPoint(14, 73));
-			m_categories.add("Login Items", QPoint(110, 73));
-			m_categories.add("Background Services", QPoint(214, 73));
+			m_categories.add(tr9("Extensions"), QPoint(14, 73));
+			m_categories.add(tr9("Login Items"), QPoint(110, 73));
+			m_categories.add(tr9("Background Services"), QPoint(214, 73));
 			m_categories.changed = [this](int) { loadCategory(); };
-			m_info = PanelButton("Item Information…", QRect(12, 424, 150, 20));
+			m_info = PanelButton(tr9("Item Information…"), QRect(12, 424, 150, 20));
 			m_info.clicked = [this] { showSelectedInfo(); };
-			m_toggle = PanelButton("Turn Off", QRect(270, 424, 150, 20));
+			m_toggle = PanelButton(tr9("Turn Off"), QRect(270, 424, 150, 20));
 			m_toggle.clicked = [this] { toggleSelected(); };
-			m_run = PanelButton("Stop", QRect(430, 424, 150, 20));
+			m_run = PanelButton(tr9("Stop"), QRect(430, 424, 150, 20));
 			m_run.clicked = [this] { runSelected(); };
 			m_list.picked = [this](int) { updateButtons(); };
 			/* Mac OS 9's Selected Set: named on/off choices, applied at once. */
 			m_set.rect = QRect(width() - 12 - 230, 13, 230, PL_POPUP_H);
-			m_set.label = "Set:";
+			m_set.label = tr9("Set:");
 			m_set.chosen = [this](int row) { chooseSet(row); };
 			fillSets();
 			watchStartupSources();
 			loadCategory();
 		} else {
-			m_explanation = "Current system details; viewing does not change this computer.";
+			m_explanation = tr9("Current system details; viewing does not change this computer.");
 			m_rows = systemInformation();
 			m_list.setItems(m_rows);
 			if (!m_rows.isEmpty()) {
@@ -237,10 +238,10 @@ private:
 				return a.name.compare(b.name, Qt::CaseInsensitive) < 0;
 			});
 		m_explanation = m_showAll.on
-			? "Every loaded kernel module, by its technical name. For viewing only."
-			: "Extensions add features to this computer. Turn one off to stop it loading "
+			? tr9("Every loaded kernel module, by its technical name. For viewing only.")
+			: tr9("Extensions add features to this computer. Turn one off to stop it loading "
 				"at start-up, or on to start it at every start-up. Changes take effect "
-				"after restart.";
+				"after restart.");
 		m_state.assign(m_resources.size(), RowState());
 		if (!m_showAll.on) {
 			for (size_t i = 0; i < m_resources.size(); i++) {
@@ -254,75 +255,75 @@ private:
 	}
 
 	void loadLoginItems() {
-		m_explanation = "Applications that open when you log in. Changes affect only your "
-			"account and take effect at your next login.";
+		m_explanation = tr9("Applications that open when you log in. Changes affect only your "
+			"account and take effect at your next login.");
 		for (const AutostartEntry &e : autostartEntries()) {
 			SystemResource r;
 			r.key = e.id;
-			r.name = e.enabled ? e.name : e.name + " (off)";
-			r.kind = "login item";
+			r.name = e.enabled ? e.name : e.name + tr9(" (off)");
+			r.kind = tr9("login item");
 			r.icon = PL_ICON_APPLICATION;
-			r.description = e.description.isEmpty() ? "A login item." : e.description;
-			r.metadata = { QString("Status: ") + (e.enabled ? "opens at login" :
-					(e.reason.isEmpty() ? "off" : e.reason)),
-				QString("Source: ") + (e.overridesSystem ? "your settings (overrides a system item)" :
-					e.userEntry ? "your account" : "this computer (shared by all users)"),
-				"Takes effect: at your next login" };
+			r.description = e.description.isEmpty() ? tr9("A login item.") : e.description;
+			r.metadata = { tr9("Status: %1").arg(e.enabled ? tr9("opens at login") :
+					(e.reason.isEmpty() ? tr9("off") : e.reason)),
+				tr9("Source: %1").arg(e.overridesSystem ? tr9("your settings (overrides a system item)") :
+					e.userEntry ? tr9("your account") : tr9("this computer (shared by all users)")),
+				tr9("Takes effect: at your next login") };
 			RowState st;
 			st.canToggle = e.enabled || e.reason == "Disabled";
 			st.on = e.enabled;
 			if (!st.canToggle) {
-				r.metadata << "Read-only: " + e.reason;
+				r.metadata << tr9("Read-only: %1").arg(e.reason);
 			}
 			m_resources.push_back(r);
 			m_state.push_back(st);
 		}
 		if (m_resources.empty()) {
-			m_explanation = "No login items were found.";
+			m_explanation = tr9("No login items were found.");
 		}
 	}
 
 	void loadServices() {
 		if (!m_serviceResultValid) {
-			m_explanation = m_serviceQuerying ? "Checking your account's background services…"
-				: "Background service status is not available.";
+			m_explanation = m_serviceQuerying ? tr9("Checking your account's background services…")
+				: tr9("Background service status is not available.");
 			if (!m_serviceQuerying) {
 				requestServiceRefresh();
 			}
 			return;
 		}
 		if (!m_serviceResult.error.isEmpty()) {
-			m_explanation = "Background services could not be listed: " + m_serviceResult.error;
+			m_explanation = tr9("Background services could not be listed: %1").arg(m_serviceResult.error);
 			return;
 		}
-		m_explanation = "Background services of your own account. Essential services are "
-			"shown but can't be changed here.";
+		m_explanation = tr9("Background services of your own account. Essential services are "
+			"shown but can't be changed here.");
 		for (const UserService &u : m_serviceResult.services) {
 			SystemResource r;
 			r.key = u.unit;
 			r.name = u.unit.chopped(8);
-			r.kind = "background service";
+			r.kind = tr9("background service");
 			r.icon = PL_ICON_EXT_GENERIC;
-			r.description = u.description.isEmpty() ? "A background service." : u.description;
-			r.metadata = { "Running now: " + QString(u.activeState == "active" ? "yes" : "no"),
-				"Starts at login: " + QString(u.fileState == "enabled" ? "yes" :
-					u.fileState == "disabled" ? "no" : "set by the system") };
+			r.description = u.description.isEmpty() ? tr9("A background service.") : u.description;
+			r.metadata = { tr9("Running now: %1").arg(u.activeState == "active" ? tr9("yes") : tr9("no")),
+				tr9("Starts at login: %1").arg(u.fileState == "enabled" ? tr9("yes") :
+					u.fileState == "disabled" ? tr9("no") : tr9("set by the system")) };
 			RowState st;
 			st.canToggle = u.manageable;
 			st.on = u.fileState == "enabled";
 			st.canRun = u.manageable;
 			st.running = u.activeState == "active";
 			if (u.manageable) {
-				r.metadata << "Login changes take effect: at your next login"
-					<< "Start and Stop take effect: immediately";
+				r.metadata << tr9("Login changes take effect: at your next login")
+					<< tr9("Start and Stop take effect: immediately");
 			} else {
-				r.metadata << "Read-only: " + u.reason;
+				r.metadata << tr9("Read-only: %1").arg(u.reason);
 			}
 			m_resources.push_back(r);
 			m_state.push_back(st);
 		}
 		if (m_resources.empty()) {
-			m_explanation = "No user services are available.";
+			m_explanation = tr9("No user services are available.");
 		}
 	}
 
@@ -333,10 +334,10 @@ private:
 		m_info.enabled = valid;
 		m_toggle.enabled = st.canToggle && !m_serviceActionPending;
 		m_toggle.label = std::make_unique<Text>(category() == Services ?
-			(st.on ? "Don't Start at Login" : "Start at Login") :
-			(st.on ? "Turn Off" : "Turn On"), 142, PL_FONT_SYSTEM);
+			(st.on ? tr9("Don't Start at Login") : tr9("Start at Login")) :
+			(st.on ? tr9("Turn Off") : tr9("Turn On")), 142, PL_FONT_SYSTEM);
 		m_run.enabled = st.canRun && !m_serviceActionPending;
-		m_run.label = std::make_unique<Text>(st.running ? "Stop Now" : "Start Now", 150,
+		m_run.label = std::make_unique<Text>(st.running ? tr9("Stop Now") : tr9("Start Now"), 150,
 			PL_FONT_SYSTEM);
 		update();
 	}
@@ -355,10 +356,10 @@ private:
 		details.location = category() == Extensions ? "System Folder:Extensions" :
 			category() == LoginItems ? "System Folder:Startup Items" : "Extensions Manager";
 		details.access = category() == Extensions ?
-			"Turn it on or off; the change takes effect after restart." :
+			tr9("Turn it on or off; the change takes effect after restart.") :
 			category() == LoginItems ?
-				"Changes affect only your account and take effect at your next login." :
-				"Changes affect only your account's user services.";
+				tr9("Changes affect only your account and take effect at your next login.") :
+				tr9("Changes affect only your account's user services.");
 		const QString path = QStringLiteral("tricks-manager:") +
 			QString::number(int(category())) + ':' + resource.key;
 		InfoWindow::openVirtual(path, resource.icon, resource.name, details);
@@ -389,8 +390,8 @@ private:
 				});
 			return;
 		}
-		if (!turnOn && !Alert::ask("Turn off “" + name + "”? It will no longer start when you log "
-				"in. This takes effect at your next login.", "Turn Off", "Cancel")) {
+		if (!turnOn && !Alert::ask(tr9("Turn off “%1”? It will no longer start when you log "
+				"in. This takes effect at your next login.").arg(name), tr9("Turn Off"), "Cancel")) {
 			return;
 		}
 		QString error;
@@ -424,8 +425,8 @@ private:
 		}
 		const bool stop = m_state[size_t(row)].running;
 		const QString name = m_resources[size_t(row)].name;
-		if (stop && !Alert::ask("Stop “" + name + "” now? Programs that depend on it may stop "
-				"working until it is started again.", "Stop", "Cancel")) {
+		if (stop && !Alert::ask(tr9("Stop “%1” now? Programs that depend on it may stop "
+				"working until it is started again.").arg(name), tr9("Stop"), "Cancel")) {
 			return;
 		}
 		m_serviceActionPending = true;
@@ -589,12 +590,12 @@ private:
 			m_set.items.emplace_back(name);
 		}
 		if (m_set.selected < 0) {
-			m_set.items.insert(m_set.items.begin(), PopupItem("(none chosen)", false));
+			m_set.items.insert(m_set.items.begin(), PopupItem(tr9("(none chosen)"), false));
 			m_setNames.prepend(QString());
 			m_set.selected = 0;
 		}
-		m_set.items.emplace_back("Save Set…");
-		m_set.items.emplace_back("Delete Set…", m_setNames.size() > 1 || !m_setNames.value(0).isEmpty());
+		m_set.items.emplace_back(tr9("Save Set…"));
+		m_set.items.emplace_back(tr9("Delete Set…"), m_setNames.size() > 1 || !m_setNames.value(0).isEmpty());
 		update();
 	}
 
@@ -612,7 +613,7 @@ private:
 	/* Login items now, then (once listed) user services: their on/off at login. */
 	void saveSet() {
 		bool ok = false;
-		const QString name = QInputDialog::getText(this, "Save Set", "Name of the set:",
+		const QString name = QInputDialog::getText(this, tr9("Save Set"), tr9("Name of the set:"),
 			QLineEdit::Normal, currentTrickSet(), &ok).trimmed();
 		if (!ok || name.isEmpty()) {
 			return;
@@ -641,8 +642,8 @@ private:
 
 	void deleteSet() {
 		const QString name = currentTrickSet();
-		if (name.isEmpty() || !Alert::ask("Delete the set “" + name + "”? The items stay as they are.",
-				"Delete", "Cancel")) {
+		if (name.isEmpty() || !Alert::ask(tr9("Delete the set “%1”? The items stay as they are.").arg(name),
+				tr9("Delete"), "Cancel")) {
 			return;
 		}
 		deleteTrickSet(name);
@@ -683,7 +684,7 @@ private:
 			std::shared_ptr<QStringList> errors) {
 		if (pending->isEmpty()) {
 			if (!errors->isEmpty()) {
-				Alert::ask("Some items couldn't be changed: " + errors->join(" "), "OK", QString());
+				Alert::ask(tr9("Some items couldn't be changed: %1").arg(errors->join(" ")), "OK", QString());
 			}
 			m_serviceResultValid = false;
 			loadCategory();

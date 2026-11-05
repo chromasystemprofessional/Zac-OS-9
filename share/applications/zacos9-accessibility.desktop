@@ -1,6 +1,9 @@
 [Desktop Entry]
 Type=Application
 Name=Accessibility
+Name[ru]=Универсальный доступ
+Name[ja]=アクセシビリティ
+Name[it]=Accessibilità
 Comment=Sticky Keys, Slow Keys, Mouse Keys and Zoom
 Exec=zacos9-controlpanel accessibility
 Categories=Settings;Accessibility;X-ZacOS9-ControlPanel;

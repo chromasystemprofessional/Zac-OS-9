@@ -1,6 +1,9 @@
 [Desktop Entry]
 Type=Application
 Name=File Translator
+Name[ru]=Переводчик файлов
+Name[ja]=ファイル翻訳
+Name[it]=Traduttore file
 Comment=Choose the application that opens each kind of document
 Exec=zacos9-fileexchange
 Categories=Settings;DesktopSettings;X-ZacOS9-ControlPanel;

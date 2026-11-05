@@ -182,5 +182,49 @@ int main(int argc, char **argv) {
 	check(top("sticky keys") == "accessibility.html" && top("old dog rom") == "old-dog.html" &&
 		(top("force quit") == "troubleshooting.html" || top("force quit") == "programs.html"),
 		"searching ZacOS Help finds the right pages");
+
+	/* A translated page overlays the English one; an untranslated page in the
+	 * same book still falls back to English. */
+	put(root + "/it/zacos9/index.html", "<html><head><title>Guida di ZacOS</title>"
+		"<meta name=\"description\" content=\"Come usare ZacOS.\"></head><body>"
+		"<p>Vedi <a href=\"print.html\">la stampa</a>.</p></body></html>");
+	put(root + "/it/zacos9/print.html", "<html><head><title>Stampare documenti</title></head>"
+		"<body><p>Scegli File &gt; Stampa.</p></body></html>");
+	qunsetenv("LANGUAGE");
+	qputenv("LANG", "it_IT.UTF-8");
+	const QList<HelpBook> translated = helpBooks(root);
+	const QList<HelpPage> translatedPages = helpPages(root);
+	bool printItalian = false, keysEnglish = false;
+	for (const HelpPage &page : translatedPages) {
+		if (page.title == "Stampare documenti" && page.path.contains("/it/")) {
+			printItalian = true;
+		}
+		if (page.title == "Keys" && !page.path.contains("/it/")) {
+			keysEnglish = true;
+		}
+	}
+	check(!translated.isEmpty() && translated[0].title == "Guida di ZacOS" &&
+		printItalian && keysEnglish,
+		"a translated page overlays the English one; a missing translation falls back");
+
+	/* The same in Russian. */
+	put(root + "/ru/zacos9/index.html", "<html><head><title>Справка ZacOS</title>"
+		"<meta name=\"description\" content=\"Как пользоваться ZacOS.\"></head><body>"
+		"<p>См. <a href=\"print.html\">печать</a>.</p></body></html>");
+	put(root + "/ru/zacos9/print.html", "<html><head><title>Печать документов</title></head>"
+		"<body><p>Выберите «Файл» &gt; «Печать».</p></body></html>");
+	qputenv("LANG", "ru_RU.UTF-8");
+	const QList<HelpPage> russianPages = helpPages(root);
+	bool printRussian = false, keysStillEnglish = false;
+	for (const HelpPage &page : russianPages) {
+		if (page.title == "Печать документов" && page.path.contains("/ru/")) {
+			printRussian = true;
+		}
+		if (page.title == "Keys" && !page.path.contains("/ru/")) {
+			keysStillEnglish = true;
+		}
+	}
+	check(printRussian && keysStillEnglish,
+		"a Russian page overlays the English one; a missing translation still falls back");
 	return fails ? 1 : 0;
 }

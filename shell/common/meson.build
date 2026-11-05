@@ -19,6 +19,12 @@ test('system-power',
   env: ['QT_QPA_PLATFORM=offscreen'],
 )
 
+test('text-wrap',
+  executable('test-text-wrap', '../../tests/common/test_wrap.cpp',
+    dependencies: [shell_common_dep, qt6],
+  ),
+)
+
 test('process',
   executable('test-process', '../../tests/common/test_process.cpp',
     dependencies: [shell_common_dep, qt6],

@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Monitors
+Name[ru]=Мониторы
+Name[it]=Monitor
 Comment=Display resolution
 Exec=zacos9-collarmodule monitors
 Categories=X-ZacOS9-CollarModule;

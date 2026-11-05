@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Software Update
+Name[ru]=Обновление ПО
+Name[it]=Aggiornamento software
 Comment=Install new versions of ZacOS 9 and Debian updates
 Exec=zacos9-update
 Categories=System;

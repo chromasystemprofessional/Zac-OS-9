@@ -48,6 +48,39 @@ This page is what's true now and what's next. What changed and when is in
 item: [`docs/system-folder.md`](docs/system-folder.md) has every item, what
 ZacOS has for it, and the order. All six items are done.
 
+**Monitors**: each screen's resolution, pixel size and rotation are
+applied live (`compositor/src/prefs.c`): rotation is
+`display.NAME.rotation` (0, 90, 180 or 270 degrees), the layout uses the
+rotated logical size, and `display-rotation` tests it.
+
+**Interface languages**: the gettext catalogs, the language setting and the
+text-fit check are in place. Italian is the first catalog: the control panels'
+names and titles, the Mouse panel, the menu bar's menus and Hint Bubbles, the
+Collar's modules and the everyday applications' names and window titles; the
+installer now asks for the installed system's language, translates its own
+screens, and the login window and Setup Assistant follow it; the Finder's
+alert buttons, core dialogs, Copying Files, View Options, Preferences, Find,
+Get Info, the Extensions Manager and the shared disk-plan strings are in too;
+every Finder alert and the Help viewer's UI are translated; the viewer
+overlays translated help pages on the English tree, the whole Italian help
+book and tutorial are in, and Bark Recorder and Neighbourhood are translated
+([Languages](docs/i18n.md)). The remaining product-named apps and a native
+review are next.
+
+**Japanese (display pilot)**: `lib/text.c` falls back through Fontconfig to
+Noto Sans CJK, `wrapText()` breaks Japanese without spaces, and `po/ja.po`
+translates the Mouse panel, every control panel's name and title, and the
+Mouse desktop entry. Input is not supported:
+ZacOS's own text fields have no IME preedit, so the language is not
+advertised as usable yet ([Languages](docs/i18n.md)).
+
+**Russian**: `po/ru.po` translates the control panels, the
+menu bar and its Hint Bubbles, the application names, the installer and the
+Setup Assistant; all 20 help pages are under `share/zacos9/help/ru/`.
+Cyrillic uses the existing DejaVu Sans fallback and needs no input method;
+a native speaker's review and the rest of the catalog are next
+([Languages](docs/i18n.md)).
+
 **Making the project easier to work on**: ten of the eleven phases are done,
 each its own pull request, and released as 1.1.0. Phase 7's four starter tasks
 are drafted, to be posted as "good first issue"s:
@@ -66,24 +99,14 @@ are drafted, to be posted as "good first issue"s:
 | 9 | The root helpers under `system/` | Done |
 | 10 | No compiler warnings | Done: CI fails if a change adds one |
 
-**On hold:** fractional scaling and the Monitors panel, split
-from #23 into [#49](https://github.com/chromasystemprofessional/Zac-OS-9/issues/49)
-(sharp text and art at 1.25x–1.75x),
-[#50](https://github.com/chromasystemprofessional/Zac-OS-9/issues/50),
-[#51](https://github.com/chromasystemprofessional/Zac-OS-9/issues/51),
-[#52](https://github.com/chromasystemprofessional/Zac-OS-9/issues/52) and
-[#53](https://github.com/chromasystemprofessional/Zac-OS-9/issues/53).
-
 ## Open issues
 
 All of them are [on GitHub](https://github.com/chromasystemprofessional/Zac-OS-9/issues).
-Besides the five above:
 
-- [#45](https://github.com/chromasystemprofessional/Zac-OS-9/issues/45):
-  the desktop's icons and the Collar don't come back after the screens
-  briefly disappear.
-- [#37](https://github.com/chromasystemprofessional/Zac-OS-9/issues/37):
-  "S" in the menus.
+- [#136](https://github.com/chromasystemprofessional/Zac-OS-9/issues/136):
+  the remaining language work, including Japanese input.
+- [#86](https://github.com/chromasystemprofessional/Zac-OS-9/issues/86):
+  video instability with multiple monitors on multiple graphics cards.
 
 ## Known gaps
 

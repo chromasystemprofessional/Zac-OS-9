@@ -63,7 +63,8 @@ class Stage:
                         HOME=str(self.root), WLR_BACKENDS="headless", WLR_RENDERER="pixman",
                         WLR_HEADLESS_OUTPUTS="1", ZACOS9_STARTUP="0", ZACOS9_MENUBAR="", ZACOS9_FINDER="",
                         ZACOS9_COLLAR="", QT_QPA_PLATFORM="wayland", DBUS_SESSION_BUS_ADDRESS=bus[0],
-                        DBUS_SYSTEM_BUS_ADDRESS=bus[0], **self.extra)
+                        DBUS_SYSTEM_BUS_ADDRESS=bus[0])
+        self.env.update(self.extra)
         self.env.pop("WAYLAND_DISPLAY", None)
         self.udisks_process = self.server = None
         self.udisks_process = subprocess.Popen(

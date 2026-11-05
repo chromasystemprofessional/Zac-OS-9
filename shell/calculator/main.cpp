@@ -15,6 +15,7 @@
 #include "pixels.h"
 #include "settings.h"
 #include "widgets.h"
+#include "tr.h"
 
 namespace {
 
@@ -43,7 +44,7 @@ QRect keyRect(const Key &k) {
 class Calculator : public QWidget {
 public:
 	Calculator() {
-		setWindowTitle("Calculator");
+		setWindowTitle(_("Calculator"));
 		setFixedSize(2 * MARGIN + 4 * KEY_W + 3 * GAP,
 			MARGIN + DISPLAY_H + MARGIN + 5 * KEY_H + 4 * GAP + MARGIN);
 		m_flash.setSingleShot(true);
@@ -150,7 +151,8 @@ private:
 int main(int argc, char *argv[]) {
 	qputenv("QT_WAYLAND_DISABLE_WINDOWDECORATION", "1");
 	QApplication app(argc, argv);
-	QApplication::setApplicationName("Calculator");
+	zacos9_i18n_init();
+	QApplication::setApplicationName(tr9("Calculator"));
 	QGuiApplication::setDesktopFileName("zacos9-calculator");
 	Calculator calculator;
 	calculator.show();

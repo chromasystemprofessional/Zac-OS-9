@@ -1,4 +1,5 @@
 #include "startupdisk.h"
+#include "tr.h"
 #include "panelregistry.h"
 #include "process.h"
 #include "programs.h"
@@ -189,7 +190,7 @@ struct StartupDiskPanel::Parts {
 };
 
 StartupDiskPanel::StartupDiskPanel() : d(std::make_unique<Parts>(this)) {
-	setWindowTitle("Startup Disk");
+	setWindowTitle(_("Startup Disk"));
 	setFixedSize(W, H);
 	d->list.frame = QRect(M, LIST_TOP, W - 2 * M, LIST_BOTTOM - LIST_TOP);
 	d->host.hintAreas.push_back({ &d->list.frame, "The systems this computer can start up from. Click one to start from it next time." });
@@ -493,4 +494,4 @@ void StartupDiskPanel::keyPressEvent(QKeyEvent *e) {
 	update();
 }
 
-PANEL("startupdisk", "Startup Disk", true, StartupDiskPanel);
+PANEL("startupdisk", N_("Startup Disk"), true, StartupDiskPanel);

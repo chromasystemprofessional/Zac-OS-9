@@ -17,6 +17,7 @@
 #include "icons.h"
 #include "pixels.h"
 #include "settings.h"
+#include "tr.h"
 
 static constexpr int W = 380, H = 108;
 static constexpr int TEXT_X = 60;
@@ -175,7 +176,7 @@ AppInstallWindow::AppInstallWindow(const QStringList &files) {
 			" an application to install (the Applications folder takes .deb, .AppImage and "
 			".tar.gz/.tar.xz files, and Windows .exe and .msi installers)";
 	}
-	setWindowTitle("Install");
+	setWindowTitle(tr9("Install"));
 	setFixedSize(W, H);
 	m_stop = PanelButton("Stop", QRect(W - 14 - 64, H - 14 - PL_BUTTON_H, 64, PL_BUTTON_H));
 	m_stop.clicked = [this] { stop(); };

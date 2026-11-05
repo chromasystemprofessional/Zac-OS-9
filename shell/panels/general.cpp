@@ -11,7 +11,7 @@ static const int CARET_MS[] = { 1600, 1066, 534 };
 
 class GeneralControlsPanel : public ControlPanel {
 public:
-	GeneralControlsPanel() : ControlPanel("General Controls", PANEL_H) {
+	GeneralControlsPanel() : ControlPanel(_("General Controls"), PANEL_H) {
 		m_groups = { { G1, G1 + ROWS(2), "Desktop" }, { G2, G2 + ROWS(1), "Menu Blinking" },
 			{ G3, G3 + ROWS(1), "Insertion Point Blinking" }, { G4, G4 + ROWS(4), "Documents" } };
 		char v[16];
@@ -121,4 +121,4 @@ private:
 	bool m_caretOn = true;
 };
 
-PANEL("general", "General Controls", false, GeneralControlsPanel);
+PANEL("general", N_("General Controls"), false, GeneralControlsPanel);

@@ -13,6 +13,7 @@ int main(int argc, char *argv[]) {
 	qputenv("QT_WAYLAND_DISABLE_WINDOWDECORATION", "1");
 	const QString which = argc > 1 ? QString::fromUtf8(argv[1]) : QString("mouse");
 	QApplication app(argc, argv);
+	zacos9_i18n_init();
 	QApplication::setDoubleClickInterval(pl_double_click_ms());
 	/* Each panel is its own app to the menu bar (zacos9-mouse...). */
 	QGuiApplication::setDesktopFileName("zacos9-" + which);
@@ -30,7 +31,7 @@ int main(int argc, char *argv[]) {
 	if (!panel) {
 		panel = mouse;
 	}
-	QApplication::setApplicationName(panel->title);
+	QApplication::setApplicationName(tr9(panel->title));
 	if (panel->alerts) {
 		platinumShellInit();
 	}

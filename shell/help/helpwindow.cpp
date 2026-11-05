@@ -15,6 +15,7 @@
 #include "helpbook.h"
 #include "panelkit.h"
 #include "pixels.h"
+#include "tr.h"
 
 namespace {
 
@@ -51,8 +52,9 @@ public:
 		}
 		if (url.isLocalFile() && type == QTextDocument::HtmlResource) {
 			// The tutorial's pages as the path chosen sees them; newcomers'
-			// wording when none is.
-			QFile f(url.toLocalFile());
+			// wording when none is. A page not translated yet falls back to
+			// its English original.
+			QFile f(helpFallbackPath(url.toLocalFile()));
 			if (f.open(QIODevice::ReadOnly)) {
 				const QString path = QUrlQuery(url).queryItemValue("for");
 				return tutorialHtml(QString::fromUtf8(f.readAll()), path.isEmpty() ? QStringLiteral("new") : path);
@@ -70,15 +72,15 @@ public:
 		setFocusPolicy(Qt::StrongFocus);
 		const int y = (BAR_H - PL_BUTTON_H) / 2;
 		int x = M;
-		m_back = PanelButton("Back", QRect(x, y, 56, PL_BUTTON_H));
+		m_back = PanelButton(tr9("Back"), QRect(x, y, 56, PL_BUTTON_H));
 		x += 56 + GAP;
-		m_forward = PanelButton("Forward", QRect(x, y, 68, PL_BUTTON_H));
+		m_forward = PanelButton(tr9("Forward"), QRect(x, y, 68, PL_BUTTON_H));
 		x += 68 + GAP;
-		m_center = PanelButton("Help Center", QRect(x, y, 92, PL_BUTTON_H));
+		m_center = PanelButton(tr9("Help Center"), QRect(x, y, 92, PL_BUTTON_H));
 		x += 92 + 3 * GAP;
 		m_field.rect = QRect(x, (BAR_H - PL_EDIT_H) / 2, 170, PL_EDIT_H);
 		x += 170 + GAP;
-		m_search = PanelButton("Search", QRect(x, y, 64, PL_BUTTON_H));
+		m_search = PanelButton(tr9("Search"), QRect(x, y, 64, PL_BUTTON_H));
 		m_back.clicked = [w] { w->back(); };
 		m_forward.clicked = [w] { w->forward(); };
 		m_center.clicked = [w] { w->showCenter(); };
@@ -136,7 +138,7 @@ private:
 };
 
 HelpWindow::HelpWindow() {
-	setWindowTitle("Help Center");
+	setWindowTitle(_("Help Center"));
 	setMinimumSize(520, 360);
 	resize(620, 520);
 	auto *central = new QWidget(this);
@@ -162,25 +164,25 @@ HelpWindow::HelpWindow() {
 
 void HelpWindow::buildMenus() {
 	/* Exported to ZacOS 9's menu bar, as other programs' are. */
-	QMenu *file = menuBar()->addMenu("File");
-	file->addAction("Close", QKeySequence::Close, this, [this] { close(); });
+	QMenu *file = menuBar()->addMenu(tr9("File"));
+	file->addAction(tr9("Close"), QKeySequence::Close, this, [this] { close(); });
 	file->addSeparator();
-	file->addAction("Quit", QKeySequence::Quit, this, [this] { close(); })->setMenuRole(QAction::NoRole);
-	QMenu *edit = menuBar()->addMenu("Edit");
-	edit->addAction("Copy", QKeySequence::Copy, m_browser, &QTextBrowser::copy);
-	edit->addAction("Select All", QKeySequence::SelectAll, m_browser, &QTextBrowser::selectAll);
+	file->addAction(tr9("Quit"), QKeySequence::Quit, this, [this] { close(); })->setMenuRole(QAction::NoRole);
+	QMenu *edit = menuBar()->addMenu(tr9("Edit"));
+	edit->addAction(tr9("Copy"), QKeySequence::Copy, m_browser, &QTextBrowser::copy);
+	edit->addAction(tr9("Select All"), QKeySequence::SelectAll, m_browser, &QTextBrowser::selectAll);
 	edit->addSeparator();
-	edit->addAction("Find in Help…", QKeySequence::Find, this, [this] {
+	edit->addAction(tr9("Find in Help…"), QKeySequence::Find, this, [this] {
 		m_toolbar->setFocus();
 		m_toolbar->m_field.selectAll();
 		m_toolbar->update();
 	})->setMenuRole(QAction::NoRole);
-	QMenu *go = menuBar()->addMenu("Go");
-	go->addAction("Back", QKeySequence(Qt::CTRL | Qt::Key_BracketLeft), this, [this] { back(); });
-	go->addAction("Forward", QKeySequence(Qt::CTRL | Qt::Key_BracketRight), this, [this] { forward(); });
+	QMenu *go = menuBar()->addMenu(tr9("Go"));
+	go->addAction(tr9("Back"), QKeySequence(Qt::CTRL | Qt::Key_BracketLeft), this, [this] { back(); });
+	go->addAction(tr9("Forward"), QKeySequence(Qt::CTRL | Qt::Key_BracketRight), this, [this] { forward(); });
 	go->addSeparator();
-	go->addAction("Help Center", this, [this] { showCenter(); });
-	go->addAction("ZacOS Help", this, [this] { showPage("zacos9"); });
+	go->addAction(tr9("Help Center"), this, [this] { showCenter(); });
+	go->addAction(tr9("ZacOS Help"), this, [this] { showPage("zacos9"); });
 }
 
 void HelpWindow::showCenter() {
@@ -190,9 +192,9 @@ void HelpWindow::showCenter() {
 bool HelpWindow::showPage(const QString &pathOrBook) {
 	QString path = pathOrBook;
 	if (!path.contains('/') && !path.endsWith(".html")) {
-		path = helpRoot() + "/" + path + "/index.html"; /* a book */
+		path = helpPagePath(path + "/index.html"); /* a book */
 	} else if (QFileInfo(path).isRelative() && !QFileInfo::exists(path)) {
-		path = helpRoot() + "/" + path; /* "zacos9/files.html" */
+		path = helpPagePath(path); /* "zacos9/files.html" */
 	}
 	if (!QFileInfo(path).isFile()) {
 		return false;
@@ -250,5 +252,5 @@ void HelpWindow::follow(const QUrl &link) {
 
 void HelpWindow::updateTitle() {
 	const QString title = m_browser->documentTitle();
-	setWindowTitle(title.isEmpty() ? QStringLiteral("Help Center") : title);
+	setWindowTitle(title.isEmpty() ? tr9("Help Center") : title);
 }

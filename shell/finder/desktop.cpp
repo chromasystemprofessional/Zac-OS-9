@@ -24,6 +24,7 @@
 
 #include "fileops.h"
 #include "alert.h"
+#include "tr.h"
 #include "folderwindow.h"
 #include "menudraw.h"
 #include "localvolumes.h"
@@ -114,7 +115,7 @@ Desktop::Desktop() {
 
 	m_trash = std::make_unique<Item>();
 	m_trash->stateKey = "::trash";
-	m_trash->name = "Trash";
+	m_trash->name = tr9("Trash");
 	m_trash->path = trashFilesPath();
 	updateTrashIcon();
 

@@ -56,7 +56,7 @@ private:
 	static constexpr int G1 = 26;
 
 	explicit TabletPanel(const TabletInfo &info)
-		: ControlPanel("Tablet", heightFor(info)), m_info(info) {
+		: ControlPanel(_("Tablet"), heightFor(info)), m_info(info) {
 		const int g1Bottom = G1 + tabletGroupHeight(m_info);
 		const int g2 = g1Bottom + 12;
 		const int choices = m_info.screens.size() + 2;
@@ -135,4 +135,4 @@ private:
 	PanelRadios m_hand;
 };
 
-PANEL("tablet", "Tablet", false, TabletPanel);
+PANEL("tablet", N_("Tablet"), false, TabletPanel);

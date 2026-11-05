@@ -22,6 +22,7 @@
 #include <sys/stat.h>
 #include <glib.h>
 
+#include "i18n.h"
 #include "icons.h"
 #include "menubar.h"
 #include "settings.h"
@@ -130,7 +131,7 @@ static void add_recent_item(struct mb_menu *menu, const char *title, const char 
 }
 
 static void fill_applications(struct mb_menu *menu, int count, bool nested) {
-	const char *title = "Recent Applications";
+	const char *title = _("Recent Applications");
 	struct mb_menu *sub = recent_list(menu, title, nested);
 	if (!sub) {
 		return;
@@ -167,7 +168,7 @@ static int newest_first(const void *a, const void *b) {
 }
 
 static void fill_documents(struct mb_menu *menu, int count, bool nested) {
-	const char *title = "Recent Documents";
+	const char *title = _("Recent Documents");
 	struct mb_menu *sub = recent_list(menu, title, nested);
 	if (!sub) {
 		return;
@@ -214,7 +215,7 @@ static void fill_documents(struct mb_menu *menu, int count, bool nested) {
 }
 
 static void fill_servers(struct mb_menu *menu, int count, bool nested) {
-	const char *title = "Recent Servers";
+	const char *title = _("Recent Servers");
 	struct mb_menu *sub = recent_list(menu, title, nested);
 	if (!sub) {
 		return;

@@ -32,6 +32,11 @@ struct HelpHit {
 
 /* The help folder: ZACOS9_HELP_DIR, installed beside us, or the source tree's. */
 QString helpRoot();
+/* The page in the user's language when share/zacos9/help/<lang>/ has it,
+ * else the English one. `path` is relative to the help root. */
+QString helpPagePath(const QString &path);
+/* A localized absolute page that is missing, mapped to its English page. */
+QString helpFallbackPath(const QString &path);
 QList<HelpBook> helpBooks(const QString &root);
 QList<HelpPage> helpPages(const QString &root);
 

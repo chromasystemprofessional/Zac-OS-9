@@ -35,6 +35,7 @@
 #include <unistd.h>
 
 #include "alert.h"
+#include "tr.h"
 #include "finder.h"
 #include "vfs.h"
 #include "apptrash.h"
@@ -84,8 +85,8 @@ void refreshUserFontCache(const QString &directory) {
 				if (status != QProcess::NormalExit || code != 0) {
 					const QString reason = process->property("font-cache-timeout").toBool() ?
 						"The refresh timed out." : QString::fromUtf8(process->readAllStandardError());
-					Alert::ask("The font files changed, but the font cache could not be updated for " +
-						directory + ". " + reason, "OK", QString());
+					Alert::ask(tr9("The font files changed, but the font cache could not be updated for %1. %2")
+						.arg(directory, reason), "OK", QString());
 				}
 				finished();
 				process->deleteLater();
@@ -94,7 +95,7 @@ void refreshUserFontCache(const QString &directory) {
 			[process, timeout, finished](QProcess::ProcessError error) {
 				if (error == QProcess::FailedToStart) {
 					timeout->stop();
-					Alert::ask("The font files changed, but fc-cache could not be started.", "OK", QString());
+					Alert::ask(tr9("The font files changed, but fc-cache could not be started."), "OK", QString());
 					finished();
 					process->deleteLater();
 				}
@@ -109,9 +110,9 @@ static bool fontRemovalAllowed(const QStringList &files, bool confirm) {
 	bool collection = false;
 	for (const QString &file : files) {
 		if (!fontCanRemove(file)) {
-			Alert::ask("This font cannot be removed: " + file +
-				". Only your own installed fonts can be moved out or put in Trash. "
-				"Option-drag to export a copy instead.", "OK", QString());
+			Alert::ask(tr9("This font cannot be removed: %1. Only your own installed fonts can be "
+				"moved out or put in Trash. Option-drag to export a copy instead.").arg(file),
+				"OK", QString());
 			return false;
 		}
 		QString error;
@@ -123,7 +124,7 @@ static bool fontRemovalAllowed(const QStringList &files, bool confirm) {
 		collection |= faces.size() > 1;
 	}
 	return !confirm || !collection || Alert::ask(
-		"Moving a font collection removes every font face in that file. Continue?",
+		tr9("Moving a font collection removes every font face in that file. Continue?"),
 		"Continue", "Cancel");
 }
 
@@ -146,7 +147,7 @@ bool trashFontFiles(const QStringList &files) {
 	bool removed = true;
 	for (const QString &file : unique) {
 		if (!fontCanRemove(file) || !QFile::moveToTrash(file)) {
-			Alert::ask("The font could not be moved to Trash: " + file, "OK", QString());
+			Alert::ask(tr9("The font could not be moved to Trash: %1").arg(file), "OK", QString());
 			removed = false;
 			continue;
 		}
@@ -319,7 +320,7 @@ QString createAlias(const QString &target, const QString &destDir, const QString
 	const QFileInfo original(target);
 	if (!original.exists() || name.isEmpty() || name.contains('/') || name == "." || name == ".." ||
 			!QFileInfo(destDir).isDir()) {
-		Alert::ask("The alias cannot be made because its original or destination is unavailable.",
+		Alert::ask(tr9("The alias cannot be made because its original or destination is unavailable."),
 			"OK", QString());
 		return {};
 	}
@@ -330,13 +331,13 @@ QString createAlias(const QString &target, const QString &destDir, const QString
 		candidate = name + suffix + " " + QString::number(i);
 	}
 	if (!QFile::link(original.absoluteFilePath(), destination.filePath(candidate))) {
-		Alert::ask("The alias could not be created in " + destDir + ". Check folder permissions.",
+		Alert::ask(tr9("The alias could not be created in %1. Check folder permissions.").arg(destDir),
 			"OK", QString());
 		return {};
 	}
 	if (!aliasRecord(destination.filePath(candidate), original.absoluteFilePath())) {
 		QFile::remove(destination.filePath(candidate));
-		Alert::ask("The alias was not created because its identity record could not be saved.",
+		Alert::ask(tr9("The alias was not created because its identity record could not be saved."),
 			"OK", QString());
 		return {};
 	}
@@ -347,7 +348,7 @@ QString createVirtualAlias(const QString &vfsPath, const QString &destDir, const
 		const QString &suffix) {
 	if (!vfsNode(vfsPath) || name.isEmpty() || name.contains('/') || name == "." || name == ".." ||
 			!QFileInfo(destDir).isDir()) {
-		Alert::ask("The alias cannot be made because its original or destination is unavailable.",
+		Alert::ask(tr9("The alias cannot be made because its original or destination is unavailable."),
 			"OK", QString());
 		return {};
 	}
@@ -358,7 +359,7 @@ QString createVirtualAlias(const QString &vfsPath, const QString &destDir, const
 		candidate = name + suffix + " " + QString::number(i);
 	}
 	if (!QFile::link(aliasVirtualLinkTarget(vfsPath), destination.filePath(candidate))) {
-		Alert::ask("The alias could not be created in " + destDir + ". Check folder permissions.",
+		Alert::ask(tr9("The alias could not be created in %1. Check folder permissions.").arg(destDir),
 			"OK", QString());
 		return {};
 	}
@@ -388,7 +389,7 @@ QStringList transferItems(const QStringList &paths, const QString &destDir, bool
 	}
 	static bool transferring = false;
 	if (transferring) {
-		Alert::ask("Another file transfer is in progress. Finish or stop it first.", "OK", QString());
+		Alert::ask(tr9("Another file transfer is in progress. Finish or stop it first."), "OK", QString());
 		return {};
 	}
 	QScopedValueRollback<bool> guard(transferring, true);
@@ -399,7 +400,7 @@ QStringList transferItems(const QStringList &paths, const QString &destDir, bool
 	const QString destAbs = dest.absolutePath();
 	const QString realDest = QFileInfo(destAbs).canonicalFilePath();
 	if (realDest.isEmpty() || !QFileInfo(destAbs).isDir()) {
-		Alert::ask("The destination folder is unavailable. Nothing was transferred.", "OK", QString());
+		Alert::ask(tr9("The destination folder is unavailable. Nothing was transferred."), "OK", QString());
 		return {};
 	}
 	if (fontUserDirectory(realDest)) {
@@ -413,8 +414,8 @@ QStringList transferItems(const QStringList &paths, const QString &destDir, bool
 	}
 	for (const QString &src : paths) {
 		if (appTrashMarker(src)) {
-			Alert::ask("Queued applications cannot be copied or moved as files. "
-				"Use Put Away or drag back to Applications to cancel removal.", "OK", QString());
+			Alert::ask(tr9("Queued applications cannot be copied or moved as files. "
+				"Use Put Away or drag back to Applications to cancel removal."), "OK", QString());
 			return {};
 		}
 		QFileInfo info(src);
@@ -423,7 +424,7 @@ QStringList transferItems(const QStringList &paths, const QString &destDir, bool
 		const QString realSrc = info.canonicalFilePath();
 		if (!info.isSymLink() && info.isDir() &&
 				(realSrc == "/" || realDest == realSrc || realDest.startsWith(realSrc + "/"))) {
-			Alert::ask("A folder cannot be transferred into itself, including through an alias.",
+			Alert::ask(tr9("A folder cannot be transferred into itself, including through an alias."),
 				"OK", QString());
 			skipped = true;
 			continue;
@@ -437,7 +438,7 @@ QStringList transferItems(const QStringList &paths, const QString &destDir, bool
 		if (sameFolder) {
 			name = copyName(dest, name, reserved);
 		} else if (dest.exists(name) || QFileInfo(dest.filePath(name)).isSymLink()) {
-			Alert::ask("“" + name + "” already exists in the destination and was not replaced.",
+			Alert::ask(tr9("“%1” already exists in the destination and was not replaced.").arg(name),
 				"OK", QString());
 			skipped = true;
 			continue;
@@ -455,8 +456,8 @@ QStringList transferItems(const QStringList &paths, const QString &destDir, bool
 		}
 		const QString resourceTarget = dest.filePath("._" + name);
 		if (reserved.contains(target)) {
-			Alert::ask("More than one selected item has the same destination name: “" + name +
-				"”. The duplicate was not transferred.", "OK", QString());
+			Alert::ask(tr9("More than one selected item has the same destination name: “%1”. "
+				"The duplicate was not transferred.").arg(name), "OK", QString());
 			skipped = true;
 			continue;
 		}
@@ -464,8 +465,8 @@ QStringList transferItems(const QStringList &paths, const QString &destDir, bool
 			!info.fileName().startsWith("._") && QFileInfo::exists(resource);
 		if (resourceFork && (QFileInfo(resource).isSymLink() || !QFileInfo(resource).isFile() ||
 				QFileInfo::exists(resourceTarget))) {
-			Alert::ask("The resource fork for “" + info.fileName() +
-				"” cannot be transferred safely; the file has not been moved.", "OK", QString());
+			Alert::ask(tr9("The resource fork for “%1” cannot be transferred safely; "
+				"the file has not been moved.").arg(info.fileName()), "OK", QString());
 			skipped = true;
 			continue;
 		}
@@ -842,14 +843,14 @@ void startItemDrag(QWidget *source, const std::vector<Item *> &items,
 		const Item *first = *std::find_if(items.begin(), items.end(),
 			[](const Item *item) { return item->isVirtual; });
 		if (vfsIsAppFolder(first->path)) {
-			Alert::ask("“" + first->name + "” stays in the Applications folder. "
-				"To remove an application, select it and choose Move To Trash.", "OK", QString());
+			Alert::ask(tr9("“%1” stays in the Applications folder. To remove an application, "
+				"select it and choose Move To Trash.").arg(first->name), "OK", QString());
 		} else if (!vfsStartupItemId(first->path).isEmpty()) {
-			Alert::ask("To stop “" + first->name + "” opening at login, drag it to the Trash.",
+			Alert::ask(tr9("To stop “%1” opening at login, drag it to the Trash.").arg(first->name),
 				"OK", QString());
 		} else {
-			Alert::ask("“" + first->name + "” is part of this computer and can't be moved "
-				"out of its window.", "OK", QString());
+			Alert::ask(tr9("“%1” is part of this computer and can't be moved out of its window.")
+				.arg(first->name), "OK", QString());
 		}
 	}
 }
@@ -947,8 +948,8 @@ static void dropIntoStartupItems(QDropEvent *e) {
 			Finder::instance().folderChanged(trashFilesPath());
 		}
 		if (!rejected.isEmpty()) {
-			Alert::ask("“" + rejected.first() + "” isn't an application. Only applications "
-				"can be startup items.", "OK", QString());
+			Alert::ask(tr9("“%1” isn't an application. Only applications can be startup items.")
+				.arg(rejected.first()), "OK", QString());
 		}
 		vfsRefresh();
 	});
@@ -975,7 +976,7 @@ static void setPanelsEnabled(QDropEvent *e, bool enabled) {
 		}
 	}
 	if (!valid) {
-		Alert::ask("The dragged control panel information is invalid.", "OK", QString());
+		Alert::ask(tr9("The dragged control panel information is invalid."), "OK", QString());
 		e->ignore();
 		return;
 	}
@@ -1014,7 +1015,7 @@ static void setCollarModulesEnabled(QDropEvent *e, bool enabled) {
 		}
 	}
 	if (!valid) {
-		Alert::ask("The dragged module information is invalid.", "OK", QString());
+		Alert::ask(tr9("The dragged module information is invalid."), "OK", QString());
 		e->ignore();
 		return;
 	}
@@ -1083,7 +1084,7 @@ static void setExtensionsEnabled(QDropEvent *e, bool enabled) {
 		}
 	}
 	if (!valid) {
-		Alert::ask("The dragged extension information is invalid.", "OK", QString());
+		Alert::ask(tr9("The dragged extension information is invalid."), "OK", QString());
 		e->ignore();
 		return;
 	}
@@ -1099,7 +1100,7 @@ static void setExtensionsEnabled(QDropEvent *e, bool enabled) {
 		}
 	}
 	if (work.isEmpty()) {
-		Alert::ask("That is not an extension the Extensions Manager knows.", "OK", QString());
+		Alert::ask(tr9("That is not an extension the Extensions Manager knows."), "OK", QString());
 		e->ignore();
 		return;
 	}
@@ -1203,7 +1204,7 @@ QStringList dropClippings(QDropEvent *e, const Item *target, const QString &fold
 	Finder::instance().folderChanged(into);
 	if (made.isEmpty()) {
 		QTimer::singleShot(0, QCoreApplication::instance(), [error] {
-			Alert::ask("The clipping couldn't be made. " + error, "OK", QString());
+			Alert::ask(tr9("The clipping couldn't be made. %1").arg(error), "OK", QString());
 		});
 	}
 	return made;
@@ -1227,7 +1228,7 @@ void dropItems(QDropEvent *e, const Item *target, const QString &folder) {
 		}
 		const QStringList paths = draggedPaths(e->mimeData());
 		if (!valid || declared.isEmpty() || declared.size() > 4096 || declared != paths) {
-			Alert::ask("The dragged font information is invalid.", "OK", QString());
+			Alert::ask(tr9("The dragged font information is invalid."), "OK", QString());
 			e->ignore();
 			return;
 		}
@@ -1338,14 +1339,14 @@ void dropItems(QDropEvent *e, const Item *target, const QString &folder) {
 	if (toTrash && e->mimeData()->hasFormat(APPLICATION_ITEMS_MIME)) {
 		const auto document = QJsonDocument::fromJson(e->mimeData()->data(APPLICATION_ITEMS_MIME));
 		if (!document.isArray() || document.array().isEmpty() || document.array().size() > 256) {
-			Alert::ask("The dragged application information is invalid.", "OK", QString());
+			Alert::ask(tr9("The dragged application information is invalid."), "OK", QString());
 			e->ignore();
 			return;
 		}
 		QStringList ids;
 		for (const auto &value : document.array()) {
 			if (!value.isString() || !appById(value.toString())) {
-				Alert::ask("The dragged application is no longer available.", "OK", QString());
+				Alert::ask(tr9("The dragged application is no longer available."), "OK", QString());
 				e->ignore();
 				return;
 			}
@@ -1378,7 +1379,7 @@ void dropItems(QDropEvent *e, const Item *target, const QString &folder) {
 			(Qt::ControlModifier | Qt::AltModifier));
 	if (link) {
 		if (!(e->possibleActions() & Qt::LinkAction)) {
-			Alert::ask("This drag source does not support aliases. Use File > Make Alias instead.",
+			Alert::ask(tr9("This drag source does not support aliases. Use File > Make Alias instead."),
 				"OK", QString());
 			e->ignore();
 			return;
@@ -1389,7 +1390,7 @@ void dropItems(QDropEvent *e, const Item *target, const QString &folder) {
 		}
 		if (destination.isEmpty() || !QFileInfo(destination).isDir() ||
 				(target && (target->kind == PL_ICON_TRASH_EMPTY || target->kind == PL_ICON_TRASH_FULL))) {
-			Alert::ask("Aliases must be placed in a real folder or on the Desktop.", "OK", QString());
+			Alert::ask(tr9("Aliases must be placed in a real folder or on the Desktop."), "OK", QString());
 			e->ignore();
 			return;
 		}
@@ -1397,7 +1398,7 @@ void dropItems(QDropEvent *e, const Item *target, const QString &folder) {
 		if (aliasDrag) {
 			const auto document = QJsonDocument::fromJson(e->mimeData()->data(ALIAS_ITEMS_MIME));
 			if (!document.isArray() || document.array().isEmpty() || document.array().size() > 256) {
-				Alert::ask("The dragged alias information is invalid.", "OK", QString());
+				Alert::ask(tr9("The dragged alias information is invalid."), "OK", QString());
 				e->ignore();
 				return;
 			}
@@ -1409,7 +1410,7 @@ void dropItems(QDropEvent *e, const Item *target, const QString &folder) {
 				if (!value.isObject() || !item["name"].isString() ||
 						(target.isEmpty() ? !vfs.startsWith(QLatin1String("vfs:/"))
 							: !QDir::isAbsolutePath(target))) {
-					Alert::ask("The dragged alias information is invalid.", "OK", QString());
+					Alert::ask(tr9("The dragged alias information is invalid."), "OK", QString());
 					e->ignore();
 					return;
 				}
@@ -1483,7 +1484,7 @@ void dropItems(QDropEvent *e, const Item *target, const QString &folder) {
 	if (vfsIsFonts(dest)) {
 		dest = userFontsPath();
 		if (dest.isEmpty() || !QDir().mkpath(dest) || !fontUserDirectory(dest)) {
-			Alert::ask("The user Fonts folder could not be created: " + dest, "OK", QString());
+			Alert::ask(tr9("The user Fonts folder could not be created: %1").arg(dest), "OK", QString());
 			e->ignore();
 			return;
 		}
@@ -1581,8 +1582,8 @@ void dropItems(QDropEvent *e, const Item *target, const QString &folder) {
 					}
 					if (!rest.isEmpty()) {
 						if (destReal.isEmpty()) {
-							Alert::ask("The other items do not belong in the System Folder itself. "
-								"Put each where it belongs, inside one of its folders.",
+							Alert::ask(tr9("The other items do not belong in the System Folder itself. "
+								"Put each where it belongs, inside one of its folders."),
 								"OK", QString());
 						} else {
 							bool restFinished = false;
@@ -1598,8 +1599,8 @@ void dropItems(QDropEvent *e, const Item *target, const QString &folder) {
 					return;
 				}
 				if (toSystemFolder) {
-					Alert::ask("Items in the System Folder belong in one of the folders "
-						"inside it (such as Appearance, Extensions or Fonts).",
+					Alert::ask(tr9("Items in the System Folder belong in one of the folders "
+						"inside it (such as Appearance, Extensions or Fonts)."),
 						"OK", QString());
 					e->ignore();
 					return;

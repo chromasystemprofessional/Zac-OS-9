@@ -1,4 +1,5 @@
 #include <ctype.h>
+#include <glib.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -122,22 +123,15 @@ void toplevels_init(struct zwlr_foreign_toplevel_manager_v1 *mgr) {
 /* ---- app names from .desktop files -------------------------------------- */
 
 static char *desktop_name(const char *path) {
-	FILE *f = fopen(path, "r");
-	if (!f) {
-		return NULL;
+	/* GKeyFile reads Name[ru], Name[it] and the rest by the session's
+	 * locale, as the Control Panels folder does; a plain Name= scan
+	 * would keep every app's name English. */
+	GKeyFile *file = g_key_file_new();
+	char *name = NULL;
+	if (g_key_file_load_from_file(file, path, G_KEY_FILE_NONE, NULL)) {
+		name = g_key_file_get_locale_string(file, G_KEY_FILE_DESKTOP_GROUP, "Name", NULL, NULL);
 	}
-	char line[512], *name = NULL;
-	bool in_entry = false;
-	while (fgets(line, sizeof(line), f)) {
-		line[strcspn(line, "\r\n")] = '\0';
-		if (line[0] == '[') {
-			in_entry = strcmp(line, "[Desktop Entry]") == 0;
-		} else if (in_entry && strncmp(line, "Name=", 5) == 0) {
-			name = strdup(line + 5);
-			break;
-		}
-	}
-	fclose(f);
+	g_key_file_free(file);
 	return name;
 }
 

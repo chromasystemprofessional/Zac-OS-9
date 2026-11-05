@@ -295,6 +295,12 @@ when it runs **under X11**. On Wayland it never does, on any desktop. So:
   `compositor/src/prefs.c`). A surface is told the scale of the screen it
   is mostly on (`preferred_buffer_scale`, `wp_fractional_scale_v1`), also
   when that screen's scale changes. Test: `fractional-scale`.
+- **Each screen its own rotation** (Monitors' Rotation applies to the
+  selected display: `display.NAME.rotation` in `desktop.conf`, 0, 90, 180
+  or 270 degrees, else `rotation` on the main screen). zacos9-wm sets the
+  output's transform; the layout and the screens' logical sizes use the
+  rotated resolution (`compositor/src/prefs.c`).
+  Test: `display-rotation`.
 - **The menu bar on every screen** (Monitors' Menu Bar on Every Display,
   `menubar-every-display=1`): zacos9-menubar puts a bar on each screen,
   naming its output, and zacos9-wm lets it (`may_choose_output`,

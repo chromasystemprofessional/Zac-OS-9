@@ -6,7 +6,7 @@
  * (zacos9-wm sets libinput's tapping from it, compositor/src/input.c). */
 class TrackpadPanel : public ControlPanel {
 public:
-	TrackpadPanel() : ControlPanel("Trackpad", PANEL_H) {
+	TrackpadPanel() : ControlPanel(_("Trackpad"), PANEL_H) {
 		m_groups = { { G1, G1 + SLIDER_GROUP_H, "Tracking Speed" },
 			{ G2, G2 + ROWS(1), "Double-Click Speed" }, { G3, G3 + ROWS(3), "Use Trackpad for" } };
 		placeSlider(m_tracking, G1, 7, settingInt("mouse-speed", 3), "Very Slow", "Fast");
@@ -71,4 +71,4 @@ private:
 	PanelCheckbox m_clicking, m_dragging, m_dragLock;
 };
 
-PANEL("trackpad", "Trackpad", false, TrackpadPanel);
+PANEL("trackpad", N_("Trackpad"), false, TrackpadPanel);

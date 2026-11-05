@@ -1,6 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=Installer
+Name[ru]=Установщик ZacOS
 Comment=Install ZacOS 9 on a hard disk
 Exec=zacos9-installer
 NoDisplay=true

@@ -37,6 +37,7 @@
 #include <xkbcommon/xkbcommon.h>
 
 #include "fractional-scale-v1-client-protocol.h"
+#include "i18n.h"
 #include "icons.h"
 #include "menubar.h"
 #include "platinum-shell-v1-client-protocol.h"
@@ -1560,6 +1561,7 @@ static void arm_clock(void) {
 }
 
 int main(void) {
+	zacos9_i18n_init();
 	wl_list_init(&g.outputs);
 	wl_list_init(&g.bars);
 	g.display = wl_display_connect(NULL);

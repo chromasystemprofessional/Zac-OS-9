@@ -23,6 +23,7 @@
 #include "pixels.h"
 #include "settings.h"
 #include "storeclient.h"
+#include "tr.h"
 
 static constexpr int W = 420, H = 150;
 static constexpr int TEXT_X = 60, TEXT_W = W - TEXT_X - 14;
@@ -158,7 +159,7 @@ int whatsnewRun() {
 }
 
 UpdateWindow::UpdateWindow() {
-	setWindowTitle("Software Update");
+	setWindowTitle(_("Software Update"));
 	setFixedSize(W, H);
 	m_daily = PanelCheckbox("Check daily", QPoint(14, H - 14 - PL_BUTTON_H + 4));
 	char v[16];

@@ -36,6 +36,7 @@
 #include "panelkit.h"
 #include "platinumshell.h"
 #include "settings.h"
+#include "tr.h"
 
 using namespace screenshare;
 
@@ -97,7 +98,7 @@ static QString viewerProgram() {
 class ScreenSharingPanel : public QWidget {
 public:
 	ScreenSharingPanel() : m_host(this) {
-		setWindowTitle("Screen Sharing");
+		setWindowTitle(_("Screen Sharing"));
 		for (const char *label : { "Start/Stop", "Activity Monitor", "Connect" }) {
 			m_tabLabels.push_back(std::make_unique<Text>(label, 200, PL_FONT_SYSTEM));
 		}
@@ -590,7 +591,8 @@ int main(int argc, char *argv[]) {
 	/* zacos9-wm draws every frame; Qt must not add its own. */
 	qputenv("QT_WAYLAND_DISABLE_WINDOWDECORATION", "1");
 	QApplication app(argc, argv);
-	QApplication::setApplicationName("Screen Sharing");
+	zacos9_i18n_init();
+	QApplication::setApplicationName(tr9("Screen Sharing"));
 	QApplication::setDoubleClickInterval(pl_double_click_ms());
 	QGuiApplication::setDesktopFileName("zacos9-screensharing"); /* Wayland app_id */
 	platinumShellInit();

@@ -21,6 +21,7 @@
 #include "pixels.h"
 #include "settings.h"
 #include "platinumshell.h"
+#include "tr.h"
 
 static constexpr int W = 460, H = 320;
 static constexpr int MARGIN = 16;
@@ -154,7 +155,7 @@ static void centred(pl_canvas *c, const QString &s, int baseline, pl_font font =
 /* ---- construction ------------------------------------------------------------------ */
 
 WinInstallWindow::WinInstallWindow(const QString &file) {
-	setWindowTitle("Windows Installer");
+	setWindowTitle(_("Windows Installer"));
 	setFixedSize(W, H);
 	setAcceptDrops(true);
 

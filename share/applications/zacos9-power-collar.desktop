@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Power
+Name[ru]=Питание
+Name[it]=Alimentazione
 Comment=Power management
 Exec=zacos9-collarmodule power
 Categories=X-ZacOS9-CollarModule;

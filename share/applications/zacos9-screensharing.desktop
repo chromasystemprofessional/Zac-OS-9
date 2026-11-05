@@ -1,6 +1,9 @@
 [Desktop Entry]
 Type=Application
 Name=Screen Sharing
+Name[ru]=Общий экран
+Name[ja]=画面共有
+Name[it]=Condivisione schermo
 Comment=Let other ZacOS computers see and control this screen
 Exec=zacos9-screensharing
 Categories=Settings;Network;X-ZacOS9-ControlPanel;

@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Bark Recorder
+Name[ru]=Регистратор
+Name[it]=Registratore
 Comment=Record and play sounds
 Exec=zacos9-barkrecorder
 Terminal=false

@@ -1,6 +1,7 @@
 /* GIO before Qt: its headers use the name `signals`. */
 #include "appfilter.h"
 #include "users.h"
+#include "tr.h"
 #include "panelregistry.h"
 
 #include <QDBusConnection>
@@ -251,7 +252,7 @@ struct UsersPanel::Parts {
 };
 
 UsersPanel::UsersPanel() : d(std::make_unique<Parts>(this)) {
-	setWindowTitle("Users");
+	setWindowTitle(_("Users"));
 	setFixedSize(PW, PH);
 	d->list.frame = QRect(M, LIST_TOP, PW - 2 * M, LIST_BOTTOM - LIST_TOP);
 	d->host.hintAreas.push_back({ &d->list.frame, "The people who can use this computer. Double-click one to change it." });
@@ -528,7 +529,7 @@ AccountWindow::AccountWindow(UsersPanel *panel, AccountsClient *client, const Ac
 		d->original = *account;
 	}
 	const bool you = account && account->uid == qint64(getuid());
-	setWindowTitle(d->creating ? "New User" : d->original.shownName());
+	setWindowTitle(d->creating ? tr9("New User") : d->original.shownName());
 	setFixedSize(AW, AH);
 	int y = 16;
 	d->realName.rect = QRect(FIELD, y, AW - FIELD - M, PL_EDIT_H);
@@ -894,7 +895,7 @@ ProgramsWindow::ProgramsWindow(QWidget *parent, const QString &who, const QStrin
 		: QWidget(parent, Qt::Dialog), d(std::make_unique<Parts>(this)) {
 	d->who = who;
 	d->done = std::move(done);
-	setWindowTitle("Programs");
+	setWindowTitle(_("Programs"));
 	setWindowModality(Qt::WindowModal);
 	setAttribute(Qt::WA_DeleteOnClose);
 	setFixedSize(RW, RH);
@@ -1063,7 +1064,7 @@ struct OptionsWindow::Parts {
 
 OptionsWindow::OptionsWindow(QWidget *parent)
 		: QWidget(parent, Qt::Dialog), d(std::make_unique<Parts>(this)) {
-	setWindowTitle("Users Options");
+	setWindowTitle(_("Users Options"));
 	setAttribute(Qt::WA_DeleteOnClose);
 	setFixedSize(OW, OH);
 	d->guest = PanelCheckbox("Allow guests to log in", QPoint(12, 16));
@@ -1167,4 +1168,4 @@ void OptionsWindow::keyPressEvent(QKeyEvent *e) {
 	update();
 }
 
-PANEL("users", "Users", true, UsersPanel);
+PANEL("users", N_("Users"), true, UsersPanel);

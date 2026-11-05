@@ -1,6 +1,9 @@
 [Desktop Entry]
 Type=Application
 Name=Keyboard
+Name[ru]=Клавиатура
+Name[ja]=キーボード
+Name[it]=Tastiera
 Comment=Key repeat rate and delay
 Exec=zacos9-controlpanel keyboard
 Categories=Settings;HardwareSettings;X-ZacOS9-ControlPanel;

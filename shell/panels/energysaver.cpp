@@ -31,7 +31,7 @@ class EnergySaverPanel : public ControlPanel {
 public:
 	static constexpr int SCHEDULE_H = 1 + PL_GROUP_MARGIN_TOP + 2 * (PL_POPUP_H + 6) + PL_BUTTON_H + PL_GROUP_MARGIN;
 
-	EnergySaverPanel() : ControlPanel("Nap Time", 202 + SCHEDULE_H + 20) {
+	EnergySaverPanel() : ControlPanel(_("Nap Time"), 202 + SCHEDULE_H + 20) {
 		const int g1 = 26, g2 = g1 + SLIDER_GROUP_H + 12, g3 = g2 + SLIDER_GROUP_H + 20;
 		m_groups = { { g1, g1 + SLIDER_GROUP_H, "Put the display to sleep when inactive for" },
 			{ g2, g2 + SLIDER_GROUP_H, "Put the system to sleep when inactive for" },
@@ -173,4 +173,4 @@ private:
 	}
 };
 
-PANEL("energysaver", "Nap Time", false, EnergySaverPanel);
+PANEL("energysaver", N_("Nap Time"), false, EnergySaverPanel);

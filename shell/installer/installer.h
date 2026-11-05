@@ -2,6 +2,7 @@
 
 #include <QProcess>
 #include <QString>
+#include <QStringList>
 #include <QWidget>
 #include <memory>
 #include <vector>
@@ -15,6 +16,7 @@
  * the user to pick a destination disk and then installs.
  *
  * Screens (shown in order):
+ *   Language — the installed system's language; passed to zacos9-install
  *   Welcome  — logo, description, Continue button
  *   Select   — list of available disks, Install button; a disk that
  *              already has ZacOS 9 offers Update (keeps its accounts,
@@ -40,7 +42,7 @@ struct DiskEntry {
 
 class InstallerWindow : public QWidget {
 public:
-	InstallerWindow();
+	explicit InstallerWindow(const QString &locale = QString());
 
 protected:
 	void paintEvent(QPaintEvent *) override;
@@ -51,8 +53,15 @@ protected:
 	void keyPressEvent(QKeyEvent *) override;
 
 private:
-	enum class Screen { Welcome, Select, Installing, Done };
-	Screen m_screen = Screen::Welcome;
+	enum class Screen { Language, Welcome, Select, Installing, Done };
+	Screen m_screen = Screen::Language;
+
+	/* Language screen */
+	PanelList m_languageList;
+	QStringList m_localeCodes;
+	PanelButton m_languageContinue;
+	QString m_locale; /* e.g. it_IT.UTF-8, for the installed system */
+	QString m_languageError;
 
 	/* Welcome screen */
 	PanelButton m_continue;
@@ -84,11 +93,14 @@ private:
 	QString m_restartError; /* why Restart couldn't, on the last screen */
 	QString m_lastOutput; /* last non-protocol line from the helper, shown on failure */
 	int m_step = 0;
-	bool m_updating = false; /* updating an installed system, not installing */
+	bool m_updating = false;
+	bool m_failed = false; /* updating an installed system, not installing */
 
 	/* Done screen */
 	PanelButton m_restart;
 
+	void showLanguage();
+	void chooseLanguage();
 	void showWelcome();
 	void showSelect();
 	void showInstalling(const QStringList &args, bool updating);
@@ -107,6 +119,7 @@ private:
 	void showDone();
 
 	void enumerateDisks();
+	void paintLanguage(pl_canvas *c);
 	void paintWelcome(pl_canvas *c);
 	void paintSelect(pl_canvas *c);
 	void paintInstalling(pl_canvas *c);

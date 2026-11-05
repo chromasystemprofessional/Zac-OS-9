@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Notepad
+Name[ru]=Блокнот
+Name[it]=Blocco note
 Comment=Keep eight pages of notes
 Exec=zacos9-notepad
 Terminal=false

@@ -7,7 +7,7 @@ static const int RECENT_COUNTS[] = { 0, 5, 10, 15, 20, 30, 40 };
 
 class ZacMenuOptionsPanel : public ControlPanel {
 public:
-	ZacMenuOptionsPanel() : ControlPanel("Zac Menu Options", PANEL_H) {
+	ZacMenuOptionsPanel() : ControlPanel(_("Zac Menu Options"), PANEL_H) {
 		m_groups = { { G, G + GROUP_H, "Remember recently used items" } };
 		const char *const keys[] = { "recent-documents", "recent-applications", "recent-servers" };
 		const char *const labels[] = { "Documents:", "Applications:", "Servers:" };
@@ -75,4 +75,4 @@ private:
 	PanelCheckbox m_submenus;
 };
 
-PANEL("zacmenu", "Zac Menu Options", false, ZacMenuOptionsPanel);
+PANEL("zacmenu", N_("Zac Menu Options"), false, ZacMenuOptionsPanel);

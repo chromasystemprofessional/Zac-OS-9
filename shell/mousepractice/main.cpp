@@ -17,6 +17,7 @@
 #include "platinumshell.h"
 #include "practice.h"
 #include "settings.h"
+#include "tr.h"
 
 namespace {
 
@@ -247,7 +248,7 @@ private:
 class Window : public QMainWindow {
 public:
 	explicit Window(bool kids) {
-		setWindowTitle("Mouse Practice");
+		setWindowTitle(_("Mouse Practice"));
 		auto *board = new Board(kids);
 		setCentralWidget(board);
 		QMenu *practice = menuBar()->addMenu("Practice");
@@ -266,7 +267,8 @@ int main(int argc, char *argv[]) {
 	/* zacos9-wm draws every frame; Qt must not add its own. */
 	qputenv("QT_WAYLAND_DISABLE_WINDOWDECORATION", "1");
 	QApplication app(argc, argv);
-	QApplication::setApplicationName("Mouse Practice");
+	zacos9_i18n_init();
+	QApplication::setApplicationName(tr9("Mouse Practice"));
 	QApplication::setDoubleClickInterval(pl_double_click_ms());
 	QGuiApplication::setDesktopFileName("zacos9-mousepractice"); /* Wayland app_id */
 	platinumShellInit();

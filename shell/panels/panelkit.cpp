@@ -4,7 +4,10 @@
 #include <QClipboard>
 #include <QDateTime>
 #include <QElapsedTimer>
+#include <QGuiApplication>
 #include <QHelpEvent>
+#include <QInputMethod>
+#include <QInputMethodEvent>
 #include <QPainter>
 #include <QToolTip>
 #include <algorithm>
@@ -818,24 +821,87 @@ QString PanelEdit::shown() const {
 	return password ? QString(text.size(), QChar(0x2022)) : text;
 }
 
+/* The text as drawn: the input method's preedit sits at the caret until it
+ * is committed. A password field masks it like the rest of its text. */
+QString PanelEdit::displayed() const {
+	const QString base = shown();
+	if (preedit.isEmpty()) {
+		return base;
+	}
+	const int at = std::clamp(caret, 0, static_cast<int>(base.size()));
+	const QString p = password ? QString(preedit.size(), QChar(0x2022)) : preedit;
+	return base.left(at) + p + base.mid(at);
+}
+
+/* Text indices and drawn indices differ by the preedit's length. */
+int PanelEdit::displayIndex(int textIndex) const {
+	if (preedit.isEmpty() || textIndex <= caret) {
+		return textIndex;
+	}
+	return textIndex + static_cast<int>(preedit.size());
+}
+
+int PanelEdit::textIndex(int display) const {
+	if (preedit.isEmpty() || display <= caret) {
+		return display;
+	}
+	if (display <= caret + static_cast<int>(preedit.size())) {
+		return caret;
+	}
+	return display - static_cast<int>(preedit.size());
+}
+
 QStringList PanelEdit::lines() const {
-	return shown().split('\n');
+	return displayed().split('\n');
 }
 
 void PanelEdit::setText(const QString &t) {
 	text = t;
 	caret = anchor = static_cast<int>(text.size());
 	m_scroll = 0;
+	clearPreedit();
 }
 
 void PanelEdit::selectAll() {
 	anchor = 0;
 	caret = static_cast<int>(text.size());
+	clearPreedit();
 	keepCaretVisible();
 }
 
+void PanelEdit::commitText(const QString &s) {
+	if (s.isEmpty()) {
+		return;
+	}
+	insert(s);
+	clearPreedit();
+	keepCaretVisible();
+	if (edited) {
+		edited();
+	}
+}
+
+void PanelEdit::setPreedit(const QString &s, int cursor) {
+	preedit = s;
+	preeditCursor = std::clamp(cursor, 0, static_cast<int>(preedit.size()));
+	keepCaretVisible();
+}
+
+void PanelEdit::clearPreedit() {
+	preedit.clear();
+	preeditCursor = 0;
+	keepCaretVisible();
+}
+
+QRect PanelEdit::cursorRect() const {
+	const int display = caret + (preedit.isEmpty() ? 0 :
+		std::clamp(preeditCursor, 0, static_cast<int>(preedit.size())));
+	const QPoint at = caretPos(display);
+	return QRect(at.x(), at.y() - 11, 1, 14);
+}
+
 QPoint PanelEdit::caretPos(int index) const {
-	const QString s = shown();
+	const QString s = displayed();
 	const int line = static_cast<int>(s.left(index).count('\n'));
 	const int lineStart = static_cast<int>(s.lastIndexOf('\n', index - 1)) + 1;
 	const int x = rect.left() + EDIT_PAD + advanceOf(s.mid(lineStart, index - lineStart)) - m_scroll;
@@ -862,7 +928,7 @@ int PanelEdit::indexAt(QPoint p) const {
 		}
 		prev = a;
 	}
-	return start + best;
+	return textIndex(start + best);
 }
 
 void PanelEdit::keepCaretVisible() {
@@ -870,7 +936,7 @@ void PanelEdit::keepCaretVisible() {
 		return;
 	}
 	const int width = rect.width() - 2 * EDIT_PAD;
-	const int cx = advanceOf(shown().left(caret));
+	const int cx = advanceOf(displayed().left(caret + static_cast<int>(preedit.size())));
 	if (cx - m_scroll > width) {
 		m_scroll = cx - width;
 	} else if (cx < m_scroll) {
@@ -894,14 +960,15 @@ void PanelEdit::paint(pl_canvas *c, bool focused, bool caretOn) const {
 	pl_canvas in = { c->px + (cy0 - c->y) * c->stride + (cx0 - c->x), c->stride, cx0, cy0,
 		r.width() - 2, r.height() - 2, c->log };
 	const int s0 = std::min(caret, anchor), s1 = std::max(caret, anchor);
+	const int d0 = displayIndex(s0), d1 = displayIndex(s1);
 	const QStringList ls = lines();
 	int start = 0;
 	for (int i = 0; i < ls.size(); i++) {
 		const int end = start + static_cast<int>(ls[i].size());
 		const QPoint at = caretPos(start);
-		if (focused && s0 != s1 && s1 >= start && s0 <= end) {
-			const int a = caretPos(std::max(s0, start)).x();
-			const int b = s1 > end ? r.right() : caretPos(std::min(s1, end)).x();
+		if (focused && d0 != d1 && d1 >= start && d0 <= end) {
+			const int a = caretPos(std::max(d0, start)).x();
+			const int b = d1 > end ? r.right() : caretPos(std::min(d1, end)).x();
 			pl_fill(&in, a, at.y() - 10, b, at.y() + 2, pl_highlight_current());
 		}
 		if (!ls[i].isEmpty()) {
@@ -912,8 +979,18 @@ void PanelEdit::paint(pl_canvas *c, bool focused, bool caretOn) const {
 		}
 		start = end + 1;
 	}
-	if (focused && caretOn && enabled && s0 == s1) {
+	if (focused && enabled && !preedit.isEmpty()) {
 		const QPoint at = caretPos(caret);
+		const int a = at.x();
+		const int b = caretPos(caret + static_cast<int>(preedit.size())).x();
+		if (b > a) {
+			pl_fill(&in, a, at.y() + 1, b - 1, at.y() + 1, C_BLACK);
+		}
+	}
+	if (focused && caretOn && enabled && s0 == s1) {
+		const int cursor = preedit.isEmpty() ? caret :
+			caret + std::clamp(preeditCursor, 0, static_cast<int>(preedit.size()));
+		const QPoint at = caretPos(cursor);
 		pl_vline(&in, at.x(), at.y() - 11, at.y() + 2, C_BLACK);
 	}
 }
@@ -1093,6 +1170,40 @@ public:
 private:
 	const PanelHost *m_host;
 };
+
+/* Input methods (fcitx5, IBus) deliver QInputMethodEvent to the widget that
+ * has the focus. A panel is one widget with many PanelEdits, so the event
+ * filter hands the event to the host, which gives it to the focused field.
+ * Queries go the same way: this is how the candidate window finds the
+ * caret, and how the method reads the text around it. */
+class InputMethodFilter : public QObject {
+public:
+	InputMethodFilter(PanelHost *host, QObject *parent) : QObject(parent), m_host(host) {}
+	bool eventFilter(QObject *, QEvent *e) override {
+		if (e->type() == QEvent::InputMethod) {
+			return m_host->inputMethodEvent(static_cast<QInputMethodEvent *>(e));
+		}
+		if (e->type() == QEvent::InputMethodQuery) {
+			auto *query = static_cast<QInputMethodQueryEvent *>(e);
+			const Qt::InputMethodQueries asked = query->queries();
+			for (int bit = 0; bit < 32; bit++) {
+				const auto q = static_cast<Qt::InputMethodQuery>(1u << bit);
+				if (!(asked & q)) {
+					continue;
+				}
+				const QVariant value = m_host->inputMethodQuery(q);
+				if (value.isValid()) {
+					query->setValue(q, value);
+				}
+			}
+			return true;
+		}
+		return false;
+	}
+
+private:
+	PanelHost *m_host;
+};
 }
 
 PanelHost::PanelHost(QWidget *w) : m_widget(w), m_caret(std::make_unique<QTimer>()) {
@@ -1105,10 +1216,13 @@ PanelHost::PanelHost(QWidget *w) : m_widget(w), m_caret(std::make_unique<QTimer>
 	m_caret->start(std::max(200, QApplication::cursorFlashTime() / 2));
 	m_hints = new HintFilter(this, w);
 	w->installEventFilter(m_hints);
+	m_ime = new InputMethodFilter(this, w);
+	w->installEventFilter(m_ime);
 }
 
 PanelHost::~PanelHost() {
 	delete m_hints;
+	delete m_ime;
 }
 
 QString PanelHost::hintAt(QPoint p) const {
@@ -1146,6 +1260,14 @@ QString PanelHost::hintAt(QPoint p) const {
 }
 
 void PanelHost::setFocus(PanelEdit *e) {
+	if (focus != e) {
+		if (focus) {
+			focus->clearPreedit();
+		}
+		if (QInputMethod *ime = QGuiApplication::inputMethod()) {
+			ime->reset();
+		}
+	}
 	focus = e;
 	if (e) {
 		e->selectAll();
@@ -1154,8 +1276,81 @@ void PanelHost::setFocus(PanelEdit *e) {
 	 * (platinumshell.cpp says so to zacos9-wm). */
 	m_widget->setAttribute(Qt::WA_InputMethodEnabled, e != nullptr);
 	m_widget->setProperty("zacos9TextField", e != nullptr);
+	if (QInputMethod *ime = QGuiApplication::inputMethod()) {
+		ime->update(Qt::ImQueryAll);
+	}
 	m_caretOn = true;
 	m_widget->update();
+}
+
+bool PanelHost::inputMethodEvent(QInputMethodEvent *e) {
+	if (!focus || !focus->enabled) {
+		return false;
+	}
+	int cursor = static_cast<int>(e->preeditString().size());
+	for (const QInputMethodEvent::Attribute &a : e->attributes()) {
+		if (a.type == QInputMethodEvent::Cursor) {
+			cursor = a.start;
+		}
+	}
+	const QString commit = e->commitString();
+	if (!commit.isEmpty()) {
+		focus->commitText(commit);
+	}
+	focus->setPreedit(e->preeditString(), cursor);
+	m_caretOn = true;
+	m_widget->update(focus->rect.adjusted(-3, -3, 3, 3));
+	return true;
+}
+
+QVariant PanelHost::inputMethodQuery(Qt::InputMethodQuery query) const {
+	if (!focus) {
+		return {};
+	}
+	switch (query) {
+	case Qt::ImEnabled:
+		return focus->enabled;
+	case Qt::ImHints: {
+		int hints = static_cast<int>(Qt::ImhNoPredictiveText);
+		if (focus->multiline) {
+			hints |= Qt::ImhMultiLine;
+		}
+		if (focus->password) {
+			hints |= Qt::ImhHiddenText | Qt::ImhNoAutoUppercase;
+		}
+		return hints;
+	}
+	case Qt::ImSurroundingText:
+		return focus->password ? QString() : focus->text;
+	case Qt::ImCursorPosition:
+		return focus->password ? 0 : focus->caret;
+	case Qt::ImAnchorPosition:
+		return focus->password ? 0 : focus->anchor;
+	case Qt::ImCurrentSelection: {
+		if (focus->password) {
+			return QString();
+		}
+		const int s0 = std::min(focus->caret, focus->anchor);
+		const int s1 = std::max(focus->caret, focus->anchor);
+		return focus->text.mid(s0, s1 - s0);
+	}
+	case Qt::ImTextBeforeCursor:
+		return focus->password ? QString() : focus->text.left(focus->caret);
+	case Qt::ImTextAfterCursor:
+		return focus->password ? QString() : focus->text.mid(focus->caret);
+	case Qt::ImCursorRectangle:
+		return focus->cursorRect();
+	case Qt::ImInputItemClipRectangle:
+		return focus->rect;
+	case Qt::ImReadOnly:
+		return !focus->enabled;
+	case Qt::ImFont:
+		return m_widget->font();
+	case Qt::ImPreferredLanguage:
+		return QLocale().name();
+	default:
+		return {};
+	}
 }
 
 void PanelHost::paintControls(pl_canvas *c, uint32_t) const {
@@ -1303,19 +1498,5 @@ void panelLabel(pl_canvas *c, const QString &s, int right, int baseline, uint32_
 }
 
 QStringList panelWrap(const QString &s, int width, pl_font font) {
-	QStringList lines;
-	QString line;
-	for (const QString &word : s.split(' ', Qt::SkipEmptyParts)) {
-		const QString candidate = line.isEmpty() ? word : line + ' ' + word;
-		if (!line.isEmpty() && Text(candidate, 100000, font).inkWidth() > width) {
-			lines << line;
-			line = word;
-		} else {
-			line = candidate;
-		}
-	}
-	if (!line.isEmpty()) {
-		lines << line;
-	}
-	return lines;
+	return wrapText(s, width, font);
 }

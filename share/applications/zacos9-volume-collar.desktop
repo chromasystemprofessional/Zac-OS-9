@@ -1,6 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=Volume
+Name[ru]=Громкость
 Comment=Volume and sound output
 Exec=zacos9-collarmodule volume
 Categories=X-ZacOS9-CollarModule;

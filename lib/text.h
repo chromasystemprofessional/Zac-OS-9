@@ -12,7 +12,9 @@ extern "C" {
  * A rendered single line of 1-bit text, stored as an 8-bit coverage mask
  * (every value is 0 or 255; no antialiasing, matching the 1990s screen).
  * Drawn with ZacOS 9's own bitmap fonts (assets/fonts), which have
- * the Mac OS 8 metrics; characters they lack fall back to DejaVu Sans.
+ * the Mac OS 8 metrics; characters they lack fall back to an outline face
+ * Fontconfig finds for them (DejaVu Sans for European scripts, Noto Sans CJK
+ * for Japanese: see docs/i18n.md).
  */
 struct plat_text {
 	int width, height;

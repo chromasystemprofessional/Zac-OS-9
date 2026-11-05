@@ -14,8 +14,9 @@
  * layout are in logical pixels (the screen's pixels divided by the pixel size). */
 struct Screen {
 	QString name;
-	QSize px;
+	QSize px; /* the mode, before rotation */
 	double scale = 1;
+	int rotation = 0; /* 0, 90, 180 or 270 degrees */
 	bool nested = false;
 	QPoint pos;
 	bool main = false;
@@ -23,7 +24,8 @@ struct Screen {
 
 	QSize logical() const {
 		const double s = std::max(scale, 1.0);
-		return QSize(qRound(px.width() / s), qRound(px.height() / s));
+		const QSize flat(qRound(px.width() / s), qRound(px.height() / s));
+		return rotation == 90 || rotation == 270 ? QSize(flat.height(), flat.width()) : flat;
 	}
 	QRect rect() const { return QRect(pos, logical()); }
 };
@@ -76,7 +78,7 @@ private:
 
 class MonitorsPanel : public ControlPanel {
 public:
-	MonitorsPanel() : ControlPanel("Monitors", 236) {
+	MonitorsPanel() : ControlPanel(_("Monitors"), 236) {
 		readOutputs();
 		build();
 		/* Hint Bubbles. */
@@ -332,14 +334,43 @@ private:
 				scales[i].value);
 			refreshSoon();
 		};
+
+		/* Rotation, of the selected screen. */
+		static const struct { int degrees; const char *label; } rotations[] = {
+			{ 0, "Normal" }, { 90, "90°" }, { 180, "180°" }, { 270, "270°" },
+		};
+
+		const int rotTop = resBottom + 12;
+		const int rotBottom = rotTop + 1 + PL_GROUP_MARGIN_TOP + 18 + PL_GROUP_MARGIN;
+		m_groups.push_back({ rotTop, rotBottom, "Rotation" });
+		m_rotation = PanelRadios();
+		const int currentRotation = selected() ? selected()->rotation : m_currentRotation;
+		for (int i = 0; i < 4; i++) {
+			m_rotation.add(rotations[i].label,
+				QPoint(M + IN + 84 * i, rotTop + 1 + PL_GROUP_MARGIN_TOP));
+			if (rotations[i].degrees == currentRotation) {
+				m_rotation.selected = i;
+			}
+		}
+		m_rotation.hint = "Rotates this screen. 90° and 270° turn it sideways, for a tablet or a "
+			"monitor on its side.";
+		m_rotation.changed = [this](int i) {
+			const Screen *d = selected();
+			const QByteArray value = QByteArray::number(rotations[i].degrees);
+			pl_setting_set(d ? ("display." + d->name.toUtf8() + ".rotation").constData() : "rotation",
+				value.constData());
+			refreshSoon();
+		};
+
 		m_radios.clear();
 		m_radios.push_back(&m_scale);
+		m_radios.push_back(&m_rotation);
 		m_notes = { "Changes take effect at once." };
 		if (m_nested) {
 			m_notes.insert(m_notes.begin(),
 				"In a window (nested), the resolution is the window's size.");
 		}
-		height = resBottom + 14 + 12 * static_cast<int>(m_notes.size());
+		height = rotBottom + 14 + 12 * static_cast<int>(m_notes.size());
 		setFixedSize(W, height);
 	}
 
@@ -590,6 +621,16 @@ private:
 					}
 				}
 			}
+			if (m_rotation.buttons.size() == 4) {
+				const int current = selected() ? selected()->rotation : m_currentRotation;
+				m_rotation.selected = 0;
+				for (int i = 0; i < 4; i++) {
+					static const int degrees[] = { 0, 90, 180, 270 };
+					if (degrees[i] == current) {
+						m_rotation.selected = i;
+					}
+				}
+			}
 			if (m_mirror) {
 				m_mirror->on = m_mirrored;
 			}
@@ -604,9 +645,9 @@ private:
 		});
 	}
 
-	/* After a scale or resolution change a screen's size changes but its
-	 * saved place doesn't, leaving gaps. Pack the screens so neighbours
-	 * still touch, in their existing order. */
+	/* After a scale, rotation or resolution change a screen's size changes
+	 * but its saved place doesn't, leaving gaps. Pack the screens so
+	 * neighbours still touch, in their existing order. */
 	void packScreens() {
 		if (m_displays.size() < 2) {
 			return;
@@ -718,6 +759,8 @@ private:
 					d.nested = w.value(6) == "1";
 					d.pos = QPoint(w.value(8).toInt(), w.value(10).toInt());
 					d.main = w.value(12) == "1";
+					/* Older status files have no rotate field: upright. */
+					d.rotation = w.value(14).toInt();
 					m_displays << d;
 				} else if (w.value(0) == "mode" && !m_displays.isEmpty()) {
 					const QList<QByteArray> wh = w.value(1).split('@').value(0).split('x');
@@ -731,6 +774,7 @@ private:
 		if (!m_displays.isEmpty()) {
 			m_size = m_displays.first().px;
 			m_currentScale = m_displays.first().scale;
+			m_currentRotation = m_displays.first().rotation;
 			m_nested = m_displays.first().nested;
 		}
 		for (Screen &d : m_displays) {
@@ -763,6 +807,7 @@ private:
 	QList<QSize> m_modes; /* with no screens published */
 	QSize m_size;
 	double m_currentScale = 1;
+	int m_currentRotation = 0;
 	bool m_nested = false;
 	bool m_mirrored = false;
 	int m_sel = 0;
@@ -774,6 +819,7 @@ private:
 	std::unique_ptr<PanelCheckbox> m_mirror, m_everyBar, m_mainDisplay;
 	PanelList m_list;
 	PanelRadios m_scale;
+	PanelRadios m_rotation;
 };
 
-PANEL("monitors", "Monitors", false, MonitorsPanel);
+PANEL("monitors", N_("Monitors"), false, MonitorsPanel);

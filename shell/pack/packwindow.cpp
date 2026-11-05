@@ -18,6 +18,7 @@
 #include "platinumshell.h"
 #include "settings.h"
 #include "toplevels.h"
+#include "tr.h"
 
 /* A floating window's thin title bar (HIG: utility windows), its small
  * boxes, and the tiles. Not measured from a Mac; TODO: measure. */
@@ -33,7 +34,7 @@ static constexpr int DROP_GAP = 6;
 PackWindow::PackWindow()
 	: m_settings(QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) +
 		"/zacos9/pack.ini", QSettings::IniFormat) {
-	setWindowTitle("Applications");
+	setWindowTitle(_("Applications"));
 	setAttribute(Qt::WA_OpaquePaintEvent);
 	setAcceptDrops(true);
 	m_look.names = m_settings.value("names", true).toBool();

@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Jigsaw Puzzle
+Name[ru]=Пазл
+Name[it]=Puzzle
 Comment=Put a picture back together
 Exec=zacos9-jigsaw
 Categories=Game;LogicGame;

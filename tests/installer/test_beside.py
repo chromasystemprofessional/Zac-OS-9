@@ -49,15 +49,17 @@ esac
         f.chmod(0o755)
     import os
     env = {"ZACOS9_INSTALL_HELPER": str(helper), "ZACOS9_FIRMWARE_EFI": directory,
-           "PATH": f"{root / 'bin'}:{os.environ['PATH']}"}
+           "PATH": f"{root / 'bin'}:{os.environ['PATH']}", "LANG": "en_US.UTF-8"}
     with Stage(compositor, [installer], env, vptr) as stage:
-        # The window's face, clicked so it has the keys; Continue (Return),
-        # then the disk (Down): Windows has things on it, so "next to what's
-        # on it" is already chosen and ZacOS planned.
+        # The window's face, clicked so it has the keys; the language screen's
+        # English (Return), Welcome's Continue (Return), then the disk (Down):
+        # Windows has things on it, so "next to what's on it" is already
+        # chosen and ZacOS planned.
         fx0, fy0, fx1, fy1 = stage.look(FACE)
-        stage.pointer("home", "move", (fx0 + fx1) // 2, (fy0 + fy1) // 2, "click", "wait", 300)
+        stage.pointer("home", "move", fx0 + 10, fy0 + 10, "click", "wait", 300)
         # (A new virtual keyboard's first key is lost: Escape, which does nothing here.)
-        stage.pointer("key", "Escape", "wait", 300, "key", "Return", "wait", 1500, "key", "Down", "wait", 1500)
+        stage.pointer("key", "Escape", "wait", 300, "key", "Return", "wait", 1500,
+                      "key", "Return", "wait", 1500, "key", "Down", "wait", 1500)
         nx0, ny0, nx1, ny1 = stage.look(NTFS)
         zx0, zy0, zx1, zy1 = stage.look(EXT4)
         assert zy0 > ny1, "ZacOS is planned after Windows"
@@ -74,6 +76,8 @@ esac
     words = args.read_text().split()
 
 print(" ".join(words))
+assert words[:2] == ["--locale", "en_US.UTF-8"], "the language screen's choice"
+words = words[2:]
 assert words[:3] == ["--beside", "/dev/sdz", "Zacintosh"] and words[3] == "HD", "the disk and its name"
 steps = words[4:]
 assert steps[0:2] == ["shrink", "/dev/sdz2"] and steps[3] == "zacos" and len(steps) == 6, \

@@ -14,6 +14,7 @@
 #include "clippings.h"
 #include "icons.h"
 #include "items.h"
+#include "tr.h"
 
 QString FindQuery::root() const {
 	switch (scope) {
@@ -73,26 +74,26 @@ bool FindQuery::ready(QString *why) const {
 		return false;
 	};
 	if (criteria.isEmpty()) {
-		return fail("Nothing to look for.");
+		return fail(tr9("Nothing to look for."));
 	}
 	for (const FindCriterion &c : criteria) {
 		if (!findOpTakesText(c.field, c.op)) {
 			continue;
 		}
 		if (c.text.trimmed().isEmpty()) {
-			return fail("Type what to look for.");
+			return fail(tr9("Type what to look for."));
 		}
 		if ((c.op == FindOp::Before || c.op == FindOp::After) && !validDate(c.text)) {
-			return fail("Type the date as year-month-day, such as 2026-10-14.");
+			return fail(tr9("Type the date as year-month-day, such as 2026-10-14."));
 		}
 		bool ok = false;
 		if ((c.op == FindOp::LargerThan || c.op == FindOp::SmallerThan) &&
 				(c.text.trimmed().toLongLong(&ok) < 0 || !ok)) {
-			return fail("Type the size as a number of K.");
+			return fail(tr9("Type the size as a number of K."));
 		}
 	}
 	if (scope == FindScope::Folder && !QFileInfo(folder).isDir()) {
-		return fail("The folder to look in isn't there any more.");
+		return fail(tr9("The folder to look in isn't there any more."));
 	}
 	return true;
 }
@@ -106,14 +107,14 @@ QString FindQuery::describe() const {
 		} else if (c.field == FindField::Label) {
 			part += " " + QString::fromUtf8(pl_labels[std::clamp(c.choice, 0, PL_LABEL_COUNT - 1)].name);
 		} else if (findOpTakesText(c.field, c.op)) {
-			part += QString(" “%1”").arg(c.text.trimmed());
+			part += tr9(" “%1”").arg(c.text.trimmed());
 			if (c.field == FindField::Size) {
 				part += " K";
 			}
 		}
 		parts << part;
 	}
-	return parts.join(" and ");
+	return parts.join(tr9(" and "));
 }
 
 QList<FindOp> findOpsFor(FindField field) {
@@ -142,43 +143,43 @@ QList<FindOp> findOpsFor(FindField field) {
 
 QString findOpName(FindOp op) {
 	switch (op) {
-	case FindOp::Contains: return "contains";
-	case FindOp::StartsWith: return "starts with";
-	case FindOp::EndsWith: return "ends with";
-	case FindOp::Is: return "is";
-	case FindOp::IsNot: return "is not";
-	case FindOp::DoesNotContain: return "doesn't contain";
-	case FindOp::Today: return "is today";
-	case FindOp::PastWeek: return "is within the past week";
-	case FindOp::PastMonth: return "is within the past month";
-	case FindOp::Before: return "is before";
-	case FindOp::After: return "is after";
-	case FindOp::LargerThan: return "is larger than";
-	case FindOp::SmallerThan: return "is smaller than";
-	case FindOp::IsLocked: return "is locked";
-	case FindOp::IsUnlocked: return "is unlocked";
-	case FindOp::IsEmpty: return "is empty";
-	case FindOp::IsShared: return "is shared";
-	case FindOp::Includes: return "include";
+	case FindOp::Contains: return tr9("contains");
+	case FindOp::StartsWith: return tr9("starts with");
+	case FindOp::EndsWith: return tr9("ends with");
+	case FindOp::Is: return tr9("is");
+	case FindOp::IsNot: return tr9("is not");
+	case FindOp::DoesNotContain: return tr9("doesn't contain");
+	case FindOp::Today: return tr9("is today");
+	case FindOp::PastWeek: return tr9("is within the past week");
+	case FindOp::PastMonth: return tr9("is within the past month");
+	case FindOp::Before: return tr9("is before");
+	case FindOp::After: return tr9("is after");
+	case FindOp::LargerThan: return tr9("is larger than");
+	case FindOp::SmallerThan: return tr9("is smaller than");
+	case FindOp::IsLocked: return tr9("is locked");
+	case FindOp::IsUnlocked: return tr9("is unlocked");
+	case FindOp::IsEmpty: return tr9("is empty");
+	case FindOp::IsShared: return tr9("is shared");
+	case FindOp::Includes: return tr9("include");
 	}
 	return {};
 }
 
 QString findFieldName(FindField field) {
 	switch (field) {
-	case FindField::Name: return "name";
-	case FindField::Contents: return "contents";
-	case FindField::Modified: return "date modified";
-	case FindField::Created: return "date created";
-	case FindField::Size: return "size";
-	case FindField::Kind: return "kind";
-	case FindField::Label: return "label";
-	case FindField::Locked: return "lock";
-	case FindField::Folder: return "folder";
-	case FindField::CustomIcon: return "custom icon";
-	case FindField::Comment: return "comments";
-	case FindField::Invisible: return "invisible";
-	case FindField::Version: return "version";
+	case FindField::Name: return tr9("name");
+	case FindField::Contents: return tr9("contents");
+	case FindField::Modified: return tr9("date modified");
+	case FindField::Created: return tr9("date created");
+	case FindField::Size: return tr9("size");
+	case FindField::Kind: return tr9("kind");
+	case FindField::Label: return tr9("label");
+	case FindField::Locked: return tr9("lock");
+	case FindField::Folder: return tr9("folder");
+	case FindField::CustomIcon: return tr9("custom icon");
+	case FindField::Comment: return tr9("comments");
+	case FindField::Invisible: return tr9("invisible");
+	case FindField::Version: return tr9("version");
 	}
 	return {};
 }
@@ -197,8 +198,9 @@ bool findOpTakesText(FindField field, FindOp op) {
 }
 
 QStringList findKindNames() {
-	return { "folder", "document", "application", "alias", "picture", "music", "movie", "text document",
-		"clipping", "Internet location", "archive", "disk image" };
+	return { tr9("folder"), tr9("document"), tr9("application"), tr9("alias"), tr9("picture"),
+		tr9("music"), tr9("movie"), tr9("text document"), tr9("clipping"),
+		tr9("Internet location"), tr9("archive"), tr9("disk image") };
 }
 
 enum Kinds { KFolder, KDocument, KApplication, KAlias, KPicture, KMusic, KMovie, KText, KClipping,
@@ -393,7 +395,7 @@ static bool readSavedFindQueries(QJsonObject *root, QString *error) {
 		return true;
 	}
 	if (!file.open(QIODevice::ReadOnly)) {
-		if (error) *error = "Could not read saved searches: " + file.errorString();
+		if (error) *error = tr9("Could not read saved searches: %1").arg(file.errorString());
 		return false;
 	}
 	QJsonParseError parse;
@@ -401,7 +403,7 @@ static bool readSavedFindQueries(QJsonObject *root, QString *error) {
 	if (parse.error != QJsonParseError::NoError || !doc.isObject() ||
 			doc.object().value("version").toInt() != 1 ||
 			!doc.object().value("searches").isArray()) {
-		if (error) *error = "Saved searches are damaged or use an unsupported format.";
+		if (error) *error = tr9("Saved searches are damaged or use an unsupported format.");
 		return false;
 	}
 	*root = doc.object();
@@ -411,17 +413,17 @@ static bool readSavedFindQueries(QJsonObject *root, QString *error) {
 static bool writeSavedFindQueries(const QJsonObject &root, QString *error) {
 	const QString path = savedFindQueriesPath();
 	if (!QDir().mkpath(QFileInfo(path).absolutePath())) {
-		if (error) *error = "Could not create the saved searches folder.";
+		if (error) *error = tr9("Could not create the saved searches folder.");
 		return false;
 	}
 	QSaveFile file(path);
 	if (!file.open(QIODevice::WriteOnly)) {
-		if (error) *error = "Could not write saved searches: " + file.errorString();
+		if (error) *error = tr9("Could not write saved searches: %1").arg(file.errorString());
 		return false;
 	}
 	const QByteArray data = QJsonDocument(root).toJson(QJsonDocument::Indented);
 	if (file.write(data) != data.size() || !file.commit()) {
-		if (error) *error = "Could not save Find searches: " + file.errorString();
+		if (error) *error = tr9("Could not save Find searches: %1").arg(file.errorString());
 		return false;
 	}
 	return true;
@@ -437,7 +439,7 @@ QStringList savedFindQueryNames(QString *error) {
 	for (const QJsonValue &value : root.value("searches").toArray()) {
 		if (!value.isObject() || !value.toObject().value("name").isString() ||
 				value.toObject().value("name").toString().isEmpty()) {
-			if (error) *error = "Saved searches are damaged or use an unsupported format.";
+			if (error) *error = tr9("Saved searches are damaged or use an unsupported format.");
 			return {};
 		}
 		names << value.toObject().value("name").toString();
@@ -451,7 +453,7 @@ bool saveFindQuery(const QString &name, const FindQuery &query, QString *error) 
 	if (error) error->clear();
 	const QString cleanName = name.trimmed();
 	if (cleanName.isEmpty() || cleanName.size() > 80 || cleanName.contains(QChar::Null)) {
-		if (error) *error = "Enter a saved-search name of 1 to 80 characters.";
+		if (error) *error = tr9("Enter a saved-search name of 1 to 80 characters.");
 		return false;
 	}
 	QString why;
@@ -488,7 +490,7 @@ bool saveFindQuery(const QString &name, const FindQuery &query, QString *error) 
 bool loadFindQuery(const QString &name, FindQuery *query, QString *error) {
 	if (error) error->clear();
 	if (!query) {
-		if (error) *error = "No query destination was provided.";
+		if (error) *error = tr9("No query destination was provided.");
 		return false;
 	}
 	QJsonObject root;
@@ -542,12 +544,12 @@ bool loadFindQuery(const QString &name, FindQuery *query, QString *error) {
 		}
 		QString why;
 		if (!loaded.ready(&why)) {
-			if (error) *error = "The saved search has invalid criteria: " + why;
+			if (error) *error = tr9("The saved search has invalid criteria: %1").arg(why);
 			return false;
 		}
 		*query = loaded;
 		return true;
 	}
-	if (error) *error = "The saved search could not be found or has invalid criteria.";
+	if (error) *error = tr9("The saved search could not be found or has invalid criteria.");
 	return false;
 }

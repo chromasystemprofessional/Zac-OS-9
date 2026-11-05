@@ -7,6 +7,7 @@
 #include "pixels.h"
 #include "platinumshell.h"
 #include "settings.h"
+#include "tr.h"
 
 static constexpr int W = 340;
 static constexpr int MARGIN = 16;
@@ -15,7 +16,8 @@ static constexpr int FIELD_X = MARGIN + 60;
 LoginDialog::LoginDialog(const QString &serverName, bool guestAllowed, bool needsShare,
 		const QString &error, const QString &what)
 	: m_error(error), m_what(what), m_needsShare(needsShare) {
-	QString title = "Connect to the " + what;
+	QString title = what == "computer" ? tr9("Connect to the computer")
+		: tr9("Connect to the file server");
 	for (int i = 0; i < title.size(); i++) { /* "Connect to the File Server" */
 		if (i == 0 || title[i - 1] == ' ') {
 			title[i] = title[i].toUpper();
@@ -28,8 +30,8 @@ LoginDialog::LoginDialog(const QString &serverName, bool guestAllowed, bool need
 	 * untested version of this got that guess wrong and clipped the
 	 * password field right under the buttons; see docs/network.md). */
 	int y = 44;
-	m_who.add("Guest", QPoint(MARGIN, y));
-	m_who.add("Registered User", QPoint(MARGIN, y + 20));
+	m_who.add(tr9("Guest"), QPoint(MARGIN, y));
+	m_who.add(tr9("Registered User"), QPoint(MARGIN, y + 20));
 	/* PanelRadios enables or disables the whole group, not one button
 	 * at a time, so Guest can't be struck out on its own when the
 	 * server doesn't offer it; Registered User is selected by default
@@ -52,9 +54,9 @@ LoginDialog::LoginDialog(const QString &serverName, bool guestAllowed, bool need
 	const int H = y + 12 + PL_BUTTON_H + MARGIN;
 	setFixedSize(W, H);
 
-	m_cancel = PanelButton("Cancel", QRect(W - MARGIN - 180, H - MARGIN - PL_BUTTON_H, 84,
+	m_cancel = PanelButton(tr9("Cancel"), QRect(W - MARGIN - 180, H - MARGIN - PL_BUTTON_H, 84,
 		PL_BUTTON_H));
-	m_connect = PanelButton("Connect", QRect(W - MARGIN - 88, H - MARGIN - PL_BUTTON_H, 88,
+	m_connect = PanelButton(tr9("Connect"), QRect(W - MARGIN - 88, H - MARGIN - PL_BUTTON_H, 88,
 		PL_BUTTON_H), true);
 	m_cancel.clicked = [this] { reject(); };
 	m_connect.clicked = [this] {
@@ -116,11 +118,11 @@ void LoginDialog::paintEvent(QPaintEvent *) {
 	Pixels px(width(), height());
 	pl_canvas *c = &px.c;
 	pl_fill(c, 0, 0, width() - 1, height() - 1, GRAY(0xD));
-	panelText(c, "Connect to the " + m_what + " as:", MARGIN, 29);
-	panelLabel(c, "Name:", FIELD_X - 8, m_name.rect.top() + 15);
-	panelLabel(c, "Password:", FIELD_X - 8, m_password.rect.top() + 15);
+	panelText(c, m_what == "computer" ? tr9("Connect to the computer as:") : tr9("Connect to the file server as:"), MARGIN, 29);
+	panelLabel(c, tr9("Name:"), FIELD_X - 8, m_name.rect.top() + 15);
+	panelLabel(c, tr9("Password:"), FIELD_X - 8, m_password.rect.top() + 15);
 	if (m_needsShare) {
-		panelLabel(c, "Share:", FIELD_X - 8, m_share.rect.top() + 15);
+		panelLabel(c, tr9("Share:"), FIELD_X - 8, m_share.rect.top() + 15);
 	}
 	if (!m_error.isEmpty()) {
 		const int y = (m_needsShare ? m_share.rect : m_password.rect).bottom() + 20;

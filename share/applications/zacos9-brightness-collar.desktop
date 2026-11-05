@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Brightness
+Name[ru]=Яркость
+Name[it]=Luminosità
 Comment=Display brightness
 Exec=zacos9-collarmodule brightness
 Categories=X-ZacOS9-CollarModule;

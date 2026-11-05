@@ -12,6 +12,7 @@
 #include "appdb.h"
 #include "pixels.h"
 #include "settings.h"
+#include "tr.h"
 
 static constexpr int W = 620, H = 400;
 static constexpr int MARGIN = 10;
@@ -42,7 +43,7 @@ static std::vector<uint32_t> installedIcon(const StoreItem &item) {
 }
 
 StoreWindow::StoreWindow() {
-	setWindowTitle("Software");
+	setWindowTitle(tr9("Software"));
 	setFixedSize(W, H);
 
 	m_categories = storeCategories();

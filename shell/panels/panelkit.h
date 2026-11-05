@@ -13,10 +13,13 @@
 #include <QRect>
 #include <QStringList>
 #include <QTimer>
+#include <QVariant>
 #include <QWidget>
 #include <functional>
 #include <memory>
 #include <vector>
+
+class QInputMethodEvent;
 
 #include "pixels.h"
 #include "widgets.h"
@@ -230,6 +233,10 @@ struct PanelEdit {
 	std::function<void()> edited;
 
 	int caret = 0, anchor = 0;
+	/* An input method's uncommitted text, drawn at the caret (underlined)
+	 * until the method commits it. Indices are UTF-16, as Qt's are. */
+	QString preedit;
+	int preeditCursor = 0;
 
 	void setText(const QString &t);
 	void selectAll();
@@ -240,13 +247,21 @@ struct PanelEdit {
 	/* Editing keys; false for keys the field doesn't use (Tab, Escape,
 	 * and Return in a one-line field). */
 	bool key(QKeyEvent *e);
+	/* What an input method commits, and where its candidate window goes. */
+	void commitText(const QString &s);
+	void setPreedit(const QString &s, int cursor);
+	void clearPreedit();
+	QRect cursorRect() const;
 
 private:
 	bool m_dragging = false;
 	QString shown() const;
+	QString displayed() const;
 	QStringList lines() const;
+	int displayIndex(int textIndex) const;
+	int textIndex(int displayIndex) const;
 	int indexAt(QPoint p) const;
-	QPoint caretPos(int index) const; /* left of the character, baseline */
+	QPoint caretPos(int displayIndex) const; /* left of the character, baseline */
 	void insert(const QString &s);
 	int m_scroll = 0; /* one-line fields: pixels scrolled left */
 	void keepCaretVisible();
@@ -279,6 +294,10 @@ public:
 	bool hostMove(QMouseEvent *e);
 	bool hostRelease(QMouseEvent *e);
 	bool hostKey(QKeyEvent *e);
+	/* The focused field's input method: preedit and commit text, and the
+	 * queries fcitx5 and IBus ask to place their windows. */
+	bool inputMethodEvent(QInputMethodEvent *e);
+	QVariant inputMethodQuery(Qt::InputMethodQuery query) const;
 
 private:
 	QWidget *m_widget;
@@ -286,6 +305,7 @@ private:
 	bool m_caretOn = true;
 	PanelEdit *m_pressedEdit = nullptr;
 	QObject *m_hints;
+	QObject *m_ime;
 };
 
 /* Hint Bubbles: answers a tooltip event on w with at(pos), shown as a

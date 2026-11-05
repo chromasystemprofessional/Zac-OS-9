@@ -9,6 +9,7 @@
 #include <QSettings>
 #include <QStandardPaths>
 #include <QTimer>
+#include "tr.h"
 
 namespace {
 
@@ -100,7 +101,7 @@ void NotepadWindow::showPage(int page) {
 }
 
 void NotepadWindow::updateTitle() {
-	setWindowTitle(QString("Notepad - Page %1 of %2").arg(m_page + 1).arg(PAGE_COUNT));
+	setWindowTitle(tr9("Notepad - Page %1 of %2").arg(m_page + 1).arg(PAGE_COUNT));
 }
 
 void NotepadWindow::closeEvent(QCloseEvent *event) {

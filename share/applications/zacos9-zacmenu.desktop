@@ -1,6 +1,9 @@
 [Desktop Entry]
 Type=Application
 Name=Zac Menu Options
+Name[ru]=Параметры меню Zac
+Name[ja]=Zacメニューオプション
+Name[it]=Opzioni menu Zac
 Comment=How many recent applications, documents and servers the Zac menu lists
 Exec=zacos9-controlpanel zacmenu
 Categories=Settings;DesktopSettings;X-ZacOS9-ControlPanel;

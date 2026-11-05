@@ -24,6 +24,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "i18n.h"
 #include "menubar.h"
 
 #define REGISTRAR_NAME "com.canonical.AppMenu.Registrar"
@@ -879,7 +880,7 @@ static bool gtk_add_menus(struct mb_menu *menus, int *n, int max) {
 	}
 	int before = *n;
 	if (gtk.app_menu && g_menu_model_get_n_items(gtk.app_menu) > 0 && *n < max) {
-		gtk_fill_menu(menus_new_menu(menus, n, "Application"), gtk.app_menu, 0, 0);
+		gtk_fill_menu(menus_new_menu(menus, n, _("Application")), gtk.app_menu, 0, 0);
 	}
 	gtk_add_top(menus, n, max, gtk.menubar, 0);
 	return *n > before;

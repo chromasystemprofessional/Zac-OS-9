@@ -1,0 +1,28 @@
+<html><head><meta charset="utf-8"><title>Quando qualcosa non funziona</title>
+<meta name="description" content="Un programma non risponde, lo schermo si blocca, il computer avvia il sistema sbagliato, un documento non viene stampato o devi segnalare un problema."></head>
+<body>
+<h1>Quando qualcosa non funziona</h1>
+<h2>Un programma non risponde</h2>
+<p>Scegli <b>menu Zac ▸ Forza chiusura</b> e il programma. Il resto di ZacOS continua.</p>
+<h2>Niente risponde</h2>
+<p>Premi <b>Control-Opzione-Backspace</b> per terminare la sessione e tornare alla finestra di accesso, poi accedi di nuovo. Tutto ciò che non è stato salvato va perso. Se anche questo non funziona, tieni premuto il pulsante di accensione finché il computer non si spegne.</p>
+<h2>Il computer avvia il sistema sbagliato</h2>
+<p>Apri <b>Pannelli di controllo ▸ Disco di avvio</b>, seleziona il sistema che vuoi e fai clic su Riavvia. Se un sistema che hai installato non è elencato, fai clic su Cerca altri sistemi.</p>
+<h2>Dischi e volumi di rete</h2>
+<ul>
+<li>Un disco collegato non appare: prova un'altra porta, poi cercalo in Dispositivi e volumi di Pedigree.</li>
+<li>Un volume di rete smette di rispondere: scegli Speciale ▸ Espelli su di esso, poi collegati di nuovo da Vicinato o Server recenti.</li>
+</ul>
+<h2>Stampa</h2>
+<ul>
+<li>Non è stata scelta una stampante: apri il <b>Selettore stampante</b> dal menu Zac e fai clic su una.</li>
+<li>Il Selettore stampante dice che il servizio di stampa (CUPS) non è in esecuzione: avvialo con <b>sudo systemctl start cups</b>, poi riprova.</li>
+<li>Un documento resta in attesa o non riesce: la sua coda dice perché, per esempio «Fermo (carta necessaria)». Metti la carta o controlla la stampante, poi fai clic su Riprendi.</li>
+<li>Un documento di un gruppo non viene stampato: il messaggio lo nomina e gli altri vengono stampati lo stesso. Il registro della sessione (sotto) contiene i dettagli.</li>
+</ul>
+<h2>Informazioni sul computer</h2>
+<p><b>Pedigree</b> (nel menu Zac, o in Cartella Sistema ▸ Informazioni sul sistema) elenca modello, processore, memoria, monitor, dischi, rete e dispositivi del computer. Il suo File ▸ Salva rapporto crea un file di testo che puoi inviare a chi ti sta aiutando.</p>
+<h2>Segnalare un problema</h2>
+<p>Annota cosa hai fatto e cosa è successo. ZacOS tiene un registro della sessione nella cartella nascosta .local/state/zacos9 della tua cartella Home (session.log); includilo, insieme al rapporto di Pedigree, nella descrizione.</p>
+<p><a href="index.html">Guida di ZacOS</a></p>
+</body></html>

@@ -16,6 +16,7 @@
 #include <QWheelEvent>
 
 #include "settings.h"
+#include "tr.h"
 #include "appdb.h"
 #include "infowindow.h"
 #include "findindex.h"
@@ -66,39 +67,39 @@ FindDialog::~FindDialog() = default;
 
 FindDialog::FindDialog(const QString &folder) : m_folder(folder) {
 	setAttribute(Qt::WA_DeleteOnClose);
-	setWindowTitle("Find");
-	m_scope.label = "Find items";
-	m_scope.items = { PopupItem("on all disks"), PopupItem("in my Home folder") };
+	setWindowTitle(tr9("Find"));
+	m_scope.label = tr9("Find items");
+	m_scope.items = { PopupItem(tr9("on all disks")), PopupItem(tr9("in my Home folder")) };
 	if (!folder.isEmpty() && QDir(folder) != QDir::home() && QDir(folder) != QDir::root()) {
-		m_scope.items.push_back(PopupItem(QString("in “%1”").arg(displayName(folder))));
+		m_scope.items.push_back(PopupItem(tr9("in “%1”").arg(displayName(folder))));
 		m_scope.selected = 2;
 	}
 	/* Sherlock's Internet channels: the same words, searched on the web. */
 	m_internetFirst = int(m_scope.items.size());
 	for (const QString &channel : webSearchChannels()) {
-		m_scope.items.push_back(PopupItem("on the Internet with " + channel));
+		m_scope.items.push_back(PopupItem(tr9("on the Internet with %1").arg(channel)));
 	}
 	m_scope.chosen = [this](int i) { m_scope.selected = i; update(); };
 	// Sized here: a button lays out its label when it's made; relayout() moves them.
-	m_more = PanelButton("More Choices", QRect(0, 0, 110, PL_BUTTON_H), false);
+	m_more = PanelButton(tr9("More Choices"), QRect(0, 0, 110, PL_BUTTON_H), false);
 	m_more.clicked = [this] {
 		addRow(FindField::Modified);
 		relayout();
 	};
-	m_fewer = PanelButton("Fewer Choices", QRect(0, 0, 110, PL_BUTTON_H), false);
+	m_fewer = PanelButton(tr9("Fewer Choices"), QRect(0, 0, 110, PL_BUTTON_H), false);
 	m_fewer.clicked = [this] {
 		if (m_rows.size() > 1) {
 			m_rows.pop_back();
 			relayout();
 		}
 	};
-	m_find = PanelButton("Find", QRect(0, 0, PL_BUTTON_MIN_W, PL_BUTTON_H), true);
+	m_find = PanelButton(tr9("Find"), QRect(0, 0, PL_BUTTON_MIN_W, PL_BUTTON_H), true);
 	m_find.clicked = [this] { find(); };
-	m_saveSearch = PanelButton("Save Search…", QRect(0, 0, 100, PL_BUTTON_H), false);
+	m_saveSearch = PanelButton(tr9("Save Search…"), QRect(0, 0, 100, PL_BUTTON_H), false);
 	m_saveSearch.clicked = [this] {
 		bool accepted = false;
-		const QString name = QInputDialog::getText(this, "Save Find Search",
-			"Name:", QLineEdit::Normal, QString(), &accepted);
+		const QString name = QInputDialog::getText(this, tr9("Save Find Search"),
+			tr9("Name:"), QLineEdit::Normal, QString(), &accepted);
 		if (!accepted) {
 			return;
 		}
@@ -111,7 +112,7 @@ FindDialog::FindDialog(const QString &folder) : m_folder(folder) {
 		m_problem.clear();
 		relayout();
 	};
-	m_savedSearches = PanelButton("Saved Searches…", QRect(0, 0, 115, PL_BUTTON_H), false);
+	m_savedSearches = PanelButton(tr9("Saved Searches…"), QRect(0, 0, 115, PL_BUTTON_H), false);
 	m_savedSearches.clicked = [this] {
 		QString why;
 		const QStringList names = savedFindQueryNames(&why);
@@ -121,7 +122,7 @@ FindDialog::FindDialog(const QString &folder) : m_folder(folder) {
 			return;
 		}
 		if (names.isEmpty()) {
-			m_problem = "No saved Find searches yet.";
+			m_problem = tr9("No saved Find searches yet.");
 			relayout();
 			return;
 		}
@@ -264,7 +265,7 @@ void FindDialog::find() {
 			}
 		}
 		if (words.isEmpty()) {
-			m_problem = "Type the words to search the Internet for.";
+			m_problem = tr9("Type the words to search the Internet for.");
 			relayout();
 			return;
 		}
@@ -289,7 +290,7 @@ void FindDialog::paintEvent(QPaintEvent *) {
 	Pixels px(W, H);
 	pl_canvas *c = &px.c;
 	pl_fill(c, 0, 0, W - 1, H - 1, FACE);
-	Text whose("whose", 80, PL_FONT_SYSTEM);
+	Text whose(tr9("whose"), 80, PL_FONT_SYSTEM);
 	pl_text(c, whose.t, m_scope.rect.right() + 8, m_scope.rect.y() + PL_POPUP_BASELINE(PL_POPUP_H), C_BLACK);
 	bool contents = false;
 	for (const auto &row : m_rows) {
@@ -297,7 +298,7 @@ void FindDialog::paintEvent(QPaintEvent *) {
 	}
 	const int notesY = ROWS_Y + int(m_rows.size()) * ROW_STEP;
 	if (contents) {
-		Text note("Contents are searched in indexed folders; File ▸ Index Selection adds one.",
+		Text note(tr9("Contents are searched in indexed folders; File ▸ Index Selection adds one."),
 			W - 2 * M, PL_FONT_VIEWS);
 		pl_text(c, note.t, M, notesY + 4, GRAY(0x5));
 	}
@@ -399,7 +400,7 @@ void FoundWindow::search(const FindQuery &query) {
 }
 
 void FoundWindow::similarTo(const QString &path) {
-	auto *w = new FoundWindow(QString("similar to “%1”").arg(displayName(path)));
+	auto *w = new FoundWindow(tr9("similar to “%1”").arg(displayName(path)));
 	foundWindows().push_back(w);
 	w->show();
 	Finder::instance().setFront(w);
@@ -536,7 +537,7 @@ void FoundWindow::finished() {
 }
 
 void FoundWindow::updateTitle() {
-	setWindowTitle(QStringLiteral("Items Found: %1").arg(m_items.size()));
+	setWindowTitle(tr9("Items Found: %1").arg(m_items.size()));
 	setToolTip(m_title);
 }
 
@@ -629,10 +630,12 @@ void FoundWindow::paintEvent(QPaintEvent *) {
 	pl_fill(c, 0, 1, W - 1, HEADER_H - 2, GRAY(0xD));
 	pl_vline(c, 0, 1, HEADER_H - 2, C_WHITE);
 	pl_hline(c, 0, W - 1, HEADER_H - 1, GRAY(0xA));
-	const QString count = QStringLiteral("%1 %2").arg(m_items.size())
-		.arg(m_items.size() == 1 ? "item" : "items");
-	Text header(m_searching ? "Searching…  " + count : !m_problem.isEmpty() && m_items.empty() ? m_problem
-		: count + " found " + m_title, W - 20, PL_FONT_VIEWS);
+	const QString count = m_items.size() == 1 ? tr9("1 item")
+		: tr9("%1 items").arg(m_items.size());
+	const QString found = m_items.size() == 1 ? tr9("1 item found %1").arg(m_title)
+		: tr9("%1 items found %2").arg(m_items.size()).arg(m_title);
+	Text header(m_searching ? tr9("Searching…  %1").arg(count)
+		: !m_problem.isEmpty() && m_items.empty() ? m_problem : found, W - 20, PL_FONT_VIEWS);
 	pl_text(c, header.t, (W - header.inkWidth()) / 2, 13, C_BLACK);
 
 	/* Column titles, drawn like a folder window's unsorted columns. */
@@ -651,9 +654,9 @@ void FoundWindow::paintEvent(QPaintEvent *) {
 			pl_text(&band, t.t, textX, 13, C_BLACK);
 		}
 	};
-	column(0, NAME_W - 1, "Name", NAME_X);
-	column(NAME_W, NAME_W + DATE_W - 1, "Date Modified", NAME_W + 6);
-	column(NAME_W + DATE_W, W - 1, "Kind", NAME_W + DATE_W + 6);
+	column(0, NAME_W - 1, tr9("Name").toUtf8().constData(), NAME_X);
+	column(NAME_W, NAME_W + DATE_W - 1, tr9("Date Modified").toUtf8().constData(), NAME_W + 6);
+	column(NAME_W + DATE_W, W - 1, tr9("Kind").toUtf8().constData(), NAME_W + DATE_W + 6);
 
 	/* Rows, clipped to the list area. */
 	const int top = listTop(), viewW = W - SB_WIDTH + 1;

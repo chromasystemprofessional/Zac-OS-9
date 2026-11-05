@@ -1,6 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=TCP/IP
+Name[it]=TCP/IP
 Comment=Network interfaces, Wi-Fi, addresses and name servers
 Exec=zacos9-tcpip
 Categories=Settings;HardwareSettings;X-ZacOS9-ControlPanel;

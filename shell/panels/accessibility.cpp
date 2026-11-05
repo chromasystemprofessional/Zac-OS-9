@@ -7,7 +7,7 @@
  * the keyboard; the panel catches up when it comes forward. */
 class AccessibilityPanel : public ControlPanel {
 public:
-	AccessibilityPanel() : ControlPanel("Accessibility", PANEL_H) {
+	AccessibilityPanel() : ControlPanel(_("Accessibility"), PANEL_H) {
 		m_groups = { { G1, G1 + ROWS(1), "Sticky Keys" }, { G2, G2 + ROWS(2), "Slow Keys" },
 			{ G3, G3 + ROWS(3), "Mouse Keys" }, { G4, G4 + ROWS(2), "Zoom" } };
 
@@ -124,4 +124,4 @@ private:
 	std::vector<Row> m_rows;
 };
 
-PANEL("accessibility", "Accessibility", false, AccessibilityPanel);
+PANEL("accessibility", N_("Accessibility"), false, AccessibilityPanel);

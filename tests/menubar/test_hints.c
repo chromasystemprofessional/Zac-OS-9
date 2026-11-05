@@ -1,13 +1,32 @@
 /* Hint Bubbles over the menu bar's menus (hints.c). */
 #include <assert.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "draw.h"
+#include "i18n.h"
 #include "menubar.h"
 
-int main(void) {
+int main(int argc, char **argv) {
 	char buf[256];
+	if (argc > 1 && strcmp(argv[1], "it") == 0) {
+		/* The labels and hints are translated together (hints.c): an
+		 * Italian label must find the Italian hint, not a NULL. */
+		zacos9_i18n_init();
+		struct mb_item item = { .label = "Sposta nel Cestino", .action = ACT_FINDER };
+		const char *hint = hint_text(&item, buf, sizeof(buf));
+		printf("%s\n", hint ? hint : "NULL");
+		return hint && strstr(hint, "Cestino") ? 0 : 1;
+	}
+	if (argc > 1 && strcmp(argv[1], "ru") == 0) {
+		/* The same pairing in Russian. */
+		zacos9_i18n_init();
+		struct mb_item item = { .label = "Переместить в Корзину", .action = ACT_FINDER };
+		const char *hint = hint_text(&item, buf, sizeof(buf));
+		printf("%s\n", hint ? hint : "NULL");
+		return hint && strstr(hint, "Корзину") ? 0 : 1;
+	}
 	struct mb_item it = { .label = "Move To Trash", .action = ACT_FINDER };
 	assert(strstr(hint_text(&it, buf, sizeof(buf)), "Trash"));
 	it.action = ACT_DBUSMENU; /* a program's own menu: no hint */

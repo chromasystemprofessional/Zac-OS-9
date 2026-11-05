@@ -25,6 +25,7 @@
 #include "panelkit.h"
 #include "pixels.h"
 #include "platinumshell.h"
+#include "tr.h"
 
 static constexpr int W = 320;
 static constexpr int MARGIN = 16;
@@ -79,10 +80,36 @@ static QString lastUserFile() {
 		"/zacos9/last-user";
 }
 
+/* The installed system's language (/etc/default/locale, or systemd's
+ * locale.conf). greetd runs the login window as _greetd, before anyone's
+ * PAM session, so it doesn't get these from pam_env itself. */
+static void systemLocale() {
+	for (const char *path : { "/etc/default/locale", "/etc/locale.conf" }) {
+		QFile f(path);
+		if (!f.open(QIODevice::ReadOnly)) {
+			continue;
+		}
+		for (const QByteArray &raw : f.readAll().split('\n')) {
+			const int eq = raw.indexOf('=');
+			if (eq <= 0) {
+				continue;
+			}
+			const QByteArray key = raw.left(eq).trimmed();
+			QByteArray value = raw.mid(eq + 1).trimmed();
+			if (!value.isEmpty() && value.front() == '"' && value.back() == '"') {
+				value = value.mid(1, value.size() - 2);
+			}
+			if (key == "LANG" || key == "LANGUAGE") {
+				qputenv(key.constData(), value);
+			}
+		}
+	}
+}
+
 class LoginWindow : public QWidget {
 public:
 	LoginWindow() : m_accounts(accounts()) {
-		setWindowTitle("Log In");
+		setWindowTitle(tr9("Log In"));
 		const QByteArray conf = qgetenv("ZACOS9_ACCOUNTS_CONF");
 		QFile welcome((conf.isEmpty() ? QString("/etc/zacos9") : QString::fromUtf8(conf)) + "/welcome");
 		if (welcome.open(QIODevice::ReadOnly)) {
@@ -113,9 +140,9 @@ public:
 		setFixedSize(W, H);
 
 		const int by = H - MARGIN - PL_BUTTON_H;
-		m_shutDown = PanelButton("Shut Down", QRect(MARGIN, by, 84, PL_BUTTON_H));
-		m_restart = PanelButton("Restart", QRect(MARGIN + 92, by, 72, PL_BUTTON_H));
-		m_logIn = PanelButton("Log In", QRect(W - MARGIN - 76, by, 76, PL_BUTTON_H), true);
+		m_shutDown = PanelButton(tr9("Shut Down"), QRect(MARGIN, by, 84, PL_BUTTON_H));
+		m_restart = PanelButton(tr9("Restart"), QRect(MARGIN + 92, by, 72, PL_BUTTON_H));
+		m_logIn = PanelButton(tr9("Log In"), QRect(W - MARGIN - 76, by, 76, PL_BUTTON_H), true);
 		m_shutDown.clicked = [this] { power(Power::ShutDown); };
 		m_restart.clicked = [this] { power(Power::Restart); };
 		m_logIn.clicked = [this] { logIn(); };
@@ -143,7 +170,7 @@ public:
 			m_list.ensureVisible(row);
 		}
 		if (m_accounts.empty()) {
-			m_error = "There are no accounts to log in to.";
+			m_error = tr9("There are no accounts to log in to.");
 		}
 		updateEnabled();
 
@@ -167,7 +194,7 @@ protected:
 		pl_canvas *c = &px.c;
 		pl_fill(c, 0, 0, width() - 1, height() - 1, GRAY(0xD));
 		/* The Users panel's welcome message, if an administrator set one. */
-		const QStringList welcome = panelWrap(m_welcome.isEmpty() ? QString("Welcome to ZacOS 9.")
+		const QStringList welcome = panelWrap(m_welcome.isEmpty() ? tr9("Welcome to ZacOS 9.")
 			: m_welcome, W - 2 * MARGIN - PICTURE - 8, PL_FONT_SYSTEM).mid(0, 3);
 		for (int i = 0; i < welcome.size(); i++) {
 			panelText(c, welcome[i], MARGIN,
@@ -181,9 +208,9 @@ protected:
 				W - MARGIN - PICTURE, PICTURE_Y);
 		}
 		m_list.paint(c, false);
-		panelLabel(c, "Password:", FIELD_X - 8, m_password.rect.top() + 15);
-		const QString status = m_greetd.busy() ? QString("Logging in…") : !m_error.isEmpty()
-			? m_error : m_safeMode ? QString("Safe mode: Startup Items will not run.") : QString();
+		panelLabel(c, tr9("Password:"), FIELD_X - 8, m_password.rect.top() + 15);
+		const QString status = m_greetd.busy() ? tr9("Logging in…") : !m_error.isEmpty()
+			? m_error : m_safeMode ? tr9("Safe mode: Startup Items will not run.") : QString();
 		if (!status.isEmpty()) {
 			panelText(c, status, MARGIN, m_password.rect.bottom() + 20, PL_FONT_VIEWS,
 				m_greetd.busy() ? C_BLACK : RGB(0x99, 0x00, 0x00), W - 2 * MARGIN);
@@ -311,8 +338,10 @@ private:
 int main(int argc, char *argv[]) {
 	/* zacos9-wm draws every frame; Qt must not add its own. */
 	qputenv("QT_WAYLAND_DISABLE_WINDOWDECORATION", "1");
+	systemLocale();
 	QApplication app(argc, argv);
-	QApplication::setApplicationName("Log In");
+	zacos9_i18n_init();
+	QApplication::setApplicationName(tr9("Log In"));
 	QGuiApplication::setDesktopFileName("zacos9-login"); /* Wayland app_id */
 	platinumShellInit();
 

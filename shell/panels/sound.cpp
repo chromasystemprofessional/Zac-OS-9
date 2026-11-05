@@ -18,7 +18,7 @@ static void setAlertSoundSetting(const QString &id) {
  * and mute, plus the independent alert volume. */
 class SoundPanel : public ControlPanel {
 public:
-	SoundPanel() : ControlPanel("Sound", PANEL_H), m_sound(this) {
+	SoundPanel() : ControlPanel(_("Sound"), PANEL_H), m_sound(this) {
 		const int g0 = 26, g1 = g0 + OUTPUT_GROUP_H + 12 + 16;
 		const int g2 = g1 + VOLUME_GROUP_H + 12 + 16 + 20;
 		const int g3 = g2 + SLIDER_GROUP_H + 12 + 16;
@@ -251,4 +251,4 @@ private:
 	static constexpr int PANEL_H = G4 + INPUT_GROUP_H + 12 + 3 * 12 + 8;
 };
 
-PANEL("sound", "Sound", false, SoundPanel);
+PANEL("sound", N_("Sound"), false, SoundPanel);

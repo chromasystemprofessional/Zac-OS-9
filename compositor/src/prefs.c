@@ -6,18 +6,20 @@
  *
  * For the Monitors panel we also publish each screen's state and modes
  * in $XDG_RUNTIME_DIR/zacos9-outputs-$WAYLAND_DISPLAY:
- *   output NAME WxH scale S nested 0|1 x X y Y main 0|1
- * (S as a decimal: 1, 1.25, 1.5, 1.75, 2, 3)
+ *   output NAME WxH scale S nested 0|1 x X y Y main 0|1 rotate R
+ * (S as a decimal: 1, 1.25, 1.5, 1.75, 2, 3; R 0, 90, 180 or 270)
  *   mode WxH@mHz
  * and, once, "mirror 0|1", then "tablet NAME" for each tablet. X and Y are the screen's place in the layout
- * (logical pixels: the size divided by the scale).
+ * (logical pixels: the size divided by the scale; W and H are the mode's,
+ * before rotation).
  *
  * Several screens: "main-display=NAME" has the menu bar and desktop icons;
- * "display.NAME.resolution=WxH", "display.NAME.scale=S" and
- * "display.NAME.x|y=N" set a screen's size, pixel size and place.
- * "resolution" and "scale" alone are the Monitors panel's setting for one
- * screen: that one when it is alone, or the main one when there are
- * several (the others keep their own, picked from their density).
+ * "display.NAME.resolution=WxH", "display.NAME.scale=S",
+ * "display.NAME.rotation=R" and "display.NAME.x|y=N" set a screen's size,
+ * pixel size, rotation and place. "resolution", "scale" and "rotation"
+ * alone are the Monitors panel's setting for one screen: that one when it
+ * is alone, or the main one when there are several (the others keep their
+ * own, picked from their density).
  * "mirror=1" puts every screen at the same place.
  */
 #define _GNU_SOURCE
@@ -110,6 +112,39 @@ static float setting_scale(struct plat_server *server, const struct wlr_output *
 	return scale <= 3 ? scale : fallback;
 }
 
+/* The Monitors panel's rotation for a screen: 0, 90, 180 or 270 degrees.
+ * "left"/"right" are accepted too, as wlroots' own names. */
+static enum wl_output_transform setting_transform(struct plat_server *server,
+		const struct wlr_output *o) {
+	char v[32];
+	if (!display_setting(server, o, "rotation", v, sizeof(v))) {
+		return WL_OUTPUT_TRANSFORM_NORMAL;
+	}
+	if (strcmp(v, "90") == 0 || strcmp(v, "left") == 0) {
+		return WL_OUTPUT_TRANSFORM_90;
+	}
+	if (strcmp(v, "180") == 0 || strcmp(v, "inverted") == 0 || strcmp(v, "upside-down") == 0) {
+		return WL_OUTPUT_TRANSFORM_180;
+	}
+	if (strcmp(v, "270") == 0 || strcmp(v, "right") == 0) {
+		return WL_OUTPUT_TRANSFORM_270;
+	}
+	return WL_OUTPUT_TRANSFORM_NORMAL;
+}
+
+static int transform_degrees(enum wl_output_transform t) {
+	switch (t) {
+	case WL_OUTPUT_TRANSFORM_90:
+		return 90;
+	case WL_OUTPUT_TRANSFORM_180:
+		return 180;
+	case WL_OUTPUT_TRANSFORM_270:
+		return 270;
+	default:
+		return 0;
+	}
+}
+
 int prefs_repeat_rate(void) {
 	const int rate = repeat_rates[setting_int("key-repeat", REPEAT_DEFAULT, 0, 6)];
 	const int delay = repeat_delays[setting_int("key-delay", DELAY_DEFAULT, 0, 5)];
@@ -174,8 +209,9 @@ void prefs_write_outputs(struct plat_server *server) {
 		struct wlr_output *o = output->wlr_output;
 		struct wlr_box box = { 0 };
 		wlr_output_layout_get_box(server->output_layout, o, &box);
-		fprintf(f, "output %s %dx%d scale %g nested %d x %d y %d main %d\n", o->name, o->width,
-			o->height, (double)o->scale, nested(o) ? 1 : 0, box.x, box.y, output == main ? 1 : 0);
+		fprintf(f, "output %s %dx%d scale %g nested %d x %d y %d main %d rotate %d\n", o->name,
+			o->width, o->height, (double)o->scale, nested(o) ? 1 : 0, box.x, box.y,
+			output == main ? 1 : 0, transform_degrees(o->transform));
 		struct wlr_output_mode *mode;
 		wl_list_for_each(mode, &o->modes, link) {
 			fprintf(f, "mode %dx%d@%d\n", mode->width, mode->height, mode->refresh);
@@ -229,6 +265,11 @@ static void apply_output(struct plat_server *server, struct plat_output *output)
 	const float scale = prefs_output_scale(server, o);
 	if (o->scale != scale) {
 		wlr_output_state_set_scale(&state, scale);
+		changed = true;
+	}
+	const enum wl_output_transform transform = setting_transform(server, o);
+	if (o->transform != transform) {
+		wlr_output_state_set_transform(&state, transform);
 		changed = true;
 	}
 	char res[32];

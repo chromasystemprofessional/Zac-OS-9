@@ -1,5 +1,7 @@
 #include "alert.h"
 
+#include "tr.h"
+
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QTimer>
@@ -15,22 +17,34 @@ static constexpr int LINE_H = 16;         /* HIG: 12-point Chicago is 16 px */
 static constexpr int BUTTON_GAP = 12;     /* HIG: between push buttons */
 static constexpr int BUTTON_TEXT_PAD = 14;
 
-/* Greedy word wrap with the system font. */
+/* The labels the alert itself supplies, in the user's language. Custom
+ * labels (a program's own verbs) are translated where they are passed. */
+static QString alertLabel(const QString &label) {
+	if (label == "OK") {
+		return tr9("OK");
+	}
+	if (label == "Cancel") {
+		return tr9("Cancel");
+	}
+	if (label == "Don't Save") {
+		return tr9("Don't Save");
+	}
+	if (label == "Save") {
+		return tr9("Save");
+	}
+	if (label == "Continue") {
+		return tr9("Continue");
+	}
+	if (label == "Quit") {
+		return tr9("Quit");
+	}
+	return label;
+}
+
+/* Greedy wrap at Unicode line breaks with the system font. */
 static std::vector<std::unique_ptr<Text>> wrap(const QString &message, int width) {
 	std::vector<std::unique_ptr<Text>> lines;
-	const QStringList words = message.split(' ', Qt::SkipEmptyParts);
-	QString line;
-	for (const QString &word : words) {
-		QString candidate = line.isEmpty() ? word : line + ' ' + word;
-		Text probe(candidate, 100000, PL_FONT_SYSTEM);
-		if (!line.isEmpty() && probe.inkWidth() > width) {
-			lines.push_back(std::make_unique<Text>(line, width, PL_FONT_SYSTEM));
-			line = word;
-		} else {
-			line = candidate;
-		}
-	}
-	if (!line.isEmpty()) {
+	for (const QString &line : wrapText(message, width, PL_FONT_SYSTEM)) {
 		lines.push_back(std::make_unique<Text>(line, width, PL_FONT_SYSTEM));
 	}
 	return lines;
@@ -51,7 +65,7 @@ Alert::Alert(const QString &message, const QString &okLabel, const QString &canc
 	auto addButton = [&](const QString &label, bool isDefault, int result) {
 		Button b;
 		b.result = result;
-		b.label = std::make_unique<Text>(label, 200, PL_FONT_SYSTEM);
+		b.label = std::make_unique<Text>(alertLabel(label), 200, PL_FONT_SYSTEM);
 		int w = std::max(PL_BUTTON_MIN_W, b.label->inkWidth() + 2 * BUTTON_TEXT_PAD);
 		b.rect = QRect(0, H - MARGIN - PL_BUTTON_H, w, PL_BUTTON_H);
 		b.isDefault = isDefault;

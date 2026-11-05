@@ -23,6 +23,7 @@
 #include <cmath>
 
 #include "alert.h"
+#include "tr.h"
 
 /* zacos9-wm's menu bar and the frame it draws around the window
  * (compositor/src/decor.h), plus a little room so the frame isn't flush with
@@ -90,7 +91,7 @@ void PictureView::paintEvent(QPaintEvent *event) {
 
 PictureWindow::PictureWindow(QWidget *parent) : QMainWindow(parent) {
 	setAttribute(Qt::WA_DeleteOnClose);
-	setWindowTitle("Picture Viewer");
+	setWindowTitle(_("Picture Viewer"));
 	m_view = new PictureView;
 	m_scroll = new QScrollArea;
 	m_scroll->setFrameShape(QFrame::NoFrame);

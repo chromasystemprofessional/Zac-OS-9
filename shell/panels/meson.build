@@ -123,6 +123,15 @@ test('internet-defaults',
   ),
 )
 
+test('panel-ime',
+  executable('test-panel-ime', '../../tests/panels/test_panelime.cpp',
+    link_with: panelkit,
+    include_directories: include_directories('../common'),
+    dependencies: [platinum_dep, qt6],
+  ),
+  env: ['QT_QPA_PLATFORM=offscreen'],
+)
+
 # The Keyboard panel's layouts, read as zacos9-wm reads them.
 xkb_layouts_sources = files('xkblayouts.cpp', '../../compositor/src/kblayout.c')
 # The Internet panel's defaults, through GIO.

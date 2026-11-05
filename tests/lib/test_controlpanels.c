@@ -67,11 +67,13 @@ int main(void) {
 	/* None of the programs installed, as in a build tree or CI: an
 	 * entry is listed whether or not its program is on $PATH. */
 	setenv("PATH", root, 1);
+	/* GKeyFile's localized Name, as the desktop entries now have. */
+	setenv("LANGUAGE", "it", 1);
 
 	entry("system", "zacos9-mouse.desktop",
 		"Name=Mouse\nExec=zacos9-controlpanel mouse\nCategories=Settings;X-ZacOS9-ControlPanel;\n");
 	entry("system", "zacos9-appearance.desktop",
-		"Name=Appearance\nExec=zacos9-appearance\nCategories=Settings;X-ZacOS9-ControlPanel;\n");
+		"Name=Appearance\nName[it]=Aspetto\nExec=zacos9-appearance\nCategories=Settings;X-ZacOS9-ControlPanel;\n");
 	entry("system", "zacos9-tcpip.desktop",
 		"Name=TCP/IP\nExec=zacos9-tcpip\nCategories=Settings;X-ZacOS9-ControlPanel;\n");
 	entry("system", "zacos9-calculator.desktop",
@@ -90,9 +92,9 @@ int main(void) {
 	size_t n = 0;
 	struct pl_control_panel *p = pl_control_panels(&n);
 	check(n == 4, "four panels: not the calculator, the NoDisplay one, or one the user hid");
-	check(n == 4 && strcmp(p[0].name, "Appearance") == 0 && strcmp(p[1].name, "Mouse") == 0 &&
+	check(n == 4 && strcmp(p[0].name, "Aspetto") == 0 && strcmp(p[1].name, "Mouse") == 0 &&
 		strcmp(p[2].name, "TCP/IP") == 0 && strcmp(p[3].name, "Writing") == 0,
-		"by name, ignoring case, the user's copy winning");
+		"by name, ignoring case, the user's copy winning, Name[it] for Italian");
 	check(n == 4 && strcmp(p[1].program, "zacos9-controlpanel") == 0 && strcmp(p[1].args, " mouse") == 0,
 		"Exec= split into the program and its argument");
 	check(n == 4 && strcmp(p[0].program, "zacos9-appearance") == 0 && strcmp(p[0].args, "") == 0,

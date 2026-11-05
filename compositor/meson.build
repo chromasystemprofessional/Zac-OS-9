@@ -179,6 +179,11 @@ test('display-scale', python3,
   args: [files('../tests/compositor/test_display_scale.py'), compositor_exe],
   timeout: 60,
 )
+# A screen's rotation is applied, and the layout uses its rotated size.
+test('display-rotation', python3,
+  args: [files('../tests/compositor/test_display_rotation.py'), compositor_exe],
+  timeout: 60,
+)
 # The card with the largest connected screen renders (onboard HDMI makes the
 # integrated GPU the boot VGA device, and wlroots renders on that).
 test('primary-gpu',

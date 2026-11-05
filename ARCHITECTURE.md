@@ -100,6 +100,7 @@ rather than reimplementing them.
 | Logging in, the session | `session/`, `shell/greeter/` | |
 | Hardware quirks | `hardware/` | [Hardware](docs/hardware.md) |
 | ZacOS Help | `share/zacos9/help/` | |
+| The interface's language (message catalogs, translations) | `po/`, `lib/i18n.c`, `shell/common/tr.h` | [Languages](docs/i18n.md) |
 | Packages, the ISO, CI | `debian/`, `packaging/`, `iso/`, `.github/` | [Packaging](docs/packaging.md) |
 
 ## The rest of the tree

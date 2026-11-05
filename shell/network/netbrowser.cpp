@@ -15,6 +15,7 @@
 
 #include "afpclient.h"
 #include "alert.h"
+#include "tr.h"
 #include "connectdialog.h"
 #include "logindialog.h"
 #include "netvolumes.h"
@@ -28,13 +29,13 @@ static constexpr int W = 400, H = 320;
 static constexpr int MARGIN = 16;
 
 NetBrowserWindow::NetBrowserWindow() {
-	setWindowTitle("Neighbourhood");
+	setWindowTitle(tr9("Neighbourhood"));
 	setFixedSize(W, H);
 	m_list.frame = QRect(MARGIN, 32, W - 2 * MARGIN, H - 32 - MARGIN - PL_BUTTON_H - 12);
 	m_list.picked = [this](int) { update(); };
 
-	m_scan = PanelButton("Scan Again", QRect(MARGIN, H - MARGIN - PL_BUTTON_H, 100, PL_BUTTON_H));
-	m_connect = PanelButton("Connect to Server…",
+	m_scan = PanelButton(tr9("Scan Again"), QRect(MARGIN, H - MARGIN - PL_BUTTON_H, 100, PL_BUTTON_H));
+	m_connect = PanelButton(tr9("Connect to Server…"),
 		QRect(W - MARGIN - 170, H - MARGIN - PL_BUTTON_H, 170, PL_BUTTON_H), true);
 	m_scan.clicked = [this] { scan(); };
 	m_connect.clicked = [this] { connectToServer(); };
@@ -49,7 +50,7 @@ NetBrowserWindow::NetBrowserWindow() {
 }
 
 void NetBrowserWindow::scan() {
-	m_status = "Looking for computers…";
+	m_status = tr9("Looking for computers…");
 	m_host.buttons = {}; /* nothing to click mid-scan */
 	update();
 	QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
@@ -69,8 +70,8 @@ void NetBrowserWindow::scan() {
 	if (!names.isEmpty()) {
 		m_list.select(0, false);
 	}
-	m_status = m_found.empty() ? "No computers were found announcing themselves. "
-		"Use Connect to Server for one that doesn’t." : QString();
+	m_status = m_found.empty() ? tr9("No computers were found announcing themselves. "
+		"Use Connect to Server for one that doesn’t.") : QString();
 	m_host.buttons = { &m_scan, &m_connect };
 	update();
 }
@@ -111,8 +112,8 @@ static void rememberServer(DiscoveredServer::Kind kind, const QString &address, 
 
 void NetBrowserWindow::connectTo(const QString &address, DiscoveredServer::Kind kind) {
 	if (isThisComputer(address, thisComputer())) {
-		Alert::ask(QString("“%1” is this computer. Its shared folders are already here: open "
-			"them in the Sniffer.").arg(address), "OK", QString());
+		Alert::ask(tr9("“%1” is this computer. Its shared folders are already here: "
+			"open them in the Sniffer.").arg(address), "OK", QString());
 		return;
 	}
 	if (kind == DiscoveredServer::SMB) {
@@ -123,7 +124,7 @@ void NetBrowserWindow::connectTo(const QString &address, DiscoveredServer::Kind 
 		QString error;
 		if (!smbMount(address, login.share, login.guest ? QString() : login.user,
 				login.guest ? QString() : login.password, &error)) {
-			Alert::ask(error.isEmpty() ? "The share could not be mounted." : error, "OK",
+			Alert::ask(error.isEmpty() ? tr9("The share could not be mounted.") : error, "OK",
 				QString());
 		} else {
 			rememberServer(kind, address, address);
@@ -144,8 +145,8 @@ void NetBrowserWindow::connectTo(const QString &address, DiscoveredServer::Kind 
 			return;
 		}
 		const bool cleartext = !login.guest && info.cleartextOnly;
-		if (cleartext && !Alert::ask(QStringLiteral("“%1” can only accept an "
-				"unencrypted password. Send it anyway?").arg(info.name), "Send", "Cancel")) {
+		if (cleartext && !Alert::ask(tr9("“%1” can only accept an unencrypted password. "
+				"Send it anyway?").arg(info.name), tr9("Send"), "Cancel")) {
 			return;
 		}
 		bool ok = false, wrong = false;
@@ -161,7 +162,7 @@ void NetBrowserWindow::connectTo(const QString &address, DiscoveredServer::Kind 
 				const QString user = login.guest ? QString() : login.user;
 				const QString mountPoint = afpMountPointFor(address, volume, user, &mounted);
 				if (mountPoint.isEmpty()) {
-					Alert::ask(QStringLiteral("“%1” can’t be connected: a different disk is "
+					Alert::ask(tr9("“%1” can’t be connected: a different disk is "
 						"already connected in its place.").arg(volume), "OK", QString());
 				} else if (!mounted && !afpMount(address, volume, mountPoint, user,
 						login.guest ? QString() : login.password, cleartext, &mountError)) {

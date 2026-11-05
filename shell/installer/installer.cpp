@@ -7,17 +7,23 @@
 #include <QDBusMessage>
 #include <QDBusMetaType>
 #include <QElapsedTimer>
+#include <QFile>
 #include <QFileInfo>
+#include <QLocale>
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QProcess>
+#include <QProcessEnvironment>
 #include <QWheelEvent>
+#include <algorithm>
+#include <numeric>
 
 #include "logo.h"
 #include "panelkit.h"
 #include "pixels.h"
 #include "settings.h"
+#include "tr.h"
 #include "udisks.h"
 
 static constexpr int W = 520, H = 440;
@@ -30,18 +36,26 @@ static constexpr int LINE_H = 14;           /* body text line height */
 /* Select: the disks, then the map of the chosen one, its words beside it. */
 static constexpr int MAP_TOP = 172, MAP_W = 190, RX = MARGIN + MAP_W + 16;
 
+/* A button wide enough for its label in the current language; longer
+ * translations must not be cut off. */
+static int buttonWidth(const QString &label, int minimum = BTN_W) {
+	return std::max(minimum, Text(label, 400, PL_FONT_SYSTEM).inkWidth() + 24);
+}
+
 /* ---- DiskEntry ------------------------------------------------------------ */
 
 QString DiskEntry::label() const {
 	/* Only the drive's make and model, as the Mac OS installer names a disk: no
 	 * size, no device name. A drive that reports none is just a disk. */
-	const QString disk = model.isEmpty() ? QStringLiteral("Hard Disk") : model;
+	const QString disk = model.isEmpty() ? tr9("Hard Disk") : model;
 	if (isDisk) {
 		return disk;
 	}
 	/* A partition prepared in Disk Setup: its name, and the disk it's on. */
-	return (partLabel.isEmpty() ? "Partition " + device.section('/', -1) : "\u201c" + partLabel + "\u201d")
-		+ " on " + disk;
+	const QString part = partLabel.isEmpty()
+		? tr9("Partition %1").arg(device.section('/', -1))
+		: tr9("\u201c%1\u201d").arg(partLabel);
+	return tr9("%1 on %2").arg(part, disk);
 }
 
 /* zacos9-install, as root through pkexec; ZACOS9_INSTALL_HELPER runs
@@ -57,16 +71,131 @@ static void startHelper(QProcess *p, const QStringList &args) {
 
 /* ---- construction -------------------------------------------------------- */
 
-InstallerWindow::InstallerWindow() {
-	setWindowTitle("ZacOS 9 Installer");
+InstallerWindow::InstallerWindow(const QString &locale) {
+	setWindowTitle(tr9("ZacOS 9 Installer"));
 	setFixedSize(W, H);
-	showWelcome();
+	if (locale.isEmpty()) {
+		showLanguage();
+	} else {
+		m_locale = locale;
+		showWelcome();
+	}
+}
+
+void InstallerWindow::showLanguage() {
+	m_screen = Screen::Language;
+	m_localeCodes.clear();
+	QStringList names;
+	QFile supported("/usr/share/i18n/SUPPORTED");
+	if (supported.open(QIODevice::ReadOnly)) {
+		for (const QByteArray &line : supported.readAll().split('\n')) {
+			const QList<QByteArray> f = line.simplified().split(' ');
+			if (f.size() != 2 || f[1] != "UTF-8" || f[0].contains('@')) {
+				continue;
+			}
+			const QString code = QString::fromLatin1(f[0]);
+			const QLocale l(code.section('.', 0, 0));
+			if (l.language() == QLocale::C) {
+				continue;
+			}
+			m_localeCodes << code;
+			names << QString("%1 (%2)").arg(l.nativeLanguageName(), l.nativeTerritoryName());
+		}
+	}
+	if (names.isEmpty()) {
+		m_localeCodes = { "en_US.UTF-8", "it_IT.UTF-8" };
+		names = { "English (United States)", "Italiano (Italia)" };
+	}
+	QList<int> order(m_localeCodes.size());
+	std::iota(order.begin(), order.end(), 0);
+	std::sort(order.begin(), order.end(), [&names](int a, int b) {
+		return names[a].compare(names[b], Qt::CaseInsensitive) < 0;
+	});
+	QStringList codes, sorted;
+	for (int i : order) {
+		codes << m_localeCodes[i];
+		sorted << names[i];
+	}
+	m_localeCodes = codes;
+	m_languageList.frame = QRect(MARGIN, 64, W - 2 * MARGIN, 10 * PL_LIST_ROW_H + 2);
+	m_languageList.setItems(sorted);
+	/* The current system language, else English: a first screen that is
+	 * readable to whoever downloaded the image. */
+	QString current = qEnvironmentVariable("LANG");
+	if (current.isEmpty()) {
+		current = "en_US.UTF-8";
+	}
+	int row = -1;
+	for (int i = 0; i < m_localeCodes.size(); i++) {
+		if (m_localeCodes[i].section('.', 0, 0) == current.section('.', 0, 0)) {
+			row = i;
+			break;
+		}
+	}
+	/* A test or a live session with LANG=C still starts on English. */
+	for (int i = 0; row < 0 && i < m_localeCodes.size(); i++) {
+		if (m_localeCodes[i] == "en_US.UTF-8") {
+			row = i;
+		}
+	}
+	for (int i = 0; row < 0 && i < m_localeCodes.size(); i++) {
+		if (m_localeCodes[i].startsWith("en_")) {
+			row = i;
+		}
+	}
+	if (row < 0) {
+		row = 0;
+	}
+	m_languageList.select(row, false);
+	m_languageList.ensureVisible(row);
+	m_locale = m_localeCodes.value(row);
+	m_languageList.picked = [this](int) {
+		m_languageError.clear();
+		update();
+	};
+	const int continueW = buttonWidth(tr9("Continue"));
+	m_languageContinue = PanelButton(tr9("Continue"),
+		QRect(BTN_R - continueW, BTN_Y, continueW, BTN_H), true);
+	update();
+}
+
+void InstallerWindow::chooseLanguage() {
+	const int row = m_languageList.state.selected;
+	if (row < 0 || row >= m_localeCodes.size()) {
+		m_languageError = tr9("Choose a language first.");
+		update();
+		return;
+	}
+	m_locale = m_localeCodes[row];
+	QString language = m_locale.section('.', 0, 0).section('_', 0, 0);
+	QString current = QString::fromUtf8(qgetenv("LANGUAGE")).section(':', 0, 0);
+	if (current.isEmpty()) {
+		current = QString::fromUtf8(qgetenv("LANG")).section('.', 0, 0).section('_', 0, 0);
+	}
+	if (language == current) {
+		showWelcome();
+		return;
+	}
+	/* The installer's words are gettext strings: restart it with LANGUAGE
+	 * set, so the Welcome screen and everything after it are translated. */
+	QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+	env.insert("LANGUAGE", language);
+	QProcess child;
+	child.setProcessEnvironment(env);
+	if (!child.startDetached(QCoreApplication::applicationFilePath(),
+			{ "--language", m_locale })) {
+		m_languageError = tr9("The installer couldn't restart in that language.");
+		update();
+		return;
+	}
+	qApp->quit();
 }
 
 void InstallerWindow::showWelcome() {
 	m_screen = Screen::Welcome;
-	m_continue = PanelButton("Continue",
-		QRect(BTN_R - BTN_W, BTN_Y, BTN_W, BTN_H), true);
+	const int continueW = buttonWidth(tr9("Continue"));
+	m_continue = PanelButton(tr9("Continue"),
+		QRect(BTN_R - continueW, BTN_Y, continueW, BTN_H), true);
 	update();
 }
 
@@ -76,10 +205,10 @@ void InstallerWindow::showSelect() {
 	m_diskList.frame = QRect(MARGIN, 52, W - 2 * MARGIN, 5 * PL_LIST_ROW_H + 2);
 	m_uefi = QFileInfo::exists(qEnvironmentVariable("ZACOS9_FIRMWARE_EFI", "/sys/firmware/efi"));
 	m_where = PanelRadios();
-	m_where.add("Erase the whole disk", QPoint(MARGIN, 144));
-	m_where.add("Next to what's on it", QPoint(MARGIN + 200, 144));
-	m_where.hint = "Erase the whole disk for ZacOS 9 alone, or keep what's on it (Windows, Haiku...) "
-		"and give ZacOS 9 room beside it.";
+	m_where.add(tr9("Erase the whole disk"), QPoint(MARGIN, 144));
+	m_where.add(tr9("Next to what's on it"), QPoint(MARGIN + 200, 144));
+	m_where.hint = tr9("Erase the whole disk for ZacOS 9 alone, or keep what's on it (Windows, Haiku...) "
+		"and give ZacOS 9 room beside it.");
 	m_where.changed = [this](int) { chooseTarget(false); };
 	m_map.frame = QRect(MARGIN, MAP_TOP, MAP_W, BTN_Y - 14 - MAP_TOP);
 	m_map.dragged = [this](int part, qulonglong at) { dragLine(part, at); };
@@ -108,9 +237,10 @@ void InstallerWindow::showSelect() {
 	if (m_diskName.text.isEmpty()) {
 		m_diskName.setText(QStringLiteral("Zacintosh HD"));
 	}
-	m_prepare = PanelButton("Prepare Disk\u2026", QRect(MARGIN, BTN_Y, 112, BTN_H));
-	m_prepare.hint = "Opens Disk Setup to partition or erase a disk first: to keep Windows beside ZacOS 9, "
-		"make a ZacOS (ext4) partition there, then choose it here.";
+	const int prepareW = buttonWidth(tr9("Prepare Disk\u2026"), 112);
+	m_prepare = PanelButton(tr9("Prepare Disk\u2026"), QRect(MARGIN, BTN_Y, prepareW, BTN_H));
+	m_prepare.hint = tr9("Opens Disk Setup to partition or erase a disk first: to keep Windows beside ZacOS 9, "
+		"make a ZacOS (ext4) partition there, then choose it here.");
 	m_prepare.clicked = [this] { prepareDisk(); };
 	m_host.edits = { &m_diskName };
 	m_host.buttons = { &m_prepare };
@@ -130,9 +260,13 @@ const DiskEntry *InstallerWindow::selectedDisk() const {
 void InstallerWindow::updateSelectButtons() {
 	const DiskEntry *d = selectedDisk();
 	const bool has = d && !d->zacosPart.isEmpty();
-	m_install = PanelButton(!has ? "Install" : d->zacosCmp == 0 ? "Reinstall" : "Update",
-		QRect(BTN_R - BTN_W, BTN_Y, BTN_W, BTN_H), true);
-	m_erase = PanelButton("Erase & Install", QRect(BTN_R - BTN_W - 12 - 112, BTN_Y, 112, BTN_H));
+	const QString installLabel = !has ? tr9("Install") : d->zacosCmp == 0 ? tr9("Reinstall")
+		: tr9("Update");
+	const int installW = buttonWidth(installLabel);
+	m_install = PanelButton(installLabel, QRect(BTN_R - installW, BTN_Y, installW, BTN_H), true);
+	const int eraseW = buttonWidth(tr9("Erase & Install"), 140);
+	m_erase = PanelButton(tr9("Erase & Install"),
+		QRect(BTN_R - installW - 12 - eraseW, BTN_Y, eraseW, BTN_H));
 	m_where.enabled = d && d->isDisk && !has;
 	update();
 }
@@ -217,7 +351,7 @@ void InstallerWindow::chooseTarget(bool chosen) {
 	}
 	if (beside()) {
 		if (m_target.block.isEmpty()) {
-			m_why = "This disk couldn't be read (UDisks isn't answering).";
+			m_why = tr9("This disk couldn't be read (UDisks isn't answering).");
 		} else {
 			/* How small each partition that can shrink can be, then the plan. */
 			for (const DiskPart &p : m_target.parts) {
@@ -306,7 +440,7 @@ void InstallerWindow::dragLine(int part, qulonglong at) {
 /* What happens to the disk, in words, beside the map. */
 QString InstallerWindow::besideText() const {
 	if (m_measure || !m_toMeasure.isEmpty()) {
-		return "Looking at what's on the disk\u2026";
+		return tr9("Looking at what's on the disk\u2026");
 	}
 	if (!m_why.isEmpty()) {
 		return m_why;
@@ -316,17 +450,17 @@ QString InstallerWindow::besideText() const {
 	if (z < 0) {
 		return QString();
 	}
-	QString text = QString("ZacOS 9 gets %1 (the new partition). Drag the line above or below it for more or "
+	QString text = tr9("ZacOS 9 gets %1 (the new partition). Drag the line above or below it for more or "
 		"less room; it needs 16 GB at least.").arg(sizeText(d.parts[z].size));
 	DiskDrive at = m_target;
 	for (const DiskOp &op : m_ops) {
 		if (op.kind == DiskOp::Resize) {
 			const DiskPart &p = at.parts[op.part];
-			text += QString(" %1 will be made smaller, %2 to %3: its files stay, but back up anything "
-				"important first.").arg(p.label.isEmpty() ? p.device.section('/', -1) : "\u201c" + p.label + "\u201d",
+			text += tr9(" %1 will be made smaller, %2 to %3: its files stay, but back up anything "
+				"important first.").arg(p.label.isEmpty() ? p.device.section('/', -1) : tr9("\u201c%1\u201d").arg(p.label),
 				sizeText(p.size), sizeText(op.size));
 		} else if (op.kind == DiskOp::Create && !op.partType.isEmpty()) {
-			text += QString(" A %1 partition is made for starting up.").arg(sizeText(op.size));
+			text += tr9(" A %1 partition is made for starting up.").arg(sizeText(op.size));
 		}
 		at = planned(at, op);
 	}
@@ -361,7 +495,8 @@ void InstallerWindow::showInstalling(const QStringList &args, bool updating) {
 	m_updating = updating;
 	m_progress = 0.0;
 	m_step = 0;
-	m_status = "Preparing...";
+	m_failed = false;
+	m_status = tr9("Preparing...");
 	update();
 
 	m_installProcess = new QProcess(this);
@@ -391,7 +526,8 @@ void InstallerWindow::showInstalling(const QStringList &args, bool updating) {
 				showDone();
 				return;
 			} else if (line.startsWith("error ")) {
-				m_status = "Error: " + line.mid(6);
+				m_status = tr9("Error: %1").arg(line.mid(6));
+				m_failed = true;
 				m_lastOutput.clear();
 			} else if (!line.isEmpty()) {
 				m_lastOutput = line;
@@ -402,8 +538,9 @@ void InstallerWindow::showInstalling(const QStringList &args, bool updating) {
 	connect(m_installProcess,
 		QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
 		this, [this](int code, QProcess::ExitStatus) {
-			if (m_screen == Screen::Installing && code != 0 && !m_status.startsWith("Error: ")) {
-				m_status = "Installation failed (exit " + QString::number(code) + ")";
+			if (m_screen == Screen::Installing && code != 0 && !m_failed) {
+				m_status = tr9("Installation failed (exit %1)").arg(code);
+				m_failed = true;
 				if (!m_lastOutput.isEmpty()) {
 					m_status += ": " + m_lastOutput;
 				}
@@ -411,13 +548,15 @@ void InstallerWindow::showInstalling(const QStringList &args, bool updating) {
 				update();
 			}
 		});
-	startHelper(m_installProcess, args);
+	startHelper(m_installProcess, m_locale.isEmpty() ? args :
+		QStringList{ "--locale", m_locale } + args);
 }
 
 void InstallerWindow::showDone() {
 	m_screen = Screen::Done;
-	m_restart = PanelButton("Restart",
-		QRect(BTN_R - BTN_W, BTN_Y, BTN_W, BTN_H), true);
+	const int restartW = buttonWidth(tr9("Restart"));
+	m_restart = PanelButton(tr9("Restart"),
+		QRect(BTN_R - restartW, BTN_Y, restartW, BTN_H), true);
 	update();
 }
 
@@ -548,27 +687,41 @@ static int bodyText(pl_canvas *c, const QString &text, int x, int y, int maxW) {
 	return y;
 }
 
+void InstallerWindow::paintLanguage(pl_canvas *c) {
+	panelText(c, tr9("Language"), MARGIN, MARGIN + 13);
+	panelText(c, tr9("Choose the language for the installed system."), MARGIN, MARGIN + 29, PL_FONT_VIEWS);
+	m_languageList.paint(c, true);
+	bodyText(c,
+		tr9("The installed system, its login window and its own programs use this language. "
+			"Debian programs get theirs from Debian's language packages."),
+		MARGIN, m_languageList.frame.bottom() + 14, W - 2 * MARGIN);
+	if (!m_languageError.isEmpty()) {
+		panelText(c, m_languageError, MARGIN, BTN_Y - 20, PL_FONT_VIEWS, RGB(0x99, 0, 0), W - 2 * MARGIN);
+	}
+	m_languageContinue.paint(c);
+}
+
 void InstallerWindow::paintWelcome(pl_canvas *c) {
 	paintLogo(c, W / 2, 68, 64);
 
 	/* Centred heading */
-	Text ttl("ZacOS 9 Installer", W, PL_FONT_SYSTEM);
+	Text ttl(tr9("ZacOS 9 Installer"), W, PL_FONT_SYSTEM);
 	const int ttl_w = ttl.t->ink_l < 0 ? 0 : ttl.t->ink_r - ttl.t->ink_l + 1;
 	pl_text(c, ttl.t, (W - ttl_w) / 2, 122, C_BLACK);
 
 	bodyText(c,
-		"This will install ZacOS 9 on a hard disk, or update the ZacOS 9 "
-		"already on one, keeping its accounts, files and settings. "
-		"ZacOS 9 can have a whole disk, or go next to what's already on one "
-		"(Windows, say). Either way, back up any files you want to keep first.",
+		tr9("This will install ZacOS 9 on a hard disk, or update the ZacOS 9 "
+			"already on one, keeping its accounts, files and settings. "
+			"ZacOS 9 can have a whole disk, or go next to what's already on one "
+			"(Windows, say). Either way, back up any files you want to keep first."),
 		MARGIN, 148, W - 2 * MARGIN);
 
 	m_continue.paint(c);
 }
 
 void InstallerWindow::paintSelect(pl_canvas *c) {
-	panelText(c, "Select a Destination", MARGIN, MARGIN + 13);
-	panelText(c, "Select the disk to install ZacOS 9 on.", MARGIN, MARGIN + 13 + 16, PL_FONT_VIEWS);
+	panelText(c, tr9("Select a Destination"), MARGIN, MARGIN + 13);
+	panelText(c, tr9("Select the disk to install ZacOS 9 on."), MARGIN, MARGIN + 13 + 16, PL_FONT_VIEWS);
 
 	m_diskList.paint(c, true);
 	const DiskEntry *d = selectedDisk();
@@ -580,21 +733,21 @@ void InstallerWindow::paintSelect(pl_canvas *c) {
 		m_map.paint(c);
 	}
 
-	panelLabel(c, "Disk name:", m_diskName.rect.left() - 8, m_diskName.rect.top() + 15);
+	panelLabel(c, tr9("Disk name:"), m_diskName.rect.left() - 8, m_diskName.rect.top() + 15);
 	m_host.paintControls(c, FACE);
 	/* What happens, beside the map. */
 	const int tw = W - MARGIN - RX;
 	const int ty = MAP_TOP + 12;
 	if (m_disks.empty()) {
-		panelText(c, "No suitable disks were found.", RX, ty);
+		panelText(c, tr9("No suitable disks were found."), RX, ty);
 	} else if (has) {
-		const QString have = "This disk has ZacOS 9 " + d->zacosVersion + " (\xe2\x80\x9c" +
-			d->zacosName + "\xe2\x80\x9d). ";
+		const QString have = tr9("This disk has ZacOS 9 %1 (\u201c%2\u201d). ")
+			.arg(d->zacosVersion, d->zacosName);
 		bodyText(c, d->zacosCmp > 0
-			? have + "That is newer than this installer's " + m_liveVersion +
-			  "; Erase & Install would erase it and everything on the disk."
-			: have + (d->zacosCmp == 0 ? "Reinstall" : "Update") +
-			  " keeps its accounts, files and settings; Erase & Install erases everything on it.",
+			? have + tr9("That is newer than this installer's %1; Erase & Install would erase it "
+				"and everything on the disk.").arg(m_liveVersion)
+			: have + tr9("%1 keeps its accounts, files and settings; Erase & Install erases "
+				"everything on it.").arg(d->zacosCmp == 0 ? tr9("Reinstall") : tr9("Update")),
 			RX, ty, tw);
 	} else if (beside()) {
 		bodyText(c, besideText(), RX, ty, tw);
@@ -603,13 +756,14 @@ void InstallerWindow::paintSelect(pl_canvas *c) {
 		QStringList lost;
 		for (const DiskPart &p : m_target.parts) {
 			if (d->isDisk || p.device == d->device) {
-				lost << (p.label.isEmpty() ? (p.efi ? QString("EFI System") : p.device.section('/', -1))
-					: "\u201c" + p.label + "\u201d");
+				lost << (p.label.isEmpty() ? (p.efi ? tr9("EFI System") : p.device.section('/', -1))
+					: tr9("\u201c%1\u201d").arg(p.label));
 			}
 		}
 		const QString what = d->isDisk ? m_diskList.items.value(m_diskList.state.selected) : d->label();
-		bodyText(c, "\xe2\x9a\xa0 " + what + " will be completely erased" +
-			(lost.isEmpty() ? QString(".") : ", with everything on " + lost.join(", ") + "."), RX, ty, tw);
+		bodyText(c, tr9("\u26a0 %1 will be completely erased").arg(what) +
+			(lost.isEmpty() ? QString(".") : tr9(", with everything on %1.").arg(lost.join(", "))),
+			RX, ty, tw);
 	}
 
 	const bool ready = !beside() || (!m_measure && m_toMeasure.isEmpty() && m_why.isEmpty() && !m_ops.isEmpty());
@@ -622,7 +776,7 @@ void InstallerWindow::paintSelect(pl_canvas *c) {
 }
 
 void InstallerWindow::paintInstalling(pl_canvas *c) {
-	panelText(c, m_updating ? "Updating ZacOS 9\xE2\x80\xA6" : "Installing ZacOS 9\xE2\x80\xA6",
+	panelText(c, m_updating ? tr9("Updating ZacOS 9\u2026") : tr9("Installing ZacOS 9\u2026"),
 		MARGIN, MARGIN + 13);
 
 	paintLogo(c, W / 2, 118, 48);
@@ -636,15 +790,15 @@ void InstallerWindow::paintInstalling(pl_canvas *c) {
 void InstallerWindow::paintDone(pl_canvas *c) {
 	paintLogo(c, W / 2, 88, 64);
 
-	Text ttl(m_updating ? "Update Complete" : "Installation Complete", W, PL_FONT_SYSTEM);
+	Text ttl(m_updating ? tr9("Update Complete") : tr9("Installation Complete"), W, PL_FONT_SYSTEM);
 	const int ttl_w = ttl.t->ink_l < 0 ? 0 : ttl.t->ink_r - ttl.t->ink_l + 1;
 	pl_text(c, ttl.t, (W - ttl_w) / 2, 146, C_BLACK);
 
 	bodyText(c, m_updating
-		? "ZacOS 9 has been updated; your accounts, files and settings are as they were. "
-		  "Remove the installer disk and click Restart."
-		: "ZacOS 9 has been installed. Remove the installer disk "
-		  "and click Restart to start your new system.",
+		? tr9("ZacOS 9 has been updated; your accounts, files and settings are as they were. "
+			"Remove the installer disk and click Restart.")
+		: tr9("ZacOS 9 has been installed. Remove the installer disk "
+			"and click Restart to start your new system."),
 		MARGIN, 166, W - 2 * MARGIN);
 	if (!m_restartError.isEmpty()) {
 		bodyText(c, m_restartError, MARGIN, BTN_Y - 36, W - 2 * MARGIN);
@@ -662,6 +816,7 @@ void InstallerWindow::paintEvent(QPaintEvent *) {
 	pl_fill(c, 0, BTN_Y - 8, W - 1, BTN_Y - 8, GRAY(0x8));
 
 	switch (m_screen) {
+	case Screen::Language:   paintLanguage(c);   break;
 	case Screen::Welcome:    paintWelcome(c);    break;
 	case Screen::Select:     paintSelect(c);     break;
 	case Screen::Installing: paintInstalling(c); break;
@@ -677,6 +832,11 @@ void InstallerWindow::paintEvent(QPaintEvent *) {
 void InstallerWindow::mousePressEvent(QMouseEvent *e) {
 	const QPoint pos = e->position().toPoint();
 	switch (m_screen) {
+	case Screen::Language:
+		m_languageList.press(pos);
+		m_languageContinue.press(pos);
+		update();
+		break;
 	case Screen::Welcome:
 		m_continue.press(pos);
 		update();
@@ -705,6 +865,9 @@ void InstallerWindow::mousePressEvent(QMouseEvent *e) {
 
 void InstallerWindow::mouseMoveEvent(QMouseEvent *e) {
 	const QPoint pos = e->position().toPoint();
+	if (m_screen == Screen::Language && m_languageList.move(pos)) {
+		update();
+	}
 	if (m_screen == Screen::Select) {
 		setCursor(m_map.onLine(pos) ? Qt::SizeVerCursor : Qt::ArrowCursor);
 	}
@@ -715,6 +878,10 @@ void InstallerWindow::mouseMoveEvent(QMouseEvent *e) {
 }
 
 void InstallerWindow::wheelEvent(QWheelEvent *e) {
+	if (m_screen == Screen::Language &&
+			m_languageList.wheel(e->position().toPoint(), e->angleDelta().y())) {
+		update();
+	}
 	if (m_screen == Screen::Select &&
 			m_diskList.wheel(e->position().toPoint(), e->angleDelta().y())) {
 		update();
@@ -727,6 +894,12 @@ void InstallerWindow::mouseReleaseEvent(QMouseEvent *e) {
 		update();
 	}
 	switch (m_screen) {
+	case Screen::Language:
+		m_languageList.release();
+		if (m_languageContinue.release(pos)) {
+			chooseLanguage();
+		}
+		break;
 	case Screen::Welcome:
 		if (m_continue.release(pos)) {
 			showSelect();
@@ -770,6 +943,14 @@ void InstallerWindow::keyPressEvent(QKeyEvent *e) {
 		return;
 	}
 	/* Return is Continue's, the default button. */
+	if (m_screen == Screen::Language) {
+		if (e->key() == Qt::Key_Return || e->key() == Qt::Key_Enter) {
+			chooseLanguage();
+		} else if (e->key() != Qt::Key_Escape && m_languageList.key(e->key(), e->text())) {
+			update();
+		}
+		return;
+	}
 	if (m_screen == Screen::Welcome && (e->key() == Qt::Key_Return || e->key() == Qt::Key_Enter)) {
 		showSelect();
 		return;

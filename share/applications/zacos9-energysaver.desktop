@@ -1,6 +1,9 @@
 [Desktop Entry]
 Type=Application
 Name=Nap Time
+Name[ru]=Экономия энергии
+Name[ja]=省エネルギー
+Name[it]=Risparmio energia
 Comment=When the display and the system go to sleep
 Exec=zacos9-controlpanel energysaver
 Categories=Settings;HardwareSettings;X-ZacOS9-ControlPanel;

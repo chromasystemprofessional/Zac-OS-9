@@ -1,4 +1,5 @@
 #include "diskinit.h"
+#include "tr.h"
 
 #include <QApplication>
 #include <QDialog>
@@ -449,7 +450,7 @@ void diskInitializationStart(std::function<void()> availabilityChanged) {
 	interface.initialized = [](const QString &device) {
 		localVolumeMountDevice(device);
 		QTimer::singleShot(1500, qApp, [device] { localVolumeMountDevice(device); });
-		Alert::ask("The disk has been initialized as FAT32 with the name you entered. It will appear on the desktop when mounted.",
+		Alert::ask(tr9("The disk has been initialized as FAT32 with the name you entered. It will appear on the desktop when mounted."),
 			"OK", QString());
 	};
 	interface.availabilityChanged = std::move(availabilityChanged);
@@ -470,7 +471,7 @@ bool diskCanEraseVolume(const QString &mountPath) {
 void diskEraseVolume(const QString &mountPath, const QString &volumeName) {
 	const QString device = localVolumeUsbDevice(mountPath);
 	if (device.isEmpty() || !diskController) {
-		Alert::ask("Select a mounted USB disk to erase. Internal and system disks cannot be erased here.",
+		Alert::ask(tr9("Select a mounted USB disk to erase. Internal and system disks cannot be erased here."),
 			"OK", QString());
 		return;
 	}

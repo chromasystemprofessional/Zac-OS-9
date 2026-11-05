@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Phone
+Name[ru]=Телефон
+Name[it]=Telefono
 Comment=Phone or tablet
 Exec=zacos9-collarmodule phone
 Categories=X-ZacOS9-CollarModule;

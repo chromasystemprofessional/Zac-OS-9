@@ -5,6 +5,7 @@
  * (docs/reference/zacos9-fonts.md). Needs no figures.
  */
 #include <assert.h>
+#include <fontconfig/fontconfig.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -39,6 +40,40 @@ static const struct sample samples[] = {
 	{ PL_FONT_VIEWS, "Name", 24, "figure 2-24" },
 	{ PL_FONT_VIEWS, "2 items, 494 MB available", 129, "figure 2-24" },
 };
+
+/* Whether any installed face claims a code point. */
+static bool font_covers(uint32_t cp) {
+	FcPattern *pat = FcPatternCreate();
+	FcConfigSubstitute(NULL, pat, FcMatchPattern);
+	FcDefaultSubstitute(pat);
+	FcResult result;
+	FcFontSet *set = FcFontSort(NULL, pat, FcFalse, NULL, &result);
+	bool found = false;
+	for (int i = 0; set && i < set->nfont && !found; i++) {
+		FcCharSet *charset = NULL;
+		if (FcPatternGetCharSet(set->fonts[i], FC_CHARSET, 0, &charset) == FcResultMatch) {
+			found = FcCharSetHasChar(charset, cp);
+		}
+	}
+	if (set) {
+		FcFontSetDestroy(set);
+	}
+	FcPatternDestroy(pat);
+	return found;
+}
+
+static bool same_mask(const struct plat_text *a, const struct plat_text *b) {
+	if (!a || !b || a->width != b->width || a->height != b->height ||
+			a->baseline != b->baseline) {
+		return false;
+	}
+	for (int y = 0; y < a->height; y++) {
+		if (memcmp(a->mask + y * a->stride, b->mask + y * b->stride, (size_t)a->width) != 0) {
+			return false;
+		}
+	}
+	return true;
+}
 
 /* The first row with ink. */
 static int ink_top(const struct plat_text *t) {
@@ -88,11 +123,29 @@ int main(void) {
 	text_destroy(up);
 	text_destroy(it);
 
-	/* A character outside the fonts still renders (fallback face). */
+	/* A character outside the fonts still renders (fallback face). A Han
+	 * character must be a real glyph, not DejaVu's .notdef box: a private-use
+	 * code point nothing covers draws that box, so the two masks must differ.
+	 * The ISO installs fonts-noto-cjk; a machine with no CJK font skips. */
 	struct plat_text *cjk = text_render_font("\xe6\x96\x87", 100, PL_FONT_VIEWS);
-	ok = cjk->ink_l >= 0;
+	ok = cjk && cjk->ink_l >= 0;
 	printf("%s  fallback glyph for U+6587\n", ok ? "ok  " : "FAIL");
 	fails += !ok;
+	if (font_covers(0x6587)) {
+		struct plat_text *box = text_render_font("\xf4\x8f\xbf\xbd", 100, PL_FONT_VIEWS);
+		ok = cjk && box && !same_mask(cjk, box) && cjk->advance >= 9;
+		printf("%s  the fallback is a CJK glyph, not .notdef\n", ok ? "ok  " : "FAIL");
+		fails += !ok;
+		struct plat_text *cjk15 = text_render_scaled(cjk, 6);
+		ok = cjk15 && cjk15->ink_l >= 0 && cjk15->height > cjk->height &&
+			cjk15->width > cjk->width;
+		printf("%s  the CJK glyph draws again at 1.5x\n", ok ? "ok  " : "FAIL");
+		fails += !ok;
+		text_destroy(cjk15);
+		text_destroy(box);
+	} else {
+		printf("skip  no CJK font installed: glyph fallback not checked\n");
+	}
 	text_destroy(cjk);
 
 	/* The fonts for 1.25x, 1.5x and 1.75x screens: a plain stem ("|") is

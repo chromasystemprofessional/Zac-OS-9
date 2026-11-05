@@ -9,6 +9,9 @@
 
 #include <QImage>
 #include <QPainter>
+#include <QStringList>
+#include <QTextBoundaryFinder>
+#include <QVector>
 #include <QWidget>
 #include <utility>
 
@@ -100,3 +103,71 @@ struct Text {
 	~Text() { text_destroy(t); }
 	int inkWidth() const { return t && t->ink_l >= 0 ? t->ink_r - t->ink_l + 1 : 0; }
 };
+
+/* Greedy wrap at Unicode line-break opportunities. Spaces are the only
+ * breaks in English, but Japanese has none: without this a paragraph is
+ * one unbreakable word. A run wider than the line (a long URL, say) is cut
+ * between characters rather than allowed to overflow. */
+inline QStringList wrapText(const QString &s, int width, pl_font font) {
+	QStringList lines;
+	if (s.isEmpty()) {
+		return lines;
+	}
+	const int n = s.size();
+	QTextBoundaryFinder finder(QTextBoundaryFinder::Line, s);
+	QVector<int> breaks;
+	breaks.append(0);
+	for (int p = finder.toNextBoundary(); p >= 0; p = finder.toNextBoundary()) {
+		if (p > 0 && p <= n) {
+			breaks.append(p);
+		}
+		if (p == n) {
+			break;
+		}
+	}
+	if (breaks.last() != n) {
+		breaks.append(n);
+	}
+	const auto fits = [&](int from, int to) {
+		return Text(s.mid(from, to - from).trimmed(), 100000, font).inkWidth() <= width;
+	};
+	int start = 0;
+	while (start < n) {
+		while (start < n && s.at(start).isSpace()) {
+			++start;
+		}
+		if (start >= n) {
+			break;
+		}
+		int best = -1;
+		for (int p : breaks) {
+			if (p <= start) {
+				continue;
+			}
+			if (!fits(start, p)) {
+				break;
+			}
+			best = p;
+		}
+		if (best < 0) {
+			int p = start;
+			while (p < n) {
+				int next = p + 1;
+				if (next < n && s.at(p).isHighSurrogate() && s.at(next).isLowSurrogate()) {
+					++next;
+				}
+				if (!fits(start, next)) {
+					break;
+				}
+				p = next;
+			}
+			best = p > start ? p : qMin(start + 1, n);
+		}
+		const QString line = s.mid(start, best - start).trimmed();
+		if (!line.isEmpty()) {
+			lines << line;
+		}
+		start = best;
+	}
+	return lines;
+}

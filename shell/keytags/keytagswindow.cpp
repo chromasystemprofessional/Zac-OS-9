@@ -12,6 +12,7 @@
 #include <QVBoxLayout>
 
 #include "xkblayouts.h"
+#include "tr.h"
 
 namespace {
 
@@ -142,7 +143,7 @@ private:
 };
 
 KeyTagsWindow::KeyTagsWindow() {
-	setWindowTitle("Key Tags");
+	setWindowTitle(_("Key Tags"));
 	auto *central = new QWidget(this);
 	auto *column = new QVBoxLayout(central);
 	column->setContentsMargins(12, 12, 12, 10);

@@ -9,7 +9,7 @@ static constexpr int SAVER_STEPS = sizeof(SAVER_MINUTES) / sizeof(SAVER_MINUTES[
  * starts zacos9-screensaver then (compositor/src/idle.c, lib/savers.c). */
 class ScreenSaverPanel : public ControlPanel {
 public:
-	ScreenSaverPanel() : ControlPanel("Screen Saver", 278) {
+	ScreenSaverPanel() : ControlPanel(_("Screen Saver"), 278) {
 		const int g1 = 26, rows = pl_saver_count() + 1;
 		const int g1h = 1 + PL_GROUP_MARGIN_TOP + 20 * rows - 8 + PL_GROUP_MARGIN;
 		const int g2 = g1 + g1h + 12;
@@ -101,4 +101,4 @@ private:
 	QTimer m_tick;
 };
 
-PANEL("screensaver", "Screen Saver", false, ScreenSaverPanel);
+PANEL("screensaver", N_("Screen Saver"), false, ScreenSaverPanel);

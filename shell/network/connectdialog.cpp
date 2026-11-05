@@ -7,20 +7,21 @@
 #include "pixels.h"
 #include "platinumshell.h"
 #include "settings.h"
+#include "tr.h"
 
 static constexpr int W = 320, H = 158;
 static constexpr int MARGIN = 16;
 
 ConnectDialog::ConnectDialog() {
-	setWindowTitle("Connect to Server");
+	setWindowTitle(tr9("Connect to Server"));
 	setFixedSize(W, H);
 	m_address.rect = QRect(MARGIN, 34, W - 2 * MARGIN, PL_EDIT_H);
-	m_kind.add("A classic Mac (AFP)", QPoint(MARGIN, 70));
-	m_kind.add("A Windows computer (SMB)", QPoint(MARGIN, 90));
+	m_kind.add(tr9("A classic Mac (AFP)"), QPoint(MARGIN, 70));
+	m_kind.add(tr9("A Windows computer (SMB)"), QPoint(MARGIN, 90));
 	m_kind.selected = 0;
-	m_cancel = PanelButton("Cancel", QRect(W - MARGIN - 180, H - MARGIN - PL_BUTTON_H, 84,
+	m_cancel = PanelButton(tr9("Cancel"), QRect(W - MARGIN - 180, H - MARGIN - PL_BUTTON_H, 84,
 		PL_BUTTON_H));
-	m_connect = PanelButton("Connect", QRect(W - MARGIN - 88, H - MARGIN - PL_BUTTON_H, 88,
+	m_connect = PanelButton(tr9("Connect"), QRect(W - MARGIN - 88, H - MARGIN - PL_BUTTON_H, 88,
 		PL_BUTTON_H), true);
 	m_cancel.clicked = [this] { reject(); };
 	m_connect.clicked = [this] {
@@ -65,7 +66,7 @@ void ConnectDialog::paintEvent(QPaintEvent *) {
 	Pixels px(W, H);
 	pl_canvas *c = &px.c;
 	pl_fill(c, 0, 0, W - 1, H - 1, GRAY(0xD));
-	panelText(c, "Server address:", MARGIN, 29);
+	panelText(c, tr9("Server address:"), MARGIN, 29);
 	m_host.paintControls(c, GRAY(0xD));
 	QPainter p(this);
 	px.blit(p);

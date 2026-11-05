@@ -14,6 +14,7 @@
 #include "panelkit.h"
 #include "platinumshell.h"
 #include "settings.h"
+#include "tr.h"
 #include "viewoptions.h"
 
 namespace {
@@ -33,15 +34,15 @@ enum class ViewKind { Icons, Buttons, List, Desktop };
 
 const Arrange KEEP_BY[] = { Arrange::Name, Arrange::Modified, Arrange::Created, Arrange::Size,
 	Arrange::Kind, Arrange::Label };
-const char *const KEEP_NAMES[] = { "by Name", "by Date Modified", "by Date Created", "by Size",
-	"by Kind", "by Label" };
+const char *const KEEP_NAMES[] = { N_("by Name"), N_("by Date Modified"), N_("by Date Created"), N_("by Size"),
+	N_("by Kind"), N_("by Label") };
 /* The optional columns, as the Mac's dialog listed them. */
 const int OPTIONAL_COLUMNS[] = { COL_MODIFIED, COL_CREATED, COL_SIZE, COL_KIND, COL_LABEL,
 	COL_COMMENTS, COL_VERSION };
 
 struct Group {
 	int top, bottom;
-	const char *title;
+	QString title;
 };
 
 /* The controls for one view's options, shared by View Options and
@@ -63,7 +64,7 @@ public:
 		const int x = x0 + IN;
 		int y = y0;
 		if (kind == ViewKind::List) {
-			m_groups.push_back({ y, y + groupH(4), "Show Columns" });
+			m_groups.push_back({ y, y + groupH(4), tr9("Show Columns") });
 			for (int i = 0; i < 7; i++) {
 				const int c = OPTIONAL_COLUMNS[i];
 				m_columns[i] = PanelCheckbox(columnInfo(c).title,
@@ -75,13 +76,13 @@ public:
 				};
 			}
 			y += groupH(4) + GAP;
-			m_groups.push_back({ y, y + groupH(2), "Options" });
-			m_relative = PanelCheckbox("Use relative date", QPoint(x, y + TOP));
+			m_groups.push_back({ y, y + groupH(2), tr9("Options") });
+			m_relative = PanelCheckbox(tr9("Use relative date"), QPoint(x, y + TOP));
 			m_relative.toggled = [this](bool on) {
 				m_options.list.relativeDate = on;
 				notify();
 			};
-			m_folderSizes = PanelCheckbox("Calculate folder sizes", QPoint(x, y + TOP + ROW));
+			m_folderSizes = PanelCheckbox(tr9("Calculate folder sizes"), QPoint(x, y + TOP + ROW));
 			m_folderSizes.toggled = [this](bool on) {
 				m_options.list.folderSizes = on;
 				notify();
@@ -91,12 +92,12 @@ public:
 			const bool keepOnly = kind == ViewKind::Buttons;
 			const int rows = keepOnly ? 1 : 3;
 			const int h = keepOnly ? TOP + PL_POPUP_H + PL_GROUP_MARGIN - 4 : groupH(rows) + 4;
-			m_groups.push_back({ y, y + h, "Icon Arrangement" });
+			m_groups.push_back({ y, y + h, tr9("Icon Arrangement") });
 			const int keepY = y + TOP + (rows - 1) * ROW;
 			if (!keepOnly) {
-				m_arrange.add("None", QPoint(x, y + TOP));
-				m_arrange.add("Always snap to grid", QPoint(x, y + TOP + ROW));
-				m_arrange.add("Keep arranged:", QPoint(x, keepY));
+				m_arrange.add(tr9("None"), QPoint(x, y + TOP));
+				m_arrange.add(tr9("Always snap to grid"), QPoint(x, y + TOP + ROW));
+				m_arrange.add(tr9("Keep arranged:"), QPoint(x, keepY));
 				m_arrange.changed = [this](int i) {
 					icons().arrangement = static_cast<IconArrangement>(i);
 					m_keepBy.enabled = i == 2;
@@ -105,7 +106,7 @@ public:
 			}
 			m_keepBy.rect = QRect(x + (keepOnly ? 104 : 124), keepY - 4, 150, PL_POPUP_H);
 			for (const char *name : KEEP_NAMES) {
-				m_keepBy.items.emplace_back(name);
+				m_keepBy.items.emplace_back(tr9(name));
 			}
 			m_keepBy.chosen = [this](int row) {
 				m_keepBy.selected = row;
@@ -115,11 +116,11 @@ public:
 			y += h + GAP;
 		}
 		if (kind != ViewKind::Desktop) {
-			m_groups.push_back({ y, y + groupH(1), "Icon Size" });
-			m_size.add("Standard", QPoint(x, y + TOP));
-			m_size.add("Small", QPoint(x + 100, y + TOP));
-			if (kind == ViewKind::List) {
-				m_size.add("Tiny", QPoint(x + 200, y + TOP));
+			m_groups.push_back({ y, y + groupH(1), tr9("Icon Size") });
+			m_size.add(tr9("Standard"), QPoint(x, y + TOP));
+			m_size.add(tr9("Small"), QPoint(x + 100, y + TOP));
+			if (kind != ViewKind::Buttons) {
+				m_size.add(tr9("Tiny"), QPoint(x + 200, y + TOP));
 			}
 			m_size.changed = [this](int i) {
 				if (m_kind == ViewKind::List) {
@@ -182,10 +183,11 @@ public:
 
 	void paint(pl_canvas *c, uint32_t bg = BG) const {
 		for (const Group &g : m_groups) {
-			panelGroup(c, m_x0, g.top, m_x1, g.bottom, g.title, bg);
+			const QByteArray title = g.title.toUtf8();
+			panelGroup(c, m_x0, g.top, m_x1, g.bottom, title.constData(), bg);
 		}
 		if (m_kind == ViewKind::Buttons) {
-			panelText(c, "Keep arranged:", m_x0 + IN, m_keepBy.rect.top() + 14);
+			panelText(c, tr9("Keep arranged:"), m_x0 + IN, m_keepBy.rect.top() + 14);
 		}
 	}
 
@@ -221,14 +223,14 @@ public:
 		m_kind = !fw ? ViewKind::Desktop :
 			fw->viewMode() == FolderWindow::ViewMode::List ? ViewKind::List :
 			fw->viewMode() == FolderWindow::ViewMode::Buttons ? ViewKind::Buttons : ViewKind::Icons;
-		m_name = fw ? fw->windowTitle() : QStringLiteral("Desktop");
-		setWindowTitle("View Options");
+		m_name = fw ? fw->windowTitle() : tr9("Desktop");
+		setWindowTitle(tr9("View Options"));
 		m_editor.layout(m_kind, 12, 48, W - 14);
 		m_editor.setOptions(fw ? fw->viewOptions() : static_cast<Desktop *>(view)->viewOptions());
 		const int h = m_editor.bottom() + 16 + PL_BUTTON_H + 14;
 		setFixedSize(W, h);
 		const int by = h - 14 - PL_BUTTON_H;
-		m_standard = PanelButton("Set to Standard Views", QRect(12, by, 170, PL_BUTTON_H));
+		m_standard = PanelButton(tr9("Set to Standard Views"), QRect(12, by, 170, PL_BUTTON_H));
 		m_standard.clicked = [this] {
 			const ViewOptions standard = standardViews();
 			ViewOptions o = m_editor.options();
@@ -242,9 +244,9 @@ public:
 			m_editor.setOptions(o);
 			update();
 		};
-		m_cancel = PanelButton("Cancel", QRect(W - 12 - 2 * 72 - 10, by, 72, PL_BUTTON_H));
+		m_cancel = PanelButton(tr9("Cancel"), QRect(W - 12 - 2 * 72 - 10, by, 72, PL_BUTTON_H));
 		m_cancel.clicked = [this] { reject(); };
-		m_ok = PanelButton("OK", QRect(W - 12 - 72, by, 72, PL_BUTTON_H), true);
+		m_ok = PanelButton(tr9("OK"), QRect(W - 12 - 72, by, 72, PL_BUTTON_H), true);
 		m_ok.clicked = [this] { accept(); };
 		m_editor.changed = [this] { update(); };
 		m_host.buttons = { &m_cancel, &m_ok };
@@ -297,9 +299,9 @@ private:
 
 /* ---- Preferences ------------------------------------------------------------------ */
 
-const char *const COLOR_NAMES[PL_PALETTE16_COUNT] = { "White", "Yellow", "Orange", "Red",
-	"Magenta", "Purple", "Blue", "Cyan", "Green", "Dark Green", "Brown", "Tan", "Light Gray",
-	"Medium Gray", "Dark Gray", "Black" };
+const char *const COLOR_NAMES[PL_PALETTE16_COUNT] = { N_("White"), N_("Yellow"), N_("Orange"), N_("Red"),
+	N_("Magenta"), N_("Purple"), N_("Blue"), N_("Cyan"), N_("Green"), N_("Dark Green"), N_("Brown"), N_("Tan"), N_("Light Gray"),
+	N_("Medium Gray"), N_("Dark Gray"), N_("Black") };
 const int SPRING_STEPS[] = { 300, 600, 900, 1200, 1500 };
 
 QImage swatch(uint32_t color, int w, int h) {
@@ -319,18 +321,18 @@ QImage swatch(uint32_t color, int w, int h) {
 class PreferencesWindow : public QWidget {
 public:
 	PreferencesWindow() {
-		setWindowTitle("Preferences");
+		setWindowTitle(tr9("Preferences"));
 		setAttribute(Qt::WA_DeleteOnClose);
 		setFixedSize(W, H);
-		for (const char *t : { "General", "Views", "Labels" }) {
-			m_tabTexts.emplace_back(t, 200, PL_FONT_SYSTEM);
+		for (const char *t : { N_("General"), N_("Views"), N_("Labels") }) {
+			m_tabTexts.emplace_back(tr9(t), 200, PL_FONT_SYSTEM);
 		}
 		for (const Text &t : m_tabTexts) {
 			m_tabs.push_back(t.t);
 		}
 
 		/* General. */
-		m_spring = PanelCheckbox("Spring-loaded folders", QPoint(X + IN, PANE + 16 + TOP));
+		m_spring = PanelCheckbox(tr9("Spring-loaded folders"), QPoint(X + IN, PANE + 16 + TOP));
 		m_spring.on = springLoadedFolders();
 		m_spring.toggled = [this](bool on) {
 			pl_setting_set("spring-loaded", on ? nullptr : "false");
@@ -345,19 +347,19 @@ public:
 				m_delay.value = i;
 			}
 		}
-		m_delay.setLabels("Short", "Long");
+		m_delay.setLabels(tr9("Short"), tr9("Long"));
 		m_delay.enabled = m_spring.on;
 		m_delay.changed = [](int i) {
 			pl_setting_set("spring-delay", i == 2 ? nullptr :
 				QByteArray::number(SPRING_STEPS[i]).constData());
 		};
 		const int gridTop = PANE + 16 + SPRING_H + GAP;
-		m_grid.add("Tight (more items)", QPoint(X + IN, gridTop + TOP));
-		m_grid.add("Wide (neater arrangement)", QPoint(X + IN, gridTop + TOP + ROW));
+		m_grid.add(tr9("Tight (more items)"), QPoint(X + IN, gridTop + TOP));
+		m_grid.add(tr9("Wide (neater arrangement)"), QPoint(X + IN, gridTop + TOP + ROW));
 		m_grid.selected = tightGrid() ? 0 : 1;
 		m_grid.changed = [](int i) { pl_setting_set("grid-spacing", i == 0 ? "tight" : nullptr); };
 		const int trashTop = gridTop + groupH(2) + 8;
-		m_warnTrash = PanelCheckbox("Warn before emptying Trash",
+		m_warnTrash = PanelCheckbox(tr9("Warn before emptying Trash"),
 			QPoint(X + IN, trashTop + TOP));
 		m_warnTrash.on = warnBeforeEmptyingTrash();
 		m_warnTrash.toggled = [this](bool warn) {
@@ -367,23 +369,23 @@ public:
 		};
 
 		const int puppyTop = trashTop + TOP + PL_CHECKBOX_SIZE + PL_GROUP_MARGIN + GAP;
-		m_puppy = PanelCheckbox("Use Puppy Mode", QPoint(X + IN, puppyTop + TOP));
+		m_puppy = PanelCheckbox(tr9("Use Puppy Mode"), QPoint(X + IN, puppyTop + TOP));
 		m_puppy.on = pl_puppy_mode();
 		m_puppy.enabled = !pl_puppy_locked(); /* set by an administrator */
-		m_puppy.hint = "Shows only the essential commands in the Sniffer's menus, for children "
-			"and people new to computers.";
+		m_puppy.hint = tr9("Shows only the essential commands in the Sniffer's menus, for children "
+			"and people new to computers.");
 		m_puppy.toggled = [](bool on) { pl_setting_set("puppy-mode", on ? "true" : nullptr); };
 		const int mediaTop = puppyTop + TOP + PL_CHECKBOX_SIZE + 4 + 12 + PL_GROUP_MARGIN + GAP;
-		m_autoplay = PanelCheckbox("Play audio CDs and video DVDs when inserted", QPoint(X + IN, mediaTop + TOP));
+		m_autoplay = PanelCheckbox(tr9("Play audio CDs and video DVDs when inserted"), QPoint(X + IN, mediaTop + TOP));
 		char autoplay[16];
 		m_autoplay.on = !(pl_setting("media-autoplay", autoplay, sizeof(autoplay)) &&
 			strcmp(autoplay, "false") == 0);
-		m_autoplay.hint = "Starts the program that plays the disc. Programs on a disc never start by themselves.";
+		m_autoplay.hint = tr9("Starts the program that plays the disc. Programs on a disc never start by themselves.");
 		m_autoplay.toggled = [](bool on) { pl_setting_set("media-autoplay", on ? nullptr : "false"); };
 
 		/* Views. */
 		m_viewFor.rect = QRect(X + 196, PANE + 14, 110, PL_POPUP_H);
-		m_viewFor.items = { PopupItem("Icon"), PopupItem("Button"), PopupItem("List") };
+		m_viewFor.items = { PopupItem(tr9("Icon")), PopupItem(tr9("Button")), PopupItem(tr9("List")) };
 		m_viewFor.chosen = [this](int row) {
 			m_viewFor.selected = row;
 			showView(row);
@@ -421,25 +423,28 @@ protected:
 		pl_fill(c, 0, 0, W - 1, H - 1, BG);
 		pl_tabs_paint(c, TABS_X, 10, W - TABS_X - 1, H - 12, m_tabs.data(), 3, m_tab);
 		if (m_tab == 0) {
-			panelGroup(c, X, PANE + 16, W - X - 2, PANE + 16 + SPRING_H, "Spring-loaded Folders", PANE_BG);
-			panelText(c, "Delay before opening:", X + IN, m_delay.pos.y() + 9, PL_FONT_SYSTEM,
+			const auto group = [&](int x0, int y0, int x1, int y1, const char *title) {
+				const QByteArray text = tr9(title).toUtf8();
+				panelGroup(c, x0, y0, x1, y1, text.constData(), PANE_BG);
+			};
+			group(X, PANE + 16, W - X - 2, PANE + 16 + SPRING_H, N_("Spring-loaded Folders"));
+			panelText(c, tr9("Delay before opening:"), X + IN, m_delay.pos.y() + 9, PL_FONT_SYSTEM,
 				m_delay.enabled ? C_BLACK : GRAY(0x8));
 			m_delay.paint(c);
 			const int gridTop = PANE + 16 + SPRING_H + GAP;
-			panelGroup(c, X, gridTop, W - X - 2, gridTop + groupH(2), "Grid Spacing", PANE_BG);
+			group(X, gridTop, W - X - 2, gridTop + groupH(2), N_("Grid Spacing"));
 			const int trashTop = gridTop + groupH(2) + 8;
-			panelGroup(c, X, trashTop, W - X - 2, trashTop + TOP + PL_CHECKBOX_SIZE +
-				PL_GROUP_MARGIN, "Trash", PANE_BG);
+			group(X, trashTop, W - X - 2, trashTop + TOP + PL_CHECKBOX_SIZE +
+				PL_GROUP_MARGIN, N_("Trash"));
 			const int puppyTop = trashTop + TOP + PL_CHECKBOX_SIZE + PL_GROUP_MARGIN + GAP;
-			panelGroup(c, X, puppyTop, W - X - 2, puppyTop + TOP + PL_CHECKBOX_SIZE + 4 + 12 +
-				PL_GROUP_MARGIN, "Puppy Mode", PANE_BG);
-			panelText(c, "Only the essential commands and features.", X + IN + 20,
+			group(X, puppyTop, W - X - 2, puppyTop + TOP + PL_CHECKBOX_SIZE + 4 + 12 +
+				PL_GROUP_MARGIN, N_("Puppy Mode"));
+			panelText(c, tr9("Only the essential commands and features."), X + IN + 20,
 				puppyTop + TOP + PL_CHECKBOX_SIZE + 14, PL_FONT_VIEWS);
 			const int mediaTop = puppyTop + TOP + PL_CHECKBOX_SIZE + 4 + 12 + PL_GROUP_MARGIN + GAP;
-			panelGroup(c, X, mediaTop, W - X - 2, mediaTop + TOP + PL_CHECKBOX_SIZE + PL_GROUP_MARGIN,
-				"Media", PANE_BG);
+			group(X, mediaTop, W - X - 2, mediaTop + TOP + PL_CHECKBOX_SIZE + PL_GROUP_MARGIN, N_("Media"));
 		} else if (m_tab == 1) {
-			panelText(c, "Standard View Options for:", X, m_viewFor.rect.top() + 14);
+			panelText(c, tr9("Standard View Options for:"), X, m_viewFor.rect.top() + 14);
 			m_views.paint(c, PANE_BG);
 		} else {
 			for (int i = 0; i < 7; i++) {
@@ -447,7 +452,7 @@ protected:
 				pl_fill(c, s.left(), s.top(), s.right(), s.bottom(), m_colors[i]);
 				pl_outline(c, s.left(), s.top(), s.right(), s.bottom(), C_BLACK);
 			}
-			panelText(c, "Click a colour to change it.", X, H - 30, PL_FONT_VIEWS, GRAY(0x5));
+			panelText(c, tr9("Click a colour to change it."), X, H - 30, PL_FONT_VIEWS, GRAY(0x5));
 		}
 		m_host.paintControls(c, PANE_BG);
 		QPainter p(this);
@@ -550,7 +555,7 @@ private:
 		std::vector<PopupItem> items;
 		int checked = -1;
 		for (int i = 0; i < PL_PALETTE16_COUNT; i++) {
-			PopupItem item(COLOR_NAMES[i]);
+			PopupItem item(tr9(COLOR_NAMES[i]));
 			item.icon = swatch(pl_palette16[i], 16, 12);
 			items.push_back(item);
 			if (pl_palette16[i] == m_colors[label]) {

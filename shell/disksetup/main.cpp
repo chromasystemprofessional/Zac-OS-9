@@ -41,6 +41,7 @@
 #include "settings.h"
 #include "udisks.h"
 #include "widgets.h"
+#include "tr.h"
 
 namespace {
 
@@ -76,7 +77,7 @@ QString errorOf(const QDBusMessage &reply) {
 class DiskSetup : public QWidget {
 public:
 	explicit DiskSetup(int tab) : m_host(this) {
-		setWindowTitle("Disk Setup");
+		setWindowTitle(_("Disk Setup"));
 		setFixedSize(W, H);
 		for (const char *t : { "First Aid", "Partition" }) {
 			m_tabTexts.emplace_back(t, 200, PL_FONT_SYSTEM);
@@ -1022,7 +1023,8 @@ int main(int argc, char *argv[]) {
 	/* zacos9-wm draws every frame; Qt must not add its own. */
 	qputenv("QT_WAYLAND_DISABLE_WINDOWDECORATION", "1");
 	QApplication app(argc, argv);
-	QApplication::setApplicationName("Disk Setup");
+	zacos9_i18n_init();
+	QApplication::setApplicationName(tr9("Disk Setup"));
 	QApplication::setDoubleClickInterval(pl_double_click_ms());
 	QGuiApplication::setDesktopFileName("zacos9-disksetup"); /* Wayland app_id */
 	platinumShellInit();

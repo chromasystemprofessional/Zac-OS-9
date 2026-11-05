@@ -4,11 +4,13 @@
 #include "notepadwindow.h"
 #include "platinumshell.h"
 #include "settings.h"
+#include "tr.h"
 
 int main(int argc, char **argv) {
 	qputenv("QT_WAYLAND_DISABLE_WINDOWDECORATION", "1");
 	QApplication app(argc, argv);
-	QApplication::setApplicationName("Notepad");
+	zacos9_i18n_init();
+	QApplication::setApplicationName(tr9("Notepad"));
 	QApplication::setDoubleClickInterval(pl_double_click_ms());
 	QGuiApplication::setDesktopFileName("zacos9-notepad");
 	QCommandLineParser parser;

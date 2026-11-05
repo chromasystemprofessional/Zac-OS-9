@@ -1,4 +1,5 @@
 #include "fileexchange.h"
+#include "tr.h"
 
 #include <QKeyEvent>
 #include <QMouseEvent>
@@ -16,7 +17,7 @@ static constexpr int OW_W = 320, OW_H = 270;
 OpenWithDialog::OpenWithDialog(const QString &kind, const QStringList &appIds,
 		const QString &current)
 	: m_kind(kind), m_ids(appIds) {
-	setWindowTitle("Open With");
+	setWindowTitle(_("Open With"));
 	setFixedSize(OW_W, OW_H);
 	m_list.frame = QRect(QPoint(13, 33), QPoint(OW_W - 14, 33 + 11 * PL_LIST_ROW_H + 1));
 	QStringList names;
@@ -104,7 +105,7 @@ static constexpr int GROUP_TOP = LIST_BOTTOM + 14, GROUP_BOTTOM = H - M - 2;
 static constexpr int LABEL_RIGHT = M + 92, VALUE_X = LABEL_RIGHT + 8;
 
 FileExchangePanel::FileExchangePanel() {
-	setWindowTitle("File Translator");
+	setWindowTitle(_("File Translator"));
 	setFixedSize(W, H);
 	m_list.frame = QRect(QPoint(M + 1, LIST_TOP), QPoint(W - M - 2, LIST_BOTTOM));
 	m_list.picked = [this](int) { showDetails(); };

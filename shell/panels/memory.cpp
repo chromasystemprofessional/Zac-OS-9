@@ -1,4 +1,5 @@
 #include "memory.h"
+#include "tr.h"
 #include "panelregistry.h"
 #include "process.h"
 #include "programs.h"
@@ -119,7 +120,7 @@ struct MemoryPanel::Parts {
 };
 
 MemoryPanel::MemoryPanel() : d(std::make_unique<Parts>(this)) {
-	setWindowTitle("Memory");
+	setWindowTitle(_("Memory"));
 	setFixedSize(W, H);
 	d->vm.add("On", QPoint(INSET, VM_Y + 24));
 	d->vm.add("Off", QPoint(INSET + 64, VM_Y + 24));
@@ -442,4 +443,4 @@ void MemoryPanel::keyPressEvent(QKeyEvent *e) {
 	update();
 }
 
-PANEL("memory", "Memory", false, MemoryPanel);
+PANEL("memory", N_("Memory"), false, MemoryPanel);

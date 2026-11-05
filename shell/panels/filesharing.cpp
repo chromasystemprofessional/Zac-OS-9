@@ -39,6 +39,7 @@
 #include "platinumshell.h"
 #include "settings.h"
 #include "sharingclient.h"
+#include "tr.h"
 
 static constexpr int W = 470, H = 420;
 static constexpr int MARGIN = 10;
@@ -160,7 +161,7 @@ struct ServerGroup {
 class FileSharingPanel : public QWidget {
 public:
 	FileSharingPanel() : m_host(this) {
-		setWindowTitle("File Sharing");
+		setWindowTitle(_("File Sharing"));
 		setFixedSize(W, H);
 		for (const char *label : { "Start/Stop", "Activity Monitor", "Users & Groups" }) {
 			m_tabLabels.push_back(std::make_unique<Text>(label, 200, PL_FONT_SYSTEM));
@@ -649,7 +650,8 @@ int main(int argc, char *argv[]) {
 	/* zacos9-wm draws every frame; Qt must not add its own. */
 	qputenv("QT_WAYLAND_DISABLE_WINDOWDECORATION", "1");
 	QApplication app(argc, argv);
-	QApplication::setApplicationName("File Sharing");
+	zacos9_i18n_init();
+	QApplication::setApplicationName(tr9("File Sharing"));
 	QApplication::setDoubleClickInterval(pl_double_click_ms());
 	QGuiApplication::setDesktopFileName("zacos9-filesharing"); /* Wayland app_id */
 	platinumShellInit();

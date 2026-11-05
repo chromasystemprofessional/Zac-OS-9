@@ -119,7 +119,7 @@ scaling only, original behaviors and timings).
   - Mouse (tracking speed, double-click speed), Keyboard (key repeat rate
     and delay), Sound (input/output selection, volume and mute through pactl,
     alert volume) and
-    Monitors (resolution, 1x/1.25x/1.5x/2x/3x pixel size) panels in
+    Monitors (resolution, rotation, 1x/1.25x/1.5x/2x/3x pixel size) panels in
     zacos9-controlpanel. zacos9-wm applies the mouse, keyboard and
     screen settings live (compositor/src/prefs.c) and publishes the
     screen's modes for the Monitors panel.

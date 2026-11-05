@@ -15,6 +15,23 @@ the same model.
 | Installing, as root | `system/installer/zacos9-install` |
 | Freeing a disk the desktop has open | `system/installer/zacos9-release-disk` |
 
+## Language
+
+The first screen lists the UTF-8 locales in `/usr/share/i18n/SUPPORTED` by
+their own names, with the current system language chosen. Continue passes the
+chosen code to `zacos9-install --locale`, which writes `LANG` and `LANGUAGE`
+to the target's `/etc/default/locale` and `/etc/locale.conf` and generates the
+locale in `/etc/locale.gen`. The login window reads those files, so a fresh
+installation logs in in the language chosen here.
+
+After Continue the installer restarts itself with `LANGUAGE` set, so its own
+words follow the catalog too: choosing Italiano makes the Welcome, Select,
+Installing and Done screens Italian. The first screen stays English, because
+it has to be readable before a language is chosen; its list shows each
+language in its own name. Debian programs need Debian's language packages
+(`task-italian-desktop`, `firefox-esr-l10n-it`, …), which are not on the
+live medium yet; the installed system can add them later.
+
 ## Where ZacOS can go
 
 When a disk is chosen in the installer:

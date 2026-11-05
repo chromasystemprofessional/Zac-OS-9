@@ -47,6 +47,7 @@
 #include "platinumshell.h"
 #include "rfb.h"
 #include "sound.h"
+#include "tr.h"
 
 using namespace screenshare;
 
@@ -512,7 +513,8 @@ private:
 int main(int argc, char *argv[]) {
 	qputenv("QT_WAYLAND_DISABLE_WINDOWDECORATION", "1");
 	QApplication app(argc, argv);
-	QApplication::setApplicationName("Screen Sharing");
+	zacos9_i18n_init();
+	QApplication::setApplicationName(tr9("Screen Sharing"));
 	QGuiApplication::setDesktopFileName("zacos9-screenshare-viewer");
 	platinumShellInit();
 	const QStringList args = app.arguments().mid(1);

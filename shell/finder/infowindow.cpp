@@ -34,6 +34,7 @@
 #include <unistd.h>
 
 #include "alert.h"
+#include "tr.h"
 #include "finder.h"
 #include "items.h"
 #include "logo.h"
@@ -99,7 +100,7 @@ static constexpr int WHO_X = 110, WHO_W = 133, WHO_LABEL_R = 104;
 static constexpr int WELL_X = 253;
 static constexpr int SEP_Y = 313, COPY_TEXT_X = 30, COPY_BASELINE = 336;
 
-static const char *const PRIVILEGES[] = { "Read & Write", "Read only", "Write only (Drop Box)", "None" };
+static const char *const PRIVILEGES[] = { N_("Read & Write"), N_("Read only"), N_("Write only (Drop Box)"), N_("None") };
 static const int PRIVILEGE_BITS[] = { 7, 5, 3, 0 };
 
 /* The privilege icons: glasses (see), a pencil (make changes), both, or
@@ -207,7 +208,7 @@ InfoWindow::InfoWindow(const QString &path, pl_icon_kind kind, const QString &na
 	setAcceptDrops(true);
 	watchThumbnails(this);
 	watchFileAssociations(this);
-	setWindowTitle(name + " Info");
+	setWindowTitle(tr9("Info for %1").arg(name));
 	if (details) {
 		m_resourceDetails = *details;
 		m_kindText = details->kind;
@@ -215,23 +216,23 @@ InfoWindow::InfoWindow(const QString &path, pl_icon_kind kind, const QString &na
 		m_size = "--";
 		m_isVolumeInfo = kind == PL_ICON_DISK && path == vfsRoot();
 		if (m_isVolumeInfo) {
-			m_kindText = "startup disk";
-			m_where = "Desktop";
+			m_kindText = tr9("startup disk");
+			m_where = tr9("Desktop");
 			m_resourceDetails.kind = m_kindText;
 			m_resourceDetails.location = m_where;
 			QStorageInfo storage(QDir::homePath());
 			storage.refresh();
 			if (storage.isValid() && storage.isReady()) {
 				m_size = storage.bytesTotal() > 0 ? finderSize(storage.bytesTotal()) :
-					QStringLiteral("Not reported");
+					tr9("Not reported");
 				m_available = storage.bytesAvailable() >= 0 ?
-					finderSize(storage.bytesAvailable()) : QStringLiteral("Not reported");
+					finderSize(storage.bytesAvailable()) : tr9("Not reported");
 			} else {
-				m_size = m_available = "Not reported";
+				m_size = m_available = tr9("Not reported");
 			}
 		}
 		m_show.rect = QRect(SHOW_X, SHOW_Y, SHOW_W, PL_POPUP_H);
-		m_show.items = { PopupItem{ "General Information" }, PopupItem{ "Sharing", false } };
+		m_show.items = { PopupItem{ tr9("General Information") }, PopupItem{ tr9("Sharing"), false } };
 		m_show.chosen = [this](int i) { showView(i); };
 		showView(0);
 		return;
@@ -240,40 +241,40 @@ InfoWindow::InfoWindow(const QString &path, pl_icon_kind kind, const QString &na
 	QFileInfo info(path);
 	m_isTrash = kind == PL_ICON_TRASH_EMPTY || kind == PL_ICON_TRASH_FULL;
 	if (m_isTrash) {
-		m_kindText = "trash";
-		m_trashWarn = PanelCheckbox("Warn before emptying", QPoint(INSIDE_X, BOX_Y1 - 26));
+		m_kindText = tr9("trash");
+		m_trashWarn = PanelCheckbox(tr9("Warn before emptying"), QPoint(INSIDE_X, BOX_Y1 - 26));
 		m_trashWarn.on = trashWarns();
 		m_trashWarn.toggled = [](bool on) { setTrashWarns(on); };
 	} else if (kind == PL_ICON_DISK) {
-		m_kindText = "disk";
+		m_kindText = tr9("disk");
 	} else if (info.isDir()) {
-		m_kindText = "folder";
+		m_kindText = tr9("folder");
 	} else {
 		static QMimeDatabase db;
 		m_kindText = db.mimeTypeForFile(info).comment();
 		if (kind == PL_ICON_APPLICATION) {
-			m_kindText = "application program";
+			m_kindText = tr9("application program");
 		}
 	}
-	m_where = m_isTrash ? QStringLiteral("Desktop") : macPath(path == "/" ? "/" : info.absolutePath());
+	m_where = m_isTrash ? tr9("Desktop") : macPath(path == "/" ? "/" : info.absolutePath());
 	if (info.isSymLink()) {
-		m_kindText = "alias";
+		m_kindText = tr9("alias");
 		const AliasResolution r = aliasResolve(path, false);
 		QString virtualTarget;
 		if (r.state == AliasState::Ok && aliasVirtualTarget(path, &virtualTarget)) {
-			m_original = vfsNode(virtualTarget) ? vfsName(virtualTarget) : QStringLiteral("(missing)");
+			m_original = vfsNode(virtualTarget) ? vfsName(virtualTarget) : tr9("(missing)");
 		} else {
 			m_original = r.state == AliasState::Ok ? r.target :
-				r.state == AliasState::Changed ? r.target + " (replaced)" :
-				r.state == AliasState::Loop ? QStringLiteral("(alias loop)") :
-				QStringLiteral("(missing)");
+				r.state == AliasState::Changed ? r.target + tr9(" (replaced)") :
+				r.state == AliasState::Loop ? tr9("(alias loop)") :
+				tr9("(missing)");
 		}
 	}
 
 	/* Show: folders can be shared; files, aliases and disks can't. */
 	const bool folder = info.isDir() && !info.isSymLink() && kind != PL_ICON_DISK && !m_isTrash;
 	m_show.rect = QRect(SHOW_X, SHOW_Y, SHOW_W, PL_POPUP_H);
-	m_show.items = { PopupItem{ "General Information" }, PopupItem{ "Sharing", folder } };
+	m_show.items = { PopupItem{ tr9("General Information") }, PopupItem{ tr9("Sharing"), folder } };
 	m_show.chosen = [this](int i) { showView(i); };
 	if (folder) {
 		loadSharing();
@@ -294,11 +295,11 @@ InfoWindow::InfoWindow(const QString &path, pl_icon_kind kind, const QString &na
 
 	if (!info.isDir()) {
 		QLocale en(QLocale::English);
-		m_size = finderSize(info.size()) + " on disk (" + en.toString(info.size()) + " bytes)";
+		m_size = tr9("%1 on disk (%2 bytes)").arg(finderSize(info.size()), en.toString(info.size()));
 		return;
 	}
 	/* Folders: add it up off the main thread. */
-	m_size = "calculating…";
+	m_size = tr9("calculating…");
 	QPointer<InfoWindow> self(this);
 	m_sizer = QThread::create([self, path] {
 		qint64 bytes = 0;
@@ -312,8 +313,9 @@ InfoWindow::InfoWindow(const QString &path, pl_icon_kind kind, const QString &na
 				bytes += it.fileInfo().size();
 			}
 		}
-		QString text = finderSize(bytes) + QStringLiteral(" on disk, for %1 %2")
-			.arg(QLocale(QLocale::English).toString(items), items == 1 ? "item" : "items");
+		QString text = items == 1
+			? tr9("%1 on disk, for 1 item").arg(finderSize(bytes))
+			: tr9("%1 on disk, for %2 items").arg(finderSize(bytes)).arg(items);
 		QMetaObject::invokeMethod(qApp, [self, text] {
 			if (self) {
 				self->m_size = text;
@@ -336,8 +338,8 @@ InfoWindow::~InfoWindow() {
  * an alert offers the File Sharing control panel instead. */
 bool InfoWindow::showView(int view) {
 	if (view == Sharing && !sharingOn()) {
-		if (Alert::ask("Folders cannot be shared until file sharing is turned on using the "
-				"File Sharing control panel. Do you want the control panel opened now?",
+		if (Alert::ask(tr9("Folders cannot be shared until file sharing is turned on using the "
+				"File Sharing control panel. Do you want the control panel opened now?"),
 				"OK", "Cancel")) {
 			platinumStartApplication("zacos9-filesharing", {});
 		}
@@ -418,7 +420,7 @@ void InfoWindow::paintHeader(pl_canvas *c) {
 	pl_group_box_paint(c, BOX_X0, BOX_Y0, BOX_X1, BOX_Y1, nullptr, FACE);
 	/* The pop-up and its label stand in the box's top line. */
 	pl_fill(c, BOX_X0 + 12, BOX_Y0, SHOW_X + SHOW_W + 1, BOX_Y0 + 1, FACE);
-	panelLabel(c, "Show:", SHOW_LABEL_R, SHOW_Y + PL_POPUP_BASELINE(PL_POPUP_H));
+	panelLabel(c, tr9("Show:"), SHOW_LABEL_R, SHOW_Y + PL_POPUP_BASELINE(PL_POPUP_H));
 }
 
 /* A label ending at LABEL_R and its value in the small font. */
@@ -429,11 +431,11 @@ static void infoRow(pl_canvas *c, int baseline, const QString &label, const QStr
 
 void InfoWindow::paintGeneral(pl_canvas *c) {
 	if (m_isResourceInfo) {
-		infoRow(c, 92, "Kind:", m_resourceDetails.kind);
-		infoRow(c, 92 + ROW_H, "Where:", m_resourceDetails.location);
+		infoRow(c, 92, tr9("Kind:"), m_resourceDetails.kind);
+		infoRow(c, 92 + ROW_H, tr9("Where:"), m_resourceDetails.location);
 		if (m_isVolumeInfo) {
-			infoRow(c, 92 + ROW_H * 2, "Size:", m_size);
-			infoRow(c, 92 + ROW_H * 3, "Available:", m_available);
+			infoRow(c, 92 + ROW_H * 2, tr9("Size:"), m_size);
+			infoRow(c, 92 + ROW_H * 3, tr9("Available:"), m_available);
 			int y = 92 + ROW_H * 4 + 8;
 			for (const QString &detail : m_resourceDetails.metadata) {
 				for (const QString &line : panelWrap(detail, BOX_X1 - VALUE_X2 - 8,
@@ -447,13 +449,13 @@ void InfoWindow::paintGeneral(pl_canvas *c) {
 			}
 			return;
 		}
-		infoRow(c, 92 + ROW_H * 2, "Source:", m_resourceDetails.sources.isEmpty()
-			? QStringLiteral("None (virtual; no physical equivalent)") : m_resourceDetails.sources);
-		infoRow(c, 92 + ROW_H * 3, "Access:", m_resourceDetails.access);
+		infoRow(c, 92 + ROW_H * 2, tr9("Source:"), m_resourceDetails.sources.isEmpty()
+			? tr9("None (virtual; no physical equivalent)") : m_resourceDetails.sources);
+		infoRow(c, 92 + ROW_H * 3, tr9("Access:"), m_resourceDetails.access);
 		int y = 92 + ROW_H * 4 + 8;
 		QStringList lines;
 		if (!m_resourceDetails.description.isEmpty()) {
-			lines << "Description: " + m_resourceDetails.description;
+			lines << tr9("Description: %1").arg(m_resourceDetails.description);
 		}
 		lines << m_resourceDetails.metadata;
 		for (const QString &detail : lines) {
@@ -469,18 +471,18 @@ void InfoWindow::paintGeneral(pl_canvas *c) {
 		return;
 	}
 	int y = 92;
-	infoRow(c, y, "Kind:", m_kindText);
-	infoRow(c, y += ROW_H, "Size:", m_size);
-	infoRow(c, y += ROW_H + 8, "Where:", m_where);
-	infoRow(c, y += ROW_H + 8, "Created:", m_created);
-	infoRow(c, y += ROW_H, "Modified:", m_modified);
+	infoRow(c, y, tr9("Kind:"), m_kindText);
+	infoRow(c, y += ROW_H, tr9("Size:"), m_size);
+	infoRow(c, y += ROW_H + 8, tr9("Where:"), m_where);
+	infoRow(c, y += ROW_H + 8, tr9("Created:"), m_created);
+	infoRow(c, y += ROW_H, tr9("Modified:"), m_modified);
 	if (!m_original.isEmpty()) {
-		infoRow(c, y += ROW_H, "Original:", m_original);
+		infoRow(c, y += ROW_H, tr9("Original:"), m_original);
 	}
 	y += 12;
 
 	/* Comments box: click to type. */
-	panelText(c, "Comments:", INSIDE_X, y + 16);
+	panelText(c, tr9("Comments:"), INSIDE_X, y + 16);
 	m_commentBox = QRect(QPoint(INSIDE_X, y + 22), QPoint(BOX_X1 - 9, BOX_Y1 - (m_isTrash ? 34 : 10)));
 	pl_fill(c, m_commentBox.left(), m_commentBox.top(), m_commentBox.right(), m_commentBox.bottom(), C_WHITE);
 	pl_outline(c, m_commentBox.left(), m_commentBox.top(), m_commentBox.right(), m_commentBox.bottom(),
@@ -593,19 +595,19 @@ void InfoWindow::loadSharing() {
 		m_privilege[k].items.clear();
 		m_privilege[k].iconWell = true;
 		for (int i = 0; i < 4; i++) {
-			PopupItem item{ PRIVILEGES[i] };
+			PopupItem item{ tr9(PRIVILEGES[i]) };
 			item.icon = privilegeIcon(i);
 			m_privilege[k].items.push_back(item);
 		}
 		m_privilege[k].chosen = [this, k](int i) { privilegeChosen(k, i); };
 	}
 
-	m_shareBox = PanelCheckbox("Share this item and its contents", QPoint(INSIDE_X, SHARE_BOX_Y));
+	m_shareBox = PanelCheckbox(tr9("Share this item and its contents"), QPoint(INSIDE_X, SHARE_BOX_Y));
 	m_shareBox.toggled = [this](bool on) {
 		m_share = on;
 		update();
 	};
-	m_copy = PanelButton("Copy", QRect(254, 324, 60, PL_BUTTON_H));
+	m_copy = PanelButton(tr9("Copy"), QRect(254, 324, 60, PL_BUTTON_H));
 	m_copy.clicked = [this] {
 		applyPrivileges(true);
 		layoutSharing();
@@ -655,31 +657,31 @@ void InfoWindow::privilegeChosen(int who, int choice) {
 
 QString InfoWindow::sharingNote() const {
 	if (!m_mine) {
-		return QString("Only %1, the owner, can change these.").arg(m_origOwner);
+		return tr9("Only %1, the owner, can change these.").arg(m_origOwner);
 	}
 	if (!m_sharedInside.isEmpty()) {
-		return QString("This folder can’t be shared, because the folder “%1” inside it is "
+		return tr9("This folder can’t be shared, because the folder “%1” inside it is "
 			"shared.").arg(m_sharedInside);
 	}
 	if ((m_share || !m_enclosingShare.isEmpty()) && !sharingOn()) {
-		return "File Sharing is off. Turn it on in the File Sharing control panel so others "
-		       "can connect.";
+		return tr9("File Sharing is off. Turn it on in the File Sharing control panel so others "
+			"can connect.");
 	}
 	if (m_share && !m_sharedAs.isEmpty()) {
-		return QString("Shared on the network as “%1”.").arg(m_sharedAs);
+		return tr9("Shared on the network as “%1”.").arg(m_sharedAs);
 	}
 	if (m_share) {
-		return "This folder will be shared when you close this window.";
+		return tr9("This folder will be shared when you close this window.");
 	}
 	return QString();
 }
 
 void InfoWindow::paintSharing(pl_canvas *c) {
-	infoRow(c, 92, "Where:", m_where);
+	infoRow(c, 92, tr9("Where:"), m_where);
 	int y = NOTE_BASELINE;
 	if (!m_enclosingShare.isEmpty()) {
 		/* Inside a shared folder: shared with it, under its own privileges. */
-		panelText(c, QString("Shared as part of “%1”.").arg(m_enclosingShare), INSIDE_X,
+		panelText(c, tr9("Shared as part of “%1”.").arg(m_enclosingShare), INSIDE_X,
 			SHARE_BOX_Y + PL_CHECKBOX_BASELINE);
 	}
 	for (const QString &line : panelWrap(sharingNote(), PRIV_X1 - INSIDE_X, PL_FONT_VIEWS)) {
@@ -689,15 +691,15 @@ void InfoWindow::paintSharing(pl_canvas *c) {
 
 	pl_group_box_paint(c, PRIV_X0, PRIV_Y0, PRIV_X1, PRIV_Y1, nullptr, FACE);
 	const uint32_t ink = m_mine ? C_BLACK : GRAY(0x8);
-	panelText(c, "Name", NAME_COL, HEAD_BASELINE, PL_FONT_VIEWS, ink);
-	panelText(c, "Privilege", PRIV_COL, HEAD_BASELINE, PL_FONT_VIEWS, ink);
+	panelText(c, tr9("Name"), NAME_COL, HEAD_BASELINE, PL_FONT_VIEWS, ink);
+	panelText(c, tr9("Privilege"), PRIV_COL, HEAD_BASELINE, PL_FONT_VIEWS, ink);
 	const int base = PL_POPUP_BASELINE(PL_POPUP_H);
-	panelLabel(c, "Owner:", WHO_LABEL_R, ROW1_Y + base, ink);
-	panelLabel(c, "User/Group:", WHO_LABEL_R, ROW1_Y + ROW_STEP + base, ink);
-	panelText(c, "Everyone", NAME_COL, ROW1_Y + 2 * ROW_STEP + base, PL_FONT_VIEWS, ink);
+	panelLabel(c, tr9("Owner:"), WHO_LABEL_R, ROW1_Y + base, ink);
+	panelLabel(c, tr9("User/Group:"), WHO_LABEL_R, ROW1_Y + ROW_STEP + base, ink);
+	panelText(c, tr9("Everyone"), NAME_COL, ROW1_Y + 2 * ROW_STEP + base, PL_FONT_VIEWS, ink);
 	pl_hline(c, PRIV_X0 + 8, PRIV_X1 - 13, SEP_Y, GRAY(0x8));
 	pl_hline(c, PRIV_X0 + 9, PRIV_X1 - 12, SEP_Y + 1, C_WHITE);
-	panelText(c, "Copy these privileges to all enclosed folders", COPY_TEXT_X, COPY_BASELINE,
+	panelText(c, tr9("Copy these privileges to all enclosed folders"), COPY_TEXT_X, COPY_BASELINE,
 		PL_FONT_VIEWS, ink);
 }
 
@@ -713,7 +715,7 @@ bool InfoWindow::applyPrivileges(bool all) {
 	QString err;
 	runSharingHelper(args, QByteArray(), &ok, &err);
 	if (!ok) {
-		Alert::ask(QString("The privileges of “%1” couldn’t be changed. %2").arg(m_name, err), "OK", "");
+		Alert::ask(tr9("The privileges of “%1” couldn’t be changed. %2").arg(m_name, err), "OK", "");
 		return false;
 	}
 	m_origOwner = m_owner;
@@ -740,8 +742,9 @@ bool InfoWindow::saveSharing() {
 		QString err;
 		runSharingHelper({ m_share ? "share" : "unshare", m_path }, QByteArray(), &ok, &err);
 		if (!ok) {
-			Alert::ask(QString("“%1” couldn’t be %2. %3")
-				.arg(m_name, m_share ? "shared" : "unshared", err), "OK", "");
+			Alert::ask(m_share
+				? tr9("“%1” couldn’t be shared. %2").arg(m_name, err)
+				: tr9("“%1” couldn’t be unshared. %2").arg(m_name, err), "OK", "");
 			return false;
 		}
 		/* Its icon changes wherever it shows. */
@@ -876,8 +879,8 @@ void InfoWindow::dropEvent(QDropEvent *e) {
 		return;
 	}
 	if (!writeCustomIconImage(m_path, image)) {
-		Alert::ask("This item's icon couldn't be changed. The file system may not "
-			"support custom icons, or the picture may be too large.", "OK", "");
+		Alert::ask(tr9("This item's icon couldn't be changed. The file system may not "
+			"support custom icons, or the picture may be too large."), "OK", "");
 	} else {
 		update();
 		Finder::instance().folderChanged(QFileInfo(m_path).absolutePath());
@@ -899,10 +902,10 @@ void InfoWindow::keyPressEvent(QKeyEvent *e) {
 		} else {
 			const QImage image = QApplication::clipboard()->image();
 			if (image.isNull()) {
-				Alert::ask("The Clipboard doesn’t contain a picture to use as an icon.", "OK", "");
+				Alert::ask(tr9("The Clipboard doesn’t contain a picture to use as an icon."), "OK", "");
 			} else if (!writeCustomIconImage(m_path, image)) {
-				Alert::ask("This item’s icon couldn’t be changed. The file system may not support "
-					"custom icons, or the picture may be too large.", "OK", "");
+				Alert::ask(tr9("This item’s icon couldn’t be changed. The file system may not support "
+					"custom icons, or the picture may be too large."), "OK", "");
 			} else {
 				update();
 				Finder::instance().folderChanged(QFileInfo(m_path).absolutePath());
@@ -912,7 +915,7 @@ void InfoWindow::keyPressEvent(QKeyEvent *e) {
 	}
 	if (m_iconFocused && (e->key() == Qt::Key_Backspace || e->key() == Qt::Key_Delete)) {
 		if (!clearCustomIconImage(m_path)) {
-			Alert::ask("This item’s custom icon couldn’t be removed.", "OK", "");
+			Alert::ask(tr9("This item’s custom icon couldn’t be removed."), "OK", "");
 		} else {
 			update();
 			Finder::instance().folderChanged(QFileInfo(m_path).absolutePath());
@@ -992,19 +995,19 @@ static QString memorySize(qint64 kb) {
 
 AboutWindow::AboutWindow() {
 	setAttribute(Qt::WA_DeleteOnClose);
-	setWindowTitle("About This Computer");
+	setWindowTitle(tr9("About This Computer"));
 	const QString cpu = cpuName();
 	const QString gpu = gpuDescription();
 	const QString version = systemInformation().value(0).section(": ", 1);
 	m_version = version.isEmpty() || version.startsWith("not reported", Qt::CaseInsensitive) ?
-		"System version not reported" : "Version " + version;
-	m_lines << "Processor:\t" + (cpu.isEmpty() ? QStringLiteral("Not reported") : cpu)
-		<< "Graphics:\t" + (gpu.isEmpty() ? QStringLiteral("Not reported") : gpu);
+		tr9("System version not reported") : tr9("Version %1").arg(version);
+	m_lines << tr9("Processor:") + "\t" + (cpu.isEmpty() ? tr9("Not reported") : cpu)
+		<< tr9("Graphics:") + "\t" + (gpu.isEmpty() ? tr9("Not reported") : gpu);
 	const qint64 swap = meminfoKB("SwapTotal");
-	m_lines << "Memory:\t" + memorySize(meminfoKB("MemTotal"))
-		<< "Virtual Memory:\t" + (swap > 0 ?
-			memorySize(swap) + " allocated on disk" : QStringLiteral("None configured"))
-		<< "Available Memory:\t" + memorySize(meminfoKB("MemAvailable"));
+	m_lines << tr9("Memory:") + "\t" + memorySize(meminfoKB("MemTotal"))
+		<< tr9("Virtual Memory:") + "\t" + (swap > 0 ?
+			tr9("%1 allocated on disk").arg(memorySize(swap)) : tr9("None configured"))
+		<< tr9("Available Memory:") + "\t" + memorySize(meminfoKB("MemAvailable"));
 	setFixedSize(620, 120 + m_lines.size() * 28 + 18);
 }
 

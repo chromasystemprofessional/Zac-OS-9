@@ -17,6 +17,7 @@
 #include "panelkit.h"
 #include "platinumshell.h"
 #include "settings.h"
+#include "tr.h"
 
 namespace {
 
@@ -26,7 +27,7 @@ constexpr uint32_t FACE = GRAY(0xD);
 class KeychainAccess : public QWidget {
 public:
 	KeychainAccess() : m_host(this) {
-		setWindowTitle("Keychain Access");
+		setWindowTitle(_("Keychain Access"));
 		setFixedSize(W, H);
 		m_keychains.frame = QRect(M, 30, W - 2 * M, 5 * PL_LIST_ROW_H + 2);
 		m_keychains.picked = [this](int) { showItems(); };
@@ -221,7 +222,8 @@ int main(int argc, char *argv[]) {
 	/* zacos9-wm draws every frame; Qt must not add its own. */
 	qputenv("QT_WAYLAND_DISABLE_WINDOWDECORATION", "1");
 	QApplication app(argc, argv);
-	QApplication::setApplicationName("Keychain Access");
+	zacos9_i18n_init();
+	QApplication::setApplicationName(tr9("Keychain Access"));
 	QApplication::setDoubleClickInterval(pl_double_click_ms());
 	QGuiApplication::setDesktopFileName("zacos9-keychain"); /* Wayland app_id */
 	platinumShellInit();

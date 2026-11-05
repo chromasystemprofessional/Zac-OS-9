@@ -1,6 +1,9 @@
 [Desktop Entry]
 Type=Application
 Name=Sound
+Name[ru]=Звук
+Name[ja]=サウンド
+Name[it]=Suono
 Comment=Volume and alert volume
 Exec=zacos9-controlpanel sound
 Categories=Settings;HardwareSettings;X-ZacOS9-ControlPanel;

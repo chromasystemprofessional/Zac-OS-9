@@ -1,6 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=Media
+Name[ru]=Медиа
 Comment=Media player controls
 Exec=zacos9-collarmodule media
 Categories=X-ZacOS9-CollarModule;

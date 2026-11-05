@@ -34,6 +34,7 @@ subdir('boot')
 subdir('hardware')
 subdir('system')
 subdir('network')
+subdir('po')
 
 # Everything the package installs, against tests/baseline/installed-files.txt
 # (the restructuring's safety net: a file that drops out of the package fails).

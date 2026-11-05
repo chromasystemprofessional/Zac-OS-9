@@ -16,7 +16,7 @@ class LocalePanel : public ControlPanel {
 
 public:
 	explicit LocalePanel(bool numbers)
-		: ControlPanel(numbers ? "Numbers" : "Text", PANEL_H), m_numbers(numbers) {
+		: ControlPanel(numbers ? _("Numbers") : _("Text"), PANEL_H), m_numbers(numbers) {
 		m_groups = { { G0, G0 + LIST_GROUP_H, numbers ? "Number Format" : "Language" },
 			{ G1, G1 + SAMPLE_H, "Sample" } };
 		m_list.frame = QRect(M + IN, G0 + 1 + PL_GROUP_MARGIN_TOP, W - 2 * M - 2 * IN - 2,
@@ -179,5 +179,5 @@ private:
 	}
 };
 
-PANEL("numbers", "Numbers", true, LocalePanel(true));
-PANEL("text", "Text", true, LocalePanel(false));
+PANEL("numbers", N_("Numbers"), true, LocalePanel(true));
+PANEL("text", N_("Text"), true, LocalePanel(false));

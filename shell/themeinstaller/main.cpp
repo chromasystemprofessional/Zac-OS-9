@@ -33,6 +33,7 @@
 #include "settings.h"
 #include "theme.h"
 #include "items.h"
+#include "tr.h"
 
 static QString extractorPath() {
 	/* From a build tree, the source tree's copy; installed, under data dir. */
@@ -821,7 +822,8 @@ static void stampThemeFileIcon(const QString &file, const QString &name) {
 int main(int argc, char *argv[]) {
 	qputenv("QT_WAYLAND_DISABLE_WINDOWDECORATION", "1");
 	QApplication app(argc, argv);
-	QApplication::setApplicationName("Theme Installer");
+	zacos9_i18n_init();
+	QApplication::setApplicationName(tr9("Theme Installer"));
 	QGuiApplication::setDesktopFileName("zacos9-themeinstaller");
 
 	/* Non-interactive (and testable): --file PATH [--name NAME]. */

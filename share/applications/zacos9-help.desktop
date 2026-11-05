@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Help Center
+Name[ru]=Центр справки
+Name[it]=Centro assistenza
 Comment=Help for ZacOS and its programs
 Exec=zacos9-help
 Terminal=false

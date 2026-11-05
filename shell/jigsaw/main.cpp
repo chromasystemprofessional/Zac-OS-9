@@ -17,6 +17,7 @@
 #include "alert.h"
 #include "platinumshell.h"
 #include "settings.h"
+#include "tr.h"
 
 namespace {
 
@@ -196,7 +197,7 @@ private:
 class Window : public QMainWindow {
 public:
 	Window() {
-		setWindowTitle("Jigsaw Puzzle");
+		setWindowTitle(_("Jigsaw Puzzle"));
 		auto *board = new Board;
 		setCentralWidget(board);
 		QMenu *puzzle = menuBar()->addMenu("Puzzle");
@@ -221,7 +222,8 @@ int main(int argc, char *argv[]) {
 	/* zacos9-wm draws every frame; Qt must not add its own. */
 	qputenv("QT_WAYLAND_DISABLE_WINDOWDECORATION", "1");
 	QApplication app(argc, argv);
-	QApplication::setApplicationName("Jigsaw Puzzle");
+	zacos9_i18n_init();
+	QApplication::setApplicationName(tr9("Jigsaw Puzzle"));
 	QGuiApplication::setDesktopFileName("zacos9-jigsaw"); /* Wayland app_id */
 	platinumShellInit();
 	Window w;

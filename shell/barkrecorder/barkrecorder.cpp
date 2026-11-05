@@ -11,24 +11,26 @@
 #include <QVBoxLayout>
 #include <QWidget>
 
+#include "tr.h"
+
 BarkRecorder::BarkRecorder(QWidget *parent) : QMainWindow(parent) {
-	setWindowTitle("Bark Recorder");
+	setWindowTitle(tr9("Bark Recorder"));
 	setAttribute(Qt::WA_DeleteOnClose);
 	auto *page = new QWidget(this);
 	auto *layout = new QVBoxLayout(page);
-	m_status = new QLabel("Choose Record to make a sound recording.", page);
+	m_status = new QLabel(tr9("Choose Record to make a sound recording."), page);
 	m_status->setWordWrap(true);
 	layout->addWidget(m_status);
 	auto *buttons = new QHBoxLayout;
-	m_record = new QPushButton("Record…", page);
+	m_record = new QPushButton(tr9("Record…"), page);
 	m_record->setObjectName("record");
-	m_stop = new QPushButton("Stop", page);
+	m_stop = new QPushButton(tr9("Stop"), page);
 	m_stop->setObjectName("stop");
 	m_stop->setEnabled(false);
-	m_play = new QPushButton("Play", page);
+	m_play = new QPushButton(tr9("Play"), page);
 	m_play->setObjectName("play");
 	m_play->setEnabled(false);
-	m_open = new QPushButton("Open…", page);
+	m_open = new QPushButton(tr9("Open…"), page);
 	m_open->setObjectName("open");
 	buttons->addWidget(m_record);
 	buttons->addWidget(m_stop);
@@ -48,7 +50,7 @@ BarkRecorder::BarkRecorder(QWidget *parent) : QMainWindow(parent) {
 	});
 	connect(m_open, &QPushButton::clicked, this, [this] { choosePlayback(); });
 	connect(&m_recorder, &QProcess::started, this, [this] {
-		m_status->setText("Recording to " + QFileInfo(m_recordingPath).fileName() + "…");
+		m_status->setText(tr9("Recording to %1…").arg(QFileInfo(m_recordingPath).fileName()));
 		m_record->setEnabled(false);
 		m_stop->setEnabled(true);
 		m_play->setEnabled(false);
@@ -73,7 +75,7 @@ BarkRecorder::BarkRecorder(QWidget *parent) : QMainWindow(parent) {
 			m_play->setEnabled(hasRecording());
 			m_open->setEnabled(true);
 			if (exitStatus == QProcess::NormalExit && exitCode == 0 && hasRecording()) {
-				m_status->setText("Recording saved to " + QFileInfo(m_recordingPath).fileName() + ".");
+				m_status->setText(tr9("Recording saved to %1.").arg(QFileInfo(m_recordingPath).fileName()));
 			} else {
 				reportProcessError("finish recording", &m_recorder);
 			}
@@ -84,7 +86,7 @@ BarkRecorder::BarkRecorder(QWidget *parent) : QMainWindow(parent) {
 
 	m_player.setProcessChannelMode(QProcess::MergedChannels);
 	connect(&m_player, &QProcess::started, this, [this] {
-		m_status->setText("Playing " + QFileInfo(m_recordingPath).fileName() + "…");
+		m_status->setText(tr9("Playing %1…").arg(QFileInfo(m_recordingPath).fileName()));
 		m_record->setEnabled(false);
 		m_play->setEnabled(false);
 		m_open->setEnabled(false);
@@ -110,9 +112,9 @@ BarkRecorder::BarkRecorder(QWidget *parent) : QMainWindow(parent) {
 			m_stop->setEnabled(false);
 			if (m_stoppingPlayback) {
 				m_stoppingPlayback = false;
-				m_status->setText("Playback stopped.");
+				m_status->setText(tr9("Playback stopped."));
 			} else if (exitStatus == QProcess::NormalExit && exitCode == 0) {
-				m_status->setText("Ready. Recording: " + QFileInfo(m_recordingPath).fileName());
+				m_status->setText(tr9("Ready. Recording: %1").arg(QFileInfo(m_recordingPath).fileName()));
 			} else {
 				reportProcessError("play recording", &m_player);
 			}
@@ -131,7 +133,7 @@ bool BarkRecorder::startRecording(const QString &path) {
 		return false;
 	}
 	m_recordingPath = destination.absoluteFilePath();
-	m_status->setText("Starting recording…");
+	m_status->setText(tr9("Starting recording…"));
 	m_record->setEnabled(false);
 	m_open->setEnabled(false);
 	m_recorder.start("pw-record", { m_recordingPath });
@@ -157,7 +159,7 @@ bool BarkRecorder::playRecording(const QString &path) {
 		return false;
 	}
 	m_recordingPath = source.absoluteFilePath();
-	m_status->setText("Starting playback…");
+	m_status->setText(tr9("Starting playback…"));
 	m_record->setEnabled(false);
 	m_play->setEnabled(false);
 	m_open->setEnabled(false);
@@ -180,37 +182,40 @@ bool BarkRecorder::hasRecording() const {
 }
 
 void BarkRecorder::chooseRecording() {
-	const QString path = QFileDialog::getSaveFileName(this, "Record a Sound",
-		QDir::homePath() + "/Recording.wav", "WAVE audio (*.wav)");
+	const QString path = QFileDialog::getSaveFileName(this, tr9("Record a Sound"),
+		QDir::homePath() + "/Recording.wav", tr9("WAVE audio (*.wav)"));
 	if (!path.isEmpty() && !startRecording(path)) {
-		QMessageBox::warning(this, "Bark Recorder",
-			"Choose a .wav file, and stop playback before recording.");
+		QMessageBox::warning(this, tr9("Bark Recorder"),
+			tr9("Choose a .wav file, and stop playback before recording."));
 	}
 }
 
 void BarkRecorder::choosePlayback() {
-	const QString path = QFileDialog::getOpenFileName(this, "Open a Sound Recording",
+	const QString path = QFileDialog::getOpenFileName(this, tr9("Open a Sound Recording"),
 		m_recordingPath.isEmpty() ? QDir::homePath() : QFileInfo(m_recordingPath).absolutePath(),
-		"WAVE audio (*.wav)");
+		tr9("WAVE audio (*.wav)"));
 	if (!path.isEmpty() && !playRecording(path)) {
-		QMessageBox::warning(this, "Bark Recorder",
-			"Choose a readable .wav file, and stop recording before playback.");
+		QMessageBox::warning(this, tr9("Bark Recorder"),
+			tr9("Choose a readable .wav file, and stop recording before playback."));
 	}
 }
 
 void BarkRecorder::reportProcessError(const QString &action, QProcess *process) {
 	const QString details = process->readAll().trimmed();
 	const QString reason = process->error() == QProcess::UnknownError
-		? QString("The audio command exited with status %1.").arg(process->exitCode())
+		? tr9("The audio command exited with status %1.").arg(process->exitCode())
 		: process->errorString();
-	QMessageBox::critical(this, "Bark Recorder", "Could not " + action + ". " + reason +
-		(details.isEmpty() ? QString() : "\n" + details));
+	const QString what = action == "start recording" ? tr9("start recording")
+		: action == "finish recording" ? tr9("finish recording")
+		: action == "play recording" ? tr9("play recording") : action;
+	QMessageBox::critical(this, tr9("Bark Recorder"), tr9("Could not %1. %2%3")
+		.arg(what, reason, details.isEmpty() ? QString() : "\n" + details));
 }
 
 void BarkRecorder::closeEvent(QCloseEvent *event) {
 	if (isRecording()) {
-		const auto answer = QMessageBox::question(this, "Bark Recorder",
-			"Stop the recording and close Bark Recorder?",
+		const auto answer = QMessageBox::question(this, tr9("Bark Recorder"),
+			tr9("Stop the recording and close Bark Recorder?"),
 			QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel);
 		if (answer != QMessageBox::Yes) {
 			event->ignore();

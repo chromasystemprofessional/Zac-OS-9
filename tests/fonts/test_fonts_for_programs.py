@@ -49,6 +49,16 @@ with tempfile.TemporaryDirectory() as d:
     home = Path(d)
     seen = listed(home)
     check(bool(seen) and seen <= set(families), f"programs see only those families ({len(seen)} installed here)")
+
+    # Japanese text needs a CJK face; when the package is installed, the
+    # session's allow-list must not hide it again.
+    system_env = {k: v for k, v in os.environ.items() if k != "FONTCONFIG_FILE"}
+    system_ja = subprocess.run(["fc-list", ":lang=ja", "family"], env=system_env,
+                               capture_output=True, text=True, timeout=120).stdout
+    if "Noto Sans CJK JP" in system_ja:
+        check("Noto Sans CJK JP" in seen, "the Japanese font is visible to programs")
+    else:
+        print("skip  fonts-noto-cjk is not installed: Japanese allow-list not checked")
     if "Nimbus Sans" in seen:
         check('"Nimbus Sans"' in fc(home, "fc-match", "Helvetica"), "Helvetica finds Nimbus Sans")
     if "Nimbus Roman" in seen:

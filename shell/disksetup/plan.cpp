@@ -1,4 +1,5 @@
 #include "plan.h"
+#include "tr.h"
 
 #include <QLocale>
 #include <algorithm>
@@ -152,38 +153,38 @@ bool resizable(const QString &fsType) {
 
 QString formatName(const QString &type) {
 	return type == "vfat" ? "FAT32" : type == "exfat" ? "exFAT" : type == "ntfs" ? "NTFS"
-		: type == "ext4" ? "ZacOS (ext4)" : type == "befs" ? "Haiku (BFS)"
-		: type == "hfsplus" ? "Mac OS Extended" : type == "apfs" ? "APFS"
-		: type.isEmpty() || type == "empty" ? QString("unformatted") : type;
+		: type == "ext4" ? tr9("ZacOS (ext4)") : type == "befs" ? tr9("Haiku (BFS)")
+		: type == "hfsplus" ? tr9("Mac OS Extended") : type == "apfs" ? "APFS"
+		: type.isEmpty() || type == "empty" ? tr9("unformatted") : type;
 }
 
 static QString partName(const DiskPart &p) {
-	const QString name = !p.label.isEmpty() ? "“" + p.label + "”" : p.efi ? QString("the EFI System partition")
-		: p.biosBoot ? QString("the BIOS boot partition") : p.device.section('/', -1);
-	return name.isEmpty() ? QString("the new partition") : name;
+	const QString name = !p.label.isEmpty() ? tr9("“%1”").arg(p.label) : p.efi ? tr9("the EFI System partition")
+		: p.biosBoot ? tr9("the BIOS boot partition") : p.device.section('/', -1);
+	return name.isEmpty() ? tr9("the new partition") : name;
 }
 
 QString DiskOp::describe(const DiskDrive &d) const {
 	const DiskPart *p = part >= 0 && part < d.parts.size() ? &d.parts[part] : nullptr;
 	switch (kind) {
 	case NewTable:
-		return QString("Erase %1 and give it a new %2 partition table").arg(d.device, tableType == "dos" ? "MBR" : "GPT");
+		return tr9("Erase %1 and give it a new %2 partition table").arg(d.device, tableType == "dos" ? "MBR" : "GPT");
 	case Delete:
-		return QString("Delete %1 (%2)").arg(p ? partName(*p) : "?", p ? sizeText(p->size) : "");
+		return tr9("Delete %1 (%2)").arg(p ? partName(*p) : "?", p ? sizeText(p->size) : "");
 	case Create:
 		if (partType == BiosBootType) {
-			return QString("Make a %1 BIOS boot partition, for starting up with GRUB").arg(sizeText(size));
+			return tr9("Make a %1 BIOS boot partition, for starting up with GRUB").arg(sizeText(size));
 		}
 		if (partType == EfiType || partType == EfiTypeMbr) {
-			return QString("Make a %1 EFI System partition, for starting up").arg(sizeText(size));
+			return tr9("Make a %1 EFI System partition, for starting up").arg(sizeText(size));
 		}
-		return QString("Make a %1 %2 partition%3").arg(sizeText(size), formatName(fsType),
-			label.isEmpty() ? QString() : " named “" + label + "”");
+		return tr9("Make a %1 %2 partition%3").arg(sizeText(size), formatName(fsType),
+			label.isEmpty() ? QString() : tr9(" named “%1”").arg(label));
 	case Format:
-		return QString("Erase %1 as %2%3").arg(p ? partName(*p) : "?", formatName(fsType),
-			label.isEmpty() ? QString() : ", named “" + label + "”");
+		return tr9("Erase %1 as %2%3").arg(p ? partName(*p) : "?", formatName(fsType),
+			label.isEmpty() ? QString() : tr9(", named “%1”").arg(label));
 	case Resize:
-		return QString("Resize %1 to %2").arg(p ? partName(*p) : "?", sizeText(size));
+		return tr9("Resize %1 to %2").arg(p ? partName(*p) : "?", sizeText(size));
 	}
 	return {};
 }
@@ -199,73 +200,73 @@ static int primaries(const DiskDrive &d) {
 
 QString refusal(const DiskDrive &d, const DiskOp &op) {
 	if (d.live) {
-		return "ZacOS is running from this drive, so it can't be changed.";
+		return tr9("ZacOS is running from this drive, so it can't be changed.");
 	}
 	const DiskPart *p = op.part >= 0 && op.part < d.parts.size() ? &d.parts[op.part] : nullptr;
 	switch (op.kind) {
 	case DiskOp::NewTable:
 		if (d.system) {
-			return "The running system is on this drive, so it can't be erased.";
+			return tr9("The running system is on this drive, so it can't be erased.");
 		}
 		for (const DiskPart &x : d.parts) {
 			if (x.inUse()) {
-				return QString("%1 is in use. Eject it first.").arg(partName(x));
+				return tr9("%1 is in use. Eject it first.").arg(partName(x));
 			}
 		}
-		return op.tableType == "gpt" || op.tableType == "dos" ? QString() : QString("Choose GPT or MBR.");
+		return op.tableType == "gpt" || op.tableType == "dos" ? QString() : tr9("Choose GPT or MBR.");
 	case DiskOp::Delete:
 	case DiskOp::Format:
 	case DiskOp::Resize:
 		if (!p) {
-			return "Choose a partition.";
+			return tr9("Choose a partition.");
 		}
 		if (p->block.isEmpty() && op.kind != DiskOp::Delete) {
-			return "Apply the changes so far first.";
+			return tr9("Apply the changes so far first.");
 		}
 		if (p->inUse()) {
-			return QString("%1 is in use. Eject it first.").arg(partName(*p));
+			return tr9("%1 is in use. Eject it first.").arg(partName(*p));
 		}
 		if (p->efi && d.system && op.kind != DiskOp::Resize) {
-			return "The running system starts up from the EFI System partition, so it can't be deleted or erased.";
+			return tr9("The running system starts up from the EFI System partition, so it can't be deleted or erased.");
 		}
 		if (op.kind == DiskOp::Format && !diskFormats().contains(op.fsType)) {
-			return "Choose a format.";
+			return tr9("Choose a format.");
 		}
 		if (op.kind == DiskOp::Resize) {
 			if (!resizable(p->type)) {
-				return QString("%1 can't be resized: only ZacOS (ext4) and NTFS partitions can.").arg(partName(*p));
+				return tr9("%1 can't be resized: only ZacOS (ext4) and NTFS partitions can.").arg(partName(*p));
 			}
 			const DiskGap around = roomAround(d, op.part);
 			const qulonglong room = around.offset + around.size;
 			if (op.size < 16 * MiB || p->offset + op.size > room) {
-				return QString("Choose a size between 16 MB and %1.").arg(sizeText(room - p->offset));
+				return tr9("Choose a size between 16 MB and %1.").arg(sizeText(room - p->offset));
 			}
 			if (p->minSize > 0 && op.size < p->minSize) {
-				return QString("%1 can't be made smaller than %2: its files need that much.")
+				return tr9("%1 can't be made smaller than %2: its files need that much.")
 					.arg(partName(*p), sizeText(p->minSize));
 			}
 		}
 		return {};
 	case DiskOp::Create: {
 		if (d.table.isEmpty()) {
-			return "Give the drive a partition table first.";
+			return tr9("Give the drive a partition table first.");
 		}
 		if (!diskFormats().contains(op.fsType) && !(op.fsType == "empty" && op.partType == BiosBootType)) {
-			return "Choose a format.";
+			return tr9("Choose a format.");
 		}
 		if (!op.partType.isEmpty() && op.partType != (d.table == "gpt" ? EfiType : EfiTypeMbr) &&
 				!(op.partType == BiosBootType && d.table == "gpt")) {
-			return "That kind of partition can't go on this drive.";
+			return tr9("That kind of partition can't go on this drive.");
 		}
 		if (d.table == "dos" && primaries(d) >= 4) {
-			return "An MBR drive holds four partitions at most.";
+			return tr9("An MBR drive holds four partitions at most.");
 		}
 		for (const DiskGap &g : freeGaps(d)) {
 			if (op.offset >= g.offset && op.offset + op.size <= g.offset + g.size && op.size >= MiB) {
 				return {};
 			}
 		}
-		return "There isn't room for that partition there.";
+		return tr9("There isn't room for that partition there.");
 	}
 	}
 	return {};

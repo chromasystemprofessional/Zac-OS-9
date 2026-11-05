@@ -22,6 +22,9 @@ user-setup
 locales
 console-setup
 keyboard-configuration
+# Japanese (and Chinese/Korean) UI text: lib/text.c asks Fontconfig for a
+# covering face, and Qt programs use the same font.
+fonts-noto-cjk
 network-manager
 upower
 gnupg

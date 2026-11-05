@@ -1,6 +1,9 @@
 [Desktop Entry]
 Type=Application
 Name=Tablet
+Name[ru]=Планшет
+Name[ja]=タブレット
+Name[it]=Tavoletta
 Comment=Which screen a graphics tablet covers
 Exec=zacos9-controlpanel tablet
 Categories=Settings;HardwareSettings;X-ZacOS9-ControlPanel;

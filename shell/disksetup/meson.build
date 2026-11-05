@@ -11,7 +11,8 @@ disksetup_exe = executable('zacos9-disksetup',
 
 test('disksetup-plan',
   executable('test-disksetup-plan', '../../tests/disksetup/test_plan.cpp', 'plan.cpp', 'udisks.cpp',
-    dependencies: [qt6],
+    include_directories: include_directories('../common'),
+    dependencies: [platinum_dep, qt6],
   ),
   env: ['LC_ALL=en_US.UTF-8'], timeout: 10,
 )

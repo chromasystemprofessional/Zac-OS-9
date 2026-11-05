@@ -1,4 +1,5 @@
 #include "labeleditor.h"
+#include "tr.h"
 #include "alias.h"
 #include "fileassoc.h"
 
@@ -31,7 +32,7 @@ void LabelEditor::begin(Item *item) {
 		return;
 	}
 	if (item->isVirtual && !vfsCanRename(item->path)) {
-		Alert::ask("This system resource is read-only and can't be renamed or labelled.",
+		Alert::ask(tr9("This system resource is read-only and can't be renamed or labelled."),
 			"OK", QString());
 		return;
 	}
@@ -196,12 +197,12 @@ void LabelEditor::commit() {
 		/* A virtual rename is metadata: the registry keeps it, and the
 		 * item's id (and so its icon's place) doesn't change. */
 		if (vfsNameTaken(item->path, name)) {
-			Alert::ask("That name is already taken. Please use a different name.",
+			Alert::ask(tr9("That name is already taken. Please use a different name."),
 				"OK", "");
 			return;
 		}
 		if (!vfsRename(item->path, name)) {
-			Alert::ask(QStringLiteral("The item “%1” can't be renamed.")
+			Alert::ask(tr9("The item “%1” can't be renamed.")
 				.arg(item->visibleName()), "OK", "");
 			return;
 		}
@@ -214,7 +215,7 @@ void LabelEditor::commit() {
 	const QFileInfo info(item->path);
 	const QDir dir = info.dir();
 	if (dir.exists(name)) {
-		Alert::ask("That name is already taken. Please use a different name.", "OK", "");
+		Alert::ask(tr9("That name is already taken. Please use a different name."), "OK", "");
 		return;
 	}
 	const QString folder = dir.absolutePath();

@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Mouse Practice
+Name[ru]=Тренировка мыши
+Name[it]=Esercitati con il mouse
 Comment=Learn to point, click, double-click and drag
 Exec=zacos9-mousepractice
 Categories=Education;

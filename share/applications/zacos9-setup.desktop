@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Setup Assistant
+Name[ru]=Помощник настройки
+Name[it]=Assistente di configurazione
 Comment=Set up this computer after installing ZacOS 9
 Exec=zacos9-setup
 NoDisplay=true

@@ -1,5 +1,6 @@
 #include "helpbook.h"
 #include "programs.h"
+#include "tr.h"
 
 #include <QCoreApplication>
 #include <QDir>
@@ -102,12 +103,55 @@ QString helpRoot() {
 	// From a build tree, the source tree's share/zacos9/help; installed,
 	// bin/ -> share/zacos9/help.
 	const QString dir = QCoreApplication::applicationDirPath();
+	QString root = "/usr/share/zacos9/help";
 	for (const QString &candidate : { sourceTreePath("share/zacos9/help"), dir + "/../share/zacos9/help" }) {
 		if (!candidate.isEmpty() && QFileInfo(candidate + "/zacos9/index.html").exists()) {
-			return QFileInfo(candidate).canonicalFilePath();
+			root = QFileInfo(candidate).canonicalFilePath();
+			break;
 		}
 	}
-	return "/usr/share/zacos9/help";
+	return root;
+}
+
+/* The interface language for the help overlay: LANGUAGE first (a colon
+ * list), then LANG. */
+static QString helpLanguage() {
+	QString language = qEnvironmentVariable("LANGUAGE").section(':', 0, 0);
+	if (language.isEmpty()) {
+		language = qEnvironmentVariable("LANG").section('.', 0, 0).section('_', 0, 0);
+	}
+	return language == "en" ? QString() : language;
+}
+
+static QString helpPageUnder(const QString &root, const QString &path) {
+	const QString language = helpLanguage();
+	if (!language.isEmpty()) {
+		const QString localized = root + "/" + language + "/" + path;
+		if (QFileInfo(localized).isFile()) {
+			return localized;
+		}
+	}
+	return root + "/" + path;
+}
+
+QString helpPagePath(const QString &path) {
+	return helpPageUnder(helpRoot(), path);
+}
+
+QString helpFallbackPath(const QString &path) {
+	if (QFileInfo(path).isFile()) {
+		return path;
+	}
+	const QString language = helpLanguage();
+	const QString root = helpRoot();
+	const QString prefix = root + "/" + language + "/";
+	if (!language.isEmpty() && path.startsWith(prefix)) {
+		const QString english = root + "/" + path.mid(prefix.size());
+		if (QFileInfo(english).isFile()) {
+			return english;
+		}
+	}
+	return path;
 }
 
 QString htmlTitle(const QString &html) {
@@ -175,7 +219,7 @@ QString tutorialHtml(const QString &html, const QString &path) {
 QList<HelpBook> helpBooks(const QString &root) {
 	QList<HelpBook> out;
 	for (const QString &id : QDir(root).entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
-		const QString index = root + "/" + id + "/index.html";
+		const QString index = helpPageUnder(root, id + "/index.html");
 		const QString html = readFile(index);
 		if (html.isEmpty()) {
 			continue;
@@ -197,8 +241,9 @@ QList<HelpPage> helpPages(const QString &root) {
 	for (const HelpBook &book : helpBooks(root)) {
 		const QDir dir(root + "/" + book.id);
 		for (const QString &name : dir.entryList({ "*.html" }, QDir::Files, QDir::Name)) {
-			const QString html = readFile(dir.filePath(name));
-			out << HelpPage{ QFileInfo(dir.filePath(name)).absoluteFilePath(), book.id, htmlTitle(html), htmlText(html) };
+			const QString page = helpPageUnder(root, book.id + "/" + name);
+			const QString html = readFile(page);
+			out << HelpPage{ QFileInfo(page).absoluteFilePath(), book.id, htmlTitle(html), htmlText(html) };
 		}
 	}
 	return out;
@@ -244,10 +289,11 @@ QList<HelpHit> searchHelp(const QList<HelpPage> &pages, const QString &query) {
 }
 
 QString helpCenterHtml(const QList<HelpBook> &books) {
-	QString html = QString("<html><head><title>Help Center</title>") + STYLE + "</head><body>"
-		"<h1>Help Center</h1><p>Choose a book, or type words in the search field above and click Search.</p>";
+	QString html = QString("<html><head><title>") + tr9("Help Center") + "</title>" + STYLE +
+		"</head><body><h1>" + tr9("Help Center") + "</h1><p>" +
+		tr9("Choose a book, or type words in the search field above and click Search.") + "</p>";
 	if (books.isEmpty()) {
-		html += "<p>No help is installed.</p>";
+		html += "<p>" + tr9("No help is installed.") + "</p>";
 	}
 	for (const HelpBook &b : books) {
 		html += "<p><a href=\"" + QUrl::fromLocalFile(b.index).toString(QUrl::FullyEncoded) + "\"><b>" +
@@ -261,12 +307,15 @@ QString helpCenterHtml(const QList<HelpBook> &books) {
 }
 
 QString searchResultsHtml(const QString &query, const QList<HelpHit> &hits) {
-	QString html = QString("<html><head><title>Search Results</title>") + STYLE + "</head><body>";
-	html += hits.isEmpty()
-		? QString("<h1>No topics found</h1><p>Nothing in the help mentions “%1”. Try fewer or other words.</p>")
-			.arg(escaped(query))
-		: QString("<h1>%1 topic%2 found</h1><p>For “%3”, the best match first.</p>")
-			.arg(hits.size()).arg(hits.size() == 1 ? "" : "s").arg(escaped(query));
+	QString html = QString("<html><head><title>") + tr9("Search Results") + "</title>" + STYLE + "</head><body>";
+	if (hits.isEmpty()) {
+		html += "<h1>" + tr9("No topics found") + "</h1><p>" +
+			tr9("Nothing in the help mentions “%1”. Try fewer or other words.").arg(escaped(query)) + "</p>";
+	} else {
+		const QString count = hits.size() == 1 ? tr9("1 topic found") : tr9("%1 topics found").arg(hits.size());
+		html += "<h1>" + count + "</h1><p>" +
+			tr9("For “%1”, the best match first.").arg(escaped(query)) + "</p>";
+	}
 	const int top = hits.isEmpty() ? 1 : std::max(1, hits.first().score);
 	for (const HelpHit &h : hits) {
 		// Relevance as five blocks, as Mac Help showed a bar.

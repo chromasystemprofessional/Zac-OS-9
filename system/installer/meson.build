@@ -8,3 +8,7 @@ install_data('50-zacos9-installer.rules',
 # Freeing a disk the live desktop has mounted, for the installer (issue #31).
 test('release-disk', find_program('sh'),
   args: [files('../../tests/installer/test_release_disk.sh'), files('zacos9-release-disk')])
+
+# The installer's --locale argument, before it can touch a disk.
+test('installer-locale', find_program('sh'),
+  args: [files('../../tests/installer/test_locale.sh'), files('zacos9-install')])
