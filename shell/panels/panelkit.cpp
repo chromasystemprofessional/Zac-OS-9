@@ -1495,6 +1495,11 @@ void panelText(pl_canvas *c, const QString &s, int x, int baseline, pl_font font
 		int maxWidth) {
 	Text t(s, maxWidth, font);
 	if (t.t && t.t->ink_l >= 0) {
+		/* An Arabic label right-aligns to the width its caller gave it;
+		 * the default 1000 means "no width was given", so leave it at x. */
+		if (t.t->rtl && maxWidth < 1000) {
+			x = x + maxWidth - t.inkWidth() + 1;
+		}
 		pl_text(c, t.t, x + t.t->ink_l - 1, baseline, color);
 	}
 }

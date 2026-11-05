@@ -126,7 +126,12 @@ void Alert::paintEvent(QPaintEvent *) {
 	pl_icon_paint(c, MARGIN, MARGIN, PL_ICON_CAUTION, PL_ICON_LARGE, false);
 	int baseline = MARGIN + 12;
 	for (auto &line : m_lines) {
-		pl_text(c, line->t, TEXT_X, baseline, C_BLACK);
+		int ink_x = TEXT_X;
+		if (line->t && line->t->rtl) {
+			const int ink = line->t->ink_l < 0 ? 0 : line->t->ink_r - line->t->ink_l + 1;
+			ink_x = TEXT_X + TEXT_W - ink + 1;
+		}
+		pl_text(c, line->t, ink_x, baseline, C_BLACK);
 		baseline += LINE_H;
 	}
 	for (size_t i = 0; i < m_buttons.size(); i++) {
