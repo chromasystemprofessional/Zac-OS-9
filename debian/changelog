@@ -1,3 +1,12 @@
+zacos9 (1.8.0) trixie; urgency=medium
+
+  * ZacOS 9 now speaks Italian, Japanese and Russian, with translated help
+    books, and each screen can be rotated by 90, 180 or 270 degrees in the
+    Monitors panel. Italian is complete; Japanese and Russian are previews,
+    and Japanese input is still to come.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Thu, 05 Nov 2026 10:19:31 -0500
+
 zacos9 (1.7.6) trixie; urgency=medium
 
   * Themes show Mac OS 9's standard icons again: the Apple menu icon, and
