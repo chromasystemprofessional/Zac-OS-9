@@ -50,8 +50,7 @@ email=$(git config user.email)
 } >debian/changelog.new
 mv debian/changelog.new debian/changelog
 
-git commit -q -m "Release ZacOS 9 $version" \
-	-m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>" -- debian/changelog
+git commit -q -m "Release ZacOS 9 $version" -- debian/changelog
 git tag -a "v$version" -m "ZacOS 9 $version"
 
 scripts/build-debs.sh
