@@ -163,6 +163,7 @@ else works, and Old Dog says the emulator isn't installed.
 - [Software and updates](docs/appstore.md) and [Software Update](docs/updates.md)
 - [Networking with Macs and Windows](docs/network.md) and [Mac disks](docs/mac-disks.md)
 - [Hardware notes](docs/hardware.md) for Macs and other PCs
+- [Security policy](SECURITY.md): supported versions and private reporting
 - [Project status](PROJECT_STATUS.md): what works now and what's next
 - ZacOS Help, in the Help menu, from inside the system
 
