@@ -1,3 +1,12 @@
+zacos9 (1.9.0) trixie; urgency=medium
+
+  * Russian, Spanish and Brazilian Portuguese are complete: applications,
+    the Finder, menu bar, installer and Setup Assistant are translated, and
+    all 20 help pages are in each language. Japanese remains a display
+    preview; Japanese input is not available yet.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Thu, 05 Nov 2026 12:22:39 -0500
+
 zacos9 (1.8.0) trixie; urgency=medium
 
   * ZacOS 9 now speaks Italian, Japanese and Russian, with translated help
