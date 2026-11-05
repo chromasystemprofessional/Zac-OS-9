@@ -1,7 +1,8 @@
 # Brazilian Portuguese translation of ZacOS 9.
 # Complete: the Finder, control panels, menu bar and Hint Bubbles, application
-# names, installer and Setup Assistant. Installed as "pt": the installer
-# exports LANGUAGE=pt for pt_BR.UTF-8. The help book is still English.
+# names, installer and Setup Assistant. The 20 help pages are under
+# share/zacos9/help/pt/. Installed as "pt": the installer exports LANGUAGE=pt
+# for pt_BR.UTF-8.
 # Needs a native speaker's review before it is advertised as complete.
 #
 # This file is distributed under the same license as the zacos9 package.

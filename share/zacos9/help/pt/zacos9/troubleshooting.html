@@ -1,0 +1,28 @@
+<html><head><meta charset="utf-8"><title>Quando algo dá errado</title>
+<meta name="description" content="Um programa para de responder, a tela congela, o computador inicia o sistema errado, um documento não é impresso, ou você precisa relatar um problema."></head>
+<body>
+<h1>Quando algo dá errado</h1>
+<h2>Um programa para de responder</h2>
+<p>Escolha <b>menu Zac ▸ Forçar encerramento</b> e o programa. O resto do ZacOS continua funcionando.</p>
+<h2>Nada responde</h2>
+<p>Pressione <b>Control-Opção-Backspace</b> para encerrar a sessão e voltar à janela de início de sessão, e depois inicie sessão de novo. Tudo o que não estiver salvo se perde. Se nem isso funcionar, mantenha o botão de ligar pressionado até o computador desligar.</p>
+<h2>O computador inicia o sistema errado</h2>
+<p>Abra <b>Painéis de controle ▸ Disco de inicialização</b>, selecione o sistema que você quer e clique em Reiniciar. Se um sistema que você instalou não aparecer, clique em Procurar outros sistemas.</p>
+<h2>Discos e volumes de rede</h2>
+<ul>
+<li>Um disco que você conectou não aparece: tente outra porta e depois procure-o em Dispositivos e volumes do Pedigree.</li>
+<li>Um volume de rede para de responder: escolha Especial ▸ Ejetar nele e conecte-se de novo pela Vizinhança ou por Servidores recentes.</li>
+</ul>
+<h2>Impressão</h2>
+<ul>
+<li>Nenhuma impressora foi escolhida: abra o <b>Seletor de impressora</b> no menu Zac e clique em uma.</li>
+<li>O Seletor de impressora diz que o serviço de impressão (CUPS) não está em execução: inicie-o com <b>sudo systemctl start cups</b> e tente de novo.</li>
+<li>Um documento fica retido ou falha: a fila dele explica por quê, como “Parado (necessita de mídia)”. Coloque papel ou verifique a impressora e clique em Retomar.</li>
+<li>Um documento de um lote não é impresso: a mensagem o nomeia e o resto é impresso mesmo assim. O registro da sessão (abaixo) tem os detalhes.</li>
+</ul>
+<h2>Informações sobre seu computador</h2>
+<p>O <b>Pedigree</b> (no menu Zac, ou em Pasta Sistema ▸ Informações do sistema) lista o modelo do seu computador, o processador, a memória, as telas, os discos, a rede e os dispositivos. Seu Arquivo ▸ Salvar relatório cria um arquivo de texto que você pode enviar a quem estiver ajudando.</p>
+<h2>Relatar um problema</h2>
+<p>Anote o que você fez e o que aconteceu. O ZacOS guarda um registro da sessão na pasta oculta .local/state/zacos9 da sua pasta de início (session.log); inclua-o, junto com o relatório do Pedigree, na sua descrição.</p>
+<p><a href="index.html">Ajuda do ZacOS</a></p>
+</body></html>

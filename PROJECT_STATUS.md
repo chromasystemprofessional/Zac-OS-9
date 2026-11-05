@@ -87,8 +87,8 @@ review is next ([Languages](docs/i18n.md)).
 
 **Brazilian Portuguese**: `po/pt.po`, installed as `pt` for
 `pt_BR.UTF-8`, is complete at 817 strings, including the Finder, menu bar,
-application names, installer and Setup Assistant. The 20 help pages are
-still English; a native speaker's review and the help book are next
+application names, installer and Setup Assistant. All 20 help pages are
+under `share/zacos9/help/pt/`; a native speaker's review is next
 ([Languages](docs/i18n.md)).
 
 **Making the project easier to work on**: ten of the eleven phases are done,
