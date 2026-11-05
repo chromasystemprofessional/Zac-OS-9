@@ -128,6 +128,18 @@ private:
 			: QStringList{ "LANG", "LC_COLLATE" };
 	}
 
+	/* LANGUAGE is gettext's priority list and overrides LANG, so the Text
+	 * panel must write it too; otherwise the installer's LANGUAGE keeps the
+	 * interface in its language. Keep the region (fr_CA, fr_FR) so regional
+	 * catalogs win; gettext still falls back to fr for the other locales. */
+	QStringList writtenKeys() const {
+		QStringList out = keys();
+		if (!m_numbers) {
+			out << "LANGUAGE";
+		}
+		return out;
+	}
+
 	/* This panel's locale: locale.conf's, else the session's. */
 	QString currentLocale() const {
 		const QString key = keys().first();
@@ -158,8 +170,12 @@ private:
 		}
 		/* Rewrite this panel's lines, keeping the other panel's. */
 		KeyValueFile conf = KeyValueFile::read(confPath());
-		for (const QString &key : keys()) {
-			conf.set(key, code);
+		for (const QString &key : writtenKeys()) {
+			QString value = code;
+			if (key == "LANGUAGE") {
+				value = code.section('.', 0, 0);
+			}
+			conf.set(key, value);
 		}
 		QDir().mkpath(QFileInfo(confPath()).path());
 		if (!conf.save(confPath())) {

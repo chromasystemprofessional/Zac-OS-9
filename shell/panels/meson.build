@@ -206,6 +206,15 @@ test('panel-hints',
   env: ['QT_QPA_PLATFORM=offscreen'], timeout: 30,
 )
 
+test('locale-panel',
+  executable('test-locale-panel', '../../tests/panels/test_locale.cpp', 'locale.cpp',
+    link_with: panelkit,
+    include_directories: include_directories('../finder', '../common'),
+    dependencies: [shell_common_dep, platinum_dep, qt6],
+  ),
+  env: ['QT_QPA_PLATFORM=offscreen'], timeout: 30,
+)
+
 test('collar-panel',
   executable('test-collar-panel',
     '../../tests/panels/test_collarpanel.cpp',

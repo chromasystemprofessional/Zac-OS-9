@@ -102,7 +102,9 @@ apply_locale() {
 	[ -n "$locale" ] || return 0
 	lang=${locale%%.*}
 	lang=${lang%%@*}
-	language=${lang%%_*}
+	# Keep the region in LANGUAGE so regional catalogs (fr_CA, fr_FR) win;
+	# gettext falls back to the language part when a region has none.
+	language=$lang
 	mkdir -p "$TARGET/etc/default"
 	printf 'LANG=%s\nLANGUAGE=%s\n' "$locale" "$language" >"$TARGET/etc/default/locale"
 	printf 'LANG=%s\nLANGUAGE=%s\n' "$locale" "$language" >"$TARGET/etc/locale.conf"
