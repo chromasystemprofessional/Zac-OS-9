@@ -1,0 +1,28 @@
+<html><head><meta charset="utf-8"><title>Cuando algo va mal</title>
+<meta name="description" content="Un programa deja de responder, la pantalla se congela, el ordenador arranca con el sistema equivocado, un documento no se imprime o necesitas informar de un problema."></head>
+<body>
+<h1>Cuando algo va mal</h1>
+<h2>Un programa deja de responder</h2>
+<p>Elige <b>menú Zac ▸ Forzar cierre</b> y el programa. El resto de ZacOS sigue funcionando.</p>
+<h2>Nada responde</h2>
+<p>Pulsa <b>Control-Opción-Retroceso</b> para finalizar la sesión y volver a la ventana de inicio de sesión, y luego inicia sesión de nuevo. Todo lo que no esté guardado se pierde. Si ni siquiera eso funciona, mantén pulsado el botón de encendido hasta que el ordenador se apague.</p>
+<h2>El ordenador arranca con el sistema equivocado</h2>
+<p>Abre <b>Paneles de control ▸ Disco de arranque</b>, selecciona el sistema que quieres y haz clic en Reiniciar. Si no aparece un sistema que instalaste, haz clic en Buscar otros sistemas.</p>
+<h2>Discos y volúmenes de red</h2>
+<ul>
+<li>Un disco que conectaste no aparece: prueba otro puerto y luego búscalo en Dispositivos y volúmenes de Pedigree.</li>
+<li>Un volumen de red deja de responder: elige Especial ▸ Expulsar en él y vuelve a conectarte desde Vecindario o Servidores recientes.</li>
+</ul>
+<h2>Impresión</h2>
+<ul>
+<li>No hay ninguna impresora elegida: abre el <b>Selector de impresora</b> desde el menú Zac y haz clic en una.</li>
+<li>El Selector de impresora dice que el servicio de impresión (CUPS) no está en marcha: inícialo con <b>sudo systemctl start cups</b> y vuelve a intentarlo.</li>
+<li>Un documento se queda retenido o falla: su cola explica por qué, por ejemplo «Detenido (se necesita papel)». Pon papel o revisa la impresora y haz clic en Reanudar.</li>
+<li>Un documento de un lote no se imprime: el mensaje lo nombra y el resto se imprime igualmente. El registro de la sesión (abajo) tiene los detalles.</li>
+</ul>
+<h2>Información sobre tu ordenador</h2>
+<p><b>Pedigree</b> (en el menú Zac, o en Carpeta Sistema ▸ Información del sistema) enumera el modelo de tu ordenador, el procesador, la memoria, las pantallas, los discos, la red y los dispositivos. Su Archivo ▸ Guardar informe crea un archivo de texto que puedes enviar a quien te ayude.</p>
+<h2>Informar de un problema</h2>
+<p>Anota lo que hiciste y lo que ocurrió. ZacOS guarda un registro de la sesión en la carpeta oculta .local/state/zacos9 de tu carpeta de inicio (session.log); inclúyelo, junto con el informe de Pedigree, con tu descripción.</p>
+<p><a href="index.html">Ayuda de ZacOS</a></p>
+</body></html>

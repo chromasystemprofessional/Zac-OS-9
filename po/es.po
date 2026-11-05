@@ -1,7 +1,7 @@
 # Spanish translation of ZacOS 9.
 # Complete: the Finder, control panels, menu bar and Hint Bubbles, application
-# names, installer and Setup Assistant. The help book is still English and is
-# content under share/zacos9/help/.
+# names, installer and Setup Assistant. The 20 help pages are under
+# share/zacos9/help/es/.
 # Needs a native speaker's review before it is advertised as complete.
 #
 # This file is distributed under the same license as the zacos9 package.
