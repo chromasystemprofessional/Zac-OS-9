@@ -31,20 +31,21 @@ It isn't a skin over another desktop. The window manager, the Sniffer (the
 file browser), the menu bar and every control panel were written for ZacOS 9,
 so everything looks and behaves the same way, down to the scroll arrows.
 
-## New in 1.7
+## New in 1.9
 
-- **Themes that are really yours.** Drop a Mac OS 9 theme file on the System
-  Folder and the Theme Installer reads it, plus your own copy of Mac OS 9, to
-  build a theme with the real Apple menu icon, window chrome, desktop picture,
-  alert sounds and fonts. Apple Platinum and the other classic themes work;
-  no Apple artwork is shipped.
-- **Appearance as Mac OS 9 had it.** The panel wears the classic six tabs and
-  shows a gallery of theme previews with each theme's own wallpaper.
-- **A What's New window** after an update, saying what changed and teaching the
-  theme drop.
-- **Printing and theming fixes**: a failed document is named while the rest
-  still print, network printers appear before their first job, and themes
-  rebuild completely instead of leaving old art underneath.
+- **More languages.** Italian, Russian, Spanish, Brazilian Portuguese, French
+  (Canada and France) and Arabic are complete, with translated help books.
+  Canadian and UK English are selectable English locales; Japanese is a
+  display pilot. The installer and Text panel show a country flag beside each
+  language.
+- **Arabic, right to left.** HarfBuzz shapes Arabic and FriBidi orders it;
+  Arabic lists, labels and alerts right-align. The rest of the window layout is
+  not mirrored yet.
+- **Rotate any screen.** Control Panels ▸ Monitors turns each display by 90°,
+  180° or 270°.
+- **Speech panel voice lists.** Choose Classic, Modern or Neural voices.
+- **Themes stay drop-only.** Drop a Mac OS 9 theme file into System Folder ▸
+  Appearance ▸ Theme Files; there is no Theme Installer menu entry.
 
 ## What you get
 
@@ -98,7 +99,7 @@ issue template.
 <table>
   <tr>
     <td width="55%"><img src="docs/screenshots/software.png" alt="The Software window: a search field, Include Flathub, categories from Featured to Extras, and Firefox, GIMP, LibreOffice and VLC"></td>
-    <td width="45%"><img src="docs/screenshots/about.png" alt="About This Computer: ZacOS 9, Version 1.7.6, with the processor, graphics and memory"></td>
+    <td width="45%"><img src="docs/screenshots/about.png" alt="About This Computer: the ZacOS 9 version, processor, graphics and memory"></td>
   </tr>
   <tr>
     <td><b>Thousands of programs</b>, from Debian's archive and Flathub, plus the
@@ -144,12 +145,12 @@ ZacOS Extras and Debian's security fixes; no new ISO is needed.
 
 ### Already running Debian 13?
 
-Download `zacos9_1.7.6_amd64.deb` from the
+Download the latest `zacos9_*_amd64.deb` from the
 [latest release](https://github.com/chromasystemprofessional/Zac-OS-9/releases/latest),
 then install the file you downloaded:
 
 ```sh
-sudo apt install ./zacos9_1.7.6_amd64.deb
+sudo apt install ./zacos9_*_amd64.deb
 ```
 
 Log out and choose **ZacOS 9** at the login screen. Classic Mac emulation (the
