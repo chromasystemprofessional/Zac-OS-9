@@ -16,6 +16,7 @@
 {prefix}/bin/zacos9-disksetup
 {prefix}/bin/zacos9-dogears
 {prefix}/bin/zacos9-expand
+{prefix}/bin/zacos9-fcitx-autostart
 {prefix}/bin/zacos9-file-portal
 {prefix}/bin/zacos9-fileexchange
 {prefix}/bin/zacos9-filesharing
@@ -238,6 +239,8 @@
 {prefix}/share/zacos9/boot/zacos-logo-6x.png
 {prefix}/share/zacos9/fontconfig/zacos9-fonts.conf
 {prefix}/share/zacos9/help
+{prefix}/share/zacos9/japanese/xdg/fcitx5/config
+{prefix}/share/zacos9/japanese/xdg/fcitx5/profile
 {prefix}/share/zacos9/sounds/chirp.wav
 {prefix}/share/zacos9/sounds/droplet.wav
 {prefix}/share/zacos9/sounds/glass.wav
@@ -270,6 +273,7 @@
 {prefix}/share/zacos9/whatsnew/1.7.5.txt
 {prefix}/share/zacos9/whatsnew/1.7.6.txt
 {prefix}/share/zacos9/whatsnew/1.8.0.txt
+{prefix}/share/zacos9/xdg/autostart/org.fcitx.Fcitx5.desktop
 {prefix}/share/zacos9/xdg/foot/foot.ini
 {prefix}/share/zacos9/xdg/xdg-desktop-portal/zacos9-portals.conf
 {prefix}/share/zacos9/xdg/zacos9-mimeapps.list

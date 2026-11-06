@@ -98,6 +98,70 @@ remove_rdp_sharing() {
 	rm -rf /etc/zacos9/rdp /run/zacos9-rdp
 }
 
+# Japanese, on a Japanese install only: the installer writes LANG=ja_JP.UTF-8
+# to /etc/default/locale when Japanese is chosen. Then the locale is made and
+# the Numbers/Text panels' file (~/.config/locale.conf, which zacos9-session
+# reads at login) is seeded for every account that has not chosen a locale
+# itself. /etc/skel gets one too, so new accounts -- and the Guest account,
+# whose home is refilled from skel -- start in Japanese as well. An account's
+# own locale.conf is never replaced. Fcitx 5 with Mozc and the CJK fonts are
+# package dependencies; its autostart entry starts it only in a Japanese
+# session (zacos9-fcitx-autostart), and its Japanese defaults (keyboard-jp +
+# Mozc, active by default) are in a config directory of their own under
+# /usr/share/zacos9/japanese/xdg.
+seed_locale_conf() {
+	home=$1 user=$2
+	conf="$home/.config/locale.conf"
+	[ -e "$conf" ] && return 0
+	mkdir -p "$home/.config" || return 0
+	printf '%s\n' \
+		'LANG=ja_JP.UTF-8' \
+		'LANGUAGE=ja_JP' \
+		'LC_COLLATE=ja_JP.UTF-8' \
+		'LC_NUMERIC=ja_JP.UTF-8' \
+		'LC_MONETARY=ja_JP.UTF-8' \
+		'LC_TIME=ja_JP.UTF-8' \
+		'LC_MEASUREMENT=ja_JP.UTF-8' \
+		'LC_PAPER=ja_JP.UTF-8' >"$conf" || return 0
+	if [ -n "$user" ]; then
+		chown "$user" "$home/.config" "$conf" 2>/dev/null || true
+	fi
+}
+
+system_language_is_japanese() {
+	lang=
+	for file in /etc/default/locale /etc/locale.conf; do
+		[ -r "$file" ] || continue
+		lang=$(sed -n 's/^LANG=//p' "$file" | tail -n 1)
+		if [ -n "$lang" ]; then
+			break
+		fi
+	done
+	lang=${lang%\"}; lang=${lang#\"}; lang=${lang%\'}; lang=${lang#\'}
+	case $lang in
+	ja | ja_* | ja.* | ja@*) return 0 ;;
+	esac
+	return 1
+}
+
+japanese_setup() {
+	system_language_is_japanese || return 0
+	if command -v locale-gen >/dev/null 2>&1; then
+		if [ -f /etc/locale.gen ]; then
+			sed -i 's/^# *\(ja_JP\.UTF-8 UTF-8\)/\1/' /etc/locale.gen || true
+		fi
+		locale-gen ja_JP.UTF-8 >/dev/null 2>&1 ||
+			echo "zacos9: could not make the ja_JP.UTF-8 locale." >&2
+	fi
+	seed_locale_conf /etc/skel ""
+	getent passwd | while IFS=: read -r user _ uid _ _ home _; do
+		case "$uid" in ''|*[!0-9]*) continue ;; esac
+		if [ "$uid" -ge 1000 ] && [ "$uid" -lt 65534 ] && [ -d "$home" ]; then
+			seed_locale_conf "$home" "$user"
+		fi
+	done
+}
+
 case "$1" in
 	configure)
 		grant_rawio
@@ -107,6 +171,7 @@ case "$1" in
 		redraw_grub_logo
 		rotate_boot
 		make_shared_documents
+		japanese_setup
 		remove_rdp_sharing
 		# Software Update's daily check, for every account.
 		systemctl --global enable zacos9-update-check.timer >/dev/null 2>&1 || true

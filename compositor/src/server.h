@@ -219,6 +219,11 @@ struct plat_server {
 
 	/* The on-screen keyboard (osk.c) */
 	struct wlr_text_input_manager_v3 *text_input_manager;
+	/* Input methods (input_method.c) */
+	struct wlr_input_method_manager_v2 *input_method_manager;
+	struct wl_listener new_input_method;
+	struct plat_input_method *input_method; /* the seat's, if one connected */
+	struct plat_text_input *im_text_input;  /* the field being relayed */
 	struct wl_listener new_text_input;
 	struct wl_list text_inputs; /* osk.c plat_text_input.link */
 	struct wl_listener osk_focus_change;
@@ -516,6 +521,28 @@ void osk_update(struct plat_server *server);
 bool osk_real_keyboard(struct wlr_input_device *device);
 /* platinum_shell_v1.text_field from the program with the focus, or not. */
 void osk_text_field(struct plat_server *server, bool focused);
+
+/* input_method.c: the relay between text fields and an input method
+ * (Fcitx, IBus). */
+struct wlr_text_input_v3;
+struct plat_text_input {
+	struct wl_list link; /* plat_server.text_inputs */
+	struct plat_server *server;
+	struct wlr_text_input_v3 *input;
+	struct wl_listener enable;
+	struct wl_listener commit;
+	struct wl_listener disable;
+	struct wl_listener destroy;
+};
+void input_method_init(struct plat_server *server);
+/* The relayed field may have changed: enable, disable, focus, destroy. */
+void input_method_update_active(struct plat_server *server);
+/* A field committed new state (its surrounding text and the like). */
+void input_method_text_input_commit(struct plat_server *server, struct plat_text_input *ti);
+/* A key on its way to a program: true when the input method took it. */
+bool input_method_key(struct plat_server *server, struct wlr_keyboard *keyboard,
+		uint32_t evdev_keycode, enum wl_keyboard_key_state state, uint32_t time_msec);
+void input_method_modifiers(struct plat_server *server, struct wlr_keyboard *keyboard);
 
 /* touch.c: touchscreens */
 void touch_init(struct plat_server *server);

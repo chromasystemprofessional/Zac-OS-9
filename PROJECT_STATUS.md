@@ -111,12 +111,14 @@ book and tutorial are in, and Bark Recorder and Neighbourhood are translated
 ([Languages](docs/i18n.md)). The remaining product-named apps and a native
 review are next.
 
-**Japanese (display pilot)**: `lib/text.c` falls back through Fontconfig to
-Noto Sans CJK, `wrapText()` breaks Japanese without spaces, and `po/ja.po`
-translates the Mouse panel, every control panel's name and title, and the
-Mouse desktop entry. Input is not supported:
-ZacOS's own text fields have no IME preedit, so the language is not
-advertised as usable yet ([Languages](docs/i18n.md)).
+**Japanese (display and input pilot)**: `lib/text.c` falls back through
+Fontconfig to Noto Sans CJK, `wrapText()` breaks Japanese without spaces,
+and `po/ja.po` translates the Mouse panel, every control panel's name and
+title, and the Mouse desktop entry. Input works through Fcitx 5 and Mozc:
+the compositor relays input-method-v2 to text-input-v3, and a login item
+starts Fcitx only in a Japanese session. The catalog is still small; a
+native speaker's review and the other panels are next
+([Languages](docs/i18n.md)).
 
 **Arabic**: `po/ar.po` is complete at 818 strings, including the Finder,
 menu bar, application names, installer and Setup Assistant; `Name[ar]` is in
@@ -173,7 +175,7 @@ are drafted, to be posted as "good first issue"s:
 All of them are [on GitHub](https://github.com/chromasystemprofessional/Zac-OS-9/issues).
 
 - [#136](https://github.com/chromasystemprofessional/Zac-OS-9/issues/136):
-  the remaining language work, including Japanese input.
+  the remaining language work.
 - [#86](https://github.com/chromasystemprofessional/Zac-OS-9/issues/86):
   video instability with multiple monitors on multiple graphics cards.
 
