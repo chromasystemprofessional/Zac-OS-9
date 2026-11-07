@@ -359,13 +359,33 @@ private:
 			const QByteArray value = QByteArray::number(rotations[i].degrees);
 			pl_setting_set(d ? ("display." + d->name.toUtf8() + ".rotation").constData() : "rotation",
 				value.constData());
+			/* The login screen and the boot splash run before an account
+			 * exists: keep the machine-wide rotation in step, and let the
+			 * helper rewrite GRUB for the next boot. Cancelling the
+			 * password prompt leaves only this session turned. A nested
+			 * session is a window on the real desktop: leave its boot
+			 * settings alone. */
+			if (m_nested) {
+				m_notes.back() = "A nested session's rotation is not used at the next boot.";
+			} else {
+				bool ok = false;
+				QString error;
+				runPrivilegedHelper("accounts",
+					{ "display", d ? d->name : QString(), QString::fromLatin1(value),
+						d && d->main ? "main" : "" },
+					QByteArray(), &ok, &error);
+				m_notes.back() = ok ? "The login screen and boot splash follow the main screen."
+					: "The login screen and boot splash were not changed.";
+			}
+			update();
 			refreshSoon();
 		};
 
 		m_radios.clear();
 		m_radios.push_back(&m_scale);
 		m_radios.push_back(&m_rotation);
-		m_notes = { "Changes take effect at once." };
+		m_notes = { "Changes take effect at once.",
+			"The login screen and boot splash follow the main screen." };
 		if (m_nested) {
 			m_notes.insert(m_notes.begin(),
 				"In a window (nested), the resolution is the window's size.");

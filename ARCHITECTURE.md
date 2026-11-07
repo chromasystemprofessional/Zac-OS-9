@@ -79,6 +79,7 @@ rather than reimplementing them.
 | Window frames, title bars, window behaviour | `compositor/src/` (`decor.c`, `frame.c`, `view.c`) | |
 | Keyboard, mouse, tablets, touch | `compositor/src/input.c`, `tablet.c`, `touch.c` | [Touchscreens](docs/touch.md) |
 | Screens: arrangement, scale, mirroring | `compositor/src/prefs.c`, `output.c` | The Monitors panel is in `shell/panels/` |
+| Rotation outside the session (login screen, kernel console, boot splash) | `boot/zacos9-rotate-boot`, `system/accounts/zacos9-accounts-helper` | [Starting up](docs/boot.md#rotated-screens) |
 | Sleep, screen saver, lock | `compositor/src/idle.c`, `lock.c`; `shell/screensaver/`, `shell/lock/` | [Energy Saver](docs/energy-saver.md) |
 | X11 programs (XWayland) | `compositor/src/xwayland.c`, `xwayland_output.c` | |
 | The menu bar and Apple-style menus | `shell/menubar/` (C) | |

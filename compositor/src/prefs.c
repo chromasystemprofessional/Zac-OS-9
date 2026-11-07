@@ -21,6 +21,11 @@
  * is alone, or the main one when there are several (the others keep their
  * own, picked from their density).
  * "mirror=1" puts every screen at the same place.
+ *
+ * A rotation the account's file doesn't set is also looked up in
+ * /etc/zacos9/desktop.conf, so the login screen -- run by greetd as its
+ * own user, with no desktop.conf -- follows the machine-wide rotation the
+ * Monitors panel writes (through zacos9-accounts-helper).
  */
 #define _GNU_SOURCE
 #include <math.h>
@@ -101,6 +106,52 @@ static bool display_setting(struct plat_server *server, const struct wlr_output 
 	return (!main_output || main_output->wlr_output == o) && pl_setting(key, value, len);
 }
 
+/* One key from the machine-wide settings, /etc/zacos9/desktop.conf: the
+ * login screen's compositor runs as greetd's own user, with no
+ * desktop.conf of its own. ZACOS9_SYSTEM_CONF lets a test use a scratch
+ * file instead. */
+static bool system_setting(const char *key, char *value, size_t len) {
+	const char *configured = getenv("ZACOS9_SYSTEM_CONF");
+	FILE *f = fopen(configured && *configured ? configured : "/etc/zacos9/desktop.conf", "r");
+	if (!f) {
+		return false;
+	}
+	char line[256];
+	bool found = false;
+	const size_t klen = strlen(key);
+	while (!found && fgets(line, sizeof(line), f)) {
+		char *s = line;
+		while (*s == ' ' || *s == '\t') {
+			s++;
+		}
+		if (strncmp(s, key, klen) != 0 || s[klen] != '=') {
+			continue;
+		}
+		char *v = s + klen + 1;
+		char *e = v + strlen(v);
+		while (e > v && (e[-1] == '\n' || e[-1] == '\r' || e[-1] == ' ' || e[-1] == '\t')) {
+			*--e = '\0';
+		}
+		snprintf(value, len, "%s", v);
+		found = true;
+	}
+	fclose(f);
+	return found;
+}
+
+/* "display.NAME.KEY" in the machine-wide settings, else its bare KEY for
+ * the main screen, as display_setting() does for the account's. */
+static bool system_display_setting(struct plat_server *server, const struct wlr_output *o,
+		const char *key, char *value, size_t len) {
+	char name[96];
+	snprintf(name, sizeof(name), "display.%s.%s", o->name, key);
+	if (system_setting(name, value, len)) {
+		return true;
+	}
+	const struct plat_output *main_output = output_main(server);
+	return (!main_output || main_output->wlr_output == o) && system_setting(key, value, len);
+}
+
 /* The Monitors panel's scale for a screen; 4 is only for -S. */
 static float setting_scale(struct plat_server *server, const struct wlr_output *o,
 		float fallback) {
@@ -113,11 +164,14 @@ static float setting_scale(struct plat_server *server, const struct wlr_output *
 }
 
 /* The Monitors panel's rotation for a screen: 0, 90, 180 or 270 degrees.
- * "left"/"right" are accepted too, as wlroots' own names. */
+ * "left"/"right" are accepted too, as wlroots' own names. An account's
+ * setting wins; the machine-wide one is for the login screen, which has no
+ * account of its own. */
 static enum wl_output_transform setting_transform(struct plat_server *server,
 		const struct wlr_output *o) {
 	char v[32];
-	if (!display_setting(server, o, "rotation", v, sizeof(v))) {
+	if (!display_setting(server, o, "rotation", v, sizeof(v)) &&
+			!system_display_setting(server, o, "rotation", v, sizeof(v))) {
 		return WL_OUTPUT_TRANSFORM_NORMAL;
 	}
 	if (strcmp(v, "90") == 0 || strcmp(v, "left") == 0) {

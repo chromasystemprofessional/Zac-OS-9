@@ -27,6 +27,16 @@ redraw_grub_logo() {
 		echo "zacos9: could not redraw the start-up picture." >&2
 }
 
+# The Monitors panel's machine-wide rotation (zacos9-accounts-helper
+# display) also turns the kernel console and the boot splash; the helper
+# rewrites GRUB_CMDLINE_LINUX and runs update-grub. Best-effort: on a
+# machine without GRUB, or in a chroot, it only warns.
+rotate_boot() {
+	[ -f /etc/zacos9/desktop.conf ] || return 0
+	[ -x /usr/libexec/zacos9/zacos9-rotate-boot ] || return 0
+	/usr/libexec/zacos9/zacos9-rotate-boot || true
+}
+
 # Shared Documents (Mac OS 9's Multiple Users): one folder everyone on the
 # computer can put things in, sticky so only an item's owner can remove it.
 # The Sniffer shows it on the startup disk. Never changed once made.
@@ -95,6 +105,7 @@ case "$1" in
 		guest_seat
 		zram_off_by_default
 		redraw_grub_logo
+		rotate_boot
 		make_shared_documents
 		remove_rdp_sharing
 		# Software Update's daily check, for every account.
