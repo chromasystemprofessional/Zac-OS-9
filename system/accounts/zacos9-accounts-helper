@@ -18,6 +18,13 @@
 #                       make a locale the Numbers and Text panels chose
 #                       (one /usr/share/i18n/SUPPORTED lists): /etc/locale.gen,
 #                       then locale-gen
+#   zacos9-accounts-helper display NAME ROTATION [main]
+#                       the Monitors panel's machine-wide record of a
+#                       screen's rotation (0, 90, 180 or 270 degrees) in
+#                       /etc/zacos9/desktop.conf, for the login screen and
+#                       the boot splash; "main" also writes the main
+#                       screen's rotation= and main-display= lines. Then
+#                       zacos9-rotate-boot rewrites GRUB for the next boot
 #   zacos9-accounts-helper schedule
 #                       Nap Time's schedule, from stdin: "startup DAYS HH:MM" and
 #                       "shutdown DAYS HH:MM" lines (DAYS: daily, weekdays or
@@ -123,6 +130,48 @@ locale)
 	fi
 	[ -n "${ZACOS9_LOCALE_GEN:-}" ] || locale-gen >/dev/null || die "The language couldn't be made."
 	;;
+display)
+	# The Monitors panel: the machine-wide rotation for the login screen
+	# and the boot splash. NAME empty writes only the main screen's
+	# rotation= line; "main" writes main-display= and the screen's own
+	# display.NAME.rotation too.
+	[ $# -ge 2 ] && [ $# -le 3 ] || die "usage: display NAME ROTATION [main]"
+	name=$1
+	rotation=$2
+	main=${3:-}
+	case $name in *[!A-Za-z0-9._-]*) die "No such screen: \"$name\"." ;; esac
+	case $rotation in 0 | 90 | 180 | 270) ;; *) die "No such rotation: \"$rotation\"." ;; esac
+	case $main in '' | main) ;; *) die "usage: display NAME ROTATION [main]" ;; esac
+	mkdir -p "$CONF"
+	conf=$CONF/desktop.conf
+	touch "$conf" || die "The display settings couldn't be written."
+	tmp=$(mktemp) || die "The display settings couldn't be written."
+	awk -v name="$name" -v rotation="$rotation" -v main="$main" '
+	{
+		line = $0
+		sub(/^[ \t]+/, "", line)
+		if (line ~ /^display\..*\.rotation[ \t]*=/) {
+			key = line
+			sub(/[ \t]*=.*/, "", key)
+			if (name != "" && key == "display." name ".rotation") next
+		}
+		if (line ~ /^rotation[ \t]*=/ && (main == "main" || name == "")) next
+		if (line ~ /^main-display[ \t]*=/ && main == "main" && name != "") next
+		print
+	}
+	END {
+		if (name != "") printf "display.%s.rotation=%s\n", name, rotation
+		if (main == "main" && name != "") printf "main-display=%s\n", name
+		if (main == "main" || name == "") printf "rotation=%s\n", rotation
+	}' "$conf" >"$tmp" || { rm -f "$tmp"; die "The display settings couldn't be written."; }
+	cat "$tmp" >"$conf" || { rm -f "$tmp"; die "The display settings couldn't be written."; }
+	chmod 644 "$conf"
+	rm -f "$tmp"
+	rotate=${ZACOS9_ROTATE_BOOT:-/usr/libexec/zacos9/zacos9-rotate-boot}
+	if [ -x "$rotate" ]; then
+		ZACOS9_ROTATE_CONF="$conf" "$rotate" || true
+	fi
+	;;
 schedule)
 	systemd=${ZACOS9_SYSTEMD_DIR:-/etc/systemd/system}
 	out=""
@@ -208,6 +257,6 @@ status)
 	done
 	;;
 *)
-	die "usage: zacos9-accounts-helper puppy|guest|welcome|status ..."
+	die "usage: zacos9-accounts-helper puppy|guest|welcome|locale|display|schedule|wakealarm|status ..."
 	;;
 esac
