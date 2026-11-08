@@ -161,6 +161,7 @@ QHash<QString, VNode> g_nodes;
 QHash<QString, Override> g_overrides;
 QString g_volumeName;
 bool g_showUnix = false;
+bool g_volumeSettingsLoaded = false;
 std::vector<VfsZacosVolume> g_zacosVolumes;
 bool g_loaded = false;
 /* Keyed by token so a window can stop listening when it closes. */
@@ -501,6 +502,50 @@ bool migrate(QJsonObject *root) {
 	}
 	root->insert("version", REGISTRY_VERSION);
 	return true;
+}
+
+/* The registry as the Finder uses it: migrated and written back when it
+ * was missing or old. */
+QJsonObject readRegistryForUse() {
+	QJsonObject root = readRegistryFile();
+	const bool migrated = migrate(&root);
+	if (!QFile::exists(vfsRegistryPath()) || migrated) {
+		writeRegistryFile(root);
+	}
+	return root;
+}
+
+/* The startup disk's name and the Unix disk's setting. These are the
+ * only parts of the registry the desktop needs before anything is
+ * listed, so they can be read without generating the folder tree (and
+ * without asking dpkg about every installed application). */
+void applyVolumeSettings(QJsonObject *root) {
+	QJsonObject volumeObj = root->value("volume").toObject();
+	if (volumeObj.value("name").toString() == QLatin1String("Macintosh HD")) {
+		volumeObj.remove("name");
+		root->insert("volume", volumeObj);
+		writeRegistryFile(*root);
+	}
+	g_volumeName = volumeObj.value("name").toString();
+	if (g_volumeName.isEmpty()) {
+		QFile named(QStringLiteral("/etc/zacos9/disk-name"));
+		if (named.open(QIODevice::ReadOnly)) {
+			g_volumeName = QString::fromUtf8(named.readLine()).trimmed();
+		}
+	}
+	if (g_volumeName.isEmpty()) {
+		g_volumeName = QStringLiteral("Zacintosh HD");
+	}
+	g_showUnix = root->value("showUnixVolume").toBool(false);
+	g_volumeSettingsLoaded = true;
+}
+
+void ensureVolumeSettings() {
+	if (g_volumeSettingsLoaded) {
+		return;
+	}
+	QJsonObject root = readRegistryForUse();
+	applyVolumeSettings(&root);
 }
 
 /* ---- generated nodes ---------------------------------------------------- */
@@ -907,34 +952,8 @@ void load() {
 	g_nodes.clear();
 	g_overrides.clear();
 
-	QJsonObject root = readRegistryFile();
-	const bool migrated = migrate(&root);
-	if (!QFile::exists(vfsRegistryPath()) || migrated) {
-		writeRegistryFile(root);
-	}
-
-	/* The startup disk's name: the user's own, if they renamed it; else
-	 * the one it was given when ZacOS 9 was installed (zacos9-install
-	 * writes /etc/zacos9/disk-name); else Zacintosh HD. "Macintosh HD",
-	 * the default before, is Apple's, so a file still holding it (never
-	 * renamed) counts as not named. */
-	QJsonObject volumeObj = root.value("volume").toObject();
-	if (volumeObj.value("name").toString() == QLatin1String("Macintosh HD")) {
-		volumeObj.remove("name");
-		root.insert("volume", volumeObj);
-		writeRegistryFile(root);
-	}
-	g_volumeName = volumeObj.value("name").toString();
-	if (g_volumeName.isEmpty()) {
-		QFile named(QStringLiteral("/etc/zacos9/disk-name"));
-		if (named.open(QIODevice::ReadOnly)) {
-			g_volumeName = QString::fromUtf8(named.readLine()).trimmed();
-		}
-	}
-	if (g_volumeName.isEmpty()) {
-		g_volumeName = QStringLiteral("Zacintosh HD");
-	}
-	g_showUnix = root.value("showUnixVolume").toBool(false);
+	QJsonObject root = readRegistryForUse();
+	applyVolumeSettings(&root);
 
 	const QJsonObject overrides = root.value("overrides").toObject();
 	for (auto it = overrides.begin(); it != overrides.end(); ++it) {
@@ -1115,7 +1134,7 @@ QString vfsName(const QString &path) {
 }
 
 QString vfsVolumeName() {
-	ensureLoaded();
+	ensureVolumeSettings();
 	return g_volumeName;
 }
 
@@ -1145,7 +1164,9 @@ void vfsSetZacosVolumes(const std::vector<VfsZacosVolume> &volumes) {
 }
 
 QString vfsZacosVolumeRoot(const QString &mountPath) {
-	ensureLoaded();
+	/* The list comes from the desktop's volume scan, not the registry:
+	 * opening an ordinary folder must not generate the folder tree (and
+	 * ask dpkg about every application) first. */
 	const QString wanted = QDir::cleanPath(mountPath);
 	for (const VfsZacosVolume &volume : g_zacosVolumes) {
 		if (volume.mountPath == wanted) {
@@ -1868,7 +1889,7 @@ bool vfsSetLabel(const QString &path, int label) {
 /* ---- the real filesystem ------------------------------------------------ */
 
 bool vfsUnixVolumeShown() {
-	ensureLoaded();
+	ensureVolumeSettings();
 	return g_showUnix;
 }
 
@@ -1961,10 +1982,14 @@ int vfsOnChange(std::function<void()> f) {
 	static bool watching = false;
 	if (!watching) {
 		watching = true;
-		/* An application installed or removed changes Applications. */
+		/* An application installed or removed changes Applications.
+		 * Before anything has listed a folder there is no tree to
+		 * rebuild; the next listing reads the current applications. */
 		appOnChange([] {
-			load();
-			notifyChanged();
+			if (g_loaded) {
+				load();
+				notifyChanged();
+			}
 		});
 		watchResourceSources();
 		/* Programs see the user's own fonts too (fonts.h). */
