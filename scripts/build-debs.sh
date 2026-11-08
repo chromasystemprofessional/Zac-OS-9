@@ -34,7 +34,13 @@ cd "$work/zacos9"
 if ! dpkg-checkbuilddeps 2>/dev/null; then
 	sudo_ apt-get build-dep -y ./
 fi
-dpkg-buildpackage -b -us -uc -j"$(nproc)"
+# The package tests include the desktop's own UI tests. They use a private
+# compositor, but some need an X display as well; CI runs them this way.
+if command -v xvfb-run >/dev/null 2>&1; then
+	xvfb-run -a dpkg-buildpackage -b -us -uc -j"$(nproc)"
+else
+	dpkg-buildpackage -b -us -uc -j"$(nproc)"
+fi
 cp "$work"/*.deb "$out/"
 
 if [ "${1:-}" = --emulators ]; then
