@@ -62,15 +62,18 @@ int main(int argc, char **argv) {
 	/* The desk accessories' desktop files, as a package installs them:
 	 * Calculator and Plotter only. */
 	char data[640], apps[700], calc_desktop[800], plot_desktop[800], theme_desktop[800];
+	char blood_desktop[800];
 	snprintf(data, sizeof(data), "%s/data", config);
 	snprintf(apps, sizeof(apps), "%s/applications", data);
 	assert(g_mkdir_with_parents(apps, 0700) == 0);
 	snprintf(calc_desktop, sizeof(calc_desktop), "%s/zacos9-calculator.desktop", apps);
 	snprintf(plot_desktop, sizeof(plot_desktop), "%s/zacos9-plotter.desktop", apps);
 	snprintf(theme_desktop, sizeof(theme_desktop), "%s/zacos9-themeinstaller.desktop", apps);
+	snprintf(blood_desktop, sizeof(blood_desktop), "%s/zacos9-bloodhound.desktop", apps);
 	assert(g_file_set_contents(calc_desktop, "[Desktop Entry]\nName=Calculator\nExec=zacos9-calculator\n", -1, NULL));
 	assert(g_file_set_contents(plot_desktop, "[Desktop Entry]\nName=Plotter\nExec=zacos9-plotter\n", -1, NULL));
 	assert(g_file_set_contents(theme_desktop, "[Desktop Entry]\nName=Theme Installer\nExec=zacos9-themeinstaller\nNoDisplay=true\n", -1, NULL));
+	assert(g_file_set_contents(blood_desktop, "[Desktop Entry]\nName=Bloodhound\nExec=zacos9-bloodhound\n", -1, NULL));
 	assert(setenv("XDG_DATA_DIRS", data, 1) == 0);
 	assert(setenv("XDG_DATA_HOME", data, 1) == 0);
 	/* Plotter was put in the Disabled folder: it isn't offered again. */
@@ -159,6 +162,13 @@ int main(int argc, char **argv) {
 	struct mb_item *calc = item_named(&menu, "Calculator");
 	assert(calc && calc->action == ACT_LAUNCH && strstr(calc->arg, "zacos9-calculator"));
 	assert(calc->icon_kind == (int)PL_ICON_APP_CALCULATOR + 1);
+	char blood_alias[700];
+	snprintf(blood_alias, sizeof(blood_alias), "%s/Bloodhound", items);
+	char *blood_pointed = g_file_read_link(blood_alias, NULL);
+	assert(blood_pointed && strcmp(blood_pointed, blood_desktop) == 0);
+	g_free(blood_pointed);
+	struct mb_item *blood = item_named(&menu, "Bloodhound");
+	assert(blood && blood->action == ACT_LAUNCH && strstr(blood->arg, "zacos9-bloodhound"));
 	assert(!contains_item(&menu, "Plotter") && !contains_item(&menu, "Dog Ears"));
 	assert(item_named(&menu, "Top app")); /* the folder's own items, beside them */
 	/* Thrown away, it stays away: the folder is the menu. */
@@ -182,7 +192,7 @@ int main(int argc, char **argv) {
 	assert(access(theme_alias, F_OK) != 0);
 	assert(!contains_item(&migrated, "Theme Installer"));
 	assert(g_file_get_contents(marker, &marker_text, NULL, NULL));
-	assert(strcmp(marker_text, "4\n") == 0);
+	assert(strcmp(marker_text, "5\n") == 0);
 	g_free(marker_text);
 	puts("ok: the old Theme Installer alias is removed once");
 	assert(contains_item(&menu, "At limit app"));
