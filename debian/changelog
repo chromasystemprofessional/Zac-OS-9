@@ -1,3 +1,21 @@
+zacos9 (1.10.0) trixie; urgency=medium
+
+  * Boot splash and login screen now follow the main display's rotation,
+    and removable media is a first-class part of the desktop.
+    
+    CDs, DVDs, audio CDs, blank discs, PC and USB floppy disks, Iomega
+    Zip/Jaz disks, USB storage and disk images now get desktop icons, mount
+    and eject through one path, and audio CDs and video DVDs play in VLC
+    when inserted. ISO 9660, UDF, FAT/exFAT, ext, NTFS, MBR/GPT and
+    single-track CUE/BIN images mount read-only; Mac HFS/APFS images keep
+    their existing helper. Commercial DVDs may need the optional libdvdcss
+    decoder from libdvd-pkg.
+    
+    Hardware validation continues for real optical drives, floppy/Zip media
+    changes, loop-image teardown and DVD playback.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Sun, 08 Nov 2026 01:29:26 -0500
+
 zacos9 (1.9.8) trixie; urgency=medium
 
   * The Finder's permission-specific tests now account for running as root,
