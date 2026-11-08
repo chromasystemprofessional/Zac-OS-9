@@ -1,4 +1,4 @@
-/* Find (shell/finder/findcriteria.cpp, findindex.cpp, findwindow.cpp):
+/* Find (shell/files/findcriteria.cpp, findindex.cpp; findwindow.cpp):
  * criteria against real files, the search index's query and answers (a
  * fake tinysparql), and searches through to the Items Found window. */
 #include <QApplication>

@@ -367,8 +367,8 @@ for), and **About This Computer** keeps showing honest memory use. The
 | Feature | Status | Notes |
 |---|---|---|
 | Find by name, results as a Sniffer view | ✅ | |
-| Criteria: dates, comments, size, kind, label, version, locked, empty/shared folder, invisible, custom icon | ✅ | `shell/finder/findcriteria.cpp`: where (all disks, Home, the front folder) and up to six rows that must all match: name (contains, starts/ends with, is, is not, doesn't contain), date modified/created (today, past week/month, before/after a date), size, kind, label, lock, folder empty/shared, custom icon (is/is not), comments (contains, is/is not, doesn't contain), invisible (is/is not; host dotfiles) and application package version (contains, is/is not, doesn't contain). Hidden entries are traversed only for a query with an invisible criterion. |
-| **Search contents** with an index; schedule indexing; Index Selection | ✅ | `shell/finder/findindex.cpp`: "contents include" asks localsearch (tinysparql full-text query, kept to the chosen place; the other rows sift its answers); File ▸ Index Selection adds folders to its index. Scheduling is localsearch's own. |
+| Criteria: dates, comments, size, kind, label, version, locked, empty/shared folder, invisible, custom icon | ✅ | `shell/files/findcriteria.cpp`: where (all disks, Home, the front folder) and up to six rows that must all match: name (contains, starts/ends with, is, is not, doesn't contain), date modified/created (today, past week/month, before/after a date), size, kind, label, lock, folder empty/shared, custom icon (is/is not), comments (contains, is/is not, doesn't contain), invisible (is/is not; host dotfiles) and application package version (contains, is/is not, doesn't contain). Hidden entries are traversed only for a query with an invisible criterion. |
+| **Search contents** with an index; schedule indexing; Index Selection | ✅ | `shell/files/findindex.cpp`: "contents include" asks localsearch (tinysparql full-text query, kept to the chosen place; the other rows sift its answers); File ▸ Index Selection adds folders to its index. Scheduling is localsearch's own. |
 | Find Similar Items | ✅ | The document's most distinctive words, any of them, ranked by the index. |
 | Save a search; several searches at once | ✅ | Save named criteria in the Find dialog; Saved Searches opens each in its own Items Found window. |
 | Internet channels (web search with plug-ins) | ✅ | The Sniffer's File ▸ Search Internet offers DuckDuckGo, Google and Bing and opens the URL-encoded query in the default browser. |
@@ -614,7 +614,7 @@ alongside the others; most are small.
 | 9.2 ✅ | **Contextual Menu Items folder**: `.desktop` file-manager actions in `~/.local/share/zacos9/contextual`, offered in the Sniffer's contextual menus (shares a format with Folder Tricks, 6.2) | Sniffer, menu bar | S |
 | 9.3 ✅ | **Zac menu**: folders in Menu Items sprout submenus (verify), and Zac Menu Options' submenus on/off | `shell/menubar/launch.c`, `shell/panels/` | S |
 | 9.4 ✅ | **Appearance ▸ Fonts**: the Views font size and font smoothing, for Qt and GTK programs (the bitmap system fonts stay fixed) | `appearance.cpp`, Qt style, GTK settings | M |
-| 9.5 ✅ | **Find criteria**: comments, version, invisible, custom icon | `shell/finder/findcriteria.cpp` | S |
+| 9.5 ✅ | **Find criteria**: comments, version, invisible, custom icon | `shell/files/findcriteria.cpp` | S |
 | 9.6 ✅ | **Printing through programs**: File ▸ Print, and Print in an icon's contextual menu, open other documents in their program with its print action | Sniffer, `shell/print/` | M |
 | 9.7 ✅ | **Menu and Pack details**: a ⇧ glyph so Log Out shows ⇧⌘Q; dragging the Pack's edge sets its width | `lib/menudraw.c`, `shell/pack/` | S |
 | 9.8 ✅ | **Scribble**: styled text, and Speech (after 6.5) | `shell/scribble/` | M |
