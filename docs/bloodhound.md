@@ -14,8 +14,8 @@ app rather than a modern search overlay.
 
 The search engine is the Sniffer's Find:
 
-- `shell/finder/findcriteria.cpp`: queries, criteria rows, saved searches.
-- `shell/finder/findindex.cpp`: contents through the local search index.
+- `shell/files/findcriteria.cpp`: queries, criteria rows, saved searches.
+- `shell/files/findindex.cpp`: contents through the local search index.
 - `shell/finder/findwindow.cpp`: the Find dialog and Items Found windows.
 
 The first app shell is in `shell/bloodhound/`: `zacos9-bloodhound` opens the
@@ -272,10 +272,11 @@ the only choices.
   id, `platinumShellInit()`, `lib/` drawing and `panelkit` controls. Its
   desktop entry keeps the name Bloodhound and the Zac menu alias keeps
   working.
-- **The engine.** Move `findcriteria.*` and `findindex.*` into a shared
-  home (`shell/files` or a new `shell/search`) so the Finder and Bloodhound
-  link one copy. `findwindow.cpp` stays in the Finder while the Sniffer's
-  Find dialog remains; Bloodhound gets its own window and result list.
+- **The engine.** The criteria and the search index live in `shell/files`
+  (`libzacos9-files`: `findcriteria.*`, `findindex.*`), so the Finder and
+  Bloodhound link one copy. `findwindow.cpp` stays in the Finder while the
+  Sniffer's Find dialog remains; Bloodhound gets its own window and result
+  list.
 - **The Sniffer link.** Open and Reveal use `zacos9-finder-ctl open` and
   `zacos9-finder-ctl reveal`, as the app shell already does. Get Info can
   follow through the same command surface, or a small `platinum-shell-v1`
