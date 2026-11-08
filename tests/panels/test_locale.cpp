@@ -9,6 +9,7 @@
 #include <memory>
 
 #include "panelregistry.h"
+#include "process.h"
 
 static int fails;
 static void check(bool ok, const char *what) {
@@ -52,6 +53,18 @@ int main(int argc, char **argv) {
 	qputenv("LANG", "en_US.UTF-8");
 	qputenv("LANGUAGE", "en");
 	QApplication app(argc, argv);
+
+	/* The package-build container need not have en_US.UTF-8 generated.
+	 * Make a private one so the panel's localeAvailable() check is real. */
+	QTemporaryDir localeRoot;
+	const ProcessResult localedef = runProcess("localedef",
+		{ "-i", "en_US", "-f", "UTF-8", localeRoot.path() + "/en_US.UTF-8" });
+	if (!localedef.ok()) {
+		std::printf("FAIL  localedef: %s%s\n",
+			localedef.error.toUtf8().constData(), localedef.err.constData());
+		return 1;
+	}
+	qputenv("LOCPATH", localeRoot.path().toUtf8());
 
 	std::unique_ptr<QWidget> text(panel("text"));
 	check(text != nullptr, "the Text panel is registered");
