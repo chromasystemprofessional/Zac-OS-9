@@ -56,7 +56,10 @@ ZacOS has for it, and the order. All six items are done.
 **Monitors**: each screen's resolution, pixel size and rotation are
 applied live (`compositor/src/prefs.c`): rotation is
 `display.NAME.rotation` (0, 90, 180 or 270 degrees), the layout uses the
-rotated logical size, and `display-rotation` tests it.
+rotated logical size, and `display-rotation` tests it. The main screen's
+rotation is also recorded machine-wide, so the login screen and the boot
+splash -- the kernel console and Plymouth -- follow it through
+`boot/zacos9-rotate-boot` ([Starting up](docs/boot.md#rotated-screens)).
 
 **Interface languages**: the gettext catalogs, the language setting and the
 text-fit check are in place. Italian is the first catalog: the control panels'

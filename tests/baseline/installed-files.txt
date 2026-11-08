@@ -97,6 +97,7 @@
 {prefix}/libexec/zacos9/zacos9-modules-helper
 {prefix}/libexec/zacos9/zacos9-parade
 {prefix}/libexec/zacos9/zacos9-release-disk
+{prefix}/libexec/zacos9/zacos9-rotate-boot
 {prefix}/libexec/zacos9/zacos9-setup-helper
 {prefix}/libexec/zacos9/zacos9-sharing-helper
 {prefix}/libexec/zacos9/zacos9-software-catalog

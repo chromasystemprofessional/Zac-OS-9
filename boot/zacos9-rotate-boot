@@ -1,0 +1,190 @@
+#!/bin/sh
+# zacos9-rotate-boot -- put the Monitors panel's rotation on the kernel
+# command line, so the kernel console and the boot splash (Plymouth) follow
+# it before any compositor exists.
+#
+# The machine-wide rotation is in /etc/zacos9/desktop.conf, which
+# zacos9-accounts-helper writes when the Monitors panel's main screen is
+# turned: "rotation=N" for the main screen and "display.NAME.rotation=N"
+# for one screen. This script reads it and rewrites GRUB_CMDLINE_LINUX in
+# /etc/default/grub:
+#
+#   fbcon=rotate:N              the kernel console (1, 2, 3 = 90, 180, 270
+#                               degrees clockwise)
+#   video=CONNECTOR:panel_orientation=VALUE
+#                               Plymouth, once per connected DRM connector
+#
+# Then it runs update-grub. Tokens it manages are removed before the new
+# ones are appended, so re-running it changes nothing when the rotation is
+# already in place; setting the rotation back to Normal removes them.
+#
+# It never fails a package install: a missing file, no connected connector
+# or no update-grub is a warning and exit 0. The GRUB menu itself cannot be
+# rotated with stock GRUB (a self-built one would break Secure Boot); it is
+# out of scope. The kernel console's fbcon=rotate is certain; Plymouth
+# follows panel_orientation on KMS drivers, but a particular panel may need
+# left_side_up and right_side_up swapped -- this is the one part to confirm
+# on real hardware.
+#
+# Re-run by hand after changing the main screen's rotation:
+#   sudo /usr/libexec/zacos9/zacos9-rotate-boot && sudo reboot
+#
+# ZACOS9_ROTATE_CONF, ZACOS9_ROTATE_GRUB and ZACOS9_ROTATE_DRM_SYS exist so
+# the test can use a scratch folder; the packaged call sets none of them.
+set -u
+
+CONF=${ZACOS9_ROTATE_CONF:-/etc/zacos9/desktop.conf}
+GRUB=${ZACOS9_ROTATE_GRUB:-/etc/default/grub}
+DRM_SYS=${ZACOS9_ROTATE_DRM_SYS:-/sys/class/drm}
+
+warn() { echo "zacos9-rotate-boot: $*" >&2; }
+
+# The first value of KEY in the machine-wide file.
+read_key() {
+	sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*//p" "$CONF" 2>/dev/null | head -n 1
+}
+
+if [ ! -f "$CONF" ]; then
+	echo "zacos9-rotate-boot: no $CONF; leaving the boot parameters unchanged"
+	exit 0
+fi
+
+# --- 1. Rotation ----------------------------------------------------------
+rotation=
+found=0
+rotation=$(read_key "rotation")
+if [ -n "$rotation" ]; then
+	found=1
+else
+	main=$(read_key "main-display")
+	if [ -n "$main" ]; then
+		rotation=$(read_key "display.$main.rotation")
+		[ -n "$rotation" ] && found=1
+	fi
+	if [ "$found" -eq 0 ]; then
+		# A hand-written file may name only the screen. With one screen
+		# that is the main one; with several, the first named wins.
+		rotation=$(sed -n 's/^[[:space:]]*display\..*\.rotation[[:space:]]*=[[:space:]]*//p' "$CONF" 2>/dev/null | head -n 1)
+		[ -n "$rotation" ] && found=1
+	fi
+fi
+if [ "$found" -eq 0 ]; then
+	echo "zacos9-rotate-boot: no rotation in $CONF; leaving the boot parameters unchanged"
+	exit 0
+fi
+
+# /etc/default/locale-style quoting, and stray whitespace.
+rotation=$(printf '%s' "$rotation" | tr -d ' \t\r\n')
+rotation=${rotation%\"}; rotation=${rotation#\"}
+rotation=${rotation%\'}; rotation=${rotation#\'}
+
+case "$rotation" in
+"")			rotate=0 ;;
+normal|0)		rotate=0 ;;
+90|left)		rotate=1 ;;
+180|inverted|upside-down) rotate=2 ;;
+270|right)		rotate=3 ;;
+*)
+	warn "unrecognised rotation '$rotation' in $CONF; leaving the boot parameters unchanged"
+	exit 0
+	;;
+esac
+case "$rotate" in
+0) panel=normal ;;
+1) panel=left_side_up ;;
+2) panel=upside_down ;;
+3) panel=right_side_up ;;
+esac
+
+# --- 2. Connected DRM connectors -----------------------------------------
+connectors=
+for status in "$DRM_SYS"/card[0-9]*-*/status; do
+	[ -f "$status" ] || continue
+	[ "$(cat "$status" 2>/dev/null)" = "connected" ] || continue
+	base=$(basename "$(dirname "$status")")
+	case "$base" in
+	card[0-9]*-*) name=${base#card[0-9]*-} ;;
+	*) continue ;;
+	esac
+	[ -n "$name" ] || continue
+	case " $connectors " in
+	*" $name "*) continue ;;
+	esac
+	connectors="$connectors $name"
+done
+
+# --- 3. Rewrite GRUB_CMDLINE_LINUX ----------------------------------------
+if [ ! -f "$GRUB" ]; then
+	warn "$GRUB not found; nothing to update"
+	exit 0
+fi
+
+tmp=$(mktemp) || exit 0
+ZACOS_ROTATE=$rotate ZACOS_PANEL=$panel ZACOS_CONNECTORS="$connectors" \
+awk '
+BEGIN {
+	rotate = ENVIRON["ZACOS_ROTATE"] + 0
+	panel = ENVIRON["ZACOS_PANEL"]
+	n = split(ENVIRON["ZACOS_CONNECTORS"], conns, " ")
+	found = 0
+}
+{
+	if ($0 ~ /^[[:space:]]*GRUB_CMDLINE_LINUX[[:space:]]*=/) {
+		found = 1
+		line = $0
+		sub(/^[[:space:]]*GRUB_CMDLINE_LINUX[[:space:]]*=/, "", line)
+		sub(/^"/, "", line)
+		sub(/"$/, "", line)
+		gsub(/\t/, " ", line)
+		m = split(line, words, " ")
+		out = ""
+		for (i = 1; i <= m; i++) {
+			if (words[i] ~ /^fbcon=rotate:/) continue
+			if (words[i] ~ /^video=[^ ]*:panel_orientation=/) continue
+			out = out (out == "" ? "" : " ") words[i]
+		}
+		if (rotate != 0) {
+			out = out (out == "" ? "" : " ") "fbcon=rotate:" rotate
+			for (i = 1; i <= n; i++)
+				out = out " video=" conns[i] ":panel_orientation=" panel
+		}
+		printf "GRUB_CMDLINE_LINUX=\"%s\"\n", out
+	} else {
+		print
+	}
+}
+END {
+	if (!found) {
+		out = ""
+		if (rotate != 0) {
+			out = "fbcon=rotate:" rotate
+			for (i = 1; i <= n; i++)
+				out = out " video=" conns[i] ":panel_orientation=" panel
+		}
+		printf "GRUB_CMDLINE_LINUX=\"%s\"\n", out
+	}
+}' "$GRUB" >"$tmp" || { warn "could not rewrite $GRUB"; rm -f "$tmp"; exit 0; }
+
+if cmp -s "$GRUB" "$tmp"; then
+	rm -f "$tmp"
+	echo "zacos9-rotate-boot: boot parameters already match rotation '${rotation:-normal}'"
+	exit 0
+fi
+
+cat "$tmp" >"$GRUB" || { warn "could not write $GRUB"; rm -f "$tmp"; exit 0; }
+rm -f "$tmp"
+if [ "$rotate" -eq 0 ]; then
+	echo "zacos9-rotate-boot: rotation '${rotation:-normal}' -> boot rotation removed"
+else
+	echo "zacos9-rotate-boot: rotation '$rotation' -> fbcon=rotate:$rotate${connectors:+; panel_orientation=$panel on$connectors}"
+fi
+if [ -z "$connectors" ]; then
+	warn "no connected DRM connector under $DRM_SYS; panel_orientation not set (fbcon only)"
+fi
+if command -v update-grub >/dev/null 2>&1; then
+	update-grub >/dev/null 2>&1 || warn "update-grub failed; run it by hand"
+else
+	warn "update-grub not found; run it by hand after editing $GRUB"
+fi
+
+exit 0

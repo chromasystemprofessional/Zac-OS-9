@@ -32,6 +32,42 @@ whole number that fits a 512x342 screen into it (1 to 6;
 the splash and the compositor all use this rule, so nothing moves between
 them.
 
+## Rotated screens
+
+The Monitors panel applies a screen's rotation live in the session. The
+login screen and the boot splash run before an account exists, so they use
+the machine-wide record the panel writes to `/etc/zacos9/desktop.conf`
+through `zacos9-accounts-helper` (`rotation=` for the main screen,
+`display.NAME.rotation=` for each screen). Changing the rotation asks for an
+administrator's password; cancelling it leaves only the session turned.
+
+The helper then runs `zacos9-rotate-boot`, which rewrites
+`GRUB_CMDLINE_LINUX` in `/etc/default/grub` and runs `update-grub`:
+
+| Rotation | `fbcon=rotate` | `panel_orientation` |
+|---|---|---|
+| Normal | removed | removed |
+| 90° clockwise | `1` | `left_side_up` |
+| 180° | `2` | `upside_down` |
+| 270° clockwise | `3` | `right_side_up` |
+
+It adds one `video=<connector>:panel_orientation=<value>` token per
+connected DRM connector, and a single `fbcon=rotate:N` for the kernel
+console. The tokens it manages are removed before the new ones are added,
+so re-running it changes nothing when the rotation is already in place;
+setting the rotation back to Normal removes them. The postinst calls it
+best-effort on configure, and it can be re-run by hand:
+
+```sh
+sudo /usr/libexec/zacos9/zacos9-rotate-boot && sudo reboot
+```
+
+`fbcon=rotate` is certain; Plymouth follows `panel_orientation` on KMS
+drivers, but a particular panel may need `left_side_up` and `right_side_up`
+swapped. The GRUB menu itself cannot be rotated with stock GRUB — a
+self-built GRUB would break the Secure Boot signing chain — so it stays as
+it is for the few seconds it is shown.
+
 ## The extension parade
 
 `lib/extensions.c` lists the extensions Extensions Manager shows, each with
