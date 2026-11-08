@@ -23,10 +23,10 @@ Find window through `zacos9-finder-ctl`, and a desktop entry puts Bloodhound
 in Applications and the Zac menu. That was [PR
 #143](https://github.com/chromasystemprofessional/Zac-OS-9/pull/143).
 
-The next slice is the standalone window: its own process and app id, one
-window holding the query and the results. It is tracked as the
-[standalone Bloodhound window
-issue](https://github.com/chromasystemprofessional/Zac-OS-9/issues/144).
+The standalone Files window is
+[PR #147](https://github.com/chromasystemprofessional/Zac-OS-9/pull/147)
+(issue #144): its own process and app id, one window holding the query and
+the results. Criteria, contents, saved searches and channels follow.
 
 ## What Sherlock 2 got right
 
