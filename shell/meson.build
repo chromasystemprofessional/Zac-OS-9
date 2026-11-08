@@ -295,6 +295,12 @@ test('window-tricks', find_program('python3'),
     vptr_exe, close_app_client],
   timeout: 60,
 )
+# ⌘Q, ⌘H and ⌘M in every program but the Sniffer (compositor/src/input.c, view.c).
+test('app-shortcuts', find_program('python3'),
+  args: [files('../tests/compositor/test_app_shortcuts.py'), compositor_exe, idle_client,
+    vptr_exe],
+  timeout: 60,
+)
 # A keyring password prompt keeps the keyboard until answered (compositor/src/view.c).
 test('system-prompt', find_program('python3'),
   args: [files('../tests/compositor/test_system_prompt.py'), compositor_exe, idle_client,

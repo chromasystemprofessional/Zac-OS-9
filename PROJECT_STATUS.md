@@ -147,6 +147,10 @@ All of them are [on GitHub](https://github.com/chromasystemprofessional/Zac-OS-9
 
 ## Known gaps
 
+- **Keyboard menus**: menus are mouse-only (no way in from the keyboard, no
+  arrow or Return walking), and the menu bar itself doesn't run its items'
+  ⌘ shortcuts; the apps' own shortcuts and ⌘Q, ⌘H and ⌘M work
+  ([Roadmap](docs/ROADMAP.md)).
 - **SMB**: no share-list dialog yet, and nothing has been tested against a
   real SMB server ([Networking](docs/network.md)).
 - **Network Browser**: no retry if `avahi-daemon` isn't running yet when it

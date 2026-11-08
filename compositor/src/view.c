@@ -527,6 +527,20 @@ void view_close_front_app_window(struct plat_server *server, const char *app_id)
 	}
 }
 
+/* ⌘Q: every window of the program, so it can ask about unsaved work and
+ * exit as the last one goes. */
+void view_close_app(struct plat_server *server, const char *app_id) {
+	if (!app_id || !*app_id) {
+		return;
+	}
+	struct plat_view *view, *tmp;
+	wl_list_for_each_safe(view, tmp, &server->views, link) {
+		if (view->mapped && view->app_id && strcmp(view->app_id, app_id) == 0) {
+			view_close(view);
+		}
+	}
+}
+
 void view_hide_app(struct plat_server *server, const char *app_id) {
 	struct plat_view *view, *tmp;
 	wl_list_for_each_safe(view, tmp, &server->views, link) {

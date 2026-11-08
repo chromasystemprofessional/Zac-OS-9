@@ -478,7 +478,8 @@ void menus_rebuild(struct mb_bar *bar, int screen_w) {
 	if (front) {
 		char label[256];
 		snprintf(label, sizeof(label), _("Hide %s"), front->name);
-		add(am, label, 0, true, ACT_HIDE_APP, front->app_id);
+		/* The Sniffer keeps ⌘H for Search Internet. */
+		add(am, label, finder_front ? 0 : 'H', true, ACT_HIDE_APP, front->app_id);
 	} else {
 		add(am, _("Hide Sniffer"), 0, false, ACT_NONE, NULL);
 	}
