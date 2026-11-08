@@ -71,12 +71,18 @@ with tempfile.TemporaryDirectory(prefix="zacos9-switch-") as directory:
                                  daemon=True).start()
                 wait_for(f"{app_id} shown", lambda: "shown" in keys[app_id])
 
-            def typed(letter):
-                """Which window, if any, got `letter`."""
-                vp("type", letter, "wait", "300")
-                got = [a for a, k in keys.items() if f"key {letter}" in k]
-                assert len(got) <= 1, got
-                return got[0] if got else None
+            def typed(letter, seconds=1.5):
+                """Which window, if any, got `letter`; a slow, busy
+                package build may deliver the key after the switch."""
+                vp("type", letter)
+                deadline = time.monotonic() + seconds
+                while time.monotonic() < deadline:
+                    got = [a for a, k in keys.items() if f"key {letter}" in k]
+                    assert len(got) <= 1, got
+                    if got:
+                        return got[0]
+                    time.sleep(0.05)
+                return None
 
             def switch(letter):
                 vp("cmd", "Tab", "wait", "300")

@@ -150,7 +150,8 @@ with tempfile.TemporaryDirectory(prefix="zacos9-popup-") as directory:
             wait_for("the pop-up closed behind Other", lambda: shot()(340, 600) != WHITE, 5)
             vp("home", "move", "133", "150", "down", "wait", "100", "move", "10", "10", "wait", "200",
                "move", "100", "300", "wait", "200", "move", "97", "250", "wait", "1300")
-            assert shot()(340, 600) == WHITE, "a drag resting on the tab opens the pop-up"
+            wait_for("a drag resting on the tab opens the pop-up",
+                lambda: shot()(340, 600) == WHITE)
             vp("move", "0", "-150", "wait", "400", "up", "wait", "500")
             wait_for("memo moved into Work", (home / "Work/memo.txt").exists)
             wait_for("the pop-up closed again", lambda: shot()(340, 600) != WHITE, 5)

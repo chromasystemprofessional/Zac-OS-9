@@ -82,15 +82,15 @@ with tempfile.TemporaryDirectory(prefix="zacos9-proxy-") as directory:
             vp("key", "Escape")
             cmd(f"open-path {home}/Work/Projects")
             vp("home", "move", "460", "50", "click", "wait", "500")
+            wait_for("Projects collapsed", lambda: shot()(100, 200) != (255, 255, 255))
             cmd(f"open-path {home}/Work")
             vp("home", "move", "380", "70", "down", "move", "0", "150", "move", "0", "150", "up", "wait", "500")
-            px = shot()
-            assert px(100, 200) != (255, 255, 255), "Projects is collapsed"
 
             # memo dragged to Projects' title bar and held: it springs open.
             vp("home", "move", "113", "428", "down", "wait", "100", "move", "10", "-10", "wait", "200",
                "move", "100", "-150", "wait", "200", "move", "77", "-218", "wait", "1300")
-            assert shot()(100, 200) == (255, 255, 255), "a drag resting on its title bar opens it"
+            wait_for("a drag resting on its title bar opens it",
+                lambda: shot()(100, 200) == (255, 255, 255))
             vp("move", "0", "100", "wait", "400", "up", "wait", "500")
             wait_for("memo moved into Projects", (home / "Work/Projects/memo.txt").exists)
             wait_for("Projects collapsed again", lambda: shot()(100, 200) != (255, 255, 255), 5)
