@@ -156,6 +156,33 @@ Sniffer mounts HFS/HFS+ and supported APFS volumes read-only, including Mac
 disk images opened with a double-click. See [Mac disks](mac-disks.md)
 for supported containers, eject behavior, authentication and limitations.
 
+Other disk images mount read-only too: ISO 9660 and UDF (CD/DVD), FAT/exFAT
+floppy and Zip images, ext, NTFS, MBR/GPT-partitioned images, and single-data-track
+CUE/BIN images (converted to ISO with bchunk). Double-click one to set up a
+read-only loop device and open its first filesystem; Put Away ejects it and
+removes the loop device. Image contents are never modified. Audio CD and
+multi-track CUE images cannot be mounted.
+
+Floppy disks, USB floppy drives and Iomega Zip/Jaz disks are noticed when
+they are inserted or removed. Inserting one mounts it and shows its disk
+icon; Put Away unmounts it so it can be removed. See
+[Removable media](removable-media.md) for supported formats and limits.
+
+## Inserted discs and AutoPlay
+
+An audio CD or video DVD starts playing in VLC when it is inserted, unless
+**Sniffer > Preferences > General > Media** has "Play audio CDs and video DVDs
+when inserted" turned off. Audio CDs, blank discs, data CDs and DVDs appear on
+the desktop like any other disk. Opening an audio CD plays it, and Put Away
+ejects the disc; a blank disc is reported as blank. Programs on a disc never
+start by themselves.
+
+Commercial movie DVDs are usually CSS-encrypted. Debian main does not include
+the `libdvdcss` decoder: enable the `contrib` section, install `libdvd-pkg`, and
+run `sudo dpkg-reconfigure libdvd-pkg` if the decoder was not built during
+installation. Unencrypted discs play without it. Blu-ray playback is not
+supported.
+
 ## Custom desktop patterns
 
 Appearance also supports saved appearance presets and interface sound sets.

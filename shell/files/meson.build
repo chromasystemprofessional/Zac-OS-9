@@ -14,7 +14,7 @@ finder_fonts_dep = declare_dependency(link_with: finder_fonts,
 # Extensions Manager sets, desktop printers, file associations, thumbnails
 # and resource forks.
 shell_files = static_library('zacos9-files',
-  'alias.cpp', 'localvolumes.cpp', 'mountpolicy.cpp',
+  'alias.cpp', 'localvolumes.cpp', 'mediakind.cpp', 'mediaeject.cpp', 'cueimage.cpp', 'floppypoll.cpp', 'autoplay.cpp', 'mountpolicy.cpp',
   'netvolumes.cpp', 'smbclient.cpp', 'vfs.cpp',
   'resources.cpp', 'autostart.cpp', 'extensioncatalog.cpp',
   'appdb.cpp', 'apptrash.cpp', 'items.cpp', 'clippings.cpp',

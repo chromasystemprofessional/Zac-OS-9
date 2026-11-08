@@ -1,6 +1,11 @@
 # ZacOS 9's default applications (XDG_CONFIG_DIRS, as zacos9-session sets it;
 # a user's own ~/.config/mimeapps.list still wins).
 [Default Applications]
+# Discs: VLC's NoDisplay entries know the dvd:// and cdda:// arguments.
+x-content/audio-cdda=vlc-opencda.desktop
+x-content/video-dvd=vlc-opendvd.desktop
+x-content/video-vcd=vlc-openvcd.desktop
+x-content/video-svcd=vlc-openvcd.desktop
 inode/directory=zacos9-finder.desktop
 # Pictures open in Picture Viewer.
 image/png=zacos9-picture.desktop

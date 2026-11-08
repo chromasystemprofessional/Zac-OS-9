@@ -63,6 +63,7 @@
 {prefix}/bin/zacos9-wininstall
 {prefix}/bin/zacos9-wm
 {prefix}/lib/modprobe.d/zacos9-hda.conf
+{prefix}/lib/modules-load.d/zacos9-floppy.conf
 {prefix}/lib/systemd/system/macipgw.service.d/zacos9.conf
 {prefix}/lib/systemd/system/plymouth-quit-wait.service.d/zacos9.conf
 {prefix}/lib/systemd/system/plymouth-quit.service.d/zacos9.conf

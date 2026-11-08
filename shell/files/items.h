@@ -10,6 +10,11 @@
 
 #include "pixels.h"
 #include "settings.h"
+#include "mediakind.h"
+
+/* The icon for a local medium: a CD, floppy or Zip instead of a disk;
+ * USB sticks and mounted images keep the disk icon. */
+pl_icon_kind mediaIconKind(MediaKind kind);
 
 /* Something the Finder shows as an icon: a file, folder, disk or the Trash. */
 struct Item {
@@ -58,6 +63,18 @@ struct Item {
 	bool isLocalVolume = false;
 	bool ejectable = false;
 	bool isUsbVolume = false;
+	/* What the volume is (local volumes only): a CD, floppy or Zip is
+	 * drawn with its own icon, while `kind` stays PL_ICON_DISK so it
+	 * still opens as a disk. `volumeDevice` is the block device, used
+	 * to notice a different medium at the same mount point. */
+	MediaKind mediaKind = MediaKind::Disk;
+	QString volumeDevice;
+	/* False for a local volume with no filesystem yet (an audio CD or a
+	 * blank disc): opening it mounts or plays it, and Put Away ejects its
+	 * drive. `activationUri` is its GIO activation root when it has no
+	 * native path. */
+	bool mounted = true;
+	QString activationUri;
 
 	/* A mounted network volume (AFP or SMB) on the desktop: real files,
 	 * at a real path, but Put Away ejects it instead of trying to move
@@ -69,7 +86,11 @@ struct Item {
 	 * See shell/files/netvolumes.h. */
 	bool isNetworkVolume = false;
 	pl_icon_kind iconKind() const {
-		/* Drawn so; the kind stays (a network volume opens as a disk does). */
+		/* A medium with its own picture is drawn so; the kind stays
+		 * PL_ICON_DISK so it opens as a disk does. */
+		if (mediaKind != MediaKind::Disk) {
+			return mediaIconKind(mediaKind);
+		}
 		return shared && kind == PL_ICON_FOLDER ? PL_ICON_SHARED_FOLDER
 			: isNetworkVolume && kind == PL_ICON_DISK ? PL_ICON_NETWORK_DISK : kind;
 	}
@@ -138,8 +159,9 @@ pl_icon_kind romIconKind(const QString &path);
 bool isSharedFolder(const QString &path);
 /* A Macintosh disk or CD image (HFS, HFS+ or partitioned): opening one
  * starts it in Classic. */
-/* A CD or DVD image (.iso, ISO 9660): Disk Copy mounts it read-only. */
-bool isDiscImage(const QString &path);
+/* A disk image that can be mounted read-only: ISO 9660, UDF, FAT/exFAT,
+ * ext, NTFS, MBR/GPT, or a Mac HFS/APFS image. */
+bool isDiskImage(const QString &path);
 bool isMacDiskImage(const QString &path);
 /* A Windows .exe or .msi: opening one runs it via Wine. */
 bool isWindowsExecutable(const QString &path);

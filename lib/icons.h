@@ -21,6 +21,10 @@ enum pl_icon_kind {
 	PL_ICON_TRASH_FULL,
 	PL_ICON_CAUTION,    /* alerts */
 	PL_ICON_DISK_IMAGE, /* a Macintosh disk or CD image */
+	PL_ICON_OPTICAL,    /* a data CD or DVD */
+	PL_ICON_AUDIO_CD,   /* an audio CD */
+	PL_ICON_FLOPPY,     /* a 3.5-inch floppy disk */
+	PL_ICON_ZIP,        /* an Iomega-style Zip cartridge */
 	PL_ICON_CLASSIC,    /* a classic Mac OS application (runs in Classic) */
 	PL_ICON_WINDOWS,    /* a Windows application (runs in Wine) */
 	PL_ICON_SHARED_FOLDER, /* a folder shared from Get Info */
