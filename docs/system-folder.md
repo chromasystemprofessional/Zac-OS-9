@@ -71,7 +71,7 @@ Of 31 items: 16 working, 6 partial, 0 view only, 9 missing.
 | Keychains (9) | Passwords, a file per keychain. | Missing | `shell/panels/keychainaccess.cpp` | A read-only *Keychains* folder; opening one opens it in Keychain Access. | S |
 | Printer Descriptions, PrintMonitor Documents (7.x) | Printers' PPDs, and jobs waiting to print. | Missing | `shell/files/printers.cpp`, `desktopprinter.cpp` | Read-only folders of installed drivers and waiting jobs. | M |
 | ColorSync Profiles (7.5) | Color profiles; drop one in to install it. | Missing | new provider in `shell/files/` | The system's profiles read-only, and the user's, which a dropped profile joins. | S |
-| Internet Search Sites (8.5) | Sherlock's search plug-ins. | Missing | `shell/finder/findwindow.cpp` | Later: search sites as files, offered by Find. | L |
+| Internet Search Sites (8.5) | Sherlock's search plug-ins. | Missing | `shell/finder/findwindow.cpp` | Later: search sites as files, offered by [Bloodhound](bloodhound.md). | L |
 
 ## The mechanisms to reuse
 
