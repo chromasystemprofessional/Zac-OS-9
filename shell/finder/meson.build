@@ -229,7 +229,7 @@ test('finder-vfs',
     '../files/extensioncatalog.cpp',
     '../files/appdb.cpp',
     '../files/apptrash.cpp',
-    '../files/items.cpp', '../files/clippings.cpp', '../files/desktopprinter.cpp', '../files/printers.cpp', '../files/thumbnails.cpp', '../files/fileassoc.cpp', '../files/alias.cpp',
+    '../files/items.cpp', '../files/cueimage.cpp', '../files/clippings.cpp', '../files/desktopprinter.cpp', '../files/printers.cpp', '../files/thumbnails.cpp', '../files/fileassoc.cpp', '../files/alias.cpp',
     link_with: panelkit,
     include_directories: include_directories('../print', '../panels', '../../compositor/src'),
     dependencies: [shell_common_dep, platinum_dep, qt6, gio, gio_unix, wayland_client, finder_fonts_dep, controlpanels_dep, collarmodules_dep, xkbcommon_client],
@@ -282,6 +282,30 @@ test('local-volume-hotplug',
   ),
   env: ['QT_NO_GLIB=1'],
   timeout: 10,
+)
+
+test('media-kind',
+  executable('test-mediakind', '../../tests/finder/test_mediakind.cpp',
+    dependencies: [shell_files_dep, platinum_dep, qt6],
+  ),
+  timeout: 10,
+)
+
+test('media-eject',
+  executable('test-mediaeject', '../../tests/finder/test_mediaeject.cpp',
+    dependencies: [shell_files_dep, qt6],
+  ),
+  timeout: 10,
+)
+
+test('media-autoplay',
+  executable('test-mediaautoplay', '../../tests/finder/test_autoplay.cpp',
+    dependencies: [shell_files_dep, platinum_dep, qt6, gio],
+    cpp_args: ['-DZACOS9_MIMEAPPS="@0@"'.format(
+      meson.project_source_root() / 'share/xdg/zacos9-mimeapps.list')],
+  ),
+  env: ['QT_NO_GLIB=1'],
+  timeout: 30,
 )
 
 test('tricks-sets',

@@ -53,9 +53,22 @@ std::vector<LocalVolume> localVolumes() { return fixtureVolumes; }
 QString localVolumeUsbDevice(const QString &) { return {}; }
 void localVolumesOnChange(std::function<void()>) {}
 void localVolumesOnError(std::function<void(const QString &)>) {}
+void localVolumesOnAutoplayMissing(std::function<void(const QString &)>) {}
 void localVolumeMountMacImage(const QString &,
 		std::function<void(const QString &, const QString &)> completed) {
 	completed({}, "Disk image mounting is unavailable in the desktop fixture.");
+}
+void localVolumeMountImage(const QString &,
+		std::function<void(const QString &, const QString &)> completed) {
+	completed({}, "Disk image mounting is unavailable in the desktop fixture.");
+}
+void localVolumeMountCueImage(const QString &,
+		std::function<void(const QString &, const QString &)> completed) {
+	completed({}, "CUE/BIN image mounting is unavailable in the desktop fixture.");
+}
+void localVolumeOpen(const LocalVolume &,
+		std::function<void(const QString &, const QString &)> completed) {
+	completed({}, "Volume mounting is unavailable in the desktop fixture.");
 }
 void localVolumesMountAll() {}
 void localVolumesOnMountFailed(std::function<void(const QString &)>) {}
@@ -369,8 +382,62 @@ int main(int argc, char **argv) {
 		disconnectedAlert->close();
 	}
 	settle();
+	/* Removable media draw their own icons, and a different medium at
+	 * the same mount point refreshes the item instead of keeping the old
+	 * name and picture. */
+	const QString discPath = home.path() + "/Disc";
+	const QString floppyPath = home.path() + "/Floppy";
+	const QString zipPath = home.path() + "/Zip";
+	check(QDir().mkpath(discPath) && QDir().mkpath(floppyPath) && QDir().mkpath(zipPath),
+		"create the media icon fixtures");
+	fixtureVolumes.clear();
+	LocalVolume discVolume;
+	discVolume.name = "Audio Disc";
+	discVolume.path = discPath;
+	discVolume.ejectable = true;
+	discVolume.kind = MediaKind::OpticalAudio;
+	discVolume.device = "/dev/sr0";
+	LocalVolume floppyVolume;
+	floppyVolume.name = "Floppy Disk";
+	floppyVolume.path = floppyPath;
+	floppyVolume.ejectable = true;
+	floppyVolume.kind = MediaKind::Floppy;
+	floppyVolume.device = "/dev/fd0";
+	LocalVolume zipVolume;
+	zipVolume.name = "Zip Disk";
+	zipVolume.path = zipPath;
+	zipVolume.ejectable = true;
+	zipVolume.kind = MediaKind::Zip;
+	zipVolume.device = "/dev/sdz1";
+	fixtureVolumes.push_back(std::move(discVolume));
+	fixtureVolumes.push_back(std::move(floppyVolume));
+	fixtureVolumes.push_back(std::move(zipVolume));
+	desktop.refreshLocalVolumes();
+	check(desktop.m_localVolumes.size() == 3 &&
+		desktop.m_localVolumes[0]->iconKind() == PL_ICON_AUDIO_CD &&
+		desktop.m_localVolumes[1]->iconKind() == PL_ICON_FLOPPY &&
+		desktop.m_localVolumes[2]->iconKind() == PL_ICON_ZIP,
+		"audio CDs, floppies and Zip disks draw their own icons");
+	fixtureVolumes[0].name = "Movie DVD";
+	fixtureVolumes[0].kind = MediaKind::OpticalData;
+	fixtureVolumes[0].device = "/dev/sr1";
+	desktop.refreshLocalVolumes();
+	check(desktop.m_localVolumes.size() == 3 &&
+		desktop.m_localVolumes[0]->name == "Movie DVD" &&
+		desktop.m_localVolumes[0]->iconKind() == PL_ICON_OPTICAL &&
+		desktop.m_localVolumes[0]->volumeDevice == "/dev/sr1",
+		"a different medium at the same mount point refreshes its name, icon and device");
+	fixtureVolumes.clear();
+	desktop.refreshLocalVolumes();
+	check(desktop.m_localVolumes.empty(), "removed media leave the desktop");
 	const QString usbPath = home.path() + "/USB Disk";
-	fixtureVolumes.push_back({ "USB Disk", usbPath, true, {}, false, {} });
+	LocalVolume usbVolume;
+	usbVolume.name = "USB Disk";
+	usbVolume.path = usbPath;
+	usbVolume.ejectable = true;
+	usbVolume.kind = MediaKind::Usb;
+	usbVolume.device = "/dev/sdz1";
+	fixtureVolumes.push_back(std::move(usbVolume));
 	desktop.refreshLocalVolumes();
 	desktop.selectByName(QString());
 	desktop.m_localVolumes.back()->selected = true;
@@ -384,6 +451,41 @@ int main(int argc, char **argv) {
 	usbStateClient.disconnectFromServer();
 	fixtureVolumes.clear();
 	desktop.refreshLocalVolumes();
+
+	/* Audio CDs and blank discs have no filesystem mount, but they still
+	 * get a desktop icon and Put Away ejects their drive. */
+	LocalVolume audioVolume;
+	audioVolume.name = "Audio CD";
+	audioVolume.path = "media:/dev/sr0";
+	audioVolume.ejectable = true;
+	audioVolume.kind = MediaKind::OpticalAudio;
+	audioVolume.device = "/dev/sr0";
+	audioVolume.mounted = false;
+	audioVolume.activationUri = "cdda://sr0";
+	LocalVolume blankVolume;
+	blankVolume.name = "Blank Disc";
+	blankVolume.path = "media:/dev/sr1";
+	blankVolume.ejectable = true;
+	blankVolume.kind = MediaKind::OpticalBlank;
+	blankVolume.device = "/dev/sr1";
+	blankVolume.mounted = false;
+	fixtureVolumes.push_back(std::move(audioVolume));
+	fixtureVolumes.push_back(std::move(blankVolume));
+	desktop.refreshLocalVolumes();
+	check(desktop.m_localVolumes.size() == 2 &&
+		desktop.m_localVolumes[0]->iconKind() == PL_ICON_AUDIO_CD &&
+		desktop.m_localVolumes[1]->iconKind() == PL_ICON_OPTICAL &&
+		!desktop.m_localVolumes[0]->mounted &&
+		desktop.m_localVolumes[0]->activationUri == "cdda://sr0",
+		"an unmounted audio CD and blank disc still get desktop icons");
+	desktop.selectByName(QString());
+	desktop.m_localVolumes[0]->selected = true;
+	Finder::instance().command("unmount-disk");
+	check(ejectedFixture == "media:/dev/sr0",
+		"Put Away routes an unmounted disc to the media eject helper");
+	fixtureVolumes.clear();
+	desktop.refreshLocalVolumes();
+
 	const QString windowsShare = home.path() + "/gvfs/smb-share:server=test,share=Menu Test";
 	const QString tools = home.path() + "/menu-tools";
 	check(QDir().mkpath(windowsShare) && QDir().mkpath(tools), "create isolated SMB command fixture");

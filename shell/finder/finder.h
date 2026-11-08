@@ -154,7 +154,9 @@ public:
 	 * status dialog; what came out is then selected. */
 	void expandArchive(const QString &archive);
 	void mountMacImage(const QString &image);
-	void mountDiscImage(const QString &image);
+	void mountDiskImage(const QString &image);
+	/* An audio CD, blank disc or not-yet-mounted local volume. */
+	void openLocalVolume(Item *item);
 
 	/* Spring-loaded folders: hovering a drag over a folder opens it; the
 	 * windows that sprang open close again when the drag ends. Each view

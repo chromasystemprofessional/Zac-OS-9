@@ -1,6 +1,6 @@
 # Project status
 
-Updated: 2026-11-05. Latest release: **1.9.8**
+Updated: 2026-11-07. Latest release: **1.9.8**
 ([releases](https://github.com/chromasystemprofessional/Zac-OS-9/releases),
 [ISO](https://sourceforge.net/projects/zac-os-9/files/)).
 
@@ -13,6 +13,11 @@ This page is what's true now and what's next. What changed and when is in
 - **The Mac OS 9 plan is built.** Every work package in
   [`docs/mac-os-9-gap-plan.md`](docs/mac-os-9-gap-plan.md) (milestones 1–9,
   83 packages) had landed by 2026-10-20.
+- **Removable media is built**: data and audio CDs/DVDs, blank discs, PC and
+  USB floppy drives, Iomega Zip/Jaz, generic and Mac disk images,
+  single-data-track CUE/BIN images, one eject path, and VLC AutoPlay
+  ([Removable media](docs/removable-media.md)). Hardware validation remains
+  (see Next).
 - **Installing next to another system** (Windows, Haiku, another Linux) came
   in 1.0.21, with a partition map in Disk Setup and the installer
   ([Installer](docs/installer.md)). It was tested in virtual machines with
@@ -146,14 +151,19 @@ All of them are [on GitHub](https://github.com/chromasystemprofessional/Zac-OS-9
   ([Software](docs/appstore.md)).
 - **Get Info** on a curated folder (System Folder, Applications) opens
   nothing: there's no file behind it to describe.
+- **Removable media hardware checks**: PC/USB floppy and Zip media-change
+  polling, loop-image teardown, and real-disc AutoPlay have not been verified
+  on hardware. Audio and multi-track CUE/BIN images and Blu-ray are not
+  supported ([Removable media](docs/removable-media.md)).
 
 ## Next
 
 1. **Check on real hardware** what was tested only headless or in a VM:
    Mirror Displays switched on and off, a Limited account logging in, a disc
-   in a USB drive (AutoPlay), Disk Setup's partition map and the installer's
-   "next to what's on it" on a real disk, and a real Windows starting after
-   its partition was made smaller.
+   in a USB drive (AutoPlay), a floppy and a Zip disk (insertion and Put
+   Away), a UDF DVD and a FAT floppy image, Disk Setup's partition map and
+   the installer's "next to what's on it" on a real disk, and a real Windows
+   starting after its partition was made smaller.
 2. **SMB**: a server to test against, then the share-list dialog.
 3. **Classic seamless windows** ([Classic](docs/classic-seamless.md)): the
    capture experiment the feasibility gate is waiting on.

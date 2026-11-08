@@ -231,3 +231,30 @@ card renders, whichever setting is in use.
 
 Test: `primary-gpu`, `log-filter`.
 
+## PC floppy drives: media changes
+
+**Symptom.** A floppy disk is inserted or removed, but the desktop does not
+notice; UDisks reports the drive as always having media.
+
+**Cause.** UDisks deliberately sets `MediaChangeDetected` to false for PC
+floppy drives and assumes media is present. It does this so an idle desktop
+does not make the drive click and spin. GIO therefore has no mount or volume
+event to pass to the Sniffer.
+
+**Fix.** `/usr/lib/modules-load.d/zacos9-floppy.conf` loads the `floppy`
+driver at boot, and `shell/files/floppypoll.cpp` polls each `/dev/fd*`
+drive's change line with `FDPOLLDRVSTAT`. It reads sector 0 only when the
+generation or change flag changes, so an idle drive is not exercised. A
+present disk is mounted through the existing volume path; a removal unmounts
+its filesystem. USB floppy drives and ATA/USB Zip/Jaz drives are ordinary
+SCSI storage; the same poller sends them `TEST UNIT READY`, with a block-size
+fallback when the kernel refuses that command.
+
+**Check** with a real drive:
+
+```sh
+ls -l /dev/fd0
+```
+
+Insert a FAT-formatted floppy: its disk icon should appear. Put Away should
+unmount it before removal.

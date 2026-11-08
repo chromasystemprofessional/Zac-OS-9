@@ -29,6 +29,7 @@
 #include "appdb.h"
 #include "apptrash.h"
 #include "controlpanels.h"
+#include "cueimage.h"
 #include "items.h"
 #include "resources.h"
 #include "folderpath.h"
@@ -1122,6 +1123,110 @@ int main(int argc, char **argv) {
 		image.write(data);
 		image.close();
 		check(isMacDiskImage(image.fileName()), "APFS and GPT raw images are recognized");
+	}
+
+	/* ---- generic disk image recognition ------------------------------- */
+	{
+		const auto writeImage = [&](const QString &name, const QByteArray &data) {
+			QFile image(root + "/" + name);
+			image.open(QIODevice::WriteOnly);
+			image.write(data);
+			image.close();
+			return image.fileName();
+		};
+		QByteArray iso(40 * 1024, '\0');
+		iso.replace(32769, 5, "CD001");
+		const QString isoPath = writeImage("disc.iso", iso);
+		check(isDiskImage(isoPath) && iconKindFor(isoPath) == PL_ICON_DISK_IMAGE,
+			"an ISO 9660 image is mountable");
+		QByteArray udf(40 * 1024, '\0');
+		udf.replace(32768, 5, "BEA01");
+		const QString udfPath = writeImage("video.iso", udf);
+		check(isDiskImage(udfPath) && iconKindFor(udfPath) == PL_ICON_DISK_IMAGE,
+			"a UDF-only DVD image is mountable without CD001");
+		QByteArray floppy(1440 * 1024, '\0');
+		floppy[0] = '\xEB';
+		floppy.replace(54, 8, "FAT12   ");
+		floppy[510] = '\x55';
+		floppy[511] = '\xAA';
+		const QString floppyPath = writeImage("floppy.img", floppy);
+		check(isDiskImage(floppyPath) && iconKindFor(floppyPath) == PL_ICON_DISK_IMAGE,
+			"a FAT12 floppy image is mountable");
+		QByteArray ext(4 * 1024, '\0');
+		ext.replace(1080, 2, QByteArray("\x53\xEF", 2));
+		const QString extPath = writeImage("linux.img", ext);
+		check(isDiskImage(extPath) && iconKindFor(extPath) == PL_ICON_DISK_IMAGE,
+			"an ext image is mountable");
+		QByteArray ntfs(1024, '\0');
+		ntfs.replace(3, 8, "NTFS    ");
+		const QString ntfsPath = writeImage("windows.img", ntfs);
+		check(isDiskImage(ntfsPath) && iconKindFor(ntfsPath) == PL_ICON_DISK_IMAGE,
+			"an NTFS image is mountable");
+		QByteArray mbr(1024, '\0');
+		mbr[450] = '\x83';
+		mbr[510] = '\x55';
+		mbr[511] = '\xAA';
+		const QString mbrPath = writeImage("partitioned.img", mbr);
+		check(isDiskImage(mbrPath) && iconKindFor(mbrPath) == PL_ICON_DISK_IMAGE,
+			"an MBR-partitioned image is mountable");
+		const QString notImage = writeImage("notes.img", QByteArray(2048, '\x5A'));
+		check(!isDiskImage(notImage) && iconKindFor(notImage) == PL_ICON_DOCUMENT,
+			"a .img file with no image signature stays a document");
+		const QString text = writeImage("fake.txt", iso);
+		check(!isDiskImage(text) && iconKindFor(text) == PL_ICON_DOCUMENT,
+			"a non-image suffix is not treated as an image");
+	}
+
+	/* ---- CUE/BIN data images ------------------------------------------ */
+	{
+		const QString bin = root + "/track.bin";
+		QFile binFile(bin);
+		binFile.open(QIODevice::WriteOnly);
+		binFile.write(QByteArray(2048, '\0'));
+		binFile.close();
+		const auto writeCue = [&](const QString &name, const QByteArray &body) {
+			QFile cue(root + "/" + name);
+			cue.open(QIODevice::WriteOnly);
+			cue.write(body);
+			cue.close();
+			return cue.fileName();
+		};
+		const QString dataCue = writeCue("disc.cue",
+			"FILE \"track.bin\" BINARY\n"
+			"  TRACK 01 MODE1/2048\n"
+			"    INDEX 01 00:00:00\n");
+		const CueImage data = cueImageInfo(dataCue);
+		check(data.hasTracks && data.data && !data.audio && data.tracks == 1 &&
+			!data.binPath.isEmpty() && data.error.isEmpty(),
+			"a single data track CUE names its track file");
+		check(isDiskImage(dataCue) && iconKindFor(dataCue) == PL_ICON_DISK_IMAGE,
+			"a data CUE sheet is a mountable disk image");
+		const QString audioCue = writeCue("audio.cue",
+			"FILE \"track.bin\" BINARY\n"
+			"  TRACK 01 AUDIO\n"
+			"    INDEX 01 00:00:00\n");
+		const CueImage audio = cueImageInfo(audioCue);
+		check(audio.hasTracks && audio.audio && !audio.data,
+			"an audio CUE sheet is recognized as audio");
+		check(isDiskImage(audioCue) && iconKindFor(audioCue) == PL_ICON_DISK_IMAGE,
+			"an audio CUE sheet is still a disk-image item so opening can explain");
+		const QString multiCue = writeCue("multi.cue",
+			"FILE \"track.bin\" BINARY\n"
+			"  TRACK 01 MODE1/2048\n"
+			"  TRACK 02 AUDIO\n");
+		const CueImage multi = cueImageInfo(multiCue);
+		check(multi.tracks == 2 && multi.data && multi.audio,
+			"a multi-track CUE is recognized as unsupported");
+		const QString missingCue = writeCue("missing.cue",
+			"FILE \"missing.bin\" BINARY\n"
+			"  TRACK 01 MODE1/2048\n");
+		check(!cueImageInfo(missingCue).error.isEmpty(),
+			"a CUE whose track file is missing is refused");
+		const QString escapeCue = writeCue("escape.cue",
+			"FILE \"../outside.bin\" BINARY\n"
+			"  TRACK 01 MODE1/2048\n");
+		check(!cueImageInfo(escapeCue).error.isEmpty(),
+			"a CUE cannot name a track outside its folder");
 	}
 
 	/* ---- console ROM recognition --------------------------------------- */

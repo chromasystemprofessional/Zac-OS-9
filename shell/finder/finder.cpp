@@ -1,3 +1,7 @@
+/* Before anything of Qt's: Qt defines `signals` as a keyword macro, and
+ * GIO's D-Bus headers have a struct field of that name. */
+#include <gio/gio.h>
+
 #include "finder.h"
 
 #include <sys/xattr.h>
@@ -12,6 +16,7 @@
 #include "platinumshell.h"
 #include "programs.h"
 #include "settings.h"
+#include "autoplay.h"
 
 #include <QCoreApplication>
 #include <QApplication>
@@ -704,6 +709,15 @@ void Finder::openItem(Item *item) {
 		}
 		if (item->kind == PL_ICON_FOLDER || item->kind == PL_ICON_DISK ||
 				item->kind == PL_ICON_TRASH_EMPTY || item->kind == PL_ICON_TRASH_FULL) {
+			/* An audio CD, blank disc or not-yet-mounted volume opens
+			 * through its GVolume, not as a filesystem path. */
+			if (item->isLocalVolume &&
+					(!item->mounted || item->path.startsWith(QLatin1String("media:")) ||
+					 item->mediaKind == MediaKind::OpticalAudio ||
+					 item->mediaKind == MediaKind::OpticalBlank)) {
+				openLocalVolume(item);
+				return;
+			}
 			/* An installed ZacOS 9 disk opens in the Macintosh view, not
 			 * as its Unix root. */
 			const QString mac = item->isVirtual ? QString() :
@@ -714,10 +728,10 @@ void Finder::openItem(Item *item) {
 			}
 			QDir().mkpath(item->path);
 			FolderWindow::open(item->path);
-		} else if (item->kind == PL_ICON_DISK_IMAGE && isDiscImage(item->path) && !isMacDiskImage(item->path)) {
-			mountDiscImage(item->path);
-		} else if (item->kind == PL_ICON_DISK_IMAGE) {
+		} else if (item->kind == PL_ICON_DISK_IMAGE && isMacDiskImage(item->path)) {
 			mountMacImage(item->path);
+		} else if (item->kind == PL_ICON_DISK_IMAGE) {
+			mountDiskImage(item->path);
 		} else if (item->kind == PL_ICON_WINDOWS) {
 			launchWindows(item->path);
 		} else if (item->kind == PL_ICON_CLASSIC) {
@@ -770,6 +784,42 @@ bool Finder::closeApplicationWindow(Item *item) {
 	return platinumCloseFrontAppWindow(appId);
 }
 
+void Finder::openLocalVolume(Item *item) {
+	for (const LocalVolume &volume : localVolumes()) {
+		if (volume.path != item->path) {
+			continue;
+		}
+		if (volume.kind == MediaKind::OpticalBlank) {
+			Alert::ask(tr9("“%1” is blank. There is nothing to open.").arg(volume.name),
+				"OK", QString());
+			return;
+		}
+		if (volume.kind == MediaKind::OpticalAudio) {
+			if (!mediaPlayAudioCd(volume.device) &&
+					Alert::ask(tr9("No player is installed for this audio CD. "
+						"Install VLC from Software?"),
+						tr9("Open Software"), tr9("Cancel"))) {
+				platinumStartApplication(siblingProgram("zacos9-store"), {});
+			}
+			return;
+		}
+		localVolumeOpen(volume, [name = volume.name](const QString &path,
+				const QString &error) {
+			if (!error.isEmpty()) {
+				Alert::ask(error, "OK", QString());
+			} else if (!path.isEmpty()) {
+				FolderWindow::open(path);
+			} else {
+				Alert::ask(tr9("“%1” has no files to open.").arg(name),
+					"OK", QString());
+			}
+		});
+		return;
+	}
+	Alert::ask(tr9("The disk “%1” is no longer inserted.").arg(item->name),
+		"OK", QString());
+}
+
 void Finder::mountMacImage(const QString &image) {
 	auto *progress = new QProgressDialog("Mounting " + QFileInfo(image).fileName() + " read-only...",
 		QString(), 0, 0);
@@ -790,25 +840,31 @@ void Finder::mountMacImage(const QString &image) {
 	});
 }
 
-/* A CD or DVD image: a read-only loop device (UDisks; polkit lets the
- * person at the computer), which the desktop then mounts like any disk. */
-void Finder::mountDiscImage(const QString &image) {
-	auto *p = new QProcess;
-	QObject::connect(p, &QProcess::finished, [p, image](int code, QProcess::ExitStatus status) {
-		p->deleteLater();
-		if (status != QProcess::NormalExit || code != 0) {
-			const QString why = QString::fromUtf8(p->readAllStandardError()).trimmed().section('\n', -1);
-			Alert::ask(tr9("“%1” couldn't be mounted. %2").arg(QFileInfo(image).fileName(), why), "OK", QString());
+/* A generic disk image: UDisks sets up a read-only loop device, the
+ * desktop mounts its filesystem, and the first mounted folder opens. */
+void Finder::mountDiskImage(const QString &image) {
+	auto *progress = new QProgressDialog("Mounting " + QFileInfo(image).fileName() + " read-only...",
+		QString(), 0, 0);
+	progress->setWindowTitle("Mounting Disk");
+	progress->setCancelButton(nullptr);
+	progress->setWindowModality(Qt::ApplicationModal);
+	progress->setMinimumDuration(0);
+	progress->show();
+	platinumSetFrameStyle(progress, FrameStyle::MovableModal);
+	auto completed = [progress](const QString &path, const QString &error) {
+		progress->hide();
+		progress->deleteLater();
+		if (!error.isEmpty()) {
+			Alert::ask(tr9("The disk image could not be mounted. %1").arg(error), "OK", QString());
+		} else {
+			FolderWindow::open(path);
 		}
-	});
-	QObject::connect(p, &QProcess::errorOccurred, [p, image](QProcess::ProcessError e) {
-		if (e == QProcess::FailedToStart) {
-			p->deleteLater();
-			Alert::ask(tr9("“%1” couldn't be mounted: udisksctl isn't installed.")
-				.arg(QFileInfo(image).fileName()), "OK", QString());
-		}
-	});
-	p->start("udisksctl", { "loop-setup", "--read-only", "--no-user-interaction", "-f", image });
+	};
+	if (image.endsWith(QLatin1String(".cue"), Qt::CaseInsensitive)) {
+		localVolumeMountCueImage(image, completed);
+	} else {
+		localVolumeMountImage(image, completed);
+	}
 }
 
 /* ---- archives ------------------------------------------------------------------------ */

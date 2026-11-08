@@ -16,6 +16,9 @@ image's loop device is allowed to write to the source. Mounts also disable
 device nodes, setuid programs and executable files. Linux does not offer safe
 write support for every Mac filesystem, especially APFS.
 
+For ISO/UDF, FAT/exFAT, ext, NTFS, MBR/GPT and CUE/BIN images, see
+[Removable media](removable-media.md).
+
 ## Images
 
 Supported containers:
