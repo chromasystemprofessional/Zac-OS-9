@@ -1,6 +1,6 @@
 # Project status
 
-Updated: 2026-11-07. Latest release: **1.9.8**
+Updated: 2026-11-07. Latest release: **1.10.0**
 ([releases](https://github.com/chromasystemprofessional/Zac-OS-9/releases),
 [ISO](https://sourceforge.net/projects/zac-os-9/files/)).
 
@@ -46,6 +46,10 @@ This page is what's true now and what's next. What changed and when is in
   resource fork and themes showed the theme file's document icon. The copy is
   now read from the image itself, every resource fork kept, and older copies
   are repaired in place; themes rebuild when Appearance opens.
+- **1.10.0** makes removable media a first-class part of the desktop
+  (CDs, DVDs, audio CDs, blank discs, floppy/Zip disks, USB storage and
+  disk images, with AutoPlay in VLC) and makes the boot splash and login
+  screen follow the main display's rotation.
 
 ## Being worked on
 
