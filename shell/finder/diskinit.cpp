@@ -427,6 +427,15 @@ std::optional<QString> diskLabelPrompt(const InitializationDisk &disk) {
 }
 
 void diskInitializationStart(std::function<void()> availabilityChanged) {
+	/* Tests run on a developer's machine too: an empty helper turns the
+	 * host's USB disks off instead of offering to erase one over the
+	 * window under test. */
+	const QString helper = qEnvironmentVariableIsSet("ZACOS9_DISK_HELPER")
+		? qEnvironmentVariable("ZACOS9_DISK_HELPER")
+		: QStringLiteral(ZACOS9_DISK_HELPER);
+	if (helper.isEmpty()) {
+		return;
+	}
 	auto *busy = new DiskBusy;
 	busy->setParent(nullptr);
 	DiskInitialization::Interface interface;
@@ -457,7 +466,7 @@ void diskInitializationStart(std::function<void()> availabilityChanged) {
 	interface.inhibitMount = localVolumeInhibitMount;
 	interface.label = diskLabelPrompt;
 	auto *controller = new DiskInitialization(std::move(interface),
-		ZACOS9_DISK_HELPER, "pkexec", "udisksctl", qApp);
+		helper, "pkexec", "udisksctl", qApp);
 	diskController = controller;
 	localVolumesOnMountFailed([controller](const QString &device) { controller->mountFailed(device); });
 	controller->start();

@@ -20,6 +20,9 @@ add_test_setup('isolated',
     # No live desktop state: with a theme installed, window text renders
     # in the theme's faces, so metric assertions need the built-ins.
     'XDG_CONFIG_HOME': meson.project_build_root() / 'test-home',
+    # No host disks: otherwise a developer's USB drive makes the Finder
+    # offer to erase it over the test window.
+    'ZACOS9_DISK_HELPER': '',
     # The Python tests' shared helpers (tests/harness/zacos9test.py).
     'PYTHONPATH': meson.project_source_root() / 'tests/harness'},
   is_default: true,
