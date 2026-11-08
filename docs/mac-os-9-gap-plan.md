@@ -241,7 +241,7 @@ Section 3 lists every feature; section 5 is the plan.
 | Pedigree | ✅ | See 3.18. |
 | Neighbourhood | ✅ | |
 | Remote Access Status | — | Dial-up; out of scope. |
-| Bloodhound | ◐ | Find with criteria and contents; Internet search is available from the Sniffer's File menu. Bloodhound in the Zac menu and Applications opens the Find window. See 3.13. |
+| Bloodhound | ◐ | Find with criteria and contents; Internet search is available from the Sniffer's File menu. Bloodhound in the Zac menu and Applications is a standalone Files search window. See 3.13. |
 | Automated Tasks (scripts) | ✅ | See 3.12. |
 | Force Quit (ZacOS addition) | ✅ | |
 
@@ -366,7 +366,7 @@ for), and **About This Computer** keeps showing honest memory use. The
 
 | Feature | Status | Notes |
 |---|---|---|
-| **Bloodhound** in the Zac menu and Applications | ✅ | `shell/bloodhound/`: the app shell opens the Sniffer's Find window; it becomes a search window of its own later. |
+| **Bloodhound** in the Zac menu and Applications | ✅ | `shell/bloodhound/`: the standalone Files search window, using the shared Find engine; criteria, contents and channels follow. |
 | Find by name, results as a Sniffer view | ✅ | |
 | Criteria: dates, comments, size, kind, label, version, locked, empty/shared folder, invisible, custom icon | ✅ | `shell/files/findcriteria.cpp`: where (all disks, Home, the front folder) and up to six rows that must all match: name (contains, starts/ends with, is, is not, doesn't contain), date modified/created (today, past week/month, before/after a date), size, kind, label, lock, folder empty/shared, custom icon (is/is not), comments (contains, is/is not, doesn't contain), invisible (is/is not; host dotfiles) and application package version (contains, is/is not, doesn't contain). Hidden entries are traversed only for a query with an invisible criterion. |
 | **Search contents** with an index; schedule indexing; Index Selection | ✅ | `shell/files/findindex.cpp`: "contents include" asks localsearch (tinysparql full-text query, kept to the chosen place; the other rows sift its answers); File ▸ Index Selection adds folders to its index. Scheduling is localsearch's own. |

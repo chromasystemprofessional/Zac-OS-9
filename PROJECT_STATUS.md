@@ -53,10 +53,10 @@ This page is what's true now and what's next. What changed and when is in
 
 ## Being worked on
 
-**Bloodhound** (Sherlock's search dog): the Sniffer's Find window is in the
-Zac menu and Applications as Bloodhound, through `shell/bloodhound/`. It
-becomes a search window of its own next; the planned Internet Search Sites
-are still missing ([Mac OS 9 plan](docs/mac-os-9-gap-plan.md), §3.13).
+**Bloodhound** (Sherlock's search dog): the standalone Files search window
+is in the Zac menu and Applications (`shell/bloodhound/`), using the shared
+Find engine. Criteria, contents, saved searches and the planned Internet
+Search Sites are next ([Mac OS 9 plan](docs/mac-os-9-gap-plan.md), §3.13).
 
 **The System Folder**, made to work the way Mac OS 7 to 9's did, item by
 item: [`docs/system-folder.md`](docs/system-folder.md) has every item, what
