@@ -1095,11 +1095,11 @@ const std::vector<uint32_t> *documentIcon(const QString &mimeType, int size) {
 	if (it == cache.end()) {
 		Icons icons;
 		const QString id = defaultAppFor(mimeType);
-		std::vector<uint32_t> glyph;
-		if (!id.isEmpty()) {
-			const AppEntry *app = appById(id);
-			glyph = app && !app->icon16.empty() ? app->icon16 : appIconPixels(id, 16);
-		}
+		/* The icon comes straight from the application's desktop entry:
+		 * asking the Applications database for it would make the first
+		 * folder draw wait on dpkg for every installed application. */
+		const std::vector<uint32_t> glyph = id.isEmpty() ? std::vector<uint32_t>{}
+			: appIconPixels(id, 16);
 		if (glyph.size() == 16 * 16) {
 			icons.large = composeDocument(glyph, PL_ICON_LARGE);
 			icons.small = composeDocument(glyph, PL_ICON_SMALL);

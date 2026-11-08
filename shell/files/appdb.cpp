@@ -547,7 +547,14 @@ QFileSystemWatcher *watcher() {
 				settle->start();
 				return;
 			}
-			appRefresh();
+			/* A change before anything has asked for the list: the
+			 * callbacks still need to run (icons, file types), but
+			 * building the list now would make dpkg queries compete
+			 * with the program that is starting. It reads the current
+			 * state when it first asks for appList(). */
+			if (g_loaded) {
+				appRefresh();
+			}
 			const auto callbacks = g_callbacks;
 			for (const auto &f : callbacks) {
 				f();
