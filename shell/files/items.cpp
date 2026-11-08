@@ -30,6 +30,7 @@
 #include "fonts.h"
 #include "vfs.h"
 #include "settings.h"
+#include "cueimage.h"
 
 static constexpr int LABEL_MAX_INK = 400;   /* a whole name on one line (list view) */
 static constexpr int LABEL_GAP = 2;      /* icon bottom to label box top */
@@ -190,7 +191,7 @@ Text Item::renderString(const QString &s, int maxWidth) const {
 const QString &Item::kindName() {
 	if (kindText.isEmpty()) {
 		if (kind == PL_ICON_DISK_IMAGE) {
-			kindText = "Macintosh disk image";
+			kindText = isMacDiskImage(path) ? "Macintosh disk image" : "disk image";
 		} else if (isDir) {
 			kindText = "folder";
 		} else if (kind == PL_ICON_WINDOWS) {
@@ -293,6 +294,27 @@ bool isSharedFolder(const QString &path) {
 	return !paths.isEmpty() && paths.contains(QFileInfo(path).canonicalFilePath());
 }
 
+pl_icon_kind mediaIconKind(MediaKind kind) {
+	switch (kind) {
+	case MediaKind::OpticalData:
+	case MediaKind::OpticalVideo:
+	case MediaKind::OpticalBlank:
+		return PL_ICON_OPTICAL;
+	case MediaKind::OpticalAudio:
+		return PL_ICON_AUDIO_CD;
+	case MediaKind::Floppy:
+		return PL_ICON_FLOPPY;
+	case MediaKind::Zip:
+	case MediaKind::Jaz:
+		return PL_ICON_ZIP;
+	case MediaKind::Disk:
+	case MediaKind::Usb:
+	case MediaKind::LoopImage:
+		break;
+	}
+	return PL_ICON_DISK;
+}
+
 pl_icon_kind iconKindFor(const QString &path) {
 	QFileInfo info(path);
 	if (info.isSymLink()) {
@@ -303,13 +325,21 @@ pl_icon_kind iconKindFor(const QString &path) {
 		info.setFile(target);
 	}
 	const QString iconPath = info.absoluteFilePath();
+	/* A data CUE sheet outside the Games folder is a disk image; a game
+	 * CUE there stays a PlayStation disc. An empty or unreadable CUE
+	 * keeps the old PlayStation behavior. */
+	if (info.suffix().compare("cue", Qt::CaseInsensitive) == 0 &&
+			!iconPath.startsWith(QDir::homePath() + "/Games/") &&
+			cueImageInfo(iconPath).hasTracks) {
+		return PL_ICON_DISK_IMAGE;
+	}
 	/* A console game disc (PlayStation 2 .iso/.mdf) takes priority over a
 	 * generic mountable disc image. */
 	const pl_icon_kind rom = romIconKind(iconPath);
 	if (rom != PL_ICON_DOCUMENT) {
 		return rom;
 	}
-	if (isMacDiskImage(iconPath) || isDiscImage(iconPath)) {
+	if (isDiskImage(iconPath)) {
 		return PL_ICON_DISK_IMAGE;
 	}
 	if (info.isDir()) {
@@ -422,14 +452,65 @@ pl_icon_kind romIconKind(const QString &path) {
 	return PL_ICON_DOCUMENT;
 }
 
-/* A CD or DVD image (ISO 9660, "CD001" in its first volume descriptor). */
-bool isDiscImage(const QString &path) {
+/* A generic disk image. The suffix is only a hint: each format's own
+ * header decides, so a text file called .iso is not a disk and a UDF-only
+ * DVD image is one even without ISO 9660's CD001. */
+bool isDiskImage(const QString &path) {
+	if (isMacDiskImage(path)) {
+		return true;
+	}
+	static const QStringList suffixes = {
+		"iso", "img", "dsk", "ima", "vfd", "hfv", "hda", "toast", "cdr", "image",
+	};
 	const QFileInfo info(path);
-	if (!info.isFile() || info.size() < 34 * 1024 || info.suffix().compare("iso", Qt::CaseInsensitive) != 0) {
+	if (!info.isFile()) {
 		return false;
 	}
-	QFile f(path);
-	return f.open(QIODevice::ReadOnly) && f.seek(32769) && f.read(5) == "CD001";
+	if (info.suffix().compare("cue", Qt::CaseInsensitive) == 0) {
+		return cueImageInfo(path).hasTracks;
+	}
+	if (info.size() < 512 ||
+			!suffixes.contains(info.suffix().toLower())) {
+		return false;
+	}
+	const QByteArray boot = fileHeader(path, 0, 512);
+	if (boot.size() == 512) {
+		const bool bootSignature =
+			static_cast<unsigned char>(boot[510]) == 0x55 &&
+			static_cast<unsigned char>(boot[511]) == 0xAA;
+		if (boot.mid(3, 8) == "NTFS    " || boot.mid(3, 8) == "EXFAT   ") {
+			return true;
+		}
+		if (bootSignature && (boot.mid(54, 8).startsWith("FAT") ||
+				boot.mid(82, 8).startsWith("FAT32"))) {
+			return true;
+		}
+		/* MBR: a partition entry with a type. */
+		if (bootSignature) {
+			for (int entry = 0; entry < 4; entry++) {
+				if (boot[446 + entry * 16 + 4] != '\0') {
+					return true;
+				}
+			}
+		}
+	}
+	if (fileHeader(path, 512, 8) == "EFI PART") {
+		return true;
+	}
+	if (fileHeader(path, 1080, 2) == QByteArray("\x53\xEF", 2)) {
+		return true;
+	}
+	if (info.size() >= 34 * 1024) {
+		if (fileHeader(path, 32769, 5) == "CD001") {
+			return true;
+		}
+		if (fileHeader(path, 32768, 5) == "BEA01" ||
+				fileHeader(path, 34816, 5) == "NSR02" ||
+				fileHeader(path, 34816, 5) == "NSR03") {
+			return true;
+		}
+	}
+	return false;
 }
 
 bool isMacDiskImage(const QString &path) {
@@ -1102,7 +1183,7 @@ void paintIcon(pl_canvas *c, Item &item, int x, int y, int size, bool highlight)
 		if (item.kind == PL_ICON_FONT && !item.fontFile.isEmpty()) {
 			paintFontSample(c, item, x, y, size);
 		}
-		if (item.isUsbVolume && item.kind == PL_ICON_DISK) {
+		if (item.isUsbVolume && item.iconKind() == PL_ICON_DISK) {
 			const int badgeSize = size >= 32 ? 16 : 8;
 			Pixels badge(PL_ICON_SMALL, PL_ICON_SMALL);
 			pl_icon_paint_label(&badge.c, 0, 0, PL_ICON_EXT_USB,

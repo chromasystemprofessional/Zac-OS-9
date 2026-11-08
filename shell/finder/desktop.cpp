@@ -32,6 +32,7 @@
 #include "patterns.h"
 #include "custompatterns.h"
 #include "platinumshell.h"
+#include "programs.h"
 #include "settings.h"
 #include <algorithm>
 
@@ -165,6 +166,19 @@ Desktop::Desktop() {
 		}
 	});
 	localVolumesOnError([](const QString &error) { Alert::ask(error, "OK", QString()); });
+	localVolumesOnAutoplayMissing([](const QString &type) {
+		QString disc = tr9("disc");
+		if (type == QLatin1String("x-content/audio-cdda")) {
+			disc = tr9("audio CD");
+		} else if (type == QLatin1String("x-content/video-dvd")) {
+			disc = tr9("video DVD");
+		}
+		if (Alert::ask(tr9("No player is installed for this %1. "
+				"Install VLC from Software?").arg(disc),
+				tr9("Open Software"), tr9("Cancel"))) {
+			platinumStartApplication(siblingProgram("zacos9-store"), {});
+		}
+	});
 	localVolumesMountAll();
 }
 
@@ -251,11 +265,19 @@ void Desktop::refreshLocalVolumes() {
 		}
 	}
 	vfsSetZacosVolumes(zacos);
-	/* Skip rebuild when nothing changed. */
+	/* Skip rebuild when nothing changed. A different medium can be
+	 * mounted at the same path (a swapped disc or floppy), so compare
+	 * the medium's identity as well as the mount point. */
+	const auto sameVolume = [](const Item &item, const LocalVolume &volume) {
+		return item.path == volume.path && item.name == volume.name &&
+			item.mediaKind == volume.kind && item.volumeDevice == volume.device &&
+			item.ejectable == volume.ejectable && item.mounted == volume.mounted &&
+			item.activationUri == volume.activationUri;
+	};
 	if (found.size() == m_localVolumes.size()) {
 		bool same = true;
 		for (size_t i = 0; i < found.size() && same; i++) {
-			same = m_localVolumes[i]->path == found[i].path;
+			same = sameVolume(*m_localVolumes[i], found[i]);
 		}
 		if (same) {
 			return;
@@ -277,6 +299,10 @@ void Desktop::refreshLocalVolumes() {
 		item->isDir = true;
 		item->isLocalVolume = true;
 		item->ejectable = v.ejectable;
+		item->mediaKind = v.kind;
+		item->volumeDevice = v.device;
+		item->mounted = v.mounted;
+		item->activationUri = v.activationUri;
 		item->isUsbVolume = !localVolumeUsbDevice(v.path).isEmpty();
 		item->selected = selected.contains(v.path);
 		fresh.push_back(std::move(item));

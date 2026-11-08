@@ -84,6 +84,7 @@ Depends: ${shlibs:Depends},
          gir1.2-appstream-1.0,
          flatpak,
          dmg2img,
+         bchunk,
          libfsapfs-utils,
          libmodi1,
          fuse3,
@@ -153,7 +154,8 @@ Recommends: balena-etcher,
             ddcutil,
             dbus-user-session,
             xdg-desktop-portal-gtk,
-            foot
+            foot,
+            vlc
 # No Conflicts with cups-browsed (issue #111): cups-daemon recommends it,
 # so most Debian systems have it. Printer Picker skips its implicitclass://
 # queues instead: they stop with "No destination host name supplied by

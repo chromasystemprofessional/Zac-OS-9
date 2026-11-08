@@ -160,6 +160,7 @@ else works, and Old Dog says the emulator isn't installed.
 ## Learn more
 
 - [User guide](docs/user-guide.md): sound, fullscreen programs, the Sniffer, disks, desktop patterns and wallpaper
+- [Removable media](docs/removable-media.md): CD/DVD, audio CDs, floppy/Zip disks, disk images and AutoPlay
 - [Themes and sound sets](docs/themes.md): what the Theme Installer reads from your Mac OS 9 System Folder
 - [Software and updates](docs/appstore.md) and [Software Update](docs/updates.md)
 - [Networking with Macs and Windows](docs/network.md) and [Mac disks](docs/mac-disks.md)

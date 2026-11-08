@@ -59,6 +59,48 @@ static const char *const DISK[TINY_ICON] = {
 	"............",
 	"............",
 };
+static const char *const DISC[TINY_ICON] = {
+	"............",
+	"....0000....",
+	"..00111100..",
+	".0111111110.",
+	".0111001110.",
+	".0110000110.",
+	".0110000110.",
+	".0111001110.",
+	".0111111110.",
+	"..00111100..",
+	"....0000....",
+	"............",
+};
+static const char *const FLOPPY[TINY_ICON] = {
+	"............",
+	".0000000000.",
+	".0111111110.",
+	".0100000010.",
+	".0101111010.",
+	".0101111010.",
+	".0100000010.",
+	".0111111110.",
+	".0000000000.",
+	"............",
+	"............",
+	"............",
+};
+static const char *const CARTRIDGE[TINY_ICON] = {
+	"............",
+	".0000000000.",
+	".0111111110.",
+	".0111111110.",
+	".0111111110.",
+	".0111111110.",
+	".0111111110.",
+	".0111111110.",
+	".0000000000.",
+	"............",
+	"............",
+	"............",
+};
 static const char *const TRASH[TINY_ICON] = {
 	"....0000....",
 	".0000000000.",
@@ -89,6 +131,19 @@ void paintTinyIcon(pl_canvas *c, const Item &item, int x, int y, bool highlight)
 		break;
 	case PL_ICON_DISK:
 		art = DISK;
+		fill = GRAY(0xD);
+		break;
+	case PL_ICON_OPTICAL:
+	case PL_ICON_AUDIO_CD:
+		art = DISC;
+		fill = GRAY(0xD);
+		break;
+	case PL_ICON_FLOPPY:
+		art = FLOPPY;
+		fill = GRAY(0xD);
+		break;
+	case PL_ICON_ZIP:
+		art = CARTRIDGE;
 		fill = GRAY(0xD);
 		break;
 	case PL_ICON_TRASH_EMPTY:

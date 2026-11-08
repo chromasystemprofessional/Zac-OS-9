@@ -7,6 +7,7 @@
 #include <QFileInfo>
 #include <QTemporaryDir>
 #include <QThread>
+#include <algorithm>
 #include <cassert>
 #include <functional>
 
@@ -14,6 +15,14 @@
 #include "netvolumes.h"
 
 std::vector<NetVolume> netVolumes() { return {}; }
+
+/* The test has no real optical device; every test volume is a disc. */
+MediaKind mediaKindForDevice(const QString &, QString *backingImage) {
+	if (backingImage) {
+		backingImage->clear();
+	}
+	return MediaKind::OpticalAudio;
+}
 
 struct TestVolume {
 	GObject parent;
@@ -142,6 +151,14 @@ int main(int argc, char **argv) {
 	assert(!localVolumePathShown("/snap/app"));
 	volume = static_cast<TestVolume *>(g_object_new(test_volume_get_type(), nullptr));
 	monitor = static_cast<TestMonitor *>(g_object_new(test_monitor_get_type(), nullptr));
+	/* An unmounted optical volume is still listed for the desktop. */
+	const std::vector<LocalVolume> media = localVolumes();
+	const auto found = std::find_if(media.begin(), media.end(),
+		[](const LocalVolume &volume) { return volume.device == "/dev/sdz1"; });
+	assert(found != media.end());
+	assert(found->path == "media:/dev/sdz1");
+	assert(!found->mounted);
+	assert(found->kind == MediaKind::OpticalAudio);
 	int failures = 0, refreshes = 0;
 	localVolumesOnChange([&] { ++refreshes; });
 	localVolumesOnMountFailed([&](const QString &path) {
@@ -157,7 +174,10 @@ int main(int argc, char **argv) {
 	g_signal_emit_by_name(monitor, "volume-changed", volume);
 	assert(volume->attempts == 1);
 	assert(waitFor([] { return volume->mounted; }));
-	assert(waitFor([&] { return refreshes == 1; }));
+	/* Volume-added/changed also refresh the desktop (an audio CD or blank
+	 * disc has no mount to announce it), and the successful mount does
+	 * once more. */
+	assert(waitFor([&] { return refreshes >= 2; }));
 	g_signal_emit_by_name(monitor, "volume-changed", volume);
 	assert(volume->attempts == 1);
 	g_signal_emit_by_name(monitor, "volume-removed", volume);

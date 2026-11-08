@@ -16,6 +16,11 @@ pipewire-audio
 wireplumber
 pulseaudio-utils
 
+# Discs: VLC's NoDisplay entries play audio CDs and video DVDs when inserted.
+vlc
+# CUE/BIN data images are converted to ISO with bchunk.
+bchunk
+
 # System
 sudo
 user-setup

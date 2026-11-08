@@ -20,7 +20,7 @@ CUSTOM_OUT = os.path.join(ROOT, "lib", "icons_custom.h")
 CUSTOM_PREFIX = "ext-custom-"
 # Icons lib/icons.c expects, in enum pl_icon_kind order.
 KINDS = ["folder", "document", "application", "disk", "trash-empty", "trash-full", "caution",
-         "disk-image", "classic", "windows", "shared-folder", "system-folder", "control-panels",
+         "disk-image", "optical", "audio-cd", "floppy", "zip", "classic", "windows", "shared-folder", "system-folder", "control-panels",
          "ext-opentransport", "ext-appletalk", "ext-bluetooth", "ext-audio", "ext-printmonitor",
          "ext-generic", "ext-display", "ext-ethernet", "ext-wifi", "ext-usb", "ext-input",
          "ext-camera", "ext-power", "ext-sensor", "ext-security", "ext-chip", "clipping",

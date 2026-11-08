@@ -30,7 +30,7 @@
       "blurb": "Keep track of your money.", "packages": ["gnucash"] },
 
     { "id": "vlc", "name": "VLC", "category": "Multimedia", "featured": true,
-      "blurb": "Play almost any video or sound file.", "packages": ["vlc"] },
+      "blurb": "Play almost any video or sound file, including audio CDs and video DVDs.", "packages": ["vlc"] },
     { "id": "audacity", "name": "Audacity", "category": "Multimedia",
       "blurb": "Record and edit sound.", "packages": ["audacity"] },
     { "id": "mpv", "name": "mpv", "category": "Multimedia",

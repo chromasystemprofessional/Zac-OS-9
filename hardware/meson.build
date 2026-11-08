@@ -5,6 +5,9 @@ install_data('zacos9-hda-load', 'zacos9-gpe-guard', 'zacos9-hdmi-watchdog',
 # Haswell HDMI audio: the driver loads through zacos9-hda-load.
 install_data('zacos9-hda.conf',
   install_dir: get_option('prefix') / 'lib' / 'modprobe.d')
+# PC floppy drives: load the driver so /dev/fd* exists to poll.
+install_data('zacos9-floppy.conf',
+  install_dir: get_option('prefix') / 'lib' / 'modules-load.d')
 # Haswell HDMI audio that freezes mid-stream; debhelper enables it per user.
 install_data('zacos9-hdmi-watchdog.service',
   install_dir: get_option('prefix') / 'lib' / 'systemd' / 'user')
