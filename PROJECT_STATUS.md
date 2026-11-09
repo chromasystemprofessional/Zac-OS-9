@@ -1,6 +1,6 @@
 # Project status
 
-Updated: 2026-11-09. Latest release: **1.14.0**
+Updated: 2026-11-09. Latest release: **1.14.1**
 ([releases](https://github.com/chromasystemprofessional/Zac-OS-9/releases),
 [ISO](https://sourceforge.net/projects/zac-os-9/files/)).
 
@@ -67,6 +67,9 @@ This page is what's true now and what's next. What changed and when is in
   in front, closing all its windows so it can ask about unsaved work, ⌘H
   hides it, and ⌘M collapses or expands its front window; the Sniffer keeps
   ⌘H and ⌘M for its File menu ([Roadmap](docs/ROADMAP.md)).
+- **1.14.1 puts disks mounted from /etc/fstab on the desktop**, such as an
+  internal data drive added after installation, which GIO never reports as
+  a volume ([Files](docs/files.md)).
 
 ## Being worked on
 
