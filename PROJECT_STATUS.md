@@ -1,6 +1,6 @@
 # Project status
 
-Updated: 2026-11-09. Latest release: **1.14.1**
+Updated: 2026-11-09. Latest release: **1.14.2**
 ([releases](https://github.com/chromasystemprofessional/Zac-OS-9/releases),
 [ISO](https://sourceforge.net/projects/zac-os-9/files/)).
 
@@ -70,6 +70,10 @@ This page is what's true now and what's next. What changed and when is in
 - **1.14.1 puts disks mounted from /etc/fstab on the desktop**, such as an
   internal data drive added after installation, which GIO never reports as
   a volume ([Files](docs/files.md)).
+- **1.14.2 states the privacy promise**: no telemetry, analytics, online
+  account, advertising ID, device fingerprint or first-party server; every
+  network connection is listed in [PRIVACY.md](PRIVACY.md) and a test
+  enforces it ([Privacy](PRIVACY.md)).
 
 ## Being worked on
 
