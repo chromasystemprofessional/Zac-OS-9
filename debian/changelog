@@ -1,3 +1,12 @@
+zacos9 (1.13.0) trixie; urgency=medium
+
+  * Bloodhound (Search) now has Live Search, recent searches, the Index
+    menu's status and controls, folder and search-site drops, and a
+    collapsible Preview pane. It remembers whether Live Search was on and
+    which channel was open.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Mon, 09 Nov 2026 10:23:53 -0500
+
 zacos9 (1.12.0) trixie; urgency=medium
 
   * Bloodhound (Search), Sherlock's search dog, now has the whole Find
