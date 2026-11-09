@@ -1,3 +1,14 @@
+zacos9 (1.12.0) trixie; urgency=medium
+
+  * Bloodhound (Search), Sherlock's search dog, now has the whole Find
+    engine and channels: More Choices criteria, contents search with
+    highlighted snippets and Index Selection, Find Similar Items, saved
+    searches, Internet Search Sites, and Web and user channels. The app is
+    called Bloodhound (Search) in Applications and the Zac menu, and
+    DuckDuckGo, Google and Bing ship as seed search sites.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Sun, 08 Nov 2026 23:14:35 -0500
+
 zacos9 (1.11.0) trixie; urgency=medium
 
   * Bloodhound, Sherlock's search dog, now has its own program.
