@@ -1,0 +1,8 @@
+Disks mounted from /etc/fstab now appear on the desktop.
+
+An internal data disk added after installation is mounted by the system,
+but GIO never reports it as a volume, so the Finder had no icon for it.
+The Finder now finds those mounted block devices itself and shows each
+one under its volume label — for example, ZacData for /mnt/data.
+
+The disk is not ejectable and opens like any other disk icon.
