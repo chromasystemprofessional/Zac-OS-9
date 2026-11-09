@@ -28,8 +28,9 @@ The search engine is shared with the Sniffer's Find:
 
 The Sniffer's Find keeps its own Find dialog; both read one engine, one
 saved-search file and one site list. Bloodhound 1.3 adds the modern polish:
-live results, recents, index controls, drag-and-drop, preview and
-localization.
+live search, recent searches, the Index menu's status and controls,
+drag-and-drop for folders and site files, a collapsible preview pane, and
+the app's strings in the translation files.
 
 ## What Sherlock 2 got right
 
@@ -137,15 +138,17 @@ Shipped in ZacOS 9 1.12.0.
 
 ### 1.3: modern polish
 
-- Live results as an option, debounced, with the Search button still there.
+- Live search as an option, debounced, with the Search button still there.
 - Recent searches, kept locally and clearable.
-- Index status and control: what is indexed, pause, rebuild, add or remove
+- Index status and control: what is indexed, rebuild, and add or remove
   folders.
 - Drag a folder onto Bloodhound to search it; drag a search-site file on to
   install it.
 - A collapsible preview or Get Info pane, not a permanent modern sidebar.
-- Full accessibility labels, focus behaviour and keyboard operation.
-- Localized channel, site and result names.
+- Accessibility names for the window and its main controls, with the
+  keyboard operation already in place.
+- The app's strings in the translation files; site and channel names stay as
+  their files write them.
 
 ### Later, carefully
 

@@ -3,6 +3,7 @@
 #include <QHash>
 #include <QPoint>
 #include <QStringList>
+#include <QTimer>
 #include <QWidget>
 #include <memory>
 #include <vector>
@@ -15,6 +16,8 @@
 
 class BloodhoundSearch;
 class QContextMenuEvent;
+class QDragEnterEvent;
+class QDropEvent;
 
 /*
  * Bloodhound (Search): Sherlock 2's Files channel in one window. The search
@@ -36,6 +39,8 @@ protected:
 	void wheelEvent(QWheelEvent *) override;
 	void keyPressEvent(QKeyEvent *) override;
 	void contextMenuEvent(QContextMenuEvent *) override;
+	void dragEnterEvent(QDragEnterEvent *) override;
+	void dropEvent(QDropEvent *) override;
 
 private:
 	struct CriterionRow;
@@ -45,7 +50,7 @@ private:
 		bool asked = false;
 	};
 
-	void search();
+	void search(bool remember = true);
 	void stop();
 	void addResults(const QStringList &paths);
 	void finished(const QString &problem);
@@ -59,6 +64,10 @@ private:
 	void saveSearch();
 	void showSavedSearches();
 	void indexSelection();
+	void showIndexMenu();
+	void indexRemoval();
+	void indexStatusReport();
+	void indexRebuildConfirm();
 	void applyQuery(const FindQuery &q);
 	void rebuildScope(FindScope scope = FindScope::AllDisks);
 	void reloadSites();
@@ -68,12 +77,23 @@ private:
 	QList<SearchSite> sitesForChannel(const QString &name) const;
 	bool filesChannel() const { return m_channelName == "Files"; }
 	bool hasContentsRow() const;
+	void liveSearchSoon();
+	void runLiveSearch();
+	void loadSettings();
+	void saveSetting(const QString &key, const QString &value);
+	void loadRecents();
+	void saveRecents();
+	void rememberRecent(const QString &words);
+	void showRecents();
+	void installSiteFile(const QString &path);
+	void searchFolder(const QString &path);
+	void paintPreview(pl_canvas *c) const;
 	int rowHeight() const;
 	void requestSnippet(const QString &path);
 	void startNextSnippet();
 	void paintSnippet(pl_canvas *c, const Snippet &snippet, int x, int baseline, int width) const;
 
-	std::vector<Item *> selectedItems();
+	std::vector<Item *> selectedItems() const;
 	void selectOnly(Item *item);
 	void moveSelection(int step);
 	void openSelection();
@@ -94,13 +114,18 @@ private:
 	PanelEdit m_search;
 	PanelPopup m_scope;
 	PanelPopup m_site;
+	PanelCheckbox m_live;
 	PanelButton m_find, m_stop;
 	PanelButton m_more, m_fewer, m_saveSearch, m_savedSearches, m_indexSelection;
+	PanelButton m_recents, m_preview;
+	QTimer m_liveTimer;
+	QStringList m_recentsList;
+	QString m_status;
+	bool m_previewOn = false;
 	QString m_channelName = "Files";
 	QStringList m_channels;
 	QList<SearchSite> m_sites;
 	std::vector<std::pair<QString, QRect>> m_channelHits;
-	QString m_status;
 	std::vector<std::unique_ptr<CriterionRow>> m_rows;
 	QPoint m_pressPos;
 	Item *m_pressItem = nullptr;

@@ -4,9 +4,12 @@
  * queried, never shown. */
 #include <QApplication>
 #include <QDir>
+#include <QElapsedTimer>
+#include <QEventLoop>
 #include <QFile>
 #include <QStringList>
 #include <QTemporaryDir>
+#include <QThread>
 #include <cstdio>
 
 #define private public
@@ -58,6 +61,10 @@ int main(int argc, char **argv) {
 	}
 	BloodhoundWindow window(dir.path());
 	check(window.m_scope.selected == 2, "the folder is the initial scope");
+	if (!write(dir.filePath("report.txt"), "the harbour report\n")) {
+		fprintf(stderr, "could not write the search file\n");
+		return 1;
+	}
 
 	window.m_search.setText("report");
 	FindQuery byName = window.query();
@@ -118,14 +125,78 @@ int main(int argc, char **argv) {
 	check(window.m_resultsTop == top, "Fewer Choices puts the room back");
 	check(window.query().criteria.size() == 4, "and the row leaves the query");
 
+	window.saveSetting("live-search", "yes");
+	window.loadSettings();
+	check(window.m_live.on, "the live-search setting is remembered");
+	FindQuery liveQuery;
+	liveQuery.scope = FindScope::Folder;
+	liveQuery.folder = dir.path();
+	FindCriterion liveName;
+	liveName.field = FindField::Name;
+	liveName.op = FindOp::Contains;
+	liveName.text = "report";
+	liveQuery.criteria << liveName;
+	window.applyQuery(liveQuery);
+	window.liveSearchSoon();
+	QElapsedTimer waited;
+	waited.start();
+	while ((window.m_searching || window.m_items.empty()) && waited.elapsed() < 5000) {
+		QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+		QThread::msleep(5);
+	}
+	check(!window.m_searching && window.m_items.size() == 1 &&
+		window.m_items.front()->name == "report.txt",
+		"Live Search searches after the pause");
+
+	window.rememberRecent("alpha");
+	window.rememberRecent("beta");
+	window.rememberRecent("alpha");
+	check(window.m_recentsList == QStringList({ "alpha", "beta" }),
+		"recent searches are unique and newest first");
+	window.loadRecents();
+	check(window.m_recentsList == QStringList({ "alpha", "beta" }),
+		"recent searches survive a reload");
+	window.m_recentsList.clear();
+	window.saveRecents();
+	window.loadRecents();
+	check(window.m_recentsList.isEmpty(), "and can be cleared");
+
+	window.selectOnly(window.m_items.front().get());
+	const int withoutPreview = window.paneTop();
+	window.m_previewOn = true;
+	check(window.paneTop() < withoutPreview, "the preview pane takes room from the list");
+	window.m_previewOn = false;
+
+	if (!QDir().mkpath(dir.filePath("other")) ||
+			!write(dir.filePath("other/notes.txt"), "notes\n")) {
+		fprintf(stderr, "could not make the dropped folder\n");
+		return 1;
+	}
+	window.m_search.setText(QString());
+	window.searchFolder(dir.filePath("other"));
+	check(window.m_scope.selected == 2 && window.m_folder == dir.filePath("other"),
+		"a dropped folder becomes the search scope");
+
+	if (!QDir().mkpath(sites.filePath("drop")) ||
+			!write(sites.filePath("drop/New.searchsite"),
+				"[Search Site]\nName=New\nURL=https://new.example/?q={query}\n"
+				"Channel=Reference\n")) {
+		fprintf(stderr, "could not write the dropped site\n");
+		return 1;
+	}
+	window.installSiteFile(sites.filePath("drop/New.searchsite"));
+	check(window.m_channelName == "Web" && window.m_status.contains("New") &&
+		window.m_sites.size() == 3, "a dropped site file is installed and offered");
+	check(QFileInfo::exists(userSites + "/New.searchsite"),
+		"and lands in the user's Internet Search Sites folder");
+
 	check(window.m_channels == QStringList({ "Files", "Web", "Reference", "My Channel" }),
 		"the channel bar has Files, Web, named channels and My Channel");
 	window.chooseChannel("Web");
-	check(!window.filesChannel() && window.m_site.items.size() == 2,
+	check(!window.filesChannel() && window.m_site.items.size() == 3,
 		"the Web channel offers every site");
 	window.chooseChannel("Reference");
-	check(window.m_site.items.size() == 1 && window.m_site.items[0].text == "Test",
-		"a named channel groups its sites");
+	check(window.m_site.items.size() == 2, "a named channel groups its sites");
 	window.chooseChannel("My Channel");
 	check(window.m_site.items.size() == 1 && window.m_site.items[0].text == "Mine",
 		"My Channel holds the user's sites without a channel");

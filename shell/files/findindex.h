@@ -38,6 +38,13 @@ void indexSnippet(const QString &path, const QStringList &words, const IndexSnip
 IndexSnippet indexSnippetText(const QString &text, const QStringList &words);
 /* Have the indexer take in a folder and everything in it. */
 void indexAddFolder(const QString &path, const std::function<void(const QString &error)> &done);
+/* Remove a folder from the indexer's settings. */
+void indexRemoveFolder(const QString &path, const std::function<void(const QString &error)> &done);
+/* What the index has and is doing, for the status window. */
+using IndexTextResults = std::function<void(const QString &text, const QString &error)>;
+void indexStatus(const IndexTextResults &done);
+/* Clear the filesystem index and start the miners again. */
+void indexRebuild(const std::function<void(const QString &error)> &done);
 
 /* ---- the pieces, for tests ---- */
 /* The SPARQL for a full-text search: one of the words (any) or all. */

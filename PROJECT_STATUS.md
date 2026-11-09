@@ -64,9 +64,9 @@ This page is what's true now and what's next. What changed and when is in
 
 **Bloodhound (Search)**, Sherlock's search dog: 1.2 shipped in 1.12.0, with
 the Files channel and Internet channels using the shared Find engine and
-site files. The next slice is 1.3: live results, recent searches, index
-controls, drag-and-drop, a preview pane, accessibility and localization
-([Bloodhound](docs/bloodhound.md)).
+site files. 1.3 adds live search, recent searches, the Index menu's status
+and controls, drag-and-drop, a collapsible preview pane and the app's
+strings in the translation files ([Bloodhound](docs/bloodhound.md)).
 
 **The System Folder**, made to work the way Mac OS 7 to 9's did, item by
 item: [`docs/system-folder.md`](docs/system-folder.md) has every item, what
