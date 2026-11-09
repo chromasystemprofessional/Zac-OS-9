@@ -155,8 +155,8 @@ with tempfile.TemporaryDirectory(prefix="zacos9-bloodhound-") as directory:
             # A saved contents search loads its criteria, asks the index and
             # draws snippets with the matched word highlighted.
             before_highlight = highlight()
-            vp("home", "move", "480", "127", "click", "wait", "700",
-               "home", "move", "487", "142", "click", "wait", "2500")
+            vp("home", "move", "431", "127", "click", "wait", "700",
+               "home", "move", "430", "142", "click", "wait", "2500")
             after_highlight = highlight()
             assert window.poll() is None, "Bloodhound exited after a saved search"
             assert after_highlight > before_highlight + 50, (before_highlight, after_highlight)

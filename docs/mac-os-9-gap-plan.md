@@ -241,7 +241,7 @@ Section 3 lists every feature; section 5 is the plan.
 | Pedigree | ✅ | See 3.18. |
 | Neighbourhood | ✅ | |
 | Remote Access Status | — | Dial-up; out of scope. |
-| Bloodhound | ✅ | Bloodhound (Search) 1.2 (1.12.0) has the Files channel (criteria, contents, Find Similar, saved searches) and Internet Search Sites with Web and user channels. 1.3 adds live results, recents, index controls, preview and localization. See 3.13. |
+| Bloodhound | ✅ | Bloodhound (Search) 1.2 (1.12.0) has the Files channel (criteria, contents, Find Similar, saved searches) and Internet Search Sites with Web and user channels. 1.3 adds live search, recents, index controls, drag-and-drop, a preview pane and the app's strings in the translation files. See 3.13. |
 | Automated Tasks (scripts) | ✅ | See 3.12. |
 | Force Quit (ZacOS addition) | ✅ | |
 
