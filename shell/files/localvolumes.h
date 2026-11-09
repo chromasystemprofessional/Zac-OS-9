@@ -6,7 +6,9 @@
  * Covers block-device mounts (internal drives, USB sticks, SD cards,
  * optical discs) but not /, network mounts (AFP/SMB — those are in
  * netvolumes.h), or virtual filesystems (tmpfs, proc, squashfs, …).
- * Uses GVolumeMonitor plus the read-only Mac helper's mount records.
+ * Uses GVolumeMonitor, a QStorageInfo fallback for block-device mounts
+ * without a GVolume (an /etc/fstab data disk), plus the read-only Mac
+ * helper's mount records.
  */
 
 #include <QString>

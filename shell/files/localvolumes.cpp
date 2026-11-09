@@ -8,6 +8,7 @@
 #include <cstring>
 
 #include <QFileInfo>
+#include <QStorageInfo>
 #include <QSet>
 #include <QCoreApplication>
 #include <QTimer>
@@ -432,6 +433,54 @@ std::vector<LocalVolume> localVolumes() {
 			volume.device = device;
 			out.push_back(std::move(volume));
 		}
+	}
+
+	/* GVolumeMonitor only knows the volumes UDisks manages. A filesystem
+	 * mounted from /etc/fstab — an internal data disk added later — has no
+	 * GVolume and would never reach the desktop, though it is as much a
+	 * mounted disk as any other. Add block-device mounts it doesn't list;
+	 * /, /boot, pseudo filesystems, snap packages and file bind mounts
+	 * are not disks. */
+	const QString rootDevice = QStorageInfo(QStringLiteral("/")).device();
+	for (const QStorageInfo &storage : QStorageInfo::mountedVolumes()) {
+		if (!storage.isValid() || !storage.isReady()) {
+			continue;
+		}
+		const QString path = QDir::cleanPath(storage.rootPath());
+		if (!localVolumePathShown(path) || isNetworkMount(path) ||
+				!QFileInfo(path).isDir() ||
+				path == "/boot" || path.startsWith("/boot/") ||
+				storage.fileSystemType() == "squashfs") {
+			continue;
+		}
+		const QString device = storage.device();
+		if (!device.startsWith("/dev/") || device == rootDevice) {
+			continue;
+		}
+		bool shown = false;
+		for (const LocalVolume &volume : out) {
+			if (volume.path == path) {
+				shown = true;
+				break;
+			}
+		}
+		if (shown) {
+			continue;
+		}
+		LocalVolume v;
+		v.path = path;
+		v.device = device;
+		v.kind = mediaKindForDevice(device, &v.backingImage);
+		v.name = storage.name().isEmpty() ? QFileInfo(path).fileName() : storage.name();
+		v.ejectable = false;
+		v.mounted = true;
+		v.mediaPresent = true;
+		QString zacosName;
+		if (localVolumeZacosInfo(path, &zacosName, &v.zacosVersion)) {
+			v.zacos = true;
+			v.name = zacosName;
+		}
+		out.push_back(std::move(v));
 	}
 	return out;
 }
