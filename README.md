@@ -116,6 +116,14 @@ issue template.
   <i>And it starts up like a Mac should: Happy Zac, then the extensions marching along the bottom.</i>
 </p>
 
+## Privacy
+
+ZacOS 9 does not track you. There is no telemetry, no analytics, no online
+account and no first-party server; the project cannot count installations,
+and doesn't try. The few connections ZacOS makes — Software Update, Software,
+Web search, and the local network — are listed with exactly what they send in
+[PRIVACY.md](PRIVACY.md).
+
 ## Get ZacOS 9
 
 ### Try it, then install it (recommended)
@@ -166,6 +174,7 @@ else works, and Old Dog says the emulator isn't installed.
 - [Networking with Macs and Windows](docs/network.md) and [Mac disks](docs/mac-disks.md)
 - [Hardware notes](docs/hardware.md) for Macs and other PCs
 - [Security policy](SECURITY.md): supported versions and private reporting
+- [Privacy](PRIVACY.md): what ZacOS never sends, and every network connection it makes
 - [Project status](PROJECT_STATUS.md): what works now and what's next
 - ZacOS Help, in the Help menu, from inside the system
 
