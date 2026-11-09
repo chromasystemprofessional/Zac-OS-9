@@ -1,6 +1,6 @@
 # Project status
 
-Updated: 2026-11-08. Latest release: **1.11.0**
+Updated: 2026-11-08. Latest release: **1.12.0**
 ([releases](https://github.com/chromasystemprofessional/Zac-OS-9/releases),
 [ISO](https://sourceforge.net/projects/zac-os-9/files/)).
 
@@ -54,15 +54,18 @@ This page is what's true now and what's next. What changed and when is in
   with a Files channel, a one-window search, results that open, reveal and
   drag out, and a worker that stops when asked
   ([Bloodhound](docs/bloodhound.md)).
+- **1.12.0 is Bloodhound 1.2**: the search dog gets the whole Find engine
+  (criteria rows, contents with snippets, Find Similar Items and saved
+  searches), Internet Search Sites, and Web and user channels; it is called
+  **Bloodhound (Search)** so its purpose is clear
+  ([Bloodhound](docs/bloodhound.md)).
 
 ## Being worked on
 
-**Bloodhound (Search)**, Sherlock's search dog: 1.0 shipped in 1.11.0, the
-standalone Files search window in the Zac menu and Applications
-(`shell/bloodhound/`), using the shared Find engine. Bloodhound 1.1 adds
-criteria rows, contents through the index, Find Similar Items and saved
-searches. 1.2 adds Internet Search Sites, a Web channel and user channels,
-shared with the Sniffer's Search Internet
+**Bloodhound (Search)**, Sherlock's search dog: 1.2 shipped in 1.12.0, with
+the Files channel and Internet channels using the shared Find engine and
+site files. The next slice is 1.3: live results, recent searches, index
+controls, drag-and-drop, a preview pane, accessibility and localization
 ([Bloodhound](docs/bloodhound.md)).
 
 **The System Folder**, made to work the way Mac OS 7 to 9's did, item by
