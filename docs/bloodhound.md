@@ -12,12 +12,13 @@ app rather than a modern search overlay.
 
 ## Where it is now
 
-Bloodhound 1.2 shipped in ZacOS 9 1.12.0: `shell/bloodhound/` is a Qt 6
+Bloodhound 1.3 shipped in ZacOS 9 1.13.0: `shell/bloodhound/` is a Qt 6
 program with its own app id and one Platinum window. It appears as
 **Bloodhound (Search)** in Applications and the Zac menu. The Files channel
 has criteria rows, contents through the index with snippets, Find Similar
 Items and saved searches; the channel bar has Web, named channels and My
-Channel, read from Internet Search Sites.
+Channel, read from Internet Search Sites. Live Search, Recents, the Index
+menu, folder and site-file drops and a collapsible Preview are in.
 
 The search engine is shared with the Sniffer's Find:
 
@@ -27,10 +28,7 @@ The search engine is shared with the Sniffer's Find:
 - `shell/finder/findwindow.cpp`: the Find dialog and Items Found windows.
 
 The Sniffer's Find keeps its own Find dialog; both read one engine, one
-saved-search file and one site list. Bloodhound 1.3 adds the modern polish:
-live search, recent searches, the Index menu's status and controls,
-drag-and-drop for folders and site files, a collapsible preview pane, and
-the app's strings in the translation files.
+saved-search file and one site list.
 
 ## What Sherlock 2 got right
 
@@ -137,6 +135,8 @@ Shipped in ZacOS 9 1.12.0.
 - Search sites are data, never code.
 
 ### 1.3: modern polish
+
+Shipped in ZacOS 9 1.13.0.
 
 - Live search as an option, debounced, with the Search button still there.
 - Recent searches, kept locally and clearable.
