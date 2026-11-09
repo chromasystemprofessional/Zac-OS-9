@@ -362,7 +362,7 @@ for), and **About This Computer** keeps showing honest memory use. The
 | **Scripts in the Zac menu** (Automated Tasks) | ✅ | Executable regular files in `~/.config/zacos9/ZacOS 9 Menu Items/Automated Tasks` appear in an alphabetical submenu and run when chosen; non-executable files are omitted. |
 | Scriptable Sniffer (open, label, comments from scripts) | ✅ | `zacos9-finder-ctl open|reveal|label|comment|command …` (`--help`) over the Sniffer's socket. |
 
-### §3.13 Search: Bloodhound (ch. 15)
+### §3.13 Search: [Bloodhound](bloodhound.md) (ch. 15)
 
 | Feature | Status | Notes |
 |---|---|---|
