@@ -31,6 +31,7 @@
 #include "controlpanels.h"
 #include "cueimage.h"
 #include "items.h"
+#include "programs.h"
 #include "resources.h"
 #include "folderpath.h"
 #include "vfs.h"
@@ -190,6 +191,13 @@ int main(int argc, char **argv) {
 	 * it does for a tool with no GUI platform at all. */
 	QGuiApplication app(argc, argv);
 	QStandardPaths::setTestModeEnabled(false);
+	/* The build tree's assets, not a zacos9 installed on the host: the
+	 * System Folder's Internet Search Sites and the alert sounds come
+	 * from here. */
+	const QString assets = sourceTreePath("assets");
+	if (!assets.isEmpty()) {
+		qputenv("ZACOS9_DATA", assets.toUtf8());
+	}
 
 	/* ---- pasted custom icons ------------------------------------------ */
 	const QString iconFixture = root + "/custom-icon-fixture.dat";
