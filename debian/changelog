@@ -1,3 +1,23 @@
+zacos9 (1.14.2) trixie; urgency=medium
+
+  * ZacOS 9 now states what it has always done: it does not track you.
+    
+    A new Privacy page in ZacOS Help, and PRIVACY.md in the source, promise
+    no
+    telemetry, analytics, online account, advertising ID, device fingerprint
+    or first-party server. They list every network connection ZacOS makes
+    and
+    what it sends — Software Update, Software, Web search, local network
+    browsing and the services you choose.
+    
+    A new test fails if a known tracking or analytics endpoint appears, or
+    if
+    the update, Software or web-search code contacts an address the policy
+    does
+    not list.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Mon, 09 Nov 2026 14:17:48 -0500
+
 zacos9 (1.14.1) trixie; urgency=medium
 
   * Disks mounted from /etc/fstab now appear on the desktop.
