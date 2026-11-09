@@ -213,7 +213,10 @@ void BloodhoundWindow::rebuildChannels() {
 			if (site.channel.isEmpty()) {
 				mine = mine || site.user;
 			} else {
-				named.insert(site.channel.toLower(), site.channel);
+				const QString key = site.channel.toLower();
+				if (key != "web" && key != "files" && key != "my channel") {
+					named.insert(key, site.channel);
+				}
 			}
 		}
 		QStringList groups = named.values();
