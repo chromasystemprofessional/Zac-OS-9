@@ -209,6 +209,36 @@ static bool handle_vt_switch(struct plat_server *server, xkb_keysym_t sym) {
 	return true;
 }
 
+/* ⌘Q, ⌘H and ⌘M: quit, hide and collapse the program in front. The
+ * Sniffer keeps those keys for its own File menu (⌘H Search Internet,
+ * ⌘M Make Alias) and cannot be quit, as the Mac's Finder couldn't. */
+static bool handle_app_shortcut(struct plat_server *server, uint32_t mods,
+		xkb_keysym_t sym) {
+	const uint32_t ignored = WLR_MODIFIER_CAPS | WLR_MODIFIER_MOD2; /* Caps, Num Lock */
+	if ((mods & ~ignored) != WLR_MODIFIER_LOGO) {
+		return false;
+	}
+	struct plat_view *view = server->focused_view;
+	if (server->grabbed_view || server->seat->drag || !view || !view->mapped ||
+			view->system_prompt || !view->app_id || !*view->app_id ||
+			strcmp(view->app_id, "zacos9-finder") == 0) {
+		return false;
+	}
+	switch (xkb_keysym_to_lower(sym)) {
+	case XKB_KEY_q:
+		view_close_app(server, view->app_id);
+		return true;
+	case XKB_KEY_h:
+		view_hide_app(server, view->app_id);
+		return true;
+	case XKB_KEY_m:
+		view_set_collapsed(view, !view->collapsed);
+		return true;
+	default:
+		return false;
+	}
+}
+
 /* Compositor-level shortcuts. Returns true if the key was consumed. */
 static bool handle_keybinding(struct plat_server *server, uint32_t mods,
 		xkb_keysym_t sym) {
@@ -231,6 +261,9 @@ static bool handle_keybinding(struct plat_server *server, uint32_t mods,
 			platinum_shell_switch_app(server, (mods & WLR_MODIFIER_SHIFT) ? -1 : 1);
 			return true;
 		}
+	}
+	if (handle_app_shortcut(server, mods, sym)) {
+		return true;
 	}
 	if (handle_layout_switch(server, mods, sym)) {
 		return true;
