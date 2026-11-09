@@ -1,3 +1,17 @@
+zacos9 (1.14.3) trixie; urgency=medium
+
+  * Disks no longer hide under a desktop file.
+    
+    A disk and a file could both remember the same place on the desktop, and
+    the file was drawn over the disk, so the disk looked missing. A disk
+    whose
+    remembered place overlaps another icon now takes a free place instead.
+    
+    The startup disk and the Trash keep their places, and files are never
+    moved.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Mon, 09 Nov 2026 18:21:16 -0500
+
 zacos9 (1.14.2) trixie; urgency=medium
 
   * ZacOS 9 now states what it has always done: it does not track you.
