@@ -1,6 +1,6 @@
 # Project status
 
-Updated: 2026-11-09. Latest release: **1.14.2**
+Updated: 2026-11-09. Latest release: **1.14.3**
 ([releases](https://github.com/chromasystemprofessional/Zac-OS-9/releases),
 [ISO](https://sourceforge.net/projects/zac-os-9/files/)).
 
@@ -74,6 +74,9 @@ This page is what's true now and what's next. What changed and when is in
   account, advertising ID, device fingerprint or first-party server; every
   network connection is listed in [PRIVACY.md](PRIVACY.md) and a test
   enforces it ([Privacy](PRIVACY.md)).
+- **1.14.3 keeps desktop disks visible**: a disk whose remembered place
+  overlapped another icon's is moved to a free place instead of being
+  drawn under it ([Files](docs/files.md)).
 
 ## Being worked on
 
