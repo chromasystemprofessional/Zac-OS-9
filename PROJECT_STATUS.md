@@ -1,6 +1,6 @@
 # Project status
 
-Updated: 2026-11-07. Latest release: **1.10.0**
+Updated: 2026-11-08. Latest release: **1.11.0**
 ([releases](https://github.com/chromasystemprofessional/Zac-OS-9/releases),
 [ISO](https://sourceforge.net/projects/zac-os-9/files/)).
 
@@ -50,13 +50,19 @@ This page is what's true now and what's next. What changed and when is in
   (CDs, DVDs, audio CDs, blank discs, floppy/Zip disks, USB storage and
   disk images, with AutoPlay in VLC) and makes the boot splash and login
   screen follow the main display's rotation.
+- **1.11.0 is Bloodhound 1.0**: Sherlock's search dog is its own program,
+  with a Files channel, a one-window search, results that open, reveal and
+  drag out, and a worker that stops when asked
+  ([Bloodhound](docs/bloodhound.md)).
 
 ## Being worked on
 
-**Bloodhound** (Sherlock's search dog): the standalone Files search window
-is in the Zac menu and Applications (`shell/bloodhound/`), using the shared
-Find engine. Criteria, contents, saved searches and the planned Internet
-Search Sites are next ([Mac OS 9 plan](docs/mac-os-9-gap-plan.md), §3.13).
+**Bloodhound** (Sherlock's search dog): 1.0 shipped in 1.11.0, the
+standalone Files search window in the Zac menu and Applications
+(`shell/bloodhound/`), using the shared Find engine. The next slice brings
+the Find window's criteria, contents and saved searches into Bloodhound;
+Internet Search Sites and the Web channel follow
+([Bloodhound](docs/bloodhound.md)).
 
 **The System Folder**, made to work the way Mac OS 7 to 9's did, item by
 item: [`docs/system-folder.md`](docs/system-folder.md) has every item, what
