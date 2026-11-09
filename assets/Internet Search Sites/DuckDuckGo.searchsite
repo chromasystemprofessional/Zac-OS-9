@@ -1,0 +1,3 @@
+[Search Site]
+Name=DuckDuckGo
+URL=https://duckduckgo.com/?q={query}

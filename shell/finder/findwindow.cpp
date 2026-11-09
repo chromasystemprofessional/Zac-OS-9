@@ -1,6 +1,7 @@
 #include "findwindow.h"
 
 #include "finder.h"
+#include "searchsites.h"
 #include "thumbnails.h"
 #include "fileassoc.h"
 
@@ -269,8 +270,13 @@ void FindDialog::find() {
 			relayout();
 			return;
 		}
-		if (openWebSearch(webSearchChannels().value(m_scope.selected - m_internetFirst), words.join(' '))) {
+		QString error;
+		if (openWebSearch(webSearchChannels().value(m_scope.selected - m_internetFirst),
+				words.join(' '), &error)) {
 			close();
+		} else {
+			m_problem = error;
+			relayout();
 		}
 		return;
 	}

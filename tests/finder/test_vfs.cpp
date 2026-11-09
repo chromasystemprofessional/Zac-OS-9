@@ -842,6 +842,11 @@ int main(int argc, char **argv) {
 		dataHome + "/zacos9/appearance/Sound Themes",
 		"Appearance contains a custom Sound Themes folder");
 	check(prefs == root + "/config", "Preferences stands for the XDG config directory");
+	const QString sites = vfsOpensAs(vfsPathFor("system-folder/internet-search-sites"));
+	check(sites.endsWith("Internet Search Sites") && QDir(sites).exists(),
+		"System Folder exposes the read-only Internet Search Sites");
+	check(namesIn(vfsPathFor("system-folder")).contains("Internet Search Sites"),
+		"and lists it in the System Folder");
 	check(vfsOpensAs(vfsPathFor("system-folder")).isEmpty(),
 		"a curated folder opens as a virtual window, not a directory");
 	check(vfsList(vfsPathFor("home")).empty(),

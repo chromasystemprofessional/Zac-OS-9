@@ -50,11 +50,13 @@
  * 20: Control Panels (Disabled).
  * 21: Utilities moves from the System Folder into Applications, and holds
  *     only shipped utilities and the user's own; the old optional root
- *     Utilities folder is gone. */
-static constexpr int REGISTRY_VERSION = 22;
+ *     Utilities folder is gone.
+ * 22: Appearance's Themes folder is Theme Files.
+ * 23: Internet Search Sites in the System Folder. */
+static constexpr int REGISTRY_VERSION = 23;
 
 static const char *DEFAULT_REGISTRY = R"JSON({
-  "version": 21,
+  "version": 23,
   "volume": {},
   "showUnixVolume": false,
   "nodes": [
@@ -79,6 +81,8 @@ static const char *DEFAULT_REGISTRY = R"JSON({
     { "id": "system-folder/collar-modules-disabled", "name": "Collar Modules (Disabled)",
       "kind": "collar-modules-disabled", "icon": "control-strip" },
     { "id": "system-folder/help", "icon": "help", "name": "Help", "kind": "help-books" },
+    { "id": "system-folder/internet-search-sites", "name": "Internet Search Sites",
+      "kind": "backed", "backing": "$ZACOS9_DATA/Internet Search Sites" },
     { "id": "system-folder/voices", "icon": "speech", "name": "Voices", "kind": "voices" },
     { "id": "system-folder/keyboard-layouts", "icon": "keyboard", "name": "Keyboard Layouts",
       "kind": "keyboard-layouts" },
@@ -190,6 +194,7 @@ QString expand(const QString &in) {
 	out.replace("$XDG_DOCUMENTS_DIR", documents);
 	out.replace("$XDG_CONFIG_HOME", config);
 	out.replace("$XDG_DATA_HOME", data);
+	out.replace("$ZACOS9_DATA", QString::fromUtf8(pl_data_dir()));
 	out.replace("$HOME", QDir::homePath());
 	return out;
 }
