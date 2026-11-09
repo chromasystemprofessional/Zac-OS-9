@@ -241,7 +241,7 @@ Section 3 lists every feature; section 5 is the plan.
 | Pedigree | ✅ | See 3.18. |
 | Neighbourhood | ✅ | |
 | Remote Access Status | — | Dial-up; out of scope. |
-| Bloodhound | ◐ | Find with criteria and contents; Internet search is available from the Sniffer's File menu. Bloodhound 1.0 (1.11.0) is a standalone Files search window in the Zac menu and Applications; criteria, contents and channels follow. See 3.13. |
+| Bloodhound | ◐ | Find with criteria and contents; Internet search is available from the Sniffer's File menu. Bloodhound (Search) is a standalone Files search window in the Zac menu and Applications; 1.0 shipped in 1.11.0, and 1.1 adds criteria, contents, Find Similar and saved searches. Channels follow. See 3.13. |
 | Automated Tasks (scripts) | ✅ | See 3.12. |
 | Force Quit (ZacOS addition) | ✅ | |
 
@@ -366,7 +366,7 @@ for), and **About This Computer** keeps showing honest memory use. The
 
 | Feature | Status | Notes |
 |---|---|---|
-| **Bloodhound** in the Zac menu and Applications | ✅ | 1.11.0: `shell/bloodhound/` is the standalone Files search window, using the shared Find engine; criteria, contents and channels follow. |
+| **Bloodhound (Search)** in the Zac menu and Applications | ✅ | 1.11.0: `shell/bloodhound/` is the standalone Files search window; 1.1 adds criteria rows, contents through the index, Find Similar Items and saved searches. Channels follow. |
 | Find by name, results as a Sniffer view | ✅ | |
 | Criteria: dates, comments, size, kind, label, version, locked, empty/shared folder, invisible, custom icon | ✅ | `shell/files/findcriteria.cpp`: where (all disks, Home, the front folder) and up to six rows that must all match: name (contains, starts/ends with, is, is not, doesn't contain), date modified/created (today, past week/month, before/after a date), size, kind, label, lock, folder empty/shared, custom icon (is/is not), comments (contains, is/is not, doesn't contain), invisible (is/is not; host dotfiles) and application package version (contains, is/is not, doesn't contain). Hidden entries are traversed only for a query with an invisible criterion. |
 | **Search contents** with an index; schedule indexing; Index Selection | ✅ | `shell/files/findindex.cpp`: "contents include" asks localsearch (tinysparql full-text query, kept to the chosen place; the other rows sift its answers); File ▸ Index Selection adds folders to its index. Scheduling is localsearch's own. |

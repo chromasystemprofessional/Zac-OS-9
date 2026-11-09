@@ -507,8 +507,9 @@ bool loadFindQuery(const QString &name, FindQuery *query, QString *error) {
 		}
 		const int scope = saved.value("scope").toInt(-1);
 		const QJsonArray rows = saved.value("criteria").toArray();
+		/* Six rows, plus Bloodhound's search field as the name row. */
 		if (scope < int(FindScope::AllDisks) || scope > int(FindScope::Folder) ||
-				rows.isEmpty() || rows.size() > 6) {
+				rows.isEmpty() || rows.size() > 7) {
 			break;
 		}
 		FindQuery loaded;
@@ -523,8 +524,7 @@ bool loadFindQuery(const QString &name, FindQuery *query, QString *error) {
 			const QJsonObject row = rowValue.toObject();
 			const int field = row.value("field").toInt(-1);
 			const int op = row.value("op").toInt(-1);
-			if (field < int(FindField::Name) || field > int(FindField::Version) ||
-					op < int(FindOp::Contains) || op > int(FindOp::IsShared) ||
+			if (field < int(FindField::Name) || field > int(FindField::Version) || op < 0 ||
 					!row.value("text").isString() || !row.value("choice").isDouble()) {
 				valid = false;
 				break;

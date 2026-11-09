@@ -14,8 +14,8 @@ app rather than a modern search overlay.
 
 Bloodhound 1.0 shipped in ZacOS 9 1.11.0: `shell/bloodhound/` is a Qt 6
 program with its own app id, one Platinum window and the Files channel
-(name search, scope, results, Open/Reveal/Get Info, drag and copy path). A
-desktop entry puts it in Applications and the Zac menu.
+(name search, scope, results, Open/Reveal/Get Info, drag and copy path). It
+appears as **Bloodhound (Search)** in Applications and the Zac menu.
 
 The search engine is shared with the Sniffer's Find:
 
@@ -23,8 +23,10 @@ The search engine is shared with the Sniffer's Find:
 - `shell/files/findindex.cpp`: contents through the local search index.
 - `shell/finder/findwindow.cpp`: the Find dialog and Items Found windows.
 
-Criteria, contents and saved searches still live in the Sniffer's Find
-window; Bloodhound 1.1 brings them into the app. Channels follow.
+Bloodhound 1.1 completes the Files channel: criteria rows, contents through
+the index (with Index Selection and snippets), Find Similar Items and saved
+searches now live in the window. The Sniffer's Find keeps its own Find
+dialog; both read one engine and one saved-search file. Channels follow.
 
 ## What Sherlock 2 got right
 

@@ -57,11 +57,11 @@ This page is what's true now and what's next. What changed and when is in
 
 ## Being worked on
 
-**Bloodhound** (Sherlock's search dog): 1.0 shipped in 1.11.0, the
+**Bloodhound (Search)**, Sherlock's search dog: 1.0 shipped in 1.11.0, the
 standalone Files search window in the Zac menu and Applications
-(`shell/bloodhound/`), using the shared Find engine. The next slice brings
-the Find window's criteria, contents and saved searches into Bloodhound;
-Internet Search Sites and the Web channel follow
+(`shell/bloodhound/`), using the shared Find engine. Bloodhound 1.1 adds
+criteria rows, contents through the index, Find Similar Items and saved
+searches. Internet Search Sites and the Web channel follow
 ([Bloodhound](docs/bloodhound.md)).
 
 **The System Folder**, made to work the way Mac OS 7 to 9's did, item by

@@ -5,6 +5,7 @@ that the result rows add ink below the search controls.
 
 usage: test_window.py ZACOS9-WM ZACOS9-BLOODHOUND VPTR
 """
+import json
 import os
 import shlex
 import shutil
@@ -23,7 +24,7 @@ if not shutil.which("grim"):
 
 # The first window in a headless session: frame at (97, 32), content below
 # the title bar. The region covers the window without the screen's edges.
-WINDOW = (100, 50, 680, 470)
+WINDOW = (100, 50, 760, 620)
 
 
 with tempfile.TemporaryDirectory(prefix="zacos9-bloodhound-") as directory:
@@ -33,17 +34,32 @@ with tempfile.TemporaryDirectory(prefix="zacos9-bloodhound-") as directory:
     search = root / "search"
     (search / "sub").mkdir()
     for name, text in [
-        ("report.txt", "report\n"),
+        ("report.txt", "the harbour report\n"),
         ("notes.txt", "notes\n"),
-        ("sub/report-two.txt", "report\n"),
+        ("sub/report-two.txt", "the harbour again\n"),
     ]:
         (search / name).write_text(text)
+    # The index answers a contents search; the saved query below asks it.
+    fake_index = root / "tinysparql"
+    fake_index.write_text("#!/bin/sh\necho 'Results:'\n"
+                          f"echo '  -1, file://{search / 'report.txt'}'\n"
+                          f"echo '  -2, file://{search / 'sub' / 'report-two.txt'}'\n")
+    fake_index.chmod(0o755)
+    config = root / "config" / "zacos9"
+    config.mkdir(parents=True)
+    (config / "find-searches.json").write_text(json.dumps({
+        "version": 1,
+        "searches": [{
+            "name": "Harbour", "scope": 2, "folder": str(search),
+            "criteria": [{"field": 1, "op": 17, "text": "harbour", "choice": 0}],
+        }],
+    }))
     actions = root / "actions"
     ctl = root / "zacos9-finder-ctl"
     ctl.write_text("#!/bin/sh\nprintf '%s\\n' \"$@\" >> " + shlex.quote(str(actions)) + "\n")
     ctl.chmod(0o755)
     env = dict(os.environ, XDG_RUNTIME_DIR=directory, HOME=str(root / "home"),
-               ZACOS9_FINDER_CTL=str(ctl),
+               ZACOS9_FINDER_CTL=str(ctl), ZACOS9_TINYSPARQL=str(fake_index),
                XDG_CONFIG_HOME=str(root / "config"), XDG_DATA_HOME=str(root / "data"),
                XDG_CACHE_HOME=str(root / "cache"),
                WLR_BACKENDS="headless", WLR_RENDERER="pixman", WLR_HEADLESS_OUTPUTS="1",
@@ -91,6 +107,28 @@ with tempfile.TemporaryDirectory(prefix="zacos9-bloodhound-") as directory:
                         dark += 1
                 return dark
 
+            def highlight():
+                path = root / "highlight.ppm"
+                x, y, w, h = WINDOW
+                subprocess.run(["grim", "-g", f"{x},{y} {w}x{h}", "-t", "ppm", str(path)],
+                               env=env, check=True, timeout=10)
+                data = path.read_bytes()
+                fields, at = [], 2
+                while len(fields) < 3:
+                    while data[at:at + 1].isspace():
+                        at += 1
+                    end = at
+                    while not data[end:end + 1].isspace():
+                        end += 1
+                    fields.append(int(data[at:end]))
+                    at = end
+                pixels = data[at + 1:]
+                marked = 0
+                for i in range(0, len(pixels) - 2, 3):
+                    if pixels[i] > 220 and pixels[i + 1] > 200 and pixels[i + 2] < 180:
+                        marked += 1
+                return marked
+
             # The first key of the session's first virtual keyboard goes on
             # its keymap. Then click the search field (window frame at 97,32)
             # and type: the default button searches on Return.
@@ -113,6 +151,16 @@ with tempfile.TemporaryDirectory(prefix="zacos9-bloodhound-") as directory:
             assert "open" in lines and "reveal" in lines and "command" in lines, asked
             assert ".txt" in asked and "report" in asked, asked
             print("ok: a result opens, reveals and shows Get Info through the Sniffer")
+
+            # A saved contents search loads its criteria, asks the index and
+            # draws snippets with the matched word highlighted.
+            before_highlight = highlight()
+            vp("home", "move", "480", "127", "click", "wait", "700",
+               "home", "move", "487", "142", "click", "wait", "2500")
+            after_highlight = highlight()
+            assert window.poll() is None, "Bloodhound exited after a saved search"
+            assert after_highlight > before_highlight + 50, (before_highlight, after_highlight)
+            print("ok: a saved contents search highlights its matches in snippets")
         finally:
             for p in reversed(processes):
                 if p.poll() is None:

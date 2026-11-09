@@ -1,6 +1,8 @@
 #pragma once
 
+#include <QHash>
 #include <QPoint>
+#include <QStringList>
 #include <QWidget>
 #include <memory>
 #include <vector>
@@ -11,11 +13,13 @@
 #include "pixels.h"
 
 class BloodhoundSearch;
+class QContextMenuEvent;
 
 /*
- * Bloodhound 1.0: the Files channel in one window. The search field and
- * scope sit above the result list; the engine is the Sniffer's Find
- * (search.h), and the results open and reveal through zacos9-finder-ctl.
+ * Bloodhound (Search): Sherlock 2's Files channel in one window. The search
+ * field, scope and criteria rows sit above the result list; the engine is
+ * the Sniffer's Find (search.h, findcriteria.*, findindex.*), and results
+ * open and reveal through zacos9-finder-ctl.
  */
 class BloodhoundWindow : public QWidget {
 public:
@@ -30,13 +34,37 @@ protected:
 	void mouseDoubleClickEvent(QMouseEvent *) override;
 	void wheelEvent(QWheelEvent *) override;
 	void keyPressEvent(QKeyEvent *) override;
+	void contextMenuEvent(QContextMenuEvent *) override;
 
 private:
+	struct CriterionRow;
+	struct Snippet {
+		QString text;
+		QStringList words;
+		bool asked = false;
+	};
+
 	void search();
 	void stop();
 	void addResults(const QStringList &paths);
 	void finished(const QString &problem);
+	void findSimilar();
 	FindQuery query() const;
+
+	void addCriterion(FindField field = FindField::Modified);
+	void removeCriterion();
+	void setCriterionField(CriterionRow &row, FindField field);
+	void relayout();
+	void saveSearch();
+	void showSavedSearches();
+	void indexSelection();
+	void applyQuery(const FindQuery &q);
+	void rebuildScope(FindScope scope = FindScope::AllDisks);
+	bool hasContentsRow() const;
+	int rowHeight() const;
+	void requestSnippet(const QString &path);
+	void startNextSnippet();
+	void paintSnippet(pl_canvas *c, const Snippet &snippet, int x, int baseline, int width) const;
 
 	std::vector<Item *> selectedItems();
 	void selectOnly(Item *item);
@@ -59,6 +87,8 @@ private:
 	PanelEdit m_search;
 	PanelPopup m_scope;
 	PanelButton m_find, m_stop;
+	PanelButton m_more, m_fewer, m_saveSearch, m_savedSearches, m_indexSelection;
+	std::vector<std::unique_ptr<CriterionRow>> m_rows;
 	QPoint m_pressPos;
 	Item *m_pressItem = nullptr;
 	bool m_listFocus = false;
@@ -70,4 +100,12 @@ private:
 	std::vector<std::unique_ptr<Item>> m_items;
 	BloodhoundSearch *m_worker = nullptr;
 	bool m_searching = false;
+	QStringList m_contentWords;
+	QHash<QString, Snippet> m_snippets;
+	QStringList m_snippetQueue;
+	int m_snippetRequests = 0;
+	bool m_snippetRunning = false;
+	quint64 m_generation = 0;
+	QString m_similarTo;
+	int m_resultsTop = 100;
 };

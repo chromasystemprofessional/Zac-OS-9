@@ -16,7 +16,7 @@ int main(int argc, char **argv) {
 	qputenv("QT_WAYLAND_DISABLE_WINDOWDECORATION", "1");
 	QApplication app(argc, argv);
 	zacos9_i18n_init();
-	QApplication::setApplicationName(tr9("Bloodhound"));
+	QApplication::setApplicationName(tr9("Bloodhound (Search)"));
 	QApplication::setDoubleClickInterval(pl_double_click_ms());
 	QGuiApplication::setDesktopFileName("zacos9-bloodhound");
 

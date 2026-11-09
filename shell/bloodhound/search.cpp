@@ -1,5 +1,7 @@
 #include "search.h"
 
+#include "findindex.h"
+
 #include <QDate>
 #include <QDir>
 #include <QElapsedTimer>
@@ -26,7 +28,31 @@ BloodhoundSearch::~BloodhoundSearch() {
 void BloodhoundSearch::start(const FindQuery &query) {
 	stop();
 	const quint64 generation = ++m_generation;
-	m_thread = QThread::create([this, query, generation] {
+	if (query.hasContents()) {
+		/* The index answers on the GUI thread; the walk then runs in the
+		 * worker, sifting its candidates with the other rows. */
+		m_pending = true;
+		const QStringList words = query.contentWords();
+		indexSearch(words, query.root(),
+			[this, query, generation](const QStringList &paths, const QString &error) {
+			if (generation != m_generation) {
+				return;
+			}
+			m_pending = false;
+			if (!error.isEmpty()) {
+				emit finished(error);
+				return;
+			}
+			startWalk(query, paths, true, generation);
+		});
+		return;
+	}
+	startWalk(query, {}, false, generation);
+}
+
+void BloodhoundSearch::startWalk(const FindQuery &query, const QStringList &candidates,
+		bool useCandidates, quint64 generation) {
+	m_thread = QThread::create([this, query, candidates, useCandidates, generation] {
 		QStringList pending;
 		int found = 0;
 		QElapsedTimer sent;
@@ -54,29 +80,38 @@ void BloodhoundSearch::start(const FindQuery &query) {
 				flush();
 			}
 		};
-		QStringList stack = { query.root() };
-		while (!stack.isEmpty() && found < MAX_RESULTS &&
-				!QThread::currentThread()->isInterruptionRequested()) {
-			const QString dir = stack.takeLast();
-			QDir::Filters filters = QDir::AllEntries | QDir::NoDotAndDotDot | QDir::System;
-			if (query.hasVisibilityCriterion()) {
-				filters |= QDir::Hidden;
-			}
-			const auto entries = QDir(dir).entryInfoList(
-				filters, QDir::Name | QDir::IgnoreCase | QDir::Reversed);
-			for (const QFileInfo &info : entries) {
+		if (useCandidates) {
+			for (const QString &path : candidates) {
 				if (QThread::currentThread()->isInterruptionRequested()) {
 					break;
 				}
-				const QString path = info.absoluteFilePath();
-				if (info.isDir() && !info.isSymLink() && !skipDir(path)) {
-					stack.push_back(path);
+				const QFileInfo info(path);
+				if (info.exists()) {
+					consider(info);
 				}
-				consider(info);
 			}
-		}
-		if (QThread::currentThread()->isInterruptionRequested()) {
-			return;
+		} else {
+			QStringList stack = { query.root() };
+			while (!stack.isEmpty() && found < MAX_RESULTS &&
+					!QThread::currentThread()->isInterruptionRequested()) {
+				const QString dir = stack.takeLast();
+				QDir::Filters filters = QDir::AllEntries | QDir::NoDotAndDotDot | QDir::System;
+				if (query.hasVisibilityCriterion()) {
+					filters |= QDir::Hidden;
+				}
+				const auto entries = QDir(dir).entryInfoList(
+					filters, QDir::Name | QDir::IgnoreCase | QDir::Reversed);
+				for (const QFileInfo &info : entries) {
+					if (QThread::currentThread()->isInterruptionRequested()) {
+						break;
+					}
+					const QString path = info.absoluteFilePath();
+					if (info.isDir() && !info.isSymLink() && !skipDir(path)) {
+						stack.push_back(path);
+					}
+					consider(info);
+				}
+			}
 		}
 		flush();
 		QMetaObject::invokeMethod(this, [this, generation] {
@@ -96,6 +131,7 @@ void BloodhoundSearch::start(const FindQuery &query) {
 
 void BloodhoundSearch::stop() {
 	++m_generation;
+	m_pending = false;
 	if (m_thread) {
 		m_thread->requestInterruption();
 		m_thread->wait();

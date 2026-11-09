@@ -21,6 +21,15 @@ test('bloodhound-search', executable('test-bloodhound-search',
   timeout: 30,
 )
 
+test('bloodhound-controls', executable('test-bloodhound-controls',
+    '../../tests/bloodhound/test_controls.cpp', 'bloodhoundwindow.cpp', 'search.cpp',
+    bloodhound_moc,
+    include_directories: include_directories('../panels'),
+    dependencies: [shell_files_dep, shell_common_dep, platinum_dep, qt6],
+  ),
+  timeout: 30,
+)
+
 test('bloodhound-window', find_program('python3'),
   args: [files('../../tests/bloodhound/test_window.py'), compositor_exe,
     bloodhound_exe, vptr_exe],
