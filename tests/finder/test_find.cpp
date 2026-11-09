@@ -1,4 +1,4 @@
-/* Find (shell/finder/findcriteria.cpp, findindex.cpp, findwindow.cpp):
+/* Find (shell/files/findcriteria.cpp, findindex.cpp; findwindow.cpp):
  * criteria against real files, the search index's query and answers (a
  * fake tinysparql), and searches through to the Items Found window. */
 #include <QApplication>
@@ -178,6 +178,17 @@ int main(int argc, char **argv) {
 		loadFindQuery("BUDGET NOTES", &loadedQuery, &savedError) &&
 		loadedQuery.criteria.size() == 1 && loadedQuery.criteria[0].text == ".txt",
 		"saving the same name replaces that query without adding a duplicate");
+	FindQuery contentQuery = in(d, {
+		row(FindField::Contents, FindOp::Includes, "harbour"),
+		row(FindField::Name, FindOp::Contains, "Budget"),
+	});
+	check(saveFindQuery("Contents Notes", contentQuery, &savedError) &&
+		loadFindQuery("Contents Notes", &loadedQuery, &savedError) &&
+		loadedQuery.criteria.size() == 2 &&
+		loadedQuery.criteria[0].field == FindField::Contents &&
+		loadedQuery.criteria[0].op == FindOp::Includes &&
+		loadedQuery.criteria[0].text == "harbour",
+		"a saved contents criterion round-trips too");
 
 	// ---- the criteria ----
 	const QString budget = d + "/Budget notes.txt";

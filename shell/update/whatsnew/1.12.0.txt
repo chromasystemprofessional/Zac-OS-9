@@ -1,0 +1,15 @@
+Bloodhound (Search), Sherlock's search dog, now has the whole Find engine
+and channels.
+
+The Files channel adds More Choices criteria (dates, size, kind, label,
+lock, comments, version and more), contents search through the index with
+highlighted snippets and Index Selection, Find Similar Items, and saved
+searches shared with the Sniffer's Find.
+
+The Web channel and user channels search with DuckDuckGo, Google, Bing or
+any site you add to System Folder ▸ Internet Search Sites or
+~/.config/zacos9/Internet Search Sites. The Sniffer's File ▸ Search
+Internet uses the same sites.
+
+The app is called Bloodhound (Search) in Applications and the Zac menu, so
+its purpose is clear; an older Bloodhound menu alias is renamed.

@@ -455,7 +455,47 @@ static void remove_seeded_theme_installer(const char *items_dir) {
 	free(target);
 }
 
-#define SEEDED 4
+/* Bloodhound was just "Bloodhound" before 1.1; rename the old alias in
+ * place, in the menu or the Disabled folder, so the new name gets made
+ * without bringing a disabled item back. */
+static void rename_old_bloodhound_alias(const char *items_dir) {
+	char *desktop = find_desktop_file("zacos9-bloodhound.desktop");
+	char *target = desktop ? realpath(desktop, NULL) : NULL;
+	g_free(desktop);
+	if (!target) {
+		return;
+	}
+	char *disabled = g_strconcat(items_dir, " (Disabled)", NULL);
+	const char *folders[] = { items_dir, disabled };
+	const char *old_name = _("Bloodhound");
+	const char *new_name = _("Bloodhound (Search)");
+	char *new_active = g_build_filename(items_dir, new_name, NULL);
+	char *new_off = g_build_filename(disabled, new_name, NULL);
+	struct stat st;
+	bool new_exists = lstat(new_active, &st) == 0 || lstat(new_off, &st) == 0;
+	for (size_t i = 0; i < sizeof(folders) / sizeof(folders[0]); i++) {
+		char *old_path = g_build_filename(folders[i], old_name, NULL);
+		char *resolved = realpath(old_path, NULL);
+		if (resolved && strcmp(resolved, target) == 0) {
+			char *new_path = g_build_filename(folders[i], new_name, NULL);
+			if (!new_exists && lstat(new_path, &st) != 0) {
+				rename(old_path, new_path);
+				new_exists = true;
+			} else {
+				unlink(old_path);
+			}
+			g_free(new_path);
+		}
+		free(resolved);
+		g_free(old_path);
+	}
+	g_free(new_off);
+	g_free(new_active);
+	g_free(disabled);
+	free(target);
+}
+
+#define SEEDED 6
 static void seed_menu_items(const char *items_dir) {
 	static const struct {
 		const char *name;
@@ -463,6 +503,7 @@ static void seed_menu_items(const char *items_dir) {
 		int since;
 	} defaults[] = {
 		{ "Bark Recorder", { "zacos9-barkrecorder.desktop" }, 1 },
+		{ "Bloodhound (Search)", { "zacos9-bloodhound.desktop" }, 6 },
 		{ "Calculator", { "zacos9-calculator.desktop" }, 1 },
 		{ "Dog Ears", { "zacos9-dogears.desktop" }, 1 },
 		{ "Jigsaw Puzzle", { "zacos9-jigsaw.desktop" }, 1 },
@@ -479,8 +520,11 @@ static void seed_menu_items(const char *items_dir) {
 	char *text = NULL;
 	const int seeded = g_file_get_contents(marker, &text, NULL, NULL) ? atoi(text) : 0;
 	g_free(text);
-	if (seeded < SEEDED) {
+	if (seeded < 5) {
 		remove_seeded_theme_installer(items_dir);
+	}
+	if (seeded < 6) {
+		rename_old_bloodhound_alias(items_dir);
 	}
 	if (seeded >= SEEDED || g_mkdir_with_parents(items_dir, 0700) != 0) {
 		g_free(marker);

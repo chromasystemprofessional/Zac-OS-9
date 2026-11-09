@@ -51,6 +51,7 @@
 #include "diskinit.h"
 #include "netvolumes.h"
 #include "vfs.h"
+#include "searchsites.h"
 
 #include "alert.h"
 #include "tr.h"
@@ -63,26 +64,6 @@
 #include "viewoptionsdialog.h"
 #include "infowindow.h"
 #include "resourcewindows.h"
-
-QStringList webSearchChannels() {
-	return { "DuckDuckGo", "Google", "Bing" };
-}
-
-bool openWebSearch(const QString &channel, const QString &words) {
-	const QString baseUrl = channel == "Google" ? "https://www.google.com/search"
-		: channel == "Bing" ? "https://www.bing.com/search"
-		: "https://duckduckgo.com/";
-	QUrl url(baseUrl);
-	QUrlQuery query;
-	query.addQueryItem("q", words);
-	url.setQuery(query);
-	if (!appOpenUrl(url.toString(QUrl::FullyEncoded))) {
-		Alert::ask(tr9("The web search could not be opened. Check that a web browser is available."),
-			"OK", QString());
-		return false;
-	}
-	return true;
-}
 
 /* Printing's messages don't stop you (Mac OS 9's didn't either). */
 static void printProblem(const QString &message) {
@@ -480,6 +461,12 @@ void Finder::command(const QString &name) {
 	} else if (name == "search-internet") {
 		bool accepted = false;
 		const QStringList searchChannels = webSearchChannels();
+		if (searchChannels.isEmpty()) {
+			Alert::ask(tr9("There are no Internet search sites. Add one to "
+				"System Folder ▸ Internet Search Sites or to your own Internet "
+				"Search Sites folder."), "OK", QString());
+			return;
+		}
 		const QString channel = QInputDialog::getItem(nullptr, tr9("Search Internet"),
 			tr9("Search the web with:"), searchChannels, 0, false, &accepted);
 		if (!accepted) {
@@ -488,7 +475,10 @@ void Finder::command(const QString &name) {
 		const QString words = QInputDialog::getText(nullptr, tr9("Search Internet"),
 			tr9("Search for:"), QLineEdit::Normal, QString(), &accepted).trimmed();
 		if (accepted && !words.isEmpty()) {
-			openWebSearch(channel, words);
+			QString error;
+			if (!openWebSearch(channel, words, &error)) {
+				Alert::ask(error, "OK", QString());
+			}
 		}
 	} else if (name == "find-similar") {
 		const std::vector<Item *> sel = front() ? front()->selectedItems() : std::vector<Item *>{};

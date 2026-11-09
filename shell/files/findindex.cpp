@@ -9,6 +9,8 @@
 #include <QUrl>
 #include <algorithm>
 
+#include "tr.h"
+
 static QString program(const char *env, const char *fallback) {
 	const QString p = qEnvironmentVariable(env);
 	return p.isEmpty() ? QString(fallback) : p;
@@ -175,10 +177,124 @@ void indexSimilar(const QString &path, const IndexResults &done) {
 		});
 }
 
+IndexSnippet indexSnippetText(const QString &raw, const QStringList &words) {
+	IndexSnippet out;
+	const QString text = raw.simplified();
+	if (text.isEmpty() || words.isEmpty()) {
+		return out;
+	}
+	int at = -1, length = 0;
+	for (const QString &word : words) {
+		const QString w = word.trimmed();
+		if (w.isEmpty()) {
+			continue;
+		}
+		const int found = text.indexOf(w, 0, Qt::CaseInsensitive);
+		if (found >= 0 && (at < 0 || found < at)) {
+			at = found;
+			length = w.size();
+		}
+	}
+	if (at < 0) {
+		return out;
+	}
+	int start = std::max(0, at - 50);
+	int end = std::min<int>(text.size(), at + length + 90);
+	if (start > 0) {
+		const int space = text.indexOf(QLatin1Char(' '), start);
+		if (space >= 0 && space < at) {
+			start = space + 1;
+		}
+	}
+	if (end < text.size()) {
+		const int space = text.lastIndexOf(QLatin1Char(' '), end);
+		if (space > at + length) {
+			end = space;
+		}
+	}
+	QString snippet = text.mid(start, end - start);
+	if (start > 0) {
+		snippet.prepend(QChar(0x2026));
+	}
+	if (end < text.size()) {
+		snippet.append(QChar(0x2026));
+	}
+	out.text = snippet;
+	for (const QString &word : words) {
+		const QString w = word.trimmed();
+		if (!w.isEmpty() && snippet.contains(w, Qt::CaseInsensitive)) {
+			out.words << w;
+		}
+	}
+	return out;
+}
+
+void indexSnippet(const QString &path, const QStringList &words, const IndexSnippetResults &done) {
+	static const QMimeDatabase db;
+	if (db.mimeTypeForFile(path).inherits("text/plain")) {
+		QFile file(path);
+		if (!file.open(QIODevice::ReadOnly)) {
+			done({}, tr9("Could not read the file to show what matched."));
+			return;
+		}
+		done(indexSnippetText(QString::fromUtf8(file.read(400000)), words), QString());
+		return;
+	}
+	// Other documents (PDFs, office files) have their text in the index.
+	const QString url = QUrl::fromLocalFile(path).toString(QUrl::FullyEncoded);
+	run(program("ZACOS9_TINYSPARQL", "tinysparql"), { "query", "--dbus-service", service(),
+			QString("SELECT ?text WHERE { ?f nie:url %1 . ?ie nie:isStoredAs ?f ; nie:plainTextContent ?text } LIMIT 1")
+				.arg(literal(url)) },
+		[words, done](int code, const QString &out, const QString &err) {
+			if (code != 0 || !out.contains("Results:")) {
+				done({}, NoIndex + (err.isEmpty() ? QString() : " (" + err.section('\n', -1) + ")"));
+				return;
+			}
+			done(indexSnippetText(out.section("Results:", 1), words), QString());
+		});
+}
+
 void indexAddFolder(const QString &path, const std::function<void(const QString &error)> &done) {
 	run(program("ZACOS9_LOCALSEARCH", "localsearch"), { "index", "--add", "--recursive", path },
 		[done](int code, const QString &, const QString &err) {
 			done(code == 0 ? QString()
 				: "The search index couldn't take in the folder." + (err.isEmpty() ? QString() : " " + err.section('\n', -1)));
+		});
+}
+
+void indexRemoveFolder(const QString &path, const std::function<void(const QString &error)> &done) {
+	run(program("ZACOS9_LOCALSEARCH", "localsearch"), { "index", "--remove", "--recursive", path },
+		[done](int code, const QString &, const QString &err) {
+			done(code == 0 ? QString()
+				: "The search index couldn't let go of the folder." + (err.isEmpty() ? QString() : " " + err.section('\n', -1)));
+		});
+}
+
+void indexStatus(const IndexTextResults &done) {
+	run(program("ZACOS9_LOCALSEARCH", "localsearch"), { "status" },
+		[done](int code, const QString &out, const QString &err) {
+			if (code != 0) {
+				done(QString(), "The search index couldn't say what it is doing." +
+					(err.isEmpty() ? QString() : " " + err.section('\n', -1)));
+				return;
+			}
+			done(out.trimmed(), QString());
+		});
+}
+
+void indexRebuild(const std::function<void(const QString &error)> &done) {
+	run(program("ZACOS9_LOCALSEARCH", "localsearch"), { "reset", "--filesystem" },
+		[done](int code, const QString &, const QString &err) {
+			if (code != 0) {
+				done("The search index couldn't be cleared." +
+					(err.isEmpty() ? QString() : " " + err.section('\n', -1)));
+				return;
+			}
+			run(program("ZACOS9_LOCALSEARCH", "localsearch"), { "daemon", "--start" },
+				[done](int code, const QString &, const QString &err) {
+					done(code == 0 ? QString()
+						: "The index was cleared, but its miners couldn't start." +
+							(err.isEmpty() ? QString() : " " + err.section('\n', -1)));
+				});
 		});
 }

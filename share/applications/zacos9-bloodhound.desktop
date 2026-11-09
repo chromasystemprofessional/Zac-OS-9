@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Bloodhound (Search)
+Comment=Find files by name, contents and criteria
+Exec=zacos9-bloodhound
+Terminal=false
+Categories=Utility;FileTools;
+OnlyShowIn=ZacOS9;

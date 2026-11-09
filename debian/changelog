@@ -1,3 +1,41 @@
+zacos9 (1.13.0) trixie; urgency=medium
+
+  * Bloodhound (Search) now has Live Search, recent searches, the Index
+    menu's status and controls, folder and search-site drops, and a
+    collapsible Preview pane. It remembers whether Live Search was on and
+    which channel was open.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Mon, 09 Nov 2026 10:23:53 -0500
+
+zacos9 (1.12.0) trixie; urgency=medium
+
+  * Bloodhound (Search), Sherlock's search dog, now has the whole Find
+    engine and channels: More Choices criteria, contents search with
+    highlighted snippets and Index Selection, Find Similar Items, saved
+    searches, Internet Search Sites, and Web and user channels. The app is
+    called Bloodhound (Search) in Applications and the Zac menu, and
+    DuckDuckGo, Google and Bing ship as seed search sites.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Sun, 08 Nov 2026 23:14:35 -0500
+
+zacos9 (1.11.0) trixie; urgency=medium
+
+  * Bloodhound, Sherlock's search dog, now has its own program.
+    
+    Open it from the Zac menu or the Applications folder. Type part of a
+    name, choose all disks or your Home folder, and press Search. Results
+    show where each file is, when it changed, its size and kind. Open,
+    Reveal and Get Info work on a result, Copy Path puts its path on the
+    clipboard, and a result can be dragged out of the list. Escape stops a
+    search, ⌘R reveals a result and ⌘I gets its information.
+    
+    Bloodhound 1.0 searches names. More Choices, contents and saved
+    searches stay in the Sniffer's File ▸ Find… for now; both use the
+    same search engine. Criteria, contents and the Internet channels are
+    next.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Sun, 08 Nov 2026 20:36:17 -0500
+
 zacos9 (1.10.0) trixie; urgency=medium
 
   * Boot splash and login screen now follow the main display's rotation,

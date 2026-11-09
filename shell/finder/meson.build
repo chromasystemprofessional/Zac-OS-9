@@ -32,7 +32,7 @@ finder_exe = executable('zacos9-finder',
   'transferdialog.cpp',
   'labeleditor.cpp',
   'infowindow.cpp', 'gpuinfo.cpp', 'modules.cpp',
-  'findwindow.cpp', 'findcriteria.cpp', 'findindex.cpp',
+  'findwindow.cpp',
   'folderstate.cpp',
   'resourcewindows.cpp',
   'diskinit.cpp',
@@ -61,7 +61,7 @@ finder_test_sources = [
   'transferdialog.cpp',
   'labeleditor.cpp',
   'infowindow.cpp', 'gpuinfo.cpp', 'modules.cpp',
-  'findwindow.cpp', 'findcriteria.cpp', 'findindex.cpp',
+  'findwindow.cpp',
   'folderstate.cpp',
   'resourcewindows.cpp',
   'diskinit.cpp',
@@ -145,7 +145,8 @@ test('finder-crypto',
   ),
   timeout: 30,
 )
-# Find: criteria, the search index, Items Found (findcriteria.cpp, findindex.cpp, findwindow.cpp).
+# Find: Items Found (findwindow.cpp); the criteria and the search index are
+# in libzacos9-files (shell/files/findcriteria.cpp, findindex.cpp).
 test('finder-find',
   executable('test-finder-find', '../../tests/finder/test_find.cpp', finder_test_sources,
     link_with: panelkit,

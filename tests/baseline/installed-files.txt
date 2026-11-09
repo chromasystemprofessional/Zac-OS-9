@@ -3,6 +3,7 @@
 {prefix}/bin/zacos9-appinstall
 {prefix}/bin/zacos9-autostart
 {prefix}/bin/zacos9-barkrecorder
+{prefix}/bin/zacos9-bloodhound
 {prefix}/bin/zacos9-bluetooth
 {prefix}/bin/zacos9-calculator
 {prefix}/bin/zacos9-capture
@@ -106,6 +107,7 @@
 {prefix}/share/applications/zacos9-appearance.desktop
 {prefix}/share/applications/zacos9-appinstall.desktop
 {prefix}/share/applications/zacos9-barkrecorder.desktop
+{prefix}/share/applications/zacos9-bloodhound.desktop
 {prefix}/share/applications/zacos9-bluetooth-collar.desktop
 {prefix}/share/applications/zacos9-bluetooth.desktop
 {prefix}/share/applications/zacos9-brightness-collar.desktop
@@ -219,6 +221,9 @@
 {prefix}/share/wayland-sessions/zacos9.desktop
 {prefix}/share/xdg-desktop-portal/portals/zacos9-inhibit.portal
 {prefix}/share/xdg-desktop-portal/portals/zacos9.portal
+{prefix}/share/zacos9/Internet Search Sites/Bing.searchsite
+{prefix}/share/zacos9/Internet Search Sites/DuckDuckGo.searchsite
+{prefix}/share/zacos9/Internet Search Sites/Google.searchsite
 {prefix}/share/zacos9/boot/happy-zac-1x.png
 {prefix}/share/zacos9/boot/happy-zac-2x.png
 {prefix}/share/zacos9/boot/happy-zac-3x.png
@@ -250,6 +255,9 @@
 {prefix}/share/zacos9/tools/macpict.py
 {prefix}/share/zacos9/tools/macsnd.py
 {prefix}/share/zacos9/tools/pngwrite.py
+{prefix}/share/zacos9/whatsnew/1.11.0.txt
+{prefix}/share/zacos9/whatsnew/1.12.0.txt
+{prefix}/share/zacos9/whatsnew/1.13.0.txt
 {prefix}/share/zacos9/whatsnew/1.7.0.txt
 {prefix}/share/zacos9/whatsnew/1.7.1.txt
 {prefix}/share/zacos9/whatsnew/1.7.2.txt

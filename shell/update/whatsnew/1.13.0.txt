@@ -1,0 +1,13 @@
+Bloodhound (Search) now searches as you type when Live Search is on.
+
+Turn on Live Search in the criteria row and the search starts after a
+pause, while the Search button and Return still work. Recents… brings
+back a recent search, and Clear Recent Searches empties the list.
+
+The Index menu reports what the contents index has, adds or removes a
+folder, and rebuilds the index. Drop a folder on the window to search it;
+drop a search-site file to add it to the Web and user channels.
+
+Preview shows the selected result's icon, kind, size, date and path in a
+pane below the list; click Preview again to put it away. Bloodhound
+remembers whether Live Search was on and which channel was open.
