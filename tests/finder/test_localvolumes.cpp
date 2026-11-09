@@ -5,6 +5,7 @@
 #include <QElapsedTimer>
 #include <QFile>
 #include <QFileInfo>
+#include <QStorageInfo>
 #include <QTemporaryDir>
 #include <QThread>
 #include <algorithm>
@@ -159,6 +160,23 @@ int main(int argc, char **argv) {
 	assert(found->path == "media:/dev/sdz1");
 	assert(!found->mounted);
 	assert(found->kind == MediaKind::OpticalAudio);
+	/* A block-device mount GIO doesn't know (an /etc/fstab data disk)
+	 * still reaches the desktop. This machine's data disk is one; on a
+	 * machine with no extra mounts the loop has nothing to check. */
+	for (const QStorageInfo &storage : QStorageInfo::mountedVolumes()) {
+		const QString path = QDir::cleanPath(storage.rootPath());
+		const QString device = storage.device();
+		if (!storage.isValid() || !storage.isReady() || !QFileInfo(path).isDir() ||
+				!localVolumePathShown(path) || !device.startsWith("/dev/") ||
+				path == "/boot" || path.startsWith("/boot/") ||
+				storage.fileSystemType() == "squashfs") {
+			continue;
+		}
+		const auto mountedStorage = std::find_if(media.begin(), media.end(),
+			[&path](const LocalVolume &volume) { return volume.path == path; });
+		assert(mountedStorage != media.end());
+		assert(mountedStorage->mounted && mountedStorage->mediaPresent);
+	}
 	int failures = 0, refreshes = 0;
 	localVolumesOnChange([&] { ++refreshes; });
 	localVolumesOnMountFailed([&](const QString &path) {
