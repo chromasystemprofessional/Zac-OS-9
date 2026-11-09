@@ -221,6 +221,9 @@
 {prefix}/share/wayland-sessions/zacos9.desktop
 {prefix}/share/xdg-desktop-portal/portals/zacos9-inhibit.portal
 {prefix}/share/xdg-desktop-portal/portals/zacos9.portal
+{prefix}/share/zacos9/Internet Search Sites/Bing.searchsite
+{prefix}/share/zacos9/Internet Search Sites/DuckDuckGo.searchsite
+{prefix}/share/zacos9/Internet Search Sites/Google.searchsite
 {prefix}/share/zacos9/boot/happy-zac-1x.png
 {prefix}/share/zacos9/boot/happy-zac-2x.png
 {prefix}/share/zacos9/boot/happy-zac-3x.png

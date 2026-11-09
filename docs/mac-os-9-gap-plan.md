@@ -195,7 +195,7 @@ Section 3 lists every feature; section 5 is the plan.
 | File ▸ Get Info ▸ General Information / Sharing / Memory submenu | ◐ | General and Sharing ✅; Memory — (out of scope) |
 | File ▸ **Add To Favorites** | ✅ | Aliases in `~/.config/zacos9/Favorites` (System Folder ▸ Favorites); also on icons' and disks' contextual menus (0.1.54). |
 | File ▸ **Encrypt / Decrypt** | ✅ | Symmetric GPG encryption and decryption; see 3.2. |
-| File ▸ **Search Internet…** (⌘H) | ✅ | Choose DuckDuckGo, Google or Bing, enter words, and open the URL-encoded query in the user's default browser. |
+| File ▸ **Search Internet…** (⌘H) | ✅ | Choose a search site from `System Folder ▸ Internet Search Sites` or the user's own `~/.config/zacos9/Internet Search Sites`; the URL-encoded query opens in the user's default browser. |
 | File ▸ **Page Setup…**, **Print Window/Print Desktop…** | ✅ | Page Setup: paper (US Letter, US Legal, A4, A5, B5; Letter by default where US units are used), orientation, scale 50–200%, in `desktop.conf`. Print Window draws the whole window (every row or icon, not just what's scrolled into view; a list with its headings) on white with nothing selected; Print Desktop the desktop's icons, cut to where they are. Laid out on PDF pages with the name, date and page number, shrunk to the page's width if wider, sent to your printer with `lp`. No Print dialog (copies, page range): one copy of everything. |
 | Edit ▸ Undo, Cut, Copy, Paste, Clear, Select All | ◐ | Edit menu sends keys to apps ✅; Command-C in the Sniffer copies selected item names as newline-separated text. Undo, Cut and Paste remain application-specific or unimplemented in the Sniffer. |
 | Edit ▸ **Show Clipboard** | ✅ | `shell/files/clippings.cpp`: a window that follows the clipboard (text or picture), "Clipboard contents: …" below. |
@@ -241,7 +241,7 @@ Section 3 lists every feature; section 5 is the plan.
 | Pedigree | ✅ | See 3.18. |
 | Neighbourhood | ✅ | |
 | Remote Access Status | — | Dial-up; out of scope. |
-| Bloodhound | ◐ | Find with criteria and contents; Internet search is available from the Sniffer's File menu. Bloodhound (Search) is a standalone Files search window in the Zac menu and Applications; 1.0 shipped in 1.11.0, and 1.1 adds criteria, contents, Find Similar and saved searches. Channels follow. See 3.13. |
+| Bloodhound | ◐ | Find with criteria and contents; Internet search is available from the Sniffer's File menu. Bloodhound (Search) is a standalone Files search window in the Zac menu and Applications; 1.0 shipped in 1.11.0, 1.1 adds criteria, contents, Find Similar and saved searches, and 1.2 adds Internet Search Sites, Web and user channels. See 3.13. |
 | Automated Tasks (scripts) | ✅ | See 3.12. |
 | Force Quit (ZacOS addition) | ✅ | |
 
@@ -366,13 +366,13 @@ for), and **About This Computer** keeps showing honest memory use. The
 
 | Feature | Status | Notes |
 |---|---|---|
-| **Bloodhound (Search)** in the Zac menu and Applications | ✅ | 1.11.0: `shell/bloodhound/` is the standalone Files search window; 1.1 adds criteria rows, contents through the index, Find Similar Items and saved searches. Channels follow. |
+| **Bloodhound (Search)** in the Zac menu and Applications | ✅ | 1.11.0: `shell/bloodhound/` is the standalone Files search window; 1.1 adds criteria rows, contents through the index, Find Similar Items and saved searches; 1.2 adds Internet Search Sites, Web and user channels shared with Search Internet. |
 | Find by name, results as a Sniffer view | ✅ | |
 | Criteria: dates, comments, size, kind, label, version, locked, empty/shared folder, invisible, custom icon | ✅ | `shell/files/findcriteria.cpp`: where (all disks, Home, the front folder) and up to six rows that must all match: name (contains, starts/ends with, is, is not, doesn't contain), date modified/created (today, past week/month, before/after a date), size, kind, label, lock, folder empty/shared, custom icon (is/is not), comments (contains, is/is not, doesn't contain), invisible (is/is not; host dotfiles) and application package version (contains, is/is not, doesn't contain). Hidden entries are traversed only for a query with an invisible criterion. |
 | **Search contents** with an index; schedule indexing; Index Selection | ✅ | `shell/files/findindex.cpp`: "contents include" asks localsearch (tinysparql full-text query, kept to the chosen place; the other rows sift its answers); File ▸ Index Selection adds folders to its index. Scheduling is localsearch's own. |
 | Find Similar Items | ✅ | The document's most distinctive words, any of them, ranked by the index. |
 | Save a search; several searches at once | ✅ | Save named criteria in the Find dialog; Saved Searches opens each in its own Items Found window. |
-| Internet channels (web search with plug-ins) | ✅ | The Sniffer's File ▸ Search Internet offers DuckDuckGo, Google and Bing and opens the URL-encoded query in the default browser. |
+| Internet channels (web search with plug-ins) | ✅ | The Sniffer's File ▸ Search Internet and Bloodhound's Web and user channels read the same site files: OpenSearch XML, `.searchsite`, and classic `.src`, in `System Folder ▸ Internet Search Sites` and `~/.config/zacos9/Internet Search Sites`. |
 
 ### §3.14 Users and login (ch. 17)
 

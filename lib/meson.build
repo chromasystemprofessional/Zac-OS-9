@@ -55,6 +55,13 @@ install_data(
 install_data('../assets/store/catalog.json',
   install_dir: get_option('datadir') / 'zacos9' / 'store',
 )
+# Internet Search Sites: the system's read-only search sites (Bloodhound).
+install_data(
+  '../assets/Internet Search Sites/Bing.searchsite',
+  '../assets/Internet Search Sites/DuckDuckGo.searchsite',
+  '../assets/Internet Search Sites/Google.searchsite',
+  install_dir: get_option('datadir') / 'zacos9' / 'Internet Search Sites',
+)
 # Default theme bundle.
 install_data('../share/zacos9/themes/Default/theme.conf',
   install_dir: get_option('datadir') / 'zacos9' / 'themes' / 'Default',

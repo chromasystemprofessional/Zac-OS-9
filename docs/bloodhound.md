@@ -26,7 +26,9 @@ The search engine is shared with the Sniffer's Find:
 Bloodhound 1.1 completes the Files channel: criteria rows, contents through
 the index (with Index Selection and snippets), Find Similar Items and saved
 searches now live in the window. The Sniffer's Find keeps its own Find
-dialog; both read one engine and one saved-search file. Channels follow.
+dialog; both read one engine and one saved-search file. Bloodhound 1.2 adds
+Internet Search Sites, a Web channel and user channels, read from the same
+site files as the Sniffer's Search Internet.
 
 ## What Sherlock 2 got right
 
