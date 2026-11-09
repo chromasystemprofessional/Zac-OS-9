@@ -45,6 +45,12 @@ test('installed-files', find_program('python3'),
   args: [files('tests/baseline/test_installed_files.py'), meson.project_build_root(),
     files('tests/baseline/installed-files.txt')])
 
+# ZacOS 9 does not track its users: no known tracker endpoint in shipped
+# source, and the update, Software and web-search code only contact the hosts
+# PRIVACY.md lists. A new network feature must be added to both.
+test('privacy', find_program('python3'),
+  args: [files('tests/privacy/test_no_tracking.py'), meson.project_source_root()])
+
 # The Mac OS 9 theme extractor (theming step 3).
 test('theme-extractor', find_program('python3'),
   args: [files('tests/tools/test_extract_macos9.py'),

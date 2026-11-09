@@ -170,6 +170,10 @@ sweep.
 
 ## Rules learned the hard way
 
+- **No tracking.** ZacOS 9 has no telemetry, analytics, advertising, remote
+  logging or unique identifiers; [PRIVACY.md](PRIVACY.md) is the promise and
+  `tests/privacy/test_no_tracking.py` enforces it. A change that adds one, or
+  a network connection the user didn't ask for, won't be merged.
 - **Never wait for a process with `QProcess::waitForFinished()`.** It has
   deadlocked in a Qt/Wayland program even after the child had exited. Use a
   `processEvents()` loop (`waitForProcess` in `shell/network/afpclient.cpp`)
