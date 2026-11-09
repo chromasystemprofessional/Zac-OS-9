@@ -261,3 +261,40 @@ void indexAddFolder(const QString &path, const std::function<void(const QString 
 				: "The search index couldn't take in the folder." + (err.isEmpty() ? QString() : " " + err.section('\n', -1)));
 		});
 }
+
+void indexRemoveFolder(const QString &path, const std::function<void(const QString &error)> &done) {
+	run(program("ZACOS9_LOCALSEARCH", "localsearch"), { "index", "--remove", "--recursive", path },
+		[done](int code, const QString &, const QString &err) {
+			done(code == 0 ? QString()
+				: "The search index couldn't let go of the folder." + (err.isEmpty() ? QString() : " " + err.section('\n', -1)));
+		});
+}
+
+void indexStatus(const IndexTextResults &done) {
+	run(program("ZACOS9_LOCALSEARCH", "localsearch"), { "status" },
+		[done](int code, const QString &out, const QString &err) {
+			if (code != 0) {
+				done(QString(), "The search index couldn't say what it is doing." +
+					(err.isEmpty() ? QString() : " " + err.section('\n', -1)));
+				return;
+			}
+			done(out.trimmed(), QString());
+		});
+}
+
+void indexRebuild(const std::function<void(const QString &error)> &done) {
+	run(program("ZACOS9_LOCALSEARCH", "localsearch"), { "reset", "--filesystem" },
+		[done](int code, const QString &, const QString &err) {
+			if (code != 0) {
+				done("The search index couldn't be cleared." +
+					(err.isEmpty() ? QString() : " " + err.section('\n', -1)));
+				return;
+			}
+			run(program("ZACOS9_LOCALSEARCH", "localsearch"), { "daemon", "--start" },
+				[done](int code, const QString &, const QString &err) {
+					done(code == 0 ? QString()
+						: "The index was cleared, but its miners couldn't start." +
+							(err.isEmpty() ? QString() : " " + err.section('\n', -1)));
+				});
+		});
+}

@@ -105,6 +105,19 @@ int main(int argc, char **argv) {
 	QFile::setPermissions(fake, QFile::permissions(fake) | QFileDevice::ExeOwner);
 	qputenv("ZACOS9_TINYSPARQL", fake.toUtf8());
 
+	const QString localLog = dir.filePath("localsearch.log");
+	const QString localFake = dir.filePath("localsearch");
+	const QString localScript = "#!/bin/sh\necho \"$@\" >> " + localLog + "\n"
+		"case \"$1\" in\n"
+		"  status) echo 'Currently indexed: 12 files, 3 folders' ;;\n"
+		"esac\nexit 0\n";
+	if (!writeFile(localFake, localScript.toUtf8())) {
+		fprintf(stderr, "could not write the fake localsearch\n");
+		return 1;
+	}
+	QFile::setPermissions(localFake, QFile::permissions(localFake) | QFileDevice::ExeOwner);
+	qputenv("ZACOS9_LOCALSEARCH", localFake.toUtf8());
+
 	FindCriterion contents;
 	contents.field = FindField::Contents;
 	contents.op = FindOp::Includes;
@@ -146,6 +159,54 @@ int main(int argc, char **argv) {
 	}
 	QFile::remove(dir.filePath("down"));
 	printf("ok: an unavailable index is reported\n");
+
+	QString statusText, statusError;
+	QEventLoop statusLoop;
+	indexStatus([&](const QString &text, const QString &error) {
+		statusText = text;
+		statusError = error;
+		statusLoop.quit();
+	});
+	QTimer::singleShot(5000, &statusLoop, &QEventLoop::quit);
+	statusLoop.exec();
+	if (!statusError.isEmpty() || !statusText.contains("12 files")) {
+		fprintf(stderr, "index status was lost: %s %s\n", qPrintable(statusError),
+			qPrintable(statusText));
+		return 1;
+	}
+	QString removeError = "the removal didn't finish";
+	QEventLoop removeLoop;
+	indexRemoveFolder("/tmp/not-indexed", [&](const QString &error) {
+		removeError = error;
+		removeLoop.quit();
+	});
+	QTimer::singleShot(5000, &removeLoop, &QEventLoop::quit);
+	removeLoop.exec();
+	if (!removeError.isEmpty()) {
+		fprintf(stderr, "index removal failed: %s\n", qPrintable(removeError));
+		return 1;
+	}
+	QString rebuildError = "the rebuild didn't finish";
+	QEventLoop rebuildLoop;
+	indexRebuild([&](const QString &error) {
+		rebuildError = error;
+		rebuildLoop.quit();
+	});
+	QTimer::singleShot(5000, &rebuildLoop, &QEventLoop::quit);
+	rebuildLoop.exec();
+	if (!rebuildError.isEmpty()) {
+		fprintf(stderr, "index rebuild failed: %s\n", qPrintable(rebuildError));
+		return 1;
+	}
+	QFile localAsked(localLog);
+	localAsked.open(QIODevice::ReadOnly);
+	const QString localArgs = QString::fromUtf8(localAsked.readAll());
+	if (!localArgs.contains("status") || !localArgs.contains("index --remove --recursive") ||
+			!localArgs.contains("reset --filesystem") || !localArgs.contains("daemon --start")) {
+		fprintf(stderr, "the index commands were not asked for: %s\n", qPrintable(localArgs));
+		return 1;
+	}
+	printf("ok: index status, removal and rebuild ask localsearch\n");
 
 	const IndexSnippet snippet = indexSnippetText(
 		"The harbour at dawn was quiet, and the ferry waited.", { "harbour", "ferry" });
