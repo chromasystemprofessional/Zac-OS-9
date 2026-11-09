@@ -12,23 +12,24 @@ app rather than a modern search overlay.
 
 ## Where it is now
 
-Bloodhound 1.0 shipped in ZacOS 9 1.11.0: `shell/bloodhound/` is a Qt 6
-program with its own app id, one Platinum window and the Files channel
-(name search, scope, results, Open/Reveal/Get Info, drag and copy path). It
-appears as **Bloodhound (Search)** in Applications and the Zac menu.
+Bloodhound 1.2 shipped in ZacOS 9 1.12.0: `shell/bloodhound/` is a Qt 6
+program with its own app id and one Platinum window. It appears as
+**Bloodhound (Search)** in Applications and the Zac menu. The Files channel
+has criteria rows, contents through the index with snippets, Find Similar
+Items and saved searches; the channel bar has Web, named channels and My
+Channel, read from Internet Search Sites.
 
 The search engine is shared with the Sniffer's Find:
 
 - `shell/files/findcriteria.cpp`: queries, criteria rows, saved searches.
 - `shell/files/findindex.cpp`: contents through the local search index.
+- `shell/files/searchsites.cpp`: Internet Search Sites for both programs.
 - `shell/finder/findwindow.cpp`: the Find dialog and Items Found windows.
 
-Bloodhound 1.1 completes the Files channel: criteria rows, contents through
-the index (with Index Selection and snippets), Find Similar Items and saved
-searches now live in the window. The Sniffer's Find keeps its own Find
-dialog; both read one engine and one saved-search file. Bloodhound 1.2 adds
-Internet Search Sites, a Web channel and user channels, read from the same
-site files as the Sniffer's Search Internet.
+The Sniffer's Find keeps its own Find dialog; both read one engine, one
+saved-search file and one site list. Bloodhound 1.3 adds the modern polish:
+live results, recents, index controls, drag-and-drop, preview and
+localization.
 
 ## What Sherlock 2 got right
 
@@ -105,6 +106,8 @@ Not in 1.0: criteria rows, contents, saved searches, Internet channels.
 
 ### 1.1: the Files channel, complete
 
+Shipped in ZacOS 9 1.12.0.
+
 - The existing criteria rows (dates, size, kind, label, lock, folder,
   custom icon, comments, invisibility, version).
 - Contents through the search index, with Index Selection and an honest
@@ -117,6 +120,8 @@ Not in 1.0: criteria rows, contents, saved searches, Internet channels.
   keep a broad search under control.
 
 ### 1.2: channels and the web
+
+Shipped in ZacOS 9 1.12.0.
 
 - **Internet Search Sites** in `System Folder/Internet Search Sites`
   (read-only, the system's sites) and

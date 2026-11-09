@@ -34,7 +34,7 @@ what the thing does.
 | Apple Menu Options | **Zac Menu Options** | new | |
 | Control Strip | **The Collar** | shipped | |
 | Software Update | **Fetch Updates** | shipped | |
-| Sherlock 2 | **Bloodhound** | shipped (Bloodhound 1.0) | the search dog |
+| Sherlock 2 | **Bloodhound** | shipped (Bloodhound 1.2) | the search dog |
 | Find Similar Files | **Find Similar Items** | new | descriptive |
 | Launcher | **Toy Box** | new | where favourite things are kept |
 | Application Switcher palette | **The Pack** | new | every running app, together |
@@ -241,7 +241,7 @@ Section 3 lists every feature; section 5 is the plan.
 | Pedigree | ✅ | See 3.18. |
 | Neighbourhood | ✅ | |
 | Remote Access Status | — | Dial-up; out of scope. |
-| Bloodhound | ◐ | Find with criteria and contents; Internet search is available from the Sniffer's File menu. Bloodhound (Search) is a standalone Files search window in the Zac menu and Applications; 1.0 shipped in 1.11.0, 1.1 adds criteria, contents, Find Similar and saved searches, and 1.2 adds Internet Search Sites, Web and user channels. See 3.13. |
+| Bloodhound | ✅ | Bloodhound (Search) 1.2 (1.12.0) has the Files channel (criteria, contents, Find Similar, saved searches) and Internet Search Sites with Web and user channels. 1.3 adds live results, recents, index controls, preview and localization. See 3.13. |
 | Automated Tasks (scripts) | ✅ | See 3.12. |
 | Force Quit (ZacOS addition) | ✅ | |
 
@@ -366,7 +366,7 @@ for), and **About This Computer** keeps showing honest memory use. The
 
 | Feature | Status | Notes |
 |---|---|---|
-| **Bloodhound (Search)** in the Zac menu and Applications | ✅ | 1.11.0: `shell/bloodhound/` is the standalone Files search window; 1.1 adds criteria rows, contents through the index, Find Similar Items and saved searches; 1.2 adds Internet Search Sites, Web and user channels shared with Search Internet. |
+| **Bloodhound (Search)** in the Zac menu and Applications | ✅ | 1.12.0: `shell/bloodhound/` is the standalone Files search window; 1.1 adds criteria rows, contents through the index, Find Similar Items and saved searches; 1.2 adds Internet Search Sites, Web and user channels shared with Search Internet. |
 | Find by name, results as a Sniffer view | ✅ | |
 | Criteria: dates, comments, size, kind, label, version, locked, empty/shared folder, invisible, custom icon | ✅ | `shell/files/findcriteria.cpp`: where (all disks, Home, the front folder) and up to six rows that must all match: name (contains, starts/ends with, is, is not, doesn't contain), date modified/created (today, past week/month, before/after a date), size, kind, label, lock, folder empty/shared, custom icon (is/is not), comments (contains, is/is not, doesn't contain), invisible (is/is not; host dotfiles) and application package version (contains, is/is not, doesn't contain). Hidden entries are traversed only for a query with an invisible criterion. |
 | **Search contents** with an index; schedule indexing; Index Selection | ✅ | `shell/files/findindex.cpp`: "contents include" asks localsearch (tinysparql full-text query, kept to the chosen place; the other rows sift its answers); File ▸ Index Selection adds folders to its index. Scheduling is localsearch's own. |
