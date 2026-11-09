@@ -3,6 +3,8 @@
  * query loads back into them. No compositor: the window is only built and
  * queried, never shown. */
 #include <QApplication>
+#include <QDir>
+#include <QFile>
 #include <QStringList>
 #include <QTemporaryDir>
 #include <cstdio>
@@ -23,8 +25,31 @@ static void check(bool ok, const QString &what) {
 	}
 }
 
+static bool write(const QString &path, const QByteArray &data) {
+	QFile file(path);
+	return file.open(QIODevice::WriteOnly) && file.write(data) == data.size();
+}
+
 int main(int argc, char **argv) {
 	qputenv("QT_QPA_PLATFORM", "offscreen");
+	QTemporaryDir sites;
+	if (!sites.isValid()) {
+		fprintf(stderr, "could not make a temporary site folder\n");
+		return 1;
+	}
+	const QString systemSites = sites.filePath("system/Internet Search Sites");
+	const QString userSites = sites.filePath("config/zacos9/Internet Search Sites");
+	if (!QDir().mkpath(systemSites) || !QDir().mkpath(userSites) ||
+			!write(systemSites + "/Test.searchsite",
+				"[Search Site]\nName=Test\nURL=https://test.example/?q={query}\n"
+				"Channel=Reference\n") ||
+			!write(userSites + "/Mine.searchsite",
+				"[Search Site]\nName=Mine\nURL=https://mine.example/?q={query}\n")) {
+		fprintf(stderr, "could not write the test sites\n");
+		return 1;
+	}
+	qputenv("ZACOS9_DATA", sites.filePath("system").toUtf8());
+	qputenv("XDG_CONFIG_HOME", sites.filePath("config").toUtf8());
 	QApplication app(argc, argv);
 	QTemporaryDir dir;
 	if (!dir.isValid()) {
@@ -92,6 +117,21 @@ int main(int argc, char **argv) {
 	window.removeCriterion();
 	check(window.m_resultsTop == top, "Fewer Choices puts the room back");
 	check(window.query().criteria.size() == 4, "and the row leaves the query");
+
+	check(window.m_channels == QStringList({ "Files", "Web", "Reference", "My Channel" }),
+		"the channel bar has Files, Web, named channels and My Channel");
+	window.chooseChannel("Web");
+	check(!window.filesChannel() && window.m_site.items.size() == 2,
+		"the Web channel offers every site");
+	window.chooseChannel("Reference");
+	check(window.m_site.items.size() == 1 && window.m_site.items[0].text == "Test",
+		"a named channel groups its sites");
+	window.chooseChannel("My Channel");
+	check(window.m_site.items.size() == 1 && window.m_site.items[0].text == "Mine",
+		"My Channel holds the user's sites without a channel");
+	window.chooseChannel("Files");
+	check(window.filesChannel() && window.m_site.items.size() == 0,
+		"Files comes back with its criteria controls");
 
 	if (fails) {
 		return 1;

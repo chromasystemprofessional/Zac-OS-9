@@ -61,7 +61,8 @@ This page is what's true now and what's next. What changed and when is in
 standalone Files search window in the Zac menu and Applications
 (`shell/bloodhound/`), using the shared Find engine. Bloodhound 1.1 adds
 criteria rows, contents through the index, Find Similar Items and saved
-searches. Internet Search Sites and the Web channel follow
+searches. 1.2 adds Internet Search Sites, a Web channel and user channels,
+shared with the Sniffer's Search Internet
 ([Bloodhound](docs/bloodhound.md)).
 
 **The System Folder**, made to work the way Mac OS 7 to 9's did, item by
