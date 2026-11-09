@@ -106,6 +106,7 @@ BloodhoundWindow::BloodhoundWindow(const QString &folder) : m_folder(folder) {
 	m_search.hint = tr9("Search for");
 	m_search.edited = [this] {
 		m_problem.clear();
+		m_status.clear();
 		update();
 	};
 	m_scope.rect = QRect(SCOPE_X, SEARCH_Y, 100, PL_POPUP_H);
