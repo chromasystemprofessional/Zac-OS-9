@@ -256,6 +256,7 @@
 {prefix}/share/zacos9/tools/macsnd.py
 {prefix}/share/zacos9/tools/pngwrite.py
 {prefix}/share/zacos9/whatsnew/1.11.0.txt
+{prefix}/share/zacos9/whatsnew/1.12.0.txt
 {prefix}/share/zacos9/whatsnew/1.7.0.txt
 {prefix}/share/zacos9/whatsnew/1.7.1.txt
 {prefix}/share/zacos9/whatsnew/1.7.2.txt
