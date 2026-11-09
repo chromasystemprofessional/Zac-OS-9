@@ -1,42 +1,72 @@
 #include "bloodhoundwindow.h"
 
+#include "alert.h"
+#include "appdb.h"
+#include "findindex.h"
 #include "icons.h"
 #include "programs.h"
 #include "search.h"
 #include "settings.h"
+#include "sharingclient.h"
 #include "tr.h"
 
 #include <QApplication>
 #include <QClipboard>
+#include <QContextMenuEvent>
 #include <QDate>
 #include <QDir>
 #include <QDrag>
+#include <QFileDialog>
 #include <QFileInfo>
+#include <QInputDialog>
 #include <QKeyEvent>
 #include <QLocale>
+#include <QMenu>
 #include <QMimeData>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QPointer>
 #include <QProcess>
+#include <QRegularExpression>
 #include <QThread>
 #include <QUrl>
 #include <QWheelEvent>
 #include <algorithm>
 
-static constexpr int W = 680, H = 460, MARGIN = 12;
+static constexpr int W = 760, H = 620, MARGIN = 12;
 static constexpr int CHANNEL_H = 28;
 static constexpr int SEARCH_Y = 38;
-static constexpr int FIELD_X = MARGIN, FIELD_W = 360;
-static constexpr int SCOPE_X = 380;
-static constexpr int RESULTS_Y = 72;
-static constexpr int HEADER_H = 21, BAND_H = 21, ROW_H = 19;
+static constexpr int SEARCH_X = MARGIN, SEARCH_W = 330;
+static constexpr int SCOPE_X = SEARCH_X + SEARCH_W + 8;
+static constexpr int CRITERIA_Y = 68, ROW_STEP = 28, MAX_ROWS = 6;
+static constexpr int FIELD_W = 140, OP_W = 180, GAP = 6;
+static constexpr int NOTE_H = 17;
+static constexpr int RESULTS_Y = 100;
+static constexpr int HEADER_H = 21, BAND_H = 21, ROW_H = 19, SNIPPET_H = 13;
 static constexpr int STATUS_H = 22, SB_W = 15;
-static constexpr int NAME_X = 30, NAME_W = 245;
-static constexpr int WHERE_X = 245, WHERE_W = 180;
-static constexpr int DATE_X = 425, DATE_W = 100;
-static constexpr int SIZE_X = 525, SIZE_W = 55;
-static constexpr int KIND_X = 580, KIND_W = 85;
+static constexpr int NAME_X = 30, NAME_W = 260;
+static constexpr int WHERE_X = 260, WHERE_W = 190;
+static constexpr int DATE_X = 450, DATE_W = 105;
+static constexpr int SIZE_X = 555, SIZE_W = 60;
+static constexpr int KIND_X = 615, KIND_W = 130;
 static constexpr uint32_t FACE = GRAY(0xD);
+static constexpr int MAX_SNIPPETS = 200;
+
+/* The fields, in the menu's order. */
+static const FindField FIELDS[] = { FindField::Name, FindField::Contents, FindField::Modified,
+	FindField::Created, FindField::Size, FindField::Kind, FindField::Label, FindField::Locked,
+	FindField::Folder, FindField::CustomIcon, FindField::Comment, FindField::Invisible,
+	FindField::Version };
+
+struct BloodhoundWindow::CriterionRow {
+	FindField field = FindField::Modified;
+	PanelPopup fieldPopup, opPopup, choicePopup;
+	PanelEdit edit;
+	FindOp op() const {
+		const QList<FindOp> ops = findOpsFor(field);
+		return ops.value(std::clamp(opPopup.selected, 0, int(ops.size()) - 1));
+	}
+};
 
 static QString formatDate(const QDateTime &t) {
 	return t.isValid() ? QLocale().toString(t.date(), QLocale::ShortFormat) : QString();
@@ -67,15 +97,21 @@ static int buttonWidth(const QString &label, int minimum) {
 }
 
 BloodhoundWindow::BloodhoundWindow(const QString &folder) : m_folder(folder) {
-	setWindowTitle(tr9("Bloodhound"));
+	setWindowTitle(tr9("Bloodhound (Search)"));
 	setFixedSize(W, H);
 	setFocusPolicy(Qt::StrongFocus);
 	setAttribute(Qt::WA_DeleteOnClose);
 
-	m_search.rect = QRect(FIELD_X, SEARCH_Y, FIELD_W, PL_EDIT_H);
+	m_search.rect = QRect(SEARCH_X, SEARCH_Y, SEARCH_W, PL_EDIT_H);
 	m_search.hint = tr9("Search for");
 	m_search.edited = [this] {
 		m_problem.clear();
+		update();
+	};
+	m_scope.rect = QRect(SCOPE_X, SEARCH_Y, 100, PL_POPUP_H);
+	m_scope.hint = tr9("Where to search.");
+	m_scope.chosen = [this](int i) {
+		m_scope.selected = i;
 		update();
 	};
 
@@ -83,18 +119,7 @@ BloodhoundWindow::BloodhoundWindow(const QString &folder) : m_folder(folder) {
 	const int findW = buttonWidth(tr9("Search"), 62);
 	const int stopX = W - MARGIN - stopW;
 	const int findX = stopX - 6 - findW;
-	m_scope.rect = QRect(SCOPE_X, SEARCH_Y, std::max(80, findX - 6 - SCOPE_X), PL_POPUP_H);
-	m_scope.hint = tr9("Where to search.");
-	m_scope.items = { PopupItem(tr9("on all disks")), PopupItem(tr9("in my Home folder")) };
-	if (!m_folder.isEmpty() && QDir(m_folder) != QDir::home() && QDir(m_folder) != QDir::root()) {
-		m_scope.items.push_back(PopupItem(tr9("in “%1”").arg(folderName(m_folder))));
-		m_scope.selected = 2;
-	}
-	m_scope.chosen = [this](int i) {
-		m_scope.selected = i;
-		update();
-	};
-
+	m_scope.rect.setWidth(std::max(100, findX - 6 - SCOPE_X));
 	m_find = PanelButton(tr9("Search"), QRect(findX, SEARCH_Y, findW, PL_BUTTON_H), true);
 	m_find.hint = tr9("Search the chosen place.");
 	m_find.clicked = [this] { search(); };
@@ -103,35 +128,194 @@ BloodhoundWindow::BloodhoundWindow(const QString &folder) : m_folder(folder) {
 	m_stop.enabled = false;
 	m_stop.clicked = [this] { stop(); };
 
+	m_more = PanelButton(tr9("More Choices"), QRect(0, 0, buttonWidth(tr9("More Choices"), 105),
+		PL_BUTTON_H), false);
+	m_more.hint = tr9("Add another criterion.");
+	m_more.clicked = [this] { addCriterion(); };
+	m_fewer = PanelButton(tr9("Fewer Choices"), QRect(0, 0, buttonWidth(tr9("Fewer Choices"), 105),
+		PL_BUTTON_H), false);
+	m_fewer.hint = tr9("Remove the last criterion.");
+	m_fewer.clicked = [this] { removeCriterion(); };
+	m_saveSearch = PanelButton(tr9("Save Search…"), QRect(0, 0, buttonWidth(tr9("Save Search…"), 105),
+		PL_BUTTON_H), false);
+	m_saveSearch.hint = tr9("Save these criteria.");
+	m_saveSearch.clicked = [this] { saveSearch(); };
+	m_savedSearches = PanelButton(tr9("Saved Searches…"), QRect(0, 0,
+		buttonWidth(tr9("Saved Searches…"), 115), PL_BUTTON_H), false);
+	m_savedSearches.hint = tr9("Use a saved search.");
+	m_savedSearches.clicked = [this] { showSavedSearches(); };
+	m_indexSelection = PanelButton(tr9("Index Selection…"), QRect(0, 0,
+		buttonWidth(tr9("Index Selection…"), 115), PL_BUTTON_H), false);
+	m_indexSelection.hint = tr9("Index a folder so contents can be searched.");
+	m_indexSelection.clicked = [this] { indexSelection(); };
+
 	m_host.edits = { &m_search };
 	m_host.popups = { &m_scope };
-	m_host.buttons = { &m_find, &m_stop };
+	m_host.buttons = { &m_more, &m_fewer, &m_saveSearch, &m_savedSearches, &m_indexSelection,
+		&m_find, &m_stop };
 	m_host.defaultButton = &m_find;
 	m_host.setFocus(&m_search);
 
+	rebuildScope();
 	m_worker = new BloodhoundSearch(this);
 	connect(m_worker, &BloodhoundSearch::batch, this, &BloodhoundWindow::addResults);
 	connect(m_worker, &BloodhoundSearch::finished, this, &BloodhoundWindow::finished);
+	relayout();
 	setFocus();
 }
 
 BloodhoundWindow::~BloodhoundWindow() = default;
 
+void BloodhoundWindow::rebuildScope(FindScope scope) {
+	m_scope.items = { PopupItem(tr9("on all disks")), PopupItem(tr9("in my Home folder")) };
+	m_scope.selected = 0;
+	if (!m_folder.isEmpty() && QDir(m_folder) != QDir::home() && QDir(m_folder) != QDir::root()) {
+		m_scope.items.push_back(PopupItem(tr9("in “%1”").arg(folderName(m_folder))));
+		if (scope != FindScope::Home) {
+			m_scope.selected = 2;
+		}
+	}
+	if (scope == FindScope::Home && m_scope.items.size() > 1) {
+		m_scope.selected = 1;
+	} else if (scope == FindScope::Folder) {
+		if (m_scope.items.size() < 3) {
+			m_scope.items.push_back(PopupItem(tr9("in “%1”").arg(folderName(m_folder))));
+		}
+		m_scope.selected = 2;
+	}
+}
+
+void BloodhoundWindow::addCriterion(FindField field) {
+	if (int(m_rows.size()) >= MAX_ROWS) {
+		return;
+	}
+	auto row = std::make_unique<CriterionRow>();
+	CriterionRow *r = row.get();
+	for (FindField f : FIELDS) {
+		r->fieldPopup.items.push_back(PopupItem(findFieldName(f)));
+	}
+	r->fieldPopup.chosen = [this, r](int i) {
+		setCriterionField(*r, FIELDS[i]);
+		relayout();
+	};
+	r->opPopup.chosen = [this, r](int i) {
+		r->opPopup.selected = i;
+		relayout();
+	};
+	r->choicePopup.chosen = [this, r](int i) {
+		r->choicePopup.selected = i;
+		update();
+	};
+	r->edit.edited = [this] { m_problem.clear(); update(); };
+	setCriterionField(*r, field);
+	m_rows.push_back(std::move(row));
+	relayout();
+}
+
+void BloodhoundWindow::removeCriterion() {
+	if (m_rows.empty()) {
+		return;
+	}
+	m_rows.pop_back();
+	relayout();
+}
+
+void BloodhoundWindow::setCriterionField(CriterionRow &row, FindField field) {
+	row.field = field;
+	row.fieldPopup.selected =
+		int(std::find(std::begin(FIELDS), std::end(FIELDS), field) - std::begin(FIELDS));
+	row.opPopup.items.clear();
+	for (FindOp op : findOpsFor(field)) {
+		row.opPopup.items.push_back(PopupItem(findOpName(op)));
+	}
+	row.opPopup.selected = 0;
+	row.choicePopup.items.clear();
+	row.choicePopup.selected = 0;
+	if (field == FindField::Kind) {
+		for (const QString &kind : findKindNames()) {
+			row.choicePopup.items.push_back(PopupItem(kind));
+		}
+	} else if (field == FindField::Label) {
+		for (int i = 0; i < PL_LABEL_COUNT; i++) {
+			row.choicePopup.items.push_back(PopupItem(QString::fromUtf8(pl_labels[i].name)));
+		}
+	}
+	row.edit.setText(field == FindField::Modified || field == FindField::Created
+		? QDate::currentDate().toString(Qt::ISODate) : QString());
+	row.edit.accepts = field == FindField::Size
+		? std::function<bool(QChar)>([](QChar c) { return c.isDigit(); })
+		: std::function<bool(QChar)>();
+}
+
+bool BloodhoundWindow::hasContentsRow() const {
+	for (const auto &row : m_rows) {
+		if (row->field == FindField::Contents) {
+			return true;
+		}
+	}
+	return false;
+}
+
+void BloodhoundWindow::relayout() {
+	m_host.popups = { &m_scope };
+	m_host.edits = { &m_search };
+	int y = CRITERIA_Y;
+	for (auto &row : m_rows) {
+		row->fieldPopup.rect = QRect(MARGIN, y, FIELD_W, PL_POPUP_H);
+		row->opPopup.rect = QRect(MARGIN + FIELD_W + GAP, y, OP_W, PL_POPUP_H);
+		const int vx = MARGIN + FIELD_W + GAP + OP_W + GAP;
+		row->choicePopup.rect = QRect(vx, y, W - MARGIN - vx, PL_POPUP_H);
+		row->edit.rect = QRect(vx, y - 1, W - MARGIN - vx, PL_EDIT_H);
+		m_host.popups.push_back(&row->fieldPopup);
+		m_host.popups.push_back(&row->opPopup);
+		if (row->field == FindField::Kind || row->field == FindField::Label) {
+			m_host.popups.push_back(&row->choicePopup);
+		} else if (findOpTakesText(row->field, row->op())) {
+			m_host.edits.push_back(&row->edit);
+		}
+		y += ROW_STEP;
+	}
+	const int buttonsY = y + 4;
+	int x = MARGIN;
+	for (PanelButton *button : { &m_more, &m_fewer, &m_saveSearch, &m_savedSearches,
+			&m_indexSelection }) {
+		button->rect.moveTo(x, buttonsY);
+		x = button->rect.right() + 8;
+	}
+	m_more.enabled = int(m_rows.size()) < MAX_ROWS;
+	m_fewer.enabled = !m_rows.empty();
+	const bool contents = hasContentsRow();
+	const int noteY = buttonsY + PL_BUTTON_H + 2;
+	m_resultsTop = noteY + (contents ? NOTE_H : 0) + 6;
+	m_host.buttons = { &m_more, &m_fewer, &m_saveSearch, &m_savedSearches, &m_indexSelection,
+		&m_find, &m_stop };
+	if (!m_listFocus &&
+			std::find(m_host.edits.begin(), m_host.edits.end(), m_host.focus) == m_host.edits.end()) {
+		m_host.setFocus(&m_search);
+	}
+	update();
+}
+
 FindQuery BloodhoundWindow::query() const {
 	FindQuery q;
-	if (m_scope.selected == 1) {
-		q.scope = FindScope::Home;
-	} else if (m_scope.selected >= 2) {
-		q.scope = FindScope::Folder;
-		q.folder = m_folder;
-	} else {
-		q.scope = FindScope::AllDisks;
+	q.scope = m_scope.selected == 1 ? FindScope::Home
+		: m_scope.selected >= 2 ? FindScope::Folder : FindScope::AllDisks;
+	q.folder = m_folder;
+	if (!m_search.text.trimmed().isEmpty()) {
+		FindCriterion criterion;
+		criterion.field = FindField::Name;
+		criterion.op = FindOp::Contains;
+		criterion.text = m_search.text.trimmed();
+		q.criteria << criterion;
 	}
-	FindCriterion criterion;
-	criterion.field = FindField::Name;
-	criterion.op = FindOp::Contains;
-	criterion.text = m_search.text.trimmed();
-	q.criteria << criterion;
+	for (const auto &row : m_rows) {
+		FindCriterion criterion;
+		criterion.field = row->field;
+		criterion.op = row->op();
+		criterion.text = row->edit.text;
+		criterion.choice = row->choicePopup.selected;
+		q.criteria << criterion;
+	}
 	return q;
 }
 
@@ -144,6 +328,27 @@ void BloodhoundWindow::search() {
 		update();
 		return;
 	}
+	for (const SharedFolder &folder : sharedFolders()) {
+		const QString path = QFileInfo(folder.path).canonicalFilePath();
+		if (!path.isEmpty() && !q.sharedFolders.contains(path)) {
+			q.sharedFolders << path;
+		}
+	}
+	if (q.hasVersionCriterion()) {
+		for (const AppEntry &app : appList()) {
+			const QString path = QFileInfo(app.file).canonicalFilePath();
+			if (!path.isEmpty() && !app.version.isEmpty()) {
+				q.applicationVersions.insert(path, app.version);
+			}
+		}
+	}
+	++m_generation;
+	m_contentWords = q.hasContents() ? q.contentWords() : QStringList();
+	m_snippets.clear();
+	m_snippetQueue.clear();
+	m_snippetRequests = 0;
+	m_snippetRunning = false;
+	m_similarTo.clear();
 	m_items.clear();
 	m_scrollY = 0;
 	m_problem.clear();
@@ -158,6 +363,9 @@ void BloodhoundWindow::search() {
 
 void BloodhoundWindow::stop() {
 	m_worker->stop();
+	++m_generation;
+	m_snippetQueue.clear();
+	m_snippetRunning = false;
 	m_searching = false;
 	m_find.enabled = true;
 	m_stop.enabled = false;
@@ -169,6 +377,9 @@ void BloodhoundWindow::addResults(const QStringList &paths) {
 		const QFileInfo info(path);
 		if (info.exists() || info.isSymLink()) {
 			m_items.push_back(makeItem(info));
+			if (!m_contentWords.isEmpty()) {
+				requestSnippet(path);
+			}
 		}
 	}
 	update();
@@ -187,6 +398,220 @@ void BloodhoundWindow::finished(const QString &problem) {
 	});
 	m_pressItem = nullptr;
 	update();
+}
+
+void BloodhoundWindow::findSimilar() {
+	const std::vector<Item *> selected = selectedItems();
+	if (selected.empty()) {
+		return;
+	}
+	const QString path = selected.front()->path;
+	m_worker->stop();
+	++m_generation;
+	m_items.clear();
+	m_scrollY = 0;
+	m_problem.clear();
+	m_contentWords.clear();
+	m_snippets.clear();
+	m_snippetQueue.clear();
+	m_snippetRequests = 0;
+	m_snippetRunning = false;
+	m_similarTo = displayName(path);
+	m_searching = true;
+	m_find.enabled = false;
+	m_stop.enabled = true;
+	m_listFocus = true;
+	m_host.setFocus(nullptr);
+	update();
+
+	const quint64 generation = m_generation;
+	QPointer<BloodhoundWindow> self(this);
+	indexSimilar(path, [self, generation](const QStringList &paths, const QString &error) {
+		if (!self || generation != self->m_generation) {
+			return;
+		}
+		if (!error.isEmpty()) {
+			self->finished(error);
+			return;
+		}
+		QStringList present;
+		for (const QString &p : paths) {
+			if (QFileInfo::exists(p)) {
+				present << p;
+			}
+		}
+		self->addResults(present);
+		self->finished(QString());
+	});
+}
+
+void BloodhoundWindow::requestSnippet(const QString &path) {
+	if (m_contentWords.isEmpty() || m_snippetRequests >= MAX_SNIPPETS ||
+			m_snippets.contains(path) || m_snippetQueue.contains(path)) {
+		return;
+	}
+	m_snippetQueue << path;
+	startNextSnippet();
+}
+
+void BloodhoundWindow::startNextSnippet() {
+	if (m_snippetRunning || m_snippetQueue.isEmpty()) {
+		return;
+	}
+	const QString path = m_snippetQueue.takeFirst();
+	m_snippets.insert(path, Snippet{});
+	m_snippetRequests++;
+	m_snippetRunning = true;
+	const quint64 generation = m_generation;
+	QPointer<BloodhoundWindow> self(this);
+	indexSnippet(path, m_contentWords, [self, generation, path](const IndexSnippet &snippet,
+			const QString &) {
+		if (!self || generation != self->m_generation) {
+			return;
+		}
+		auto it = self->m_snippets.find(path);
+		if (it != self->m_snippets.end()) {
+			it->text = snippet.text;
+			it->words = snippet.words;
+			it->asked = true;
+			self->update();
+		}
+		self->m_snippetRunning = false;
+		self->startNextSnippet();
+	});
+}
+
+void BloodhoundWindow::paintSnippet(pl_canvas *c, const Snippet &snippet, int x, int baseline,
+		int width) const {
+	if (snippet.text.isEmpty()) {
+		return;
+	}
+	const int limit = x + width;
+	int pos = 0;
+	while (pos < snippet.text.size() && x < limit) {
+		int at = -1, length = 0;
+		for (const QString &word : snippet.words) {
+			const int found = snippet.text.indexOf(word, pos, Qt::CaseInsensitive);
+			if (found >= 0 && (at < 0 || found < at)) {
+				at = found;
+				length = word.size();
+			}
+		}
+		if (at < 0) {
+			Text rest(snippet.text.mid(pos), 10000, PL_FONT_VIEWS);
+			pl_text(c, rest.t, x, baseline, GRAY(0x5));
+			break;
+		}
+		if (at > pos) {
+			Text before(snippet.text.mid(pos, at - pos), 10000, PL_FONT_VIEWS);
+			pl_text(c, before.t, x, baseline, GRAY(0x5));
+			x += before.inkWidth();
+		}
+		const QString matched = snippet.text.mid(at, length);
+		Text text(matched, 10000, PL_FONT_VIEWS);
+		if (text.inkWidth() > 0) {
+			pl_fill(c, x, baseline - 9, x + text.inkWidth() - 1, baseline + 1,
+				RGB(0xFF, 0xF1, 0x86));
+			pl_text(c, text.t, x, baseline, C_BLACK);
+			x += text.inkWidth();
+		}
+		pos = at + length;
+	}
+}
+
+void BloodhoundWindow::saveSearch() {
+	bool accepted = false;
+	const QString name = QInputDialog::getText(this, tr9("Save Find Search"),
+		tr9("Name:"), QLineEdit::Normal, QString(), &accepted);
+	if (!accepted) {
+		return;
+	}
+	QString why;
+	if (!saveFindQuery(name, query(), &why)) {
+		m_problem = why;
+		update();
+		return;
+	}
+	m_problem.clear();
+	update();
+}
+
+void BloodhoundWindow::showSavedSearches() {
+	QString why;
+	const QStringList names = savedFindQueryNames(&why);
+	if (!why.isEmpty()) {
+		m_problem = why;
+		update();
+		return;
+	}
+	if (names.isEmpty()) {
+		m_problem = tr9("No saved Find searches yet.");
+		update();
+		return;
+	}
+	QMenu menu(this);
+	for (const QString &name : names) {
+		QAction *action = menu.addAction(name);
+		connect(action, &QAction::triggered, this, [this, name] {
+			FindQuery saved;
+			QString error;
+			if (!loadFindQuery(name, &saved, &error)) {
+				m_problem = error;
+				update();
+				return;
+			}
+			applyQuery(saved);
+			search();
+		});
+	}
+	menu.exec(mapToGlobal(m_savedSearches.rect.bottomLeft()));
+}
+
+void BloodhoundWindow::applyQuery(const FindQuery &q) {
+	m_rows.clear();
+	m_search.setText(QString());
+	if (q.scope == FindScope::Folder && !q.folder.isEmpty()) {
+		m_folder = q.folder;
+	}
+	rebuildScope(q.scope);
+	for (const FindCriterion &criterion : q.criteria) {
+		if (criterion.field == FindField::Name && criterion.op == FindOp::Contains &&
+				m_search.text.trimmed().isEmpty()) {
+			m_search.setText(criterion.text);
+			continue;
+		}
+		addCriterion(criterion.field);
+		CriterionRow *row = m_rows.back().get();
+		const QList<FindOp> ops = findOpsFor(criterion.field);
+		const int op = ops.indexOf(criterion.op);
+		if (op >= 0) {
+			row->opPopup.selected = op;
+		}
+		row->choicePopup.selected = criterion.choice;
+		row->edit.setText(criterion.text);
+	}
+	relayout();
+}
+
+void BloodhoundWindow::indexSelection() {
+	const QString folder = QFileDialog::getExistingDirectory(this, tr9("Index Selection"),
+		QDir::homePath());
+	if (folder.isEmpty()) {
+		return;
+	}
+	QPointer<BloodhoundWindow> self(this);
+	indexAddFolder(folder, [self, folder](const QString &error) {
+		if (!self) {
+			return;
+		}
+		if (!error.isEmpty()) {
+			self->m_problem = error;
+			self->update();
+			return;
+		}
+		Alert::ask(tr9("“%1” will be indexed in the background. Bloodhound can search its "
+			"contents once that's done.").arg(displayName(folder)), "OK", QString());
+	});
 }
 
 std::vector<Item *> BloodhoundWindow::selectedItems() {
@@ -210,10 +635,11 @@ void BloodhoundWindow::selectOnly(Item *item) {
 				index = static_cast<int>(i);
 			}
 		}
-		if (index * ROW_H < m_scrollY) {
-			scrollTo(index * ROW_H);
-		} else if ((index + 1) * ROW_H > m_scrollY + listHeight()) {
-			scrollTo((index + 1) * ROW_H - listHeight());
+		const int step = rowHeight();
+		if (index * step < m_scrollY) {
+			scrollTo(index * step);
+		} else if ((index + 1) * step > m_scrollY + listHeight()) {
+			scrollTo((index + 1) * step - listHeight());
 		}
 	}
 	update();
@@ -274,8 +700,41 @@ void BloodhoundWindow::copyPaths() {
 	}
 }
 
+void BloodhoundWindow::contextMenuEvent(QContextMenuEvent *e) {
+	Item *hit = itemAt(e->pos());
+	if (!hit) {
+		return;
+	}
+	if (!hit->selected) {
+		selectOnly(hit);
+	}
+	QMenu menu(this);
+	QAction *open = menu.addAction(tr9("Open"));
+	QAction *reveal = menu.addAction(tr9("Reveal"));
+	QAction *info = menu.addAction(tr9("Get Info"));
+	menu.addSeparator();
+	QAction *copy = menu.addAction(tr9("Copy Path"));
+	QAction *similar = menu.addAction(tr9("Find Similar Items"));
+	QAction *chosen = menu.exec(e->globalPos());
+	if (chosen == open) {
+		openSelection();
+	} else if (chosen == reveal) {
+		revealSelection();
+	} else if (chosen == info) {
+		getInfo();
+	} else if (chosen == copy) {
+		copyPaths();
+	} else if (chosen == similar) {
+		findSimilar();
+	}
+}
+
+int BloodhoundWindow::rowHeight() const {
+	return m_contentWords.isEmpty() ? ROW_H : ROW_H + SNIPPET_H;
+}
+
 int BloodhoundWindow::listTop() const {
-	return RESULTS_Y + HEADER_H + BAND_H;
+	return m_resultsTop + HEADER_H + BAND_H;
 }
 
 int BloodhoundWindow::paneTop() const {
@@ -287,7 +746,7 @@ int BloodhoundWindow::listHeight() const {
 }
 
 pl_scrollbar BloodhoundWindow::bar() const {
-	const int content = static_cast<int>(m_items.size()) * ROW_H;
+	const int content = static_cast<int>(m_items.size()) * rowHeight();
 	const int view = listHeight();
 	pl_scrollbar v{};
 	v.vertical = true;
@@ -302,7 +761,7 @@ pl_scrollbar BloodhoundWindow::bar() const {
 }
 
 void BloodhoundWindow::scrollTo(int y) {
-	const int max = std::max(0, static_cast<int>(m_items.size()) * ROW_H - listHeight());
+	const int max = std::max(0, static_cast<int>(m_items.size()) * rowHeight() - listHeight());
 	m_scrollY = std::clamp(y, 0, max);
 	update();
 }
@@ -311,7 +770,7 @@ Item *BloodhoundWindow::itemAt(QPoint pos) const {
 	if (pos.y() < listTop() || pos.y() >= paneTop() || pos.x() >= W - SB_W + 1) {
 		return nullptr;
 	}
-	const int row = (pos.y() - listTop() + m_scrollY) / ROW_H;
+	const int row = (pos.y() - listTop() + m_scrollY) / rowHeight();
 	return row >= 0 && row < static_cast<int>(m_items.size()) ? m_items[row].get() : nullptr;
 }
 
@@ -320,25 +779,35 @@ void BloodhoundWindow::paintEvent(QPaintEvent *) {
 	pl_canvas *c = &px.c;
 	pl_fill(c, 0, 0, W - 1, H - 1, FACE);
 
-	/* The channel bar: Files is the only channel in 1.0. */
+	/* The channel bar: Files is the only channel. */
 	pl_fill(c, 0, 0, W - 1, CHANNEL_H - 1, GRAY(0xC));
 	pl_hline(c, 0, W - 1, CHANNEL_H - 1, GRAY(0x8));
 	pl_icon_paint(c, 10, 6, PL_ICON_FOLDER, PL_ICON_SMALL, false);
 	Text files(tr9("Files"), 200, PL_FONT_SYSTEM);
 	pl_text(c, files.t, 30, 19, C_BLACK);
 
-	/* Search row. */
+	/* The search field, scope, criteria rows and their buttons. */
 	m_host.paintControls(c, FACE);
+	if (hasContentsRow()) {
+		Text note(tr9("Contents are searched in indexed folders; Index Selection adds one."),
+			W - 2 * MARGIN, PL_FONT_VIEWS);
+		const int noteY = m_resultsTop - 6;
+		pl_text(c, note.t, MARGIN, noteY, GRAY(0x5));
+	}
 
 	/* Results header. */
-	pl_fill(c, 0, RESULTS_Y, W - 1, RESULTS_Y + HEADER_H - 1, FACE);
-	pl_hline(c, 0, W - 1, RESULTS_Y + HEADER_H - 1, GRAY(0xA));
+	pl_fill(c, 0, m_resultsTop, W - 1, m_resultsTop + HEADER_H - 1, FACE);
+	pl_hline(c, 0, W - 1, m_resultsTop + HEADER_H - 1, GRAY(0xA));
 	const int count = static_cast<int>(m_items.size());
 	QString header;
 	if (m_searching) {
-		header = tr9("Searching…  %1 found").arg(count);
+		header = m_contentWords.isEmpty() ? tr9("Searching…  %1 found").arg(count)
+			: tr9("Searching contents…  %1 found").arg(count);
 	} else if (!m_problem.isEmpty()) {
 		header = m_problem;
+	} else if (!m_similarTo.isEmpty()) {
+		header = count == 1 ? tr9("Similar to “%1” — 1 item").arg(m_similarTo)
+			: tr9("Similar to “%1” — %2 items").arg(m_similarTo).arg(count);
 	} else if (count == 0) {
 		header = tr9("No items found");
 	} else if (count == 1) {
@@ -347,11 +816,12 @@ void BloodhoundWindow::paintEvent(QPaintEvent *) {
 		header = tr9("%1 items found").arg(count);
 	}
 	Text headerText(header, W - 20, PL_FONT_VIEWS);
-	pl_text(c, headerText.t, (W - headerText.inkWidth()) / 2, RESULTS_Y + 14,
+	pl_text(c, headerText.t, (W - headerText.inkWidth()) / 2, m_resultsTop + 14,
 		m_problem.isEmpty() ? C_BLACK : RGB(0xAA, 0x22, 0x22));
 
 	/* Column titles, drawn like a folder window's unsorted columns. */
-	pl_canvas band = { c->px + (RESULTS_Y + HEADER_H) * c->stride, c->stride, 0, 0, W, BAND_H, c->log };
+	const int bandY = m_resultsTop + HEADER_H;
+	pl_canvas band = { c->px + bandY * c->stride, c->stride, 0, 0, W, BAND_H, c->log };
 	auto column = [&](int x0, int x1, const QString &title, int textX) {
 		pl_hline(&band, x0, x1, 0, GRAY(0x6));
 		pl_hline(&band, x0 + 1, x1, 1, C_WHITE);
@@ -371,16 +841,16 @@ void BloodhoundWindow::paintEvent(QPaintEvent *) {
 	column(KIND_X, KIND_X + KIND_W - 1, tr9("Kind"), KIND_X + 6);
 
 	/* Rows, clipped to the list area. */
-	const int top = listTop(), viewW = W - SB_W + 1;
+	const int top = listTop(), viewW = W - SB_W + 1, step = rowHeight();
 	pl_fill(c, 0, top, viewW - 1, paneTop() - 1, C_WHITE);
 	pl_canvas list = { c->px + top * c->stride, c->stride, 0, m_scrollY, viewW, listHeight(), c->log };
-	const int first = m_scrollY / ROW_H;
+	const int first = m_scrollY / step;
 	const int last = std::min<int>(static_cast<int>(m_items.size()) - 1,
-		(m_scrollY + listHeight()) / ROW_H);
+		(m_scrollY + listHeight()) / step);
 	for (int r = first; r <= last; r++) {
 		Item *item = m_items[r].get();
-		const int y = r * ROW_H;
-		pl_hline(&list, 0, viewW - 1, y + ROW_H - 1, GRAY(0xE));
+		const int y = r * step;
+		pl_hline(&list, 0, viewW - 1, y + step - 1, GRAY(0xE));
 		paintIcon(&list, *item, 8, y + 1, PL_ICON_SMALL, item->selected);
 		Text name(item->visibleName(), NAME_W - NAME_X - 6, item->nameFont());
 		uint32_t ink = C_BLACK;
@@ -399,6 +869,10 @@ void BloodhoundWindow::paintEvent(QPaintEvent *) {
 		pl_text(&list, sizeText.t, SIZE_X + 6, y + 13, C_BLACK);
 		Text kind(item->kindName(), KIND_W - 8, PL_FONT_VIEWS);
 		pl_text(&list, kind.t, KIND_X + 6, y + 13, C_BLACK);
+		if (!m_contentWords.isEmpty()) {
+			const Snippet snippet = m_snippets.value(item->path);
+			paintSnippet(&list, snippet, NAME_X, y + ROW_H + 10, viewW - NAME_X - 6);
+		}
 	}
 
 	/* Bottom pane: the selected path, or how many are listed. */
@@ -440,10 +914,10 @@ void BloodhoundWindow::mousePressEvent(QMouseEvent *e) {
 		pl_scrollbar v = bar();
 		const int along = pos.y() - (listTop() - 1);
 		m_sbPart = sb_hit(&v, along);
-		const int page = listHeight() - ROW_H;
+		const int page = listHeight() - rowHeight();
 		switch (m_sbPart) {
-		case SB_DEC_ARROW: scrollTo(m_scrollY - ROW_H); break;
-		case SB_INC_ARROW: scrollTo(m_scrollY + ROW_H); break;
+		case SB_DEC_ARROW: scrollTo(m_scrollY - rowHeight()); break;
+		case SB_INC_ARROW: scrollTo(m_scrollY + rowHeight()); break;
 		case SB_DEC_PAGE: scrollTo(m_scrollY - page); break;
 		case SB_INC_PAGE: scrollTo(m_scrollY + page); break;
 		case SB_THUMB_PART: m_thumbGrab = along - (sb_track_start(&v) + v.thumb); break;
@@ -476,7 +950,7 @@ void BloodhoundWindow::mouseMoveEvent(QMouseEvent *e) {
 	if (m_sbPart == SB_THUMB_PART && (e->buttons() & Qt::LeftButton)) {
 		pl_scrollbar v = bar();
 		const int range = sb_thumb_span(&v);
-		const int content = static_cast<int>(m_items.size()) * ROW_H - listHeight();
+		const int content = static_cast<int>(m_items.size()) * rowHeight() - listHeight();
 		if (range > 0 && content > 0) {
 			const int thumb = pos.y() - (listTop() - 1) - m_thumbGrab - sb_track_start(&v);
 			scrollTo(static_cast<int>(static_cast<long long>(thumb) * content / range));
@@ -520,12 +994,17 @@ void BloodhoundWindow::mouseDoubleClickEvent(QMouseEvent *e) {
 }
 
 void BloodhoundWindow::wheelEvent(QWheelEvent *e) {
-	scrollTo(m_scrollY - e->angleDelta().y() / 120 * ROW_H * 3);
+	scrollTo(m_scrollY - e->angleDelta().y() / 120 * rowHeight() * 3);
 }
 
 void BloodhoundWindow::keyPressEvent(QKeyEvent *e) {
 	const bool cmd = e->modifiers() & Qt::ControlModifier;
+	const bool shift = e->modifiers() & Qt::ShiftModifier;
 	const int key = e->key();
+	if (cmd && key == Qt::Key_F && shift && m_listFocus) {
+		findSimilar();
+		return;
+	}
 	if (cmd && key == Qt::Key_F) {
 		m_listFocus = false;
 		m_host.setFocus(&m_search);
@@ -583,21 +1062,42 @@ void BloodhoundWindow::keyPressEvent(QKeyEvent *e) {
 		}
 	}
 	if (key == Qt::Key_Tab || key == Qt::Key_Backtab) {
-		m_listFocus = !m_listFocus;
+		const int direction = key == Qt::Key_Backtab ? -1 : 1;
+		std::vector<PanelEdit *> live;
+		for (PanelEdit *edit : m_host.edits) {
+			if (edit->enabled) {
+				live.push_back(edit);
+			}
+		}
 		if (m_listFocus) {
-			m_host.setFocus(nullptr);
+			m_listFocus = false;
+			m_host.setFocus(direction > 0 ? &m_search
+				: (live.empty() ? &m_search : live.back()));
 		} else {
-			m_host.setFocus(&m_search);
+			auto it = std::find(live.begin(), live.end(), m_host.focus);
+			const int at = it == live.end() ? -1 : int(it - live.begin());
+			const int next = at + direction;
+			if (next < 0 || next >= int(live.size())) {
+				m_listFocus = true;
+				m_host.setFocus(nullptr);
+			} else {
+				m_host.setFocus(live[next]);
+			}
 		}
 		update();
 		return;
 	}
 	if (key == Qt::Key_Escape) {
-		if (m_worker->running()) {
+		if (m_worker->running() || m_searching) {
 			stop();
 		} else {
 			m_search.setText(QString());
 			m_items.clear();
+			m_snippets.clear();
+			m_snippetQueue.clear();
+			m_snippetRunning = false;
+			m_contentWords.clear();
+			m_similarTo.clear();
 			m_problem.clear();
 			m_scrollY = 0;
 			m_search.selectAll();

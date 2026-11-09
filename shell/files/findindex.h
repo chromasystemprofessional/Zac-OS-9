@@ -17,11 +17,25 @@
 
 using IndexResults = std::function<void(const QStringList &paths, const QString &error)>;
 
+/* A short piece of a file's text around the words a contents search found,
+ * with the words that appear in it. */
+struct IndexSnippet {
+	QString text;
+	QStringList words;
+};
+using IndexSnippetResults =
+	std::function<void(const IndexSnippet &snippet, const QString &error)>;
+
 /* Files whose contents have every word, best matches first, under `root`
  * ("/" for anywhere). */
 void indexSearch(const QStringList &words, const QString &root, const IndexResults &done);
 /* Files like `path`: sharing its most distinctive words, best first. */
 void indexSimilar(const QString &path, const IndexResults &done);
+/* A snippet for `path` around any of `words`: text files are read here;
+ * others ask the index for the text it extracted. */
+void indexSnippet(const QString &path, const QStringList &words, const IndexSnippetResults &done);
+/* The snippet for a text, without reading a file (for tests). */
+IndexSnippet indexSnippetText(const QString &text, const QStringList &words);
 /* Have the indexer take in a folder and everything in it. */
 void indexAddFolder(const QString &path, const std::function<void(const QString &error)> &done);
 

@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
-Name=Bloodhound
-Comment=Find files and search the web
+Name=Bloodhound (Search)
+Comment=Find files by name, contents and criteria
 Exec=zacos9-bloodhound
 Terminal=false
 Categories=Utility;FileTools;
