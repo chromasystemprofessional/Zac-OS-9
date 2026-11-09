@@ -1,3 +1,16 @@
+zacos9 (1.14.1) trixie; urgency=medium
+
+  * Disks mounted from /etc/fstab now appear on the desktop.
+    
+    An internal data disk added after installation is mounted by the system,
+    but GIO never reports it as a volume, so the Finder had no icon for it.
+    The Finder now finds those mounted block devices itself and shows each
+    one under its volume label — for example, ZacData for /mnt/data.
+    
+    The disk is not ejectable and opens like any other disk icon.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Mon, 09 Nov 2026 13:34:33 -0500
+
 zacos9 (1.14.0) trixie; urgency=medium
 
   * The standard application shortcuts now work in every program.
