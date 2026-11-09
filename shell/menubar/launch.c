@@ -455,7 +455,7 @@ static void remove_seeded_theme_installer(const char *items_dir) {
 	free(target);
 }
 
-#define SEEDED 4
+#define SEEDED 5
 static void seed_menu_items(const char *items_dir) {
 	static const struct {
 		const char *name;
@@ -463,6 +463,7 @@ static void seed_menu_items(const char *items_dir) {
 		int since;
 	} defaults[] = {
 		{ "Bark Recorder", { "zacos9-barkrecorder.desktop" }, 1 },
+		{ "Bloodhound", { "zacos9-bloodhound.desktop" }, 5 },
 		{ "Calculator", { "zacos9-calculator.desktop" }, 1 },
 		{ "Dog Ears", { "zacos9-dogears.desktop" }, 1 },
 		{ "Jigsaw Puzzle", { "zacos9-jigsaw.desktop" }, 1 },

@@ -67,7 +67,7 @@ FindDialog::~FindDialog() = default;
 
 FindDialog::FindDialog(const QString &folder) : m_folder(folder) {
 	setAttribute(Qt::WA_DeleteOnClose);
-	setWindowTitle(tr9("Find"));
+	setWindowTitle(tr9("Bloodhound"));
 	m_scope.label = tr9("Find items");
 	m_scope.items = { PopupItem(tr9("on all disks")), PopupItem(tr9("in my Home folder")) };
 	if (!folder.isEmpty() && QDir(folder) != QDir::home() && QDir(folder) != QDir::root()) {
