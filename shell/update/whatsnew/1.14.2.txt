@@ -1,0 +1,11 @@
+ZacOS 9 now states what it has always done: it does not track you.
+
+A new Privacy page in ZacOS Help, and PRIVACY.md in the source, promise no
+telemetry, analytics, online account, advertising ID, device fingerprint
+or first-party server. They list every network connection ZacOS makes and
+what it sends — Software Update, Software, Web search, local network
+browsing and the services you choose.
+
+A new test fails if a known tracking or analytics endpoint appears, or if
+the update, Software or web-search code contacts an address the policy does
+not list.
