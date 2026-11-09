@@ -578,6 +578,48 @@ int main(int argc, char **argv) {
 		QFile::remove(path + "/" + longName);
 		check(waitFor([&] { return !hasFile(desktop, longName); }) && desktop.cellH() == rows,
 			"and close up again when it goes");
+	}
+	{
+		/* A disk and a file whose remembered places overlap: the disk must
+		 * take a free cell instead of disappearing under the file. */
+		fixtureVolumes.clear();
+		LocalVolume dataDisk;
+		dataDisk.name = "ZacData";
+		dataDisk.path = home.path() + "/ZacData";
+		dataDisk.kind = MediaKind::Disk;
+		dataDisk.device = "/dev/sdz9";
+		fixtureVolumes.push_back(std::move(dataDisk));
+		desktop.refreshLocalVolumes();
+		Item *volume = desktop.m_localVolumes.empty() ? nullptr : desktop.m_localVolumes.front().get();
+		Item *file = nullptr;
+		for (auto &item : desktop.m_files) {
+			if (item->name == "External file") {
+				file = item.get();
+				break;
+			}
+		}
+		check(volume && file, "create the disk-over-file layout fixture");
+		if (volume && file) {
+			const QHash<QString, QPoint> saved = desktop.m_state.icons;
+			desktop.m_state.icons.clear();
+			desktop.m_state.icons.insert(file->key(), QPoint(200, 200));
+			desktop.m_state.icons.insert(volume->key(), QPoint(208, 223));
+			desktop.placeIcons();
+			const int w = tightGrid() ? 64 : 80;
+			const int inset = (w - PL_ICON_LARGE) / 2;
+			const auto footprint = [&](const Item &item) {
+				return QRect(item.pos.x() - inset, item.pos.y(),
+					w, desktop.cellH());
+			};
+			check(!footprint(*volume).intersects(footprint(*file)),
+				"a disk whose saved place overlaps a file's takes a free cell");
+			desktop.m_state.icons = saved;
+			desktop.placeIcons();
+		}
+		fixtureVolumes.clear();
+		desktop.refreshLocalVolumes();
+	}
+	{
 		/* The disk and the Trash move about the desktop and stay put, as on
 		 * a Mac; dragged anywhere else they carry nothing. */
 		const QPoint diskWas = desktop.m_disk->pos, trashWas = desktop.m_trash->pos;

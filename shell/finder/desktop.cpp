@@ -452,7 +452,37 @@ void Desktop::placeIcons() {
 		}
 	}
 	items.insert(items.end(), files.begin(), files.end());
-	::placeIcons(items, placed, gridSlot(nullptr), cellW(), cellH());
+	/* Remembered places can overlap: a file was dropped on a disk, or the
+	 * grid's rows grew when a long name wrapped. placeIcons() keeps saved
+	 * places as they are, and a file paints over a disk, so a disk under
+	 * one would disappear. A local or network volume whose saved place
+	 * meets another saved place takes the nearest free cell instead. */
+	const int w = cellW(), h = cellH();
+	const int inset = (w - PL_ICON_LARGE) / 2;
+	const auto footprint = [&](const QPoint &p) {
+		return QRect(p.x() - inset, p.y(), w, h);
+	};
+	for (Item *item : items) {
+		if (!item->isLocalVolume && !item->isNetworkVolume) {
+			continue;
+		}
+		auto own = placed.find(item->key());
+		if (own == placed.end()) {
+			continue;
+		}
+		const QRect mine = footprint(*own);
+		for (Item *other : items) {
+			if (other == item) {
+				continue;
+			}
+			auto theirs = placed.find(other->key());
+			if (theirs != placed.end() && footprint(*theirs).intersects(mine)) {
+				placed.remove(item->key());
+				break;
+			}
+		}
+	}
+	::placeIcons(items, placed, gridSlot(nullptr), w, h);
 }
 
 /* Clean Up snaps the disks and files to the nearest free spot; Arrange
