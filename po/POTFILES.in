@@ -6,10 +6,10 @@ shell/calculator/main.cpp
 shell/common/alert.cpp
 shell/disksetup/main.cpp
 shell/disksetup/plan.cpp
+shell/files/findcriteria.cpp
 shell/finder/desktop.cpp
 shell/finder/diskinit.cpp
 shell/finder/fileops.cpp
-shell/finder/findcriteria.cpp
 shell/finder/finder.cpp
 shell/finder/findwindow.cpp
 shell/finder/infowindow.cpp
