@@ -1,0 +1,10 @@
+The standard application shortcuts now work in every program.
+
+⌘Q quits the program in front, closing all its windows so it can ask
+about unsaved work; it exits as the last one closes. ⌘H hides the
+program and hands the keyboard to the one behind it, and ⌘M collapses
+or expands the front window. The control panels had no Quit command of
+their own, so ⌘Q did nothing there before.
+
+The Sniffer keeps ⌘H and ⌘M for its File menu — Search Internet and
+Make Alias — and is never quit, as the Mac's Finder wasn't.
