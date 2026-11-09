@@ -12,21 +12,19 @@ app rather than a modern search overlay.
 
 ## Where it is now
 
-The search engine is the Sniffer's Find:
+Bloodhound 1.0 shipped in ZacOS 9 1.11.0: `shell/bloodhound/` is a Qt 6
+program with its own app id, one Platinum window and the Files channel
+(name search, scope, results, Open/Reveal/Get Info, drag and copy path). A
+desktop entry puts it in Applications and the Zac menu.
+
+The search engine is shared with the Sniffer's Find:
 
 - `shell/files/findcriteria.cpp`: queries, criteria rows, saved searches.
 - `shell/files/findindex.cpp`: contents through the local search index.
 - `shell/finder/findwindow.cpp`: the Find dialog and Items Found windows.
 
-The first app shell is in `shell/bloodhound/`: `zacos9-bloodhound` opens the
-Find window through `zacos9-finder-ctl`, and a desktop entry puts Bloodhound
-in Applications and the Zac menu. That was [PR
-#143](https://github.com/chromasystemprofessional/Zac-OS-9/pull/143).
-
-The standalone Files window is
-[PR #147](https://github.com/chromasystemprofessional/Zac-OS-9/pull/147)
-(issue #144): its own process and app id, one window holding the query and
-the results. Criteria, contents, saved searches and channels follow.
+Criteria, contents and saved searches still live in the Sniffer's Find
+window; Bloodhound 1.1 brings them into the app. Channels follow.
 
 ## What Sherlock 2 got right
 
@@ -81,6 +79,8 @@ those pieces rather than reproducing them.
 ## Releases
 
 ### 1.0: the standalone window
+
+Shipped in ZacOS 9 1.11.0.
 
 The first real Bloodhound process, with the Files channel only.
 
@@ -268,7 +268,7 @@ the only choices.
 
 ## How it fits the code
 
-- **The app.** `shell/bloodhound/` becomes a Qt 6 program with its own app
+- **The app.** `shell/bloodhound/` is a Qt 6 program with its own app
   id, `platinumShellInit()`, `lib/` drawing and `panelkit` controls. Its
   desktop entry keeps the name Bloodhound and the Zac menu alias keeps
   working.
@@ -293,7 +293,7 @@ the only choices.
 ## Order
 
 1. **Standalone window** (the first issue): own process, one window, Files
-   channel, name search, results, open/reveal, keyboard.
+   channel, name search, results, open/reveal, keyboard. Shipped in 1.11.0.
 2. **Files channel complete**: criteria, contents, Find Similar, saved
    searches, snippets, cancellation.
 3. **Channels and the web**: Internet Search Sites, the Web channel, user
