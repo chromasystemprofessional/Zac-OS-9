@@ -7,6 +7,7 @@
 #include "apptrash.h"
 
 #include <QApplication>
+#include <QClipboard>
 #include <QDir>
 #include <QFileInfo>
 #include <QKeyEvent>
@@ -81,6 +82,31 @@ void LabelEditor::deleteSelection() {
 	m_cursor = m_anchor = a;
 }
 
+/* Insert typed or pasted text: printable characters, less "/" (which can't
+ * be in a Linux file name; on the Mac it was ":"). */
+void LabelEditor::insertText(const QString &raw) {
+	QString s;
+	bool slash = false;
+	for (QChar ch : raw) {
+		if (ch == '/') {
+			slash = true;
+		} else if (ch.isPrint()) {
+			s += ch;
+		}
+	}
+	if (slash) {
+		QApplication::beep();
+	}
+	if (s.isEmpty()) {
+		return;
+	}
+	deleteSelection();
+	m_text.insert(m_cursor, s);
+	m_cursor += s.size();
+	m_anchor = m_cursor;
+	changed();
+}
+
 bool LabelEditor::key(QKeyEvent *e) {
 	if (!m_item) {
 		return false;
@@ -147,18 +173,14 @@ bool LabelEditor::key(QKeyEvent *e) {
 		changed();
 		return true;
 	}
+	if ((e->modifiers() & Qt::ControlModifier) && e->key() == Qt::Key_V) {
+		/* Paste: the way to get a bullet (•) into a name for a Toy Box page. */
+		insertText(QApplication::clipboard()->text());
+		return true;
+	}
 	const QString typed = e->text();
 	if (!typed.isEmpty() && typed.at(0).isPrint() && !(e->modifiers() & Qt::ControlModifier)) {
-		/* "/" can't be in a Linux file name (on the Mac it was ":"). */
-		if (typed.contains('/')) {
-			QApplication::beep();
-			return true;
-		}
-		deleteSelection();
-		m_text.insert(m_cursor, typed);
-		m_cursor += typed.size();
-		m_anchor = m_cursor;
-		changed();
+		insertText(typed);
 		return true;
 	}
 	return true; /* everything else is swallowed while editing */

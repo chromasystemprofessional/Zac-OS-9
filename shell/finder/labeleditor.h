@@ -33,6 +33,8 @@ public:
 	/* Handles a key; returns false if it isn't an editing key. On Return
 	 * the edit is committed, on Escape cancelled. */
 	bool key(QKeyEvent *e);
+	/* The name being edited, without the extension. */
+	QString text() const { return m_text; }
 	/* Commit (rename on disk) or cancel; both end editing. */
 	void commit();
 	void cancel();
@@ -49,6 +51,7 @@ public:
 private:
 	int advanceTo(int chars) const;
 	void deleteSelection();
+	void insertText(const QString &raw);
 	void changed();
 
 	std::function<void()> m_repaint;

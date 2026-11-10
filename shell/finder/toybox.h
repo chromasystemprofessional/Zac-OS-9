@@ -57,6 +57,7 @@ private:
 	void layout();
 	void showPage(int page);
 	void setButtonSize(ButtonSize size);
+	void newPage();
 	void sizeMenu(QPoint at, Item *item);
 
 	struct Metrics {
