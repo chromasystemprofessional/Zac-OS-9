@@ -1,3 +1,14 @@
+zacos9 (1.17.0) trixie; urgency=medium
+
+  * Classic Mac OS 9 folder and file icons now appear in the Finder,
+    aliases, Get Info and Find, decoded from Icon resource forks and the
+    AppleDouble companions StuffIt extraction keeps. A mounted game disc
+    dropped on Games opens in Game Player instead of being copied; audio
+    and video discs are refused. A picture set through Get Info still takes
+    precedence over an item's classic icon.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Tue, 10 Nov 2026 08:47:35 -0500
+
 zacos9 (1.16.2) trixie; urgency=medium
 
   * Get Info's icon works again for applications, aliases and files:
