@@ -89,6 +89,8 @@ named after the archive. Existing items are never overwritten, and the archive
 is kept. 7z support uses `python3-libarchive-c`; StuffIt (`.sit`) support uses
 `unar` and `lsar` (installed with ZacOS 9) and preserves resource forks as hidden
 `._` AppleDouble sidecars without recursively expanding nested archives.
+Classic Mac folder and file icons carried in those forks (a folder's `Icon\r`)
+appear in the Finder after extraction.
 Unsafe StuffIt paths, links, and special entries are rejected before extraction.
 Password-protected archives are reported as unsupported rather than prompting.
 

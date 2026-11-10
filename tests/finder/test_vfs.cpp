@@ -53,6 +53,113 @@ static void writeEntry(const QString &dir, const QString &file, const QString &b
 	}
 }
 
+static bool writeBytes(const QString &path, const QByteArray &data) {
+	QFile f(path);
+	return f.open(QIODevice::WriteOnly | QIODevice::Truncate) && f.write(data) == data.size();
+}
+
+static void append16(QByteArray &data, quint16 value) {
+	data.append(static_cast<char>((value >> 8) & 0xFF));
+	data.append(static_cast<char>(value & 0xFF));
+}
+
+static void append32(QByteArray &data, quint32 value) {
+	data.append(static_cast<char>((value >> 24) & 0xFF));
+	data.append(static_cast<char>((value >> 16) & 0xFF));
+	data.append(static_cast<char>((value >> 8) & 0xFF));
+	data.append(static_cast<char>(value & 0xFF));
+}
+
+struct MacResource {
+	QByteArray type;
+	int id = -16455;
+	QByteArray body;
+};
+
+/* A classic Mac resource fork, as tests/themeinstaller builds them: data
+ * section at 256, then the map naming each resource's offset. */
+static QByteArray resourceFork(const QList<MacResource> &resources) {
+	const quint32 dataOffset = 256;
+	QByteArray data;
+	QList<int> offsets;
+	for (const MacResource &resource : resources) {
+		offsets << data.size();
+		append32(data, resource.body.size());
+		data += resource.body;
+	}
+	QList<QByteArray> types;
+	for (const MacResource &resource : resources) {
+		if (!types.contains(resource.type)) {
+			types << resource.type;
+		}
+	}
+	QByteArray typeList;
+	append16(typeList, types.size() - 1);
+	int referenceList = 2 + 8 * types.size();
+	for (const QByteArray &type : types) {
+		int count = 0;
+		for (const MacResource &resource : resources) {
+			count += resource.type == type;
+		}
+		typeList += type;
+		append16(typeList, count - 1);
+		append16(typeList, referenceList);
+		referenceList += 12 * count;
+	}
+	for (const QByteArray &type : types) {
+		for (int i = 0; i < resources.size(); i++) {
+			if (resources[i].type != type) {
+				continue;
+			}
+			append16(typeList, resources[i].id);
+			append16(typeList, 0xFFFF);
+			typeList.append('\0');
+			typeList.append(static_cast<char>((offsets[i] >> 16) & 0xFF));
+			typeList.append(static_cast<char>((offsets[i] >> 8) & 0xFF));
+			typeList.append(static_cast<char>(offsets[i] & 0xFF));
+			append32(typeList, 0);
+		}
+	}
+	QByteArray map;
+	append32(map, dataOffset);
+	append32(map, dataOffset + data.size());
+	append32(map, data.size());
+	append32(map, 28 + typeList.size());
+	append32(map, 0);
+	append16(map, 0);
+	append16(map, 0);
+	append16(map, 28);
+	append16(map, 28 + typeList.size());
+	map += typeList;
+	QByteArray fork;
+	append32(fork, dataOffset);
+	append32(fork, dataOffset + data.size());
+	append32(fork, data.size());
+	append32(fork, map.size());
+	fork += QByteArray(dataOffset - 16, '\0');
+	fork += data;
+	fork += map;
+	return fork;
+}
+
+/* An AppleDouble companion holding that fork. */
+static QByteArray appleDouble(const QByteArray &fork) {
+	QByteArray data;
+	data.append(QByteArray("\x00\x05\x16\x07", 4));
+	append32(data, 0x00020000);
+	data += QByteArray(16, '\0');
+	append16(data, 2);
+	append32(data, 9);
+	append32(data, 50);
+	append32(data, 32);
+	append32(data, 2);
+	append32(data, 82);
+	append32(data, fork.size());
+	data += QByteArray(32, '\0');
+	data += fork;
+	return data;
+}
+
 /* An ordinary application entry, as most packages write one. */
 static QString entry(const QString &name, const QString &exec = "/bin/true",
 		const QString &extra = QString()) {
@@ -220,6 +327,47 @@ int main(int argc, char **argv) {
 		"oversized pictures are rejected before encoding");
 	check(clearCustomIconImage(iconFixture) && customIconImage(iconFixture).isNull(),
 		"clearing a custom icon removes its persisted metadata");
+
+	/* ---- classic Mac folder and file icons ----------------------------- */
+	/* The icon a Mac OS 9 folder carries in Icon\r's resource fork, kept
+	 * by StuffIt extraction as an AppleDouble ._Icon\r companion. */
+	QByteArray icl8(32 * 32, char(0x2A)); /* standard palette: #CCCCFF */
+	QByteArray icn(128, '\0');
+	icn += QByteArray(128, char(0xFF));
+	icn[128] = char(0x7F); /* (0, 0) stays transparent */
+	const QByteArray classicFork = resourceFork({
+		MacResource{ "icl8", -16455, icl8 },
+		MacResource{ "ICN#", -16455, icn },
+	});
+	const QString classicFolder = root + "/Mac Icon Folder";
+	QDir().mkpath(classicFolder);
+	check(writeBytes(classicFolder + "/Icon\r", QByteArray()) &&
+		writeBytes(classicFolder + "/._Icon\r", appleDouble(classicFork)),
+		"a folder gets the classic Icon\\r resource-fork pair");
+	const QImage classicIcon = customIconImage(classicFolder);
+	check(classicIcon.size() == QSize(32, 32) &&
+		classicIcon.pixel(16, 16) == qRgb(0xCC, 0xCC, 0xFF) &&
+		qAlpha(classicIcon.pixel(0, 0)) == 0,
+		"a classic folder icon is decoded with its palette and mask");
+	const auto classicItem = makeItem(QFileInfo(classicFolder));
+	check(classicItem && classicItem->customIcon32.size() == 32 * 32 &&
+		classicItem->customIcon32[16 * 32 + 16] == qRgb(0xCC, 0xCC, 0xFF),
+		"Finder items use the classic folder icon");
+
+	const QString classicFile = root + "/Mac Icon File.txt";
+	writeEntry(root, "Mac Icon File.txt", "x");
+	check(writeBytes(root + "/._Mac Icon File.txt", appleDouble(classicFork)),
+		"a file gets its AppleDouble resource fork");
+	const QImage classicFileIcon = customIconImage(classicFile);
+	check(!classicFileIcon.isNull() &&
+		classicFileIcon.pixel(16, 16) == qRgb(0xCC, 0xCC, 0xFF),
+		"a file's classic resource-fork icon is shown too");
+
+	const QString brokenFolder = root + "/Broken Mac Icon";
+	QDir().mkpath(brokenFolder);
+	writeBytes(brokenFolder + "/._Icon\r", QByteArray("not a resource fork"));
+	check(customIconImage(brokenFolder).isNull(),
+		"a malformed classic icon sidecar is ignored");
 
 	/* ---- discovery ---------------------------------------------------- */
 	writeEntry(appsDir, "simpletext.desktop", entry("SimpleText"));

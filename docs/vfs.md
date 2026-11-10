@@ -122,6 +122,18 @@ edited picture gets a new preview. A separate in-memory cache holds the
 icons for the most recent 2,000 pictures. Unlike Mac OS 9's preview icons,
 nothing is written to the picture file itself.
 
+## Classic Mac icons
+
+A folder copied from a Mac OS 9 disk can carry the icon its owner gave it in
+`Icon\r`'s resource fork; a file carries one in its own fork. A StuffIt
+extraction keeps those forks as hidden `._` AppleDouble companions (Netatalk's
+`.rsrc` folders and an HFS mount's `..namedfork/rsrc` are read too). The
+Finder decodes the classic `icl8`/`icl4` colour resources with their `ICN#`
+mask, and the 16x16 `ics` family when that is all a file has, into the same
+32x32 icons it uses for pictures pasted in Get Info. An icon set through Get
+Info still takes precedence; removing that one reveals the classic icon again.
+No icon artwork is bundled: only the user's own resource forks are read.
+
 ## Document names and icons
 
 File names are shown without their extension: "Read Me.txt" appears as

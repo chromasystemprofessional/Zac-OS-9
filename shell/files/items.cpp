@@ -1,4 +1,5 @@
 #include "items.h"
+#include "macicons.h"
 
 #include "clippings.h"
 #include "desktopprinter.h"
@@ -744,8 +745,18 @@ static QImage directCustomIconImage(const QString &path) {
 	return {};
 }
 
+/* A user-given icon, else the one the item itself carries from Mac OS 9
+ * (a folder's Icon\r resource, or a file's own fork). */
+static QImage ownIconImage(const QString &path) {
+	const QImage custom = directCustomIconImage(path);
+	if (!custom.isNull()) {
+		return custom;
+	}
+	return macResourceIconImage(path);
+}
+
 QImage customIconImage(const QString &path) {
-	const QImage direct = directCustomIconImage(path);
+	const QImage direct = ownIconImage(path);
 	if (!direct.isNull()) {
 		return direct;
 	}
@@ -776,7 +787,7 @@ QImage customIconImage(const QString &path) {
 	}
 	/* An alias without a custom icon of its own inherits its original's. */
 	if (target != path) {
-		const QImage inherited = directCustomIconImage(target);
+		const QImage inherited = ownIconImage(target);
 		if (!inherited.isNull()) {
 			return inherited;
 		}
