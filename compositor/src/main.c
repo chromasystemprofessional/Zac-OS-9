@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #include <wlr/types/wlr_compositor.h>
 #include <wlr/types/wlr_data_control_v1.h>
@@ -68,6 +69,80 @@ pid_t spawn_component(const char *env_var, const char *program, const char *args
 	char cmd[256];
 	snprintf(cmd, sizeof(cmd), "exec %s%s", program, args);
 	return spawn(cmd);
+}
+
+/* The menu bar, the Sniffer and the Collar are the desktop itself: if one
+ * crashes, the session loses part of itself for good (and its process sits
+ * in the table as a zombie, since nothing else reaps it). Watch their pids
+ * on a timer, the way lock.c brings zacos9-lock back. */
+#define SHELL_CHECK_MS 2000
+#define SHELL_MAX_RESTARTS 5
+
+struct shell_child {
+	const char *env;
+	const char *program;
+	pid_t pid;
+	unsigned deaths; /* restarts in a row that died before the next check */
+};
+
+static struct shell_child shell_children[] = {
+	{ "ZACOS9_MENUBAR", "zacos9-menubar", 0, 0 },
+	{ "ZACOS9_FINDER", "zacos9-finder", 0, 0 },
+	{ "ZACOS9_COLLAR", "zacos9-collar", 0, 0 },
+};
+
+static struct wl_event_source *shell_timer;
+
+static int watch_shell(void *data) {
+	(void)data;
+	int delay = SHELL_CHECK_MS;
+	for (size_t i = 0; i < sizeof(shell_children) / sizeof(shell_children[0]); i++) {
+		struct shell_child *c = &shell_children[i];
+		if (c->pid <= 0) {
+			continue; /* disabled on purpose ($VAR=""), or it wouldn't start */
+		}
+		if (waitpid(c->pid, NULL, WNOHANG) == 0) {
+			c->deaths = 0; /* it has stayed up through a whole check */
+			continue;
+		}
+		/* Exited, or already reaped. Give up on a run of quick deaths: a
+		 * broken build must not fill the disk with core dumps. */
+		if (++c->deaths >= SHELL_MAX_RESTARTS) {
+			wlr_log(WLR_ERROR, "shell: %s keeps going away; leaving it stopped",
+				c->program);
+			c->pid = 0;
+			continue;
+		}
+		wlr_log(WLR_ERROR, "shell: %s went away; starting it again", c->program);
+		c->pid = spawn_component(c->env, c->program, "");
+		if (c->pid <= 0) {
+			c->pid = 0; /* disabled or couldn't start: don't keep trying */
+			continue;
+		}
+		/* Something that dies at once must not be relaunched in a tight
+		 * loop: back off until it has had time to come up. */
+		if (c->deaths > 1) {
+			delay = 10000;
+		}
+	}
+	wl_event_source_timer_update(shell_timer, delay);
+	return 0;
+}
+
+static void shell_children_start(struct plat_server *server) {
+	for (size_t i = 0; i < sizeof(shell_children) / sizeof(shell_children[0]); i++) {
+		struct shell_child *c = &shell_children[i];
+		const char *override = getenv(c->env);
+		c->pid = spawn_component(c->env, c->program, "");
+		if (override && *override) {
+			/* A replacement command (a test's stand-in, or the user's own)
+			 * is somebody else's to run: leave its lifetime alone. */
+			c->pid = 0;
+		}
+	}
+	shell_timer = wl_event_loop_add_timer(wl_display_get_event_loop(server->display),
+		watch_shell, NULL);
+	wl_event_source_timer_update(shell_timer, SHELL_CHECK_MS);
 }
 
 /* Our desktop entries (app names for the menu bar) live in ../share next
@@ -277,9 +352,7 @@ int main(int argc, char *argv[]) {
 	prefs_write_outputs(&server);
 	share_our_data();
 	startup_begin(&server);
-	spawn_component("ZACOS9_MENUBAR", "zacos9-menubar", "");
-	spawn_component("ZACOS9_FINDER", "zacos9-finder", "");
-	spawn_component("ZACOS9_COLLAR", "zacos9-collar", "");
+	shell_children_start(&server);
 	/* Keeping screens awake for apps that ask over D-Bus: in a real session
 	 * only, or a nested or test one would take the host's bus names. */
 	if (server.session || getenv("ZACOS9_INHIBIT")) {
