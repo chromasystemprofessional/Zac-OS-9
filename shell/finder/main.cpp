@@ -5,6 +5,7 @@
 #include <QApplication>
 #include <QCoreApplication>
 #include <QScreen>
+#include <QSize>
 #include <QTimer>
 #include <cstdio>
 
@@ -57,10 +58,13 @@ int main(int argc, char *argv[]) {
 		alert->open();
 	});
 
-	QScreen *screen = QGuiApplication::primaryScreen();
-	const auto makeDesktop = [screen] {
+	/* A screen can come and go while the Finder starts (hot-plug, the
+	 * Monitors panel, or a rotation applied at login): Qt deletes QScreen
+	 * objects when outputs change, so don't hold one across startup. */
+	const auto makeDesktop = [] {
 		auto *d = new Desktop;
-		d->resize(screen->size());
+		QScreen *screen = QGuiApplication::primaryScreen();
+		d->resize(screen ? screen->size() : QSize(1024, 768));
 		d->becomeLayerSurface();
 		d->show();
 		return d;
@@ -89,15 +93,27 @@ int main(int argc, char *argv[]) {
 	SecondaryDesktop::keepInStep();
 	/* The Monitors panel can change the screen's size or scale. Qt keeps
 	 * a widget's backing store at the scale it started with, so the
-	 * desktop is replaced by a fresh one drawn at the new scale. */
-	QObject::connect(screen, &QScreen::geometryChanged, &app, [&desktop, makeDesktop] {
-		QTimer::singleShot(0, [&desktop, makeDesktop] {
-			Desktop *old = desktop;
-			desktop = makeDesktop();
-			Finder::instance().replaceDesktop(desktop);
-			old->hide();
-			old->deleteLater();
-		});
-	});
+	 * desktop is replaced by a fresh one drawn at the new scale. Watch
+	 * the primary screen as it is now, and follow it when it changes:
+	 * an older QScreen is gone once its output is reconfigured. */
+	QMetaObject::Connection geometryConnection;
+	const auto watchGeometry = [&app, &desktop, makeDesktop, &geometryConnection](QScreen *screen) {
+		QObject::disconnect(geometryConnection);
+		if (!screen) {
+			return;
+		}
+		geometryConnection = QObject::connect(screen, &QScreen::geometryChanged, &app,
+			[&desktop, makeDesktop] {
+				QTimer::singleShot(0, [&desktop, makeDesktop] {
+					Desktop *old = desktop;
+					desktop = makeDesktop();
+					Finder::instance().replaceDesktop(desktop);
+					old->hide();
+					old->deleteLater();
+				});
+			});
+	};
+	QObject::connect(qApp, &QGuiApplication::primaryScreenChanged, &app, watchGeometry);
+	watchGeometry(QGuiApplication::primaryScreen());
 	return app.exec();
 }
