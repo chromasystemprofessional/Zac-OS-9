@@ -1,3 +1,13 @@
+zacos9 (1.16.2) trixie; urgency=medium
+
+  * Get Info's icon works again for applications, aliases and files:
+    Command-C copies the icon, Command-V pastes it, and the copied picture
+    keeps its transparency. Applications now shows a custom icon given
+    through Get Info and refreshes at once, and dragging an icon between
+    Get Info windows still works.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Tue, 10 Nov 2026 07:38:50 -0500
+
 zacos9 (1.16.1) trixie; urgency=medium
 
   * In the Games folder, a bin/cue PlayStation game now shows its track
