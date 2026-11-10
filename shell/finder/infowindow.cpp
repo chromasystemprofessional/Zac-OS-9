@@ -31,6 +31,7 @@
 #include <QDropEvent>
 #include <QMimeData>
 #include <algorithm>
+#include <cstring>
 #include <grp.h>
 #include <pwd.h>
 #include <sys/stat.h>
@@ -192,23 +193,30 @@ void InfoWindow::open(const QString &path, pl_icon_kind kind, const QString &nam
 	}
 	w->show();
 	w->raise();
+	w->activateWindow();
 }
 
 void InfoWindow::openVirtual(const QString &path, pl_icon_kind kind, const QString &name,
-		const ResourceDetails &details) {
+		const ResourceDetails &details, const QString &iconPath) {
 	InfoWindow *w = infoWindows().value(path);
 	if (!w) {
-		w = new InfoWindow(path, kind, name, &details);
+		w = new InfoWindow(path, kind, name, &details, iconPath);
 		infoWindows().insert(path, w);
+	} else if (!iconPath.isEmpty()) {
+		w->m_iconPath = iconPath;
 	}
 	w->show();
 	w->raise();
+	w->activateWindow();
 }
 
 InfoWindow::InfoWindow(const QString &path, pl_icon_kind kind, const QString &name,
-		const ResourceDetails *details)
-	: m_path(path), m_name(name), m_kind(kind),
+		const ResourceDetails *details, const QString &iconPath)
+	: m_path(path), m_name(name), m_iconPath(iconPath), m_kind(kind),
 	  m_isResourceInfo(details != nullptr) {
+	if (!details) {
+		m_iconPath = path;
+	}
 	/* A network volume shows as one (its kind stays a disk's). */
 	for (const NetVolume &v : netVolumes()) {
 		m_network = m_network || v.path == path;
@@ -399,6 +407,80 @@ void InfoWindow::paintEvent(QPaintEvent *) {
 	px.blit(p);
 }
 
+/* What can be copied to and pasted from the icon: the item itself, or for
+ * a virtual item such as an application, the file whose icon stands for it. */
+bool InfoWindow::canChangeIcon() const {
+	return !m_iconPath.isEmpty() && !m_isVolumeInfo && !m_isTrash;
+}
+
+pl_icon_kind InfoWindow::shownKind() const {
+	return m_kind == PL_ICON_FOLDER && !m_sharedAs.isEmpty() ? PL_ICON_SHARED_FOLDER
+		: m_kind == PL_ICON_DISK && m_network ? PL_ICON_NETWORK_DISK : m_kind;
+}
+
+/* The icon as the Finder shows it, without the window behind it: a custom
+ * icon, a document's thumbnail or document icon, or the built-in art. */
+QImage InfoWindow::currentIconImage() const {
+	QImage custom;
+	if (canChangeIcon()) {
+		custom = customIconImage(m_iconPath);
+	}
+	if (!custom.isNull()) {
+		return custom;
+	}
+	auto fromPixels = [](const std::vector<uint32_t> &pixels) {
+		if (pixels.size() < PL_ICON_LARGE * PL_ICON_LARGE) {
+			return QImage();
+		}
+		QImage image(PL_ICON_LARGE, PL_ICON_LARGE, QImage::Format_ARGB32);
+		for (int y = 0; y < PL_ICON_LARGE; y++) {
+			memcpy(image.scanLine(y), pixels.data() + y * PL_ICON_LARGE,
+				PL_ICON_LARGE * sizeof(uint32_t));
+		}
+		return image;
+	};
+	if (m_kind == PL_ICON_DOCUMENT && !m_isResourceInfo) {
+		std::vector<uint32_t> preview, small;
+		if (thumbnailFor(m_path, &preview, &small) == ThumbnailState::Ready) {
+			const QImage image = fromPixels(preview);
+			if (!image.isNull()) {
+				return image;
+			}
+		}
+		if (const std::vector<uint32_t> *document = documentIcon(fileMimeType(m_path),
+				PL_ICON_LARGE)) {
+			const QImage image = fromPixels(*document);
+			if (!image.isNull()) {
+				return image;
+			}
+		}
+	}
+	const uint32_t *pixels = pl_icon(shownKind(), PL_ICON_LARGE);
+	if (!pixels) {
+		return QImage();
+	}
+	QImage image(PL_ICON_LARGE, PL_ICON_LARGE, QImage::Format_ARGB32);
+	for (int y = 0; y < PL_ICON_LARGE; y++) {
+		memcpy(image.scanLine(y), pixels + y * PL_ICON_LARGE,
+			PL_ICON_LARGE * sizeof(uint32_t));
+	}
+	return image;
+}
+
+/* The folder whose view shows m_path's icon. A virtual path is not an
+ * absolute filesystem path, so QFileInfo would resolve it against the
+ * current directory and miss the window. */
+void InfoWindow::refreshIconFolder() {
+	QString folder;
+	if (vfsIsVirtual(m_path)) {
+		const int slash = m_path.lastIndexOf('/');
+		folder = slash > 0 ? m_path.left(slash) : vfsRoot();
+	} else {
+		folder = QFileInfo(m_path).absolutePath();
+	}
+	Finder::instance().folderChanged(folder);
+}
+
 /* The item's icon (framed) and name, and the group box the Show pop-up
  * titles. */
 void InfoWindow::paintHeader(pl_canvas *c) {
@@ -406,8 +488,7 @@ void InfoWindow::paintHeader(pl_canvas *c) {
 		m_iconFocused ? GRAY(0x5) : C_BLACK);
 	std::vector<uint32_t> preview, small;
 	const std::vector<uint32_t> *document = nullptr;
-	const QImage customIcon = m_isResourceInfo || m_isVolumeInfo ? QImage() :
-		customIconImage(m_path);
+	const QImage customIcon = canChangeIcon() ? customIconImage(m_iconPath) : QImage();
 	if (!customIcon.isNull()) {
 		pl_image_blend(c, ICON_BOX_X + 3, ICON_BOX_Y + 3,
 			reinterpret_cast<const uint32_t *>(customIcon.constBits()),
@@ -421,9 +502,7 @@ void InfoWindow::paintHeader(pl_canvas *c) {
 		pl_image_blend(c, ICON_BOX_X + 3, ICON_BOX_Y + 3, document->data(),
 			PL_ICON_LARGE, PL_ICON_LARGE, false);
 	} else {
-		pl_icon_paint(c, ICON_BOX_X + 3, ICON_BOX_Y + 3,
-			m_kind == PL_ICON_FOLDER && !m_sharedAs.isEmpty() ? PL_ICON_SHARED_FOLDER
-				: m_kind == PL_ICON_DISK && m_network ? PL_ICON_NETWORK_DISK : m_kind,
+		pl_icon_paint(c, ICON_BOX_X + 3, ICON_BOX_Y + 3, shownKind(),
 			PL_ICON_LARGE, false);
 	}
 	panelText(c, m_name, NAME_X, NAME_BASELINE, PL_FONT_SYSTEM, C_BLACK, INFO_W - NAME_X - 10);
@@ -754,7 +833,7 @@ bool InfoWindow::saveSharing() {
 			return false;
 		}
 		/* Its icon changes wherever it shows. */
-		Finder::instance().folderChanged(QFileInfo(m_path).absolutePath());
+		refreshIconFolder();
 	}
 	return true;
 }
@@ -932,8 +1011,7 @@ void InfoWindow::mousePressEvent(QMouseEvent *e) {
 	if (m_host.hostPress(e) || m_view != 0) {
 		return;
 	}
-	if (!m_isResourceInfo && !m_isVolumeInfo &&
-			QRect(ICON_BOX_X, ICON_BOX_Y, 38, 38).contains(pos)) {
+	if (canChangeIcon() && QRect(ICON_BOX_X, ICON_BOX_Y, 38, 38).contains(pos)) {
 		m_iconFocused = true;
 		m_iconPressPos = pos;
 		setEditingComment(false);
@@ -948,18 +1026,16 @@ void InfoWindow::mousePressEvent(QMouseEvent *e) {
 void InfoWindow::mouseMoveEvent(QMouseEvent *e) {
 	m_host.hostMove(e);
 	/* Dragging the icon copies it to another Get Info window, as on a Mac. */
-	if (m_iconFocused && (e->buttons() & Qt::LeftButton) && !m_isResourceInfo &&
-			!m_isVolumeInfo && !m_isTrash) {
+	if (m_iconFocused && (e->buttons() & Qt::LeftButton) && canChangeIcon()) {
 		const int dist = (e->position().toPoint() - m_iconPressPos).manhattanLength();
 		if (dist >= QApplication::startDragDistance()) {
-			const QImage icon = grab(QRect(ICON_BOX_X + 3, ICON_BOX_Y + 3,
-				PL_ICON_LARGE, PL_ICON_LARGE)).toImage();
+			const QImage icon = currentIconImage();
 			if (!icon.isNull()) {
 				QMimeData *mime = new QMimeData;
 				mime->setImageData(icon);
 				QDrag *drag = new QDrag(this);
 				drag->setMimeData(mime);
-				drag->setPixmap(QPixmap::fromImage(icon.scaled(32, 32)));
+				drag->setPixmap(QPixmap::fromImage(icon));
 				drag->exec(Qt::CopyAction);
 				m_iconFocused = false;
 				update();
@@ -973,7 +1049,7 @@ void InfoWindow::mouseReleaseEvent(QMouseEvent *e) {
 }
 
 void InfoWindow::dragEnterEvent(QDragEnterEvent *e) {
-	if (m_isResourceInfo || m_isVolumeInfo || m_isTrash) {
+	if (!canChangeIcon()) {
 		return;
 	}
 	if (!QRect(ICON_BOX_X, ICON_BOX_Y, 38, 38).contains(e->position().toPoint())) {
@@ -1000,7 +1076,7 @@ void InfoWindow::dragEnterEvent(QDragEnterEvent *e) {
 }
 
 void InfoWindow::dropEvent(QDropEvent *e) {
-	if (m_isResourceInfo || m_isVolumeInfo || m_isTrash) {
+	if (!canChangeIcon()) {
 		return;
 	}
 	if (!QRect(ICON_BOX_X, ICON_BOX_Y, 38, 38).contains(e->position().toPoint())) {
@@ -1029,12 +1105,12 @@ void InfoWindow::dropEvent(QDropEvent *e) {
 	if (image.isNull()) {
 		return;
 	}
-	if (!writeCustomIconImage(m_path, image)) {
+	if (!writeCustomIconImage(m_iconPath, image)) {
 		Alert::ask(tr9("This item's icon couldn't be changed. The file system may not "
 			"support custom icons, or the picture may be too large."), "OK", "");
 	} else {
 		update();
-		Finder::instance().folderChanged(QFileInfo(m_path).absolutePath());
+		refreshIconFolder();
 	}
 	e->acceptProposedAction();
 }
@@ -1045,31 +1121,40 @@ void InfoWindow::keyPressEvent(QKeyEvent *e) {
 		return;
 	}
 	const bool command = e->modifiers() & (Qt::ControlModifier | Qt::MetaModifier);
-	if (m_iconFocused && command && (e->key() == Qt::Key_C || e->key() == Qt::Key_V)) {
+	/* With no comment being typed, Command-C and Command-V belong to the
+	 * icon even before it is clicked: it is the only thing here to copy. */
+	if (!m_editingComment && canChangeIcon() && command &&
+			(e->key() == Qt::Key_C || e->key() == Qt::Key_V)) {
 		if (e->key() == Qt::Key_C) {
-			const QImage icon = grab(QRect(ICON_BOX_X + 3, ICON_BOX_Y + 3,
-				PL_ICON_LARGE, PL_ICON_LARGE)).toImage();
-			QApplication::clipboard()->setImage(icon);
+			const QImage icon = currentIconImage();
+			if (!icon.isNull()) {
+				QApplication::clipboard()->setImage(icon);
+			}
 		} else {
 			const QImage image = QApplication::clipboard()->image();
 			if (image.isNull()) {
-				Alert::ask(tr9("The Clipboard doesn’t contain a picture to use as an icon."), "OK", "");
-			} else if (!writeCustomIconImage(m_path, image)) {
+				/* A stray paste of text isn't an error, but an explicit
+				 * paste after clicking the icon gets an explanation. */
+				if (m_iconFocused) {
+					Alert::ask(tr9("The Clipboard doesn’t contain a picture to use as an icon."), "OK", "");
+				}
+			} else if (!writeCustomIconImage(m_iconPath, image)) {
 				Alert::ask(tr9("This item’s icon couldn’t be changed. The file system may not support "
 					"custom icons, or the picture may be too large."), "OK", "");
 			} else {
 				update();
-				Finder::instance().folderChanged(QFileInfo(m_path).absolutePath());
+				refreshIconFolder();
 			}
 		}
 		return;
 	}
-	if (m_iconFocused && (e->key() == Qt::Key_Backspace || e->key() == Qt::Key_Delete)) {
-		if (!clearCustomIconImage(m_path)) {
+	if (m_iconFocused && canChangeIcon() &&
+			(e->key() == Qt::Key_Backspace || e->key() == Qt::Key_Delete)) {
+		if (!clearCustomIconImage(m_iconPath)) {
 			Alert::ask(tr9("This item’s custom icon couldn’t be removed."), "OK", "");
 		} else {
 			update();
-			Finder::instance().folderChanged(QFileInfo(m_path).absolutePath());
+			refreshIconFolder();
 		}
 		return;
 	}

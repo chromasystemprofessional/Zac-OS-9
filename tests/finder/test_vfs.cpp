@@ -412,6 +412,25 @@ int main(int argc, char **argv) {
 	check(apps.contains("SimpleText"), "an installed application appears in Applications");
 	check(vfsName(vfsPathFor("applications/simpletext.desktop")) == "SimpleText",
 		"a hidden system tool of the same name does not rename it");
+
+	/* A custom icon given to an application through its virtual Get Info
+	 * shows in Applications, like any other item's. */
+	const QString simpleApp = pathNamed(vfsPathFor("applications"), "SimpleText");
+	QImage appIcon(48, 24, QImage::Format_ARGB32);
+	appIcon.fill(0xffff0000);
+	check(writeCustomIconImage(simpleApp, appIcon),
+		"an application accepts a custom icon through its virtual path");
+	bool appIconShown = false;
+	for (const auto &item : vfsList(vfsPathFor("applications"))) {
+		if (item->path == simpleApp && item->customIcon32.size() == PL_ICON_LARGE * PL_ICON_LARGE) {
+			appIconShown = item->customIcon32[16 * PL_ICON_LARGE + 16] == 0xffff0000;
+		}
+	}
+	check(appIconShown, "Applications shows the application's custom icon");
+	check(customIconImage(simpleApp).size() == QSize(PL_ICON_LARGE, PL_ICON_LARGE) &&
+		customIconImage(simpleApp).pixel(16, 16) == 0xffff0000,
+		"Get Info reads the same application icon");
+	check(clearCustomIconImage(simpleApp), "an application's custom icon can be removed");
 	check(!apps.contains("Calculator"),
 		"an application the user installed as a utility is not loose in Applications");
 	check(namesIn(vfsPathFor("applications/utilities")).contains("Calculator"),

@@ -763,6 +763,24 @@ QImage customIconImage(const QString &path) {
 			}
 		}
 	}
+	/* A Finder application item names the application, not its desktop
+	 * entry; look through to the entry for its icon and custom icon. */
+	if (vfsIsVirtual(target)) {
+		const VNode *node = vfsNode(target);
+		if (node && node->kind == VKind::Launcher && node->actionId.isEmpty() &&
+				!node->appId.isEmpty()) {
+			if (const AppEntry *app = appById(node->appId)) {
+				target = app->file;
+			}
+		}
+	}
+	/* An alias without a custom icon of its own inherits its original's. */
+	if (target != path) {
+		const QImage inherited = directCustomIconImage(target);
+		if (!inherited.isNull()) {
+			return inherited;
+		}
+	}
 	/* An application's own icon (ZacOS's pieces and installed apps) is
 	 * shown for the app and any alias to it, the way Mac OS showed an
 	 * application's icon for its documents. */
@@ -779,13 +797,6 @@ QImage customIconImage(const QString &path) {
 				}
 				return icon;
 			}
-		}
-	}
-	/* An alias without a custom icon of its own inherits its original's. */
-	if (target != path) {
-		const QImage inherited = directCustomIconImage(target);
-		if (!inherited.isNull()) {
-			return inherited;
 		}
 	}
 	return {};

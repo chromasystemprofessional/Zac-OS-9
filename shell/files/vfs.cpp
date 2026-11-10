@@ -1320,8 +1320,22 @@ std::vector<std::unique_ptr<Item>> vfsList(const QString &path) {
 		}
 		if (node->kind == VKind::Launcher && node->actionId.isEmpty() && !node->appId.isEmpty()) {
 			/* The application itself, not one of its Desktop Actions:
-			 * show its own icon when one was resolved. */
-			if (const AppEntry *app = appById(node->appId)) {
+			 * show its own icon, or the custom one Get Info gave it. */
+			const QImage icon = customIconImage(item->path);
+			if (!icon.isNull()) {
+				const QImage small = icon.scaled(PL_ICON_SMALL, PL_ICON_SMALL,
+					Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+				item->customIcon32.resize(PL_ICON_LARGE * PL_ICON_LARGE);
+				item->customIcon16.resize(PL_ICON_SMALL * PL_ICON_SMALL);
+				for (int y = 0; y < PL_ICON_LARGE; y++) {
+					memcpy(item->customIcon32.data() + y * PL_ICON_LARGE,
+						icon.constScanLine(y), PL_ICON_LARGE * sizeof(uint32_t));
+				}
+				for (int y = 0; y < PL_ICON_SMALL; y++) {
+					memcpy(item->customIcon16.data() + y * PL_ICON_SMALL,
+						small.constScanLine(y), PL_ICON_SMALL * sizeof(uint32_t));
+				}
+			} else if (const AppEntry *app = appById(node->appId)) {
 				item->customIcon32 = app->icon32;
 				item->customIcon16 = app->icon16;
 			}

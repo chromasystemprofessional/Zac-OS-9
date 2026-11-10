@@ -338,3 +338,14 @@ test('finder-ime-fields',
   env: ['QT_QPA_PLATFORM=offscreen'],
   timeout: 60,
 )
+# Get Info's icon: copy and paste, including for a virtual application.
+test('finder-get-info',
+  executable('test-finder-get-info',
+    '../../tests/finder/test_getinfo.cpp', finder_test_sources,
+    link_with: panelkit,
+    include_directories: include_directories('../print', '../panels', '../network'),
+    dependencies: [shell_files_dep, shell_common_dep, platinum_dep, qt6, layershellqt, wayland_client, gio, gio_unix, finder_fonts_dep, collarmodules_dep],
+  ),
+  env: ['QT_QPA_PLATFORM=offscreen'],
+  timeout: 60,
+)

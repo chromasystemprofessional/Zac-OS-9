@@ -33,8 +33,10 @@ public:
 	/* One Info window per item; brings back an open one, showing `view`
 	 * (if the item has it). */
 	static void open(const QString &path, pl_icon_kind kind, const QString &name, int view = General);
+	/* `iconPath` is the item whose icon this window edits when `path` is
+	 * virtual (an application's desktop entry); empty when there is none. */
 	static void openVirtual(const QString &path, pl_icon_kind kind, const QString &name,
-		const ResourceDetails &details);
+		const ResourceDetails &details, const QString &iconPath = QString());
 	~InfoWindow() override;
 
 protected:
@@ -51,7 +53,7 @@ protected:
 
 private:
 	InfoWindow(const QString &path, pl_icon_kind kind, const QString &name,
-		const ResourceDetails *details = nullptr);
+		const ResourceDetails *details = nullptr, const QString &iconPath = QString());
 	void setEditingComment(bool editing);
 	QStringList commentLines() const;
 	QPoint commentPreeditOrigin() const;
@@ -59,6 +61,10 @@ private:
 	QRect commentCursorRect() const;
 	void saveComment();
 	bool showView(int view);
+	bool canChangeIcon() const;
+	pl_icon_kind shownKind() const;
+	QImage currentIconImage() const;
+	void refreshIconFolder();
 	void paintHeader(pl_canvas *c);
 	void paintGeneral(pl_canvas *c);
 	void paintSharing(pl_canvas *c);
@@ -103,6 +109,7 @@ private:
 	QTimer m_caretTimer;
 
 	QString m_path, m_name;
+	QString m_iconPath; /* m_path, or a virtual item's real icon file */
 	pl_icon_kind m_kind;
 	bool m_network = false;
 	QString m_kindText, m_where, m_created, m_modified, m_size, m_original;

@@ -1786,8 +1786,9 @@ void Finder::getInfo(bool sharing) {
 			 * their own virtual details. */
 			const QString real = vfsRealCounterpart(item->path);
 			const VNode *node = vfsNode(item->path);
-			if (!real.isEmpty() && !(node && node->kind == VKind::Launcher &&
-					!node->appId.isEmpty())) {
+			const bool app = node && node->kind == VKind::Launcher &&
+				node->actionId.isEmpty() && !node->appId.isEmpty();
+			if (!real.isEmpty() && !app) {
 				InfoWindow::open(real, item->kind, item->visibleName(), view);
 			} else {
 				QStringList metadata;
@@ -1796,7 +1797,10 @@ void Finder::getInfo(bool sharing) {
 					&details.sources, &details.access);
 				details.name = item->name;
 				details.metadata = metadata;
-				InfoWindow::openVirtual(item->path, item->kind, item->name, details);
+				/* An application's icon is its desktop entry's, even
+				 * though the window shows the virtual item's details. */
+				InfoWindow::openVirtual(item->path, item->kind, item->name, details,
+					app ? real : QString());
 			}
 			continue;
 		}
