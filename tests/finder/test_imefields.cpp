@@ -140,9 +140,10 @@ int main(int argc, char **argv) {
 				QString::fromUtf8("日本"), "the committed comment is saved");
 		}
 
-		/* Japanese comments have no spaces: wrap at Unicode line breaks. */
+		/* Japanese comments have no spaces: wrap at Unicode line breaks.
+		 * Long enough that the font's exact metrics can't decide it. */
 		info->m_comment = QString::fromUtf8(
-			"日本語の文章には空白がないので、単語で折り返すことができません。");
+			"日本語の文章には空白がないので、単語で折り返すことができません。").repeated(3);
 		const QStringList lines = info->commentLines();
 		check(lines.size() > 1, "a Japanese comment wraps without spaces");
 		bool punctuationOk = true;
