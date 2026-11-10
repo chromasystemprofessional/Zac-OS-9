@@ -1,3 +1,15 @@
+zacos9 (1.15.0) trixie; urgency=medium
+
+  * Japanese input arrives: Fcitx 5 and Mozc, with the compositor relaying
+    input-method-v2 to text-input-v3. The Finder's icon names and Get Info
+    comments now accept composed text, and icon names can be pasted into.
+    The Toy Box gains New Page, treats bulleted folder aliases as pages,
+    and its help explains both. Installing or upgrading the .deb no longer
+    prints the static-unit warnings, and seatd gives the login window its
+    seat after Log Out.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Mon, 09 Nov 2026 22:10:25 -0500
+
 zacos9 (1.14.3) trixie; urgency=medium
 
   * Disks no longer hide under a desktop file.
