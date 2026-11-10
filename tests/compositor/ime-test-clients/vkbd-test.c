@@ -42,7 +42,10 @@ int main(int argc, char **argv) {
 	char *km_str = xkb_keymap_get_as_string(keymap, XKB_KEYMAP_FORMAT_TEXT_V1);
 	size_t km_size = strlen(km_str) + 1;
 	int fd = memfd_create("vkbd-test", MFD_CLOEXEC);
-	ftruncate(fd, km_size);
+	if (ftruncate(fd, km_size) < 0) {
+		perror("ftruncate");
+		exit(1);
+	}
 	void *data = mmap(NULL, km_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 	memcpy(data, km_str, km_size);
 	munmap(data, km_size);

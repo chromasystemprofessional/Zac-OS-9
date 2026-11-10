@@ -32,7 +32,10 @@ static void log_line(const char *fmt, ...) {
 static struct wl_buffer *tiny_buffer(int w, int h) {
 	int stride = w * 4, size = stride * h;
 	int fd = memfd_create("ime-test", MFD_CLOEXEC);
-	ftruncate(fd, size);
+	if (ftruncate(fd, size) < 0) {
+		perror("ftruncate");
+		exit(1);
+	}
 	void *data = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 	memset(data, 0x80, size);
 	munmap(data, size);
