@@ -132,7 +132,9 @@ const QStringList &fontMacFamilies() {
 		"Comic Neue",          /* Comic Sans MS */
 		"ZacOS 9 System",      /* ZacOS 9's own, as TrueType (tools/fonts/build_ttf.py) */
 		"ZacOS 9 Views",
-		"Noto Sans CJK JP",    /* Japanese; lib/text.c falls back to it */
+		"Noto Sans CJK JP",    /* Osaka; lib/text.c falls back to it */
+		"Noto Serif CJK JP",   /* Heisei Mincho */
+		"Noto Sans Mono CJK JP", /* Osaka-Mono */
 		"Noto Sans Arabic",    /* Arabic; lib/shaping.c shapes it */
 	};
 	return families;

@@ -1,0 +1,26 @@
+#!/bin/sh
+# zacos9-fcitx-autostart: start Fcitx 5 in a Japanese session, and only
+# there. zacos9-session exports the session's language (from
+# /etc/default/locale and the account's ~/.config/locale.conf); with none
+# set -- a manual run, say -- the installed system's is read.
+set -eu
+
+lang=${LC_ALL:-${LC_CTYPE:-${LANG:-${LANGUAGE:-}}}}
+if [ -z "$lang" ] && [ -r /etc/default/locale ]; then
+	lang=$(sed -n 's/^LANG=//p' /etc/default/locale | tail -n 1)
+fi
+if [ -z "$lang" ] && [ -r /etc/locale.conf ]; then
+	lang=$(sed -n 's/^LANG=//p' /etc/locale.conf | tail -n 1)
+fi
+# /etc/default/locale may quote its values.
+lang=${lang%\"}; lang=${lang#\"}; lang=${lang%\'}; lang=${lang#\'}
+case $lang in
+ja*) ;;
+*) exit 0 ;;
+esac
+command -v fcitx5 >/dev/null 2>&1 || exit 0
+# The Japanese defaults (keyboard-jp, Mozc, active by default) have a config
+# directory of their own, so Fcitx in another language is left untouched.
+XDG_CONFIG_DIRS="/usr/share/zacos9/japanese/xdg:${XDG_CONFIG_DIRS:-/etc/xdg}"
+export XDG_CONFIG_DIRS
+exec fcitx5

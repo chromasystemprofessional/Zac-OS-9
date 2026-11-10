@@ -38,15 +38,6 @@
 
 #define HIDE_DELAY_MS 300
 
-struct plat_text_input {
-	struct wl_list link; /* plat_server.text_inputs */
-	struct plat_server *server;
-	struct wlr_text_input_v3 *input;
-	struct wl_listener enable;
-	struct wl_listener disable;
-	struct wl_listener destroy;
-};
-
 static void write_state(struct plat_server *server, bool shown) {
 	const char *runtime = getenv("XDG_RUNTIME_DIR");
 	if (!runtime || !server->socket) {
@@ -166,22 +157,34 @@ void osk_text_field(struct plat_server *server, bool focused) {
 static void text_input_enable(struct wl_listener *listener, void *data) {
 	struct plat_text_input *ti = wl_container_of(listener, ti, enable);
 	update(ti->server, true);
+	input_method_update_active(ti->server);
+}
+
+static void text_input_commit(struct wl_listener *listener, void *data) {
+	struct plat_text_input *ti = wl_container_of(listener, ti, commit);
+	input_method_text_input_commit(ti->server, ti);
 }
 
 static void text_input_disable(struct wl_listener *listener, void *data) {
 	struct plat_text_input *ti = wl_container_of(listener, ti, disable);
 	osk_update(ti->server);
+	input_method_update_active(ti->server);
 }
 
 static void text_input_destroy(struct wl_listener *listener, void *data) {
 	struct plat_text_input *ti = wl_container_of(listener, ti, destroy);
 	struct plat_server *server = ti->server;
+	if (server->im_text_input == ti) {
+		server->im_text_input = NULL;
+	}
 	wl_list_remove(&ti->enable.link);
+	wl_list_remove(&ti->commit.link);
 	wl_list_remove(&ti->disable.link);
 	wl_list_remove(&ti->destroy.link);
 	wl_list_remove(&ti->link);
 	free(ti);
 	osk_update(server);
+	input_method_update_active(server);
 }
 
 /* Tell a text input of the focus, if the focus is its program's. */
@@ -208,6 +211,8 @@ static void new_text_input(struct wl_listener *listener, void *data) {
 	ti->input = input;
 	ti->enable.notify = text_input_enable;
 	wl_signal_add(&input->events.enable, &ti->enable);
+	ti->commit.notify = text_input_commit;
+	wl_signal_add(&input->events.commit, &ti->commit);
 	ti->disable.notify = text_input_disable;
 	wl_signal_add(&input->events.disable, &ti->disable);
 	ti->destroy.notify = text_input_destroy;
@@ -224,6 +229,7 @@ static void keyboard_focus_change(struct wl_listener *listener, void *data) {
 		text_input_focus(ti->input, event->new_surface);
 	}
 	update(server, true);
+	input_method_update_active(server);
 }
 
 void osk_init(struct plat_server *server) {

@@ -10,6 +10,9 @@ test('screen-sharing-session', find_program('dbus-run-session'),
 # Folders open in the Finder (xdg-open, GIO): ZacOS 9's own default
 # applications, read as $XDG_CURRENT_DESKTOP-mimeapps.list.
 install_data('zacos9-mimeapps.list', install_dir: get_option('datadir') / 'zacos9' / 'xdg')
+# Fcitx 5's login item; its command starts the method only in Japanese.
+install_data('autostart/org.fcitx.Fcitx5.desktop',
+  install_dir: get_option('datadir') / 'zacos9' / 'xdg' / 'autostart')
 install_data('foot/foot.ini',
   install_dir: get_option('datadir') / 'zacos9' / 'xdg' / 'foot')
 install_data('xdg-desktop-portal/zacos9-portals.conf',

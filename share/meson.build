@@ -8,6 +8,10 @@ install_data('pam.d/zacos9-lock', install_dir: get_option('sysconfdir') / 'pam.d
 install_data('pam.d/zacos9-screenshare', install_dir: get_option('sysconfdir') / 'pam.d')
 # The Help Center's books (zacos9-help).
 install_subdir('zacos9/help', install_dir: get_option('datadir') / 'zacos9')
+# Fcitx 5's Japanese defaults (keyboard-jp, Mozc, active by default); the
+# login item's command puts this directory on its XDG_CONFIG_DIRS only.
+install_data('zacos9/japanese/xdg/fcitx5/profile', 'zacos9/japanese/xdg/fcitx5/config',
+  install_dir: get_option('datadir') / 'zacos9' / 'japanese' / 'xdg' / 'fcitx5')
 # ZacOS 9's own fonts as TrueType, for programs and the Fonts folder; built
 # from the .pfont sources by tools/fonts/build_ttf.py (test fonts-ttf-current
 # in lib/ checks they're current).

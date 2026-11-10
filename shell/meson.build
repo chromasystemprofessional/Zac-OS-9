@@ -199,6 +199,52 @@ test('onscreen-keyboard', find_program('python3'),
   depends: [keyboard_exe],
   timeout: 120,
 )
+# Input methods (input_method.c): a text field, a stand-in input method and
+# a virtual keyboard, headless. Their two protocols are not on the list
+# above, so the other programs don't carry them.
+ime_test_protocols = []
+foreach xml : [wl_protocol_dir / 'unstable/text-input/text-input-unstable-v3.xml',
+    meson.project_source_root() / 'protocols/input-method-unstable-v2.xml']
+  name = 'ime_' + xml.underscorify()
+  ime_test_protocols += custom_target(name + '_client_h',
+    input: xml,
+    output: '@BASENAME@-client-protocol.h',
+    command: [wayland_scanner, 'client-header', '@INPUT@', '@OUTPUT@'],
+  )
+  ime_test_protocols += custom_target(name + '_c',
+    input: xml,
+    output: '@BASENAME@-protocol.c',
+    command: [wayland_scanner, 'private-code', '@INPUT@', '@OUTPUT@'],
+  )
+endforeach
+ime_app_client = executable('test-ime-app',
+  '../tests/compositor/ime-test-clients/app-test.c',
+  client_protocol_src, ime_test_protocols,
+  dependencies: [wayland_client],
+)
+ime_client = executable('test-ime-ime',
+  '../tests/compositor/ime-test-clients/ime-test.c',
+  client_protocol_src, ime_test_protocols,
+  dependencies: [wayland_client],
+)
+ime_vkbd_client = executable('test-ime-vkbd',
+  '../tests/compositor/ime-test-clients/vkbd-test.c',
+  client_protocol_src, ime_test_protocols,
+  dependencies: [wayland_client, xkbcommon_client],
+)
+test('input-method', find_program('python3'),
+  args: [files('../tests/compositor/test_ime.py'), compositor_exe,
+    ime_app_client, ime_client, ime_vkbd_client],
+  depends: [compositor_exe],
+  timeout: 120,
+)
+# The same path with the real Fcitx 5, when the build machine has it.
+test('input-method-fcitx', find_program('python3'),
+  args: [files('../tests/compositor/test_ime_fcitx.py'), compositor_exe,
+    ime_app_client, ime_vkbd_client],
+  depends: [compositor_exe],
+  timeout: 120,
+)
 test('idle-sleep', find_program('python3'),
   args: [files('../tests/compositor/test_idle.py'), compositor_exe, idle_client, vptr_exe],
   timeout: 60,

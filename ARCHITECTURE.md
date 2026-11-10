@@ -64,7 +64,7 @@ rather than reimplementing them.
 
 | Channel | What goes over it |
 |---|---|
-| **Wayland**, standard | Windows (`xdg-shell`), layers above and below them (`wlr-layer-shell`: the menu bar, the Collar, the desktop, the lock screen), the window list for the Application menu (`wlr-foreign-toplevel`), fractional scales. |
+| **Wayland**, standard | Windows (`xdg-shell`), layers above and below them (`wlr-layer-shell`: the menu bar, the Collar, the desktop, the lock screen), the window list for the Application menu (`wlr-foreign-toplevel`), text fields (`text-input-v3`) and input methods (`input-method-v2`, relayed by `compositor/src/input_method.c`), fractional scales. |
 | **Wayland**, ZacOS's own (`protocols/`) | `platinum-shell-v1`: a ZacOS program tells the compositor how to frame its window (a movable modal dialog, a utility window…). `zacos-snapshot-v1`: screenshots, for Capture and the tests. `gtk-shell`: GTK programs' menus in the menu bar. |
 | **Files in `$XDG_RUNTIME_DIR`** | The compositor publishes its state for programs and tests to read: `zacos9-outputs-*` (the screens, their scales and places, tablets) and `zacos9-idle-*` (awake, screen saver, asleep, locked). The Sniffer listens on `zacos9-finder.*.sock` so a second copy hands its request to the first. |
 | **Settings** | `~/.config/zacos9/desktop.conf`, `key=value`: the control panels write it, and the compositor and programs read it (C through `lib/settings.c`). The compositor applies a change as soon as the file changes. |
@@ -78,6 +78,7 @@ rather than reimplementing them.
 |---|---|---|
 | Window frames, title bars, window behaviour | `compositor/src/` (`decor.c`, `frame.c`, `view.c`) | |
 | Keyboard, mouse, tablets, touch | `compositor/src/input.c`, `tablet.c`, `touch.c` | [Touchscreens](docs/touch.md) |
+| Text fields and input methods (Fcitx, Mozc) | `compositor/src/input_method.c`, `osk.c`; `shell/panels/panelkit.cpp` | [Languages](docs/i18n.md#japanese) |
 | Screens: arrangement, scale, mirroring | `compositor/src/prefs.c`, `output.c` | The Monitors panel is in `shell/panels/` |
 | Rotation outside the session (login screen, kernel console, boot splash) | `boot/zacos9-rotate-boot`, `system/accounts/zacos9-accounts-helper` | [Starting up](docs/boot.md#rotated-screens) |
 | Sleep, screen saver, lock | `compositor/src/idle.c`, `lock.c`; `shell/screensaver/`, `shell/lock/` | [Energy Saver](docs/energy-saver.md) |

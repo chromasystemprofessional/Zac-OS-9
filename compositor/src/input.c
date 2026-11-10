@@ -105,6 +105,7 @@ static void keyboard_modifiers(struct wl_listener *listener, void *data) {
 		return;
 	}
 	wlr_seat_set_keyboard(kb->server->seat, kb->wlr_keyboard);
+	input_method_modifiers(kb->server, kb->wlr_keyboard);
 	input_send_modifiers(kb->server);
 }
 
@@ -338,6 +339,9 @@ void input_deliver_key(struct plat_keyboard *kb, uint32_t evdev_keycode,
 			handled = lock_active(server) ? handle_vt_switch(server, syms[i]) :
 				handle_keybinding(server, mods, syms[i]);
 		}
+	}
+	if (!handled && input_method_key(server, kb->wlr_keyboard, evdev_keycode, state, time_msec)) {
+		handled = true; /* the input method has it; unused keys come back */
 	}
 	if (!handled) {
 		wlr_seat_set_keyboard(server->seat, kb->wlr_keyboard);
@@ -1590,6 +1594,7 @@ void input_init(struct plat_server *server) {
 	tablet_init(server);
 	touch_init(server);
 	osk_init(server);
+	input_method_init(server);
 	/* There is always the pointer, from the start: a session with no
 	 * mouse yet (headless, or one plugged in later) still offers one, so
 	 * programs started before it set theirs up. A virtual pointer doesn't

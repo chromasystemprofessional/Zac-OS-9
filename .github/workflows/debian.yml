@@ -78,7 +78,9 @@ jobs:
           results = [json.loads(line) for line in logs[0].read_text().splitlines()]
           if not results:
               raise SystemExit("Meson test log is empty")
-          allowed = {"menudraw", "widgets", "decor", "screen-sharing-session", "afp-disconnect"}
+          # Fcitx is not a build dependency: its smoke test skips without it.
+          allowed = {"menudraw", "widgets", "decor", "screen-sharing-session", "afp-disconnect",
+                     "input-method-fcitx"}
           skipped = {test["name"] for test in results if test["result"] == "SKIP"}
           unexpected = skipped - allowed
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as summary:

@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Fcitx 5
+Comment=Flexible Input Method Framework
+Exec=zacos9-fcitx-autostart
+Icon=org.fcitx.Fcitx5
+Terminal=false
+X-GNOME-Autostart-enabled=true

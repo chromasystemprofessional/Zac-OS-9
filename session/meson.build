@@ -9,6 +9,9 @@ install_data('zacos9-shutdown-items', install_dir: get_option('bindir'),
   install_mode: 'rwxr-xr-x')
 install_data('zacos9-web-sharing', install_dir: get_option('bindir'),
   install_mode: 'rwxr-xr-x')
+# Starts Fcitx 5 only in a Japanese session (the login item's command).
+install_data('zacos9-fcitx-autostart', install_dir: get_option('bindir'),
+  install_mode: 'rwxr-xr-x')
 test('desktop-places', find_program('python3'),
   args: [files('../tests/finder/test_desktop_places.py'), files('zacos9-desktop-places')])
 test('desktop-gtk', find_program('python3'),
@@ -24,6 +27,9 @@ test('safe-mode-session', find_program('python3'),
   timeout: 15)
 test('web-sharing', find_program('python3'),
   args: [files('../tests/session/test_web_sharing.py'), files('zacos9-web-sharing')],
+  timeout: 30)
+test('fcitx-autostart', find_program('sh'),
+  args: [files('../tests/session/test_fcitx_autostart.sh'), files('zacos9-fcitx-autostart')],
   timeout: 30)
 # The login screen's command (greetd's default_session).
 install_data('zacos9-greeter', install_dir: get_option('libexecdir') / 'zacos9',
