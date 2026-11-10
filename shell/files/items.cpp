@@ -397,19 +397,24 @@ static QByteArray fileHeader(const QString &path, qint64 offset, int length) {
 	return f.read(length);
 }
 
-/* Does a .cue sheet sit beside this disc track (same directory and stem)?
- * A PlayStation game is usually a .cue naming one or more .bin tracks; the
+/* The .cue sheet beside a disc track (same directory and stem). A
+ * PlayStation game is usually a .cue naming one or more .bin tracks; the
  * cue carries the disc's layout, so the cue itself is the disc. */
-static bool hasSiblingCue(const QFileInfo &info) {
+QString siblingCuePath(const QString &binPath) {
+	const QFileInfo info(binPath);
 	const QString cue = info.completeBaseName() + ".cue";
 	const QDir dir = info.absoluteDir();
 	const QStringList names = dir.entryList(QDir::Files, QDir::Name);
 	for (const QString &name : names) {
 		if (name.compare(cue, Qt::CaseInsensitive) == 0) {
-			return true;
+			return dir.absoluteFilePath(name);
 		}
 	}
-	return false;
+	return QString();
+}
+
+static bool hasSiblingCue(const QFileInfo &info) {
+	return !siblingCuePath(info.absoluteFilePath()).isEmpty();
 }
 
 /* Does a .bin track sit beside this cue sheet (same directory and stem)? */
@@ -423,6 +428,51 @@ static bool hasSiblingBin(const QFileInfo &info) {
 		}
 	}
 	return false;
+}
+
+bool renameGameTrack(const QString &binPath, const QString &newName, QString *error) {
+	const QFileInfo bin(binPath);
+	const QString oldCue = siblingCuePath(binPath);
+	if (oldCue.isEmpty() || !newName.endsWith(QLatin1String(".bin"), Qt::CaseInsensitive)) {
+		if (error) {
+			*error = "not a track";
+		}
+		return false;
+	}
+	const QString oldBin = bin.absoluteFilePath();
+	const QString dir = bin.absolutePath();
+	const QString newBin = dir + "/" + newName;
+	const QFileInfo cueInfo(oldCue);
+	const QString newCue = dir + "/" + newName.left(newName.size() - 4) + "." +
+		(cueInfo.suffix().isEmpty() ? QStringLiteral("cue") : cueInfo.suffix());
+	if (newBin == oldBin && newCue == oldCue) {
+		return true;
+	}
+	/* Leave the pair alone if either new name is used. The track's own
+	 * old name is not a collision when only its case changes. */
+	if ((newBin != oldBin && QFileInfo::exists(newBin)) ||
+			(newCue != oldCue && QFileInfo::exists(newCue))) {
+		if (error) {
+			*error = "taken";
+		}
+		return false;
+	}
+	/* The cue goes first: if the track's rename then fails, the cue can
+	 * still be put back, so the game is never left without its cue. */
+	if (!QDir().rename(oldCue, newCue)) {
+		if (error) {
+			*error = "cue";
+		}
+		return false;
+	}
+	if (!QDir().rename(oldBin, newBin)) {
+		QDir().rename(newCue, oldCue);
+		if (error) {
+			*error = "track";
+		}
+		return false;
+	}
+	return true;
 }
 
 pl_icon_kind romIconKind(const QString &path) {
@@ -808,6 +858,11 @@ static bool macHousekeeping(const QString &name) {
 	return names.contains(name);
 }
 
+/* Is this inside ~/Games (or any folder below it)? */
+static bool inGamesFolder(const QFileInfo &info) {
+	return info.absoluteFilePath().startsWith(QDir::homePath() + "/Games/");
+}
+
 /* A bin/cue PlayStation game shows as its .bin in ~/Games (and any folder
  * below it): the cue is the same game's track list, not a second item. A cue
  * without a same-named .bin stays visible. */
@@ -815,11 +870,7 @@ static bool hiddenGameCue(const QFileInfo &info) {
 	if (info.suffix().compare(QLatin1String("cue"), Qt::CaseInsensitive) != 0) {
 		return false;
 	}
-	const QString games = QDir::homePath() + "/Games";
-	if (!info.absoluteFilePath().startsWith(games + "/")) {
-		return false;
-	}
-	return hasSiblingBin(info);
+	return inGamesFolder(info) && hasSiblingBin(info);
 }
 
 std::vector<std::unique_ptr<Item>> listFolder(const QString &path) {
@@ -865,7 +916,14 @@ std::unique_ptr<Item> makeItem(const QFileInfo &info) {
 		}
 	}
 	if (!item->isDir) {
-		const QString shown = nameWithoutExtension(item->name);
+		QString shown = nameWithoutExtension(item->name);
+		/* The track of a hidden bin/cue pair shows without .bin too. */
+		if (item->kind == PL_ICON_ROM_PS1 &&
+				item->name.endsWith(QLatin1String(".bin"), Qt::CaseInsensitive) &&
+				inGamesFolder(info) && !siblingCuePath(item->path).isEmpty()) {
+			shown = item->name.left(item->name.size() - 4);
+			item->hiddenCue = !shown.isEmpty();
+		}
 		if (shown != item->name) {
 			item->shownName = shown;
 		}

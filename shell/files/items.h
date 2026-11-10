@@ -24,6 +24,9 @@ struct Item {
 	 * extension (fileassoc.h's hiddenExtension). `name` stays the real
 	 * one, the key for positions, selection and renames. */
 	QString shownName;
+	/* A PlayStation .bin whose .cue sheet the Finder hides (in ~/Games):
+	 * renaming the track renames the cue too. */
+	bool hiddenCue = false;
 	const QString &visibleName() const { return shownName.isEmpty() ? name : shownName; }
 	/* The file's MIME type, looked up when first painted. */
 	QString mimeType;
@@ -155,6 +158,13 @@ pl_icon_kind iconKindFor(const QString &path);
  * where an extension is shared with other files, by the file's own bytes;
  * PL_ICON_DOCUMENT when it is not one. Game Player opens these. */
 pl_icon_kind romIconKind(const QString &path);
+/* The .cue sheet beside a .bin track (same folder and stem), or empty. */
+QString siblingCuePath(const QString &binPath);
+/* Rename a PlayStation .bin track and its .cue sheet together. NEWNAME is
+ * the track's new file name, including .bin. Returns false and leaves the
+ * pair as it was when a target exists or either rename fails; ERROR says
+ * "taken" when a target exists. */
+bool renameGameTrack(const QString &binPath, const QString &newName, QString *error = nullptr);
 /* A PlayStation 3 game folder: a disc dump (PS3_GAME/PARAM.SFO, or
  * PS3_GAME/USRDIR/EBOOT.BIN) or an installed game (PARAM.SFO beside
  * USRDIR/EBOOT.BIN). Game Player opens it with RPCS3. */

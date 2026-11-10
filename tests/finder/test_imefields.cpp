@@ -96,6 +96,30 @@ int main(int argc, char **argv) {
 	check(QFile::exists(dir.path() + QString::fromUtf8("/日本.txt")),
 		"the committed name is renamed on disk, keeping its extension");
 
+	/* A PlayStation track's hidden cue follows its rename. */
+	const QString pairBin = dir.path() + "/pair.bin";
+	const QString pairCue = dir.path() + "/pair.cue";
+	QFile pairBinFile(pairBin);
+	QFile pairCueFile(pairCue);
+	check(pairBinFile.open(QIODevice::WriteOnly) && pairCueFile.open(QIODevice::WriteOnly),
+		"create a bin/cue pair to rename");
+	pairBinFile.close();
+	pairCueFile.close();
+	Item pairItem;
+	pairItem.name = "pair.bin";
+	pairItem.path = pairBin;
+	pairItem.shownName = "pair";
+	pairItem.kind = PL_ICON_ROM_PS1;
+	pairItem.hiddenCue = true;
+	LabelEditor pairEditor([] {});
+	pairEditor.begin(&pairItem);
+	sendLabelCommit(pairEditor, "renamed");
+	pairEditor.commit();
+	check(QFile::exists(dir.path() + "/renamed.bin") &&
+		QFile::exists(dir.path() + "/renamed.cue") &&
+		!QFile::exists(pairBin) && !QFile::exists(pairCue),
+		"renaming a track renames its hidden cue and keeps .bin");
+
 	const QString notePath = dir.path() + "/notes.txt";
 	QFile note(notePath);
 	check(note.open(QIODevice::WriteOnly), "create a file with a comment");

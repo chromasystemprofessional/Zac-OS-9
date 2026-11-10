@@ -119,6 +119,12 @@ int main(int argc, char **argv) {
 		"a whole-name file is renamed as typed");
 	check(renamedFileName("Report.txt", "Report", "Notes.v2") == "Notes.v2.txt",
 		"an unknown suffix typed is part of the name");
+	check(renamedFileName("game.bin", "game", "new") == "new.bin",
+		"a PlayStation track keeps its .bin extension");
+	check(renamedFileName("game.bin", "game", "new.bin") == "new.bin",
+		"typing .bin does not double it");
+	check(renamedFileName("game.BIN", "game", "new.BIN") == "new.BIN",
+		"the track's extension case is kept");
 
 	/* ---- items ---- */
 	const QString notes = base + "/Notes.txt";

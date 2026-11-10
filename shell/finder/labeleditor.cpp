@@ -327,7 +327,17 @@ QString renamedFileName(const QString &oldName, const QString &shownName, const 
 	if (!hiddenExtension(typed).isEmpty()) {
 		return typed;
 	}
-	return typed + hiddenExtension(oldName);
+	/* A suffix the MIME database doesn't hide (a PlayStation .bin, say)
+	 * is still the part `shownName` left out. */
+	QString suffix = hiddenExtension(oldName);
+	if (suffix.isEmpty() && oldName.size() > shownName.size() &&
+			oldName.startsWith(shownName, Qt::CaseInsensitive)) {
+		suffix = oldName.mid(shownName.size());
+	}
+	if (!suffix.isEmpty() && typed.endsWith(suffix, Qt::CaseInsensitive)) {
+		return typed;
+	}
+	return typed + suffix;
 }
 
 void LabelEditor::commit() {
@@ -374,7 +384,17 @@ void LabelEditor::commit() {
 		return;
 	}
 	const QString folder = dir.absolutePath();
-	if (!QDir().rename(item->path, dir.filePath(name))) {
+	const QString oldCue = item->hiddenCue ? siblingCuePath(item->path) : QString();
+	if (!oldCue.isEmpty()) {
+		QString error;
+		if (!renameGameTrack(item->path, name, &error)) {
+			Alert::ask(error == QLatin1String("taken")
+				? tr9("That name is already taken. Please use a different name.")
+				: QStringLiteral("The item “%1” could not be renamed.")
+					.arg(item->visibleName()), "OK", "");
+			return;
+		}
+	} else if (!QDir().rename(item->path, dir.filePath(name))) {
 		Alert::ask(QStringLiteral("The item “%1” could not be renamed.").arg(item->visibleName()),
 			"OK", "");
 		return;
@@ -382,6 +402,12 @@ void LabelEditor::commit() {
 	if (!aliasMoveRecord(item->path, dir.filePath(name), false)) {
 		Alert::ask(QStringLiteral("“%1” was renamed, but its alias identity record could not be "
 			"preserved.").arg(nameWithoutExtension(name)), "OK", "");
+	}
+	if (!oldCue.isEmpty()) {
+		const QString newCue = siblingCuePath(dir.filePath(name));
+		if (!newCue.isEmpty()) {
+			aliasMoveRecord(oldCue, newCue, false);
+		}
 	}
 	Finder &finder = Finder::instance();
 	if (FinderView *v = finder.front()) {

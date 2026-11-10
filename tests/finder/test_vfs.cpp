@@ -1341,6 +1341,36 @@ int main(int argc, char **argv) {
 		const QStringList discNames = namesInFolder(disc);
 		check(!discNames.contains("game.cue") && discNames.contains("game.bin"),
 			"a bin/cue game inside Games shows only its .bin");
+		{
+			auto trackItem = makeItem(QFileInfo(disc + "/game.bin"));
+			check(trackItem->visibleName() == "game" && trackItem->hiddenCue,
+				"the visible track shows without .bin and remembers its cue");
+			check(siblingCuePath(disc + "/game.bin") == disc + "/game.cue",
+				"the track finds its cue sheet");
+		}
+		const QString pair = root + "/Games/Paired";
+		QDir().mkpath(pair);
+		writeEmpty(pair + "/track.cue");
+		writeEmpty(pair + "/track.bin");
+		QString renameError;
+		check(renameGameTrack(pair + "/track.bin", "renamed.bin", &renameError),
+			"renaming a track renames its cue too");
+		check(QFileInfo::exists(pair + "/renamed.bin") &&
+			QFileInfo::exists(pair + "/renamed.cue") &&
+			!QFileInfo::exists(pair + "/track.bin") &&
+			!QFileInfo::exists(pair + "/track.cue"),
+			"both halves of the pair get the new name");
+		const QStringList pairNames = namesInFolder(pair);
+		check(pairNames.contains("renamed.bin") && !pairNames.contains("renamed.cue"),
+			"the renamed cue is still hidden");
+		writeEmpty(pair + "/taken.bin");
+		writeEmpty(pair + "/taken.cue");
+		check(!renameGameTrack(pair + "/renamed.bin", "taken.bin", &renameError) &&
+			renameError == "taken",
+			"a pair rename refuses a name already used");
+		check(QFileInfo::exists(pair + "/renamed.bin") &&
+			QFileInfo::exists(pair + "/renamed.cue"),
+			"the pair is left alone when the name is taken");
 		writeEmpty(root + "/Games/lone.cue");
 		check(namesInFolder(root + "/Games").contains("lone.cue"),
 			"a cue with no .bin beside it stays visible");

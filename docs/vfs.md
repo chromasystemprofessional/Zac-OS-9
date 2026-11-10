@@ -169,8 +169,9 @@ files stays an ordinary folder.
 
 In the Games folder in Home, and in any folder inside it, a `.cue` sheet with
 a same-named `.bin` track is not listed separately: the `.bin` is shown as
-the disc and opens through the cue. A cue without its `.bin` beside it stays
-visible.
+the disc, without its `.bin` extension, and opens through the cue. Renaming
+the visible track renames the hidden cue too, so the pair stays matched. A
+cue without its `.bin` beside it stays visible.
 
 The **File Exchange** control panel (`zacos9-fileexchange`, in Control Panels
 and the Apple menu) lists every kind of document an installed application
