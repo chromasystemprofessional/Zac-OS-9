@@ -435,8 +435,10 @@ do" below): the package owning the desktop file, or, for an unowned launcher,
 the application's own executable (`dpkg -S` on its canonical path, resolving the symlinks a
 merged-`/usr` system has — `dpkg`'s file database has `/usr/bin/x`, not
 the `/bin/x` most `Exec=` lines actually name), then its version
-(`dpkg-query`). Looked up once per executable path and kept for the life
-of the process.
+(`dpkg-query`). Every desktop entry and `Exec=` program is asked about in
+one `dpkg-query -S`, not one process each, and the answers are kept for the
+life of the process (until dpkg's status file changes). Starting a process
+per application made the first folder's draw take minutes on a slow disk.
 
 A Flatpak export is read from its own `X-Flatpak` key instead: its
 `Exec=` runs the `flatpak` program, and attributing the application to
@@ -766,7 +768,8 @@ private XDG environment in a temporary directory and checks discovery,
 precedence, hidden entries, duplicate names, Desktop Actions, launching,
 installing and uninstalling, renames and labels surviving a reload,
 migration, what the Finder refuses, hiding and un-hiding an application,
-package/version lookup against the real dpkg database, Flatpak origin
+package/version lookup against the real dpkg database (one batched query,
+with a whole list even while a refresh is running), Flatpak origin
 detection, icon resolution (and its fallback when nothing resolves), and
 that every writable folder is inside the user's own directories. It runs
 as a `QGuiApplication` on the offscreen QPA platform so icon rendering

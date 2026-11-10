@@ -13,7 +13,6 @@
 #include <QDateTime>
 #include <QDir>
 #include <QDebug>
-#include <QElapsedTimer>
 #include <QDirIterator>
 #include <QFile>
 #include <QFileInfo>
@@ -27,7 +26,6 @@
 #include <QSet>
 #include <QStandardPaths>
 #include <QTimer>
-#include <QThread>
 #include <algorithm>
 #include <cstring>
 
@@ -36,6 +34,9 @@ namespace {
 std::vector<AppEntry> g_apps;
 bool g_loaded = false;
 bool g_loading = false;
+/* appList() was called while a load was running: rebuild whatever drew
+ * from the previous list once the new one is complete. */
+bool g_waiting = false;
 std::vector<std::function<void()>> g_callbacks;
 
 QString fromUtf8(const char *s) {
@@ -158,53 +159,166 @@ QHash<QString, PackageInfo> &packageCache() {
 	return cache;
 }
 
-bool finishPackageQuery(QProcess &process) {
-	if (!waitForProcess(&process, 3000)) {
-		qWarning() << "Package query timed out:" << process.program() << process.arguments();
-		return false;
-	}
-	if (process.error() == QProcess::FailedToStart || process.exitStatus() != QProcess::NormalExit) {
-		qWarning() << "Package query failed:" << process.errorString();
-		return false;
-	}
-	return true;
+/* dpkg's file database names canonical paths (a merged /usr has
+ * /usr/bin/x, not the /bin/x an Exec= line usually writes), so both what
+ * is asked and what is answered are keyed the same way. */
+QString packagePathKey(const QString &path) {
+	const QFileInfo info(path);
+	const QString canonical = info.canonicalFilePath();
+	return canonical.isEmpty() ? QDir::cleanPath(info.absoluteFilePath()) : canonical;
 }
 
-PackageInfo lookupPackage(const QString &exePath) {
+/* The program a desktop entry's Exec= starts, for the package lookup
+ * that catches a hand-written entry no package owns: the path itself,
+ * or the program found on $PATH, made canonical like dpkg's own. */
+QString applicationExecutable(GAppInfo *info) {
+	const char *executable = g_app_info_get_executable(info);
+	if (!executable) {
+		return {};
+	}
+	QString exePath = fromUtf8(executable);
+	if (!exePath.startsWith('/')) {
+		exePath = QStandardPaths::findExecutable(exePath);
+	}
+	if (exePath.isEmpty()) {
+		return {};
+	}
+	return packagePathKey(exePath);
+}
+
+/* One dpkg-query for every path, not one process per application: the
+ * Finder used to start dpkg -S for each desktop entry and each of their
+ * Exec= programs, which on a slow disk put the first folder behind
+ * minutes of process starts. False only when dpkg didn't answer; a path
+ * no package owns is an answer (exit status 1), not a failure. */
+bool queryPackageOwners(const QStringList &paths, QHash<QString, PackageInfo> *found) {
+	bool answered = true;
+	/* Keep well under ARG_MAX even for an unusually large application
+	 * list; a normal desktop asks in one go. */
+	for (int from = 0; from < paths.size(); from += 200) {
+		QProcess query;
+		query.start("dpkg-query", QStringList{ "-S" } +
+			paths.mid(from, 200));
+		if (!waitForProcess(&query, 15000)) {
+			qWarning() << "Package query timed out for" << paths.size() << "paths";
+			answered = false;
+			continue;
+		}
+		if (query.error() == QProcess::FailedToStart ||
+				query.exitStatus() != QProcess::NormalExit) {
+			qWarning() << "Package query failed:" << query.errorString();
+			answered = false;
+			continue;
+		}
+		if (query.exitCode() != 0 && query.exitCode() != 1) {
+			qWarning().noquote() << "Could not query application package ownership:"
+				<< query.readAllStandardError();
+			answered = false;
+			continue;
+		}
+		for (const QString &line : QString::fromUtf8(query.readAllStandardOutput()).split('\n')) {
+			const int colon = line.indexOf(": ");
+			if (colon <= 0) {
+				continue;
+			}
+			/* "pkg1, pkg2: /path": the first packager is the one Get Info
+			 * names. A package name can carry :architecture; keep it, as
+			 * the automatic-install marks do. */
+			const QString owner = line.left(colon).section(',', 0, 0).trimmed();
+			const QString key = packagePathKey(line.mid(colon + 2));
+			if (!owner.isEmpty() && !key.isEmpty()) {
+				(*found)[key].name = owner;
+			}
+		}
+	}
+	return answered;
+}
+
+/* The installed versions, one query for every package the batch found. */
+void queryPackageVersions(const QSet<QString> &names) {
+	if (names.isEmpty()) {
+		return;
+	}
+	QStringList packages;
+	for (const QString &name : names) {
+		packages << name;
+	}
+	QProcess query;
+	query.start("dpkg-query", QStringList{ "-W", "-f=${Package}\t${Version}\n" } + packages);
+	if (!waitForProcess(&query, 15000)) {
+		qWarning() << "Package version query timed out";
+		return;
+	}
+	if (query.error() == QProcess::FailedToStart ||
+			query.exitStatus() != QProcess::NormalExit) {
+		qWarning() << "Package version query failed:" << query.errorString();
+		return;
+	}
+	QHash<QString, QString> versions;
+	for (const QString &line : QString::fromUtf8(query.readAllStandardOutput()).split('\n')) {
+		const int tab = line.indexOf('\t');
+		if (tab > 0) {
+			versions.insert(line.left(tab), line.mid(tab + 1).trimmed());
+		}
+	}
+	if (versions.isEmpty()) {
+		return;
+	}
 	auto &cache = packageCache();
-	auto it = cache.find(exePath);
-	if (it != cache.end()) {
-		return it.value();
-	}
-	PackageInfo info;
-	QProcess owner;
-	owner.start("dpkg", { "-S", exePath });
-	const bool finished = finishPackageQuery(owner);
-	if (finished && owner.exitCode() == 0) {
-		const QString out = QString::fromUtf8(owner.readAllStandardOutput());
-		const int colon = out.indexOf(": ");
-		if (colon > 0) {
-			info.name = out.left(colon).trimmed();
-		}
-	} else if (!finished || owner.exitCode() != 1) {
-		/* Not an answer (a slow dpkg on a cold cache times out): don't
-		 * remember it as "no package", or the next lookup falls through
-		 * to the Exec= program and names the wrong one. */
-		qWarning().noquote() << "Could not query application package ownership:"
-			<< exePath << owner.readAllStandardError();
-		return info;
-	}
-	if (!info.name.isEmpty()) {
-		QProcess version;
-		version.start("dpkg-query", { "-W", "-f=${Version}", info.name });
-		if (finishPackageQuery(version) && version.exitCode() == 0) {
-			info.version = QString::fromUtf8(version.readAllStandardOutput()).trimmed();
-		} else {
-			qWarning() << "Could not read application package version:" << info.name;
+	for (auto it = cache.begin(); it != cache.end(); ++it) {
+		/* -S may name pkg:arch; dpkg-query -W answers to pkg. */
+		const QString bare = it->name.section(':', 0, 0);
+		const auto version = versions.constFind(bare);
+		if (version != versions.constEnd()) {
+			it->version = *version;
 		}
 	}
-	cache.insert(exePath, info);
-	return info;
+}
+
+/* Ask dpkg once about every path not answered before. */
+void ensurePackages(const QStringList &paths) {
+	auto &cache = packageCache();
+	QStringList missing;
+	QSet<QString> seen;
+	for (const QString &path : paths) {
+		const QString key = packagePathKey(path);
+		if (key.isEmpty() || seen.contains(key) || cache.contains(key)) {
+			continue;
+		}
+		seen.insert(key);
+		missing << key;
+	}
+	if (!missing.isEmpty()) {
+		QHash<QString, PackageInfo> found;
+		if (!queryPackageOwners(missing, &found)) {
+			return; /* no answer: don't remember "no package" */
+		}
+		for (auto it = found.begin(); it != found.end(); ++it) {
+			cache.insert(it.key(), it.value());
+		}
+		/* Any path still unanswered belongs to no package; remember that
+		 * so a later refresh doesn't ask dpkg about it again. */
+		for (const QString &key : missing) {
+			if (!cache.contains(key)) {
+				cache.insert(key, PackageInfo());
+			}
+		}
+	}
+	/* Versions a timed-out query left empty are tried again; with
+	 * nothing to do this is one empty call. */
+	QSet<QString> names;
+	for (auto it = cache.begin(); it != cache.end(); ++it) {
+		if (!it->name.isEmpty() && it->version.isEmpty()) {
+			names.insert(it->name.section(':', 0, 0));
+		}
+	}
+	queryPackageVersions(names);
+}
+
+PackageInfo packageForPath(const QString &path) {
+	const auto &cache = packageCache();
+	const auto it = cache.constFind(packagePathKey(path));
+	return it == cache.constEnd() ? PackageInfo() : it.value();
 }
 
 QString aptStatePath() {
@@ -271,43 +385,29 @@ void resolveOrigin(GDesktopAppInfo *desktop, AppEntry *entry) {
 		g_free(flatpakId);
 		return;
 	}
-	const PackageInfo owner = lookupPackage(entry->file);
+	const PackageInfo owner = packageForPath(entry->file);
 	if (!owner.name.isEmpty()) {
 		entry->origin = "dpkg:" + owner.name.section(':', 0, 0);
 		entry->version = owner.version;
 		return;
 	}
-	/* Owned by the GAppInfo itself: not g_free'd. */
-	const char *executable = g_app_info_get_executable(G_APP_INFO(desktop));
-	if (!executable) {
-		return;
-	}
-	QString exePath = fromUtf8(executable);
-	if (!exePath.startsWith('/')) {
-		exePath = QStandardPaths::findExecutable(exePath);
-	}
+	const QString exePath = applicationExecutable(G_APP_INFO(desktop));
 	if (exePath.isEmpty()) {
 		return;
 	}
 	/* "Exec=env ...", "Exec=systemctl start ...": a program that only
 	 * starts the application, from a package (coreutils, systemd) that
-	 * has nothing to do with it. */
+	 * has nothing to do with it. Both the name Exec= gave (wine is a
+	 * symlink to wine64) and the canonical one are checked. */
 	static const QStringList launchers = { "env", "sh", "dash", "bash", "systemctl",
 		"systemd-run", "gio", "xdg-open", "flatpak", "snap", "nice", "ionice", "taskset",
 		"pkexec", "sudo", "python3", "perl", "java", "wine", "mono" };
-	const QString canonical = QFileInfo(exePath).canonicalFilePath();
-	if (launchers.contains(QFileInfo(exePath).fileName()) ||
-			launchers.contains(QFileInfo(canonical).fileName())) {
+	const char *named = g_app_info_get_executable(G_APP_INFO(desktop));
+	if ((named && launchers.contains(QFileInfo(fromUtf8(named)).fileName())) ||
+			launchers.contains(QFileInfo(exePath).fileName())) {
 		return;
 	}
-	/* dpkg's file database has the packaged path, which on a merged-/usr
-	 * system is /usr/bin/x even though /bin/x (what most Exec= lines
-	 * name) is a symlink to it; dpkg -S on the symlink path itself finds
-	 * nothing. */
-	if (!canonical.isEmpty()) {
-		exePath = canonical;
-	}
-	const PackageInfo pkg = lookupPackage(exePath);
+	const PackageInfo pkg = packageForPath(exePath);
 	if (!pkg.name.isEmpty()) {
 		entry->origin = "dpkg:" + pkg.name.section(':', 0, 0);
 		entry->version = pkg.version;
@@ -375,7 +475,7 @@ void load() {
 		return;
 	}
 	g_loading = true;
-	g_apps.clear();
+	g_waiting = false;
 	static qint64 packageTime = -1, packageSize = -1;
 	const QFileInfo status(QStringLiteral("/var/lib/dpkg/status"));
 	const qint64 time = status.lastModified().toMSecsSinceEpoch();
@@ -391,6 +491,34 @@ void load() {
 	/* g_app_info_get_all() applies XDG data directory precedence and
 	 * drops entries that are Hidden or whose TryExec is missing. */
 	GList *all = g_app_info_get_all();
+	/* One dpkg-query for all of them, before the list is built: asking
+	 * per entry was minutes of process starts on a slow disk. The Exec=
+	 * programs are only needed for entries no package owns, so they are
+	 * asked about in a second, usually empty, batch. */
+	QStringList packagePaths;
+	for (GList *l = all; l; l = l->next) {
+		auto *info = static_cast<GAppInfo *>(l->data);
+		if (G_IS_DESKTOP_APP_INFO(info)) {
+			packagePaths << fromUtf8(g_desktop_app_info_get_filename(
+				G_DESKTOP_APP_INFO(info)));
+		}
+	}
+	ensurePackages(packagePaths);
+	QStringList fallbackPaths;
+	for (GList *l = all; l; l = l->next) {
+		auto *info = static_cast<GAppInfo *>(l->data);
+		if (!G_IS_DESKTOP_APP_INFO(info)) {
+			continue;
+		}
+		const QString file = fromUtf8(g_desktop_app_info_get_filename(
+			G_DESKTOP_APP_INFO(info)));
+		if (packageForPath(file).name.isEmpty()) {
+			fallbackPaths << applicationExecutable(info);
+		}
+	}
+	ensurePackages(fallbackPaths);
+
+	std::vector<AppEntry> apps;
 	for (GList *l = all; l; l = l->next) {
 		auto *info = static_cast<GAppInfo *>(l->data);
 		/* NoDisplay, and OnlyShowIn/NotShowIn for this desktop. */
@@ -444,7 +572,7 @@ void load() {
 			if (userEntry || flatpak) {
 				entry.userInstalled = true;
 			} else {
-				const PackageInfo package = lookupPackage(entry.file);
+				const PackageInfo package = packageForPath(entry.file);
 				if (!package.name.isEmpty() && isAutomaticPackage(package, automatic)) {
 					entry.userInstalled = false;
 				}
@@ -461,17 +589,28 @@ void load() {
 			resolveOrigin(desktop, &entry);
 		}
 		resolveIcon(info, &entry);
-		g_apps.push_back(std::move(entry));
+		apps.push_back(std::move(entry));
 	}
 	g_list_free_full(all, g_object_unref);
 
-	std::sort(g_apps.begin(), g_apps.end(), [](const AppEntry &a, const AppEntry &b) {
+	std::sort(apps.begin(), apps.end(), [](const AppEntry &a, const AppEntry &b) {
 		const int c = a.name.compare(b.name, Qt::CaseInsensitive);
 		return c != 0 ? c < 0 : a.id < b.id;
 	});
-	disambiguate(g_apps);
+	disambiguate(apps);
+	/* The old list stays whole until the new one is: events are served
+	 * while dpkg runs, and a caller that asks during the load must never
+	 * see entries whose folderName has not been worked out yet. */
+	g_apps = std::move(apps);
 	g_loaded = true;
 	g_loading = false;
+	if (g_waiting) {
+		g_waiting = false;
+		const auto callbacks = g_callbacks;
+		for (const auto &f : callbacks) {
+			f();
+		}
+	}
 }
 
 /* Every directory desktop entries can come from, in XDG order. */
@@ -584,7 +723,15 @@ QFileSystemWatcher *watcher() {
 
 const std::vector<AppEntry> &appList() {
 	if (!g_loaded) {
-		load();
+		if (g_loading) {
+			/* A load is serving its waits' events and something asked
+			 * for the list meanwhile. Answer from the previous whole
+			 * list, and have the new one rebuild its callers when it
+			 * is done. */
+			g_waiting = true;
+		} else {
+			load();
+		}
 	}
 	return g_apps;
 }
