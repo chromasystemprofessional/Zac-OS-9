@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QImage>
+#include <QVariant>
 
 #include <QFileSystemWatcher>
 #include <QSet>
@@ -12,6 +13,8 @@
 #include "folderstate.h"
 #include "items.h"
 #include "labeleditor.h"
+
+class QInputMethodEvent;
 
 /*
  * The desktop: a full-screen wlr-layer-shell surface beneath all windows,
@@ -57,8 +60,11 @@ protected:
 	void dragMoveEvent(QDragMoveEvent *) override;
 	void dragLeaveEvent(QDragLeaveEvent *) override;
 	void dropEvent(QDropEvent *) override;
+	void inputMethodEvent(QInputMethodEvent *) override;
+	QVariant inputMethodQuery(Qt::InputMethodQuery) const override;
 
 private:
+	void setImeEditing(bool editing);
 	bool iconsShown() const;
 	void placeIcons();
 	std::function<QPoint(int)> gridSlot(int *slotCount) const;

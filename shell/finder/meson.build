@@ -327,3 +327,14 @@ test('finder-desktop',
   env: ['QT_QPA_PLATFORM=offscreen'],
   timeout: 60,
 )
+# Input methods in the Finder's own fields: icon names and Get Info comments.
+test('finder-ime-fields',
+  executable('test-finder-ime-fields',
+    '../../tests/finder/test_imefields.cpp', finder_test_sources,
+    link_with: panelkit,
+    include_directories: include_directories('../print', '../panels', '../network'),
+    dependencies: [shell_files_dep, shell_common_dep, platinum_dep, qt6, layershellqt, wayland_client, gio, gio_unix, finder_fonts_dep, collarmodules_dep],
+  ),
+  env: ['QT_QPA_PLATFORM=offscreen'],
+  timeout: 60,
+)

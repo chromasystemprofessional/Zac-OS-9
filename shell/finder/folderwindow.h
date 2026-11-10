@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QImage>
+#include <QVariant>
 
 #include <QFileSystemWatcher>
 #include <QSet>
@@ -16,6 +17,8 @@
 #include "labeleditor.h"
 #include "viewoptions.h"
 #include "widgets.h"
+
+class QInputMethodEvent;
 
 /*
  * A Finder window onto one folder, as icons or as a list. Windows are
@@ -92,9 +95,12 @@ protected:
 	void dropEvent(QDropEvent *) override;
 	void changeEvent(QEvent *) override;
 	void closeEvent(QCloseEvent *) override;
+	void inputMethodEvent(QInputMethodEvent *) override;
+	QVariant inputMethodQuery(Qt::InputMethodQuery) const override;
 
 private:
 	explicit FolderWindow(const QString &path);
+	void setImeEditing(bool editing);
 
 	/* Layout and scrolling, shared by both views. */
 	void relayout();
