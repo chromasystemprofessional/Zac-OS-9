@@ -192,6 +192,8 @@ const QString &Item::kindName() {
 	if (kindText.isEmpty()) {
 		if (kind == PL_ICON_DISK_IMAGE) {
 			kindText = isMacDiskImage(path) ? "Macintosh disk image" : "disk image";
+		} else if (kind == PL_ICON_ROM_PS3) {
+			kindText = "PlayStation 3 game";
 		} else if (isDir) {
 			kindText = "folder";
 		} else if (kind == PL_ICON_WINDOWS) {
@@ -315,6 +317,21 @@ pl_icon_kind mediaIconKind(MediaKind kind) {
 	return PL_ICON_DISK;
 }
 
+bool isPs3GameFolder(const QString &path) {
+	const QFileInfo info(path);
+	if (!info.isDir()) {
+		return false;
+	}
+	/* A disc dump keeps the game under PS3_GAME; an installed PSN game
+	 * has PARAM.SFO and USRDIR at the folder's top. */
+	if (QFileInfo(path + "/PS3_GAME").isDir()) {
+		return QFileInfo(path + "/PS3_GAME/PARAM.SFO").isFile() ||
+			QFileInfo(path + "/PS3_GAME/USRDIR/EBOOT.BIN").isFile();
+	}
+	return QFileInfo(path + "/PARAM.SFO").isFile() &&
+		QFileInfo(path + "/USRDIR/EBOOT.BIN").isFile();
+}
+
 pl_icon_kind iconKindFor(const QString &path) {
 	QFileInfo info(path);
 	if (info.isSymLink()) {
@@ -343,7 +360,7 @@ pl_icon_kind iconKindFor(const QString &path) {
 		return PL_ICON_DISK_IMAGE;
 	}
 	if (info.isDir()) {
-		return PL_ICON_FOLDER;
+		return isPs3GameFolder(iconPath) ? PL_ICON_ROM_PS3 : PL_ICON_FOLDER;
 	}
 	switch (clippingKind(iconPath)) {
 	case ClippingKind::Text:

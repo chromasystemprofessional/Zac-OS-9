@@ -32,7 +32,8 @@ KINDS = ["folder", "document", "application", "disk", "trash-empty", "trash-full
     "sf-appearance", "sf-extensions", "sf-sounds", "sf-startup-items", "sf-application-support", "sf-device-drivers", "sf-network", "sf-system-logs", "sf-software-components", "sf-fonts", "sf-favorites", "sf-toy-box-items", "sf-folder-tricks", "sf-contextual-menu-items", "sf-preferences", "sf-utilities",
     "app-barkrecorder", "app-calculator", "app-dogears", "app-jigsaw", "app-keytags", "app-notepad",
     "app-pedigree", "app-plotter", "app-stash",
-    "rom-nes", "rom-snes", "rom-ps1", "rom-ps2", "rom-n64", "rom-sega", "rom-gameboy"]
+    "rom-nes", "rom-snes", "rom-ps1", "rom-ps2", "rom-n64", "rom-sega", "rom-gameboy",
+    "rom-ps3"]
 
 
 def parse():

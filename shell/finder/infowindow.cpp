@@ -256,6 +256,8 @@ InfoWindow::InfoWindow(const QString &path, pl_icon_kind kind, const QString &na
 		m_trashWarn.toggled = [](bool on) { setTrashWarns(on); };
 	} else if (kind == PL_ICON_DISK) {
 		m_kindText = tr9("disk");
+	} else if (kind == PL_ICON_ROM_PS3) {
+		m_kindText = tr9("PlayStation 3 game");
 	} else if (info.isDir()) {
 		m_kindText = tr9("folder");
 	} else {

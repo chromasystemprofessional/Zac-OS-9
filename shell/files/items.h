@@ -155,6 +155,10 @@ pl_icon_kind iconKindFor(const QString &path);
  * where an extension is shared with other files, by the file's own bytes;
  * PL_ICON_DOCUMENT when it is not one. Game Player opens these. */
 pl_icon_kind romIconKind(const QString &path);
+/* A PlayStation 3 game folder: a disc dump (PS3_GAME/PARAM.SFO, or
+ * PS3_GAME/USRDIR/EBOOT.BIN) or an installed game (PARAM.SFO beside
+ * USRDIR/EBOOT.BIN). Game Player opens it with RPCS3. */
+bool isPs3GameFolder(const QString &path);
 /* Is this folder shared (Get Info > Sharing)? */
 bool isSharedFolder(const QString &path);
 /* A Macintosh disk or CD image (HFS, HFS+ or partitioned): opening one

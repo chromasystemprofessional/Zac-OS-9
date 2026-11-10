@@ -1301,6 +1301,32 @@ int main(int argc, char **argv) {
 			f.open(QIODevice::WriteOnly);
 			f.close();
 		};
+		/* A PlayStation 3 game is a folder: a disc dump or an installed
+		 * PSN game gets the PS3 icon and opens as one package. */
+		const auto makePs3 = [&](const QString &name, bool installed) {
+			const QString dir = root + "/Games/" + name;
+			const QString game = installed ? dir : dir + "/PS3_GAME";
+			QDir().mkpath(game + "/USRDIR");
+			writeEmpty(game + "/PARAM.SFO");
+			writeEmpty(game + "/USRDIR/EBOOT.BIN");
+			return dir;
+		};
+		const QString ps3Disc = makePs3("PS3 Disc", false);
+		check(isPs3GameFolder(ps3Disc) && iconKindFor(ps3Disc) == PL_ICON_ROM_PS3,
+			"a PS3 disc folder gets the PS3 icon");
+		{
+			auto item = makeItem(QFileInfo(ps3Disc));
+			check(item->kind == PL_ICON_ROM_PS3 && item->isDir &&
+				item->kindName() == "PlayStation 3 game",
+				"a PS3 folder is a game package, not an ordinary folder");
+		}
+		const QString ps3Installed = makePs3("PS3 Installed", true);
+		check(isPs3GameFolder(ps3Installed) && iconKindFor(ps3Installed) == PL_ICON_ROM_PS3,
+			"an installed PS3 game gets the PS3 icon");
+		const QString plainFolder = root + "/Games/Not A Game";
+		QDir().mkpath(plainFolder);
+		check(!isPs3GameFolder(plainFolder) && iconKindFor(plainFolder) == PL_ICON_FOLDER,
+			"a folder without PS3 game files stays a folder");
 		const auto namesInFolder = [](const QString &path) {
 			QStringList names;
 			for (const auto &item : listFolder(path)) {

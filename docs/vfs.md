@@ -157,7 +157,16 @@ a Sega cartridge, and a bare `.bin` is never a disc). Opening one still goes
 through GIO: Game Player (a ZacOS extra) declares the ROM MIME types, so
 double-clicking a cartridge plays it.
 
-The PlayStation and PlayStation 2 disc icons carry a `PS1` or `PS2` label.
+The console game icons carry their system's name — `NES`, `SNES`, `N64`,
+`SEGA`, `GB`, `PS1`, `PS2` or `PS3` — on the cartridge or disc; the 16 px
+versions use shorter forms.
+
+A PlayStation 3 game is a folder, not a file: one holding `PS3_GAME/`
+(a disc dump) or `PARAM.SFO` beside `USRDIR/EBOOT.BIN` (an installed game) is
+drawn as a PlayStation 3 game package with its own icon, and opening it hands
+the folder to Game Player, which starts it in RPCS3. A folder without those
+files stays an ordinary folder.
+
 In the Games folder in Home, and in any folder inside it, a `.cue` sheet with
 a same-named `.bin` track is not listed separately: the `.bin` is shown as
 the disc and opens through the cue. A cue without its `.bin` beside it stays

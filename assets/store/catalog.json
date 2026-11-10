@@ -66,7 +66,7 @@
 
 
     { "id": "extra-gameplayer", "name": "Game Player", "category": "Extras",
-      "blurb": "Play NES, Super NES, Sega, Game Boy, Game Boy Advance, PlayStation, PlayStation 2 and Nintendo 64 cartridges and discs in ZacOS 9: double-click a game file in the Sniffer and it runs in a Platinum-framed window, with a Game Player module in The Collar to quit it. The engines are RetroArch, mednafen, PCSX2 and mupen64plus, installed with Game Player. Game Player makes your Games folder, and a PlayStation or PlayStation 2 BIOS .bin dropped there is moved into place automatically. Nintendo 64 firmware is yours to supply.",
+      "blurb": "Play NES, Super NES, Sega, Game Boy, Game Boy Advance, PlayStation, PlayStation 2, PlayStation 3 and Nintendo 64 games in ZacOS 9: double-click a game file or a PlayStation 3 game folder in the Sniffer and it runs in a Platinum-framed window, with a Game Player module in The Collar to quit it. The engines are RetroArch, mednafen, PCSX2, mupen64plus and RPCS3; the extra installs RetroArch, mednafen and mupen64plus. Game Player makes your Games folder, and a PlayStation or PlayStation 2 BIOS .bin dropped there is moved into place automatically. PlayStation 3 firmware is installed in RPCS3; Nintendo 64 firmware is yours to supply.",
       "packages": ["zacos9-extra-gameplayer"], "extra": { "id": "gameplayer", "start": "zacos9-gameplayer" } },
     { "id": "extra-steam", "name": "Steam", "category": "Extras",
       "blurb": "List and launch your installed Steam games from The Collar. Installs Steam if it is not already present.",

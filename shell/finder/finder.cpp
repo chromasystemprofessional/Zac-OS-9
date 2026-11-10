@@ -739,9 +739,10 @@ void Finder::openItem(Item *item) {
 				Alert::ask(item->visibleName() + " could not be opened." +
 					(url.isEmpty() ? QString(" It holds no address.") : QString()), "OK", QString());
 			}
-		} else if (item->kind >= PL_ICON_ROM_NES && item->kind <= PL_ICON_ROM_GAMEBOY) {
+		} else if (item->kind >= PL_ICON_ROM_NES && item->kind <= PL_ICON_ROM_PS3) {
 			/* A console game: Game Player runs it, regardless of the file's
-			 * MIME type (a PlayStation 2 .iso has none of its own). */
+			 * MIME type (a PlayStation 2 .iso has none of its own) or
+			 * whether it is a PlayStation 3 game folder. */
 			if (!platinumStartApplication(siblingProgram("zacos9-gameplayer"),
 					{ "--play", item->path })) {
 				Alert::ask(item->visibleName() + " could not be opened. Game Player "
