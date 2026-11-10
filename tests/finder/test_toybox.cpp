@@ -4,17 +4,20 @@
  * aliases (on a topic button: in that page); button sizes; what it keeps.
  */
 #include <QApplication>
+#include <QClipboard>
 #include <QDir>
 #include <QDropEvent>
 #include <QElapsedTimer>
 #include <QFile>
 #include <QFileInfo>
+#include <QKeyEvent>
 #include <QMimeData>
 #include <QTemporaryDir>
 #include <QTextStream>
 #include <QUrl>
 
 #include "items.h"
+#include "labeleditor.h"
 
 #define private public
 #define protected public
@@ -72,6 +75,33 @@ int main(int argc, char **argv) {
 	QDir().mkpath(root + "/• Work");
 	check(names(ToyBox::pagesIn(root)) == QStringList({ "Games", "Work" }),
 		"bulleted folders are pages, named without the bullet; no loose items, no Applications");
+	const QString linked = home.path() + "/Linked Target";
+	QDir().mkpath(linked);
+	check(QFile::link(linked, root + "/•Linked"), "make a bulleted alias to a folder");
+	check(names(ToyBox::pagesIn(root)) == QStringList({ "Games", "Linked", "Work" }),
+		"a bulleted alias to a folder is a page too");
+	QFile::remove(root + "/•Linked");
+	const QString dropped = home.path() + "/•Dropped";
+	QDir().mkpath(dropped);
+	ToyBox::addAliases({ { "•Dropped", dropped } }, root);
+	check(QFileInfo(root + "/•Dropped").isSymLink() &&
+		names(ToyBox::pagesIn(root)).contains("Dropped"),
+		"a bulleted folder dropped on the Toy Box becomes an alias page");
+	QFile::remove(root + "/•Dropped");
+
+	const QString pageFile = home.path() + "/page.txt";
+	QFile(pageFile).open(QIODevice::WriteOnly);
+	Item pageItem;
+	pageItem.name = "page.txt";
+	pageItem.path = pageFile;
+	pageItem.shownName = "page";
+	LabelEditor editor([] {});
+	editor.begin(&pageItem);
+	QApplication::clipboard()->setText(QString::fromUtf8("•"));
+	QKeyEvent paste(QEvent::KeyPress, Qt::Key_V, Qt::ControlModifier);
+	check(editor.key(&paste) && editor.text() == QString::fromUtf8("•"),
+		"Ctrl-V pastes a bullet into a name, for a Toy Box page");
+	editor.cancel();
 	const QString letter = home.path() + "/Letter.txt", photos = home.path() + "/Photos";
 	QFile(letter).open(QIODevice::WriteOnly);
 	QDir().mkpath(photos);
@@ -118,6 +148,12 @@ int main(int argc, char **argv) {
 	settle();
 	check(again->m_size == ToyBox::ButtonSize::Large && again->m_pages[again->m_page].name == "Games",
 		"it comes back with its size and page");
+	const size_t before = again->m_pages.size();
+	again->newPage();
+	settle();
+	check(again->m_pages.size() == before + 1 && again->m_pages[again->m_page].name == "Page 1",
+		"New Page makes a bulleted folder and shows it");
+	check(QFileInfo(root + "/•Page 1").isDir(), "the new page folder is in Toy Box Items");
 	again->close();
 	settle();
 	QTextStream(stdout) << fails << " failure(s)\n";

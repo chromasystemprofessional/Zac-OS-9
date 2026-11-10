@@ -17,6 +17,7 @@
 #include <QWheelEvent>
 #include <algorithm>
 
+#include "alert.h"
 #include "fileops.h"
 #include "finder.h"
 #include "panelkit.h"
@@ -96,7 +97,9 @@ std::vector<ToyBox::Page> ToyBox::pagesIn(const QString &root) {
 	const auto entries = QDir(root).entryInfoList(QDir::AllEntries | QDir::NoDotAndDotDot | QDir::System,
 		QDir::Name | QDir::IgnoreCase);
 	for (const QFileInfo &entry : entries) {
-		if (entry.isDir() && !entry.isSymLink() && entry.fileName().startsWith(BULLET)) {
+		/* An alias to a folder is a page too when its name says so: a
+		 * bulleted folder dropped on the Toy Box makes an alias here. */
+		if (entry.isDir() && entry.fileName().startsWith(BULLET)) {
 			const QString name = entry.fileName().mid(1).trimmed();
 			topics.push_back({ name.isEmpty() ? entry.fileName() : name, entry.absoluteFilePath() });
 		} else {
@@ -128,6 +131,35 @@ void ToyBox::addAliases(const std::vector<std::pair<QString, QString>> &targets,
 	}
 }
 
+/* A page is a folder whose name starts with a bullet. Make one without
+ * asking anyone to type the bullet. */
+void ToyBox::newPage() {
+	if (pagesIn(toyBoxPath()).size() >= 8) {
+		Alert::ask("The Toy Box holds eight pages at most.", "OK", "");
+		return;
+	}
+	const QString root = toyBoxPath();
+	QString folder;
+	for (int i = 1; ; i++) {
+		folder = root + QString("/") + BULLET + QString("Page %1").arg(i);
+		if (!QFileInfo::exists(folder) && !QFileInfo(folder).isSymLink()) {
+			break;
+		}
+	}
+	if (!QDir().mkpath(folder)) {
+		QApplication::beep();
+		return;
+	}
+	const QString name = QFileInfo(folder).fileName().mid(1).trimmed();
+	reload();
+	for (size_t i = 0; i < m_pages.size(); i++) {
+		if (m_pages[i].name == name) {
+			showPage(static_cast<int>(i));
+			break;
+		}
+	}
+}
+
 void ToyBox::reload() {
 	const QString current = m_page < static_cast<int>(m_pages.size()) ? m_pages[m_page].name : QString();
 	m_pages = pagesIn(toyBoxPath());
@@ -141,8 +173,9 @@ void ToyBox::reload() {
 	m_items.clear();
 	const QString folder = m_pages[m_page].folder;
 	for (auto &item : listFolder(folder)) {
-		/* The Applications page is the loose items, not the pages' folders. */
-		if (folder == toyBoxPath() && item->isDir && !item->isAlias && item->name.startsWith(BULLET)) {
+		/* The Applications page is the loose items, not the pages' folders.
+		 * A page may be an alias to a folder, so `isAlias` doesn't matter. */
+		if (folder == toyBoxPath() && item->isDir && item->name.startsWith(BULLET)) {
 			continue;
 		}
 		m_items.push_back(std::move(item));
@@ -152,7 +185,9 @@ void ToyBox::reload() {
 	}
 	m_watcher.addPath(toyBoxPath());
 	if (folder != toyBoxPath()) {
-		m_watcher.addPath(folder);
+		/* A page may be an alias: watch what it points at. */
+		const QString target = QFileInfo(folder).canonicalFilePath();
+		m_watcher.addPath(target.isEmpty() ? folder : target);
 	}
 	layout();
 	update();
@@ -337,19 +372,26 @@ void ToyBox::sizeMenu(QPoint at, Item *item) {
 	if (item) {
 		items = { PopupItem("Open"), PopupItem("Remove From Toy Box"), PopupItem("", true, true) };
 	}
+	const int newPageItem = static_cast<int>(items.size());
+	items.push_back(PopupItem("New Page…"));
+	items.push_back(PopupItem("", true, true));
 	const int first = static_cast<int>(items.size());
 	items.insert(items.end(), { PopupItem("Small Buttons"), PopupItem("Medium Buttons"),
 		PopupItem("Large Buttons") });
 	const QString path = item ? item->path : QString();
 	panelMenuNear(this, items, first + static_cast<int>(m_size), QRect(at, QSize(1, 1)), at.y(),
-		PL_FONT_SYSTEM, [this, first, path](int i) {
+		PL_FONT_SYSTEM, [this, first, newPageItem, path](int i) {
+			if (i == newPageItem) {
+				newPage();
+				return;
+			}
 			if (i >= first) {
 				setButtonSize(static_cast<ButtonSize>(i - first));
 				return;
 			}
-			if (i == 0) {
+			if (i == 0 && !path.isEmpty()) {
 				Finder::instance().openPath(path);
-			} else if (i == 1) {
+			} else if (i == 1 && !path.isEmpty()) {
 				QFile::moveToTrash(path); /* the alias, not its original */
 				reload();
 			}
