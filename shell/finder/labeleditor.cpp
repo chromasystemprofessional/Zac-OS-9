@@ -7,6 +7,7 @@
 #include "apptrash.h"
 
 #include <QApplication>
+#include <QClipboard>
 #include <QDir>
 #include <QFileInfo>
 #include <QInputMethodEvent>
@@ -109,8 +110,9 @@ void LabelEditor::deleteSelection() {
 	m_cursor = m_anchor = a;
 }
 
-/* Printable characters, less "/" (which can't be in a Linux file name; on
- * the Mac it was ":"). A commit can carry a whole word at once. */
+/* Insert typed or pasted text: printable characters, less "/" (which can't
+ * be in a Linux file name; on the Mac it was ":"). A commit can carry a
+ * whole word at once. */
 void LabelEditor::insertText(const QString &raw) {
 	QString s;
 	bool slash = false;
@@ -294,6 +296,11 @@ bool LabelEditor::key(QKeyEvent *e) {
 		m_anchor = 0;
 		m_cursor = m_text.size();
 		changed();
+		return true;
+	}
+	if ((e->modifiers() & Qt::ControlModifier) && e->key() == Qt::Key_V) {
+		/* Paste: the way to get a bullet (•) into a name for a Toy Box page. */
+		insertText(QApplication::clipboard()->text());
 		return true;
 	}
 	const QString typed = e->text();
