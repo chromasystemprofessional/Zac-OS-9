@@ -1,3 +1,11 @@
+zacos9 (1.16.1) trixie; urgency=medium
+
+  * In the Games folder, a bin/cue PlayStation game now shows its track
+    without the .bin extension, and renaming the track renames the hidden
+    .cue with it so the pair stays matched.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Tue, 10 Nov 2026 06:45:01 -0500
+
 zacos9 (1.16.0) trixie; urgency=medium
 
   * PlayStation 3 game folders now appear with a PS3 icon and open in Game
