@@ -18,8 +18,49 @@ if [ "${ZACOS9_LOGOUT_COMMAND:-}" ]; then
 	exec /bin/sh -c "$ZACOS9_LOGOUT_COMMAND"
 fi
 
-session=${XDG_SESSION_ID:-self}
+# Ask this session's compositor to quit. A display manager starts the next
+# greeter when its session process exits; logind's terminate-session instead
+# kills SDDM's helper along with the desktop, and SDDM then never brings the
+# greeter back. The compositor publishes its pid under its Wayland socket's
+# name, so a nested session's compositor is never mistaken for this one.
+runtime=${XDG_RUNTIME_DIR:-}
+display=${WAYLAND_DISPLAY:-}
+pid=
+if [ -n "$runtime" ] && [ -n "$display" ] && [ -r "$runtime/zacos9-wm-$display.pid" ]; then
+	read -r pid <"$runtime/zacos9-wm-$display.pid" || pid=
+fi
+case ${pid:-} in
+'' | *[!0-9]*) pid= ;;
+esac
+# A live compositor, not a zombie left for its parent to reap: kill -0
+# still succeeds for a zombie, and its /proc/PID/stat says Z.
+wm_alive() {
+	kill -0 "$1" 2>/dev/null || return 1
+	[ -r "/proc/$1/stat" ] || return 1
+	read -r _stat <"/proc/$1/stat" || return 1
+	_state=${_stat##*) }
+	[ "${_state%% *}" != Z ]
+}
+if [ -n "$pid" ] && wm_alive "$pid" &&
+		[ "$(cat "/proc/$pid/comm" 2>/dev/null || true)" = "zacos9-wm" ]; then
+	kill -TERM "$pid" 2>/dev/null || true
+	# It cleans up and exits at once; wait for it so the session is gone
+	# before this script returns.
+	i=0
+	while wm_alive "$pid" && [ "$i" -lt 50 ]; do
+		sleep 0.1
+		i=$((i + 1))
+	done
+	if ! wm_alive "$pid"; then
+		exit 0
+	fi
+fi
+
+# No compositor to ask (a text login, or a build before this pid file):
+# end the login session through logind. An empty session ID means "the
+# caller's session" (loginctl(1)); "self" is not a session ID.
+session=${XDG_SESSION_ID:-}
 case $session in
-	''|*[!A-Za-z0-9_-]*) session=self ;;
+	*[!A-Za-z0-9_-]*) session= ;;
 esac
 exec loginctl terminate-session "$session"

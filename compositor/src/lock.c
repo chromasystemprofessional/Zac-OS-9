@@ -307,3 +307,15 @@ void lock_init(struct plat_server *server) {
 	wlr_scene_rect_create(server->lock_layer, 16384, 16384, (float[4]){ 0, 0, 0, 1 });
 	wlr_scene_node_set_enabled(&server->lock_layer->node, false);
 }
+
+/* For the compositor leaving: wlroots asserts at display destroy that no
+ * one still listens for a session lock. The manager is destroyed with the
+ * display, and its signal has no more locks to send. */
+void lock_finish(struct plat_server *server) {
+	wl_list_remove(&server->lock_new.link);
+	wl_list_init(&server->lock_new.link);
+	if (server->lock_restart) {
+		wl_event_source_remove(server->lock_restart);
+		server->lock_restart = NULL;
+	}
+}

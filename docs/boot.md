@@ -152,3 +152,11 @@ and the postinst puts `_greetd` in the `video` and `render` groups that
 `seatd -g video` serves. Without those, Log Out ends the session but the
 login window's compositor cannot open the display, leaving a blank screen
 with a cursor.
+
+Log Out runs Shutdown Items and then asks this session's `zacos9-wm` to
+quit through `$XDG_RUNTIME_DIR/zacos9-wm-$WAYLAND_DISPLAY.pid`. The display
+manager starts the next greeter when its session process exits; that works
+with GDM, LightDM and SDDM. `loginctl terminate-session` is only the
+fallback when no compositor pid file is there: it kills every process in
+the session, SDDM's helper included, and SDDM then has nothing left to
+report the logout and show its greeter.
