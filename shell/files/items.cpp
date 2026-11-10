@@ -395,6 +395,19 @@ static bool hasSiblingCue(const QFileInfo &info) {
 	return false;
 }
 
+/* Does a .bin track sit beside this cue sheet (same directory and stem)? */
+static bool hasSiblingBin(const QFileInfo &info) {
+	const QString bin = info.completeBaseName() + ".bin";
+	const QDir dir = info.absoluteDir();
+	const QStringList names = dir.entryList(QDir::Files, QDir::Name);
+	for (const QString &name : names) {
+		if (name.compare(bin, Qt::CaseInsensitive) == 0) {
+			return true;
+		}
+	}
+	return false;
+}
+
 pl_icon_kind romIconKind(const QString &path) {
 	const QFileInfo info(path);
 	const QString suffix = info.suffix().toLower();
@@ -778,6 +791,20 @@ static bool macHousekeeping(const QString &name) {
 	return names.contains(name);
 }
 
+/* A bin/cue PlayStation game shows as its .bin in ~/Games (and any folder
+ * below it): the cue is the same game's track list, not a second item. A cue
+ * without a same-named .bin stays visible. */
+static bool hiddenGameCue(const QFileInfo &info) {
+	if (info.suffix().compare(QLatin1String("cue"), Qt::CaseInsensitive) != 0) {
+		return false;
+	}
+	const QString games = QDir::homePath() + "/Games";
+	if (!info.absoluteFilePath().startsWith(games + "/")) {
+		return false;
+	}
+	return hasSiblingBin(info);
+}
+
 std::vector<std::unique_ptr<Item>> listFolder(const QString &path) {
 	if (vfsIsVirtual(path)) {
 		return vfsList(path);
@@ -787,7 +814,7 @@ std::vector<std::unique_ptr<Item>> listFolder(const QString &path) {
 	const auto entries = dir.entryInfoList(
 		QDir::AllEntries | QDir::NoDotAndDotDot | QDir::System, QDir::Name | QDir::IgnoreCase);
 	for (const QFileInfo &info : entries) {
-		if (!macHousekeeping(info.fileName())) {
+		if (!macHousekeeping(info.fileName()) && !hiddenGameCue(info)) {
 			items.push_back(makeItem(info));
 		}
 	}

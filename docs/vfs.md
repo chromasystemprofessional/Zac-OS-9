@@ -157,6 +157,12 @@ a Sega cartridge, and a bare `.bin` is never a disc). Opening one still goes
 through GIO: Game Player (a ZacOS extra) declares the ROM MIME types, so
 double-clicking a cartridge plays it.
 
+The PlayStation and PlayStation 2 disc icons carry a `PS1` or `PS2` label.
+In the Games folder in Home, and in any folder inside it, a `.cue` sheet with
+a same-named `.bin` track is not listed separately: the `.bin` is shown as
+the disc and opens through the cue. A cue without its `.bin` beside it stays
+visible.
+
 The **File Exchange** control panel (`zacos9-fileexchange`, in Control Panels
 and the Apple menu) lists every kind of document an installed application
 can open, with its extensions and the application that opens it now. Change…

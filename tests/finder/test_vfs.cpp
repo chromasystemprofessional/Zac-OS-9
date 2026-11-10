@@ -1294,6 +1294,34 @@ int main(int argc, char **argv) {
 			"a PlayStation 2 disc image in the Games folder gets its own icon");
 		check(romIconKind(make("outside.iso")) == PL_ICON_DOCUMENT,
 			"an .iso outside the Games folder is not a game");
+
+		/* A bin/cue game in Games shows as its .bin; the cue is hidden. */
+		const auto writeEmpty = [](const QString &path) {
+			QFile f(path);
+			f.open(QIODevice::WriteOnly);
+			f.close();
+		};
+		const auto namesInFolder = [](const QString &path) {
+			QStringList names;
+			for (const auto &item : listFolder(path)) {
+				names << item->name;
+			}
+			return names;
+		};
+		const QString disc = root + "/Games/Final Fantasy IX";
+		QDir().mkpath(disc);
+		writeEmpty(disc + "/game.cue");
+		writeEmpty(disc + "/game.bin");
+		const QStringList discNames = namesInFolder(disc);
+		check(!discNames.contains("game.cue") && discNames.contains("game.bin"),
+			"a bin/cue game inside Games shows only its .bin");
+		writeEmpty(root + "/Games/lone.cue");
+		check(namesInFolder(root + "/Games").contains("lone.cue"),
+			"a cue with no .bin beside it stays visible");
+		writeEmpty(root + "/loose.cue");
+		writeEmpty(root + "/loose.bin");
+		check(namesInFolder(root).contains("loose.cue"),
+			"a bin/cue game outside Games keeps its cue visible");
 	}
 
 	/* ---- unprivileged -------------------------------------------------- */
