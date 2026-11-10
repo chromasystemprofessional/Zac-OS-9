@@ -51,6 +51,11 @@ use one decision table (`shell/files/mediaeject.cpp`):
 The desktop icon stays until the mount is actually gone. A busy volume
 reports the error and keeps its icon.
 
+A mounted PlayStation 1 or 2 game disc dragged onto **Home ▸ Games** is
+handed to the Game Player extra, which reads it into a cache image and
+launches mednafen or PCSX2; nothing is copied into Games. PlayStation 3 discs
+are not read directly.
+
 ## AutoPlay
 
 With **Sniffer ▸ Preferences ▸ General ▸ Media** on, an inserted audio CD or

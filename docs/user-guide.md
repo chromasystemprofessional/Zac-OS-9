@@ -177,6 +177,11 @@ the desktop like any other disk. Opening an audio CD plays it, and Put Away
 ejects the disc; a blank disc is reported as blank. Programs on a disc never
 start by themselves.
 
+A physical PlayStation 1 or 2 game disc can be played without copying it
+first: drag its mounted desktop icon onto **Home ▸ Games**. Game Player
+reads the disc into its cache image and starts mednafen or PCSX2. PlayStation
+BIOS files and the separate Game Player extra are still required.
+
 Commercial movie DVDs are usually CSS-encrypted. Debian main does not include
 the `libdvdcss` decoder: enable the `contrib` section, install `libdvd-pkg`, and
 run `sudo dpkg-reconfigure libdvd-pkg` if the decoder was not built during

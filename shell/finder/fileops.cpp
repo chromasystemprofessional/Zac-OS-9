@@ -46,6 +46,7 @@
 #include "resources.h"
 #include "autostart.h"
 #include "fileassoc.h"
+#include "localvolumes.h"
 #include "transferdialog.h"
 #include "customthemes.h"
 #include "fonts.h"
@@ -1210,6 +1211,14 @@ QStringList dropClippings(QDropEvent *e, const Item *target, const QString &fold
 	return made;
 }
 
+/* Is this the Games folder, or a folder inside it? A physical game disc
+ * dropped there is launched, not copied. */
+static bool insideGamesFolder(const QString &path) {
+	const QString games = QDir::cleanPath(QDir::homePath() + "/Games");
+	const QString clean = QDir::cleanPath(path);
+	return clean == games || clean.startsWith(games + "/");
+}
+
 void dropItems(QDropEvent *e, const Item *target, const QString &folder) {
 	const bool fontDrag = e->mimeData()->hasFormat(FONT_ITEMS_MIME);
 	const QString fontDestination = target ? target->path : folder;
@@ -1442,6 +1451,60 @@ void dropItems(QDropEvent *e, const Item *target, const QString &folder) {
 	const QStringList paths = draggedPaths(e->mimeData());
 	if (paths.isEmpty()) {
 		return;
+	}
+	/* A mounted game disc dropped on Games runs from its drive, through
+	 * Game Player; nothing is copied into the folder. */
+	const QString destination = target ? target->path : folder;
+	if (!toTrash && insideGamesFolder(destination)) {
+		const auto dragged = [&](const QString &mount) {
+			for (const QString &path : paths) {
+				if (QDir::cleanPath(path) == QDir::cleanPath(mount)) {
+					return true;
+				}
+			}
+			return false;
+		};
+		std::vector<LocalVolume> discs;
+		for (const LocalVolume &volume : localVolumes()) {
+			if (volume.mounted && volume.backingImage.isEmpty() &&
+					volume.kind == MediaKind::OpticalData &&
+					dragged(volume.path)) {
+				discs.push_back(volume);
+			}
+		}
+		if (discs.size() > 1) {
+			Alert::ask(tr9("Drop one game disc at a time."), "OK", QString());
+			e->ignore();
+			return;
+		}
+		if (!discs.empty()) {
+			const LocalVolume &disc = discs.front();
+			if (disc.device.isEmpty()) {
+				Alert::ask(tr9("The disc's drive could not be found."), "OK", QString());
+				e->ignore();
+				return;
+			}
+			if (!platinumStartApplication(siblingProgram("zacos9-gameplayer"),
+					{ "--play-disc", disc.device, disc.path })) {
+				Alert::ask(tr9("The disc could not be opened. Game Player may not be installed."),
+					"OK", QString());
+				e->ignore();
+				return;
+			}
+			e->setDropAction(Qt::CopyAction);
+			e->accept();
+			return;
+		}
+		for (const LocalVolume &volume : localVolumes()) {
+			if (volume.mounted && dragged(volume.path) &&
+					(volume.kind == MediaKind::OpticalAudio ||
+					 volume.kind == MediaKind::OpticalVideo)) {
+				Alert::ask(tr9("That disc isn't a game Game Player can play."), "OK", QString());
+				e->setDropAction(Qt::CopyAction);
+				e->accept();
+				return;
+			}
+		}
 	}
 	Finder &finder = Finder::instance();
 	if (toTrash) {
