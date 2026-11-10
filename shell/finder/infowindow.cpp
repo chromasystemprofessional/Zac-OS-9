@@ -14,7 +14,10 @@
 #include <QDirIterator>
 #include <QFile>
 #include <QFileInfo>
+#include <QGuiApplication>
 #include <QHash>
+#include <QInputMethod>
+#include <QInputMethodEvent>
 #include <QKeyEvent>
 #include <QLocale>
 #include <QMimeDatabase>
@@ -27,6 +30,7 @@
 #include <QDragEnterEvent>
 #include <QDropEvent>
 #include <QMimeData>
+#include <algorithm>
 #include <grp.h>
 #include <pwd.h>
 #include <sys/stat.h>
@@ -48,6 +52,11 @@ static constexpr int VALUE_X = 82;
 static constexpr int ROW_H = 16;
 static constexpr int COMMENT_MAX = 200; /* Mac OS Finder comment limit */
 static const char *const COMMENT_ATTR = "user.xdg.comment";
+
+static int textAdvance(const QString &s) {
+	Text t(s, 100000, PL_FONT_VIEWS);
+	return t.t ? t.t->advance : 0;
+}
 
 QString finderDate(const QDateTime &t) {
 	if (!t.isValid()) {
@@ -357,8 +366,7 @@ bool InfoWindow::showView(int view) {
 	m_host.checks.clear();
 	m_host.buttons.clear();
 	if (view == 1) {
-		m_editingComment = false;
-		m_caretTimer.stop();
+		setEditingComment(false);
 		layoutSharing();
 		m_host.popups.insert(m_host.popups.end(),
 			{ &m_ownerPopup, &m_groupPopup, &m_privilege[0], &m_privilege[1], &m_privilege[2] });
@@ -488,25 +496,11 @@ void InfoWindow::paintGeneral(pl_canvas *c) {
 	pl_outline(c, m_commentBox.left(), m_commentBox.top(), m_commentBox.right(), m_commentBox.bottom(),
 		m_editingComment ? C_BLACK : GRAY(0x8));
 
-	/* Wrap the comment to the box, word by word. */
+	/* Wrap the comment to the box at Unicode line-break opportunities:
+	 * Japanese has no spaces, but still breaks between characters. */
 	const int textW = m_commentBox.width() - 8;
-	QStringList lines;
-	for (const QString &para : m_comment.split('\n')) {
-		QString line;
-		for (const QString &word : para.split(' ')) {
-			QString candidate = line.isEmpty() ? word : line + ' ' + word;
-			Text probe(candidate, 100000, PL_FONT_VIEWS);
-			if (!line.isEmpty() && probe.inkWidth() > textW) {
-				lines << line;
-				line = word;
-			} else {
-				line = candidate;
-			}
-		}
-		lines << line;
-	}
-	int baseline = m_commentBox.top() + 12, caretX = m_commentBox.left() + 4;
-	for (const QString &line : lines) {
+	int baseline = m_commentBox.top() + 12;
+	for (const QString &line : commentLines()) {
 		if (baseline > m_commentBox.bottom() - 2) {
 			break;
 		}
@@ -514,11 +508,19 @@ void InfoWindow::paintGeneral(pl_canvas *c) {
 		if (t.t && t.t->ink_l >= 0) {
 			pl_text(c, t.t, m_commentBox.left() + 4 + t.t->ink_l - 1, baseline, C_BLACK);
 		}
-		caretX = m_commentBox.left() + 4 + (t.t ? t.t->advance : 0);
 		baseline += 12;
 	}
+	if (!m_commentPreedit.isEmpty()) {
+		const QPoint at = commentPreeditOrigin();
+		Text t(m_commentPreedit, 100000, PL_FONT_VIEWS);
+		if (t.t && t.t->ink_l >= 0) {
+			pl_text(c, t.t, at.x() + t.t->ink_l - 1, at.y(), C_BLACK);
+			pl_hline(c, at.x(), at.x() + t.t->advance, at.y() + 1, C_BLACK);
+		}
+	}
 	if (m_editingComment && m_caretOn) {
-		pl_vline(c, caretX, baseline - 12 - 9, baseline - 12 + 1, C_BLACK);
+		const QPoint caret = commentCaretPos();
+		pl_vline(c, caret.x(), caret.y() - 9, caret.y() + 1, C_BLACK);
 	}
 }
 
@@ -756,6 +758,7 @@ bool InfoWindow::saveSharing() {
 }
 
 void InfoWindow::closeEvent(QCloseEvent *e) {
+	setEditingComment(false);
 	if (m_show.items.size() > 1 && m_show.items[1].enabled) {
 		saveSharing();
 	}
@@ -772,28 +775,172 @@ void InfoWindow::saveComment() {
 	}
 }
 
+/* The comment's lines, with explicit newlines kept. */
+QStringList InfoWindow::commentLines() const {
+	QStringList lines;
+	if (m_commentBox.width() <= 8) {
+		return lines;
+	}
+	const int textW = m_commentBox.width() - 8;
+	for (const QString &para : m_comment.split('\n')) {
+		if (para.isEmpty()) {
+			lines << QString();
+			continue;
+		}
+		lines += wrapText(para, textW, PL_FONT_VIEWS);
+	}
+	if (lines.isEmpty()) {
+		lines << QString();
+	}
+	return lines;
+}
+
+/* Where the input method's preedit begins: after the committed text, on
+ * the last line if it fits, else on the next one. */
+QPoint InfoWindow::commentPreeditOrigin() const {
+	int baseline = m_commentBox.top() + 12;
+	int caretX = m_commentBox.left() + 4;
+	for (const QString &line : commentLines()) {
+		if (baseline > m_commentBox.bottom() - 2) {
+			break;
+		}
+		caretX = m_commentBox.left() + 4 + textAdvance(line);
+		baseline += 12;
+	}
+	baseline -= 12;
+	const int textW = m_commentBox.width() - 8;
+	if (textAdvance(m_commentPreedit) > 0 &&
+			caretX + textAdvance(m_commentPreedit) > m_commentBox.left() + 4 + textW) {
+		caretX = m_commentBox.left() + 4;
+		baseline += 12;
+	}
+	return QPoint(caretX, baseline);
+}
+
+QPoint InfoWindow::commentCaretPos() const {
+	const QPoint at = commentPreeditOrigin();
+	const int cursor = std::clamp(m_commentPreeditCursor, 0,
+		static_cast<int>(m_commentPreedit.size()));
+	return QPoint(at.x() + textAdvance(m_commentPreedit.left(cursor)), at.y());
+}
+
+QRect InfoWindow::commentCursorRect() const {
+	const QPoint at = commentCaretPos();
+	return QRect(at.x(), at.y() - 11, 1, 14);
+}
+
+void InfoWindow::setEditingComment(bool editing) {
+	if (editing == m_editingComment) {
+		return;
+	}
+	m_editingComment = editing;
+	if (editing) {
+		/* The comment, not a control panel field, takes the typing. */
+		m_host.setFocus(nullptr);
+		setFocus(Qt::MouseFocusReason);
+		m_caretTimer.start(QApplication::cursorFlashTime() / 2);
+	} else {
+		/* Keep what the input method had composed when the focus leaves. */
+		if (!m_commentPreedit.isEmpty()) {
+			m_comment += m_commentPreedit;
+			m_comment = m_comment.left(COMMENT_MAX);
+			m_commentPreedit.clear();
+			m_commentPreeditCursor = 0;
+			saveComment();
+		}
+		m_caretTimer.stop();
+	}
+	setAttribute(Qt::WA_InputMethodEnabled, editing);
+	setProperty("zacos9TextField", editing);
+	if (QInputMethod *ime = QGuiApplication::inputMethod()) {
+		ime->update(Qt::ImQueryAll);
+	}
+	m_caretOn = true;
+	update();
+}
+
+void InfoWindow::inputMethodEvent(QInputMethodEvent *e) {
+	if (!m_editingComment) {
+		return;
+	}
+	int cursor = static_cast<int>(e->preeditString().size());
+	for (const QInputMethodEvent::Attribute &a : e->attributes()) {
+		if (a.type == QInputMethodEvent::Cursor) {
+			cursor = a.start;
+		}
+	}
+	QString commit;
+	for (QChar ch : e->commitString()) {
+		if (ch.isPrint()) {
+			commit += ch;
+		}
+	}
+	if (!commit.isEmpty()) {
+		m_comment += commit;
+		m_comment = m_comment.left(COMMENT_MAX);
+		saveComment();
+	}
+	m_commentPreedit = e->preeditString();
+	m_commentPreeditCursor = std::clamp(cursor, 0, static_cast<int>(m_commentPreedit.size()));
+	m_caretOn = true;
+	update();
+}
+
+QVariant InfoWindow::inputMethodQuery(Qt::InputMethodQuery query) const {
+	if (!m_editingComment) {
+		return QWidget::inputMethodQuery(query);
+	}
+	switch (query) {
+	case Qt::ImEnabled:
+		return true;
+	case Qt::ImHints:
+		return static_cast<int>(Qt::ImhNoPredictiveText | Qt::ImhMultiLine);
+	case Qt::ImSurroundingText:
+		return m_comment;
+	case Qt::ImCursorPosition:
+		return m_comment.size();
+	case Qt::ImAnchorPosition:
+		return m_comment.size();
+	case Qt::ImCurrentSelection:
+		return QString();
+	case Qt::ImTextBeforeCursor:
+		return m_comment;
+	case Qt::ImTextAfterCursor:
+		return QString();
+	case Qt::ImCursorRectangle:
+		return commentCursorRect();
+	case Qt::ImInputItemClipRectangle:
+		return m_commentBox;
+	case Qt::ImReadOnly:
+		return false;
+	case Qt::ImPreferredLanguage:
+		return QLocale().name();
+	default:
+		return {};
+	}
+}
+
 void InfoWindow::mousePressEvent(QMouseEvent *e) {
+	const QPoint pos = e->position().toPoint();
+	/* A click outside the comments box ends the comment before it does
+	 * whatever it was aimed at (a button, the icon, the Show pop-up). */
+	if (!m_commentBox.contains(pos)) {
+		setEditingComment(false);
+	}
 	if (m_host.hostPress(e) || m_view != 0) {
 		return;
 	}
 	if (!m_isResourceInfo && !m_isVolumeInfo &&
-			QRect(ICON_BOX_X, ICON_BOX_Y, 38, 38).contains(e->position().toPoint())) {
+			QRect(ICON_BOX_X, ICON_BOX_Y, 38, 38).contains(pos)) {
 		m_iconFocused = true;
-		m_iconPressPos = e->position().toPoint();
-		m_editingComment = false;
-		m_caretTimer.stop();
+		m_iconPressPos = pos;
+		setEditingComment(false);
 		setFocus(Qt::MouseFocusReason);
 		update();
 		return;
 	}
 	m_iconFocused = false;
-	const bool inBox = m_commentBox.contains(e->position().toPoint());
-	if (inBox != m_editingComment) {
-		m_editingComment = inBox;
-		m_caretOn = true;
-		inBox ? m_caretTimer.start(QApplication::cursorFlashTime() / 2) : m_caretTimer.stop();
-		update();
-	}
+	setEditingComment(m_commentBox.contains(pos));
 }
 
 void InfoWindow::mouseMoveEvent(QMouseEvent *e) {
@@ -927,13 +1074,26 @@ void InfoWindow::keyPressEvent(QKeyEvent *e) {
 	if (!m_editingComment) {
 		return;
 	}
+	/* While composing, the keys belong to the input method. */
+	if (!m_commentPreedit.isEmpty()) {
+		if (e->key() == Qt::Key_Escape) {
+			m_commentPreedit.clear();
+			m_commentPreeditCursor = 0;
+			update();
+		} else if (e->key() == Qt::Key_Backspace && m_commentPreeditCursor > 0) {
+			m_commentPreedit.remove(m_commentPreeditCursor - 1, 1);
+			--m_commentPreeditCursor;
+			update();
+		}
+		return;
+	}
 	if (e->key() == Qt::Key_Backspace) {
 		m_comment.chop(1);
 	} else if (e->key() == Qt::Key_Return || e->key() == Qt::Key_Enter) {
 		m_comment += '\n';
 	} else if (e->key() == Qt::Key_Escape) {
-		m_editingComment = false;
-		m_caretTimer.stop();
+		setEditingComment(false);
+		return;
 	} else if (!e->text().isEmpty() && e->text().at(0).isPrint() &&
 			!(e->modifiers() & Qt::ControlModifier)) {
 		m_comment += e->text();

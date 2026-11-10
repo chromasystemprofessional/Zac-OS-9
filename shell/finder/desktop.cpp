@@ -12,6 +12,9 @@
 #include <QApplication>
 #include <QDir>
 #include <QDragEnterEvent>
+#include <QGuiApplication>
+#include <QInputMethod>
+#include <QInputMethodEvent>
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QPointer>
@@ -91,6 +94,7 @@ Desktop::Desktop() {
 	watchDefaultPrinter(this, [this] { update(); });
 	setAttribute(Qt::WA_OpaquePaintEvent);
 	setAcceptDrops(true);
+	m_editor.setEditingChanged([this](bool editing) { setImeEditing(editing); });
 	m_renameTimer.setSingleShot(true);
 	m_renameTimer.callOnTimeout([this] { beginRename(m_renameItem); });
 	m_state = FolderState::load(folderPath());
@@ -1001,6 +1005,29 @@ void Desktop::placeSelection(QPoint delta, Qt::KeyboardModifiers modifiers) {
 	m_state.save(folderPath());
 	placeIcons();
 	update();
+}
+
+void Desktop::setImeEditing(bool editing) {
+	setAttribute(Qt::WA_InputMethodEnabled, editing);
+	setProperty("zacos9TextField", editing);
+	if (QInputMethod *ime = QGuiApplication::inputMethod()) {
+		ime->update(Qt::ImQueryAll);
+	}
+	update();
+}
+
+void Desktop::inputMethodEvent(QInputMethodEvent *e) {
+	if (m_editor.active() && m_editor.inputMethodEvent(e)) {
+		return;
+	}
+	QWidget::inputMethodEvent(e);
+}
+
+QVariant Desktop::inputMethodQuery(Qt::InputMethodQuery query) const {
+	if (m_editor.active() && m_editor.item()) {
+		return m_editor.inputMethodQuery(query, m_editor.item()->pos);
+	}
+	return QWidget::inputMethodQuery(query);
 }
 
 void Desktop::keyPressEvent(QKeyEvent *e) {

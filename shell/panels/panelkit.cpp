@@ -1193,6 +1193,11 @@ public:
 			return m_host->inputMethodEvent(static_cast<QInputMethodEvent *>(e));
 		}
 		if (e->type() == QEvent::InputMethodQuery) {
+			/* No panel field has the focus: the window's own field (the
+			 * Finder's Get Info comment, say) answers the query. */
+			if (!m_host->focus) {
+				return false;
+			}
 			auto *query = static_cast<QInputMethodQueryEvent *>(e);
 			const Qt::InputMethodQueries asked = query->queries();
 			for (int bit = 0; bit < 32; bit++) {

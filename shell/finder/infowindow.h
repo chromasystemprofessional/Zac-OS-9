@@ -4,11 +4,14 @@
 #include <QRect>
 #include <QThread>
 #include <QTimer>
+#include <QVariant>
 #include <QWidget>
 
 #include "panelkit.h"
 #include "pixels.h"
 #include "resources.h"
+
+class QInputMethodEvent;
 
 /*
  * "<name> Info": what Get Info shows for a file, folder or disk, chosen
@@ -43,10 +46,17 @@ protected:
 	void dragEnterEvent(QDragEnterEvent *) override;
 	void dropEvent(QDropEvent *) override;
 	void closeEvent(QCloseEvent *) override;
+	void inputMethodEvent(QInputMethodEvent *) override;
+	QVariant inputMethodQuery(Qt::InputMethodQuery) const override;
 
 private:
 	InfoWindow(const QString &path, pl_icon_kind kind, const QString &name,
 		const ResourceDetails *details = nullptr);
+	void setEditingComment(bool editing);
+	QStringList commentLines() const;
+	QPoint commentPreeditOrigin() const;
+	QPoint commentCaretPos() const;
+	QRect commentCursorRect() const;
 	void saveComment();
 	bool showView(int view);
 	void paintHeader(pl_canvas *c);
@@ -83,6 +93,8 @@ private:
 	/* Comments live in the file's "user.xdg.comment" extended attribute
 	 * (the freedesktop convention), at most 200 characters like the Mac's. */
 	QString m_comment;
+	QString m_commentPreedit;
+	int m_commentPreeditCursor = 0;
 	bool m_editingComment = false;
 	bool m_iconFocused = false;
 	QPoint m_iconPressPos;

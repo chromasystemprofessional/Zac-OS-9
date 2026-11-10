@@ -13,7 +13,10 @@
 #include <QPointer>
 #include <QDir>
 #include <QDragEnterEvent>
+#include <QGuiApplication>
 #include <QHash>
+#include <QInputMethod>
+#include <QInputMethodEvent>
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QStorageInfo>
@@ -172,6 +175,7 @@ FolderWindow::FolderWindow(const QString &path) : m_path(path) {
 	m_sortColumn = m_state.options.list.columns & columnBit(m_state.sortColumn) ?
 		m_state.sortColumn : COL_NAME;
 	m_editor.setBeside(smallIcons());
+	m_editor.setEditingChanged([this](bool editing) { setImeEditing(editing); });
 	m_saveTimer.setSingleShot(true);
 	m_saveTimer.callOnTimeout([this] { m_state.save(m_path); });
 	setAttribute(Qt::WA_DeleteOnClose);
@@ -1875,6 +1879,29 @@ void FolderWindow::beginRename(Item *item) {
 	if (m_mode == ViewMode::Icons && item && item->selected) {
 		m_editor.begin(item);
 	}
+}
+
+void FolderWindow::setImeEditing(bool editing) {
+	setAttribute(Qt::WA_InputMethodEnabled, editing);
+	setProperty("zacos9TextField", editing);
+	if (QInputMethod *ime = QGuiApplication::inputMethod()) {
+		ime->update(Qt::ImQueryAll);
+	}
+	update();
+}
+
+void FolderWindow::inputMethodEvent(QInputMethodEvent *e) {
+	if (m_editor.active() && m_editor.inputMethodEvent(e)) {
+		return;
+	}
+	QWidget::inputMethodEvent(e);
+}
+
+QVariant FolderWindow::inputMethodQuery(Qt::InputMethodQuery query) const {
+	if (m_editor.active() && m_editor.item()) {
+		return m_editor.inputMethodQuery(query, toWindow(m_editor.item()->pos));
+	}
+	return QWidget::inputMethodQuery(query);
 }
 
 void FolderWindow::keyPressEvent(QKeyEvent *e) {

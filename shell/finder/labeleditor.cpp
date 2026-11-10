@@ -9,7 +9,10 @@
 #include <QApplication>
 #include <QDir>
 #include <QFileInfo>
+#include <QInputMethodEvent>
 #include <QKeyEvent>
+#include <QLocale>
+#include <algorithm>
 
 #include "alert.h"
 #include "finder.h"
@@ -40,8 +43,11 @@ void LabelEditor::begin(Item *item) {
 	m_text = item->visibleName();
 	m_anchor = 0;
 	m_cursor = m_text.size(); /* the whole name selected */
+	m_preedit.clear();
+	m_preeditCursor = 0;
 	m_caretOn = true;
 	m_blink.start(QApplication::cursorFlashTime() / 2);
+	reportEditing();
 	m_repaint();
 }
 
@@ -59,6 +65,18 @@ void LabelEditor::retarget(const std::vector<std::unique_ptr<Item>> &items) {
 	if (!m_item) {
 		m_blink.stop();
 	}
+	reportEditing();
+}
+
+void LabelEditor::reportEditing() {
+	const bool now = m_item != nullptr;
+	if (now == m_editingReported) {
+		return;
+	}
+	m_editingReported = now;
+	if (m_editingChanged) {
+		m_editingChanged(now);
+	}
 }
 
 void LabelEditor::changed() {
@@ -67,11 +85,21 @@ void LabelEditor::changed() {
 	m_repaint();
 }
 
+/* The committed text with the input method's preedit inserted at the
+ * caret. Indices below are UTF-16, as Qt's are. */
+QString LabelEditor::displayed() const {
+	if (m_preedit.isEmpty()) {
+		return m_text;
+	}
+	const int at = std::clamp(m_cursor, 0, static_cast<int>(m_text.size()));
+	return m_text.left(at) + m_preedit + m_text.mid(at);
+}
+
 int LabelEditor::advanceTo(int chars) const {
 	if (chars <= 0) {
 		return 0;
 	}
-	Text t(m_text.left(chars), 100000, PL_FONT_VIEWS);
+	Text t(displayed().left(chars), 100000, PL_FONT_VIEWS);
 	return t.t ? t.t->advance : 0;
 }
 
@@ -81,9 +109,130 @@ void LabelEditor::deleteSelection() {
 	m_cursor = m_anchor = a;
 }
 
+/* Printable characters, less "/" (which can't be in a Linux file name; on
+ * the Mac it was ":"). A commit can carry a whole word at once. */
+void LabelEditor::insertText(const QString &raw) {
+	QString s;
+	bool slash = false;
+	for (QChar ch : raw) {
+		if (ch == '/') {
+			slash = true;
+		} else if (ch.isPrint()) {
+			s += ch;
+		}
+	}
+	if (slash) {
+		QApplication::beep();
+	}
+	if (s.isEmpty()) {
+		return;
+	}
+	deleteSelection();
+	m_text.insert(m_cursor, s);
+	m_cursor += s.size();
+	m_anchor = m_cursor;
+	clearPreedit();
+	changed();
+}
+
+void LabelEditor::setPreedit(const QString &text, int cursor) {
+	m_preedit = text;
+	m_preeditCursor = std::clamp(cursor, 0, static_cast<int>(m_preedit.size()));
+	changed();
+}
+
+void LabelEditor::clearPreedit() {
+	m_preedit.clear();
+	m_preeditCursor = 0;
+}
+
+bool LabelEditor::inputMethodEvent(QInputMethodEvent *e) {
+	if (!m_item) {
+		return false;
+	}
+	int cursor = static_cast<int>(e->preeditString().size());
+	for (const QInputMethodEvent::Attribute &a : e->attributes()) {
+		if (a.type == QInputMethodEvent::Cursor) {
+			cursor = a.start;
+		}
+	}
+	const QString commit = e->commitString();
+	if (!commit.isEmpty()) {
+		insertText(commit);
+	}
+	setPreedit(e->preeditString(), cursor);
+	return true;
+}
+
+QRect LabelEditor::boxRect(QPoint iconPos) const {
+	const int width = advanceTo(displayed().size());
+	int pen, top;
+	origin(iconPos.x(), iconPos.y(), width, &pen, &top);
+	return QRect(QPoint(pen - BOX_PAD - 1, top), QPoint(pen + width + BOX_PAD, top + BOX_H - 1));
+}
+
+QRect LabelEditor::cursorRect(QPoint iconPos) const {
+	const int width = advanceTo(displayed().size());
+	int pen, top;
+	origin(iconPos.x(), iconPos.y(), width, &pen, &top);
+	const int caret = m_preedit.isEmpty() ? m_cursor :
+		m_cursor + std::clamp(m_preeditCursor, 0, static_cast<int>(m_preedit.size()));
+	return QRect(pen + advanceTo(caret), top + 2, 1, BOX_H - 4);
+}
+
+QVariant LabelEditor::inputMethodQuery(Qt::InputMethodQuery query, QPoint iconPos) const {
+	if (!m_item) {
+		return {};
+	}
+	switch (query) {
+	case Qt::ImEnabled:
+		return true;
+	case Qt::ImHints:
+		return static_cast<int>(Qt::ImhNoPredictiveText | Qt::ImhNoAutoUppercase);
+	case Qt::ImSurroundingText:
+		return m_text;
+	case Qt::ImCursorPosition:
+		return m_cursor;
+	case Qt::ImAnchorPosition:
+		return m_anchor;
+	case Qt::ImCurrentSelection: {
+		const int a = std::min(m_cursor, m_anchor), b = std::max(m_cursor, m_anchor);
+		return m_text.mid(a, b - a);
+	}
+	case Qt::ImTextBeforeCursor:
+		return m_text.left(m_cursor);
+	case Qt::ImTextAfterCursor:
+		return m_text.mid(m_cursor);
+	case Qt::ImCursorRectangle:
+		return cursorRect(iconPos);
+	case Qt::ImInputItemClipRectangle:
+		return boxRect(iconPos);
+	case Qt::ImReadOnly:
+		return false;
+	case Qt::ImPreferredLanguage:
+		return QLocale().name();
+	default:
+		return {};
+	}
+}
+
 bool LabelEditor::key(QKeyEvent *e) {
 	if (!m_item) {
 		return false;
+	}
+	/* While the input method is composing, the keys belong to it. The
+	 * compositor normally keeps them from reaching us; this keeps a stray
+	 * one from editing the committed text behind the preedit. */
+	if (!m_preedit.isEmpty()) {
+		if (e->key() == Qt::Key_Escape) {
+			clearPreedit();
+			changed();
+		} else if (e->key() == Qt::Key_Backspace && m_preeditCursor > 0) {
+			m_preedit.remove(m_preeditCursor - 1, 1);
+			--m_preeditCursor;
+			changed();
+		}
+		return true;
 	}
 	const bool shift = e->modifiers() & Qt::ShiftModifier;
 	switch (e->key()) {
@@ -149,16 +298,7 @@ bool LabelEditor::key(QKeyEvent *e) {
 	}
 	const QString typed = e->text();
 	if (!typed.isEmpty() && typed.at(0).isPrint() && !(e->modifiers() & Qt::ControlModifier)) {
-		/* "/" can't be in a Linux file name (on the Mac it was ":"). */
-		if (typed.contains('/')) {
-			QApplication::beep();
-			return true;
-		}
-		deleteSelection();
-		m_text.insert(m_cursor, typed);
-		m_cursor += typed.size();
-		m_anchor = m_cursor;
-		changed();
+		insertText(typed);
 		return true;
 	}
 	return true; /* everything else is swallowed while editing */
@@ -166,7 +306,9 @@ bool LabelEditor::key(QKeyEvent *e) {
 
 void LabelEditor::cancel() {
 	m_item = nullptr;
+	clearPreedit();
 	m_blink.stop();
+	reportEditing();
 	m_repaint();
 }
 
@@ -186,9 +328,15 @@ void LabelEditor::commit() {
 	if (!item) {
 		return;
 	}
+	/* A preedit still in the field when editing ends is text the person
+	 * sees; keep it rather than losing what they typed. */
+	if (!m_preedit.isEmpty()) {
+		insertText(m_preedit);
+	}
 	const QString name = renamedFileName(item->name, item->shownName, m_text.trimmed());
 	m_item = nullptr;
 	m_blink.stop();
+	reportEditing();
 	m_repaint();
 	if (name.isEmpty() || name == item->name) {
 		return;
@@ -250,31 +398,34 @@ void LabelEditor::origin(int x, int y, int width, int *pen, int *top) const {
 }
 
 void LabelEditor::paint(pl_canvas *c, int x, int y) const {
-	const int width = advanceTo(m_text.size());
+	const QString shown = displayed();
+	const int width = advanceTo(shown.size());
 	int pen, top;
 	origin(x, y, width, &pen, &top);
 	pl_fill(c, pen - BOX_PAD - 1, top, pen + width + BOX_PAD, top + BOX_H - 1, C_WHITE);
 	pl_outline(c, pen - BOX_PAD - 1, top, pen + width + BOX_PAD, top + BOX_H - 1, C_BLACK);
 
-	int a = std::min(m_cursor, m_anchor), b = std::max(m_cursor, m_anchor);
-	if (a != b) {
+	const int a = std::min(m_cursor, m_anchor), b = std::max(m_cursor, m_anchor);
+	if (a != b && m_preedit.isEmpty()) {
 		pl_fill(c, pen + advanceTo(a), top + 1, pen + advanceTo(b) - 1, top + BOX_H - 2,
 			TEXT_HILITE);
 	}
-	Text t(m_text, 100000, PL_FONT_VIEWS);
+	Text t(shown, 100000, PL_FONT_VIEWS);
 	if (t.t && t.t->ink_l >= 0) {
 		/* Text is rendered with its pen at mask column 1. */
 		pl_text(c, t.t, pen + t.t->ink_l - 1, top + BASELINE, C_BLACK);
 	}
-	if (a == b && m_caretOn) {
-		pl_vline(c, pen + advanceTo(m_cursor), top + 2, top + BOX_H - 3, C_BLACK);
+	if (!m_preedit.isEmpty()) {
+		const int from = m_cursor, to = m_cursor + static_cast<int>(m_preedit.size());
+		pl_hline(c, pen + advanceTo(from), pen + advanceTo(to), top + BASELINE + 1, C_BLACK);
+	}
+	const int caret = m_preedit.isEmpty() ? m_cursor :
+		m_cursor + std::clamp(m_preeditCursor, 0, static_cast<int>(m_preedit.size()));
+	if ((a == b || !m_preedit.isEmpty()) && m_caretOn) {
+		pl_vline(c, pen + advanceTo(caret), top + 2, top + BOX_H - 3, C_BLACK);
 	}
 }
 
 bool LabelEditor::contains(int x, int y, QPoint p) const {
-	const int width = advanceTo(m_text.size());
-	int pen, top;
-	origin(x, y, width, &pen, &top);
-	return QRect(QPoint(pen - BOX_PAD - 1, top), QPoint(pen + width + BOX_PAD, top + BOX_H - 1))
-		.contains(p);
+	return boxRect(QPoint(x, y)).contains(p);
 }
