@@ -6,6 +6,14 @@
 override_dh_auto_test:
 	dh_auto_test --no-parallel
 
+# zacos9-boot-handoff.service is started on demand by
+# zacos9-boot-handoff quit, and zacos9-gpe-guard.service by its timer:
+# neither has an [Install] section. Asking deb-systemd-invoke to start them
+# from the package scripts only printed "is a disabled or a static unit not
+# running, not starting it" during install and upgrade.
+override_dh_installsystemd:
+	dh_installsystemd -Xzacos9-boot-handoff.service -Xzacos9-gpe-guard.service
+
 # dh_dwz fails on some binaries in this tree (zacos9-parade and others);
 # compressing debug info is optional and not worth blocking the build.
 override_dh_dwz:

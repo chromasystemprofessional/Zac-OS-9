@@ -142,3 +142,13 @@ If `deactivate` or starting the watcher fails, `quit` falls back to a plain
 Debugging on a running system: `systemctl status zacos9-parade
 zacos9-boot-handoff plymouth-quit`, `cat /run/zacos9/parade /run/zacos9/handoff`.
 Booting with `splash` removed from the kernel command line skips all of it.
+
+## The login window's seat
+
+The login window (`zacos9-greeter`) runs a `zacos9-wm` as `_greetd`, not as
+the person logging in. It has no logind session of its own, so libseat gets
+the display from `seatd`; the package recommends `seatd`, the ISO lists it,
+and the postinst puts `_greetd` in the `video` and `render` groups that
+`seatd -g video` serves. Without those, Log Out ends the session but the
+login window's compositor cannot open the display, leaving a blank screen
+with a cursor.

@@ -45,6 +45,11 @@ test('installed-files', find_program('python3'),
   args: [files('tests/baseline/test_installed_files.py'), meson.project_build_root(),
     files('tests/baseline/installed-files.txt')])
 
+# Static units (no [Install]) are on demand, not started by the package
+# scripts, and the login window's compositor has seatd for its seat.
+test('packaging', find_program('python3'),
+  args: [files('tests/baseline/test_packaging.py'), meson.project_source_root()])
+
 # ZacOS 9 does not track its users: no known tracker endpoint in shipped
 # source, and the update, Software and web-search code only contact the hosts
 # PRIVACY.md lists. A new network feature must be added to both.

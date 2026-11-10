@@ -157,6 +157,7 @@ Recommends: balena-etcher,
             dbus-user-session,
             xdg-desktop-portal-gtk,
             foot,
+            seatd,
             vlc
 # No Conflicts with cups-browsed (issue #111): cups-daemon recommends it,
 # so most Debian systems have it. Printer Picker skips its implicitclass://

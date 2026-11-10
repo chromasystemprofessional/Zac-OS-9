@@ -2,8 +2,11 @@
 zacos9
 zacos9-emulators
 
-# Login: greetd with a text greeter; live sessions log straight in
+# Login: greetd with a text greeter; live sessions log straight in.
+# seatd gives the login window's compositor a seat: it runs as _greetd,
+# which has no logind session of its own.
 greetd
+seatd
 tuigreet
 
 # Session
