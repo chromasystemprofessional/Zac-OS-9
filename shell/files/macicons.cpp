@@ -18,6 +18,7 @@
  *   icl8/ics8   8-bit indices into the standard Mac 256-colour table
  *   icl4/ics4   4-bit indices into the standard 16-colour table
  *   ICN#/ics#   a 1-bit bitmap, then its 1-bit opacity mask
+ *   icns        an icon suite holding any of the above (Mac OS 8.5+)
  *
  * The colour resources have no palette of their own: they index the
  * system's standard tables. Those are generated below; no Apple data is
@@ -213,6 +214,35 @@ static QHash<QByteArray, QByteArray> iconResources(const QByteArray &fork) {
 	return icons;
 }
 
+/* The sub-icons inside an 'icns' icon-suite resource (Mac OS 8.5 and
+ * later). The suite is "icns", its total length, then entries of a
+ * four-byte type and a big-endian length that includes the entry header.
+ * Each entry body uses the same icl8/ICN#/ics formats as a standalone
+ * icon resource. */
+static QHash<QByteArray, QByteArray> iconSuiteResources(const QByteArray &suite) {
+	QHash<QByteArray, QByteArray> icons;
+	if (suite.size() < 8 || suite.left(4) != QByteArray("icns", 4)) {
+		return icons;
+	}
+	const quint32 total = be32(suite, 4);
+	if (total < 8 || static_cast<qint64>(total) > suite.size()) {
+		return icons;
+	}
+	int at = 8;
+	while (at + 8 <= static_cast<int>(total)) {
+		const QByteArray type = suite.mid(at, 4);
+		const quint32 length = be32(suite, at + 4);
+		if (length < 8 || static_cast<qint64>(at) + length > total) {
+			break;
+		}
+		if (!icons.contains(type)) {
+			icons.insert(type, suite.mid(at + 8, static_cast<int>(length) - 8));
+		}
+		at += static_cast<int>(length);
+	}
+	return icons;
+}
+
 static bool maskBit(const QByteArray &mask, int size, int x, int y) {
 	const int rowBytes = size / 8;
 	const int at = size * rowBytes + y * rowBytes + x / 8;
@@ -271,7 +301,13 @@ static QImage decodeMonoIcon(const QByteArray &body, int size) {
 }
 
 static QImage decodeIconFork(const QByteArray &fork) {
-	const QHash<QByteArray, QByteArray> icons = iconResources(fork);
+	QHash<QByteArray, QByteArray> icons = iconResources(fork);
+	const QHash<QByteArray, QByteArray> suite = iconSuiteResources(icons.value("icns"));
+	for (auto it = suite.cbegin(); it != suite.cend(); ++it) {
+		if (!icons.contains(it.key())) {
+			icons.insert(it.key(), it.value());
+		}
+	}
 	if (icons.isEmpty()) {
 		return {};
 	}

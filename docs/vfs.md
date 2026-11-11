@@ -129,9 +129,10 @@ A folder copied from a Mac OS 9 disk can carry the icon its owner gave it in
 extraction keeps those forks as hidden `._` AppleDouble companions (Netatalk's
 `.rsrc` folders and an HFS mount's `..namedfork/rsrc` are read too). The
 Finder decodes the classic `icl8`/`icl4` colour resources with their `ICN#`
-mask, and the 16x16 `ics` family when that is all a file has, into the same
-32x32 icons it uses for pictures pasted in Get Info. An icon set through Get
-Info still takes precedence; removing that one reveals the classic icon again.
+mask, the 16x16 `ics` family when that is all a file has, and an `icns` icon
+suite (Mac OS 8.5+) that groups those resources, into the same 32x32 icons it
+uses for pictures pasted in Get Info. An icon set through Get Info still takes
+precedence; removing that one reveals the classic icon again.
 No icon artwork is bundled: only the user's own resource forks are read.
 
 ## Document names and icons
