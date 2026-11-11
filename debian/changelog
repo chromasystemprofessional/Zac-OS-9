@@ -1,3 +1,14 @@
+zacos9 (1.17.1) trixie; urgency=medium
+
+  * Finder: applications are listed in one batch, so the first folder opens
+    promptly and every application has its name; contextual menus get the
+    pointer on the button release that opened them; Log Out exits through
+    the display manager so the login window returns; StuffIt archives with
+    legal Mac colon names or non-ASCII names expand again, and the Finder
+    shows classic icons stored in Mac OS 8.5 icns icon suites.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Tue, 10 Nov 2026 21:22:23 -0500
+
 zacos9 (1.17.0) trixie; urgency=medium
 
   * Classic Mac OS 9 folder and file icons now appear in the Finder,
