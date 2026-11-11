@@ -1,11 +1,13 @@
 #include <getopt.h>
 #include <limits.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <wayland-server-core.h>
 #include <wlr/types/wlr_compositor.h>
 #include <wlr/types/wlr_data_control_v1.h>
 #include <wlr/types/wlr_data_device.h>
@@ -92,6 +94,48 @@ static struct shell_child shell_children[] = {
 };
 
 static struct wl_event_source *shell_timer;
+
+/* ---- leaving -------------------------------------------------------------
+
+   Log Out asks this process to exit rather than asking logind to terminate
+   the whole session. SDDM's helper lives in the session too, and when
+   logind kills it along with the desktop, SDDM has no helper to report the
+   session's end and no greeter comes back; the display manager does start
+   one when its session process (this one) exits. Publish the pid under the
+   Wayland socket's name so the shutdown helper can find this session's
+   compositor, not a nested test's. */
+
+static char quit_pid_path[PATH_MAX + 64];
+
+static void write_quit_pid(void) {
+	const char *runtime = getenv("XDG_RUNTIME_DIR");
+	const char *display = getenv("WAYLAND_DISPLAY");
+	if (!runtime || !display || !*runtime || !*display) {
+		return;
+	}
+	snprintf(quit_pid_path, sizeof(quit_pid_path), "%s/zacos9-wm-%s.pid", runtime, display);
+	FILE *f = fopen(quit_pid_path, "w");
+	if (!f) {
+		quit_pid_path[0] = '\0';
+		return;
+	}
+	fprintf(f, "%d\n", (int)getpid());
+	fclose(f);
+}
+
+static void remove_quit_pid(void) {
+	if (quit_pid_path[0]) {
+		unlink(quit_pid_path);
+		quit_pid_path[0] = '\0';
+	}
+}
+
+static int quit_signal(int signal, void *data) {
+	(void)signal;
+	struct plat_server *server = data;
+	wl_display_terminate(server->display);
+	return 0;
+}
 
 static int watch_shell(void *data) {
 	(void)data;
@@ -348,6 +392,11 @@ int main(int argc, char *argv[]) {
 	}
 
 	setenv("WAYLAND_DISPLAY", socket, true);
+	/* The shutdown helper asks this process to leave; see quit_signal. */
+	write_quit_pid();
+	struct wl_event_loop *loop = wl_display_get_event_loop(server.display);
+	wl_event_loop_add_signal(loop, SIGTERM, quit_signal, &server);
+	wl_event_loop_add_signal(loop, SIGINT, quit_signal, &server);
 	pl_sound_event("startup");
 	prefs_write_outputs(&server);
 	share_our_data();
@@ -377,8 +426,10 @@ int main(int argc, char *argv[]) {
 		"Quit with Ctrl+Alt+Backspace or by closing its window.\n", socket);
 	wl_display_run(server.display);
 
+	remove_quit_pid();
 	input_cancel_grab(&server);
 	wl_display_destroy_clients(server.display);
+	lock_finish(&server);
 	if (server.xwayland) {
 		wlr_xwayland_destroy(server.xwayland);
 	}

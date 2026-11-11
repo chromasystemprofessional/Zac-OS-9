@@ -439,6 +439,8 @@ void idle_keep_awake(struct plat_server *server, struct wl_client *client, uint3
 
 /* lock.c: locking the screens (ext-session-lock-v1) */
 void lock_init(struct plat_server *server);
+/* Stop listening for new locks, for wl_display_destroy. */
+void lock_finish(struct plat_server *server);
 bool lock_active(struct plat_server *server);
 /* "Ask for my password to wake" is on. */
 bool lock_required(void);
