@@ -90,6 +90,14 @@ static void arrange_for(struct plat_layer_surface *ls) {
 	}
 }
 
+/* A layer surface is mapped before its first buffer reaches the scene,
+ * so the map handler cannot find it under a still pointer yet. Doing the
+ * same once the event loop is idle lets the desktop at login (and a
+ * contextual menu opening under the pointer) take the first click. */
+static void refocus_idle(void *data) {
+	input_pointer_refocus(data);
+}
+
 /* Keyboard focus for shell surfaces that ask for it (menus being tracked
  * use "exclusive"). NULL hands focus back to the frontmost window. */
 void layers_focus(struct plat_layer_surface *layer) {
@@ -127,10 +135,14 @@ static void handle_map(struct wl_listener *listener, void *data) {
 	if (ls->layer_surface->current.keyboard_interactive ==
 			ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_EXCLUSIVE) {
 		layers_focus(ls);
-		/* A menu (or the lock) appearing under a still pointer gets it at
-		 * once: a contextual menu opens where the pointer is. */
-		input_pointer_refocus(ls->server);
 	}
+	/* A layer surface appearing under a still pointer gets it at once:
+	 * the desktop as the session starts, or a contextual menu opening
+	 * where the pointer is. Without this the first click went nowhere
+	 * until the pointer moved. The idle turn catches the first buffer. */
+	input_pointer_refocus(ls->server);
+	wl_event_loop_add_idle(wl_display_get_event_loop(ls->server->display),
+		refocus_idle, ls->server);
 }
 
 static void handle_unmap(struct wl_listener *listener, void *data) {

@@ -183,11 +183,18 @@ with tempfile.TemporaryDirectory(prefix="zacos9-switch-") as directory:
             print("ok: the Application menu's handle hides and shows the program's name")
 
             # Control-click on the desktop: its contextual menu opens at the
-            # pointer and stays (a click); its first item, New Folder, makes one.
+            # pointer and stays (a click); its first item, New Folder, makes
+            # one. Hold the button while the Sniffer and menu bar open it:
+            # the pointer does not move between the press and the menu, so
+            # it must not wait for a motion to find where it is.
             desktop = root / "home" / "Desktop"
             desktop.mkdir(exist_ok=True)
             # (the windows cover the middle; the desktop shows at the left)
-            vp("home", "move", "40", "450", "hold", "control", "click", "release", "control", "wait", "700")
+            before = green() if have_grim else None
+            vp("home", "move", "40", "450", "hold", "control", "down", "wait", "400",
+               "up", "release", "control", "wait", "700")
+            if have_grim:
+                assert green() < before, "the contextual menu opens without the pointer moving"
             vp("home", "move", "70", "458", "click", "wait", "1500")
             wait_for("New Folder from the contextual menu", lambda: (desktop / "untitled folder").is_dir())
             print("ok: a contextual menu on the desktop opens at the pointer; New Folder works")

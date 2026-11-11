@@ -1253,10 +1253,21 @@ static void pointer_button(struct plat_server *server, uint32_t time_msec, uint3
 	if (event->state == WL_POINTER_BUTTON_STATE_PRESSED && press_focus(server, event->time_msec, event->button)) {
 		return;
 	}
+	/* Whether the release ends an implicit grab: a menu bar overlay that
+	 * mapped during the press (a contextual menu) is under the pointer
+	 * but could not take it while the button was down. Once the release
+	 * has gone to the press's surface, focus follows the stack again, so
+	 * the menu opens without the pointer having to move. */
+	struct wlr_seat_pointer_state *pstate = &server->seat->pointer_state;
+	const bool implicit = event->state == WL_POINTER_BUTTON_STATE_RELEASED &&
+		pstate->button_count > 0 && pstate->grab == pstate->default_grab;
 	wlr_seat_pointer_notify_button(server->seat, event->time_msec,
 		event->button, event->state);
 	if (event->state == WL_POINTER_BUTTON_STATE_RELEASED) {
 		proxy_done(server);
+		if (implicit && pstate->button_count == 0) {
+			input_pointer_refocus(server);
+		}
 	}
 }
 
