@@ -111,7 +111,22 @@ int main(int argc, char **argv) {
 		"#!/bin/sh\ncase \"$1:$2\" in\n"
 		"-S:*version-fixture.desktop) printf 'finder-version-fixture: %s\\n' \"$2\" ;;\n"
 		"*) exit 1 ;;\nesac\n");
-	write(fakeBin + "/dpkg-query", "#!/bin/sh\nprintf '4.2.1-zac\\n'\n");
+	write(fakeBin + "/dpkg-query",
+		"#!/bin/sh\n"
+		"case \"$1\" in\n"
+		"-S)\n"
+		"	shift\n"
+		"	for path in \"$@\"; do\n"
+		"		case \"$path\" in\n"
+		"		*version-fixture.desktop) printf 'finder-version-fixture: %s\\n' \"$path\" ;;\n"
+		"		esac\n"
+		"	done\n"
+		"	exit 0 ;;\n"
+		"-W)\n"
+		"	printf 'finder-version-fixture\\t4.2.1-zac\\n'\n"
+		"	exit 0 ;;\n"
+		"esac\n"
+		"exit 1\n");
 	for (const QString tool : { "dpkg", "dpkg-query" }) {
 		QFile::setPermissions(fakeBin + "/" + tool,
 			QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);

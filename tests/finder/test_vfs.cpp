@@ -21,6 +21,7 @@
 #include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QTextStream>
+#include <QTimer>
 #include <QSaveFile>
 #include <functional>
 
@@ -280,17 +281,51 @@ int main(int argc, char **argv) {
 		"*/manual.desktop|*/qps.desktop) printf 'finder-manual-demo: %s\\n' \"$2\" ;;\n"
 		"*) exec /usr/bin/dpkg \"$@\" ;;\n"
 		"esac\n");
+	/* appdb asks once for every desktop entry and its Exec= program, and
+	 * once for their versions: answer all the paths in the one call. */
 	writeEntry(root + "/bin", "dpkg-query",
 		"#!/bin/sh\n"
-		"case \"$3\" in\n"
-		"finder-auto-demo:amd64|finder-manual-demo) printf '1.0\\n' ;;\n"
-		"*) exec /usr/bin/dpkg-query \"$@\" ;;\n"
-		"esac\n");
+		"[ -n \"${ZACOS9_TEST_PKG_LOG:-}\" ] && printf '%s\\n' \"$*\" >> \"$ZACOS9_TEST_PKG_LOG\"\n"
+		"case \"$1\" in\n"
+		"-S)\n"
+		"	sleep 0.1\n"
+		"	shift\n"
+		"	rest=\n"
+		"	status=1\n"
+		"	for path in \"$@\"; do\n"
+		"		case \"$path\" in\n"
+		"		*/automatic.desktop) printf 'finder-auto-demo:amd64: %s\\n' \"$path\"; status=0 ;;\n"
+		"		*/manual.desktop|*/qps.desktop) printf 'finder-manual-demo: %s\\n' \"$path\"; status=0 ;;\n"
+		"		*) rest=\"$rest $path\" ;;\n"
+		"		esac\n"
+		"	done\n"
+		"	if [ -n \"$rest\" ]; then\n"
+		"		/usr/bin/dpkg-query -S $rest\n"
+		"		[ $? = 0 ] && status=0\n"
+		"	fi\n"
+		"	exit $status ;;\n"
+		"-W)\n"
+		"	format=${2#-f=}\n"
+		"	shift 2\n"
+		"	rest=\n"
+		"	for package in \"$@\"; do\n"
+		"		case \"$package\" in\n"
+		"		finder-auto-demo|finder-auto-demo:*) printf 'finder-auto-demo\\t1.0\\n' ;;\n"
+		"		finder-manual-demo|finder-manual-demo:*) printf 'finder-manual-demo\\t1.0\\n' ;;\n"
+		"		*) rest=\"$rest $package\" ;;\n"
+		"		esac\n"
+		"	done\n"
+		"	[ -n \"$rest\" ] && exec /usr/bin/dpkg-query -W -f=\"$format\" $rest\n"
+		"	exit 0 ;;\n"
+		"esac\n"
+		"exec /usr/bin/dpkg-query \"$@\"\n");
 	for (const QString name : { "dpkg", "dpkg-query" }) {
 		QFile::setPermissions(root + "/bin/" + name,
 			QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
 	}
 	setenv("PATH", (root + "/bin:" + QString::fromLocal8Bit(qgetenv("PATH"))).toUtf8().constData(), 1);
+	const QString pkgLog = root + "/dpkg-query.log";
+	setenv("ZACOS9_TEST_PKG_LOG", pkgLog.toUtf8().constData(), 1);
 
 	/* A QGuiApplication (not just QCoreApplication), offscreen: so icon
 	 * resolution (QIcon::fromTheme, which needs a QPA platform to
@@ -420,6 +455,48 @@ int main(int argc, char **argv) {
 	writeEntry(appsDir, "missingbin.desktop",
 		entry("Missing Binary", "/bin/true", "TryExec=/nonexistent/program\n"));
 	settle();
+
+	/* Package ownership is asked once for all of them, not once per
+	 * application (one dpkg process per desktop entry and Exec= program
+	 * was minutes on a slow disk). */
+	{
+		QFile log(pkgLog);
+		QStringList calls;
+		if (log.open(QIODevice::ReadOnly)) {
+			calls = QString::fromUtf8(log.readAll()).split('\n', Qt::SkipEmptyParts);
+		}
+		int ownerCalls = 0;
+		for (const QString &call : calls) {
+			ownerCalls += call.startsWith(QLatin1String("-S "));
+		}
+		check(ownerCalls >= 1 && ownerCalls <= 2,
+			"package ownership is one dpkg-query for every application");
+	}
+	bool allNamed = true;
+	for (const AppEntry &app : appList()) {
+		allNamed &= !app.name.isEmpty() && !app.folderName.isEmpty();
+	}
+	check(allNamed, "every discovered application has a complete name");
+
+	/* A caller answered during a refresh must get the previous whole
+	 * list, never the one being built (the Finder used to draw launchers
+	 * whose names had not been worked out yet). */
+	{
+		const int before = static_cast<int>(appList().size());
+		writeEntry(appsDir, "late.desktop", entry("Late Arrival", "/bin/true"));
+		int during = -1;
+		bool fired = false;
+		QTimer::singleShot(10, [&during, &fired] {
+			during = static_cast<int>(appList().size());
+			fired = true;
+		});
+		appRefresh();
+		check(fired, "the refresh serves events while dpkg answers");
+		check(during == before,
+			"a list asked for during a refresh is the previous whole one");
+		check(static_cast<int>(appList().size()) == before + 1,
+			"and the one after it has the new application");
+	}
 
 	QStringList apps = namesIn(vfsPathFor("applications"));
 	const QString systemFolder = vfsPathFor("system-folder");
