@@ -404,6 +404,45 @@ int main(int argc, char **argv) {
 	check(customIconImage(brokenFolder).isNull(),
 		"a malformed classic icon sidecar is ignored");
 
+	/* Mac OS 8.5 grouped those resources in an 'icns' icon suite. */
+	QByteArray suiteEntries;
+	suiteEntries += "icl8";
+	append32(suiteEntries, 8 + icl8.size());
+	suiteEntries += icl8;
+	suiteEntries += "ICN#";
+	append32(suiteEntries, 8 + icn.size());
+	suiteEntries += icn;
+	QByteArray suite("icns");
+	append32(suite, 8 + suiteEntries.size());
+	suite += suiteEntries;
+	const QByteArray suiteFork = resourceFork({
+		MacResource{ "icns", -16455, suite },
+	});
+	const QString suiteFolder = root + "/Mac Suite Folder";
+	QDir().mkpath(suiteFolder + "/.rsrc");
+	check(writeBytes(suiteFolder + "/Icon\r", QByteArray()) &&
+		writeBytes(suiteFolder + "/.rsrc/Icon\r", suiteFork),
+		"a folder gets an icns icon suite in a Netatalk rsrc folder");
+	const QImage suiteIcon = customIconImage(suiteFolder);
+	check(!suiteIcon.isNull() && suiteIcon.size() == QSize(32, 32) &&
+		suiteIcon.pixel(16, 16) == qRgb(0xCC, 0xCC, 0xFF) &&
+		qAlpha(suiteIcon.pixel(0, 0)) == 0,
+		"an icns icon suite is decoded with its palette and mask");
+	const auto suiteItem = makeItem(QFileInfo(suiteFolder));
+	check(suiteItem && suiteItem->customIcon32.size() == 32 * 32 &&
+		suiteItem->customIcon32[16 * 32 + 16] == qRgb(0xCC, 0xCC, 0xFF),
+		"Finder items use an icns suite icon");
+
+	QByteArray badSuite("icns");
+	append32(badSuite, 4);
+	const QString badSuiteFolder = root + "/Broken Suite Folder";
+	QDir().mkpath(badSuiteFolder + "/.rsrc");
+	check(writeBytes(badSuiteFolder + "/Icon\r", QByteArray()) &&
+		writeBytes(badSuiteFolder + "/.rsrc/Icon\r", resourceFork({
+			MacResource{ "icns", -16455, badSuite },
+		})) && customIconImage(badSuiteFolder).isNull(),
+		"a malformed icns icon suite is ignored");
+
 	/* ---- discovery ---------------------------------------------------- */
 	writeEntry(appsDir, "simpletext.desktop", entry("SimpleText"));
 	writeEntry(appsDir, "calculator.desktop",

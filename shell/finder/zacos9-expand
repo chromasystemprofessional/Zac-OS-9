@@ -147,9 +147,12 @@ def sit_path(root, name):
     if not isinstance(name, str) or not name or "\0" in name:
         fail("The StuffIt archive has an invalid item name.")
     normalized = name.replace("\\", "/")
-    if (normalized.startswith("/") or ".." in normalized.split("/")
-            or any(len(part) >= 2 and part[0].isascii() and part[0].isalpha()
-                   and part[1] == ":" for part in normalized.split("/"))
+    # A colon is legal in a Mac file name ("w: ornament"); only a leading
+    # drive letter followed by a separator is a Windows path.
+    drive = (len(normalized) >= 3 and normalized[0].isascii()
+             and normalized[0].isalpha() and normalized[1] == ":"
+             and normalized[2] == "/")
+    if (normalized.startswith("/") or drive or ".." in normalized.split("/")
             or not normalized.strip("/.")):
         fail(f"The archive holds an item that would go outside its folder ({name}).")
     return safe_target(root, normalized)
@@ -176,7 +179,10 @@ def sit_metadata(item):
 def expand_sit(archive, root):
     listing = os.path.join(root, ".listing.json")
     with open(listing, "wb") as output:
-        sit_process(["lsar", "-j", "-nr", "-p", "", archive], output, SIT_LIST_LIMIT)
+        # -ja keeps the listing pure ASCII: lsar's default JSON has emitted
+        # raw NULs and control bytes for some Mac file names, which is not
+        # valid JSON even though the archive itself is readable.
+        sit_process(["lsar", "-j", "-ja", "-nr", "-p", "", archive], output, SIT_LIST_LIMIT)
     try:
         with open(listing, encoding="utf-8") as source:
             data = json.load(source)

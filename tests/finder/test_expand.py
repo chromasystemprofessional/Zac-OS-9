@@ -252,7 +252,7 @@ assert sys.stdin.read() == ""
 with open(args[-1]) as source:
     fixture = json.load(source)
 if os.path.basename(sys.argv[0]) == "lsar":
-    assert "-j" in args
+    assert "-ja" in args
     if fixture.get("broken_json"):
         print("not JSON")
     else:
@@ -297,11 +297,16 @@ sys.exit(fixture.get("extract_exit", 0))
         return dict(XADFileName=name, XADFileSize=5, **metadata)
 
     for name in ("../escape", "/absolute", "..\\escape", "C:\\escape",
-                 "C:escape", "\\\\server\\share", "safe/../escape", "._../bad/../../escape",
+                 "\\\\server\\share", "safe/../escape", "._../bad/../../escape",
                  "__MACOSX/../../escape", "safe\x00bad"):
         code, out, err = mock_sit([sit_entry(), sit_entry(name)], files={"safe.txt": "safe"})
         check(code != 0 and not out and not os.path.exists(j("called")),
               f"StuffIt validates every path before unar: {name!r}")
+    for name in ("w: ornament", "Icons/w: ornament/note", "C:escape"):
+        code, out, err = mock_sit([sit_entry(name)], files={name: "inside"})
+        check(code == 0 and os.path.isfile(j(name)) and
+              open(j(name)).read() == "inside",
+              f"StuffIt accepts a legal Mac colon name: {name!r}")
     for metadata in ({"XADIsLink": 1}, {"XADIsHardLink": 1},
                      {"XADLinkDestination": "../escape"}, {"XADIsEncrypted": 1},
                      {"XADIsCharacterDevice": 1}, {"XADIsBlockDevice": 1},
