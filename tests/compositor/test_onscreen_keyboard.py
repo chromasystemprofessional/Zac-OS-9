@@ -66,7 +66,8 @@ with tempfile.TemporaryDirectory(prefix="zacos9-osk-") as directory:
                ZACOS9_STARTUP="0", ZACOS9_MENUBAR="", ZACOS9_FINDER="", ZACOS9_COLLAR="",
                ZACOS9_INHIBIT="", QT_QPA_PLATFORM="wayland", QT_STYLE_OVERRIDE="",
                QT_WAYLAND_DISABLE_WINDOWDECORATION="1")
-    for name in ("WAYLAND_DISPLAY", "ZACOS9_SCALE", "DISPLAY", "ZACOS9_KEYBOARD"):
+    for name in ("WAYLAND_DISPLAY", "ZACOS9_SCALE", "DISPLAY", "ZACOS9_KEYBOARD",
+                 "QT_IM_MODULE", "GTK_IM_MODULE"):
         env.pop(name, None)
     log = (root / "log").open("w+")
     processes = [subprocess.Popen([compositor], env=env, stdout=log, stderr=log)]
