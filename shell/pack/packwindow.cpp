@@ -54,6 +54,7 @@ PackWindow::PackWindow()
 	/* An older version could save a place off the screen (a tear-off near
 	 * the bottom); come back on it. */
 	moveTo(m_pos);
+	m_shownPos = m_pos;
 }
 
 /* Above the windows (the Mac's palettes floated), placed by its margins
@@ -210,6 +211,7 @@ static void paintBox(pl_canvas *c, QRect r, bool pressed) {
 }
 
 void PackWindow::paintEvent(QPaintEvent *) {
+	m_shownPos = m_pos; /* this paint's commit carries the margins it set */
 	const int W = width(), H = height();
 	Pixels px(W, H);
 	pl_canvas *c = &px.c;
@@ -280,14 +282,21 @@ bool PackWindow::onEdge(QPoint p) const {
 
 void PackWindow::mousePressEvent(QMouseEvent *e) {
 	const QPoint pos = e->position().toPoint();
-	m_pressLocal = pos;
 	if (onEdge(pos)) {
 		m_sizing = true;
 		return;
 	}
+	/* A move begins here: remember where the palette and the pointer were
+	 * on the screen, so each motion can be placed from that fixed start
+	 * rather than accumulated through coordinates that lag behind it. */
+	const auto beginMove = [this, pos] {
+		m_moveStart = m_shownPos;
+		m_movePointer = m_shownPos + pos;
+		m_moving = true;
+	};
 	/* ⌘-drag anywhere moves it (⌘ arrives as Control). */
 	if (e->modifiers() & Qt::ControlModifier) {
-		m_moving = true;
+		beginMove();
 		return;
 	}
 	m_box = boxAt(pos);
@@ -297,7 +306,7 @@ void PackWindow::mousePressEvent(QMouseEvent *e) {
 		return;
 	}
 	if (pos.y() < BORDER + TITLE_H) {
-		m_moving = true;
+		beginMove();
 		return;
 	}
 	m_pressedTile = tileAt(pos);
@@ -317,9 +326,11 @@ void PackWindow::mouseMoveEvent(QMouseEvent *e) {
 		setCursor(onEdge(pos) ? Qt::SizeHorCursor : Qt::ArrowCursor);
 	}
 	if (m_moving) {
-		/* The surface moves under the pointer: the press point stays put
-		 * in it. */
-		moveTo(m_pos + pos - m_pressLocal);
+		/* Measure from the last position the compositor has shown, not
+		 * the margins just requested: a motion that arrived first would
+		 * otherwise count the pending move again and the palette would
+		 * run away from the pointer. */
+		moveTo(m_moveStart + (m_shownPos + pos) - m_movePointer);
 		return;
 	}
 	if (m_box != Box::None) {

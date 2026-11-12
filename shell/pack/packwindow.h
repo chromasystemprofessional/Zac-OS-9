@@ -61,6 +61,12 @@ private:
 	QSettings m_settings;
 	Look m_look;
 	QPoint m_pos;
+	/* Where the last painted frame was committed. Qt doesn't know a layer
+	 * surface's place on the screen, so pointer events arrive in surface
+	 * coordinates: this turns them back into screen coordinates, as the
+	 * Collar does, without mixing in margins the compositor hasn't shown
+	 * yet. */
+	QPoint m_shownPos;
 	std::vector<PackApp> m_apps;
 	QTimer m_refresh;
 
@@ -68,7 +74,8 @@ private:
 	bool m_moving = false;
 	bool m_sizing = false; /* dragging the right edge: the names' width */
 	bool onEdge(QPoint p) const;
-	QPoint m_pressLocal;
+	QPoint m_moveStart;   /* the palette's top-left when the drag began */
+	QPoint m_movePointer; /* the pointer's screen position when it began */
 	Box m_box = Box::None;
 	bool m_boxInside = false;
 	int m_pressedTile = -1;
