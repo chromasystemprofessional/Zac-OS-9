@@ -1,8 +1,9 @@
 #!/bin/sh
 # Build the ZacOS 9 live and install ISO into build/iso. Run
-# inside Debian 13 (WSL Debian on the Windows dev box) with sudo; needs
-# a network connection and about 10 GB free. The first build takes
-# 20-40 minutes; later ones reuse the downloaded packages.
+# inside Debian 13 (WSL Debian on the Windows dev box) as your normal user;
+# it asks for sudo for the steps that need root. Needs a network connection
+# and about 10 GB free. The first build takes 20-40 minutes; later ones reuse
+# the downloaded packages.
 #
 #   scripts/build-iso.sh
 #
@@ -13,6 +14,19 @@ set -eu
 self=$(realpath "$0")
 cd "$(dirname "$self")/.."
 root=$(pwd)
+
+# The package tests assume a normal user's permissions; running the whole
+# script through sudo makes them root and they fail one by one. Re-run as the
+# user who invoked sudo: the sudo calls below keep their permission.
+if [ "$(id -u)" = 0 ]; then
+	if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != root ]; then
+		echo "build-iso.sh: running as $SUDO_USER; sudo is only for the ISO steps." >&2
+		exec su -s /bin/sh "$SUDO_USER" -c 'cd "$1" && shift && exec sh "$@"' \
+			sh "$root" "$self" "$@"
+	fi
+	echo "build-iso.sh: run it as your normal user, not as root." >&2
+	exit 1
+fi
 
 sudo_() { if [ "$(id -u)" = 0 ]; then "$@"; else sudo "$@"; fi; }
 if ! command -v lb >/dev/null; then

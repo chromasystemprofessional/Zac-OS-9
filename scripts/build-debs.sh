@@ -1,6 +1,8 @@
 #!/bin/sh
 # Build the Debian packages into build/packages. Run inside Debian 13
-# (WSL Debian on the Windows dev box); installs missing build tools.
+# (WSL Debian on the Windows dev box) as your normal user; it asks for sudo
+# to install missing build tools. The package tests assume a normal user's
+# permissions.
 #
 #   scripts/build-debs.sh               # zacos9
 #   scripts/build-debs.sh --emulators   # and zacos9-emulators
@@ -12,6 +14,24 @@ set -eu
 self=$(realpath "$0")
 cd "$(dirname "$self")/.."
 root=$(pwd)
+
+# A root build runs the package tests as root, where a different one fails
+# every release. Re-run as the user who invoked sudo.
+if [ "$(id -u)" = 0 ]; then
+	if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != root ]; then
+		echo "build-debs.sh: running as $SUDO_USER; the package tests need a normal user." >&2
+		exec su -s /bin/sh "$SUDO_USER" -c 'cd "$1" && shift && exec sh "$@"' \
+			sh "$root" "$self" "$@"
+	fi
+	echo "build-debs.sh: run it as your normal user, not as root." >&2
+	exit 1
+fi
+# rustup installs cargo outside PATH. The tests and dpkg-checkbuilddeps need
+# it even after su has reset PATH for the user who ran sudo.
+if [ -d "$HOME/.cargo/bin" ]; then
+	PATH="$HOME/.cargo/bin:$PATH"
+	export PATH
+fi
 out=$root/build/packages
 mkdir -p "$out"
 rm -f "$out"/zacos9*.deb
