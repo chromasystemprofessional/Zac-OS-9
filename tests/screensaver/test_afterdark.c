@@ -112,7 +112,9 @@ static bool sigterm_blocked(void) {
 static void mask_helper(void) {
 	if (sigterm_blocked()) {
 		static const char message[] = "SIGTERM was blocked in the helper\n";
-		write(STDERR_FILENO, message, sizeof(message) - 1);
+		if (write(STDERR_FILENO, message, sizeof(message) - 1) < 0) {
+			_exit(3);
+		}
 		_exit(3);
 	}
 	small_helper();
