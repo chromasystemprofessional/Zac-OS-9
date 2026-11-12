@@ -15,4 +15,5 @@ executable('zacos9-lock', 'lock.c', lock_protocol, client_protocol_src,
 test_lock_exe = executable('test-lock', 'lock.c', lock_protocol, client_protocol_src,
   c_args: ['-DZACOS9_LOCK_TEST'],
   dependencies: [platinum_dep, wayland_client, xkbcommon_client],
+  build_by_default: false,
 )

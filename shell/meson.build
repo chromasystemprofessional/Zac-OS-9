@@ -89,6 +89,7 @@ xkb_layouts_include = include_directories('../compositor/src')
 fullscreen_client = executable('test-fullscreen-client',
   '../tests/compositor/fullscreen_client.cpp',
   dependencies: qt6,
+  build_by_default: false,
 )
 
 vptr_protocol = []
@@ -112,16 +113,19 @@ rawshot_exe = executable('rawshot', meson.project_source_root() / 'tools/rawshot
 idle_client = executable('test-idle-client',
   '../tests/compositor/idle_client.cpp',
   dependencies: qt6,
+  build_by_default: false,
 )
 # Monitors' 1.25x, 1.5x and 1.75x, per screen: wp_fractional_scale_v1, but not for ZacOS's own programs.
 globals_client = executable('test-globals-client',
   '../tests/compositor/globals_client.c',
   dependencies: [wayland_client],
+  build_by_default: false,
 )
 # Option-click on the close and collapse boxes, ⌘-drag behind (input.c).
 close_app_client = executable('test-close-app-client',
   '../tests/compositor/close_app_client.c', finder_protocol,
   dependencies: [wayland_client],
+  build_by_default: false,
 )
 gtk3 = dependency('gtk+-3.0')
 qt_menu_fixture = executable('qt-menu-fixture', '../tests/finder/qt_menu_fixture.cpp',
@@ -191,6 +195,7 @@ field_client = executable('test-field-client',
   include_directories: include_directories('finder'),
   dependencies: [shell_common_dep, qt6, wayland_client],
   cpp_args: ['-DPLATINUM_FIELD'],
+  build_by_default: false,
 )
 # The on-screen keyboard for a text field with no keyboard attached.
 test('onscreen-keyboard', find_program('python3'),
@@ -221,16 +226,19 @@ ime_app_client = executable('test-ime-app',
   '../tests/compositor/ime-test-clients/app-test.c',
   client_protocol_src, ime_test_protocols,
   dependencies: [wayland_client],
+  build_by_default: false,
 )
 ime_client = executable('test-ime-ime',
   '../tests/compositor/ime-test-clients/ime-test.c',
   client_protocol_src, ime_test_protocols,
   dependencies: [wayland_client],
+  build_by_default: false,
 )
 ime_vkbd_client = executable('test-ime-vkbd',
   '../tests/compositor/ime-test-clients/vkbd-test.c',
   client_protocol_src, ime_test_protocols,
   dependencies: [wayland_client, xkbcommon_client],
+  build_by_default: false,
 )
 test('input-method', find_program('python3'),
   args: [files('../tests/compositor/test_ime.py'), compositor_exe,
@@ -364,6 +372,7 @@ busy_client = executable('test-busy-client',
   '../tests/compositor/busy_client.cpp',
   include_directories: include_directories('finder'),
   dependencies: [shell_common_dep, qt6, wayland_client],
+  build_by_default: false,
 )
 test('busy-cursor-protocols', find_program('python3'),
   args: [files('../tests/compositor/test_busy_cursor.py'), compositor_exe, busy_client, vptr_exe,
@@ -386,7 +395,9 @@ test('gtk-save-places', find_program('dbus-run-session'),
 )
 test('gtk-theme-css',
   executable('test-gtk-theme', '../tests/finder/test_gtk_theme.c',
-    dependencies: [gtk3]),
+    dependencies: [gtk3],
+    build_by_default: false,
+  ),
   args: [meson.project_source_root() / 'share/themes/ZacOS9/gtk-3.0/gtk.css'],
 )
 test('gtk-menu-protocol', find_program('dbus-run-session'),

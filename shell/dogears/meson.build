@@ -8,5 +8,6 @@ executable('zacos9-dogears',
 test('dog-ears-notes',
   executable('test-dog-ears-notes', '../../tests/dogears/test_notes.cpp', 'notes.cpp',
     dependencies: [qt6],
+    build_by_default: false,
   ),
 )

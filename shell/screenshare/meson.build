@@ -11,6 +11,7 @@ test_screenshare_host = executable('test-screenshare-host', screenshare_host_src
   include_directories: include_directories('../finder', '../panels'),
   dependencies: [shell_common_dep, platinum_dep, qt6, wayland_client, pam],
   cpp_args: ['-DZACOS9_SCREENSHARE_TEST'],
+  build_by_default: false,
 )
 
 # The viewer's side of the sound, on its own.
@@ -19,6 +20,7 @@ test_screenshare_sound = executable('test-screenshare-sound', '../../tests/scree
   link_with: panelkit,
   include_directories: include_directories('../finder', '../panels'),
   dependencies: [shell_common_dep, platinum_dep, qt6],
+  build_by_default: false,
 )
 
 test('screenshare-host', find_program('python3'),
@@ -46,6 +48,7 @@ test('screenshare-rfb',
     link_with: panelkit,
     include_directories: include_directories('../finder', '../panels'),
     dependencies: [shell_common_dep, platinum_dep, qt6, zlib],
+    build_by_default: false,
   ),
   env: ['QT_QPA_PLATFORM=offscreen'],
 )

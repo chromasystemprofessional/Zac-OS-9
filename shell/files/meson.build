@@ -34,6 +34,7 @@ shell_files_dep = declare_dependency(link_with: [shell_files, panelkit],
 test('search-sites', executable('test-search-sites',
     '../../tests/finder/test_searchsites.cpp',
     dependencies: [shell_files_dep, shell_common_dep, qt6],
-  ),
+  build_by_default: false,
+),
   timeout: 30,
 )

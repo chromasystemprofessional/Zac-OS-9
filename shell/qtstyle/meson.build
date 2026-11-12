@@ -14,6 +14,7 @@ test('qtstyle-tooltips',
   executable('test-qtstyle-tooltips', '../../tests/qtstyle/test_tooltips.cpp',
     'zacos9style.cpp', qtstyle_moc,
     dependencies: [platinum_dep, qt6],
+    build_by_default: false,
   ),
   env: ['QT_QPA_PLATFORM=offscreen'],
 )

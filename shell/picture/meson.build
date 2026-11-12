@@ -11,5 +11,6 @@ picture_test = executable('test-picture', '../../tests/picture/test_picture.cpp'
   link_with: panelkit,
   include_directories: include_directories('../finder', '../print', '../panels'),
   dependencies: [shell_common_dep, platinum_dep, qt6, wayland_client],
+  build_by_default: false,
 )
 test('picture-viewer', picture_test, env: ['QT_QPA_PLATFORM=offscreen'], timeout: 30)

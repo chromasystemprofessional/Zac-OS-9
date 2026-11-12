@@ -8,5 +8,6 @@ executable('zacos9-calculator',
 test('calculator',
   executable('test-calculator', '../../tests/calculator/test_engine.cpp', 'engine.cpp',
     dependencies: [qt6],
+    build_by_default: false,
   ),
 )

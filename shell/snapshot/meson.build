@@ -13,12 +13,16 @@ test('snapshot-image',
   executable('test-snapshot-image', '../../tests/finder/test_snapshot_image.cpp',
     snapshot_protocol,
     dependencies: [shell_common_dep, platinum_dep, qt6, wayland_client],
-    include_directories: include_directories('../finder')),
+    include_directories: include_directories('../finder'),
+    build_by_default: false,
+  ),
   env: ['QT_QPA_PLATFORM=offscreen'],
 )
 snapshot_animation = executable('test-snapshot-animation',
   '../../tests/finder/snapshot_animation.cpp',
-  dependencies: [qt6])
+  dependencies: [qt6],
+  build_by_default: false,
+)
 test('native-snapshot', find_program('python3'),
   args: [files('../../tests/finder/test_snapshot.py'), compositor_exe, capture_exe,
     files('zacos9-snapshot'), snapshot_animation],

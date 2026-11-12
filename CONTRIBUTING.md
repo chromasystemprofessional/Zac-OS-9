@@ -97,6 +97,9 @@ meson test -C build $(meson test -C build --list | grep disksetup)   # those nam
 meson test -C build --num-processes 1                   # all of them
 ```
 
+For a faster local build (a separate `build-fast/`, ccache/mold, and
+target-only builds), see [Build speed](docs/build-speed.md).
+
 - Test names don't always match file names; `--list` shows them, and each
   part's `meson.build` registers its tests.
 - Run the whole suite one test at a time (`--num-processes 1`): some tests

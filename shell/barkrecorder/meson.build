@@ -9,6 +9,7 @@ test('bark-recorder',
     'barkrecorder.cpp',
     include_directories: include_directories('../common'),
     dependencies: [platinum_dep, qt6],
+    build_by_default: false,
   ),
   env: ['QT_QPA_PLATFORM=offscreen'],
 )

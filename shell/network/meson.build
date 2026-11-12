@@ -6,6 +6,7 @@ test('discovery',
     'discovery.cpp',
     include_directories: include_directories('../common'),
     dependencies: [shell_common_dep, platinum_dep, qt6],
+    build_by_default: false,
   ),
   timeout: 60,
 )
@@ -15,6 +16,7 @@ test('netvolumes',
   executable('test-netvolumes',
     '../../tests/network/test_netvolumes.cpp',
     dependencies: [shell_files_dep, qt6],
+    build_by_default: false,
   ),
 )
 

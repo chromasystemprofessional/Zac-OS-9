@@ -51,6 +51,7 @@ test('afterdark-frame',
     link_with: afterdark_lib,
     include_directories: include_directories('.'),
     dependencies: [platinum_dep],
+    build_by_default: false,
   ),
   timeout: 10,
 )

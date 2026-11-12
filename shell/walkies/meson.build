@@ -10,6 +10,7 @@ executable('zacos9-walkies',
 test('walkies-locations',
   executable('test-walkies-locations', '../../tests/walkies/test_location.cpp', 'location.cpp',
     dependencies: [shell_common_dep, platinum_dep, qt6],
+    build_by_default: false,
   ),
   timeout: 10,
 )

@@ -9,6 +9,7 @@ executable('zacos9-retriever',
 test('retriever-sync',
   executable('test-retriever-sync', '../../tests/retriever/test_sync.cpp', 'sync.cpp',
     dependencies: [qt6],
+    build_by_default: false,
   ),
   timeout: 30,
 )

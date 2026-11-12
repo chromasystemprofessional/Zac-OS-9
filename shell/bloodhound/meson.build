@@ -17,7 +17,8 @@ test('bloodhound-search', executable('test-bloodhound-search',
     '../../tests/bloodhound/test_search.cpp', 'search.cpp', bloodhound_moc,
     include_directories: include_directories('../panels'),
     dependencies: [shell_files_dep, shell_common_dep, platinum_dep, qt6],
-  ),
+  build_by_default: false,
+),
   timeout: 30,
 )
 
@@ -26,7 +27,8 @@ test('bloodhound-controls', executable('test-bloodhound-controls',
     bloodhound_moc,
     include_directories: include_directories('../panels'),
     dependencies: [shell_files_dep, shell_common_dep, platinum_dep, qt6],
-  ),
+  build_by_default: false,
+),
   timeout: 30,
 )
 

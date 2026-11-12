@@ -10,6 +10,7 @@ test('key-tags',
     'keytagswindow.cpp', xkb_layouts_sources,
     include_directories: [include_directories('../common', '../panels'), xkb_layouts_include],
     dependencies: [platinum_dep, qt6, xkbcommon_client],
+    build_by_default: false,
   ),
   env: ['QT_QPA_PLATFORM=offscreen'],
 )

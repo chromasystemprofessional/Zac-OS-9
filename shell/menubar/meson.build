@@ -4,7 +4,9 @@ test('erase-disk-menu',
   executable('test-erase-menu', '../../tests/menubar/test_erase_menu.c',
     dependencies: [platinum_dep, wayland_client],
     c_args: ['-ffunction-sections', '-fdata-sections'],
-    link_args: ['-Wl,--gc-sections']))
+    link_args: ['-Wl,--gc-sections'],
+    build_by_default: false,
+  ))
 
 menubar_exe = executable('zacos9-menubar',
   'main.c',
@@ -29,6 +31,7 @@ menubar_exe = executable('zacos9-menubar',
 # Hint Bubbles over the menu bar's menus (menubar/hints.c).
 hints_test = executable('test-hints', '../../tests/menubar/test_hints.c', 'hints.c',
   dependencies: [platinum_dep, wayland_client],
+  build_by_default: false,
 )
 test('menu-hints', hints_test, timeout: 10)
 # The same, with the Italian catalog: labels and hints translated together.
@@ -60,6 +63,7 @@ test('menu-hints-pt', find_program('python3'),
 test('menu-recent',
   executable('test-recent', '../../tests/menubar/test_recent.c', 'recent.c',
     dependencies: [platinum_dep, gio],
+    build_by_default: false,
   ),
   timeout: 10,
 )
@@ -68,6 +72,7 @@ test('menu-recent',
 test('menu-keyboard',
   executable('test-kbmenu', '../../tests/menubar/test_kbmenu.c', 'kbmenu.c',
     dependencies: [platinum_dep, wayland_client],
+    build_by_default: false,
   ),
   timeout: 10,
 )
@@ -77,6 +82,7 @@ test('menu-app-switch',
   executable('test-app-switch',
     '../../tests/menubar/test_app_switch.c', 'toplevels.c', client_protocol_src,
     dependencies: [platinum_dep, wayland_client, gio],
+    build_by_default: false,
   ),
   timeout: 10,
 )
@@ -85,6 +91,7 @@ test('menu-launch-feedback',
   executable('test-menu-launch',
     '../../tests/menubar/test_launch.c', 'launch.c',
     dependencies: [platinum_dep, wayland_client, gio, appfilter_dep, controlpanels_dep],
+    build_by_default: false,
   ),
   timeout: 10,
 )
@@ -94,5 +101,7 @@ gtk_menu_observer = executable('gtk-menu-observer',
 )
 test('gtk-appmenu', find_program('dbus-run-session'),
   args: [executable('test-appmenu-gtk', '../../tests/menubar/test_appmenu_gtk.c',
-    dependencies: [platinum_dep, wayland_client, gio])],
+    dependencies: [platinum_dep, wayland_client, gio],
+    build_by_default: false,
+  )],
   env: ['G_DEBUG=fatal-warnings'], timeout: 15)

@@ -81,7 +81,9 @@ appfilter_dep = declare_dependency(link_with: appfilter_lib,
   include_directories: include_directories('.'),
   dependencies: dependency('gio-unix-2.0'))
 test('appfilter', executable('test-appfilter', '../tests/lib/test_appfilter.c',
-  dependencies: [appfilter_dep]))
+  dependencies: [appfilter_dep],
+  build_by_default: false,
+))
 # The control panels, from their desktop entries: the Control Panels folder
 # and the Zac menu's (lib/controlpanels.h).
 controlpanels_lib = static_library('controlpanels', 'controlpanels.c',
@@ -90,7 +92,9 @@ controlpanels_dep = declare_dependency(link_with: controlpanels_lib,
   include_directories: include_directories('.'),
   dependencies: [platinum_dep, dependency('glib-2.0')])
 test('control-panels', executable('test-control-panels', '../tests/lib/test_controlpanels.c',
-  dependencies: [controlpanels_dep]))
+  dependencies: [controlpanels_dep],
+  build_by_default: false,
+))
 
 # The Collar modules, from their desktop entries: the Collar Modules folder.
 collarmodules_lib = static_library('collarmodules', 'collarmodules.c',
@@ -106,24 +110,50 @@ figcompare_dep = declare_dependency(
 )
 test('menudraw',
   executable('test-menudraw', '../tests/lib/test_menudraw.c',
-    dependencies: [figcompare_dep]),
+    dependencies: [figcompare_dep],
+    build_by_default: false,
+  ),
   args: [figs_dir],
 )
-test('text', executable('test-text', '../tests/lib/test_text.c', dependencies: [platinum_dep]))
-test('draw', executable('test-draw', '../tests/lib/test_draw.c', dependencies: [platinum_dep]))
-test('welcome', executable('test-welcome', '../tests/lib/test_welcome.c', dependencies: [platinum_dep]))
-test('settings', executable('test-settings', '../tests/lib/test_settings.c', dependencies: [platinum_dep]))
-test('theme', executable('test-theme', '../tests/lib/test_theme.c', dependencies: [platinum_dep]))
-test('pfont', executable('test-pfont', '../tests/lib/test_pfont.c', dependencies: [platinum_dep]))
-test('flags', executable('test-flags', '../tests/lib/test_flags.c', dependencies: [platinum_dep]))
-test('arabic', executable('test-arabic', '../tests/lib/test_arabic.c', dependencies: [platinum_dep]),
+test('text', executable('test-text', '../tests/lib/test_text.c', dependencies: [platinum_dep],
+  build_by_default: false,
+))
+test('draw', executable('test-draw', '../tests/lib/test_draw.c', dependencies: [platinum_dep],
+  build_by_default: false,
+))
+test('welcome', executable('test-welcome', '../tests/lib/test_welcome.c', dependencies: [platinum_dep],
+  build_by_default: false,
+))
+test('settings', executable('test-settings', '../tests/lib/test_settings.c', dependencies: [platinum_dep],
+  build_by_default: false,
+))
+test('theme', executable('test-theme', '../tests/lib/test_theme.c', dependencies: [platinum_dep],
+  build_by_default: false,
+))
+test('pfont', executable('test-pfont', '../tests/lib/test_pfont.c', dependencies: [platinum_dep],
+  build_by_default: false,
+))
+test('flags', executable('test-flags', '../tests/lib/test_flags.c', dependencies: [platinum_dep],
+  build_by_default: false,
+))
+test('arabic', executable('test-arabic', '../tests/lib/test_arabic.c', dependencies: [platinum_dep],
+  build_by_default: false,
+),
   env: ['FONTCONFIG_FILE=' + meson.project_source_root() / 'share/fontconfig/zacos9-fonts.conf'])
-test('savers', executable('test-savers', '../tests/lib/test_savers.c', dependencies: [platinum_dep]))
-test('electron', executable('test-electron', '../tests/lib/test_electron.c', dependencies: [platinum_dep]))
-test('locate', executable('test-locate', '../tests/lib/test_locate.c', dependencies: [platinum_dep]))
+test('savers', executable('test-savers', '../tests/lib/test_savers.c', dependencies: [platinum_dep],
+  build_by_default: false,
+))
+test('electron', executable('test-electron', '../tests/lib/test_electron.c', dependencies: [platinum_dep],
+  build_by_default: false,
+))
+test('locate', executable('test-locate', '../tests/lib/test_locate.c', dependencies: [platinum_dep],
+  build_by_default: false,
+))
 test('widgets',
   executable('test-widgets', '../tests/lib/test_widgets.c',
-    dependencies: [figcompare_dep]),
+    dependencies: [figcompare_dep],
+    build_by_default: false,
+  ),
   args: [figs_dir],
 )
 
@@ -131,7 +161,9 @@ test('widgets',
 python3 = find_program('python3', required: false)
 if python3.found()
   sound_driver = executable('test-sound-driver', '../tests/lib/sound_driver.c',
-    dependencies: [platinum_dep])
+    dependencies: [platinum_dep],
+    build_by_default: false,
+  )
   test('sound-playback', python3,
     args: [files('../tests/lib/test_sound.py'), sound_driver,
       meson.project_source_root() / 'assets'],
@@ -144,7 +176,9 @@ if python3.found()
   # The gettext pipeline, end to end: a pseudo-locale from the strings
   # marked in po/POTFILES.in, then the strict text-fit warning.
   i18n_test = executable('test-i18n', '../tests/lib/test_i18n.c',
-    dependencies: [platinum_dep])
+    dependencies: [platinum_dep],
+    build_by_default: false,
+  )
   test('i18n', python3,
     args: [files('../tests/lib/test_i18n.py'), meson.project_source_root(), i18n_test],
     timeout: 60)

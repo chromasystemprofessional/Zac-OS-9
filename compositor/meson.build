@@ -128,6 +128,7 @@ test('decor',
   executable('test-decor',
     '../tests/compositor/test_decor.c',
     dependencies: [decor_dep],
+    build_by_default: false,
   ),
   args: [meson.project_source_root() / 'tools/measure/figs'],
 )
@@ -136,6 +137,7 @@ test('decor-geometry',
   executable('test-decor-geometry',
     '../tests/compositor/test_decor_geometry.c',
     dependencies: [decor_dep],
+    build_by_default: false,
   ),
 )
 
@@ -143,6 +145,7 @@ test('decor-chrome',
   executable('test-decor-chrome',
     '../tests/compositor/test_decor_chrome.c',
     dependencies: [decor_dep],
+    build_by_default: false,
   ),
 )
 
@@ -151,6 +154,7 @@ test('function-keys',
     '../tests/compositor/test_fkeys.c', 'src/fkeys.c',
     include_directories: include_directories('src'),
     dependencies: [platinum_dep, xkbcommon],
+    build_by_default: false,
   ),
 )
 
@@ -159,6 +163,7 @@ test('keyboard-layouts',
     '../tests/compositor/test_kblayout.c', 'src/kblayout.c',
     include_directories: include_directories('src'),
     dependencies: [platinum_dep, xkbcommon],
+    build_by_default: false,
   ),
 )
 
@@ -167,6 +172,7 @@ test('startup-displays',
     '../tests/compositor/test_startup.c', 'src/startup.c', 'src/pixbuf.c',
     include_directories: include_directories('src'),
     dependencies: [platinum_dep, wayland_server, wlroots],
+    build_by_default: false,
   ),
   env: ['ZACOS9_STARTUP=1'],
 )
@@ -192,6 +198,7 @@ test('primary-gpu',
   executable('test-primarygpu',
     '../tests/compositor/test_primarygpu.c', 'src/primarygpu.c',
     include_directories: include_directories('src'),
+    build_by_default: false,
   ),
 )
 # One "Failed to pick cursor plane format" per pointer motion, printed once.
@@ -200,6 +207,7 @@ test('log-filter',
     '../tests/compositor/test_logfilter.c', 'src/logfilter.c',
     include_directories: include_directories('src'),
     dependencies: [wlroots],
+    build_by_default: false,
   ),
 )
 test('cursor-theme', python3,
@@ -212,6 +220,7 @@ test('launch-feedback',
     '../tests/compositor/test_launch.c', 'src/launch.c',
     include_directories: include_directories('src'),
     dependencies: [platinum_dep, wayland_server, wlroots],
+    build_by_default: false,
   ),
   timeout: 20,
 )
@@ -223,6 +232,7 @@ test('virtual-pointer-output',
     dependencies: [decor_dep, wayland_server, wlroots, xkbcommon, libinput],
     c_args: ['-ffunction-sections', '-fdata-sections'],
     link_args: ['-Wl,--gc-sections'],
+    build_by_default: false,
   ),
 )
 
@@ -234,6 +244,7 @@ test('implicit-grab',
     dependencies: [decor_dep, wayland_server, wlroots, xkbcommon, libinput],
     c_args: ['-ffunction-sections', '-fdata-sections'],
     link_args: ['-Wl,--gc-sections'],
+    build_by_default: false,
   ),
 )
 
@@ -245,6 +256,7 @@ test('access',
     dependencies: [decor_dep, wayland_server, wlroots, xkbcommon, libinput, meson.get_compiler('c').find_library('m')],
     c_args: ['-ffunction-sections', '-fdata-sections'],
     link_args: ['-Wl,--gc-sections'],
+    build_by_default: false,
   ),
 )
 
@@ -252,6 +264,7 @@ test('window-sounds',
   executable('test-window-sounds',
     '../tests/compositor/test_window_sounds.c', 'src/window_sounds.c',
     include_directories: include_directories('src', '../lib'),
+    build_by_default: false,
   ),
 )
 
@@ -263,6 +276,7 @@ test('content-inset',
     dependencies: [decor_dep, wayland_server, wlroots, libdrm],
     c_args: ['-ffunction-sections', '-fdata-sections'],
     link_args: ['-Wl,--gc-sections'],
+    build_by_default: false,
   ),
 )
 
@@ -274,6 +288,7 @@ test('default-window-size',
     dependencies: [decor_dep, wayland_server, wlroots, libdrm],
     c_args: ['-ffunction-sections', '-fdata-sections'],
     link_args: ['-Wl,--gc-sections'],
+    build_by_default: false,
   ),
 )
 
@@ -285,6 +300,7 @@ test('xwayland-output',
     dependencies: [decor_dep, wayland_server, wlroots, libdrm],
     c_args: ['-ffunction-sections', '-fdata-sections'],
     link_args: ['-Wl,--gc-sections'],
+    build_by_default: false,
   ),
 )
 
@@ -303,6 +319,7 @@ test('snapshot-output-state',
     dependencies: [decor_dep, wayland_server, wlroots, libdrm],
     link_args: ['-Wl,--wrap=wlr_output_from_resource',
       '-Wl,--wrap=wlr_output_layout_get_box'],
+    build_by_default: false,
   ),
 )
 
@@ -311,6 +328,7 @@ test('touch-tap',
   executable('test-touch-tap',
     '../tests/compositor/test_touch_tap.c', 'src/touch_tap.c',
     include_directories: include_directories('src'),
+    build_by_default: false,
   ),
 )
 
@@ -318,6 +336,7 @@ test('idle-policy',
   executable('test-idle-policy',
     '../tests/compositor/test_idle_policy.c', 'src/idle_policy.c',
     include_directories: include_directories('src'),
+    build_by_default: false,
   ),
 )
 
@@ -326,5 +345,6 @@ test('collar-hotkey',
     '../tests/compositor/test_hotkey.c', 'src/hotkey.c',
     include_directories: include_directories('src'),
     dependencies: [wlroots, xkbcommon],
+    build_by_default: false,
   ),
 )

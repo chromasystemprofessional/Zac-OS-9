@@ -8,5 +8,7 @@ executable('zacos9-plotter',
 )
 test('plotter-expr',
   executable('test-plotter-expr', '../../tests/plotter/test_expr.cpp', 'expr.cpp',
-    dependencies: [qt6]),
+    dependencies: [qt6],
+    build_by_default: false,
+  ),
   timeout: 10)
