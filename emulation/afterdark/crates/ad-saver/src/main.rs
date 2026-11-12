@@ -124,6 +124,27 @@ fn main() {
     }
 }
 
+/// The Windows After Dark CD, recognized before the HFS reader can call it
+/// damaged: its modules are Windows `.AD`/DLL files, which this engine cannot
+/// run. Only the first block of a CD is needed: the ISO 9660 descriptor and
+/// the Windows installer's names are all near the start.
+fn windows_after_dark_cd(path: &Path) -> bool {
+    use std::io::Read as _;
+    let Ok(mut file) = std::fs::File::open(path) else {
+        return false;
+    };
+    let mut head = vec![0u8; 128 * 1024];
+    let Ok(n) = file.read(&mut head) else {
+        return false;
+    };
+    let head = &head[..n];
+    if head.get(0x8001..0x8006) != Some(b"CD001") {
+        return false;
+    }
+    let has = |needle: &[u8]| head.windows(needle.len()).any(|w| w == needle);
+    has(b"SETUP.EXE") && has(b"ADESETUP.EXE")
+}
+
 /// Import a file the user chose: a disk image or folder first, and a
 /// compressed archive through `unar` (a ZacOS runtime dependency) if that is
 /// what it turns out to be.
@@ -132,6 +153,14 @@ fn import_source(source: &str) -> Result<String, String> {
     match ad_runtime::install_from(path) {
         Ok(installed) => return Ok(imported_message(&installed)),
         Err(first) => {
+            if windows_after_dark_cd(path) {
+                return Err("That's the Windows After Dark CD. Its modules are Windows \
+                    .AD files, not the Macintosh 68k modules this screen saver runs.\n\n\
+                    Use a Macintosh After Dark disk image instead: AfterDark.img \
+                    (After Dark 2.0) or AfterDark40.img (After Dark 4.0) from \
+                    archive.org, or a folder of Mac .rsrc modules."
+                    .to_owned());
+            }
             if !is_archive(path) {
                 return Err(first);
             }
