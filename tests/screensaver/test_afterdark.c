@@ -3,6 +3,7 @@
  * scales it into a canvas with black bars. The test runs itself as the fake
  * helper, so it needs no module or Rust toolchain. */
 #include <errno.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -98,9 +99,50 @@ static void large_helper(void) {
 	_exit(0);
 }
 
+static bool sigterm_blocked(void) {
+	sigset_t set;
+	if (sigprocmask(SIG_SETMASK, NULL, &set) != 0) {
+		return true;
+	}
+	return sigismember(&set, SIGTERM) == 1;
+}
+
+/* The panel inherits the compositor's blocked SIGTERM. The helper must not:
+ * it has to start with the default mask so stopping it works. */
+static void mask_helper(void) {
+	if (sigterm_blocked()) {
+		static const char message[] = "SIGTERM was blocked in the helper\n";
+		write(STDERR_FILENO, message, sizeof(message) - 1);
+		_exit(3);
+	}
+	small_helper();
+}
+
+/* Blocks SIGTERM itself and stays alive. ad_renderer_stop must still return;
+ * the old unbounded waitpid would hang the panel here. */
+static void stubborn_helper(void) {
+	sigset_t set;
+	sigemptyset(&set);
+	sigaddset(&set, SIGTERM);
+	sigprocmask(SIG_BLOCK, &set, NULL);
+	unsigned char pixels[4 * 3] = { 0 };
+	write_header(4, 3, 9);
+	write_palette();
+	write_all(pixels, sizeof(pixels));
+	for (;;) {
+		pause();
+	}
+}
+
 static void fake_helper(const char *module) {
 	if (strcmp(module, "large") == 0) {
 		large_helper();
+	}
+	if (strcmp(module, "mask") == 0) {
+		mask_helper();
+	}
+	if (strcmp(module, "stubborn") == 0) {
+		stubborn_helper();
 	}
 	small_helper();
 }
@@ -176,6 +218,37 @@ int main(int argc, char **argv) {
 		const struct ad_frame *next = wait_frame(r, 8);
 		check(next != NULL, "the frame after it is read in step");
 		ad_renderer_stop(r);
+	}
+
+	/* The compositor blocks SIGTERM for its event loop; the panel inherits
+	 * that mask. The helper must start with the default mask. */
+	sigset_t block, old;
+	sigemptyset(&block);
+	sigaddset(&block, SIGTERM);
+	sigprocmask(SIG_BLOCK, &block, &old);
+	r = ad_renderer_start_program(argv[0], "mask", 30);
+	sigprocmask(SIG_SETMASK, &old, NULL);
+	check(r != NULL, "the mask helper starts");
+	if (r) {
+		check(wait_frame(r, 7) != NULL,
+			"the helper does not inherit the blocked SIGTERM");
+		ad_renderer_stop(r);
+	}
+
+	/* A helper that blocks SIGTERM itself must not wedge the caller. */
+	r = ad_renderer_start_program(argv[0], "stubborn", 30);
+	check(r != NULL, "the stubborn helper starts");
+	if (r) {
+		check(wait_frame(r, 9) != NULL, "the stubborn helper draws a frame");
+		struct timespec before, after;
+		clock_gettime(CLOCK_MONOTONIC, &before);
+		alarm(5); /* fail rather than hang if the wait is unbounded */
+		ad_renderer_stop(r);
+		alarm(0);
+		clock_gettime(CLOCK_MONOTONIC, &after);
+		const double seconds = (double)(after.tv_sec - before.tv_sec) +
+			(double)(after.tv_nsec - before.tv_nsec) / 1e9;
+		check(seconds < 2.0, "stopping a helper that blocks SIGTERM returns");
 	}
 
 	return failures ? 1 : 0;

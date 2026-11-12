@@ -41,6 +41,12 @@ pid_t spawn(const char *command) {
 	const pid_t pid = fork();
 	if (pid == 0) {
 		setsid();
+		/* The compositor blocks SIGTERM and SIGINT for its own event
+		 * loop. Its children run their own lives and must not inherit
+		 * that mask: a component told to quit has to hear SIGTERM. */
+		sigset_t empty;
+		sigemptyset(&empty);
+		sigprocmask(SIG_SETMASK, &empty, NULL);
 		execl("/bin/sh", "/bin/sh", "-c", command, (void *)NULL);
 		_exit(127);
 	}

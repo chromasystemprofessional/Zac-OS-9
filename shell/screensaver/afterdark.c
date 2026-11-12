@@ -17,6 +17,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/wait.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "locate.h"
@@ -112,7 +113,13 @@ struct ad_renderer *ad_renderer_start_program(const char *program, const char *m
 		return NULL;
 	}
 	if (pid == 0) {
-		/* Only async-signal-safe calls between fork and exec. */
+		/* Only async-signal-safe calls between fork and exec. The
+		 * panel may have SIGTERM and SIGINT blocked for the compositor's
+		 * event loop; the helper must start with the default mask or
+		 * stopping it would wait forever. */
+		sigset_t empty;
+		sigemptyset(&empty);
+		sigprocmask(SIG_SETMASK, &empty, NULL);
 		if (fds[1] != STDOUT_FILENO) {
 			dup2(fds[1], STDOUT_FILENO);
 			close(fds[1]);
@@ -298,13 +305,32 @@ void ad_renderer_draw(const struct ad_renderer *r, struct pl_canvas *c, int x, i
 	}
 }
 
+/* Reap a child without blocking the caller forever: a helper that ignores
+ * SIGTERM must not freeze the panel's event loop. */
+static bool reap(pid_t pid, int tries) {
+	for (int i = 0; i < tries; i++) {
+		const pid_t done = waitpid(pid, NULL, WNOHANG);
+		if (done == pid || (done < 0 && errno == ECHILD)) {
+			return true;
+		}
+		if (done < 0 && errno != EINTR) {
+			return true;
+		}
+		const struct timespec wait = { 0, 10000000 };
+		nanosleep(&wait, NULL);
+	}
+	return false;
+}
+
 void ad_renderer_stop(struct ad_renderer *r) {
 	if (!r) {
 		return;
 	}
 	if (r->pid > 0) {
 		kill(r->pid, SIGTERM);
-		while (waitpid(r->pid, NULL, 0) < 0 && errno == EINTR) {
+		if (!reap(r->pid, 20)) {
+			kill(r->pid, SIGKILL);
+			reap(r->pid, 20);
 		}
 	}
 	if (r->fd >= 0) {
