@@ -502,7 +502,11 @@ int main(void) {
 	const int inotify = inotify_init1(IN_CLOEXEC | IN_NONBLOCK);
 	inotify_add_watch(inotify, runtime, IN_MOVED_TO | IN_CLOSE_WRITE);
 	const int timer = timerfd_create(CLOCK_MONOTONIC, TFD_CLOEXEC | TFD_NONBLOCK);
-	const struct itimerspec every = { { 0, FRAME_NS }, { 0, FRAME_NS } };
+	/* After Dark keeps a 60 Hz emulated clock and writes 30 frames a second.
+	 * The built-in savers need 25 Hz, but reading After Dark at 25 would fill
+	 * its pipe and slow the emulator to 25/60 of real time. */
+	const long frame_ns = afterdark_saver ? (1000000000L / 60) : FRAME_NS;
+	const struct itimerspec every = { { 0, frame_ns }, { 0, frame_ns } };
 	timerfd_settime(timer, 0, &every, NULL);
 
 	if (!read_states()) {
