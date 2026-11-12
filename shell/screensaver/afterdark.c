@@ -157,7 +157,9 @@ static bool begin_pixels(struct ad_renderer *r) {
 		return false;
 	}
 	const size_t need = (size_t)w * (size_t)h;
-	if (need != r->incoming_len) {
+	/* The first frame's swap leaves `incoming` NULL while `incoming_len`
+	 * still has its size; allocate the second buffer on the next frame. */
+	if (need != r->incoming_len || !r->incoming) {
 		uint8_t *grown = realloc(r->incoming, need);
 		if (!grown) {
 			return false;
@@ -192,25 +194,25 @@ bool ad_renderer_take_frame(struct ad_renderer *r) {
 	r->new_frame = false;
 	for (;;) {
 		uint8_t *dst;
-		size_t want;
+		size_t total;
 		switch (r->state) {
 		case READING_HEADER:
-			dst = r->header + r->got;
-			want = HEADER_SIZE - r->got;
+			dst = r->header;
+			total = HEADER_SIZE;
 			break;
 		case READING_PALETTE:
-			dst = r->palette + r->got;
-			want = PALETTE_SIZE - r->got;
+			dst = r->palette;
+			total = PALETTE_SIZE;
 			break;
 		default:
-			dst = r->incoming + r->got;
-			want = r->incoming_len - r->got;
+			dst = r->incoming;
+			total = r->incoming_len;
 			break;
 		}
-		const ssize_t n = read(r->fd, dst, want);
+		const ssize_t n = read(r->fd, dst + r->got, total - r->got);
 		if (n > 0) {
 			r->got += (size_t)n;
-			if (r->got < want) {
+			if (r->got < total) {
 				continue;
 			}
 			r->got = 0;
@@ -224,6 +226,10 @@ bool ad_renderer_take_frame(struct ad_renderer *r) {
 				r->state = READING_PIXELS;
 			} else {
 				finish_frame(r);
+				/* One whole frame per call: a helper that draws faster
+				 * than the display can otherwise keep this read loop
+				 * full forever and freeze the panel's event loop. */
+				break;
 			}
 			continue;
 		}
