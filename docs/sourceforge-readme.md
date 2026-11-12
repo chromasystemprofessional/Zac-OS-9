@@ -56,6 +56,10 @@ for what it reads.
 
 ## Newer features
 
+- **Mount network disks at startup.** Tick Mount at startup when connecting
+  to an AFP volume or an SMB share; the disk appears in System Folder ▸
+  Startup Items with the network-disk icon, and a registered user's password
+  is kept in the keychain.
 - **After Dark screen savers** can be imported in Control Panels ▸ Screen
   Saver: choose After Dark and click Import…, then pick a disk image, a
   folder of modules or an archive. ZacOS does not include the modules or

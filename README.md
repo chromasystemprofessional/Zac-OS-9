@@ -84,8 +84,9 @@ artwork. See [Themes and sound sets](docs/themes.md) for what it reads.
   PlayStation and Nintendo 64 games in a Platinum-framed window.
 - **Talks to old Macs**: browse and mount AppleShare (AFP) and Windows (SMB)
   servers in Neighbourhood, even AppleTalk-only Macs, and share your own folders
-  back to them with File Sharing. Mac HFS and HFS+ disks and disk images open
-  read-only.
+  back to them with File Sharing. A network disk can be saved to mount at
+  startup and appears in System Folder ▸ Startup Items with its network-disk
+  icon. Mac HFS and HFS+ disks and disk images open read-only.
 - **Windows programs** install through Wine with the Windows Installer.
 - **Printing** through CUPS: a Printer Picker and Print Queue in the Platinum
   look, USB and network printers, and honest reasons when a job fails.

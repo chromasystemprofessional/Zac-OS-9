@@ -1,0 +1,7 @@
+ZacOS 9 1.18.5 can mount network disks when you log in.
+
+When you connect to an AFP volume or an SMB share, tick Mount at startup.
+The disk appears in System Folder ▸ Startup Items with the network-disk
+icon; a registered user's password is kept in the keychain. At login ZacOS
+mounts the saved disks. Drag the Startup Items entry to the Trash to stop
+it mounting; drag it back to restore it.

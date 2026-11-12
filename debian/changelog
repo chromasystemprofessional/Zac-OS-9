@@ -1,3 +1,14 @@
+zacos9 (1.18.5) trixie; urgency=medium
+
+  * Network disks can now be saved to mount at startup. The AFP volume list
+    and the SMB login dialog have a Mount at startup checkbox; a registered
+    user's password is kept in the keychain. Each saved disk gets its own
+    entry in System Folder ▸ Startup Items, wearing the network-disk icon,
+    and zacos9-netmount mounts it at login. Dragging the entry to the Trash
+    stops the mount; dragging it back restores it.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Thu, 12 Nov 2026 16:20:13 -0500
+
 zacos9 (1.18.4) trixie; urgency=medium
 
   * After Dark modules play at their intended speed again. The screen saver
