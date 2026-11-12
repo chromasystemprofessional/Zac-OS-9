@@ -1,0 +1,8 @@
+ZacOS 9 1.18.4 makes imported After Dark modules play at their intended
+speed again.
+
+The screen saver read the module's frames on the built-in savers' 25 Hz
+timer, so the emulator ran at about 25/60 of real time. It now reads at
+60 Hz. Scaling a frame also no longer repaints the whole screen or looks up
+the palette for every pixel: a 640x480 module on a 4K display costs about a
+fifth of what it did.
