@@ -31,6 +31,19 @@ It isn't a skin over another desktop. The window manager, the Sniffer (the
 file browser), the menu bar and every control panel were written for ZacOS 9,
 so everything looks and behaves the same way, down to the scroll arrows.
 
+## Mac OS 9 themes
+
+Drop an original Mac OS 9 appearance theme or Kaleidoscope scheme onto the
+System Folder. ZacOS files it into **System Folder ▸ Appearance ▸ Theme
+Files**, reads the theme's own resource fork, and rebuilds the desktop from
+it: window chrome and accent, icons and cursors, desktop patterns and
+pictures, and alert sounds. No installer menu — just a drop.
+
+Theme files come as `.sit`, `.hqx` or `.ksc`, or with no extension; all
+import. The theme is built on your computer from your own Mac OS 9 System
+Folder, or from the one on Old Dog's startup disk; ZacOS ships no Apple
+artwork. See [Themes and sound sets](docs/themes.md) for what it reads.
+
 ## New in 1.9
 
 - **More languages.** Italian, Russian, Spanish, Brazilian Portuguese, French
@@ -44,8 +57,6 @@ so everything looks and behaves the same way, down to the scroll arrows.
 - **Rotate any screen.** Control Panels ▸ Monitors turns each display by 90°,
   180° or 270°.
 - **Speech panel voice lists.** Choose Classic, Modern or Neural voices.
-- **Themes stay drop-only.** Drop a Mac OS 9 theme file into System Folder ▸
-  Appearance ▸ Theme Files; there is no Theme Installer menu entry.
 
 ## What you get
 
@@ -82,7 +93,7 @@ so everything looks and behaves the same way, down to the scroll arrows.
   resolution, power, media, brightness, Bluetooth, printers, the keychain and
   your phone.
 - **Make it yours**: accent colours, desktop patterns (including classic Mac
-  `ppat` resources), wallpaper, Mac OS 9 themes and sound sets.
+  `ppat` resources), wallpaper, your own Mac OS 9 themes and sound sets.
 - **For the whole family**: separate accounts, Limited accounts and a Guest
   account, Puppy Mode for a simpler Sniffer, a keychain, a screen saver, a
   password-protected screen lock and screen sharing between ZacOS 9 computers.
@@ -167,6 +178,7 @@ else works, and Old Dog says the emulator isn't installed.
 
 ## Learn more
 
+- [Project website](https://chromasystemprofessional.com/zacos9/): screenshots, the theme demo and downloads
 - [User guide](docs/user-guide.md): sound, fullscreen programs, the Sniffer, disks, desktop patterns and wallpaper
 - [Removable media](docs/removable-media.md): CD/DVD, audio CDs, floppy/Zip disks, disk images and AutoPlay
 - [Themes and sound sets](docs/themes.md): what the Theme Installer reads from your Mac OS 9 System Folder

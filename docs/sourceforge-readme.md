@@ -39,8 +39,29 @@ sudo apt install ./zacos9_*_amd64.deb
 Classic Mac emulation (the `zacos9-emulators` package) comes on the ISO for
 now.
 
-## What's new in 1.9
+## Mac OS 9 themes
 
+Drop an original Mac OS 9 appearance theme or Kaleidoscope scheme onto the
+System Folder. ZacOS files it into System Folder ▸ Appearance ▸ Theme Files,
+reads the theme's own resource fork, and rebuilds the desktop from it: window
+chrome and accent, icons and cursors, patterns and sounds. No installer menu
+— just a drop.
+
+Theme files come as `.sit`, `.hqx` or `.ksc`, or with no extension; all
+import. The theme is built on your computer from your own Mac OS 9 System
+Folder, or from the one on Old Dog's startup disk; ZacOS ships no Apple
+artwork. See [Themes and sound
+sets](https://github.com/chromasystemprofessional/Zac-OS-9/blob/main/docs/themes.md)
+for what it reads.
+
+## Newer features
+
+- **After Dark screen savers** can be imported in Control Panels ▸ Screen
+  Saver: choose After Dark and click Import…, then pick a disk image, a
+  folder of modules or an archive. ZacOS does not include the modules or
+  fonts.
+- **Hint Bubbles** explain Get Info's icon — ⌘C copies it and ⌘V pastes a
+  picture — and the newer menu items.
 - **More languages.** Italian, Russian, Spanish, Brazilian Portuguese, French
   (Canada and France) and Arabic are complete, with translated help books.
   Canadian and UK English are selectable English locales; Japanese is a
@@ -52,8 +73,6 @@ now.
 - **Rotate any screen.** Control Panels ▸ Monitors turns each display by 90°,
   180° or 270°.
 - **Speech panel voice lists.** Choose Classic, Modern or Neural voices.
-- **Themes stay drop-only.** Drop a Mac OS 9 theme file into System Folder ▸
-  Appearance ▸ Theme Files; there is no Theme Installer menu entry.
 
 Every release since 1.0 has its notes at
 https://github.com/chromasystemprofessional/Zac-OS-9/releases, and the current
@@ -62,6 +81,7 @@ https://github.com/chromasystemprofessional/Zac-OS-9/blob/main/PROJECT_STATUS.md
 
 ## Source, help and licence
 
+- Project website: https://chromasystemprofessional.com/zacos9/
 - Code, bug reports and ideas: https://github.com/chromasystemprofessional/Zac-OS-9
 - What works now and what's next: https://github.com/chromasystemprofessional/Zac-OS-9/blob/main/PROJECT_STATUS.md
 - Languages and translations: https://github.com/chromasystemprofessional/Zac-OS-9/blob/main/docs/i18n.md
