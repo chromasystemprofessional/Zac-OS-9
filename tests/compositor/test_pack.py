@@ -85,6 +85,22 @@ with tempfile.TemporaryDirectory(prefix="zacos9-pack-") as directory:
                          if "=" in line)
             x0, y0 = int(saved["x"]), int(saved["y"])
             assert (x0, y0) == (1000 - 17, 409 - 7), "its title bar is under the pointer"
+
+            # Drag its title bar left and down: it follows the pointer
+            # rather than jumping away as pending layer-surface margins
+            # used to make it (issue 172).
+            startx, starty = x0 + 40, y0 + 6
+            vp("home", "move", str(startx), str(starty), "down", "wait", "100")
+            for _ in range(5):
+                vp("move", "-20", "20", "wait", "80")
+            vp("up", "wait", "300")
+            saved = dict(line.split("=", 1) for line in pack_ini.read_text().split()
+                         if "=" in line)
+            x0, y0 = int(saved["x"]), int(saved["y"])
+            assert (x0, y0) == (startx - 40 - 100, starty - 6 + 100), \
+                "the Pack follows the pointer while dragged"
+            print("ok: dragging its title bar moves the Pack with the pointer")
+
             tile = lambda i: (str(x0 + 40), str(y0 + 1 + 13 + 22 * i + 11))
             vp("home", "move", *tile(0), "click", "wait", "600")
             assert typed("a") == "alpha", "a click on Alpha's tile brings Alpha forward"
