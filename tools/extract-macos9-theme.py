@@ -1370,15 +1370,21 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None):
 		pngwrite.write_argb(os.path.join(chrome_dir, key + ".argb"), rows)
 		keys[key] = "chrome/" + key + ".argb"
 
-	def save_bar(key, rows, height):
-		"""Save a title-bar tile cropped to the bar band.
+	def save_bar(key, rows, height, trim_left=False, trim_right=False):
+		"""Save a title-bar tile cropped to the bar band and its own edge.
 
 		The frame layout's end caps and middle come from different
 		resources, and a cap can carry transparent rows above the bar (or
 		the window frame below it). Drawn from row 0, such a cap looks
 		shorter than the middle. Start every tile at the first row that
-		has ink and keep the middle's height, repeating the last row when
-		the art is shorter."""
+		has ink and keep the bar's height, repeating the last row when the
+		art is shorter.
+
+		An end cap can also carry transparent columns outside its art.
+		Drawn as-is, they make the bar narrower than the window and leave
+		the boxes past its end. A left cap loses the columns before its
+		ink; a right cap the columns after it, so each meets its window
+		edge. The middle tiles edge to edge and is left alone."""
 		if not rows or not rows[0]:
 			return
 		top = 0
@@ -1391,6 +1397,13 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None):
 			return
 		while len(rows) < height:
 			rows.append(list(rows[-1]))
+		if trim_left or trim_right:
+			inked = [x for x in range(len(rows[0])) if any(row[x][3] for row in rows)]
+			if inked:
+				if trim_left:
+					rows = [row[inked[0]:] for row in rows]
+				if trim_right:
+					rows = [row[:inked[-1] + 1] for row in rows]
 		save_tile(key, rows)
 
 	# 1. Universal Kaleidoscope title-bar buttons (200 close, 210 collapse, 220 zoom).
@@ -1447,10 +1460,19 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None):
 					(r for r in recs[2:] if r[0] == b"pxm#" and (r[1] & 0xFFFF) in (6178, 6134, 6278)),
 					recs[2]))
 			right_rows = resolve_rec(right_rec[0], right_rec[1], layer)
+			# The middle can be a tiled pattern that runs past the bar
+			# into the body (Paper's is 32 rows for a 22-row bar). Only a
+			# pxm# knows the bar's height; otherwise the caps do.
 			bar_h = len(mid_rows)
-			save_bar("bar-left" + suffix, left_rows, bar_h)
+			if recs[1][0] != b"pxm#":
+				cap_heights = [len(rows) for tag, rows in
+					((recs[0][0], left_rows), (right_rec[0], right_rows))
+					if tag == b"pxm#" and rows]
+				if cap_heights:
+					bar_h = min(cap_heights)
+			save_bar("bar-left" + suffix, left_rows, bar_h, trim_left=True)
 			save_bar("bar-middle" + suffix, mid_rows, bar_h)
-			save_bar("bar-right" + suffix, right_rows, bar_h)
+			save_bar("bar-right" + suffix, right_rows, bar_h, trim_right=True)
 			mids_by_suffix[suffix] = mid_rows
 
 		# 2b. Two-part bars: the title group rides a pinstripe patch on
@@ -1506,14 +1528,15 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None):
 					except (ValueError, IndexError, struct.error):
 						continue
 					if len(rows[0]) >= 48:
-						return rows
+						return rows, True
 				else:
 					rows = resolve_rec(tag, rid, layer)
 					if rows and len(rows[0]) >= 48 and len(rows) >= 16:
-						return rows
+						return rows, False
 			if len(records) > 1:
-				return resolve_rec(records[1][0], records[1][1], layer)
-			return None
+				return (resolve_rec(records[1][0], records[1][1], layer),
+					records[1][0] == b"pxm#")
+			return None, False
 
 		def dialog_side(records, layer, last):
 			cands = []
@@ -1542,7 +1565,7 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None):
 			if len(recs) < 2:
 				continue
 			left_rows = dialog_side(recs, layer, False)
-			mid_rows = dialog_middle(recs, layer)
+			mid_rows, mid_is_pxm = dialog_middle(recs, layer)
 			right_rec = next(
 				(r for r in recs[2:] if r[0] == b"pxm#" and (r[1] & 0xFFFF) == 6173),
 				next(
@@ -1552,9 +1575,13 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None):
 			if not right_rows:
 				right_rows = dialog_side(recs, layer, True)
 			bar_h = len(mid_rows)
-			save_bar("bar-dialog-left" + suffix, left_rows, bar_h)
+			if not mid_is_pxm:
+				cap_heights = [len(rows) for rows in (left_rows, right_rows) if rows]
+				if cap_heights:
+					bar_h = min(cap_heights)
+			save_bar("bar-dialog-left" + suffix, left_rows, bar_h, trim_left=True)
 			save_bar("bar-dialog-middle" + suffix, mid_rows, bar_h)
-			save_bar("bar-dialog-right" + suffix, right_rows, bar_h)
+			save_bar("bar-dialog-right" + suffix, right_rows, bar_h, trim_right=True)
 
 		for short, pid in (("dialog-close", 6185), ("dialog-zoom", 211), ("dialog-grow", 221)):
 			bodies = pxm.get(pid)
