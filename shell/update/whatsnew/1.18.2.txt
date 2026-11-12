@@ -1,0 +1,6 @@
+ZacOS 9 1.18.2 fixes the After Dark screen saver.
+
+Imported modules keep playing after their first frame. In 1.18.1 the
+preview and the screen saver could stop on one frame, and the Screen Saver
+panel could stop responding while a module was chosen. Choose After Dark in
+Control Panels ▸ Screen Saver and the preview animates again.

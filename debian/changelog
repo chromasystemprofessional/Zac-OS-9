@@ -1,3 +1,12 @@
+zacos9 (1.18.2) trixie; urgency=medium
+
+  * After Dark modules keep playing instead of freezing on their first
+    frame. The preview and the screen saver read every frame again, and a
+    frame that arrives in several pieces is no longer mistaken for a whole
+    one.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Thu, 12 Nov 2026 01:22:00 -0500
+
 zacos9 (1.18.1) trixie; urgency=medium
 
   * Builds and packages are faster and more reliable.
