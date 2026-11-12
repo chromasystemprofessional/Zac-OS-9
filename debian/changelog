@@ -1,3 +1,19 @@
+zacos9 (1.18.1) trixie; urgency=medium
+
+  * Builds and packages are faster and more reliable.
+
+    Shared test sources are compiled once and linked, instead of being
+    recompiled for every test executable; test binaries are built when
+    meson test runs, not by every ninja. A full build has 703 compile
+    commands instead of 1,110, and a clean default build on the
+    development machine falls from 383 s to 185 s. scripts/build-fast.sh
+    gives a separate -O2 build with ccache and mold/lld when installed.
+
+    The After Dark helper now builds when Debian sets CC="ccache gcc"
+    (and when AR is unset), so the package build includes it in CI.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Thu, 12 Nov 2026 00:48:38 -0500
+
 zacos9 (1.18.0) trixie; urgency=medium
 
   * After Dark screen savers can now be imported. Open Control Panels ▸
@@ -81,12 +97,12 @@ zacos9 (1.15.0) trixie; urgency=medium
 zacos9 (1.14.3) trixie; urgency=medium
 
   * Disks no longer hide under a desktop file.
-    
+
     A disk and a file could both remember the same place on the desktop, and
     the file was drawn over the disk, so the disk looked missing. A disk
     whose
     remembered place overlaps another icon now takes a free place instead.
-    
+
     The startup disk and the Trash keep their places, and files are never
     moved.
 
@@ -95,7 +111,7 @@ zacos9 (1.14.3) trixie; urgency=medium
 zacos9 (1.14.2) trixie; urgency=medium
 
   * ZacOS 9 now states what it has always done: it does not track you.
-    
+
     A new Privacy page in ZacOS Help, and PRIVACY.md in the source, promise
     no
     telemetry, analytics, online account, advertising ID, device fingerprint
@@ -103,7 +119,7 @@ zacos9 (1.14.2) trixie; urgency=medium
     and
     what it sends — Software Update, Software, Web search, local network
     browsing and the services you choose.
-    
+
     A new test fails if a known tracking or analytics endpoint appears, or
     if
     the update, Software or web-search code contacts an address the policy
@@ -115,12 +131,12 @@ zacos9 (1.14.2) trixie; urgency=medium
 zacos9 (1.14.1) trixie; urgency=medium
 
   * Disks mounted from /etc/fstab now appear on the desktop.
-    
+
     An internal data disk added after installation is mounted by the system,
     but GIO never reports it as a volume, so the Finder had no icon for it.
     The Finder now finds those mounted block devices itself and shows each
     one under its volume label — for example, ZacData for /mnt/data.
-    
+
     The disk is not ejectable and opens like any other disk icon.
 
  -- adamjlawson-ctrl <adamjlawson@gmail.com>  Mon, 09 Nov 2026 13:34:33 -0500
@@ -128,13 +144,13 @@ zacos9 (1.14.1) trixie; urgency=medium
 zacos9 (1.14.0) trixie; urgency=medium
 
   * The standard application shortcuts now work in every program.
-    
+
     ⌘Q quits the program in front, closing all its windows so it can ask
     about unsaved work; it exits as the last one closes. ⌘H hides the
     program and hands the keyboard to the one behind it, and ⌘M collapses
     or expands the front window. The control panels had no Quit command of
     their own, so ⌘Q did nothing there before.
-    
+
     The Sniffer keeps ⌘H and ⌘M for its File menu — Search Internet
     and
     Make Alias — and is never quit, as the Mac's Finder wasn't.
@@ -164,14 +180,14 @@ zacos9 (1.12.0) trixie; urgency=medium
 zacos9 (1.11.0) trixie; urgency=medium
 
   * Bloodhound, Sherlock's search dog, now has its own program.
-    
+
     Open it from the Zac menu or the Applications folder. Type part of a
     name, choose all disks or your Home folder, and press Search. Results
     show where each file is, when it changed, its size and kind. Open,
     Reveal and Get Info work on a result, Copy Path puts its path on the
     clipboard, and a result can be dragged out of the list. Escape stops a
     search, ⌘R reveals a result and ⌘I gets its information.
-    
+
     Bloodhound 1.0 searches names. More Choices, contents and saved
     searches stay in the Sniffer's File ▸ Find… for now; both use the
     same search engine. Criteria, contents and the Internet channels are
@@ -183,7 +199,7 @@ zacos9 (1.10.0) trixie; urgency=medium
 
   * Boot splash and login screen now follow the main display's rotation,
     and removable media is a first-class part of the desktop.
-    
+
     CDs, DVDs, audio CDs, blank discs, PC and USB floppy disks, Iomega
     Zip/Jaz disks, USB storage and disk images now get desktop icons, mount
     and eject through one path, and audio CDs and video DVDs play in VLC
@@ -191,7 +207,7 @@ zacos9 (1.10.0) trixie; urgency=medium
     single-track CUE/BIN images mount read-only; Mac HFS/APFS images keep
     their existing helper. Commercial DVDs may need the optional libdvdcss
     decoder from libdvd-pkg.
-    
+
     Hardware validation continues for real optical drives, floppy/Zip media
     changes, loop-image teardown and DVD playback.
 
@@ -288,13 +304,13 @@ zacos9 (1.7.6) trixie; urgency=medium
 
   * Themes show Mac OS 9's standard icons again: the Apple menu icon, and
     the standard folder, disk, Trash and document icons.
-    
+
     The System Folder copied from Old Dog's startup disk lost its resource
     forks, because the kernel's HFS driver exposes only data forks. The copy
     now reads the disk image directly and keeps every resource fork, and
     older copies are repaired in place. Apple Platinum and the themes that
     share its artwork no longer keep the theme file's document icon.
-    
+
     Themes already installed rebuild themselves the next time the
     Appearance panel is opened.
 

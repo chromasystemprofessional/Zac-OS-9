@@ -1,0 +1,6 @@
+ZacOS 9 1.18.1 is a maintenance release.
+
+Builds and packages are more reliable: the After Dark screen saver helper
+now builds through Debian's compiler wrapper as well as a plain compiler,
+and the build no longer recompiles the same test sources for every test.
+The desktop itself is unchanged from 1.18.0.
