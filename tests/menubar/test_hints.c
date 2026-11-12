@@ -51,6 +51,12 @@ int main(int argc, char **argv) {
 	assert(strstr(hint_text(&it, buf, sizeof(buf)), "Makes Scribble the active"));
 	it = (struct mb_item){ .label = "Mouse Practice", .action = ACT_LAUNCH };
 	assert(strstr(hint_text(&it, buf, sizeof(buf)), "double-clicking"));
+	it = (struct mb_item){ .label = "New Tricks", .action = ACT_LAUNCH };
+	assert(strstr(hint_text(&it, buf, sizeof(buf)), "programs you can install"));
+	it = (struct mb_item){ .label = "Fetch Updates", .action = ACT_LAUNCH };
+	assert(strstr(hint_text(&it, buf, sizeof(buf)), "system updates"));
+	it = (struct mb_item){ .label = "Bloodhound (Search)", .action = ACT_LAUNCH };
+	assert(strstr(hint_text(&it, buf, sizeof(buf)), "searches the web"));
 	it = (struct mb_item){ .label = "Something Unknown", .action = ACT_LAUNCH };
 	assert(!hint_text(&it, buf, sizeof(buf)));
 

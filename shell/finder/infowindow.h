@@ -62,6 +62,7 @@ private:
 	void saveComment();
 	bool showView(int view);
 	bool canChangeIcon() const;
+	void addIconHint();
 	pl_icon_kind shownKind() const;
 	QImage currentIconImage() const;
 	void refreshIconFolder();
@@ -104,6 +105,7 @@ private:
 	bool m_editingComment = false;
 	bool m_iconFocused = false;
 	QPoint m_iconPressPos;
+	QRect m_iconHintArea;
 	bool m_caretOn = true;
 	QRect m_commentBox;
 	QTimer m_caretTimer;

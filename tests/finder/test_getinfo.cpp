@@ -82,6 +82,10 @@ int main(int argc, char **argv) {
 		source->show();
 		QApplication::processEvents();
 		check(!source->m_iconFocused, "the icon starts unselected");
+		const QString hint = source->m_host.hintAt(QPoint(30, 20));
+		check(hint.contains(QString::fromUtf8("⌘-C")) &&
+			hint.contains(QString::fromUtf8("⌘-V")),
+			"the icon's Hint Bubble names the keys that copy and paste it");
 
 		sendKey(source, Qt::Key_C, Qt::ControlModifier);
 		const QImage copied = QApplication::clipboard()->image();

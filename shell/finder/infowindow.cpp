@@ -248,6 +248,7 @@ InfoWindow::InfoWindow(const QString &path, pl_icon_kind kind, const QString &na
 				m_size = m_available = tr9("Not reported");
 			}
 		}
+		addIconHint();
 		m_show.rect = QRect(SHOW_X, SHOW_Y, SHOW_W, PL_POPUP_H);
 		m_show.items = { PopupItem{ tr9("General Information") }, PopupItem{ tr9("Sharing"), false } };
 		m_show.chosen = [this](int i) { showView(i); };
@@ -257,6 +258,7 @@ InfoWindow::InfoWindow(const QString &path, pl_icon_kind kind, const QString &na
 
 	QFileInfo info(path);
 	m_isTrash = kind == PL_ICON_TRASH_EMPTY || kind == PL_ICON_TRASH_FULL;
+	addIconHint();
 	if (m_isTrash) {
 		m_kindText = tr9("trash");
 		m_trashWarn = PanelCheckbox(tr9("Warn before emptying"), QPoint(INSIDE_X, BOX_Y1 - 26));
@@ -411,6 +413,17 @@ void InfoWindow::paintEvent(QPaintEvent *) {
  * a virtual item such as an application, the file whose icon stands for it. */
 bool InfoWindow::canChangeIcon() const {
 	return !m_iconPath.isEmpty() && !m_isVolumeInfo && !m_isTrash;
+}
+
+/* The icon's Hint Bubble: copy it, or paste a picture from the Clipboard
+ * as this item's icon. Only where the icon can be changed. */
+void InfoWindow::addIconHint() {
+	if (!canChangeIcon()) {
+		return;
+	}
+	m_iconHintArea = QRect(ICON_BOX_X, ICON_BOX_Y, 38, 38);
+	m_host.hintAreas.push_back({ &m_iconHintArea,
+		tr9("⌘-C copies this icon. ⌘-V pastes a picture from the Clipboard as this item's icon.") });
 }
 
 pl_icon_kind InfoWindow::shownKind() const {
