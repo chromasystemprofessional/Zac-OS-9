@@ -258,23 +258,24 @@ const struct ad_frame *ad_renderer_frame(const struct ad_renderer *r) {
 	return r && r->frame.pixels ? &r->frame : NULL;
 }
 
+/* A black rectangle clipped to the canvas. */
+static void black_rect(struct pl_canvas *c, int x0, int y0, int x1, int y1) {
+	if (x0 < 0) x0 = 0;
+	if (y0 < 0) y0 = 0;
+	if (x1 > c->width) x1 = c->width;
+	if (y1 > c->height) y1 = c->height;
+	for (int y = y0; y < y1; y++) {
+		uint32_t *out = c->px + (size_t)y * c->stride;
+		for (int x = x0; x < x1; x++) {
+			out[x] = 0xFF000000u;
+		}
+	}
+}
+
 void ad_renderer_draw(const struct ad_renderer *r, struct pl_canvas *c, int x, int y, int w,
 		int h) {
 	if (!c || !c->px || !r || !r->frame.pixels || w <= 0 || h <= 0) {
 		return;
-	}
-	/* The bars around a 4:3 module on a wider screen, and the first frames
-	 * before the helper has drawn anything, are black. */
-	for (int row = 0; row < h; row++) {
-		if (y + row < 0 || y + row >= c->height) {
-			continue;
-		}
-		uint32_t *out = c->px + (size_t)(y + row) * c->stride;
-		for (int col = 0; col < w; col++) {
-			if (x + col >= 0 && x + col < c->width) {
-				out[x + col] = 0xFF000000u;
-			}
-		}
 	}
 	const int sw = r->frame.width, sh = r->frame.height;
 	int dw = w, dh = w * sh / sw;
@@ -286,6 +287,29 @@ void ad_renderer_draw(const struct ad_renderer *r, struct pl_canvas *c, int x, i
 		return;
 	}
 	const int ox = x + (w - dw) / 2, oy = y + (h - dh) / 2;
+	/* The bars around a 4:3 module on a wider screen, and the first frames
+	 * before the helper has drawn anything, are black. Fill only what the
+	 * frame does not cover: repainting the whole screen every frame was most
+	 * of the cost of a large display. */
+	black_rect(c, x, y, x + w, oy);
+	black_rect(c, x, oy + dh, x + w, y + h);
+	black_rect(c, x, oy, ox, oy + dh);
+	black_rect(c, ox + dw, oy, x + w, oy + dh);
+
+	uint32_t lut[256];
+	for (int i = 0; i < 256; i++) {
+		const uint8_t *rgb = r->frame.palette + (size_t)i * 3;
+		lut[i] = 0xFF000000u | (uint32_t)rgb[0] << 16 | (uint32_t)rgb[1] << 8 | rgb[2];
+	}
+	/* One source column per destination column, instead of a divide per
+	 * pixel; the map is the same for every row. */
+	int *xmap = malloc(sizeof(*xmap) * (size_t)dw);
+	if (!xmap) {
+		return;
+	}
+	for (int col = 0; col < dw; col++) {
+		xmap[col] = col * sw / dw;
+	}
 	for (int row = 0; row < dh; row++) {
 		const int sy = row * sh / dh;
 		if (oy + row < 0 || oy + row >= c->height) {
@@ -294,15 +318,13 @@ void ad_renderer_draw(const struct ad_renderer *r, struct pl_canvas *c, int x, i
 		const uint8_t *src = r->frame.pixels + (size_t)sy * sw;
 		uint32_t *out = c->px + (size_t)(oy + row) * c->stride;
 		for (int col = 0; col < dw; col++) {
-			const int sx = col * sw / dw;
-			if (ox + col < 0 || ox + col >= c->width) {
-				continue;
+			const int gx = ox + col;
+			if (gx >= 0 && gx < c->width) {
+				out[gx] = lut[src[xmap[col]]];
 			}
-			const uint8_t *rgb = r->frame.palette + (size_t)src[sx] * 3;
-			out[ox + col] = 0xFF000000u | (uint32_t)rgb[0] << 16 | (uint32_t)rgb[1] << 8 |
-				rgb[2];
 		}
 	}
+	free(xmap);
 }
 
 /* Reap a child without blocking the caller forever: a helper that ignores
