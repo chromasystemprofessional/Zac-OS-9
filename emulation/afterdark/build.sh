@@ -14,6 +14,16 @@ out=${1:?usage: build.sh OUTPUT TARGET_DIR [CARGO]}
 target=${2:?usage: build.sh OUTPUT TARGET_DIR [CARGO]}
 cargo=${3:-${CARGO:-cargo}}
 
+# rustup keeps its settings and toolchains in RUSTUP_HOME (normally ~/.rustup)
+# and uses HOME to find it. A package build can change HOME, so when CARGO is
+# rustup's shim under ~/.cargo/bin, point rustup at the .rustup beside it.
+case "$cargo" in
+*/.cargo/bin/cargo)
+	RUSTUP_HOME=${RUSTUP_HOME:-${cargo%/.cargo/bin/cargo}/.rustup}
+	export RUSTUP_HOME
+	;;
+esac
+
 "$cargo" build --release --locked --offline \
 	--manifest-path "$src/Cargo.toml" \
 	--target-dir "$target" \
