@@ -172,14 +172,16 @@ test('startupdisk-panel',
 )
 crypt = dependency('libxcrypt')
 users_sources = ['users.cpp']
+users_panel = executable('test-users-panel', '../../tests/users/test_panel.cpp', users_sources,
+  link_with: panelkit,
+  include_directories: include_directories('../finder'),
+  dependencies: [shell_common_dep, platinum_dep, qt6, wayland_client, crypt, gio_unix],
+  build_by_default: false,
+)
 # Users with a stand-in accountsservice on a private session bus (users.cpp).
 test('users-panel', find_program('dbus-run-session'),
-  args: ['--', executable('test-users-panel', '../../tests/users/test_panel.cpp', users_sources,
-      link_with: panelkit,
-      include_directories: include_directories('../finder'),
-      dependencies: [shell_common_dep, platinum_dep, qt6, wayland_client, crypt, gio_unix],
-    build_by_default: false,
-  ).full_path(), files('../../tests/users/fake_accounts.py')],
+  args: ['--', users_panel.full_path(), files('../../tests/users/fake_accounts.py')],
+  depends: users_panel,
   timeout: 60,
 )
 # The Sound panel's Alert Sound menu, with the panel as it is built.
