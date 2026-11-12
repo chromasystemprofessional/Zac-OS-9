@@ -931,6 +931,18 @@ def _pxm_body(w=13, h=13, layers=2):
     return head + mask + px * layers
 
 
+def _pxm_edged(w, h, left=0, right=0):
+    # A correctly laid out pxm# (bounds top 0, left 0, bottom h, right w),
+    # white where the mask is set and transparent outside the art.
+    head = struct.pack(">12H", 1, 1, 0, 0, h, w, 16, 0, 0, 0, 0, 1)
+    mask_rb = ((w + 15) // 16) * 2
+    mask = bytearray(mask_rb * h)
+    for y in range(h):
+        for x in range(left, w - right):
+            mask[y * mask_rb + x // 8] |= 0x80 >> (x % 8)
+    return head + bytes(mask) + struct.pack(">H", 0x7FFF) * (w * h)
+
+
 def test_theme_chrome_decodes():
     # pxm# layers decode with their mask; the lined-up theme's bar tiles
     # resolve to its pattern files and its buttons land in chrome/.
@@ -979,6 +991,30 @@ def test_bar_tiles_align():
         heights[key] = struct.unpack(">I", head[20:24])[0]
     assert heights == {"bar-left": 6, "bar-middle": 6, "bar-right": 6}, heights
     print("ok    bar caps are aligned to the middle's height")
+
+
+def test_bar_tiles_fit_window():
+    # Paper's middle is a 32-row pattern for a 22-row bar, and Slate
+    # Board's caps carry transparent columns: the saved bar must be the
+    # caps' height, and each cap trimmed on the side that meets the window
+    # edge, or it draws shorter and narrower than the frame.
+    pxm = {6176: [_pxm_edged(24, 22, left=4)],
+        6173: [_pxm_edged(8, 22, right=3)]}
+    plut = {387: _plut_body({48: (9001, (255, 255, 255))})}
+    ppats = [(9001, _ppat_body_wide(128, 32))]
+    layo = {128: _layo_body([
+        (b"pxm#", 6176, 256, 0),
+        (b"plut", -49, 256, 0),
+        (b"pxm#", 6173, 256, 0),
+    ])}
+    out = tempfile.mkdtemp() + "/theme"
+    keys = tool.write_theme_chrome("Paper", pxm, ppats, out, {}, layo, plut)
+    sizes = {key: _png_size(os.path.join(out, "chrome", key + ".png"))
+        for key in ("bar-left", "bar-middle", "bar-right")}
+    assert sizes == {"bar-left": (20, 22), "bar-middle": (128, 22),
+        "bar-right": (5, 22)}, sizes
+    assert keys.get("bar-middle", "").endswith("chrome/bar-middle.argb"), keys
+    print("ok    bar tiles fill the window's width and the bar's height")
 
 
 def _layo_body(entries):
@@ -1099,6 +1135,7 @@ test_file_icon_decodes()
 test_theme_chrome_decodes()
 test_theme_chrome_twopart()
 test_bar_tiles_align()
+test_bar_tiles_fit_window()
 
 
 def test_theme_icons_scale_and_clear_stale():

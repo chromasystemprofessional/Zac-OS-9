@@ -149,7 +149,11 @@ reads the Appearance theme's resource fork and produces a **theme bundle** in
   to the Platinum drawing. Every title-bar tile (left, middle, right;
   document and dialog, active and inactive) is written at the bar's own
   height, starting at its first inked row, so end caps whose resources
-  carried padding above the bar still compose into one band.
+  carried padding above the bar still compose into one band. A middle that
+  is a tiled pattern running past the bar into the body is cropped to the
+  height of the frame layout's `pxm#` caps. A cap's fully transparent
+  columns are trimmed on the side that meets the window edge, so padding
+  in the resource does not leave the bar narrower than the frame.
 - `sounds/` — alert sounds. `system-sound-N.wav` are the System file's own
   `snd` resources, decoded from sampled sounds only; synthesized and compressed
   sounds are skipped. Theme-file sounds sit beside them. The installer never
