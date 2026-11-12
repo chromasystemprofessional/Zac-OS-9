@@ -18,6 +18,7 @@ public:
 		bool accepted = false;
 		bool guest = true;
 		QString user, password, share;
+		bool mountAtStartup = false;
 	};
 
 	/* `error`, non-empty, shows as a line under the fields: a previous
@@ -40,11 +41,14 @@ private:
 	LoginDialog(const QString &serverName, bool guestAllowed, bool needsShare,
 		const QString &error, const QString &what);
 	void updateEnabled();
+	void refreshStartup();
 
-	QString m_error, m_what;
+	QString m_error, m_what, m_server;
 	bool m_needsShare = false;
+	bool m_startupTouched = false;
 	PanelRadios m_who;
 	PanelEdit m_name, m_password, m_share;
+	PanelCheckbox m_startup;
 	PanelButton m_connect, m_cancel;
 	PanelHost m_host{ this };
 };

@@ -34,7 +34,7 @@ Of 31 items: 17 working, 6 partial, 0 view only, 8 missing.
 | Apple Menu Items (7.0) | Whatever was in it appeared in the Apple menu. | Working: Zac Menu Items, with a (Disabled) twin | `shell/menubar/launch.c` | – | – |
 | Control Panels (7.0) | One file per panel. | Working: the panels' desktop entries | `lib/controlpanels`, `shell/panels/panelregistry.h` | – | – |
 | Control Panels (Disabled) (7.5) | Extensions Manager moved panels here to turn them off. | Working: drag a panel in to turn it off, back to turn it on | `lib/controlpanels`, `shell/files/vfs.cpp`, `shell/finder/fileops.cpp` | – | – |
-| Startup Items (7.0) | Opened everything in it at startup. | Working: XDG autostart | `shell/files/autostart.cpp`, `shell/autostart/` | – | – |
+| Startup Items (7.0) | Opened everything in it at startup. | Working: XDG autostart, including saved network disks | `shell/files/autostart.cpp`, `shell/autostart/` | – | – |
 | Shutdown Items (7.5) | Opened everything in it when shutting down. | Working | `session/` (`zacos9-shutdown-items`) | – | – |
 | Launcher Items (7.5) | The Launcher's buttons. | Working: Toy Box Items | `shell/finder/toybox.cpp` | – | – |
 | Contextual Menu Items (8.0) | Commands added to Control-click menus. | Working | `shell/finder/contextitems.cpp` | – | – |

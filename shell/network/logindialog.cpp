@@ -7,6 +7,7 @@
 #include "pixels.h"
 #include "platinumshell.h"
 #include "settings.h"
+#include "startupmounts.h"
 #include "tr.h"
 
 static constexpr int W = 340;
@@ -15,7 +16,7 @@ static constexpr int FIELD_X = MARGIN + 60;
 
 LoginDialog::LoginDialog(const QString &serverName, bool guestAllowed, bool needsShare,
 		const QString &error, const QString &what)
-	: m_error(error), m_what(what), m_needsShare(needsShare) {
+	: m_error(error), m_what(what), m_server(serverName), m_needsShare(needsShare) {
 	QString title = what == "computer" ? tr9("Connect to the computer")
 		: tr9("Connect to the file server");
 	for (int i = 0; i < title.size(); i++) { /* "Connect to the File Server" */
@@ -47,6 +48,12 @@ LoginDialog::LoginDialog(const QString &serverName, bool guestAllowed, bool need
 	if (needsShare) {
 		m_share.rect = QRect(FIELD_X, y, W - MARGIN - FIELD_X, PL_EDIT_H);
 		y += PL_EDIT_H + 6;
+		m_startup = PanelCheckbox(tr9("Mount at startup"), QPoint(MARGIN, y));
+		m_startup.toggled = [this](bool) {
+			m_startupTouched = true;
+			update();
+		};
+		y += 22;
 	}
 	if (!error.isEmpty()) {
 		y += 16;
@@ -68,10 +75,17 @@ LoginDialog::LoginDialog(const QString &serverName, bool guestAllowed, bool need
 		}
 		accept();
 	};
-	m_who.changed = [this](int) { updateEnabled(); };
+	m_who.changed = [this](int) {
+		updateEnabled();
+		refreshStartup();
+	};
+	m_share.edited = [this] { refreshStartup(); };
+	m_name.edited = [this] { refreshStartup(); };
 	updateEnabled();
 
 	m_host.radios = { &m_who };
+	m_host.checks = needsShare ? std::vector<PanelCheckbox *>{ &m_startup }
+		: std::vector<PanelCheckbox *>{};
 	m_host.edits = needsShare
 		? std::vector<PanelEdit *>{ &m_name, &m_password, &m_share }
 		: std::vector<PanelEdit *>{ &m_name, &m_password };
@@ -80,7 +94,35 @@ LoginDialog::LoginDialog(const QString &serverName, bool guestAllowed, bool need
 	m_host.cancelButton = &m_cancel;
 	m_host.setFocus(guestAllowed ? nullptr : &m_name);
 
-	(void)serverName;
+	refreshStartup();
+}
+
+void LoginDialog::refreshStartup() {
+	if (!m_needsShare) {
+		return;
+	}
+	const bool guest = m_who.selected == 0;
+	const QString share = m_share.text.trimmed();
+	const QString user = guest ? QString() : m_name.text.trimmed();
+	const bool keychain = startupMountKeychainAvailable();
+	m_startup.enabled = guest || keychain;
+	m_startup.hint = guest ? tr9("Mounts this share each time you log in.")
+		: keychain ? tr9("Mounts this share each time you log in. The password is kept in your keychain.")
+		: tr9("The keychain isn’t available; only a Guest share can mount at startup.");
+	if (!m_startup.enabled) {
+		m_startup.on = false;
+		return;
+	}
+	if (m_startupTouched) {
+		return;
+	}
+	StartupMount mount;
+	mount.kind = StartupMount::SMB;
+	mount.server = m_server;
+	mount.share = share;
+	mount.user = user;
+	mount.guest = guest;
+	m_startup.on = !share.isEmpty() && startupMountExists(mount);
 }
 
 void LoginDialog::updateEnabled() {
@@ -105,6 +147,7 @@ LoginDialog::Result LoginDialog::ask(QWidget *parent, const QString &serverName,
 	}
 	if (needsShare) {
 		r.share = dialog.m_share.text.trimmed();
+		r.mountAtStartup = dialog.m_startup.on;
 	}
 	return r;
 }
@@ -125,7 +168,7 @@ void LoginDialog::paintEvent(QPaintEvent *) {
 		panelLabel(c, tr9("Share:"), FIELD_X - 8, m_share.rect.top() + 15);
 	}
 	if (!m_error.isEmpty()) {
-		const int y = (m_needsShare ? m_share.rect : m_password.rect).bottom() + 20;
+		const int y = m_needsShare ? m_startup.pos.y() + 20 : m_password.rect.bottom() + 20;
 		panelText(c, m_error, MARGIN, y, PL_FONT_VIEWS, RGB(0x99, 0x00, 0x00));
 	}
 	m_host.paintControls(c, GRAY(0xD));

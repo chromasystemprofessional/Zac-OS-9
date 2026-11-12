@@ -14,6 +14,8 @@ the rest of the control panels already use, the same honest approach
 | Piece | Path | What |
 |---|---|---|
 | The window | `shell/network/netbrowser.{h,cpp}` | The server list, Connect to Server, and the whole login → volumes → mount sequence. |
+| Saved at startup | `shell/files/startupmounts.{h,cpp}` | The disks ticked **Mount at startup**, their keychain passwords, and one Startup Items entry each. |
+| Mounting at login | `shell/network/netmount.cpp` (`zacos9-netmount`) | Runs from each saved disk's Startup Items entry and mounts it; failures go to the session log. |
 | Finding servers | `shell/network/discovery.{h,cpp}` | Bonjour (`avahi-browse`) and our own WS-Discovery probe. |
 | AFP | `shell/network/afpclient.{h,cpp}` | Wraps `zacos9-afp info`/`volumes`/`mount`. |
 | SMB | `shell/network/smbclient.{h,cpp}` | Wraps `gio mount`. |
@@ -115,6 +117,29 @@ unmount errors are reported without pretending the operation succeeded.
 Installed live on 2026-10-08; Finder and the menu bar were restarted with user
 approval. Offscreen tests cover menu enablement, USB helper routing, successful
 SMB disconnect, and a refused SMB unmount that misleadingly exits zero.
+
+### Mount at startup
+
+The AFP volume list and the SMB login dialog have a **Mount at startup**
+checkbox, like the alias a Mac OS 9 person kept in Startup Items. Ticking it
+saves the disk; for a registered user the password goes to the keychain, never
+to the saved list. Each saved disk gets its own entry in **System Folder ▸
+Startup Items**, wearing the network-disk icon, so the folder looks and works
+like Mac OS 9's. At login `zacos9-netmount --mount-id ID` reads the saved
+disk, takes its password from the keychain, and mounts it if it is not already
+there. One unreachable server is written to
+`$XDG_STATE_HOME/zacos9/network-mounts.log` and does not hold up the others.
+
+Dragging a saved disk's Startup Items entry to the Trash stops it mounting at
+login; the saved list and keychain item stay, so dragging it back from the
+Trash works again. Connecting to the disk again with the box cleared removes
+the saved entry and its keychain item. A volume with its own volume password,
+or a registered-user disk when `secret-tool` is not installed, cannot be saved
+this way; the checkbox is disabled and says why.
+
+The saved list is `$XDG_CONFIG_HOME/zacos9/network-mounts.json`; the entries
+are `$XDG_CONFIG_HOME/autostart/zacos9-network-*.desktop`, each tagged
+`X-ZacOS9-NetworkMount=true`.
 
 All three map straight onto `zacos9-afp`'s own commands (`info`,
 `volumes`, `mount`), already built with this GUI in mind — see its own

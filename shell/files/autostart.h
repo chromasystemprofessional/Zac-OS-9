@@ -18,6 +18,7 @@ struct AutostartEntry {
 	bool userEntry = false;     /* the user's file is the effective one */
 	bool overridesSystem = false;
 	bool enabled = false;
+	bool networkMount = false;  /* a saved network disk (X-ZacOS9-NetworkMount) */
 	QString reason;      /* why it is not enabled; empty when enabled */
 };
 

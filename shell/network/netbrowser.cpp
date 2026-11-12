@@ -23,6 +23,7 @@
 #include "platinumshell.h"
 #include "settings.h"
 #include "smbclient.h"
+#include "startupmounts.h"
 #include "volumedialog.h"
 
 static constexpr int W = 400, H = 320;
@@ -110,6 +111,22 @@ static void rememberServer(DiscoveredServer::Kind kind, const QString &address, 
 	}
 }
 
+/* The mount succeeded (or was already there): remember it in Startup Items,
+ * or forget it when the box was cleared. A keychain failure is reported but
+ * never undoes the connection that just worked. */
+static void rememberStartupMount(const StartupMount &mount, const QString &password,
+		bool wanted) {
+	if (!wanted) {
+		forgetStartupMount(mount);
+		return;
+	}
+	QString error;
+	if (!saveStartupMount(mount, password, &error)) {
+		Alert::ask(tr9("The disk is connected, but it can’t be mounted at startup: %1").arg(error),
+			"OK", QString());
+	}
+}
+
 void NetBrowserWindow::connectTo(const QString &address, DiscoveredServer::Kind kind) {
 	if (isThisComputer(address, thisComputer())) {
 		Alert::ask(tr9("“%1” is this computer. Its shared folders are already here: "
@@ -128,6 +145,14 @@ void NetBrowserWindow::connectTo(const QString &address, DiscoveredServer::Kind 
 				QString());
 		} else {
 			rememberServer(kind, address, address);
+			StartupMount mount;
+			mount.kind = StartupMount::SMB;
+			mount.server = address;
+			mount.share = login.share;
+			mount.guest = login.guest;
+			mount.user = login.guest ? QString() : login.user;
+			rememberStartupMount(mount, login.guest ? QString() : login.password,
+				login.mountAtStartup);
 		}
 		return;
 	}
@@ -155,20 +180,30 @@ void NetBrowserWindow::connectTo(const QString &address, DiscoveredServer::Kind 
 			login.guest ? QString() : login.user, login.guest ? QString() : login.password,
 			cleartext, &ok, &wrong, &err);
 		if (ok) {
-			const QString volume = VolumeDialog::ask(this, info.name, volumes);
-			if (!volume.isEmpty()) {
+			const QString user = login.guest ? QString() : login.user;
+			const VolumeDialog::Result choice = VolumeDialog::ask(this, info.name, volumes,
+				address, user, login.guest, cleartext);
+			if (!choice.volume.isEmpty()) {
 				QString mountError;
 				bool mounted = false;
-				const QString user = login.guest ? QString() : login.user;
-				const QString mountPoint = afpMountPointFor(address, volume, user, &mounted);
+				const QString mountPoint = afpMountPointFor(address, choice.volume, user, &mounted);
 				if (mountPoint.isEmpty()) {
 					Alert::ask(tr9("“%1” can’t be connected: a different disk is "
-						"already connected in its place.").arg(volume), "OK", QString());
-				} else if (!mounted && !afpMount(address, volume, mountPoint, user,
+						"already connected in its place.").arg(choice.volume), "OK", QString());
+				} else if (!mounted && !afpMount(address, choice.volume, mountPoint, user,
 						login.guest ? QString() : login.password, cleartext, &mountError)) {
 					Alert::ask(mountError, "OK", QString());
 				} else {
 					rememberServer(kind, address, info.name);
+					StartupMount mount;
+					mount.kind = StartupMount::AFP;
+					mount.server = address;
+					mount.volume = choice.volume;
+					mount.user = user;
+					mount.guest = login.guest;
+					mount.cleartext = cleartext;
+					rememberStartupMount(mount, login.guest ? QString() : login.password,
+						choice.mountAtStartup);
 				}
 			}
 			return;

@@ -35,6 +35,7 @@
 {prefix}/bin/zacos9-menubar
 {prefix}/bin/zacos9-mousepractice
 {prefix}/bin/zacos9-netbrowser
+{prefix}/bin/zacos9-netmount
 {prefix}/bin/zacos9-notepad
 {prefix}/bin/zacos9-pack
 {prefix}/bin/zacos9-patterns

@@ -33,3 +33,22 @@ executable('zacos9-netbrowser',
   dependencies: [shell_files_dep, shell_common_dep, platinum_dep, qt6, wayland_client],
   install: true,
 )
+
+# Runs the network disks saved to mount at startup; the Startup Items entry
+# starts it once per saved disk.
+executable('zacos9-netmount',
+  'netmount.cpp',
+  'afpclient.cpp',
+  include_directories: include_directories('../finder', '../print', '../panels'),
+  dependencies: [shell_files_dep, shell_common_dep, qt6],
+  install: true,
+)
+
+test('startup-mounts',
+  executable('test-startup-mounts',
+    '../../tests/network/test_startupmounts.cpp',
+    dependencies: [shell_files_dep, shell_common_dep, qt6],
+    build_by_default: false,
+  ),
+  timeout: 60,
+)

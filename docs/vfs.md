@@ -581,7 +581,9 @@ Current providers:
   GIO parses and launches `Exec` according to the desktop-entry specification.
   Distinct IDs remain distinct even when their commands match. Command text is
   not exposed. Each item is keyed by its desktop-file ID and shows the
-  application's icon when that ID is an installed application.
+  application's icon when that ID is an installed application, or the
+  network-disk icon when the entry is a saved network disk
+  (`X-ZacOS9-NetworkMount`, see [The Network Browser](network.md)).
 
   Startup Items is the one provider folder that takes drops
   (`autostartAddApplication`, `autostartRemove`):

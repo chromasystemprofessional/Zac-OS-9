@@ -192,6 +192,7 @@ std::vector<AutostartEntry> autostartEntries(const AutostartContext &context) {
 			}
 			e.description = file.localized("Comment", context.locale).trimmed();
 			e.command = file.str("Exec");
+			e.networkMount = file.boolean("X-ZacOS9-NetworkMount");
 			e.reason = disabledReason(path, file, context.desktops);
 			e.enabled = e.reason.isEmpty();
 			out.push_back(e);

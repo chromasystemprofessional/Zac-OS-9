@@ -260,6 +260,9 @@ int main(int argc, char **argv) {
 		"[Desktop Entry]\nType=Application\nName=Fixture Startup\nExec=sh -c secret-command\n");
 	writeEntry(resourceRoot + "/startup/user", "disabled.desktop",
 		"[Desktop Entry]\nType=Application\nName=Disabled Fixture\nExec=sh -c secret-command\nHidden=true\n");
+	writeEntry(resourceRoot + "/startup/user", "network.desktop",
+		"[Desktop Entry]\nType=Application\nName=Network Fixture\nExec=sh -c secret-command\n"
+		"X-ZacOS9-NetworkMount=true\n");
 	writeEntry(resourceRoot + "/dpkg", "status",
 		"Package: other\nVersion: 1.0\n\nPackage: zacos9\nVersion: 0.1.27-fixture\n"
 		"Status: install ok installed\n\n");
@@ -617,6 +620,11 @@ int main(int argc, char **argv) {
 	check(!startupEntry.isEmpty() &&
 		pathNamed(startupItems, "Disabled Fixture").isEmpty(),
 		"startup discovery includes enabled entries and excludes disabled entries");
+	const QString networkEntry = pathNamed(startupItems, "Network Fixture");
+	const VNode *networkNode = vfsNode(networkEntry);
+	check(!networkEntry.isEmpty() && networkNode &&
+		networkNode->icon == PL_ICON_NETWORK_DISK,
+		"a saved network disk wears the network-disk icon in Startup Items");
 	vfsResourceDetails(startupEntry, &resourceInfo, &resourceKind, &resourceLocation,
 		&resourceSource, &resourceAccess);
 	check(resourceInfo.join('\n').contains("opens at login") &&

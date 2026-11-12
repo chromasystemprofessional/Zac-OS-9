@@ -379,11 +379,14 @@ std::vector<SystemResource> resourceChildren(const QString &provider, const QStr
 		 * exactly the entry it stands for. */
 		for (const AutostartEntry &entry : startupEnabledEntries()) {
 			add(entry.id, safeDisplayName(entry.name), ResourceType::Information,
-				"startup item", "Opens when you log in. To stop it opening, drag it to the "
-					"Trash; to add an application, drag it into Startup Items.",
-				{ "Status: opens at login",
+				"startup item", entry.networkMount
+					? "Mounts this network disk when you log in. To stop it, drag it to the Trash."
+					: "Opens when you log in. To stop it opening, drag it to the Trash; to add "
+						"an application, drag it into Startup Items.",
+				{ entry.networkMount ? QStringLiteral("Status: mounts at login") :
+						QStringLiteral("Status: opens at login"),
 					QString("Added by: ") + (entry.userEntry ? "you" : "the system") });
-			out.back().icon = PL_ICON_APPLICATION;
+			out.back().icon = entry.networkMount ? PL_ICON_NETWORK_DISK : PL_ICON_APPLICATION;
 		}
 		return out;
 	}
@@ -562,8 +565,8 @@ ResourceDetails resourceDetails(const QString &provider, const QString &key) {
 		details.name = "Startup Items";
 		details.kind = key.isEmpty() ? "folder" : "startup item";
 		details.description = key.isEmpty() ?
-			"Applications in this folder open when you log in. Drag an application here to "
-				"add it; drag an item to the Trash to remove it." :
+			"Applications and saved network disks in this folder open when you log in. Drag "
+				"an application here to add it; drag an item to the Trash to remove it." :
 			"Opens when you log in. Drag it to the Trash to stop it opening.";
 		return details;
 	}
