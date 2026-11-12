@@ -11,6 +11,9 @@
 //! upstream `AD_M68K_REGENERATE` path is not vendored: the committed tables are
 //! used as they are. What this tree is, and the hash of every byte of it, is in
 //! `vendor/PROVENANCE.md`.
+//!
+//! `CC` and `AR` may name a wrapper and its arguments (`ccache gcc`), as the
+//! Debian CI build sets them, so they are split like a shell would.
 
 use std::path::PathBuf;
 use std::process::Command;
@@ -56,8 +59,14 @@ fn main() {
     println!("cargo:rerun-if-env-changed=CC");
     println!("cargo:rerun-if-env-changed=AR");
 
-    let cc = std::env::var("CC").unwrap_or_else(|_| "cc".to_owned());
-    let ar = std::env::var("AR").unwrap_or_else(|_| "ar".to_owned());
+    let cc_raw = std::env::var("CC").unwrap_or_else(|_| "cc".to_owned());
+    let mut cc_parts = cc_raw.split_whitespace();
+    let cc = cc_parts.next().unwrap_or("cc");
+    let cc_args: Vec<&str> = cc_parts.collect();
+    let ar_raw = std::env::var("AR").unwrap_or_else(|_| "ar".to_owned());
+    let mut ar_parts = ar_raw.split_whitespace();
+    let ar = ar_parts.next().unwrap_or("ar");
+    let ar_args: Vec<&str> = ar_parts.collect();
     let generated = vendor.join("generated");
 
     let mut objects = Vec::with_capacity(SOURCES.len());
@@ -66,7 +75,8 @@ fn main() {
         // `generated` folder inside OUT_DIR.
         let name = source.replace('/', "_").replace(".c", ".o");
         let object = out.join(name);
-        let status = Command::new(&cc)
+        let status = Command::new(cc)
+            .args(&cc_args)
             .args(["-O2", "-fPIC", "-w"])
             .arg("-I")
             .arg(&vendor)
@@ -77,18 +87,19 @@ fn main() {
             .arg("-o")
             .arg(&object)
             .status()
-            .unwrap_or_else(|e| panic!("cannot run {cc}: {e}"));
+            .unwrap_or_else(|e| panic!("cannot run {cc_raw}: {e}"));
         assert!(status.success(), "compiling {} failed", source);
         objects.push(object);
     }
 
     let library = out.join("libmusashi.a");
-    let status = Command::new(&ar)
+    let status = Command::new(ar)
+        .args(&ar_args)
         .arg("crsD")
         .arg(&library)
         .args(&objects)
         .status()
-        .unwrap_or_else(|e| panic!("cannot run {ar}: {e}"));
+        .unwrap_or_else(|e| panic!("cannot run {ar_raw}: {e}"));
     assert!(status.success(), "archiving libmusashi.a failed");
 
     println!("cargo:rustc-link-search=native={}", out.display());
