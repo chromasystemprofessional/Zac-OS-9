@@ -1,3 +1,14 @@
+zacos9 (1.18.3) trixie; urgency=medium
+
+  * Choosing an imported After Dark module no longer freezes the Screen
+    Saver panel. The compositor blocks SIGTERM for its own event loop and
+    its children inherited that mask, so the preview helper ignored the
+    panel's stop signal while the panel waited for it. Started children
+    now reset the mask, and stopping a helper is bounded and ends with
+    SIGKILL if it still will not leave.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Thu, 12 Nov 2026 01:54:00 -0500
+
 zacos9 (1.18.2) trixie; urgency=medium
 
   * After Dark modules keep playing instead of freezing on their first

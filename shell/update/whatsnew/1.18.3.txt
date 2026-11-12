@@ -1,0 +1,6 @@
+ZacOS 9 1.18.3 fixes the Screen Saver panel freezing when you choose an
+imported After Dark module.
+
+The panel now stops the old preview helper even when it inherits a blocked
+quit signal from the compositor, and it no longer waits forever for a helper
+that will not leave. The After Dark modules themselves are unchanged.
