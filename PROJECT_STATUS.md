@@ -1,6 +1,6 @@
 # Project status
 
-Updated: 2026-11-09. Latest release: **1.14.3**
+Updated: 2026-11-11. Latest release: **1.18.0**
 ([releases](https://github.com/chromasystemprofessional/Zac-OS-9/releases),
 [ISO](https://sourceforge.net/projects/zac-os-9/files/)).
 
@@ -77,6 +77,10 @@ This page is what's true now and what's next. What changed and when is in
 - **1.14.3 keeps desktop disks visible**: a disk whose remembered place
   overlapped another icon's is moved to a free place instead of being
   drawn under it ([Files](docs/files.md)).
+- **After Dark modules can be imported** into the Screen Saver panel from a
+  disk image the user supplies, and run in the saver through the vendored
+  MIT 68k engine; no modules or fonts ship ([After Dark
+  modules](docs/after-dark.md)).
 
 ## Being worked on
 

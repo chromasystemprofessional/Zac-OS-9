@@ -1,0 +1,13 @@
+After Dark screen savers can now be imported.
+
+Open Control Panels ▸ Screen Saver, choose After Dark, and click Import…
+Pick your own After Dark disk image, a folder of modules, or an archive of
+them; ZacOS does not include the modules or fonts. The imported modules
+appear in the list with a live preview. Not every module can run, the saver
+is silent, and games show their attract screen. Each screen runs its own
+copy, so a module uses one processor core per screen.
+
+Hint Bubbles now explain Get Info's icon: ⌘C copies it, and ⌘V pastes a
+picture from the Clipboard as the item's icon. New Tricks, Fetch Updates,
+Bloodhound (Search), Old Dog, Screen Snapshot and the other newer menu
+items have hints too.

@@ -15,6 +15,10 @@ An original guest test application and host pixel verifier are available in
 the [rendering feasibility spike](seamless/README.md); this does not enable
 seamless mode.
 
+`afterdark/` is separate: it vendors the MIT Rust engine that runs imported
+After Dark modules in the screen saver ([After Dark](../docs/after-dark.md)).
+It is not a Mac OS emulator, and it needs no ROM or system disk.
+
 ## Setting up
 
 1. Build the emulators once:

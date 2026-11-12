@@ -4,7 +4,8 @@
  * screen that is in the "saver" state of $XDG_RUNTIME_DIR/zacos9-idle-
  * $WAYLAND_DISPLAY with an overlay layer surface (namespace "screensaver"),
  * drawing the saver chosen in desktop.conf ("screensaver=ID", lib/savers.c)
- * at the screen's logical size, scaled up nearest-neighbour. It hides the
+ * at the screen's logical size, scaled up nearest-neighbour, or scaling the
+ * frames of an imported After Dark module (afterdark.c). It hides the
  * pointer over them. Any input wakes the screens (zacos9-wm hides these
  * surfaces at once); it takes its surfaces down as the file changes and
  * exits when no screen is in the saver state. See docs/energy-saver.md.
@@ -24,6 +25,7 @@
 #include <wayland-client.h>
 
 #include "draw.h"
+#include "afterdark.h"
 #include "fractional-scale-v1-client-protocol.h"
 #include "savers.h"
 #include "settings.h"
@@ -49,6 +51,9 @@ struct screen {
 	struct wp_fractional_scale_v1 *fractional;
 	int w, h; /* logical size, once configured */
 	struct pl_saver *saver;
+	struct ad_renderer *afterdark; /* the module, when that is the saver */
+	bool afterdark_first;          /* present a black frame while it starts */
+	double afterdark_since;        /* when its helper started */
 	uint32_t *logical; /* the frame at logical size, for scale > 1 or a fraction */
 	struct pl_shm_buffer buffers[2];
 	struct wl_callback *frame; /* the last frame not yet shown */
@@ -65,6 +70,8 @@ static struct wl_list screens; /* screen.link */
 static char state_path[1024], state_name[256];
 static double started;
 static int saver_index;
+static bool afterdark_saver;
+static char afterdark_module[256];
 
 static double now_seconds(void) {
 	struct timespec ts;
@@ -84,13 +91,75 @@ static void frame_done(void *data, struct wl_callback *callback, uint32_t time) 
 
 static const struct wl_callback_listener frame_listener = { frame_done };
 
+/* Shows the finished buffer and asks for the next frame. */
+static void present(struct screen *s, struct pl_shm_buffer *b) {
+	b->busy = true;
+	wl_surface_attach(s->surface, b->wl, 0, 0);
+	wl_surface_damage_buffer(s->surface, 0, 0, INT32_MAX, INT32_MAX);
+	s->frame = wl_surface_frame(s->surface);
+	wl_callback_add_listener(s->frame, &frame_listener, s);
+	wl_surface_commit(s->surface);
+}
+
+/* The logical frame, one pixel at a time to the screen's own pixels. */
+static void scale_logical(struct screen *s, struct pl_shm_buffer *b) {
+	const int k = s->scale;
+	if (s->quarters) {
+		struct pl_canvas c = { s->logical, s->w, 0, 0, s->w, s->h, NULL };
+		pl_snap_scale_canvas(&c, 0, 0, s->quarters, b->px);
+	} else if (k == 1) {
+		memcpy(b->px, s->logical, (size_t)s->w * s->h * 4);
+	} else {
+		for (int y = 0; y < s->h; y++) {
+			uint32_t *out = b->px + (size_t)y * k * s->w * k;
+			const uint32_t *in = s->logical + (size_t)y * s->w;
+			for (int x = 0; x < s->w; x++) {
+				for (int i = 0; i < k; i++) {
+					out[x * k + i] = in[x];
+				}
+			}
+			for (int i = 1; i < k; i++) {
+				memcpy(out + (size_t)i * s->w * k, out, (size_t)s->w * k * 4);
+			}
+		}
+	}
+}
+
 /* The next frame, unless the last isn't on screen yet. */
 static void draw(struct screen *s) {
-	if (!s->saver || s->frame) {
+	if ((!s->saver && !s->afterdark) || s->frame) {
 		return;
 	}
 	struct pl_shm_buffer *b = pl_shm_buffer_pick(s->buffers);
 	if (!b) {
+		return;
+	}
+	if (s->afterdark) {
+		const bool fresh = ad_renderer_take_frame(s->afterdark);
+		if (!fresh && !s->afterdark_first) {
+			/* A module that never produced a frame (a bad import, a
+			 * runtime it needs but cannot find) would leave the screen
+			 * black; the built-in saver covers it instead. */
+			if (!ad_renderer_frame(s->afterdark) &&
+					now_seconds() - s->afterdark_since > 5.0) {
+				ad_renderer_stop(s->afterdark);
+				s->afterdark = NULL;
+				s->saver = pl_saver_new(saver_index, s->w, s->h,
+					(unsigned)(now_seconds() * 1000) ^ s->global);
+				draw(s);
+			}
+			return;
+		}
+		if (fresh) {
+			struct pl_canvas c = { s->logical, s->w, 0, 0, s->w, s->h, NULL };
+			ad_renderer_draw(s->afterdark, &c, 0, 0, s->w, s->h);
+		} else {
+			/* Cover the screen at once; the first module frame follows. */
+			memset(s->logical, 0, (size_t)s->w * s->h * 4);
+		}
+		s->afterdark_first = false;
+		scale_logical(s, b);
+		present(s, b);
 		return;
 	}
 	const int k = s->scale;
@@ -108,25 +177,9 @@ static void draw(struct screen *s) {
 		/* At logical size, then each pixel k×k: sharp, like the rest. */
 		struct pl_canvas c = { s->logical, s->w, 0, 0, s->w, s->h, NULL };
 		pl_saver_draw(s->saver, &c, now_seconds() - started);
-		for (int y = 0; y < s->h; y++) {
-			uint32_t *out = b->px + (size_t)y * k * s->w * k;
-			const uint32_t *in = s->logical + (size_t)y * s->w;
-			for (int x = 0; x < s->w; x++) {
-				for (int i = 0; i < k; i++) {
-					out[x * k + i] = in[x];
-				}
-			}
-			for (int i = 1; i < k; i++) {
-				memcpy(out + (size_t)i * s->w * k, out, (size_t)s->w * k * 4);
-			}
-		}
+		scale_logical(s, b);
 	}
-	b->busy = true;
-	wl_surface_attach(s->surface, b->wl, 0, 0);
-	wl_surface_damage_buffer(s->surface, 0, 0, INT32_MAX, INT32_MAX);
-	s->frame = wl_surface_frame(s->surface);
-	wl_callback_add_listener(s->frame, &frame_listener, s);
-	wl_surface_commit(s->surface);
+	present(s, b);
 }
 
 /* ---- showing and hiding ---------------------------------------------------- */
@@ -153,6 +206,8 @@ static void hide(struct screen *s) {
 	pl_shm_buffer_free(&s->buffers[1]);
 	pl_saver_free(s->saver);
 	s->saver = NULL;
+	ad_renderer_stop(s->afterdark);
+	s->afterdark = NULL;
 	free(s->logical);
 	s->logical = NULL;
 }
@@ -163,7 +218,7 @@ static void layer_configure(void *data, struct zwlr_layer_surface_v1 *layer, uin
 		uint32_t w, uint32_t h) {
 	struct screen *s = data;
 	zwlr_layer_surface_v1_ack_configure(layer, serial);
-	if ((int)w == s->w && (int)h == s->h && s->saver) {
+	if ((int)w == s->w && (int)h == s->h && (s->saver || s->afterdark)) {
 		return;
 	}
 	s->w = (int)w;
@@ -178,8 +233,11 @@ static void start(struct screen *s) {
 	pl_shm_buffer_free(&s->buffers[1]);
 	pl_saver_free(s->saver);
 	s->saver = NULL;
+	ad_renderer_stop(s->afterdark);
+	s->afterdark = NULL;
+	s->afterdark_first = false;
 	free(s->logical);
-	const bool scaled = s->scale > 1 || s->quarters;
+	const bool scaled = s->scale > 1 || s->quarters || afterdark_saver;
 	const int bw = s->quarters ? pl_snap(s->w, s->quarters) : s->w * s->scale;
 	const int bh = s->quarters ? pl_snap(s->h, s->quarters) : s->h * s->scale;
 	s->logical = scaled ? malloc((size_t)s->w * s->h * 4) : NULL;
@@ -188,7 +246,17 @@ static void start(struct screen *s) {
 		fprintf(stderr, "zacos9-screensaver: no memory for %s\n", s->name);
 		return;
 	}
-	s->saver = pl_saver_new(saver_index, s->w, s->h, (unsigned)(now_seconds() * 1000) ^ s->global);
+	if (afterdark_saver) {
+		s->afterdark = ad_renderer_start(afterdark_module, 30);
+		s->afterdark_first = s->afterdark != NULL;
+		s->afterdark_since = now_seconds();
+	}
+	if (!s->afterdark) {
+		/* The helper may have gone missing since startup; the built-in
+		 * saver keeps the screen covered rather than leaving it black. */
+		s->saver = pl_saver_new(saver_index, s->w, s->h,
+			(unsigned)(now_seconds() * 1000) ^ s->global);
+	}
 	wl_surface_set_buffer_scale(s->surface, s->quarters ? 1 : s->scale);
 	if (s->viewport) {
 		wp_viewport_set_destination(s->viewport, s->quarters ? s->w : -1, s->quarters ? s->h : -1);
@@ -397,7 +465,22 @@ int main(void) {
 	snprintf(state_path, sizeof(state_path), "%s/%s", runtime, state_name);
 	char id[64] = "";
 	pl_setting("screensaver", id, sizeof(id));
-	saver_index = pl_saver_find(id);
+	afterdark_saver = strcmp(id, "afterdark") == 0;
+	if (afterdark_saver) {
+		char dir[4096], path[4096];
+		const bool found = pl_afterdark_available() &&
+			pl_afterdark_module(afterdark_module, sizeof(afterdark_module)) &&
+			pl_afterdark_library_dir(dir, sizeof(dir)) &&
+			snprintf(path, sizeof(path), "%s/%s.rsrc", dir, afterdark_module) < (int)sizeof(path) &&
+			access(path, R_OK) == 0;
+		if (!found) {
+			afterdark_saver = false;
+			saver_index = pl_saver_find("patterns");
+		}
+	}
+	if (!afterdark_saver) {
+		saver_index = pl_saver_find(id);
+	}
 	started = now_seconds();
 
 	display = wl_display_connect(NULL);

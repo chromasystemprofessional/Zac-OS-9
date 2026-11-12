@@ -23,6 +23,13 @@ Copyright: 2008-2011 Kristian Høgsberg
            2019 Josef Gajdusek
 License: MIT
 
+Files: emulation/afterdark/*
+Copyright: 2026 After Dark Port contributors
+License: MIT
+Comment: The vendored Musashi core and SoftFloat sources under
+ emulation/afterdark/crates/ad-m68k/vendor/ carry their own notices, preserved
+ there; the Rust code and the headless helper are MIT.
+
 License: HPND-sell-variant
  Permission to use, copy, modify, distribute, and sell this
  software and its documentation for any purpose is hereby granted

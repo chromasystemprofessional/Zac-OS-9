@@ -17,7 +17,7 @@
 <li><b>Monitors</b>: resolution and size.</li>
 <li><b>Mouse</b> and <b>Trackpad</b>: tracking and double-click speed; on a trackpad, tap to click, dragging and drag lock. Mouse's Options make the pointer easier to follow: <b>Mouse Tracks</b> leaves a short trail behind it as it moves, and <b>Thick I-Beam</b> makes the text pointer bolder in programs that let ZacOS draw it.</li>
 <li><b>Nap Time</b>: when the computer and display sleep.</li>
-<li><b>Screen Saver</b>: the screen saver, when it starts, and asking for your password afterwards.</li>
+<li><b>Screen Saver</b>: the screen saver, when it starts, and asking for your password afterwards. It can also run original After Dark modules; see <a href="#after-dark">After Dark modules</a> below.</li>
 <li><b>Sound</b>: the alert sound, output volume and mute, sound input and output devices, and left/right balance for stereo speakers.</li>
 <li><b>Startup Disk</b>: which system the computer starts up with, if it has more than one, and which disk Old Dog starts from. Click Restart to start the chosen one now.</li>
 <li><b>TCP/IP</b>: Wi-Fi and wired network settings.</li>
@@ -25,5 +25,13 @@
 <li><b>Toy Box</b>: opens the <a href="sniffer.html">Toy Box</a>.</li>
 <li><b>Zac Menu Options</b>: how many recent items the Zac menu keeps, and whether it shows each category as a submenu or lists the items directly.</li>
 </ul>
+<h2 id="after-dark">After Dark modules</h2>
+<p>ZacOS can run the original 68k <i>After Dark</i> screen savers, such as Flying Toasters, Starry Night and Satori. They are not included: you supply an After Dark disk image or a folder of module files.</p>
+<ol>
+<li>Open <b>Control Panels ▸ Screen Saver</b>.</li>
+<li>Click <b>Import…</b> in the <b>After Dark Modules</b> section and choose a disk image, or drag a disk image or a folder of modules onto the panel.</li>
+<li>Choose <b>After Dark</b> and the module you want.</li>
+</ol>
+<p>The import copies the modules and the fonts they use into your own folder, <code>~/.local/share/after-dark/modules</code>. Importing another disk replaces that library rather than adding to it. A <code>.zip</code>, <code>.sit</code> or similar archive is unpacked for you. Not every module works: ones that need After Dark 3.0 or later are left out of the list. The screen saver is silent and takes no input, so games such as Lunatic Fringe show their attract screen. It runs an emulator, so it uses more power than the built-in savers. A window filling a screen still keeps the saver away from that screen.</p>
 <p><a href="index.html">ZacOS Help</a></p>
 </body></html>

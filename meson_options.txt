@@ -1,0 +1,5 @@
+option('afterdark',
+  type: 'combo',
+  choices: ['auto', 'enabled', 'disabled'],
+  value: 'auto',
+  description: 'Build the After Dark module helper (needs cargo; auto skips it when cargo is missing).')

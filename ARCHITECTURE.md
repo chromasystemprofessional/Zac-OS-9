@@ -81,7 +81,7 @@ rather than reimplementing them.
 | Text fields and input methods (Fcitx, Mozc) | `compositor/src/input_method.c`, `osk.c`; `shell/panels/panelkit.cpp` | [Languages](docs/i18n.md#japanese) |
 | Screens: arrangement, scale, mirroring | `compositor/src/prefs.c`, `output.c` | The Monitors panel is in `shell/panels/` |
 | Rotation outside the session (login screen, kernel console, boot splash) | `boot/zacos9-rotate-boot`, `system/accounts/zacos9-accounts-helper` | [Starting up](docs/boot.md#rotated-screens) |
-| Sleep, screen saver, lock | `compositor/src/idle.c`, `lock.c`; `shell/screensaver/`, `shell/lock/` | [Energy Saver](docs/energy-saver.md) |
+| Sleep, screen saver, lock | `compositor/src/idle.c`, `lock.c`; `shell/screensaver/`, `shell/lock/`; `emulation/afterdark/` | [Energy Saver](docs/energy-saver.md), [After Dark](docs/after-dark.md) |
 | X11 programs (XWayland) | `compositor/src/xwayland.c`, `xwayland_output.c` | |
 | The menu bar and Apple-style menus | `shell/menubar/` (C) | |
 | The Collar (the control strip) | `shell/collar/` | [The Collar](docs/collar.md) |

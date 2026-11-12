@@ -9,6 +9,8 @@ build (/usr/local) and the package (/usr, /etc) give the same list.
     test_installed_files.py BUILDDIR BASELINE --update  write the list
 """
 import json
+import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -43,6 +45,19 @@ if "--update" in sys.argv[3:]:
     sys.exit(0)
 
 expected = [line for line in baseline.read_text().splitlines() if line]
+# The After Dark helper is optional: -Dafterdark=disabled, or a machine without
+# cargo under the default auto, simply does not build it. The baseline lists it
+# for the package and CI, where cargo is a build dependency.
+def cargo_available():
+    if shutil.which("cargo"):
+        return True
+    # The Meson fallback for a rustup install outside PATH.
+    return (Path(os.environ.get("HOME", "")) / ".cargo/bin/cargo").is_file()
+
+
+if options.get("afterdark") == "disabled" or (
+        options.get("afterdark") == "auto" and not cargo_available()):
+    expected = [path for path in expected if not path.endswith("/zacos9-afterdark")]
 gone = sorted(set(expected) - set(installed))
 new = sorted(set(installed) - set(expected))
 for path in gone:

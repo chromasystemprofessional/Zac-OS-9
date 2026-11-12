@@ -20,6 +20,7 @@ panels' settings.
 | Key | Default | What happens |
 |---|---|---|
 | `screensaver` | `patterns` | which screen saver; `none` for none |
+| `screensaver-afterdark` | unset | the imported After Dark module, when `screensaver=afterdark` |
 | `screensaver-after` | 5 | the screen saver starts |
 | `display-sleep` | 10 | the display goes dark |
 | `system-sleep` | 0 (never) | `systemctl suspend` |
@@ -42,6 +43,11 @@ nearest-neighbour, 25 frames a second:
 | `stars` | Starfield | stars coming towards you, nearer ones brighter |
 | `logo` | Bouncing Logo | the ZacOS logo bouncing off the edges (double size on a screen 512 pixels wide or more) |
 | `blank` | Blank Screen | black |
+
+**After Dark** modules are a fifth choice, once the user imports a disk:
+the original 68k modules run in a headless helper and their frames are
+scaled into the same overlay, per screen. The modules and fonts are the
+user's, not ZacOS's; see [After Dark modules](after-dark.md).
 
 `zacos9-screensaver` is started when a screen's turn begins. It covers
 each screen in the `saver` state with an overlay layer surface (namespace
@@ -171,7 +177,8 @@ under `dbus-run-session`, and `test_lock.py` for the lock, with
 - **`ActiveChanged`** isn't sent yet, and X11 apps using the X screen
   saver extension (`XScreenSaverSuspend`) or `xset s` go unheard: Xwayland
   keeps those to itself.
-- **More screen savers**, and perhaps xscreensaver's hacks as extra ones.
+- **More built-in screen savers**, and perhaps xscreensaver's hacks as extra
+  ones.
 - **Virtual keyboards** (`zwp_virtual_keyboard`, used by `vptr` and
   on-screen keyboards) can type into the lock like any keyboard: any
   program in the session could guess passwords at PAM's pace.

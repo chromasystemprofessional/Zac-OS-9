@@ -1,0 +1,18 @@
+[package]
+name = "ad-runtime"
+description = "Host-side policy for the After Dark runtime: options, save locations, durable resource writes."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+ad-resource = { path = "../ad-resource" }
+ad-toolbox = { path = "../ad-toolbox" }
+
+[dev-dependencies]
+ad-m68k = { path = "../ad-m68k" }
+ad-memory = { path = "../ad-memory" }
+
+[lints]
+workspace = true

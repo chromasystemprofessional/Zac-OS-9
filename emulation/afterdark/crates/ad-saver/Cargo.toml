@@ -1,0 +1,20 @@
+[package]
+name = "ad-saver"
+description = "Headless After Dark module renderer and importer for the ZacOS screen saver."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "zacos9-afterdark"
+path = "src/main.rs"
+
+[dependencies]
+ad-host-v2 = { path = "../ad-host-v2" }
+ad-resource = { path = "../ad-resource" }
+ad-runtime = { path = "../ad-runtime" }
+ad-toolbox = { path = "../ad-toolbox" }
+
+[lints]
+workspace = true

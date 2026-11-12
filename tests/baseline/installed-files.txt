@@ -1,4 +1,5 @@
 {prefix}/bin/zacos9-afp
+{prefix}/bin/zacos9-afterdark
 {prefix}/bin/zacos9-appearance
 {prefix}/bin/zacos9-appinstall
 {prefix}/bin/zacos9-autostart
@@ -265,6 +266,7 @@
 {prefix}/share/zacos9/whatsnew/1.14.1.txt
 {prefix}/share/zacos9/whatsnew/1.14.2.txt
 {prefix}/share/zacos9/whatsnew/1.14.3.txt
+{prefix}/share/zacos9/whatsnew/1.18.0.txt
 {prefix}/share/zacos9/whatsnew/1.7.0.txt
 {prefix}/share/zacos9/whatsnew/1.7.1.txt
 {prefix}/share/zacos9/whatsnew/1.7.2.txt
