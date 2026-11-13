@@ -1,0 +1,8 @@
+ZacOS 9 1.18.6 lets programs installed from Flathub print.
+
+Flatpak keeps the printing service out of a program's sandbox unless the
+program asks for it. Adobe Reader, installed from Flathub, asked only for a
+window, so its Print dialog had no printers in its Name list. At login ZacOS
+now gives Flatpak programs the same printing service the rest of the desktop
+uses. Restart a Flatpak program that was already open, and its Print dialog
+lists the printers this computer knows.

@@ -59,6 +59,9 @@ for what it reads.
 
 ## Newer features
 
+- **Printing from sandboxed programs.** Flatpak programs are given the CUPS
+  socket at login, so their own Print dialogs list this computer's printers;
+  Adobe Reader, for one, used to show none.
 - **Mount network disks at startup.** Tick Mount at startup when connecting
   to an AFP volume or an SMB share; the disk appears in System Folder ▸
   Startup Items with the network-disk icon, and a registered user's password

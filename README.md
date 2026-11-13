@@ -89,7 +89,8 @@ artwork. See [Themes and sound sets](docs/themes.md) for what it reads.
   icon. Mac HFS and HFS+ disks and disk images open read-only.
 - **Windows programs** install through Wine with the Windows Installer.
 - **Printing** through CUPS: a Printer Picker and Print Queue in the Platinum
-  look, USB and network printers, and honest reasons when a job fails.
+  look, USB and network printers, honest reasons when a job fails, and your
+  programs' own Print dialogs — including programs in a Flatpak sandbox.
 - **The Collar**: Mac OS 9's control strip, with modules for volume,
   resolution, power, media, brightness, Bluetooth, printers, the keychain and
   your phone.
