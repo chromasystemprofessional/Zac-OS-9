@@ -45,7 +45,10 @@ Drop an original Mac OS 9 appearance theme or Kaleidoscope scheme onto the
 System Folder. ZacOS files it into System Folder ▸ Appearance ▸ Theme Files,
 reads the theme's own resource fork, and rebuilds the desktop from it: window
 chrome and accent, icons and cursors, patterns and sounds. No installer menu
-— just a drop.
+— just a drop. Appearance ▸ Themes also has **New Theme…** and **Edit
+Theme…**, including dark themes; editing an imported theme makes a linked
+copy so the import stays as it is, and **Artwork…** chooses each window part
+as imported, Platinum or your own image.
 
 Theme files come as `.sit`, `.hqx` or `.ksc`, or with no extension; all
 import. The theme is built on your computer from your own Mac OS 9 System

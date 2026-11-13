@@ -92,7 +92,7 @@ rather than reimplementing them.
 | Removable media: CDs/DVDs, audio CDs, floppy/Zip, disk images, mounts and AutoPlay | `shell/files/` (`localvolumes`, `mediakind`, `mediaeject`, `autoplay`, `cueimage`, `floppypoll`); `shell/finder/` | [Removable media](docs/removable-media.md) |
 | What nearly every desktop program uses: window hints to `zacos9-wm` (`platinumshell`), the alert box, drawing Platinum images in Qt (`pixels.h`), Shut Down and Restart (`power`) | `shell/common/` (`libzacos9-shell`) | |
 | A control panel | `shell/panels/`, a file each (`mouse.cpp`, `sound.cpp`…; `panelregistry.h` says how to add one) | e.g. [Bluetooth](docs/bluetooth.md), [Memory](docs/memory.md) |
-| Appearance: themes, desktop patterns, sound sets | `shell/panels/appearance.cpp` | [Themes and sound sets](docs/themes.md) |
+| Appearance: themes, themes editor, desktop patterns, sound sets | `shell/panels/appearance.cpp`, `shell/panels/themeeditor.cpp` | [Themes and sound sets](docs/themes.md) |
 | Software (installing programs), Software Update | `shell/store/`, `shell/update/`; `system/appstore/` | [Software](docs/appstore.md), [Updates](docs/updates.md) |
 | The installer, Disk Setup | `shell/installer/`, `shell/disksetup/`; `system/installer/` | [Installer](docs/installer.md) |
 | File sharing, networking with Macs and Windows | `shell/network/`, `network/afp/`; `system/sharing/` | [Networking](docs/network.md) |

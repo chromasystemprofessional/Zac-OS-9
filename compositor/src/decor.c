@@ -6,6 +6,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <time.h>
 #include "chrome.h"
 #include "icons.h"
 #include "theme.h"
@@ -25,6 +27,60 @@
 static uint32_t chrome(const char *key, uint32_t fallback) {
 	uint32_t v;
 	return zac_theme_color(key, &v) ? v : fallback;
+}
+
+/* Inactive frames follow the theme's active colours instead of the fixed
+ * Platinum greys, so a dark theme stays dark when its window loses focus.
+ * A theme may name the inactive colour outright; without any theme colour
+ * the Platinum fallback is used. */
+static uint32_t inactive_face(uint32_t fallback) {
+	uint32_t v;
+	if (zac_theme_color("frame-face-inactive", &v)) {
+		return v;
+	}
+	if (zac_theme_color("frame-face", &v)) {
+		return zac_blend(v, C_WHITE, 8);
+	}
+	return fallback;
+}
+
+static uint32_t inactive_border(uint32_t fallback, uint32_t face) {
+	uint32_t v;
+	if (zac_theme_color("frame-border-inactive", &v)) {
+		return v;
+	}
+	if (zac_theme_color("frame-border", &v)) {
+		return zac_blend(v, face, 35);
+	}
+	return fallback;
+}
+
+/* The body-edge fallback is C_DDD in Platinum; a themed frame uses the
+ * window's face colour (active or inactive) so a dark theme does not show
+ * light edges. */
+static uint32_t themed_or(uint32_t themed, uint32_t fallback) {
+	uint32_t v;
+	return zac_theme_color("frame-face", &v) ? themed : fallback;
+}
+
+/* Title ink: the theme's title-text, else readable ink for the bar. An
+ * inactive title without its own colour is the active ink dimmed toward
+ * the bar, so a dark theme keeps light text. */
+static uint32_t title_ink(bool active, uint32_t base) {
+	uint32_t v;
+	if (active) {
+		zac_theme_ink("title-text", base, &v);
+		return v;
+	}
+	if (zac_theme_color("title-text-inactive", &v)) {
+		return v;
+	}
+	if (zac_theme_color("title-text", &v)) {
+		return zac_blend(v, base, 35);
+	}
+	/* Auto contrast, dimmed toward the bar for an inactive window. */
+	const uint32_t ink = zac_ink_for(base);
+	return ink == C_BLACK ? C_666 : zac_blend(ink, base, 35);
 }
 
 /* Window-frame skins: the bundle files per frame part, active and
@@ -49,10 +105,35 @@ static const char *const chrome_files[CHROME_SLOTS][2] = {
 	[CHROME_POPUP_TAB] = { "chrome/popup-tab.png", "chrome/popup-tab-inactive.png" },
 };
 
+/* Theme keys for those skins. Absent keeps the conventional file (and an
+ * inherited bundle's), "off" paints the flat face, anything else is a
+ * bundle-relative image. */
+static const char *const chrome_skin_keys[CHROME_SLOTS][2] = {
+	[CHROME_DOC_TOP] = { "document-top", "document-top-inactive" },
+	[CHROME_DOC_BOTTOM] = { "document-bottom", "document-bottom-inactive" },
+	[CHROME_DOC_LEFT] = { "document-left", "document-left-inactive" },
+	[CHROME_DOC_RIGHT] = { "document-right", "document-right-inactive" },
+	[CHROME_MODAL_TOP] = { "modal-top", NULL },
+	[CHROME_MODAL_BOTTOM] = { "modal-bottom", NULL },
+	[CHROME_MODAL_LEFT] = { "modal-left", NULL },
+	[CHROME_MODAL_RIGHT] = { "modal-right", NULL },
+	[CHROME_POPUP_TAB] = { "popup-tab", "popup-tab-inactive" },
+};
+
 static void chrome_fill_slot(struct pl_canvas *c, int x0, int y0, int x1, int y1,
 		enum chrome_slot slot, bool active, uint32_t fallback) {
-	const char *path = chrome_files[slot][!active && chrome_files[slot][1] ? 1 : 0];
-	chrome_fill(c, x0, y0, x1, y1, path, fallback);
+	const int variant = !active && chrome_files[slot][1] ? 1 : 0;
+	char rel[256];
+	if (chrome_skin_keys[slot][variant] &&
+			zac_theme_string(chrome_skin_keys[slot][variant], rel, sizeof(rel))) {
+		if (strcmp(rel, "off") == 0) {
+			pl_fill(c, x0, y0, x1, y1, fallback);
+			return;
+		}
+		chrome_fill(c, x0, y0, x1, y1, rel, fallback);
+		return;
+	}
+	chrome_fill(c, x0, y0, x1, y1, chrome_files[slot][variant], fallback);
 }
 
 /* Title-bar boxes: 12x12 at y=4, 1 px emboss right and below. */
@@ -103,6 +184,8 @@ struct chrome_tile {
 	int w, h;
 	uint32_t *px;
 	char path[4096];
+	struct timespec mtime;
+	off_t size;
 };
 
 static struct chrome_tile chrome_cache[CHROME_COUNT];
@@ -112,6 +195,8 @@ static void chrome_tile_drop(int id) {
 	chrome_cache[id].px = NULL;
 	chrome_cache[id].w = chrome_cache[id].h = 0;
 	chrome_cache[id].path[0] = '\0';
+	chrome_cache[id].mtime = (struct timespec){ 0 };
+	chrome_cache[id].size = -1;
 }
 
 /* The tile for a chrome key, or NULL when the theme supplies none.
@@ -128,7 +213,15 @@ static const struct chrome_tile *chrome_tile_get(int id) {
 		return NULL;
 	}
 	struct chrome_tile *t = &chrome_cache[id];
-	if (t->px && strcmp(t->path, path) == 0) {
+	struct stat st;
+	if (stat(path, &st) != 0) {
+		chrome_tile_drop(id);
+		return NULL;
+	}
+	if (t->px && strcmp(t->path, path) == 0 &&
+			t->mtime.tv_sec == st.st_mtim.tv_sec &&
+			t->mtime.tv_nsec == st.st_mtim.tv_nsec &&
+			t->size == st.st_size) {
 		return t;
 	}
 	chrome_tile_drop(id);
@@ -167,6 +260,8 @@ static const struct chrome_tile *chrome_tile_get(int id) {
 	t->w = (int)w;
 	t->h = (int)h;
 	snprintf(t->path, sizeof(t->path), "%s", path);
+	t->mtime = st.st_mtim;
+	t->size = st.st_size;
 	return t;
 }
 
@@ -370,6 +465,26 @@ static bool paint_themed_bar(struct pl_canvas *c, const struct decor_state *st,
 	return true;
 }
 
+/* A title-bar button tile, centred in the 13 px box; oversized art is
+ * scaled down so it cannot paint over the title or its neighbours. */
+static void blit_button_tile(struct pl_canvas *c, const struct chrome_tile *t,
+		int bx, int by) {
+	const int box = BOX_SIZE + 1;
+	int dw = t->w, dh = t->h;
+	if (dw > box) {
+		dh = dh * box / dw;
+		if (dh < 1) dh = 1;
+		dw = box;
+	}
+	if (dh > box) {
+		dw = dw * box / dh;
+		if (dw < 1) dw = 1;
+		dh = box;
+	}
+	chrome_blit(c, t, 0, 0, t->w, t->h, bx + (box - dw) / 2,
+		by + (box - dh) / 2, dw, dh);
+}
+
 /* A themed title-bar button (13 px art over the 12 px box origin keeps
  * the existing hit testing). Pressed art while held. Dialogs prefer
  * their own smaller art, falling back to the document buttons. */
@@ -399,8 +514,7 @@ static bool paint_themed_box(struct pl_canvas *c, const struct decor_state *st,
 				t = chrome_tile_get(id);
 			}
 			if (t) {
-				chrome_blit(c, t, 0, 0, t->w, t->h, bx + (BOX_SIZE + 1 - t->w) / 2,
-					by + (BOX_SIZE + 1 - t->h) / 2, t->w, t->h);
+				blit_button_tile(c, t, bx, by);
 				return true;
 			}
 		}
@@ -429,8 +543,7 @@ static bool paint_themed_box(struct pl_canvas *c, const struct decor_state *st,
 	if (!t) {
 		return false;
 	}
-	chrome_blit(c, t, 0, 0, t->w, t->h, bx + (BOX_SIZE + 1 - t->w) / 2,
-		by + (BOX_SIZE + 1 - t->h) / 2, t->w, t->h);
+	blit_button_tile(c, t, bx, by);
 	return true;
 }
 
@@ -777,7 +890,8 @@ static void paint_title(struct pl_canvas *c, const struct decor_state *st) {
 		int ink_l, proxy_x;
 		title_layout(st, ink_w, &ink_l, &proxy_x);
 		if (ink_w > 0) {
-			pl_text(c, t, ink_l, TITLE_BASELINE, st->active ? C_BLACK : C_666);
+			pl_text(c, t, ink_l, TITLE_BASELINE,
+				title_ink(st->active, chrome("title-base", C_CCC)));
 		}
 		if (st->proxy) {
 			pl_icon_paint(c, proxy_x, PROXY_Y, (enum pl_icon_kind)(st->proxy - 1), PROXY_SIZE, false);
@@ -850,9 +964,10 @@ static void paint_grow(struct pl_canvas *c, const struct decor_state *st) {
 	}
 	/* Inactive: blank cell; the well lines stop at it. */
 	int x1 = st->width - DECOR_RIGHT, y1 = st->height - DECOR_BOTTOM;
-	pl_fill(c, gx + 1, gy + 1, x1, y1, C_DDD);
-	pl_hline(c, gx, x1, gy, C_555);
-	pl_vline(c, gx, gy, y1, C_555);
+	const uint32_t face = inactive_face(C_DDD);
+	pl_fill(c, gx + 1, gy + 1, x1, y1, face);
+	pl_hline(c, gx, x1, gy, inactive_border(C_555, face));
+	pl_vline(c, gx, gy, y1, inactive_border(C_555, face));
 }
 
 /* Movable modal dialog (HIG figure 3-2): a document-style title bar
@@ -872,17 +987,17 @@ static bool dialog_box_on(const struct decor_state *st, enum decor_part part, bo
 static void paint_modal(struct pl_canvas *c, const struct decor_state *st) {
 	const int W = st->width, H = st->height;
 	const bool act = st->active;
-	const uint32_t border = act ? chrome("frame-border", C_BLACK) : chrome("frame-border-inactive", C_555);
-	const uint32_t face = act ? chrome("frame-face", C_CCC) : chrome("frame-face-inactive", C_DDD);
+	const uint32_t face = act ? chrome("frame-face", C_CCC) : inactive_face(C_DDD);
+	const uint32_t border = act ? chrome("frame-border", C_BLACK) : inactive_border(C_555, face);
 
 	/* Title bar: rows 0..21, as a collapsed document window's. */
 	chrome_fill_slot(c, 0, 0, W - 1, 21, CHROME_MODAL_TOP, act, face);
 	const bool themed = st->style == DECOR_STYLE_MOVABLE_MODAL && themed_dialog_available(act);
 	/* Body edges (the client paints the interior). */
-	chrome_fill_slot(c, 0, 22, 2, H - 1, CHROME_MODAL_LEFT, act, C_DDD);
-	chrome_fill_slot(c, W - 3, 22, W - 1, H - 1, CHROME_MODAL_RIGHT, act, C_DDD);
-	chrome_fill_slot(c, 0, 22, W - 1, 23, CHROME_MODAL_BOTTOM, act, C_DDD);
-	chrome_fill_slot(c, 0, H - 3, W - 1, H - 1, CHROME_MODAL_BOTTOM, act, C_DDD);
+	chrome_fill_slot(c, 0, 22, 2, H - 1, CHROME_MODAL_LEFT, act, themed_or(face, C_DDD));
+	chrome_fill_slot(c, W - 3, 22, W - 1, H - 1, CHROME_MODAL_RIGHT, act, themed_or(face, C_DDD));
+	chrome_fill_slot(c, 0, 22, W - 1, 23, CHROME_MODAL_BOTTOM, act, themed_or(face, C_DDD));
+	chrome_fill_slot(c, 0, H - 3, W - 1, H - 1, CHROME_MODAL_BOTTOM, act, themed_or(face, C_DDD));
 
 	const uint32_t m_light = chrome("frame-light", C_WHITE);
 	const uint32_t m_shadow = chrome("frame-dark", C_999);
@@ -944,8 +1059,8 @@ int decor_tab_width(const struct decor_state *st) {
 static void paint_popup(struct pl_canvas *c, const struct decor_state *st) {
 	const int W = st->width, H = frame_height(st);
 	const bool act = st->active;
-	const uint32_t border = act ? chrome("frame-border", C_BLACK) : chrome("frame-border-inactive", C_555);
-	const uint32_t face = act ? chrome("frame-face", C_CCC) : chrome("frame-face-inactive", C_DDD);
+	const uint32_t face = act ? chrome("frame-face", C_CCC) : inactive_face(C_DDD);
+	const uint32_t border = act ? chrome("frame-border", C_BLACK) : inactive_border(C_555, face);
 	const int x0 = st->tab_x, x1 = st->tab_x + decor_tab_width(st) - 1;
 	const int y0 = DECOR_TAB_H; /* the body's top row */
 
@@ -979,8 +1094,10 @@ static void paint_popup(struct pl_canvas *c, const struct decor_state *st) {
 	 * emboss of a title bar. A closed one along the bottom of the screen
 	 * always reads as active. */
 	const bool tab_act = act || st->collapsed;
-	const uint32_t tab_border = tab_act ? C_BLACK : C_555;
-	const uint32_t tab_face = tab_act ? C_CCC : C_DDD;
+	const uint32_t active_face = chrome("frame-face", C_CCC);
+	const uint32_t active_border = chrome("frame-border", C_BLACK);
+	const uint32_t tab_border = tab_act ? active_border : inactive_border(C_555, face);
+	const uint32_t tab_face = tab_act ? active_face : inactive_face(C_DDD);
 	chrome_fill_slot(c, x0 + 1, 1, x1 - 1, H > y0 ? y0 : H - 1, CHROME_POPUP_TAB, tab_act, tab_face);
 	pl_hline(c, x0 + 2, x1 - 2, 0, tab_border);
 	pl_put(c, x0 + 1, 1, tab_border);
@@ -1004,7 +1121,7 @@ static void paint_popup(struct pl_canvas *c, const struct decor_state *st) {
 	const int ink_w = title_ink_width(st);
 	if (ink_w > 0) {
 		pl_text(c, t, x0 + (x1 - x0 + 1 - ink_w) / 2, TITLE_BASELINE,
-			tab_act ? C_BLACK : C_666);
+			title_ink(tab_act, tab_face));
 	}
 }
 
@@ -1019,8 +1136,8 @@ void decor_paint(struct pl_canvas *c, const struct decor_state *st) {
 	}
 	const int W = st->width, H = frame_height(st);
 	const bool act = st->active;
-	const uint32_t border = act ? chrome("frame-border", C_BLACK) : chrome("frame-border-inactive", C_555);
-	const uint32_t face = act ? chrome("frame-face", C_CCC) : chrome("frame-face-inactive", C_DDD);
+	const uint32_t face = act ? chrome("frame-face", C_CCC) : inactive_face(C_DDD);
+	const uint32_t border = act ? chrome("frame-border", C_BLACK) : inactive_border(C_555, face);
 
 	const bool has_bar = bar_themed(st, act);
 	/* Frame fill, never touching the client area. */

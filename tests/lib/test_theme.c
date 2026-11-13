@@ -189,6 +189,57 @@ int main(void) {
 		assert(zac_theme_color("no-such-key", &v) == false);
 	}
 
+	/* A linked theme finds artwork in the bundle it inherits from, one
+	 * level only; paths cannot escape either bundle. */
+	{
+		char linked[256];
+		snprintf(linked, sizeof(linked), "%s/zacos9/themes/Linked", cfg);
+		assert(mkdir(linked, 0755) == 0);
+		char linkedconf[320];
+		snprintf(linkedconf, sizeof(linkedconf), "%s/theme.conf", linked);
+		FILE *lf = fopen(linkedconf, "w");
+		assert(lf); fputs("name=Linked\ninherits=Test\n", lf); fclose(lf);
+		char cursordir[320];
+		snprintf(cursordir, sizeof(cursordir), "%s/cursors", bundle);
+		assert(mkdir(cursordir, 0755) == 0);
+		char macdir[320];
+		snprintf(macdir, sizeof(macdir), "%s/cursors/Macintosh", bundle);
+		assert(mkdir(macdir, 0755) == 0);
+		char cursorindex[400];
+		snprintf(cursorindex, sizeof(cursorindex), "%s/index.theme", macdir);
+		FILE *ci = fopen(cursorindex, "w");
+		assert(ci); fputs("[Icon Theme]\nName=Macintosh\n", ci); fclose(ci);
+		FILE *lf2 = fopen(confpath, "w");
+		assert(lf2); fputs("theme-bundle=Linked\n", lf2); fclose(lf2);
+		assert(zac_theme_asset("menu-icon.png", resolved, sizeof(resolved)) == true);
+		assert(strstr(resolved, "/Test/menu-icon.png") != NULL);
+		char cursor_name[64], cursor_dir[320];
+		assert(zac_cursor_theme(cursor_name, sizeof(cursor_name), cursor_dir, sizeof(cursor_dir)));
+		assert(strcmp(cursor_name, "Macintosh") == 0);
+		assert(strstr(cursor_dir, "/Test/cursors") != NULL);
+		assert(!zac_theme_asset("../Test/menu-icon.png", resolved, sizeof(resolved)));
+		assert(!zac_theme_asset("/etc/passwd", resolved, sizeof(resolved)));
+		/* The linked theme's own colour keys still win. */
+		FILE *lc = fopen(linkedconf, "a");
+		assert(lc); fputs("title-base=123456\n", lc); fclose(lc);
+		uint32_t linked_colour = 0;
+		assert(zac_theme_color("title-base", &linked_colour));
+		assert(linked_colour == 0xFF123456u);
+		/* Ink and blending settle contrast for dark themes. */
+		assert(zac_ink_for(0xFFFFFFFFu) == 0xFF000000u);
+		assert(zac_ink_for(0xFF000000u) == 0xFFFFFFFFu);
+		assert(zac_blend(0xFF000000u, 0xFFFFFFFFu, 50) == 0xFF808080u);
+		uint32_t ink = 0;
+		assert(!zac_theme_ink("no-such-ink", 0xFF000000u, &ink));
+		assert(ink == 0xFFFFFFFFu);
+		unlink(cursorindex);
+		rmdir(macdir);
+		rmdir(cursordir);
+		/* Back to the plain test bundle for the rest of the test. */
+		FILE *back = fopen(confpath, "w");
+		assert(back); fputs("theme-bundle=Test\n", back); fclose(back);
+	}
+
 	/* pl_icon: the bundle's icons/<kind>-<size>.png overrides the builtin. */
 	char iconsdir[300];
 	snprintf(iconsdir, sizeof(iconsdir), "%s/icons", bundle);

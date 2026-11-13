@@ -16,6 +16,8 @@
 #include "custompatterns.h"
 #include "appearance.h"
 #include "settings.h"
+#include "theme.h"
+#include "themeeditor.h"
 
 static bool waitFor(const std::function<bool()> &ready) {
 	QElapsedTimer timer;
@@ -97,6 +99,10 @@ int main(int argc, char **argv) {
 	assert(appearanceThemesFolder() == root.path() + "/data/zacos9/appearance/Theme Files");
 	const QString recording = root.path() + "/Recorded Chime.wav";
 	assert(QFile::copy(QString::fromUtf8(argv[1]), recording));
+	QImage artSample(12, 12, QImage::Format_ARGB32);
+	artSample.fill(qRgba(40, 120, 200, 255));
+	const QString artSamplePath = root.path() + "/art-sample.png";
+	assert(artSample.save(artSamplePath));
 	QString customAlert, importError;
 	assert(importAlertSound(recording, &customAlert, &importError));
 	assert(customAlert == "Recorded_Chime" &&
@@ -164,6 +170,33 @@ int main(int argc, char **argv) {
 	const QString screenshot = qEnvironmentVariable("THEMES_SCREENSHOT");
 	if (!screenshot.isEmpty()) {
 		assert(panel.grab().save(screenshot));
+	}
+	const QString editorShot = qEnvironmentVariable("THEME_EDITOR_SCREENSHOT");
+	if (!editorShot.isEmpty()) {
+		ThemeEditorWindow editor(-1);
+		editor.show();
+		QApplication::processEvents();
+		assert(editor.grab().save(editorShot));
+	}
+	const QString themesShot = qEnvironmentVariable("THEMES_TAB_SCREENSHOT");
+	if (!themesShot.isEmpty()) {
+		AppearancePanel themesPanel;
+		themesPanel.showTab(0);
+		themesPanel.show();
+		QApplication::processEvents();
+		assert(themesPanel.grab().save(themesShot));
+	}
+	const QString artworkShot = qEnvironmentVariable("THEME_ARTWORK_SCREENSHOT");
+	if (!artworkShot.isEmpty()) {
+		ThemeDraft artDraft;
+		artDraft.chrome = themePaletteDefaults(false);
+		artDraft.chrome["bar-left"] = "chrome/custom-bar-left.argb";
+		artDraft.artSources["bar-left"] = artSamplePath;
+		artDraft.chrome["document-top"] = "off";
+		ThemeArtworkWindow artwork(&artDraft, [] {}, [] {}, [] {}, [] {});
+		artwork.show();
+		QApplication::processEvents();
+		assert(artwork.grab().save(artworkShot));
 	}
 	QString error;
 	assert(applySoundTheme(2, &error));
@@ -337,6 +370,323 @@ int main(int argc, char **argv) {
 	}
 	assert(appearanceThemeCount() == 3);
 	assert(QFileInfo(bundle + "/theme.conf").lastModified() == firstWrite);
+	/* ---- the Theme Editor's user themes ---- */
+	auto findTheme = [](const QString &name) {
+		for (int i = 0; i < appearanceThemeCount(); ++i) {
+			if (appearanceThemeName(i) == name) {
+				return i;
+			}
+		}
+		return -1;
+	};
+	QString editorError;
+	ThemeDraft darkDraft;
+	darkDraft.name = "Dark Test";
+		darkDraft.settings = {
+		{ "accent", "" }, { "highlight", "CCEEFF" }, { "pattern", "" },
+		{ "wallpaper", "" }, { "background", "pattern" }, { "wallpaper-mode", "fit" },
+		{ "alert-sound", "" }, { "sound-theme", "none" }, { "font-family", "" },
+	};
+	darkDraft.chrome = themePaletteDefaults(true);
+	/* A saved theme clears choices it does not name, like a preset. */
+	assert(pl_setting_set("alert-sound", "Recorded_Chime"));
+	assert(pl_setting_set("pattern", "StalePattern"));
+	assert(themeDraftSave(&darkDraft, -1, &editorError));
+	assert(preference("alert-sound").isEmpty());
+	assert(preference("pattern").isEmpty());
+	assert(darkDraft.bundleId == "Dark Test");
+	const QString darkConfPath = root.path() + "/config/zacos9/themes/Dark Test/theme.conf";
+	assert(QFileInfo::exists(darkConfPath));
+	assert(QFileInfo::exists(darkDraft.presetPath));
+	{
+		QFile conf(darkConfPath);
+		assert(conf.open(QIODevice::ReadOnly));
+		const QString text = QString::fromUtf8(conf.readAll());
+		assert(text.contains("user-theme=1"));
+		assert(text.contains("title-base=3A3A3A"));
+		assert(text.contains("title-text=FFFFFF"));
+		assert(text.contains("menu-bar=333333"));
+		assert(!text.contains("source="));
+		assert(!text.contains("extractor-sha256="));
+	}
+	assert(preference("theme-bundle") == "Dark Test");
+	assert(waitFor([&] { return findTheme("Dark Test") >= 0; }));
+	int darkIndex = findTheme("Dark Test");
+	assert(darkIndex >= 0);
+	assert(appearanceThemeId(darkIndex) == preference("appearance-theme"));
+	assert(appearanceThemeBundle(darkIndex) == "Dark Test");
+	assert(appearanceThemeIsUser(darkIndex));
+	assert(appearanceThemeValues(darkIndex).value("highlight") == "CCEEFF");
+
+	/* Editing an imported theme writes a linked copy: the import's own
+	 * bundle and preset are left exactly as they were. */
+	QByteArray aquaBefore;
+	{
+		QFile conf(bundle + "/theme.conf");
+		assert(conf.open(QIODevice::ReadOnly));
+		aquaBefore = conf.readAll();
+	}
+	const QString aquaPresetPath = appearanceThemePath(findTheme("Aqua"));
+	assert(!aquaPresetPath.isEmpty());
+	ThemeDraft copyDraft;
+	assert(themeDraftFromPreset(findTheme("Aqua"), &copyDraft, &editorError));
+	assert(copyDraft.linked);
+	assert(copyDraft.inherits == "Aqua");
+	assert(copyDraft.bundleId.isEmpty());
+	copyDraft.name = "Aqua Dark";
+	copyDraft.chrome = themePaletteDefaults(true);
+	assert(themeDraftSave(&copyDraft, findTheme("Aqua"), &editorError));
+	assert(copyDraft.bundleId == "Aqua Dark");
+	const QString copyConf = root.path() + "/config/zacos9/themes/Aqua Dark/theme.conf";
+	assert(QFileInfo::exists(copyConf));
+	{
+		QFile conf(copyConf);
+		assert(conf.open(QIODevice::ReadOnly));
+		const QString text = QString::fromUtf8(conf.readAll());
+		assert(text.contains("inherits=Aqua"));
+		assert(text.contains("user-theme=1"));
+	}
+	{
+		QFile conf(bundle + "/theme.conf");
+		assert(conf.open(QIODevice::ReadOnly));
+		assert(conf.readAll() == aquaBefore);
+	}
+	assert(QFileInfo::exists(aquaPresetPath));
+	assert(preference("theme-bundle") == "Aqua Dark");
+	/* The linked copy takes its artwork from the import it names. */
+	{
+		char asset[4096];
+		assert(zac_theme_asset("menu-icon.png", asset, sizeof(asset)));
+		assert(QString::fromUtf8(asset).startsWith(bundle + "/"));
+		uint32_t value = 0;
+		assert(zac_theme_color("title-base", &value));
+		assert(value == 0xFF3A3A3A);
+	}
+	assert(waitFor([&] { return findTheme("Aqua Dark") >= 0; }));
+	int copyIndex = findTheme("Aqua Dark");
+	assert(copyIndex >= 0 && appearanceThemeIsUser(copyIndex));
+	/* Editing it again changes the same bundle and preset in place. */
+	{
+		ThemeDraft edit;
+		assert(themeDraftFromPreset(copyIndex, &edit, &editorError));
+		assert(!edit.linked && edit.bundleId == "Aqua Dark");
+		const QString presetPath = edit.presetPath;
+		edit.name = "Aqua Darker";
+		edit.chrome["title-base"] = "1A1A1A";
+		assert(themeDraftSave(&edit, copyIndex, &editorError));
+		assert(edit.bundleId == "Aqua Dark");
+		assert(edit.presetPath == presetPath);
+	}
+	assert(waitFor([&] { return findTheme("Aqua Darker") >= 0; }));
+	int darkerIndex = findTheme("Aqua Darker");
+	assert(darkerIndex >= 0);
+	assert(preference("theme-bundle") == "Aqua Dark");
+	assert(preference("appearance-theme") == appearanceThemeId(darkerIndex));
+
+	/* A plain saved preset becomes a full theme in its own file. */
+	int plainIndex = findTheme("My Settings");
+	assert(plainIndex >= 0);
+	QString plainPath;
+	{
+		ThemeDraft plain;
+		assert(themeDraftFromPreset(plainIndex, &plain, &editorError));
+		assert(!plain.linked && plain.bundleId.isEmpty());
+		plainPath = plain.presetPath;
+		assert(QFileInfo(plainPath).absolutePath() == appearanceThemesFolder());
+		plain.name = "My Settings Edited";
+		plain.chrome = themePaletteDefaults(true);
+		assert(themeDraftSave(&plain, plainIndex, &editorError));
+		assert(plain.presetPath == plainPath);
+		assert(preference("theme-bundle") == plain.bundleId);
+	}
+	assert(waitFor([&] { return findTheme("My Settings Edited") >= 0; }));
+	assert(findTheme("My Settings Edited") >= 0);
+
+	/* Writing a chosen image as a chrome tile or a PNG skin. */
+	{
+		QString artError;
+		const QString argbTarget = root.path() + "/test-tile.argb";
+		assert(themeArtWrite(artSamplePath, argbTarget, true, &artError));
+		QFile argb(argbTarget);
+		assert(argb.open(QIODevice::ReadOnly));
+		const QByteArray bytes = argb.readAll();
+		assert(bytes.size() == 8 + 12 * 12 * 4);
+		assert((uchar)bytes[0] == 12 && (uchar)bytes[4] == 12);
+		assert((uchar)bytes[8] == 40 && (uchar)bytes[9] == 120 &&
+			(uchar)bytes[10] == 200 && (uchar)bytes[11] == 255);
+		const QString pngTarget = root.path() + "/test-skin.png";
+		assert(themeArtWrite(artSamplePath, pngTarget, false, &artError));
+		QImage skin(pngTarget);
+		assert(!skin.isNull() && skin.size() == QSize(12, 12));
+		assert(!themeArtWrite(root.path() + "/missing-image.png", pngTarget, false, &artError));
+		auto findSlot = [](const QString &key) {
+			for (const ThemeArtSlot &slot : themeArtSlots()) {
+				if (slot.key == key) {
+					return slot;
+				}
+			}
+			return ThemeArtSlot{};
+		};
+		const ThemeArtSlot barMiddle = findSlot("bar-middle");
+		const ThemeArtSlot docTop = findSlot("document-top");
+		assert(barMiddle.argb && !barMiddle.key.isEmpty());
+		assert(!docTop.argb && docTop.defaultPath == "chrome/document-top.png");
+		ThemeDraft state;
+		state.chrome = themePaletteDefaults(false);
+		assert(themeArtState(state, barMiddle) == ThemeArtState::Platinum);
+		state.importedChrome["bar-middle"] = "chrome/bar.argb";
+		state.chrome["bar-middle"] = "chrome/bar.argb";
+		assert(themeArtState(state, barMiddle) == ThemeArtState::Inherit);
+		state.chrome["bar-middle"] = "chrome/custom.argb";
+		assert(themeArtState(state, barMiddle) == ThemeArtState::Custom);
+		state.chrome.remove("bar-middle");
+		const QString baseArt = root.path() + "/art-base";
+		assert(QDir().mkpath(baseArt + "/chrome"));
+		assert(QFile::copy(artSamplePath, baseArt + "/chrome/document-top.png"));
+		state.baseBundleDir = baseArt;
+		assert(themeArtState(state, docTop) == ThemeArtState::Inherit);
+		state.chrome["document-top"] = "off";
+		assert(themeArtState(state, docTop) == ThemeArtState::Platinum);
+		state.chrome["document-top"] = "chrome/custom-document-top.png";
+		assert(themeArtState(state, docTop) == ThemeArtState::Custom);
+
+		/* Save writes the chosen images into the bundle beside theme.conf
+		 * and points the keys at those copies. */
+		ThemeDraft artDraft;
+		artDraft.name = "Art Test";
+		artDraft.settings = darkDraft.settings;
+		artDraft.chrome = themePaletteDefaults(true);
+		artDraft.artSources["bar-middle"] = artSamplePath;
+		artDraft.artSources["document-top"] = artSamplePath;
+		assert(themeDraftSave(&artDraft, -1, &artError));
+		const QString artDir = root.path() + "/config/zacos9/themes/Art Test";
+		assert(QFileInfo::exists(artDir + "/chrome/custom-bar-middle.argb"));
+		assert(QFileInfo::exists(artDir + "/chrome/custom-document-top.png"));
+		{
+			QFile conf(artDir + "/theme.conf");
+			assert(conf.open(QIODevice::ReadOnly));
+			const QString text = QString::fromUtf8(conf.readAll());
+			assert(text.contains("bar-middle=chrome/custom-bar-middle.argb"));
+			assert(text.contains("document-top=chrome/custom-document-top.png"));
+		}
+		assert(waitFor([&] { return findTheme("Art Test") >= 0; }));
+		const int artIndex = findTheme("Art Test");
+		ThemeDraft reloaded;
+		assert(themeDraftFromPreset(artIndex, &reloaded, &artError));
+		assert(themeArtState(reloaded, findSlot("bar-middle")) == ThemeArtState::Custom);
+		assert(themeArtState(reloaded, findSlot("document-top")) == ThemeArtState::Custom);
+		const QString artEditorShot = qEnvironmentVariable("THEME_EDITOR_ART_SCREENSHOT");
+		if (!artEditorShot.isEmpty()) {
+			ThemeEditorWindow editor(artIndex);
+			editor.show();
+			QApplication::processEvents();
+			assert(editor.grab().save(artEditorShot));
+		}
+		const QString reloadedArtShot = qEnvironmentVariable("THEME_ARTWORK_RELOADED_SCREENSHOT");
+		if (!reloadedArtShot.isEmpty()) {
+			ThemeArtworkWindow artwork(&reloaded, [] {}, [] {}, [] {}, [] {});
+			artwork.selectSlot("bar-middle");
+			artwork.show();
+			QApplication::processEvents();
+			assert(artwork.grab().save(reloadedArtShot));
+		}
+		/* A duplicate carries the source bundle's own artwork files. */
+		ThemeDraft duplicate = reloaded;
+		for (const ThemeArtSlot &slot : themeArtSlots()) {
+			const QString value = duplicate.chrome.value(slot.key);
+			if (!value.isEmpty() && value != "off" &&
+					QFileInfo(artDir + "/" + value).isFile()) {
+				duplicate.artSources[slot.key] = artDir + "/" + value;
+			}
+		}
+		duplicate.name = "Art Copy";
+		duplicate.bundleId.clear();
+		duplicate.presetPath.clear();
+		assert(themeDraftSave(&duplicate, -1, &artError));
+		assert(QFileInfo::exists(root.path() +
+			"/config/zacos9/themes/Art Copy/chrome/custom-bar-middle.argb"));
+		assert(QFileInfo::exists(root.path() +
+			"/config/zacos9/themes/Art Copy/chrome/custom-document-top.png"));
+		assert(waitFor([&] { return findTheme("Art Copy") >= 0; }));
+		const int copyIndex = findTheme("Art Copy");
+		assert(copyIndex >= 0 && themeDraftDelete(copyIndex, &artError));
+		assert(waitFor([&] { return findTheme("Art Copy") < 0; }));
+		const int artAgain = findTheme("Art Test");
+		assert(artAgain >= 0 && themeDraftDelete(artAgain, &artError));
+		assert(waitFor([&] { return findTheme("Art Test") < 0; }));
+		assert(!QFileInfo(artDir).exists());
+	}
+
+	/* Dropping the import's chrome art leaves the palette and the
+	 * inherited icons, pointers and fonts. */
+	{
+		ThemeDraft drop;
+		drop.chrome = {
+			{ "bar-middle", "chrome/bar.argb" },
+			{ "button-close", "chrome/close.argb" },
+			{ "menu-background-image", "chrome/menu.png" },
+			{ "title-cluster", "left" },
+			{ "accent", "ocean" },
+			{ "frame-face", "303030" },
+		};
+		themeDraftDropChromeArt(&drop);
+		assert(!drop.chrome.contains("bar-middle"));
+		assert(!drop.chrome.contains("button-close"));
+		assert(drop.chrome.value("menu-background-image") == "off");
+		assert(drop.chrome.value("document-top") == "off");
+		assert(!drop.chrome.contains("title-cluster"));
+		assert(drop.chrome.value("accent") == "ocean");
+		assert(drop.chrome.value("frame-face") == "303030");
+	}
+
+	/* Invalid drafts never write anything. */
+	{
+		ThemeDraft bad;
+		bad.name = "Bad Theme";
+		bad.settings = darkDraft.settings;
+		bad.chrome = themePaletteDefaults(true);
+		bad.chrome["title-base"] = "NOTHEX";
+		assert(!themeDraftSave(&bad, -1, &editorError));
+		assert(!QFileInfo::exists(root.path() + "/config/zacos9/themes/Bad Theme"));
+		bad.chrome["title-base"] = "3A3A3A";
+		bad.inherits = "No Such Import";
+		assert(!themeDraftSave(&bad, -1, &editorError));
+		bad.inherits.clear();
+		bad.name = "Aqua";
+		assert(!themeDraftSave(&bad, -1, &editorError));
+		assert(editorError.contains("already exists"));
+	}
+
+	/* Imported themes are never deleted; user themes are. */
+	int imported = findTheme("Aqua");
+	assert(imported >= 0);
+	assert(!themeDraftDelete(imported, &editorError));
+	assert(editorError.contains("Imported"));
+	assert(QFileInfo::exists(bundle + "/theme.conf"));
+	int doomed = findTheme("My Settings Edited");
+	assert(doomed >= 0);
+	assert(themeDraftDelete(doomed, &editorError));
+	assert(!QFileInfo::exists(plainPath));
+	assert(waitFor([&] { return findTheme("My Settings Edited") < 0; }));
+	int userTheme = findTheme("Aqua Darker");
+	assert(userTheme >= 0);
+	assert(themeDraftDelete(userTheme, &editorError));
+	assert(!QFileInfo::exists(root.path() + "/config/zacos9/themes/Aqua Dark"));
+	assert(waitFor([&] { return findTheme("Aqua Darker") < 0; }));
+	assert(QFileInfo::exists(bundle + "/theme.conf"));
+	int darkToDelete = findTheme("Dark Test");
+	assert(darkToDelete >= 0);
+	assert(themeDraftDelete(darkToDelete, &editorError));
+	assert(waitFor([&] { return findTheme("Dark Test") < 0; }));
+	/* Put the plain preset the rest of this test started with back. */
+	assert(pl_setting_set("highlight", "FFCC66"));
+	assert(pl_setting_set("sound-theme", soundThemeId(2).toUtf8().constData()));
+	assert(saveAppearanceTheme("My Settings", &editorError));
+	assert(waitFor([&] { return findTheme("My Settings") >= 0; }));
+	/* Leave the imported theme selected for the tests below. */
+	int aquaAgain = findTheme("Aqua");
+	assert(aquaAgain >= 0 && applyAppearanceTheme(aquaAgain, &editorError));
+	assert(applySoundTheme(2, &editorError));
 	assert(QDir(folder).removeRecursively());
 	for (int i = 0; i < 15; ++i) {
 		QApplication::processEvents();

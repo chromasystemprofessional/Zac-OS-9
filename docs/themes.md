@@ -2,9 +2,10 @@
 
 Appearance follows the classic tabbed control-panel model. **Themes** applies
 named combinations of accent, highlight, desktop background, alert sound and
-interface sound set. **Save Current** saves the current combination under a
-new name. **Platinum** restores the original default appearance and disables
-interface sounds.
+interface sound set. **Save Theme…** saves the current combination under a new
+name; **New Theme…** and **Edit Theme…** open the Theme Editor described below.
+**Platinum** restores the original default appearance and disables interface
+sounds.
 
 Presets are stored in **System Folder > Appearance > Theme Files**, normally
 `~/.local/share/zacos9/appearance/Theme Files`. Each dropped theme keeps its
@@ -32,9 +33,9 @@ preset is applied. Background can be
 `pattern` or `wallpaper`; wallpaper presets can supply `wallpaper` (a catalog
 ID) and `wallpaper-mode` (`fit`, `fill`, `stretch`, `center`). Save Current
 records the actual IDs, so user assets must remain available when a preset is
-applied. Presets are settings combinations, not arbitrary window/control skins.
-Full classic Mac appearance skin resources are explicitly reported as
-unsupported; no executable resources are loaded or run.
+applied. Presets are settings combinations; user themes (below) add the window
+and menu chrome palette. Full classic Mac appearance skin resources are
+explicitly reported as unsupported; no executable resources are loaded or run.
 
 ## Mac OS 9 themes
 
@@ -248,6 +249,117 @@ views font) becomes the programs' typeface, selectable any time under
 Appearance > Fonts. The desktop chrome (menus, titles, lists) uses
 the `theme-*.pfont` bitmaps rasterized from those same faces.
 
+## Theme Editor
+
+Appearance ▸ Themes has **New Theme…** and **Edit Theme…**. The Theme Editor
+edits the whole look in one window: the window title and frame colours, the
+menu bar and pull-down menu colours, accent and highlight, desktop pattern or
+picture and its placement, sound set and alert sound, and the program font.
+Its preview shows a menu bar, an open menu and a window in the chosen colours.
+**Light Palette** and **Dark Palette** start the chrome from a complete set of
+colours; every colour can then be changed with the standard colour picker.
+**Duplicate…** saves the current settings as a new theme and leaves the one
+you opened as it is. **Artwork…** opens the per-slot decoration editor:
+each title-bar tile, button, frame edge, pop-up tab and menu skin can be
+**Inherited** from the imported theme, left **Platinum** (the flat palette),
+or replaced with your own image. Undo and Redo work in both windows.
+Imported artwork is only a starting point; nothing in the import is changed.
+
+The Artwork window lists the themeable parts by group: title bar (active,
+inactive, document and dialog, including the Aqua span), buttons (normal and
+pressed), window and dialog frame edges, the pop-up tab, and the menu
+background and selected-item skin. **Choose Image…** accepts PNG, JPEG, BMP,
+GIF and TIFF; title-bar tiles must be at most 2048 × 256, buttons at most
+64 × 64 (larger button art is scaled into the 13 px box), and frame or menu
+skins at most 4096 pixels a side and about four megapixels. Choosing an Aqua
+span picture switches the title cluster to the left, as those themes do. The
+image is copied into the theme's own `chrome/` folder when the theme is saved,
+so a duplicated theme carries its artwork. The main editor's preview shows
+title-bar, button, menu-bar and menu artwork; the Artwork window previews each
+frame edge and skin on its own. **All Imported** resets every part to the
+import's artwork where it exists (Platinum elsewhere); **All Platinum** clears
+the whole set. Title-bar tiles are stored as `.argb` (width, height, then
+straight RGBA); frame and menu skins are PNGs.
+
+Per-slot states are stored in `theme.conf`:
+
+- no key — for frame and menu skins, the conventional bundle file (or the
+  inherited bundle's); otherwise Platinum paint. A title-bar or button tile
+  has no conventional file, so no key means Platinum.
+- `key=off` — Platinum paint, even when the inherited bundle has a file
+- `key=chrome/custom-<part>.argb|.png` — the theme's own copy
+
+Title-bar and button tiles are the keyed `.argb` tiles (`bar-*`, `button-*`);
+frame and menu skins use `document-*`, `modal-*`, `popup-tab`,
+`menu-bar-image`, `menu-background-image` and `menu-highlight-image`.
+Control faces and scroll-bar skins that an import supplies to the toolkit are
+not part of this window; they keep following the imported bundle.
+
+**Editing an imported theme never changes the import.** Saving makes a linked
+copy: a user bundle that names the imported one with `inherits=` and takes its
+icons, window-chrome artwork, pointers and fonts from it, while overriding the
+colours and appearance settings. The import's own folder and preset stay
+exactly as they were, so a later reimport or a ZacOS update cannot erase the
+edit. Editing a linked copy again updates that copy in place. **Delete Theme…**
+removes only themes the editor made; imported themes are kept.
+
+A user theme is a bundle in `~/.config/zacos9/themes/<name>` and a preset in
+`System Folder > Appearance > Theme Files` (a new theme's is
+`Theme Files/<name>/theme.json`; a preset made with **Save Theme…** is
+updated where it is). The bundle's `theme.conf` records `user-theme=1` and,
+for a linked copy, `inherits=<imported theme>`. A new theme's chrome starts
+from these keys (all `RRGGBB`):
+
+```ini
+name=My Dark Theme
+user-theme=1
+title-base=3A3A3A
+title-stripe-light=555555
+title-stripe-dark=242424
+title-text=FFFFFF
+title-text-inactive=C8C8C8
+frame-face=2E2E2E
+frame-face-inactive=3A3A3A
+frame-light=555555
+frame-dark=141414
+frame-border=000000
+frame-border-inactive=3A3A3A
+menu-bar=333333
+menu-bar-text=FFFFFF
+menu-bar-text-dimmed=A8A8A8
+menu-bar-text-selected=FFFFFF
+menu-bar-light=4A4A4A
+menu-bar-shadow=1A1A1A
+menu-bar-border=000000
+menu-background=2A2A2A
+menu-text=FFFFFF
+menu-text-dimmed=999999
+menu-text-selected=FFFFFF
+menu-border=000000
+menu-light=444444
+menu-shadow=151515
+menu-separator=666666
+menu-separator-light=3A3A3A
+```
+
+A dark theme changes the window frames, title bars, menu bar, pull-down menus
+and desktop. Program contents (lists, text fields, dialogs' interiors) stay
+Platinum, as classic Mac OS appearance themes did. Title text, menu-bar text
+and menu text may be omitted: the compositor and menu bar then pick black or
+white from the background they sit on, so an imported dark scheme stays
+readable without a text colour of its own. Inactive frames follow the active
+frame colours unless `frame-face-inactive` / `frame-border-inactive` name
+their own.
+
+The editor validates every colour, name and chosen image, writes the bundle
+and preset with atomic replacement, and won't overwrite a duplicate name or an
+imported theme's preset. A save applies the theme at once; Cancel discards,
+asking first when anything was changed. Like presets, user themes are settings
+and artwork only: no executable resources are loaded or run.
+
+**Save Theme…** still saves the current settings as a preset without changing
+its chrome; editing that preset later turns it into a full user theme.
+
 ## Sound sets
 
 **Sound Sets** chooses None, the original ZacOS sounds, or a custom set.
@@ -343,5 +455,8 @@ reported explicitly.
 Tests use original WAVs and synthetic classic resources. They cover resource
 parsing and sound event mapping, safe file handling, catalog changes, preset
 validation, selection persistence, muted interface volume, preview and playback
-argument routing. The user-supplied compatibility archive is ignored by Git and
-excluded from package builds.
+argument routing. They also cover user themes: creating one, linked copies of
+imports, inherited artwork and cursors, dark palettes and readable title ink,
+deletion rules, the themed menu bar and menus, per-slot artwork states, and
+writing chosen images as ARGB tiles and PNG skins. The user-supplied
+compatibility archive is ignored by Git and excluded from package builds.

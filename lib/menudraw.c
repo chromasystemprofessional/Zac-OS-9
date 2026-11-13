@@ -1,11 +1,47 @@
 #include "menudraw.h"
 
+#include <stddef.h>
+#include <stdio.h>
+#include <string.h>
 #include "chrome.h"
+#include "theme.h"
 
 #define C_222 GRAY(0x2)
 #define C_888 GRAY(0x8)
 #define C_999 GRAY(0x9)
 #define C_DDD GRAY(0xD)
+
+/* A menu skin named by the theme, else the conventional bundle file.
+ * "off" means the flat palette. */
+static bool menu_skin(const char *key, const char *path, char *out, size_t size) {
+	if (zac_theme_string(key, out, size)) {
+		if (strcmp(out, "off") == 0) {
+			return false;
+		}
+		return true;
+	}
+	snprintf(out, size, "%s", path);
+	return true;
+}
+
+static void menu_fill_skin(struct pl_canvas *c, int x0, int y0, int x1, int y1,
+		const char *key, const char *path, uint32_t fallback) {
+	char rel[256];
+	if (menu_skin(key, path, rel, sizeof(rel))) {
+		chrome_fill(c, x0, y0, x1, y1, rel, fallback);
+		return;
+	}
+	pl_fill(c, x0, y0, x1, y1, fallback);
+}
+
+static const uint32_t *menu_skin_pixels(const char *key, const char *path,
+		int *w, int *h) {
+	char rel[256];
+	if (!menu_skin(key, path, rel, sizeof(rel))) {
+		return NULL;
+	}
+	return chrome_file(rel, w, h);
+}
 
 /* Rounded top-left screen corner, HIG figure 4-1. */
 static const char *const corner_tl[9] = {
@@ -102,20 +138,42 @@ void mbar_layout_right(struct mbar_title *titles, int n, int screen_w) {
 }
 
 void mbar_paint_background(struct pl_canvas *c, int screen_w) {
+	mbar_paint_background_themed(c, screen_w, NULL);
+}
+
+void mbar_paint_background_themed(struct pl_canvas *c, int screen_w,
+		const struct pl_menu_palette *palette) {
 	const int W = screen_w;
 	int mw, mh;
-	if (chrome_file("chrome/menu-background.png", &mw, &mh)) {
-		chrome_tile(c, chrome_file("chrome/menu-background.png", &mw, &mh),
-			mw, mh, 0, 0, W - 1, MBAR_HEIGHT - 1);
-		pl_hline(c, 0, W - 1, MBAR_HEIGHT - 1, C_BLACK);
+	const uint32_t *bar_art = menu_skin_pixels("menu-bar-image",
+		"chrome/menu-background.png", &mw, &mh);
+	if (bar_art) {
+		pl_fill(c, 0, 0, W - 1, MBAR_HEIGHT - 1, palette ? palette->bar_face : C_DDD);
+		chrome_tile(c, bar_art, mw, mh, 0, 0, W - 1, MBAR_HEIGHT - 1);
+		pl_hline(c, 0, W - 1, MBAR_HEIGHT - 1,
+			palette ? palette->bar_border : C_BLACK);
 		return;
 	}
-	pl_hline(c, 0, W - 1, 0, C_WHITE);
-	pl_fill(c, 0, 1, W - 1, MBAR_HEIGHT - 3, C_DDD);
-	pl_hline(c, 0, W - 1, MBAR_HEIGHT - 2, C_999);
-	pl_hline(c, 0, W - 1, MBAR_HEIGHT - 1, C_BLACK);
-	pl_vline(c, 0, 1, MBAR_HEIGHT - 3, C_WHITE);
-	pl_put(c, 0, MBAR_HEIGHT - 2, C_DDD);
+	const uint32_t face = palette ? palette->bar_face : C_DDD;
+	const uint32_t light = palette ? palette->bar_light : C_WHITE;
+	const uint32_t shadow = palette ? palette->bar_shadow : C_999;
+	const uint32_t border = palette ? palette->bar_border : C_BLACK;
+	if (palette && palette->flat_bar) {
+		/* A themed bar: flat colour and its two edge lines. The Platinum
+		 * corner ornaments belong to the Platinum face only. */
+		pl_fill(c, 0, 0, W - 1, MBAR_HEIGHT - 1, face);
+		pl_hline(c, 0, W - 1, 0, light);
+		pl_hline(c, 0, W - 1, MBAR_HEIGHT - 2, shadow);
+		pl_hline(c, 0, W - 1, MBAR_HEIGHT - 1, border);
+		pl_vline(c, 0, 1, MBAR_HEIGHT - 2, light);
+		return;
+	}
+	pl_hline(c, 0, W - 1, 0, light);
+	pl_fill(c, 0, 1, W - 1, MBAR_HEIGHT - 3, face);
+	pl_hline(c, 0, W - 1, MBAR_HEIGHT - 2, shadow);
+	pl_hline(c, 0, W - 1, MBAR_HEIGHT - 1, border);
+	pl_vline(c, 0, 1, MBAR_HEIGHT - 3, light);
+	pl_put(c, 0, MBAR_HEIGHT - 2, face);
 
 	pl_grays(c, 0, 0, corner_tl, 9);
 	/* Top-right: mirror image without the left-hand highlight column.
@@ -134,6 +192,17 @@ void mbar_paint_background(struct pl_canvas *c, int screen_w) {
 
 void mbar_paint_titles(struct pl_canvas *c, const struct mbar_title *titles,
 		int n, int highlighted, struct pl_accent accent) {
+	mbar_paint_titles_themed(c, titles, n, highlighted, accent, NULL);
+}
+
+void mbar_paint_titles_themed(struct pl_canvas *c, const struct mbar_title *titles,
+		int n, int highlighted, struct pl_accent accent,
+		const struct pl_menu_palette *palette) {
+	const uint32_t text = palette ? palette->bar_text : C_BLACK;
+	const uint32_t dimmed = palette ? palette->bar_text_dimmed : C_888;
+	const uint32_t selected = palette ? palette->bar_text_selected : C_WHITE;
+	const uint32_t ridge_light = palette ? palette->bar_light : C_WHITE;
+	const uint32_t ridge_shadow = palette ? palette->bar_text_dimmed : C_888;
 	for (int i = 0; i < n; i++) {
 		const struct mbar_title *t = &titles[i];
 		bool hi = i == highlighted;
@@ -145,16 +214,16 @@ void mbar_paint_titles(struct pl_canvas *c, const struct mbar_title *titles,
 		if (t->handle) {
 			/* Ridges: a highlight and a shadow each. */
 			for (int r = 0; r < 3; r++) {
-				pl_vline(c, t->handle_l + 2 * r, 4, MBAR_HEIGHT - 6, C_WHITE);
-				pl_vline(c, t->handle_l + 2 * r + 1, 4, MBAR_HEIGHT - 6, C_888);
+				pl_vline(c, t->handle_l + 2 * r, 4, MBAR_HEIGHT - 6, ridge_light);
+				pl_vline(c, t->handle_l + 2 * r + 1, 4, MBAR_HEIGHT - 6, ridge_shadow);
 			}
 		}
 		if (t->icon) {
 			/* Blended: the logo's edge is soft. */
 			pl_image_blend(c, t->ink_l, MBAR_ICON_Y, t->icon, MBAR_ICON_W, MBAR_ICON_H, false);
 		} else {
-			uint32_t color = hi ? C_WHITE : t->dimmed ? C_888 : C_BLACK;
-			pl_text(c, t->text, t->ink_l, MBAR_BASELINE, color);
+			pl_text(c, t->text, t->ink_l, MBAR_BASELINE,
+				hi ? selected : t->dimmed ? dimmed : text);
 		}
 	}
 }
@@ -222,23 +291,40 @@ static void paint_glyph(struct pl_canvas *c, const char *const *rows, int nrows,
 
 void menu_paint(struct pl_canvas *c, const struct menu_item *items, int n,
 		int width, int height, int selected, struct pl_accent accent) {
-	const int W = width, H = height;
+	menu_paint_themed(c, items, n, width, height, selected, accent, NULL);
+}
 
-	chrome_fill(c, 1, 1, W - 2, H - 2, "chrome/menu-background.png", C_DDD);
-	pl_outline(c, 0, 0, W - 1, H - 1, C_BLACK);
-	pl_hline(c, 1, W - 3, 1, C_WHITE);
-	pl_vline(c, 1, 1, H - 3, C_WHITE);
-	pl_vline(c, W - 2, 2, H - 2, C_999);
-	pl_hline(c, 2, W - 2, H - 2, C_999);
-	pl_vline(c, W, 2, H, C_222);
-	pl_hline(c, 2, W, H, C_222);
+void menu_paint_themed(struct pl_canvas *c, const struct menu_item *items, int n,
+		int width, int height, int selected, struct pl_accent accent,
+		const struct pl_menu_palette *palette) {
+	const int W = width, H = height;
+	const uint32_t face = palette ? palette->face : C_DDD;
+	const uint32_t text = palette ? palette->text : C_BLACK;
+	const uint32_t dimmed = palette ? palette->text_dimmed : C_888;
+	const uint32_t selected_text = palette ? palette->text_selected : C_WHITE;
+	const uint32_t border = palette ? palette->border : C_BLACK;
+	const uint32_t light = palette ? palette->light : C_WHITE;
+	const uint32_t shadow = palette ? palette->shadow : C_999;
+	const uint32_t separator = palette ? palette->separator : C_888;
+	const uint32_t separator_light = palette ? palette->separator_light : C_WHITE;
+	const uint32_t outer_shadow = palette ? palette->shadow : C_222;
+
+	menu_fill_skin(c, 1, 1, W - 2, H - 2, "menu-background-image",
+		"chrome/menu-background.png", face);
+	pl_outline(c, 0, 0, W - 1, H - 1, border);
+	pl_hline(c, 1, W - 3, 1, light);
+	pl_vline(c, 1, 1, H - 3, light);
+	pl_vline(c, W - 2, 2, H - 2, shadow);
+	pl_hline(c, 2, W - 2, H - 2, shadow);
+	pl_vline(c, W, 2, H, outer_shadow);
+	pl_hline(c, 2, W, H, outer_shadow);
 
 	int y = 1;
 	for (int i = 0; i < n; i++) {
 		const struct menu_item *it = &items[i];
 		if (!it->label) {
-			pl_hline(c, 1, W - 2, y + 2, C_888);
-			pl_hline(c, 1, W - 2, y + 3, C_WHITE);
+			pl_hline(c, 1, W - 2, y + 2, separator);
+			pl_hline(c, 1, W - 2, y + 3, separator_light);
 			y += MENU_SEP_H;
 			continue;
 		}
@@ -247,7 +333,8 @@ void menu_paint(struct pl_canvas *c, const struct menu_item *items, int n,
 		bool sel = i == selected && it->enabled;
 		if (sel) {
 			int hw, hh;
-			const uint32_t *hp = chrome_file("chrome/menu-highlight.png", &hw, &hh);
+			const uint32_t *hp = menu_skin_pixels("menu-highlight-image",
+				"chrome/menu-highlight.png", &hw, &hh);
 			if (hp) {
 				chrome_tile(c, hp, hw, hh, 1, y, W - 2, y + MENU_ITEM_H - 1);
 			} else {
@@ -257,7 +344,7 @@ void menu_paint(struct pl_canvas *c, const struct menu_item *items, int n,
 				pl_vline(c, W - 2, y + 1, y + MENU_ITEM_H - 1, accent.deep);
 			}
 		}
-		uint32_t color = sel ? C_WHITE : it->enabled ? C_BLACK : C_888;
+		uint32_t color = sel ? selected_text : it->enabled ? text : dimmed;
 		int tx = MENU_TEXT_X + it->indent;
 		if (it->swatch) {
 			int sy = y + (MENU_ITEM_H - MENU_SWATCH) / 2;

@@ -79,10 +79,23 @@ int zac_theme_list(const char *root, char ***out_dirs) {
 	return i;
 }
 
-/* The active theme bundle's directory (from "theme-bundle"), or false. */
-static bool active_theme_dir(char *out, size_t size) {
-	char id[256];
-	if (!pl_setting("theme-bundle", id, sizeof(id)) || !id[0]) {
+/* A bundle id from theme.conf or desktop.conf: one path component, no
+ * separators or "..". */
+static bool valid_bundle_id(const char *id) {
+	if (!id || !*id || id[0] == '.' || strlen(id) >= 200) {
+		return false;
+	}
+	for (const char *p = id; *p; p++) {
+		if (*p == '/' || *p == '\\' || *p < 0x20) {
+			return false;
+		}
+	}
+	return strcmp(id, ".") != 0 && strcmp(id, "..") != 0;
+}
+
+/* A bundle by id: the user's own first, then the installed data themes. */
+static bool theme_dir_for_id(const char *id, char *out, size_t size) {
+	if (!valid_bundle_id(id)) {
 		return false;
 	}
 	const char *home = getenv("HOME");
@@ -110,17 +123,72 @@ static bool active_theme_dir(char *out, size_t size) {
 	return false;
 }
 
-bool zac_theme_asset(const char *relative, char *out, size_t size) {
-	if (!relative || !out || size == 0) return false;
-	char dir[4096];
-	if (!active_theme_dir(dir, sizeof(dir))) {
+/* The active theme bundle's directory (from "theme-bundle"), or false. */
+static bool active_theme_dir(char *out, size_t size) {
+	char id[256];
+	if (!pl_setting("theme-bundle", id, sizeof(id)) || !id[0]) {
 		return false;
 	}
-	char path[8192];
-	snprintf(path, sizeof(path), "%s/%s", dir, relative);
-	if (access(path, R_OK) == 0) {
-		snprintf(out, size, "%s", path);
-		return true;
+	return theme_dir_for_id(id, out, size);
+}
+
+/* The bundle the active theme inherits its artwork from ("inherits"),
+ * or false. One level only. */
+static bool inherited_theme_dir(char *out, size_t size) {
+	char id[256], own[4096], inherited[4096];
+	if (!zac_theme_string("inherits", id, sizeof(id)) || !id[0]) {
+		return false;
+	}
+	if (!theme_dir_for_id(id, inherited, sizeof(inherited))) {
+		return false;
+	}
+	if (active_theme_dir(own, sizeof(own)) && strcmp(own, inherited) == 0) {
+		return false;
+	}
+	snprintf(out, size, "%s", inherited);
+	return true;
+}
+
+/* A bundle-relative path that cannot escape its bundle. */
+static bool safe_relative(const char *relative) {
+	if (!relative || !*relative || relative[0] == '/') {
+		return false;
+	}
+	const char *p = relative;
+	while (*p) {
+		const char *slash = strchr(p, '/');
+		size_t n = slash ? (size_t)(slash - p) : strlen(p);
+		if (n == 0 || (n == 1 && p[0] == '.') ||
+				(n == 2 && p[0] == '.' && p[1] == '.')) {
+			return false;
+		}
+		if (!slash) {
+			break;
+		}
+		p = slash + 1;
+	}
+	return true;
+}
+
+bool zac_theme_asset(const char *relative, char *out, size_t size) {
+	if (!relative || !out || size == 0 || !safe_relative(relative)) return false;
+	char dir[4096], id[256];
+	if (pl_setting("theme-bundle", id, sizeof(id)) && theme_dir_for_id(id, dir, sizeof(dir))) {
+		char path[8192];
+		snprintf(path, sizeof(path), "%s/%s", dir, relative);
+		if (access(path, R_OK) == 0) {
+			snprintf(out, size, "%s", path);
+			return true;
+		}
+	}
+	char inherited[4096];
+	if (inherited_theme_dir(inherited, sizeof(inherited))) {
+		char path[8192];
+		snprintf(path, sizeof(path), "%s/%s", inherited, relative);
+		if (access(path, R_OK) == 0) {
+			snprintf(out, size, "%s", path);
+			return true;
+		}
 	}
 	return false;
 }
@@ -139,12 +207,22 @@ bool zac_cursor_theme(char *name, size_t nsize, char *dir, size_t dsize) {
 	char index[8192];
 	snprintf(index, sizeof(index), "%s/cursors/Macintosh/index.theme", bundle);
 	struct stat st;
-	if (stat(index, &st) != 0 || !S_ISREG(st.st_mode)) {
-		return false;
+	if (stat(index, &st) == 0 && S_ISREG(st.st_mode)) {
+		snprintf(name, nsize, "Macintosh");
+		snprintf(dir, dsize, "%s/cursors", bundle);
+		return true;
 	}
-	snprintf(name, nsize, "Macintosh");
-	snprintf(dir, dsize, "%s/cursors", bundle);
-	return true;
+	/* A linked copy may take its pointers from the bundle it inherits. */
+	char inherited[4096];
+	if (inherited_theme_dir(inherited, sizeof(inherited))) {
+		snprintf(index, sizeof(index), "%s/cursors/Macintosh/index.theme", inherited);
+		if (stat(index, &st) == 0 && S_ISREG(st.st_mode)) {
+			snprintf(name, nsize, "Macintosh");
+			snprintf(dir, dsize, "%s/cursors", inherited);
+			return true;
+		}
+	}
+	return false;
 }
 
 /* The active theme's theme.conf lines, cached until the file changes.
@@ -156,7 +234,7 @@ static struct {
 	char path[8192];
 	bool loaded;
 	int n;
-	char lines[64][256];
+	char lines[128][512];
 } confcache;
 
 static void conf_load(void) {
@@ -194,7 +272,7 @@ static void conf_load(void) {
 	if (!f) {
 		return;
 	}
-	while (confcache.n < 64 && fgets(confcache.lines[confcache.n], sizeof(confcache.lines[0]), f)) {
+	while (confcache.n < 128 && fgets(confcache.lines[confcache.n], sizeof(confcache.lines[0]), f)) {
 		confcache.lines[confcache.n][strcspn(confcache.lines[confcache.n], "\r\n")] = '\0';
 		confcache.n++;
 	}
@@ -252,6 +330,43 @@ bool zac_theme_color(const char *key, uint32_t *out) {
 		return true;
 	}
 	return false;
+}
+
+uint32_t zac_ink_for(uint32_t background) {
+	const int r = (int)((background >> 16) & 0xFF);
+	const int g = (int)((background >> 8) & 0xFF);
+	const int b = (int)(background & 0xFF);
+	/* Rec. 601 luma, integer only: what reads as light on a screen. */
+	const int luma = (r * 299 + g * 587 + b * 114) / 1000;
+	return luma < 128 ? 0xFFFFFFFFu : 0xFF000000u;
+}
+
+bool zac_theme_ink(const char *key, uint32_t background, uint32_t *out) {
+	if (!out) return false;
+	if (key && zac_theme_color(key, out)) {
+		return true;
+	}
+	*out = zac_ink_for(background);
+	return false;
+}
+
+uint32_t zac_blend(uint32_t from, uint32_t to, int percent) {
+	if (percent <= 0) return from;
+	if (percent >= 100) return to;
+	const int f[4] = {
+		(int)((from >> 16) & 0xFF), (int)((from >> 8) & 0xFF),
+		(int)(from & 0xFF), (int)((from >> 24) & 0xFF),
+	};
+	const int t[4] = {
+		(int)((to >> 16) & 0xFF), (int)((to >> 8) & 0xFF),
+		(int)(to & 0xFF), (int)((to >> 24) & 0xFF),
+	};
+	int v[4];
+	for (int i = 0; i < 4; i++) {
+		v[i] = (f[i] * (100 - percent) + t[i] * percent + 50) / 100;
+	}
+	return ((uint32_t)v[3] << 24) | ((uint32_t)v[0] << 16) |
+		((uint32_t)v[1] << 8) | (uint32_t)v[2];
 }
 
 int zac_theme_apply(void) {

@@ -11,6 +11,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QFontDatabase>
+#include <QImage>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -146,6 +147,7 @@ const QStringList events{ "button-click", "checkbox-toggle", "menu-open", "menu-
 struct Theme {
 	QString id, name;
 	QMap<QString, QString> values;
+	QString path; /* preset file, for the editor (empty: built in) */
 };
 struct Watch {
 	QPointer<QObject> owner;
@@ -492,12 +494,12 @@ public:
 			}
 		}
 	}
-	QList<Theme> sounds{{ "none", "None", {} }, { "original", "ZacOS Original", {} }};
+	QList<Theme> sounds{{ "none", "None", {}, {} }, { "original", "ZacOS Original", {}, {} }};
 	QList<Theme> presets{{ "platinum", "Silver Coat", {
 		{ "accent", "" }, { "highlight", "" }, { "pattern", "" },
 		{ "background", "pattern" }, { "wallpaper", "" },
 		{ "wallpaper-mode", "fit" }, { "alert-sound", "" }, { "sound-theme", "none" }
-	}}};
+	}, {} }};
 	QStringList errors, soundErrors, importErrors;
 	QList<Watch> watches;
 	QProcess process;
@@ -577,7 +579,7 @@ public:
 			}
 			for (const QJsonValue &v : doc.object().value("themes").toArray()) {
 				const QJsonObject o = v.toObject();
-				Theme theme{ o.value("id").toString(), o.value("name").toString(), {} };
+				Theme theme{ o.value("id").toString(), o.value("name").toString(), {}, {} };
 				bool valid = !theme.id.isEmpty() && theme.id.size() < 100 && !theme.name.isEmpty();
 				const QJsonObject mapping = o.value("events").toObject();
 				for (auto it = mapping.begin(); it != mapping.end(); ++it) {
@@ -897,7 +899,7 @@ public:
 				"wallpaper-mode", "alert-sound", "sound-theme", "theme-bundle", "font-family" };
 			Theme preset{ "theme:" + QString::fromLatin1(QCryptographicHash::hash(
 				themeRoot.relativeFilePath(file.filePath()).toUtf8(), QCryptographicHash::Sha256).toHex().left(24)),
-				obj.value("name").toString(), {} };
+				obj.value("name").toString(), {}, file.absoluteFilePath() };
 			bool valid = obj.value("version").toInt() == 1 && !preset.name.isEmpty();
 			const QJsonObject values = obj.value("settings").toObject();
 			for (auto it = values.begin(); it != values.end(); ++it) {
@@ -1293,6 +1295,886 @@ bool saveAppearanceTheme(const QString &name, QString *error) {
 	if (!output.open(QIODevice::WriteOnly) || output.write(bytes) != bytes.size() || !output.commit()) {
 		*error = output.errorString();
 		return false;
+	}
+	catalog().fingerprint.clear();
+	catalog().refresh();
+	return true;
+}
+
+/* ---- user themes (the Theme Editor) ---------------------------------- */
+
+namespace {
+
+QString themeConfigRoot() {
+	return QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) +
+		"/zacos9/themes";
+}
+
+bool validThemeId(const QString &id) {
+	if (id.isEmpty() || id.size() > 120 || id.startsWith('.') ||
+			id.contains('/') || id.contains('\\')) {
+		return false;
+	}
+	for (const QChar c : id) {
+		if (c.unicode() < 0x20) {
+			return false;
+		}
+	}
+	return id != "." && id != "..";
+}
+
+/* A bundle installed in the user's own folder, then the system themes. */
+QString themeBundleFolder(const QString &id) {
+	if (!validThemeId(id)) {
+		return QString();
+	}
+	const QString user = themeConfigRoot() + "/" + id;
+	if (QFileInfo(user).isDir()) {
+		return user;
+	}
+	const QString system = QString::fromUtf8(pl_data_dir()) + "/themes/" + id;
+	if (QFileInfo(system).isDir()) {
+		return system;
+	}
+	return QString();
+}
+
+QMap<QString, QString> readThemeConf(const QString &dir) {
+	QMap<QString, QString> conf;
+	QFile f(dir + "/theme.conf");
+	if (dir.isEmpty() || !f.open(QIODevice::ReadOnly | QIODevice::Text)) {
+		return conf;
+	}
+	QTextStream in(&f);
+	in.setEncoding(QStringConverter::Utf8);
+	QString line;
+	while (in.readLineInto(&line)) {
+		const int eq = line.indexOf('=');
+		if (eq <= 0) {
+			continue;
+		}
+		const QString key = line.left(eq).trimmed();
+		if (key.isEmpty() || line.size() > 4096) {
+			continue;
+		}
+		conf.insert(key, line.mid(eq + 1));
+	}
+	return conf;
+}
+
+/* Older bundles sometimes used the menu colour keys for art paths.
+ * Move those to the explicit image keys. */
+static void migrateMenuArtKeys(QMap<QString, QString> &conf) {
+	const QPair<QString, QString> moves[] = {
+		{ "menu-background", "menu-background-image" },
+		{ "menu-highlight", "menu-highlight-image" },
+	};
+	for (const auto &move : moves) {
+		const QString art = conf.value(move.first);
+		if (art.startsWith("chrome/") && conf.value(move.second).isEmpty()) {
+			conf[move.second] = art;
+			conf.remove(move.first);
+		}
+	}
+}
+
+const QStringList &paletteKeys() {
+	static const QStringList keys{
+		"title-base", "title-stripe-light", "title-stripe-dark", "title-text",
+		"title-text-inactive", "frame-face", "frame-face-inactive", "frame-light",
+		"frame-dark", "frame-border", "frame-border-inactive", "menu-bar",
+		"menu-bar-text", "menu-bar-text-dimmed", "menu-bar-text-selected",
+		"menu-bar-light", "menu-bar-shadow", "menu-bar-border", "menu-background",
+		"menu-text", "menu-text-dimmed", "menu-text-selected", "menu-border",
+		"menu-light", "menu-shadow", "menu-separator", "menu-separator-light",
+	};
+	return keys;
+}
+
+const QMap<QString, QString> &lightPalette() {
+	static const QMap<QString, QString> colours{
+		{ "title-base", "CCCCCC" }, { "title-stripe-light", "FFFFFF" },
+		{ "title-stripe-dark", "777777" }, { "title-text", "000000" },
+		{ "title-text-inactive", "666666" }, { "frame-face", "CCCCCC" },
+		{ "frame-face-inactive", "DDDDDD" }, { "frame-light", "FFFFFF" },
+		{ "frame-dark", "999999" }, { "frame-border", "000000" },
+		{ "frame-border-inactive", "555555" }, { "menu-bar", "DDDDDD" },
+		{ "menu-bar-text", "000000" }, { "menu-bar-text-dimmed", "888888" },
+		{ "menu-bar-text-selected", "FFFFFF" }, { "menu-bar-light", "FFFFFF" },
+		{ "menu-bar-shadow", "999999" }, { "menu-bar-border", "000000" },
+		{ "menu-background", "DDDDDD" }, { "menu-text", "000000" },
+		{ "menu-text-dimmed", "888888" }, { "menu-text-selected", "FFFFFF" },
+		{ "menu-border", "000000" }, { "menu-light", "FFFFFF" },
+		{ "menu-shadow", "999999" }, { "menu-separator", "888888" },
+		{ "menu-separator-light", "FFFFFF" },
+	};
+	return colours;
+}
+
+QString normalisedColour(const QString &value) {
+	QString v = value.trimmed();
+	if (v.startsWith('#')) {
+		v = v.mid(1);
+	}
+	if (v.size() != 6) {
+		return QString();
+	}
+	for (const QChar c : v) {
+		if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'))) {
+			return QString();
+		}
+	}
+	return v.toUpper();
+}
+
+bool safeRelativePath(const QString &path) {
+	if (path.isEmpty() || path.startsWith('/') || path.contains('\\')) {
+		return false;
+	}
+	for (const QString &part : path.split('/')) {
+		if (part.isEmpty() || part == "." || part == "..") {
+			return false;
+		}
+	}
+	return true;
+}
+
+QString presetIdForPath(const QString &path) {
+	QDir root(appearanceThemesFolder());
+	const QString rel = root.relativeFilePath(path);
+	return "theme:" + QString::fromLatin1(
+		QCryptographicHash::hash(rel.toUtf8(), QCryptographicHash::Sha256).toHex().left(24));
+}
+
+QString sanitisedBundleName(const QString &name) {
+	QString id = name.trimmed();
+	for (int i = 0; i < id.size(); ++i) {
+		const QChar c = id[i];
+		if (c == '/' || c == '\\' || c == ':' || c.unicode() < 0x20) {
+			id[i] = '-';
+		}
+	}
+	id = id.left(60).trimmed();
+	while (id.startsWith('.')) {
+		id.remove(0, 1);
+	}
+	while (id.endsWith('.') || id.endsWith(' ')) {
+		id.chop(1);
+	}
+	return id.isEmpty() ? QString("Theme") : id;
+}
+
+QString uniqueBundleId(const QString &name) {
+	const QString base = sanitisedBundleName(name);
+	QString id = base;
+	for (int n = 2; QFileInfo::exists(themeConfigRoot() + "/" + id) ||
+			QFileInfo::exists(QString::fromUtf8(pl_data_dir()) + "/themes/" + id); ++n) {
+		id = base + " Custom";
+		if (n > 2) {
+			id += " " + QString::number(n - 1);
+		}
+	}
+	return id;
+}
+
+bool validateDraftSettings(QMap<QString, QString> &settings, QString *error) {
+	const QString accent = settings.value("accent");
+	if (!accent.isEmpty() &&
+			QString::fromUtf8(pl_accent_id(pl_accent_find(accent.toUtf8().constData()))) != accent) {
+		*error = "Choose one of the accent colours.";
+		return false;
+	}
+	const QString highlight = settings.value("highlight");
+	if (!highlight.isEmpty() && normalisedColour(highlight).isEmpty()) {
+		*error = "The highlight colour must be six hexadecimal digits.";
+		return false;
+	}
+	if (!highlight.isEmpty()) {
+		settings["highlight"] = normalisedColour(highlight);
+	}
+	const QString background = settings.value("background");
+	if (!background.isEmpty() && background != "pattern" && background != "wallpaper") {
+		*error = "The desktop background must be a pattern or a picture.";
+		return false;
+	}
+	const QString mode = settings.value("wallpaper-mode");
+	if (!mode.isEmpty() && !QStringList{ "fit", "fill", "stretch", "center", "tile" }.contains(mode)) {
+		*error = "Choose how the desktop picture is placed.";
+		return false;
+	}
+	const QString sound = settings.value("sound-theme");
+	if (!sound.isEmpty() && sound != "none" && sound != "original") {
+		bool found = false;
+		for (int i = 0; i < soundThemeCount(); ++i) {
+			if (soundThemeId(i) == sound) {
+				found = true;
+				break;
+			}
+		}
+		if (!found) {
+			*error = "The chosen sound set is no longer installed.";
+			return false;
+		}
+	}
+	const QString alert = settings.value("alert-sound");
+	if (!alert.isEmpty() && alert != "platinum" && alert != "none" &&
+			!alertSoundIds().contains(alert)) {
+		*error = "The chosen alert sound is no longer installed.";
+		return false;
+	}
+	const QString font = settings.value("font-family");
+	if (!font.isEmpty() && !QFontDatabase::families().contains(font) &&
+			!themeFontFamilies().contains(font)) {
+		*error = "The chosen program font is no longer installed.";
+		return false;
+	}
+	for (const QString key : { "pattern", "wallpaper" }) {
+		if (settings.value(key).size() > 120 || settings.value(key).contains('\n') ||
+				settings.value(key).contains('\r')) {
+			*error = "The desktop art name is too long.";
+			return false;
+		}
+	}
+	return true;
+}
+
+/* Every key the editor writes must be safe to put on a theme.conf line. */
+bool validateChrome(QMap<QString, QString> &chrome, QString *error) {
+	for (const char *meta : { "name", "user-theme", "inherits", "source",
+			"extractor-sha256", "editor-version" }) {
+		chrome.remove(meta);
+	}
+	for (const char *key : { "accent", "highlight", "pattern" }) {
+		chrome.remove(key); /* written from the preset's settings */
+	}
+	for (auto it = chrome.begin(); it != chrome.end(); ++it) {
+		if (it.key().isEmpty() || it.key().size() > 64 ||
+				!QRegularExpression("\\A[a-z0-9-]+\\z").match(it.key()).hasMatch()) {
+			*error = "The theme has an invalid setting name: " + it.key();
+			return false;
+		}
+		if (it.value().size() > 400 || it.value().contains('\n') || it.value().contains('\r')) {
+			*error = "The theme has a setting that is too long: " + it.key();
+			return false;
+		}
+		if (paletteKeys().contains(it.key())) {
+			const QString colour = normalisedColour(it.value());
+			if (colour.isEmpty()) {
+				*error = "The theme's " + it.key() + " colour is not six hexadecimal digits.";
+				return false;
+			}
+			it.value() = colour;
+		} else if (it.value().contains('/') && !safeRelativePath(it.value())) {
+			*error = "The theme names a file outside its own folder: " + it.value();
+			return false;
+		}
+	}
+	return true;
+}
+
+bool writeUserBundle(const QString &dir, const ThemeDraft &draft, QString *error) {
+	if (!QDir().mkpath(dir)) {
+		*error = "Could not create the theme's folder.";
+		return false;
+	}
+	QMap<QString, QString> chrome = draft.chrome;
+	if (!validateChrome(chrome, error)) {
+		return false;
+	}
+	for (const QString &key : paletteKeys()) {
+		if (chrome.value(key).isEmpty()) {
+			chrome.insert(key, lightPalette().value(key));
+		}
+	}
+	QByteArray text;
+	text += "name=" + draft.name.toUtf8() + "\n";
+	text += "user-theme=1\n";
+	text += "editor-version=1\n";
+	if (!draft.inherits.isEmpty()) {
+		text += "inherits=" + draft.inherits.toUtf8() + "\n";
+	}
+	for (auto it = chrome.cbegin(); it != chrome.cend(); ++it) {
+		if (!it.value().isEmpty()) {
+			text += it.key().toUtf8() + "=" + it.value().toUtf8() + "\n";
+		}
+	}
+	for (const char *key : { "accent", "highlight", "pattern" }) {
+		if (!draft.settings.value(key).isEmpty()) {
+			text += key + QByteArray("=") + draft.settings.value(key).toUtf8() + "\n";
+		}
+	}
+	QSaveFile output(dir + "/theme.conf");
+	if (!output.open(QIODevice::WriteOnly) || output.write(text) != text.size() ||
+			!output.commit()) {
+		*error = output.errorString().isEmpty() ? "Could not write the theme." : output.errorString();
+		return false;
+	}
+	return true;
+}
+
+bool writePreset(const QString &path, const ThemeDraft &draft, const QString &bundleId,
+		QString *error) {
+	const QString folder = QFileInfo(path).absolutePath();
+	if (!QDir().mkpath(folder)) {
+		*error = "Could not create the theme's folder.";
+		return false;
+	}
+	QJsonObject settings;
+	settings.insert("accent", draft.settings.value("accent"));
+	settings.insert("highlight", draft.settings.value("highlight"));
+	settings.insert("pattern", draft.settings.value("pattern"));
+	settings.insert("wallpaper", draft.settings.value("wallpaper"));
+	settings.insert("background", draft.settings.value("background").isEmpty()
+		? QString("pattern") : draft.settings.value("background"));
+	settings.insert("wallpaper-mode", draft.settings.value("wallpaper-mode").isEmpty()
+		? QString("fit") : draft.settings.value("wallpaper-mode"));
+	settings.insert("alert-sound", draft.settings.value("alert-sound"));
+	settings.insert("sound-theme", draft.settings.value("sound-theme").isEmpty()
+		? QString("none") : draft.settings.value("sound-theme"));
+	settings.insert("font-family", draft.settings.value("font-family"));
+	settings.insert("theme-bundle", bundleId);
+	QSaveFile output(path);
+	const QByteArray bytes = QJsonDocument(QJsonObject{
+		{ "version", 1 }, { "name", draft.name }, { "settings", settings } }).toJson();
+	if (!output.open(QIODevice::WriteOnly) || output.write(bytes) != bytes.size() ||
+			!output.commit()) {
+		*error = output.errorString().isEmpty() ? "Could not write the theme preset." : output.errorString();
+		return false;
+	}
+	return true;
+}
+
+bool withinFolder(const QString &path, const QString &folder) {
+	const QString canonicalFolder = QFileInfo(folder).canonicalFilePath();
+	const QString canonical = QFileInfo(path).canonicalFilePath();
+	if (!canonicalFolder.isEmpty() && !canonical.isEmpty()) {
+		return canonical.startsWith(canonicalFolder + "/");
+	}
+	const QString clean = QDir::cleanPath(QFileInfo(path).absoluteFilePath());
+	const QString root = QDir::cleanPath(QFileInfo(folder).absoluteFilePath());
+	return clean.startsWith(root + "/");
+}
+
+std::unique_ptr<QLockFile> lockThemeWrite(QString *error) {
+	QString runtime = QStandardPaths::writableLocation(QStandardPaths::RuntimeLocation);
+	if (runtime.isEmpty()) {
+		runtime = QDir::tempPath();
+	}
+	std::unique_ptr<QLockFile> lock(new QLockFile(runtime + "/zacos9-theme-import.lock"));
+	if (!lock->tryLock(200)) {
+		*error = "Another theme is being installed or saved. Try again in a moment.";
+		return nullptr;
+	}
+	return lock;
+}
+
+} // namespace
+
+QString appearanceThemePath(int index) {
+	return catalog().presets.value(index).path;
+}
+
+QString appearanceThemeBundle(int index) {
+	return appearanceThemeValues(index).value("theme-bundle");
+}
+
+void themeDraftDropChromeArt(ThemeDraft *draft) {
+	if (!draft) {
+		return;
+	}
+	for (const ThemeArtSlot &slot : themeArtSlots()) {
+		if (slot.defaultPath.isEmpty()) {
+			draft->chrome.remove(slot.key);
+		} else {
+			draft->chrome[slot.key] = "off";
+		}
+		draft->artSources.remove(slot.key);
+	}
+	draft->chrome.remove("title-cluster");
+}
+
+const QList<ThemeArtSlot> &themeArtSlots() {
+	static const QList<ThemeArtSlot> artSlots{
+		{ "bar-left", "Left end", QString(), true, "Title bar" },
+		{ "bar-middle", "Middle", QString(), true, "Title bar" },
+		{ "bar-right", "Right end", QString(), true, "Title bar" },
+		{ "bar-span", "Aqua span", QString(), true, "Title bar" },
+		{ "bar-left-inactive", "Inactive left end", QString(), true, "Title bar" },
+		{ "bar-middle-inactive", "Inactive middle", QString(), true, "Title bar" },
+		{ "bar-right-inactive", "Inactive right end", QString(), true, "Title bar" },
+		{ "bar-span-inactive", "Inactive Aqua span", QString(), true, "Title bar" },
+		{ "bar-dialog-left", "Dialog left end", QString(), true, "Dialog title bar" },
+		{ "bar-dialog-middle", "Dialog middle", QString(), true, "Dialog title bar" },
+		{ "bar-dialog-right", "Dialog right end", QString(), true, "Dialog title bar" },
+		{ "bar-dialog-left-inactive", "Inactive dialog left end", QString(), true, "Dialog title bar" },
+		{ "bar-dialog-middle-inactive", "Inactive dialog middle", QString(), true, "Dialog title bar" },
+		{ "bar-dialog-right-inactive", "Inactive dialog right end", QString(), true, "Dialog title bar" },
+		{ "button-close", "Close", QString(), true, "Buttons" },
+		{ "button-close-pressed", "Close, pressed", QString(), true, "Buttons" },
+		{ "button-zoom", "Zoom", QString(), true, "Buttons" },
+		{ "button-zoom-pressed", "Zoom, pressed", QString(), true, "Buttons" },
+		{ "button-grow", "Collapse", QString(), true, "Buttons" },
+		{ "button-grow-pressed", "Collapse, pressed", QString(), true, "Buttons" },
+		{ "button-dialog-close", "Dialog close", QString(), true, "Dialog buttons" },
+		{ "button-dialog-close-pressed", "Dialog close, pressed", QString(), true, "Dialog buttons" },
+		{ "button-dialog-zoom", "Dialog zoom", QString(), true, "Dialog buttons" },
+		{ "button-dialog-zoom-pressed", "Dialog zoom, pressed", QString(), true, "Dialog buttons" },
+		{ "button-dialog-grow", "Dialog collapse", QString(), true, "Dialog buttons" },
+		{ "button-dialog-grow-pressed", "Dialog collapse, pressed", QString(), true, "Dialog buttons" },
+		{ "document-top", "Top edge", "chrome/document-top.png", false, "Window frame" },
+		{ "document-top-inactive", "Inactive top edge", "chrome/document-top-inactive.png", false, "Window frame" },
+		{ "document-bottom", "Bottom edge", "chrome/document-bottom.png", false, "Window frame" },
+		{ "document-bottom-inactive", "Inactive bottom edge", "chrome/document-bottom-inactive.png", false, "Window frame" },
+		{ "document-left", "Left edge", "chrome/document-left.png", false, "Window frame" },
+		{ "document-left-inactive", "Inactive left edge", "chrome/document-left-inactive.png", false, "Window frame" },
+		{ "document-right", "Right edge", "chrome/document-right.png", false, "Window frame" },
+		{ "document-right-inactive", "Inactive right edge", "chrome/document-right-inactive.png", false, "Window frame" },
+		{ "modal-top", "Dialog top edge", "chrome/modal-top.png", false, "Dialog frame" },
+		{ "modal-bottom", "Dialog bottom edge", "chrome/modal-bottom.png", false, "Dialog frame" },
+		{ "modal-left", "Dialog left edge", "chrome/modal-left.png", false, "Dialog frame" },
+		{ "modal-right", "Dialog right edge", "chrome/modal-right.png", false, "Dialog frame" },
+		{ "popup-tab", "Pop-up tab", "chrome/popup-tab.png", false, "Pop-up" },
+		{ "popup-tab-inactive", "Inactive pop-up tab", "chrome/popup-tab-inactive.png", false, "Pop-up" },
+		{ "menu-bar-image", "Menu bar background", "chrome/menu-background.png", false, "Menus" },
+		{ "menu-background-image", "Menu background", "chrome/menu-background.png", false, "Menus" },
+		{ "menu-highlight-image", "Selected item", "chrome/menu-highlight.png", false, "Menus" },
+	};
+	return artSlots;
+}
+
+bool themeArtWrite(const QString &source, const QString &path, bool argb, QString *error) {
+	const QFileInfo info(source);
+	if (info.isSymLink() || !info.isFile() || info.size() > 8 * 1024 * 1024) {
+		*error = "Choose a regular image no larger than 8 MiB.";
+		return false;
+	}
+	if (!QDir().mkpath(QFileInfo(path).absolutePath())) {
+		*error = "Could not create the theme's chrome folder.";
+		return false;
+	}
+	/* A theme's own .argb tile is already in the compositor's format:
+	 * validate it and copy it through, so Duplicate carries it. */
+	if (argb && source.endsWith(".argb", Qt::CaseInsensitive)) {
+		QFile input(source);
+		if (!input.open(QIODevice::ReadOnly)) {
+			*error = input.errorString();
+			return false;
+		}
+		const QByteArray bytes = input.readAll();
+		if (bytes.size() < 8) {
+			*error = "That ARGB tile is too short.";
+			return false;
+		}
+		auto u32 = [&bytes](int at) {
+			return (quint32)(uchar)bytes[at] | (quint32)(uchar)bytes[at + 1] << 8 |
+				(quint32)(uchar)bytes[at + 2] << 16 | (quint32)(uchar)bytes[at + 3] << 24;
+		};
+		const quint32 w = u32(0), h = u32(4);
+		if (w == 0 || h == 0 || w > 4096 || h > 4096 ||
+				(qint64)bytes.size() != 8 + (qint64)w * h * 4) {
+			*error = "That ARGB tile has an invalid size.";
+			return false;
+		}
+		QSaveFile output(path);
+		if (!output.open(QIODevice::WriteOnly) || output.write(bytes) != bytes.size() ||
+				!output.commit()) {
+			*error = output.errorString().isEmpty() ? "Could not write the theme's artwork."
+				: output.errorString();
+			return false;
+		}
+		return true;
+	}
+	QImage image(source);
+	if (image.isNull() || image.width() < 1 || image.height() < 1 ||
+			image.width() > 4096 || image.height() > 4096 ||
+			(qint64)image.width() * image.height() > 4096LL * 1024) {
+		*error = "That image could not be read, or is too large for a window tile.";
+		return false;
+	}
+	QSaveFile output(path);
+	if (!output.open(QIODevice::WriteOnly)) {
+		*error = output.errorString();
+		return false;
+	}
+	if (argb) {
+		const QImage rgba = image.convertToFormat(QImage::Format_RGBA8888);
+		if (rgba.isNull()) {
+			*error = "That image could not be converted.";
+			return false;
+		}
+		unsigned char head[8] = {
+			(unsigned char)(rgba.width() & 0xFF),
+			(unsigned char)((rgba.width() >> 8) & 0xFF),
+			(unsigned char)((rgba.width() >> 16) & 0xFF),
+			(unsigned char)((rgba.width() >> 24) & 0xFF),
+			(unsigned char)(rgba.height() & 0xFF),
+			(unsigned char)((rgba.height() >> 8) & 0xFF),
+			(unsigned char)((rgba.height() >> 16) & 0xFF),
+			(unsigned char)((rgba.height() >> 24) & 0xFF),
+		};
+		if (output.write((const char *)head, sizeof(head)) != (qint64)sizeof(head)) {
+			output.cancelWriting();
+			*error = output.errorString();
+			return false;
+		}
+		for (int y = 0; y < rgba.height(); ++y) {
+			const uchar *line = rgba.constScanLine(y);
+			const qint64 bytes = (qint64)rgba.width() * 4;
+			if (output.write((const char *)line, bytes) != bytes) {
+				output.cancelWriting();
+				*error = output.errorString();
+				return false;
+			}
+		}
+	} else if (!image.save(&output, "PNG")) {
+		output.cancelWriting();
+		*error = "That image could not be written as a PNG.";
+		return false;
+	}
+	if (!output.commit()) {
+		*error = output.errorString().isEmpty() ? "Could not write the theme's artwork."
+			: output.errorString();
+		return false;
+	}
+	return true;
+}
+
+ThemeArtState themeArtState(const ThemeDraft &draft, const ThemeArtSlot &slot) {
+	const QString value = draft.chrome.value(slot.key);
+	if (!slot.defaultPath.isEmpty()) {
+		if (value == "off") {
+			return ThemeArtState::Platinum;
+		}
+		const QString own = themeBundleFolder(draft.bundleId);
+		const bool own_has_file = !own.isEmpty() &&
+			QFileInfo::exists(own + "/" + slot.defaultPath);
+		const bool base_has_file = !draft.baseBundleDir.isEmpty() &&
+			QFileInfo::exists(draft.baseBundleDir + "/" + slot.defaultPath);
+		if (value == slot.defaultPath) {
+			if (own_has_file) {
+				return ThemeArtState::Custom;
+			}
+			return base_has_file ? ThemeArtState::Inherit : ThemeArtState::Custom;
+		}
+		if (!value.isEmpty()) {
+			return ThemeArtState::Custom;
+		}
+		if (own_has_file) {
+			return ThemeArtState::Custom;
+		}
+		return base_has_file ? ThemeArtState::Inherit : ThemeArtState::Platinum;
+	}
+	const QString inherited = draft.importedChrome.value(slot.key);
+	if (!value.isEmpty() && !inherited.isEmpty() && value == inherited) {
+		return ThemeArtState::Inherit;
+	}
+	return value.isEmpty() ? ThemeArtState::Platinum : ThemeArtState::Custom;
+}
+
+QMap<QString, QString> themePaletteDefaults(bool dark) {
+	if (!dark) {
+		return lightPalette();
+	}
+	static const QMap<QString, QString> colours{
+		{ "title-base", "3A3A3A" }, { "title-stripe-light", "555555" },
+		{ "title-stripe-dark", "242424" }, { "title-text", "FFFFFF" },
+		{ "title-text-inactive", "C8C8C8" }, { "frame-face", "2E2E2E" },
+		{ "frame-face-inactive", "3A3A3A" }, { "frame-light", "555555" },
+		{ "frame-dark", "141414" }, { "frame-border", "000000" },
+		{ "frame-border-inactive", "3A3A3A" }, { "menu-bar", "333333" },
+		{ "menu-bar-text", "FFFFFF" }, { "menu-bar-text-dimmed", "A8A8A8" },
+		{ "menu-bar-text-selected", "FFFFFF" }, { "menu-bar-light", "4A4A4A" },
+		{ "menu-bar-shadow", "1A1A1A" }, { "menu-bar-border", "000000" },
+		{ "menu-background", "2A2A2A" }, { "menu-text", "FFFFFF" },
+		{ "menu-text-dimmed", "999999" }, { "menu-text-selected", "FFFFFF" },
+		{ "menu-border", "000000" }, { "menu-light", "444444" },
+		{ "menu-shadow", "151515" }, { "menu-separator", "666666" },
+		{ "menu-separator-light", "3A3A3A" },
+	};
+	return colours;
+}
+
+bool appearanceThemeIsUser(int index) {
+	if (index < 0 || index >= appearanceThemeCount()) {
+		return false;
+	}
+	const QString bundle = appearanceThemeBundle(index);
+	if (bundle.isEmpty()) {
+		return true; /* a saved settings preset, not an imported bundle */
+	}
+	const QString dir = themeBundleFolder(bundle);
+	return !dir.isEmpty() && readThemeConf(dir).value("user-theme") == "1";
+}
+
+bool themeDraftFromPreset(int index, ThemeDraft *draft, QString *error) {
+	if (!draft || index < 0 || index >= appearanceThemeCount()) {
+		*error = "Choose a theme to edit.";
+		return false;
+	}
+	ThemeDraft d;
+	d.name = appearanceThemeName(index);
+	d.presetPath = appearanceThemePath(index);
+	d.settings = appearanceThemeValues(index);
+	const QString bundle = d.settings.take("theme-bundle");
+	if (!bundle.isEmpty()) {
+		const QString dir = themeBundleFolder(bundle);
+		if (!dir.isEmpty()) {
+			QMap<QString, QString> conf = readThemeConf(dir);
+			migrateMenuArtKeys(conf);
+			d.chrome = conf;
+			if (conf.value("user-theme") == "1") {
+				d.bundleId = bundle;
+				d.inherits = conf.value("inherits");
+				if (!d.inherits.isEmpty()) {
+					d.baseBundleDir = themeBundleFolder(d.inherits);
+					if (!d.baseBundleDir.isEmpty()) {
+						d.importedChrome = readThemeConf(d.baseBundleDir);
+					migrateMenuArtKeys(d.importedChrome);
+					}
+				}
+			} else {
+				d.inherits = bundle;
+				d.linked = true;
+				d.importedChrome = conf;
+				d.baseBundleDir = dir;
+			}
+		}
+	}
+	*draft = d;
+	return true;
+}
+
+bool themeDraftSave(ThemeDraft *draft, int sourceIndex, QString *error) {
+	if (!draft) {
+		*error = "No theme to save.";
+		return false;
+	}
+	draft->name = draft->name.trimmed();
+	if (draft->name.isEmpty()) {
+		*error = "Give the theme a name.";
+		return false;
+	}
+	if (draft->name.size() > 64) {
+		*error = "The theme's name is too long (64 characters at most).";
+		return false;
+	}
+	if (draft->name.startsWith('.') || draft->name.contains('/') || draft->name.contains('\\') ||
+			draft->name.contains('\n') || draft->name.contains('\r')) {
+		*error = "The theme's name cannot start with a dot or contain a slash.";
+		return false;
+	}
+	for (int i = 0; i < appearanceThemeCount(); ++i) {
+		if (i != sourceIndex &&
+				appearanceThemeName(i).compare(draft->name, Qt::CaseInsensitive) == 0) {
+			*error = "A theme with that name already exists. Choose a new name.";
+			return false;
+		}
+	}
+	if (!validateDraftSettings(draft->settings, error)) {
+		return false;
+	}
+	const bool newBundle = draft->bundleId.isEmpty();
+	const QString id = newBundle ? uniqueBundleId(draft->name) : draft->bundleId;
+	if (!validThemeId(id)) {
+		*error = "That theme name cannot be used for its folder. Choose another name.";
+		return false;
+	}
+	QString userDir = themeConfigRoot() + "/" + id;
+	if (!newBundle) {
+		if (QFileInfo(userDir).isSymLink() || !QFileInfo(userDir).isDir() ||
+				readThemeConf(userDir).value("user-theme") != "1") {
+			*error = "Only themes made with the Theme Editor can be changed here.";
+			return false;
+		}
+	}
+	if (!draft->inherits.isEmpty()) {
+		if (draft->inherits == id) {
+			*error = "A theme cannot inherit its own artwork.";
+			return false;
+		}
+		if (themeBundleFolder(draft->inherits).isEmpty()) {
+			*error = "The imported theme this one copies is no longer installed.";
+			return false;
+		}
+	}
+	/* Keep the preset where it is for a user theme or a plain settings
+	 * preset; a linked copy gets its own file, and the import's preset is
+	 * never touched. */
+	const bool updateInPlace = !draft->presetPath.isEmpty() && !draft->linked;
+	QString presetPath = updateInPlace ? draft->presetPath
+		: appearanceThemesFolder() + "/" + id + "/theme.json";
+	if (!withinFolder(presetPath, appearanceThemesFolder()) ||
+			QFileInfo(presetPath).isSymLink()) {
+		*error = "The theme's preset is outside the Theme Files folder.";
+		return false;
+	}
+	if (!QFileInfo(QFileInfo(presetPath).absolutePath()).exists() &&
+			!QDir().mkpath(QFileInfo(presetPath).absolutePath())) {
+		*error = "Could not create the theme's folder.";
+		return false;
+	}
+	std::unique_ptr<QLockFile> lock = lockThemeWrite(error);
+	if (!lock) {
+		return false;
+	}
+	const bool createdBundle = !QFileInfo(userDir).exists();
+	/* Validate every chosen image before anything is written. */
+	const QList<ThemeArtSlot> &artSlots = themeArtSlots();
+	auto slotFor = [&artSlots](const QString &key) -> const ThemeArtSlot * {
+		for (const ThemeArtSlot &slot : artSlots) {
+			if (slot.key == key) {
+				return &slot;
+			}
+		}
+		return nullptr;
+	};
+	for (auto it = draft->artSources.cbegin(); it != draft->artSources.cend(); ++it) {
+		const ThemeArtSlot *slot = slotFor(it.key());
+		const QFileInfo source(it.value());
+		if (!slot) {
+			*error = "The theme names an unknown piece of artwork: " + it.key();
+			return false;
+		}
+		if (source.isSymLink() || !source.isFile() || source.size() > 8 * 1024 * 1024) {
+			*error = "The image chosen for " + slot->label + " is missing or too large.";
+			return false;
+		}
+	}
+	QMap<QString, QString> checked = draft->chrome;
+	if (!validateChrome(checked, error)) {
+		return false;
+	}
+	if (!QDir().mkpath(userDir)) {
+		*error = "Could not create the theme's folder.";
+		return false;
+	}
+	if (QFileInfo(userDir).isSymLink()) {
+		*error = "The theme's folder is a symbolic link; it was left alone.";
+		return false;
+	}
+	/* Custom tiles live beside the theme's theme.conf, so Save is
+	 * self-contained and a copied theme carries its own artwork. */
+	for (auto it = draft->artSources.cbegin(); it != draft->artSources.cend(); ++it) {
+		const ThemeArtSlot *slot = slotFor(it.key());
+		const QString target = "chrome/custom-" + it.key() + (slot->argb ? ".argb" : ".png");
+		if (!themeArtWrite(it.value(), userDir + "/" + target, slot->argb, error)) {
+			if (createdBundle) {
+				QDir(userDir).removeRecursively();
+			}
+			return false;
+		}
+		draft->chrome[it.key()] = target;
+	}
+	if (!writeUserBundle(userDir, *draft, error)) {
+		if (createdBundle) {
+			QDir(userDir).removeRecursively();
+		}
+		return false;
+	}
+	if (!writePreset(presetPath, *draft, id, error)) {
+		if (createdBundle) {
+			QDir(userDir).removeRecursively();
+		}
+		return false;
+	}
+	draft->bundleId = id;
+	draft->presetPath = presetPath;
+	draft->linked = false;
+
+	/* Apply exactly what was saved, without waiting for the catalogue's
+	 * two-second poll (it may be busy importing sounds). */
+	QMap<QString, QString> values;
+	/* Empty values remove the previous theme's choice from desktop.conf,
+	 * just as applying a preset does. */
+	for (const char *key : { "accent", "highlight", "pattern", "wallpaper",
+			"alert-sound", "font-family" }) {
+		values.insert(key, draft->settings.value(key));
+	}
+	values.insert("background", draft->settings.value("background").isEmpty()
+		? QString("pattern") : draft->settings.value("background"));
+	values.insert("wallpaper-mode", draft->settings.value("wallpaper-mode").isEmpty()
+		? QString("fit") : draft->settings.value("wallpaper-mode"));
+	const QString sound = draft->settings.value("sound-theme").isEmpty()
+		? QString("none") : draft->settings.value("sound-theme");
+	values.insert("sound-theme", sound);
+	for (const QString &event : events) {
+		values.insert("sound." + event, "");
+	}
+	for (int i = 0; i < soundThemeCount(); ++i) {
+		if (soundThemeId(i) == sound) {
+			for (auto it = catalog().sounds[i].values.cbegin();
+					it != catalog().sounds[i].values.cend(); ++it) {
+				values.insert(it.key(), it.value());
+			}
+			break;
+		}
+	}
+	values.insert("theme-bundle", id);
+	values.insert("appearance-theme", presetIdForPath(presetPath));
+	if (!writeSettings(values, error)) {
+		return false;
+	}
+	catalog().fingerprint.clear();
+	catalog().refresh();
+	return true;
+}
+
+bool themeDraftDelete(int index, QString *error) {
+	if (index < 0 || index >= appearanceThemeCount()) {
+		*error = "Choose a theme to delete.";
+		return false;
+	}
+	if (!appearanceThemeIsUser(index)) {
+		*error = "Imported themes stay in Theme Files. Edit one to make a copy you can change.";
+		return false;
+	}
+	const QString path = appearanceThemePath(index);
+	if (path.isEmpty()) {
+		*error = "The built-in theme cannot be deleted.";
+		return false;
+	}
+	if (!withinFolder(path, appearanceThemesFolder()) || QFileInfo(path).isSymLink()) {
+		*error = "The theme's preset is outside the Theme Files folder.";
+		return false;
+	}
+	std::unique_ptr<QLockFile> lock = lockThemeWrite(error);
+	if (!lock) {
+		return false;
+	}
+	const QString bundle = appearanceThemeBundle(index);
+	const QString id = appearanceThemeId(index);
+	const bool active = setting("appearance-theme") == id;
+	const QString userDir = themeConfigRoot() + "/" + bundle;
+	if (!bundle.isEmpty() && appearanceThemeIsUser(index) && QFileInfo(userDir).isSymLink()) {
+		*error = "The theme's folder is a symbolic link; it was left alone.";
+		return false;
+	}
+	if (!QFile::remove(path)) {
+		*error = "Could not remove the theme's preset.";
+		return false;
+	}
+	if (!bundle.isEmpty() && appearanceThemeIsUser(index)) {
+		if (QFileInfo(userDir).isDir()) {
+			QFile::remove(userDir + "/theme.conf");
+			const QString chrome = userDir + "/chrome";
+			for (const QFileInfo &file : QDir(chrome).entryInfoList(
+					QStringList("custom-*"), QDir::Files | QDir::Hidden)) {
+				QFile::remove(file.filePath());
+			}
+			QDir().rmdir(chrome);
+			QDir().rmdir(userDir); /* only when nothing else was put there */
+		}
+		const QString folder = appearanceThemesFolder() + "/" + bundle;
+		if (QFileInfo(folder).isDir()) {
+			QDir().rmdir(folder);
+		}
+	}
+	if (active) {
+		QString applyError;
+		if (!applyAppearanceTheme(0, &applyError)) {
+			*error = applyError;
+			return false;
+		}
 	}
 	catalog().fingerprint.clear();
 	catalog().refresh();

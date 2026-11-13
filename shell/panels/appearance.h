@@ -49,6 +49,7 @@ private:
 	QString recordAlertSound();
 	void loadThemes();
 	void paintOptionsTab(pl_canvas *c);
+	void openThemeEditor(int index);
 	/* Options: Mac OS 9's "Double-click title bar to collapse windows"
 	 * (title-collapse, read by zacos9-wm) and Smart Scrolling
 	 * (smart-scrolling: lib/widgets' scroll bars and the Qt style read it;
@@ -66,7 +67,7 @@ private:
 	int m_tab = 0;
 	std::vector<std::unique_ptr<Text>> m_tabLabels;
 	PanelList m_accents, m_highlights, m_patterns, m_wallpapers, m_sounds, m_themes, m_soundThemes;
-	PanelButton m_previewTheme, m_saveTheme, m_addSound;
+	PanelButton m_previewTheme, m_saveTheme, m_addSound, m_newTheme, m_editTheme;
 	PanelEdit m_themeName;
 	PanelSlider m_interfaceVolume;
 	PanelHost m_host{ this };

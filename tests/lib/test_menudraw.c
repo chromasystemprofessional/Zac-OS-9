@@ -171,10 +171,62 @@ static int run_layout_tests(void) {
 	return fails;
 }
 
+static int run_theme_palette_tests(void) {
+	int fails = 0;
+	struct pl_menu_palette palette = { 0 };
+	palette.themed = true;
+	palette.flat_bar = true;
+	palette.bar_face = 0xFF123456u;
+	palette.bar_light = 0xFF234567u;
+	palette.bar_shadow = 0xFF012345u;
+	palette.bar_border = 0xFF000000u;
+	palette.bar_text = 0xFFFFFFFFu;
+	palette.bar_text_dimmed = 0xFF888888u;
+	palette.bar_text_selected = 0xFFFFFFFFu;
+	palette.face = 0xFF222233u;
+	palette.text = 0xFFFFFFFFu;
+	palette.text_dimmed = 0xFF999999u;
+	palette.text_selected = 0xFFFFFFFFu;
+	palette.border = 0xFF000000u;
+	palette.light = 0xFF555566u;
+	palette.shadow = 0xFF111122u;
+	palette.separator = 0xFF666677u;
+	palette.separator_light = 0xFF888899u;
+	const int W = 40;
+	uint32_t *bar = calloc((size_t)W * MBAR_HEIGHT, sizeof(*bar));
+	struct pl_canvas bc = { .px = bar, .stride = W, .width = W, .height = MBAR_HEIGHT };
+	mbar_paint_background_themed(&bc, W, &palette);
+	if (bar[5 * W + 5] != palette.bar_face) {
+		fprintf(stderr, "FAIL themed menu bar face\n");
+		fails++;
+	}
+	if (bar[0] != palette.bar_light ||
+			bar[(MBAR_HEIGHT - 1) * W + W - 1] != palette.bar_border) {
+		fprintf(stderr, "FAIL themed menu bar edges\n");
+		fails++;
+	}
+	free(bar);
+
+	const int mw = 40, mh = 30;
+	uint32_t *menu = calloc((size_t)(mw + 1) * (mh + 1), sizeof(*menu));
+	struct pl_canvas mc = { .px = menu, .stride = mw + 1, .width = mw + 1, .height = mh + 1 };
+	menu_paint_themed(&mc, NULL, 0, mw, mh, -1, PL_ACCENT_DEFAULT, &palette);
+	if (menu[5 * (mw + 1) + 5] != palette.face ||
+			menu[0] != palette.border ||
+			menu[1 * (mw + 1) + 1] != palette.light) {
+		fprintf(stderr, "FAIL themed menu face and edges\n");
+		fails++;
+	}
+	free(menu);
+	printf("%s theme palette\n", fails ? "FAIL" : "ok  ");
+	return fails;
+}
+
 int main(int argc, char *argv[]) {
 	const char *dir = argc > 1 ? argv[1] : "tools/measure/figs";
 	int ran = 0;
 	int fails = run_layout_tests();
+	fails += run_theme_palette_tests();
 	fails += run_menu_bar(dir, &ran);
 	fails += run_edit_menu(dir, &ran);
 	fails += run_help_menu(dir, &ran);
