@@ -90,6 +90,12 @@ works for it:
   `QT_WAYLAND_DISABLE_WINDOWDECORATION=1`, `GTK_THEME=ZacOS9`,
   `QT_STYLE_OVERRIDE=zacos9`, and GTK/Qt portal selection. GTK 3 already took
   our frames before this; it is a safeguard.
+- **Printing from sandboxed programs**: at login `zacos9-session` runs
+  `flatpak override --user --socket=cups`. Software installs Flatpak apps in
+  the user installation, and without the socket a sandbox has no CUPS at all,
+  so an app's own Print dialog lists no printers (Adobe Reader's, for
+  example, offered only "Custom ..."). The user-wide override also reaches
+  system-installed Flatpak apps and merges with the person's own overrides.
 - **GTK 3 theme** `share/themes/ZacOS9/gtk-3.0/gtk.css`, installed to
   `/usr/share/themes`. Adwaita imported as the base, then restyled: grey
   outlined buttons, square corners, sunk white fields, flat grey menu bar and

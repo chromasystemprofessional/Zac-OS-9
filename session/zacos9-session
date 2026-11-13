@@ -117,6 +117,15 @@ if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
 	fi
 fi
 
+# Printing from sandboxed programs: Flatpak keeps CUPS out of an app unless
+# the app asks for the cups socket, and an app's own Print dialog then lists
+# no printers at all (Adobe Reader's, for one). Software installs Flatpak
+# programs for the user, so a user-wide override reaches them; merging it
+# leaves a person's own Flatpak settings alone.
+if command -v flatpak >/dev/null 2>&1; then
+	timeout 10 flatpak override --user --socket=cups >/dev/null 2>&1 || true
+fi
+
 state="${XDG_STATE_HOME:-$HOME/.local/state}/zacos9"
 mkdir -p "$state"
 [ -f "$state/session.log" ] && mv -f "$state/session.log" "$state/session.log.old"

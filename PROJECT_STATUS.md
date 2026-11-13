@@ -41,6 +41,9 @@ This page is what's true now and what's next. What changed and when is in
   printers appear before their first job, one printer over USB and Wi-Fi is one
   row, and a theme dropped on the desktop now copies the System Folder it needs
   so it gets its Apple menu icon.
+- **Printing reaches sandboxed programs.** The session gives Flatpak apps the
+  CUPS socket at login, so a program's own Print dialog lists the printer the
+  desktop prints with instead of offering no printers at all.
 - **1.7.6 repairs the System Folder copied from Old Dog's disk.** A
   kernel-mounted HFS volume exposes only data forks, so the copy had no
   resource fork and themes showed the theme file's document icon. The copy is
