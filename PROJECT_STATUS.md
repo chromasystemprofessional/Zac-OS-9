@@ -93,6 +93,16 @@ hotkey and local semantic search — are not scheduled
 item: [`docs/system-folder.md`](docs/system-folder.md) has every item, what
 ZacOS has for it, and the order. All six items are done.
 
+**Themes**: the Appearance panel's Themes tab has **New Theme…** and **Edit
+Theme…**. The Theme Editor writes a user bundle and preset with window, menu,
+accent and highlight colours, desktop art, sounds and font; it includes light
+and dark starting palettes and a live preview. **Artwork…** edits each
+title-bar tile, button, frame edge, pop-up tab and menu skin as inherited,
+Platinum or a user image, with undo and redo. Editing an imported Mac OS 9
+theme makes a linked copy (`inherits=`) that reuses its artwork, so imports
+are never rewritten. Imported themes, presets and user themes share the same
+gallery ([Themes](docs/themes.md#theme-editor)).
+
 **Monitors**: each screen's resolution, pixel size and rotation are
 applied live (`compositor/src/prefs.c`): rotation is
 `display.NAME.rotation` (0, 90, 180 or 270 degrees), the layout uses the

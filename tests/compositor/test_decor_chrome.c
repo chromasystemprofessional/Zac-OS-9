@@ -6,6 +6,7 @@
  * Platinum.
  */
 #include <assert.h>
+#include <cairo.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -41,6 +42,22 @@ static void write_file(const char *path, const char *text) {
 	assert(f);
 	assert(fputs(text, f) >= 0);
 	fclose(f);
+}
+
+/* A small opaque PNG for the frame-skin keys. */
+static void write_png(const char *path, int w, int h, uint32_t argb) {
+	cairo_surface_t *surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, w, h);
+	assert(cairo_surface_status(surface) == CAIRO_STATUS_SUCCESS);
+	unsigned char *data = cairo_image_surface_get_data(surface);
+	const int stride = cairo_image_surface_get_stride(surface);
+	for (int y = 0; y < h; y++) {
+		for (int x = 0; x < w; x++) {
+			memcpy(data + y * stride + x * 4, &argb, 4);
+		}
+	}
+	cairo_surface_mark_dirty(surface);
+	assert(cairo_surface_write_to_png(surface, path) == CAIRO_STATUS_SUCCESS);
+	cairo_surface_destroy(surface);
 }
 
 static uint32_t *render(const struct decor_state *st, int *w, int *h) {
@@ -204,6 +221,89 @@ int main(void) {
 	assert(decor_hit(&st, 10, 10) == DECOR_PART_CLOSE);
 	assert(decor_hit(&st, 270, 10) == DECOR_PART_ZOOM);
 	assert(decor_hit(&st, 200, 10) == DECOR_PART_DRAG);
+	free(px);
+
+	/* A dark theme without chrome art: flat colours and readable ink. The
+	 * inactive frame follows the active colour instead of Platinum grey. */
+	char bundle4[4096], conf4[4096];
+	snprintf(bundle4, sizeof(bundle4), "%s/config/zacos9/themes/Dark", home);
+	snprintf(conf4, sizeof(conf4), "%s/config/zacos9/themes/Dark/theme.conf", home);
+	assert(mkdir(bundle4, 0755) == 0);
+	write_file(conf4,
+		"name=Dark\n"
+		"title-base=202020\n"
+		"title-stripe-light=202020\n"
+		"title-stripe-dark=202020\n"
+		"frame-face=303030\n"
+		"frame-light=404040\n"
+		"frame-dark=101010\n"
+		"frame-border=000000\n");
+	write_file(desk, "theme-bundle=Dark\n");
+	st.style = DECOR_STYLE_DOCUMENT;
+	st.has_close = st.has_zoom = st.has_collapse = false;
+	struct plat_text *dark_title = text_render("Aa", 100);
+	st.title = dark_title;
+	st.active = true;
+	px = render(&st, &w, &h);
+	assert(px[5 * w + 80] == 0xFF202020u);           /* title base */
+	assert(px[60 * w + 2] == 0xFF303030u);           /* frame face */
+	bool found_white = false;
+	for (int y = 0; y < 22 && !found_white; y++) {
+		for (int x = 1; x < 299; x++) {
+			if (px[y * w + x] == 0xFFFFFFFFu) {
+				found_white = true; /* auto-contrast title ink */
+			}
+		}
+	}
+	assert(found_white);
+	st.active = false;
+	px = render(&st, &w, &h);
+	assert(px[60 * w + 2] == 0xFF414141u);           /* face, 8% to white */
+	bool found_dim = false;
+	for (int y = 0; y < 22 && !found_dim; y++) {
+		for (int x = 1; x < 299; x++) {
+			if (px[y * w + x] == 0xFFB1B1B1u) {
+				found_dim = true; /* white ink dimmed toward the bar */
+			}
+		}
+	}
+	assert(found_dim);
+	free(px);
+	text_destroy(dark_title);
+	st.title = NULL;
+	st.active = true;
+
+	/* Frame-skin keys: a PNG edge paints, "off" returns to the face. */
+	char chrome4[4200], skin[4400];
+	snprintf(chrome4, sizeof(chrome4), "%s/chrome", bundle4);
+	assert(mkdir(chrome4, 0755) == 0);
+	snprintf(skin, sizeof(skin), "%s/doc-left.png", chrome4);
+	write_png(skin, 4, 4, 0xFF00FF00u);
+	write_file(conf4,
+		"name=Dark\n"
+		"title-base=202020\n"
+		"title-stripe-light=202020\n"
+		"title-stripe-dark=202020\n"
+		"frame-face=303030\n"
+		"frame-light=404040\n"
+		"frame-dark=101010\n"
+		"frame-border=000000\n"
+		"document-left=chrome/doc-left.png\n");
+	px = render(&st, &w, &h);
+	assert(px[60 * w + 2] == 0xFF00FF00u);
+	free(px);
+	write_file(conf4,
+		"name=Dark\n"
+		"title-base=202020\n"
+		"title-stripe-light=202020\n"
+		"title-stripe-dark=202020\n"
+		"frame-face=303030\n"
+		"frame-light=404040\n"
+		"frame-dark=101010\n"
+		"frame-border=000000\n"
+		"document-left=off\n");
+	px = render(&st, &w, &h);
+	assert(px[60 * w + 2] == 0xFF303030u);
 	free(px);
 
 	printf("decor-chrome: ok\n");

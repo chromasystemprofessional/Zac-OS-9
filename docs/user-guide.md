@@ -192,9 +192,11 @@ supported.
 
 ## Custom desktop patterns
 
-Appearance also supports saved appearance presets and interface sound sets.
-Use its **Themes** and **Sound Sets** tabs, with custom files under
-**System Folder > Appearance > Theme Files** or **Sound Themes**.
+Appearance also supports saved appearance presets, user themes and interface
+sound sets. Use its **Themes** and **Sound Sets** tabs, with custom files under
+**System Folder > Appearance > Theme Files** or **Sound Themes**. **New
+Theme…** and **Edit Theme…** open the Theme Editor, which can create a dark
+theme and edit an imported Mac OS 9 theme without changing the import.
 See [Themes and sound sets](themes.md) for formats and compatibility limits.
 
 Place your own or freely licensed tiles in **System Folder > Appearance >

@@ -2,8 +2,12 @@
 
 /*
  * ZacOS themes: a directory containing a theme.conf (key=value) plus
- * icons/, patterns/ and sounds/. Step 1 of the theming feature only defines
- * the bundle format and a reader; no theme ships yet.
+ * icons/, patterns/ and sounds/.
+ *
+ * A user theme is a bundle the Theme Editor writes. Its theme.conf may name
+ * another bundle with "inherits=<id>": its own files win, and the inherited
+ * bundle supplies the artwork (icons, chrome, cursors, fonts) it does not
+ * carry. One level only; an inherited bundle's own "inherits" is ignored.
  */
 
 #include <stdbool.h>
@@ -52,6 +56,17 @@ bool zac_theme_color(const char *key, uint32_t *out);
 /* Read a raw string value from the active theme's theme.conf. Returns
  * false (leaving out untouched) when the key is unset or too long. */
 bool zac_theme_string(const char *key, char *out, size_t size);
+
+/* Pick ink that reads on `background`: white on a dark fill, black on a
+ * light one. */
+uint32_t zac_ink_for(uint32_t background);
+
+/* Read a colour `key`; when it is unset, pick ink that reads on
+ * `background`. `out` is always set. True when the key itself was used. */
+bool zac_theme_ink(const char *key, uint32_t background, uint32_t *out);
+
+/* Blend two opaque colours: 0 keeps `from`, 100 gives `to`. */
+uint32_t zac_blend(uint32_t from, uint32_t to, int percent);
 
 #ifdef __cplusplus
 }

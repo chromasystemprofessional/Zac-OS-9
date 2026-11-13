@@ -42,6 +42,7 @@
 #include "menubar.h"
 #include "platinum-shell-v1-client-protocol.h"
 #include "settings.h"
+#include "theme.h"
 #include "viewporter-client-protocol.h"
 #include "virtual-keyboard-unstable-v1-client-protocol.h"
 #include "wlr-foreign-toplevel-management-unstable-v1-client-protocol.h"
@@ -258,6 +259,55 @@ static struct mbar_title *open_title_ptr(void) {
 		: &g.model.right_titles[g.open_index];
 }
 
+/* The theme's menu colours, when it names any. A theme from the editor
+ * names all of them; an imported one usually names none and keeps the
+ * Platinum drawing exactly. */
+static bool menu_palette(struct pl_menu_palette *p) {
+	memset(p, 0, sizeof(*p));
+	uint32_t v;
+	bool any = false;
+	static const char *const keys[] = {
+		"menu-bar", "menu-bar-text", "menu-bar-text-dimmed",
+		"menu-bar-text-selected", "menu-bar-light", "menu-bar-shadow",
+		"menu-bar-border", "menu-background", "menu-text",
+		"menu-text-dimmed", "menu-text-selected", "menu-border", "menu-light",
+		"menu-shadow", "menu-separator", "menu-separator-light",
+	};
+	for (size_t i = 0; i < sizeof(keys) / sizeof(keys[0]); i++) {
+		if (zac_theme_color(keys[i], &v)) {
+			any = true;
+		}
+	}
+	if (!any) {
+		return false;
+	}
+	const uint32_t white = 0xFFFFFFFFu, black = 0xFF000000u, ddd = 0xFFDDDDDDu;
+	p->bar_face = zac_theme_color("menu-bar", &v) ? v : ddd;
+	p->flat_bar = zac_theme_color("menu-bar", &v);
+	zac_theme_ink("menu-bar-text", p->bar_face, &p->bar_text);
+	p->bar_text_selected = zac_theme_color("menu-bar-text-selected", &v) ? v : white;
+	p->bar_text_dimmed = zac_theme_color("menu-bar-text-dimmed", &v) ? v
+		: zac_blend(p->bar_text, p->bar_face, 45);
+	p->bar_light = zac_theme_color("menu-bar-light", &v) ? v
+		: zac_blend(p->bar_face, white, 30);
+	p->bar_shadow = zac_theme_color("menu-bar-shadow", &v) ? v
+		: zac_blend(p->bar_face, black, 18);
+	p->bar_border = zac_theme_color("menu-bar-border", &v) ? v : black;
+	p->face = zac_theme_color("menu-background", &v) ? v : ddd;
+	zac_theme_ink("menu-text", p->face, &p->text);
+	p->text_selected = zac_theme_color("menu-text-selected", &v) ? v : white;
+	p->text_dimmed = zac_theme_color("menu-text-dimmed", &v) ? v
+		: zac_blend(p->text, p->face, 45);
+	p->border = zac_theme_color("menu-border", &v) ? v : black;
+	p->light = zac_theme_color("menu-light", &v) ? v : zac_blend(p->face, white, 35);
+	p->shadow = zac_theme_color("menu-shadow", &v) ? v : zac_blend(p->face, black, 20);
+	p->separator = zac_theme_color("menu-separator", &v) ? v
+		: zac_blend(p->text, p->face, 55);
+	p->separator_light = zac_theme_color("menu-separator-light", &v) ? v : p->light;
+	p->themed = true;
+	return true;
+}
+
 /* One bar with a model laid out for its width; an open menu's title
  * highlighted on the active bar only. */
 static void paint_bar(struct bar *b, const struct mb_bar *model) {
@@ -269,12 +319,14 @@ static void paint_bar(struct bar *b, const struct mb_bar *model) {
 		return;
 	}
 	struct pl_canvas c = canvas_for(px, b->width, MBAR_HEIGHT, b->quarters);
-	mbar_paint_background(&c, b->width);
+	struct pl_menu_palette palette;
+	const struct pl_menu_palette *pal = menu_palette(&palette) ? &palette : NULL;
+	mbar_paint_background_themed(&c, b->width, pal);
 	const bool here = b == g.active;
 	int hl = here && g.open_side == SIDE_LEFT ? g.open_index : -1;
 	int hr = here && g.open_side == SIDE_RIGHT ? g.open_index : -1;
-	mbar_paint_titles(&c, model->left_titles, model->n_left, hl, pl_accent_current());
-	mbar_paint_titles(&c, model->right_titles, model->n_right, hr, pl_accent_current());
+	mbar_paint_titles_themed(&c, model->left_titles, model->n_left, hl, pl_accent_current(), pal);
+	mbar_paint_titles_themed(&c, model->right_titles, model->n_right, hr, pl_accent_current(), pal);
 	present_at(b->surface, b->viewport, &c, 0, 0, b->scale, b->quarters);
 	free(px);
 }
@@ -377,7 +429,9 @@ static void draw_submenu(struct menu_item *parent_items, int parent_n) {
 	uint32_t *px = calloc((size_t)w * h, sizeof(*px));
 	struct pl_canvas c = canvas_for(px, w, h, g.quarters);
 	int sel = g.blinks_left > 0 && g.chosen_in_sub && !g.blink_on ? -1 : g.sub_selected;
-	menu_paint(&c, items, s->n, g.sub_w, g.sub_h, sel, pl_accent_current());
+	struct pl_menu_palette palette;
+	const struct pl_menu_palette *pal = menu_palette(&palette) ? &palette : NULL;
+	menu_paint_themed(&c, items, s->n, g.sub_w, g.sub_h, sel, pl_accent_current(), pal);
 	paint_icons(&c, s, items);
 	wl_subsurface_set_position(g.sub_sub, g.sub_x, g.sub_y);
 	present(g.sub_surface, g.sub_viewport, &c, g.sub_x, g.sub_y);
@@ -475,7 +529,9 @@ static void draw_menu(void) {
 	uint32_t *px = calloc((size_t)w * h, sizeof(*px));
 	struct pl_canvas c = canvas_for(px, w, h, g.quarters);
 	int sel = g.blinks_left > 0 && !g.chosen_in_sub && !g.blink_on ? -1 : g.selected;
-	menu_paint(&c, items, m->n, g.menu_w, g.menu_h, sel, pl_accent_current());
+	struct pl_menu_palette palette;
+	const struct pl_menu_palette *pal = menu_palette(&palette) ? &palette : NULL;
+	menu_paint_themed(&c, items, m->n, g.menu_w, g.menu_h, sel, pl_accent_current(), pal);
 	paint_icons(&c, m, items);
 
 	wl_subsurface_set_position(g.menu_sub, g.menu_x, g.menu_y);

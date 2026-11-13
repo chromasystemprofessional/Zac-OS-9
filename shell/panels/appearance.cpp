@@ -25,6 +25,7 @@
 #include "custompatterns.h"
 #include "customthemes.h"
 #include "settings.h"
+#include "themeeditor.h"
 
 /* The window, its tab control, and the layout inside a pane following
  * the HIG's group box measurements (figure 3-29). */
@@ -341,6 +342,12 @@ AppearancePanel::AppearancePanel() {
 		saveAppearanceTheme(m_themeName.text, &m_themeError);
 		update();
 	};
+	m_newTheme = PanelButton("New Theme...", QRect(BOX_L + ITEM_INSET, H - 42, 100, 22));
+	m_newTheme.hint = "Creates a theme with its own window and menu colours, desktop, sounds and font.";
+	m_newTheme.clicked = [this] { openThemeEditor(-1); };
+	m_editTheme = PanelButton("Edit Theme...", QRect(BOX_L + ITEM_INSET + 108, H - 42, 100, 22));
+	m_editTheme.hint = "Changes the selected theme. Imported Mac OS 9 themes are copied, so the import stays as it is.";
+	m_editTheme.clicked = [this] { openThemeEditor(m_themes.state.selected); };
 	m_themes.picked = [this](int i) {
 		m_themeError.clear();
 		if (applyAppearanceTheme(i, &m_themeError)) {
@@ -404,6 +411,16 @@ void AppearancePanel::loadAlertSounds() {
 	m_sounds.setItems(names);
 }
 
+/* The Theme Editor is its own top-level window: the Appearance panel can
+ * be closed while it is open. It deletes itself when closed. */
+void AppearancePanel::openThemeEditor(int index) {
+	auto *editor = new ThemeEditorWindow(index);
+	editor->setAttribute(Qt::WA_DeleteOnClose);
+	editor->show();
+	editor->raise();
+	editor->activateWindow();
+}
+
 void AppearancePanel::loadThemes() {
 	QStringList names;
 	int selected = 0;
@@ -461,7 +478,7 @@ void AppearancePanel::showTab(int tab) {
 	m_host.checks = m_tab == 2 ? std::vector<PanelCheckbox *>{ &m_smoothFonts }
 		: m_tab == 5 ? std::vector<PanelCheckbox *>{ &m_titleCollapse, &m_smartScrolling }
 		: std::vector<PanelCheckbox *>{};
-	m_host.buttons = m_tab == 0 ? std::vector<PanelButton *>{ &m_saveTheme }
+	m_host.buttons = m_tab == 0 ? std::vector<PanelButton *>{ &m_newTheme, &m_editTheme, &m_saveTheme }
 		: m_tab == 4 ? std::vector<PanelButton *>{ &m_previewTheme, &m_addSound }
 		: std::vector<PanelButton *>{};
 	m_host.edits = {};
@@ -700,17 +717,20 @@ static QImage galleryTile(const QString &bundleDir, const QString &rel) {
 		return QImage();
 	}
 	const QString path = bundleDir + "/" + rel;
-	if (cache.contains(path)) {
-		return cache.value(path);
+	const QFileInfo info(path);
+	const QString key = path + "|" + QString::number(info.size()) + "|" +
+		QString::number(info.lastModified().toMSecsSinceEpoch());
+	if (cache.contains(key)) {
+		return cache.value(key);
 	}
 	QFile f(path);
 	if (!f.open(QIODevice::ReadOnly)) {
-		cache.insert(path, QImage());
+		cache.insert(key, QImage());
 		return QImage();
 	}
 	unsigned char head[8];
 	if (f.read((char *)head, 8) != 8) {
-		cache.insert(path, QImage());
+		cache.insert(key, QImage());
 		return QImage();
 	}
 	const uint32_t w = (uint32_t)head[0] | (uint32_t)head[1] << 8 |
@@ -718,19 +738,19 @@ static QImage galleryTile(const QString &bundleDir, const QString &rel) {
 	const uint32_t h = (uint32_t)head[4] | (uint32_t)head[5] << 8 |
 		(uint32_t)head[6] << 16 | (uint32_t)head[7] << 24;
 	if (w == 0 || h == 0 || w > 512 || h > 512 || (uint64_t)w * h > 256 * 256) {
-		cache.insert(path, QImage());
+		cache.insert(key, QImage());
 		return QImage();
 	}
 	QImage img((int)w, (int)h, QImage::Format_ARGB32);
 	for (uint32_t i = 0; i < w * h; ++i) {
 		unsigned char b[4];
 		if (f.read((char *)b, 4) != 4) {
-			cache.insert(path, QImage());
+			cache.insert(key, QImage());
 			return QImage();
 		}
 		img.setPixel((int)(i % w), (int)(i / w), qRgba(b[0], b[1], b[2], b[3]));
 	}
-	cache.insert(path, img);
+	cache.insert(key, img);
 	return img;
 }
 
@@ -775,6 +795,13 @@ static uint32_t galleryHex(const QString &s, uint32_t fallback) {
 	return ok ? (0xFF000000u | v) : fallback;
 }
 
+static uint32_t galleryInk(uint32_t background) {
+	const int r = (int)((background >> 16) & 0xFF);
+	const int g = (int)((background >> 8) & 0xFF);
+	const int b = (int)(background & 0xFF);
+	return (r * 299 + g * 587 + b * 114) / 1000 < 128 ? C_WHITE : C_BLACK;
+}
+
 /* The mini window's title bar in the theme's own chrome. Returns the
  * title height (22, or 38 with Aqua's blue span). */
 static int paintMiniTitleBar(pl_canvas *c, int wx, int wy, int ww,
@@ -786,6 +813,10 @@ static int paintMiniTitleBar(pl_canvas *c, int wx, int wy, int ww,
 	const QImage btnClose = galleryTile(bundleDir, conf.value("button-close"));
 	const QImage btnZoom = galleryTile(bundleDir, conf.value("button-zoom"));
 	const QImage btnGrow = galleryTile(bundleDir, conf.value("button-grow"));
+	const uint32_t titleBase = galleryHex(conf.value("title-base"), 0xFFEEEEEEu);
+	const uint32_t titleInk = conf.contains("title-text")
+		? galleryHex(conf.value("title-text"), galleryInk(titleBase))
+		: galleryInk(titleBase);
 	const bool hasBar = !barMiddle.isNull();
 	const bool leftCluster = conf.value("title-cluster") == "left";
 	const bool hasSpan = leftCluster && !barSpan.isNull();
@@ -827,7 +858,7 @@ static int paintMiniTitleBar(pl_canvas *c, int wx, int wy, int ww,
 				blitImage(c, btnClose, wx + closeX + (12 + 1 - btnClose.width()) / 2,
 					wy + 4 + (12 + 1 - btnClose.height()) / 2);
 			}
-			pl_text(c, aa.t, wx + titleX, wy + 15, C_BLACK);
+			pl_text(c, aa.t, wx + titleX, wy + 15, titleInk);
 			if (!btnZoom.isNull()) {
 				blitImage(c, btnZoom, wx + zoomX + (12 + 1 - btnZoom.width()) / 2,
 					wy + 4 + (12 + 1 - btnZoom.height()) / 2);
@@ -867,7 +898,7 @@ static int paintMiniTitleBar(pl_canvas *c, int wx, int wy, int ww,
 	}
 	/* Platinum fallback: title-base fill, stripes around a centred Aa,
 	 * close box left, zoom/grow boxes right. */
-	const uint32_t base = galleryHex(conf.value("title-base"), 0xFFEEEEEEu);
+	const uint32_t base = titleBase;
 	const uint32_t light = galleryHex(conf.value("title-stripe-light"), C_WHITE);
 	const uint32_t dark = galleryHex(conf.value("title-stripe-dark"), 0xFF777777u);
 	pl_fill(c, wx, wy, wx + ww - 1, wy + 21, base);
@@ -903,7 +934,7 @@ static int paintMiniTitleBar(pl_canvas *c, int wx, int wy, int ww,
 	pl_hline(c, wx + ww - 17, wx + ww - 6, wy + 15, C_BLACK);
 	pl_vline(c, wx + ww - 17, wy + 4, wy + 15, C_BLACK);
 	pl_vline(c, wx + ww - 6, wy + 4, wy + 15, C_BLACK);
-	pl_text(c, aa.t, titleL, wy + 15, C_BLACK);
+	pl_text(c, aa.t, titleL, wy + 15, titleInk);
 	return 22;
 }
 
@@ -1045,19 +1076,15 @@ void AppearancePanel::paintThemesTab(pl_canvas *c) {
 		? appearanceThemeName(m_themes.state.selected) : QString("None");
 	{
 		Text cur("Current Theme: " + current, BOX_R - BOX_L, PL_FONT_SYSTEM);
-		pl_text(c, cur.t, BOX_L + 4, m_galleryRect.bottom() + 16, C_BLACK);
+		pl_text(c, cur.t, BOX_L + 4, m_galleryRect.bottom() + 14, C_BLACK);
 	}
-	panelText(c, "To create a new theme, modify the settings in the following sections.",
-		BOX_L + 4, m_galleryRect.bottom() + 30, PL_FONT_VIEWS);
 	m_host.paintControls(c, PANE);
 	const QStringList errors = customThemeErrors();
-	if (!m_themeError.isEmpty() || !errors.isEmpty()) {
-		panelText(c, !m_themeError.isEmpty() ? m_themeError : errors.first(),
-			BOX_L + 4, H - 24, PL_FONT_VIEWS, C_BLACK, BOX_R - BOX_L);
-	} else {
-		panelText(c, "Tip: drop a Mac OS 9 theme onto the System Folder and it files itself into Theme Files.",
-			BOX_L + 4, H - 24, PL_FONT_VIEWS, C_BLACK, BOX_R - BOX_L);
-	}
+	const QString status = !m_themeError.isEmpty() ? m_themeError
+		: !errors.isEmpty() ? errors.first()
+		: "Tip: drop a Mac OS 9 theme on the System Folder to install it.";
+	panelText(c, status, BOX_L + 4, m_galleryRect.bottom() + 26, PL_FONT_VIEWS, C_BLACK,
+		BOX_R - BOX_L - 220);
 }
 
 /* GTK programs read their font from gsettings (the session runs no

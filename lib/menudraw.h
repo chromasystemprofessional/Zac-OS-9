@@ -59,11 +59,28 @@ struct mbar_title {
 void mbar_layout_left(struct mbar_title *titles, int n);
 void mbar_layout_right(struct mbar_title *titles, int n, int screen_w);
 
+/* The colours a themed menu bar and menus draw with. A caller fills it
+ * from the active theme's theme.conf; NULL keeps the Platinum palette. */
+struct pl_menu_palette {
+	bool themed;   /* any theme menu colour is in use */
+	bool flat_bar; /* the theme names menu-bar: draw it flat, no gradient corners */
+	uint32_t bar_face, bar_text, bar_text_dimmed, bar_text_selected;
+	uint32_t bar_light, bar_shadow, bar_border;
+	uint32_t face, text, text_dimmed, text_selected;
+	uint32_t border, light, shadow;
+	uint32_t separator, separator_light;
+};
+
 /* Paint the bar (rows 0..19) across screen_w, with titles. highlighted is
  * an index into titles, or -1. Several arrays can be painted in turn. */
 void mbar_paint_background(struct pl_canvas *c, int screen_w);
+void mbar_paint_background_themed(struct pl_canvas *c, int screen_w,
+		const struct pl_menu_palette *palette);
 void mbar_paint_titles(struct pl_canvas *c, const struct mbar_title *titles,
 		int n, int highlighted, struct pl_accent accent);
+void mbar_paint_titles_themed(struct pl_canvas *c, const struct mbar_title *titles,
+		int n, int highlighted, struct pl_accent accent,
+		const struct pl_menu_palette *palette);
 /* The title whose handle is at x, or -1. */
 int mbar_handle_at(const struct mbar_title *titles, int n, int x);
 int mbar_title_at(const struct mbar_title *titles, int n, int x);
@@ -86,6 +103,9 @@ void menu_measure(const struct menu_item *items, int n, int *width, int *height)
  * (one extra column and row). */
 void menu_paint(struct pl_canvas *c, const struct menu_item *items, int n,
 		int width, int height, int selected, struct pl_accent accent);
+void menu_paint_themed(struct pl_canvas *c, const struct menu_item *items, int n,
+		int width, int height, int selected, struct pl_accent accent,
+		const struct pl_menu_palette *palette);
 /* Item index at menu-local y, or -1 (separators and borders count as -1). */
 int menu_item_at(const struct menu_item *items, int n, int height, int y);
 /* Menu-local y of item i's top row. */

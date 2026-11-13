@@ -53,7 +53,7 @@ Of 31 items: 17 working, 6 partial, 0 view only, 8 missing.
 
 | Mac OS item | What it did | ZacOS today | Its home | Idea | Size |
 |---|---|---|---|---|---|
-| Appearance (8.0) | Desktop Pictures, Sound Sets, Theme Files. | Working | `shell/panels/appearance.cpp`, `customthemes.cpp` | – | – |
+| Appearance (8.0) | Desktop Pictures, Sound Sets, Theme Files. | Working, with a Theme Editor | `shell/panels/appearance.cpp`, `customthemes.cpp`, `themeeditor.cpp` | – | – |
 | Fonts (7.1) | Drop a font in to install it. | Working | `shell/files/fonts.cpp` | – | – |
 | Alert sounds (in System, 7.0) | Drag a sound in and the Sound panel offered it. | Working: drop a WAVE recording into Sounds | `lib/settings.c`, `shell/panels/sound.cpp`, `shell/files/resources.cpp`, `shell/finder/fileops.cpp` | – | – |
 | Keyboard layouts (in System, 7.0) | Each layout a resource in the System file. | Missing | `shell/panels/xkblayouts.cpp` | A read-only *Keyboard Layouts* folder; opening one opens the Keyboard panel with it chosen. | S |
