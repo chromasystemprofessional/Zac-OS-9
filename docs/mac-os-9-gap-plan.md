@@ -617,7 +617,7 @@ alongside the others; most are small.
 | 9.3 ✅ | **Zac menu**: folders in Menu Items sprout submenus (verify), and Zac Menu Options' submenus on/off | `shell/menubar/launch.c`, `shell/panels/` | S |
 | 9.4 ✅ | **Appearance ▸ Fonts**: the Views font size and font smoothing, for Qt and GTK programs (the bitmap system fonts stay fixed) | `appearance.cpp`, Qt style, GTK settings | M |
 | 9.5 ✅ | **Find criteria**: comments, version, invisible, custom icon | `shell/files/findcriteria.cpp` | S |
-| 9.6 ✅ | **Printing through programs**: File ▸ Print, and Print in an icon's contextual menu, open other documents in their program with its print action | Sniffer, `shell/print/` | M |
+| 9.6 ✅ | **Printing through programs**: File ▸ Print, and Print in an icon's contextual menu, open other documents in their program with its print action; the program's own Print dialog lists the chosen printer, including in a Flatpak sandbox (the session gives Flatpak apps the CUPS socket) | Sniffer, `shell/print/`, `session/` | M |
 | 9.7 ✅ | **Menu and Pack details**: a ⇧ glyph so Log Out shows ⇧⌘Q; dragging the Pack's edge sets its width | `lib/menudraw.c`, `shell/pack/` | S |
 | 9.8 ✅ | **Scribble**: styled text, and Speech (after 6.5) | `shell/scribble/` | M |
 | 9.9 ✅ | **Several screens**: arrangement in Monitors, the desktop and menu bar per screen, pop-up tabs on any screen; then video mirroring (7.7) | compositor, Monitors panel, Sniffer | L |
