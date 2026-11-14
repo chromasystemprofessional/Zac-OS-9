@@ -38,9 +38,13 @@ The serial port is also blocked on that guest. SheepShaver's output driver
 (`.AOut`) returns `openErr` (-23) because it needs `DriverServicesLib`; the Mac
 OS 9 install used for testing does not provide that library, so the serial
 bridge process never starts. A TCP bridge over the emulator's NAT is the next
-candidate: a prototype connected to `10.0.2.2` and carried request/ack lines,
-but the test guest did not show the launched applications. Verify visible app
-launching on the target guest before relying on it.
+candidate. On a repaired Mac OS 9 guest, a prototype connected to
+`10.0.2.2`, launched SimpleText, and displayed its window. A second request
+still timed out: after the app switch, MacTCP's synchronous receive and close
+calls stopped returning. A permanent asynchronous receive using a raw
+completion routine crashed the guest. The next attempt should use Open
+Transport or a correctly built asynchronous completion UPP, not a blocking
+MacTCP receive loop.
 
 The prototype also only opens applications that are files in the shared home
 folder, with plain ASCII names and no colon. Applications inside a guest disk

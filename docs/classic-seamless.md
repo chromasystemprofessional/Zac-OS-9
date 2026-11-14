@@ -189,9 +189,12 @@ guest failure does not yet reach a ZacOS alert. The shared-folder queue cannot
 deliver later requests: the guest File Manager keeps a cached view of the
 volume after boot. The serial-port attempt is blocked because SheepShaver's
 `.AOut` driver needs `DriverServicesLib`, which the test Mac OS 9 install does
-not provide. The next candidate is a TCP bridge over the emulator's NAT; a
-prototype carried request/ack lines, but visible app launching still needs
-validation on the target guest.
+not provide. The next candidate is a TCP bridge over the emulator's NAT. On a
+repaired Mac OS 9 guest, a prototype launched SimpleText and displayed its
+window, but a second request timed out because MacTCP's receive and close calls
+stopped returning after the app switch. A permanent asynchronous receive with
+a raw completion routine crashed the guest. The next attempt should use Open
+Transport or a correctly built asynchronous completion UPP.
 
 ### 2. Opt-in independent document windows
 
