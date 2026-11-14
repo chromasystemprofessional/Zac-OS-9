@@ -274,6 +274,7 @@
 {prefix}/share/zacos9/whatsnew/1.18.4.txt
 {prefix}/share/zacos9/whatsnew/1.18.5.txt
 {prefix}/share/zacos9/whatsnew/1.18.6.txt
+{prefix}/share/zacos9/whatsnew/1.18.7.txt
 {prefix}/share/zacos9/whatsnew/1.7.0.txt
 {prefix}/share/zacos9/whatsnew/1.7.1.txt
 {prefix}/share/zacos9/whatsnew/1.7.2.txt
