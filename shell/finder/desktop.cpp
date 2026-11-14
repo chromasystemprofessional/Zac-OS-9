@@ -752,12 +752,16 @@ void Desktop::mousePressEvent(QMouseEvent *e) {
 		m_renameItem = hit;
 		m_renameTimer.start(QApplication::doubleClickInterval());
 	}
+	/* Checked before the loop: once it selects the icon, testing
+	 * hit->selected would stop it clearing the icons after it, and a
+	 * drag would carry their stale selection along too. */
+	const bool hitSelected = hit && hit->selected;
 	for (Item *item : allItems()) {
 		if (extend) {
 			if (item == hit) {
 				item->selected = !item->selected;
 			}
-		} else if (!hit || !hit->selected) {
+		} else if (!hitSelected) {
 			/* Pressing a selected icon keeps the selection, to drag them all. */
 			item->selected = item == hit;
 		}

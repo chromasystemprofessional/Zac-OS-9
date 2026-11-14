@@ -700,6 +700,21 @@ int main(int argc, char **argv) {
 				"releasing without a drag selects only the clicked desktop icon");
 			desktop.selectByName(QString());
 		}
+		{
+			/* Pressing an unselected icon drops the old selection at once,
+			 * so a drag carries only the icon under the pointer. */
+			desktop.selectByName("External file");
+			check(desktop.selectedItems().size() == 1,
+				"select a desktop file for the press test");
+			const QPoint centre = desktop.m_disk->pos + QPoint(PL_ICON_LARGE / 2, PL_ICON_LARGE / 2);
+			QMouseEvent press(QEvent::MouseButtonPress, QPointF(centre), QPointF(centre),
+				Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+			desktop.mousePressEvent(&press);
+			check(desktop.m_disk->selected && desktop.selectedItems().size() == 1,
+				"pressing an unselected desktop icon releases the earlier selection before a drag");
+			desktop.mouseReleaseEvent(nullptr);
+			desktop.selectByName(QString());
+		}
 		/* A place saved on a bigger screen (Monitors' scale turned back
 		 * up) is off this one: the icon takes a free spot instead, can be
 		 * clicked, and keeps its saved place for when the screen grows. */
