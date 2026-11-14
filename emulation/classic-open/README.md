@@ -27,9 +27,20 @@ in the same session is written but not noticed by the guest. The host now waits
 for the current acknowledgement and reports the failure, but the milestone 1
 gate (two applications in one session) is **not** met.
 
-The next transport should be the emulator's serial port (`SheepShaver
---seriala`/`--serialb`, with a pty) or another narrow bridge. Do not build
-production host windows on the shared-folder queue.
+The shared-folder queue is not a viable transport for later requests. On the
+Mac OS 9.0.4 test guest, pre-created request slots are visible at boot, but
+after boot the File Manager keeps returning its cached view of the volume:
+new sizes, modification dates and names stay invisible even after
+`PBGetCatInfo`, `FSpOpenDF` and `GetEOF`. Do not build production host windows
+on this queue.
+
+The serial port is also blocked on that guest. SheepShaver's output driver
+(`.AOut`) returns `openErr` (-23) because it needs `DriverServicesLib`; the Mac
+OS 9 install used for testing does not provide that library, so the serial
+bridge process never starts. A TCP bridge over the emulator's NAT is the next
+candidate: a prototype connected to `10.0.2.2` and carried request/ack lines,
+but the test guest did not show the launched applications. Verify visible app
+launching on the target guest before relying on it.
 
 The prototype also only opens applications that are files in the shared home
 folder, with plain ASCII names and no colon. Applications inside a guest disk

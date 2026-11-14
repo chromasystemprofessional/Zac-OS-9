@@ -185,9 +185,13 @@ new session opens the application after boot. The guest File Manager caches the
 shared ExtFS directory after its first read, so a second request in the same
 session is written but not seen; the host fails explicitly after five seconds.
 The gate above (two applications in one session) is therefore not met, and a
-guest failure does not yet reach a ZacOS alert. The next transport should be
-the emulator's serial port or another narrow bridge, not the shared-folder
-queue.
+guest failure does not yet reach a ZacOS alert. The shared-folder queue cannot
+deliver later requests: the guest File Manager keeps a cached view of the
+volume after boot. The serial-port attempt is blocked because SheepShaver's
+`.AOut` driver needs `DriverServicesLib`, which the test Mac OS 9 install does
+not provide. The next candidate is a TCP bridge over the emulator's NAT; a
+prototype carried request/ack lines, but visible app launching still needs
+validation on the target guest.
 
 ### 2. Opt-in independent document windows
 

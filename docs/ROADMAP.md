@@ -93,9 +93,11 @@ scaling only, original behaviors and timings).
   - **Direct-launch prototype:** `zacos9-classic --open` and Classic Open
     Helper open the first app requested from the shared home volume in a
     running session. The guest's directory cache does not notice a second
-    request, so the milestone 1 gate is not met; the next transport is the
-    emulator serial port or another narrow bridge. Do not claim general direct
-    launching, and do not launch apps inside guest disk images yet.
+    request, so the milestone 1 gate is not met. The serial-port attempt is
+    blocked because SheepShaver's output driver needs `DriverServicesLib`,
+    which the test Mac OS 9 install lacks. The next candidate is a TCP bridge
+    over the emulator's NAT. Do not claim general direct launching, and do not
+    launch apps inside guest disk images yet.
   - After that gate, double-clicking a Classic app or document in the Sniffer
     should launch it in Old Dog. The current emulator startup path only
     attaches disks; documents and apps inside guest images remain
