@@ -1,6 +1,6 @@
 # Project status
 
-Updated: 2026-11-13. Latest release: **1.18.7**
+Updated: 2026-11-14. Latest release: **1.18.7**
 ([releases](https://github.com/chromasystemprofessional/Zac-OS-9/releases),
 [ISO](https://sourceforge.net/projects/zac-os-9/files/)).
 
@@ -225,7 +225,9 @@ All of them are [on GitHub](https://github.com/chromasystemprofessional/Zac-OS-9
    starting after its partition was made smaller.
 2. **SMB**: a server to test against, then the share-list dialog.
 3. **Classic seamless windows** ([Classic](docs/classic-seamless.md)): the
-   capture experiment the feasibility gate is waiting on.
+   color-port/GWorld prerequisite now passes exact-pixel direct-32-bit tests.
+   The feasibility gate still needs guest window discovery and identities,
+   input delivery, and lifecycle evidence.
 4. **From the [roadmap](docs/ROADMAP.md)**: a Platinum boot menu (on Esc),
    manual pages, trying it in Hyper-V.
 

@@ -18,17 +18,21 @@ relaunch tested. This is bounded black/white rectangle capture from one original
 test application, not general compatibility or a production guest extension.
 The latest monochrome graphics trial also matches styled text, explicit
 clipping, patterned/XOR pen state, frames/lines, scaled bitmap copies,
-window self-copies and scrolling under overlap and after resize. Color ports
-are explicitly rejected, not supported. The feasibility gate has not passed:
-color/PixMap/GWorld state, general graphics APIs/origins, broader lifetime
-handling and input still need proof. The exact tested guest OS version is not
-yet confirmed.
+window self-copies and scrolling under overlap and after resize. The separate
+color-port/GWorld experiment now captures two overlapping direct-32-bit color
+windows exactly: the fixture's references pass an independent host RGB,
+marker and calibration/grid oracle, the helper's candidates match them every
+pixel, and the obscured screen crop fails the negative control. Indexed color,
+custom procedures and general color APIs remain unproven. The feasibility gate
+has not passed: cross-process window discovery/identity, input, broader
+lifetime handling and general graphics APIs/origins still need proof. The
+exact tested guest OS version is not yet confirmed.
 
-The host verifier now has a bounded version-3 PPM contract for future RGB
-reference/candidate captures, with independent-reference enforcement, frame
-markers, payload bounds and exact pixel comparison. This is test
-infrastructure, not guest color evidence; the dedicated color-port/GWorld
-experiment remains the next rendering prerequisite.
+The host verifier's version-3 PPM path now has an independent RGB oracle for
+the fixture's marker, calibration bars and 5-bit color grid, plus exact
+reference comparison. It is no longer only a format contract; the direct
+32-bit guest trial passes it. The 16-bit RGB555 conversion path is implemented
+but has not been run on a 16-bit guest display.
 
 ## Goal and agreed scope
 

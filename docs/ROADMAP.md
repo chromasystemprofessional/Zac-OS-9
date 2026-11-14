@@ -84,13 +84,12 @@ scaling only, original behaviors and timings).
     booted from it; the home folder shows up as the "Unix" volume.
 - Next:
   - **Milestone 0 (feasibility) is in progress:** the original guest probe
-    and host verifier now establish exact monochrome capture for several
-    QuickDraw operations, but color/GWorlds, general drawing coverage,
-    lifecycle recovery and input remain unproven. The `classic-window-probe`
-    host test passes; see `docs/classic-seamless.md` for the measured results
-    and acceptance gate. Host-side version-3 RGB PPM verification is now
-    available, but it is not guest color evidence; the dedicated color-port/
-    GWorld experiment remains the next rendering prerequisite.
+    and host verifier establish exact monochrome capture for several QuickDraw
+    operations, and the color-port/GWorld experiment now matches two
+    overlapping direct-32-bit color windows exactly against an independent RGB
+    oracle. Indexed/custom color, general drawing coverage, lifecycle recovery
+    and input remain unproven. The `classic-window-probe` host test passes; see
+    `docs/classic-seamless.md` for the measured results and acceptance gate.
   - After that gate, double-clicking a Classic app or document in the Sniffer
     should launch it in Old Dog. The current emulator startup path only
     attaches disks; launching an item from the shared home volume remains
