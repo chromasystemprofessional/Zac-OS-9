@@ -127,6 +127,9 @@ FolderWindow *FolderWindow::open(const QString &path) {
 			Finder::instance().notifyState();
 		});
 		w->updateStandardSize();
+		/* Laid out once more now it has its real size, so every icon's
+		 * place is saved (the constructor's layout runs before it does). */
+		w->relayout();
 		platinumOnTitleMenu(w, [w](bool option) { Finder::instance().showPathMenu(w, option); });
 		w->setUpProxyIcon();
 		platinumOnWindowPosition(w, [w](QPoint p) {
@@ -194,6 +197,13 @@ FolderWindow::FolderWindow(const QString &path) : m_path(path) {
 	if (vfsIsVirtual(path)) {
 		/* Applications come and go as packages are installed. */
 		m_vfsToken = vfsOnChange([this] { reload(); });
+		/* Its user aliases live in a real overlay beside the read-only
+		 * folder; follow them like any folder's contents. */
+		const QString aliases = vfsAliasDirectory(path);
+		if (!aliases.isEmpty()) {
+			QDir().mkpath(aliases);
+			m_watcher.addPath(aliases);
+		}
 	} else {
 		m_watcher.addPath(path);
 	}
@@ -810,6 +820,22 @@ void FolderWindow::layoutIcons() {
 		}
 	} else {
 		placeIcons(items, m_state.icons, slot, g.cellW, g.cellH, g.inset);
+		/* Every icon keeps the place it now has: a refresh, a new item or
+		 * a drag only fills free cells; it never reflows the others. Saved
+		 * once the window has a real size, not while it is being built. */
+		if (isVisible() && viewWidth() > 0) {
+			bool changed = false;
+			for (Item *item : items) {
+				auto it = m_state.icons.find(item->key());
+				if (it == m_state.icons.end() || *it != item->pos) {
+					m_state.icons.insert(item->key(), item->pos);
+					changed = true;
+				}
+			}
+			if (changed) {
+				saveStateSoon();
+			}
+		}
 	}
 	m_contentHeight = 0;
 	m_contentWidth = 0;
@@ -2080,7 +2106,8 @@ bool finderShortcut(QKeyEvent *e) {
 	switch (e->key()) {
 	case Qt::Key_N: f.newFolder(); return true;
 	case Qt::Key_A: f.command("select-all"); return true;
-	case Qt::Key_C: f.copySelectionNames(); return true;
+	case Qt::Key_C: f.copySelection(); return true;
+	case Qt::Key_V: f.paste(); return true;
 	case Qt::Key_O: f.openSelection(); return true;
 	case Qt::Key_W:
 		if (e->modifiers() & Qt::AltModifier) {
@@ -2123,7 +2150,7 @@ void FolderWindow::dragEnterEvent(QDragEnterEvent *e) {
 			e->mimeData()->hasUrls() ||
 			(e->source() == nullptr && canMakeClipping(mime) && !vfsIsVirtual(m_path)) ||
 			(e->mimeData()->hasFormat(ALIAS_ITEMS_MIME) &&
-			!vfsIsVirtual(m_path)) ||
+			(!vfsIsVirtual(m_path) || !vfsAliasDirectory(m_path).isEmpty())) ||
 			(e->mimeData()->hasFormat(ICON_MOVE_MIME) && e->source() == this)) {
 		e->acceptProposedAction();
 	}
@@ -2191,7 +2218,9 @@ void FolderWindow::dragMoveEvent(QDragMoveEvent *e) {
 		vfsIsControlPanels(target->path) || vfsIsControlPanelsDisabled(target->path) ||
 		vfsIsExtensions(target->path) || vfsIsExtensionsDisabled(target->path));
 	if (target && vfsIsVirtual(m_path) && e->mimeData()->hasFormat(ICON_MOVE_MIME) &&
-			!takesIconMove) {
+			!takesIconMove &&
+			!(e->mimeData()->hasFormat(ALIAS_ITEMS_MIME) &&
+			  (!vfsIsVirtual(target->path) || !vfsAliasDirectory(target->path).isEmpty()))) {
 		target = nullptr;
 	}
 	forEachItem([&](Item *item) { item->dropTarget = item == target; });
@@ -2208,6 +2237,25 @@ void FolderWindow::dragLeaveEvent(QDragLeaveEvent *) {
 
 void FolderWindow::dropEvent(QDropEvent *e) {
 	const bool iconMove = e->mimeData()->hasFormat(ICON_MOVE_MIME);
+	/* A new alias stays where it was dropped, as the item it came from
+	 * would have: another icon may be near it, but nothing moves it. */
+		const auto placeAliases = [this, drop = toContent(e->position().toPoint())]
+		(const QString &into, const QStringList &made) {
+			const QString aliases = vfsAliasDirectory(m_path);
+			if (m_mode != ViewMode::Icons ||
+					(QDir(into) != QDir(m_path) &&
+					 (aliases.isEmpty() || QDir(into) != QDir(aliases)))) {
+				return;
+			}
+			QPoint p = drop - QPoint(PL_ICON_LARGE / 2, PL_ICON_LARGE / 2);
+			p.setX(std::max(0, p.x()));
+			p.setY(std::max(0, p.y()));
+			for (const QString &name : made) {
+				m_state.icons.insert(name, p);
+				p += QPoint(0, PL_ICON_LARGE + 24);
+			}
+			saveStateSoon();
+		};
 	Item *target = iconMove ? nullptr
 		: dropTargetAt(e->position().toPoint(), draggedPaths(e->mimeData()));
 	clearDropTarget();
@@ -2233,14 +2281,14 @@ void FolderWindow::dropEvent(QDropEvent *e) {
 				vfsIsControlPanelsDisabled(destination) || vfsIsCollarModules(destination) ||
 				vfsIsCollarModulesDisabled(destination) || vfsIsExtensions(destination) ||
 				vfsIsExtensionsDisabled(destination)) {
-			dropItems(e, on, m_path);
+			dropItems(e, on, m_path, placeAliases);
 			Finder::instance().dragEnded();
 			return;
 		}
 	}
 	if (iconMove && e->source() != this && e->mimeData()->hasFormat(ALIAS_ITEMS_MIME) &&
-			!vfsIsVirtual(m_path)) {
-		dropItems(e, dropTargetAt(e->position().toPoint(), {}), m_path);
+			(!vfsIsVirtual(m_path) || !vfsAliasDirectory(m_path).isEmpty())) {
+		dropItems(e, dropTargetAt(e->position().toPoint(), {}), m_path, placeAliases);
 		Finder::instance().dragEnded();
 		return;
 	}
@@ -2294,6 +2342,6 @@ void FolderWindow::dropEvent(QDropEvent *e) {
 		});
 		return;
 	}
-	dropItems(e, target, m_path);
+	dropItems(e, target, m_path, placeAliases);
 	Finder::instance().dragEnded();
 }

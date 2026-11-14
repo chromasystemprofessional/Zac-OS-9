@@ -60,8 +60,11 @@ void startItemDrag(QWidget *source, const std::vector<Item *> &items,
 QStringList draggedPaths(const QMimeData *mime);
 
 /* Drop onto `target` (a folder, the disk or the Trash item) or, with
- * target == nullptr, into `folder`. Notifies the Finder of changes. */
-void dropItems(QDropEvent *e, const Item *target, const QString &folder);
+ * target == nullptr, into `folder`. Notifies the Finder of changes.
+ * `placed` (before the folder is shown again) may say where newly made
+ * aliases go. */
+void dropItems(QDropEvent *e, const Item *target, const QString &folder,
+	const std::function<void(const QString &into, const QStringList &made)> &placed = {});
 /* Text, a picture or links dragged in from another program (clippings.h). */
 bool isClippingDrop(const QDropEvent *e);
 /* Makes them in `target` if it's a folder, else in `folder`: their paths. */

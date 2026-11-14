@@ -226,6 +226,7 @@ enum pl_icon_kind pl_icon_for_program(const char *desktop_id) {
 		{ "zacos9-pedigree", PL_ICON_APP_PEDIGREE },
 		{ "zacos9-plotter", PL_ICON_APP_PLOTTER },
 		{ "zacos9-stash", PL_ICON_APP_STASH },
+		{ "zacos9-disksetup", PL_ICON_APP_DISKSETUP },
 		/* The control panels (lib/controlpanels.h). */
 		{ "zacos9-accessibility", PL_ICON_CP_ACCESSIBILITY },
 		{ "zacos9-appearance", PL_ICON_CP_APPEARANCE },

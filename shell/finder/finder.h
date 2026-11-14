@@ -81,8 +81,13 @@ public:
 	/* Commands (from menus or ⌘-keys). */
 	void command(const QString &name);
 	void newFolder();
-	/* Edit > Copy in the Sniffer copies the selected names as text. */
-	void copySelectionNames();
+	/* Edit > Copy in the Sniffer: the selected items, and their names as
+	 * text, on the Clipboard. Files are the real files; an application
+	 * copies its desktop entry, so Paste is a duplicate, never an alias. */
+	void copySelection();
+	/* Edit > Paste: Copy's items duplicated into the front view's real
+	 * folder, as Duplicate does. */
+	void paste();
 	void openSelection();
 	/* Opens just this item, whatever else is selected: what a double-click
 	 * means, so two icons selected by accident aren't both opened. */

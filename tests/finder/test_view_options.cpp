@@ -217,6 +217,27 @@ int main(int argc, char **argv) {
 		"small icons sit in short, wide cells");
 	check(w->itemHit(*a, a->pos + QPoint(30, 6)), "a small icon's name is beside it");
 
+	/* Spatial icon placement: every icon keeps the place it was given,
+	 * and moving one leaves the rest alone. */
+	w->relayout();
+	bool allPlaced = true;
+	for (auto &item : w->m_items) {
+		allPlaced &= w->m_state.icons.value(item->key()) == item->pos;
+	}
+	check(allPlaced, "every icon keeps a saved place after a layout");
+	{
+		Item *apple = named(w, "apple"), *banana = named(w, "banana");
+		const QPoint appleWas = apple->pos, bananaWas = banana->pos;
+		banana->pos += QPoint(7, 9);
+		w->m_state.icons.insert(banana->key(), banana->pos);
+		w->relayout();
+		check(apple->pos == appleWas && banana->pos == bananaWas + QPoint(7, 9),
+			"moving one icon does not move the icons around it");
+		banana->pos = bananaWas;
+		w->m_state.icons.insert(banana->key(), bananaWas);
+		w->relayout();
+	}
+
 	/* Always snap to grid: a moved icon lands on the nearest free slot. */
 	icons.icons.size = IconSize::Standard;
 	icons.icons.arrangement = IconArrangement::SnapToGrid;

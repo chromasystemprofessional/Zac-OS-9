@@ -22,6 +22,7 @@
 #include <QApplication>
 #include <QClipboard>
 #include <QGuiApplication>
+#include <QMimeData>
 #include <algorithm>
 #include <QDir>
 #include <QFile>
@@ -921,17 +922,107 @@ void Finder::openSelection() {
 	}
 }
 
-void Finder::copySelectionNames() {
+static bool isSpecial(const Item *item);
+
+void Finder::copySelection() {
 	FinderView *view = front();
 	if (!view) {
 		return;
 	}
-	QStringList names;
-	for (const Item *item : view->selectedItems()) {
-		names.push_back(item->visibleName());
+	QStringList names, paths;
+	for (Item *item : view->selectedItems()) {
+		names << item->visibleName();
+		QString path;
+		if (item->isVirtual) {
+			/* An application copies its desktop entry, and a folder
+			 * standing for a real one copies that folder: a duplicate,
+			 * never an alias. A Flatpak export is a link to the entry;
+			 * copy what it points at. */
+			path = vfsRealCounterpart(item->path);
+			const QString resolved = QFileInfo(path).canonicalFilePath();
+			if (!resolved.isEmpty()) {
+				path = resolved;
+			}
+		} else if (!isSpecial(item)) {
+			path = item->path;
+		}
+		if (!path.isEmpty() && !paths.contains(path)) {
+			paths << path;
+		}
 	}
-	if (!names.isEmpty()) {
-		QGuiApplication::clipboard()->setText(names.join('\n'));
+	if (names.isEmpty()) {
+		return;
+	}
+	auto *mime = new QMimeData;
+	QList<QUrl> urls;
+	for (const QString &path : paths) {
+		urls << QUrl::fromLocalFile(path);
+	}
+	if (!urls.isEmpty()) {
+		mime->setUrls(urls);
+	}
+	mime->setText(names.join('\n'));
+	QGuiApplication::clipboard()->setMimeData(mime);
+}
+
+/* Copy then Paste is Duplicate: the copied files, folders and aliases go
+ * into the front view's folder with the Finder's "copy" names beside an
+ * original of the same name. Unlike Make Alias, nothing here links. */
+void Finder::paste() {
+	FinderView *view = front();
+	if (!view) {
+		return;
+	}
+	const QString destination = view->folderPath();
+	const QMimeData *mime = QGuiApplication::clipboard()->mimeData();
+	const QList<QUrl> urls = mime ? mime->urls() : QList<QUrl>();
+	QStringList paths;
+	for (const QUrl &url : urls) {
+		if (!url.isLocalFile()) {
+			continue;
+		}
+		const QString path = url.toLocalFile();
+		const QFileInfo info(path);
+		if ((info.exists() || info.isSymLink()) && !paths.contains(path)) {
+			paths << path;
+		}
+	}
+	if (paths.isEmpty()) {
+		pl_beep();
+		return;
+	}
+	/* A read-only virtual folder can still take the user's aliases: they
+	 * go into its real overlay. Files themselves cannot. */
+	if (vfsIsVirtual(destination)) {
+		const QString aliases = vfsAliasDirectory(destination);
+		if (aliases.isEmpty()) {
+			pl_beep();
+			return;
+		}
+		QStringList aliasPaths;
+		for (const QString &path : paths) {
+			if (QFileInfo(path).isSymLink()) {
+				aliasPaths << path;
+			}
+		}
+		if (aliasPaths.size() != paths.size()) {
+			Alert::ask(tr9("Only aliases can be pasted into the Macintosh view's read-only folders."),
+				"OK", QString());
+			return;
+		}
+		QDir().mkpath(aliases);
+		if (!transferItems(aliasPaths, aliases, true).isEmpty()) {
+			vfsAliasesChanged();
+		}
+		return;
+	}
+	if (destination.isEmpty() || !QFileInfo(destination).isDir() ||
+			QDir(destination) == QDir(trashFilesPath())) {
+		pl_beep();
+		return;
+	}
+	for (const QString &folder : transferItems(paths, destination, true)) {
+		folderChanged(folder);
 	}
 }
 
@@ -1311,34 +1402,44 @@ void Finder::setLabel(int label) {
  * italics. */
 void Finder::makeAlias() {
 	FinderView *v = front();
+	if (!v) {
+		return;
+	}
+	const QString desktopDir = QStandardPaths::writableLocation(QStandardPaths::DesktopLocation);
+	/* A read-only virtual folder keeps user aliases in a real overlay;
+	 * make the alias there, so it appears in the folder itself. */
+	const QString inPlace = vfsAliasDirectory(v->folderPath());
 	QString lastName;
 	QString folder;
-	const QString desktopDir = QStandardPaths::writableLocation(QStandardPaths::DesktopLocation);
-	bool onDesktop = false;
+	bool inView = false;
 	for (Item *item : v->selectedItems()) {
 		if (item->kind == PL_ICON_TRASH_EMPTY || item->kind == PL_ICON_TRASH_FULL) {
 			continue;
 		}
 		if (item->isVirtual) {
-			/* Nothing can be put in the Macintosh view's own folders, so -
-			 * as the Mac did when it couldn't write an alias beside its
-			 * original - the alias goes on the desktop. An application's
-			 * links to its desktop file; a folder standing for a real one,
-			 * to that folder; the Finder's own items (Applications, the
-			 * System Folder, a control panel) name their virtual path. */
+			/* An application's links to its desktop file; a folder
+			 * standing for a real one, to that folder; the Finder's own
+			 * items (Applications, the System Folder, a control panel)
+			 * name their virtual path. Where the folder can't hold the
+			 * alias itself, it goes on the desktop, as the Mac did when
+			 * it couldn't write one beside its original. */
 			const VNode *node = vfsNode(item->path);
 			const QString target = node && node->actionId.isEmpty()
 				? vfsRealCounterpart(item->path) : QString();
+			const QString destination = inPlace.isEmpty() ? desktopDir : inPlace;
 			QString name;
-			QDir().mkpath(desktopDir);
+			QDir().mkpath(destination);
 			if (!target.isEmpty()) {
-				name = createAlias(target, desktopDir, item->name);
+				name = createAlias(target, destination, item->name);
 			} else if (node) {
-				name = createVirtualAlias(item->path, desktopDir, item->name);
+				name = createVirtualAlias(item->path, destination, item->name);
 			}
 			if (!name.isEmpty()) {
-				folderChanged(desktopDir);
-				onDesktop = true;
+				lastName = name;
+				inView = !inPlace.isEmpty();
+				if (!inView) {
+					folder = desktopDir;
+				}
 			}
 			continue;
 		}
@@ -1348,13 +1449,16 @@ void Finder::makeAlias() {
 			item->kind == PL_ICON_DISK ? item->name : info.fileName());
 		if (!name.isEmpty()) {
 			lastName = name;
+			inView = !inPlace.isEmpty() && QDir(folder) == QDir(inPlace);
 		}
 	}
 	if (!lastName.isEmpty()) {
-		folderChanged(folder);
+		if (inView) {
+			vfsAliasesChanged();
+		} else {
+			folderChanged(folder);
+		}
 		v->selectByName(lastName);
-		notifyState();
-	} else if (onDesktop) {
 		notifyState();
 	}
 }

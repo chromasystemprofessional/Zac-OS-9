@@ -10,6 +10,7 @@
 #include <cstdlib>
 #include <unistd.h>
 
+#include <algorithm>
 #include <QDir>
 #include <QElapsedTimer>
 #include <QFile>
@@ -450,6 +451,11 @@ int main(int argc, char **argv) {
 	writeEntry(appsDir, "simpletext.desktop", entry("SimpleText"));
 	writeEntry(appsDir, "calculator.desktop",
 		entry("Calculator", "/bin/true", "Categories=Utility;\n"));
+	/* An app that also calls itself a development tool is not a utility
+	 * just because it lists Utility too: ChatGPT's entry is
+	 * "Utility;Development;". */
+	writeEntry(appsDir, "chatgpt.desktop",
+		entry("ChatGPT", "/bin/true", "Categories=Utility;Development;\n"));
 	/* An entry written for this desktop only shows too. */
 	writeEntry(appsDir, "ours-only.desktop", entry("Only Ours", "/bin/true", "OnlyShowIn=ZacOS9;\n"));
 	/* What Applications leaves out: the system's own applications (listed
@@ -476,6 +482,9 @@ int main(int argc, char **argv) {
 	writeEntry(appsDir, "zacos9-somepanel.desktop", entry("A ZacOS Panel"));
 	/* One of ZacOS 9's own that it files in Utilities (Disk Setup). */
 	writeEntry(appsDir, "zacos9-diskthing.desktop", entry("A ZacOS Disk Tool", "/bin/true",
+		"Categories=System;Utility;X-ZacOS9-Utility;\nOnlyShowIn=ZacOS9;\n"));
+	/* Disk Setup's entry names no Icon=: its icon is in the built-in set. */
+	writeEntry(appsDir, "zacos9-disksetup.desktop", entry("Disk Setup", "/bin/true",
 		"Categories=System;Utility;X-ZacOS9-Utility;\nOnlyShowIn=ZacOS9;\n"));
 	writeEntry(homeAppsDir + "/wine/Programs/Notepad Plus", "Notepad Plus.desktop",
 		entry("Notepad Plus", "env WINEPREFIX=/nonexistent wine C:\\\\np.exe"));
@@ -707,6 +716,9 @@ int main(int argc, char **argv) {
 		"an application the user installed as a utility is not loose in Applications");
 	check(namesIn(vfsPathFor("applications/utilities")).contains("Calculator"),
 		"it is in Applications > Utilities instead");
+	check(apps.contains("ChatGPT") &&
+			!namesIn(vfsPathFor("applications/utilities")).contains("ChatGPT"),
+		"an app with another main category is in Applications, not Utilities");
 	check(!apps.contains("Hidden One"), "Hidden=true is not shown");
 	check(!apps.contains("NoDisplay One"), "NoDisplay=true is not shown");
 	check(!apps.contains("Only Elsewhere"), "OnlyShowIn for another desktop is not shown");
@@ -749,6 +761,12 @@ int main(int argc, char **argv) {
 			namesIn(vfsPathFor("applications/utilities")).contains("A ZacOS Disk Tool") &&
 			!namesIn(vfsPathFor("applications/utilities")).contains("A ZacOS Panel"),
 		"ZacOS 9's own utilities (Disk Setup) are in Applications > Utilities");
+	const AppEntry *diskSetup = appById("zacos9-disksetup.desktop");
+	const uint32_t *diskSetupIcon = pl_icon(PL_ICON_APP_DISKSETUP, PL_ICON_LARGE);
+	check(diskSetup && diskSetupIcon &&
+			diskSetup->icon32.size() == PL_ICON_LARGE * PL_ICON_LARGE &&
+			std::equal(diskSetup->icon32.begin(), diskSetup->icon32.end(), diskSetupIcon),
+		"Disk Setup shows its built-in icon");
 	check(apps.contains("Notepad Plus"), "a Windows program installed through Wine is shown");
 	check(!apps.contains("Uninstall Notepad Plus"), "its Wine uninstaller is not shown");
 	const int markWatch = vfsOnChange([] {});

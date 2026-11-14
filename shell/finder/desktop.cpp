@@ -424,15 +424,17 @@ void Desktop::placeIcons() {
 	const int right = width() - ICON_MARGIN_RIGHT - PL_ICON_LARGE;
 	const QPoint trashHome(right, height() - ICON_MARGIN_BOTTOM - PL_ICON_LARGE - 16);
 	QHash<QString, QPoint> placed = m_state.icons;
+	QSet<QString> offScreen;
 	/* A place that is off the screen now (the screen got smaller: another
 	 * resolution, or Monitors' scale turned up) isn't used: the icon takes
 	 * a free spot instead, as on a Mac, and goes back there if the screen
 	 * grows again. Its label alone would show, and nothing could be
-	 * clicked. */
+	 * clicked. The remembered place itself is kept. */
 	for (auto it = placed.begin(); it != placed.end();) {
 		const QPoint p = *it;
 		if (p.x() < 0 || p.x() > width() - PL_ICON_LARGE ||
 				p.y() < MBAR_HEIGHT || p.y() > height() - PL_ICON_LARGE) {
+			offScreen.insert(it.key());
 			it = placed.erase(it);
 		} else {
 			++it;
@@ -487,6 +489,28 @@ void Desktop::placeIcons() {
 		}
 	}
 	::placeIcons(items, placed, gridSlot(nullptr), w, h);
+	/* Every icon keeps the place it now has: a refresh, a new file or a
+	 * drag only fills free cells; it never reflows the icons around one
+	 * that moved. Kept arranged, the files stay in that order instead. */
+	if (width() > 0 && height() > 0) {
+		bool changed = false;
+		for (Item *item : items) {
+			if (o.arrangement == IconArrangement::KeepArranged && !isFixed(item)) {
+				continue;
+			}
+			if (offScreen.contains(item->key())) {
+				continue; /* kept for a bigger screen */
+			}
+			auto it = m_state.icons.find(item->key());
+			if (it == m_state.icons.end() || *it != item->pos) {
+				m_state.icons.insert(item->key(), item->pos);
+				changed = true;
+			}
+		}
+		if (changed) {
+			m_state.save(folderPath());
+		}
+	}
 }
 
 /* Clean Up snaps the disks and files to the nearest free spot; Arrange
@@ -958,7 +982,23 @@ void Desktop::dropEvent(QDropEvent *e) {
 		});
 		return;
 	}
-	dropItems(e, target, folderPath());
+	dropItems(e, target, folderPath(),
+		[this, drop = e->position().toPoint()](const QString &into, const QStringList &made) {
+			if (QDir(into) != QDir(folderPath())) {
+				return;
+			}
+			/* An alias dropped on the Desktop stays where it was let go,
+			 * as a Mac's icons did: clear of nothing in particular, and
+			 * movable afterwards like any other. */
+			QPoint p = drop - QPoint(PL_ICON_LARGE / 2, PL_ICON_LARGE / 2);
+			p.setX(std::clamp(p.x(), 0, width() - PL_ICON_LARGE));
+			p.setY(std::clamp(p.y(), MBAR_HEIGHT, height() - PL_ICON_LARGE - 16));
+			for (const QString &name : made) {
+				m_state.icons.insert(name, p);
+				p += QPoint(0, PL_ICON_LARGE + 24);
+			}
+			m_state.save(folderPath());
+		});
 	Finder::instance().dragEnded();
 }
 

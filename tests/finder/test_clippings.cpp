@@ -9,7 +9,11 @@
 #include <QElapsedTimer>
 #include <QFile>
 #include <QFileInfo>
+#include <QHash>
 #include <QImage>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QLabel>
 #include <QMimeData>
 #include <QPlainTextEdit>
@@ -20,6 +24,7 @@
 
 #include "clippings.h"
 #include "fileops.h"
+#include "finder.h"
 #include "items.h"
 
 #define private public
@@ -149,6 +154,55 @@ int main(int argc, char **argv) {
 	Item *linkItem = itemNamed(w, "Example Page.url");
 	check(linkItem && linkItem->kind == PL_ICON_INTERNET_LOCATION && linkItem->kindName() == "Internet location",
 		"with the Internet location icon");
+
+	// An alias dragged in lands where it was dropped, and moves nothing
+	// else: the window is spatial, not auto-arranged.
+	const QString aliasTarget = home.path() + "/Alias Target";
+	QDir().mkpath(aliasTarget);
+	const QHash<QString, QPoint> beforeAlias = w->m_state.icons;
+	QJsonArray aliases;
+	aliases.append(QJsonObject{ { "name", "Folder shortcut" }, { "target", aliasTarget } });
+	auto *aliasMime = new QMimeData;
+	aliasMime->setData(ALIAS_ITEMS_MIME, QJsonDocument(aliases).toJson(QJsonDocument::Compact));
+	QDropEvent aliasDrop(QPointF(300, 260), Qt::MoveAction | Qt::LinkAction, aliasMime,
+		Qt::LeftButton, Qt::NoModifier);
+	w->dropEvent(&aliasDrop);
+	settle();
+	Item *aliasItem = itemNamed(w, "Folder shortcut alias");
+	const QPoint aliasWant = w->toContent(QPoint(300, 260)) - QPoint(PL_ICON_LARGE / 2, PL_ICON_LARGE / 2);
+	check(aliasDrop.isAccepted() && QFileInfo(folder + "/Folder shortcut alias").isSymLink() &&
+			aliasItem && aliasItem->pos == aliasWant,
+		"an alias dropped in a folder stays where it was dropped");
+	bool aliasOthersKept = true;
+	for (auto it = beforeAlias.constBegin(); it != beforeAlias.constEnd(); ++it) {
+		aliasOthersKept &= w->m_state.icons.value(it.key()) == it.value();
+	}
+	check(aliasOthersKept, "and leaves the folder's other icons where they were");
+
+	// Copy then Paste duplicates the item; it never makes an alias.
+	{
+		const QString original = folder + "/Duplicate me";
+		QFile sourceFile(original);
+		check(sourceFile.open(QIODevice::WriteOnly) && sourceFile.write("duplicate") == 9,
+			"create a file to duplicate");
+		sourceFile.close();
+		w->reload();
+		settle();
+		Item *source = itemNamed(w, "Duplicate me");
+		check(source, "the file to duplicate appears in the folder");
+		if (source) {
+			w->selectByName("Duplicate me");
+			Finder::instance().setFront(w);
+			Finder::instance().copySelection();
+			Finder::instance().paste();
+			settle();
+			const QString copied = folder + "/Duplicate me copy";
+			QFile copyFile(copied);
+			check(QFileInfo(copied).isFile() && !QFileInfo(copied).isSymLink() &&
+					copyFile.open(QIODevice::ReadOnly) && copyFile.readAll() == "duplicate",
+				"Copy then Paste duplicates the file, not an alias");
+		}
+	}
 
 	// Dragged out again, each carries what it holds as well as the file. (The
 	// folder has been read again since: find them afresh.)

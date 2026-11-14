@@ -7,6 +7,7 @@
 #include "process.h"
 #include "appfilter.h"
 #include "electronlaunch.h"
+#include "icons.h"
 #include "platinumshell.h"
 
 #include <QCoreApplication>
@@ -145,6 +146,26 @@ void resolveIcon(GAppInfo *info, AppEntry *entry) {
 			return;
 		}
 	}
+}
+
+/* ZacOS 9's own programs name no Icon=: theirs is in the built-in set,
+ * the same art the Zac menu and Control Panels draw. Only a themed icon
+ * already found takes precedence. */
+void resolveBuiltinIcon(AppEntry *entry) {
+	if (!entry->icon32.empty()) {
+		return;
+	}
+	const pl_icon_kind kind = pl_icon_for_program(entry->id.toUtf8().constData());
+	if (kind == PL_ICON_APPLICATION) {
+		return;
+	}
+	const uint32_t *large = pl_icon(kind, PL_ICON_LARGE);
+	const uint32_t *small = pl_icon(kind, PL_ICON_SMALL);
+	if (!large || !small) {
+		return;
+	}
+	entry->icon32.assign(large, large + PL_ICON_LARGE * PL_ICON_LARGE);
+	entry->icon16.assign(small, small + PL_ICON_SMALL * PL_ICON_SMALL);
 }
 
 /* ---- where an application came from --------------------------------- */
@@ -414,6 +435,23 @@ void resolveOrigin(GDesktopAppInfo *desktop, AppEntry *entry) {
 	}
 }
 
+/* The desktop entry specification's main categories, other than Utility.
+ * A program that names one of these is a development tool, a game, an
+ * office application and so on, not a utility, however many categories it
+ * lists: ChatGPT ships "Utility;Development;". Additional categories
+ * ("TextEditor", "FileTools", ...) say what kind of utility it is and are
+ * not considered. */
+bool hasAnotherMainCategory(const QStringList &categories) {
+	static const QStringList main = { "AudioVideo", "Development", "Education",
+		"Game", "Graphics", "Network", "Office", "Science", "Settings", "System" };
+	for (const QString &category : categories) {
+		if (main.contains(category, Qt::CaseInsensitive)) {
+			return true;
+		}
+	}
+	return false;
+}
+
 /* Append " (stem)" to the names that more than one entry shares, so each
  * application folder has a name of its own. */
 void disambiguate(std::vector<AppEntry> &apps) {
@@ -580,15 +618,19 @@ void load() {
 			g_free(flatpak);
 			/* Utilities: the tools ZacOS 9 ships, and what the user
 			 * installed as a utility themselves. Settings, file
-			 * managers and other system tools stay out. */
+			 * managers and other system tools stay out, and so does
+			 * an application that also calls itself a development
+			 * tool, a game or the like. */
 			entry.inUtilities =
 				entry.categories.contains(QLatin1String("X-ZacOS9-Utility"), Qt::CaseInsensitive) ||
 				(entry.userInstalled &&
-					entry.categories.contains(QLatin1String("Utility"), Qt::CaseInsensitive));
+					entry.categories.contains(QLatin1String("Utility"), Qt::CaseInsensitive) &&
+					!hasAnotherMainCategory(entry.categories));
 			readActions(desktop, &entry);
 			resolveOrigin(desktop, &entry);
 		}
 		resolveIcon(info, &entry);
+		resolveBuiltinIcon(&entry);
 		apps.push_back(std::move(entry));
 	}
 	g_list_free_full(all, g_object_unref);

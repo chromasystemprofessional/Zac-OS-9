@@ -735,6 +735,29 @@ int main(int argc, char **argv) {
 			"and keeps its saved place for a bigger screen");
 		desktop.m_state.icons.remove("External file");
 		desktop.placeIcons();
+		/* Moving one icon no longer reflows the others: the desktop is
+		 * spatial, not an auto-arranged list. */
+		Item *externalFile = nullptr, *externalFolder = nullptr;
+		for (auto &item : desktop.m_files) {
+			if (item->name == "External file") {
+				externalFile = item.get();
+			} else if (item->name == "External folder") {
+				externalFolder = item.get();
+			}
+		}
+		check(externalFile && externalFolder, "find two desktop icons for the free-placement test");
+		if (externalFile && externalFolder) {
+			const QPoint fileWas = externalFile->pos, folderWas = externalFolder->pos;
+			desktop.selectByName("External file");
+			desktop.placeSelection(QPoint(-19, 23), Qt::NoModifier);
+			check(externalFile->pos == fileWas + QPoint(-19, 23) &&
+					externalFolder->pos == folderWas &&
+					desktop.m_state.icons.value(externalFolder->key()) == folderWas,
+				"moving a desktop icon leaves the others exactly where they were");
+			externalFile->pos = fileWas;
+			desktop.m_state.icons.insert(externalFile->key(), fileWas);
+			desktop.placeIcons();
+		}
 		desktop.m_disk->pos = diskWas;
 		desktop.m_trash->pos = trashWas;
 		desktop.m_state.icons.remove("::disk");
@@ -930,15 +953,31 @@ int main(int argc, char **argv) {
 		"virtual drag exposes alias payload, never movable package paths");
 	QDropEvent virtualDrop(QPointF(10, 400), Qt::MoveAction | Qt::LinkAction,
 		virtualMime.get(), Qt::LeftButton, Qt::NoModifier);
+	const QHash<QString, QPoint> beforeAlias = desktop.m_state.icons;
 	desktop.dropEvent(&virtualDrop);
 	check(virtualDrop.isAccepted() && virtualDrop.dropAction() == Qt::LinkAction &&
 		QFileInfo(path + "/Folder shortcut alias").isSymLink(),
 		"virtual backed/app drag onto Desktop creates alias, never moves original");
+	{
+		Item *shortcut = nullptr;
+		for (auto &item : desktop.m_files) {
+			if (item->name == "Folder shortcut alias") {
+				shortcut = item.get();
+			}
+		}
+		bool othersKept = true;
+		for (auto it = beforeAlias.constBegin(); it != beforeAlias.constEnd(); ++it) {
+			othersKept &= desktop.m_state.icons.value(it.key()) == it.value();
+		}
+		check(shortcut && shortcut->pos == QPoint(0, 384),
+			"a dropped alias stays where it was let go");
+		check(othersKept, "and leaves the desktop's other icons where they were");
+	}
 	bool appAlias = false;
 	for (auto &item : vfsList(vfsRoot() + "applications")) {
 		if (vfsRealCounterpart(item->path) == launcher.fileName()) {
 			std::unique_ptr<QMimeData> appMime(itemDragMime({item.get()}));
-			QDropEvent appDrop(QPointF(10, 400), Qt::MoveAction | Qt::LinkAction,
+			QDropEvent appDrop(QPointF(10, desktop.height() - 100), Qt::MoveAction | Qt::LinkAction,
 				appMime.get(), Qt::LeftButton, Qt::NoModifier);
 			desktop.dropEvent(&appDrop);
 			const QString shortcut = path + "/" + item->name + " alias";
@@ -961,39 +1000,129 @@ int main(int argc, char **argv) {
 	}
 	check(appAlias, "dragging actual Applications entry creates a launchable alias without moving launcher");
 
-	/* The Finder's own items: Applications, the System Folder and what is
-	 * inside them have no file to link to, but can be aliased too. */
+	/* Copy then Paste is a duplicate, never an alias: an application's
+	 * desktop entry is copied as a real file. */
+	{
+		auto *appsWindow = FolderWindow::open(vfsPathFor("applications"));
+		check(appsWindow, "open Applications for the copy test");
+		if (appsWindow) {
+			appsWindow->selectByName("Desktop Test");
+			Finder::instance().setFront(appsWindow);
+			Finder::instance().copySelection();
+			Finder::instance().setFront(&desktop);
+			Finder::instance().paste();
+			settle();
+			const QString pasted = path + "/desktop-test.desktop";
+			check(QFileInfo(pasted).isFile() && !QFileInfo(pasted).isSymLink() &&
+				QFileInfo(pasted).size() == QFileInfo(launcher.fileName()).size(),
+				"copying an application and pasting makes a real duplicate, not an alias");
+			QFile::remove(pasted);
+			desktop.reload();
+
+			/* The read-only Applications folder holds the user's aliases
+			 * in its overlay, among the applications. */
+			Finder::instance().setFront(appsWindow);
+			appsWindow->selectByName("Desktop Test");
+			Finder::instance().command("make-alias");
+			const QString inPlace = vfsAliasDirectory(vfsPathFor("applications")) +
+				"/Desktop Test alias";
+			bool shownAlias = false;
+			for (auto &item : vfsList(vfsPathFor("applications"))) {
+				shownAlias |= item->name == "Desktop Test alias" && item->isAlias;
+			}
+			check(QFileInfo(inPlace).isSymLink() && shownAlias,
+				"an application alias can live in read-only Applications");
+			QFile::remove(inPlace);
+			vfsAliasesChanged();
+
+			/* Copy an alias on the Desktop and paste it into Applications:
+			 * it is duplicated into that folder's overlay. */
+			Finder::instance().setFront(&desktop);
+			desktop.selectByName("Desktop Test alias");
+			Finder::instance().copySelection();
+			Finder::instance().setFront(appsWindow);
+			Finder::instance().paste();
+			const QString pastedAlias = vfsAliasDirectory(vfsPathFor("applications")) +
+				"/Desktop Test alias";
+			check(QFileInfo(pastedAlias).isSymLink(),
+				"a copied alias can be pasted into read-only Applications");
+			QFile::remove(pastedAlias);
+			vfsAliasesChanged();
+
+			/* Dragging an alias in from the Desktop also leaves it in the
+			 * Applications overlay. */
+			const QString draggedAlias = path + "/Dragged alias";
+			check(QFile::link(launcher.fileName(), draggedAlias),
+				"create an alias to drag into Applications");
+			auto *dragMime = new QMimeData;
+			dragMime->setUrls({ QUrl::fromLocalFile(draggedAlias) });
+			QDropEvent aliasDrop(QPointF(10, 10), Qt::MoveAction, dragMime,
+				Qt::LeftButton, Qt::NoModifier);
+			dropItems(&aliasDrop, nullptr, vfsPathFor("applications"));
+			const QString draggedIn = vfsAliasDirectory(vfsPathFor("applications")) +
+				"/Dragged alias";
+			check(aliasDrop.isAccepted() && QFileInfo(draggedIn).isSymLink() &&
+				!QFileInfo::exists(draggedAlias),
+				"an alias dragged into read-only Applications is kept there");
+			QFile::remove(draggedIn);
+			vfsAliasesChanged();
+
+			appsWindow->close();
+			settle();
+		}
+	}
+
+	/* The Finder's own items: Applications, the System Folder and what's
+	 * inside them have no file to link to, but can be aliased too. The
+	 * root is read-only, so the aliases live in its user overlay and show
+	 * in the root window. */
 	{
 		auto *rootWindow = FolderWindow::open(vfsRoot());
 		Finder::instance().setFront(rootWindow);
 		rootWindow->selectByName("Applications");
 		Finder::instance().command("make-alias");
-		const QString appsAlias = path + "/Applications alias";
+		std::vector<std::unique_ptr<Item>> rootItems = vfsList(vfsRoot());
+		Item *appsAliasItem = nullptr;
+		for (auto &item : rootItems) {
+			if (item->name == "Applications alias") {
+				appsAliasItem = item.get();
+			}
+		}
+		const QString appsAliasPath = appsAliasItem ? appsAliasItem->path : QString();
 		QString virtualTarget;
-		auto appsAliasItem = makeItem(QFileInfo(appsAlias));
-		check(QFileInfo(appsAlias).isSymLink() &&
-			aliasVirtualTarget(appsAlias, &virtualTarget) &&
+		check(appsAliasItem && QFileInfo(appsAliasPath).isSymLink() &&
+			aliasVirtualTarget(appsAliasPath, &virtualTarget) &&
 			virtualTarget == vfsPathFor("applications"),
 			"Make Alias creates an alias of Applications, naming its virtual path");
-		check(appsAliasItem->isAlias && appsAliasItem->isDir &&
+		check(appsAliasItem && appsAliasItem->isAlias && appsAliasItem->isDir &&
 			appsAliasItem->kind == PL_ICON_APPLICATIONS_FOLDER &&
 			appsAliasItem->nameFont() == PL_FONT_VIEWS_ITALIC,
 			"the Applications alias keeps the folder icon and italic alias label");
-		Finder::instance().openItem(appsAliasItem.get());
-		check(waitFor([&] { return FolderWindow::isOpen(vfsPathFor("applications")); }),
-			"opening the alias opens Applications");
+		if (appsAliasItem) {
+			Finder::instance().openItem(appsAliasItem);
+			check(waitFor([&] { return FolderWindow::isOpen(vfsPathFor("applications")); }),
+				"opening the alias opens Applications");
+		}
 
 		Finder::instance().setFront(rootWindow);
 		rootWindow->selectByName("System Folder");
 		Finder::instance().command("make-alias");
-		const QString systemAlias = path + "/System Folder alias";
-		auto systemAliasItem = makeItem(QFileInfo(systemAlias));
-		check(QFileInfo(systemAlias).isSymLink() && systemAliasItem->isAlias &&
-			systemAliasItem->kind == PL_ICON_SYSTEM_FOLDER,
+		rootItems = vfsList(vfsRoot());
+		Item *systemAliasItem = nullptr;
+		for (auto &item : rootItems) {
+			if (item->name == "System Folder alias") {
+				systemAliasItem = item.get();
+			}
+		}
+		const QString systemAliasPath = systemAliasItem ? systemAliasItem->path : QString();
+		check(systemAliasItem && QFileInfo(systemAliasPath).isSymLink() &&
+			systemAliasItem->isAlias && systemAliasItem->kind == PL_ICON_SYSTEM_FOLDER,
 			"the System Folder can be made into an alias with its own icon");
-		Finder::instance().openItem(systemAliasItem.get());
-		check(waitFor([&] { return FolderWindow::isOpen(vfsPathFor("system-folder")); }),
-			"opening the alias opens the System Folder");
+		if (systemAliasItem) {
+			Finder::instance().openItem(systemAliasItem);
+			check(waitFor([&] { return FolderWindow::isOpen(vfsPathFor("system-folder")); }),
+				"opening the alias opens the System Folder");
+		}
 
 		/* A control panel is an item, not a file: its alias opens it. */
 		QFile panelEntry(home.path() + "/data/applications/zacos9-mouse.desktop");
@@ -1016,14 +1145,21 @@ int main(int argc, char **argv) {
 			mouseAliasItem->kind == PL_ICON_CP_MOUSE,
 			"an item in the System Folder can be aliased and keeps its icon");
 
-		desktop.selectByName("Applications alias");
-		Finder::instance().setFront(&desktop);
+		Finder::instance().setFront(rootWindow);
+		rootWindow->selectByName("Applications alias");
 		Finder::instance().command("show-original");
 		auto *rootAgain = FolderWindow::open(vfsRoot());
 		check(waitFor([&] {
 				const auto selected = rootAgain->selectedItems();
 				return !selected.empty() && selected.front()->name == "Applications";
 			}), "Show Original reveals Applications in the startup disk");
+		if (!appsAliasPath.isEmpty()) {
+			QFile::remove(appsAliasPath);
+		}
+		if (!systemAliasPath.isEmpty()) {
+			QFile::remove(systemAliasPath);
+		}
+		vfsAliasesChanged();
 
 		/* Dragging one of the Finder's own folders to Desktop aliases it. */
 		std::unique_ptr<Item> utilities;

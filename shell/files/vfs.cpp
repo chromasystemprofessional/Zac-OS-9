@@ -1350,6 +1350,22 @@ std::vector<std::unique_ptr<Item>> vfsList(const QString &path) {
 		}
 		items.push_back(std::move(item));
 	}
+	/* A read-only folder's user aliases live in a real overlay beside it;
+	 * show them with the folder's own items. */
+	const QString aliases = vfsAliasDirectory(path);
+	if (!aliases.isEmpty()) {
+		const QFileInfoList entries = QDir(aliases).entryInfoList(
+			QDir::AllEntries | QDir::NoDotAndDotDot | QDir::System,
+			QDir::Name | QDir::IgnoreCase);
+		for (const QFileInfo &entry : entries) {
+			if (entry.fileName().startsWith('.') || !entry.isSymLink()) {
+				continue;
+			}
+			if (auto item = makeItem(entry)) {
+				items.push_back(std::move(item));
+			}
+		}
+	}
 	return items;
 }
 
@@ -1442,6 +1458,26 @@ QString vfsRealCounterpart(const QString &path) {
 		return app ? app->file : QString();
 	}
 	return QString();
+}
+
+QString vfsAliasDirectory(const QString &path) {
+	const VNode *node = vfsNode(path);
+	if (!node || node->readOnly || !vfsIsVirtual(path)) {
+		return {};
+	}
+	/* Only the Finder's structural folders, where an alias is a thing the
+	 * user can see and open; not the generated resource views. */
+	if (node->kind != VKind::Volume && node->kind != VKind::Folder &&
+			node->kind != VKind::Apps) {
+		return {};
+	}
+	const QString id = vfsIdOf(path);
+	if (id.startsWith('/') || id.split('/').contains(QStringLiteral(".."))) {
+		return {};
+	}
+	const QString base = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) +
+		"/zacos9/aliases";
+	return base + "/" + (id.isEmpty() ? QStringLiteral("root") : id);
 }
 
 bool vfsResourceOpenPath(const QString &path, QString *sourcePath) {
@@ -1993,6 +2029,10 @@ static void watchResourceSources() {
 			[debounce](const QString &) { debounce->start(); });
 	}
 	arm();
+}
+
+void vfsAliasesChanged() {
+	notifyChanged();
 }
 
 int vfsOnChange(std::function<void()> f) {

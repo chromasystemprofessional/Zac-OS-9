@@ -50,7 +50,23 @@ folder, and Get Info names it; it has no identity record to reconnect, so if
 the item is gone the alias simply reports that. For ordinary files and
 folders, Command-Option-drag creates an alias; Option-drag copies. Aliases can
 also be moved between real folders and Desktop. Copying an alias preserves
-the link, and moving it to Trash does not delete the original.
+the link, and moving it to Trash does not delete the original. An alias
+dragged from the Macintosh view into a folder or onto the Desktop lands where
+it was let go; every icon keeps the place it was given, so making one or
+moving one never reflows the icons around it. Edit > Copy and Paste duplicate
+the selected items, an application's desktop entry as a real launcher rather
+than an alias.
+
+The Finder's own read-only folders — the startup disk's root, the System
+Folder, Applications and Utilities — have nowhere of their own to write an
+alias. Their aliases live in a user-owned overlay,
+`$XDG_DATA_HOME/zacos9/aliases/<folder id>/`, and are listed with the folder's
+built-in items. The folder's own contents stay read-only and package-managed:
+an alias there is only a symbolic link in the overlay, and deleting it removes
+the link, never the original. File > Make Alias creates it in the folder when
+the front window is one of these; an alias dragged or pasted in is kept the
+same way. Other generated folders (Control Panels, Extensions, resources) do
+not take aliases.
 Aliases inherit the resolved original's icon, including application icons in
 both icon and list views, while retaining their own name and italic alias label.
 Alias chains use the final target's icon; missing or looping targets show a
@@ -402,9 +418,12 @@ none of these appear loose in Applications too. Entries with `System`,
 `Settings` or `FileManager` categories (qps, PCManFM, desktop/screen-saver
 settings, print settings) are system parts rather than user applications: they
 are left out of both folders and stay reachable from Control Panels and the Zac
-menu. The ordinary `Utility` category alone is not enough for a packaged
-baseline application; an app the user installed as a utility is filed there.
-ZacOS's own control panels remain in Control Panels.
+menu. An entry that names another main category beside `Utility` is an
+application of that kind, not a utility: ChatGPT's `Utility;Development;` is
+filed in Applications. The ordinary `Utility` category alone is not enough for
+a packaged baseline application; an app the user installed as a utility is
+filed there. Additional categories such as `TextEditor` or `FileTools` do not
+change that. ZacOS's own control panels remain in Control Panels.
 
 This uses installation metadata, not a historical record of user intent:
 `apt-mark manual` makes a non-baseline application eligible, while packages
@@ -425,8 +444,10 @@ lifetime, paid again only when an application is newly discovered.
 
 When nothing resolves — no icon named, the name doesn't exist in any
 theme, or the process has no GUI platform to rasterize into at all (a
-headless tool, not the Finder itself) — the generic application icon is
-drawn instead. A Desktop Action always keeps the generic document icon:
+headless tool, not the Finder itself) — ZacOS 9's own programs take their
+built-in icon (`pl_icon_for_program`: the same art the Zac menu draws;
+Disk Setup's drive and wrench, for one). Any other entry gets the generic
+application icon. A Desktop Action always keeps the generic document icon:
 it isn't the application itself.
 
 ### Where it came from

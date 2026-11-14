@@ -106,6 +106,13 @@ bool vfsLaunch(const QString &path);
  * Backed node's directory, or an application's desktop entry. Empty for
  * the curated and generated folders, which stand for nothing on disk. */
 QString vfsRealCounterpart(const QString &path);
+/* Where a read-only virtual folder keeps the user's aliases: a real
+ * directory under the user's data, or empty when the folder can't hold
+ * them. The folder's own contents stay read-only; vfsList shows these
+ * aliases with them. */
+QString vfsAliasDirectory(const QString &path);
+/* The aliases in that overlay changed: reload the virtual views. */
+void vfsAliasesChanged();
 /* The other way: the Macintosh view's node that stands for this real
  * folder (Home for $HOME, say), or empty. */
 QString vfsPathBacking(const QString &directory);

@@ -44,7 +44,9 @@ struct AppEntry {
 	bool systemUtility = false;
 	/* Shown in Applications > Utilities: what ZacOS 9 ships as a utility
 	 * (Disk Setup, balenaEtcher, marked X-ZacOS9-Utility), and a
-	 * Utility-category application the user installed themselves. */
+	 * Utility-category application the user installed themselves that
+	 * does not also name another main category (ChatGPT says
+	 * "Utility;Development;", so it is an application). */
 	bool inUtilities = false;
 	bool userInstalled = true;
 	bool terminal = false;

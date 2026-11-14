@@ -102,6 +102,7 @@ enum pl_icon_kind {
 	PL_ICON_APP_PEDIGREE,
 	PL_ICON_APP_PLOTTER,
 	PL_ICON_APP_STASH,
+	PL_ICON_APP_DISKSETUP, /* Disk Setup: a drive and Utilities' wrench */
 	/* A console game's own icon: a cartridge, disc or PS3 game folder
 	 * (Game Player). */
 	PL_ICON_ROM_NES,

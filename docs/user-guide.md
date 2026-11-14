@@ -76,6 +76,25 @@ whose icon or name it crosses and scrolls when dragged past the window edge.
 Drag any selected item to move the whole selection into another folder; hold
 Option while dropping to copy instead.
 
+An icon stays where it is put. Moving one leaves its neighbours alone, and
+icons may sit close together or overlap as they did on a Mac; **Clean Up** and
+**Arrange** are there when an orderly grid is wanted. An alias dragged in from
+the Macintosh view (Applications, the System Folder, a control panel) lands
+where it is dropped, on the Desktop or in another folder.
+
+Applications, Utilities and the System Folder stay read-only, but aliases can
+live there too: they are stored in a small user-owned overlay and shown with
+the folder's own items. **File > Make Alias** in one of those windows puts the
+alias there; dragging or pasting an alias in does the same. Deleting the alias
+removes only the link, never the application or system item.
+
+**Edit > Copy** puts the selected items on the Clipboard (their names as text
+too), and **Edit > Paste** duplicates them into the front window or Desktop,
+named "copy", "copy 2" and so on beside an original. Files, folders and
+aliases are copied as they are; an application's desktop entry is copied as a
+real launcher, never turned into an alias. In the read-only folders only an
+alias can be pasted.
+
 As in Mac OS 9, a disk's desktop icon is dimmed while its folder window is
 open, and comes back to full strength when the window closes.
 

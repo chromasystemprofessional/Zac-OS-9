@@ -1219,7 +1219,8 @@ static bool insideGamesFolder(const QString &path) {
 	return clean == games || clean.startsWith(games + "/");
 }
 
-void dropItems(QDropEvent *e, const Item *target, const QString &folder) {
+void dropItems(QDropEvent *e, const Item *target, const QString &folder,
+		const std::function<void(const QString &into, const QStringList &made)> &placed) {
 	const bool fontDrag = e->mimeData()->hasFormat(FONT_ITEMS_MIME);
 	const QString fontDestination = target ? target->path : folder;
 	if (fontDrag) {
@@ -1279,6 +1280,28 @@ void dropItems(QDropEvent *e, const Item *target, const QString &folder) {
 	const bool toTrash = (target &&
 		(target->kind == PL_ICON_TRASH_EMPTY || target->kind == PL_ICON_TRASH_FULL)) ||
 		(!target && QDir(folder) == QDir(trashFilesPath()));
+	/* A read-only virtual folder keeps user aliases in a real overlay: a
+	 * dragged alias goes there rather than failing the folder's own
+	 * read-only contents. */
+	const QString aliasFolder = vfsAliasDirectory(target ? target->path : folder);
+	const QStringList droppedPaths = draggedPaths(e->mimeData());
+	const bool aliasFiles = !e->mimeData()->hasFormat(ALIAS_ITEMS_MIME) &&
+		!droppedPaths.isEmpty() &&
+		std::all_of(droppedPaths.begin(), droppedPaths.end(),
+			[](const QString &path) { return QFileInfo(path).isSymLink(); });
+	if (!aliasFolder.isEmpty() && aliasFiles) {
+		QDir().mkpath(aliasFolder);
+		const bool copy = (e->modifiers() & Qt::AltModifier) ||
+			e->proposedAction() == Qt::CopyAction;
+		if (transferItems(droppedPaths, aliasFolder, copy).isEmpty()) {
+			e->ignore();
+			return;
+		}
+		vfsAliasesChanged();
+		e->setDropAction(copy ? Qt::CopyAction : Qt::MoveAction);
+		e->accept();
+		return;
+	}
 	if (vfsIsStartupItems(target ? target->path : folder)) {
 		if (e->mimeData()->hasFormat(STARTUP_ITEMS_MIME)) {
 			e->ignore(); /* already there */
@@ -1394,8 +1417,18 @@ void dropItems(QDropEvent *e, const Item *target, const QString &folder) {
 			return;
 		}
 		QString destination = target ? target->path : folder;
+		bool inOverlay = false;
 		if (vfsIsVirtual(destination)) {
-			destination = vfsOpensAs(destination);
+			const QString aliases = vfsAliasDirectory(destination);
+			if (!aliases.isEmpty()) {
+				destination = aliases;
+				inOverlay = true;
+			} else {
+				destination = vfsOpensAs(destination);
+			}
+		}
+		if (inOverlay) {
+			QDir().mkpath(destination);
 		}
 		if (destination.isEmpty() || !QFileInfo(destination).isDir() ||
 				(target && (target->kind == PL_ICON_TRASH_EMPTY || target->kind == PL_ICON_TRASH_FULL))) {
@@ -1430,6 +1463,7 @@ void dropItems(QDropEvent *e, const Item *target, const QString &folder) {
 			}
 		}
 		bool made = false;
+		QStringList madeNames;
 		for (const auto &value : aliases) {
 			const auto item = value.toObject();
 			const QString target = item["target"].toString();
@@ -1437,10 +1471,20 @@ void dropItems(QDropEvent *e, const Item *target, const QString &folder) {
 			const QString created = target.isEmpty()
 				? createVirtualAlias(item["vfs"].toString(), destination, name)
 				: createAlias(target, destination, name);
-			made = !created.isEmpty() || made;
+			if (!created.isEmpty()) {
+				made = true;
+				madeNames << created;
+			}
 		}
 		if (made) {
-			Finder::instance().folderChanged(destination);
+			if (placed) {
+				placed(destination, madeNames);
+			}
+			if (inOverlay) {
+				vfsAliasesChanged();
+			} else {
+				Finder::instance().folderChanged(destination);
+			}
 			e->setDropAction(Qt::LinkAction);
 			e->accept();
 		} else {
