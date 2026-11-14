@@ -90,11 +90,16 @@ scaling only, original behaviors and timings).
     oracle. Indexed/custom color, general drawing coverage, lifecycle recovery
     and input remain unproven. The `classic-window-probe` host test passes; see
     `docs/classic-seamless.md` for the measured results and acceptance gate.
+  - **Direct-launch prototype:** `zacos9-classic --open` and Classic Open
+    Helper open the first app requested from the shared home volume in a
+    running session. The guest's directory cache does not notice a second
+    request, so the milestone 1 gate is not met; the next transport is the
+    emulator serial port or another narrow bridge. Do not claim general direct
+    launching, and do not launch apps inside guest disk images yet.
   - After that gate, double-clicking a Classic app or document in the Sniffer
     should launch it in Old Dog. The current emulator startup path only
-    attaches disks; launching an item from the shared home volume remains
-    unimplemented. Do not add guessed emulator flags or claim direct launching
-    until a guest/host open-request mechanism is validated.
+    attaches disks; documents and apps inside guest images remain
+    unimplemented.
   - SDL's Wayland backend under zacos9-wm (Xwayland for now).
   - Packaging the emulators (Phase 7).
 

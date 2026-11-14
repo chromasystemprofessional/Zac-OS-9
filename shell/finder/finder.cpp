@@ -726,8 +726,8 @@ void Finder::openItem(Item *item) {
 		} else if (item->kind == PL_ICON_WINDOWS) {
 			launchWindows(item->path);
 		} else if (item->kind == PL_ICON_CLASSIC) {
-			/* TODO: open the application itself inside the Mac. */
-			launchClassic();
+			/* The Mac opens it through Classic Open Helper. */
+			launchClassic({}, item->path);
 		} else if (isExpandable(item->path)) {
 			expandArchive(item->path);
 		} else if (item->kind == PL_ICON_CLIPPING) {
@@ -1304,10 +1304,13 @@ void Finder::openPrintQueue(const QString &queue) {
 	}
 }
 
-void Finder::launchClassic(const QStringList &disks) {
+void Finder::launchClassic(const QStringList &disks, const QString &openPath) {
 	QStringList args;
 	for (const QString &d : disks) {
 		args << "--disk" << d;
+	}
+	if (!openPath.isEmpty()) {
+		args << "--open" << openPath;
 	}
 	const uint32_t cookie = platinumBeginLaunch();
 	auto *check = new QProcess(QCoreApplication::instance());

@@ -94,5 +94,8 @@ used. Add `--68k` for Basilisk II.
   emulators run through Xwayland.
 - Classic applications copied out through the "Unix" volume show in the
   Finder with the Classic icon (their type, 'APPL', is in the `.finf/`
-  file SheepShaver keeps beside them). Double-clicking one starts Classic,
-  but doesn't open that application inside the Mac yet.
+  file SheepShaver keeps beside them). Double-clicking one starts Classic.
+  With [Classic Open Helper](classic-open/README.md) installed in the Mac's
+  Startup Items, the first application started that way also opens inside the
+  Mac; a second request in the same session waits for the bridge work in
+  [the seamless plan](../docs/classic-seamless.md).

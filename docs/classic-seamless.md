@@ -177,6 +177,18 @@ do not silently downgrade the requirement to cropping.
 launch does not start another emulator or attach a writable disk twice.
 Missing originals, guest readiness failures and rejected opens show an alert.
 
+**Prototype status (2026-11-14):** `zacos9-classic --open`, the Finder's
+Classic-application double-click and
+[`emulation/classic-open`](../emulation/classic-open/README.md) open the first
+requested application in a running session and report its acknowledgement; a
+new session opens the application after boot. The guest File Manager caches the
+shared ExtFS directory after its first read, so a second request in the same
+session is written but not seen; the host fails explicitly after five seconds.
+The gate above (two applications in one session) is therefore not met, and a
+guest failure does not yet reach a ZacOS alert. The next transport should be
+the emulator's serial port or another narrow bridge, not the shared-folder
+queue.
+
 ### 2. Opt-in independent document windows
 
 - Export each supported document window as a host toplevel, using the rendering
