@@ -15,8 +15,15 @@ class DesktopPlaces(unittest.TestCase):
         self.home = Path(self.temporary.name)
         self.config = self.home / "config"
         self.config.mkdir()
+        self.applications = self.home / "data" / "applications"
+        self.applications.mkdir(parents=True)
+        self.desktop_entry = self.applications / "zacos9-bloodhound.desktop"
+        self.desktop_entry.write_text("[Desktop Entry]\nName=Bloodhound (Search)\n")
+        self.data_dirs = self.home / "data-dirs"
+        self.data_dirs.mkdir()
         self.env = dict(os.environ, HOME=str(self.home), XDG_CONFIG_HOME=str(self.config),
-                        XDG_DATA_HOME=str(self.home / "data"))
+                        XDG_DATA_HOME=str(self.home / "data"),
+                        XDG_DATA_DIRS=str(self.data_dirs))
 
     def run_helper(self):
         return subprocess.run([sys.executable, str(HELPER)], env=self.env,
@@ -37,9 +44,16 @@ class DesktopPlaces(unittest.TestCase):
         self.assertEqual(dirs.read_text(), 'XDG_DESKTOP_DIR="$HOME/Desktop"\n')
         self.assertEqual(bookmarks.read_text(), desktop.as_uri() + " Desktop\n" +
                          private_disk.as_uri() + " Zacintosh HD\n")
+        shortcut = desktop / "Bloodhound (Search)"
+        self.assertTrue(shortcut.is_symlink())
+        self.assertEqual(shortcut.resolve(), self.desktop_entry.resolve())
         before = (dirs.read_bytes(), bookmarks.read_bytes())
         self.assertEqual(self.run_helper().returncode, 0)
         self.assertEqual(before, (dirs.read_bytes(), bookmarks.read_bytes()))
+        # The desktop shortcut is seeded once; removing it keeps it removed.
+        shortcut.unlink()
+        self.assertEqual(self.run_helper().returncode, 0)
+        self.assertFalse(shortcut.exists())
 
     def test_custom_desktop_and_existing_bookmarks(self):
         desktop = self.home / "My Desktop #1"
@@ -58,6 +72,7 @@ class DesktopPlaces(unittest.TestCase):
                          (self.home / "data/zacos9/Zacintosh HD").as_uri() +
                          " Zacintosh HD\n")
         self.assertEqual(result.stdout.strip(), str(desktop))
+        self.assertTrue((desktop / "Bloodhound (Search)").is_symlink())
 
     def test_existing_desktop_label_preserved(self):
         bookmarks = self.config / "gtk-3.0/bookmarks"
@@ -68,6 +83,26 @@ class DesktopPlaces(unittest.TestCase):
         self.assertEqual(bookmarks.read_text(), original +
                          (self.home / "data/zacos9/Zacintosh HD").as_uri() +
                          " Zacintosh HD\n")
+
+    def test_bloodhound_shortcut_respects_an_existing_item(self):
+        desktop = self.home / "Desktop"
+        desktop.mkdir()
+        existing = desktop / "Bloodhound (Search)"
+        existing.write_text("the user's own item\n")
+        self.assertEqual(self.run_helper().returncode, 0)
+        self.assertFalse(existing.is_symlink())
+        self.assertEqual(existing.read_text(), "the user's own item\n")
+        self.assertTrue((self.config / "zacos9/desktop-shortcuts").is_file())
+
+    def test_bloodhound_shortcut_waits_for_the_program(self):
+        self.desktop_entry.unlink()
+        self.assertEqual(self.run_helper().returncode, 0)
+        desktop = self.home / "Desktop"
+        self.assertFalse((desktop / "Bloodhound (Search)").exists())
+        self.assertFalse((self.config / "zacos9/desktop-shortcuts").exists())
+        self.desktop_entry.write_text("[Desktop Entry]\nName=Bloodhound (Search)\n")
+        self.assertEqual(self.run_helper().returncode, 0)
+        self.assertTrue((desktop / "Bloodhound (Search)").is_symlink())
 
     def test_missing_desktop_entry_preserves_other_settings(self):
         dirs = self.config / "user-dirs.dirs"

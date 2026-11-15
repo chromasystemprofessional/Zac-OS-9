@@ -3,8 +3,8 @@
 Bloodhound is ZacOS 9's name for Sherlock 2: the search dog. The plan maps
 Sherlock 2 to Bloodhound in the
 [Mac OS 9 gap plan](mac-os-9-gap-plan.md) (the glossary and §3.13), and the
-System Folder plan lists Sherlock's [Internet Search
-Sites](system-folder.md) as still missing.
+System Folder plan has Sherlock's [Internet Search
+Sites](system-folder.md).
 
 This page is the design brief. It records the shape kept from Sherlock, what
 each release should do, and the rules that keep Bloodhound a Mac OS 9 search
@@ -14,11 +14,15 @@ app rather than a modern search overlay.
 
 Bloodhound 1.3 shipped in ZacOS 9 1.13.0: `shell/bloodhound/` is a Qt 6
 program with its own app id and one Platinum window. It appears as
-**Bloodhound (Search)** in Applications and the Zac menu. The Files channel
-has criteria rows, contents through the index with snippets, Find Similar
-Items and saved searches; the channel bar has Web, named channels and My
-Channel, read from Internet Search Sites. Live Search, Recents, the Index
-menu, folder and site-file drops and a collapsible Preview are in.
+**Bloodhound (Search)** in Applications, the Zac menu and, since 1.4, the
+desktop. The Files channel has criteria rows, contents through the index
+with snippets, Find Similar Items and saved searches; the channel bar reads
+Internet Search Sites. Live Search, Recents, the Index menu, folder and
+site-file drops and a collapsible Preview are in. Bloodhound 1.4 (in the
+tree for the next release) gives the bar Sherlock 2's icons and fixed
+channel set: Internet, People, Shopping, News, ZacOS, Reference, My Channel
+and the user's channels; see
+[Sherlock 2's channel bar](#sherlock-2s-channel-bar).
 
 The search engine is shared with the Sniffer's Find:
 
@@ -38,7 +42,8 @@ The parts worth keeping:
 - **One window** holds the query, the settings and the results. It did not
   open a new results window for every search.
 - **Channels** are the first choice: a Files channel, Internet channels, and
-  user-made channels that group search sites.
+  user-made channels that group search sites, drawn as a row of icons along
+  the top of the window.
 - **The Files channel** searches names and, after indexing, the contents of
   files. "More Choices" adds criteria.
 - **Internet Search Sites** are plain-text files in the System Folder. Anyone
@@ -51,11 +56,86 @@ The parts not to copy: the giant "More Search Options" dialog, banner
 advertisements, and searches that could not be stopped. Bloodhound improves
 those pieces rather than reproducing them.
 
+## Sherlock 2's channel bar
+
+Sherlock 2 shipped with Mac OS 9 in October 1999. Its window began with a
+row of icon tiles. Choosing one changed the search beneath it: the web sites,
+the fields and the results all belonged to that channel. The tiles were
+icon-only; the name came from a hint bubble, and the chosen tile was pressed
+into the accent colour. Apple's own review material and the Missing Manual
+both describe the same set of built-in channels:
+
+| Sherlock 2 channel | What it was |
+|---|---|
+| **Files** | The local disks: names, criteria and, with Find by Content, the words inside documents. |
+| **Internet** | The general web search sites. |
+| **People** | LDAP and white-pages directories: Yahoo, Bigfoot, Four11. |
+| **Shopping** | Retail search sites. Sherlock 2 parsed price and availability out of their results. |
+| **News** | News sites. Sherlock 2 parsed publication dates out of their results. |
+| **Apple** | Apple's own support, software and news. |
+| **Reference** | Dictionaries and encyclopedias. |
+| **My Channel** | The user's own sites, plus any site without a route. |
+| User channels | Channels the user made, each a group of sites. |
+
+Mac OS 9.1 added an **Entertainment** channel (films and music). The built-in
+channels could not be deleted; their sites could. A search site was a plain
+file in `Internet Search Sites`, and its `routeType` attribute decided which
+channel it joined; without one it went to My Channel. That is the part worth
+keeping: a channel is a group of files, not a service baked into the
+program.
+
+The parts not to copy are the embedded result pages and their banner ads,
+the price and date scrapers, and the dead directories. People search in 2026
+means data brokers; Apple's channel means a company ZacOS is not; a
+shopping channel that scrapes prices is a second web browser with worse
+privacy. Bloodhound keeps the shape and replaces the services.
+
+Sources: Apple's Technical Note TN1141 (the search-site format, `routeType`
+and the default channel names), TidBITS' and Macworld's Mac OS 9 reviews
+(the built-in set, People's LDAP directories and custom channels), and the
+Missing Manual's chapter 15.
+
+### The equivalents
+
+Bloodhound's channels, in Sherlock 2's order:
+
+| Sherlock 2 | Bloodhound 1.4 | What it searches |
+|---|---|---|
+| Files | **Files** | The local search index and the Sniffer's Find engine, unchanged. |
+| Internet | **Internet** | Every installed search site; a general engine first, DuckDuckGo by default. |
+| People | **People** | The people who can use this computer: their full names and Home folders, from the system's account list. It never sends a name to a people-search service. A web people directory would be a site the user adds to another channel; it is not in the box. |
+| Shopping | **Shopping** | A group of shop search sites. eBay and Amazon ship as plain search URLs: no affiliate or tracking parameters, no price scraping, and the results open in the browser. |
+| News | **News** | A group of news search sites; BBC News and NPR ship. The site does the searching; Bloodhound does not fetch or render the page. |
+| Apple | **ZacOS** | ZacOS's own Help. Search runs `zacos9-help --search WORDS`; with the field empty it opens the Help Center. This is the vendor channel, and it is local. |
+| Reference | **Reference** | Wikipedia and Wiktionary ship; more can be dropped in. |
+| My Channel | **My Channel** | The user's sites without a `Channel=`, as before. |
+| User channels | **User channels** | Sites grouped by `Channel=`, each with the generic channel icon. |
+| Entertainment (9.1) | — | Not copied. A user channel can hold film or music sites. |
+
+The icons are original 32×32 Platinum art in
+`assets/icons/platinum-icons.picon` (`PL_ICON_CHANNEL_*`; the app's own
+`PL_ICON_APP_BLOODHOUND` is a paw print and a magnifier). Sherlock 2's
+tiles had no labels; Bloodhound puts a small label under each, because a
+32-pixel bone does not say ZacOS by itself and a page with a pencil does not
+say My Channel. The hint bubble names every tile as well, and `⌘1`–`⌘8`
+choose the fixed channels. The chosen tile is pressed into the accent
+colour; hovering raises the one under the pointer. Tiles that do not fit
+behind the last one live behind a `»` tile and a menu.
+
+The fixed channels stay even when they have no sites, as Sherlock's did:
+a channel is a place to put sites, and a user channel with no sites says so.
+**People** is the local exception: it lists the accounts on this computer,
+with their full names, Home folders and kind, and filters as the user types.
+**ZacOS** is the other local channel: it has the bone, the Help sentence and
+the Search button, and no site popup. A channel with sites shows the site
+popup, the search field and the usual "results open in your browser" line.
+
 ## The shape we keep
 
 ```
 +----------------------------------------------------------------+
-| Channels: [ Files ] [ Web ] [ Reference ] [ My Channel ]       |
+| [Files] [Internet] [People] [Shopping] [News] [ZacOS]           |
+| [Reference] [My Channel] [user channels...]                     |
 +----------------------------------------------------------------+
 | Search: [................................] [ Search ] [ Stop ] |
 | Find items: [ on all disks v ] whose [ name v ] [ contains v ] |
@@ -70,8 +150,13 @@ those pieces rather than reproducing them.
 +----------------------------------------------------------------+
 ```
 
-- The channel bar is a Platinum toolbar, not tabs, a sidebar or a hamburger
-  menu.
+- The channel bar is a Platinum toolbar of 32×32 icons with a label under
+  each, not text tabs, a sidebar or a hamburger menu. The fixed channels are
+  always there; the user's channels follow them in one row, and a `»` tile
+  holds any that don't fit.
+- A web channel replaces the criteria rows with its site popup and a short
+  pane that names the site and says the results open in the browser. The
+  ZacOS channel replaces them with the Help sentence.
 - The search field, scope and criteria are one row group above the results.
 - The result list replaces its contents for each search; a new search does not
   leave a trail of result windows. "New Bloodhound Window" stays available
@@ -150,15 +235,47 @@ Shipped in ZacOS 9 1.13.0.
 - The app's strings in the translation files; site and channel names stay as
   their files write them.
 
+### 1.4: the channel bar
+
+In the tree for the next release.
+
+- Sherlock 2's channels as a row of 32×32 Platinum icons with labels:
+  Files, Internet, People, Shopping, News, ZacOS, Reference and My Channel,
+  then the user's own channels. The fixed set stays when a channel is empty.
+- The selected tile is pressed into the accent colour; hovering raises a
+  tile; Hint Bubbles name each one; `⌘1`–`⌘8` choose the fixed channels and
+  Tab, the arrow keys, Return and Escape work the bar from the keyboard.
+- A `»` tile and a menu when the channels outgrow the window.
+- **Internet** is every installed site, with DuckDuckGo first, then the other
+  general engines, then the rest.
+- **People** replaces Sherlock's white pages with the people who can use this
+  computer: their full names, Home folders and kind, from the system's
+  account list, filtered as you type. No name is sent anywhere.
+- **Shopping** ships eBay and Amazon as plain search URLs; **News** BBC News
+  and NPR; **Reference** Wikipedia and Wiktionary. No affiliate codes, no
+  price or date scraping, and no embedded pages: the site's own page opens in
+  the browser.
+- **ZacOS** replaces Sherlock's Apple channel: Search runs
+  `zacos9-help --search WORDS`, or opens the Help Center when the field is
+  empty.
+- A search-site file dropped on Bloodhound is installed into its own
+  `Channel=`, not always into Internet.
+- `zacos9-desktop-places` puts a **Bloodhound (Search)** alias on the desktop
+  once, with the app's own icon. Deleting it keeps it deleted; a marker in
+  `~/.config/zacos9/desktop-shortcuts` records that it was offered.
+
 ### Later, carefully
 
-- Optional local channels: Programs, Control Panels, Help, Settings.
+- Optional local channels: Programs, Control Panels, Settings.
 - Smart Folders in the Sniffer backed by a saved Bloodhound search.
 - A global hotkey that opens Bloodhound as an app window.
 - Local, clearly labelled semantic search. Never the default.
-- No People/LDAP, Shopping or News channels of our own: if they exist, they
-  are user search sites. Sherlock's built-in services are gone; we should not
-  revive dead directories.
+- An Entertainment channel (Mac OS 9.1's): not copied; a user channel can
+  hold film and music sites.
+- People stays local: the accounts on this computer, never a people-search
+  broker. Shopping and News stay groups of site files: Shopping is plain
+  store searches, not price scraping; News sends the words to the news site
+  and opens the page in the browser.
 
 ## The Files channel
 
@@ -230,11 +347,21 @@ Internet command without a restart.
 The format is data only. No scripts, no executable plug-ins, no automatic
 updates from the network.
 
+**The fixed groups.** The system's seed files put DuckDuckGo, Google and Bing
+in **Internet**; eBay and Amazon in **Shopping**; BBC News and NPR in
+**News**; Wikipedia and Wiktionary in **Reference**. **People** and
+**ZacOS** are local and have no site files. A site whose `Channel=` names
+one of the fixed web channels joins it; any other name makes a user channel;
+no `Channel=` means **My Channel**. The Internet channel is the exception:
+it offers every site, with a general engine first, so the familiar
+one-field search never runs out of choices.
+
 **Searching.** A Web search is only sent when the user presses Search or
 Return. The query goes to the chosen site; the results open in the default
 browser. Bloodhound does not fetch the result page, does not show ads, and
 does not add affiliate or tracking parameters. The status line names the
-site that will be used.
+site that will be used. The ZacOS channel is local: it runs the Help Center
+with the words, and no network request is made.
 
 **One list.** The Find window's "Find items" popup and File ▸ Search
 Internet… use the same site reader. When the site list changes, both update;
@@ -256,7 +383,9 @@ the only choices.
   technology and visible focus.
 - **The browser is the web viewer.** That is the modern replacement for
   Sherlock's embedded, ad-bearing result pages. It also keeps untrusted HTML
-  out of the shell.
+  out of the shell. The ZacOS channel is the other side of the rule: the
+  vendor's own content is local, so it opens the installed Help rather than
+  a web page.
 - **Plain files, not a registry.** Search sites and channels are files a
   person can read, copy and edit. This is Sherlock's best idea and the
   cheapest way to keep the app open.
@@ -275,6 +404,12 @@ the only choices.
 - No separate results window for every search.
 - No mandatory live search.
 - No cloud index or AI search by default.
+- No people-search broker in the box: People lists the accounts on this
+  computer. A web people directory would be a site the user adds.
+- No shopping price scrapers, affiliate codes or "partner" results: Shopping
+  is a group of ordinary store searches.
+- No Entertainment channel or other built-in service that would need a
+  directory to keep alive; user channels cover those interests.
 - Do not rename the Sniffer's **Find…** command. Bloodhound is the app;
   Find is the verb.
 
@@ -296,11 +431,28 @@ the only choices.
 - **Settings.** `~/.config/zacos9/bloodhound.conf` through `KeyValueFile`:
   last channel and scope, live results on/off, result limit. Saved searches
   stay in `find-searches.json`.
+- **The channels.** `BloodhoundWindow::ChannelKind` and
+  `BloodhoundWindow::rebuildChannels()` build the fixed set, read the user's
+  channels from the sites, and place the tiles. `fillPeople()` reads the
+  account list through NSS (`getpwent`; `ZACOS9_PASSWD` points at a file for
+  tests) and makes each Home folder a result. `searchHelp()` runs
+  `zacos9-help --search`. The icons are `PL_ICON_CHANNEL_*` and
+  `PL_ICON_APP_BLOODHOUND` in `lib/icons.h`, drawn from
+  `assets/icons/platinum-icons.picon`; `pl_icon_for_program()` gives the
+  program and its aliases the paw-print icon.
+- **The desktop shortcut.** `session/zacos9-desktop-places` creates
+  `~/Desktop/Bloodhound (Search)` as a symbolic link to the installed
+  `.desktop` file, once, and records it in
+  `~/.config/zacos9/desktop-shortcuts`. The Sniffer draws the link as an
+  application alias with Bloodhound's own icon.
 - **Tests.** The existing `finder-find` unit tests cover criteria and
-  results. Add a headless window test (search a temporary folder, check the
-  rows, open/reveal through a stand-in `zacos9-finder-ctl`), a search-site
-  parser test (OpenSearch, `.searchsite`, `.src`), and the launcher test
-  already in `tests/bloodhound/`.
+  results. `tests/bloodhound/test_controls.cpp` checks the fixed channels,
+  People's account list and filtering, and that ZacOS Search runs the Help
+  Center;
+  `test_window.py` searches a temporary folder through the real compositor;
+  the search-site parser tests cover OpenSearch, `.searchsite` and `.src`;
+  `tests/finder/test_desktop_places.py` checks the desktop alias is seeded
+  once and respects an item the user already has.
 
 ## Order
 
@@ -312,6 +464,9 @@ the only choices.
    channels, one shared site list with Search Internet.
 4. **Modern polish**: live results, recents, index status, drag and drop,
    preview, accessibility, localization.
+5. **The channel bar**: Sherlock 2's icons, the fixed channels, the ZacOS
+   Help channel, the seed groups, and the desktop shortcut. In the tree for
+   the next release.
 
 Each slice is its own pull request. The engine move in slice 1 is the one
 structural change; after that, features stay inside `shell/bloodhound/` and

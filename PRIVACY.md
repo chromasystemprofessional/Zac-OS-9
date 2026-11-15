@@ -34,7 +34,8 @@ are not sent to us.
 |---|---|---|---|
 | Software Update | The daily check (on by default; turn it off in Software Update) or when you open it | `api.github.com` for the release list; `github.com` for a package you choose to install | A plain GET for release metadata, with `User-Agent: zacos9-update`. No machine ID and no query identifying you. |
 | Software (New Tricks) | When you open or refresh it | `api.github.com`, `dl.flathub.org`, and the apt sources configured on your system | The same catalog request for everyone, plus apt and Flatpak metadata requests. |
-| Web search (Bloodhound) | When you choose a Web search | The search site you chose: `duckduckgo.com`, `www.google.com`, `www.bing.com`, or a search-site file you added | Your search words, as any web search. |
+| Web search (Bloodhound) | When you choose a Web search | The search site you chose: `duckduckgo.com`, `www.google.com`, `www.bing.com`, `www.ebay.com`, `www.amazon.com`, `www.bbc.co.uk`, `www.npr.org`, `en.wikipedia.org`, `en.wiktionary.org`, or a search-site file you added | Your search words, as any web search. |
+| ZacOS Help (Bloodhound's ZacOS channel) | When you choose it | Nothing; the Help pages are installed locally | Nothing. |
 | Neighbourhood / Network Browser | When you open it | Your local network, by multicast (mDNS and WS-Discovery) | Discovery probes. It does not use the Internet. |
 | File Sharing, Screen Sharing, AFP and SMB | When you connect to or share with a computer | The computer you choose | The protocol's own traffic. |
 | Help | When you open a page | Nothing; the pages are installed locally | Nothing. |

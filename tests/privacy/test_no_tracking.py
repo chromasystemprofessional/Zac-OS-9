@@ -77,6 +77,12 @@ ALLOWED_HOSTS = {
     "duckduckgo.com": "Bloodhound's default web search",
     "www.google.com": "Bloodhound's Google search",
     "www.bing.com": "Bloodhound's Bing search",
+    "www.ebay.com": "Bloodhound's Shopping channel",
+    "www.amazon.com": "Bloodhound's Shopping channel",
+    "www.bbc.co.uk": "Bloodhound's News channel",
+    "www.npr.org": "Bloodhound's News channel",
+    "en.wikipedia.org": "Bloodhound's Reference channel",
+    "en.wiktionary.org": "Bloodhound's Reference channel",
 }
 
 HOST = re.compile(r"https?://([A-Za-z0-9.-]+)")

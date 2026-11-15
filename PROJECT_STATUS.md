@@ -1,6 +1,6 @@
 # Project status
 
-Updated: 2026-11-14. Latest release: **1.18.7**
+Updated: 2026-11-15. Latest release: **1.18.7**
 ([releases](https://github.com/chromasystemprofessional/Zac-OS-9/releases),
 [ISO](https://sourceforge.net/projects/zac-os-9/files/)).
 
@@ -88,7 +88,10 @@ This page is what's true now and what's next. What changed and when is in
 ## Being worked on
 
 **Bloodhound (Search)**: the planned 1.0–1.3 slices are done; 1.3 shipped in
-1.13.0. The later ideas — optional local channels, Smart Folders, a global
+1.13.0. **1.4** is in the tree: Sherlock 2's icon channel bar (Files,
+Internet, People, Shopping, News, ZacOS, Reference, My Channel and user
+channels), local People and ZacOS Help channels, the seed search sites, and
+the desktop alias. The later ideas — optional local channels, Smart Folders, a global
 hotkey and local semantic search — are not scheduled
 ([Bloodhound](docs/bloodhound.md)).
 

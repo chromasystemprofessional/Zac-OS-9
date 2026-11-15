@@ -1,0 +1,4 @@
+[Search Site]
+Name=NPR
+URL=https://www.npr.org/search?query={query}
+Channel=News

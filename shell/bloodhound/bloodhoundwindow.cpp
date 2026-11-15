@@ -38,18 +38,20 @@
 #include <QUrl>
 #include <QWheelEvent>
 #include <algorithm>
+#include <cstdio>
+#include <pwd.h>
 
 #include "conf.h"
 
 static constexpr int W = 760, H = 620, MARGIN = 12;
-static constexpr int CHANNEL_H = 28;
-static constexpr int SEARCH_Y = 38;
+static constexpr int CHANNEL_H = 56;
+static constexpr int CHANNEL_TILE_W = 64, CHANNEL_TILE_H = 50, CHANNEL_TILE_GAP = 2;
+static constexpr int SEARCH_Y = CHANNEL_H + 10;
 static constexpr int SEARCH_X = MARGIN, SEARCH_W = 330;
 static constexpr int SCOPE_X = SEARCH_X + SEARCH_W + 8;
-static constexpr int CRITERIA_Y = 68, ROW_STEP = 28, MAX_ROWS = 6;
+static constexpr int CRITERIA_Y = SEARCH_Y + 30, ROW_STEP = 28, MAX_ROWS = 6;
 static constexpr int FIELD_W = 140, OP_W = 180, GAP = 6;
 static constexpr int NOTE_H = 17;
-static constexpr int RESULTS_Y = 100;
 static constexpr int HEADER_H = 21, BAND_H = 21, ROW_H = 19, SNIPPET_H = 13;
 static constexpr int STATUS_H = 22, SB_W = 15;
 static constexpr int PREVIEW_H = 92;
@@ -132,7 +134,11 @@ BloodhoundWindow::BloodhoundWindow(const QString &folder)
 	m_search.edited = [this] {
 		m_problem.clear();
 		m_status.clear();
-		liveSearchSoon();
+		if (peopleChannel()) {
+			fillPeople();
+		} else {
+			liveSearchSoon();
+		}
 		update();
 	};
 	m_scope.rect = QRect(SCOPE_X, SEARCH_Y, 100, PL_POPUP_H);
@@ -218,8 +224,7 @@ BloodhoundWindow::BloodhoundWindow(const QString &folder)
 	connect(m_worker, &BloodhoundSearch::finished, this, &BloodhoundWindow::finished);
 	loadSettings();
 	loadRecents();
-	reloadSites();
-	relayout();
+	chooseChannel(m_channelName);
 	setFocus();
 }
 
@@ -256,7 +261,10 @@ void BloodhoundWindow::reloadSites() {
 void BloodhoundWindow::loadSettings() {
 	const KeyValueFile conf = KeyValueFile::read(bloodhoundConfPath());
 	m_live.on = conf.yes("live-search");
-	const QString channel = conf.value("channel");
+	QString channel = conf.value("channel");
+	if (channel == "Internet") {
+		channel = "Web"; /* the 1.4 name for what 1.2 called Web */
+	}
 	if (!channel.isEmpty()) {
 		m_channelName = channel;
 	}
@@ -349,49 +357,194 @@ void BloodhoundWindow::runLiveSearch() {
 	}
 }
 
-void BloodhoundWindow::rebuildChannels() {
-	m_channels = { "Files" };
-	if (!m_sites.isEmpty()) {
-		m_channels << "Web";
-		QHash<QString, QString> named;
-		bool mine = false;
-		for (const SearchSite &site : m_sites) {
-			if (site.channel.isEmpty()) {
-				mine = mine || site.user;
-			} else {
-				const QString key = site.channel.toLower();
-				if (key != "web" && key != "files" && key != "my channel") {
-					named.insert(key, site.channel);
-				}
-			}
-		}
-		QStringList groups = named.values();
-		std::sort(groups.begin(), groups.end(), [](const QString &a, const QString &b) {
-			return a.compare(b, Qt::CaseInsensitive) < 0;
-		});
-		m_channels += groups;
-		if (mine) {
-			m_channels << "My Channel";
+const BloodhoundWindow::Channel *BloodhoundWindow::channelById(const QString &id) const {
+	for (const Channel &channel : m_channelDefs) {
+		if (channel.id == id) {
+			return &channel;
 		}
 	}
-	m_channelHits.clear();
-	int x = 10;
-	for (const QString &name : m_channels) {
-		Text label(name, 200, PL_FONT_SYSTEM);
-		const int width = label.inkWidth();
-		if (x + width + 12 > W - 10) {
+	return nullptr;
+}
+
+const BloodhoundWindow::Channel *BloodhoundWindow::currentChannel() const {
+	return channelById(m_channelName);
+}
+
+QString BloodhoundWindow::channelLabel(const QString &id) const {
+	const Channel *channel = channelById(id);
+	return channel ? channel->label : id;
+}
+
+bool BloodhoundWindow::filesChannel() const {
+	const Channel *channel = currentChannel();
+	return !channel || channel->kind == ChannelKind::Files;
+}
+
+bool BloodhoundWindow::sitesChannel() const {
+	const Channel *channel = currentChannel();
+	return channel && channel->kind == ChannelKind::Sites;
+}
+
+bool BloodhoundWindow::peopleChannel() const {
+	const Channel *channel = currentChannel();
+	return channel && channel->kind == ChannelKind::People;
+}
+
+bool BloodhoundWindow::helpChannel() const {
+	const Channel *channel = currentChannel();
+	return channel && channel->kind == ChannelKind::Help;
+}
+
+bool BloodhoundWindow::channelTileAt(const QPoint &pos, QString *id) const {
+	for (const ChannelTile &tile : m_channelTiles) {
+		if (tile.rect.contains(pos)) {
+			if (id) {
+				*id = tile.id;
+			}
+			return true;
+		}
+	}
+	return false;
+}
+
+void BloodhoundWindow::rebuildChannels() {
+	m_channels.clear();
+	m_channelDefs.clear();
+	auto add = [this](const QString &id, const QString &label, pl_icon_kind icon,
+			ChannelKind kind, bool builtin) {
+		Channel channel;
+		channel.id = id;
+		channel.label = label;
+		channel.icon = icon;
+		channel.kind = kind;
+		channel.builtin = builtin;
+		m_channelDefs.push_back(channel);
+		m_channels << id;
+	};
+
+	/* Sherlock 2's channels, in its order, with Apple's own channel
+	 * replaced by ZacOS's Help. The fixed set stays even when a channel
+	 * has no sites: a channel is a place to put sites, as it was in
+	 * Sherlock. */
+	add("Files", tr9("Files"), PL_ICON_CHANNEL_FILES, ChannelKind::Files, true);
+	add("Web", tr9("Internet"), PL_ICON_CHANNEL_INTERNET, ChannelKind::Sites, true);
+	add("People", tr9("People"), PL_ICON_CHANNEL_PEOPLE, ChannelKind::People, true);
+	add("Shopping", tr9("Shopping"), PL_ICON_CHANNEL_SHOPPING, ChannelKind::Sites, true);
+	add("News", tr9("News"), PL_ICON_CHANNEL_NEWS, ChannelKind::Sites, true);
+	add("ZacOS", tr9("ZacOS"), PL_ICON_CHANNEL_ZACOS, ChannelKind::Help, true);
+	add("Reference", tr9("Reference"), PL_ICON_CHANNEL_REFERENCE, ChannelKind::Sites, true);
+
+	QHash<QString, QString> named;
+	bool mine = false;
+	for (const SearchSite &site : m_sites) {
+		if (site.channel.isEmpty()) {
+			mine = mine || site.user;
+			continue;
+		}
+		const QString key = site.channel.toLower();
+		if (key != "files" && key != "web" && key != "internet" && key != "my channel" &&
+				key != "people" && key != "shopping" && key != "news" &&
+				key != "zacos" && key != "reference") {
+			named.insert(key, site.channel);
+		}
+	}
+	add("My Channel", tr9("My Channel"), PL_ICON_CHANNEL_MYCHANNEL,
+		ChannelKind::Sites, true);
+	QStringList groups = named.values();
+	std::sort(groups.begin(), groups.end(), [](const QString &a, const QString &b) {
+		return a.compare(b, Qt::CaseInsensitive) < 0;
+	});
+	for (const QString &group : groups) {
+		add(group, group, PL_ICON_CHANNEL_USER, ChannelKind::Sites, false);
+	}
+
+	/* One icon tile each, in a row that fits the window; what doesn't
+	 * fit goes behind the chevron at the right. */
+	m_channelTiles.clear();
+	m_channelMore = QRect();
+	m_host.hintAreas.clear();
+	int x = 6;
+	for (const Channel &channel : m_channelDefs) {
+		if (x + CHANNEL_TILE_W > W - 34) {
+			m_channelMore = QRect(W - 30, 3, 24, CHANNEL_TILE_H);
 			break;
 		}
-		const QRect hit(x - 5, 3, width + 10, 23);
-		m_channelHits.push_back({ name, hit });
-		x = hit.right() + 9;
+		ChannelTile tile;
+		tile.id = channel.id;
+		tile.rect = QRect(x, 3, CHANNEL_TILE_W, CHANNEL_TILE_H);
+		m_channelTiles.push_back(tile);
+		x += CHANNEL_TILE_W + CHANNEL_TILE_GAP;
 	}
+	for (const ChannelTile &tile : m_channelTiles) {
+		const Channel *channel = channelById(tile.id);
+		QString hint;
+		if (!channel) {
+			continue;
+		}
+		if (channel->id == "Files") {
+			hint = tr9("Files on this computer.");
+		} else if (channel->id == "Web") {
+			hint = tr9("Search sites on the Internet.");
+		} else if (channel->id == "People") {
+			hint = tr9("The people who can use this computer.");
+		} else if (channel->id == "Shopping") {
+			hint = tr9("Search shopping sites.");
+		} else if (channel->id == "News") {
+			hint = tr9("Search news sites.");
+		} else if (channel->id == "ZacOS") {
+			hint = tr9("Search ZacOS Help.");
+		} else if (channel->id == "Reference") {
+			hint = tr9("Search reference sites.");
+		} else if (channel->id == "My Channel") {
+			hint = tr9("Your own search sites.");
+		} else {
+			hint = tr9("“%1”: the sites grouped in this channel.").arg(channel->label);
+		}
+		m_host.hintAreas.push_back({ &tile.rect, hint });
+	}
+	if (!m_channelMore.isNull()) {
+		m_host.hintAreas.push_back({ &m_channelMore, tr9("The rest of the channels.") });
+	}
+	if (m_hoverChannel != QString() && !m_channels.contains(m_hoverChannel)) {
+		m_hoverChannel.clear();
+	}
+}
+
+void BloodhoundWindow::showChannelMenu(const QPoint &at) {
+	QMenu menu(this);
+	bool builtin = true;
+	for (const Channel &channel : m_channelDefs) {
+		if (builtin && !channel.builtin) {
+			menu.addSeparator();
+			builtin = false;
+		}
+		QAction *action = menu.addAction(channel.label);
+		action->setCheckable(true);
+		action->setChecked(channel.id == m_channelName);
+		connect(action, &QAction::triggered, this, [this, id = channel.id] {
+			chooseChannel(id);
+		});
+	}
+	menu.exec(mapToGlobal(at));
 }
 
 QList<SearchSite> BloodhoundWindow::sitesForChannel(const QString &name) const {
 	QList<SearchSite> out;
 	if (name == "Web") {
-		return m_sites;
+		/* Every site, but a general engine first: DuckDuckGo is the
+		 * default, then the other Internet sites, then the rest. */
+		out = m_sites;
+		auto rank = [](const SearchSite &site) {
+			if (site.name.compare("DuckDuckGo", Qt::CaseInsensitive) == 0) {
+				return 0;
+			}
+			return site.channel.compare("Internet", Qt::CaseInsensitive) == 0 ? 1 : 2;
+		};
+		std::stable_sort(out.begin(), out.end(), [&](const SearchSite &a, const SearchSite &b) {
+			const int ra = rank(a), rb = rank(b);
+			return ra != rb ? ra < rb : a.name.compare(b.name, Qt::CaseInsensitive) < 0;
+		});
+		return out;
 	}
 	if (name == "My Channel") {
 		for (const SearchSite &site : m_sites) {
@@ -411,7 +564,7 @@ QList<SearchSite> BloodhoundWindow::sitesForChannel(const QString &name) const {
 
 void BloodhoundWindow::updateSitePopup() {
 	m_site.items.clear();
-	if (filesChannel()) {
+	if (!sitesChannel()) {
 		m_site.selected = 0;
 		return;
 	}
@@ -436,19 +589,35 @@ void BloodhoundWindow::chooseChannel(const QString &name) {
 	m_similarTo.clear();
 	m_scrollY = 0;
 	m_listFocus = false;
+	m_barFocus = false;
 	m_searching = false;
 	m_worker->stop();
 	++m_generation;
 	m_find.enabled = true;
 	m_stop.enabled = false;
 	reloadSites();
-	if (filesChannel()) {
+	const Channel *channel = currentChannel();
+	if (!channel || channel->kind == ChannelKind::Files) {
 		m_search.hint = tr9("Search for");
+	} else if (channel->kind == ChannelKind::Help) {
+		m_search.hint = tr9("Search ZacOS Help for");
+	} else if (channel->id == "People") {
+		m_search.hint = tr9("Search for a person");
 	} else {
 		m_search.hint = tr9("Search the web for");
 	}
-	saveSetting("channel", m_channelName);
+	if (channel) {
+		m_barIndex = std::max(0, int(std::find_if(m_channelDefs.begin(),
+			m_channelDefs.end(), [&](const Channel &c) { return c.id == channel->id; }) -
+			m_channelDefs.begin()));
+		setAccessibleDescription(tr9("Search files and the web. The %1 channel is chosen.")
+			.arg(channel->label));
+	}
+	saveSetting("channel", m_channelName == "Web" ? "Internet" : m_channelName);
 	relayout();
+	if (peopleChannel()) {
+		fillPeople();
+	}
 	update();
 }
 
@@ -533,22 +702,56 @@ bool BloodhoundWindow::hasContentsRow() const {
 }
 
 void BloodhoundWindow::relayout() {
-	if (!filesChannel()) {
+	if (peopleChannel()) {
+		/* People keeps the result list and loses the criteria: one
+		 * search field, one Search button, the accounts below. */
 		m_liveTimer.stop();
-		m_host.popups = { &m_site };
+		m_host.popups.clear();
 		m_host.edits = { &m_search };
 		m_host.buttons = { &m_find };
 		m_host.checks.clear();
-		m_site.rect = QRect(SEARCH_X, SEARCH_Y, 230, PL_POPUP_H);
 		const int findX = m_find.rect.x();
-		m_search.rect = QRect(SEARCH_X + 238, SEARCH_Y,
-			std::max(100, findX - 6 - (SEARCH_X + 238)), PL_EDIT_H);
-		m_search.hint = tr9("Search the web for");
+		m_search.rect = QRect(SEARCH_X, SEARCH_Y,
+			std::max(100, findX - 6 - SEARCH_X), PL_EDIT_H);
 		m_find.enabled = true;
 		m_stop.enabled = false;
-		m_resultsTop = CRITERIA_Y + 30;
+		m_resultsTop = SEARCH_Y + PL_EDIT_H + 10;
 		m_listFocus = false;
+		m_barFocus = false;
 		m_host.defaultButton = &m_find;
+		if (m_host.focus != &m_search) {
+			m_host.setFocus(&m_search);
+		}
+		update();
+		return;
+	}
+	if (!filesChannel()) {
+		m_liveTimer.stop();
+		m_host.checks.clear();
+		m_host.defaultButton = &m_find;
+		m_find.enabled = true;
+		m_stop.enabled = false;
+		m_listFocus = false;
+		const int findX = m_find.rect.x();
+		m_host.edits = { &m_search };
+		m_host.buttons = { &m_find };
+		if (helpChannel()) {
+			m_host.popups.clear();
+			m_search.rect = QRect(SEARCH_X, SEARCH_Y,
+				std::max(100, findX - 6 - SEARCH_X), PL_EDIT_H);
+		} else if (m_site.items.empty()) {
+			/* No sites to choose from: the empty pane says how to add
+			 * one, and the search field takes the room. */
+			m_host.popups.clear();
+			m_search.rect = QRect(SEARCH_X, SEARCH_Y,
+				std::max(100, findX - 6 - SEARCH_X), PL_EDIT_H);
+		} else {
+			m_host.popups = { &m_site };
+			m_site.rect = QRect(SEARCH_X, SEARCH_Y, 230, PL_POPUP_H);
+			m_search.rect = QRect(SEARCH_X + 238, SEARCH_Y,
+				std::max(100, findX - 6 - (SEARCH_X + 238)), PL_EDIT_H);
+		}
+		m_resultsTop = SEARCH_Y + PL_EDIT_H + 10;
 		if (m_host.focus != &m_search) {
 			m_host.setFocus(&m_search);
 		}
@@ -621,8 +824,111 @@ FindQuery BloodhoundWindow::query() const {
 	return q;
 }
 
+void BloodhoundWindow::searchHelp() {
+	const QString words = m_search.text.trimmed();
+	m_problem.clear();
+	m_status.clear();
+	QString help = qEnvironmentVariable("ZACOS9_HELP");
+	if (help.isEmpty()) {
+		help = siblingProgram("zacos9-help");
+	}
+	if (help.isEmpty()) {
+		m_problem = tr9("The Help Center isn't installed.");
+		update();
+		return;
+	}
+	QStringList args;
+	if (!words.isEmpty()) {
+		args << "--search" << words;
+		rememberRecent(words);
+	}
+	if (!QProcess::startDetached(help, args)) {
+		m_problem = tr9("The Help Center couldn't be opened.");
+	} else if (words.isEmpty()) {
+		m_status = tr9("Opened the Help Center.");
+	} else {
+		m_status = tr9("The Help Center is searching for “%1”.").arg(words);
+	}
+	update();
+}
+
+void BloodhoundWindow::fillPeople() {
+	/* Sherlock's People channel found people on the web. Bloodhound's
+	 * finds the people who can use this computer: their full names and
+	 * Home folders, from the system's account list (NSS, so an account a
+	 * school or office serves appears too). A name never leaves the
+	 * computer. */
+	m_items.clear();
+	m_scrollY = 0;
+	m_problem.clear();
+	m_status.clear();
+	m_searching = false;
+	m_find.enabled = true;
+	m_stop.enabled = false;
+	const QString words = m_search.text.trimmed();
+	const QString passwdPath = qEnvironmentVariable("ZACOS9_PASSWD");
+	FILE *file = nullptr;
+	if (!passwdPath.isEmpty()) {
+		file = std::fopen(QFile::encodeName(passwdPath).constData(), "r");
+		if (!file) {
+			m_problem = tr9("Could not read the account list.");
+			update();
+			return;
+		}
+	} else {
+		setpwent();
+	}
+	struct passwd *pw = nullptr;
+	while ((pw = file ? fgetpwent(file) : getpwent())) {
+		if (!pw->pw_name || pw->pw_uid < 1000) {
+			continue;
+		}
+		const QString login = QString::fromLocal8Bit(pw->pw_name);
+		const QString path = pw->pw_dir ? QFileInfo(QString::fromLocal8Bit(pw->pw_dir))
+			.absoluteFilePath() : QString();
+		if (path.isEmpty() || !QFileInfo(path).isDir()) {
+			continue;
+		}
+		QString name = pw->pw_gecos ? QString::fromLocal8Bit(pw->pw_gecos)
+			.section(',', 0, 0).trimmed() : QString();
+		if (name.isEmpty()) {
+			name = login;
+		}
+		if (!words.isEmpty() && !name.contains(words, Qt::CaseInsensitive) &&
+				!login.contains(words, Qt::CaseInsensitive)) {
+			continue;
+		}
+		auto item = makeItem(QFileInfo(path));
+		if (!item) {
+			continue;
+		}
+		item->shownName = name;
+		item->kind = PL_ICON_HOME_FOLDER;
+		item->kindText = tr9("Person");
+		m_items.push_back(std::move(item));
+	}
+	if (file) {
+		std::fclose(file);
+	} else {
+		endpwent();
+	}
+	std::sort(m_items.begin(), m_items.end(), [](const auto &a, const auto &b) {
+		const int order = a->visibleName().compare(b->visibleName(), Qt::CaseInsensitive);
+		return order == 0 ? a->path < b->path : order < 0;
+	});
+	update();
+}
+
 void BloodhoundWindow::search(bool remember) {
 	m_liveTimer.stop();
+	if (peopleChannel()) {
+		fillPeople();
+		return;
+	}
+	if (helpChannel()) {
+		searchHelp();
+		return;
+	}
 	if (!filesChannel()) {
 		reloadSites();
 		if (filesChannel()) {
@@ -737,6 +1043,9 @@ void BloodhoundWindow::finished(const QString &problem) {
 }
 
 void BloodhoundWindow::findSimilar() {
+	if (!filesChannel()) {
+		return;
+	}
 	const std::vector<Item *> selected = selectedItems();
 	if (selected.empty()) {
 		return;
@@ -1129,7 +1438,7 @@ void BloodhoundWindow::copyPaths() {
 }
 
 void BloodhoundWindow::contextMenuEvent(QContextMenuEvent *e) {
-	if (!filesChannel()) {
+	if (!filesChannel() && !peopleChannel()) {
 		return;
 	}
 	Item *hit = itemAt(e->pos());
@@ -1145,7 +1454,7 @@ void BloodhoundWindow::contextMenuEvent(QContextMenuEvent *e) {
 	QAction *info = menu.addAction(tr9("Get Info"));
 	menu.addSeparator();
 	QAction *copy = menu.addAction(tr9("Copy Path"));
-	QAction *similar = menu.addAction(tr9("Find Similar Items"));
+	QAction *similar = filesChannel() ? menu.addAction(tr9("Find Similar Items")) : nullptr;
 	QAction *chosen = menu.exec(e->globalPos());
 	if (chosen == open) {
 		openSelection();
@@ -1155,7 +1464,7 @@ void BloodhoundWindow::contextMenuEvent(QContextMenuEvent *e) {
 		getInfo();
 	} else if (chosen == copy) {
 		copyPaths();
-	} else if (chosen == similar) {
+	} else if (similar && chosen == similar) {
 		findSimilar();
 	}
 }
@@ -1173,6 +1482,14 @@ void BloodhoundWindow::dragEnterEvent(QDragEnterEvent *e) {
 	if (info.isDir() || suffix == "searchsite" || suffix == "xml" || suffix == "src") {
 		e->acceptProposedAction();
 	}
+}
+
+void BloodhoundWindow::leaveEvent(QEvent *e) {
+	if (!m_hoverChannel.isEmpty()) {
+		m_hoverChannel.clear();
+		update();
+	}
+	QWidget::leaveEvent(e);
 }
 
 void BloodhoundWindow::dropEvent(QDropEvent *e) {
@@ -1213,8 +1530,10 @@ void BloodhoundWindow::searchFolder(const QString &path) {
 	m_similarTo.clear();
 	m_problem.clear();
 	m_status.clear();
+	m_search.hint = tr9("Search for");
 	m_scrollY = 0;
 	m_listFocus = false;
+	m_barFocus = false;
 	rebuildScope(FindScope::Folder);
 	relayout();
 	update();
@@ -1249,7 +1568,20 @@ void BloodhoundWindow::installSiteFile(const QString &path) {
 		return;
 	}
 	reloadSites();
-	chooseChannel("Web");
+	QString channelId = "Web";
+	for (const Channel &channel : m_channelDefs) {
+		/* People and ZacOS are local; a site naming them joins the
+		 * Internet channel instead, where every site is offered. */
+		if (channel.kind == ChannelKind::People || channel.kind == ChannelKind::Help) {
+			continue;
+		}
+		if (!site.channel.isEmpty() &&
+				channel.id.compare(site.channel, Qt::CaseInsensitive) == 0) {
+			channelId = channel.id;
+			break;
+		}
+	}
+	chooseChannel(channelId);
 	m_status = tr9("Installed “%1”.").arg(site.name);
 	update();
 }
@@ -1304,52 +1636,128 @@ void BloodhoundWindow::paintEvent(QPaintEvent *) {
 	pl_canvas *c = &px.c;
 	pl_fill(c, 0, 0, W - 1, H - 1, FACE);
 
-	/* The channel bar: Files, Web and the sites' own channels. */
+	/* The channel bar: Sherlock 2's row of icons, with ZacOS labels under
+	 * them. The chosen tile is pressed into the accent colour. */
 	pl_fill(c, 0, 0, W - 1, CHANNEL_H - 1, GRAY(0xC));
+	pl_hline(c, 0, W - 1, 0, C_WHITE);
 	pl_hline(c, 0, W - 1, CHANNEL_H - 1, GRAY(0x8));
-	for (const auto &[name, rect] : m_channelHits) {
-		if (name == m_channelName) {
-			pl_fill(c, rect.x(), rect.y(), rect.right(), rect.bottom(), C_WHITE);
-			pl_hline(c, rect.x(), rect.right(), rect.y(), C_BLACK);
-			pl_hline(c, rect.x(), rect.right(), rect.bottom(), C_BLACK);
-			pl_vline(c, rect.x(), rect.y(), rect.bottom(), C_BLACK);
-			pl_vline(c, rect.right(), rect.y(), rect.bottom(), C_BLACK);
+	bool chosenVisible = false;
+	for (const ChannelTile &tile : m_channelTiles) {
+		const Channel *channel = channelById(tile.id);
+		if (!channel) {
+			continue;
 		}
-		Text label(name, rect.width() - 8, PL_FONT_SYSTEM);
-		pl_text(c, label.t, rect.x() + 5, 19, C_BLACK);
+		const QRect &r = tile.rect;
+		const bool chosen = tile.id == m_channelName;
+		chosenVisible = chosenVisible || chosen;
+		if (chosen) {
+			const pl_accent accent = pl_accent_current();
+			pl_fill(c, r.x(), r.y(), r.right(), r.bottom(), accent.light);
+			pl_outline(c, r.x(), r.y(), r.right(), r.bottom(), C_BLACK);
+			pl_hline(c, r.x() + 1, r.right() - 1, r.y() + 1, C_WHITE);
+			pl_vline(c, r.x() + 1, r.y() + 1, r.bottom() - 1, C_WHITE);
+			pl_hline(c, r.x() + 1, r.right() - 1, r.bottom() - 1, accent.dark);
+			pl_vline(c, r.right() - 1, r.y() + 1, r.bottom() - 1, accent.dark);
+		} else if (tile.id == m_hoverChannel) {
+			pl_fill(c, r.x() + 1, r.y() + 1, r.right() - 1, r.bottom() - 1, GRAY(0xE));
+			pl_hline(c, r.x() + 1, r.right() - 1, r.y() + 1, C_WHITE);
+			pl_outline(c, r.x(), r.y(), r.right(), r.bottom(), GRAY(0xA));
+		}
+		pl_icon_paint(c, r.x() + (r.width() - PL_ICON_LARGE) / 2, r.y() + 3,
+			channel->icon, PL_ICON_LARGE, false);
+		Text label(channel->label, r.width() - 2, PL_FONT_VIEWS);
+		pl_text(c, label.t, r.x() + (r.width() - label.inkWidth()) / 2,
+			r.y() + 46, C_BLACK);
+		if (m_barFocus && int(&tile - m_channelTiles.data()) == m_barIndex) {
+			pl_outline(c, r.x() + 2, r.y() + 2, r.right() - 2, r.bottom() - 2, C_BLACK);
+		}
+	}
+	if (!m_channelMore.isNull()) {
+		const QRect &r = m_channelMore;
+		const bool hidden = !chosenVisible;
+		if (hidden) {
+			const pl_accent accent = pl_accent_current();
+			pl_fill(c, r.x(), r.y(), r.right(), r.bottom(), accent.light);
+			pl_outline(c, r.x(), r.y(), r.right(), r.bottom(), C_BLACK);
+		} else if (m_hoverChannel == "more") {
+			pl_fill(c, r.x(), r.y(), r.right(), r.bottom(), GRAY(0xE));
+		}
+		if (!hidden) {
+			pl_outline(c, r.x(), r.y(), r.right(), r.bottom(), GRAY(0x8));
+		}
+		Text more(QString::fromUtf8("»"), r.width() - 2, PL_FONT_SYSTEM);
+		pl_text(c, more.t, r.x() + (r.width() - more.inkWidth()) / 2, r.y() + 31,
+			C_BLACK);
 	}
 
 	/* The search field, scope or site, criteria rows and their buttons. */
 	m_host.paintControls(c, FACE);
-	if (!filesChannel()) {
+	if (!filesChannel() && !peopleChannel()) {
 		const int top = m_resultsTop, pt = paneTop();
 		pl_fill(c, 0, top, W - 1, pt - 1, C_WHITE);
-		const QList<SearchSite> sites = sitesForChannel(m_channelName);
-		QString siteName;
-		if (!sites.isEmpty()) {
-			siteName = sites.value(std::clamp(m_site.selected, 0, int(sites.size()) - 1)).name;
-		}
-		QString header;
-		if (!m_problem.isEmpty()) {
-			header = m_problem;
-		} else if (!m_status.isEmpty()) {
-			header = m_status;
-		} else if (!siteName.isEmpty()) {
-			header = tr9("Search the web with %1").arg(siteName);
+		if (helpChannel()) {
+			/* ZacOS replaces Sherlock's Apple channel: its own Help,
+			 * searched by the Help Center. */
+			pl_icon_paint(c, (W - PL_ICON_LARGE) / 2, top + 24,
+				PL_ICON_CHANNEL_ZACOS, PL_ICON_LARGE, false);
+			Text title(tr9("Search ZacOS Help"), W - 40, PL_FONT_SYSTEM);
+			pl_text(c, title.t, (W - title.inkWidth()) / 2, top + 78, C_BLACK);
+			QString line;
+			if (!m_problem.isEmpty()) {
+				line = m_problem;
+			} else if (!m_status.isEmpty()) {
+				line = m_status;
+			} else {
+				line = tr9("Type words and press Search. The Help Center opens with "
+					"every topic that mentions them.");
+			}
+			int lineY = top + 100;
+			for (const QString &part : panelWrap(line, W - 80, PL_FONT_VIEWS)) {
+				Text text(part, W - 80, PL_FONT_VIEWS);
+				pl_text(c, text.t, (W - text.inkWidth()) / 2, lineY,
+					m_problem.isEmpty() ? GRAY(0x5) : RGB(0xAA, 0x22, 0x22));
+				lineY += 14;
+			}
+			Text empty(tr9("With the field empty, Search opens the Help Center."),
+				W - 80, PL_FONT_VIEWS);
+			pl_text(c, empty.t, (W - empty.inkWidth()) / 2, lineY + 8, GRAY(0x5));
 		} else {
-			header = tr9("Search the web");
+			const QList<SearchSite> sites = sitesForChannel(m_channelName);
+			QString siteName;
+			if (!sites.isEmpty()) {
+				siteName = sites.value(std::clamp(m_site.selected, 0, int(sites.size()) - 1)).name;
+			}
+			QString header, hint;
+			if (!m_problem.isEmpty()) {
+				header = m_problem;
+			} else if (!m_status.isEmpty()) {
+				header = m_status;
+			} else if (sites.isEmpty()) {
+				header = tr9("No sites in %1 yet").arg(channelLabel(m_channelName));
+			} else if (!siteName.isEmpty()) {
+				header = tr9("Search the web with %1").arg(siteName);
+			} else if (m_channelName == "Web") {
+				header = tr9("Search the web");
+			} else {
+				header = tr9("Search %1").arg(channelLabel(m_channelName));
+			}
+			if (sites.isEmpty() && m_problem.isEmpty() && m_status.isEmpty()) {
+				hint = tr9("Drop a search site on Bloodhound, or add one to your "
+					"Internet Search Sites folder.");
+			} else {
+				hint = tr9("Type words and press Search. The results open in your browser.");
+			}
+			Text headerText(header, W - 40, PL_FONT_VIEWS);
+			pl_text(c, headerText.t, (W - headerText.inkWidth()) / 2, top + 24,
+				m_problem.isEmpty() ? C_BLACK : RGB(0xAA, 0x22, 0x22));
+			Text hintText(hint, W - 60, PL_FONT_VIEWS);
+			pl_text(c, hintText.t, (W - hintText.inkWidth()) / 2, top + 54, GRAY(0x5));
 		}
-		Text headerText(header, W - 40, PL_FONT_VIEWS);
-		pl_text(c, headerText.t, (W - headerText.inkWidth()) / 2, top + 24,
-			m_problem.isEmpty() ? C_BLACK : RGB(0xAA, 0x22, 0x22));
-		Text hint(tr9("Type words and press Search. The results open in your browser."),
-			W - 60, PL_FONT_VIEWS);
-		pl_text(c, hint.t, (W - hint.inkWidth()) / 2, top + 54, GRAY(0x5));
 		pl_hline(c, 0, W - 1, pt, C_BLACK);
 		pl_fill(c, 0, pt + 1, W - 1, H - 1, GRAY(0xD));
 		pl_hline(c, 0, W - 1, pt + 1, C_WHITE);
-		Text where(siteName.isEmpty() ? m_channelName : siteName, W - 2 * MARGIN,
-			PL_FONT_VIEWS);
+		Text where(helpChannel() ? tr9("ZacOS Help") : channelLabel(m_channelName),
+			W - 2 * MARGIN, PL_FONT_VIEWS);
 		pl_text(c, where.t, MARGIN, pt + 15, C_BLACK);
 		QPainter p(this);
 		px.blit(p);
@@ -1375,6 +1783,8 @@ void BloodhoundWindow::paintEvent(QPaintEvent *) {
 	} else if (!m_similarTo.isEmpty()) {
 		header = count == 1 ? tr9("Similar to “%1” — 1 item").arg(m_similarTo)
 			: tr9("Similar to “%1” — %2 items").arg(m_similarTo).arg(count);
+	} else if (peopleChannel()) {
+		header = count == 1 ? tr9("1 person") : tr9("%1 people").arg(count);
 	} else if (count == 0) {
 		header = tr9("No items found");
 	} else if (count == 1) {
@@ -1462,8 +1872,13 @@ void BloodhoundWindow::paintEvent(QPaintEvent *) {
 		Text where(selected.front()->path, statusW, PL_FONT_VIEWS);
 		pl_text(c, where.t, MARGIN, st + 15, C_BLACK);
 	} else if (count > 0) {
-		Text items(count == 1 ? tr9("1 item") : tr9("%1 items").arg(count),
-			statusW, PL_FONT_VIEWS);
+		QString countText;
+		if (peopleChannel()) {
+			countText = count == 1 ? tr9("1 person") : tr9("%1 people").arg(count);
+		} else {
+			countText = count == 1 ? tr9("1 item") : tr9("%1 items").arg(count);
+		}
+		Text items(countText, statusW, PL_FONT_VIEWS);
 		pl_text(c, items.t, MARGIN, st + 15, C_BLACK);
 	}
 	if (filesChannel()) {
@@ -1480,13 +1895,13 @@ void BloodhoundWindow::mousePressEvent(QMouseEvent *e) {
 	}
 	const QPoint pos = e->position().toPoint();
 	if (pos.y() < CHANNEL_H) {
-		for (const auto &[name, rect] : m_channelHits) {
-			if (rect.contains(pos)) {
-				if (name != m_channelName) {
-					chooseChannel(name);
-				}
-				return;
-			}
+		if (!m_channelMore.isNull() && m_channelMore.contains(pos)) {
+			showChannelMenu(m_channelMore.bottomLeft());
+			return;
+		}
+		QString id;
+		if (channelTileAt(pos, &id) && id != m_channelName) {
+			chooseChannel(id);
 		}
 		return;
 	}
@@ -1497,10 +1912,11 @@ void BloodhoundWindow::mousePressEvent(QMouseEvent *e) {
 	}
 	if (m_host.hostPress(e)) {
 		m_listFocus = false;
+		m_barFocus = false;
 		update();
 		return;
 	}
-	if (!filesChannel()) {
+	if (!filesChannel() && !peopleChannel()) {
 		return;
 	}
 	if (pos.x() >= W - SB_W + 1 && pos.y() >= listTop() - 1 && pos.y() < paneTop()) {
@@ -1520,6 +1936,7 @@ void BloodhoundWindow::mousePressEvent(QMouseEvent *e) {
 	}
 	if (pos.y() >= listTop() && pos.y() < paneTop() && pos.x() < W - SB_W) {
 		m_listFocus = true;
+		m_barFocus = false;
 		m_host.setFocus(nullptr);
 		Item *hit = itemAt(pos);
 		const bool toggle = e->modifiers() & (Qt::ShiftModifier | Qt::ControlModifier);
@@ -1538,8 +1955,20 @@ void BloodhoundWindow::mousePressEvent(QMouseEvent *e) {
 }
 
 void BloodhoundWindow::mouseMoveEvent(QMouseEvent *e) {
-	m_host.hostMove(e);
 	const QPoint pos = e->position().toPoint();
+	QString hover;
+	if (pos.y() < CHANNEL_H) {
+		if (!m_channelMore.isNull() && m_channelMore.contains(pos)) {
+			hover = "more";
+		} else {
+			channelTileAt(pos, &hover);
+		}
+	}
+	if (hover != m_hoverChannel) {
+		m_hoverChannel = hover;
+		update();
+	}
+	m_host.hostMove(e);
 	if (m_sbPart == SB_THUMB_PART && (e->buttons() & Qt::LeftButton)) {
 		pl_scrollbar v = bar();
 		const int range = sb_thumb_span(&v);
@@ -1577,7 +2006,7 @@ void BloodhoundWindow::mouseReleaseEvent(QMouseEvent *e) {
 }
 
 void BloodhoundWindow::mouseDoubleClickEvent(QMouseEvent *e) {
-	if (e->button() == Qt::LeftButton && filesChannel()) {
+	if (e->button() == Qt::LeftButton && (filesChannel() || peopleChannel())) {
 		Item *hit = itemAt(e->position().toPoint());
 		if (hit) {
 			selectOnly(hit);
@@ -1587,7 +2016,7 @@ void BloodhoundWindow::mouseDoubleClickEvent(QMouseEvent *e) {
 }
 
 void BloodhoundWindow::wheelEvent(QWheelEvent *e) {
-	if (!filesChannel()) {
+	if (!filesChannel() && !peopleChannel()) {
 		return;
 	}
 	scrollTo(m_scrollY - e->angleDelta().y() / 120 * rowHeight() * 3);
@@ -1597,12 +2026,20 @@ void BloodhoundWindow::keyPressEvent(QKeyEvent *e) {
 	const bool cmd = e->modifiers() & Qt::ControlModifier;
 	const bool shift = e->modifiers() & Qt::ShiftModifier;
 	const int key = e->key();
+	if (cmd && key >= Qt::Key_1 && key <= Qt::Key_9) {
+		const int index = key - Qt::Key_1;
+		if (index < int(m_channelDefs.size())) {
+			chooseChannel(m_channelDefs[index].id);
+		}
+		return;
+	}
 	if (cmd && key == Qt::Key_F && shift && m_listFocus) {
 		findSimilar();
 		return;
 	}
 	if (cmd && key == Qt::Key_F) {
 		m_listFocus = false;
+		m_barFocus = false;
 		m_host.setFocus(&m_search);
 		m_search.selectAll();
 		update();
@@ -1615,6 +2052,39 @@ void BloodhoundWindow::keyPressEvent(QKeyEvent *e) {
 	if (cmd && key == Qt::Key_Q) {
 		QApplication::quit();
 		return;
+	}
+	if (m_barFocus) {
+		const int count = int(m_channelDefs.size());
+		if (key == Qt::Key_Left || key == Qt::Key_Up) {
+			m_barIndex = (m_barIndex + count - 1) % count;
+			update();
+			return;
+		}
+		if (key == Qt::Key_Right || key == Qt::Key_Down) {
+			m_barIndex = (m_barIndex + 1) % count;
+			update();
+			return;
+		}
+		if (key == Qt::Key_Home) {
+			m_barIndex = 0;
+			update();
+			return;
+		}
+		if (key == Qt::Key_End) {
+			m_barIndex = count - 1;
+			update();
+			return;
+		}
+		if (key == Qt::Key_Return || key == Qt::Key_Enter || key == Qt::Key_Space) {
+			chooseChannel(m_channelDefs[m_barIndex].id);
+			return;
+		}
+		if (key == Qt::Key_Escape) {
+			m_barFocus = false;
+			m_host.setFocus(&m_search);
+			update();
+			return;
+		}
 	}
 	if (m_listFocus) {
 		if (cmd && key == Qt::Key_R) {
@@ -1658,12 +2128,36 @@ void BloodhoundWindow::keyPressEvent(QKeyEvent *e) {
 		}
 	}
 	if (key == Qt::Key_Tab || key == Qt::Key_Backtab) {
-		if (!filesChannel()) {
-			m_host.setFocus(&m_search);
+		const int direction = key == Qt::Key_Backtab ? -1 : 1;
+		if (!filesChannel() && !peopleChannel()) {
+			/* The web and Help channels have one field and the bar; they
+			 * have no result list to reach. */
+			if (m_barFocus) {
+				m_barFocus = false;
+				m_host.setFocus(&m_search);
+			} else {
+				m_barFocus = true;
+				for (size_t i = 0; i < m_channelDefs.size(); i++) {
+					if (m_channelDefs[i].id == m_channelName) {
+						m_barIndex = int(i);
+					}
+				}
+				m_host.setFocus(nullptr);
+			}
 			update();
 			return;
 		}
-		const int direction = key == Qt::Key_Backtab ? -1 : 1;
+		if (m_barFocus) {
+			m_barFocus = false;
+			if (direction > 0) {
+				m_listFocus = true;
+				m_host.setFocus(nullptr);
+			} else {
+				m_host.setFocus(&m_search);
+			}
+			update();
+			return;
+		}
 		std::vector<PanelEdit *> live;
 		for (PanelEdit *edit : m_host.edits) {
 			if (edit->enabled) {
@@ -1672,14 +2166,28 @@ void BloodhoundWindow::keyPressEvent(QKeyEvent *e) {
 		}
 		if (m_listFocus) {
 			m_listFocus = false;
-			m_host.setFocus(direction > 0 ? &m_search
-				: (live.empty() ? &m_search : live.back()));
+			if (direction < 0) {
+				m_barFocus = true;
+				for (size_t i = 0; i < m_channelDefs.size(); i++) {
+					if (m_channelDefs[i].id == m_channelName) {
+						m_barIndex = int(i);
+					}
+				}
+				m_host.setFocus(nullptr);
+			} else {
+				m_host.setFocus(live.empty() ? &m_search : live.front());
+			}
 		} else {
 			auto it = std::find(live.begin(), live.end(), m_host.focus);
 			const int at = it == live.end() ? -1 : int(it - live.begin());
 			const int next = at + direction;
 			if (next < 0 || next >= int(live.size())) {
-				m_listFocus = true;
+				m_barFocus = true;
+				for (size_t i = 0; i < m_channelDefs.size(); i++) {
+					if (m_channelDefs[i].id == m_channelName) {
+						m_barIndex = int(i);
+					}
+				}
 				m_host.setFocus(nullptr);
 			} else {
 				m_host.setFocus(live[next]);
@@ -1689,6 +2197,9 @@ void BloodhoundWindow::keyPressEvent(QKeyEvent *e) {
 		return;
 	}
 	if (key == Qt::Key_Escape) {
+		m_listFocus = false;
+		m_barFocus = false;
+		m_host.setFocus(&m_search);
 		if (m_worker->running() || m_searching) {
 			stop();
 		} else {

@@ -34,7 +34,7 @@ what the thing does.
 | Apple Menu Options | **Zac Menu Options** | new | |
 | Control Strip | **The Collar** | shipped | |
 | Software Update | **Fetch Updates** | shipped | |
-| Sherlock 2 | **Bloodhound** | shipped (Bloodhound 1.3) | the search dog |
+| Sherlock 2 | **Bloodhound** | shipped (Bloodhound 1.3; 1.4 in the tree) | the search dog |
 | Find Similar Files | **Find Similar Items** | new | descriptive |
 | Launcher | **Toy Box** | new | where favourite things are kept |
 | Application Switcher palette | **The Pack** | new | every running app, together |
@@ -241,7 +241,7 @@ Section 3 lists every feature; section 5 is the plan.
 | Pedigree | ✅ | See 3.18. |
 | Neighbourhood | ✅ | |
 | Remote Access Status | — | Dial-up; out of scope. |
-| Bloodhound | ✅ | Bloodhound (Search) 1.2 (1.12.0) has the Files channel (criteria, contents, Find Similar, saved searches) and Internet Search Sites with Web and user channels. 1.3 (1.13.0) adds live search, recents, index controls, drag-and-drop, a preview pane and the app's strings in the translation files. See 3.13. |
+| Bloodhound | ✅ | Bloodhound (Search) 1.2 (1.12.0) has the Files channel (criteria, contents, Find Similar, saved searches) and Internet Search Sites with Web and user channels. 1.3 (1.13.0) adds live search, recents, index controls, drag-and-drop, a preview pane and the app's strings in the translation files. 1.4 adds Sherlock 2's icon channel bar: Files, Internet, People, Shopping, News, ZacOS, Reference, My Channel and user channels, with a desktop alias. See 3.13. |
 | Automated Tasks (scripts) | ✅ | See 3.12. |
 | Force Quit (ZacOS addition) | ✅ | |
 
@@ -367,13 +367,13 @@ for), and **About This Computer** keeps showing honest memory use. The
 
 | Feature | Status | Notes |
 |---|---|---|
-| **Bloodhound (Search)** in the Zac menu and Applications | ✅ | 1.12.0: `shell/bloodhound/` is the standalone Files search window; 1.1 adds criteria rows, contents through the index, Find Similar Items and saved searches; 1.2 adds Internet Search Sites, Web and user channels shared with Search Internet. |
+| **Bloodhound (Search)** in the Zac menu, Applications and the desktop | ✅ | 1.12.0: `shell/bloodhound/` is the standalone Files search window; 1.1 adds criteria rows, contents through the index, Find Similar Items and saved searches; 1.2 adds Internet Search Sites, Web and user channels shared with Search Internet; 1.4 adds Sherlock 2's icon channel bar and the ZacOS Help channel. |
 | Find by name, results as a Sniffer view | ✅ | |
 | Criteria: dates, comments, size, kind, label, version, locked, empty/shared folder, invisible, custom icon | ✅ | `shell/files/findcriteria.cpp`: where (all disks, Home, the front folder) and up to six rows that must all match: name (contains, starts/ends with, is, is not, doesn't contain), date modified/created (today, past week/month, before/after a date), size, kind, label, lock, folder empty/shared, custom icon (is/is not), comments (contains, is/is not, doesn't contain), invisible (is/is not; host dotfiles) and application package version (contains, is/is not, doesn't contain). Hidden entries are traversed only for a query with an invisible criterion. |
 | **Search contents** with an index; schedule indexing; Index Selection | ✅ | `shell/files/findindex.cpp`: "contents include" asks localsearch (tinysparql full-text query, kept to the chosen place; the other rows sift its answers); File ▸ Index Selection adds folders to its index. Scheduling is localsearch's own. |
 | Find Similar Items | ✅ | The document's most distinctive words, any of them, ranked by the index. |
 | Save a search; several searches at once | ✅ | Save named criteria in the Find dialog; Saved Searches opens each in its own Items Found window. |
-| Internet channels (web search with plug-ins) | ✅ | The Sniffer's File ▸ Search Internet and Bloodhound's Web and user channels read the same site files: OpenSearch XML, `.searchsite`, and classic `.src`, in `System Folder ▸ Internet Search Sites` and `~/.config/zacos9/Internet Search Sites`. |
+| Internet channels (web search with plug-ins) | ✅ | The Sniffer's File ▸ Search Internet and Bloodhound's Internet, Shopping, News, Reference, My Channel and user channels read the same site files: OpenSearch XML, `.searchsite`, and classic `.src`, in `System Folder ▸ Internet Search Sites` and `~/.config/zacos9/Internet Search Sites`. People lists the accounts on this computer; ZacOS searches the local Help Center. |
 
 ### §3.14 Users and login (ch. 17)
 

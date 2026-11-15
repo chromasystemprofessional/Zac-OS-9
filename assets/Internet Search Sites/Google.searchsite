@@ -1,3 +1,4 @@
 [Search Site]
 Name=Google
 URL=https://www.google.com/search?q={query}
+Channel=Internet
