@@ -56,14 +56,19 @@ if [ -n "$missing" ]; then
 	fi
 fi
 
-# Beside the tree rather than in /tmp: the package and its tests need
-# several gigabytes, and a tmpfs /tmp can be too small for them (the
-# Memory tests' 1 GB swap file then looks like "no room on disks"). Keep
-# the tree when the build fails, so the test log survives.
-work=$root/build/deb
-rm -rf "$work"
-mkdir -p "$work/tmp"
-export TMPDIR=$work/tmp
+# A disk-backed temporary directory without spaces: the package and its
+# tests need several gigabytes, /tmp can be a small tmpfs (the Memory
+# tests' 1 GB swap file then reads "no room on disk"), and a few helpers
+# hand their paths to shell commands that split on whitespace, so a
+# checkout under "Zac OS" must not also be the build's own path.
+# ZACOS9_BUILD_TMPDIR replaces ~/.cache/zacos9.
+base=${ZACOS9_BUILD_TMPDIR:-${XDG_CACHE_HOME:-$HOME/.cache}/zacos9}
+case $base in
+*" "*) echo "build-debs.sh: $base contains a space; set ZACOS9_BUILD_TMPDIR to a path without one." >&2; exit 1 ;;
+esac
+mkdir -p "$base"
+export TMPDIR=$base
+work=$(mktemp -d "$TMPDIR/zacos9-deb.XXXXXX")
 finish() {
 	status=$?
 	if [ "$status" -eq 0 ]; then
