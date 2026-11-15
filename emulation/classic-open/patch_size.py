@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Let Classic Open Helper run in the background.
 
-Retro68's application template marks apps cannotBackgound. A Startup Item
-helper must be allowed to run behind the Finder. This rewrites the SIZE
-resource in the generated .rsrc/ClassicOpenHelper.APPL (the resource fork
-SheepShaver reads beside the .APPL data fork), clearing that one flag.
+Retro68's application template does not set canBackground. A Startup Item
+helper must be allowed to run behind another Classic application. This
+rewrites the SIZE resource in the generated .rsrc/ClassicOpenHelper.APPL
+(the resource fork SheepShaver reads beside the .APPL data fork), setting that
+flag.
 
     python3 patch_size.py build/.../.rsrc/ClassicOpenHelper.APPL
 """
@@ -13,7 +14,7 @@ import struct
 import sys
 from pathlib import Path
 
-CANNOT_BACKGROUND = 0x1000
+CAN_BACKGROUND = 0x1000
 SIZE_ID = 0xFFFF
 
 
@@ -34,9 +35,9 @@ def patch(path):
             if kind == b"SIZE" and resource_id == SIZE_ID:
                 base = data_offset + resource_offset + 4
                 flags = struct.unpack(">H", data[base:base + 2])[0]
-                data[base:base + 2] = struct.pack(">H", flags & ~CANNOT_BACKGROUND)
+                data[base:base + 2] = struct.pack(">H", flags | CAN_BACKGROUND)
                 Path(path).write_bytes(data)
-                print(f"patched {path}: SIZE flags {flags:#06x} -> {flags & ~CANNOT_BACKGROUND:#06x}")
+                print(f"patched {path}: SIZE flags {flags:#06x} -> {flags | CAN_BACKGROUND:#06x}")
                 return
     raise SystemExit(f"{path}: no SIZE (-1) resource")
 

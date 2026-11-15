@@ -205,7 +205,11 @@ install now boots and opens SimpleText, but MacTCP still drops the second
 request; the real-header Open Transport probe also does not run from Startup
 Items there. Launching it manually from Applications also left it frontmost
 with no log entry and no connection, so it hangs before `InitOpenTransport`
-returns. Open Transport support is still unresolved.
+returns. The helper's SIZE resource was also missing `canBackground`, so Mac OS
+suspended it when another app came forward; `patch_size.py` now sets it. Even
+with that flag, MacTCP did not deliver a second request. Open Transport support
+is still unresolved, and the next transport must not depend on MacTCP after an
+app switch.
 
 ### 2. Opt-in independent document windows
 

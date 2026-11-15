@@ -85,8 +85,9 @@ python3 emulation/classic-open/patch_size.py \
   /tmp/classic-open-build/.rsrc/ClassicOpenHelper.APPL
 ```
 
-`patch_size.py` clears the `cannotBackground` flag if the Retro68 template set
-it; the current build is already background-capable, so it is a no-op. The
+`patch_size.py` sets the SIZE resource's `canBackground` flag. Retro68 does not
+set it, so without this step the helper is suspended as soon as another Classic
+application comes forward. The
 generated `.APPL`, `.rsrc/ClassicOpenHelper.APPL` and
 `.finf/ClassicOpenHelper.APPL` are what SheepShaver's ExtFS reads. Copy all
 three to the Mac (the shared Unix volume is easiest), then drag the
