@@ -59,6 +59,12 @@ launch it: that Mac OS 9 install lacks the `OTClientLib`/`OTClientUtilLib`
 client libraries. A clean Mac OS 9 installation is required before Open
 Transport can be used.
 
+A clean Mac OS 9 installation was then made on a fresh disk. It boots normally
+and opens SimpleText, but the MacTCP bridge still times out on the second
+request there, so the post-app-switch receive failure is not disk corruption.
+The real-header Open Transport probe also does not run from Startup Items on
+that install, so Open Transport launch/library support is still unresolved.
+
 The prototype also only opens applications that are files in the shared home
 folder, with plain ASCII names and no colon. Applications inside a guest disk
 image are not reachable by this path; open those inside the Mac for now.

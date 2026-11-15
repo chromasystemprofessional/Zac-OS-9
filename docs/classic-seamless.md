@@ -200,7 +200,10 @@ shared volume. The Open Transport route needs the real Universal Interfaces 3.x
 headers to match its private entry point. With Universal Interfaces 3.4 the
 probe builds correctly, but the repaired test guest does not launch it because
 that install lacks the `OTClientLib`/`OTClientUtilLib` client libraries. A clean
-Mac OS 9 install is required before Open Transport can be used.
+Mac OS 9 install is required before Open Transport can be used. A clean
+install now boots and opens SimpleText, but MacTCP still drops the second
+request; the real-header Open Transport probe also does not run from Startup
+Items there. Open Transport support is still unresolved.
 
 ### 2. Opt-in independent document windows
 
