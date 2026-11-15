@@ -209,7 +209,10 @@ returns. The helper's SIZE resource was also missing `canBackground`, so Mac OS
 suspended it when another app came forward; `patch_size.py` now sets it. Even
 with that flag, MacTCP did not deliver a second request. Open Transport support
 is still unresolved, and the next transport must not depend on MacTCP after an
-app switch.
+app switch. A split listener/launcher design also opened the first app while
+the listener never called `LaunchApplication`, but its MacTCP receive still
+stopped after the process switch. Direct launching beyond one request per
+session therefore needs an emulator-side bridge or another IPC path.
 
 ### 2. Opt-in independent document windows
 
