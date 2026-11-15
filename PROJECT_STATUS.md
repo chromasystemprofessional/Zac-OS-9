@@ -233,8 +233,10 @@ All of them are [on GitHub](https://github.com/chromasystemprofessional/Zac-OS-9
    processes, including typed text. A basic host viewer shows them as ordinary
    toplevels and forwards clicks and keys through the emulator's ADB queue.
    Close in Classic reaches the guest close box and preserves the unsaved
-   SimpleText prompt; resize, drag/wheel, documents and full lifecycle
-   recovery are still to come.
+   SimpleText prompt. An isolated compositor trial showed real ZacOS title
+   bars with Calculator, SheepShaver and the exported SimpleText window.
+   Resize, documents, window placement and full lifecycle recovery are still
+   to come.
 4. **From the [roadmap](docs/ROADMAP.md)**: a Platinum boot menu (on Esc),
    manual pages, trying it in Hyper-V.
 

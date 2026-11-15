@@ -165,6 +165,13 @@ It reads `$HOME/ClassicWindows.txt` (override with
 the exported windows are hidden; **Show Exported Windows** brings them back.
 The current transport is polling files, not a live event stream.
 
+The first real-compositor trial ran the emulator, `zacos9-classic-windows` and
+`zacos9-calculator` in an isolated headless `zacos9-wm`. The Calculator,
+SheepShaver and exported SimpleText windows all received real ZacOS title
+bars, and **Show Exported Windows** raised the exported window. The compositor
+placed a re-shown exported window partly off the bottom of the screen in one
+trial; placement and focus restoration still need work.
+
 Clicks and keys in an exported window are written as
 `zacos9-classic/input/event.<n>.evt`. The patched sheepshaver injects them
 through ADB one event per video tick. Mouse coordinates are the guest content

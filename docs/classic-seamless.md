@@ -239,7 +239,11 @@ writing PPM frames to the shared volume. A basic host frontend
 guest window titles, a controller that can hide them for desktop mode, and
 click/key forwarding through the patched emulator's ADB input queue. In the
 disposable guest, typing, dragging a text selection and close requests reached
-the guest and appeared in the captured frame. **Close in Classic** sends the guest close-box click;
+the guest and appeared in the captured frame. An isolated headless
+`zacos9-wm` trial showed the Calculator, SheepShaver and exported SimpleText
+windows with real ZacOS title bars; **Show Exported Windows** raised the
+exported window. One re-shown window was placed partly offscreen, so placement
+and focus restoration remain to fix. **Close in Classic** sends the guest close-box click;
 SimpleText's unsaved-document prompt appeared in the desktop and Cancel kept
 the document, so the close path does not bypass the prompt. Guest resize,
 drag/wheel, document routing and a fully persistent **Show Classic Desktop**
