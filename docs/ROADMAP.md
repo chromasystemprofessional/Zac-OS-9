@@ -94,8 +94,10 @@ scaling only, original behaviors and timings).
     Helper open apps from the shared home volume, and the emulator-side bridge
     lets a running session accept further apps one at a time. SimpleText and
     SimpleSound have been opened in one session, so the milestone 1 application
-    gate is met. Documents and apps inside guest disk images are not handled
-    yet; do not claim general direct launching.
+    gate is met. The guest window agent now discovers and captures SimpleText
+    and Graphing Calculator windows as independent frames; host toplevels,
+    input and documents are not implemented yet. Do not claim seamless windows
+    or general direct launching.
   - After that gate, double-clicking a Classic app or document in the Sniffer
     should launch it in Old Dog. The current emulator startup path only
     attaches disks; documents and apps inside guest images remain

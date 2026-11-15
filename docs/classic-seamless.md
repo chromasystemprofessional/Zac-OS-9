@@ -225,6 +225,17 @@ sets it.
 does not stretch stale pixels, moving one window does not move another, and
 unsaved close can be cancelled. Repeated focus switches leave no stuck input.
 
+**Prototype status (2026-11-15):** the guest half is working. An original
+background agent ([`emulation/classic-windows`](../emulation/classic-windows/README.md))
+installs native InterfaceLib transition-vector hooks and identifies windows
+from separate processes. In a Mac OS 9.0.4 guest it discovered and captured
+SimpleText and Graphing Calculator 1.1 windows, including typed text, while
+writing PPM frames to the shared volume. Host toplevels, input forwarding,
+close/resize requests and the **Show Classic Desktop** action are not
+implemented, so the gate above is not met. The current frame transport
+(rewriting PPM every two seconds) and bounded operation coverage are prototype
+work, not production compatibility.
+
 ### 3. Modal dialogs, popups and full-desktop recovery
 
 - Represent supported dialogs as transient host windows with guest-correct

@@ -228,9 +228,10 @@ All of them are [on GitHub](https://github.com/chromasystemprofessional/Zac-OS-9
    color-port/GWorld prerequisite now passes exact-pixel direct-32-bit tests.
    The patched SheepShaver's emulator bridge lets `--open` and Classic Open
    Helper open further apps in a running session; SimpleText and SimpleSound
-   have been opened in one session. Documents and apps inside guest disk images
-   still need guest-side handling. The feasibility gate still needs guest
-   window discovery and identities, input delivery, and lifecycle evidence.
+   have been opened in one session. A background window agent now discovers
+   and captures SimpleText and Graphing Calculator windows in separate
+   processes, including typed text, but host toplevels, input forwarding,
+   documents, and lifecycle recovery are still to come.
 4. **From the [roadmap](docs/ROADMAP.md)**: a Platinum boot menu (on Esc),
    manual pages, trying it in Hyper-V.
 
