@@ -1,7 +1,11 @@
 #!/bin/sh
 # zacos9-classic: run classic Mac OS in an emulator window.
 #
-#   zacos9-classic [--check] [--68k] [--disk IMAGE]...
+#   zacos9-classic [--check] [--68k] [--fullscreen|--windowed] [--disk IMAGE]...
+#
+# The screen fills the desktop at its resolution when the compositor's
+# output list can be read; --windowed (or "screen=window" in classic.conf)
+# keeps the 800x600 window instead.
 #
 # The user supplies Apple's files: ROMs and system disk images go in
 # ~/Classic (or $ZACOS9_CLASSIC_DIR), up to two folders deep. ROMs are
@@ -24,14 +28,17 @@ self_dir=$(cd "$(dirname "$0")" && pwd)
 check=false
 arch=ppc
 extra_disks=""
+fullscreen=auto
 
 while [ $# -gt 0 ]; do
 	case $1 in
 	--check) check=true ;;
 	--68k) arch=68k ;;
+	--fullscreen) fullscreen=yes ;;
+	--windowed) fullscreen=no ;;
 	--disk) shift; extra_disks="$extra_disks
 $1" ;;
-	*) echo "usage: zacos9-classic [--check] [--68k] [--disk IMAGE]..." >&2; exit 64 ;;
+	*) echo "usage: zacos9-classic [--check] [--68k] [--fullscreen|--windowed] [--disk IMAGE]..." >&2; exit 64 ;;
 	esac
 	shift
 done
@@ -39,6 +46,35 @@ done
 fail() {
 	echo "$1" >&2
 	exit 2
+}
+
+# The main screen's resolution as the desktop shows it: the mode divided by
+# its scale, turned for a rotated screen. The compositor publishes it in
+# $XDG_RUNTIME_DIR/zacos9-outputs-$WAYLAND_DISPLAY:
+#   output NAME WxH scale S nested 0|1 x X y Y main 0|1 rotate R
+# A windowed or headless session has no such file and gets the window.
+desktop_size() {
+	runtime=${XDG_RUNTIME_DIR:-}
+	display=${WAYLAND_DISPLAY:-}
+	[ -n "$runtime" ] && [ -n "$display" ] || return 1
+	[ -r "$runtime/zacos9-outputs-$display" ] || return 1
+	while read -r kind name size scale_word scale nested_word nested \
+			x_word x y_word y main_word main rotate_word rotate; do
+		[ "$kind" = "output" ] && [ "$main" = "1" ] || continue
+		width=${size%x*}
+		height=${size#*x}
+		case $width in ''|*[!0-9]*) continue ;; esac
+		case $height in ''|*[!0-9]*) continue ;; esac
+		case $scale in ''|*[!0-9.]*) scale=1 ;; esac
+		width=$(awk -v n="$width" -v s="$scale" 'BEGIN { printf "%d", n / s + 0.5 }')
+		height=$(awk -v n="$height" -v s="$scale" 'BEGIN { printf "%d", n / s + 0.5 }')
+		case $rotate in
+		90|270) turned=$width; width=$height; height=$turned ;;
+		esac
+		echo "$width $height"
+		return 0
+	done < "$runtime/zacos9-outputs-$display"
+	return 1
 }
 
 # ROM checksums (the first four bytes), best first. SheepShaver wants an
@@ -165,16 +201,38 @@ if $has_cd && ! $has_hd; then
 	fi
 fi
 
+# Full screen at the desktop's resolution, or the 800x600 window. The
+# command line wins over classic.conf's "screen=", which wins over full
+# screen when the compositor's output list is readable.
+if [ "$fullscreen" = auto ]; then
+	conf_screen=$(sed -n 's/^screen=//p' "$classic_conf" 2>/dev/null | tail -n 1)
+	case $conf_screen in
+	fullscreen) fullscreen=yes ;;
+	window|windowed) fullscreen=no ;;
+	esac
+fi
+screen=win/800/600
+if [ "$fullscreen" != no ]; then
+	size=$(desktop_size) || size=""
+	if [ -n "$size" ]; then
+		screen="dga/${size% *}/${size#* }"
+	elif [ "$fullscreen" = yes ]; then
+		# Asked for by hand, but the desktop's size can't be read.
+		screen=dga/800/600
+	fi
+fi
+
 if $check; then
 	echo "emulator: $exe"
 	echo "rom: $rom"
 	echo "$disks" | sed -n 's/^./disk: &/p'
 	[ -z "$startup" ] || echo "startup: $startup"
+	echo "screen: $screen"
 	[ -n "$disks" ] || echo "disks: none (the Mac will wait for a startup disk)"
 	exit 0
 fi
 
-set -- --rom "$rom" --ramsize $ram --screen win/800/600 --extfs "$HOME" --nogui true
+set -- --rom "$rom" --ramsize $ram --screen "$screen" --extfs "$HOME" --nogui true
 # A network through the emulator's own NAT: the Mac gets an address by DHCP
 # and reaches this computer at 10.0.2.2 (its file sharing too, in the
 # Chooser or Network Browser). This computer reaches the Mac's file
