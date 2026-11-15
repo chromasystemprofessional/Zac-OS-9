@@ -46,6 +46,13 @@ completion routine crashed the guest. The next attempt should use Open
 Transport or a correctly built asynchronous completion UPP, not a blocking
 MacTCP receive loop.
 
+A Finder `Open Documents` Apple Event was also tried, to keep the helper out of
+the application launch. The Finder rejected both FSSpec and alias items for
+applications on the ExtFS volume with error -903, so that route did not help.
+The Open Transport probe linked, but `OTOpenEndpointPriv` crashed with a
+hand-written prototype; the real Universal Interfaces 3.x headers are needed
+to get that entry point's signature right.
+
 The prototype also only opens applications that are files in the shared home
 folder, with plain ASCII names and no colon. Applications inside a guest disk
 image are not reachable by this path; open those inside the Mac for now.
