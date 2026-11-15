@@ -203,6 +203,13 @@ emulator() {
 	program_path "$1"
 }
 
+start_window_viewer() {
+	[ "${ZACOS9_CLASSIC_WINDOWS:-1}" != 0 ] || return 0
+	frontend=$(program_path zacos9-classic-windows 2>/dev/null || true)
+	[ -n "$frontend" ] || return 0
+	"$frontend" >/dev/null 2>&1 &
+}
+
 [ -d "$classic_dir" ] || fail "Put Macintosh ROM files and system disk images in the folder \"$(basename "$classic_dir")\" in your home folder."
 
 if [ $arch = ppc ]; then
@@ -296,12 +303,6 @@ if [ -n "$open_path" ]; then
 	queue_reset
 	queue_request
 	printf '%s\n' "$$" > "$pidfile"
-	if [ "${ZACOS9_CLASSIC_WINDOWS:-1}" != 0 ]; then
-		frontend=$(program_path zacos9-classic-windows 2>/dev/null || true)
-		if [ -n "$frontend" ]; then
-			"$frontend" >/dev/null 2>&1 &
-		fi
-	fi
 else
 	if session_alive; then
 		echo "Classic is already running." >&2
@@ -310,6 +311,7 @@ else
 	queue_reset
 	printf '%s\n' "$$" > "$pidfile"
 fi
+start_window_viewer
 
 set -- --rom "$rom" --ramsize $ram --screen win/800/600 --extfs "$HOME" --nogui true
 # A network through the emulator's own NAT: the Mac gets an address by DHCP

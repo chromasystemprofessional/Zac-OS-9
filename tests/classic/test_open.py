@@ -127,7 +127,12 @@ with tempfile.TemporaryDirectory() as d:
     check((home / "zacos9-classic" / "input").is_dir(),
           "a new session creates the input queue")
     check(viewer_record.exists(),
-          "a new session starts the Classic window viewer")
+          "a new --open session starts the Classic window viewer")
+
+    viewer_record.unlink()
+    code, out, err = run()
+    check(code == 0 and viewer_record.exists(),
+          "a plain new session starts the Classic window viewer")
 
     # A running session accepts further requests. The bridge stand-in
     # acknowledges and removes each one, as the patched emulator does.
