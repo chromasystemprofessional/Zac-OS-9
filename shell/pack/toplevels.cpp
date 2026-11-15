@@ -111,6 +111,9 @@ void Toplevels::start(std::function<void()> changed) {
 			wl_proxy_set_queue(reinterpret_cast<wl_proxy *>(w->handle), nullptr);
 		}
 	}
+	if (seat) {
+		wl_proxy_set_queue(reinterpret_cast<wl_proxy *>(seat), nullptr);
+	}
 	wl_event_queue_destroy(queue);
 	wl_display_flush(display);
 }

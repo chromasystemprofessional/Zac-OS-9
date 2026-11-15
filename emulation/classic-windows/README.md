@@ -47,7 +47,9 @@ the full desktop fallback are not implemented yet.
 - Mouse drag and double-click are forwarded; the wheel is mapped to cursor
   up/down keys. Dragging across SimpleText text selected it in the guest.
 - **Resize in Classic** (controller button, context menu or `Ctrl+Alt+R`) asks
-  for a content size and sends one grow-box drag. Direct guest input changed
+  for a content size and sends one grow-box drag; close and resize first click
+  the target's guest title bar so a background window is not confused with the
+  front one. Direct guest input changed
   SimpleText from 615x541 to 645x564 and the capture resized with it.
 - **Close in Classic** sends a click to the guest window's close box, so the
   application's normal close path runs. With unsaved SimpleText text, the save

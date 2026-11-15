@@ -348,9 +348,22 @@ public:
 		setToolTip(window.app);
 	}
 
+	void activateGuest(std::function<void()> then) {
+		if (m_frame.isNull()) {
+			then();
+			return;
+		}
+		sendMouse(m_frame.left() + m_frame.width() / 2, m_frame.top() + 10, "move");
+		sendMouse(m_frame.left() + m_frame.width() / 2, m_frame.top() + 10, "down");
+		sendMouse(m_frame.left() + m_frame.width() / 2, m_frame.top() + 10, "up");
+		QTimer::singleShot(180, this, std::move(then));
+	}
+
 	void requestResize() {
 		if (m_frame.isNull() || !m_guestSize.isValid())
 			return;
+		/* The guest grow box can be under another Classic window; bring this
+		   window forward first. */
 		bool ok = false;
 		const int width = QInputDialog::getInt(this, tr("Resize in Classic"),
 			tr("Content width:"), m_guestSize.width(), 64, 1024, 1, &ok);
@@ -363,15 +376,17 @@ public:
 		const QSize delta(width - m_guestSize.width(), height - m_guestSize.height());
 		if (delta.isNull())
 			return;
-		const int x = m_frame.right() - 12;
-		const int y = m_frame.bottom() - 12;
-		sendMouse(x, y, "move");
-		sendMouse(x, y, "down");
-		for (int step = 1; step <= 8; step++) {
-			sendMouse(x + delta.width() * step / 8,
-				y + delta.height() * step / 8, "move");
-		}
-		sendMouse(x + delta.width(), y + delta.height(), "up");
+		activateGuest([this, delta] {
+			const int x = m_frame.right() - 12;
+			const int y = m_frame.bottom() - 12;
+			sendMouse(x, y, "move");
+			sendMouse(x, y, "down");
+			for (int step = 1; step <= 8; step++) {
+				sendMouse(x + delta.width() * step / 8,
+					y + delta.height() * step / 8, "move");
+			}
+			sendMouse(x + delta.width(), y + delta.height(), "up");
+		});
 	}
 
 	void requestClose() {
@@ -380,11 +395,13 @@ public:
 		m_closePending = true;
 		const int x = m_frame.left() + 10;
 		const int y = m_frame.top() + 12;
-		sendMouse(x, y, "move");
-		sendMouse(x, y, "down");
-		sendMouse(x, y, "up");
-		hide();
-		m_closeRequested(m_serial);
+		activateGuest([this, x, y] {
+			sendMouse(x, y, "move");
+			sendMouse(x, y, "down");
+			sendMouse(x, y, "up");
+			hide();
+			m_closeRequested(m_serial);
+		});
 		QTimer::singleShot(1500, this, [this] { m_closePending = false; });
 	}
 
