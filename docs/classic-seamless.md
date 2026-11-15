@@ -203,7 +203,9 @@ that install lacks the `OTClientLib`/`OTClientUtilLib` client libraries. A clean
 Mac OS 9 install is required before Open Transport can be used. A clean
 install now boots and opens SimpleText, but MacTCP still drops the second
 request; the real-header Open Transport probe also does not run from Startup
-Items there. Open Transport support is still unresolved.
+Items there. Launching it manually from Applications also left it frontmost
+with no log entry and no connection, so it hangs before `InitOpenTransport`
+returns. Open Transport support is still unresolved.
 
 ### 2. Opt-in independent document windows
 

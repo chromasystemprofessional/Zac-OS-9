@@ -64,6 +64,8 @@ and opens SimpleText, but the MacTCP bridge still times out on the second
 request there, so the post-app-switch receive failure is not disk corruption.
 The real-header Open Transport probe also does not run from Startup Items on
 that install, so Open Transport launch/library support is still unresolved.
+Launching it manually from Applications left it frontmost with no log entry and
+no network connection, so it hangs before `InitOpenTransport` returns.
 
 The prototype also only opens applications that are files in the shared home
 folder, with plain ASCII names and no colon. Applications inside a guest disk
