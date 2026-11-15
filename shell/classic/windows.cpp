@@ -16,6 +16,7 @@
 #include <QFileInfo>
 #include <QHBoxLayout>
 #include <QImage>
+#include <QInputDialog>
 #include <QCloseEvent>
 #include <QKeyEvent>
 #include <QMouseEvent>
@@ -318,6 +319,9 @@ public:
 		auto *desktop = new QAction(tr("Show Classic Desktop"), this);
 		connect(desktop, &QAction::triggered, this, [this] { m_showDesktop(); });
 		addAction(desktop);
+		auto *resize = new QAction(tr("Resize in Classic…"), this);
+		connect(resize, &QAction::triggered, this, [this] { requestResize(); });
+		addAction(resize);
 		auto *close = new QAction(tr("Close in Classic"), this);
 		connect(close, &QAction::triggered, this, [this] { requestClose(); });
 		addAction(close);
@@ -328,6 +332,9 @@ public:
 		auto *shortcut = new QShortcut(QKeySequence("Ctrl+Alt+D"), this);
 		connect(shortcut, &QShortcut::activated, this,
 			[this] { m_showDesktop(); });
+		auto *resizeShortcut = new QShortcut(QKeySequence("Ctrl+Alt+R"), this);
+		connect(resizeShortcut, &QShortcut::activated, this,
+			[this] { requestResize(); });
 	}
 
 	int serial() const { return m_serial; }
@@ -338,6 +345,32 @@ public:
 		m_goAway = window.goAway;
 		setWindowTitle(window.title.isEmpty() ? window.app : window.title);
 		setToolTip(window.app);
+	}
+
+	void requestResize() {
+		if (m_frame.isNull() || !m_guestSize.isValid())
+			return;
+		bool ok = false;
+		const int width = QInputDialog::getInt(this, tr("Resize in Classic"),
+			tr("Content width:"), m_guestSize.width(), 64, 1024, 1, &ok);
+		if (!ok)
+			return;
+		const int height = QInputDialog::getInt(this, tr("Resize in Classic"),
+			tr("Content height:"), m_guestSize.height(), 64, 768, 1, &ok);
+		if (!ok)
+			return;
+		const QSize delta(width - m_guestSize.width(), height - m_guestSize.height());
+		if (delta.isNull())
+			return;
+		const int x = m_frame.right() - 12;
+		const int y = m_frame.bottom() - 12;
+		sendMouse(x, y, "move");
+		sendMouse(x, y, "down");
+		for (int step = 1; step <= 8; step++) {
+			sendMouse(x + delta.width() * step / 8,
+				y + delta.height() * step / 8, "move");
+		}
+		sendMouse(x + delta.width(), y + delta.height(), "up");
 	}
 
 	void requestClose() {
@@ -366,6 +399,7 @@ public:
 		m_path = path;
 		m_modified = modified;
 		m_image->setPixmap(QPixmap::fromImage(image));
+		m_guestSize = image.size();
 		setFixedSize(image.size());
 	}
 
@@ -443,6 +477,7 @@ private:
 	QRect m_frame;
 	bool m_goAway = false;
 	bool m_closePending = false;
+	QSize m_guestSize;
 	QString m_path;
 	QDateTime m_modified;
 	QLabel *m_image = nullptr;
@@ -457,11 +492,13 @@ public:
 		m_status->setWordWrap(true);
 		auto *desktop = new QPushButton(tr("Show Classic Desktop"), this);
 		auto *windows = new QPushButton(tr("Show Exported Windows"), this);
+		auto *resize = new QPushButton(tr("Resize"), this);
 		auto *close = new QPushButton(tr("Close in Classic"), this);
 		auto *refresh = new QPushButton(tr("Refresh"), this);
 		auto *buttons = new QHBoxLayout;
 		buttons->addWidget(desktop);
 		buttons->addWidget(windows);
+		buttons->addWidget(resize);
 		buttons->addWidget(close);
 		buttons->addWidget(refresh);
 		auto *layout = new QVBoxLayout(this);
@@ -470,9 +507,10 @@ public:
 		layout->addLayout(buttons);
 		connect(desktop, &QPushButton::clicked, this, [this] { showDesktop(); });
 		connect(windows, &QPushButton::clicked, this, [this] { showWindows(); });
+		connect(resize, &QPushButton::clicked, this, [this] { resizeSelected(); });
 		connect(close, &QPushButton::clicked, this, [this] { closeSelected(); });
 		connect(refresh, &QPushButton::clicked, this, [this] { poll(); });
-		setFixedSize(520, 320);
+		setFixedSize(620, 320);
 	}
 
 	void poll() {
@@ -562,6 +600,15 @@ private:
 			viewer->activateWindow();
 		}
 	}
+	void resizeSelected() {
+		auto *item = m_list->currentItem();
+		int serial = item ? item->data(Qt::UserRole).toInt() : -1;
+		if (serial < 0 && m_viewers.size() == 1)
+			serial = m_viewers.firstKey();
+		if (auto *viewer = m_viewers.value(serial))
+			viewer->requestResize();
+	}
+
 	void closeSelected() {
 		auto *item = m_list->currentItem();
 		int serial = item ? item->data(Qt::UserRole).toInt() : -1;

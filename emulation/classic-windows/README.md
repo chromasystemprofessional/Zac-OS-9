@@ -46,6 +46,9 @@ the full desktop fallback are not implemented yet.
   and in the next captured frame.
 - Mouse drag and double-click are forwarded; the wheel is mapped to cursor
   up/down keys. Dragging across SimpleText text selected it in the guest.
+- **Resize in Classic** (controller button, context menu or `Ctrl+Alt+R`) asks
+  for a content size and sends one grow-box drag. Direct guest input changed
+  SimpleText from 615x541 to 645x564 and the capture resized with it.
 - **Close in Classic** sends a click to the guest window's close box, so the
   application's normal close path runs. With unsaved SimpleText text, the save
   prompt appeared in the Classic desktop; Cancel kept the document and Don't
@@ -102,8 +105,8 @@ delete old frames.
 - Exporting a full PPM about every 250 ms is prototype transport, not the
   production frame path. It writes about 1 MB per 615x541 window per update,
   which is usable for typing and selection but not 30 fps animation.
-- No resize or menu forwarding. The exported window is fixed to the guest
-  content size.
+- Host window border dragging is not forwarded. The exported window stays at
+  the guest content size; use **Resize in Classic** for a one-shot resize.
 - Dialogs are not exported. The SimpleText save prompt is usable only through
   the Classic desktop (use **Show Classic Desktop**).
 - The agent may keep a closed window's last record until the process exits or
@@ -115,6 +118,8 @@ delete old frames.
 - Wheel scrolling is cursor-key emulation, not a native scroll event. Modifier
   edge cases are not complete. Key mapping is the US layout; the guest's own
   keyboard layout still applies.
+- Resize is one-shot, not a live border drag; a guest that clamps the requested
+  size keeps its actual size.
 - A window that never draws after the agent starts is not discovered. Hooking
   window creation and activation is the next step.
 - The agent is a Startup Item application, not an INIT. It uses the background
