@@ -244,13 +244,15 @@ the guest and appeared in the captured frame. An isolated headless
 windows with real ZacOS title bars; **Show Exported Windows** raised the
 exported window. **Show Classic Desktop** hides exported windows and activates
 the emulator through foreign-toplevel activation. One re-shown window appeared
-as a collapsed bottom tab, so restoring it with focus remains to fix. **Close in Classic** sends the guest close-box click;
-SimpleText's unsaved-document prompt appeared in the desktop and Cancel kept
-the document, so the close path does not bypass the prompt. Guest resize,
-drag/wheel, document routing and a fully persistent **Show Classic Desktop**
-action are not implemented, so the gate above is not met. The current frame transport
-(rewriting PPM about every 250 ms) and bounded operation coverage are prototype
-work, not production compatibility.
+as a collapsed bottom tab, so restoring it with focus remains to fix. **Close
+in Classic** sends the guest close-box click; SimpleText's unsaved-document
+prompt appeared in the desktop and Cancel kept the document, so the close path
+does not bypass the prompt. **Resize in Classic** sends one grow-box drag;
+direct guest input resized SimpleText from 615x541 to 645x564 and the capture
+followed. Live host-border resize, document routing and full window lifecycle
+cleanup are not implemented, so the gate above is not met. The current frame
+transport (rewriting PPM about every 250 ms) and bounded operation coverage are
+prototype work, not production compatibility.
 
 ### 3. Modal dialogs, popups and full-desktop recovery
 
