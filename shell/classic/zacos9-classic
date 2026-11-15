@@ -1,7 +1,11 @@
 #!/bin/sh
 # zacos9-classic: run classic Mac OS in an emulator window.
 #
-#   zacos9-classic [--check] [--68k] [--disk IMAGE]... [--open APP]
+#   zacos9-classic [--check] [--68k] [--fullscreen|--windowed] [--disk IMAGE]...
+#
+# The screen fills the desktop at its resolution when the compositor's
+# output list can be read; --windowed (or "screen=window" in classic.conf)
+# keeps the 800x600 window instead.
 #
 # The user supplies Apple's files: ROMs and system disk images go in
 # ~/Classic (or $ZACOS9_CLASSIC_DIR), up to two folders deep. ROMs are
@@ -29,17 +33,17 @@ self_dir=$(cd "$(dirname "$0")" && pwd)
 check=false
 arch=ppc
 extra_disks=""
-open_path=""
-queue_root=$HOME/zacos9-classic
+fullscreen=auto
 
 while [ $# -gt 0 ]; do
 	case $1 in
 	--check) check=true ;;
 	--68k) arch=68k ;;
-	--disk) [ $# -ge 2 ] || { echo "usage: zacos9-classic [--check] [--68k] [--disk IMAGE]... [--open APP]" >&2; exit 64; }; shift; extra_disks="$extra_disks
+	--fullscreen) fullscreen=yes ;;
+	--windowed) fullscreen=no ;;
+	--disk) shift; extra_disks="$extra_disks
 $1" ;;
-	--open) [ $# -ge 2 ] || { echo "usage: zacos9-classic [--check] [--68k] [--disk IMAGE]... [--open APP]" >&2; exit 64; }; shift; open_path=$1 ;;
-	*) echo "usage: zacos9-classic [--check] [--68k] [--disk IMAGE]... [--open APP]" >&2; exit 64 ;;
+	*) echo "usage: zacos9-classic [--check] [--68k] [--fullscreen|--windowed] [--disk IMAGE]..." >&2; exit 64 ;;
 	esac
 	shift
 done
@@ -49,82 +53,33 @@ fail() {
 	exit 2
 }
 
-# Direct launching only knows files on the shared Unix volume. The host
-# home folder is the ExtFS root, so the Mac path is the relative path with
-# colons instead of slashes.
-map_open_path() {
-	[ -n "$open_path" ] || return 0
-	case $open_path in
-	/*) ;;
-	*) open_path=$(pwd)/$open_path ;;
-	esac
-	[ -f "$open_path" ] || fail "The Classic application \"$open_path\" was not found."
-	case $open_path in
-	"$HOME"/*) ;;
-	*) fail "Classic applications must be in your home folder to open directly. Put this one in the Mac's Unix volume, or open it inside the Mac." ;;
-	esac
-	rel=${open_path#"$HOME"/}
-	case $rel in
-	''|*:*) fail "The Classic application's name contains a colon, which the Mac cannot use in a path. Rename it and try again." ;;
-	esac
-	case ":$rel:" in
-	*:..:*) fail "The Classic application's path contains \"..\". Move it into a folder in your home folder and try again." ;;
-	esac
-	if printf '%s' "$rel" | LC_ALL=C grep -q '[^ -~]'; then
-		fail "The Classic application's path has characters that direct launching cannot pass yet. Rename it to plain ASCII, or open it inside the Mac."
-	fi
-	# The bridge block holds 200 bytes including the terminator.
-	[ ${#rel} -le 199 ] || fail "The Classic application's path is too long to open directly."
-	guest_path=$(printf '%s' "$rel" | tr '/' ':')
-}
-
-runtime_dir() {
-	if [ -n "${XDG_RUNTIME_DIR:-}" ]; then
-		echo "$XDG_RUNTIME_DIR/zacos9-classic"
-	else
-		echo "/tmp/zacos9-classic-$(id -u)"
-	fi
-}
-
-session_alive() {
-	[ -f "$pidfile" ] || return 1
-	pid=$(cat "$pidfile" 2>/dev/null) || return 1
-	case $pid in ''|*[!0-9]*) return 1 ;; esac
-	kill -0 "$pid" 2>/dev/null
-}
-
-# A small versioned request, read by the patched emulator's Classic bridge.
-# Every request gets a new name with a sequence number so the queue is easy to
-# inspect; the bridge reads the directory afresh for each request.
-queue_reset() {
-	rm -rf "$queue_root/requests" "$queue_root/acks" "$queue_root/input"
-	mkdir -p "$queue_root/requests" "$queue_root/acks" "$queue_root/input"
-	chmod 700 "$queue_root" "$queue_root/requests" "$queue_root/acks" \
-		"$queue_root/input" 2>/dev/null || true
-	printf '0\n' > "$queue_root/sequence"
-}
-
-queue_request() {
-	requests="$queue_root/requests"
-	acks="$queue_root/acks"
-	seqfile="$queue_root/sequence"
-	seq=$(cat "$seqfile" 2>/dev/null || echo 0)
-	case $seq in ''|*[!0-9]*) seq=0 ;; esac
-	if [ "$seq" -gt 0 ]; then
-		tries=0
-		while [ ! -f "$acks/ack-$seq" ] && [ "$tries" -lt 50 ]; do
-			sleep 0.1
-			tries=$((tries + 1))
-		done
-		[ -f "$acks/ack-$seq" ] || fail "The Mac has not taken the previous open request yet. Try again in a moment."
-	fi
-	seq=$((seq + 1))
-	printf '%s\n' "$seq" > "$seqfile"
-	request_id=$seq
-	id=$seq
-	tmp="$requests/.request.$seq.tmp"
-	printf 'version=1\nid=%s\npath=%s\n' "$id" "$guest_path" > "$tmp"
-	mv "$tmp" "$requests/request.$seq.req"
+# The main screen's resolution as the desktop shows it: the mode divided by
+# its scale, turned for a rotated screen. The compositor publishes it in
+# $XDG_RUNTIME_DIR/zacos9-outputs-$WAYLAND_DISPLAY:
+#   output NAME WxH scale S nested 0|1 x X y Y main 0|1 rotate R
+# A windowed or headless session has no such file and gets the window.
+desktop_size() {
+	runtime=${XDG_RUNTIME_DIR:-}
+	display=${WAYLAND_DISPLAY:-}
+	[ -n "$runtime" ] && [ -n "$display" ] || return 1
+	[ -r "$runtime/zacos9-outputs-$display" ] || return 1
+	while read -r kind name size scale_word scale nested_word nested \
+			x_word x y_word y main_word main rotate_word rotate; do
+		[ "$kind" = "output" ] && [ "$main" = "1" ] || continue
+		width=${size%x*}
+		height=${size#*x}
+		case $width in ''|*[!0-9]*) continue ;; esac
+		case $height in ''|*[!0-9]*) continue ;; esac
+		case $scale in ''|*[!0-9.]*) scale=1 ;; esac
+		width=$(awk -v n="$width" -v s="$scale" 'BEGIN { printf "%d", n / s + 0.5 }')
+		height=$(awk -v n="$height" -v s="$scale" 'BEGIN { printf "%d", n / s + 0.5 }')
+		case $rotate in
+		90|270) turned=$width; width=$height; height=$turned ;;
+		esac
+		echo "$width $height"
+		return 0
+	done < "$runtime/zacos9-outputs-$display"
+	return 1
 }
 
 # ROM checksums (the first four bytes), best first. SheepShaver wants an
@@ -191,8 +146,8 @@ find_disks() {
 	done
 }
 
-program_path() {
-	for dir in ${ZACOS9_EMULATORS:-} "$self_dir/../emulators/bin" \
+emulator() {
+	for dir in "${ZACOS9_EMULATORS:-}" "$self_dir/../emulators/bin" \
 			"$self_dir/../libexec/zacos9"; do
 		[ -x "$dir/$1" ] && { echo "$(cd "$dir" && pwd)/$1"; return 0; }
 	done
@@ -262,58 +217,39 @@ if $has_cd && ! $has_hd; then
 	fi
 fi
 
-map_open_path
+# Full screen at the desktop's resolution, or the 800x600 window. The
+# command line wins over classic.conf's "screen=", which wins over full
+# screen when the compositor's output list is readable.
+if [ "$fullscreen" = auto ]; then
+	conf_screen=$(sed -n 's/^screen=//p' "$classic_conf" 2>/dev/null | tail -n 1)
+	case $conf_screen in
+	fullscreen) fullscreen=yes ;;
+	window|windowed) fullscreen=no ;;
+	esac
+fi
+screen=win/800/600
+if [ "$fullscreen" != no ]; then
+	size=$(desktop_size) || size=""
+	if [ -n "$size" ]; then
+		screen="dga/${size% *}/${size#* }"
+	elif [ "$fullscreen" = yes ]; then
+		# Asked for by hand, but the desktop's size can't be read.
+		screen=dga/800/600
+	fi
+fi
 
 if $check; then
 	echo "emulator: $exe"
 	echo "rom: $rom"
 	echo "$disks" | sed -n 's/^./disk: &/p'
 	[ -z "$startup" ] || echo "startup: $startup"
+	echo "screen: $screen"
 	[ -n "$disks" ] || echo "disks: none (the Mac will wait for a startup disk)"
 	[ -z "$open_path" ] || echo "open: $open_path -> Unix:$guest_path"
 	exit 0
 fi
 
-# One session owns the emulator and its disks. A running session accepts
-# further direct opens one at a time; the emulator bridge reads each request
-# directly, so the guest's ExtFS directory cache is no longer involved. A
-# second plain launch leaves the running session alone.
-runtime=$(runtime_dir)
-pidfile=$runtime/session.pid
-mkdir -p "$runtime"
-chmod 700 "$runtime" 2>/dev/null || true
-if [ -n "$open_path" ]; then
-	if session_alive; then
-		queue_request
-		tries=0
-		while [ ! -f "$queue_root/acks/ack-$request_id" ] && [ "$tries" -lt 50 ]; do
-			sleep 0.1
-			tries=$((tries + 1))
-		done
-		ack="$queue_root/acks/ack-$request_id"
-		[ -f "$ack" ] || \
-			fail "Classic did not open \"$open_path\". Classic Open Helper may be missing or busy."
-		grep -q '^status=ok$' "$ack" || {
-			code=$(sed -n 's/^code=//p' "$ack" | head -n 1)
-			fail "The Mac refused \"$open_path\"${code:+ (Mac error $code)}."
-		}
-		echo "Classic is running; asked it to open $open_path." >&2
-		exit 0
-	fi
-	queue_reset
-	queue_request
-	printf '%s\n' "$$" > "$pidfile"
-else
-	if session_alive; then
-		echo "Classic is already running." >&2
-		exit 0
-	fi
-	queue_reset
-	printf '%s\n' "$$" > "$pidfile"
-fi
-start_window_viewer
-
-set -- --rom "$rom" --ramsize $ram --screen win/800/600 --extfs "$HOME" --nogui true
+set -- --rom "$rom" --ramsize $ram --screen "$screen" --extfs "$HOME" --nogui true
 # A network through the emulator's own NAT: the Mac gets an address by DHCP
 # and reaches this computer at 10.0.2.2 (its file sharing too, in the
 # Chooser or Network Browser). This computer reaches the Mac's file

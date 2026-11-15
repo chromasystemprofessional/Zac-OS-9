@@ -70,8 +70,12 @@ so the Mac starts up from the installed system and only falls back to a CD.
 - The emulator window gets a Platinum frame from zacos9-wm.
 - Your home folder appears on the Mac's desktop as the "Unix" volume. Copy
   files across through it.
-- RAM is 256 MB for SheepShaver and 64 MB for Basilisk II. The screen is an
-  800×600 window.
+- RAM is 256 MB for SheepShaver and 64 MB for Basilisk II. Old Dog opens
+  **full screen at the desktop's resolution**, read from the compositor's
+  output list. Run `zacos9-classic --windowed` (or put `screen=window` in
+  `~/.config/zacos9/classic.conf`) for the 800×600 window instead;
+  `--fullscreen` forces full screen when the desktop's size can't be read.
+  `zacos9-classic --check` prints the screen mode it would use.
 
 Run `zacos9-classic --check` to see which emulator, ROM and disks would be
 used. Add `--68k` for Basilisk II.

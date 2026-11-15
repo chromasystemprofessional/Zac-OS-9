@@ -37,12 +37,49 @@ mkdir -p "$out"
 rm -f "$out"/zacos9*.deb
 
 sudo_() { if [ "$(id -u)" = 0 ]; then "$@"; else sudo "$@"; fi; }
-if ! command -v dpkg-buildpackage >/dev/null || ! command -v dh >/dev/null; then
-	sudo_ apt-get install -y --no-install-recommends build-essential debhelper devscripts fakeroot
+# The package tools come from Debian. A container or sandbox without them
+# (and without apt-get or sudo) can't build the package: say so plainly
+# instead of failing inside sudo, which reads as a bug in this script.
+missing=""
+for tool in dpkg-buildpackage dh; do
+	command -v "$tool" >/dev/null || missing="$missing $tool"
+done
+if [ -n "$missing" ]; then
+	if command -v apt-get >/dev/null && { [ "$(id -u)" = 0 ] || command -v sudo >/dev/null; }; then
+		sudo_ apt-get install -y --no-install-recommends build-essential debhelper devscripts fakeroot
+	else
+		echo "build-debs.sh: cannot build here: missing$missing" >&2
+		echo "and there is no apt-get/sudo to install them. Run this script in Debian 13:" >&2
+		echo "this computer's own terminal, a Debian machine or WSL 2, as your normal" >&2
+		echo "user. CONTRIBUTING.md has the setup steps." >&2
+		exit 1
+	fi
 fi
 
-work=$(mktemp -d /tmp/zacos9-deb.XXXXXX)
-trap 'rm -rf "$work"' EXIT
+# A disk-backed temporary directory without spaces: the package and its
+# tests need several gigabytes, /tmp can be a small tmpfs (the Memory
+# tests' 1 GB swap file then reads "no room on disk"), and a few helpers
+# hand their paths to shell commands that split on whitespace, so a
+# checkout under "Zac OS" must not also be the build's own path.
+# ZACOS9_BUILD_TMPDIR replaces ~/.cache/zacos9.
+base=${ZACOS9_BUILD_TMPDIR:-${XDG_CACHE_HOME:-$HOME/.cache}/zacos9}
+case $base in
+*" "*) echo "build-debs.sh: $base contains a space; set ZACOS9_BUILD_TMPDIR to a path without one." >&2; exit 1 ;;
+esac
+mkdir -p "$base"
+export TMPDIR=$base
+work=$(mktemp -d "$TMPDIR/zacos9-deb.XXXXXX")
+finish() {
+	status=$?
+	if [ "$status" -eq 0 ]; then
+		rm -rf "$work"
+	else
+		printf 'build-debs.sh: the build stopped; its tree is in %s\n' "$work" >&2
+		printf '  test log: %s/zacos9/obj-x86_64-linux-gnu/meson-logs/testlog.txt\n' "$work" >&2
+	fi
+	exit "$status"
+}
+trap finish EXIT
 index=$work/index
 GIT_INDEX_FILE=$index git read-tree HEAD
 GIT_INDEX_FILE=$index git add -A

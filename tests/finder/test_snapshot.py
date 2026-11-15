@@ -115,14 +115,19 @@ class NativeCaptureTests(unittest.TestCase):
         self.addCleanup(stop_animation)
         time.sleep(0.5)
         colors = set()
-        # Repeated region readbacks must not stall subsequent compositor frames.
-        for _ in range(8):
+        # Repeated region readbacks must not stall subsequent compositor
+        # frames. The animation changes colour on its own schedule, so keep
+        # reading until both are seen: eight reads catch only one of them on
+        # a machine busy enough to start the animation late.
+        for _ in range(40):
             result = self.run_capture("--geometry", "0,0 100x80", str(target))
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(png(target)[:2], (100 * self.scale, 80 * self.scale))
             colors.add(png(target)[4][:4])
             self.assertIsNone(self.server.poll())
             self.assertIsNone(app.poll())
+            if {bytes((255, 0, 0, 255)), bytes((0, 255, 0, 255))} <= colors:
+                break
             time.sleep(0.07)
         self.assertIn(bytes((255, 0, 0, 255)), colors)
         self.assertIn(bytes((0, 255, 0, 255)), colors)

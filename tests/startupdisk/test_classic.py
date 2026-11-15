@@ -5,6 +5,7 @@ CD started from as a CD (--bootdriver -62); a choice that's gone ignored.
 usage: test_classic.py LAUNCHER
 """
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -44,7 +45,7 @@ with tempfile.TemporaryDirectory() as d:
     env = {k: v for k, v in os.environ.items() if not k.startswith(("XDG_", "ZACOS9_"))}
     env.update(HOME=str(home), ZACOS9_EMULATORS=str(emulators))
 
-    def run(*args):
+    def run(*args, env=env):
         r = subprocess.run([launcher, *args], env=env, capture_output=True, text=True, timeout=30)
         return r.returncode, r.stdout.splitlines()
 
@@ -71,5 +72,39 @@ with tempfile.TemporaryDirectory() as d:
     check(code == 0 and sorted(disks(out)[:2]) == [str(hd), str(other)] and disks(out)[2] == "*" + str(cd) and
           not any(l.startswith("startup:") for l in run("--check")[1]),
           "a chosen disk that's gone is ignored")
+
+    # A checkout whose path has a space (this project's own has one) must
+    # still find the emulator: the variable is not word-split.
+    spaced = root / "emu lators"
+    spaced.mkdir()
+    shutil.copy2(sheep, spaced / "SheepShaver")
+    code, out = run(env={**env, "ZACOS9_EMULATORS": str(spaced)})
+    check(code == 0 and len(disks(out)) == 3, "an emulator folder whose path has a space is found")
+
+    # The screen: full screen at the desktop's resolution when the
+    # compositor's output list is readable, the 800x600 window otherwise.
+    def screen(argv):
+        return argv[argv.index("--screen") + 1]
+
+    check(screen(run()[1]) == "win/800/600", "no desktop to read: the 800x600 window")
+    runtime = root / "runtime"
+    runtime.mkdir()
+    outputs = runtime / "zacos9-outputs-wayland-0"
+    desktop = {**env, "XDG_RUNTIME_DIR": str(runtime), "WAYLAND_DISPLAY": "wayland-0"}
+
+    outputs.write_text("output HDMI-A-1 1920x1080 scale 1 nested 0 x 0 y 0 main 1 rotate 0\n")
+    check(screen(run(env=desktop)[1]) == "dga/1920/1080", "full screen at the main screen's resolution")
+    check("screen: dga/1920/1080" in run("--check", env=desktop)[1], "--check names the screen mode")
+    check(screen(run("--windowed", env=desktop)[1]) == "win/800/600", "--windowed keeps the window")
+
+    outputs.write_text("output eDP-1 2880x1800 scale 2 nested 0 x 0 y 0 main 1 rotate 90\n")
+    check(screen(run(env=desktop)[1]) == "dga/900/1440",
+          "the scale divides the mode and a rotated screen turns the size")
+
+    (home / ".config" / "zacos9" / "classic.conf").write_text("screen=window\n")
+    check(screen(run(env=desktop)[1]) == "win/800/600", "classic.conf's screen=window is followed")
+    (home / ".config" / "zacos9" / "classic.conf").unlink()
+    check(screen(run("--fullscreen")[1]) == "dga/800/600",
+          "--fullscreen without a desktop still goes full screen")
 
 sys.exit(1 if failures else 0)

@@ -843,5 +843,13 @@ int main(int argc, char **argv) {
 	setGtkSmartScrolling(false);
 	assert(css.open(QIODevice::ReadOnly));
 	assert(QString::fromUtf8(css.readAll()) == "label { color: red; }\n");
+
+	/* Let any import the panel started finish before the application, and
+	 * with it the panel's QProcess, is destroyed: tearing that down while
+	 * the Theme Installer still runs has crashed the test's exit. */
+	for (int i = 0; i < 300; i++) {
+		QApplication::processEvents();
+		QThread::msleep(10);
+	}
 	return 0;
 }

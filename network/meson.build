@@ -14,8 +14,11 @@ afp_client = executable('zacos9-afp',
   install: true,
 )
 
-test('afp-disconnect', find_program('python3'),
-  args: [files('../tests/sharing/test_afp_disconnect.py'), afp_client.full_path()],
+# A private bus: the running session's gvfs probes the FUSE mount the test
+# makes, and then the test's own eject finds it busy.
+test('afp-disconnect', find_program('dbus-run-session'),
+  args: ['--', find_program('python3').full_path(),
+    files('../tests/sharing/test_afp_disconnect.py'), afp_client.full_path()],
   depends: [afp_client],
-  timeout: 45,
+  timeout: 90,
 )

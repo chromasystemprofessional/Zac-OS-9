@@ -92,17 +92,24 @@ def main():
         time.sleep(5)
 
         app_before = open(logs["app"], errors="replace").read()
-        subprocess.run([VKBD, "31"], env=env, timeout=30,
-                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        ok_key = wait_for(logs["app"], "APP key keycode=31 state=1")
-        app_after = open(logs["app"], errors="replace").read()
+        enters = app_before.count("APP keyboard-enter")
+        ok_key = grabbed = False
         # Through fcitx the key comes back on fcitx's own virtual
         # keyboard: the seat's keyboard switches to it first, which
         # the program sees as a fresh keyboard-enter. A key that went
-        # straight in (no grab) adds no enter.
-        check("typed key comes back into the program through fcitx",
-              ok_key and app_after.count("APP keyboard-enter") >
-              app_before.count("APP keyboard-enter"))
+        # straight in (no grab) adds no enter. Fcitx can take a while to
+        # take the grab on a busy machine, so keep typing for it.
+        deadline = time.time() + 20
+        while time.time() < deadline:
+            subprocess.run([VKBD, "31"], env=env, timeout=30,
+                           stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            ok_key = wait_for(logs["app"], "APP key keycode=31 state=1", timeout=2)
+            app_after = open(logs["app"], errors="replace").read()
+            if ok_key and app_after.count("APP keyboard-enter") > enters:
+                grabbed = True
+                break
+            time.sleep(0.2)
+        check("typed key comes back into the program through fcitx", ok_key and grabbed)
         check("fcitx still running", procs[-1].poll() is None)
     finally:
         for name, path in logs.items():
