@@ -197,7 +197,9 @@ application gate is met for applications that are files below the shared home
 folder. Documents, applications inside guest disk images, and guest window
 discovery/input remain unimplemented; the request queue is versioned, but a
 full handshake/capability exchange and guest window identities are still to
-come.
+come. A document-opening trial sent an `odoc` Apple Event to SimpleText and
+then to the Finder; both returned `-903`, so document routing still needs a
+different guest mechanism.
 
 Earlier prototypes used the shared-folder queue directly, the SheepShaver
 serial port, MacTCP, Open Transport and Finder Apple Events. The shared-folder

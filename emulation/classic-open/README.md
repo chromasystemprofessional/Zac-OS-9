@@ -35,7 +35,11 @@ patched emulator before this helper. Basilisk II is not supported yet.
   a path of at most 199 bytes. Applications inside guest disk images are not
   reachable this way yet.
 - Documents are not passed to the application yet; this launcher opens an
-  application, not a document.
+  application, not a document. Sending an `odoc` Apple Event from the helper
+  to the running app, and falling back to the Finder, both returned `-903`
+  (`errAEEventNotHandled`) in the clean Mac OS 9 guest. The Finder also
+  rejected shared-volume items. Do not claim document opening until a working
+  guest mechanism is found.
 - The helper is not installed automatically. Copy it into Startup Items as
   described below.
 - Independent window export, input forwarding and the **Show Classic Desktop**
