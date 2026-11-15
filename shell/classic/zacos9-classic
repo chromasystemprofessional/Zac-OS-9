@@ -142,7 +142,7 @@ find_disks() {
 }
 
 emulator() {
-	for dir in ${ZACOS9_EMULATORS:-} "$self_dir/../emulators/bin" \
+	for dir in "${ZACOS9_EMULATORS:-}" "$self_dir/../emulators/bin" \
 			"$self_dir/../libexec/zacos9"; do
 		[ -x "$dir/$1" ] && { echo "$(cd "$dir" && pwd)/$1"; return 0; }
 	done

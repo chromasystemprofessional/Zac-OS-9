@@ -5,6 +5,7 @@ CD started from as a CD (--bootdriver -62); a choice that's gone ignored.
 usage: test_classic.py LAUNCHER
 """
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -71,6 +72,14 @@ with tempfile.TemporaryDirectory() as d:
     check(code == 0 and sorted(disks(out)[:2]) == [str(hd), str(other)] and disks(out)[2] == "*" + str(cd) and
           not any(l.startswith("startup:") for l in run("--check")[1]),
           "a chosen disk that's gone is ignored")
+
+    # A checkout whose path has a space (this project's own has one) must
+    # still find the emulator: the variable is not word-split.
+    spaced = root / "emu lators"
+    spaced.mkdir()
+    shutil.copy2(sheep, spaced / "SheepShaver")
+    code, out = run(env={**env, "ZACOS9_EMULATORS": str(spaced)})
+    check(code == 0 and len(disks(out)) == 3, "an emulator folder whose path has a space is found")
 
     # The screen: full screen at the desktop's resolution when the
     # compositor's output list is readable, the 800x600 window otherwise.
