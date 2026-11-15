@@ -75,6 +75,12 @@ with tempfile.TemporaryDirectory() as d:
         folder.mkdir(parents=True)
     (classic / "rom").write_bytes(bytes.fromhex("9630c68b") + bytes(4 * 1024 * 1024 - 4))
     hfs(classic / "A.dsk")
+    viewer_record = root / "viewer-started"
+    viewer = emulators / "zacos9-classic-windows"
+    viewer.write_text(
+        "#!/bin/sh\n"
+        f"printf started > {shlex.quote(str(viewer_record))}\n")
+    viewer.chmod(0o755)
     sheep = emulators / "SheepShaver"
     record = root / "emulator-queue"
     sheep.write_text(
@@ -120,6 +126,8 @@ with tempfile.TemporaryDirectory() as d:
           "the emulator receives the queue path")
     check((home / "zacos9-classic" / "input").is_dir(),
           "a new session creates the input queue")
+    check(viewer_record.exists(),
+          "a new session starts the Classic window viewer")
 
     # A running session accepts further requests. The bridge stand-in
     # acknowledges and removes each one, as the patched emulator does.

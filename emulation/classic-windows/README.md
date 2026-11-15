@@ -154,11 +154,9 @@ g++ -std=c++17 -fPIC -O2 $(pkg-config --cflags Qt6Widgets) \
   $(pkg-config --libs Qt6Widgets)
 ```
 
-Run it inside the ZacOS session:
-
-```sh
-zacos9-classic-windows
-```
+`zacos9-classic` starts the viewer automatically for a new Classic session
+(set `ZACOS9_CLASSIC_WINDOWS=0` to disable it), and the viewer exits when that
+session's emulator exits. A manually started viewer stays until closed.
 
 It reads `$HOME/ClassicWindows.txt` (override with
 `ZACOS9_CLASSIC_WINDOWS`) every half second. The controller window remains if

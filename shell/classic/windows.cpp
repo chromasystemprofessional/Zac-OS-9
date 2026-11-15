@@ -31,6 +31,9 @@
 #include <QShortcut>
 #include <QStringList>
 #include <QTimer>
+
+#include <csignal>
+#include <unistd.h>
 #include <QVector>
 #include <QVBoxLayout>
 #include <QWidget>
@@ -588,5 +591,27 @@ int main(int argc, char **argv) {
 	QObject::connect(&timer, &QTimer::timeout, &controller, &Controller::poll);
 	timer.start(150);
 	controller.poll();
+
+	/* A viewer started by zacos9-classic exits with that session; a manually
+	   started viewer stays until closed. */
+	QTimer session;
+	bool seen = false;
+	QObject::connect(&session, &QTimer::timeout, [&seen] {
+		QString runtime = qEnvironmentVariable("XDG_RUNTIME_DIR");
+		if (runtime.isEmpty())
+			runtime = QString("/tmp/zacos9-classic-%1").arg(getuid());
+		QFile file(runtime + "/zacos9-classic/session.pid");
+		if (!file.open(QIODevice::ReadOnly)) {
+			if (seen)
+				QCoreApplication::quit();
+			return;
+		}
+		seen = true;
+		bool ok = false;
+		const qint64 pid = QString::fromUtf8(file.readAll()).trimmed().toLongLong(&ok);
+		if (!ok || pid <= 0 || ::kill(static_cast<pid_t>(pid), 0) != 0)
+			QCoreApplication::quit();
+	});
+	session.start(1000);
 	return app.exec();
 }
