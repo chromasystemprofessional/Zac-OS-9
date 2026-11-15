@@ -456,7 +456,7 @@ public:
 		connect(windows, &QPushButton::clicked, this, [this] { showWindows(); });
 		connect(close, &QPushButton::clicked, this, [this] { closeSelected(); });
 		connect(refresh, &QPushButton::clicked, this, [this] { poll(); });
-		resize(360, 300);
+		setFixedSize(520, 320);
 	}
 
 	void poll() {
@@ -487,8 +487,14 @@ public:
 			}
 			viewer->updateInfo(window);
 			viewer->updateFrame(window.framePath);
-			if (m_showing)
+			if (m_showing) {
 				viewer->show();
+				if (!viewer->property("raised").toBool()) {
+					viewer->setProperty("raised", true);
+					viewer->raise();
+					viewer->activateWindow();
+				}
+			}
 		}
 		for (auto it = m_viewers.begin(); it != m_viewers.end();) {
 			if (!seen.contains(it.key())) {
@@ -532,8 +538,11 @@ private:
 	void showWindows() {
 		m_showing = true;
 		m_ignored.clear();
-		for (WindowViewer *viewer : m_viewers)
+		for (WindowViewer *viewer : m_viewers) {
 			viewer->show();
+			viewer->raise();
+			viewer->activateWindow();
+		}
 	}
 	void closeSelected() {
 		auto *item = m_list->currentItem();
