@@ -226,11 +226,11 @@ All of them are [on GitHub](https://github.com/chromasystemprofessional/Zac-OS-9
 2. **SMB**: a server to test against, then the share-list dialog.
 3. **Classic seamless windows** ([Classic](docs/classic-seamless.md)): the
    color-port/GWorld prerequisite now passes exact-pixel direct-32-bit tests.
-   A direct-launch prototype (`--open` and Classic Open Helper) opens one
-   requested app per Classic session; a second open asks for a restart. The
-   guest's directory cache and the emulator's guest networking both block a
-   reliable multi-request bridge. The feasibility gate still needs guest window
-   discovery and identities, input delivery, and lifecycle evidence.
+   The patched SheepShaver's emulator bridge lets `--open` and Classic Open
+   Helper open further apps in a running session; SimpleText and SimpleSound
+   have been opened in one session. Documents and apps inside guest disk images
+   still need guest-side handling. The feasibility gate still needs guest
+   window discovery and identities, input delivery, and lifecycle evidence.
 4. **From the [roadmap](docs/ROADMAP.md)**: a Platinum boot menu (on Esc),
    manual pages, trying it in Hyper-V.
 

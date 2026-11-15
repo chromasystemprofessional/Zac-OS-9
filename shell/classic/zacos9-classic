@@ -14,8 +14,9 @@
 # problems go to stderr, one line, with exit status 2.
 #
 # --open APP asks the running (or newly started) Mac to open a Classic
-# application from the shared Unix volume. It needs Classic Open Helper in
-# the Mac's System Folder:Startup Items (emulation/classic-open).
+# application from the shared Unix volume. A running session accepts further
+# opens; it needs the patched SheepShaver and Classic Open Helper in the Mac's
+# System Folder:Startup Items (emulation/classic-open).
 #
 # The Startup Disk control panel picks the disk the Mac starts up from
 # ("startup-disk=PATH" in ~/.config/zacos9/classic.conf): it is attached
@@ -29,6 +30,7 @@ check=false
 arch=ppc
 extra_disks=""
 open_path=""
+queue_root=$HOME/zacos9-classic
 
 while [ $# -gt 0 ]; do
 	case $1 in
@@ -71,7 +73,8 @@ map_open_path() {
 	if printf '%s' "$rel" | LC_ALL=C grep -q '[^ -~]'; then
 		fail "The Classic application's path has characters that direct launching cannot pass yet. Rename it to plain ASCII, or open it inside the Mac."
 	fi
-	[ ${#rel} -le 200 ] || fail "The Classic application's path is too long to open directly."
+	# The bridge block holds 200 bytes including the terminator.
+	[ ${#rel} -le 199 ] || fail "The Classic application's path is too long to open directly."
 	guest_path=$(printf '%s' "$rel" | tr '/' ':')
 }
 
@@ -90,38 +93,25 @@ session_alive() {
 	kill -0 "$pid" 2>/dev/null
 }
 
-# A small versioned request, read by Classic Open Helper in the Mac
-# (emulation/classic-open). The guest caches a file name after it is used,
-# so every request gets a new name with a sequence number, and the helper
-# learns the last issued number from the sequence file.
+# A small versioned request, read by the patched emulator's Classic bridge.
+# Every request gets a new name with a sequence number so the queue is easy to
+# inspect; the bridge reads the directory afresh for each request.
 queue_reset() {
-	root="$HOME/zacos9-classic"
-	rm -rf "$root/requests"
-	mkdir -p "$root/requests" "$root/acks"
-	rm -f "$root/acks/"*
-	printf '0\n' > "$root/sequence"
-}
-
-session_has_request() {
-	root="$HOME/zacos9-classic"
-	if [ -d "$root/requests" ] && find "$root/requests" -maxdepth 1 -name 'request.*.req' -type f -print -quit 2>/dev/null | grep -q .; then
-		return 0
-	fi
-	if [ -d "$root/acks" ] && find "$root/acks" -maxdepth 1 -name 'ack-*' -type f -print -quit 2>/dev/null | grep -q .; then
-		return 0
-	fi
-	return 1
+	rm -rf "$queue_root/requests" "$queue_root/acks"
+	mkdir -p "$queue_root/requests" "$queue_root/acks"
+	chmod 700 "$queue_root" "$queue_root/requests" "$queue_root/acks" 2>/dev/null || true
+	printf '0\n' > "$queue_root/sequence"
 }
 
 queue_request() {
-	requests="$HOME/zacos9-classic/requests"
-	acks="$HOME/zacos9-classic/acks"
-	seqfile="$HOME/zacos9-classic/sequence"
+	requests="$queue_root/requests"
+	acks="$queue_root/acks"
+	seqfile="$queue_root/sequence"
 	seq=$(cat "$seqfile" 2>/dev/null || echo 0)
 	case $seq in ''|*[!0-9]*) seq=0 ;; esac
 	if [ "$seq" -gt 0 ]; then
 		tries=0
-		while [ ! -f "$acks/ack-$seq" ] && [ "$tries" -lt 30 ]; do
+		while [ ! -f "$acks/ack-$seq" ] && [ "$tries" -lt 50 ]; do
 			sleep 0.1
 			tries=$((tries + 1))
 		done
@@ -272,26 +262,23 @@ if $check; then
 	exit 0
 fi
 
-# One session owns the emulator and its disks. A running session accepts one
-# direct open request; another app needs a new session because the guest's
-# ExtFS directory view does not refresh. A second plain launch leaves the
-# running session alone.
+# One session owns the emulator and its disks. A running session accepts
+# further direct opens one at a time; the emulator bridge reads each request
+# directly, so the guest's ExtFS directory cache is no longer involved. A
+# second plain launch leaves the running session alone.
 runtime=$(runtime_dir)
 pidfile=$runtime/session.pid
 mkdir -p "$runtime"
 chmod 700 "$runtime" 2>/dev/null || true
 if [ -n "$open_path" ]; then
 	if session_alive; then
-		if session_has_request; then
-			fail "This Classic session already has an open request. Quit Classic and start it again to open another application."
-		fi
 		queue_request
 		tries=0
-		while [ ! -f "$HOME/zacos9-classic/acks/ack-$request_id" ] && [ "$tries" -lt 50 ]; do
+		while [ ! -f "$queue_root/acks/ack-$request_id" ] && [ "$tries" -lt 50 ]; do
 			sleep 0.1
 			tries=$((tries + 1))
 		done
-		ack="$HOME/zacos9-classic/acks/ack-$request_id"
+		ack="$queue_root/acks/ack-$request_id"
 		[ -f "$ack" ] || \
 			fail "Classic did not open \"$open_path\". Classic Open Helper may be missing or busy."
 		grep -q '^status=ok$' "$ack" || {
@@ -339,4 +326,6 @@ fi
 
 # SDL's Wayland backend never shows a window here; Xwayland works.
 # TODO: find out why (frame callbacks? libdecor?).
+# The patched SheepShaver reads the same queue as the host.
+export ZACOS9_CLASSIC_QUEUE="$queue_root"
 SDL_VIDEODRIVER=x11 exec "$exe" "$@"

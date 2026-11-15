@@ -1,7 +1,7 @@
 # Seamless Classic windows: implementation plan
 
-Status: feasibility spike in progress; production integration not implemented.
-Target: SheepShaver with user-supplied
+Status: milestone 1 application transport implemented; independent window
+integration not started. Target: SheepShaver with user-supplied
 Mac OS 9.0.4 first. Basilisk II and other guest versions are later work.
 
 Milestone 0 is now started: an original PowerPC two-window probe and exact-pixel
@@ -60,10 +60,11 @@ appropriately licensed interfaces and tools.
 - [Classic launcher](../shell/classic/zacos9-classic): starts SheepShaver with
   an 800x600 guest display, shared home directory and SDL/Xwayland output.
 - [Finder](../shell/finder/finder.cpp): recognizes Classic application metadata
-  and starts Classic, but does not yet open the selected application.
-- [Emulator build](../emulation/build-emulators.sh): pins a macemu revision.
-  A reproducible patch mechanism will be needed; do not edit generated build
-  output or the excluded upstream checkout in place.
+  and starts Classic with `--open`; document association is still to come.
+- [Emulator build](../emulation/build-emulators.sh): pins a macemu revision
+  and applies the Classic bridge patch from
+  [`emulation/patches`](../emulation/patches/README.md). Do not edit generated
+  build output or the excluded upstream checkout in place.
 - [Compositor](../compositor/src/xdg.c): manages ordinary Wayland toplevels,
   server-side frames, activation, size requests and close requests.
 - [Application integration](app-integration.md): global-menu support already
@@ -177,46 +178,34 @@ do not silently downgrade the requirement to cropping.
 launch does not start another emulator or attach a writable disk twice.
 Missing originals, guest readiness failures and rejected opens show an alert.
 
-**Current product decision (2026-11-14):** one direct open per Classic session.
-A second `--open` is refused immediately and asks the user to restart Classic.
-The milestone 1 gate below (two applications in one session) is not met.
+**Prototype status (2026-11-15):** the transport is now an emulator-side
+bridge. The pinned SheepShaver carries `OP_CLASSIC_BRIDGE` (selector 53,
+instruction `0x18000038`; patch in
+[`emulation/patches`](../emulation/patches/README.md)). The emulator reads the
+host request queue itself and writes acknowledgements, so the guest helper is
+not affected by the guest File Manager's ExtFS cache and needs no serial port,
+MacTCP or Open Transport. The helper is original Retro68 code in
+[`emulation/classic-open`](../emulation/classic-open/README.md).
 
-**Prototype status (2026-11-14):** `zacos9-classic --open`, the Finder's
-Classic-application double-click and
-[`emulation/classic-open`](../emulation/classic-open/README.md) open the first
-requested application in a running session and report its acknowledgement; a
-new session opens the application after boot. The guest File Manager caches the
-shared ExtFS directory after its first read; the host now refuses a second
-request immediately instead of writing one the guest cannot see.
-The gate above (two applications in one session) is therefore not met, and a
-guest failure does not yet reach a ZacOS alert. The shared-folder queue cannot
-deliver later requests: the guest File Manager keeps a cached view of the
-volume after boot. The serial-port attempt is blocked because SheepShaver's
-`.AOut` driver needs `DriverServicesLib`, which the test Mac OS 9 install does
-not provide. The next candidate is a TCP bridge over the emulator's NAT. On a
-repaired Mac OS 9 guest, a prototype launched SimpleText and displayed its
-window, but a second request timed out because MacTCP's receive and close calls
-stopped returning after the app switch. A permanent asynchronous receive with
-a raw completion routine crashed the guest. The next attempt should use Open
-Transport or a correctly built asynchronous completion UPP. A Finder
-`Open Documents` Apple Event was also rejected with error -903 for apps on the
-shared volume. The Open Transport route needs the real Universal Interfaces 3.x
-headers to match its private entry point. With Universal Interfaces 3.4 the
-probe builds correctly, but the repaired test guest does not launch it because
-that install lacks the `OTClientLib`/`OTClientUtilLib` client libraries. A clean
-Mac OS 9 install is required before Open Transport can be used. A clean
-install now boots and opens SimpleText, but MacTCP still drops the second
-request; the real-header Open Transport probe also does not run from Startup
-Items there. Launching it manually from Applications also left it frontmost
-with no log entry and no connection, so it hangs before `InitOpenTransport`
-returns. The helper's SIZE resource was also missing `canBackground`, so Mac OS
-suspended it when another app came forward; `patch_size.py` now sets it. Even
-with that flag, MacTCP did not deliver a second request. Open Transport support
-is still unresolved, and the next transport must not depend on MacTCP after an
-app switch. A split listener/launcher design also opened the first app while
-the listener never called `LaunchApplication`, but its MacTCP receive still
-stopped after the process switch. Direct launching beyond one request per
-session therefore needs an emulator-side bridge or another IPC path.
+A clean Mac OS 9 guest opened SimpleText, then SimpleSound, in one Classic
+session; both requests were acknowledged with `status=ok`. `zacos9-classic`
+no longer refuses a second open: it serialises requests, waits for each
+acknowledgement, and reports a guest error or timeout. The milestone 1
+application gate is met for applications that are files below the shared home
+folder. Documents, applications inside guest disk images, and guest window
+discovery/input remain unimplemented; the request queue is versioned, but a
+full handshake/capability exchange and guest window identities are still to
+come.
+
+Earlier prototypes used the shared-folder queue directly, the SheepShaver
+serial port, MacTCP, Open Transport and Finder Apple Events. The shared-folder
+view was cached by the guest; the serial driver needed a library the test
+install lacked; MacTCP stopped receiving after an application switch; Open
+Transport client libraries were missing; and the Finder rejected app items on
+the shared volume with error -903. Do not reintroduce those paths without new
+evidence. The helper's SIZE resource also needed `canBackground` so Mac OS
+does not suspend it when another application comes forward; `patch_size.py`
+sets it.
 
 ### 2. Opt-in independent document windows
 

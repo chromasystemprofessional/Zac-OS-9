@@ -1,8 +1,9 @@
-"""zacos9-classic --open: path mapping, one session, one app request and ack.
+"""zacos9-classic --open: path mapping, one session, a queue of app requests.
 
 usage: test_open.py LAUNCHER
 """
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -35,25 +36,28 @@ def request_id(path):
 
 
 def answer_requests(requests, acks, status="ok", code="0"):
-    """Stand in for Classic Open Helper: acknowledge the first request."""
+    """Stand in for the emulator bridge: acknowledge and consume each request."""
     stop = threading.Event()
+    delivered = []
     seen = set()
 
     def worker():
         while not stop.is_set():
-            for path in requests.glob("request.*.req"):
+            for path in sorted(requests.glob("request.*.req")):
                 if path in seen:
                     continue
                 seen.add(path)
                 request = request_id(path)
                 if request:
+                    delivered.append(request)
                     (acks / f"ack-{request}").write_text(
                         f"version=1\nid={request}\nstatus={status}\ncode={code}\n")
+                    path.unlink(missing_ok=True)
             time.sleep(0.02)
 
     thread = threading.Thread(target=worker, daemon=True)
     thread.start()
-    return stop
+    return stop, delivered
 
 
 def reset_queue(home):
@@ -72,7 +76,12 @@ with tempfile.TemporaryDirectory() as d:
     (classic / "rom").write_bytes(bytes.fromhex("9630c68b") + bytes(4 * 1024 * 1024 - 4))
     hfs(classic / "A.dsk")
     sheep = emulators / "SheepShaver"
-    sheep.write_text("#!/bin/sh\nsleep 0.2\nexit 0\n")
+    record = root / "emulator-queue"
+    sheep.write_text(
+        "#!/bin/sh\n"
+        f"printf '%s\\n' \"$ZACOS9_CLASSIC_QUEUE\" > {shlex.quote(str(record))}\n"
+        "sleep 0.2\n"
+        "exit 0\n")
     sheep.chmod(0o755)
     app = home / "Apps" / "Test App"
     app.write_text("an application")
@@ -107,30 +116,29 @@ with tempfile.TemporaryDirectory() as d:
     check(code == 0 and request_text(1) ==
           "version=1\nid=1\npath=Apps:Test App\n",
           "a new session queues request 1 with the colon-separated path")
+    check(record.exists() and record.read_text().strip() == str(home / "zacos9-classic"),
+          "the emulator receives the queue path")
 
-    # One running session accepts one request. A helper stand-in acknowledges
-    # the request; later opens must fail immediately instead of writing a
-    # second request the guest cannot see.
+    # A running session accepts further requests. The bridge stand-in
+    # acknowledges and removes each one, as the patched emulator does.
     reset_queue(home)
     (runtime / "zacos9-classic").mkdir(parents=True, exist_ok=True)
     sleeper = subprocess.Popen(["sleep", "30"])
     try:
         (runtime / "zacos9-classic" / "session.pid").write_text(f"{sleeper.pid}\n")
-        stop = answer_requests(requests, acks)
+        stop, delivered = answer_requests(requests, acks)
         try:
             code, out, err = run("--open", str(app))
-            check(code == 0 and request_text(1) ==
-                  "version=1\nid=1\npath=Apps:Test App\n",
-                  "a running session receives its one request and its ack")
+            check(code == 0 and delivered == ["1"] and (acks / "ack-1").exists(),
+                  "a running session receives and acknowledges request 1")
+            code, out, err = run("--open", str(app))
+            check(code == 0 and delivered == ["1", "2"] and (acks / "ack-2").exists(),
+                  "a second open in the same session receives request 2")
         finally:
             stop.set()
 
-        code, out, err = run("--open", str(app))
-        check(code == 2 and "already has an open request" in err,
-              "a second open in the same session fails immediately")
-
         reset_queue(home)
-        stop = answer_requests(requests, acks, "error", "-50")
+        stop, delivered = answer_requests(requests, acks, "error", "-50")
         try:
             code, out, err = run("--open", str(app))
             check(code == 2 and "refused" in err and "-50" in err,

@@ -1,6 +1,7 @@
 #!/bin/sh
 # Build SheepShaver (PowerPC, Mac OS 7.5.2 to 9.0.4) and Basilisk II
 # (68k, System 7 to Mac OS 8.1) from the maintained macemu fork.
+# SheepShaver gets the Classic bridge patch from emulation/patches.
 # Binaries land in build/emulators/bin. Apple ROMs and system disks are
 # never part of this: the user supplies them (see emulation/README.md).
 #
@@ -29,6 +30,13 @@ if [ "$(git -C "$src" rev-parse HEAD 2>/dev/null)" != "$MACEMU_COMMIT" ]; then
 	git -C "$src" fetch -q --depth 1 origin "$MACEMU_COMMIT"
 	git -C "$src" checkout -q --force FETCH_HEAD
 fi
+
+# SheepShaver carries the Classic bridge (emulation/patches). Reset the two
+# touched files first so a rebuild always uses the patch in this tree.
+patch=$root/emulation/patches/sheepshaver-classic-bridge.patch
+git -C "$src" checkout -q -- \
+	SheepShaver/src/emul_op.cpp SheepShaver/src/include/emul_op.h
+git -C "$src" apply "$patch"
 mkdir -p "$out"
 
 # SheepShaver: SDL video and audio, no GTK preferences editor (our own

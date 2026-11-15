@@ -27,7 +27,9 @@ It is not a Mac OS emulator, and it needs no ROM or system disk.
    sh emulation/build-emulators.sh
    ```
 
-   The binaries go into `build/emulators/bin`.
+   The binaries go into `build/emulators/bin`. The script applies the Classic
+   bridge patch in [`patches/`](patches/README.md) to SheepShaver; Basilisk II
+   is unpatched.
 2. Put your files in a folder named `Classic` in your home folder, up to two
    folders deep. Set `ZACOS9_CLASSIC_DIR` to use a different folder.
    - **ROMs.** The launcher identifies each ROM by its checksum, so file names
@@ -96,7 +98,8 @@ used. Add `--68k` for Basilisk II.
   Finder with the Classic icon (their type, 'APPL', is in the `.finf/`
   file SheepShaver keeps beside them). Double-clicking one starts Classic.
   With [Classic Open Helper](classic-open/README.md) installed in the Mac's
-  Startup Items, the application started that way also opens inside the Mac.
-  One direct open per Classic session is supported; to open another, quit
-  Classic and start it again. Multi-request support needs the bridge work in
-  [the seamless plan](../docs/classic-seamless.md).
+  Startup Items, the application started that way also opens inside the Mac,
+  and a running session accepts further applications one at a time. The
+  helper needs the patched SheepShaver built here; an unpatched emulator does
+  not have the bridge. Applications inside guest disk images and documents
+  are not handled yet.

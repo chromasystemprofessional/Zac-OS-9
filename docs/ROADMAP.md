@@ -91,12 +91,11 @@ scaling only, original behaviors and timings).
     and input remain unproven. The `classic-window-probe` host test passes; see
     `docs/classic-seamless.md` for the measured results and acceptance gate.
   - **Direct-launch prototype:** `zacos9-classic --open` and Classic Open
-    Helper open one app per Classic session from the shared home volume; a
-    second open is refused and asks for a restart. The milestone 1 gate (two
-    apps in one session) is not met. Serial and guest TCP bridges were tried
-    and blocked by missing guest libraries and MacTCP's post-app-switch state.
-    The next step is an emulator-side bridge. Do not claim general direct
-    launching, and do not launch apps inside guest disk images yet.
+    Helper open apps from the shared home volume, and the emulator-side bridge
+    lets a running session accept further apps one at a time. SimpleText and
+    SimpleSound have been opened in one session, so the milestone 1 application
+    gate is met. Documents and apps inside guest disk images are not handled
+    yet; do not claim general direct launching.
   - After that gate, double-clicking a Classic app or document in the Sniffer
     should launch it in Old Dog. The current emulator startup path only
     attaches disks; documents and apps inside guest images remain
