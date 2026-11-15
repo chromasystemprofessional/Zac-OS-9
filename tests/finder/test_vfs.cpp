@@ -235,6 +235,11 @@ int main(int argc, char **argv) {
 	setenv("XDG_CONFIG_HOME", (root + "/config").toUtf8().constData(), 1);
 	setenv("HOME", root.toUtf8().constData(), 1);
 	setenv("XDG_CURRENT_DESKTOP", "ZacOS9", 1);
+	/* The fake dpkg-query below answers the test's own files itself: a full
+	 * system's dpkg file database is large, and asking it for fifty temp
+	 * paths takes longer than the query allows. /bin/true, asked for
+	 * elsewhere, still goes to the real dpkg-query. */
+	setenv("ZACOS9_TEST_VFS_ROOT", root.toUtf8().constData(), 1);
 	const QString resourceRoot = root + "/resource-fixtures";
 	setenv("ZACOS9_RESOURCE_TEST_ROOT", resourceRoot.toUtf8().constData(), 1);
 	QDir().mkpath(appsDir);
@@ -300,6 +305,7 @@ int main(int argc, char **argv) {
 		"		case \"$path\" in\n"
 		"		*/automatic.desktop) printf 'finder-auto-demo:amd64: %s\\n' \"$path\"; status=0 ;;\n"
 		"		*/manual.desktop|*/qps.desktop) printf 'finder-manual-demo: %s\\n' \"$path\"; status=0 ;;\n"
+		"		\"$ZACOS9_TEST_VFS_ROOT\"/*) : ;;\n"
 		"		*) rest=\"$rest $path\" ;;\n"
 		"		esac\n"
 		"	done\n"
