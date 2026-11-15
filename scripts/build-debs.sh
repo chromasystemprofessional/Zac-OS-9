@@ -37,8 +37,23 @@ mkdir -p "$out"
 rm -f "$out"/zacos9*.deb
 
 sudo_() { if [ "$(id -u)" = 0 ]; then "$@"; else sudo "$@"; fi; }
-if ! command -v dpkg-buildpackage >/dev/null || ! command -v dh >/dev/null; then
-	sudo_ apt-get install -y --no-install-recommends build-essential debhelper devscripts fakeroot
+# The package tools come from Debian. A container or sandbox without them
+# (and without apt-get or sudo) can't build the package: say so plainly
+# instead of failing inside sudo, which reads as a bug in this script.
+missing=""
+for tool in dpkg-buildpackage dh; do
+	command -v "$tool" >/dev/null || missing="$missing $tool"
+done
+if [ -n "$missing" ]; then
+	if command -v apt-get >/dev/null && { [ "$(id -u)" = 0 ] || command -v sudo >/dev/null; }; then
+		sudo_ apt-get install -y --no-install-recommends build-essential debhelper devscripts fakeroot
+	else
+		echo "build-debs.sh: cannot build here: missing$missing" >&2
+		echo "and there is no apt-get/sudo to install them. Run this script in Debian 13:" >&2
+		echo "this computer's own terminal, a Debian machine or WSL 2, as your normal" >&2
+		echo "user. CONTRIBUTING.md has the setup steps." >&2
+		exit 1
+	fi
 fi
 
 work=$(mktemp -d /tmp/zacos9-deb.XXXXXX)
