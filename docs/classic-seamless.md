@@ -194,7 +194,10 @@ repaired Mac OS 9 guest, a prototype launched SimpleText and displayed its
 window, but a second request timed out because MacTCP's receive and close calls
 stopped returning after the app switch. A permanent asynchronous receive with
 a raw completion routine crashed the guest. The next attempt should use Open
-Transport or a correctly built asynchronous completion UPP.
+Transport or a correctly built asynchronous completion UPP. A Finder
+`Open Documents` Apple Event was also rejected with error -903 for apps on the
+shared volume. The Open Transport route needs the real Universal Interfaces 3.x
+headers to match its private entry point.
 
 ### 2. Opt-in independent document windows
 
