@@ -14,8 +14,9 @@ the original function. A window that is fully covered by another window still
 has current pixels.
 
 This is a development slice. It writes an inventory and PPM frames to the
-shared Unix volume; a host window frontend and input forwarding are not
-implemented yet.
+shared Unix volume. `zacos9-classic-windows` (in `shell/classic`) shows those
+frames as ordinary ZacOS toplevels; input forwarding and guest close/resize
+requests are not implemented yet.
 
 ## What works
 
@@ -33,6 +34,11 @@ implemented yet.
   `LineTo`, `CopyBits` (when the destination is the window) and `ScrollRect`.
   `StdText` is optional; the agent still starts if InterfaceLib does not export
   it.
+- The host frontend creates one ordinary Qt toplevel per captured window. The
+  compositor supplies the ZacOS title bar; the title text is the guest window
+  title. A controller window lists all guest windows and provides **Show Classic
+  Desktop** (hide exported windows so the emulator is usable) and **Show
+  Exported Windows**.
 
 ## Host-visible files
 
@@ -62,8 +68,9 @@ P6
 255
 ```
 
-Frames are overwritten in place. The host must use `ClassicWindows.txt` to
-ignore files from closed windows; the agent does not delete old frames.
+Frames are overwritten in place. `zacos9-classic-windows` uses
+`ClassicWindows.txt` to ignore files from closed windows; the agent does not
+delete old frames.
 
 ## Limits
 
@@ -83,7 +90,10 @@ ignore files from closed windows; the agent does not delete old frames.
 - Exporting a full PPM every two seconds is prototype transport, not the
   production frame path. It writes about 1 MB per 615x541 window per update.
 - No input, close, resize, focus or menu forwarding. The host cannot yet
-  activate or type into an exported window.
+  activate or type into an exported window. Closing an exported host window
+  only hides it; it does not close the guest window.
+- The exported window is fixed to the guest content size; host resize is not
+  forwarded.
 - A window that never draws after the agent starts is not discovered. Hooking
   window creation and activation is the next step.
 - The agent is a Startup Item application, not an INIT. It uses the background
@@ -113,6 +123,27 @@ Copy the generated `.APPL`, `.rsrc/ClassicWindowAgent.APPL` and
 `System Folder:Startup Items` and restart. The shared Unix volume is easiest.
 No Apple files are included.
 
+## Host frontend
+
+Build the Qt frontend with the rest of the shell, or directly:
+
+```sh
+g++ -std=c++17 -fPIC -O2 $(pkg-config --cflags Qt6Widgets) \
+  shell/classic/windows.cpp -o /tmp/zacos9-classic-windows \
+  $(pkg-config --libs Qt6Widgets)
+```
+
+Run it inside the ZacOS session:
+
+```sh
+zacos9-classic-windows
+```
+
+It reads `$HOME/ClassicWindows.txt` (override with
+`ZACOS9_CLASSIC_WINDOWS`) every half second. The controller window remains if
+the exported windows are hidden; **Show Exported Windows** brings them back.
+The current transport is polling files, not a live event stream.
+
 ## Recorded result
 
 In the disposable Mac OS 9.0.4 guest, with SimpleText opened from ZacOS and
@@ -135,9 +166,9 @@ matches the empty graph window shown on the guest screen.
 
 - Move frame and inventory transport onto the emulator bridge or shared memory
   instead of rewriting PPMs.
-- Add a host frontend that creates ordinary ZacOS toplevels with ZacOS title
-  bars and a **Show Classic Desktop** fallback.
 - Add input forwarding, close/resize requests and window activation.
+- Make the controller's **Show Classic Desktop** bring the emulator window
+  forward, not just hide exported windows.
 - Hook window creation/activation for windows that do not draw after startup.
 - Handle `FillCRect`/`FillRect`, custom drawing procedures and indexed color,
   then broaden the compatibility matrix.

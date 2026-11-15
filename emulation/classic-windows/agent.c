@@ -542,15 +542,16 @@ static pascal void capture_bits(BitMap *source, BitMap *destination,
 			PixMap *window_pixmap = *((CGrafPtr)replay_original)->portPixMap;
 			PixMap *capture_pixmap = *record->color_surface.pixmap;
 			BitMap *replay_source = source;
-			if (!(destination->rowBytes & 0x8000) ||
-					(PixMap *)destination != window_pixmap) {
+			if ((PixMap *)destination != window_pixmap) {
+				/* Drawing from the window into an offscreen buffer is not
+				   window content; leave it alone. */
+			} else if (!(destination->rowBytes & 0x8000)) {
 				record->capture_error = paramErr;
 			} else if ((PixMap *)source == window_pixmap) {
 				replay_source = (BitMap *)capture_pixmap;
 			} else if (!(source->rowBytes & 0x8000)) {
 				record->capture_error = paramErr;
-			}
-			if (record->capture_error == noErr) {
+			} else {
 				record->op_counts[5]++;
 				((NativeBits)&saved_extra[BITS_HOOK])(replay_source,
 					(BitMap *)capture_pixmap, source_rect, destination_rect, mode, mask);

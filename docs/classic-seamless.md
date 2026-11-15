@@ -230,11 +230,14 @@ background agent ([`emulation/classic-windows`](../emulation/classic-windows/REA
 installs native InterfaceLib transition-vector hooks and identifies windows
 from separate processes. In a Mac OS 9.0.4 guest it discovered and captured
 SimpleText and Graphing Calculator 1.1 windows, including typed text, while
-writing PPM frames to the shared volume. Host toplevels, input forwarding,
-close/resize requests and the **Show Classic Desktop** action are not
-implemented, so the gate above is not met. The current frame transport
-(rewriting PPM every two seconds) and bounded operation coverage are prototype
-work, not production compatibility.
+writing PPM frames to the shared volume. A basic host frontend
+(`zacos9-classic-windows`) shows those frames as ordinary Qt toplevels with
+guest window titles and a controller that can hide them for desktop mode.
+Input forwarding, guest close/resize requests, document routing and a fully
+persistent **Show Classic Desktop** action are not implemented, so the gate
+above is not met. The current frame transport (rewriting PPM every two seconds)
+and bounded operation coverage are prototype work, not production
+compatibility.
 
 ### 3. Modal dialogs, popups and full-desktop recovery
 

@@ -9,6 +9,7 @@
 {prefix}/bin/zacos9-calculator
 {prefix}/bin/zacos9-capture
 {prefix}/bin/zacos9-classic
+{prefix}/bin/zacos9-classic-windows
 {prefix}/bin/zacos9-collar
 {prefix}/bin/zacos9-collarpanel
 {prefix}/bin/zacos9-controlpanel

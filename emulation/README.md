@@ -11,8 +11,9 @@ For the proposed independent-window integration, see the
 [seamless Classic windows plan](../docs/classic-seamless.md). It targets true
 per-window rendering with a permanent full-desktop fallback. The guest half now
 lives in [Classic Window Agent](classic-windows/README.md): it discovers
-SimpleText and Graphing Calculator windows and keeps independent color frames.
-Host toplevels, input forwarding and the fallback are not implemented yet.
+SimpleText and Graphing Calculator windows and keeps independent color frames;
+`zacos9-classic-windows` shows them as ordinary toplevels. Input forwarding and
+the full desktop fallback are not implemented yet.
 An original guest test application and host pixel verifier are available in
 the [rendering feasibility spike](seamless/README.md); this does not enable
 seamless mode.

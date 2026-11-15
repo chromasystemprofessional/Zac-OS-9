@@ -230,8 +230,9 @@ All of them are [on GitHub](https://github.com/chromasystemprofessional/Zac-OS-9
    Helper open further apps in a running session; SimpleText and SimpleSound
    have been opened in one session. A background window agent now discovers
    and captures SimpleText and Graphing Calculator windows in separate
-   processes, including typed text, but host toplevels, input forwarding,
-   documents, and lifecycle recovery are still to come.
+   processes, including typed text. A basic host viewer shows them as ordinary
+   toplevels; input forwarding, documents and lifecycle recovery are still to
+   come.
 4. **From the [roadmap](docs/ROADMAP.md)**: a Platinum boot menu (on Esc),
    manual pages, trying it in Hyper-V.
 
