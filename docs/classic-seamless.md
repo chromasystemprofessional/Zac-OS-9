@@ -1,9 +1,9 @@
 # Seamless Classic windows: implementation plan
 
 Status: milestone 1 application transport implemented; milestone 2 guest
-window discovery/capture and a basic host viewer are in progress. Target:
-SheepShaver with user-supplied Mac OS 9.0.4 first. Basilisk II and other guest
-versions are later work.
+window discovery/capture, a basic host viewer and click/key forwarding are in
+progress. Target: SheepShaver with user-supplied Mac OS 9.0.4 first. Basilisk
+II and other guest versions are later work.
 
 Milestone 0 is now started: an original PowerPC two-window probe and exact-pixel
 host verifier are in [the feasibility spike](../emulation/seamless/README.md).
@@ -25,9 +25,10 @@ windows exactly: the fixture's references pass an independent host RGB,
 marker and calibration/grid oracle, the helper's candidates match them every
 pixel, and the obscured screen crop fails the negative control. Indexed color,
 custom procedures and general color APIs remain unproven. The feasibility gate
-has not passed: cross-process window discovery/identity, input, broader
-lifetime handling and general graphics APIs/origins still need proof. The
-exact tested guest OS version is not yet confirmed.
+has not passed: broader lifetime handling and general graphics APIs/origins
+still need proof. Milestone 2 has since demonstrated cross-process discovery
+and basic click/key input for SimpleText and Graphing Calculator, but not
+general compatibility. The exact tested guest OS version is not yet confirmed.
 
 The host verifier's version-3 PPM path now has an independent RGB oracle for
 the fixture's marker, calibration bars and 5-bit color grid, plus exact
@@ -233,12 +234,14 @@ from separate processes. In a Mac OS 9.0.4 guest it discovered and captured
 SimpleText and Graphing Calculator 1.1 windows, including typed text, while
 writing PPM frames to the shared volume. A basic host frontend
 (`zacos9-classic-windows`) shows those frames as ordinary Qt toplevels with
-guest window titles and a controller that can hide them for desktop mode.
-Input forwarding, guest close/resize requests, document routing and a fully
-persistent **Show Classic Desktop** action are not implemented, so the gate
-above is not met. The current frame transport (rewriting PPM every two seconds)
-and bounded operation coverage are prototype work, not production
-compatibility.
+guest window titles, a controller that can hide them for desktop mode, and
+click/key forwarding through the patched emulator's ADB input queue. In the
+disposable guest, typing into the exported SimpleText window reached the guest
+and the captured frame. Guest close/resize requests, drag/wheel, document
+routing and a fully persistent **Show Classic Desktop** action are not
+implemented, so the gate above is not met. The current frame transport
+(rewriting PPM every two seconds) and bounded operation coverage are prototype
+work, not production compatibility.
 
 ### 3. Modal dialogs, popups and full-desktop recovery
 

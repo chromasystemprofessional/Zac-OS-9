@@ -56,6 +56,7 @@ typedef struct {
 	OSType signature;
 	Str255 title;
 	Rect bounds;
+	Rect global;
 	short kind;
 	short depth;
 	unsigned short version;
@@ -253,6 +254,10 @@ static WindowInfo *observe_window(void) {
 	record->kind = target->windowKind;
 	record->visible = target->visible;
 	record->bounds = port->portRect;
+	if (target->contRgn)
+		record->global = (*target->contRgn)->rgnBBox;
+	else
+		record->global = port->portRect;
 	record->version = ((CGrafPtr)port)->portVersion;
 	record->color = is_color_port(port);
 	record->depth = 1;
@@ -770,7 +775,7 @@ static void write_window_meta(WindowInfo *record, int length) {
 	length = snprintf(text, sizeof(text),
 		"version=1\nserial=%u\napp=\"%.*s\"\ntitle=\"%.*s\"\n"
 		"psn=%lu:%lu\nsig=%08lx\nkind=%d\nvisible=%d\ncolor=%d\ndepth=%d\n"
-		"bounds=%d,%d,%d,%d\nwidth=%d\nheight=%d\nframe=%lu\ncalls=%lu\nfile=ZacWin-%u.ppm\n",
+		"bounds=%d,%d,%d,%d\nglobal=%d,%d,%d,%d\nwidth=%d\nheight=%d\nframe=%lu\ncalls=%lu\nfile=ZacWin-%u.ppm\n",
 		record->serial, record->app_name[0], record->app_name + 1,
 		record->title[0], record->title + 1,
 		(unsigned long)record->process.highLongOfPSN,
@@ -778,6 +783,8 @@ static void write_window_meta(WindowInfo *record, int length) {
 		(unsigned long)record->signature, record->kind, record->visible,
 		record->color, record->depth, record->bounds.left,
 		record->bounds.top, record->bounds.right, record->bounds.bottom,
+		record->global.left, record->global.top,
+		record->global.right, record->global.bottom,
 		record->color_surface.width, record->color_surface.height,
 		record->frame, record->calls, record->serial);
 	write_text_file(name, text, length);
@@ -802,7 +809,8 @@ static void write_report(void) {
 			int line_length = snprintf(line, sizeof(line),
 				"window=%u serial=%u psn=%lu:%lu app=\"%.*s\" sig=%08lx "
 				"kind=%d visible=%d color=%d depth=%d bounds=%d,%d,%d,%d "
-				"title=\"%.*s\" calls=%lu frame=%lu capture=%d error=%d "
+				"global=%d,%d,%d,%d title=\"%.*s\" calls=%lu frame=%lu "
+				"capture=%d error=%d "
 				"ops=%lu,%lu,%lu,%lu,%lu,%lu,%lu bk=%08lx rgbbk=%06lx clips=%d,%d,%d,%d\n",
 				n++, record->serial,
 				(unsigned long)record->process.highLongOfPSN,
@@ -812,6 +820,8 @@ static void write_report(void) {
 				record->visible, record->color, record->depth,
 				record->bounds.left, record->bounds.top,
 				record->bounds.right, record->bounds.bottom,
+				record->global.left, record->global.top,
+				record->global.right, record->global.bottom,
 				record->title[0], record->title + 1, record->calls,
 				record->frame, record->capture_ok, record->capture_error,
 				record->op_counts[0], record->op_counts[1], record->op_counts[2],

@@ -91,6 +91,12 @@ install -D -m 644 "$src/SheepShaver/src/emul_op.cpp" \
 	"$srcstage/SheepShaver/src/emul_op.cpp"
 install -D -m 644 "$src/SheepShaver/src/include/emul_op.h" \
 	"$srcstage/SheepShaver/src/include/emul_op.h"
+install -D -m 644 "$src/SheepShaver/src/Unix/video_x.cpp" \
+	"$srcstage/SheepShaver/src/Unix/video_x.cpp"
+for sdl in video_sdl.cpp video_sdl2.cpp video_sdl3.cpp; do
+	install -D -m 644 "$src/BasiliskII/src/SDL/$sdl" \
+		"$srcstage/BasiliskII/src/SDL/$sdl"
+done
 cp "$root/emulation/patches/sheepshaver-classic-bridge.patch" \
 	"$srcstage/zacos9-classic-bridge.patch"
 tar -C "$work/source" -czf "$out/${name}_${version}.source.tar.gz" \

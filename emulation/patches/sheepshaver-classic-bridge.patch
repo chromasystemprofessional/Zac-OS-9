@@ -1,5 +1,97 @@
+diff --git a/BasiliskII/src/SDL/video_sdl.cpp b/BasiliskII/src/SDL/video_sdl.cpp
+index b7befed..ff4576a 100644
+--- a/BasiliskII/src/SDL/video_sdl.cpp
++++ b/BasiliskII/src/SDL/video_sdl.cpp
+@@ -58,6 +58,9 @@
+ #include "cpu_emulation.h"
+ #include "main.h"
+ #include "adb.h"
++#ifdef SHEEPSHAVER
++#include "emul_op.h"
++#endif
+ #include "macos_util.h"
+ #include "prefs.h"
+ #include "user_strings.h"
+@@ -1814,6 +1817,9 @@ static void force_complete_window_refresh()
+ 
+ static void handle_events(void)
+ {
++#ifdef SHEEPSHAVER
++	ClassicBridgeInputPoll();
++#endif
+ 	SDL_Event events[10];
+ 	const int n_max_events = sizeof(events) / sizeof(events[0]);
+ 	int n_events;
+diff --git a/BasiliskII/src/SDL/video_sdl2.cpp b/BasiliskII/src/SDL/video_sdl2.cpp
+index 3c116e6..0547304 100644
+--- a/BasiliskII/src/SDL/video_sdl2.cpp
++++ b/BasiliskII/src/SDL/video_sdl2.cpp
+@@ -62,6 +62,9 @@
+ #include <cpu_emulation.h>
+ #include "main.h"
+ #include "adb.h"
++#ifdef SHEEPSHAVER
++#include "emul_op.h"
++#endif
+ #include "macos_util.h"
+ #include "prefs.h"
+ #include "user_strings.h"
+@@ -2337,6 +2340,9 @@ static int SDLCALL on_sdl_event_generated(void *userdata, SDL_Event * event)
+ 
+ static void handle_events(void)
+ {
++#ifdef SHEEPSHAVER
++	ClassicBridgeInputPoll();
++#endif
+ 	SDL_Event events[10];
+ 	const int n_max_events = sizeof(events) / sizeof(events[0]);
+ 	int n_events;
+diff --git a/BasiliskII/src/SDL/video_sdl3.cpp b/BasiliskII/src/SDL/video_sdl3.cpp
+index 5621a72..c5d8f37 100644
+--- a/BasiliskII/src/SDL/video_sdl3.cpp
++++ b/BasiliskII/src/SDL/video_sdl3.cpp
+@@ -60,6 +60,9 @@
+ #include <cpu_emulation.h>
+ #include "main.h"
+ #include "adb.h"
++#ifdef SHEEPSHAVER
++#include "emul_op.h"
++#endif
+ #include "macos_util.h"
+ #include "prefs.h"
+ #include "user_strings.h"
+@@ -2285,6 +2288,9 @@ static bool SDLCALL on_sdl_event_generated(void *userdata, SDL_Event *event)
+ 
+ static void handle_events(void)
+ {
++#ifdef SHEEPSHAVER
++	ClassicBridgeInputPoll();
++#endif
+ 	SDL_Event events[10];
+ 	const int n_max_events = sizeof(events) / sizeof(events[0]);
+ 	int n_events;
+diff --git a/SheepShaver/src/Unix/video_x.cpp b/SheepShaver/src/Unix/video_x.cpp
+index 0f98003..7a21064 100644
+--- a/SheepShaver/src/Unix/video_x.cpp
++++ b/SheepShaver/src/Unix/video_x.cpp
+@@ -60,6 +60,7 @@
+ 
+ #include "main.h"
+ #include "adb.h"
++#include "emul_op.h"
+ #include "prefs.h"
+ #include "user_strings.h"
+ #include "about_window.h"
+@@ -2030,6 +2031,7 @@ static int event2keycode(XKeyEvent &ev, bool key_down)
+ 
+ static void handle_events(void)
+ {
++	ClassicBridgeInputPoll();
+ 	// Handle events
+ 	for (;;) {
+ 		XEvent event;
 diff --git a/SheepShaver/src/emul_op.cpp b/SheepShaver/src/emul_op.cpp
-index d17415f..b946212 100644
+index d17415f..b8b98ed 100644
 --- a/SheepShaver/src/emul_op.cpp
 +++ b/SheepShaver/src/emul_op.cpp
 @@ -19,6 +19,10 @@
@@ -13,7 +105,7 @@ index d17415f..b946212 100644
  
  #include "sysdeps.h"
  #include "main.h"
-@@ -62,6 +66,191 @@ static uint32 MakeExecutableTvec;
+@@ -62,6 +66,293 @@ static uint32 MakeExecutableTvec;
   *  Execute EMUL_OP opcode (called by 68k emulator)
   */
  
@@ -169,6 +261,108 @@ index d17415f..b946212 100644
 +	return ok;
 +}
 +
++/*
++ *  Host input queue. The host frontend writes event.<n>.evt below
++ *  ZACOS9_CLASSIC_QUEUE/input; one event is injected per video tick so the
++ *  guest sees mouse-down/up and key-down/up as separate ADB samples.
++ */
++static int bridge_event_id(const char *name, uint32 *id) {
++	const char *digits;
++	char *end;
++	unsigned long value;
++	if (strncmp(name, "event.", 6) != 0)
++		return 0;
++	digits = name + 6;
++	value = strtoul(digits, &end, 10);
++	if (end == digits || strcmp(end, ".evt") != 0 ||
++			value == 0 || value > 0xffffffffUL)
++		return 0;
++	*id = (uint32)value;
++	return 1;
++}
++
++static int bridge_read_input(char *text, size_t cap, char *filename, size_t fcap) {
++	char input[512], best[256] = "";
++	uint32 best_id = 0;
++	DIR *dir;
++	struct dirent *entry;
++	snprintf(input, sizeof(input), "%s/input", bridge_queue_dir());
++	dir = opendir(input);
++	if (!dir)
++		return 0;
++	while ((entry = readdir(dir)) != NULL) {
++		uint32 candidate;
++		if (!bridge_event_id(entry->d_name, &candidate))
++			continue;
++		if (best[0] != 0 && candidate >= best_id)
++			continue;
++		if (strlen(entry->d_name) >= sizeof(best))
++			continue;
++		best_id = candidate;
++		strcpy(best, entry->d_name);
++	}
++	closedir(dir);
++	if (!best[0])
++		return 0;
++	snprintf(filename, fcap, "%s/%s", input, best);
++	{
++		FILE *f = fopen(filename, "r");
++		size_t len;
++		if (!f)
++			return 0;
++		len = fread(text, 1, cap - 1, f);
++		text[len] = 0;
++		fclose(f);
++	}
++	return 1;
++}
++
++static void bridge_inject_input(const char *text) {
++	char type[16], action[16], value[32];
++	unsigned long x = 0, y = 0, code = 0, button = 0;
++	if (!bridge_value(text, "type", type, sizeof(type)) ||
++			!bridge_value(text, "action", action, sizeof(action)))
++		return;
++	if (!strcmp(type, "mouse")) {
++		if (bridge_value(text, "x", value, sizeof(value)))
++			x = strtoul(value, NULL, 10);
++		if (bridge_value(text, "y", value, sizeof(value)))
++			y = strtoul(value, NULL, 10);
++		if (bridge_value(text, "button", value, sizeof(value)))
++			button = strtoul(value, NULL, 10);
++		if (x > 4096 || y > 4096 || button > 2)
++			return;
++		ADBMouseMoved((int)x, (int)y);
++		if (!strcmp(action, "down"))
++			ADBMouseDown((int)button);
++		else if (!strcmp(action, "up"))
++			ADBMouseUp((int)button);
++	} else if (!strcmp(type, "key")) {
++		if (!bridge_value(text, "code", value, sizeof(value)))
++			return;
++		code = strtoul(value, NULL, 10);
++		if (code > 0x7f)
++			return;
++		if (!strcmp(action, "down"))
++			ADBKeyDown((int)code);
++		else if (!strcmp(action, "up"))
++			ADBKeyUp((int)code);
++	}
++}
++
++void ClassicBridgeInputPoll(void) {
++	static unsigned long last_poll;
++	unsigned long now = GetTicks_usec() / 1000;
++	char text[512], filename[512];
++	if (now - last_poll < 8)
++		return;
++	last_poll = now;
++	if (!bridge_read_input(text, sizeof(text), filename, sizeof(filename)))
++		return;
++	bridge_inject_input(text);
++	unlink(filename);
++}
++
 +static uint32 ClassicBridgeOp(uint32 block) {
 +	uint8 *host;
 +	uint32 command, result = 0;
@@ -205,7 +399,7 @@ index d17415f..b946212 100644
  void EmulOp(M68kRegisters *r, uint32 pc, int selector)
  {
  	D(bug("EmulOp %04x at %08x\n", selector, pc));
-@@ -498,6 +687,10 @@ void EmulOp(M68kRegisters *r, uint32 pc, int selector)
+@@ -498,6 +789,10 @@ void EmulOp(M68kRegisters *r, uint32 pc, int selector)
  			r->d[0] = (uint32)-2;
  			break;
  
@@ -217,7 +411,7 @@ index d17415f..b946212 100644
  			printf("FATAL: EMUL_OP called with bogus selector %08x\n", selector);
  			QuitEmulator();
 diff --git a/SheepShaver/src/include/emul_op.h b/SheepShaver/src/include/emul_op.h
-index 9f9a323..15afc85 100644
+index 9f9a323..15d8618 100644
 --- a/SheepShaver/src/include/emul_op.h
 +++ b/SheepShaver/src/include/emul_op.h
 @@ -49,6 +49,7 @@ enum {	// Selectors for EMUL_OP opcodes
@@ -228,3 +422,10 @@ index 9f9a323..15afc85 100644
  	OP_MAX
  };
  const uint16 M68K_EMUL_RETURN = 0xfe40;	// Extended opcodes
+@@ -109,5 +110,6 @@ const uint16 M68K_EMUL_OP_IDLE_TIME = M68K_EMUL_BREAK + OP_IDLE_TIME;
+ const uint16 M68K_EMUL_OP_IDLE_TIME_2 = M68K_EMUL_BREAK + OP_IDLE_TIME_2;
+ 
+ extern "C" void EmulOp(M68kRegisters *r, uint32 pc, int selector);
++extern void ClassicBridgeInputPoll(void);
+ 
+ #endif

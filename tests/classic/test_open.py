@@ -118,6 +118,8 @@ with tempfile.TemporaryDirectory() as d:
           "a new session queues request 1 with the colon-separated path")
     check(record.exists() and record.read_text().strip() == str(home / "zacos9-classic"),
           "the emulator receives the queue path")
+    check((home / "zacos9-classic" / "input").is_dir(),
+          "a new session creates the input queue")
 
     # A running session accepts further requests. The bridge stand-in
     # acknowledges and removes each one, as the patched emulator does.

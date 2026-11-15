@@ -16,6 +16,9 @@
 #include <QFileInfo>
 #include <QHBoxLayout>
 #include <QImage>
+#include <QKeyEvent>
+#include <QMouseEvent>
+#include <QRect>
 #include <QLabel>
 #include <QListWidget>
 #include <QMap>
@@ -37,8 +40,147 @@ struct GuestWindow {
 	QString app;
 	bool captured = false;
 	int error = 0;
+	QRect global;
 	QString framePath;
 };
+
+QVector<int> rectNumbers(const QString &line, const char *name) {
+	const QRegularExpression re(QString("%1=(-?[0-9]+),(-?[0-9]+),(-?[0-9]+),(-?[0-9]+)").arg(name));
+	const auto match = re.match(line);
+	if (!match.hasMatch())
+		return {};
+	return { match.captured(1).toInt(), match.captured(2).toInt(),
+		match.captured(3).toInt(), match.captured(4).toInt() };
+}
+
+QString inputDirectory() {
+	return QDir::homePath() + "/zacos9-classic/input";
+}
+
+qint64 nextInputId() {
+	static qint64 id = [] {
+		qint64 next = QDateTime::currentSecsSinceEpoch();
+		const QDir directory(inputDirectory());
+		for (const QString &name : directory.entryList({ "event.*.evt" }, QDir::Files)) {
+			bool ok = false;
+			const qint64 value = name.section('.', 1, 1).toLongLong(&ok);
+			if (ok && value > next)
+				next = value;
+		}
+		return next;
+	}();
+	return ++id;
+}
+
+void sendInput(const QString &body) {
+	const QString directory = inputDirectory();
+	QDir().mkpath(directory);
+	const qint64 id = nextInputId();
+	const QString temporary = QString("%1/.event.%2.tmp").arg(directory).arg(id);
+	const QString target = QString("%1/event.%2.evt").arg(directory).arg(id);
+	QFile file(temporary);
+	if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate))
+		return;
+	file.write(QString("version=1\nid=%1\n%2").arg(id).arg(body).toUtf8());
+	file.close();
+	QFile::remove(target);
+	QFile::rename(temporary, target);
+}
+
+void sendMouse(int x, int y, const char *action, int button = 0) {
+	sendInput(QString("type=mouse\naction=%1\nx=%2\ny=%3\nbutton=%4\n")
+		.arg(action).arg(x).arg(y).arg(button));
+}
+
+void sendKey(int code, const char *action) {
+	sendInput(QString("type=key\naction=%1\ncode=%2\n").arg(action).arg(code));
+}
+
+int macKeyCode(QKeyEvent *event) {
+	switch (event->key()) {
+		case Qt::Key_Shift: return 0x38;
+		case Qt::Key_Control: return 0x36;
+		case Qt::Key_Alt: return 0x3A;
+		case Qt::Key_Meta: return 0x37;
+		case Qt::Key_CapsLock: return 0x39;
+		case Qt::Key_Return:
+		case Qt::Key_Enter: return 0x24;
+		case Qt::Key_Tab: return 0x30;
+		case Qt::Key_Space: return 0x31;
+		case Qt::Key_Backspace: return 0x33;
+		case Qt::Key_Escape: return 0x35;
+		case Qt::Key_Delete: return 0x75;
+		case Qt::Key_Home: return 0x73;
+		case Qt::Key_End: return 0x77;
+		case Qt::Key_PageUp: return 0x74;
+		case Qt::Key_PageDown: return 0x79;
+		case Qt::Key_Left: return 0x7B;
+		case Qt::Key_Right: return 0x7C;
+		case Qt::Key_Down: return 0x7D;
+		case Qt::Key_Up: return 0x7E;
+		case Qt::Key_F1: return 0x7A;
+		case Qt::Key_F2: return 0x78;
+		case Qt::Key_F3: return 0x63;
+		case Qt::Key_F4: return 0x76;
+		case Qt::Key_F5: return 0x60;
+		case Qt::Key_F6: return 0x61;
+		case Qt::Key_F7: return 0x62;
+		case Qt::Key_F8: return 0x64;
+		case Qt::Key_F9: return 0x65;
+		case Qt::Key_F10: return 0x6D;
+		case Qt::Key_F11: return 0x67;
+		case Qt::Key_F12: return 0x6F;
+		default: break;
+	}
+	if (event->key() >= Qt::Key_A && event->key() <= Qt::Key_Z) {
+		static const int letters[26] = {
+			0x00, 0x0B, 0x08, 0x02, 0x0E, 0x03, 0x05, 0x04, 0x22, 0x26,
+			0x28, 0x25, 0x2E, 0x2D, 0x1F, 0x23, 0x0C, 0x0F, 0x01, 0x11,
+			0x20, 0x09, 0x0D, 0x07, 0x10, 0x06
+		};
+		return letters[event->key() - Qt::Key_A];
+	}
+	if (event->key() >= Qt::Key_0 && event->key() <= Qt::Key_9) {
+		static const int digits[10] = { 0x1D, 0x12, 0x13, 0x14, 0x15, 0x17, 0x16, 0x1A, 0x1C, 0x19 };
+		return digits[event->key() - Qt::Key_0];
+	}
+	switch (event->key()) {
+		case Qt::Key_Minus: return 0x1B;
+		case Qt::Key_Equal: return 0x18;
+		case Qt::Key_BracketLeft: return 0x21;
+		case Qt::Key_BracketRight: return 0x1E;
+		case Qt::Key_Semicolon: return 0x29;
+		case Qt::Key_Apostrophe: return 0x27;
+		case Qt::Key_Comma: return 0x2B;
+		case Qt::Key_Period: return 0x2F;
+		case Qt::Key_Slash: return 0x2C;
+		case Qt::Key_Backslash: return 0x2A;
+		case Qt::Key_QuoteLeft: return 0x32;
+		/* Shifted symbols report their own keys on some platforms. */
+		case Qt::Key_Exclam: return 0x12;
+		case Qt::Key_At: return 0x13;
+		case Qt::Key_NumberSign: return 0x14;
+		case Qt::Key_Dollar: return 0x15;
+		case Qt::Key_Percent: return 0x17;
+		case Qt::Key_AsciiCircum: return 0x16;
+		case Qt::Key_Ampersand: return 0x1A;
+		case Qt::Key_Asterisk: return 0x1C;
+		case Qt::Key_ParenLeft: return 0x19;
+		case Qt::Key_ParenRight: return 0x1D;
+		case Qt::Key_Underscore: return 0x1B;
+		case Qt::Key_Plus: return 0x18;
+		case Qt::Key_BraceLeft: return 0x21;
+		case Qt::Key_BraceRight: return 0x1E;
+		case Qt::Key_Colon: return 0x29;
+		case Qt::Key_QuoteDbl: return 0x27;
+		case Qt::Key_Less: return 0x2B;
+		case Qt::Key_Greater: return 0x2F;
+		case Qt::Key_Question: return 0x2C;
+		case Qt::Key_Bar: return 0x2A;
+		case Qt::Key_AsciiTilde: return 0x32;
+		default: return -1;
+	}
+}
 
 QString inventoryPath() {
 	const QByteArray override = qgetenv("ZACOS9_CLASSIC_WINDOWS");
@@ -77,6 +219,12 @@ QVector<GuestWindow> readInventory() {
 		window.app = field(line, "app");
 		window.captured = number(line, "capture") != 0;
 		window.error = number(line, "error");
+		{
+			const QVector<int> global = rectNumbers(line, "global");
+			if (global.size() == 4)
+				window.global = QRect(global[0], global[1],
+					global[2] - global[0], global[3] - global[1]);
+		}
 		if (window.serial >= 0)
 			window.framePath = QDir::homePath() +
 				QString("/ZacWin-%1.ppm").arg(window.serial);
@@ -137,6 +285,7 @@ public:
 	WindowViewer(const GuestWindow &window, QWidget *parent = nullptr)
 		: QWidget(parent), m_serial(window.serial) {
 		setAttribute(Qt::WA_DeleteOnClose);
+		setFocusPolicy(Qt::StrongFocus);
 		setWindowTitle(window.title.isEmpty() ? window.app : window.title);
 		setToolTip(window.app);
 		m_image = new QLabel(this);
@@ -151,6 +300,12 @@ public:
 	}
 
 	int serial() const { return m_serial; }
+
+	void updateInfo(const GuestWindow &window) {
+		m_global = window.global;
+		setWindowTitle(window.title.isEmpty() ? window.app : window.title);
+		setToolTip(window.app);
+	}
 
 	void updateFrame(const QString &path) {
 		const QFileInfo info(path);
@@ -168,8 +323,43 @@ public:
 		setFixedSize(image.size());
 	}
 
+protected:
+	void mousePressEvent(QMouseEvent *event) override {
+		setFocus(Qt::MouseFocusReason);
+		const QPoint point = event->position().toPoint();
+		const int x = m_global.left() + point.x();
+		const int y = m_global.top() + point.y();
+		sendMouse(x, y, "move");
+		sendMouse(x, y, "down");
+	}
+
+	void mouseReleaseEvent(QMouseEvent *event) override {
+		const QPoint point = event->position().toPoint();
+		const int x = m_global.left() + point.x();
+		const int y = m_global.top() + point.y();
+		sendMouse(x, y, "move");
+		sendMouse(x, y, "up");
+	}
+
+	void keyPressEvent(QKeyEvent *event) override {
+		if (event->isAutoRepeat())
+			return;
+		const int code = macKeyCode(event);
+		if (code >= 0)
+			sendKey(code, "down");
+	}
+
+	void keyReleaseEvent(QKeyEvent *event) override {
+		if (event->isAutoRepeat())
+			return;
+		const int code = macKeyCode(event);
+		if (code >= 0)
+			sendKey(code, "up");
+	}
+
 private:
 	int m_serial;
+	QRect m_global;
 	QString m_path;
 	QDateTime m_modified;
 	QLabel *m_image = nullptr;
@@ -224,6 +414,7 @@ public:
 					m_ignored.insert(window.serial);
 				});
 			}
+			viewer->updateInfo(window);
 			viewer->updateFrame(window.framePath);
 			if (m_showing)
 				viewer->show();

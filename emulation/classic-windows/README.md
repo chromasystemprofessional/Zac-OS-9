@@ -15,8 +15,9 @@ has current pixels.
 
 This is a development slice. It writes an inventory and PPM frames to the
 shared Unix volume. `zacos9-classic-windows` (in `shell/classic`) shows those
-frames as ordinary ZacOS toplevels; input forwarding and guest close/resize
-requests are not implemented yet.
+frames as ordinary ZacOS toplevels and forwards clicks and keys through the
+patched emulator's ADB input queue. Guest close/resize requests, documents and
+the full desktop fallback are not implemented yet.
 
 ## What works
 
@@ -39,6 +40,10 @@ requests are not implemented yet.
   title. A controller window lists all guest windows and provides **Show Classic
   Desktop** (hide exported windows so the emulator is usable) and **Show
   Exported Windows**.
+- Clicks and keys in an exported window reach the guest through the patched
+  emulator's ADB input queue. In the disposable guest, clicking the exported
+  SimpleText window and typing `hello input` produced that text in SimpleText
+  and in the next captured frame.
 
 ## Host-visible files
 
@@ -89,11 +94,13 @@ delete old frames.
   source is used as-is; a screen-source alias is refused.
 - Exporting a full PPM every two seconds is prototype transport, not the
   production frame path. It writes about 1 MB per 615x541 window per update.
-- No input, close, resize, focus or menu forwarding. The host cannot yet
-  activate or type into an exported window. Closing an exported host window
-  only hides it; it does not close the guest window.
+- No close, resize or menu forwarding. Closing an exported host window only
+  hides it; it does not close the guest window.
 - The exported window is fixed to the guest content size; host resize is not
   forwarded.
+- Mouse drag, wheel, double-click detection and modifier edge cases are not
+  complete yet. Key mapping is the US layout; the guest's own keyboard layout
+  still applies.
 - A window that never draws after the agent starts is not discovered. Hooking
   window creation and activation is the next step.
 - The agent is a Startup Item application, not an INIT. It uses the background
@@ -144,6 +151,13 @@ It reads `$HOME/ClassicWindows.txt` (override with
 the exported windows are hidden; **Show Exported Windows** brings them back.
 The current transport is polling files, not a live event stream.
 
+Clicks and keys in an exported window are written as
+`zacos9-classic/input/event.<n>.evt`. The patched sheepshaver injects them
+through ADB one event per video tick. Mouse coordinates are the guest content
+origin from the agent's `global=` field plus the local host position, so the
+viewer must use an agent build that reports `global`. The first click in a
+Classic window may only activate it; click again to place the insertion point.
+
 ## Recorded result
 
 In the disposable Mac OS 9.0.4 guest, with SimpleText opened from ZacOS and
@@ -160,13 +174,16 @@ GraphingCalculator kind=8 visible=1 color=1 depth=32 bounds=0,0,634,552
 
 The exported SimpleText frame contains the typed text `Hello Classic` at the
 same pixel positions as the guest window. The Graphing Calculator frame
-matches the empty graph window shown on the guest screen.
+matches the empty graph window shown on the guest screen. A later trial clicked
+the exported SimpleText window and typed `hello input`; the guest window and the
+next captured frame both showed it.
 
 ## Next
 
 - Move frame and inventory transport onto the emulator bridge or shared memory
   instead of rewriting PPMs.
-- Add input forwarding, close/resize requests and window activation.
+- Add mouse drag, wheel, double-click and focus/activation handling.
+- Add close/resize requests and document routing.
 - Make the controller's **Show Classic Desktop** bring the emulator window
   forward, not just hide exported windows.
 - Hook window creation/activation for windows that do not draw after startup.

@@ -97,9 +97,10 @@ session_alive() {
 # Every request gets a new name with a sequence number so the queue is easy to
 # inspect; the bridge reads the directory afresh for each request.
 queue_reset() {
-	rm -rf "$queue_root/requests" "$queue_root/acks"
-	mkdir -p "$queue_root/requests" "$queue_root/acks"
-	chmod 700 "$queue_root" "$queue_root/requests" "$queue_root/acks" 2>/dev/null || true
+	rm -rf "$queue_root/requests" "$queue_root/acks" "$queue_root/input"
+	mkdir -p "$queue_root/requests" "$queue_root/acks" "$queue_root/input"
+	chmod 700 "$queue_root" "$queue_root/requests" "$queue_root/acks" \
+		"$queue_root/input" 2>/dev/null || true
 	printf '0\n' > "$queue_root/sequence"
 }
 
