@@ -40,7 +40,8 @@ Problems go to stderr, exit 1.
 For tests (only when not run as root, or when ZACOS9_MEMORY_TEST=1): ZACOS9_MEMORY_ROOT is the root the
 files above are under, ZACOS9_MEMORY_PROC the directory of meminfo and
 swaps, ZACOS9_MEMORY_SYS stands for /sys, ZACOS9_MEMORY_UID the caller's
-uid; the programs run (swapon, swapoff, mkswap, fallocate, systemctl,
+uid, ZACOS9_MEMORY_DISK_FREE the free space of the file systems the tests
+make (so they don't depend on the real /tmp being large); the programs run (swapon, swapoff, mkswap, fallocate, systemctl,
 modprobe, mount, umount, mountpoint, tar) are found on PATH.
 """
 import os
@@ -63,6 +64,17 @@ SYS = setting("ZACOS9_MEMORY_SYS", "/sys")
 
 def at(path):
     return os.path.join(ROOT, path.lstrip("/"))
+
+
+def disk_free(path):
+    """Free space on the file system holding `path`.
+
+    The tests stand in for it: a build on a machine whose /tmp is a small
+    tmpfs must not turn a 1 GB swap file into a refusal."""
+    size = setting("ZACOS9_MEMORY_DISK_FREE", "")
+    if size.isdigit():
+        return int(size)
+    return shutil.disk_usage(path).free
 
 
 SWAPFILE = "/swapfile"
@@ -161,8 +173,7 @@ def status():
     size = os.path.getsize(file) if os.path.isfile(file) else 0
     size_on, used = active.get(SWAPFILE, (0, 0))
     print(f"swapfile\t{size_on or size}\t{used}\t{'yes' if SWAPFILE in active else 'no'}")
-    usage = shutil.disk_usage(os.path.dirname(file) or "/")
-    print(f"swapfile-room\t{usage.free}")
+    print(f"swapfile-room\t{disk_free(os.path.dirname(file) or '/')}")
     for name, size, used in swaps():
         if name != SWAPFILE and not name.startswith("/dev/zram"):
             print(f"other-swap\t{name}\t{size}\t{used}")
@@ -220,7 +231,7 @@ def swap_on(megabytes):
         die("Virtual memory can't be smaller than 256 MB.")
     file = at(SWAPFILE)
     old = os.path.getsize(file) if os.path.isfile(file) else 0
-    room = shutil.disk_usage(os.path.dirname(file) or "/").free + old
+    room = disk_free(os.path.dirname(file) or "/") + old
     if megabytes * MB + 2048 * MB > room:
         die(f"There isn't room on the disk for {megabytes} MB of virtual memory "
             f"({room // MB - 2048} MB at most, keeping 2 GB free).")
