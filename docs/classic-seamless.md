@@ -1,8 +1,9 @@
 # Seamless Classic windows: implementation plan
 
-Status: milestone 1 application transport implemented; independent window
-integration not started. Target: SheepShaver with user-supplied
-Mac OS 9.0.4 first. Basilisk II and other guest versions are later work.
+Status: milestone 1 application transport implemented; milestone 2 guest
+window discovery/capture and a basic host viewer are in progress. Target:
+SheepShaver with user-supplied Mac OS 9.0.4 first. Basilisk II and other guest
+versions are later work.
 
 Milestone 0 is now started: an original PowerPC two-window probe and exact-pixel
 host verifier are in [the feasibility spike](../emulation/seamless/README.md).
