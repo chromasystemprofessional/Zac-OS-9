@@ -57,7 +57,9 @@ typedef struct {
 	Str255 title;
 	Rect bounds;
 	Rect global;
+	Rect window_frame;
 	short kind;
+	int go_away;
 	short depth;
 	unsigned short version;
 	int color;
@@ -81,7 +83,9 @@ static const char *extra_names[EXTRA_HOOKS] = {
 };
 
 static NativeVector *native_paint, *native_erase, *native_dispose, *native_set_title;
+static NativeVector *native_hide, *native_show, *native_close;
 static NativeVector saved_paint, saved_erase, saved_dispose, saved_set_title;
+static NativeVector saved_hide, saved_show, saved_close;
 static NativeVector *extra_vectors[EXTRA_HOOKS];
 static NativeVector saved_extra[EXTRA_HOOKS];
 static ConnectionID interface_connection;
@@ -95,6 +99,8 @@ static OSErr last_error;
 static short unix_vref;
 static GrafPort agent_port;
 static GrafPtr replay_original;
+static CGrafPtr replay_world;
+static GDHandle replay_device;
 static THz replay_zone;
 static WindowInfo *replay_window;
 static RgnHandle scroll_update;
@@ -103,6 +109,9 @@ static pascal void observe_paint(const Rect *rect);
 static pascal void observe_erase(const Rect *rect);
 static pascal void observe_dispose(WindowPtr window);
 static pascal void observe_set_title(WindowPtr window, ConstStringPtr title);
+static pascal void observe_hide(WindowPtr window);
+static pascal void observe_show(WindowPtr window);
+static pascal void observe_close(WindowPtr window);
 static pascal void capture_text(Ptr text, short first, short count);
 static pascal void capture_frame(const Rect *rect);
 static pascal void capture_line(short h, short v);
@@ -258,6 +267,11 @@ static WindowInfo *observe_window(void) {
 		record->global = (*target->contRgn)->rgnBBox;
 	else
 		record->global = port->portRect;
+	if (target->strucRgn)
+		record->window_frame = (*target->strucRgn)->rgnBBox;
+	else
+		record->window_frame = record->global;
+	record->go_away = target->goAwayFlag;
 	record->version = ((CGrafPtr)port)->portVersion;
 	record->color = is_color_port(port);
 	record->depth = 1;
@@ -402,10 +416,12 @@ static WindowInfo *begin_capture(void) {
 		seed_color_surface(&record->color_surface, color_port->rgbBkColor);
 		capture_count++;
 	}
+	GetGWorld(&replay_world, &replay_device);
 	SetGWorld((CGrafPtr)record->color_surface.world, NULL);
 	copy_color_state((CGrafPtr)record->color_surface.world, color_port, &error);
 	if (error != noErr) {
 		record->capture_error = error;
+		SetGWorld(replay_world, replay_device);
 		SetPort((GrafPtr)record->window);
 		in_capture = 0;
 		return NULL;
@@ -430,6 +446,7 @@ static void end_capture(WindowInfo *record) {
 	captured_ops++;
 	record->frame++;
 	record->dirty = 1;
+	SetGWorld(replay_world, replay_device);
 	SetPort(replay_original);
 	SetZone(replay_zone);
 	replay_window = NULL;
@@ -606,6 +623,31 @@ static pascal void observe_dispose(WindowPtr window) {
 	((NativeDisposeWindow)&saved_dispose)(window);
 }
 
+static void update_visibility(WindowPtr window, int visible) {
+	ProcessSerialNumber process;
+	WindowInfo *record;
+	if (!in_callback && GetCurrentProcess(&process) == noErr) {
+		record = find_window(window, &process);
+		if (record)
+			record->visible = visible;
+	}
+}
+
+static pascal void observe_hide(WindowPtr window) {
+	update_visibility(window, 0);
+	((pascal void (*)(WindowPtr))&saved_hide)(window);
+}
+
+static pascal void observe_show(WindowPtr window) {
+	update_visibility(window, 1);
+	((pascal void (*)(WindowPtr))&saved_show)(window);
+}
+
+static pascal void observe_close(WindowPtr window) {
+	update_visibility(window, 0);
+	((pascal void (*)(WindowPtr))&saved_close)(window);
+}
+
 static pascal void observe_set_title(WindowPtr window, ConstStringPtr title) {
 	ProcessSerialNumber process;
 	WindowInfo *record;
@@ -664,6 +706,24 @@ static int start_observer(void) {
 	if (error != noErr || symbol_class != NATIVE_TVECTOR_SYMBOL)
 		return error != noErr ? error : paramErr;
 	native_set_title = (NativeVector *)address;
+	{
+		static const unsigned char hide_name[] = "\pHideWindow";
+		static const unsigned char show_name[] = "\pShowWindow";
+		static const unsigned char close_name[] = "\pCloseWindow";
+		struct { const unsigned char *name; NativeVector **vector; } lifecycle[] = {
+			{ hide_name, &native_hide }, { show_name, &native_show },
+			{ close_name, &native_close }
+		};
+		unsigned int n;
+		for (n = 0; n < 3; n++) {
+			error = FindSymbol(interface_connection, lifecycle[n].name, &address,
+				&symbol_class);
+			if (error == noErr && symbol_class == NATIVE_TVECTOR_SYMBOL)
+				*lifecycle[n].vector = (NativeVector *)address;
+			else
+				*lifecycle[n].vector = NULL;
+		}
+	}
 	for (i = 0; i < EXTRA_HOOKS; i++) {
 		Str255 name;
 		name[0] = strlen(extra_names[i]);
@@ -686,10 +746,16 @@ static int start_observer(void) {
 	saved_erase = *native_erase;
 	saved_dispose = *native_dispose;
 	saved_set_title = *native_set_title;
+	if (native_hide) saved_hide = *native_hide;
+	if (native_show) saved_show = *native_show;
+	if (native_close) saved_close = *native_close;
 	*native_paint = *(const NativeVector *)observe_paint;
 	*native_erase = *(const NativeVector *)observe_erase;
 	*native_dispose = *(const NativeVector *)observe_dispose;
 	*native_set_title = *(const NativeVector *)observe_set_title;
+	if (native_hide) *native_hide = *(const NativeVector *)observe_hide;
+	if (native_show) *native_show = *(const NativeVector *)observe_show;
+	if (native_close) *native_close = *(const NativeVector *)observe_close;
 	for (i = 0; i < EXTRA_HOOKS; i++) {
 		if (extra_vectors[i])
 			*extra_vectors[i] = *extra_callback(i);
@@ -706,6 +772,9 @@ static void stop_observer(void) {
 	*native_erase = saved_erase;
 	*native_dispose = saved_dispose;
 	*native_set_title = saved_set_title;
+	if (native_hide) *native_hide = saved_hide;
+	if (native_show) *native_show = saved_show;
+	if (native_close) *native_close = saved_close;
 	for (i = 0; i < EXTRA_HOOKS; i++) {
 		if (extra_vectors[i])
 			*extra_vectors[i] = saved_extra[i];
@@ -775,7 +844,9 @@ static void write_window_meta(WindowInfo *record, int length) {
 	length = snprintf(text, sizeof(text),
 		"version=1\nserial=%u\napp=\"%.*s\"\ntitle=\"%.*s\"\n"
 		"psn=%lu:%lu\nsig=%08lx\nkind=%d\nvisible=%d\ncolor=%d\ndepth=%d\n"
-		"bounds=%d,%d,%d,%d\nglobal=%d,%d,%d,%d\nwidth=%d\nheight=%d\nframe=%lu\ncalls=%lu\nfile=ZacWin-%u.ppm\n",
+		"bounds=%d,%d,%d,%d\nglobal=%d,%d,%d,%d\n"
+		"frame=%d,%d,%d,%d\ngoAway=%d\nwidth=%d\nheight=%d\n"
+		"frameNumber=%lu\ncalls=%lu\nfile=ZacWin-%u.ppm\n",
 		record->serial, record->app_name[0], record->app_name + 1,
 		record->title[0], record->title + 1,
 		(unsigned long)record->process.highLongOfPSN,
@@ -785,6 +856,8 @@ static void write_window_meta(WindowInfo *record, int length) {
 		record->bounds.top, record->bounds.right, record->bounds.bottom,
 		record->global.left, record->global.top,
 		record->global.right, record->global.bottom,
+		record->window_frame.left, record->window_frame.top,
+		record->window_frame.right, record->window_frame.bottom, record->go_away,
 		record->color_surface.width, record->color_surface.height,
 		record->frame, record->calls, record->serial);
 	write_text_file(name, text, length);
@@ -809,8 +882,8 @@ static void write_report(void) {
 			int line_length = snprintf(line, sizeof(line),
 				"window=%u serial=%u psn=%lu:%lu app=\"%.*s\" sig=%08lx "
 				"kind=%d visible=%d color=%d depth=%d bounds=%d,%d,%d,%d "
-				"global=%d,%d,%d,%d title=\"%.*s\" calls=%lu frame=%lu "
-				"capture=%d error=%d "
+				"global=%d,%d,%d,%d frame=%d,%d,%d,%d goAway=%d "
+				"title=\"%.*s\" calls=%lu frame=%lu capture=%d error=%d "
 				"ops=%lu,%lu,%lu,%lu,%lu,%lu,%lu bk=%08lx rgbbk=%06lx clips=%d,%d,%d,%d\n",
 				n++, record->serial,
 				(unsigned long)record->process.highLongOfPSN,
@@ -822,6 +895,8 @@ static void write_report(void) {
 				record->bounds.right, record->bounds.bottom,
 				record->global.left, record->global.top,
 				record->global.right, record->global.bottom,
+				record->window_frame.left, record->window_frame.top,
+				record->window_frame.right, record->window_frame.bottom, record->go_away,
 				record->title[0], record->title + 1, record->calls,
 				record->frame, record->capture_ok, record->capture_error,
 				record->op_counts[0], record->op_counts[1], record->op_counts[2],

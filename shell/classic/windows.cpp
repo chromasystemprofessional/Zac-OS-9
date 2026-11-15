@@ -16,6 +16,7 @@
 #include <QFileInfo>
 #include <QHBoxLayout>
 #include <QImage>
+#include <QCloseEvent>
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QRect>
@@ -39,8 +40,12 @@ struct GuestWindow {
 	QString title;
 	QString app;
 	bool captured = false;
+	bool visible = false;
 	int error = 0;
+	int kind = 0;
+	bool goAway = false;
 	QRect global;
+	QRect frame;
 	QString framePath;
 };
 
@@ -218,12 +223,19 @@ QVector<GuestWindow> readInventory() {
 		window.title = field(line, "title");
 		window.app = field(line, "app");
 		window.captured = number(line, "capture") != 0;
+		window.visible = number(line, "visible") != 0;
 		window.error = number(line, "error");
+		window.kind = number(line, "kind");
+		window.goAway = number(line, "goAway") != 0;
 		{
 			const QVector<int> global = rectNumbers(line, "global");
 			if (global.size() == 4)
 				window.global = QRect(global[0], global[1],
 					global[2] - global[0], global[3] - global[1]);
+			const QVector<int> frame = rectNumbers(line, "frame");
+			if (frame.size() == 4)
+				window.frame = QRect(frame[0], frame[1],
+					frame[2] - frame[0], frame[3] - frame[1]);
 		}
 		if (window.serial >= 0)
 			window.framePath = QDir::homePath() +
@@ -293,6 +305,9 @@ public:
 		auto *layout = new QVBoxLayout(this);
 		layout->setContentsMargins(0, 0, 0, 0);
 		layout->addWidget(m_image);
+		auto *close = new QAction(tr("Close in Classic"), this);
+		connect(close, &QAction::triggered, this, [this] { requestClose(); });
+		addAction(close);
 		auto *desktop = new QAction(tr("Hide This Window"), this);
 		connect(desktop, &QAction::triggered, this, [this] { hide(); });
 		addAction(desktop);
@@ -303,8 +318,23 @@ public:
 
 	void updateInfo(const GuestWindow &window) {
 		m_global = window.global;
+		m_frame = window.frame;
+		m_goAway = window.goAway;
 		setWindowTitle(window.title.isEmpty() ? window.app : window.title);
 		setToolTip(window.app);
+	}
+
+	void requestClose() {
+		if (!m_goAway || m_closePending || m_frame.isNull())
+			return;
+		m_closePending = true;
+		const int x = m_frame.left() + 10;
+		const int y = m_frame.top() + 12;
+		sendMouse(x, y, "move");
+		sendMouse(x, y, "down");
+		sendMouse(x, y, "up");
+		hide();
+		QTimer::singleShot(1500, this, [this] { m_closePending = false; });
 	}
 
 	void updateFrame(const QString &path) {
@@ -357,9 +387,22 @@ protected:
 			sendKey(code, "up");
 	}
 
+protected:
+	void closeEvent(QCloseEvent *event) override {
+		if (m_goAway) {
+			requestClose();
+			event->ignore();
+		} else {
+			event->accept();
+		}
+	}
+
 private:
 	int m_serial;
 	QRect m_global;
+	QRect m_frame;
+	bool m_goAway = false;
+	bool m_closePending = false;
 	QString m_path;
 	QDateTime m_modified;
 	QLabel *m_image = nullptr;
@@ -374,10 +417,12 @@ public:
 		m_status->setWordWrap(true);
 		auto *desktop = new QPushButton(tr("Show Classic Desktop"), this);
 		auto *windows = new QPushButton(tr("Show Exported Windows"), this);
+		auto *close = new QPushButton(tr("Close in Classic"), this);
 		auto *refresh = new QPushButton(tr("Refresh"), this);
 		auto *buttons = new QHBoxLayout;
 		buttons->addWidget(desktop);
 		buttons->addWidget(windows);
+		buttons->addWidget(close);
 		buttons->addWidget(refresh);
 		auto *layout = new QVBoxLayout(this);
 		layout->addWidget(m_status);
@@ -385,6 +430,7 @@ public:
 		layout->addLayout(buttons);
 		connect(desktop, &QPushButton::clicked, this, [this] { showDesktop(); });
 		connect(windows, &QPushButton::clicked, this, [this] { showWindows(); });
+		connect(close, &QPushButton::clicked, this, [this] { closeSelected(); });
 		connect(refresh, &QPushButton::clicked, this, [this] { poll(); });
 		resize(360, 300);
 	}
@@ -400,7 +446,8 @@ public:
 		QSet<int> seen;
 		for (const GuestWindow &window : windows) {
 			seen.insert(window.serial);
-			if (!window.captured || m_ignored.contains(window.serial)) {
+			if (!window.captured || !window.visible || window.kind != 8 ||
+					m_ignored.contains(window.serial)) {
 				if (auto *viewer = m_viewers.value(window.serial))
 					viewer->hide();
 				continue;
@@ -436,14 +483,20 @@ public:
 		}
 		m_list->clear();
 		for (const GuestWindow &window : windows) {
+			if (!window.visible)
+				continue;
 			QString text = QString("%1 — %2").arg(window.app,
 				window.title.isEmpty() ? tr("untitled") : window.title);
-			if (!window.captured)
+			if (!window.captured || window.kind != 8)
 				text += tr("  [Classic desktop only]");
 			else if (window.error)
 				text += tr("  [partial: Mac error %1]").arg(window.error);
-			m_list->addItem(text);
+			auto *item = new QListWidgetItem(text);
+			item->setData(Qt::UserRole, window.serial);
+			m_list->addItem(item);
 		}
+		if (m_list->count() > 0 && !m_list->currentItem())
+			m_list->setCurrentRow(0);
 	}
 
 private:
@@ -457,6 +510,14 @@ private:
 		m_ignored.clear();
 		for (WindowViewer *viewer : m_viewers)
 			viewer->show();
+	}
+	void closeSelected() {
+		auto *item = m_list->currentItem();
+		int serial = item ? item->data(Qt::UserRole).toInt() : -1;
+		if (serial < 0 && m_viewers.size() == 1)
+			serial = m_viewers.firstKey();
+		if (auto *viewer = m_viewers.value(serial))
+			viewer->requestClose();
 	}
 
 	QListWidget *m_list = nullptr;

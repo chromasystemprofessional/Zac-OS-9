@@ -231,9 +231,10 @@ All of them are [on GitHub](https://github.com/chromasystemprofessional/Zac-OS-9
    have been opened in one session. A background window agent now discovers
    and captures SimpleText and Graphing Calculator windows in separate
    processes, including typed text. A basic host viewer shows them as ordinary
-   toplevels and forwards clicks and keys through the emulator's ADB queue;
-   guest close/resize, drag/wheel, documents and lifecycle recovery are still
-   to come.
+   toplevels and forwards clicks and keys through the emulator's ADB queue.
+   Close in Classic reaches the guest close box and preserves the unsaved
+   SimpleText prompt; resize, drag/wheel, documents and full lifecycle
+   recovery are still to come.
 4. **From the [roadmap](docs/ROADMAP.md)**: a Platinum boot menu (on Esc),
    manual pages, trying it in Hyper-V.
 

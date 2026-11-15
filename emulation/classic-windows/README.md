@@ -44,6 +44,11 @@ the full desktop fallback are not implemented yet.
   emulator's ADB input queue. In the disposable guest, clicking the exported
   SimpleText window and typing `hello input` produced that text in SimpleText
   and in the next captured frame.
+- **Close in Classic** sends a click to the guest window's close box, so the
+  application's normal close path runs. With unsaved SimpleText text, the save
+  prompt appeared in the Classic desktop; Cancel kept the document and Don't
+  Save closed it. The host window is hidden while the request is pending; use
+  **Show Exported Windows** after Cancel.
 
 ## Host-visible files
 
@@ -94,10 +99,16 @@ delete old frames.
   source is used as-is; a screen-source alias is refused.
 - Exporting a full PPM every two seconds is prototype transport, not the
   production frame path. It writes about 1 MB per 615x541 window per update.
-- No close, resize or menu forwarding. Closing an exported host window only
-  hides it; it does not close the guest window.
-- The exported window is fixed to the guest content size; host resize is not
-  forwarded.
+- No resize or menu forwarding. The exported window is fixed to the guest
+  content size.
+- Dialogs are not exported. The SimpleText save prompt is usable only through
+  the Classic desktop (use **Show Classic Desktop**).
+- The agent may keep a closed window's last record until the process exits or
+  the session restarts. The host hides the window after a close request, but
+  the controller can still list the stale entry.
+- The close box location is derived from the window frame and is tested with
+  the standard SimpleText document window; non-standard windows may need
+  desktop mode.
 - Mouse drag, wheel, double-click detection and modifier edge cases are not
   complete yet. Key mapping is the US layout; the guest's own keyboard layout
   still applies.
@@ -183,7 +194,9 @@ next captured frame both showed it.
 - Move frame and inventory transport onto the emulator bridge or shared memory
   instead of rewriting PPMs.
 - Add mouse drag, wheel, double-click and focus/activation handling.
-- Add close/resize requests and document routing.
+- Add resize requests and document routing.
+- Remove stale window records when a Classic process keeps a closed window
+  allocated.
 - Make the controller's **Show Classic Desktop** bring the emulator window
   forward, not just hide exported windows.
 - Hook window creation/activation for windows that do not draw after startup.
