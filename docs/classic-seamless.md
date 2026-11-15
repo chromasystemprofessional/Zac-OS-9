@@ -236,13 +236,13 @@ writing PPM frames to the shared volume. A basic host frontend
 (`zacos9-classic-windows`) shows those frames as ordinary Qt toplevels with
 guest window titles, a controller that can hide them for desktop mode, and
 click/key forwarding through the patched emulator's ADB input queue. In the
-disposable guest, typing into the exported SimpleText window reached the guest
-and the captured frame. **Close in Classic** sends the guest close-box click;
+disposable guest, typing, dragging a text selection and close requests reached
+the guest and appeared in the captured frame. **Close in Classic** sends the guest close-box click;
 SimpleText's unsaved-document prompt appeared in the desktop and Cancel kept
 the document, so the close path does not bypass the prompt. Guest resize,
 drag/wheel, document routing and a fully persistent **Show Classic Desktop**
 action are not implemented, so the gate above is not met. The current frame transport
-(rewriting PPM every two seconds) and bounded operation coverage are prototype
+(rewriting PPM about every 250 ms) and bounded operation coverage are prototype
 work, not production compatibility.
 
 ### 3. Modal dialogs, popups and full-desktop recovery

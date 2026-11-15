@@ -19,6 +19,7 @@
 #include <QCloseEvent>
 #include <QKeyEvent>
 #include <QMouseEvent>
+#include <QWheelEvent>
 #include <QRect>
 #include <QLabel>
 #include <QListWidget>
@@ -363,12 +364,35 @@ protected:
 		sendMouse(x, y, "down");
 	}
 
+	void mouseMoveEvent(QMouseEvent *event) override {
+		if (!(event->buttons() & Qt::LeftButton))
+			return;
+		const QPoint point = event->position().toPoint();
+		sendMouse(m_global.left() + point.x(),
+			m_global.top() + point.y(), "move");
+	}
+
 	void mouseReleaseEvent(QMouseEvent *event) override {
 		const QPoint point = event->position().toPoint();
 		const int x = m_global.left() + point.x();
 		const int y = m_global.top() + point.y();
 		sendMouse(x, y, "move");
 		sendMouse(x, y, "up");
+	}
+
+	void mouseDoubleClickEvent(QMouseEvent *event) override {
+		const QPoint point = event->position().toPoint();
+		const int x = m_global.left() + point.x();
+		const int y = m_global.top() + point.y();
+		sendMouse(x, y, "move");
+		sendMouse(x, y, "down");
+		sendMouse(x, y, "up");
+	}
+
+	void wheelEvent(QWheelEvent *event) override {
+		const int key = event->angleDelta().y() >= 0 ? 0x7E : 0x7D;
+		sendKey(key, "down");
+		sendKey(key, "up");
 	}
 
 	void keyPressEvent(QKeyEvent *event) override {
@@ -537,7 +561,7 @@ int main(int argc, char **argv) {
 	controller.show();
 	QTimer timer;
 	QObject::connect(&timer, &QTimer::timeout, &controller, &Controller::poll);
-	timer.start(500);
+	timer.start(150);
 	controller.poll();
 	return app.exec();
 }

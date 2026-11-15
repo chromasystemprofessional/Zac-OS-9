@@ -44,6 +44,8 @@ the full desktop fallback are not implemented yet.
   emulator's ADB input queue. In the disposable guest, clicking the exported
   SimpleText window and typing `hello input` produced that text in SimpleText
   and in the next captured frame.
+- Mouse drag and double-click are forwarded; the wheel is mapped to cursor
+  up/down keys. Dragging across SimpleText text selected it in the guest.
 - **Close in Classic** sends a click to the guest window's close box, so the
   application's normal close path runs. With unsaved SimpleText text, the save
   prompt appeared in the Classic desktop; Cancel kept the document and Don't
@@ -53,7 +55,7 @@ the full desktop fallback are not implemented yet.
 ## Host-visible files
 
 The agent writes these files below the shared Unix volume (the host's home
-folder) every two seconds when a capture changed:
+folder) about every 250 ms when a capture changed:
 
 ```text
 ClassicWindows.txt          one line per live window
@@ -97,8 +99,9 @@ delete old frames.
   operation, and the host must treat such captures as incomplete.
 - `CopyBits` is replayed only when the destination is the window. An offscreen
   source is used as-is; a screen-source alias is refused.
-- Exporting a full PPM every two seconds is prototype transport, not the
-  production frame path. It writes about 1 MB per 615x541 window per update.
+- Exporting a full PPM about every 250 ms is prototype transport, not the
+  production frame path. It writes about 1 MB per 615x541 window per update,
+  which is usable for typing and selection but not 30 fps animation.
 - No resize or menu forwarding. The exported window is fixed to the guest
   content size.
 - Dialogs are not exported. The SimpleText save prompt is usable only through
@@ -109,9 +112,9 @@ delete old frames.
 - The close box location is derived from the window frame and is tested with
   the standard SimpleText document window; non-standard windows may need
   desktop mode.
-- Mouse drag, wheel, double-click detection and modifier edge cases are not
-  complete yet. Key mapping is the US layout; the guest's own keyboard layout
-  still applies.
+- Wheel scrolling is cursor-key emulation, not a native scroll event. Modifier
+  edge cases are not complete. Key mapping is the US layout; the guest's own
+  keyboard layout still applies.
 - A window that never draws after the agent starts is not discovered. Hooking
   window creation and activation is the next step.
 - The agent is a Startup Item application, not an INIT. It uses the background
