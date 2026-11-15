@@ -53,6 +53,12 @@ The Open Transport probe linked, but `OTOpenEndpointPriv` crashed with a
 hand-written prototype; the real Universal Interfaces 3.x headers are needed
 to get that entry point's signature right.
 
+Universal Interfaces 3.4 was then mounted, and the probe builds against the real
+headers and the PPC Open Transport glue. The repaired test guest still does not
+launch it: that Mac OS 9 install lacks the `OTClientLib`/`OTClientUtilLib`
+client libraries. A clean Mac OS 9 installation is required before Open
+Transport can be used.
+
 The prototype also only opens applications that are files in the shared home
 folder, with plain ASCII names and no colon. Applications inside a guest disk
 image are not reachable by this path; open those inside the Mac for now.
