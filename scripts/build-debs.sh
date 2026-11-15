@@ -56,8 +56,25 @@ if [ -n "$missing" ]; then
 	fi
 fi
 
-work=$(mktemp -d /tmp/zacos9-deb.XXXXXX)
-trap 'rm -rf "$work"' EXIT
+# Beside the tree rather than in /tmp: the package and its tests need
+# several gigabytes, and a tmpfs /tmp can be too small for them (the
+# Memory tests' 1 GB swap file then looks like "no room on disks"). Keep
+# the tree when the build fails, so the test log survives.
+work=$root/build/deb
+rm -rf "$work"
+mkdir -p "$work/tmp"
+export TMPDIR=$work/tmp
+finish() {
+	status=$?
+	if [ "$status" -eq 0 ]; then
+		rm -rf "$work"
+	else
+		printf 'build-debs.sh: the build stopped; its tree is in %s\n' "$work" >&2
+		printf '  test log: %s/zacos9/obj-x86_64-linux-gnu/meson-logs/testlog.txt\n' "$work" >&2
+	fi
+	exit "$status"
+}
+trap finish EXIT
 index=$work/index
 GIT_INDEX_FILE=$index git read-tree HEAD
 GIT_INDEX_FILE=$index git add -A
