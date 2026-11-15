@@ -242,8 +242,9 @@ disposable guest, typing, dragging a text selection and close requests reached
 the guest and appeared in the captured frame. An isolated headless
 `zacos9-wm` trial showed the Calculator, SheepShaver and exported SimpleText
 windows with real ZacOS title bars; **Show Exported Windows** raised the
-exported window. One re-shown window appeared as a collapsed bottom tab, so
-focus restoration remains to fix. **Close in Classic** sends the guest close-box click;
+exported window. **Show Classic Desktop** hides exported windows and activates
+the emulator through foreign-toplevel activation. One re-shown window appeared
+as a collapsed bottom tab, so restoring it with focus remains to fix. **Close in Classic** sends the guest close-box click;
 SimpleText's unsaved-document prompt appeared in the desktop and Cancel kept
 the document, so the close path does not bypass the prompt. Guest resize,
 drag/wheel, document routing and a fully persistent **Show Classic Desktop**

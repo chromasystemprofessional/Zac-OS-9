@@ -168,7 +168,10 @@ The current transport is polling files, not a live event stream.
 The first real-compositor trial ran the emulator, `zacos9-classic-windows` and
 `zacos9-calculator` in an isolated headless `zacos9-wm`. The Calculator,
 SheepShaver and exported SimpleText windows all received real ZacOS title
-bars, and **Show Exported Windows** raised the exported window. The compositor
+bars, and **Show Exported Windows** raised the exported window.
+**Show Classic Desktop** hides the exported windows and activates the
+SheepShaver window through the compositor's foreign-toplevel protocol;
+`Ctrl+Alt+D` does the same from any exported window. The compositor
 showed a re-shown exported window as a collapsed bottom tab in one trial;
 restoring it with focus still needs work.
 
@@ -207,8 +210,8 @@ next captured frame both showed it.
 - Add resize requests and document routing.
 - Remove stale window records when a Classic process keeps a closed window
   allocated.
-- Make the controller's **Show Classic Desktop** bring the emulator window
-  forward, not just hide exported windows.
+- Make the controller's **Show Exported Windows** reliable after the emulator
+  has been in front.
 - Hook window creation/activation for windows that do not draw after startup.
 - Handle `FillCRect`/`FillRect`, custom drawing procedures and indexed color,
   then broaden the compatibility matrix.

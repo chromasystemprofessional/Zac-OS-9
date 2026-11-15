@@ -28,11 +28,16 @@
 #include <QPushButton>
 #include <QRegularExpression>
 #include <QSet>
+#include <QShortcut>
 #include <QStringList>
 #include <QTimer>
 #include <QVector>
 #include <QVBoxLayout>
 #include <QWidget>
+
+#include <functional>
+
+#include "toplevels.h"
 
 namespace {
 
@@ -295,8 +300,9 @@ QImage readPpm(const QString &path) {
 
 class WindowViewer : public QWidget {
 public:
-	WindowViewer(const GuestWindow &window, QWidget *parent = nullptr)
-		: QWidget(parent), m_serial(window.serial) {
+	WindowViewer(const GuestWindow &window, std::function<void()> showDesktop,
+			QWidget *parent = nullptr)
+		: QWidget(parent), m_serial(window.serial), m_showDesktop(std::move(showDesktop)) {
 		setAttribute(Qt::WA_DeleteOnClose);
 		setFocusPolicy(Qt::StrongFocus);
 		setWindowTitle(window.title.isEmpty() ? window.app : window.title);
@@ -306,13 +312,19 @@ public:
 		auto *layout = new QVBoxLayout(this);
 		layout->setContentsMargins(0, 0, 0, 0);
 		layout->addWidget(m_image);
+		auto *desktop = new QAction(tr("Show Classic Desktop"), this);
+		connect(desktop, &QAction::triggered, this, [this] { m_showDesktop(); });
+		addAction(desktop);
 		auto *close = new QAction(tr("Close in Classic"), this);
 		connect(close, &QAction::triggered, this, [this] { requestClose(); });
 		addAction(close);
-		auto *desktop = new QAction(tr("Hide This Window"), this);
-		connect(desktop, &QAction::triggered, this, [this] { hide(); });
-		addAction(desktop);
+		auto *hideAction = new QAction(tr("Hide This Window"), this);
+		connect(hideAction, &QAction::triggered, this, [this] { hide(); });
+		addAction(hideAction);
 		setContextMenuPolicy(Qt::ActionsContextMenu);
+		auto *shortcut = new QShortcut(QKeySequence("Ctrl+Alt+D"), this);
+		connect(shortcut, &QShortcut::activated, this,
+			[this] { m_showDesktop(); });
 	}
 
 	int serial() const { return m_serial; }
@@ -423,6 +435,7 @@ protected:
 
 private:
 	int m_serial;
+	std::function<void()> m_showDesktop;
 	QRect m_global;
 	QRect m_frame;
 	bool m_goAway = false;
@@ -478,7 +491,7 @@ public:
 			}
 			WindowViewer *viewer = m_viewers.value(window.serial);
 			if (!viewer) {
-				viewer = new WindowViewer(window);
+				viewer = new WindowViewer(window, [this] { showDesktop(); });
 				m_viewers.insert(window.serial, viewer);
 				connect(viewer, &QObject::destroyed, this, [this, window] {
 					m_viewers.remove(window.serial);
@@ -534,6 +547,8 @@ private:
 		m_showing = false;
 		for (WindowViewer *viewer : m_viewers)
 			viewer->hide();
+		if (!Toplevels::activate("SheepShaver"))
+			Toplevels::activate("BasiliskII");
 	}
 	void showWindows() {
 		m_showing = true;
@@ -566,6 +581,7 @@ int main(int argc, char **argv) {
 	QApplication app(argc, argv);
 	QApplication::setApplicationName("Classic Windows");
 	QApplication::setQuitOnLastWindowClosed(true);
+	Toplevels::start([] {});
 	Controller controller;
 	controller.show();
 	QTimer timer;
