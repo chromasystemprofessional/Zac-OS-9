@@ -247,7 +247,9 @@ the emulator through foreign-toplevel activation. One re-shown window appeared
 as a collapsed bottom tab, so restoring it with focus remains to fix. **Close
 in Classic** sends the guest close-box click; SimpleText's unsaved-document
 prompt appeared in the desktop and Cancel kept the document, so the close path
-does not bypass the prompt. **Resize in Classic** sends one grow-box drag;
+does not bypass the prompt; its host window and controller entry stay hidden
+until the guest closes it or Show Exported Windows is used after Cancel.
+**Resize in Classic** sends one grow-box drag;
 direct guest input resized SimpleText from 615x541 to 645x564 and the capture
 followed. Live host-border resize, document routing and full window lifecycle
 cleanup are not implemented, so the gate above is not met. The current frame

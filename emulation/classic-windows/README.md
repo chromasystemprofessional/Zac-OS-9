@@ -52,8 +52,9 @@ the full desktop fallback are not implemented yet.
 - **Close in Classic** sends a click to the guest window's close box, so the
   application's normal close path runs. With unsaved SimpleText text, the save
   prompt appeared in the Classic desktop; Cancel kept the document and Don't
-  Save closed it. The host window is hidden while the request is pending; use
-  **Show Exported Windows** after Cancel.
+  Save closed it. The host window and controller entry are hidden while the
+  request is pending; use **Show Exported Windows** after Cancel to bring them
+  back. If the guest closes the window, the entry stays gone.
 
 ## Host-visible files
 
@@ -110,8 +111,9 @@ delete old frames.
 - Dialogs are not exported. The SimpleText save prompt is usable only through
   the Classic desktop (use **Show Classic Desktop**).
 - The agent may keep a closed window's last record until the process exits or
-  the session restarts. The host hides the window after a close request, but
-  the controller can still list the stale entry.
+  the session restarts. The host hides the window and controller entry after a
+  close request; **Show Exported Windows** clears that suppression if the guest
+  prompt was cancelled.
 - The close box location is derived from the window frame and is tested with
   the standard SimpleText document window; non-standard windows may need
   desktop mode.

@@ -237,7 +237,8 @@ All of them are [on GitHub](https://github.com/chromasystemprofessional/Zac-OS-9
    bars with Calculator, SheepShaver and the exported SimpleText window.
    Show Classic Desktop now raises the emulator, and Resize in Classic sends a
    one-shot grow-box drag. Documents, live border resize, window placement and
-   full lifecycle recovery are still to come.
+   full lifecycle recovery are still to come, though a close request now hides
+   the stale host entry immediately.
 4. **From the [roadmap](docs/ROADMAP.md)**: a Platinum boot menu (on Esc),
    manual pages, trying it in Hyper-V.
 

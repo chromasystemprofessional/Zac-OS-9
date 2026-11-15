@@ -305,8 +305,9 @@ QImage readPpm(const QString &path) {
 class WindowViewer : public QWidget {
 public:
 	WindowViewer(const GuestWindow &window, std::function<void()> showDesktop,
-			QWidget *parent = nullptr)
-		: QWidget(parent), m_serial(window.serial), m_showDesktop(std::move(showDesktop)) {
+			std::function<void(int)> closeRequested, QWidget *parent = nullptr)
+		: QWidget(parent), m_serial(window.serial), m_showDesktop(std::move(showDesktop)),
+		  m_closeRequested(std::move(closeRequested)) {
 		setAttribute(Qt::WA_DeleteOnClose);
 		setFocusPolicy(Qt::StrongFocus);
 		setWindowTitle(window.title.isEmpty() ? window.app : window.title);
@@ -383,6 +384,7 @@ public:
 		sendMouse(x, y, "down");
 		sendMouse(x, y, "up");
 		hide();
+		m_closeRequested(m_serial);
 		QTimer::singleShot(1500, this, [this] { m_closePending = false; });
 	}
 
@@ -473,6 +475,7 @@ protected:
 private:
 	int m_serial;
 	std::function<void()> m_showDesktop;
+	std::function<void(int)> m_closeRequested;
 	QRect m_global;
 	QRect m_frame;
 	bool m_goAway = false;
@@ -532,7 +535,8 @@ public:
 			}
 			WindowViewer *viewer = m_viewers.value(window.serial);
 			if (!viewer) {
-				viewer = new WindowViewer(window, [this] { showDesktop(); });
+				viewer = new WindowViewer(window, [this] { showDesktop(); },
+					[this](int serial) { m_ignored.insert(serial); });
 				m_viewers.insert(window.serial, viewer);
 				connect(viewer, &QObject::destroyed, this, [this, window] {
 					m_viewers.remove(window.serial);
@@ -567,7 +571,7 @@ public:
 		}
 		m_list->clear();
 		for (const GuestWindow &window : windows) {
-			if (!window.visible)
+			if (!window.visible || m_ignored.contains(window.serial))
 				continue;
 			QString text = QString("%1 — %2").arg(window.app,
 				window.title.isEmpty() ? tr("untitled") : window.title);
