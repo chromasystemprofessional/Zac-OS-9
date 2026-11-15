@@ -96,6 +96,7 @@ used. Add `--68k` for Basilisk II.
   Finder with the Classic icon (their type, 'APPL', is in the `.finf/`
   file SheepShaver keeps beside them). Double-clicking one starts Classic.
   With [Classic Open Helper](classic-open/README.md) installed in the Mac's
-  Startup Items, the first application started that way also opens inside the
-  Mac; a second request in the same session waits for the bridge work in
+  Startup Items, the application started that way also opens inside the Mac.
+  One direct open per Classic session is supported; to open another, quit
+  Classic and start it again. Multi-request support needs the bridge work in
   [the seamless plan](../docs/classic-seamless.md).

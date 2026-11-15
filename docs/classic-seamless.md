@@ -177,13 +177,17 @@ do not silently downgrade the requirement to cropping.
 launch does not start another emulator or attach a writable disk twice.
 Missing originals, guest readiness failures and rejected opens show an alert.
 
+**Current product decision (2026-11-14):** one direct open per Classic session.
+A second `--open` is refused immediately and asks the user to restart Classic.
+The milestone 1 gate below (two applications in one session) is not met.
+
 **Prototype status (2026-11-14):** `zacos9-classic --open`, the Finder's
 Classic-application double-click and
 [`emulation/classic-open`](../emulation/classic-open/README.md) open the first
 requested application in a running session and report its acknowledgement; a
 new session opens the application after boot. The guest File Manager caches the
-shared ExtFS directory after its first read, so a second request in the same
-session is written but not seen; the host fails explicitly after five seconds.
+shared ExtFS directory after its first read; the host now refuses a second
+request immediately instead of writing one the guest cannot see.
 The gate above (two applications in one session) is therefore not met, and a
 guest failure does not yet reach a ZacOS alert. The shared-folder queue cannot
 deliver later requests: the guest File Manager keeps a cached view of the

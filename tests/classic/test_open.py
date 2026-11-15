@@ -1,4 +1,4 @@
-"""zacos9-classic --open: path mapping, one session, request and ack.
+"""zacos9-classic --open: path mapping, one session, one app request and ack.
 
 usage: test_open.py LAUNCHER
 """
@@ -7,6 +7,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 from pathlib import Path
 
 launcher = sys.argv[1]
@@ -23,6 +25,43 @@ def hfs(path, size=512 * 1024):
     data = bytearray(size)
     data[1024:1026] = b"BD"
     path.write_bytes(bytes(data))
+
+
+def request_id(path):
+    for line in path.read_text().splitlines():
+        if line.startswith("id="):
+            return line[3:]
+    return ""
+
+
+def answer_requests(requests, acks, status="ok", code="0"):
+    """Stand in for Classic Open Helper: acknowledge the first request."""
+    stop = threading.Event()
+    seen = set()
+
+    def worker():
+        while not stop.is_set():
+            for path in requests.glob("request.*.req"):
+                if path in seen:
+                    continue
+                seen.add(path)
+                request = request_id(path)
+                if request:
+                    (acks / f"ack-{request}").write_text(
+                        f"version=1\nid={request}\nstatus={status}\ncode={code}\n")
+            time.sleep(0.02)
+
+    thread = threading.Thread(target=worker, daemon=True)
+    thread.start()
+    return stop
+
+
+def reset_queue(home):
+    root = home / "zacos9-classic"
+    shutil.rmtree(root, ignore_errors=True)
+    (root / "requests").mkdir(parents=True)
+    (root / "acks").mkdir()
+    (root / "sequence").write_text("0\n")
 
 
 with tempfile.TemporaryDirectory() as d:
@@ -52,8 +91,11 @@ with tempfile.TemporaryDirectory() as d:
                                 text=True, timeout=30)
         return result.returncode, result.stdout.splitlines(), result.stderr
 
+    requests = home / "zacos9-classic" / "requests"
+    acks = home / "zacos9-classic" / "acks"
+
     def request_text(number):
-        path = home / "zacos9-classic" / "requests" / f"request.{number}.req"
+        path = requests / f"request.{number}.req"
         return path.read_text() if path.exists() else ""
 
     code, out, err = run("--check", "--open", str(app))
@@ -66,28 +108,37 @@ with tempfile.TemporaryDirectory() as d:
           "version=1\nid=1\npath=Apps:Test App\n",
           "a new session queues request 1 with the colon-separated path")
 
-    # An existing session is owned by another process; ack files stand in for
-    # Classic Open Helper here.
-    shutil.rmtree(home / "zacos9-classic")
-    (home / "zacos9-classic" / "requests").mkdir(parents=True)
-    (home / "zacos9-classic" / "acks").mkdir(parents=True)
-    (home / "zacos9-classic" / "sequence").write_text("0\n")
+    # One running session accepts one request. A helper stand-in acknowledges
+    # the request; later opens must fail immediately instead of writing a
+    # second request the guest cannot see.
+    reset_queue(home)
     (runtime / "zacos9-classic").mkdir(parents=True, exist_ok=True)
     sleeper = subprocess.Popen(["sleep", "30"])
     try:
         (runtime / "zacos9-classic" / "session.pid").write_text(f"{sleeper.pid}\n")
-        (home / "zacos9-classic" / "acks" / "ack-1").write_text(
-            "version=1\nid=1\nstatus=ok\ncode=0\n")
+        stop = answer_requests(requests, acks)
+        try:
+            code, out, err = run("--open", str(app))
+            check(code == 0 and request_text(1) ==
+                  "version=1\nid=1\npath=Apps:Test App\n",
+                  "a running session receives its one request and its ack")
+        finally:
+            stop.set()
+
         code, out, err = run("--open", str(app))
-        check(code == 0 and request_text(1) ==
-              "version=1\nid=1\npath=Apps:Test App\n",
-              "a running session receives the first request and its ack")
-        (home / "zacos9-classic" / "acks" / "ack-2").write_text(
-            "version=1\nid=2\nstatus=ok\ncode=0\n")
-        code, out, err = run("--open", str(app))
-        check(code == 0 and request_text(2) ==
-              "version=1\nid=2\npath=Apps:Test App\n",
-              "the next request gets a new name and sequence number")
+        check(code == 2 and "already has an open request" in err,
+              "a second open in the same session fails immediately")
+
+        reset_queue(home)
+        stop = answer_requests(requests, acks, "error", "-50")
+        try:
+            code, out, err = run("--open", str(app))
+            check(code == 2 and "refused" in err and "-50" in err,
+                  "a guest error is reported instead of success")
+        finally:
+            stop.set()
+
+        reset_queue(home)
         code, out, err = run("--open", str(app))
         check(code == 2 and "did not open" in err,
               "a missing acknowledgement fails instead of pretending success")

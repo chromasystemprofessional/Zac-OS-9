@@ -13,19 +13,25 @@ application is double-clicked.
 
 - A new Classic session started from a Classic application in the shared home
   opens that application once the Mac is ready.
-- A running session receives its first request, opens the application, and
-  writes an acknowledgement.
+- A running session receives one request, opens the application, and writes
+  an acknowledgement.
+- A second `--open` in the same session is refused immediately: this prototype
+  supports one direct open per Classic session. Quit Classic and start it again
+  to open another application.
 - The host waits for that acknowledgement. If the helper is missing, or does
   not take the request, `zacos9-classic --open` fails after five seconds
   instead of claiming success.
 
 ## Known limit
 
+**Current decision:** one direct open per Classic session. The host refuses a
+second request before writing it, and asks the user to restart Classic. This is
+a deliberate limit, not the milestone 1 gate: two applications in one session
+are **not** supported.
+
 The guest File Manager caches the ExtFS directory after its first read. The
 helper can therefore open the **first** request in a session; a second request
-in the same session is written but not noticed by the guest. The host now waits
-for the current acknowledgement and reports the failure, but the milestone 1
-gate (two applications in one session) is **not** met.
+would be written but not noticed by the guest.
 
 The shared-folder queue is not a viable transport for later requests. On the
 Mac OS 9.0.4 test guest, pre-created request slots are visible at boot, but

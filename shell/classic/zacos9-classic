@@ -102,6 +102,17 @@ queue_reset() {
 	printf '0\n' > "$root/sequence"
 }
 
+session_has_request() {
+	root="$HOME/zacos9-classic"
+	if [ -d "$root/requests" ] && find "$root/requests" -maxdepth 1 -name 'request.*.req' -type f -print -quit 2>/dev/null | grep -q .; then
+		return 0
+	fi
+	if [ -d "$root/acks" ] && find "$root/acks" -maxdepth 1 -name 'ack-*' -type f -print -quit 2>/dev/null | grep -q .; then
+		return 0
+	fi
+	return 1
+}
+
 queue_request() {
 	requests="$HOME/zacos9-classic/requests"
 	acks="$HOME/zacos9-classic/acks"
@@ -261,14 +272,19 @@ if $check; then
 	exit 0
 fi
 
-# One session owns the emulator and its disks. A second launch with an app
-# becomes a request; a second plain launch leaves the running one alone.
+# One session owns the emulator and its disks. A running session accepts one
+# direct open request; another app needs a new session because the guest's
+# ExtFS directory view does not refresh. A second plain launch leaves the
+# running session alone.
 runtime=$(runtime_dir)
 pidfile=$runtime/session.pid
 mkdir -p "$runtime"
 chmod 700 "$runtime" 2>/dev/null || true
 if [ -n "$open_path" ]; then
 	if session_alive; then
+		if session_has_request; then
+			fail "This Classic session already has an open request. Quit Classic and start it again to open another application."
+		fi
 		queue_request
 		tries=0
 		while [ ! -f "$HOME/zacos9-classic/acks/ack-$request_id" ] && [ "$tries" -lt 50 ]; do
