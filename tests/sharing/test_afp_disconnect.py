@@ -154,7 +154,16 @@ def exercise(binary, mode):
             assert os.path.ismount(mountpoint), "file-level I/O errors must not disconnect a disk"
             start = time.monotonic()
             if mode == "normal-eject":
-                subprocess.run(["fusermount3", "-u", str(mountpoint)], check=True)
+                # A client that has just closed can hold the mount for a
+                # moment; ask again before calling the eject a failure.
+                for _ in range(10):
+                    done = subprocess.run(["fusermount3", "-u", str(mountpoint)],
+                                          capture_output=True)
+                    if done.returncode == 0:
+                        break
+                    time.sleep(0.1)
+                else:
+                    raise AssertionError(done.stderr.decode().strip())
             elif mode in ("active-eof", "session-closed", "server-shutdown"):
                 try:
                     os.stat(mountpoint / ("read-break" if mode == "active-eof" else mode))
