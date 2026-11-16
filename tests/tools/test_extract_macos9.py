@@ -1539,7 +1539,9 @@ def test_theme_chrome_reordered_layout():
     assert _png_size(os.path.join(out, "chrome", "bar-title.png")) == (64, 8)
     assert _png_size(os.path.join(out, "chrome", "bar-right.png")) == (7, tool.ZACOS_BAR_HEIGHT)
     assert _png_size(os.path.join(out, "chrome", "document-left.png")) == (14, 38)
-    assert _png_size(os.path.join(out, "chrome", "document-right.png")) == (14, 38)
+    # The active right edge is the plut fill (the red rail), not the named
+    # RTL "right vine" variant, so the sides stay asymmetric.
+    assert _png_size(os.path.join(out, "chrome", "document-right.png")) == (8, 8)
     assert _png_size(os.path.join(out, "chrome", "document-left-cap.png")) == (15, 19)
     assert _png_size(os.path.join(out, "chrome", "document-right-cap.png")) == (15, 19)
     assert _png_size(os.path.join(out, "chrome", "document-bottom.png")) == (8, 8)

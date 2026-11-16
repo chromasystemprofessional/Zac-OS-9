@@ -309,6 +309,17 @@ static int themed_doc_bottom(bool active) {
 	return t ? t->h : DECOR_BOTTOM;
 }
 
+/* An imported Appearance frame: the layout supplied its edge metrics.
+ * Its own art, including transparent pixels, then owns the frame; the
+ * Platinum border, highlight, shadow and flat face are not painted over or
+ * behind it. */
+static bool themed_frame(void) {
+	char v[16];
+	return zac_theme_string("frame-left", v, sizeof(v)) ||
+		zac_theme_string("frame-right", v, sizeof(v)) ||
+		zac_theme_string("frame-bottom", v, sizeof(v));
+}
+
 /* Blit a tile rectangle, nearest-neighbour scaled to (dw, dh), clipped
  * to the canvas like pl_image_blend. */
 static void chrome_blit(struct pl_canvas *c, const struct chrome_tile *t,
@@ -1217,6 +1228,7 @@ void decor_paint(struct pl_canvas *c, const struct decor_state *st) {
 	const int dl = themed_doc_left(act);
 	const int dr = themed_doc_right(act);
 	const int db = themed_doc_bottom(act);
+	const bool tframe = themed_frame();
 	const uint32_t face = act ? chrome("frame-face", C_CCC) : inactive_face(C_DDD);
 	const uint32_t border = act ? chrome("frame-border", C_BLACK) : inactive_border(C_555, face);
 
@@ -1229,11 +1241,15 @@ void decor_paint(struct pl_canvas *c, const struct decor_state *st) {
 		 * installed (its tab stays transparent past its end caps);
 		 * otherwise the frame skin fills it. */
 		if (!has_bar) {
-			chrome_fill_slot(c, 0, 0, W - 1, DECOR_TOP - 1, CHROME_DOC_TOP, act, face);
+			chrome_fill_slot(c, 0, 0, W - 1, DECOR_TOP - 1, CHROME_DOC_TOP, act,
+				tframe ? 0 : face);
 		}
-		chrome_fill_slot(c, 0, H - db, W - 1, H - 1, CHROME_DOC_BOTTOM, act, face);
-		chrome_fill_slot(c, 0, DECOR_TOP, dl - 1, H - db - 1, CHROME_DOC_LEFT, act, face);
-		chrome_fill_slot(c, W - dr, DECOR_TOP, W - 1, H - db - 1, CHROME_DOC_RIGHT, act, face);
+		chrome_fill_slot(c, 0, H - db, W - 1, H - 1, CHROME_DOC_BOTTOM, act,
+			tframe ? 0 : face);
+		chrome_fill_slot(c, 0, DECOR_TOP, dl - 1, H - db - 1, CHROME_DOC_LEFT, act,
+			tframe ? 0 : face);
+		chrome_fill_slot(c, W - dr, DECOR_TOP, W - 1, H - db - 1, CHROME_DOC_RIGHT, act,
+			tframe ? 0 : face);
 		int cw, ch;
 		const uint32_t *cp = chrome_file("chrome/document-left-cap.png", &cw, &ch);
 		if (cp) {
@@ -1247,6 +1263,7 @@ void decor_paint(struct pl_canvas *c, const struct decor_state *st) {
 
 	const uint32_t highlight = chrome("frame-light", C_WHITE);
 	const uint32_t shadow = chrome("frame-dark", C_999);
+	if (!tframe) {
 	if (has_bar) {
 		if (!st->collapsed) {
 			pl_vline(c, 0, DECOR_TOP, H - 1, border);
@@ -1267,6 +1284,7 @@ void decor_paint(struct pl_canvas *c, const struct decor_state *st) {
 			pl_hline(c, 2, W - 2, H - 2, shadow);
 		}
 	}
+	}
 
 	/* Drop shadow: 1 px, offset 2 px in from the corners. */
 	const int shadow_top = (has_bar && title_cluster_left(st) && span_tile_get(act))
@@ -1274,7 +1292,7 @@ void decor_paint(struct pl_canvas *c, const struct decor_state *st) {
 	pl_vline(c, W, shadow_top, H, border);
 	pl_hline(c, 2, W, H, border);
 
-	if (!st->collapsed) {
+	if (!st->collapsed && !tframe) {
 		if (act && !has_bar) {
 			pl_hline(c, dl - 2, W - dr + 1, DECOR_TOP - 2, shadow);
 			pl_vline(c, dl - 2, DECOR_TOP - 2, H - db, shadow);
@@ -1289,6 +1307,12 @@ void decor_paint(struct pl_canvas *c, const struct decor_state *st) {
 		if (st->has_grow) {
 			paint_grow(c, st);
 		}
+	}
+	if (!st->collapsed && tframe && st->has_grow) {
+		/* The theme owns the frame, but the grow box still needs a
+		 * visible hit target. Keep the Platinum corner until the theme's
+		 * own grow-box pxm# is extracted. */
+		paint_grow(c, st);
 	}
 	if (has_bar) {
 		paint_themed_bar(c, st, W, act);

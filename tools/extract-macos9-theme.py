@@ -2002,6 +2002,7 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None, px
 			except (ValueError, IndexError, struct.error):
 				return
 			edges = {"left": None, "right": None}
+			right_vine = False
 			for item in items:
 				if item["type"] != b"pxm#" or item["attrs"] & 1 or item["visible"] not in (0, 2):
 					continue
@@ -2025,6 +2026,8 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None, px
 					"right" if "right" in words or "r" in words else None
 				if side is None:
 					continue
+				if side == "right" and "vine" in words:
+					right_vine = True
 				bodies = pxm.get(item["id"] & 0xFFFF)
 				if not bodies:
 					continue
@@ -2034,11 +2037,23 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None, px
 					continue
 				if edges[side] is None or len(rows) > len(edges[side]):
 					edges[side] = rows
+			# Gizmo's active right edge is a plut fill (the red rail); the
+			# named right "vine" record is its inactive/RTL variant. Using
+			# that vine made the left and right sides identical.
+			if right_vine:
+				for item in items:
+					if item["type"] != b"plut" or item["attrs"] & 1 or item["visible"] != 0:
+						continue
+					fill = resolve_rec(item["type"], item["id"], 0)
+					if fill:
+						edges["right"] = fill
+						break
 			for side in ("left", "right"):
 				rows = edges[side]
 				key = "document-" + side + suffix
 				path = os.path.join(chrome_dir, key + ".png")
-				if rows and not os.path.exists(path):
+				force = side == "right" and right_vine and suffix == ""
+				if rows and (force or not os.path.exists(path)):
 					save_tile(key, rows)
 				if rows and not suffix:
 					keys["frame-" + side] = str(len(rows[0]))
