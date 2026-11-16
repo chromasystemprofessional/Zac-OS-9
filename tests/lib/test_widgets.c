@@ -252,6 +252,61 @@ static int run_skin_test(void) {
 	return fails;
 }
 
+/* A themed thumb's caps may be any length: the renderer reads the cap
+ * image's along-axis size instead of assuming Platinum's 8 px. */
+static int run_thumb_caps_test(void) {
+	char dir[] = "/tmp/zacos9-widgets-caps-XXXXXX";
+	if (!mkdtemp(dir)) {
+		return 0;
+	}
+	char path[sizeof(dir) + 64];
+	const char *parts[] = { "zacos9", "zacos9/themes", "zacos9/themes/Caps",
+		"zacos9/themes/Caps/chrome" };
+	for (size_t i = 0; i < sizeof(parts) / sizeof(parts[0]); i++) {
+		snprintf(path, sizeof(path), "%s/%s", dir, parts[i]);
+		mkdir(path, 0700);
+	}
+	snprintf(path, sizeof(path), "%s/zacos9/desktop.conf", dir);
+	FILE *f = fopen(path, "w");
+	fputs("theme-bundle=Caps\n# cap-length test\n", f);
+	fclose(f);
+	snprintf(path, sizeof(path), "%s/zacos9/themes/Caps/theme.conf", dir);
+	f = fopen(path, "w");
+	fputs("name=Caps\n", f);
+	fclose(f);
+	snprintf(path, sizeof(path), "%s/zacos9/themes/Caps/chrome/scroll-thumb-vert-top.png", dir);
+	write_skin_png(path, 16, 3, 0xFFFF0000u);
+	snprintf(path, sizeof(path), "%s/zacos9/themes/Caps/chrome/scroll-thumb-vert-stretch.png", dir);
+	write_skin_png(path, 16, 4, 0xFF00FF00u);
+	snprintf(path, sizeof(path), "%s/zacos9/themes/Caps/chrome/scroll-thumb-vert-bottom.png", dir);
+	write_skin_png(path, 16, 3, 0xFF0000FFu);
+	setenv("XDG_CONFIG_HOME", dir, 1);
+	int w = 16, h = 240;
+	uint32_t *px = calloc((size_t)w * h, sizeof(*px));
+	struct pl_canvas c = { .px = px, .stride = w, .width = w, .height = h };
+	struct pl_scrollbar sb = { .vertical = true, .length = h, .enabled = true,
+		.thumb = 40, .thumb_len = 60 };
+	pl_scrollbar_paint(&c, 0, 0, &sb, PL_ACCENT_DEFAULT);
+	const int t0 = sb_track_start(&sb) + sb.thumb + 1;
+	int fails = 0;
+	if (px[(t0 + 1) * w + 8] != 0xFFFF0000u) {
+		fprintf(stderr, "FAIL thumb top cap is not three pixels\n");
+		fails++;
+	}
+	if (px[(t0 + 5) * w + 8] != 0xFF00FF00u) {
+		fprintf(stderr, "FAIL thumb stretch does not start after its cap\n");
+		fails++;
+	}
+	if (px[(t0 + 60 - 2) * w + 8] != 0xFF0000FFu) {
+		fprintf(stderr, "FAIL thumb bottom cap is not three pixels\n");
+		fails++;
+	}
+	free(px);
+	unsetenv("XDG_CONFIG_HOME");
+	printf("%s themed thumb caps\n", fails ? "FAIL" : "ok  ");
+	return fails;
+}
+
 /* A titled group box (figure 2-38): the engraved frame, everywhere but
  * the title and the controls inside it. */
 static int run_group_box(const char *dir, int *ran) {
@@ -482,7 +537,7 @@ int main(int argc, char *argv[]) {
 	setenv("XDG_CONFIG_HOME", config_home, 1);
 	const char *dir = argc > 1 ? argv[1] : "tools/measure/figs";
 	int ran = 0;
-	int fails = run_hit_tests() + run_smart_tests() + run_skin_test();
+	int fails = run_hit_tests() + run_smart_tests() + run_skin_test() + run_thumb_caps_test();
 	fails += run_hbar(dir, "horizontal scroll bar, left window (fig 2-24)", 5, &ran);
 	fails += run_button(dir, "standard push button (fig 3-2)", 0, 223, 161, &ran);
 	fails += run_button(dir, "default push button (fig 3-2)", PL_BUTTON_DEFAULT, 220, 125, &ran);
