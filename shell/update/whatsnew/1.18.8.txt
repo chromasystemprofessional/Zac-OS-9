@@ -1,0 +1,13 @@
+ZacOS 9 1.18.8 brings Mac OS 9 theme sounds and controls together.
+
+Appearance themes' Sound Sets now import with their resource forks, so the
+sets appear in Sound Sets instead of only under Alert Sound. Kaleidoscope
+schemes' WindowShade sounds become a selectable set too.
+
+Kaleidoscope schemes that use wnd# window recipes now draw their title bars
+and window widgets. Drawing Board's title art lines up, and its push
+buttons, checkboxes, radio buttons, progress bars and scrollbars use the
+theme's own faces while keeping ZacOS's geometry and labels.
+
+Re-import your themes once, or open Appearance, so the updated extractor
+rebuilds their bundles.
