@@ -2010,6 +2010,33 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None, px
 				if rows and not os.path.exists(path):
 					save_tile(key, rows)
 
+		def save_menu_bar():
+			"""The root menu bar's fill from layo 256. Its middle slice
+			is the second drawable active record; the menu bar needs a
+			separate skin from pull-down menus, which is why this writes
+			the menu-bar-image key rather than menu-background."""
+			body = (layo or {}).get(256)
+			if not body:
+				return
+			try:
+				_coords, items = decode_layo(body)
+			except (ValueError, IndexError, struct.error):
+				return
+			rows = []
+			for item in items:
+				if item["type"] not in (b"pxm#", b"plut", b"ppat") or item["visible"]:
+					continue
+				layer = item["index"] if item["type"] == b"pxm#" else 0
+				art = resolve_rec(item["type"], item["id"], layer)
+				if art and len(art) <= 32 and len(art[0]) <= 64:
+					rows.append(art)
+			if not rows:
+				return
+			choice = rows[1] if len(rows) > 1 else rows[0]
+			if not os.path.exists(os.path.join(chrome_dir, "menu-bar-image.png")):
+				save_tile("menu-bar-image", choice)
+
+		save_menu_bar()
 		for lid, layer, suffix in ((128, 0, ""), (129, 1, "-inactive")):
 			if lid not in layo:
 				continue
@@ -3066,6 +3093,7 @@ def main():
 				"button-dialog-close", "button-dialog-close-pressed",
 				"button-dialog-zoom", "button-dialog-zoom-pressed",
 				"button-dialog-grow", "button-dialog-grow-pressed",
+				"menu-bar-image",
 				"scroll-arrow-dec", "scroll-arrow-inc"):
 			if chrome_keys.get(key):
 				f.write("%s=%s\n" % (key, chrome_keys[key]))

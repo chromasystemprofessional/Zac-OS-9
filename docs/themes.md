@@ -130,7 +130,9 @@ reads the Appearance theme's resource fork and produces a **theme bundle** in
   `document window tab center`, each with an `inactive` variant where the
   theme ships one). The compositor tiles them over title bars and borders;
   the menu bar, dropdown menus and the selected item use the `menu
-  background` / `menu highlight` skins. Scrollbars tile the `scroll-track-*`
+  background` / `menu highlight` skins. The root menu bar's own fill is
+  written separately as `menu-bar-image` from its layout; dropdown menus
+  keep `menu-background`. Scrollbars tile the `scroll-track-*`
   and three-part `scroll-thumb-*` skins (caps with the stretch between,
   stretch alone when short); a theme's own `scroll-arrow-*` art is used
   when its arrow boxes match, else the arrows stay procedural.

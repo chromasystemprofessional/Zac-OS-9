@@ -1448,9 +1448,13 @@ def test_theme_chrome_reordered_layout():
         (0, 258, 0x121, (1, -2, -1, -4), b"pxm#", 6183, 1, 0),
         (0, 250, 0x121, (1, -2, -1, -4), b"plut", -65, 1, 0),
         (32, 2, 0x125, (1, -2, -1, -4), b"pxm#", 200, 1, 0),
+    ]), 256: _layo_resource([], [
+        (0, 32, 0x300, (1, -2, -1, -4), b"plut", -28, 1, 0),
+        (0, 32, 0x300, (1, -2, -1, -4), b"plut", -28, 1, 0),
     ])}
-    plut = {387: _plut_body({64: (9001, (255, 255, 255))})}
-    ppats = [(9001, _ppat_body_wide(16, 16))]
+    plut = {387: _plut_body({64: (9001, (255, 255, 255)),
+        27: (9002, (255, 255, 255))})}
+    ppats = [(9001, _ppat_body_wide(16, 16)), (9002, _ppat_body_wide(1, 16))]
     names = {6173: "Doc Win Left Planter", 6177: "Doc Win L Vine",
         6174: "Dow Win Right Planter", 6178: "Doc Win R Vine",
         6181: "Doc Win TItlebar Left No Close",
@@ -1458,7 +1462,8 @@ def test_theme_chrome_reordered_layout():
         6182: "Doc Win TItlebar RTL L No Close",
         6183: "Doc Win TItlebar RTL Right"}
     out = tempfile.mkdtemp() + "/theme"
-    tool.write_theme_chrome("Gizmo", pxm, ppats, out, [], layo, plut, names)
+    keys = tool.write_theme_chrome("Gizmo", pxm, ppats, out, [], layo, plut, names)
+    assert keys.get("menu-bar-image", "").endswith("chrome/menu-bar-image.argb"), keys
     assert _png_size(os.path.join(out, "chrome", "bar-left.png")) == (14, tool.ZACOS_BAR_HEIGHT)
     assert _png_size(os.path.join(out, "chrome", "bar-middle.png")) == (16, tool.ZACOS_BAR_HEIGHT)
     assert _png_size(os.path.join(out, "chrome", "bar-right.png")) == (7, tool.ZACOS_BAR_HEIGHT)
