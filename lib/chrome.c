@@ -168,6 +168,24 @@ void chrome_tile(struct pl_canvas *c, const uint32_t *px, int sw, int sh,
 	}
 }
 
+/* Stretch a skin over a rectangle, nearest-neighbour. The middle part of
+ * a themed scrollbar thumb is a stretchable slice: repeating it would show
+ * its gradient once per slice. */
+void chrome_stretch(struct pl_canvas *c, const uint32_t *px, int sw, int sh,
+		int x0, int y0, int x1, int y1) {
+	const int dw = x1 - x0 + 1, dh = y1 - y0 + 1;
+	if (dw <= 0 || dh <= 0 || sw <= 0 || sh <= 0) {
+		return;
+	}
+	for (int y = 0; y < dh; y++) {
+		const int sy = (int)((long long)y * sh / dh);
+		for (int x = 0; x < dw; x++) {
+			const int sx = (int)((long long)x * sw / dw);
+			tile_put(c, x0 + x, y0 + y, px[sy * sw + sx]);
+		}
+	}
+}
+
 /* Fill a rectangle with a skin when the theme has one, else a flat colour. */
 void chrome_fill(struct pl_canvas *c, int x0, int y0, int x1, int y1,
 		const char *path, uint32_t fallback) {

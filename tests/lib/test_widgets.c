@@ -145,6 +145,24 @@ static void write_skin_png(const char *path, int w, int h, uint32_t argb) {
 	cairo_surface_destroy(surface);
 }
 
+/* A red-to-blue gradient across the stretchable axis. Tiling it shows a
+ * repeating pattern; stretching it runs once from red to blue. */
+static void write_gradient_png(const char *path, int w, int h, int horizontal) {
+	cairo_surface_t *surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, w, h);
+	unsigned char *data = cairo_image_surface_get_data(surface);
+	const int stride = cairo_image_surface_get_stride(surface);
+	for (int y = 0; y < h; y++) {
+		for (int x = 0; x < w; x++) {
+			const int t = horizontal ? x * 255 / (w - 1) : y * 255 / (h - 1);
+			const uint32_t argb = 0xFF000000u | (uint32_t)(255 - t) << 16 | (uint32_t)t;
+			memcpy(data + y * stride + x * 4, &argb, 4);
+		}
+	}
+	cairo_surface_mark_dirty(surface);
+	cairo_surface_write_to_png(surface, path);
+	cairo_surface_destroy(surface);
+}
+
 static int run_skin_test(void) {
 	char dir[] = "/tmp/zacos9-widgets-skin-XXXXXX";
 	if (!mkdtemp(dir)) {
@@ -196,6 +214,38 @@ static int run_skin_test(void) {
 		fprintf(stderr, "FAIL themed increment arrow hit\n");
 		fails++;
 	}
+	/* A thumb's middle slice stretches, so a gradient runs once instead
+	 * of repeating every slice. */
+	snprintf(path, sizeof(path),
+		"%s/zacos9/themes/Test/chrome/scroll-thumb-vert-stretch.png", dir);
+	write_gradient_png(path, 16, 8, 0);
+	snprintf(path, sizeof(path),
+		"%s/zacos9/themes/Test/chrome/scroll-thumb-horz-stretch.png", dir);
+	write_gradient_png(path, 8, 16, 1);
+	int vw = 16, vh = 240;
+	uint32_t *vpx = calloc((size_t)vw * vh, sizeof(*vpx));
+	struct pl_canvas vc = { .px = vpx, .stride = vw, .width = vw, .height = vh };
+	struct pl_scrollbar vsb = { .vertical = true, .length = vh, .enabled = true,
+		.thumb = 40, .thumb_len = 60 };
+	pl_scrollbar_paint(&vc, 0, 0, &vsb, PL_ACCENT_DEFAULT);
+	const uint32_t vtop = vpx[50 * vw + 8], vbottom = vpx[107 * vw + 8];
+	if (((vtop >> 16) & 0xFF) < 200 || (vbottom & 0xFF) < 200) {
+		fprintf(stderr, "FAIL vertical thumb stretch\n");
+		fails++;
+	}
+	free(vpx);
+	int hw = 240, hh = 16;
+	uint32_t *hpx = calloc((size_t)hw * hh, sizeof(*hpx));
+	struct pl_canvas hc = { .px = hpx, .stride = hw, .width = hw, .height = hh };
+	struct pl_scrollbar hsb = { .length = hw, .enabled = true, .thumb = 40,
+		.thumb_len = 60 };
+	pl_scrollbar_paint(&hc, 0, 0, &hsb, PL_ACCENT_DEFAULT);
+	const uint32_t hleft = hpx[8 * hw + 50], hright = hpx[8 * hw + 107];
+	if (((hleft >> 16) & 0xFF) < 200 || (hright & 0xFF) < 200) {
+		fprintf(stderr, "FAIL horizontal thumb stretch\n");
+		fails++;
+	}
+	free(hpx);
 	free(px);
 	unsetenv("XDG_CONFIG_HOME");
 	printf("%s themed control faces\n", fails ? "FAIL" : "ok  ");

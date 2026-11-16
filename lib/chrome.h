@@ -17,6 +17,10 @@ const uint32_t *chrome_file(const char *path, int *w, int *h);
 void chrome_tile(struct pl_canvas *c, const uint32_t *px, int sw, int sh,
 	int x0, int y0, int x1, int y1);
 
+/* Stretch a skin over a rectangle (nearest-neighbour). Pure. */
+void chrome_stretch(struct pl_canvas *c, const uint32_t *px, int sw, int sh,
+	int x0, int y0, int x1, int y1);
+
 /* Fill a rectangle with a skin when the theme has one, else a flat colour. */
 void chrome_fill(struct pl_canvas *c, int x0, int y0, int x1, int y1,
 	const char *path, uint32_t fallback);

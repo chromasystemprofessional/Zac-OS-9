@@ -998,8 +998,10 @@ static bool sb_track(struct sb_ctx *s, int a0, int a1) {
 	return false;
 }
 
-/* Tile a thumb part (cap or stretch) over an along-extent, full width. */
-static void sb_thumb_skin(struct sb_ctx *s, int a0, int a1, const char *path) {
+/* Tile or stretch a thumb part (cap or stretch) over an along-extent,
+ * full width. Caps are fixed-size; the middle slice stretches. */
+static void sb_thumb_skin(struct sb_ctx *s, int a0, int a1, const char *path,
+		bool stretch) {
 	int w, h;
 	const uint32_t *px = chrome_file(path, &w, &h);
 	if (!px) {
@@ -1032,9 +1034,21 @@ static void sb_thumb_skin(struct sb_ctx *s, int a0, int a1, const char *path) {
 		return;
 	}
 	if (s->vertical) {
-		chrome_tile(s->c, px, w, h, s->x, s->y + a0, s->x + SB_WIDTH - 1, s->y + a1);
+		if (stretch) {
+			chrome_stretch(s->c, px, w, h, s->x, s->y + a0, s->x + SB_WIDTH - 1,
+				s->y + a1);
+		} else {
+			chrome_tile(s->c, px, w, h, s->x, s->y + a0, s->x + SB_WIDTH - 1,
+				s->y + a1);
+		}
 	} else {
-		chrome_tile(s->c, px, w, h, s->x + a0, s->y, s->x + a1, s->y + SB_WIDTH - 1);
+		if (stretch) {
+			chrome_stretch(s->c, px, w, h, s->x + a0, s->y, s->x + a1,
+				s->y + SB_WIDTH - 1);
+		} else {
+			chrome_tile(s->c, px, w, h, s->x + a0, s->y, s->x + a1,
+				s->y + SB_WIDTH - 1);
+		}
 	}
 }
 
@@ -1066,11 +1080,11 @@ static void sb_thumb(struct sb_ctx *s, int line_a, int len, struct pl_accent ac)
 		if (chrome_file(mid, &sw, &sh)) {
 			if (len >= 20 && chrome_file(cap0, &cw, &ch) &&
 					chrome_file(cap1, &cw, &ch)) {
-				sb_thumb_skin(s, t0, t0 + 7, cap0);
-				sb_thumb_skin(s, t0 + 8, t1 - 8, mid);
-				sb_thumb_skin(s, t1 - 7, t1, cap1);
+				sb_thumb_skin(s, t0, t0 + 7, cap0, false);
+				sb_thumb_skin(s, t0 + 8, t1 - 8, mid, true);
+				sb_thumb_skin(s, t1 - 7, t1, cap1, false);
 			} else {
-				sb_thumb_skin(s, t0, t1, mid);
+				sb_thumb_skin(s, t0, t1, mid, true);
 			}
 			themed = true;
 			goto grip;
