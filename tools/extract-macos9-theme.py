@@ -2036,7 +2036,31 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None, px
 			if not os.path.exists(os.path.join(chrome_dir, "menu-bar-image.png")):
 				save_tile("menu-bar-image", choice)
 
+		def save_menu_palette():
+			"""The pull-down menu's flat face from layo 257. A solid plut
+			entry is the fill behind the menu's border corners; recording
+			it as menu-background turns on the themed menu palette instead
+			of leaving the panel Platinum grey."""
+			body = (layo or {}).get(257)
+			if not body:
+				return
+			try:
+				_coords, items = decode_layo(body)
+			except (ValueError, IndexError, struct.error):
+				return
+			for item in items:
+				if item["type"] != b"plut" or item["visible"]:
+					continue
+				idx = ~item["id"]
+				if not (0 <= idx < len(plut_entries)):
+					continue
+				pid, rgb = plut_entries[idx]
+				if pid == 0:
+					keys["menu-background"] = "%02x%02x%02x" % rgb
+					return
+
 		save_menu_bar()
+		save_menu_palette()
 		for lid, layer, suffix in ((128, 0, ""), (129, 1, "-inactive")):
 			if lid not in layo:
 				continue
@@ -2300,8 +2324,9 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None, px
 			rows = button_face(state)
 			if rows:
 				save_tile(key, rows)
-		# A progress bar's fill is the wide pxm# 1150 layer; the solid
-		# button face and 1 px border strips are not it.
+		# A progress bar's fill is the widest active pxm# layer; themes
+		# use 1150, but Gizmo's is a 7x10 gradient (356). The solid
+		# button face and 1 px border strips are narrower.
 		rows = None
 		body = layo.get(520)
 		if body:
@@ -2309,10 +2334,9 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None, px
 				_coords, items = decode_layo(body)
 			except (ValueError, IndexError, struct.error):
 				items = []
+			best_area = 0
 			for item in items:
 				if item["type"] != b"pxm#" or not item["attrs"] & 0x100:
-					continue
-				if (item["id"] & 0xFFFF) != 1150:
 					continue
 				if not (item["visible"] == 0 and item["invisible"] & 0x20):
 					continue
@@ -2320,10 +2344,12 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None, px
 				if not bodies:
 					continue
 				try:
-					rows = decode_pxm(bodies[0], item["index"], clut_map)
+					candidate = decode_pxm(bodies[0], item["index"], clut_map)
 				except (ValueError, IndexError, struct.error):
 					continue
-				break
+				area = len(candidate[0]) * len(candidate)
+				if area > best_area:
+					rows, best_area = candidate, area
 		if rows:
 			save_tile("progress-fill", rows)
 		for key, pid, layer in (("checkbox-off", 300, 0),
@@ -3094,6 +3120,7 @@ def main():
 				"button-dialog-zoom", "button-dialog-zoom-pressed",
 				"button-dialog-grow", "button-dialog-grow-pressed",
 				"menu-bar-image",
+				"menu-background",
 				"scroll-arrow-dec", "scroll-arrow-inc"):
 			if chrome_keys.get(key):
 				f.write("%s=%s\n" % (key, chrome_keys[key]))

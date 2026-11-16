@@ -1435,6 +1435,7 @@ def test_theme_chrome_reordered_layout():
         6182: [_pxm_edged(13, 13)],   # RTL left, not the bar
         6183: [_pxm_edged(8, 13)],    # RTL right, not the bar
         200: [_pxm_edged(13, 13)],    # close box
+        356: [_pxm_layers(7, 10, 1)], # progress fill, not pxm 1150
     }
     layo = {128: _layo_resource([], [
         (0, 259, 0x120, (1, -2, -1, -4), b"pxm#", 6170, 1, 0),
@@ -1451,9 +1452,13 @@ def test_theme_chrome_reordered_layout():
     ]), 256: _layo_resource([], [
         (0, 32, 0x300, (1, -2, -1, -4), b"plut", -28, 1, 0),
         (0, 32, 0x300, (1, -2, -1, -4), b"plut", -28, 1, 0),
+    ]), 257: _layo_resource([], [
+        (0, 0, 0x100, (1, -2, -1, -4), b"plut", -72, 1, 0),
+    ]), 520: _layo_resource([], [
+        (0, 0x21, 0x100, (1, -2, -1, -4), b"pxm#", 356, 1, 0),
     ])}
     plut = {387: _plut_body({64: (9001, (255, 255, 255)),
-        27: (9002, (255, 255, 255))})}
+        27: (9002, (255, 255, 255)), 71: (0, (255, 255, 255))})}
     ppats = [(9001, _ppat_body_wide(16, 16)), (9002, _ppat_body_wide(1, 16))]
     names = {6173: "Doc Win Left Planter", 6177: "Doc Win L Vine",
         6174: "Dow Win Right Planter", 6178: "Doc Win R Vine",
@@ -1464,11 +1469,13 @@ def test_theme_chrome_reordered_layout():
     out = tempfile.mkdtemp() + "/theme"
     keys = tool.write_theme_chrome("Gizmo", pxm, ppats, out, [], layo, plut, names)
     assert keys.get("menu-bar-image", "").endswith("chrome/menu-bar-image.argb"), keys
+    assert keys.get("menu-background") == "ffffff", keys
     assert _png_size(os.path.join(out, "chrome", "bar-left.png")) == (14, tool.ZACOS_BAR_HEIGHT)
     assert _png_size(os.path.join(out, "chrome", "bar-middle.png")) == (16, tool.ZACOS_BAR_HEIGHT)
     assert _png_size(os.path.join(out, "chrome", "bar-right.png")) == (7, tool.ZACOS_BAR_HEIGHT)
     assert _png_size(os.path.join(out, "chrome", "document-left.png")) == (14, 38)
     assert _png_size(os.path.join(out, "chrome", "document-right.png")) == (14, 38)
+    assert _png_size(os.path.join(out, "chrome", "progress-fill.png")) == (7, 10)
     print("ok    title-bar and frame-side records keep their named art when reordered")
 
 
