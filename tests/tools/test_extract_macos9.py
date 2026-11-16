@@ -981,7 +981,7 @@ def _make_cicn(w, h):
     ctab = (struct.pack(">IHH", 0, 0, 1) +
             struct.pack(">HHHH", 0, 0, 0, 0) +
             struct.pack(">HHHH", 1, 0xFFFF, 0xFFFF, 0xFFFF))
-    pixel = b"\x11" * (((w * h + 1) // 2))
+    pixel = b"\x11" * (row_bytes * h)
     return pixmap + bit_hdr + bit_hdr + handle + mask + bitmap + ctab + pixel
 
 
@@ -1056,6 +1056,46 @@ def test_wnd_chrome():
         out2 = tempfile.mkdtemp()
         assert tool.write_wnd_chrome(fork2, out2, []) == {}, "mid-bar widgets keep the tint"
     print("ok    a wnd# scheme's title band and widgets become chrome")
+
+
+def test_k2_scrollbars():
+    # A Kaleidoscope scrollbar is one cicn per track: two arrow ends and a
+    # stretchable middle. Split it into the slots the desktop paints, and
+    # split the thumb into three-pixel caps with the stretch between.
+    fork = build_resource_fork([
+        (b"cicn", -8278, _make_cicn(16, 41)),
+        (b"cicn", -8286, _make_cicn(41, 16)),
+        (b"cicn", -10208, _make_cicn(16, 19)),
+        (b"cicn", -10206, _make_cicn(19, 16)),
+    ])
+    with tempfile.TemporaryDirectory() as out:
+        keys = tool.write_k2_scrollbars(fork, out, [])
+        assert keys.get("scroll-arrow-dec") == "15", keys
+        assert keys.get("scroll-arrow-inc") == "15", keys
+        expected = {
+            "scroll-track-vert": (14, 11),
+            "scroll-arrow-decrement-vert": (14, 15),
+            "scroll-arrow-increment-vert": (14, 15),
+            "scroll-track-horz": (11, 14),
+            "scroll-arrow-decrement-horz": (15, 14),
+            "scroll-arrow-increment-horz": (15, 14),
+            "scroll-thumb-vert-top": (16, 3),
+            "scroll-thumb-vert-stretch": (16, 13),
+            "scroll-thumb-vert-bottom": (16, 3),
+            "scroll-thumb-horz-left": (3, 16),
+            "scroll-thumb-horz-stretch": (13, 16),
+            "scroll-thumb-horz-right": (3, 16),
+        }
+        for key, size in expected.items():
+            assert key in keys, (key, keys)
+            with open(os.path.join(out, "chrome", key + ".png"), "rb") as f:
+                head = f.read(24)
+            assert (struct.unpack(">I", head[16:20])[0],
+                    struct.unpack(">I", head[20:24])[0]) == size, (key, size)
+    assert tool.write_k2_scrollbars(
+        build_resource_fork([(b"Colr", 129, b"\x00" * 16)]),
+        tempfile.mkdtemp(), []) == {}
+    print("ok    a scheme's scrollbar cicns become track, arrows and thumb")
 
 
 def test_layo_title_items():
@@ -1348,6 +1388,7 @@ test_wctb()
 test_cicn()
 test_chrome_slots()
 test_wnd_chrome()
+test_k2_scrollbars()
 test_layo_title_items()
 test_control_faces()
 test_scen()

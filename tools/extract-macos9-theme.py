@@ -1705,6 +1705,107 @@ def write_wnd_chrome(fork, out, cluts=()):
 	return keys
 
 
+def write_k2_scrollbars(fork, out, cluts=()):
+	"""Extract Kaleidoscope scrollbar cicns into the bundle's scroll slots.
+
+	A scheme's scrollbar track is one cicn: an arrow at each end and a
+	stretchable middle. ZacOS paints the arrows, track and thumb
+	separately, so split the track and use the scheme's thumb. The normal
+	(size 16) and small (size 11) variants use the IDs in the K2 Scheme
+	Reference; the track's own length gives the arrow size (15 or 10).
+	"""
+	items = parse_resource_fork(fork)
+	cicns = {rid: body for rtype, rid, body in items if rtype == b"cicn"}
+	if not cicns:
+		return {}
+	clut_map = {}
+	for _rid, cols in cluts:
+		clut_map.setdefault(len(cols), cols)
+	chrome_dir = os.path.join(out, "chrome")
+	keys = {}
+
+	def save(key, rows):
+		if not rows or not rows[0]:
+			return
+		os.makedirs(chrome_dir, exist_ok=True)
+		pngwrite.write_png(os.path.join(chrome_dir, key + ".png"),
+			len(rows[0]), len(rows), rows)
+		pngwrite.write_argb(os.path.join(chrome_dir, key + ".argb"), rows)
+		keys[key] = "chrome/" + key + ".argb"
+
+	def decode(cid):
+		if cid not in cicns:
+			return None
+		try:
+			return macicons.decode_cicn(cicns[cid], cluts=clut_map)
+		except (ValueError, IndexError, struct.error):
+			return None
+
+	def crop(rows, x0, x1):
+		return [row[x0:x1] for row in rows]
+
+	def one_axis(vertical, track_ids, thumb_ids):
+		track = None
+		for cid in track_ids:
+			track = decode(cid)
+			if track:
+				break
+		if not track:
+			return
+		total = len(track) if vertical else len(track[0])
+		# Normal tracks are 41 px (15 px arrows), small ones 29 px
+		# (10 px arrows); 39/34 px disabled and empty states fit the
+		# same arrow sizes.
+		arrow = 15 if total >= 39 else 10
+		if total <= 2 * arrow + 1:
+			return
+		if vertical:
+			mid = crop(track[arrow:total - arrow], 1, 15)
+			save("scroll-track-vert", mid)
+			save("scroll-arrow-decrement-vert", crop(track[:arrow], 1, 15))
+			save("scroll-arrow-increment-vert", crop(track[total - arrow:], 1, 15))
+		else:
+			mid = crop(track, arrow, total - arrow)[1:15]
+			save("scroll-track-horz", mid)
+			save("scroll-arrow-decrement-horz", crop(track[1:15], 0, arrow))
+			save("scroll-arrow-increment-horz",
+				crop(track[1:15], total - arrow, total))
+		keys["scroll-arrow-dec"] = str(arrow)
+		keys["scroll-arrow-inc"] = str(arrow)
+
+		thumb = None
+		for cid in thumb_ids:
+			thumb = decode(cid)
+			if thumb:
+				break
+		if not thumb:
+			return
+		# The scheme's thumb is one cicn; keep a three-pixel cap at each
+		# end (the K2 default) and stretch the middle. The renderer reads
+		# the cap length from the image, so 3 px caps work.
+		cap = 3
+		if vertical:
+			n = len(thumb)
+			if n > 2 * cap + 1:
+				save("scroll-thumb-vert-top", thumb[:cap])
+				save("scroll-thumb-vert-stretch", thumb[cap:n - cap])
+				save("scroll-thumb-vert-bottom", thumb[n - cap:])
+			else:
+				save("scroll-thumb-vert-stretch", thumb)
+		else:
+			n = len(thumb[0])
+			if n > 2 * cap + 1:
+				save("scroll-thumb-horz-left", crop(thumb, 0, cap))
+				save("scroll-thumb-horz-stretch", crop(thumb, cap, n - cap))
+				save("scroll-thumb-horz-right", crop(thumb, n - cap, n))
+			else:
+				save("scroll-thumb-horz-stretch", thumb)
+
+	one_axis(True, (-8278, -8262), (-10208, -8252))
+	one_axis(False, (-8286, -8270), (-10206, -8250))
+	return keys
+
+
 def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None):
 	"""Decode the theme's own window art into the bundle's chrome/.
 
@@ -2702,6 +2803,12 @@ def main():
 		theme_cluts or cluts, layo, plut)
 	if theme_fork and not any(key.startswith("bar-") for key in chrome_keys):
 		chrome_keys.update(write_wnd_chrome(theme_fork, out, theme_cluts or cluts))
+	if theme_fork and not any(key.startswith("scroll-track-") for key in chrome_keys):
+		has_colr = any(rtype == b"Colr"
+			for rtype, _rid, _body in parse_resource_fork(theme_fork))
+		if has_colr:
+			chrome_keys.update(
+				write_k2_scrollbars(theme_fork, out, theme_cluts or cluts))
 	write_desktop_wallpaper(scen_tags, args.pictures, out)
 
 	if args.list_cluts:

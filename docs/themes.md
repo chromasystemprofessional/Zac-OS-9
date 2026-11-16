@@ -132,7 +132,8 @@ reads the Appearance theme's resource fork and produces a **theme bundle** in
   the menu bar, dropdown menus and the selected item use the `menu
   background` / `menu highlight` skins. Scrollbars tile the `scroll-track-*`
   and three-part `scroll-thumb-*` skins (caps with the stretch between,
-  stretch alone when short); the arrows and disabled state stay procedural.
+  stretch alone when short); a theme's own `scroll-arrow-*` art is used
+  when its arrow boxes match, else the arrows stay procedural.
   Buttons tile the `button` face inside their rounded border
   (`-inactive`/`-pressed` variants when the theme ships them). The
   determinate progress fill uses `progress-fill`. Kaleidoscope themes add
@@ -148,6 +149,9 @@ reads the Appearance theme's resource fork and produces a **theme bundle** in
   chrome `cicn`'s title band supplies a cap/fill/cap bar, and the recipe's
   rectangle list supplies the close, zoom and collapse art. Schemes whose
   widgets sit mid-bar keep flat chrome rather than guess a composition.
+  Kaleidoscope scrollbars are read from the scheme's own track and thumb
+  `cicn`s, including K2 schemes; the track's ends become arrow skins and
+  the thumb's caps keep the scheme's own length.
   Each tile ships as a PNG (for the
   catalog sheets) and a flat `.argb` dump (u32le width and height, then
   straight RGBA) that the compositor reads directly. Close/zoom/collapse

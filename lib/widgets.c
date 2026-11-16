@@ -1078,11 +1078,18 @@ static void sb_thumb(struct sb_ctx *s, int line_a, int len, struct pl_accent ac)
 			: "chrome/scroll-thumb-horz-right.png";
 		int sw, sh, cw, ch;
 		if (chrome_file(mid, &sw, &sh)) {
-			if (len >= 20 && chrome_file(cap0, &cw, &ch) &&
-					chrome_file(cap1, &cw, &ch)) {
-				sb_thumb_skin(s, t0, t0 + 7, cap0, false);
-				sb_thumb_skin(s, t0 + 8, t1 - 8, mid, true);
-				sb_thumb_skin(s, t1 - 7, t1, cap1, false);
+			int cap = 0, c1w = 0, c1h = 0;
+			if (chrome_file(cap0, &cw, &ch)) {
+				cap = s->vertical ? ch : cw;
+				if (!chrome_file(cap1, &c1w, &c1h) ||
+						(s->vertical ? c1h : c1w) != cap) {
+					cap = 0;
+				}
+			}
+			if (cap > 0 && len >= 2 * cap + 1) {
+				sb_thumb_skin(s, t0, t0 + cap - 1, cap0, false);
+				sb_thumb_skin(s, t0 + cap, t1 - cap, mid, true);
+				sb_thumb_skin(s, t1 - cap + 1, t1, cap1, false);
 			} else {
 				sb_thumb_skin(s, t0, t1, mid, true);
 			}
