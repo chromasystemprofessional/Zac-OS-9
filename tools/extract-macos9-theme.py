@@ -2010,6 +2010,42 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None, px
 				if rows and not os.path.exists(path):
 					save_tile(key, rows)
 
+		def save_frame_bottom():
+			"""A three-piece bottom frame whose first record is named
+			"bottom corners" (Gizmo). The next two frame records are its
+			fill and opposite corner; the first is the strip that tiles
+			under the client area."""
+			body = (layo or {}).get(128)
+			if not body or not pxm_names:
+				return
+			try:
+				_coords, items = decode_layo(body)
+			except (ValueError, IndexError, struct.error):
+				return
+			for index, item in enumerate(items):
+				if item["type"] != b"pxm#" or item["attrs"] & 1:
+					continue
+				words = pxm_names.get(item["id"] & 0xFFFF, "").lower().split()
+				if "bottom" not in words or not any(word.startswith("corner") for word in words):
+					continue
+				following = []
+				for nxt in items[index + 1:]:
+					if nxt["type"] not in (b"pxm#", b"plut", b"ppat"):
+						continue
+					if nxt["attrs"] & 1 or nxt["visible"] not in (0, 2):
+						continue
+					following.append(nxt)
+					if len(following) == 2:
+						break
+				if not following:
+					return
+				fill = following[0]
+				layer = fill["index"] if fill["type"] == b"pxm#" else 0
+				rows = resolve_rec(fill["type"], fill["id"], layer)
+				if rows and not os.path.exists(os.path.join(chrome_dir, "document-bottom.png")):
+					save_tile("document-bottom", rows)
+				return
+
 		def save_menu_bar():
 			"""The root menu bar's fill from layo 256. Its middle slice
 			is the second drawable active record; the menu bar needs a
@@ -2061,6 +2097,7 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None, px
 
 		save_menu_bar()
 		save_menu_palette()
+		save_frame_bottom()
 		for lid, layer, suffix in ((128, 0, ""), (129, 1, "-inactive")):
 			if lid not in layo:
 				continue

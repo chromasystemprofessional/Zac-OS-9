@@ -1439,6 +1439,8 @@ def test_theme_chrome_reordered_layout():
     }
     layo = {128: _layo_resource([], [
         (0, 259, 0x120, (1, -2, -1, -4), b"pxm#", 6170, 1, 0),
+        (0, 258, 0x120, (1, -2, -1, -4), b"plut", -64, 1, 0),
+        (0, 258, 0x120, (1, -2, -1, -4), b"plut", -63, 1, 0),
         (0, 258, 0x120, (1, -2, -1, -4), b"pxm#", 6173, 1, 0),
         (0, 258, 0x120, (1, -2, -1, -4), b"pxm#", 6177, 1, 0),
         (2, 256, 0x120, (1, -2, -1, -4), b"pxm#", 6174, 1, 0),
@@ -1458,9 +1460,12 @@ def test_theme_chrome_reordered_layout():
         (0, 0x21, 0x100, (1, -2, -1, -4), b"pxm#", 356, 1, 0),
     ])}
     plut = {387: _plut_body({64: (9001, (255, 255, 255)),
-        27: (9002, (255, 255, 255)), 71: (0, (255, 255, 255))})}
-    ppats = [(9001, _ppat_body_wide(16, 16)), (9002, _ppat_body_wide(1, 16))]
-    names = {6173: "Doc Win Left Planter", 6177: "Doc Win L Vine",
+        27: (9002, (255, 255, 255)), 71: (0, (255, 255, 255)),
+        63: (9003, (255, 255, 255)), 62: (9004, (255, 255, 255))})}
+    ppats = [(9001, _ppat_body_wide(16, 16)), (9002, _ppat_body_wide(1, 16)),
+        (9003, _ppat_body_wide(8, 8)), (9004, _ppat_body_wide(8, 8))]
+    names = {6170: "Doc Win Bottom Corners",
+        6173: "Doc Win Left Planter", 6177: "Doc Win L Vine",
         6174: "Dow Win Right Planter", 6178: "Doc Win R Vine",
         6181: "Doc Win TItlebar Left No Close",
         6185: "Doc Win Titlebar Right",
@@ -1475,6 +1480,7 @@ def test_theme_chrome_reordered_layout():
     assert _png_size(os.path.join(out, "chrome", "bar-right.png")) == (7, tool.ZACOS_BAR_HEIGHT)
     assert _png_size(os.path.join(out, "chrome", "document-left.png")) == (14, 38)
     assert _png_size(os.path.join(out, "chrome", "document-right.png")) == (14, 38)
+    assert _png_size(os.path.join(out, "chrome", "document-bottom.png")) == (8, 8)
     assert _png_size(os.path.join(out, "chrome", "progress-fill.png")) == (7, 10)
     print("ok    title-bar and frame-side records keep their named art when reordered")
 
