@@ -141,9 +141,12 @@ reads the Appearance theme's resource fork and produces a **theme bundle** in
   determinate progress fill uses `progress-fill`. Kaleidoscope themes add
   their own set beside it, decoded from the frame layout: `bar-middle`
   (`bar-left`, `bar-right`, `-inactive` variants) tiles the title bar
-  stretched edge to edge, and `button-close/zoom/grow` (plus `-pressed`
-  variants) draw over the title-box slots, leaving hit-testing and geometry
-  untouched. Movable-modal dialogs get their own set from the frame layout's
+  stretched edge to edge. Appearance layouts that split a titled bar into a
+  left field, title placard and right field also write `bar-span` and
+  `bar-title`; the compositor preserves that three-part composition. The
+  title ink comes from the theme's `clr#` title colour when present.
+  `button-close/zoom/grow` (plus `-pressed` variants) draw over the
+  title-box slots, leaving hit-testing and geometry untouched. Movable-modal dialogs get their own set from the frame layout's
   dialog records (`layo` 134/135). Themes whose buttons ride with the title
   group instead get a two-row bar with a full-width blue band
   (`bar-span`/`bar-span-inactive`). A scheme that uses the older `wnd#`

@@ -1484,6 +1484,7 @@ def test_theme_chrome_reordered_layout():
         6185: [_pxm_edged(7, 13)],    # titlebar right
         6182: [_pxm_edged(13, 13)],   # RTL left, not the bar
         6183: [_pxm_edged(8, 13)],    # RTL right, not the bar
+        6155: [_pxm_edged(64, 8)],    # title placard
         200: [_pxm_edged(13, 13)],    # close box
         356: [_pxm_layers(7, 10, 1)], # progress fill, not pxm 1150
     }
@@ -1500,6 +1501,9 @@ def test_theme_chrome_reordered_layout():
         (0, 290, 0x121, (1, -2, -1, -4), b"pxm#", 6182, 1, 0),
         (0, 258, 0x121, (1, -2, -1, -4), b"pxm#", 6183, 1, 0),
         (0, 250, 0x121, (1, -2, -1, -4), b"plut", -65, 1, 0),
+        (0x80, 0, 0x121, (1, -2, -1, -4), b"plut", -65, 1, 0),
+        (0x80, 0, 0x121, (1, -2, -1, -4), b"plut", -66, 1, 0),
+        (0x80, 0, 0x121, (1, -2, -1, -4), b"pxm#", 6155, 1, 0),
         (32, 2, 0x125, (1, -2, -1, -4), b"pxm#", 200, 1, 0),
     ]), 256: _layo_resource([], [
         (0, 32, 0x300, (1, -2, -1, -4), b"plut", -28, 1, 0),
@@ -1510,10 +1514,12 @@ def test_theme_chrome_reordered_layout():
         (0, 0x21, 0x100, (1, -2, -1, -4), b"pxm#", 356, 1, 0),
     ])}
     plut = {387: _plut_body({64: (9001, (255, 255, 255)),
+        65: (9005, (255, 255, 255)), 61: (9006, (255, 255, 255)),
         27: (9002, (255, 255, 255)), 71: (0, (255, 255, 255)),
         63: (9003, (255, 255, 255)), 62: (9004, (255, 255, 255))})}
     ppats = [(9001, _ppat_body_wide(16, 16)), (9002, _ppat_body_wide(1, 16)),
-        (9003, _ppat_body_wide(8, 8)), (9004, _ppat_body_wide(8, 8))]
+        (9003, _ppat_body_wide(8, 8)), (9004, _ppat_body_wide(8, 8)),
+        (9005, _ppat_body_wide(8, 16)), (9006, _ppat_body_wide(8, 16))]
     names = {6170: "Doc Win Bottom Corners",
         6173: "Doc Win Left Planter", 6177: "Doc Win L Vine",
         6174: "Dow Win Right Planter", 6178: "Doc Win R Vine",
@@ -1529,6 +1535,8 @@ def test_theme_chrome_reordered_layout():
     # A plut/ppat bar fill keeps its natural pattern height; the compositor
     # scales it to the title row, so a 16-row gradient is not flattened.
     assert _png_size(os.path.join(out, "chrome", "bar-middle.png")) == (16, 16)
+    assert _png_size(os.path.join(out, "chrome", "bar-span.png")) == (8, 16)
+    assert _png_size(os.path.join(out, "chrome", "bar-title.png")) == (64, 8)
     assert _png_size(os.path.join(out, "chrome", "bar-right.png")) == (7, tool.ZACOS_BAR_HEIGHT)
     assert _png_size(os.path.join(out, "chrome", "document-left.png")) == (14, 38)
     assert _png_size(os.path.join(out, "chrome", "document-right.png")) == (14, 38)

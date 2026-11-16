@@ -1858,7 +1858,7 @@ def write_k2_scrollbars(fork, out, cluts=()):
 
 
 def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None, pxm_names=None,
-		frme=None):
+		frme=None, clr=None):
 	"""Decode the theme's own window art into the bundle's chrome/.
 
 	Every Kaleidoscope scheme carrying standard window resources gets its
@@ -1870,6 +1870,24 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None, px
 	clut_map = {cid: dict(cols) for cid, cols in cluts}
 	chrome_dir = os.path.join(out, "chrome")
 	keys = {}
+
+	# Appearance's clr# 384 holds the text colours used by the window
+	# recipes. The document title pair is entries 22/23 (the same indices
+	# used by Appearance.r / scheme2theme). Keep these separate from the
+	# approximated chrome colours: Gizmo's title ink is gold on a black
+	# placard, not a contrast colour derived from its purple desktop palette.
+	if clr:
+		body = clr.get(384)
+		if body:
+			def clr_rgb(index):
+				off = 4 + index * 6
+				if off + 6 > len(body):
+					return None
+				return tuple(body[off + n] for n in (0, 2, 4))
+			for index, key in ((22, "title-text"), (23, "title-text-inactive")):
+				rgb = clr_rgb(index)
+				if rgb:
+					keys[key] = "%02x%02x%02x" % rgb
 
 	def save_tile(key, rows):
 		if not rows or not rows[0]:
@@ -2167,6 +2185,29 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None, px
 				crop_top=right_crop)
 			mids_by_suffix[suffix] = mid_rows
 			save_frame_sides(lid, layer, suffix)
+
+		# Gizmo's real title bar is a three-layer composition selected by
+		# the has-title-text flag (0x80): red/blue field on the left,
+		# black title placard in the middle, and green field on the right.
+		# It is not a cap/middle/cap bar. Preserve those three layers for
+		# the compositor; choosing the first generic plut made the whole
+		# title bar red/blue and lost the placard and green field.
+		body = (layo or {}).get(128)
+		if body:
+			try:
+				_coords, title_items = decode_layo(body)
+			except (ValueError, IndexError, struct.error):
+				title_items = []
+			for item in title_items:
+				if item["visible"] != 0x80:
+					continue
+				rows = resolve_rec(item["type"], item["id"], 0)
+				if item["type"] == b"plut" and item["id"] == -65 and rows:
+					save_tile("bar-middle", rows)
+				elif item["type"] == b"plut" and item["id"] == -66 and rows:
+					save_tile("bar-span", rows)
+				elif item["type"] == b"pxm#" and (item["id"] & 0xFFFF) == 6155 and rows:
+					save_tile("bar-title", rows)
 
 		# 2b. Two-part bars: the title group rides a pinstripe patch on
 		# the left while a span fills the rest of the bar. The span is
@@ -3089,8 +3130,12 @@ def main():
 		write_icon_dump(raw_icons, cluts, out)
 	# Decode wallpapers, patterns and sounds.
 	font_families, font_files = write_assets(assets, epics, out)
+	clr = {}
+	if theme_fork:
+		clr = {res_id: body for rtype, res_id, body in parse_resource_fork(theme_fork)
+			if rtype == b"clr#"}
 	chrome_keys = write_theme_chrome(name, pxm, assets.get("ppat", []), out,
-		theme_cluts or cluts, layo, plut, assets.get("pxm_names", {}), frme)
+		theme_cluts or cluts, layo, plut, assets.get("pxm_names", {}), frme, clr)
 	if theme_fork and not any(key.startswith("bar-") for key in chrome_keys):
 		chrome_keys.update(write_wnd_chrome(theme_fork, out, theme_cluts or cluts))
 	if theme_fork and not any(key.startswith("scroll-track-") for key in chrome_keys):
@@ -3234,7 +3279,10 @@ def main():
 			f.write("frame-border=%s\n" % frame_border)
 		if frame_face:
 			f.write("frame-face=%s\n" % frame_face)
-		for key in ("bar-left", "bar-middle", "bar-right", "bar-span",
+		for key in ("title-text", "title-text-inactive"):
+			if chrome_keys.get(key):
+				f.write("%s=%s\n" % (key, chrome_keys[key]))
+		for key in ("bar-left", "bar-middle", "bar-right", "bar-span", "bar-title",
 				"bar-left-inactive", "bar-middle-inactive", "bar-right-inactive",
 				"bar-span-inactive", "bar-dialog-left", "bar-dialog-middle",
 				"bar-dialog-right", "bar-dialog-left-inactive",

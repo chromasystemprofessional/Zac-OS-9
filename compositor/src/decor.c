@@ -158,6 +158,7 @@ enum {
 	CHROME_BUTTON_ZOOM, CHROME_BUTTON_ZOOM_PRESSED,
 	CHROME_BUTTON_GROW, CHROME_BUTTON_GROW_PRESSED,
 	CHROME_BAR_SPAN, CHROME_BAR_SPAN_INACTIVE,
+	CHROME_BAR_TITLE,
 	CHROME_BAR_DIALOG_LEFT, CHROME_BAR_DIALOG_MIDDLE, CHROME_BAR_DIALOG_RIGHT,
 	CHROME_BAR_DIALOG_LEFT_INACTIVE, CHROME_BAR_DIALOG_MIDDLE_INACTIVE, CHROME_BAR_DIALOG_RIGHT_INACTIVE,
 	CHROME_BUTTON_DIALOG_CLOSE, CHROME_BUTTON_DIALOG_CLOSE_PRESSED,
@@ -173,6 +174,7 @@ static const char *const chrome_keys[CHROME_COUNT] = {
 	"button-zoom", "button-zoom-pressed",
 	"button-grow", "button-grow-pressed",
 	"bar-span", "bar-span-inactive",
+	"bar-title",
 	"bar-dialog-left", "bar-dialog-middle", "bar-dialog-right",
 	"bar-dialog-left-inactive", "bar-dialog-middle-inactive", "bar-dialog-right-inactive",
 	"button-dialog-close", "button-dialog-close-pressed",
@@ -327,6 +329,8 @@ static bool themed_bar_available(bool act) {
  * inactive art falls back to the active span. */
 static bool title_cluster_left(const struct decor_state *st);
 static int title_group_end(const struct decor_state *st);
+static int title_ink_width(const struct decor_state *st);
+static void title_layout(const struct decor_state *st, int ink_w, int *ink_l, int *proxy_x);
 static bool themed_dialog_available(bool act);
 
 static const struct chrome_tile *span_tile_get(bool act) {
@@ -405,6 +409,35 @@ static bool paint_themed_bar(struct pl_canvas *c, const struct decor_state *st,
 	int lw = tl ? tl->w : 0;
 	int rw = tr ? tr->w : 0;
 	const struct chrome_tile *span = span_tile_get(act);
+	const struct chrome_tile *title = !dialog ? chrome_tile_get(CHROME_BAR_TITLE) : NULL;
+	/* Gizmo's title-text layout is a three-field bar: the red/blue field,
+	 * a black placard behind the title, then the green field. It is distinct
+	 * from the older left-cluster/Aqua composition below. */
+	if (title && span && !dialog) {
+		if (lw > 0) {
+			chrome_blit(c, tl, 0, 0, tl->w, tl->h, 0, 0, lw, DECOR_TOP);
+		}
+		for (int x = lw; x < w - rw; x += tm->w) {
+			int tilew = w - rw - x < tm->w ? w - rw - x : tm->w;
+			chrome_blit(c, tm, 0, 0, tilew, tm->h, x, 0, tilew, DECOR_TOP);
+		}
+		int ink_l = 0, proxy_x = 0;
+		title_layout(st, title_ink_width(st), &ink_l, &proxy_x);
+		int patch_l = (st->proxy ? proxy_x : ink_l) - 20;
+		int patch_r = ink_l + title_ink_width(st) + 20;
+		if (patch_l < lw) patch_l = lw;
+		if (patch_r > w - rw) patch_r = w - rw;
+		if (patch_r > patch_l) {
+			chrome_blit(c, span, 0, 0, span->w, span->h,
+				patch_r, 0, w - rw - patch_r, DECOR_TOP);
+			chrome_blit(c, title, 0, 0, title->w, title->h,
+				patch_l, 0, patch_r - patch_l, DECOR_TOP);
+		}
+		if (rw > 0) {
+			chrome_blit(c, tr, 0, 0, tr->w, tr->h, w - rw, 0, rw, DECOR_TOP);
+		}
+		return true;
+	}
 	if (span && !dialog && title_cluster_left(st)) {
 		/* The title group sits in a raised pinstripe tab at the top-left
 		 * (end caps hugging the cluster, transparent to the right of the
