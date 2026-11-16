@@ -1,3 +1,21 @@
+zacos9 (1.18.9) trixie; urgency=medium
+
+  * Bloodhound now has Sherlock 2's channel bar: Files, Internet, People,
+    Shopping, News, ZacOS, Reference, My Channel and user channels, with
+    labels, hint bubbles, Command-1 to Command-8 and an overflow menu. People
+    lists the accounts on this computer; ZacOS opens the Help Center. A
+    Bloodhound alias is offered once on the desktop.
+  * Classic applications open inside the Mac from the Finder, and a running
+    session accepts further opens one at a time. A basic viewer shows Mac OS 9
+    windows as ordinary ZacOS windows and forwards clicks and keys; Close
+    reaches the guest close box, Resize sends one grow-box drag, and Show
+    Classic Desktop raises the emulator. Documents, live resizing and window
+    placement are still to come.
+  * A theme's scrollbar thumb stretches its middle slice instead of repeating
+    it, so the Aqua theme's gel thumb runs once.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Sun, 15 Nov 2026 22:55:42 -0500
+
 zacos9 (1.18.8) trixie; urgency=medium
 
   * Theme sounds and controls: Appearance themes' Sound Sets import with

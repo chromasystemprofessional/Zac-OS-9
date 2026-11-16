@@ -1,0 +1,13 @@
+ZacOS 9 1.18.9 brings Bloodhound's channel bar, Classic windows and
+themed scrollbars whose thumbs stretch instead of repeat.
+
+Bloodhound now has Sherlock 2's channel bar: Files, Internet, People,
+Shopping, News, ZacOS, Reference, My Channel and your own channels, with
+labels, hint bubbles, Command-1 to Command-8 and an overflow menu. People
+lists the accounts on this computer; ZacOS opens the Help Center.
+
+Classic applications now open inside the Mac from the Finder, and a
+running session takes further opens. Mac OS 9 windows can appear as
+ordinary ZacOS windows, with clicks, keys, Close and a one-shot Resize;
+Show Classic Desktop raises the emulator. Documents, live resizing and
+window placement are still to come.
