@@ -1250,6 +1250,48 @@ def _plut_body(mapping):
     return out
 
 
+def _frme_body(refs):
+    # Minimal frme: a header word then the negative plut ids as u16s; the
+    # extractor only scans for the negative ids.
+    out = struct.pack(">HH", 0x0002, 0x0000)
+    for r in refs:
+        out += struct.pack(">H", r & 0xFFFF)
+    return out
+
+
+def test_frme_button_face():
+    # A push button's face is the frme frame its layout (layo 500) names
+    # under each state, resolved through plut: the lightest flat colour
+    # that is neither the white highlight nor the black focus ring.
+    plut = {387: _plut_body({72: (0, (221, 221, 221)),   # -73
+                             73: (0, (187, 187, 187)),   # -74
+                             74: (0, (238, 238, 238)),   # -75
+                             75: (0, (136, 136, 136)),   # -76
+                             77: (0, (255, 255, 255))})} # -78
+    frme = {
+        547: _frme_body([-73, -75, -78]),   # active: lightest non-white = 238
+        548: _frme_body([-74, -76]),        # pressed: lightest = 187
+        549: _frme_body([-73, -78]),        # inactive: lightest non-white = 221
+    }
+    layo = {128: _layo_resource([], []),
+            500: _layo_resource([], [
+        (0, 0x21, 0x100, (1, -2, -1, -4), b"fram", 547, 1, 0),
+        (0x1, 0x20, 0x100, (1, -2, -1, -4), b"fram", 549, 1, 0),
+        (0x20, 0x1, 0x100, (1, -2, -1, -4), b"fram", 548, 1, 0),
+    ])}
+    out = tempfile.mkdtemp() + "/theme"
+    tool.write_theme_chrome("Synthetic", {}, [], out, [], layo, plut, {}, frme)
+
+    def face(key):
+        with open(os.path.join(out, "chrome", key + ".argb"), "rb") as f:
+            return f.read()[8:12]
+
+    assert face("button") == bytes((238, 238, 238, 255)), face("button")
+    assert face("button-pressed") == bytes((187, 187, 187, 255)), face("button-pressed")
+    assert face("button-inactive") == bytes((221, 221, 221, 255)), face("button-inactive")
+    print("ok    a push button's face comes from its frme frame")
+
+
 def test_control_faces():
     # Appearance control layouts: push button (layo 500), progress
     # (520), checkbox (pxm 300) and radio (pxm 310). The button face is
@@ -1398,6 +1440,7 @@ test_wnd_chrome()
 test_k2_scrollbars()
 test_layo_title_items()
 test_control_faces()
+test_frme_button_face()
 test_scen()
 test_pointers()
 test_system_sounds()

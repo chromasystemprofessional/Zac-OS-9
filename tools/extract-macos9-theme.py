@@ -61,7 +61,7 @@ KALEIDOSCOPE_SOUNDS = {-14336: "window-collapse", -14335: "window-expand"}
 CURSOR_TYPES = {b"CURS", b"crsr"}
 PICT_TYPES = {b"PICT"}
 THEME_TYPES = {b"thme", b"clut", b"pltt", b"WIND", b"scen", b"pxm#", b"layo", b"plut",
-	b"cicn", b"crsr", b"CURS", b"wctb"}
+	b"frme", b"cicn", b"crsr", b"CURS", b"wctb"}
 
 # The desktop's title row (compositor/src/decor.c DECOR_TOP). Theme bar
 # art is written at this height so the compositor never resamples it,
@@ -635,7 +635,7 @@ def chrome_slot(name):
 
 def process_resource_fork(data, out, counts, cluts, icons, assets, scen_tags, apple_menu, wctb, raw_icons, epics,
 		theme_icons=None, system_file=False, cursors=None, file_icon=None, pxm=None,
-		layo=None, plut=None):
+		layo=None, plut=None, frme=None):
 	for rtype, res_id, body in parse_resource_fork(data):
 		bucket = bucket_for(rtype)
 		if not bucket:
@@ -679,6 +679,8 @@ def process_resource_fork(data, out, counts, cluts, icons, assets, scen_tags, ap
 			layo[res_id] = body
 		if plut is not None and rtype == b"plut":
 			plut[res_id] = body
+		if frme is not None and rtype == b"frme":
+			frme[res_id] = body
 		if rtype in (b"icns", b"ics8", b"ics4", b"ics#") and res_id == -16386:
 			apple_menu.setdefault(rtype, []).append(body)
 		if rtype == b"wctb" and res_id == 0 and not wctb:
@@ -1855,7 +1857,8 @@ def write_k2_scrollbars(fork, out, cluts=()):
 	return keys
 
 
-def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None, pxm_names=None):
+def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None, pxm_names=None,
+		frme=None):
 	"""Decode the theme's own window art into the bundle's chrome/.
 
 	Every Kaleidoscope scheme carrying standard window resources gets its
@@ -2335,32 +2338,92 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None, px
 					best, best_area = rows, area
 			return best
 
+		def _frme_plut_ids(body):
+			"""The plut references (negative ids) a frme frame lists."""
+			if not body or len(body) < 4:
+				return []
+			n = len(body) // 2
+			words = struct.unpack(">%dH" % n, body[:n * 2])
+			refs = []
+			for w in words:
+				if w >= 0xff00:  # -256..-1 when read as a signed short
+					signed = w - 0x10000
+					if signed <= -2:  # 0xffff (-1) is the terminator
+						refs.append(signed)
+			return refs
+
 		def button_face(state):
-			# A button's face is the solid plut entry (ppat 0); its
-			# border strips are ppat textures and decode smaller.
-			body = layo.get(500)
-			if body:
-				try:
-					_coords, items = decode_layo(body)
-				except (ValueError, IndexError, struct.error):
-					items = []
-				for item in items:
-					if item["type"] != b"plut" or not item["attrs"] & 0x100:
-						continue
-					if state == "active" and not (item["visible"] == 0 and
-							item["invisible"] & 0x20):
-						continue
-					if state == "pressed" and not (item["visible"] & 0x20):
-						continue
-					if state == "inactive" and not (item["visible"] & 0x1 and
-							not item["invisible"] & 0x20):
-						continue
-					idx = ~item["id"]
-					if not (0 <= idx < len(plut_entries)):
-						continue
-					pid, rgb = plut_entries[idx]
-					if pid == 0:
-						return [[rgb + (255,)] * 8 for _ in range(8)]
+			# A push button's face is the frme frame its layout (layo 500)
+			# references under the state's flags, resolved through plut:
+			# the lightest flat colour that is not the white highlight or
+			# the black focus ring. Older layouts that put a solid plut
+			# fill straight in the layo fall through to that path.
+			body = (layo or {}).get(500)
+			if not body:
+				return None
+			try:
+				_coords, items = decode_layo(body)
+			except (ValueError, IndexError, struct.error):
+				items = []
+			frame_id = None
+			for item in items:
+				if item["type"] != b"fram":
+					continue
+				if state == "active" and item["visible"] == 0:
+					frame_id = item["id"] & 0xFFFF
+					break
+				if state == "pressed" and item["visible"] & 0x20:
+					frame_id = item["id"] & 0xFFFF
+					break
+				if state == "inactive" and item["visible"] & 0x1:
+					frame_id = item["id"] & 0xFFFF
+					break
+			if frame_id is not None:
+				frme_body = (frme or {}).get(frame_id)
+				if frme_body:
+					best = None
+					best_lum = -1
+					best_ppat = None
+					best_ppat_area = 0
+					for rid in _frme_plut_ids(frme_body):
+						idx = ~rid
+						if not (0 <= idx < len(plut_entries)):
+							continue
+						pid, rgb = plut_entries[idx]
+						if pid and pid in patterns:
+							try:
+								_, _, rows = macpat.decode_ppat(patterns[pid])
+							except (ValueError, IndexError, struct.error):
+								continue
+							area = len(rows[0]) * len(rows)
+							if area > best_ppat_area:
+								best_ppat, best_ppat_area = rows, area
+							continue
+						if rgb in ((255, 255, 255), (0, 0, 0)):
+							continue
+						lum = rgb[0] * 299 + rgb[1] * 587 + rgb[2] * 114
+						if lum > best_lum:
+							best, best_lum = rgb, lum
+					if best_ppat is not None:
+						return best_ppat
+					if best is not None:
+						return [[best + (255,)] * 8 for _ in range(8)]
+			# Fallback: a solid plut entry laid straight into layo 500.
+			for item in items:
+				if item["type"] != b"plut" or not item["attrs"] & 0x100:
+					continue
+				if state == "active" and item["visible"] != 0:
+					continue
+				if state == "pressed" and not (item["visible"] & 0x20):
+					continue
+				if state == "inactive" and not (item["visible"] & 0x1):
+					continue
+				idx = ~item["id"]
+				if not (0 <= idx < len(plut_entries)):
+					continue
+				pid, rgb = plut_entries[idx]
+				if pid == 0:
+					return [[rgb + (255,)] * 8 for _ in range(8)]
 			return None
 
 		for key, state in (("button", "active"), ("button-pressed", "pressed"),
@@ -2868,6 +2931,7 @@ def main():
 	pxm = {}
 	layo = {}
 	plut = {}
+	frme = {}
 	theme_fork = None
 
 	if args.file:
@@ -2899,7 +2963,7 @@ def main():
 			# its own art); the helpers fill the kinds it lacks.
 			theme_fork = fork
 			process_resource_fork(fork, out, counts, cluts, icons, assets, scen_tags, apple_menu, wctb, raw_icons, epics,
-				theme_icons, True, cursors, file_icon, pxm, layo, plut)
+				theme_icons, True, cursors, file_icon, pxm, layo, plut, frme)
 			theme_keys = set(theme_icons.keys())
 			theme_cluts = list(cluts)
 			theme_apple = {key: len(bodies) for key, bodies in apple_menu.items()}
@@ -2952,7 +3016,7 @@ def main():
 							base = fn[2:]
 							helper = base in ("System", "Finder")
 							process_resource_fork(fork, out, counts, cluts, icons, assets, scen_tags, apple_menu, wctb, raw_icons, epics,
-								theme_icons, helper, cursors if helper else None, file_icon, pxm, layo, plut)
+								theme_icons, helper, cursors if helper else None, file_icon, pxm, layo, plut, frme)
 							continue
 						with open(full, "rb") as f:
 							raw = f.read()
@@ -2962,7 +3026,7 @@ def main():
 					if looks_like_resource_fork(raw) and not fn.startswith("._"):
 						helper = fn in ("System", "Finder")
 						process_resource_fork(raw, out, counts, cluts, icons, assets, scen_tags, apple_menu, wctb, raw_icons, epics,
-							theme_icons, helper, cursors if helper else None, file_icon, pxm, layo, plut)
+							theme_icons, helper, cursors if helper else None, file_icon, pxm, layo, plut, frme)
 						continue
 
 					# Loose asset files.
@@ -2988,7 +3052,7 @@ def main():
 					if looks_like_resource_fork(raw):
 						helper = fn in ("System", "Finder")
 						process_resource_fork(raw, out, counts, cluts, icons, assets, scen_tags, apple_menu, wctb, raw_icons, epics,
-							theme_icons, helper, cursors if helper else None, file_icon, pxm, layo, plut)
+							theme_icons, helper, cursors if helper else None, file_icon, pxm, layo, plut, frme)
 
 		for s in [src] + expand_archives(src):
 			walk_tree(s)
@@ -3026,7 +3090,7 @@ def main():
 	# Decode wallpapers, patterns and sounds.
 	font_families, font_files = write_assets(assets, epics, out)
 	chrome_keys = write_theme_chrome(name, pxm, assets.get("ppat", []), out,
-		theme_cluts or cluts, layo, plut, assets.get("pxm_names", {}))
+		theme_cluts or cluts, layo, plut, assets.get("pxm_names", {}), frme)
 	if theme_fork and not any(key.startswith("bar-") for key in chrome_keys):
 		chrome_keys.update(write_wnd_chrome(theme_fork, out, theme_cluts or cluts))
 	if theme_fork and not any(key.startswith("scroll-track-") for key in chrome_keys):
