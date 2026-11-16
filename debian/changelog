@@ -1,3 +1,12 @@
+zacos9 (1.18.8) trixie; urgency=medium
+
+  * Theme sounds and controls: Appearance themes' Sound Sets import with
+    their resource forks; Kaleidoscope WindowShade sounds become a set;
+    wnd# scheme title bars, Drawing Board widgets and scrollbars are
+    themed. Re-import themes or open Appearance to rebuild bundles.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Sun, 15 Nov 2026 21:30:36 -0500
+
 zacos9 (1.18.7) trixie; urgency=medium
 
   * Dragging a desktop icon after selecting another now moves only the icon
