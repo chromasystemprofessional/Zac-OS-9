@@ -30,7 +30,7 @@ void PanelList::setItems(const QStringList &list, const std::vector<int> &rowIco
 	texts.clear();
 	for (const QString &s : list) {
 		texts.push_back(std::make_unique<Text>(s, frame.width() - SB_WIDTH - 8 - state.indent,
-			PL_FONT_SYSTEM));
+			font));
 	}
 	state.n = static_cast<int>(texts.size());
 	state.top = std::min(state.top, std::max(0, state.n - 1));

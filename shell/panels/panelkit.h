@@ -29,6 +29,9 @@ struct PanelList {
 	QRect frame; /* the black frame */
 	QString hint;
 	QStringList items;
+	/* The font its rows are drawn in (and measured with); most lists use
+	 * the system font, while body text such as What's New uses views. */
+	pl_font font = PL_FONT_SYSTEM;
 	std::vector<std::unique_ptr<Text>> texts;
 	std::vector<int> icons;
 	std::vector<int> flags; /* enum pl_flag per row; text starts after it */

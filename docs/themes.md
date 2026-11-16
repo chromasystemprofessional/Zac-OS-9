@@ -143,22 +143,49 @@ reads the Appearance theme's resource fork and produces a **theme bundle** in
   untouched. Movable-modal dialogs get their own set from the frame layout's
   dialog records (`layo` 134/135). Themes whose buttons ride with the title
   group instead get a two-row bar with a full-width blue band
-  (`bar-span`/`bar-span-inactive`). Each tile ships as a PNG (for the
+  (`bar-span`/`bar-span-inactive`). A scheme that uses the older `wnd#`
+  window recipes instead of `layo` gets an approximation: the document
+  chrome `cicn`'s title band supplies a cap/fill/cap bar, and the recipe's
+  rectangle list supplies the close, zoom and collapse art. Schemes whose
+  widgets sit mid-bar keep flat chrome rather than guess a composition.
+  Each tile ships as a PNG (for the
   catalog sheets) and a flat `.argb` dump (u32le width and height, then
   straight RGBA) that the compositor reads directly. Close/zoom/collapse
   boxes, title text and hit-testing stay ZacOS's. Missing files fall back
   to the Platinum drawing. Every title-bar tile (left, middle, right;
-  document and dialog, active and inactive) is written at the bar's own
-  height, starting at its first inked row, so end caps whose resources
-  carried padding above the bar still compose into one band. A middle that
-  is a tiled pattern running past the bar into the body is cropped to the
-  height of the frame layout's `pxm#` caps. A cap's fully transparent
+  document and dialog, active and inactive) is written at the desktop's
+  22 px title row, starting at its first inked row, so a 19 or 23 px
+  source is padded or cropped instead of resampled at draw time. A cap
+  whose `layo` item extends above the window (Drawing Board's pencil
+  marks sit five and ten rows above the bar) has those rows cropped
+  using the item's resolved top, so the bar starts on the title row and
+  its widget rectangles line up. A middle that
+  is a tiled pattern running past the bar into the body is cropped to
+  the height of the frame layout's `pxm#` caps. A cap's fully transparent
   columns are trimmed on the side that meets the window edge, so padding
   in the resource does not leave the bar narrower than the frame.
+  Appearance themes also carry control layouts (`layo` 500 push button,
+  510 checkbox, 515 radio, 520 progress). The importer files the
+  push-button face, checkbox and radio marks and the progress fill as
+  `chrome/button*.png`, `checkbox-*.png`, `radio-*.png` and
+  `progress-fill.png`; the toolkit keeps its control geometry and
+  labels, so a theme can change the art without moving the widgets.
+  Scrollbars use `layo` 400/405 for the track, thin thumb and arrow art;
+  `scroll-arrow-dec`/`scroll-arrow-inc` record the theme's arrow-box
+  sizes so painting and hit-testing share them. Smaller `layo` 410/415
+  variants are not used by ZacOS's 16 px bars.
 - `sounds/` — alert sounds. `system-sound-N.wav` are the System file's own
   `snd` resources, decoded from sampled sounds only; synthesized and compressed
   sounds are skipped. Theme-file sounds sit beside them. The installer never
   picks a `system-` sound as the theme's default alert.
+- `soundset/` — the theme's own interface sounds, as a Sound Themes folder:
+  `theme.json` names the events and one WAV holds each sample. A
+  Kaleidoscope scheme's WindowShade pair (`snd` -14336/-14335) becomes
+  `window-collapse` and `window-expand`; a theme carrying `sdid`/`snd#`
+  metadata keeps every event those name. The installer copies this folder
+  into `Sound Themes/<name> Sounds`, so a scheme's sounds appear in the
+  Sound Sets window instead of only as alert sounds. Alert sounds without
+  that metadata stay in `sounds/`.
 - `icons/<kind>-32.png` and `icons/<kind>-16.png` — the desktop's icons,
   decoded at both sizes against the user's System palette, through one
   resolver: the theme's icon suite (`icns`) first, then the colour family
@@ -214,7 +241,13 @@ in `~/Classic`, and reads a copy whose fork is kept as `System/rsrc` by Old
 Dog's Unix volume. It reads the Apple menu icon, the busy pointers, the
 alert sounds, the desktop pictures and the fonts from it; without one, the
 theme still installs but keeps ZacOS's Apple, pointers, sounds and fonts,
-and takes no desktop picture.
+and takes no desktop picture. It also copies every sound set from
+`Appearance/Sound Sets` (or `Appearance add-ons/Sound Sets`) into Sound
+Themes, taking the set's resource fork from a `.rsrc/NAME` companion,
+`NAME/rsrc` or an AppleDouble `._` file so its sounds survive the copy.
+When the theme names one of those sets (`scen` `sndt`), that set is selected
+with the theme; otherwise the theme's own `soundset/` folder is offered in
+Sound Sets without replacing the current set.
 
 When there is none, the installer copies it out of Old Dog's startup disk.
 It reads the disk image directly (`tools/mac-hfs.py`) and keeps every file's
@@ -421,6 +454,13 @@ their resource forks, including companion `._` AppleDouble files produced by
 StuffIt extraction. Supported PCM resources are decoded to cached WAVs;
 unsupported encodings are reported, not played as noise. No Apple sounds or
 third-party archive artwork is bundled.
+The Theme Installer brings the sets from your Mac OS 9 System Folder's
+`Appearance/Sound Sets` across this way, and a Kaleidoscope scheme's own
+WindowShade sounds arrive as a `<scheme> Sounds` set. A set that an
+Appearance theme names is selected with that theme. A scheme's set is
+offered in **Sound Sets** without being selected, because its two
+WindowShade events would otherwise silence the current set's menus,
+windows and controls; choose it there when you want it.
 Sniffer preserves an individual classic file's hidden AppleDouble companion
 when it is moved or copied, including renamed duplicates.
 You can also copy the extracted `Sounds` folder into Sound Themes: one level
@@ -458,5 +498,12 @@ validation, selection persistence, muted interface volume, preview and playback
 argument routing. They also cover user themes: creating one, linked copies of
 imports, inherited artwork and cursors, dark palettes and readable title ink,
 deletion rules, the themed menu bar and menus, per-slot artwork states, and
-writing chosen images as ARGB tiles and PNG skins. The user-supplied
+writing chosen images as ARGB tiles and PNG skins. Sound-set coverage includes
+a System Folder set keeping its `.rsrc` fork, a Kaleidoscope scheme's
+WindowShade pair becoming a selectable set, and a theme's own `sdid` sounds
+being written as a Sound Themes folder. Chrome tests cover a
+`wnd#` scheme's title band and widgets, the fixed 22 px bar height, the
+`layo` frame/dialog/button layouts, the resolved top of title-bar
+caps that carry decoration above the window, and the button, checkbox,
+radio, progress and scrollbar faces. The user-supplied
 compatibility archive is ignored by Git and excluded from package builds.

@@ -47,5 +47,31 @@ int main() {
 		PL_FONT_VIEWS);
 	check(!url.isEmpty() && fits(url, 60, PL_FONT_VIEWS), "an unbreakable run is cut to fit");
 
+	/* A newline ends the line: it is not a break opportunity to wrap
+	 * across. A newline left inside a line has no glyph, so it would draw
+	 * as a missing-glyph box. */
+	const QStringList hard = wrapText("first line\nsecond line", 1000, PL_FONT_SYSTEM);
+	bool noNewlineInside = true;
+	for (const QString &line : hard) {
+		if (line.contains('\n')) {
+			noNewlineInside = false;
+		}
+	}
+	check(hard.size() == 2 && hard[0] == "first line" && hard[1] == "second line" &&
+			noNewlineInside,
+		"a newline ends the line");
+
+	/* A blank line between paragraphs stays one empty row. */
+	const QStringList paragraphs = wrapText("first paragraph\n\nsecond paragraph", 1000,
+		PL_FONT_SYSTEM);
+	check(paragraphs.size() == 3 && paragraphs[0] == "first paragraph" &&
+			paragraphs[1].isEmpty() && paragraphs[2] == "second paragraph",
+		"a blank line separates paragraphs");
+
+	/* Blank lines at the ends do not make empty rows. */
+	const QStringList edges = wrapText("\n\nfirst\n\n", 1000, PL_FONT_SYSTEM);
+	check(edges.size() == 1 && edges[0] == "first",
+		"leading and trailing blank lines are not rows");
+
 	return fails ? 1 : 0;
 }

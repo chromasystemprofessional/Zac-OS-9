@@ -1,8 +1,11 @@
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "widgets.h"
 #include "chrome.h"
 #include "settings.h"
+#include "theme.h"
 
 /* Push-button art: left columns, one stretchable column, right columns. */
 struct nine_slice {
@@ -124,8 +127,40 @@ static uint32_t grey_char(char ch) {
 	}
 }
 
+
+/* A theme control skin, centred in the widget's fixed box. The skin
+ * supplies the whole mark; the label layout stays Platinum's. */
+static bool control_skin(struct pl_canvas *c, const char *path,
+		int x, int y, int w, int h) {
+	int sw, sh;
+	const uint32_t *px = chrome_file(path, &sw, &sh);
+	if (!px) {
+		return false;
+	}
+	const int ox = x + (w - sw) / 2, oy = y + (h - sh) / 2;
+	for (int j = 0; j < sh; j++) {
+		for (int i = 0; i < sw; i++) {
+			const uint32_t v = px[j * sw + i];
+			if (v >> 24) {
+				pl_put(c, ox + i, oy + j, v);
+			}
+		}
+	}
+	return true;
+}
+
 void pl_checkbox_paint(struct pl_canvas *c, int x, int y, enum pl_check value,
 		bool pressed, bool enabled, const struct plat_text *label) {
+	const char *skin = value == PL_CHECK_ON ? "chrome/checkbox-on.png" :
+		value == PL_CHECK_MIXED ? "chrome/checkbox-mixed.png" :
+		"chrome/checkbox-off.png";
+	if (control_skin(c, skin, x, y, PL_CHECKBOX_SIZE, PL_CHECKBOX_SIZE)) {
+		if (label && label->ink_l >= 0) {
+			pl_text(c, label, x + PL_CHECKBOX_LABEL_X, y + PL_CHECKBOX_BASELINE,
+				enabled ? C_BLACK : GRAY(0x8));
+		}
+		return;
+	}
 	const char *const *rows = value == PL_CHECK_ON ? check_on : check_off;
 	for (int j = 0; j < PL_CHECKBOX_SIZE; j++) {
 		for (int i = 0; rows[j][i]; i++) {
@@ -212,6 +247,14 @@ static uint32_t radio_grey(char ch) {
 
 void pl_radio_paint(struct pl_canvas *c, int x, int y, bool on, bool pressed, bool enabled,
 		const struct plat_text *label) {
+	if (control_skin(c, on ? "chrome/radio-on.png" : "chrome/radio-off.png",
+			x, y, PL_RADIO_SIZE, PL_RADIO_SIZE)) {
+		if (label && label->ink_l >= 0) {
+			pl_text(c, label, x + PL_CHECKBOX_LABEL_X, y + PL_CHECKBOX_BASELINE,
+				enabled ? C_BLACK : GRAY(0x8));
+		}
+		return;
+	}
 	const char *const *rows = on ? radio_on : radio_off;
 	for (int j = 0; j < PL_RADIO_SIZE; j++) {
 		for (int i = 0; i < PL_RADIO_SIZE && rows[j][i]; i++) {
@@ -769,6 +812,31 @@ void pl_progress_paint(struct pl_canvas *c, int x, int y, int w, double fraction
 #define C_DDD GRAY(0xD)
 #define C_EEE GRAY(0xE)
 
+struct sb_style {
+	int dec, inc;
+};
+
+/* Theme arrow boxes: a scheme can make its own arrows narrower than
+ * Platinum's 14 px boxes (Drawing Board uses 7 and 8 px). The thumb and
+ * track art follow the theme's own files; the width stays 16 px. */
+static struct sb_style sb_style(void) {
+	struct sb_style st = { SB_ARROW, SB_ARROW };
+	char v[32];
+	if (zac_theme_string("scroll-arrow-dec", v, sizeof(v))) {
+		int n = atoi(v);
+		if (n >= 4 && n <= 32) {
+			st.dec = n;
+		}
+	}
+	if (zac_theme_string("scroll-arrow-inc", v, sizeof(v))) {
+		int n = atoi(v);
+		if (n >= 4 && n <= 32) {
+			st.inc = n;
+		}
+	}
+	return st;
+}
+
 struct sb_ctx {
 	struct pl_canvas *c;
 	int x, y;
@@ -797,7 +865,8 @@ static void sb_col(struct sb_ctx *s, int a, int b0, int b1, uint32_t color) {
 
 int sb_thumb_range(int length) {
 	/* Thumb lines may sit on either arrow separator. */
-	int r = (length - 1 - SB_ARROW - 1) - (SB_ARROW + 1) - (SB_THUMB + 1);
+	const struct sb_style st = sb_style();
+	int r = (length - 1 - st.inc - 1) - (st.dec + 1) - (SB_THUMB + 1);
 	return r > 0 ? r : 0;
 }
 
@@ -808,9 +877,10 @@ static int thumb_len_of(const struct pl_scrollbar *sb) {
 /* The lines the thumb moves between: the arrow separators, or with the
  * arrows together, the leading border and the first arrow's separator. */
 static void track_lines(const struct pl_scrollbar *sb, int *start, int *end) {
-	const int inc_sep = sb->length - 2 - SB_ARROW;
-	*start = sb->together ? 0 : SB_ARROW + 1;
-	*end = sb->together ? inc_sep - SB_ARROW - 1 : inc_sep;
+	const struct sb_style st = sb_style();
+	const int inc_sep = sb->length - 2 - st.inc;
+	*start = sb->together ? 0 : st.dec + 1;
+	*end = sb->together ? inc_sep - st.inc - 1 : inc_sep;
 }
 
 int sb_track_start(const struct pl_scrollbar *sb) {
@@ -839,41 +909,74 @@ void sb_smart(struct pl_scrollbar *sb, int visible, int total) {
 	sb->thumb_len = len < SB_THUMB ? SB_THUMB : len > track - 1 ? track - 1 : (int)len;
 }
 
-/* Arrow glyph: a 4x8 triangle pointing to `dir` (-1 = towards a=0). */
-static void sb_arrow_glyph(struct sb_ctx *s, int box_a, int dir, uint32_t color) {
-	/* Rows across 4..11, columns 5..8 of the box: widths 1,2,3,4,4,3,2,1
-	 * growing from the flat side (column 8 for left, 5 for right). */
+/* Draw the theme's arrow art, if it has the right dimensions for this
+ * box; its source is size x 14 for a horizontal bar and 14 x size for a
+ * vertical one. */
+static bool sb_arrow_image(struct sb_ctx *s, int box_a, int size, int dir) {
+	char path[64];
+	snprintf(path, sizeof(path), "chrome/scroll-arrow-%s-%s.png",
+		dir < 0 ? "decrement" : "increment", s->vertical ? "vert" : "horz");
+	int w, h;
+	const uint32_t *px = chrome_file(path, &w, &h);
+	if (!px) {
+		return false;
+	}
+	const int along = s->vertical ? h : w;
+	const int across = s->vertical ? w : h;
+	if (along != size || across != SB_ARROW) {
+		return false;
+	}
+	for (int a = 0; a < size; a++) {
+		for (int b = 1; b <= SB_ARROW; b++) {
+			const int sx = s->vertical ? b : a;
+			const int sy = s->vertical ? a : b;
+			const uint32_t v = px[sy * w + sx];
+			if (v >> 24) {
+				sbp(s, box_a + a, b, v);
+			}
+		}
+	}
+	return true;
+}
+
+/* Arrow glyph: a triangle pointing to `dir` (-1 = towards a=0). */
+static void sb_arrow_glyph(struct sb_ctx *s, int box_a, int dir, uint32_t color, int size) {
 	static const int widths[8] = { 1, 2, 3, 4, 4, 3, 2, 1 };
+	const int off = box_a + (size - 4) / 2;
 	for (int i = 0; i < 8; i++) {
 		for (int k = 0; k < widths[i]; k++) {
-			int a = dir < 0 ? box_a + 8 - k : box_a + 5 + k;
+			int a = dir < 0 ? off + 3 - k : off + k;
 			sbp(s, a, 4 + i, color);
 		}
 	}
 }
 
-/* An arrow box occupying a = box_a .. box_a+13 (interior). */
-static void sb_arrow_box(struct sb_ctx *s, int box_a, int dir, bool enabled) {
+/* An arrow box occupying a = box_a .. box_a+size-1 (interior). */
+static void sb_arrow_box(struct sb_ctx *s, int box_a, int dir, bool enabled, int size) {
 	const int last = SB_ARROW; /* interior b runs 1..14 */
 	if (!enabled) {
 		for (int b = 1; b <= last; b++) {
-			sb_run(s, box_a, box_a + SB_ARROW - 1, b, C_EEE);
+			sb_run(s, box_a, box_a + size - 1, b, C_EEE);
 		}
-		sb_arrow_glyph(s, box_a, dir, C_888);
+		sb_arrow_glyph(s, box_a, dir, C_888, size);
+		return;
+	}
+	if (sb_arrow_image(s, box_a, size, dir)) {
 		return;
 	}
 	for (int b = 1; b <= last; b++) {
-		sb_run(s, box_a, box_a + SB_ARROW - 1, b, C_DDD);
+		sb_run(s, box_a, box_a + size - 1, b, C_DDD);
 	}
-	sb_run(s, box_a, box_a + SB_ARROW - 2, 1, C_WHITE);
+	sb_run(s, box_a, box_a + size - 2, 1, C_WHITE);
 	sb_col(s, box_a, 1, last - 1, C_WHITE);
-	sb_col(s, box_a + SB_ARROW - 1, 2, last, C_BBB);
-	sb_run(s, box_a + 1, box_a + SB_ARROW - 1, last, C_BBB);
-	sb_arrow_glyph(s, box_a, dir, C_BLACK);
+	sb_col(s, box_a + size - 1, 2, last, C_BBB);
+	sb_run(s, box_a + 1, box_a + size - 1, last, C_BBB);
+	sb_arrow_glyph(s, box_a, dir, C_BLACK, size);
 }
 
-/* Recessed track, with the shadow cast by whatever precedes `shade_a`. */
-static void sb_track(struct sb_ctx *s, int a0, int a1) {
+/* Recessed track, with the shadow cast by whatever precedes `shade_a`.
+ * True when the theme supplied the track art (then it owns the shading). */
+static bool sb_track(struct sb_ctx *s, int a0, int a1) {
 	int tw, th;
 	const uint32_t *tp = chrome_file(s->vertical ?
 		"chrome/scroll-track-vert.png" : "chrome/scroll-track-horz.png", &tw, &th);
@@ -883,7 +986,7 @@ static void sb_track(struct sb_ctx *s, int a0, int a1) {
 		} else {
 			chrome_tile(s->c, tp, tw, th, s->x + a0, s->y + 1, s->x + a1, s->y + SB_WIDTH - 2);
 		}
-		return;
+		return true;
 	}
 	for (int a = a0; a <= a1; a++) {
 		sbp(s, a, 1, C_777);
@@ -892,6 +995,7 @@ static void sb_track(struct sb_ctx *s, int a0, int a1) {
 		sbp(s, a, 13, C_BBB);
 		sbp(s, a, 14, C_CCC);
 	}
+	return false;
 }
 
 /* Tile a thumb part (cap or stretch) over an along-extent, full width. */
@@ -899,6 +1003,32 @@ static void sb_thumb_skin(struct sb_ctx *s, int a0, int a1, const char *path) {
 	int w, h;
 	const uint32_t *px = chrome_file(path, &w, &h);
 	if (!px) {
+		return;
+	}
+	/* Some themes draw a scrollbar thumb as a thin line across the
+	 * bar (Drawing Board's is 2 px), not as a full-width tile. */
+	if (!s->vertical && w <= 2 && h >= SB_ARROW) {
+		/* A thin vertical thumb line at the thumb's leading edge. */
+		for (int j = 0; j < h && 1 + j <= SB_ARROW; j++) {
+			for (int i = 0; i < w; i++) {
+				const uint32_t v = px[j * w + i];
+				if (v >> 24) {
+					sbp(s, a0 + i, 1 + j, v);
+				}
+			}
+		}
+		return;
+	}
+	if (s->vertical && h <= 2 && w >= SB_ARROW) {
+		/* A thin horizontal thumb line at the thumb's leading edge. */
+		for (int i = 0; i < w && 1 + i <= SB_ARROW; i++) {
+			for (int j = 0; j < h; j++) {
+				const uint32_t v = px[j * w + i];
+				if (v >> 24) {
+					sbp(s, a0 + j, 1 + i, v);
+				}
+			}
+		}
 		return;
 	}
 	if (s->vertical) {
@@ -919,11 +1049,12 @@ static void sb_track_shadow(struct sb_ctx *s, int a, int a_max) {
 
 static void sb_thumb(struct sb_ctx *s, int line_a, int len, struct pl_accent ac) {
 	int t0 = line_a + 1, t1 = line_a + len; /* interior along */
+	bool themed = false;
 	sb_col(s, line_a, 1, SB_ARROW, C_BLACK);
 	sb_col(s, line_a + len + 1, 1, SB_ARROW, C_BLACK);
 
 	/* A themed thumb: end caps with the stretch between, or the stretch
-	 * alone when too short for caps. The grip ridges draw over it. */
+	 * alone when too short for caps. */
 	{
 		const char *cap0 = s->vertical ? "chrome/scroll-thumb-vert-top.png"
 			: "chrome/scroll-thumb-horz-left.png";
@@ -941,6 +1072,7 @@ static void sb_thumb(struct sb_ctx *s, int line_a, int len, struct pl_accent ac)
 			} else {
 				sb_thumb_skin(s, t0, t1, mid);
 			}
+			themed = true;
 			goto grip;
 		}
 	}
@@ -957,7 +1089,10 @@ static void sb_thumb(struct sb_ctx *s, int line_a, int len, struct pl_accent ac)
 
 grip:
 	/* Grip: four ridges in the middle (offsets 3..10 of the usual
-	 * thumb), rows 4..11. */
+	 * thumb), rows 4..11. A themed thumb owns its own face. */
+	if (themed) {
+		return;
+	}
 	for (int r = 0; r < 4; r++) {
 		int la = t0 + (len - 8) / 2 + 2 * r;
 		sbp(s, la, 4, ac.grip_hi);
@@ -970,10 +1105,11 @@ void pl_scrollbar_paint(struct pl_canvas *c, int x, int y,
 		const struct pl_scrollbar *sb, struct pl_accent accent) {
 	struct sb_ctx s = { .c = c, .x = x, .y = y, .vertical = sb->vertical };
 	const int L = sb->length;
+	const struct sb_style st = sb_style();
 	/* Arrows apart: the up/left arrow, then the track. Together: the
 	 * track, then both arrows. */
-	const int inc_sep = L - 2 - SB_ARROW;
-	const int dec_sep = sb->together ? inc_sep - SB_ARROW - 1 : SB_ARROW + 1;
+	const int inc_sep = L - 2 - st.inc;
+	const int dec_sep = sb->together ? inc_sep - st.inc - 1 : st.dec + 1;
 	int start, end;
 	track_lines(sb, &start, &end);
 	const int len = thumb_len_of(sb);
@@ -987,8 +1123,8 @@ void pl_scrollbar_paint(struct pl_canvas *c, int x, int y,
 	sb_col(&s, dec_sep, 1, SB_ARROW, line);
 	sb_col(&s, inc_sep, 1, SB_ARROW, line);
 
-	sb_arrow_box(&s, sb->together ? dec_sep + 1 : 1, -1, sb->enabled);
-	sb_arrow_box(&s, inc_sep + 1, +1, sb->enabled);
+	sb_arrow_box(&s, sb->together ? dec_sep + 1 : 1, -1, sb->enabled, st.dec);
+	sb_arrow_box(&s, inc_sep + 1, +1, sb->enabled, st.inc);
 
 	int t0 = start + 1, t1 = end - 1;
 	if (!sb->enabled) {
@@ -997,18 +1133,20 @@ void pl_scrollbar_paint(struct pl_canvas *c, int x, int y,
 		}
 		return;
 	}
-	sb_track(&s, t0, t1);
+	const bool themed_track = sb_track(&s, t0, t1);
 	int thumb = sb->thumb < 0 ? 0 : sb->thumb;
 	int range = sb_thumb_span(sb);
 	if (thumb > range) {
 		thumb = range;
 	}
 	int line_a = start + thumb;
-	if (line_a > start) {
+	if (!themed_track && line_a > start) {
 		sb_track_shadow(&s, t0, line_a - 1);
 	}
 	sb_thumb(&s, line_a, len, accent);
-	sb_track_shadow(&s, line_a + len + 2, t1);
+	if (!themed_track) {
+		sb_track_shadow(&s, line_a + len + 2, t1);
+	}
 	if (line_a == 0) {
 		sb_col(&s, 0, 0, SB_WIDTH - 1, C_BLACK); /* the thumb's line is the border */
 	}
@@ -1020,11 +1158,12 @@ enum sb_part sb_hit(const struct pl_scrollbar *sb, int along) {
 		return SB_NONE;
 	}
 	int start, end;
+	const struct sb_style st = sb_style();
 	track_lines(sb, &start, &end);
-	if (along >= L - 1 - SB_ARROW) {
+	if (along >= L - 1 - st.inc) {
 		return SB_INC_ARROW;
 	}
-	if (sb->together ? along > end : along <= SB_ARROW) {
+	if (sb->together ? along > end : along <= st.dec) {
 		return SB_DEC_ARROW;
 	}
 	if (!sb->enabled || (sb->together && along == end)) {

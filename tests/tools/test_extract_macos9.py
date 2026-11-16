@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import os
 import struct
 import subprocess
@@ -91,6 +92,50 @@ def test_end_to_end():
     with open(os.path.join(out, "theme", thme_files[0]), "rb") as f:
         assert f.read() == b"thmedata", "theme body is the full resource"
     print("ok    end-to-end bundle build")
+
+
+def test_sound_set_from_theme_file():
+    # A theme or Kaleidoscope scheme can carry interface sounds: the
+    # WindowShade pair has documented snd IDs, and a full set names its
+    # events with sdid. They become a Sound Themes folder, while the same
+    # sounds stay available as alert sounds.
+    def snd(samples=b"\x80\x40\xc0\x80"):
+        head = struct.pack(">HHHI", 1, 1, 5, 0) + struct.pack(">H", 1)
+        head += struct.pack(">HHI", 0x8051, 0, len(head) + 8)
+        header = struct.pack(">IIIII", 0, len(samples), 22050 << 16, 0, 0) + struct.pack(">BB", 0, 60)
+        return head + header + samples
+
+    fork = build_resource_fork([
+        (b"icns", 128, b"iconbytes"),
+        (b"thme", 1, b"thmedata"),
+        (b"snd ", 42, snd()),
+        (b"sdid", 42, b"btnp#Press#ui#Button press"),
+        (b"snd ", -14336, snd()),
+        (b"snd ", -14335, snd()),
+    ])
+    with tempfile.TemporaryDirectory() as src:
+        path = os.path.join(src, "Scheme")
+        with open(path, "wb") as f:
+            f.write(fork)
+        out = os.path.join(src, "out")
+        r = subprocess.run([sys.executable, sys.argv[1], "--file", path,
+                            "--output", out, "--name", "Scheme"],
+                           capture_output=True, text=True)
+        assert r.returncode == 0, r.stderr
+        with open(os.path.join(out, "soundset", "theme.json")) as f:
+            manifest = json.load(f)
+        assert manifest["name"] == "Scheme Sounds", manifest
+        assert manifest["events"] == {
+            "button-click": "button-click.wav",
+            "window-collapse": "window-collapse.wav",
+            "window-expand": "window-expand.wav",
+        }, manifest
+        for name in manifest["events"].values():
+            with open(os.path.join(out, "soundset", name), "rb") as f:
+                assert f.read(4) == b"RIFF", name
+        # Alert sounds are still extracted separately.
+        assert os.path.isfile(os.path.join(out, "sounds", "sound-1.wav"))
+    print("ok    a theme's own sounds become a Sound Themes set")
 
 
 def build_scen(items):
@@ -922,8 +967,133 @@ def test_file_icon_decodes():
     print("ok    the theme file's own icon rides along for the Sniffer")
 
 
+def _make_cicn(w, h):
+    # 4-bit PixMap with an opaque mask and two-entry table (index 1 white).
+    row_bytes = ((w * 4 + 15) // 16) * 2
+    mask_rb = ((w + 15) // 16) * 2
+    pixmap = struct.pack(">IHhhhhHHIIIHHHHIII", 0, 0x8000 | row_bytes,
+                         0, 0, h, w, 0, 0, 0, 72 << 16, 72 << 16,
+                         0, 4, 1, 4, 0, 0, 0)
+    bit_hdr = struct.pack(">IHhhhh", 0, mask_rb, 0, 0, h, w)
+    handle = struct.pack(">I", 0)
+    mask = b"\xff" * (mask_rb * h)
+    bitmap = b"\x00" * (mask_rb * h)
+    ctab = (struct.pack(">IHH", 0, 0, 1) +
+            struct.pack(">HHHH", 0, 0, 0, 0) +
+            struct.pack(">HHHH", 1, 0xFFFF, 0xFFFF, 0xFFFF))
+    pixel = b"\x11" * (((w * h + 1) // 2))
+    return pixmap + bit_hdr + bit_hdr + handle + mask + bitmap + ctab + pixel
+
+
+def _layo_resource(coords, items):
+    # layo: 6 zero bytes, coordinate count, 16-byte entries, item count,
+    # then 40-byte items (visible/invisible/attributes, rect refs, image).
+    out = b"\x00" * 6 + struct.pack(">H", len(coords))
+    for typ, offset, ref, stip, secondary_offset, secondary_ref in coords:
+        out += struct.pack(">HhhHhh", typ, offset, ref, stip,
+                           secondary_offset, secondary_ref) + b"\x00" * 4
+    out += struct.pack(">H", len(items))
+    for visible, invisible, attrs, rect, rtype, rid, align, index in items:
+        out += struct.pack(">IIIhhhh", visible, invisible, attrs, *rect)
+        out += b"\x00" * 4 + rtype
+        out += struct.pack(">hHH", rid, align, index) + b"\x00" * 6
+    return out
+
+
+def _wnd_body(rects, top):
+    out = struct.pack(">h", len(rects) - 1)
+    for part, (t, l, b, r) in rects:
+        out += struct.pack(">hhhhh", part, t, l, b, r)
+    lists = [top, [], [], []]
+    for side in lists:
+        out += struct.pack(">h", len(side) - 1) if side else struct.pack(">h", -1)
+        for part, border in side:
+            out += struct.pack(">hh", part, border)
+    return out
+
+
+def test_wnd_chrome():
+    # A Kaleidoscope scheme with no layo uses wnd# + cicn: the title band
+    # supplies the bar fill, and the rectangle list supplies the widget art.
+    w, h = 48, 32
+    bar_h = tool.ZACOS_BAR_HEIGHT
+    wnd = _wnd_body([
+        (0, (12, 4, 30, 44)),
+        (1, (2, 2, 8, 10)),
+        (2, (2, 30, 8, 38)),
+        (3, (2, 40, 8, 48)),
+    ], [(0, 0), (1, 4), (8, 20), (1, 48)])
+    fork = build_resource_fork([
+        (b"wnd#", -14336, wnd),
+        (b"cicn", -14336, _make_cicn(w, h)),
+        (b"cicn", -14335, _make_cicn(w, h)),
+    ])
+    with tempfile.TemporaryDirectory() as out:
+        keys = tool.write_wnd_chrome(fork, out, [])
+        assert keys.get("bar-middle", "").endswith("chrome/bar-middle.argb"), keys
+        expected = {
+            "bar-left": (2, bar_h), "bar-middle": (1, bar_h), "bar-right": (8, bar_h),
+            "button-close": (8, 6), "button-zoom": (8, 6), "button-grow": (8, 6),
+        }
+        for key, size in expected.items():
+            assert key in keys, (key, keys)
+            with open(os.path.join(out, "chrome", key + ".png"), "rb") as f:
+                head = f.read(24)
+            assert (struct.unpack(">I", head[16:20])[0],
+                    struct.unpack(">I", head[20:24])[0]) == size, (key, size)
+        # Widgets grouped in the middle are left to the full kDEF walk.
+        middle = _wnd_body([
+            (0, (12, 4, 30, 44)),
+            (1, (2, 20, 8, 26)),
+            (2, (2, 26, 8, 32)),
+            (3, (2, 32, 8, 38)),
+        ], [(0, 0), (1, 4), (8, 20), (1, 48)])
+        fork2 = build_resource_fork([
+            (b"wnd#", -14336, middle),
+            (b"cicn", -14336, _make_cicn(w, h)),
+            (b"cicn", -14335, _make_cicn(w, h)),
+        ])
+        out2 = tempfile.mkdtemp()
+        assert tool.write_wnd_chrome(fork2, out2, []) == {}, "mid-bar widgets keep the tint"
+    print("ok    a wnd# scheme's title band and widgets become chrome")
+
+
+def test_layo_title_items():
+    # The first three drawable title-bar items are cap/middle/cap. Their
+    # resolved tops tell the extractor how much decoration sits above the
+    # window (Drawing Board's caps carry 5 and 10 such rows).
+    coords = [
+        (0, -5, -1, 0, 0, 0),   # top -5
+        (0, 0, -1, 0, 0, 0),    # top 0
+        (0, -10, -1, 0, 0, 0),  # top -10
+    ]
+    items = [
+        (0, 0, 1, (1, -2, -1, -4), b"pxm#", 6176, 1, 0),
+        (0, 0, 1, (2, -2, -1, -4), b"pxm#", 6177, 1, 0),
+        (0, 0, 1, (3, -2, -1, -4), b"pxm#", 6178, 2, 0),
+        (0x20, 0, 0x125, (1, -2, -1, -4), b"pxm#", 200, 1, 0),
+    ]
+    body = _layo_resource(coords, items)
+    parsed_coords, parsed_items = tool.decode_layo(body)
+    assert len(parsed_coords) == 3 and len(parsed_items) == 4, parsed_items
+    assert tool.layo_coord(1, parsed_coords) == 17, tool.layo_coord(1, parsed_coords)
+    titles = tool.layo_title_items(body)
+    assert [item["id"] for item, _top, _bottom in titles] == [6176, 6177, 6178], titles
+    assert [top for _item, top, _bottom in titles] == [17, 22, 12], titles
+    print("ok    layo title items and their above-window rows resolve")
+
+
+def _pxm_layers(w, h, layers):
+    # A correctly bounded pxm# with `layers` identical white layers.
+    head = struct.pack(">12H", 1, 1, 0, 0, h, w, 16, 0, 0, 0, 0, layers)
+    mask_rb = ((w + 15) // 16) * 2
+    pix_rb = ((w * 16 + 15) // 16) * 2
+    mask = b"\xff" * (mask_rb * h)
+    pix = struct.pack(">H", 0x7FFF) * (pix_rb // 2 * h) * layers
+    return head + mask + pix
+
+
 def _pxm_body(w=13, h=13, layers=2):
-    # Minimal pxm#: 24-byte header, all-set mask, layers of 16-bit white.
     head = struct.pack(">HHIHHH", 1, 1, 0, w, h, 16) + b"\x00" * 6 + b"\x07\xda" + struct.pack(">H", layers)
     assert len(head) == 24, len(head)
     mask = b"\xff" * (h * 2)
@@ -989,8 +1159,9 @@ def test_bar_tiles_align():
         with open(os.path.join(out, "chrome", key + ".png"), "rb") as f:
             head = f.read(24)
         heights[key] = struct.unpack(">I", head[20:24])[0]
-    assert heights == {"bar-left": 6, "bar-middle": 6, "bar-right": 6}, heights
-    print("ok    bar caps are aligned to the middle's height")
+    bar_h = tool.ZACOS_BAR_HEIGHT
+    assert heights == {"bar-left": bar_h, "bar-middle": bar_h, "bar-right": bar_h}, heights
+    print("ok    bar caps are aligned to the middle's height and the title row")
 
 
 def test_bar_tiles_fit_window():
@@ -1011,8 +1182,9 @@ def test_bar_tiles_fit_window():
     keys = tool.write_theme_chrome("Paper", pxm, ppats, out, {}, layo, plut)
     sizes = {key: _png_size(os.path.join(out, "chrome", key + ".png"))
         for key in ("bar-left", "bar-middle", "bar-right")}
-    assert sizes == {"bar-left": (20, 22), "bar-middle": (128, 22),
-        "bar-right": (5, 22)}, sizes
+    bar_h = tool.ZACOS_BAR_HEIGHT
+    assert sizes == {"bar-left": (20, bar_h), "bar-middle": (128, bar_h),
+        "bar-right": (5, bar_h)}, sizes
     assert keys.get("bar-middle", "").endswith("chrome/bar-middle.argb"), keys
     print("ok    bar tiles fill the window's width and the bar's height")
 
@@ -1036,6 +1208,69 @@ def _plut_body(mapping):
         pid, rgb = mapping.get(k, (0, (255, 255, 255)))
         out += struct.pack(">HHHH", pid, rgb[0] << 8, rgb[1] << 8, rgb[2] << 8)
     return out
+
+
+def test_control_faces():
+    # Appearance control layouts: push button (layo 500), progress
+    # (520), checkbox (pxm 300) and radio (pxm 310). The button face is
+    # the solid plut entry, not one of its border strips.
+    plut = {387: _plut_body({10: (0, (206, 198, 181)),
+                             11: (0, (182, 173, 165))})}
+    layo = {
+        128: _layo_resource([], [
+            (0, 0, 1, (1, -2, -1, -4), b"pxm#", 6176, 1, 0),
+            (0, 0, 1, (1, -2, -1, -4), b"pxm#", 6177, 1, 0),
+            (0, 0, 1, (1, -2, -1, -4), b"pxm#", 6178, 1, 0),
+        ]),
+        500: _layo_resource([], [
+            (0, 0x21, 0x102, (1, -2, -1, -4), b"plut", -11, 1, 0),
+            (0x20, 0x1, 0x102, (1, -2, -1, -4), b"plut", -11, 1, 0),
+            (0x1, 0, 0x100, (1, -2, -1, -4), b"plut", -11, 1, 0),
+        ]),
+        520: _layo_resource([], [
+            (0, 0x21, 0x100, (1, -2, -1, -4), b"pxm#", 1150, 1, 0),
+        ]),
+        400: _layo_resource([], [
+            (0x10, 0x103, 0x101, (1, -2, -1, -4), b"pxm#", 1113, 1, 0),
+            (0x10, 0x103, 0x101, (1, -2, -1, -4), b"pxm#", 1112, 1, 0),
+            (0x10, 0x103, 0x101, (1, -2, -1, -4), b"pxm#", 1114, 1, 0),
+            (0x10, 0x103, 0x101, (1, -2, -1, -4), b"pxm#", 1115, 1, 0),
+        ]),
+        405: _layo_resource([], [
+            (0x10, 0x103, 0x101, (1, -2, -1, -4), b"pxm#", 1116, 1, 0),
+            (0x10, 0x103, 0x101, (1, -2, -1, -4), b"pxm#", 1117, 1, 0),
+            (0x10, 0x103, 0x101, (1, -2, -1, -4), b"pxm#", 1118, 1, 0),
+            (0x10, 0x103, 0x101, (1, -2, -1, -4), b"pxm#", 1119, 1, 0),
+        ]),
+    }
+    pxm = {
+        6176: [_pxm_body()], 6177: [_pxm_body()], 6178: [_pxm_body()],
+        1150: [_pxm_layers(14, 14, 1)],
+        300: [_pxm_layers(14, 11, 4)],
+        310: [_pxm_layers(16, 12, 2)],
+        1113: [_pxm_layers(7, 14, 1)], 1112: [_pxm_layers(8, 14, 1)],
+        1114: [_pxm_layers(1, 14, 1)], 1115: [_pxm_layers(2, 14, 1)],
+        1116: [_pxm_layers(14, 7, 1)], 1117: [_pxm_layers(14, 8, 1)],
+        1118: [_pxm_layers(14, 1, 1)], 1119: [_pxm_layers(14, 2, 1)],
+    }
+    out = tempfile.mkdtemp() + "/theme"
+    keys = tool.write_theme_chrome("Synthetic", pxm, [], out, [], layo, plut)
+    for key in ("button", "button-pressed", "button-inactive",
+                "progress-fill", "checkbox-off", "checkbox-on",
+                "checkbox-mixed", "radio-off", "radio-on",
+                "scroll-arrow-decrement-horz", "scroll-arrow-increment-horz",
+                "scroll-track-horz", "scroll-thumb-horz-stretch",
+                "scroll-arrow-decrement-vert", "scroll-arrow-increment-vert",
+                "scroll-track-vert", "scroll-thumb-vert-stretch"):
+        assert os.path.isfile(os.path.join(out, "chrome", key + ".png")), key
+        assert key in keys, (key, keys)
+    assert keys.get("scroll-arrow-dec") == "7", keys
+    assert keys.get("scroll-arrow-inc") == "8", keys
+    with open(os.path.join(out, "chrome", "button.argb"), "rb") as f:
+        blob = f.read()
+        assert struct.unpack("<II", blob[:8]) == (8, 8), blob[:8]
+        assert blob[8:12] == bytes((206, 198, 181, 255)), blob[8:12]
+    print("ok    Appearance control faces become chrome skins")
 
 
 def _ppat_body_wide(w=64, h=16):
@@ -1107,10 +1342,14 @@ def test_theme_chrome_twopart():
 
 test_parse()
 test_end_to_end()
+test_sound_set_from_theme_file()
 test_clut_positional()
 test_wctb()
 test_cicn()
 test_chrome_slots()
+test_wnd_chrome()
+test_layo_title_items()
+test_control_faces()
 test_scen()
 test_pointers()
 test_system_sounds()

@@ -1,4 +1,7 @@
 import importlib.util
+import glob
+import hashlib
+import json
 import re
 import os
 import struct
@@ -51,6 +54,14 @@ def build_fork(resources):
     return header + b"\x00" * (data_offset - 16) + data + \
         struct.pack(">IIII", data_offset, map_offset, len(data), map_size) + \
         struct.pack(">IHH", 0, 0, 0) + struct.pack(">HH", 28, name_list) + type_list
+
+
+def make_snd(samples=b"\x80\x40\xc0\x80"):
+    """A format 1 snd: one buffer command, a standard header, PCM samples."""
+    head = struct.pack(">HHHI", 1, 1, 5, 0) + struct.pack(">H", 1)
+    head += struct.pack(">HHI", 0x8051, 0, len(head) + 8)
+    header = struct.pack(">IIIII", 0, len(samples), 22050 << 16, 0, 0) + struct.pack(">BB", 0, 60)
+    return head + header + samples
 
 
 def make_theme_file(directory):
@@ -147,6 +158,111 @@ def build_scen(items):
         headers += struct.pack(">4sIII", tag, 0, 0x40000000, len(pool))
         pool += value
     return header + headers + struct.pack(">I", len(pool)) + pool
+
+
+# 2c. Mac OS 9 sound sets keep their resource fork through the import. The
+# System Folder copy keeps every fork in .rsrc/NAME; copying only the data
+# fork left every set "no supported sound events" in the Sound Sets window.
+sound_root = tempfile.mkdtemp()
+sound_system = os.path.join(sound_root, "Classic", "System Folder")
+os.makedirs(os.path.join(sound_system, ".rsrc"))
+with open(os.path.join(sound_system, ".rsrc", "System"), "wb") as f:
+    f.write(build_fork([(b"ics8", -16386, b"\x07" * 256),
+                        (b"ics#", -16386, b"\x00" * 64)]))
+sound_sets = os.path.join(sound_system, "Appearance", "Sound Sets")
+os.makedirs(os.path.join(sound_sets, ".rsrc"))
+with open(os.path.join(sound_sets, "Test Set"), "wb") as f:
+    f.write(b"data fork")
+sound_set_fork = build_fork([(b"snd ", 1, make_snd()),
+                             (b"sdid", 1, b"btnp#Press#ui#Button press")])
+with open(os.path.join(sound_sets, ".rsrc", "Test Set"), "wb") as f:
+    f.write(sound_set_fork)
+# The kernel HFS mount exposes a resource fork as NAME/rsrc: a set then
+# looks like a folder holding only that fork.
+kernel_set = os.path.join(sound_sets, "Kernel Set")
+os.makedirs(kernel_set)
+with open(os.path.join(kernel_set, "rsrc"), "wb") as f:
+    f.write(sound_set_fork)
+sound_scen = build_scen([(b"name", b"\x0bSound Theme"),
+                         (b"sndt", b"\x08Test Set")])
+sound_theme = os.path.join(sound_root, "Sound Theme")
+with open(sound_theme, "wb") as f:
+    f.write(build_fork([
+        (b"icl8", 1024, b"\x00" * 1024),
+        (b"ICN#", 1024, b"\xff" * 128 + b"\xff" * 128),
+        (b"clut", 200, struct.pack(">I", 0) + struct.pack(">HH", 0, 0) +
+                   struct.pack(">HHHH", 0, 0, 0, 0)),
+        (b"scen", 2000, sound_scen),
+    ]))
+envS = dict(os.environ)
+configS = tempfile.mkdtemp()
+dataS = tempfile.mkdtemp()
+envS["HOME"] = sound_root
+envS["XDG_CONFIG_HOME"] = configS
+envS["XDG_DATA_HOME"] = dataS
+envS["QT_QPA_PLATFORM"] = "offscreen"
+r = run(binary, sound_theme, "Sound Theme", envS)
+assert r.returncode == 0, r.stderr
+sound_themes = os.path.join(dataS, "zacos9", "appearance", "Sound Themes")
+with open(os.path.join(sound_themes, "Test Set"), "rb") as f:
+    assert f.read() == sound_set_fork, "the set's resource fork is imported, not its data fork"
+with open(os.path.join(sound_themes, "Kernel Set"), "rb") as f:
+    assert f.read() == sound_set_fork, "a NAME/rsrc fork becomes the set file"
+expected_id = "user:" + hashlib.sha256(b"Test Set").hexdigest()[:32]
+preset = json.load(open(glob.glob(os.path.join(
+    dataS, "zacos9", "appearance", "Theme Files", "*.json"))[0]))
+assert preset["settings"].get("sound-theme") == expected_id, preset
+with open(os.path.join(configS, "zacos9", "desktop.conf")) as f:
+    assert "sound-theme=" + expected_id in f.read(), "the theme's set is selected"
+catalog = json.loads(subprocess.check_output([
+    sys.executable,
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..",
+                 "shell", "panels", "zacos9-soundthemes"),
+    sound_themes, tempfile.mkdtemp()], text=True))
+assert any(theme["name"] == "Test Set" and "button-click" in theme["events"]
+           for theme in catalog["themes"]), catalog
+print("ok    a System Folder sound set keeps its fork and reaches Sound Sets")
+
+
+# 2d. A Kaleidoscope scheme's own WindowShade sounds become a folder set,
+# so they are selectable in Sound Sets instead of only as alert sounds.
+scheme_root = tempfile.mkdtemp()
+scheme_path = os.path.join(scheme_root, "Scheme")
+with open(scheme_path, "wb") as f:
+    f.write(build_fork([
+        (b"icl8", 1024, b"\x00" * 1024),
+        (b"ICN#", 1024, b"\xff" * 128 + b"\xff" * 128),
+        (b"clut", 200, struct.pack(">I", 0) + struct.pack(">HH", 0, 0) +
+                   struct.pack(">HHHH", 0, 0, 0, 0)),
+        (b"snd ", -14336, make_snd()),
+        (b"snd ", -14335, make_snd()),
+    ]))
+envScheme = dict(os.environ)
+configScheme = tempfile.mkdtemp()
+dataScheme = tempfile.mkdtemp()
+envScheme["HOME"] = tempfile.mkdtemp()
+envScheme["XDG_CONFIG_HOME"] = configScheme
+envScheme["XDG_DATA_HOME"] = dataScheme
+envScheme["QT_QPA_PLATFORM"] = "offscreen"
+r = run(binary, scheme_path, "Scheme", envScheme)
+assert r.returncode == 0, r.stderr
+scheme_set = os.path.join(dataScheme, "zacos9", "appearance", "Sound Themes",
+                          "Scheme Sounds")
+with open(os.path.join(scheme_set, "theme.json")) as f:
+    events = json.load(f)["events"]
+assert set(events) == {"window-collapse", "window-expand"}, events
+scheme_catalog = json.loads(subprocess.check_output([
+    sys.executable,
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..",
+                 "shell", "panels", "zacos9-soundthemes"),
+    os.path.dirname(scheme_set), tempfile.mkdtemp()], text=True))
+assert any(theme["name"] == "Scheme Sounds" for theme in scheme_catalog["themes"]), \
+    scheme_catalog
+preset = json.load(open(glob.glob(os.path.join(
+    dataScheme, "zacos9", "appearance", "Theme Files", "*.json"))[0]))
+assert "sound-theme" not in preset["settings"], \
+    "a scheme's partial set is offered, not selected over the current sounds"
+print("ok    a scheme's WindowShade sounds become a selectable set")
 
 
 def build_sfnt(family, subfamily):

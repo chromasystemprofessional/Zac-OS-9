@@ -16,6 +16,7 @@ Usage:
 
 import argparse
 import hashlib
+import json
 import os
 import shutil
 import struct
@@ -42,10 +43,30 @@ ICON_TYPES = {b"ICN#", b"icl8", b"icl4", b"ics#", b"ics8", b"ics4", b"icns", b"I
 PATTERN_TYPES = {b"PAT ", b"PAT#", b"ppat"}
 SOUND_TYPES = {b"snd "}
 FONT_TYPES = {b"sfnt", b"FOND", b"nfnt"}
+
+# Classic sound-set metadata: sdid names each sound's event, snd# supplies
+# defaults. These are the public Carbon HIToolbox kThemeSound* FourCCs
+# (docs/themes.md); window drags keep their phases in slots 1 and 3.
+CLASSIC_SOUND_EVENTS = {
+	b"btnp": "button-click", b"chkp": "checkbox-toggle",
+	b"mnuo": "menu-open", b"mnus": "menu-command",
+	b"wopn": "window-open", b"wcls": "window-close",
+	b"wcol": "window-collapse", b"wexp": "window-expand",
+	b"wmov": "window-drag", b"ftrs": "trash-empty",
+}
+SOUND_SLOT_OFFSET, SOUND_SLOT_SIZE = 10, 8
+# Kaleidoscope schemes carry their WindowShade pair as ordinary snd
+# resources, with no sdid/snd# metadata to name the events.
+KALEIDOSCOPE_SOUNDS = {-14336: "window-collapse", -14335: "window-expand"}
 CURSOR_TYPES = {b"CURS", b"crsr"}
 PICT_TYPES = {b"PICT"}
 THEME_TYPES = {b"thme", b"clut", b"pltt", b"WIND", b"scen", b"pxm#", b"layo", b"plut",
 	b"cicn", b"crsr", b"CURS", b"wctb"}
+
+# The desktop's title row (compositor/src/decor.c DECOR_TOP). Theme bar
+# art is written at this height so the compositor never resamples it,
+# which shifted a source line by a pixel or two on 19/23 px themes.
+ZACOS_BAR_HEIGHT = 22
 
 # Mac OS 9 pointer shapes that become the desktop's cursors, as
 # (bundle name, file, resource type, id). 16x16 1-bit with a hotspot,
@@ -1015,6 +1036,115 @@ def write_system_sounds(system_raw, out):
 			continue
 
 
+def classic_sound_events(records):
+	"""Map a theme's or scheme's own snd resources to ZacOS events.
+
+	The shell's sound-theme importer reads the same sdid/snd# metadata
+	(shell/panels/zacos9-soundthemes). A theme that carries a complete
+	sound set therefore keeps its event identities; Kaleidoscope's
+	WindowShade pair has no metadata and is mapped by its documented
+	resource IDs. Alert sounds without either stay alert sounds only."""
+	identities, candidates, defaults = {}, {}, {}
+	for (rtype, res_id), body in records.items():
+		if rtype != b"sdid":
+			continue
+		fields = body.split(b"#")
+		if len(fields) < 2 or len(fields[0]) != 4:
+			continue
+		identities[res_id] = fields[0]
+		event = CLASSIC_SOUND_EVENTS.get(fields[0])
+		if event:
+			candidates.setdefault(event, set()).add(res_id)
+	for (rtype, _res_id), body in records.items():
+		if rtype != b"snd#":
+			continue
+		if len(body) < 4:
+			continue
+		version, count = struct.unpack(">HH", body[:4])
+		if version != 1 or count > 512 or len(body) != 4 + count * 44:
+			continue
+		for i in range(count):
+			record = body[4 + i * 44:4 + (i + 1) * 44]
+			code = record[:4]
+			if code == b"wmov":
+				for event, slot in (("window-drag", 1), ("window-drag-end", 3)):
+					number = struct.unpack(">i", record[
+						SOUND_SLOT_OFFSET + slot * SOUND_SLOT_SIZE:
+						SOUND_SLOT_OFFSET + slot * SOUND_SLOT_SIZE + 4])[0]
+					if slot == 1 and not number:
+						number = struct.unpack(">i", record[
+							SOUND_SLOT_OFFSET:SOUND_SLOT_OFFSET + 4])[0]
+					if not number:
+						continue
+					if event in defaults and defaults[event] != number:
+						return {}
+					defaults[event] = number
+				continue
+			number = struct.unpack(">i", record[
+				SOUND_SLOT_OFFSET:SOUND_SLOT_OFFSET + 4])[0]
+			event = CLASSIC_SOUND_EVENTS.get(code)
+			if not event or not number:
+				continue
+			# An sdid may deliberately label a shared sound for another
+			# event; it wins over the snd# record that borrows it.
+			if number in identities and identities[number] != code:
+				continue
+			if event in defaults and defaults[event] != number:
+				return {}
+			defaults[event] = number
+	selected = {}
+	for event in candidates.keys() | defaults.keys():
+		choices = candidates.get(event, set())
+		default = defaults.get(event)
+		if default is not None and (not choices or default in choices):
+			number = default
+		elif len(choices) == 1:
+			number = next(iter(choices))
+		else:
+			continue  # No authoritative choice: leave an ambiguous event silent.
+		if (b"snd ", number) in records:
+			selected[event] = number
+	for number, event in KALEIDOSCOPE_SOUNDS.items():
+		if (b"snd ", number) in records and event not in selected:
+			selected[event] = number
+	return selected
+
+
+def write_sound_set(fork, out, name):
+	"""Write the theme's own interface sounds as a Sound Themes folder.
+
+	A Kaleidoscope scheme (or a theme that carries its set) has its event
+	sounds in the same fork as its artwork. The installer copies this
+	folder into System Folder > Appearance > Sound Themes so the set
+	appears in the Sound Sets window, with its events already named."""
+	dest = os.path.join(out, "soundset")
+	shutil.rmtree(dest, ignore_errors=True)
+	try:
+		records = {(rtype, res_id): body
+			for rtype, res_id, body in parse_resource_fork(fork)}
+		events = classic_sound_events(records)
+	except (ValueError, struct.error, IndexError):
+		return 0
+	if not events:
+		return 0
+	os.makedirs(dest, exist_ok=True)
+	written = {}
+	for event in sorted(events):
+		try:
+			macsnd.snd_to_wav(records[(b"snd ", events[event])],
+				os.path.join(dest, event + ".wav"))
+		except (ValueError, struct.error):
+			continue
+		written[event] = event + ".wav"
+	if not written:
+		shutil.rmtree(dest, ignore_errors=True)
+		return 0
+	set_name = (name.strip() or "Mac OS 9 Theme") + " Sounds"
+	with open(os.path.join(dest, "theme.json"), "w", encoding="utf-8") as f:
+		json.dump({"version": 1, "name": set_name[:128], "events": written}, f)
+	return len(written)
+
+
 def write_pointers(theme_raw, theme_cluts, system_raw, system_cluts, out):
 	"""Write cursors/<name> for every pointer the two sources supply, and an
 	index.theme that inherits everything else from ZacOS9. Returns False when
@@ -1348,6 +1478,233 @@ def _parse_plut_entries(body):
 	return out
 
 
+def decode_layo(body):
+	"""Decode an Appearance theme 'layo' resource.
+
+	Layout: 6 zero bytes, a u16 coordinate count, 16-byte coordinate
+	entries (type, offset, reference, stipulation, secondary offset and
+	reference), a u16 item count, then 40-byte items: visible and
+	invisible flag masks, attribute bits, a rectangle of coordinate
+	references, a 4-byte resource type, id, alignment and image layer.
+	Returns (coordinates, items); see layo.h in the Mac Themes Project's
+	scheme2theme for the field names."""
+	if len(body) < 8:
+		raise ValueError("layo is too short")
+	coord_n = struct.unpack(">H", body[6:8])[0]
+	off = 8
+	if off + coord_n * 16 + 2 > len(body):
+		raise ValueError("layo coordinate table is truncated")
+	coords = []
+	for _ in range(coord_n):
+		typ, po, pr, stip, so, sr = struct.unpack(">HhhHhh", body[off:off + 12])
+		coords.append({"type": typ, "offset": po, "ref": pr, "stip": stip,
+			"secondary_offset": so, "secondary_ref": sr})
+		off += 16
+	item_n = struct.unpack(">H", body[off:off + 2])[0]
+	off += 2
+	if off + item_n * 40 > len(body):
+		raise ValueError("layo item table is truncated")
+	items = []
+	for _ in range(item_n):
+		visible, invisible, attrs = struct.unpack(">III", body[off:off + 12])
+		top, left, bottom, right = struct.unpack(">hhhh", body[off + 12:off + 20])
+		rtype = body[off + 24:off + 28]
+		rid = struct.unpack(">h", body[off + 28:off + 30])[0]
+		align = struct.unpack(">H", body[off + 30:off + 32])[0]
+		index = struct.unpack(">H", body[off + 32:off + 34])[0]
+		items.append({"visible": visible, "invisible": invisible, "attrs": attrs,
+			"rect": (top, left, bottom, right), "type": rtype, "id": rid,
+			"align": align, "index": index})
+		off += 40
+	return coords, items
+
+
+def layo_coord(ref, coords, seen=None):
+	"""Resolve a layo coordinate reference to a window-relative pixel.
+
+	Negative references are the content area's top, left, bottom and
+	right (the title bar lies above it), positive ones index the
+	coordinate table. The resolver only needs the title-axis values;
+	the content top is the desktop's 22 px title row."""
+	defaults = { -1: 22, -2: 6, -3: 22, -4: 1000 }
+	if ref < 0:
+		return defaults.get(ref, 0)
+	if ref == 0:
+		return 0
+	if seen is None:
+		seen = set()
+	if ref in seen or ref > len(coords):
+		return 0
+	seen.add(ref)
+	entry = coords[ref - 1]
+	value = layo_coord(entry["ref"], coords, seen) + entry["offset"]
+	if entry["type"] == 2:
+		other = layo_coord(entry["secondary_ref"], coords, seen) + entry["secondary_offset"]
+		value = (value + other) // 2
+	return value
+
+
+def layo_title_items(body):
+	"""The first three drawable title-bar items of a layo, with resolved
+	top and bottom. These are the left cap, middle and right cap."""
+	coords, items = decode_layo(body)
+	out = []
+	for item in items:
+		if not item["attrs"] & 1 or item["visible"] or item["invisible"]:
+			continue
+		if item["type"] not in (b"pxm#", b"plut", b"ppat"):
+			continue
+		top = layo_coord(item["rect"][0], coords)
+		bottom = layo_coord(item["rect"][2], coords)
+		out.append((item, top, bottom))
+		if len(out) == 3:
+			break
+	return out
+
+
+def decode_wnd(body):
+	"""Decode a Kaleidoscope 'wnd#' window recipe.
+
+	The five lists are a rectangle list (part -> rect in the chrome
+	cicn) and the top, bottom, left and right side lists (part ->
+	border along that edge). Counts are signed 16-bit minus one.
+	Returns (rectangles, sides); rectangles is {part: (top, left,
+	bottom, right)} and sides maps "top"/"bottom"/"left"/"right" to
+	[(part, border), ...]."""
+	if len(body) < 2:
+		raise ValueError("wnd# is too short")
+
+	def count(off, stride):
+		stored = struct.unpack(">h", body[off:off + 2])[0]
+		if stored < -1:
+			raise ValueError("wnd# has an invalid list count")
+		n = stored + 1
+		if off + 2 + n * stride > len(body):
+			raise ValueError("wnd# list is truncated")
+		return n, off + 2
+
+	n, off = count(0, 10)
+	rectangles = {}
+	for _ in range(n):
+		part = struct.unpack(">h", body[off:off + 2])[0]
+		rectangles[part] = struct.unpack(">hhhh", body[off + 2:off + 10])
+		off += 10
+	sides = {}
+	for name in ("top", "bottom", "left", "right"):
+		n, off = count(off, 4)
+		sides[name] = [struct.unpack(">hh", body[off + i * 4:off + i * 4 + 4])
+			for i in range(n)]
+		off += n * 4
+	return rectangles, sides
+
+
+def write_wnd_chrome(fork, out, cluts=()):
+	"""Skin a Kaleidoscope scheme that uses 'wnd#' window recipes.
+
+	Most schemes draw a document window from a small chrome 'cicn'
+	template plus a wnd# recipe: the body rectangle gives the title band,
+	and the rectangle list names the close, zoom and collapse boxes.
+	ZacOS keeps its own title geometry, so this builds a left cap, a
+	one-column fill and a right cap from the template's title band, and
+	crops the scheme's widget art for the boxes. The result is an
+	approximation of the recipe's composition, not a full kDEF walk."""
+	items = parse_resource_fork(fork)
+	wnd = {rid: body for rtype, rid, body in items if rtype == b"wnd#"}
+	cicns = {rid: body for rtype, rid, body in items if rtype == b"cicn"}
+	clut_map = {}
+	for _rid, cols in cluts:
+		clut_map.setdefault(len(cols), cols)
+	if -14336 not in wnd or -14336 not in cicns or -14335 not in cicns:
+		return {}
+	try:
+		rects, _sides = decode_wnd(wnd[-14336])
+		active = macicons.decode_cicn(cicns[-14335], cluts=clut_map)
+	except (ValueError, IndexError, struct.error):
+		return {}
+	body = rects.get(0)
+	if not body or not active or body[0] <= 0:
+		return {}
+	height = min(body[0], len(active))
+	width = len(active[0])
+	if width <= 0:
+		return {}
+	chrome_dir = os.path.join(out, "chrome")
+	keys = {}
+
+	def save(key, rows, bar=False):
+		if not rows or not rows[0]:
+			return
+		if bar:
+			rows = rows[:ZACOS_BAR_HEIGHT]
+			while len(rows) < ZACOS_BAR_HEIGHT:
+				rows.append(list(rows[-1]))
+		os.makedirs(chrome_dir, exist_ok=True)
+		pngwrite.write_png(os.path.join(chrome_dir, key + ".png"),
+			len(rows[0]), len(rows), rows)
+		pngwrite.write_argb(os.path.join(chrome_dir, key + ".argb"), rows)
+		keys[key] = "chrome/" + key + ".argb"
+
+	def crop(rows, x0, x1):
+		return [row[max(0, x0):min(width, x1)] for row in rows]
+
+	def widget(part):
+		rect = rects.get(part)
+		if not rect:
+			return None
+		top, left, bottom, right = rect
+		if top < 0 or left < 0 or bottom > height or right > width or right <= left:
+			return None
+		return (top, left, bottom, right)
+
+	widgets = {part: widget(part) for part in (1, 2, 3)}
+	widgets = {part: rect for part, rect in widgets.items() if rect}
+	left_cap = min((rect[1] for rect in widgets.values()), default=min(8, width))
+	right_start = max((rect[3] for rect in widgets.values()), default=max(0, width - 8))
+	if left_cap <= 0:
+		left_cap = min(8, width)
+	if right_start >= width:
+		right_start = max(0, width - 8)
+	# Widgets at the window's edges are the standard document layout this
+	# cap/fill/cap approximation can reproduce. A scheme with its boxes
+	# grouped mid-bar needs the full kDEF walk, so keep its flat tint.
+	if left_cap > width * 2 // 5 or right_start < width * 3 // 5:
+		return {}
+
+	# A one-column fill: a title-bar pinstripe is uniform along x, so
+	# repeating one column horizontally keeps its horizontal lines
+	# without repeating a picture. Start after the left widget so the
+	# column is fill, not widget art.
+	mid_x = left_cap
+	left_widgets = [rect for rect in widgets.values() if rect[1] < width // 2]
+	if left_widgets:
+		mid_x = max(rect[3] for rect in left_widgets)
+	if mid_x >= right_start:
+		mid_x = max(0, min(width - 1, (left_cap + right_start) // 2))
+
+	for cid, suffix in ((-14335, ""), (-14336, "-inactive")):
+		if cid not in cicns:
+			continue
+		try:
+			rows = macicons.decode_cicn(cicns[cid], cluts=clut_map)[:height]
+		except (ValueError, IndexError, struct.error):
+			continue
+		if not rows:
+			continue
+		if left_cap > 0:
+			save("bar-left" + suffix, crop(rows, 0, left_cap), bar=True)
+		save("bar-middle" + suffix, crop(rows, mid_x, mid_x + 1), bar=True)
+		if right_start < width:
+			save("bar-right" + suffix, crop(rows, right_start, width), bar=True)
+
+	for part, key in ((1, "close"), (2, "zoom"), (3, "grow")):
+		rect = widgets.get(part)
+		if not rect:
+			continue
+		top, left, bottom, right = rect
+		save("button-" + key, [row[left:right] for row in active[top:bottom]])
+	return keys
+
+
 def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None):
 	"""Decode the theme's own window art into the bundle's chrome/.
 
@@ -1370,7 +1727,7 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None):
 		pngwrite.write_argb(os.path.join(chrome_dir, key + ".argb"), rows)
 		keys[key] = "chrome/" + key + ".argb"
 
-	def save_bar(key, rows, height, trim_left=False, trim_right=False):
+	def save_bar(key, rows, height, trim_left=False, trim_right=False, crop_top=None):
 		"""Save a title-bar tile cropped to the bar band and its own edge.
 
 		The frame layout's end caps and middle come from different
@@ -1384,15 +1741,24 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None):
 		Drawn as-is, they make the bar narrower than the window and leave
 		the boxes past its end. A left cap loses the columns before its
 		ink; a right cap the columns after it, so each meets its window
-		edge. The middle tiles edge to edge and is left alone."""
+		edge. The middle tiles edge to edge and is left alone.
+
+		The desktop's title row is 22 px (DECOR_TOP); art of another
+		height is padded or cropped here rather than resampled at draw
+		time, which shifted the theme's lines by a pixel or two."""
 		if not rows or not rows[0]:
 			return
-		top = 0
-		for y, row in enumerate(rows):
-			if any(px[3] for px in row):
-				top = y
-				break
-		rows = rows[top:top + height]
+		if crop_top is not None:
+			rows = rows[max(0, crop_top):]
+			if not rows:
+				return
+		else:
+			top = 0
+			for y, row in enumerate(rows):
+				if any(px[3] for px in row):
+					top = y
+					break
+			rows = rows[top:top + height]
 		if not rows:
 			return
 		while len(rows) < height:
@@ -1404,6 +1770,11 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None):
 					rows = [row[inked[0]:] for row in rows]
 				if trim_right:
 					rows = [row[:inked[-1] + 1] for row in rows]
+		# The compositor's title row is fixed; keep the art's own pixels
+		# instead of letting chrome_blit stretch them into it.
+		rows = rows[:ZACOS_BAR_HEIGHT]
+		while len(rows) < ZACOS_BAR_HEIGHT:
+			rows.append(list(rows[-1]))
 		save_tile(key, rows)
 
 	# 1. Universal Kaleidoscope title-bar buttons (200 close, 210 collapse, 220 zoom).
@@ -1452,6 +1823,8 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None):
 			recs = _parse_layo_records(layo[lid])
 			if len(recs) < 3:
 				continue
+			titles = layo_title_items(layo[lid])
+			crops = [max(0, -top) for _item, top, _bottom in titles]
 			left_rows = resolve_rec(recs[0][0], recs[0][1], layer)
 			mid_rows = resolve_rec(recs[1][0], recs[1][1], layer)
 			right_rec = next(
@@ -1470,9 +1843,19 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None):
 					if tag == b"pxm#" and rows]
 				if cap_heights:
 					bar_h = min(cap_heights)
-			save_bar("bar-left" + suffix, left_rows, bar_h, trim_left=True)
-			save_bar("bar-middle" + suffix, mid_rows, bar_h)
-			save_bar("bar-right" + suffix, right_rows, bar_h, trim_right=True)
+			# A cap can extend above the window (Drawing Board's pencil
+			# marks are five and ten rows above the bar). The item's
+			# resolved top says which source rows are outside; crop them
+			# so the cap's bar band starts on the desktop's title row.
+			left_crop = crops[0] if len(crops) > 0 else None
+			mid_crop = crops[1] if len(crops) > 1 else None
+			right_crop = crops[2] if len(crops) > 2 else None
+			save_bar("bar-left" + suffix, left_rows, bar_h, trim_left=True,
+				crop_top=left_crop)
+			save_bar("bar-middle" + suffix, mid_rows, bar_h,
+				crop_top=mid_crop if mid_crop else None)
+			save_bar("bar-right" + suffix, right_rows, bar_h, trim_right=True,
+				crop_top=right_crop)
 			mids_by_suffix[suffix] = mid_rows
 
 		# 2b. Two-part bars: the title group rides a pinstripe patch on
@@ -1593,6 +1976,177 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None):
 				except (ValueError, IndexError, struct.error):
 					continue
 				save_tile("button-" + short + suffix, rows)
+
+		# 2d. Control faces: the Appearance theme's own layo control
+		# layouts (500 push button, 520 progress) and pxm layers (300
+		# checkbox, 310 radio). lib/widgets tiles these inside its
+		# control geometry, so only the face changes.
+		def control_rows(lid, state):
+			body = layo.get(lid)
+			if not body:
+				return None
+			try:
+				coords, items = decode_layo(body)
+			except (ValueError, IndexError, struct.error):
+				return None
+			best = None
+			best_area = -1
+			for item in items:
+				if item["type"] not in (b"pxm#", b"plut"):
+					continue
+				if not item["attrs"] & 0x100:
+					continue
+				if state == "active" and not (item["visible"] == 0 and
+						item["invisible"] & 0x20):
+					continue
+				if state == "pressed" and not (item["visible"] & 0x20):
+					continue
+				if state == "inactive" and not (item["visible"] & 0x1 and
+						not item["invisible"] & 0x20):
+					continue
+				try:
+					if item["type"] == b"pxm#":
+						bodies = pxm.get(item["id"] & 0xFFFF)
+						if not bodies:
+							continue
+						rows = decode_pxm(bodies[0], item["index"], clut_map)
+					else:
+						idx = ~item["id"]
+						if not (0 <= idx < len(plut_entries)):
+							continue
+						pid, rgb = plut_entries[idx]
+						if pid and pid in patterns:
+							_, _, rows = macpat.decode_ppat(patterns[pid])
+						else:
+							rows = [[rgb + (255,)] * 8 for _ in range(8)]
+				except (ValueError, IndexError, struct.error):
+					continue
+				# The face is the largest decoded image; border strips
+				# can have a longer coordinate rect but only a few pixels.
+				area = len(rows[0]) * len(rows)
+				if area > best_area:
+					best, best_area = rows, area
+			return best
+
+		def button_face(state):
+			# A button's face is the solid plut entry (ppat 0); its
+			# border strips are ppat textures and decode smaller.
+			body = layo.get(500)
+			if body:
+				try:
+					_coords, items = decode_layo(body)
+				except (ValueError, IndexError, struct.error):
+					items = []
+				for item in items:
+					if item["type"] != b"plut" or not item["attrs"] & 0x100:
+						continue
+					if state == "active" and not (item["visible"] == 0 and
+							item["invisible"] & 0x20):
+						continue
+					if state == "pressed" and not (item["visible"] & 0x20):
+						continue
+					if state == "inactive" and not (item["visible"] & 0x1 and
+							not item["invisible"] & 0x20):
+						continue
+					idx = ~item["id"]
+					if not (0 <= idx < len(plut_entries)):
+						continue
+					pid, rgb = plut_entries[idx]
+					if pid == 0:
+						return [[rgb + (255,)] * 8 for _ in range(8)]
+			return None
+
+		for key, state in (("button", "active"), ("button-pressed", "pressed"),
+				("button-inactive", "inactive")):
+			rows = button_face(state)
+			if rows:
+				save_tile(key, rows)
+		# A progress bar's fill is the wide pxm# 1150 layer; the solid
+		# button face and 1 px border strips are not it.
+		rows = None
+		body = layo.get(520)
+		if body:
+			try:
+				_coords, items = decode_layo(body)
+			except (ValueError, IndexError, struct.error):
+				items = []
+			for item in items:
+				if item["type"] != b"pxm#" or not item["attrs"] & 0x100:
+					continue
+				if (item["id"] & 0xFFFF) != 1150:
+					continue
+				if not (item["visible"] == 0 and item["invisible"] & 0x20):
+					continue
+				bodies = pxm.get(item["id"] & 0xFFFF)
+				if not bodies:
+					continue
+				try:
+					rows = decode_pxm(bodies[0], item["index"], clut_map)
+				except (ValueError, IndexError, struct.error):
+					continue
+				break
+		if rows:
+			save_tile("progress-fill", rows)
+		for key, pid, layer in (("checkbox-off", 300, 0),
+				("checkbox-on", 300, 1), ("checkbox-mixed", 300, 3),
+				("radio-off", 310, 0), ("radio-on", 310, 1)):
+			bodies = pxm.get(pid)
+			if not bodies:
+				continue
+			try:
+				save_tile(key, decode_pxm(bodies[0], layer, clut_map))
+			except (ValueError, IndexError, struct.error):
+				continue
+
+		# Scrollbars: layo 400/405 are the normal horizontal and
+		# vertical bars. The first four drawable pxm# items are the
+		# decrement arrow, increment arrow, track and thumb in order.
+		def scroll_parts(lid):
+			body = layo.get(lid)
+			if not body:
+				return []
+			try:
+				_coords, items = decode_layo(body)
+			except (ValueError, IndexError, struct.error):
+				return []
+			out = []
+			for item in items:
+				if item["type"] != b"pxm#" or not item["attrs"] & 0x100:
+					continue
+				# The arrow/track/thumb set is the visible state group;
+				# the first thumb-only item (a different flag group) is
+				# not part of the four-piece sequence.
+				if not item["visible"] & 0x10 or not item["attrs"] & 0x1:
+					continue
+				bodies = pxm.get(item["id"] & 0xFFFF)
+				if not bodies:
+					continue
+				try:
+					rows = decode_pxm(bodies[0], item["index"], clut_map)
+				except (ValueError, IndexError, struct.error):
+					continue
+				out.append(rows)
+				if len(out) == 4:
+					break
+			return out
+
+		for axis, lid, suffix in (("horz", 400, ""), ("vert", 405, "")):
+			parts = scroll_parts(lid)
+			if len(parts) < 4:
+				continue
+			dec, inc, track, thumb = parts
+			save_tile("scroll-arrow-decrement-" + axis, dec)
+			save_tile("scroll-arrow-increment-" + axis, inc)
+			save_tile("scroll-track-" + axis, track)
+			save_tile("scroll-thumb-" + axis + "-stretch", thumb)
+			# The along-axis size is the arrow's width for a horizontal
+			# bar and its height for a vertical one.
+			if axis == "horz":
+				keys["scroll-arrow-dec"] = str(len(dec[0]))
+				keys["scroll-arrow-inc"] = str(len(inc[0]))
+			else:
+				keys.setdefault("scroll-arrow-dec", str(len(dec)))
+				keys.setdefault("scroll-arrow-inc", str(len(inc)))
 		return keys
 
 	# 3. Fallback for synthetic unit-test fixtures without layo.
@@ -1987,6 +2541,7 @@ def main():
 	pxm = {}
 	layo = {}
 	plut = {}
+	theme_fork = None
 
 	if args.file:
 		# A single theme file the user copied out of Mac OS 9.
@@ -2015,6 +2570,7 @@ def main():
 			# The theme file's own desktop icons and menu icon win over
 			# the System/Finder helpers' (a Kaleidoscope scheme ships
 			# its own art); the helpers fill the kinds it lacks.
+			theme_fork = fork
 			process_resource_fork(fork, out, counts, cluts, icons, assets, scen_tags, apple_menu, wctb, raw_icons, epics,
 				theme_icons, True, cursors, file_icon, pxm, layo, plut)
 			theme_keys = set(theme_icons.keys())
@@ -2137,12 +2693,15 @@ def main():
 	write_pointers(theme_raw, pointer_cluts, system_raw, system_cluts, out)
 	write_system_sounds(system_raw, out)
 	write_theme_fonts(scen_tags, args.system, args.fonts, out)
+	sound_events = write_sound_set(theme_fork, out, name) if theme_fork else 0
 	if args.dump_icons:
 		write_icon_dump(raw_icons, cluts, out)
 	# Decode wallpapers, patterns and sounds.
 	font_families, font_files = write_assets(assets, epics, out)
 	chrome_keys = write_theme_chrome(name, pxm, assets.get("ppat", []), out,
 		theme_cluts or cluts, layo, plut)
+	if theme_fork and not any(key.startswith("bar-") for key in chrome_keys):
+		chrome_keys.update(write_wnd_chrome(theme_fork, out, theme_cluts or cluts))
 	write_desktop_wallpaper(scen_tags, args.pictures, out)
 
 	if args.list_cluts:
@@ -2288,7 +2847,8 @@ def main():
 				"button-grow", "button-grow-pressed",
 				"button-dialog-close", "button-dialog-close-pressed",
 				"button-dialog-zoom", "button-dialog-zoom-pressed",
-				"button-dialog-grow", "button-dialog-grow-pressed"):
+				"button-dialog-grow", "button-dialog-grow-pressed",
+				"scroll-arrow-dec", "scroll-arrow-inc"):
 			if chrome_keys.get(key):
 				f.write("%s=%s\n" % (key, chrome_keys[key]))
 		if chrome_keys.get("title-cluster"):
@@ -2300,6 +2860,8 @@ def main():
 	print("  icons:    %d" % counts["icons"])
 	print("  patterns: %d" % counts["patterns"])
 	print("  sounds:   %d" % counts["sounds"])
+	if sound_events:
+		print("  soundset: %d events" % sound_events)
 	print("  theme:    %d" % counts["theme"])
 	print("  fonts:    %d" % counts["fonts"])
 	print("Note: Appearance theme (thme/clut/pltt) resources are saved raw under")

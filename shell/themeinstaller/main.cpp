@@ -424,6 +424,7 @@ static QString resolveResourceFork(const QString &file) {
 	for (const QString &candidate : {
 			dir + "/._" + base,
 			dir + "/.rsrc/" + base,
+			dir + "/" + base + "/rsrc",
 			QDir::homePath() + "/.rsrc/" + base,
 			QDir::homePath() + "/._" + base }) {
 		if (QFileInfo::exists(candidate)) {
@@ -691,6 +692,13 @@ static QString soundThemeId(const QString &soundThemes, const QString &setName) 
 			continue;
 		}
 		if (top.isDir()) {
+			if (QFileInfo::exists(top.filePath() + "/theme.json")) {
+				if (top.fileName() == setName) {
+					return "user:" + QString::fromLatin1(QCryptographicHash::hash(
+						top.fileName().toUtf8(), QCryptographicHash::Sha256).toHex().left(32));
+				}
+				continue;
+			}
 			for (const QFileInfo &child : QDir(top.filePath()).entryInfoList(QDir::Files, QDir::Name)) {
 				QString leaf = child.fileName();
 				if (leaf.startsWith("._")) {
@@ -765,34 +773,94 @@ static bool copyTree(const QString &src, const QString &dst) {
 	return ok;
 }
 
+/* Copy one Mac sound set as a file the sound-theme catalog can decode.
+ * A set's sounds live in its resource fork. The System Folder copy keeps
+ * each fork in .rsrc/NAME (or NAME/rsrc on the kernel's HFS mount), so
+ * copying the data fork alone left every set silent. A raw fork and an
+ * AppleDouble stream are both readable from one file by the catalog, so
+ * the resolved fork becomes the set file itself. */
+static bool copySoundSetFile(const QString &src, const QString &target) {
+	const QString fork = resolveResourceFork(src);
+	QFile::remove(target);
+	if (fork != src && QFileInfo(fork).isFile()) {
+		return QFile::copy(fork, target);
+	}
+	return QFile::copy(src, target);
+}
+
 static int copyMacSoundSets(const QString &src, const QString &dst) {
 	int count = 0;
 	const QFileInfoList entries = QDir(src).entryInfoList(
 		QDir::Files | QDir::Dirs | QDir::Hidden | QDir::NoDotAndDotDot | QDir::System, QDir::Name);
 	for (const QFileInfo &e : entries) {
 		const QString name = e.fileName();
-		if (name == ".DS_Store" || name.startsWith("._")) {
+		if (name == ".DS_Store" || name == ".rsrc" || name == ".finf") {
+			continue;
+		}
+		if (name.startsWith("._")) {
+			/* A resource-only Mac file (StuffIt often leaves just the
+			 * AppleDouble companion): adopt it unless its data fork is
+			 * also present and will be handled above. */
+			const QString leaf = name.mid(2);
+			if (leaf.isEmpty() || QFileInfo::exists(src + "/" + leaf)) {
+				continue;
+			}
+			QDir().mkpath(dst);
+			if (copySoundSetFile(e.filePath(), dst + "/" + leaf)) {
+				count++;
+			}
 			continue;
 		}
 		bool ok;
 		if (e.isDir()) {
-			ok = copyTree(e.filePath(), dst + "/" + name);
+			/* On the kernel's HFS mount a file's fork is NAME/rsrc, so a
+			 * set can look like a folder holding only that fork. */
+			const QStringList contents = QDir(e.filePath()).entryList(
+				QDir::AllEntries | QDir::NoDotAndDotDot | QDir::Hidden | QDir::System);
+			const QString fork = e.filePath() + "/rsrc";
+			if (contents == QStringList{ "rsrc" } && QFileInfo(fork).isFile()) {
+				QDir().mkpath(dst);
+				ok = copySoundSetFile(fork, dst + "/" + name);
+			} else {
+				ok = copyTree(e.filePath(), dst + "/" + name);
+			}
 		} else {
 			QDir().mkpath(dst);
-			QFile::remove(dst + "/" + name);
-			ok = QFile::copy(e.filePath(), dst + "/" + name);
+			ok = copySoundSetFile(e.filePath(), dst + "/" + name);
 		}
-		if (!ok) {
-			continue;
-		}
-		count++;
-		const QString companion = "._" + name;
-		if (QFileInfo::exists(src + "/" + companion)) {
-			QFile::remove(dst + "/" + companion);
-			QFile::copy(src + "/" + companion, dst + "/" + companion);
+		if (ok) {
+			count++;
 		}
 	}
 	return count;
+}
+
+static bool installThemeSoundSet(const QString &name, const QString &soundThemes) {
+	/* A Kaleidoscope scheme, or a theme that carries a full set, has its
+	 * event sounds beside its artwork in the extractor's bundle. A folder
+	 * with theme.json is the catalog's folder-set format, so its events
+	 * arrive already named instead of being guessed from resource IDs.
+	 * It is offered in Sound Sets but not selected: a scheme's set may
+	 * carry only the WindowShade pair, and selecting it would silence the
+	 * current set's other events. */
+	const QString src = outputDir(name) + "/soundset";
+	if (!QFileInfo::exists(src + "/theme.json")) {
+		return false;
+	}
+	QString folder = name + " Sounds";
+	folder.replace(QRegularExpression("[^A-Za-z0-9 _.-]"), "_");
+	folder = folder.trimmed().left(120);
+	if (folder.isEmpty()) {
+		return false;
+	}
+	const QString dest = soundThemes + "/" + folder;
+	if (QFileInfo(dest).isSymLink() || QFileInfo(dest).isFile()) {
+		/* A classic set or a link already uses this name; never replace
+		 * it with the scheme's smaller set. */
+		return false;
+	}
+	QDir(dest).removeRecursively();
+	return copyTree(src, dest);
 }
 
 static void stampThemeFileIcon(const QString &file, const QString &name) {
@@ -966,8 +1034,15 @@ int main(int argc, char *argv[]) {
 	if (!QDir(soundSetFolder).exists()) {
 		soundSetFolder = QDir::homePath() + "/Classic/Appearance add-ons/Sound Sets";
 	}
-	const int soundSets = copyMacSoundSets(soundSetFolder, soundThemes);
+	int soundSets = copyMacSoundSets(soundSetFolder, soundThemes);
 	const QString soundId = soundThemeId(soundThemes, themeConfValue(name, "sound-set"));
+	/* A scheme's own sounds are not a named Sound Sets file; install them
+	 * as a folder set so they appear in the Sound Sets window too. They
+	 * are not selected: the set may hold only the WindowShade pair, and
+	 * choosing it would silence the current set's other events. */
+	if (installThemeSoundSet(name, soundThemes)) {
+		soundSets++;
+	}
 	const QString fontFamily = installThemeFonts(name);
 	const QString presetId = writeAppearancePreset(file, name, wallpaper, pattern, alert, fontFamily, soundId, &error);
 	if (presetId.isEmpty()) {
