@@ -42,6 +42,9 @@ public:
 		setFixedSize(NW, NH);
 		m_list.frame = QRect(14, 36, NW - 28, 13 * PL_LIST_ROW_H + 2);
 		m_host.hintAreas.push_back({ &m_list.frame, "What changed in this version. Arrow keys scroll." });
+		/* The notes are prose, not a menu: draw and measure them in the
+		 * views font. A blank line between paragraphs stays a blank row. */
+		m_list.font = PL_FONT_VIEWS;
 		m_list.setItems(panelWrap(notes.trimmed(), NW - 28 - SB_WIDTH - 8, PL_FONT_VIEWS));
 		m_list.state.selected = -1;
 		const int by = NH - 14 - PL_BUTTON_H;

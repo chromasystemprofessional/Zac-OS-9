@@ -109,6 +109,25 @@ struct Text {
  * one unbreakable word. A run wider than the line (a long URL, say) is cut
  * between characters rather than allowed to overflow. */
 inline QStringList wrapText(const QString &s, int width, pl_font font) {
+	/* A newline is a hard break, never a break opportunity to wrap across:
+	 * the bitmap fonts have no glyph for it, so one left inside a line
+	 * would draw as a missing-glyph box. A blank line stays as an empty
+	 * row, which is how paragraphs are told apart. Leading and trailing
+	 * blank lines are not rows. */
+	const QString text = s.trimmed();
+	if (text.contains('\n')) {
+		QStringList lines;
+		for (const QString &paragraph : text.split('\n')) {
+			if (paragraph.trimmed().isEmpty()) {
+				if (!lines.isEmpty() && !lines.last().isEmpty()) {
+					lines << QString();
+				}
+			} else {
+				lines += wrapText(paragraph, width, font);
+			}
+		}
+		return lines;
+	}
 	QStringList lines;
 	if (s.isEmpty()) {
 		return lines;
