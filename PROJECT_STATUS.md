@@ -104,7 +104,10 @@ title-bar tile, button, frame edge, pop-up tab and menu skin as inherited,
 Platinum or a user image, with undo and redo. Editing an imported Mac OS 9
 theme makes a linked copy (`inherits=`) that reuses its artwork, so imports
 are never rewritten. Imported themes, presets and user themes share the same
-gallery ([Themes](docs/themes.md#theme-editor)).
+gallery ([Themes](docs/themes.md#theme-editor)). The Theme Installer also
+copies the System Folder's sound sets into Sound Themes, resource forks
+included, and turns a Kaleidoscope scheme's own WindowShade sounds into a
+selectable set, so both appear in the Sound Sets list.
 
 **Monitors**: each screen's resolution, pixel size and rotation are
 applied live (`compositor/src/prefs.c`): rotation is

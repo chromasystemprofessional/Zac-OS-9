@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import os
 import struct
 import subprocess
@@ -91,6 +92,50 @@ def test_end_to_end():
     with open(os.path.join(out, "theme", thme_files[0]), "rb") as f:
         assert f.read() == b"thmedata", "theme body is the full resource"
     print("ok    end-to-end bundle build")
+
+
+def test_sound_set_from_theme_file():
+    # A theme or Kaleidoscope scheme can carry interface sounds: the
+    # WindowShade pair has documented snd IDs, and a full set names its
+    # events with sdid. They become a Sound Themes folder, while the same
+    # sounds stay available as alert sounds.
+    def snd(samples=b"\x80\x40\xc0\x80"):
+        head = struct.pack(">HHHI", 1, 1, 5, 0) + struct.pack(">H", 1)
+        head += struct.pack(">HHI", 0x8051, 0, len(head) + 8)
+        header = struct.pack(">IIIII", 0, len(samples), 22050 << 16, 0, 0) + struct.pack(">BB", 0, 60)
+        return head + header + samples
+
+    fork = build_resource_fork([
+        (b"icns", 128, b"iconbytes"),
+        (b"thme", 1, b"thmedata"),
+        (b"snd ", 42, snd()),
+        (b"sdid", 42, b"btnp#Press#ui#Button press"),
+        (b"snd ", -14336, snd()),
+        (b"snd ", -14335, snd()),
+    ])
+    with tempfile.TemporaryDirectory() as src:
+        path = os.path.join(src, "Scheme")
+        with open(path, "wb") as f:
+            f.write(fork)
+        out = os.path.join(src, "out")
+        r = subprocess.run([sys.executable, sys.argv[1], "--file", path,
+                            "--output", out, "--name", "Scheme"],
+                           capture_output=True, text=True)
+        assert r.returncode == 0, r.stderr
+        with open(os.path.join(out, "soundset", "theme.json")) as f:
+            manifest = json.load(f)
+        assert manifest["name"] == "Scheme Sounds", manifest
+        assert manifest["events"] == {
+            "button-click": "button-click.wav",
+            "window-collapse": "window-collapse.wav",
+            "window-expand": "window-expand.wav",
+        }, manifest
+        for name in manifest["events"].values():
+            with open(os.path.join(out, "soundset", name), "rb") as f:
+                assert f.read(4) == b"RIFF", name
+        # Alert sounds are still extracted separately.
+        assert os.path.isfile(os.path.join(out, "sounds", "sound-1.wav"))
+    print("ok    a theme's own sounds become a Sound Themes set")
 
 
 def build_scen(items):
@@ -1107,6 +1152,7 @@ def test_theme_chrome_twopart():
 
 test_parse()
 test_end_to_end()
+test_sound_set_from_theme_file()
 test_clut_positional()
 test_wctb()
 test_cicn()

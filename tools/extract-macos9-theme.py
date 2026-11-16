@@ -16,6 +16,7 @@ Usage:
 
 import argparse
 import hashlib
+import json
 import os
 import shutil
 import struct
@@ -42,6 +43,21 @@ ICON_TYPES = {b"ICN#", b"icl8", b"icl4", b"ics#", b"ics8", b"ics4", b"icns", b"I
 PATTERN_TYPES = {b"PAT ", b"PAT#", b"ppat"}
 SOUND_TYPES = {b"snd "}
 FONT_TYPES = {b"sfnt", b"FOND", b"nfnt"}
+
+# Classic sound-set metadata: sdid names each sound's event, snd# supplies
+# defaults. These are the public Carbon HIToolbox kThemeSound* FourCCs
+# (docs/themes.md); window drags keep their phases in slots 1 and 3.
+CLASSIC_SOUND_EVENTS = {
+	b"btnp": "button-click", b"chkp": "checkbox-toggle",
+	b"mnuo": "menu-open", b"mnus": "menu-command",
+	b"wopn": "window-open", b"wcls": "window-close",
+	b"wcol": "window-collapse", b"wexp": "window-expand",
+	b"wmov": "window-drag", b"ftrs": "trash-empty",
+}
+SOUND_SLOT_OFFSET, SOUND_SLOT_SIZE = 10, 8
+# Kaleidoscope schemes carry their WindowShade pair as ordinary snd
+# resources, with no sdid/snd# metadata to name the events.
+KALEIDOSCOPE_SOUNDS = {-14336: "window-collapse", -14335: "window-expand"}
 CURSOR_TYPES = {b"CURS", b"crsr"}
 PICT_TYPES = {b"PICT"}
 THEME_TYPES = {b"thme", b"clut", b"pltt", b"WIND", b"scen", b"pxm#", b"layo", b"plut",
@@ -1013,6 +1029,115 @@ def write_system_sounds(system_raw, out):
 			macsnd.snd_to_wav(body, os.path.join(out, "sounds", "system-sound-%d.wav" % (i + 1)))
 		except (ValueError, struct.error):
 			continue
+
+
+def classic_sound_events(records):
+	"""Map a theme's or scheme's own snd resources to ZacOS events.
+
+	The shell's sound-theme importer reads the same sdid/snd# metadata
+	(shell/panels/zacos9-soundthemes). A theme that carries a complete
+	sound set therefore keeps its event identities; Kaleidoscope's
+	WindowShade pair has no metadata and is mapped by its documented
+	resource IDs. Alert sounds without either stay alert sounds only."""
+	identities, candidates, defaults = {}, {}, {}
+	for (rtype, res_id), body in records.items():
+		if rtype != b"sdid":
+			continue
+		fields = body.split(b"#")
+		if len(fields) < 2 or len(fields[0]) != 4:
+			continue
+		identities[res_id] = fields[0]
+		event = CLASSIC_SOUND_EVENTS.get(fields[0])
+		if event:
+			candidates.setdefault(event, set()).add(res_id)
+	for (rtype, _res_id), body in records.items():
+		if rtype != b"snd#":
+			continue
+		if len(body) < 4:
+			continue
+		version, count = struct.unpack(">HH", body[:4])
+		if version != 1 or count > 512 or len(body) != 4 + count * 44:
+			continue
+		for i in range(count):
+			record = body[4 + i * 44:4 + (i + 1) * 44]
+			code = record[:4]
+			if code == b"wmov":
+				for event, slot in (("window-drag", 1), ("window-drag-end", 3)):
+					number = struct.unpack(">i", record[
+						SOUND_SLOT_OFFSET + slot * SOUND_SLOT_SIZE:
+						SOUND_SLOT_OFFSET + slot * SOUND_SLOT_SIZE + 4])[0]
+					if slot == 1 and not number:
+						number = struct.unpack(">i", record[
+							SOUND_SLOT_OFFSET:SOUND_SLOT_OFFSET + 4])[0]
+					if not number:
+						continue
+					if event in defaults and defaults[event] != number:
+						return {}
+					defaults[event] = number
+				continue
+			number = struct.unpack(">i", record[
+				SOUND_SLOT_OFFSET:SOUND_SLOT_OFFSET + 4])[0]
+			event = CLASSIC_SOUND_EVENTS.get(code)
+			if not event or not number:
+				continue
+			# An sdid may deliberately label a shared sound for another
+			# event; it wins over the snd# record that borrows it.
+			if number in identities and identities[number] != code:
+				continue
+			if event in defaults and defaults[event] != number:
+				return {}
+			defaults[event] = number
+	selected = {}
+	for event in candidates.keys() | defaults.keys():
+		choices = candidates.get(event, set())
+		default = defaults.get(event)
+		if default is not None and (not choices or default in choices):
+			number = default
+		elif len(choices) == 1:
+			number = next(iter(choices))
+		else:
+			continue  # No authoritative choice: leave an ambiguous event silent.
+		if (b"snd ", number) in records:
+			selected[event] = number
+	for number, event in KALEIDOSCOPE_SOUNDS.items():
+		if (b"snd ", number) in records and event not in selected:
+			selected[event] = number
+	return selected
+
+
+def write_sound_set(fork, out, name):
+	"""Write the theme's own interface sounds as a Sound Themes folder.
+
+	A Kaleidoscope scheme (or a theme that carries its set) has its event
+	sounds in the same fork as its artwork. The installer copies this
+	folder into System Folder > Appearance > Sound Themes so the set
+	appears in the Sound Sets window, with its events already named."""
+	dest = os.path.join(out, "soundset")
+	shutil.rmtree(dest, ignore_errors=True)
+	try:
+		records = {(rtype, res_id): body
+			for rtype, res_id, body in parse_resource_fork(fork)}
+		events = classic_sound_events(records)
+	except (ValueError, struct.error, IndexError):
+		return 0
+	if not events:
+		return 0
+	os.makedirs(dest, exist_ok=True)
+	written = {}
+	for event in sorted(events):
+		try:
+			macsnd.snd_to_wav(records[(b"snd ", events[event])],
+				os.path.join(dest, event + ".wav"))
+		except (ValueError, struct.error):
+			continue
+		written[event] = event + ".wav"
+	if not written:
+		shutil.rmtree(dest, ignore_errors=True)
+		return 0
+	set_name = (name.strip() or "Mac OS 9 Theme") + " Sounds"
+	with open(os.path.join(dest, "theme.json"), "w", encoding="utf-8") as f:
+		json.dump({"version": 1, "name": set_name[:128], "events": written}, f)
+	return len(written)
 
 
 def write_pointers(theme_raw, theme_cluts, system_raw, system_cluts, out):
@@ -1987,6 +2112,7 @@ def main():
 	pxm = {}
 	layo = {}
 	plut = {}
+	theme_fork = None
 
 	if args.file:
 		# A single theme file the user copied out of Mac OS 9.
@@ -2015,6 +2141,7 @@ def main():
 			# The theme file's own desktop icons and menu icon win over
 			# the System/Finder helpers' (a Kaleidoscope scheme ships
 			# its own art); the helpers fill the kinds it lacks.
+			theme_fork = fork
 			process_resource_fork(fork, out, counts, cluts, icons, assets, scen_tags, apple_menu, wctb, raw_icons, epics,
 				theme_icons, True, cursors, file_icon, pxm, layo, plut)
 			theme_keys = set(theme_icons.keys())
@@ -2137,6 +2264,7 @@ def main():
 	write_pointers(theme_raw, pointer_cluts, system_raw, system_cluts, out)
 	write_system_sounds(system_raw, out)
 	write_theme_fonts(scen_tags, args.system, args.fonts, out)
+	sound_events = write_sound_set(theme_fork, out, name) if theme_fork else 0
 	if args.dump_icons:
 		write_icon_dump(raw_icons, cluts, out)
 	# Decode wallpapers, patterns and sounds.
@@ -2300,6 +2428,8 @@ def main():
 	print("  icons:    %d" % counts["icons"])
 	print("  patterns: %d" % counts["patterns"])
 	print("  sounds:   %d" % counts["sounds"])
+	if sound_events:
+		print("  soundset: %d events" % sound_events)
 	print("  theme:    %d" % counts["theme"])
 	print("  fonts:    %d" % counts["fonts"])
 	print("Note: Appearance theme (thme/clut/pltt) resources are saved raw under")
