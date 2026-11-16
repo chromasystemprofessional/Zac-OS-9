@@ -2007,6 +2007,16 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None, px
 					continue
 				name = pxm_names.get(item["id"] & 0xFFFF, "").lower()
 				words = name.replace("-", " ").split()
+				if "planter" in words and suffix == "":
+					bodies = pxm.get(item["id"] & 0xFFFF)
+					if bodies:
+						try:
+							cap_rows = decode_pxm(bodies[0], item["index"], clut_map)
+							side = "left" if "left" in words else "right" if "right" in words else None
+							if side and cap_rows:
+								save_tile("document-" + side + "-cap", cap_rows)
+						except (ValueError, IndexError, struct.error):
+							pass
 				if not words or any(word in words for word in
 						("title", "titlebar", "grow", "tab", "rtl", "button",
 						 "box", "close", "zoom", "collapse")):
@@ -3289,6 +3299,7 @@ def main():
 			if chrome_keys.get(key):
 				f.write("%s=%s\n" % (key, chrome_keys[key]))
 		for key in ("frame-left", "frame-right", "frame-bottom",
+				"document-left-cap", "document-right-cap",
 				"bar-left", "bar-middle", "bar-right", "bar-span", "bar-title",
 				"bar-left-inactive", "bar-middle-inactive", "bar-right-inactive",
 				"bar-span-inactive", "bar-dialog-left", "bar-dialog-middle",

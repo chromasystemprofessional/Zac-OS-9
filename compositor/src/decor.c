@@ -88,6 +88,7 @@ static uint32_t title_ink(bool active, uint32_t base) {
  * one, else its active skin; missing files keep the Platinum drawing. */
 enum chrome_slot {
 	CHROME_DOC_TOP, CHROME_DOC_BOTTOM, CHROME_DOC_LEFT, CHROME_DOC_RIGHT,
+	CHROME_DOC_LEFT_CAP, CHROME_DOC_RIGHT_CAP,
 	CHROME_MODAL_TOP, CHROME_MODAL_BOTTOM, CHROME_MODAL_LEFT, CHROME_MODAL_RIGHT,
 	CHROME_POPUP_TAB,
 	CHROME_SLOTS
@@ -98,6 +99,8 @@ static const char *const chrome_files[CHROME_SLOTS][2] = {
 	[CHROME_DOC_BOTTOM] = { "chrome/document-bottom.png", "chrome/document-bottom-inactive.png" },
 	[CHROME_DOC_LEFT] = { "chrome/document-left.png", "chrome/document-left-inactive.png" },
 	[CHROME_DOC_RIGHT] = { "chrome/document-right.png", "chrome/document-right-inactive.png" },
+	[CHROME_DOC_LEFT_CAP] = { "chrome/document-left-cap.png", NULL },
+	[CHROME_DOC_RIGHT_CAP] = { "chrome/document-right-cap.png", NULL },
 	[CHROME_MODAL_TOP] = { "chrome/modal-top.png", NULL },
 	[CHROME_MODAL_BOTTOM] = { "chrome/modal-bottom.png", NULL },
 	[CHROME_MODAL_LEFT] = { "chrome/modal-left.png", NULL },
@@ -113,6 +116,8 @@ static const char *const chrome_skin_keys[CHROME_SLOTS][2] = {
 	[CHROME_DOC_BOTTOM] = { "document-bottom", "document-bottom-inactive" },
 	[CHROME_DOC_LEFT] = { "document-left", "document-left-inactive" },
 	[CHROME_DOC_RIGHT] = { "document-right", "document-right-inactive" },
+	[CHROME_DOC_LEFT_CAP] = { "document-left-cap", NULL },
+	[CHROME_DOC_RIGHT_CAP] = { "document-right-cap", NULL },
 	[CHROME_MODAL_TOP] = { "modal-top", NULL },
 	[CHROME_MODAL_BOTTOM] = { "modal-bottom", NULL },
 	[CHROME_MODAL_LEFT] = { "modal-left", NULL },
@@ -1229,6 +1234,16 @@ void decor_paint(struct pl_canvas *c, const struct decor_state *st) {
 		chrome_fill_slot(c, 0, H - db, W - 1, H - 1, CHROME_DOC_BOTTOM, act, face);
 		chrome_fill_slot(c, 0, DECOR_TOP, dl - 1, H - db - 1, CHROME_DOC_LEFT, act, face);
 		chrome_fill_slot(c, W - dr, DECOR_TOP, W - 1, H - db - 1, CHROME_DOC_RIGHT, act, face);
+		const struct chrome_tile *left_cap = chrome_tile_get(CHROME_DOC_LEFT_CAP);
+		const struct chrome_tile *right_cap = chrome_tile_get(CHROME_DOC_RIGHT_CAP);
+		if (left_cap) {
+			chrome_blit(c, left_cap, 0, 0, left_cap->w, left_cap->h,
+				0, H - left_cap->h, left_cap->w, left_cap->h);
+		}
+		if (right_cap) {
+			chrome_blit(c, right_cap, 0, 0, right_cap->w, right_cap->h,
+				W - right_cap->w, H - right_cap->h, right_cap->w, right_cap->h);
+		}
 	}
 
 	const uint32_t highlight = chrome("frame-light", C_WHITE);
