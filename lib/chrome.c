@@ -168,6 +168,18 @@ void chrome_tile(struct pl_canvas *c, const uint32_t *px, int sw, int sh,
 	}
 }
 
+/* Draw a skin once at (x, y), blending its alpha. Frame corner layers
+ * (Gizmo's planters) are single images with transparent surroundings, not
+ * tiles that should repeat. */
+void chrome_draw(struct pl_canvas *c, const uint32_t *px, int w, int h,
+		int x, int y) {
+	for (int j = 0; j < h; j++) {
+		for (int i = 0; i < w; i++) {
+			tile_put(c, x + i, y + j, px[j * w + i]);
+		}
+	}
+}
+
 /* Stretch a skin over a rectangle, nearest-neighbour. The middle part of
  * a themed scrollbar thumb is a stretchable slice: repeating it would show
  * its gradient once per slice. */

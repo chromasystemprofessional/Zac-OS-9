@@ -21,6 +21,10 @@ void chrome_tile(struct pl_canvas *c, const uint32_t *px, int sw, int sh,
 void chrome_stretch(struct pl_canvas *c, const uint32_t *px, int sw, int sh,
 	int x0, int y0, int x1, int y1);
 
+/* Draw a skin once at (x, y), blending its alpha. Pure. */
+void chrome_draw(struct pl_canvas *c, const uint32_t *px, int w, int h,
+	int x, int y);
+
 /* Fill a rectangle with a skin when the theme has one, else a flat colour. */
 void chrome_fill(struct pl_canvas *c, int x0, int y0, int x1, int y1,
 	const char *path, uint32_t fallback);

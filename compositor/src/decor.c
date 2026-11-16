@@ -1234,15 +1234,14 @@ void decor_paint(struct pl_canvas *c, const struct decor_state *st) {
 		chrome_fill_slot(c, 0, H - db, W - 1, H - 1, CHROME_DOC_BOTTOM, act, face);
 		chrome_fill_slot(c, 0, DECOR_TOP, dl - 1, H - db - 1, CHROME_DOC_LEFT, act, face);
 		chrome_fill_slot(c, W - dr, DECOR_TOP, W - 1, H - db - 1, CHROME_DOC_RIGHT, act, face);
-		const struct chrome_tile *left_cap = chrome_tile_get(CHROME_DOC_LEFT_CAP);
-		const struct chrome_tile *right_cap = chrome_tile_get(CHROME_DOC_RIGHT_CAP);
-		if (left_cap) {
-			chrome_blit(c, left_cap, 0, 0, left_cap->w, left_cap->h,
-				0, H - left_cap->h, left_cap->w, left_cap->h);
+		int cw, ch;
+		const uint32_t *cp = chrome_file("chrome/document-left-cap.png", &cw, &ch);
+		if (cp) {
+			chrome_draw(c, cp, cw, ch, 0, H - ch);
 		}
-		if (right_cap) {
-			chrome_blit(c, right_cap, 0, 0, right_cap->w, right_cap->h,
-				W - right_cap->w, H - right_cap->h, right_cap->w, right_cap->h);
+		cp = chrome_file("chrome/document-right-cap.png", &cw, &ch);
+		if (cp) {
+			chrome_draw(c, cp, cw, ch, W - cw, H - ch);
 		}
 	}
 
