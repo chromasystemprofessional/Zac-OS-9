@@ -1418,6 +1418,55 @@ test_bar_tiles_align()
 test_bar_tiles_fit_window()
 
 
+def test_theme_chrome_reordered_layout():
+    # Gizmo lists its frame and grow-box records before the title bar, and
+    # carries both LTR and RTL title caps. Taking the first three drawable
+    # records skins the bar with the bottom corners and left planter; the
+    # title group's attribute bit and the pxm# names keep the bar's own
+    # left/middle/right pieces.
+    pxm = {
+        6170: [_pxm_edged(8, 4)],     # bottom corners, first in the file
+        6173: [_pxm_edged(15, 19)],   # left planter
+        6177: [_pxm_edged(14, 38)],   # left vine
+        6174: [_pxm_edged(15, 19)],   # right planter
+        6178: [_pxm_edged(14, 38)],   # right vine
+        6181: [_pxm_edged(14, 13)],   # titlebar left
+        6185: [_pxm_edged(7, 13)],    # titlebar right
+        6182: [_pxm_edged(13, 13)],   # RTL left, not the bar
+        6183: [_pxm_edged(8, 13)],    # RTL right, not the bar
+        200: [_pxm_edged(13, 13)],    # close box
+    }
+    layo = {128: _layo_resource([], [
+        (0, 259, 0x120, (1, -2, -1, -4), b"pxm#", 6170, 1, 0),
+        (0, 258, 0x120, (1, -2, -1, -4), b"pxm#", 6173, 1, 0),
+        (0, 258, 0x120, (1, -2, -1, -4), b"pxm#", 6177, 1, 0),
+        (2, 256, 0x120, (1, -2, -1, -4), b"pxm#", 6174, 1, 0),
+        (2, 256, 0x120, (1, -2, -1, -4), b"pxm#", 6178, 1, 0),
+        (0, 290, 0x121, (1, -2, -1, -4), b"pxm#", 6181, 1, 0),
+        (0, 258, 0x121, (1, -2, -1, -4), b"pxm#", 6185, 1, 0),
+        (0, 290, 0x121, (1, -2, -1, -4), b"pxm#", 6182, 1, 0),
+        (0, 258, 0x121, (1, -2, -1, -4), b"pxm#", 6183, 1, 0),
+        (0, 250, 0x121, (1, -2, -1, -4), b"plut", -65, 1, 0),
+        (32, 2, 0x125, (1, -2, -1, -4), b"pxm#", 200, 1, 0),
+    ])}
+    plut = {387: _plut_body({64: (9001, (255, 255, 255))})}
+    ppats = [(9001, _ppat_body_wide(16, 16))]
+    names = {6173: "Doc Win Left Planter", 6177: "Doc Win L Vine",
+        6174: "Dow Win Right Planter", 6178: "Doc Win R Vine",
+        6181: "Doc Win TItlebar Left No Close",
+        6185: "Doc Win Titlebar Right",
+        6182: "Doc Win TItlebar RTL L No Close",
+        6183: "Doc Win TItlebar RTL Right"}
+    out = tempfile.mkdtemp() + "/theme"
+    tool.write_theme_chrome("Gizmo", pxm, ppats, out, [], layo, plut, names)
+    assert _png_size(os.path.join(out, "chrome", "bar-left.png")) == (14, tool.ZACOS_BAR_HEIGHT)
+    assert _png_size(os.path.join(out, "chrome", "bar-middle.png")) == (16, tool.ZACOS_BAR_HEIGHT)
+    assert _png_size(os.path.join(out, "chrome", "bar-right.png")) == (7, tool.ZACOS_BAR_HEIGHT)
+    assert _png_size(os.path.join(out, "chrome", "document-left.png")) == (14, 38)
+    assert _png_size(os.path.join(out, "chrome", "document-right.png")) == (14, 38)
+    print("ok    title-bar and frame-side records keep their named art when reordered")
+
+
 def test_theme_icons_scale_and_clear_stale():
     palette = [(i, (i, i, i)) for i in range(256)]
     out = tempfile.mkdtemp() + "/theme"
@@ -1461,6 +1510,7 @@ def test_resource_map_bounds():
     print("ok    a corrupt resource map cannot copy one body without bound")
 
 
+test_theme_chrome_reordered_layout()
 test_theme_icons_scale_and_clear_stale()
 test_resource_map_bounds()
 print("OK")

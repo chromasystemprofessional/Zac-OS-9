@@ -167,7 +167,12 @@ reads the Appearance theme's resource fork and produces a **theme bundle** in
   is a tiled pattern running past the bar into the body is cropped to
   the height of the frame layout's `pxm#` caps. A cap's fully transparent
   columns are trimmed on the side that meets the window edge, so padding
-  in the resource does not leave the bar narrower than the frame.
+  in the resource does not leave the bar narrower than the frame. Title-bar
+  pieces are selected by the layout's title-group bit and, when the theme
+  names them, their left/right/middle names, not by record order: Gizmo
+  puts its frame and grow-box records first. RTL and tab variants are
+  ignored; named left and right frame strips become the document edge
+  skins.
   Appearance themes also carry control layouts (`layo` 500 push button,
   510 checkbox, 515 radio, 520 progress). The importer files the
   push-button face, checkbox and radio marks and the progress fill as

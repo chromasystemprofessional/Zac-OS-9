@@ -668,6 +668,13 @@ def process_resource_fork(data, out, counts, cluts, icons, assets, scen_tags, ap
 		# Kaleidoscope window art, same pass rule: the helpers carry none.
 		if pxm is not None and rtype == b"pxm#":
 			pxm.setdefault(res_id, []).append(body)
+			if "pxm_names" not in assets:
+				try:
+					named = macfont.resources(data).get("pxm#", {})
+				except (ValueError, struct.error, IndexError):
+					named = {}
+				assets["pxm_names"] = {rid: pname for rid, (pname, _pbody) in named.items()
+					if pname}
 		if layo is not None and rtype == b"layo":
 			layo[res_id] = body
 		if plut is not None and rtype == b"plut":
@@ -1544,22 +1551,64 @@ def layo_coord(ref, coords, seen=None):
 	return value
 
 
-def layo_title_items(body):
-	"""The first three drawable title-bar items of a layo, with resolved
-	top and bottom. These are the left cap, middle and right cap."""
+def layo_title_items(body, names=None):
+	"""The title-bar items of a layo, with resolved top and bottom.
+
+	The title-bar group is marked by attribute bit 0 (the same bit used by
+	the frame layout's title group), not by its position: Gizmo puts the
+	frame and grow-box records first, so taking the first three drawable
+	records would skin its bar with the bottom corners and left planter.
+	Visible state 0 is the active window; the inactive layout is a separate
+	layo resource. When the theme names its pxm# resources, use the names
+	to keep the left-to-right order for schemes whose records also carry
+	RTL or tab variants; otherwise the first three records are the usual
+	cap/middle/cap."""
 	coords, items = decode_layo(body)
-	out = []
+	candidates = []
 	for item in items:
-		if not item["attrs"] & 1 or item["visible"] or item["invisible"]:
+		if not item["attrs"] & 1 or item["visible"]:
 			continue
 		if item["type"] not in (b"pxm#", b"plut", b"ppat"):
 			continue
 		top = layo_coord(item["rect"][0], coords)
 		bottom = layo_coord(item["rect"][2], coords)
-		out.append((item, top, bottom))
-		if len(out) == 3:
-			break
-	return out
+		candidates.append((item, top, bottom))
+	if not candidates:
+		return []
+	if names:
+		def named(entry):
+			item = entry[0]
+			if item["type"] != b"pxm#":
+				return ""
+			return names.get(item["id"] & 0xFFFF, "").lower()
+
+		left = next((entry for entry in candidates
+			if "left" in named(entry) and "rtl" not in named(entry)), None)
+		right = next((entry for entry in candidates
+			if "right" in named(entry) and "rtl" not in named(entry) and
+			"tab" not in named(entry)), None)
+		if left and right:
+			left_index = candidates.index(left)
+			right_index = candidates.index(right)
+			middle = next((entry for entry in candidates
+				if entry is not left and entry is not right and
+				entry[0]["type"] in (b"pxm#", b"plut", b"ppat") and
+				any(word in named(entry) for word in ("middle", "center", "fill"))),
+				None)
+			if middle is None:
+				lo, hi = sorted((left_index, right_index))
+				middle = next((entry for entry in candidates[lo + 1:hi]
+					if entry is not left and entry is not right), None)
+			if middle is None:
+				# Gizmo's middle is a plut/ppat tile after the caps, not a
+				# named middle pxm#.
+				after = candidates[max(left_index, right_index) + 1:]
+				middle = next((entry for entry in after
+					if entry[0]["type"] == b"plut"), None)
+			if middle is not None:
+				return [left, middle, right]
+			return [left, right]
+	return candidates[:3]
 
 
 def decode_wnd(body):
@@ -1806,7 +1855,7 @@ def write_k2_scrollbars(fork, out, cluts=()):
 	return keys
 
 
-def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None):
+def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None, pxm_names=None):
 	"""Decode the theme's own window art into the bundle's chrome/.
 
 	Every Kaleidoscope scheme carrying standard window resources gets its
@@ -1918,32 +1967,93 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None):
 				return [[rgb + (255,)] * 8 for _ in range(22)]
 			return None
 
+		def save_frame_sides(lid, layer, suffix):
+			"""Named frame strips beside the title bar: Gizmo's wiggly
+			left and right vines, and the equivalent edge art in other
+			Appearance themes. The title bit is clear on these records;
+			the tallest named left/right piece is the edge, while planter
+			corners and grow boxes are ignored."""
+			body = (layo or {}).get(lid)
+			if not body or not pxm_names:
+				return
+			try:
+				_coords, items = decode_layo(body)
+			except (ValueError, IndexError, struct.error):
+				return
+			edges = {"left": None, "right": None}
+			for item in items:
+				if item["type"] != b"pxm#" or item["attrs"] & 1 or item["visible"] not in (0, 2):
+					continue
+				name = pxm_names.get(item["id"] & 0xFFFF, "").lower()
+				words = name.replace("-", " ").split()
+				if not words or any(word in words for word in
+						("title", "titlebar", "grow", "tab", "rtl", "button",
+						 "box", "close", "zoom", "collapse")):
+					continue
+				side = "left" if "left" in words or "l" in words else \
+					"right" if "right" in words or "r" in words else None
+				if side is None:
+					continue
+				bodies = pxm.get(item["id"] & 0xFFFF)
+				if not bodies:
+					continue
+				try:
+					rows = decode_pxm(bodies[0], item["index"], clut_map)
+				except (ValueError, IndexError, struct.error):
+					continue
+				if edges[side] is None or len(rows) > len(edges[side]):
+					edges[side] = rows
+			for side in ("left", "right"):
+				rows = edges[side]
+				key = "document-" + side + suffix
+				path = os.path.join(chrome_dir, key + ".png")
+				if rows and not os.path.exists(path):
+					save_tile(key, rows)
+
 		for lid, layer, suffix in ((128, 0, ""), (129, 1, "-inactive")):
 			if lid not in layo:
 				continue
 			recs = _parse_layo_records(layo[lid])
-			if len(recs) < 3:
-				continue
-			titles = layo_title_items(layo[lid])
+			titles = layo_title_items(layo[lid], pxm_names)
 			crops = [max(0, -top) for _item, top, _bottom in titles]
-			left_rows = resolve_rec(recs[0][0], recs[0][1], layer)
-			mid_rows = resolve_rec(recs[1][0], recs[1][1], layer)
-			right_rec = next(
-				(r for r in recs[2:] if r[0] == b"pxm#" and (r[1] & 0xFFFF) == 6173),
-				next(
-					(r for r in recs[2:] if r[0] == b"pxm#" and (r[1] & 0xFFFF) in (6178, 6134, 6278)),
-					recs[2]))
-			right_rows = resolve_rec(right_rec[0], right_rec[1], layer)
-			# The middle can be a tiled pattern that runs past the bar
-			# into the body (Paper's is 32 rows for a 22-row bar). Only a
-			# pxm# knows the bar's height; otherwise the caps do.
-			bar_h = len(mid_rows)
-			if recs[1][0] != b"pxm#":
-				cap_heights = [len(rows) for tag, rows in
-					((recs[0][0], left_rows), (right_rec[0], right_rows))
-					if tag == b"pxm#" and rows]
-				if cap_heights:
-					bar_h = min(cap_heights)
+			if len(titles) >= 3:
+				left_item = titles[0][0]
+				mid_item = titles[1][0]
+				right_item = titles[2][0]
+
+				def item_layer(item):
+					return item["index"] if item["type"] == b"pxm#" else layer
+
+				left_rows = resolve_rec(left_item["type"], left_item["id"], item_layer(left_item))
+				mid_rows = resolve_rec(mid_item["type"], mid_item["id"], item_layer(mid_item))
+				right_rows = resolve_rec(right_item["type"], right_item["id"], item_layer(right_item))
+				mid_is_pxm = mid_item["type"] == b"pxm#"
+				right_is_pxm = right_item["type"] == b"pxm#"
+			elif len(recs) >= 3:
+				# Fixtures and unmarked layouts: the first three drawable
+				# records are still the usual cap/middle/cap.
+				left_rows = resolve_rec(recs[0][0], recs[0][1], layer)
+				mid_rows = resolve_rec(recs[1][0], recs[1][1], layer)
+				right_rec = next(
+					(r for r in recs[2:] if r[0] == b"pxm#" and (r[1] & 0xFFFF) == 6173),
+					next(
+						(r for r in recs[2:] if r[0] == b"pxm#" and (r[1] & 0xFFFF) in (6178, 6134, 6278)),
+						recs[2]))
+				right_rows = resolve_rec(right_rec[0], right_rec[1], layer)
+				mid_is_pxm = recs[1][0] == b"pxm#"
+				right_is_pxm = right_rec[0] == b"pxm#"
+			else:
+				continue
+			if not mid_rows:
+				bar_h = ZACOS_BAR_HEIGHT
+			else:
+				bar_h = len(mid_rows)
+				if not mid_is_pxm:
+					cap_heights = [len(rows) for is_pxm, rows in
+						((right_is_pxm, right_rows), (True, left_rows))
+						if is_pxm and rows]
+					if cap_heights:
+						bar_h = min(cap_heights)
 			# A cap can extend above the window (Drawing Board's pencil
 			# marks are five and ten rows above the bar). The item's
 			# resolved top says which source rows are outside; crop them
@@ -1958,6 +2068,7 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None):
 			save_bar("bar-right" + suffix, right_rows, bar_h, trim_right=True,
 				crop_top=right_crop)
 			mids_by_suffix[suffix] = mid_rows
+			save_frame_sides(lid, layer, suffix)
 
 		# 2b. Two-part bars: the title group rides a pinstripe patch on
 		# the left while a span fills the rest of the bar. The span is
@@ -2800,7 +2911,7 @@ def main():
 	# Decode wallpapers, patterns and sounds.
 	font_families, font_files = write_assets(assets, epics, out)
 	chrome_keys = write_theme_chrome(name, pxm, assets.get("ppat", []), out,
-		theme_cluts or cluts, layo, plut)
+		theme_cluts or cluts, layo, plut, assets.get("pxm_names", {}))
 	if theme_fork and not any(key.startswith("bar-") for key in chrome_keys):
 		chrome_keys.update(write_wnd_chrome(theme_fork, out, theme_cluts or cluts))
 	if theme_fork and not any(key.startswith("scroll-track-") for key in chrome_keys):
