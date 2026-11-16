@@ -143,18 +143,37 @@ reads the Appearance theme's resource fork and produces a **theme bundle** in
   untouched. Movable-modal dialogs get their own set from the frame layout's
   dialog records (`layo` 134/135). Themes whose buttons ride with the title
   group instead get a two-row bar with a full-width blue band
-  (`bar-span`/`bar-span-inactive`). Each tile ships as a PNG (for the
+  (`bar-span`/`bar-span-inactive`). A scheme that uses the older `wnd#`
+  window recipes instead of `layo` gets an approximation: the document
+  chrome `cicn`'s title band supplies a cap/fill/cap bar, and the recipe's
+  rectangle list supplies the close, zoom and collapse art. Schemes whose
+  widgets sit mid-bar keep flat chrome rather than guess a composition.
+  Each tile ships as a PNG (for the
   catalog sheets) and a flat `.argb` dump (u32le width and height, then
   straight RGBA) that the compositor reads directly. Close/zoom/collapse
   boxes, title text and hit-testing stay ZacOS's. Missing files fall back
   to the Platinum drawing. Every title-bar tile (left, middle, right;
-  document and dialog, active and inactive) is written at the bar's own
-  height, starting at its first inked row, so end caps whose resources
-  carried padding above the bar still compose into one band. A middle that
-  is a tiled pattern running past the bar into the body is cropped to the
-  height of the frame layout's `pxm#` caps. A cap's fully transparent
+  document and dialog, active and inactive) is written at the desktop's
+  22 px title row, starting at its first inked row, so a 19 or 23 px
+  source is padded or cropped instead of resampled at draw time. A cap
+  whose `layo` item extends above the window (Drawing Board's pencil
+  marks sit five and ten rows above the bar) has those rows cropped
+  using the item's resolved top, so the bar starts on the title row and
+  its widget rectangles line up. A middle that
+  is a tiled pattern running past the bar into the body is cropped to
+  the height of the frame layout's `pxm#` caps. A cap's fully transparent
   columns are trimmed on the side that meets the window edge, so padding
   in the resource does not leave the bar narrower than the frame.
+  Appearance themes also carry control layouts (`layo` 500 push button,
+  510 checkbox, 515 radio, 520 progress). The importer files the
+  push-button face, checkbox and radio marks and the progress fill as
+  `chrome/button*.png`, `checkbox-*.png`, `radio-*.png` and
+  `progress-fill.png`; the toolkit keeps its control geometry and
+  labels, so a theme can change the art without moving the widgets.
+  Scrollbars use `layo` 400/405 for the track, thin thumb and arrow art;
+  `scroll-arrow-dec`/`scroll-arrow-inc` record the theme's arrow-box
+  sizes so painting and hit-testing share them. Smaller `layo` 410/415
+  variants are not used by ZacOS's 16 px bars.
 - `sounds/` — alert sounds. `system-sound-N.wav` are the System file's own
   `snd` resources, decoded from sampled sounds only; synthesized and compressed
   sounds are skipped. Theme-file sounds sit beside them. The installer never
@@ -482,5 +501,9 @@ deletion rules, the themed menu bar and menus, per-slot artwork states, and
 writing chosen images as ARGB tiles and PNG skins. Sound-set coverage includes
 a System Folder set keeping its `.rsrc` fork, a Kaleidoscope scheme's
 WindowShade pair becoming a selectable set, and a theme's own `sdid` sounds
-being written as a Sound Themes folder. The user-supplied
+being written as a Sound Themes folder. Chrome tests cover a
+`wnd#` scheme's title band and widgets, the fixed 22 px bar height, the
+`layo` frame/dialog/button layouts, the resolved top of title-bar
+caps that carry decoration above the window, and the button, checkbox,
+radio, progress and scrollbar faces. The user-supplied
 compatibility archive is ignored by Git and excluded from package builds.

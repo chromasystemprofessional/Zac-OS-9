@@ -107,7 +107,12 @@ are never rewritten. Imported themes, presets and user themes share the same
 gallery ([Themes](docs/themes.md#theme-editor)). The Theme Installer also
 copies the System Folder's sound sets into Sound Themes, resource forks
 included, and turns a Kaleidoscope scheme's own WindowShade sounds into a
-selectable set, so both appear in the Sound Sets list.
+selectable set, so both appear in the Sound Sets list. Scheme title bars
+come from the frame layout (`layo`) or, for older schemes, from a `wnd#`
+recipe's title band and widget rectangles; imported bars are written at the
+desktop's 22 px title row so their lines do not shift. An Appearance theme's
+push button, checkbox, radio, progress and scrollbar faces are read from its
+control layouts too, while their geometry and labels stay ZacOS's.
 
 **Monitors**: each screen's resolution, pixel size and rotation are
 applied live (`compositor/src/prefs.c`): rotation is

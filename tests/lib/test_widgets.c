@@ -4,8 +4,10 @@
  *
  * usage: test-widgets FIGS_DIR
  */
+#include <cairo.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -124,6 +126,79 @@ static int run_smart_tests(void) {
 		rmdir(dir);
 	}
 	printf("%s smart scrolling layout and thumb size\n", fails ? "FAIL" : "ok  ");
+	return fails;
+}
+
+/* Theme control faces: a bundle's chrome/button.png, checkbox-*.png and
+ * radio-*.png replace the Platinum marks while their geometry stays put. */
+static void write_skin_png(const char *path, int w, int h, uint32_t argb) {
+	cairo_surface_t *surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, w, h);
+	unsigned char *data = cairo_image_surface_get_data(surface);
+	const int stride = cairo_image_surface_get_stride(surface);
+	for (int y = 0; y < h; y++) {
+		for (int x = 0; x < w; x++) {
+			memcpy(data + y * stride + x * 4, &argb, 4);
+		}
+	}
+	cairo_surface_mark_dirty(surface);
+	cairo_surface_write_to_png(surface, path);
+	cairo_surface_destroy(surface);
+}
+
+static int run_skin_test(void) {
+	char dir[] = "/tmp/zacos9-widgets-skin-XXXXXX";
+	if (!mkdtemp(dir)) {
+		return 0;
+	}
+	char path[sizeof(dir) + 64];
+	const char *parts[] = { "zacos9", "zacos9/themes", "zacos9/themes/Test",
+		"zacos9/themes/Test/chrome" };
+	for (size_t i = 0; i < sizeof(parts) / sizeof(parts[0]); i++) {
+		snprintf(path, sizeof(path), "%s/%s", dir, parts[i]);
+		mkdir(path, 0700);
+	}
+	snprintf(path, sizeof(path), "%s/zacos9/desktop.conf", dir);
+	FILE *f = fopen(path, "w");
+	fputs("theme-bundle=Test\n", f);
+	fclose(f);
+	snprintf(path, sizeof(path), "%s/zacos9/themes/Test/theme.conf", dir);
+	f = fopen(path, "w");
+	fputs("name=Test\nscroll-arrow-dec=7\nscroll-arrow-inc=8\n", f);
+	fclose(f);
+	const char *skins[] = { "button", "checkbox-off", "checkbox-on",
+		"checkbox-mixed", "radio-off", "radio-on" };
+	for (size_t i = 0; i < sizeof(skins) / sizeof(skins[0]); i++) {
+		snprintf(path, sizeof(path), "%s/zacos9/themes/Test/chrome/%s.png", dir, skins[i]);
+		write_skin_png(path, 12, 12, 0xFF010203u);
+	}
+	setenv("XDG_CONFIG_HOME", dir, 1);
+	int w = 80, h = 30;
+	uint32_t *px = calloc((size_t)w * h, sizeof(*px));
+	struct pl_canvas c = { .px = px, .stride = w, .width = w, .height = h };
+	int fails = 0;
+	pl_button_paint(&c, 2, 2, 60, NULL, 0);
+	if (px[10 * w + 20] != 0xFF010203u) {
+		fprintf(stderr, "FAIL themed button face\n");
+		fails++;
+	}
+	pl_checkbox_paint(&c, 65, 2, PL_CHECK_ON, false, true, NULL);
+	if (px[7 * w + 70] != 0xFF010203u) {
+		fprintf(stderr, "FAIL themed checkbox\n");
+		fails++;
+	}
+	/* The theme's 7/8 px arrow boxes move the hit boundaries. */
+	struct pl_scrollbar sb = { .length = 100, .enabled = true };
+	if (sb_hit(&sb, 3) != SB_DEC_ARROW) {
+		fprintf(stderr, "FAIL themed decrement arrow hit\n");
+		fails++;
+	}
+	if (sb_hit(&sb, 95) != SB_INC_ARROW) {
+		fprintf(stderr, "FAIL themed increment arrow hit\n");
+		fails++;
+	}
+	free(px);
+	unsetenv("XDG_CONFIG_HOME");
+	printf("%s themed control faces\n", fails ? "FAIL" : "ok  ");
 	return fails;
 }
 
@@ -357,7 +432,7 @@ int main(int argc, char *argv[]) {
 	setenv("XDG_CONFIG_HOME", config_home, 1);
 	const char *dir = argc > 1 ? argv[1] : "tools/measure/figs";
 	int ran = 0;
-	int fails = run_hit_tests() + run_smart_tests();
+	int fails = run_hit_tests() + run_smart_tests() + run_skin_test();
 	fails += run_hbar(dir, "horizontal scroll bar, left window (fig 2-24)", 5, &ran);
 	fails += run_button(dir, "standard push button (fig 3-2)", 0, 223, 161, &ran);
 	fails += run_button(dir, "default push button (fig 3-2)", PL_BUTTON_DEFAULT, 220, 125, &ran);
