@@ -18,6 +18,10 @@ QStringList alertSoundIds();
 QString alertSoundDisplayName(const QString &id);
 QString appearanceThemesFolder();
 QStringList themeFontFamilies();
+/* Every program typeface the Appearance panel and Theme Editor offer: the
+ * families theme bundles installed (recorded even before a running font
+ * database has picked up the new faces), then the fonts this session can use. */
+QStringList programFontFamilies();
 /* One preset's stored settings (accent, highlight, pattern, wallpaper,
  * wallpaper-mode, alert-sound, sound-theme, theme-bundle, font-family),
  * for the Appearance panel's visual theme cards. */

@@ -3,6 +3,7 @@
 #include <QDir>
 #include <QElapsedTimer>
 #include <QFile>
+#include <QFontDatabase>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QImage>
@@ -84,7 +85,7 @@ static QString preference(const char *name) {
 	return pl_setting(name, value, sizeof(value)) ? QString::fromUtf8(value) : QString();
 }
 int main(int argc, char **argv) {
-	assert(argc == 2);
+	assert(argc == 3);
 	QTemporaryDir root;
 	qputenv("HOME", root.path().toUtf8());
 	qputenv("XDG_DATA_HOME", (root.path() + "/data").toUtf8());
@@ -147,6 +148,30 @@ int main(int argc, char **argv) {
 	assert(changes > 0);
 	assert(soundThemeName(2) == "Original Test");
 	AppearancePanel panel;
+	/* A font only Qt knows about stands in for one installed in the Fonts
+	 * folder: Appearance > Fonts offers every font programs can use, not
+	 * only the families a theme bundle declared. */
+	const QString installedFamily = "ZacOS 9 System";
+	const int addedFont = QFontDatabase::addApplicationFont(QString::fromUtf8(argv[2]));
+	assert(addedFont >= 0 || QFontDatabase::families().contains(installedFamily));
+	assert(QFontDatabase::families().contains(installedFamily));
+	const QStringList programFamilies = programFontFamilies();
+	assert(programFamilies.contains(installedFamily));
+	panel.showTab(2);
+	panel.show();
+	const QPointF familyButton(304, 81);
+	QMouseEvent openFamily(QEvent::MouseButtonPress, familyButton,
+		panel.mapToGlobal(familyButton.toPoint()), Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+	QApplication::sendEvent(&panel, &openFamily);
+	QWidget *familyPopup = QApplication::activePopupWidget();
+	assert(familyPopup);
+	for (int i = 0; i < 1 + programFamilies.indexOf(installedFamily); ++i) {
+		QKeyEvent nextFamily(QEvent::KeyPress, Qt::Key_Down, Qt::NoModifier);
+		QApplication::sendEvent(familyPopup, &nextFamily);
+	}
+	QKeyEvent applyFamily(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier);
+	QApplication::sendEvent(familyPopup, &applyFamily);
+	assert(preference("font-family") == installedFamily);
 	panel.showTab(4);
 	QKeyEvent selectAlert(QEvent::KeyPress, Qt::Key_R, Qt::NoModifier, "Recorded_Chime");
 	QApplication::sendEvent(&panel, &selectAlert);

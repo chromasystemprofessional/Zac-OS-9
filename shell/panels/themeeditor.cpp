@@ -7,7 +7,6 @@
 #include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
-#include <QFontDatabase>
 #include <QInputDialog>
 #include <QKeyEvent>
 #include <QLineEdit>
@@ -583,12 +582,7 @@ void ThemeEditorWindow::buildAppearanceControls() {
 	m_font.items.clear();
 	m_fontIds << "";
 	m_font.items.push_back(PopupItem("System Font"));
-	QStringList families = themeFontFamilies();
-	for (const QString &family : QFontDatabase::families()) {
-		if (!family.isEmpty() && !families.contains(family)) {
-			families << family;
-		}
-	}
+	const QStringList families = programFontFamilies();
 	for (const QString &family : families) {
 		m_fontIds << family;
 		m_font.items.push_back(PopupItem(family));

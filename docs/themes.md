@@ -283,7 +283,8 @@ one keep the generic document icon. The menu icon,
 boot art and colours change at the next menu-bar rebuild and boot. Decoded TrueType faces install to `~/.local/share/fonts/zacos9/` (registered
 with fontconfig); the preset's `font-family` (the theme's system font, else its
 views font) becomes the programs' typeface, selectable any time under
-Appearance > Fonts. The desktop chrome (menus, titles, lists) uses
+Appearance > Fonts, which lists every family the session's fontconfig offers.
+The desktop chrome (menus, titles, lists) uses
 the `theme-*.pfont` bitmaps rasterized from those same faces.
 
 ## Theme Editor

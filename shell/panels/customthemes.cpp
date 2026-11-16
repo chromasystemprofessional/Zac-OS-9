@@ -1071,6 +1071,17 @@ QStringList themeFontFamilies() {
 	names.sort();
 	return names;
 }
+
+QStringList programFontFamilies() {
+	QStringList families = themeFontFamilies();
+	for (const QString &family : QFontDatabase::families()) {
+		if (!family.isEmpty() && !families.contains(family)) {
+			families << family;
+		}
+	}
+	return families;
+}
+
 void watchCustomThemes(QObject *owner, std::function<void()> changed) {
 	catalog().watches.append({ owner, std::move(changed) });
 }

@@ -389,7 +389,7 @@ AppearancePanel::AppearancePanel() {
 void AppearancePanel::loadFontFamilies() {
 	m_fontFamilyIds = { QString() };
 	QStringList names = { "Default" };
-	for (const QString &family : themeFontFamilies()) {
+	for (const QString &family : programFontFamilies()) {
 		if (!m_fontFamilyIds.contains(family)) {
 			m_fontFamilyIds << family;
 			names << family;
