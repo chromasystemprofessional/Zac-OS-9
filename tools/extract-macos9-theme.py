@@ -2151,8 +2151,15 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None, px
 			right_crop = crops[2] if len(crops) > 2 else None
 			save_bar("bar-left" + suffix, left_rows, bar_h, trim_left=True,
 				crop_top=left_crop)
-			save_bar("bar-middle" + suffix, mid_rows, bar_h,
-				crop_top=mid_crop if mid_crop else None)
+			if mid_is_pxm:
+				save_bar("bar-middle" + suffix, mid_rows, bar_h,
+					crop_top=mid_crop if mid_crop else None)
+			else:
+				# A plut/ppat fill tiles the title row; keep its full
+				# pattern, cropped to the bar's height when taller. The
+				# compositor scales a shorter pattern up, so its gradient
+				# is not truncated to the caps' height.
+				save_tile("bar-middle" + suffix, mid_rows[:ZACOS_BAR_HEIGHT])
 			save_bar("bar-right" + suffix, right_rows, bar_h, trim_right=True,
 				crop_top=right_crop)
 			mids_by_suffix[suffix] = mid_rows
@@ -2400,55 +2407,73 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None, px
 			except (ValueError, IndexError, struct.error):
 				continue
 
-		# Scrollbars: layo 400/405 are the normal horizontal and
-		# vertical bars. The first four drawable pxm# items are the
-		# decrement arrow, increment arrow, track and thumb in order.
-		def scroll_parts(lid):
-			body = layo.get(lid)
+		# Scrollbars: layo 400/405 are the normal horizontal and vertical
+		# bars. Each is a plut fill (the track), two pxm# end caps with a
+		# plut middle (the thumb), plus the standalone ScrollArrowsStd
+		# pxm# (321/322 up/down, 331/332 left/right) for the arrows. The
+		# old code read the first four pxm# records as arrows/track/thumb,
+		# but those four are all thumb caps in Gizmo, so its track and
+		# arrows were the thumb and its thumb was a cap.
+		def scroll_axis(lid, vertical, cap_left, cap_right, arrow_dec, arrow_inc):
+			body = (layo or {}).get(lid)
 			if not body:
-				return []
+				return
 			try:
 				_coords, items = decode_layo(body)
 			except (ValueError, IndexError, struct.error):
-				return []
-			out = []
+				return
+			# The track is the layout's base-state plut fill.
+			track = None
 			for item in items:
-				if item["type"] != b"pxm#" or not item["attrs"] & 0x100:
-					continue
-				# The arrow/track/thumb set is the visible state group;
-				# the first thumb-only item (a different flag group) is
-				# not part of the four-piece sequence.
-				if not item["visible"] & 0x10 or not item["attrs"] & 0x1:
-					continue
-				bodies = pxm.get(item["id"] & 0xFFFF)
+				if item["type"] == b"plut" and item["visible"] == 0 and \
+						item["attrs"] & 0x100:
+					track = resolve_rec(b"plut", item["id"], 0)
+					break
+			# The thumb: two pxm# end caps and the plut fill between them.
+			caps = {}
+			thumb_mid = None
+			for item in items:
+				if item["type"] == b"pxm#":
+					rid = item["id"] & 0xFFFF
+					if rid in (cap_left, cap_right) and rid not in caps:
+						bodies = pxm.get(rid)
+						if bodies:
+							try:
+								caps[rid] = decode_pxm(bodies[0], 0, clut_map)
+							except (ValueError, IndexError, struct.error):
+								pass
+				elif item["type"] == b"plut" and caps and thumb_mid is None and \
+						item["visible"] != 0:
+					thumb_mid = resolve_rec(b"plut", item["id"], 0)
+			axis = "vert" if vertical else "horz"
+			if track:
+				save_tile("scroll-track-" + axis, track)
+			side0 = "-top" if vertical else "-left"
+			side1 = "-bottom" if vertical else "-right"
+			if caps.get(cap_left):
+				save_tile("scroll-thumb-" + axis + side0, caps[cap_left])
+			if thumb_mid:
+				save_tile("scroll-thumb-" + axis + "-stretch", thumb_mid)
+			if caps.get(cap_right):
+				save_tile("scroll-thumb-" + axis + side1, caps[cap_right])
+			# The arrow box is 16 px with a 1 px border; crop to the 14 px
+			# interior ZacOS draws.
+			for pid, name in ((arrow_dec, "decrement"), (arrow_inc, "increment")):
+				bodies = pxm.get(pid)
 				if not bodies:
 					continue
 				try:
-					rows = decode_pxm(bodies[0], item["index"], clut_map)
+					rows = decode_pxm(bodies[0], 0, clut_map)
 				except (ValueError, IndexError, struct.error):
 					continue
-				out.append(rows)
-				if len(out) == 4:
-					break
-			return out
+				if len(rows) >= 16 and len(rows[0]) >= 16:
+					rows = [row[1:15] for row in rows[1:15]]
+				save_tile("scroll-arrow-" + name + "-" + axis, rows)
 
-		for axis, lid, suffix in (("horz", 400, ""), ("vert", 405, "")):
-			parts = scroll_parts(lid)
-			if len(parts) < 4:
-				continue
-			dec, inc, track, thumb = parts
-			save_tile("scroll-arrow-decrement-" + axis, dec)
-			save_tile("scroll-arrow-increment-" + axis, inc)
-			save_tile("scroll-track-" + axis, track)
-			save_tile("scroll-thumb-" + axis + "-stretch", thumb)
-			# The along-axis size is the arrow's width for a horizontal
-			# bar and its height for a vertical one.
-			if axis == "horz":
-				keys["scroll-arrow-dec"] = str(len(dec[0]))
-				keys["scroll-arrow-inc"] = str(len(inc[0]))
-			else:
-				keys.setdefault("scroll-arrow-dec", str(len(dec)))
-				keys.setdefault("scroll-arrow-inc", str(len(inc)))
+		scroll_axis(400, False, 500, 501, 331, 332)
+		scroll_axis(405, True, 502, 503, 321, 322)
+		keys.setdefault("scroll-arrow-dec", "14")
+		keys.setdefault("scroll-arrow-inc", "14")
 		return keys
 
 	# 3. Fallback for synthetic unit-test fixtures without layo.

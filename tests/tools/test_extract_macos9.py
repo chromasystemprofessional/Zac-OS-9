@@ -1255,7 +1255,11 @@ def test_control_faces():
     # (520), checkbox (pxm 300) and radio (pxm 310). The button face is
     # the solid plut entry, not one of its border strips.
     plut = {387: _plut_body({10: (0, (206, 198, 181)),
-                             11: (0, (182, 173, 165))})}
+                             11: (0, (182, 173, 165)),
+                             30: (0, (210, 210, 210)),
+                             33: (0, (200, 200, 200)),
+                             42: (0, (180, 180, 180)),
+                             45: (0, (170, 170, 170))})}
     layo = {
         128: _layo_resource([], [
             (0, 0, 1, (1, -2, -1, -4), b"pxm#", 6176, 1, 0),
@@ -1271,16 +1275,16 @@ def test_control_faces():
             (0, 0x21, 0x100, (1, -2, -1, -4), b"pxm#", 1150, 1, 0),
         ]),
         400: _layo_resource([], [
-            (0x10, 0x103, 0x101, (1, -2, -1, -4), b"pxm#", 1113, 1, 0),
-            (0x10, 0x103, 0x101, (1, -2, -1, -4), b"pxm#", 1112, 1, 0),
-            (0x10, 0x103, 0x101, (1, -2, -1, -4), b"pxm#", 1114, 1, 0),
-            (0x10, 0x103, 0x101, (1, -2, -1, -4), b"pxm#", 1115, 1, 0),
+            (0, 0, 0x100, (1, -2, -1, -4), b"plut", -31, 1, 0),
+            (0, 0, 0x100, (1, -2, -1, -4), b"pxm#", 500, 1, 0),
+            (0, 0, 0x100, (1, -2, -1, -4), b"pxm#", 501, 1, 0),
+            (0x30, 0, 0x100, (1, -2, -1, -4), b"plut", -43, 1, 0),
         ]),
         405: _layo_resource([], [
-            (0x10, 0x103, 0x101, (1, -2, -1, -4), b"pxm#", 1116, 1, 0),
-            (0x10, 0x103, 0x101, (1, -2, -1, -4), b"pxm#", 1117, 1, 0),
-            (0x10, 0x103, 0x101, (1, -2, -1, -4), b"pxm#", 1118, 1, 0),
-            (0x10, 0x103, 0x101, (1, -2, -1, -4), b"pxm#", 1119, 1, 0),
+            (0, 0, 0x100, (1, -2, -1, -4), b"plut", -34, 1, 0),
+            (0, 0, 0x100, (1, -2, -1, -4), b"pxm#", 502, 1, 0),
+            (0, 0, 0x100, (1, -2, -1, -4), b"pxm#", 503, 1, 0),
+            (0x30, 0, 0x100, (1, -2, -1, -4), b"plut", -46, 1, 0),
         ]),
     }
     pxm = {
@@ -1288,10 +1292,10 @@ def test_control_faces():
         1150: [_pxm_layers(14, 14, 1)],
         300: [_pxm_layers(14, 11, 4)],
         310: [_pxm_layers(16, 12, 2)],
-        1113: [_pxm_layers(7, 14, 1)], 1112: [_pxm_layers(8, 14, 1)],
-        1114: [_pxm_layers(1, 14, 1)], 1115: [_pxm_layers(2, 14, 1)],
-        1116: [_pxm_layers(14, 7, 1)], 1117: [_pxm_layers(14, 8, 1)],
-        1118: [_pxm_layers(14, 1, 1)], 1119: [_pxm_layers(14, 2, 1)],
+        500: [_pxm_layers(5, 12, 1)], 501: [_pxm_layers(5, 12, 1)],
+        502: [_pxm_layers(12, 5, 1)], 503: [_pxm_layers(12, 5, 1)],
+        331: [_pxm_layers(16, 16, 1)], 332: [_pxm_layers(16, 16, 1)],
+        321: [_pxm_layers(16, 16, 1)], 322: [_pxm_layers(16, 16, 1)],
     }
     out = tempfile.mkdtemp() + "/theme"
     keys = tool.write_theme_chrome("Synthetic", pxm, [], out, [], layo, plut)
@@ -1299,13 +1303,16 @@ def test_control_faces():
                 "progress-fill", "checkbox-off", "checkbox-on",
                 "checkbox-mixed", "radio-off", "radio-on",
                 "scroll-arrow-decrement-horz", "scroll-arrow-increment-horz",
-                "scroll-track-horz", "scroll-thumb-horz-stretch",
+                "scroll-track-horz", "scroll-thumb-horz-left",
+                "scroll-thumb-horz-right", "scroll-thumb-horz-stretch",
                 "scroll-arrow-decrement-vert", "scroll-arrow-increment-vert",
-                "scroll-track-vert", "scroll-thumb-vert-stretch"):
+                "scroll-track-vert", "scroll-thumb-vert-top",
+                "scroll-thumb-vert-bottom", "scroll-thumb-vert-stretch"):
         assert os.path.isfile(os.path.join(out, "chrome", key + ".png")), key
         assert key in keys, (key, keys)
-    assert keys.get("scroll-arrow-dec") == "7", keys
-    assert keys.get("scroll-arrow-inc") == "8", keys
+    assert keys.get("scroll-arrow-dec") == "14", keys
+    assert keys.get("scroll-arrow-inc") == "14", keys
+    assert _png_size(os.path.join(out, "chrome", "scroll-arrow-decrement-horz.png")) == (14, 14)
     with open(os.path.join(out, "chrome", "button.argb"), "rb") as f:
         blob = f.read()
         assert struct.unpack("<II", blob[:8]) == (8, 8), blob[:8]
@@ -1476,7 +1483,9 @@ def test_theme_chrome_reordered_layout():
     assert keys.get("menu-bar-image", "").endswith("chrome/menu-bar-image.argb"), keys
     assert keys.get("menu-background") == "ffffff", keys
     assert _png_size(os.path.join(out, "chrome", "bar-left.png")) == (14, tool.ZACOS_BAR_HEIGHT)
-    assert _png_size(os.path.join(out, "chrome", "bar-middle.png")) == (16, tool.ZACOS_BAR_HEIGHT)
+    # A plut/ppat bar fill keeps its natural pattern height; the compositor
+    # scales it to the title row, so a 16-row gradient is not flattened.
+    assert _png_size(os.path.join(out, "chrome", "bar-middle.png")) == (16, 16)
     assert _png_size(os.path.join(out, "chrome", "bar-right.png")) == (7, tool.ZACOS_BAR_HEIGHT)
     assert _png_size(os.path.join(out, "chrome", "document-left.png")) == (14, 38)
     assert _png_size(os.path.join(out, "chrome", "document-right.png")) == (14, 38)
