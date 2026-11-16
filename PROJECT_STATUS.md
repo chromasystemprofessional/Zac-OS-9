@@ -88,7 +88,10 @@ This page is what's true now and what's next. What changed and when is in
 ## Being worked on
 
 **Bloodhound (Search)**: the planned 1.0–1.3 slices are done; 1.3 shipped in
-1.13.0. The later ideas — optional local channels, Smart Folders, a global
+1.13.0. **1.4** is in the tree: Sherlock 2's icon channel bar (Files,
+Internet, People, Shopping, News, ZacOS, Reference, My Channel and user
+channels), local People and ZacOS Help channels, the seed search sites, and
+the desktop alias. The later ideas — optional local channels, Smart Folders, a global
 hotkey and local semantic search — are not scheduled
 ([Bloodhound](docs/bloodhound.md)).
 
@@ -233,7 +236,20 @@ All of them are [on GitHub](https://github.com/chromasystemprofessional/Zac-OS-9
    starting after its partition was made smaller.
 2. **SMB**: a server to test against, then the share-list dialog.
 3. **Classic seamless windows** ([Classic](docs/classic-seamless.md)): the
-   capture experiment the feasibility gate is waiting on.
+   color-port/GWorld prerequisite now passes exact-pixel direct-32-bit tests.
+   The patched SheepShaver's emulator bridge lets `--open` and Classic Open
+   Helper open further apps in a running session; SimpleText and SimpleSound
+   have been opened in one session. A background window agent now discovers
+   and captures SimpleText and Graphing Calculator windows in separate
+   processes, including typed text. A basic host viewer shows them as ordinary
+   toplevels and forwards clicks and keys through the emulator's ADB queue.
+   Close in Classic reaches the guest close box and preserves the unsaved
+   SimpleText prompt. An isolated compositor trial showed real ZacOS title
+   bars with Calculator, SheepShaver and the exported SimpleText window.
+   Show Classic Desktop now raises the emulator, and Resize in Classic sends a
+   one-shot grow-box drag. Documents, live border resize, window placement and
+   full lifecycle recovery are still to come, though a close request now hides
+   the stale host entry immediately.
 4. **From the [roadmap](docs/ROADMAP.md)**: a Platinum boot menu (on Esc),
    manual pages, trying it in Hyper-V.
 

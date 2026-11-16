@@ -134,8 +134,9 @@ public:
 	void showOriginal();
 	void setLabel(int label);
 	/* Start classic Mac OS (shell/classic/zacos9-classic), with extra
-	 * disk images; explains in an alert when ROM or emulator is missing. */
-	void launchClassic(const QStringList &disks = {});
+	 * disk images and optionally a Classic application to open inside the
+	 * Mac; explains in an alert when ROM, emulator or app is missing. */
+	void launchClassic(const QStringList &disks = {}, const QString &openPath = {});
 	/* File > Print (⌘P): the selected documents, on your printer. */
 	void printSelection();
 	/* File > Print Window… / Print Desktop…: the front window's contents

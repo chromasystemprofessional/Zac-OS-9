@@ -20,8 +20,9 @@ class QDragEnterEvent;
 class QDropEvent;
 
 /*
- * Bloodhound (Search): Sherlock 2's Files channel in one window. The search
- * field, scope and criteria rows sit above the result list; the engine is
+ * Bloodhound (Search): Sherlock 2's channels in one window. The channel bar
+ * chooses Files (the scope, criteria and result list), a group of Internet
+ * search sites, the accounts on this computer, or ZacOS Help. The engine is
  * the Sniffer's Find (search.h, findcriteria.*, findindex.*), and results
  * open and reveal through zacos9-finder-ctl.
  */
@@ -41,8 +42,26 @@ protected:
 	void contextMenuEvent(QContextMenuEvent *) override;
 	void dragEnterEvent(QDragEnterEvent *) override;
 	void dropEvent(QDropEvent *) override;
+	void leaveEvent(QEvent *) override;
 
 private:
+	/* Sherlock 2's channels, as a row of icons along the top. Files is
+	 * the local search; Sites are groups of Internet Search Sites (one
+	 * group each, or every site for Internet); People is the account
+	 * list; ZacOS searches Help. */
+	enum class ChannelKind { Files, Sites, People, Help };
+	struct Channel {
+		QString id;
+		QString label;
+		pl_icon_kind icon = PL_ICON_CHANNEL_FILES;
+		ChannelKind kind = ChannelKind::Sites;
+		bool builtin = true;
+	};
+	struct ChannelTile {
+		QString id;
+		QRect rect;
+	};
+
 	struct CriterionRow;
 	struct Snippet {
 		QString text;
@@ -62,6 +81,17 @@ private:
 	void setCriterionField(CriterionRow &row, FindField field);
 	void relayout();
 	void saveSearch();
+	void searchHelp();
+	void fillPeople();
+	void showChannelMenu(const QPoint &at);
+	const Channel *channelById(const QString &id) const;
+	const Channel *currentChannel() const;
+	QString channelLabel(const QString &id) const;
+	bool filesChannel() const;
+	bool sitesChannel() const;
+	bool peopleChannel() const;
+	bool helpChannel() const;
+	bool channelTileAt(const QPoint &pos, QString *id) const;
 	void showSavedSearches();
 	void indexSelection();
 	void showIndexMenu();
@@ -75,7 +105,6 @@ private:
 	void chooseChannel(const QString &name);
 	void updateSitePopup();
 	QList<SearchSite> sitesForChannel(const QString &name) const;
-	bool filesChannel() const { return m_channelName == "Files"; }
 	bool hasContentsRow() const;
 	void liveSearchSoon();
 	void runLiveSearch();
@@ -124,8 +153,13 @@ private:
 	bool m_previewOn = false;
 	QString m_channelName = "Files";
 	QStringList m_channels;
+	std::vector<Channel> m_channelDefs;
+	std::vector<ChannelTile> m_channelTiles;
+	QRect m_channelMore;
+	QString m_hoverChannel;
+	bool m_barFocus = false;
+	int m_barIndex = 0;
 	QList<SearchSite> m_sites;
-	std::vector<std::pair<QString, QRect>> m_channelHits;
 	std::vector<std::unique_ptr<CriterionRow>> m_rows;
 	QPoint m_pressPos;
 	Item *m_pressItem = nullptr;

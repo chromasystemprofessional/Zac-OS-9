@@ -1,0 +1,4 @@
+[Search Site]
+Name=Wikipedia
+URL=https://en.wikipedia.org/w/index.php?search={query}
+Channel=Reference

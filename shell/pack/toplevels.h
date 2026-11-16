@@ -15,4 +15,6 @@ void start(std::function<void()> changed);
 std::vector<WindowInfo> windows();
 /* Hides every window of `appId` (Option-click: the program you leave). */
 void hide(const QString &appId);
+/* Brings the first window whose app id or title matches to the front. */
+bool activate(const QString &appIdOrTitle);
 }

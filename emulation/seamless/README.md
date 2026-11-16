@@ -24,7 +24,9 @@ in a separate temporary checkout, not the excluded upstream/build directories.
   future private bridge, not an existing safe application/window protocol.
 
 The guest experiments below establish bounded native monochrome interception
-before visibility clipping. General drawing coverage without changing the
+before visibility clipping. They also establish, for the fixture's direct
+32-bit color ports, exact GWorld-backed color capture whose references pass an
+independent RGB oracle. General drawing coverage without changing the
 application, corrupting Window Manager regions or running Toolbox code from a
 video thread remains a research question. The acceleration hooks alone do not
 establish this.
@@ -48,6 +50,8 @@ window's cooperative offscreen reference buffer.
 - **Probe > Switch window** brings the other window forward.
 - **Probe > Export snapshots** writes six named PBM files in the current
   guest working folder, replacing prior exports with the same names.
+- **Probe > Color mode** (Command-K) replaces the monochrome windows with
+  direct-color ones and exports version-3 PPMs; see the color section below.
 - Drag the guest title bars to test fully obscured, partial overlap and
   separated layouts. The standard grow region supports 64x64 to 640x384.
 - Closing or quitting asks for confirmation; Cancel preserves the window.
@@ -79,8 +83,10 @@ Guest code builds with `-Wall -Wextra -Werror`. Retro68 produces a MacBinary
 application (`ClassicWindowProbe.bin`), an application-only HFS disk
 (`ClassicWindowProbe.dsk`) and resource-fork-aware loose-file formats.
 Do not copy a bare `.APPL` data fork and discard its resources.
-The same build also produces `ClassicDrawingFixture` and `ClassicCaptureHelper`
-in these formats; their roles and limitations are described below.
+The same build also produces `ClassicDrawingFixture`,
+`ClassicCaptureHelper`, and the automated `ClassicColorFixture` and
+`AutoCaptureHelper` targets in these formats; their roles and limitations are
+described below.
 
 Validated with the public `ghcr.io/autc04/retro68` PowerPC toolchain,
 GCC 16.1.0, using the toolchain layer:
@@ -205,6 +211,9 @@ This experiment separates the fixture from the hook:
   callbacks. Quit does the same. If another patch changes the chain, the helper
   refuses to unload its callback code; recover the disposable test guest rather
   than force-quitting it. Do not use this experiment in a normal guest session.
+- **Helper > Export color** (Command-K) writes PPM candidates for the color
+  windows; **Helper > Export candidates/graphics** remain the monochrome
+  paths.
 
 Reproduction in the disposable guest:
 
@@ -239,8 +248,8 @@ system-wide hooks fail.
 The observer was stopped and a second report confirmed restored trap entries
 (`hooks_installed=0`). Both applications then exited normally, the disposable
 guest shut down through Finder, and the original hard-disk SHA-256 remained
-unchanged. All three guest targets build with strict warnings; the nine host
-verifier tests still pass through Meson.
+unchanged. All guest targets build with strict warnings; the host verifier
+tests still pass through Meson.
 
 This led to the native execution-context experiment below. Do not proceed to
 production host windows or claim the milestone-0 gate passed.
@@ -335,8 +344,8 @@ was two. Relaunch while the helper remained installed produced fresh captures.
 The final build, including custom-procedure rejection, region error checks and
 restoration readback, passed a fresh frame-29 capture trial. All six recorded
 native trials pass the CLI's independent-reference comparison; each screen
-pair fails its intended negative control. Ten host tests pass directly and
-through Meson, and all three guest targets build with strict warnings.
+pair fails its intended negative control. The host tests pass directly and
+through Meson, and all guest targets build with strict warnings.
 Native vectors were restored, both applications exited normally and the copied
 guest shut down through Finder. The original disk's SHA-256 still matches the
 pre-experiment value.
@@ -435,34 +444,78 @@ frame, 38 line, 76 image/self-copy and 38 scroll replay calls, with no observati
 error. Later trials exercise both scroll directions. This is measured pixel
 coverage, not merely successful compilation or seeing a window.
 
-**Color remains unsupported.** A **Color guard test** (Command-C) creates and
-draws a temporary color window in the fixture. The real guest test confirmed
-explicit `color port` rejection (Mac error -50), with no candidate exports or
-overwriting previous evidence. Unrelated color alerts are ignored because
-they are not fixture document windows. The helper never interprets a target
-CGrafPort/PixMap as a monochrome GrafPort/BitMap.
+Stopping/restarting capture worked. Closing one window invalidated its
+capture while the other remained live, and pair export was refused. All eight
+native vectors were restored before helper exit.
 
-Stopping/restarting capture after that rejection worked. Closing A invalidated
-its capture while B remained live, and pair export was refused. All eight
-native vectors were restored before helper exit; the copied guest shut down
-through Finder and the original disk's checksum remained unchanged.
-The final build's graphics trial also passed, then shrinking A below 256 pixels
-confirmed explicit refusal by both fixture and helper without overwriting the
-previous exports. Fixture graphics resources are released on normal exit and
-initialization failures.
-All three guest targets build with strict warnings. Eighteen host tests pass
-directly, including graphics and color profile enforcement, full-pixel
+## Color ports and GWorld backing store
+
+The fixture's **Color mode** (Command-K) and the automated
+**ClassicColorFixture** target create two overlapping direct-color document
+windows. The scene has three host-checkable bands:
+
+- rows 0–7: the 32-bit frame marker as 8-pixel grayscale bands;
+- rows 8–15: black, white, red, green, blue, yellow, cyan and magenta bars;
+- rows 16–47: an 8×8-pixel color grid whose channel values are 5-bit RGB555
+  values expanded to the exact 8-bit equivalents, so the pattern is exact in
+  both 16- and 32-bit exports.
+
+Below that it draws color graphics state: an explicit clip, RGB
+foreground/background, pen pattern/size/mode, `FrameRect`/`LineTo`, styled
+`DrawText`, a window self-copy and `ScrollRect`.
+
+The helper treats a target titled **Classic Color A/B** as a `CGrafPort`. It
+refuses indexed or non-direct PixMaps and any window with a non-NULL
+`grafProcs`; the fixture clears the standard color-window field, so a window
+that keeps standard procedures in a non-NULL field would also be refused until
+this is narrowed. It copies the color, pen, text and explicit clip state, and
+replays `PaintRect`,
+`EraseRect`, `DrawText`, `FrameRect`, `LineTo`, `CopyBits` and `ScrollRect`
+into a per-window GWorld. The GWorlds are allocated in the system zone because
+the helper's 1 MB application partition cannot hold two 320×192×32 backing
+stores; `LockPixels` pins them. The fixture clears the standard color-window
+`grafProcs` so the helper's custom-procedure guard sees only explicit
+application procedures.
+
+Color exports use the version-3 P6 PPM contract. The host verifier
+independently recomputes the marker, calibration bars and color grid and
+requires every RGB pixel to match; candidates must also match the fixture's
+reference exactly. The obscured screen crop is the negative control.
+
+Automated reproduction uses two extra test targets: **ClassicColorFixture**
+starts in color mode, exports its references at frame 10 and keeps repainting
+that frame; **AutoCaptureHelper** installs capture at launch and exports its
+candidates when both windows carry frame 10. Both are test fixtures, not the
+production helper.
+
+| Trial | Frame | Window sizes A / B | Reference oracle A / B | Candidate vs reference A / B | Screen negative control A / B |
+|---|---:|---|---|---|---|
+| Direct 32-bit color, B in front | 10 | 320×192 / 320×192 | pass / pass | 0 / 0 | 15,034 / 0 |
+
+Both reference exports pass the independent RGB/marker/calibration/grid
+oracle. The helper candidate pair matches those references exactly at every
+pixel. The obscured window's screen crop differs in 15,034 pixels, so the
+trial cannot pass by cropping the guest framebuffer. The guest display was
+32-bit ARGB.
+
+The 16-bit RGB555 conversion path is implemented and the color grid is chosen
+to be exact at both depths, but no 16-bit guest display was run. Indexed
+(8-bit) ports, custom color procedures, arbitrary offscreen blit sources,
+other color APIs (for example `FillCRect` and `RGBOpColor`) and general
+application clipping/origins remain unsupported or unproven.
+
+All five guest targets build with strict warnings. Twenty-one host tests pass
+directly, including graphics and color profile enforcement, the independent
+RGB oracle (marker, calibration, grid and channel order), full-pixel
 comparison, stale/relabelled markers, CLI reference requirements and original
-version-1 behavior. The host suite has also passed through Meson in a
-configured build.
+version-1 behavior. The host suite also passes through Meson in a configured
+build.
 
-Host tests now enforce the bounded version-3 PPM color-reference contract,
-including exact RGB comparison, frame marker, dimensions and payload length.
-This only validates the future export format; it is not guest color evidence.
-
-**Next prerequisite:** a dedicated color-port/GWorld backing-store experiment
-with verified RGB/PixMap layout and color-state-preserving replay. Do not
-enable color capture by casting through the monochrome structs.
-General application clipping/origins, other text APIs, cross-window blits,
-custom drawing procedures, lifecycle recovery and production integration also
-remain unproven; milestone 0 has not passed.
+**Next prerequisite:** the remaining milestone-0 gate evidence: cross-process
+window discovery and stable identities for arbitrary applications, guest input
+delivery and activation, unsaved-close/modal/lifecycle behavior, and a broader
+color/API compatibility matrix. Color capture is a bounded direct-32-bit
+result from the fixture, not general compatibility. General application
+clipping/origins, other text APIs, cross-window blits, custom drawing
+procedures, lifecycle recovery and production integration also remain
+unproven; milestone 0 has not passed.

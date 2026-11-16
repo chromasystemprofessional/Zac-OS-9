@@ -134,16 +134,18 @@ with tempfile.TemporaryDirectory(prefix="zacos9-bloodhound-") as directory:
             # and type: the default button searches on Return.
             vp("key", "Escape", "wait", "300")
             before = ink()
-            vp("home", "move", "220", "95", "click", "wait", "300",
+            vp("home", "move", "220", "123", "click", "wait", "300",
                "type", "report", "wait", "300", "key", "Return", "wait", "2000")
             after = ink()
             assert window.poll() is None, "Bloodhound exited"
             assert after > before + 500, (before, after)
             print("ok: Bloodhound searches a folder and draws the results")
 
-            # Tab reaches the list, Down selects a result, and Return, ⌘R
-            # and ⌘I ask the Sniffer to open, reveal and show Get Info.
-            vp("key", "Tab", "wait", "200", "key", "Down", "wait", "200",
+            # Tab once reaches the channel bar, again the list; Down selects
+            # a result, and Return, ⌘R and ⌘I ask the Sniffer to open,
+            # reveal and show Get Info.
+            vp("key", "Tab", "wait", "200", "key", "Tab", "wait", "200",
+               "key", "Down", "wait", "200",
                "key", "Return", "wait", "500",
                "cmd", "r", "wait", "500", "cmd", "i", "wait", "500")
             asked = actions.read_text() if actions.exists() else ""
@@ -155,8 +157,8 @@ with tempfile.TemporaryDirectory(prefix="zacos9-bloodhound-") as directory:
             # A saved contents search loads its criteria, asks the index and
             # draws snippets with the matched word highlighted.
             before_highlight = highlight()
-            vp("home", "move", "431", "127", "click", "wait", "700",
-               "home", "move", "430", "142", "click", "wait", "2500")
+            vp("home", "move", "431", "155", "click", "wait", "700",
+               "home", "move", "430", "170", "click", "wait", "2500")
             after_highlight = highlight()
             assert window.poll() is None, "Bloodhound exited after a saved search"
             assert after_highlight > before_highlight + 50, (before_highlight, after_highlight)

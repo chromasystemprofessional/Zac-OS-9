@@ -80,6 +80,41 @@ def mismatch_count(capture):
     return mismatches
 
 
+COLOR_BARS = (
+    (0, 0, 0), (255, 255, 255),
+    (255, 0, 0), (0, 255, 0), (0, 0, 255),
+    (255, 255, 0), (0, 255, 255), (255, 0, 255),
+)
+COLOR_MARKER_ROWS = 8
+COLOR_CALIBRATION_ROWS = 8
+COLOR_ORACLE_ROWS = 32
+COLOR_STRUCTURED_ROWS = (COLOR_MARKER_ROWS + COLOR_CALIBRATION_ROWS +
+                         COLOR_ORACLE_ROWS)
+
+
+def color_expected(window, frame, x, y):
+    """The fixture's host-checkable color rows, independent of its exports."""
+    if y < COLOR_MARKER_ROWS:
+        value = 255 if (((frame >> ((x // 8) % 32)) ^ window) & 1) else 0
+        return (value, value, value)
+    if y < COLOR_MARKER_ROWS + COLOR_CALIBRATION_ROWS:
+        return COLOR_BARS[(x // 32) % 8]
+    if y < COLOR_STRUCTURED_ROWS:
+        cell_x = x // 8
+        cell_y = (y - COLOR_MARKER_ROWS - COLOR_CALIBRATION_ROWS) // 8
+        tick = frame & 0xFF
+        return (_expand5(cell_x * 37 + cell_y * 11 + tick * 5 + window * 127),
+                _expand5(cell_x * 13 + cell_y * 53 + tick * 7 + window * 191),
+                _expand5(cell_x * 71 + cell_y * 29 + tick * 3 + window * 251))
+    return None
+
+
+def _expand5(value):
+    """The exact 8-bit equivalent of a 5-bit RGB555 channel."""
+    value &= 31
+    return (value << 3) | (value >> 2)
+
+
 def verify_pair(paths, frame, mode, allow_reference_profiles=False):
     if mode not in ("reference", "screen", "candidate"):
         raise ValueError("unknown capture mode")
@@ -106,7 +141,7 @@ def verify_pair(paths, frame, mode, allow_reference_profiles=False):
                     for y in range(8) for x in range(min(capture.width, 256))
                 )
             else:
-                mismatches = _color_marker_mismatches(capture, frame)
+                mismatches = _color_structure_mismatches(capture)
         else:
             mismatches = mismatch_count(capture)
         if mismatches:
@@ -151,13 +186,13 @@ def verify_against_references(paths, reference_paths, frame, mode="candidate"):
     return captures
 
 
-def _color_marker_mismatches(capture, frame):
+def _color_structure_mismatches(capture):
     mismatches = 0
-    for y in range(8):
-        for x in range(256):
-            expected = 255 if (((frame >> (x // 8)) ^ capture.window) & 1) else 0
+    for y in range(min(capture.height, COLOR_STRUCTURED_ROWS)):
+        for x in range(capture.width):
+            expected = color_expected(capture.window, capture.frame, x, y)
             offset = (y * capture.width + x) * 3
-            mismatches += capture.pixels[offset:offset + 3] != bytes((expected,) * 3)
+            mismatches += capture.pixels[offset:offset + 3] != bytes(expected)
     return mismatches
 
 

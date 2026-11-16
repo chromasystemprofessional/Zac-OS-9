@@ -1,5 +1,6 @@
 #!/usr/bin/python3
-"""Register ZacOS save locations without moving or exposing system files."""
+"""Register ZacOS save locations without moving or exposing system files,
+and offer Bloodhound on the Desktop once."""
 
 import fcntl
 import os
@@ -7,6 +8,49 @@ from pathlib import Path
 import shlex
 import sys
 import tempfile
+
+
+SHORTCUTS_VERSION = 1
+
+
+def find_desktop_file(name, data):
+    """The first applications/NAME in XDG_DATA_HOME then XDG_DATA_DIRS."""
+    roots = [data]
+    for root in os.environ.get("XDG_DATA_DIRS", "/usr/local/share:/usr/share").split(":"):
+        if root:
+            roots.append(Path(root))
+    for root in roots:
+        candidate = root / "applications" / name
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def seed_desktop_shortcuts(desktop, config, data):
+    """Put Bloodhound on the Desktop once, as the Zac menu seeds its items.
+
+    The marker is written even when the user already has an item of that
+    name, and after the first run a shortcut the user removes stays
+    removed."""
+    marker = config / "zacos9" / "desktop-shortcuts"
+    try:
+        seeded = int(marker.read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        seeded = 0
+    if seeded >= SHORTCUTS_VERSION:
+        return
+    target = find_desktop_file("zacos9-bloodhound.desktop", data)
+    if target is None:
+        return  # installed later; the next login tries again
+    shortcut = desktop / "Bloodhound (Search)"
+    if not shortcut.exists() and not shortcut.is_symlink():
+        try:
+            shortcut.symlink_to(target.resolve())
+        except OSError as error:
+            print(f"zacos9-desktop-places: could not add the Bloodhound shortcut: {error}",
+                  file=sys.stderr)
+            return
+    write_atomic(marker, f"{SHORTCUTS_VERSION}\n")
 
 
 def write_atomic(path, text):
@@ -75,6 +119,7 @@ def register():
                 lines.append(entry)
         if updated != existing:
             write_atomic(bookmarks, updated)
+        seed_desktop_shortcuts(desktop, config, data)
         print(desktop)
 
 

@@ -43,10 +43,16 @@ static ConnectionID interface_connection;
 static int native_hooked, interface_open;
 static unsigned long fixture_windows;
 static Surface candidates[2];
+static ColorSurface color_candidates[2];
+static int candidate_color[2];
 static WindowPtr candidate_windows[2];
 static ProcessSerialNumber candidate_processes[2];
 static unsigned long candidate_calls[2], disposed_windows;
 static THz helper_zone;
+static GrafPort helper_port;
+#ifdef HELPER_AUTO_EXPORT
+static int auto_exported;
+#endif
 enum { TEXT_HOOK, FRAME_HOOK, LINE_HOOK, BITS_HOOK, SCROLL_HOOK, EXTRA_HOOKS };
 static NativeVector *extra_vectors[EXTRA_HOOKS];
 static NativeVector saved_extra[EXTRA_HOOKS];
@@ -85,7 +91,35 @@ static int same_process(const ProcessSerialNumber *a, const ProcessSerialNumber 
 		a->lowLongOfPSN == b->lowLongOfPSN;
 }
 
+
+static void copy_color_state(CGrafPtr destination, CGrafPtr source, OSErr *error) {
+	destination->rgbFgColor = source->rgbFgColor;
+	destination->rgbBkColor = source->rgbBkColor;
+	destination->fgColor = source->fgColor;
+	destination->bkColor = source->bkColor;
+	destination->bkPixPat = source->bkPixPat;
+	destination->pnPixPat = source->pnPixPat;
+	destination->fillPixPat = source->fillPixPat;
+	destination->pnLoc = source->pnLoc;
+	destination->pnSize = source->pnSize;
+	destination->pnMode = source->pnMode;
+	destination->pnVis = source->pnVis;
+	destination->txFont = source->txFont;
+	destination->txFace = source->txFace;
+	destination->txMode = source->txMode;
+	destination->txSize = source->txSize;
+	destination->spExtra = source->spExtra;
+	destination->chExtra = source->chExtra;
+	destination->pnLocHFrac = source->pnLocHFrac;
+	CopyRgn(source->clipRgn, destination->clipRgn);
+	*error = probe_mem_error();
+}
+
 static void observe_rectangle(GrafVerb verb, const Rect *rect, int replay) {
+	static const unsigned char titles[4][18] = {
+		"\pClassic Probe A", "\pClassic Probe B",
+		"\pClassic Color A", "\pClassic Color B"
+	};
 	ProcessSerialNumber process;
 	ProcessInfoRec info;
 	OSErr error;
@@ -106,12 +140,11 @@ static void observe_rectangle(GrafVerb verb, const Rect *rect, int replay) {
 		WindowPeek window = LMGetWindowList();
 		GrafPtr port;
 		WindowPeek target = NULL;
-		unsigned int count;
+		unsigned int count, match, id;
 		unsigned long found = 0;
-		unsigned int id;
 		Str255 title;
 		THz previous_zone;
-		int width, height;
+		int width, height, color;
 		fixture_rectangles++;
 		GetPort(&port);
 		for (count = 0; window && count < MAX_WINDOWS; count++) {
@@ -130,22 +163,93 @@ static void observe_rectangle(GrafVerb verb, const Rect *rect, int replay) {
 			return;
 		}
 		GetWTitle((WindowPtr)target, title);
-		for (id = 0; id < 2; id++) {
-			static const unsigned char titles[2][17] = {
-				"\pClassic Probe A", "\pClassic Probe B"
-			};
-			if (title[0] == titles[id][0] && !memcmp(title, titles[id], title[0] + 1)) {
+		for (match = 0; match < 4; match++) {
+			if (title[0] == titles[match][0] &&
+					!memcmp(title, titles[match], title[0] + 1)) {
 				break;
 			}
 		}
-		if (id == 2) {
+		if (match == 4) {
 			return;
 		}
-		/* CGrafPort and GrafPort have different layouts; classify before reading fields. */
-		if (IsPortColor(port)) {
-			observation_error = paramErr;
-			observation_reason = "color port";
+		id = match & 1;
+		color = match >= 2;
+		if (color) {
+			CGrafPtr color_port = (CGrafPtr)port;
+			PixMapHandle pixmap = color_port->portPixMap;
+			int depth;
+			if (!pixmap) {
+				observation_error = paramErr;
+				observation_reason = "missing color pixmap";
+				return;
+			}
+			if (color_port->grafProcs) {
+				observation_error = paramErr;
+				observation_reason = "custom procedures";
+				return;
+			}
+			width = port->portRect.right;
+			height = port->portRect.bottom;
+			if (port->portRect.left || port->portRect.top ||
+					width < 64 || width > 640 || height < 64 || height > 384) {
+				observation_error = paramErr;
+				observation_reason = "origin/dimensions";
+				return;
+			}
+			if (!color_pixmap_supported(*pixmap)) {
+				observation_error = paramErr;
+				observation_reason = "color pixel format";
+				return;
+			}
+			depth = (**pixmap).pixelSize;
+			previous_zone = GetZone();
+			SetZone(helper_zone);
+			if (candidate_color[id] != 1 ||
+					candidate_windows[id] != (WindowPtr)target ||
+					!same_process(&candidate_processes[id], &process) ||
+					color_candidates[id].width != width ||
+					color_candidates[id].height != height ||
+					color_candidates[id].depth != depth) {
+				dispose_color_surface(&color_candidates[id]);
+				candidate_color[id] = 1;
+				if (!create_color_surface(&color_candidates[id], width, height, depth)) {
+					observation_error = memFullErr;
+					observation_reason = "color surface allocation";
+					SetZone(previous_zone);
+					return;
+				}
+				candidate_windows[id] = (WindowPtr)target;
+				candidate_processes[id] = process;
+				candidate_calls[id] = 0;
+			}
+			SetGWorld((CGrafPtr)color_candidates[id].world, NULL);
+			copy_color_state((CGrafPtr)color_candidates[id].world, color_port, &error);
+			if (error != noErr) {
+				observation_error = error;
+				SetPort(port);
+				SetZone(previous_zone);
+				return;
+			}
+			if (replay == 2) {
+				replay_original = port;
+				replay_zone = previous_zone;
+				replay_id = id;
+				return;
+			}
+			StdRect(verb, rect);
+			candidate_calls[id]++;
+			SetPort(port);
+			SetZone(previous_zone);
 			return;
+		}
+		/* CGrafPort and GrafPort have different layouts; the fixture titles
+		   above are the only way this spike classifies the port. */
+		if (candidate_color[id]) {
+			THz color_zone = GetZone();
+			SetZone(helper_zone);
+			dispose_color_surface(&color_candidates[id]);
+			SetZone(color_zone);
+			candidate_color[id] = 0;
 		}
 		if (port->grafProcs) {
 			observation_error = paramErr;
@@ -171,10 +275,10 @@ static void observe_rectangle(GrafVerb verb, const Rect *rect, int replay) {
 			SetRect(&candidates[id].port.portRect, 0, 0, width, height);
 			candidates[id].port.portBits.bounds = candidates[id].port.portRect;
 			RectRgn(candidates[id].port.visRgn, &candidates[id].port.portRect);
-			error = MemError();
+			error = probe_mem_error();
 			if (error == noErr) {
 				RectRgn(candidates[id].port.clipRgn, &candidates[id].port.portRect);
-				error = MemError();
+				error = probe_mem_error();
 			}
 			if (error != noErr) {
 				observation_error = error;
@@ -203,7 +307,7 @@ static void observe_rectangle(GrafVerb verb, const Rect *rect, int replay) {
 			destination->txSize = port->txSize;
 			destination->spExtra = port->spExtra;
 			CopyRgn(port->clipRgn, destination->clipRgn);
-			error = MemError();
+			error = probe_mem_error();
 			if (error != noErr) {
 				observation_error = error;
 				SetPort(port);
@@ -283,27 +387,52 @@ static pascal void capture_line(short h, short v) {
 static pascal void capture_bits(BitMap *source, BitMap *destination,
 		const Rect *source_rect, const Rect *destination_rect, short mode, RgnHandle mask) {
 	int nested = in_callback;
-	GrafPtr original;
-	GetPort(&original);
-	if (!IsPortColor(original) &&
-			destination == &original->portBits && begin_replay()) {
-		BitMap *replay_source = source;
-		if (source->rowBytes & 0xC000) {
-			observation_error = paramErr;
-			observation_reason = "color source bitmap";
-		}
-		if (source->baseAddr == replay_original->portBits.baseAddr) {
-			if (source == &replay_original->portBits) {
-				replay_source = &candidates[replay_id].port.portBits;
+	if (begin_replay()) {
+		if (candidate_color[replay_id]) {
+			PixMap *window_pixmap = *((CGrafPtr)replay_original)->portPixMap;
+			PixMap *candidate_pixmap = *color_candidates[replay_id].pixmap;
+			BitMap *replay_source = source;
+			BitMap *replay_destination = (BitMap *)candidate_pixmap;
+			if (!(destination->rowBytes & 0x8000) ||
+					(PixMap *)destination != window_pixmap) {
+				observation_error = paramErr;
+				observation_reason = "unmapped color destination";
+			} else if (!(source->rowBytes & 0x8000)) {
+				observation_error = paramErr;
+				observation_reason = "monochrome color source";
+			} else if ((PixMap *)source == window_pixmap) {
+				replay_source = (BitMap *)candidate_pixmap;
 			} else {
 				observation_error = paramErr;
-				observation_reason = "unmapped screen source";
+				observation_reason = "unmapped color source";
 			}
-		}
-		if (observation_error == noErr) {
-			((NativeBits)&saved_extra[BITS_HOOK])(replay_source,
-				&candidates[replay_id].port.portBits,
-				source_rect, destination_rect, mode, mask);
+			if (observation_error == noErr) {
+				((NativeBits)&saved_extra[BITS_HOOK])(replay_source,
+					replay_destination, source_rect, destination_rect, mode, mask);
+			}
+		} else {
+			BitMap *replay_source = source;
+			if (destination != &replay_original->portBits) {
+				observation_error = paramErr;
+				observation_reason = "unmapped destination";
+			}
+			if (source->rowBytes & 0xC000) {
+				observation_error = paramErr;
+				observation_reason = "color source bitmap";
+			}
+			if (source->baseAddr == replay_original->portBits.baseAddr) {
+				if (source == &replay_original->portBits) {
+					replay_source = &candidates[replay_id].port.portBits;
+				} else {
+					observation_error = paramErr;
+					observation_reason = "unmapped screen source";
+				}
+			}
+			if (observation_error == noErr) {
+				((NativeBits)&saved_extra[BITS_HOOK])(replay_source,
+					&candidates[replay_id].port.portBits,
+					source_rect, destination_rect, mode, mask);
+			}
 		}
 		end_replay(BITS_HOOK);
 	}
@@ -449,6 +578,8 @@ static int stop_observer(void) {
 	}
 	for (i = 0; i < 2; i++) {
 		dispose_surface(&candidates[i]);
+		dispose_color_surface(&color_candidates[i]);
+		candidate_color[i] = 0;
 		candidate_windows[i] = NULL;
 		candidate_calls[i] = 0;
 	}
@@ -550,7 +681,9 @@ static void start_native_observer(void) {
 		*extra_vectors[i] = *extra_callback(i);
 	}
 	native_hooked = 1;
-	message("Native monochrome graphics capture installed for ZcDF. Color/custom ports are refused. Keep helper running; pause and export fixture references before helper candidates.");
+#ifndef HELPER_AUTO_START
+	message("Native graphics capture installed for ZcDF: monochrome and direct 16/32-bit color ports; indexed color and windows with drawing-procedure overrides are refused. Keep helper running; pause and export fixture references before helper candidates.");
+#endif
 	return;
 failed:
 	stop_observer();
@@ -565,6 +698,10 @@ static void export_candidates(int graphics) {
 	if (!native_hooked || observation_error != noErr) {
 		snprintf(text, sizeof(text), "No valid native capture session (Mac error %d: %s). No PBM exported.", observation_error, observation_reason);
 		message(text);
+		return;
+	}
+	if (candidate_color[0] || candidate_color[1]) {
+		message("The captured windows are color. Use Export color for a PPM. No PBM exported.");
 		return;
 	}
 	for (i = 0; i < 2; i++) {
@@ -603,6 +740,81 @@ static void export_candidates(int graphics) {
 	}
 	snprintf(text, sizeof(text), "Helper candidates exported for frame %lu. Verify against independently exported fixture references.", frames[0]);
 	message(text);
+}
+
+static int color_candidate_frame(unsigned int id, unsigned long *frame) {
+	const PixMap *pixmap;
+	const unsigned char *base;
+	unsigned long value = 0;
+	unsigned int bit;
+	if (!candidate_color[id] || !color_candidates[id].pixmap ||
+			color_candidates[id].width < 256) {
+		return 0;
+	}
+	pixmap = *color_candidates[id].pixmap;
+	base = (const unsigned char *)GetPixBaseAddr(color_candidates[id].pixmap);
+	if (!base) {
+		return 0;
+	}
+	for (bit = 0; bit < 32; bit++) {
+		unsigned char rgb[3];
+		color_sample(pixmap, base, (int)bit * 8, rgb);
+		if (rgb[0] == 255 && rgb[1] == 255 && rgb[2] == 255) {
+			value |= (1UL ^ id) << bit;
+		} else if (rgb[0] == 0 && rgb[1] == 0 && rgb[2] == 0) {
+			value |= (0UL ^ id) << bit;
+		} else {
+			return 0;
+		}
+	}
+	*frame = value;
+	return 1;
+}
+
+static void export_color_candidates(void) {
+	unsigned long frames[2] = { 0, 0 };
+	unsigned int i;
+	char text[180];
+	if (!native_hooked || observation_error != noErr) {
+		snprintf(text, sizeof(text), "No valid native capture session (Mac error %d: %s). No PPM exported.", observation_error, observation_reason);
+		message(text);
+		return;
+	}
+	for (i = 0; i < 2; i++) {
+		ProcessInfoRec info;
+		OSErr error;
+		if (!candidate_color[i] || !candidate_windows[i] || !candidate_calls[i]) {
+			message("Both color fixture windows must have been drawn and remain open. No PPM exported.");
+			return;
+		}
+		memset(&info, 0, sizeof(info));
+		info.processInfoLength = sizeof(info);
+		error = GetProcessInformation(&candidate_processes[i], &info);
+		if (error != noErr) {
+			candidate_windows[i] = NULL;
+			snprintf(text, sizeof(text), "Captured color owner is no longer available (Mac error %d). No PPM exported.", error);
+			message(text);
+			return;
+		}
+		if (!color_candidate_frame(i, &frames[i])) {
+			message("A captured color frame marker is missing or invalid. Pause the fixture and retry. No PPM exported.");
+			return;
+		}
+	}
+	if (frames[0] != frames[1]) {
+		message("Captured color frame markers disagree. Pause the fixture and retry. No PPM exported.");
+		return;
+	}
+	for (i = 0; i < 2; i++) {
+		if (!export_color_pixmap(color_candidates[i].pixmap, color_candidates[i].width,
+				color_candidates[i].height, i, "candidate", frames[i], "ZacHelper")) {
+			return;
+		}
+	}
+#ifndef HELPER_AUTO_EXPORT
+	snprintf(text, sizeof(text), "Helper color candidates exported for frame %lu. Verify against independently exported fixture references.", frames[0]);
+	message(text);
+#endif
 }
 
 static void start_observer(void) {
@@ -657,7 +869,7 @@ static void inspect_windows(void) {
 	}
 	if (error == noErr) {
 		error = write_line(file,
-			"Classic helper discovery report v4\n"
+			"Classic helper discovery report v5\n"
 			"No window pointers or per-window drawing procedures are modified.\n");
 	}
 	for (count = 0; error == noErr && count < MAX_PROCESSES; count++) {
@@ -732,6 +944,15 @@ static void inspect_windows(void) {
 	}
 	if (error == noErr) {
 		snprintf(line, sizeof(line),
+			"color_candidates=%d,%d color_depths=%d,%d color_sizes=%dx%d,%dx%d\n",
+			candidate_color[0], candidate_color[1],
+			color_candidates[0].depth, color_candidates[1].depth,
+			color_candidates[0].width, color_candidates[0].height,
+			color_candidates[1].width, color_candidates[1].height);
+		error = write_line(file, line);
+	}
+	if (error == noErr) {
+		snprintf(line, sizeof(line),
 			"graphics_calls text=%lu frame=%lu line=%lu bits=%lu scroll=%lu\nobservation_reason=%s\n",
 			extra_calls[TEXT_HOOK], extra_calls[FRAME_HOOK], extra_calls[LINE_HOOK],
 			extra_calls[BITS_HOOK], extra_calls[SCROLL_HOOK], observation_reason);
@@ -769,13 +990,15 @@ int main(void) {
 	int running = 1;
 	static const unsigned char menu_title[] = "\pHelper";
 	static const unsigned char menu_items[] =
-		"\pInspect windows/I;Start observer/S;Stop observer/T;Native capture/N;Export candidates/E;(-;Quit/Q;Export graphics/G";
+		"\pInspect windows/I;Start observer/S;Stop observer/T;Native capture/N;Export candidates/E;(-;Quit/Q;Export graphics/G;Export color/K";
 	InitGraf(&qd.thePort);
 	InitFonts();
 	InitWindows();
 	InitMenus();
 	TEInit();
 	InitDialogs(NULL);
+	OpenPort(&helper_port);
+	SetPort(&helper_port);
 	InitCursor();
 	helper_zone = GetZone();
 	menu = NewMenu(128, menu_title);
@@ -786,6 +1009,9 @@ int main(void) {
 	AppendMenu(menu, menu_items);
 	InsertMenu(menu, 0);
 	DrawMenuBar();
+#ifdef HELPER_AUTO_START
+	start_native_observer();
+#endif
 	while (running) {
 		if (WaitNextEvent(everyEvent, &event, 1, NULL)) {
 			long command = 0;
@@ -796,7 +1022,26 @@ int main(void) {
 				}
 			} else if ((event.what == keyDown || event.what == autoKey) &&
 					(event.modifiers & cmdKey)) {
-				command = MenuKey(event.message & charCodeMask);
+				char key = event.message & charCodeMask;
+				/* MenuKey is case-sensitive for this Toolbox version; handle
+				   the experiment's shortcuts directly. */
+				if (key == 'n' || key == 'N') {
+					start_native_observer();
+				} else if (key == 'k' || key == 'K') {
+					export_color_candidates();
+				} else if (key == 'e' || key == 'E') {
+					export_candidates(0);
+				} else if (key == 'g' || key == 'G') {
+					export_candidates(1);
+				} else if (key == 'i' || key == 'I') {
+					inspect_windows();
+				} else if (key == 'q' || key == 'Q') {
+					if (stop_observer()) {
+						running = 0;
+					}
+				} else {
+					command = MenuKey(key);
+				}
 			}
 			if ((command >> 16) == 128) {
 				if ((command & 0xffff) == 1) {
@@ -817,10 +1062,25 @@ int main(void) {
 					}
 				} else if ((command & 0xffff) == 8) {
 					export_candidates(1);
+				} else if ((command & 0xffff) == 9) {
+					export_color_candidates();
 				}
 			}
 			HiliteMenu(0);
 		}
+#ifdef HELPER_AUTO_EXPORT
+		if (!auto_exported && native_hooked && observation_error == noErr &&
+				candidate_color[0] && candidate_color[1] &&
+				candidate_calls[0] && candidate_calls[1]) {
+			unsigned long first = 0, second = 0;
+			if (color_candidate_frame(0, &first) &&
+					color_candidate_frame(1, &second) &&
+					first == second && first >= 10) {
+				auto_exported = 1;
+				export_color_candidates();
+			}
+		}
+#endif
 	}
 	DeleteMenu(128);
 	DisposeMenu(menu);

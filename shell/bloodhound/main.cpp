@@ -1,7 +1,7 @@
 /*
- * zacos9-bloodhound: the search app. Sherlock 2's Files channel, first:
- * one window with a search field, a scope and a result list, using the
- * Sniffer's Find engine (libzacos9-files).
+ * zacos9-bloodhound: the search app. Sherlock 2's channels in one window:
+ * Files and the Sniffer's Find engine (libzacos9-files), Internet Search
+ * Sites, the people who can use this computer, and ZacOS Help.
  */
 #include <QApplication>
 #include <QCommandLineParser>

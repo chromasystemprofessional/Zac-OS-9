@@ -103,6 +103,17 @@ enum pl_icon_kind {
 	PL_ICON_APP_PLOTTER,
 	PL_ICON_APP_STASH,
 	PL_ICON_APP_DISKSETUP, /* Disk Setup: a drive and Utilities' wrench */
+	PL_ICON_APP_BLOODHOUND, /* a paw print and a magnifier */
+	/* Bloodhound's channel bar (Sherlock 2's channels). */
+	PL_ICON_CHANNEL_FILES,
+	PL_ICON_CHANNEL_INTERNET,
+	PL_ICON_CHANNEL_PEOPLE,
+	PL_ICON_CHANNEL_SHOPPING,
+	PL_ICON_CHANNEL_NEWS,
+	PL_ICON_CHANNEL_ZACOS,
+	PL_ICON_CHANNEL_REFERENCE,
+	PL_ICON_CHANNEL_MYCHANNEL,
+	PL_ICON_CHANNEL_USER,
 	/* A console game's own icon: a cartridge, disc or PS3 game folder
 	 * (Game Player). */
 	PL_ICON_ROM_NES,

@@ -1,0 +1,4 @@
+[Search Site]
+Name=Amazon
+URL=https://www.amazon.com/s?k={query}
+Channel=Shopping

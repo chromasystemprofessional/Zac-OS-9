@@ -1,0 +1,431 @@
+diff --git a/BasiliskII/src/SDL/video_sdl.cpp b/BasiliskII/src/SDL/video_sdl.cpp
+index b7befed..ff4576a 100644
+--- a/BasiliskII/src/SDL/video_sdl.cpp
++++ b/BasiliskII/src/SDL/video_sdl.cpp
+@@ -58,6 +58,9 @@
+ #include "cpu_emulation.h"
+ #include "main.h"
+ #include "adb.h"
++#ifdef SHEEPSHAVER
++#include "emul_op.h"
++#endif
+ #include "macos_util.h"
+ #include "prefs.h"
+ #include "user_strings.h"
+@@ -1814,6 +1817,9 @@ static void force_complete_window_refresh()
+ 
+ static void handle_events(void)
+ {
++#ifdef SHEEPSHAVER
++	ClassicBridgeInputPoll();
++#endif
+ 	SDL_Event events[10];
+ 	const int n_max_events = sizeof(events) / sizeof(events[0]);
+ 	int n_events;
+diff --git a/BasiliskII/src/SDL/video_sdl2.cpp b/BasiliskII/src/SDL/video_sdl2.cpp
+index 3c116e6..0547304 100644
+--- a/BasiliskII/src/SDL/video_sdl2.cpp
++++ b/BasiliskII/src/SDL/video_sdl2.cpp
+@@ -62,6 +62,9 @@
+ #include <cpu_emulation.h>
+ #include "main.h"
+ #include "adb.h"
++#ifdef SHEEPSHAVER
++#include "emul_op.h"
++#endif
+ #include "macos_util.h"
+ #include "prefs.h"
+ #include "user_strings.h"
+@@ -2337,6 +2340,9 @@ static int SDLCALL on_sdl_event_generated(void *userdata, SDL_Event * event)
+ 
+ static void handle_events(void)
+ {
++#ifdef SHEEPSHAVER
++	ClassicBridgeInputPoll();
++#endif
+ 	SDL_Event events[10];
+ 	const int n_max_events = sizeof(events) / sizeof(events[0]);
+ 	int n_events;
+diff --git a/BasiliskII/src/SDL/video_sdl3.cpp b/BasiliskII/src/SDL/video_sdl3.cpp
+index 5621a72..c5d8f37 100644
+--- a/BasiliskII/src/SDL/video_sdl3.cpp
++++ b/BasiliskII/src/SDL/video_sdl3.cpp
+@@ -60,6 +60,9 @@
+ #include <cpu_emulation.h>
+ #include "main.h"
+ #include "adb.h"
++#ifdef SHEEPSHAVER
++#include "emul_op.h"
++#endif
+ #include "macos_util.h"
+ #include "prefs.h"
+ #include "user_strings.h"
+@@ -2285,6 +2288,9 @@ static bool SDLCALL on_sdl_event_generated(void *userdata, SDL_Event *event)
+ 
+ static void handle_events(void)
+ {
++#ifdef SHEEPSHAVER
++	ClassicBridgeInputPoll();
++#endif
+ 	SDL_Event events[10];
+ 	const int n_max_events = sizeof(events) / sizeof(events[0]);
+ 	int n_events;
+diff --git a/SheepShaver/src/Unix/video_x.cpp b/SheepShaver/src/Unix/video_x.cpp
+index 0f98003..7a21064 100644
+--- a/SheepShaver/src/Unix/video_x.cpp
++++ b/SheepShaver/src/Unix/video_x.cpp
+@@ -60,6 +60,7 @@
+ 
+ #include "main.h"
+ #include "adb.h"
++#include "emul_op.h"
+ #include "prefs.h"
+ #include "user_strings.h"
+ #include "about_window.h"
+@@ -2030,6 +2031,7 @@ static int event2keycode(XKeyEvent &ev, bool key_down)
+ 
+ static void handle_events(void)
+ {
++	ClassicBridgeInputPoll();
+ 	// Handle events
+ 	for (;;) {
+ 		XEvent event;
+diff --git a/SheepShaver/src/emul_op.cpp b/SheepShaver/src/emul_op.cpp
+index d17415f..b8b98ed 100644
+--- a/SheepShaver/src/emul_op.cpp
++++ b/SheepShaver/src/emul_op.cpp
+@@ -19,6 +19,10 @@
+  */
+ 
+ #include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <dirent.h>
++#include <unistd.h>
+ 
+ #include "sysdeps.h"
+ #include "main.h"
+@@ -62,6 +66,293 @@ static uint32 MakeExecutableTvec;
+  *  Execute EMUL_OP opcode (called by 68k emulator)
+  */
+ 
++/*
++ *  Classic emulator bridge (ZacOS 9). Guest code passes a block pointer in A0:
++ *    +0 command (1 = poll, 2 = acknowledge)
++ *    +4 result
++ *    +8 request id
++ *   +12 path (200 bytes including the terminator, colon-separated)
++ *  +212 acknowledge status (0 ok, 1 error)
++ *  +216 acknowledge error code
++ *
++ *  The emulator reads the host request queue and writes acknowledgements, so
++ *  the guest needs no network or ExtFS request view. The bridge only touches
++ *  the request and acknowledgement files below ZACOS9_CLASSIC_QUEUE; it never
++ *  interprets the requested path on the host.
++ */
++enum {
++	BRIDGE_POLL = 1,
++	BRIDGE_ACK = 2,
++	BRIDGE_PATH_SIZE = 200,
++	BRIDGE_TEXT_SIZE = 512,
++	BRIDGE_BLOCK_RESULT = 4,
++	BRIDGE_BLOCK_ID = 8,
++	BRIDGE_BLOCK_PATH = 12,
++	BRIDGE_BLOCK_STATUS = 212,
++	BRIDGE_BLOCK_CODE = 216
++};
++
++static uint32 bridge_current_id;
++static char bridge_current_path[BRIDGE_PATH_SIZE];
++
++static const char *bridge_queue_dir(void) {
++	const char *queue = getenv("ZACOS9_CLASSIC_QUEUE");
++	static char fallback[512];
++	if (queue && *queue)
++		return queue;
++	snprintf(fallback, sizeof(fallback), "%s/zacos9-classic",
++		getenv("HOME") ? getenv("HOME") : ".");
++	return fallback;
++}
++
++static int bridge_value(const char *text, const char *key, char *out, size_t cap) {
++	size_t keylen = strlen(key);
++	const char *line = text;
++	while (*line) {
++		const char *end = line;
++		while (*end && *end != '\n' && *end != '\r')
++			end++;
++		if ((size_t)(end - line) > keylen && !memcmp(line, key, keylen) &&
++				line[keylen] == '=') {
++			const char *value = line + keylen + 1;
++			size_t len = (size_t)(end - value);
++			if (len >= cap)
++				return 0;
++			memcpy(out, value, len);
++			out[len] = 0;
++			return 1;
++		}
++		if (!*end)
++			break;
++		line = end;
++		while (*line == '\n' || *line == '\r')
++			line++;
++	}
++	return 0;
++}
++
++/* request.<n>.req, with a positive decimal <n>. */
++static int bridge_request_id(const char *name, uint32 *id) {
++	const char *digits;
++	char *end;
++	unsigned long value;
++	if (strncmp(name, "request.", 8) != 0)
++		return 0;
++	digits = name + 8;
++	value = strtoul(digits, &end, 10);
++	if (end == digits || strcmp(end, ".req") != 0 ||
++			value == 0 || value > 0xffffffffUL)
++		return 0;
++	*id = (uint32)value;
++	return 1;
++}
++
++static int bridge_read_request(char *path, size_t cap, uint32 *id) {
++	char requests[512], best[256] = "";
++	uint32 best_id = 0;
++	DIR *dir;
++	struct dirent *entry;
++	snprintf(requests, sizeof(requests), "%s/requests", bridge_queue_dir());
++	dir = opendir(requests);
++	if (!dir)
++		return 0;
++	while ((entry = readdir(dir)) != NULL) {
++		uint32 candidate;
++		if (!bridge_request_id(entry->d_name, &candidate))
++			continue;
++		if (best[0] != 0 && candidate >= best_id)
++			continue;
++		if (strlen(entry->d_name) >= sizeof(best))
++			continue;
++		best_id = candidate;
++		strcpy(best, entry->d_name);
++	}
++	closedir(dir);
++	if (!best[0])
++		return 0;
++	{
++		char filename[512], text[BRIDGE_TEXT_SIZE], idtext[32];
++		FILE *f;
++		size_t len;
++		snprintf(filename, sizeof(filename), "%s/%s", requests, best);
++		f = fopen(filename, "r");
++		if (!f)
++			return 0;
++		len = fread(text, 1, sizeof(text) - 1, f);
++		text[len] = 0;
++		fclose(f);
++		if (len >= sizeof(text) - 1)
++			return 0;
++		if (!bridge_value(text, "version", idtext, sizeof(idtext)) ||
++				strcmp(idtext, "1") != 0 ||
++				!bridge_value(text, "id", idtext, sizeof(idtext)) ||
++				(uint32)strtoul(idtext, NULL, 10) != best_id ||
++				!bridge_value(text, "path", path, cap) || path[0] == 0)
++			return 0;
++		*id = best_id;
++		return 1;
++	}
++}
++
++static int bridge_write_ack(uint32 id, uint32 status, uint32 code) {
++	char acks[512], filename[512], tmp[512], requests[512];
++	FILE *f;
++	int ok;
++	snprintf(acks, sizeof(acks), "%s/acks", bridge_queue_dir());
++	snprintf(filename, sizeof(filename), "%s/ack-%lu", acks, (unsigned long)id);
++	snprintf(tmp, sizeof(tmp), "%s/.ack-%lu.tmp", acks, (unsigned long)id);
++	f = fopen(tmp, "w");
++	if (!f)
++		return 0;
++	ok = fprintf(f, "version=1\nid=%lu\nstatus=%s\ncode=%ld\n",
++		(unsigned long)id, status == 0 ? "ok" : "error", (long)(int32)code) > 0;
++	if (fclose(f) != 0)
++		ok = 0;
++	if (ok && rename(tmp, filename) != 0)
++		ok = 0;
++	if (!ok)
++		unlink(tmp);
++	snprintf(requests, sizeof(requests), "%s/requests/request.%lu.req",
++		bridge_queue_dir(), (unsigned long)id);
++	unlink(requests);
++	return ok;
++}
++
++/*
++ *  Host input queue. The host frontend writes event.<n>.evt below
++ *  ZACOS9_CLASSIC_QUEUE/input; one event is injected per video tick so the
++ *  guest sees mouse-down/up and key-down/up as separate ADB samples.
++ */
++static int bridge_event_id(const char *name, uint32 *id) {
++	const char *digits;
++	char *end;
++	unsigned long value;
++	if (strncmp(name, "event.", 6) != 0)
++		return 0;
++	digits = name + 6;
++	value = strtoul(digits, &end, 10);
++	if (end == digits || strcmp(end, ".evt") != 0 ||
++			value == 0 || value > 0xffffffffUL)
++		return 0;
++	*id = (uint32)value;
++	return 1;
++}
++
++static int bridge_read_input(char *text, size_t cap, char *filename, size_t fcap) {
++	char input[512], best[256] = "";
++	uint32 best_id = 0;
++	DIR *dir;
++	struct dirent *entry;
++	snprintf(input, sizeof(input), "%s/input", bridge_queue_dir());
++	dir = opendir(input);
++	if (!dir)
++		return 0;
++	while ((entry = readdir(dir)) != NULL) {
++		uint32 candidate;
++		if (!bridge_event_id(entry->d_name, &candidate))
++			continue;
++		if (best[0] != 0 && candidate >= best_id)
++			continue;
++		if (strlen(entry->d_name) >= sizeof(best))
++			continue;
++		best_id = candidate;
++		strcpy(best, entry->d_name);
++	}
++	closedir(dir);
++	if (!best[0])
++		return 0;
++	snprintf(filename, fcap, "%s/%s", input, best);
++	{
++		FILE *f = fopen(filename, "r");
++		size_t len;
++		if (!f)
++			return 0;
++		len = fread(text, 1, cap - 1, f);
++		text[len] = 0;
++		fclose(f);
++	}
++	return 1;
++}
++
++static void bridge_inject_input(const char *text) {
++	char type[16], action[16], value[32];
++	unsigned long x = 0, y = 0, code = 0, button = 0;
++	if (!bridge_value(text, "type", type, sizeof(type)) ||
++			!bridge_value(text, "action", action, sizeof(action)))
++		return;
++	if (!strcmp(type, "mouse")) {
++		if (bridge_value(text, "x", value, sizeof(value)))
++			x = strtoul(value, NULL, 10);
++		if (bridge_value(text, "y", value, sizeof(value)))
++			y = strtoul(value, NULL, 10);
++		if (bridge_value(text, "button", value, sizeof(value)))
++			button = strtoul(value, NULL, 10);
++		if (x > 4096 || y > 4096 || button > 2)
++			return;
++		ADBMouseMoved((int)x, (int)y);
++		if (!strcmp(action, "down"))
++			ADBMouseDown((int)button);
++		else if (!strcmp(action, "up"))
++			ADBMouseUp((int)button);
++	} else if (!strcmp(type, "key")) {
++		if (!bridge_value(text, "code", value, sizeof(value)))
++			return;
++		code = strtoul(value, NULL, 10);
++		if (code > 0x7f)
++			return;
++		if (!strcmp(action, "down"))
++			ADBKeyDown((int)code);
++		else if (!strcmp(action, "up"))
++			ADBKeyUp((int)code);
++	}
++}
++
++void ClassicBridgeInputPoll(void) {
++	static unsigned long last_poll;
++	unsigned long now = GetTicks_usec() / 1000;
++	char text[512], filename[512];
++	if (now - last_poll < 8)
++		return;
++	last_poll = now;
++	if (!bridge_read_input(text, sizeof(text), filename, sizeof(filename)))
++		return;
++	bridge_inject_input(text);
++	unlink(filename);
++}
++
++static uint32 ClassicBridgeOp(uint32 block) {
++	uint8 *host;
++	uint32 command, result = 0;
++	if (block == 0)
++		return (uint32)-1;
++	host = (uint8 *)Mac2HostAddr(block);
++	command = ReadMacInt32(block);
++	if (command == BRIDGE_POLL) {
++		if (bridge_current_id == 0 &&
++				!bridge_read_request(bridge_current_path,
++					sizeof(bridge_current_path), &bridge_current_id))
++			bridge_current_id = 0;
++		if (bridge_current_id != 0) {
++			WriteMacInt32(block + BRIDGE_BLOCK_ID, bridge_current_id);
++			memcpy(host + BRIDGE_BLOCK_PATH, bridge_current_path,
++				strlen(bridge_current_path) + 1);
++			result = 1;
++		}
++		WriteMacInt32(block + BRIDGE_BLOCK_RESULT, result);
++	} else if (command == BRIDGE_ACK) {
++		uint32 id = ReadMacInt32(block + BRIDGE_BLOCK_ID);
++		uint32 status = ReadMacInt32(block + BRIDGE_BLOCK_STATUS);
++		uint32 code = ReadMacInt32(block + BRIDGE_BLOCK_CODE);
++		if (id != 0 && id == bridge_current_id) {
++			result = bridge_write_ack(id, status, code) ? 1 : 0;
++			bridge_current_id = 0;
++			bridge_current_path[0] = 0;
++		}
++		WriteMacInt32(block + BRIDGE_BLOCK_RESULT, result);
++	}
++	return result;
++}
++
+ void EmulOp(M68kRegisters *r, uint32 pc, int selector)
+ {
+ 	D(bug("EmulOp %04x at %08x\n", selector, pc));
+@@ -498,6 +789,10 @@ void EmulOp(M68kRegisters *r, uint32 pc, int selector)
+ 			r->d[0] = (uint32)-2;
+ 			break;
+ 
++		case OP_CLASSIC_BRIDGE:
++			r->d[0] = ClassicBridgeOp(r->a[0]);
++			break;
++
+ 		default:
+ 			printf("FATAL: EMUL_OP called with bogus selector %08x\n", selector);
+ 			QuitEmulator();
+diff --git a/SheepShaver/src/include/emul_op.h b/SheepShaver/src/include/emul_op.h
+index 9f9a323..15d8618 100644
+--- a/SheepShaver/src/include/emul_op.h
++++ b/SheepShaver/src/include/emul_op.h
+@@ -49,6 +49,7 @@ enum {	// Selectors for EMUL_OP opcodes
+ 	OP_SCSI_DISPATCH, OP_SCSI_ATOMIC,
+ 	OP_CHECK_SYSV, OP_NTRB_17_PATCH, OP_NTRB_17_PATCH2, OP_NTRB_17_PATCH3, OP_NTRB_17_PATCH4, OP_CHECKLOAD,
+ 	OP_EXTFS_COMM, OP_EXTFS_HFS, OP_IDLE_TIME, OP_IDLE_TIME_2,
++	OP_CLASSIC_BRIDGE,	// ZacOS 9 guest bridge (emulation/patches)
+ 	OP_MAX
+ };
+ const uint16 M68K_EMUL_RETURN = 0xfe40;	// Extended opcodes
+@@ -109,5 +110,6 @@ const uint16 M68K_EMUL_OP_IDLE_TIME = M68K_EMUL_BREAK + OP_IDLE_TIME;
+ const uint16 M68K_EMUL_OP_IDLE_TIME_2 = M68K_EMUL_BREAK + OP_IDLE_TIME_2;
+ 
+ extern "C" void EmulOp(M68kRegisters *r, uint32 pc, int selector);
++extern void ClassicBridgeInputPoll(void);
+ 
+ #endif

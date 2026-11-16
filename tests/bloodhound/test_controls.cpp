@@ -185,24 +185,80 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 	window.installSiteFile(sites.filePath("drop/New.searchsite"));
-	check(window.m_channelName == "Web" && window.m_status.contains("New") &&
-		window.m_sites.size() == 3, "a dropped site file is installed and offered");
+	check(window.m_channelName == "Reference" && window.m_status.contains("New") &&
+		window.m_sites.size() == 3, "a dropped site file is installed in its channel");
 	check(QFileInfo::exists(userSites + "/New.searchsite"),
 		"and lands in the user's Internet Search Sites folder");
 
-	check(window.m_channels == QStringList({ "Files", "Web", "Reference", "My Channel" }),
-		"the channel bar has Files, Web, named channels and My Channel");
+	check(window.m_channels == QStringList({ "Files", "Web", "People", "Shopping", "News",
+		"ZacOS", "Reference", "My Channel" }),
+		"the channel bar has Sherlock 2's channels");
 	window.chooseChannel("Web");
 	check(!window.filesChannel() && window.m_site.items.size() == 3,
-		"the Web channel offers every site");
+		"the Internet channel offers every site");
 	window.chooseChannel("Reference");
 	check(window.m_site.items.size() == 2, "a named channel groups its sites");
 	window.chooseChannel("My Channel");
 	check(window.m_site.items.size() == 1 && window.m_site.items[0].text == "Mine",
 		"My Channel holds the user's sites without a channel");
+	/* People reads the account list: the full names and Home folders of
+	 * the people who can use this computer, and nothing off the network. */
+	const QString people = sites.filePath("people");
+	const QString passwd = sites.filePath("passwd");
+	if (!QDir().mkpath(people + "/ada") || !QDir().mkpath(people + "/grace") ||
+			!write(passwd, ("ada:x:1000:1000:Ada Lovelace:" + people + "/ada:/bin/sh\n"
+				"daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin\n"
+				"grace:x:1001:1001:Grace Hopper:" + people + "/grace:/bin/sh\n").toUtf8())) {
+		fprintf(stderr, "could not write the account list\n");
+		return 1;
+	}
+	qputenv("ZACOS9_PASSWD", passwd.toUtf8());
+	window.chooseChannel("People");
+	check(window.peopleChannel() && !window.sitesChannel() && window.m_items.size() == 2,
+		"People lists the people who can use this computer");
+	check(window.m_items[0]->visibleName() == "Ada Lovelace" &&
+		window.m_items[1]->visibleName() == "Grace Hopper" &&
+		window.m_items[0]->kindName() == "Person",
+		"with their full names, Home folders and kind");
+	window.m_search.setText("grace");
+	window.search();
+	check(window.m_items.size() == 1 &&
+		window.m_items[0]->visibleName() == "Grace Hopper",
+		"and the search field filters them by name");
+	window.m_search.setText(QString());
 	window.chooseChannel("Files");
 	check(window.filesChannel() && window.m_site.items.size() == 0,
 		"Files comes back with its criteria controls");
+
+	/* The ZacOS channel is the Help Center: Search runs zacos9-help
+	 * with the words, and with no words it opens the center. */
+	const QString help = sites.filePath("zacos9-help");
+	const QString asked = help + ".args";
+	if (!write(help, "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$0.args\"\n")) {
+		fprintf(stderr, "could not write the help stand-in\n");
+		return 1;
+	}
+	QFile::setPermissions(help, QFileDevice::ReadOwner | QFileDevice::WriteOwner |
+		QFileDevice::ExeOwner);
+	qputenv("ZACOS9_HELP", help.toUtf8());
+	window.chooseChannel("ZacOS");
+	check(window.helpChannel() && !window.sitesChannel() && !window.filesChannel(),
+		"ZacOS is its own Help channel");
+	window.m_search.setText("harbour");
+	window.search();
+	QElapsedTimer helped;
+	helped.start();
+	while (!QFileInfo::exists(asked) && helped.elapsed() < 3000) {
+		QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+		QThread::msleep(5);
+	}
+	QString arguments;
+	QFile helpArgs(asked);
+	if (helpArgs.open(QIODevice::ReadOnly)) {
+		arguments = QString::fromUtf8(helpArgs.readAll());
+	}
+	check(arguments.contains("--search") && arguments.contains("harbour"),
+		"ZacOS Search asks the Help Center for the words");
 
 	if (fails) {
 		return 1;

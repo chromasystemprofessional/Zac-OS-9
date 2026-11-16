@@ -1,8 +1,9 @@
 # Seamless Classic windows: implementation plan
 
-Status: feasibility spike in progress; production integration not implemented.
-Target: SheepShaver with user-supplied
-Mac OS 9.0.4 first. Basilisk II and other guest versions are later work.
+Status: milestone 1 application transport implemented; milestone 2 guest
+window discovery/capture, a basic host viewer and click/key forwarding are in
+progress. Target: SheepShaver with user-supplied Mac OS 9.0.4 first. Basilisk
+II and other guest versions are later work.
 
 Milestone 0 is now started: an original PowerPC two-window probe and exact-pixel
 host verifier are in [the feasibility spike](../emulation/seamless/README.md).
@@ -18,17 +19,22 @@ relaunch tested. This is bounded black/white rectangle capture from one original
 test application, not general compatibility or a production guest extension.
 The latest monochrome graphics trial also matches styled text, explicit
 clipping, patterned/XOR pen state, frames/lines, scaled bitmap copies,
-window self-copies and scrolling under overlap and after resize. Color ports
-are explicitly rejected, not supported. The feasibility gate has not passed:
-color/PixMap/GWorld state, general graphics APIs/origins, broader lifetime
-handling and input still need proof. The exact tested guest OS version is not
-yet confirmed.
+window self-copies and scrolling under overlap and after resize. The separate
+color-port/GWorld experiment now captures two overlapping direct-32-bit color
+windows exactly: the fixture's references pass an independent host RGB,
+marker and calibration/grid oracle, the helper's candidates match them every
+pixel, and the obscured screen crop fails the negative control. Indexed color,
+custom procedures and general color APIs remain unproven. The feasibility gate
+has not passed: broader lifetime handling and general graphics APIs/origins
+still need proof. Milestone 2 has since demonstrated cross-process discovery
+and basic click/key input for SimpleText and Graphing Calculator, but not
+general compatibility. The exact tested guest OS version is not yet confirmed.
 
-The host verifier now has a bounded version-3 PPM contract for future RGB
-reference/candidate captures, with independent-reference enforcement, frame
-markers, payload bounds and exact pixel comparison. This is test
-infrastructure, not guest color evidence; the dedicated color-port/GWorld
-experiment remains the next rendering prerequisite.
+The host verifier's version-3 PPM path now has an independent RGB oracle for
+the fixture's marker, calibration bars and 5-bit color grid, plus exact
+reference comparison. It is no longer only a format contract; the direct
+32-bit guest trial passes it. The 16-bit RGB555 conversion path is implemented
+but has not been run on a 16-bit guest display.
 
 ## Goal and agreed scope
 
@@ -56,10 +62,11 @@ appropriately licensed interfaces and tools.
 - [Classic launcher](../shell/classic/zacos9-classic): starts SheepShaver with
   an 800x600 guest display, shared home directory and SDL/Xwayland output.
 - [Finder](../shell/finder/finder.cpp): recognizes Classic application metadata
-  and starts Classic, but does not yet open the selected application.
-- [Emulator build](../emulation/build-emulators.sh): pins a macemu revision.
-  A reproducible patch mechanism will be needed; do not edit generated build
-  output or the excluded upstream checkout in place.
+  and starts Classic with `--open`; document association is still to come.
+- [Emulator build](../emulation/build-emulators.sh): pins a macemu revision
+  and applies the Classic bridge patch from
+  [`emulation/patches`](../emulation/patches/README.md). Do not edit generated
+  build output or the excluded upstream checkout in place.
 - [Compositor](../compositor/src/xdg.c): manages ordinary Wayland toplevels,
   server-side frames, activation, size requests and close requests.
 - [Application integration](app-integration.md): global-menu support already
@@ -173,6 +180,37 @@ do not silently downgrade the requirement to cropping.
 launch does not start another emulator or attach a writable disk twice.
 Missing originals, guest readiness failures and rejected opens show an alert.
 
+**Prototype status (2026-11-15):** the transport is now an emulator-side
+bridge. The pinned SheepShaver carries `OP_CLASSIC_BRIDGE` (selector 53,
+instruction `0x18000038`; patch in
+[`emulation/patches`](../emulation/patches/README.md)). The emulator reads the
+host request queue itself and writes acknowledgements, so the guest helper is
+not affected by the guest File Manager's ExtFS cache and needs no serial port,
+MacTCP or Open Transport. The helper is original Retro68 code in
+[`emulation/classic-open`](../emulation/classic-open/README.md).
+
+A clean Mac OS 9 guest opened SimpleText, then SimpleSound, in one Classic
+session; both requests were acknowledged with `status=ok`. `zacos9-classic`
+no longer refuses a second open: it serialises requests, waits for each
+acknowledgement, and reports a guest error or timeout. The milestone 1
+application gate is met for applications that are files below the shared home
+folder. Documents, applications inside guest disk images, and guest window
+discovery/input remain unimplemented; the request queue is versioned, but a
+full handshake/capability exchange and guest window identities are still to
+come. A document-opening trial sent an `odoc` Apple Event to SimpleText and
+then to the Finder; both returned `-903`, so document routing still needs a
+different guest mechanism.
+
+Earlier prototypes used the shared-folder queue directly, the SheepShaver
+serial port, MacTCP, Open Transport and Finder Apple Events. The shared-folder
+view was cached by the guest; the serial driver needed a library the test
+install lacked; MacTCP stopped receiving after an application switch; Open
+Transport client libraries were missing; and the Finder rejected app items on
+the shared volume with error -903. Do not reintroduce those paths without new
+evidence. The helper's SIZE resource also needed `canBackground` so Mac OS
+does not suspend it when another application comes forward; `patch_size.py`
+sets it.
+
 ### 2. Opt-in independent document windows
 
 - Export each supported document window as a host toplevel, using the rendering
@@ -190,6 +228,33 @@ Missing originals, guest readiness failures and rejected opens show an alert.
 **Gate:** two Classic apps and a Linux app interleave independently. Resizing
 does not stretch stale pixels, moving one window does not move another, and
 unsaved close can be cancelled. Repeated focus switches leave no stuck input.
+
+**Prototype status (2026-11-15):** the guest half is working. An original
+background agent ([`emulation/classic-windows`](../emulation/classic-windows/README.md))
+installs native InterfaceLib transition-vector hooks and identifies windows
+from separate processes. In a Mac OS 9.0.4 guest it discovered and captured
+SimpleText and Graphing Calculator 1.1 windows, including typed text, while
+writing PPM frames to the shared volume. A basic host frontend
+(`zacos9-classic-windows`) shows those frames as ordinary Qt toplevels with
+guest window titles, a controller that can hide them for desktop mode, and
+click/key forwarding through the patched emulator's ADB input queue. In the
+disposable guest, typing, dragging a text selection and close requests reached
+the guest and appeared in the captured frame. An isolated headless
+`zacos9-wm` trial showed the Calculator, SheepShaver and exported SimpleText
+windows with real ZacOS title bars; **Show Exported Windows** raised the
+exported window. **Show Classic Desktop** hides exported windows and activates
+the emulator through foreign-toplevel activation. One re-shown window appeared
+as a collapsed bottom tab, so restoring it with focus remains to fix. **Close
+in Classic** sends the guest close-box click; SimpleText's unsaved-document
+prompt appeared in the desktop and Cancel kept the document, so the close path
+does not bypass the prompt; its host window and controller entry stay hidden
+until the guest closes it or Show Exported Windows is used after Cancel.
+**Resize in Classic** sends one grow-box drag;
+direct guest input resized SimpleText from 615x541 to 645x564 and the capture
+followed. Live host-border resize, document routing and full window lifecycle
+cleanup are not implemented, so the gate above is not met. The current frame
+transport (rewriting PPM about every 250 ms) and bounded operation coverage are
+prototype work, not production compatibility.
 
 ### 3. Modal dialogs, popups and full-desktop recovery
 

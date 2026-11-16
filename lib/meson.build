@@ -57,9 +57,15 @@ install_data('../assets/store/catalog.json',
 )
 # Internet Search Sites: the system's read-only search sites (Bloodhound).
 install_data(
+  '../assets/Internet Search Sites/Amazon.searchsite',
+  '../assets/Internet Search Sites/BBC News.searchsite',
   '../assets/Internet Search Sites/Bing.searchsite',
   '../assets/Internet Search Sites/DuckDuckGo.searchsite',
+  '../assets/Internet Search Sites/eBay.searchsite',
   '../assets/Internet Search Sites/Google.searchsite',
+  '../assets/Internet Search Sites/NPR.searchsite',
+  '../assets/Internet Search Sites/Wikipedia.searchsite',
+  '../assets/Internet Search Sites/Wiktionary.searchsite',
   install_dir: get_option('datadir') / 'zacos9' / 'Internet Search Sites',
 )
 # Default theme bundle.

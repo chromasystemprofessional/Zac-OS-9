@@ -1,0 +1,4 @@
+[Search Site]
+Name=eBay
+URL=https://www.ebay.com/sch/i.html?_nkw={query}
+Channel=Shopping

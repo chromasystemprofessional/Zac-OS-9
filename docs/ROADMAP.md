@@ -84,18 +84,26 @@ scaling only, original behaviors and timings).
     booted from it; the home folder shows up as the "Unix" volume.
 - Next:
   - **Milestone 0 (feasibility) is in progress:** the original guest probe
-    and host verifier now establish exact monochrome capture for several
-    QuickDraw operations, but color/GWorlds, general drawing coverage,
-    lifecycle recovery and input remain unproven. The `classic-window-probe`
-    host test passes; see `docs/classic-seamless.md` for the measured results
-    and acceptance gate. Host-side version-3 RGB PPM verification is now
-    available, but it is not guest color evidence; the dedicated color-port/
-    GWorld experiment remains the next rendering prerequisite.
+    and host verifier establish exact monochrome capture for several QuickDraw
+    operations, and the color-port/GWorld experiment now matches two
+    overlapping direct-32-bit color windows exactly against an independent RGB
+    oracle. Indexed/custom color, general drawing coverage, lifecycle recovery
+    and input remain unproven. The `classic-window-probe` host test passes; see
+    `docs/classic-seamless.md` for the measured results and acceptance gate.
+  - **Direct-launch prototype:** `zacos9-classic --open` and Classic Open
+    Helper open apps from the shared home volume, and the emulator-side bridge
+    lets a running session accept further apps one at a time. SimpleText and
+    SimpleSound have been opened in one session, so the milestone 1 application
+    gate is met. The guest window agent now discovers and captures SimpleText
+    and Graphing Calculator windows as independent frames, and a basic host
+    viewer shows them as toplevels, forwards clicks/keys and reaches the guest
+    close box. Resize, drag/wheel, documents and the full desktop fallback are
+    not implemented yet. Do not claim seamless windows or general direct
+    launching.
   - After that gate, double-clicking a Classic app or document in the Sniffer
     should launch it in Old Dog. The current emulator startup path only
-    attaches disks; launching an item from the shared home volume remains
-    unimplemented. Do not add guessed emulator flags or claim direct launching
-    until a guest/host open-request mechanism is validated.
+    attaches disks; documents and apps inside guest images remain
+    unimplemented.
   - SDL's Wayland backend under zacos9-wm (Xwayland for now).
   - Packaging the emulators (Phase 7).
 

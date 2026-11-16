@@ -9,6 +9,7 @@
 {prefix}/bin/zacos9-calculator
 {prefix}/bin/zacos9-capture
 {prefix}/bin/zacos9-classic
+{prefix}/bin/zacos9-classic-windows
 {prefix}/bin/zacos9-collar
 {prefix}/bin/zacos9-collarpanel
 {prefix}/bin/zacos9-controlpanel
@@ -224,9 +225,15 @@
 {prefix}/share/wayland-sessions/zacos9.desktop
 {prefix}/share/xdg-desktop-portal/portals/zacos9-inhibit.portal
 {prefix}/share/xdg-desktop-portal/portals/zacos9.portal
+{prefix}/share/zacos9/Internet Search Sites/Amazon.searchsite
+{prefix}/share/zacos9/Internet Search Sites/BBC News.searchsite
 {prefix}/share/zacos9/Internet Search Sites/Bing.searchsite
 {prefix}/share/zacos9/Internet Search Sites/DuckDuckGo.searchsite
+{prefix}/share/zacos9/Internet Search Sites/eBay.searchsite
 {prefix}/share/zacos9/Internet Search Sites/Google.searchsite
+{prefix}/share/zacos9/Internet Search Sites/NPR.searchsite
+{prefix}/share/zacos9/Internet Search Sites/Wikipedia.searchsite
+{prefix}/share/zacos9/Internet Search Sites/Wiktionary.searchsite
 {prefix}/share/zacos9/boot/happy-zac-1x.png
 {prefix}/share/zacos9/boot/happy-zac-2x.png
 {prefix}/share/zacos9/boot/happy-zac-3x.png

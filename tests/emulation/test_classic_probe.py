@@ -36,17 +36,42 @@ def graphics_bytes(window, frame, mode="candidate"):
     ).replace(f" {frame}\n".encode(), f" {frame} graphics\n".encode(), 1)
 
 
+COLOR_BARS = (
+    (0, 0, 0), (255, 255, 255),
+    (255, 0, 0), (0, 255, 0), (0, 0, 255),
+    (255, 255, 0), (0, 255, 255), (255, 0, 255),
+)
+
+
+def color_pattern(window, frame, x, y):
+    """Independent copy of the fixture's host-checkable color layout."""
+    if y < 8:
+        value = 255 if (((frame >> ((x // 8) % 32)) ^ window) & 1) else 0
+        return (value, value, value)
+    if y < 16:
+        return COLOR_BARS[(x // 32) % 8]
+    if y < 48:
+        cell_x = x // 8
+        cell_y = (y - 16) // 8
+        tick = frame & 0xFF
+
+        def expand(value):
+            value &= 31
+            return (value << 3) | (value >> 2)
+
+        return (expand(cell_x * 37 + cell_y * 11 + tick * 5 + window * 127),
+                expand(cell_x * 13 + cell_y * 53 + tick * 7 + window * 191),
+                expand(cell_x * 71 + cell_y * 29 + tick * 3 + window * 251))
+    return ((x + frame) & 0xff, (y + window) & 0xff,
+            (x + y + frame + window) & 0xff)
+
+
 def color_bytes(window, frame, mode="candidate"):
     width, height = 320, 192
     pixels = bytearray()
     for y in range(height):
         for x in range(width):
-            if y < 8 and x < 256:
-                channel = 255 if (((frame >> (x // 8)) ^ window) & 1) else 0
-                pixels.extend((channel,) * 3)
-            else:
-                pixels.extend(((x + frame) & 0xff, (y + window) & 0xff,
-                               (x + y + frame + window) & 0xff))
+            pixels.extend(color_pattern(window, frame, x, y))
     return (f"P6\n# zacos9-classic-probe 3 {mode} {window} {frame} color\n"
             f"{width} {height}\n255\n").encode("ascii") + pixels
 
@@ -189,6 +214,32 @@ class ProbeTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "pixels differ"):
             probe.verify_against_references(candidates, references, 33)
 
+    def test_color_oracle_rejects_wrong_rgb_channels(self):
+        references = [self.root / f"reference-{window}.ppm" for window in (0, 1)]
+        for window in (0, 1):
+            references[window].write_bytes(color_bytes(window, 33, "reference"))
+        data = bytearray(references[0].read_bytes())
+        payload = data.index(b"255\n") + 4
+        # Row 8, x=64 is the red calibration bar. Swap red and blue.
+        offset = payload + (8 * 320 + 64) * 3
+        data[offset], data[offset + 2] = data[offset + 2], data[offset]
+        references[0].write_bytes(data)
+        with self.assertRaisesRegex(ValueError, "pixels differ"):
+            probe.verify_pair(references, 33, "reference", allow_reference_profiles=True)
+
+    def test_color_oracle_rejects_shifted_grid_cells(self):
+        candidates = [self.root / f"candidate-{window}.ppm" for window in (0, 1)]
+        for window in (0, 1):
+            candidates[window].write_bytes(color_bytes(window, 33))
+        data = bytearray(candidates[0].read_bytes())
+        payload = data.index(b"255\n") + 4
+        # Row 16, x=8 is cell 1; replace it with cell 2's color.
+        offset = payload + (16 * 320 + 8) * 3
+        data[offset:offset + 3] = bytes(color_pattern(0, 33, 16, 16))
+        candidates[0].write_bytes(data)
+        with self.assertRaisesRegex(ValueError, "pixels differ"):
+            probe.verify_pair(candidates, 33, "candidate", allow_reference_profiles=True)
+
     def test_color_export_rejects_bad_headers_and_payloads(self):
         path = self.root / "bad.ppm"
         valid = color_bytes(0, 33)
@@ -285,6 +336,33 @@ class ProbeTests(unittest.TestCase):
                         expected.append((((frame >> ((x // 8) % 32)) ^ window)
                                          if y < 8 else
                                          x // 8 + y // 8 + window + frame) & 1)
+        self.assertEqual(actual, expected)
+
+    def test_guest_color_pattern_matches_independent_host_oracle(self):
+        compiler = shutil.which("cc")
+        self.assertIsNotNone(compiler, "a C compiler is required for the guest pattern test")
+        source = self.root / "color-pattern-test.c"
+        source.write_text(
+            '#include <stdio.h>\n#include "pattern.h"\n'
+            'int main(void) { unsigned int id, f; int x, y; unsigned char rgb[3];\n'
+            'unsigned long frames[] = {0, 1, 32, 33, 0xffffffffUL};\n'
+            'for(id=0; id<2; id++) { for(f=0; f<5; f++) {\n'
+            'for(y=0; y<48; y++) { for(x=0; x<64; x++) {\n'
+            'probe_color(id, frames[f], x, y, rgb);\n'
+            'fwrite(rgb, 1, 3, stdout); } } } } return 0; }\n',
+            encoding="ascii",
+        )
+        binary = self.root / "color-pattern-test"
+        subprocess.run([compiler, "-Wall", "-Wextra", "-Werror", "-I",
+                        str(ROOT / "emulation/seamless/probe"),
+                        str(source), "-o", str(binary)], check=True)
+        actual = subprocess.check_output([str(binary)])
+        expected = bytearray()
+        for window in (0, 1):
+            for frame in (0, 1, 32, 33, 0xffffffff):
+                for y in range(48):
+                    for x in range(64):
+                        expected.extend(color_pattern(window, frame, x, y))
         self.assertEqual(actual, expected)
 
     def test_cli_failure_and_success_are_explicit(self):

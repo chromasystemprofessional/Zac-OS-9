@@ -17,6 +17,7 @@ struct Window {
 };
 
 wl_display *display = nullptr;
+wl_seat *seat = nullptr;
 zwlr_foreign_toplevel_manager_v1 *manager = nullptr;
 std::vector<Window *> all;
 std::function<void()> onChange;
@@ -71,7 +72,10 @@ void finished(void *, zwlr_foreign_toplevel_manager_v1 *) {}
 const zwlr_foreign_toplevel_manager_v1_listener managerListener = { toplevel, finished };
 
 void global(void *, wl_registry *reg, uint32_t name, const char *iface, uint32_t version) {
-	if (std::strcmp(iface, zwlr_foreign_toplevel_manager_v1_interface.name) == 0) {
+	if (std::strcmp(iface, wl_seat_interface.name) == 0) {
+		seat = static_cast<wl_seat *>(wl_registry_bind(reg, name, &wl_seat_interface,
+			std::min(version, 5u)));
+	} else if (std::strcmp(iface, zwlr_foreign_toplevel_manager_v1_interface.name) == 0) {
 		manager = static_cast<zwlr_foreign_toplevel_manager_v1 *>(wl_registry_bind(reg, name,
 			&zwlr_foreign_toplevel_manager_v1_interface, std::min(version, 3u)));
 		zwlr_foreign_toplevel_manager_v1_add_listener(manager, &managerListener, nullptr);
@@ -107,6 +111,9 @@ void Toplevels::start(std::function<void()> changed) {
 			wl_proxy_set_queue(reinterpret_cast<wl_proxy *>(w->handle), nullptr);
 		}
 	}
+	if (seat) {
+		wl_proxy_set_queue(reinterpret_cast<wl_proxy *>(seat), nullptr);
+	}
 	wl_event_queue_destroy(queue);
 	wl_display_flush(display);
 }
@@ -128,4 +135,18 @@ void Toplevels::hide(const QString &appId) {
 		}
 	}
 	wl_display_flush(display);
+}
+
+bool Toplevels::activate(const QString &appIdOrTitle) {
+	if (!display || !seat) {
+		return false;
+	}
+	for (Window *w : all) {
+		if (w->info.appId == appIdOrTitle || w->info.title == appIdOrTitle) {
+			zwlr_foreign_toplevel_handle_v1_activate(w->handle, seat);
+			wl_display_flush(display);
+			return true;
+		}
+	}
+	return false;
 }

@@ -33,6 +33,7 @@ cat <<EOF | gzip -9n >"$pkg/usr/share/doc/$name/changelog.gz"
 $name ($version) trixie; urgency=medium
 
   * SheepShaver and Basilisk II from macemu commit $commit.
+  * SheepShaver includes the ZacOS 9 Classic bridge patch.
 
  -- adamjlawson-ctrl <adamjlawson@gmail.com>  $(git -C "$src" log -1 --format=%cD)
 EOF
@@ -77,4 +78,26 @@ EOF
 chmod 755 "$pkg/DEBIAN/postinst"
 
 dpkg-deb --root-owner-group --build "$pkg" "$out/${name}_${version}_$arch.deb"
-git -C "$src" archive --prefix="macemu-$commit/" -o "$out/${name}_${version}.source.tar.gz" "$commit"
+
+# GPL source: the pinned tree plus the Classic bridge changes that were
+# actually built. Include the patch itself, and overlay the two files it
+# touches so the archive matches the binaries.
+srcstage=$work/source/macemu-$commit
+mkdir -p "$work/source"
+git -C "$src" archive --format=tar --prefix="macemu-$commit/" \
+	-o "$work/source.tar" "$commit"
+tar -C "$work/source" -xf "$work/source.tar"
+install -D -m 644 "$src/SheepShaver/src/emul_op.cpp" \
+	"$srcstage/SheepShaver/src/emul_op.cpp"
+install -D -m 644 "$src/SheepShaver/src/include/emul_op.h" \
+	"$srcstage/SheepShaver/src/include/emul_op.h"
+install -D -m 644 "$src/SheepShaver/src/Unix/video_x.cpp" \
+	"$srcstage/SheepShaver/src/Unix/video_x.cpp"
+for sdl in video_sdl.cpp video_sdl2.cpp video_sdl3.cpp; do
+	install -D -m 644 "$src/BasiliskII/src/SDL/$sdl" \
+		"$srcstage/BasiliskII/src/SDL/$sdl"
+done
+cp "$root/emulation/patches/sheepshaver-classic-bridge.patch" \
+	"$srcstage/zacos9-classic-bridge.patch"
+tar -C "$work/source" -czf "$out/${name}_${version}.source.tar.gz" \
+	"macemu-$commit"

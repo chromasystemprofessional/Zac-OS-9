@@ -1,7 +1,7 @@
 #!/bin/sh
 # zacos9-classic: run classic Mac OS in an emulator window.
 #
-#   zacos9-classic [--check] [--68k] [--fullscreen|--windowed] [--disk IMAGE]...
+#   zacos9-classic [--check] [--68k] [--fullscreen|--windowed] [--disk IMAGE]... [--open APP]
 #
 # The screen fills the desktop at its resolution when the compositor's
 # output list can be read; --windowed (or "screen=window" in classic.conf)
@@ -17,6 +17,11 @@
 # the Mac as the "Unix" volume. --check only reports what would run;
 # problems go to stderr, one line, with exit status 2.
 #
+# --open APP asks the running (or newly started) Mac to open a Classic
+# application from the shared Unix volume. A running session accepts further
+# opens; it needs the patched SheepShaver and Classic Open Helper in the Mac's
+# System Folder:Startup Items (emulation/classic-open).
+#
 # The Startup Disk control panel picks the disk the Mac starts up from
 # ("startup-disk=PATH" in ~/.config/zacos9/classic.conf): it is attached
 # first, and a CD is started from as a CD.
@@ -29,6 +34,8 @@ check=false
 arch=ppc
 extra_disks=""
 fullscreen=auto
+open_path=""
+queue_root=$HOME/zacos9-classic
 
 while [ $# -gt 0 ]; do
 	case $1 in
@@ -36,9 +43,10 @@ while [ $# -gt 0 ]; do
 	--68k) arch=68k ;;
 	--fullscreen) fullscreen=yes ;;
 	--windowed) fullscreen=no ;;
-	--disk) shift; extra_disks="$extra_disks
+	--disk) [ $# -ge 2 ] || { echo "usage: zacos9-classic [--check] [--68k] [--fullscreen|--windowed] [--disk IMAGE]... [--open APP]" >&2; exit 64; }; shift; extra_disks="$extra_disks
 $1" ;;
-	*) echo "usage: zacos9-classic [--check] [--68k] [--fullscreen|--windowed] [--disk IMAGE]..." >&2; exit 64 ;;
+	--open) [ $# -ge 2 ] || { echo "usage: zacos9-classic [--check] [--68k] [--fullscreen|--windowed] [--disk IMAGE]... [--open APP]" >&2; exit 64; }; shift; open_path=$1 ;;
+	*) echo "usage: zacos9-classic [--check] [--68k] [--fullscreen|--windowed] [--disk IMAGE]... [--open APP]" >&2; exit 64 ;;
 	esac
 	shift
 done
@@ -46,6 +54,84 @@ done
 fail() {
 	echo "$1" >&2
 	exit 2
+}
+
+# Direct launching only knows files on the shared Unix volume. The host
+# home folder is the ExtFS root, so the Mac path is the relative path with
+# colons instead of slashes.
+map_open_path() {
+	[ -n "$open_path" ] || return 0
+	case $open_path in
+	/*) ;;
+	*) open_path=$(pwd)/$open_path ;;
+	esac
+	[ -f "$open_path" ] || fail "The Classic application \"$open_path\" was not found."
+	case $open_path in
+	"$HOME"/*) ;;
+	*) fail "Classic applications must be in your home folder to open directly. Put this one in the Mac's Unix volume, or open it inside the Mac." ;;
+	esac
+	rel=${open_path#"$HOME"/}
+	case $rel in
+	''|*:*) fail "The Classic application's name contains a colon, which the Mac cannot use in a path. Rename it and try again." ;;
+	esac
+	case ":$rel:" in
+	*:..:*) fail "The Classic application's path contains \"..\". Move it into a folder in your home folder and try again." ;;
+	esac
+	if printf '%s' "$rel" | LC_ALL=C grep -q '[^ -~]'; then
+		fail "The Classic application's path has characters that direct launching cannot pass yet. Rename it to plain ASCII, or open it inside the Mac."
+	fi
+	# The bridge block holds 200 bytes including the terminator.
+	[ ${#rel} -le 199 ] || fail "The Classic application's path is too long to open directly."
+	guest_path=$(printf '%s' "$rel" | tr '/' ':')
+}
+
+runtime_dir() {
+	if [ -n "${XDG_RUNTIME_DIR:-}" ]; then
+		echo "$XDG_RUNTIME_DIR/zacos9-classic"
+	else
+		echo "/tmp/zacos9-classic-$(id -u)"
+	fi
+}
+
+session_alive() {
+	[ -f "$pidfile" ] || return 1
+	pid=$(cat "$pidfile" 2>/dev/null) || return 1
+	case $pid in ''|*[!0-9]*) return 1 ;; esac
+	kill -0 "$pid" 2>/dev/null
+}
+
+# A small versioned request, read by the patched emulator's Classic bridge.
+# Every request gets a new name with a sequence number so the queue is easy to
+# inspect; the bridge reads the directory afresh for each request.
+queue_reset() {
+	rm -rf "$queue_root/requests" "$queue_root/acks" "$queue_root/input"
+	mkdir -p "$queue_root/requests" "$queue_root/acks" "$queue_root/input"
+	chmod 700 "$queue_root" "$queue_root/requests" "$queue_root/acks" \
+		"$queue_root/input" 2>/dev/null || true
+	printf '0\n' > "$queue_root/sequence"
+}
+
+queue_request() {
+	requests="$queue_root/requests"
+	acks="$queue_root/acks"
+	seqfile="$queue_root/sequence"
+	seq=$(cat "$seqfile" 2>/dev/null || echo 0)
+	case $seq in ''|*[!0-9]*) seq=0 ;; esac
+	if [ "$seq" -gt 0 ]; then
+		tries=0
+		while [ ! -f "$acks/ack-$seq" ] && [ "$tries" -lt 50 ]; do
+			sleep 0.1
+			tries=$((tries + 1))
+		done
+		[ -f "$acks/ack-$seq" ] || fail "The Mac has not taken the previous open request yet. Try again in a moment."
+	fi
+	seq=$((seq + 1))
+	printf '%s\n' "$seq" > "$seqfile"
+	request_id=$seq
+	id=$seq
+	tmp="$requests/.request.$seq.tmp"
+	printf 'version=1\nid=%s\npath=%s\n' "$id" "$guest_path" > "$tmp"
+	mv "$tmp" "$requests/request.$seq.req"
 }
 
 # The main screen's resolution as the desktop shows it: the mode divided by
@@ -141,12 +227,23 @@ find_disks() {
 	done
 }
 
-emulator() {
+program_path() {
 	for dir in "${ZACOS9_EMULATORS:-}" "$self_dir/../emulators/bin" \
 			"$self_dir/../libexec/zacos9"; do
 		[ -x "$dir/$1" ] && { echo "$(cd "$dir" && pwd)/$1"; return 0; }
 	done
 	command -v "$1"
+}
+
+emulator() {
+	program_path "$1"
+}
+
+start_window_viewer() {
+	[ "${ZACOS9_CLASSIC_WINDOWS:-1}" != 0 ] || return 0
+	frontend=$(program_path zacos9-classic-windows 2>/dev/null || true)
+	[ -n "$frontend" ] || return 0
+	"$frontend" >/dev/null 2>&1 &
 }
 
 [ -d "$classic_dir" ] || fail "Put Macintosh ROM files and system disk images in the folder \"$(basename "$classic_dir")\" in your home folder."
@@ -222,6 +319,8 @@ if [ "$fullscreen" != no ]; then
 	fi
 fi
 
+map_open_path
+
 if $check; then
 	echo "emulator: $exe"
 	echo "rom: $rom"
@@ -229,8 +328,48 @@ if $check; then
 	[ -z "$startup" ] || echo "startup: $startup"
 	echo "screen: $screen"
 	[ -n "$disks" ] || echo "disks: none (the Mac will wait for a startup disk)"
+	[ -z "$open_path" ] || echo "open: $open_path -> Unix:$guest_path"
 	exit 0
 fi
+
+# One session owns the emulator and its disks. A running session accepts
+# further direct opens one at a time; the emulator bridge reads each request
+# directly, so the guest's ExtFS directory cache is no longer involved. A
+# second plain launch leaves the running session alone.
+runtime=$(runtime_dir)
+pidfile=$runtime/session.pid
+mkdir -p "$runtime"
+chmod 700 "$runtime" 2>/dev/null || true
+if [ -n "$open_path" ]; then
+	if session_alive; then
+		queue_request
+		tries=0
+		while [ ! -f "$queue_root/acks/ack-$request_id" ] && [ "$tries" -lt 50 ]; do
+			sleep 0.1
+			tries=$((tries + 1))
+		done
+		ack="$queue_root/acks/ack-$request_id"
+		[ -f "$ack" ] || \
+			fail "Classic did not open \"$open_path\". Classic Open Helper may be missing or busy."
+		grep -q '^status=ok$' "$ack" || {
+			code=$(sed -n 's/^code=//p' "$ack" | head -n 1)
+			fail "The Mac refused \"$open_path\"${code:+ (Mac error $code)}."
+		}
+		echo "Classic is running; asked it to open $open_path." >&2
+		exit 0
+	fi
+	queue_reset
+	queue_request
+	printf '%s\n' "$$" > "$pidfile"
+else
+	if session_alive; then
+		echo "Classic is already running." >&2
+		exit 0
+	fi
+	queue_reset
+	printf '%s\n' "$$" > "$pidfile"
+fi
+start_window_viewer
 
 set -- --rom "$rom" --ramsize $ram --screen "$screen" --extfs "$HOME" --nogui true
 # A network through the emulator's own NAT: the Mac gets an address by DHCP
@@ -258,4 +397,6 @@ fi
 
 # SDL's Wayland backend never shows a window here; Xwayland works.
 # TODO: find out why (frame callbacks? libdecor?).
+# The patched SheepShaver reads the same queue as the host.
+export ZACOS9_CLASSIC_QUEUE="$queue_root"
 SDL_VIDEODRIVER=x11 exec "$exe" "$@"

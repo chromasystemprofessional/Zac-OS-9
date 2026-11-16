@@ -1,0 +1,4 @@
+[Search Site]
+Name=Wiktionary
+URL=https://en.wiktionary.org/w/index.php?search={query}
+Channel=Reference

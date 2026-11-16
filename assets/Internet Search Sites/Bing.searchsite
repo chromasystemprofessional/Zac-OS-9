@@ -1,3 +1,4 @@
 [Search Site]
 Name=Bing
 URL=https://www.bing.com/search?q={query}
+Channel=Internet
