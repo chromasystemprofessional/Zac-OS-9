@@ -2030,6 +2030,8 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None, px
 				path = os.path.join(chrome_dir, key + ".png")
 				if rows and not os.path.exists(path):
 					save_tile(key, rows)
+				if rows and not suffix:
+					keys["frame-" + side] = str(len(rows[0]))
 
 		def save_frame_bottom():
 			"""A three-piece bottom frame whose first record is named
@@ -2065,6 +2067,10 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None, px
 				rows = resolve_rec(fill["type"], fill["id"], layer)
 				if rows and not os.path.exists(os.path.join(chrome_dir, "document-bottom.png")):
 					save_tile("document-bottom", rows)
+				top = layo_coord(item["rect"][0], _coords)
+				bottom = layo_coord(item["rect"][2], _coords)
+				if bottom > top:
+					keys["frame-bottom"] = str(bottom - top)
 				return
 
 		def save_menu_bar():
@@ -3282,7 +3288,8 @@ def main():
 		for key in ("title-text", "title-text-inactive"):
 			if chrome_keys.get(key):
 				f.write("%s=%s\n" % (key, chrome_keys[key]))
-		for key in ("bar-left", "bar-middle", "bar-right", "bar-span", "bar-title",
+		for key in ("frame-left", "frame-right", "frame-bottom",
+				"bar-left", "bar-middle", "bar-right", "bar-span", "bar-title",
 				"bar-left-inactive", "bar-middle-inactive", "bar-right-inactive",
 				"bar-span-inactive", "bar-dialog-left", "bar-dialog-middle",
 				"bar-dialog-right", "bar-dialog-left-inactive",

@@ -12,7 +12,7 @@
 #include "draw.h"
 #include "theme.h"
 
-#define CHROME_SLOTS 16
+#define CHROME_SLOTS 64
 
 static char *chrome_bundle; /* theme.conf path the skins below were read from */
 static struct timespec chrome_mtime;

@@ -267,6 +267,43 @@ static const struct chrome_tile *chrome_tile_get(int id) {
 	return t;
 }
 
+/* Appearance layouts describe the frame strips at their real thickness.
+ * Imported themes such as Gizmo use a 14 px vine edge and an 8 px bottom
+ * rail; squeezing those into Platinum's 6 px margins destroys the frame even
+ * when the extracted pixels are correct. */
+static int themed_doc_left(bool active) {
+	const struct chrome_tile *t = chrome_tile_get(CHROME_DOC_LEFT);
+	char value[16];
+	(void)active;
+	if (zac_theme_string("frame-left", value, sizeof(value))) {
+		int n = atoi(value);
+		if (n >= 1 && n <= 128) return n;
+	}
+	return t ? t->w : DECOR_LEFT;
+}
+
+static int themed_doc_right(bool active) {
+	const struct chrome_tile *t = chrome_tile_get(CHROME_DOC_RIGHT);
+	char value[16];
+	(void)active;
+	if (zac_theme_string("frame-right", value, sizeof(value))) {
+		int n = atoi(value);
+		if (n >= 1 && n <= 128) return n;
+	}
+	return t ? t->w : DECOR_RIGHT;
+}
+
+static int themed_doc_bottom(bool active) {
+	const struct chrome_tile *t = chrome_tile_get(CHROME_DOC_BOTTOM);
+	char value[16];
+	(void)active;
+	if (zac_theme_string("frame-bottom", value, sizeof(value))) {
+		int n = atoi(value);
+		if (n >= 1 && n <= 128) return n;
+	}
+	return t ? t->h : DECOR_BOTTOM;
+}
+
 /* Blit a tile rectangle, nearest-neighbour scaled to (dw, dh), clipped
  * to the canvas like pl_image_blend. */
 static void chrome_blit(struct pl_canvas *c, const struct chrome_tile *t,
@@ -819,10 +856,13 @@ struct decor_margins decor_margins(enum decor_style style) {
 	if (style == DECOR_STYLE_MOVABLE_MODAL) {
 		return (struct decor_margins){ .left = 3, .right = 3, .top = 24, .bottom = 3 };
 	}
+	char title_art[256];
+	const bool split_title = zac_theme_string("bar-title", title_art, sizeof(title_art));
 	return (struct decor_margins){
-		.left = DECOR_LEFT, .right = DECOR_RIGHT,
-		.top = DECOR_TOP + (style == DECOR_STYLE_DOCUMENT ? themed_band_max() : 0),
-		.bottom = DECOR_BOTTOM,
+		.left = themed_doc_left(true), .right = themed_doc_right(true),
+		.top = DECOR_TOP + (style == DECOR_STYLE_DOCUMENT && !split_title
+			? themed_band_max() : 0),
+		.bottom = themed_doc_bottom(true),
 	};
 }
 
@@ -1169,6 +1209,9 @@ void decor_paint(struct pl_canvas *c, const struct decor_state *st) {
 	}
 	const int W = st->width, H = frame_height(st);
 	const bool act = st->active;
+	const int dl = themed_doc_left(act);
+	const int dr = themed_doc_right(act);
+	const int db = themed_doc_bottom(act);
 	const uint32_t face = act ? chrome("frame-face", C_CCC) : inactive_face(C_DDD);
 	const uint32_t border = act ? chrome("frame-border", C_BLACK) : inactive_border(C_555, face);
 
@@ -1183,9 +1226,9 @@ void decor_paint(struct pl_canvas *c, const struct decor_state *st) {
 		if (!has_bar) {
 			chrome_fill_slot(c, 0, 0, W - 1, DECOR_TOP - 1, CHROME_DOC_TOP, act, face);
 		}
-		chrome_fill_slot(c, 0, H - DECOR_BOTTOM, W - 1, H - 1, CHROME_DOC_BOTTOM, act, face);
-		chrome_fill_slot(c, 0, DECOR_TOP, DECOR_LEFT - 1, H - DECOR_BOTTOM - 1, CHROME_DOC_LEFT, act, face);
-		chrome_fill_slot(c, W - DECOR_RIGHT, DECOR_TOP, W - 1, H - DECOR_BOTTOM - 1, CHROME_DOC_RIGHT, act, face);
+		chrome_fill_slot(c, 0, H - db, W - 1, H - 1, CHROME_DOC_BOTTOM, act, face);
+		chrome_fill_slot(c, 0, DECOR_TOP, dl - 1, H - db - 1, CHROME_DOC_LEFT, act, face);
+		chrome_fill_slot(c, W - dr, DECOR_TOP, W - 1, H - db - 1, CHROME_DOC_RIGHT, act, face);
 	}
 
 	const uint32_t highlight = chrome("frame-light", C_WHITE);
@@ -1219,15 +1262,15 @@ void decor_paint(struct pl_canvas *c, const struct decor_state *st) {
 
 	if (!st->collapsed) {
 		if (act && !has_bar) {
-			pl_hline(c, 4, W - 6, 20, shadow);
-			pl_vline(c, 4, 20, H - 6, shadow);
+			pl_hline(c, dl - 2, W - dr + 1, DECOR_TOP - 2, shadow);
+			pl_vline(c, dl - 2, DECOR_TOP - 2, H - db, shadow);
 		} else if (act) {
-			pl_vline(c, 4, DECOR_TOP, H - 6, shadow);
+			pl_vline(c, dl - 2, DECOR_TOP, H - db, shadow);
 		}
-		pl_outline(c, 5, 21, W - 6, H - 6, border);
+		pl_outline(c, dl - 1, DECOR_TOP - 1, W - dr, H - db, border);
 		if (act) {
-			pl_vline(c, W - 5, 21, H - 5, highlight);
-			pl_hline(c, 4, W - 5, H - 5, highlight);
+			pl_vline(c, W - dr + 1, DECOR_TOP - 1, H - db + 1, highlight);
+			pl_hline(c, dl - 1, W - dr + 1, H - db + 1, highlight);
 		}
 		if (st->has_grow) {
 			paint_grow(c, st);
@@ -1238,6 +1281,22 @@ void decor_paint(struct pl_canvas *c, const struct decor_state *st) {
 	}
 
 	if (act) {
+		/* Gizmo's title layout has a one-pixel black rule between the
+		 * right-side zoom and collapse controls. It is part of the
+		 * modifier group, not part of either pxm# button, so draw it
+		 * before the button art. Other themes do not opt into this detail. */
+		char title_art[256];
+		if (has_bar && st->style == DECOR_STYLE_DOCUMENT &&
+				zac_theme_string("bar-title", title_art, sizeof(title_art))) {
+			int zoom_x, zoom_y, collapse_x, collapse_y;
+			decor_box_origin(st, DECOR_PART_ZOOM, &zoom_x, &zoom_y);
+			decor_box_origin(st, DECOR_PART_COLLAPSE, &collapse_x, &collapse_y);
+			if (zoom_x >= 0 && collapse_x > zoom_x + BOX_SIZE + 1) {
+				const int sep = zoom_x + BOX_SIZE +
+					(collapse_x - zoom_x - BOX_SIZE) / 2;
+				pl_vline(c, sep, BOX_Y, BOX_Y + BOX_SIZE, C_BLACK);
+			}
+		}
 		int bx, by;
 		const enum decor_part boxes[] = {
 			DECOR_PART_CLOSE, DECOR_PART_ZOOM, DECOR_PART_COLLAPSE,
@@ -1329,8 +1388,8 @@ enum decor_part decor_hit(const struct decor_state *st, int x, int y) {
 		return DECOR_PART_GROW;
 	}
 	const struct decor_margins dm = decor_margins(st->style);
-	if (x >= DECOR_LEFT && x < W - DECOR_RIGHT &&
-			y >= dm.top && y < H - DECOR_BOTTOM) {
+	if (x >= dm.left && x < W - dm.right &&
+			y >= dm.top && y < H - dm.bottom) {
 		return DECOR_PART_CLIENT;
 	}
 	return DECOR_PART_DRAG;
