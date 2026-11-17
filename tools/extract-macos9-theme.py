@@ -2756,6 +2756,107 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None, px
 			save_tile(key, rows)
 			if key == "button-frame":
 				keys["button-frame-inset"] = str(max(1, frame["max_inset"] + 1))
+
+		# Themes like iTheme draw the button as eight named pxm# tiles
+		# ("Button TL/TR/BR/BL/Top/Bottom/Left/Right") plus a plut centre,
+		# not as a frme. Compose the same 9-slice from those names.
+		if "button-frame" not in keys and layo and 500 in layo:
+			try:
+				_coords, bitems = decode_layo(layo[500])
+			except (ValueError, IndexError, struct.error):
+				bitems = []
+
+			def button_role(name):
+				words = name.lower().replace("-", " ").replace("_", " ").split()
+				joined = " ".join(words)
+				if "tl" in words or "top left" in joined:
+					return "tl"
+				if "tr" in words or "top right" in joined:
+					return "tr"
+				if "br" in words or "bottom right" in joined:
+					return "br"
+				if "bl" in words or "bottom left" in joined:
+					return "bl"
+				if "top" in words:
+					return "top"
+				if "bottom" in words:
+					return "bottom"
+				if "left" in words:
+					return "left"
+				if "right" in words:
+					return "right"
+				return None
+
+			def compose_button(tiles, centre):
+				w, h = 80, 20
+				cw = max(len(tiles[r][0]) for r in ("tl", "tr", "bl", "br"))
+				ch = max(len(tiles[r]) for r in ("tl", "tr", "bl", "br"))
+				if cw * 2 >= w or ch * 2 >= h:
+					return None, 0
+				rows = [[centre] * w for _ in range(h)]
+
+				def blit(tile, dx, dy):
+					for y, row in enumerate(tile):
+						for x, col in enumerate(row):
+							if 0 <= dx + x < w and 0 <= dy + y < h:
+								rows[dy + y][dx + x] = col
+
+				blit(tiles["tl"], 0, 0)
+				blit(tiles["tr"], w - cw, 0)
+				blit(tiles["bl"], 0, h - ch)
+				blit(tiles["br"], w - cw, h - ch)
+				for x in range(cw, w - cw):
+					for y in range(ch):
+						rows[y][x] = tiles["top"][y][len(tiles["top"][0]) // 2]
+						rows[h - ch + y][x] = tiles["bottom"][y][len(tiles["bottom"][0]) // 2]
+				for y in range(ch, h - ch):
+					for x in range(cw):
+						rows[y][x] = tiles["left"][len(tiles["left"]) // 2][x]
+						rows[y][w - cw + x] = tiles["right"][len(tiles["right"]) // 2][x]
+				return rows, cw
+
+			base_tiles = {}
+			base_centre = None
+			for key, mask, exact in (("button-frame", 0, True),
+					("button-frame-pressed", 0x20, False),
+					("button-frame-inactive", 0x1, False)):
+				tiles = dict(base_tiles)
+				centre = None
+				for item in bitems:
+					if exact and item["visible"] != 0:
+						continue
+					if not exact and not (item["visible"] & mask):
+						continue
+					if item["type"] == b"pxm#":
+						role = button_role(pxm_names.get(item["id"] & 0xFFFF, ""))
+						if role and role not in tiles:
+							bodies = pxm.get(item["id"] & 0xFFFF)
+							if not bodies:
+								continue
+							try:
+								tiles[role] = decode_pxm(bodies[0], item["index"], clut_map)
+							except (ValueError, IndexError, struct.error):
+								pass
+					elif item["type"] == b"plut" and centre is None:
+						fill = resolve_rec(b"plut", item["id"], 0)
+						if fill and fill[0]:
+							centre = fill[0][0]
+				if key == "button-frame":
+					base_tiles = dict(tiles)
+					if centre is not None:
+						base_centre = centre
+				if centre is None:
+					centre = base_centre
+				if len(tiles) < 4 or centre is None:
+					continue
+				try:
+					rows, corner = compose_button(tiles, centre)
+				except (KeyError, IndexError):
+					continue
+				if rows:
+					save_tile(key, rows)
+					if key == "button-frame":
+						keys["button-frame-inset"] = str(max(1, corner))
 		# A progress bar's fill is the widest active pxm# layer; themes
 		# use 1150, but Gizmo's is a 7x10 gradient (356). The solid
 		# button face and 1 px border strips are narrower.
