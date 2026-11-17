@@ -2343,6 +2343,31 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None, px
 				save_tile(tile_key, tile)
 				keys[key] = str(thickness)
 
+		def save_grow_box(lid, suffix):
+			"""The theme's bottom-corner grow box (pxm# 450/451)."""
+			body = (layo or {}).get(lid)
+			if not body:
+				return
+			try:
+				_coords, items = decode_layo(body)
+			except (ValueError, IndexError, struct.error):
+				return
+			for item in items:
+				if item["type"] != b"pxm#":
+					continue
+				rid = item["id"] & 0xFFFF
+				key = {450: "grow-box", 451: "grow-box-left"}.get(rid)
+				if not key:
+					continue
+				bodies = pxm.get(rid)
+				if not bodies:
+					continue
+				try:
+					rows = decode_pxm(bodies[0], item["index"], clut_map)
+				except (ValueError, IndexError, struct.error):
+					continue
+				save_tile(key + suffix, rows)
+
 		save_menu_bar()
 		save_menu_palette()
 		save_frame_bottom()
@@ -2414,6 +2439,8 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None, px
 			save_frame_sides(lid, layer, suffix)
 
 		save_layout_rails(128, 0)
+		save_grow_box(128, "")
+		save_grow_box(129, "-inactive")
 
 		# Gizmo's real title bar is a three-layer composition selected by
 		# the has-title-text flag (0x80): red/blue field on the left,
@@ -2791,21 +2818,34 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None, px
 					track = resolve_rec(b"plut", item["id"], 0)
 					break
 			# The thumb: two pxm# end caps and the plut fill between them.
+			# The normal active bar is the 0x10 state (active, not
+			# pressed); 0x30 is pressed and 0x110 is its layer-1 variant.
+			# Using the first plut after any caps picked the pressed
+			# pink variant, which blended into the track.
 			caps = {}
 			thumb_mid = None
-			for item in items:
-				if item["type"] == b"pxm#":
+			want = 0x10
+			for candidate in (0x10, 0x0, 0x30, 0x110):
+				caps = {}
+				for item in items:
+					if item["type"] != b"pxm#":
+						continue
 					rid = item["id"] & 0xFFFF
-					if rid in (cap_left, cap_right) and rid not in caps:
+					if rid in (cap_left, cap_right) and item["visible"] == candidate \
+							and rid not in caps:
 						bodies = pxm.get(rid)
 						if bodies:
 							try:
-								caps[rid] = decode_pxm(bodies[0], 0, clut_map)
+								caps[rid] = decode_pxm(bodies[0], item["index"], clut_map)
 							except (ValueError, IndexError, struct.error):
 								pass
-				elif item["type"] == b"plut" and caps and thumb_mid is None and \
-						item["visible"] != 0:
+				if caps.get(cap_left) and caps.get(cap_right):
+					want = candidate
+					break
+			for item in items:
+				if item["type"] == b"plut" and item["visible"] == want:
 					thumb_mid = resolve_rec(b"plut", item["id"], 0)
+					break
 			axis = "vert" if vertical else "horz"
 			if track:
 				save_tile("scroll-track-" + axis, track)

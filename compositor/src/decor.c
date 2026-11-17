@@ -1058,6 +1058,16 @@ void decor_paint_stripes_scaled(uint32_t *dst, int dw, int dh, const struct deco
 }
 
 static void paint_grow(struct pl_canvas *c, const struct decor_state *st) {
+	int gw, gh;
+	const uint32_t *gp = chrome_file(st->active ? "chrome/grow-box.png" :
+		"chrome/grow-box-inactive.png", &gw, &gh);
+	if (!gp && !st->active) {
+		gp = chrome_file("chrome/grow-box.png", &gw, &gh);
+	}
+	if (gp) {
+		chrome_draw(c, gp, gw, gh, st->width - gw, st->height - gh);
+		return;
+	}
 	int gx = st->width - DECOR_GROW_INSET, gy = st->height - DECOR_GROW_INSET;
 	if (st->active) {
 		pl_grays(c, gx, gy, grow_active, 20);
