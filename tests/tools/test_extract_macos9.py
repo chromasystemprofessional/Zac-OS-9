@@ -1178,6 +1178,48 @@ def test_theme_chrome_decodes():
     print("ok    lined-up window art decodes into chrome/")
 
 
+def test_layo_title_items_out_of_order():
+    # Hi-Tech's layo 128 stores its title pieces as left cap, right cap,
+    # then the full-width fill, not cap/middle/cap. The fill must not be
+    # saved as a cap and tiled across the bar.
+    coords = [
+        (0, 18, 0, 0, 0, 0),      # 1: bar top
+        (0, -1, -2, 0, 0, 0),     # 2: left cap left = 5
+        (0, 22, 0, 0, 0, 0),      # 3: bar bottom
+        (0, 12, 0, 0, 0, 0),      # 4: left cap right = 12
+        (0, 1000, 0, 0, 0, 0),    # 5: right cap left
+        (0, 1007, 0, 0, 0, 0),    # 6: right cap right
+        (0, 6, 0, 0, 0, 0),       # 7: fill left
+        (0, 1000, 0, 0, 0, 0),    # 8: fill right
+    ]
+    items = [
+        (0, 0, 1, (1, 2, 3, 4), b"pxm#", 6176, 1, 0),   # left cap
+        (0, 0, 1, (1, 5, 3, 6), b"pxm#", 6173, 1, 0),   # right cap
+        (0, 0, 1, (1, 7, 3, 8), b"plut", -137, 1, 0),   # full-width fill
+    ]
+    titles = tool.layo_title_items(_layo_resource(coords, items))
+    assert [item["id"] for item, _top, _bottom in titles] == [6176, -137, 6173], titles
+    print("ok    title pieces are ordered by their left edge, so the fill is the middle")
+
+
+def test_dark_menu_bar_gets_dark_face():
+    # Hi-Tech's menu bar image is near black. Without a menu-bar face the
+    # palette keeps Platinum's light face and the bar titles come out black
+    # on the dark art. The extractor records the art's own dark face, so the
+    # menu bar picks white ink.
+    out = tempfile.mkdtemp() + "/theme"
+    layo = {
+        128: _layo_body([]),
+        256: _layo_resource([], [
+            (0, 0, 0x300, (1, -2, -1, -4), b"plut", -1, 1, 0),
+        ]),
+    }
+    plut = {387: _plut_body({0: (0, (10, 10, 10))})}
+    keys = tool.write_theme_chrome("Dark", {}, [], out, [], layo, plut)
+    assert keys.get("menu-bar") == "0a0a0a", keys
+    print("ok    a dark menu bar image records a dark menu-bar face")
+
+
 def test_bar_tiles_align():
     # A cap resource can carry rows above the bar (or the frame below it):
     # every bar tile is saved at the middle's height from its first inked
@@ -1202,6 +1244,23 @@ def test_bar_tiles_align():
     bar_h = tool.ZACOS_BAR_HEIGHT
     assert heights == {"bar-left": bar_h, "bar-middle": bar_h, "bar-right": bar_h}, heights
     print("ok    bar caps are aligned to the middle's height and the title row")
+
+
+def test_frame_left_rail():
+    # Appearance layouts also carry a left frame rail as a plut/ppat strip
+    # inside the content rectangle (Hi-Tech's left rail is the first such
+    # record). Without it the themed frame leaves the window's left edge
+    # transparent, since the theme draws its own frame.
+    plut = {387: _plut_body({48: (9001, (255, 255, 255))})}
+    ppats = [(9001, _ppat_body_wide(16, 8))]
+    layo = {128: _layo_resource([], [
+        (0, 0, 0, (-1, 1, -3, -2), b"plut", -49, 1, 0),
+    ])}
+    out = tempfile.mkdtemp() + "/theme"
+    keys = tool.write_theme_chrome("Left", {}, ppats, out, [], layo, plut)
+    assert keys.get("frame-left") == "6", keys
+    assert _png_size(os.path.join(out, "chrome", "document-left.png")) == (6, 1)
+    print("ok    a themed window's left frame rail is extracted like its right")
 
 
 def test_bar_tiles_fit_window():
@@ -1496,6 +1555,7 @@ test_theme_chrome_decodes()
 test_theme_chrome_twopart()
 test_bar_tiles_align()
 test_bar_tiles_fit_window()
+test_frame_left_rail()
 
 
 def test_theme_chrome_reordered_layout():
@@ -1622,6 +1682,8 @@ def test_resource_map_bounds():
     print("ok    a corrupt resource map cannot copy one body without bound")
 
 
+test_layo_title_items_out_of_order()
+test_dark_menu_bar_gets_dark_face()
 test_theme_chrome_reordered_layout()
 test_theme_icons_scale_and_clear_stale()
 test_resource_map_bounds()

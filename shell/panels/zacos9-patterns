@@ -18,8 +18,8 @@ from PIL import Image
 
 MAX_FILE = 16 * 1024 * 1024
 MAX_PIXELS = 1024 * 1024
-MAX_CATALOG_PIXELS = 16 * MAX_PIXELS
-MAX_ENTRIES = 512
+MAX_CATALOG_PIXELS = 64 * MAX_PIXELS
+MAX_ENTRIES = 8192
 WALLPAPER = False
 Image.MAX_IMAGE_PIXELS = MAX_PIXELS
 warnings.simplefilter("error", Image.DecompressionBombWarning)

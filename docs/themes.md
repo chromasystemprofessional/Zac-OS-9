@@ -131,8 +131,11 @@ reads the Appearance theme's resource fork and produces a **theme bundle** in
   theme ships one). The compositor tiles them over title bars and borders;
   the menu bar, dropdown menus and the selected item use the `menu
   background` / `menu highlight` skins. The root menu bar's own fill is
-  written separately as `menu-bar-image` from its layout; dropdown menus
-  keep `menu-background`. Scrollbars tile the `scroll-track-*`
+  written separately as `menu-bar-image` from its layout; a dark fill also
+  records a dark `menu-bar` face so the bar titles pick white ink. Dropdown
+  menus keep `menu-background`. A frame's left rail is saved as
+  `document-left` with `frame-left`, alongside the right and bottom rails.
+  Scrollbars tile the `scroll-track-*`
   and three-part `scroll-thumb-*` skins (caps with the stretch between,
   stretch alone when short); a theme's own `scroll-arrow-*` art is used
   when its arrow boxes match, else the arrows stay procedural.

@@ -203,6 +203,17 @@ with tempfile.TemporaryDirectory(prefix="zacos9-pattern-test-") as directory:
     assert not any(entry["name"].startswith("Photo.png") for entry in small_tiles["entries"])
     assert any(error.startswith("Photo.png:") and ("limit" in error or "dimensions" in error)
                for error in small_tiles["errors"])
+    # Theme imports add a whole set of patterns at once. The catalog must
+    # not stop at 512 and silently drop a theme's own desktop tile.
+    many = Path(tempfile.mkdtemp())
+    tile = Image.new("RGB", (1, 1), (12, 34, 56))
+    for i in range(520):
+        tile.save(many / ("tile-%03d.png" % i))
+    result = subprocess.run([sys.executable, str(tool), str(many)],
+                            capture_output=True, text=True, timeout=30, check=True)
+    catalog = json.loads(result.stdout)
+    assert len(catalog["entries"]) == 520 and not catalog["errors"], catalog["errors"]
 print("ok: original image, ppat, PAT#, PICT, resource, MacBinary, AppleDouble and BinHex fixtures")
 print("ok: IDs, palette colors, checksums, corrupt inputs, removal and source preservation")
 print("ok: separate wallpaper catalog, photo-size limits and classic PICT pictures")
+print("ok: theme-sized pattern sets stay in the catalog")

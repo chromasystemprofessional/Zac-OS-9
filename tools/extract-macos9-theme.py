@@ -1745,7 +1745,12 @@ def layo_title_items(body, names=None):
 			if middle is not None:
 				return [left, middle, right]
 			return [left, right]
-	return candidates[:3]
+	# No resource names: the first three title-bar records are usually
+	# cap/middle/cap, but some themes (Hi-Tech) draw cap, opposite cap, then
+	# one full-width fill. Order by their left edge, so the wide record lands
+	# in the middle instead of being tiled across the bar as a cap.
+	first = candidates[:3]
+	return sorted(first, key=lambda entry: layo_coord(entry[0]["rect"][1], coords))
 
 
 def decode_wnd(body):
@@ -2262,6 +2267,17 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None, px
 			choice = rows[1] if len(rows) > 1 else rows[0]
 			if not os.path.exists(os.path.join(chrome_dir, "menu-bar-image.png")):
 				save_tile("menu-bar-image", choice)
+			# A dark bar image needs a dark menu-bar face so the bar's ink
+			# comes out white. Without it the palette keeps Platinum's light
+			# face and picks black text, which disappears on the art (Hi-Tech).
+			if "menu-bar" not in keys:
+				opaque = [px for row in choice for px in row if px[3] >= 128]
+				if opaque:
+					r = sum(px[0] for px in opaque) // len(opaque)
+					g = sum(px[1] for px in opaque) // len(opaque)
+					b = sum(px[2] for px in opaque) // len(opaque)
+					if (r * 299 + g * 587 + b * 114) // 1000 < 128:
+						keys["menu-bar"] = "%02x%02x%02x" % (r, g, b)
 
 		def save_menu_palette():
 			"""The pull-down menu's flat face from layo 257. A solid plut
@@ -2304,8 +2320,10 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None, px
 				coords, items = decode_layo(body)
 			except (ValueError, IndexError, struct.error):
 				return
-			for vertical, tile_key, key in ((True, "document-right", "frame-right"),
-					(False, "document-bottom", "frame-bottom")):
+			for vertical, tile_key, key, edge in (
+					(True, "document-right", "frame-right", -4),
+					(True, "document-left", "frame-left", -2),
+					(False, "document-bottom", "frame-bottom", -3)):
 				found = None
 				for item in items:
 					if item["type"] not in (b"plut", b"ppat"):
@@ -2314,7 +2332,7 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None, px
 						continue
 					top, left, bottom, right = item["rect"]
 					if vertical:
-						if left != -4:
+						if (edge == -4 and left != -4) or (edge == -2 and right != -2):
 							continue
 						thickness = layo_coord(right, coords) - layo_coord(left, coords)
 					else:
@@ -3708,6 +3726,7 @@ def main():
 				"button-dialog-zoom", "button-dialog-zoom-pressed",
 				"button-dialog-grow", "button-dialog-grow-pressed",
 				"menu-bar-image",
+				"menu-bar",
 				"menu-background",
 				"button-frame-inset",
 				"scroll-arrow-dec", "scroll-arrow-inc"):
