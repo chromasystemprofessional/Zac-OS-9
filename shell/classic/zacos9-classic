@@ -405,7 +405,11 @@ if [ -n "$open_path" ]; then
 	export ZACOS9_CLASSIC_QUEUE="$queue_root"
 fi
 # SheepShaver's SDL audio callback segfaults shortly after the guest
-# starts once a real driver is attached, on both SDL's default driver and
-# PulseAudio. The dummy driver keeps the emulator stable; set
-# SDL_AUDIODRIVER=pulseaudio to opt back in when that is fixed.
+# starts, whatever the SDL driver: both the default driver, PulseAudio and
+# the dummy driver reach the same crash once the guest plays a sound. Keep
+# the emulator's sound output off until that is fixed; SDL_AUDIODRIVER can
+# still be set for experiments.
+if [ "$program" = SheepShaver ]; then
+	set -- "$@" --nosound true
+fi
 SDL_VIDEODRIVER=x11 SDL_AUDIODRIVER=${SDL_AUDIODRIVER:-dummy} exec "$exe" "$@"
