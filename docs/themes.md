@@ -296,8 +296,10 @@ A bundle records the extractor that built it, so when a ZacOS
 update learns to decode more, the Appearance panel rebuilds the bundles
 from the copies in Theme Files rather than leaving the old, partial ones.
 The dropped file wears the theme's own Finder icon (its mini window art) where
-one exists, and the folder it is filed into wears the same icon; files without
-one keep the generic document icon. The menu icon,
+one exists, and the folder it is filed into wears the same icon. A theme
+without a Finder icon gives its folder the theme's folder art, then its Apple
+menu icon, so it is never a plain folder; existing theme folders are repaired
+when Appearance opens. The menu icon,
 boot art and colours change at the next menu-bar rebuild and boot. Decoded TrueType faces install to `~/.local/share/fonts/zacos9/` (registered
 with fontconfig); the preset's `font-family` (the theme's system font, else its
 views font) becomes the programs' typeface, selectable any time under

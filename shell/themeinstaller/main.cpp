@@ -864,8 +864,19 @@ static bool installThemeSoundSet(const QString &name, const QString &soundThemes
 }
 
 static void stampThemeFileIcon(const QString &file, const QString &name) {
-	const QImage icon(outputDir(name) + "/file-icon.png");
-	if (icon.isNull()) {
+	const QImage fileIcon(outputDir(name) + "/file-icon.png");
+	QImage folderIcon = fileIcon;
+	/* Not every Mac OS 9 theme carried a Finder icon (Aqua, Gizmo,
+	 * Hi-Tech and Liquid do not). Give their folder the theme's own
+	 * folder art, then the Apple menu icon, so it is not a plain folder. */
+	for (const char *fallback : { "/icons/folder-32.png", "/menu-icon.png",
+			"/apple-menu.png" }) {
+		if (!folderIcon.isNull()) {
+			break;
+		}
+		folderIcon = QImage(outputDir(name) + fallback);
+	}
+	if (folderIcon.isNull()) {
 		return;
 	}
 	QString target = file;
@@ -876,14 +887,14 @@ static void stampThemeFileIcon(const QString &file, const QString &name) {
 			target = sibling;
 		}
 	}
-	if (!writeCustomIconImage(target, icon)) {
+	if (!fileIcon.isNull() && !writeCustomIconImage(target, fileIcon)) {
 		qWarning() << "Could not stamp the theme file's icon onto" << target;
 	}
 	/* The folder the theme was filed into wears the same icon, so the
 	 * theme is recognisable before its file is opened. */
 	const QString folder = QFileInfo(target).absolutePath();
 	if (folder.startsWith(appearanceThemesFolder() + "/") &&
-			!writeCustomIconImage(folder, icon)) {
+			!writeCustomIconImage(folder, folderIcon)) {
 		qWarning() << "Could not stamp the theme's icon onto" << folder;
 	}
 }

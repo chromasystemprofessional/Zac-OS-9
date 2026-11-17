@@ -2,6 +2,7 @@
 #include "conf.h"
 #include "programs.h"
 
+#include <QBuffer>
 #include <QCoreApplication>
 #include <QCryptographicHash>
 #include <QDir>
@@ -17,12 +18,14 @@
 #include <QJsonObject>
 #include <QLockFile>
 #include <QMap>
+#include <QPainter>
 #include <QPointer>
 #include <QProcess>
 #include <QRegularExpression>
 #include <QSaveFile>
 #include <QStandardPaths>
 #include <QTimer>
+#include <sys/xattr.h>
 
 #include "custompatterns.h"
 #include "settings.h"
@@ -485,6 +488,100 @@ static void moveSoundThemesFolder() {
 	QDir().rmdir(from);
 }
 
+/* A theme bundle's folder icon: the theme's own file icon, else its
+ * folder art, else its Apple menu icon. The Finder reads the xattr or,
+ * on a filesystem without one, the SHA-256 store writeCustomIconImage
+ * uses; mirror both so an existing theme folder can be repaired. */
+static QString themeIconStore(const QString &folder) {
+	const QString canonical = QFileInfo(folder).canonicalFilePath();
+	const QString key = QStringLiteral("file:") +
+		(canonical.isEmpty() ? QFileInfo(folder).absoluteFilePath() : canonical);
+	return QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) +
+		"/zacos9/custom-icons/" + QString::fromLatin1(QCryptographicHash::hash(
+			key.toUtf8(), QCryptographicHash::Sha256).toHex()) + ".png";
+}
+
+static bool themeFolderHasIcon(const QString &folder) {
+	const QByteArray name = QFile::encodeName(folder);
+	if (lgetxattr(name.constData(), "user.zacos9.custom-icon", nullptr, 0) > 0) {
+		return true;
+	}
+	return QFileInfo::exists(themeIconStore(folder));
+}
+
+static bool stampThemeFolderIcon(const QString &folder, const QImage &source) {
+	QImage image(32, 32, QImage::Format_ARGB32);
+	image.fill(Qt::transparent);
+	const QImage scaled = source.scaled(32, 32, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+	QPainter painter(&image);
+	painter.drawImage((32 - scaled.width()) / 2, (32 - scaled.height()) / 2, scaled);
+	painter.end();
+	QByteArray encoded;
+	QBuffer buffer(&encoded);
+	if (!buffer.open(QIODevice::WriteOnly) || !image.save(&buffer, "PNG") || encoded.isEmpty()) {
+		return false;
+	}
+	const QByteArray name = QFile::encodeName(folder);
+	if (lsetxattr(name.constData(), "user.zacos9.custom-icon", encoded.constData(),
+			static_cast<size_t>(encoded.size()), 0) == 0) {
+		return true;
+	}
+	const QString store = themeIconStore(folder);
+	QDir().mkpath(QFileInfo(store).absolutePath());
+	QSaveFile output(store);
+	return output.open(QIODevice::WriteOnly) && output.write(encoded) == encoded.size() &&
+		output.commit();
+}
+
+/* Older imports had no folder icon when the source theme carried no
+ * Finder icon. Fill those in from the bundle now, leaving a user-set
+ * icon alone. */
+static void repairThemeFolderIcons() {
+	const QDir root(appearanceThemesFolder());
+	if (!root.exists()) {
+		return;
+	}
+	const QString bundles = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) +
+		"/zacos9/themes";
+	for (const QFileInfo &folder : root.entryInfoList(
+			QDir::Dirs | QDir::NoDotAndDotDot | QDir::Hidden, QDir::Name)) {
+		const QString path = folder.absoluteFilePath();
+		if (folder.isSymLink() || folder.fileName().startsWith("._") ||
+				themeFolderHasIcon(path)) {
+			continue;
+		}
+		QString bundle;
+		for (const QString &file : QDir(path).entryList({ "*.json" }, QDir::Files, QDir::Name)) {
+			QFile input(path + "/" + file);
+			if (!input.open(QIODevice::ReadOnly)) {
+				continue;
+			}
+			bundle = QJsonDocument::fromJson(input.readAll()).object()
+				.value("settings").toObject().value("theme-bundle").toString();
+			if (!bundle.isEmpty()) {
+				break;
+			}
+		}
+		if (bundle.isEmpty()) {
+			continue;
+		}
+		const QString dir = bundles + "/" + bundle;
+		QImage icon(dir + "/file-icon.png");
+		if (icon.isNull()) {
+			icon.load(dir + "/icons/folder-32.png");
+		}
+		if (icon.isNull()) {
+			icon.load(dir + "/menu-icon.png");
+		}
+		if (icon.isNull()) {
+			icon.load(dir + "/apple-menu.png");
+		}
+		if (!icon.isNull() && !stampThemeFolderIcon(path, icon)) {
+			qWarning() << "Could not give the theme folder its icon:" << path;
+		}
+	}
+}
+
 /* Bundles named for an AppleDouble companion (".-prefixed) can only
  * be leftovers from before the installer stopped importing companions
  * directly: nameFromFile() strips the "._" prefix, so no new bundle can
@@ -549,6 +646,7 @@ public:
 				qWarning().noquote() << "Could not create theme folder:" << folder;
 			}
 		}
+		repairThemeFolderIcons();
 		poll.setInterval(2000);
 		importTimeout.setSingleShot(true);
 		importTimeout.setInterval(60000);
