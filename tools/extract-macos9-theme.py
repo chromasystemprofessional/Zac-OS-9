@@ -39,7 +39,8 @@ import pngwrite
 ASSET_EXTS = {".icns", ".png", ".jpg", ".jpeg", ".wav", ".aiff", ".aif", ".pat"}
 
 # Resource-fork types and where they land.
-ICON_TYPES = {b"ICN#", b"icl8", b"icl4", b"ics#", b"ics8", b"ics4", b"icns", b"ICON"}
+ICON_TYPES = {b"ICN#", b"icl8", b"icl4", b"ics#", b"ics8", b"ics4", b"icns", b"ICON",
+	b"icm#", b"icm4", b"icm8"}
 PATTERN_TYPES = {b"PAT ", b"PAT#", b"ppat"}
 SOUND_TYPES = {b"snd "}
 FONT_TYPES = {b"sfnt", b"FOND", b"nfnt"}
@@ -58,10 +59,15 @@ SOUND_SLOT_OFFSET, SOUND_SLOT_SIZE = 10, 8
 # Kaleidoscope schemes carry their WindowShade pair as ordinary snd
 # resources, with no sdid/snd# metadata to name the events.
 KALEIDOSCOPE_SOUNDS = {-14336: "window-collapse", -14335: "window-expand"}
-CURSOR_TYPES = {b"CURS", b"crsr"}
+CURSOR_TYPES = {b"CURS", b"crsr", b"acur"}
 PICT_TYPES = {b"PICT"}
 THEME_TYPES = {b"thme", b"clut", b"pltt", b"WIND", b"scen", b"pxm#", b"layo", b"plut",
-	b"frme", b"cicn", b"crsr", b"CURS", b"wctb"}
+	b"frme", b"cicn", b"crsr", b"CURS", b"wctb",
+	# Kept raw for the audit and future decoding: text/metrics/dialog
+	# information and creator-specific theme markers.
+	b"tdat", b"tic#", b"tinf", b"dftb", b"dlgx", b"dctb", b"ictb", b"ftag",
+	b"tvar", b"tthm", b"ntek", b"jthm", b"pthm", b"fthm", b"zthm", b"sys7",
+	b"TMDA", b"ckid", b"Wpos", b"Mngl", b"MSco", b"hiro", b"iSNP"}
 
 # The desktop's title row (compositor/src/decor.c DECOR_TOP). Theme bar
 # art is written at this height so the compositor never resamples it,

@@ -75,7 +75,13 @@ def test_end_to_end():
     with open(os.path.join(src, "a.png"), "wb") as f:
         f.write(b"png")
     # Build a resource fork and save as a file
-    fork = build_resource_fork([(b"icns", 128, b"iconbytes"), (b"thme", 1, b"thmedata")])
+    fork = build_resource_fork([
+        (b"icns", 128, b"iconbytes"),
+        (b"thme", 1, b"thmedata"),
+        (b"tdat", 128, b"textdata"),
+        (b"icm#", 128, b"iconmask"),
+        (b"acur", 128, b"animatedcursor"),
+    ])
     with open(os.path.join(src, "Finder"), "wb") as f:
         f.write(fork)
     out = tempfile.mkdtemp() + "/theme"
@@ -91,6 +97,13 @@ def test_end_to_end():
     assert thme_files, "resource-fork theme extracted"
     with open(os.path.join(out, "theme", thme_files[0]), "rb") as f:
         assert f.read() == b"thmedata", "theme body is the full resource"
+    for folder, prefix, body in (("theme", "tdat_", b"textdata"),
+                                 ("icons", "icm#_", b"iconmask"),
+                                 ("cursors", "acur_", b"animatedcursor")):
+        files = [fn for fn in os.listdir(os.path.join(out, folder)) if fn.startswith(prefix)]
+        assert files, (folder, prefix)
+        with open(os.path.join(out, folder, files[0]), "rb") as f:
+            assert f.read() == body, prefix
     print("ok    end-to-end bundle build")
 
 

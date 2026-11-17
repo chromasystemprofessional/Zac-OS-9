@@ -160,3 +160,9 @@ so Gizmo's own window is a thick vine frame with a comb title bar and a
 22 px title row and a 16 px scrollbar, and only swap the artwork. Faithful
 rendering therefore needs the compositor's frame/title/scrollbar metrics to be
 theme-driven, not just the extractor to be correct.
+
+## Auditing
+
+[Theme rendering audit](theme-audit.md) maps each visible part to its
+resource and metric, lists the parts still drawn by Platinum, and explains
+how to inventory a theme's undecoded resources.
