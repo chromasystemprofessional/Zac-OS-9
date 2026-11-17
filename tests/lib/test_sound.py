@@ -30,7 +30,7 @@ class PlaybackTests(unittest.TestCase):
         for name in ("drag", "collapse", "expand", "end", "startup", "shutdown"):
             (self.root / f"zacos9/sounds/{name}.wav").write_bytes(b"mock")
         self.configure()
-        self.player("pw-play")
+        self.player("paplay")
         env = dict(os.environ, PATH=str(self.root), SOUND_TEST_LOG=str(self.log),
                    XDG_CONFIG_HOME=str(self.root), XDG_CACHE_HOME=str(self.root),
                    XDG_RUNTIME_DIR=str(self.root), ZACOS9_DATA=DATA)
@@ -109,7 +109,7 @@ with open(os.environ["SOUND_TEST_LOG"], "a") as f:
         self.command("start window-drag")
         self.wait_for(lambda: len(self.records()) >= 3)
         records = self.records()
-        self.assertTrue(all(r["args"][:2] == ["--volume", "0.714"] for r in records))
+        self.assertTrue(all(r["args"][0] == "--volume=46811" for r in records))
         self.command("stop")
         self.command("stop")
         self.cleanup_complete(records)
@@ -125,7 +125,7 @@ with open(os.environ["SOUND_TEST_LOG"], "a") as f:
                                   for r in self.records()))
 
     def test_stop_long_backend_and_caller_exit(self):
-        self.player("pw-play", 30, descendants=True)
+        self.player("paplay", 30, descendants=True)
         self.command("start window-drag")
         self.wait_for(lambda: len(self.records()) >= 1)
         records = self.records()
@@ -158,7 +158,7 @@ with open(os.environ["SOUND_TEST_LOG"], "a") as f:
         self.assertEqual(self.records(), [])
 
     def test_live_mute_theme_and_volume(self):
-        self.player("pw-play", 30)
+        self.player("paplay", 30)
         self.command("start window-drag")
         self.wait_for(lambda: len(self.records()) == 1)
         self.configure(**{"interface-volume": "0"})
@@ -167,7 +167,7 @@ with open(os.environ["SOUND_TEST_LOG"], "a") as f:
         self.assertEqual(len(self.records()), 1)
         self.configure(**{"interface-volume": "2"})
         self.wait_for(lambda: len(self.records()) == 2)
-        self.assertEqual(self.records()[-1]["args"][:2], ["--volume", "0.286"])
+        self.assertEqual(self.records()[-1]["args"][0], "--volume=18724")
         self.configure(**{"sound-theme": "none"})
         self.wait_for(lambda: self.dead(self.records()[-1]["pid"]))
         time.sleep(0.2)
@@ -216,7 +216,7 @@ with open(os.environ["SOUND_TEST_LOG"], "a") as f:
         self.wait_for(lambda: len(self.records()) >= 3)
 
     def test_interface_events_do_not_overlap_loop(self):
-        self.player("pw-play", 30)
+        self.player("paplay", 30)
         self.command("start window-drag")
         self.wait_for(lambda: len(self.records()) == 1)
         self.command("event window-collapse")
@@ -224,20 +224,20 @@ with open(os.environ["SOUND_TEST_LOG"], "a") as f:
         self.assertEqual(len(self.records()), 1)
         self.command("stop")
         self.cleanup_complete(self.records())
-        self.player("pw-play")
+        self.player("paplay")
         self.command("event window-collapse")
         self.wait_for(lambda: len(self.records()) == 2)
         self.assertTrue(self.records()[-1]["args"][-1].endswith("collapse.wav"))
 
     def test_immediate_stop_then_drag_end(self):
-        self.player("pw-play", 30)
+        self.player("paplay", 30)
         self.command("reaper")
         self.command("start window-drag")
         self.wait_for(lambda: len(self.records()) == 1)
         drag = self.records()[0]
         self.command("event window-collapse")  # Update one-shot throttle.
         self.command("stop")
-        self.player("pw-play")
+        self.player("paplay")
         self.command("event window-drag-end")
         self.wait_for(lambda: len(self.records()) == 2)
         self.assertTrue(self.records()[-1]["args"][-1].endswith("end.wav"))
@@ -254,14 +254,14 @@ with open(os.environ["SOUND_TEST_LOG"], "a") as f:
         self.assertEqual(self.records(), [])
 
     def test_pending_one_shot_does_not_delay_stop_eof(self):
-        self.player("pw-play", 30)
+        self.player("paplay", 30)
         self.command("start window-drag")
         self.wait_for(lambda: len(self.records()) == 1)
         drag = self.records()[0]
         # This detached one-shot waits for the lock before exec; it must not
         # retain a copy of the loop control writer during that wait.
         self.command("event window-drag-end")
-        self.player("pw-play")
+        self.player("paplay")
         before = time.monotonic()
         self.command("stop")
         self.wait_for(lambda: self.dead(drag["pid"]))
@@ -269,16 +269,24 @@ with open(os.environ["SOUND_TEST_LOG"], "a") as f:
         self.wait_for(lambda: len(self.records()) == 2)
         self.assertTrue(self.records()[-1]["args"][-1].endswith("end.wav"))
 
-    def test_backend_fallback(self):
-        (self.root / "pw-play").unlink()
-        self.player("paplay")
+    def test_prefers_paplay_over_pw_play(self):
+        self.player("pw-play")
         self.command("start window-drag")
-        self.wait_for(lambda: len(self.records()) >= 2)
+        self.wait_for(lambda: len(self.records()) >= 1)
         self.assertEqual(self.records()[0]["backend"], "paplay")
-        self.assertEqual(self.records()[0]["args"][0], "--volume=46811")
         self.command("stop")
         self.cleanup_complete(self.records())
+
+    def test_backend_fallback(self):
         (self.root / "paplay").unlink()
+        self.player("pw-play")
+        self.command("start window-drag")
+        self.wait_for(lambda: len(self.records()) >= 2)
+        self.assertEqual(self.records()[0]["backend"], "pw-play")
+        self.assertEqual(self.records()[0]["args"][:2], ["--volume", "0.714"])
+        self.command("stop")
+        self.cleanup_complete(self.records())
+        (self.root / "pw-play").unlink()
         self.player("aplay")
         count = len(self.records())
         self.command("start window-drag")
@@ -287,7 +295,7 @@ with open(os.environ["SOUND_TEST_LOG"], "a") as f:
         self.assertEqual(self.records()[-1]["args"][0], "-q")
 
     def test_failed_backend_does_not_repeat_forever(self):
-        player = self.root / "pw-play"
+        player = self.root / "paplay"
         player.write_text(player.read_text() + "\nsys.exit(1)\n")
         self.command("start window-drag")
         self.wait_for(lambda: len(self.records()) == 1)

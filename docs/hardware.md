@@ -67,7 +67,7 @@ on 2026-10-07, under a once-a-second monitor of
 - It happened twice, 90 seconds apart, while Firefox was playing YouTube
   (48 kHz).
 - Switching outputs doesn't help, because something else keeps the frozen
-  device open: an interface sound's `pw-play`, for example, that never
+  device open: an interface sound's player process, for example, that never
   finishes.
 - Closing and reopening the device does help (`pactl suspend-sink … 1`,
   then `0`). The position moves again and the TV plays, with no restart.

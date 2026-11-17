@@ -132,7 +132,7 @@ int main(int argc, char **argv) {
 	check(writeFile(root.path() + "/bin/pactl", "#!/bin/sh\nexit 0\n", true),
 		"a pactl that reports no sound server is in place");
 	/* The player the alert sound is previewed with, noted down. */
-	check(writeFile(root.path() + "/bin/pw-play",
+	check(writeFile(root.path() + "/bin/paplay",
 		"#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$TEST_LOG\"\n", true),
 		"a player that notes what it is asked to play is in place");
 	qputenv("PATH", (root.path() + "/bin:/usr/bin:/bin").toUtf8());

@@ -282,8 +282,13 @@ static void sound_backend(const char *path, int level) {
 		dup2(null, STDOUT_FILENO);
 		close(null);
 	}
-	execlp("pw-play", "pw-play", "--volume", pw_volume, path, (char *)NULL);
+	/* paplay first: it drains the stream before closing. pw-play can close
+	 * while the server still holds the last samples, which is heard as a
+	 * click at the end of an 8-bit or low-rate sound (Wet and Myst sets).
+	 * pw-play and aplay stay as fallbacks for systems without PulseAudio
+	 * tools. */
 	execlp("paplay", "paplay", pa_volume, path, (char *)NULL);
+	execlp("pw-play", "pw-play", "--volume", pw_volume, path, (char *)NULL);
 	execlp("aplay", "aplay", "-q", path, (char *)NULL);
 	perror("No sound playback command could be started");
 	_exit(127);

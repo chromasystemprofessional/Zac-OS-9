@@ -234,8 +234,8 @@ int main(int argc, char **argv) {
 			"sound.shutdown", "sound.window-open" }) {
 		assert(!preference(key).isEmpty());
 	}
-	write(root.path() + "/pw-play", "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$TEST_LOG\"\nsleep 0.4\n");
-	QFile player(root.path() + "/pw-play");
+	write(root.path() + "/paplay", "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$TEST_LOG\"\nsleep 0.4\n");
+	QFile player(root.path() + "/paplay");
 	assert(player.setPermissions(QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner));
 	pl_sound_play("Recorded_Chime");
 	assert(waitFor([&] {
@@ -256,12 +256,12 @@ int main(int argc, char **argv) {
 			return false;
 		}
 		const QByteArray played = playback.readAll();
-		return played.contains("--volume 0.429") && played.contains("/cache/zacos9/sounds/");
+		return played.contains("--volume=28086") && played.contains("/cache/zacos9/sounds/");
 	}));
 	QFile log(root.path() + "/played");
 	assert(log.open(QIODevice::ReadOnly));
 	const QByteArray played = log.readAll();
-	assert(played.contains("--volume 0.429") && played.contains("/cache/zacos9/sounds/"));
+	assert(played.contains("--volume=28086") && played.contains("/cache/zacos9/sounds/"));
 	log.close();
 	QThread::msleep(100);
 	pl_sound_event("checkbox-toggle");
