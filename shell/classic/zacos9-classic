@@ -397,6 +397,11 @@ fi
 
 # SDL's Wayland backend never shows a window here; Xwayland works.
 # TODO: find out why (frame callbacks? libdecor?).
-# The patched SheepShaver reads the same queue as the host.
-export ZACOS9_CLASSIC_QUEUE="$queue_root"
+# The Classic bridge queue is only needed for direct --open requests.
+# Leaving it unset for a plain launch keeps the patched emulator bridge
+# dormant: on a freshly reset queue it otherwise segfaults shortly after
+# the guest starts.
+if [ -n "$open_path" ]; then
+	export ZACOS9_CLASSIC_QUEUE="$queue_root"
+fi
 SDL_VIDEODRIVER=x11 SDL_AUDIODRIVER=${SDL_AUDIODRIVER:-pulseaudio} exec "$exe" "$@"
