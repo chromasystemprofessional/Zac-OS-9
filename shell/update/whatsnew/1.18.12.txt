@@ -1,0 +1,13 @@
+ZacOS 9 1.18.12 completes the Sniffer's Edit menu.
+
+Cut (⌘X) now marks the selected files and folders to move, and Paste
+(⌘V) moves them into the front window or Desktop. Copy (⌘C) puts them
+on the Clipboard to duplicate instead; the copies are named "copy",
+"copy 2" and so on.
+
+Clear moves the selection to the Trash without putting it on the
+Clipboard. The menu items are enabled only when there is something to
+cut, copy, paste or clear, and files copied in another file manager can
+be pasted in the Sniffer too.
+
+Undo still belongs to the program in front; the Sniffer has none.

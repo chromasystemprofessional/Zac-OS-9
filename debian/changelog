@@ -1,3 +1,13 @@
+zacos9 (1.18.12) trixie; urgency=medium
+
+  * The Sniffer's Edit menu now works on files: Cut (⌘X) marks the selected
+    items to move and Paste moves them into the front window or Desktop;
+    Copy duplicates them on Paste; Clear moves the selection to the Trash
+    without putting it on the Clipboard. The items follow the selection and
+    the Clipboard, including files copied in another file manager.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Tue, 17 Nov 2026 16:24:02 -0500
+
 zacos9 (1.18.11) trixie; urgency=medium
 
   * Saving an Appearance theme keeps its base theme file and icons instead
