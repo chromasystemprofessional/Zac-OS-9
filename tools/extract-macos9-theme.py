@@ -1487,6 +1487,139 @@ def _parse_plut_entries(body):
 	return out
 
 
+def decode_frme(body):
+	"""Decode an Appearance theme 'frme' control frame.
+
+	The Resorcerer Theme Templates 0.5.1 describe a 12-byte header —
+	frame type (2 small, 3 big), reserved, align-bottom/align-right
+	flags, minimum and maximum inset, base brush and item count — then
+	one record per item: its own flags, inset, brush and four side masks
+	(left, top, right, bottom). A small frame's masks are one byte each
+	and a big frame's are two; each mask selects the corner pixel, the
+	edge pixels and the stretchable line segment on that side.
+
+	Brush indices are the same as `layo`'s: a negative value indexes
+	plut 387's theme brushes, a positive one plut 386's regular brushes.
+	See render_frme() for the painting order."""
+	if not body or len(body) < 12:
+		raise ValueError("frme is too short")
+	typ, _reserved, flags, min_inset, _unused, max_inset, base, count = \
+		struct.unpack(">HHBBBBhH", body[:12])
+	if typ not in (2, 3):
+		raise ValueError("frme has an unknown frame type")
+	item_size = 8 if typ == 2 else 12
+	if len(body) < 12 + count * item_size:
+		raise ValueError("frme item table is truncated")
+	items = []
+	off = 12
+	for _ in range(count):
+		item_flags, inset, brush = struct.unpack(">BBh", body[off:off + 4])
+		if typ == 2:
+			masks = tuple(body[off + 4:off + 8])
+		else:
+			masks = struct.unpack(">HHHH", body[off + 4:off + 12])
+		items.append({"flags": item_flags, "inset": inset,
+			"plut": brush, "masks": masks})
+		off += item_size
+	return {"type": typ, "flags": flags, "min_inset": min_inset,
+		"max_inset": max_inset, "base": base, "items": items}
+
+
+def _frme_side(big, side, x0, y0, xn, yn):
+	"""The 8 (small) or 16 (big) positions of one frame side, in mask
+	bit order (most significant first): corner pixel, edge pixels, the
+	stretchable line, then the pixels up to the next corner. Each entry
+	is ('p', x, y) or ('l', x0, y0, x1, y1)."""
+	end = 7 if big else 3
+	steps = []
+
+	def pixel(x, y):
+		steps.append(("p", x, y))
+
+	def line(ax, ay, bx, by):
+		steps.append(("l", ax, ay, bx, by))
+
+	if side == "left":
+		pixel(x0, yn)
+		for k in range(1, end + 1):
+			pixel(x0, yn - k)
+		line(x0, yn - end - 1, x0, end + 1)
+		for k in range(end, 0, -1):
+			pixel(x0, k)
+	elif side == "top":
+		pixel(x0, y0)
+		for k in range(1, end + 1):
+			pixel(x0 + k, y0)
+		line(x0 + end + 1, y0, xn - end - 1, y0)
+		for k in range(end, 0, -1):
+			pixel(xn - k, y0)
+	elif side == "right":
+		pixel(xn, y0)
+		for k in range(1, end + 1):
+			pixel(xn, y0 + k)
+		line(xn, y0 + end + 1, xn, yn - end - 1)
+		for k in range(end, 0, -1):
+			pixel(xn, yn - k)
+	else:  # bottom: from the bottom-right corner back to the left
+		pixel(xn, yn)
+		for k in range(1, end + 1):
+			pixel(xn - k, yn)
+		line(xn - end - 1, yn, x0 + end + 1, yn)
+		for k in range(end, 0, -1):
+			pixel(x0 + k, yn)
+	return steps
+
+
+def render_frme(body, width, height, color_for):
+	"""Paint a decoded `frme` frame into width x height RGBA rows.
+
+	The header's base brush fills the whole control; each item then
+	paints its selected side pixels and line segments at its inset.
+	`color_for(brush)` returns an (r, g, b, a) pixel for a brush index,
+	or None. Patterns and gradients are the caller's job; this is the
+	frame geometry the theme itself defines."""
+	frame = decode_frme(body)
+	rows = [[(0, 0, 0, 0) for _ in range(width)] for _ in range(height)]
+	base = color_for(frame["base"])
+	if base:
+		for row in rows:
+			for x in range(width):
+				row[x] = base
+	big = frame["type"] == 3
+	for item in frame["items"]:
+		inset = item["inset"]
+		x0 = inset
+		y0 = inset
+		xn = width - 1 - inset
+		yn = height - 1 - inset
+		if xn < x0 or yn < y0:
+			continue
+		col = color_for(item["plut"])
+		if not col:
+			continue
+		for side, mask in zip(("left", "top", "right", "bottom"), item["masks"]):
+			steps = _frme_side(big, side, x0, y0, xn, yn)
+			bits = len(steps)
+			for bit, step in enumerate(steps):
+				if not (mask & (1 << (bits - 1 - bit))):
+					continue
+				if step[0] == "p":
+					_, x, y = step
+					if 0 <= x < width and 0 <= y < height:
+						rows[y][x] = col
+				else:
+					_, ax, ay, bx, by = step
+					if ax == bx:
+						lo, hi = sorted((ay, by))
+						for y in range(max(0, lo), min(height - 1, hi) + 1):
+							rows[y][ax] = col
+					else:
+						lo, hi = sorted((ax, bx))
+						for x in range(max(0, lo), min(width - 1, hi) + 1):
+							rows[ay][x] = col
+	return rows
+
+
 def decode_layo(body):
 	"""Decode an Appearance theme 'layo' resource.
 
@@ -1534,7 +1667,9 @@ def layo_coord(ref, coords, seen=None):
 	Negative references are the content area's top, left, bottom and
 	right (the title bar lies above it), positive ones index the
 	coordinate table. The resolver only needs the title-axis values;
-	the content top is the desktop's 22 px title row."""
+	the content top is the desktop's 22 px title row. Coordinate type 3
+	("Size-o-matic") resolves like a standard offset; the frame art we
+	read does not need its precise constraint behaviour."""
 	defaults = { -1: 22, -2: 6, -3: 22, -4: 1000 }
 	if ref < 0:
 		return defaults.get(ref, 0)
@@ -1965,6 +2100,7 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None, px
 	# 2. Generic layo 128 (active) and layo 129 (inactive) title-bar assembly.
 	if layo and 128 in layo:
 		plut_entries = _parse_plut_entries((plut or {}).get(387))
+		plut_entries_386 = _parse_plut_entries((plut or {}).get(386))
 		mids_by_suffix = {}
 
 		def resolve_rec(tag, rid, layer):
@@ -1976,9 +2112,12 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None, px
 					return decode_pxm(bodies[0], layer, clut_map)
 				except (ValueError, IndexError, struct.error):
 					return None
-			idx = ~rid
-			if 0 <= idx < len(plut_entries):
-				pid, rgb = plut_entries[idx]
+			# Negative ids are theme brushes (plut 387), positive ids
+			# regular brushes (plut 386); both are one-based.
+			entries, idx = (plut_entries, ~rid) if rid < 0 else \
+				(plut_entries_386, rid - 1)
+			if 0 <= idx < len(entries):
+				pid, rgb = entries[idx]
 				if pid and pid in patterns:
 					try:
 						_, _, rows = macpat.decode_ppat(patterns[pid])
@@ -2411,18 +2550,14 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None, px
 			return best
 
 		def _frme_plut_ids(body):
-			"""The plut references (negative ids) a frme frame lists."""
-			if not body or len(body) < 4:
+			"""The brushes a frme frame paints with, base first."""
+			try:
+				frame = decode_frme(body)
+			except (ValueError, IndexError, struct.error):
 				return []
-			n = len(body) // 2
-			words = struct.unpack(">%dH" % n, body[:n * 2])
-			refs = []
-			for w in words:
-				if w >= 0xff00:  # -256..-1 when read as a signed short
-					signed = w - 0x10000
-					if signed <= -2:  # 0xffff (-1) is the terminator
-						refs.append(signed)
-			return refs
+			refs = [frame["base"]]
+			refs.extend(item["plut"] for item in frame["items"])
+			return [ref for ref in refs if ref < 0]
 
 		def button_face(state):
 			# A push button's face is the frme frame its layout (layo 500)
@@ -2453,6 +2588,16 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None, px
 			if frame_id is not None:
 				frme_body = (frme or {}).get(frame_id)
 				if frme_body:
+					# The frame's base brush is the button's face; the
+					# items paint the bevel rings over it. Pressed Gizmo
+					# is a black frame, not a darker grey.
+					try:
+						frame = decode_frme(frme_body)
+						base = resolve_rec(b"plut", frame["base"], 0) if frame["base"] else None
+					except (ValueError, IndexError, struct.error):
+						base = None
+					if base:
+						return base
 					best = None
 					best_lum = -1
 					best_ppat = None

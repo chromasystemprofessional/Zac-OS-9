@@ -12,10 +12,12 @@ two sources that can be read without shipping Apple material:
   whose `layo.h`/`layo.cpp` document the `layo` layout and the canonical
   control IDs.
 
-Apple's own `Appearance.r` / `Types.r` (the Rez templates for `layo`, `frme`,
-`pxm#`, `plut`, `ppat` and `wnd#`) are in the **Appearance SDK 1.0.4** on
-Macintosh Garden / Macintosh Repository. They do not ship here and are not
-read here; the fields below match them.
+Apple's public `Appearance.r` / `Types.r` (Universal Interfaces 3.4) do not
+contain the theme resource templates — only the API constants. The field
+names below are checked against the **Resorcerer Theme Templates 0.5.1**,
+the community template set published on the MacThemes list in 2000, and
+against the bytes of real themes. Neither the templates nor any Apple
+artwork ship here.
 
 ## Two formats
 
@@ -117,24 +119,35 @@ progress frames, 10 indeterminate active.
 
 ## The `frme` resource
 
-A control frame is a flat list of **frame elements**, each a pair:
+A control frame is a 12-byte header followed by a list of painting items,
+not a flat list of fill pairs:
 
-- `u16` fill type / part. Small values (0–5) select the frame part; larger
-  sentinel values (`0x00fe`/`0x00ff`, `0x7fff`/`0x8000`, `0xc000`/`0xc001`,
-  `0xffff`) select edge/alignment/terminator roles. The exact per-value
-  meaning is not yet confirmed against Apple's `Appearance.r`.
-- `s16` fill id — a negative `plut` id for a flat colour or pattern, or a
-  positive `pxm#` id for artwork.
+- **Header**: `u16` frame type (`2` small, `3` big), `u16` reserved,
+  one byte of alignment flags (`align bottom`, `align right`, six unused),
+  `u8` minimum inset, `u8` unused, `u8` maximum inset, `s16` base brush,
+  `u16` item count.
+- **Item**: one byte of alignment flags, `u8` inset, `s16` brush, then four
+  side masks — left, top, right, bottom. A small frame's masks are one byte
+  each; a big frame's are two.
+- The **base brush** fills the control. Each item paints its selected side
+  pixels and stretchable line segment at its inset, producing the bevel
+  rings. The mask bit order runs around the frame from each corner: corner
+  pixel, edge pixels, the line segment, then the pixels up to the next
+  corner.
 
-A push button's face (`frme` 547) is a list of `plut` greys (`-73`…`-78` →
-white, 238, 221, 187, 136, 119), not a `pxm#` image. That is why the button
-face must be read from `frme` + `plut`, not from `layo` 500.
+Brush indices are the same as `layo`'s: negative indexes `plut` 387's
+theme brushes, positive indexes `plut` 386's regular brushes. A push
+button's face (`frme` 547) is therefore a set of `plut` greys and bevel
+rings, not a `pxm#` image. That is why the button face must be read from
+`frme` + `plut`, not from `layo` 500.
 
 ## `plut`, `ppat`, `pxm#`
 
-- **`plut` 387**: a `u16` count then 8-byte entries `(ppat_id, r, g, b)`. A
-  `layo`/`frme` item with a negative id `-k` indexes entry `k-1`; `ppat_id`
-  0 means the flat colour is the entry's `rgb`.
+- **`plut` 387**: the theme brush list. A `u16` count then 8-byte entries
+  `(ppat_id, r, g, b)`. A `layo`/`frme` item with a negative id `-k` indexes
+  entry `k-1`; `ppat_id` 0 means the flat colour is the entry's `rgb`.
+- **`plut` 386**: the regular brush list, indexed by a positive id `k` at
+  entry `k-1`.
 - **`ppat`**: a 1/2/4/8-bit pixel pattern, decoded by `tools/macpat.py`.
 - **`pxm#`**: a multi-image pixel map (8/16/32-bit), decoded by
   `decode_pxm`; image index selects the layer.

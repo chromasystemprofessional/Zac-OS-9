@@ -1251,27 +1251,51 @@ def _plut_body(mapping):
 
 
 def _frme_body(refs):
-    # Minimal frme: a header word then the negative plut ids as u16s; the
-    # extractor only scans for the negative ids.
-    out = struct.pack(">HH", 0x0002, 0x0000)
+    # A real small frme: 12-byte header (type 2, base brush, item count)
+    # then per item: flags, inset, brush and four side masks.
+    out = struct.pack(">HHBBBBhH", 2, 0, 0, 0, 0, 1, refs[0], len(refs))
     for r in refs:
-        out += struct.pack(">H", r & 0xFFFF)
+        out += struct.pack(">BBh4B", 0, 0, r, 0xFF, 0xFF, 0xFF, 0xFF)
     return out
 
 
+def test_decode_frme():
+    body = struct.pack(">HHBBBBhH", 2, 0, 0, 1, 0, 3, -73, 2)
+    body += struct.pack(">BBh4B", 0, 0, -74, 0x3E, 0x3E, 0x41, 0x41)
+    body += struct.pack(">BBh4B", 0x80, 1, -78, 0x7F, 0x7F, 0, 0)
+    frame = tool.decode_frme(body)
+    assert frame["type"] == 2 and frame["base"] == -73
+    assert frame["min_inset"] == 1 and frame["max_inset"] == 3
+    assert frame["items"][0]["inset"] == 0
+    assert frame["items"][0]["plut"] == -74
+    assert frame["items"][0]["masks"] == (0x3E, 0x3E, 0x41, 0x41)
+    assert frame["items"][1]["flags"] == 0x80
+    assert frame["items"][1]["masks"] == (0x7F, 0x7F, 0, 0)
+
+    # The masks are part of the frame recipe, not a flat list of brushes:
+    # a truncated item table is rejected instead of silently misread.
+    try:
+        tool.decode_frme(body[:-1])
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("truncated frme accepted")
+    print("ok    frme header, insets, brushes and side masks decode")
+
+
 def test_frme_button_face():
-    # A push button's face is the frme frame its layout (layo 500) names
-    # under each state, resolved through plut: the lightest flat colour
-    # that is neither the white highlight nor the black focus ring.
+    # A push button's face is the base brush of the frme frame its layout
+    # (layo 500) names under each state, resolved through plut. The bevel
+    # items paint over it; the base is the face colour.
     plut = {387: _plut_body({72: (0, (221, 221, 221)),   # -73
                              73: (0, (187, 187, 187)),   # -74
                              74: (0, (238, 238, 238)),   # -75
                              75: (0, (136, 136, 136)),   # -76
                              77: (0, (255, 255, 255))})} # -78
     frme = {
-        547: _frme_body([-73, -75, -78]),   # active: lightest non-white = 238
-        548: _frme_body([-74, -76]),        # pressed: lightest = 187
-        549: _frme_body([-73, -78]),        # inactive: lightest non-white = 221
+        547: _frme_body([-75, -73, -78]),   # active: base brush = 238
+        548: _frme_body([-74, -76]),        # pressed: base = 187
+        549: _frme_body([-73, -78]),        # inactive: base = 221
     }
     layo = {128: _layo_resource([], []),
             500: _layo_resource([], [
@@ -1440,6 +1464,7 @@ test_wnd_chrome()
 test_k2_scrollbars()
 test_layo_title_items()
 test_control_faces()
+test_decode_frme()
 test_frme_button_face()
 test_scen()
 test_pointers()
