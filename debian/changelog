@@ -1,3 +1,12 @@
+zacos9 (1.18.16) trixie; urgency=medium
+
+  * iBook, Drawing Board and other Appearance themes that draw their
+    bottom frame as a pxm# picture now keep that rail instead of leaving a
+    transparent gap along the window's bottom. A pxm# left or right rail is
+    extracted the same way.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Tue, 17 Nov 2026 18:20:00 -0500
+
 zacos9 (1.18.15) trixie; urgency=medium
 
   * Imported theme folders that have no Finder icon now wear the theme's own

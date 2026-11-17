@@ -1,0 +1,8 @@
+ZacOS 9 1.18.16 restores the bottom frame of imported Appearance themes.
+
+iBook and Drawing Board draw their bottom border as a picture. It is
+now extracted and tiled along the window bottom instead of leaving a
+transparent gap. The same applies to any theme whose frame rail is a
+picture rather than a colour strip, including its left and right rails.
+
+Re-import the affected theme after updating so its bundle is rebuilt.
