@@ -2918,6 +2918,18 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None, px
 						item["attrs"] & 0x100:
 					track = resolve_rec(b"plut", item["id"], 0)
 					break
+			# The disabled bar is a separate flat track (Gizmo's 1031/
+			# 1034 red), not the enabled rainbow art. The active-window
+			# disabled state is 0x2; 0x1 is the inactive variant.
+			disabled = None
+			for want_state in (2, 1):
+				for item in items:
+					if item["type"] == b"plut" and item["visible"] == want_state and \
+							item["attrs"] & 0x100:
+						disabled = resolve_rec(b"plut", item["id"], 0)
+						break
+				if disabled:
+					break
 			# The thumb: two pxm# end caps and the plut fill between them.
 			# The normal active bar is the 0x10 state (active, not
 			# pressed); 0x30 is pressed and 0x110 is its layer-1 variant.
@@ -2950,6 +2962,8 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None, px
 			axis = "vert" if vertical else "horz"
 			if track:
 				save_tile("scroll-track-" + axis, track)
+			if disabled:
+				save_tile("scroll-track-" + axis + "-disabled", disabled)
 			side0 = "-top" if vertical else "-left"
 			side1 = "-bottom" if vertical else "-right"
 			if caps.get(cap_left):

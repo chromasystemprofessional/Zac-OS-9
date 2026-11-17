@@ -1028,11 +1028,19 @@ static void sb_arrow_box(struct sb_ctx *s, int box_a, int dir, bool enabled, int
 }
 
 /* Recessed track, with the shadow cast by whatever precedes `shade_a`.
- * True when the theme supplied the track art (then it owns the shading). */
-static bool sb_track(struct sb_ctx *s, int a0, int a1) {
+ * True when the theme supplied the track art (then it owns the shading).
+ * Disabled bars use their own flat track when the theme has one. */
+static bool sb_track(struct sb_ctx *s, int a0, int a1, bool disabled) {
 	int tw, th;
-	const uint32_t *tp = chrome_file(s->vertical ?
-		"chrome/scroll-track-vert.png" : "chrome/scroll-track-horz.png", &tw, &th);
+	const char *path;
+	if (s->vertical) {
+		path = disabled ? "chrome/scroll-track-vert-disabled.png" :
+			"chrome/scroll-track-vert.png";
+	} else {
+		path = disabled ? "chrome/scroll-track-horz-disabled.png" :
+			"chrome/scroll-track-horz.png";
+	}
+	const uint32_t *tp = chrome_file(path, &tw, &th);
 	if (tp) {
 		if (s->vertical) {
 			chrome_tile(s->c, tp, tw, th, s->x + 1, s->y + a0, s->x + SB_WIDTH - 2, s->y + a1);
@@ -1206,7 +1214,7 @@ void pl_scrollbar_paint(struct pl_canvas *c, int x, int y,
 		 * fits; the Mac original does not fall back to a flat disabled
 		 * fill. Themes without track art keep the Platinum disabled
 		 * appearance. */
-		if (sb_track(&s, t0, t1)) {
+		if (sb_track(&s, t0, t1, true)) {
 			return;
 		}
 		for (int b = 1; b <= SB_ARROW; b++) {
@@ -1214,7 +1222,7 @@ void pl_scrollbar_paint(struct pl_canvas *c, int x, int y,
 		}
 		return;
 	}
-	const bool themed_track = sb_track(&s, t0, t1);
+	const bool themed_track = sb_track(&s, t0, t1, false);
 	int thumb = sb->thumb < 0 ? 0 : sb->thumb;
 	int range = sb_thumb_span(sb);
 	if (thumb > range) {
