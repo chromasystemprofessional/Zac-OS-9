@@ -1,3 +1,15 @@
+zacos9 (1.18.13) trixie; urgency=medium
+
+  * Hi-Tech and other Appearance themes whose title-bar pieces are not
+    stored in left/middle/right order now keep the full-width fill in the
+    middle instead of tiling an end cap across the bar. A dark menu-bar
+    image records a dark face, so its titles are readable, and a theme's
+    left frame rail is extracted like the right and bottom ones.
+  * The desktop pattern catalog holds up to 8192 images instead of 512, so
+    a theme's own pattern is not dropped after several themes are installed.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Tue, 17 Nov 2026 17:16:00 -0500
+
 zacos9 (1.18.12) trixie; urgency=medium
 
   * The Sniffer's Edit menu now works on files: Cut (⌘X) marks the selected

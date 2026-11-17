@@ -1,0 +1,14 @@
+ZacOS 9 1.18.13 fixes how imported Appearance themes draw.
+
+Hi-Tech and themes like it now keep their title-bar fill across the
+window instead of repeating an end piece, their menu-bar titles are
+readable on a dark bar, and the window's left frame edge uses the
+theme's own rail.
+
+The desktop pattern list no longer stops at 512 pictures, so a theme's
+own pattern is available after several themes are installed.
+
+If a theme names a desktop picture that is not in your Mac OS 9 System
+Folder (Hi-Tech's "Bumpy Floor", for example), the theme still installs
+and keeps its pattern; add the picture to Desktop Pictures and install
+the theme again to get it.
