@@ -1,0 +1,14 @@
+ZacOS 9 1.18.10 makes Mac OS 9 themes render much closer to the
+original, and keeps Old Dog running.
+
+Appearance themes now use their own frame recipes. Push buttons take the
+theme's frme bevel or its named pxm# 9-slice, title-bar controls draw at
+their native size with the black control rails, and the document frame
+rails and grow box come from the theme. Scrollbars use the theme's
+enabled or disabled track, its single or lower-right arrows and its
+normal or proportional thumb. Re-import a theme to pick up the new art.
+
+Classic (Old Dog) no longer opens SheepShaver's audio, whose SDL callback
+crashed here, and a normal launch leaves the Classic bridge dormant. The
+emulator now stays up through startup instead of crashing after the
+guest begins.
