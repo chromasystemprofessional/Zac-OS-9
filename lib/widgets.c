@@ -946,8 +946,9 @@ void sb_smart(struct pl_scrollbar *sb, int visible, int total) {
 			together = true;
 		}
 	}
-	if (zac_theme_string("scroll-bar-thumb", v, sizeof(v))) {
-		proportional = strcmp(v, "proportional") == 0;
+	if (zac_theme_string("scroll-bar-thumb", v, sizeof(v)) &&
+			strcmp(v, "proportional") == 0) {
+		proportional = true;
 	}
 	sb->together = together;
 	sb->thumb_len = 0;
