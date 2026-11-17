@@ -576,11 +576,14 @@ static bool paint_themed_bar(struct pl_canvas *c, const struct decor_state *st,
 	return true;
 }
 
-/* A title-bar button tile, centred in the 13 px box; oversized art is
- * scaled down so it cannot paint over the title or its neighbours. */
+/* A title-bar button tile, drawn at the theme's own size. Platinum's
+ * 12 px box is only the floor; Gizmo's close/zoom/collapse art is 16 px.
+ * Oversized art is still clamped so it cannot paint over the title. */
 static void blit_button_tile(struct pl_canvas *c, const struct chrome_tile *t,
 		int bx, int by) {
-	const int box = BOX_SIZE + 1;
+	int box = t->w > t->h ? t->w : t->h;
+	if (box < BOX_SIZE) box = BOX_SIZE;
+	if (box > 16) box = 16;
 	int dw = t->w, dh = t->h;
 	if (dw > box) {
 		dh = dh * box / dw;
@@ -1371,10 +1374,32 @@ void decor_paint(struct pl_canvas *c, const struct decor_state *st) {
 	paint_title(c, st);
 }
 
+static int box_extent(const struct decor_state *st, enum decor_part part) {
+	int id;
+	if (st->style == DECOR_STYLE_MOVABLE_MODAL) {
+		id = part == DECOR_PART_CLOSE ? CHROME_BUTTON_DIALOG_CLOSE :
+			part == DECOR_PART_ZOOM ? CHROME_BUTTON_DIALOG_ZOOM :
+			CHROME_BUTTON_DIALOG_GROW;
+	} else {
+		id = part == DECOR_PART_CLOSE ? CHROME_BUTTON_CLOSE :
+			part == DECOR_PART_ZOOM ? CHROME_BUTTON_ZOOM :
+			CHROME_BUTTON_GROW;
+	}
+	const struct chrome_tile *t = chrome_tile_get(id);
+	if (!t) {
+		return BOX_SIZE;
+	}
+	int n = t->w > t->h ? t->w : t->h;
+	if (n < BOX_SIZE) n = BOX_SIZE;
+	if (n > 16) n = 16;
+	return n;
+}
+
 static bool in_box(const struct decor_state *st, enum decor_part part, int x, int y) {
 	int bx, by;
 	decor_box_origin(st, part, &bx, &by);
-	return x >= bx && x <= bx + BOX_SIZE && y >= by && y <= by + BOX_SIZE;
+	int n = box_extent(st, part);
+	return x >= bx && x < bx + n && y >= by && y < by + n;
 }
 
 enum decor_part decor_hit(const struct decor_state *st, int x, int y) {
