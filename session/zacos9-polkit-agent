@@ -7,7 +7,7 @@
 if command -v pgrep >/dev/null 2>&1; then
 	for name in lxpolkit lxqt-policykit-agent polkit-gnome-authentication-agent-1 \
 			polkit-kde-authentication-agent-1 xfce-polkit mate-polkit ukui-polkit; do
-		if pgrep -u "$(id -u)" -x "$name" >/dev/null 2>&1; then
+		if pgrep -u "$(id -u)" -f "$name" >/dev/null 2>&1; then
 			exit 0
 		fi
 	done
