@@ -179,15 +179,18 @@ reads the Appearance theme's resource fork and produces a **theme bundle** in
   ignored; named left and right frame strips become the document edge
   skins, and a named bottom-corner group supplies the bottom edge.
   Appearance themes also carry control layouts (`layo` 500 push button,
-  510 checkbox, 515 radio, 520 progress). The importer files the
-  push-button face, checkbox and radio marks and the progress fill as
-  `chrome/button*.png`, `checkbox-*.png`, `radio-*.png` and
-  `progress-fill.png`; the toolkit keeps its control geometry and
-  labels, so a theme can change the art without moving the widgets.
-  Scrollbars use `layo` 400/405 for the track, thin thumb and arrow art;
-  `scroll-arrow-dec`/`scroll-arrow-inc` record the theme's arrow-box
-  sizes so painting and hit-testing share them. Smaller `layo` 410/415
-  variants are not used by ZacOS's 16 px bars.
+  510 checkbox, 515 radio, 520 progress). Push buttons use the theme's
+  `frme` frame when it has one, otherwise its named `pxm#` 9-slice
+  ("Button TL/TR/BL/BR/Top/Bottom/Left/Right") plus the `plut` centre;
+  checkbox/radio marks and the progress fill become `checkbox-*.png`,
+  `radio-*.png` and `progress-fill.png`. Labels and the remaining widget
+  metrics stay ZacOS's.
+  Scrollbars use `layo` 400/405 for the enabled track, the flat disabled
+  track, the thin thumb and arrow art; the theme's `scroll-bar-arrows` and
+  `scroll-bar-thumb` settings choose single vs lower-right arrows and
+  normal vs proportional thumbs. `scroll-arrow-dec`/`scroll-arrow-inc`
+  record the theme's arrow-box sizes so painting and hit-testing share
+  them. Smaller `layo` 410/415 variants are not used by ZacOS's 16 px bars.
 - `sounds/` — alert sounds. `system-sound-N.wav` are the System file's own
   `snd` resources, decoded from sampled sounds only; synthesized and compressed
   sounds are skipped. Theme-file sounds sit beside them. The installer never
@@ -233,8 +236,10 @@ reads the Appearance theme's resource fork and produces a **theme bundle** in
 The extractor (`tools/extract-macos9-theme.py`) decodes the classic icon,
 PICT, pattern and sound resources (`macpict.py`, `macpat.py`, `macsnd.py`); `--list-cluts` prints the colour tables and
 `--auto-colours` (or `--accent`/`--highlight`/`--pattern`) set the chrome
-colours. Window geometry (title-bar height, close/zoom/collapse positions,
-margins) is never changed — only colours and artwork.
+colours. Window metrics that the layout supplies (document
+frame-left/right/bottom, title-bar control size and black rails,
+scrollbar state) are applied from the theme; other geometry stays
+ZacOS's.
 
 To install: put your Mac OS 9 System Folder in `~/Classic` (Old Dog), pick the
 look in Mac OS 9's Appearance control panel, then copy the theme file out of

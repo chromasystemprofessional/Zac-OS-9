@@ -1,6 +1,6 @@
 # Project status
 
-Updated: 2026-11-15. Latest release: **1.18.9**
+Updated: 2026-11-17. Latest release: **1.18.10**
 ([releases](https://github.com/chromasystemprofessional/Zac-OS-9/releases),
 [ISO](https://sourceforge.net/projects/zac-os-9/files/)).
 
@@ -115,8 +115,10 @@ selectable set, so both appear in the Sound Sets list. Scheme title bars
 come from the frame layout (`layo`) or, for older schemes, from a `wnd#`
 recipe's title band and widget rectangles; imported bars are written at the
 desktop's 22 px title row so their lines do not shift. An Appearance theme's
-push button, checkbox, radio, progress and scrollbar faces are read from its
-control layouts too, while their geometry and labels stay ZacOS's.
+`layo`/`frme` recipes drive its push-button frame (a `frme` or a named
+`pxm#` 9-slice), the title-bar controls' native size and black rails, the
+document frame rails and grow box, and the enabled/disabled scrollbar
+tracks; labels and the remaining control metrics stay ZacOS's.
 
 **Monitors**: each screen's resolution, pixel size and rotation are
 applied live (`compositor/src/prefs.c`): rotation is

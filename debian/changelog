@@ -1,3 +1,19 @@
+zacos9 (1.18.10) trixie; urgency=medium
+
+  * Mac OS 9 Appearance themes now import their real frame recipes: the
+    `layo`/`frme` layouts decode to native push-button and control frames,
+    title-bar controls draw at their own size with the black control rails,
+    and the document's frame rails and grow box come from the theme. Push
+    buttons use either the theme's `frme` frame or its named `pxm#` 9-slice.
+  * Scrollbars follow the theme's own state: the enabled track and thumb,
+    or the flat disabled track with no arrow boxes, with the theme's single
+    or lower-right arrows and normal or proportional thumb.
+  * Classic: SheepShaver no longer opens audio (its SDL callback segfaults
+    here) and plain launches leave the Classic bridge dormant, so Old Dog
+    stays up.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Tue, 17 Nov 2026 12:44:28 -0500
+
 zacos9 (1.18.9) trixie; urgency=medium
 
   * Bloodhound now has Sherlock 2's channel bar: Files, Internet, People,
