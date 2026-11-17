@@ -1,0 +1,19 @@
+#!/bin/sh
+# Start the session's polkit agent only when no other one is already
+# running. The desktop's FreeDesktop autostart may have started LXpolkit,
+# GNOME's or XFCE's agent before this command; a second agent prints
+# "another authentication agent is already running" at every login.
+
+if command -v pgrep >/dev/null 2>&1; then
+	for name in lxpolkit lxqt-policykit-agent polkit-gnome-authentication-agent-1 \
+			polkit-kde-authentication-agent-1 xfce-polkit mate-polkit ukui-polkit; do
+		if pgrep -u "$(id -u)" -x "$name" >/dev/null 2>&1; then
+			exit 0
+		fi
+	done
+fi
+
+if command -v lxqt-policykit-agent >/dev/null 2>&1; then
+	exec lxqt-policykit-agent
+fi
+exit 0

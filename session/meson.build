@@ -12,6 +12,9 @@ install_data('zacos9-web-sharing', install_dir: get_option('bindir'),
 # Starts Fcitx 5 only in a Japanese session (the login item's command).
 install_data('zacos9-fcitx-autostart', install_dir: get_option('bindir'),
   install_mode: 'rwxr-xr-x')
+# Starts the session's polkit agent only when another one is not running.
+install_data('zacos9-polkit-agent', install_dir: get_option('bindir'),
+  install_mode: 'rwxr-xr-x')
 test('desktop-places', find_program('python3'),
   args: [files('../tests/finder/test_desktop_places.py'), files('zacos9-desktop-places')])
 test('desktop-gtk', find_program('python3'),
@@ -31,6 +34,9 @@ test('web-sharing', find_program('python3'),
 test('fcitx-autostart', find_program('sh'),
   args: [files('../tests/session/test_fcitx_autostart.sh'), files('zacos9-fcitx-autostart')],
   timeout: 30)
+test('polkit-agent', find_program('sh'),
+  args: [files('../tests/session/test_polkit_agent.sh'), files('zacos9-polkit-agent')],
+  timeout: 15)
 # The login screen's command (greetd's default_session).
 install_data('zacos9-greeter', install_dir: get_option('libexecdir') / 'zacos9',
   install_mode: 'rwxr-xr-x')
