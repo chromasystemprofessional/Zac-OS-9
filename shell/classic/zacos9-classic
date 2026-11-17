@@ -399,4 +399,4 @@ fi
 # TODO: find out why (frame callbacks? libdecor?).
 # The patched SheepShaver reads the same queue as the host.
 export ZACOS9_CLASSIC_QUEUE="$queue_root"
-SDL_VIDEODRIVER=x11 exec "$exe" "$@"
+SDL_VIDEODRIVER=x11 SDL_AUDIODRIVER=${SDL_AUDIODRIVER:-pulseaudio} exec "$exe" "$@"
