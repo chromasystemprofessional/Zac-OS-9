@@ -897,9 +897,26 @@ int sb_thumb_span(const struct pl_scrollbar *sb) {
 }
 
 void sb_smart(struct pl_scrollbar *sb, int visible, int total) {
-	sb->together = pl_smart_scrolling();
+	bool together = pl_smart_scrolling();
+	bool proportional = together;
+	char v[32];
+	/* Appearance themes record their own scrollbar style in scen:
+	 * "single" is one arrow at each end, "lower-right" puts both at the
+	 * bottom/right; "normal" is the classic fixed thumb. Use the theme's
+	 * choice when it has one, otherwise the system preference. */
+	if (zac_theme_string("scroll-bar-arrows", v, sizeof(v))) {
+		if (strcmp(v, "single") == 0) {
+			together = false;
+		} else if (strcmp(v, "lower-right") == 0) {
+			together = true;
+		}
+	}
+	if (zac_theme_string("scroll-bar-thumb", v, sizeof(v))) {
+		proportional = strcmp(v, "proportional") == 0;
+	}
+	sb->together = together;
 	sb->thumb_len = 0;
-	if (!sb->together || total <= 0 || visible <= 0) {
+	if (!proportional || total <= 0 || visible <= 0) {
 		return;
 	}
 	int start, end;
