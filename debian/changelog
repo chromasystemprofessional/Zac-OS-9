@@ -1,3 +1,16 @@
+zacos9 (1.18.14) trixie; urgency=medium
+
+  * DrawingBoard Sounds and other classic sound sets with version-0 snd#
+    metadata now import and appear in Sound Sets, with their window, menu,
+    checkbox, Trash and drag sounds. A screenshot or read-me beside the sets
+    is ignored instead of reported as a broken set.
+  * The Appearance folder is now Sound Sets, as on Mac OS 9 (it was Sound
+    Themes); an existing folder is renamed with its sets kept.
+  * Dropping a sound set into Appearance > Sound Sets keeps it there instead
+    of sending it to Theme Files as an appearance theme.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Tue, 17 Nov 2026 17:38:00 -0500
+
 zacos9 (1.18.13) trixie; urgency=medium
 
   * Hi-Tech and other Appearance themes whose title-bar pieces are not

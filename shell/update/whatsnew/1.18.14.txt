@@ -1,0 +1,12 @@
+ZacOS 9 1.18.14 fixes sound sets.
+
+DrawingBoard Sounds and other older sets now appear in Sound Sets
+instead of being reported as an error. Their window, menu, checkbox,
+Trash and drag sounds are imported. A screenshot or read-me beside the
+sets is ignored rather than reported as a broken set.
+
+The Appearance folder is now called Sound Sets, as on Mac OS 9; an
+existing Sound Themes folder is renamed with its sets kept.
+
+Dropping a sound set into Appearance > Sound Sets now keeps it there
+instead of importing it as an appearance theme.
