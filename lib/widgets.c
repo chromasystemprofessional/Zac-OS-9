@@ -1202,6 +1202,24 @@ void pl_scrollbar_paint(struct pl_canvas *c, int x, int y,
 	sb_run(&s, 0, L - 1, SB_WIDTH - 1, C_BLACK);
 	sb_col(&s, 0, 0, SB_WIDTH - 1, C_BLACK);
 	sb_col(&s, L - 1, 0, SB_WIDTH - 1, C_BLACK);
+	/* A disabled themed bar is the theme's flat track end to end: the
+	 * Mac re-draws no arrow boxes when there is nothing to scroll. */
+	if (!sb->enabled) {
+		int tw, th;
+		const uint32_t *tp = chrome_file(sb->vertical ?
+			"chrome/scroll-track-vert-disabled.png" :
+			"chrome/scroll-track-horz-disabled.png", &tw, &th);
+		if (tp) {
+			if (sb->vertical) {
+				chrome_tile(c, tp, tw, th, x + 1, y + 1,
+					x + SB_WIDTH - 2, y + L - 2);
+			} else {
+				chrome_tile(c, tp, tw, th, x + 1, y + 1,
+					x + L - 2, y + SB_WIDTH - 2);
+			}
+			return;
+		}
+	}
 	sb_col(&s, dec_sep, 1, SB_ARROW, line);
 	sb_col(&s, inc_sep, 1, SB_ARROW, line);
 
