@@ -1,3 +1,12 @@
+zacos9 (1.18.15) trixie; urgency=medium
+
+  * Imported theme folders that have no Finder icon now wear the theme's own
+    folder art, then its Apple menu icon, instead of looking like ordinary
+    folders. Theme folders imported by earlier versions are repaired when
+    Appearance opens.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Tue, 17 Nov 2026 18:08:00 -0500
+
 zacos9 (1.18.14) trixie; urgency=medium
 
   * DrawingBoard Sounds and other classic sound sets with version-0 snd#

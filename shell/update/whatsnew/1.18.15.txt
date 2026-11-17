@@ -1,0 +1,6 @@
+ZacOS 9 1.18.15 gives every imported theme folder its theme's icon.
+
+Themes without their own Finder icon (Aqua, Gizmo, Hi-Tech and Liquid,
+for example) now use the theme's folder art, then its Apple menu icon,
+instead of looking like an ordinary folder. Theme Files folders made by
+earlier versions are repaired when Appearance opens.
