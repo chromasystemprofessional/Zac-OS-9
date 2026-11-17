@@ -489,17 +489,19 @@ static bool paint_themed_bar(struct pl_canvas *c, const struct decor_state *st,
 		if (rw > 0) {
 			chrome_blit(c, tr, 0, 0, tr->w, tr->h, w - rw, 0, rw, DECOR_TOP);
 		}
-		/* Gizmo's right-hand modifier cluster sits on a black block: the
-		 * green field ends where the cluster starts, and the close/zoom/
-		 * grow controls keep black around them. Without this the green
-		 * bar runs behind and around the buttons. */
+		/* Gizmo's right-hand modifier cluster sits on a thin black rail
+		 * through the button centres; the title-bar face shows above and
+		 * below it. A full-height black block lost that horizontal bar. */
 		int zx, zy, cx, cy;
 		decor_box_origin(st, DECOR_PART_ZOOM, &zx, &zy);
 		decor_box_origin(st, DECOR_PART_COLLAPSE, &cx, &cy);
 		if (zx >= 0 && cx > zx) {
 			int cluster_l = zx - 8;
 			if (cluster_l < 0) cluster_l = 0;
-			pl_fill(c, cluster_l, 0, w - 1, DECOR_TOP - 1, C_BLACK);
+			pl_fill(c, cluster_l, 0, w - 1, DECOR_TOP - 1, GRAY(0xE));
+			int rail_y = zy + 6;
+			if (rail_y < 1) rail_y = 1;
+			pl_fill(c, cluster_l, rail_y, w - 1, rail_y + 3, C_BLACK);
 		}
 		/* The left close box has the same black separator: the Mac's
 		 * cluster is the 16 px box plus a four-pixel bar before the
