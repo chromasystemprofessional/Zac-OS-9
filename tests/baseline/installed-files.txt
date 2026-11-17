@@ -44,6 +44,7 @@
 {prefix}/bin/zacos9-photobooth
 {prefix}/bin/zacos9-picture
 {prefix}/bin/zacos9-plotter
+{prefix}/bin/zacos9-polkit-agent
 {prefix}/bin/zacos9-printerpicker
 {prefix}/bin/zacos9-printqueue
 {prefix}/bin/zacos9-retriever
@@ -284,6 +285,8 @@
 {prefix}/share/zacos9/whatsnew/1.18.7.txt
 {prefix}/share/zacos9/whatsnew/1.18.8.txt
 {prefix}/share/zacos9/whatsnew/1.18.9.txt
+{prefix}/share/zacos9/whatsnew/1.18.10.txt
+{prefix}/share/zacos9/whatsnew/1.18.11.txt
 {prefix}/share/zacos9/whatsnew/1.7.0.txt
 {prefix}/share/zacos9/whatsnew/1.7.1.txt
 {prefix}/share/zacos9/whatsnew/1.7.2.txt
