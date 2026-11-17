@@ -69,10 +69,45 @@ void pl_button_paint(struct pl_canvas *c, int x, int y, int w,
 	if (flags & PL_BUTTON_DEFAULT) {
 		paint_nine(c, x - PL_BUTTON_RING, y - PL_BUTTON_RING, w + 2 * PL_BUTTON_RING,
 			pressed ? &button_default_pressed : &button_default);
-	} else {
-		paint_nine(c, x, y, w, pressed ? &button_standard_pressed : &button_standard);
 	}
-	{
+	/* A theme's own frme frame, rendered by the extractor. It owns the
+	 * bevel and face; the Platinum ring above stays for default buttons. */
+	const char *frame_skin = pressed ? "chrome/button-frame-pressed.png" :
+		(flags & PL_BUTTON_DISABLED) ? "chrome/button-frame-inactive.png" :
+		"chrome/button-frame.png";
+	int fw, fh;
+	const uint32_t *fp = chrome_file(frame_skin, &fw, &fh);
+	bool themed = false;
+	if (fp && fh == PL_BUTTON_H && fw > 4) {
+		int inset = 4;
+		char v[16];
+		if (zac_theme_string("button-frame-inset", v, sizeof(v))) {
+			int n = atoi(v);
+			if (n >= 1 && n <= 8) {
+				inset = n;
+			}
+		}
+		if (inset * 2 >= fw) {
+			inset = 1;
+		}
+		for (int yy = 0; yy < fh; yy++) {
+			for (int xx = 0; xx < w; xx++) {
+				int sx = xx < inset ? xx :
+					xx >= w - inset ? fw - (w - xx) : inset;
+				if (sx < 0) sx = 0;
+				if (sx >= fw) sx = fw - 1;
+				uint32_t p = fp[yy * fw + sx];
+				if (p >> 24) {
+					pl_put(c, x + xx, y + yy, p);
+				}
+			}
+		}
+		themed = true;
+	}
+	if (!themed) {
+		if (!(flags & PL_BUTTON_DEFAULT)) {
+			paint_nine(c, x, y, w, pressed ? &button_standard_pressed : &button_standard);
+		}
 		/* A theme button face over the nine-slice's flat middle; the
 		 * rounded border ring stays Platinum. */
 		const char *skin = NULL;

@@ -1304,7 +1304,7 @@ def test_frme_button_face():
         (0x20, 0x1, 0x100, (1, -2, -1, -4), b"fram", 548, 1, 0),
     ])}
     out = tempfile.mkdtemp() + "/theme"
-    tool.write_theme_chrome("Synthetic", {}, [], out, [], layo, plut, {}, frme)
+    chrome = tool.write_theme_chrome("Synthetic", {}, [], out, [], layo, plut, {}, frme)
 
     def face(key):
         with open(os.path.join(out, "chrome", key + ".argb"), "rb") as f:
@@ -1313,6 +1313,11 @@ def test_frme_button_face():
     assert face("button") == bytes((238, 238, 238, 255)), face("button")
     assert face("button-pressed") == bytes((187, 187, 187, 255)), face("button-pressed")
     assert face("button-inactive") == bytes((221, 221, 221, 255)), face("button-inactive")
+    assert chrome.get("button-frame-inset") == "2", chrome.get("button-frame-inset")
+    with open(os.path.join(out, "chrome", "button-frame.argb"), "rb") as f:
+        frame = f.read()
+    center = 8 + (10 * 80 + 40) * 4
+    assert frame[center:center + 4] == bytes((238, 238, 238, 255)), frame[center:center + 4]
     print("ok    a push button's face comes from its frme frame")
 
 

@@ -2707,6 +2707,28 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None, px
 			rows = button_face(state)
 			if rows:
 				save_tile(key, rows)
+
+		# The full frme frame, not just its face, so the button's bevel
+		# is the theme's own rather than Platinum's. Render one
+		# representative width; pl_button_paint() repeats the middle.
+		def button_brush(brush):
+			fill = resolve_rec(b"plut", brush, 0)
+			return fill[0][0] if fill and fill[0] else None
+
+		for key, fid in (("button-frame", 547),
+				("button-frame-pressed", 548),
+				("button-frame-inactive", 549)):
+			body = (frme or {}).get(fid)
+			if not body:
+				continue
+			try:
+				frame = decode_frme(body)
+				rows = render_frme(body, 80, 20, button_brush)
+			except (ValueError, IndexError, struct.error):
+				continue
+			save_tile(key, rows)
+			if key == "button-frame":
+				keys["button-frame-inset"] = str(max(1, frame["max_inset"] + 1))
 		# A progress bar's fill is the widest active pxm# layer; themes
 		# use 1150, but Gizmo's is a 7x10 gradient (356). The solid
 		# button face and 1 px border strips are narrower.
@@ -3532,6 +3554,7 @@ def main():
 				"button-dialog-grow", "button-dialog-grow-pressed",
 				"menu-bar-image",
 				"menu-background",
+				"button-frame-inset",
 				"scroll-arrow-dec", "scroll-arrow-inc"):
 			if chrome_keys.get(key):
 				f.write("%s=%s\n" % (key, chrome_keys[key]))
