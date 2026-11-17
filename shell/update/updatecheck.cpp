@@ -164,6 +164,10 @@ bool whatsnewShouldShow(const QString &installed, const QString &seen) {
 	return versionNewer(installed, seen);
 }
 
+bool whatsnewSessionAllowed(const QByteArray &desktop) {
+	return desktop.split(':').contains(QByteArrayLiteral("ZacOS9"));
+}
+
 QString debArchitecture() {
 	const QString arch = runQuiet("dpkg", { "--print-architecture" });
 	return arch.isEmpty() ? QStringLiteral("amd64") : arch;

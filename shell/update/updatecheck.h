@@ -76,3 +76,8 @@ QString whatsnewSeenFile();
 /* True when `installed` is newer than `seen` (empty `seen` counts as
  * older; empty `installed` never shows). */
 bool whatsnewShouldShow(const QString &installed, const QString &seen);
+
+/* Whether this is a ZacOS 9 session. The autostart entry is installed
+ * for every desktop, and some sessions ignore OnlyShowIn; the LXQt
+ * login must not get ZacOS's What's New window. */
+bool whatsnewSessionAllowed(const QByteArray &desktop);

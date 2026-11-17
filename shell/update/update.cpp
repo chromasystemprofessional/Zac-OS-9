@@ -141,22 +141,34 @@ void showWhatsNew(QWidget *parent, const QString &version, const QString &notes)
  * The notes ship in the package (/usr/share/zacos9/whatsnew/<version>.txt);
  * the seen version lives in ~/.config/zacos9/whatsnew-seen. */
 int whatsnewRun() {
+	/* The autostart entry is installed for every desktop and LXQt may
+	 * ignore OnlyShowIn; never show ZacOS's notes in another session. */
+	if (!whatsnewSessionAllowed(qgetenv("XDG_CURRENT_DESKTOP"))) {
+		return 0;
+	}
 	const QString installed = installedVersion(PACKAGE);
 	QString seen;
-	QFile seenFile(whatsnewSeenFile());
-	if (seenFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
-		seen = QString::fromUtf8(seenFile.readAll()).trimmed();
+	QFile seenRead(whatsnewSeenFile());
+	if (seenRead.open(QIODevice::ReadOnly | QIODevice::Text)) {
+		seen = QString::fromUtf8(seenRead.readAll()).trimmed();
+		seenRead.close();
 	}
 	if (!whatsnewShouldShow(installed, seen)) {
 		return 0;
 	}
+	/* Record the version before showing the modal window: closing the
+	 * session with it open must not queue it again at every login. The
+	 * old code reopened the same still-open QFile for writing, which
+	 * always failed, so the seen file never advanced. */
+	QDir().mkpath(QFileInfo(whatsnewSeenFile()).absolutePath());
+	QFile seenWrite(whatsnewSeenFile());
+	if (seenWrite.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate)) {
+		seenWrite.write(installed.toUtf8());
+		seenWrite.close();
+	}
 	QFile notes(whatsnewNotesFile(installed));
 	if (notes.open(QIODevice::ReadOnly | QIODevice::Text)) {
 		showWhatsNew(nullptr, installed, QString::fromUtf8(notes.readAll()));
-	}
-	QDir().mkpath(QFileInfo(whatsnewSeenFile()).absolutePath());
-	if (seenFile.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate)) {
-		seenFile.write(installed.toUtf8());
 	}
 	return 0;
 }

@@ -100,6 +100,10 @@ int main(int argc, char *argv[]) {
 	check(!whatsnewShouldShow("1.6.3", "1.7.0"), "an older install than seen doesn't show");
 	check(!whatsnewShouldShow("", ""), "nothing installed never shows");
 	check(whatsnewNotesFile("1.7.0").endsWith("/1.7.0.txt"), "the notes file is named for the version");
+	check(whatsnewSessionAllowed("ZacOS9"), "a ZacOS 9 session shows the notes");
+	check(whatsnewSessionAllowed("ZacOS9:GNOME"), "a colon-separated desktop list finds ZacOS 9");
+	check(!whatsnewSessionAllowed("LXQt"), "an LXQt session does not show ZacOS notes");
+	check(!whatsnewSessionAllowed(""), "an unidentified session does not show them");
 
 	QTextStream(stdout) << (fails ? "FAILED\n" : "all passed\n");
 	return fails ? 1 : 0;
