@@ -19,8 +19,7 @@ not, open an issue and I will remove it.
 - **Liam Proven** ([@lproven](https://github.com/lproven)) wrote
   [“ZacOS 9 and Mavernix: Two classic Apple desktops find their Wayland to
   Linux”](https://www.theregister.com/os-platforms/2026/10/27/zacos-9-and-mavernix-two-classic-apple-desktops-find-their-wayland-to-linux/5305710)
-  in The Register on 27 October 2026. He also starred the repository and has
-  followed the project since.
+  in The Register on 27 October 2026.
 - **The Hacker News community** — the people who tried it, asked hard
   questions and sent the project on to others.
 
@@ -71,10 +70,10 @@ being built. Thank you for taking the time to write them down.
 
 ## Everyone else
 
-Thank you to everyone who starred the repository, forked it, downloaded the
-ISO or the Debian package, installed ZacOS 9 and tried it on real hardware.
-Thank you, too, to the people who wrote kind words in the Hacker News thread
-and elsewhere; they were read.
+Thank you to everyone who forked the repository, downloaded the ISO or the
+Debian package, installed ZacOS 9 and tried it on real hardware. Thank you,
+too, to the people who wrote kind words in the Hacker News thread and
+elsewhere; they were read.
 
 ## Built with
 

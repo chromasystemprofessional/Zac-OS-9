@@ -214,10 +214,10 @@ it, the GPL lets you.
 
 ZacOS 9 is a one-person project with a lot of help from other people. Felix
 Ding's Hacker News post brought it a wider audience; Liam Proven wrote about
-it in The Register and has followed it since; Irontooth1, shiroankuroan,
-nanocodium, uityyy, Sad-Anon, Sobserius, jploudre and Felix filed the issue
-reports that shaped many of the fixes above. Thank you, too, to everyone who
-starred, forked, downloaded and tested it.
+it in The Register; Irontooth1, shiroankuroan, nanocodium, uityyy, Sad-Anon,
+Sobserius, jploudre and Felix filed the issue reports that shaped many of the
+fixes above. Thank you, too, to everyone who forked, downloaded and tested
+it.
 
 [The full list, with issue numbers, is in THANKS.md.](THANKS.md) If your name
 is there and you would rather it were not, open an issue and I will remove it.
