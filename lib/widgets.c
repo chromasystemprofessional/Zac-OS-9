@@ -1149,6 +1149,13 @@ void pl_scrollbar_paint(struct pl_canvas *c, int x, int y,
 
 	int t0 = start + 1, t1 = end - 1;
 	if (!sb->enabled) {
+		/* A themed scrollbar keeps its own track even when the content
+		 * fits; the Mac original does not fall back to a flat disabled
+		 * fill. Themes without track art keep the Platinum disabled
+		 * appearance. */
+		if (sb_track(&s, t0, t1)) {
+			return;
+		}
 		for (int b = 1; b <= SB_ARROW; b++) {
 			sb_run(&s, t0, t1, b, C_EEE);
 		}

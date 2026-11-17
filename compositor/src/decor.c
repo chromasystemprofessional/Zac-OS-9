@@ -489,6 +489,18 @@ static bool paint_themed_bar(struct pl_canvas *c, const struct decor_state *st,
 		if (rw > 0) {
 			chrome_blit(c, tr, 0, 0, tr->w, tr->h, w - rw, 0, rw, DECOR_TOP);
 		}
+		/* Gizmo's right-hand modifier cluster sits on a black block: the
+		 * green field ends where the cluster starts, and the close/zoom/
+		 * grow controls keep black around them. Without this the green
+		 * bar runs behind and around the buttons. */
+		int zx, zy, cx, cy;
+		decor_box_origin(st, DECOR_PART_ZOOM, &zx, &zy);
+		decor_box_origin(st, DECOR_PART_COLLAPSE, &cx, &cy);
+		if (zx >= 0 && cx > zx) {
+			int cluster_l = zx - 4;
+			if (cluster_l < 0) cluster_l = 0;
+			pl_fill(c, cluster_l, 0, w - 1, DECOR_TOP - 1, C_BLACK);
+		}
 		return true;
 	}
 	if (span && !dialog && title_cluster_left(st)) {
@@ -1319,22 +1331,6 @@ void decor_paint(struct pl_canvas *c, const struct decor_state *st) {
 	}
 
 	if (act) {
-		/* Gizmo's title layout has a one-pixel black rule between the
-		 * right-side zoom and collapse controls. It is part of the
-		 * modifier group, not part of either pxm# button, so draw it
-		 * before the button art. Other themes do not opt into this detail. */
-		char title_art[256];
-		if (has_bar && st->style == DECOR_STYLE_DOCUMENT &&
-				zac_theme_string("bar-title", title_art, sizeof(title_art))) {
-			int zoom_x, zoom_y, collapse_x, collapse_y;
-			decor_box_origin(st, DECOR_PART_ZOOM, &zoom_x, &zoom_y);
-			decor_box_origin(st, DECOR_PART_COLLAPSE, &collapse_x, &collapse_y);
-			if (zoom_x >= 0 && collapse_x > zoom_x + BOX_SIZE + 1) {
-				const int sep = zoom_x + BOX_SIZE +
-					(collapse_x - zoom_x - BOX_SIZE) / 2;
-				pl_vline(c, sep, BOX_Y, BOX_Y + BOX_SIZE, C_BLACK);
-			}
-		}
 		int bx, by;
 		const enum decor_part boxes[] = {
 			DECOR_PART_CLOSE, DECOR_PART_ZOOM, DECOR_PART_COLLAPSE,
