@@ -71,6 +71,18 @@ def snd_list(entries):
     return bytes(result)
 
 
+def snd_list_v0(entries):
+    """Version 0 snd# records: (code, (slot0, slot1, slot2, slot3)) as u16."""
+    result = bytearray(struct.pack(">HH", 0, len(entries)))
+    for code, slots in entries:
+        entry = bytearray(20)
+        entry[:4] = code
+        for index, value in enumerate(slots):
+            struct.pack_into(">H", entry, 4 + index * 2, value)
+        result.extend(entry)
+    return bytes(result)
+
+
 def cmp_snd(fmt, samples, frames, compression=-1, bits=16, channels=1, rate=22050):
     header = bytearray(64)
     struct.pack_into(">III", header, 0, 0, channels, rate << 16)
@@ -286,6 +298,19 @@ class SoundTests(unittest.TestCase):
         records[b"snd#", 1000] = snd_list([(b"wmov", (0, 504, 0, 0))])
         self.assertEqual(sounds.classic_mapping(records), {"window-drag": 504})
 
+    def test_version0_snd_list(self):
+        # DrawingBoard Sounds and other older sets use 20-byte snd# records:
+        # four 16-bit IDs, with the drag release in slot 2 (not slot 3).
+        records = {(b"snd ", 7422): snd(), (b"snd ", 505): snd(), (b"snd ", 144): snd(),
+                   (b"snd#", 1000): snd_list_v0([
+                       (b"wcls", (7422, 7422, 7422, 1)),
+                       (b"wmov", (0, 505, 144, 5))])}
+        self.assertEqual(sounds.classic_mapping(records),
+                         {"window-close": 7422, "window-drag": 505, "window-drag-end": 144})
+        records[b"snd#", 1000] = snd_list_v0([(b"wcls", (7422, 0, 0, 0))])[:23]
+        with self.assertRaises(ValueError):
+            sounds.classic_mapping(records)
+
     def test_classic_window_actions_and_drag_pcm(self):
         entries = [(b"wcol", 10), (b"wexp", 11), (b"wmov", 12)]
         records = {(b"snd ", number): snd() for _, number in entries}
@@ -311,6 +336,7 @@ class SoundTests(unittest.TestCase):
                            ("Binary.bin", macbinary(resource))):
             (self.source / name).write_bytes(data)
         (self.source / "Double").write_bytes(b"ignored data fork")
+        (self.source / "Screenshot.png").write_bytes(b"\x89PNG\r\n\x1a\nnot a set")
         result = sounds.scan(self.source, self.cache)
         self.assertEqual(result["errors"], [])
         self.assertEqual(len(result["themes"]), 3)

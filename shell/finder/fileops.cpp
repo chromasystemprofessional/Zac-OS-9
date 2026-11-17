@@ -50,6 +50,7 @@
 #include "transferdialog.h"
 #include "customthemes.h"
 #include "fonts.h"
+#include "macicons.h"
 
 static bool sameDisk(const QString &a, const QString &b) {
 	return QStorageInfo(a).device() == QStorageInfo(b).device();
@@ -588,55 +589,19 @@ QStringList draggedPaths(const QMimeData *mime) {
 	return paths;
 }
 
-/* A Mac OS 9 theme file by content, mirroring customthemes' own check: a
- * 16-byte header naming data and map sections that exactly fill the file,
- * else a tail map offset pointing back into it. AppleDouble files carry
- * the fork instead (magic 0x00051607). */
-static bool themeLooksLikeFork(const QString &path) {
-	QFile f(path);
-	if (!f.open(QIODevice::ReadOnly) || f.size() < 16) {
-		return false;
-	}
-	const QByteArray head = f.read(16);
-	auto u32 = [&head](int i) {
-		return (quint32)(uchar)head[i] << 24 | (quint32)(uchar)head[i + 1] << 16 |
-			(quint32)(uchar)head[i + 2] << 8 | (quint32)(uchar)head[i + 3];
-	};
-	const quint64 size = (quint64)f.size();
-	if (head.left(4) == QByteArray("\x00\x05\x16\x07", 4)) {
-		return true;
-	}
-	if (u32(0) + (quint64)u32(8) + u32(12) == size && u32(4) > 0 &&
-			u32(4) < size && u32(8) > 0 && u32(12) > 0) {
-		return true;
-	}
-	if (!f.seek(size - 4)) {
-		return false;
-	}
-	const QByteArray tail = f.read(4);
-	const quint32 map = (quint32)(uchar)tail[0] << 24 | (quint32)(uchar)tail[1] << 16 |
-		(quint32)(uchar)tail[2] << 8 | (quint32)(uchar)tail[3];
-	return 0 < map + 28 && map + 28 <= size;
-}
-
+/* A file that belongs in Theme Files: an Appearance theme (thme/pltn),
+ * a Kaleidoscope scheme (wnd#/cicn), or its frame layout. A classic Sound
+ * Sets file is a resource fork too, but it has snd/snd#/sdid and belongs in
+ * Sound Sets; dropping one in Appearance must not send it to Theme Files. */
 static bool isMacThemeFile(const QString &path) {
-	const QFileInfo info(path);
-	if (!info.exists() || info.isDir() || info.isSymLink()) {
-		return false;
-	}
-	if (info.fileName().startsWith("._")) {
-		return themeLooksLikeFork(path);
-	}
-	if (themeLooksLikeFork(path)) {
+	const QStringList types = macResourceTypes(path);
+	if (types.contains("thme") || types.contains("pltn") || types.contains("wnd#")) {
 		return true;
 	}
-	const QString dir = info.absolutePath(), base = info.fileName();
-	for (const QString &cand : { dir + "/._" + base, dir + "/.rsrc/" + base }) {
-		if (QFileInfo::exists(cand) && !QFileInfo(cand).isDir() && themeLooksLikeFork(cand)) {
-			return true;
-		}
+	if (types.contains("snd ") || types.contains("snd#") || types.contains("sdid")) {
+		return false;
 	}
-	return false;
+	return types.contains("cicn") || types.contains("layo") || types.contains("frme");
 }
 
 static QString appearanceBaseFolder() {

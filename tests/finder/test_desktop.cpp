@@ -90,6 +90,67 @@ static bool write(const QString &path) {
 	return file.open(QIODevice::WriteOnly) && file.write("saved data") == 10;
 }
 
+static void append16(QByteArray &data, int value) {
+	data.append(static_cast<char>((value >> 8) & 0xFF));
+	data.append(static_cast<char>(value & 0xFF));
+}
+
+static void append32(QByteArray &data, quint32 value) {
+	data.append(static_cast<char>((value >> 24) & 0xFF));
+	data.append(static_cast<char>((value >> 16) & 0xFF));
+	data.append(static_cast<char>((value >> 8) & 0xFF));
+	data.append(static_cast<char>(value & 0xFF));
+}
+
+/* A classic resource fork with just enough map for macResourceTypes: a
+ * Sound Sets file names snd/snd#, an Appearance theme names thme. */
+static QByteArray resourceFork(const QList<QByteArray> &types) {
+	const quint32 dataOffset = 256;
+	QByteArray data;
+	for (const QByteArray &type : types) {
+		append32(data, type.size());
+		data += type;
+	}
+	QByteArray typeList;
+	append16(typeList, types.size() - 1);
+	int referenceList = 2 + 8 * types.size();
+	for (const QByteArray &type : types) {
+		typeList += type;
+		append16(typeList, 0);
+		append16(typeList, referenceList);
+		referenceList += 12;
+	}
+	for (int i = 0; i < types.size(); i++) {
+		append16(typeList, 128 + i);
+		append16(typeList, 0xFFFF);
+		typeList.append('\0');
+		typeList.append(static_cast<char>((i * 4 >> 16) & 0xFF));
+		typeList.append(static_cast<char>((i * 4 >> 8) & 0xFF));
+		typeList.append(static_cast<char>((i * 4) & 0xFF));
+		append32(typeList, 0);
+	}
+	QByteArray map;
+	append32(map, dataOffset);
+	append32(map, dataOffset + data.size());
+	append32(map, data.size());
+	append32(map, 28 + typeList.size());
+	append32(map, 0);
+	append16(map, 0);
+	append16(map, 0);
+	append16(map, 28);
+	append16(map, 28 + typeList.size());
+	map += typeList;
+	QByteArray fork;
+	append32(fork, dataOffset);
+	append32(fork, dataOffset + data.size());
+	append32(fork, data.size());
+	append32(fork, map.size());
+	fork += QByteArray(dataOffset - 16, '\0');
+	fork += data;
+	fork += map;
+	return fork;
+}
+
 static void settle() {
 	QElapsedTimer timer;
 	timer.start();
@@ -1070,6 +1131,38 @@ int main(int argc, char **argv) {
 			appsWindow->close();
 			settle();
 		}
+	}
+
+	/* A classic Sound Sets file is a resource fork too, but it belongs in
+	 * Appearance > Sound Sets, not Theme Files. The drop used to be sent to
+	 * Theme Files just because it had a fork, which imported a sound set as
+	 * an appearance theme. */
+	{
+		const QString dest = vfsOpensAs(vfsPathFor("system-folder/appearance/sound-themes"));
+		QDir().mkpath(dest);
+		const QString themeFiles = QStandardPaths::writableLocation(
+			QStandardPaths::GenericDataLocation) + "/zacos9/appearance/Theme Files";
+		const QString source = home.path() + "/DrawingBoard Sound Set";
+		QFile data(source);
+		check(data.open(QIODevice::WriteOnly), "create a classic sound set");
+		data.close();
+		QFile fork(source + ".resource");
+		const bool wroteFork = fork.open(QIODevice::WriteOnly) &&
+			fork.write(resourceFork({ "snd ", "snd#", "sdid" })) > 0;
+		fork.close();
+		check(wroteFork && QFile::rename(source + ".resource", home.path() +
+			"/._DrawingBoard Sound Set"), "give the sound set its resource fork");
+		QMimeData *mime = new QMimeData;
+		mime->setUrls({ QUrl::fromLocalFile(source) });
+		QDropEvent drop(QPointF(10, 10), Qt::CopyAction, mime,
+			Qt::LeftButton, Qt::NoModifier);
+		dropItems(&drop, nullptr, vfsPathFor("system-folder/appearance/sound-themes"));
+		settle();
+		check(drop.isAccepted() &&
+			QFileInfo::exists(dest + "/DrawingBoard Sound Set") &&
+			QFileInfo::exists(dest + "/._DrawingBoard Sound Set") &&
+			!QFileInfo::exists(themeFiles + "/DrawingBoard Sound Set"),
+			"a sound set dropped on Sound Sets stays there, not in Theme Files");
 	}
 
 	/* The Finder's own items: Applications, the System Folder and what's

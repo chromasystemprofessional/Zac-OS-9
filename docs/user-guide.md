@@ -217,7 +217,7 @@ supported.
 
 Appearance also supports saved appearance presets, user themes and interface
 sound sets. Use its **Themes** and **Sound Sets** tabs, with custom files under
-**System Folder > Appearance > Theme Files** or **Sound Themes**. **New
+**System Folder > Appearance > Theme Files** or **Sound Sets**. **New
 Theme…** and **Edit Theme…** open the Theme Editor, which can create a dark
 theme and edit an imported Mac OS 9 theme without changing the import.
 See [Themes and sound sets](themes.md) for formats and compatibility limits.

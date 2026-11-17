@@ -1,6 +1,6 @@
 # Project status
 
-Updated: 2026-11-17. Latest release: **1.18.13**
+Updated: 2026-11-17. Latest release: **1.18.14**
 ([releases](https://github.com/chromasystemprofessional/Zac-OS-9/releases),
 [ISO](https://sourceforge.net/projects/zac-os-9/files/)).
 
@@ -109,7 +109,7 @@ Platinum or a user image, with undo and redo. Editing an imported Mac OS 9
 theme makes a linked copy (`inherits=`) that reuses its artwork, so imports
 are never rewritten. Imported themes, presets and user themes share the same
 gallery ([Themes](docs/themes.md#theme-editor)). The Theme Installer also
-copies the System Folder's sound sets into Sound Themes, resource forks
+copies the System Folder's sound sets into Sound Sets, resource forks
 included, and turns a Kaleidoscope scheme's own WindowShade sounds into a
 selectable set, so both appear in the Sound Sets list. Scheme title bars
 come from the frame layout (`layo`) or, for older schemes, from a `wnd#`

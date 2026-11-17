@@ -203,7 +203,7 @@ envS["XDG_DATA_HOME"] = dataS
 envS["QT_QPA_PLATFORM"] = "offscreen"
 r = run(binary, sound_theme, "Sound Theme", envS)
 assert r.returncode == 0, r.stderr
-sound_themes = os.path.join(dataS, "zacos9", "appearance", "Sound Themes")
+sound_themes = os.path.join(dataS, "zacos9", "appearance", "Sound Sets")
 with open(os.path.join(sound_themes, "Test Set"), "rb") as f:
     assert f.read() == sound_set_fork, "the set's resource fork is imported, not its data fork"
 with open(os.path.join(sound_themes, "Kernel Set"), "rb") as f:
@@ -246,7 +246,7 @@ envScheme["XDG_DATA_HOME"] = dataScheme
 envScheme["QT_QPA_PLATFORM"] = "offscreen"
 r = run(binary, scheme_path, "Scheme", envScheme)
 assert r.returncode == 0, r.stderr
-scheme_set = os.path.join(dataScheme, "zacos9", "appearance", "Sound Themes",
+scheme_set = os.path.join(dataScheme, "zacos9", "appearance", "Sound Sets",
                           "Scheme Sounds")
 with open(os.path.join(scheme_set, "theme.json")) as f:
     events = json.load(f)["events"]

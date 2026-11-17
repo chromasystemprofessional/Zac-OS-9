@@ -2,6 +2,7 @@
 
 #include <QImage>
 #include <QString>
+#include <QStringList>
 
 /*
  * A classic Mac OS file or folder's custom icon. Mac OS 9 kept it in a
@@ -17,3 +18,10 @@
  * image when the item carries no icon.
  */
 QImage macResourceIconImage(const QString &path);
+
+/* The resource types in a file's fork: a raw fork, an AppleDouble
+ * companion, a Netatalk .rsrc copy, or an HFS named fork. Empty when the
+ * file has no resource fork. Used to tell a theme (thme/pltn/layo/cicn)
+ * from a classic Sound Sets file (snd/snd#/sdid), so a drop goes to the
+ * right Appearance folder. */
+QStringList macResourceTypes(const QString &path);

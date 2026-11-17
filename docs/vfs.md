@@ -248,7 +248,7 @@ Zacintosh HD
 │   │   ├── Desktop Patterns → custom user-created tiles and classic Mac pattern files
 │   │   ├── Wallpaper     → ~/.local/share/zacos9/appearance/Wallpaper
 │   │   ├── Themes        → compatible appearance preset JSON files
-│   │   └── Sound Themes  → custom WAV themes and classic resource-fork sound sets
+│   │   └── Sound Sets  → custom WAV themes and classic resource-fork sound sets
 │   ├── Control Panels      (generated: the desktop entries marked X-ZacOS9-ControlPanel)
 │   ├── Extensions         (generated, read-only driver/module status)
 │   ├── Sounds             (generated, read-only aliases to user/system sounds)
@@ -284,7 +284,7 @@ backed nodes to existing registries without removing user changes. Version 7
 moves Wallpaper under Appearance, retaining node overrides and existing files.
 If the old folder cannot be moved (including an existing destination), the
 catalog retains the old folder and logs the conflict rather than overwriting files.
-Version 8 adds Themes and Sound Themes under Appearance.
+Version 8 adds Themes and Sound Sets under Appearance.
 Version 9 moves the shipped Utilities folder into System Folder and preserves
 its custom name and the renamed titles/labels of system launchers. Version 10
 adds read-only System Folder resource providers (Sounds, Startup Items,

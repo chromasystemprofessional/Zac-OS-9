@@ -1070,27 +1070,36 @@ def classic_sound_events(records):
 		if len(body) < 4:
 			continue
 		version, count = struct.unpack(">HH", body[:4])
-		if version != 1 or count > 512 or len(body) != 4 + count * 44:
+		if version == 0:
+			record_size = 20
+		elif version == 1:
+			record_size = 44
+		else:
+			continue
+		if count > 512 or len(body) != 4 + count * record_size:
 			continue
 		for i in range(count):
-			record = body[4 + i * 44:4 + (i + 1) * 44]
+			record = body[4 + i * record_size:4 + (i + 1) * record_size]
 			code = record[:4]
+			if version == 0:
+				slots = struct.unpack(">4H", record, 4)
+				release = slots[2]
+			else:
+				slots = [struct.unpack(">i", record[
+					SOUND_SLOT_OFFSET + slot * SOUND_SLOT_SIZE:
+					SOUND_SLOT_OFFSET + slot * SOUND_SLOT_SIZE + 4])[0]
+					for slot in range(4)]
+				release = slots[3]
 			if code == b"wmov":
-				for event, slot in (("window-drag", 1), ("window-drag-end", 3)):
-					number = struct.unpack(">i", record[
-						SOUND_SLOT_OFFSET + slot * SOUND_SLOT_SIZE:
-						SOUND_SLOT_OFFSET + slot * SOUND_SLOT_SIZE + 4])[0]
-					if slot == 1 and not number:
-						number = struct.unpack(">i", record[
-							SOUND_SLOT_OFFSET:SOUND_SLOT_OFFSET + 4])[0]
+				for event, number in (("window-drag", slots[1] or slots[0]),
+						("window-drag-end", release)):
 					if not number:
 						continue
 					if event in defaults and defaults[event] != number:
 						return {}
 					defaults[event] = number
 				continue
-			number = struct.unpack(">i", record[
-				SOUND_SLOT_OFFSET:SOUND_SLOT_OFFSET + 4])[0]
+			number = slots[0]
 			event = CLASSIC_SOUND_EVENTS.get(code)
 			if not event or not number:
 				continue
@@ -1120,11 +1129,11 @@ def classic_sound_events(records):
 
 
 def write_sound_set(fork, out, name):
-	"""Write the theme's own interface sounds as a Sound Themes folder.
+	"""Write the theme's own interface sounds as a Sound Sets folder.
 
 	A Kaleidoscope scheme (or a theme that carries its set) has its event
 	sounds in the same fork as its artwork. The installer copies this
-	folder into System Folder > Appearance > Sound Themes so the set
+	folder into System Folder > Appearance > Sound Sets so the set
 	appears in the Sound Sets window, with its events already named."""
 	dest = os.path.join(out, "soundset")
 	shutil.rmtree(dest, ignore_errors=True)

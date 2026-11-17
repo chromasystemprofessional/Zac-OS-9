@@ -460,6 +460,31 @@ static void moveThemesFolder() {
 	}
 }
 
+/* Mac OS 9 called this folder Sound Sets. Older ZacOS 9 called it Sound
+ * Themes; move it once, merging if both exist. */
+static void moveSoundThemesFolder() {
+	const QString base = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) +
+		"/zacos9/appearance";
+	const QString from = base + "/Sound Themes", to = base + "/Sound Sets";
+	if (!QDir(from).exists()) {
+		return;
+	}
+	if (!QDir(to).exists()) {
+		if (!QDir().rename(from, to)) {
+			qWarning() << "Could not rename Sound Themes to Sound Sets.";
+		}
+		return;
+	}
+	for (const QFileInfo &entry : QDir(from).entryInfoList(
+			QDir::AllEntries | QDir::NoDotAndDotDot | QDir::Hidden, QDir::Name)) {
+		const QString target = to + "/" + entry.fileName();
+		if (!QFileInfo::exists(target) && !QFileInfo(target).isSymLink()) {
+			QDir().rename(entry.filePath(), target);
+		}
+	}
+	QDir().rmdir(from);
+}
+
 /* Bundles named for an AppleDouble companion (".-prefixed) can only
  * be leftovers from before the installer stopped importing companions
  * directly: nameFromFile() strips the "._" prefix, so no new bundle can
@@ -517,6 +542,7 @@ public:
 
 	Catalog() : QObject(QCoreApplication::instance()) {
 		moveThemesFolder();
+		moveSoundThemesFolder();
 		sweepCompanionBundles();
 		for (const QString &folder : { soundThemesFolder(), appearanceThemesFolder(), cacheFolder() }) {
 			if (!QDir().mkpath(folder)) {
@@ -965,7 +991,7 @@ QString alertSoundDisplayName(const QString &id) {
 }
 
 QString soundThemesFolder() {
-	return QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + "/zacos9/appearance/Sound Themes";
+	return QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + "/zacos9/appearance/Sound Sets";
 }
 QString userAlertSoundsFolder() {
 	return QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + "/zacos9/sounds";

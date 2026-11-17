@@ -1162,8 +1162,8 @@ int main(int argc, char **argv) {
 		dataHome + "/zacos9/appearance/Theme Files",
 		"Appearance contains a custom preset Theme Files folder");
 	check(vfsOpensAs(vfsPathFor("system-folder/appearance/sound-themes")) ==
-		dataHome + "/zacos9/appearance/Sound Themes",
-		"Appearance contains a custom Sound Themes folder");
+		dataHome + "/zacos9/appearance/Sound Sets",
+		"Appearance contains a custom Sound Sets folder");
 	check(prefs == root + "/config", "Preferences stands for the XDG config directory");
 	const QString sites = vfsOpensAs(vfsPathFor("system-folder/internet-search-sites"));
 	check(sites.endsWith("Internet Search Sites") && QDir(sites).exists(),

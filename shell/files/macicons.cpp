@@ -153,6 +153,48 @@ static QByteArray readFork(const QString &path) {
 	return looksLikeResourceFork(data) ? data : QByteArray();
 }
 
+QStringList macResourceTypes(const QString &path) {
+	QStringList types;
+	const QFileInfo info(path);
+	if (!info.exists() || info.isDir()) {
+		return types;
+	}
+	const QString dir = info.absolutePath();
+	const QString base = info.fileName();
+	const QStringList forks{ path, path + "/..namedfork/rsrc",
+		dir + "/._" + base, dir + "/.rsrc/" + base };
+	for (const QString &candidate : forks) {
+		const QByteArray fork = readFork(candidate);
+		if (fork.size() < 16) {
+			continue;
+		}
+		const quint32 mapOffset = be32(fork, 4);
+		const quint32 mapLength = be32(fork, 12);
+		if (mapOffset < 16 || mapLength < 28 ||
+				static_cast<qint64>(mapOffset) + mapLength > fork.size()) {
+			continue;
+		}
+		const qint64 mapEnd = static_cast<qint64>(mapOffset) + mapLength;
+		const int typeList = static_cast<int>(mapOffset) +
+			be16(fork, static_cast<int>(mapOffset) + 24);
+		if (typeList + 2 > mapEnd) {
+			continue;
+		}
+		const int count = be16(fork, typeList) + 1;
+		if (count > 4096) {
+			continue;
+		}
+		int at = typeList + 2;
+		for (int i = 0; i < count && at + 8 <= mapEnd; i++, at += 8) {
+			types << QString::fromLatin1(fork.mid(at, 4));
+		}
+		if (!types.isEmpty()) {
+			break;
+		}
+	}
+	return types;
+}
+
 /* The icon resources in a fork, by type, keeping the first of each. The
  * map is followed defensively: a corrupt one must not copy a large body
  * once per type. */

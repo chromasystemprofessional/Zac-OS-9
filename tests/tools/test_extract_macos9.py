@@ -97,7 +97,7 @@ def test_end_to_end():
 def test_sound_set_from_theme_file():
     # A theme or Kaleidoscope scheme can carry interface sounds: the
     # WindowShade pair has documented snd IDs, and a full set names its
-    # events with sdid. They become a Sound Themes folder, while the same
+    # events with sdid. They become a Sound Sets folder, while the same
     # sounds stay available as alert sounds.
     def snd(samples=b"\x80\x40\xc0\x80"):
         head = struct.pack(">HHHI", 1, 1, 5, 0) + struct.pack(">H", 1)
@@ -135,7 +135,7 @@ def test_sound_set_from_theme_file():
                 assert f.read(4) == b"RIFF", name
         # Alert sounds are still extracted separately.
         assert os.path.isfile(os.path.join(out, "sounds", "sound-1.wav"))
-    print("ok    a theme's own sounds become a Sound Themes set")
+    print("ok    a theme's own sounds become a Sound Sets set")
 
 
 def build_scen(items):

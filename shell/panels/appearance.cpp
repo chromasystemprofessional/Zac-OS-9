@@ -443,7 +443,7 @@ void AppearancePanel::loadThemes() {
 	m_themes.setItems(names);
 	m_themes.select(selected, false);
 	setToolTip("Appearance Themes: " + appearanceThemesFolder() +
-		"\nSound Themes: " + soundThemesFolder() + "\n" + customThemeErrors().join('\n'));
+		"\nSound Sets: " + soundThemesFolder() + "\n" + customThemeErrors().join('\n'));
 }
 
 void AppearancePanel::loadPatterns() {
@@ -638,7 +638,7 @@ void AppearancePanel::paintSoundTab(pl_canvas *c) {
 	m_host.paintControls(c, PANE);
 	const QStringList errors = customThemeErrors();
 	panelText(c, !m_themeError.isEmpty() ? m_themeError : !errors.isEmpty() ? errors.first()
-		: "Add sets to Appearance > Sound Themes", BOX_L + 4, H - 24, PL_FONT_VIEWS, C_BLACK, BOX_R - BOX_L);
+		: "Add sets to Appearance > Sound Sets", BOX_L + 4, H - 24, PL_FONT_VIEWS, C_BLACK, BOX_R - BOX_L);
 }
 
 /* ---- Themes gallery (Mac OS 9's Themes tab) -------------------------- */

@@ -96,7 +96,7 @@ int main(int argc, char **argv) {
 	qputenv("PATH", (root.path() + ":/usr/bin:/bin").toUtf8());
 	qputenv("TEST_LOG", (root.path() + "/played").toUtf8());
 	QApplication app(argc, argv);
-	assert(soundThemesFolder() == root.path() + "/data/zacos9/appearance/Sound Themes");
+	assert(soundThemesFolder() == root.path() + "/data/zacos9/appearance/Sound Sets");
 	assert(userAlertSoundsFolder() == root.path() + "/data/zacos9/sounds");
 	assert(appearanceThemesFolder() == root.path() + "/data/zacos9/appearance/Theme Files");
 	const QString recording = root.path() + "/Recorded Chime.wav";

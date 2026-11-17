@@ -1029,7 +1029,7 @@ int main(int argc, char *argv[]) {
 	QString wallpaper, pattern, alert;
 	installThemeAssets(name, &wallpaper, &pattern, &alert);
 	const QString soundThemes = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) +
-		"/zacos9/appearance/Sound Themes";
+		"/zacos9/appearance/Sound Sets";
 	QString soundSetFolder = systemFolder + "/Appearance/Sound Sets";
 	if (!QDir(soundSetFolder).exists()) {
 		soundSetFolder = QDir::homePath() + "/Classic/Appearance add-ons/Sound Sets";

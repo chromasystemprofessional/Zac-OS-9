@@ -27,6 +27,10 @@ MIN_RATE, MAX_RATE = 1000, 96000
 MAX_THEMES = 256
 MAX_OUTPUT = 256 * 1024 * 1024
 MAX_SCAN_ENTRIES = 1024
+# A Sound Sets folder often has a screenshot or read-me beside the sets.
+# They are not sets and should not be reported as broken ones.
+NON_SOUND_SUFFIXES = frozenset((".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tif",
+                                ".tiff", ".pdf", ".txt", ".rtf", ".html", ".htm"))
 EVENTS = frozenset(("button-click", "checkbox-toggle", "menu-open", "menu-command",
                     "window-open", "window-close", "trash-move", "trash-empty",
                     "window-collapse", "window-expand", "window-drag", "window-drag-end",
@@ -40,10 +44,9 @@ CLASSIC_EVENTS = {b"btnp": "button-click", b"chkp": "checkbox-toggle",
                   b"wmov": "window-drag",
                   b"ftrs": "trash-empty"}
 # Drag sounds (kThemeDragSound*) keep their phases in later snd# slots:
-# slot 1 plays while dragging, slot 2 while held still, slot 3 on release.
-# Slot 0 is normally empty; older or hand-made sets may put the drag there.
+# slot 1 plays while dragging, slot 2 while held still, slot 3 on release
+# (version 1; version 0 uses slot 2 for release).
 DRAG_CODE = b"wmov"
-DRAG_SLOT, DRAG_RELEASE_SLOT = 1, 3
 SLOT_OFFSET, SLOT_SIZE = 10, 8
 _patterns = None
 
@@ -115,10 +118,11 @@ def classic_mapping(records):
     Older sets sometimes store only a filename: those have no event identity.
     snd# v1 has a 16-bit count and 44-byte records: FourCC at 0, then four
     8-byte slots from offset 10, each starting with a signed 32-bit
-    sound-resource reference. Discrete events use slot 0; later slots are
-    interactive variants. Window drags use the drag and release slots
-    (see DRAG_SLOT), which sets often share between several drag codes, so
-    an sdid naming another drag code does not veto them.
+    sound-resource reference. Version 0 (still used by DrawingBoard) has
+    20-byte records: FourCC at 0, then four 16-bit references. Discrete
+    events use slot 0; later slots are interactive variants. Window drags
+    use the drag and release slots, which sets often share between several
+    drag codes, so an sdid naming another drag code does not veto them.
     """
     identities, candidates, defaults = {}, {}, {}
     for (kind, number), payload in records.items():
@@ -135,25 +139,36 @@ def classic_mapping(records):
         if kind != b"snd#":
             continue
         version, count = unpack(">HH", payload)
-        if version != 1 or count > 512 or len(payload) != 4 + count * 44:
+        if version == 0:
+            record_size = 20
+        elif version == 1:
+            record_size = 44
+        else:
+            raise ValueError("unsupported snd# metadata structure")
+        if count > 512 or len(payload) != 4 + count * record_size:
             raise ValueError("unsupported snd# metadata structure")
         for i in range(count):
-            record = take(payload, 4 + i * 44, 44)
+            record = take(payload, 4 + i * record_size, record_size)
             code = record[:4]
-
-            def slot(index):
-                return unpack(">i", record, SLOT_OFFSET + index * SLOT_SIZE)[0]
-
+            if version == 0:
+                # Version 0: four 16-bit sound IDs, then four metadata words.
+                slots = unpack(">4H", record, 4)
+                release_slot = slots[2]
+            else:
+                # Version 1: four 8-byte slots, each a 32-bit sound ID.
+                slots = [unpack(">i", record, SLOT_OFFSET + index * SLOT_SIZE)[0]
+                         for index in range(4)]
+                release_slot = slots[3]
             if code == DRAG_CODE:
-                for event, number in (("window-drag", slot(DRAG_SLOT) or slot(0)),
-                                      ("window-drag-end", slot(DRAG_RELEASE_SLOT))):
+                for event, number in (("window-drag", slots[1] or slots[0]),
+                                      ("window-drag-end", release_slot)):
                     if number == 0:
                         continue
                     if event in defaults and defaults[event] != number:
                         raise ValueError("ambiguous snd# event mapping")
                     defaults[event] = number
                 continue
-            number = slot(0)
+            number = slots[0]
             if code not in CLASSIC_EVENTS or number == 0:
                 continue
             # A user-set sdid may deliberately identify a different event.
@@ -549,6 +564,8 @@ def scan(source, cache):
         relative = path.relative_to(source)
         leaf = path.name[2:] if path.name.startswith("._") else path.name
         identity = str(relative.with_name(leaf))
+        if path.is_file() and path.suffix.lower() in NON_SOUND_SUFFIXES:
+            continue
         try:
             no_symlinks(path)
             if path.is_dir():

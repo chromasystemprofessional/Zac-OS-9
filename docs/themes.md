@@ -198,12 +198,12 @@ reads the Appearance theme's resource fork and produces a **theme bundle** in
   `snd` resources, decoded from sampled sounds only; synthesized and compressed
   sounds are skipped. Theme-file sounds sit beside them. The installer never
   picks a `system-` sound as the theme's default alert.
-- `soundset/` — the theme's own interface sounds, as a Sound Themes folder:
+- `soundset/` — the theme's own interface sounds, as a Sound Sets folder:
   `theme.json` names the events and one WAV holds each sample. A
   Kaleidoscope scheme's WindowShade pair (`snd` -14336/-14335) becomes
   `window-collapse` and `window-expand`; a theme carrying `sdid`/`snd#`
   metadata keeps every event those name. The installer copies this folder
-  into `Sound Themes/<name> Sounds`, so a scheme's sounds appear in the
+  into `Sound Sets/<name> Sounds`, so a scheme's sounds appear in the
   Sound Sets window instead of only as alert sounds. Alert sounds without
   that metadata stay in `sounds/`.
 - `icons/<kind>-32.png` and `icons/<kind>-16.png` — the desktop's icons,
@@ -436,7 +436,7 @@ window closure, fullscreen transitions and session shutdown cancel it without
 an end sound. These compositor events also work for other applications' windows.
 
 Place user-created or freely licensed sets in **System Folder > Appearance >
-Sound Themes**, normally `~/.local/share/zacos9/appearance/Sound Themes`.
+Sound Sets**, normally `~/.local/share/zacos9/appearance/Sound Sets`.
 For a WAV set, create a subfolder containing `theme.json` and the referenced
 files:
 
@@ -472,7 +472,7 @@ when the user logs out after applications close.
 Missing selected sets become silent while retaining their selection ID.
 Malformed or unsupported sets report an error in Appearance and the session log.
 
-Classic resource-fork sound sets can also be placed in Sound Themes. Preserve
+Classic resource-fork sound sets can also be placed in Sound Sets. Preserve
 their resource forks, including companion `._` AppleDouble files produced by
 StuffIt extraction. Supported PCM resources are decoded to cached WAVs;
 unsupported encodings are reported, not played as noise. No Apple sounds or
@@ -486,7 +486,7 @@ WindowShade events would otherwise silence the current set's menus,
 windows and controls; choose it there when you want it.
 Sniffer preserves an individual classic file's hidden AppleDouble companion
 when it is moved or copied, including renamed duplicates.
-You can also copy the extracted `Sounds` folder into Sound Themes: one level
+You can also copy the extracted `Sounds` folder into Sound Sets: one level
 of contained classic sets is scanned. Deeper nesting is reported rather than
 recursively traversed. Resource-only StuffIt entries receive visible empty
 data files so they can be selected normally in Sniffer.
@@ -496,10 +496,12 @@ Classic discrete events supported are button press (`btnp`), checkbox press
 window close (`wcls`), collapse (`wcol`), expansion (`wexp`) and Trash flush
 (`ftrs`). Window movement (`wmov`) imports the record's drag slot as
 `window-drag`, which repeats throughout the grab, and its release slot as
-`window-drag-end`. Classic sets keep these in the second and fourth `snd#`
-slots (the first is normally empty) and often share them with other drag
-records, so a shared sound label does not block them. These identifiers follow
-the public Carbon HIToolbox Appearance Manager interface. Playback repeats the
+`window-drag-end`. Classic sets keep these in later `snd#` slots and often
+share them with other drag records, so a shared sound label does not block
+them. Both `snd#` versions are read: the 20-byte version 0 used by older
+sets such as DrawingBoard, and the 44-byte version 1 used by later ones.
+These identifiers follow the public Carbon HIToolbox Appearance Manager
+interface. Playback repeats the
 complete decoded sample; the idle-drag variant, embedded loop regions and
 random sound sequences are not supported.
 
@@ -524,7 +526,7 @@ deletion rules, the themed menu bar and menus, per-slot artwork states, and
 writing chosen images as ARGB tiles and PNG skins. Sound-set coverage includes
 a System Folder set keeping its `.rsrc` fork, a Kaleidoscope scheme's
 WindowShade pair becoming a selectable set, and a theme's own `sdid` sounds
-being written as a Sound Themes folder. Chrome tests cover a
+being written as a Sound Sets folder. Chrome tests cover a
 `wnd#` scheme's title band and widgets, the fixed 22 px bar height, the
 `layo` frame/dialog/button layouts, the resolved top of title-bar
 caps that carry decoration above the window, and the button, checkbox,
