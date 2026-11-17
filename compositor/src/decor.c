@@ -497,9 +497,20 @@ static bool paint_themed_bar(struct pl_canvas *c, const struct decor_state *st,
 		decor_box_origin(st, DECOR_PART_ZOOM, &zx, &zy);
 		decor_box_origin(st, DECOR_PART_COLLAPSE, &cx, &cy);
 		if (zx >= 0 && cx > zx) {
-			int cluster_l = zx - 4;
+			int cluster_l = zx - 8;
 			if (cluster_l < 0) cluster_l = 0;
 			pl_fill(c, cluster_l, 0, w - 1, DECOR_TOP - 1, C_BLACK);
+		}
+		/* The left close box has the same black separator: the Mac's
+		 * cluster is the 16 px box plus a four-pixel bar before the
+		 * red/blue field starts. */
+		int bx, by;
+		decor_box_origin(st, DECOR_PART_CLOSE, &bx, &by);
+		const struct chrome_tile *ct = chrome_tile_get(CHROME_BUTTON_CLOSE);
+		if (bx >= 0 && ct) {
+			int right = bx + ct->w + 4;
+			if (right > w) right = w;
+			pl_fill(c, 0, 0, right - 1, DECOR_TOP - 1, C_BLACK);
 		}
 		return true;
 	}
