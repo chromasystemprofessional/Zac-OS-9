@@ -1,3 +1,15 @@
+zacos9 (1.18.11) trixie; urgency=medium
+
+  * Saving an Appearance theme keeps its base theme file and icons instead
+    of falling back to Silver Coat.
+  * What's New is recorded once it is shown, so it no longer opens at every
+    login, and it stays out of non-ZacOS desktops.
+  * The session starts a polkit password agent only when another one is not
+    already running, so an installed LXpolkit no longer triggers a
+    duplicate-agent error.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Tue, 17 Nov 2026 12:59:21 -0500
+
 zacos9 (1.18.10) trixie; urgency=medium
 
   * Mac OS 9 Appearance themes now import their real frame recipes: the

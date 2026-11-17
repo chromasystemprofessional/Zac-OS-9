@@ -1,0 +1,12 @@
+ZacOS 9 1.18.11 fixes three problems reported after 1.18.9.
+
+Saving an Appearance theme now keeps the theme file and icons it was
+saved from, instead of falling back to Silver Coat.
+
+The What's New window is remembered once it is shown, so it appears once
+per version instead of at every login. It also stays out of LXQt and
+other desktops.
+
+ZacOS starts its polkit password agent only when one is not already
+running, so installing LXpolkit no longer produces a duplicate-agent
+error at login.
