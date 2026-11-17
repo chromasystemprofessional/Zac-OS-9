@@ -183,6 +183,7 @@ void HelpWindow::buildMenus() {
 	go->addSeparator();
 	go->addAction(tr9("Help Center"), this, [this] { showCenter(); });
 	go->addAction(tr9("ZacOS Help"), this, [this] { showPage("zacos9"); });
+	go->addAction(tr9("Thanks and Credits"), this, [this] { showPage("zacos9/credits.html"); });
 }
 
 void HelpWindow::showCenter() {

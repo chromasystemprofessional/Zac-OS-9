@@ -31,6 +31,10 @@ It isn't a skin over another desktop. The window manager, the Sniffer (the
 file browser), the menu bar and every control panel were written for ZacOS 9,
 so everything looks and behaves the same way, down to the scroll arrows.
 
+> **Thank you.** Felix Ding posted ZacOS 9 to Hacker News, Liam Proven wrote
+> about it in The Register, and Irontooth1 and many others filed the reports
+> that shaped it. [The full list is in THANKS.md.](THANKS.md)
+
 ## Mac OS 9 themes
 
 Drop an original Mac OS 9 appearance theme or Kaleidoscope scheme onto the
@@ -205,6 +209,18 @@ sounds.
 I'm not selling anything and there's no catch. Bug reports, ideas and
 contributions are welcome, and if you'd rather build something different from
 it, the GPL lets you.
+
+## Thanks
+
+ZacOS 9 is a one-person project with a lot of help from other people. Felix
+Ding's Hacker News post brought it a wider audience; Liam Proven wrote about
+it in The Register and has followed it since; Irontooth1, shiroankuroan,
+nanocodium, uityyy, Sad-Anon, Sobserius, jploudre and Felix filed the issue
+reports that shaped many of the fixes above. Thank you, too, to everyone who
+starred, forked, downloaded and tested it.
+
+[The full list, with issue numbers, is in THANKS.md.](THANKS.md) If your name
+is there and you would rather it were not, open an issue and I will remove it.
 
 ## Building from source
 

@@ -251,6 +251,9 @@ static void add_finder_menus(struct mb_menu *menus, int *n) {
 	add(m, _("Learn ZacOS"), 0, true, ACT_LAUNCH, tutorial);
 	sibling_program("zacos9-mousepractice", practice, sizeof(practice));
 	add(m, _("Mouse Practice"), 0, true, ACT_LAUNCH, practice);
+	char credits[PATH_MAX + 80];
+	snprintf(credits, sizeof(credits), "%s zacos9/credits.html", help);
+	add(m, _("Thanks and Credits"), 0, true, ACT_LAUNCH, credits);
 	sep(m);
 	char hints[16];
 	struct mb_item *hint_bubbles = add(m, _("Show Hint Bubbles"), 0, true,

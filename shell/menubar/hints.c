@@ -93,6 +93,7 @@ static const struct {
 	{ N_("Help Center"), N_("Opens the Help Center, where you can read help for ZacOS and your programs.") },
 	{ N_("Show Hint Bubbles"), N_("Turns hint bubbles like this one on or off.") },
 	{ N_("ZacOS Help"), N_("Opens help for ZacOS.") },
+	{ N_("Thanks and Credits"), N_("Shows the people who reported issues and helped ZacOS 9.") },
 	{ N_("Bark Recorder"), N_("Opens Bark Recorder, to record a sound and play it back.") },
 	{ N_("Bloodhound (Search)"), N_("Finds files and folders by name, contents and more, and searches the web.") },
 	{ N_("Calculator"), N_("Opens the Calculator, for adding, subtracting, multiplying and dividing.") },

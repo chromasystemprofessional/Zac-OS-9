@@ -130,11 +130,16 @@ public:
 protected:
 	void paintEvent(QPaintEvent *) override;
 	void keyPressEvent(QKeyEvent *) override;
+	void mousePressEvent(QMouseEvent *) override;
+	void mouseMoveEvent(QMouseEvent *) override;
+	void mouseReleaseEvent(QMouseEvent *) override;
 
 private:
 	AboutWindow();
 	QString m_version;
 	QStringList m_lines;
+	PanelHost m_host{ this };
+	PanelButton m_credits;
 };
 
 /* Mac-style time stamp: "Thu, Oct 1, 2026, 9:41 AM". */

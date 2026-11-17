@@ -89,6 +89,24 @@ https://github.com/chromasystemprofessional/Zac-OS-9/releases, and the current
 state of the project is at
 https://github.com/chromasystemprofessional/Zac-OS-9/blob/main/PROJECT_STATUS.md
 
+## Thanks
+
+ZacOS 9 is a one-person project with a lot of help from other people.
+
+- **Felix Ding** posted it to Hacker News on 22 October 2026, where it reached
+  more than 50 points and 37 comments, and filed five early issues.
+- **Liam Proven** wrote about it in The Register on 27 October 2026, starred
+  the repository and follows the project.
+- **Irontooth1**, **shiroankuroan**, **nanocodium**, **uityyy**, **Sad-Anon**,
+  **Sobserius**, **jploudre** and **felixding** reported the issues that led
+  to many of the fixes above.
+- Everyone who starred, forked, downloaded, installed and tested it.
+
+The full list, with issue numbers, is in
+[THANKS.md](https://github.com/chromasystemprofessional/Zac-OS-9/blob/main/THANKS.md).
+If your name is there and you would rather it were not, open an issue and it
+will be removed.
+
 ## Source, help and licence
 
 - Project website: https://chromasystemprofessional.com/zacos9/

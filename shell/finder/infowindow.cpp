@@ -5,6 +5,7 @@
 #include "gpuinfo.h"
 #include "alias.h"
 #include "platinumshell.h"
+#include "programs.h"
 
 #include "vfs.h"
 
@@ -1255,7 +1256,7 @@ static QString memorySize(qint64 kb) {
 	return QLocale(QLocale::English).toString(gb, 'f', 1) + " GB";
 }
 
-AboutWindow::AboutWindow() {
+AboutWindow::AboutWindow() : m_credits(tr9("Credits…"), QRect(0, 0, 84, PL_BUTTON_H)) {
 	setAttribute(Qt::WA_DeleteOnClose);
 	setWindowTitle(tr9("About This Computer"));
 	const QString cpu = cpuName();
@@ -1270,7 +1271,14 @@ AboutWindow::AboutWindow() {
 		<< tr9("Virtual Memory:") + "\t" + (swap > 0 ?
 			tr9("%1 allocated on disk").arg(memorySize(swap)) : tr9("None configured"))
 		<< tr9("Available Memory:") + "\t" + memorySize(meminfoKB("MemAvailable"));
-	setFixedSize(620, 120 + m_lines.size() * 28 + 18);
+	const int H = 120 + m_lines.size() * 28 + 18 + 40;
+	setFixedSize(620, H);
+	m_credits.rect.moveTopLeft(QPoint(width() - 20 - m_credits.rect.width(), H - 45));
+	m_credits.hint = tr9("Shows the people who helped make ZacOS 9.");
+	m_credits.clicked = [] {
+		platinumStartApplication(siblingProgram("zacos9-help"), { "zacos9/credits.html" });
+	};
+	m_host.buttons = { &m_credits };
 }
 
 void AboutWindow::paintEvent(QPaintEvent *) {
@@ -1300,8 +1308,24 @@ void AboutWindow::paintEvent(QPaintEvent *) {
 		pl_text(c, value.t, 190, y, C_BLACK);
 		y += 28;
 	}
+	separator(c, 24, W - 25, H - 52);
+	Text thanks(tr9("Thanks to everyone who reported an issue."), 360, PL_FONT_SYSTEM);
+	pl_text(c, thanks.t, 36, H - 31, GRAY(0x3));
+	m_host.paintControls(c, FACE);
 	QPainter p(this);
 	px.blit(p);
+}
+
+void AboutWindow::mousePressEvent(QMouseEvent *e) {
+	m_host.hostPress(e);
+}
+
+void AboutWindow::mouseMoveEvent(QMouseEvent *e) {
+	m_host.hostMove(e);
+}
+
+void AboutWindow::mouseReleaseEvent(QMouseEvent *e) {
+	m_host.hostRelease(e);
 }
 
 void AboutWindow::keyPressEvent(QKeyEvent *e) {

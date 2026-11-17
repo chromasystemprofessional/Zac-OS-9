@@ -3,7 +3,8 @@
 Thanks for helping. This page gets you from a fresh clone to a running desktop
 and a passing test, then explains how changes are made here. For how the
 pieces fit together, read [ARCHITECTURE.md](ARCHITECTURE.md); each part also
-has its own page in [`docs/`](docs/).
+has its own page in [`docs/`](docs/). People who report issues and spread the
+word are credited in [THANKS.md](THANKS.md).
 
 New here? Issues labelled
 [good first issue](https://github.com/chromasystemprofessional/Zac-OS-9/labels/good%20first%20issue)
