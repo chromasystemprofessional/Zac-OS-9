@@ -2286,6 +2286,63 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None, px
 					keys["menu-background"] = "%02x%02x%02x" % rgb
 					return
 
+		def save_layout_rails(lid, layer):
+			"""The document frame's right and bottom rails.
+
+			The active layout draws them as 4 px plut/ppat strips
+			*outside* the content rectangle; the scrollbars sit inside
+			and cover most of the strip, leaving the theme's shadow at
+			the window edge. The old code used the art's full 8 px tile
+			and tiled it in both directions, which turned the strip into
+			a checker. Take the strip's cross-section (one column of the
+			pattern, one pixel per thickness) and repeat it along the
+			edge."""
+			body = (layo or {}).get(lid)
+			if not body:
+				return
+			try:
+				coords, items = decode_layo(body)
+			except (ValueError, IndexError, struct.error):
+				return
+			for vertical, tile_key, key in ((True, "document-right", "frame-right"),
+					(False, "document-bottom", "frame-bottom")):
+				found = None
+				for item in items:
+					if item["type"] not in (b"plut", b"ppat"):
+						continue
+					if item["visible"] != 0 or item["attrs"] & 1:
+						continue
+					top, left, bottom, right = item["rect"]
+					if vertical:
+						if left != -4:
+							continue
+						thickness = layo_coord(right, coords) - layo_coord(left, coords)
+					else:
+						if top != -3:
+							continue
+						thickness = layo_coord(bottom, coords) - layo_coord(top, coords)
+					if 1 <= thickness <= 8:
+						found = (item, thickness)
+						break
+				if not found:
+					continue
+				item, thickness = found
+				rows = resolve_rec(item["type"], item["id"], 0)
+				if not rows or len(rows) < 1 or not rows[0]:
+					continue
+				# The edge pattern's gradient runs across the frame for
+				# a vertical rail (row 0) and down it for a horizontal
+				# one (column 0); repeat that cross-section along the
+				# edge instead of tiling the 8x8 art in both directions.
+				if vertical:
+					cross = rows[0][:thickness]
+					tile = [cross]
+				else:
+					cross = [rows[y][0] for y in range(min(thickness, len(rows)))]
+					tile = [[c] for c in cross]
+				save_tile(tile_key, tile)
+				keys[key] = str(thickness)
+
 		save_menu_bar()
 		save_menu_palette()
 		save_frame_bottom()
@@ -2355,6 +2412,8 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None, px
 				crop_top=right_crop)
 			mids_by_suffix[suffix] = mid_rows
 			save_frame_sides(lid, layer, suffix)
+
+		save_layout_rails(128, 0)
 
 		# Gizmo's real title bar is a three-layer composition selected by
 		# the has-title-text flag (0x80): red/blue field on the left,
