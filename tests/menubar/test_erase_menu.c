@@ -250,6 +250,59 @@ int main(void) {
 	assert(prefs && prefs->enabled && strcmp(prefs->label, "Preferences…") == 0);
 	menus_free(&views);
 
+	/* Edit: Cut, Copy, Paste and Clear drive the Sniffer's Clipboard. */
+	parse_line("state selection=2 window=1 trash=0 view=0 label=-1 erase=0 network=0 unmount=0 "
+		"sort=0 columns=0 custom=0 popup=0 popups=0 documents=0 clipboard=1 cuttable=1");
+	struct mb_bar editing = {0};
+	add_finder_menus(editing.left, &editing.n_left);
+	bool cut = false, copy = false, paste = false, clear = false, selectAll = false;
+	for (int m = 0; m < editing.n_left; m++) {
+		if (!editing.left[m].title || strcmp(editing.left[m].title, "Edit") != 0) {
+			continue;
+		}
+		for (int i = 0; i < editing.left[m].n; i++) {
+			const struct mb_item *it = &editing.left[m].items[i];
+			if (!it->arg) {
+				continue;
+			}
+			if (strcmp(it->arg, "cut") == 0) {
+				cut = it->action == ACT_FINDER && it->enabled && it->key == 'X' &&
+					strcmp(it->label, "Cut") == 0;
+			} else if (strcmp(it->arg, "copy") == 0) {
+				copy = it->action == ACT_FINDER && it->enabled && it->key == 'C' &&
+					strcmp(it->label, "Copy") == 0;
+			} else if (strcmp(it->arg, "paste") == 0) {
+				paste = it->action == ACT_FINDER && it->enabled && it->key == 'V' &&
+					strcmp(it->label, "Paste") == 0;
+			} else if (strcmp(it->arg, "clear") == 0) {
+				clear = it->action == ACT_FINDER && it->enabled && it->key == 0 &&
+					strcmp(it->label, "Clear") == 0;
+			} else if (strcmp(it->arg, "select-all") == 0) {
+				selectAll = it->action == ACT_FINDER && it->enabled;
+			}
+		}
+	}
+	assert(cut && copy && paste && clear && selectAll);
+	menus_free(&editing);
+
+	parse_line("state selection=0 window=0 trash=0 view=0 label=-1 erase=0 network=0 unmount=0 "
+		"sort=0 columns=0 custom=0 popup=0 popups=0 documents=0 clipboard=0 cuttable=0");
+	struct mb_bar no_edit = {0};
+	add_finder_menus(no_edit.left, &no_edit.n_left);
+	for (int m = 0; m < no_edit.n_left; m++) {
+		if (!no_edit.left[m].title || strcmp(no_edit.left[m].title, "Edit") != 0) {
+			continue;
+		}
+		for (int i = 0; i < no_edit.left[m].n; i++) {
+			const struct mb_item *it = &no_edit.left[m].items[i];
+			if (it->arg && (strcmp(it->arg, "cut") == 0 || strcmp(it->arg, "copy") == 0 ||
+					strcmp(it->arg, "paste") == 0 || strcmp(it->arg, "clear") == 0)) {
+				assert(!it->enabled);
+			}
+		}
+	}
+	menus_free(&no_edit);
+
 	/* The folder-path menu: the names, each choosing its place in the list. */
 	assert(!parse_line("pathmenu Extensions\tSystem Folder\tZacintosh HD") &&
 		strcmp(path_names, "Extensions\tSystem Folder\tZacintosh HD") == 0);
@@ -298,6 +351,7 @@ int main(void) {
 		sizeof(puppy_context));
 	assert(strcmp(puppy_context, "New Folder|-|View|-|Close Window|") == 0);
 	assert(!pl_puppy_allows("duplicate") && !pl_puppy_allows("label 2") && pl_puppy_allows("open"));
+	assert(!pl_puppy_allows("clear") && pl_puppy_allows("copy") && pl_puppy_allows("paste"));
 	assert(pl_setting_set("puppy-mode", NULL));
 	assert(pl_puppy_allows("duplicate"));
 	/* Set by an administrator: on whatever the person's own setting says. */

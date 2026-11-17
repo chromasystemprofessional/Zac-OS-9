@@ -56,7 +56,9 @@ public:
  *                         unmount=<0|1 selected local mounted disk>
  *                         sort=<column> columns=<bits> custom=<0|1>
  *                         popup=<0|1> popups=<0|1>
- *                         documents=<0|1 selection has documents to print>"
+ *                         documents=<0|1 selection has documents to print>
+ *                         clipboard=<0|1 the Clipboard holds files Paste can use>
+ *                         cuttable=<0|1 the selection can be cut>"
  *   and before "context <kind>" (a contextual menu, at the pointer):
  *                        "tricks <0|1 a folder to attach to>" then TAB "+name"
  *                         per trick attached, TAB "*name" per trick there is;
@@ -85,9 +87,15 @@ public:
 	 * text, on the Clipboard. Files are the real files; an application
 	 * copies its desktop entry, so Paste is a duplicate, never an alias. */
 	void copySelection();
+	/* Edit > Cut: Copy's items, marked so Paste moves them instead of
+	 * duplicating them. The originals stay until they are pasted. */
+	void cutSelection();
 	/* Edit > Paste: Copy's items duplicated into the front view's real
-	 * folder, as Duplicate does. */
+	 * folder, as Duplicate does; Cut's items moved there. */
 	void paste();
+	/* Edit > Clear: the selected items go to the Trash, as Move To Trash,
+	 * without being put on the Clipboard. */
+	void clearSelection();
 	void openSelection();
 	/* Opens just this item, whatever else is selected: what a double-click
 	 * means, so two icons selected by accident aren't both opened. */

@@ -2107,6 +2107,7 @@ bool finderShortcut(QKeyEvent *e) {
 	case Qt::Key_N: f.newFolder(); return true;
 	case Qt::Key_A: f.command("select-all"); return true;
 	case Qt::Key_C: f.copySelection(); return true;
+	case Qt::Key_X: f.cutSelection(); return true;
 	case Qt::Key_V: f.paste(); return true;
 	case Qt::Key_O: f.openSelection(); return true;
 	case Qt::Key_W:

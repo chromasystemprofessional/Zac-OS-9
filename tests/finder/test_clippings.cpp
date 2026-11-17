@@ -204,6 +204,52 @@ int main(int argc, char **argv) {
 		}
 	}
 
+	// Cut then Paste moves the item; Clear sends it to the Trash.
+	{
+		const QString original = folder + "/Cut me";
+		QFile sourceFile(original);
+		check(sourceFile.open(QIODevice::WriteOnly) && sourceFile.write("cut") == 3,
+			"create a file to cut");
+		sourceFile.close();
+		w->reload();
+		settle();
+		Item *source = itemNamed(w, "Cut me");
+		check(source, "the file to cut appears in the folder");
+		if (source) {
+			const QString destination = home.path() + "/Destination";
+			QDir().mkpath(destination);
+			FolderWindow *target = FolderWindow::open(destination);
+			check(target, "open the destination for the cut");
+			w->selectByName("Cut me");
+			Finder::instance().setFront(w);
+			Finder::instance().command("cut");
+			if (target) {
+				Finder::instance().setFront(target);
+				Finder::instance().command("paste");
+				settle();
+				check(!QFileInfo::exists(original) &&
+					read(destination + "/Cut me") == "cut",
+					"Cut then Paste moves the file instead of duplicating it");
+				target->close();
+				settle();
+			}
+		}
+
+		const QString doomed = folder + "/Clear me";
+		QFile clearFile(doomed);
+		check(clearFile.open(QIODevice::WriteOnly) && clearFile.write("clear") == 5,
+			"create a file to clear");
+		clearFile.close();
+		w->reload();
+		settle();
+		check(itemNamed(w, "Clear me"), "the file to clear appears in the folder");
+		Finder::instance().setFront(w);
+		w->selectByName("Clear me");
+		Finder::instance().command("clear");
+		settle();
+		check(!QFileInfo::exists(doomed), "Clear moves the selected file to the Trash");
+	}
+
 	// Dragged out again, each carries what it holds as well as the file. (The
 	// folder has been read again since: find them afresh.)
 	textItem = itemNamed(w, "Hello there clipping.txt");

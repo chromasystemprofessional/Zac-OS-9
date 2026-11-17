@@ -195,6 +195,8 @@ struct finder_state {
 	int popup;            /* the front window is a pop-up window */
 	int popups;           /* zacos9-wm has pop-up windows */
 	int documents;        /* the selection has documents to print */
+	int clipboard;        /* the Clipboard holds files Paste can use */
+	int cuttable;         /* the selection can be cut (real items, not disks) */
 };
 
 bool finder_connect(void);

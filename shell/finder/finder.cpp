@@ -137,6 +137,9 @@ void Finder::dragEnded() {
 void Finder::start(Desktop *desktop) {
 	m_desktop = desktop;
 	m_front = desktop;
+	/* Edit > Paste follows the Clipboard, whoever filled it. */
+	QObject::connect(QGuiApplication::clipboard(), &QClipboard::dataChanged,
+		[this] { notifyState(); });
 	platinumOnDragSpring([this] { springNow(); });
 	FolderTricks::instance(); /* watches the folders with tricks attached */
 	QLocalServer::removeServer(socketPath());
@@ -233,6 +236,27 @@ static bool isPrintable(const Item *item) {
 	return !item->isVirtual && !item->isDir && item->kind != PL_ICON_PRINTER;
 }
 
+static bool isSpecial(const Item *item);
+
+/* The Clipboard holds real files Paste can use (an application's entry
+ * was copied as its real file, so it counts). */
+static bool clipboardHasFiles() {
+	const QMimeData *mime = QGuiApplication::clipboard()->mimeData();
+	if (!mime) {
+		return false;
+	}
+	for (const QUrl &url : mime->urls()) {
+		if (!url.isLocalFile()) {
+			continue;
+		}
+		const QFileInfo info(url.toLocalFile());
+		if (info.exists() || info.isSymLink()) {
+			return true;
+		}
+	}
+	return false;
+}
+
 QString Finder::stateLine() {
 	FinderView *v = front();
 	int selection = v ? static_cast<int>(v->selectedItems().size()) : 0;
@@ -274,10 +298,16 @@ QString Finder::stateLine() {
 	const bool popup = fw && fw->isPopup();
 	/* Documents File > Print would print, for the contextual menu's Print. */
 	const bool documents = std::any_of(items.begin(), items.end(), isPrintable);
-	return QStringLiteral("state selection=%1 window=%2 trash=%3 view=%4 label=%5 erase=%6 network=%7 unmount=%8 sort=%9 columns=%10 custom=%11 popup=%12 popups=%13 documents=%14")
+	/* Edit > Cut can move real files, not the Finder's own items or disks. */
+	const bool cuttable = std::any_of(items.begin(), items.end(),
+		[](const Item *i) { return !isSpecial(i); });
+	/* Edit > Paste: the Clipboard holds files that are still there. */
+	const bool clipboard = clipboardHasFiles();
+	return QStringLiteral("state selection=%1 window=%2 trash=%3 view=%4 label=%5 erase=%6 network=%7 unmount=%8 sort=%9 columns=%10 custom=%11 popup=%12 popups=%13 documents=%14 clipboard=%15 cuttable=%16")
 		.arg(selection).arg(window ? 1 : 0).arg(full ? 1 : 0).arg(list).arg(label).arg(erase ? 1 : 0)
 		.arg(network ? 1 : 0).arg(unmount ? 1 : 0).arg(sort).arg(columns).arg(custom ? 1 : 0)
-		.arg(popup ? 1 : 0).arg(platinumHasPopupWindows() ? 1 : 0).arg(documents ? 1 : 0);
+		.arg(popup ? 1 : 0).arg(platinumHasPopupWindows() ? 1 : 0).arg(documents ? 1 : 0)
+		.arg(clipboard ? 1 : 0).arg(cuttable ? 1 : 0);
 }
 
 void Finder::notifyState() {
@@ -391,6 +421,14 @@ void Finder::command(const QString &name) {
 		closeWindow();
 	} else if (name == "move-to-trash") {
 		moveSelectionToTrash();
+	} else if (name == "cut") {
+		cutSelection();
+	} else if (name == "copy") {
+		copySelection();
+	} else if (name == "paste") {
+		paste();
+	} else if (name == "clear") {
+		clearSelection();
 	} else if (name == "empty-trash" || name == "empty-trash-option") {
 		emptyTrash(name == "empty-trash-option");
 	} else if (name == "erase-disk") {
@@ -924,20 +962,28 @@ void Finder::openSelection() {
 
 static bool isSpecial(const Item *item);
 
-void Finder::copySelection() {
-	FinderView *view = front();
-	if (!view) {
-		return;
-	}
+/* Cut leaves a marker with the copied files: Paste moves those instead of
+ * duplicating them. The GNOME form is written too, so a Cut made in
+ * another file manager is understood, and ours elsewhere. */
+static const char CUT_FILES_MIME[] = "application/x-zacos9-cut-files";
+static const char GNOME_COPIED_FILES_MIME[] = "x-special/gnome-copied-files";
+
+/* Copy's items go on the Clipboard, their names as text too. A Cut marks
+ * them for moving; the originals stay where they are until Paste. */
+static void putSelectionOnClipboard(FinderView *view, bool cut) {
 	QStringList names, paths;
 	for (Item *item : view->selectedItems()) {
-		names << item->visibleName();
+		const QString name = item->visibleName();
 		QString path;
 		if (item->isVirtual) {
 			/* An application copies its desktop entry, and a folder
 			 * standing for a real one copies that folder: a duplicate,
 			 * never an alias. A Flatpak export is a link to the entry;
-			 * copy what it points at. */
+			 * copy what it points at. The Finder's own items have no
+			 * file Cut could move. */
+			if (cut) {
+				continue;
+			}
 			path = vfsRealCounterpart(item->path);
 			const QString resolved = QFileInfo(path).canonicalFilePath();
 			if (!resolved.isEmpty()) {
@@ -946,9 +992,14 @@ void Finder::copySelection() {
 		} else if (!isSpecial(item)) {
 			path = item->path;
 		}
-		if (!path.isEmpty() && !paths.contains(path)) {
-			paths << path;
+		if (!path.isEmpty()) {
+			if (!paths.contains(path)) {
+				paths << path;
+			}
+		} else if (cut) {
+			continue;
 		}
+		names << name;
 	}
 	if (names.isEmpty()) {
 		return;
@@ -962,12 +1013,35 @@ void Finder::copySelection() {
 		mime->setUrls(urls);
 	}
 	mime->setText(names.join('\n'));
+	/* The standard "cut" or "copy" line, then one URL per line. */
+	QByteArray list = cut ? "cut\n" : "copy\n";
+	for (const QUrl &url : urls) {
+		list += url.toEncoded() + '\n';
+	}
+	mime->setData(GNOME_COPIED_FILES_MIME, list);
+	if (cut) {
+		mime->setData(CUT_FILES_MIME, QByteArray());
+	}
 	QGuiApplication::clipboard()->setMimeData(mime);
+}
+
+void Finder::copySelection() {
+	if (FinderView *view = front()) {
+		putSelectionOnClipboard(view, false);
+	}
+}
+
+void Finder::cutSelection() {
+	if (FinderView *view = front()) {
+		putSelectionOnClipboard(view, true);
+	}
 }
 
 /* Copy then Paste is Duplicate: the copied files, folders and aliases go
  * into the front view's folder with the Finder's "copy" names beside an
- * original of the same name. Unlike Make Alias, nothing here links. */
+ * original of the same name. Unlike Make Alias, nothing here links. Cut
+ * then Paste moves instead (within a disk; to another disk it copies, as
+ * the Sniffer's drags do). */
 void Finder::paste() {
 	FinderView *view = front();
 	if (!view) {
@@ -976,6 +1050,9 @@ void Finder::paste() {
 	const QString destination = view->folderPath();
 	const QMimeData *mime = QGuiApplication::clipboard()->mimeData();
 	const QList<QUrl> urls = mime ? mime->urls() : QList<QUrl>();
+	const bool move = mime && (mime->hasFormat(CUT_FILES_MIME) ||
+		(mime->hasFormat(GNOME_COPIED_FILES_MIME) &&
+			mime->data(GNOME_COPIED_FILES_MIME).startsWith("cut")));
 	QStringList paths;
 	for (const QUrl &url : urls) {
 		if (!url.isLocalFile()) {
@@ -1021,9 +1098,14 @@ void Finder::paste() {
 		pl_beep();
 		return;
 	}
-	for (const QString &folder : transferItems(paths, destination, true)) {
+	for (const QString &folder : transferItems(paths, destination, !move)) {
 		folderChanged(folder);
 	}
+}
+
+/* Edit > Clear: the same as Move To Trash, without the Clipboard. */
+void Finder::clearSelection() {
+	moveSelectionToTrash();
 }
 
 static QString classicLauncher() {

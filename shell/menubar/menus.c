@@ -149,6 +149,26 @@ static void puppy_trim(struct mb_menu *m) {
 	m->n = out;
 }
 
+/* The Sniffer's Edit menu: its Clipboard holds files, so these commands go
+ * to the Finder instead of being typed into the front app. Undo is left to
+ * programs; the Sniffer has none. */
+static void add_finder_edit_menu(struct mb_menu *menus, int *n, const struct finder_state *fs) {
+	struct mb_menu *m = new_menu(menus, n, _("Edit"));
+	const bool up = fs->connected;
+	const bool sel = up && fs->selection > 0;
+	add(m, _("Undo"), 'Z', false, ACT_EDIT_COMMAND, NULL);
+	sep(m);
+	add(m, _("Cut"), 'X', up && fs->cuttable, ACT_FINDER, "cut");
+	add(m, _("Copy"), 'C', sel, ACT_FINDER, "copy");
+	add(m, _("Paste"), 'V', up && fs->clipboard, ACT_FINDER, "paste");
+	add(m, _("Clear"), 0, sel, ACT_FINDER, "clear");
+	add(m, _("Select All"), 'A', up, ACT_FINDER, "select-all");
+	sep(m);
+	add(m, _("Show Clipboard"), 0, up, ACT_FINDER, "show-clipboard");
+	sep(m);
+	add(m, _("Preferences…"), 0, up, ACT_FINDER, "preferences");
+}
+
 static void add_finder_menus(struct mb_menu *menus, int *n) {
 	finder_connect();
 	const struct finder_state *fs = finder_state();
@@ -185,17 +205,8 @@ static void add_finder_menus(struct mb_menu *menus, int *n) {
 	add(m, _("Page Setup…"), 0, up, ACT_FINDER, "page-setup");
 	add(m, up && fs->window ? _("Print Window…") : _("Print Desktop…"), 0, up, ACT_FINDER,
 		"print-window");
-	/* Sniffer has no undoable edits or clipboard yet; it can select. */
-	add_edit_menu(menus, n, false);
-	struct mb_menu *edit = &menus[*n - 1];
-	struct mb_item *select_all = &edit->items[edit->n - 1];
-	select_all->enabled = up;
-	select_all->action = ACT_FINDER;
-	select_all->arg = strdup("select-all");
-	sep(edit);
-	add(edit, _("Show Clipboard"), 0, up, ACT_FINDER, "show-clipboard");
-	sep(edit);
-	add(edit, _("Preferences…"), 0, up, ACT_FINDER, "preferences");
+	/* The Sniffer's Clipboard holds files; its Edit menu drives it. */
+	add_finder_edit_menu(menus, n, fs);
 	m = new_menu(menus, n, _("View"));
 	const bool win = up && fs->window;
 	struct mb_item *icons = add(m, _("as Icons"), 0, win, ACT_FINDER, "view-icons");

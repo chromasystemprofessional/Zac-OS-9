@@ -88,12 +88,16 @@ the folder's own items. **File > Make Alias** in one of those windows puts the
 alias there; dragging or pasting an alias in does the same. Deleting the alias
 removes only the link, never the application or system item.
 
-**Edit > Copy** puts the selected items on the Clipboard (their names as text
-too), and **Edit > Paste** duplicates them into the front window or Desktop,
-named "copy", "copy 2" and so on beside an original. Files, folders and
-aliases are copied as they are; an application's desktop entry is copied as a
-real launcher, never turned into an alias. In the read-only folders only an
-alias can be pasted.
+**Edit > Cut** puts the selected items on the Clipboard marked to move, and
+**Edit > Paste** moves them into the front window or Desktop (to another disk
+it copies, as dragging does). **Edit > Copy**
+puts them on the Clipboard to duplicate instead, and Paste names the copies
+"copy", "copy 2" and so on beside an original. **Edit > Clear** moves the
+selection to the Trash without putting it on the Clipboard. Their names go on
+the Clipboard as text too. Files, folders and aliases are copied as they are;
+an application's desktop entry is copied as a real launcher, never turned into
+an alias. A disk or one of the Finder's own items can't be cut; in the
+read-only folders only an alias can be pasted.
 
 As in Mac OS 9, a disk's desktop icon is dimmed while its folder window is
 open, and comes back to full strength when the window closes.

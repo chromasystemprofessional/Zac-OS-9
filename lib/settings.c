@@ -767,7 +767,7 @@ bool pl_puppy_allows(const char *command) {
 	 * New Folder, Open, Close Window, Put Away, Find, the views, Clean Up,
 	 * Arrange, Empty Trash, Eject and Log Out stay. */
 	static const char *const hidden[] = {
-		"duplicate", "make-alias", "get-info", "get-info-sharing", "move-to-trash", "encrypt",
+		"duplicate", "make-alias", "get-info", "get-info-sharing", "move-to-trash", "clear", "encrypt",
 		"decrypt", "print", "print-window", "page-setup", "add-to-favorites", "search-internet",
 		"find-similar", "index-selection", "show-original", "erase-disk",
 		"show-hidden-applications", "view-window", "view-popup", "view-options", "reset-columns",
