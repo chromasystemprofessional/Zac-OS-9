@@ -242,7 +242,8 @@ PICT, pattern and sound resources (`macpict.py`, `macpat.py`, `macsnd.py`); `--l
 colours. Window metrics that the layout supplies (document
 frame-left/right/bottom, title-bar control size and black rails,
 scrollbar state) are applied from the theme; other geometry stays
-ZacOS's.
+ZacOS's. A frame rail may be a `pxm#` picture (iBook's 14 px bottom) or
+a `plut`/`ppat` strip; both become the window edge skin.
 
 To install: put your Mac OS 9 System Folder in `~/Classic` (Old Dog), pick the
 look in Mac OS 9's Appearance control panel, then copy the theme file out of

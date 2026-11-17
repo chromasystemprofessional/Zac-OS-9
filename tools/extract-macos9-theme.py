@@ -2335,7 +2335,7 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None, px
 					(False, "document-bottom", "frame-bottom", -3)):
 				found = None
 				for item in items:
-					if item["type"] not in (b"plut", b"ppat"):
+					if item["type"] not in (b"plut", b"ppat", b"pxm#"):
 						continue
 					if item["visible"] != 0 or item["attrs"] & 1:
 						continue
@@ -2348,7 +2348,7 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None, px
 						if top != -3:
 							continue
 						thickness = layo_coord(bottom, coords) - layo_coord(top, coords)
-					if 1 <= thickness <= 8:
+					if 1 <= thickness <= (8 if vertical else 32):
 						found = (item, thickness)
 						break
 				if not found:
@@ -2356,6 +2356,20 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None, px
 				item, thickness = found
 				rows = resolve_rec(item["type"], item["id"], 0)
 				if not rows or len(rows) < 1 or not rows[0]:
+					continue
+				if item["type"] == b"pxm#":
+					# A frame rail can be a pxm# picture (iBook's and
+					# Drawing Board's 6181 bottom rail), not only a
+					# plut/ppat strip. The picture already has the rail's
+					# width/height; crop it to the layout's thickness.
+					if vertical:
+						rows = [row[:thickness] for row in rows]
+					else:
+						rows = rows[:thickness]
+						while len(rows) < thickness:
+							rows.append(list(rows[-1]))
+					save_tile(tile_key, rows)
+					keys[key] = str(thickness)
 					continue
 				# The edge pattern's gradient runs across the frame for
 				# a vertical rail (row 0) and down it for a horizontal

@@ -1263,6 +1263,22 @@ def test_frame_left_rail():
     print("ok    a themed window's left frame rail is extracted like its right")
 
 
+def test_frame_pxm_bottom_rail():
+    # iBook and Drawing Board draw the bottom rail as one pxm# picture
+    # (6181), 14 px tall, not as a plut/ppat strip. It must fill the
+    # window bottom instead of leaving it transparent.
+    pxm = {6181: [_pxm_edged(20, 14)]}
+    coords = [(0, 36, 0, 0, 0, 0)]
+    layo = {128: _layo_resource(coords, [
+        (0, 0, 0, (-3, -2, 1, -4), b"pxm#", 6181, 1, 0),
+    ])}
+    out = tempfile.mkdtemp() + "/theme"
+    keys = tool.write_theme_chrome("Bottom", pxm, [], out, [], layo)
+    assert keys.get("frame-bottom") == "14", keys
+    assert _png_size(os.path.join(out, "chrome", "document-bottom.png")) == (20, 14)
+    print("ok    a pxm# bottom rail fills the themed window's bottom")
+
+
 def test_bar_tiles_fit_window():
     # Paper's middle is a 32-row pattern for a 22-row bar, and Slate
     # Board's caps carry transparent columns: the saved bar must be the
@@ -1556,6 +1572,7 @@ test_theme_chrome_twopart()
 test_bar_tiles_align()
 test_bar_tiles_fit_window()
 test_frame_left_rail()
+test_frame_pxm_bottom_rail()
 
 
 def test_theme_chrome_reordered_layout():
