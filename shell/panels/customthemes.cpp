@@ -1293,6 +1293,9 @@ bool saveAppearanceTheme(const QString &name, QString *error) {
 	values.insert("background", setting("background").isEmpty() ? "pattern" : setting("background"));
 	values.insert("wallpaper-mode", setting("wallpaper-mode").isEmpty() ? "fit" : setting("wallpaper-mode"));
 	values.insert("sound-theme", setting("sound-theme").isEmpty() ? "none" : setting("sound-theme"));
+	/* Keep the theme file/art the settings were saved against. Without
+	 * this every saved theme falls back to Silver Coat and its icons. */
+	values.insert("theme-bundle", setting("theme-bundle"));
 	const QString filename = QString::fromLatin1(QCryptographicHash::hash(
 		name.toUtf8(), QCryptographicHash::Sha256).toHex().left(24)) + ".json";
 	const QString path = appearanceThemesFolder() + "/" + filename;

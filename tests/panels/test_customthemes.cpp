@@ -1,4 +1,5 @@
 #include <QApplication>
+#include <QCryptographicHash>
 #include <QDateTime>
 #include <QDir>
 #include <QElapsedTimer>
@@ -290,6 +291,7 @@ int main(int argc, char **argv) {
 	assert(!QFile::exists(root.path() + "/played"));
 	assert(applySoundTheme(2, &error));
 	assert(pl_setting_set("highlight", "FFCC66"));
+	assert(pl_setting_set("theme-bundle", nullptr));
 	assert(saveAppearanceTheme("My Settings", &error));
 	assert(waitFor([] { return appearanceThemeCount() == 2; }));
 	assert(!saveAppearanceTheme("My Settings", &error));
@@ -321,6 +323,24 @@ int main(int argc, char **argv) {
 	assert(applySoundTheme(2, &error));
 	assert(QFile::remove(appearanceThemesFolder() + "/bundled.json"));
 	assert(waitFor([] { return appearanceThemeCount() == 2; }));
+	/* A theme saved with a base bundle keeps that bundle: applying it
+	 * must not fall back to Silver Coat and its icons. */
+	assert(pl_setting_set("theme-bundle", "Paper"));
+	assert(saveAppearanceTheme("Paper Saved", &error));
+	assert(waitFor([] { return appearanceThemeCount() == 3; }));
+	int paperSaved = -1;
+	for (int i = 0; i < appearanceThemeCount(); ++i) {
+		if (appearanceThemeName(i) == "Paper Saved") {
+			paperSaved = i;
+		}
+	}
+	assert(paperSaved >= 0 && applyAppearanceTheme(paperSaved, &error));
+	assert(preference("theme-bundle") == "Paper");
+	const QString paperFile = QCryptographicHash::hash(
+		"Paper Saved", QCryptographicHash::Sha256).toHex().left(24) + ".json";
+	assert(QFile::remove(appearanceThemesFolder() + "/" + paperFile));
+	assert(waitFor([] { return appearanceThemeCount() == 2; }));
+	assert(applyAppearanceTheme(0, &error));
 	/* A preset without a program font drops the previous one; one naming
 	 * a missing font still applies, without the font and with a note. */
 	assert(pl_setting_set("font-family", "Stale Font"));
