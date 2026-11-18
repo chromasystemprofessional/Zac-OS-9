@@ -375,6 +375,23 @@ busy_client = executable('test-busy-client',
   dependencies: [shell_common_dep, qt6, wayland_client],
   build_by_default: false,
 )
+# A program's window keeps the size it asks for (issue #184).
+test('window-size', find_program('python3'),
+  args: [files('../tests/compositor/test_window_size.py'), compositor_exe, idle_client],
+  depends: [compositor_exe],
+  timeout: 60,
+)
+# The person's ~/.Xresources reach X11 programs (issue #184).
+xresources_client = executable('test-xresources-client',
+  '../tests/compositor/xresources_client.c',
+  dependencies: xcb,
+  build_by_default: false,
+)
+test('xresources', find_program('python3'),
+  args: [files('../tests/compositor/test_xresources.py'), compositor_exe, xresources_client],
+  depends: [compositor_exe],
+  timeout: 60,
+)
 test('busy-cursor-protocols', find_program('python3'),
   args: [files('../tests/compositor/test_busy_cursor.py'), compositor_exe, busy_client, vptr_exe,
     meson.project_source_root() / 'tools/cursors/build_cursors.py',

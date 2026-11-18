@@ -28,7 +28,7 @@ not, open an issue and I will remove it.
 Every report below led to a fix, a better decision or a feature that is still
 being built. Thank you for taking the time to write them down.
 
-- **Irontooth1** — 13 reports:
+- **Irontooth1** — 14 reports:
   [#156](https://github.com/chromasystemprofessional/Zac-OS-9/issues/156),
   [#157](https://github.com/chromasystemprofessional/Zac-OS-9/issues/157),
   [#163](https://github.com/chromasystemprofessional/Zac-OS-9/issues/163),
@@ -40,9 +40,10 @@ being built. Thank you for taking the time to write them down.
   [#173](https://github.com/chromasystemprofessional/Zac-OS-9/issues/173),
   [#179](https://github.com/chromasystemprofessional/Zac-OS-9/issues/179),
   [#181](https://github.com/chromasystemprofessional/Zac-OS-9/issues/181),
-  [#182](https://github.com/chromasystemprofessional/Zac-OS-9/issues/182) and
-  [#183](https://github.com/chromasystemprofessional/Zac-OS-9/issues/183).
-  The last three became ZacOS 9 1.18.11; #171 and #173 are the Drawing Board
+  [#182](https://github.com/chromasystemprofessional/Zac-OS-9/issues/182),
+  [#183](https://github.com/chromasystemprofessional/Zac-OS-9/issues/183) and
+  [#184](https://github.com/chromasystemprofessional/Zac-OS-9/issues/184).
+  #181 to #183 became ZacOS 9 1.18.11; #171 and #173 are the Drawing Board
   theme reports that pushed the theme renderer forward.
 - **shiroankuroan** —
   [#136](https://github.com/chromasystemprofessional/Zac-OS-9/issues/136),

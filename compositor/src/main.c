@@ -381,7 +381,6 @@ int main(int argc, char *argv[]) {
 	prefs_init(&server);
 	lock_init(&server);
 	idle_init(&server);
-	xwayland_init(&server);
 	xwayland_output_init(&server);
 
 	const char *socket = wl_display_add_socket_auto(server.display);
@@ -398,6 +397,9 @@ int main(int argc, char *argv[]) {
 	}
 
 	setenv("WAYLAND_DISPLAY", socket, true);
+	/* After the socket and Xwayland's output global: Xwayland's own Wayland
+	 * client needs both (xwayland.c). */
+	xwayland_init(&server);
 	/* The shutdown helper asks this process to leave; see quit_signal. */
 	write_quit_pid();
 	struct wl_event_loop *loop = wl_display_get_event_loop(server.display);

@@ -21,9 +21,10 @@ from zacos9test import wait_for
 compositor, client, vptr, close_app_client = (str(Path(a).resolve()) for a in sys.argv[1:5])
 GREEN = (0x00, 0xAA, 0x00)
 # Other programs' windows open at the same place on a 1280 x 720 screen with
-# no menu bar: the frame's top-left is (97, 32); its boxes sit on the title
-# bar's row, y = 42.
-CLOSE, COLLAPSE, TITLE = (106, 42), (1172, 42), (640, 42)
+# no menu bar: the frame's top-left is (96, 32). The idle client asks for
+# 320 x 200, so its frame is 332 wide; its boxes sit on the title bar's row,
+# y = 42.
+CLOSE, COLLAPSE, TITLE = (106, 42), (417, 42), (262, 42)
 
 
 with tempfile.TemporaryDirectory(prefix="zacos9-tricks-") as directory:
@@ -111,21 +112,27 @@ with tempfile.TemporaryDirectory(prefix="zacos9-tricks-") as directory:
             vp("home", "move", *map(str, TITLE), "down", "move", "0", "250", "up", "wait", "500")
             dy = 250
 
-            # ⌘-drag Alpha's front window, behind Bravo: it moves (its title bar
-            # now crosses Alpha's other window), and Bravo keeps the keyboard.
-            before = green()
+            # ⌘-drag Alpha's front window, behind Bravo: it moves without coming
+            # forward (Bravo keeps the keyboard).
+            def parked():
+                vp("home", "move", "1270", "710", "wait", "300")
+                return pixels()
+
+            before = parked()
             vp("home", "move", *map(str, TITLE), "hold", "command", "down", "move", "0", "100",
                "up", "release", "command", "wait", "500")
-            assert green() < before, "the window behind moved"
+            after = parked()
+            assert sum(a != b for a, b in zip(before, after)) > 1000, \
+                "the window behind moved"
             vp("type", "k")
             wait_for("Bravo, still in front, to get the key", lambda: "key k" in b_keys)
             assert "key k" not in a2_keys, "and not the window moved behind it"
             # The same move gesture works from the window's border, not just
             # its title bar. Alpha is now 100 px below its original position.
-            before = pixels()
+            before = parked()
             vp("home", "move", "99", "232", "hold", "command", "down", "move", "100", "0",
                "up", "release", "command", "wait", "500")
-            after = pixels()
+            after = parked()
             assert sum(a != b for a, b in zip(before, after)) > 1000, \
                 "the window behind moves when dragged by its edge"
             vp("type", "e")

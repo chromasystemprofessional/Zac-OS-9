@@ -39,11 +39,12 @@ top-left. Position that tree directly at the decoration margins; subtracting
 the geometry offset again pulls content into the frame. Fullscreen uses a
 zero inset. Movable-modal dialogs use margins **3/3/24/3** instead.
 
-New main windows from other programs open nearly full-screen: the frame sits
-96 px in from the left and right of the area below the menu bar and 32 px in
-from its top and bottom, so the desktop icon column stays visible. Client
-size limits still apply. Finder windows, dialogs, windows with a parent,
-fixed-size windows and fullscreen requests keep their own size and placement.
+New main windows from other programs open inside the desktop's strip: their
+top-left corner sits 96 px in from the left of the area below the menu bar
+and 32 px in from its top, so the desktop icon column stays visible. Each
+program keeps the size it chooses (its own default, its saved size or its
+preferences). Finder windows, dialogs, windows with a parent, fixed-size
+windows and fullscreen requests keep their own placement as well.
 
 ```
 row/col                       active                         inactive

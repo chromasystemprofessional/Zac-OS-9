@@ -22,8 +22,8 @@ works for it:
   double-clicked in the Finder open here; `share/xdg/zacos9-mimeapps.list`
   makes it the default for image types. A user's own `~/.config/mimeapps.list`
   still wins. It opens a picture fitted to the screen (never enlarged), sizes
-  its window to the picture (zacos9-wm exempts it from the near-full-screen
-  default frame), and zooms in fixed steps from 1/16 to 16× with the bar's
+  its window to the picture (zacos9-wm leaves its place and size to it),
+  and zooms in fixed steps from 1/16 to 16× with the bar's
   − / + buttons, ⌘+ / ⌘−, ⌘0, ⌘9 or ⌘-scroll. Drag to pan.
 - **Standard application file chooser**: the session selects the ZacOS
   `FileChooser` portal for GTK and Qt standard dialogs. Its first screen lists
@@ -294,6 +294,15 @@ when it runs **under X11**. On Wayland it never does, on any desktop. So:
   At 1.25x, 1.5x and 1.75x every X11 window, Electron apps included, has
   scale 1 and is enlarged (a little soft): the scaled path is whole-number
   only. X11 has one scale for every screen: the main display's.
+- **Programs keep the size they ask for, and X11 users their resources**
+  (`compositor/src/view.c`, `xwayland.c`). A new main window opens inside the
+  desktop strip (96 px in from the left, 32 px from the top), at the size its
+  program chooses: its own default, its saved size or its preferences.
+  Xwayland's root resource manager carries `~/.Xresources` for X11 programs
+  (XTerm's colours and geometry), followed by the compositor's own Xcursor
+  and `Xft.dpi: 96` entries, which win (issue #33). Xwayland starts with the
+  session when that file exists, so the first X11 program sees it too.
+  Tests: `window-size`, `xresources`.
 - **Each screen its own scale** (Monitors' Pixel size applies to the
   selected display: `display.NAME.scale` in `desktop.conf`, else `scale` on
   the main screen — the panel writes `scale` alone while it shows one

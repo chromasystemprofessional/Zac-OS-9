@@ -19,8 +19,8 @@ if not shutil.which("grim") or not shutil.which("Xwayland"):
     sys.exit(77)
 
 compositor, client, pointer, builder, source = map(lambda arg: Path(arg).resolve(), sys.argv[1:6])
-# Inside the probe window, which opens near full-screen past the desktop strip.
-AT = 300
+# Inside the probe window (320 x 220), which opens inside the desktop strip.
+AT = 250
 spec = importlib.util.spec_from_file_location("cursors", builder)
 cursors = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(cursors)

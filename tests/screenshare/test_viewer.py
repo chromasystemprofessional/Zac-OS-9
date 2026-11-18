@@ -187,12 +187,18 @@ with tempfile.TemporaryDirectory(prefix="zacos9-viewer-") as directory:
         # Use My Desktop: the host's screen in a window, the guest's own around it.
         subprocess.run([vptr, "move", str(BAR_X + 66 - middle), "16", "click", "wait", "500"], env=guest_env,
                        check=True, timeout=20)
+        host_green = sum(1 for y in range(0, hh, 2) for x in range(0, hw, 2)
+                         if at(host, hw, x, y) == GREEN)
 
         def windowed():
             gw, gh, guest = shot(guest_env, top / "guest")
-            differ = sum(1 for y in range(0, hh, 8) for x in range(0, hw, 8)
-                         if at(guest, gw, x, y) != at(host, hw, x, y))
-            return differ > (hw // 8) * (hh // 8) // 5
+            if (gw, gh) != (hw, hh):
+                return False
+            # The host screen is fitted into a window here, so the green
+            # test window shrinks; full screen shows it pixel for pixel.
+            guest_green = sum(1 for y in range(0, gh, 2) for x in range(0, gw, 2)
+                              if at(guest, gw, x, y) == GREEN)
+            return 0 < guest_green < host_green * 3 // 4
         try:
             wait_for("a window", windowed, 10)
             check(True, "Use My Desktop puts the host's screen in a window")

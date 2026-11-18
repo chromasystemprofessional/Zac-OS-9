@@ -1,3 +1,4 @@
+#include <limits.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -212,12 +213,12 @@ static void handle_map(struct wl_listener *listener, void *data) {
 	view_set_title(view, view->xsurface->title);
 	view_set_app_id(view, view->xsurface->class);
 	view_place_new(view);
-	struct wlr_box frame;
-	int width, height;
+	/* Its own size, which X11 programs set on their window and in their
+	 * size hints (issue #184); only the place is ours. */
+	int x, y;
 	if (!view->xsurface->fullscreen && !view->xsurface->modal &&
-			view_default_frame(view, view->xsurface->class, &frame, &width, &height)) {
-		view_move_to(view, frame.x, frame.y);
-		xw_set_size(view, width, height);
+			view_default_place(view, view->xsurface->class, &x, &y)) {
+		view_move_to(view, x, y);
 	}
 	view_handle_map(view);
 	if (view->xsurface->fullscreen) {
@@ -577,6 +578,74 @@ static void server_new_xwayland_surface(struct wl_listener *listener, void *data
 	}
 }
 
+/* The person's own X resources: XTerm's colours and geometry, for one, come
+ * from ~/.Xresources. No other part of the session loads it, so put it in
+ * the root window's resource manager as Xwayland starts (issue #184). Our
+ * cursor theme and Xft.dpi follow it in the property, so they win: an
+ * Xft.dpi left from another desktop would scale X11 programs twice
+ * (issue #33). */
+static bool xresources_path(char *path, size_t size) {
+	const char *home = getenv("HOME");
+	if (!home || !*home) {
+		return false;
+	}
+	int length = snprintf(path, size, "%s/.Xresources", home);
+	return length > 0 && (size_t)length < size;
+}
+
+static bool have_user_xresources(void) {
+	char path[PATH_MAX];
+	if (!xresources_path(path, sizeof(path))) {
+		return false;
+	}
+	FILE *file = fopen(path, "r");
+	if (!file) {
+		return false;
+	}
+	fclose(file);
+	return true;
+}
+
+static char *user_xresources(size_t *length) {
+	char path[PATH_MAX];
+	if (!xresources_path(path, sizeof(path))) {
+		return NULL;
+	}
+	FILE *file = fopen(path, "r");
+	if (!file) {
+		return NULL;
+	}
+	if (fseek(file, 0, SEEK_END) != 0) {
+		fclose(file);
+		return NULL;
+	}
+	long size = ftell(file);
+	if (size <= 0 || size > 64 * 1024) {
+		fclose(file);
+		return NULL;
+	}
+	rewind(file);
+	char *text = malloc((size_t)size + 2);
+	if (!text) {
+		fclose(file);
+		return NULL;
+	}
+	size_t read = fread(text, 1, (size_t)size, file);
+	fclose(file);
+	if (read == 0) {
+		free(text);
+		return NULL;
+	}
+	if (text[read - 1] != '\n') {
+		text[read++] = '\n';
+	}
+	text[read] = '\0';
+	*length = read;
+	return text;
+}
+
+static bool xwayland_started;
+
 static void xwayland_ready(struct wl_listener *listener, void *data) {
 	struct plat_server *server = wl_container_of(listener, server, xwayland_ready);
 	wlr_xwayland_set_seat(server->xwayland, server->seat);
@@ -593,7 +662,7 @@ static void xwayland_ready(struct wl_listener *listener, void *data) {
 		xcb_disconnect(connection);
 	} else {
 		xcb_screen_t *screen = xcb_setup_roots_iterator(xcb_get_setup(connection)).data;
-		char resources[128];
+		char defaults[160];
 		char theme[64];
 		snprintf(theme, sizeof(theme), "%s", ZACOS9_CURSOR_THEME);
 		{
@@ -603,18 +672,32 @@ static void xwayland_ready(struct wl_listener *listener, void *data) {
 				snprintf(theme, sizeof(theme), "%s", bundle_theme);
 			}
 		}
-		int length = snprintf(resources, sizeof(resources),
+		int defaults_length = snprintf(defaults, sizeof(defaults),
 			"Xcursor.theme: %s\nXcursor.size: %d\nXft.dpi: 96\n",
 			theme, ZACOS9_CURSOR_SIZE);
-		xcb_void_cookie_t cookie = xcb_change_property_checked(connection,
-			XCB_PROP_MODE_REPLACE, screen->root, XCB_ATOM_RESOURCE_MANAGER,
-			XCB_ATOM_STRING, 8, length, resources);
-		xcb_generic_error_t *error = xcb_request_check(connection, cookie);
-		if (error) {
-			wlr_log(WLR_ERROR, "Could not set Xwayland cursor resources (X11 error %u)",
-				error->error_code);
-			free(error);
+		size_t user_length = 0;
+		char *user = user_xresources(&user_length);
+		if (defaults_length > 0 && (size_t)defaults_length < sizeof(defaults)) {
+			size_t length = user_length + (size_t)defaults_length;
+			char *resources = malloc(length);
+			if (!resources) {
+				wlr_log(WLR_ERROR, "Could not set Xwayland resources: out of memory");
+			} else {
+				memcpy(resources, user ? user : "", user_length);
+				memcpy(resources + user_length, defaults, (size_t)defaults_length);
+				xcb_void_cookie_t cookie = xcb_change_property_checked(connection,
+					XCB_PROP_MODE_REPLACE, screen->root, XCB_ATOM_RESOURCE_MANAGER,
+					XCB_ATOM_STRING, 8, (uint32_t)length, resources);
+				xcb_generic_error_t *error = xcb_request_check(connection, cookie);
+				if (error) {
+					wlr_log(WLR_ERROR, "Could not set Xwayland resources (X11 error %u)",
+						error->error_code);
+					free(error);
+				}
+				free(resources);
+			}
 		}
+		free(user);
 		xcb_disconnect(connection);
 	}
 
@@ -626,11 +709,17 @@ static void xwayland_ready(struct wl_listener *listener, void *data) {
 		wlr_xwayland_set_cursor(server->xwayland, img->buffer, img->width * 4,
 			img->width, img->height, img->hotspot_x, img->hotspot_y);
 	}
+	xwayland_started = true;
 }
 
 void xwayland_init(struct plat_server *server) {
-	/* Lazy: Xwayland starts when the first X11 client connects. */
-	server->xwayland = wlr_xwayland_create(server->display, server->compositor, true);
+	/* Lazy: Xwayland starts when the first X11 client connects. With
+	 * ~/.Xresources it starts now instead: Xwayland is otherwise still
+	 * starting when the program that connected reads the root window's
+	 * resources, and the person's colours and geometry would be missing
+	 * (issue #184). */
+	server->xwayland = wlr_xwayland_create(server->display, server->compositor,
+		!have_user_xresources());
 	if (!server->xwayland) {
 		wlr_log(WLR_ERROR, "Xwayland unavailable; X11 apps will not run");
 		return;
@@ -640,4 +729,20 @@ void xwayland_init(struct plat_server *server) {
 	server->new_xwayland_surface.notify = server_new_xwayland_surface;
 	wl_signal_add(&server->xwayland->events.new_surface, &server->new_xwayland_surface);
 	setenv("DISPLAY", server->xwayland->display_name, true);
+
+	if (!have_user_xresources()) {
+		return;
+	}
+	/* Let xwayland_ready put ~/.Xresources in the root window before the
+	 * session starts anything: a program that connects earlier would read
+	 * an empty resource manager (issue #184). Flush the compositor's replies
+	 * to Xwayland's own Wayland client, or its start waits for this loop. */
+	struct wl_event_loop *loop = wl_display_get_event_loop(server->display);
+	for (int wait = 0; wait < 300 && !xwayland_started; wait++) {
+		wl_event_loop_dispatch(loop, 10);
+		wl_display_flush_clients(server->display);
+	}
+	if (!xwayland_started) {
+		wlr_log(WLR_ERROR, "Xwayland did not start; X11 resources are not set");
+	}
 }
