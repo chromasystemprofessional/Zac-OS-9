@@ -1,0 +1,13 @@
+ZacOS 9 1.18.17 fixes Aqua's title bar and scrollbars.
+
+Imported title bars now choose their pieces by name, not by record
+order: a named left corner is the left cap, a named right tab is the
+right cap, and the widest full-height record fills the bar. Aqua's
+repeating endcap is gone.
+
+Scrollbars use the theme's own track recipe and named thumb caps and
+stretch. Aqua's 14 px thumb art is centred in the 16 px bar instead of
+being stretched, and its top and bottom caps no longer collapse into a
+blob.
+
+Re-import the affected theme after updating so its bundle is rebuilt.

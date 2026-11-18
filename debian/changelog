@@ -1,3 +1,19 @@
+zacos9 (1.18.17) trixie; urgency=medium
+
+  * Aqua and other Appearance themes choose their title-bar pieces by
+    role: a named left corner is the left cap, a named right tab is the
+    right cap, and the widest full-height record is the fill. A short
+    tiled pattern repeats to the title row instead of stretching, so
+    Aqua's repeating endcap is gone.
+  * Scrollbars read the theme's fram/frme track recipe and named thumb
+    caps and stretch, falling back to pxm# 500-503. Thumb art narrower
+    than the 16 px bar is centred, and unequal top and bottom caps keep
+    their own lengths, so Aqua's thumb is no longer distorted.
+  * The App Store's .deb install lets apt remove a stale zacos9-dbgsym,
+    so an update no longer stops with "try apt --fix-broken install".
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Tue, 17 Nov 2026 19:47:39 -0500
+
 zacos9 (1.18.16) trixie; urgency=medium
 
   * iBook, Drawing Board and other Appearance themes that draw their
