@@ -15,13 +15,7 @@
 
 #include "decor.h"
 
-static void write_argb(const char *path, int w, int h, uint32_t fill) {
-	unsigned char rgba[4] = {
-		(unsigned char)((fill >> 16) & 0xFF),
-		(unsigned char)((fill >> 8) & 0xFF),
-		(unsigned char)(fill & 0xFF),
-		(unsigned char)((fill >> 24) & 0xFF),
-	};
+static void write_argb_pixels(const char *path, int w, int h, const uint32_t *px) {
 	FILE *f = fopen(path, "wb");
 	assert(f);
 	unsigned char head[8] = {
@@ -32,9 +26,24 @@ static void write_argb(const char *path, int w, int h, uint32_t fill) {
 	};
 	assert(fwrite(head, 1, sizeof(head), f) == sizeof(head));
 	for (int i = 0; i < w * h; i++) {
+		unsigned char rgba[4] = {
+			(unsigned char)((px[i] >> 16) & 0xFF),
+			(unsigned char)((px[i] >> 8) & 0xFF),
+			(unsigned char)(px[i] & 0xFF),
+			(unsigned char)((px[i] >> 24) & 0xFF),
+		};
 		assert(fwrite(rgba, 1, sizeof(rgba), f) == sizeof(rgba));
 	}
 	fclose(f);
+}
+
+static void write_argb(const char *path, int w, int h, uint32_t fill) {
+	uint32_t px[256];
+	assert(w * h <= (int)(sizeof(px) / sizeof(px[0])));
+	for (int i = 0; i < w * h; i++) {
+		px[i] = fill;
+	}
+	write_argb_pixels(path, w, h, px);
 }
 
 static void write_file(const char *path, const char *text) {
@@ -44,20 +53,28 @@ static void write_file(const char *path, const char *text) {
 	fclose(f);
 }
 
-/* A small opaque PNG for the frame-skin keys. */
-static void write_png(const char *path, int w, int h, uint32_t argb) {
+/* A PNG with real alpha, for frame-edge art. */
+static void write_png_pixels(const char *path, int w, int h, const uint32_t *px) {
 	cairo_surface_t *surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, w, h);
 	assert(cairo_surface_status(surface) == CAIRO_STATUS_SUCCESS);
 	unsigned char *data = cairo_image_surface_get_data(surface);
 	const int stride = cairo_image_surface_get_stride(surface);
 	for (int y = 0; y < h; y++) {
-		for (int x = 0; x < w; x++) {
-			memcpy(data + y * stride + x * 4, &argb, 4);
-		}
+		memcpy(data + y * stride, px + (size_t)y * w, (size_t)w * 4);
 	}
 	cairo_surface_mark_dirty(surface);
 	assert(cairo_surface_write_to_png(surface, path) == CAIRO_STATUS_SUCCESS);
 	cairo_surface_destroy(surface);
+}
+
+/* A small opaque PNG for the frame-skin keys. */
+static void write_png(const char *path, int w, int h, uint32_t argb) {
+	uint32_t px[64];
+	assert(w * h <= (int)(sizeof(px) / sizeof(px[0])));
+	for (int i = 0; i < w * h; i++) {
+		px[i] = argb;
+	}
+	write_png_pixels(path, w, h, px);
 }
 
 static uint32_t *render(const struct decor_state *st, int *w, int *h) {
@@ -193,6 +210,125 @@ int main(void) {
 	assert(decor_hit(&st, 10, 10) == DECOR_PART_CLOSE);
 	free(px);
 	st.collapsed = false;
+
+	/* Older imported bundles recorded a rail's raw width, including clear
+	 * columns that are really the window's shadow (iBook: one on the left,
+	 * four on the right). The rail must be trimmed at draw time and its
+	 * outline put on the window edge, or it steps in at every title-bar
+	 * corner. This test uses the un-trimmed widths on purpose. */
+	char bundle5[4096], chrome5[4096], conf5[4096];
+	snprintf(bundle5, sizeof(bundle5), "%s/config/zacos9/themes/Rails", home);
+	snprintf(chrome5, sizeof(chrome5), "%s/config/zacos9/themes/Rails/chrome", home);
+	snprintf(conf5, sizeof(conf5), "%s/config/zacos9/themes/Rails/theme.conf", home);
+	assert(mkdir(bundle5, 0755) == 0);
+	assert(mkdir(chrome5, 0755) == 0);
+	const uint32_t red = 0xFFFF0000u, green = 0xFF00FF00u, blue = 0xFF0000FFu;
+	const uint32_t clear = 0x00000000u;
+	uint32_t left_art[4 * 4], right_art[6 * 4], bottom_art[4 * 6];
+	for (int y = 0; y < 4; y++) {
+		left_art[y * 4 + 0] = clear;
+		left_art[y * 4 + 1] = red;
+		left_art[y * 4 + 2] = green;
+		left_art[y * 4 + 3] = blue;
+		for (int x = 0; x < 6; x++) {
+			right_art[y * 6 + x] = x < 3 ? (x == 0 ? red : x == 1 ? green : blue)
+				: clear;
+		}
+	}
+	for (int y = 0; y < 6; y++) {
+		for (int x = 0; x < 4; x++) {
+			bottom_art[y * 4 + x] = y == 0 ? red : y == 1 ? green :
+				y == 2 ? blue : clear;
+		}
+	}
+	snprintf(path, sizeof(path), "%s/rail-left.png", chrome5);
+	write_png_pixels(path, 4, 4, left_art);
+	snprintf(path, sizeof(path), "%s/rail-right.png", chrome5);
+	write_png_pixels(path, 6, 4, right_art);
+	snprintf(path, sizeof(path), "%s/rail-bottom.png", chrome5);
+	write_png_pixels(path, 4, 6, bottom_art);
+	write_file(conf5,
+		"name=Rails\n"
+		"frame-left=4\n"
+		"frame-right=6\n"
+		"frame-bottom=6\n"
+		"document-left=chrome/rail-left.png\n"
+		"document-right=chrome/rail-right.png\n"
+		"document-bottom=chrome/rail-bottom.png\n");
+	write_file(desk, "theme-bundle=Rails\n");
+	st.style = DECOR_STYLE_DOCUMENT;
+	st.width = 300;
+	st.height = 120;
+	st.has_close = st.has_zoom = st.has_collapse = true;
+	struct decor_margins rims = decor_margins(st.style);
+	assert(rims.left == 3 && rims.right == 3 && rims.bottom == 3);
+	px = render(&st, &w, &h);
+	/* The left outline starts on the window edge, the right one ends on
+	 * it: the clear shadow columns are gone, not a moat inside the frame. */
+	assert(px[30 * w + 0] == red);
+	assert(px[30 * w + 1] == green);
+	assert(px[30 * w + 2] == blue);
+	assert(px[60 * w + (w - 4)] == red);
+	assert(px[60 * w + (w - 3)] == green);
+	assert(px[60 * w + (w - 2)] == blue);
+	/* Nor does the bottom rail leave its shadow rows inside the window. */
+	assert(px[(h - 4) * w + 10] == red);
+	assert(px[(h - 3) * w + 10] == green);
+	assert(px[(h - 2) * w + 10] == blue);
+	free(px);
+
+	/* The same clear outer margin can be baked into a bar cap. Old imports
+	 * have it (several themes' bar-right ends with ten clear columns), so
+	 * the cap is trimmed at draw time and its outer pixel lands on the
+	 * window edge, meeting the frame below. */
+	char bundle6[4096], chrome6[4096], conf6[4096];
+	snprintf(bundle6, sizeof(bundle6), "%s/config/zacos9/themes/Caps", home);
+	snprintf(chrome6, sizeof(chrome6), "%s/config/zacos9/themes/Caps/chrome", home);
+	snprintf(conf6, sizeof(conf6), "%s/config/zacos9/themes/Caps/theme.conf", home);
+	assert(mkdir(bundle6, 0755) == 0);
+	assert(mkdir(chrome6, 0755) == 0);
+	const uint32_t yellow = 0xFFFFFF00u;
+	uint32_t cap_left[4 * 2], cap_mid[4 * 2], cap_right[4 * 2];
+	for (int y = 0; y < 2; y++) {
+		cap_left[y * 4 + 0] = clear;
+		cap_left[y * 4 + 1] = red;
+		cap_left[y * 4 + 2] = green;
+		cap_left[y * 4 + 3] = blue;
+		cap_right[y * 4 + 0] = red;
+		cap_right[y * 4 + 1] = green;
+		cap_right[y * 4 + 2] = blue;
+		cap_right[y * 4 + 3] = clear;
+		for (int x = 0; x < 4; x++) {
+			cap_mid[y * 4 + x] = yellow;
+		}
+	}
+	snprintf(path, sizeof(path), "%s/bar-left.argb", chrome6);
+	write_argb_pixels(path, 4, 2, cap_left);
+	snprintf(path, sizeof(path), "%s/bar-middle.argb", chrome6);
+	write_argb_pixels(path, 4, 2, cap_mid);
+	snprintf(path, sizeof(path), "%s/bar-right.argb", chrome6);
+	write_argb_pixels(path, 4, 2, cap_right);
+	write_file(conf6,
+		"name=Caps\n"
+		"bar-left=chrome/bar-left.argb\n"
+		"bar-middle=chrome/bar-middle.argb\n"
+		"bar-right=chrome/bar-right.argb\n");
+	write_file(desk, "theme-bundle=Caps\n");
+	/* A bar-only theme keeps Platinum's frame edges: the rail margins
+	 * come from rail art or metrics, never from the title-bar tiles. */
+	struct decor_margins capm = decor_margins(DECOR_STYLE_DOCUMENT);
+	assert(capm.left == DECOR_LEFT && capm.right == DECOR_RIGHT &&
+		capm.bottom == DECOR_BOTTOM && capm.top == DECOR_TOP);
+	st.width = 300;
+	st.height = 120;
+	px = render(&st, &w, &h);
+	assert(px[5 * w + 0] == red);
+	assert(px[5 * w + 1] == green);
+	assert(px[5 * w + 2] == blue);
+	assert(px[5 * w + (w - 4)] == red);
+	assert(px[5 * w + (w - 3)] == green);
+	assert(px[5 * w + (w - 2)] == blue);
+	free(px);
 
 	/* Dialogs use their own pinstripe bar and close box, even though
 	 * Platinum dialogs show none. */
