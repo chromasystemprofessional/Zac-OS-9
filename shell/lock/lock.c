@@ -339,7 +339,7 @@ static void redraw(struct screen *s) {
 	const int k = s->scale;
 	uint32_t *drawn = k == 1 && !s->quarters ? b->px : s->logical;
 	struct pl_canvas c = { drawn, s->w, 0, 0, s->w, s->h,
-		s->quarters ? pl_text_log_new(drawn, s->w) : NULL };
+		s->quarters ? pl_text_log_new(drawn, s->w) : NULL, false, PL_PUT_RAW };
 	paint(s, &c);
 	if (s->quarters) {
 		/* Each logical pixel one or two of the screen's, the text in the

@@ -1,5 +1,6 @@
 /* The Mouse control panel (zacos9-controlpanel mouse). */
 #include "controlpanel.h"
+#include "theme.h"
 
 class MousePanel : public ControlPanel {
 public:
@@ -53,14 +54,21 @@ protected:
 		/* A spot to try the speed: it lights up on a double-click. */
 		const QRect r = m_test;
 		pl_edit_frame_paint(c, r.left(), r.top(), r.right(), r.bottom());
+		const uint32_t highlight = pl_highlight_current();
 		if (m_lit) {
 			pl_fill(c, r.left() + 1, r.top() + 1, r.right() - 1, r.bottom() - 1,
-				pl_highlight_current());
+				highlight);
 		}
+		const bool was_raw = c->raw;
+		if (m_lit) {
+			c->raw = true;
+		}
+		const uint32_t ink = m_lit ? zac_ink_for(highlight) : C_BLACK;
 		for (int i = 0; i < 2; i++) {
 			Text t(i == 0 ? tr9("Double-click") : tr9("here to try it"), r.width() - 8, PL_FONT_VIEWS);
-			pl_text(c, t.t, r.center().x() - t.inkWidth() / 2, r.top() + 22 + 13 * i, C_BLACK);
+			pl_text(c, t.t, r.center().x() - t.inkWidth() / 2, r.top() + 22 + 13 * i, ink);
 		}
+		c->raw = was_raw;
 	}
 
 	bool pressExtra(QPoint p, bool doubleClick) override {

@@ -13,6 +13,7 @@
 #include "alert.h"
 #include "platinumshell.h"
 #include "settings.h"
+#include "theme.h"
 
 static constexpr uint32_t FACE = GRAY(0xD);
 /* Text in the clock control: first ink 11 px in, baseline 13 rows down;
@@ -59,11 +60,18 @@ void ClockField::paint(pl_canvas *c, uint32_t bg) const {
 		Text t(ps[i].text, 1000, PL_FONT_SYSTEM);
 		if (t.t && t.t->ink_l >= 0) {
 			const int ink = pen + t.t->ink_l - 1;
-			if (i == selected && focused && enabled) {
-				pl_fill(c, ink - 3, pos.y() + 2, ink + t.inkWidth(), pos.y() + 17,
-					pl_highlight_current());
+			const bool lit = i == selected && focused && enabled;
+			const uint32_t highlight = pl_highlight_current();
+			if (lit) {
+				pl_fill(c, ink - 3, pos.y() + 2, ink + t.inkWidth(), pos.y() + 17, highlight);
 			}
-			pl_text(c, t.t, ink, pos.y() + CLOCK_BASELINE, enabled ? C_BLACK : GRAY(0x8));
+			const bool was_raw = c->raw;
+			if (lit) {
+				c->raw = true;
+			}
+			pl_text(c, t.t, ink, pos.y() + CLOCK_BASELINE,
+				lit ? zac_ink_for(highlight) : enabled ? C_BLACK : GRAY(0x8));
+			c->raw = was_raw;
 		}
 		pen += t.t ? t.t->advance : 0;
 	}

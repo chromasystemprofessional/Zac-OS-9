@@ -7,6 +7,15 @@
 #include "settings.h"
 #include "theme.h"
 
+/* Draw this control through a copy of its canvas whose put mode is the
+ * dark program palette when the theme asks for one. Everything else about
+ * the canvas (pixels, clip, text log) is shared, and the caller's canvas
+ * keeps its own mode. */
+#define WIDGET_CANVAS(c) \
+	struct pl_canvas widget_canvas = *(c); \
+	widget_canvas.put = zac_theme_program_dark() ? PL_PUT_WIDGET : PL_PUT_RAW; \
+	(c) = &widget_canvas
+
 /* Push-button art: left columns, one stretchable column, right columns. */
 struct nine_slice {
 	int left, right, height;
@@ -16,6 +25,7 @@ struct nine_slice {
 
 static void paint_nine(struct pl_canvas *c, int x, int y, int w,
 		const struct nine_slice *s) {
+	WIDGET_CANVAS(c);
 	for (int j = 0; j < s->height; j++) {
 		const char *row = s->rows[j];
 		for (int i = 0; i < w; i++) {
@@ -29,6 +39,7 @@ static void paint_nine(struct pl_canvas *c, int x, int y, int w,
 }
 
 void pl_bevel_button_paint(struct pl_canvas *c, int x, int y, int w, int h, bool pressed) {
+	WIDGET_CANVAS(c);
 	const int x1 = x + w - 1, y1 = y + h - 1;
 	if (!pressed) {
 		/* Raised: #888 / #444 outside, white / #999 inside, #CCC face. */
@@ -65,6 +76,7 @@ void pl_bevel_button_paint(struct pl_canvas *c, int x, int y, int w, int h, bool
 
 void pl_button_paint(struct pl_canvas *c, int x, int y, int w,
 		const struct plat_text *label, unsigned flags) {
+	WIDGET_CANVAS(c);
 	const bool pressed = flags & PL_BUTTON_PRESSED;
 	if (flags & PL_BUTTON_DEFAULT) {
 		paint_nine(c, x - PL_BUTTON_RING, y - PL_BUTTON_RING, w + 2 * PL_BUTTON_RING,
@@ -98,7 +110,7 @@ void pl_button_paint(struct pl_canvas *c, int x, int y, int w,
 				if (sx >= fw) sx = fw - 1;
 				uint32_t p = fp[yy * fw + sx];
 				if (p >> 24) {
-					pl_put(c, x + xx, y + yy, p);
+					pl_put_raw(c, x + xx, y + yy, p);
 				}
 			}
 		}
@@ -177,7 +189,7 @@ static bool control_skin(struct pl_canvas *c, const char *path,
 		for (int i = 0; i < sw; i++) {
 			const uint32_t v = px[j * sw + i];
 			if (v >> 24) {
-				pl_put(c, ox + i, oy + j, v);
+				pl_put_raw(c, ox + i, oy + j, v);
 			}
 		}
 	}
@@ -186,6 +198,7 @@ static bool control_skin(struct pl_canvas *c, const char *path,
 
 void pl_checkbox_paint(struct pl_canvas *c, int x, int y, enum pl_check value,
 		bool pressed, bool enabled, const struct plat_text *label) {
+	WIDGET_CANVAS(c);
 	const char *skin = value == PL_CHECK_ON ? "chrome/checkbox-on.png" :
 		value == PL_CHECK_MIXED ? "chrome/checkbox-mixed.png" :
 		"chrome/checkbox-off.png";
@@ -282,6 +295,7 @@ static uint32_t radio_grey(char ch) {
 
 void pl_radio_paint(struct pl_canvas *c, int x, int y, bool on, bool pressed, bool enabled,
 		const struct plat_text *label) {
+	WIDGET_CANVAS(c);
 	if (control_skin(c, on ? "chrome/radio-on.png" : "chrome/radio-off.png",
 			x, y, PL_RADIO_SIZE, PL_RADIO_SIZE)) {
 		if (label && label->ink_l >= 0) {
@@ -357,6 +371,7 @@ int pl_slider_value_at(int x, int w, int steps, int px) {
 
 void pl_slider_paint(struct pl_canvas *c, int x, int y, int w, int steps, int value,
 		bool enabled, struct pl_accent ac) {
+	WIDGET_CANVAS(c);
 	/* The track, 3 rows below the thumb's top: a #AAA rim, #222 lines
 	 * with rounded ends around a #AAA groove, and a white rim below. */
 	const int L = x, R = x + w - 1, T = y + 3;
@@ -413,6 +428,7 @@ void pl_slider_paint(struct pl_canvas *c, int x, int y, int w, int steps, int va
 /* ---- little arrows (figures 2-20, 2-22) --------------------------------------- */
 
 static void arrow_box(struct pl_canvas *c, int x, int y, bool up, bool pressed, bool enabled) {
+	WIDGET_CANVAS(c);
 	/* A 13 x 12 box sharing its top or bottom line with its partner. */
 	const int x1 = x + PL_ARROWS_W - 1, y1 = y + 11;
 	const uint32_t hi = pressed ? GRAY(0x5) : C_WHITE;
@@ -435,6 +451,7 @@ static void arrow_box(struct pl_canvas *c, int x, int y, bool up, bool pressed, 
 
 void pl_little_arrows_paint(struct pl_canvas *c, int x, int y, enum pl_arrows_part pressed,
 		bool enabled) {
+	WIDGET_CANVAS(c);
 	const int x1 = x + PL_ARROWS_W - 1, y1 = y + PL_ARROWS_H - 1;
 	arrow_box(c, x, y, true, pressed == PL_ARROWS_UP, enabled);
 	arrow_box(c, x, y + 11, false, pressed == PL_ARROWS_DOWN, enabled);
@@ -458,6 +475,7 @@ enum pl_arrows_part pl_little_arrows_hit(int x, int y, int px, int py) {
 
 void pl_clock_paint(struct pl_canvas *c, int x0, int y0, int field_w, bool focused,
 		enum pl_arrows_part pressed, bool enabled, struct pl_accent accent, uint32_t bg) {
+	WIDGET_CANVAS(c);
 	const int fx1 = x0 + field_w - 1, y1 = y0 + PL_CLOCK_H - 1;
 	const int ax = PL_CLOCK_ARROWS_X(x0, field_w), ax1 = ax + PL_ARROWS_W - 1;
 	if (focused) {
@@ -478,6 +496,7 @@ void pl_clock_paint(struct pl_canvas *c, int x0, int y0, int field_w, bool focus
 /* ---- edit text frame and focus ring ------------------------------------------- */
 
 void pl_edit_frame_paint(struct pl_canvas *c, int x0, int y0, int x1, int y1) {
+	WIDGET_CANVAS(c);
 	pl_hline(c, x0 - 1, x1, y0 - 1, GRAY(0x8));
 	pl_vline(c, x0 - 1, y0 - 1, y1, GRAY(0x8));
 	pl_hline(c, x0, x1 + 1, y1 + 1, C_WHITE);
@@ -488,6 +507,7 @@ void pl_edit_frame_paint(struct pl_canvas *c, int x0, int y0, int x1, int y1) {
 
 void pl_focus_ring_paint(struct pl_canvas *c, int x0, int y0, int x1, int y1,
 		struct pl_accent accent, uint32_t bg) {
+	WIDGET_CANVAS(c);
 	for (int k = 1; k <= 2; k++) {
 		pl_outline(c, x0 - k, y0 - k, x1 + k, y1 + k, accent.dark);
 	}
@@ -501,6 +521,7 @@ void pl_focus_ring_paint(struct pl_canvas *c, int x0, int y0, int x1, int y1,
 
 void pl_group_box_paint(struct pl_canvas *c, int x0, int y0, int x1, int y1,
 		const struct plat_text *title, uint32_t bg) {
+	WIDGET_CANVAS(c);
 	/* White first, one pixel down and right; the #888 line over it. */
 	pl_outline(c, x0 + 1, y0 + 1, x1 + 1, y1 + 1, C_WHITE);
 	pl_outline(c, x0, y0, x1, y1, GRAY(0x8));
@@ -536,6 +557,7 @@ struct pl_scrollbar pl_list_scrollbar(int y0, int y1, const struct pl_list *list
 
 void pl_list_paint(struct pl_canvas *c, int x0, int y0, int x1, int y1,
 		const struct pl_list *list, struct pl_accent accent, uint32_t highlight) {
+	WIDGET_CANVAS(c);
 	const int sx = x1 - SB_WIDTH + 1; /* the scroll bar's left line */
 	if (list->focused) {
 		/* A 2 px ring outside the frame, its outer corners clipped. */
@@ -552,7 +574,8 @@ void pl_list_paint(struct pl_canvas *c, int x0, int y0, int x1, int y1,
 	const int visible = pl_list_visible_rows(y0, y1);
 	for (int r = 0; r < visible && list->top + r < list->n; r++) {
 		const int i = list->top + r, top = y0 + 1 + r * PL_LIST_ROW_H;
-		if (i == list->selected) {
+		const bool selected = i == list->selected;
+		if (selected) {
 			pl_fill(c, x0 + 1, top, sx - 1, top + PL_LIST_ROW_H - 1, highlight);
 		}
 		int ink_x = x0 + 3 + list->indent;
@@ -561,7 +584,15 @@ void pl_list_paint(struct pl_canvas *c, int x0, int y0, int x1, int y1,
 				list->rows[i]->ink_r - list->rows[i]->ink_l + 1;
 			ink_x = sx - 2 - ink;
 		}
-		pl_text(c, list->rows[i], ink_x, top + 11, C_BLACK);
+		const bool was_raw = c->raw;
+		if (selected) {
+			/* The highlight is a colour the theme chose, so pick the ink
+			 * that reads on it rather than the palette's usual white. */
+			c->raw = true;
+		}
+		pl_text(c, list->rows[i], ink_x, top + 11,
+			selected ? zac_ink_for(highlight) : C_BLACK);
+		c->raw = was_raw;
 	}
 	struct pl_scrollbar sb = pl_list_scrollbar(y0, y1, list);
 	pl_scrollbar_paint(c, sx, y0, &sb, accent);
@@ -657,6 +688,7 @@ static uint32_t tab_color(char ch) {
 
 static void paint_tab(struct pl_canvas *c, int x0, int y0,
 		const struct plat_text *const *labels, int i, bool front, bool last) {
+	WIDGET_CANVAS(c);
 	int tx0, tx1;
 	const int bl = tab_geometry(x0, labels, i, &tx0, &tx1);
 	const int br = tx1 + 10;
@@ -697,6 +729,7 @@ static void paint_tab(struct pl_canvas *c, int x0, int y0,
 
 void pl_tabs_paint(struct pl_canvas *c, int x0, int y0, int x1, int y1,
 		const struct plat_text *const *labels, int n, int selected) {
+	WIDGET_CANVAS(c);
 	const int py = y0 + PL_TAB_H; /* the pane's top line */
 	/* The raised pane: black, an inner #CCC line, a white highlight, and
 	 * a #999 shade along the bottom and right. */
@@ -756,6 +789,7 @@ int pl_tabs_hit(int x0, int y0, const struct plat_text *const *labels, int n, in
  */
 void pl_progress_paint(struct pl_canvas *c, int x, int y, int w, double fraction,
 		struct pl_accent ac) {
+	WIDGET_CANVAS(c);
 	const int x1 = x + w - 1, y1 = y + PL_PROGRESS_H - 1;
 	const int inner = w - 2;
 	int fill = (int)(fraction * inner + 0.5);
@@ -876,13 +910,22 @@ struct sb_ctx {
 	struct pl_canvas *c;
 	int x, y;
 	bool vertical;
+	bool raw; /* drawing the theme's own thumb or arrow art */
 };
 
 static void sbp(struct sb_ctx *s, int a, int b, uint32_t color) {
 	if (s->vertical) {
-		pl_put(s->c, s->x + b, s->y + a, color);
+		if (s->raw) {
+			pl_put_raw(s->c, s->x + b, s->y + a, color);
+		} else {
+			pl_put(s->c, s->x + b, s->y + a, color);
+		}
 	} else {
-		pl_put(s->c, s->x + a, s->y + b, color);
+		if (s->raw) {
+			pl_put_raw(s->c, s->x + a, s->y + b, color);
+		} else {
+			pl_put(s->c, s->x + a, s->y + b, color);
+		}
 	}
 }
 
@@ -979,13 +1022,15 @@ static bool sb_arrow_image(struct sb_ctx *s, int box_a, int size, int dir) {
 	if (along != size || across != SB_ARROW) {
 		return false;
 	}
+	struct sb_ctx raw = *s;
+	raw.raw = true;
 	for (int a = 0; a < size; a++) {
 		for (int b = 1; b <= SB_ARROW; b++) {
 			const int sx = s->vertical ? b : a;
 			const int sy = s->vertical ? a : b;
 			const uint32_t v = px[sy * w + sx];
 			if (v >> 24) {
-				sbp(s, box_a + a, b, v);
+				sbp(&raw, box_a + a, b, v);
 			}
 		}
 	}
@@ -1070,6 +1115,8 @@ static void sb_thumb_skin(struct sb_ctx *s, int a0, int a1, const char *path,
 	if (!px) {
 		return;
 	}
+	struct sb_ctx raw = *s;
+	raw.raw = true;
 	/* Some themes draw a scrollbar thumb as a thin line across the
 	 * bar (Drawing Board's is 2 px), not as a full-width tile. */
 	if (thin_line && !s->vertical && w <= 2 && h >= SB_ARROW) {
@@ -1078,7 +1125,7 @@ static void sb_thumb_skin(struct sb_ctx *s, int a0, int a1, const char *path,
 			for (int i = 0; i < w; i++) {
 				const uint32_t v = px[j * w + i];
 				if (v >> 24) {
-					sbp(s, a0 + i, 1 + j, v);
+					sbp(&raw, a0 + i, 1 + j, v);
 				}
 			}
 		}
@@ -1090,7 +1137,7 @@ static void sb_thumb_skin(struct sb_ctx *s, int a0, int a1, const char *path,
 			for (int j = 0; j < h; j++) {
 				const uint32_t v = px[j * w + i];
 				if (v >> 24) {
-					sbp(s, a0 + j, 1 + i, v);
+					sbp(&raw, a0 + j, 1 + i, v);
 				}
 			}
 		}
@@ -1201,6 +1248,7 @@ grip:
 
 void pl_scrollbar_paint(struct pl_canvas *c, int x, int y,
 		const struct pl_scrollbar *sb, struct pl_accent accent) {
+	WIDGET_CANVAS(c);
 	struct sb_ctx s = { .c = c, .x = x, .y = y, .vertical = sb->vertical };
 	const int L = sb->length;
 	const struct sb_style st = sb_style();
@@ -1309,6 +1357,7 @@ enum sb_part sb_hit(const struct pl_scrollbar *sb, int along) {
  */
 void pl_popup_button_paint(struct pl_canvas *c, int x, int y, int w, int h,
 		const struct plat_text *label, bool enabled) {
+	WIDGET_CANVAS(c);
 	const int x1 = x + w - 1, y1 = y + h - 1;
 	const uint32_t ink = enabled ? C_BLACK : GRAY(0x8);
 

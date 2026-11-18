@@ -50,6 +50,14 @@ struct pl_accent {
 
 struct pl_text_log;
 
+/* How pl_put treats a colour. Widgets paint their bevel art in the raw
+ * Platinum ramp; while their put mode is PL_PUT_WIDGET the drawing
+ * library maps that ramp to the theme's dark program palette. */
+enum pl_put_mode {
+	PL_PUT_RAW = 0,
+	PL_PUT_WIDGET = 1,
+};
+
 /* A rectangle of ARGB8888 pixels positioned in some local coordinate
  * space; drawing outside it is clipped. With a text log, the text drawn
  * on it is also remembered, to be drawn again at a 1.25x, 1.5x or 1.75x
@@ -59,9 +67,16 @@ struct pl_canvas {
 	int stride; /* in pixels */
 	int x, y, width, height;
 	struct pl_text_log *log; /* NULL: none */
+	/* Artwork (icons, patterns, imported skins): never recoloured by the
+	 * dark program palette. */
+	bool raw;
+	/* PL_PUT_RAW, or PL_PUT_WIDGET for the controls in lib/widgets.c. */
+	int put;
 };
 
 void pl_put(struct pl_canvas *c, int x, int y, uint32_t color);
+/* One artwork pixel, never recoloured. */
+void pl_put_raw(struct pl_canvas *c, int x, int y, uint32_t color);
 void pl_hline(struct pl_canvas *c, int x0, int x1, int y, uint32_t color);
 void pl_vline(struct pl_canvas *c, int x, int y0, int y1, uint32_t color);
 void pl_fill(struct pl_canvas *c, int x0, int y0, int x1, int y1, uint32_t color);

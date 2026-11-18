@@ -144,7 +144,7 @@ static void tile_put(struct pl_canvas *c, int x, int y, uint32_t p) {
 		return;
 	}
 	if (a == 255) {
-		pl_put(c, x, y, p);
+		pl_put_raw(c, x, y, p);
 		return;
 	}
 	if (x < c->x || x >= c->x + c->width || y < c->y || y >= c->y + c->height) {

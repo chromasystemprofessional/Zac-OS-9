@@ -140,8 +140,16 @@ void pl_welcome_box_paint(struct pl_canvas *c, int bx, int by, int scale,
 	}
 	if (title) {
 		const int tw = (title->ink_r - title->ink_l + 1) * s;
+		const bool was_raw = c->raw;
+		if (zac_theme_program_dark()) {
+			/* The box became dark above; its engraved title turns light
+			 * without turning the pixels into the palette's field grey. */
+			c->raw = true;
+		}
 		text_scaled(c, title, bx + PL_WELCOME_TITLE_X * s - tw / 2,
-			by + PL_WELCOME_BASELINE * s, s, C_BLACK);
+			by + PL_WELCOME_BASELINE * s, s,
+			zac_theme_program_dark() ? C_WHITE : C_BLACK);
+		c->raw = was_raw;
 	}
 }
 

@@ -28,6 +28,7 @@
 #include "apptrash.h"
 #include "sharingclient.h"
 #include "thumbnails.h"
+#include "theme.h"
 #include "fonts.h"
 #include "vfs.h"
 #include "settings.h"
@@ -1130,6 +1131,8 @@ std::vector<uint32_t> scaledArgb(const std::vector<uint32_t> &pixels, int from, 
  * small), as the Mac drew an application's documents. */
 std::vector<uint32_t> composeDocument(const std::vector<uint32_t> &appIcon16, int size) {
 	Pixels page(size, size);
+	/* The page is artwork: keep its paper and ink in the icon's own colours. */
+	page.c.raw = true;
 	pl_icon_paint(&page.c, 0, 0, PL_ICON_DOCUMENT, size, false);
 	const bool large = size >= 32;
 	/* Inside the page's frame, below its folded corner. */
@@ -1269,6 +1272,7 @@ static void paintFontSample(pl_canvas *c, const Item &item, int x, int y, int si
 	}
 	/* Drawn on a canvas of just the label, so a wide glyph stays on it. */
 	pl_canvas onLabel = *c;
+	onLabel.raw = true; /* the font sample is drawn on the icon's own page */
 	onLabel.px = c->px + (label.top() - c->y) * c->stride + (label.left() - c->x);
 	onLabel.x = label.left();
 	onLabel.y = label.top();
@@ -1408,9 +1412,10 @@ void paintMarquee(pl_canvas *c, const QRect &r) {
 	if (visible.isEmpty()) {
 		return;
 	}
+	const uint32_t ink = zac_theme_program_dark() ? 0xFFC8C8C8u : GRAY(0x5);
 	auto dot = [&](int x, int y) {
 		if (((x + y) & 1) == 0) {
-			pl_put(c, x, y, GRAY(0x5));
+			pl_put(c, x, y, ink);
 		}
 	};
 	for (int x = visible.left(); x <= visible.right(); x++) {

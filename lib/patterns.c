@@ -60,7 +60,7 @@ void pl_pattern_fill(struct pl_canvas *c, int index, int x0, int y0, int x1, int
 	for (int y = y0; y <= y1; y++) {
 		const char *row = p->rows[((y % p->height) + p->height) % p->height];
 		for (int x = x0; x <= x1; x++) {
-			pl_put(c, x, y, p->palette[palette_index(row[((x % p->width) + p->width) % p->width])]);
+			pl_put_raw(c, x, y, p->palette[palette_index(row[((x % p->width) + p->width) % p->width])]);
 		}
 	}
 }

@@ -30,6 +30,17 @@ static bool waitFor(const std::function<bool()> &ready) {
 	}
 	return ready();
 }
+
+/* The first preset with this name: the catalogue's two built-ins come
+ * first, then presets read from Theme Files in name order. */
+static int findThemeIndex(const QString &name) {
+	for (int i = 0; i < appearanceThemeCount(); ++i) {
+		if (appearanceThemeName(i) == name) {
+			return i;
+		}
+	}
+	return -1;
+}
 static void write(const QString &path, const QByteArray &bytes) {
 	QFile file(path);
 	assert(file.open(QIODevice::WriteOnly));
@@ -289,25 +300,56 @@ int main(int argc, char **argv) {
 	assert(preference("sound.window-drag").isEmpty());
 	QThread::msleep(100);
 	assert(!QFile::exists(root.path() + "/played"));
+	/* The built-in dark theme sits beside Silver Coat, names its bundle,
+	 * and turns the program palette dark until Silver Coat clears it. */
+	const int darkBuiltin = findThemeIndex("Silver Coat Dark");
+	assert(darkBuiltin == 1);
+	assert(appearanceThemeBundle(darkBuiltin) == "Silver Coat Dark");
+	assert(appearanceThemeValues(darkBuiltin).value("pattern") == "graphite");
+	assert(applyAppearanceTheme(darkBuiltin, &error));
+	assert(preference("theme-bundle") == "Silver Coat Dark");
+	assert(preference("highlight") == "5555AA");
+	assert(zac_theme_program_dark());
+	const QString darkScreenshot = qEnvironmentVariable("THEMES_DARK_SCREENSHOT");
+	if (!darkScreenshot.isEmpty()) {
+		AppearancePanel darkPanel;
+		darkPanel.showTab(0);
+		darkPanel.show();
+		QApplication::processEvents();
+		assert(darkPanel.grab().save(darkScreenshot));
+	}
+	const QString darkListScreenshot = qEnvironmentVariable("THEMES_DARK_LIST_SCREENSHOT");
+	if (!darkListScreenshot.isEmpty()) {
+		AppearancePanel darkPanel;
+		darkPanel.showTab(4);
+		darkPanel.show();
+		QApplication::processEvents();
+		assert(darkPanel.grab().save(darkListScreenshot));
+	}
+	assert(applyAppearanceTheme(0, &error));
+	assert(preference("theme-bundle").isEmpty());
+	assert(!zac_theme_program_dark());
 	assert(applySoundTheme(2, &error));
 	assert(pl_setting_set("highlight", "FFCC66"));
 	assert(pl_setting_set("theme-bundle", nullptr));
 	assert(saveAppearanceTheme("My Settings", &error));
-	assert(waitFor([] { return appearanceThemeCount() == 2; }));
+	assert(waitFor([] { return appearanceThemeCount() == 3; }));
 	assert(!saveAppearanceTheme("My Settings", &error));
 	assert(pl_setting_set("highlight", "CCEEFF"));
-	assert(applyAppearanceTheme(1, &error));
+	const int mySettings = findThemeIndex("My Settings");
+	assert(mySettings >= 0);
+	assert(applyAppearanceTheme(mySettings, &error));
 	assert(preference("highlight") == "FFCC66");
 	assert(preference("sound-theme") == id);
 	/* A preset without a theme bundle drops the previous one: applying
 	 * My Settings (no bundle) clears theme-bundle, a bundled preset sets
 	 * it, and Silver Coat clears it again. */
 	assert(pl_setting_set("theme-bundle", "Stale"));
-	assert(applyAppearanceTheme(1, &error));
+	assert(applyAppearanceTheme(mySettings, &error));
 	assert(preference("theme-bundle").isEmpty());
 	write(appearanceThemesFolder() + "/bundled.json",
 		R"JSON({"version":1,"name":"Bundled","settings":{"theme-bundle":"MyBundle"}})JSON");
-	assert(waitFor([] { return appearanceThemeCount() == 3; }));
+	assert(waitFor([] { return appearanceThemeCount() == 4; }));
 	int bundled = -1;
 	for (int i = 0; i < appearanceThemeCount(); ++i) {
 		if (appearanceThemeName(i) == "Bundled") {
@@ -322,12 +364,12 @@ int main(int argc, char **argv) {
 	 * sound theme back for the assertions below. */
 	assert(applySoundTheme(2, &error));
 	assert(QFile::remove(appearanceThemesFolder() + "/bundled.json"));
-	assert(waitFor([] { return appearanceThemeCount() == 2; }));
+	assert(waitFor([] { return appearanceThemeCount() == 3; }));
 	/* A theme saved with a base bundle keeps that bundle: applying it
 	 * must not fall back to Silver Coat and its icons. */
 	assert(pl_setting_set("theme-bundle", "Paper"));
 	assert(saveAppearanceTheme("Paper Saved", &error));
-	assert(waitFor([] { return appearanceThemeCount() == 3; }));
+	assert(waitFor([] { return appearanceThemeCount() == 4; }));
 	int paperSaved = -1;
 	for (int i = 0; i < appearanceThemeCount(); ++i) {
 		if (appearanceThemeName(i) == "Paper Saved") {
@@ -339,7 +381,7 @@ int main(int argc, char **argv) {
 	const QString paperFile = QCryptographicHash::hash(
 		"Paper Saved", QCryptographicHash::Sha256).toHex().left(24) + ".json";
 	assert(QFile::remove(appearanceThemesFolder() + "/" + paperFile));
-	assert(waitFor([] { return appearanceThemeCount() == 2; }));
+	assert(waitFor([] { return appearanceThemeCount() == 3; }));
 	assert(applyAppearanceTheme(0, &error));
 	/* A preset without a program font drops the previous one; one naming
 	 * a missing font still applies, without the font and with a note. */
@@ -348,7 +390,7 @@ int main(int argc, char **argv) {
 	assert(preference("font-family").isEmpty());
 	write(appearanceThemesFolder() + "/badfont.json",
 		R"JSON({"version":1,"name":"BadFont","settings":{"font-family":"No Such Font"}})JSON");
-	assert(waitFor([] { return appearanceThemeCount() == 3; }));
+	assert(waitFor([] { return appearanceThemeCount() == 4; }));
 	int badfont = -1;
 	for (int i = 0; i < appearanceThemeCount(); ++i) {
 		if (appearanceThemeName(i) == "BadFont") {
@@ -358,13 +400,13 @@ int main(int argc, char **argv) {
 	assert(badfont >= 0 && applyAppearanceTheme(badfont, &error));
 	assert(error.contains("font") && preference("font-family").isEmpty());
 	assert(QFile::remove(appearanceThemesFolder() + "/badfont.json"));
-	assert(waitFor([] { return appearanceThemeCount() == 2; }));
+	assert(waitFor([] { return appearanceThemeCount() == 3; }));
 	/* A preset whose sound set the catalogue could not decode (Drawing
 	 * Board's) still applies: one missing piece of art must not make the
 	 * theme unselectable. */
 	write(appearanceThemesFolder() + "/badsound.json",
 		R"JSON({"version":1,"name":"BadSound","settings":{"sound-theme":"user:00000000000000000000000000000000"}})JSON");
-	assert(waitFor([] { return appearanceThemeCount() == 3; }));
+	assert(waitFor([] { return appearanceThemeCount() == 4; }));
 	int badsound = -1;
 	for (int i = 0; i < appearanceThemeCount(); ++i) {
 		if (appearanceThemeName(i) == "BadSound") {
@@ -374,7 +416,7 @@ int main(int argc, char **argv) {
 	assert(badsound >= 0 && applyAppearanceTheme(badsound, &error));
 	assert(error.contains("sound set") && preference("sound-theme").isEmpty());
 	assert(QFile::remove(appearanceThemesFolder() + "/badsound.json"));
-	assert(waitFor([] { return appearanceThemeCount() == 2; }));
+	assert(waitFor([] { return appearanceThemeCount() == 3; }));
 	assert(applySoundTheme(2, &error));
 	/* Dropping a Mac OS 9 theme file into Appearance > Theme Files files
 	 * it into its own folder (data fork, fork and preset together) and
@@ -390,7 +432,7 @@ int main(int argc, char **argv) {
 		}
 		return appearanceThemeCount() == n;
 	};
-	assert(waitCount(3));
+	assert(waitCount(4));
 	int aqua = -1;
 	for (int i = 0; i < appearanceThemeCount(); ++i) {
 		if (appearanceThemeName(i) == "Aqua") {
@@ -413,17 +455,9 @@ int main(int argc, char **argv) {
 		QApplication::processEvents();
 		QThread::msleep(200);
 	}
-	assert(appearanceThemeCount() == 3);
+	assert(appearanceThemeCount() == 4);
 	assert(QFileInfo(bundle + "/theme.conf").lastModified() == firstWrite);
 	/* ---- the Theme Editor's user themes ---- */
-	auto findTheme = [](const QString &name) {
-		for (int i = 0; i < appearanceThemeCount(); ++i) {
-			if (appearanceThemeName(i) == name) {
-				return i;
-			}
-		}
-		return -1;
-	};
 	QString editorError;
 	ThemeDraft darkDraft;
 	darkDraft.name = "Dark Test";
@@ -448,6 +482,7 @@ int main(int argc, char **argv) {
 		assert(conf.open(QIODevice::ReadOnly));
 		const QString text = QString::fromUtf8(conf.readAll());
 		assert(text.contains("user-theme=1"));
+		assert(text.contains("program-palette=dark"));
 		assert(text.contains("title-base=3A3A3A"));
 		assert(text.contains("title-text=FFFFFF"));
 		assert(text.contains("menu-bar=333333"));
@@ -455,8 +490,8 @@ int main(int argc, char **argv) {
 		assert(!text.contains("extractor-sha256="));
 	}
 	assert(preference("theme-bundle") == "Dark Test");
-	assert(waitFor([&] { return findTheme("Dark Test") >= 0; }));
-	int darkIndex = findTheme("Dark Test");
+	assert(waitFor([&] { return findThemeIndex("Dark Test") >= 0; }));
+	int darkIndex = findThemeIndex("Dark Test");
 	assert(darkIndex >= 0);
 	assert(appearanceThemeId(darkIndex) == preference("appearance-theme"));
 	assert(appearanceThemeBundle(darkIndex) == "Dark Test");
@@ -471,16 +506,16 @@ int main(int argc, char **argv) {
 		assert(conf.open(QIODevice::ReadOnly));
 		aquaBefore = conf.readAll();
 	}
-	const QString aquaPresetPath = appearanceThemePath(findTheme("Aqua"));
+	const QString aquaPresetPath = appearanceThemePath(findThemeIndex("Aqua"));
 	assert(!aquaPresetPath.isEmpty());
 	ThemeDraft copyDraft;
-	assert(themeDraftFromPreset(findTheme("Aqua"), &copyDraft, &editorError));
+	assert(themeDraftFromPreset(findThemeIndex("Aqua"), &copyDraft, &editorError));
 	assert(copyDraft.linked);
 	assert(copyDraft.inherits == "Aqua");
 	assert(copyDraft.bundleId.isEmpty());
 	copyDraft.name = "Aqua Dark";
 	copyDraft.chrome = themePaletteDefaults(true);
-	assert(themeDraftSave(&copyDraft, findTheme("Aqua"), &editorError));
+	assert(themeDraftSave(&copyDraft, findThemeIndex("Aqua"), &editorError));
 	assert(copyDraft.bundleId == "Aqua Dark");
 	const QString copyConf = root.path() + "/config/zacos9/themes/Aqua Dark/theme.conf";
 	assert(QFileInfo::exists(copyConf));
@@ -507,8 +542,8 @@ int main(int argc, char **argv) {
 		assert(zac_theme_color("title-base", &value));
 		assert(value == 0xFF3A3A3A);
 	}
-	assert(waitFor([&] { return findTheme("Aqua Dark") >= 0; }));
-	int copyIndex = findTheme("Aqua Dark");
+	assert(waitFor([&] { return findThemeIndex("Aqua Dark") >= 0; }));
+	int copyIndex = findThemeIndex("Aqua Dark");
 	assert(copyIndex >= 0 && appearanceThemeIsUser(copyIndex));
 	/* Editing it again changes the same bundle and preset in place. */
 	{
@@ -522,14 +557,14 @@ int main(int argc, char **argv) {
 		assert(edit.bundleId == "Aqua Dark");
 		assert(edit.presetPath == presetPath);
 	}
-	assert(waitFor([&] { return findTheme("Aqua Darker") >= 0; }));
-	int darkerIndex = findTheme("Aqua Darker");
+	assert(waitFor([&] { return findThemeIndex("Aqua Darker") >= 0; }));
+	int darkerIndex = findThemeIndex("Aqua Darker");
 	assert(darkerIndex >= 0);
 	assert(preference("theme-bundle") == "Aqua Dark");
 	assert(preference("appearance-theme") == appearanceThemeId(darkerIndex));
 
 	/* A plain saved preset becomes a full theme in its own file. */
-	int plainIndex = findTheme("My Settings");
+	int plainIndex = findThemeIndex("My Settings");
 	assert(plainIndex >= 0);
 	QString plainPath;
 	{
@@ -544,8 +579,8 @@ int main(int argc, char **argv) {
 		assert(plain.presetPath == plainPath);
 		assert(preference("theme-bundle") == plain.bundleId);
 	}
-	assert(waitFor([&] { return findTheme("My Settings Edited") >= 0; }));
-	assert(findTheme("My Settings Edited") >= 0);
+	assert(waitFor([&] { return findThemeIndex("My Settings Edited") >= 0; }));
+	assert(findThemeIndex("My Settings Edited") >= 0);
 
 	/* Writing a chosen image as a chrome tile or a PNG skin. */
 	{
@@ -614,8 +649,8 @@ int main(int argc, char **argv) {
 			assert(text.contains("bar-middle=chrome/custom-bar-middle.argb"));
 			assert(text.contains("document-top=chrome/custom-document-top.png"));
 		}
-		assert(waitFor([&] { return findTheme("Art Test") >= 0; }));
-		const int artIndex = findTheme("Art Test");
+		assert(waitFor([&] { return findThemeIndex("Art Test") >= 0; }));
+		const int artIndex = findThemeIndex("Art Test");
 		ThemeDraft reloaded;
 		assert(themeDraftFromPreset(artIndex, &reloaded, &artError));
 		assert(themeArtState(reloaded, findSlot("bar-middle")) == ThemeArtState::Custom);
@@ -652,13 +687,13 @@ int main(int argc, char **argv) {
 			"/config/zacos9/themes/Art Copy/chrome/custom-bar-middle.argb"));
 		assert(QFileInfo::exists(root.path() +
 			"/config/zacos9/themes/Art Copy/chrome/custom-document-top.png"));
-		assert(waitFor([&] { return findTheme("Art Copy") >= 0; }));
-		const int copyIndex = findTheme("Art Copy");
+		assert(waitFor([&] { return findThemeIndex("Art Copy") >= 0; }));
+		const int copyIndex = findThemeIndex("Art Copy");
 		assert(copyIndex >= 0 && themeDraftDelete(copyIndex, &artError));
-		assert(waitFor([&] { return findTheme("Art Copy") < 0; }));
-		const int artAgain = findTheme("Art Test");
+		assert(waitFor([&] { return findThemeIndex("Art Copy") < 0; }));
+		const int artAgain = findThemeIndex("Art Test");
 		assert(artAgain >= 0 && themeDraftDelete(artAgain, &artError));
-		assert(waitFor([&] { return findTheme("Art Test") < 0; }));
+		assert(waitFor([&] { return findThemeIndex("Art Test") < 0; }));
 		assert(!QFileInfo(artDir).exists());
 	}
 
@@ -703,33 +738,33 @@ int main(int argc, char **argv) {
 	}
 
 	/* Imported themes are never deleted; user themes are. */
-	int imported = findTheme("Aqua");
+	int imported = findThemeIndex("Aqua");
 	assert(imported >= 0);
 	assert(!themeDraftDelete(imported, &editorError));
 	assert(editorError.contains("Imported"));
 	assert(QFileInfo::exists(bundle + "/theme.conf"));
-	int doomed = findTheme("My Settings Edited");
+	int doomed = findThemeIndex("My Settings Edited");
 	assert(doomed >= 0);
 	assert(themeDraftDelete(doomed, &editorError));
 	assert(!QFileInfo::exists(plainPath));
-	assert(waitFor([&] { return findTheme("My Settings Edited") < 0; }));
-	int userTheme = findTheme("Aqua Darker");
+	assert(waitFor([&] { return findThemeIndex("My Settings Edited") < 0; }));
+	int userTheme = findThemeIndex("Aqua Darker");
 	assert(userTheme >= 0);
 	assert(themeDraftDelete(userTheme, &editorError));
 	assert(!QFileInfo::exists(root.path() + "/config/zacos9/themes/Aqua Dark"));
-	assert(waitFor([&] { return findTheme("Aqua Darker") < 0; }));
+	assert(waitFor([&] { return findThemeIndex("Aqua Darker") < 0; }));
 	assert(QFileInfo::exists(bundle + "/theme.conf"));
-	int darkToDelete = findTheme("Dark Test");
+	int darkToDelete = findThemeIndex("Dark Test");
 	assert(darkToDelete >= 0);
 	assert(themeDraftDelete(darkToDelete, &editorError));
-	assert(waitFor([&] { return findTheme("Dark Test") < 0; }));
+	assert(waitFor([&] { return findThemeIndex("Dark Test") < 0; }));
 	/* Put the plain preset the rest of this test started with back. */
 	assert(pl_setting_set("highlight", "FFCC66"));
 	assert(pl_setting_set("sound-theme", soundThemeId(2).toUtf8().constData()));
 	assert(saveAppearanceTheme("My Settings", &editorError));
-	assert(waitFor([&] { return findTheme("My Settings") >= 0; }));
+	assert(waitFor([&] { return findThemeIndex("My Settings") >= 0; }));
 	/* Leave the imported theme selected for the tests below. */
-	int aquaAgain = findTheme("Aqua");
+	int aquaAgain = findThemeIndex("Aqua");
 	assert(aquaAgain >= 0 && applyAppearanceTheme(aquaAgain, &editorError));
 	assert(applySoundTheme(2, &editorError));
 	assert(QDir(folder).removeRecursively());
@@ -737,10 +772,10 @@ int main(int argc, char **argv) {
 		QApplication::processEvents();
 		QThread::msleep(200);
 	}
-	assert(appearanceThemeCount() == 2);
+	assert(appearanceThemeCount() == 3);
 	write(appearanceThemesFolder() + "/bad.json",
 		R"JSON({"version":1,"name":"Bad","settings":{"accent":"no-such-accent"}})JSON");
-	assert(waitFor([] { return appearanceThemeCount() == 3; }));
+	assert(waitFor([] { return appearanceThemeCount() == 4; }));
 	int invalid = -1;
 	for (int i = 0; i < appearanceThemeCount(); ++i) {
 		if (appearanceThemeName(i) == "Bad") {
@@ -783,7 +818,7 @@ int main(int argc, char **argv) {
 		QApplication::processEvents();
 		QThread::msleep(200);
 	}
-	assert(appearanceThemeCount() == 4);
+	assert(appearanceThemeCount() == 5);
 	/* Without a bundle claiming it, the filed theme installs like any
 	 * other drop. */
 	assert(QFile::remove(oldBundle + "/theme.conf"));
@@ -791,11 +826,11 @@ int main(int argc, char **argv) {
 	{
 		QElapsedTimer timer;
 		timer.start();
-		while (appearanceThemeCount() != 5 && timer.elapsed() < 60000) {
+		while (appearanceThemeCount() != 6 && timer.elapsed() < 60000) {
 			QApplication::processEvents();
 			QThread::msleep(200);
 		}
-		assert(appearanceThemeCount() == 5);
+		assert(appearanceThemeCount() == 6);
 	}
 	/* A leftover companion-named bundle from the old importer is swept:
 	 * bundles can never legitimately start with "._". */
@@ -807,7 +842,7 @@ int main(int argc, char **argv) {
 	 * filed under the data-fork name with no "._" bundle left behind. */
 	const QString lone = appearanceThemesFolder() + "/._Lone";
 	write(lone, makeThemeFork());
-	assert(waitCount(6));
+	assert(waitCount(7));
 	int loneIdx = -1;
 	for (int i = 0; i < appearanceThemeCount(); ++i) {
 		if (appearanceThemeName(i) == "Lone") {

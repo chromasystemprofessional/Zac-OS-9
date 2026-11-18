@@ -72,6 +72,10 @@ install_data(
 install_data('../share/zacos9/themes/Default/theme.conf',
   install_dir: get_option('datadir') / 'zacos9' / 'themes' / 'Default',
 )
+# The built-in dark appearance bundle.
+install_data('../share/zacos9/themes/Silver Coat Dark/theme.conf',
+  install_dir: get_option('datadir') / 'zacos9' / 'themes' / 'Silver Coat Dark',
+)
 platinum_dep = declare_dependency(
   link_with: platinum_lib,
   include_directories: platinum_inc,

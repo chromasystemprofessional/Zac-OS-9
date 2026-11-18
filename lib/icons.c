@@ -315,7 +315,7 @@ void pl_icon_paint_label(struct pl_canvas *c, int x, int y, enum pl_icon_kind ki
 			if (selected) {
 				v = 0xFF000000u | ((v >> 1) & 0x7F7F7F);
 			}
-			pl_put(c, x + i, y + j, v);
+			pl_put_raw(c, x + i, y + j, v);
 		}
 	}
 }

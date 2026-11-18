@@ -263,7 +263,7 @@ ThemeEditorWindow::ThemeEditorWindow(int presetIndex, QWidget *parent) : QWidget
 		markDirty();
 	};
 	m_dark = PanelButton("Dark Palette", QRect(RIGHT_X + 116, 14, 108, 22));
-	m_dark.hint = "Starts the window and menu colours from a dark grey palette.";
+	m_dark.hint = "Starts the window, menu and program colours from a dark grey palette.";
 	m_dark.clicked = [this] {
 		pushUndo();
 		fillPalette(true);
@@ -625,6 +625,10 @@ void ThemeEditorWindow::loadValues() {
 }
 
 void ThemeEditorWindow::fillPalette(bool dark) {
+	if (!dark) {
+		/* Program contents return to Platinum with the light chrome. */
+		m_draft.chrome.remove("program-palette");
+	}
 	const QMap<QString, QString> colours = themePaletteDefaults(dark);
 	for (auto it = colours.cbegin(); it != colours.cend(); ++it) {
 		m_draft.chrome[it.key()] = it.value();

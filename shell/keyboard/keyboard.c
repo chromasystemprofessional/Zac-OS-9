@@ -296,15 +296,15 @@ static void draw(void) {
 	}
 	const int k = whole(), q = quarters();
 	if (q) {
-		struct pl_canvas c = { logical, w, 0, 0, w, h, pl_text_log_new(logical, w) };
+		struct pl_canvas c = { logical, w, 0, 0, w, h, pl_text_log_new(logical, w), false, PL_PUT_RAW };
 		paint(&c);
 		pl_snap_scale_canvas(&c, 0, 0, q, b->px);
 		pl_text_log_free(c.log);
 	} else if (k == 1) {
-		struct pl_canvas c = { b->px, w, 0, 0, w, h, NULL };
+		struct pl_canvas c = { b->px, w, 0, 0, w, h, NULL, false, PL_PUT_RAW };
 		paint(&c);
 	} else {
-		struct pl_canvas c = { logical, w, 0, 0, w, h, NULL };
+		struct pl_canvas c = { logical, w, 0, 0, w, h, NULL, false, PL_PUT_RAW };
 		paint(&c);
 		for (int y = 0; y < h; y++) {
 			uint32_t *out = b->px + (size_t)y * k * w * k;

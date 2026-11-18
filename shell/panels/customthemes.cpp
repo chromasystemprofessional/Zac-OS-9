@@ -29,6 +29,7 @@
 
 #include "custompatterns.h"
 #include "settings.h"
+#include "theme.h"
 #include "widgets.h"
 
 namespace {
@@ -156,6 +157,25 @@ struct Watch {
 	QPointer<QObject> owner;
 	std::function<void()> changed;
 };
+/* The themes every desktop offers without a preset file. Silver Coat is
+ * the original look; Silver Coat Dark is its program-wide dark palette
+ * (the bundle in share/zacos9/themes carries the chrome colours and
+ * program-palette=dark). */
+static QList<Theme> builtinPresets() {
+	return {
+		{ "platinum", "Silver Coat", {
+			{ "accent", "" }, { "highlight", "" }, { "pattern", "" },
+			{ "background", "pattern" }, { "wallpaper", "" },
+			{ "wallpaper-mode", "fit" }, { "alert-sound", "" }, { "sound-theme", "none" }
+		}, {} },
+		{ "silver-coat-dark", "Silver Coat Dark", {
+			{ "accent", "" }, { "highlight", "5555AA" }, { "pattern", "graphite" },
+			{ "background", "pattern" }, { "wallpaper", "" },
+			{ "wallpaper-mode", "fit" }, { "alert-sound", "" }, { "sound-theme", "none" },
+			{ "theme-bundle", "Silver Coat Dark" }
+		}, {} },
+	};
+}
 QString setting(const char *key) {
 	char value[128];
 	return pl_setting(key, value, sizeof(value)) ? QString::fromUtf8(value) : QString();
@@ -617,11 +637,7 @@ public:
 		}
 	}
 	QList<Theme> sounds{{ "none", "None", {}, {} }, { "original", "ZacOS Original", {}, {} }};
-	QList<Theme> presets{{ "platinum", "Silver Coat", {
-		{ "accent", "" }, { "highlight", "" }, { "pattern", "" },
-		{ "background", "pattern" }, { "wallpaper", "" },
-		{ "wallpaper-mode", "fit" }, { "alert-sound", "" }, { "sound-theme", "none" }
-	}, {} }};
+	QList<Theme> presets = builtinPresets();
 	QStringList errors, soundErrors, importErrors;
 	QList<Watch> watches;
 	QProcess process;
@@ -987,7 +1003,7 @@ public:
 		}
 		fingerprint = mark;
 		errors.clear();
-		presets = { presets.first() };
+		presets = builtinPresets();
 		/* Presets live beside their theme (one preset per theme folder);
 		 * older ones sit in the root itself. */
 		const QDir themeRoot(appearanceThemesFolder());
@@ -1466,15 +1482,9 @@ QString themeBundleFolder(const QString &id) {
 	if (!validThemeId(id)) {
 		return QString();
 	}
-	const QString user = themeConfigRoot() + "/" + id;
-	if (QFileInfo(user).isDir()) {
-		return user;
-	}
-	const QString system = QString::fromUtf8(pl_data_dir()) + "/themes/" + id;
-	if (QFileInfo(system).isDir()) {
-		return system;
-	}
-	return QString();
+	char dir[4096];
+	return zac_theme_bundle_dir(id.toUtf8().constData(), dir, sizeof(dir))
+		? QString::fromUtf8(dir) : QString();
 }
 
 QMap<QString, QString> readThemeConf(const QString &dir) {
@@ -1702,6 +1712,11 @@ bool validateChrome(QMap<QString, QString> &chrome, QString *error) {
 				return false;
 			}
 			it.value() = colour;
+		} else if (it.key() == "program-palette") {
+			if (it.value() != "dark" && it.value() != "light") {
+				*error = "The theme's program palette must be dark or light.";
+				return false;
+			}
 		} else if (it.value().contains('/') && !safeRelativePath(it.value())) {
 			*error = "The theme names a file outside its own folder: " + it.value();
 			return false;
@@ -2014,6 +2029,7 @@ QMap<QString, QString> themePaletteDefaults(bool dark) {
 		return lightPalette();
 	}
 	static const QMap<QString, QString> colours{
+		{ "program-palette", "dark" },
 		{ "title-base", "3A3A3A" }, { "title-stripe-light", "555555" },
 		{ "title-stripe-dark", "242424" }, { "title-text", "FFFFFF" },
 		{ "title-text-inactive", "C8C8C8" }, { "frame-face", "2E2E2E" },

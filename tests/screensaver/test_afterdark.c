@@ -193,7 +193,7 @@ int main(int argc, char **argv) {
 			/* 4:3 in a 10x10 box: 10x7, one black row above and two
 			 * below. The centre maps to source (2,1), red. */
 			uint32_t pixels[10 * 10];
-			struct pl_canvas c = { pixels, 10, 0, 0, 10, 10, NULL };
+			struct pl_canvas c = { pixels, 10, 0, 0, 10, 10, NULL, false, PL_PUT_RAW };
 			ad_renderer_draw(r, &c, 0, 0, 10, 10);
 			check(pixels[0] == 0xFF000000u, "the letterbox is black");
 			check(pixels[5 * 10 + 5] == 0xFFFF0000u, "the centre is the red pixel");

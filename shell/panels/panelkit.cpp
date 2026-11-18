@@ -967,7 +967,7 @@ void PanelEdit::paint(pl_canvas *c, bool focused, bool caretOn) const {
 	/* Text and selection, clipped to the inside of the frame. */
 	const int cx0 = r.left() + 1, cy0 = r.top() + 1;
 	pl_canvas in = { c->px + (cy0 - c->y) * c->stride + (cx0 - c->x), c->stride, cx0, cy0,
-		r.width() - 2, r.height() - 2, c->log };
+		r.width() - 2, r.height() - 2, c->log, c->raw, c->put };
 	const int s0 = std::min(caret, anchor), s1 = std::max(caret, anchor);
 	const int d0 = displayIndex(s0), d1 = displayIndex(s1);
 	const QStringList ls = lines();

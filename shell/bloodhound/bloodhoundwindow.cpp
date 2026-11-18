@@ -1798,7 +1798,7 @@ void BloodhoundWindow::paintEvent(QPaintEvent *) {
 
 	/* Column titles, drawn like a folder window's unsorted columns. */
 	const int bandY = m_resultsTop + HEADER_H;
-	pl_canvas band = { c->px + bandY * c->stride, c->stride, 0, 0, W, BAND_H, c->log };
+	pl_canvas band = { c->px + bandY * c->stride, c->stride, 0, 0, W, BAND_H, c->log, c->raw, c->put };
 	auto column = [&](int x0, int x1, const QString &title, int textX) {
 		pl_hline(&band, x0, x1, 0, GRAY(0x6));
 		pl_hline(&band, x0 + 1, x1, 1, C_WHITE);
@@ -1820,7 +1820,7 @@ void BloodhoundWindow::paintEvent(QPaintEvent *) {
 	/* Rows, clipped to the list area. */
 	const int top = listTop(), viewW = W - SB_W + 1, step = rowHeight();
 	pl_fill(c, 0, top, viewW - 1, paneTop() - 1, C_WHITE);
-	pl_canvas list = { c->px + top * c->stride, c->stride, 0, m_scrollY, viewW, listHeight(), c->log };
+	pl_canvas list = { c->px + top * c->stride, c->stride, 0, m_scrollY, viewW, listHeight(), c->log, c->raw, c->put };
 	const int first = m_scrollY / step;
 	const int last = std::min<int>(static_cast<int>(m_items.size()) - 1,
 		(m_scrollY + listHeight()) / step);

@@ -18,6 +18,7 @@
 
 extern "C" {
 #include "settings.h"
+#include "theme.h"
 #include "widgets.h"
 }
 #include "../common/pixels.h" /* blitPixels */
@@ -34,7 +35,8 @@ struct Canvas {
 		img.fill(Qt::transparent);
 		uint32_t *px = reinterpret_cast<uint32_t *>(img.bits());
 		const int stride = static_cast<int>(img.bytesPerLine() / 4);
-		c = { px, stride, 0, 0, img.width(), img.height(), pl_text_log_new(px, stride) };
+		c = { px, stride, 0, 0, img.width(), img.height(), pl_text_log_new(px, stride),
+			false, PL_PUT_RAW };
 	}
 	~Canvas() { pl_text_log_free(c.log); }
 	Canvas(const Canvas &) = delete;
@@ -119,22 +121,31 @@ void Zacos9Style::polish(QApplication *app) {
 
 void Zacos9Style::polish(QPalette &p) {
 	QProxyStyle::polish(p);
-	const QColor face(0xDD, 0xDD, 0xDD), dim(0x88, 0x88, 0x88);
-	const QColor highlight = fromArgb(pl_highlight_current());
+	/* The program palette follows the active theme's program-palette key.
+	 * Faces, fields and text are the same dark greys lib/draw.c paints the
+	 * desktop's own programs with, so Qt dialogs sit beside them. */
+	const bool dark = zac_theme_program_dark();
+	const QColor face = dark ? QColor(0x34, 0x34, 0x34) : QColor(0xDD, 0xDD, 0xDD);
+	const QColor base = dark ? QColor(0x3C, 0x3C, 0x3C) : QColor(Qt::white);
+	const QColor ink = dark ? QColor(Qt::white) : QColor(Qt::black);
+	const QColor dim = dark ? QColor(0xA7, 0xA7, 0xA7) : QColor(0x88, 0x88, 0x88);
+	const uint32_t highlightArgb = pl_highlight_current();
+	const QColor highlight = fromArgb(highlightArgb);
+	const QColor highlightInk = fromArgb(zac_ink_for(highlightArgb));
 	p.setColor(QPalette::Window, face);
 	p.setColor(QPalette::Button, face);
-	p.setColor(QPalette::Base, Qt::white);
-	p.setColor(QPalette::AlternateBase, QColor(0xEE, 0xEE, 0xEE));
-	p.setColor(QPalette::WindowText, Qt::black);
-	p.setColor(QPalette::ButtonText, Qt::black);
-	p.setColor(QPalette::Text, Qt::black);
-	p.setColor(QPalette::ToolTipBase, QColor(0xFF, 0xFF, 0xCC));
-	p.setColor(QPalette::ToolTipText, Qt::black);
+	p.setColor(QPalette::Base, base);
+	p.setColor(QPalette::AlternateBase, dark ? QColor(0x30, 0x30, 0x30) : QColor(0xEE, 0xEE, 0xEE));
+	p.setColor(QPalette::WindowText, ink);
+	p.setColor(QPalette::ButtonText, ink);
+	p.setColor(QPalette::Text, ink);
+	p.setColor(QPalette::ToolTipBase, dark ? QColor(0x33, 0x33, 0x22) : QColor(0xFF, 0xFF, 0xCC));
+	p.setColor(QPalette::ToolTipText, ink);
 	p.setColor(QPalette::Highlight, highlight);
-	p.setColor(QPalette::HighlightedText, Qt::black);
-	p.setColor(QPalette::Light, Qt::white);
+	p.setColor(QPalette::HighlightedText, highlightInk);
+	p.setColor(QPalette::Light, dark ? QColor(0x5A, 0x5A, 0x5A) : QColor(Qt::white));
 	p.setColor(QPalette::Dark, dim);
-	p.setColor(QPalette::Mid, QColor(0xBB, 0xBB, 0xBB));
+	p.setColor(QPalette::Mid, dark ? QColor(0x28, 0x28, 0x28) : QColor(0xBB, 0xBB, 0xBB));
 	p.setColor(QPalette::Shadow, Qt::black);
 	for (QPalette::ColorRole role : { QPalette::WindowText, QPalette::ButtonText, QPalette::Text }) {
 		p.setColor(QPalette::Disabled, role, dim);

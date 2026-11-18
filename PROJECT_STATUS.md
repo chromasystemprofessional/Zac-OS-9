@@ -110,9 +110,13 @@ item: [`docs/system-folder.md`](docs/system-folder.md) has every item, what
 ZacOS has for it, and the order. All six items are done.
 
 **Themes**: the Appearance panel's Themes tab has **New Theme…** and **Edit
-Theme…**. The Theme Editor writes a user bundle and preset with window, menu,
-accent and highlight colours, desktop art, sounds and font; it includes light
-and dark starting palettes and a live preview. **Artwork…** edits each
+Theme…**, and the built-in **Silver Coat Dark** alongside Silver Coat. The
+Theme Editor writes a user bundle and preset with window, menu, accent and
+highlight colours, desktop art, sounds and font; it includes light and dark
+starting palettes and a live preview. A theme's `program-palette=dark` key
+carries the dark palette into program contents: panel faces, lists, text
+fields, controls and text, while icons and imported artwork keep their own
+colours. **Artwork…** edits each
 title-bar tile, button, frame edge, pop-up tab and menu skin as inherited,
 Platinum or a user image, with undo and redo. Editing an imported Mac OS 9
 theme makes a linked copy (`inherits=`) that reuses its artwork, so imports

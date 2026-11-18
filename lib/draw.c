@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "theme.h"
+
 /* A text drawn on a canvas with a log: what, where, and what it covered. */
 struct pl_text_entry {
 	char *utf8;
@@ -99,11 +101,18 @@ static void log_pixel(struct pl_text_log *log, struct pl_text_entry *e, const ui
 	e->n++;
 }
 
-void pl_put(struct pl_canvas *c, int x, int y, uint32_t color) {
+void pl_put_raw(struct pl_canvas *c, int x, int y, uint32_t color) {
 	if (x < c->x || y < c->y || x >= c->x + c->width || y >= c->y + c->height) {
 		return;
 	}
 	c->px[(y - c->y) * c->stride + (x - c->x)] = color;
+}
+
+void pl_put(struct pl_canvas *c, int x, int y, uint32_t color) {
+	if (c->put == PL_PUT_WIDGET && !c->raw) {
+		color = zac_dark_widget(color);
+	}
+	pl_put_raw(c, x, y, color);
 }
 
 void pl_hline(struct pl_canvas *c, int x0, int x1, int y, uint32_t color) {
@@ -119,12 +128,20 @@ void pl_vline(struct pl_canvas *c, int x, int y0, int y1, uint32_t color) {
 }
 
 void pl_fill(struct pl_canvas *c, int x0, int y0, int x1, int y1, uint32_t color) {
+	if (!c->raw && zac_theme_program_dark()) {
+		color = zac_dark_fill(color);
+	}
 	for (int y = y0; y <= y1; y++) {
 		pl_hline(c, x0, x1, y, color);
 	}
 }
 
 void pl_outline(struct pl_canvas *c, int x0, int y0, int x1, int y1, uint32_t color) {
+	if (!c->raw && color == C_BLACK && zac_theme_program_dark()) {
+		/* Frames and borders read as a light line on a dark face, rather
+		 * than disappearing into it. */
+		color = 0xFFB8B8B8u;
+	}
 	pl_hline(c, x0, x1, y0, color);
 	pl_hline(c, x0, x1, y1, color);
 	pl_vline(c, x0, y0, y1, color);
@@ -136,6 +153,27 @@ void pl_text(struct pl_canvas *c, const struct plat_text *t, int ink_x,
 	if (!t || t->ink_l < 0) {
 		return;
 	}
+	if (!c->raw && zac_theme_program_dark()) {
+		/* Default text follows what it is drawn on: white on the dark
+		 * palette's faces and fields, but still black on a light selection
+		 * or a coloured chart block. Dimmed and coloured text only needs
+		 * lifting on a dark background. */
+		const int sx = ink_x > c->x ? ink_x - 1 : ink_x;
+		const int sy = baseline_y - t->baseline;
+		uint32_t bg = 0;
+		bool known = false;
+		if (c->px && sx >= c->x && sy >= c->y &&
+				sx < c->x + c->width && sy < c->y + c->height) {
+			bg = c->px[(sy - c->y) * c->stride + (sx - c->x)];
+			known = (bg >> 24) == 0xFF;
+		}
+		const bool dark_bg = !known || zac_ink_for(bg) == 0xFFFFFFFFu;
+		if (color == C_BLACK) {
+			color = dark_bg ? 0xFFFFFFFFu : 0xFF000000u;
+		} else if (dark_bg) {
+			color = zac_dark_ink(color);
+		}
+	}
 	int ox = ink_x - t->ink_l, oy = baseline_y - t->baseline;
 	struct pl_text_entry *e = c->log ? log_text(c, t, ox, oy, color) : NULL;
 	for (int y = 0; y < t->height; y++) {
@@ -145,7 +183,7 @@ void pl_text(struct pl_canvas *c, const struct plat_text *t, int ink_x,
 				if (e && px >= c->x && py >= c->y && px < c->x + c->width && py < c->y + c->height) {
 					log_pixel(c->log, e, &c->px[(py - c->y) * c->stride + (px - c->x)]);
 				}
-				pl_put(c, px, py, color);
+				pl_put_raw(c, px, py, color);
 			}
 		}
 	}
@@ -169,7 +207,7 @@ void pl_image(struct pl_canvas *c, int x, int y, const uint32_t *px, int w, int 
 		for (int i = 0; i < w; i++) {
 			uint32_t p = px[j * w + i];
 			if (p >> 24) {
-				pl_put(c, x + i, y + j, p);
+				pl_put_raw(c, x + i, y + j, p);
 			}
 		}
 	}

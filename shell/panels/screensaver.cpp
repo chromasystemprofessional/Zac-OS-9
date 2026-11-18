@@ -192,7 +192,7 @@ protected:
 		const QRect r = m_preview;
 		pl_outline(c, r.left() - 1, r.top() - 1, r.right() + 1, r.bottom() + 1, C_BLACK);
 		pl_canvas inner = { c->px + r.top() * c->stride + r.left(), c->stride, 0, 0,
-			r.width(), r.height(), c->log };
+			r.width(), r.height(), c->log, c->raw, c->put };
 		if (m_previewAfterdark) {
 			ad_renderer_take_frame(m_previewAfterdark);
 			if (!ad_renderer_frame(m_previewAfterdark) && m_clock.elapsed() > 5000) {

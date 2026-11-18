@@ -5,7 +5,9 @@ named combinations of accent, highlight, desktop background, alert sound and
 interface sound set. **Save Theme…** saves the current combination under a new
 name; **New Theme…** and **Edit Theme…** open the Theme Editor described below.
 **Platinum** restores the original default appearance and disables interface
-sounds.
+sounds. **Silver Coat Dark** is the same desktop with a dark program-wide
+palette: dark window chrome, menu bar, menus, panel faces, lists, text fields,
+controls and desktop, with white text.
 
 Presets are stored in **System Folder > Appearance > Theme Files**, normally
 `~/.local/share/zacos9/appearance/Theme Files`. Each dropped theme keeps its
@@ -327,13 +329,20 @@ the `theme-*.pfont` bitmaps rasterized from those same faces.
 
 ## Theme Editor
 
+**Silver Coat Dark** is built in: its chrome colours and
+`program-palette=dark` live in `share/zacos9/themes/Silver Coat Dark`, so it
+needs no preset file and cannot be deleted; **Edit Theme…** makes a linked copy
+like any imported theme.
+
 Appearance ▸ Themes has **New Theme…** and **Edit Theme…**. The Theme Editor
 edits the whole look in one window: the window title and frame colours, the
 menu bar and pull-down menu colours, accent and highlight, desktop pattern or
 picture and its placement, sound set and alert sound, and the program font.
 Its preview shows a menu bar, an open menu and a window in the chosen colours.
 **Light Palette** and **Dark Palette** start the chrome from a complete set of
-colours; every colour can then be changed with the standard colour picker.
+colours; **Dark Palette** also turns on the dark program palette, so panels,
+lists, fields and controls follow. Every colour can then be changed with the
+standard colour picker.
 **Duplicate…** saves the current settings as a new theme and leaves the one
 you opened as it is. **Artwork…** opens the per-slot decoration editor:
 each title-bar tile, button, frame edge, pop-up tab and menu skin can be
@@ -389,6 +398,7 @@ from these keys (all `RRGGBB`):
 ```ini
 name=My Dark Theme
 user-theme=1
+program-palette=dark
 title-base=3A3A3A
 title-stripe-light=555555
 title-stripe-dark=242424
@@ -419,13 +429,18 @@ menu-separator-light=3A3A3A
 ```
 
 A dark theme changes the window frames, title bars, menu bar, pull-down menus
-and desktop. Program contents (lists, text fields, dialogs' interiors) stay
-Platinum, as classic Mac OS appearance themes did. Title text, menu-bar text
-and menu text may be omitted: the compositor and menu bar then pick black or
-white from the background they sit on, so an imported dark scheme stays
-readable without a text colour of its own. Inactive frames follow the active
-frame colours unless `frame-face-inactive` / `frame-border-inactive` name
-their own.
+and desktop. Its `program-palette=dark` key also darkens program contents:
+panel faces, list and text-field backgrounds, buttons, checkboxes, radio
+buttons, tabs and scroll bars, and draws their text in white (black on a
+light coloured block or selection, where white would not read). Icons,
+previews and imported theme artwork keep their own colours. Without the key,
+programs stay Platinum, as classic Mac OS appearance themes did. **Silver
+Coat Dark** and the Theme Editor's **Dark Palette** set
+`program-palette=dark`. Title text, menu-bar text and menu text
+may be omitted: the compositor and menu bar then pick black or white from the
+background they sit on, so an imported dark scheme stays readable without a
+text colour of its own. Inactive frames follow the active frame colours unless
+`frame-face-inactive` / `frame-border-inactive` name their own.
 
 The editor validates every colour, name and chosen image, writes the bundle
 and preset with atomic replacement, and won't overwrite a duplicate name or an
@@ -541,9 +556,10 @@ Tests use original WAVs and synthetic classic resources. They cover resource
 parsing and sound event mapping, safe file handling, catalog changes, preset
 validation, selection persistence, muted interface volume, preview and playback
 argument routing. They also cover user themes: creating one, linked copies of
-imports, inherited artwork and cursors, dark palettes and readable title ink,
-deletion rules, the themed menu bar and menus, per-slot artwork states, and
-writing chosen images as ARGB tiles and PNG skins. Sound-set coverage includes
+imports, inherited artwork and cursors, dark palettes, the dark program
+palette and readable title ink, deletion rules, the themed menu bar and menus,
+per-slot artwork states, and writing chosen images as ARGB tiles and PNG
+skins. Sound-set coverage includes
 a System Folder set keeping its `.rsrc` fork, a Kaleidoscope scheme's
 WindowShade pair becoming a selectable set, and a theme's own `sdid` sounds
 being written as a Sound Sets folder. Chrome tests cover a

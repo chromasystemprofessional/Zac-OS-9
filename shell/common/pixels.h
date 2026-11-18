@@ -74,7 +74,8 @@ struct Pixels {
 		img.fill(0);
 		uint32_t *px = reinterpret_cast<uint32_t *>(img.bits());
 		const int stride = static_cast<int>(img.bytesPerLine() / 4);
-		c = { px, stride, 0, 0, img.width(), img.height(), pl_text_log_new(px, stride) };
+		c = { px, stride, 0, 0, img.width(), img.height(), pl_text_log_new(px, stride),
+			false, PL_PUT_RAW };
 	}
 	~Pixels() { pl_text_log_free(c.log); }
 	Pixels(const Pixels &) = delete;

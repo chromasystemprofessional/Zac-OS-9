@@ -102,7 +102,9 @@ works for it:
   menus, lavender selection, Platinum tabs, check boxes and scroll bars, and
   compact Platinum message dialogs with emphasized default actions. Checked
   on screen with Mousepad (menu bar, File menu, Preferences dialog); other
-  applications' prompts have not been visually exercised.
+  applications' prompts have not been visually exercised. GTK applications
+  still use this light theme when Silver Coat Dark is active; a dark GTK
+  variant is not shipped yet.
   To try it from a build tree: `XDG_DATA_DIRS=$PWD/share:/usr/share`.
 - **GTK 4 theme** `share/themes/ZacOS9/gtk-4.0/gtk.css` supplies the same
   palette, controls, and prompt treatment to GTK 4 applications which honor
@@ -114,8 +116,10 @@ works for it:
   default ring), check boxes, radio buttons, text-field frames and scroll bars
   are drawn by `lib/widgets.c`, so they match our own programs pixel for pixel.
   Standard Qt dialogs and message prompts inherit the same palette and
-  controls. Scroll bar geometry is in `subControlRect` (arrows at both ends,
-  fixed 17-px thumb). Checked with `build/qtdemo.cpp` (thumb drag and arrows
+  controls. The palette follows the active theme's `program-palette=dark`
+  key, so Qt applications started while Silver Coat Dark is active get dark
+  faces, fields and white text too. Scroll bar geometry is in
+  `subControlRect` (arrows at both ends, fixed 17-px thumb). Checked with `build/qtdemo.cpp` (thumb drag and arrows
   work); prompts are covered by an offscreen palette regression check.
   To try it from a build tree: copy `build/shell/qtstyle/zacos9style.so` into
   `<dir>/styles/` and set `QT_PLUGIN_PATH=<dir> QT_STYLE_OVERRIDE=zacos9`.

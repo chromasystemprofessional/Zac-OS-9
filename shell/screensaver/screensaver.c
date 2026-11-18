@@ -105,7 +105,7 @@ static void present(struct screen *s, struct pl_shm_buffer *b) {
 static void scale_logical(struct screen *s, struct pl_shm_buffer *b) {
 	const int k = s->scale;
 	if (s->quarters) {
-		struct pl_canvas c = { s->logical, s->w, 0, 0, s->w, s->h, NULL };
+		struct pl_canvas c = { s->logical, s->w, 0, 0, s->w, s->h, NULL, false, PL_PUT_RAW };
 		pl_snap_scale_canvas(&c, 0, 0, s->quarters, b->px);
 	} else if (k == 1) {
 		memcpy(b->px, s->logical, (size_t)s->w * s->h * 4);
@@ -151,7 +151,7 @@ static void draw(struct screen *s) {
 			return;
 		}
 		if (fresh) {
-			struct pl_canvas c = { s->logical, s->w, 0, 0, s->w, s->h, NULL };
+			struct pl_canvas c = { s->logical, s->w, 0, 0, s->w, s->h, NULL, false, PL_PUT_RAW };
 			ad_renderer_draw(s->afterdark, &c, 0, 0, s->w, s->h);
 		} else {
 			/* Cover the screen at once; the first module frame follows. */
@@ -166,16 +166,16 @@ static void draw(struct screen *s) {
 	if (s->quarters) {
 		/* Each logical pixel one or two of the screen's, any text in the
 		 * font for this scale: sharp. */
-		struct pl_canvas c = { s->logical, s->w, 0, 0, s->w, s->h, pl_text_log_new(s->logical, s->w) };
+		struct pl_canvas c = { s->logical, s->w, 0, 0, s->w, s->h, pl_text_log_new(s->logical, s->w), false, PL_PUT_RAW };
 		pl_saver_draw(s->saver, &c, now_seconds() - started);
 		pl_snap_scale_canvas(&c, 0, 0, s->quarters, b->px);
 		pl_text_log_free(c.log);
 	} else if (k == 1) {
-		struct pl_canvas c = { b->px, s->w, 0, 0, s->w, s->h, NULL };
+		struct pl_canvas c = { b->px, s->w, 0, 0, s->w, s->h, NULL, false, PL_PUT_RAW };
 		pl_saver_draw(s->saver, &c, now_seconds() - started);
 	} else {
 		/* At logical size, then each pixel k×k: sharp, like the rest. */
-		struct pl_canvas c = { s->logical, s->w, 0, 0, s->w, s->h, NULL };
+		struct pl_canvas c = { s->logical, s->w, 0, 0, s->w, s->h, NULL, false, PL_PUT_RAW };
 		pl_saver_draw(s->saver, &c, now_seconds() - started);
 		scale_logical(s, b);
 	}

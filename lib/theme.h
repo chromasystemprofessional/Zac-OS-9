@@ -33,6 +33,10 @@ void zac_theme_free(ZacTheme *theme);
  * returned array and each string. Returns count (0 if none). */
 int zac_theme_list(const char *root, char ***out_dirs);
 
+/* Resolve a theme bundle by id: the user's own bundle, the installed data
+ * directory, then the source tree's share/zacos9/themes (a build tree). */
+bool zac_theme_bundle_dir(const char *id, char *out, size_t size);
+
 /* Resolve a theme-provided asset to an absolute path when the active theme
  * bundle ("theme-bundle" in desktop.conf) supplies it. `relative` is the
  * path inside the bundle (e.g. "boot/happy-zac-1x.png" or "menu-icon.png").
@@ -56,6 +60,19 @@ bool zac_theme_color(const char *key, uint32_t *out);
 /* Read a raw string value from the active theme's theme.conf. Returns
  * false (leaving out untouched) when the key is unset or too long. */
 bool zac_theme_string(const char *key, char *out, size_t size);
+
+/* Whether the active theme asks program contents (panels, lists, fields,
+ * controls) to use the dark program palette ("program-palette=dark"). */
+bool zac_theme_program_dark(void);
+
+/* The dark program palette's conversions of a Platinum grey. `fill` turns
+ * a light face or field into its dark counterpart; `widget` keeps a
+ * control's bevel readable (its white highlight stays lighter than its
+ * face); `ink` turns black or grey text light. Chromatic colours and
+ * colours outside the Platinum ramp pass through unchanged. */
+uint32_t zac_dark_fill(uint32_t colour);
+uint32_t zac_dark_widget(uint32_t colour);
+uint32_t zac_dark_ink(uint32_t colour);
 
 /* Pick ink that reads on `background`: white on a dark fill, black on a
  * light one. */

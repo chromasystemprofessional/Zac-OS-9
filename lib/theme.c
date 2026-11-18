@@ -123,13 +123,33 @@ static bool theme_dir_for_id(const char *id, char *out, size_t size) {
 	return false;
 }
 
+/* A bundle in the source tree's share/zacos9/themes: a build tree runs
+ * with the developer's installed data directory on PATH, which may be an
+ * older release, but the built-in themes should be the ones just built. */
+bool zac_theme_bundle_dir(const char *id, char *out, size_t size) {
+	if (!out || size == 0 || !valid_bundle_id(id)) {
+		return false;
+	}
+	if (theme_dir_for_id(id, out, size)) {
+		return true;
+	}
+	char source[4096];
+	snprintf(source, sizeof(source), "%s/share/zacos9/themes/%s", ZACOS9_SOURCE_DIR, id);
+	struct stat st;
+	if (stat(source, &st) == 0 && S_ISDIR(st.st_mode)) {
+		snprintf(out, size, "%s", source);
+		return true;
+	}
+	return false;
+}
+
 /* The active theme bundle's directory (from "theme-bundle"), or false. */
 static bool active_theme_dir(char *out, size_t size) {
 	char id[256];
 	if (!pl_setting("theme-bundle", id, sizeof(id)) || !id[0]) {
 		return false;
 	}
-	return theme_dir_for_id(id, out, size);
+	return zac_theme_bundle_dir(id, out, size);
 }
 
 /* The bundle the active theme inherits its artwork from ("inherits"),
@@ -139,7 +159,7 @@ static bool inherited_theme_dir(char *out, size_t size) {
 	if (!zac_theme_string("inherits", id, sizeof(id)) || !id[0]) {
 		return false;
 	}
-	if (!theme_dir_for_id(id, inherited, sizeof(inherited))) {
+	if (!zac_theme_bundle_dir(id, inherited, sizeof(inherited))) {
 		return false;
 	}
 	if (active_theme_dir(own, sizeof(own)) && strcmp(own, inherited) == 0) {
@@ -348,6 +368,71 @@ bool zac_theme_ink(const char *key, uint32_t background, uint32_t *out) {
 	}
 	*out = zac_ink_for(background);
 	return false;
+}
+
+/* A Platinum grey's level 0..15 (GRAY(n) is n * 0x111111), or -1 for
+ * anything else: chromatic colours, artwork and custom greys are left
+ * alone by the program palette. */
+static int platinum_grey(uint32_t colour) {
+	if ((colour >> 24) != 0xFF) {
+		return -1;
+	}
+	const unsigned r = (colour >> 16) & 0xFF, g = (colour >> 8) & 0xFF, b = colour & 0xFF;
+	if (r != g || g != b || r % 0x11 != 0) {
+		return -1;
+	}
+	return (int)(r / 0x11);
+}
+
+bool zac_theme_program_dark(void) {
+	char value[16];
+	return zac_theme_string("program-palette", value, sizeof(value)) &&
+		strcmp(value, "dark") == 0;
+}
+
+/* Dark surfaces, from shadow (#08) to field (#3C), keeping Platinum's
+ * order: a face stays lighter than its shadow and darker than a field. */
+static const unsigned char dark_surface[16] = {
+	0x00, 0x04, 0x08, 0x0C, 0x10, 0x14, 0x18, 0x1C,
+	0x20, 0x24, 0x28, 0x2C, 0x30, 0x34, 0x38, 0x3C,
+};
+
+static uint32_t grey_of(unsigned level) {
+	return 0xFF000000u | level << 16 | level << 8 | level;
+}
+
+uint32_t zac_dark_fill(uint32_t colour) {
+	const int n = platinum_grey(colour);
+	return n < 0 ? colour : grey_of(dark_surface[n]);
+}
+
+uint32_t zac_dark_widget(uint32_t colour) {
+	const int n = platinum_grey(colour);
+	if (n < 0) {
+		return colour;
+	}
+	/* A control's black outline and its white bevel are the two places
+	 * where inverting the grey would read wrong: keep the outline light
+	 * and the highlight a step above the face. */
+	if (n == 0) {
+		return grey_of(0xB8);
+	}
+	if (n == 15) {
+		return grey_of(0x5A);
+	}
+	return grey_of(dark_surface[n]);
+}
+
+uint32_t zac_dark_ink(uint32_t colour) {
+	static const unsigned char ink[15] = {
+		0xFF, 0xF4, 0xE9, 0xDE, 0xD3, 0xC8, 0xBD, 0xB2,
+		0xA7, 0x9C, 0x91, 0x86, 0x7B, 0x70, 0x65,
+	};
+	const int n = platinum_grey(colour);
+	if (n < 0) {
+		return colour;
+	}
+	return n == 15 ? 0xFFFFFFFFu : grey_of(ink[n]);
 }
 
 uint32_t zac_blend(uint32_t from, uint32_t to, int percent) {

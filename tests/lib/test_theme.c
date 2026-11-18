@@ -167,6 +167,7 @@ int main(void) {
 	snprintf(themeconf, sizeof(themeconf), "%s/zacos9/themes/Test/theme.conf", cfg);
 	FILE *tf = fopen(themeconf, "w");
 	assert(tf); fputs("name=Test\naccent=ocean\nhighlight=46A0FA\n", tf); fclose(tf);
+	assert(!zac_theme_program_dark());
 
 	char resolved[256];
 	assert(zac_theme_asset("menu-icon.png", resolved, sizeof(resolved)) == true);
@@ -179,7 +180,7 @@ int main(void) {
 		snprintf(tc, sizeof(tc), "%s/zacos9/themes/Test/theme.conf", cfg);
 		FILE *tcf = fopen(tc, "a");
 		assert(tcf);
-		fputs("title-base=FF0000\nframe-light=00FF00\n", tcf);
+		fputs("title-base=FF0000\nframe-light=00FF00\nprogram-palette=dark\n", tcf);
 		fclose(tcf);
 		uint32_t v = 0;
 		assert(zac_theme_color("title-base", &v) == true);
@@ -187,6 +188,19 @@ int main(void) {
 		assert(zac_theme_color("frame-light", &v) == true);
 		assert(v == 0xFF00FF00u);
 		assert(zac_theme_color("no-such-key", &v) == false);
+		/* The program palette keeps Platinum's order in the dark and
+		 * leaves chromatic colours and custom greys alone. */
+		assert(zac_theme_program_dark());
+		assert(zac_dark_fill(0xFFDDDDDDu) == 0xFF343434u);
+		assert(zac_dark_fill(0xFFFFFFFFu) == 0xFF3C3C3Cu);
+		assert(zac_dark_fill(0xFF000000u) == 0xFF000000u);
+		assert(zac_dark_fill(0xFF9999FFu) == 0xFF9999FFu);
+		assert(zac_dark_fill(0xFF3A3A3Au) == 0xFF3A3A3Au);
+		assert(zac_dark_widget(0xFF000000u) == 0xFFB8B8B8u);
+		assert(zac_dark_widget(0xFFFFFFFFu) == 0xFF5A5A5Au);
+		assert(zac_dark_ink(0xFF000000u) == 0xFFFFFFFFu);
+		assert(zac_dark_ink(0xFF888888u) == 0xFFA7A7A7u);
+		assert(zac_dark_ink(0xFFFFFFFFu) == 0xFFFFFFFFu);
 	}
 
 	/* A linked theme finds artwork in the bundle it inherits from, one

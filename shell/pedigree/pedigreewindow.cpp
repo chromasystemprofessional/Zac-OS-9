@@ -16,6 +16,7 @@
 #include "panelkit.h"
 #include "pixels.h"
 #include "settings.h"
+#include "theme.h"
 
 namespace {
 
@@ -76,7 +77,8 @@ protected:
 			}
 			const Row &row = m_w->m_rows[index];
 			const int top = r.top() + 1 + i * ROW_H;
-			if (index == m_w->m_selected) {
+			const bool selected = index == m_w->m_selected;
+			if (selected) {
 				pl_fill(c, r.left() + 1, top, sbx - 1, top + ROW_H - 1, highlight);
 			}
 			const int x = r.left() + 6 + row.depth * INDENT;
@@ -86,12 +88,20 @@ protected:
 			const pl_font font = row.depth == 0 ? PL_FONT_SYSTEM : PL_FONT_VIEWS;
 			const int labelX = x + 14;
 			Text label(row.item->label, std::max(10, (row.item->value.isEmpty() ? sbx : valueX) - labelX - 6), font);
-			pl_text(c, label.t, labelX, top + 12, C_BLACK);
+			/* The highlight is the theme's own colour; pick ink that reads
+			 * on it rather than the palette's usual white. */
+			const bool was_raw = c->raw;
+			if (selected) {
+				c->raw = true;
+			}
+			const uint32_t ink = selected ? zac_ink_for(highlight) : C_BLACK;
+			pl_text(c, label.t, labelX, top + 12, ink);
 			if (!row.item->value.isEmpty()) {
 				const int vx = std::max(valueX, labelX + label.inkWidth() + 10);
 				Text value(row.item->value, std::max(10, sbx - vx - 6), PL_FONT_VIEWS);
-				pl_text(c, value.t, vx, top + 12, C_BLACK);
+				pl_text(c, value.t, vx, top + 12, ink);
 			}
+			c->raw = was_raw;
 		}
 		const pl_scrollbar sb = scrollbar();
 		pl_scrollbar_paint(c, sbx, r.top(), &sb, pl_accent_current());

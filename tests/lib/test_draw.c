@@ -2,12 +2,17 @@
  * pl_image_blend: alpha compositing for a resolved application icon
  * (real alpha, not the 1990s pixel art's on/off alpha).
  */
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #include "draw.h"
+#include "settings.h"
 #include "text.h"
+#include "theme.h"
 
 static int fails;
 
@@ -126,6 +131,96 @@ int main(void) {
 		free(got);
 		free(want);
 		pl_text_log_free(c.log);
+	}
+
+	/* The dark program palette: fills become dark, black text white, and
+	 * artwork (raw canvases, images, imported icons) keeps its pixels. */
+	{
+		char cfg[] = "/tmp/zacdrawXXXXXX";
+		assert(mkdtemp(cfg) != NULL);
+		setenv("XDG_CONFIG_HOME", cfg, 1);
+		setenv("HOME", cfg, 1);
+		char dir[256];
+		snprintf(dir, sizeof(dir), "%s/zacos9", cfg);
+		assert(mkdir(dir, 0755) == 0);
+		snprintf(dir, sizeof(dir), "%s/zacos9/themes", cfg);
+		assert(mkdir(dir, 0755) == 0);
+		snprintf(dir, sizeof(dir), "%s/zacos9/themes/Dark", cfg);
+		assert(mkdir(dir, 0755) == 0);
+		char path[320];
+		snprintf(path, sizeof(path), "%s/zacos9/themes/Dark/theme.conf", cfg);
+		FILE *conf = fopen(path, "w");
+		assert(conf);
+		fputs("name=Dark\nprogram-palette=dark\n", conf);
+		fclose(conf);
+		snprintf(path, sizeof(path), "%s/zacos9/desktop.conf", cfg);
+		conf = fopen(path, "w");
+		assert(conf);
+		fputs("theme-bundle=Dark\n", conf);
+		fclose(conf);
+
+		uint32_t field[4] = { 0, 0, 0, 0 };
+		struct pl_canvas c = make(field, 2, 2);
+		pl_fill(&c, 0, 0, 1, 1, C_WHITE);
+		check(field[0] == 0xFF3C3C3Cu && field[3] == 0xFF3C3C3Cu,
+			"a white field becomes the dark palette's field grey");
+
+		uint32_t page[40 * 20];
+		struct pl_canvas text_canvas = make(page, 40, 20);
+		pl_fill(&text_canvas, 0, 0, 39, 19, GRAY(0xD));
+		struct plat_text *letter = text_render("H", 40);
+		pl_text(&text_canvas, letter, 4, 15, C_BLACK);
+		bool white = false, black = false;
+		for (int i = 0; i < 40 * 20; i++) {
+			white = white || page[i] == 0xFFFFFFFFu;
+			black = black || page[i] == 0xFF000000u;
+		}
+		check(white && !black, "black text is drawn white on the dark face");
+		text_destroy(letter);
+
+		uint32_t light_page[40 * 20];
+		struct pl_canvas light_canvas = make(light_page, 40, 20);
+		pl_fill(&light_canvas, 0, 0, 39, 19, RGB(0xFF, 0xCC, 0x66));
+		letter = text_render("H", 40);
+		pl_text(&light_canvas, letter, 4, 15, C_BLACK);
+		white = false;
+		black = false;
+		for (int i = 0; i < 40 * 20; i++) {
+			white = white || light_page[i] == 0xFFFFFFFFu;
+			black = black || light_page[i] == 0xFF000000u;
+		}
+		check(black && !white, "black text stays black on a light coloured block");
+		text_destroy(letter);
+
+		uint32_t art[1] = { 0 };
+		struct pl_canvas raw = make(art, 1, 1);
+		raw.raw = true;
+		pl_fill(&raw, 0, 0, 0, 0, C_WHITE);
+		check(art[0] == 0xFFFFFFFFu, "a raw artwork canvas keeps its white paper");
+
+		uint32_t widget[1] = { 0 };
+		struct pl_canvas wc = make(widget, 1, 1);
+		wc.put = PL_PUT_WIDGET;
+		pl_put(&wc, 0, 0, C_BLACK);
+		check(widget[0] == 0xFFB8B8B8u, "a control outline becomes light on dark");
+
+		uint32_t image[1] = { 0 };
+		struct pl_canvas ic = make(image, 1, 1);
+		uint32_t white_px[1] = { C_WHITE };
+		pl_image(&ic, 0, 0, white_px, 1, 1);
+		check(image[0] == 0xFFFFFFFFu, "an icon keeps its own colours");
+
+		snprintf(path, sizeof(path), "%s/zacos9/themes/Dark/theme.conf", cfg);
+		unlink(path);
+		snprintf(path, sizeof(path), "%s/zacos9/themes/Dark", cfg);
+		rmdir(path);
+		snprintf(path, sizeof(path), "%s/zacos9/themes", cfg);
+		rmdir(path);
+		snprintf(path, sizeof(path), "%s/zacos9/desktop.conf", cfg);
+		unlink(path);
+		snprintf(path, sizeof(path), "%s/zacos9", cfg);
+		rmdir(path);
+		rmdir(cfg);
 	}
 
 	if (fails) {

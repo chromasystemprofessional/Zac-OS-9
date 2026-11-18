@@ -326,7 +326,7 @@ void ToyBox::paintEvent(QPaintEvent *) {
 	}
 
 	pl_canvas content = { c->px + top * c->stride, c->stride, 0, 0, W - SB_WIDTH + 1,
-		std::max(0, H - top), c->log };
+		std::max(0, H - top), c->log, c->raw, c->put };
 	const Metrics m = metrics();
 	for (const auto &item : m_items) {
 		QRect b = buttonRect(item.get());

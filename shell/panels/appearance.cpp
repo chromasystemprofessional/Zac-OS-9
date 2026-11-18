@@ -25,6 +25,7 @@
 #include "custompatterns.h"
 #include "customthemes.h"
 #include "settings.h"
+#include "theme.h"
 #include "themeeditor.h"
 
 /* The window, its tab control, and the layout inside a pane following
@@ -670,8 +671,9 @@ static QString galleryBundleDir(const QString &bundle) {
 	if (bundle.isEmpty()) {
 		return QString();
 	}
-	return QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) +
-		"/zacos9/themes/" + bundle;
+	char dir[4096];
+	return zac_theme_bundle_dir(bundle.toUtf8().constData(), dir, sizeof(dir))
+		? QString::fromUtf8(dir) : QString();
 }
 
 static void blitImage(pl_canvas *c, const QImage &img, int x, int y) {
@@ -806,6 +808,11 @@ static uint32_t galleryInk(uint32_t background) {
  * title height (22, or 38 with Aqua's blue span). */
 static int paintMiniTitleBar(pl_canvas *c, int wx, int wy, int ww,
 		const QMap<QString, QString> &conf, const QString &bundleDir, Text &aa) {
+	/* The card previews the theme's own chrome, so the active program
+	 * palette must not recolour it. */
+	struct pl_canvas preview = *c;
+	preview.raw = true;
+	c = &preview;
 	const QImage barLeft = galleryTile(bundleDir, conf.value("bar-left"));
 	const QImage barMiddle = galleryTile(bundleDir, conf.value("bar-middle"));
 	const QImage barRight = galleryTile(bundleDir, conf.value("bar-right"));
@@ -981,10 +988,16 @@ static void paintThemeCard(pl_canvas *c, int x, int y, int index, bool selected)
 	/* Mini window in the theme's own chrome, with Aa, radios and checkboxes. */
 	const int wx = x + 8, wy = y + 4, ww = 90;
 	const QMap<QString, QString> tconf = galleryThemeConf(bundleDir);
+	/* The preview shows this theme's own program body, not the active
+	 * theme's: a near-white and a dark value stay outside the palette's
+	 * ramp, so pl_fill leaves them alone. */
+	const bool activeDark = zac_theme_program_dark();
+	const uint32_t cardBody = tconf.value("program-palette") == "dark"
+		? 0xFF3C3C3Cu : activeDark ? 0xFFFEFEFEu : C_WHITE;
 	Text aa("Aa", 80, PL_FONT_SYSTEM);
 	const int titleH = paintMiniTitleBar(c, wx, wy, ww, tconf, bundleDir, aa);
 	const int bodyH = 52, wh = titleH + bodyH;
-	pl_fill(c, wx, wy + titleH, wx + ww - 1, wy + wh - 1, C_WHITE);
+	pl_fill(c, wx, wy + titleH, wx + ww - 1, wy + wh - 1, cardBody);
 	pl_hline(c, wx, wx + ww - 1, wy + wh - 1, C_BLACK);
 	pl_vline(c, wx, wy, wy + wh - 1, C_BLACK);
 	pl_vline(c, wx + ww - 1, wy, wy + wh - 1, C_BLACK);
@@ -1016,7 +1029,7 @@ static void paintThemeCard(pl_canvas *c, int x, int y, int index, bool selected)
 
 	/* Mini progress card in the theme's accent. */
 	const int px = x + 100, py = y + 58, pw = 70, ph = 24;
-	pl_fill(c, px, py, px + pw - 1, py + ph - 1, C_WHITE);
+	pl_fill(c, px, py, px + pw - 1, py + ph - 1, cardBody);
 	pl_hline(c, px, px + pw - 1, py, C_BLACK);
 	pl_hline(c, px, px + pw - 1, py + ph - 1, C_BLACK);
 	pl_vline(c, px, py, py + ph - 1, C_BLACK);

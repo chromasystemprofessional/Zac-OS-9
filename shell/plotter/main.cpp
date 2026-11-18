@@ -15,6 +15,7 @@
 #include "panelkit.h"
 #include "platinumshell.h"
 #include "settings.h"
+#include "theme.h"
 
 namespace {
 
@@ -88,6 +89,9 @@ private:
 
 	void paintGraph(pl_canvas *c) {
 		pl_fill(c, GX, GY, GX + GW - 1, GY + GH - 1, C_WHITE);
+		const bool dark = zac_theme_program_dark();
+		const uint32_t grid = dark ? 0xFF555555u : GRAY(0xD);
+		const uint32_t axis = dark ? 0xFFC8C8C8u : C_BLACK;
 		const double perPx = m_span / GW;
 		const double x0 = -m_span / 2, y1 = GH * perPx / 2;
 		auto sx = [&](double x) { return GX + int(std::lround((x - x0) / perPx)); };
@@ -96,15 +100,15 @@ private:
 		double step = std::pow(10, std::ceil(std::log10(30 * perPx)));
 		if (step / perPx > 120) step /= 5; else if (step / perPx > 60) step /= 2;
 		for (double g = std::ceil(x0 / step) * step; g <= -x0; g += step) {
-			pl_vline(c, sx(g), GY, GY + GH - 1, GRAY(0xD));
+			pl_vline(c, sx(g), GY, GY + GH - 1, grid);
 		}
 		for (double g = std::ceil(-y1 / step) * step; g <= y1; g += step) {
-			pl_hline(c, GX, GX + GW - 1, sy(g), GRAY(0xD));
+			pl_hline(c, GX, GX + GW - 1, sy(g), grid);
 		}
-		pl_hline(c, GX, GX + GW - 1, sy(0), C_BLACK);
-		pl_vline(c, sx(0), GY, GY + GH - 1, C_BLACK);
+		pl_hline(c, GX, GX + GW - 1, sy(0), axis);
+		pl_vline(c, sx(0), GY, GY + GH - 1, axis);
 		/* The curve: one sample per column, joined where it doesn't jump away. */
-		const uint32_t ink = RGB(0x33, 0x33, 0x99);
+		const uint32_t ink = dark ? RGB(0x99, 0x99, 0xFF) : RGB(0x33, 0x33, 0x99);
 		int lastY = INT_MIN;
 		for (int col = 0; col < GW; col++) {
 			const double y = m_expr.valid() ? m_expr(x0 + col * perPx) : NAN;
