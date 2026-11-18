@@ -1,3 +1,13 @@
+zacos9 (1.18.19) trixie; urgency=medium
+
+  * Front Desk: a shared-computer session shell for chosen accounts. It
+    uses the real ZacOS accounts and the existing Use only chosen programs
+    list; Front Desk Setup chooses the programs, menus, save locations and
+    Finder access, and the login window wears the Front Desk welcome.
+    Install it from Software > Extras after updating.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Wed, 18 Nov 2026 12:55:02 -0500
+
 zacos9 (1.18.18) trixie; urgency=medium
 
   * Other programs keep the window size they ask for: LXTerminal's 80x24,
