@@ -14,10 +14,6 @@ static struct wlr_surface *get_surface(struct plat_view *view) {
 	return NULL;
 }
 
-static void get_geometry(struct plat_view *view, struct wlr_box *box) {
-	*box = (struct wlr_box){ .width = 320, .height = 200 };
-}
-
 static void get_limits(struct plat_view *view, int *min_w, int *min_h,
 		int *max_w, int *max_h) {
 	*min_w = limits[0];
@@ -45,7 +41,6 @@ struct wlr_box output_usable_area(struct plat_server *server, double lx, double 
 
 static const struct plat_view_impl impl = {
 	.get_surface = get_surface,
-	.get_geometry = get_geometry,
 	.get_size_limits = get_limits,
 	.has_parent = has_parent,
 };
@@ -60,58 +55,44 @@ int main(void) {
 	};
 	struct plat_view view = {0};
 	view_setup(&view, &server, PLAT_VIEW_XDG, &impl);
-	struct decor_margins m = decor_margins(DECOR_STYLE_DOCUMENT);
 
 	/* 1920x1080 below a 20 px menu bar. */
 	usable = (struct wlr_box){ .x = 0, .y = 20, .width = 1920, .height = 1060 };
-	struct wlr_box frame;
-	int w, h;
-	assert(view_default_frame(&view, "org.gnome.TextEditor", &frame, &w, &h));
-	assert(frame.x == 96 && frame.y == 20 + 32);
-	/* The desktop's icon column (the rightmost 80 px) stays uncovered. */
-	assert(frame.x + frame.width + DECOR_SHADOW <= 1920 - 96);
-	assert(frame.y + frame.height + DECOR_SHADOW <= 1080 - 32);
-	assert(w == frame.width - m.left - m.right);
-	assert(h == frame.height - m.top - m.bottom);
-
-	/* Client limits win over the default. */
-	limits[2] = 800;
-	limits[3] = 600;
-	assert(view_default_frame(&view, "app", &frame, &w, &h));
-	assert(w == 800 && h == 600);
-	limits[2] = limits[3] = 0;
+	int x, y;
+	assert(view_default_place(&view, "org.gnome.TextEditor", &x, &y));
+	assert(x == 96 && y == 20 + 32);
 
 	/* Small screens keep proportionate strips. */
 	usable = (struct wlr_box){ .x = 0, .y = 20, .width = 320, .height = 100 };
-	frame = view_default_frame_in(usable);
-	assert(frame.x == 40 && frame.y == 20 + 12);
-	assert(frame.width > 0 && frame.height > 0);
+	assert(view_default_place(&view, "app", &x, &y));
+	assert(x == 40 && y == 20 + 12);
 	usable = (struct wlr_box){ .x = 0, .y = 20, .width = 1920, .height = 1060 };
 
-	/* Left alone: the Finder, our programs' hinted windows, dialogs,
-	 * fixed-size windows and fullscreen windows. */
-	assert(!view_default_frame(&view, "zacos9-finder", &frame, &w, &h));
-	assert(!view_default_frame(&view, "zacos9-picture", &frame, &w, &h));
+	/* Left alone: our programs that place their own windows, hinted
+	 * windows, windows with a parent, fixed-size windows and fullscreen
+	 * windows. */
+	assert(!view_default_place(&view, "zacos9-finder", &x, &y));
+	assert(!view_default_place(&view, "zacos9-picture", &x, &y));
 	style = DECOR_STYLE_DOCUMENT;
-	assert(!view_default_frame(&view, "app", &frame, &w, &h));
+	assert(!view_default_place(&view, "app", &x, &y));
 	style = -1;
 	positioned = true;
-	assert(!view_default_frame(&view, "app", &frame, &w, &h));
+	assert(!view_default_place(&view, "app", &x, &y));
 	positioned = false;
 	parent = true;
-	assert(!view_default_frame(&view, "app", &frame, &w, &h));
+	assert(!view_default_place(&view, "app", &x, &y));
 	parent = false;
 	limits[0] = limits[2] = 400;
 	limits[1] = limits[3] = 300;
-	assert(!view_default_frame(&view, "app", &frame, &w, &h));
+	assert(!view_default_place(&view, "app", &x, &y));
 	memset(limits, 0, sizeof(limits));
 	view.fullscreen = true;
-	assert(!view_default_frame(&view, "app", &frame, &w, &h));
+	assert(!view_default_place(&view, "app", &x, &y));
 	view.fullscreen = false;
 
 	frame_destroy(view.frame);
 	wlr_cursor_destroy(cursor);
 	wlr_scene_node_destroy(&scene->tree.node);
-	puts("ok: new app windows open near full-screen with the desktop showing around them");
+	puts("ok: new app windows open inside the desktop strip");
 	return 0;
 }

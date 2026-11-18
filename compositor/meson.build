@@ -280,9 +280,9 @@ test('content-inset',
   ),
 )
 
-test('default-window-size',
-  executable('test-default-size',
-    '../tests/compositor/test_default_size.c', 'src/view.c', 'src/frame.c', 'src/pixbuf.c',
+test('default-window-place',
+  executable('test-default-place',
+    '../tests/compositor/test_default_place.c', 'src/view.c', 'src/frame.c', 'src/pixbuf.c',
     protocol_headers,
     include_directories: include_directories('src'),
     dependencies: [decor_dep, wayland_server, wlroots, libdrm],

@@ -8,8 +8,8 @@
 #define VIEW_MIN_W 100
 #define VIEW_MIN_H 50
 
-/* Desktop left showing around a new window: the right strip clears the
- * desktop's icon column (an 80 px cell 24 px in from the edge). */
+/* Where a new main window's top-left corner goes: in from the usable area's
+ * edges, so the desktop and its icon column show around it. */
 #define VIEW_DEFAULT_MARGIN_X 96
 #define VIEW_DEFAULT_MARGIN_Y 32
 
@@ -299,27 +299,10 @@ void view_place_new(struct plat_view *view) {
 	view_move_to(view, area.x + 40 + offset, area.y + 20 + offset);
 }
 
-struct wlr_box view_default_frame_in(struct wlr_box area) {
-	int mx = VIEW_DEFAULT_MARGIN_X, my = VIEW_DEFAULT_MARGIN_Y;
-	/* Small screens: keep the strips proportionate rather than squash the window. */
-	if (area.width < 4 * mx) {
-		mx = area.width / 8;
-	}
-	if (area.height < 4 * my) {
-		my = area.height / 8;
-	}
-	return (struct wlr_box){
-		.x = area.x + mx,
-		.y = area.y + my,
-		.width = area.width - 2 * mx - DECOR_SHADOW,
-		.height = area.height - 2 * my - DECOR_SHADOW,
-	};
-}
-
-/* ZacOS 9's own programs that size their windows themselves: the Finder,
+/* ZacOS 9's own programs that place their windows themselves: the Finder,
  * Picture Viewer (fitted to its picture), Dog Ears' notes, Scribble's
- * documents, the Stash and Key Tags, as small as the Mac's. */
-static bool sizes_own_windows(const char *app_id) {
+ * documents, the Stash and Key Tags. */
+static bool places_own_windows(const char *app_id) {
 	static const char *const own[] = { "zacos9-finder", "zacos9-picture", "zacos9-dogears",
 		"zacos9-scribble", "zacos9-stash", "zacos9-keytags" };
 	for (size_t i = 0; app_id && i < sizeof(own) / sizeof(own[0]); i++) {
@@ -330,15 +313,31 @@ static bool sizes_own_windows(const char *app_id) {
 	return false;
 }
 
-/* Other programs' main windows open almost full-screen, leaving a strip of
- * desktop on every side so the disk icons stay in view. Dialogs, fixed-size
- * windows and those of ours above keep their own sizes. */
-bool view_default_frame(struct plat_view *view, const char *app_id,
-		struct wlr_box *frame, int *content_w, int *content_h) {
+/* How far from the usable area's edges a new main window opens. */
+static void default_place_in(struct wlr_box area, int *x, int *y) {
+	int mx = VIEW_DEFAULT_MARGIN_X, my = VIEW_DEFAULT_MARGIN_Y;
+	/* Small screens: keep the strips proportionate rather than push the
+	 * window past the middle. */
+	if (area.width < 4 * mx) {
+		mx = area.width / 8;
+	}
+	if (area.height < 4 * my) {
+		my = area.height / 8;
+	}
+	*x = area.x + mx;
+	*y = area.y + my;
+}
+
+/* Other programs' main windows open inset from the screen's edges so the
+ * disk icons stay in view. The program chooses the size: its own default,
+ * its saved size or its preferences (issue #184). Dialogs, fixed-size
+ * windows, fullscreen requests and those of ours above keep their own
+ * places too. */
+bool view_default_place(struct plat_view *view, const char *app_id, int *x, int *y) {
 	struct wlr_surface *surface = view->impl->get_surface(view);
 	int hx, hy;
 	if (view->fullscreen || view->impl->has_parent(view) || !view_resizable(view) ||
-			sizes_own_windows(app_id) ||
+			places_own_windows(app_id) ||
 			platinum_shell_style_for(surface) >= 0 ||
 			platinum_shell_position_for(surface, &hx, &hy)) {
 		return false;
@@ -348,21 +347,7 @@ bool view_default_frame(struct plat_view *view, const char *app_id,
 	if (wlr_box_empty(&area)) {
 		return false;
 	}
-	struct wlr_box box = view_default_frame_in(area);
-	struct decor_margins m = decor_margins(DECOR_STYLE_DOCUMENT);
-	int w = box.width - m.left - m.right;
-	int h = box.height - m.top - m.bottom;
-	int min_w, min_h, max_w, max_h;
-	view->impl->get_size_limits(view, &min_w, &min_h, &max_w, &max_h);
-	w = max_w > 0 && w > max_w ? max_w : w;
-	h = max_h > 0 && h > max_h ? max_h : h;
-	w = w < min_w ? min_w : w;
-	h = h < min_h ? min_h : h;
-	w = w < VIEW_MIN_W ? VIEW_MIN_W : w;
-	h = h < VIEW_MIN_H ? VIEW_MIN_H : h;
-	*frame = box;
-	*content_w = w;
-	*content_h = h;
+	default_place_in(area, x, y);
 	return true;
 }
 

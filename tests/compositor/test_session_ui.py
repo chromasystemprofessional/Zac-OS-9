@@ -120,7 +120,7 @@ with tempfile.TemporaryDirectory(prefix="zacos9-switch-") as directory:
             # Option-click on the desktop: Bravo, the program left, hides. New
             # windows open in the same place; Bravo moves down first, so hiding
             # it shows less green.
-            vp("home", "move", "640", "62", "down", "move", "0", "250", "up", "wait", "400")
+            vp("home", "move", "262", "62", "down", "move", "0", "250", "up", "wait", "400")
             before = green() if have_grim else None
             vp("home", "move", "40", "400", "hold", "option", "click", "release", "option", "wait", "400")
             assert typed("w") is None, "Option-click on the desktop brings the Sniffer forward"

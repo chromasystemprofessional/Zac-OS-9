@@ -17,8 +17,9 @@ from zacos9test import wait_for
 
 compositor, client, vptr = (str(Path(a).resolve()) for a in sys.argv[1:4])
 # Other programs' windows open at the same place on a 1280 x 720 screen with
-# no menu bar; their title bars are on the row y = 42.
-TITLE = (640, 42)
+# no menu bar: the idle client is 320 wide, so its title bar's middle is at
+# x = 262, on the row y = 42.
+TITLE = (262, 42)
 
 
 with tempfile.TemporaryDirectory(prefix="zacos9-prompt-") as directory:
