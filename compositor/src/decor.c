@@ -275,38 +275,179 @@ static const struct chrome_tile *chrome_tile_get(int id) {
 /* Appearance layouts describe the frame strips at their real thickness.
  * Imported themes such as Gizmo use a 14 px vine edge and an 8 px bottom
  * rail; squeezing those into Platinum's 6 px margins destroys the frame even
- * when the extracted pixels are correct. */
-static int themed_doc_left(bool active) {
-	const struct chrome_tile *t = chrome_tile_get(CHROME_DOC_LEFT);
-	char value[16];
-	(void)active;
-	if (zac_theme_string("frame-left", value, sizeof(value))) {
-		int n = atoi(value);
-		if (n >= 1 && n <= 128) return n;
+ * when the extracted pixels are correct.
+ *
+ * The rail art is the authority for that thickness. Some theme resources
+ * carry the window's shadow outside the rail (iBook's left strip starts
+ * with one clear column, its right strip ends with four). Drawing the tile
+ * at the window edge then leaves the black outline one or more pixels in,
+ * where the title bar's corner meets the edge, so the frame steps at every
+ * corner. Trim the outermost clear columns/rows instead, and shrink the
+ * margin to the ink that remains. Older imported bundles get the same
+ * treatment without a re-import. */
+enum doc_rail_edge {
+	DOC_RAIL_LEFT,
+	DOC_RAIL_RIGHT,
+	DOC_RAIL_BOTTOM,
+};
+
+struct doc_rail {
+	const uint32_t *px; /* the whole tile */
+	int w, h;
+	int x0, y0; /* the visible part, clear edges trimmed */
+	int cw, ch;
+};
+
+static bool column_clear(const uint32_t *px, int w, int h, int x) {
+	for (int y = 0; y < h; y++) {
+		if (px[(size_t)y * w + x] >> 24) {
+			return false;
+		}
 	}
-	return t ? t->w : DECOR_LEFT;
+	return true;
 }
 
-static int themed_doc_right(bool active) {
-	const struct chrome_tile *t = chrome_tile_get(CHROME_DOC_RIGHT);
-	char value[16];
-	(void)active;
-	if (zac_theme_string("frame-right", value, sizeof(value))) {
-		int n = atoi(value);
-		if (n >= 1 && n <= 128) return n;
+static bool row_clear(const uint32_t *px, int w, int h, int y) {
+	for (int x = 0; x < w; x++) {
+		if (px[(size_t)y * w + x] >> 24) {
+			return false;
+		}
 	}
-	return t ? t->w : DECOR_RIGHT;
+	return true;
 }
 
-static int themed_doc_bottom(bool active) {
-	const struct chrome_tile *t = chrome_tile_get(CHROME_DOC_BOTTOM);
-	char value[16];
-	(void)active;
-	if (zac_theme_string("frame-bottom", value, sizeof(value))) {
-		int n = atoi(value);
-		if (n >= 1 && n <= 128) return n;
+/* The rail's image, honouring the theme's skin keys ("off" paints none),
+ * with fully transparent outer rows/columns trimmed. */
+static bool doc_rail_load(enum doc_rail_edge edge, bool active, struct doc_rail *r) {
+	enum chrome_slot slot = edge == DOC_RAIL_LEFT ? CHROME_DOC_LEFT :
+		edge == DOC_RAIL_RIGHT ? CHROME_DOC_RIGHT : CHROME_DOC_BOTTOM;
+	const int variant = !active && chrome_files[slot][1] ? 1 : 0;
+	char rel[256];
+	const char *path;
+	if (chrome_skin_keys[slot][variant] &&
+			zac_theme_string(chrome_skin_keys[slot][variant], rel, sizeof(rel))) {
+		if (strcmp(rel, "off") == 0) {
+			return false;
+		}
+		path = rel;
+	} else {
+		path = chrome_files[slot][variant];
 	}
-	return t ? t->h : DECOR_BOTTOM;
+	if (!path) {
+		return false;
+	}
+	int w, h;
+	const uint32_t *px = chrome_file(path, &w, &h);
+	if (!px || w < 1 || h < 1) {
+		return false;
+	}
+	int first = 0, last = edge == DOC_RAIL_BOTTOM ? h - 1 : w - 1;
+	if (edge == DOC_RAIL_BOTTOM) {
+		while (last >= 0 && row_clear(px, w, h, last)) last--;
+	} else if (edge == DOC_RAIL_RIGHT) {
+		while (last >= 0 && column_clear(px, w, h, last)) last--;
+	} else {
+		while (first <= last && column_clear(px, w, h, first)) first++;
+	}
+	if (first > last) {
+		return false;
+	}
+	*r = (struct doc_rail){
+		.px = px, .w = w, .h = h,
+		.x0 = edge == DOC_RAIL_BOTTOM ? 0 : first,
+		.y0 = 0,
+		.cw = edge == DOC_RAIL_BOTTOM ? w : (edge == DOC_RAIL_RIGHT ? last + 1 : w - first),
+		.ch = edge == DOC_RAIL_BOTTOM ? last + 1 : h,
+	};
+	return true;
+}
+
+static int doc_rail_thickness(enum doc_rail_edge edge, int fallback) {
+	const char *key = edge == DOC_RAIL_LEFT ? "frame-left" :
+		edge == DOC_RAIL_RIGHT ? "frame-right" : "frame-bottom";
+	char value[16];
+	int configured = -1;
+	if (zac_theme_string(key, value, sizeof(value))) {
+		int n = atoi(value);
+		if (n >= 1 && n <= 128) {
+			configured = n;
+		}
+	}
+	struct doc_rail rail;
+	if (!doc_rail_load(edge, true, &rail)) {
+		return configured > 0 ? configured : fallback;
+	}
+	const int visible = edge == DOC_RAIL_BOTTOM ? rail.ch : rail.cw;
+	/* A theme that deliberately asks for less than its art draws the
+	 * outer part only; more than the art leaves no clear moat. */
+	return configured > 0 && configured < visible ? configured : visible;
+}
+
+/* Blend one rail pixel, clipped to the canvas like chrome_blit. */
+static void rail_put(struct pl_canvas *c, int x, int y, uint32_t p) {
+	const unsigned a = p >> 24;
+	if (a == 0) {
+		return;
+	}
+	if (x < c->x || x >= c->x + c->width || y < c->y || y >= c->y + c->height) {
+		return;
+	}
+	uint32_t *dst = &c->px[(size_t)(y - c->y) * c->stride + (x - c->x)];
+	if (a == 255) {
+		*dst = p;
+		return;
+	}
+	const uint32_t bg = *dst;
+	const unsigned r = (((p >> 16) & 0xFF) * a + ((bg >> 16) & 0xFF) * (255 - a)) / 255;
+	const unsigned g = (((p >> 8) & 0xFF) * a + ((bg >> 8) & 0xFF) * (255 - a)) / 255;
+	const unsigned b = ((p & 0xFF) * a + (bg & 0xFF) * (255 - a)) / 255;
+	*dst = 0xFF000000u | r << 16 | g << 8 | b;
+}
+
+/* Paint a document window's rail edge to its window edge. The source's
+ * visible outer side maps to the destination's outer side, so a margin
+ * narrower than the art crops the shadow rather than the outline. */
+static void doc_rail_paint(struct pl_canvas *c, enum doc_rail_edge edge, bool active,
+		int thickness, int x0, int y0, int x1, int y1) {
+	struct doc_rail r;
+	if (!doc_rail_load(edge, active, &r) || thickness <= 0) {
+		return;
+	}
+	if (edge == DOC_RAIL_BOTTOM) {
+		for (int y = 0; y < thickness; y++) {
+			const int d = thickness - 1 - y;
+			const int sy = r.y0 + r.ch - 1 - d * r.ch / thickness;
+			const int dy = y1 - thickness + 1 + y;
+			for (int x = x0; x <= x1; x++) {
+				const int sx = r.x0 + (x - x0) % r.cw;
+				rail_put(c, x, dy, r.px[(size_t)sy * r.w + sx]);
+			}
+		}
+		return;
+	}
+	const int dx0 = edge == DOC_RAIL_LEFT ? x0 : x1 - thickness + 1;
+	for (int x = 0; x < thickness; x++) {
+		const int d = edge == DOC_RAIL_LEFT ? x : thickness - 1 - x;
+		const int sx = edge == DOC_RAIL_LEFT
+			? r.x0 + d * r.cw / thickness
+			: r.x0 + r.cw - 1 - d * r.cw / thickness;
+		for (int y = y0; y <= y1; y++) {
+			const int sy = r.y0 + (y - y0) % r.ch;
+			rail_put(c, dx0 + x, y, r.px[(size_t)sy * r.w + sx]);
+		}
+	}
+}
+
+static int themed_doc_left(void) {
+	return doc_rail_thickness(DOC_RAIL_LEFT, DECOR_LEFT);
+}
+
+static int themed_doc_right(void) {
+	return doc_rail_thickness(DOC_RAIL_RIGHT, DECOR_RIGHT);
+}
+
+static int themed_doc_bottom(void) {
+	return doc_rail_thickness(DOC_RAIL_BOTTOM, DECOR_BOTTOM);
 }
 
 /* An imported Appearance frame: the layout supplied its edge metrics.
@@ -414,6 +555,26 @@ static int themed_band_max(void) {
 	return a > b ? a : b;
 }
 
+/* Older bundles kept a bar cap's clear window-shadow columns (the current
+ * extractor trims them). Drawn as-is, the cap stops inside the window while
+ * the rail below starts on the edge, so the outline steps at the corner.
+ * Trim the cap's own outer margin at draw time. */
+static int cap_left_trim(const struct chrome_tile *t) {
+	int x = 0;
+	while (t && t->px && x < t->w && column_clear(t->px, t->w, t->h, x)) {
+		x++;
+	}
+	return x;
+}
+
+static int cap_right_trim(const struct chrome_tile *t) {
+	int x = t && t->px ? t->w - 1 : -1;
+	while (x >= 0 && column_clear(t->px, t->w, t->h, x)) {
+		x--;
+	}
+	return t ? t->w - 1 - x : 0;
+}
+
 /* The title bar with the theme's own art: end caps at each end and the
  * middle tiled horizontally, the band filling the title row (scaled when
  * the theme's bar has another height), and (left-clustered themes) the
@@ -459,8 +620,10 @@ static bool paint_themed_bar(struct pl_canvas *c, const struct decor_state *st,
 	if (!tm) {
 		return false;
 	}
-	int lw = tl ? tl->w : 0;
-	int rw = tr ? tr->w : 0;
+	const int lcut = cap_left_trim(tl);
+	const int rcut = cap_right_trim(tr);
+	int lw = tl ? tl->w - lcut : 0;
+	int rw = tr ? tr->w - rcut : 0;
 	const struct chrome_tile *span = span_tile_get(act);
 	const struct chrome_tile *title = !dialog ? chrome_tile_get(CHROME_BAR_TITLE) : NULL;
 	/* Gizmo's title-text layout is a three-field bar: the red/blue field,
@@ -468,7 +631,7 @@ static bool paint_themed_bar(struct pl_canvas *c, const struct decor_state *st,
 	 * from the older left-cluster/Aqua composition below. */
 	if (title && span && !dialog) {
 		if (lw > 0) {
-			chrome_blit(c, tl, 0, 0, tl->w, tl->h, 0, 0, lw, DECOR_TOP);
+			chrome_blit(c, tl, lcut, 0, lw, tl->h, 0, 0, lw, DECOR_TOP);
 		}
 		for (int x = lw; x < w - rw; x += tm->w) {
 			int tilew = w - rw - x < tm->w ? w - rw - x : tm->w;
@@ -487,7 +650,7 @@ static bool paint_themed_bar(struct pl_canvas *c, const struct decor_state *st,
 				patch_l, 0, patch_r - patch_l, DECOR_TOP);
 		}
 		if (rw > 0) {
-			chrome_blit(c, tr, 0, 0, tr->w, tr->h, w - rw, 0, rw, DECOR_TOP);
+			chrome_blit(c, tr, 0, 0, rw, tr->h, w - rw, 0, rw, DECOR_TOP);
 		}
 		/* Gizmo's right-hand modifier cluster sits on a thin black rail
 		 * through the button centres; the title-bar face shows above and
@@ -529,14 +692,14 @@ static bool paint_themed_bar(struct pl_canvas *c, const struct decor_state *st,
 			patchW = w;
 		}
 		if (lw > 0) {
-			chrome_blit(c, tl, 0, 0, tl->w, tl->h, 0, 0, lw, DECOR_TOP);
+			chrome_blit(c, tl, lcut, 0, lw, tl->h, 0, 0, lw, DECOR_TOP);
 		}
 		for (int x = lw; x < patchW - rw; x += tm->w) {
 			int tilew = patchW - rw - x < tm->w ? patchW - rw - x : tm->w;
 			chrome_blit(c, tm, 0, 0, tilew, tm->h, x, 0, tilew, DECOR_TOP);
 		}
 		if (rw > 0) {
-			chrome_blit(c, tr, 0, 0, tr->w, tr->h, patchW - rw, 0, rw, DECOR_TOP);
+			chrome_blit(c, tr, 0, 0, rw, tr->h, patchW - rw, 0, rw, DECOR_TOP);
 		}
 		if (patchW < w) {
 			const uint32_t rim_border = act ? 0xFF525252u : 0xFF737373u;
@@ -564,14 +727,14 @@ static bool paint_themed_bar(struct pl_canvas *c, const struct decor_state *st,
 	 * at the bar's own height, so a taller or shorter theme bar is scaled
 	 * rather than cropped. */
 	if (lw > 0) {
-		chrome_blit(c, tl, 0, 0, tl->w, tl->h, 0, 0, lw, DECOR_TOP);
+		chrome_blit(c, tl, lcut, 0, lw, tl->h, 0, 0, lw, DECOR_TOP);
 	}
 	for (int x = lw; x < w - rw; x += tm->w) {
 		int spanw = w - rw - x < tm->w ? w - rw - x : tm->w;
 		chrome_blit(c, tm, 0, 0, spanw, tm->h, x, 0, spanw, DECOR_TOP);
 	}
 	if (rw > 0) {
-		chrome_blit(c, tr, 0, 0, tr->w, tr->h, w - rw, 0, rw, DECOR_TOP);
+		chrome_blit(c, tr, 0, 0, rw, tr->h, w - rw, 0, rw, DECOR_TOP);
 	}
 	return true;
 }
@@ -721,7 +884,8 @@ static int cluster_close_x(const struct decor_state *st) {
 	if (!tl) {
 		tl = chrome_tile_get(CHROME_BAR_LEFT);
 	}
-	return tl && tl->w >= 16 ? CLOSE_X + 8 : CLOSE_X;
+	const int w = tl ? tl->w - cap_left_trim(tl) : 0;
+	return w >= 16 ? CLOSE_X + 8 : CLOSE_X;
 }
 
 /* The title block's start in a left cluster: after the close box. */
@@ -903,10 +1067,10 @@ struct decor_margins decor_margins(enum decor_style style) {
 	char title_art[256];
 	const bool split_title = zac_theme_string("bar-title", title_art, sizeof(title_art));
 	return (struct decor_margins){
-		.left = themed_doc_left(true), .right = themed_doc_right(true),
+		.left = themed_doc_left(), .right = themed_doc_right(),
 		.top = DECOR_TOP + (style == DECOR_STYLE_DOCUMENT && !split_title
 			? themed_band_max() : 0),
-		.bottom = themed_doc_bottom(true),
+		.bottom = themed_doc_bottom(),
 	};
 }
 
@@ -1263,9 +1427,9 @@ void decor_paint(struct pl_canvas *c, const struct decor_state *st) {
 	}
 	const int W = st->width, H = frame_height(st);
 	const bool act = st->active;
-	const int dl = themed_doc_left(act);
-	const int dr = themed_doc_right(act);
-	const int db = themed_doc_bottom(act);
+	const int dl = themed_doc_left();
+	const int dr = themed_doc_right();
+	const int db = themed_doc_bottom();
 	const bool tframe = themed_frame();
 	const uint32_t face = act ? chrome("frame-face", C_CCC) : inactive_face(C_DDD);
 	const uint32_t border = act ? chrome("frame-border", C_BLACK) : inactive_border(C_555, face);
@@ -1282,20 +1446,11 @@ void decor_paint(struct pl_canvas *c, const struct decor_state *st) {
 			chrome_fill_slot(c, 0, 0, W - 1, DECOR_TOP - 1, CHROME_DOC_TOP, act,
 				tframe ? 0 : face);
 		}
-		chrome_fill_slot(c, 0, H - db, W - 1, H - 1, CHROME_DOC_BOTTOM, act,
-			tframe ? 0 : face);
-		chrome_fill_slot(c, 0, DECOR_TOP, dl - 1, H - db - 1, CHROME_DOC_LEFT, act,
-			tframe ? 0 : face);
-		chrome_fill_slot(c, W - dr, DECOR_TOP, W - 1, H - db - 1, CHROME_DOC_RIGHT, act,
-			tframe ? 0 : face);
-		int cw, ch;
-		const uint32_t *cp = chrome_file("chrome/document-left-cap.png", &cw, &ch);
-		if (cp) {
-			chrome_draw(c, cp, cw, ch, 0, H - ch);
-		}
-		cp = chrome_file("chrome/document-right-cap.png", &cw, &ch);
-		if (cp) {
-			chrome_draw(c, cp, cw, ch, W - cw, H - ch);
+		const uint32_t edge_fill = tframe ? 0 : face;
+		if (edge_fill) {
+			pl_fill(c, 0, H - db, W - 1, H - 1, edge_fill);
+			pl_fill(c, 0, DECOR_TOP, dl - 1, H - db - 1, edge_fill);
+			pl_fill(c, W - dr, DECOR_TOP, W - 1, H - db - 1, edge_fill);
 		}
 	}
 
@@ -1342,15 +1497,26 @@ void decor_paint(struct pl_canvas *c, const struct decor_state *st) {
 			pl_vline(c, W - dr + 1, DECOR_TOP - 1, H - db + 1, highlight);
 			pl_hline(c, dl - 1, W - dr + 1, H - db + 1, highlight);
 		}
+	}
+	if (!st->collapsed) {
+		/* The rail art goes over the Platinum edge just drawn: when a
+		 * theme supplies only an edge skin, its own outline still meets
+		 * the title-bar corner. Then the corner caps and the grow box. */
+		doc_rail_paint(c, DOC_RAIL_BOTTOM, act, db, 0, H - db, W - 1, H - 1);
+		doc_rail_paint(c, DOC_RAIL_LEFT, act, dl, 0, DECOR_TOP, dl - 1, H - db - 1);
+		doc_rail_paint(c, DOC_RAIL_RIGHT, act, dr, W - dr, DECOR_TOP, W - 1, H - db - 1);
+		int cw, ch;
+		const uint32_t *cp = chrome_file("chrome/document-left-cap.png", &cw, &ch);
+		if (cp) {
+			chrome_draw(c, cp, cw, ch, 0, H - ch);
+		}
+		cp = chrome_file("chrome/document-right-cap.png", &cw, &ch);
+		if (cp) {
+			chrome_draw(c, cp, cw, ch, W - cw, H - ch);
+		}
 		if (st->has_grow) {
 			paint_grow(c, st);
 		}
-	}
-	if (!st->collapsed && tframe && st->has_grow) {
-		/* The theme owns the frame, but the grow box still needs a
-		 * visible hit target. Keep the Platinum corner until the theme's
-		 * own grow-box pxm# is extracted. */
-		paint_grow(c, st);
 	}
 	if (has_bar) {
 		paint_themed_bar(c, st, W, act);

@@ -74,6 +74,33 @@ THEME_TYPES = {b"thme", b"clut", b"pltt", b"WIND", b"scen", b"pxm#", b"layo", b"
 # which shifted a source line by a pixel or two on 19/23 px themes.
 ZACOS_BAR_HEIGHT = 22
 
+
+def trim_frame_rail(rows, edge):
+	"""Crop a frame rail's fully transparent margin from its window edge.
+
+	An Appearance theme's side art can carry the window's shadow outside
+	the rail itself: iBook's left strip starts with one clear column and
+	its right strip ends with four. Drawn as-is, the rail's black outline
+	sits inside the window while the title bar's corner sits on the edge,
+	so the frame steps in at every corner. The outer side is the one that
+	must meet the edge: left strips lose their leading columns, right
+	strips their trailing ones, bottom strips their lowest rows. Ink on
+	the inner side is kept because it can be part of the design."""
+	if not rows or not rows[0]:
+		return rows
+	if edge == "bottom":
+		inked = [y for y, row in enumerate(rows) if any(px[3] for px in row)]
+		return rows[:inked[-1] + 1] if inked else rows
+	inked = [x for x in range(len(rows[0])) if any(row[x][3] for row in rows)]
+	if not inked:
+		return rows
+	if edge == "left":
+		return [row[inked[0]:] for row in rows]
+	if edge == "right":
+		return [row[:inked[-1] + 1] for row in rows]
+	return rows
+
+
 # Mac OS 9 pointer shapes that become the desktop's cursors, as
 # (bundle name, file, resource type, id). 16x16 1-bit with a hotspot,
 # verified against a running Mac OS 9 desktop. The arrow pointer lives
@@ -2316,7 +2343,7 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None, px
 						edges["right"] = fill
 						break
 			for side in ("left", "right"):
-				rows = edges[side]
+				rows = trim_frame_rail(edges[side], side)
 				key = "document-" + side + suffix
 				path = os.path.join(chrome_dir, key + ".png")
 				force = side == "right" and right_vine and suffix == ""
@@ -2356,13 +2383,10 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None, px
 					return
 				fill = following[0]
 				layer = fill["index"] if fill["type"] == b"pxm#" else 0
-				rows = resolve_rec(fill["type"], fill["id"], layer)
-				if rows and not os.path.exists(os.path.join(chrome_dir, "document-bottom.png")):
+				rows = trim_frame_rail(resolve_rec(fill["type"], fill["id"], layer), "bottom")
+				if rows:
 					save_tile("document-bottom", rows)
-				top = layo_coord(item["rect"][0], _coords)
-				bottom = layo_coord(item["rect"][2], _coords)
-				if bottom > top:
-					keys["frame-bottom"] = str(bottom - top)
+					keys["frame-bottom"] = str(len(rows))
 				return
 
 		def save_menu_bar():
@@ -2443,10 +2467,10 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None, px
 				coords, items = decode_layo(body)
 			except (ValueError, IndexError, struct.error):
 				return
-			for vertical, tile_key, key, edge in (
-					(True, "document-right", "frame-right", -4),
-					(True, "document-left", "frame-left", -2),
-					(False, "document-bottom", "frame-bottom", -3)):
+			for vertical, tile_key, key, edge, side in (
+					(True, "document-right", "frame-right", -4, "right"),
+					(True, "document-left", "frame-left", -2, "left"),
+					(False, "document-bottom", "frame-bottom", -3, "bottom")):
 				found = None
 				for item in items:
 					if item["type"] not in (b"plut", b"ppat", b"pxm#"):
@@ -2482,21 +2506,22 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None, px
 						rows = rows[:thickness]
 						while len(rows) < thickness:
 							rows.append(list(rows[-1]))
-					save_tile(tile_key, rows)
-					keys[key] = str(thickness)
-					continue
-				# The edge pattern's gradient runs across the frame for
-				# a vertical rail (row 0) and down it for a horizontal
-				# one (column 0); repeat that cross-section along the
-				# edge instead of tiling the 8x8 art in both directions.
-				if vertical:
-					cross = rows[0][:thickness]
-					tile = [cross]
 				else:
-					cross = [rows[y][0] for y in range(min(thickness, len(rows)))]
-					tile = [[c] for c in cross]
-				save_tile(tile_key, tile)
-				keys[key] = str(thickness)
+					# The edge pattern's gradient runs across the frame for
+					# a vertical rail (row 0) and down it for a horizontal
+					# one (column 0); repeat that cross-section along the
+					# edge instead of tiling the 8x8 art in both directions.
+					if vertical:
+						cross = rows[0][:thickness]
+						rows = [cross]
+					else:
+						cross = [rows[y][0] for y in range(min(thickness, len(rows)))]
+						rows = [[c] for c in cross]
+				rows = trim_frame_rail(rows, side)
+				if not rows:
+					continue
+				save_tile(tile_key, rows)
+				keys[key] = str(len(rows[0]) if vertical else len(rows))
 
 		def save_grow_box(lid, suffix):
 			"""The theme's bottom-corner grow box (pxm# 450/451)."""
