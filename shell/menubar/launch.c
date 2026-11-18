@@ -567,6 +567,11 @@ static void seed_menu_items(const char *items_dir) {
 void launch_fill_logo_menu(struct mb_menu *menu, const struct app *apps, int n_apps) {
 	/* About and software tools are the top group in the Apple menu. */
 	with_kind(add_item(menu, _("About This Computer…"), true, ACT_ABOUT, NULL), PL_ICON_EXT_CHIP);
+	/* Front Desk: the shell owns the programs, so the Zac menu must not be
+	 * a way round it into Control Panels, Software or the Sniffer. */
+	if (getenv("ZACOS9_MENUBAR_MODE") && strcmp(getenv("ZACOS9_MENUBAR_MODE"), "frontdesk") == 0) {
+		return;
+	}
 	/* The app catalog over apt. */
 	{
 		char command[PATH_MAX + 64];

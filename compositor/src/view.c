@@ -213,7 +213,10 @@ void view_update_frame(struct plat_view *view) {
 	bool dialog = hint >= 0 ? hint == DECOR_STYLE_MOVABLE_MODAL
 		: view->system_prompt || (!view_resizable(view) && view->impl->has_parent(view));
 	const bool popup = hint == DECOR_STYLE_POPUP;
-	frame_set_style(view->frame, popup ? DECOR_STYLE_POPUP
+	const bool shell = view->server->frontdesk && view->app_id &&
+		strcmp(view->app_id, "zacos9-frontdesk") == 0;
+	frame_set_style(view->frame, shell ? DECOR_STYLE_NONE
+		: popup ? DECOR_STYLE_POPUP
 		: dialog ? DECOR_STYLE_MOVABLE_MODAL : DECOR_STYLE_DOCUMENT);
 	if (popup != view->popup) {
 		popup_changed(view, popup);
@@ -285,6 +288,9 @@ void view_set_app_id(struct plat_view *view, const char *app_id) {
 	free(view->app_id);
 	view->app_id = strdup(app_id ? app_id : "");
 	view->system_prompt = is_system_prompt(view->app_id);
+	if (view->server->frontdesk && strcmp(view->app_id, "zacos9-frontdesk") == 0) {
+		frame_set_style(view->frame, DECOR_STYLE_NONE);
+	}
 	if (view->toplevel_handle) {
 		wlr_foreign_toplevel_handle_v1_set_app_id(view->toplevel_handle, view->app_id);
 	}
@@ -303,8 +309,8 @@ void view_place_new(struct plat_view *view) {
  * Picture Viewer (fitted to its picture), Dog Ears' notes, Scribble's
  * documents, the Stash and Key Tags. */
 static bool places_own_windows(const char *app_id) {
-	static const char *const own[] = { "zacos9-finder", "zacos9-picture", "zacos9-dogears",
-		"zacos9-scribble", "zacos9-stash", "zacos9-keytags" };
+	static const char *const own[] = { "zacos9-finder", "zacos9-frontdesk", "zacos9-picture",
+		"zacos9-dogears", "zacos9-scribble", "zacos9-stash", "zacos9-keytags" };
 	for (size_t i = 0; app_id && i < sizeof(own) / sizeof(own[0]); i++) {
 		if (strcmp(app_id, own[i]) == 0) {
 			return true;

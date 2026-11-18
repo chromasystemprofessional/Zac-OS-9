@@ -70,6 +70,10 @@
       "packages": ["zacos9-extra-gameplayer"], "extra": { "id": "gameplayer", "start": "zacos9-gameplayer" } },
     { "id": "extra-steam", "name": "Steam", "category": "Extras",
       "blurb": "List and launch your installed Steam games from The Collar. Installs Steam if it is not already present.",
-      "packages": ["zacos9-extra-steam"], "extra": { "id": "steam", "start": "zacos9-steam" } }
+      "packages": ["zacos9-extra-steam"], "extra": { "id": "steam", "start": "zacos9-steam" } },
+
+    { "id": "extra-frontdesk", "name": "Front Desk", "category": "Extras",
+      "blurb": "Turn a ZacOS account into a shared-computer launcher: a full-screen panel with the programs and documents you choose, a Front Desk login, and per-account menus, save locations, Finder access and speech. It uses the account's existing “Use only chosen programs” list; Front Desk Setup chooses the programs and settings. Choose the account in Front Desk Setup, then log out and back in to see its panel.",
+      "packages": ["zacos9-extra-frontdesk"], "extra": { "id": "frontdesk", "start": "zacos9-frontdesk-setup" } }
   ]
 }

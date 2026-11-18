@@ -86,6 +86,7 @@ rather than reimplementing them.
 | The menu bar and Apple-style menus | `shell/menubar/` (C) | |
 | The Collar (the control strip) | `shell/collar/` | [The Collar](docs/collar.md) |
 | The Sniffer, the desktop, Get Info | `shell/finder/` | [The Macintosh view](docs/vfs.md) |
+| Front Desk, the shared-computer shell | `ZAC-OS-EXTRAS/frontdesk`, `session/zacos9-session`, `compositor/src/main.c`, `shell/menubar/launch.c`, `shell/greeter/main.cpp` | [Front Desk](docs/frontdesk.md) |
 | Bloodhound, the search app | `shell/bloodhound/`; the Find engine in `shell/files/` (`findcriteria.cpp`, `findindex.cpp`) | [Bloodhound](docs/bloodhound.md) |
 | The Open and Save dialogs other programs get (xdg-desktop-portal) | `shell/fileportal/` | |
 | Files as the Sniffer shows them, which other programs share: items and their icons, volumes and when to mount them, the Macintosh view, aliases, the Applications database, file associations, thumbnails, desktop printers | `shell/files/` (`libzacos9-files`) | [The Macintosh view](docs/vfs.md) |

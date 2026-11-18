@@ -28,6 +28,9 @@ test('shutdown-items', find_program('python3'),
 test('safe-mode-session', find_program('python3'),
   args: [files('../tests/session/test_safe_mode.py'), files('zacos9-session')],
   timeout: 15)
+test('frontdesk-session', find_program('python3'),
+  args: [files('../tests/session/test_frontdesk_session.py'), files('zacos9-session')],
+  timeout: 20)
 test('web-sharing', find_program('python3'),
   args: [files('../tests/session/test_web_sharing.py'), files('zacos9-web-sharing')],
   timeout: 30)

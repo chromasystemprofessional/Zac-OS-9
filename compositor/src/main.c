@@ -91,12 +91,15 @@ struct shell_child {
 	const char *program;
 	pid_t pid;
 	unsigned deaths; /* restarts in a row that died before the next check */
+	bool in_frontdesk;
+	bool in_finder;
 };
 
 static struct shell_child shell_children[] = {
-	{ "ZACOS9_MENUBAR", "zacos9-menubar", 0, 0 },
-	{ "ZACOS9_FINDER", "zacos9-finder", 0, 0 },
-	{ "ZACOS9_COLLAR", "zacos9-collar", 0, 0 },
+	{ "ZACOS9_MENUBAR", "zacos9-menubar", 0, 0, true, true },
+	{ "ZACOS9_FINDER", "zacos9-finder", 0, 0, false, true },
+	{ "ZACOS9_COLLAR", "zacos9-collar", 0, 0, false, true },
+	{ "ZACOS9_FRONTDESK", "zacos9-frontdesk", 0, 0, true, false },
 };
 
 static struct wl_event_source *shell_timer;
@@ -182,6 +185,10 @@ static int watch_shell(void *data) {
 static void shell_children_start(struct plat_server *server) {
 	for (size_t i = 0; i < sizeof(shell_children) / sizeof(shell_children[0]); i++) {
 		struct shell_child *c = &shell_children[i];
+		if (server->frontdesk ? !c->in_frontdesk : !c->in_finder) {
+			c->pid = 0;
+			continue;
+		}
 		const char *override = getenv(c->env);
 		c->pid = spawn_component(c->env, c->program, "");
 		if (override && *override) {
@@ -250,6 +257,8 @@ int main(int argc, char *argv[]) {
 	struct plat_server server = {0};
 	server.output_scale = scale;
 	server.scale_explicit = scale_explicit;
+	const char *shell = getenv("ZACOS9_SHELL");
+	server.frontdesk = shell && strcmp(shell, "frontdesk") == 0;
 	server.display = wl_display_create();
 	server.gamma_manager = wlr_gamma_control_manager_v1_create(server.display);
 	if (server.gamma_manager) {

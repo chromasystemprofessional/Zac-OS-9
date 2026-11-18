@@ -8,6 +8,15 @@
 #                       Puppy Mode for USER, set by an administrator: the
 #                       Sniffer keeps only the essential commands, and USER
 #                       can't turn it off (lib/settings.c reads it)
+#   zacos9-accounts-helper frontdesk USER on|off [KEY=VALUE...]
+#                       Front Desk for USER: the session's shell, its
+#                       settings in frontdesk/USER. On also takes the
+#                       account out of Puppy Mode.
+#   zacos9-accounts-helper frontdesk-settings USER KEY=VALUE...
+#                       change one Front Desk account's settings
+#   zacos9-accounts-helper desktop USER frontdesk|puppy|finder [KEY=VALUE...]
+#                       the three startup modes: Front Desk, Puppy Mode or
+#                       the ordinary Finder/session
 #   zacos9-accounts-helper guest on|off
 #                       the Guest account: "guest", no password; its home is
 #                       emptied at each login (session/zacos9-session)
@@ -34,7 +43,8 @@
 #   zacos9-accounts-helper wakealarm
 #                       set the RTC wake alarm for the next scheduled start-up
 #   zacos9-accounts-helper status
-#                       "guest on|off", then "puppy USER" lines
+#                       "guest on|off", then "puppy USER" and "frontdesk USER"
+#                       lines
 #
 # Everything lives in /etc/zacos9 (ZACOS9_ACCOUNTS_CONF, for tests), readable
 # by everyone: puppy/USER (empty files), welcome, guest-account (the guest's
@@ -58,6 +68,41 @@ valid_user() {
 	[ -n "${ZACOS9_ACCOUNTS_CONF:-}" ] || getent passwd "$1" >/dev/null
 }
 
+frontdesk_defaults() {
+	printf 'menus=restricted\nsave=user\nsave-removable=off\nfinder=off\nspeech=off\ncapture=off\n'
+}
+
+# Replace the validated KEY=VALUE arguments in an account's Front Desk file.
+frontdesk_apply() {
+	user=$1
+	shift
+	file="$CONF/frontdesk/$user"
+	tmp=$(mktemp) || die "The Front Desk settings couldn't be written."
+	if [ -f "$file" ]; then
+		cp "$file" "$tmp"
+	else
+		frontdesk_defaults >"$tmp"
+	fi
+	for arg in "$@"; do
+		case $arg in
+		menus=minimal | menus=restricted | menus=all | save=anywhere | save=user | \
+			save-removable=on | save-removable=off | finder=on | finder=off | \
+			speech=on | speech=off | capture=on | capture=off) ;;
+		*)
+			rm -f "$tmp"
+			die "No such Front Desk setting: \"$arg\"."
+			;;
+		esac
+		key=${arg%%=*}
+		value=${arg#*=}
+		grep -v "^$key=" "$tmp" >"$tmp.new" || true
+		printf '%s=%s\n' "$key" "$value" >>"$tmp.new"
+		mv "$tmp.new" "$tmp"
+	done
+	mv "$tmp" "$file"
+	chmod 644 "$file"
+}
+
 cmd=${1:-}
 [ $# -gt 0 ] && shift
 case $cmd in
@@ -67,9 +112,67 @@ puppy)
 	mkdir -p "$CONF/puppy"
 	chmod 755 "$CONF" "$CONF/puppy"
 	case $2 in
-	on) : >"$CONF/puppy/$1" && chmod 644 "$CONF/puppy/$1" ;;
+	on)
+		rm -f "$CONF/frontdesk/$1"
+		: >"$CONF/puppy/$1" && chmod 644 "$CONF/puppy/$1"
+		;;
 	off) rm -f "$CONF/puppy/$1" ;;
 	*) die "usage: puppy USER on|off" ;;
+	esac
+	;;
+frontdesk)
+	[ $# -ge 2 ] || die "usage: frontdesk USER on|off [KEY=VALUE...]"
+	user=$1
+	action=$2
+	shift 2
+	valid_user "$user" || die "There is no account named \"$user\"."
+	mkdir -p "$CONF/frontdesk"
+	chmod 755 "$CONF" "$CONF/frontdesk"
+	case $action in
+	on)
+		rm -f "$CONF/puppy/$user"
+		[ -f "$CONF/frontdesk/$user" ] || frontdesk_defaults >"$CONF/frontdesk/$user"
+		chmod 644 "$CONF/frontdesk/$user"
+		[ $# -eq 0 ] || frontdesk_apply "$user" "$@"
+		;;
+	off) rm -f "$CONF/frontdesk/$user" ;;
+	*) die "usage: frontdesk USER on|off [KEY=VALUE...]" ;;
+	esac
+	;;
+frontdesk-settings)
+	[ $# -ge 1 ] || die "usage: frontdesk-settings USER KEY=VALUE..."
+	user=$1
+	shift
+	valid_user "$user" || die "There is no account named \"$user\"."
+	[ -f "$CONF/frontdesk/$user" ] || die "Front Desk isn't on for \"$user\"."
+	frontdesk_apply "$user" "$@"
+	;;
+desktop)
+	[ $# -ge 2 ] || die "usage: desktop USER frontdesk|puppy|finder [KEY=VALUE...]"
+	user=$1
+	mode=$2
+	shift 2
+	valid_user "$user" || die "There is no account named \"$user\"."
+	case $mode in
+	frontdesk)
+		mkdir -p "$CONF/frontdesk"
+		chmod 755 "$CONF" "$CONF/frontdesk"
+		rm -f "$CONF/puppy/$user"
+		frontdesk_defaults >"$CONF/frontdesk/$user"
+		chmod 644 "$CONF/frontdesk/$user"
+		[ $# -eq 0 ] || frontdesk_apply "$user" "$@"
+		;;
+	puppy)
+		mkdir -p "$CONF/puppy"
+		chmod 755 "$CONF" "$CONF/puppy"
+		rm -f "$CONF/frontdesk/$user"
+		: >"$CONF/puppy/$user"
+		chmod 644 "$CONF/puppy/$user"
+		;;
+	finder)
+		rm -f "$CONF/frontdesk/$user" "$CONF/puppy/$user"
+		;;
+	*) die "usage: desktop USER frontdesk|puppy|finder [KEY=VALUE...]" ;;
 	esac
 	;;
 guest)
@@ -255,8 +358,11 @@ status)
 	for f in "$CONF"/puppy/*; do
 		[ -e "$f" ] && echo "puppy ${f##*/}"
 	done
+	for f in "$CONF"/frontdesk/*; do
+		[ -e "$f" ] && echo "frontdesk ${f##*/}"
+	done
 	;;
 *)
-	die "usage: zacos9-accounts-helper puppy|guest|welcome|locale|display|schedule|wakealarm|status ..."
+	die "usage: zacos9-accounts-helper puppy|frontdesk|frontdesk-settings|desktop|guest|welcome|locale|display|schedule|wakealarm|status ..."
 	;;
 esac

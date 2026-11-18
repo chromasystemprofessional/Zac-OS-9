@@ -59,6 +59,9 @@ struct plat_server {
 	float output_scale;
 	float default_scale; /* from -S / ZACOS9_SCALE, until a panel picks one */
 	bool scale_explicit; /* -S or ZACOS9_SCALE given: no automatic 2x */
+	/* The session shell is Front Desk (ZACOS9_SHELL=frontdesk): start it
+	 * instead of the Sniffer, and no Collar. */
+	bool frontdesk;
 	struct wlr_fractional_scale_manager_v1 *fractional_scale;
 	/* Mouse and Keyboard panel settings (prefs.c). */
 	double pointer_speed;

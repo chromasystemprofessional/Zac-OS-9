@@ -155,6 +155,11 @@ void frame_commit(struct plat_frame *frame) {
 		return;
 	}
 	frame->dirty = false;
+	if (frame->st.style == DECOR_STYLE_NONE) {
+		wlr_scene_node_set_enabled(&frame->tree->node, false);
+		wlr_scene_node_set_enabled(&frame->grow->node, false);
+		return;
+	}
 	update_title_text(frame);
 
 	const struct decor_state *st = &frame->st;

@@ -21,6 +21,8 @@ enum decor_style {
 	/* A Sniffer pop-up window (Mac OS 8/9): a tab on top of a body that
 	 * rises from the bottom of the screen; collapsed, only the tab. */
 	DECOR_STYLE_POPUP,
+	/* The session shell (Front Desk): no frame at all. */
+	DECOR_STYLE_NONE,
 };
 
 /* Document-window margins around the client surface. */

@@ -96,6 +96,14 @@ This page is what's true now and what's next. What changed and when is in
 local channels, Smart Folders, a global hotkey and local semantic search —
 are not scheduled ([Bloodhound](docs/bloodhound.md)).
 
+**Front Desk**: the shared-computer session shell is being built as an extra
+(`zacos9-extra-frontdesk`), using the real Unix accounts as the people and the
+existing **Use only chosen programs** list as its panel. The tabbed panel,
+Front Desk Setup, the Front Desk-skinned login window, the per-account
+`desktop` modes in the accounts helper, and the session/menu-bar/Collar hooks
+are in place. The save-location enforcement through the file chooser portal is
+still to come. Not released.
+
 **The System Folder**, made to work the way Mac OS 7 to 9's did, item by
 item: [`docs/system-folder.md`](docs/system-folder.md) has every item, what
 ZacOS has for it, and the order. All six items are done.

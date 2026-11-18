@@ -348,3 +348,8 @@ test('collar-hotkey',
     build_by_default: false,
   ),
 )
+
+test('frontdesk-shell', python3,
+  args: [files('../tests/compositor/test_frontdesk_shell.py'), compositor_exe],
+  timeout: 30,
+)

@@ -26,6 +26,7 @@
 #include "pixels.h"
 #include "platinumshell.h"
 #include "tr.h"
+#include "welcome.h"
 
 static constexpr int W = 320;
 static constexpr int MARGIN = 16;
@@ -117,32 +118,45 @@ public:
 		}
 		/* The Guest account has no password (zacos9-accounts-helper), and
 		 * we can't read /etc/shadow to see who else hasn't. */
-		QFile guest((conf.isEmpty() ? QString("/etc/zacos9") : QString::fromUtf8(conf)) +
-			"/guest-account");
+		const QString accountsConf = conf.isEmpty() ? QString("/etc/zacos9")
+			: QString::fromUtf8(conf);
+		QFile guest(accountsConf + "/guest-account");
 		if (guest.open(QIODevice::ReadOnly)) {
 			m_guest = QString::fromUtf8(guest.read(64)).trimmed();
 		}
+		/* A Front Desk machine gets the Front Desk welcome: the same login,
+		 * with the classic illustration and Start in place of Log In. */
+		for (const Account &a : m_accounts) {
+			if (QFile::exists(accountsConf + "/frontdesk/" + a.user)) {
+				m_frontDesk = true;
+			}
+		}
+		m_w = m_frontDesk ? 430 : W;
+		setWindowTitle(m_frontDesk ? tr9("Welcome to Front Desk!") : tr9("Log In"));
 
 		/* Under the welcome and the chosen person's picture. */
-		int y = PICTURE_Y + PICTURE + 8;
+		int y = m_frontDesk ? 56 : PICTURE_Y + PICTURE + 8;
 		const int rows = std::clamp(static_cast<int>(m_accounts.size()), 3, 6);
-		m_list.frame = QRect(MARGIN, y, W - 2 * MARGIN, rows * PL_LIST_ROW_H + 2);
+		m_list.frame = QRect(MARGIN, y, m_w - 2 * MARGIN - (m_frontDesk ? 140 : 0),
+			rows * PL_LIST_ROW_H + 2);
 		QStringList names;
 		for (const Account &a : m_accounts) {
 			names << a.name;
 		}
 		m_list.setItems(names);
 		y = m_list.frame.bottom() + 12;
-		m_password.rect = QRect(FIELD_X, y, W - MARGIN - FIELD_X, PL_EDIT_H);
+		m_password.rect = QRect(FIELD_X, y,
+			m_w - MARGIN - FIELD_X - (m_frontDesk ? 140 : 0), PL_EDIT_H);
 		m_password.password = true;
 		y += PL_EDIT_H + 6 + 16; /* and a line for what went wrong */
 		const int H = y + 12 + PL_BUTTON_H + MARGIN;
-		setFixedSize(W, H);
+		setFixedSize(m_w, H);
 
 		const int by = H - MARGIN - PL_BUTTON_H;
 		m_shutDown = PanelButton(tr9("Shut Down"), QRect(MARGIN, by, 84, PL_BUTTON_H));
 		m_restart = PanelButton(tr9("Restart"), QRect(MARGIN + 92, by, 72, PL_BUTTON_H));
-		m_logIn = PanelButton(tr9("Log In"), QRect(W - MARGIN - 76, by, 76, PL_BUTTON_H), true);
+		m_logIn = PanelButton(tr9(m_frontDesk ? "Start" : "Log In"),
+			QRect(m_w - MARGIN - 76, by, 76, PL_BUTTON_H), true);
 		m_shutDown.clicked = [this] { power(Power::ShutDown); };
 		m_restart.clicked = [this] { power(Power::Restart); };
 		m_logIn.clicked = [this] { logIn(); };
@@ -194,18 +208,31 @@ protected:
 		pl_canvas *c = &px.c;
 		pl_fill(c, 0, 0, width() - 1, height() - 1, GRAY(0xD));
 		/* The Users panel's welcome message, if an administrator set one. */
-		const QStringList welcome = panelWrap(m_welcome.isEmpty() ? tr9("Welcome to ZacOS 9.")
-			: m_welcome, W - 2 * MARGIN - PICTURE - 8, PL_FONT_SYSTEM).mid(0, 3);
+		const QString defaultWelcome = m_frontDesk ? tr9("Welcome to Front Desk!")
+			: tr9("Welcome to ZacOS 9.");
+		const QStringList welcome = panelWrap(m_welcome.isEmpty() ? defaultWelcome : m_welcome,
+			m_w - 2 * MARGIN - (m_frontDesk ? 140 : PICTURE) - 8, PL_FONT_SYSTEM).mid(0, 3);
 		for (int i = 0; i < welcome.size(); i++) {
 			panelText(c, welcome[i], MARGIN,
-				PICTURE_Y + PICTURE / 2 + 5 + (i - (int(welcome.size()) - 1) / 2) * 16);
+				(m_frontDesk ? 24 : PICTURE_Y + PICTURE / 2 + 5) +
+					(i - (int(welcome.size()) - 1) / 2) * 16);
 		}
-		/* The chosen person's picture (Users control panel), as Mac OS 9's
-		 * Multiple Users showed it. */
-		if (const int row = m_list.state.selected; row >= 0) {
+		if (m_frontDesk) {
+			/* Happy Zac, the original illustration, in the classic slot. */
+			const uint32_t *art = pl_boot_art(PL_ART_HAPPY_ZAC, 4);
+			if (art) {
+				pl_image_blend(c, m_w - MARGIN - 128, 20, art, 128, 128, false);
+			} else if (const int row = m_list.state.selected; row >= 0) {
+				const Account &a = m_accounts[static_cast<size_t>(row)];
+				panelIcon(c, accountPicture(accountPictureFile(a.user), a.name, PICTURE),
+					m_w - MARGIN - PICTURE, PICTURE_Y);
+			}
+		} else if (const int row = m_list.state.selected; row >= 0) {
+			/* The chosen person's picture (Users control panel), as Mac OS 9's
+			 * Multiple Users showed it. */
 			const Account &a = m_accounts[static_cast<size_t>(row)];
 			panelIcon(c, accountPicture(accountPictureFile(a.user), a.name, PICTURE),
-				W - MARGIN - PICTURE, PICTURE_Y);
+				m_w - MARGIN - PICTURE, PICTURE_Y);
 		}
 		m_list.paint(c, false);
 		panelLabel(c, tr9("Password:"), FIELD_X - 8, m_password.rect.top() + 15);
@@ -213,7 +240,7 @@ protected:
 			? m_error : m_safeMode ? tr9("Safe mode: Startup Items will not run.") : QString();
 		if (!status.isEmpty()) {
 			panelText(c, status, MARGIN, m_password.rect.bottom() + 20, PL_FONT_VIEWS,
-				m_greetd.busy() ? C_BLACK : RGB(0x99, 0x00, 0x00), W - 2 * MARGIN);
+				m_greetd.busy() ? C_BLACK : RGB(0x99, 0x00, 0x00), m_w - 2 * MARGIN);
 		}
 		m_host.paintControls(c, GRAY(0xD));
 		QPainter p(this);
@@ -315,6 +342,8 @@ private:
 	std::vector<Account> m_accounts;
 	QString m_welcome;
 	QString m_guest; /* the Guest account's user name, if it's on */
+	bool m_frontDesk = false; /* a Front Desk machine: its own welcome */
+	int m_w = W;
 	Greetd m_greetd;
 	QString m_error;
 

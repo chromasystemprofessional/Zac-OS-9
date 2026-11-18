@@ -13,6 +13,19 @@ fail() { echo "FAIL: $*" >&2; exit 1; }
 "$helper" puppy someone off && [ ! -e "$T/puppy/someone" ] || fail "Puppy Mode taken away"
 ! "$helper" puppy '../x' on 2>/dev/null || fail "odd user names refused"
 
+"$helper" desktop someone frontdesk menus=all finder=on save=anywhere
+[ -f "$T/frontdesk/someone" ] && [ ! -e "$T/puppy/someone" ] || fail "Front Desk starts"
+grep -qx 'menus=all' "$T/frontdesk/someone" || fail "Front Desk menus"
+grep -qx 'finder=on' "$T/frontdesk/someone" || fail "Front Desk Finder access"
+"$helper" status | grep -qx "frontdesk someone" || fail "status lists Front Desk"
+"$helper" frontdesk-settings someone speech=on
+grep -qx 'speech=on' "$T/frontdesk/someone" || fail "Front Desk settings"
+! "$helper" frontdesk-settings someone menus=wrong 2>/dev/null || fail "bad Front Desk settings refused"
+"$helper" desktop someone puppy
+[ -e "$T/puppy/someone" ] && [ ! -e "$T/frontdesk/someone" ] || fail "Puppy Mode replaces Front Desk"
+"$helper" desktop someone finder
+[ ! -e "$T/puppy/someone" ] && [ ! -e "$T/frontdesk/someone" ] || fail "the Finder mode clears both"
+
 printf 'Hello,\n family\001' | "$helper" welcome
 [ "$(cat "$T/welcome")" = "Hello,  family" ] || fail "welcome on one line: $(cat "$T/welcome")"
 printf '' | "$helper" welcome && [ ! -e "$T/welcome" ] || fail "an empty welcome removes it"
@@ -65,4 +78,4 @@ done
 printf '' | "$helper" schedule
 [ ! -e "$T/systemd/zacos9-shutdown.timer" ] && [ "$(cat "$T/wakealarm")" = 0 ] || fail "the schedule turned off"
 ! printf 'startup daily 25:00\n' | "$helper" schedule 2>/dev/null || fail "odd times refused"
-echo "ok: zacos9-accounts-helper keeps Puppy Mode, the welcome message, locales, screen rotations and Nap Time's schedule"
+echo "ok: zacos9-accounts-helper keeps Puppy Mode, Front Desk, the welcome message, locales, screen rotations and Nap Time's schedule"

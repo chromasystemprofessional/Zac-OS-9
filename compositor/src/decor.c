@@ -854,6 +854,9 @@ static const char *const grow_active[20] = {
 #define TAB_MIN_W 64
 
 static int frame_height(const struct decor_state *st) {
+	if (st->style == DECOR_STYLE_NONE) {
+		return 0;
+	}
 	if (st->collapsed) {
 		return st->style == DECOR_STYLE_POPUP ? DECOR_TAB_H : DECOR_COLLAPSED_H;
 	}
@@ -1056,6 +1059,9 @@ static void title_span(const struct decor_state *st, int *x0, int *x1) {
 }
 
 struct decor_margins decor_margins(enum decor_style style) {
+	if (style == DECOR_STYLE_NONE) {
+		return (struct decor_margins){ 0, 0, 0, 0 };
+	}
 	if (style == DECOR_STYLE_POPUP) {
 		/* The body's edge is a document window's, under the tab. */
 		return (struct decor_margins){ .left = DECOR_LEFT, .right = DECOR_RIGHT,
@@ -1075,6 +1081,9 @@ struct decor_margins decor_margins(enum decor_style style) {
 }
 
 int decor_title_max_width(const struct decor_state *st) {
+	if (st->style == DECOR_STYLE_NONE) {
+		return 0;
+	}
 	if (st->style == DECOR_STYLE_POPUP) {
 		const int width = st->width - 2 * TAB_PAD;
 		return width > 0 ? width : 0;
@@ -1113,7 +1122,8 @@ static int title_ink_width(const struct decor_state *st) {
 
 bool decor_title_hit(const struct decor_state *st, int x, int y) {
 	const struct plat_text *t = st->title;
-	if (st->style == DECOR_STYLE_POPUP || !t || t->ink_l < 0 || y < 0 || y >= DECOR_TOP - 2) {
+	if (st->style == DECOR_STYLE_NONE || st->style == DECOR_STYLE_POPUP || !t ||
+			t->ink_l < 0 || y < 0 || y >= DECOR_TOP - 2) {
 		return false;
 	}
 	const int ink_w = title_ink_width(st);
@@ -1339,6 +1349,9 @@ static void paint_modal(struct pl_canvas *c, const struct decor_state *st) {
 }
 
 int decor_tab_width(const struct decor_state *st) {
+	if (st->style == DECOR_STYLE_NONE) {
+		return 0;
+	}
 	int w = title_ink_width(st) + 2 * TAB_PAD;
 	w = w < TAB_MIN_W ? TAB_MIN_W : w;
 	return w > st->width ? st->width : w;
@@ -1417,6 +1430,9 @@ static void paint_popup(struct pl_canvas *c, const struct decor_state *st) {
 }
 
 void decor_paint(struct pl_canvas *c, const struct decor_state *st) {
+	if (st->style == DECOR_STYLE_NONE) {
+		return;
+	}
 	if (st->style == DECOR_STYLE_MOVABLE_MODAL) {
 		paint_modal(c, st);
 		return;
@@ -1569,6 +1585,9 @@ static bool in_box(const struct decor_state *st, enum decor_part part, int x, in
 }
 
 enum decor_part decor_hit(const struct decor_state *st, int x, int y) {
+	if (st->style == DECOR_STYLE_NONE) {
+		return DECOR_PART_NONE;
+	}
 	const int W = st->width, H = frame_height(st);
 	if (x < 0 || y < 0 || x >= W || y >= H) {
 		return DECOR_PART_NONE;
