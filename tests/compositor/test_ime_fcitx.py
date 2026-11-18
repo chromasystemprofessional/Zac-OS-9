@@ -2,8 +2,9 @@
 """Smoke test with the real Fcitx 5 as the input method: it should
 connect to the compositor's input-method global, activate for the
 test program's field, and a letter typed on the virtual keyboard
-should come back from Fcitx's own virtual keyboard into the program
-(the key pass-through path), proving the grab loop works both ways.
+should reach Fcitx and then the program (through Fcitx's own virtual
+keyboard on older versions, or straight back from Fcitx when it does
+not use the key), proving the grab loop works both ways.
 """
 import os
 import shutil
@@ -30,6 +31,14 @@ def wait_for(path, needle, timeout=25.0):
             pass
         time.sleep(0.2)
     return False
+
+
+def count_in(path, needle):
+    try:
+        with open(path, errors="replace") as f:
+            return f.read().count(needle)
+    except FileNotFoundError:
+        return 0
 
 
 def main():
@@ -83,7 +92,8 @@ def main():
         logs["fcitx"] = os.path.join(runtime, "fcitx.log")
         f = open(logs["fcitx"], "w")
         procs.append(subprocess.Popen(
-            ["dbus-run-session", "--", "fcitx5"], env=env,
+            ["dbus-run-session", "--", "fcitx5", "--verbose",
+             "default=5,key_trace=5"], env=env,
             stdout=f, stderr=subprocess.STDOUT))
         check("fcitx starts (its wayland input method loads)",
               wait_for(logs["fcitx"], "Loaded addon waylandim", timeout=30))
@@ -93,19 +103,22 @@ def main():
 
         app_before = open(logs["app"], errors="replace").read()
         enters = app_before.count("APP keyboard-enter")
+        fcitx_before = count_in(logs["fcitx"], "KeyEvent:")
         ok_key = grabbed = False
-        # Through fcitx the key comes back on fcitx's own virtual
-        # keyboard: the seat's keyboard switches to it first, which
-        # the program sees as a fresh keyboard-enter. A key that went
-        # straight in (no grab) adds no enter. Fcitx can take a while to
-        # take the grab on a busy machine, so keep typing for it.
+        # Through fcitx the key reaches the input method, which decides what
+        # to do with it. Fcitx 5.1.12 returns a key it does not use straight
+        # to the focused client, so the program can see it without a new
+        # keyboard-enter (older versions switched the seat to fcitx's virtual
+        # keyboard first). Accept either, provided fcitx itself logged the
+        # key, which proves the compositor routed it through the grab.
         deadline = time.time() + 20
         while time.time() < deadline:
             subprocess.run([VKBD, "31"], env=env, timeout=30,
                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             ok_key = wait_for(logs["app"], "APP key keycode=31 state=1", timeout=2)
             app_after = open(logs["app"], errors="replace").read()
-            if ok_key and app_after.count("APP keyboard-enter") > enters:
+            fcitx_key = count_in(logs["fcitx"], "KeyEvent:") > fcitx_before
+            if ok_key and (fcitx_key or app_after.count("APP keyboard-enter") > enters):
                 grabbed = True
                 break
             time.sleep(0.2)
