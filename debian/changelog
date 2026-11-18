@@ -1,3 +1,21 @@
+zacos9 (1.18.18) trixie; urgency=medium
+
+  * Other programs keep the window size they ask for: LXTerminal's 80x24,
+    XTerm's geometry, galculator's compact window, Featherpad's size and
+    saved sizes are no longer overridden by a near-full-screen default. New
+    main windows still open inside the desktop strip, clear of the desktop's
+    icons (issue #184).
+  * X11 programs read the person's ~/.Xresources at start-up, so XTerm's
+    colours and geometry apply on the first launch instead of a manual
+    xrdb -merge; the compositor's Xcursor and Xft.dpi entries still win
+    (issue #184).
+  * Imported themes' frame rails and title-bar caps line up with the window
+    edge: transparent shadow columns are trimmed at extraction and at draw
+    time, and the right and bottom rails are anchored to the edges, so
+    existing theme bundles line up without re-importing.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Wed, 18 Nov 2026 00:13:49 -0500
+
 zacos9 (1.18.17) trixie; urgency=medium
 
   * Aqua and other Appearance themes choose their title-bar pieces by

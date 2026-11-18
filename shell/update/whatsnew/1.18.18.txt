@@ -1,0 +1,14 @@
+ZacOS 9 1.18.18 keeps other programs' window sizes and loads ~/.Xresources.
+
+LXTerminal, XTerm, galculator, Featherpad and other programs now open at
+the size they ask for — their own default, their saved size or their
+preferences — instead of being stretched to almost fill the screen. New
+main windows still open inside the desktop strip, so the desktop and its
+icons stay in view.
+
+X11 programs also get the person's ~/.Xresources at start-up: XTerm's
+colours and geometry now apply on its first launch, without running
+xrdb -merge by hand.
+
+Imported themes' frame rails and title-bar caps now line up with the
+window edge, including themes already on disk; re-importing is not needed.
