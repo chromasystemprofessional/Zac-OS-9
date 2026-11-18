@@ -307,6 +307,68 @@ static int run_thumb_caps_test(void) {
 	return fails;
 }
 
+/* Aqua's thumb art is 14 px across in a 16 px bar, with a 7 px top cap
+ * and an 8 px bottom cap. The art is centred inside the frame, and the
+ * unequal caps are drawn at their own lengths instead of one guessed
+ * size. */
+static int run_thumb_inset_test(void) {
+	char dir[] = "/tmp/zacos9-widgets-inset-XXXXXX";
+	if (!mkdtemp(dir)) {
+		return 0;
+	}
+	char path[sizeof(dir) + 64];
+	const char *parts[] = { "zacos9", "zacos9/themes", "zacos9/themes/Inset",
+		"zacos9/themes/Inset/chrome" };
+	for (size_t i = 0; i < sizeof(parts) / sizeof(parts[0]); i++) {
+		snprintf(path, sizeof(path), "%s/%s", dir, parts[i]);
+		mkdir(path, 0700);
+	}
+	snprintf(path, sizeof(path), "%s/zacos9/desktop.conf", dir);
+	FILE *f = fopen(path, "w");
+	fputs("theme-bundle=Inset\n# thumb inset test\n", f);
+	fclose(f);
+	snprintf(path, sizeof(path), "%s/zacos9/themes/Inset/theme.conf", dir);
+	f = fopen(path, "w");
+	fputs("name=Inset\n", f);
+	fclose(f);
+	snprintf(path, sizeof(path), "%s/zacos9/themes/Inset/chrome/scroll-thumb-vert-top.png", dir);
+	write_skin_png(path, 14, 7, 0xFFFF0000u);
+	snprintf(path, sizeof(path), "%s/zacos9/themes/Inset/chrome/scroll-thumb-vert-stretch.png", dir);
+	write_skin_png(path, 14, 1, 0xFF00FF00u);
+	snprintf(path, sizeof(path), "%s/zacos9/themes/Inset/chrome/scroll-thumb-vert-bottom.png", dir);
+	write_skin_png(path, 14, 8, 0xFF0000FFu);
+	setenv("XDG_CONFIG_HOME", dir, 1);
+	int w = 16, h = 240;
+	uint32_t *px = calloc((size_t)w * h, sizeof(*px));
+	struct pl_canvas c = { .px = px, .stride = w, .width = w, .height = h };
+	struct pl_scrollbar sb = { .vertical = true, .length = h, .enabled = true,
+		.thumb = 40, .thumb_len = 60 };
+	pl_scrollbar_paint(&c, 0, 0, &sb, PL_ACCENT_DEFAULT);
+	const int t0 = sb_track_start(&sb) + sb.thumb + 1;
+	int fails = 0;
+	if (px[(t0 + 1) * w + 1] != 0xFFFF0000u ||
+			px[(t0 + 1) * w + 14] != 0xFFFF0000u) {
+		fprintf(stderr, "FAIL 14 px thumb top cap is not centred\n");
+		fails++;
+	}
+	if (px[(t0 + 1) * w] == 0xFFFF0000u || px[(t0 + 1) * w + 15] == 0xFFFF0000u) {
+		fprintf(stderr, "FAIL thumb cap painted over the 1 px frame\n");
+		fails++;
+	}
+	if (px[(t0 + 10) * w + 8] != 0xFF00FF00u) {
+		fprintf(stderr, "FAIL thumb stretch does not follow the 7 px top cap\n");
+		fails++;
+	}
+	if (px[(t0 + 60 - 2) * w + 8] != 0xFF0000FFu) {
+		fprintf(stderr, "FAIL unequal 8 px bottom cap is not drawn\n");
+		fails++;
+	}
+	free(px);
+	unsetenv("XDG_CONFIG_HOME");
+	printf("%s themed thumb inset and unequal caps\n", fails ? "FAIL" : "ok  ");
+	return fails;
+}
+
 /* A titled group box (figure 2-38): the engraved frame, everywhere but
  * the title and the controls inside it. */
 static int run_group_box(const char *dir, int *ran) {
@@ -537,7 +599,8 @@ int main(int argc, char *argv[]) {
 	setenv("XDG_CONFIG_HOME", config_home, 1);
 	const char *dir = argc > 1 ? argv[1] : "tools/measure/figs";
 	int ran = 0;
-	int fails = run_hit_tests() + run_smart_tests() + run_skin_test() + run_thumb_caps_test();
+	int fails = run_hit_tests() + run_smart_tests() + run_skin_test() +
+		run_thumb_caps_test() + run_thumb_inset_test();
 	fails += run_hbar(dir, "horizontal scroll bar, left window (fig 2-24)", 5, &ran);
 	fails += run_button(dir, "standard push button (fig 3-2)", 0, 223, 161, &ran);
 	fails += run_button(dir, "default push button (fig 3-2)", PL_BUTTON_DEFAULT, 220, 125, &ran);

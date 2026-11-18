@@ -178,7 +178,12 @@ reads the Appearance theme's resource fork and produces a **theme bundle** in
   in the resource does not leave the bar narrower than the frame. Title-bar
   pieces are selected by the layout's title-group bit and, when the theme
   names them, their left/right/middle names, not by record order: Gizmo
-  puts its frame and grow-box records first. RTL and tab variants are
+  puts its frame and grow-box records first, and Aqua's
+  `DocWinTopTabRight` is the right cap, never the middle. A named corner
+  outside the title group (`DocWinTopLeft`) is still the left cap. The fill
+  is the widest full-height record, so a short top band cannot stand in for
+  the bar. A short tiled pattern is repeated to the 22 px row instead of
+  stretched, keeping its pinstripe pitch. RTL and tab variants are
   ignored; named left and right frame strips become the document edge
   skins, and a named bottom-corner group supplies the bottom edge.
   Appearance themes also carry control layouts (`layo` 500 push button,
@@ -188,12 +193,18 @@ reads the Appearance theme's resource fork and produces a **theme bundle** in
   checkbox/radio marks and the progress fill become `checkbox-*.png`,
   `radio-*.png` and `progress-fill.png`. Labels and the remaining widget
   metrics stay ZacOS's.
-  Scrollbars use `layo` 400/405 for the enabled track, the flat disabled
-  track, the thin thumb and arrow art; the theme's `scroll-bar-arrows` and
+  Scrollbars use `layo` 400/405. The track can be a `fram` record (an
+  `frme` whose base brush is a ppat; Aqua's pinstripe bands) or a `plut`
+  fill, with its flat disabled variant. Thumb parts are matched by name
+  (`HThumbLeft`/`HThumbRight`/`HThumbStretch`,
+  `VThumbTop`/`VThumbBottom`/`VThumbStretch`) and fall back to pxm# 500-503
+  plus a plut middle. The theme's `scroll-bar-arrows` and
   `scroll-bar-thumb` settings choose single vs lower-right arrows and
   normal vs proportional thumbs. `scroll-arrow-dec`/`scroll-arrow-inc`
   record the theme's arrow-box sizes so painting and hit-testing share
-  them. Smaller `layo` 410/415 variants are not used by ZacOS's 16 px bars.
+  them. Thumb art narrower than the 16 px bar is centred rather than
+  stretched, and unequal end caps keep their own lengths. Smaller `layo`
+  410/415 variants are not used by ZacOS's 16 px bars.
 - `sounds/` — alert sounds. `system-sound-N.wav` are the System file's own
   `snd` resources, decoded from sampled sounds only; synthesized and compressed
   sounds are skipped. Theme-file sounds sit beside them. The installer never

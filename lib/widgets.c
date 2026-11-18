@@ -1059,10 +1059,12 @@ static bool sb_track(struct sb_ctx *s, int a0, int a1, bool disabled) {
 	return false;
 }
 
-/* Tile or stretch a thumb part (cap or stretch) over an along-extent,
- * full width. Caps are fixed-size; the middle slice stretches. */
+/* Tile or stretch a thumb part (cap or stretch) over an along-extent.
+ * Caps are fixed-size; the middle slice stretches. `thin_line` is for a
+ * theme whose whole thumb is a line across the bar, not for a 1 px
+ * stretch between two caps (Aqua's stretch is 14x1). */
 static void sb_thumb_skin(struct sb_ctx *s, int a0, int a1, const char *path,
-		bool stretch) {
+		bool stretch, bool thin_line) {
 	int w, h;
 	const uint32_t *px = chrome_file(path, &w, &h);
 	if (!px) {
@@ -1070,7 +1072,7 @@ static void sb_thumb_skin(struct sb_ctx *s, int a0, int a1, const char *path,
 	}
 	/* Some themes draw a scrollbar thumb as a thin line across the
 	 * bar (Drawing Board's is 2 px), not as a full-width tile. */
-	if (!s->vertical && w <= 2 && h >= SB_ARROW) {
+	if (thin_line && !s->vertical && w <= 2 && h >= SB_ARROW) {
 		/* A thin vertical thumb line at the thumb's leading edge. */
 		for (int j = 0; j < h && 1 + j <= SB_ARROW; j++) {
 			for (int i = 0; i < w; i++) {
@@ -1082,7 +1084,7 @@ static void sb_thumb_skin(struct sb_ctx *s, int a0, int a1, const char *path,
 		}
 		return;
 	}
-	if (s->vertical && h <= 2 && w >= SB_ARROW) {
+	if (thin_line && s->vertical && h <= 2 && w >= SB_ARROW) {
 		/* A thin horizontal thumb line at the thumb's leading edge. */
 		for (int i = 0; i < w && 1 + i <= SB_ARROW; i++) {
 			for (int j = 0; j < h; j++) {
@@ -1094,21 +1096,36 @@ static void sb_thumb_skin(struct sb_ctx *s, int a0, int a1, const char *path,
 		}
 		return;
 	}
+	/* Thumb art can be narrower than the 16 px bar: Aqua's is 14 px,
+	 * leaving the 1 px frame visible on either side. Centre it rather
+	 * than stretching it across the full width. */
+	int pad0 = 0, pad1 = 0;
+	if (s->vertical) {
+		if (w < SB_WIDTH) {
+			pad0 = (SB_WIDTH - w) / 2;
+			pad1 = SB_WIDTH - w - pad0;
+		}
+	} else {
+		if (h < SB_WIDTH) {
+			pad0 = (SB_WIDTH - h) / 2;
+			pad1 = SB_WIDTH - h - pad0;
+		}
+	}
 	if (s->vertical) {
 		if (stretch) {
-			chrome_stretch(s->c, px, w, h, s->x, s->y + a0, s->x + SB_WIDTH - 1,
-				s->y + a1);
+			chrome_stretch(s->c, px, w, h, s->x + pad0, s->y + a0,
+				s->x + SB_WIDTH - 1 - pad1, s->y + a1);
 		} else {
-			chrome_tile(s->c, px, w, h, s->x, s->y + a0, s->x + SB_WIDTH - 1,
-				s->y + a1);
+			chrome_tile(s->c, px, w, h, s->x + pad0, s->y + a0,
+				s->x + SB_WIDTH - 1 - pad1, s->y + a1);
 		}
 	} else {
 		if (stretch) {
-			chrome_stretch(s->c, px, w, h, s->x + a0, s->y, s->x + a1,
-				s->y + SB_WIDTH - 1);
+			chrome_stretch(s->c, px, w, h, s->x + a0, s->y + pad0,
+				s->x + a1, s->y + SB_WIDTH - 1 - pad1);
 		} else {
-			chrome_tile(s->c, px, w, h, s->x + a0, s->y, s->x + a1,
-				s->y + SB_WIDTH - 1);
+			chrome_tile(s->c, px, w, h, s->x + a0, s->y + pad0,
+				s->x + a1, s->y + SB_WIDTH - 1 - pad1);
 		}
 	}
 }
@@ -1137,22 +1154,21 @@ static void sb_thumb(struct sb_ctx *s, int line_a, int len, struct pl_accent ac)
 			: "chrome/scroll-thumb-horz-stretch.png";
 		const char *cap1 = s->vertical ? "chrome/scroll-thumb-vert-bottom.png"
 			: "chrome/scroll-thumb-horz-right.png";
-		int sw, sh, cw, ch;
+		int sw, sh, cw, ch, c1w = 0, c1h = 0;
 		if (chrome_file(mid, &sw, &sh)) {
-			int cap = 0, c1w = 0, c1h = 0;
+			int len0 = 0, len1 = 0;
 			if (chrome_file(cap0, &cw, &ch)) {
-				cap = s->vertical ? ch : cw;
-				if (!chrome_file(cap1, &c1w, &c1h) ||
-						(s->vertical ? c1h : c1w) != cap) {
-					cap = 0;
-				}
+				len0 = s->vertical ? ch : cw;
 			}
-			if (cap > 0 && len >= 2 * cap + 1) {
-				sb_thumb_skin(s, t0, t0 + cap - 1, cap0, false);
-				sb_thumb_skin(s, t0 + cap, t1 - cap, mid, true);
-				sb_thumb_skin(s, t1 - cap + 1, t1, cap1, false);
+			if (chrome_file(cap1, &c1w, &c1h)) {
+				len1 = s->vertical ? c1h : c1w;
+			}
+			if (len0 > 0 && len1 > 0 && len >= len0 + len1 + 1) {
+				sb_thumb_skin(s, t0, t0 + len0 - 1, cap0, false, false);
+				sb_thumb_skin(s, t0 + len0, t1 - len1, mid, true, false);
+				sb_thumb_skin(s, t1 - len1 + 1, t1, cap1, false, false);
 			} else {
-				sb_thumb_skin(s, t0, t1, mid, true);
+				sb_thumb_skin(s, t0, t1, mid, true, true);
 			}
 			themed = true;
 			goto grip;

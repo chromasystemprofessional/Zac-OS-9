@@ -113,12 +113,15 @@ copies the System Folder's sound sets into Sound Sets, resource forks
 included, and turns a Kaleidoscope scheme's own WindowShade sounds into a
 selectable set, so both appear in the Sound Sets list. Scheme title bars
 come from the frame layout (`layo`) or, for older schemes, from a `wnd#`
-recipe's title band and widget rectangles; imported bars are written at the
+recipe's title band and widget rectangles. Named pieces win over record
+order: a named right tab is a cap, a named left corner is the left cap, and
+the fill is the widest full-height record. Imported bars are written at the
 desktop's 22 px title row so their lines do not shift. An Appearance theme's
 `layo`/`frme` recipes drive its push-button frame (a `frme` or a named
 `pxm#` 9-slice), the title-bar controls' native size and black rails, the
 document frame rails and grow box, and the enabled/disabled scrollbar
-tracks; labels and the remaining control metrics stay ZacOS's.
+tracks (a `fram`/`frme` or `plut` fill) with named thumb caps and stretch;
+labels and the remaining control metrics stay ZacOS's.
 
 **Monitors**: each screen's resolution, pixel size and rotation are
 applied live (`compositor/src/prefs.c`): rotation is

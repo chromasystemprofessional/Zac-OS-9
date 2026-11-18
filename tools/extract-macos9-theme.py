@@ -1585,21 +1585,22 @@ def _frme_side(big, side, x0, y0, xn, yn):
 	return steps
 
 
-def render_frme(body, width, height, color_for):
-	"""Paint a decoded `frme` frame into width x height RGBA rows.
+def _paint_frme(body, width, height, pixel_for):
+	"""Paint a decoded `frme` frame, asking pixel_for for every brush pixel.
 
-	The header's base brush fills the whole control; each item then
-	paints its selected side pixels and line segments at its inset.
-	`color_for(brush)` returns an (r, g, b, a) pixel for a brush index,
-	or None. Patterns and gradients are the caller's job; this is the
-	frame geometry the theme itself defines."""
+	`pixel_for(brush, x, y)` returns an (r, g, b, a) pixel or None. The
+	header's base brush fills the whole control; each item then paints
+	its selected side pixels and line segments at its inset. Painting
+	follows the frame's own item order, so a later item can correct an
+	earlier one."""
 	frame = decode_frme(body)
 	rows = [[(0, 0, 0, 0) for _ in range(width)] for _ in range(height)]
-	base = color_for(frame["base"])
-	if base:
-		for row in rows:
-			for x in range(width):
-				row[x] = base
+	base = frame["base"]
+	for y in range(height):
+		for x in range(width):
+			pixel = pixel_for(base, x, y)
+			if pixel:
+				rows[y][x] = pixel
 	big = frame["type"] == 3
 	for item in frame["items"]:
 		inset = item["inset"]
@@ -1608,9 +1609,6 @@ def render_frme(body, width, height, color_for):
 		xn = width - 1 - inset
 		yn = height - 1 - inset
 		if xn < x0 or yn < y0:
-			continue
-		col = color_for(item["plut"])
-		if not col:
 			continue
 		for side, mask in zip(("left", "top", "right", "bottom"), item["masks"]):
 			steps = _frme_side(big, side, x0, y0, xn, yn)
@@ -1621,18 +1619,53 @@ def render_frme(body, width, height, color_for):
 				if step[0] == "p":
 					_, x, y = step
 					if 0 <= x < width and 0 <= y < height:
-						rows[y][x] = col
+						pixel = pixel_for(item["plut"], x, y)
+						if pixel:
+							rows[y][x] = pixel
 				else:
 					_, ax, ay, bx, by = step
 					if ax == bx:
 						lo, hi = sorted((ay, by))
 						for y in range(max(0, lo), min(height - 1, hi) + 1):
-							rows[y][ax] = col
+							pixel = pixel_for(item["plut"], ax, y)
+							if pixel:
+								rows[y][ax] = pixel
 					else:
 						lo, hi = sorted((ax, bx))
 						for x in range(max(0, lo), min(width - 1, hi) + 1):
-							rows[ay][x] = col
+							pixel = pixel_for(item["plut"], x, ay)
+							if pixel:
+								rows[ay][x] = pixel
 	return rows
+
+
+def render_frme(body, width, height, color_for):
+	"""Paint a decoded `frme` frame into width x height RGBA rows.
+
+	The header's base brush fills the whole control; each item then
+	paints its selected side pixels and line segments at its inset.
+	`color_for(brush)` returns an (r, g, b, a) pixel for a brush index,
+	or None. Patterns and gradients are the caller's job; this is the
+	frame geometry the theme itself defines."""
+	def pixel_for(brush, _x, _y):
+		return color_for(brush)
+	return _paint_frme(body, width, height, pixel_for)
+
+
+def render_frme_tiled(body, width, height, tile_for):
+	"""Paint a `frme` whose brushes are tiles, not single colours.
+
+	`tile_for(brush)` returns rows of RGBA pixels or None. Each brush is
+	repeated at its own scale, so a frame's base pattern keeps its
+	pinstripes inside the control instead of flattening to one colour.
+	This is how Appearance scrollbar tracks are painted: their `fram`
+	record is a `frme` whose base brush is a ppat."""
+	def pixel_for(brush, x, y):
+		tile = tile_for(brush)
+		if not tile or not tile[0]:
+			return None
+		return tile[y % len(tile)][x % len(tile[0])]
+	return _paint_frme(body, width, height, pixel_for)
 
 
 def decode_layo(body):
@@ -1716,56 +1749,131 @@ def layo_title_items(body, names=None):
 	RTL or tab variants; otherwise the first three records are the usual
 	cap/middle/cap."""
 	coords, items = decode_layo(body)
+
+	def named(entry):
+		item = entry[0]
+		if item["type"] != b"pxm#":
+			return ""
+		return names.get(item["id"] & 0xFFFF, "").lower() if names else ""
+
 	candidates = []
+	extras = []
 	for item in items:
-		if not item["attrs"] & 1 or item["visible"]:
-			continue
-		if item["type"] not in (b"pxm#", b"plut", b"ppat"):
+		if item["visible"] or item["type"] not in (b"pxm#", b"plut", b"ppat"):
 			continue
 		top = layo_coord(item["rect"][0], coords)
 		bottom = layo_coord(item["rect"][2], coords)
-		candidates.append((item, top, bottom))
+		entry = (item, top, bottom)
+		if item["attrs"] & 1:
+			candidates.append(entry)
+			continue
+		# A named title corner can sit outside the layout's title-group
+		# bit (Aqua's DocWinTopLeft is part of the window's top edge,
+		# not the tab group). Keep it as a cap candidate, never a fill.
+		name = named(entry)
+		if name and "rtl" not in name and \
+				any(word in name for word in ("title", "tab", "top")) and \
+				("left" in name or "right" in name):
+			extras.append(entry)
 	if not candidates:
 		return []
-	if names:
-		def named(entry):
-			item = entry[0]
-			if item["type"] != b"pxm#":
-				return ""
-			return names.get(item["id"] & 0xFFFF, "").lower()
 
+	def span(entry):
+		item = entry[0]
+		return (layo_coord(item["rect"][1], coords),
+			layo_coord(item["rect"][3], coords))
+
+	def width(entry):
+		left, right = span(entry)
+		return max(0, right - left)
+
+	def height(entry):
+		return entry[2] - entry[1]
+
+	if names:
+		# Names are the strongest role: DocWinTopTabRight, Doc Win Titlebar
+		# Left, ... A right tab is a cap even when its name also says "tab".
+		# A named left corner outside the title-group bit (Aqua's
+		# DocWinTopLeft) is still the left cap.
 		left = next((entry for entry in candidates
 			if "left" in named(entry) and "rtl" not in named(entry)), None)
+		if left is None:
+			left = next((entry for entry in extras
+				if "left" in named(entry) and "rtl" not in named(entry)), None)
 		right = next((entry for entry in candidates
-			if "right" in named(entry) and "rtl" not in named(entry) and
-			"tab" not in named(entry)), None)
+			if "right" in named(entry) and "tab" in named(entry) and
+			"rtl" not in named(entry)), None)
+		if right is None:
+			right = next((entry for entry in candidates
+				if "right" in named(entry) and "rtl" not in named(entry)), None)
+		if right is None:
+			right = next((entry for entry in extras
+				if "right" in named(entry) and "rtl" not in named(entry)), None)
+		pool = [entry for entry in candidates
+			if entry is not left and entry is not right]
+		middle = next((entry for entry in pool
+			if any(word in named(entry) for word in ("middle", "center", "fill")) and
+			"rtl" not in named(entry)), None)
+		if middle is None and pool:
+			# Prefer a full-height fill. Aqua's "document window top" is
+			# an 8 px band under the 22 px caps; tiled as the middle it
+			# left the title row blank above it.
+			cap_height = max((height(entry) for entry in (left, right) if entry),
+				default=0)
+			full = [entry for entry in pool if height(entry) >= cap_height - 1]
+			middle = max(full or pool, key=width)
 		if left and right:
-			left_index = candidates.index(left)
-			right_index = candidates.index(right)
-			middle = next((entry for entry in candidates
-				if entry is not left and entry is not right and
-				entry[0]["type"] in (b"pxm#", b"plut", b"ppat") and
-				any(word in named(entry) for word in ("middle", "center", "fill"))),
-				None)
+			if middle is not None:
+				return [left, middle, right]
+			# No fill: a middle record between the caps, then a plut after
+			# them (Gizmo's fill is not a named middle pxm#).
+			left_index = candidates.index(left) if left in candidates else -1
+			right_index = candidates.index(right) if right in candidates \
+				else len(candidates)
+			lo, hi = sorted((left_index, right_index))
+			middle = next((entry for entry in candidates[lo + 1:hi]
+				if entry is not left and entry is not right), None)
 			if middle is None:
-				lo, hi = sorted((left_index, right_index))
-				middle = next((entry for entry in candidates[lo + 1:hi]
-					if entry is not left and entry is not right), None)
-			if middle is None:
-				# Gizmo's middle is a plut/ppat tile after the caps, not a
-				# named middle pxm#.
 				after = candidates[max(left_index, right_index) + 1:]
 				middle = next((entry for entry in after
 					if entry[0]["type"] == b"plut"), None)
 			if middle is not None:
 				return [left, middle, right]
 			return [left, right]
-	# No resource names: the first three title-bar records are usually
-	# cap/middle/cap, but some themes (Hi-Tech) draw cap, opposite cap, then
-	# one full-width fill. Order by their left edge, so the wide record lands
-	# in the middle instead of being tiled across the bar as a cap.
-	first = candidates[:3]
-	return sorted(first, key=lambda entry: layo_coord(entry[0]["rect"][1], coords))
+		if left or right:
+			# Only one cap is named. Its opposite is the remaining
+			# record whose edge is nearest, and the fill is the widest
+			# remaining full-height record.
+			cap = left or right
+			rest = [entry for entry in candidates
+				if entry is not cap and entry is not middle]
+			if middle is None and rest:
+				full = [entry for entry in rest if height(entry) >= height(cap) - 1]
+				middle = max(full or rest, key=width)
+			rest = [entry for entry in rest if entry is not middle]
+			if left is None and rest:
+				left = min(rest, key=lambda entry: span(entry)[0])
+			if right is None and rest:
+				right = max(rest, key=lambda entry: span(entry)[1])
+			if left and middle and right:
+				return [left, middle, right]
+			if left and right:
+				return [left, right]
+	# No useful names: the title-bar records are usually cap/middle/cap, but
+	# some themes draw cap, opposite cap, then one full-width fill (Hi-Tech),
+	# and Aqua puts a named right tab before its wide fill. The wide record is
+	# the middle; the remaining records are the caps. Equal widths keep the
+	# records' own order.
+	if len(candidates) >= 3:
+		widest = max(candidates, key=width)
+		others = [entry for entry in candidates if entry is not widest]
+		second = max((width(entry) for entry in others), default=0)
+		if second == 0 or width(widest) > second * 2:
+			left = min(others, key=lambda entry: span(entry)[0])
+			right = max(others, key=lambda entry: span(entry)[1])
+			return [left, widest, right]
+	ordered = sorted(candidates[:3], key=lambda entry: span(entry)[0])
+	return ordered
 
 
 def decode_wnd(body):
@@ -2475,11 +2583,18 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None, px
 				save_bar("bar-middle" + suffix, mid_rows, bar_h,
 					crop_top=mid_crop if mid_crop else None)
 			else:
-				# A plut/ppat fill tiles the title row; keep its full
-				# pattern, cropped to the bar's height when taller. The
-				# compositor scales a shorter pattern up, so its gradient
-				# is not truncated to the caps' height.
-				save_tile("bar-middle" + suffix, mid_rows[:ZACOS_BAR_HEIGHT])
+				# A plut/ppat fill is a repeatable pattern. Repeat a short
+				# one vertically (Aqua's is an 8 px pinstripe band), so the
+				# compositor's title row gets a full-height tile instead of
+				# stretching four pinstripes into 22 px; crop a tall one to
+				# the bar's own rows.
+				mid = mid_rows[mid_crop:] if mid_crop else mid_rows
+				if mid:
+					if len(mid) < ZACOS_BAR_HEIGHT:
+						mid = [mid[y % len(mid)] for y in range(ZACOS_BAR_HEIGHT)]
+					else:
+						mid = mid[:ZACOS_BAR_HEIGHT]
+					save_tile("bar-middle" + suffix, mid)
 			save_bar("bar-right" + suffix, right_rows, bar_h, trim_right=True,
 				crop_top=right_crop)
 			mids_by_suffix[suffix] = mid_rows
@@ -2944,12 +3059,29 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None, px
 				continue
 
 		# Scrollbars: layo 400/405 are the normal horizontal and vertical
-		# bars. Each is a plut fill (the track), two pxm# end caps with a
-		# plut middle (the thumb), plus the standalone ScrollArrowsStd
-		# pxm# (321/322 up/down, 331/332 left/right) for the arrows. The
-		# old code read the first four pxm# records as arrows/track/thumb,
-		# but those four are all thumb caps in Gizmo, so its track and
-		# arrows were the thumb and its thumb was a cap.
+		# bars. Appearance themes may draw the track as a `fram` record (a
+		# `frme` whose base brush is a ppat) and name their thumb parts
+		# (HThumbLeft/HThumbRight/HThumbStretch, VThumbTop/VThumbBottom/
+		# VThumbStretch). Older schemes use a plut track and pxm# 500-503
+		# caps with a plut middle. Resolve the parts by name and resource
+		# kind first; the fixed IDs are only the fallback.
+		STRIP = 14   # a 16 px bar's inside, within its 1 px frame
+
+		def brush_tile(pid):
+			"""A brush's pixels: an 8x8 ppat tile or a 1x1 solid."""
+			entries, idx = (plut_entries, ~pid) if pid < 0 else \
+				(plut_entries_386, pid - 1)
+			if not (0 <= idx < len(entries)):
+				return None
+			pattern_id, rgb = entries[idx]
+			if pattern_id and pattern_id in patterns:
+				try:
+					_, _, rows = macpat.decode_ppat(patterns[pattern_id])
+					return rows
+				except (ValueError, IndexError, struct.error):
+					pass
+			return [[rgb + (255,)]]
+
 		def scroll_axis(lid, vertical, cap_left, cap_right, arrow_dec, arrow_inc):
 			body = (layo or {}).get(lid)
 			if not body:
@@ -2958,54 +3090,131 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None, px
 				_coords, items = decode_layo(body)
 			except (ValueError, IndexError, struct.error):
 				return
-			# The track is the layout's base-state plut fill.
+
+			def pxm_rows(item):
+				bodies = pxm.get(item["id"] & 0xFFFF)
+				if not bodies:
+					return None
+				try:
+					return decode_pxm(bodies[0], item["index"], clut_map)
+				except (ValueError, IndexError, struct.error):
+					return None
+
+			def track_rows(item):
+				"""A track record: a frme frame, or a plut fill."""
+				if item["type"] in (b"fram", b"frme"):
+					frame_body = (frme or {}).get(item["id"])
+					if not frame_body:
+						return None
+					width, height = (STRIP, 64) if vertical else (64, STRIP)
+					try:
+						return render_frme_tiled(frame_body, width, height, brush_tile)
+					except (ValueError, IndexError, struct.error):
+						return None
+				if item["type"] == b"plut":
+					return resolve_rec(b"plut", item["id"], 0)
+				return None
+
+			# The track is the layout's base-state fill. Aqua's is a fram
+			# record whose base brush is the pinstripe ppat; Gizmo's is a
+			# plut fill. The disabled bar is the flat 0x2 variant (0x1 is
+			# the inactive one).
 			track = None
 			for item in items:
-				if item["type"] == b"plut" and item["visible"] == 0 and \
-						item["attrs"] & 0x100:
-					track = resolve_rec(b"plut", item["id"], 0)
-					break
-			# The disabled bar is a separate flat track (Gizmo's 1031/
-			# 1034 red), not the enabled rainbow art. The active-window
-			# disabled state is 0x2; 0x1 is the inactive variant.
+				if item["visible"] == 0 and item["attrs"] & 0x100:
+					track = track_rows(item)
+					if track:
+						break
 			disabled = None
 			for want_state in (2, 1):
 				for item in items:
-					if item["type"] == b"plut" and item["visible"] == want_state and \
-							item["attrs"] & 0x100:
-						disabled = resolve_rec(b"plut", item["id"], 0)
-						break
+					if item["visible"] == want_state and item["attrs"] & 0x100:
+						disabled = track_rows(item)
+						if disabled:
+							break
 				if disabled:
 					break
-			# The thumb: two pxm# end caps and the plut fill between them.
-			# The normal active bar is the 0x10 state (active, not
-			# pressed); 0x30 is pressed and 0x110 is its layer-1 variant.
-			# Using the first plut after any caps picked the pressed
-			# pink variant, which blended into the track.
+
+			# Named thumb parts are the strongest role. Aqua calls them
+			# HThumbLeft/HThumbRight/HThumbStretch and VThumbTop/
+			# VThumbBottom/VThumbStretch; the caps are 7-8 px along and
+			# the stretch is 1 px, so they cannot be sliced from a fixed
+			# 8 px guess.
+			def thumb_role(item):
+				if item["type"] != b"pxm#":
+					return None
+				name = ((pxm_names or {}).get(item["id"] & 0xFFFF) or "").lower()
+				if "thumb" not in name:
+					return None
+				flat = "".join(ch for ch in name if ch.isalnum())
+				if "stretch" in flat:
+					return "stretch"
+				if vertical:
+					if "top" in flat:
+						return "side0"
+					if "bottom" in flat:
+						return "side1"
+				else:
+					if "left" in flat:
+						return "side0"
+					if "right" in flat:
+						return "side1"
+				return None
+
+			groups = {}
+			for item in items:
+				role = thumb_role(item)
+				if role:
+					groups.setdefault(item["visible"], {}).setdefault(role, item)
 			caps = {}
 			thumb_mid = None
 			want = 0x10
-			for candidate in (0x10, 0x0, 0x30, 0x110):
+			state_order = (0x30, 0x10, 0x0, 0x110, 0x20, 0x100, 0x120)
+			state_order += tuple(state for state in groups if state not in state_order)
+			for state in state_order:
+				group = groups.get(state)
+				if not group or "side0" not in group or "side1" not in group:
+					continue
+				caps[0] = pxm_rows(group["side0"])
+				caps[1] = pxm_rows(group["side1"])
+				if caps[0] and caps[1]:
+					want = state
+					if "stretch" in group:
+						thumb_mid = pxm_rows(group["stretch"])
+					break
 				caps = {}
-				for item in items:
-					if item["type"] != b"pxm#":
-						continue
-					rid = item["id"] & 0xFFFF
-					if rid in (cap_left, cap_right) and item["visible"] == candidate \
-							and rid not in caps:
-						bodies = pxm.get(rid)
-						if bodies:
-							try:
-								caps[rid] = decode_pxm(bodies[0], item["index"], clut_map)
-							except (ValueError, IndexError, struct.error):
-								pass
-				if caps.get(cap_left) and caps.get(cap_right):
-					want = candidate
-					break
-			for item in items:
-				if item["type"] == b"plut" and item["visible"] == want:
-					thumb_mid = resolve_rec(b"plut", item["id"], 0)
-					break
+			if not caps:
+				# Kaleidoscope's pxm# 500-503 caps keep their old IDs. The
+				# normal active bar is 0x10; 0x30 is pressed and 0x110 its
+				# layer-1 variant.
+				for candidate in (0x10, 0x0, 0x30, 0x110):
+					caps = {}
+					for item in items:
+						if item["type"] != b"pxm#":
+							continue
+						rid = item["id"] & 0xFFFF
+						if rid not in (cap_left, cap_right) or \
+								item["visible"] != candidate:
+							continue
+						rows = pxm_rows(item)
+						if not rows:
+							continue
+						if rid == cap_left:
+							caps[0] = rows
+						else:
+							caps[1] = rows
+					if caps.get(0) and caps.get(1):
+						want = candidate
+						break
+			if thumb_mid is None:
+				for candidate in (want, 0x10, 0x0, 0x30, 0x110):
+					for item in items:
+						if item["type"] == b"plut" and item["visible"] == candidate:
+							thumb_mid = resolve_rec(b"plut", item["id"], 0)
+							if thumb_mid:
+								break
+					if thumb_mid:
+						break
 			axis = "vert" if vertical else "horz"
 			if track:
 				save_tile("scroll-track-" + axis, track)
@@ -3013,12 +3222,12 @@ def write_theme_chrome(name, pxm, ppats, out, cluts=(), layo=None, plut=None, px
 				save_tile("scroll-track-" + axis + "-disabled", disabled)
 			side0 = "-top" if vertical else "-left"
 			side1 = "-bottom" if vertical else "-right"
-			if caps.get(cap_left):
-				save_tile("scroll-thumb-" + axis + side0, caps[cap_left])
+			if caps.get(0):
+				save_tile("scroll-thumb-" + axis + side0, caps[0])
 			if thumb_mid:
 				save_tile("scroll-thumb-" + axis + "-stretch", thumb_mid)
-			if caps.get(cap_right):
-				save_tile("scroll-thumb-" + axis + side1, caps[cap_right])
+			if caps.get(1):
+				save_tile("scroll-thumb-" + axis + side1, caps[1])
 			# The arrow box is 16 px with a 1 px border; crop to the 14 px
 			# interior ZacOS draws.
 			for pid, name in ((arrow_dec, "decrement"), (arrow_inc, "increment")):

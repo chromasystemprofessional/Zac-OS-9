@@ -86,7 +86,7 @@ Use this matrix for every theme. “Source” is the resource from
 |---|---|---|---|
 | Document frame edges | `layo` 128/129, `pxm#`/`plut`/`ppat` rails | `compositor/src/decor.c` | Edges, left/right/bottom rails, caps; top is the title bar |
 | Document frame corners/caps | `pxm#` corner groups | `decor.c` | Gizmo caps; generic corners partial |
-| Title bar | `layo` 128/129 title items | `decor.c` | Active/inactive, left cluster, spans; fixed 22 px row |
+| Title bar | `layo` 128/129 title items | `decor.c` | Active/inactive, named left/right caps and full-height fill, left cluster, spans; fixed 22 px row |
 | Close/collapse/zoom/grow | `pxm#` 200–221, 450–463 | `decor.c` | At theme tile size; dialog variants |
 | Dialog/alert frame | `layo` 130–133 | `decor.c` | Uses the document/movable-modal drawing |
 | Movable modal | `layo` 134/135 | `decor.c` | Separate title pieces and boxes |
@@ -98,7 +98,7 @@ Use this matrix for every theme. “Source” is the resource from
 | Checkbox/radio | `layo` 510/515, `frme` 510–515 | `widgets.c`, Qt style | Bitmaps from theme; fixed 12/13 px |
 | Pop-up button | `layo` 520, `frme` 555–557 | `widgets.c` | Drawn by Qt; fixed metrics |
 | Tabs | `layo` 300–345 | none | Platinum/fixed |
-| Scrollbars | `layo` 400–415, `pxm#` 500–503, 321/322/331/332 | `widgets.c`, Qt style | Track, thumb, arrows, smart scrolling; fixed 16 px |
+| Scrollbars | `layo` 400–415, `frme`/`fram` tracks, named `pxm#` thumb caps, 321/322/331/332 | `widgets.c`, Qt style | Track, named caps/stretch, arrows, smart scrolling; fixed 16 px |
 | Sliders | `layo` 420–427 | none | Platinum/fixed |
 | Progress | `layo` 430/440, `frme` | `widgets.c` | Fill art; fixed 10×12 |
 | Disclosure/little arrows | `layo` 540/550 | `widgets.c` | Fixed Platinum geometry |

@@ -1215,6 +1215,119 @@ def test_layo_title_items_out_of_order():
     print("ok    title pieces are ordered by their left edge, so the fill is the middle")
 
 
+def test_layo_title_items_named_right_tab():
+    # Aqua names only its right title tab (DocWinTopTabRight, 14 px): a
+    # 54 px left cap, a 911 px fill and the named tab. The tab is a cap,
+    # never the middle, even though its name contains "tab".
+    coords = [
+        (0, 0, 0, 0, 0, 0),       # 1: bar top
+        (0, 0, 0, 0, 0, 0),       # 2: left cap left
+        (0, 22, 0, 0, 0, 0),      # 3: bar bottom
+        (0, 54, 0, 0, 0, 0),      # 4: left cap right
+        (0, 54, 0, 0, 0, 0),      # 5: fill left
+        (0, 965, 0, 0, 0, 0),     # 6: fill right
+        (0, 965, 0, 0, 0, 0),     # 7: right tab left
+        (0, 979, 0, 0, 0, 0),     # 8: right tab right
+    ]
+    items = [
+        (0, 0, 1, (1, 2, 3, 4), b"plut", -90, 1, 0),    # 54 px left
+        (0, 0, 1, (1, 5, 3, 6), b"plut", -86, 1, 0),    # 911 px fill
+        (0, 0, 1, (1, 7, 3, 8), b"pxm#", 6173, 1, 0),   # named right tab
+    ]
+    titles = tool.layo_title_items(_layo_resource(coords, items),
+        {6173: "DocWinTopTabRight"})
+    assert [item["id"] for item, _top, _bottom in titles] == [-90, -86, 6173], titles
+    print("ok    a named right title tab stays the right cap")
+
+
+def test_layo_title_items_named_left_corner():
+    # Aqua's DocWinTopLeft sits outside the title-group bit, and its
+    # "document window top" fill is an 8 px band under the 22 px caps.
+    # Both caps are full height, so the 54 px tab centre is the middle;
+    # picking the wide 8 px band left the top of the title row blank.
+    coords = [
+        (0, 0, 0, 0, 0, 0),       # 1: top 0
+        (0, 22, 0, 0, 0, 0),      # 2: bottom 22
+        (0, 0, 0, 0, 0, 0),       # 3: x 0
+        (0, 20, 0, 0, 0, 0),      # 4: x 20
+        (0, 74, 0, 0, 0, 0),      # 5: x 74
+        (0, 985, 0, 0, 0, 0),     # 6: x 985
+        (0, 999, 0, 0, 0, 0),     # 7: x 999
+        (0, 14, 0, 0, 0, 0),      # 8: top 14 (the short band)
+    ]
+    items = [
+        (0, 0, 0x120, (1, 3, 2, 4), b"pxm#", 6176, 1, 0),  # named left
+        (0, 0, 0x121, (1, 4, 2, 5), b"plut", -90, 1, 0),    # tab centre
+        (0, 0, 0x121, (8, 5, 2, 6), b"plut", -86, 1, 0),    # 8 px band
+        (0, 0, 0x121, (1, 6, 2, 7), b"pxm#", 6173, 1, 0),   # named right
+    ]
+    titles = tool.layo_title_items(_layo_resource(coords, items),
+        {6176: "DocWinTopLeft", 6173: "DocWinTopTabRight"})
+    assert [item["id"] for item, _top, _bottom in titles] == [6176, -90, 6173], titles
+    print("ok    a named left corner and a full-height tab centre are the title bar")
+
+
+def test_named_scrollbar_parts():
+    # Aqua's layo 400/405 names its thumb parts (HThumbLeft 7 px,
+    # HThumbStretch 1 px, HThumbRight 8 px; VThumbTop 7 px,
+    # VThumbStretch 1 px, VThumbBottom 8 px) and draws the track as a
+    # fram record (frme 800/801) instead of a plut fill. The old fixed
+    # pxm# 500-503 slices found none of them.
+    plut = {387: _plut_body({0: (0, (200, 200, 200)),
+                             1: (0, (100, 100, 100))})}
+    frme = {800: _frme_body([-1, -2]), 801: _frme_body([-1, -2]),
+            802: _frme_body([-1, -2]), 803: _frme_body([-1, -2])}
+    layo = {
+        128: _layo_resource([], []),
+        400: _layo_resource([], [
+            (0, 0, 0x100, (1, -2, -1, -4), b"fram", 801, 1, 0),
+            (2, 0, 0x100, (1, -2, -1, -4), b"fram", 803, 1, 0),
+            (0x30, 0, 0x100, (1, -2, -1, -4), b"pxm#", 1113, 1, 0),
+            (0x30, 0, 0x100, (1, -2, -1, -4), b"pxm#", 1114, 1, 0),
+            (0x30, 0, 0x100, (1, -2, -1, -4), b"pxm#", 1112, 1, 0),
+        ]),
+        405: _layo_resource([], [
+            (0, 0, 0x100, (1, -2, -1, -4), b"fram", 800, 1, 0),
+            (2, 0, 0x100, (1, -2, -1, -4), b"fram", 802, 1, 0),
+            (0x30, 0, 0x100, (1, -2, -1, -4), b"pxm#", 1116, 1, 0),
+            (0x30, 0, 0x100, (1, -2, -1, -4), b"pxm#", 1118, 1, 0),
+            (0x30, 0, 0x100, (1, -2, -1, -4), b"pxm#", 1117, 1, 0),
+        ]),
+    }
+    pxm = {
+        1113: [_pxm_layers(7, 14, 1)],
+        1114: [_pxm_layers(1, 14, 1)],
+        1112: [_pxm_layers(8, 14, 1)],
+        1116: [_pxm_layers(14, 7, 1)],
+        1118: [_pxm_layers(14, 1, 1)],
+        1117: [_pxm_layers(14, 8, 1)],
+        331: [_pxm_layers(16, 16, 1)], 332: [_pxm_layers(16, 16, 1)],
+        321: [_pxm_layers(16, 16, 1)], 322: [_pxm_layers(16, 16, 1)],
+    }
+    names = {1113: "HThumbLeft", 1114: "HThumbStretch",
+             1112: "HThumbRight", 1116: "VThumbTop",
+             1118: "VThumbStretch", 1117: "VThumbBottom"}
+    out = tempfile.mkdtemp() + "/theme"
+    keys = tool.write_theme_chrome("Synthetic Aqua", pxm, [], out, [], layo,
+        plut, names, frme)
+
+    def size(key):
+        return _png_size(os.path.join(out, "chrome", key + ".png"))
+
+    assert keys.get("scroll-track-horz") == "chrome/scroll-track-horz.argb", keys
+    assert size("scroll-track-horz") == (64, 14), size("scroll-track-horz")
+    assert size("scroll-track-horz-disabled") == (64, 14)
+    assert size("scroll-thumb-horz-left") == (7, 14)
+    assert size("scroll-thumb-horz-stretch") == (1, 14)
+    assert size("scroll-thumb-horz-right") == (8, 14)
+    assert size("scroll-track-vert") == (14, 64)
+    assert size("scroll-track-vert-disabled") == (14, 64)
+    assert size("scroll-thumb-vert-top") == (14, 7)
+    assert size("scroll-thumb-vert-stretch") == (14, 1)
+    assert size("scroll-thumb-vert-bottom") == (14, 8)
+    print("ok    named scrollbar caps and stretch come from the layout, not fixed slices")
+
+
 def test_dark_menu_bar_gets_dark_face():
     # Hi-Tech's menu bar image is near black. Without a menu-bar face the
     # palette keeps Platinum's light face and the bar titles come out black
@@ -1315,6 +1428,25 @@ def test_bar_tiles_fit_window():
         "bar-right": (5, bar_h)}, sizes
     assert keys.get("bar-middle", "").endswith("chrome/bar-middle.argb"), keys
     print("ok    bar tiles fill the window's width and the bar's height")
+
+
+def test_short_bar_pattern_repeats():
+    # Aqua's document-window top is a 64x8 pinstripe ppat. A short fill
+    # repeats to the 22 px title row; stretching four pinstripes into 22 px
+    # thickened the theme's lines.
+    pxm = {6176: [_pxm_edged(24, 22)], 6173: [_pxm_edged(8, 22)]}
+    plut = {387: _plut_body({48: (9001, (255, 255, 255))})}
+    ppats = [(9001, _ppat_body_wide(64, 8))]
+    layo = {128: _layo_body([
+        (b"pxm#", 6176, 256, 0),
+        (b"plut", -49, 256, 0),
+        (b"pxm#", 6173, 256, 0),
+    ])}
+    out = tempfile.mkdtemp() + "/theme"
+    tool.write_theme_chrome("Pinstripe", pxm, ppats, out, {}, layo, plut)
+    assert _png_size(os.path.join(out, "chrome", "bar-middle.png")) == \
+        (64, tool.ZACOS_BAR_HEIGHT)
+    print("ok    a short title-bar pattern repeats to the title row")
 
 
 def _layo_body(entries):
@@ -1713,8 +1845,12 @@ def test_resource_map_bounds():
 
 
 test_layo_title_items_out_of_order()
+test_layo_title_items_named_right_tab()
+test_layo_title_items_named_left_corner()
+test_named_scrollbar_parts()
 test_dark_menu_bar_gets_dark_face()
 test_theme_chrome_reordered_layout()
+test_short_bar_pattern_repeats()
 test_theme_icons_scale_and_clear_stale()
 test_resource_map_bounds()
 print("OK")
