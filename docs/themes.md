@@ -135,6 +135,12 @@ reads the Appearance theme's resource fork and produces a **theme bundle** in
   records a dark `menu-bar` face so the bar titles pick white ink. Dropdown
   menus keep `menu-background`. A frame's left rail is saved as
   `document-left` with `frame-left`, alongside the right and bottom rails.
+  A rail's fully transparent outer margin (the window's shadow: iBook's
+  left strip has one clear column, its right four) is trimmed, and the
+  margin shrinks to the ink, so the rail's black outline meets the title
+  bar's corner on the window edge instead of stepping inside it. The
+  compositor applies the same trimming to rails and bar caps at draw time,
+  so older bundles line up without a re-import.
   Scrollbars tile the `scroll-track-*`
   and three-part `scroll-thumb-*` skins (caps with the stretch between,
   stretch alone when short); a theme's own `scroll-arrow-*` art is used

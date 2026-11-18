@@ -1389,6 +1389,42 @@ def test_frame_left_rail():
     print("ok    a themed window's left frame rail is extracted like its right")
 
 
+def test_frame_rails_trim_clear_outer_edge():
+    # A theme's side art can carry the window's shadow outside the rail:
+    # iBook's left strip starts with one clear column and its right strip
+    # ends with four. Saving them as-is leaves the black outline inside the
+    # window while the title bar's corner sits on the edge, so the frame
+    # steps in at every corner. Trim the outer side and record the ink's
+    # width as the frame margin.
+    clear = (0, 0, 0, 0)
+    ink = (0, 0, 0, 255)
+    assert tool.trim_frame_rail([[clear, ink, ink]], "left") == [[ink, ink]]
+    assert tool.trim_frame_rail([[ink, ink, clear, clear]], "right") == [[ink, ink]]
+    assert tool.trim_frame_rail([[ink], [ink], [clear]], "bottom") == [[ink], [ink]]
+
+    pxm = {700: [_pxm_edged(10, 12, left=2)],
+        701: [_pxm_edged(14, 12, right=4)],
+        710: [_pxm_edged(24, 22)], 711: [_pxm_edged(128, 22)],
+        712: [_pxm_edged(8, 22)]}
+    names = {700: "Document Window Left", 701: "Document Window Right",
+        710: "Title Left", 711: "Title Middle", 712: "Title Right"}
+    layo = {128: _layo_resource([], [
+        (2, 0, 0, (0, 0, 0, 0), b"pxm#", 700, 1, 0),
+        (2, 0, 0, (0, 0, 0, 0), b"pxm#", 701, 1, 0),
+        (0, 0, 1, (0, 0, 0, 0), b"pxm#", 710, 1, 0),
+        (0, 0, 1, (0, 0, 0, 0), b"pxm#", 711, 1, 0),
+        (0, 0, 1, (0, 0, 0, 0), b"pxm#", 712, 1, 0),
+    ])}
+    out = tempfile.mkdtemp() + "/theme"
+    keys = tool.write_theme_chrome("Rails", pxm, [], out, [], layo,
+        None, names)
+    assert keys.get("frame-left") == "8", keys
+    assert keys.get("frame-right") == "10", keys
+    assert _png_size(os.path.join(out, "chrome", "document-left.png")) == (8, 12)
+    assert _png_size(os.path.join(out, "chrome", "document-right.png")) == (10, 12)
+    print("ok    frame rails lose their clear outer shadow and keep the outline on the edge")
+
+
 def test_frame_pxm_bottom_rail():
     # iBook and Drawing Board draw the bottom rail as one pxm# picture
     # (6181), 14 px tall, not as a plut/ppat strip. It must fill the
@@ -1717,6 +1753,7 @@ test_theme_chrome_twopart()
 test_bar_tiles_align()
 test_bar_tiles_fit_window()
 test_frame_left_rail()
+test_frame_rails_trim_clear_outer_edge()
 test_frame_pxm_bottom_rail()
 
 
