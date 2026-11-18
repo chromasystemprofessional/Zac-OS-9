@@ -1,0 +1,10 @@
+ZacOS 9 1.18.20 brings Silver Coat Dark, a true dark mode for the desktop.
+
+Appearance now offers Silver Coat Dark beside Silver Coat. It turns the
+window chrome, menu bar, menus, panels, lists, text fields, buttons,
+checkboxes, tabs, scroll bars and desktop dark, with white text that stays
+readable on selections and coloured blocks. Icons, wallpapers and imported
+theme artwork keep their own colours.
+
+The Theme Editor's Dark Palette now makes a theme dark all the way through,
+and Qt applications started while Silver Coat Dark is active follow it.
