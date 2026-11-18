@@ -95,7 +95,11 @@ install-deb)
 	chmod 755 "$tmp"
 	chmod 644 "$tmp/package.deb"
 	dpkg-deb --info "$tmp/package.deb" >/dev/null 2>&1 || die "That file isn't a Debian package."
-	apt-get -y -o Dpkg::Options::="--force-confold" -o Dpkg::Progress-Fancy=0 		-o APT::Status-Fd=1 install "$tmp/package.deb"
+	# A zacos9-dbgsym installed from an older release is version-locked to
+	# that zacos9 and makes apt call the whole system broken, so the update
+	# refuses to unpack. The debug symbols are optional; --fix-broken lets
+	# apt remove the stale companion while installing this package.
+	apt-get -y --fix-broken -o Dpkg::Options::="--force-confold" -o Dpkg::Progress-Fancy=0 		-o APT::Status-Fd=1 install "$tmp/package.deb"
 	;;
 refresh)
 	[ "$#" -eq 0 ] || die "usage: zacos9-appstore-helper refresh"
