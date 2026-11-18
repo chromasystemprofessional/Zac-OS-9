@@ -1,3 +1,12 @@
+zacos9 (1.18.20) trixie; urgency=medium
+
+  * Silver Coat Dark, a true dark mode for the desktop: dark window chrome,
+    menu bar, menus, panels, lists, text fields, controls and desktop, with
+    readable white text. The Theme Editor's Dark Palette and Qt
+    applications follow it.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Wed, 18 Nov 2026 17:51:53 -0500
+
 zacos9 (1.18.19) trixie; urgency=medium
 
   * Front Desk: a shared-computer session shell for chosen accounts. It
