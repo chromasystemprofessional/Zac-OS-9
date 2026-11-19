@@ -1,3 +1,11 @@
+zacos9 (1.18.21) trixie; urgency=medium
+
+  * Renaming now works in list view: click the selected row's name, or
+    press Return, to edit it just as in icon view and on the desktop (issue
+    #187).
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Wed, 18 Nov 2026 21:55:54 -0500
+
 zacos9 (1.18.20) trixie; urgency=medium
 
   * Silver Coat Dark, a true dark mode for the desktop: dark window chrome,
