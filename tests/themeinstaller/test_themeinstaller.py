@@ -265,6 +265,54 @@ assert "sound-theme" not in preset["settings"], \
 print("ok    a scheme's WindowShade sounds become a selectable set")
 
 
+# 2e. A theme's own full sound set (sdid/snd# metadata) belongs in Sound
+# Sets, not in the personal alert sounds. The theme's snd resources were
+# copied to both places, so its interface sounds appeared as alerts too.
+full_root = tempfile.mkdtemp()
+full_theme = os.path.join(full_root, "Full Set")
+full_snd_record = (b"btnp" + b"\x00" * 6 + struct.pack(">i", 1) + b"\x00" * 4 +
+                   b"\x00" * 24 + b"\x00" * 2)
+assert len(full_snd_record) == 44
+full_snd_hash = struct.pack(">HH", 1, 1) + full_snd_record
+full_icl8 = b"\x00" * 1024
+full_icn = b"\xff" * 128 + b"\xff" * 128
+full_clut = struct.pack(">I", 0) + struct.pack(">HH", 0, 0) + struct.pack(">HHHH", 0, 0, 0, 0)
+with open(full_theme, "wb") as f:
+    f.write(build_fork([
+        (b"icl8", 1024, full_icl8),
+        (b"ICN#", 1024, full_icn),
+        (b"clut", 200, full_clut),
+        (b"snd ", 1, make_snd()),
+        (b"sdid", 1, b"btnp#Press#ui#Button press"),
+        (b"snd#", 128, full_snd_hash),
+    ]))
+envFull = dict(os.environ)
+configFull = tempfile.mkdtemp()
+dataFull = tempfile.mkdtemp()
+envFull["HOME"] = tempfile.mkdtemp()
+envFull["XDG_CONFIG_HOME"] = configFull
+envFull["XDG_DATA_HOME"] = dataFull
+envFull["QT_QPA_PLATFORM"] = "offscreen"
+# An older import left the set's sounds in Alert Sounds; reinstalling the
+# theme must remove them.
+old_alerts = os.path.join(dataFull, "zacos9", "sounds")
+os.makedirs(old_alerts, exist_ok=True)
+with open(os.path.join(old_alerts, "Full_Set-sound-1.wav"), "wb") as f:
+    f.write(b"old alert")
+r = run(binary, full_theme, "Full Set", envFull)
+assert r.returncode == 0, r.stderr
+full_set = os.path.join(dataFull, "zacos9", "appearance", "Sound Sets",
+                        "Full Set Sounds")
+with open(os.path.join(full_set, "theme.json")) as f:
+    full_events = json.load(f)["events"]
+assert set(full_events) == {"button-click"}, full_events
+full_alerts = os.path.join(dataFull, "zacos9", "sounds")
+alerts = os.listdir(full_alerts) if os.path.isdir(full_alerts) else []
+assert not any(name.lower().endswith(".wav") for name in alerts), \
+    "a theme's sound-set sounds stay out of Alert Sounds: %r" % alerts
+print("ok    a theme's sound set is not imported as alert sounds")
+
+
 def build_sfnt(family, subfamily):
     recs, strings, off = b"", b"", 0
     for name_id, text in ((1, family), (2, subfamily)):

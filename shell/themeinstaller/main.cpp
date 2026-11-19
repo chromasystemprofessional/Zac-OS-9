@@ -665,6 +665,19 @@ static void installThemeAssets(const QString &name, QString *wallpaper,
 			}
 			installed << name;
 		}
+		if (f.sub == QStringLiteral("sounds")) {
+			/* Older ZacOS installs copied a theme's Sound Set here too.
+			 * It belongs to Sound Sets only now; drop the alert files
+			 * this import no longer supplies, keeping the theme's real
+			 * alert sounds (and the user's own). */
+			const QStringList previous = QDir(dest).entryList(
+				{ prefix + "-sound-*.wav" }, QDir::Files);
+			for (const QString &old : previous) {
+				if (!installed.contains(old)) {
+					QFile::remove(dest + "/" + old);
+				}
+			}
+		}
 		/* The System's own alert sounds are offered, never chosen as the theme's. */
 		for (int i = 0; i < files.size(); i++) {
 			if (f.sub == QStringLiteral("sounds") &&
