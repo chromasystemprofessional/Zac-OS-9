@@ -19,9 +19,7 @@
 #include "finder.h"
 
 static constexpr int LABEL_GAP = 2;       /* as items.cpp */
-static constexpr int BOX_H = 13;
 static constexpr int BOX_PAD = 2;
-static constexpr int BASELINE = 10;
 static constexpr uint32_t TEXT_HILITE = RGB(0xCC, 0xCC, 0xFF); /* lavender */
 
 LabelEditor::LabelEditor(std::function<void()> repaint) : m_repaint(std::move(repaint)) {
@@ -419,9 +417,13 @@ void LabelEditor::commit() {
 	}
 }
 
-/* The box is centred under the icon and sized to the text being typed. */
+/* The box is centred under the icon and sized to the text being typed. In
+ * a list row it starts at the pen and top the view gives. */
 void LabelEditor::origin(int x, int y, int width, int *pen, int *top) const {
-	if (m_beside) {
+	if (m_row) {
+		*pen = x;
+		*top = y;
+	} else if (m_beside) {
 		*pen = x + PL_ICON_SMALL + 4;
 		*top = y + 1;
 	} else {

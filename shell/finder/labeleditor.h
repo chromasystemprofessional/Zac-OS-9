@@ -58,13 +58,24 @@ public:
 	/* Small icons (View Options): the name sits beside the 16 px icon,
 	 * not under it. */
 	void setBeside(bool beside) { m_beside = beside; }
+	/* List view: (x, y) are the box's pen and top, not an icon's place. */
+	void setRow(bool row) { m_row = row; }
+	/* A list row's box, given the row's text baseline: its top and its
+	 * height. The row gives the pen, the name's x. */
+	static int rowBoxTop(int baseline) { return baseline - BASELINE; }
+	static int rowBoxHeight() { return BOX_H; }
 
-	/* Paint the edit box for the item whose icon is at (x, y). */
+	/* Paint the edit box for the item whose icon is at (x, y); in a list
+	 * row, for the name whose pen and top are (x, y). */
 	void paint(pl_canvas *c, int x, int y) const;
-	/* Is `p` inside the edit box of the icon at (x, y)? */
+	/* Is `p` inside the edit box of the icon at (x, y), or of the list
+	 * name at (x, y)? */
 	bool contains(int x, int y, QPoint p) const;
 
 private:
+	static constexpr int BOX_H = 13;
+	static constexpr int BASELINE = 10;
+
 	int advanceTo(int chars) const;
 	void deleteSelection();
 	void insertText(const QString &raw);
@@ -84,8 +95,10 @@ private:
 	int m_preeditCursor = 0;
 	bool m_caretOn = true;
 	bool m_beside = false;
+	bool m_row = false;
 	bool m_editingReported = false;
 	QTimer m_blink;
-	/* The pen and the box's top for the icon at (x, y). */
+	/* The pen and the box's top for the icon at (x, y), or the pen and top
+	 * themselves in a list row. */
 	void origin(int x, int y, int width, int *pen, int *top) const;
 };
