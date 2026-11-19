@@ -172,6 +172,10 @@ private:
 	int m_headerColumn = -1, m_headerPressX = 0, m_headerPointerX = 0, m_headerStartWidth = 0;
 	void moveColumn(int column, int contentX);
 	void buildRows();
+	/* A row's name, for a rename: is (content) on it, and where does its
+	 * edit box start (the pen and the box's top)? */
+	bool listNameHit(Item &item, QPoint content);
+	bool listEditorOrigin(Item *item, QPoint *origin) const;
 	void paintColumnHeaders(pl_canvas *band);
 	void paintList(pl_canvas *content);
 	int listWidth() const;

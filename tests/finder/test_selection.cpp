@@ -247,6 +247,25 @@ int main(int argc, char **argv) {
 	check(copiedNames == QSet<QString>{ "Alpha", "Bravo", "Charlie", "Delta" },
 		"Command-C copies the selected Finder item names as newline-separated text");
 
+	/* issue 187: a click on the selected icon's name edits it. */
+	w->setViewMode(FolderWindow::ViewMode::Icons);
+	w->resize(520, 360);
+	w->relayout();
+	settle();
+	icons = iconOrder(w);
+	const QPoint iconCentre = w->toWindow(icons[0]->pos + QPoint(16, 16));
+	const QPoint iconName = w->toWindow(icons[0]->pos + QPoint(16, 32 + 2 + 5));
+	mouse(w, QEvent::MouseButtonPress, iconCentre, Qt::LeftButton);
+	mouse(w, QEvent::MouseButtonRelease, iconCentre, Qt::NoButton);
+	check(selectedNames(w) == QSet<QString>{ icons[0]->name }, "clicking an icon selects it");
+	settle(QApplication::doubleClickInterval() + 100);
+	mouse(w, QEvent::MouseButtonPress, iconName, Qt::LeftButton);
+	mouse(w, QEvent::MouseButtonRelease, iconName, Qt::NoButton);
+	settle(QApplication::doubleClickInterval() + 200);
+	check(w->m_editor.active() && w->m_editor.item() == icons[0],
+		"a click on the selected icon's name opens the rename box");
+	w->m_editor.cancel();
+
 	w->setViewMode(FolderWindow::ViewMode::List);
 	w->resize(640, 360);
 	w->relayout();
@@ -269,6 +288,47 @@ int main(int argc, char **argv) {
 	mouse(w, QEvent::MouseButtonRelease, nameFirst, Qt::NoButton);
 	check(selectedNames(w) == QSet<QString>{ w->m_rows[0].item->name },
 		"releasing without a drag selects only the clicked name");
+
+	/* issue 187: a click on the selected row's name edits it, in list view too. */
+	Item *listItem = w->m_rows[0].item;
+	const QString listItemName = listItem->name;
+	const QRect nameRect = w->selectionRect(listItem);
+	const QPoint listName = w->toWindow(QPoint(nameRect.right() - 2, nameRect.center().y()));
+	settle(QApplication::doubleClickInterval() + 100);
+	mouse(w, QEvent::MouseButtonPress, listName, Qt::LeftButton);
+	mouse(w, QEvent::MouseButtonRelease, listName, Qt::NoButton);
+	settle(QApplication::doubleClickInterval() + 200);
+	check(w->m_editor.active() && w->m_editor.item() == listItem,
+		"a click on the selected row's name opens the rename box in list view");
+	if (w->m_editor.active()) {
+		QPoint origin;
+		check(w->listEditorOrigin(listItem, &origin), "the list rename box has its row");
+		const QImage shot = w->grab().toImage();
+		const QPoint box = w->toWindow(origin) + QPoint(-3, 0);
+		check(shot.pixel(box) == 0xFF000000u &&
+			shot.pixel(box + QPoint(1, 1)) == 0xFFFFFFFFu,
+			"the list rename box is drawn white with a black outline on the name");
+	}
+	if (w->m_editor.active()) {
+		const QString renamed = listItemName.endsWith(".txt") ? "X.txt" : "X";
+		QKeyEvent typeName(QEvent::KeyPress, Qt::Key_X, Qt::NoModifier, "X");
+		QApplication::sendEvent(w, &typeName);
+		QKeyEvent commit(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier);
+		QApplication::sendEvent(w, &commit);
+		settle();
+		check(QFile::exists(folder + "/" + renamed) && !QFile::exists(folder + "/" + listItemName),
+			"typing a list name and pressing Return renames the file on disk");
+		QFile::rename(folder + "/" + renamed, folder + "/" + listItemName);
+		w->reload();
+	}
+	w->m_editor.cancel();
+	w->selectByName(listItemName);
+	QKeyEvent listReturn(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier);
+	QApplication::sendEvent(w, &listReturn);
+	check(w->m_editor.active() && w->m_editor.item() &&
+		w->m_editor.item()->name == listItemName,
+		"Return edits the selected list row's name");
+	w->m_editor.cancel();
 
 	for (int i = 0; i < 40; i++) {
 		touch(folder + QString("/More %1").arg(i, 2, 10, QLatin1Char('0')));

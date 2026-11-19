@@ -178,6 +178,7 @@ FolderWindow::FolderWindow(const QString &path) : m_path(path) {
 	m_sortColumn = m_state.options.list.columns & columnBit(m_state.sortColumn) ?
 		m_state.sortColumn : COL_NAME;
 	m_editor.setBeside(smallIcons());
+	m_editor.setRow(m_mode == ViewMode::List);
 	m_editor.setEditingChanged([this](bool editing) { setImeEditing(editing); });
 	m_saveTimer.setSingleShot(true);
 	m_saveTimer.callOnTimeout([this] { m_state.save(m_path); });
@@ -252,6 +253,7 @@ void FolderWindow::setViewMode(ViewMode mode) {
 	saveStateSoon();
 	m_editor.cancel();
 	m_mode = mode;
+	m_editor.setRow(m_mode == ViewMode::List);
 	m_scrollX = m_scrollY = 0;
 	relayout();
 	update();
@@ -1206,9 +1208,49 @@ void FolderWindow::buildRows() {
 	add(m_items, 0);
 }
 
+/* The row showing `item`: its name's pen (the left of the text) and the
+ * top of the rename box, in content coordinates. */
+bool FolderWindow::listEditorOrigin(Item *item, QPoint *origin) const {
+	const ListMetrics m = metrics();
+	for (size_t r = 0; r < m_rows.size(); r++) {
+		if (m_rows[r].item != item) {
+			continue;
+		}
+		*origin = QPoint(m.nameX + m_rows[r].depth * INDENT,
+			static_cast<int>(r) * m.rowH + LabelEditor::rowBoxTop(m.baseline));
+		return true;
+	}
+	return false;
+}
+
+/* Is `p` on the name of the row showing `item` (not its icon or the rest
+ * of the row)? */
+bool FolderWindow::listNameHit(Item &item, QPoint p) {
+	const ListMetrics m = metrics();
+	for (size_t r = 0; r < m_rows.size(); r++) {
+		if (m_rows[r].item != &item) {
+			continue;
+		}
+		const int d = m_rows[r].depth * INDENT, top = static_cast<int>(r) * m.rowH;
+		const int nameW = columnWidth(COL_NAME) - m.nameX - d - 6;
+		Text name = item.renderName(std::max(8, nameW));
+		const int boxTop = top + LabelEditor::rowBoxTop(m.baseline);
+		const QRect box(QPoint(m.nameX + d - 2, boxTop),
+			QPoint(m.nameX + d + name.inkWidth() + 1,
+				boxTop + LabelEditor::rowBoxHeight() - 1));
+		return box.contains(p);
+	}
+	return false;
+}
+
 void FolderWindow::toggleExpanded(Item *item) {
 	const QString path = item->path;
 	if (m_expanded.contains(path)) {
+		/* The edit box may be on a name inside: its item is about to go. */
+		Item *edited = m_editor.item();
+		if (edited && (edited->path + "/").startsWith(path + "/")) {
+			m_editor.cancel();
+		}
 		m_expanded.remove(path);
 		m_children.erase(path);
 		if (!vfsIsVirtual(path)) {
@@ -1329,18 +1371,21 @@ void FolderWindow::paintList(pl_canvas *c) {
 			paintIcon(c, *item, m.iconX + d, top + m.iconY, m.icon, highlight);
 		}
 
+		const bool editing = m_editor.editing(item);
 		const int nameW = columnWidth(COL_NAME) - m.nameX - d - 6;
 		Text name = item->renderName(std::max(8, nameW));
-		uint32_t ink = C_BLACK;
-		if (item->selected) {
-			pl_fill(c, m.nameX + d - 2,
-				top + m.baseline - (item->fontFile.isEmpty() || !name.t ? 9 : name.t->baseline),
-				m.nameX + d + name.inkWidth() + 1,
-				top + m.baseline + (item->fontFile.isEmpty() || !name.t ?
-					3 : name.t->height - name.t->baseline), C_BLACK);
-			ink = C_WHITE;
+		if (!editing) {
+			uint32_t ink = C_BLACK;
+			if (item->selected) {
+				pl_fill(c, m.nameX + d - 2,
+					top + m.baseline - (item->fontFile.isEmpty() || !name.t ? 9 : name.t->baseline),
+					m.nameX + d + name.inkWidth() + 1,
+					top + m.baseline + (item->fontFile.isEmpty() || !name.t ?
+						3 : name.t->height - name.t->baseline), C_BLACK);
+				ink = C_WHITE;
+			}
+			pl_text(c, name.t, m.nameX + d, top + m.baseline, ink);
 		}
-		pl_text(c, name.t, m.nameX + d, top + m.baseline, ink);
 
 		int cx = 0;
 		for (int col : shown) {
@@ -1351,6 +1396,12 @@ void FolderWindow::paintList(pl_canvas *c) {
 				pl_text(c, t.t, cx + COL_TEXT_X, top + m.baseline, C_BLACK);
 			}
 			cx += w;
+		}
+		if (editing) {
+			QPoint origin;
+			if (listEditorOrigin(item, &origin)) {
+				m_editor.paint(c, origin.x(), origin.y());
+			}
 		}
 	}
 }
@@ -1641,7 +1692,15 @@ void FolderWindow::mousePressEvent(QMouseEvent *e) {
 
 	const QPoint content = toContent(pos);
 	if (Item *edited = m_editor.item()) {
-		if (m_editor.contains(edited->pos.x(), edited->pos.y(), content)) {
+		bool inside = false;
+		if (m_mode == ViewMode::List) {
+			QPoint origin;
+			inside = listEditorOrigin(edited, &origin) &&
+				m_editor.contains(origin.x(), origin.y(), content);
+		} else {
+			inside = m_editor.contains(edited->pos.x(), edited->pos.y(), content);
+		}
+		if (inside) {
 			return;
 		}
 		m_editor.commit();
@@ -1669,11 +1728,12 @@ void FolderWindow::mousePressEvent(QMouseEvent *e) {
 	}
 	const bool extend = e->modifiers() & Qt::ShiftModifier;
 	/* Icon view: a click on the name of the one selected icon starts a
-	 * rename, unless it turns into a double-click or a drag first. */
+	 * rename, unless it turns into a double-click or a drag first; list
+	 * view does the same on the row's name. */
 	m_renameTimer.stop();
-	if (m_mode == ViewMode::Icons && hit && hit->selected && !extend &&
+	if (m_mode != ViewMode::Buttons && hit && hit->selected && !extend &&
 			selectedItems().size() == 1 &&
-			labelHit(*hit, content)) {
+			(m_mode == ViewMode::List ? listNameHit(*hit, content) : labelHit(*hit, content))) {
 		m_renameItem = hit;
 		m_renameTimer.start(QApplication::doubleClickInterval());
 	}
@@ -1903,7 +1963,7 @@ void FolderWindow::wheelEvent(QWheelEvent *e) {
 /* ---- keyboard ----------------------------------------------------------------- */
 
 void FolderWindow::beginRename(Item *item) {
-	if (m_mode == ViewMode::Icons && item && item->selected) {
+	if (m_mode != ViewMode::Buttons && item && item->selected) {
 		m_editor.begin(item);
 	}
 }
@@ -1926,6 +1986,10 @@ void FolderWindow::inputMethodEvent(QInputMethodEvent *e) {
 
 QVariant FolderWindow::inputMethodQuery(Qt::InputMethodQuery query) const {
 	if (m_editor.active() && m_editor.item()) {
+		QPoint origin;
+		if (m_mode == ViewMode::List && listEditorOrigin(m_editor.item(), &origin)) {
+			return m_editor.inputMethodQuery(query, toWindow(origin));
+		}
 		return m_editor.inputMethodQuery(query, toWindow(m_editor.item()->pos));
 	}
 	return QWidget::inputMethodQuery(query);
