@@ -14,7 +14,8 @@
  *                           (test_onscreen_keyboard.py); built as
  *                           test-field-client, it says so as ZacOS's own
  *                           programs do (platinumShellInit)
- *   ... --app-id ID         with that Wayland app id (test_app_switch.py) */
+ *   ... --app-id ID         with that Wayland app id (test_app_switch.py)
+ *   ... --color #RRGGBB     with that background (test_frontdesk_switch.py) */
 #include <QApplication>
 #include <QKeyEvent>
 #include <QLineEdit>
@@ -52,9 +53,12 @@ protected:
 
 int main(int argc, char **argv) {
 	QApplication app(argc, argv);
+	const char *color = "#00aa00";
 	for (int i = 1; i + 1 < argc; i++) {
 		if (std::strcmp(argv[i], "--app-id") == 0) {
 			QGuiApplication::setDesktopFileName(argv[i + 1]);
+		} else if (std::strcmp(argv[i], "--color") == 0) {
+			color = argv[i + 1];
 		}
 	}
 	const bool dbus = argc > 1 && std::strcmp(argv[1], "--dbus") == 0;
@@ -88,7 +92,7 @@ int main(int argc, char **argv) {
 	KeyWindow window;
 	window.setWindowTitle("Idle test film");
 	window.setAttribute(Qt::WA_StyledBackground, true); /* a subclass, so the style sheet paints */
-	window.setStyleSheet("background-color: #00aa00;");
+	window.setStyleSheet(QStringLiteral("background-color: %1;").arg(color));
 	window.resize(320, 200);
 	window.show();
 	if (keys) {

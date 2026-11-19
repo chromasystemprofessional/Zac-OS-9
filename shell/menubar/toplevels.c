@@ -323,8 +323,12 @@ const char *app_switch_pick(struct app *apps, int n, int step) {
 		}
 		have_finder |= strcmp(apps[i].app_id, FINDER_APP_ID) == 0;
 	}
-	if (!have_finder) {
-		/* The Sniffer runs even with no windows: the desktop is its. */
+	/* The Sniffer runs even with no windows: the desktop is its. A Front
+	 * Desk session has no Sniffer, and adding one would make Command-Tab
+	 * stop on an empty screen between the panel and a program. */
+	const char *mode = getenv("ZACOS9_MENUBAR_MODE");
+	const bool frontdesk = mode && strcmp(mode, "frontdesk") == 0;
+	if (!have_finder && !frontdesk) {
 		apps[n++] = (struct app){ .app_id = FINDER_APP_ID, .name = "Sniffer" };
 	}
 	qsort(apps, n, sizeof(apps[0]), by_app_name);

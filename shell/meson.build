@@ -282,6 +282,13 @@ test('pack-session', find_program('python3'),
   depends: [pack_exe],
   timeout: 60,
 )
+# Front Desk's programs stay in the Application menu while only the front
+# one draws (compositor/src/view.c, menus' app switch).
+test('frontdesk-switch', find_program('python3'),
+  args: [files('../tests/compositor/test_frontdesk_switch.py'), compositor_exe, menubar_exe,
+    idle_client, vptr_exe],
+  timeout: 90,
+)
 # Function keys that open things (fkeys.c, input.c).
 test('function-keys-session', find_program('python3'),
   args: [files('../tests/compositor/test_function_keys.py'), compositor_exe, idle_client, vptr_exe],

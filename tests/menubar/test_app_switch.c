@@ -2,6 +2,7 @@
  * always among them, and the Sniffer in front when no program is. */
 #include <assert.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "menubar.h"
@@ -43,6 +44,17 @@ int main(void) {
 
 	/* Only the Sniffer: ⌘-Tab stays there. */
 	assert(strcmp(pick(apps, 0, 1), FINDER_APP_ID) == 0);
+
+	/* A Front Desk session has no Sniffer: ⌘-Tab goes round its programs
+	 * only, so the panel and a program alternate. */
+	struct app panel[] = {
+		{ .app_id = "zacos9-frontdesk", .name = "Front Desk", .active = true },
+	};
+	setenv("ZACOS9_MENUBAR_MODE", "frontdesk", 1);
+	assert(strcmp(pick(panel, 1, 1), "zacos9-frontdesk") == 0);
+	assert(strcmp(pick(panel, 1, -1), "zacos9-frontdesk") == 0);
+	unsetenv("ZACOS9_MENUBAR_MODE");
+	assert(strcmp(pick(panel, 1, 1), FINDER_APP_ID) == 0);
 
 	/* Names compare without case; the Sniffer isn't listed twice. */
 	struct app named[] = {
