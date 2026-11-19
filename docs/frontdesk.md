@@ -64,9 +64,12 @@ compositor. Its presence sets `ZACOS9_SHELL=frontdesk` and
   Old Dog and the Sniffer are not an escape;
 - Quit logs out, and Restart/Shut Down use the normal `systemctl` paths.
 
-The panel hides while a program it started runs and comes back when that
-process exits. Programs that detach are shown again early; the Application
-menu still switches to them.
+The panel stays a program of the session while the programs it starts run:
+like the shared Macs it copies, only the program in front draws, and the
+others wait hidden but open. The panel is one of them, so the Application
+menu and ⌘-Tab bring it back to start another program; choosing a program
+hides the panel, and closing the last program returns to it. A program that
+detaches without opening a window leaves the panel in front.
 
 ## Programs
 
@@ -89,5 +92,9 @@ save-location enforcement through the file chooser portal is a later hook.
 
 - `tests/accounts/test_helper.sh` covers the Front Desk settings, modes and
   status.
+- `tests/compositor/test_frontdesk_switch.py` starts a Front Desk session and
+  checks that the panel stays in the Application menu while a program runs,
+  that choosing it hides the program, and that closing the last program
+  returns to the panel.
 - `ZAC-OS-EXTRAS/frontdesk/tests/` builds and checks the panel and setup
   offscreen.

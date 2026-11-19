@@ -417,6 +417,45 @@ static bool is_finder(struct plat_view *view) {
 	return view->app_id && strcmp(view->app_id, "zacos9-finder") == 0;
 }
 
+static bool is_frontdesk(struct plat_view *view) {
+	return view->app_id && strcmp(view->app_id, "zacos9-frontdesk") == 0;
+}
+
+/* Front Desk runs one program at a time, as the shared Macs did: only the
+ * front program's windows are drawn. The rest stay mapped but hidden (the
+ * same as Hide in the Application menu), so Command-Tab and the
+ * Application menu still list them and can bring one back. */
+static void frontdesk_hide_others(struct plat_server *server, struct plat_view *front) {
+	struct plat_view *view, *tmp;
+	wl_list_for_each_safe(view, tmp, &server->views, link) {
+		if (view == front || !view->mapped) {
+			continue;
+		}
+		if (front->app_id && view->app_id && strcmp(view->app_id, front->app_id) == 0) {
+			continue;
+		}
+		view_set_hidden(view, true);
+	}
+}
+
+/* Nothing is in front any more: the panel comes back. Hiding the panel
+ * itself is not a reason to show it again; it stays in the Application
+ * menu, where choosing it or Show All brings it back. */
+static bool frontdesk_return(struct plat_server *server, const char *hidden_app) {
+	if (!server->frontdesk ||
+			(hidden_app && strcmp(hidden_app, "zacos9-frontdesk") == 0)) {
+		return false;
+	}
+	struct plat_view *view;
+	wl_list_for_each(view, &server->views, link) {
+		if (view->mapped && is_frontdesk(view)) {
+			view_focus(view);
+			return true;
+		}
+	}
+	return false;
+}
+
 /* General Controls' "Show Desktop when in background", off: while another
  * program is in front the Sniffer is hidden, windows and all (and it hides
  * its desktop icons), so a stray click can't bring it forward. It comes
@@ -455,7 +494,7 @@ void view_set_hidden(struct plat_view *view, bool hidden) {
 		if (next) {
 			view_focus(next);
 			platinum_shell_focus_changed(server);
-		} else {
+		} else if (!frontdesk_return(server, view->app_id)) {
 			if (!server->focused_layer) {
 				wlr_seat_keyboard_clear_focus(server->seat);
 			}
@@ -578,6 +617,9 @@ void view_focus(struct plat_view *view) {
 			view_hide_app(server, "zacos9-finder");
 		}
 		platinum_shell_focus_changed(server);
+	}
+	if (server->frontdesk) {
+		frontdesk_hide_others(server, view);
 	}
 	/* While the menu bar tracks a menu (an exclusive layer) it keeps the
 	 * keyboard. A shell surface that merely had it - the desktop, after a
@@ -970,7 +1012,7 @@ void view_handle_unmap(struct plat_view *view) {
 		if (next) {
 			view_focus(next);
 			platinum_shell_focus_changed(server);
-		} else {
+		} else if (!frontdesk_return(server, NULL)) {
 			focus_none(server);
 		}
 	}
