@@ -215,16 +215,17 @@ reads the Appearance theme's resource fork and produces a **theme bundle** in
   410/415 variants are not used by ZacOS's 16 px bars.
 - `sounds/` — alert sounds. `system-sound-N.wav` are the System file's own
   `snd` resources, decoded from sampled sounds only; synthesized and compressed
-  sounds are skipped. Theme-file sounds sit beside them. The installer never
-  picks a `system-` sound as the theme's default alert.
+  sounds are skipped. Theme-file `snd`s that have no interface event identity
+  sit beside them. The installer never picks a `system-` sound as the theme's
+  default alert.
 - `soundset/` — the theme's own interface sounds, as a Sound Sets folder:
   `theme.json` names the events and one WAV holds each sample. A
   Kaleidoscope scheme's WindowShade pair (`snd` -14336/-14335) becomes
   `window-collapse` and `window-expand`; a theme carrying `sdid`/`snd#`
   metadata keeps every event those name. The installer copies this folder
-  into `Sound Sets/<name> Sounds`, so a scheme's sounds appear in the
-  Sound Sets window instead of only as alert sounds. Alert sounds without
-  that metadata stay in `sounds/`.
+  into `Sound Sets/<name> Sounds` and leaves those sounds out of the alert
+  list, so a theme's set appears once, in Sound Sets. Theme `snd`s without
+  an event identity stay in `sounds/` as alert sounds.
 - `icons/<kind>-32.png` and `icons/<kind>-16.png` — the desktop's icons,
   decoded at both sizes against the user's System palette, through one
   resolver: the theme's icon suite (`icns`) first, then the colour family

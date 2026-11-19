@@ -110,8 +110,8 @@ def test_end_to_end():
 def test_sound_set_from_theme_file():
     # A theme or Kaleidoscope scheme can carry interface sounds: the
     # WindowShade pair has documented snd IDs, and a full set names its
-    # events with sdid. They become a Sound Sets folder, while the same
-    # sounds stay available as alert sounds.
+    # events with sdid. They become a Sound Sets folder and are not copied
+    # again as alert sounds; an snd with no event identity stays an alert.
     def snd(samples=b"\x80\x40\xc0\x80"):
         head = struct.pack(">HHHI", 1, 1, 5, 0) + struct.pack(">H", 1)
         head += struct.pack(">HHI", 0x8051, 0, len(head) + 8)
@@ -125,6 +125,7 @@ def test_sound_set_from_theme_file():
         (b"sdid", 42, b"btnp#Press#ui#Button press"),
         (b"snd ", -14336, snd()),
         (b"snd ", -14335, snd()),
+        (b"snd ", 43, snd()),
     ])
     with tempfile.TemporaryDirectory() as src:
         path = os.path.join(src, "Scheme")
@@ -146,8 +147,10 @@ def test_sound_set_from_theme_file():
         for name in manifest["events"].values():
             with open(os.path.join(out, "soundset", name), "rb") as f:
                 assert f.read(4) == b"RIFF", name
-        # Alert sounds are still extracted separately.
-        assert os.path.isfile(os.path.join(out, "sounds", "sound-1.wav"))
+        # The set's sounds are not alert sounds; the unclaimed one still is.
+        alert_sounds = sorted(name for name in os.listdir(os.path.join(out, "sounds"))
+                              if name.endswith(".wav"))
+        assert len(alert_sounds) == 1, alert_sounds
     print("ok    a theme's own sounds become a Sound Sets set")
 
 

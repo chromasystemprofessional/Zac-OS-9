@@ -750,7 +750,7 @@ def process_resource_fork(data, out, counts, cluts, icons, assets, scen_tags, ap
 								assets["chrome"][slot + "-inactive"] = lowered[alt + " inactive"]
 								break
 		if rtype == b"snd ":
-			assets.setdefault("snd", []).append(body)
+			assets.setdefault("snd", []).append((res_id, body))
 		if rtype in FONT_TYPES:
 			assets.setdefault("font", []).append(body)
 		# Theme icon families come from the System and Finder files only:
@@ -1167,7 +1167,9 @@ def write_sound_set(fork, out, name):
 	A Kaleidoscope scheme (or a theme that carries its set) has its event
 	sounds in the same fork as its artwork. The installer copies this
 	folder into System Folder > Appearance > Sound Sets so the set
-	appears in the Sound Sets window, with its events already named."""
+	appears in the Sound Sets window, with its events already named.
+	Returns the snd resource IDs the set uses, so they are not copied a
+	second time as alert sounds."""
 	dest = os.path.join(out, "soundset")
 	shutil.rmtree(dest, ignore_errors=True)
 	try:
@@ -1175,9 +1177,9 @@ def write_sound_set(fork, out, name):
 			for rtype, res_id, body in parse_resource_fork(fork)}
 		events = classic_sound_events(records)
 	except (ValueError, struct.error, IndexError):
-		return 0
+		return set()
 	if not events:
-		return 0
+		return set()
 	os.makedirs(dest, exist_ok=True)
 	written = {}
 	for event in sorted(events):
@@ -1189,11 +1191,11 @@ def write_sound_set(fork, out, name):
 		written[event] = event + ".wav"
 	if not written:
 		shutil.rmtree(dest, ignore_errors=True)
-		return 0
+		return set()
 	set_name = (name.strip() or "Mac OS 9 Theme") + " Sounds"
 	with open(os.path.join(dest, "theme.json"), "w", encoding="utf-8") as f:
 		json.dump({"version": 1, "name": set_name[:128], "events": written}, f)
-	return len(written)
+	return set(events.values())
 
 
 def write_pointers(theme_raw, theme_cluts, system_raw, system_cluts, out):
@@ -1320,7 +1322,7 @@ def write_desktop_wallpaper(scen_tags, pictures_dir, out):
 	return True
 
 
-def write_assets(assets, epics, out):
+def write_assets(assets, epics, out, sound_set_ids=frozenset()):
 	"""Decode PICT/PAT/snd resources into wallpapers, patterns and sounds."""
 	# Other PICTs in a theme file are its credit splash (id 128) and the Appearance
 	# panel's preview thumbnails (the scen epic ids), never desktop wallpapers.
@@ -1373,8 +1375,11 @@ def write_assets(assets, epics, out):
 				w, h, rows)
 		except (ValueError, IndexError, struct.error):
 			continue
-	# Alert sounds from snd.
-	for i, body in enumerate(assets.get("snd", [])):
+	# Alert sounds from snd, except the theme's own Sound Set events: those
+	# are offered in Sound Sets, not again as alerts.
+	for i, (res_id, body) in enumerate(assets.get("snd", [])):
+		if res_id in sound_set_ids:
+			continue
 		try:
 			macsnd.snd_to_wav(body, os.path.join(out, "sounds", "sound-%d.wav" % (i + 1)))
 		except (ValueError, struct.error):
@@ -3643,6 +3648,15 @@ def main():
 	for sub in ("icons", "patterns", "sounds", "theme", "boot", "wallpapers", "fonts", "cursors",
 		"chrome"):
 		os.makedirs(os.path.join(out, sub), exist_ok=True)
+	# Re-extracting into an existing bundle must not keep the last run's
+	# decoded sounds: one that is now part of the Sound Set (or has gone)
+	# would otherwise stay there as an alert sound.
+	for stale in os.listdir(os.path.join(out, "sounds")):
+		if stale.startswith("sound-") or stale.startswith("system-sound-"):
+			try:
+				os.remove(os.path.join(out, "sounds", stale))
+			except OSError:
+				pass
 
 	counts = {"icons": 0, "patterns": 0, "sounds": 0, "theme": 0, "fonts": 0, "cursors": 0}
 	cluts = []
@@ -3818,11 +3832,12 @@ def main():
 	write_pointers(theme_raw, pointer_cluts, system_raw, system_cluts, out)
 	write_system_sounds(system_raw, out)
 	write_theme_fonts(scen_tags, args.system, args.fonts, out)
-	sound_events = write_sound_set(theme_fork, out, name) if theme_fork else 0
+	sound_set_ids = write_sound_set(theme_fork, out, name) if theme_fork else set()
 	if args.dump_icons:
 		write_icon_dump(raw_icons, cluts, out)
-	# Decode wallpapers, patterns and sounds.
-	font_families, font_files = write_assets(assets, epics, out)
+	# Decode wallpapers, patterns and sounds. The set's own events are left
+	# out of the alert sounds.
+	font_families, font_files = write_assets(assets, epics, out, sound_set_ids)
 	clr = {}
 	if theme_fork:
 		clr = {res_id: body for rtype, res_id, body in parse_resource_fork(theme_fork)
@@ -4004,8 +4019,8 @@ def main():
 	print("  icons:    %d" % counts["icons"])
 	print("  patterns: %d" % counts["patterns"])
 	print("  sounds:   %d" % counts["sounds"])
-	if sound_events:
-		print("  soundset: %d events" % sound_events)
+	if sound_set_ids:
+		print("  soundset: %d events" % len(sound_set_ids))
 	print("  theme:    %d" % counts["theme"])
 	print("  fonts:    %d" % counts["fonts"])
 	print("Note: Appearance theme (thme/clut/pltt) resources are saved raw under")
