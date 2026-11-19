@@ -127,7 +127,8 @@ to the saved list. Each saved disk gets its own entry in **System Folder ▸
 Startup Items**, wearing the network-disk icon, so the folder looks and works
 like Mac OS 9's. At login `zacos9-netmount --mount-id ID` reads the saved
 disk, takes its password from the keychain, and mounts it if it is not already
-there. One unreachable server is written to
+there. If the keychain is locked and asks for its password, the mount waits
+for it with no time limit. One unreachable server is written to
 `$XDG_STATE_HOME/zacos9/network-mounts.log` and does not hold up the others.
 
 Dragging a saved disk's Startup Items entry to the Trash stops it mounting at
