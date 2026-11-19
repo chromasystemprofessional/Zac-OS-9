@@ -1,3 +1,13 @@
+zacos9 (1.18.22) trixie; urgency=medium
+
+  * Front Desk now works like the shared Macs it copies: a program started
+    from the panel stays in the Application menu and Command-Tab, only the
+    program in front draws, and the panel comes back to start another or
+    when the last program closes. Update Front Desk in Software > Extras
+    (0.1.1 or later) for the panel side.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Wed, 18 Nov 2026 23:00:59 -0500
+
 zacos9 (1.18.21) trixie; urgency=medium
 
   * Renaming now works in list view: click the selected row's name, or
