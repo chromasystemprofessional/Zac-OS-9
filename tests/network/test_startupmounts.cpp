@@ -55,7 +55,7 @@ int main(int argc, char **argv) {
 		"  cat > \"$SECRET_FILE\"\n"
 		"  printf '%s\\n' \"$*\" > \"$SECRET_CALLS\"\n"
 		"  ;;\n"
-		"lookup) cat \"$SECRET_FILE\" 2>/dev/null ;;\n"
+		"lookup) [ -n \"$SECRET_DELAY\" ] && sleep \"$SECRET_DELAY\"; cat \"$SECRET_FILE\" 2>/dev/null ;;\n"
 		"clear) rm -f \"$SECRET_FILE\"; printf 'clear %s\\n' \"$*\" > \"$SECRET_CALLS\" ;;\n"
 		"esac\n");
 	qputenv("ZACOS9_SECRET_TOOL", (bin + "/secret-tool").toUtf8());
@@ -73,6 +73,12 @@ int main(int argc, char **argv) {
 	check(startupMountExists(afp), "its Startup Items entry is enabled");
 	check(startupMounts().size() == 1, "the saved list has it");
 	check(startupMountPassword(afp) == "s3cret", "its password comes back from the keychain");
+	/* The keychain may ask for its password first; the mount waits. A
+	 * five-second limit used to kill the prompt and lose the disk. */
+	qputenv("SECRET_DELAY", "6");
+	check(startupMountPassword(afp) == "s3cret",
+		"a locked keychain's prompt may take longer than five seconds");
+	qunsetenv("SECRET_DELAY");
 	check(QFileInfo(startupMountAutostartFile(afp)).isFile(), "its Startup Items entry exists");
 	QFile entry(startupMountAutostartFile(afp));
 	entry.open(QIODevice::ReadOnly);

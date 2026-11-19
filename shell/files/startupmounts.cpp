@@ -283,7 +283,10 @@ QString startupMountPassword(const StartupMount &mount) {
 	}
 	QStringList args = { "lookup" };
 	args << secretAttributes(mount);
-	const ProcessResult result = runProcess(tool, args, { {}, 5000 });
+	/* No time limit: a locked keychain asks for its password, and the
+	 * mount must wait for the person instead of giving up. The old five
+	 * seconds killed the prompt, so a slow typist lost the startup disk. */
+	const ProcessResult result = runProcess(tool, args, { {}, -1 });
 	if (!result.ok()) {
 		return QString();
 	}
