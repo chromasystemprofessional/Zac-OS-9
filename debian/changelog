@@ -1,3 +1,11 @@
+zacos9 (1.18.23) trixie; urgency=medium
+
+  * A theme's own Sound Set now appears only in Sound Sets, not under Alert
+    Sounds as well. Re-import a theme imported before this version to
+    remove the duplicate alerts (issue #190).
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Thu, 19 Nov 2026 12:15:16 -0500
+
 zacos9 (1.18.22) trixie; urgency=medium
 
   * Front Desk now works like the shared Macs it copies: a program started
