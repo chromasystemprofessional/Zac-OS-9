@@ -1,3 +1,11 @@
+zacos9 (1.18.24) trixie; urgency=medium
+
+  * A saved network disk now waits for a locked keychain's password prompt
+    with no time limit, so typing the password slowly no longer stops it
+    mounting at login.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Thu, 19 Nov 2026 12:52:11 -0500
+
 zacos9 (1.18.23) trixie; urgency=medium
 
   * A theme's own Sound Set now appears only in Sound Sets, not under Alert
