@@ -85,9 +85,10 @@ with no filter shows every program the panel offers; Front Desk Setup's
 Programs… window writes an allowlist through accountsservice, so both
 control panels agree. The Users panel's **Use only chosen programs** and **Programs…** work
 the same way for every account, including an administrator's; if the old
-list can't be read, choosing programs still sets a new one. ZacOS's user
-programs (Calculator, Jigsaw, Notepad and the rest) are panel items; the
-shell, control panels, installers and helpers are not.
+list can't be read, choosing programs still sets a new one. Both Programs…
+windows list the applications in the Finder's Applications folder—the
+user-installed applications—and leave ZacOS's own programs, control panels,
+utilities and the system's helpers out.
 
 ## Security
 

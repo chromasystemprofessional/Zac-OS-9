@@ -91,9 +91,10 @@ private:
  * for tests): puppy/USER, guest-account, welcome. */
 QString accountsConf(const QString &name);
 
-/* The programs a Limited account may use: installed programs, each with a
- * checkbox. ZacOS's user programs are listed; its control panels and system
- * programs are not. OK hands back malcontent's entries for the checked ones. */
+/* The programs a Limited account may use: the user-installed applications
+ * in the Finder's Applications folder, each with a checkbox. ZacOS's own
+ * programs, control panels, utilities and system helpers are not listed.
+ * OK hands back malcontent's entries for the checked ones. */
 class ProgramsWindow : public QWidget {
 public:
 	ProgramsWindow(QWidget *parent, const QString &who, const QStringList &allowed,

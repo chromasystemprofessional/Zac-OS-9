@@ -1,5 +1,6 @@
 /* GIO before Qt: its headers use the name `signals`. */
 #include "appfilter.h"
+#include "appdb.h"
 #include "users.h"
 #include "tr.h"
 #include "panelregistry.h"
@@ -917,37 +918,6 @@ void AccountWindow::keyPressEvent(QKeyEvent *e) {
 
 namespace {
 constexpr int RW = 340, RH = 340;
-
-/* ZacOS's shell, installers and helpers, and the control panels' own
- * programs: not things a person chooses for their desktop. A panel's
- * desktop entry says so with X-ZacOS9-ControlPanel or X-ZacOS9-Utility. */
-bool systemProgram(GDesktopAppInfo *desktop, const QString &entry) {
-	const char *categories = g_desktop_app_info_get_categories(desktop);
-	const QStringList list = QString::fromUtf8(categories ? categories : "")
-		.split(';', Qt::SkipEmptyParts);
-	if (list.contains(QStringLiteral("X-ZacOS9-ControlPanel")) ||
-			list.contains(QStringLiteral("X-ZacOS9-Utility"))) {
-		return true;
-	}
-	static const char *const programs[] = {
-		"zacos9-controlpanel", "zacos9-collarpanel", "zacos9-finder",
-		"zacos9-frontdesk", "zacos9-frontdesk-setup", "zacos9-menubar",
-		"zacos9-collar", "zacos9-session", "zacos9-greeter", "zacos9-lock",
-		"zacos9-screensaver", "zacos9-keyboard", "zacos9-inhibit",
-		"zacos9-setup", "zacos9-installer", "zacos9-update", "zacos9-store",
-		"zacos9-disksetup", "zacos9-themeinstaller", "zacos9-wininstall",
-		"zacos9-classic", "zacos9-snapshot", "zacos9-appinstall",
-		"zacos9-gtkmenu", "zacos9-web-sharing", "zacos9-disk-helper",
-		"zacos9-accounts-helper", "zacos9-appstore-helper",
-	};
-	const QString base = QFileInfo(entry).fileName();
-	for (const char *name : programs) {
-		if (base == QLatin1String(name)) {
-			return true;
-		}
-	}
-	return false;
-}
 }
 
 struct ProgramsWindow::Parts {
@@ -974,29 +944,30 @@ ProgramsWindow::ProgramsWindow(QWidget *parent, const QString &who, const QStrin
 	setWindowModality(Qt::WindowModal);
 	setAttribute(Qt::WA_DeleteOnClose);
 	setFixedSize(RW, RH);
-	/* Installed programs, by name, one row per program: ZacOS's user
-	 * programs included, its control panels and system programs left out. */
-	GList *all = g_app_info_get_all();
+	/* The Finder's Applications folder (libzacos9-files): the user-installed
+	 * applications it shows, not ZacOS's own programs, control panels,
+	 * utilities or the system's helpers. */
 	QSet<QString> seen;
-	for (GList *l = all; l; l = l->next) {
-		auto *info = static_cast<GAppInfo *>(l->data);
-		if (!g_app_info_should_show(info) || !G_IS_DESKTOP_APP_INFO(info)) {
+	for (const AppEntry &app : appList()) {
+		if (!app.userInstalled || app.systemUtility || app.inUtilities ||
+				app.file.isEmpty()) {
 			continue;
 		}
-		char *entry = pl_app_filter_entry(G_DESKTOP_APP_INFO(info));
+		GDesktopAppInfo *desktop = g_desktop_app_info_new_from_filename(
+			app.file.toUtf8().constData());
+		if (!desktop) {
+			continue;
+		}
+		char *entry = pl_app_filter_entry(desktop);
 		const QString e = QString::fromUtf8(entry ? entry : "");
 		g_free(entry);
-		if (e.isEmpty() || seen.contains(e) ||
-				systemProgram(G_DESKTOP_APP_INFO(info), e)) {
+		g_object_unref(desktop);
+		if (e.isEmpty() || seen.contains(e)) {
 			continue;
 		}
 		seen.insert(e);
-		d->programs.push_back({ QString::fromUtf8(g_app_info_get_name(info)), e });
+		d->programs.push_back({ app.folderName, e });
 	}
-	g_list_free_full(all, g_object_unref);
-	std::sort(d->programs.begin(), d->programs.end(), [](const auto &a, const auto &b) {
-		return a.name.compare(b.name, Qt::CaseInsensitive) < 0;
-	});
 	for (const QString &e : allowed) {
 		(seen.contains(e) ? d->on : (d->others << e, d->on)).insert(e);
 	}
@@ -1073,7 +1044,7 @@ void ProgramsWindow::paintEvent(QPaintEvent *) {
 		pl_checkbox_paint(c, d->list.frame.left() + 3, d->list.frame.top() + 1 + r * PL_LIST_ROW_H + 2,
 			d->on.contains(d->programs[i].entry) ? PL_CHECK_ON : PL_CHECK_OFF, false, true, nullptr);
 	}
-	panelText(c, "ZacOS's control panels and system programs aren't listed here.", 12,
+	panelText(c, "Only the applications in the Applications folder are listed.", 12,
 		RH - 12 - PL_BUTTON_H - 6, PL_FONT_VIEWS, GRAY(0x5));
 	d->host.paintControls(c, FACE);
 	QPainter p(this);
