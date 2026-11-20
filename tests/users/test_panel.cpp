@@ -79,11 +79,14 @@ int main(int argc, char **argv) {
 
 	QTemporaryDir dir;
 	logPath = dir.filePath("calls.log");
-	/* One ZacOS user program and one control panel of our own, so
-	 * Programs… has a list whatever the build machine has installed and
-	 * none of the user's own entries. */
-	const QString dataDir = dir.filePath("data");
-	QDir().mkpath(dataDir + "/applications");
+	/* A user-installed application, a utility, a control panel, a ZacOS
+	 * program and a baseline application of the ISO, so Programs… shows
+	 * exactly the Applications folder whatever the build machine has. */
+	const QString dataHome = dir.filePath("data-home");
+	const QString dataSystem = dir.filePath("data-system");
+	QDir().mkpath(dataHome + "/applications");
+	QDir().mkpath(dataHome + "/zacos9");
+	QDir().mkpath(dataSystem + "/applications");
 	const QString binDir = dir.filePath("bin");
 	QDir().mkpath(binDir);
 	QFile helper(binDir + "/zacos9-test-program");
@@ -92,18 +95,37 @@ int main(int argc, char **argv) {
 	helper.close();
 	helper.setPermissions(QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
 	qputenv("PATH", (binDir + ':' + qgetenv("PATH")).toUtf8());
-	QFile program(dataDir + "/applications/zacos9-test-program.desktop");
+	QFile program(dataHome + "/applications/test-program.desktop");
 	program.open(QIODevice::WriteOnly);
 	program.write("[Desktop Entry]\nType=Application\nName=Test Program\n"
-		"Exec=zacos9-test-program\nCategories=Utility;\n");
+		"Exec=zacos9-test-program\nCategories=Graphics;\n");
 	program.close();
-	QFile panelEntry(dataDir + "/applications/zacos9-test-panel.desktop");
+	QFile utility(dataHome + "/applications/test-utility.desktop");
+	utility.open(QIODevice::WriteOnly);
+	utility.write("[Desktop Entry]\nType=Application\nName=Test Utility\nExec=/bin/false\n"
+		"Categories=Utility;\n");
+	utility.close();
+	QFile panelEntry(dataHome + "/applications/test-panel.desktop");
 	panelEntry.open(QIODevice::WriteOnly);
 	panelEntry.write("[Desktop Entry]\nType=Application\nName=Test Panel\nExec=/bin/false\n"
 		"Categories=Settings;X-ZacOS9-ControlPanel;\n");
 	panelEntry.close();
-	qputenv("XDG_DATA_HOME", dataDir.toUtf8());
-	qputenv("XDG_DATA_DIRS", dataDir.toUtf8());
+	QFile builtin(dataHome + "/applications/zacos9-test-app.desktop");
+	builtin.open(QIODevice::WriteOnly);
+	builtin.write("[Desktop Entry]\nType=Application\nName=Test ZacOS App\n"
+		"Exec=zacos9-test-program\nCategories=Graphics;\n");
+	builtin.close();
+	QFile baseline(dataSystem + "/applications/baseline.desktop");
+	baseline.open(QIODevice::WriteOnly);
+	baseline.write("[Desktop Entry]\nType=Application\nName=Baseline App\nExec=/bin/false\n"
+		"Categories=Graphics;\n");
+	baseline.close();
+	QFile baseList(dataHome + "/zacos9/base-applications");
+	baseList.open(QIODevice::WriteOnly);
+	baseList.write("baseline.desktop\n");
+	baseList.close();
+	qputenv("XDG_DATA_HOME", dataHome.toUtf8());
+	qputenv("XDG_DATA_DIRS", dataSystem.toUtf8());
 	/* zacos9-accounts-helper from the sources, its settings here, and a
 	 * pkexec that just runs it. */
 	const QString conf = dir.filePath("etc");
@@ -186,7 +208,8 @@ int main(int argc, char **argv) {
 	w->setLimited(true, {});
 	ProgramsWindow *programs = w->openPrograms();
 	check(programs && programs->names() == QStringList{ "Test Program" },
-		"Programs… keeps ZacOS's user programs and leaves out control panels");
+		"Programs… lists only Applications-folder programs: no utilities, "
+		"control panels, ZacOS programs or baseline apps");
 	programs->toggle(0);
 	const QString chosen = programs->entries().value(0);
 	programs->accept();

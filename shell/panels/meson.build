@@ -179,7 +179,7 @@ users_sources = ['users.cpp']
 users_panel = executable('test-users-panel', '../../tests/users/test_panel.cpp', users_sources,
   link_with: panelkit,
   include_directories: include_directories('../finder'),
-  dependencies: [shell_common_dep, platinum_dep, qt6, wayland_client, crypt, gio_unix],
+  dependencies: [shell_files_dep, shell_common_dep, platinum_dep, qt6, wayland_client, crypt, gio_unix],
   build_by_default: false,
 )
 # Users with a stand-in accountsservice on a private session bus (users.cpp).
@@ -211,7 +211,7 @@ controlpanel_exe = executable('zacos9-controlpanel',
   xkb_layouts_sources, default_apps_sources, startup_disk_sources, memory_sources,
   link_with: [panelkit, soundclient_lib, afterdark_lib],
   include_directories: [include_directories('../finder', '../screensaver'), xkb_layouts_include],
-  dependencies: [shell_common_dep, platinum_dep, qt6, xkbcommon_client, gio, gio_unix, wayland_client, crypt, layershellqt],
+  dependencies: [shell_files_dep, shell_common_dep, platinum_dep, qt6, xkbcommon_client, gio, gio_unix, wayland_client, crypt, layershellqt],
   install: true,
 )
 
