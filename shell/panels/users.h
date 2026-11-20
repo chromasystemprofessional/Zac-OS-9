@@ -92,14 +92,17 @@ private:
 QString accountsConf(const QString &name);
 
 /* The programs a Limited account may use: installed programs, each with a
- * checkbox. OK hands back malcontent's entries for the checked ones. */
+ * checkbox. ZacOS's user programs are listed; its control panels and system
+ * programs are not. OK hands back malcontent's entries for the checked ones. */
 class ProgramsWindow : public QWidget {
 public:
 	ProgramsWindow(QWidget *parent, const QString &who, const QStringList &allowed,
 		std::function<void(const QStringList &)> done);
 	~ProgramsWindow() override;
-	/* For tests: the programs listed, and checking one as a click would. */
+	/* For tests: the programs listed, their malcontent entries, and
+	 * checking one as a click would. */
 	QStringList names() const;
+	QStringList entries() const;
 	void toggle(int row);
 	void accept();
 
@@ -172,6 +175,13 @@ public:
 	/* Use only chosen programs, and which (malcontent entries). */
 	void setLimited(bool limited, const QStringList &allowed);
 	void setPuppy(bool puppy);
+	/* For tests: whether the program limit and its Programs… button can be
+	 * used. They work for every account: choosing programs sets a new
+	 * list even when the old one couldn't be read. */
+	bool limitedEnabled() const;
+	bool programsEnabled() const;
+	/* For tests: what the Programs… button does. */
+	ProgramsWindow *openPrograms();
 	/* Save: false (with the reason) if it can't be saved as it is. */
 	bool save(QString *problem = nullptr);
 
