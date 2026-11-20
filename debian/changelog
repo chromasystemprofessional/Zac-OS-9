@@ -1,3 +1,13 @@
+zacos9 (1.18.26) trixie; urgency=medium
+
+  * Programs… in Users now lists only the user-installed applications in
+    the Finder's Applications folder—the programs installed since the
+    system—not ZacOS's own programs, control panels, utilities or
+    helpers. Update Front Desk in Software > Extras (0.1.3 or later) for
+    the same list in Front Desk Setup and the panel.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Thu, 19 Nov 2026 22:35:52 -0500
+
 zacos9 (1.18.25) trixie; urgency=medium
 
   * Front Desk Setup is now a control panel, so an administrator can open
