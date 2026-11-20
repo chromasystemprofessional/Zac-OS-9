@@ -17,6 +17,7 @@ user database or account creation.
 |---|---|---|
 | The panel | `ZAC-OS-EXTRAS/frontdesk/src/` | `zacos9-frontdesk`: tabs, pages and single-click launch |
 | The setup | `ZAC-OS-EXTRAS/frontdesk/src/setup_main.cpp` | `zacos9-frontdesk-setup`: accounts, programs, menus, security |
+| Control panel | `ZAC-OS-EXTRAS/frontdesk/data/zacos9-frontdesk-setup.desktop` | **Front Desk Setup** in Control Panels and the Zac menu |
 | Account settings | `system/accounts/zacos9-accounts-helper` | `desktop USER frontdesk|puppy|finder`, `frontdesk`, `frontdesk-settings`; `/etc/zacos9/frontdesk/USER` |
 | Session shell | `session/zacos9-session`, `compositor/src/main.c` | `ZACOS9_SHELL=frontdesk`; starts Front Desk instead of the Sniffer, no Collar |
 | Menu bar | `shell/menubar/launch.c` | `ZACOS9_MENUBAR_MODE=frontdesk`: the Zac menu keeps only About This Computer |
@@ -34,6 +35,11 @@ startup modes:
 - `finder`: both are removed (the ordinary ZacOS session).
 
 The three are mutually exclusive. Puppy Mode is the “restricted Finder”.
+
+Front Desk Setup is also a control panel, so an administrator can open it
+from an ordinary session, before any account runs Front Desk: **Control
+Panels ▸ Front Desk Setup**, the Zac menu's Control Panels, or the panel's
+own **Special ▸ Go To Front Desk Setup…** when it is running.
 
 The settings file is root-owned and world-readable:
 
@@ -75,10 +81,13 @@ detaches without opening a window leaves the panel in front.
 
 The panel reads the account's malcontent app filter through accountsservice,
 the same list the Users panel's `Use only chosen programs` edits. An account
-with no filter shows every installed program; Front Desk Setup's Programs…
-window writes an allowlist through accountsservice, so both control panels
-agree. ZacOS's user programs (Calculator, Jigsaw, Notepad and the rest) are
-panel items; the shell, control panels, installers and helpers are not.
+with no filter shows every program the panel offers; Front Desk Setup's
+Programs… window writes an allowlist through accountsservice, so both
+control panels agree. The Users panel's **Use only chosen programs** and **Programs…** work
+the same way for every account, including an administrator's; if the old
+list can't be read, choosing programs still sets a new one. ZacOS's user
+programs (Calculator, Jigsaw, Notepad and the rest) are panel items; the
+shell, control panels, installers and helpers are not.
 
 ## Security
 
@@ -97,4 +106,5 @@ save-location enforcement through the file chooser portal is a later hook.
   that choosing it hides the program, and that closing the last program
   returns to the panel.
 - `ZAC-OS-EXTRAS/frontdesk/tests/` builds and checks the panel and setup
-  offscreen.
+  offscreen, the panel's program list (ZacOS's user programs in, control
+  panels out), and that Front Desk Setup is a control panel.

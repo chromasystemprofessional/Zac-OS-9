@@ -111,7 +111,9 @@ def on_user_get(conn, sender, path, iface, prop):
 
 
 def on_filter_get(conn, sender, path, iface, prop):
-    return GLib.Variant("(bas)", users[int(path.rsplit("User", 1)[1])]["filter"])
+    u = users[int(path.rsplit("User", 1)[1])]
+    log(f"GetAppFilter {u['name']}")
+    return GLib.Variant("(bas)", u["filter"])
 
 
 def on_filter_set(conn, sender, path, iface, prop, value):

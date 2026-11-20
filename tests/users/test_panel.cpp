@@ -7,6 +7,7 @@
  *
  * usage: test-users-panel FAKE_ACCOUNTS.PY  (under dbus-run-session) */
 #include <QApplication>
+#include <QDir>
 #include <QElapsedTimer>
 #include <QFile>
 #include <QProcess>
@@ -78,6 +79,31 @@ int main(int argc, char **argv) {
 
 	QTemporaryDir dir;
 	logPath = dir.filePath("calls.log");
+	/* One ZacOS user program and one control panel of our own, so
+	 * Programs… has a list whatever the build machine has installed and
+	 * none of the user's own entries. */
+	const QString dataDir = dir.filePath("data");
+	QDir().mkpath(dataDir + "/applications");
+	const QString binDir = dir.filePath("bin");
+	QDir().mkpath(binDir);
+	QFile helper(binDir + "/zacos9-test-program");
+	helper.open(QIODevice::WriteOnly);
+	helper.write("#!/bin/sh\nexit 0\n");
+	helper.close();
+	helper.setPermissions(QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
+	qputenv("PATH", (binDir + ':' + qgetenv("PATH")).toUtf8());
+	QFile program(dataDir + "/applications/zacos9-test-program.desktop");
+	program.open(QIODevice::WriteOnly);
+	program.write("[Desktop Entry]\nType=Application\nName=Test Program\n"
+		"Exec=zacos9-test-program\nCategories=Utility;\n");
+	program.close();
+	QFile panelEntry(dataDir + "/applications/zacos9-test-panel.desktop");
+	panelEntry.open(QIODevice::WriteOnly);
+	panelEntry.write("[Desktop Entry]\nType=Application\nName=Test Panel\nExec=/bin/false\n"
+		"Categories=Settings;X-ZacOS9-ControlPanel;\n");
+	panelEntry.close();
+	qputenv("XDG_DATA_HOME", dataDir.toUtf8());
+	qputenv("XDG_DATA_DIRS", dataDir.toUtf8());
 	/* zacos9-accounts-helper from the sources, its settings here, and a
 	 * pkexec that just runs it. */
 	const QString conf = dir.filePath("etc");
@@ -145,20 +171,99 @@ int main(int argc, char **argv) {
 
 	/* Limited: only the chosen programs (malcontent's allowlist). */
 	w = panel.openSelected();
-	waitFor([] { return calls().contains("Get"); }, 500); /* the filter read */
+	waitFor([] { return calls().contains("GetAppFilter bob"); }, 500); /* the filter read */
 	w->setLimited(true, { "/usr/bin/gimp", "app/org.example.Paint/x86_64/stable" });
 	check(w->save(), "Bob's programs save");
 	check(waitFor([] { return calls().contains(
 			"SetAppFilter bob True /usr/bin/gimp app/org.example.Paint/x86_64/stable"); }),
 		"a Limited account is an allowlist of its programs");
+
+	/* Programs… itself: the list, a checked program, and Save. */
+	const int chosenMark = calls().size();
 	w = panel.openSelected();
-	waitFor([] { return false; }, 300); /* the filter read back */
+	check(waitFor([&] { return calls().mid(chosenMark).contains("GetAppFilter bob") &&
+			w->limitedEnabled(); }), "Bob's list is read for Programs…");
+	w->setLimited(true, {});
+	ProgramsWindow *programs = w->openPrograms();
+	check(programs && programs->names() == QStringList{ "Test Program" },
+		"Programs… keeps ZacOS's user programs and leaves out control panels");
+	programs->toggle(0);
+	const QString chosen = programs->entries().value(0);
+	programs->accept();
+	const int saveMark = calls().size();
+	check(w->save(), "a program chosen in Programs… saves");
+	check(waitFor([&] { return calls().mid(saveMark).contains(
+			"SetAppFilter bob True " + chosen); }),
+		"the chosen program is the allowlist");
+
+	const int readMark = calls().size();
+	w = panel.openSelected();
+	check(waitFor([&] { return calls().mid(readMark).contains("GetAppFilter bob") &&
+			w->limitedEnabled(); }), "Bob's list is read back");
 	w->setLimited(false, {});
 	check(w->save(), "unlimiting saves");
 	check(waitFor([] { return calls().contains("SetAppFilter bob False\n"); }),
 		"not limited is an empty blocklist");
 
+	/* The program limit is offered for every account, including an
+	 * administrator's, as Front Desk Setup allows; it waits only for the
+	 * old list to be read. */
+	int mark = calls().size();
+	w = panel.openSelected();
+	check(!w->limitedEnabled(), "the program limit waits for the old list");
+	check(waitFor([&] { return calls().mid(mark).contains("GetAppFilter bob") &&
+			w->limitedEnabled(); }), "the old list is read");
+	check(w->limitedEnabled(), "then the program limit can be chosen");
+	mark = calls().size();
+	w->setAdmin(true);
+	w->setLimited(true, { "/usr/bin/gimp" });
+	check(w->programsEnabled(), "Programs… is usable for an administrator too");
+	check(w->save(), "an administrator's programs save");
+	check(waitFor([&] { return calls().mid(mark).contains("SetAppFilter bob True /usr/bin/gimp"); }),
+		"an administrator's allowlist is set");
+	check(waitFor([&] { return rowOf(panel, "Robert Builder  –  Administrator") >= 0; }),
+		"Bob is an administrator again");
+	mark = calls().size();
+	w = panel.openSelected();
+	check(waitFor([&] { return calls().mid(mark).contains("GetAppFilter bob") &&
+			w->limitedEnabled(); }), "the administrator's list is read back");
+	w->setAdmin(false);
+	w->setLimited(false, {});
+	mark = calls().size();
+	check(w->save(), "the administrator and the limit can be undone");
+	check(waitFor([&] { return calls().mid(mark).contains("SetAccountType bob 0") &&
+			calls().mid(mark).contains("SetAppFilter bob False\n"); }),
+		"both changes are sent");
+	check(waitFor([&] { return rowOf(panel, "Robert Builder  –  Standard") >= 0; }),
+		"Bob is a standard account again");
+
+	/* Your own account, too: an administrator's password still guards the
+	 * change through polkit. */
+	panel.select(rowOf(panel, "You"));
+	mark = calls().size();
+	AccountWindow *self = panel.openSelected();
+	check(waitFor([&] { return calls().mid(mark).contains("GetAppFilter you") &&
+			self->limitedEnabled(); }), "your own list is read");
+	check(self->limitedEnabled() && !self->programsEnabled(),
+		"your own programs can be chosen once the limit is on");
+	self->setLimited(true, { "/usr/bin/gimp" });
+	check(self->programsEnabled(), "your own Programs… is usable");
+	mark = calls().size();
+	check(self->save(), "your own program limit saves");
+	check(waitFor([&] { return calls().mid(mark).contains("SetAppFilter you True /usr/bin/gimp"); }),
+		"your own allowlist is set");
+	mark = calls().size();
+	self = panel.openSelected();
+	check(waitFor([&] { return calls().mid(mark).contains("GetAppFilter you") &&
+			self->limitedEnabled(); }), "your own list is read back");
+	self->setLimited(false, {});
+	mark = calls().size();
+	check(self->save(), "your own program limit can be undone");
+	check(waitFor([&] { return calls().mid(mark).contains("SetAppFilter you False\n"); }),
+		"your own filter is cleared");
+
 	/* Puppy Mode, set by an administrator (zacos9-accounts-helper). */
+	panel.select(rowOf(panel, "Robert"));
 	w = panel.openSelected();
 	w->setPuppy(true);
 	check(w->save(), "Bob's Puppy Mode saves");

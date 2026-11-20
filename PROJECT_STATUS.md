@@ -100,10 +100,11 @@ are not scheduled ([Bloodhound](docs/bloodhound.md)).
 0.1.0 in ZacOS Extras (`zacos9-extra-frontdesk`; ZacOS 9 1.18.19 carries its
 session, compositor, menu-bar and greeter hooks). It uses the real Unix
 accounts as the people and the existing **Use only chosen programs** list as
-its panel. The tabbed panel, Front Desk Setup, the Front Desk-skinned login
-window and the per-account `desktop` modes in the accounts helper are in
-place. The save-location enforcement through the file chooser portal is still
-to come ([Front Desk](docs/frontdesk.md)).
+its panel. The tabbed panel, Front Desk Setup (a control panel, so it opens
+without Front Desk running), the Front Desk-skinned login window and the
+per-account `desktop` modes in the accounts helper are in place. The
+save-location enforcement through the file chooser portal is still to come
+([Front Desk](docs/frontdesk.md)).
 
 **The System Folder**, made to work the way Mac OS 7 to 9's did, item by
 item: [`docs/system-folder.md`](docs/system-folder.md) has every item, what

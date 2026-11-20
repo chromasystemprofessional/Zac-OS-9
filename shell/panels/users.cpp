@@ -224,7 +224,8 @@ void AccountsClient::setAppFilter(const QString &path, bool limited, const QStri
 		{ MCT_IFACE, QStringLiteral("AppFilter"), QVariant::fromValue(QDBusVariant(QVariant::fromValue(arg))) },
 		[done](const QDBusMessage &reply) {
 			if (reply.type() == QDBusMessage::ErrorMessage &&
-					reply.errorName() == "org.freedesktop.DBus.Error.UnknownInterface") {
+					(reply.errorName() == "org.freedesktop.DBus.Error.UnknownInterface" ||
+					 reply.errorName() == "org.freedesktop.DBus.Error.UnknownProperty")) {
 				done("Limited accounts need malcontent, which isn't installed.");
 				return;
 			}
@@ -509,8 +510,15 @@ struct AccountWindow::Parts {
 	PanelButton choose, cancel, save, programs;
 	QStringList allowed; /* malcontent's entries, for a Limited account */
 	bool filterKnown = false;
+	/* The old list is being read. Only that brief wait disables the
+	 * checkbox: if the read fails (no malcontent, or another user's list
+	 * without an administrator's password), choosing programs still
+	 * works and saving sets a new list. A choice made in the meantime is
+	 * not overwritten when the answer arrives. */
+	bool filterPending = false;
+	bool filterEdited = false;
 	void updateLimited() {
-		limited.enabled = filterKnown && !admin.on && admin.enabled;
+		limited.enabled = !filterPending;
 		programs.enabled = limited.enabled && limited.on;
 		puppy.enabled = !admin.on && admin.enabled;
 	}
@@ -584,19 +592,16 @@ AccountWindow::AccountWindow(UsersPanel *panel, AccountsClient *client, const Ac
 	d->canLogIn.enabled = !you;
 	y += 26;
 	d->limited = PanelCheckbox("Use only chosen programs", QPoint(FIELD, y));
-	d->limited.hint = "Limits this person to the programs you choose. Not a security boundary: "
-		"programs started some other way still run.";
-	d->limited.toggled = [this](bool) { d->updateLimited(); update(); };
+	d->limited.hint = "Limits this person to the programs you choose. An administrator can "
+		"undo it; not a security boundary: programs started some other way still run.";
+	d->limited.toggled = [this](bool) {
+		d->filterEdited = true;
+		d->updateLimited();
+		update();
+	};
 	d->programs = PanelButton("Programs…", QRect(AW - M - 4 - 96, y - 4, 96, PL_BUTTON_H));
 	d->programs.hint = "Chooses the programs this person can use.";
-	d->programs.clicked = [this] {
-		auto *w = new ProgramsWindow(this, d->realName.text.isEmpty() ? d->userName.text : d->realName.text,
-			d->allowed, [this](const QStringList &allowed) {
-				d->allowed = allowed;
-				update();
-			});
-		w->show();
-	};
+	d->programs.clicked = [this] { openPrograms(); };
 	y += 22;
 	d->puppy = PanelCheckbox("Puppy Mode", QPoint(FIELD, y));
 	d->puppy.hint = "Gives this person only the Sniffer's essential commands, which they can't "
@@ -606,15 +611,19 @@ AccountWindow::AccountWindow(UsersPanel *panel, AccountsClient *client, const Ac
 	if (d->creating) {
 		d->filterKnown = true; /* without malcontent, saving says so */
 	} else {
+		d->filterPending = true;
 		QPointer<AccountWindow> self(this); /* it may close before the answer */
 		d->client->appFilter(d->original.path, [this, self](bool known, bool limited,
 				const QStringList &allowed) {
 			if (!self) {
 				return;
 			}
+			d->filterPending = false;
 			d->filterKnown = d->original.filterKnown = known;
-			d->limited.on = d->original.limited = limited;
-			d->allowed = d->original.allowed = allowed;
+			if (!d->filterEdited) {
+				d->limited.on = d->original.limited = limited;
+				d->allowed = d->original.allowed = allowed;
+			}
 			d->updateLimited();
 			update();
 		});
@@ -671,6 +680,8 @@ void AccountWindow::setCanLogIn(bool can) {
 }
 
 void AccountWindow::setLimited(bool limited, const QStringList &allowed) {
+	d->filterPending = false;
+	d->filterEdited = true;
 	d->filterKnown = true;
 	d->limited.on = limited;
 	d->allowed = allowed;
@@ -680,6 +691,25 @@ void AccountWindow::setLimited(bool limited, const QStringList &allowed) {
 void AccountWindow::setPuppy(bool puppy) {
 	d->puppy.on = puppy;
 	d->updateLimited();
+}
+
+bool AccountWindow::limitedEnabled() const {
+	return d->limited.enabled;
+}
+
+bool AccountWindow::programsEnabled() const {
+	return d->programs.enabled;
+}
+
+ProgramsWindow *AccountWindow::openPrograms() {
+	auto *w = new ProgramsWindow(this, d->realName.text.isEmpty() ? d->userName.text : d->realName.text,
+		d->allowed, [this](const QStringList &allowed) {
+			d->filterEdited = true;
+			d->allowed = allowed;
+			update();
+		});
+	w->show();
+	return w;
 }
 
 void AccountWindow::setPicture(const QString &file) {
@@ -729,12 +759,14 @@ bool AccountWindow::save(QString *why) {
 	if (d->canLogIn.enabled && d->canLogIn.on == d->original.locked && !(d->creating && d->canLogIn.on)) {
 		steps << "locked";
 	}
-	const bool limited = d->limited.on && !d->admin.on;
+	/* The old filter may be unknown (the read failed): checking the box
+	 * still sets a new allowlist, as Front Desk Setup does. */
+	const bool limited = d->limited.on;
 	if ((d->puppy.on && !d->admin.on) != d->puppyWas) {
 		steps << "puppy";
 	}
-	if (d->filterKnown && (limited != d->original.limited ||
-			(limited && d->allowed != d->original.allowed))) {
+	if (limited != d->original.limited ||
+			(limited && d->allowed != d->original.allowed)) {
 		steps << "limited";
 	}
 	d->saving = true;
@@ -777,7 +809,7 @@ void AccountWindow::apply(const QString &path, QStringList steps) {
 		apply(path, steps);
 	};
 	if (step == "limited") {
-		d->client->setAppFilter(path, d->limited.on && !d->admin.on, d->allowed, next);
+		d->client->setAppFilter(path, d->limited.on, d->allowed, next);
 		return;
 	}
 	if (step == "puppy") {
@@ -840,6 +872,18 @@ void AccountWindow::paintEvent(QPaintEvent *) {
 		panelText(c, "The passwords don't match.", d->verify.rect.right() + 8, d->verify.rect.y() + base,
 			PL_FONT_VIEWS);
 	}
+	/* What the choice means, and when the old list couldn't be read. */
+	QString limitNote;
+	if (d->limited.on) {
+		limitNote = d->allowed.isEmpty() ? "No programs chosen yet."
+			: QString("%1 program%2 chosen.").arg(d->allowed.size())
+				.arg(d->allowed.size() == 1 ? QString() : QStringLiteral("s"));
+	} else if (!d->filterPending && !d->filterKnown) {
+		limitNote = "The current program list couldn't be read; Programs… sets a new one.";
+	}
+	if (!limitNote.isEmpty()) {
+		panelText(c, limitNote, FIELD, 302, PL_FONT_VIEWS, GRAY(0x5));
+	}
 	d->host.paintControls(c, FACE);
 	QPainter p(this);
 	px.blit(p);
@@ -873,6 +917,37 @@ void AccountWindow::keyPressEvent(QKeyEvent *e) {
 
 namespace {
 constexpr int RW = 340, RH = 340;
+
+/* ZacOS's shell, installers and helpers, and the control panels' own
+ * programs: not things a person chooses for their desktop. A panel's
+ * desktop entry says so with X-ZacOS9-ControlPanel or X-ZacOS9-Utility. */
+bool systemProgram(GDesktopAppInfo *desktop, const QString &entry) {
+	const char *categories = g_desktop_app_info_get_categories(desktop);
+	const QStringList list = QString::fromUtf8(categories ? categories : "")
+		.split(';', Qt::SkipEmptyParts);
+	if (list.contains(QStringLiteral("X-ZacOS9-ControlPanel")) ||
+			list.contains(QStringLiteral("X-ZacOS9-Utility"))) {
+		return true;
+	}
+	static const char *const programs[] = {
+		"zacos9-controlpanel", "zacos9-collarpanel", "zacos9-finder",
+		"zacos9-frontdesk", "zacos9-frontdesk-setup", "zacos9-menubar",
+		"zacos9-collar", "zacos9-session", "zacos9-greeter", "zacos9-lock",
+		"zacos9-screensaver", "zacos9-keyboard", "zacos9-inhibit",
+		"zacos9-setup", "zacos9-installer", "zacos9-update", "zacos9-store",
+		"zacos9-disksetup", "zacos9-themeinstaller", "zacos9-wininstall",
+		"zacos9-classic", "zacos9-snapshot", "zacos9-appinstall",
+		"zacos9-gtkmenu", "zacos9-web-sharing", "zacos9-disk-helper",
+		"zacos9-accounts-helper", "zacos9-appstore-helper",
+	};
+	const QString base = QFileInfo(entry).fileName();
+	for (const char *name : programs) {
+		if (base == QLatin1String(name)) {
+			return true;
+		}
+	}
+	return false;
+}
 }
 
 struct ProgramsWindow::Parts {
@@ -899,8 +974,8 @@ ProgramsWindow::ProgramsWindow(QWidget *parent, const QString &who, const QStrin
 	setWindowModality(Qt::WindowModal);
 	setAttribute(Qt::WA_DeleteOnClose);
 	setFixedSize(RW, RH);
-	/* Installed programs (as the Sniffer's Applications folder lists them),
-	 * by name, one row per program; ZacOS's own are always allowed. */
+	/* Installed programs, by name, one row per program: ZacOS's user
+	 * programs included, its control panels and system programs left out. */
 	GList *all = g_app_info_get_all();
 	QSet<QString> seen;
 	for (GList *l = all; l; l = l->next) {
@@ -911,7 +986,8 @@ ProgramsWindow::ProgramsWindow(QWidget *parent, const QString &who, const QStrin
 		char *entry = pl_app_filter_entry(G_DESKTOP_APP_INFO(info));
 		const QString e = QString::fromUtf8(entry ? entry : "");
 		g_free(entry);
-		if (e.isEmpty() || seen.contains(e) || QFileInfo(e).fileName().startsWith("zacos9-")) {
+		if (e.isEmpty() || seen.contains(e) ||
+				systemProgram(G_DESKTOP_APP_INFO(info), e)) {
 			continue;
 		}
 		seen.insert(e);
@@ -948,6 +1024,14 @@ QStringList ProgramsWindow::names() const {
 	QStringList out;
 	for (const auto &p : d->programs) {
 		out << p.name;
+	}
+	return out;
+}
+
+QStringList ProgramsWindow::entries() const {
+	QStringList out;
+	for (const auto &p : d->programs) {
+		out << p.entry;
 	}
 	return out;
 }
@@ -989,8 +1073,8 @@ void ProgramsWindow::paintEvent(QPaintEvent *) {
 		pl_checkbox_paint(c, d->list.frame.left() + 3, d->list.frame.top() + 1 + r * PL_LIST_ROW_H + 2,
 			d->on.contains(d->programs[i].entry) ? PL_CHECK_ON : PL_CHECK_OFF, false, true, nullptr);
 	}
-	panelText(c, "ZacOS's own programs are always available.", 12, RH - 12 - PL_BUTTON_H - 6,
-		PL_FONT_VIEWS, GRAY(0x5));
+	panelText(c, "ZacOS's control panels and system programs aren't listed here.", 12,
+		RH - 12 - PL_BUTTON_H - 6, PL_FONT_VIEWS, GRAY(0x5));
 	d->host.paintControls(c, FACE);
 	QPainter p(this);
 	px.blit(p);
