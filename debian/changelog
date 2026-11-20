@@ -1,3 +1,18 @@
+zacos9 (1.18.25) trixie; urgency=medium
+
+  * Front Desk Setup is now a control panel, so an administrator can open
+    it from Control Panels or the Zac menu in an ordinary session, before
+    any account runs Front Desk. Update Front Desk in Software > Extras
+    (0.1.2 or later) for the control panel and the panel's corrected
+    program list. The Users panel's Use only chosen programs now works for
+    every account, including administrators and your own; Programs… lists
+    ZacOS's user programs (Calculator, Jigsaw, Notepad and the rest)
+    instead of dropping every zacos9-* program and leaves out control
+    panels, installers and system programs. Choosing programs still works
+    when the old list cannot be read.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Thu, 19 Nov 2026 20:22:33 -0500
+
 zacos9 (1.18.24) trixie; urgency=medium
 
   * A saved network disk now waits for a locked keychain's password prompt
