@@ -227,9 +227,11 @@ find_disks() {
 	done
 }
 
+# A standalone build-emulators.sh puts the emulators in the user's own
+# libexec, so a desktop installed from the Debian package can use them.
 program_path() {
 	for dir in "${ZACOS9_EMULATORS:-}" "$self_dir/../emulators/bin" \
-			"$self_dir/../libexec/zacos9"; do
+			"$self_dir/../libexec/zacos9" "$HOME/.local/libexec/zacos9"; do
 		[ -x "$dir/$1" ] && { echo "$(cd "$dir" && pwd)/$1"; return 0; }
 	done
 	command -v "$1"
@@ -257,7 +259,7 @@ else
 	rom=$(find_rom "$M68K_ROMS") || fail "No 68040 Macintosh ROM was found in \"$(basename "$classic_dir")\". Basilisk II needs a Quadra or Centris ROM."
 	ram=67108864
 fi
-exe=$(emulator $program) || fail "$program isn't installed. Build it with emulation/build-emulators.sh."
+exe=$(emulator $program) || fail "$program isn't installed. The ZacOS 9 ISO includes it; from a source checkout, build it with emulation/build-emulators.sh."
 
 disks=$(printf '%s\n%s\n' "$extra_disks" "$(find_disks)" | grep . | awk '!seen[$0]++' || true)
 

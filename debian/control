@@ -166,8 +166,7 @@ Recommends: balena-etcher,
 # queues instead: they stop with "No destination host name supplied by
 # cups-browsed" (seen on a Canon over Wi-Fi) unless it keeps running, and
 # CUPS 2.4 sets up IPP Everywhere printers itself.
-Suggests: zacos9-emulators,
-          greetd,
+Suggests: greetd,
           kdeconnect
 Description: classic Platinum desktop for Wayland
  ZacOS 9 is a desktop in the style of a late-1990s Platinum

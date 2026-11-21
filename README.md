@@ -81,8 +81,10 @@ artwork. See [Themes and sound sets](docs/themes.md) for what it reads.
   Zacintosh HD with a System Folder and Applications, labels, Get Info, Find,
   spring-loaded folders, and `.zip`, `.7z` and StuffIt `.sit` archives opened
   with a double-click.
-- **Classic Mac software**: **Old Dog** starts classic Mac OS in the
-  SheepShaver emulator. Bring your own ROM and Mac OS install disk.
+- **Classic Mac software (on the ISO)**: **Old Dog** starts classic Mac OS in
+  the SheepShaver emulator. Bring your own ROM and Mac OS install disk; on a
+  Debian install, build the optional emulators from the source tree
+  ([emulation/README.md](emulation/README.md)).
 - **Games**: console cartridges and discs wear their own icons, and the Game
   Player extra runs NES, Super NES, Sega, Game Boy, Game Boy Advance,
   PlayStation and Nintendo 64 games in a Platinum-framed window.
@@ -178,9 +180,11 @@ then install the file you downloaded:
 sudo apt install ./zacos9_*_amd64.deb
 ```
 
-Log out and choose **ZacOS 9** at the login screen. Classic Mac emulation (the
-`zacos9-emulators` package) comes on the ISO for now; without it, everything
-else works, and Old Dog says the emulator isn't installed.
+Log out and choose **ZacOS 9** at the login screen. Classic Mac emulation is
+not in this package. The `zacos9-emulators` package is on the ISO for now; on
+a Debian install, build it from a source checkout
+([emulation/README.md](emulation/README.md)). Without it, everything else
+works, and Old Dog says the emulator isn't installed.
 
 ## Learn more
 

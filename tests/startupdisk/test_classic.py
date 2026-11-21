@@ -81,6 +81,25 @@ with tempfile.TemporaryDirectory() as d:
     code, out = run(env={**env, "ZACOS9_EMULATORS": str(spaced)})
     check(code == 0 and len(disks(out)) == 3, "an emulator folder whose path has a space is found")
 
+    # A fresh Debian install has no emulator: say where it comes from, not
+    # just that it is missing.
+    empty = root / "no-emulators"
+    empty.mkdir()
+    result = subprocess.run([launcher], env={**env, "ZACOS9_EMULATORS": str(empty)},
+                            capture_output=True, text=True, timeout=30)
+    check(result.returncode == 2 and "ZacOS 9 ISO" in result.stderr and
+          "emulation/build-emulators.sh" in result.stderr,
+          "a missing emulator points at the ISO or a source build")
+
+    # A standalone build-emulators.sh writes here, and the installed desktop
+    # finds it without ZACOS9_EMULATORS.
+    local = home / ".local" / "libexec" / "zacos9"
+    local.mkdir(parents=True)
+    shutil.copy2(sheep, local / "SheepShaver")
+    code, out = run(env={k: v for k, v in env.items() if k != "ZACOS9_EMULATORS"})
+    check(code == 0 and len(disks(out)) == 3,
+          "an emulator in the user's libexec is found")
+
     # The screen: full screen at the desktop's resolution when the
     # compositor's output list is readable, the 800x600 window otherwise.
     def screen(argv):
