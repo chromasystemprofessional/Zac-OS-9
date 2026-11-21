@@ -1,3 +1,14 @@
+zacos9 (1.18.27) trixie; urgency=medium
+
+  * Classic Mac emulation is ISO-only until the emulators are a release
+    asset. A Debian install no longer suggests an uninstallable
+    zacos9-emulators package, and Old Dog's missing-emulator alert says
+    where to get it. A downloaded emulation/build-emulators.sh now works on
+    its own: it fetches the pinned source and patch, builds into
+    ~/.local/libexec/zacos9, and Old Dog finds it (issue #195).
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Sat, 21 Nov 2026 14:16:02 -0500
+
 zacos9 (1.18.26) trixie; urgency=medium
 
   * Programs… in Users now lists only the user-installed applications in
