@@ -105,7 +105,8 @@ scaling only, original behaviors and timings).
     attaches disks; documents and apps inside guest images remain
     unimplemented.
   - SDL's Wayland backend under zacos9-wm (Xwayland for now).
-  - Packaging the emulators (Phase 7).
+  - Publish the emulators package with releases (Phase 7). The ISO already
+    carries it; the GitHub `.deb` does not.
 
 ## Phase 5: Control Panels and theming (in progress)
 - Done:

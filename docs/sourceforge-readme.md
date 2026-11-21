@@ -36,8 +36,9 @@ and install the file you downloaded:
 sudo apt install ./zacos9_*_amd64.deb
 ```
 
-Classic Mac emulation (the `zacos9-emulators` package) comes on the ISO for
-now.
+Classic Mac emulation (the `zacos9-emulators` package) is on the ISO only for
+now; it is not part of the Debian package. A source checkout can build it
+instead.
 
 ## Mac OS 9 themes
 

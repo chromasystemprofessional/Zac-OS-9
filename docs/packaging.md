@@ -22,7 +22,10 @@ scripts/build-debs.sh --emulators   # and zacos9-emulators_*.deb
 
 - **zacos9-emulators** holds SheepShaver and Basilisk II, built from the pinned
   macemu commit in `emulation/build-emulators.sh`. They are installed in
-  `/usr/libexec/zacos9`, where `zacos9-classic` looks for them.
+  `/usr/libexec/zacos9`, where `zacos9-classic` looks for them. It is an ISO
+  package for now: the GitHub release carries only `zacos9`, so a direct
+  `.deb` install does not have Classic until the emulators are built from a
+  source checkout.
   - The emulators are GPL-2. Their source is written next to the package as
     `zacos9-emulators_*.source.tar.gz`, and must go wherever the package goes.
   - No ROMs or Mac OS system software are included.
@@ -205,7 +208,8 @@ The guest's `macipgw.service` failed with exit status 64. It comes with
 gateway, so `system/sharing/macipgw.service.d/zacos9.conf` skips the service
 (`ExecCondition`) until `network =` is set there; it then starts as before.
 
-To install the packages on a Debian 13 machine:
+`zacos9` is a release asset. To install both packages on a Debian 13 machine,
+build them from a source checkout (`scripts/build-debs.sh --emulators`), then:
 
 ```sh
 sudo apt install ./zacos9_*.deb ./zacos9-emulators_*.deb

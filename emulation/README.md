@@ -26,15 +26,21 @@ It is not a Mac OS emulator, and it needs no ROM or system disk.
 
 ## Setting up
 
-1. Build the emulators once:
+1. Build the emulators once, as your normal user:
 
    ```sh
    sh emulation/build-emulators.sh
    ```
 
-   The binaries go into `build/emulators/bin`. The script applies the Classic
-   bridge patch in [`patches/`](patches/README.md) to SheepShaver; Basilisk II
-   is unpatched.
+   In a source checkout the binaries go into `build/emulators/bin`. A copy of
+   the script downloaded on its own fetches the pinned macemu source and the
+   Classic bridge patch, and installs into `~/.local/libexec/zacos9`, where
+   `zacos9-classic` finds them without an environment variable. The script
+   applies the patch in [`patches/`](patches/README.md) to SheepShaver;
+   Basilisk II is unpatched.
+
+   The ZacOS 9 ISO already carries the packaged emulators
+   (`zacos9-emulators`). This step is for a Debian install or development.
 2. Put your files in a folder named `Classic` in your home folder, up to two
    folders deep. Set `ZACOS9_CLASSIC_DIR` to use a different folder.
    - **ROMs.** The launcher identifies each ROM by its checksum, so file names
@@ -87,10 +93,12 @@ used. Add `--68k` for Basilisk II.
   The `zacos9` and `zacos9-emulators` packages therefore give only the
   packaged SheepShaver this permission when they're installed or upgraded.
   A dpkg file trigger in `zacos9` grants it again whenever an emulator
-  upgrade replaces the binary. To apply or check it by hand:
+  upgrade replaces the binary. A standalone `build-emulators.sh` gives it
+  to the copy in `~/.local/libexec/zacos9`. To apply or check it by hand:
 
   ```sh
   sudo setcap cap_sys_rawio=ep /usr/libexec/zacos9/SheepShaver
+  sudo setcap cap_sys_rawio=ep ~/.local/libexec/zacos9/SheepShaver
   /usr/sbin/getcap /usr/libexec/zacos9/SheepShaver
   ```
 
