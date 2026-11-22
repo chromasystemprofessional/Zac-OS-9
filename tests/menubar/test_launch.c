@@ -213,6 +213,19 @@ int main(int argc, char **argv) {
 	unlink(top);
 	unlink(linked);
 	unlink(doc_alias);
+	setenv("ZACOS9_MENUBAR_MODE", "frontdesk", 1);
+	struct mb_menu frontdeskLimited = { 0 };
+	launch_fill_logo_menu(&frontdeskLimited, NULL, 0);
+	assert(item_named(&frontdeskLimited, "About This Computer…"));
+	assert(!item_named(&frontdeskLimited, "Control Panels"));
+	setenv("ZACOS9_FRONTDESK_ZAC_MENU", "on", 1);
+	struct mb_menu frontdeskAll = { 0 };
+	launch_fill_logo_menu(&frontdeskAll, NULL, 0);
+	assert(item_named(&frontdeskAll, "Control Panels"));
+	unsetenv("ZACOS9_FRONTDESK_ZAC_MENU");
+	unsetenv("ZACOS9_MENUBAR_MODE");
+	puts("ok: a Front Desk account can have all the Zac menu items");
+
 	unlink(doc);
 	unlink(theme_desktop);
 	unlink(at_limit);
