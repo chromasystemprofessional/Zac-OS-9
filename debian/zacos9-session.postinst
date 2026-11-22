@@ -1,0 +1,46 @@
+#!/bin/sh
+# The session package: the desktop alone. Boot, installer, Setup Assistant
+# and update integration belong to zacos9.
+set -e
+
+sheepshaver=/usr/libexec/zacos9/SheepShaver
+
+# Classic: an Old World ROM needs SheepShaver to map the Mac's low-memory
+# globals at address 0, which Linux refuses without CAP_SYS_RAWIO
+# ("Cannot map Low Memory Globals: Operation not permitted"). Grant that
+# one capability to the packaged emulator alone, rather than lowering
+# vm.mmap_min_addr for the whole system. Re-run by the file trigger when
+# zacos9-emulators replaces the binary.
+grant_rawio() {
+	[ -f "$sheepshaver" ] || return 0
+	if ! setcap cap_sys_rawio=ep "$sheepshaver" 2>/dev/null; then
+		echo "zacos9: could not give SheepShaver the low-memory permission;" \
+			"Old Dog may not start with an Old World ROM." >&2
+	fi
+}
+
+# A Guest account made before zacos9-accounts-helper gave it the session's
+# device groups couldn't log in (no seat); give them to it.
+guest_seat() {
+	guest=$(cat /etc/zacos9/guest-account 2>/dev/null) || return 0
+	[ -n "$guest" ] && getent passwd "$guest" >/dev/null 2>&1 || return 0
+	for g in audio video render input; do
+		getent group "$g" >/dev/null 2>&1 || continue
+		usermod -aG "$g" "$guest" ||
+			echo "zacos9: could not add the Guest account to the $g group." >&2
+	done
+}
+
+case "$1" in
+	configure)
+		grant_rawio
+		guest_seat
+		;;
+	triggered)
+		grant_rawio
+		;;
+esac
+
+#DEBHELPER#
+
+exit 0

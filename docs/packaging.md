@@ -6,11 +6,11 @@ WSL distro), from the project folder.
 ## Debian packages
 
 ```sh
-scripts/build-debs.sh               # build/packages/zacos9_*.deb
+scripts/build-debs.sh               # build/packages/zacos9*.deb
 scripts/build-debs.sh --emulators   # and zacos9-emulators_*.deb
 ```
 
-- **zacos9** is the desktop:
+- **zacos9-session** is the desktop:
   - `zacos9-wm`, the menu bar, the Finder, [The Collar](collar.md),
     the control panels and `zacos9-classic`;
   - the fonts, icons, patterns, cursors and sounds;
@@ -20,21 +20,30 @@ scripts/build-debs.sh --emulators   # and zacos9-emulators_*.deb
   console, run `zacos9-session`. The session log is
   `~/.local/state/zacos9/session.log`.
 
+- **zacos9-greeter** is the optional greetd login window, `zacos9-login` in a
+  `zacos9-wm` of its own. It depends on the session and on greetd, seatd and
+  tuigreet.
+
+- **zacos9** is the full system integration: the installer, Setup Assistant,
+  Startup Disk, Software, Software Update, the boot splash and the GRUB
+  scripts. It depends on `zacos9-session` and `zacos9-greeter`.
+
 - **zacos9-emulators** holds SheepShaver and Basilisk II, built from the pinned
   macemu commit in `emulation/build-emulators.sh`. They are installed in
   `/usr/libexec/zacos9`, where `zacos9-classic` looks for them. It is an ISO
-  package for now: the GitHub release carries only `zacos9`, so a direct
-  `.deb` install does not have Classic until the emulators are built from a
-  source checkout.
+  package for now: the GitHub release carries the three `zacos9*` packages, not
+  the emulators, so a direct `.deb` install does not have Classic until the
+  emulators are built from a source checkout.
   - The emulators are GPL-2. Their source is written next to the package as
     `zacos9-emulators_*.source.tar.gz`, and must go wherever the package goes.
   - No ROMs or Mac OS system software are included.
 
-The package is built from what `git add -A` would commit. That means the tracked
-files plus any new ones, minus everything `.gitignore` excludes. Build output
-and the Apple files in `macos/` and `uploads/` can never get into a package.
+The packages are built from what `git add -A` would commit. That means the
+tracked files plus any new ones, minus everything `.gitignore` excludes. Build
+output and the Apple files in `macos/` and `uploads/` can never get into a
+package.
 
-The package build runs the unit tests serially: desktop integration tests
+The package builds run the unit tests serially: desktop integration tests
 share gvfs, compositor and package-manager resources and must not contend
 with one another. Compilation remains parallel. Without the HIG figures
 (`tools/measure/figs`), the pixel tests are skipped.
@@ -209,11 +218,13 @@ The guest's `macipgw.service` failed with exit status 64. It comes with
 gateway, so `system/sharing/macipgw.service.d/zacos9.conf` skips the service
 (`ExecCondition`) until `network =` is set there; it then starts as before.
 
-`zacos9` is a release asset. To install both packages on a Debian 13 machine,
-build them from a source checkout (`scripts/build-debs.sh --emulators`), then:
+The three `zacos9` packages are release assets. To install them and the
+emulators on a Debian 13 machine, build them from a source checkout
+(`scripts/build-debs.sh --emulators`), then:
 
 ```sh
-sudo apt install ./zacos9_*.deb ./zacos9-emulators_*.deb
+sudo apt install ./zacos9_*.deb ./zacos9-session_*.deb \
+    ./zacos9-greeter_*.deb ./zacos9-emulators_*.deb
 ```
 
 To publish a release that installed systems pick up through Software

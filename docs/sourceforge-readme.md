@@ -28,12 +28,14 @@ Extras and Debian's security fixes. You don't need a new ISO.
 
 ## Already running Debian 13?
 
-Download the latest `zacos9_*_amd64.deb` from the [latest release on
+Download the latest `zacos9_*_amd64.deb`, `zacos9-session_*_amd64.deb` and
+`zacos9-greeter_*_amd64.deb` from the [latest release on
 GitHub](https://github.com/chromasystemprofessional/Zac-OS-9/releases/latest)
-and install the file you downloaded:
+and install the files you downloaded:
 
 ```sh
-sudo apt install ./zacos9_*_amd64.deb
+sudo apt install ./zacos9_*_amd64.deb ./zacos9-session_*_amd64.deb \
+    ./zacos9-greeter_*_amd64.deb
 ```
 
 Classic Mac emulation (the `zacos9-emulators` package) is on the ISO only for

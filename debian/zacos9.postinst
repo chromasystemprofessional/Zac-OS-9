@@ -1,21 +1,8 @@
 #!/bin/sh
-# Classic: an Old World ROM needs SheepShaver to map the Mac's low-memory
-# globals at address 0, which Linux refuses without CAP_SYS_RAWIO
-# ("Cannot map Low Memory Globals: Operation not permitted"). Grant that
-# one capability to the packaged emulator alone, rather than lowering
-# vm.mmap_min_addr for the whole system. Re-run by the file trigger when
-# zacos9-emulators replaces the binary.
+# The full ZacOS system: boot, installer, Setup Assistant, Software/Update
+# and the update timer. The desktop itself is zacos9-session, and the login
+# window is zacos9-greeter.
 set -e
-
-sheepshaver=/usr/libexec/zacos9/SheepShaver
-
-grant_rawio() {
-	[ -f "$sheepshaver" ] || return 0
-	if ! setcap cap_sys_rawio=ep "$sheepshaver" 2>/dev/null; then
-		echo "zacos9: could not give SheepShaver the low-memory permission;" \
-			"Old Dog may not start with an Old World ROM." >&2
-	fi
-}
 
 # GRUB's start-up picture (/etc/grub.d/09_zacos9) is drawn once by
 # zacos9-install for the screen's size; draw it again at that size so an
@@ -44,32 +31,6 @@ make_shared_documents() {
 	[ -e /home/Shared ] && return 0
 	mkdir -p /home/Shared && chmod 1777 /home/Shared ||
 		echo "zacos9: could not make the Shared Documents folder." >&2
-}
-
-# The login window (zacos9-greeter) runs a zacos9-wm as greetd's own user,
-# and seatd hands the screen only to the video group (seatd -g video), so
-# without it the window never gets the seat: Log Out left a frozen screen.
-# render for the GPU's render node, as the Setup Assistant's account has.
-greeter_seat() {
-	getent passwd _greetd >/dev/null 2>&1 || return 0
-	for g in video render; do
-		getent group "$g" >/dev/null 2>&1 || continue
-		usermod -aG "$g" _greetd ||
-			echo "zacos9: could not add the login window to the $g group;" \
-				"Log Out may leave a blank screen." >&2
-	done
-}
-
-# A Guest account made before zacos9-accounts-helper gave it the session's
-# device groups couldn't log in (no seat); give them to it.
-guest_seat() {
-	guest=$(cat /etc/zacos9/guest-account 2>/dev/null) || return 0
-	[ -n "$guest" ] && getent passwd "$guest" >/dev/null 2>&1 || return 0
-	for g in audio video render input; do
-		getent group "$g" >/dev/null 2>&1 || continue
-		usermod -aG "$g" "$guest" ||
-			echo "zacos9: could not add the Guest account to the $g group." >&2
-	done
 }
 
 # Compressed Memory is off until the Memory control panel turns it on, but
@@ -164,9 +125,6 @@ japanese_setup() {
 
 case "$1" in
 	configure)
-		grant_rawio
-		greeter_seat
-		guest_seat
 		zram_off_by_default
 		redraw_grub_logo
 		rotate_boot
@@ -175,9 +133,6 @@ case "$1" in
 		remove_rdp_sharing
 		# Software Update's daily check, for every account.
 		systemctl --global enable zacos9-update-check.timer >/dev/null 2>&1 || true
-		;;
-	triggered)
-		grant_rawio
 		;;
 esac
 

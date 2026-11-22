@@ -52,22 +52,49 @@ for name in sorted(names):
         failures += 1
 
 control = (root / "debian/control").read_text()
-package = control.split("Package: zacos9\n", 1)[1]
-recommends = package.split("Recommends:", 1)[1].split("\nSuggests:", 1)[0]
-if "seatd" not in {entry.strip() for entry in recommends.split(",")}:
-    print("debian/control does not recommend seatd for the login window")
-    failures += 1
+
+
+def stanza(name):
+    marker = f"Package: {name}\n"
+    if marker not in control:
+        return ""
+    return control.split(marker, 1)[1].split("\nPackage: ", 1)[0]
+
+
+def field(text, name):
+    marker = f"{name}:"
+    if marker not in text:
+        return ""
+    lines = []
+    for line in text.split(marker, 1)[1].splitlines():
+        if line and not line[0].isspace():
+            break
+        lines.append(line.strip())
+    return " ".join(lines).strip()
+
+
+greeter_depends = field(stanza("zacos9-greeter"), "Depends")
+for package in ("seatd", "greetd", "tuigreet", "zacos9-session"):
+    if package not in greeter_depends:
+        print(f"debian/control does not give zacos9-greeter {package}")
+        failures += 1
+
+full_depends = field(stanza("zacos9"), "Depends")
+for package in ("zacos9-session", "zacos9-greeter"):
+    if package not in full_depends:
+        print(f"debian/control does not give zacos9 {package}")
+        failures += 1
 
 iso = (root / "iso/config/package-lists/zacos9.list.chroot").read_text().splitlines()
 if "seatd" not in {line.strip() for line in iso}:
     print("the ISO package list does not include seatd")
     failures += 1
 
-postinst = (root / "debian/zacos9.postinst").read_text()
+postinst = (root / "debian/zacos9-greeter.postinst").read_text()
 if "_greetd" not in postinst or "video" not in postinst or "render" not in postinst:
-    print("debian/zacos9.postinst does not give _greetd the seat groups")
+    print("debian/zacos9-greeter.postinst does not give _greetd the seat groups")
     failures += 1
 
 if failures:
     sys.exit(1)
-print(f"ok: the {static} static system unit(s) are excluded, and the login window has seatd")
+print(f"ok: the {static} static system unit(s) are excluded, and the login window package has seatd")
