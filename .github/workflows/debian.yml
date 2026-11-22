@@ -6,9 +6,15 @@ on:
     tags: ["v*"]
   pull_request:
   workflow_dispatch:
+    inputs:
+      publish_repo:
+        description: "Publish the tested packages to the repo branch"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
+  actions: read
 
 concurrency:
   group: debian-${{ github.ref }}
@@ -138,3 +144,98 @@ jobs:
           body_path: release-notes.txt
         env:
           GITHUB_TOKEN: ${{ github.token }}
+
+  repo:
+    needs: package
+    if: >-
+      startsWith(github.ref, 'refs/tags/v') ||
+      (github.event_name == 'workflow_dispatch' && inputs.publish_repo)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Install repository tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends apt-utils gnupg
+
+      - name: Download the tested packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p packages
+          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            --name debian-13-amd64-packages --dir packages
+
+      - name: Import the signing key
+        env:
+          KEY: ${{ secrets.ZACOS9_REPO_GPG_PRIVATE_KEY }}
+        run: |
+          if [ -z "$KEY" ]; then
+            echo "::error::ZACOS9_REPO_GPG_PRIVATE_KEY is not set"
+            exit 1
+          fi
+          install -d -m 700 "$HOME/.gnupg"
+          printf '%s' "$KEY" | tr -d '\n' | base64 -d | gpg --batch --import
+          fingerprint=$(gpg --batch --with-colons --list-secret-keys |
+            awk -F: '/^fpr:/ { print $10; exit }')
+          if [ -z "$fingerprint" ]; then
+            echo "::error::no signing key after import"
+            exit 1
+          fi
+          echo "ZACOS9_REPO_KEY=$fingerprint" >> "$GITHUB_ENV"
+
+      - name: Build the repository
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          ZACOS9_REPO_GPG_PASSPHRASE: ${{ secrets.ZACOS9_REPO_GPG_PASSPHRASE }}
+        run: |
+          mkdir -p repo-out repo-packages
+          remote="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          if git ls-remote --exit-code --heads "$remote" repo >/dev/null 2>&1; then
+            git clone --depth 1 --branch repo "$remote" repo-old
+            find repo-old -maxdepth 1 -type f \
+              \( -name '*.deb' -o -name '*.source.tar.gz' \) \
+              -exec cp -t repo-out {} +
+          fi
+          find packages -type f \
+            \( -name '*.deb' -o -name '*.source.tar.gz' \) \
+            -exec cp -t repo-packages {} +
+          scripts/build-repo.sh --packages repo-packages --output repo-out
+
+      - name: Publish the repository branch
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          remote="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          repo_dir=$(mktemp -d)
+          if git ls-remote --exit-code --heads "$remote" repo >/dev/null 2>&1; then
+            git clone --depth 1 --branch repo "$remote" "$repo_dir"
+          else
+            git -C "$repo_dir" init -q
+            git -C "$repo_dir" checkout -q --orphan repo
+          fi
+          git -C "$repo_dir" config user.name "github-actions[bot]"
+          git -C "$repo_dir" config user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
+          find "$repo_dir" -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -a repo-out/. "$repo_dir"/
+          git -C "$repo_dir" add -A
+          if git -C "$repo_dir" diff --cached --quiet; then
+            echo "The repository branch is already current."
+          else
+            git -C "$repo_dir" commit -q -m "Repository: ${GITHUB_REF_NAME}"
+            git -C "$repo_dir" push -q "$remote" HEAD:repo
+          fi
+          owner=${GITHUB_REPOSITORY%/*}
+          name=${GITHUB_REPOSITORY#*/}
+          {
+            echo "## ZacOS 9 package repository"
+            echo
+            echo "Branch: https://github.com/${GITHUB_REPOSITORY}/tree/repo"
+            echo "Pages:  https://${owner}.github.io/${name}/"
+            echo "Key:    ${ZACOS9_REPO_KEY}"
+          } >> "$GITHUB_STEP_SUMMARY"

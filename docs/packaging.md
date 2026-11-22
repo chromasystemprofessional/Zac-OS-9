@@ -107,7 +107,8 @@ checking that the mock player's log existed could read it before `printf`
 wrote its contents. The fixture now waits for the expected playback arguments
 and uses a private runtime directory. Seven focused prerequisite/sound/GTK/boot
 tests pass locally under Xvfb. The hosted `package` result, not local success,
-is the gate to require before merging or releasing.
+is the gate to require before merging or releasing. The signed package
+repository that TTOS consumes is described in [repo.md](repo.md).
 
 ### Installed-system acceptance (2026-10-18)
 

@@ -45,6 +45,12 @@ test('installed-files', find_program('python3'),
   args: [files('tests/baseline/test_installed_files.py'), meson.project_build_root(),
     files('tests/baseline/installed-files.txt')])
 
+# The signed package repository: layout, signatures, APT update and download,
+# and keeping the previous release's package.
+test('repo', find_program('python3'),
+  args: [files('tests/repo/test_repo.py'), files('scripts/build-repo.sh')],
+  timeout: 180)
+
 # Static units (no [Install]) are on demand, not started by the package
 # scripts, and the login window's compositor has seatd for its seat.
 test('packaging', find_program('python3'),
