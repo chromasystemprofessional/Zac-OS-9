@@ -1408,6 +1408,12 @@ static void destroy_bar(struct bar *b) {
 }
 
 static bool every_display_setting(void) {
+	/* A Front Desk panel on every screen needs a menu bar on every screen
+	 * too, whatever the Monitors panel's own setting says. */
+	const char *each = getenv("ZACOS9_FRONTDESK_EACH_SCREEN");
+	if (each && strcmp(each, "1") == 0) {
+		return true;
+	}
 	char v[8];
 	return pl_setting("menubar-every-display", v, sizeof(v)) && strcmp(v, "1") == 0;
 }

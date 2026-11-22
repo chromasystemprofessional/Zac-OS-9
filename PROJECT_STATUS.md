@@ -107,7 +107,8 @@ accounts as the people and the existing **Use only chosen programs** list as
 its panel. The tabbed panel, Front Desk Setup (a control panel, so it opens
 without Front Desk running), the Front Desk-skinned login window and the
 per-account `desktop` modes in the accounts helper are in place. Each
-account can keep the minimal Zac menu or have all of it (`zac-menu`). Front
+account can keep the minimal Zac menu or have all of it (`zac-menu`), and
+each screen can have its own panel and front program (`screens=each`). Front
 Desk sessions keep The Collar, and the panel's tabs, icons and pages click
 with ZacOS's original sounds. The save-location enforcement through the file
 chooser portal is still to come

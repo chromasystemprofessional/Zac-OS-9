@@ -110,13 +110,17 @@ fi
 # Front Desk (Users ▸ Front Desk Setup): this account's session shell. The
 # accounts helper keeps the settings in /etc/zacos9/frontdesk/USER; its
 # presence is the choice, and the user can't turn it off from the session.
-unset ZACOS9_SHELL ZACOS9_MENUBAR_MODE ZACOS9_FRONTDESK_ZAC_MENU
+unset ZACOS9_SHELL ZACOS9_MENUBAR_MODE ZACOS9_FRONTDESK_ZAC_MENU \
+	ZACOS9_FRONTDESK_EACH_SCREEN
 frontdesk_file="${ZACOS9_ACCOUNTS_CONF:-/etc/zacos9}/frontdesk/$(id -un)"
 if [ -f "$frontdesk_file" ]; then
 	export ZACOS9_SHELL=frontdesk
 	export ZACOS9_MENUBAR_MODE=frontdesk
 	if grep -qx 'zac-menu=on' "$frontdesk_file" 2>/dev/null; then
 		export ZACOS9_FRONTDESK_ZAC_MENU=on
+	fi
+	if grep -qx 'screens=each' "$frontdesk_file" 2>/dev/null; then
+		export ZACOS9_FRONTDESK_EACH_SCREEN=1
 	fi
 fi
 

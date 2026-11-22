@@ -51,11 +51,14 @@ finder=on|off
 speech=on|off
 capture=on|off
 zac-menu=on|off
+screens=one|each
 ```
 
 `menus` is the Front Desk panel's own menus. `zac-menu=on` gives the
 menu bar's Zac menu every item (Control Panels, Software, Old Dog and the
 rest); it is off by default because it is a way out of the panel.
+`screens=each` gives every display its own panel and its own front program;
+there is still one pointer and keyboard, and focus follows the screen in use.
 
 `frontdesk-settings USER KEY=VALUE…` changes them. Only an administrator may
 write, through polkit; the user cannot change their own shell.
@@ -70,6 +73,10 @@ compositor. Its presence sets `ZACOS9_SHELL=frontdesk` and
   Sniffer; the Collar's hot key works as in an ordinary session;
 - the Front Desk window is the session shell window: no title bar
   (`DECOR_STYLE_NONE`), maximized to the usable area under the menu bar;
+- with `screens=each`, every display gets its own panel and its own front
+  program; Command-Tab, the Application menu and new programs act on the
+  screen in use, and a window dragged to another screen moves into that
+  screen's workspace;
 - user autostart entries are skipped, so only the panel's programs start;
 - the menu bar's Zac menu keeps About This Computer; Control Panels, Software,
   Old Dog and the Sniffer are not an escape there unless the account has
@@ -123,7 +130,11 @@ file chooser portal is a later hook.
   checks that the panel stays in the Application menu while a program runs,
   that choosing it hides the program, and that closing the last program
   returns to the panel.
+- `tests/compositor/test_frontdesk_screens.py` gives the session two screens
+  and checks one panel and one front program per screen, Command-Tab on the
+  focused screen, per-screen closing, and dragging a window to the other
+  screen.
 - `ZAC-OS-EXTRAS/frontdesk/tests/` builds and checks the panel and setup
-  offscreen, the panel's program list (ZacOS's user programs in, control
-  panels out), its sounds (with a stand-in player), and that Front Desk
+  offscreen, the panel's program list (the Applications folder's programs,
+  helpers out), its sounds (with a stand-in player), and that Front Desk
   Setup is a control panel.

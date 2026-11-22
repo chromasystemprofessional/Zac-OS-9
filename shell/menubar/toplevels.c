@@ -34,10 +34,16 @@ static void handle_app_id(void *data, struct zwlr_foreign_toplevel_handle_v1 *h,
 
 static void handle_output_enter(void *data, struct zwlr_foreign_toplevel_handle_v1 *h,
 		struct wl_output *output) {
+	struct toplevel *t = data;
+	t->output = output;
 }
 
 static void handle_output_leave(void *data, struct zwlr_foreign_toplevel_handle_v1 *h,
 		struct wl_output *output) {
+	struct toplevel *t = data;
+	if (t->output == output) {
+		t->output = NULL;
+	}
 }
 
 static void handle_state(void *data, struct zwlr_foreign_toplevel_handle_v1 *h,
@@ -206,7 +212,7 @@ static const char *app_of(const struct toplevel *t) {
 	return t->app_id ? t->app_id : "";
 }
 
-int apps_collect(struct app *apps, int max) {
+static int apps_collect_filter(struct app *apps, int max, struct wl_output *only) {
 	/* Visit windows from most to least recently active. */
 	int n_top = wl_list_length(&toplevels);
 	struct toplevel **sorted = calloc(n_top > 0 ? n_top : 1, sizeof(*sorted));
@@ -225,6 +231,9 @@ int apps_collect(struct app *apps, int max) {
 
 	int n = 0;
 	for (int i = 0; i < k; i++) {
+		if (only && sorted[i]->output != only) {
+			continue;
+		}
 		const char *id = app_of(sorted[i]);
 		int found = -1;
 		for (int a = 0; a < n; a++) {
@@ -248,6 +257,14 @@ int apps_collect(struct app *apps, int max) {
 	}
 	free(sorted);
 	return n;
+}
+
+int apps_collect(struct app *apps, int max) {
+	return apps_collect_filter(apps, max, NULL);
+}
+
+int apps_collect_on_output(struct app *apps, int max, struct wl_output *output) {
+	return apps_collect_filter(apps, max, output);
 }
 
 /* Mac OS brings all of an app's windows forward together: activate them
@@ -353,6 +370,24 @@ const char *app_switch_option_previous(struct app *apps, int n, const char *targ
 
 const char *app_switch_target(int step) {
 	static struct app apps[MAX_ITEMS];
-	const int n = apps_collect(apps, MAX_ITEMS - 1);
+	int n = 0;
+	/* One panel per screen: Command-Tab switches the screen it is on. */
+	const char *each = getenv("ZACOS9_FRONTDESK_EACH_SCREEN");
+	if (each && strcmp(each, "1") == 0) {
+		struct wl_output *output = NULL;
+		struct toplevel *t;
+		wl_list_for_each(t, &toplevels, link) {
+			if (t->activated && t->output) {
+				output = t->output;
+				break;
+			}
+		}
+		if (output) {
+			n = apps_collect_on_output(apps, MAX_ITEMS - 1, output);
+		}
+	}
+	if (n == 0) {
+		n = apps_collect(apps, MAX_ITEMS - 1);
+	}
 	return app_switch_pick(apps, n, step);
 }
