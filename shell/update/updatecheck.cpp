@@ -9,6 +9,8 @@
 #include <QRegularExpression>
 #include <QStandardPaths>
 
+#include <cstring>
+
 static const char DEFAULT_REPO[] = "chromasystemprofessional/Zac-OS-9";
 
 QString updateRepo() {
@@ -40,24 +42,37 @@ Release parseRelease(const QByteArray &json, const QString &arch) {
 	}
 	r.notes = o.value("body").toString();
 	const QString suffix = "_" + arch + ".deb";
-	for (const QJsonValue &v : o.value("assets").toArray()) {
-		const QJsonObject a = v.toObject();
-		const QString name = a.value("name").toString();
-		if (!name.startsWith("zacos9_") || !name.endsWith(suffix)) {
-			continue;
+	/* The metapackage first, then the packages it needs. A release before
+	 * the 1.18.28 split has only the first. */
+	static const char *const prefixes[] = { "zacos9_", "zacos9-session_", "zacos9-greeter_" };
+	bool have_main = false;
+	for (const char *prefix : prefixes) {
+		for (const QJsonValue &v : o.value("assets").toArray()) {
+			const QJsonObject a = v.toObject();
+			const QString name = a.value("name").toString();
+			if (!name.startsWith(prefix) || !name.endsWith(suffix)) {
+				continue;
+			}
+			const QString url = a.value("browser_download_url").toString();
+			if (!url.startsWith("https://")) {
+				continue;
+			}
+			ReleasePackage package;
+			package.name = name;
+			package.url = url;
+			const QString digest = a.value("digest").toString();
+			if (digest.startsWith("sha256:")) {
+				package.sha256 = digest.mid(7).toLower();
+			}
+			r.packages.push_back(package);
+			if (strcmp(prefix, "zacos9_") == 0) {
+				have_main = true;
+			}
+			break;
 		}
-		const QString url = a.value("browser_download_url").toString();
-		if (!url.startsWith("https://")) {
-			continue;
-		}
-		r.debName = name;
-		r.debUrl = url;
-		const QString digest = a.value("digest").toString();
-		if (digest.startsWith("sha256:")) {
-			r.sha256 = digest.mid(7).toLower();
-		}
+	}
+	if (have_main) {
 		r.valid = true;
-		break;
 	}
 	return r;
 }

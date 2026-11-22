@@ -18,13 +18,20 @@ QString updateRepo();
  * overrides the whole URL (tests serve a file). */
 QString updateReleaseUrl();
 
+struct ReleasePackage {
+	QString name;   /* zacos9_0.2.0_amd64.deb */
+	QString url;
+	QString sha256; /* the asset's digest from GitHub, hex; empty if none given */
+};
+
 struct Release {
 	QString version;   /* the tag without a leading "v": "0.1.0" */
 	QString name;      /* the release's title, or the tag */
 	QString notes;     /* its description (Markdown, as written) */
-	QString debUrl;    /* the zacos9 .deb for this machine's architecture */
-	QString debName;
-	QString sha256;    /* the asset's digest from GitHub, hex; empty if none given */
+	/* The release's packages for this machine's architecture: zacos9
+	 * first, then zacos9-session and zacos9-greeter when the release has
+	 * them (1.18.28 and later; older releases have only zacos9). */
+	std::vector<ReleasePackage> packages;
 	bool valid = false;
 };
 

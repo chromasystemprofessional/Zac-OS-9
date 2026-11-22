@@ -18,8 +18,10 @@ an installed ZacOS 9 current. It covers three things in one window:
 1. **Check.**
    - It asks GitHub's API for the latest release
      (`/repos/OWNER/REPO/releases/latest`). It reads the tag (`v0.2.0` means
-     version `0.2.0`) and takes the `.deb` for this machine's architecture.
-     The installed `zacos9` is compared with it using `dpkg --compare-versions`.
+     version `0.2.0`) and takes the packages for this machine's
+     architecture: `zacos9`, and `zacos9-session` and `zacos9-greeter` when
+     the release has them. The installed `zacos9` is compared with it using
+     `dpkg --compare-versions`.
    - A repository with no releases yet (GitHub answers 404) counts as up to
      date.
    - It asks the extras repository for its releases once, and compares each
@@ -32,10 +34,15 @@ an installed ZacOS 9 current. It covers three things in one window:
    version, the extras and their versions, and the Debian package count, or
    says the software is up to date.
 3. **Update.**
-   - It downloads the `.deb` into `~/.cache/zacos9/updates` and checks it:
+   - It downloads the release's packages into `~/.cache/zacos9/updates` and
+     checks each:
      - the SHA-256 against the asset's `digest`, when GitHub gives one;
-     - that its `Package` is `zacos9` and its `Version` is the release's.
-   - It installs the `.deb` with the helper's `install-deb`. Each updated
+     - that the `zacos9` package's `Package` is `zacos9` and its `Version`
+       is the release's.
+   - It installs them together with the helper's `install-deb`, so the
+     `zacos9` metapackage and the `zacos9-session` and `zacos9-greeter`
+     packages it needs arrive in one apt transaction. This does not wait
+     for the signed repository to catch up with a new release. Each updated
      extra's `.deb` is downloaded the same way (checksum and package/version
      checked) and installed with `install-deb`; the extra's program is then
      stopped and started again so it uses the new version.
@@ -130,10 +137,11 @@ It does the following:
 2. Commits it and tags `v0.2.0`.
 3. Builds the package with `scripts/build-debs.sh`.
 4. Pushes the commit and the tag.
-5. Runs `gh release create` with the `.deb` attached.
+5. Runs `gh release create` with the release's packages attached.
 
 Every installed system then sees the release the next time Software Update
-checks.
+checks. Software Update downloads the release's packages itself, so it can
+install a new release before the signed repository has republished it.
 
 The version must be newer than the last changelog entry. Use `~` for
 pre-releases (`0.2.0~rc1` sorts before `0.2.0`).

@@ -530,6 +530,8 @@ void UpdateWindow::install() {
 	m_state = State::Working;
 	m_progress = 0;
 	m_zacosUpdated = false;
+	m_debPaths.clear();
+	m_debIndex = 0;
 	setText("Installing updates…", QString());
 	setButtons(QString(), QString());
 	/* Each part gets an equal share of the bar: the new ZacOS 9, the
@@ -558,25 +560,37 @@ void UpdateWindow::install() {
 	}
 }
 
+/* A release is a set: on 1.18.28 and later the zacos9 metapackage needs
+ * zacos9-session and zacos9-greeter of the same version. Download every
+ * package before asking apt to install them together, so the update does
+ * not depend on the signed repository having caught up yet. */
 void UpdateWindow::downloadDeb() {
+	if (m_debIndex >= static_cast<int>(m_release.packages.size())) {
+		installDeb();
+		return;
+	}
+	const ReleasePackage package = m_release.packages[m_debIndex];
 	const double share = m_zacosSpan;
+	const double per = share * 0.4 / m_release.packages.size();
+	const double from = m_zacosFrom + per * m_debIndex;
 	const QString dir =
 		QStandardPaths::writableLocation(QStandardPaths::GenericCacheLocation) + "/zacos9/updates";
 	QDir().mkpath(dir);
-	m_debPath = dir + "/" + QFileInfo(m_release.debName).fileName();
-	m_doing = "Downloading ZacOS 9 " + m_release.version;
-	QNetworkRequest req{ QUrl(m_release.debUrl) };
+	m_debPath = dir + "/" + QFileInfo(QUrl(package.url).path()).fileName();
+	m_doing = QString("Downloading ZacOS 9 %1 (%2 of %3)")
+		.arg(m_release.version).arg(m_debIndex + 1).arg(m_release.packages.size());
+	QNetworkRequest req{ QUrl(package.url) };
 	req.setRawHeader("User-Agent", "zacos9-update");
 	req.setTransferTimeout(60000);
 	m_reply = m_net.get(req);
 	QNetworkReply *reply = m_reply;
-	connect(reply, &QNetworkReply::downloadProgress, this, [this, share](qint64 got, qint64 total) {
+	connect(reply, &QNetworkReply::downloadProgress, this, [this, from, per](qint64 got, qint64 total) {
 		if (total > 0) {
-			m_progress = m_zacosFrom + share * 0.4 * got / total;
+			m_progress = from + per * got / total;
 			update();
 		}
 	});
-	connect(reply, &QNetworkReply::finished, this, [this, reply] {
+	connect(reply, &QNetworkReply::finished, this, [this, reply, package] {
 		reply->deleteLater();
 		if (m_reply != reply) {
 			return;
@@ -587,8 +601,8 @@ void UpdateWindow::downloadDeb() {
 			return;
 		}
 		const QByteArray data = reply->readAll();
-		if (!m_release.sha256.isEmpty() &&
-				QCryptographicHash::hash(data, QCryptographicHash::Sha256).toHex() != m_release.sha256.toLatin1()) {
+		if (!package.sha256.isEmpty() &&
+				QCryptographicHash::hash(data, QCryptographicHash::Sha256).toHex() != package.sha256.toLatin1()) {
 			failed("The downloaded ZacOS 9 package is damaged (its checksum doesn’t match). Nothing was installed.");
 			return;
 		}
@@ -598,14 +612,22 @@ void UpdateWindow::downloadDeb() {
 			return;
 		}
 		f.close();
-		installDeb();
+		m_debPaths << m_debPath;
+		m_debIndex++;
+		downloadDeb();
 	});
 }
 
 void UpdateWindow::installDeb() {
-	/* It must really be the release we offered, not some other package. */
+	if (m_debPaths.isEmpty()) {
+		failed("The ZacOS 9 packages couldn’t be downloaded. Nothing was installed.");
+		return;
+	}
+	/* It must really be the release we offered, not some other package.
+	 * The metapackage is first; apt checks the others' names and versions
+	 * in the same transaction. */
 	auto fields = std::make_shared<QStringList>();
-	run("dpkg-deb", { "-f", m_debPath, "Package", "Version" }, [this, fields](int code) {
+	run("dpkg-deb", { "-f", m_debPaths.first(), "Package", "Version" }, [this, fields](int code) {
 		QString pkg, version;
 		for (const QString &l : *fields) {
 			if (l.startsWith("Package:")) {
@@ -620,13 +642,18 @@ void UpdateWindow::installDeb() {
 		}
 		m_doing = "Installing ZacOS 9 " + m_release.version;
 		update();
-		run(QString(), { "install-deb", m_debPath }, [this](int code) {
+		QStringList args{ "install-deb" };
+		args << m_debPaths;
+		run(QString(), args, [this](int code) {
 			if (code != 0) {
 				failed("ZacOS 9 " + m_release.version + " couldn’t be installed" +
 					(m_procErr.isEmpty() ? QString(".") : ": " + m_procErr));
 				return;
 			}
-			QFile::remove(m_debPath);
+			for (const QString &path : m_debPaths) {
+				QFile::remove(path);
+			}
+			m_debPaths.clear();
 			m_zacosUpdated = true;
 			afterZacos();
 		}, aptProgress(m_zacosFrom + m_zacosSpan * 0.4, m_zacosFrom + m_zacosSpan));
