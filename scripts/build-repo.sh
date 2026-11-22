@@ -11,7 +11,8 @@
 #
 # The signing key must be in GNUPGHOME. Leave ZACOS9_REPO_GPG_PASSPHRASE
 # unset to let gpg prompt (a local run); set it, even empty, for a
-# non-interactive run such as CI.
+# non-interactive run such as CI. Debug-symbol packages are left out unless
+# ZACOS9_REPO_DEBUG=1.
 #
 #   --packages DIR   where the .deb files are (default: build/packages)
 #   --output DIR     where the repository is written (default: build/repo)
@@ -73,9 +74,17 @@ gpg --batch --list-secret-keys "$key" >/dev/null 2>&1 ||
 	die "the output is a git checkout; use a clean directory and copy the result in."
 
 mkdir -p "$output"
+if [ "${ZACOS9_REPO_DEBUG:-}" != 1 ]; then
+	find "$output" -maxdepth 1 -type f -name '*-dbgsym_*.deb' -delete
+fi
 found=false
 for deb in "$packages"/*.deb; do
 	[ -e "$deb" ] || continue
+	case ${deb##*/} in
+	*-dbgsym_*.deb)
+		[ "${ZACOS9_REPO_DEBUG:-}" = 1 ] || continue
+		;;
+	esac
 	cp -f "$deb" "$output/"
 	found=true
 done

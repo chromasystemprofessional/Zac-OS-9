@@ -38,19 +38,19 @@ def sha256(path):
     return digest.hexdigest()
 
 
-def make_deb(directory, version):
-    tree = directory / f"tree-{version}"
+def make_deb(directory, version, name="zacos9-dummy", section="misc"):
+    tree = directory / f"tree-{name}-{version}"
     (tree / "DEBIAN").mkdir(parents=True)
     (tree / "DEBIAN" / "control").write_text(
-        "Package: zacos9-dummy\n"
+        f"Package: {name}\n"
         f"Version: {version}\n"
         "Architecture: all\n"
         "Maintainer: ZacOS Test <test@example.com>\n"
-        "Section: misc\n"
+        f"Section: {section}\n"
         "Priority: optional\n"
         "Description: dummy package for the repository test\n"
         " A package with no dependencies, used only to exercise the repository.\n")
-    package = directory / f"zacos9-dummy_{version}_all.deb"
+    package = directory / f"{name}_{version}_all.deb"
     run(["dpkg-deb", "--root-owner-group", "--build", str(tree), str(package)])
     return package
 
@@ -114,6 +114,7 @@ def main():
         env = os.environ.copy()
         env["GNUPGHOME"] = str(gnupg)
         env["ZACOS9_REPO_GPG_PASSPHRASE"] = ""
+        env.pop("ZACOS9_REPO_DEBUG", None)
         run(["gpg", "--batch", "--pinentry-mode", "loopback", "--passphrase", "",
              "--quick-generate-key", "ZacOS Repo Test <test@example.com>",
              "default", "default", "never"], env=env)
@@ -125,10 +126,16 @@ def main():
         packages = temp / "packages"
         packages.mkdir()
         first = make_deb(temp, "1.0")
+        dbgsym = make_deb(temp, "1.0", name="zacos9-dummy-dbgsym", section="debug")
         shutil.copy(first, packages)
+        shutil.copy(dbgsym, packages)
         repo = temp / "repo"
         build_repo(repo, packages, fingerprint, env)
         verify(repo, [first], env)
+        index = (repo / "Packages").read_text()
+        assert "Package: zacos9-dummy-dbgsym" not in index, \
+            "debug symbols are in the repository"
+        assert not (repo / dbgsym.name).exists(), "debug .deb was copied"
         apt_test(repo, env)
 
         second = make_deb(temp, "2.0")
@@ -139,8 +146,14 @@ def main():
         assert "Version: 1.0" in index and "Version: 2.0" in index, \
             "the second build dropped the first package"
 
+        env["ZACOS9_REPO_DEBUG"] = "1"
+        build_repo(repo, packages, fingerprint, env)
+        verify(repo, [first, second, dbgsym], env)
+        assert (repo / dbgsym.name).is_file(), \
+            "ZACOS9_REPO_DEBUG did not include the debug package"
+
         print("ok: signed repository, apt update and download, "
-              "old package kept")
+              "old package kept, debug symbols excluded by default")
     finally:
         shutil.rmtree(temp)
 
