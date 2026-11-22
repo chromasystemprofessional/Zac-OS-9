@@ -106,9 +106,10 @@ session, compositor, menu-bar and greeter hooks). It uses the real Unix
 accounts as the people and the existing **Use only chosen programs** list as
 its panel. The tabbed panel, Front Desk Setup (a control panel, so it opens
 without Front Desk running), the Front Desk-skinned login window and the
-per-account `desktop` modes in the accounts helper are in place. Front Desk
-sessions keep The Collar, and the panel's tabs, icons and pages click with
-ZacOS's original sounds. The save-location enforcement through the file
+per-account `desktop` modes in the accounts helper are in place. Each
+account can keep the minimal Zac menu or have all of it (`zac-menu`). Front
+Desk sessions keep The Collar, and the panel's tabs, icons and pages click
+with ZacOS's original sounds. The save-location enforcement through the file
 chooser portal is still to come
 ([Front Desk](docs/frontdesk.md)).
 

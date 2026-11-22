@@ -20,7 +20,7 @@ user database or account creation.
 | Control panel | `ZAC-OS-EXTRAS/frontdesk/data/zacos9-frontdesk-setup.desktop` | **Front Desk Setup** in Control Panels and the Zac menu |
 | Account settings | `system/accounts/zacos9-accounts-helper` | `desktop USER frontdesk|puppy|finder`, `frontdesk`, `frontdesk-settings`; `/etc/zacos9/frontdesk/USER` |
 | Session shell | `session/zacos9-session`, `compositor/src/main.c` | `ZACOS9_SHELL=frontdesk`; starts Front Desk instead of the Sniffer, with The Collar |
-| Menu bar | `shell/menubar/launch.c` | `ZACOS9_MENUBAR_MODE=frontdesk`: the Zac menu keeps only About This Computer |
+| Menu bar | `shell/menubar/launch.c` | `ZACOS9_MENUBAR_MODE=frontdesk`: the Zac menu keeps only About This Computer, unless `zac-menu=on` |
 | Login window | `shell/greeter/main.cpp` | “Welcome to Front Desk!”, Happy Zac, Start |
 | Catalog | `assets/store/catalog.json` | **Software ▸ Extras ▸ Front Desk** |
 
@@ -50,7 +50,12 @@ save-removable=on|off
 finder=on|off
 speech=on|off
 capture=on|off
+zac-menu=on|off
 ```
+
+`menus` is the Front Desk panel's own menus. `zac-menu=on` gives the
+menu bar's Zac menu every item (Control Panels, Software, Old Dog and the
+rest); it is off by default because it is a way out of the panel.
 
 `frontdesk-settings USER KEY=VALUE…` changes them. Only an administrator may
 write, through polkit; the user cannot change their own shell.
@@ -67,8 +72,9 @@ compositor. Its presence sets `ZACOS9_SHELL=frontdesk` and
   (`DECOR_STYLE_NONE`), maximized to the usable area under the menu bar;
 - user autostart entries are skipped, so only the panel's programs start;
 - the menu bar's Zac menu keeps About This Computer; Control Panels, Software,
-  Old Dog and the Sniffer are not an escape there. The Collar remains as its
-  own control strip, and the programs its menus open follow the same
+  Old Dog and the Sniffer are not an escape there unless the account has
+  `zac-menu=on`, which gives the Zac menu all its items. The Collar remains
+  as its own control strip, and the programs its menus open follow the same
   one-at-a-time rule;
 - Quit logs out, and Restart/Shut Down use the normal `systemctl` paths.
 
@@ -101,8 +107,10 @@ utilities and the system's helpers out.
 This is a simplified desktop, not a sandbox. The real account, its home folder
 and the OS permissions still decide what can run and what can be read. Front
 Desk hides the usual ways out but does not claim to stop a program started
-another way. `save=user` and `capture` are stored and used by the panel; the
-save-location enforcement through the file chooser portal is a later hook.
+another way; `zac-menu=on` deliberately gives the Zac menu its usual ways out
+for an account an administrator trusts with them. `save=user` and `capture`
+are stored and used by the panel; the save-location enforcement through the
+file chooser portal is a later hook.
 
 ## Tests
 

@@ -69,7 +69,7 @@ valid_user() {
 }
 
 frontdesk_defaults() {
-	printf 'menus=restricted\nsave=user\nsave-removable=off\nfinder=off\nspeech=off\ncapture=off\n'
+	printf 'menus=restricted\nsave=user\nsave-removable=off\nfinder=off\nspeech=off\ncapture=off\nzac-menu=off\n'
 }
 
 # Replace the validated KEY=VALUE arguments in an account's Front Desk file.
@@ -87,7 +87,8 @@ frontdesk_apply() {
 		case $arg in
 		menus=minimal | menus=restricted | menus=all | save=anywhere | save=user | \
 			save-removable=on | save-removable=off | finder=on | finder=off | \
-			speech=on | speech=off | capture=on | capture=off) ;;
+			speech=on | speech=off | capture=on | capture=off | \
+			zac-menu=on | zac-menu=off) ;;
 		*)
 			rm -f "$tmp"
 			die "No such Front Desk setting: \"$arg\"."
