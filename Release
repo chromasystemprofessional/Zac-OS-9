@@ -1,20 +1,20 @@
 Architectures: amd64
 Codename: trixie
 Components: main
-Date: Sun, 22 Nov 2026 06:16:46 +0000
+Date: Sun, 22 Nov 2026 21:08:34 +0000
 Description: ZacOS 9 package repository
 Label: ZacOS 9
 Origin: ZacOS
 Suite: stable
 MD5Sum:
- 62bfd1d43dfcc1a1b5d4d0897bafb021             3084 Packages
- b7621ee60dc46b7be6aa68eba0808ba5             1610 Packages.gz
+ 02e576c4bb94e53495dff1f6637cbd92             8857 Packages
+ 82c3ca558f3bc07d82f06a589944e3ed             2723 Packages.gz
 SHA1:
- f99a58ecdb1a21ba4b476815b11783a8f3d62ae6             3084 Packages
- e0c8945cdb0e2d85deab385794be9af5459a267b             1610 Packages.gz
+ 0adbf26aa33477f784f41cb9de6929c7412ee5cd             8857 Packages
+ cf1318b2dcf21d9600ddbc91ebb42415fd0e46d3             2723 Packages.gz
 SHA256:
- 8d7d4ea22165ee65c61da197fdee756cd932a5c4f2bbf5a1ed92dae975e43016             3084 Packages
- 131dca5369d4b6d6e8620a13392be050c48f03167efd68fd5496d2bbdfed750f             1610 Packages.gz
+ 4505136d1cf0edd6818b06d24b54fe10469cff41ca9aa7b1d603abcdf9b0a373             8857 Packages
+ 54a664867c5b17d54fb191983846400f20038967a8319fd1b137ab2f7b9c04eb             2723 Packages.gz
 SHA512:
- 4a0f961be3742e87a0a2a931ec26a5e841f42cc3d82c8e857ec40e536a261aa934ae6ac469089795659e0167b2396903814bd8a488b42e2a3b267a0ddee0e7b2             3084 Packages
- 77ee43004e7f74c74bdea8a7ecbd1903eb3ac9c8426b998740ad76fc28aef5cdc53275662b82393599eeeca9ea5cb9f7db6da5152815402fa2c27b662c0c4fd6             1610 Packages.gz
+ 19f05d3ef5bf72ad04fabb8f26e6e88f4cb30ca947e8171cbc0a3c7c570ac73f8f462c25e6b6fbe27b58a0cab00e2c7af407a1f6e361e9e1f98b09b2ce47e56a             8857 Packages
+ bd4cd0eda4493e4d9709cafc393fd11203a3f64cb23f491e16f63bfc2786159068021320b20c03d4a4e4349526d08b43ac06e3632da0a21482742d5c7b1a0028             2723 Packages.gz
