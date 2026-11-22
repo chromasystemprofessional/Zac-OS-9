@@ -1,0 +1,39 @@
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA512
+
+Architectures: amd64
+Codename: trixie
+Components: main
+Date: Sun, 22 Nov 2026 06:16:46 +0000
+Description: ZacOS 9 package repository
+Label: ZacOS 9
+Origin: ZacOS
+Suite: stable
+MD5Sum:
+ 62bfd1d43dfcc1a1b5d4d0897bafb021             3084 Packages
+ b7621ee60dc46b7be6aa68eba0808ba5             1610 Packages.gz
+SHA1:
+ f99a58ecdb1a21ba4b476815b11783a8f3d62ae6             3084 Packages
+ e0c8945cdb0e2d85deab385794be9af5459a267b             1610 Packages.gz
+SHA256:
+ 8d7d4ea22165ee65c61da197fdee756cd932a5c4f2bbf5a1ed92dae975e43016             3084 Packages
+ 131dca5369d4b6d6e8620a13392be050c48f03167efd68fd5496d2bbdfed750f             1610 Packages.gz
+SHA512:
+ 4a0f961be3742e87a0a2a931ec26a5e841f42cc3d82c8e857ec40e536a261aa934ae6ac469089795659e0167b2396903814bd8a488b42e2a3b267a0ddee0e7b2             3084 Packages
+ 77ee43004e7f74c74bdea8a7ecbd1903eb3ac9c8426b998740ad76fc28aef5cdc53275662b82393599eeeca9ea5cb9f7db6da5152815402fa2c27b662c0c4fd6             1610 Packages.gz
+-----BEGIN PGP SIGNATURE-----
+
+iQIzBAEBCgAdFiEE0hpCclhRGJse8iccVBMp8o6EabcFAmsCiM4ACgkQVBMp8o6E
+abfKShAAjnozVBkQX20GEr5i/ToY10R1DEFgMkKhjed6mx5d7JLCUZNyqFeH/Pgm
+Snn88Nk9cOxEHF7GcDRWoQhIcC70GVaT2cKuLfIu6Yf0cpHdknddVFNqFuU8dDbF
+wMhVQiRq3nff4+wcGEx/TKdvaVrxblJtYVpeVcLCwDYK1jVBFVYRfPxn9zCSS4vx
+tC+I6yCZGQM7wAMUi+nF7ZMoHLSEvjGW8ihBQm0KQB9c1c/spP7A9Wpq8TcM0QzG
+bvOhuTuwpl7GiUUx28oXu1/zfDGaGfKUCIWl93bj1JeNCNtmYsesUVqMVb95GkaX
++ye0BVhFkKKkLaZdPROOCJe/EBO/Jg+M17VeQc3aDQfPuerEejtklCr/KrzrTJBg
+v7cAU+5h6EcvqsrC/ZNuEwPJNJiYARtkMWPcbxXpsg4tmuxIhp50EksK+otkgwIw
+NkOZ7pdo5W16HzMpr5+kTjMZP/XbN67P4BZ2HwazHx62UoNc4qa2bsBHwMYCK7Oi
+RW8SoO3XivPjOgFrvrWprjAhKfnFXomNl7m+866T12ls0hJu57D1GMVgJy1g3A1N
+IZxYAtWTq5Xv+KTpzCDuJ2/1frC+jHmhwLNcI1xwXruLxygbiGHFGgagJKyJYOI7
+5zq+BENpnT56uTuoxCAwIqPBuYVcydH5pPsEvNitgaQzLlB1ZkA=
+=l7Gx
+-----END PGP SIGNATURE-----

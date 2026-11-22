@@ -1,0 +1,25 @@
+Package: zacos9
+Architecture: amd64
+Version: 1.18.27
+Priority: optional
+Section: x11
+Maintainer: adamjlawson-ctrl <adamjlawson@gmail.com>
+Installed-Size: 56827
+Depends: libappmenu-gtk3-parser0 (>= 0.5.5), libc6 (>= 2.39), libcairo2 (>= 1.2.4), libcrypt1 (>= 1:4.1.0), libfontconfig1 (>= 2.12.6), libfreetype6 (>= 2.2.1), libfribidi0 (>= 0.19.2), libfuse3-4 (>= 3.17.2), libgcc-s1 (>= 4.2), libgcrypt20 (>= 1.11.0), libgdk-pixbuf-2.0-0 (>= 2.31.1), libglib2.0-0t64 (>= 2.66.0), libgstreamer-plugins-base1.0-0 (>= 1.10.0), libgstreamer1.0-0 (>= 1.6.0), libgtk-3-0t64 (>= 3.10.0), libharfbuzz0b (>= 0.9.38), libinput10 (>= 1.2.0), liblayershellqtinterface6 (>= 6.1.0), libpam0g (>= 0.99.7.1), libqt6core6t64 (>= 6.8.2), libqt6dbus6 (>= 6.8.2), libqt6gui6 (>= 6.8.2), libqt6network6 (>= 6.7.2), libqt6widgets6 (>= 6.3.0), libstdc++6 (>= 12), libwayland-client0 (>= 1.20.0), libwayland-cursor0 (>= 1.0.2), libwayland-server0 (>= 1.17.0), libwlroots-0.18 (>= 0.18.0), libxcb1, libxkbcommon0 (>= 0.8.0), zlib1g (>= 1:1.1.4), init-system-helpers (>= 1.52), accountsservice, malcontent, libsecret-tools, rsync, qt6-wayland, qt6-svg-plugins, qt6-image-formats-plugins, librsvg2-common, python3, python3-gi, appstream, gir1.2-appstream-1.0, flatpak, dmg2img, bchunk, libfsapfs-utils, libmodi1, fuse3, acl, gnupg, dosfstools, fdisk, ntfs-3g, os-prober, udev, udisks2, earlyoom, systemd-zram-generator, upower, python3-libarchive-c, unar, python3-pil, imagemagick, procps, fonts-dejavu-core, fonts-dejavu-mono, fonts-urw-base35, fonts-liberation, fonts-linuxlibertine, fonts-comic-neue, fonts-noto-core, fonts-noto-cjk, fcitx5-mozc, locales, fontconfig, avahi-utils, gvfs-backends, grim, slurp, wl-clipboard, bluez, libcap2-bin, lxqt-policykit, pipewire, wireplumber, xdg-desktop-portal, xdg-desktop-portal-wlr, libdbusmenu-glib4, gstreamer1.0-plugins-base, gstreamer1.0-plugins-good, network-manager-config-connectivity-debian, cups-client, cups-ipp-utils, cups-pk-helper
+Recommends: balena-etcher, cups, ipp-usb, system-config-printer, speech-dispatcher, speech-dispatcher-espeak-ng, speech-dispatcher-rhvoice, rhvoice-english, xwayland, netatalk, atalkd, samba, wsdd2, wayvnc, openssl, avahi-daemon, pkexec, pulseaudio-utils, ddcutil, dbus-user-session, xdg-desktop-portal-gtk, foot, seatd, vlc
+Suggests: greetd, kdeconnect
+Filename: ./zacos9_1.18.27_amd64.deb
+Size: 8038004
+MD5sum: c792098e9bb53d93bf5587b9d8ca1b77
+SHA1: 79d3f6931be17be379addeced29bd2718847f2d5
+SHA256: b09a8b6209823bc4e9faee7eb8bae47b3edd1bc8d4dc63fc726b17044cfb9909
+SHA512: 88082438d5681519e98565fdf743f9b80a670c05edd187f50cf3bd4c1d3ca151fd68ba1bbb12f31949ca7303e961e363fcea28077941e3538e60821e0483fbc7
+Description: classic Platinum desktop for Wayland
+ ZacOS 9 is a desktop in the style of a late-1990s Platinum
+ interface: a wlroots compositor that draws Platinum window frames,
+ a menu bar, a spatial Finder and control panels, with original fonts,
+ icons, cursors, desktop patterns and sounds.
+ .
+ It installs a "ZacOS 9" session for login managers, and the
+ zacos9-session command for starting it from a text console.
+
