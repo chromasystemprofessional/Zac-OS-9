@@ -4,36 +4,36 @@ Hash: SHA512
 Architectures: amd64
 Codename: trixie
 Components: main
-Date: Sun, 22 Nov 2026 21:08:34 +0000
+Date: Sun, 22 Nov 2026 23:07:03 +0000
 Description: ZacOS 9 package repository
 Label: ZacOS 9
 Origin: ZacOS
 Suite: stable
 MD5Sum:
- 02e576c4bb94e53495dff1f6637cbd92             8857 Packages
- 82c3ca558f3bc07d82f06a589944e3ed             2723 Packages.gz
+ e3f1c47dd07fa898b86d711e0c251102            14631 Packages
+ a3c7b0ade2e3f40b1c6176f7c718624e             3350 Packages.gz
 SHA1:
- 0adbf26aa33477f784f41cb9de6929c7412ee5cd             8857 Packages
- cf1318b2dcf21d9600ddbc91ebb42415fd0e46d3             2723 Packages.gz
+ 01c99d5d903ecdd52fef9452d05891bcf71863fa            14631 Packages
+ e738dd65b25de2481040e89c1581bac574d5fa74             3350 Packages.gz
 SHA256:
- 4505136d1cf0edd6818b06d24b54fe10469cff41ca9aa7b1d603abcdf9b0a373             8857 Packages
- 54a664867c5b17d54fb191983846400f20038967a8319fd1b137ab2f7b9c04eb             2723 Packages.gz
+ d67ccfd219f9c065263d3219eb0ff62e1fb8804406c832724957997ea76ed41d            14631 Packages
+ 15553b17e17f9a5e7c9c444548ec2b252ba3aca93191f4cc8cb41cf6408d58db             3350 Packages.gz
 SHA512:
- 19f05d3ef5bf72ad04fabb8f26e6e88f4cb30ca947e8171cbc0a3c7c570ac73f8f462c25e6b6fbe27b58a0cab00e2c7af407a1f6e361e9e1f98b09b2ce47e56a             8857 Packages
- bd4cd0eda4493e4d9709cafc393fd11203a3f64cb23f491e16f63bfc2786159068021320b20c03d4a4e4349526d08b43ac06e3632da0a21482742d5c7b1a0028             2723 Packages.gz
+ 314714460eb78e18f3b568bb9bd62dfa07cbbcf21514cea06efbdf9f44e2195eb21ec9a704e4a48344deb8fa9b983266edf591a96c1b1022e5f7e2fadadb93f4            14631 Packages
+ b5e26afb1c82ee04cb2ff2c7bb0f0095570ea428ffe314a34b16fa1b088da567fa17d9a9e9bc40ab6572f1d5b5c647475b71ce5edf4e6222c9f92b4ab1baf29d             3350 Packages.gz
 -----BEGIN PGP SIGNATURE-----
 
-iQIzBAEBCgAdFiEE0hpCclhRGJse8iccVBMp8o6EabcFAmsDWdIACgkQVBMp8o6E
-abdGeBAAgwPtZ3RoopxO4ujtF1Tp0FbnJ39i8G+wLyMm2S7Ni3/RIUBsFo3m4hHr
-XpnSuFsJ/pczG60xwH1SfjSulTx56UXDNiwnSOH4LmdmDyAzBFzqh6vOm8TdXEtT
-qUx2mr6uCFTJiJREwyeNxHO00HrJd8zYrCuDvGBT1BjP++zhvSDlHzpSWUL7uqMM
-moqVfNKzxvaXVNqdIP1AdGekzfNpuSjzHRW7Nd08dwjfO94hqEeQdBH6sDbdxhLa
-QxCcMGqLhUcs5Jyw5IuPArhX2WNLhXqe/NltSuiY3qqyw3XCWl1377A2emziHeiZ
-59mKQBm6QMWkmvGkHqwtmTmHylGcGMCC3V8Zyeuu5XgF5+lPQ/6xE6C86zZermuB
-L57jHC9thMdpa/QbWxbKmKo5etWnNObbotaTps+qddloOJyM2/Mpk8jCuoe8mdiU
-n/NhES4Z4IvsxLz54shqbwXJLkeBEqJM64xS3ikbkTyZXtbSqdD1PyQMuUBIIYkz
-4rjvnb27rb5vigpZkXdo/VNIRAwr/QCzMg+xObcaCoI98+QCwCM75a3+A4BClgd1
-wPAYzE6FI41NndM3HqzCpynT1nQJ4BU1+ubmc1P/Se+962EfvuXTZc/bjDAIR236
-9A9yqQPXfNdgWnOK4A+DgJu42ZKvX4heWJO4nnp4VhCdhd55RGo=
-=psSd
+iQIzBAEBCgAdFiEE0hpCclhRGJse8iccVBMp8o6EabcFAmsDdZcACgkQVBMp8o6E
+abf4EA//T9o3iOUeuvxHjCXn0KWjnvgXPF1Yjgw+ETzhI1BhcDWCIX0oN5RBrILl
+Z6ANcm+m7UVcvmSH8rJM17SFhF36n74hrxrl6rzgS30xsXVt1LyaFiQ2wKfpXTQd
+Ss/5PLaHMzNDj0tsXOEKDaSX1frUzRi7TVj1iacd3OAgpvZ23flUVADzP4NNOBNG
+Jw7JTSqRs/N8ZoCIbZiN1vm8HOOrUA1NymITzb9YgrLKgmmee1HQ+6dFAnjBtZfI
+o/aWWgTaFmxColSAq8yknXdoqAbiifpVE1dwtV21A1Gm1VjzWS3fZEmzN9eOB6dC
+HuVnLTZnR9EwrfcNStTepgMpbju7fA07w4qyC7k5MFnnOZoUxZ0HojoatYplXQTG
++vv2qmtK0QbccsazmL1M0HQSWJ0wIESZ+k8umcxlwp7UwyfnlBvpMNvqyJgQC3WM
+Ni43RB46MBeD8SEZJ6SMFpjSRJX45oU8Tr335EMeFi8snA79cZIvKR+MBG2mbMP3
+Xzx/P7brohBSjIjgU/KK4Jcj/k0JGq3T3yfLyOTOMF+BwlrRTlsFW96zh94oI7D4
+NHdmCRL/WQyO/Pjdo1Kt+RURbiKL/tlTGCNQoehvpnRZqNuOQPQUIbPy2vMoHbWi
+Bj6Kzup4egybLuBIzM8jkMi2f/ern3Tk4eQkF3ozsX7zbYGZkKs=
+=M3Iv
 -----END PGP SIGNATURE-----
