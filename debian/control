@@ -3,7 +3,9 @@ Section: x11
 Priority: optional
 Maintainer: adamjlawson-ctrl <adamjlawson@gmail.com>
 Build-Depends: debhelper-compat (= 13),
+               apt-utils <!nocheck>,
                gnu-efi [amd64],
+               gnupg <!nocheck>,
                meson,
                ninja-build,
                cargo,
