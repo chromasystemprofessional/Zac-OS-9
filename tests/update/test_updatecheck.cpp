@@ -26,7 +26,13 @@ static const char RELEASE[] = R"({
       "browser_download_url": "https://github.com/o/r/releases/download/v0.2.0/zacos9_0.2.0_arm64.deb" },
     { "name": "zacos9_0.2.0_amd64.deb",
       "digest": "sha256:ABCDEF0123",
-      "browser_download_url": "https://github.com/o/r/releases/download/v0.2.0/zacos9_0.2.0_amd64.deb" }
+      "browser_download_url": "https://github.com/o/r/releases/download/v0.2.0/zacos9_0.2.0_amd64.deb" },
+    { "name": "zacos9-session_0.2.0_amd64.deb",
+      "digest": "sha256:1111",
+      "browser_download_url": "https://github.com/o/r/releases/download/v0.2.0/zacos9-session_0.2.0_amd64.deb" },
+    { "name": "zacos9-greeter_0.2.0_amd64.deb",
+      "digest": "sha256:2222",
+      "browser_download_url": "https://github.com/o/r/releases/download/v0.2.0/zacos9-greeter_0.2.0_amd64.deb" }
   ]
 })";
 
@@ -37,9 +43,25 @@ int main(int argc, char *argv[]) {
 	Release r = parseRelease(RELEASE, "amd64");
 	check(r.valid, "a release with an amd64 package is valid");
 	check(r.version == "0.2.0", "the version is the tag without its v");
-	check(r.debName == "zacos9_0.2.0_amd64.deb", "it picks zacos9 for amd64, not dbgsym or arm64");
-	check(r.sha256 == "abcdef0123", "the digest is kept, lower case, without sha256:");
+	check(r.packages.size() == 3, "the release keeps zacos9, session and greeter for amd64");
+	check(r.packages.size() == 3 &&
+		r.packages[0].name == "zacos9_0.2.0_amd64.deb" &&
+		r.packages[1].name == "zacos9-session_0.2.0_amd64.deb" &&
+		r.packages[2].name == "zacos9-greeter_0.2.0_amd64.deb",
+		"the metapackage comes first, then the packages it needs");
+	check(r.packages.size() == 3 && r.packages[0].sha256 == "abcdef0123" &&
+		r.packages[1].sha256 == "1111" && r.packages[2].sha256 == "2222",
+		"each digest is kept, lower case, without sha256:");
 	check(r.name == "ZacOS 9 0.2.0" && r.notes == "Global menus.", "title and notes are kept");
+
+	Release old = parseRelease(R"({"tag_name":"v1.0.0","assets":[
+		{"name":"zacos9_1.0.0_amd64.deb","browser_download_url":"https://example.com/zacos9_1.0.0_amd64.deb"}]})",
+		"amd64");
+	check(old.valid && old.packages.size() == 1,
+		"a release before the split has only the metapackage");
+	check(!parseRelease(R"({"tag_name":"v1.0.0","assets":[
+		{"name":"zacos9-session_1.0.0_amd64.deb","browser_download_url":"https://example.com/zacos9-session_1.0.0_amd64.deb"}]})",
+		"amd64").valid, "a release without the metapackage is refused");
 
 	check(!parseRelease(RELEASE, "i386").valid, "no package for this architecture: not valid");
 	check(!parseRelease("not json", "amd64").valid, "broken JSON: not valid");
