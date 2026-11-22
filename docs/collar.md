@@ -9,6 +9,9 @@ services.
 
 All measurements are logical pixels and scale by nearest-neighbour integer factors.
 
+The Collar belongs to every session, Front Desk included: it floats above
+the shared-computer panel, and its show/hide hot key works there too.
+
 - The strip sits flush in the bottom-left corner of the main display by
   default. It is 24 pixels tall.
 - Open layout, from left to right:

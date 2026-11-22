@@ -288,8 +288,9 @@ static bool handle_keybinding(struct plat_server *server, uint32_t mods,
 		return true;
 	}
 	/* The Collar panel's hot key shows or hides the Collar (if one runs:
-	 * --toggle just asks it over D-Bus). */
-	if (!server->frontdesk && prefs_collar_hotkey(mods, sym)) {
+	 * --toggle just asks it over D-Bus). A Front Desk session keeps the
+	 * Collar too, so its hot key works there the same way. */
+	if (prefs_collar_hotkey(mods, sym)) {
 		spawn_component(NULL, "zacos9-collar", " --toggle");
 		return true;
 	}

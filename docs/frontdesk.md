@@ -15,11 +15,11 @@ user database or account creation.
 
 | Piece | Where | What |
 |---|---|---|
-| The panel | `ZAC-OS-EXTRAS/frontdesk/src/` | `zacos9-frontdesk`: tabs, pages and single-click launch |
+| The panel | `ZAC-OS-EXTRAS/frontdesk/src/` | `zacos9-frontdesk`: tabs, pages, single-click launch and original click sounds |
 | The setup | `ZAC-OS-EXTRAS/frontdesk/src/setup_main.cpp` | `zacos9-frontdesk-setup`: accounts, programs, menus, security |
 | Control panel | `ZAC-OS-EXTRAS/frontdesk/data/zacos9-frontdesk-setup.desktop` | **Front Desk Setup** in Control Panels and the Zac menu |
 | Account settings | `system/accounts/zacos9-accounts-helper` | `desktop USER frontdesk|puppy|finder`, `frontdesk`, `frontdesk-settings`; `/etc/zacos9/frontdesk/USER` |
-| Session shell | `session/zacos9-session`, `compositor/src/main.c` | `ZACOS9_SHELL=frontdesk`; starts Front Desk instead of the Sniffer, no Collar |
+| Session shell | `session/zacos9-session`, `compositor/src/main.c` | `ZACOS9_SHELL=frontdesk`; starts Front Desk instead of the Sniffer, with The Collar |
 | Menu bar | `shell/menubar/launch.c` | `ZACOS9_MENUBAR_MODE=frontdesk`: the Zac menu keeps only About This Computer |
 | Login window | `shell/greeter/main.cpp` | “Welcome to Front Desk!”, Happy Zac, Start |
 | Catalog | `assets/store/catalog.json` | **Software ▸ Extras ▸ Front Desk** |
@@ -61,13 +61,15 @@ write, through polkit; the user cannot change their own shell.
 compositor. Its presence sets `ZACOS9_SHELL=frontdesk` and
 `ZACOS9_MENUBAR_MODE=frontdesk`. In that session:
 
-- `zacos9-wm` starts the menu bar and `zacos9-frontdesk`, not the Sniffer or
-  the Collar; the Collar hot key is ignored;
+- `zacos9-wm` starts the menu bar, The Collar and `zacos9-frontdesk`, not the
+  Sniffer; the Collar's hot key works as in an ordinary session;
 - the Front Desk window is the session shell window: no title bar
   (`DECOR_STYLE_NONE`), maximized to the usable area under the menu bar;
 - user autostart entries are skipped, so only the panel's programs start;
 - the menu bar's Zac menu keeps About This Computer; Control Panels, Software,
-  Old Dog and the Sniffer are not an escape;
+  Old Dog and the Sniffer are not an escape there. The Collar remains as its
+  own control strip, and the programs its menus open follow the same
+  one-at-a-time rule;
 - Quit logs out, and Restart/Shut Down use the normal `systemctl` paths.
 
 The panel stays a program of the session while the programs it starts run:
@@ -76,6 +78,10 @@ others wait hidden but open. The panel is one of them, so the Application
 menu and ⌘-Tab bring it back to start another program; choosing a program
 hides the panel, and closing the last program returns to it. A program that
 detaches without opening a window leaves the panel in front.
+
+The panel's tabs, page arrows and icons click with ZacOS's own original
+sounds, as At Ease did; opening an item plays the opening sound, and a
+refused action the alert chime. **Special ▸ Turn Sound Off** silences them.
 
 ## Programs
 
@@ -102,10 +108,14 @@ save-location enforcement through the file chooser portal is a later hook.
 
 - `tests/accounts/test_helper.sh` covers the Front Desk settings, modes and
   status.
+- `tests/compositor/test_frontdesk_shell.py` starts a Front Desk session and
+  checks that the menu bar, The Collar and the panel start, and the Sniffer
+  doesn't.
 - `tests/compositor/test_frontdesk_switch.py` starts a Front Desk session and
   checks that the panel stays in the Application menu while a program runs,
   that choosing it hides the program, and that closing the last program
   returns to the panel.
 - `ZAC-OS-EXTRAS/frontdesk/tests/` builds and checks the panel and setup
   offscreen, the panel's program list (ZacOS's user programs in, control
-  panels out), and that Front Desk Setup is a control panel.
+  panels out), its sounds (with a stand-in player), and that Front Desk
+  Setup is a control panel.

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""A Front Desk session starts the menu bar and zacos9-frontdesk, not the
-Sniffer or the Collar. The shell commands are stand-ins that leave a stamp,
-so no Wayland client or Qt is needed."""
+"""A Front Desk session starts the menu bar, The Collar and
+zacos9-frontdesk, not the Sniffer. The shell commands are stand-ins that
+leave a stamp, so no Wayland client or Qt is needed."""
 import os
 from pathlib import Path
 import subprocess
@@ -50,8 +50,8 @@ with tempfile.TemporaryDirectory(prefix="zacos9-frontdesk-shell-") as temp:
             assert (root / "menubar.ran").exists(), (root / "wm.log").read_text()
             assert (root / "frontdesk.ran").exists(), (root / "wm.log").read_text()
             assert not (root / "finder.ran").exists(), "the Sniffer started"
-            assert not (root / "collar.ran").exists(), "the Collar started"
+            assert (root / "collar.ran").exists(), "the Collar didn't start"
         finally:
             server.terminate()
             server.wait(timeout=10)
-print("ok: Front Desk replaces the Sniffer and the Collar in its session")
+print("ok: Front Desk replaces the Sniffer and keeps the Collar in its session")

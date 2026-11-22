@@ -98,7 +98,7 @@ struct shell_child {
 static struct shell_child shell_children[] = {
 	{ "ZACOS9_MENUBAR", "zacos9-menubar", 0, 0, true, true },
 	{ "ZACOS9_FINDER", "zacos9-finder", 0, 0, false, true },
-	{ "ZACOS9_COLLAR", "zacos9-collar", 0, 0, false, true },
+	{ "ZACOS9_COLLAR", "zacos9-collar", 0, 0, true, true },
 	{ "ZACOS9_FRONTDESK", "zacos9-frontdesk", 0, 0, true, false },
 };
 
