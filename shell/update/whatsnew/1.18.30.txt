@@ -1,0 +1,4 @@
+Software Update now installs all of a new ZacOS 9 release's packages together,
+instead of only the main package. Updates no longer wait for the signed
+software repository to catch up with the release, so the "[no choices]"
+dependency error after updating to 1.18.28 is fixed.
