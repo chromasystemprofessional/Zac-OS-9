@@ -47,6 +47,10 @@ kept, so a new release adds to the repository instead of replacing it. With a
 protected key, gpg prompts for the passphrase; CI sets
 `ZACOS9_REPO_GPG_PASSPHRASE` so it does not prompt.
 
+Debug-symbol packages (`*-dbgsym_*.deb`) are left out, because the main
+package's debug symbols are larger than GitHub's 100 MB file limit. Set
+`ZACOS9_REPO_DEBUG=1` to include them in a local repository.
+
 ## The signing key
 
 Make a dedicated key once:
