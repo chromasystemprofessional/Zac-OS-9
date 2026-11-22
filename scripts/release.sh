@@ -54,9 +54,12 @@ git commit -q -m "Release ZacOS 9 $version" -- debian/changelog
 git tag -a "v$version" -m "ZacOS 9 $version"
 
 scripts/build-debs.sh
-deb=build/packages/zacos9_${version}_$(dpkg --print-architecture).deb
-[ -f "$deb" ] || die "the build didn't make $deb."
+arch=$(dpkg --print-architecture)
+debs=$(find build/packages -maxdepth 1 \
+	-name "zacos9*_${version}_${arch}.deb" ! -name "*-dbgsym_*.deb" -print)
+[ -n "$debs" ] || die "the build didn't make the $version packages."
 
 git push -q origin main "v$version"
-gh release create "v$version" "$deb" --title "ZacOS 9 $version" --notes "$notes"
+# shellcheck disable=SC2086 # one path per package, none contains a space
+gh release create "v$version" $debs --title "ZacOS 9 $version" --notes "$notes"
 echo "Released ZacOS 9 $version: Software Update will offer it."

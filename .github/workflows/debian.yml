@@ -101,7 +101,10 @@ jobs:
           mkdir -p ci-artifacts
           cp /tmp/zacos9-debian/zacos9*.deb ci-artifacts/
           cd ci-artifacts
-          sha256sum *.deb > SHA256SUMS
+          for deb in *.deb; do
+            case $deb in *-dbgsym_*.deb) continue ;; esac
+            sha256sum "$deb"
+          done > SHA256SUMS
 
       - name: Upload build and test logs
         if: always()
@@ -138,6 +141,8 @@ jobs:
         with:
           files: |
             ci-artifacts/zacos9_*.deb
+            ci-artifacts/zacos9-session_*.deb
+            ci-artifacts/zacos9-greeter_*.deb
             ci-artifacts/SHA256SUMS
           tag_name: ${{ github.ref_name }}
           name: "ZacOS 9 ${{ github.ref_name }}"

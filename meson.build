@@ -51,6 +51,11 @@ test('repo', find_program('python3'),
   args: [files('tests/repo/test_repo.py'), files('scripts/build-repo.sh')],
   timeout: 180)
 
+# The three binary packages partition what the build installs.
+test('package-split', find_program('python3'),
+  args: [files('tests/baseline/test_package_split.py'),
+    meson.project_source_root()])
+
 # Static units (no [Install]) are on demand, not started by the package
 # scripts, and the login window's compositor has seatd for its seat.
 test('packaging', find_program('python3'),

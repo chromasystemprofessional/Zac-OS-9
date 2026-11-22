@@ -70,7 +70,7 @@ Build-Depends: debhelper-compat (= 13),
 Standards-Version: 4.7.0
 Rules-Requires-Root: no
 
-Package: zacos9
+Package: zacos9-session
 Architecture: any
 Depends: ${shlibs:Depends},
          ${misc:Depends},
@@ -86,18 +86,15 @@ Depends: ${shlibs:Depends},
          python3-gi,
          appstream,
          gir1.2-appstream-1.0,
-         flatpak,
          dmg2img,
          bchunk,
          libfsapfs-utils,
          libmodi1,
          fuse3,
          acl,
-         gnupg,
          dosfstools,
          fdisk,
          ntfs-3g,
-         os-prober,
          udev,
          udisks2,
          earlyoom,
@@ -138,8 +135,7 @@ Depends: ${shlibs:Depends},
          cups-client,
          cups-ipp-utils,
          cups-pk-helper
-Recommends: balena-etcher,
-            cups,
+Recommends: cups,
             ipp-usb,
             system-config-printer,
             speech-dispatcher,
@@ -161,20 +157,56 @@ Recommends: balena-etcher,
             dbus-user-session,
             xdg-desktop-portal-gtk,
             foot,
-            seatd,
             vlc
 # No Conflicts with cups-browsed (issue #111): cups-daemon recommends it,
 # so most Debian systems have it. Printer Picker skips its implicitclass://
 # queues instead: they stop with "No destination host name supplied by
 # cups-browsed" (seen on a Canon over Wi-Fi) unless it keeps running, and
 # CUPS 2.4 sets up IPP Everywhere printers itself.
-Suggests: greetd,
+Suggests: zacos9-emulators,
           kdeconnect
+Breaks: zacos9 (<< 1.18.28)
+Replaces: zacos9 (<< 1.18.28)
 Description: classic Platinum desktop for Wayland
  ZacOS 9 is a desktop in the style of a late-1990s Platinum
  interface: a wlroots compositor that draws Platinum window frames,
  a menu bar, a spatial Finder and control panels, with original fonts,
  icons, cursors, desktop patterns and sounds.
  .
- It installs a "ZacOS 9" session for login managers, and the
- zacos9-session command for starting it from a text console.
+ This package contains the desktop session. It installs a "ZacOS 9"
+ session for login managers and the zacos9-session command for starting
+ it from a text console.
+
+Package: zacos9-greeter
+Architecture: any
+Depends: ${shlibs:Depends},
+         ${misc:Depends},
+         zacos9-session (= ${binary:Version}),
+         greetd,
+         seatd,
+         tuigreet
+Breaks: zacos9 (<< 1.18.28)
+Replaces: zacos9 (<< 1.18.28)
+Description: ZacOS 9 login window for greetd
+ The Platinum login window shown by greetd. It runs a zacos9-wm of its
+ own, draws the ZacOS 9 login screen, and falls back to tuigreet when the
+ graphical window cannot start.
+
+Package: zacos9
+Architecture: any
+Depends: ${shlibs:Depends},
+         ${misc:Depends},
+         zacos9-session (= ${binary:Version}),
+         zacos9-greeter (= ${binary:Version}),
+         flatpak,
+         gnupg,
+         os-prober,
+         plymouth
+Recommends: balena-etcher
+Description: ZacOS 9 desktop and system integration
+ The full ZacOS 9 system: the desktop session, the greetd login window,
+ the installer, Setup Assistant, Startup Disk, Software, Software Update,
+ the boot splash and the GRUB integration.
+ .
+ Install zacos9-session instead on another distribution that supplies its
+ own boot, installer and login manager.

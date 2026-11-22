@@ -22,7 +22,7 @@ class ScreenSharingConfig(unittest.TestCase):
 
     def test_capture_stack_is_required(self):
         control = (ROOT / "debian/control").read_text()
-        package = control.split("Package: zacos9\n", 1)[1]
+        package = control.split("Package: zacos9-session\n", 1)[1]
         depends = package.split("Depends:", 1)[1].split("\nRecommends:", 1)[0]
         dependencies = {entry.strip() for entry in depends.split(",")}
         for name in ("pipewire", "wireplumber", "xdg-desktop-portal",
