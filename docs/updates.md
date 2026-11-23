@@ -146,6 +146,30 @@ install a new release before the signed repository has republished it.
 The version must be newer than the last changelog entry. Use `~` for
 pre-releases (`0.2.0~rc1` sorts before `0.2.0`).
 
+## The 1.18.31 transition
+
+The 1.18.28 split made `zacos9` a metapackage that needs `zacos9-session`
+and `zacos9-greeter`. The updater on 1.18.27 and 1.18.29 downloads only the
+metapackage, so those computers cannot install 1.18.30 without the signed
+repository — and the fixed updater is in 1.18.30.
+
+1.18.31 is a one-release monolith that bridges that gap. It is built from
+the 1.18.30 split packages, carries their files and maintainer scripts, and
+has no dependency on `zacos9-session` or `zacos9-greeter`. It also carries
+the fixed 1.18.30 updater. The 1.18.27/1.18.29 updaters can therefore install
+it from GitHub with no repository:
+
+```sh
+scripts/build-transition-package.py --version 1.18.31 \
+    --base-version 1.18.30 --debs build/packages --output build/packages
+```
+
+The release tag is `1.18.31`, deliberately without the leading `v`, so the
+normal `v*` tag workflow does not build split packages over the transition.
+The next normal release, 1.18.32, builds the split packages again; their
+`Breaks`/`Replaces: zacos9 (<< 1.18.32)` take the files back from the
+monolith. After 1.18.32 the tree is back to the split layout.
+
 ## Tests
 
 `meson test -C build update-check` (`shell/update/tests/`) tests the parts
