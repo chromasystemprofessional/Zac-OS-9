@@ -2,12 +2,15 @@
 # Publish a ZacOS 9 release, which is what Software Update (zacos9-update)
 # offers every installed system:
 #
-#   scripts/release.sh 0.2.0 "What's new, one or more sentences."
+#   scripts/release.sh [--transition|--split] 0.2.0 "What's new, one or more sentences."
 #
 # On a clean main branch, it adds a debian/changelog entry for the version,
-# commits and tags it (v0.2.0), builds the package, pushes, and creates the
-# GitHub release with zacos9_0.2.0_amd64.deb attached. Needs `gh auth login`.
-# See docs/updates.md.
+# commits and tags it, builds the package, pushes, and creates the GitHub
+# release. A transition release (the default) tags 0.2.0, publishes only the
+# zacos9_0.2.0_amd64.deb monolith and SHA256SUMS, and keeps the split packages
+# for the signed repository. A split release (--split, once pre-1.18.30
+# updaters are no longer supported) tags v0.2.0 and publishes the split
+# package set. Needs `gh auth login`. See docs/updates.md.
 set -eu
 self=$(realpath "$0")
 cd "$(dirname "$self")/.."
@@ -17,7 +20,12 @@ die() {
 	exit 1
 }
 
-[ "$#" -ge 1 ] || die "usage: scripts/release.sh VERSION [NOTES]"
+transition=true
+case "${1:-}" in
+--transition) shift ;;
+--split) transition=false; shift ;;
+esac
+[ "$#" -ge 1 ] || die "usage: scripts/release.sh [--transition|--split] VERSION [NOTES]"
 version=$1
 notes=${2:-"ZacOS 9 $version."}
 case "$version" in
@@ -27,6 +35,11 @@ esac
 case "$version" in
 	*[!A-Za-z0-9.+~]*) die "'$version' isn't a Debian version (letters, digits, . + ~)." ;;
 esac
+if $transition; then
+	tag=$version
+else
+	tag=v$version
+fi
 
 command -v gh >/dev/null || die "gh isn't installed (sudo apt install gh)."
 gh auth status >/dev/null 2>&1 || die "not logged in to GitHub: run gh auth login."
@@ -34,10 +47,15 @@ gh auth status >/dev/null 2>&1 || die "not logged in to GitHub: run gh auth logi
 [ -z "$(git status --porcelain)" ] || die "commit or stash your changes first."
 git fetch -q origin
 [ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] || die "main isn't the same as origin/main; pull or push first."
-git rev-parse -q --verify "refs/tags/v$version" >/dev/null && die "v$version already exists."
+git rev-parse -q --verify "refs/tags/$tag" >/dev/null && die "$tag already exists."
 
 current=$(dpkg-parsechangelog -S Version)
 dpkg --compare-versions "$version" gt "$current" || die "$version isn't newer than $current."
+
+if $transition; then
+	notes="$notes The GitHub release is a transition monolith built from this
+release's split packages for computers whose updater is older than 1.18.30."
+fi
 
 # The changelog entry: debian/changelog's own format, newest first.
 name=$(git config user.name)
@@ -51,15 +69,34 @@ email=$(git config user.email)
 mv debian/changelog.new debian/changelog
 
 git commit -q -m "Release ZacOS 9 $version" -- debian/changelog
-git tag -a "v$version" -m "ZacOS 9 $version"
+git tag -a "$tag" -m "ZacOS 9 $version"
 
 scripts/build-debs.sh
 arch=$(dpkg --print-architecture)
-debs=$(find build/packages -maxdepth 1 \
-	-name "zacos9*_${version}_${arch}.deb" ! -name "*-dbgsym_*.deb" -print)
-[ -n "$debs" ] || die "the build didn't make the $version packages."
+[ "$arch" = amd64 ] || die "transition releases are built for amd64, not $arch."
+if $transition; then
+	out=build/transition
+	rm -rf "$out"
+	mkdir -p "$out"
+	scripts/build-transition-package.py --version "$version" --base-version "$version" \
+		--debs build/packages --output "$out"
+	deb=$out/zacos9_${version}_${arch}.deb
+	[ -f "$deb" ] || die "the build didn't make $deb."
+	(cd "$out" && sha256sum "zacos9_${version}_${arch}.deb" >SHA256SUMS)
+	assets="$deb $out/SHA256SUMS"
+else
+	debs=$(find build/packages -maxdepth 1 \
+		-name "zacos9*_${version}_${arch}.deb" ! -name "*-dbgsym_*.deb" -print)
+	[ -n "$debs" ] || die "the build didn't make the $version packages."
+	assets=$debs
+fi
 
-git push -q origin main "v$version"
+git push -q origin main "$tag"
 # shellcheck disable=SC2086 # one path per package, none contains a space
-gh release create "v$version" $debs --title "ZacOS 9 $version" --notes "$notes"
-echo "Released ZacOS 9 $version: Software Update will offer it."
+gh release create "$tag" $assets --title "ZacOS 9 $version" --notes "$notes"
+if $transition; then
+	echo "Released ZacOS 9 $version as a transition monolith."
+	echo "Publish the split packages in build/packages to the signed repository."
+else
+	echo "Released ZacOS 9 $version: Software Update will offer it."
+fi
