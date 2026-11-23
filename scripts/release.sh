@@ -5,8 +5,9 @@
 #   scripts/release.sh [--transition|--split] 0.2.0 "What's new, one or more sentences."
 #
 # On a clean main branch, it adds a debian/changelog entry for the version,
-# commits and tags it, builds the package, pushes, and creates the GitHub
-# release. A transition release (the default) tags 0.2.0, publishes only the
+# moves the split packages' zacos9 Breaks/Replaces to it, commits and tags
+# it, builds the package, pushes, and creates the GitHub release. A
+# transition release (the default) tags 0.2.0, publishes only the
 # zacos9_0.2.0_amd64.deb monolith and SHA256SUMS, and keeps the split packages
 # for the signed repository. A split release (--split, once pre-1.18.30
 # updaters are no longer supported) tags v0.2.0 and publishes the split
@@ -57,6 +58,15 @@ if $transition; then
 release's split packages for computers whose updater is older than 1.18.30."
 fi
 
+# The split packages must take back the files from the last monolith, so a
+# repository install can replace it with this version's session and greeter.
+if ! grep -q '^Breaks: zacos9 (<< ' debian/control ||
+		! grep -q '^Replaces: zacos9 (<< ' debian/control; then
+	die "debian/control has no zacos9 Breaks/Replaces lines to update."
+fi
+sed -i "s/^Breaks: zacos9 (<< .*)$/Breaks: zacos9 (<< $version)/" debian/control
+sed -i "s/^Replaces: zacos9 (<< .*)$/Replaces: zacos9 (<< $version)/" debian/control
+
 # The changelog entry: debian/changelog's own format, newest first.
 name=$(git config user.name)
 email=$(git config user.email)
@@ -68,7 +78,7 @@ email=$(git config user.email)
 } >debian/changelog.new
 mv debian/changelog.new debian/changelog
 
-git commit -q -m "Release ZacOS 9 $version" -- debian/changelog
+git commit -q -m "Release ZacOS 9 $version" -- debian/changelog debian/control
 git tag -a "$tag" -m "ZacOS 9 $version"
 
 scripts/build-debs.sh
