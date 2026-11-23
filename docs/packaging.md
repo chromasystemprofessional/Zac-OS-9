@@ -117,7 +117,8 @@ wrote its contents. The fixture now waits for the expected playback arguments
 and uses a private runtime directory. Seven focused prerequisite/sound/GTK/boot
 tests pass locally under Xvfb. The hosted `package` result, not local success,
 is the gate to require before merging or releasing. The signed package
-repository that TTOS consumes is described in [repo.md](repo.md).
+repository that TTOS consumes is described in [repo.md](repo.md). The
+Debian 14/wlroots survey is in [debian-14.md](debian-14.md).
 
 ### Installed-system acceptance (2026-10-18)
 
