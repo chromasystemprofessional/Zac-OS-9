@@ -96,6 +96,15 @@ The panel's tabs, page arrows and icons click with ZacOS's own original
 sounds, as At Ease did; opening an item plays the opening sound, and a
 refused action the alert chime. **Special ▸ Turn Sound Off** silences them.
 
+## Folder pages
+
+The person's panel starts on their home folder. **Special ▸ Folders…** is
+the person's own list: folders can be added, removed and reordered, and each
+one gets a tab of its own. It is kept in
+`~/.config/zacos9/frontdesk-folders`, one path a line; a missing file means
+the home folder alone. This is separate from the administrator's Front Desk
+settings.
+
 ## Programs
 
 The panel reads the account's malcontent app filter through accountsservice,
