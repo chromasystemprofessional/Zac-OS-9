@@ -1,3 +1,15 @@
+zacos9 (1.18.32) trixie; urgency=medium
+
+  * The session package no longer offers New Tricks, Fetch Updates or the
+    Software and App Install paths when the full-system programs are absent.
+  * The GitHub release is again a monolith built from this release's split
+    packages. A computer that skipped 1.18.31 still has the pre-1.18.30
+    updater and downloads only zacos9_*.deb; the monolith lets it update.
+    The signed repository carries the split packages. A later release returns
+    to the split layout.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Mon, 23 Nov 2026 09:00:00 -0500
+
 zacos9 (1.18.31) trixie; urgency=medium
 
   * Transitional release for computers whose 1.18.27/1.18.29 updater cannot

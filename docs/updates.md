@@ -146,29 +146,43 @@ install a new release before the signed repository has republished it.
 The version must be newer than the last changelog entry. Use `~` for
 pre-releases (`0.2.0~rc1` sorts before `0.2.0`).
 
-## The 1.18.31 transition
+## Transition releases
 
 The 1.18.28 split made `zacos9` a metapackage that needs `zacos9-session`
 and `zacos9-greeter`. The updater on 1.18.27 and 1.18.29 downloads only the
-metapackage, so those computers cannot install 1.18.30 without the signed
-repository — and the fixed updater is in 1.18.30.
+metapackage, so those computers cannot install a newer release without the
+signed repository; the fixed updater is in 1.18.30.
 
-1.18.31 is a one-release monolith that bridges that gap. It is built from
-the 1.18.30 split packages, carries their files and maintainer scripts, and
-has no dependency on `zacos9-session` or `zacos9-greeter`. It also carries
-the fixed 1.18.30 updater. The 1.18.27/1.18.29 updaters can therefore install
-it from GitHub with no repository:
+1.18.31 and 1.18.32 are transition releases: the GitHub release asset is a
+single monolith built from that release's split packages, with their files
+and maintainer scripts and no dependency on `zacos9-session` or
+`zacos9-greeter`. It carries the fixed updater, so an old updater can install
+it with no repository.
+
+A computer that skips one transition release never installs it, and the old
+updater always fetches the latest release. Until pre-1.18.30 updaters are no
+longer supported, every GitHub release needs the same monolith.
+
+Build it from the split packages of the same version:
 
 ```sh
-scripts/build-transition-package.py --version 1.18.31 \
-    --base-version 1.18.30 --debs build/packages --output build/packages
+scripts/build-transition-package.py --version 1.18.32 \
+    --base-version 1.18.32 --debs build/packages --output build/packages
 ```
 
-The release tag is `1.18.31`, deliberately without the leading `v`, so the
+Publish only `zacos9_1.18.32_amd64.deb` and `SHA256SUMS` in that GitHub
+release. Do not attach `zacos9-session` or `zacos9-greeter` there: the fixed
+updater downloads the whole set, which would conflict with the monolith.
+Publish the split packages to the signed repository instead.
+
+The release tag is the version without the leading `v` (`1.18.32`), so the
 normal `v*` tag workflow does not build split packages over the transition.
-The next normal release, 1.18.32, builds the split packages again; their
-`Breaks`/`Replaces: zacos9 (<< 1.18.32)` take the files back from the
-monolith. After 1.18.32 the tree is back to the split layout.
+The source tree stays split.
+
+When a release returns to the split GitHub layout, its split packages must
+carry `Breaks`/`Replaces: zacos9 (<< that version)` to take the files back
+from the last monolith. The current 1.18.32 split packages use
+`<< 1.18.32`, so a repository install can replace the 1.18.31 monolith.
 
 ## Tests
 

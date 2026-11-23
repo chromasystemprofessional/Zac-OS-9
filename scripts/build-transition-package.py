@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Build the one-release monolithic zacos9 package that bridges the 1.18.28
-package split.
+"""Build the monolithic zacos9 package that bridges the 1.18.28 split for
+updaters older than 1.18.30.
 
 The updater on 1.18.27 and 1.18.29 downloads only zacos9_*.deb. Since the
 split, that metapackage needs zacos9-session and zacos9-greeter, so those
@@ -9,11 +9,19 @@ package has no dependencies on the other two: it carries their files and runs
 their maintainer scripts itself. Once installed it also carries the fixed
 1.18.30 updater, which downloads the whole package set for later releases.
 
-The next normal release must build its split packages with
-Breaks/Replaces: zacos9 (<< that version), so they can replace this package.
+A computer that skips one bridge release never installs it, and the old
+updater always fetches the latest release. Build a monolith for every GitHub
+release until pre-1.18.30 updaters are no longer supported. Publish only this
+package (and SHA256SUMS) in that GitHub release: the fixed updater downloads
+the whole package set, so a monolith plus split session/greeter assets in one
+release would conflict. Publish the split packages to the signed repository.
+
+When a release returns to the split GitHub layout, its split packages must
+carry Breaks/Replaces: zacos9 (<< that version), so they can take the files
+back from the last monolith.
 
     scripts/build-transition-package.py \
-        --version 1.18.31 --base-version 1.18.30 \
+        --version 1.18.32 --base-version 1.18.32 \
         --debs build/packages --output build/packages
 
 It takes zacos9, zacos9-session and zacos9-greeter of --base-version from
