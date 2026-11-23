@@ -153,7 +153,7 @@ and `zacos9-greeter`. The updater on 1.18.27 and 1.18.29 downloads only the
 metapackage, so those computers cannot install a newer release without the
 signed repository; the fixed updater is in 1.18.30.
 
-1.18.31 and 1.18.32 are transition releases: the GitHub release asset is a
+1.18.31 onward are transition releases: the GitHub release asset is a
 single monolith built from that release's split packages, with their files
 and maintainer scripts and no dependency on `zacos9-session` or
 `zacos9-greeter`. It carries the fixed updater, so an old updater can install
@@ -166,23 +166,23 @@ longer supported, every GitHub release needs the same monolith.
 Build it from the split packages of the same version:
 
 ```sh
-scripts/build-transition-package.py --version 1.18.32 \
-    --base-version 1.18.32 --debs build/packages --output build/packages
+scripts/build-transition-package.py --version 1.18.33 \
+    --base-version 1.18.33 --debs build/packages --output build/packages
 ```
 
-Publish only `zacos9_1.18.32_amd64.deb` and `SHA256SUMS` in that GitHub
+Publish only `zacos9_1.18.33_amd64.deb` and `SHA256SUMS` in that GitHub
 release. Do not attach `zacos9-session` or `zacos9-greeter` there: the fixed
 updater downloads the whole set, which would conflict with the monolith.
 Publish the split packages to the signed repository instead.
 
-The release tag is the version without the leading `v` (`1.18.32`), so the
+The release tag is the version without the leading `v` (`1.18.33`), so the
 normal `v*` tag workflow does not build split packages over the transition.
 The source tree stays split.
 
 When a release returns to the split GitHub layout, its split packages must
 carry `Breaks`/`Replaces: zacos9 (<< that version)` to take the files back
-from the last monolith. The current 1.18.32 split packages use
-`<< 1.18.32`, so a repository install can replace the 1.18.31 monolith.
+from the last monolith. The current 1.18.33 split packages use
+`<< 1.18.33`, so a repository install can replace the 1.18.32 monolith.
 
 ## Tests
 

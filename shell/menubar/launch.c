@@ -60,6 +60,24 @@ void sibling_program(const char *program, char *out, size_t size) {
 	snprintf(out, size, "exec %s", program);
 }
 
+/* The path of `program` beside this binary or in the build tree, else on
+ * $PATH; false when it isn't installed. sibling_program() returns a shell
+ * command, not a path, so it can't be used with access(). */
+static bool program_path(const char *program, char *out, size_t size) {
+	char path[PATH_MAX];
+	if (pl_sibling_program(program, path, sizeof(path))) {
+		snprintf(out, size, "%s", path);
+		return true;
+	}
+	gchar *found = g_find_program_in_path(program);
+	if (!found) {
+		return false;
+	}
+	snprintf(out, size, "%s", found);
+	g_free(found);
+	return true;
+}
+
 /* Exec= minus the %f/%u/... field codes we don't fill in. */
 static char *strip_field_codes(const char *exec) {
 	char *out = malloc(strlen(exec) + 1), *o = out;
@@ -578,18 +596,20 @@ void launch_fill_logo_menu(struct mb_menu *menu, const struct app *apps, int n_a
 	}
 	/* The app catalog over apt. The session package leaves it out. */
 	{
-		char command[PATH_MAX + 64];
-		sibling_program("zacos9-store", command, sizeof(command));
-		if (access(command, X_OK) == 0) {
+		char path[PATH_MAX];
+		if (program_path("zacos9-store", path, sizeof(path))) {
+			char command[PATH_MAX + 64];
+			snprintf(command, sizeof(command), "exec '%s'", path);
 			with_kind(add_item(menu, _("New Tricks"), true, ACT_LAUNCH, command), PL_ICON_APPLICATION);
 		}
 	}
 	/* New ZacOS 9 releases and Debian's own updates; only the full package
 	 * installs them. */
 	{
-		char command[PATH_MAX + 64];
-		sibling_program("zacos9-update", command, sizeof(command));
-		if (access(command, X_OK) == 0) {
+		char path[PATH_MAX];
+		if (program_path("zacos9-update", path, sizeof(path))) {
+			char command[PATH_MAX + 64];
+			snprintf(command, sizeof(command), "exec '%s'", path);
 			with_kind(add_item(menu, _("Fetch Updates"), true, ACT_LAUNCH, command), PL_ICON_EXT_OPENTRANSPORT);
 		}
 	}

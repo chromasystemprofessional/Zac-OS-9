@@ -21,7 +21,7 @@ carry Breaks/Replaces: zacos9 (<< that version), so they can take the files
 back from the last monolith.
 
     scripts/build-transition-package.py \
-        --version 1.18.32 --base-version 1.18.32 \
+        --version 1.18.33 --base-version 1.18.33 \
         --debs build/packages --output build/packages
 
 It takes zacos9, zacos9-session and zacos9-greeter of --base-version from
