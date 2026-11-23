@@ -1,3 +1,15 @@
+zacos9 (1.18.33) trixie; urgency=medium
+
+  * Fix the session-only gating in 1.18.32: the menu bar checked access() on
+    the whole "exec '...'" command instead of the program path, so New Tricks
+    and Fetch Updates disappeared on every install. The check now uses the
+    program path and falls back to $PATH; a full install shows both again,
+    while a session-only install still hides them.
+  * The GitHub release is another monolith built from this release's split
+    packages for computers that skipped 1.18.31 or 1.18.32.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Mon, 23 Nov 2026 14:30:00 -0500
+
 zacos9 (1.18.32) trixie; urgency=medium
 
   * The session package no longer offers New Tricks, Fetch Updates or the
