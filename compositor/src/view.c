@@ -8,6 +8,13 @@
 #define VIEW_MIN_W 100
 #define VIEW_MIN_H 50
 
+static bool is_frontdesk(struct plat_view *view);
+static struct plat_output *view_output(struct plat_view *view);
+static void frontdesk_hide_others(struct plat_server *server, struct plat_view *front);
+static bool frontdesk_show_panel_if_empty(struct plat_server *server,
+	struct plat_output *output);
+static void view_update_toplevel_output(struct plat_view *view);
+
 /* Where a new main window's top-left corner goes: in from the usable area's
  * edges, so the desktop and its icon column show around it. */
 #define VIEW_DEFAULT_MARGIN_X 96
@@ -421,14 +428,115 @@ static bool is_frontdesk(struct plat_view *view) {
 	return view->app_id && strcmp(view->app_id, "zacos9-frontdesk") == 0;
 }
 
+/* The screen a view is on: a panel keeps the one the compositor gave it;
+ * every other window follows the centre of its frame. */
+static struct plat_output *view_output(struct plat_view *view) {
+	if (is_frontdesk(view) && view->frontdesk_output) {
+		return view->frontdesk_output;
+	}
+	struct wlr_box frame = view_frame_box(view);
+	return output_at(view->server, frame.x + frame.width / 2.0,
+		frame.y + frame.height / 2.0);
+}
+
+static struct plat_view *view_topmost_on_output(struct plat_server *server,
+		struct plat_output *output) {
+	struct plat_view *view;
+	wl_list_for_each(view, &server->views, link) {
+		if (view->mapped && !view->hidden && view_output(view) == output) {
+			return view;
+		}
+	}
+	return NULL;
+}
+
+static struct plat_view *frontdesk_panel_on(struct plat_server *server,
+		struct plat_output *output) {
+	struct plat_view *view;
+	wl_list_for_each(view, &server->views, link) {
+		if (view->mapped && is_frontdesk(view) && view_output(view) == output) {
+			return view;
+		}
+	}
+	return NULL;
+}
+
+/* The first screen without a panel, else the main display. */
+static struct plat_output *frontdesk_panel_output(struct plat_server *server) {
+	struct plat_output *output;
+	wl_list_for_each(output, &server->outputs, link) {
+		if (output->off) {
+			continue;
+		}
+		if (!frontdesk_panel_on(server, output)) {
+			return output;
+		}
+	}
+	return output_main(server);
+}
+
+/* One panel per screen: fill the panel to its screen's usable area. The
+ * compositor places it, as a Wayland client cannot put its own window on a
+ * chosen display. */
+static void frontdesk_place_panel(struct plat_view *view) {
+	struct plat_server *server = view->server;
+	struct plat_output *output = frontdesk_panel_output(server);
+	if (!output) {
+		return;
+	}
+	view->frontdesk_output = output;
+	struct wlr_box area = output->usable_area;
+	if (wlr_box_empty(&area)) {
+		wlr_output_layout_get_box(server->output_layout, output->wlr_output, &area);
+	}
+	if (wlr_box_empty(&area)) {
+		return;
+	}
+	/* Already "zoomed": the panel's own maximize request must not inset it
+	 * for a document window's shadow. */
+	view->zoomed = true;
+	view->unzoomed = area;
+	view_resize_frame(view, area);
+}
+
+/* No program is visible on this screen any more: its panel comes back.
+ * The panel stays hidden only while another program is still shown. */
+static bool frontdesk_show_panel_if_empty(struct plat_server *server,
+		struct plat_output *output) {
+	if (!server->frontdesk_each_screen || !output) {
+		return false;
+	}
+	struct plat_view *view;
+	wl_list_for_each(view, &server->views, link) {
+		if (view->mapped && !view->hidden && !is_frontdesk(view) &&
+				view_output(view) == output) {
+			return false;
+		}
+	}
+	struct plat_view *panel = frontdesk_panel_on(server, output);
+	if (!panel) {
+		return false;
+	}
+	view_set_hidden(panel, false);
+	return true;
+}
+
 /* Front Desk runs one program at a time, as the shared Macs did: only the
  * front program's windows are drawn. The rest stay mapped but hidden (the
  * same as Hide in the Application menu), so Command-Tab and the
- * Application menu still list them and can bring one back. */
+ * Application menu still list them and can bring one back. With one panel
+ * per screen this is per screen: the other screens keep their own front
+ * program. */
 static void frontdesk_hide_others(struct plat_server *server, struct plat_view *front) {
+	struct plat_output *front_output = server->frontdesk_each_screen
+		? view_output(front) : NULL;
 	struct plat_view *view, *tmp;
 	wl_list_for_each_safe(view, tmp, &server->views, link) {
 		if (view == front || !view->mapped) {
+			continue;
+		}
+		if (server->frontdesk_each_screen &&
+				(!front_output || view_output(view) != front_output)) {
 			continue;
 		}
 		if (front->app_id && view->app_id && strcmp(view->app_id, front->app_id) == 0) {
@@ -454,6 +562,22 @@ static bool frontdesk_return(struct plat_server *server, const char *hidden_app)
 		}
 	}
 	return false;
+}
+
+/* The same on one screen, for one panel per screen. */
+static bool frontdesk_return_on(struct plat_server *server, struct plat_output *output,
+		const char *hidden_app) {
+	if (!server->frontdesk_each_screen || !output ||
+			(hidden_app && strcmp(hidden_app, "zacos9-frontdesk") == 0)) {
+		return false;
+	}
+	struct plat_view *panel = frontdesk_panel_on(server, output);
+	if (!panel) {
+		return false;
+	}
+	view_set_hidden(panel, false);
+	view_focus(panel);
+	return true;
 }
 
 /* General Controls' "Show Desktop when in background", off: while another
@@ -483,6 +607,8 @@ void view_set_hidden(struct plat_view *view, bool hidden) {
 		input_cancel_grab(server);
 	}
 	view->hidden = hidden;
+	struct plat_output *output = server->frontdesk_each_screen
+		? view_output(view) : NULL;
 	wlr_scene_node_set_enabled(&view->scene_tree->node, !hidden);
 	if (view->toplevel_handle) {
 		wlr_foreign_toplevel_handle_v1_set_minimized(view->toplevel_handle, hidden);
@@ -490,16 +616,23 @@ void view_set_hidden(struct plat_view *view, bool hidden) {
 	if (hidden && server->focused_view == view) {
 		set_active(view, false);
 		server->focused_view = NULL;
-		struct plat_view *next = view_topmost(server);
+		struct plat_view *next = server->frontdesk_each_screen && output
+			? view_topmost_on_output(server, output)
+			: view_topmost(server);
 		if (next) {
 			view_focus(next);
 			platinum_shell_focus_changed(server);
-		} else if (!frontdesk_return(server, view->app_id)) {
+		} else if (!(server->frontdesk_each_screen
+				? frontdesk_return_on(server, output, view->app_id)
+				: frontdesk_return(server, view->app_id))) {
 			if (!server->focused_layer) {
 				wlr_seat_keyboard_clear_focus(server->seat);
 			}
 			focus_none(server);
 		}
+	}
+	if (hidden && server->frontdesk_each_screen && output && !is_frontdesk(view)) {
+		frontdesk_show_panel_if_empty(server, output);
 	}
 	if (view->fullscreen) {
 		idle_update(server); /* hidden, it no longer keeps its screen awake */
@@ -508,11 +641,18 @@ void view_set_hidden(struct plat_view *view, bool hidden) {
 
 void view_activate_app(struct plat_server *server, const char *app_id) {
 	/* server->views is front first: raising from the back forward keeps
-	 * the app's own order, and its front window ends up active. */
+	 * the app's own order, and its front window ends up active. One panel
+	 * per screen: Command-Tab and the Application menu act on the screen
+	 * they were used from. */
+	struct plat_output *only = server->frontdesk_each_screen && server->focused_view
+		? view_output(server->focused_view) : NULL;
 	struct plat_view *mine[64];
 	int n = 0;
 	struct plat_view *view;
 	wl_list_for_each(view, &server->views, link) {
+		if (only && view_output(view) != only) {
+			continue;
+		}
 		if (n < (int)(sizeof(mine) / sizeof(mine[0])) && view->mapped &&
 				view->app_id && strcmp(view->app_id, app_id) == 0) {
 			mine[n++] = view;
@@ -708,6 +848,12 @@ static void snap_to_pixels(struct plat_view *view, int *x, int *y) {
 }
 
 void view_move_to(struct plat_view *view, int x, int y) {
+	struct plat_server *server = view->server;
+	/* One panel per screen: a program dragged to another screen belongs to
+	 * that screen's workspace from then on. */
+	const bool each = server->frontdesk_each_screen && view->mapped &&
+		!is_frontdesk(view);
+	struct plat_output *before = each ? view_output(view) : NULL;
 	snap_to_pixels(view, &x, &y);
 	wlr_scene_node_set_position(&view->scene_tree->node, x, y);
 	frame_commit(view->frame); /* its pixels may fall differently there */
@@ -715,6 +861,16 @@ void view_move_to(struct plat_view *view, int x, int y) {
 		view->impl->moved(view);
 	}
 	platinum_shell_report_position(view);
+	view_update_toplevel_output(view);
+	struct plat_output *after = each ? view_output(view) : NULL;
+	if (each && before != after) {
+		if (view == server->focused_view) {
+			frontdesk_hide_others(server, view);
+		}
+		if (before) {
+			frontdesk_show_panel_if_empty(server, before);
+		}
+	}
 }
 
 void view_resize_frame(struct plat_view *view, struct wlr_box box) {
@@ -725,6 +881,7 @@ void view_resize_frame(struct plat_view *view, struct wlr_box box) {
 	struct decor_margins m = decor_margins(view->frame->st.style);
 	view->impl->set_size(view, box.width - m.left - m.right,
 		box.height - m.top - m.bottom);
+	view_update_toplevel_output(view);
 }
 
 void view_set_fullscreen(struct plat_view *view, bool fullscreen, struct wlr_output *requested) {
@@ -765,6 +922,7 @@ void view_set_fullscreen(struct plat_view *view, bool fullscreen, struct wlr_out
 		view->impl->set_fullscreen(view, true);
 		wlr_scene_node_set_position(&view->scene_tree->node, box.x, box.y);
 		view->impl->set_size(view, box.width, box.height);
+		view_update_toplevel_output(view);
 		wlr_scene_node_reparent(&view->scene_tree->node,
 			server->focused_view == view ? server->fullscreen_layer : server->view_layer);
 	} else {
@@ -910,6 +1068,30 @@ static void handle_request_fullscreen(struct wl_listener *listener, void *data) 
 	view_set_fullscreen(view, event->fullscreen, event->output);
 }
 
+/* Keep the menu bar's idea of the window's screen with the window: it
+ * chooses the apps for Command-Tab, which is per screen in a Front Desk
+ * session with one panel per screen. */
+static void view_update_toplevel_output(struct plat_view *view) {
+	if (!view->toplevel_handle) {
+		return;
+	}
+	struct wlr_box box = view_frame_box(view);
+	struct plat_output *output =
+		output_at(view->server, box.x + box.width / 2.0, box.y + box.height / 2.0);
+	struct wlr_output *current = output ? output->wlr_output : NULL;
+	if (current == view->toplevel_output) {
+		return;
+	}
+	if (view->toplevel_output) {
+		wlr_foreign_toplevel_handle_v1_output_leave(view->toplevel_handle,
+			view->toplevel_output);
+	}
+	if (current) {
+		wlr_foreign_toplevel_handle_v1_output_enter(view->toplevel_handle, current);
+	}
+	view->toplevel_output = current;
+}
+
 static void create_toplevel_handle(struct plat_view *view) {
 	struct plat_server *server = view->server;
 	struct wlr_foreign_toplevel_handle_v1 *h =
@@ -922,12 +1104,8 @@ static void create_toplevel_handle(struct plat_view *view) {
 		view->frame->title_str ? view->frame->title_str : "");
 	wlr_foreign_toplevel_handle_v1_set_app_id(h, view->app_id ? view->app_id : "");
 	wlr_foreign_toplevel_handle_v1_set_fullscreen(h, view->fullscreen);
-	struct wlr_box box = view_frame_box(view);
-	struct plat_output *output =
-		output_at(server, box.x + box.width / 2.0, box.y + box.height / 2.0);
-	if (output) {
-		wlr_foreign_toplevel_handle_v1_output_enter(h, output->wlr_output);
-	}
+	view->toplevel_output = NULL;
+	view_update_toplevel_output(view);
 	view->handle_request_activate.notify = handle_request_activate;
 	wl_signal_add(&h->events.request_activate, &view->handle_request_activate);
 	view->handle_request_minimize.notify = handle_request_minimize;
@@ -978,6 +1156,9 @@ void view_handle_map(struct plat_view *view) {
 		view_move_to(view, area.x + (area.width - frame.width) / 2,
 			area.y + (area.height - frame.height) / 3);
 	}
+	if (server->frontdesk_each_screen && is_frontdesk(view)) {
+		frontdesk_place_panel(view);
+	}
 	wl_list_remove(&view->link); /* never in the list twice */
 	wl_list_insert(&view->server->views, &view->link);
 	create_toplevel_handle(view);
@@ -987,6 +1168,8 @@ void view_handle_map(struct plat_view *view) {
 
 void view_handle_unmap(struct plat_view *view) {
 	struct plat_server *server = view->server;
+	struct plat_output *output = server->frontdesk_each_screen
+		? view_output(view) : NULL;
 	if (view->fullscreen) {
 		view_set_fullscreen(view, false, NULL);
 	}
@@ -1008,13 +1191,20 @@ void view_handle_unmap(struct plat_view *view) {
 	/* Like the Mac, activate the next window in line. */
 	if (server->focused_view == view) {
 		server->focused_view = NULL;
-		struct plat_view *next = view_topmost(server);
+		struct plat_view *next = server->frontdesk_each_screen && output
+			? view_topmost_on_output(server, output)
+			: view_topmost(server);
 		if (next) {
 			view_focus(next);
 			platinum_shell_focus_changed(server);
-		} else if (!frontdesk_return(server, NULL)) {
+		} else if (!(server->frontdesk_each_screen
+				? frontdesk_return_on(server, output, NULL)
+				: frontdesk_return(server, NULL))) {
 			focus_none(server);
 		}
+	}
+	if (server->frontdesk_each_screen && output && !is_frontdesk(view)) {
+		frontdesk_show_panel_if_empty(server, output);
 	}
 }
 

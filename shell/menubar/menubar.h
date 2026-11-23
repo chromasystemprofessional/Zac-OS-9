@@ -21,6 +21,7 @@ struct toplevel {
 	struct wl_list link;
 	struct zwlr_foreign_toplevel_handle_v1 *handle;
 	char *title, *app_id;
+	struct wl_output *output; /* the screen its centre is on */
 	bool activated, minimized;
 	/* Pending state, applied on "done". */
 	char *p_title, *p_app_id;
@@ -40,6 +41,9 @@ struct wl_list *toplevels_list(void);
 /* Distinct apps, front-most first. Returns the count; apps[] valid until
  * the next call. */
 int apps_collect(struct app *apps, int max);
+/* The same on one screen: for a Front Desk session with one panel per
+ * screen, where Command-Tab switches only the screen it is on. */
+int apps_collect_on_output(struct app *apps, int max, struct wl_output *output);
 const char *app_display_name(const char *app_id);
 void app_activate(const char *app_id, struct wl_seat *seat);
 void app_set_hidden(const char *app_id, bool hidden);

@@ -259,6 +259,9 @@ int main(int argc, char *argv[]) {
 	server.scale_explicit = scale_explicit;
 	const char *shell = getenv("ZACOS9_SHELL");
 	server.frontdesk = shell && strcmp(shell, "frontdesk") == 0;
+	const char *eachScreen = getenv("ZACOS9_FRONTDESK_EACH_SCREEN");
+	server.frontdesk_each_screen = server.frontdesk && eachScreen &&
+		strcmp(eachScreen, "1") == 0;
 	server.display = wl_display_create();
 	server.gamma_manager = wlr_gamma_control_manager_v1_create(server.display);
 	if (server.gamma_manager) {

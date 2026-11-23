@@ -289,6 +289,12 @@ test('frontdesk-switch', find_program('python3'),
     idle_client, vptr_exe],
   timeout: 90,
 )
+# One panel and one front program per screen, with one pointer and keyboard.
+test('frontdesk-screens', find_program('python3'),
+  args: [files('../tests/compositor/test_frontdesk_screens.py'), compositor_exe, menubar_exe,
+    idle_client, vptr_exe],
+  timeout: 90,
+)
 # Function keys that open things (fkeys.c, input.c).
 test('function-keys-session', find_program('python3'),
   args: [files('../tests/compositor/test_function_keys.py'), compositor_exe, idle_client, vptr_exe],

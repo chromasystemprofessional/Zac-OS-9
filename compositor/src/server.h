@@ -60,8 +60,11 @@ struct plat_server {
 	float default_scale; /* from -S / ZACOS9_SCALE, until a panel picks one */
 	bool scale_explicit; /* -S or ZACOS9_SCALE given: no automatic 2x */
 	/* The session shell is Front Desk (ZACOS9_SHELL=frontdesk): start it
-	 * instead of the Sniffer, with the menu bar and The Collar. */
+	 * instead of the Sniffer, with the menu bar and The Collar. With
+	 * frontdesk_each_screen, each display has its own panel and front
+	 * program (ZACOS9_FRONTDESK_EACH_SCREEN=1). */
 	bool frontdesk;
+	bool frontdesk_each_screen;
 	struct wlr_fractional_scale_manager_v1 *fractional_scale;
 	/* Mouse and Keyboard panel settings (prefs.c). */
 	double pointer_speed;
@@ -334,6 +337,8 @@ struct plat_view {
 	bool zoomed;
 	bool fullscreen;
 	struct wlr_output *fullscreen_output;
+	/* Front Desk one-panel-per-screen: the screen this panel belongs to. */
+	struct plat_output *frontdesk_output;
 	struct wlr_box unfullscreen;
 	struct wlr_box unzoomed; /* frame box to restore from zoom */
 
@@ -350,6 +355,8 @@ struct plat_view {
 
 	/* Exposed to the menu bar via wlr-foreign-toplevel-management. */
 	struct wlr_foreign_toplevel_handle_v1 *toplevel_handle;
+	/* The screen its centre is on, as the menu bar last heard. */
+	struct wlr_output *toplevel_output;
 	struct wl_listener handle_request_activate;
 	struct wl_listener handle_request_minimize;
 	struct wl_listener handle_request_close;

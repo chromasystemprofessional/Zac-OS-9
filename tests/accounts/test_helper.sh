@@ -13,16 +13,18 @@ fail() { echo "FAIL: $*" >&2; exit 1; }
 "$helper" puppy someone off && [ ! -e "$T/puppy/someone" ] || fail "Puppy Mode taken away"
 ! "$helper" puppy '../x' on 2>/dev/null || fail "odd user names refused"
 
-"$helper" desktop someone frontdesk menus=all zac-menu=on finder=on save=anywhere
+"$helper" desktop someone frontdesk menus=all zac-menu=on screens=each finder=on save=anywhere
 [ -f "$T/frontdesk/someone" ] && [ ! -e "$T/puppy/someone" ] || fail "Front Desk starts"
 grep -qx 'menus=all' "$T/frontdesk/someone" || fail "Front Desk menus"
 grep -qx 'zac-menu=on' "$T/frontdesk/someone" || fail "Front Desk Zac menu"
+grep -qx 'screens=each' "$T/frontdesk/someone" || fail "Front Desk screens"
 grep -qx 'finder=on' "$T/frontdesk/someone" || fail "Front Desk Finder access"
 "$helper" status | grep -qx "frontdesk someone" || fail "status lists Front Desk"
 "$helper" frontdesk-settings someone speech=on
 grep -qx 'speech=on' "$T/frontdesk/someone" || fail "Front Desk settings"
 ! "$helper" frontdesk-settings someone menus=wrong 2>/dev/null || fail "bad Front Desk settings refused"
 ! "$helper" frontdesk-settings someone zac-menu=maybe 2>/dev/null || fail "bad Zac menu setting refused"
+! "$helper" frontdesk-settings someone screens=many 2>/dev/null || fail "bad screens setting refused"
 "$helper" desktop someone puppy
 [ -e "$T/puppy/someone" ] && [ ! -e "$T/frontdesk/someone" ] || fail "Puppy Mode replaces Front Desk"
 "$helper" desktop someone finder

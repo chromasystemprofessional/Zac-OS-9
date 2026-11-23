@@ -16,13 +16,14 @@ with tempfile.TemporaryDirectory(prefix="zacos9-frontdesk-session-") as temp:
     accounts = root / "accounts"
     (accounts / "frontdesk").mkdir(parents=True)
     frontdesk = accounts / "frontdesk" / pwd.getpwuid(os.getuid()).pw_name
-    frontdesk.write_text("menus=restricted\nzac-menu=on\n")
+    frontdesk.write_text("menus=restricted\nzac-menu=on\nscreens=each\n")
     wm_log = root / "wm.log"
     shell_log = root / "shell.log"
     for name, body in {
         "zacos9-wm": '#!/bin/sh\n'
-                     'printf "%s|%s|%s\\n" "$ZACOS9_SHELL" "$ZACOS9_MENUBAR_MODE" '
-                     '"${ZACOS9_FRONTDESK_ZAC_MENU:-}" > "$TEST_SHELL_LOG"\n'
+                     'printf "%s|%s|%s|%s\\n" "$ZACOS9_SHELL" "$ZACOS9_MENUBAR_MODE" '
+                     '"${ZACOS9_FRONTDESK_ZAC_MENU:-}" '
+                     '"${ZACOS9_FRONTDESK_EACH_SCREEN:-}" > "$TEST_SHELL_LOG"\n'
                      'while [ "$#" -gt 0 ]; do\n'
                      '[ "$1" = "-s" ] && { printf "%s\\n" "$2" > "$TEST_WM_LOG"; exit 0; }\n'
                      'shift\ndone\nexit 2\n',
@@ -44,13 +45,14 @@ with tempfile.TemporaryDirectory(prefix="zacos9-frontdesk-session-") as temp:
         "TEST_SHELL_LOG": str(shell_log),
     }
     subprocess.run(["/bin/sh", str(session)], env=env, check=True, timeout=15)
-    assert shell_log.read_text() == "frontdesk|frontdesk|on\n", shell_log.read_text()
+    assert shell_log.read_text() == "frontdesk|frontdesk|on|1\n", shell_log.read_text()
     startup = wm_log.read_text()
     assert "zacos9-autostart" not in startup, startup
 
-    # Without the setting, the menu bar keeps its Front Desk Zac menu.
+    # Without the settings, the menu bar keeps its Front Desk Zac menu and
+    # there is one panel, not one per screen.
     frontdesk.write_text("menus=restricted\n")
     subprocess.run(["/bin/sh", str(session)], env=env, check=True, timeout=15)
-    assert shell_log.read_text() == "frontdesk|frontdesk|\n", shell_log.read_text()
+    assert shell_log.read_text() == "frontdesk|frontdesk||\n", shell_log.read_text()
 print("ok: a Front Desk account starts the Front Desk shell without Startup Items, "
       "with all Zac menu items only when asked")
