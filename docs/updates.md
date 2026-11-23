@@ -134,8 +134,11 @@ The script only runs on a clean `main` branch that matches `origin/main`.
 It does the following:
 
 1. Adds a `debian/changelog` entry; the package version comes from there.
-2. Commits it and tags it: `0.2.0` for a transition release (the default),
-   or `v0.2.0` for a split release.
+   It also moves the split packages' `Breaks`/`Replaces: zacos9 (<< …)` to
+   this version, so a repository install can take the files back from the
+   previous monolith.
+2. Commits both files and tags the commit: `0.2.0` for a transition release
+   (the default), or `v0.2.0` for a split release.
 3. Builds the split packages with `scripts/build-debs.sh`.
 4. For a transition release, builds the monolith from those packages with
    `scripts/build-transition-package.py`, writes `SHA256SUMS`, and attaches
