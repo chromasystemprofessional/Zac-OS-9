@@ -1,3 +1,14 @@
+zacos9 (1.18.34) trixie; urgency=medium
+
+  * Front Desk can give each screen its own panel and front program, with
+    one pointer and keyboard. The user's panel starts on their Home folder,
+    and Special ▸ Folders… adds, removes and reorders the user's folder
+    pages. The GitHub release is a transition monolith built from this
+    release's split packages for computers whose updater is older than
+    1.18.30.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Mon, 23 Nov 2026 17:25:27 -0500
+
 zacos9 (1.18.33) trixie; urgency=medium
 
   * Fix the session-only gating in 1.18.32: the menu bar checked access() on

@@ -165,8 +165,8 @@ Recommends: cups,
 # CUPS 2.4 sets up IPP Everywhere printers itself.
 Suggests: zacos9-emulators,
           kdeconnect
-Breaks: zacos9 (<< 1.18.33)
-Replaces: zacos9 (<< 1.18.33)
+Breaks: zacos9 (<< 1.18.34)
+Replaces: zacos9 (<< 1.18.34)
 Description: classic Platinum desktop for Wayland
  ZacOS 9 is a desktop in the style of a late-1990s Platinum
  interface: a wlroots compositor that draws Platinum window frames,
@@ -185,8 +185,8 @@ Depends: ${shlibs:Depends},
          greetd,
          seatd,
          tuigreet
-Breaks: zacos9 (<< 1.18.33)
-Replaces: zacos9 (<< 1.18.33)
+Breaks: zacos9 (<< 1.18.34)
+Replaces: zacos9 (<< 1.18.34)
 Description: ZacOS 9 login window for greetd
  The Platinum login window shown by greetd. It runs a zacos9-wm of its
  own, draws the ZacOS 9 login screen, and falls back to tuigreet when the
