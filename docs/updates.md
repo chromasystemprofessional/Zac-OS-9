@@ -121,7 +121,7 @@ that predates Software Update.
 
 ```sh
 gh auth login                     # once
-scripts/release.sh 0.2.0 "What's new, in a sentence or two."
+scripts/release.sh [--transition|--split] 0.2.0 "What's new, in a sentence or two."
 ```
 
 The second argument becomes the release's notes on GitHub, which Software
@@ -134,10 +134,20 @@ The script only runs on a clean `main` branch that matches `origin/main`.
 It does the following:
 
 1. Adds a `debian/changelog` entry; the package version comes from there.
-2. Commits it and tags `v0.2.0`.
-3. Builds the package with `scripts/build-debs.sh`.
-4. Pushes the commit and the tag.
-5. Runs `gh release create` with the release's packages attached.
+2. Commits it and tags it: `0.2.0` for a transition release (the default),
+   or `v0.2.0` for a split release.
+3. Builds the split packages with `scripts/build-debs.sh`.
+4. For a transition release, builds the monolith from those packages with
+   `scripts/build-transition-package.py`, writes `SHA256SUMS`, and attaches
+   only `zacos9_0.2.0_amd64.deb` and `SHA256SUMS` to the GitHub release. The
+   split packages are left in `build/packages` for the signed repository.
+   For a split release, attaches the split package set.
+5. Pushes the commit and the tag, and runs `gh release create`.
+
+Transition is the default because a computer that skipped an earlier
+transition release still has an updater older than 1.18.30; the old updater
+always fetches the latest release. Pass `--split` only once those updaters
+are no longer supported.
 
 Every installed system then sees the release the next time Software Update
 checks. Software Update downloads the release's packages itself, so it can
@@ -161,16 +171,18 @@ it with no repository.
 
 A computer that skips one transition release never installs it, and the old
 updater always fetches the latest release. Until pre-1.18.30 updaters are no
-longer supported, every GitHub release needs the same monolith.
+longer supported, every GitHub release needs the same monolith. That is why
+`scripts/release.sh` defaults to a transition release; `--split` is the
+opt-out for when those updaters are gone.
 
-Build it from the split packages of the same version:
+The script builds the monolith from the split packages of the same version:
 
 ```sh
 scripts/build-transition-package.py --version 1.18.33 \
-    --base-version 1.18.33 --debs build/packages --output build/packages
+    --base-version 1.18.33 --debs build/packages --output build/transition
 ```
 
-Publish only `zacos9_1.18.33_amd64.deb` and `SHA256SUMS` in that GitHub
+It publishes only `zacos9_1.18.33_amd64.deb` and `SHA256SUMS` in that GitHub
 release. Do not attach `zacos9-session` or `zacos9-greeter` there: the fixed
 updater downloads the whole set, which would conflict with the monolith.
 Publish the split packages to the signed repository instead.
