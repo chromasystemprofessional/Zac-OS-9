@@ -1,0 +1,58 @@
+name: Debian 14 preview
+
+# A survey, not a release gate: the compositor is built against wlroots 0.18,
+# and Debian 14 ships 0.20. This records what a forky build needs before the
+# port or the compatibility package is chosen.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  survey:
+    runs-on: ubuntu-24.04
+    container: debian:testing
+    timeout-minutes: 20
+    steps:
+      - name: Install survey tools
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates git build-essential dpkg-dev devscripts
+
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Show the available wlroots packages
+        run: |
+          apt-cache policy libwlroots-dev libwlroots-0.20-dev \
+            libwlroots-0.19-dev libwlroots-0.18-dev
+
+      - name: List missing build dependencies
+        run: |
+          set +e
+          dpkg-checkbuilddeps 2>&1 | tee /tmp/builddeps.log
+          code=${PIPESTATUS[0]}
+          echo "exit: $code"
+          {
+            echo "### Debian 14 build dependencies"
+            echo '```'
+            cat /tmp/builddeps.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Try the build-dependency install
+        run: |
+          set +e
+          apt-get build-dep -y --no-install-recommends ./ 2>&1 | tee /tmp/builddep.log
+          code=${PIPESTATUS[0]}
+          echo "exit: $code"
+          {
+            echo "### Debian 14 build-dep"
+            echo '```'
+            tail -40 /tmp/builddep.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
