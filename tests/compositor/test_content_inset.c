@@ -3,6 +3,7 @@
 
 #include "frame.h"
 #include "server.h"
+#include "window_sounds.h"
 
 static struct wlr_box geometry;
 static int style;
@@ -47,6 +48,30 @@ struct wlr_box output_usable_area(struct plat_server *server, double lx, double 
 
 int platinum_shell_style_for(struct wlr_surface *surface) {
 	return style;
+}
+
+/* The rest of the compositor isn't linked here: focusing and hiding a view
+ * talks to it, even though this test only measures the frame. */
+bool prefs_show_desktop(void) {
+	return true;
+}
+
+void idle_update(struct plat_server *server) {
+}
+
+void input_cancel_grab(struct plat_server *server) {
+}
+
+void input_keyboard_enter(struct plat_server *server, struct wlr_surface *surface) {
+}
+
+void platinum_shell_focus_changed(struct plat_server *server) {
+}
+
+void platinum_shell_launch_ready(struct plat_view *view) {
+}
+
+void window_sound_collapse(bool collapsed) {
 }
 
 static const struct plat_view_impl impl = {
