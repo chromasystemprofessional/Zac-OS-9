@@ -177,10 +177,16 @@ Desktop::Desktop() {
 		} else if (type == QLatin1String("x-content/video-dvd")) {
 			disc = tr9("video DVD");
 		}
-		if (Alert::ask(tr9("No player is installed for this %1. "
-				"Install VLC from Software?").arg(disc),
-				tr9("Open Software"), tr9("Cancel"))) {
-			platinumStartApplication(siblingProgram("zacos9-store"), {});
+		const bool store = programExists("zacos9-store");
+		const QString message = store
+			? tr9("No player is installed for this %1. "
+				"Install VLC from Software?").arg(disc)
+			: tr9("No player is installed for this %1.").arg(disc);
+		if (Alert::ask(message, store ? tr9("Open Software") : tr9("OK"),
+				store ? tr9("Cancel") : QString())) {
+			if (store) {
+				platinumStartApplication(siblingProgram("zacos9-store"), {});
+			}
 		}
 	});
 	localVolumesMountAll();

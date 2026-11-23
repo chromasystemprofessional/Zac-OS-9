@@ -825,11 +825,17 @@ void Finder::openLocalVolume(Item *item) {
 			return;
 		}
 		if (volume.kind == MediaKind::OpticalAudio) {
+			const bool store = programExists("zacos9-store");
+			const QString message = store
+				? tr9("No player is installed for this audio CD. "
+					"Install VLC from Software?")
+				: tr9("No player is installed for this audio CD.");
 			if (!mediaPlayAudioCd(volume.device) &&
-					Alert::ask(tr9("No player is installed for this audio CD. "
-						"Install VLC from Software?"),
-						tr9("Open Software"), tr9("Cancel"))) {
-				platinumStartApplication(siblingProgram("zacos9-store"), {});
+					Alert::ask(message, store ? tr9("Open Software") : tr9("OK"),
+						store ? tr9("Cancel") : QString())) {
+				if (store) {
+					platinumStartApplication(siblingProgram("zacos9-store"), {});
+				}
 			}
 			return;
 		}

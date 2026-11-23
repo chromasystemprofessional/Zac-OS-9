@@ -9,6 +9,7 @@
 #include <QByteArray>
 #include <QCoreApplication>
 #include <QFileInfo>
+#include <QStandardPaths>
 #include <QString>
 #include <climits>
 
@@ -21,6 +22,21 @@ inline QString siblingProgram(const QString &name) {
 	char path[PATH_MAX];
 	return pl_sibling_program(name.toUtf8().constData(), path, sizeof(path))
 		? QString::fromUtf8(path) : name;
+}
+
+/* Another program when it is installed or built here, or on $PATH; "" when
+ * it isn't. The session package leaves the full system's Software, Update
+ * and App Install out, so the desktop must not offer them. */
+inline QString findProgram(const QString &name) {
+	const QString sibling = siblingProgram(name);
+	if (QFileInfo(sibling).isExecutable()) {
+		return sibling;
+	}
+	return QStandardPaths::findExecutable(name);
+}
+
+inline bool programExists(const QString &name) {
+	return !findProgram(name).isEmpty();
 }
 
 /* `relative` under the source tree that was built, when this program runs

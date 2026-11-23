@@ -576,17 +576,22 @@ void launch_fill_logo_menu(struct mb_menu *menu, const struct app *apps, int n_a
 			!(zacMenu && strcmp(zacMenu, "on") == 0)) {
 		return;
 	}
-	/* The app catalog over apt. */
+	/* The app catalog over apt. The session package leaves it out. */
 	{
 		char command[PATH_MAX + 64];
 		sibling_program("zacos9-store", command, sizeof(command));
-		with_kind(add_item(menu, _("New Tricks"), true, ACT_LAUNCH, command), PL_ICON_APPLICATION);
+		if (access(command, X_OK) == 0) {
+			with_kind(add_item(menu, _("New Tricks"), true, ACT_LAUNCH, command), PL_ICON_APPLICATION);
+		}
 	}
-	/* New ZacOS 9 releases and Debian's own updates. */
+	/* New ZacOS 9 releases and Debian's own updates; only the full package
+	 * installs them. */
 	{
 		char command[PATH_MAX + 64];
 		sibling_program("zacos9-update", command, sizeof(command));
-		with_kind(add_item(menu, _("Fetch Updates"), true, ACT_LAUNCH, command), PL_ICON_EXT_OPENTRANSPORT);
+		if (access(command, X_OK) == 0) {
+			with_kind(add_item(menu, _("Fetch Updates"), true, ACT_LAUNCH, command), PL_ICON_EXT_OPENTRANSPORT);
+		}
 	}
 	/* Force Quit: the open applications, front-most first; the Finder
 	 * asks first, then has zacos9-wm end the one chosen. */
