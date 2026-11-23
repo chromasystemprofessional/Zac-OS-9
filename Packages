@@ -86,6 +86,28 @@ Description: ZacOS 9 login window for greetd
  own, draws the ZacOS 9 login screen, and falls back to tuigreet when the
  graphical window cannot start.
 
+Package: zacos9-greeter
+Architecture: amd64
+Version: 1.18.33
+Priority: optional
+Section: x11
+Source: zacos9
+Maintainer: adamjlawson-ctrl <adamjlawson@gmail.com>
+Installed-Size: 746
+Depends: libc6 (>= 2.38), libcairo2 (>= 1.2.4), libfontconfig1 (>= 2.12.6), libfreetype6 (>= 2.2.1), libfribidi0 (>= 0.19.2), libgcc-s1 (>= 3.0), libharfbuzz0b (>= 0.9.38), libqt6core6t64 (>= 6.8.2), libqt6gui6 (>= 6.8.2), libqt6network6 (>= 6.1.2), libqt6widgets6 (>= 6.1.2), libstdc++6 (>= 12), libwayland-client0 (>= 1.20.0), zacos9-session (= 1.18.33), greetd, seatd, tuigreet
+Breaks: zacos9 (<< 1.18.33)
+Replaces: zacos9 (<< 1.18.33)
+Filename: ./zacos9-greeter_1.18.33_amd64.deb
+Size: 205320
+MD5sum: 96fbca561d1a821e81de2e1419214b1a
+SHA1: 3a6d4bed880ecdce59af7b32d91223e3bd64c21b
+SHA256: 6bf92986aa882485d94789ead282eeffd2bd12c2033c100fbfb1be0165b5e366
+SHA512: b817b72959bb61e51e722bf443a82cdec820947b61e5456f12fc21b13413535dc155630f5aacb28d2aa2e42eea530c8b07cb57ddb1e5d1c55fd3090cbc3972db
+Description: ZacOS 9 login window for greetd
+ The Platinum login window shown by greetd. It runs a zacos9-wm of its
+ own, draws the ZacOS 9 login screen, and falls back to tuigreet when the
+ graphical window cannot start.
+
 Package: zacos9-session
 Architecture: amd64
 Version: 1.18.28
@@ -192,6 +214,35 @@ MD5sum: e268c61d39f54457830e47a6919d4c30
 SHA1: 9bac0765a8d9eac347e56635be772c2c22e471c2
 SHA256: 47f08c9dce71a1b845ba816edca50429d4d4281b2bf771e33bf5671e1abc5466
 SHA512: 0393e82b971150a023e23aea5d04269baea6f4592a68fb527e7a6abb84fbbdb7a1ec0bab08c19f3137aa9bdcf7b37e2e52635337d1e22a0e1716de174ae8c50e
+Description: classic Platinum desktop for Wayland
+ ZacOS 9 is a desktop in the style of a late-1990s Platinum
+ interface: a wlroots compositor that draws Platinum window frames,
+ a menu bar, a spatial Finder and control panels, with original fonts,
+ icons, cursors, desktop patterns and sounds.
+ .
+ This package contains the desktop session. It installs a "ZacOS 9"
+ session for login managers and the zacos9-session command for starting
+ it from a text console.
+
+Package: zacos9-session
+Architecture: amd64
+Version: 1.18.33
+Priority: optional
+Section: x11
+Source: zacos9
+Maintainer: adamjlawson-ctrl <adamjlawson@gmail.com>
+Installed-Size: 51552
+Depends: libappmenu-gtk3-parser0 (>= 0.5.5), libc6 (>= 2.39), libcairo2 (>= 1.2.4), libcrypt1 (>= 1:4.1.0), libfontconfig1 (>= 2.12.6), libfreetype6 (>= 2.2.1), libfribidi0 (>= 0.19.2), libfuse3-4 (>= 3.17.2), libgcc-s1 (>= 4.2), libgcrypt20 (>= 1.11.0), libgdk-pixbuf-2.0-0 (>= 2.31.1), libglib2.0-0t64 (>= 2.66.0), libgstreamer-plugins-base1.0-0 (>= 1.10.0), libgstreamer1.0-0 (>= 1.6.0), libgtk-3-0t64 (>= 3.10.0), libharfbuzz0b (>= 0.9.38), libinput10 (>= 1.2.0), liblayershellqtinterface6 (>= 6.1.0), libpam0g (>= 0.99.7.1), libqt6core6t64 (>= 6.8.2), libqt6dbus6 (>= 6.8.2), libqt6gui6 (>= 6.8.2), libqt6network6 (>= 6.7.2), libqt6widgets6 (>= 6.3.0), libstdc++6 (>= 12), libwayland-client0 (>= 1.20.0), libwayland-cursor0 (>= 1.0.2), libwayland-server0 (>= 1.17.0), libwlroots-0.18 (>= 0.18.0), libxcb1, libxkbcommon0 (>= 0.8.0), zlib1g (>= 1:1.1.4), init-system-helpers (>= 1.52), accountsservice, malcontent, libsecret-tools, rsync, qt6-wayland, qt6-svg-plugins, qt6-image-formats-plugins, librsvg2-common, python3, python3-gi, appstream, gir1.2-appstream-1.0, dmg2img, bchunk, libfsapfs-utils, libmodi1, fuse3, acl, dosfstools, fdisk, ntfs-3g, udev, udisks2, earlyoom, systemd-zram-generator, upower, python3-libarchive-c, unar, python3-pil, imagemagick, procps, fonts-dejavu-core, fonts-dejavu-mono, fonts-urw-base35, fonts-liberation, fonts-linuxlibertine, fonts-comic-neue, fonts-noto-core, fonts-noto-cjk, fcitx5-mozc, locales, fontconfig, avahi-utils, gvfs-backends, grim, slurp, wl-clipboard, bluez, libcap2-bin, lxqt-policykit, pipewire, wireplumber, xdg-desktop-portal, xdg-desktop-portal-wlr, libdbusmenu-glib4, gstreamer1.0-plugins-base, gstreamer1.0-plugins-good, network-manager-config-connectivity-debian, cups-client, cups-ipp-utils, cups-pk-helper
+Recommends: cups, ipp-usb, system-config-printer, speech-dispatcher, speech-dispatcher-espeak-ng, speech-dispatcher-rhvoice, rhvoice-english, xwayland, netatalk, atalkd, samba, wsdd2, wayvnc, openssl, avahi-daemon, pkexec, pulseaudio-utils, ddcutil, dbus-user-session, xdg-desktop-portal-gtk, foot, vlc
+Suggests: zacos9-emulators, kdeconnect
+Breaks: zacos9 (<< 1.18.33)
+Replaces: zacos9 (<< 1.18.33)
+Filename: ./zacos9-session_1.18.33_amd64.deb
+Size: 7374140
+MD5sum: 7c9f3e7bf51b7b198f3e8dc9c87938eb
+SHA1: b1c28c83ae3faea62256ca2d3c36478650248d09
+SHA256: 3325cf5c3a7f5df3e42c40d932afc9ef12d960e993e6092a882fc0c65654d7e3
+SHA512: 884a992330cde37e465c0789b045186f838b010a9aacf7dbb9b41c6665d8e76367912c0fc120fccbf672e71bc97a4bf83d84bf1a8d80305bf99854308b3113f5
 Description: classic Platinum desktop for Wayland
  ZacOS 9 is a desktop in the style of a late-1990s Platinum
  interface: a wlroots compositor that draws Platinum window frames,
@@ -311,6 +362,29 @@ MD5sum: a2241e66e54e1b7bb1a2bd665605c607
 SHA1: 978636655daf0fcffdf7557dd500f44b22d5ff02
 SHA256: ff0248754c752b198d79bcf347adef289621ba0bddd99b60f4e9685b07667360
 SHA512: a13c27340a89167d8f07d26684c62beaf9370ca10bda7f4f2019ad292f9b220eeccf1733666be7a641c28f3cad682360cbe01de5d841f4b12119bc8c2a0e3fe7
+Description: ZacOS 9 desktop and system integration
+ The full ZacOS 9 system: the desktop session, the greetd login window,
+ the installer, Setup Assistant, Startup Disk, Software, Software Update,
+ the boot splash and the GRUB integration.
+ .
+ Install zacos9-session instead on another distribution that supplies its
+ own boot, installer and login manager.
+
+Package: zacos9
+Architecture: amd64
+Version: 1.18.33
+Priority: optional
+Section: x11
+Maintainer: adamjlawson-ctrl <adamjlawson@gmail.com>
+Installed-Size: 4635
+Depends: libc6 (>= 2.38), libcairo2 (>= 1.2.4), libfontconfig1 (>= 2.12.6), libfreetype6 (>= 2.2.1), libfribidi0 (>= 0.19.2), libgcc-s1 (>= 3.0), libglib2.0-0t64 (>= 2.40.0), libharfbuzz0b (>= 0.9.38), libqt6core6t64 (>= 6.8.2), libqt6dbus6 (>= 6.8.2), libqt6gui6 (>= 6.8.2), libqt6network6 (>= 6.7.2), libqt6widgets6 (>= 6.1.2), libstdc++6 (>= 12), libwayland-client0 (>= 1.20.0), init-system-helpers (>= 1.52), zacos9-session (= 1.18.33), zacos9-greeter (= 1.18.33), flatpak, gnupg, os-prober, plymouth
+Recommends: balena-etcher
+Filename: ./zacos9_1.18.33_amd64.deb
+Size: 1001956
+MD5sum: 4642333c5095ea101e0a89e6a8c70261
+SHA1: 1ab79e4283cc3bcec6241f5e3f9f9ad498327354
+SHA256: 37ac1bb37365bec399f4e705cd100cccfed21c502698f8c2d4f56a4bb6af46b2
+SHA512: d152966414ecc1a31aa74f36c6682583cffc859b749e1b4dc6f1b4e7670f9e588c778de48273880ba5450123fd4f83adb5f4cac4750660a39972b2dea988062f
 Description: ZacOS 9 desktop and system integration
  The full ZacOS 9 system: the desktop session, the greetd login window,
  the installer, Setup Assistant, Startup Disk, Software, Software Update,
