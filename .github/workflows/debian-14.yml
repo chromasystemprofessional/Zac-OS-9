@@ -14,6 +14,9 @@ jobs:
   survey:
     runs-on: ubuntu-24.04
     container: debian:testing
+    defaults:
+      run:
+        shell: bash
     timeout-minutes: 20
     steps:
       - name: Install survey tools
