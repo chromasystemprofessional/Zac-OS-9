@@ -837,7 +837,12 @@ static void installIntoApplications(const QStringList &paths) {
 		}
 	}
 	if (!rest.isEmpty()) {
-		platinumStartApplication(siblingProgram("zacos9-appinstall"), rest);
+		if (programExists("zacos9-appinstall")) {
+			platinumStartApplication(siblingProgram("zacos9-appinstall"), rest);
+		} else {
+			Alert::ask(tr9("Installing applications isn't available in this session."),
+				"OK", QString());
+		}
 	}
 }
 
