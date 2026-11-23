@@ -1,3 +1,12 @@
+zacos9 (1.18.31) trixie; urgency=medium
+
+  * Transitional release for computers whose 1.18.27/1.18.29 updater cannot
+    install the split packages without the signed repository. The published
+    zacos9_1.18.31_amd64.deb is a one-release monolith built from the 1.18.30
+    packages; the source tree stays split, and 1.18.32 returns to it.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Sun, 22 Nov 2026 22:17:11 -0500
+
 zacos9 (1.18.30) trixie; urgency=medium
 
   * Software Update downloads a release's whole package set — zacos9,
