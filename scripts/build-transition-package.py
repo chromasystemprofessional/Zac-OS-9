@@ -16,6 +16,12 @@ package (and SHA256SUMS) in that GitHub release: the fixed updater downloads
 the whole package set, so a monolith plus split session/greeter assets in one
 release would conflict. Publish the split packages to the signed repository.
 
+The monolith is self-contained, so it also breaks and replaces the split
+session and greeter up to and including its own version. Otherwise a computer
+that installed the same version from the signed repository would have both
+the split packages and the monolith owning the same files, and dpkg would
+refuse to unpack the monolith.
+
 When a release returns to the split GitHub layout, its split packages must
 carry Breaks/Replaces: zacos9 (<< that version), so they can take the files
 back from the last monolith.
@@ -233,8 +239,8 @@ exit 0
         if suggests:
             fields.append(("Suggests", suggests))
         fields += [
-            ("Breaks", f"zacos9-session (<< {args.version}), zacos9-greeter (<< {args.version})"),
-            ("Replaces", f"zacos9-session (<< {args.version}), zacos9-greeter (<< {args.version})"),
+            ("Breaks", f"zacos9-session (<= {args.version}), zacos9-greeter (<= {args.version})"),
+            ("Replaces", f"zacos9-session (<= {args.version}), zacos9-greeter (<= {args.version})"),
             ("Section", base.get("Section", "x11")),
             ("Priority", base.get("Priority", "optional")),
         ]
