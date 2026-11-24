@@ -10,7 +10,7 @@ It opens from Apple menu > **New Tricks**.
 ## What it's for
 
 A short, curated catalog remains the default. Its **Extras** category
-holds ZacOS's own add-ons (below, "ZacOS Extras"). **All Applications** expands
+holds ZacOS's add-ons (below, "ZacOS Extras"). **All Applications** expands
 it with desktop applications described by the configured Debian repositories'
 AppStream metadata. Search filters names, descriptions and package identifiers.
 **Include Flathub applications** adds Flathub apps to the main categories and
@@ -168,8 +168,11 @@ of who calls it — the GUI is not the only thing trusted to get this
 right. `zacos9-store`'s package names come from the shipped catalog or validated
 AppStream metadata, never directly from the search field. Flatpak identifiers
 are validated separately and commands receive argument arrays, not shell strings.
-The privileged helper still checks Debian arguments independently.
-`DEBIAN_FRONTEND=noninteractive` keeps apt from ever
+An extra's own `repo` and `tag` come from the shipped catalog too: the
+repository must be two plain GitHub path pieces, the tag a plain prefix, and
+the package still has to arrive over https, match GitHub's digest and be the
+package the catalog names. The privileged helper still checks Debian
+arguments independently. `DEBIAN_FRONTEND=noninteractive` keeps apt from ever
 blocking on a question with no one positioned to answer it.
 
 `installed` needs no privilege (reading dpkg's own status is not a
@@ -218,30 +221,41 @@ repository mutations.
 The **Extras** category offers add-ons from the ZacOS Extras repository
 (`chromasystemprofessional/ZacOS-Extras` on GitHub, checked out beside this
 tree as `ZAC-OS-EXTRAS`), such as **Hue Lights** and **Turntable** (a USB
-turntable played through the sound output) for The Collar. Each extra
-is released there on its own, tagged `EXTRA-vVERSION` (`hue-v0.1.0`), with
-a `PACKAGE_VERSION_ARCH.deb` attached. Its package puts its program in
-`/usr/bin` and starts it at login from `/etc/xdg/autostart`.
+turntable played through the sound output) for The Collar, and applications
+such as **Netzac**. Most extras are released there on their own, tagged
+`EXTRA-vVERSION` (`hue-v0.1.0`), with a `PACKAGE_VERSION_ARCH.deb` attached.
+A Collar extra's package puts its program in `/usr/bin` and starts it at
+login from `/etc/xdg/autostart`.
 
 A catalog item is an extra when it has an `"extra"` object:
 `{ "id": "hue", "start": "zacos9-collar-hue" }`, with exactly one package.
+`start` is optional. Without it the extra is an ordinary application: its
+package installs a desktop entry, so it appears in Applications, and nothing
+starts it in the background. Netzac is one:
+`{ "id": "netzac", "repo": "guimaraeslucas/netzac", "tag": "v" }`.
+`repo` is a GitHub repository (`owner/name`) whose releases hold the extra's
+package; it defaults to the ZacOS Extras repository. `tag` is the prefix
+before the version in a release tag (`v` finds `v1.0.0.0`); it defaults to
+`ID-v`. Both are validated before either becomes part of a URL.
+
 Install:
-1. Lists the repository's releases (GitHub's API; `ZACOS9_EXTRAS_URL`
-   replaces the URL in tests) and takes the newest whose tag starts with
-   `ID-v`, skipping drafts and pre-releases. Its asset must be named for the
-   item's package and this machine's architecture, and be served over https.
+1. Lists the item's release repository (GitHub's API; `ZACOS9_EXTRAS_URL`
+   replaces the official repository's URL in tests, never a third-party
+   extra's) and takes the newest whose tag starts with the item's prefix,
+   skipping drafts and pre-releases. Its asset must be named for the item's
+   package and this machine's architecture, and be served over https.
 2. Downloads it, checks it against GitHub's SHA-256 digest when there is
    one, and checks that `dpkg-deb -f` names the item's package.
 3. Installs it with the helper's `install-deb`, as the App Installer does,
    so apt brings in its dependencies. Nothing new runs as root.
-4. Starts `start` (a plain program name) once, so it runs without logging
-   out.
+4. Starts `start` (a plain program name) once, if the extra has one, so it
+   runs without logging out.
 
 Remove is the helper's ordinary `remove`. An extra's package stops its
 program when removed. The status line reads "ZacOS Extras: Installed."
 
-Left out: Software Update doesn't look for new releases of installed
-extras yet. Removing and installing again picks up the newest one.
+Software Update looks for newer releases of installed extras too, asking
+each extra's repository once; see [Updates](updates.md).
 
 ## Look-and-feel presets
 

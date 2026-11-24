@@ -115,15 +115,29 @@ int main(int argc, char **argv) {
 		{ "id": "x2", "name": "Bad Name", "category": "Extras", "packages": ["p"], "extra": { "id": "../hue" } },
 		{ "id": "x3", "name": "Bad Start", "category": "Extras", "packages": ["p"],
 		  "extra": { "id": "ok", "start": "sh -c reboot" } },
-		{ "id": "x4", "name": "Two", "category": "Extras", "packages": ["p", "q"], "extra": { "id": "two" } }
+		{ "id": "x4", "name": "Two", "category": "Extras", "packages": ["p", "q"], "extra": { "id": "two" } },
+		{ "id": "x5", "name": "Browser", "category": "Extras", "packages": ["zacos9-extra-netzac"],
+		  "extra": { "id": "netzac", "repo": "guimaraeslucas/netzac", "tag": "v" } },
+		{ "id": "x6", "name": "Bad Repo", "category": "Extras", "packages": ["p"],
+		  "extra": { "id": "ok", "repo": "../netzac" } },
+		{ "id": "x7", "name": "Bad Tag", "category": "Extras", "packages": ["p"],
+		  "extra": { "id": "ok", "tag": "v 1" } }
 	] })JSON");
 	const std::vector<StoreItem> extras = storeItems();
-	check(extras.size() == 1 && extras[0].source == "extra" && extras[0].extra == "hue" &&
-		extras[0].extraStart == "zacos9-collar-hue", "an extra is read with its id and program");
-	check(extras.size() == 1, "an extra with a bad id or program, or two packages, is left out");
+	check(extras.size() == 2 && extras[0].source == "extra" && extras[0].extra == "hue" &&
+		extras[0].extraStart == "zacos9-collar-hue" && extras[0].extraTag == "hue-v",
+		"an extra is read with its id, program and official tag prefix");
+	check(extras.size() == 2 && extras[1].extra == "netzac" &&
+		extras[1].extraRepo == "guimaraeslucas/netzac" && extras[1].extraTag == "v" &&
+		extras[1].extraStart.isEmpty(),
+		"an extra can name its own repository and tag prefix, and install as an application");
+	check(extras.size() == 2, "an extra with a bad id, program, repository or tag, or two packages, is left out");
 	check(!qEnvironmentVariableIsSet("ZACOS9_EXTRAS_URL") &&
 		extrasReleasesUrl() == "https://api.github.com/repos/chromasystemprofessional/ZacOS-Extras/releases?per_page=100",
-		"extras come from the ZacOS-Extras repository");
+		"official extras come from the ZacOS-Extras repository");
+	check(extrasReleasesUrl("guimaraeslucas/netzac") ==
+		"https://api.github.com/repos/guimaraeslucas/netzac/releases?per_page=100",
+		"a third-party extra's own repository is asked for its releases");
 
 	const QByteArray releases = R"JSON([
 		{ "tag_name": "other-v9.0", "assets": [ { "name": "zacos9-extra-other_9.0_amd64.deb",
@@ -139,22 +153,28 @@ int main(int argc, char **argv) {
 		{ "tag_name": "hue-v0.1.0", "assets": [ { "name": "zacos9-extra-hue_0.1.0_amd64.deb",
 			"browser_download_url": "https://example.com/old.deb" } ] }
 	])JSON";
-	const ExtraRelease hue = parseExtraReleases(releases, "hue", "zacos9-extra-hue", "amd64");
+	const ExtraRelease hue = parseExtraReleases(releases, "hue-v", "zacos9-extra-hue", "amd64");
 	check(hue.valid && hue.version == "0.1.1" && hue.debUrl == "https://example.com/hue.deb",
 		"the newest release with the extra's tag, skipping drafts, pre-releases and other extras");
 	check(hue.sha256 == "abcdef", "with GitHub's digest");
-	check(!parseExtraReleases(releases, "hue", "zacos9-extra-hue", "riscv64").valid,
+	check(!parseExtraReleases(releases, "hue-v", "zacos9-extra-hue", "riscv64").valid,
 		"no package for this architecture is no release");
-	check(!parseExtraReleases(releases, "hue", "zacos9-extra-lights", "amd64").valid,
+	check(!parseExtraReleases(releases, "hue-v", "zacos9-extra-lights", "amd64").valid,
 		"nor is a package with another name");
+	const QByteArray netzac = R"JSON([ { "tag_name": "v1.0.0.0", "assets": [
+		{ "name": "zacos9-extra-netzac_1.0.0.0_amd64.deb",
+		  "browser_download_url": "https://example.com/netzac.deb" } ] } ])JSON";
+	const ExtraRelease browser = parseExtraReleases(netzac, "v", "zacos9-extra-netzac", "amd64");
+	check(browser.valid && browser.version == "1.0.0.0" && browser.debUrl == "https://example.com/netzac.deb",
+		"an extra's own tag prefix finds its release");
 	const QByteArray plain = R"JSON([ { "tag_name": "hue-v1.0", "assets": [
 		{ "name": "zacos9-extra-hue_1.0_amd64.deb", "browser_download_url": "http://example.com/hue.deb" },
 		{ "name": "zacos9-extra-hue_1.0_amd64.deb", "browser_download_url": "file:///tmp/hue.deb" } ] } ])JSON";
-	check(!parseExtraReleases(plain, "hue", "zacos9-extra-hue", "amd64").valid,
+	check(!parseExtraReleases(plain, "hue-v", "zacos9-extra-hue", "amd64").valid,
 		"a package not served over https is refused");
-	check(parseExtraReleases(plain, "hue", "zacos9-extra-hue", "amd64", true).debUrl == "file:///tmp/hue.deb",
+	check(parseExtraReleases(plain, "hue-v", "zacos9-extra-hue", "amd64", true).debUrl == "file:///tmp/hue.deb",
 		"file: is only for tests");
-	check(!parseExtraReleases("not json", "hue", "zacos9-extra-hue", "amd64").valid, "a bad reply is no release");
+	check(!parseExtraReleases("not json", "hue-v", "zacos9-extra-hue", "amd64").valid, "a bad reply is no release");
 
 	/* ---- the helper's own validation, run directly, never through pkexec --- */
 	QString out;

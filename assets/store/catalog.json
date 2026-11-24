@@ -74,6 +74,10 @@
 
     { "id": "extra-frontdesk", "name": "Front Desk", "category": "Extras",
       "blurb": "Turn a ZacOS account into a shared-computer launcher: a full-screen panel with the programs and documents you choose, a Front Desk login, and per-account menus, save locations, Finder access and speech. It uses the account's existing “Use only chosen programs” list; Front Desk Setup chooses the programs and settings. Choose the account in Front Desk Setup, then log out and back in to see its panel.",
-      "packages": ["zacos9-extra-frontdesk"], "extra": { "id": "frontdesk", "start": "zacos9-frontdesk-setup" } }
+      "packages": ["zacos9-extra-frontdesk"], "extra": { "id": "frontdesk", "start": "zacos9-frontdesk-setup" } },
+
+    { "id": "extra-netzac", "name": "Netzac", "category": "Extras",
+      "blurb": "A web browser in classic Navigator 4.0 style, drawn with ZacOS 9's Platinum look, with tabs and Calm Mode. It installs as an application in your Applications folder; there is no Collar module and nothing starts in the background.",
+      "packages": ["zacos9-extra-netzac"], "extra": { "id": "netzac", "repo": "guimaraeslucas/netzac", "tag": "v" } }
   ]
 }

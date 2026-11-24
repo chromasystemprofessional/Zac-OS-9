@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QList>
 #include <QNetworkAccessManager>
 #include <QProcess>
 #include <QStringList>
@@ -12,7 +13,7 @@
 #include "updatecheck.h"
 
 /* An installed ZacOS Extra with a newer release, from its catalog entry
- * and the extras repository's releases. */
+ * and its release repository (the official extras one, or its own). */
 struct ExtraUpdate {
 	QString package; /* zacos9-extra-steam */
 	QString extra;   /* steam */
@@ -93,13 +94,19 @@ private:
 	QTimer m_sweep;
 	QNetworkAccessManager m_net;
 	QNetworkReply *m_reply = nullptr;
-	QNetworkReply *m_extrasReply = nullptr;
+	QList<QNetworkReply *> m_extrasReplies;
 	QProcess *m_proc = nullptr;
 	QString m_procErr;
 
 	void check();
 	void checkGitHub();
+	/* The release repositories of installed extras the catalog still
+	 * offers, each once; empty means the official ZacOS Extras one. */
+	QStringList extraReleaseRepos() const;
 	void checkExtras();
+	void checkExtraRepo(const QString &repo);
+	void readExtraReleases(const QString &repo, const QByteArray &json);
+	void addExtrasProblem(const QString &repo, const QString &why);
 	void checkDebian();
 	void checkDone();
 	void showResults();

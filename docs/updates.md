@@ -11,7 +11,8 @@ an installed ZacOS 9 current. It covers three things in one window:
 - **New versions of ZacOS Extras.** Extras you installed from Software's
   Extras page (Steam, Game Player, Hue Lights and the rest) are GitHub
   releases of `chromasystemprofessional/ZacOS-Extras`, tagged
-  `EXTRA-vVERSION`.
+  `EXTRA-vVERSION`. An extra may name its own repository and tag prefix in
+  the catalog (Netzac does), and Software Update asks that repository too.
 
 ## What it does
 
@@ -24,9 +25,9 @@ an installed ZacOS 9 current. It covers three things in one window:
      `dpkg --compare-versions`.
    - A repository with no releases yet (GitHub answers 404) counts as up to
      date.
-   - It asks the extras repository for its releases once, and compares each
-     installed extra's `dpkg` version with the newest release the catalog
-     still offers. An extra removed from the catalog is not updated.
+   - It asks each installed extra's release repository once, and compares
+     its `dpkg` version with the newest release the catalog still offers.
+     An extra removed from the catalog is not updated.
    - Meanwhile it runs `zacos9-appstore-helper refresh` (`apt-get update`, as
      root) and then `apt-get -s --with-new-pkgs upgrade` as the user. The
      second is a simulation whose `Inst` lines are the Debian updates.
@@ -79,8 +80,9 @@ Settings for tests and forks:
 - `ZACOS9_UPDATE_REPO` sets the repository (`owner/name`).
 - `ZACOS9_UPDATE_URL` sets the whole release URL. A `file://` URL works for
   trying the window without the network.
-- `ZACOS9_EXTRAS_URL` sets the extras releases URL; a `file://` URL works
-  for trying extras updates without the network.
+- `ZACOS9_EXTRAS_URL` sets the official extras releases URL; a `file://`
+  URL works for trying extras updates without the network. It does not
+  replace a third-party extra's own repository URL.
 - `ZACOS9_WHATSNEW_DIR` sets where `--whatsnew` looks for `<version>.txt`
   notes, for tests.
 

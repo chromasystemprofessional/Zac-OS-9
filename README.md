@@ -122,8 +122,8 @@ issue template.
   </tr>
   <tr>
     <td><b>Thousands of programs</b>, from Debian's archive and Flathub, plus the
-      ZacOS Extras: Steam, Game Player, Hue Lights, Turntable and Phone. They
-      wear the Platinum look too.</td>
+      ZacOS Extras: Steam, Game Player, Hue Lights, Turntable, Phone and
+      Netzac. They wear the Platinum look too.</td>
     <td><b>About This Computer</b> says which version you run, and Software
       Update (Zac menu ▸ Fetch Updates) installs new ZacOS releases, Debian's
       security fixes and the extras together.</td>

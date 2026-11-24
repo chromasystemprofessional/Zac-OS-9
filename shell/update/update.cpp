@@ -322,16 +322,18 @@ void UpdateWindow::check() {
 	m_extras.clear();
 	m_extrasError.clear();
 	m_current = installedVersion(PACKAGE);
+	const QStringList repos = extraReleaseRepos();
 	QString looking = "Looking for a new version of ZacOS 9 and for updates to the Debian software it runs on.";
-	if (!m_installedExtras.empty()) {
+	if (!repos.isEmpty()) {
 		looking += " It also looks for new versions of your ZacOS Extras.";
 	}
 	setText("Checking for updates…", looking);
 	setButtons(QString(), "Cancel");
-	m_pendingChecks = 2 + (m_installedExtras.empty() ? 0 : 1);
+	/* One reply for ZacOS, one for Debian, one per extras repository. */
+	m_pendingChecks = 2 + static_cast<int>(repos.size());
 	checkGitHub();
 	checkDebian();
-	if (!m_installedExtras.empty()) {
+	if (!repos.isEmpty()) {
 		checkExtras();
 	}
 }
@@ -366,68 +368,109 @@ void UpdateWindow::checkGitHub() {
 	});
 }
 
+QStringList UpdateWindow::extraReleaseRepos() const {
+	QStringList repos;
+	for (const StoreItem &item : storeItems()) {
+		if (item.source != "extra" || item.packages.size() != 1) {
+			continue;
+		}
+		bool installed = false;
+		for (const InstalledExtra &extra : m_installedExtras) {
+			if (extra.package == item.packages.first()) {
+				installed = true;
+				break;
+			}
+		}
+		if (installed && !repos.contains(item.extraRepo)) {
+			repos << item.extraRepo;
+		}
+	}
+	return repos;
+}
+
+void UpdateWindow::addExtrasProblem(const QString &repo, const QString &why) {
+	/* An official-extras failure needs no repository name; a third-party
+	 * extra's does, since several may be checked. */
+	if (!m_extrasError.isEmpty()) {
+		m_extrasError += "; ";
+	}
+	if (!repo.isEmpty()) {
+		m_extrasError += repo + ": ";
+	}
+	m_extrasError += why;
+}
+
 void UpdateWindow::checkExtras() {
-	QNetworkRequest req{ QUrl(extrasReleasesUrl()) };
+	for (const QString &repo : extraReleaseRepos()) {
+		checkExtraRepo(repo);
+	}
+}
+
+void UpdateWindow::checkExtraRepo(const QString &repo) {
+	QNetworkRequest req{ QUrl(extrasReleasesUrl(repo)) };
 	req.setRawHeader("Accept", "application/vnd.github+json");
 	req.setRawHeader("User-Agent", "zacos9-update");
 	req.setTransferTimeout(20000);
-	m_extrasReply = m_net.get(req);
-	QNetworkReply *reply = m_extrasReply;
-	connect(reply, &QNetworkReply::finished, this, [this, reply] {
-		reply->deleteLater();
-		if (m_extrasReply != reply) {
+	QNetworkReply *reply = m_net.get(req);
+	m_extrasReplies << reply;
+	connect(reply, &QNetworkReply::finished, this, [this, reply, repo] {
+		if (!m_extrasReplies.removeOne(reply)) {
+			reply->deleteLater();
 			return; /* cancelled */
 		}
-		m_extrasReply = nullptr;
+		reply->deleteLater();
 		const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
 		if (status == 404) {
-			/* The extras repository has no releases: nothing to update. */
+			/* This repository has no releases: nothing to update. */
 		} else if (reply->error() != QNetworkReply::NoError) {
-			m_extrasError = reply->errorString();
+			addExtrasProblem(repo, reply->errorString());
 		} else {
 			const QByteArray json = reply->readAll();
 			if (!QJsonDocument::fromJson(json).isArray()) {
-				m_extrasError = "the list of releases couldn’t be read";
+				addExtrasProblem(repo, "the list of releases couldn’t be read");
 			} else {
-				/* Only extras the catalog still offers are updated: one
-				 * removed from it (Night Mode) is left alone. */
-				const bool testing = !qEnvironmentVariableIsEmpty("ZACOS9_EXTRAS_URL");
-				const QString arch = debArchitecture();
-				const std::vector<StoreItem> catalog = storeItems();
-				for (const StoreItem &item : catalog) {
-					if (item.source != "extra" || item.packages.size() != 1) {
-						continue;
-					}
-					const QString package = item.packages.first();
-					QString from;
-					for (const InstalledExtra &installed : m_installedExtras) {
-						if (installed.package == package) {
-							from = installed.version;
-						}
-					}
-					if (from.isEmpty()) {
-						continue;
-					}
-					const ExtraRelease release = parseExtraReleases(json, item.extra, package, arch, testing);
-					if (!release.valid || !versionNewer(release.version, from)) {
-						continue;
-					}
-					ExtraUpdate u;
-					u.package = package;
-					u.extra = item.extra;
-					u.name = item.name;
-					u.start = item.extraStart;
-					u.from = from;
-					u.to = release.version;
-					u.debName = QFileInfo(QUrl(release.debUrl).path()).fileName();
-					u.debUrl = release.debUrl;
-					u.sha256 = release.sha256;
-					m_extras.push_back(u);
-				}
+				readExtraReleases(repo, json);
 			}
 		}
 		checkDone();
 	});
+}
+
+void UpdateWindow::readExtraReleases(const QString &repo, const QByteArray &json) {
+	/* Only extras the catalog still offers are updated: one removed from
+	 * it (Night Mode) is left alone. */
+	const bool testing = !qEnvironmentVariableIsEmpty("ZACOS9_EXTRAS_URL");
+	const QString arch = debArchitecture();
+	for (const StoreItem &item : storeItems()) {
+		if (item.source != "extra" || item.packages.size() != 1 || item.extraRepo != repo) {
+			continue;
+		}
+		const QString package = item.packages.first();
+		QString from;
+		for (const InstalledExtra &installed : m_installedExtras) {
+			if (installed.package == package) {
+				from = installed.version;
+			}
+		}
+		if (from.isEmpty()) {
+			continue;
+		}
+		const ExtraRelease release = parseExtraReleases(json, item.extraTag, package, arch, testing);
+		if (!release.valid || !versionNewer(release.version, from)) {
+			continue;
+		}
+		ExtraUpdate u;
+		u.package = package;
+		u.extra = item.extra;
+		u.name = item.name;
+		u.start = item.extraStart;
+		u.from = from;
+		u.to = release.version;
+		u.debName = QFileInfo(QUrl(release.debUrl).path()).fileName();
+		u.debUrl = release.debUrl;
+		u.sha256 = release.sha256;
+		m_extras.push_back(u);
+	}
 }
 
 void UpdateWindow::checkDebian() {
@@ -926,9 +969,9 @@ void UpdateWindow::closeEvent(QCloseEvent *e) {
 		m_reply = nullptr;
 		r->abort();
 	}
-	if (m_extrasReply) {
-		QNetworkReply *r = m_extrasReply;
-		m_extrasReply = nullptr;
+	const QList<QNetworkReply *> extraReplies = m_extrasReplies;
+	m_extrasReplies.clear();
+	for (QNetworkReply *r : extraReplies) {
 		r->abort();
 	}
 	if (m_proc) {

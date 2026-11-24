@@ -68,10 +68,23 @@ std::vector<StoreItem> storeItems() {
 			item.source = "extra";
 			item.extra = extra.value("id").toString();
 			item.extraStart = extra.value("start").toString();
-			/* Both become parts of URLs, tags and a command line. */
+			item.extraRepo = extra.value("repo").toString();
+			/* The version follows the prefix in a release's tag. */
+			item.extraTag = extra.value("tag").toString();
+			if (item.extraTag.isEmpty()) {
+				item.extraTag = item.extra + "-v";
+			}
+			/* These become parts of URLs, tags and a command line. A
+			 * repository is two non-empty path pieces, each starting with
+			 * a letter or digit so "..", a scheme or a query can't appear. */
 			static const QRegularExpression name("\\A[a-z0-9][a-z0-9.-]*\\z");
+			static const QRegularExpression repo(
+				"\\A[A-Za-z0-9][A-Za-z0-9_.-]*/[A-Za-z0-9][A-Za-z0-9_.-]*\\z");
+			static const QRegularExpression tag("\\A[A-Za-z0-9._-]+\\z");
 			if (!name.match(item.extra).hasMatch() || item.packages.size() != 1 ||
-					(!item.extraStart.isEmpty() && !name.match(item.extraStart).hasMatch())) {
+					(!item.extraStart.isEmpty() && !name.match(item.extraStart).hasMatch()) ||
+					(!item.extraRepo.isEmpty() && !repo.match(item.extraRepo).hasMatch()) ||
+					!tag.match(item.extraTag).hasMatch()) {
 				continue;
 			}
 		}
@@ -283,16 +296,26 @@ bool parseSoftwareCatalog(const QByteArray &json, const QString &source,
 	return true;
 }
 
-QString extrasReleasesUrl() {
-	const QString env = qEnvironmentVariable("ZACOS9_EXTRAS_URL");
-	return env.isEmpty() ? QStringLiteral("https://api.github.com/repos/chromasystemprofessional/ZacOS-Extras/releases?per_page=100")
-		: env;
+static const char OFFICIAL_EXTRAS_REPO[] = "chromasystemprofessional/ZacOS-Extras";
+
+QString extrasReleasesUrl(const QString &repo) {
+	const bool official = repo.isEmpty() ||
+		repo.compare(QLatin1String(OFFICIAL_EXTRAS_REPO), Qt::CaseInsensitive) == 0;
+	if (official) {
+		const QString env = qEnvironmentVariable("ZACOS9_EXTRAS_URL");
+		if (!env.isEmpty()) {
+			return env;
+		}
+	}
+	const QString name = official ? QString::fromLatin1(OFFICIAL_EXTRAS_REPO) : repo;
+	return QStringLiteral("https://api.github.com/repos/") + name +
+		QStringLiteral("/releases?per_page=100");
 }
 
-ExtraRelease parseExtraReleases(const QByteArray &json, const QString &extra, const QString &package,
-		const QString &arch, bool allowFile) {
+ExtraRelease parseExtraReleases(const QByteArray &json, const QString &tagPrefix,
+		const QString &package, const QString &arch, bool allowFile) {
 	static const QRegularExpression versionRe("^[0-9][A-Za-z0-9.+~]*$");
-	const QString prefix = extra + "-v";
+	const QString &prefix = tagPrefix;
 	for (const QJsonValue &v : QJsonDocument::fromJson(json).array()) {
 		const QJsonObject o = v.toObject();
 		const QString tag = o.value("tag_name").toString();
@@ -327,6 +350,8 @@ ExtraRelease parseExtraReleases(const QByteArray &json, const QString &extra, co
 static QByteArray fetch(QNetworkAccessManager *net, const QString &url, QString *err) {
 	QNetworkRequest req{ QUrl(url) };
 	req.setRawHeader("Accept", "application/vnd.github+json");
+	/* GitHub's API rejects a request without one. */
+	req.setRawHeader("User-Agent", "zacos9-store");
 	req.setTransferTimeout(60000);
 	QNetworkReply *reply = net->get(req);
 	waitUntil([reply] { return reply->isFinished(); }, -1);
@@ -348,7 +373,7 @@ bool installExtra(const StoreItem &item, QString *err) {
 	const QString package = item.packages.first();
 	const bool testing = !qEnvironmentVariableIsEmpty("ZACOS9_EXTRAS_URL");
 	QNetworkAccessManager net;
-	const QByteArray list = fetch(&net, extrasReleasesUrl(), err);
+	const QByteArray list = fetch(&net, extrasReleasesUrl(item.extraRepo), err);
 	if (list.isEmpty()) {
 		return false;
 	}
@@ -358,7 +383,7 @@ bool installExtra(const StoreItem &item, QString *err) {
 	if (!ok) {
 		return false;
 	}
-	const ExtraRelease release = parseExtraReleases(list, item.extra, package, arch, testing);
+	const ExtraRelease release = parseExtraReleases(list, item.extraTag, package, arch, testing);
 	if (!release.valid) {
 		*err = item.name + " hasn’t been released for this computer yet.";
 		return false;

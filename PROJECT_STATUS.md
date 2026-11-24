@@ -93,6 +93,9 @@ This page is what's true now and what's next. What changed and when is in
   channels; Classic opens Mac OS 9 applications from the Finder and can show
   their windows as ordinary ZacOS windows
   ([Bloodhound](docs/bloodhound.md), [Classic](docs/classic-seamless.md)).
+- **Netzac** is offered in Software's Extras: a Navigator 4.0-style web
+  browser installed from its own GitHub releases as an ordinary application,
+  so it opens from Applications rather than The Collar.
 
 ## Being worked on
 

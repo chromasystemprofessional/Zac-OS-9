@@ -23,11 +23,13 @@ struct StoreItem {
 	 * button's label to switch it on (`styleLabel`) and off (`styleReset`),
 	 * and what it does. Empty `styleId` means none. */
 	QString styleId, styleLabel, styleReset, styleBlurb;
-	/* A ZacOS extra (source "extra"): its directory in the extras
-	 * repository, which names its releases (EXTRA-vVERSION), and the
-	 * program to start once it's installed, so it runs without logging
-	 * out (its package also starts it at every login). */
-	QString extra, extraStart;
+	/* A ZacOS extra (source "extra"): its id, the GitHub repository its
+	 * releases come from (empty means the official ZacOS-Extras one),
+	 * the tag prefix before each release's version, and the program to
+	 * start once it's installed, so it runs without logging out. Empty
+	 * `extraStart` means an ordinary application: its package installs
+	 * a desktop entry, and nothing starts it in the background. */
+	QString extra, extraStart, extraRepo, extraTag;
 };
 
 /* The shipped catalog (pl_data_dir()/store/catalog.json, or
@@ -65,19 +67,23 @@ bool flathubEnabled(bool *ok, QString *err);
 bool flatpakInstalled(const QString &id, bool *ok, QString *err);
 QString softwareCatalogHelper();
 
-/* ZacOS Extras: add-ons released on GitHub
- * (chromasystemprofessional/ZacOS-Extras) as EXTRA-vVERSION, each with
- * a PACKAGE_VERSION_ARCH.deb. The list of releases, from GitHub's API;
- * ZACOS9_EXTRAS_URL replaces it (tests serve a file). */
-QString extrasReleasesUrl();
+/* ZacOS Extras: add-ons released on GitHub with a PACKAGE_VERSION_ARCH.deb.
+ * The official ones are chromasystemprofessional/ZacOS-Extras, tagged
+ * EXTRA-vVERSION; an extra may name its own repository and tag prefix in
+ * the catalog instead. `repo` is "owner/name"; empty means the official
+ * repository. ZACOS9_EXTRAS_URL replaces the official URL (tests serve
+ * a file) and never a third-party extra's. */
+QString extrasReleasesUrl(const QString &repo = QString());
 struct ExtraRelease {
 	QString version, debUrl, sha256; /* sha256: GitHub's digest, hex; may be empty */
 	bool valid = false;
 };
-/* The newest release of `extra` in a GitHub releases list (which GitHub
- * gives newest first), skipping drafts and pre-releases. Its package must
- * be `package` for `arch`, served over https (or file:, if `allowFile`). */
-ExtraRelease parseExtraReleases(const QByteArray &json, const QString &extra, const QString &package,
+/* The newest release of an extra in a GitHub releases list (which GitHub
+ * gives newest first), skipping drafts and pre-releases. `tagPrefix` is
+ * what comes before the version in a tag (`hue-v` in `hue-v0.1.0`, `v` in
+ * `v1.0.0`). Its package must be `package` for `arch`, served over https
+ * (or file:, if `allowFile`). */
+ExtraRelease parseExtraReleases(const QByteArray &json, const QString &tagPrefix, const QString &package,
 	const QString &arch, bool allowFile = false);
 /* Finds the extra's newest release, downloads its .deb, checks its digest
  * and that it is the catalog's package, and installs it through the
