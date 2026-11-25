@@ -319,31 +319,28 @@ struct TransferTask {
 
 QString createAlias(const QString &target, const QString &destDir, const QString &name,
 		const QString &suffix) {
-	const QFileInfo original(target);
-	if (!original.exists() || name.isEmpty() || name.contains('/') || name == "." || name == ".." ||
-			!QFileInfo(destDir).isDir()) {
+	AliasCreateProblem problem = AliasCreateProblem::None;
+	const QString candidate = aliasCreate(target, destDir, name, suffix, &problem);
+	if (!candidate.isEmpty() || problem == AliasCreateProblem::None) {
+		return candidate;
+	}
+	switch (problem) {
+	case AliasCreateProblem::Unavailable:
 		Alert::ask(tr9("The alias cannot be made because its original or destination is unavailable."),
 			"OK", QString());
-		return {};
-	}
-	QDir destination(destDir);
-	QString candidate = name + suffix;
-	for (int i = 2; QFileInfo(destination.filePath(candidate)).exists() ||
-			QFileInfo(destination.filePath(candidate)).isSymLink(); i++) {
-		candidate = name + suffix + " " + QString::number(i);
-	}
-	if (!QFile::link(original.absoluteFilePath(), destination.filePath(candidate))) {
+		break;
+	case AliasCreateProblem::LinkFailed:
 		Alert::ask(tr9("The alias could not be created in %1. Check folder permissions.").arg(destDir),
 			"OK", QString());
-		return {};
-	}
-	if (!aliasRecord(destination.filePath(candidate), original.absoluteFilePath())) {
-		QFile::remove(destination.filePath(candidate));
+		break;
+	case AliasCreateProblem::RecordFailed:
 		Alert::ask(tr9("The alias was not created because its identity record could not be saved."),
 			"OK", QString());
-		return {};
+		break;
+	case AliasCreateProblem::None:
+		break;
 	}
-	return candidate;
+	return {};
 }
 
 QString createVirtualAlias(const QString &vfsPath, const QString &destDir, const QString &name,

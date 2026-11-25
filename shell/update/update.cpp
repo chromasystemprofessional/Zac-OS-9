@@ -464,6 +464,8 @@ void UpdateWindow::readExtraReleases(const QString &repo, const QByteArray &json
 		u.extra = item.extra;
 		u.name = item.name;
 		u.start = item.extraStart;
+		u.aliasName = item.extraAliasName;
+		u.aliasApp = item.extraAliasApp;
 		u.from = from;
 		u.to = release.version;
 		u.debName = QFileInfo(QUrl(release.debUrl).path()).fileName();
@@ -784,6 +786,16 @@ void UpdateWindow::installNextExtra() {
 					failed("“" + u.name + "” " + u.to + " couldn’t be installed" +
 						(m_procErr.isEmpty() ? QString(".") : ": " + m_procErr));
 					return;
+				}
+				/* The update keeps the alias; put it back if an older
+				 * install never had one, or the user removed it. */
+				if (!u.aliasName.isEmpty()) {
+					StoreItem item;
+					item.name = u.name;
+					item.extraAliasName = u.aliasName;
+					item.extraAliasApp = u.aliasApp;
+					QString aliasError;
+					createExtraDesktopAlias(item, &aliasError);
 				}
 				QFile::remove(m_extraPath);
 				m_extraIndex++;

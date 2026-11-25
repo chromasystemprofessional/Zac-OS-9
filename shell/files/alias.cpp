@@ -233,6 +233,41 @@ bool repoint(const QString &aliasPath, const QString &target) {
 
 } // namespace
 
+QString aliasCreate(const QString &target, const QString &destDir, const QString &name,
+		const QString &suffix, AliasCreateProblem *problem) {
+	if (problem) {
+		*problem = AliasCreateProblem::None;
+	}
+	const QFileInfo original(target);
+	if (!original.exists() || name.isEmpty() || name.contains('/') || name == "." || name == ".." ||
+			!QFileInfo(destDir).isDir()) {
+		if (problem) {
+			*problem = AliasCreateProblem::Unavailable;
+		}
+		return {};
+	}
+	QDir destination(destDir);
+	QString candidate = name + suffix;
+	for (int i = 2; QFileInfo(destination.filePath(candidate)).exists() ||
+			QFileInfo(destination.filePath(candidate)).isSymLink(); i++) {
+		candidate = name + suffix + " " + QString::number(i);
+	}
+	if (!QFile::link(original.absoluteFilePath(), destination.filePath(candidate))) {
+		if (problem) {
+			*problem = AliasCreateProblem::LinkFailed;
+		}
+		return {};
+	}
+	if (!aliasRecord(destination.filePath(candidate), original.absoluteFilePath())) {
+		QFile::remove(destination.filePath(candidate));
+		if (problem) {
+			*problem = AliasCreateProblem::RecordFailed;
+		}
+		return {};
+	}
+	return candidate;
+}
+
 bool aliasRecord(const QString &aliasPath, const QString &target) {
 	const Identity id = identityOf(target);
 	return id.valid && writeRecord(aliasPath, id);

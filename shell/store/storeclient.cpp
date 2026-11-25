@@ -4,6 +4,7 @@
 
 #include <QApplication>
 #include <QCryptographicHash>
+#include <QDir>
 #include <QFile>
 #include <QFileInfo>
 #include <QJsonArray>
@@ -12,10 +13,12 @@
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QRegularExpression>
+#include <QStandardPaths>
 #include <QTemporaryDir>
 #include <functional>
 #include <unistd.h>
 
+#include "alias.h"
 #include "settings.h"
 
 static QString catalogFile() {
@@ -86,6 +89,21 @@ std::vector<StoreItem> storeItems() {
 					(!item.extraRepo.isEmpty() && !repo.match(item.extraRepo).hasMatch()) ||
 					!tag.match(item.extraTag).hasMatch()) {
 				continue;
+			}
+			/* A bad alias must not hide an otherwise good extra. */
+			const QJsonObject alias = extra.value("alias").toObject();
+			if (!alias.isEmpty()) {
+				item.extraAliasName = alias.value("name").toString().trimmed();
+				item.extraAliasApp = alias.value("app").toString();
+				static const QRegularExpression aliasName("\\A[^/[:cntrl:]]+\\z");
+				static const QRegularExpression appId(
+					"\\A[A-Za-z0-9][A-Za-z0-9_.-]*\\.desktop\\z");
+				if (item.extraAliasName == "." || item.extraAliasName == ".." ||
+						!aliasName.match(item.extraAliasName).hasMatch() ||
+						!appId.match(item.extraAliasApp).hasMatch()) {
+					item.extraAliasName.clear();
+					item.extraAliasApp.clear();
+				}
 			}
 		}
 		if (!item.id.isEmpty() && !item.name.isEmpty() && !item.packages.isEmpty()) {
@@ -414,4 +432,90 @@ bool installExtra(const StoreItem &item, QString *err) {
 	}
 	runAppstoreHelper({ "install-deb", path }, &ok, err);
 	return ok;
+}
+
+QString extraDesktopFile(const StoreItem &item) {
+	if (item.extraAliasApp.isEmpty()) {
+		return {};
+	}
+	return QStandardPaths::locate(QStandardPaths::ApplicationsLocation, item.extraAliasApp);
+}
+
+static QString aliasDesktopDir(const QString &given) {
+	return given.isEmpty()
+		? QStandardPaths::writableLocation(QStandardPaths::DesktopLocation) : given;
+}
+
+bool createExtraDesktopAlias(const StoreItem &item, QString *err, const QString &desktopDir,
+		const QString &targetFile) {
+	if (item.extraAliasName.isEmpty() || item.extraAliasApp.isEmpty()) {
+		return true;
+	}
+	QString problem;
+	const QString target = targetFile.isEmpty() ? extraDesktopFile(item) : targetFile;
+	if (target.isEmpty() || !QFileInfo(target).isFile()) {
+		problem = "“" + item.extraAliasName + "” wasn’t added to the Desktop because " +
+			item.name + "’s application entry wasn’t found.";
+	} else {
+		const QString dir = aliasDesktopDir(desktopDir);
+		if (dir.isEmpty() || !QDir().mkpath(dir)) {
+			problem = "“" + item.extraAliasName + "” couldn’t be added to the Desktop.";
+		} else {
+			const QString path = QDir(dir).filePath(item.extraAliasName);
+			const QFileInfo existing(path);
+			if (existing.isSymLink()) {
+				QString current = existing.symLinkTarget();
+				if (QFileInfo(current).isRelative()) {
+					current = QDir(dir).filePath(current);
+				}
+				/* Already the alias we would make: leave it alone. */
+				if (QFileInfo(current).canonicalFilePath() == QFileInfo(target).canonicalFilePath()) {
+					return true;
+				}
+			}
+			if (existing.exists() || existing.isSymLink()) {
+				problem = "There is already a “" + item.extraAliasName + "” item on the Desktop.";
+			} else {
+				AliasCreateProblem why = AliasCreateProblem::None;
+				const QString made = aliasCreate(target, dir, item.extraAliasName, QString(), &why);
+				if (!made.isEmpty()) {
+					return true;
+				}
+				problem = why == AliasCreateProblem::RecordFailed
+					? "“" + item.extraAliasName + "” was linked, but its alias information couldn’t be saved."
+					: "“" + item.extraAliasName + "” couldn’t be added to the Desktop.";
+			}
+		}
+	}
+	if (err) {
+		*err = problem;
+	}
+	return false;
+}
+
+void removeExtraDesktopAlias(const StoreItem &item, const QString &targetFile,
+		const QString &desktopDir) {
+	if (item.extraAliasName.isEmpty() || targetFile.isEmpty()) {
+		return;
+	}
+	const QString dir = aliasDesktopDir(desktopDir);
+	if (dir.isEmpty()) {
+		return;
+	}
+	const QString path = QDir(dir).filePath(item.extraAliasName);
+	const QFileInfo link(path);
+	if (!link.isSymLink()) {
+		return;
+	}
+	QString current = link.symLinkTarget();
+	if (QFileInfo(current).isRelative()) {
+		current = QDir(dir).filePath(current);
+	}
+	/* Compare paths, not canonical paths: the package has just been
+	 * removed, so its desktop entry no longer exists to resolve. */
+	if (QFileInfo(current).absoluteFilePath() != QFileInfo(targetFile).absoluteFilePath()) {
+		return;
+	}
+	QFile::remove(path);
+	aliasRemoveRecord(path);
 }

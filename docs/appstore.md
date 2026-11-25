@@ -232,11 +232,18 @@ A catalog item is an extra when it has an `"extra"` object:
 `start` is optional. Without it the extra is an ordinary application: its
 package installs a desktop entry, so it appears in Applications, and nothing
 starts it in the background. Netzac is one:
-`{ "id": "netzac", "repo": "guimaraeslucas/netzac", "tag": "v" }`.
+`{ "id": "netzac", "repo": "guimaraeslucas/netzac", "tag": "v",
+   "alias": { "name": "Browse the Web", "app": "netzac.desktop" } }`.
 `repo` is a GitHub repository (`owner/name`) whose releases hold the extra's
 package; it defaults to the ZacOS Extras repository. `tag` is the prefix
-before the version in a release tag (`v` finds `v1.0.0.0`); it defaults to
+before the version in a release tag (`v` finds `v1.0.0.1`); it defaults to
 `ID-v`. Both are validated before either becomes part of a URL.
+`alias` is optional: after installing, Software makes a Finder alias with
+that name on the user's Desktop, pointing at the application's desktop entry
+(`app`). The alias keeps working across updates, and Software Update puts it
+back if it is missing. If the name is already taken, or the entry can't be
+found, the application still installs and the status line says why the alias
+wasn't made.
 
 Install:
 1. Lists the item's release repository (GitHub's API; `ZACOS9_EXTRAS_URL`
@@ -250,9 +257,11 @@ Install:
    so apt brings in its dependencies. Nothing new runs as root.
 4. Starts `start` (a plain program name) once, if the extra has one, so it
    runs without logging out.
+5. Makes the item's Desktop alias, if it has one.
 
 Remove is the helper's ordinary `remove`. An extra's package stops its
-program when removed. The status line reads "ZacOS Extras: Installed."
+program when removed, and its Desktop alias goes too if it is still the one
+Software made. The status line reads "ZacOS Extras: Installed."
 
 Software Update looks for newer releases of installed extras too, asking
 each extra's repository once; see [Updates](updates.md).

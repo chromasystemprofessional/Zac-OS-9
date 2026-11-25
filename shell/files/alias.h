@@ -24,6 +24,21 @@ struct AliasResolution {
 	QString error;  /* a repair or identity-record write that could not complete */
 };
 
+enum class AliasCreateProblem {
+	None,
+	Unavailable, /* the original or destination is missing, or the name is unusable */
+	LinkFailed,  /* the symbolic link could not be written */
+	RecordFailed,/* the link was written but its identity record was not */
+};
+
+/* Makes `destDir/name+suffix` an alias (symbolic link plus identity record)
+ * of `target`. If that name is taken, tries `name+suffix 2`, ` 3` and so on.
+ * Returns the chosen name, or empty with `problem` set. Nothing is created
+ * on failure. */
+QString aliasCreate(const QString &target, const QString &destDir, const QString &name,
+	const QString &suffix = QStringLiteral(" alias"),
+	AliasCreateProblem *problem = nullptr);
+
 /* Records the identity of `target` for the link at `aliasPath`. */
 bool aliasRecord(const QString &aliasPath, const QString &target);
 /* The Finder's own items (Applications, the System Folder, a control

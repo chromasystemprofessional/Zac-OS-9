@@ -95,7 +95,8 @@ This page is what's true now and what's next. What changed and when is in
   ([Bloodhound](docs/bloodhound.md), [Classic](docs/classic-seamless.md)).
 - **Netzac** is offered in Software's Extras: a Navigator 4.0-style web
   browser installed from its own GitHub releases as an ordinary application,
-  so it opens from Applications rather than The Collar.
+  with a **Browse the Web** alias on the Desktop, so it opens from there or
+  from Applications rather than The Collar.
 
 ## Being worked on
 

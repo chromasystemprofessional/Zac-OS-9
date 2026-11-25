@@ -77,7 +77,8 @@
       "packages": ["zacos9-extra-frontdesk"], "extra": { "id": "frontdesk", "start": "zacos9-frontdesk-setup" } },
 
     { "id": "extra-netzac", "name": "Netzac", "category": "Extras",
-      "blurb": "A web browser in classic Navigator 4.0 style, drawn with ZacOS 9's Platinum look, with tabs and Calm Mode. It installs as an application in your Applications folder; there is no Collar module and nothing starts in the background.",
-      "packages": ["zacos9-extra-netzac"], "extra": { "id": "netzac", "repo": "guimaraeslucas/netzac", "tag": "v" } }
+      "blurb": "A web browser in classic Navigator 4.0 style, drawn with ZacOS 9's Platinum look, with tabs, Calm Mode and an adblocker. It installs as an application in your Applications folder, with a “Browse the Web” alias on your Desktop; there is no Collar module and nothing starts in the background.",
+      "packages": ["zacos9-extra-netzac"], "extra": { "id": "netzac", "repo": "guimaraeslucas/netzac", "tag": "v",
+        "alias": { "name": "Browse the Web", "app": "netzac.desktop" } } }
   ]
 }

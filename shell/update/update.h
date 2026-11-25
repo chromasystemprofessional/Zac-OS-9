@@ -19,6 +19,7 @@ struct ExtraUpdate {
 	QString extra;   /* steam */
 	QString name;    /* "Steam" from the catalog */
 	QString start;   /* the program to start again after updating */
+	QString aliasName, aliasApp; /* its catalog Desktop alias, if any */
 	QString from, to;/* installed and available versions */
 	QString debName, debUrl, sha256;
 };

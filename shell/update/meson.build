@@ -32,6 +32,6 @@ executable('zacos9-update',
   'updatecheck.cpp',
   link_with: [panelkit, storeclient_lib],
   include_directories: include_directories('../finder', '../print', '../panels', '../store'),
-  dependencies: [shell_common_dep, platinum_dep, qt6, wayland_client],
+  dependencies: [shell_files_dep, shell_common_dep, platinum_dep, qt6, wayland_client],
   install: true,
 )

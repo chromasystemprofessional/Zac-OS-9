@@ -28,8 +28,10 @@ struct StoreItem {
 	 * the tag prefix before each release's version, and the program to
 	 * start once it's installed, so it runs without logging out. Empty
 	 * `extraStart` means an ordinary application: its package installs
-	 * a desktop entry, and nothing starts it in the background. */
-	QString extra, extraStart, extraRepo, extraTag;
+	 * a desktop entry, and nothing starts it in the background.
+	 * `extraAliasName` and `extraAliasApp` are an optional Desktop alias
+	 * to make after installing it, pointing at that desktop entry. */
+	QString extra, extraStart, extraRepo, extraTag, extraAliasName, extraAliasApp;
 };
 
 /* The shipped catalog (pl_data_dir()/store/catalog.json, or
@@ -89,5 +91,16 @@ ExtraRelease parseExtraReleases(const QByteArray &json, const QString &tagPrefix
  * and that it is the catalog's package, and installs it through the
  * helper's install-deb. Keeps the windows drawn meanwhile. */
 bool installExtra(const StoreItem &item, QString *err);
+/* The desktop entry an extra's catalog alias points at, or empty. */
+QString extraDesktopFile(const StoreItem &item);
+/* Makes the extra's catalog alias on the Desktop, if it has one, pointing
+ * at its installed desktop entry. It does nothing when the alias is
+ * already there. `desktopDir` and `targetFile` are for tests. */
+bool createExtraDesktopAlias(const StoreItem &item, QString *err = nullptr,
+	const QString &desktopDir = QString(), const QString &targetFile = QString());
+/* Takes that alias away again when the extra is removed, but only if it is
+ * the symbolic link Software made: same name, same target. */
+void removeExtraDesktopAlias(const StoreItem &item, const QString &targetFile,
+	const QString &desktopDir = QString());
 bool parseSoftwareCatalog(const QByteArray &json, const QString &source,
 	std::vector<StoreItem> *items, QString *error);

@@ -46,7 +46,8 @@ an installed ZacOS 9 current. It covers three things in one window:
      for the signed repository to catch up with a new release. Each updated
      extra's `.deb` is downloaded the same way (checksum and package/version
      checked) and installed with `install-deb`; the extra's program is then
-     stopped and started again so it uses the new version.
+     stopped and started again so it uses the new version, and its catalog
+     Desktop alias is put back if it is missing.
    - Then it installs Debian's updates with `upgrade`. That command is
      `apt-get upgrade --with-new-pkgs` with `--force-confdef --force-confold`:
      it never removes packages and keeps configuration files the user changed.

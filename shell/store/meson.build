@@ -33,8 +33,8 @@ test('store-client',
   executable('test-store-client',
     '../../tests/store/test_storeclient.cpp',
     link_with: storeclient_lib,
-    include_directories: include_directories('../finder', '../print'), # settings.h
-    dependencies: [shell_common_dep, platinum_dep, qt6],
+    include_directories: include_directories('../finder', '../print', '../files'), # settings.h, alias.h
+    dependencies: [shell_files_dep, shell_common_dep, platinum_dep, qt6],
     build_by_default: false,
   ),
   timeout: 60,

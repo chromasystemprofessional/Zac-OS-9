@@ -72,6 +72,19 @@ int main(int argc, char **argv) {
 	check(aliasRecord(alias, r + "/docs/report.txt"), "record identity");
 	check(aliasResolve(alias).state == AliasState::Ok, "intact alias resolves");
 
+	/* Making one by name, as Software does for an extra's Desktop alias. */
+	AliasCreateProblem problem = AliasCreateProblem::None;
+	const QString made = aliasCreate(r + "/docs/report.txt", r + "/aliases", "Browse the Web", "",
+		&problem);
+	check(made == "Browse the Web" && problem == AliasCreateProblem::None &&
+		QFileInfo(r + "/aliases/Browse the Web").isSymLink() &&
+		aliasResolve(r + "/aliases/Browse the Web").state == AliasState::Ok,
+		"aliasCreate makes a named alias with its identity record");
+	check(aliasCreate(r + "/docs/report.txt", r + "/aliases", "Browse the Web", "", &problem) ==
+		"Browse the Web 2", "and does not overwrite a name that is taken");
+	check(aliasCreate(r + "/missing", r + "/aliases", "Missing", "", &problem).isEmpty() &&
+		problem == AliasCreateProblem::Unavailable, "a missing original is refused");
+
 	/* Device numbers change across mounts; filesystem IDs and inodes do not. */
 	check(!recordContents(alias).contains("filesystem=\n"),
 		"test filesystem supplies a persistent identity");

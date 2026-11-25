@@ -435,6 +435,9 @@ void StoreWindow::act() {
 	const QString start = item->extraStart;
 	const StoreItem chosen = *item;
 	const bool wasInstalled = m_installed;
+	/* Resolve this before removing the package, while its desktop entry
+	 * still exists: the alias is deleted only if it still points there. */
+	const QString aliasTarget = wasInstalled ? extraDesktopFile(chosen) : QString();
 	m_busy = true;
 	m_actionButton.enabled = false;
 	m_styleButton.enabled = false;
@@ -459,6 +462,17 @@ void StoreWindow::act() {
 		runAppstoreHelper(QStringList{ wasInstalled ? "remove" : "install" } + packages, &ok, &err);
 	}
 
+	QString postError;
+	if (ok && source == "extra") {
+		if (wasInstalled) {
+			removeExtraDesktopAlias(chosen, aliasTarget);
+		} else {
+			/* An alias that can't be made doesn't undo the install: say
+			 * so in the status line, under the installed item. */
+			createExtraDesktopAlias(chosen, &postError);
+		}
+	}
+
 	m_sweep.stop();
 	m_busy = false;
 	/* The catalog list may be showing a different item by the time a
@@ -469,6 +483,8 @@ void StoreWindow::act() {
 	}
 	if (!ok) {
 		m_status = err.isEmpty() ? "That didn't work." : err;
+	} else if (!postError.isEmpty()) {
+		m_status = postError;
 	}
 	update();
 }
