@@ -1,3 +1,17 @@
+zacos9 (1.18.35) trixie; urgency=medium
+
+  * Software's Extras now offers Netzac Navigator, a Navigator 4.0-style
+    web browser drawn with ZacOS 9's Platinum look, with tabs, Calm Mode
+    and an adblocker. Installing it from Extras adds a Browse the Web alias
+    to the Desktop, and Software Update checks its releases for new
+    versions. Extras can also name their own GitHub release repository, so
+    independently released apps keep updating. The GitHub release is a
+    transition monolith built from this
+    release's split packages for computers whose updater is older than
+    1.18.30.
+
+ -- adamjlawson-ctrl <adamjlawson@gmail.com>  Thu, 26 Nov 2026 12:37:48 -0500
+
 zacos9 (1.18.34) trixie; urgency=medium
 
   * Front Desk can give each screen its own panel and front program, with
