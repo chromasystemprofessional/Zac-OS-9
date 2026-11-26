@@ -1,0 +1,4 @@
+Netzac Navigator is now offered in Software's Extras: a Navigator 4.0-style
+web browser drawn with ZacOS 9's Platinum look, with tabs, Calm Mode and an
+adblocker. Installing it puts a "Browse the Web" alias on the Desktop, and
+Software Update checks its releases for new versions.
