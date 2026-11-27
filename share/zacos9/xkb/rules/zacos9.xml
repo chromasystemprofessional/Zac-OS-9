@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Variants Debian's xkb-data has symbols for but does not list in its rules
+  XML (evdev.xml). The Keyboard panel reads this file after the system's, so
+  these layouts appear in its list and the keyboard menu.
+
+  Portuguese (Brazil) is already ABNT2 in Debian's symbols/br, but its rules
+  XML lists no "abnt2" variant, so before this file the panel could not offer
+  it. Nothing here changes /usr/share/X11/xkb: an xkb-data upgrade replaces
+  its rules XML, and the panel reads this file beside it either way.
+-->
+<xkbConfigRegistry version="1.1">
+  <layoutList>
+    <layout>
+      <configItem>
+        <name>br</name>
+        <shortDescription>pt</shortDescription>
+        <description>Portuguese (Brazil)</description>
+      </configItem>
+      <variantList>
+        <variant>
+          <configItem>
+            <name>abnt2</name>
+            <description>Portuguese (Brazil, ABNT2)</description>
+          </configItem>
+        </variant>
+      </variantList>
+    </layout>
+  </layoutList>
+</xkbConfigRegistry>

@@ -8,6 +8,10 @@ install_data('pam.d/zacos9-lock', install_dir: get_option('sysconfdir') / 'pam.d
 install_data('pam.d/zacos9-screenshare', install_dir: get_option('sysconfdir') / 'pam.d')
 # The Help Center's books (zacos9-help).
 install_subdir('zacos9/help', install_dir: get_option('datadir') / 'zacos9')
+# xkb variants Debian has symbols for but leaves out of its rules XML
+# (br(abnt2)); the Keyboard panel reads this after the system's list.
+install_data('zacos9/xkb/rules/zacos9.xml',
+  install_dir: get_option('datadir') / 'zacos9' / 'xkb' / 'rules')
 # Fcitx 5's Japanese defaults (keyboard-jp, Mozc, active by default); the
 # login item's command puts this directory on its XDG_CONFIG_DIRS only.
 install_data('zacos9/japanese/xdg/fcitx5/profile', 'zacos9/japanese/xdg/fcitx5/config',
