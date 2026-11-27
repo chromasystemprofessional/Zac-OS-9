@@ -10,6 +10,10 @@
 - The login window's zacos9-wm runs as _greetd, which has no logind
   session, so it needs seatd for the display. Without it, Log Out ends the
   session but the login window cannot start.
+- The Date & Time panel's "Set automatically" needs an NTP client.
+  zacos9-session depends on systemd-timesyncd and the ISO includes it, so
+  a clock reset by a flat battery corrects itself before apt or HTTPS has
+  to trust a certificate.
 
     test_packaging.py SOURCE-DIR
 """
@@ -85,9 +89,17 @@ for package in ("zacos9-session", "zacos9-greeter"):
         print(f"debian/control does not give zacos9 {package}")
         failures += 1
 
+session_depends = field(stanza("zacos9-session"), "Depends")
+if "systemd-timesyncd" not in session_depends:
+    print("debian/control does not give zacos9-session systemd-timesyncd (network time)")
+    failures += 1
+
 iso = (root / "iso/config/package-lists/zacos9.list.chroot").read_text().splitlines()
 if "seatd" not in {line.strip() for line in iso}:
     print("the ISO package list does not include seatd")
+    failures += 1
+if "systemd-timesyncd" not in {line.strip() for line in iso}:
+    print("the ISO package list does not include systemd-timesyncd (network time)")
     failures += 1
 
 postinst = (root / "debian/zacos9-greeter.postinst").read_text()

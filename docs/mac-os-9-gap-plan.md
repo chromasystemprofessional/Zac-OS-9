@@ -306,7 +306,7 @@ for), and **About This Computer** keeps showing honest memory use. The
 | AppleTalk | — | |
 | ColorSync | — | colord is out of scope for now. |
 | **The Collar** panel (show/hide, hot key, font) | ✅ | The Collar panel. |
-| **Date & Time**: date/time, time zone, network time, clock options | ✅ | Menu-bar date formats (month-day-year, day-month-year, ISO year-month-day) and optional hourly ZacOS sound are set in the Date & Time panel. |
+| **Date & Time**: date/time, time zone, network time, clock options | ✅ | Menu-bar date formats (month-day-year, day-month-year, ISO year-month-day) and optional hourly ZacOS sound are set in the Date & Time panel. Network time is on by default: `zacos9-session` depends on `systemd-timesyncd`, so the clock corrects itself after a flat battery. |
 | DialAssist, Modem, Remote Access | — | |
 | **Nap Time**: sleep, display sleep | ✅ | Schedule: Start up / Shut down, every day, weekdays or weekends at a time (`/etc/zacos9/schedule` through `zacos9-accounts-helper schedule`): shut-down is a generated systemd timer, start-up the RTC wake alarm, set again at every shut-down by `zacos9-wakealarm.service`. |
 | **Extensions Manager** (sets, item information) | ✅ | Login items, user services and curated extensions with item information and on/off; extension changes take effect after restart. The Set pop-up saves the current login-item/service choices as a named set (`~/.config/zacos9/Tricks Sets`), applies one, or deletes it. |
