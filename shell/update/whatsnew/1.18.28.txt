@@ -1,0 +1,9 @@
+ZacOS 9 1.18.28 splits the package for other distributions. zacos9-session
+is the desktop session, zacos9-greeter the optional greetd login window, and
+zacos9 the full system integration (boot, installer, Setup Assistant,
+Software and updates). A distribution can install the session alone; the
+full package depends on both pieces.
+
+Front Desk sessions keep The Collar, and its hot key works there too. Update
+Front Desk in Software > Extras (0.1.4 or later) for the panel's original
+click sounds.

@@ -1,0 +1,8 @@
+ZacOS 9 1.18.33 fixes the session-only gating in 1.18.32: the menu bar
+checked access() on the whole "exec '...'" command instead of the program
+path, so New Tricks and Fetch Updates disappeared on every install. The
+check now uses the program path and falls back to $PATH; a full install
+shows both again, while a session-only install still hides them.
+
+The GitHub release is another monolith for computers that skipped 1.18.31
+or 1.18.32.

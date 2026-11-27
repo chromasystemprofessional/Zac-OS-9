@@ -230,11 +230,11 @@
 {prefix}/share/zacos9/Internet Search Sites/BBC News.searchsite
 {prefix}/share/zacos9/Internet Search Sites/Bing.searchsite
 {prefix}/share/zacos9/Internet Search Sites/DuckDuckGo.searchsite
-{prefix}/share/zacos9/Internet Search Sites/eBay.searchsite
 {prefix}/share/zacos9/Internet Search Sites/Google.searchsite
 {prefix}/share/zacos9/Internet Search Sites/NPR.searchsite
 {prefix}/share/zacos9/Internet Search Sites/Wikipedia.searchsite
 {prefix}/share/zacos9/Internet Search Sites/Wiktionary.searchsite
+{prefix}/share/zacos9/Internet Search Sites/eBay.searchsite
 {prefix}/share/zacos9/boot/happy-zac-1x.png
 {prefix}/share/zacos9/boot/happy-zac-2x.png
 {prefix}/share/zacos9/boot/happy-zac-3x.png
@@ -278,14 +278,6 @@
 {prefix}/share/zacos9/whatsnew/1.14.3.txt
 {prefix}/share/zacos9/whatsnew/1.18.0.txt
 {prefix}/share/zacos9/whatsnew/1.18.1.txt
-{prefix}/share/zacos9/whatsnew/1.18.2.txt
-{prefix}/share/zacos9/whatsnew/1.18.3.txt
-{prefix}/share/zacos9/whatsnew/1.18.4.txt
-{prefix}/share/zacos9/whatsnew/1.18.5.txt
-{prefix}/share/zacos9/whatsnew/1.18.6.txt
-{prefix}/share/zacos9/whatsnew/1.18.7.txt
-{prefix}/share/zacos9/whatsnew/1.18.8.txt
-{prefix}/share/zacos9/whatsnew/1.18.9.txt
 {prefix}/share/zacos9/whatsnew/1.18.10.txt
 {prefix}/share/zacos9/whatsnew/1.18.11.txt
 {prefix}/share/zacos9/whatsnew/1.18.12.txt
@@ -295,9 +287,31 @@
 {prefix}/share/zacos9/whatsnew/1.18.16.txt
 {prefix}/share/zacos9/whatsnew/1.18.17.txt
 {prefix}/share/zacos9/whatsnew/1.18.18.txt
+{prefix}/share/zacos9/whatsnew/1.18.19.txt
+{prefix}/share/zacos9/whatsnew/1.18.2.txt
 {prefix}/share/zacos9/whatsnew/1.18.20.txt
+{prefix}/share/zacos9/whatsnew/1.18.21.txt
+{prefix}/share/zacos9/whatsnew/1.18.22.txt
+{prefix}/share/zacos9/whatsnew/1.18.23.txt
+{prefix}/share/zacos9/whatsnew/1.18.24.txt
+{prefix}/share/zacos9/whatsnew/1.18.25.txt
+{prefix}/share/zacos9/whatsnew/1.18.26.txt
+{prefix}/share/zacos9/whatsnew/1.18.27.txt
+{prefix}/share/zacos9/whatsnew/1.18.28.txt
+{prefix}/share/zacos9/whatsnew/1.18.29.txt
+{prefix}/share/zacos9/whatsnew/1.18.3.txt
 {prefix}/share/zacos9/whatsnew/1.18.30.txt
+{prefix}/share/zacos9/whatsnew/1.18.31.txt
+{prefix}/share/zacos9/whatsnew/1.18.32.txt
+{prefix}/share/zacos9/whatsnew/1.18.33.txt
+{prefix}/share/zacos9/whatsnew/1.18.34.txt
 {prefix}/share/zacos9/whatsnew/1.18.35.txt
+{prefix}/share/zacos9/whatsnew/1.18.4.txt
+{prefix}/share/zacos9/whatsnew/1.18.5.txt
+{prefix}/share/zacos9/whatsnew/1.18.6.txt
+{prefix}/share/zacos9/whatsnew/1.18.7.txt
+{prefix}/share/zacos9/whatsnew/1.18.8.txt
+{prefix}/share/zacos9/whatsnew/1.18.9.txt
 {prefix}/share/zacos9/whatsnew/1.7.0.txt
 {prefix}/share/zacos9/whatsnew/1.7.1.txt
 {prefix}/share/zacos9/whatsnew/1.7.2.txt

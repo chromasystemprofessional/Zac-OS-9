@@ -1,0 +1,7 @@
+ZacOS 9 1.18.34 lets Front Desk give each screen its own panel and front
+program, with one pointer and keyboard. The user's panel starts on their
+Home folder, and Special ▸ Folders… adds, removes and reorders the user's
+folder pages.
+
+The GitHub release is another monolith built from this release's split
+packages for computers whose updater is older than 1.18.30.

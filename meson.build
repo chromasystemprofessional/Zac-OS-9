@@ -1,5 +1,5 @@
 project('zacos9', 'c',
-  version: '0.0.1',
+  version: '1.18.35',
   license: 'GPL-3.0-or-later',
   meson_version: '>=1.0.0',
   default_options: ['c_std=c11', 'cpp_std=c++17', 'warning_level=2', 'werror=false'],
@@ -66,6 +66,12 @@ test('packaging', find_program('python3'),
 # PRIVACY.md lists. A new network feature must be added to both.
 test('privacy', find_program('python3'),
   args: [files('tests/privacy/test_no_tracking.py'), meson.project_source_root()])
+
+# One version everywhere: the changelog, Meson, PROJECT_STATUS, the README's
+# "New in" section and a What's New note for every release since 1.18.19.
+test('release-truth', find_program('python3'),
+  args: [files('tests/release/test_release_truth.py'),
+    meson.project_version(), meson.project_source_root()])
 
 # The Mac OS 9 theme extractor (theming step 3).
 test('theme-extractor', find_program('python3'),

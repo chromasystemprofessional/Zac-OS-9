@@ -1,0 +1,3 @@
+ZacOS 9 1.18.21 renames in list view the way it does in icon view and on
+the desktop: click the selected row's name, or press Return, and edit it in
+place (issue #187).

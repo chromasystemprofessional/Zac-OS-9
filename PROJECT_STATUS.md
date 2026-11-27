@@ -1,6 +1,6 @@
 # Project status
 
-Updated: 2026-11-18. Latest release: **1.18.20**
+Updated: 2026-11-27. Latest release: **1.18.35**
 ([releases](https://github.com/chromasystemprofessional/Zac-OS-9/releases),
 [ISO](https://sourceforge.net/projects/zac-os-9/files/)).
 
@@ -93,19 +93,26 @@ This page is what's true now and what's next. What changed and when is in
   channels; Classic opens Mac OS 9 applications from the Finder and can show
   their windows as ordinary ZacOS windows
   ([Bloodhound](docs/bloodhound.md), [Classic](docs/classic-seamless.md)).
+  The later Bloodhound ideas — optional local channels, Smart Folders, a
+  global hotkey and local semantic search — are not scheduled.
 - **Netzac** is offered in Software's Extras: a Navigator 4.0-style web
   browser installed from its own GitHub releases as an ordinary application,
   with a **Browse the Web** alias on the Desktop, so it opens from there or
   from Applications rather than The Collar.
+- **The System Folder** works the way Mac OS 7 to 9's did, item by item:
+  [`docs/system-folder.md`](docs/system-folder.md) has every item, what
+  ZacOS has for it, and the order. All six items are done.
+- **1.18.28 splits the package for other distributions.**
+  `zacos9-session` is the desktop alone, `zacos9-greeter` the optional
+  greetd login window, and `zacos9` the full system integration; the full
+  package depends on both pieces. Software Update installs the whole package
+  set together, and transition releases bridge computers whose updater
+  predates 1.18.30.
 
 ## Being worked on
 
-**Bloodhound (Search)**: 1.4 shipped in 1.18.9. The later ideas — optional
-local channels, Smart Folders, a global hotkey and local semantic search —
-are not scheduled ([Bloodhound](docs/bloodhound.md)).
-
 **Front Desk**: the shared-computer session shell is released as Front Desk
-0.1.0 in ZacOS Extras (`zacos9-extra-frontdesk`; ZacOS 9 1.18.19 carries its
+0.1.5 in ZacOS Extras (`zacos9-extra-frontdesk`; ZacOS 9 1.18.35 carries its
 session, compositor, menu-bar and greeter hooks). It uses the real Unix
 accounts as the people and the existing **Use only chosen programs** list as
 its panel. The tabbed panel, Front Desk Setup (a control panel, so it opens
@@ -118,10 +125,6 @@ Special ▸ Folders…. Front Desk sessions keep The Collar, and the panel's
 tabs, icons and pages click with ZacOS's original sounds. The save-location
 enforcement through the file chooser portal is still to come
 ([Front Desk](docs/frontdesk.md)).
-
-**The System Folder**, made to work the way Mac OS 7 to 9's did, item by
-item: [`docs/system-folder.md`](docs/system-folder.md) has every item, what
-ZacOS has for it, and the order. All six items are done.
 
 **Themes**: the Appearance panel's Themes tab has **New Theme…** and **Edit
 Theme…**, and the built-in **Silver Coat Dark** alongside Silver Coat. The

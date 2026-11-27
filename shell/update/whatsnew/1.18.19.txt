@@ -1,0 +1,9 @@
+ZacOS 9 1.18.19 brings Front Desk, a shared-computer session shell for
+chosen accounts.
+
+Front Desk uses the real ZacOS accounts and the existing Use only chosen
+programs list. Front Desk Setup chooses the programs, menus, save locations
+and Finder access, and the login window wears the Front Desk welcome. Each
+person's folder pages start at Home and are their own list.
+
+Install Front Desk from Software > Extras after updating.

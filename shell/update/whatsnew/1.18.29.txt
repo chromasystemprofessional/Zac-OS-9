@@ -1,0 +1,5 @@
+ZacOS 9 1.18.29 lets a Front Desk account choose Show all Zac menu items in
+Front Desk Setup (Front Desk 0.1.5 or later in Software > Extras). The menu
+bar's Zac menu then keeps its usual items—Control Panels, Software, Old Dog
+and the rest—instead of only About This Computer. It is off by default
+because the full menu is a way out of the panel.
