@@ -13,9 +13,10 @@ This page is what's true now and what's next. What changed and when is in
 - **The Mac OS 9 plan is built.** Every work package in
   [`docs/mac-os-9-gap-plan.md`](docs/mac-os-9-gap-plan.md) (milestones 1–9,
   83 packages) had landed by 2026-10-20.
-- **Classic Mac emulation is ISO-only for now.** The `zacos9-emulators`
-  package is built for the ISO, not published as a release asset. On a Debian
-  install, Old Dog needs the emulators built from a source checkout
+- **Classic Mac emulation joins the release assets.** The `zacos9-emulators`
+  package is built from the pinned macemu commit; the release workflow now
+  publishes it beside the desktop packages, so a Debian install can install
+  it instead of building the emulators from a source checkout
   ([emulation/README.md](emulation/README.md)).
 - **Removable media is built**: data and audio CDs/DVDs, blank discs, PC and
   USB floppy drives, Iomega Zip/Jaz, generic and Mac disk images,

@@ -28,19 +28,19 @@ Extras and Debian's security fixes. You don't need a new ISO.
 
 ## Already running Debian 13?
 
-Download the latest `zacos9_*_amd64.deb`, `zacos9-session_*_amd64.deb` and
-`zacos9-greeter_*_amd64.deb` from the [latest release on
-GitHub](https://github.com/chromasystemprofessional/Zac-OS-9/releases/latest)
+Download the latest `zacos9_*_amd64.deb`, `zacos9-session_*_amd64.deb`,
+`zacos9-greeter_*_amd64.deb` and `zacos9-emulators_*_amd64.deb` from the
+[latest release on GitHub](https://github.com/chromasystemprofessional/Zac-OS-9/releases/latest)
 and install the files you downloaded:
 
 ```sh
 sudo apt install ./zacos9_*_amd64.deb ./zacos9-session_*_amd64.deb \
-    ./zacos9-greeter_*_amd64.deb
+    ./zacos9-greeter_*_amd64.deb ./zacos9-emulators_*_amd64.deb
 ```
 
-Classic Mac emulation (the `zacos9-emulators` package) is on the ISO only for
-now; it is not part of the Debian package. A source checkout can build it
-instead.
+Classic Mac emulation is in `zacos9-emulators`; without it everything else
+works, and Old Dog says the emulator isn't installed. A source checkout can
+build the emulators instead.
 
 ## Mac OS 9 themes
 

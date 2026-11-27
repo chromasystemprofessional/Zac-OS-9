@@ -30,10 +30,9 @@ scripts/build-debs.sh --emulators   # and zacos9-emulators_*.deb
 
 - **zacos9-emulators** holds SheepShaver and Basilisk II, built from the pinned
   macemu commit in `emulation/build-emulators.sh`. They are installed in
-  `/usr/libexec/zacos9`, where `zacos9-classic` looks for them. It is an ISO
-  package for now: the GitHub release carries the three `zacos9*` packages, not
-  the emulators, so a direct `.deb` install does not have Classic until the
-  emulators are built from a source checkout.
+  `/usr/libexec/zacos9`, where `zacos9-classic` looks for them. The ISO and
+  every tagged release carry the package, so a Debian install can install it
+  without building the emulators from source.
   - The emulators are GPL-2. Their source is written next to the package as
     `zacos9-emulators_*.source.tar.gz`, and must go wherever the package goes.
   - No ROMs or Mac OS system software are included.
@@ -108,8 +107,11 @@ An additional gate rejects Meson skips outside the four documented above plus
 so real FUSE disconnect/teardown verification still needs a suitable machine.
 All skips are listed in the workflow summary. Build/Meson logs are retained even on
 failure; successful jobs retain the tested amd64 packages and SHA-256 sums
-for 14 days. These are CI artifacts, not published releases. The conditional
-screen-sharing check still needs a suitable session outside this container.
+for 14 days. These are CI artifacts, not published releases. The same job
+builds `zacos9-emulators` from the pinned macemu commit; the package and its
+GPL source tarball join the tested artifact, the release assets and the signed
+repository. The conditional screen-sharing check still needs a suitable
+session outside this container.
 
 The first hosted run exposed missing prerequisites and a sound-test race:
 checking that the mock player's log existed could read it before `printf`
@@ -219,9 +221,10 @@ The guest's `macipgw.service` failed with exit status 64. It comes with
 gateway, so `system/sharing/macipgw.service.d/zacos9.conf` skips the service
 (`ExecCondition`) until `network =` is set there; it then starts as before.
 
-The three `zacos9` packages are release assets. To install them and the
-emulators on a Debian 13 machine, build them from a source checkout
-(`scripts/build-debs.sh --emulators`), then:
+On a split release, the `zacos9`, `zacos9-session`, `zacos9-greeter` and
+`zacos9-emulators` packages are release assets. On a transition release, the
+release carries the monolith and the emulators, while the split packages are
+in the signed repository. For a split release, install them with:
 
 ```sh
 sudo apt install ./zacos9_*.deb ./zacos9-session_*.deb \

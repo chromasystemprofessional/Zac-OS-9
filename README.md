@@ -90,10 +90,11 @@ list every change.
   Zacintosh HD with a System Folder and Applications, labels, Get Info, Find,
   spring-loaded folders, and `.zip`, `.7z` and StuffIt `.sit` archives opened
   with a double-click.
-- **Classic Mac software (on the ISO)**: **Old Dog** starts classic Mac OS in
-  the SheepShaver emulator. Bring your own ROM and Mac OS install disk; on a
-  Debian install, build the optional emulators from the source tree
-  ([emulation/README.md](emulation/README.md)).
+- **Classic Mac software**: **Old Dog** starts classic Mac OS in the
+  SheepShaver emulator. Bring your own ROM and Mac OS install disk; the
+  emulators come on the ISO and in the `zacos9-emulators` release package.
+  On a Debian install, install it from the ZacOS repository or build it from
+  the source tree ([emulation/README.md](emulation/README.md)).
 - **Games**: console cartridges and discs wear their own icons, and the Game
   Player extra runs NES, Super NES, Sega, Game Boy, Game Boy Advance,
   PlayStation and Nintendo 64 games in a Platinum-framed window.
@@ -181,21 +182,19 @@ ZacOS Extras and Debian's security fixes; no new ISO is needed.
 
 ### Already running Debian 13?
 
-Download the latest `zacos9_*_amd64.deb`, `zacos9-session_*_amd64.deb` and
-`zacos9-greeter_*_amd64.deb` from the
+Download the latest `zacos9_*_amd64.deb`, `zacos9-session_*_amd64.deb`,
+`zacos9-greeter_*_amd64.deb` and `zacos9-emulators_*_amd64.deb` from the
 [latest release](https://github.com/chromasystemprofessional/Zac-OS-9/releases/latest),
 then install the files you downloaded:
 
 ```sh
 sudo apt install ./zacos9_*_amd64.deb ./zacos9-session_*_amd64.deb \
-    ./zacos9-greeter_*_amd64.deb
+    ./zacos9-greeter_*_amd64.deb ./zacos9-emulators_*_amd64.deb
 ```
 
 Log out and choose **ZacOS 9** at the login screen. Classic Mac emulation is
-not in this package. The `zacos9-emulators` package is on the ISO for now; on
-a Debian install, build it from a source checkout
-([emulation/README.md](emulation/README.md)). Without it, everything else
-works, and Old Dog says the emulator isn't installed.
+in `zacos9-emulators`; without it everything else works, and Old Dog says the
+emulator isn't installed ([emulation/README.md](emulation/README.md)).
 
 ## Learn more
 

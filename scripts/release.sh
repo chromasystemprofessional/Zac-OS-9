@@ -6,12 +6,13 @@
 #
 # On a clean main branch, it adds a debian/changelog entry for the version,
 # moves the split packages' zacos9 Breaks/Replaces to it, commits and tags
-# it, builds the package, pushes, and creates the GitHub release. A
-# transition release (the default) tags 0.2.0, publishes only the
-# zacos9_0.2.0_amd64.deb monolith and SHA256SUMS, and keeps the split packages
-# for the signed repository. A split release (--split, once pre-1.18.30
-# updaters are no longer supported) tags v0.2.0 and publishes the split
-# package set. Needs `gh auth login`. See docs/updates.md.
+# it, builds the desktop packages and the Classic emulators, pushes, and
+# creates the GitHub release. A transition release (the default) tags 0.2.0,
+# publishes the zacos9_0.2.0_amd64.deb monolith, SHA256SUMS and the emulator
+# package/source, and keeps the split packages for the signed repository. A
+# split release (--split, once pre-1.18.30 updaters are no longer supported)
+# tags v0.2.0 and publishes the split package set and the emulators. Needs
+# `gh auth login`. See docs/updates.md.
 set -eu
 self=$(realpath "$0")
 cd "$(dirname "$self")/.."
@@ -81,9 +82,12 @@ mv debian/changelog.new debian/changelog
 git commit -q -m "Release ZacOS 9 $version" -- debian/changelog debian/control
 git tag -a "$tag" -m "ZacOS 9 $version"
 
-scripts/build-debs.sh
+scripts/build-debs.sh --emulators
 arch=$(dpkg --print-architecture)
 [ "$arch" = amd64 ] || die "transition releases are built for amd64, not $arch."
+emulators=$(find build/packages -maxdepth 1 \
+	\( -name "zacos9-emulators_*.deb" -o -name "zacos9-emulators_*.source.tar.gz" \) -print)
+[ -n "$emulators" ] || die "the build didn't make the emulators package."
 if $transition; then
 	out=build/transition
 	rm -rf "$out"
@@ -92,21 +96,22 @@ if $transition; then
 		--debs build/packages --output "$out"
 	deb=$out/zacos9_${version}_${arch}.deb
 	[ -f "$deb" ] || die "the build didn't make $deb."
-	(cd "$out" && sha256sum "zacos9_${version}_${arch}.deb" >SHA256SUMS)
-	assets="$deb $out/SHA256SUMS"
+	cp $emulators "$out/"
+	(cd "$out" && sha256sum "zacos9_${version}_${arch}.deb" zacos9-emulators_* >SHA256SUMS)
+	assets="$deb $out/zacos9-emulators_*.deb $out/zacos9-emulators_*.source.tar.gz $out/SHA256SUMS"
 else
 	debs=$(find build/packages -maxdepth 1 \
 		-name "zacos9*_${version}_${arch}.deb" ! -name "*-dbgsym_*.deb" -print)
 	[ -n "$debs" ] || die "the build didn't make the $version packages."
-	assets=$debs
+	assets="$debs $emulators"
 fi
 
 git push -q origin main "$tag"
-# shellcheck disable=SC2086 # one path per package, none contains a space
+# shellcheck disable=SC2086 # one path per file, none contains a space
 gh release create "$tag" $assets --title "ZacOS 9 $version" --notes "$notes"
 if $transition; then
 	echo "Released ZacOS 9 $version as a transition monolith."
-	echo "Publish the split packages in build/packages to the signed repository."
+	echo "Publish the split packages and emulators in build/packages to the signed repository."
 else
 	echo "Released ZacOS 9 $version: Software Update will offer it."
 fi
