@@ -215,3 +215,4 @@ usr/share/zacos9/xdg/autostart/org.fcitx.Fcitx5.desktop
 usr/share/zacos9/xdg/foot/foot.ini
 usr/share/zacos9/xdg/xdg-desktop-portal/zacos9-portals.conf
 usr/share/zacos9/xdg/zacos9-mimeapps.list
+usr/share/zacos9/xkb/rules/zacos9.xml

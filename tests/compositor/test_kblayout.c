@@ -67,6 +67,19 @@ int main(void) {
 			"Q is q in U.S., ' in Dvorak, a in French");
 		xkb_keymap_unref(keymap);
 	}
+	/* Debian has the ABNT2 symbols; the Keyboard panel's extra list names
+	 * them. ç and the dead keys are what the issue was about. */
+	struct kb_layouts abnt2;
+	memset(&abnt2, 0, sizeof(abnt2));
+	kb_layouts_parse(&abnt2, "br(abnt2)");
+	keymap = kb_layouts_keymap(ctx, &abnt2);
+	check(keymap && xkb_keymap_num_layouts(keymap) == 1, "br(abnt2) compiles");
+	if (keymap) {
+		check(sym(keymap, KEY_SEMICOLON, 0) == XKB_KEY_ccedilla &&
+			sym(keymap, KEY_APOSTROPHE, 0) == XKB_KEY_dead_tilde,
+			"ABNT2 gives ccedilla and dead-key accents");
+		xkb_keymap_unref(keymap);
+	}
 	struct kb_layouts unknown;
 	memset(&unknown, 0, sizeof(unknown));
 	kb_layouts_parse(&unknown, "zz-nosuch");

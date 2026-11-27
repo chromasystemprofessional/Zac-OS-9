@@ -11,7 +11,8 @@ struct XkbLayout {
 };
 
 /* Every layout and variant this system's xkb knows (rules/evdev.xml, or
- * $ZACOS9_XKB_RULES), sorted by name. */
+ * $ZACOS9_XKB_RULES), plus ZacOS's additions (share/zacos9/xkb/rules/
+ * zacos9.xml, or $ZACOS9_XKB_EXTRA), sorted by name. */
 QList<XkbLayout> xkbLayouts();
 /* The layouts in use: the Keyboard panel's choice, else Debian's
  * /etc/default/keyboard (as zacos9-wm reads them, compositor/src/kblayout.c). */
