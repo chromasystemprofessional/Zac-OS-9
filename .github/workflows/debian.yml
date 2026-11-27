@@ -24,14 +24,14 @@ jobs:
   package:
     runs-on: ubuntu-24.04
     container: debian:13-slim
-    timeout-minutes: 60
+    timeout-minutes: 90
     env:
       DEBIAN_FRONTEND: noninteractive
     steps:
       - name: Install bootstrap tools
         run: |
           apt-get update
-          apt-get install -y --no-install-recommends ca-certificates git build-essential debhelper devscripts fakeroot passwd ccache
+          apt-get install -y --no-install-recommends ca-certificates git build-essential debhelper devscripts fakeroot passwd ccache sudo
 
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -96,14 +96,31 @@ jobs:
               raise SystemExit("Unexpected skipped tests: " + ", ".join(sorted(unexpected)))
           PY
 
+      # The emulators are a release asset, not part of the main package: build
+      # them from the same tagged tree so the package and its GPL source sit
+      # beside the desktop's packages. build-emulators.sh asks for sudo itself;
+      # give the unprivileged builder that one ability for this ephemeral job.
+      - name: Build the Classic emulators
+        shell: bash
+        run: |
+          printf 'builder ALL=(ALL) NOPASSWD:ALL\nDefaults:builder !requiretty\n' \
+            > /etc/sudoers.d/builder
+          chmod 0440 /etc/sudoers.d/builder
+          cd /tmp/zacos9-debian/source
+          runuser -u builder -- sh packaging/emulators/build-deb.sh
+
       - name: Collect packages and checksums
         run: |
           mkdir -p ci-artifacts
           cp /tmp/zacos9-debian/zacos9*.deb ci-artifacts/
+          cp /tmp/zacos9-debian/source/build/packages/zacos9-emulators_*.deb \
+            /tmp/zacos9-debian/source/build/packages/zacos9-emulators_*.source.tar.gz \
+            ci-artifacts/
           cd ci-artifacts
-          for deb in *.deb; do
-            case $deb in *-dbgsym_*.deb) continue ;; esac
-            sha256sum "$deb"
+          for file in *.deb *.source.tar.gz; do
+            [ -f "$file" ] || continue
+            case $file in *-dbgsym_*.deb) continue ;; esac
+            sha256sum "$file"
           done > SHA256SUMS
 
       - name: Upload build and test logs
@@ -143,6 +160,8 @@ jobs:
             ci-artifacts/zacos9_*.deb
             ci-artifacts/zacos9-session_*.deb
             ci-artifacts/zacos9-greeter_*.deb
+            ci-artifacts/zacos9-emulators_*.deb
+            ci-artifacts/zacos9-emulators_*.source.tar.gz
             ci-artifacts/SHA256SUMS
           tag_name: ${{ github.ref_name }}
           name: "ZacOS 9 ${{ github.ref_name }}"

@@ -289,9 +289,9 @@ show programs that are not installed.
   make the package explicit if needed.
 - `scripts/build-debs.sh` already copies `zacos9*.deb`, so both packages land
   in `build/packages`.
-- `scripts/release.sh` attaches only `zacos9_${version}_${arch}.deb`. It must
-  attach both packages, or an `apt install ./zacos9_*.deb` fails to find the
-  session.
+- `scripts/release.sh` attaches the desktop packages with
+  `zacos9*_${version}_${arch}.deb`, and the emulators and their source
+  separately.
 - `zacos9-update` (`shell/update`) downloads one release asset and installs
   it. It must install both packages, or an upgrade leaves `zacos9-session`
   behind. The test fixtures and `docs/updates.md` assume one package too.

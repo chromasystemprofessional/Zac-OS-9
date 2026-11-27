@@ -203,6 +203,7 @@ Depends: ${shlibs:Depends},
          os-prober,
          plymouth
 Recommends: balena-etcher
+Suggests: zacos9-emulators
 Description: ZacOS 9 desktop and system integration
  The full ZacOS 9 system: the desktop session, the greetd login window,
  the installer, Setup Assistant, Startup Disk, Software, Software Update,

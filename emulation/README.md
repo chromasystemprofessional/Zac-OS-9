@@ -39,8 +39,9 @@ It is not a Mac OS emulator, and it needs no ROM or system disk.
    applies the patch in [`patches/`](patches/README.md) to SheepShaver;
    Basilisk II is unpatched.
 
-   The ZacOS 9 ISO already carries the packaged emulators
-   (`zacos9-emulators`). This step is for a Debian install or development.
+   The ZacOS 9 ISO and the tagged releases carry the packaged emulators
+   (`zacos9-emulators`). This step is for development or a system that cannot
+   use the release package.
 2. Put your files in a folder named `Classic` in your home folder, up to two
    folders deep. Set `ZACOS9_CLASSIC_DIR` to use a different folder.
    - **ROMs.** The launcher identifies each ROM by its checksum, so file names

@@ -51,7 +51,7 @@ Architecture: $arch
 Maintainer: adamjlawson-ctrl <adamjlawson@gmail.com>
 Installed-Size: $(du -ks "$pkg/usr" | cut -f1)
 Depends: $deps, libcap2-bin
-Enhances: zacos9
+Enhances: zacos9-session, zacos9
 Section: otherosfs
 Priority: optional
 Homepage: https://github.com/kanjitalk755/macemu

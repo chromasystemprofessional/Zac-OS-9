@@ -142,12 +142,14 @@ It does the following:
    previous monolith.
 2. Commits both files and tags the commit: `0.2.0` for a transition release
    (the default), or `v0.2.0` for a split release.
-3. Builds the split packages with `scripts/build-debs.sh`.
+3. Builds the split packages and the Classic emulators with
+   `scripts/build-debs.sh --emulators`.
 4. For a transition release, builds the monolith from those packages with
    `scripts/build-transition-package.py`, writes `SHA256SUMS`, and attaches
-   only `zacos9_0.2.0_amd64.deb` and `SHA256SUMS` to the GitHub release. The
-   split packages are left in `build/packages` for the signed repository.
-   For a split release, attaches the split package set.
+   the monolith, `SHA256SUMS`, and the `zacos9-emulators` package and its
+   source tarball to the GitHub release. The split packages are left in
+   `build/packages` for the signed repository. For a split release, attaches
+   the split package set and the emulators.
 5. Pushes the commit and the tag, and runs `gh release create`.
 
 Transition is the default because a computer that skipped an earlier
@@ -169,11 +171,12 @@ and `zacos9-greeter`. The updater on 1.18.27 and 1.18.29 downloads only the
 metapackage, so those computers cannot install a newer release without the
 signed repository; the fixed updater is in 1.18.30.
 
-1.18.31 onward are transition releases: the GitHub release asset is a
-single monolith built from that release's split packages, with their files
+1.18.31 onward are transition releases: the GitHub release's update asset is
+a single monolith built from that release's split packages, with their files
 and maintainer scripts and no dependency on `zacos9-session` or
 `zacos9-greeter`. It carries the fixed updater, so an old updater can install
-it with no repository.
+it with no repository. The emulator package and its source are also attached
+for direct download; Software Update ignores them.
 
 A computer that skips one transition release never installs it, and the old
 updater always fetches the latest release. Until pre-1.18.30 updaters are no
@@ -188,10 +191,12 @@ scripts/build-transition-package.py --version 1.18.33 \
     --base-version 1.18.33 --debs build/packages --output build/transition
 ```
 
-It publishes only `zacos9_1.18.33_amd64.deb` and `SHA256SUMS` in that GitHub
-release. Do not attach `zacos9-session` or `zacos9-greeter` there: the fixed
-updater downloads the whole set, which would conflict with the monolith.
-Publish the split packages to the signed repository instead.
+It publishes the monolith, `SHA256SUMS`, and the `zacos9-emulators` package
+and its source tarball in that GitHub release. Do not attach `zacos9-session`
+or `zacos9-greeter` there: the fixed updater downloads the whole set, which
+would conflict with the monolith. The updater selects only `zacos9_`,
+`zacos9-session_` and `zacos9-greeter_` assets, so it ignores the emulator
+files. Publish the split packages to the signed repository instead.
 
 The release tag is the version without the leading `v` (`1.18.33`), so the
 normal `v*` tag workflow does not build split packages over the transition.
