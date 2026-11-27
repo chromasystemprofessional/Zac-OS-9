@@ -173,7 +173,10 @@ signed repository; the fixed updater is in 1.18.30.
 single monolith built from that release's split packages, with their files
 and maintainer scripts and no dependency on `zacos9-session` or
 `zacos9-greeter`. It carries the fixed updater, so an old updater can install
-it with no repository.
+it with no repository. It breaks and replaces the split session and greeter
+up to and including its own version, so a computer that already installed
+that version from the signed repository converts to the monolith instead of
+failing on files both packages own.
 
 A computer that skips one transition release never installs it, and the old
 updater always fetches the latest release. Until pre-1.18.30 updaters are no
@@ -184,23 +187,23 @@ opt-out for when those updaters are gone.
 The script builds the monolith from the split packages of the same version:
 
 ```sh
-scripts/build-transition-package.py --version 1.18.33 \
-    --base-version 1.18.33 --debs build/packages --output build/transition
+scripts/build-transition-package.py --version 1.18.35 \
+    --base-version 1.18.35 --debs build/packages --output build/transition
 ```
 
-It publishes only `zacos9_1.18.33_amd64.deb` and `SHA256SUMS` in that GitHub
+It publishes only `zacos9_1.18.35_amd64.deb` and `SHA256SUMS` in that GitHub
 release. Do not attach `zacos9-session` or `zacos9-greeter` there: the fixed
 updater downloads the whole set, which would conflict with the monolith.
 Publish the split packages to the signed repository instead.
 
-The release tag is the version without the leading `v` (`1.18.33`), so the
+The release tag is the version without the leading `v` (`1.18.35`), so the
 normal `v*` tag workflow does not build split packages over the transition.
 The source tree stays split.
 
 When a release returns to the split GitHub layout, its split packages must
 carry `Breaks`/`Replaces: zacos9 (<< that version)` to take the files back
-from the last monolith. The current 1.18.33 split packages use
-`<< 1.18.33`, so a repository install can replace the 1.18.32 monolith.
+from the last monolith. The 1.18.35 split packages use `<< 1.18.35`, so a
+repository install can replace the 1.18.34 monolith.
 
 ## Tests
 
