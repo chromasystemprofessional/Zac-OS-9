@@ -14,7 +14,9 @@ scripts/build-debs.sh --emulators   # and zacos9-emulators_*.deb
   - `zacos9-wm`, the menu bar, the Finder, [The Collar](collar.md),
     the control panels and `zacos9-classic`;
   - the fonts, icons, patterns, cursors and sounds;
-  - a **ZacOS 9** session in `/usr/share/wayland-sessions`.
+  - a **ZacOS 9** session in `/usr/share/wayland-sessions`;
+  - `systemd-timesyncd`, so network time is installed and on by default and
+    the Date & Time panel's **Set automatically** works out of the box.
 
   Login managers (GDM, SDDM, LightDM, greetd) list the session. From a text
   console, run `zacos9-session`. The session log is

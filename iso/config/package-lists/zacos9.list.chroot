@@ -30,6 +30,9 @@ user-setup
 locales
 console-setup
 keyboard-configuration
+# Network time: keeps the clock right after a battery has run flat, so HTTPS
+# and apt use valid certificates. Enabled by its package on installation.
+systemd-timesyncd
 # Japanese (and Chinese/Korean) UI text: lib/text.c asks Fontconfig for a
 # covering face, and Qt programs use the same font.
 fonts-noto-cjk
