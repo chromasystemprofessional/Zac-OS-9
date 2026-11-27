@@ -48,19 +48,28 @@ import. The theme is built on your computer from your own Mac OS 9 System
 Folder, or from the one on Old Dog's startup disk; ZacOS ships no Apple
 artwork. See [Themes and sound sets](docs/themes.md) for what it reads.
 
-## New in 1.9
+## New in 1.18
 
-- **More languages.** Italian, Russian, Spanish, Brazilian Portuguese, French
-  (Canada and France) and Arabic are complete, with translated help books.
-  Canadian and UK English are selectable English locales; Japanese is a
-  display pilot. The installer and Text panel show a country flag beside each
-  language.
-- **Arabic, right to left.** HarfBuzz shapes Arabic and FriBidi orders it;
-  Arabic lists, labels and alerts right-align. The rest of the window layout is
-  not mirrored yet.
-- **Rotate any screen.** Control Panels ▸ Monitors turns each display by 90°,
-  180° or 270°.
-- **Speech panel voice lists.** Choose Classic, Modern or Neural voices.
+- **Front Desk**, the shared-computer shell: real Unix accounts, a panel of
+  chosen programs, per-account menus and Finder access, a Front Desk welcome
+  at login, and The Collar. Each screen can have its own panel and front
+  program. Install it from Software ▸ Extras.
+- **Bloodhound 1.4** brings Sherlock 2's channel bar, with People and ZacOS
+  Help channels. **Classic** can open supported Mac OS 9 applications from
+  the Sniffer and show their windows as ordinary ZacOS windows.
+- **Silver Coat Dark** is a true dark mode for the window chrome, menu bar,
+  panels, lists, text fields, controls and desktop; Qt programs started while
+  it is active follow it.
+- **Netzac**, a Navigator 4.0-style web browser, is offered in Software's
+  Extras and adds a **Browse the Web** alias to the Desktop.
+- **The desktop is now packaged for other distributions.** `zacos9-session`
+  installs the desktop alone, `zacos9-greeter` the greetd login window, and
+  `zacos9` the full system integration. Software Update installs the whole
+  set together, and transition releases keep older updaters working. The
+  signed APT repository publishes the tested packages.
+
+[Release notes](https://github.com/chromasystemprofessional/Zac-OS-9/releases)
+list every change.
 
 ## What you get
 

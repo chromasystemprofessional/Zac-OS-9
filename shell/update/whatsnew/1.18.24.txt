@@ -1,0 +1,3 @@
+ZacOS 9 1.18.24 lets a saved network disk wait for a locked keychain's
+password prompt with no time limit, so typing the password slowly no longer
+stops it mounting at login.

@@ -1,0 +1,6 @@
+ZacOS 9 1.18.22 makes Front Desk behave like the shared Macs it copies. A
+program started from the panel stays in the Application menu and
+Command-Tab, only the program in front draws, and the panel comes back to
+start another program or when the last one closes.
+
+Update Front Desk in Software > Extras (0.1.1 or later) for the panel side.

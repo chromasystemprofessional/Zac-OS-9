@@ -1,0 +1,7 @@
+ZacOS 9 1.18.32 keeps the session package's New Tricks, Fetch Updates,
+Software and App Install paths out of a session-only install, where the
+full-system programs are absent.
+
+The GitHub release is another monolith built from this release's split
+packages, so a computer that skipped 1.18.31 can still update. The signed
+repository carries the split packages.

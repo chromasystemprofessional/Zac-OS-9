@@ -1,0 +1,5 @@
+ZacOS 9 1.18.31 is a transitional release for computers whose 1.18.27 or
+1.18.29 updater cannot install the split packages without the signed
+repository. The published zacos9_1.18.31_amd64.deb is a one-release
+monolith built from the 1.18.30 packages; the source tree stays split, and
+1.18.32 returns to it.

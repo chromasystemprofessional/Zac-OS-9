@@ -1,0 +1,9 @@
+ZacOS 9 1.18.25 makes Front Desk Setup a control panel, so an administrator
+can open it from Control Panels or the Zac menu before any account runs
+Front Desk.
+
+The Users panel's Use only chosen programs now works for every account,
+including administrators and your own. Programs… lists ZacOS's user
+programs and leaves out control panels, installers and system programs.
+Update Front Desk in Software > Extras (0.1.2 or later) for the control
+panel and the corrected program list.

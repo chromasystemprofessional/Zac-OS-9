@@ -1,0 +1,8 @@
+ZacOS 9 1.18.27 makes Classic Mac emulation's packaging honest: the
+emulators are ISO-only until they are a release asset, so a Debian install
+no longer suggests an uninstallable zacos9-emulators package. Old Dog's
+missing-emulator alert says where to get them.
+
+A downloaded emulation/build-emulators.sh now works on its own: it fetches
+the pinned source and patch, builds into ~/.local/libexec/zacos9, and Old
+Dog finds it (issue #195).
