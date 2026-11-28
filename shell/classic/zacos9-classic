@@ -169,6 +169,7 @@ desktop_size() {
 	display=${WAYLAND_DISPLAY:-}
 	[ -n "$runtime" ] && [ -n "$display" ] || return 1
 	[ -r "$runtime/zacos9-outputs-$display" ] || return 1
+	# shellcheck disable=SC2034 # unused fields keep the fixed columns aligned
 	while read -r kind name size scale_word scale nested_word nested \
 			x_word x y_word y main_word main rotate_word rotate; do
 		[ "$kind" = "output" ] && [ "$main" = "1" ] || continue

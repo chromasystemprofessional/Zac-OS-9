@@ -101,7 +101,7 @@ for m in $(printf '%s\n' "$members" | cut -d' ' -f1); do
 	while IFS= read -r where; do
 		case $where in
 		/ | /run/live/* | /lib/live/mount/* | /cdrom | /usr | /boot | /boot/efi)
-			fail "ZacOS is running from “$(label "$m")”, so it can't be $changed."
+			fail "ZacOS is running from '$(label "$m")', so it can't be $changed."
 			;;
 		esac
 	done <<-EOF
@@ -119,7 +119,7 @@ mkdir -p "$rules_dir"
 		*[0-9]) parts=${device}p ;;
 		*) parts=$device ;;
 		esac
-		echo "SUBSYSTEM==\"block\", ENV{DEVNAME}==\"$parts[0-9]*\", ENV{UDISKS_IGNORE}=\"1\""
+		echo "SUBSYSTEM==\"block\", ENV{DEVNAME}==\"${parts}[0-9]*\", ENV{UDISKS_IGNORE}=\"1\""
 	fi
 } >"$rule"
 udev_refresh
@@ -129,13 +129,13 @@ udev_refresh
 swaps=$(swapon --noheadings --raw --show=NAME 2>/dev/null || true)
 for m in $(printf '%s\n' "$members" | cut -d' ' -f1); do
 	if printf '%s\n' "$swaps" | grep -qx "$m"; then
-		swapoff "$m" || fail "“$(label "$m")” is in use as swap and couldn't be turned off."
+		swapoff "$m" || fail "'$(label "$m")' is in use as swap and couldn't be turned off."
 	fi
 	while IFS= read -r where; do
 		[ -n "$where" ] || continue
 		if ! umount "$where" 2>/dev/null; then
 			who=$(users_of "$where")
-			fail "“$(label "$m")” is in use${who:+ by $who}, so it can't be $changed. Quit ${who:+that program}${who:-the programs using it} and try again."
+			fail "'$(label "$m")' is in use${who:+ by $who}, so it can't be $changed. Quit ${who:+that program}${who:-the programs using it} and try again."
 		fi
 	done <<-EOF
 		$(mounts_of "$m" | sort -r)
@@ -145,7 +145,7 @@ printf '%s\n' "$members" | tac | while read -r m type; do
 	case $type in
 	crypt | dm)
 		dmsetup remove "$m" 2>/dev/null ||
-			fail "“$(label "$m")” is open on this disk and couldn't be closed."
+			fail "'$(label "$m")' is open on this disk and couldn't be closed."
 		;;
 	lvm | raid* | md*)
 		fail "$device is part of a $type volume, which the installer can't take apart. Remove it from that volume first."
