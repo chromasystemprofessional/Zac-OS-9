@@ -139,10 +139,30 @@ wlroots issue; [SECURITY.md](../SECURITY.md) explains what is in scope for
 ZacOS 9 itself. Track the Debian security tracker and take the trixie
 update when it lands.
 
+### CVE-2026-111133: libfsapfs encrypted-key over-read
+
+`libfsapfs` through 20260921 has an integer underflow in
+`libfsapfs_key_encrypted_key_read_data()`: a crafted APFS container with a
+malformed KEK attribute makes it read past a heap buffer. Debian 13 ships
+`libfsapfs` 20240429-1+b1; as of 2026-11-28 the Debian security tracker
+still lists trixie as undetermined. The upstream fix is a bounds check in
+`libfsapfs_key_encrypted_key.c`.
+
+`zacos9-mac-mount` opens an APFS device as root through `libfsapfs` to list
+its volumes before the FUSE mounts start, so a crafted image reaches the
+parser. The volume list is now read in a short-lived child with a 30-second
+timeout, no core dumps, and memory, CPU and file-size limits: a crash or a
+hang in the library no longer takes down the root helper. That contains the
+denial of service but does not fix the over-read. The child returns volume
+names or an error and then exits, but until Debian ships the update, do not
+mount an APFS image from an untrusted source, and take the trixie update
+when it lands.
+
 ## What is not covered yet
 
-- The HFS, HFS+ and APFS readers are Python and ctypes helpers around
-  Debian libraries; fuzzing those readers is the next target.
+- The HFS and HFS+ readers are Python helpers around Debian libraries; the
+  APFS reader has malformed-image tests, and fuzzing all of them remains a
+  target.
 - Wayland protocol parsing is wlroots' code; report those issues upstream.
 - The root helpers pass ShellCheck, but argument-level tests for each
   helper are still to come.
