@@ -97,6 +97,12 @@ test('mac-hfs', find_program('python3'),
   args: [files('tests/tools/test_mac_hfs.py'),
     meson.project_source_root() / 'tools' / 'mac-hfs.py'])
 
+# The same reader on truncated and corrupted images: a clean error or a
+# valid listing, never a traceback or a hang.
+test('mac-hfs-malformed', find_program('python3'),
+  args: [files('tests/tools/test_mac_hfs_malformed.py'),
+    meson.project_source_root() / 'tools' / 'mac-hfs.py'])
+
 # The extractor the Theme Installer runs, and its decoder modules.
 install_data(
   'tools/extract-macos9-theme.py',
