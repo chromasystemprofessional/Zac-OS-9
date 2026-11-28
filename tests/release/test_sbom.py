@@ -63,8 +63,12 @@ with tempfile.TemporaryDirectory() as d:
         raise SystemExit("sbom: the package hash is wrong")
     if components["zacos9-test"]["properties"][0]["value"] != "libc6 (>= 2.38)":
         raise SystemExit("sbom: the package depends field is missing")
+    if components["zacos9-test"]["licenses"][0]["license"]["id"] != "GPL-3.0-or-later":
+        raise SystemExit("sbom: wrong package license")
     if "zacos9-emulators" not in components or components["zacos9-emulators"]["type"] != "file":
         raise SystemExit("sbom: the GPL source component is missing")
+    if components["zacos9-emulators"]["licenses"][0]["license"]["id"] != "GPL-2.0-or-later":
+        raise SystemExit("sbom: wrong emulator license")
     refs = sbom["dependencies"][0]["dependsOn"]
     if sorted(refs) != sorted(c["bom-ref"] for c in sbom["components"]):
         raise SystemExit("sbom: the dependency graph is incomplete")

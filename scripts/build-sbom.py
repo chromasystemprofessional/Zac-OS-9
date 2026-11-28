@@ -43,9 +43,10 @@ def sha256(path):
 
 
 def license_for(package):
-    # The emulators are GPL-2; ZacOS's own packages are GPL-3.0-or-later.
+    # The emulators are GPL-2.0-or-later; ZacOS's own packages are
+    # GPL-3.0-or-later.
     if package == "zacos9-emulators":
-        return "GPL-2.0-only"
+        return "GPL-2.0-or-later"
     return "GPL-3.0-or-later"
 
 
@@ -84,7 +85,7 @@ def source_component(path):
         "bom-ref": f"urn:zacos9:source:{package}:{version}",
         "name": package,
         "version": version,
-        "licenses": [{"license": {"id": "GPL-2.0-only"}}],
+        "licenses": [{"license": {"id": "GPL-2.0-or-later"}}],
         "hashes": [{"alg": "SHA-256", "content": sha256(path)}],
         "properties": [
             {"name": "zacos9:source", "value": "GPL source tarball for the emulators"},
