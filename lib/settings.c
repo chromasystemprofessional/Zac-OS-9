@@ -231,6 +231,14 @@ static bool is_dir(const char *path) {
 	return stat(path, &st) == 0 && S_ISDIR(st.st_mode);
 }
 
+/* The source tree this build came from, for a build-tree run. ZACOS9_SOURCE
+ * overrides the path compiled in at configure time: the package build sets a
+ * fixed path so the checkout directory is not embedded in the binaries. */
+const char *pl_source_dir(void) {
+	const char *env = getenv("ZACOS9_SOURCE");
+	return env && *env ? env : ZACOS9_SOURCE_DIR;
+}
+
 const char *pl_data_dir(void) {
 	static char dir[1024];
 	if (dir[0]) {
@@ -242,7 +250,7 @@ const char *pl_data_dir(void) {
 	} else if (is_dir(ZACOS9_DATA_DIR "/sounds")) {
 		snprintf(dir, sizeof(dir), "%s", ZACOS9_DATA_DIR);
 	} else {
-		snprintf(dir, sizeof(dir), "%s/assets", ZACOS9_SOURCE_DIR);
+		snprintf(dir, sizeof(dir), "%s/assets", pl_source_dir());
 	}
 	return dir;
 }

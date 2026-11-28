@@ -8,6 +8,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include "settings.h"
+
 /* Folders a build tree can be above a program: build/shell/<folder>/ is two. */
 #define BUILD_TREE_DEPTH 3
 
@@ -75,7 +77,7 @@ bool pl_build_path(const char *relative, char *out, size_t size) {
 bool pl_source_path(const char *relative, char *out, size_t size) {
 	char tree[PATH_MAX];
 	return pl_build_tree(tree, sizeof(tree)) &&
-		fits(snprintf(out, size, "%s/%s", ZACOS9_SOURCE_DIR, relative), size);
+		fits(snprintf(out, size, "%s/%s", pl_source_dir(), relative), size);
 }
 
 static bool found(const char *path, char *out, size_t size) {
