@@ -106,7 +106,7 @@ check 'grep -qF "ENV{DEVNAME}==\"${p}[0-9]*\", ENV{UDISKS_IGNORE}=\"1\"" "$work/
 	"--keep hides the disk from UDisks too"
 echo /media/live/Haiku >"$fake/busy"
 run --keep "$d"
-check 'grep -q "^error “Haiku” is in use, so it can.t be changed" "$work/out"' "--keep says changed, not erased"
+check 'grep -q "^error '\''Haiku'\'' is in use, so it can.t be changed" "$work/out"' "--keep says changed, not erased"
 
 # The running system: refused before anything is changed.
 reset
@@ -131,7 +131,7 @@ echo php >"$work/proc/4242/comm"
 ln -s /media/live/Archive/www "$work/proc/4242/cwd"
 run "$d"
 status=$?
-check '[ "$status" = 1 ] && grep -q "^error “Archive” is in use by php" "$work/out"' \
+check '[ "$status" = 1 ] && grep -q "^error '\''Archive'\'' is in use by php" "$work/out" && grep -q "Quit that program and try again" "$work/out"' \
 	"a busy volume stops it, naming the program"
 check '! grep -q "^wipefs" "$fake/log"' "and the disk isn't erased"
 

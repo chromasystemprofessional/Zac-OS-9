@@ -135,7 +135,9 @@ for m in $(printf '%s\n' "$members" | cut -d' ' -f1); do
 		[ -n "$where" ] || continue
 		if ! umount "$where" 2>/dev/null; then
 			who=$(users_of "$where")
-			fail "'$(label "$m")' is in use${who:+ by $who}, so it can't be $changed. Quit ${who:+that program}${who:-the programs using it} and try again."
+			quit="the programs using it"
+			[ -z "$who" ] || quit="that program"
+			fail "'$(label "$m")' is in use${who:+ by $who}, so it can't be $changed. Quit $quit and try again."
 		fi
 	done <<-EOF
 		$(mounts_of "$m" | sort -r)
