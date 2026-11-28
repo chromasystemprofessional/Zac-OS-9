@@ -8,9 +8,13 @@ import os
 from pathlib import Path
 import pwd
 import re
+import resource
+import signal
 import stat
 import subprocess
 import sys
+import tempfile
+import time
 
 ROOT = Path("/run/media/zacos9-mac")
 DEVICE = re.compile(r"/dev/(?:sd[a-z]+[0-9]*|nvme[0-9]+n[0-9]+(?:p[0-9]+)?|"
@@ -18,6 +22,7 @@ DEVICE = re.compile(r"/dev/(?:sd[a-z]+[0-9]*|nvme[0-9]+n[0-9]+(?:p[0-9]+)?|"
 FILESYSTEMS = {"hfs", "hfsplus", "apfs"}
 APFS_HELPER_NAMES = {"preboot", "recovery", "vm", "update", "xart", "iscpreboot",
                      "hardware", "diagnostics"}
+APFS_TIMEOUT = 30
 
 
 def user_apfs_volumes(volumes):
@@ -133,8 +138,74 @@ def apfs_volumes(source):
                 check(library.libfsapfs_container_free(ctypes.byref(container), ctypes.byref(error)))
 
 
+def apfs_volumes_bounded(source):
+    """List an APFS container's volumes in a short-lived child process.
+
+    libfsapfs parses bytes from an untrusted image, and a crafted one can
+    crash or hang it (CVE-2026-111133 is an over-read in its key parser). The
+    child keeps that away from the root helper; the timeout, core limit and
+    address-space limit bound the damage. The child stays root because the
+    library reopens /proc/self/fd/N, which the parent opened on the device.
+    """
+    output = tempfile.TemporaryFile()
+    try:
+        pid = os.fork()
+    except OSError as error:
+        output.close()
+        raise ValueError(f"Cannot start the APFS reader: {error}") from error
+    if pid == 0:
+        try:
+            for limit, value in (
+                    (resource.RLIMIT_CORE, (0, 0)),
+                    (resource.RLIMIT_AS, (1 << 30, 1 << 30)),
+                    (resource.RLIMIT_CPU, (APFS_TIMEOUT, APFS_TIMEOUT)),
+                    (resource.RLIMIT_FSIZE, (1 << 20, 1 << 20))):
+                try:
+                    resource.setrlimit(limit, value)
+                except (OSError, ValueError):
+                    pass
+            try:
+                payload = json.dumps({"volumes": apfs_volumes(source)})
+            except (OSError, ValueError) as error:
+                payload = json.dumps({"error": str(error)})
+            output.write(payload.encode())
+            output.flush()
+        finally:
+            os._exit(0)
+    deadline = time.monotonic() + APFS_TIMEOUT
+    status = None
+    while status is None:
+        done, state = os.waitpid(pid, os.WNOHANG)
+        if done:
+            status = state
+            break
+        if time.monotonic() >= deadline:
+            try:
+                os.kill(pid, signal.SIGKILL)
+            finally:
+                os.waitpid(pid, 0)
+            output.close()
+            raise ValueError(
+                f"The APFS reader did not finish within {APFS_TIMEOUT} seconds")
+        time.sleep(0.05)
+    output.seek(0)
+    data = output.read()
+    output.close()
+    if os.WIFSIGNALED(status):
+        raise ValueError(f"The APFS reader crashed (signal {os.WTERMSIG(status)})")
+    if not os.WIFEXITED(status) or os.WEXITSTATUS(status) != 0:
+        raise ValueError("The APFS reader failed")
+    try:
+        result = json.loads(data)
+    except ValueError as error:
+        raise ValueError("The APFS reader returned no result") from error
+    if "error" in result:
+        raise ValueError(result["error"])
+    return result["volumes"]
+
+
 def mount_apfs(source, target, fd):
-    volumes = user_apfs_volumes(apfs_volumes(source))
+    volumes = user_apfs_volumes(apfs_volumes_bounded(source))
     directories = []
     try:
         for entry in volumes:
