@@ -1,0 +1,74 @@
+# Security hardening
+
+This page is for people changing ZacOS 9's C and C++ code: the sanitizer
+build, the fuzzer, and the dependency issues we are tracking. The reporting
+policy is in [SECURITY.md](../SECURITY.md).
+
+## Sanitizer build
+
+Build the desktop with AddressSanitizer and UndefinedBehaviorSanitizer:
+
+```sh
+meson setup build-asan -Db_sanitize=address,undefined -Dafterdark=disabled
+meson compile -C build-asan
+meson test -C build-asan afp-parse --print-errorlogs
+```
+
+CI compiles the desktop this way and runs the AFP parser test. Other tests
+can be run from `build-asan` the same way; tests that start their own
+compositor also run under the sanitizer. `ASAN_OPTIONS=detect_leaks=0` is
+set in CI because Qt, Mesa and the test harness keep allocations alive at
+exit; the parser test has no leaks of its own.
+
+## Fuzzing
+
+The AFP client parses bytes from a server, so its reply parsers are pure
+functions in `network/afp/afp_parse.c` and have a libFuzzer harness:
+
+```sh
+sudo apt install clang libclang-rt-19-dev
+CC=clang CXX=clang++ meson setup build-fuzz -Dfuzz=true -Dafterdark=disabled
+meson test -C build-fuzz fuzz-afp-parse --print-errorlogs
+```
+
+The CI test runs 2,000 inputs. For a longer local run, run the harness
+directly against a corpus directory or with a time limit:
+
+```sh
+build-fuzz/network/fuzz-afp-parse -max_total_time=3600
+```
+
+The harness feeds the same bytes to the server-info, item-parameter and
+enumerate parsers. Add the failing bytes to `test_afp_parse.c` when a crash
+is fixed; the deterministic `afp-parse` test is the fast gate that runs in
+the normal package build.
+
+## Known dependency issues
+
+### CVE-2026-121604: wlroots Xwayland `WM_CLASS` over-read
+
+`read_surface_class()` in wlroots' Xwayland window manager can over-read
+the compositor's heap when an X11 client sets a `WM_CLASS` with a
+NUL-terminated instance but an unterminated class. The over-read bytes can
+be exposed as the window's class or app ID over IPC. It is fixed in
+wlroots 0.20.2 (commit `4412992469540b1d578cb94a5cd4e6e5829812dc`).
+
+Debian 13 (trixie) ships wlroots 0.18.2, which is affected; Debian 14
+(forky/sid) has 0.20.2. As of 2026-11-27 there is no trixie security
+update. ZacOS 9 on Debian 13 therefore inherits the issue in its Xwayland
+path.
+
+Until the Debian 14/wlroots 0.20 rebase, treat X11 programs as less
+isolated than Wayland programs and do not run untrusted X11 clients on a
+desktop that holds data you would not show them. This is an upstream
+wlroots issue; [SECURITY.md](../SECURITY.md) explains what is in scope for
+ZacOS 9 itself. Track the Debian security tracker and take the trixie
+update when it lands.
+
+## What is not covered yet
+
+- The HFS, HFS+ and APFS readers are Python and ctypes helpers around
+  Debian libraries; fuzzing those readers is the next target.
+- Wayland protocol parsing is wlroots' code; report those issues upstream.
+- The root helpers under `system/` are shell scripts. Shellcheck and
+  malformed-argument tests are next.

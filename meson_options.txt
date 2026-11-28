@@ -3,3 +3,8 @@ option('afterdark',
   choices: ['auto', 'enabled', 'disabled'],
   value: 'auto',
   description: 'Build the After Dark module helper (needs cargo; auto skips it when cargo is missing).')
+
+option('fuzz',
+  type: 'boolean',
+  value: false,
+  description: 'Build the libFuzzer harnesses (needs Clang and compiler-rt).')

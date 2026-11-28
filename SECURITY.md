@@ -7,12 +7,12 @@ privately.
 
 ## Supported versions
 
-Security fixes are made on `main` and released in the newest **1.9.x**
+Security fixes are made on `main` and released in the newest **1.18.x**
 release. Older releases are not maintained.
 
 | Version | Supported |
 |---|---|
-| Latest 1.9.x release | Yes |
+| Latest 1.18.x release | Yes |
 | `main` (development) | Fixes land here first |
 | Older releases | No; update with **Zac menu ▸ Fetch Updates** |
 
@@ -92,5 +92,6 @@ ask privately first.
 ## Related
 
 - [Security advisories](https://github.com/chromasystemprofessional/Zac-OS-9/security/advisories)
+- [Security hardening](docs/security.md): sanitizer build, fuzzing and tracked dependency issues
 - [Contributing](CONTRIBUTING.md)
 - [Project status](PROJECT_STATUS.md)
