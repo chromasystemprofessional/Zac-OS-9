@@ -6,13 +6,15 @@
 #
 # On a clean main branch, it adds a debian/changelog entry for the version,
 # moves the split packages' zacos9 Breaks/Replaces to it, commits and tags
-# it, builds the desktop packages and the Classic emulators, pushes, and
-# creates the GitHub release. A transition release (the default) tags 0.2.0,
-# publishes the zacos9_0.2.0_amd64.deb monolith, SHA256SUMS and the emulator
-# package/source, and keeps the split packages for the signed repository. A
-# split release (--split, once pre-1.18.30 updaters are no longer supported)
-# tags v0.2.0 and publishes the split package set and the emulators. Needs
-# `gh auth login`. See docs/updates.md.
+# it, builds the desktop packages and the Classic emulators, writes the
+# CycloneDX SBOM and SHA256SUMS, signs the checksums with the archive key,
+# pushes, and creates the GitHub release. A transition release (the default)
+# tags 0.2.0, publishes the zacos9_0.2.0_amd64.deb monolith, the emulator
+# package/source, the SBOM and the signed checksums, and keeps the split
+# packages for the signed repository. A split release (--split, once
+# pre-1.18.30 updaters are no longer supported) tags v0.2.0 and publishes
+# the split package set and the emulators the same way. Needs `gh auth login`
+# and the archive signing key (docs/repo.md). See docs/updates.md.
 set -eu
 self=$(realpath "$0")
 cd "$(dirname "$self")/.."
@@ -20,6 +22,27 @@ cd "$(dirname "$self")/.."
 die() {
 	echo "release.sh: $1" >&2
 	exit 1
+}
+
+# Sign the release checksums with the archive key, the same key the package
+# repository uses. ZACOS9_REPO_GPG_PASSPHRASE keeps gpg non-interactive; when
+# it is unset, gpg prompts for the passphrase (a local release).
+sign_checksums() {
+	[ -n "${ZACOS9_REPO_KEY:-}" ] ||
+		die "set ZACOS9_REPO_KEY to the archive signing key (docs/repo.md)."
+	if [ "${ZACOS9_REPO_GPG_PASSPHRASE+set}" != set ]; then
+		gpg --yes --local-user "$ZACOS9_REPO_KEY" --armor --detach-sign \
+			--output "$1.asc" "$1"
+	elif [ -n "$ZACOS9_REPO_GPG_PASSPHRASE" ]; then
+		printf '%s' "$ZACOS9_REPO_GPG_PASSPHRASE" |
+			gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 \
+				--local-user "$ZACOS9_REPO_KEY" --armor --detach-sign \
+				--output "$1.asc" "$1"
+	else
+		gpg --batch --yes --pinentry-mode loopback --passphrase '' \
+			--local-user "$ZACOS9_REPO_KEY" --armor --detach-sign \
+			--output "$1.asc" "$1"
+	fi
 }
 
 transition=true
@@ -88,6 +111,10 @@ arch=$(dpkg --print-architecture)
 emulators=$(find build/packages -maxdepth 1 \
 	\( -name "zacos9-emulators_*.deb" -o -name "zacos9-emulators_*.source.tar.gz" \) -print)
 [ -n "$emulators" ] || die "the build didn't make the emulators package."
+case $emulators in
+	*.source.tar.gz*) ;;
+	*) die "the build didn't make the emulators' GPL source tarball." ;;
+esac
 if $transition; then
 	out=build/transition
 	rm -rf "$out"
@@ -96,15 +123,30 @@ if $transition; then
 		--debs build/packages --output "$out"
 	deb=$out/zacos9_${version}_${arch}.deb
 	[ -f "$deb" ] || die "the build didn't make $deb."
+	# shellcheck disable=SC2086 # one path per file, none contains a space
 	cp $emulators "$out/"
-	(cd "$out" && sha256sum "zacos9_${version}_${arch}.deb" zacos9-emulators_* >SHA256SUMS)
-	assets="$deb $out/zacos9-emulators_*.deb $out/zacos9-emulators_*.source.tar.gz $out/SHA256SUMS"
 else
 	debs=$(find build/packages -maxdepth 1 \
 		-name "zacos9*_${version}_${arch}.deb" ! -name "*-dbgsym_*.deb" -print)
 	[ -n "$debs" ] || die "the build didn't make the $version packages."
-	assets="$debs $emulators"
+	out=build/release
+	rm -rf "$out"
+	mkdir -p "$out"
+	# shellcheck disable=SC2086 # one path per file, none contains a space
+	cp $debs $emulators "$out/"
 fi
+
+# The SBOM describes what this release publishes: its packages and the
+# emulators' GPL source, not the whole Debian base system. The changelog
+# entry's timestamp makes the document the same when the release is rebuilt.
+repo=$(gh repo view --json nameWithOwner -q .nameWithOwner)
+SOURCE_DATE_EPOCH=$(dpkg-parsechangelog -S Timestamp) \
+	python3 scripts/build-sbom.py --version "$version" \
+		--release-url "https://github.com/$repo/releases/tag/$tag" \
+		"$out"/*.deb "$out"/*.source.tar.gz >"$out/zacos9-$version.cdx.json"
+(cd "$out" && sha256sum *.deb *.source.tar.gz *.cdx.json >SHA256SUMS)
+sign_checksums "$out/SHA256SUMS"
+assets=$(find "$out" -maxdepth 1 -type f -print)
 
 git push -q origin main "$tag"
 # shellcheck disable=SC2086 # one path per file, none contains a space

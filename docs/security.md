@@ -70,6 +70,34 @@ meson test -C build system-shellcheck --print-errorlogs
 The Python helpers (disks, APFS, modules) are out of scope for ShellCheck.
 Argument-level tests for each helper are still to come.
 
+## Release integrity
+
+Every release publishes a CycloneDX 1.6 SBOM, `zacos9-<version>.cdx.json`,
+and a `SHA256SUMS` file with a detached signature, `SHA256SUMS.asc`, made
+with the same archive key as the package repository
+([docs/repo.md](repo.md)). The SBOM lists each package's name, version,
+architecture, SHA-256 and Debian `Depends`, plus the emulators' GPL source
+tarball. It inventories what ZacOS 9 publishes, not the whole Debian base
+system.
+
+`scripts/release.sh` writes the SBOM from the packages it built and signs
+the checksums; the `repo` CI job signs the `v*` release assets again from
+the tested artifacts. The `sbom` test checks the generator against sample
+packages, including that a given `SOURCE_DATE_EPOCH` produces the same
+document.
+
+Verify a release before installing it; `SHA256SUMS` lists the packages, the
+SBOM and the emulators' source. Import the archive key first if you haven't:
+the repository publishes it as `zacos9-archive-keyring.asc`
+([docs/repo.md](repo.md)).
+
+```sh
+gh release download TAG --pattern 'SHA256SUMS*'
+gpg --verify SHA256SUMS.asc SHA256SUMS
+gh release download TAG --pattern '*.deb' --pattern '*.cdx.json'
+sha256sum -c SHA256SUMS
+```
+
 ## Known dependency issues
 
 ### CVE-2026-121604: wlroots Xwayland `WM_CLASS` over-read

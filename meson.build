@@ -79,6 +79,11 @@ test('release-truth', find_program('python3'),
   args: [files('tests/release/test_release_truth.py'),
     meson.project_version(), meson.project_source_root()])
 
+# The release SBOM: CycloneDX, packages plus the emulators' GPL source,
+# and deterministic output for a given SOURCE_DATE_EPOCH.
+test('sbom', find_program('python3'),
+  args: [files('tests/release/test_sbom.py'), meson.project_source_root()])
+
 # The Mac OS 9 theme extractor (theming step 3).
 test('theme-extractor', find_program('python3'),
   args: [files('tests/tools/test_extract_macos9.py'),
