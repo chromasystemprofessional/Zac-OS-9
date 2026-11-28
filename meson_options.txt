@@ -8,3 +8,8 @@ option('fuzz',
   type: 'boolean',
   value: false,
   description: 'Build the libFuzzer harnesses (needs Clang and compiler-rt).')
+
+option('source-dir',
+  type: 'string',
+  value: '',
+  description: 'Path compiled in for the build-tree data fallback; empty uses the source root. Package builds set a fixed path so the checkout directory is not embedded in the binaries.')

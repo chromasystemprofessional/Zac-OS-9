@@ -7,6 +7,13 @@ freetype = dependency('freetype2')
 fribidi = dependency('fribidi')
 
 platinum_inc = include_directories('.')
+# The source path is only the fallback for running from a build tree (see
+# pl_source_dir()). A package build sets -Dsource-dir to a fixed installed
+# path, so the checkout's own path is not compiled into every binary.
+source_dir = get_option('source-dir')
+if source_dir == ''
+  source_dir = meson.project_source_root()
+endif
 platinum_lib = static_library('platinum',
   'draw.c',
   'text.c',
@@ -38,7 +45,7 @@ platinum_lib = static_library('platinum',
     dependency('wayland-client').partial_dependency(compile_args: true, includes: true)],
   c_args: [
     '-DZACOS9_DATA_DIR="@0@"'.format(get_option('prefix') / get_option('datadir') / 'zacos9'),
-    '-DZACOS9_SOURCE_DIR="@0@"'.format(meson.project_source_root()),
+    '-DZACOS9_SOURCE_DIR="@0@"'.format(source_dir),
     '-DZACOS9_LOCALEDIR="@0@"'.format(get_option('prefix') / get_option('datadir') / 'locale'),
   ],
 )

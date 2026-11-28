@@ -98,6 +98,25 @@ gh release download TAG --pattern '*.deb' --pattern '*.cdx.json'
 sha256sum -c SHA256SUMS
 ```
 
+## Reproducible builds
+
+The desktop packages are reproducible: two builds of the same tree, in
+different directories, produce identical `.deb` files, including the
+debug-symbol packages. The changelog entry sets `SOURCE_DATE_EPOCH`,
+`dpkg-buildflags` maps the build path, and `debian/rules` compiles a fixed
+source path (`-Dsource-dir=/usr/share/zacos9`) instead of the checkout. A
+build-tree run still finds its assets through `ZACOS9_SOURCE`.
+
+Verify locally; it needs the build dependencies and takes two full builds:
+
+```sh
+sudo apt build-dep ./
+scripts/check-reproducible.sh
+```
+
+CI runs the same check every week and on release tags. The emulators' package
+and GPL source tarball are not covered yet.
+
 ## Known dependency issues
 
 ### CVE-2026-121604: wlroots Xwayland `WM_CLASS` over-read

@@ -101,6 +101,12 @@ int main(void) {
 	pl_setting_set("talking-alerts", "true");
 	check(pl_talking_alerts(), "and on when chosen");
 
+	/* A package build compiles a fixed path; a build-tree run points at its
+	 * own checkout through ZACOS9_SOURCE (the isolated test setup does this). */
+	setenv("ZACOS9_SOURCE", "/tmp/zacos9-source", 1);
+	check(strcmp(pl_source_dir(), "/tmp/zacos9-source") == 0,
+		"ZACOS9_SOURCE overrides the compiled source tree");
+
 	unlink(conf);
 	rmdir(sub);
 	rmdir(dir);

@@ -134,7 +134,7 @@ bool zac_theme_bundle_dir(const char *id, char *out, size_t size) {
 		return true;
 	}
 	char source[4096];
-	snprintf(source, sizeof(source), "%s/share/zacos9/themes/%s", ZACOS9_SOURCE_DIR, id);
+	snprintf(source, sizeof(source), "%s/share/zacos9/themes/%s", pl_source_dir(), id);
 	struct stat st;
 	if (stat(source, &st) == 0 && S_ISDIR(st.st_mode)) {
 		snprintf(out, size, "%s", source);

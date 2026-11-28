@@ -6,6 +6,7 @@
 
 #include "welcome.h"
 #include "theme.h"
+#include "settings.h"
 
 int pl_welcome_scale(int w, int h) {
 	int s = w / PL_WELCOME_SCREEN_W;
@@ -69,9 +70,11 @@ const uint32_t *pl_boot_art(enum pl_boot_art art, int scale) {
 	if (zac_theme_asset(themepath, themepath, sizeof(themepath))) {
 		cache[art][scale] = load_png(themepath, PL_WELCOME_ICON * scale);
 	}
+	char source_boot[4096];
+	snprintf(source_boot, sizeof(source_boot), "%s/assets/boot", pl_source_dir());
 	const char *env = getenv("ZACOS9_BOOT_ART");
 	const char *dirs[] = { env && *env ? env : NULL, ZACOS9_DATA_DIR "/boot",
-		ZACOS9_SOURCE_DIR "/assets/boot" };
+		source_boot };
 	for (size_t i = 0; i < sizeof(dirs) / sizeof(dirs[0]) && !cache[art][scale]; i++) {
 		if (!dirs[i]) {
 			continue;

@@ -3,6 +3,12 @@
 %:
 	dh $@ --buildsystem=meson
 
+# Reproducible binaries: the checkout path is only the fallback for running
+# from a build tree, so compile in a fixed path. Tests still find the source
+# through ZACOS9_SOURCE (the isolated test setup).
+override_dh_auto_configure:
+	dh_auto_configure --buildsystem=meson -- -Dsource-dir=/usr/share/zacos9
+
 override_dh_auto_test:
 	dh_auto_test --no-parallel
 

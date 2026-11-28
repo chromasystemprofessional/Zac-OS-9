@@ -40,6 +40,10 @@ uint32_t pl_highlight_current(void);
  * directory, or the source tree's assets/ when running from a build. */
 const char *pl_data_dir(void);
 
+/* The source tree this build came from, for a build-tree run: $ZACOS9_SOURCE,
+ * or the path compiled in (a fixed installed path in packages). */
+const char *pl_source_dir(void);
+
 /* Play a sound from sounds/NAME.wav without waiting for it. NULL plays
  * the chosen alert sound ("alert-sound", default "platinum"). */
 void pl_sound_play(const char *name);
