@@ -55,6 +55,21 @@ default); `classic.conf` accepts `sandbox=`, `network=` and `gpu=`. The
 `classic-sandbox` test checks that a guest cannot read `~/.ssh` or the
 desktop's settings.
 
+## Root helpers
+
+The privileged helpers under `system/` are shell scripts. The
+`system-shellcheck` test runs ShellCheck over every shell helper with
+warnings treated as errors; it is part of the normal package test suite.
+`shellcheck` is a build dependency, so `apt build-dep ./` installs it;
+run the test on its own with:
+
+```sh
+meson test -C build system-shellcheck --print-errorlogs
+```
+
+The Python helpers (disks, APFS, modules) are out of scope for ShellCheck.
+Argument-level tests for each helper are still to come.
+
 ## Known dependency issues
 
 ### CVE-2026-121604: wlroots Xwayland `WM_CLASS` over-read
@@ -82,5 +97,5 @@ update when it lands.
 - The HFS, HFS+ and APFS readers are Python and ctypes helpers around
   Debian libraries; fuzzing those readers is the next target.
 - Wayland protocol parsing is wlroots' code; report those issues upstream.
-- The root helpers under `system/` are shell scripts. Shellcheck and
-  malformed-argument tests are next.
+- The root helpers pass ShellCheck, but argument-level tests for each
+  helper are still to come.

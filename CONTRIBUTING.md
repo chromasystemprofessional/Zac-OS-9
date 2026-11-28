@@ -124,6 +124,9 @@ target-only builds), see [Build speed](docs/build-speed.md).
   `-Db_sanitize=address,undefined`, or with `-Dfuzz=true` and Clang for the
   AFP parser fuzzer. [Security hardening](docs/security.md) has the commands
   and the dependency issues being tracked.
+- **ShellCheck:** `system-shellcheck` checks the privileged helpers under
+  `system/`; install `shellcheck` (or run `apt build-dep ./`) and run
+  `meson test -C build system-shellcheck`.
 
 Two checks look after the build itself (see
 [`tests/baseline/`](tests/baseline/README.md)):

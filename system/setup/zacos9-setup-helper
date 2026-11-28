@@ -21,7 +21,7 @@ fail() { echo "error $*"; exit 1; }
 [ "$(id -u)" = 0 ] || fail "Must run as root"
 [ -e "$FLAG" ] || fail "This computer is already set up"
 
-fullname= username= password= computername= hostname= timezone= autologin=0
+fullname='' username='' password='' computername='' hostname='' timezone='' autologin=0
 while IFS= read -r line; do
 	value=${line#*=}
 	case $line in

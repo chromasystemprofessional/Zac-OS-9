@@ -67,6 +67,12 @@ test('packaging', find_program('python3'),
 test('privacy', find_program('python3'),
   args: [files('tests/privacy/test_no_tracking.py'), meson.project_source_root()])
 
+# The privileged helpers under system/ are shell scripts. ShellCheck's
+# warnings are errors here; the Python helpers are out of scope. The Ubuntu
+# package build installs shellcheck from debian/control's Build-Depends.
+test('system-shellcheck', find_program('python3'),
+  args: [files('tests/system/test_shellcheck.py'), meson.project_source_root()])
+
 # One version everywhere: the changelog, Meson, PROJECT_STATUS, the README's
 # "New in" section and a What's New note for every release since 1.18.19.
 test('release-truth', find_program('python3'),

@@ -54,7 +54,7 @@ die() {
 [ "$(id -u)" = 0 ] || die "zacos9-sharing-helper must run as root (through pkexec)."
 
 # The user who asked: pkexec says, sudo says, or root itself.
-caller() {
+requesting_user() {
 	if [ -n "${PKEXEC_UID:-}" ]; then
 		getent passwd "$PKEXEC_UID" | cut -d: -f1
 	elif [ -n "${SUDO_USER:-}" ]; then
@@ -114,7 +114,7 @@ write_afp_conf() {
 	# on the folder, and a shared folder's (its volume's root) would clash
 	# in the home volume around it. So home volumes hide the shared folders
 	# in them, which Macs mount as volumes of their own.
-	home_veto=/.*/
+	home_veto='/.*/'
 	each_share | while IFS="$tab" read -r sname spath; do
 		case $spath in /home/*/*) printf '%s/' "$(basename "$spath")" ;; esac
 	done >/tmp/zacos9-veto.$$
@@ -346,7 +346,7 @@ own_folder() {
 	if [ "$(printf %s "$p" | wc -l)" -ne 0 ] || printf %s "$p" | grep -q '[;#"\\[:cntrl:]]'; then
 		die "Folders with ; # \" \\ or control characters in their names can't be shared."
 	fi
-	who=$(caller)
+	who=$(requesting_user)
 	if [ "$who" != root ] && [ "$(stat -c %U -- "$p")" != "$who" ]; then
 		die "Only the owner of \"$(basename "$p")\" can share it or change its privileges."
 	fi
@@ -429,7 +429,7 @@ privileges() {
 	# Others reach the folder through the ones it's in: let them pass
 	# through (not look in) the caller's own, such as their home folder,
 	# which Debian makes private.
-	who=$(caller)
+	who=$(requesting_user)
 	case $mode:$who in ?00:* | *:root) ;; *)
 		uid=$(id -u "$who")
 		dir=$(dirname "$path")
@@ -442,7 +442,7 @@ privileges() {
 }
 
 password() {
-	user=$(caller)
+	user=$(requesting_user)
 	[ "$user" != root ] || die "Run this as the user whose password it is."
 	IFS= read -r pw || true
 	[ -n "$pw" ] || die "The password is empty."
@@ -454,7 +454,7 @@ password() {
 # bytes in hex padded with zeros to 8. Written here, not with afppasswd -w,
 # which would show it in ps; afppasswd only if a key file encrypts them.
 macpassword() {
-	user=$(caller)
+	user=$(requesting_user)
 	[ "$user" != root ] || die "Run this as the user whose password it is."
 	IFS= read -r pw || true
 	[ -n "$pw" ] || die "The password is empty."
@@ -482,8 +482,8 @@ macpassword() {
 }
 
 status() {
-	who=${1:-$(caller)}
-	if [ "$who" != "$(caller)" ] && [ "$(caller)" != root ]; then
+	who=${1:-$(requesting_user)}
+	if [ "$who" != "$(requesting_user)" ] && [ "$(requesting_user)" != root ]; then
 		die "Only root can ask about another user's password."
 	fi
 	if pdbedit -L 2>/dev/null | cut -d: -f1 | grep -qxF "$who"; then
