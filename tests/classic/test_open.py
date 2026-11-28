@@ -71,7 +71,7 @@ def reset_queue(home):
 with tempfile.TemporaryDirectory() as d:
     root = Path(d)
     home, classic, emulators, runtime = root / "home", root / "home" / "Classic", root / "emulators", root / "run"
-    for folder in (classic, emulators, runtime, home / "Apps"):
+    for folder in (classic, emulators, runtime, classic / "Apps"):
         folder.mkdir(parents=True)
     (classic / "rom").write_bytes(bytes.fromhex("9630c68b") + bytes(4 * 1024 * 1024 - 4))
     hfs(classic / "A.dsk")
@@ -89,7 +89,7 @@ with tempfile.TemporaryDirectory() as d:
         "sleep 0.2\n"
         "exit 0\n")
     sheep.chmod(0o755)
-    app = home / "Apps" / "Test App"
+    app = classic / "Apps" / "Test App"
     app.write_text("an application")
     (root / "outside.App").write_text("an application")
 
@@ -98,6 +98,7 @@ with tempfile.TemporaryDirectory() as d:
         HOME=str(home),
         ZACOS9_CLASSIC_DIR=str(classic),
         ZACOS9_EMULATORS=str(emulators),
+        ZACOS9_CLASSIC_SANDBOX="no",
         XDG_RUNTIME_DIR=str(runtime),
     )
 
@@ -115,7 +116,7 @@ with tempfile.TemporaryDirectory() as d:
 
     code, out, err = run("--check", "--open", str(app))
     check(code == 0 and f"open: {app} -> Unix:Apps:Test App" in out,
-          "--check maps a home app to the Unix volume")
+          "--check maps a Classic app to the Unix volume")
     check(not (home / "zacos9-classic").exists(), "--check writes no request")
 
     code, out, err = run("--open", str(app))
@@ -170,7 +171,7 @@ with tempfile.TemporaryDirectory() as d:
         sleeper.wait()
 
     code, out, err = run("--open", str(root / "outside.App"))
-    check(code == 2 and "home folder" in err, "an app outside the home folder is refused")
+    check(code == 2 and "Classic folder" in err, "an app outside the Classic folder is refused")
     code, out, err = run("--open", str(home / "Apps" / "Missing"))
     check(code == 2 and "not found" in err, "a missing app is refused")
 

@@ -75,8 +75,10 @@ so the Mac starts up from the installed system and only falls back to a CD.
 ## Inside the Mac
 
 - The emulator window gets a Platinum frame from zacos9-wm.
-- Your home folder appears on the Mac's desktop as the "Unix" volume. Copy
-  files across through it.
+- The `Classic` folder appears on the Mac's desktop as the "Unix" volume.
+  Copy files across through it. The rest of your home is hidden by the
+  sandbox; the Classic folder is the only part of it the Mac can see or
+  write.
 - RAM is 256 MB for SheepShaver and 64 MB for Basilisk II. Old Dog opens
   **full screen at the desktop's resolution**, read from the compositor's
   output list. Run `zacos9-classic --windowed` (or put `screen=window` in
@@ -86,6 +88,37 @@ so the Mac starts up from the installed system and only falls back to a CD.
 
 Run `zacos9-classic --check` to see which emulator, ROM and disks would be
 used. Add `--68k` for Basilisk II.
+
+## Sandbox
+
+`zacos9-classic` runs the emulator in a bubblewrap sandbox by default. The
+sandbox gives the Mac the `Classic` folder as its "Unix" volume and hides
+the rest of your home, including `~/.ssh`, `~/.gnupg` and the desktop's
+settings. The emulator gets a private `HOME` for its preferences, and the
+guest has no network or GPU unless you ask:
+
+```sh
+zacos9-classic --network       # the emulator's NAT and port 5548
+zacos9-classic --gpu           # /dev/dri for hardware rendering
+zacos9-classic --unsandboxed   # no bubblewrap; network on, host readable
+```
+
+The same settings can go in `~/.config/zacos9/classic.conf`:
+
+```text
+sandbox=auto        # auto (default), yes or no
+network=no          # no (default in the sandbox), yes or auto
+gpu=no              # no (default), yes
+```
+
+`auto` uses the sandbox when bubblewrap and unprivileged user namespaces
+are available, and warns before running without it. The package installs
+`bubblewrap`; a source checkout needs it too. `classic-sandbox` in the test
+suite checks that a guest cannot read `~/.ssh`.
+
+Direct launching (`--open`) only accepts applications in the Classic
+folder, because that is the Mac's Unix volume. Put the application there,
+or open it inside the Mac.
 
 ## Known gaps
 
@@ -109,6 +142,11 @@ used. Add `--68k` for Basilisk II.
   `sudo setcap -r /usr/libexec/zacos9/SheepShaver`; the next upgrade of
   either package grants it again.
   Some emulator startup errors return exit status zero; `--check` verifies
+- **Sandbox and Old World ROMs:** the bubblewrap sandbox drops extra
+  capabilities, so SheepShaver's low-memory permission may not survive it.
+  If an Old World ROM fails with `Cannot map Low Memory Globals: Operation
+  not permitted`, run `zacos9-classic --unsandboxed` or use a New World
+  "Mac OS ROM" file. The sandbox is the safer default for everything else.
   file discovery, not successful emulation.
 - SDL's Wayland backend never shows a window under zacos9-wm, so the
   emulators run through Xwayland.

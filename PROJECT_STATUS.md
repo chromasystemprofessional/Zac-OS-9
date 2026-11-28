@@ -17,7 +17,10 @@ This page is what's true now and what's next. What changed and when is in
   package is built from the pinned macemu commit; the release workflow now
   publishes it beside the desktop packages, so a Debian install can install
   it instead of building the emulators from a source checkout
-  ([emulation/README.md](emulation/README.md)).
+  ([emulation/README.md](emulation/README.md)). The emulator runs in a
+  bubblewrap sandbox by default: the Classic folder is the Mac's Unix volume,
+  the rest of the home is hidden, and the guest has no network or GPU unless
+  asked for.
 - **Removable media is built**: data and audio CDs/DVDs, blank discs, PC and
   USB floppy drives, Iomega Zip/Jaz, generic and Mac disk images,
   single-data-track CUE/BIN images, one eject path, and VLC AutoPlay

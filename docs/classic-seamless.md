@@ -60,7 +60,8 @@ appropriately licensed interfaces and tools.
 ## Existing foundations
 
 - [Classic launcher](../shell/classic/zacos9-classic): starts SheepShaver with
-  an 800x600 guest display, shared home directory and SDL/Xwayland output.
+  an 800x600 guest display, the Classic folder as a sandboxed "Unix" volume
+  and SDL/Xwayland output.
 - [Finder](../shell/finder/finder.cpp): recognizes Classic application metadata
   and starts Classic with `--open`; document association is still to come.
 - [Emulator build](../emulation/build-emulators.sh): pins a macemu revision
@@ -331,8 +332,8 @@ pass before a Debian release. No ISO rebuild is required for iteration.
   limits against hardware measurements before release.
 - Use private per-user runtime endpoints and peer/session checks. Never
   accept guest-provided shell commands or arbitrary host executable paths.
-- Keep clipboard and additional file access opt-in. The existing shared-home
-  behavior must be documented, not described as a sandbox.
+- Keep clipboard and additional file access opt-in. The sandbox exposes the
+  Classic folder, not the whole home; keep it that way when adding access.
 - On helper timeout, suspend seamless controls and offer desktop recovery.
   On emulator exit, remove stale windows and report the failure without
   automatically restarting writable disks.
