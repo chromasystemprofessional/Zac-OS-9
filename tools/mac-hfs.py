@@ -113,8 +113,12 @@ class _Volume:
 			count = _u16(node, 10)
 			if count > (node_size - 14) // 2:
 				raise MacVolumeError("invalid B-tree record count")
+			table = node_size - 2 * count
 			for index in range(count):
-				yield node, _u16(node, node_size - 2 * (index + 1))
+				offset = _u16(node, node_size - 2 * (index + 1))
+				if offset < 14 or offset >= table:
+					raise MacVolumeError("invalid B-tree record offset")
+				yield node, offset
 			node_number = _u32(node, 0)
 
 	def _folder(self, parent, name):
@@ -140,9 +144,14 @@ class _Volume:
 
 	def copy_tree(self, source, destination, merge=False):
 		root = self.find_folder(source)
-		self._copy_folder(root, destination, merge)
+		self._copy_folder(root, destination, merge, set())
 
-	def _copy_folder(self, folder_id, destination, merge):
+	def _copy_folder(self, folder_id, destination, merge, seen):
+		if folder_id in seen:
+			raise MacVolumeError("folder loop in the catalog")
+		if len(seen) >= 100:
+			raise MacVolumeError("folder nesting is too deep")
+		seen.add(folder_id)
 		os.makedirs(destination, exist_ok=True)
 		for entry in sorted(self.children.get(folder_id, []),
 				key=lambda item: item["name"].casefold()):
@@ -151,7 +160,7 @@ class _Volume:
 				continue
 			target = os.path.join(destination, name)
 			if entry["folder"]:
-				self._copy_folder(entry["id"], target, merge)
+				self._copy_folder(entry["id"], target, merge, seen)
 				continue
 			if not merge or not os.path.exists(target):
 				with open(target, "wb") as stream:
@@ -162,6 +171,7 @@ class _Volume:
 				os.makedirs(forks, exist_ok=True)
 				with open(os.path.join(forks, name), "wb") as stream:
 					stream.write(resource)
+		seen.remove(folder_id)
 
 
 class HFSVolume(_Volume):
@@ -392,6 +402,9 @@ def open_volume(path):
 					return volume
 			raise MacVolumeError("no HFS volume in the partition map")
 		raise MacVolumeError("not an HFS or HFS+ volume")
+	except (IndexError, UnicodeDecodeError, struct.error) as error:
+		stream.close()
+		raise MacVolumeError("invalid disk image: " + str(error)) from error
 	except Exception:
 		stream.close()
 		raise

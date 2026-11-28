@@ -70,6 +70,19 @@ meson test -C build system-shellcheck --print-errorlogs
 The Python helpers (disks, APFS, modules) are out of scope for ShellCheck.
 Argument-level tests for each helper are still to come.
 
+## Disk image readers
+
+The Theme Installer reads HFS and HFS+ images with `tools/mac-hfs.py`, a
+small pure-Python reader of the catalog and fork B-trees. It only reads the
+image and never writes to it. The `mac-hfs-malformed` test feeds it
+truncated images, an out-of-range B-tree record offset, a folder-ID loop and
+deterministic bit flips; every case must end in a clean error or a valid
+listing, never a traceback or a hang. The reader refuses unsafe file names,
+folder loops and excessive folder nesting.
+
+The APFS reader in `zacos9-mac-mount` is the root helper described under
+CVE-2026-111133 below.
+
 ## Release integrity
 
 Every release publishes a CycloneDX 1.6 SBOM, `zacos9-<version>.cdx.json`,
@@ -160,9 +173,8 @@ when it lands.
 
 ## What is not covered yet
 
-- The HFS and HFS+ readers are Python helpers around Debian libraries; the
-  APFS reader has malformed-image tests, and fuzzing all of them remains a
-  target.
+- The HFS/HFS+ reader has the malformed-image tests above; a longer fuzzing
+  corpus remains. The APFS reader runs in the bounded child above.
 - Wayland protocol parsing is wlroots' code; report those issues upstream.
 - The root helpers pass ShellCheck, but argument-level tests for each
   helper are still to come.
