@@ -120,6 +120,10 @@ target-only builds), see [Build speed](docs/build-speed.md).
 - `tests/ui/*.sh` are visual checks, not pass or fail: run one with
   `scripts/snapshot.sh /tmp/out.png 3 'sh tests/ui/finder-drag.sh'` and look
   at the screenshots; each script's header says what to expect.
+- **Sanitizers and fuzzing:** build with
+  `-Db_sanitize=address,undefined`, or with `-Dfuzz=true` and Clang for the
+  AFP parser fuzzer. [Security hardening](docs/security.md) has the commands
+  and the dependency issues being tracked.
 
 Two checks look after the build itself (see
 [`tests/baseline/`](tests/baseline/README.md)):
