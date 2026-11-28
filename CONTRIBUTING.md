@@ -127,6 +127,9 @@ target-only builds), see [Build speed](docs/build-speed.md).
 - **ShellCheck:** `system-shellcheck` checks the privileged helpers under
   `system/`; install `shellcheck` (or run `apt build-dep ./`) and run
   `meson test -C build system-shellcheck`.
+- **Reproducible packages:** `scripts/check-reproducible.sh` builds the
+  package twice and compares the hashes. It takes two full builds; CI runs
+  it weekly and on release tags.
 
 Two checks look after the build itself (see
 [`tests/baseline/`](tests/baseline/README.md)):

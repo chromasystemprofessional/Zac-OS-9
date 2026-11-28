@@ -1,6 +1,6 @@
 # Project status
 
-Updated: 2026-11-27. Latest release: **1.18.35**
+Updated: 2026-11-28. Latest release: **1.18.35**
 ([releases](https://github.com/chromasystemprofessional/Zac-OS-9/releases),
 [ISO](https://sourceforge.net/projects/zac-os-9/files/)).
 
@@ -24,6 +24,10 @@ This page is what's true now and what's next. What changed and when is in
 - **Releases carry their own inventory.** Every release publishes a
   CycloneDX SBOM beside the packages and `SHA256SUMS` signed with the archive
   key, so a download can be checked before it is installed
+  ([Security hardening](docs/security.md)).
+- **The Debian packages build reproducibly.** Two builds of the same tree in
+  different directories produce identical `.deb` hashes, including the
+  debug-symbol packages; CI checks it weekly and on release tags
   ([Security hardening](docs/security.md)).
 - **Removable media is built**: data and audio CDs/DVDs, blank discs, PC and
   USB floppy drives, Iomega Zip/Jaz, generic and Mac disk images,
