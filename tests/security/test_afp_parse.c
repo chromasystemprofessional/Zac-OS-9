@@ -142,7 +142,7 @@ static void test_list(void) {
 
 static void test_malformed_loop(void) {
 	uint32_t state = 0x9e3779b9;
-	uint8_t data[512];
+	uint8_t data[512] = { 0 };
 	for (size_t len = 0; len <= sizeof(data); len++) {
 		for (size_t i = 0; i < len; i++) {
 			state = state * 1664525u + 1013904223u;
