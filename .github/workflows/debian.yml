@@ -109,15 +109,22 @@ jobs:
           cd /tmp/zacos9-debian/source
           runuser -u builder -- sh packaging/emulators/build-deb.sh
 
-      - name: Collect packages and checksums
+      - name: Collect packages, SBOM and checksums
         run: |
           mkdir -p ci-artifacts
           cp /tmp/zacos9-debian/zacos9*.deb ci-artifacts/
           cp /tmp/zacos9-debian/source/build/packages/zacos9-emulators_*.deb \
             /tmp/zacos9-debian/source/build/packages/zacos9-emulators_*.source.tar.gz \
             ci-artifacts/
+          version=$(dpkg-parsechangelog -S Version)
+          SOURCE_DATE_EPOCH=$(dpkg-parsechangelog -S Timestamp) \
+            python3 scripts/build-sbom.py --version "$version" \
+              --release-url "https://github.com/${GITHUB_REPOSITORY}/releases/tag/${GITHUB_REF_NAME}" \
+              ci-artifacts/zacos9*.deb \
+              ci-artifacts/zacos9-emulators_*.source.tar.gz \
+              > "ci-artifacts/zacos9-$version.cdx.json"
           cd ci-artifacts
-          for file in *.deb *.source.tar.gz; do
+          for file in *.deb *.source.tar.gz *.cdx.json; do
             [ -f "$file" ] || continue
             case $file in *-dbgsym_*.deb) continue ;; esac
             sha256sum "$file"
@@ -162,6 +169,7 @@ jobs:
             ci-artifacts/zacos9-greeter_*.deb
             ci-artifacts/zacos9-emulators_*.deb
             ci-artifacts/zacos9-emulators_*.source.tar.gz
+            ci-artifacts/zacos9-*.cdx.json
             ci-artifacts/SHA256SUMS
           tag_name: ${{ github.ref_name }}
           name: "ZacOS 9 ${{ github.ref_name }}"
@@ -286,6 +294,21 @@ jobs:
             \( -name '*.deb' -o -name '*.source.tar.gz' \) \
             -exec cp -t repo-packages {} +
           scripts/build-repo.sh --packages repo-packages --output repo-out
+
+      # The release's SHA256SUMS covers the packages and the SBOM. Sign it
+      # with the same archive key as the repository, and attach the signature
+      # beside it: a download can then be checked end to end before install.
+      - name: Sign the release checksums
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ZACOS9_REPO_GPG_PASSPHRASE: ${{ secrets.ZACOS9_REPO_GPG_PASSPHRASE }}
+        run: |
+          gpg --batch --yes --pinentry-mode loopback \
+            --passphrase "$ZACOS9_REPO_GPG_PASSPHRASE" \
+            --local-user "$ZACOS9_REPO_KEY" --armor --detach-sign \
+            --output SHA256SUMS.asc packages/SHA256SUMS
+          gh release upload "$GITHUB_REF_NAME" SHA256SUMS.asc --clobber
 
       - name: Publish the repository branch
         env:

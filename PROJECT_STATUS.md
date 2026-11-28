@@ -21,6 +21,10 @@ This page is what's true now and what's next. What changed and when is in
   bubblewrap sandbox by default: the Classic folder is the Mac's Unix volume,
   the rest of the home is hidden, and the guest has no network or GPU unless
   asked for.
+- **Releases carry their own inventory.** Every release publishes a
+  CycloneDX SBOM beside the packages and `SHA256SUMS` signed with the archive
+  key, so a download can be checked before it is installed
+  ([Security hardening](docs/security.md)).
 - **Removable media is built**: data and audio CDs/DVDs, blank discs, PC and
   USB floppy drives, Iomega Zip/Jaz, generic and Mac disk images,
   single-data-track CUE/BIN images, one eject path, and VLC AutoPlay

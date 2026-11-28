@@ -93,16 +93,29 @@ after the package job passes:
 2. import the signing key;
 3. clone the current `repo` branch and copy its old packages aside;
 4. run `scripts/build-repo.sh`;
-5. replace the branch's contents with the new repository and push.
+5. sign the release's `SHA256SUMS` and upload `SHA256SUMS.asc` to the
+   GitHub release;
+6. replace the branch's contents with the new repository and push.
 
 One-time setup: enable GitHub Pages for the repository, with **Deploy from a
 branch**, branch `repo`, folder `/ (root)`. The site is then
 `https://OWNER.github.io/REPO/`. Do not protect the `repo` branch; CI writes
 it. The first tag creates it.
 
-If the signing secret is missing, the job fails before it publishes anything.
-The package job still publishes the GitHub release assets, so the two paths
-are independent.
+## Release assets
+
+The GitHub release carries more than the repository branch: the packages,
+the emulators' GPL source, a CycloneDX SBOM (`zacos9-<version>.cdx.json`)
+and `SHA256SUMS` with `SHA256SUMS.asc`, a detached signature made with the
+archive key above. The SBOM and signature are release assets, not part of
+the `repo` branch. `scripts/release.sh` writes and signs them for a local
+release; the `repo` job signs the `v*` assets again from the tested
+artifacts. [docs/security.md](security.md) has the verification commands.
+
+If the signing secret is missing, the job fails before it publishes anything,
+and the release is left with the package job's unsigned assets. Fix the
+secret and re-run the tag's workflow to sign `SHA256SUMS` and publish the
+repository.
 
 ## Using it
 
