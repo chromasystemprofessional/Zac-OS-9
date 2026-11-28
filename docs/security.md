@@ -43,6 +43,18 @@ enumerate parsers. Add the failing bytes to `test_afp_parse.c` when a crash
 is fixed; the deterministic `afp-parse` test is the fast gate that runs in
 the normal package build.
 
+## Classic emulation
+
+Classic Mac OS has no memory protection, cooperative multitasking and an
+old network stack. `zacos9-classic` runs SheepShaver and Basilisk II in a
+bubblewrap sandbox by default: the `Classic` folder is the Mac's Unix
+volume (read-write), the rest of the home is hidden, the emulator gets a
+private `HOME`, and the guest has no network or GPU unless `--network` or
+`--gpu` is given. `--unsandboxed` runs without bubblewrap (network on by
+default); `classic.conf` accepts `sandbox=`, `network=` and `gpu=`. The
+`classic-sandbox` test checks that a guest cannot read `~/.ssh` or the
+desktop's settings.
+
 ## Known dependency issues
 
 ### CVE-2026-121604: wlroots Xwayland `WM_CLASS` over-read

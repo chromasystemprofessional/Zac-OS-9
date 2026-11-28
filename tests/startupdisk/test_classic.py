@@ -43,7 +43,7 @@ with tempfile.TemporaryDirectory() as d:
     conf = home / ".config" / "zacos9" / "classic.conf"
     conf.parent.mkdir(parents=True)
     env = {k: v for k, v in os.environ.items() if not k.startswith(("XDG_", "ZACOS9_"))}
-    env.update(HOME=str(home), ZACOS9_EMULATORS=str(emulators))
+    env.update(HOME=str(home), ZACOS9_EMULATORS=str(emulators), ZACOS9_CLASSIC_SANDBOX="no")
 
     def run(*args, env=env):
         r = subprocess.run([launcher, *args], env=env, capture_output=True, text=True, timeout=30)

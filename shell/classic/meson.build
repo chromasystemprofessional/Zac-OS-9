@@ -16,6 +16,11 @@ test('classic-open', find_program('python3'),
   args: [files('../../tests/classic/test_open.py'), files('zacos9-classic')],
   env: ['PYTHONDONTWRITEBYTECODE=1'],
 )
+test('classic-sandbox', find_program('python3'),
+  args: [files('../../tests/classic/test_sandbox.py'), files('zacos9-classic')],
+  env: ['PYTHONDONTWRITEBYTECODE=1'],
+  timeout: 60,
+)
 test('emulator-build-paths', find_program('sh'),
   args: [files('../../tests/emulation/test_build_emulators.sh'),
          files('../../emulation/build-emulators.sh')],

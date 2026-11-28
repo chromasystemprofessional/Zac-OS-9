@@ -2,6 +2,7 @@
 # zacos9-classic: run classic Mac OS in an emulator window.
 #
 #   zacos9-classic [--check] [--68k] [--fullscreen|--windowed] [--disk IMAGE]... [--open APP]
+#                   [--sandbox|--unsandboxed] [--network] [--gpu]
 #
 # The screen fills the desktop at its resolution when the compositor's
 # output list can be read; --windowed (or "screen=window" in classic.conf)
@@ -13,9 +14,16 @@
 # partition-map signature, so file names don't matter.
 #
 # PowerPC (SheepShaver, Mac OS 7.5.2 to 9.0.4) is the default; --68k uses
-# Basilisk II (System 7 to Mac OS 8.1). The home folder is shared with
+# Basilisk II (System 7 to Mac OS 8.1). The Classic folder is shared with
 # the Mac as the "Unix" volume. --check only reports what would run;
 # problems go to stderr, one line, with exit status 2.
+#
+# The emulator runs in a bubblewrap sandbox by default: the Classic folder
+# and the open-request queue are writable, the rest of the home is hidden,
+# the emulator gets a private HOME for its preferences, and the guest has no
+# network or GPU unless asked for. --unsandboxed runs without bubblewrap;
+# network is then on by default, and the Mac still sees the Classic folder
+# as its Unix volume. classic.conf accepts sandbox=, network= and gpu=.
 #
 # --open APP asks the running (or newly started) Mac to open a Classic
 # application from the shared Unix volume. A running session accepts further
@@ -36,6 +44,17 @@ extra_disks=""
 fullscreen=auto
 open_path=""
 queue_root=$HOME/zacos9-classic
+sandbox=${ZACOS9_CLASSIC_SANDBOX:-auto}
+sandbox_network=${ZACOS9_CLASSIC_NETWORK:-auto}
+sandbox_gpu=${ZACOS9_CLASSIC_GPU:-auto}
+
+conf_value() {
+	sed -n "s/^$1=//p" "$classic_conf" 2>/dev/null | tail -n 1
+}
+
+case $(conf_value sandbox) in yes|no|auto) sandbox=$(conf_value sandbox) ;; esac
+case $(conf_value network) in yes|no|auto) sandbox_network=$(conf_value network) ;; esac
+case $(conf_value gpu) in yes|no|auto) sandbox_gpu=$(conf_value gpu) ;; esac
 
 while [ $# -gt 0 ]; do
 	case $1 in
@@ -43,10 +62,16 @@ while [ $# -gt 0 ]; do
 	--68k) arch=68k ;;
 	--fullscreen) fullscreen=yes ;;
 	--windowed) fullscreen=no ;;
-	--disk) [ $# -ge 2 ] || { echo "usage: zacos9-classic [--check] [--68k] [--fullscreen|--windowed] [--disk IMAGE]... [--open APP]" >&2; exit 64; }; shift; extra_disks="$extra_disks
+	--sandbox) sandbox=yes ;;
+	--unsandboxed) sandbox=no ;;
+	--network) sandbox_network=yes ;;
+	--no-network) sandbox_network=no ;;
+	--gpu) sandbox_gpu=yes ;;
+	--no-gpu) sandbox_gpu=no ;;
+	--disk) [ $# -ge 2 ] || { echo "usage: zacos9-classic [--check] [--68k] [--fullscreen|--windowed] [--disk IMAGE]... [--open APP] [--sandbox|--unsandboxed] [--network] [--gpu]" >&2; exit 64; }; shift; extra_disks="$extra_disks
 $1" ;;
-	--open) [ $# -ge 2 ] || { echo "usage: zacos9-classic [--check] [--68k] [--fullscreen|--windowed] [--disk IMAGE]... [--open APP]" >&2; exit 64; }; shift; open_path=$1 ;;
-	*) echo "usage: zacos9-classic [--check] [--68k] [--fullscreen|--windowed] [--disk IMAGE]... [--open APP]" >&2; exit 64 ;;
+	--open) [ $# -ge 2 ] || { echo "usage: zacos9-classic [--check] [--68k] [--fullscreen|--windowed] [--disk IMAGE]... [--open APP] [--sandbox|--unsandboxed] [--network] [--gpu]" >&2; exit 64; }; shift; open_path=$1 ;;
+	*) echo "usage: zacos9-classic [--check] [--68k] [--fullscreen|--windowed] [--disk IMAGE]... [--open APP] [--sandbox|--unsandboxed] [--network] [--gpu]" >&2; exit 64 ;;
 	esac
 	shift
 done
@@ -67,10 +92,10 @@ map_open_path() {
 	esac
 	[ -f "$open_path" ] || fail "The Classic application \"$open_path\" was not found."
 	case $open_path in
-	"$HOME"/*) ;;
-	*) fail "Classic applications must be in your home folder to open directly. Put this one in the Mac's Unix volume, or open it inside the Mac." ;;
+	"$classic_dir"/*) ;;
+	*) fail "Classic applications must be in the Classic folder to open directly. Put this one in $(basename "$classic_dir"), or open it inside the Mac." ;;
 	esac
-	rel=${open_path#"$HOME"/}
+	rel=${open_path#"$classic_dir"/}
 	case $rel in
 	''|*:*) fail "The Classic application's name contains a colon, which the Mac cannot use in a path. Rename it and try again." ;;
 	esac
@@ -261,6 +286,41 @@ else
 fi
 exe=$(emulator $program) || fail "$program isn't installed. The ZacOS 9 ISO includes it; from a source checkout, build it with emulation/build-emulators.sh."
 
+# The guest is a classic Mac with no memory protection and an old network
+# stack. Run it in a bubblewrap sandbox by default: the Classic folder and
+# the open-request queue are writable, the rest of the home is hidden, and
+# the guest has no network or GPU unless asked for. --unsandboxed runs
+# without bubblewrap; network is then on by default.
+case $sandbox in 0|false) sandbox=no ;; 1|true) sandbox=yes ;; esac
+use_sandbox=false
+case $sandbox in
+yes|auto)
+	if command -v bwrap >/dev/null 2>&1 &&
+			bwrap --unshare-all --ro-bind / / -- /bin/true 2>/dev/null; then
+		use_sandbox=true
+	elif [ "$sandbox" = yes ]; then
+		fail "The Classic sandbox needs bubblewrap, but bwrap isn't available or user namespaces are disabled. Install bubblewrap or run with --unsandboxed."
+	else
+		echo "Classic: bubblewrap isn't available; running without the sandbox. Install bubblewrap, or pass --unsandboxed to silence this." >&2
+	fi
+	;;
+no) ;;
+*) fail "sandbox must be yes, no or auto in classic.conf." ;;
+esac
+network=false
+gpu=false
+case $sandbox_network in
+yes) network=true ;;
+no) network=false ;;
+auto) if ! $use_sandbox; then network=true; fi ;;
+*) fail "network must be yes, no or auto in classic.conf." ;;
+esac
+case $sandbox_gpu in
+yes) gpu=true ;;
+no|auto) gpu=false ;;
+*) fail "gpu must be yes, no or auto in classic.conf." ;;
+esac
+
 disks=$(printf '%s\n%s\n' "$extra_disks" "$(find_disks)" | grep . | awk '!seen[$0]++' || true)
 
 # The chosen startup disk, if it is still there, goes first.
@@ -329,6 +389,10 @@ if $check; then
 	echo "$disks" | sed -n 's/^./disk: &/p'
 	[ -z "$startup" ] || echo "startup: $startup"
 	echo "screen: $screen"
+	if $use_sandbox; then sandbox_label=bwrap; else sandbox_label=no; fi
+	if $network; then network_label=yes; else network_label=no; fi
+	if $gpu; then gpu_label=yes; else gpu_label=no; fi
+	echo "sandbox: $sandbox_label (network: $network_label, gpu: $gpu_label)"
 	[ -n "$disks" ] || echo "disks: none (the Mac will wait for a startup disk)"
 	[ -z "$open_path" ] || echo "open: $open_path -> Unix:$guest_path"
 	exit 0
@@ -373,13 +437,16 @@ else
 fi
 start_window_viewer
 
-set -- --rom "$rom" --ramsize $ram --screen "$screen" --extfs "$HOME" --nogui true
+set -- --rom "$rom" --ramsize $ram --screen "$screen" --extfs "$classic_dir" --nogui true
 # A network through the emulator's own NAT: the Mac gets an address by DHCP
 # and reaches this computer at 10.0.2.2 (its file sharing too, in the
 # Chooser or Network Browser). This computer reaches the Mac's file
 # sharing at localhost:5548 (host port, then the Mac's address, left empty
-# for its own 10.0.2.15, then its port).
-set -- "$@" --ether slirp --redir tcp:5548::548
+# for its own 10.0.2.15, then its port). The sandbox has no network by
+# default; --network (or network=yes in classic.conf) turns it back on.
+if $network; then
+	set -- "$@" --ether slirp --redir tcp:5548::548
+fi
 # Hard disks first, so the Mac starts up from an installed system and
 # only falls back to a CD; CD images are read-only ("*" prefix).
 old_ifs=$IFS
@@ -414,4 +481,49 @@ fi
 if [ "$program" = SheepShaver ]; then
 	set -- "$@" --nosound true
 fi
-SDL_VIDEODRIVER=x11 SDL_AUDIODRIVER=${SDL_AUDIODRIVER:-dummy} exec "$exe" "$@"
+
+if $use_sandbox; then
+	home=$HOME
+	sandbox_home=$home/.config/zacos9/classic-home
+	mkdir -p "$sandbox_home"
+	auth=${XAUTHORITY:-$home/.Xauthority}
+	if [ -r "$auth" ]; then
+		cp "$auth" "$runtime/.Xauthority"
+	else
+		: > "$runtime/.Xauthority"
+	fi
+	chmod 600 "$runtime/.Xauthority"
+	if $network; then net_arg=--share-net; else net_arg=--unshare-net; fi
+	if $gpu; then gpu_arg="--dev-bind-try /dev/dri /dev/dri"; else gpu_arg=""; fi
+	export HOME="$sandbox_home"
+	export XAUTHORITY=/tmp/.Xauthority
+	export TMPDIR=/tmp
+	export SDL_VIDEODRIVER=x11
+	export SDL_AUDIODRIVER=${SDL_AUDIODRIVER:-dummy}
+
+	run_sandboxed() {
+		# $@ is the emulator command. The Classic folder is the Mac's
+		# Unix volume; the rest of the home is a private tmpfs, so the
+		# guest cannot read ~/.ssh or the desktop's settings. The queue
+		# and the emulator's private HOME are mounted back in.
+		exec bwrap \
+			--ro-bind / / \
+			--dev /dev \
+			--proc /proc \
+			--tmpfs /tmp \
+			--ro-bind-try /tmp/.X11-unix /tmp/.X11-unix \
+			--ro-bind "$runtime/.Xauthority" /tmp/.Xauthority \
+			--tmpfs /run/user \
+			--tmpfs "$home" \
+			--bind "$classic_dir" "$classic_dir" \
+			--bind "$queue_root" "$queue_root" \
+			--bind "$sandbox_home" "$sandbox_home" \
+			--ro-bind-try "$(dirname "$exe")" "$(dirname "$exe")" \
+			--unshare-all $net_arg $gpu_arg \
+			--die-with-parent --new-session --cap-drop ALL \
+			--chdir "$classic_dir" \
+			-- "$@" || fail "Couldn't start the Classic sandbox."
+	}
+	run_sandboxed "$exe" "$@"
+fi
+exec "$exe" "$@"
